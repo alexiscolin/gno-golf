@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, drawn, rbox, windNow, share, texOf, fadeable, setFade, fadeLoop } from "./materials.js";
+import { C, ink, flat, drawn, grows, sway, rbox, windNow, share, texOf, fadeable, setFade, fadeLoop } from "./materials.js";
 import { animate } from "./state.js";
 import { timeOf } from "./camera.js";
 import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, brolly, mailbox, signpost, hill, house, pond, puddle, fence, mushroom, tuft, bunting, butterfly } from "./props.js";
@@ -491,11 +491,20 @@ function giants({ rand, X0, X1, reserve, free, W, H }) {
     if (!free(x, z, 0.8)) continue;
     reserve(x, z, 0.8);
     const h = 3 + rand() * 1.5;
-    const stem = drawn(new THREE.CylinderGeometry(0.06, 0.09, h, 6), flat(C.leafDark));
-    stem.position.set(x, GRASS + h / 2, z);
+    // one plant: a stem tapering up to a small receptacle, the seed spokes
+    // radiating from it; all on the one sway, from its foot, so the head
+    // never floats off the stem. Lit like the rest (toon), not glowing at night
+    const dand = new THREE.Group();
+    dand.position.set(x, GRASS, z);
+    dand.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
+    dand.userData.flex = 0.7; // a thin stem: it bends, but less than grass
+    const stem = grows(new THREE.CylinderGeometry(0.035, 0.09, h, 6), C.leafDark);
+    stem.position.y = h / 2;
+    const cup = grows(new THREE.SphereGeometry(0.11, 8, 6), C.leafDark);
+    cup.position.y = h;
     const puff = new THREE.Group();
-    puff.position.set(x, GRASS + h + 0.7, z);
-    const seed = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+    puff.position.y = h + 0.04;
+    const seed = sway(0xf4f1ea);
     for (let q = 0; q < 40; q++) {
       const d = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize();
       const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.7, 3), seed);
@@ -505,7 +514,8 @@ function giants({ rand, X0, X1, reserve, free, W, H }) {
       tip.position.copy(d).multiplyScalar(0.72);
       puff.add(sp, tip);
     }
-    g.add(stem, puff);
+    dand.add(stem, cup, puff);
+    g.add(dand);
   }
   // a ladybird on a leaf, on the left
   const lx = X0 + 2, lz = 1 + rand() * Math.max(1, H - 2);
