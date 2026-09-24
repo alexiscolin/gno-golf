@@ -1,0 +1,20 @@
+Gnogolf promo: credits
+
+Music
+  "Dizzy Racing" by Zane Little Music
+  https://opengameart.org/content/dizzy-racing
+  File: https://opengameart.org/sites/default/files/dizzy_racing.wav
+  Licence: CC0 1.0 Universal (public domain dedication), as stated on the page
+  https://creativecommons.org/publicdomain/zero/1.0/
+  No attribution is required; credited here anyway.
+  Used: 104.53 s to the end of the track (30 s), with a short fade-in.
+  Kept here losslessly as music/dizzy_racing.flac (converted from the original WAV).
+
+  FreePD.com was the first choice but the site has closed (checked 2026-09-24),
+  so the track comes from OpenGameArt's CC0 section instead.
+
+Sound effects
+  The game's own synthesised sounds (web/lib/feel.js), recorded from the capture.
+
+Visuals
+  Gnogolf itself, captured from the web client in promo mode (web/lib/promo.js).

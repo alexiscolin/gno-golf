@@ -1,4 +1,5 @@
-// Package town3 is a street into the square, and the cup behind the fountain in its middle.
+// Package town3 is a street into the square, and the cup behind the fountain in its middle,
+// between two street lamps.
 package town3
 
 import (
@@ -18,10 +19,17 @@ var me = course.Fit(&course.Simple{
 	Substeps:  24,
 	CupRadius: 1.2,
 
+	// the houses round the square keep the worst of the wind off it
+	Shelter: 0.08,
 	Course: &physics.Field{
 		Walls: physics.Walls(
 			physics.Outline(physics.Keyhole(0, 6, physics.V(31, 8), 7, 5)...),
 		),
+		// two street lamps by the cup, one each side of the way round the fountain
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(35.5, 10.8), R: 0.35}, Bounce: 0.9, Skin: "lamp"},
+			{Circle: physics.Circle{C: physics.V(35.5, 5.2), R: 0.35}, Bounce: 0.9, Skin: "lamp"},
+		},
 		Zones: []physics.Zone{
 			{Kind: physics.Hazard, Min: physics.V(28.7, 5.7), Max: physics.V(33.3, 10.3), Vec: physics.V(24, 8), Round: true, Skin: "fountain"},
 		},

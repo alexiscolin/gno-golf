@@ -9,14 +9,31 @@ import * as THREE from "three";
 import { buzz, sound, ambience } from "./feel.js";
 import { makeWeather } from "./scene/weather.js";
 import { makeCauses, causeAt } from "./scene/cause.js";
+import { behind, chaseState } from "./chase.js";
 import { loadWorld } from "./scene/worlds.js";
 import { makeChain, shotOf, pullShot } from "./chain.js";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, makeBall, makeAim, aimAlong, at,
-  courseBox, overviewRig, focusRig, applyRig, easeRig, makeBand, bandTo, gnomeById, makeConfetti, makeSplash, disposeCourse, setTime, buildExtras, setLighting,
+  courseBox, overviewRig, focusRig, applyRig, makeBand, bandTo, gnomeById, makeConfetti, makeSplash, disposeCourse, setTime, buildExtras, setLighting,
 } from "./scene.js";
 import { BALL_R, inZone } from "./terrain.js";
+import { promo } from "./promo.js";
 
+// How much the aim dots give away, by aim mode. Assisted: the chain's whole
+// path, as far as the pull is strong (2 + power × 1.6 units). Pro: no line at
+// all — the elastic and the gnome turning along it are the direction, like a
+// real putter — and the chain is not asked. ("first-contact" is kept for a
+// middle mode: up to the first thing the ball meets, maxLen units at most.)
+// Rounds of each mode are ranked apart on the chain.
+export const PREVIEWS = {
+  assisted: { stopAt: "none", maxLen: Infinity },
+  pro: { stopAt: "hidden", maxLen: 0 },
+};
+// in pro, aimAlong is given the power that makes its reach maxLen (and the
+// dots' size), the same whatever the pull
+const proPower = (p) => Math.min(10, ((p.maxLen - 2) / 16) * 10 + 0.5);
+
+const FOLLOW_CLOSER = 0.7; // the follow camera, nearer the gnome than the rig frames it
 const MS_PER_STEP = 72; // one path segment is one substep: a constant slice of time
 const MAX_POWER = 10;
 const MAX_SHOTS = 12; // the realm's limit for one committed round
@@ -28,7 +45,7 @@ const SHOW_SPEED = 26;
 const HUD = { top: 108, bottom: 136, side: 14 };
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
 
-export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather = "", onChange = () => {}, onHoled = () => {} } = {}) {
+export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather = "", aimMode = "assisted", camMode = "classic", onChange = () => {}, onHoled = () => {} } = {}) {
   const chain = makeChain({ rpc, web });
 
   const renderer = makeRenderer(canvas);
@@ -49,6 +66,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     fakeWeather.includes("rain") && { skin: "rain", vec: [0, 0] },
     fakeWeather.includes("fog") && { skin: "fog", vec: [0, 0] },
     fakeWeather.includes("storm") && { skin: "storm", vec: [0, 0] },
+    fakeWeather.includes("snow") && { skin: "snow", vec: [0, 0] },
   ].filter(Boolean);
   // near 3, far 260: the whole of any cup's scenery (measured, 210 at most on the
   // island overview, and the lean) with three times the depth precision of
@@ -56,41 +74,6 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   const camera = new THREE.PerspectiveCamera(30, 1, 3, 260);
   let ball = makeBall(gnomeById(gnome));
   const aim = makeAim();
-  // The direction, drawn here the instant you pull and whatever the chain is
-  // doing: a short arrow from the ball, as long as the pull is strong. The
-  // chain's dots then show where the ball really goes. Drawn over everything
-  // (rain, fog, the ground), so the player is never without a direction.
-  const arrow = (() => {
-    const g = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
-    const edge = new THREE.MeshBasicMaterial({ color: 0x16433a, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false });
-    const shaft = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.22), mat);
-    const shaftEdge = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.36), edge);
-    const tri = new THREE.Shape([new THREE.Vector2(0, 0.42), new THREE.Vector2(0.62, 0), new THREE.Vector2(0, -0.42)]);
-    const triEdge = new THREE.Shape([new THREE.Vector2(-0.08, 0.56), new THREE.Vector2(0.78, 0), new THREE.Vector2(-0.08, -0.56)]);
-    const head = new THREE.Mesh(new THREE.ShapeGeometry(tri), mat), headEdge = new THREE.Mesh(new THREE.ShapeGeometry(triEdge), edge);
-    for (const m of [shaftEdge, headEdge]) m.renderOrder = 20;
-    for (const m of [shaft, head]) m.renderOrder = 21;
-    g.add(shaftEdge, shaft, headEdge, head);
-    g.rotation.x = -Math.PI / 2; // lies flat, x along the shot
-    const pivot = new THREE.Group();
-    pivot.add(g);
-    pivot.visible = false;
-    pivot.userData = { shaft, shaftEdge, head, headEdge };
-    return pivot;
-  })();
-  scene.add(arrow);
-  function pointArrow() {
-    if (!g.aiming || !(shot.power > 0.05) || !g.ball) return void (arrow.visible = false);
-    const len = 1.2 + (shot.power / MAX_POWER) * 3.8;
-    const { shaft, shaftEdge, head, headEdge } = arrow.userData;
-    shaft.scale.x = shaftEdge.scale.x = len;
-    shaft.position.x = shaftEdge.position.x = 0.7 + len / 2;
-    head.position.x = headEdge.position.x = 0.7 + len;
-    arrow.position.set(g.ball.x, BALL_R + ground(g.ball.x, g.ball.y) - 0.35, g.ball.y);
-    arrow.rotation.y = -shot.angle;
-    arrow.visible = true;
-  }
   const band = makeBand();
   scene.add(ball, aim, band);
   let confetti = null;
@@ -154,6 +137,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       error: g.error,
       weather: g.weather || null, // { wind: [x, y] | null, rain, fog, storm } for the HUD
       flash: g.flash || 0,
+      mode, // the aim mode set now
+      cam: g.cam,
+      roundMode: g.roundMode || null, // the mode this round is played in, from its first stroke
       period: g.period == null ? null : g.period, // the round's weather quarter hour: what a record is played in
       cause: g.cause || null, // a word on why the ball speeds up or drifts, once a shot
       note: g.note || null, // a word on how the shot went
@@ -238,10 +224,475 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       return leant;
     }
     // in flight, follow the ball; at rest, keep the cup in the picture too
-    if (g.flying || !g.s) return focusRig(ball.position, g.over, screen(), null, focus);
+    if (g.flying || !g.s) {
+      const r = focusRig(ball.position, g.over, screen(), null, focus);
+      r.dist *= FOLLOW_CLOSER;
+      return r;
+    }
     cupAt.set(g.s.cup[0], ball.position.y, g.s.cup[1]);
-    return focusRig(ball.position, g.over, screen(), cupAt, focus);
+    // following the gnome: 30 % closer than the rig's own framing, the cup
+    // still leaned toward; tall decor in the way is faded by the canopy
+    const r = focusRig(ball.position, g.over, screen(), cupAt, focus);
+    r.dist *= FOLLOW_CLOSER;
+    return r;
   }
+
+  // ------------------------------------------------------------ the camera
+  //
+  // One controller. A MODE says where the camera wants to be — classic (the
+  // rig on the gnome), far (the whole hole, high and wide), third person (low
+  // behind the gnome) — for the STATE the game is in: at rest, aiming, the
+  // replay, a tube, the hole won. Each frame the mode gives a target pose
+  // (position, look-at point, lens, view offset) and one smoother brings the
+  // real camera to it: critically damped springs, so a mode change, a state
+  // change or a new hole always eases from the pose the camera actually has
+  // (about half a second), never from a stale one and never with overshoot.
+  g.cam = ["classic", "far", "third"].includes(camMode) ? camMode : "classic";
+  const home = () => (g.cam === "far" ? "overview" : "ball");
+  // holed: from when the winning ball is near the cup (not from the stroke's start: it has to roll there first)
+  const nearCup = () => g.s && Math.hypot(ball.position.x - g.s.cup[0], ball.position.z - g.s.cup[1]) < 2.5;
+  const camState = () => (g.holed || (g.done && nearCup()) ? "holed" : g.inTube ? "tube" : g.flying ? "replay" : dragging || g.aiming ? "aiming" : "rest");
+  // the target pose, and the springs' own state (position, look-at, lens, offset)
+  const want = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 30, oy: 0, near: 3, far: 260 };
+  const sp = { pos: new THREE.Vector3(), vp: new THREE.Vector3(), look: new THREE.Vector3(), vl: new THREE.Vector3(), fov: 30, vf: 0, oy: 0, vo: 0, live: false };
+  const rigCam = new THREE.PerspectiveCamera(30, 1, 3, 260); // where the rig would put the camera
+  const _d = new THREE.Vector3();
+  // x'' = ω²(x* − x) − 2ωx': critically damped, settled in ~4.7/ω seconds
+  function springV(x, v, target, w, dt) {
+    _d.subVectors(target, x).multiplyScalar(w * w).addScaledVector(v, -2 * w);
+    v.addScaledVector(_d, dt);
+    x.addScaledVector(v, dt);
+  }
+  function springN(x, v, target, w, dt) {
+    const a = w * w * (target - x) - 2 * w * v;
+    v += a * dt;
+    return [x + v * dt, v];
+  }
+  let lastMode = null;
+  // the third-person follow's own state, reset whenever the mode or the hole changes
+  const chase = chaseState(), cdir = new THREE.Vector3(1, 0, 0), prevB = new THREE.Vector3(), vel = new THREE.Vector3(), inst = new THREE.Vector3();
+  let yaw = 0, wide = 0, hold = 0, rise = 0, swing = 0, swingTo = 0, swingTick = 0, pen = 0, fresh = true, urgent = false;
+  const resetFollow = () => ((fresh = true), (wide = hold = rise = swing = 0), vel.set(0, 0, 0));
+  const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  const ndcB = new THREE.Vector3(), ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3(), camLog = [];
+  let sightOk = true, sightTick = 0, clearTick = 0;
+  const lensWho = {};
+  const rawPos = new THREE.Vector3(), push = new THREE.Vector3();
+  // where the ball is when the course hides it on purpose (a tube, a tunnel): a ring over everything
+  const marker = new THREE.Mesh(
+    new THREE.RingGeometry(0.55, 0.75, 28),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false })
+  );
+  marker.renderOrder = 30;
+  marker.visible = false;
+  scene.add(marker);
+
+  // Where the course goes next from a point: a distance field over the green
+  // cells, from the cup (made once per hole), walked downhill a few cells —
+  // so on a lane that doubles back the camera faces the next stretch, not
+  // the cup across the rough.
+  let field = null;
+  function courseField() {
+    const t = g.course && g.course.userData.terrain;
+    if (!t || !g.s) return null;
+    if (field && field.id === g.id) return field;
+    const { nx, nz, idx, green } = t, CELLS = 0.5;
+    const dist = new Float32Array(nx * nz).fill(Infinity), q = new Int32Array(nx * nz);
+    const ci = Math.floor(g.s.cup[0] / CELLS), cj = Math.floor(g.s.cup[1] / CELLS);
+    let head = 0, tail = 0;
+    if (ci >= 0 && cj >= 0 && ci < nx && cj < nz) (dist[idx(ci, cj)] = 0), (q[tail++] = idx(ci, cj));
+    while (head < tail) {
+      const k = q[head++], i = k % nx, j = (k / nx) | 0;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const a = i + di, b = j + dj;
+        if (a < 0 || b < 0 || a >= nx || b >= nz) continue;
+        const n = idx(a, b);
+        if (!green[n] || dist[n] !== Infinity) continue;
+        dist[n] = dist[k] + 1;
+        q[tail++] = n;
+      }
+    }
+    return (field = { id: g.id, dist, nx, nz, idx, CELLS });
+  }
+  /** The heading from (x, z) towards where the lane leads, or null. */
+  function aheadHeading(x, z) {
+    const f = courseField();
+    if (!f) return null;
+    let i = Math.floor(x / f.CELLS), j = Math.floor(z / f.CELLS);
+    if (i < 0 || j < 0 || i >= f.nx || j >= f.nz || f.dist[f.idx(i, j)] === Infinity) return null;
+    // ~5 units along the lane, cell by cell towards the cup
+    for (let n = 0; n < 10; n++) {
+      let best = f.dist[f.idx(i, j)], bi = i, bj = j;
+      for (let di = -1; di <= 1; di++)
+        for (let dj = -1; dj <= 1; dj++) {
+          const a = i + di, b = j + dj;
+          if (a < 0 || b < 0 || a >= f.nx || b >= f.nz) continue;
+          const d = f.dist[f.idx(a, b)];
+          if (d < best) (best = d), (bi = a), (bj = b);
+        }
+      if (bi === i && bj === j) break;
+      (i = bi), (j = bj);
+    }
+    const tx = (i + 0.5) * f.CELLS, tz = (j + 0.5) * f.CELLS;
+    return Math.hypot(tx - x, tz - z) > 0.5 ? Math.atan2(tz - z, tx - x) : null;
+  }
+
+  /** Third person's target, per state: 7 behind, 3 up, looking along the aim, the ball's run, or at the cup. */
+  const cupPt = new THREE.Vector3();
+  function thirdTarget(dt, state) {
+    // holed: framed on the cup, up and back a little — the ball sinking into
+    // it is not followed down (that was a close-up of the hat)
+    const B = state === "holed" && g.s ? cupPt.set(g.s.cup[0], BALL_R + ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]) : ball.position;
+    let target = yaw, turning = false;
+    const pulling = state === "aiming";
+    flatFloor = state === "rest" || state === "aiming" ? REST_FLAT : MIN_FLAT;
+    if (pulling) target = shot.power > 0 ? shot.angle : yaw; // trailing the aim (measured from the pull's start heading)
+    else if (state === "replay" && dt > 0) {
+      inst.subVectors(B, prevB).setY(0).divideScalar(dt);
+      // a step that turns hard against the averaged run is a bounce or a sharp curve: hold the heading
+      if (inst.length() > 0.5 && vel.lengthSq() > 0.25 && inst.angleTo(vel) > Math.PI / 4) hold = 0.6;
+      vel.lerp(inst, 1 - Math.exp(-dt / 0.6));
+      hold = Math.max(0, hold - dt);
+      turning = hold > 0;
+      if (!turning && vel.length() > 1.5) target = Math.atan2(vel.z, vel.x);
+    } else if (state === "rest" && g.s) {
+      // where the lane leads next from here (an S or a spiral turns the camera with it), else the cup
+      const a = aheadHeading(B.x, B.z);
+      target = a != null ? a : Math.atan2(g.s.cup[1] - B.z, g.s.cup[0] - B.x);
+    }
+    // a jump, a tunnel exit: the ball is elsewhere at once, and so is the camera
+    const teleport = !fresh && B.distanceTo(prevB) > 2.5;
+    if (fresh || teleport) (yaw = target), vel.set(0, 0, 0), (rise = 0);
+    prevB.copy(B);
+    const d = angDiff(target, yaw);
+    // coming back at the camera: rise and back off rather than spin round
+    const reversing = state === "replay" && Math.abs(d) > (2 * Math.PI) / 3;
+    if (!reversing) {
+      const step = pulling ? d * (1 - Math.exp(-dt / 0.35)) : d; // aiming: a 0.35 s trail
+      const cap = dt * (pulling ? (2 * Math.PI) / 3 : Math.PI / 2); // at most 120°/s aiming, 90°/s rolling
+      yaw += Math.max(-cap, Math.min(cap, step));
+    }
+    const widen = turning || reversing || state === "holed" || (pulling && Math.abs(d) > Math.PI / 2);
+    wide += ((widen ? 1 : 0) - wide) * (1 - Math.exp(-dt * (widen ? 5 : 1.5)));
+    // behind along the heading — swung round a little if a wall right behind blocks the view
+    const up = (state === "holed" ? 4.2 : 3) + wide * 2.5 + rise;
+    if (fresh || ++swingTick % 10 === 0) swingTo = clearHeading(B, 7 + wide * 4, up);
+    swing += (swingTo - swing) * (1 - Math.exp(-dt * 3));
+    const back = 7 + wide * 4 - pen;
+    cdir.set(Math.cos(yaw + swing), 0, Math.sin(yaw + swing));
+    behind(chase, B, cdir, { back, up, ahead: 0, lookUp: 0 });
+    // the collision pass (walls, posts, ground under the line) three times in
+    // four frames' worth of time is plenty: between passes its push is reused
+    if (fresh || ++clearTick % 3 === 0) {
+      rawPos.copy(chase.pos);
+      keepClear(chase.pos, B);
+      push.subVectors(chase.pos, rawPos);
+    } else chase.pos.add(push);
+    // the gnome in the lower third: look a little past it, less the steeper the view
+    const hz = Math.hypot(chase.pos.x - B.x, chase.pos.z - B.z), hy = chase.pos.y - B.y;
+    chase.look.copy(B).addScaledVector(cdir, Math.max(0, 1.8 - Math.max(0, hy - hz * 0.5) * 0.4));
+    want.pos.copy(chase.pos);
+    want.look.copy(chase.look);
+    want.fov = TP_FOV;
+    want.oy = 0;
+    want.near = 0.5;
+    want.far = 80; // close in: the course and its near scenery, not the far hills (fewer draws, finer depth)
+    fresh = false;
+    return teleport; // a teleport jumps; a mode switch eases from the actual pose
+  }
+
+  /** The rig modes' target: where applyRig would put the camera for the rig's goal. */
+  function rigTarget(dt) {
+    const to = goal();
+    if (!to) return false;
+    const v = screen();
+    // Classic keeps one side for the whole hole: it pans and trucks, never turns
+    applyRig(rigCam, to, v);
+    want.pos.copy(rigCam.position);
+    want.look.copy(to.target);
+    want.fov = 30;
+    want.oy = to.oy || 0;
+    want.near = 3;
+    want.far = rigCam.far;
+    // kept for what reads the rig (the fog's distance, the far plane)
+    if (!g.rig) g.rig = { ...to, target: to.target.clone() };
+    g.rig.target.copy(to.target);
+    g.rig.dist = to.dist;
+    g.rig.ox = to.ox;
+    g.rig.oy = to.oy;
+    return false;
+  }
+
+  function updateCamera(dt) {
+    if (!g.s || !g.over) return;
+    const mode = g.cam === "third" && g.view === "ball" ? "third" : "rig";
+    const state = camState();
+    if (mode !== lastMode) resetFollow();
+    lastMode = mode;
+    const snap = mode === "third" ? thirdTarget(dt, state) : rigTarget(dt);
+    const snapped = snap || !sp.live;
+    // faster in flight, a touch faster still when the ball would leave the frame
+    const w = urgent ? 16 : state === "replay" ? 11 : 9;
+    if (!sp.live || snap) {
+      sp.pos.copy(want.pos), sp.look.copy(want.look), (sp.fov = want.fov), (sp.oy = want.oy), sp.vp.set(0, 0, 0), sp.vl.set(0, 0, 0), (sp.vf = sp.vo = 0), (sp.live = true);
+    } else {
+      springV(sp.pos, sp.vp, want.pos, w, dt);
+      springV(sp.look, sp.vl, want.look, urgent ? 18 : w, dt);
+      [sp.fov, sp.vf] = springN(sp.fov, sp.vf, want.fov, 9, dt);
+      [sp.oy, sp.vo] = springN(sp.oy, sp.vo, want.oy, 9, dt);
+    }
+    // a hard floor on the real pose too (the spring lags a ball rolling back
+    // at the camera): never nearer than MIN_FLAT across the ground in third person
+    if (mode === "third") {
+      const B0 = ball.position, fx = sp.pos.x - B0.x, fz = sp.pos.z - B0.z, fl = Math.hypot(fx, fz);
+      if (fl < MIN_FLAT - 0.3) {
+        const k = (MIN_FLAT - 0.3) / Math.max(fl, 1e-3);
+        if (fl > 1e-3) (sp.pos.x = B0.x + fx * k), (sp.pos.z = B0.z + fz * k);
+        else (sp.pos.x = B0.x - cdir.x * MIN_FLAT), (sp.pos.z = B0.z - cdir.z * MIN_FLAT);
+      }
+      sp.pos.y = Math.min(sp.pos.y, B0.y + Math.tan(MAX_PITCH + 0.1) * Math.max(Math.hypot(sp.pos.x - B0.x, sp.pos.z - B0.z), MIN_D));
+    }
+    const v = screen();
+    camera.aspect = v.w / v.h;
+    camera.position.copy(sp.pos);
+    camera.lookAt(sp.look);
+    if (Math.abs(sp.oy) > 0.5) camera.setViewOffset(v.w, v.h, 0, sp.oy, v.w, v.h);
+    else camera.clearViewOffset();
+    camera.fov = sp.fov;
+    camera.near = Math.min(want.near, sp.pos.distanceTo(ball.position) * 0.5);
+    camera.far = want.far;
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+    // the ball on screen and in sight: in the middle 70 %, nothing between it
+    // and the camera (board-space test, no ray); out of frame → catch up fast;
+    // hidden by a wall → rise a little; hidden on purpose (a tube) → a ring
+    const B = ball.position;
+    ndcB.copy(B).project(camera);
+    const inFrame = ndcB.z < 1 && Math.abs(ndcB.x) < 0.7 && Math.abs(ndcB.y) < 0.7;
+    // in sight: the gnome's head over any kerb between (the hat is what the player looks for)
+    if (!inFrame) sightOk = false;
+    else if (++sightTick % 2 === 0 || !sightOk) sightOk = !occluded(camera.position, headAt.copy(B).setY(B.y + 0.7));
+    const seen = inFrame && sightOk;
+    // (decor between is the canopy's to fade; a ray through the whole baked course each frame cost 3× the frame)
+    const blocked = inFrame && !seen;
+    // out of frame or behind a wall: the springs catch up fast until it is back in sight
+    urgent = mode === "third" && (!inFrame || blocked);
+    rise = blocked ? Math.min(3, rise + dt * 12) : Math.max(0, rise - dt * 6);
+    // down a cliff, into water, in a tube: hidden on purpose, and marked
+    const under = g.inTube || B.y < ground(B.x, B.z) - 0.3;
+    marker.visible = !seen && (under || (mode === "third" && rise >= 3));
+    if (marker.visible) (marker.position.copy(B), marker.quaternion.copy(camera.quaternion));
+    settled = sp.vp.lengthSq() < 1e-4 && sp.vl.lengthSq() < 1e-4 && Math.abs(sp.vf) < 1e-3;
+    if (logCam) {
+      // [yaw°, distance, widening, seen, in a tube, pitch°, flat distance, gnome height (share of screen), ball ndc y, cup ndc x, state, near-wall]
+      const fl = Math.hypot(camera.position.x - B.x, camera.position.z - B.z);
+      const top = ndcTop.copy(B).setY(B.y + 1.1).project(camera).y, bot = ndcBot.copy(B).setY(B.y - BALL_R).project(camera).y;
+      const cupX = ndcTop.set(g.s.cup[0], B.y, g.s.cup[1]).project(camera).x;
+      camLog.push([+((yaw * 180) / Math.PI).toFixed(1), +camera.position.distanceTo(B).toFixed(1), +wide.toFixed(2), seen ? 1 : 0, under ? 1 : 0,
+        +((Math.atan2(camera.position.y - B.y, fl) * 180) / Math.PI).toFixed(1), +fl.toFixed(1), +((top - bot) / 2).toFixed(3), +ndcB.y.toFixed(2), +cupX.toFixed(2), state, wallHug(camera.position) ? 1 : 0, inFrame ? 1 : 0, snapped ? 1 : 0, +ndcB.x.toFixed(2), Math.round(performance.now())]);
+    }
+  }
+  // a camera in a wall's face: within 1 of a wall and below its kerb top
+  function wallHug(P) {
+    for (const w of g.s.walls) {
+      if (!wallOn(w)) continue;
+      const ax = w.a[0], az = w.a[1], bx = w.b[0], bz = w.b[1];
+      const l2 = (bx - ax) ** 2 + (bz - az) ** 2 || 1;
+      const t = Math.max(0, Math.min(1, ((P.x - ax) * (bx - ax) + (P.z - az) * (bz - az)) / l2));
+      if (Math.hypot(P.x - (ax + (bx - ax) * t), P.z - (az + (bz - az) * t)) < 1 && P.y < ground(P.x, P.z) + KERB + 0.3) return true;
+    }
+    return false;
+  }
+
+  // The chase camera never sits in or behind a wall: the line from the ball to
+  // it is tested against the hole's walls and posts, and a hit brings it in
+  // front of the wall and up over the kerb. It stays over the board, at least
+  // MIN_D from the ball and looking down at least MIN_PITCH; beside a wall it
+  // leans away from it. The chase's own easing then smooths every push.
+  const TP_FOV = 58; // third person's lens (the others keep 30)
+  const KERB = 1.1, MIN_D = 3, MIN_PITCH = (18 * Math.PI) / 180, MAX_PITCH = (40 * Math.PI) / 180;
+  /** Whether the line from B (raised by lift) to C clears the ground (from 1.5 out). */
+  function lineClear(B, cx, cy, cz, lift = 0.7) {
+    const L = Math.hypot(cx - B.x, cz - B.z) || 1;
+    for (let k = 1; k < 8; k++) {
+      const t = k / 8;
+      if (t * L < 1.5) continue;
+      const x = B.x + (cx - B.x) * t, z = B.z + (cz - B.z) * t;
+      if (B.y + lift + (cy - B.y - lift) * t < ground(x, z) + 0.15) return false;
+    }
+    return true;
+  }
+
+  // a timed wall (a tram, a gate) counts only while the clock has it standing
+  const wallOn = (w) => !w.every || (((Math.floor(clock) + (w.phase | 0)) % w.every) + w.every) % w.every < w.on;
+  // whether the course hides B from P: a wall or a post between them, higher
+  // than the sight line where it crosses (no allocation, no ray)
+  const POST_H = 1.6;
+  function occluded(P, B) {
+    if (!g.s) return false;
+    // the ground and the decor between (from 1.5 out: what the ball sits in is not in the way)
+    if (!lineClear(B, P.x, P.y, P.z, 0)) return true;
+    for (const w of g.s.walls) {
+      if (!wallOn(w)) continue;
+      const t = segHit(B.x, B.z, P.x, P.z, w.a, w.b); // from the ball towards the camera
+      if (t < 0) continue;
+      const x = B.x + (P.x - B.x) * t, z = B.z + (P.z - B.z) * t;
+      if (B.y + (P.y - B.y) * t < ground(x, z) + KERB) return true;
+    }
+    for (const p of g.s.posts || []) {
+      const c = p.c;
+      if (!c) continue;
+      const r = p.r || 0.5, dx = P.x - B.x, dz = P.z - B.z, fx = B.x - c[0], fz = B.z - c[1];
+      const A = dx * dx + dz * dz, Bq = 2 * (fx * dx + fz * dz), Cq = fx * fx + fz * fz - r * r, disc = Bq * Bq - 4 * A * Cq;
+      if (A <= 0 || disc < 0) continue;
+      const t = (-Bq - Math.sqrt(disc)) / (2 * A);
+      if (t > 0 && t < 1 && B.y + (P.y - B.y) * t < ground(c[0], c[1]) + POST_H) return true;
+    }
+    return false;
+  }
+  function segHit(ox, oz, cx, cz, a, b) {
+    // where o→c crosses a→b, as a fraction of o→c, or -1
+    const rx = cx - ox, rz = cz - oz, sx = b[0] - a[0], sz = b[1] - a[1];
+    const den = rx * sz - rz * sx;
+    if (Math.abs(den) < 1e-9) return -1;
+    const t = ((a[0] - ox) * sz - (a[1] - oz) * sx) / den, u = ((a[0] - ox) * rz - (a[1] - oz) * rx) / den;
+    return t > 0 && t < 1 && u >= 0 && u <= 1 ? t : -1;
+  }
+  // the nearest wall or post on the line from (ox, oz) to (cx, cz), as a fraction (1: none)
+  function firstHit(ox, oz, cx, cz) {
+    let t = 1;
+    for (const w of g.s.walls) {
+      if (!wallOn(w)) continue;
+      const h = segHit(ox, oz, cx, cz, w.a, w.b);
+      if (h >= 0 && h < t) t = h;
+    }
+    for (const p of g.s.posts || []) {
+      const c = p.c;
+      if (!c) continue;
+      const r = (p.r || 0.5) + 0.3, dx = cx - ox, dz = cz - oz, fx = ox - c[0], fz = oz - c[1];
+      const A = dx * dx + dz * dz, Bq = 2 * (fx * dx + fz * dz), Cq = fx * fx + fz * fz - r * r, disc = Bq * Bq - 4 * A * Cq;
+      if (A > 0 && disc >= 0) {
+        const h = (-Bq - Math.sqrt(disc)) / (2 * A);
+        if (h > 0 && h < t) t = h;
+      }
+    }
+    return t;
+  }
+  // A wall right behind the ball (a ball at rest against the kerb) cannot be
+  // seen over from 7 behind at a sane pitch: the camera swings round a little,
+  // either way, to the nearest heading it can look from — it never comes in
+  // closer than MIN_FLAT, nor ends up over the ball's head.
+  // at rest and aiming the framing wants 6.5 at least; rolling, 4.5 will do
+  const MIN_FLAT = 4.5, REST_FLAT = 6.5;
+  let flatFloor = MIN_FLAT;
+  const SWINGS = [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.8, -1.8];
+  function clearHeading(B, dist, up) {
+    // first a heading it can look from at its own height, then one it can
+    // look from by rising (up to MAX_PITCH)
+    // (a tight pen: a unit closer is still the framing, and needs no climb)
+    for (const [lim, dd] of [[up, dist], [up, dist - 1], [Math.tan(MAX_PITCH) * dist, dist]])
+      for (const off of SWINGS) {
+        const dist_ = dd;
+        const a = yaw + off, cx = B.x - Math.cos(a) * dist_, cz = B.z - Math.sin(a) * dist_;
+        // a place off the board and its rim would be pulled in: not one to stand on
+        if (cx < -1.5 || cz < -1.5 || cx > g.s.board.w + 1.5 || cz > g.s.board.h + 1.5) continue;
+        const t = firstHit(B.x, B.z, cx, cz);
+        if (t >= 1) return (pen = dist - dist_), off;
+        const need = (ground(B.x + (cx - B.x) * t, B.z + (cz - B.z) * t) + KERB + 0.35 - B.y) / Math.max(t, 0.05);
+        if (need <= lim && t * dist_ >= 1) return (pen = dist - dist_), off;
+      }
+    pen = 0;
+    return 0;
+  }
+  function keepClear(C, B) {
+    if (!g.s) return;
+    const ox = B.x, oz = B.z;
+    // lean away from a wall close beside the ball
+    let nx = 0, nz = 0;
+    for (const w of g.s.walls) {
+      if (!wallOn(w)) continue;
+      const ax = w.a[0], az = w.a[1], bx = w.b[0], bz = w.b[1];
+      const l2 = (bx - ax) ** 2 + (bz - az) ** 2 || 1;
+      const t = Math.max(0, Math.min(1, ((ox - ax) * (bx - ax) + (oz - az) * (bz - az)) / l2));
+      const px = ax + (bx - ax) * t, pz = az + (bz - az) * t, d = Math.hypot(ox - px, oz - pz);
+      if (d < 1.6 && d > 1e-3) (nx += ((ox - px) / d) * (1.6 - d)), (nz += ((oz - pz) / d) * (1.6 - d));
+    }
+    C.x += nx * 1.5;
+    C.z += nz * 1.5;
+    // a post (a bumper, a mushroom) is never right beside the lens: pushed out of its reach
+    for (const p of g.s.posts || []) {
+      const c = p.c;
+      if (!c) continue;
+      const r = (p.r || 0.5) + 1.6, dx = C.x - c[0], dz = C.z - c[1], d = Math.hypot(dx, dz);
+      if (d < r && d > 1e-3) {
+        (C.x = c[0] + (dx / d) * r), (C.z = c[1] + (dz / d) * r);
+        // pushed in towards the ball? keep the distance, round the post's far side
+        const fl = Math.hypot(C.x - ox, C.z - oz);
+        if (fl < flatFloor) (C.x = ox + ((C.x - ox) / (fl || 1)) * flatFloor), (C.z = oz + ((C.z - oz) / (fl || 1)) * flatFloor);
+      }
+    }
+    // the nearest wall or post between the ball and the camera
+    let t = 1;
+    for (const w of g.s.walls) {
+      if (!wallOn(w)) continue;
+      const h = segHit(ox, oz, C.x, C.z, w.a, w.b);
+      if (h >= 0 && h < t) t = h;
+    }
+    for (const p of g.s.posts || []) {
+      const c = p.c || p.at || p.pos;
+      if (!c) continue;
+      const r = (p.r || 0.5) + 0.3, dx = C.x - ox, dz = C.z - oz, fx = ox - c[0], fz = oz - c[1];
+      const A = dx * dx + dz * dz, Bq = 2 * (fx * dx + fz * dz), Cq = fx * fx + fz * fz - r * r, disc = Bq * Bq - 4 * A * Cq;
+      if (A > 0 && disc >= 0) {
+        const h = (-Bq - Math.sqrt(disc)) / (2 * A);
+        if (h > 0 && h < t) t = h;
+      }
+    }
+    let blocked = false;
+    const flat0 = Math.hypot(C.x - ox, C.z - oz) || 1;
+    if (t < 1) {
+      // a wall between: stay where it is, but high enough that the line of
+      // sight clears the kerb at the wall; only if that would look down
+      // steeper than MAX_PITCH, come in to just in front of it
+      const need = B.y + (ground(ox + (C.x - ox) * t, oz + (C.z - oz) * t) + KERB + 0.35 - B.y) / Math.max(t, 0.05);
+      if (need - B.y <= Math.tan(MAX_PITCH) * flat0) C.y = Math.max(C.y, need);
+      else {
+        const k = Math.max(Math.min(1, flatFloor / flat0), t - 0.6 / flat0);
+        C.x = ox + (C.x - ox) * k;
+        C.z = oz + (C.z - oz) * k;
+        blocked = true;
+      }
+    }
+    // over the board (plus its rim): beyond it the scenery is higher than the
+    // course's own ground, and a camera out there sits in the decor
+    const W = g.s.board.w, H = g.s.board.h, RIM = 1.5;
+    const cx = Math.max(-RIM, Math.min(W + RIM, C.x)), cz = Math.max(-RIM, Math.min(H + RIM, C.z));
+    if (cx !== C.x || cz !== C.z) (C.x = cx), (C.z = cz), (C.y = Math.max(C.y, B.y + 2.5));
+    const base = ground(C.x, C.z);
+    if (blocked) C.y = Math.max(C.y, base + KERB + 1.5);
+    C.y = Math.max(C.y, base + 1);
+    // a rise in the ground between: the camera goes over it, not into it
+    // a rise in the ground between: the camera goes over it, not into it
+    const L = Math.hypot(C.x - ox, C.z - oz) || 1;
+    for (let k = 1; k < 8; k++) {
+      const t = k / 8;
+      if (t * L < 1.5) continue;
+      const x = ox + (C.x - ox) * t, z = oz + (C.z - oz) * t, h = ground(x, z) + 0.8;
+      if (B.y + (C.y - B.y) * t < h) C.y = Math.max(C.y, B.y + (h - B.y) / t);
+    }
+    // far enough, looking down at least MIN_PITCH and at most MAX_PITCH
+    const flat = Math.hypot(C.x - ox, C.z - oz);
+    C.y = Math.max(C.y, B.y + Math.tan(MIN_PITCH) * flat);
+    C.y = Math.min(C.y, B.y + Math.tan(MAX_PITCH) * Math.max(flat, MIN_D));
+    const d3 = Math.hypot(flat, C.y - B.y);
+    if (d3 < MIN_D) C.y = Math.min(B.y + Math.tan(MAX_PITCH) * MIN_D, B.y + Math.sqrt(Math.max(0, MIN_D * MIN_D - flat * flat)));
+  }
+
+  // ?camlog (dev only): the camera's per-frame log and the probes below
+  // (camLog, camPose, camAim, lensFill, inView, camInner, classicTurn,
+  // sightProbe) exist for media/camera/camsuite.mjs; without the flag they
+  // do nothing and cost nothing
+  const logCam = typeof location !== "undefined" && /[?&]camlog/.test(location.search);
 
   function setView(v) {
     clearTimeout(closeIn);
@@ -263,19 +714,14 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     if (!alive) return;
     requestAnimationFrame(frame);
     if (!g.started || g.covered || document.hidden) return (last = now);
-    const busy = g.flying || dragging || growing.length || confetti || righting || !settled || everyOf() > 0;
+    const busy = promo.on || g.flying || dragging || !!morph || (g.cam === "third" && g.aiming) || growing.length || confetti || righting || !settled || everyOf() > 0;
     const still = !g.weather;
     if (!busy && now - last < (still ? STILL_MS : IDLE_MS) - 2) return;
     probeFrame(now, busy);
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
-    if (g.rig) {
-      // a flying ball is followed closely, or a hard shot leaves the frame
-      const to = goal();
-      easeRig(g.rig, to, 1 - Math.exp(-dt * (g.flying ? 7 : 3.2)));
-      applyRig(camera, g.rig, screen());
-      settled = g.rig.target.distanceTo(to.target) < 0.01 && Math.abs(g.rig.dist - to.dist) < 0.01 && Math.abs(g.rig.ox - to.ox) < 0.5 && Math.abs(g.rig.oy - to.oy) < 0.5;
-    }
+    updateCamera(dt);
+    promo.camera(camera); // ?promo: the trailer's camera, off otherwise
     setTime(now / 1000);
     if (growing.length) growing = growing.filter((a) => {
       a.t = Math.min(a.t + dt / 0.35, 1);
@@ -300,12 +746,14 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       clock += dt * (reduced ? 1.5 : 3.5);
       showClock(clock);
       // aiming at moving pieces: the dots follow them
-      if (dragging && everyOf() && now - lastTickPreview > 250) (lastTickPreview = now), preview();
+      if (dragging && everyOf() && PREVIEW().stopAt !== "hidden" && now - lastTickPreview > 250) (lastTickPreview = now), preview();
     }
     // a world's canopy fades what stands between the camera and the ball
     if (g.course && g.course.userData.fade) g.course.userData.fade(camera.position, ball.position);
     weather.tick(now / 1000);
     causes.tick(now / 1000);
+    stepMorph(now);
+    if (glowing.size) fadeSlopes(dt);
     if (g.rig) weather.view(g.rig.dist);
     if (extras && extras.userData.tick) extras.userData.tick(now / 1000);
     const flag = g.course && g.course.userData.flag;
@@ -416,7 +864,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     g.rig = null; // a new hole starts from its overview, not from the last one
     resize();
     setView("overview");
-    if (g.started) closeIn = setTimeout(() => setView("ball"), OVERVIEW_MS);
+    if (g.started) closeIn = setTimeout(() => setView(home()), OVERVIEW_MS);
   }
 
   // A timed hole's moving pieces, for the stroke about to be played. They grow
@@ -461,6 +909,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     if (mill && mill.shoot && !mill.started) (mill.shoot(), (mill.started = true));
     ambience(g.weather || {});
     if (g.course.userData.wind) g.course.userData.wind((g.weather && g.weather.wind) || null);
+    if (g.course.userData.weather) g.course.userData.weather(g.weather); // the decor dressed for it (sunbathers in, parasols shut...)
     publish();
   }
   // between rounds the quarter hour may have turned: a new round takes the new weather
@@ -508,6 +957,12 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   /** A fresh round on the hole already built: back to the tee, nothing kept. */
   function newRound(ask = true) {
+    // a new round starts behind the gnome, looking at the cup: no easing in from the last pose
+    g.lastAim = null;
+    resetFollow();
+    sp.live = false; // a new round: the camera starts in its framing, not eased in from the last hole
+    g.roundMode = null;
+    glowing.clear();
     restTimed();
     g.round = (g.round || 0) + 1;
     if (confetti) {
@@ -549,16 +1004,51 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   const ray = new THREE.Raycaster();
   const hit = new THREE.Vector3(), ndc = new THREE.Vector2();
   let dragging = false;
+  // the aim mode (assisted | pro); a round keeps the mode of its first stroke
+  let mode = aimMode === "pro" ? "pro" : "assisted";
+  const PREVIEW = () => PREVIEWS[g.roundMode || mode];
+  const dotPower = (p) => (PREVIEW().stopAt === "none" ? p : proPower(PREVIEW()));
   // replays cut by the safety net: every animation of the one cut stops
   let cut = 0; // each animation keeps the value it started with (cutAt)
   let shown = null; // the aim the dots on screen were computed for (see interpolate)
   const straight = [[0, 0], [0, 0]]; // the provisional line, until the chain answers
+  // The chain's dots bend into place from where the straight ones were: each
+  // dot glides to its new spot over 120 ms (one blend of the instance matrices).
+  const MORPH_MS = 120;
+  let morph = null;
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _q = new THREE.Quaternion(), _mm = new THREE.Matrix4();
+  function snapDots() {
+    const d = aim.userData.dots;
+    if (!d || !d.count || !aim.visible) return null;
+    return d.instanceMatrix.array.slice(0, d.count * 16);
+  }
+  function morphFrom(was) {
+    const d = aim.userData.dots;
+    if (!was || !d || !d.count) return void (morph = null);
+    morph = { from: was, to: d.instanceMatrix.array.slice(0, d.count * 16), n: d.count, t0: performance.now() };
+  }
+  function stepMorph(now) {
+    if (!morph) return;
+    const d = aim.userData.dots, k = Math.min(1, (now - morph.t0) / MORPH_MS), e = 1 - (1 - k) * (1 - k);
+    const arr = d.instanceMatrix.array, had = morph.from.length / 16;
+    for (let i = 0; i < morph.n; i++) {
+      // a dot the straight line did not have grows out of its last one
+      _mm.fromArray(morph.from, Math.min(i, had - 1) * 16).decompose(_a, _q, _sa);
+      _mm.fromArray(morph.to, i * 16).decompose(_b, _q, _sb);
+      _a.lerp(_b, e);
+      _sa.lerp(_sb, e);
+      _mm.makeScale(_sa.x, _sa.y, _sa.z).setPosition(_a);
+      _mm.toArray(arr, i * 16);
+    }
+    d.instanceMatrix.needsUpdate = true;
+    if (k >= 1) morph = null;
+  }
   // the aim put away: no dots, no elastic, nothing turned
   // the dashed outlines of timed pieces that are away, shown only while aiming
   const ghosts = (on) => g.course && g.course.userData.ghosts && g.course.userData.ghosts(on);
   const dropAim = () => {
+    morph = null;
     ghosts(false);
-    arrow.visible = false;
     aim.visible = band.visible = false;
     shown = null;
     aim.rotation.set(0, 0, 0);
@@ -584,9 +1074,20 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     if (px < 6) return;
     // both ends through the camera as it is now: an easing camera moves the
     // board under a still hand, and must not turn the shot
-    const from = boardPoint(press), to = boardPoint(ev);
-    if (!from || !to) return;
-    const { deg, power } = pullShot(px, window.innerWidth, window.innerHeight, Math.atan2(from.y - to.y, from.x - to.x), MAX_POWER);
+    let dir;
+    if (g.cam === "third" && press.yaw != null) {
+      // behind the gnome: the aim turns from the heading the pull started
+      // with, by the sideways drag — the screen's width is 90°, half that
+      // with Shift — while the camera trails it softly
+      dir = press.yaw - ((ev.clientX - press.baseX) / window.innerWidth) * (Math.PI / 2) * (ev.shiftKey ? 0.5 : 1);
+      press.lastX = ev.clientX;
+      press.moved = performance.now();
+    } else {
+      const from = boardPoint(press), to = boardPoint(ev);
+      if (!from || !to) return;
+      dir = Math.atan2(from.y - to.y, from.x - to.x);
+    }
+    const { deg, power } = pullShot(px, window.innerWidth, window.innerHeight, dir, MAX_POWER);
     shot.angle = (deg * Math.PI) / 180;
     shot.deg = deg;
     shot.power = power;
@@ -594,10 +1095,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     g.power = shot.power / MAX_POWER;
     creak();
 
-    aim.visible = band.visible = true;
+    band.visible = true;
+    aim.visible = PREVIEW().stopAt !== "hidden";
     preview();
     bandTo(band, g.ball, shot.angle, shot.power, BALL_R + ground(g.ball.x, g.ball.y));
-    pointArrow();
     placeBall();
     // the HUD shows a power bar and nothing else of the pull: re-render only
     // when the bar would move
@@ -619,6 +1120,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     ghosts(true);
     shot = { angle: 0, power: 0 };
     press = { clientX: ev.clientX, clientY: ev.clientY, x: ev.clientX, y: ev.clientY };
+    // third person: the heading the pull is measured from, frozen for the pull
+    if (g.cam === "third" && g.view === "ball") Object.assign(press, { yaw, baseX: ev.clientX, lastX: ev.clientX, moved: performance.now() });
     // no dots until the chain has answered for this pull
     if (aim.userData.dots) aim.userData.dots.count = 0;
     else for (const d of aim.children) d.visible = false;
@@ -679,10 +1182,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     g.facing = shot.angle;
     g.power = shot.power / MAX_POWER;
     creak();
-    aim.visible = band.visible = true;
+    band.visible = true;
+    aim.visible = PREVIEW().stopAt !== "hidden";
     preview();
     bandTo(band, g.ball, shot.angle, shot.power, BALL_R + ground(g.ball.x, g.ball.y));
-    pointArrow();
     placeBall();
     publish();
   };
@@ -769,6 +1272,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       g.errorKind = "shot";
       return publish();
     }
+    if (!g.shots.length) g.roundMode = mode; // this round is played, and recorded, in this mode
+    g.lastAim = (angleDeg * Math.PI) / 180;
     g.shots.push(shotOf(angleDeg, power, tick));
     g.tick0 = tick || 0;
     g.strokes = res.strokes;
@@ -845,14 +1350,15 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-3) return null;
     let best = null, bd = Infinity;
     for (const z of g.s.zones) {
-      if ((z.kind !== "tunnel" && z.kind !== "hazard") || Math.abs(q[0] - z.vec[0]) > 1e-3 || Math.abs(q[1] - z.vec[1]) > 1e-3) continue;
+      // a loop with a tube (island7's castle tube) is ridden like a tunnel
+      if ((z.kind !== "tunnel" && z.kind !== "hazard" && z.kind !== "loop") || Math.abs(q[0] - z.vec[0]) > 1e-3 || Math.abs(q[1] - z.vec[1]) > 1e-3) continue;
       const dx = Math.max(z.min[0] - p[0], 0, p[0] - z.max[0]), dz = Math.max(z.min[1] - p[1], 0, p[1] - z.max[1]);
       const d = Math.hypot(dx, dz);
       if (d < bd) (bd = d), (best = z);
     }
     return best;
   };
-  const tunnelled = (p, q) => { const z = jumpFrom(p, q); return z && z.kind === "tunnel" ? z : null; };
+  const tunnelled = (p, q) => { const z = jumpFrom(p, q); return z && (z.kind === "tunnel" || z.kind === "loop") ? z : null; };
 
   // The aim is the chain's own answer: while the player pulls, the shot is
   // previewed with Simulate (read-only, free) and the dots follow the path it
@@ -876,13 +1382,14 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   function preview() {
     interpolate();
     if (!(shot.power > 0.3)) return; // too soft to shoot: nothing to ask
+    if (PREVIEW().stopAt === "hidden") return void (aim.visible = false); // pro: no line, no request
     // no answer from the chain yet for this pull: a straight line of dots
     // along the aim, replaced by the chain's the moment it lands
     if (!shown && g.ball) {
-      const len = 2 + (shot.power / MAX_POWER) * 16;
+      const len = Math.min(PREVIEW().maxLen, 2 + (shot.power / MAX_POWER) * 16);
       straight[0][0] = g.ball.x, straight[0][1] = g.ball.y;
       straight[1][0] = g.ball.x + Math.cos(shot.angle) * len, straight[1][1] = g.ball.y + Math.sin(shot.angle) * len;
-      aimAlong(aim, straight, shot.power, ground);
+      aimAlong(aim, straight, dotPower(shot.power), ground);
       aim.visible = true;
     }
     wanted = { angle: shot.angle, deg: shot.deg, power: shot.power, shots: g.shots, id: g.id };
@@ -905,9 +1412,11 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       .simulateRound(q.id, [...q.shots, shotOf(q.deg != null ? q.deg : (q.angle * 180) / Math.PI, q.power, q.tick)], g.period, 1500)
       .then((res) => {
         if (dragging && q.id === g.id && q.round === g.round && q.n === g.shots.length) {
-          aimAlong(aim, fogged(res.path), q.power, ground, landing, dotTint(q));
+          const was = snapDots();
+          aimAlong(aim, fogged(previewPath(res)), dotPower(q.power), ground, landing, dotTint(q));
+          morphFrom(was);
           shown = { angle: q.angle };
-          aim.rotation.y = 0;
+                aim.rotation.y = 0;
           aim.position.set(0, 0, 0);
           interpolate();
         }
@@ -948,6 +1457,23 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   // gravity and lands with a little bounce. Cosmetic: the chain's ball is a
   // point on a flat board.
   const air = { y: 0, vy: 0, gvy: 0, up: false, t: 0 };
+  // On the ground, the ball follows it up at once but comes down a drop (the
+  // end of a ramp too slow to take off, a ledge) under gravity, never in one
+  // frame. The chain's air flags handle real flights.
+  let dropY = null, dropV = 0, dropT = 0;
+  function fallTo(floor, now) {
+    const dt = dropT ? Math.min((now - dropT) / 1000, 0.05) : 0;
+    dropT = now;
+    if (dropY === null || floor >= dropY - 0.02 || !dt) {
+      dropY = floor;
+      dropV = 0;
+      return floor;
+    }
+    dropV -= GRAVITY * dt;
+    dropY = Math.max(floor, dropY + dropV * dt);
+    if (dropY === floor) dropV = 0;
+    return dropY;
+  }
   const GRAVITY = 30;
   function fly(p) {
     const now = performance.now();
@@ -985,6 +1511,23 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   // The kind of jump a step makes, for the aim dots: "tunnel", "hazard" or null.
 
+  // A slope's contour arrows light up while the ball rolls down it, and fade after.
+  const glowing = new Map(); // zone -> glow level 0..1
+  function glowSlope(x, y) {
+    const slopes = g.course && g.course.userData.slopes;
+    if (!slopes) return;
+    for (const [z] of slopes) if (inZone(z, x, y)) glowing.set(z, 1);
+  }
+  function fadeSlopes(dt) {
+    const slopes = g.course && g.course.userData.slopes;
+    for (const [z, k] of glowing) {
+      const n = Math.max(0, k - dt * 1.5);
+      if (slopes && slopes.get(z)) slopes.get(z).glow(n);
+      if (n <= 0) glowing.delete(z);
+      else glowing.set(z, n);
+    }
+  }
+
   // The dots take the colour of what bends them: wind blue, a downhill slope
   // gold, ice or a wet green cyan — the same causes the replay shows.
   const TINT = { wind: new THREE.Color(0x8fc9ff), slope: new THREE.Color(0xffd36b), ice: new THREE.Color(0x9ff3ff), wet: new THREE.Color(0x9ff3ff) };
@@ -996,6 +1539,39 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       return c ? TINT[c.kind] : null;
     };
   };
+
+  // The chain's path cut where the preview stops (see PREVIEW): at the first
+  // contact, and at maxLen units along it whatever the power.
+  function previewPath(res) {
+    const path = res.path || [], why = typeof res.cause === "string" && res.cause.length === path.length ? res.cause : "";
+    let stop = path.length;
+    const P = PREVIEW();
+    if (P.stopAt === "first-contact") {
+      for (let i = 1; i < path.length; i++) {
+        const c = why[i];
+        const hit = (c && c !== "-") || landing(path[i - 1], path[i]) != null;
+        // a sharp turn is a bounce, for a realm that does not say
+        let turn = false;
+        if (!why && i + 1 < path.length) {
+          const ax = path[i][0] - path[i - 1][0], ay = path[i][1] - path[i - 1][1], bx = path[i + 1][0] - path[i][0], by = path[i + 1][1] - path[i][1];
+          const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+          turn = la > 1e-3 && lb > 1e-3 && (ax * bx + ay * by) / (la * lb) < Math.cos((25 * Math.PI) / 180);
+        }
+        if (hit || turn) {
+          stop = i + 1;
+          break;
+        }
+      }
+    }
+    const out = [path[0]];
+    let left = P.maxLen;
+    for (let i = 1; i < stop && left > 0; i++) {
+      const [ax, ay] = out[out.length - 1], [bx, by] = path[i], l = Math.hypot(bx - ax, by - ay);
+      if (l <= left) (out.push(path[i]), (left -= l));
+      else (out.push([ax + ((bx - ax) * left) / l, ay + ((by - ay) * left) / l]), (left = 0));
+    }
+    return out;
+  }
 
   // in fog the dots see only 7 units ahead: it hinders the aim without blinding it
   const fogged = (path) => {
@@ -1022,8 +1598,25 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     // a shaped sea (a polygon, or all but one): it sinks where it went in,
     // a little further on
     if (z.poly) {
-      const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1;
-      const x = p[0] + (dx / l) * 0.8, y = p[1] + (dy / l) * 0.8;
+      // it went in at p (the last point before the chain sends it back): a
+      // little further out from the lane's edge, over the water
+      let best = null, bd = Infinity;
+      const P = z.poly;
+      for (let k = 0; k < P.length; k++) {
+        const A = P[k], B = P[(k + 1) % P.length], ex = B[0] - A[0], ey = B[1] - A[1], l2 = ex * ex + ey * ey || 1;
+        const u = Math.max(0, Math.min(1, ((p[0] - A[0]) * ex + (p[1] - A[1]) * ey) / l2));
+        const cx = A[0] + u * ex, cy = A[1] + u * ey, d = Math.hypot(p[0] - cx, p[1] - cy);
+        if (d < bd) (bd = d), (best = [cx, cy]);
+      }
+      // the chain records the substep before it went over, still on the deck
+      // (p inside the lane): then the edge is ahead of it, and it goes in
+      // just past the edge on the far side
+      const wet = inZone(z, p[0], p[1]);
+      let ox = p[0] - best[0], oy = p[1] - best[1], ol = Math.hypot(ox, oy);
+      if (ol < 1e-6) return at(p, BALL_R + ground(p[0], p[1]));
+      if (!wet) (ox = -ox), (oy = -oy);
+      const out = wet ? Math.max(ol, 0.9) : 0.9;
+      const x = best[0] + (ox / ol) * out, y = best[1] + (oy / ol) * out;
       return at([x, y], BALL_R + ground(x, y));
     }
     const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
@@ -1042,16 +1635,21 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   function through(z, from, to, round) {
     const cutAt = cut;
     const tube = g.course.userData.tubes && g.course.userData.tubes.get(z);
+    if (tube && tube.userData && tube.userData.open) return rideLoop(tube, from, round, 1);
     sound("whoosh");
-    return new Promise((done) => {
-      const start = performance.now(), T = tube ? 900 : 350;
+    // in the tube, the ball is hidden on purpose (the camera shows where it is)
+    g.inTube = true;
+    return new Promise((settle) => {
+      const done = () => ((g.inTube = false), settle());
+      // a longer tube (a spiral slide) takes longer, at the same pace as a straight one
+      const start = performance.now(), T = tube ? Math.min(2400, Math.max(900, (tube.getLength ? tube.getLength() : 12) * 75)) : 350;
       const tick = (now) => {
         if (round !== g.round || cut !== cutAt) return done();
         const k = Math.min((now - start) / T, 1);
         if (tube) {
           const p = tube.getPoint(k);
           ball.position.copy(p);
-          ball.scale.setScalar(0.7); // inside the pipe, a size smaller
+          ball.scale.setScalar(tube.userData && tube.userData.arc ? 1 : 0.7); // inside the pipe, a size smaller (thrown through the air: full size)
         } else {
           ball.position.lerpVectors(from, to, k);
           ball.scale.setScalar(0.2 + 0.8 * k);
@@ -1065,20 +1663,184 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     });
   }
 
+  /**
+   * Round an open loop (zones.js loopTrack): in along the lane from where the
+   * ball was, up the track, over the top and down onto the second lane,
+   * slower the higher it is, rolling on the deck all the way. upTo < 1 stops
+   * at that share of the way to the top, and the ball flies off the track
+   * from there back down to `land` (the chain's spot in front of the mouth).
+   */
+  function rideLoop(tube, from, round, upTo, land = null) {
+    const cutAt = cut, U = tube.userData;
+    const start0 = tube.getPointAt(0), lead = from.distanceTo(start0);
+    const leadT = Math.min(500, (lead / SHOW_SPEED) * 1000);
+    const T = Math.min(2600, Math.max(1300, tube.getLength() * 70)) * (upTo < 1 ? 0.55 : 1);
+    const uEnd = upTo < 1 ? U.top * upTo : 1;
+    const inward = new THREE.Vector3(), prev = from.clone(), d = new THREE.Vector3();
+    const spinBy = (p) => {
+      d.subVectors(p, prev);
+      const l = d.length();
+      if (l < 1e-6) return;
+      // rolling on the deck: about the axis across the loop (inward x motion)
+      inward.subVectors(U.centre, p).projectOnPlane(U.across);
+      if (p.y - U.base < 0.6 || inward.lengthSq() < 1e-6) inward.set(0, 1, 0);
+      axis.crossVectors(inward.normalize(), d).normalize();
+      spin.setFromAxisAngle(axis, l / BALL_R);
+      ball.userData.body.quaternion.premultiply(spin);
+      prev.copy(p);
+    };
+    sound("whoosh");
+    return new Promise((done) => {
+      const start = performance.now();
+      let fly = null;
+      const tick = (now) => {
+        if (round !== g.round || cut !== cutAt) return done();
+        const e = now - start;
+        if (e < leadT) ball.position.lerpVectors(from, start0, e / leadT);
+        else if (!fly) {
+          const k = Math.min((e - leadT) / T, 1);
+          // an overhit ball rides up at pace: no slowing to a crawl near the top
+          const u = upTo < 1 ? uEnd * k : U.pace(k);
+          ball.position.copy(tube.getPointAt(Math.min(u, 1)));
+          if (k >= 1) {
+            if (!land) {
+              spinBy(ball.position);
+              ball.position.copy(tube.getPointAt(1));
+              return done();
+            }
+            // off the track: out of the loop and down in front of it
+            fly = { t0: now, a: ball.position.clone(), b: land.clone(), T: 750 };
+            sound("whoosh");
+          }
+        }
+        if (fly) {
+          const k = Math.min((now - fly.t0) / fly.T, 1);
+          ball.position.lerpVectors(fly.a, fly.b, k);
+          ball.position.y = fly.a.y + (fly.b.y - fly.a.y) * k * k + 1.2 * Math.sin(Math.PI * k) * (1 - k);
+          if (k >= 1) {
+            buzz(25);
+            sound("thud");
+            mood.shake(performance.now());
+            return done();
+          }
+        }
+        spinBy(ball.position);
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  /** The open loop this last step flew off: the chain set the ball down at its fall spot. */
+  function flewOff(path, i) {
+    const tubes = g.course && g.course.userData.tubes;
+    if (!tubes || i + 2 !== path.length) return null;
+    const [x, y] = path[i + 1];
+    for (const z of g.s.zones) {
+      const tube = z.kind === "loop" && tubes.get(z);
+      if (tube && tube.userData && tube.userData.open && Math.hypot(tube.userData.fall[0] - x, tube.userData.fall[1] - y) < 0.05) return tube;
+    }
+    return null;
+  }
+
+  /**
+   * A roll-back into a tube (a loop zone with a tube: island7's castle): the
+   * ball reached the mouth moving in, and the chain sends it back out the way
+   * it came. Returns { tube, reach } or null. reach is how far up it gets, a
+   * fraction of the tube: entry speed / the zone's scale, of half the tube.
+   */
+  function rollBackAt(path, i) {
+    const tubes = g.course && g.course.userData.tubes;
+    if (!tubes || !path[i + 1]) return null;
+    const [px, py] = path[i - 1], [x, y] = path[i], [nx, ny] = path[i + 1];
+    const ix = x - px, iy = y - py, ox = nx - x, oy = ny - y;
+    if (ix * ox + iy * oy >= 0) return null; // not a reversal
+    for (const z of g.s.zones) {
+      if (z.kind !== "loop" || !tubes.get(z)) continue;
+      const dx = Math.max(z.min[0] - x, 0, x - z.max[0]), dy = Math.max(z.min[1] - y, 0, y - z.max[1]);
+      if (Math.hypot(dx, dy) > 0.7) continue;
+      const tube = tubes.get(z), t0 = tube.getTangentAt(0);
+      if (ix * t0.x + iy * t0.z <= 0) continue; // it was not going in
+      let speed = Math.hypot(ix, iy), frac = Math.min(0.97, speed / (z.scale || 2));
+      if (tube.userData && tube.userData.open) {
+        // the step into an open mouth ends short at its front: the pace is the
+        // substep before's; and it climbs as high as v² takes it
+        if (i > 1) speed = Math.max(speed, Math.hypot(px - path[i - 2][0], py - path[i - 2][1]) * 0.92);
+        frac = Math.min(0.97, speed / (z.scale || 2)) ** 2;
+      }
+      return { tube, reach: frac * ((tube.userData && tube.userData.top) || 0.5), speed };
+    }
+    return null;
+  }
+  let rolledBack = -1;
+  /** Up the tube and back down, like a ball under gravity: slower as it
+   *  climbs, faster as it comes down, out at the mouth. */
+  function climbBack({ tube, reach }, round) {
+    const cutAt = cut;
+    const L = tube.getLength(), T = Math.max(450, Math.min(2200, 350 + Math.sqrt(reach * L) * 520));
+    return new Promise((done) => {
+      const start = performance.now();
+      const tick = (now) => {
+        if (round !== g.round || cut !== cutAt) return done();
+        const k = Math.min((now - start) / T, 1);
+        const u = reach * (1 - (2 * k - 1) * (2 * k - 1)); // up, a pause at the top, down
+        ball.position.copy(tube.getPointAt(Math.max(0, u)));
+        ball.scale.setScalar(tube.userData && tube.userData.open ? 1 : 0.7 + 0.3 * (1 - Math.min(1, u * 20))); // an open track: no pipe to shrink into
+        if (k < 1) return requestAnimationFrame(tick);
+        ball.scale.setScalar(1);
+        done();
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
   /** A hazard step: from inside a hazard zone, straight to its destination. */
   const drowned = (p, q) => { const z = jumpFrom(p, q); return !!z && z.kind === "hazard"; };
 
   /** The ball sinks where it went in — ripples, a pause — then pops up at the
    *  hazard's destination. 1.4 s in all: long enough to feel the loss. */
-  function splashDown(at, back, round) {
+  // skin: the hazard's — a serac (mountain) catches the ball in falling ice:
+  // no water there, so no rings and no splash, a burst of ice shards instead
+  function splashDown(at, back, round, edge = null, skin = "") {
     const cutAt = cut;
     buzz(25);
-    sound("splash");
+    // Off a raised edge (a pier, a boardwalk, a crevasse's lip): the water is
+    // below. The ball carries on outward in a short falling arc from the edge
+    // down to it, and splashes there. It never hovers at deck height.
+    const surf = g.course && g.course.userData.surfaceAt ? g.course.userData.surfaceAt(at.x, at.z) : at.y - BALL_R;
+    const drop = at.y - BALL_R - surf;
+    const fall = drop > 0.25 ? Math.sqrt((2 * drop) / GRAVITY) : 0; // seconds, under gravity
+    const from = edge || at.clone();
+    const land = at.clone().setY(surf + BALL_R * 0.4);
     return new Promise((done) => {
-      const start = performance.now();
-      const rings = makeSplash(at);
-      scene.add(rings.group);
+      const t0 = performance.now();
+      let rings = null, start = 0;
       const tick = (now) => {
+        if (round !== g.round || cut !== cutAt) {
+          if (rings) (scene.remove(rings.group), disposeCourse(rings.group));
+          return done();
+        }
+        // the fall first
+        const tf = (now - t0) / 1000;
+        if (tf < fall) {
+          const k = tf / fall;
+          ball.position.lerpVectors(from, land, k); // on outward at its speed
+          ball.position.y = from.y + (land.y - from.y) * k * k; // and down, faster and faster
+          return requestAnimationFrame(tick);
+        }
+        if (!rings) {
+          start = now;
+          at = land;
+          if (skin === "serac") {
+            sound("thud");
+            for (let n = 0; n < 6; n++) causes.at(ball.position, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, { kind: "ice" });
+            rings = { group: new THREE.Group(), step() {} };
+          } else {
+            sound("splash");
+            rings = makeSplash(land.clone().setY(surf + 0.5), { open: drop > 0.25 });
+          }
+          scene.add(rings.group);
+        }
         const t = (now - start) / 1000;
         if (round !== g.round || cut !== cutAt) {
           scene.remove(rings.group);
@@ -1125,6 +1887,25 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
         f.len += Math.hypot(path[j + 1][0] - path[j][0], path[j + 1][1] - path[j][1]);
       }
       f.h = Math.min(0.35 + f.len * 0.16, 2.6);
+      // one flight, one arc. The flight's first point is still on the ramp:
+      // the ball rolls up it to the crest (the highest ground under the
+      // flight) and leaves the ground there; from the crest it flies one
+      // parabola down to where the chain lands it. Adding the arc on top of
+      // the ground (as before) put the ramp's own hump under the arc: two
+      // humps, a "double jump".
+      const pt = (d) => {
+        let j = s;
+        while (j < e - 1 && f.starts[j - s + 1] <= d) j++;
+        const a0 = f.starts[j - s], a1 = f.starts[j - s + 1] ?? f.len, k = a1 > a0 ? (d - a0) / (a1 - a0) : 0;
+        return [path[j][0] + (path[j + 1][0] - path[j][0]) * k, path[j][1] + (path[j + 1][1] - path[j][1]) * k];
+      };
+      let crest = 0, top = -Infinity;
+      for (let q = 0; q <= 24; q++) {
+        const d = (q / 24) * f.len, [x, z] = pt(d), gh = ground(x, z);
+        if (gh > top + 1e-6) (top = gh), (crest = d);
+      }
+      const [lx, lz] = path[e];
+      f.crest = crest; f.top = top; f.land = ground(lx, lz);
       for (let j = s; j < e; j++) at.set(j, { f, off: f.starts[j - s], seg: f.starts[j - s + 1] ?? f.len });
     }
     return at;
@@ -1151,6 +1932,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       const raf = window.requestAnimationFrame;
       const requestAnimationFrame = (f) => raf(guard(f));
       let i = 0;
+      rolledBack = -1;
+      dropY = null;
+      dropT = 0;
       air.y = BALL_R + ground(path[0][0], path[0][1]);
       air.vy = air.gvy = 0;
       air.up = false;
@@ -1166,7 +1950,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
         const drop = holed && i === path.length - 2;
         // into the water: splash, sink, a beat, then back where the hazard sends it
         if (drowned(path[i], path[i + 1])) {
-          return splashDown(sinkPoint(path[i], path[i + 1], from), to, round).then(() => {
+          const hz = jumpFrom(path[i], path[i + 1]);
+          return splashDown(sinkPoint(path[i], path[i + 1], from), to, round, ball.position.clone(), hz && hz.skin).then(() => {
             mood.shake(performance.now());
             air.t = 0;
             i++;
@@ -1181,17 +1966,43 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
           const kind = on && { sand: "sand", wetsand: "sand", ice: "ice", puddle: "puddle", flowerbed: "flowers" }[on.skin];
           if (kind && !(flights && flights.get(i))) sound(kind, Math.min(1, 0.25 + len / 2.2));
         }
-        // a sharp turn is a bounce: a knock off timber, a boing off a mushroom
-        if (i > 0 && len > 0.15) {
+        // a bounce: a knock off timber, a boing off a mushroom. The chain marks
+        // every one ("b"), glancing and slow ones too; an older realm says
+        // nothing, and a sharp turn in the path stands in for it
+        if (i > 0) {
           const ax = path[i][0] - path[i - 1][0], ay = path[i][1] - path[i - 1][1], l0 = Math.hypot(ax, ay);
-          const cos = l0 > 0.15 ? (ax * (path[i + 1][0] - path[i][0]) + ay * (path[i + 1][1] - path[i][1])) / (l0 * len) : 1;
-          if (cos < 0.6) {
+          const cos = l0 > 0.15 && len > 0.15 ? (ax * (path[i + 1][0] - path[i][0]) + ay * (path[i + 1][1] - path[i][1])) / (l0 * len) : 1;
+          const told = typeof why === "string" && why.length === path.length;
+          if (told ? why[i] === "b" : cos < 0.6) {
             const post = g.s.posts.some((p) => Math.hypot(p.c[0] - path[i][0], p.c[1] - path[i][1]) < p.r + 1.2);
-            sound(post ? "boing" : "knock", Math.min(1, len / 2));
+            // louder the faster it hits, never silent
+            sound(post ? "boing" : "knock", Math.max(0.2, Math.min(1, Math.max(l0, len) / 2)));
           }
         }
         const ms = drop ? 320 : Math.max(MS_PER_STEP, (len / SHOW_SPEED) * 1000);
+        // a roll-back at a tube's mouth: the ball climbs part way into it and
+        // slides back down before the path goes on (once per point)
+        const back = !jump && i > 0 && rolledBack !== i && rollBackAt(path, i);
+        if (back) {
+          rolledBack = i;
+          return climbBack(back, round).then(() => {
+            air.t = 0;
+            step();
+          });
+        }
+        // too fast (or slanted) into an open loop: up the track, off it, and down in front
+        const off = !jump && flewOff(path, i);
+        if (off) {
+          return rideLoop(off, from, round, 0.9, to).then(() => {
+            air.t = 0;
+            i++;
+            step();
+          });
+        }
         if (jump) {
+          // the timed pieces where the chain had them as the ball went in (a blowhole spouting)
+          clock = (g.tick0 || 0) + i;
+          showClock(clock);
           return through(jump, from, to, round).then(() => {
             air.t = 0;
             i++;
@@ -1229,9 +2040,20 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
           if (!jump && !drop) {
             const fl = flights && flights.get(i);
             if (fl) {
-              const u = (fl.off + (fl.seg - fl.off) * k) / fl.f.len;
-              ball.position.y = BALL_R + ground(ball.position.x, ball.position.z) + fl.f.h * 4 * u * (1 - u);
-            } else if (flights) ball.position.y = BALL_R + ground(ball.position.x, ball.position.z);
+              const F = fl.f, d = fl.off + (fl.seg - fl.off) * k, gh = ground(ball.position.x, ball.position.z);
+              if (d <= F.crest) ball.position.y = BALL_R + gh; // still rolling up to the lip
+              else {
+                const v = (d - F.crest) / Math.max(1e-6, F.len - F.crest);
+                // from the lip's height down to the landing's, plus one arc; never
+                // through the ground it flies over
+                const y = F.top + (F.land - F.top) * v + F.h * 4 * v * (1 - v);
+                ball.position.y = BALL_R + Math.max(gh, y);
+              }
+              // a flight lands where it lands: no fall left over from before it
+              dropY = ball.position.y;
+              dropV = 0;
+              dropT = now;
+            } else if (flights) ball.position.y = fallTo(BALL_R + ground(ball.position.x, ball.position.z), now);
             else fly(ball.position);
           }
           if (drop && raw > 0.6) {
@@ -1239,6 +2061,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
             ball.position.y -= sink * 0.9;
             ball.scale.setScalar(1 - sink * 0.5);
           }
+          if (push && push.kind === "slope") glowSlope(path[i][0], path[i][1]);
           if (push) {
             const label = causes.at(ball.position, vx * perSec, vy * perSec, push);
             if (label) (g.cause = { label, at: performance.now() }), publish();
@@ -1280,7 +2103,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
    */
   function linked(link) {
     if (!link || !g.list) return null;
-    if (link.id) return g.list.find((h) => h.id === link.id) || null;
+    if (link.id) return (g.all || g.list).find((h) => h.id === link.id) || null; // an archived hole too, by its id
     if (!link.cup || !link.n) return null;
     const cup = g.list.filter((h) => worldOf(h) === link.cup);
     return cup.find((h) => Math.round(h.order) === link.n) || cup[link.n - 1] || null;
@@ -1289,7 +2112,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   async function start(link) {
     const list = await chain.holes();
     if (!alive) return; // destroyed while the chain answered (a remount in dev)
-    g.list = list.sort(byNumber);
+    // a hole another has replaced (same cup, same place) stays playable by its
+    // link, but only the current one fills the cup
+    g.all = list;
+    g.list = list.filter((h) => !h.next).sort(byNumber);
     if (!g.list.length) throw new Error("no hole is registered on this chain");
     // a string is a realm id, as before
     const asked = linked(typeof link === "string" ? { id: link } : link);
@@ -1301,9 +2127,17 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     requestAnimationFrame(frame);
   }
 
+  promo.attach({ g, chain, fire, ball: () => ball, every: () => everyOf(), setClock: (t) => (clock = t) }); // ?promo only
   return {
     start,
     load,
+    /** The hole a cup and place name ({ cup, n }), or null. */
+    find: (link) => {
+      const h = linked(link);
+      return h ? h.id : null;
+    },
+    /** The hole being played. */
+    current: () => g.id,
     /** Whether the page's link named a hole that exists here. */
     linked: () => !!g.linked,
     /** Play a world: its first hole, and its holes in the menu. */
@@ -1322,7 +2156,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     /** Leave the title screen: show the hole whole, then close on the ball. */
     play() {
       g.started = true;
-      closeIn = setTimeout(() => setView("ball"), OVERVIEW_MS);
+      closeIn = setTimeout(() => setView(home()), OVERVIEW_MS);
     },
     /**
      * Plays a list of "angle,power" shots as a player would, pulling the
@@ -1421,9 +2255,82 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     },
     /** Toggle between the whole course and the ball. */
     toggleView: () => setView(g.view === "ball" ? "overview" : "ball"),
+    /** The aim mode for the next round ("assisted" | "pro"); a round under way is restarted. */
+    setMode(m) {
+      mode = m === "pro" ? "pro" : "assisted";
+      if (g.shots && g.shots.length && g.roundMode !== mode) (newRound(), setView(home()));
+      publish();
+    },
+    /** ?camlog only: [yaw°, distance to the ball, widening] per frame. */
+    camLog: () => camLog.splice(0),
+    /** ?camlog only: the ball and a point 3 units along the aim, on screen (y up), and the gnome's visibility. */
+    camAim: () => {
+      const B = ball.position, p = ndcTop.set(B.x + Math.cos(shot.angle) * 3, B.y, B.z + Math.sin(shot.angle) * 3).project(camera);
+      const px = p.x, py = p.y, q = ndcBot.copy(B).project(camera);
+      return { ball: [+q.x.toFixed(2), +q.y.toFixed(2), +q.z.toFixed(3)], ahead: [+px.toFixed(2), +py.toFixed(2)], seen: !occluded(camera.position, headAt.copy(B).setY(B.y + 0.7)) }; // the same test the camera uses
+    },
+    /** ?camlog only: the ground along the camera→head line. */
+    sightProbe: () => {
+      const B = ball.position, P = camera.position, out = { ball: B.toArray().map((v) => +v.toFixed(2)), groundAtBall: +ground(B.x, B.z).toFixed(2), cam: P.toArray().map((v) => +v.toFixed(2)), line: [] };
+      for (let k = 1; k < 8; k++) { const t = k / 8, x = B.x + (P.x - B.x) * t, z = B.z + (P.z - B.z) * t; out.line.push([+(B.y + 0.7 + (P.y - B.y - 0.7) * t).toFixed(2), +ground(x, z).toFixed(2)]); }
+      return out;
+    },
+    /** ?camlog only: the meshes in view now, by their parent's name (what draws). */
+    inView: () => {
+      const f = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      const out = {};
+      scene.traverseVisible((o) => {
+        if (!(o.isMesh || o.isLine || o.isPoints || o.isSprite)) return;
+        if (o.frustumCulled !== false && o.geometry && !f.intersectsObject(o)) return;
+        let k = o.name || "", p = o.parent;
+        while (!k && p) (k = p.name || (p.userData && p.userData.kind) || ""), (p = p.parent);
+        if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+        const c = o.geometry.boundingSphere.center.clone().applyMatrix4(o.matrixWorld), r = o.geometry.boundingSphere.radius * o.matrixWorld.getMaxScaleOnAxis();
+        k = `${o.type} r${Math.round(r)} d${Math.round(c.distanceTo(camera.position))} v${o.geometry.attributes.position ? o.geometry.attributes.position.count : 0}${o.isInstancedMesh ? " inst" + o.count : ""}`;
+        out[k] = (out[k] || 0) + 1;
+      });
+      return out;
+    },
+    /** ?camlog only: which way the camera looks across the board (radians). */
+    camHeading: () => { const d = camera.getWorldDirection(ndcTop); return Math.atan2(d.z, d.x); },
+    /** ?camlog only: the follow's inner state. */
+    camInner: () => ({ swing: +swing.toFixed(2), pen, rise: +rise.toFixed(2), wide: +wide.toFixed(2), yaw: +yaw.toFixed(2) }),
+    /** ?camlog only: how much of the view is right in front of the lens — the share of a 5×5 grid of rays that hit the scene nearer than 2. */
+    lensFill: () => {
+      const rc = new THREE.Raycaster(), v = new THREE.Vector2();
+      rc.camera = camera;
+      rc.far = 2;
+      let near = 0;
+      for (let i = 0; i < 5; i++)
+        for (let j = 0; j < 5; j++) {
+          rc.setFromCamera(v.set(-0.8 + i * 0.4, -0.8 + j * 0.4), camera);
+          // (lines are picked up a whole unit wide: bunting wires, not a wall in the face)
+          const hit = rc.intersectObjects(scene.children, true).find((h) => h.object.visible && !h.object.isSprite && !h.object.isPoints && !h.object.isLine && h.object !== marker && !(h.object.material && h.object.material.transparent && h.object.material.opacity < 0.5));
+          if (hit) {
+            near++;
+            if (!hit.object.geometry.boundingSphere) hit.object.geometry.computeBoundingSphere();
+            const r = Math.round(hit.object.geometry.boundingSphere.radius * hit.object.matrixWorld.getMaxScaleOnAxis());
+            lensWho[r] = (lensWho[r] || 0) + 1;
+          }
+        }
+      return near / 25;
+    },
+    /** ?camlog only: the radius of what the lens probe hit, counted. */
+    lensWho: () => lensWho,
+    /** ?camlog only: where the camera is now. */
+    camPose: () => camera.position.toArray(),
+    /** The camera: "classic" | "far" | "third". */
+    setCam(m) {
+      g.cam = ["classic", "far", "third"].includes(m) ? m : "classic";
+      // every switch starts clean: the chase state reset, a pull under way
+      // dropped, and the pose eased from where the camera actually is
+      resetFollow();
+      if (dragging) (dragging = g.aiming = false), (press = null), dropAim();
+      setView(home());
+    },
     reset() {
       newRound();
-      setView("ball");
+      setView(home());
     },
     shoot: fire,
     chain,
@@ -1447,7 +2354,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       clearTimeout(later);
       cut++; // every animation still running stops at its next frame
       if (g.course) disposeCourse(g.course);
-      for (const o of [ball, aim, band, arrow, confetti && confetti.group]) if (o) disposeCourse(o);
+      for (const o of [ball, aim, band, confetti && confetti.group]) if (o) disposeCourse(o);
       renderer.dispose();
     },
   };

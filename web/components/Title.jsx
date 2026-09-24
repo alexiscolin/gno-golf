@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { sound } from "@/lib/feel";
+import { Button } from "@/components/ui";
 
 // What the gnomes are up to while the game loads. Silly on purpose: a wait
 // reads shorter when something is going on.
@@ -195,10 +196,10 @@ export default function Title({ onStart, loading = false, world }) {
         </svg>
         <p className="title__tag">“mini-golf on-chain”</p>
         {ready ? (
-          <button className="btn btn--play btn--cta btn--pop" onClick={() => (sound("start"), onStart())}>
+          <Button variant="primary" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), onStart())}>
             Play
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12 H18 M13 6 L19 12 L13 18" /></svg>
-          </button>
+          </Button>
         ) : (
           <Loader loading={loading} onDone={done} world={world} />
         )}

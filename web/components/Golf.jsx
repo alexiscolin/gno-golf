@@ -9,6 +9,7 @@ import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
 import Share from "@/components/Share";
+import { Button, Segmented, Toggle, Sheet, SheetClose } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, medalOf, parOf, setPars, UNLOCKS } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 
@@ -46,9 +47,6 @@ function useConfig() {
 const rolling = { k: 0 };
 
 /** The close button's X, the same in every sheet. */
-const CloseX = () => (
-  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4 16 16M16 4 4 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
-);
 
 const short = (a) => (a ? `${a.slice(0, 4)}…${a.slice(-3)}` : "");
 
@@ -87,6 +85,25 @@ export default function Golf() {
     return own;
   });
   const [menu, setMenu] = useState(false);
+  const [board, setBoard] = useState(false); // the leaderboard sheet
+  // the aim mode, kept in this browser: assisted (the whole path) or pro
+  const [aim, setAimState] = useState(() => {
+    try {
+      return localStorage.getItem("gnogolf.aim") === "pro" ? "pro" : "assisted";
+    } catch {
+      return "assisted";
+    }
+  });
+  const [askAim, setAskAim] = useState(null); // a mode waiting for the player's yes (a round under way)
+  const setAim = (m, sure = false) => {
+    if (m === aim) return;
+    // a round under way restarts in the new mode: asked once, in the game's own dialog
+    if (!sure && s && s.shots && s.shots.length && !s.holed) return setMenu(false), setAskAim(m);
+    setAskAim(null);
+    try { localStorage.setItem("gnogolf.aim", m); } catch {}
+    setAimState(m);
+    game.current && game.current.setMode && game.current.setMode(m);
+  };
   const [chainName, setChainName] = useState("");
   // the curtain between holes: shut on the way out, open once the next is built
   const [curtain, setCurtain] = useState(null);
@@ -178,10 +195,12 @@ export default function Golf() {
     if (!cfg || !canvas.current) return;
 
     const g = createGame(canvas.current, {
-      rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, onChange: setS,
+      rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), onChange: setS,
       onHoled: ({ id, strokes }) => holedRef.current(id, strokes),
     });
     game.current = g;
+    // ?camlog: the game within reach of the camera probe (a test hook)
+    if (/[?&]camlog/.test(window.location.search)) window.__g = g;
 
     // a dev remount destroys this game while it is still starting: it must
     // not then drive the live one
@@ -228,6 +247,17 @@ export default function Golf() {
   }, [holeId, chainName]);
 
   // a different account or network in Adena: forget the connection
+  // an "add me as a friend" link: the address joins this browser's friends
+  useEffect(() => {
+    const f = new URLSearchParams(window.location.search).get("friend");
+    if (f && /^g1[0-9a-z]{38}$/.test(f)) {
+      addFriend(f);
+      const p = new URLSearchParams(window.location.search);
+      p.delete("friend");
+      window.history.replaceState(window.history.state, "", window.location.pathname + (String(p) ? `?${p}` : ""));
+    }
+  }, []);
+
   // a player Adena already knows is shown as such from the start, and follows
   // the account picked in Adena
   useEffect(() => {
@@ -292,7 +322,7 @@ export default function Golf() {
     try {
       const chain = game.current.chain;
       const tx = await recordRound({
-        address: account.address, realm: chain.realm, hole: s.id, shots: s.shots, pieces: s.pieces, period: s.period, price: gasPrice,
+        address: account.address, realm: chain.realm, hole: s.id, shots: s.shots, pieces: s.pieces, period: s.period, mode: s.roundMode || "assisted", price: gasPrice,
         chainId: chainId || (await within(chain.chainId())), rpc: chain.rpc,
       });
       within(chain.balance(account.address)).then(setFunds).catch(() => {});
@@ -340,13 +370,49 @@ export default function Golf() {
   }, [holeId, curtain]);
 
   const holed = s && s.holed;
-  // the address bar follows the hole being played (no history entry per shot)
+  // The address bar follows the screen: the title is the bare page, the cups
+  // ?cup=<world>, the picker adds &gnome=, a hole ?cup=&hole=&gnome=. A new
+  // screen is a new history entry (Back returns to the one before); moving
+  // within a hole — next hole, another gnome — only rewrites the current one.
   const place = s && s.place, world = s && s.world;
+  const lastScreen = useRef(null);
   useEffect(() => {
-    if (!playing || !place) return;
-    const url = holeLink({ world, place }, gnome, window.location.pathname);
-    if (url !== window.location.pathname + window.location.search) window.history.replaceState(null, "", url);
-  }, [playing, place, world, gnome]);
+    if (!cfg) return;
+    const keep = new URLSearchParams(window.location.search);
+    const q = new URLSearchParams();
+    for (const k of ["rpc", "web"]) if (keep.get(k)) q.set(k, keep.get(k));
+    if (screen === "play" && place) {
+      q.set("cup", world || "garden");
+      q.set("hole", String(place));
+      q.set("gnome", gnome);
+    } else if (screen === "worlds" && world) q.set("cup", world);
+    else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
+    else if (screen === "play") return; // the hole is not known yet: wait for it
+    const url = window.location.pathname + (String(q) ? `?${q}` : "");
+    const here = window.location.pathname + window.location.search;
+    const moved = lastScreen.current !== null && lastScreen.current !== screen;
+    lastScreen.current = screen;
+    if (url === here) return;
+    if (moved) window.history.pushState({ screen }, "", url);
+    else window.history.replaceState({ screen }, "", url);
+  }, [cfg, screen, place, world, gnome]);
+  // Back and Forward: back to that screen, and that hole, without reloading the scene
+  useEffect(() => {
+    const onPop = (e) => {
+      const p = new URLSearchParams(window.location.search);
+      const sc = (e.state && e.state.screen) || (p.get("hole") ? "play" : p.get("cup") ? "worlds" : "title");
+      lastScreen.current = sc; // arriving here is not a new step
+      setMenu(false);
+      setScreen(sc);
+      if (sc === "play" && game.current) {
+        const cup = p.get("cup"), n = Number(p.get("hole"));
+        const h = game.current.find && game.current.find({ cup, n });
+        if (h && h !== (game.current.current && game.current.current())) goTo(h);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  });
   // the stroke's weather (?weather= fakes it, for screenshots)
   const wx = cfg && cfg.weather
     ? { wind: cfg.weather.includes("wind") ? [0.05, -0.03] : null, rain: cfg.weather.includes("rain"), fog: cfg.weather.includes("fog"), storm: cfg.weather.includes("storm") }
@@ -392,7 +458,7 @@ export default function Golf() {
           }}
         />
       )}
-      {screen === "pick" && <Picker gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} onBack={() => {
+      {screen === "pick" && <Picker aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} onBack={() => {
         sound("blip");
         // leaving on a locked gnome: back to the one really chosen
         if (!unlocked(gnome)) { let saved = null; try { saved = localStorage.getItem("gnogolf.gnome"); } catch {} setGnome(saved && unlocked(saved) ? saved : "classic"); }
@@ -420,6 +486,7 @@ export default function Golf() {
               <span className="eyebrow">Strokes</span>
               <strong>{s.strokes}</strong>
               <span className="card__par">par {parOf(s.id)}</span>
+              {(s.roundMode || s.mode) === "pro" && <span className="pro-chip" title="Pro: no aim line">PRO</span>}
             </div>
             <Weather w={wx} flash={s.flash || 0} until={s.period != null ? (s.period + 1) * 300 * 1000 : null} />
             <div className="hud__right">
@@ -469,9 +536,7 @@ export default function Golf() {
                       </button>
                     );
                   })()}
-                  <button className="round round--small round--x" aria-label="Close" onClick={() => setMenu(false)}>
-                    <CloseX />
-                  </button>
+                  <SheetClose onClose={() => setMenu(false)} inline />
                 </div>
                 <section className="drawer__me">
                   <div className="me__stats">
@@ -483,20 +548,17 @@ export default function Golf() {
                     </div>
                   </div>
                   <div className="me__row">
-                    <button className="btn btn--main" onClick={() => { setMenu(false); setCardOpen(true); }}>The cup</button>
-                    <button className="btn btn--ghost" onClick={() => { setMenu(false); setScreen("pick"); }}>Change gnome</button>
-                    <button className="btn btn--ghost" onClick={() => { setMenu(false); setScreen("title"); }}>Main menu</button>
-                    {account && <button className="btn btn--ghost drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</button>}
+                    <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}>The cup</Button>
+                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("pick"); }}>Change gnome</Button>
+                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("title"); }}>Main menu</Button>
+                    {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
                 <section className="drawer__settings" aria-label="Settings">
                   <span className="eyebrow">Settings</span>
+                  <AimSetting aim={aim} onChange={setAim} />
                   {[["sound", "Sound"], ["vibe", "Vibration"]].map(([k, label]) => (
-                    <label key={k} className="switch">
-                      <span>{label}</span>
-                      <input type="checkbox" role="switch" checked={prefs[k]} onChange={() => toggle(k)} />
-                      <i aria-hidden="true" />
-                    </label>
+                    <Toggle key={k} label={label} checked={prefs[k]} onChange={() => toggle(k)} />
                   ))}
                   <button
                     className={"btn btn--ghost btn--wipe" + (wipe ? " btn--danger" : "")}
@@ -549,13 +611,26 @@ export default function Golf() {
             </div>
           )}
 
+          <Button variant="chip" className="lbchip" badge={SOON ? "Coming soon" : null} onClick={() => (sound("blip"), setBoard(true))} aria-label="Leaderboard">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v4a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6" /></svg>
+            <span>Leaderboard</span>
+          </Button>
           <footer className="hud hud--bottom">
-            <button className="btn btn--ghost" onClick={() => game.current.reset()}>
-              Restart
-            </button>
-            <button className="btn btn--ghost" onClick={() => game.current.toggleView()}>
-              {s.view === "ball" ? "Whole course" : "Follow gnome"}
-            </button>
+            <Button onClick={() => game.current.reset()}>Restart</Button>
+            <Button
+              className="cam-btn"
+              aria-label={`Camera: ${CAMS[s.cam] || "Classic"} — click to change`}
+              title={`Camera: ${CAMS[s.cam] || "Classic"} — click to change`}
+              onClick={() => {
+                const next = CAM_ORDER[(CAM_ORDER.indexOf(s.cam || "classic") + 1) % CAM_ORDER.length];
+                try { sessionStorage.setItem(CAM_KEY, next); } catch {}
+                sound("blip");
+                game.current.setCam(next);
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" /></svg>
+              {CAMS[s.cam] || "Classic"} <span aria-hidden="true">▾</span>
+            </Button>
           </footer>
         </>
       )}
@@ -617,14 +692,14 @@ export default function Golf() {
               );
             })()}
             <div className="banner__row">
-              <button className="btn btn--ghost" onClick={() => game.current.reset()}>
+              <Button variant="secondary" onClick={() => game.current.reset()}>
                 Play again
-              </button>
+              </Button>
               {!(record && record.hash !== undefined && !record.error) && (
-                <button className="btn btn--chain" disabled={record === "signing"} onClick={recordIt}>
+                <Button variant="chain" disabled={record === "signing"} onClick={recordIt}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record === "signing" ? "Waiting for Adena…" : account ? `Save on-chain · ~${costOf(s.shots.length, s.pieces, gasPrice)} GNOT` : "Save my score on-chain"}
-                </button>
+                </Button>
               )}
               <button
                 className="btn btn--main"
@@ -640,17 +715,29 @@ export default function Golf() {
         </div>
       )}
 
+      {askAim && (
+        <Sheet className="confirm" role="alertdialog" label="Switch aim mode" onClose={() => setAskAim(null)}>
+          <h2>Switch to {askAim === "pro" ? "Pro" : "Assisted"}?</h2>
+          <p>This restarts the hole.</p>
+          <div className="banner__row">
+            <Button onClick={() => setAskAim(null)}>Cancel</Button>
+            <Button variant="primary" onClick={() => setAim(askAim, true)}>Restart in {askAim === "pro" ? "Pro" : "Assisted"}</Button>
+          </div>
+        </Sheet>
+      )}
+
+      {board && s && (
+        <Boards web={(game.current && game.current.chain.web) || ""} mode={aim} s={s} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} />
+      )}
+
       {cardOpen && s && (
-        <div className="sheet" onClick={() => setCardOpen(false)}>
-          <div className="sheet__in cardsheet" role="dialog" aria-modal="true" aria-label="Scorecard" onClick={(e) => e.stopPropagation()}>
-            <button className="round round--small round--x real__close" aria-label="Close" onClick={() => setCardOpen(false)}><CloseX /></button>
+        <Sheet className="cardsheet" label="Scorecard" onClose={() => setCardOpen(false)}>
             <span className="eyebrow">Gnogolf · the cup and its card</span>
             <h2>The cup</h2>
             <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} />
             <Scorecard holes={s.holes} card={card} current={s.id} world={s.world} />
             <Leaderboard chain={game.current && game.current.chain} me={account && account.address} />
-          </div>
-        </div>
+        </Sheet>
       )}
 
       {curtain && (
@@ -711,15 +798,15 @@ export default function Golf() {
               )}
               <div className="banner__row">
                 {fatal ? (
-                  <button className="btn btn--main" onClick={() => window.location.reload()}>{kind === "bug" ? "Reload" : "Try again"}</button>
+                  <Button variant="primary" onClick={() => window.location.reload()}>{kind === "bug" ? "Reload" : "Try again"}</Button>
                 ) : kind === "load" ? (
-                  <button className="btn btn--main" onClick={() => { g.clearError(); g.load(holeNow); }}>Try again</button>
+                  <Button variant="primary" onClick={() => { g.clearError(); g.load(holeNow); }}>Try again</Button>
                 ) : kind === "draw" ? (
-                  <button className="btn btn--main" onClick={() => { g.clearError(); setMenu(true); }}>Pick a hole</button>
+                  <Button variant="primary" onClick={() => { g.clearError(); setMenu(true); }}>Pick a hole</Button>
                 ) : kind === "limit" ? (
-                  <button className="btn btn--main" onClick={() => { g.clearError(); g.reset(); }}>Restart the hole</button>
+                  <Button variant="primary" onClick={() => { g.clearError(); g.reset(); }}>Restart the hole</Button>
                 ) : (
-                  <button className="btn btn--main" onClick={() => g.clearError()}>Keep playing</button>
+                  <Button variant="primary" onClick={() => g.clearError()}>Keep playing</Button>
                 )}
               </div>
             </div>
@@ -764,9 +851,7 @@ function RecordState({ record, account, s, chain }) {
 function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName }) {
   const installed = hasAdena();
   return (
-    <div className="sheet" onClick={onClose}>
-      <div className="sheet__in real" role="dialog" aria-modal="true" aria-label="Play for real" onClick={(e) => e.stopPropagation()}>
-        <button className="round round--small round--x real__close" aria-label="Close" onClick={onClose}><CloseX /></button>
+    <Sheet className="real" label="Play for real" onClose={onClose}>
         <span className="eyebrow">Adena wallet</span>
         <h2>Play for real</h2>
         <p className="real__lead">
@@ -821,13 +906,13 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName }) {
             Install Adena ↗
           </a>
         ) : account ? (
-          <button className="btn btn--main btn--wide" onClick={onClose}>
+          <Button variant="primary" className="btn--wide" onClick={onClose}>
             Connected as {short(account.address)} — keep playing
-          </button>
+          </Button>
         ) : (
-          <button className="btn btn--main btn--wide" disabled={wallet.busy} onClick={onConnect}>
+          <Button variant="primary" className="btn--wide" disabled={wallet.busy} onClick={onConnect}>
             {wallet.busy ? "Check Adena…" : "Connect Adena"}
-          </button>
+          </Button>
         )}
         <p className="real__fine">
           Network: <span className="mono">{chainName}</span>
@@ -836,9 +921,23 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName }) {
             <> · <a href="https://faucet.gno.land" target="_blank" rel="noopener noreferrer">Get test GNOT ↗</a></>
           )}
         </p>
-      </div>
-    </div>
+    </Sheet>
   );
+}
+
+// the camera modes, in the order the button goes through them. A page always
+// opens in Classic; a mode picked since is kept for this tab's session only.
+const CAM_ORDER = ["classic", "third", "far"];
+const CAMS = { classic: "Classic", far: "Far", third: "Third person" };
+const CAM_KEY = "gnogolf.cam.session";
+function savedCam() {
+  try {
+    localStorage.removeItem("gnogolf.cam"); // the old, lasting choice: forgotten
+    const c = sessionStorage.getItem(CAM_KEY);
+    return CAM_ORDER.includes(c) ? c : "classic";
+  } catch {
+    return "classic";
+  }
 }
 
 /** Whether this player ever picked a gnome (a first visit has not). */
@@ -873,7 +972,7 @@ function savedGnome() {
   }
 }
 
-function Picker({ gnome, onChange, onPick, unlocked, onBack }) {
+function Picker({ gnome, onChange, onPick, unlocked, onBack, aim, onAim }) {
   const canvas = useRef(null);
   const preview = useRef(null);
   const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
@@ -917,17 +1016,36 @@ function Picker({ gnome, onChange, onPick, unlocked, onBack }) {
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
         <p className="pick__line">
-          {unlocked(skin.id) ? skin.line : <>🔒 {(UNLOCKS[skin.unlock] || { need: "Keep playing" }).need} to unlock</>}
+          {unlocked(skin.id) ? skin.line : <>🔒 {(UNLOCKS[skin.unlock] || { need: "Keep playing" }).need}</>}
         </p>
         <div className="pick__dots">
           {GNOMES.map((g) => (
             <span key={g.id} aria-current={g.id === skin.id} />
           ))}
         </div>
-        <button className="btn btn--main btn--play" onClick={() => (sound("start"), onPick())} disabled={!unlocked(skin.id)}>
+        <AimSetting aim={aim} onChange={onAim} compact />
+        <Button variant="primary" className="btn--play" onClick={() => (sound("start"), onPick())} disabled={!unlocked(skin.id)}>
           {unlocked(skin.id) ? "Choose this gnome" : "Locked"}
-        </button>
+        </Button>
       </div>
+    </div>
+  );
+}
+
+/** Assisted or Pro aim, with what it means — and what the chain can't check. */
+function AimSetting({ aim, onChange, compact = false }) {
+  return (
+    <div className={"aimset" + (compact ? " aimset--compact" : "")}>
+      <span className="aimset__label">Aim</span>
+      <Segmented label="Aim" value={aim} full={!compact} options={[["assisted", "Assisted"], ["pro", "Pro"]]} onChange={(m) => (sound("blip"), onChange(m))} />
+      <small className="aimset__help">
+        {aim === "pro" ? "No aim line · ranked apart" : "Full aim line"}
+        {aim === "pro" && (
+          <span className="aimset__info" tabIndex={0} title="The mode is on your word — the chain can't see your screen." aria-label="The mode is on your word — the chain can't see your screen.">
+            ⓘ
+          </span>
+        )}
+      </small>
     </div>
   );
 }
@@ -1096,10 +1214,11 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }) 
  */
 // The chain's leaderboard, read once for the sheets that show it at the same
 // time (Standings and Leaderboard): the same answer for 5 s.
-let board = { at: 0, p: null };
-const leaderboardOf = (chain) => {
-  if (!board.p || Date.now() - board.at > 5000) board = { at: Date.now(), p: chain.leaderboard() };
-  return board.p;
+let board = {};
+const leaderboardOf = (chain, mode = "assisted") => {
+  const b = board[mode];
+  if (!b || Date.now() - b.at > 5000) board[mode] = { at: Date.now(), p: chain.leaderboard(mode) };
+  return board[mode].p;
 };
 
 function Standings({ s, card, chain, me }) {
@@ -1162,34 +1281,316 @@ function Standings({ s, card, chain, me }) {
   );
 }
 
-/** The chain's ranking: the only board a score cannot be typed into. */
-function Leaderboard({ chain, me }) {
-  const [lb, setLb] = useState(null);
-  const [err, setErr] = useState(null);
+// Leaderboards are shown as "coming soon" until launch: false here, and the
+// badge and ribbon are gone
+const SOON = true;
+
+/** Until launch, an empty leaderboard says when it opens. */
+const ComingSoon = () => (
+  <div className="soon">
+    <span className="soon__badge">Coming soon</span>
+    <p>Leaderboards open at launch: record your rounds with Adena to take your place.</p>
+  </div>
+);
+
+// Players another script flags as likely bots (public/flags.json: { flags:
+// { addr: { score, reasons } } }), read once a session when a board opens.
+// Missing or broken: nobody is hidden.
+let flagsOnce = null;
+const flagsOf = () =>
+  (flagsOnce ||= fetch("flags.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((j) => (j && typeof j.flags === "object" && j.flags) || {})
+    .catch(() => ({})));
+const HIDE_AT = 0.5; // the checker's own self-test bot scores 0.61, a strong human up to 0.35
+function useFlags() {
+  const [f, setF] = useState({});
   useEffect(() => {
-    if (!chain) return;
     let live = true;
-    leaderboardOf(chain).then((b) => live && setLb(b)).catch((e) => live && setErr(String(e.message || e)));
+    flagsOf().then((x) => live && setF(x));
     return () => (live = false);
-  }, [chain]);
+  }, []);
+  return f;
+}
+/** Rows with the flagged ones taken out unless shown; the count taken out. */
+const screen_ = (rows, flags, all) => {
+  const out = all ? rows : rows.filter((r) => !(flags[r.player] && flags[r.player].score >= HIDE_AT));
+  return { rows: out, hidden: rows.length - out.length };
+};
+const FlagMark = ({ f }) =>
+  f && f.score >= HIDE_AT ? (
+    <em className="flag-mark" tabIndex={0} title={`Possibly automated: ${(f.reasons || []).join(", ") || "flagged"}`} aria-label={`Possibly automated: ${(f.reasons || []).join(", ")}`}>?</em>
+  ) : null;
+
+// Friends: addresses (or gno.land names, resolved once) kept in this browser.
+const FRIENDS = "gnogolf.friends";
+export const loadFriends = () => {
+  try {
+    const f = JSON.parse(localStorage.getItem(FRIENDS) || "[]");
+    return Array.isArray(f) ? f.filter((x) => x && /^g1[0-9a-z]{38}$/.test(x.addr)) : [];
+  } catch {
+    return [];
+  }
+};
+export const saveFriends = (f) => {
+  try {
+    localStorage.setItem(FRIENDS, JSON.stringify(f.slice(0, 49)));
+  } catch {}
+  return f;
+};
+export function addFriend(addr, name = "") {
+  const f = loadFriends();
+  if (!/^g1[0-9a-z]{38}$/.test(addr) || f.some((x) => x.addr === addr)) return f;
+  return saveFriends([...f, { addr, name }]);
+}
+
+/**
+ * You and your friends, on this hole and across the course, in the mode shown.
+ * Read with Bests / Standings, which rank anyone, named or not.
+ */
+function Friends({ s, chain, me, mode }) {
+  const [friends, setFriends] = useState(loadFriends);
+  const [hole, setHole] = useState(null);
+  const [course, setCourse] = useState(null);
+  const [adding, setAdding] = useState("");
+  const [note, setNote] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const who = [me, ...friends.map((f) => f.addr)].filter(Boolean);
+  const key = who.join(",");
+  useEffect(() => {
+    if (!chain || !who.length) return;
+    let live = true;
+    chain.bests(s.id, mode, who).then((b) => live && setHole(b)).catch(() => live && setHole({ rows: [] }));
+    chain.standings(mode, who).then((b) => live && setCourse(b)).catch(() => live && setCourse({ rows: [] }));
+    return () => (live = false);
+    // who is keyed by its join
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain, s.id, mode, key]);
+  const label = (a) => (a === me ? "You" : (friends.find((f) => f.addr === a) || {}).name || `${a.slice(0, 8)}…${a.slice(-4)}`);
+  const add = async (e) => {
+    e.preventDefault();
+    const v = adding.trim().replace(/^@/, "");
+    if (!v) return;
+    setNote(null);
+    let addr = v, name = "";
+    if (!/^g1[0-9a-z]{38}$/.test(v)) {
+      addr = await chain.resolveName(v).catch(() => "");
+      name = v;
+      if (!addr) return setNote(`No gno.land name “${v}” on this chain.`);
+    }
+    if (addr === me) return setNote("That's you — you're always here.");
+    setFriends(addFriend(addr, name));
+    setAdding("");
+  };
+  const drop = (addr) => setFriends(saveFriends(loadFriends().filter((f) => f.addr !== addr)));
+  const invite = me && `${window.location.origin}${window.location.pathname}?friend=${me}`;
+  const rows = (b, pick) => (b && b.rows ? [...b.rows].sort(pick) : null);
+  const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
   return (
-    <div className="lb">
-      <h3>Leaderboard <small>recorded on-chain</small></h3>
-      {err && <p className="note note--bad">{err}</p>}
-      {!lb && !err && <p className="lb__empty">Reading the chain…</p>}
-      {lb && lb.rows.length === 0 && <p className="lb__empty">Nobody has recorded a round yet. Connect Adena and be the first.</p>}
-      {lb && lb.rows.length > 0 && (
+    <div className="lb friends">
+      {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends.</p>}
+      <h3>{s.name} <small>par {(hole && hole.par) || parOf(s.id)}</small></h3>
+      {h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet.</p>}
+      {h && h.length > 0 && (
         <ol>
-          {lb.rows.map((r, i) => (
+          {h.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{r.player === me ? "You" : `${String(r.player).slice(0, 8)}…${String(r.player).slice(-4)}`}</span>
-              <span className="lb__holes">{r.holes}/{lb.holes}</span>
+              <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
+              <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
+              <strong>{vsPar(r.strokes - ((hole && hole.par) || parOf(s.id)))}</strong>
+            </li>
+          ))}
+        </ol>
+      )}
+      <h3>The course <small>{course ? `${course.holes} holes` : ""}</small></h3>
+      {c && c.length === 0 && <p className="lb__empty">No recorded rounds yet.</p>}
+      {c && c.length > 0 && (
+        <ol>
+          {c.map((r, i) => (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              <span className="lb__rank">{i + 1}</span>
+              <span className="lb__who">{label(r.player)}</span>
+              <span className="lb__holes">{r.holes} holes</span>
               <strong>{r.strokes}</strong>
             </li>
           ))}
         </ol>
       )}
+      <form className="friends__add" onSubmit={add}>
+        <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Add a friend: address or gno.land name" aria-label="Add a friend by address or gno.land name" />
+        <Button variant="secondary" type="submit">Add</Button>
+      </form>
+      {note && <p className="note note--warn">{note}</p>}
+      {friends.length > 0 && (
+        <ul className="friends__list">
+          {friends.map((f) => (
+            <li key={f.addr}>
+              <span>{f.name || `${f.addr.slice(0, 10)}…${f.addr.slice(-4)}`}</span>
+              <button className="linkish" onClick={() => drop(f.addr)} aria-label={`Remove ${f.name || f.addr}`}>remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {invite && (
+        <button
+          className="linkish friends__invite"
+          onClick={() => navigator.clipboard.writeText(invite).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1600)), () => {})}
+        >
+          {copied ? "Link copied — send it to a friend" : "Copy an “add me as a friend” link"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Strokes against par, the golf way: −1, E, +2. */
+const vsPar = (n) => (n === 0 ? "E" : n > 0 ? `+${n}` : `−${-n}`);
+
+/**
+ * The leaderboards, in a sheet: this hole's best rounds, and the whole
+ * course's. Read from the chain when the sheet opens, not before.
+ */
+function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = "" }) {
+  const [tab, setTab] = useState("friends");
+  const [mode, setMode] = useState(mine);
+  const [hb, setHb] = useState(null); // { par, players, rows } as loaded so far
+  const [err, setErr] = useState(null);
+  const [more, setMore] = useState(false); // a page is on its way
+  const PAGE = 10, TOP = 100;
+  const page = (offset) =>
+    chain.holeLeaderboard(s.id, offset, PAGE, mode).then((b) => ({ ...b, rows: b.rows || [], done: (b.rows || []).length < PAGE || offset + PAGE >= Math.min(TOP, b.players || 0) }));
+  useEffect(() => {
+    if (!chain || tab !== "hole") return;
+    let live = true;
+    setHb(null);
+    setErr(null);
+    page(0).then((b) => live && setHb(b)).catch((e) => live && setErr(String(e.message || e)));
+    return () => (live = false);
+    // page() reads chain and s.id, both listed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain, s.id, tab, mode]);
+  const loadMore = () => {
+    if (!hb || hb.done || more) return;
+    setMore(true);
+    page(hb.rows.length)
+      .then((b) => setHb((h) => ({ ...h, rows: [...h.rows, ...b.rows], done: b.done })))
+      .catch((e) => setErr(String(e.message || e)))
+      .finally(() => setMore(false));
+  };
+  const me_ = (p) => (p === me ? "You" : `${String(p).slice(0, 8)}…${String(p).slice(-4)}`);
+  const flags = useFlags();
+  const [showAll, setShowAll] = useState(false);
+  const shownHole = hb ? screen_(hb.rows, flags, showAll) : null;
+  // the connected player's gno.land name: the general boards list only named players
+  const [myName, setMyName] = useState(null);
+  useEffect(() => {
+    if (!chain || !me) return;
+    let live = true;
+    chain.nameOf(me).then((n) => live && setMyName(n)).catch(() => {});
+    return () => (live = false);
+  }, [chain, me]);
+  const self = (s.allHoles || []).find((h) => h.id === s.id);
+  const newer = self && self.next;
+  return (
+    <Sheet className="boards" label="Leaderboard" onClose={onClose}>
+        <span className="eyebrow">Recorded on-chain</span>
+        <h2>Leaderboard</h2>
+        <Segmented className="boards__modes" full role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["assisted", "Assisted"], ["pro", "Pro"]]} />
+        {mode === "pro" && <p className="boards__word">Pro rounds are ranked apart. The mode is on your word — the chain can't see your screen.</p>}
+        <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={[["friends", "Friends"], ["hole", "This hole"], ["course", "The course"]]} />
+        {tab !== "friends" && (
+          <p className="boards__ranked">
+            Ranked: players with a gno.land name ·{" "}
+            <a href={`${web}/r/gnoland/users`} target="_blank" rel="noopener noreferrer">get a name ↗</a>
+            {me && myName === "" && <> — get one to appear here</>}
+          </p>
+        )}
+        {tab === "friends" ? (
+          <Friends s={s} chain={chain} me={me} mode={mode} />
+        ) : tab === "hole" ? (
+          <div className="lb">
+            <h3>{s.name} <small>par {parOf(s.id)}{hb ? ` · ${hb.players} player${hb.players === 1 ? "" : "s"} finished` : ""}</small></h3>
+            {newer && (
+              <p className="note note--warn">
+                Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
+              </p>
+            )}
+            {err && <p className="note note--bad">{err}</p>}
+            {!hb && !err && <p className="lb__empty">Reading the chain…</p>}
+            {hb && hb.rows.length === 0 && (SOON ? <ComingSoon /> : <p className="lb__empty">No recorded round yet — connect Adena and be the first.</p>)}
+            {shownHole && shownHole.rows.length > 0 && (
+              <ol>
+                {shownHole.rows.map((r, i) => (
+                  <li key={r.player} className={r.player === me ? "me" : ""}>
+                    <span className="lb__rank">{i + 1}</span>
+                    <span className="lb__who">{me_(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}<FlagMark f={showAll && flags[r.player]} /></span>
+                    <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
+                    <strong>{vsPar(r.strokes - (hb.par || parOf(s.id)))}</strong>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {shownHole && (shownHole.hidden > 0 || showAll) && (
+              <button className="linkish" onClick={() => setShowAll((v) => !v)}>
+                {showAll ? "Hide flagged players" : `Show all (${shownHole.hidden} hidden)`}
+              </button>
+            )}
+            {hb && !hb.done && (
+              <Button className="boards__more" disabled={more} onClick={loadMore}>
+                {more ? "Reading…" : "Show more"}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <Leaderboard chain={chain} me={me} mode={mode} filter />
+        )}
+        {!SOON && <p className="real__fine">Only rounds recorded with Adena appear here: free play is computed by the chain but not kept.</p>}
+    </Sheet>
+  );
+}
+
+/** The chain's ranking: the only board a score cannot be typed into. */
+function Leaderboard({ chain, me, mode = "assisted", filter = false }) {
+  const [lb, setLb] = useState(null);
+  const flags = useFlags();
+  const [showAll, setShowAll] = useState(false);
+  const [err, setErr] = useState(null);
+  useEffect(() => {
+    if (!chain) return;
+    let live = true;
+    setLb(null);
+    leaderboardOf(chain, mode).then((b) => live && setLb(b)).catch((e) => live && setErr(String(e.message || e)));
+    return () => (live = false);
+  }, [chain, mode]);
+  return (
+    <div className="lb">
+      <h3>Leaderboard <small>recorded on-chain</small></h3>
+      {err && <p className="note note--bad">{err}</p>}
+      {!lb && !err && <p className="lb__empty">Reading the chain…</p>}
+      {lb && lb.rows.length === 0 && (SOON ? <ComingSoon /> : <p className="lb__empty">Nobody has recorded a round yet. Connect Adena and be the first.</p>)}
+      {lb && lb.rows.length > 0 && (() => {
+        const v = filter ? screen_(lb.rows, flags, showAll) : { rows: lb.rows, hidden: 0 };
+        return (
+          <>
+        <ol>
+          {v.rows.map((r, i) => (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              <span className="lb__rank">{i + 1}</span>
+              <span className="lb__who">{r.player === me ? "You" : `${String(r.player).slice(0, 8)}…${String(r.player).slice(-4)}`}<FlagMark f={showAll && flags[r.player]} /></span>
+              <span className="lb__holes">{r.holes}/{lb.holes}</span>
+              <strong>{r.strokes}</strong>
+            </li>
+          ))}
+        </ol>
+            {(v.hidden > 0 || (filter && showAll)) && (
+              <button className="linkish" onClick={() => setShowAll((x) => !x)}>
+                {showAll ? "Hide flagged players" : `Show all (${v.hidden} hidden)`}
+              </button>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }

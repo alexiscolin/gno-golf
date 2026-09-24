@@ -14,7 +14,7 @@ var me = course.Fit(&course.Simple{
 	World:     "town",
 	Order:     13,
 	Title:     "Roundabout",
-	Strokes:   3, // par
+	Strokes:   2, // par
 	Tee:       physics.V(12, 12),
 	Pin:       physics.V(28.5, 12),
 	Substeps:  26,

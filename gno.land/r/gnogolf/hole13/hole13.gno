@@ -1,4 +1,4 @@
-// Package hole13 is a lane that splits round a long flower bed and meets again: the wide way is through the bunker, the narrow way is clean.
+// Package hole13 is a lane that splits round a long flower bed and meets again: the wide way is through the bunker, the narrow way is clean, but a stump waits where the two meet.
 package hole13
 
 import (
@@ -22,6 +22,10 @@ var me = course.Fit(&course.Simple{
 		Walls: physics.Walls(
 			physics.Walls(physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(46, 16), 8)...), physics.Outline(physics.Stadium(physics.V(13, 4), physics.V(33, 9), 4)...)),
 		),
+		// a stump where the two ways meet, in the line off the narrow one
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(39, 6), R: 0.8}, Bounce: 0.6, Skin: "stump"},
+		},
 		Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(15, 10.2), Max: physics.V(31, 15.6), Scale: 0.5, Round: true, Skin: "sand"},
 		},

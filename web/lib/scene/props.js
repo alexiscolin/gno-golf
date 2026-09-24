@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, sway, grows, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share } from "./materials.js";
+import { C, ink, flat, sway, grows, swayLine, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share } from "./materials.js";
 import { animate } from "./state.js";
 import { GRASS } from "./common.js";
 
@@ -57,6 +57,7 @@ function tree(rand) {
   const kind = rand();
   if (kind < 0.22) {
     const g = new THREE.Group(), big = rand() < 0.2 ? 1.6 : 1, h = (1.4 + rand() * 0.8) * big;
+    g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
     const trunk = grows(new THREE.CylinderGeometry(0.2 * big, 0.3 * big, h, 7), C.bark);
     trunk.position.y = h / 2;
     g.add(trunk);
@@ -70,6 +71,7 @@ function tree(rand) {
   }
   if (kind < 0.34) {
     const g = new THREE.Group(), h = 3 + rand() * 1.5;
+    g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
     const trunk = grows(new THREE.CylinderGeometry(0.1, 0.14, h, 6), 0xefe9dd);
     trunk.position.y = h / 2;
     const crown = grows(new THREE.IcosahedronGeometry(0.8 + rand() * 0.3, 1), 0x8cc084);
@@ -79,6 +81,7 @@ function tree(rand) {
     return g;
   }
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   const h = 2.2 + rand() * 2.4;
   const trunk = grows(new THREE.CylinderGeometry(0.18, 0.24, h * 0.5, 7), C.bark);
   trunk.position.y = h * 0.25;
@@ -90,6 +93,7 @@ function tree(rand) {
 
 function bush(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   for (let i = 0; i < 3; i++) {
     const r = 0.45 + rand() * 0.4;
     const b = grows(new THREE.IcosahedronGeometry(r, 1), C.leaf);
@@ -109,6 +113,7 @@ function stone(rand) {
 
 function flower(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 5), sway(C.leafDark));
   stem.position.y = 0.35;
   const head = grows(new THREE.SphereGeometry(0.17, 8, 6), rand() > 0.5 ? C.petal : C.cream);
@@ -265,11 +270,14 @@ function fence(x0, x1, z) {
 /** A big garden flower: a tall bending stem, a leaf, a wide head of petals. */
 function bigFlower(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   const H = 1.6 + rand() * 0.9, lean = (rand() - 0.5) * 0.3;
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, H, 6), sway(C.leafDark));
   stem.position.y = H / 2;
   stem.rotation.z = lean;
-  const leafM = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 5), flat(C.leaf));
+  // every part sways with the stem (one shader, world-space), or the head and
+  // its leaf float off the stem in the wind
+  const leafM = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 5), sway(C.leaf));
   leafM.scale.set(1, 0.18, 0.45);
   leafM.position.set(0.22, H * 0.35, 0);
   leafM.rotation.z = -0.5;
@@ -277,7 +285,7 @@ function bigFlower(rand) {
   head.position.set(-Math.sin(lean) * H, Math.cos(lean) * H, 0);
   head.rotation.x = -0.5; // faces up and out, towards the camera side
   const colour = [C.petal, C.sun, 0x9b7fd1, 0xf29a6b, C.cream][Math.floor(rand() * 5)];
-  const petal = new THREE.SphereGeometry(0.2, 8, 5), pm = flat(colour);
+  const petal = new THREE.SphereGeometry(0.2, 8, 5), pm = sway(colour);
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2, p = new THREE.Mesh(petal, pm);
     p.scale.set(1, 0.25, 0.55);
@@ -285,7 +293,7 @@ function bigFlower(rand) {
     p.rotation.y = -a;
     head.add(p);
   }
-  const heart = drawn(new THREE.SphereGeometry(0.16, 10, 6), flat(colour === C.sun ? C.bark : C.sun));
+  const heart = grows(new THREE.SphereGeometry(0.16, 10, 6), colour === C.sun ? C.bark : C.sun);
   heart.scale.y = 0.5;
   head.add(heart);
   g.add(stem, leafM, head);
@@ -302,6 +310,17 @@ function gnomelet(rand) {
   const hat = drawn(new THREE.ConeGeometry(0.17, 0.42, 10), flat(C.cap));
   hat.position.y = 0.78;
   g.add(body, face, hat);
+  return g;
+}
+
+/** A gnomelet's umbrella, held at his side: set it on the gnome's own group. */
+function brolly(color) {
+  const g = new THREE.Group();
+  const pole = drawn(new THREE.CylinderGeometry(0.02, 0.02, 1, 5), flat(C.ink));
+  pole.position.set(0.22, 0.8, 0);
+  const top = drawn(new THREE.ConeGeometry(0.5, 0.22, 8), flat(color));
+  top.position.set(0.1, 1.35, 0);
+  g.add(pole, top);
   return g;
 }
 
@@ -331,6 +350,7 @@ function mushroom(rand) {
 }
 function tuft(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   const m = sway(rand() > 0.5 ? C.leaf : C.leafDark);
   for (let i = 0; i < 3; i++) {
     const b = new THREE.Mesh(tuftGeo, m);
@@ -344,13 +364,20 @@ function tuft(rand) {
 /** Bunting between two poles: the one thing here that says "a fête". */
 function bunting(a, b) {
   const g = new THREE.Group();
+  // a and b are the poles' feet, on the ground (their y); the line hangs at a
+  // fixed height, so a pole reaches from its foot up to it. Each sways from
+  // its own foot (materials.js plantFeet); line and flags from the lower one
+  g.userData.foot = Math.min(a.y, b.y);
   const H = 4.2;
   for (const p of [a, b]) {
-    const pole = drawn(new THREE.CylinderGeometry(0.1, 0.12, H, 8), flat(C.bark));
-    pole.position.set(p.x, H / 2, p.z);
-    const knob = drawn(new THREE.SphereGeometry(0.2, 10, 8), flat(C.cap));
+    const post = new THREE.Group();
+    post.userData.foot = p.y;
+    const pole = grows(new THREE.CylinderGeometry(0.1, 0.12, H - p.y, 8), C.bark);
+    pole.position.set(p.x, (H + p.y) / 2, p.z);
+    const knob = grows(new THREE.SphereGeometry(0.2, 10, 8), C.cap);
     knob.position.set(p.x, H + 0.1, p.z);
-    g.add(pole, knob);
+    post.add(pole, knob);
+    g.add(post);
   }
   const n = 13, sag = 0.9, pts = [];
   const colors = [C.cap, C.sun, C.cream, C.pond];
@@ -358,7 +385,8 @@ function bunting(a, b) {
     const t = i / n;
     pts.push(new THREE.Vector3().lerpVectors(a, b, t).setY(H - 0.2 - Math.sin(t * Math.PI) * sag));
   }
-  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ink));
+  // poles, line and pennants all sway with one shader, or the flags drop off the line
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), swayLine(C.ink)));
   const tri = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-0.28, 0, 0), new THREE.Vector3(0.28, 0, 0), new THREE.Vector3(0, -0.6, 0),
   ]);
@@ -559,4 +587,4 @@ function windmill(x, y, z) {
   return { group, hub, spin: (t) => (hub.rotation.z = -t * 0.9) };
 }
 
-export { smoke, lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, mailbox, signpost, hill, house, pond, puddle, fence, mushroom, tuft, bunting, butterfly, warp, badge, mole, windmill };
+export { smoke, lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, brolly, mailbox, signpost, hill, house, pond, puddle, fence, mushroom, tuft, bunting, butterfly, warp, badge, mole, windmill };

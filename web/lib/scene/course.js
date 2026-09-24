@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { terrain, CELL, CUP_R, airy } from "../terrain.js";
-import { C, ink, flat, motion, drawn, rbox, ringLine, texOf, setWind, share } from "./materials.js";
+import { C, ink, flat, motion, drawn, rbox, ringLine, texOf, setWind, share, plantFeet } from "./materials.js";
 import { state } from "./state.js";
 import { timeOf, islandBox } from "./camera.js";
 import { bush, stone, flower, tuft, mole, windmill } from "./props.js";
@@ -10,12 +10,13 @@ import { roughOf } from "./garden.js";
 import { worldOf } from "./worlds.js";
 import { WEATHER_SKINS } from "./weather.js";
 import { POSTS, BARS, roofs, ROOF_Y } from "./pieces.js";
-import { zoneDetail, waterMask } from "./zones.js";
+import { zoneDetail, waterMask, loopFrame } from "./zones.js";
 
 export function buildHole(s) {
   state.live = [];
   state.tubes = new Map();
   state.timed = [];
+  state.slopes = new Map();
   state.ghosts = null;
   state.mill = null;
   const g = new THREE.Group();
@@ -43,8 +44,12 @@ export function buildHole(s) {
   g.add(wear.mesh);
 
   const ownSea = worldOf(s).SEA !== undefined;
+  // several roof zones over one another (a fall sends you back to where that
+  // stretch began) are one town below: its houses drawn once, by the widest
+  const area = (q) => (q.max[0] - q.min[0]) * (q.max[1] - q.min[1]);
+  const town = s.zones.filter((q) => q.skin === "roof").reduce((a, q) => (!a || area(q) > area(a) ? q : a), null);
   for (const z of s.zones) {
-    if (z.skin === "roof") g.add(roofs(z, s));
+    if (z.skin === "roof") { if (z === town) g.add(roofs(z, s)); }
     else if (!(ownSea && z.skin === "sea")) g.add(zoneDetail(z, s, t));
   }
   for (const w of wallPieces(s, t)) g.add(w);
@@ -58,6 +63,7 @@ export function buildHole(s) {
   g.userData.terrain = t;
   g.userData.wind = setWind; // wind(vec): the weather's push [x, y] per substep, or null for calm
   g.userData.fade = dec.userData.fade || null; // a world's canopy fading out of the way: fade(eye, ball)
+  g.userData.weather = dec.userData.weather || null; // its decor dressed for the weather: weather(w) (see weatherLooks)
   g.userData.state = s; // for what a stroke adds (buildExtras)
   // what the course owns that no mesh holds: its masks, freed with it
   g.userData.owned = [t.water && t.water.tex, t.mask].filter(Boolean);
@@ -67,12 +73,26 @@ export function buildHole(s) {
   // timed walls (a tram, a clock's hands...): the replay calls at(step) on
   // each with the substep it is showing; they show and move as the chain has them
   g.userData.timed = state.timed;
+  g.userData.slopes = state.slopes; // slope zone -> { glow(k) }
+  // where a ball that falls in at (x, z) meets the water or the bottom: the
+  // world's sea under a pier, a gap's water, a crevasse's floor, the streets
+  // under the roofs; a pond on the green is at the green's own height
+  g.userData.surfaceAt = (x, z) => {
+    const q = t.zoneAt(x, z), SEA = worldOf(s).SEA;
+    if (!q) return t.height(x, z);
+    if (q.skin === "sea" && SEA !== undefined) return SEA;
+    if (q.skin === "gap") return (SEA ?? -1.2) + 0.2;
+    if (q.skin === "roof") return ROOF_Y - 3.2;
+    if (GAPS.has(q.skin)) return CREVASSE_Y + 0.3;
+    return t.height(x, z);
+  };
   g.userData.ghosts = state.ghosts || (() => {}); // ghosts(aiming): the timed pieces' dashed outlines
   g.userData.mill = state.mill;
   const ticks = state.live;
   state.live = [];
   g.userData.tick = (time) => { if (motion) for (const f of ticks) f(time); };
-  bake(g);
+  if (!s.unbaked) bake(g);
+  else plantFeet(g); // unbaked: kept in pieces, for the trailer's hole that builds itself (web/lib/promo.js)
   return g;
 }
 
@@ -143,7 +163,11 @@ function openings(w, zones) {
   // (a polygon gap, "everything but the lane", cuts nothing: the lane's own
   // walls run along its edge)
   for (const z of zones || []) if (GAPS.has(z.skin) && !z.poly) strips.push([z.min[0], z.max[0], z.min[1] - 1, z.max[1] + 1]);
-  if (!strips.length) return [w];
+  // an open loop's track is the lane itself: its kerbs stop where the track
+  // leaves the lane and start again where it comes down (zones.js loopTrack)
+  for (const z of zones || []) if (isLoop(z)) strips.push(...loopStrips(z));
+  const inlet = (zones || []).some((z) => z.skin === "sea" && z.poly && !z.outside);
+  if (!strips.length && !inlet) return [w];
   const [ax, az] = w.a, dx = w.b[0] - ax, dz = w.b[1] - az, L = segLen(w) || 1;
   // where the wall is inside each strip, in its own parameter u (Liang-Barsky)
   const cuts = [];
@@ -156,12 +180,55 @@ function openings(w, zones) {
     }
     if (ok && lo < hi) cuts.push([lo, hi]);
   }
+  // an inlet of the sea (a sea polygon cut into the lane) opens the rail
+  // across its mouth: the stretches of the wall inside the polygon
+  for (const z of zones || []) if (z.skin === "sea" && z.poly && !z.outside) cuts.push(...polyCuts(w, z.poly));
   let pieces = [[0, 1]];
   for (const [c0, c1] of cuts) pieces = pieces.flatMap(([p0, p1]) => [[p0, Math.min(p1, c0)], [Math.max(p0, c1), p1]]).filter(([p0, p1]) => p1 - p0 > 1e-6);
   const at = (u) => [ax + dx * u, az + dz * u];
   return pieces.filter(([p0, p1]) => (p1 - p0) * L > 0.05).map(([p0, p1]) => ({ a: at(p0), b: at(p1), skin: w.skin, cut: p0 > 0 || p1 < 1 }));
 }
 
+
+/** The stretches [u0, u1] of wall w (in its own parameter) inside polygon pts. */
+function polyCuts(w, pts) {
+  const [ax, az] = w.a, dx = w.b[0] - ax, dz = w.b[1] - az;
+  const us = [0, 1];
+  for (let i = 0; i < pts.length; i++) {
+    const [px, pz] = pts[i], [qx, qz] = pts[(i + 1) % pts.length], ex = qx - px, ez = qz - pz;
+    const den = dx * ez - dz * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const u = ((px - ax) * ez - (pz - az) * ex) / den, v = ((px - ax) * dz - (pz - az) * dx) / den;
+    if (u > 0 && u < 1 && v >= 0 && v <= 1) us.push(u);
+  }
+  us.sort((a, b) => a - b);
+  const inside = (x, z) => {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++)
+      if ((pts[i][1] > z) !== (pts[j][1] > z) && x < ((pts[j][0] - pts[i][0]) * (z - pts[i][1])) / (pts[j][1] - pts[i][1]) + pts[i][0]) c = !c;
+    return c;
+  };
+  const out = [];
+  for (let i = 0; i + 1 < us.length; i++) {
+    const m = (us[i] + us[i + 1]) / 2;
+    if (inside(ax + dx * m, az + dz * m)) out.push([us[i], us[i + 1]]);
+  }
+  return out;
+}
+
+/** The two rectangles [x0, x1, z0, z1] under an open loop's low ends. */
+function loopStrips(z) {
+  const F = loopFrame(z), rect = (u0, u1, w0, w1) => {
+    const [a, b] = [F.P(u0, w0), F.P(u1, w1)];
+    return [Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+  };
+  return [
+    rect(F.Xc - F.sign * 0.05, F.back + F.sign * 1.5, F.wA - F.W / 2 - 0.6, F.wA + F.W / 2 + 0.6),
+    rect(F.Xc - F.sign * 1.5, F.Xc + F.sign * 0.6, F.wB - F.W / 2 - 0.6, F.wB + F.W / 2 + 0.6),
+  ];
+}
+// the open loops drawn as the lane curling up (zones.js loopTrack): the garden's and the bobsleigh's
+const isLoop = (q) => q.kind === "loop" && (q.skin === "loop-the-loop" || q.skin === "bob loop");
 
 const CREVASSE_Y = -7; // how deep a gap goes
 // the zones drawn as a real gap in the lane: nothing under the ball there
@@ -194,12 +261,24 @@ function groundMesh(s, t) {
     const q = t.zoneAt(x, z);
     // sand, water and the like are drawn as shapes over the green
     // (zoneDetail): the ground under them stays green, so no square corner shows
+    // a mound is the lane's own grass, lit brighter as it rises (a soft
+    // highlight on top, the plain green at its foot): by the dome, not by the
+    // zones' rectangles, so no square patch shows
+    const dome = t.domes && t.domes.find((d) => Math.hypot((x - d.x) / d.rx, (z - d.z) / d.rz) < 1);
+    if (dome) {
+      const wg = worldOf(s).green, G = (typeof wg === "function" ? wg(s) : wg) || [0x60ab96, 0x5aa38e];
+      c.set(Array.isArray(G) ? (Math.floor(i / 4) % 2 ? G[0] : G[1]) : 0x60ab96);
+      c.offsetHSL(0, 0.03, Math.min(0.1, (t.height(x, z) / dome.h) * 0.1));
+      return c;
+    }
     if (q && q.kind === "slope" && !airy(q)) {
       // contour bands every 0.4 of height: the eye reads a climb from them
       // one tone: the ramp reads from its shading, not from stripes. A dune is
       // sand, stairs are stone steps (banded every half unit up)
       if (q.skin === "dune") c.set(0xe9cf97);
       else if (q.skin === "stairs") c.set(Math.floor(t.height(x, z) / 0.35) % 2 ? 0xb9c2bd : 0xa5aea9);
+      // a skate park's ramps are smooth concrete, a touch lighter as they rise
+      else if (q.skin === "quarter pipe" || q.skin === "funbox") c.set(0xb3aea4).offsetHSL(0, 0, Math.min(0.12, t.height(x, z) * 0.09));
       else c.set(0x62ae98);
       return c;
     }
@@ -224,14 +303,15 @@ function groundMesh(s, t) {
   // is left open: the world's water shows through, and the lane's edge gets a
   // side face down to it
   const open_ = new Uint8Array(t.nx * t.nz);
-  const seaZone = s.zones.find((q) => ((worldOf(s).SEA !== undefined && q.skin === "sea") || q.skin === "roof" || GAPS.has(q.skin)) && q.poly && q.outside);
+  // (an inlet of the sea, a polygon cut into the lane, is one too)
+  const seaZone = s.zones.find((q) => ((worldOf(s).SEA !== undefined && q.skin === "sea") || q.skin === "roof" || GAPS.has(q.skin)) && q.poly && (q.outside || q.skin === "sea"));
   // a corner of a lane cell out in the sea is pulled onto the lane's outline,
   // so the lane's edge is the chain's polygon and not cell steps
   // (every corner on the lane's edge — touching an open cell — goes onto
   // the outline, the inner corners of a stair step as much as the outer ones)
   const onLane = (x, z) => {
     const ci = Math.round(x / CELL), cj = Math.round(z / CELL);
-    const rim = [[ci - 1, cj - 1], [ci, cj - 1], [ci - 1, cj], [ci, cj]].some(([a, b]) => a >= 0 && b >= 0 && a < t.nx && b < t.nz && open_[t.idx(a, b)]);
+    const rim = [[ci - 1, cj - 1], [ci, cj - 1], [ci - 1, cj], [ci, cj]].some(([a, b]) => a >= 0 && b >= 0 && a < t.nx && b < t.nz && open_[t.idx(a, b)] === 1);
     if (!seaZone || !rim) return [x, z];
     let best = [x, z], bd = Infinity;
     const P = seaZone.poly;
@@ -256,10 +336,13 @@ function groundMesh(s, t) {
       for (let i = 0; i < t.nx; i++) {
         const q = t.zoneAt((i + 0.5) * CELL, (j + 0.5) * CELL);
         if (q && ((ownSea && q.skin === "sea") || q.skin === "roof" || GAPS.has(q.skin))) open_[t.idx(i, j)] = 1;
+        // a plank laid between two roofs: the street shows under it (the
+        // world draws the plank); 2, so the roofs' edges are not pulled onto it
+        else if (hasRoof && q && q.skin === "plank bridge") open_[t.idx(i, j)] = 2;
       }
   // side faces reach the water, or down past the rooftops' eaves
   const foot = hasRoof ? ROOF_Y - 1.5 : ownSea ? worldOf(s).SEA - 0.3 : -1;
-  if (ownSea && seaZone) side.set(C.woodDark); // a lane over the sea is a jetty: timber sides
+  if (ownSea && seaZone && seaZone.outside) side.set(C.woodDark); // a lane over the sea is a jetty: timber sides
   // in a world with its own ground the green's sides take that ground's
   // colour: a dark face peeping between kerb posts read as a hole
   else if (!hasRoof && (worldOf(s).rough || roughOf(s))) side.set((worldOf(s).rough || roughOf(s)).lo);
@@ -273,7 +356,7 @@ function groundMesh(s, t) {
       const hc = (x, z) => {
         if (added) [x, z] = edge.corner(x, z);
         if (seaZone) [x, z] = onLane(x, z);
-        return [x, t.height(x, z), z];
+        return [x, (t.ground || t.height)(x, z), z];
       };
       const top = [hc(x0, z0), hc(x0, z1), hc(x1, z1), hc(x1, z0)];
       const col = colour(i, j, x0 + CELL / 2, z0 + CELL / 2);
@@ -464,7 +547,15 @@ function roughScenery(s, t) {
   }
 
   // where the mill stands nothing grows: it would come up through it
-  const built = s.zones.filter((z) => z.skin === "mill");
+  // (nor under a loop's track: its box, and the ring's reach behind it)
+  // (nor round a serac's tower uphill of its spot, nor the cairns at a col's saddle)
+  const built = [...s.zones.filter((z) => z.skin === "mill"),
+    ...s.zones.filter((z) => z.skin === "serac").map((z) => ({ min: [z.min[0] - 2.5, z.min[1] - 9], max: [z.max[0] + 2.5, z.max[1] + 9] })),
+    ...s.zones.filter((z) => z.skin === "saddle crest" && z.vec[0] < 0).map((z) => ({ min: [z.max[0] - 1.5, z.min[1]], max: [z.max[0] + 1.5, z.max[1]] })),
+    ...s.zones.filter(isLoop).map((z) => {
+    const F = loopFrame(z), a = F.P(F.Xc - F.sign * (F.r + 1), Math.min(F.wA, F.wB) - F.W), b = F.P(F.Xc + F.sign * (F.r + 1), Math.max(F.wA, F.wB) + F.W);
+    return { min: [Math.min(a[0], b[0]), Math.min(a[1], b[1])], max: [Math.max(a[0], b[0]), Math.max(a[1], b[1])] };
+  })];
   const taken = [];
   const FOOT = [0.75, 0.45, 0.2, 0.2]; // bush, stone, tuft, flower
   for (const cells of t.rough) {
@@ -756,7 +847,9 @@ function wallPieces(s, t) {
   // a world may dress the rails its own way: world.kerb = { color, post }
   // (mountain: grey stone, town: kerbstone...); wood by default
   const K = (s.board && worldOf(s).kerb) || {};
-  const cutAny = (s.zones || []).some((q) => GAPS.has(q.skin)); // any gap to cut the kerbs at
+  const loopRects = (s.zones || []).filter(isLoop).flatMap(loopStrips);
+  const inLoopStrip = ([x, z]) => loopRects.some(([x0, x1, z0, z1]) => x >= x0 - 0.05 && x <= x1 + 0.05 && z >= z0 - 0.05 && z <= z1 + 0.05);
+  const cutAny = (s.zones || []).some((q) => GAPS.has(q.skin) || isLoop(q) || (q.skin === "sea" && q.poly && !q.outside)); // any gap, loop or inlet to cut the kerbs at
   for (const ch of kerbChains(W)) {
     for (let k = ch.from; k <= ch.to; k++) inKerb.add(k);
     // where a loop's track crosses the kerb it is cut open for it; each run
@@ -780,8 +873,10 @@ function wallPieces(s, t) {
     }
     for (const { list, ch: c } of runs) {
       out.push(kerb(list, c, t, reachable, { color: K.color ?? C.wood }));
-      // an open run ends at a post, like any wall: no bare cut profile
-      if (!c.closed) for (const p of [list[c.from].a, list[c.to].b]) caps.set(p[0].toFixed(2) + "," + p[1].toFixed(2), [p[0], p[1]]);
+      // an open run ends at a post, like any wall: no bare cut profile —
+      // except where a loop's track takes over the rail: a post there would
+      // stand inside the ring
+      if (!c.closed) for (const p of [list[c.from].a, list[c.to].b]) if (!inLoopStrip(p)) caps.set(p[0].toFixed(2) + "," + p[1].toFixed(2), [p[0], p[1]]);
     }
   }
 
@@ -871,6 +966,10 @@ function wallPieces(s, t) {
     }
     const whole = W[i];
     if (segLen(whole) < 1e-6) continue;
+    if (whole.skin === "rampart") {
+      out.push(rampart(whole, t));
+      continue;
+    }
     const parts = openings(whole, s.zones);
     for (const w of parts) {
     const len = segLen(w);
@@ -939,6 +1038,37 @@ function timber([x, z], len, thick, ang, height, color = C.wood, skirt = false) 
   return drawn(geo, flat(color));
 }
 
+
+/**
+ * A sand rampart along a wall (from a sandcastle to the shore): a thick
+ * wall of moulded sand, darker wet band at its foot, crenellated on top, its
+ * ends run on into the castle and under the shore's kerb so nothing shows a
+ * gap. Centred on the wall's line; the ball meets its face.
+ */
+function rampart(w, t) {
+  const g = new THREE.Group();
+  const len = segLen(w), ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]);
+  const TH = 0.9, H = 1.2, over = 0.6; // runs on past each end
+  const cx = (w.a[0] + w.b[0]) / 2, cz = (w.a[1] + w.b[1]) / 2;
+  const y = t.height(cx, cz);
+  const body = drawn(rbox(len + over * 2, H, TH, 0.12), flat(0xe0bd7e));
+  body.position.set(cx, y + H / 2 - 0.05, cz);
+  body.rotation.y = -ang;
+  const band = new THREE.Mesh(new THREE.BoxGeometry(len + over * 2 - 0.1, 0.16, TH + 0.04), flat(0xc9a66a));
+  band.position.set(cx, y + 0.22, cz);
+  band.rotation.y = -ang;
+  g.add(body, band);
+  const n = Math.max(2, Math.round(len / 0.9));
+  for (let k = 0; k < n; k++) {
+    if (k % 2) continue;
+    const u = (k + 0.5) / n - 0.5, x = cx + Math.cos(ang) * u * len, z = cz + Math.sin(ang) * u * len;
+    const m = drawn(new THREE.BoxGeometry((len / n) * 0.9, 0.42, TH * 0.72), flat(0xeed7a4));
+    m.position.set(x, y + H + 0.16, z);
+    m.rotation.y = -ang;
+    g.add(m);
+  }
+  return g;
+}
 
 /** A boulder filling a post's circle exactly (its widest is the radius). */
 function rock(p, height) {
@@ -1104,6 +1234,7 @@ const hookId = (f) => (f ? (hookIds.has(f) || hookIds.set(f, nextHook++), hookId
 /** Merges every static mesh under root into one mesh per material kind (see
  *  the signature below). The shared merge helper: worlds use it too. */
 export function bake(root) {
+  plantFeet(root); // what sways is weighed from its own foot (before its geometry is merged)
   root.updateMatrixWorld(true);
   const buckets = new Map();
   const taken = [];
@@ -1207,6 +1338,30 @@ export function buildExtras(course, ex) {
   g.userData.tick = (time) => { if (motion) for (const f of ticks) f(time); };
   bake(g); // walls, posts, moles: merged; a mill's sails stay live
   return g;
+}
+
+/**
+ * A world's decor dressed for the weather. Its builders tag the parts that
+ * change with userData.look = [the looks they show in]; looks are one of
+ * "clear", "wind", "wet" (or a world's own). Each look's parts are gathered
+ * into one group, merged by material (a few draw calls) and kept out of the
+ * hole's bake; root.userData.weather(w) then shows the look pick(w) names,
+ * w being the engine's weather ({ wind, rain, fog, storm, snow } | null).
+ * A part in two looks is copied, so only one group ever draws.
+ */
+/** Tags a decor part with the looks it shows in (see weatherLooks); returns it. */
+export const look = (o, ...looks) => ((o.userData.look = looks), o);
+export function weatherLooks(root, pick) {
+  root.updateMatrixWorld(true);
+  const tagged = [];
+  root.traverse((o) => o.userData.look && tagged.push(o));
+  const looks = {};
+  for (const o of tagged)
+    o.userData.look.forEach((k, i) => (looks[k] ||= new THREE.Group()).attach(i ? o.clone() : o));
+  for (const [k, grp] of Object.entries(looks)) (root.add(grp), bake(grp), (grp.userData.live = true), (grp.name = "look:" + k));
+  const show = (w) => { const on = pick(w || {}); for (const k in looks) looks[k].visible = k === on; };
+  show(null);
+  root.userData.weather = show;
 }
 
 export { drape, bake as mergeByMaterial };

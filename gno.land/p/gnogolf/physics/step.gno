@@ -364,7 +364,7 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 			}
 			side := pos.Sub(axis.Scale(pos.Dot(axis)))
 			switch {
-			case slanted || sp > z.Scale*LoopOver:
+			case slanted || (sp > z.Scale*LoopOver && !closedLoop(z)):
 				// off the top of the track: down in front of the mouth, still
 				*pos = mid.Sub(axis.Scale(mid.Dot(axis))).Add(axis.Scale(front - sign*1.5))
 				out.add(*pos, false)
@@ -381,6 +381,10 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 	}
 	return false
 }
+
+// closedLoop reports whether a loop is a closed tube (its skin says "tube"):
+// a ball cannot fly off one, so any speed from Scale up goes round.
+func closedLoop(z *Zone) bool { return strings.Contains(z.Skin, "tube") }
 
 func orDefault(v, def float64) float64 {
 	if v == 0 {

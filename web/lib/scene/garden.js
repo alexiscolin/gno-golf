@@ -3,7 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { C, ink, flat, drawn, rbox, windNow, share, texOf } from "./materials.js";
 import { animate } from "./state.js";
 import { timeOf } from "./camera.js";
-import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, mailbox, signpost, hill, house, pond, puddle, fence, mushroom, tuft, bunting, butterfly } from "./props.js";
+import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, brolly, mailbox, signpost, hill, house, pond, puddle, fence, mushroom, tuft, bunting, butterfly } from "./props.js";
 
 
 
@@ -15,6 +15,7 @@ import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, mai
 // from one visit to the next.
 
 import { seeded, ISLAND, GRASS } from "./common.js";
+import { look, weatherLooks } from "./course.js"; // (a cycle, but only called at build time)
 
 /** Pebbles caught in the island's soil, so its sides read as earth. */
 function edging(box, seed) {
@@ -751,6 +752,7 @@ function decor(s, bank = () => 0) {
       const gx = x - 0.9, gz = z + 0.2;
       if (k % 2 === 0 && free(gx, gz, 0.3)) {
         const gn = gnomelet(rand);
+        gn.add(look(brolly(caps[(hh + k + 1) % caps.length]), "wet")); // his umbrella, up in the rain
         gn.position.set(gx, GRASS + bank(gx, gz), gz);
         gn.rotation.y = rand() * 2 - 1;
         g.add(gn);
@@ -818,7 +820,7 @@ function decor(s, bank = () => 0) {
   scatter(Math.round(60 * span), X0, X1, Z0, Z1, tuft, 1);
   scatter(5, X0, -1.5, 0, H, mushroom, 1);
   scatter(4, W + 1.5, X1, -1, H, mushroom, 1);
-  g.add(bunting(new THREE.Vector3(X0 + 6.5, GRASS, -2.4), new THREE.Vector3(X1 - 3, GRASS, -2.4)));
+  g.add(bunting(new THREE.Vector3(X0 + 6.5, GRASS + bank(X0 + 6.5, -2.4), -2.4), new THREE.Vector3(X1 - 3, GRASS + bank(X1 - 3, -2.4), -2.4)));
 
   // evening and night: lanterns along the lane, and at night fireflies
   const time = timeOf(s.hole);
@@ -842,6 +844,7 @@ function decor(s, bank = () => 0) {
   sign.rotation.y = -0.5; // readable from the front and from the tee end
   g.add(sign);
 
+  weatherLooks(g, (w) => (w.rain || w.storm || w.snow ? "wet" : "clear"));
   return g;
 }
 

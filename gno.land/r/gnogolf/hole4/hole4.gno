@@ -39,7 +39,7 @@ var me = course.Fit(&course.Simple{
 	World: "garden", Order: 4,
 	W: 48, H: 12,
 	Title:     "The Mill",
-	Strokes:   3, // par
+	Strokes:   2, // par
 	Tee:       physics.V(4, 6),
 	Pin:       physics.V(44, 6),
 	Substeps:  22,

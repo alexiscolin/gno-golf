@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { GRASS } from "./common.js";
 
 // A gnome's garden, in gno.land's own colours: #226C57 is the primary green,
 // #60AB96 its light, #144134 its deep. The rest is what a garden needs.
@@ -104,7 +105,9 @@ const SWAY = `
   vec4 swayW = modelMatrix * vec4(transformed, 1.0);
   // capped: a treetop sways a few tenths, never metres (a palm's fronds sway
   // and its trunk does not; uncapped, the fronds flew off the trunk)
-  float swayH = clamp(swayW.y + 0.6, 0.0, 2.4);
+  // weighed from the plant's own foot (swayFoot, see plantFeet): 0 there, so
+  // a trunk never slides off its bed, its pot or its dune
+  float swayH = clamp(swayW.y - swayFoot, 0.0, 2.4);
   // a gale sways things about twice as much, never more; and they lean a
   // little downwind — capped, or a tall stem is thrown across the screen
   float swayK = 1.0 + min(length(uWind) * 15.0, 1.0);
@@ -118,7 +121,7 @@ const withSway = (m, extra = "") => {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = clock;
     sh.uniforms.uWind = wind;
-    sh.vertexShader = "uniform float uTime;\nuniform vec2 uWind;\n" + sh.vertexShader.replace(
+    sh.vertexShader = "uniform float uTime;\nuniform vec2 uWind;\nattribute float swayFoot;\n" + sh.vertexShader.replace(
       "#include <begin_vertex>",
       "#include <begin_vertex>" + extra + SWAY
     );
@@ -127,6 +130,31 @@ const withSway = (m, extra = "") => {
   m.userData.hook = "sway" + extra.length; // same shader whatever the colour: merges
   return m;
 };
+/** Gives a swaying geometry its foot: the world height its sway is weighed
+ *  from. Every swaying geometry needs one (plantFeet sets them). */
+export function setFoot(geo, y) {
+  geo.setAttribute("swayFoot", new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(y), 1));
+  return geo;
+}
+const footV = new THREE.Vector3();
+/** The world height of o's plant's foot: its nearest ancestor marked with
+ *  userData.foot (that foot's local y); unmarked, the grass. */
+export function footOf(o) {
+  for (let p = o; p; p = p.parent) if (p.userData.foot !== undefined) return p.localToWorld(footV.set(0, p.userData.foot, 0)).y;
+  return GRASS;
+}
+/** Sets the foot of every swaying mesh or line under root that has none
+ *  (bake() calls it; a shared geometry is copied first, its foot is per plant). */
+export function plantFeet(root) {
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    const m = o.material;
+    if (!o.geometry || !m || Array.isArray(m) || !String(m.userData.hook).startsWith("sway")) return;
+    if (SHARED.has(o.geometry)) o.geometry = o.geometry.clone();
+    else if (o.geometry.attributes.swayFoot) return;
+    setFoot(o.geometry, footOf(o));
+  });
+}
 const swayMats = new Map();
 /** A flat material that sways in the wind: for anything that grows. Pass
  *  { double: true } for a flat thing seen from both sides (a pennant, a leaf):

@@ -1,4 +1,5 @@
-// Package hole5 is a lane through a gate to a round green, and the gate shuts every other stroke.
+// Package hole5 is a lane through a gate to a round green, and the gate shuts every other stroke:
+// shut for the first, so the tee shot lays up and the second goes through.
 package hole5
 
 import (
@@ -11,15 +12,15 @@ var me = course.Fit(&course.Simple{
 	World: "garden", Order: 5,
 	W: 43, H: 14,
 	Title:     "The Gate",
-	Strokes:   2, // par
+	Strokes:   3, // par
 	Tee:       physics.V(4, 7),
 	Pin:       physics.V(36, 7),
 	Substeps:  22,
 	CupRadius: 1.2,
 
-	// the gate: open for your first stroke, shut for the second, open again…
+	// the gate: shut for your first stroke, open for the second, shut again…
 	Pulses: []course.Pulse{{
-		Every: 2, On: 1, Offset: 1,
+		Every: 2, On: 1, Offset: 0,
 		Walls: physics.Bar(physics.V(18, 5.5), physics.V(18, 8.5), 0.8, '=', "gate door"),
 	}},
 	Course: &physics.Field{

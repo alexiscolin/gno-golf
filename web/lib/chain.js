@@ -33,6 +33,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
   /** A raw ABCI query; returns the decoded data string. */
   const abci = (path) => query(`${rpc}/abci_query?path=%22${path}%22`);
 
+  // a string answer from any realm (r/sys/users): ("…" string), unwrapped once
+  async function qstr(realm, expr, ms) {
+    const hex = [...new TextEncoder().encode(`${realm}.${expr}`)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const raw = await query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hex}`, ms);
+    return JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)")));
+  }
+
   async function qeval(expr, ms) {
     const call = `${REALM}.${expr}`;
     const hex = [...new TextEncoder().encode(call)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -92,7 +99,23 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
     /** What a timed hole adds at one stroke of a round (0 = first shot). */
     extras: (hole, stroke) => qeval(`Extras(${s(hole)}, ${Math.max(0, stroke | 0)})`),
     /** The course-wide ranking of recorded rounds. */
-    leaderboard: () => qeval("Leaderboard()"),
+    leaderboard: (mode = "assisted") => qeval(`Leaderboard(${s(mode)})`),
+    /** One page of a hole's top 100: { hole, par, players, offset, rows: [{ player, strokes }] }. */
+    /** The best rounds of these players (at most 50) on a hole: { hole, mode, par, rows: [{ player, strokes }] }. */
+    bests: (hole, mode, players) => qeval(`Bests(${s(hole)}, ${s(mode)}, ${s(players.slice(0, 50).join(","))})`),
+    /** These players across the course: { mode, holes, rows: [{ player, holes, strokes }] }. */
+    standings: (mode, players) => qeval(`Standings(${s(mode)}, ${s(players.slice(0, 50).join(","))})`),
+    /** A gno.land name's address, or "" (r/sys/users). */
+    resolveName: (name) =>
+      /^[a-z0-9._-]{1,64}$/i.test(name)
+        ? qstr("gno.land/r/sys/users", `func() string { d, _ := ResolveName(${s(name)}); if d == nil { return "" }; return d.Addr().String() }()`)
+        : Promise.resolve(""),
+    /** An address's gno.land name, or "". */
+    nameOf: (addr) =>
+      /^g1[0-9a-z]{38}$/.test(addr)
+        ? qstr("gno.land/r/sys/users", `func() string { d := ResolveAddress(address(${s(addr)})); if d == nil { return "" }; return d.Name() }()`)
+        : Promise.resolve(""),
+    holeLeaderboard: (hole, offset = 0, limit = 10, mode = "assisted") => qeval(`HoleLeaderboard(${s(hole)}, ${s(mode)}, ${offset | 0}, ${limit | 0})`),
     /** One player's round on a hole, or null — read back after recording. */
     round: (hole, player) => qeval(`Round(${s(hole)}, address(${s(player)}))`),
   };

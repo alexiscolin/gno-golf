@@ -7,11 +7,11 @@
 // behind and to the right, as in the garden, so the lane is never hidden.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"; // the skyline
-import { C, flat, drawn, rbox, texOf, lanternGlow, grows, share, pushHull, fadeable as fading, fadeLoop } from "./materials.js";
-import { mergeByMaterial } from "./course.js";
+import { C, flat, drawn, rbox, texOf, ink, lanternGlow, grows, share, pushHull, fadeable as fading, fadeLoop } from "./materials.js";
+import { mergeByMaterial, look, weatherLooks } from "./course.js";
 import { animate } from "./state.js";
 import { timeOf } from "./camera.js";
-import { gnomelet, bunting, mailbox } from "./props.js";
+import { gnomelet, brolly, bunting, mailbox } from "./props.js";
 import { seeded, ISLAND, GRASS } from "./common.js";
 
 const T = {
@@ -189,6 +189,7 @@ function tflower(rand) {
 
 function tbush(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   for (let i = 0; i < 3; i++) {
     const r = 0.45 + rand() * 0.35;
     const puff = grows(new THREE.IcosahedronGeometry(r, 0), rand() < 0.5 ? C.leaf : C.leafDark);
@@ -329,7 +330,7 @@ function townHouse(rand, night, only = null) {
 }
 
 /** A gnome's stall on the street: a small cart with a parasol, a gnome behind it. */
-function gnomeStand(rand, night) {
+function gnomeStand(rand, night, late = night) {
   const g = new THREE.Group();
   const cart = drawn(box3(1.1, 0.6, 0.6), flat(C.wood));
   cart.position.y = 0.5;
@@ -352,7 +353,7 @@ function gnomeStand(rand, night) {
   }
   const seller = gnomelet(rand);
   seller.position.set(0, 0, -0.55);
-  g.add(seller);
+  if (!late) g.add(seller); // at night the cart is left lit, its seller gone home
   if (night) {
     const glow = new THREE.Sprite(lanternGlow());
     glow.scale.set(1.8, 1.8, 1);
@@ -363,7 +364,7 @@ function gnomeStand(rand, night) {
 }
 
 /** A market stall: a counter, four poles, a striped roof, a crate of fruit. */
-function stall(rand) {
+function stall(rand, night) {
   const g = new THREE.Group();
   const counter = drawn(box3(1.8, 0.8, 0.9), flat(C.wood));
   counter.position.y = 0.4;
@@ -384,6 +385,14 @@ function stall(rand) {
     fruit.position.set(-0.6 + i * 0.3, 0.9, 0.15);
     g.add(fruit);
   }
+  // in the rain its awning is let down over the front, the fruit behind it
+  const down = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const p = drawn(box3(0.5, 1, 0.05), flat(i % 2 ? C.cream : colour));
+    p.position.set(-0.75 + i * 0.5, 1.42, 0.63);
+    down.add(p);
+  }
+  g.add(night ? look(down, "clear", "wind", "wet") : look(down, "wet")); // and shut for the night
   return g;
 }
 
@@ -448,6 +457,7 @@ function streetTree(rand, bare = false) {
   const h = 1.6 + rand() * 0.8;
   const trunk = grows(new THREE.CylinderGeometry(0.12, 0.17, h, 7), C.bark);
   trunk.position.y = h / 2 + 0.2;
+  g.userData.foot = 0.2; // the trunk's foot: its sway is weighed from here (materials.js plantFeet)
   // bare: no bed of its own, for a tree planted in a lawn that has one
   if (bare) g.add(trunk);
   else g.add(bed, lawn, trunk);
@@ -840,7 +850,7 @@ function decor(s) {
 
   // the back row: market stalls first (the houses find room round them),
   // the clock tower right of centre, then the houses
-  for (let x = X0 + 4; x < X1 - 3; x += 7 + rand() * 4) place(stall(rand), x, -5.6, 1.1, (rand() - 0.5) * 0.3);
+  for (let x = X0 + 4; x < X1 - 3; x += 7 + rand() * 4) place(stall(rand, time === "night"), x, -5.6, 1.1, (rand() - 0.5) * 0.3);
   const tower = place(clockTower(night), X0 + (X1 - X0) * 0.68, -7.2, 2);
   if (!tower) place(clockTower(night), X1 - 3, -7.2, 2);
   // two rows of houses, the far one staggered behind the near one
@@ -852,8 +862,8 @@ function decor(s) {
     }
 
   // gnomes selling on the street: in front of the back row, and down the right
-  for (let x = X0 + 6; x < X1 - 4; x += 9 + rand() * 4) place(gnomeStand(rand, night), x, -4.6, 0.9, (rand() - 0.5) * 0.4);
-  place(gnomeStand(rand, night), W + 2.6, H + 1.6, 0.9, -0.6);
+  for (let x = X0 + 6; x < X1 - 4; x += 9 + rand() * 4) place(gnomeStand(rand, night, time === "night"), x, -4.6, 0.9, (rand() - 0.5) * 0.4);
+  place(gnomeStand(rand, night, time === "night"), W + 2.6, H + 1.6, 0.9, -0.6);
 
   // the right: the bakery, the fountain, a couple of houses
   place(bakery(night), X1 - 2.6, H * 0.25, 2.2, -Math.PI / 2);
@@ -877,7 +887,10 @@ function decor(s) {
   for (let z = 1; z < H; z += 5) place(lamp(night), W + 1.8, z, 0.35);
   for (let i = 0; i < 6; i++) {
     const x = X0 + rand() * (X1 - X0), z = rand() < 0.5 ? H + 2 + rand() : -4.4 - rand() * 0.6;
-    place(gnomelet(rand), x, z, 0.3, rand() * Math.PI * 2);
+    const gn = gnomelet(rand);
+    gn.add(look(brolly(T.caps[i % T.caps.length]), "wet")); // his umbrella, up in the rain
+    const turn = rand() * Math.PI * 2;
+    if (time !== "night" || i < 2) place(gn, x, z, 0.3, turn); // after dark, only a couple out strolling
   }
   place(mailbox(), -2.4, H + 1.4, 0.35, 0.4);
 
@@ -896,8 +909,8 @@ function decor(s) {
     const rx = 2 + rand() * 1.3, rz = 1 + rand() * 0.5;
     place(parkBed(rx, rz, rand), x, H + 5.8 + rand() * 1.2, rx, (rand() - 0.5) * 0.4);
   }
-  place(gnomeStand(rand, night), X0 + (X1 - X0) * 0.3, H + 7.5, 0.9, Math.PI + 0.3);
-  place(gnomeStand(rand, night), X0 + (X1 - X0) * 0.75, H + 8, 0.9, Math.PI - 0.4);
+  place(gnomeStand(rand, night, time === "night"), X0 + (X1 - X0) * 0.3, H + 7.5, 0.9, Math.PI + 0.3);
+  place(gnomeStand(rand, night, time === "night"), X0 + (X1 - X0) * 0.75, H + 8, 0.9, Math.PI - 0.4);
   // and past the park, the houses on the near side of the square, of every
   // shape and size, with trees between them
   for (let x = X0 - 3; x < X1 + 4; x += 2.8 + rand() * 2) {
@@ -951,6 +964,7 @@ function decor(s) {
   reserve(-2.6, H / 2, 0.8);
   reserve(W + 2.6, H / 2, 0.8);
   g.add(skyline(rand, X0, X1, Z0));
+  weatherLooks(g, (w) => (w.rain || w.storm || w.snow ? "wet" : "clear"));
   return g;
 }
 
@@ -1102,6 +1116,477 @@ function awningAcross(len, thick) {
   return g;
 }
 
+// --------------------------------------------------------- the Grand Plaza
+//
+// town18's own pieces: a brick floor with its patches (herringbone, a marble
+// rosette) and the tram rails set in it, a bandstand, a clock obelisk, round
+// market stalls and pigeons. Each stands on its physics footprint: a post's
+// circle, a zone's polygon, rectangle or ellipse.
+
+// a paving: one tile of it drawn on a canvas, repeated over the ground
+const pavings = new Map();
+function paving(key, px, draw) {
+  if (!pavings.has(key)) {
+    const c = document.createElement("canvas");
+    c.width = c.height = px;
+    draw(c.getContext("2d"), seeded(key), px);
+    const tex = texOf(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 4;
+    pavings.set(key, share(tex));
+  }
+  return pavings.get(key);
+}
+const rgb = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
+// red bricks in a running bond, 4 by 8 to a tile: a brick is a ball across
+const brickTex = () => paving("brick", 128, (x, rand, n) => {
+  x.fillStyle = "#e2cdb0"; // the mortar
+  x.fillRect(0, 0, n, n);
+  const tone = Array.from({ length: 32 }, () => rand());
+  for (let row = 0; row < 8; row++)
+    for (let col = -1; col <= 4; col++) {
+      const k = tone[row * 4 + ((col + 4) % 4)]; // a brick cut by the edge is the same brick on the other side
+      x.fillStyle = rgb(186 + k * 34, 84 + k * 26, 62 + k * 18);
+      x.fillRect(col * 32 + (row % 2) * 16 + 1.5, row * 16 + 1.5, 29, 13);
+    }
+});
+// a 90° herringbone of paler bricks, laid at 45° (the texture turns)
+const herringTex = () => paving("herringbone", 128, (x, rand, n) => {
+  x.fillStyle = "#e9dcc4";
+  x.fillRect(0, 0, n, n);
+  const u = 8, tone = Array.from({ length: 32 }, () => rand());
+  // the pattern's lattice is (1, 1) and (-2, 2) bricks-widths: it tiles every 4
+  for (let a = -24; a <= 24; a++)
+    for (let b = -12; b <= 12; b++) {
+      const ox = (a - 2 * b) * u, oy = (a + 2 * b) * u;
+      if (ox > n + 2 * u || oy > n + 3 * u || ox < -3 * u || oy < -3 * u) continue;
+      const k = tone[(((a % 8) + 8) % 8) * 4 + (((b % 4) + 4) % 4)];
+      x.fillStyle = rgb(214 + k * 22, 150 + k * 24, 112 + k * 20);
+      x.fillRect(ox + 1, oy + 1, 2 * u - 2, u - 2); // lying
+      x.fillStyle = rgb(206 + k * 22, 140 + k * 24, 104 + k * 20);
+      x.fillRect(ox + 1, oy + u + 1, u - 2, 2 * u - 2); // standing
+    }
+});
+// a marble rosette: a compass star in two stones on cream, ringed in slate
+const marbleTex = () => paving("marble", 256, (x, rand, n) => {
+  const c = n / 2;
+  x.fillStyle = "#f1e9da";
+  x.fillRect(0, 0, n, n);
+  x.strokeStyle = "rgba(160,150,140,0.35)"; // veins
+  x.lineWidth = 1.2;
+  for (let i = 0; i < 14; i++) {
+    x.beginPath();
+    let px = rand() * n, py = rand() * n;
+    x.moveTo(px, py);
+    for (let k = 0; k < 5; k++) x.lineTo((px += (rand() - 0.5) * 50), (py += (rand() - 0.3) * 40));
+    x.stroke();
+  }
+  const ring = (r, w, col) => { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); x.arc(c, c, r, 0, Math.PI * 2); x.stroke(); };
+  ring(c - 7, 10, "#8d9ca6");
+  ring(c - 20, 4, "#c9785a");
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2, long = i % 2 === 0, R = long ? c - 26 : c * 0.52, w = long ? 0.2 : 0.2;
+    x.fillStyle = long ? (i % 4 === 0 ? "#c9785a" : "#8d9ca6") : "#d9b99a";
+    x.beginPath();
+    x.moveTo(c, c);
+    x.lineTo(c + Math.cos(a - w) * R * 0.34, c + Math.sin(a - w) * R * 0.34);
+    x.lineTo(c + Math.cos(a) * R, c + Math.sin(a) * R);
+    x.lineTo(c + Math.cos(a + w) * R * 0.34, c + Math.sin(a + w) * R * 0.34);
+    x.closePath();
+    x.fill();
+  }
+  ring(c * 0.2, 5, "#8d9ca6");
+});
+
+// a zone's outline, as the chain has it: its polygon, ellipse or rectangle
+function outlineOf(z) {
+  if (z.poly && z.poly.length > 2) return z.poly;
+  const [x0, z0] = z.min, [x1, z1] = z.max;
+  if (!z.round) return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, hx = (x1 - x0) / 2, hz = (z1 - z0) / 2;
+  return Array.from({ length: 72 }, (_, i) => [cx + Math.cos((i / 72) * Math.PI * 2) * hx, cz + Math.sin((i / 72) * Math.PI * 2) * hz]);
+}
+const insidePoly = (pts, x, z) => {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [ax, az] = pts[i], [bx, bz] = pts[j];
+    if (az > z !== bz > z && x < ax + ((z - az) * (bx - ax)) / (bz - az)) inside = !inside;
+  }
+  return inside;
+};
+// a flat sheet over pts, lift above the ground; tile > 0 repeats the texture
+// every tile units of the board, 0 stretches it over the zone once. over
+// pulls it forward in depth, over what it lies on
+function sheet(pts, z, t, mat, tile, lift) {
+  const [x0, z0] = z.min, [x1, z1] = z.max;
+  const geo = new THREE.ShapeGeometry(new THREE.Shape(pts.map(([x, zz]) => new THREE.Vector2(x, -zz))));
+  const p = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), zz = -p.getY(i);
+    uv.setXY(i, tile ? x / tile : (x - x0) / (x1 - x0), tile ? -zz / tile : 1 - (zz - z0) / (z1 - z0));
+  }
+  geo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < p.count; i++) p.setY(i, t.height(p.getX(i), p.getZ(i)) + lift);
+  return new THREE.Mesh(geo, mat);
+}
+const overMat = (map, color, k) => flat(color, { map, polygonOffset: true, polygonOffsetFactor: -k, polygonOffsetUnits: -k * 2 });
+// a patch of paving with a stone kerb flush round it and an ink line
+function patch(z, t, map, tile, kerb) {
+  const g = new THREE.Group(), pts = outlineOf(z);
+  const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
+  const hx = (z.max[0] - z.min[0]) / 2, hz = (z.max[1] - z.min[1]) / 2;
+  g.add(sheet(pts, z, t, overMat(map, 0xffffff, 1), tile, 0.02));
+  // the kerb: the outline, and inside it the same outline pulled in by 0.3
+  const inner = pts.map(([x, zz]) => [cx + (x - cx) * (1 - 0.3 / hx), cz + (zz - cz) * (1 - 0.3 / hz)]);
+  const shape = new THREE.Shape(pts.map(([x, zz]) => new THREE.Vector2(x, -zz)));
+  shape.holes.push(new THREE.Path(inner.map(([x, zz]) => new THREE.Vector2(x, -zz))));
+  const geo = new THREE.ShapeGeometry(shape);
+  geo.rotateX(-Math.PI / 2);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setY(i, t.height(p.getX(i), p.getZ(i)) + 0.03);
+  g.add(new THREE.Mesh(geo, flat(kerb, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
+  g.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts.map(([x, zz]) => new THREE.Vector3(x, t.height(x, zz) + 0.04, zz))), ink));
+  return g;
+}
+// the floor: bricks over the whole plaza, and the tram rails set in them
+// along every tram's track, as far as the plaza goes
+function brickFloor(z, s, t) {
+  const g = new THREE.Group(), pts = outlineOf(z);
+  g.add(sheet(pts, z, t, flat(0xffffff, { map: brickTex() }), 4, 0.012));
+  const trams = (s.walls || []).filter((w) => w.skin === "tram" && w.every);
+  const steel = flat(0x8d989e, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  const len = (w) => Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+  for (let i = 0; i + 3 < trams.length; i += 4) {
+    const q = trams.slice(i, i + 4), long = len(q[0]) >= len(q[1]) ? q[0] : q[1], L = len(long);
+    const cx = q.reduce((a, w) => a + w.a[0] / 4, 0), cz = q.reduce((a, w) => a + w.a[1] / 4, 0);
+    const dx = (long.b[0] - long.a[0]) / L, dz = (long.b[1] - long.a[1]) / L;
+    for (const side of [-0.6, 0.6]) {
+      const ox = cx - dz * side, oz = cz + dx * side, on = (u) => insidePoly(pts, ox + dx * u, oz + dz * u);
+      let a = -L / 2 - 3, b = L / 2 + 3;
+      while (a < 0 && !(on(a) && on(a - 0.8))) a += 0.25;
+      while (b > 0 && !(on(b) && on(b + 0.8))) b -= 0.25;
+      const rail = new THREE.Mesh(new THREE.PlaneGeometry(b - a, 0.14), steel);
+      rail.rotation.set(-Math.PI / 2, 0, Math.atan2(-dz, dx));
+      const mx = ox + dx * (a + b) / 2, mz = oz + dz * (a + b) / 2;
+      rail.position.set(mx, t.height(mx, mz) + 0.02, mz);
+      g.add(rail);
+    }
+  }
+  return g;
+}
+const PLAZA_GROUND = {
+  brick: brickFloor,
+  herringbone: (z, s, t) => { const tex = herringTex(); tex.rotation = Math.PI / 4; return patch(z, t, tex, 8, T.curb); },
+  marble: (z, s, t) => patch(z, t, marbleTex(), 0, 0x8d9ca6),
+  // a parterre: lawn and low flowers in a stone kerb, low enough to read as
+  // ground a ball rolls through (slowly), not a wall of stems
+  flowerbed: (z, s, t) => {
+    const g = patch(z, t, bedTex(), 3, T.curb), rand = seeded("bed" + z.min + z.max);
+    const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, hx = (z.max[0] - z.min[0]) / 2, hz = (z.max[1] - z.min[1]) / 2;
+    for (let i = 0; i < hx * hz * 2.2; i++) {
+      const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.82;
+      const x = cx + Math.cos(a) * hx * d, zz = cz + Math.sin(a) * hz * d, f = tflower(rand);
+      f.scale.setScalar(0.5 + rand() * 0.2);
+      g.add(onGround(f, x, zz, t));
+    }
+    return g;
+  },
+};
+// the parterre's lawn, speckled with petals
+const bedTex = () => paving("bed", 128, (x, rand, n) => {
+  x.fillStyle = "#6fa57a";
+  x.fillRect(0, 0, n, n);
+  for (let i = 0; i < 220; i++) {
+    x.fillStyle = rand() < 0.7 ? (rand() < 0.5 ? "#7fb488" : "#5f9670") : ["#f2b8b0", "#ffd98a", "#fdf6e9", "#9b7fd1"][Math.floor(rand() * 4)];
+    x.beginPath();
+    x.arc(rand() * n, rand() * n, 1.5 + rand() * 2.5, 0, Math.PI * 2);
+    x.fill();
+  }
+});
+
+/** The bandstand: a stone drum, a ring of slim columns, a mushroom-cap roof. */
+function bandstand(r, rand, night) {
+  const g = new THREE.Group();
+  const drum = drawn(new THREE.CylinderGeometry(r, r, 0.6, 36), flat(T.curb));
+  drum.position.y = 0.3;
+  const deck = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.15, r - 0.15, 0.06, 36), flat(C.wood));
+  deck.position.y = 0.63;
+  g.add(drum, deck);
+  const cr = r - 0.45;
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2, col = drawn(new THREE.CylinderGeometry(0.11, 0.14, 1.9, 8), flat(C.cream));
+    col.position.set(Math.cos(a) * cr, 1.6, Math.sin(a) * cr);
+    g.add(col);
+  }
+  const rail = drawn(new THREE.TorusGeometry(cr, 0.05, 5, 48), flat(C.cream));
+  rail.rotation.x = Math.PI / 2;
+  rail.position.y = 1.2;
+  g.add(rail);
+  // the roof, a red cap with white spots, overhanging a little in the air
+  const R = r + 0.15, k = 0.38, y0 = 2.5;
+  const cap = drawn(new THREE.SphereGeometry(R, 32, 10, 0, Math.PI * 2, 0, Math.PI / 2), flat(C.cap));
+  cap.scale.y = k;
+  cap.position.y = y0;
+  const under = new THREE.Mesh(new THREE.CircleGeometry(R, 32), flat(C.cream, { side: THREE.DoubleSide }));
+  under.rotation.x = Math.PI / 2;
+  under.position.y = y0;
+  g.add(cap, under);
+  for (let i = 0; i < 11; i++) {
+    const th = 0.35 + rand() * 0.9, ph = rand() * Math.PI * 2;
+    const spot = new THREE.Mesh(new THREE.SphereGeometry(0.34 + rand() * 0.2, 10, 6), flat(C.cream));
+    spot.scale.y = 0.3;
+    spot.position.set(Math.sin(th) * Math.cos(ph) * R * 0.99, y0 + Math.cos(th) * R * k, Math.sin(th) * Math.sin(ph) * R * 0.99);
+    spot.lookAt(spot.position.x * 2, y0 + (spot.position.y - y0) * 2 / (k * k), spot.position.z * 2);
+    spot.rotateX(Math.PI / 2);
+    g.add(spot);
+  }
+  const mast = drawn(new THREE.CylinderGeometry(0.05, 0.05, 1, 6), flat(T.iron));
+  mast.position.y = y0 + R * k + 0.45;
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.35), flat(C.sun, { side: THREE.DoubleSide }));
+  flag.position.set(0.3, y0 + R * k + 0.78, 0);
+  g.add(mast, flag);
+  // the band: three gnomes on the deck
+  for (let i = 0; i < 3; i++) {
+    const gn = gnomelet(rand), a = (i / 3) * Math.PI * 2 + 0.5;
+    gn.scale.setScalar(1.8);
+    gn.position.set(Math.cos(a) * r * 0.35, 0.66, Math.sin(a) * r * 0.35);
+    gn.rotation.y = -a - Math.PI / 2;
+    g.add(gn);
+  }
+  if (night) {
+    const glow = new THREE.Sprite(lanternGlow());
+    glow.scale.set(4, 4, 1);
+    glow.position.y = y0 - 0.3;
+    g.add(glow);
+  }
+  return g;
+}
+
+/** The clock obelisk: a stepped plinth, a shaft, a clock, a gilt spire. */
+function obelisk(r, night) {
+  // built for a plinth of 1.1 and scaled to the post: a bigger post, a taller obelisk
+  const g = new THREE.Group(), k = r / 1.1;
+  g.scale.setScalar(k);
+  r = 1.1;
+  const plinth = drawn(new THREE.CylinderGeometry(r, r, 0.7, 8), flat(T.quay));
+  plinth.position.y = 0.35;
+  const step = drawn(new THREE.CylinderGeometry(r * 0.72, r * 0.8, 0.5, 8), flat(T.curb));
+  step.position.y = 0.95;
+  const shaft = drawn(new THREE.CylinderGeometry(0.34, 0.46, 2.4, 4), flat(T.curb));
+  shaft.rotation.y = Math.PI / 4;
+  shaft.position.y = 2.4;
+  const box = drawn(rbox(0.86, 0.86, 0.86, 0.08), flat(T.wallWarm));
+  box.position.y = 4;
+  const spire = drawn(new THREE.ConeGeometry(0.5, 1.5, 4), flat(C.cap));
+  spire.rotation.y = Math.PI / 4;
+  spire.position.y = 5.18;
+  const tip = drawn(new THREE.SphereGeometry(0.14, 10, 8), flat(C.sun));
+  tip.position.y = 6;
+  g.add(plinth, step, shaft, box, spire, tip);
+  const face = night ? new THREE.MeshBasicMaterial({ color: T.lampLit }) : flat(C.cream);
+  for (let i = 0; i < 4; i++) {
+    const side = new THREE.Group();
+    side.rotation.y = (i * Math.PI) / 2;
+    const dial = new THREE.Mesh(new THREE.CircleGeometry(0.33, 20), face);
+    dial.position.set(0, 4, 0.44);
+    const hh = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.2), flat(C.ink));
+    hh.position.set(0, 4.08, 0.45);
+    const mh = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.28), flat(C.ink));
+    mh.position.set(0.1, 4, 0.451);
+    mh.rotation.z = -1.2;
+    side.add(dial, hh, mh);
+    g.add(side);
+  }
+  return g;
+}
+
+/** A round market stall: a counter all round, fruit on it, a striped parasol. */
+function marketStall(r, rand) {
+  const g = new THREE.Group();
+  const counter = drawn(new THREE.CylinderGeometry(r * 0.94, r, 0.85, 18), flat(C.wood));
+  counter.position.y = 0.425;
+  const top = drawn(new THREE.CylinderGeometry(r * 0.97, r * 0.97, 0.08, 18), flat(C.woodDark));
+  top.position.y = 0.89;
+  g.add(counter, top);
+  const fruit = [C.cap, 0xf2a93b, 0x8fcba8, 0x9b7fd1];
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2, f = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(fruit[i % 4]));
+    f.position.set(Math.cos(a) * r * 0.66, 1.05, Math.sin(a) * r * 0.66);
+    g.add(f);
+  }
+  const pole = drawn(new THREE.CylinderGeometry(0.06, 0.06, 2.3, 6), flat(C.woodDark));
+  pole.position.y = 2.05;
+  g.add(pole);
+  const colour = [C.cap, 0x5b6fb5, 0xf2a93b][Math.floor(rand() * 3)];
+  for (let i = 0; i < 8; i++) {
+    const wedge = drawn(new THREE.ConeGeometry(r * 1.3, 0.65, 3, 1, false, (i / 8) * Math.PI * 2, Math.PI / 4), flat(i % 2 ? C.cream : colour));
+    wedge.position.y = 3.4;
+    g.add(wedge);
+  }
+  return g;
+}
+
+/** Two pigeons pecking at the paving. */
+function pigeons(r, rand) {
+  const g = new THREE.Group();
+  const grey = flat(0x9ba4b6), dark = flat(0x757e91), neck = flat(0x6f9e8e);
+  for (const [px, pz] of [[-r * 0.35, -r * 0.2], [r * 0.3, r * 0.3]]) {
+    const b = new THREE.Group();
+    const body = drawn(new THREE.SphereGeometry(0.15, 10, 8), grey);
+    body.scale.set(1.4, 0.95, 0.95);
+    body.position.y = 0.2;
+    const tail = drawn(new THREE.ConeGeometry(0.09, 0.24, 4), dark);
+    tail.rotation.z = Math.PI / 2 + 0.3;
+    tail.position.set(-0.26, 0.24, 0);
+    const collar = new THREE.Mesh(new THREE.SphereGeometry(0.095, 8, 6), neck);
+    collar.position.set(0.14, 0.3, 0);
+    const head = drawn(new THREE.SphereGeometry(0.08, 8, 6), grey);
+    const pecking = rand() < 0.5;
+    head.position.set(pecking ? 0.26 : 0.2, pecking ? 0.2 : 0.4, 0);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08, 4), flat(C.sun));
+    beak.rotation.z = -Math.PI / 2 - (pecking ? 0.9 : 0);
+    beak.position.set(0.08, pecking ? -0.04 : 0, 0);
+    head.add(beak);
+    for (const e of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 5, 4), flat(C.ink));
+      eye.position.set(0.04, 0.02, e * 0.06);
+      head.add(eye);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 4), flat(0xe28b8b));
+      leg.position.set(0.02, 0.06, e * 0.05);
+      b.add(leg);
+    }
+    b.add(body, tail, collar, head);
+    b.position.set(px, 0, pz);
+    b.rotation.y = rand() * Math.PI * 2;
+    g.add(b);
+  }
+  return g;
+}
+const PLAZA_POSTS = {
+  bandstand: (r, rand, night) => bandstand(r, rand, night),
+  obelisk: (r, rand, night) => obelisk(r, night),
+  stall: (r, rand) => marketStall(r, rand),
+  pigeon: (r, rand) => pigeons(r, rand),
+};
+
+// ------------------------------------------------------------- the skate park
+//
+// town6: concrete ramps (the ground itself rises: terrain.js), a funbox, a
+// ledge down the middle and a grind rail. The park's floor is concrete, not a
+// lawn (green below).
+const CONCRETE = 0xd0cbc1, STEEL = 0x8e9aa3;
+const skatePark = (s) => (s.zones || []).some((z) => z.skin === "quarter pipe");
+/** The lane's stripes: poured concrete in a skate park, the default lawn elsewhere. */
+const green = (s) => (skatePark(s) ? [0xcfcac1, 0xcac5bc] : null);
+
+/** A grind rail: a steel tube on legs over a low concrete curb, the bar's footprint. */
+function grindRail(len, thick) {
+  const g = new THREE.Group();
+  const curb = drawn(rbox(len, 0.14, thick, 0.04), flat(CONCRETE));
+  curb.position.y = 0.07;
+  const tube = drawn(new THREE.CylinderGeometry(0.07, 0.07, len - 0.1, 10).rotateZ(Math.PI / 2), flat(STEEL));
+  tube.position.y = 0.55;
+  g.add(curb, tube);
+  const legs = Math.max(2, Math.round(len / 2.5) + 1);
+  for (let k = 0; k < legs; k++) {
+    const leg = drawn(new THREE.CylinderGeometry(0.045, 0.045, 0.42, 6), flat(STEEL));
+    leg.position.set(-len / 2 + 0.25 + ((len - 0.5) * k) / (legs - 1), 0.34, 0);
+    g.add(leg);
+  }
+  return g;
+}
+
+/** A ledge: a low concrete block, steel coping along both top edges. */
+function skateLedge(len, thick) {
+  const g = new THREE.Group();
+  // as tall as the funbox it meets: the ramps butt against it, never through it
+  const block = drawn(rbox(len, 1, thick, 0.05), flat(CONCRETE));
+  block.position.y = 0.5;
+  g.add(block);
+  for (const side of [-1, 1]) {
+    const edge = drawn(new THREE.CylinderGeometry(0.05, 0.05, len - 0.04, 8).rotateZ(Math.PI / 2), flat(STEEL));
+    edge.position.set(0, 1, side * (thick / 2 - 0.05));
+    g.add(edge);
+  }
+  return g;
+}
+
+/** A funbox ramp's top edge: a steel coping strip flush with the concrete. */
+function funboxEdge(z, t) {
+  const g = new THREE.Group();
+  const [x0, z0] = z.min, [x1, z1] = z.max;
+  // uphill is against the push; the top edge is the zone's side that way
+  const alongX = Math.abs(z.vec[0]) >= Math.abs(z.vec[1]);
+  const ex = alongX ? (z.vec[0] > 0 ? x0 : x1) : (x0 + x1) / 2, ez = alongX ? (z0 + z1) / 2 : z.vec[1] > 0 ? z0 : z1;
+  const w = alongX ? 0.16 : x1 - x0 - 0.1, d = alongX ? z1 - z0 - 0.1 : 0.16;
+  const inX = alongX ? Math.sign(z.vec[0]) * 0.08 : 0, inZ = alongX ? 0 : Math.sign(z.vec[1]) * 0.08;
+  const strip = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), flat(STEEL, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+  strip.position.set(ex + inX, t.height(ex + inX, ez + inZ) + 0.012, ez + inZ);
+  g.add(strip);
+  return g;
+}
+
+// ------------------------------------------------------------- the rooftops
+//
+// town15: planks laid from roof to roof over the street, and a cat asleep on one.
+
+/** A plank bridge over the street: boards across the way, two stringers under them. */
+function plankBridge(z, t) {
+  const g = new THREE.Group();
+  const [x0, z0] = z.min, [x1, z1] = z.max, w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const alongX = w >= d, L = alongX ? w : d, A = alongX ? d : w; // along the way, across it
+  const y = t.height(cx, cz);
+  const n = Math.max(4, Math.round(L / 0.55));
+  for (let k = 0; k < n; k++) {
+    // the boards a hair apart, a little uneven in tone
+    const u = -L / 2 + (L / n) * (k + 0.5), bw = L / n - 0.05;
+    const board = drawn(rbox(alongX ? bw : A, 0.1, alongX ? A : bw, 0.02), flat(k % 3 ? C.wood : C.woodDark));
+    board.position.set(cx + (alongX ? u : 0), y - 0.05, cz + (alongX ? 0 : u));
+    g.add(board);
+  }
+  // the stringers run on under the roofs' edges, where the plank rests
+  for (const side of [-1, 1]) {
+    const beam = drawn(rbox(alongX ? L + 0.8 : 0.22, 0.22, alongX ? 0.22 : L + 0.8, 0.03), flat(C.woodDark));
+    const off = side * (A / 2 - 0.3);
+    beam.position.set(cx + (alongX ? 0 : off), y - 0.21, cz + (alongX ? off : 0));
+    g.add(beam);
+  }
+  return g;
+}
+
+/** A cat asleep, curled up: the post it is, round, ginger with a tail about it. */
+function sleepingCat(r) {
+  const g = new THREE.Group();
+  const fur = flat(0xe39a4f), dark = flat(0xb86a2c), cream = flat(0xf6e3c6);
+  const body = drawn(new THREE.SphereGeometry(1, 16, 10), fur);
+  body.scale.set(r, r * 0.55, r * 0.8);
+  body.position.y = r * 0.5;
+  const head = drawn(new THREE.SphereGeometry(r * 0.42, 14, 10), fur);
+  head.position.set(r * 0.62, r * 0.55, r * 0.25);
+  const muzzle = drawn(new THREE.SphereGeometry(r * 0.2, 10, 8), cream);
+  muzzle.position.set(r * 0.92, r * 0.47, r * 0.33);
+  g.add(body, head, muzzle);
+  for (const side of [-1, 1]) {
+    const ear = drawn(new THREE.ConeGeometry(r * 0.13, r * 0.26, 4), dark);
+    ear.position.set(r * 0.6, r * 0.93, r * 0.25 + side * r * 0.2);
+    ear.rotation.x = side * 0.25;
+    g.add(ear);
+  }
+  // the tail wrapped round the front, and a stripe or two over the back
+  const tail = drawn(new THREE.TorusGeometry(r * 0.78, r * 0.11, 6, 16, Math.PI * 0.9), dark);
+  tail.rotation.set(Math.PI / 2, 0, Math.PI * 0.05);
+  tail.position.y = r * 0.14;
+  g.add(tail);
+  for (const k of [-0.25, 0.05, 0.35]) {
+    const stripe = drawn(new THREE.TorusGeometry(r * 0.5, r * 0.05, 4, 10, Math.PI), dark);
+    stripe.scale.set(1, 1.05, 1.5);
+    stripe.rotation.y = Math.PI / 2;
+    stripe.position.set(k * r, r * 0.52, 0);
+    g.add(stripe);
+  }
+  return g;
+}
+
 function piece(kind, item, t, s) {
   const night = timeOf(s.hole) !== "day";
   // seeded by where it stands: two pieces of one skin get different looks
@@ -1154,20 +1639,31 @@ function piece(kind, item, t, s) {
       const lip = drawn(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.2, 12), flat(T.quay));
       lip.position.y = 1.65;
       m.add(stack, lip);
-    }
+    } else if (skin === "cat") m = sleepingCat(r);
+    else if (PLAZA_POSTS[skin]) m = PLAZA_POSTS[skin](r, rand, night);
     return m ? onGround(m, x, z, t) : undefined;
   }
   if (kind === "wall") {
-    if (!["tram", "clock hand", "stall", "awning"].includes(skin)) return undefined;
+    if (!["tram", "clock hand", "stall", "awning", "rail", "ledge"].includes(skin)) return undefined;
     const [cx, cz] = item.c, len = item.length, thick = item.thick, ang = item.ang, g = new THREE.Group();
-    const make = { tram: () => tramAcross(len, thick, night), "clock hand": () => clockHand(len, thick), stall: () => stallAcross(len, thick, rand), awning: () => awningAcross(len, thick) };
+    const make = { tram: () => tramAcross(len, thick, night), "clock hand": () => clockHand(len, thick), stall: () => stallAcross(len, thick, rand), awning: () => awningAcross(len, thick), rail: () => grindRail(len, thick), ledge: () => skateLedge(len, thick) };
     g.add(make[skin]());
     g.rotation.y = -ang; // a timed bar is drawn still: course.js shows and slides it with the replay
     // one mesh per kind of material: a timed bar stays out of the bake
+    // (a ledge stands on the park's floor, whatever ramp runs up beside it)
+    if (skin === "ledge") {
+      const m = mergeLive(g);
+      m.position.set(cx, 0, cz);
+      return m;
+    }
     return onGround(mergeLive(g), cx, cz, t);
   }
   if (kind === "zone") {
     const [x0, z0] = item.min, [x1, z1] = item.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
+    if (PLAZA_GROUND[skin]) return PLAZA_GROUND[skin](item, s, t);
+    if (skin === "plank bridge") return plankBridge(item, t);
+    if (skin === "funbox") return funboxEdge(item, t);
+    if (skin === "quarter pipe") return new THREE.Group(); // the ground rises itself: concrete, nothing on it
     if (skin === "fountain") {
       const f = fountain();
       f.scale.set(w / 3.2, 0.45, d / 3.2); // a low rim: the ball rolls in, it does not bounce off
@@ -1279,4 +1775,4 @@ function extras(ex, s, t) {
   return { group, skins: new Set(["bridge", "canal"]) };
 }
 
-export { base, edging, berms, decor, rough, piece, extras };
+export { base, edging, berms, decor, rough, green, piece, extras };

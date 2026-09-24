@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CUP_R, inZone, airy } from "../terrain.js";
+import { CUP_R, BALL_R, inZone, airy } from "../terrain.js";
 import { CELL } from "../terrain.js";
 import { C, ink, flat, drawn, clipTo, rbox } from "./materials.js";
 import { animate, state } from "./state.js";
@@ -135,8 +135,15 @@ const TUNNEL_COLORS = [C.cap, 0x5b6fb5, C.sun, 0xe98fb0];
  * the first entry whose test matches draws the zone (world pieces first).
  */
 const ZONE_DRAW = [
+  [(z) => z.kind === "loop" && (z.skin === "loop-the-loop" || z.skin === "bob loop"), loopTrack],
+  [(z) => z.skin === "castle tube", (z, s, t, g) => {
+    const castle = (s.posts || []).find((p) => p.skin === "sandcastle");
+    const [cx, cz] = [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2];
+    return castle ? castleSlide(z, s, t, g, castle, [cx, cz], z.vec) : g;
+  }],
   [(z) => z.skin === "crevasse" || z.skin === "ditch", draw_gap],
-  [(z) => z.kind === "slope" && !airy(z) && (z.vec[0] || z.vec[1]), draw_contours],
+  [(z) => z.kind === "slope" && z.skin === "moon bridge", moonBridge],
+  [(z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && (z.vec[0] || z.vec[1]), draw_contours],
   [(z) => z.skin === "mill", draw_mill],
   [(z) => z.skin === "molehill", draw_molehill],
   [(z) => z.kind === "surface" || z.kind === "hazard", draw_surface],
@@ -189,6 +196,65 @@ function draw_gap(z, s, t) {
   return g;
 }
 
+/**
+ * Half of a moon bridge (one of its two slopes): planks across the deck on
+ * the arch the terrain already makes, and a red side each way, down into the
+ * stream, with the arch's dark opening under the crest. No rails: the chain
+ * has none, and a ball that runs off the side is in the water.
+ */
+function moonBridge(z, s, t, g) {
+  const alongX = Math.abs(z.vec[0]) > Math.abs(z.vec[1]); // the slope's own axis
+  const [a0, a1] = alongX ? [z.min[0], z.max[0]] : [z.min[1], z.max[1]];
+  const [b0, b1] = alongX ? [z.min[1], z.max[1]] : [z.min[0], z.max[0]];
+  const P = (a, b) => (alongX ? [a, b] : [b, a]);
+  const H = (a) => t.height(...P(a, (b0 + b1) / 2));
+  const wood = flat(0xb9804c), red = flat(0xc8452f), shade = flat(0x2f5f75, { side: THREE.DoubleSide });
+  const n = Math.max(2, Math.round((a1 - a0) / 0.42));
+  for (let k = 0; k < n; k++) {
+    const a = a0 + ((k + 0.5) / n) * (a1 - a0), d = 0.1, slope = (H(Math.min(a1 - 0.01, a + d)) - H(Math.max(a0, a - d))) / (2 * d);
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(alongX ? (a1 - a0) / n - 0.05 : b1 - b0, 0.06, alongX ? b1 - b0 : (a1 - a0) / n - 0.05), k % 2 ? wood : flat(0xa9733f));
+    const [x, zz] = P(a, (b0 + b1) / 2);
+    plank.position.set(x, H(a) + 0.02, zz);
+    if (alongX) plank.rotation.z = Math.atan(slope);
+    else plank.rotation.x = -Math.atan(slope);
+    g.add(plank);
+  }
+  // each side: a red face from the deck's edge down into the water, with the
+  // arch's shadow cut in under the crest
+  const crest = Math.abs(H(a0)) > Math.abs(H(a1)) ? a0 : a1, foot = crest === a0 ? a1 : a0;
+  for (const b of [b0 - 0.02, b1 + 0.02]) {
+    const prof = [];
+    for (let k = 0; k <= 16; k++) {
+      const a = a0 + (k / 16) * (a1 - a0);
+      prof.push([a, H(a) + 0.06]);
+    }
+    const side = [...prof, [a1, -0.3], [a0, -0.3]];
+    const hole = [];
+    for (let k = 0; k <= 12; k++) {
+      // a quarter ellipse from the crest down to the stream, the arch's inside
+      const q = (k / 12) * (Math.PI / 2), a = crest + (foot - crest) * Math.sin(q) * 0.55, y = -0.3 + (H(crest) * 0.6) * Math.cos(q);
+      hole.push([a, Math.max(-0.3, y)]);
+    }
+    hole.push([crest, -0.3]);
+    for (const [pts, mat, off] of [[side, red, 0], [hole, shade, 0.012]]) {
+      const shp = new THREE.Shape(pts.map(([a, y]) => new THREE.Vector2(a, y)));
+      const geo = new THREE.ShapeGeometry(shp);
+      const m = new THREE.Mesh(geo, mat === red ? flat(0xc8452f, { side: THREE.DoubleSide }) : mat);
+      // the shape's x is along the bridge, its y is height: stand it up on the side
+      if (alongX) m.position.set(0, 0, b + (b === b0 - 0.02 ? -off : off));
+      else {
+        m.rotation.y = -Math.PI / 2;
+        m.position.set(b + (b === b0 - 0.02 ? -off : off), 0, 0);
+      }
+      g.add(m);
+    }
+    // the red beam along the top of the side
+    const beam = new THREE.CatmullRomCurve3(prof.map(([a, y]) => { const [x, zz] = P(a, b); return new THREE.Vector3(x, y - 0.04, zz); }));
+    g.add(drawn(new THREE.TubeGeometry(beam, 24, 0.09, 6, false), red));
+  }
+  return g;
+}
+
 function draw_contours(z, s, t, g, { w, h, rand, inside, onGreen }) {
   // Contour lines, like a map: one every half unit of height, across the
   // slope and draped on it. They show where it rises and how steeply —
@@ -199,6 +265,7 @@ function draw_contours(z, s, t, g, { w, h, rand, inside, onGreen }) {
   const contour = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
   const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
   const reach = Math.hypot(w, h) / 2 + 3;
+  const segs = [];
   let last = t.height(cx - ux * reach, cz - uz * reach);
   for (let a = -reach; a <= reach; a += 0.25) {
     const px = cx + ux * a, pz = cz + uz * a;
@@ -208,7 +275,9 @@ function draw_contours(z, s, t, g, { w, h, rand, inside, onGreen }) {
     // walk across the slope at this height, keeping the pieces on the green
     let run = [];
     const flush = () => {
-      if (run.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(run), contour));
+      // as pairs, all in one LineSegments per slope (one draw, and one
+      // material the replay can light up)
+      for (let k = 1; k < run.length; k++) segs.push(run[k - 1], run[k]);
       run = [];
     };
     for (let b = -reach; b <= reach; b += 0.3) {
@@ -218,6 +287,20 @@ function draw_contours(z, s, t, g, { w, h, rand, inside, onGreen }) {
       run.push(new THREE.Vector3(x, t.height(x, zz) + 0.04, zz));
     }
     flush();
+  }
+  if (segs.length) {
+    const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(segs), contour);
+    lines.userData.live = true; // lit by the replay: never baked
+    g.add(lines);
+    // glow(k): 0 at rest, 1 fully lit (a pale gold) while the ball rolls on it
+    const rest = new THREE.Color(0xffffff), lit = new THREE.Color(0xffe38a);
+    state.slopes.set(z, {
+      glow(k) {
+        k = Math.max(0, Math.min(1, k));
+        contour.color.copy(rest).lerp(lit, k);
+        contour.opacity = 0.55 + 0.45 * k;
+      },
+    });
   }
   return g;
 }
@@ -288,11 +371,11 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
   const water = z.kind === "hazard";
   const ice = z.skin === "ice" || (z.kind === "surface" && z.scale > 1);
   // skins the chain names get their own look; an unknown one is the kind's
-  const bed = z.skin === "flowerbed", puddle = z.skin === "puddle", deck = z.skin === "bridge";
+  const bed = z.skin === "flowerbed", puddle = z.skin === "puddle", deck = z.skin === "bridge", soil = z.skin === "soil";
   const WATER = { sea: 0x4ea3cf, wave: 0x8fd0ee, lagoon: 0x5fd0cc, tidepool: 0x6fc3c9, fountain: 0x8fd0ee, canal: 0x4d8fb3, gap: 0x1f3d4a };
   // in the mountains a bunker is a patch of deep snow: same drag, white
   const snow = s.world === "mountain" && !water && !ice && !puddle && !bed && !deck && (z.skin === "sand" || !z.skin);
-  const color = snow ? 0xf3f7fa : water ? WATER[z.skin] ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : deck ? C.wood : z.skin === "wetsand" ? 0xc8a46e : ice ? 0xbfe6f0 : 0xecd49c;
+  const color = snow ? 0xf3f7fa : water ? WATER[z.skin] ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : soil ? 0x6e4d33 : deck ? C.wood : z.skin === "wetsand" ? 0xc8a46e : ice ? 0xbfe6f0 : 0xecd49c;
   const blob = organic(z, rand, s.board);
   // inside the drawn shape and on the green, with a margin: where detail may go
   const inSand = (x, zz) => {
@@ -338,7 +421,9 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
   if (water) {
     // a shore of pebbles, reeds at a corner, a lily pad and ripples — none
     // on a wall: a pond that runs up to one would push them through it
-    const byWall = (x, zz) => s.walls.some((w) => {
+    // (nor on a bridge's deck or a causeway, where a pond runs up to one)
+    const onDeck = (x, zz) => s.zones.some((q) => ((q.kind === "slope" && q.skin === "moon bridge") || q.skin === "bridge") && x > q.min[0] - 0.8 && x < q.max[0] + 0.8 && zz > q.min[1] - 0.8 && zz < q.max[1] + 0.8);
+    const byWall = (x, zz) => onDeck(x, zz) || s.walls.some((w) => {
       const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
       const u = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (zz - w.a[1]) * dz) / l2));
       return Math.hypot(x - w.a[0] - u * dx, zz - w.a[1] - u * dz) < 0.8;
@@ -444,6 +529,39 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
       m.position.set(at[0], t.height(at[0], at[1]) + 0.05, at[1]);
       g.add(m);
     }
+  } else if (soil) {
+    // a row of the vegetable patch: furrows along it, and cabbages and
+    // lettuces planted in lines on the ridges, low enough to roll through
+    const pts = z.poly && z.poly.length > 2 ? z.poly : [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]];
+    let ax = 1, az = 0, best = 0;
+    for (let k = 0; k < pts.length; k++) {
+      const a = pts[k], b = pts[(k + 1) % pts.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (l > best) (best = l), (ax = (b[0] - a[0]) / l), (az = (b[1] - a[1]) / l);
+    }
+    const nx = -az, nz = ax, cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, reach = Math.hypot(w, h) / 2 + 1;
+    const furrow = new THREE.LineBasicMaterial({ color: 0x4f3524 });
+    const heads = [flat(0x8fcb6a), flat(0x6fae55), flat(0xb5d98a)], leaf = new THREE.SphereGeometry(1, 9, 6);
+    const inRow = (x, zz) => inSand(x, zz) && inZone(z, x, zz);
+    for (let b = -reach, line = 0; b <= reach; b += 0.55, line++) {
+      let run = [];
+      const flush = () => { if (run.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(run), furrow)); run = []; };
+      for (let a = -reach; a <= reach; a += 0.3) {
+        const x = cx + ax * a + nx * b, zz = cz + az * a + nz * b;
+        if (!inRow(x, zz)) { flush(); continue; }
+        run.push(new THREE.Vector3(x, t.height(x, zz) + 0.05, zz));
+      }
+      flush();
+      if (line % 2) continue;
+      // every other ridge is planted, a head every 1.1 or so
+      for (let a = -reach + (line % 4 ? 0.55 : 0); a <= reach; a += 1.1) {
+        const x = cx + ax * a + nx * (b + 0.27), zz = cz + az * a + nz * (b + 0.27), r = 0.17 + rand() * 0.08;
+        if (![[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].every(([dx, dz]) => inRow(x + dx, zz + dz))) continue;
+        const m = new THREE.Mesh(leaf, heads[Math.floor(rand() * heads.length)]);
+        m.scale.set(r, r * 0.75, r);
+        m.position.set(x, t.height(x, zz) + 0.04 + r * 0.5, zz);
+        g.add(m);
+      }
+    }
   } else if (bed) {
     // a bed of soil full of flowers, low enough to read as ground you can
     // roll through (slowly), not a wall of stems
@@ -491,7 +609,7 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
       glint.position.set(x, t.height(x, zz) + 0.05, zz);
       g.add(glint);
     }
-  } else {
+  } else if (!deck) {
     // sand: grains and raked lines, kept inside the shape's inner margin
     const grain = new THREE.CircleGeometry(1, 10);
     const tones = snow ? [flat(0xd6e6ef), flat(0xffffff)] : [flat(0xd9bd82), flat(0xf4e1b2)];
@@ -530,50 +648,53 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
 function castleSlide(z, s, t, g, castle, [cx, cz], [ox, oz]) {
   const [kx, kz] = castle.c, R0 = castle.r;
   const ang = (x, zz) => Math.atan2(zz - kz, x - kx);
-  const a0 = ang(cx, cz), a1raw = ang(ox, oz);
-  const turns = 1.5;
-  // the other way round would also do; this way the spiral ends facing the cup
-  let a1 = a1raw;
-  while (a1 < a0 + turns * Math.PI * 2 - Math.PI) a1 += Math.PI * 2;
+  // round the castle the way that leaves it heading +x (east, to the cup):
+  // clockwise on the board, the angle going down
+  const a0 = ang(cx, cz);
+  let a1 = ang(ox, oz);
+  while (a1 > a0 - Math.PI * 2.2) a1 -= Math.PI * 2; // about a turn and a quarter
   const r0 = Math.hypot(cx - kx, cz - kz), r1 = Math.hypot(ox - kx, oz - kz), rs = R0 + 0.55; // hugs the wall
-  const y0 = t.height(cx, cz), y1 = t.height(ox, oz), top = 4.6, clear = 1.6; // above a rolling ball
-  const pts = [];
+  const y0 = t.height(cx, cz), y1 = t.height(ox, oz), top = 5.6, clear = 2.1; // clear of a rolling ball and the ramparts
+  // in straight from the tee side: the mouth opens at -x, square to the zone,
+  // and the tube runs +x a little before it turns round the castle
+  const lead = Math.max(0.3, Math.min(0.8, r0 - R0 - 0.6));
+  const sit = 0.9; // the mouth's centre: its ring clears the ground
+  const pts = [new THREE.Vector3(cx - 0.05, y0 + sit, cz), new THREE.Vector3(cx + lead, y0 + sit + 0.1, cz)];
   const N = 90;
-  for (let k = 0; k <= N; k++) {
+  for (let k = 3; k < N; k++) {
     const u = k / N, a = a0 + (a1 - a0) * u;
-    // out at the mouths, snug on the wall in between; up quick, over, down quick
-    const edge = Math.min(1, Math.min(u, 1 - u) / 0.08);
+    const edge = Math.min(1, Math.min(u, 1 - u) / 0.1);
     const r = u < 0.5 ? r0 + (rs - r0) * edge : r1 + (rs - r1) * edge;
-    const lift = Math.sin(Math.PI * u);
-    const yy = (u < 0.5 ? y0 : y1) + 0.5 + Math.max(0, Math.min(1, Math.min(u, 1 - u) / 0.06)) * (clear - 0.5) + lift * (top - clear);
+    const up = Math.min(1, Math.min(u, 1 - u) / 0.07);
+    const yy = (u < 0.5 ? y0 : y1) + sit + up * (clear - sit) + Math.sin(Math.PI * u) * (top - clear);
     pts.push(new THREE.Vector3(kx + Math.cos(a) * r, yy, kz + Math.sin(a) * r));
   }
+  // and out, straightened: the last stretch runs east onto the exit
+  pts.push(new THREE.Vector3(ox - 1.4, y1 + sit + 0.3, oz), new THREE.Vector3(ox, y1 + sit, oz));
   const path = new THREE.CatmullRomCurve3(pts);
-  const tubeR = 0.48;
-  g.add(drawn(new THREE.TubeGeometry(path, 180, tubeR, 12, false), flat(0xe0bd7e)));
-  // the slide's rim stripe: a thinner darker line along its top
+  const tubeR = 0.6; // the zone is 1.6 across: the mouth fills it
+  g.add(drawn(new THREE.TubeGeometry(path, 200, tubeR, 12, false), flat(0xe0bd7e)));
   const rim = new THREE.CatmullRomCurve3(pts.map((p) => p.clone().setY(p.y + tubeR * 0.85)));
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(rim, 180, 0.07, 5, false), flat(0xb98f55)));
-  // the two mouths: arches of wet sand, dark inside, facing along the path
-  for (const [u, at] of [[0, [cx, cz]], [1, [ox, oz]]]) {
-    const p = path.getPoint(u), d = path.getTangent(u).setY(0).normalize();
-    if (u === 1) d.negate();
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(rim, 200, 0.07, 5, false), flat(0xb98f55)));
+  // the two mouths: wet-sand arches, dark inside; the entry faces the tee
+  // (-x), the exit faces the cup (+x)
+  for (const u of [0, 1]) {
+    const p = path.getPoint(u);
+    // square to the lane: the entry faces the tee (-x), the exit the cup (+x)
+    const face = new THREE.Vector3(u === 0 ? -1 : 1, 0, 0);
     const arch = new THREE.Group();
     const ring = drawn(new THREE.TorusGeometry(tubeR * 1.35, 0.16, 8, 18), flat(0xc9a66a));
-    const hole = new THREE.Mesh(new THREE.CircleGeometry(tubeR * 1.2, 18), flat(C.burrow));
-    hole.position.z = -0.05;
-    arch.add(ring, hole);
-    arch.position.set(p.x, p.y, p.z);
-    arch.lookAt(p.x - d.x, p.y, p.z - d.z);
+    // a dark throat going into the tube: it reads "in here" from any angle
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(tubeR * 1.2, 18), new THREE.MeshBasicMaterial({ color: C.burrow }));
+    hole.position.z = -0.35;
+    const throat = new THREE.Mesh(new THREE.CylinderGeometry(tubeR * 1.2, tubeR * 1.2, 0.4, 18, 1, true), new THREE.MeshBasicMaterial({ color: C.burrow, side: THREE.BackSide }));
+    throat.rotation.x = Math.PI / 2;
+    throat.position.z = -0.15;
+    arch.add(ring, hole, throat);
+    arch.position.copy(p);
+    arch.lookAt(p.x + face.x, p.y, p.z + face.z);
     g.add(arch);
-    void at;
   }
-  // a gate in the castle wall right by the entry, so it reads "in you go"
-  const ga = a0, gr = R0 * 0.99;
-  const gate = new THREE.Mesh(new THREE.CircleGeometry(0.55, 14, 0, Math.PI), flat(C.burrow, { side: THREE.DoubleSide }));
-  gate.position.set(kx + Math.cos(ga) * gr, t.height(kx, kz) + 0.02, kz + Math.sin(ga) * gr);
-  gate.rotation.y = -ga + Math.PI / 2;
-  g.add(gate);
   state.tubes.set(z, path);
   return g;
 }
@@ -671,6 +792,167 @@ function draw_tunnel(z, s, t, g, { w, h, rand, inside, onGreen }) {
     g.add(band);
   }
   state.tubes.set(z, path);
+  return g;
+}
+
+/** The loop's radius, board units: its top is 2R over the lane. */
+export const LOOP_R = 3;
+
+/**
+ * An open loop's layout, from its zone as the chain has it (step.gno Loop):
+ * the axis is the one the destination lies furthest along; the lane (A) runs
+ * in along it at the mouth's middle, the track comes down on a lane (B)
+ * beside it at vec's side. P(u, w) is the board point at u along the axis
+ * and w across it; Xc is where the track leaves the lane (a unit in from the
+ * mouth's front); fall is where the chain sets down a ball that flew off.
+ */
+export function loopFrame(z) {
+  const mx = (z.min[0] + z.max[0]) / 2, mz = (z.min[1] + z.max[1]) / 2;
+  const ax = Math.abs(z.vec[1] - mz) <= Math.abs(z.vec[0] - mx); // along x (as the chain decides)
+  const k = ax ? 0 : 1, o = 1 - k;
+  const sign = z.vec[k] < (ax ? mx : mz) ? -1 : 1;
+  const P = (u, w) => (ax ? [u, w] : [w, u]);
+  const front = sign > 0 ? z.min[k] : z.max[k], back = sign > 0 ? z.max[k] : z.min[k];
+  const wA = (z.min[o] + z.max[o]) / 2, W = z.max[o] - z.min[o];
+  return { ax, sign, P, front, back, Xc: front + sign, wA, W, wB: z.vec[o], vecU: z.vec[k], r: LOOP_R, fall: P(front - sign * 0.01 - sign * 1.5, wA) };
+}
+
+/**
+ * The lane itself curling up into a vertical loop and coming down beside
+ * itself: a deck with the lane's green on top and timber sides, rails along
+ * both edges, and the ground filled in under its two low ends, so the lane
+ * bends up rather than a track standing on it. The kerbs it replaces are cut
+ * open for it (course.js openings). The replay rides the ball along
+ * state.tubes.get(z) (open: no tube round it): round and down onto the second
+ * lane, part way up and back, or off the top.
+ */
+function loopTrack(z, s, t, g) {
+  const F = loopFrame(z), { sign, P, Xc, wA, wB, W, r } = F;
+  const base = t.height(...P(F.front, wA));
+  // the garden's is timber under a strip of lawn; the bobsleigh's is packed
+  // snow under glassy ice, with red-and-white banks
+  const bob = z.skin === "bob loop";
+  const LOOK = bob ? { body: 0xe9f1f8, top: 0xa9dcf0, rail: C.cap, skirt: 0xd3e0ec } : { body: C.wood, top: C.fairway, rail: C.wood, skirt: C.woodDark };
+  const L = F.ax ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0); // across
+  const U = F.ax ? new THREE.Vector3(sign, 0, 0) : new THREE.Vector3(0, 0, sign); // along
+  const ease = (q) => q * q * (3 - 2 * q);
+  const N = 120, TH = 0.28;
+  // the centreline of the deck's top, and the normal into the loop
+  const ring = [];
+  for (let i = 0; i <= N; i++) {
+    const phi = (i / N) * Math.PI * 2;
+    const w = wA + (wB - wA) * ease(i / N);
+    const [x, zz] = P(Xc + sign * r * Math.sin(phi), w);
+    const c = new THREE.Vector3(x, base + 0.03 + r * (1 - Math.cos(phi)), zz);
+    const n = U.clone().multiplyScalar(-Math.sin(phi)).add(new THREE.Vector3(0, Math.cos(phi), 0));
+    ring.push({ c, n, h: r * (1 - Math.cos(phi)), phi });
+  }
+  // the deck: a box section swept round, timber, outlined
+  const pos = [], idx = [];
+  const corners = ({ c, n }) => [
+    c.clone().addScaledVector(L, -W / 2), c.clone().addScaledVector(L, W / 2),
+    c.clone().addScaledVector(L, W / 2).addScaledVector(n, -TH), c.clone().addScaledVector(L, -W / 2).addScaledVector(n, -TH),
+  ];
+  for (const q of ring) for (const v of corners(q)) pos.push(v.x, v.y, v.z);
+  const V = (i) => new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+  const quad = (a, b, c, d, out) => {
+    // wound so its normal points out of the section (the ink hull needs it)
+    const n = V(b).sub(V(a)).cross(V(d).sub(V(a)));
+    if (n.dot(out) < 0) idx.push(a, d, c, a, c, b);
+    else idx.push(a, b, c, a, c, d);
+  };
+  for (let i = 0; i < N; i++)
+    for (let e = 0; e < 4; e++) {
+      const a = i * 4 + e, b = i * 4 + ((e + 1) % 4), mid = V(a).add(V(b)).multiplyScalar(0.5);
+      const ctr = ring[i].c.clone().addScaledVector(ring[i].n, -TH / 2);
+      quad(a, b, b + 4, a + 4, mid.sub(ctr));
+    }
+  for (const [i, out] of [[0, U.clone().negate()], [N, U.clone()]]) quad(i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 3, out);
+  const body = new THREE.BufferGeometry();
+  body.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  body.setIndex(idx);
+  body.computeVertexNormals();
+  g.add(drawn(body, flat(LOOK.body)));
+  // the lane's green on top, a hair over the timber
+  const top = [], tIdx = [];
+  for (const { c, n } of ring) {
+    for (const sgn of [-1, 1]) {
+      const v = c.clone().addScaledVector(L, sgn * (W / 2 - 0.02)).addScaledVector(n, 0.015);
+      top.push(v.x, v.y, v.z);
+    }
+  }
+  for (let i = 0; i < N; i++) tIdx.push(i * 2, i * 2 + 1, i * 2 + 3, i * 2, i * 2 + 3, i * 2 + 2);
+  const deck = new THREE.BufferGeometry();
+  deck.setAttribute("position", new THREE.Float32BufferAttribute(top, 3));
+  deck.setIndex(tIdx);
+  deck.computeVertexNormals();
+  g.add(new THREE.Mesh(deck, flat(LOOK.top, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
+  // a rail each side, like the lane's kerbs, riding the deck's edges
+  for (const sgn of [-1, 1]) {
+    const pts = ring.map(({ c, n }) => c.clone().addScaledVector(L, sgn * (W / 2 + 0.12)).addScaledVector(n, 0.22));
+    g.add(drawn(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, 0.17, 8, false), flat(sgn > 0 && bob ? C.cream : LOOK.rail)));
+  }
+  // under its low ends the deck is filled down into the ground: timber faces
+  // under both edges, and one across where the fill stops
+  const skirt = flat(LOOK.skirt, { side: THREE.DoubleSide });
+  const fill = (from, to) => {
+    const sp = [], si = [];
+    for (let i = from; i <= to; i++) {
+      const [, , cB, dB] = corners(ring[i]);
+      for (const v of [dB, cB]) sp.push(v.x, v.y, v.z, v.x, base - 0.7, v.z);
+    }
+    const n = to - from;
+    for (let i = 0; i < n; i++) {
+      for (const e of [0, 2]) {
+        const a = i * 4 + e, b = a + 1, c = a + 4, d = a + 5;
+        si.push(a, b, d, a, d, c);
+      }
+    }
+    // the face across, at the end that stands clear of the ground
+    const end = from === 0 ? n : 0;
+    si.push(end * 4, end * 4 + 1, end * 4 + 3, end * 4, end * 4 + 3, end * 4 + 2);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
+    geo.setIndex(si);
+    geo.computeVertexNormals();
+    g.add(new THREE.Mesh(geo, skirt));
+  };
+  const lowEnd = Math.round(N * 0.12); // ~43°: up to about 0.6 of r
+  fill(0, lowEnd);
+  fill(N - lowEnd, N);
+  // the ride: the ball's centre, BALL_R in from the deck, in along the lane
+  // from the mouth and out along the second lane to where the chain sets it
+  const [fx, fz] = P(F.front, wA);
+  const ride = [new THREE.Vector3(fx, base + BALL_R, fz)];
+  for (const { c, n } of ring) ride.push(c.clone().addScaledVector(n, BALL_R + 0.03));
+  const [ex, ez] = P(F.vecU, wB);
+  ride.push(new THREE.Vector3(ex, t.height(ex, ez) + BALL_R, ez));
+  const curve = new THREE.CatmullRomCurve3(ride, false, "centripetal");
+  // its pace: slower the higher it climbs, as a ball under gravity
+  const lens = curve.getLengths(400), total = lens[lens.length - 1];
+  const times = [0];
+  for (let i = 1; i < lens.length; i++) {
+    const p = curve.getPointAt(lens[i] / total), h = Math.max(0, p.y - base - BALL_R);
+    times.push(times[i - 1] + (lens[i] - lens[i - 1]) / Math.sqrt(Math.max(0.2, 1 - (0.7 * h) / (2 * r))));
+  }
+  const T = times[times.length - 1];
+  const topAt = (lens[Math.round(400 * (1 + N / 2) / (N + 2))] || total / 2) / total;
+  curve.userData = {
+    open: true,
+    top: topAt, // the arc fraction at the top of the loop
+    fall: F.fall, // where a ball that flew off is set down
+    centre: new THREE.Vector3(...((q) => [q[0], base + 0.03 + r, q[1]])(P(Xc, wA))), // the ring's middle
+    across: L, // the axis across the loop
+    base, // the lane's height at the mouth
+    pace(k) {
+      const want = k * T;
+      let lo = 0, hi = times.length - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (times[m] < want) lo = m; else hi = m; }
+      const f = times[hi] > times[lo] ? (want - times[lo]) / (times[hi] - times[lo]) : 0;
+      return (lens[lo] + (lens[hi] - lens[lo]) * f) / total;
+    },
+  };
+  state.tubes.set(z, curve);
   return g;
 }
 

@@ -29,6 +29,8 @@ var me = course.Fit(&course.Simple{
 			{Circle: physics.Circle{C: physics.V(19, 5.5), R: 1.2}, Bounce: 1.3, Skin: "bumper"},
 			{Circle: physics.Circle{C: physics.V(27, 3.2), R: 1.0}, Bounce: 1.25, Skin: "bumper"},
 			{Circle: physics.Circle{C: physics.V(27, 7.8), R: 1.0}, Bounce: 1.25, Skin: "bumper"},
+			// across from the logs, guarding the low bank shot to the cup
+			{Circle: physics.Circle{C: physics.V(32, 8.2), R: 0.8}, Bounce: 1.25, Skin: "bumper"},
 		},
 		Friction: 0.86,
 		Radius:   0.5,

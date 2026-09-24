@@ -3,9 +3,16 @@
 // itself, and the only thing golf understands about it is course.Hole.
 //
 // There is no administrator here. No owner, no pause, no upgrade, no way to
-// delist a course — five writes (Register, Launch, PlayRound, PlayRoundAt,
-// Reset), all open to anyone. The other half of that
+// delist a course — six writes (Register, Launch, PlayRound, PlayRoundAt,
+// PlayRoundPro, Reset), all open to anyone. The other half of that
 // is that a bad course cannot be taken down.
+//
+// A course's own hole can be replaced, and only by a newer one of the course:
+// a realm under r/gnogolf/ registering the same world and order takes that
+// place in the cup. The old one is archived, never erased — still playable,
+// its records kept and shown — and only drops out of the course-wide
+// ranking. Who may publish under r/gnogolf/ is the chain's namespace rule,
+// not a key held here.
 //
 // PlayRound continues the caller's round where it stands. SimulateRound
 // always starts from the tee, so a client that previews with it must record
@@ -25,6 +32,7 @@ import (
 	"gno.land/p/gnogolf/physics"
 	"gno.land/p/nt/avl/v0"
 	"gno.land/p/nt/ufmt/v0"
+	"gno.land/r/sys/users"
 )
 
 const (
@@ -40,10 +48,13 @@ type entry struct {
 	par    int     // its par, read once at Register like the name
 	h      course.Hole
 	rounds *avl.Tree // player address -> *round
-	bests  *avl.Tree // player address -> int: their best finished round here, kept across replays
 	plays  int
-	bestBy address
-	best   int // strokes of the best completed round, 0 if never completed
+	// per mode (assisted, pro): each player's best finished round here, kept
+	// across replays, and the hole's record, 0 if never completed
+	bests  [modes]*avl.Tree // player address -> int
+	bestBy [modes]address
+	best   [modes]int
+	next   string // the official hole that took this one's place, "" while it is current
 }
 
 type round struct {
@@ -54,12 +65,36 @@ type round struct {
 	air     string    // one '0' or '1' per path point: '1' where the ball was in the air
 	period  int64     // the weather it is played in: set by its first stroke
 	shots   []string  // the decisions so far, "angle,power,tick": the round, replayable
+	mode    int       // assisted or pro: set by its first stroke, like the weather
 }
+
+// A round is played in one of two modes, and each has its own records and
+// rankings. Assisted is the 3D client with its full aim preview; pro is the
+// same game with the preview cut short. The chain cannot see a screen: the
+// mode is the player's word, like a handicap. Simulate stays open to all.
+const (
+	assisted = iota
+	pro
+	modes
+)
+
+// modeOf reads a mode's name; anything but "pro" is assisted.
+func modeOf(name string) int {
+	if name == "pro" {
+		return pro
+	}
+	return assisted
+}
+
+var modeNames = [modes]string{"assisted", "pro"}
 
 var (
 	holes  = avl.NewTree() // id -> *entry
-	totals = avl.NewTree() // player -> *row: their standing over the official holes
-	top    []*row          // the course-wide top ten, kept up to date on every finish
+	slots  = avl.NewTree() // "world/order" -> id of the current official hole there
+	// per mode: player -> *row, their standing over the official holes, and
+	// the course-wide top ten, kept up to date on every finish
+	totals = [modes]*avl.Tree{avl.NewTree(), avl.NewTree()}
+	top    [modes][]*row
 )
 
 // row is one player's standing across the course.
@@ -70,6 +105,15 @@ type row struct {
 
 const topSize = 10
 
+// named reports whether a player has a gno.land name (r/sys/users). Only
+// named players enter the rankings: an address is free, a name is not, so a
+// script cannot fill the boards with a thousand accounts. Every finish is
+// still kept, named or not — a player who takes a name later ranks on their
+// next finish, and friends' boards (Bests, Standings) read anyone.
+var named = func(player string) bool {
+	return !users.ResolveAddress(address(player)).IsDeleted()
+}
+
 // improve moves a player's running standing by a new best on one official
 // hole (was is their old best there, 0 if none) and re-ranks them. Only the
 // course's own holes count toward the course-wide ranking: registration is
@@ -78,12 +122,12 @@ const topSize = 10
 // namespace, as gno.land's does.) The standing is kept, not recomputed: a
 // finish costs the same however many holes there are.
 // A best on anyone else's hole still ranks the player, standing unchanged.
-func improve(player string, official bool, was, best int) {
+func improve(mode int, player string, official bool, was, best int) {
 	r := &row{player: player}
-	if v := totals.Get(player); v != nil {
+	if v := totals[mode].Get(player); v != nil {
 		r = v.(*row)
 	} else {
-		totals.Set(player, r)
+		totals[mode].Set(player, r)
 	}
 	if official && was == 0 {
 		r.holes++
@@ -91,15 +135,17 @@ func improve(player string, official bool, was, best int) {
 	} else if official {
 		r.strokes += best - was
 	}
-	rank(r)
+	if named(player) {
+		rank(mode, r)
+	}
 }
 
 // rank puts a player's row in its place in the top ten.
-func rank(r *row) {
+func rank(mode int, r *row) {
 	player := r.player
 	out := make([]*row, 0, topSize+1)
 	placed := false
-	for _, x := range top {
+	for _, x := range top[mode] {
 		if x.player == player {
 			continue
 		}
@@ -115,7 +161,7 @@ func rank(r *row) {
 	if len(out) > topSize {
 		out = out[:topSize]
 	}
-	top = out
+	top[mode] = out
 }
 
 func better(a, b *row) bool {
@@ -157,11 +203,47 @@ func Register(cur realm, h course.Hole) {
 	if par < 1 || par > 20 {
 		par = 3
 	}
-	holes.Set(id, &entry{id: id, name: cleanName(h.Name()), par: par, world: world, order: order, h: h, rounds: avl.NewTree(), bests: avl.NewTree()})
+	holes.Set(id, &entry{id: id, name: cleanName(h.Name()), par: par, world: world, order: order, h: h, rounds: avl.NewTree(), bests: [modes]*avl.Tree{avl.NewTree(), avl.NewTree()}})
 	chain.Emit("hole_registered", "id", id)
+	// a place in a cup is a world and a number: a hole with neither has none
+	if strings.HasPrefix(id, official) && order != float64(holeNo("")) {
+		slot := world + "/" + strconv.FormatFloat(order, 'g', -1, 64)
+		if old := slots.Get(slot); old != nil {
+			retire(mustHole(old.(string)), id)
+		}
+		slots.Set(slot, id)
+	}
 }
 
-// Launch is one shot, one transaction. Use it when a shot should land
+// retire archives an official hole replaced by a newer one: its players'
+// bests there leave their course-wide standing, which the new hole starts
+// afresh. The bests themselves stay on the old hole, shown as its records.
+// ponytail: one pass over the hole's players and one over every player to
+// refill the top ten, paid by the replacing Register; chunk it if a hole ever
+// has tens of thousands of players.
+func retire(old *entry, next string) {
+	old.next = next
+	for m := 0; m < modes; m++ {
+		old.bests[m].Iterate("", "", func(player string, v any) bool {
+			if r := totals[m].Get(player); r != nil {
+				r.(*row).holes--
+				r.(*row).strokes -= v.(int)
+			}
+			return false
+		})
+		top[m] = nil
+		totals[m].Iterate("", "", func(_ string, v any) bool {
+			if v.(*row).holes > 0 && named(v.(*row).player) {
+				rank(m, v.(*row))
+			}
+			return false
+		})
+	}
+	chain.Emit("hole_retired", "id", old.id, "next", next)
+}
+
+// Launch is one shot, one transaction, and always a pro round: it is how
+// gnoweb plays, with no aim preview. Use it when a shot should land
 // immediately; use PlayRound to commit a whole hole at once.
 func Launch(cur realm, hole string, angle, power float64) string {
 	e := mustHole(hole)
@@ -169,6 +251,11 @@ func Launch(cur realm, hole string, angle, power float64) string {
 	r := playable(e, player)
 	if r.strokes == 0 {
 		r.period = Period() // a round starts in the weather of the moment, and keeps it
+		// one shot at a time from a text board, with no aim line to go on:
+		// a pro round by construction
+		r.mode = pro
+	} else if r.mode != pro {
+		panic("golf: this round is being played in " + modeNames[r.mode] + " mode")
 	}
 
 	if stroke(e, r, player, hole, angle, power, 0, weatherOf(e, r.period).Zones) {
@@ -199,23 +286,31 @@ func aim(from, cup physics.Vec2) (float64, float64) {
 //
 // shots is "angle,power;angle,power;…" because MsgCall cannot carry a slice.
 func PlayRound(cur realm, hole string, shots string) string {
-	return playRound(mustHole(hole), cur.Previous().Address(), hole, shots, Period())
+	return playRound(mustHole(hole), cur.Previous().Address(), hole, shots, Period(), assisted)
 }
 
 // PlayRoundAt is PlayRound in the weather of a given period: the one the
 // client showed while the shots were chosen. Only the current period or the
 // one before is accepted, and a round already under way keeps its own.
 func PlayRoundAt(cur realm, hole string, shots string, period int64) string {
-	return playRound(mustHole(hole), cur.Previous().Address(), hole, shots, period)
+	return playRound(mustHole(hole), cur.Previous().Address(), hole, shots, period, assisted)
 }
 
-func playRound(e *entry, player address, hole, shots string, period int64) string {
+// PlayRoundPro is PlayRoundAt for a round played in pro mode: the aim
+// preview cut short. It counts on the pro records and rankings only.
+func PlayRoundPro(cur realm, hole string, shots string, period int64) string {
+	return playRound(mustHole(hole), cur.Previous().Address(), hole, shots, period, pro)
+}
+
+func playRound(e *entry, player address, hole, shots string, period int64, mode int) string {
 	r := playable(e, player)
 	if r.strokes == 0 {
 		playablePeriod(period)
-		r.period = period
+		r.period, r.mode = period, mode
 	} else if r.period != period {
 		panic(ufmt.Sprintf("golf: this round is being played in the weather of period %d", r.period))
+	} else if r.mode != mode {
+		panic("golf: this round is being played in " + modeNames[r.mode] + " mode")
 	}
 
 	list := strings.Split(shots, ";")
@@ -285,20 +380,21 @@ func stroke(e *entry, r *round, player address, hole string, angle, power float6
 
 	if holed {
 		r.done = true
-		if e.best == 0 || r.strokes < e.best {
-			e.best, e.bestBy = r.strokes, player
+		m := r.mode
+		if e.best[m] == 0 || r.strokes < e.best[m] {
+			e.best[m], e.bestBy[m] = r.strokes, player
 		}
 		// a player's best stays theirs: replaying the hole never erases it
-		if v := e.bests.Get(player.String()); v == nil || r.strokes < v.(int) {
+		if v := e.bests[m].Get(player.String()); v == nil || r.strokes < v.(int) {
 			was := 0
 			if v != nil {
 				was = v.(int)
 			}
-			e.bests.Set(player.String(), r.strokes)
-			improve(player.String(), strings.HasPrefix(e.id, official), was, r.strokes)
+			e.bests[m].Set(player.String(), r.strokes)
+			improve(m, player.String(), strings.HasPrefix(e.id, official) && e.next == "", was, r.strokes)
 		}
 		chain.Emit("holed", "hole", hole, "player", player.String(),
-			"strokes", ufmt.Sprintf("%d", r.strokes))
+			"strokes", ufmt.Sprintf("%d", r.strokes), "mode", modeNames[m])
 		return true
 	}
 	chain.Emit("shot", "hole", hole, "player", player.String(),

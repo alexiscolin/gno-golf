@@ -1,7 +1,8 @@
 // Package town10 is a swing bridge over the canal. It is down on one stroke
 // and swung open on the next: down, the ball rolls over; open, the canal is
 // water across the whole street and sends you back to the start. Watch it
-// before you shoot, or lay up short.
+// before you shoot: it is open for the tee shot, so lay up short and cross
+// on the next.
 package town10
 
 import (
@@ -17,18 +18,18 @@ var me = course.Fit(&course.Simple{
 	World:     "town",
 	Order:     10,
 	Title:     "Swing Bridge",
-	Strokes:   2, // par
+	Strokes:   3, // par
 	Tee:       physics.V(5, 6),
 	Pin:       physics.V(42, 10),
 	Substeps:  26,
 	CupRadius: 1.2,
 
-	// the bridge: down on the first stroke, open on the second, down again…
+	// the bridge: open for the first stroke, down for the second, open again…
 	Pulses: []course.Pulse{
-		{Every: 2, On: 1, Offset: 0, Zones: []physics.Zone{
+		{Every: 2, On: 1, Offset: 1, Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(20, 0), Max: physics.V(24, 16), Scale: 1, Mark: '=', Skin: "bridge"},
 		}},
-		{Every: 2, On: 1, Offset: 1, Zones: []physics.Zone{
+		{Every: 2, On: 1, Offset: 0, Zones: []physics.Zone{
 			{Kind: physics.Hazard, Min: physics.V(20, 0), Max: physics.V(24, 16), Vec: physics.V(5, 6), Mark: '~', Skin: "canal"},
 		}},
 	},

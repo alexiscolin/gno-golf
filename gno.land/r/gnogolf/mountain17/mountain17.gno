@@ -1,4 +1,5 @@
-// Package mountain17 is a crevasse splits the glacier: the short way along it is sheer ice, the long way round is deep snow.
+// Package mountain17 is a crevasse splits the glacier: the short way along it is sheer ice, the long way round is deep snow,
+// and two pines stand at the fork.
 package mountain17
 
 import (
@@ -24,6 +25,9 @@ var me = course.Fit(&course.Simple{
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(43.5, 7.6), R: 0.6}, Bounce: 0.7, Skin: "pine"},
+			// and two at the fork, where the ice and the snow part
+			{Circle: physics.Circle{C: physics.V(13.3, 9.8), R: 0.6}, Bounce: 0.7, Skin: "pine"},
+			{Circle: physics.Circle{C: physics.V(11.6, 8.4), R: 0.6}, Bounce: 0.7, Skin: "pine"},
 		},
 		Zones: []physics.Zone{
 			{Kind: physics.Hazard, Min: physics.V(14, 9.6), Max: physics.V(40, 12.4), Vec: physics.V(8, 11), Skin: "crevasse"},

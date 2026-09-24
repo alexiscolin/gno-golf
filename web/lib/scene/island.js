@@ -4,10 +4,11 @@
 // mushrooms, and turquoise water to the horizon.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, flat, drawn, grows, sway, swayLine, rbox, lanternGlow, share, hullOf, fadeable, fadeLoop } from "./materials.js";
+import { C, flat, drawn, grows, sway, swayLine, setFoot, footOf, rbox, lanternGlow, glowTex, share, hullOf, fadeable, fadeLoop } from "./materials.js";
 import { inZone } from "../terrain.js";
-import { mergeByMaterial } from "./course.js";
-import { animate } from "./state.js";
+import { mergeByMaterial, look, weatherLooks } from "./course.js";
+import { gnomelet, brolly } from "./props.js";
+import { animate, state } from "./state.js";
 import { timeOf, islandBox } from "./camera.js";
 import { seeded, ISLAND, GRASS } from "./common.js";
 import { zoneDetail } from "./zones.js";
@@ -372,16 +373,15 @@ function coconuts(g, top, n = 3) {
     const a = i * 2.1 + 0.4;
     geos.push(new THREE.SphereGeometry(0.19, 7, 5).translate(top.x + Math.cos(a) * 0.24, top.y - 0.28, top.z + Math.sin(a) * 0.24));
   }
-  g.add(drawn(mergeGeometries(geos), flat(0x6b4a2b)));
+  g.add(grows(mergeGeometries(geos), 0x6b4a2b)); // hung in the crown: they sway with it
 }
 
-// a leaf blade: seen from above and below, with its ink edge
-const leafMats = new Map();
+// a leaf blade: seen from above and below, with its ink edge. It sways with
+// the same shader as its midrib (sway) and its outline (swayLine): a still
+// blade left the ribs and the ink floating over it in the wind
 function leafMesh(geo, color) {
-  let m = leafMats.get(color);
-  if (!m) leafMats.set(color, (m = dside(color)));
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, m));
+  g.add(new THREE.Mesh(geo, sway(color, { double: true })));
   // the outline is collected: decor() (or piece()) draws all of them as one set of lines
   const e = new THREE.EdgesGeometry(geo, 40);
   g.updateMatrixWorld();
@@ -395,7 +395,8 @@ let leafLines = [];
 function flushLeafLines(root) {
   if (!leafLines.length) return;
   root.updateMatrixWorld(true);
-  const geos = leafLines.map(({ e, owner }) => e.applyMatrix4(owner.matrixWorld));
+  // each outline weighs its sway from its own palm's foot, as its leaves do
+  const geos = leafLines.map(({ e, owner }) => setFoot(e.applyMatrix4(owner.matrixWorld), footOf(owner)));
   leafLines = [];
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const lines = new THREE.LineSegments(mergeGeometries(geos).applyMatrix4(inv), leafInk);
@@ -405,6 +406,7 @@ function flushLeafLines(root) {
 /** A standing palm: a gentle wind lean, its crown over its own footprint. */
 function palm(rand, h = 4.5 + rand() * 2.5) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   const a = rand() * Math.PI * 2;
   const curve = trunkCurve(h, 0.2 + rand() * 0.25, new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
   const { bark, rings } = trunkGeometry(curve, 0.24 + rand() * 0.06);
@@ -541,8 +543,12 @@ function lighthouse(night = false, away = 0) {
   return g;
 }
 
-function umbrella(rand) {
+/** A beach umbrella and its towel, in three looks (see weatherLooks): open in
+ *  clear weather, tilted and flapping in the wind, furled in the rain; and
+ *  furled whatever the weather at night. */
+function umbrella(rand, time) {
   const g = new THREE.Group();
+  const open = new THREE.Group();
   const pole = drawn(new THREE.CylinderGeometry(0.04, 0.04, 2.1, 6), flat(C.cream));
   pole.position.y = 1.05;
   pole.rotation.z = 0.12;
@@ -553,10 +559,38 @@ function umbrella(rand) {
     canopy.add(m);
   }
   canopy.position.set(0.12, 2.1, 0);
-  const towel = drawn(rbox(0.8, 0.04, 1.6, 0.02), flatTop(colors[0]));
-  towel.position.set(0.9, 0.07, 0.2);
-  towel.rotation.y = 0.3;
-  g.add(pole, canopy, towel);
+  open.add(pole, canopy);
+  // in the wind: leaning, and all of it (pole, canopy, their ink) on the one
+  // sway weighed from its foot, so the canopy never slides off the pole
+  const windy = new THREE.Group();
+  windy.userData.foot = 0;
+  const wpole = grows(new THREE.CylinderGeometry(0.04, 0.04, 2.1, 6), C.cream);
+  wpole.position.y = 1.05;
+  windy.add(wpole);
+  for (let i = 0; i < 8; i++) {
+    const m = grows(new THREE.ConeGeometry(1.2, 0.5, 2, 1, true, (i / 8) * Math.PI * 2, Math.PI / 4).translate(0, 2.1, 0), colors[i % 2]);
+    m.children[0].material = sway(colors[i % 2], { double: true });
+    windy.add(m);
+  }
+  windy.rotation.z = 0.2;
+  // in the rain: furled round its pole, tied
+  const shut = new THREE.Group();
+  const spole = drawn(new THREE.CylinderGeometry(0.04, 0.04, 2.3, 6), flat(C.cream));
+  spole.position.y = 1.15;
+  // a spindle: slim at the bottom, fullest near the top where the ribs meet
+  const furl = drawn(new THREE.LatheGeometry([[0.045, 0], [0.13, 0.5], [0.19, 1], [0.1, 1.28], [0.045, 1.36]].map(([x, y]) => new THREE.Vector2(x, y)), 8), flat(colors[0]));
+  furl.position.y = 0.9;
+  const tie = drawn(new THREE.TorusGeometry(0.15, 0.025, 4, 10).rotateX(Math.PI / 2), flat(colors[1]));
+  tie.position.y = 1.55;
+  shut.add(spole, furl, tie);
+  if (time === "night") g.add(look(shut, "clear", "wind", "wet"));
+  else g.add(look(open, "clear"), look(windy, "wind"), look(shut, "wet"));
+  for (const wet of [false, true]) {
+    const towel = drawn(rbox(0.8, 0.04, 1.6, 0.02), flatTop(wet ? soaked(colors[0]) : colors[0]));
+    towel.position.set(0.9, 0.07, 0.2);
+    towel.rotation.y = 0.3;
+    g.add(wet ? look(towel, "wet") : look(towel, "clear", "wind"));
+  }
   return g;
 }
 
@@ -584,6 +618,7 @@ function sandcastle(rand) {
 
 function hibiscus(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   for (let i = 0; i < 3; i++) {
     const b = grows(new THREE.IcosahedronGeometry(0.35 + rand() * 0.2, 1), P.frond);
     b.position.set((rand() - 0.5) * 0.7, 0.3, (rand() - 0.5) * 0.6);
@@ -600,6 +635,7 @@ function hibiscus(rand) {
 /** Dune grass, in the sand's own colours: the only "green" out here is the palms. */
 function duneGrass(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   for (let i = 0; i < 5; i++) {
     const b = grows(new THREE.ConeGeometry(0.05, 0.6 + rand() * 0.4, 3), rand() < 0.5 ? 0xc9b06a : 0xb99d58);
     b.position.set((rand() - 0.5) * 0.35, 0.3, (rand() - 0.5) * 0.35);
@@ -851,6 +887,7 @@ function archPalm(rand, toward, reach, h, fd) {
 /** A hibiscus as big as a gnome's house, on a dune. */
 function giantHibiscus(rand) {
   const g = new THREE.Group();
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
   const stem = grows(new THREE.CylinderGeometry(0.1, 0.16, 2.4, 6), P.frondDark);
   stem.position.y = 1.2;
   stem.rotation.z = (rand() - 0.5) * 0.3;
@@ -909,28 +946,123 @@ function mergedMover(group) {
 
 const STRIPES = [[C.cap, 0xffffff], [P.towel, 0xffffff], [0xf5b83d, C.cap], [0x5b6fb5, 0xf5b83d], [0x3fbf8f, 0xffffff], [0xf29ac0, 0xffffff]];
 
-/** A towel in bright stripes, flat on the sand. */
+// a towel left out in the rain: its colours darker
+const soaked = (c) => new THREE.Color(c).multiplyScalar(0.5).getHex();
+/** A towel in bright stripes, flat on the sand; soaked in the rain. */
 function towel(rand) {
   const g = new THREE.Group();
   const [a, b] = STRIPES[Math.floor(rand() * STRIPES.length)];
-  for (let i = 0; i < 5; i++) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.03, 0.34), flatTop(i % 2 ? b : a));
-    m.position.set(0, 0.06, -0.68 + i * 0.34);
-    g.add(m);
-  }
+  const dry = new THREE.Group(), wet = new THREE.Group();
+  for (let i = 0; i < 5; i++)
+    for (const grp of [dry, wet]) {
+      const c = i % 2 ? b : a, m = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.03, 0.34), flatTop(grp === wet ? soaked(c) : c));
+      m.position.set(0, 0.06, -0.68 + i * 0.34);
+      grp.add(m);
+    }
+  g.add(look(dry, "clear", "wind"), look(wet, "wet"));
   return g;
 }
-/** A gnome sunbathing on his towel, hat over his eyes. */
-function sunbather(rand) {
+/** A gnome sunbathing on his towel, hat over his eyes. In the rain he is
+ *  gone, or stands on it under his umbrella (wrand: the weather's own dice,
+ *  so the beach's layout never changes with it). At dusk he is packing up:
+ *  sitting up, or gone; at night the towel is left empty. */
+function sunbather(rand, wrand, time) {
   const g = towel(rand);
+  const lying = new THREE.Group();
   const body = drawn(new THREE.CapsuleGeometry(0.17, 0.5, 3, 8).rotateX(Math.PI / 2), flat([0x5b6fb5, C.leaf, 0xf5b83d][Math.floor(rand() * 3)]));
   body.position.set(0, 0.2, 0.15);
   const face = drawn(new THREE.SphereGeometry(0.16, 10, 8), flat(C.cream));
   face.position.set(0, 0.2, -0.45);
   const hat = drawn(new THREE.ConeGeometry(0.17, 0.42, 10).rotateX(-Math.PI / 2), flat(C.cap));
   hat.position.set(0, 0.26, -0.72);
-  g.add(body, face, hat);
+  lying.add(body, face, hat);
+  if (time === "night") return g;
+  if (time === "day") g.add(look(lying, "clear", "wind"));
+  else if (wrand() < 0.5) g.add(look(sitter(wrand, 0, 0.1), "clear", "wind"));
+  if (wrand() < 0.5) {
+    const gn = gnomelet(wrand);
+    gn.add(brolly(STRIPES[Math.floor(wrand() * STRIPES.length)][0]));
+    gn.position.set(0, 0.075, 0.3); // on the towel
+    gn.rotation.y = wrand() * 6;
+    g.add(look(gn, "wet"));
+  }
   return g;
+}
+/** A gnome sitting on the sand (or a towel): a gnomelet, squat. */
+function sitter(wrand, x, z, turn = wrand() * 6, y = 0.075) {
+  const gn = gnomelet(wrand);
+  gn.scale.y = 0.78;
+  gn.position.set(x, y, z);
+  gn.rotation.y = turn;
+  return gn;
+}
+/** A beach campfire for the night, three gnomes round it: a ring of stones,
+ *  crossed logs, the flame, and a glow that flickers (its own material, so
+ *  every copy of it flickers too). Lights nothing: the glow is a sprite. */
+function campfire(wrand) {
+  const g = new THREE.Group();
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2, st = drawn(new THREE.DodecahedronGeometry(0.13, 0), flat(P.rock));
+    st.position.set(Math.cos(a) * 0.42, 0.06, Math.sin(a) * 0.42);
+    st.scale.y = 0.6;
+    g.add(st);
+  }
+  for (const a of [0.5, -0.6]) {
+    const log = drawn(new THREE.CylinderGeometry(0.06, 0.06, 0.62, 6).rotateZ(Math.PI / 2), flat(P.trunkDark));
+    log.position.y = 0.08;
+    log.rotation.y = a;
+    g.add(log);
+  }
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.55, 7), new THREE.MeshBasicMaterial({ color: 0xffa040 }));
+  flame.position.y = 0.38;
+  const core = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.35, 6), new THREE.MeshBasicMaterial({ color: 0xffe38a }));
+  core.position.y = 0.3;
+  const mat = new THREE.SpriteMaterial({ map: glowTex(), color: 0xffa64d, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const glow = new THREE.Sprite(mat);
+  glow.scale.set(4.4, 4.4, 1);
+  glow.position.y = 0.5;
+  g.add(flame, core, glow);
+  const ph = wrand() * 6;
+  for (let k = 0; k < 3; k++) {
+    const a = ph + (k / 3) * Math.PI * 2 + (wrand() - 0.5) * 0.4;
+    // facing the fire: a gnomelet's front is +z
+    g.add(sitter(wrand, Math.cos(a) * 1.05, Math.sin(a) * 1.05, Math.atan2(-Math.cos(a), -Math.sin(a)), 0));
+  }
+  animate((t) => (mat.opacity = 0.8 + Math.sin(t * 11 + ph) * 0.12 + Math.sin(t * 6.7) * 0.08));
+  return g;
+}
+/** Two gnomes sheltering from the rain: side by side at (x, z) of a hut or a bar. */
+function shelter(wrand, pts) {
+  const g = new THREE.Group();
+  for (const [x, z] of pts) {
+    const gn = gnomelet(wrand);
+    gn.position.set(x, 0, z);
+    gn.rotation.y = (wrand() - 0.5) * 1.2;
+    g.add(gn);
+  }
+  return look(g, "wet");
+}
+/** A gnome running along the shore with a towel over his head, in the rain. */
+function runner(wrand, sh, bank) {
+  const gn = gnomelet(wrand);
+  const cover = drawn(new THREE.CylinderGeometry(0.34, 0.34, 0.75, 10, 1, true, 0, Math.PI).rotateZ(Math.PI / 2), dside(STRIPES[Math.floor(wrand() * STRIPES.length)][0]));
+  cover.position.y = 0.66; // an arch over the hat, its tip just under the crown
+  gn.add(cover);
+  const run = mergedMover(gn);
+  // his way, sampled once: along the front of the shore, off the wet sand's edge
+  const N = 40, way = new Float32Array(N * 3);
+  for (let k = 0; k < N; k++) {
+    const [x, z] = sh.shore(Math.PI * (0.3 + (0.4 * k) / (N - 1)), -1.3);
+    way.set([x, GRASS + bank(x, z), z], k * 3);
+  }
+  animate((t) => {
+    if (!run.parent || !run.parent.visible) return;
+    const u = (t * 0.05) % 2, back = u > 1, f = (back ? 2 - u : u) * (N - 1), i = Math.min(N - 2, f | 0), a = f - i, j = i * 3;
+    const dx = way[j + 3] - way[j], dz = way[j + 5] - way[j + 2];
+    run.position.set(way[j] + dx * a, way[j + 1] + (way[j + 4] - way[j + 1]) * a + Math.abs(Math.sin(t * 9)) * 0.08, way[j + 2] + dz * a);
+    run.rotation.y = Math.atan2(-dz, dx) + (back ? Math.PI : 0);
+  });
+  return look(run, "wet");
 }
 function flipflops() {
   const g = new THREE.Group();
@@ -1060,11 +1192,12 @@ function seaweedLine(sh, rand, th0, bank) {
 function footprints(from, to, y) {
   const g = new THREE.Group();
   const d = to.clone().sub(from), n = Math.floor(d.length() / 0.45), side = new THREE.Vector3(-d.z, 0, d.x).normalize();
-  const mat = onTop(new THREE.MeshBasicMaterial({ color: 0xc8ad74 }));
+  // dents, lit like the sand they are pressed in (an unlit colour glowed at night)
+  const mat = flatTop(0xdcc28c);
   for (let i = 0; i < n; i++) {
     const m = new THREE.Mesh(new THREE.CircleGeometry(0.08, 8).rotateX(-Math.PI / 2).scale(0.7, 1, 1.2), mat);
     m.position.copy(from).addScaledVector(d, i / n).addScaledVector(side, i % 2 ? 0.1 : -0.1);
-    m.position.y = y(m.position.x, m.position.z) + 0.05;
+    m.position.y = y(m.position.x, m.position.z) + 0.02;
     m.rotation.y = -Math.atan2(d.z, d.x);
     g.add(m);
   }
@@ -1077,6 +1210,7 @@ function decor(s, bank = () => 0) {
   const g = new THREE.Group();
   const W = s.board.w, H = s.board.h;
   const rand = seeded(s.name + s.hole + "isle");
+  const wrand = seeded(s.hole + "isle weather"); // the weather looks' own: rand's draws, so the layout, stay as they were
   const sh = shape(s);
   const time = timeOf(s.hole);
 
@@ -1147,14 +1281,14 @@ function decor(s, bank = () => 0) {
     const x = W * (0.25 + (0.5 * k) / Math.max(1, huts - 1)) + (rand() - 0.5) * 3, z = -5 - rand() * 2;
     const big = 0.8 + rand() * 0.35;
     if (dry(x, z, 2) && free(x, z, 2 * big)) {
-      put(paillote(rand, big), x, z, 2 * big, (rand() - 0.5) * 0.4);
+      put(paillote(rand, big), x, z, 2 * big, (rand() - 0.5) * 0.4).add(shelter(wrand, [[-0.5 * big, 1.35 * big + 0.1], [0.5 * big, 1.35 * big + 0.1]]));
       perches.push(new THREE.Vector3(x, GRASS + bank(x, z) + (1.6 + 1.75 * 0.62 + 0.05) * big, z)); // the top of its straw cap
     }
   }
   {
     const x = W * 0.5 + (rand() - 0.5) * 4, z = -3.4;
     if (dry(x, z, 2.2) && free(x, z, 2.4)) {
-      put(tikiBar(), x, z, 2.4, (rand() - 0.5) * 0.3);
+      put(tikiBar(), x, z, 2.4, (rand() - 0.5) * 0.3).add(shelter(wrand, [[-0.6, -0.1], [0.6, -0.1]])); // behind the counter
       for (const dx of [-2.9, 2.9]) if (free(x + dx, z, 0.5)) put(coconutPile(rand), x + dx, z, 0.5);
     }
   }
@@ -1206,8 +1340,9 @@ function decor(s, bank = () => 0) {
       const a = put(palm(rand, 4.2), x, z, 2.2, 0), b = put(palm(rand, 4.4), x, z + 4.6, 2.2, 0);
       const pa = a.position.clone().setY(a.position.y + 1.4), pb = b.position.clone().setY(b.position.y + 1.4);
       const mid = pa.clone().lerp(pb, 0.5).setY(pa.y - 0.6);
-      const net = drawn(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(pa, mid, pb), 12, 0.16, 6, false), flat(P.towel));
-      net.scale.set(1, 1, 1);
+      // it sways as the trunks it is tied to do (same shader, same foot), or it slips off them
+      const net = grows(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(pa, mid, pb), 12, 0.16, 6, false), P.towel);
+      net.userData.foot = (a.position.y + b.position.y) / 2;
       g.add(net);
     }
   }
@@ -1236,10 +1371,13 @@ function decor(s, bank = () => 0) {
   const kit = [...KIT.keys()].sort(() => rand() - 0.5).slice(0, 3 + Math.floor(rand() * 3));
   for (const k of kit) KIT[k]();
   // and on every beach: umbrellas with towels and sunbathers, the odd picnic
+  // at night the first umbrella's place is a campfire's, gnomes round it (the
+  // same draw of rand, so the rest of the beach stays put)
+  let fire = false;
   const spot = (n, x0, x1, z0, z1) => {
     for (let i = 0; i < n; i++) {
-      scatter(1, x0, x1, z0, z1, 1.3, () => umbrella(rand));
-      scatter(1 + Math.floor(rand() * 2), x0, x1, z0, z1, 0.9, () => (rand() < 0.5 ? sunbather(rand) : towel(rand)), undefined, 1.2);
+      scatter(1, x0, x1, z0, z1, 1.3, () => (time === "night" && !fire ? (rand(), (fire = true), look(campfire(wrand), "clear", "wind")) : umbrella(rand, time)));
+      scatter(1 + Math.floor(rand() * 2), x0, x1, z0, z1, 0.9, () => (rand() < 0.5 ? sunbather(rand, wrand, time) : towel(rand)), undefined, 1.2);
       if (rand() < 0.6) scatter(1, x0, x1, z0, z1, 0.3, () => flipflops());
       if (rand() < 0.5) scatter(1, x0, x1, z0, z1, 0.5, () => coolBox());
       if (rand() < 0.4) scatter(1, x0, x1, z0, z1, 0.4, () => beachBall());
@@ -1248,6 +1386,7 @@ function decor(s, bank = () => 0) {
   spot(2, W + 1.5, X1 - 1, -1, H + 2);
   spot(1, X0 + 1, -1.8, -1, H + 2);
   spot(2, X0 + 1, X1 - 1, H + 1.6, sh.cz + sh.b - 2.4);
+  g.add(runner(wrand, sh, bank));
   // footprints from the huts down to the water
   if (rand() < 0.7) {
     const fx = W * (0.2 + rand() * 0.6), [tx, tz] = sh.shore(Math.PI / 2 + (rand() - 0.5) * 0.8, -1.4);
@@ -1316,6 +1455,8 @@ function decor(s, bank = () => 0) {
   g.add(gulls(rand, sh.cx, sh.cz, 4 + Math.floor(rand() * 3), perches));
   if (green(s) === "planks") g.add(lagoonUnder(s, bank));
   flushLeafLines(g);
+  // the beach in the weather: in rain or storm no one sunbathes, in wind the parasols lean
+  weatherLooks(g, (w) => (w.rain || w.storm || w.snow ? "wet" : w.wind ? "wind" : "clear"));
   return g;
 }
 
@@ -1344,6 +1485,7 @@ function palmPost(item, t) {
   g.add(pot);
   const rand = seeded("palm" + x + z);
   const p = palm(rand, 4 + rand() * 1.5);
+  p.userData.foot = 0.35; // where the trunk leaves the planter: still there
   g.add(p);
   g.position.set(x, ground(t, x, z), z);
   flushLeafLines(g);
@@ -1443,13 +1585,104 @@ function driftwoodBar(bar, t) {
   return g;
 }
 
-// a flat shape filling a zone's footprint exactly (its ellipse if round),
-// laid on the ground a hair above it
+/**
+ * A rowing boat beached across the lane (island4): the chain's bar is its
+ * footprint exactly — the hull runs the bar's length and width, square at
+ * the stern (the bar's start) and pointed at the bow, with two thwarts and a
+ * pair of oars shipped along them, listing a little as a boat does on sand.
+ */
+function rowingBoat(bar, t) {
+  const [cx, cz] = bar.c, L = bar.length, W = bar.thick || 1.4, H = 0.6;
+  const g = new THREE.Group();
+  // the hull in plan: x along the bar (-L/2 stern .. +L/2 bow), y across
+  const plan = (inset) => {
+    const l = L / 2 - inset, w = W / 2 - inset, s = new THREE.Shape();
+    s.moveTo(-l, -w * 0.8);
+    s.quadraticCurveTo(-l, -w, -l + 0.3, -w);
+    s.lineTo(l * 0.25, -w);
+    s.quadraticCurveTo(l * 0.85, -w, l, 0);
+    s.quadraticCurveTo(l * 0.85, w, l * 0.25, w);
+    s.lineTo(-l + 0.3, w);
+    s.quadraticCurveTo(-l, w, -l, w * 0.8);
+    s.closePath();
+    return s;
+  };
+  // extruded up (the shape's y becomes the world's z once laid flat)
+  const lay = (geo) => geo.rotateX(-Math.PI / 2);
+  const ext = (shape, depth) => lay(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 8 }));
+  const ring = (inset) => { const r = plan(0); r.holes.push(plan(inset)); return r; };
+  const keel = drawn(ext(plan(0), 0.25), flat(0x3f7fa6)); // the bottom, solid
+  const sides = drawn(ext(ring(0.12), H - 0.25), flat(0x3f7fa6)); // the planking, open inside
+  sides.position.y = 0.25;
+  const strake = drawn(ext(ring(0.12), 0.07), flat(C.cream)); // the gunwale
+  strake.position.y = H;
+  const floor = drawn(ext(plan(0.12), 0.02), flat(P.trunk)); // the boards inside
+  floor.position.y = 0.25;
+  g.add(keel, sides, strake, floor);
+  for (const u of [-0.22, 0.12]) {
+    const thwart = drawn(rbox(0.26, 0.06, W - 0.3, 0.02), flat(P.trunkDark));
+    thwart.position.set(u * L, H - 0.12, 0);
+    g.add(thwart);
+  }
+  for (const side of [-1, 1]) {
+    const oar = drawn(new THREE.CylinderGeometry(0.04, 0.04, L * 0.7, 6).rotateZ(Math.PI / 2), flat(C.cream));
+    oar.position.set(-0.05 * L, H - 0.02, side * (W / 2 - 0.3));
+    const blade = drawn(rbox(0.5, 0.03, 0.18, 0.01), flat(C.cream));
+    blade.position.set(0.3 * L, H - 0.02, side * (W / 2 - 0.3));
+    g.add(oar, blade);
+  }
+  const tilt = new THREE.Group();
+  tilt.add(g);
+  g.rotation.x = 0.08; // listing onto one side on the sand
+  tilt.rotation.y = -bar.ang;
+  tilt.position.set(cx, ground(t, cx, cz) - 0.05, cz);
+  return tilt;
+}
+
+/** A zone's polygon as a flat geometry (x, 0, z) about (cx, cz), cut in unit
+ *  squares so it can follow the ground: each square's piece of the polygon
+ *  (Sutherland–Hodgman), triangulated on its own. */
+function polyGeometry(poly, cx, cz) {
+  const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]), pos = [];
+  const clip = (pts, inside, cut) => {
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      if (inside(b)) { if (!inside(a)) out.push(cut(a, b)); out.push(b); }
+      else if (inside(a)) out.push(cut(a, b));
+    }
+    return out;
+  };
+  const atX = (x) => (a, b) => [x, a[1] + ((b[1] - a[1]) * (x - a[0])) / (b[0] - a[0])];
+  const atZ = (zz) => (a, b) => [a[0] + ((b[0] - a[0]) * (zz - a[1])) / (b[1] - a[1]), zz];
+  for (let x = Math.floor(Math.min(...xs)); x < Math.max(...xs); x++)
+    for (let zz = Math.floor(Math.min(...zs)); zz < Math.max(...zs); zz++) {
+      let piece = clip(poly, (p) => p[0] >= x, atX(x));
+      piece = clip(piece, (p) => p[0] <= x + 1, atX(x + 1));
+      piece = clip(piece, (p) => p[1] >= zz, atZ(zz));
+      piece = clip(piece, (p) => p[1] <= zz + 1, atZ(zz + 1));
+      if (piece.length < 3) continue;
+      const v = piece.map(([a, b]) => new THREE.Vector2(a, b));
+      for (const tri of THREE.ShapeUtils.triangulateShape(v, [])) {
+        // wound to face up (+y): in (x, z) that is clockwise
+        const [a, b, c] = tri.map((k) => v[k]), up = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) < 0;
+        for (const q of up ? [a, b, c] : [a, c, b]) pos.push(q.x - cx, 0, q.y - cz);
+      }
+    }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// a flat shape filling a zone's footprint exactly (its ellipse if round, its
+// polygon if it has one), laid on the ground a hair above it
 function footprint(z, t, material, lift = 0.05, seg = 40) {
   onTop(material);
   const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  const geo = z.round ? new THREE.CircleGeometry(1, seg).scale((x1 - x0) / 2, (z1 - z0) / 2, 1) : new THREE.PlaneGeometry(x1 - x0, z1 - z0, 8, 4);
-  geo.rotateX(-Math.PI / 2);
+  const poly = z.poly && z.poly.length > 2 && !z.outside;
+  const geo = poly ? polyGeometry(z.poly, cx, cz) : z.round ? new THREE.CircleGeometry(1, seg).scale((x1 - x0) / 2, (z1 - z0) / 2, 1) : new THREE.PlaneGeometry(x1 - x0, z1 - z0, 8, 4);
+  if (!poly) geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position;
   for (let i = 0; i < p.count; i++) p.setY(i, ground(t, cx + p.getX(i), cz + p.getZ(i)) + lift);
   const m = new THREE.Mesh(geo, material);
@@ -1486,6 +1719,104 @@ function waterZone(z, t, s, { color = P.shallow, stones = true, foam = true } = 
     animate((tt) => (ring.material.opacity = 0.2 + 0.2 * (0.5 + 0.5 * Math.sin(tt * 1.4))));
   }
   if (stones && z.round) g.add(rim(z, t, rand, Math.round((z.max[0] - z.min[0] + z.max[1] - z.min[1]) * 0.8), (r) => pebble(r)));
+  if (z.poly && z.poly.length > 2 && !z.outside) {
+    // a pool in the rock: its edge inked, and a starfish or two on its floor
+    const loop = z.poly.map(([x, zz]) => new THREE.Vector3(x, ground(t, x, zz) + 0.16, zz));
+    g.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(loop), new THREE.LineBasicMaterial({ color: 0x3d5a63 })));
+    const n = z.poly.length, c = z.poly.reduce((a, p) => [a[0] + p[0] / n, a[1] + p[1] / n], [0, 0]);
+    // rocks round its edge, just inside the water (where a ball is already sunk)
+    for (let k = 0; k < n; k++) {
+      const a = z.poly[k], b = z.poly[(k + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      for (let u = 0.45 / L; u < 1; u += 0.85 / L) {
+        let x = a[0] + (b[0] - a[0]) * u, zz = a[1] + (b[1] - a[1]) * u;
+        const d = Math.hypot(c[0] - x, c[1] - zz) || 1;
+        x += ((c[0] - x) / d) * 0.32;
+        zz += ((c[1] - zz) / d) * 0.32;
+        if (!inZone(z, x, zz)) continue;
+        const r = pebble(rand);
+        r.scale.multiplyScalar(1.4 + rand() * 0.8);
+        r.position.set(x, ground(t, x, zz) + 0.08, zz);
+        g.add(r);
+      }
+    }
+    for (let k = 0; k < 2; k++) {
+      const [px, pz] = z.poly[k * 2 % n], x = c[0] + (px - c[0]) * 0.45, zz = c[1] + (pz - c[1]) * 0.45;
+      if (!inZone(z, x, zz)) continue;
+      const f = starfish(rand);
+      f.position.set(x, ground(t, x, zz) + 0.17, zz);
+      f.rotation.y = rand() * 6;
+      g.add(f);
+    }
+  }
+  return g;
+}
+
+/**
+ * A blowhole (a timed tunnel): a dark hole in a flat rim of rock, flush with
+ * the lane, and the sea spouting up out of it in its window of substeps —
+ * driven by the timed pieces' clock (state.timed), so it spouts on screen
+ * when the chain has it throw. A ball thrown out flies an arc over to where
+ * it comes down (state.tubes, ridden by the replay at full size).
+ */
+function blowhole(z, t) {
+  const g = new THREE.Group();
+  const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, a = (x1 - x0) / 2, b = (z1 - z0) / 2;
+  const y = ground(t, cx, cz), rand = seeded("blowhole" + z.min.join());
+  // the rock shelf round it, flat: the ball rolls over it
+  const shelf = new THREE.Mesh(new THREE.CircleGeometry(1, 36).scale(a, b, 1).rotateX(-Math.PI / 2), onTop(flat(0x8e96a0, {}), 1));
+  shelf.position.set(cx, y + 0.03, cz);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(1, 28).scale(a * 0.55, b * 0.55, 1).rotateX(-Math.PI / 2), onTop(new THREE.MeshBasicMaterial({ color: 0x0f2a33 }), 2));
+  hole.position.set(cx, y + 0.04, cz);
+  g.add(shelf, hole);
+  // cracks and barnacles in the rim, flat on it
+  for (let k = 0; k < 9; k++) {
+    const th = (k / 9) * Math.PI * 2 + rand() * 0.4, r = 0.62 + rand() * 0.3;
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.08 + rand() * 0.06, 6).rotateX(-Math.PI / 2), onTop(flat(0xdfe5e8, {}), 3));
+    dot.position.set(cx + Math.cos(th) * a * r, y + 0.05, cz + Math.sin(th) * b * r);
+    g.add(dot);
+  }
+  // the spout: a column of white water with spray at its head
+  const spout = new THREE.Group();
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.7, 4.2, 14, 1, true), new THREE.MeshBasicMaterial({ color: 0xe8f7fb, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+  col.position.y = 2.1;
+  const N = 60, pos = new Float32Array(N * 3), seeds = [];
+  for (let k = 0; k < N; k++) seeds.push([rand() * Math.PI * 2, rand(), rand()]);
+  const spray = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(pos, 3)), new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, depthWrite: false }));
+  spray.frustumCulled = false;
+  spout.add(col, spray);
+  spout.position.set(cx, y, cz);
+  spout.userData.live = true;
+  g.add(spout);
+  let on = 0, target = 0;
+  const every = z.every | 0, onFor = z.on | 0, phase = z.phase | 0;
+  state.timed.push({ at: (step) => (target = !every || ((((Math.floor(step) + phase) % every) + every) % every) < onFor ? 1 : 0) });
+  let last = null;
+  animate((tt) => {
+    const dt = last === null ? 0 : Math.min(0.1, tt - last);
+    last = tt;
+    // up fast, down a little slower: the spout is a burst
+    on += (target - on) * Math.min(1, dt * (target > on ? 18 : 9));
+    col.scale.set(0.6 + 0.4 * on, Math.max(0.02, on), 0.6 + 0.4 * on);
+    col.position.y = 2.1 * Math.max(0.02, on);
+    col.material.opacity = 0.85 * Math.min(1, on * 2);
+    for (let k = 0; k < N; k++) {
+      const [th, r, v] = seeds[k], u = (tt * (0.9 + v) + r) % 1;
+      const h = on * (3.2 + v * 1.8) + u * 1.2 * on, rr = (0.2 + u * 1.4) * (0.3 + on);
+      pos.set([Math.cos(th) * rr, on > 0.05 ? h : 0.15 + u * 0.3, Math.sin(th) * rr], k * 3);
+    }
+    spray.geometry.attributes.position.needsUpdate = true;
+    spray.material.opacity = on > 0.05 ? 0.9 * on : 0.25; // a wisp of mist between spouts
+  });
+  // the throw: up out of the hole and over, to where the ball comes down
+  const [ox, oz] = z.vec, oy = ground(t, ox, oz);
+  const arc = [];
+  for (let k = 0; k <= 24; k++) {
+    const u = k / 24;
+    arc.push(new THREE.Vector3(cx + (ox - cx) * u, y + 0.5 + (oy - y) * u + 5.5 * Math.sin(Math.PI * u), cz + (oz - cz) * u));
+  }
+  const path = new THREE.CatmullRomCurve3(arc);
+  path.userData = { arc: true };
+  state.tubes.set(z, path);
   return g;
 }
 
@@ -1616,6 +1947,7 @@ export function piece(kind, item, t, s) {
   }
   if (kind === "wall") {
     if (k === "driftwood") return driftwoodBar(item, t);
+    if (k === "rowing boat") return rowingBoat(item, t);
     // (a pier backstop is a polyline, not a bar: it keeps the shared kerb)
     return null;
   }
@@ -1625,6 +1957,7 @@ export function piece(kind, item, t, s) {
     if (k === "tidepool") return waterZone(item, t, s);
     if (k === "lagoon") return waterZone(item, t, s, { color: 0x4fc4c9 });
     if (k === "wave") return wave(item, t);
+    if (k === "blowhole") return blowhole(item, t);
     if (k === "gap") return gap(item, t);
     if (k === "sea") return new THREE.Group(); // the world's sea shows round the lane
     if (item.islandDressed) return null;
@@ -1682,4 +2015,5 @@ function lagoonUnder(s) {
 
 /** The lane's own ground, for course.js: boardwalk planks where the lane is a
  *  boardwalk over the water (the pier and the broken boardwalk), else green. */
-export const green = (s) => (/island(9|10)$/.test(s.hole) ? "planks" : null);
+// the rock pools' shelf is flat rock, not a lawn
+export const green = (s) => (/island(9|10)$/.test(s.hole) ? "planks" : /island8$/.test(s.hole) ? [0xaeb0a6, 0xa5a79d] : null);

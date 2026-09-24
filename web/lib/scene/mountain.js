@@ -12,7 +12,7 @@ import { animate, state } from "./state.js";
 import { inZone } from "../terrain.js";
 import { timeOf } from "./camera.js";
 import { gnomelet, bunting, stone, smoke } from "./props.js";
-import { mergeByMaterial } from "./course.js";
+import { mergeByMaterial, look, weatherLooks } from "./course.js";
 import { seeded, ISLAND, GRASS } from "./common.js";
 
 const M = {
@@ -94,23 +94,36 @@ function base(s, box) {
   const xs = [];
   for (let i = 0; i <= 48; i++) xs.push(X0 + ((X1 - X0) * i) / 48);
   for (const [a, b] of cracks) xs.push(a, b);
+  xs.push(0, W);
   xs.sort((p, q) => p - q);
   const nx = xs.length - 1;
-  for (let j = 0; j <= nz; j++)
+  // rows: the board's own edges are rows too, so the sheet can leave the
+  // board's rectangle out (under.. below fills it, open where the ground is)
+  const zs = [];
+  for (let j = 0; j <= nz; j++) zs.push(Z0 + ((Z1 - Z0) * j) / nz);
+  zs.push(0, H);
+  zs.sort((p, q) => p - q);
+  const nzz = zs.length - 1;
+  const far = new THREE.Color(0xc2d2e2);
+  const tint = (x, z, y) => {
+    c.copy(white).lerp(blue, 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(x * 0.4 + z * 0.25)) * smooth(y / 2));
+    // aerial perspective: the snow further back goes blue-grey, so it reads
+    // as ground running up to the peaks, not as sky
+    return c.lerp(far, 0.6 * smooth(-(z + 3) / 9));
+  };
+  for (let j = 0; j <= nzz; j++)
     for (let i = 0; i <= nx; i++) {
-      const x = xs[i], z = Z0 + ((Z1 - Z0) * j) / nz;
+      const x = xs[i], z = zs[j];
       const y = lift(x, z);
       pos.push(x, GRASS + y, z);
-      c.copy(white).lerp(blue, 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(x * 0.4 + z * 0.25)) * smooth(y / 2));
-      // aerial perspective: the snow further back goes blue-grey, so it reads
-      // as ground running up to the peaks, not as sky
-      c.lerp(new THREE.Color(0xc2d2e2), 0.6 * smooth(-(z + 3) / 9));
+      tint(x, z, y);
       col.push(c.r, c.g, c.b);
     }
-  for (let j = 0; j < nz; j++)
+  for (let j = 0; j < nzz; j++)
     for (let i = 0; i < nx; i++) {
-      const mx = (xs[i] + xs[i + 1]) / 2;
+      const mx = (xs[i] + xs[i + 1]) / 2, mz = (zs[j] + zs[j + 1]) / 2;
       if (cracks.some(([a, b]) => mx > a && mx < b)) continue; // the gap
+      if (mx > 0 && mx < W && mz > 0 && mz < H) continue; // the board's: under() below
       const a = j * (nx + 1) + i, b = a + 1, d = a + nx + 1, e = d + 1;
       idx.push(a, d, b, b, d, e);
     }
@@ -119,6 +132,33 @@ function base(s, box) {
   geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   geo.setIndex(idx);
   geo.computeVertexNormals();
+  let under = null;
+  // under the board, fine snow at the garden's level: open wherever the board
+  // is (a cliff, a crack), so the drop is a drop and not a floor of snow
+  {
+    const open = (s.zones || []).filter((q) => q.skin === "cliff" || q.skin === "crevasse");
+    const step = 0.5, un = Math.ceil(W / step), vn = Math.ceil(H / step), up = [], uc = [], ui = [];
+    for (let j = 0; j <= vn; j++)
+      for (let i = 0; i <= un; i++) {
+        const x = Math.min(W, i * step), z = Math.min(H, j * step);
+        up.push(x, GRASS + lift(x, z), z);
+        tint(x, z, lift(x, z)); // the same snow as the sheet round it: no seam at the board's edge
+        uc.push(c.r, c.g, c.b);
+      }
+    for (let j = 0; j < vn; j++)
+      for (let i = 0; i < un; i++) {
+        const mx = (i + 0.5) * step, mz = (j + 0.5) * step;
+        if (open.some((q) => inZone(q, mx, mz))) continue;
+        const a = j * (un + 1) + i;
+        ui.push(a, a + un + 1, a + 1, a + 1, a + un + 1, a + un + 2);
+      }
+    const ug = new THREE.BufferGeometry();
+    ug.setAttribute("position", new THREE.Float32BufferAttribute(up, 3));
+    ug.setAttribute("color", new THREE.Float32BufferAttribute(uc, 3));
+    ug.setIndex(ui);
+    ug.computeVertexNormals();
+    under = ug;
+  }
   // the chasm beyond the board, behind it and in front, down to the depth
   const ground = { height: (x, z) => GRASS + snowAt(W, H, x, z) };
   for (const [a, b] of cracks) {
@@ -128,7 +168,9 @@ function base(s, box) {
   // lit a little from within: under the scene's warm light plain white reads grey
   // by day crisp white; at dusk the scene's warm light gives it alpenglow
   const day = timeOf(s.hole) === "day";
-  g.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, emissive: day ? 0xc4d2e2 : 0x9fb2c8, emissiveIntensity: day ? 0.6 : 0.45 })));
+  const snowMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: day ? 0xc4d2e2 : 0x9fb2c8, emissiveIntensity: day ? 0.6 : 0.45 });
+  g.add(new THREE.Mesh(geo, snowMat));
+  if (under) g.add(new THREE.Mesh(under, snowMat));
 
   // the cliff: a rock face dropping from the shelf's front edge, jagged, with
   // snow lying on its ledges
@@ -349,7 +391,8 @@ function pine(rand, scale = 1) {
 }
 
 /** The chalet: timber walls, a snowy pitched roof, lit windows after dark. */
-function chalet(night) {
+/** A chalet; fog: by day its windows light up in the fog (a weather look). */
+function chalet(night, fog = false) {
   const g = new THREE.Group();
   const body = drawn(rbox(4.2, 2.6, 3.4, 0.1), flat(M.wood));
   body.position.y = 1.3;
@@ -374,6 +417,19 @@ function chalet(night) {
       glow.position.set(x, 1.6, 1.9);
       g.add(glow);
     }
+  }
+  if (fog && !night) {
+    // lit through the murk: the lamps inside on, a glow at each window
+    const lit = new THREE.Group(), glass = new THREE.MeshBasicMaterial({ color: M.lit, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+    for (const x of [-1.2, 1.2]) {
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), glass);
+      w.position.set(x, 1.6, 1.71);
+      const glow = new THREE.Sprite(lanternGlow());
+      glow.scale.set(2.4, 2.4, 1);
+      glow.position.set(x, 1.6, 1.9);
+      lit.add(w, glow);
+    }
+    g.add(look(lit, "fog"));
   }
   const door = drawn(rbox(0.8, 1.4, 0.1, 0.05), flat(M.woodDark));
   door.position.set(0, 0.7, 1.72);
@@ -763,6 +819,7 @@ function drift(rand) {
   g.add(shade);
   return g;
 }
+const DRIFT_MOUND = share(new THREE.MeshLambertMaterial({ color: 0xf4f8fd, emissive: 0xa9bdd6, emissiveIntensity: 0.4 }));
 const DRIFT = share(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xc4d2e2, emissiveIntensity: 0.45 }));
 
 /** A rock outcrop: two or three slabs breaking through, snow on their tops. */
@@ -1116,7 +1173,7 @@ function decor(s, bank = () => 0) {
 
   // behind, big things: the chalet right of centre, the frozen fall at the
   // back right, a forest of pines
-  place(chalet(night), X0 + (X1 - X0) * 0.72, -6.4, 2.8, -0.15) || place(chalet(night), X1 - 3.4, -6.4, 2.8);
+  place(chalet(night, true), X0 + (X1 - X0) * 0.72, -6.4, 2.8, -0.15) || place(chalet(night, true), X1 - 3.4, -6.4, 2.8);
   place(frozenFall(), X1 - 2.5, -8.5, 3.4, -0.3);
   for (let i = 0; i < Math.round((X1 - X0) / 2.2); i++) {
     const x = X0 + rand() * (X1 - X0), z = -3.6 - rand() * 6;
@@ -1129,7 +1186,7 @@ function decor(s, bank = () => 0) {
     place(p.g, W + 2.6 + rand() * 3, z, p.r, rand() * 6);
   }
   // prayer flags across the back
-  g.add(bunting(new THREE.Vector3(X0 + 3, GRASS, -3.2), new THREE.Vector3(X1 - 4, GRASS, -3.2)));
+  g.add(bunting(new THREE.Vector3(X0 + 3, GRASS + bank(X0 + 3, -3.2), -3.2), new THREE.Vector3(X1 - 4, GRASS + bank(X1 - 4, -3.2), -3.2)));
   for (let x = X0 + 3; x < X1 - 4; x += 1.2) reserve(x, -3.2, 0.25);
 
   // the left and the front: only low things — a snowman, skis, sledges,
@@ -1151,7 +1208,8 @@ function decor(s, bank = () => 0) {
     new THREE.Vector3(X0 + 3, 0, -6.5),
     new THREE.Vector3(X0 + 10, 0, -3.8),
   ]);
-  g.add(skiers(rand, piste, bank, 3));
+  if (timeOf(s.hole) === "night") rand(); // the skiers have gone home (their one draw kept, so the rest stays put)
+  else g.add(skiers(rand, piste, bank, 3));
 
   // the snow field, filled like the town is: all of it low in front of the
   // lane, taller only behind and at the far sides
@@ -1233,6 +1291,8 @@ function decor(s, bank = () => 0) {
   const over = canopy(s, rand);
   g.add(over);
   g.userData.fade = over.userData.fade;
+  // in snow or storm the skiers ski on; in fog the chalet lights up
+  weatherLooks(g, (w) => (w.fog ? "fog" : "clear"));
   return g;
 }
 
@@ -1684,7 +1744,9 @@ function cliff(z, t, s) {
       for (let i = 0; i <= n; i++) {
         const u = i / n, v = j / rows, jag = j && j < rows ? (rand() - 0.5) * 0.4 : 0;
         const x = ax + (bx - ax) * u, zz = az + (bz - az) * u, nx = -(bz - az) / L, nz = (bx - ax) / L;
-        const y0 = t.height(Math.min(Math.max(x, 0), W), Math.min(Math.max(zz, 0), H));
+        // on the board's own edge the world's snow is the ground (GRASS), inside it the board's
+        const rim = x <= 0.01 || x >= W - 0.01 || zz <= 0.01 || zz >= H - 0.01;
+        const y0 = rim ? GRASS : t.height(Math.min(Math.max(x, 0), W), Math.min(Math.max(zz, 0), H));
         pos.push(x + nx * jag, y0 + (CLIFF_Y - y0) * v, zz + nz * jag);
         const c = top.clone().lerp(low, Math.pow(v, 0.8));
         col.push(c.r, c.g, c.b);
@@ -1930,16 +1992,211 @@ function snowCannon(z, t, s) {
   return g;
 }
 
+// ------------------------------------------------------------- the ice rink
+//
+// mountain13: gnomes on skates (posts that come and go stroke by stroke: the
+// pulse's pieces), the goalie padded out, and a goal net round the cup.
+
+/** A skater, a gnome on blades, the post's circle his footprint; the goalie in pads with a stick. */
+function skaterPost(r, rand, goalie) {
+  const g = new THREE.Group();
+  const k = r / 0.28; // the gnomelet's body is about 0.22 across its foot
+  const gn = gnomelet(rand);
+  gn.scale.setScalar(k);
+  gn.position.y = 0.16 * k;
+  g.add(gn);
+  // a scarf, two skates on their blades
+  const scarf = drawn(new THREE.TorusGeometry(0.15 * k, 0.04 * k, 6, 14), flat(M.flags[Math.floor(rand() * M.flags.length)]));
+  scarf.rotation.x = Math.PI / 2;
+  scarf.position.y = 0.16 * k + 0.37 * k;
+  g.add(scarf);
+  for (const side of [-1, 1]) {
+    const boot = drawn(rbox(0.14 * k, 0.1 * k, 0.26 * k, 0.03 * k), flat(0x3a3f4a));
+    boot.position.set(side * 0.1 * k, 0.1 * k, 0.03 * k);
+    const blade = drawn(rbox(0.03 * k, 0.05 * k, 0.32 * k, 0.01 * k), flat(0xd8dee6));
+    blade.position.set(side * 0.1 * k, 0.03 * k, 0.03 * k);
+    g.add(boot, blade);
+  }
+  if (goalie) {
+    for (const side of [-1, 1]) {
+      const pad = drawn(rbox(0.14 * k, 0.34 * k, 0.12 * k, 0.04 * k), flat(C.cream));
+      pad.position.set(side * 0.13 * k, 0.28 * k, 0.12 * k);
+      g.add(pad);
+    }
+    const stick = drawn(rbox(0.04 * k, 0.04 * k, 0.6 * k, 0.01), flat(M.woodDark));
+    stick.position.set(0.25 * k, 0.1 * k, 0.28 * k);
+    stick.rotation.x = -0.35;
+    g.add(stick);
+  }
+  g.rotation.y = rand() * Math.PI * 2;
+  return g;
+}
+
+/** A goal's net: a red frame along the bar, mesh hung from it down to the ice. */
+function goalNet(len, thick) {
+  const g = new THREE.Group();
+  const H = 1.1, red = flat(C.cap);
+  const top = drawn(new THREE.CylinderGeometry(0.06, 0.06, len, 8).rotateZ(Math.PI / 2), red);
+  top.position.y = H;
+  g.add(top);
+  for (const e of [-1, 1]) {
+    const post = drawn(new THREE.CylinderGeometry(0.06, 0.06, H, 8), red);
+    post.position.set((e * len) / 2, H / 2, 0);
+    g.add(post);
+  }
+  // the mesh: a pale sheet the bar's thickness, and its cords over it
+  const sheet = new THREE.Mesh(new THREE.BoxGeometry(len, H, thick * 0.5), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false }));
+  sheet.position.y = H / 2;
+  const cords = [];
+  for (let x = -len / 2; x <= len / 2 + 1e-6; x += 0.22) cords.push(new THREE.Vector3(x, 0, thick * 0.26), new THREE.Vector3(x, H, thick * 0.26), new THREE.Vector3(x, 0, -thick * 0.26), new THREE.Vector3(x, H, -thick * 0.26));
+  for (let y = 0.2; y < H; y += 0.22) for (const zz of [thick * 0.26, -thick * 0.26]) cords.push(new THREE.Vector3(-len / 2, y, zz), new THREE.Vector3(len / 2, y, zz));
+  const net = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(cords), new THREE.LineBasicMaterial({ color: 0xe6edf3 }));
+  g.add(sheet, net);
+  return g;
+}
+
+// ------------------------------------------------------------- the col
+//
+// mountain12: at the saddle, a cairn each side of the pass and prayer flags
+// strung over it, off the lane.
+function colCrest(z, t) {
+  const g = new THREE.Group();
+  // the top edge of the climb (against its push), and the lane's two sides along it
+  const x = z.vec[0] < 0 ? z.max[0] : z.min[0], mid = (z.min[1] + z.max[1]) / 2;
+  const on = (zz) => !t.onGreen || t.onGreen(x, zz);
+  let lo = mid, hi = mid;
+  while (lo > z.min[1] && on(lo - 0.25)) lo -= 0.25;
+  while (hi < z.max[1] && on(hi + 0.25)) hi += 0.25;
+  const rand = seeded("col" + z.min.join());
+  const feet = [];
+  for (const [zz, dir] of [[lo - 1.6, -1], [hi + 1.6, 1]]) {
+    if (on(zz) || on(zz - dir * 0.6)) continue; // no room off the lane
+    const cairn = new THREE.Group();
+    let y = 0;
+    for (let k = 0; k < 4; k++) {
+      const rr = 0.55 - k * 0.1, st = drawn(new THREE.DodecahedronGeometry(rr, 0), flat(k % 2 ? M.rock : M.rockDark));
+      st.scale.y = 0.6;
+      st.rotation.y = rand() * 3;
+      st.position.y = y + rr * 0.55;
+      y += rr * 1.05;
+      cairn.add(st);
+    }
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), SNOW);
+    cap.scale.y = 0.5;
+    cap.position.y = y;
+    cairn.add(cap);
+    g.add(onGround(cairn, x, zz, t));
+    feet.push(new THREE.Vector3(x, t.height(x, zz), zz + dir * 0.9));
+  }
+  if (feet.length === 2) g.add(bunting(feet[0], feet[1]));
+  return g;
+}
+
+// ------------------------------------------------------------- the seracs
+//
+// mountain15: a serac leans over the traverse above each timed hazard, and
+// its ice comes down on the lane in the hazard's window of substeps — driven
+// by the timed pieces' clock (state.timed), so the blocks fall on screen when
+// the chain has them fall. A shadow darkens the spot for a few substeps
+// before, and the rubble of old falls marks it the rest of the time.
+function serac(z, t, s) {
+  const g = new THREE.Group();
+  const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, ax = (x1 - x0) / 2, az = (z1 - z0) / 2;
+  const rand = seeded("serac" + z.min.join());
+  const lane = (x, zz) => !t.onGreen || t.onGreen(x, zz);
+  // the rubble, where the ice lands: always there, so the spot reads
+  g.add(overlay(z, t, (x, zz) => new THREE.Color(0xdfeaf3).lerp(new THREE.Color(0xa9c4dc), 0.35 + 0.25 * Math.sin(x * 2.1 + zz * 1.7)), () => 0.01));
+  for (let k = 0; k < 7; k++) {
+    const x = cx + (rand() - 0.5) * ax * 1.4, zz = cz + (rand() - 0.5) * az * 1.4;
+    if (!inZone(z, x, zz) || !lane(x, zz)) continue;
+    const chip = new THREE.Mesh(new THREE.TetrahedronGeometry(0.12 + rand() * 0.08), ICE_SOLID);
+    chip.position.set(x, t.height(x, zz) + 0.05, zz);
+    chip.rotation.set(rand() * 3, rand() * 3, rand() * 3);
+    g.add(chip);
+  }
+  // the serac: a leaning tower of ice off the lane, uphill of the spot (-z),
+  // or below it when the board leaves no room above; clear of the lane by a
+  // good step and inside the board, so it never stands in the decor round it
+  const clear = (zz) => zz > 1.3 && zz < s.board.h - 1.3 && [[-1.3, 0], [1.3, 0], [0, -1.3], [0, 1.3], [0, 0], [-1, -1], [1, 1], [-1, 1], [1, -1]].every(([a, b]) => !lane(cx + a, zz + b));
+  let tz = null;
+  for (const dir of [-1, 1]) for (let d = 0.5; d < 9 && tz == null; d += 0.25) if (clear(dir < 0 ? z0 - d : z1 + d)) tz = dir < 0 ? z0 - d : z1 + d;
+  if (tz == null) tz = z0 - 3;
+  const tower = new THREE.Group();
+  for (let k = 0; k < 3; k++) {
+    const w = 2.2 - k * 0.45, h = 1.5 + rand() * 0.4;
+    const b = drawn(rbox(w, h, w * 0.8, 0.15), ICE_SOLID);
+    b.position.set((rand() - 0.5) * 0.3, 0.1 + k * 1.35 + h / 2, k * 0.35);
+    b.rotation.y = (rand() - 0.5) * 0.4;
+    tower.add(b);
+  }
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), SNOW);
+  cap.scale.set(1, 0.4, 0.8);
+  cap.position.set(0, 4.4, 0.7);
+  tower.add(cap);
+  tower.rotation.x = tz < cz ? 0.12 : -0.12; // leaning out over the path
+  if (tz > cz) tower.rotation.y = Math.PI;
+  g.add(onGround(tower, cx, tz, t));
+  // the fall: blocks dropping on the spot, and the shadow before them
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 28).scale(ax * 0.85, az * 0.85, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x1d3550, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));
+  shadow.position.set(cx, t.height(cx, cz) + 0.06, cz);
+  shadow.userData.live = true;
+  g.add(shadow);
+  const blocks = [];
+  for (let k = 0; k < 9 && blocks.length < 6; k++) {
+    const x = cx + (rand() - 0.5) * ax * 1.3, zz = cz + (rand() - 0.5) * az * 1.3, s = 0.45 + rand() * 0.35;
+    if (!inZone(z, x, zz) || !lane(x, zz)) continue;
+    const b = drawn(rbox(s, s * 0.8, s, 0.08), ICE_SOLID);
+    b.userData.live = true;
+    b.visible = false;
+    g.add(b);
+    blocks.push({ b, x, zz, y: t.height(x, zz) + s * 0.4, s, d: rand() * 0.05, spin: rand() * 3 });
+  }
+  const every = z.every | 0, onFor = z.on | 0, phase = z.phase | 0;
+  let on = false, warn = 0, t0 = -1e9, t1 = -1e9, now = 0;
+  state.timed.push({
+    at: (step) => {
+      const k = ((((Math.floor(step) + phase) % every) + every) % every);
+      const was = on;
+      on = !every || k < onFor;
+      // substeps to go before the next fall
+      const until = on ? 0 : every - k;
+      warn = on ? 1 : until <= 3 ? 1 - (until - 1) / 3 : 0;
+      if (on && !was) t0 = now;
+      if (!on && was) t1 = now;
+    },
+  });
+  animate((tt) => {
+    now = tt;
+    shadow.material.opacity = 0.35 * Math.max(warn, 0);
+    for (const q of blocks) {
+      const fall = Math.min(1, Math.max(0, (tt - t0 - q.d) / 0.15)), gone = Math.min(1, Math.max(0, (tt - t1) / 0.1));
+      const showing = on || gone < 1;
+      q.b.visible = showing && tt - t0 > q.d;
+      if (!q.b.visible) continue;
+      q.b.position.set(q.x, q.y + (1 - fall * fall) * 7, q.zz);
+      q.b.rotation.set(q.spin * (1 - fall), q.spin, 0);
+      q.b.scale.setScalar(on ? 1 : 1 - gone);
+    }
+  });
+  return g;
+}
+
 function piece(kind, item, t, s) {
   const skin = item.skin || "";
   const rand = seeded("mpiece" + s.hole + JSON.stringify(item.c || item.min || []));
   const night = timeOf(s.hole) !== "day";
   if (kind === "post") {
     const [x, z] = item.c, r = item.r;
-    const make = { pine: () => pinePost(r, rand), boulder: () => boulder(r, rand), snowman: () => snowmanPost(r), chalet: () => chaletPost(r, night) }[skin];
+    const make = { pine: () => pinePost(r, rand), boulder: () => boulder(r, rand), snowman: () => snowmanPost(r), chalet: () => chaletPost(r, night), skater: () => skaterPost(r, rand, r > 0.8) }[skin];
     return make ? onGround(make(), x, z, t) : undefined;
   }
   if (kind === "wall") {
+    if (skin === "net") {
+      const g = new THREE.Group();
+      g.add(goalNet(item.length, item.thick));
+      g.rotation.y = -item.ang;
+      return onGround(g, item.c[0], item.c[1], t);
+    }
     if (skin !== "lift") return undefined;
     // the chairs glide along the cable, drawn by decor (laneLift): the bar
     // itself, shown and hidden by the replay, is nothing to see
@@ -1983,23 +2240,54 @@ function piece(kind, item, t, s) {
     }
     g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(scratch), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 })));
     g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(crack), new THREE.LineBasicMaterial({ color: 0x4f8fb4, transparent: true, opacity: 0.8 })));
+    // a rink (a goal net on it): its markings, the red centre line and the circles
+    if ((s.walls || []).some((w) => w.skin === "net")) {
+      const y = t.height(cx, cz) + 0.07, mark = (pts, color) => g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([a, b]) => new THREE.Vector3(a, y, b))), new THREE.LineBasicMaterial({ color })));
+      const ring = (x, zz, r) => Array.from({ length: 33 }, (_, k) => [x + Math.cos((k / 32) * Math.PI * 2) * r, zz + Math.sin((k / 32) * Math.PI * 2) * r]);
+      const H = (z1 - z0) / 2;
+      mark([[cx, z0 + 0.8], [cx, z1 - 0.8]], C.cap);
+      mark(ring(cx, cz, H * 0.35), 0x4a78c8);
+      for (const x of [x0 + (x1 - x0) * 0.3, x0 + (x1 - x0) * 0.7]) mark([[x, z0 + 1.5], [x, z1 - 1.5]], 0x4a78c8);
+    }
     return g;
   }
   if (skin === "snowdrift") {
     // deep powder: soft rounded bumps (still low: the physics is flat), blue
     // in their hollows, wind ripples across it and a sparkle of light on top
     const g = new THREE.Group();
-    const bump = (x, zz) => 0.12 + 0.1 * Math.sin(x * 1.7 + zz * 1.3) * Math.cos(zz * 1.1 - x * 0.6);
-    const hi = new THREE.Color(0xfbfdff), lo = new THREE.Color(0xb9cde4);
-    g.add(overlay(item, t, (x, zz) => lo.clone().lerp(hi, 0.35 + 0.65 * ((bump(x, zz) - 0.02) / 0.2)), bump));
+    // (a soft rim: the bumps die away to the zone's edge, so it swells out of
+    // the lane rather than sitting on it as a disc)
+    const rim = (x, zz) => {
+      if (item.round) {
+        const u = (x - cx) / ((x1 - x0) / 2), v = (zz - cz) / ((z1 - z0) / 2);
+        return Math.max(0, Math.min(1, (1 - Math.hypot(u, v)) * 3));
+      }
+      return Math.max(0, Math.min(1, Math.min(x - x0, x1 - x, zz - z0, z1 - zz) / 1));
+    };
+    const wave = (x, zz) => Math.sin(x * 1.7 + zz * 1.3) * Math.cos(zz * 1.1 - x * 0.6);
+    const bump = (x, zz) => rim(x, zz) * (0.2 + 0.14 * wave(x, zz));
+    const hi = new THREE.Color(0xfdfeff), lo = new THREE.Color(0x98b1d0);
+    // lit on the side facing the light (+x, -z), blue in the hollows and at the rim
+    g.add(overlay(item, t, (x, zz) => lo.clone().lerp(hi, Math.max(0, Math.min(1, 0.25 + 0.55 * (0.5 + 0.5 * wave(x + 0.3, zz - 0.3)) + 0.2 * rim(x, zz)))), bump));
     const rip = [];
     for (let k = 0; k < Math.ceil(((x1 - x0) * (z1 - z0)) / 3); k++) {
       const x = x0 + rand() * (x1 - x0), zz = z0 + rand() * (z1 - z0), l = 0.5 + rand() * 0.6;
       const p = [x - l, zz - l * 0.25], q = [x + l, zz + l * 0.25];
       if (!inZone(item, ...p) || !inZone(item, ...q)) continue;
-      for (const [a2, b2] of [p, q]) rip.push(new THREE.Vector3(a2, t.height(a2, b2) + bump(a2, b2) + 0.05, b2));
+      for (const [a2, b2] of [p, q]) rip.push(new THREE.Vector3(a2, t.height(a2, b2) + bump(a2, b2) + 0.06, b2));
     }
     g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(rip), new THREE.LineBasicMaterial({ color: 0x9fb8d6, transparent: true, opacity: 0.6 })));
+    // a few soft mounds of powder heaped in it, so it reads as deep snow at a glance
+    for (let k = 0; k < Math.max(3, Math.round(((x1 - x0) * (z1 - z0)) / 8)); k++) {
+      const x = x0 + (0.2 + rand() * 0.6) * (x1 - x0), zz = z0 + (0.2 + rand() * 0.6) * (z1 - z0);
+      if (!inZone(item, x, zz) || rim(x, zz) < 0.6) continue;
+      const r = 0.4 + rand() * 0.35;
+      const mound = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), DRIFT_MOUND);
+      mound.scale.set(1.3, 0.45, 1);
+      mound.rotation.y = rand() * 6;
+      mound.position.set(x, t.height(x, zz) + bump(x, zz) - 0.04, zz);
+      g.add(mound);
+    }
     const N = Math.min(80, Math.ceil(((x1 - x0) * (z1 - z0)) * 1.5)), sp = new Float32Array(N * 3);
     for (let k = 0; k < N; k++) {
       let x = x0 + rand() * (x1 - x0), zz = z0 + rand() * (z1 - z0);
@@ -2012,8 +2300,9 @@ function piece(kind, item, t, s) {
     animate((tt) => (sparkle.material.opacity = 0.35 + 0.35 * Math.sin(tt * 2.1)));
     return g;
   }
-  if (item.kind === "slope" && ["kicker", "terrace", "downhill", "slope"].includes(skin)) {
+  if (item.kind === "slope" && ["kicker", "terrace", "downhill", "slope", "saddle crest"].includes(skin)) {
     const g = new THREE.Group();
+    if (skin === "saddle crest" && item.vec[0] < 0) g.add(colCrest(item, t));
     const top = Math.max(0.3, ...[[x0, z0], [x1, z0], [x0, z1], [x1, z1], [cx, cz]].map(([a, b]) => t.height(a, b)));
     g.add(overlay(item, t, skin === "downhill" ? (x, zz, h) => snowRise(0xd9e6f3, 0xf7fbff, top)(x, zz, h).lerp(new THREE.Color(0xc6d6e8), Math.floor(zz * 2.5) % 2 ? 0.15 : 0) : snowRise(0xc6d6e8, 0xf7fbff, top)));
     // the uphill side (against the push): a timber lip on a kicker, a stone step on a terrace
@@ -2050,6 +2339,7 @@ function piece(kind, item, t, s) {
     return g;
   }
   if (skin === "cliff") return cliff(item, t, s);
+  if (skin === "serac") return serac(item, t, s);
   // a crack inside the lane (mountain17): drawn here, walls on all four
   // sides; one across the whole board (mountain5) is the shared drawing's,
   // carried on into the mountain by base()

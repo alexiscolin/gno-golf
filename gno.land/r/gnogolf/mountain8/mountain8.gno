@@ -1,4 +1,5 @@
-// Package mountain8 is the ski lift runs across the lane, its chairs passing one after another.
+// Package mountain8 is the ski lift runs across the lane, its chairs passing one after another,
+// each one over the lane more than half the time.
 package mountain8
 
 import (
@@ -21,9 +22,9 @@ var me = course.Fit(&course.Simple{
 	Course: &physics.Field{
 		Walls: physics.Walls(
 			physics.Outline(physics.Lane(7, 4, physics.V(5, 8), physics.V(24, 9), physics.V(43, 8))...),
-			physics.Timed(physics.Bar(physics.V(20, 4.8), physics.V(20, 13.2), 0.8, '#', "lift"), 9, 3, 0),
-			physics.Timed(physics.Bar(physics.V(24.5, 5), physics.V(24.5, 13.2), 0.8, '#', "lift"), 9, 3, 3),
-			physics.Timed(physics.Bar(physics.V(29, 4.8), physics.V(29, 13.2), 0.8, '#', "lift"), 9, 3, 6),
+			physics.Timed(physics.Bar(physics.V(20, 4.8), physics.V(20, 13.2), 0.8, '#', "lift"), 9, 5, 0),
+			physics.Timed(physics.Bar(physics.V(24.5, 5), physics.V(24.5, 13.2), 0.8, '#', "lift"), 9, 5, 3),
+			physics.Timed(physics.Bar(physics.V(29, 4.8), physics.V(29, 13.2), 0.8, '#', "lift"), 9, 5, 6),
 		),
 		Friction: 0.87,
 		Radius:   0.5,

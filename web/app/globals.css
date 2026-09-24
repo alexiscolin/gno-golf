@@ -241,11 +241,6 @@ html, body {
   background: var(--ink);
 }
 
-.burger:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
-}
-
 .drawer {
   position: fixed;
   inset: 0;
@@ -386,11 +381,6 @@ html, body {
   border-radius: 16px;
   box-shadow: 0 4px 0 var(--ink);
   transition: transform .08s, box-shadow .08s;
-}
-
-.btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
 }
 
 .btn--main {
@@ -640,9 +630,16 @@ html, body {
 .pick__line {
   margin: 0 0 14px;
   color: var(--green);
-  font-size: clamp(17px, 2vw, 21px);
-  max-width: 36ch;
-  line-height: 1.45;
+  font-size: clamp(15px, 1.6vw, 18px);
+  max-width: 46ch;
+  line-height: 1.4;
+  /* always two lines tall, whatever the gnome says: nothing below jumps
+     when you flip through them */
+  min-height: 2.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .pick__dots {
@@ -723,11 +720,6 @@ html, body {
   border-radius: 9px;
   box-shadow: 0 0 0 2px var(--paper);
   flex: 0 0 auto;
-}
-
-.adena:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
 }
 
 .adena__text {
@@ -1999,3 +1991,118 @@ button:focus-visible, a:focus-visible {
 @media (max-width: 600px) { .cause { bottom: 104px; } }
 @keyframes cause { 0% { opacity: 0; transform: translate(-50%, 6px); } 15%, 60% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -8px); } }
 @media (prefers-reduced-motion: reduce) { .cause { animation: none; opacity: 1; } }
+
+/* the leaderboard: a chip at the bottom right of every hole, a sheet with two tabs */
+/* a phone: the bottom row is Restart and Whole course; the chip goes to the icon alone, above them */
+.boards { max-width: 560px; }
+.boards__tabs { display: flex; gap: 6px; margin: 6px 0 12px; }
+/* the close X sits in the sheet's own corner */
+.boards { position: relative; }
+
+.boards__soon { margin: 0 0 8px; padding: 6px 12px; border-radius: 10px; background: #fff3d6; border: 2px dashed #e0a44a; font-size: 13px; font-weight: 800; color: var(--ink); text-align: center; }
+.boards__more { display: block; margin: 10px auto 0; }
+.boards .lb ol { max-height: 46vh; overflow-y: auto; }
+
+/* Every sheet: its close X 16 px in from the corner, and the space for it
+   kept free — the first rows of content leave room on the right, so nothing
+   (a ribbon, tabs, a heading) ever passes under it */
+.sheet__in { position: relative; }
+.sheet__close { position: absolute; top: 16px; right: 16px; z-index: 2; }
+/* the X sits in the header rows: the few right after it stop short of it */
+.sheet__close ~ .eyebrow, .sheet__close ~ h2, .sheet__close ~ .boards__tabs, .sheet__close ~ .boards__soon { margin-right: 52px; }
+.sheet__in:has(> .sheet__close) { padding-top: 22px; }
+/* until launch */
+.soon { margin: 6px 0 4px; padding: 12px 14px; border-radius: 14px; background: #fff3d6; border: 2px dashed #e0a44a; }
+.soon__badge { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; background: var(--hat); color: var(--paper); border: 2px solid var(--ink); }
+.soon p { margin: 8px 0 0; font-size: 14px; color: var(--ink); }
+
+/* the aim mode: a two-way switch with its note, in the menu and the picker */
+.aimset { display: grid; gap: 6px; margin: 4px 0 10px; }
+.aimset__label { font-weight: 800; }
+.aimset__help { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
+.aimset--compact { justify-items: center; text-align: center; margin: 6px auto 12px; max-width: 360px; }
+.pro-chip { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 1px 6px; border-radius: 6px; background: var(--ink); color: var(--paper); font-style: normal; }
+.pro-chip--row { margin: 0 0 0 6px; vertical-align: 1px; }
+.boards__modes { margin-bottom: 4px; }
+
+/* one short line under the switch; the honesty note behind an (i) */
+.aimset__info { margin-left: 6px; cursor: help; font-style: normal; }
+.aimset__info:focus-visible { outline: 2px solid var(--hat); border-radius: 50%; }
+.boards__word { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
+/* the picker, slimmer: fits a 13" laptop and a phone without scrolling */
+.aimset--compact { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; margin: 4px auto 8px; }
+.aimset--compact .aimset__label { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.aimset--compact .aimset--compact .aimset__help { flex-basis: 100%; text-align: center; font-size: 11px; }
+/* the picker's button, the same size whether it says Choose or Locked (the
+   line above keeps its own fixed two-line height, in its rule above) */
+.screen .btn--play { font-size: 16px; padding: 10px 26px; min-width: 210px; min-height: 48px; }
+@media (max-height: 820px) { .pick__canvas { height: 38vh !important; width: 38vh !important; } }
+@media (max-width: 600px) { .pick__canvas { width: 56vw !important; height: 56vw !important; } }
+
+/* friends and the named-only line */
+.boards__ranked { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
+.friends h3 { margin: 10px 0 6px; }
+.friends__add { display: flex; gap: 8px; margin: 12px 0 6px; }
+.friends__add input { flex: 1; min-width: 0; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--ink); font: inherit; font-size: 14px; background: #fff; color: var(--ink); }
+.friends__add input:focus-visible { outline: 3px solid var(--hat); outline-offset: 1px; }
+.friends__list { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; font-size: 13px; }
+.friends__list li { display: flex; justify-content: space-between; gap: 8px; }
+.friends__invite { margin-top: 6px; }
+.boards .lb { max-height: 58vh; overflow-y: auto; }
+
+.cam-btn { display: inline-flex; align-items: center; gap: 6px; }
+.cam-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.flag-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 6px; border-radius: 50%; border: 1.5px solid var(--ink-soft); color: var(--ink-soft); font-size: 10px; font-style: normal; font-weight: 800; cursor: help; vertical-align: 1px; }
+.confirm { max-width: 360px; }
+.confirm h2 { margin-right: 52px; }
+.sheet:has(.confirm) { z-index: 9; }
+
+/* ---------------------------------------------------------- shared controls
+   One look for every control (components/ui.jsx): a button sinks when pressed,
+   lifts a little under the pointer, rings when focused, greys when disabled;
+   a badge sits in its top-right corner. The segmented switch and the toggle
+   are the same family. */
+:root { --press: 3px; --lift: 1px; --ring: 3px solid var(--hat); --shadow-btn: 0 4px 0 var(--ink); }
+.btn, .burger, .adena { position: relative; transition: transform .08s, box-shadow .08s, background .15s; }
+.btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
+.btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
+.btn:focus-visible, .burger:focus-visible, .adena:focus-visible, .seg button:focus-visible { outline: var(--ring); outline-offset: 3px; }
+.btn[disabled] { cursor: default; opacity: .7; box-shadow: 0 2px 0 var(--ink); transform: none; }
+.badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--hat); color: var(--paper); border: 2px solid var(--ink); white-space: nowrap; pointer-events: none; }
+/* a HUD card that is a button (the leaderboard) */
+.btn--chip { background: var(--paper); color: var(--ink); display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 800; }
+.btn--chip svg { width: 22px; height: 22px; fill: #f5c542; stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.lbchip { position: fixed; right: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 3; }
+@media (max-width: 600px) {
+  .lbchip { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 118px); right: 14px; }
+  .lbchip span { display: none; }
+  .lbchip .badge { top: -8px; right: -14px; font-size: 9px; padding: 1px 5px; }
+}
+/* the segmented switch: the aim mode, the board's tabs */
+.seg { display: inline-flex; border: 2px solid var(--ink); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-btn); background: var(--paper); }
+.seg--full { display: flex; width: 100%; }
+.seg button { flex: 1; border: 0; background: transparent; font: inherit; font-weight: 800; font-size: 15px; padding: 10px 16px; min-height: 48px; color: var(--ink); cursor: pointer; transition: background .15s; }
+.seg button + button { border-left: 2px solid var(--ink); }
+.seg button:hover:not(.on) { background: #eaf4ee; }
+.seg button:active { transform: translateY(1px); }
+.seg button.on { background: var(--green); color: var(--paper); }
+.boards .seg { margin: 6px 0 10px; }
+.aimset { display: grid; gap: 8px; margin: 4px 0 14px; }
+.aimset__help { text-align: left; }
+.aimset--compact .seg { box-shadow: none; }
+.aimset--compact .seg button { padding: 4px 12px; min-height: 30px; font-size: 13px; }
+/* the strokes card: room around its lines, the PRO badge in its corner */
+.card--score { position: relative; padding: 10px 14px; display: grid; align-content: center; gap: 2px; }
+.card--score .eyebrow { line-height: 1; }
+.card--score strong { line-height: 1; }
+.card--score .card__par { line-height: 1.1; }
+.card--score .pro-chip { position: absolute; top: -9px; right: -8px; margin: 0; border: 2px solid var(--paper); }
+@media (max-width: 600px) { .card--score { padding-top: 14px; } .card--score .pro-chip { top: -11px; right: -6px; font-size: 9px; } }
+/* the same press on the remaining controls: the round buttons, the cup cards, the switches */
+.round { box-shadow: 0 3px 0 var(--green); transition: transform .08s, box-shadow .08s, background .15s; }
+.round:active { transform: translateY(2px) scale(.97); box-shadow: 0 1px 0 var(--green); }
+.round:focus-visible { outline: var(--ring); outline-offset: 3px; }
+.world:active:not([disabled]) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.switch:active i { transform: scale(.96); }
+.seg button:active { background: #dcebe2; }
+.seg button.on:active { background: #1d5d4a; }

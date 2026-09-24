@@ -85,13 +85,13 @@ export function cupTotals(card, allHoles) {
 // ok() is given cupTotals().
 export const UNLOCKS = {
   wizard: { need: "Finish the Garden Cup", ok: (t) => t.garden.all },
-  viking: { need: "Finish the Garden Cup at par or under", ok: (t) => t.garden.clean },
-  golden: { need: "Make a hole-in-one on five holes", ok: (t) => t.aces >= 5 },
+  viking: { need: "Garden Cup at par", ok: (t) => t.garden.clean },
+  golden: { need: "Five holes-in-one", ok: (t) => t.aces >= 5 },
   pirate: { need: "Finish the Island Cup", ok: (t) => t.island.all },
-  diver: { need: "Finish the Island Cup at par or under", ok: (t) => t.island.clean },
-  baker: { need: "Finish the Mushroom Town Cup", ok: (t) => t.town.all },
-  mayor: { need: "Finish the Mushroom Town Cup at par or under", ok: (t) => t.town.clean },
-  king: { need: "The grand slam: every cup at par or under", ok: (t) => t.slam },
+  diver: { need: "Island Cup at par", ok: (t) => t.island.clean },
+  baker: { need: "Finish the Town Cup", ok: (t) => t.town.all },
+  mayor: { need: "Town Cup at par", ok: (t) => t.town.clean },
+  king: { need: "Every cup at par", ok: (t) => t.slam },
 };
 
 /** A medal for a finished hole: gold for one stroke, silver under par, bronze at par. */

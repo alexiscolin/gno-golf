@@ -1,4 +1,4 @@
-// Package island16 is a path to the volcano and the cup in its crater on top: hard enough to climb, soft enough to stay.
+// Package island16 is a long path to the volcano and the cup in its crater on top: hard enough to climb, soft enough to stay.
 package island16
 
 import (
@@ -8,19 +8,19 @@ import (
 )
 
 var me = course.Fit(&course.Simple{
-	W: 44, H: 22,
+	W: 66, H: 22,
 	World:     "island",
 	Order:     16,
 	Title:     "The Volcano",
 	Strokes:   3, // par
-	Tee:       physics.V(4, 11),
+	Tee:       physics.V(-18, 11),
 	Pin:       physics.V(34, 11),
 	Substeps:  26,
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
 		Walls: physics.Walls(
-			physics.Outline(physics.Keyhole(0, 6, physics.V(34, 11), 9, 6)...),
+			physics.Outline(physics.Keyhole(-22, 6, physics.V(34, 11), 9, 6)...),
 		),
 		Zones: []physics.Zone{
 			{Kind: physics.Slope, Min: physics.V(28, 5), Max: physics.V(32.6, 17), Vec: physics.V(-0.3, 0), Skin: "volcano"},

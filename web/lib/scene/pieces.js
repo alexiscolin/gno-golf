@@ -235,7 +235,7 @@ function sandcastle(p, y) {
   const put = (m, px, py, pz) => (m.position.set(x + px, y + py, z + pz), g.add(m), m);
   // the keep: a bucket shape (wider at the foot), two wet bands where the
   // bucket's ridges were
-  const H = 2.2;
+  const H = 3; // tall: it is the island's landmark
   put(drawn(new THREE.CylinderGeometry(R * 0.86, R * 0.98, H, 28), flat(SAND)), 0, H / 2, 0);
   for (const [hy, r] of [[0.45, R * 0.965], [1.25, R * 0.92]]) put(new THREE.Mesh(new THREE.CylinderGeometry(r + 0.02, r + 0.02, 0.18, 28), flat(WET)), 0, hy, 0);
   // crenellations round the top: merlons with gaps
@@ -268,7 +268,77 @@ function sandcastle(p, y) {
   return g;
 }
 
+/** A scarecrow standing in a round straw bale (the bale is the footprint);
+ *  his arms reach out over the ball's head. */
+function scarecrow(p, y) {
+  const g = new THREE.Group(), [x, z] = p.c, R = p.r;
+  const straw = flat(0xe8c36a), strawDark = flat(0xc9a24e);
+  const bale = drawn(new THREE.CylinderGeometry(R * 0.96, R, 0.55, 16), straw);
+  bale.position.set(x, y + 0.275, z);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(R * 0.985, 0.04, 5, 20), strawDark);
+  band.rotation.x = Math.PI / 2;
+  band.position.set(x, y + 0.3, z);
+  const pole = drawn(new THREE.CylinderGeometry(0.07, 0.08, 2.1, 7), flat(C.woodDark));
+  pole.position.set(x, y + 1.35, z);
+  const arms = drawn(new THREE.CylinderGeometry(0.06, 0.06, 1.9, 7), flat(C.woodDark));
+  arms.rotation.z = Math.PI / 2;
+  arms.position.set(x, y + 1.75, z);
+  const shirt = drawn(rbox(0.62, 0.72, 0.36, 0.1), flat(0x5b6fb5));
+  shirt.position.set(x, y + 1.55, z);
+  const sleeves = drawn(new THREE.CylinderGeometry(0.13, 0.15, 1.3, 8), flat(0x4a5c9e));
+  sleeves.rotation.z = Math.PI / 2;
+  sleeves.position.set(x, y + 1.75, z);
+  g.add(bale, band, pole, arms, shirt, sleeves);
+  // straw poking out of the cuffs and the collar
+  for (const sgn of [-1, 1]) {
+    const tuft = drawn(new THREE.ConeGeometry(0.12, 0.3, 6), straw);
+    tuft.rotation.z = sgn * Math.PI / 2;
+    tuft.position.set(x + sgn * 1.02, y + 1.75, z);
+    g.add(tuft);
+  }
+  const head = drawn(new THREE.SphereGeometry(0.26, 12, 9), flat(0xd8c19a));
+  head.position.set(x, y + 2.13, z);
+  const brim = drawn(new THREE.CylinderGeometry(0.46, 0.5, 0.05, 16), straw);
+  brim.position.set(x, y + 2.3, z);
+  const crown = drawn(new THREE.CylinderGeometry(0.2, 0.26, 0.28, 12), straw);
+  crown.position.set(x, y + 2.45, z);
+  const patch = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.02), flat(C.cap));
+  patch.position.set(x + 0.14, y + 1.45, z + 0.19);
+  g.add(head, brim, crown, patch);
+  for (const [dx, dz] of [[-0.09, 0.22], [0.09, 0.22]]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 5), flat(C.ink));
+    eye.position.set(x + dx, y + 2.18, z + dz);
+    g.add(eye);
+  }
+  return g;
+}
+
+/** A stone lantern (a tōrō) by the water: its round foot is the footprint. */
+function lantern(p, y) {
+  const g = new THREE.Group(), [x, z] = p.c, R = p.r, stone = flat(0xb9c2bd), dark = flat(0x9aa39e);
+  const foot = drawn(new THREE.CylinderGeometry(R * 0.9, R, 0.35, 8), stone);
+  foot.position.set(x, y + 0.175, z);
+  const post = drawn(new THREE.CylinderGeometry(R * 0.32, R * 0.4, 0.8, 8), stone);
+  post.position.set(x, y + 0.75, z);
+  const shelf = drawn(new THREE.CylinderGeometry(R * 0.72, R * 0.62, 0.16, 6), stone);
+  shelf.position.set(x, y + 1.23, z);
+  const box = drawn(rbox(R * 0.95, 0.5, R * 0.95, 0.05), stone);
+  box.position.set(x, y + 1.56, z);
+  const light = new THREE.Mesh(new THREE.BoxGeometry(R * 0.55, 0.3, R * 1.0), new THREE.MeshBasicMaterial({ color: 0xffd98a }));
+  light.position.set(x, y + 1.56, z);
+  const light2 = light.clone();
+  light2.rotation.y = Math.PI / 2;
+  const roof = drawn(new THREE.ConeGeometry(R * 1.15, 0.5, 6), dark);
+  roof.position.set(x, y + 2.05, z);
+  const knob = drawn(new THREE.SphereGeometry(0.12, 8, 6), dark);
+  knob.position.set(x, y + 2.38, z);
+  g.add(foot, post, shelf, light, light2, box, roof, knob);
+  return g;
+}
+
 export const POSTS = {
+  scarecrow,
+  lantern,
   sandcastle,
   palm, coral, buoy, crab, lamp, clock, roundabout, chimney,
   outcrop: (p, y) => boulder(p, y, P.sandstone, 0.9),
@@ -380,7 +450,37 @@ function awning(c, L, th, ang, height) {
   return along(g, c, ang, y);
 }
 
-export const BARS = { driftwood: driftBar, plank, tram, "clock hand": clockHand, stall, awning };
+/** A wheelbarrow of greens left at the end of a row: its tray fills the bar,
+ *  the wheel at one end, the handles at the other. */
+function wheelbarrow(c, L, th, ang, height) {
+  const g = new THREE.Group(), y = height(c[0], c[1]);
+  const tray = drawn(rbox(L * 0.72, 0.5, th * 0.95, 0.1), flat(0x3f8f6f));
+  tray.position.set(-L * 0.08, 0.62, 0);
+  const soil = new THREE.Mesh(new THREE.BoxGeometry(L * 0.66, 0.05, th * 0.8), flat(0x6b4a31));
+  soil.position.set(-L * 0.08, 0.88, 0);
+  g.add(tray, soil);
+  for (let k = 0; k < 3; k++) {
+    const cab = drawn(new THREE.SphereGeometry(0.22, 10, 7), flat(k % 2 ? 0x8fcb6a : 0x6fae55));
+    cab.scale.y = 0.8;
+    cab.position.set(-L * 0.08 + (k - 1) * L * 0.2, 0.98, (k % 2 ? 0.1 : -0.1) * th);
+    g.add(cab);
+  }
+  const wheel = drawn(new THREE.CylinderGeometry(0.34, 0.34, 0.14, 14), flat(C.woodDark));
+  wheel.rotation.x = Math.PI / 2;
+  wheel.position.set(L / 2 - 0.36, 0.36, 0);
+  g.add(wheel);
+  for (const sgn of [-1, 1]) {
+    const handle = drawn(new THREE.CylinderGeometry(0.05, 0.05, L * 0.55, 6), flat(C.wood));
+    handle.rotation.z = Math.PI / 2 + 0.25;
+    handle.position.set(-L * 0.22, 0.72, sgn * th * 0.34);
+    const leg = drawn(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 6), flat(C.woodDark));
+    leg.position.set(-L * 0.28, 0.2, sgn * th * 0.34);
+    g.add(handle, leg);
+  }
+  return along(g, c, ang, y);
+}
+
+export const BARS = { driftwood: driftBar, plank, tram, "clock hand": clockHand, stall, awning, wheelbarrow };
 
 // ------------------------------------------------------------ tunnel ends
 // (x, y, z) the centre of the mouth on the ground, R its radius, dir the way

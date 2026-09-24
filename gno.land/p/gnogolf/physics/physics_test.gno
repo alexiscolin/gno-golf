@@ -275,6 +275,12 @@ func TestLoopWantsTheRightSpeedAndTheMouth(t *testing.T) {
 	if slant.Rest().X >= 10 || slant.Rest().X < 7 {
 		t.Fatalf("a ball coming in slanted falls off the side and is put down in front, at %v", slant.Rest())
 	}
+	// a closed tube has no top to fly off: the fast ball goes round too
+	f.Zones[0].Skin = "castle tube"
+	if tube := f.Step(Vec2{8, 2}, Vec2{3.6, 0}, 20); tube.Rest().X <= 16 {
+		t.Fatalf("a fast ball goes round a closed tube, stopped at %v", tube.Rest())
+	}
+	f.Zones[0].Skin = ""
 	wide := f.Step(Vec2{6, 4.5}, Vec2{2.6, 0}, 20)
 	if wide.Rest().X >= 12 {
 		t.Fatalf("a ball that misses the mouth meets the loop's base, got to %v", wide.Rest())

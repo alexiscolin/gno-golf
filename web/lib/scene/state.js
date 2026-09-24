@@ -6,6 +6,7 @@ export const state = {
   tubes: new Map(), // tunnel zone -> the curve its tube follows (userData.tubes)
   mill: null, // the hole's mill: { shoot(), at(step), idle() }, driven by the replay (userData.mill)
   timed: [], // timed walls: { at(step), walls } each, driven by the engine's clock (userData.timed)
+  slopes: new Map(), // slope zone -> { glow(k) }: its contour lines, lit by the replay (userData.slopes)
   water: null, // the hole's water mask { tex, data, nx, nz, cell, w, h }: splashes clip to it
 };
 export const animate = (fn) => state.live.push(fn);

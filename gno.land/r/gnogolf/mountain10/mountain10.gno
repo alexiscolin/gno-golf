@@ -1,7 +1,7 @@
 // Package mountain10 is a narrow ridge swept by a snow cannon. Past the first
 // stretch the way narrows to a spine with a drop on each side, and the cannon
 // blows across it in bursts. Cross while it rests, or be blown over the edge
-// and start again.
+// and start again. A pine by the tee stands in the straight line along it.
 package mountain10
 
 import (
@@ -26,6 +26,10 @@ var me = course.Fit(&course.Simple{
 
 	Course: &physics.Field{
 		Walls: physics.Outline(physics.Lane(7, 4, physics.V(5, 9), physics.V(40, 9))...),
+		// a pine just off the tee, square in the line along the spine
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(7.9, 9.3), R: 0.6}, Bounce: 0.7, Skin: "pine"},
+		},
 		Zones: []physics.Zone{
 			// the drops either side of the spine
 			{Kind: physics.Hazard, Min: physics.V(16, 4), Max: physics.V(30, 7.6), Vec: physics.V(5, 9), Mark: '~', Skin: "cliff"},

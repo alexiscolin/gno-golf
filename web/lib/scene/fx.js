@@ -26,14 +26,16 @@ function toShore(at, water, reach = 3) {
   return best;
 }
 
-export function makeSplash(at) {
+// open: in open water (the sea under a pier, a gap's water): not clipped to
+// the green's ponds, which do not reach there
+export function makeSplash(at, { open = false } = {}) {
   const group = new THREE.Group();
-  const room = Math.max(0.35, toShore(at, state.water) - 0.15); // the rings' widest
+  const room = open ? 2.4 : Math.max(0.35, toShore(at, state.water) - 0.15); // the rings' widest
   const rings = [0, 0.25, 0.5].map((delay) => {
     const m = new THREE.Mesh(
       RING_GEO,
       // only over the water: a ring at the bank would spread onto the grass
-      clipTo(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false }), state.water)
+      clipTo(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false }), open ? null : state.water)
     );
     m.rotation.x = -Math.PI / 2;
     m.position.set(at.x, at.y - 0.45, at.z);

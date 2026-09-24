@@ -12,7 +12,7 @@ var me = course.Fit(&course.Simple{
 	World:     "mountain",
 	Order:     2,
 	Title:     "Pine Slalom",
-	Strokes:   3, // par
+	Strokes:   2, // par
 	Tee:       physics.V(5, 8),
 	Pin:       physics.V(45, 8),
 	Substeps:  26,

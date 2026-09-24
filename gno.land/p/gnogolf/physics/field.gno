@@ -123,6 +123,8 @@ const (
 	// back and rolls out of the mouth the way it came. Faster, it flies off
 	// the track and is put down at rest in front of the mouth — and so does
 	// one that comes in more than 25° off straight: it falls off the side.
+	// A closed tube (a skin with "tube" in it) has no top to fly off: from
+	// Scale up, any speed goes round.
 	Loop
 )
 

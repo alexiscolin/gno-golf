@@ -66,13 +66,21 @@ export const isPortrait = (w, h) => h > w * 1.05;
 
 // the two viewing directions, made once: applyRig runs every frame
 const LOOK_PORTRAIT = new THREE.Vector3(-0.7, 0.9, 0).normalize(), LOOK_WIDE = new THREE.Vector3(0, 0.72, 0.8).normalize();
-const lookDir = (w, h) => (isPortrait(w, h) ? LOOK_PORTRAIT : LOOK_WIDE);
+// following the gnome the camera sits a few degrees lower (about 36° over
+// the ground instead of 42°): closer to the grass, the cup still in view.
+// A rig's tilt (0 overview, 1 follow) blends the two, eased like the rest.
+const LOOK_PORTRAIT_LOW = new THREE.Vector3(-0.78, 0.8, 0).normalize(), LOOK_WIDE_LOW = new THREE.Vector3(0, 0.6, 0.83).normalize();
+const _dir = new THREE.Vector3();
+const lookDir = (w, h, tilt = 0) => {
+  const hi = isPortrait(w, h) ? LOOK_PORTRAIT : LOOK_WIDE, lo = isPortrait(w, h) ? LOOK_PORTRAIT_LOW : LOOK_WIDE_LOW;
+  return tilt <= 0 ? hi : _dir.copy(hi).lerp(lo, Math.min(1, tilt)).normalize();
+};
 
 /** Where the camera is: what it looks at, from how far, and how the picture is
  *  slid so that point lands in the middle of the space the HUD leaves free. */
 export function applyRig(camera, rig, view) {
   camera.aspect = view.w / view.h;
-  camera.position.copy(rig.target).addScaledVector(lookDir(view.w, view.h), rig.dist);
+  camera.position.copy(rig.target).addScaledVector(lookDir(view.w, view.h, rig.tilt || 0), rig.dist);
   camera.lookAt(rig.target);
   camera.setViewOffset(view.w, view.h, rig.ox, rig.oy, view.w, view.h);
   camera.updateMatrixWorld();
@@ -121,7 +129,7 @@ export function overviewRig(camera, box, view) {
 // it then allocates nothing
 export function focusRig(point, overview, view, cup = null, out = null) {
   const T = (v) => (out ? out.target.copy(v) : v.clone());
-  const R = (r) => (out ? Object.assign(out, { dist: r.dist, ox: r.ox, oy: r.oy }) : r);
+  const R = (r) => ((r.tilt = 1), out ? Object.assign(out, { dist: r.dist, ox: r.ox, oy: r.oy, tilt: 1 }) : r);
   // with a cup given, frame the ball and the cup together: the target sits
   // between them, nearer the ball, and the camera backs off as they part —
   // you aim seeing where you aim
@@ -150,4 +158,5 @@ export function easeRig(cur, goal, k) {
   cur.dist += (goal.dist - cur.dist) * k;
   cur.ox += (goal.ox - cur.ox) * k;
   cur.oy += (goal.oy - cur.oy) * k;
+  cur.tilt = (cur.tilt || 0) + ((goal.tilt || 0) - (cur.tilt || 0)) * k;
 }

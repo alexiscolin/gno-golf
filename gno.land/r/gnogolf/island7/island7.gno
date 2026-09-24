@@ -1,4 +1,4 @@
-// Package island7 is a round islet with a great sandcastle in the middle: round it by either side, or straight through its gate.
+// Package island7 is a round islet cut in two by a great sandcastle and its ramparts: the only way through is the tube that spirals round it, and a soft shot rolls back out.
 package island7
 
 import (
@@ -23,16 +23,24 @@ var me = course.Fit(&course.Simple{
 	Course: &physics.Field{
 		Walls: physics.Walls(
 			physics.Outline(physics.Arc(physics.V(16, 13), 11, 0, 2*math.Pi, 20)[:20]...),
+			// the ramparts, castle to shore: there is no way round, only
+			// through the tube
+			[]physics.Wall{
+				{Seg: physics.Segment{A: physics.V(17, 1.8), B: physics.V(17, 10.2)}, Skin: "rampart"},
+				{Seg: physics.Segment{A: physics.V(17, 15.8), B: physics.V(17, 24.2)}, Skin: "rampart"},
+			},
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(17, 13), R: 3.2}, Bounce: 0.6, Skin: "sandcastle"},
 		},
 		Zones: []physics.Zone{
-			{Kind: physics.Tunnel, Min: physics.V(12.4, 12.2), Max: physics.V(13.4, 13.8), Vec: physics.V(21.6, 13), Round: true, Skin: "castle gate"},
-			{Kind: physics.Slope, Min: physics.V(14, 19), Max: physics.V(15.6, 23), Vec: physics.V(-0.3, 0), Skin: "mound"},
-			{Kind: physics.Slope, Min: physics.V(16.4, 19), Max: physics.V(18, 23), Vec: physics.V(0.3, 0), Skin: "mound"},
-			{Kind: physics.Slope, Min: physics.V(15.6, 21.4), Max: physics.V(16.4, 23), Vec: physics.V(0, 0.3), Skin: "mound"},
-			{Kind: physics.Slope, Min: physics.V(15.6, 19), Max: physics.V(16.4, 20.6), Vec: physics.V(0, -0.3), Skin: "mound"},
+			// the tube spirals up round the castle: hit it hard enough and the
+			// ball comes out by the cup, too soft and it rolls back out
+			{Kind: physics.Loop, Min: physics.V(12.4, 12.2), Max: physics.V(13.4, 13.8), Vec: physics.V(21.6, 17), Scale: 2, Skin: "castle tube"},
+			{Kind: physics.Slope, Min: physics.V(9.5, 5), Max: physics.V(11.1, 9), Vec: physics.V(-0.3, 0), Skin: "mound"},
+			{Kind: physics.Slope, Min: physics.V(11.9, 5), Max: physics.V(13.5, 9), Vec: physics.V(0.3, 0), Skin: "mound"},
+			{Kind: physics.Slope, Min: physics.V(11.1, 7.4), Max: physics.V(11.9, 9), Vec: physics.V(0, 0.3), Skin: "mound"},
+			{Kind: physics.Slope, Min: physics.V(11.1, 5), Max: physics.V(11.9, 6.6), Vec: physics.V(0, -0.3), Skin: "mound"},
 		},
 		Friction: 0.87,
 		Radius:   0.5,

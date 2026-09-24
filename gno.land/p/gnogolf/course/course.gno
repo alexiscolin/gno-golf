@@ -228,8 +228,11 @@ var climates = map[string][]Chance{
 const (
 	WindMin = 0.08
 	WindMax = 0.15
-	// how much quicker the green is in the rain, and wet ice quicker again
-	RainScale = 1.12
+	// how much quicker the green is in the rain, and wet ice quicker again.
+	// Rain is a touch quicker, not ice: on a 0.87 green the ball keeps 94% of
+	// its speed a substep instead of 92%. (At 1.12 it hit the 98% cap and
+	// every board played like pinball: a repeatable ace on half the holes.)
+	RainScale = 1.025
 	WetIce    = 1.06
 	SnowScale = 0.9
 )

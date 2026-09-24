@@ -14,7 +14,7 @@ var me = course.Fit(&course.Simple{
 	World:     "island",
 	Order:     3,
 	Title:     "Crab Beach",
-	Strokes:   3, // par
+	Strokes:   2, // par
 	Tee:       physics.V(5, 9),
 	Pin:       physics.V(44, 8),
 	Substeps:  26,

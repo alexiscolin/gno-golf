@@ -1,4 +1,6 @@
-// Package island4 is a crescent of sandbar with a rowing boat beached across the top of it and wet sand where the tide went out.
+// Package island4 is a crescent of sandbar with a rowing boat beached across
+// its neck: squeeze past its bow, then over the wet sand where the tide went
+// out, round the palm in the line to the cup.
 package island4
 
 import (
@@ -23,8 +25,14 @@ var me = course.Fit(&course.Simple{
 	Course: &physics.Field{
 		Walls: physics.Walls(
 			physics.Outline(lane...),
-			physics.Soft(physics.Bar(physics.V(22.5, 6.6), physics.V(27.5, 5.8), 1.8, 'b', "rowing boat"), 0.5),
+			// the rowing boat, beached across the neck from stern to bow: the
+			// only way on is the gap between its bow and the far bank
+			physics.Soft(physics.Bar(physics.V(27.1, 6), physics.V(22.8, 3), 1.5, 'b', "rowing boat"), 0.5),
 		),
+		// a palm on the last of the crescent, in the line down to the cup
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(40.5, 8), R: 0.6}, Bounce: 0.8, Skin: "palm"},
+		},
 		Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(32, 5), Max: physics.V(38, 10.5), Scale: 0.6, Round: true, Skin: "wetsand"},
 		},

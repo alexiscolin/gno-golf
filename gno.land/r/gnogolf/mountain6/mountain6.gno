@@ -1,4 +1,4 @@
-// Package mountain6 is a path onto a frozen lake, the cup on its far shore and two boulders out on the ice.
+// Package mountain6 is a long path onto a frozen lake, the cup on its far shore and two boulders out on the ice.
 package mountain6
 
 import (
@@ -8,19 +8,19 @@ import (
 )
 
 var me = course.Fit(&course.Simple{
-	W: 42, H: 22,
+	W: 64, H: 22,
 	World:     "mountain",
 	Order:     6,
 	Title:     "Frozen Lake",
 	Strokes:   3, // par
-	Tee:       physics.V(4, 11),
+	Tee:       physics.V(-18, 11),
 	Pin:       physics.V(35.5, 11),
 	Substeps:  26,
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
 		Walls: physics.Walls(
-			physics.Outline(physics.Keyhole(0, 6, physics.V(30, 11), 9, 6)...),
+			physics.Outline(physics.Keyhole(-22, 6, physics.V(30, 11), 9, 6)...),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(27, 8.2), R: 0.9}, Bounce: 0.6, Skin: "boulder"},

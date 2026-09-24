@@ -1,7 +1,7 @@
 // Package island10 is a boardwalk over the lagoon with two planks missing:
 // one on the near half of the walk, one on the far half of the next stretch.
 // A gap is the lagoon, and the lagoon sends you back to the start; thread the
-// sound boards between them.
+// sound boards between them, and round the crab asleep where the walk turns.
 package island10
 
 import (
@@ -25,6 +25,10 @@ var me = course.Fit(&course.Simple{
 
 	Course: &physics.Field{
 		Walls: physics.Outline(lane...),
+		// a crab sunning itself in the middle of the walk, where it turns
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(24, 7), R: 0.6}, Bounce: 0.8, Skin: "crab"},
+		},
 		Zones: []physics.Zone{
 			// the missing planks: the low half of the first stretch, the high half of the last
 			{Kind: physics.Hazard, Min: physics.V(13, 1.5), Max: physics.V(16, 5.2), Vec: physics.V(5, 5), Mark: '~', Skin: "gap"},

@@ -14,7 +14,7 @@ var me = course.Fit(&course.Simple{
 	World:     "island",
 	Order:     11,
 	Title:     "Rope Bridge",
-	Strokes:   3, // par
+	Strokes:   2, // par
 	Tee:       physics.V(5, 8),
 	Pin:       physics.V(45, 8),
 	Substeps:  28,

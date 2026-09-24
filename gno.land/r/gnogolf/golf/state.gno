@@ -70,6 +70,7 @@ func roundJSON(player string, r *round) string {
 	b := "{" + `"player":` + jstr(player) +
 		`,"ball":` + jvec(r.ball) +
 		ufmt.Sprintf(`,"strokes":%d,"done":%t,"period":%d`, r.strokes, r.done, r.period) +
+		`,"mode":` + jstr(modeNames[r.mode]) +
 		`,"shots":` + jstr(strings.Join(r.shots, ";")) +
 		`,"path":[`
 	var sb strings.Builder
@@ -165,8 +166,8 @@ func Holes() string {
 		sb.WriteString(sep(i) + "{" + `"id":` + jstr(e.id) +
 			`,"name":` + jstr(e.name) +
 			`,"by":` + jstr(e.id) +
-			ufmt.Sprintf(`,"plays":%d,"best":%d,"par":%d`, e.plays, e.best, e.par) +
-			`,"world":` + jstr(e.world) + `,"order":` + jnum(e.order) + "}")
+			ufmt.Sprintf(`,"plays":%d,"best":%d,"proBest":%d,"par":%d`, e.plays, e.best[assisted], e.best[pro], e.par) +
+			`,"world":` + jstr(e.world) + `,"order":` + jnum(e.order) + `,"next":` + jstr(e.next) + "}")
 	}
 	sb.WriteString("]")
 	return sb.String()
@@ -336,10 +337,13 @@ func Extras(hole string, stroke int) string {
 // best finish on each hole, summed; most holes first, then fewest strokes.
 // It is kept up to date as rounds finish, so reading it costs nothing that
 // grows with the number of players.
-func Leaderboard() string {
+// Leaderboard is a mode's course-wide top ten ("assisted" or "pro").
+func Leaderboard(mode string) string {
+	m := modeOf(mode)
 	var sb strings.Builder
-	sb.WriteString(ufmt.Sprintf(`{"holes":%d,"rows":[`, holes.Size()))
-	for i, r := range top {
+	// out of the course's current holes: archived and anyone's do not count
+	sb.WriteString(ufmt.Sprintf(`{"holes":%d,"rows":[`, slots.Size()))
+	for i, r := range top[m] {
 		sb.WriteString(sep(i) + "{" + `"player":` + jstr(r.player) + ufmt.Sprintf(`,"holes":%d,"strokes":%d}`, r.holes, r.strokes))
 	}
 	sb.WriteString("]}")
@@ -348,3 +352,113 @@ func Leaderboard() string {
 
 // maxListed bounds Holes() and the hub: registration is open.
 const maxListed = 120
+
+// HoleLeaderboard is a page of one hole's top hundred named players: each one's best
+// finished round there, fewest strokes first, from rank offset+1, at most
+// limit rows (clamped to 1..100 and to the top hundred), and how many players
+// have finished it. A client loads it ten by ten.
+// ponytail: a full pass over the hole's players per read, free as a query;
+// keep a sorted top hundred per hole if a hole ever has tens of thousands.
+func HoleLeaderboard(hole, mode string, offset, limit int) string {
+	e, m := mustHole(hole), modeOf(mode)
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > holeTop {
+		limit = holeTop
+	}
+	keep := offset + limit
+	if keep > holeTop {
+		keep = holeTop
+	}
+	type best struct {
+		player  string
+		strokes int
+	}
+	var list []best
+	e.bests[m].Iterate("", "", func(p string, v any) bool {
+		if !named(p) {
+			return false // ranked names only; Bests reads anyone
+		}
+		b := best{p, v.(int)}
+		i := len(list)
+		for i > 0 && list[i-1].strokes > b.strokes {
+			i--
+		}
+		if i < keep {
+			list = append(list, best{})
+			copy(list[i+1:], list[i:])
+			list[i] = b
+			if len(list) > keep {
+				list = list[:keep]
+			}
+		}
+		return false
+	})
+	if offset > len(list) {
+		offset = len(list)
+	}
+	var sb strings.Builder
+	sb.WriteString(ufmt.Sprintf(`{"hole":%s,"mode":%s,"par":%d,"players":%d,"offset":%d,"rows":[`, jstr(e.id), jstr(modeNames[m]), e.par, e.bests[m].Size(), offset))
+	for i, b := range list[offset:] {
+		sb.WriteString(sep(i) + "{" + `"player":` + jstr(b.player) + ufmt.Sprintf(`,"strokes":%d}`, b.strokes))
+	}
+	sb.WriteString("]}")
+	return sb.String()
+}
+
+// holeTop is how deep a hole's leaderboard goes.
+const holeTop = 100
+
+// maxFriends bounds the addresses one Bests or Standings read takes.
+const maxFriends = 50
+
+// friends splits a comma-separated list of addresses, at most maxFriends.
+func friends(list string) []string {
+	var out []string
+	for _, p := range strings.Split(list, ",") {
+		if p = strings.TrimSpace(p); p != "" && len(out) < maxFriends {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// Bests is the best finished round on one hole, in a mode, of each of the
+// given players (comma-separated addresses, named or not): a board of
+// friends, where no stranger and no bot can push anyone off.
+func Bests(hole, mode, players string) string {
+	e, m := mustHole(hole), modeOf(mode)
+	var sb strings.Builder
+	sb.WriteString(`{"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + ufmt.Sprintf(`,"par":%d,"rows":[`, e.par))
+	n := 0
+	for _, p := range friends(players) {
+		if v := e.bests[m].Get(p); v != nil {
+			sb.WriteString(sep(n) + "{" + `"player":` + jstr(p) + ufmt.Sprintf(`,"strokes":%d}`, v.(int)))
+			n++
+		}
+	}
+	sb.WriteString("]}")
+	return sb.String()
+}
+
+// Standings is each given player's course-wide standing in a mode: how many
+// of the course's current holes they finished, and in how many strokes.
+func Standings(mode, players string) string {
+	m := modeOf(mode)
+	var sb strings.Builder
+	sb.WriteString(ufmt.Sprintf(`{"mode":%s,"holes":%d,"rows":[`, jstr(modeNames[m]), slots.Size()))
+	n := 0
+	for _, p := range friends(players) {
+		if v := totals[m].Get(p); v != nil {
+			r := v.(*row)
+			sb.WriteString(sep(n) + "{" + `"player":` + jstr(p) + ufmt.Sprintf(`,"holes":%d,"strokes":%d}`, r.holes, r.strokes))
+			n++
+		}
+	}
+	sb.WriteString("]}")
+	return sb.String()
+}

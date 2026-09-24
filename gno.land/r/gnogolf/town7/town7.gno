@@ -1,4 +1,5 @@
-// Package town7 is a lane the canal cuts in two, with a narrow bridge the only dry way over.
+// Package town7 is a lane the canal cuts in two, with a narrow bridge the only dry way over
+// and street lamps on the far bank.
 package town7
 
 import (
@@ -22,6 +23,13 @@ var me = course.Fit(&course.Simple{
 		Walls: physics.Walls(
 			physics.Outline(physics.Lane(8, 4, physics.V(5, 7), physics.V(24, 9), physics.V(43, 8))...),
 		),
+		// street lamps on the far bank: one at the foot of the bridge, two in
+		// the lines off it to the cup
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(26.7, 10.3), R: 0.35}, Bounce: 0.9, Skin: "lamp"},
+			{Circle: physics.Circle{C: physics.V(32.9, 7.7), R: 0.35}, Bounce: 0.9, Skin: "lamp"},
+			{Circle: physics.Circle{C: physics.V(39.7, 8.8), R: 0.35}, Bounce: 0.9, Skin: "lamp"},
+		},
 		Zones: []physics.Zone{
 			{Kind: physics.Hazard, Min: physics.V(21, 0), Max: physics.V(26, 7.9), Vec: physics.V(15, 8.4), Skin: "canal"},
 			{Kind: physics.Hazard, Min: physics.V(21, 10.5), Max: physics.V(26, 16), Vec: physics.V(15, 8.4), Skin: "canal"},

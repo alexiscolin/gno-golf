@@ -70,8 +70,8 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 var golden = map[string][3]string{
 	"pulse":  {"9719d14aa64e381c", "076ac3e7c0d705a9", "9e3c8794bb1d1d11"},
 	"sea":    {"12b5a8cdb090a87b", "c3224daa821020f4", "f56f3dd4a17ea7ed"},
-	"slope":  {"87e7f3740220c88a", "105d3fc181182b05", "75dfd3431a6bffc3"},
-	"storm":  {"01699172e9684456", "e6d6becaf3a225c0", "998fdc1a5358c897"},
+	"slope":  {"b573a774ab116bbf", "0757d6c38ca9a9ef", "75dfd3431a6bffc3"},
+	"storm":  {"a067c66d3f85e79b", "217b2a005fc76324", "a387c08076159a8c"},
 	"timed":  {"e6df7a73dd8d8b0f", "c3224daa821020f4", "0063bad2dad04acc"},
 	"tunnel": {"4dfa30294af9fc9b", "c3224daa821020f4", "df901e669ef4d8e6"},
 }
@@ -191,7 +191,7 @@ func TestTheTopIsTen(cur realm, t *testing.T) {
 		testing.SetRealm(testing.NewUserRealm(p))
 		PlayRound(cross(cur), "gno.land/r/gnogolf/top", "0,5;0,5;0,5;0,5")
 	}
-	if len(top) > topSize {
-		t.Fatalf("the top keeps %d, got %d", topSize, len(top))
+	if len(top[assisted]) > topSize {
+		t.Fatalf("the top keeps %d, got %d", topSize, len(top[assisted]))
 	}
 }

@@ -65,7 +65,7 @@ function segDist(px, pz, a, b) {
 /** A ramp per Slope zone: 0 on its downhill edge, rising against the push. */
 function ramps(zones) {
   return zones
-    .filter((z) => z.kind === "slope" && !airy(z) && (z.vec[0] || z.vec[1]))
+    .filter((z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && (z.vec[0] || z.vec[1]))
     .map((z) => {
       const l = Math.hypot(z.vec[0], z.vec[1]);
       const ux = -z.vec[0] / l, uz = -z.vec[1] / l; // uphill
@@ -74,12 +74,42 @@ function ramps(zones) {
       // as high as the slope is strong over its length: what looks steep is steep
       const len = hi - lo;
       // a kicker is a ski jump, not a bump: steep and tall, cut off at its lip
-      const rise = z.skin === "kicker" || z.skin === "ramp" ? 2.2 : Math.min(MAX_RISE, 0.35 * l * len * 1.6);
+      // a moon bridge is a high arch, whatever its push
+      // a skate park's quarter-pipe curls up to its coping, a funbox is a low block
+      const rise = z.skin === "kicker" || z.skin === "ramp" ? 2.2 : z.skin === "moon bridge" ? 1.5 : z.skin === "quarter pipe" ? 1.3 : z.skin === "funbox" ? 0.8 : Math.min(MAX_RISE, 0.35 * l * len * 1.6);
       // across the slope, for the shoulders
       const vx = -uz, vz = ux;
       const across = [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]].map((p) => p[0] * vx + p[1] * vz);
-      return { z, ux, uz, vx, vz, lo, span: hi - lo || 1, rise, noLip: z.skin === "kicker" || z.skin === "ramp", a0: Math.min(...across), a1: Math.max(...across) };
+      return { z, ux, uz, vx, vz, lo, span: hi - lo || 1, rise, noLip: z.skin === "kicker" || z.skin === "ramp" || z.skin === "moon bridge" || z.skin === "quarter pipe", a0: Math.min(...across), a1: Math.max(...across) };
     });
+}
+
+/**
+ * A mound: the chain makes one of four slopes pushing out from a centre (skin
+ * "mound"). Drawn as one round dome over them, as high as its push is strong,
+ * not as four ramps: that read as a flat square with lines on it.
+ */
+export function mounds(zones) {
+  const ms = zones.filter((z) => z.kind === "slope" && z.skin === "mound");
+  const groups = [];
+  for (const z of ms) {
+    const near = groups.find((g) => z.min[0] <= g.x1 + 0.1 && z.max[0] >= g.x0 - 0.1 && z.min[1] <= g.y1 + 0.1 && z.max[1] >= g.y0 - 0.1);
+    if (near) Object.assign(near, { x0: Math.min(near.x0, z.min[0]), x1: Math.max(near.x1, z.max[0]), y0: Math.min(near.y0, z.min[1]), y1: Math.max(near.y1, z.max[1]), push: Math.max(near.push, Math.hypot(...z.vec)) });
+    else groups.push({ x0: z.min[0], x1: z.max[0], y0: z.min[1], y1: z.max[1], push: Math.hypot(...z.vec) });
+  }
+  // a zone added late can join two groups: merge until none touch
+  const touch = (a, b) => a.x0 <= b.x1 + 0.1 && a.x1 >= b.x0 - 0.1 && a.y0 <= b.y1 + 0.1 && a.y1 >= b.y0 - 0.1;
+  for (let merged = true; merged; ) {
+    merged = false;
+    for (let i = 0; i < groups.length && !merged; i++)
+      for (let j = i + 1; j < groups.length && !merged; j++)
+        if (touch(groups[i], groups[j])) {
+          const a = groups[i], b = groups.splice(j, 1)[0];
+          Object.assign(a, { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1), push: Math.max(a.push, b.push) });
+          merged = true;
+        }
+  }
+  return groups.map((g) => ({ x: (g.x0 + g.x1) / 2, z: (g.y0 + g.y1) / 2, rx: (g.x1 - g.x0) / 2 + 0.6, rz: (g.y1 - g.y0) / 2 + 0.6, h: Math.min(1.1, 0.35 + g.push * 2) }));
 }
 
 /**
@@ -199,25 +229,40 @@ export function terrain(s) {
     }
 
   const rs = plateaus(ramps(s.zones), s.start);
+  const domes = mounds(s.zones);
   const W2 = W, H2 = H;
-  const raw = (x, z) => {
-    let h = 0;
+  // mesh: the ground as drawn, a moon bridge's sides tucked in under its deck
+  const raw = (x, z, mesh = false) => {
+    let h = 0, arch = 0;
     for (const r of rs) {
       const along = x * r.ux + z * r.uz - r.lo, side = x * r.vx + z * r.vz;
       if (along < 0 || side < r.a0 || side > r.a1) continue;
       let k;
-      if (along <= r.span) k = r.z.skin === "kicker" || r.z.skin === "ramp" ? (along / r.span) ** 2 : smooth(along / r.span); // a jump curls up to its lip
+      if (along <= r.span) k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? (along / r.span) ** 2 : smooth(along / r.span); // a jump curls up to its lip
       else if (r.bridge && along - r.span < r.bridge.gap) k = 1 + (r.bridge.to / r.rise - 1) * smooth((along - r.span) / r.bridge.gap);
       else if (r.plateau) k = 1;
+      // a quarter-pipe's deck behind its coping: the kerb stands on it, not buried in the ramp
+      else if (r.z.skin === "quarter pipe" && along - r.span < 1.2) k = 1;
       else if (r.noLip) continue; // the top of the hill the tee stands on
       else if (along - r.span < BANK * 0.4 && x > 0 && z > 0 && x < W2 && z < H2) k = 1 - smooth((along - r.span) / (BANK * 0.4)); // a short lip, not a slope the physics lacks
       else continue;
       // shoulders: a ramp inside the green tapers at its sides; one that runs
       // wall to wall does not (its sides are the walls)
       const edge = Math.min(side - r.a0, r.a1 - side);
-      const walled = r.a0 <= 0.01 || r.a1 >= Math.max(W2, H2) - 0.01;
+      // (nor does a bridge: its deck is full width, over the water)
+      const walled = r.a0 <= 0.01 || r.a1 >= Math.max(W2, H2) - 0.01 || r.z.skin === "moon bridge";
       if (!walled && edge < SHOULDER) k *= smooth(edge / SHOULDER);
+      // a moon bridge's two halves meet at its crown: the higher, not the sum
+      if (r.z.skin === "moon bridge") {
+        arch = Math.max(arch, k * r.rise * (mesh && edge < 0.5 ? smooth(edge / 0.5) : 1));
+        continue;
+      }
       h += k * r.rise;
+    }
+    h += arch;
+    for (const d of domes) {
+      const q = Math.hypot((x - d.x) / d.rx, (z - d.z) / d.rz);
+      if (q < 1) h += d.h * (1 - q * q) * (1 - q * q); // a soft dome, flat at its foot
     }
     return h;
   };
@@ -242,6 +287,12 @@ export function terrain(s) {
     return raw(x, z);
   };
 
+  // the ground mesh's own heights: height() but for a moon bridge's sides,
+  // which drop to the water under the deck's edge (the deck is drawn at
+  // height(), and the ball rides on that)
+  const bridges = s.zones.filter((q) => q.kind === "slope" && q.skin === "moon bridge");
+  const ground = (x, z) => (bridges.some((q) => x >= q.min[0] && x <= q.max[0] && z >= q.min[1] && z <= q.max[1]) ? raw(x, z, true) : height(x, z));
+
   const zoneAt = (x, z) => s.zones.find((q) => inZone(q, x, z)) || null;
 
   /** Whether the ball can be at (x, z): the board cell there is green. */
@@ -249,7 +300,7 @@ export function terrain(s) {
     const i = Math.floor(x / CELL), j = Math.floor(z / CELL);
     return i >= 0 && j >= 0 && i < nx && j < nz && !!green[idx(i, j)];
   };
-  return { nx, nz, idx, green, rough, height, zoneAt, centre, onGreen };
+  return { nx, nz, idx, green, rough, height, ground, zoneAt, centre, onGreen, domes };
 }
 
 // The self-check: an L made of walls leaves its corner as rough, and a ramp
@@ -277,6 +328,7 @@ export function demo() {
     ],
   });
   console.assert(hill.height(9.5, 1.5) > hill.height(7.9, 1.5) * 0.9, "facing ramps make one hill, not two");
+  console.assert(mounds([[6, 4.7, 7.6, 8.7], [8.4, 4.7, 10, 8.7], [7.6, 7.1, 8.4, 8.7], [7.6, 4.7, 8.4, 6.3]].map(([a, b, c, d]) => ({ kind: "slope", skin: "mound", min: [a, b], max: [c, d], vec: [0.3, 0] }))).length === 1, "four mound slopes make one dome");
   console.assert(t.height(6, 1) === 0, "flat past the bank");
   console.assert(t.height(3.3, 1) > 0 && t.height(3.3, 1) < t.height(2.9, 1), "the lip falls back to the green");
   console.assert(t.height(1, 7) === t.height(1.5, 7), "flat around the cup");

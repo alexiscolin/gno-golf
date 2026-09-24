@@ -152,7 +152,7 @@ const need = (shots, pieces) => Math.ceil((20e6 + shots * (5e6 + 4.5e6 * pieces)
 const gasFor = (shots, pieces = 8) => Math.min(need(shots, pieces), MAX_GAS);
 
 /** Signs Reset + PlayRound for this round. Resolves with the tx (hash, height). */
-export async function recordRound({ address, realm, hole, shots, pieces, period, price = 0.001, chainId, rpc }) {
+export async function recordRound({ address, realm, hole, shots, pieces, period, mode = "assisted", price = 0.001, chainId, rpc }) {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
   if (need(shots.length, pieces) > MAX_GAS * 1.35)
@@ -171,7 +171,12 @@ export async function recordRound({ address, realm, hole, shots, pieces, period,
     // takes the current one or the one before
     messages: [
       call("Reset", [hole]),
-      period == null ? call("PlayRound", [hole, shots.join(";")]) : call("PlayRoundAt", [hole, shots.join(";"), String(period)]),
+      // a pro round goes on the pro board (the mode is the one it was played in)
+      mode === "pro"
+        ? call("PlayRoundPro", [hole, shots.join(";"), String(period ?? 0)])
+        : period == null
+          ? call("PlayRound", [hole, shots.join(";")])
+          : call("PlayRoundAt", [hole, shots.join(";"), String(period)]),
     ],
     // a starting point: Adena simulates the tx and sets the final fee itself
     gasFee,

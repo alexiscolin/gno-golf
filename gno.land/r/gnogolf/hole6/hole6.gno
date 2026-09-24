@@ -1,4 +1,5 @@
-// Package hole6 is a bend on ice: it runs, and it does not stop where you hoped.
+// Package hole6 is a bend on ice, then a long run down to the cup: it runs,
+// and it does not stop where you hoped.
 package hole6
 
 import (
@@ -11,11 +12,11 @@ import (
 
 var me = course.Fit(&course.Simple{
 	World: "garden", Order: 6,
-	W: 40, H: 26,
+	W: 40, H: 31,
 	Title:     "Icehouse",
 	Strokes:   3, // par
 	Tee:       physics.V(4, 3.5),
-	Pin:       physics.V(35.5, 21),
+	Pin:       physics.V(35.5, 26),
 	Substeps:  24,
 	CupRadius: 1.2,
 
@@ -24,7 +25,7 @@ var me = course.Fit(&course.Simple{
 			physics.Outline(physics.Path(
 				physics.Arc(physics.V(3.5, 3.5), 3.5, math.Pi/2, 3*math.Pi/2, 5),
 				physics.Arc(physics.V(32, 7), 7, -math.Pi/2, 0, 7),
-				physics.Arc(physics.V(35.5, 22), 3.5, 0, math.Pi, 5),
+				physics.Arc(physics.V(35.5, 27), 3.5, 0, math.Pi, 5),
 				physics.Pts(physics.V(32, 7)),
 			)...),
 		),
