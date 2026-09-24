@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+.next/
+out/
+# working screenshots stay local; the README's demo and the promo are kept
+media/*
+!media/gnogolf-demo.gif
+!media/promo/
