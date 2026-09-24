@@ -99,29 +99,55 @@ export function applyRig(camera, rig, view) {
 export function overviewRig(camera, box, view) {
   const { w, h, top, bottom, side } = view;
   const target = box.getCenter(new THREE.Vector3());
-  const corners = [];
-  for (const x of [box.min.x, box.max.x])
-    for (const y of [box.min.y, box.max.y])
-      for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z));
-
-  const bounds = (dist) => {
-    applyRig(camera, { target, dist, ox: 0, oy: 0 }, view);
-    const r = { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9 };
-    for (const p of corners) {
-      const q = p.clone().project(camera);
-      const px = ((q.x + 1) / 2) * w, py = ((1 - q.y) / 2) * h;
-      r.x0 = Math.min(r.x0, px); r.x1 = Math.max(r.x1, px);
-      r.y0 = Math.min(r.y0, py); r.y1 = Math.max(r.y1, py);
-    }
-    return r;
-  };
   let lo = 5, hi = 240; // no overview is further off than this
   for (let i = 0; i < 32; i++) {
-    const mid = (lo + hi) / 2, r = bounds(mid);
+    const mid = (lo + hi) / 2, r = frameOf(camera, box, view, target, mid);
     if (r.x1 - r.x0 <= w - 2 * side && r.y1 - r.y0 <= h - top - bottom) hi = mid; else lo = mid;
   }
-  const r = bounds(hi);
+  const r = frameOf(camera, box, view, target, hi);
   return { target, dist: hi, ox: (r.x0 + r.x1) / 2 - w / 2, oy: (r.y0 + r.y1) / 2 - (top + (h - top - bottom) / 2) };
+}
+
+// where the box's corners land on screen, in CSS pixels, for a rig on target at dist
+const _corner = new THREE.Vector3();
+function frameOf(camera, box, view, target, dist, ox = 0, oy = 0) {
+  applyRig(camera, { target, dist, ox, oy }, view);
+  const r = { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9 };
+  for (const x of [box.min.x, box.max.x])
+    for (const y of [box.min.y, box.max.y])
+      for (const z of [box.min.z, box.max.z]) {
+        const q = _corner.set(x, y, z).project(camera);
+        const px = ((q.x + 1) / 2) * view.w, py = ((1 - q.y) / 2) * view.h;
+        r.x0 = Math.min(r.x0, px); r.x1 = Math.max(r.x1, px);
+        r.y0 = Math.min(r.y0, py); r.y1 = Math.max(r.y1, py);
+      }
+  return r;
+}
+
+/**
+ * How far the overview's target may lean (along x, a quarter of it along z)
+ * with the whole box still inside the free part of the screen: the mouse
+ * lean in the whole-course view looks around, it never cuts the hole off.
+ * A long hole the overview fits end to end has almost no room.
+ */
+export function leanRoom(camera, box, view, rig, span) {
+  const { w, h, top, bottom, side } = view;
+  const t = new THREE.Vector3();
+  const fits = (s) =>
+    [[1, 1], [1, -1], [-1, 1], [-1, -1]].every(([a, b]) => {
+      t.copy(rig.target);
+      t.x += a * s;
+      t.z += b * s * 0.25;
+      const r = frameOf(camera, box, view, t, rig.dist, rig.ox, rig.oy);
+      return r.x0 >= side - 0.5 && r.x1 <= w - side + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
+    });
+  if (fits(span)) return span;
+  let lo = 0, hi = span;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid; else hi = mid;
+  }
+  return lo;
 }
 
 /** Close on a point — the ball — centred in the free part of the screen. */

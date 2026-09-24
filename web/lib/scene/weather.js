@@ -175,7 +175,17 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
   // banks and clouds: soft blobs on planes turned to the camera, one batch each
   const blobGeo = new THREE.PlaneGeometry(1, 1);
   const bankMat = new THREE.MeshBasicMaterial({ map: blob(), color: 0xeef2ef, transparent: true, opacity: 0.55, depthWrite: false });
-  const bankMesh = new THREE.InstancedMesh(blobGeo, bankMat, BANKS);
+  // a bank fades out as the camera comes into it (Third person runs through
+  // the low ones): one blended plane over the whole screen was the storm's
+  // and the fog's worst overdraw, and it hid the course. Gone within NEAR_BANK.
+  const bankGeo = new THREE.PlaneGeometry(1, 1), bankA = new THREE.InstancedBufferAttribute(new Float32Array(BANKS).fill(1), 1);
+  bankGeo.setAttribute("bankA", bankA);
+  bankMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = "attribute float bankA;\nvarying float vBankA;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vBankA = bankA;");
+    sh.fragmentShader = "varying float vBankA;\n" + sh.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\n  diffuseColor.a *= vBankA;");
+  };
+  bankMat.customProgramCacheKey = () => "bankA";
+  const bankMesh = new THREE.InstancedMesh(bankGeo, bankMat, BANKS);
   const cloudMat = new THREE.MeshBasicMaterial({ map: blob(), color: 0x3a4250, transparent: true, opacity: 0.8, depthWrite: false });
   const cloudMesh = new THREE.InstancedMesh(blobGeo, cloudMat, CLOUDS);
   bankMesh.frustumCulled = cloudMesh.frustumCulled = false;
@@ -192,11 +202,18 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
   const piece = (x) => x.m;
   const self = (x) => x;
   let cam = null;
-  function inst(mesh, list, get, face, color) {
+  const NEAR_BANK = 3, FAR_BANK = 7;
+  const bankFade = (m) => {
+    const d = cam ? m.position.distanceTo(cam.position) : Infinity;
+    return d >= FAR_BANK ? 1 : d <= NEAR_BANK ? 0 : ((d - NEAR_BANK) / (FAR_BANK - NEAR_BANK)) ** 2;
+  };
+  function inst(mesh, list, get, face, color, fade = null, alpha = null) {
     if (!mesh.visible) return; // a hidden batch is not rewritten
     for (let k = 0; k < list.length; k++) {
       const m = get(list[k]);
-      if (!m.visible) {
+      const a = fade && m.visible ? fade(m) : 1;
+      if (alpha) alpha.array[k] = a;
+      if (!m.visible || a < 0.01) {
         mesh.setMatrixAt(k, HIDE);
         continue;
       }
@@ -207,13 +224,14 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     }
     mesh.instanceMatrix.needsUpdate = true;
     if (color && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (alpha) alpha.needsUpdate = true;
   }
   function flush() {
     cam = typeof camera === "function" ? camera() : camera;
     inst(bitMesh, bits, piece, false, bitColor);
     inst(ringMesh, splashes, piece, false, ringColor);
     inst(puddleMesh, puddles, self, false, null);
-    inst(bankMesh, banks, piece, true, null);
+    inst(bankMesh, banks, piece, true, null, bankFade, bankA);
     inst(cloudMesh, clouds, piece, true, null);
     if (!trailMesh.visible) return;
     // the gusts: each ribbon's vertices into place, alpha 0 outside its drawn part
@@ -230,9 +248,10 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     trailGeo.attributes.position.needsUpdate = true;
     trailGeo.attributes.color.needsUpdate = true;
   }
-  // the lightning's light over the scene
+  // the lightning's light over the scene: always in it (dark between flashes),
+  // since a light coming or going recompiles every lit material
   const bolt = new THREE.HemisphereLight(0xeaf0ff, 0x8090a0, 0);
-  group.add(bolt);
+  scene.add(bolt);
   let nextFlash = 0, flashAt = -9;
   const placeWeather = () => {
     // puddles are the chain's (zones skinned "puddle", set in set())
@@ -266,19 +285,30 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
   let gusts = [], gustOn = 0;
   const streaks = Array.from({ length: GS }, () => ({ u: Math.random(), v: Math.random(), s: 0.6 + Math.random() * 0.8 }));
 
-  // fog: the scene's own, while it lasts
-  let savedFog, fogOn = false;
+  // fog: the scene's own, always there — fog coming or going recompiles every
+  // material — and pushed far past the far plane (no effect) when there is none
+  const OFF = 1e5;
+  const fog = (scene.fog = new THREE.Fog(0xdfe6e2, OFF, OFF * 10));
+  let fogOn = false;
   const setFog = (on) => {
     if (on === fogOn) return;
     fogOn = on;
-    if (on) {
-      savedFog = scene.fog;
-      scene.fog = new THREE.Fog(0xdfe6e2, 20, 60);
-    } else scene.fog = savedFog || null;
+    if (on) (fog.near = 20), (fog.far = 60);
+    else (fog.near = OFF), (fog.far = OFF * 10);
   };
 
-  let last = null;
+  let last = null, lastZones = [];
+  // the Low tier: a third of the rain, half the banks, clouds, rings and gusts
+  let thin = false;
+  const share = (n) => (thin ? Math.ceil(n / (n === RAIN ? 3 : 2)) : n);
+  let rainN = RAIN;
   return {
+    /** Low: fewer particles of every kind (the next set() and on). */
+    thin(on) {
+      if (thin === !!on) return;
+      thin = !!on;
+      this.set(lastZones);
+    },
     /** The board it hangs over: rain falls there and a little around. */
     board(w, h, world = "garden", onGreen = () => true) {
       green = onGreen;
@@ -292,6 +322,9 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     },
     /** The weather zones for this stroke (the hole's own and the stroke's). */
     set(zones) {
+      lastZones = zones || [];
+      rainN = share(RAIN);
+      rainGeo.setDrawRange(0, rainN * 2);
       gusts = (zones || []).filter((q) => q.skin === "gust" && q.every > 0);
       const z = (zones || []).filter((q) => WEATHER_SKINS.includes(q.skin));
       const wind = z.find((q) => q.skin === "wind");
@@ -318,15 +351,15 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
         p.position.set((q.min[0] + q.max[0]) / 2, 0.03, (q.min[1] + q.max[1]) / 2);
         p.scale.set((q.max[0] - q.min[0]) / 2, (q.max[1] - q.min[1]) / 2, 1);
       });
-      splashes.forEach((sp) => (sp.m.visible = raining));
+      splashes.forEach((sp, k) => (sp.m.visible = raining && k < share(SPLASH)));
 
-      banks.forEach((b) => (b.m.visible = !!now && now.fog));
-      clouds.forEach((c) => (c.m.visible = !!now && now.storm));
+      banks.forEach((b, k) => (b.m.visible = !!now && now.fog && k < share(BANKS)));
+      clouds.forEach((c, k) => (c.m.visible = !!now && now.storm && k < share(CLOUDS)));
       if (!raining) wet = 0;
       setFog(!!now && now.fog);
       const s = now && now.wind ? Math.hypot(now.wind[0], now.wind[1]) : 0;
       // a breeze shows a few gusts, a gale a dozen
-      const n = s ? Math.max(3, Math.min(TRAILS, Math.round(3 + (s / 0.08) * 9))) : 0;
+      const n = s ? share(Math.max(3, Math.min(TRAILS, Math.round(3 + (s / 0.08) * 9)))) : 0;
       trails.forEach((tr, k) => ((tr.m.visible = k < n), k < n && reseedTrail(tr), (tr.t = k / Math.max(1, n))));
       bits.forEach((b, k) => ((b.m.visible = k < Math.round((n / TRAILS) * BITS)), reseedBit(b, true)));
       trailMesh.visible = n > 0;
@@ -342,7 +375,7 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     /** The fog is set by how far the camera stands: the near end of the
      *  course clear, the far end and the garden beyond it lost in it. */
     view(dist) {
-      if (fogOn && scene.fog) (scene.fog.near = dist * 0.75), (scene.fog.far = dist * 1.9);
+      if (fogOn) (fog.near = dist * 0.75), (fog.far = dist * 1.9);
     },
     /** The timed pieces' clock (substeps, fractional): gusts blow when the chain has them on. */
     clock(c) {
@@ -373,11 +406,12 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
         gustGeo.attributes.position.needsUpdate = true;
       }
       if (!now) return;
-      const [wx, wz] = now.wind || [0, 0];
+      const wx = now.wind ? now.wind[0] : 0, wz = now.wind ? now.wind[1] : 0;
       if (rain.visible) {
         // slanted by the wind
         const sx = wx * 18, sz = wz * 18;
-        drops.forEach((d, i) => {
+        for (let i = 0; i < rainN; i++) {
+          const d = drops[i];
           d.y -= d.v * dt;
           d.x += sx * dt;
           d.z += sz * dt;
@@ -387,12 +421,13 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
           const o = i * 6;
           rainPos[o] = d.x, rainPos[o + 1] = d.y, rainPos[o + 2] = d.z;
           rainPos[o + 3] = d.x - sx * 0.05, rainPos[o + 4] = d.y + l, rainPos[o + 5] = d.z - sz * 0.05;
-        });
+        }
         rainGeo.attributes.position.needsUpdate = true;
       }
       if (rain.visible && !now.snow) {
         // rings where drops land, and puddles gathering over some seconds
         for (const sp of splashes) {
+          if (!sp.m.visible) continue;
           sp.t += dt * 2.2;
           if (sp.t >= 1) {
             sp.t = 0;
@@ -454,8 +489,8 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
       flush();
     },
     dispose() {
-      setFog(false);
-      scene.remove(group);
+      if (scene.fog === fog) scene.fog = null;
+      scene.remove(group, bolt);
       scene.remove(gustLines);
       gustGeo.dispose();
       gustMat.dispose();

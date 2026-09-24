@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sound } from "@/lib/feel";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
@@ -20,6 +20,8 @@ const GLYPH = {
 
 export default function Share({ text, snapshot, link = "" }) {
   const [copied, setCopied] = useState(false);
+  const copiedT = useRef(0); // the "copied" note's timer, cleared if the card goes first
+  useEffect(() => () => clearTimeout(copiedT.current), []);
   // the game's public address (set NEXT_PUBLIC_SITE_URL when building for
   // Netlify); a local dev address is never worth sharing, the page is
   const site = process.env.NEXT_PUBLIC_SITE_URL;
@@ -45,7 +47,8 @@ export default function Share({ text, snapshot, link = "" }) {
     try {
       await navigator.clipboard.writeText(`${text} ${url}`);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      clearTimeout(copiedT.current);
+      copiedT.current = setTimeout(() => setCopied(false), 1800);
     } catch {}
   };
   const links = [

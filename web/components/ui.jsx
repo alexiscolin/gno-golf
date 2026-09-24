@@ -4,7 +4,7 @@
 // game is one of these, so they all hover, press, focus and disable alike.
 // Their look is in globals.css under "shared controls".
 
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 
 /**
  * A button. variant: "primary" (green), "secondary" (paper), "chain" (the
@@ -65,15 +65,69 @@ export function SheetClose({ onClose, inline = false }) {
   );
 }
 
+// Dialogs open over one another (a confirm over the menu): only the top one
+// hears Escape and keeps Tab inside it.
+const open = [];
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+
+/**
+ * What every dialog does: focus moves into it when it opens (its first
+ * control, the close button in a sheet), Tab and Shift-Tab stay inside it,
+ * Escape closes it (when it can be closed), and focus goes back to what
+ * opened it once it is gone. Returns the ref for the dialog's element.
+ */
+export function useDialog(onClose) {
+  const ref = useRef(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const me = {};
+    open.push(me);
+    const back = document.activeElement;
+    const el = ref.current;
+    const first = el && el.querySelector(FOCUSABLE);
+    (first || el) && (first || el).focus({ preventScroll: true });
+    const onKey = (e) => {
+      if (open[open.length - 1] !== me || !ref.current) return;
+      if (e.key === "Escape" && close.current) return e.stopPropagation(), close.current();
+      if (e.key !== "Tab") return;
+      const all = [...ref.current.querySelectorAll(FOCUSABLE)].filter((x) => x.offsetParent !== null);
+      if (!all.length) return e.preventDefault();
+      const a = all[0], z = all[all.length - 1];
+      if (!ref.current.contains(document.activeElement)) return e.preventDefault(), a.focus();
+      if (e.shiftKey && document.activeElement === a) e.preventDefault(), z.focus();
+      else if (!e.shiftKey && document.activeElement === z) e.preventDefault(), a.focus();
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      open.splice(open.indexOf(me), 1);
+      if (back && back.isConnected && back.focus) back.focus({ preventScroll: true });
+    };
+  }, []);
+  return ref;
+}
+
 /** A sheet over the game: its dim backdrop closes it, its X in the corner. */
 export function Sheet({ label, onClose, className = "", role = "dialog", children }) {
   const id = useId();
+  const ref = useDialog(onClose);
   return (
     <div className="sheet" onClick={onClose}>
-      <div className={`sheet__in ${className}`.trim()} role={role} aria-modal="true" aria-label={label} id={id} onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} tabIndex={-1} className={`sheet__in ${className}`.trim()} role={role} aria-modal="true" aria-label={label} id={id} onClick={(e) => e.stopPropagation()}>
         <SheetClose onClose={onClose} />
         {children}
       </div>
     </div>
+  );
+}
+
+/** Any other dialog (the menu drawer, the win card, an error): useDialog on an element of its own. onClose: what Escape does, or nothing. */
+export function Dialog({ onClose = null, as: Tag = "div", children, ...props }) {
+  const ref = useDialog(onClose);
+  return (
+    <Tag ref={ref} tabIndex={-1} {...props}>
+      {children}
+    </Tag>
   );
 }

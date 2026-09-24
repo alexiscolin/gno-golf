@@ -73,7 +73,7 @@ The raw form above is here so the contract does not depend on a library version.
 ### `State(hole string) string` — everything to draw
 
 ```json
-{"hole":"gno.land/r/gnogolf/hole3","name":"Down the Tunnel","by":"gno.land/r/gnogolf/hole3",
+{"version":1,"hole":"gno.land/r/gnogolf/hole3","name":"Down the Tunnel","official":true,
  "board":{"w":32,"h":16},"start":[3,13],"cup":[28,8],"plays":1,
  "walls":[{"a":[0,0],"b":[32,0],"skin":""}, …],
  "posts":[{"c":[9,4],"r":1.4,"skin":"bumper"}],
@@ -82,8 +82,13 @@ The raw form above is here so the contract does not depend on a library version.
           {"kind":"slope","min":[20,6],"max":[32,11],"vec":[-0.35,0],"scale":0,"skin":"slope"},
           {"kind":"hazard","min":[18,13],"max":[24,16],"vec":[3,13],"scale":0,"skin":"water"}],
  "wear":{"w":16,"h":8,"cells":[0,0,1, …]},
- "rounds":[{"player":"g1…","ball":[26,0.04],"strokes":1,"done":false,"path":[[3,13], …]}]}
+ "rounds":[{"version":1,"player":"g1…","ball":[26,0.04],"rest":[26,0.0412…],"strokes":1,"done":false,"period":N,"mode":"assisted","shots":"…"}]}
 ```
+
+Every object a read returns starts with `"version":1`. `official` says the hole
+is one of the course's (cups, numbers, rankings); anyone else's hole is a
+community hole. `State`'s rounds carry no path: `Round(hole, player)` replays a
+round's last stroke, and is `null` after `Reset`.
 
 `zones[].vec` means a different thing per kind: an acceleration for `slope`, a
 destination for `tunnel` and `hazard`, nothing for `surface` (which uses
@@ -123,6 +128,21 @@ Replaying the decisions is what keeps the free game and a recorded one
 identical — `PlayRound` with the same string records exactly what was shown.
 Format each number the same way on both calls (the web client uses
 `toFixed(4)`).
+
+A long list can be refused as more than one transaction can replay:
+`commit the first N, then the rest`. `PlayRound*` refuses it the same way, so
+record such a round in several transactions (the first with `Reset`), each
+continuing the round.
+
+### `SimulateFrom(hole, ballX, ballY, shot, stroke, period) string` — one stroke, from an exact ball
+
+The same stroke `PlayRoundAt` would play, for one shot's gas instead of the
+whole round's. `ballX, ballY` is the `"rest"` of the previous answer (`Round`,
+`SimulateRound*`, `SimulateFrom`), passed exactly as it came (it is the
+shortest decimal that reads back as the same float64); `shot` is
+`"angle,power,tick"`; `stroke` is the stroke number (0 = the first). The web
+client asks the first stroke with `SimulateRound` (the tee exactly) and every
+later one, aim previews included, with `SimulateFrom`.
 
 ### What the physics now knows
 

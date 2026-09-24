@@ -71,35 +71,41 @@ export function makeSplash(at, { open = false } = {}) {
 
 /** Holed: a burst out of the cup. Pointy hats, petals and leaves — the
  *  garden's own confetti. Returns a step(dt) that says whether it is still alive. */
+// Two instanced draws (hats, petals) for all 70 pieces, each its own colour.
 export function makeConfetti(cup, y = 0) {
   const group = new THREE.Group();
   const colors = [C.cap, C.sun, 0x5b6fb5, 0xe98fb0, C.cream, C.leaf];
-  const hatGeo = HAT_GEO, petalGeo = PETAL_GEO;
+  const N = 70, white = flat(0xffffff), col = new THREE.Color();
+  const hats = new THREE.InstancedMesh(HAT_GEO, white, Math.ceil(N / 3)), petals = new THREE.InstancedMesh(PETAL_GEO, white, N - Math.ceil(N / 3));
+  for (const m of [hats, petals]) (m.frustumCulled = false), m.instanceMatrix.setUsage(THREE.DynamicDrawUsage), group.add(m);
   const parts = [];
-  for (let i = 0; i < 70; i++) {
-    const m = new THREE.Mesh(i % 3 ? petalGeo : hatGeo, flat(colors[i % colors.length]));
-    m.position.set(cup[0], y + 0.3, cup[1]);
+  for (let i = 0; i < N; i++) {
+    const mesh = i % 3 ? petals : hats, k = i % 3 ? i - Math.ceil(i / 3) : i / 3;
+    mesh.setColorAt(k, col.set(colors[i % colors.length]));
+    const o = new THREE.Object3D();
+    o.position.set(cup[0], y + 0.3, cup[1]);
     const a = Math.random() * Math.PI * 2, out = 2 + Math.random() * 4;
-    parts.push({ m, v: new THREE.Vector3(Math.cos(a) * out, 9 + Math.random() * 7, Math.sin(a) * out),
+    parts.push({ m: o, mesh, k, v: new THREE.Vector3(Math.cos(a) * out, 9 + Math.random() * 7, Math.sin(a) * out),
       spin: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8) });
-    group.add(m);
   }
   let age = 0;
-  return {
-    group,
-    step(dt) {
-      age += dt;
-      for (const p of parts) {
-        p.v.y -= 18 * dt;
-        p.v.multiplyScalar(1 - 1.2 * dt); // air: they float down instead of dropping
-        p.m.position.addScaledVector(p.v, dt);
-        if (p.m.position.y < y + 0.05) { p.m.position.y = y + 0.05; p.v.set(0, 0, 0); }
-        else p.m.rotation.set(p.m.rotation.x + p.spin.x * dt, p.m.rotation.y + p.spin.y * dt, p.m.rotation.z + p.spin.z * dt);
-        if (age > 2.6) p.m.scale.multiplyScalar(1 - 3 * dt);
-      }
-      return age < 3.6;
-    },
+  const step = (dt) => {
+    age += dt;
+    for (const p of parts) {
+      p.v.y -= 18 * dt;
+      p.v.multiplyScalar(1 - 1.2 * dt); // air: they float down instead of dropping
+      p.m.position.addScaledVector(p.v, dt);
+      if (p.m.position.y < y + 0.05) { p.m.position.y = y + 0.05; p.v.set(0, 0, 0); }
+      else p.m.rotation.set(p.m.rotation.x + p.spin.x * dt, p.m.rotation.y + p.spin.y * dt, p.m.rotation.z + p.spin.z * dt);
+      if (age > 2.6) p.m.scale.multiplyScalar(1 - 3 * dt);
+      p.m.updateMatrix();
+      p.mesh.setMatrixAt(p.k, p.m.matrix);
+    }
+    hats.instanceMatrix.needsUpdate = petals.instanceMatrix.needsUpdate = true;
+    return age < 3.6;
   };
+  step(0);
+  return { group, step };
 }
 
 /** The elastic: from the gnome back toward the pull, stretched with the power. */

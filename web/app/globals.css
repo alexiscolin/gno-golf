@@ -4,6 +4,7 @@
   --ink-soft: #4f7a6c;
   --green: #226c57;
   --hat: #e0524b;
+  --hat-ink: #b83a33; /* the hat's red dark enough for paper text on it (5:1) */
   --paper: #fdf6e9;
   --shadow: 0 5px 0 var(--ink), 0 12px 24px rgba(20, 65, 52, .18);
 }
@@ -1731,14 +1732,16 @@ button:focus-visible, a:focus-visible {
 .w__head { fill: #8a9a8c; stroke: var(--ink); stroke-width: 2.5; }
 
 /* a word on how the shot went, over the course for a moment */
-.note {
+.toast {
   position: fixed; left: 50%; top: 108px; transform: translateX(-50%); z-index: 6;
   padding: 10px 18px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper);
   box-shadow: 0 4px 0 var(--ink); font-weight: 800; color: var(--ink); white-space: nowrap;
-  animation: note 3.2s ease forwards; pointer-events: none;
+  animation: toast 3.2s ease forwards; pointer-events: none;
 }
-@keyframes note { 0% { opacity: 0; transform: translate(-50%, -8px); } 8%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
-@media (max-width: 600px) { .note { top: 90px; white-space: normal; text-align: center; width: calc(100vw - 32px); } }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 8%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+@media (max-width: 600px) { .toast { top: 90px; white-space: normal; text-align: center; width: calc(100vw - 32px); } }
+/* after the global reduced-motion rule: a toast stays put and is taken away by its timer */
+@media (prefers-reduced-motion: reduce) { .toast { animation: none !important; opacity: 1; } }
 
 /* the forecast, bottom left: a gnome's weathervane, a windsock, the sky */
 .weather__vane { width: 50px; height: 50px; flex: 0 0 auto; }
@@ -2013,7 +2016,7 @@ button:focus-visible, a:focus-visible {
 .sheet__in:has(> .sheet__close) { padding-top: 22px; }
 /* until launch */
 .soon { margin: 6px 0 4px; padding: 12px 14px; border-radius: 14px; background: #fff3d6; border: 2px dashed #e0a44a; }
-.soon__badge { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; background: var(--hat); color: var(--paper); border: 2px solid var(--ink); }
+.soon__badge { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); border: 2px solid var(--ink); }
 .soon p { margin: 8px 0 0; font-size: 14px; color: var(--ink); }
 
 /* the aim mode: a two-way switch with its note, in the menu and the picker */
@@ -2068,7 +2071,7 @@ button:focus-visible, a:focus-visible {
 .btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
 .btn:focus-visible, .burger:focus-visible, .adena:focus-visible, .seg button:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .btn[disabled] { cursor: default; opacity: .7; box-shadow: 0 2px 0 var(--ink); transform: none; }
-.badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--hat); color: var(--paper); border: 2px solid var(--ink); white-space: nowrap; pointer-events: none; }
+.badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); border: 2px solid var(--ink); white-space: nowrap; pointer-events: none; }
 /* a HUD card that is a button (the leaderboard) */
 .btn--chip { background: var(--paper); color: var(--ink); display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 800; }
 .btn--chip svg { width: 22px; height: 22px; fill: #f5c542; stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
@@ -2076,7 +2079,7 @@ button:focus-visible, a:focus-visible {
 @media (max-width: 600px) {
   .lbchip { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 118px); right: 14px; }
   .lbchip span { display: none; }
-  .lbchip .badge { top: -8px; right: -14px; font-size: 9px; padding: 1px 5px; }
+  .lbchip .badge { top: -8px; right: -10px; font-size: 10px; padding: 1px 5px; }
 }
 /* the segmented switch: the aim mode, the board's tabs */
 .seg { display: inline-flex; border: 2px solid var(--ink); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-btn); background: var(--paper); }
@@ -2106,3 +2109,15 @@ button:focus-visible, a:focus-visible {
 .switch:active i { transform: scale(.96); }
 .seg button:active { background: #dcebe2; }
 .seg button.on:active { background: #1d5d4a; }
+
+/* the save-before countdown on the win card, and the start's own retry */
+.saveclock { margin: 6px 0 0; font-size: 14px; color: var(--ink); }
+.saveclock b { font-variant-numeric: tabular-nums; }
+.saveclock--soon b { color: var(--hat-ink); }
+.banner__retry { font-size: 14px; color: var(--ink-soft); margin: 4px 0 0; }
+.real__cost { display: block; margin-top: 6px; font-weight: 700; color: var(--ink); }
+/* community holes: a small list under the cups */
+.community { margin: 18px auto 0; max-width: 640px; text-align: left; }
+.community h3 { font-size: 15px; margin: 0 0 6px; color: var(--ink); }
+.community h3 small { font-weight: 600; color: var(--ink-soft); margin-left: 6px; }
+.community ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }

@@ -4,7 +4,7 @@
 // mushrooms, and turquoise water to the horizon.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, flat, drawn, grows, sway, swayLine, setFoot, footOf, rbox, lanternGlow, glowTex, share, hullOf, fadeable, fadeLoop } from "./materials.js";
+import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, fadeable, fadeLoop, windNow } from "./materials.js";
 import { inZone } from "../terrain.js";
 import { mergeByMaterial, look, weatherLooks } from "./course.js";
 import { gnomelet, brolly } from "./props.js";
@@ -181,12 +181,14 @@ function base(s) {
       around(m, 1 + ((1 - u) * 4) / R0);
       m.position.y = 0;
       m.material.opacity = Math.sin(Math.PI * Math.min(1, u * 1.15)) * (0.25 + 0.6 * u);
+      m.visible = m.material.opacity > 0.01; // gone: not drawn (nor blended) for nothing
     });
     // runs up as each crest breaks, then slides back
     const u = (t / PERIOD * 3) % 1;
     const run = u < 0.35 ? u / 0.35 : 1 - (u - 0.35) / 0.65;
     around(swash, 1 - (run * 0.5) / R0);
     swash.material.opacity = 0.45 * run;
+    swash.visible = swash.material.opacity > 0.01;
   });
   return g;
 }
@@ -396,7 +398,7 @@ function flushLeafLines(root) {
   if (!leafLines.length) return;
   root.updateMatrixWorld(true);
   // each outline weighs its sway from its own palm's foot, as its leaves do
-  const geos = leafLines.map(({ e, owner }) => setFoot(e.applyMatrix4(owner.matrixWorld), footOf(owner)));
+  const geos = leafLines.map(({ e, owner }) => setFoot(e.applyMatrix4(owner.matrixWorld), owner));
   leafLines = [];
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const lines = new THREE.LineSegments(mergeGeometries(geos).applyMatrix4(inv), leafInk);
@@ -407,6 +409,7 @@ function flushLeafLines(root) {
 function palm(rand, h = 4.5 + rand() * 2.5) {
   const g = new THREE.Group();
   g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  g.userData.flex = 0.6; // a palm bends, but not like grass
   const a = rand() * Math.PI * 2;
   const curve = trunkCurve(h, 0.2 + rand() * 0.25, new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
   const { bark, rings } = trunkGeometry(curve, 0.24 + rand() * 0.06);
@@ -861,12 +864,13 @@ function fader(colors) {
 function archPalm(rand, toward, reach, h, fd) {
   const g = new THREE.Group();
   g.userData.live = true;
-  // from its foot to its crown it leans `reach` over `h`; the bend is all near
-  // the top (x ∝ k²), as a wind-bent beach palm grows
+  // from its foot to its crown it leans `reach` over `h`, as a coconut palm
+  // grows: leaning most at the foot, then rising towards the crown in one
+  // gentle upward curve (the outward step shrinks up the trunk)
   const pts = [];
   for (let i = 0; i <= 12; i++) {
-    const k = i / 12;
-    pts.push(new THREE.Vector3(toward.x * reach * k * k, h * k, toward.z * reach * k * k));
+    const k = i / 12, u = 0.65 * (2 * k - k * k) + 0.35 * k;
+    pts.push(new THREE.Vector3(toward.x * reach * u, h * k, toward.z * reach * u));
   }
   const curve = new THREE.CatmullRomCurve3(pts);
   const { bark, rings } = trunkGeometry(curve, 0.32);
@@ -888,6 +892,7 @@ function archPalm(rand, toward, reach, h, fd) {
 function giantHibiscus(rand) {
   const g = new THREE.Group();
   g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  g.userData.flex = 0.7; // how far it bends: see materials.js SWAY
   const stem = grows(new THREE.CylinderGeometry(0.1, 0.16, 2.4, 6), P.frondDark);
   stem.position.y = 1.2;
   stem.rotation.z = (rand() - 0.5) * 0.3;
@@ -918,20 +923,71 @@ function giantHibiscus(rand) {
   return g;
 }
 
-/** A kite high over the beach, swaying on its line, its tail hanging. */
-function kite(rand, color) {
+/**
+ * A kite high over the beach: a diamond sail on its cross spars, inked round,
+ * a ribbon tail with bows, and its string down to a stake in the sand
+ * (`stake`, in the kite's own frame). The sail and tail flutter as one piece
+ * about the string's knot; the tail waves out behind it, downwind.
+ */
+function kite(rand, color, stake) {
   const g = new THREE.Group();
-  const shape = new THREE.Shape([new THREE.Vector2(0, 0.7), new THREE.Vector2(0.45, 0), new THREE.Vector2(0, -0.9), new THREE.Vector2(-0.45, 0)]);
-  g.add(new THREE.Mesh(new THREE.ShapeGeometry(shape), flat(color)));
-  for (let i = 0; i < 5; i++) {
-    const b = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.12), flat(i % 2 ? 0xffffff : color));
-    b.position.set(Math.sin(i * 0.9) * 0.12 * (i + 1), -1.1 - i * 0.35, 0);
-    g.add(b);
+  g.userData.live = true;
+  // the string: from the knot (the kite's origin) down to the stake, sagging
+  const sag = [];
+  for (let i = 0; i <= 16; i++) {
+    const k = i / 16;
+    sag.push(stake.clone().multiplyScalar(k).add(new THREE.Vector3(0, -Math.sin(k * Math.PI) * 0.8, 0)));
   }
-  const k = mergedMover(g);
-  const ph = rand() * 6;
-  animate((t) => (k.rotation.z = Math.sin(t * 0.8 + ph) * 0.15));
-  return k;
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(sag), ink));
+  const peg = drawn(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 5), flat(P.trunkDark));
+  peg.position.copy(stake).add(new THREE.Vector3(0, 0.2, 0));
+  g.add(peg);
+  // the flier: all that flutters, about the knot at the spars' cross
+  const fly = new THREE.Group();
+  const top = new THREE.Vector2(0, 0.75), right = new THREE.Vector2(0.6, 0), bottom = new THREE.Vector2(0, -1.05), left = new THREE.Vector2(-0.6, 0);
+  fly.add(new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([top, right, bottom, left])), dside(color)));
+  const v3 = (p, z = 0.02) => new THREE.Vector3(p.x, p.y, z);
+  fly.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([top, right, bottom, left].map((p) => v3(p, 0.01))), ink));
+  const spar = flat(P.trunkDark);
+  for (const [a, b] of [[top, bottom], [left, right]]) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, a.distanceTo(b), 4), spar);
+    m.position.copy(v3(a.clone().lerp(b, 0.5), 0.04));
+    m.rotation.z = Math.atan2(b.y - a.y, b.x - a.x) - Math.PI / 2;
+    fly.add(m);
+  }
+  // the tail: one ribbon from the bottom tip, its bows riding on it
+  const N = 14, LEN = 2.6, W = 0.05;
+  const rib = new THREE.PlaneGeometry(W * 2, LEN, 1, N);
+  const ribbon = new THREE.Mesh(rib, dside(0xffffff));
+  ribbon.frustumCulled = false; // its vertices move every frame, away from its first bounds
+  const bows = [];
+  const bow = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.2, 0.1, 0), new THREE.Vector3(-0.2, -0.1, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.2, -0.1, 0), new THREE.Vector3(0.2, 0.1, 0)]);
+  bow.computeVertexNormals();
+  for (let i = 1; i <= 4; i++) {
+    const b = new THREE.Mesh(bow, dside(i % 2 ? color : 0xffffff));
+    fly.add(b);
+    bows.push({ b, at: (i * N) / 5 | 0 });
+  }
+  fly.add(ribbon);
+  g.add(fly);
+  const pos = rib.attributes.position, ph = rand() * 6, spine = [];
+  animate((t) => {
+    const w = windNow(), k = 1 + Math.min(w.length() * 15, 1);
+    // the whole kite flutters about its knot, leaning a little downwind
+    fly.rotation.z = Math.sin(t * 0.8 * k + ph) * 0.12 - Math.max(-0.08, Math.min(0.08, w.x)) * 2;
+    // the tail waves, more at its end, and streams downwind
+    for (let j = 0; j <= N; j++) {
+      const u = j / N;
+      spine[j] = [Math.sin(t * 2.6 * k - u * 5 + ph) * 0.22 * u + Math.max(-0.08, Math.min(0.08, w.x)) * 9 * u * u, bottom.y - u * LEN];
+    }
+    for (let i = 0; i < pos.count; i++) {
+      const j = i >> 1; // PlaneGeometry: two vertices a row, from the top (the kite) down
+      pos.setXYZ(i, spine[j][0] + (i % 2 ? W : -W), spine[j][1], 0);
+    }
+    pos.needsUpdate = true;
+    for (const { b, at } of bows) b.position.set(spine[at][0], spine[at][1], 0.01);
+  });
+  return g;
 }
 
 /** A whole object that moves as one, merged into a mesh per material by the
@@ -1250,25 +1306,30 @@ function decor(s, bank = () => 0) {
   const X0 = sh.cx - sh.a, X1 = sh.cx + sh.a, Z0 = sh.cz - sh.b;
   const perches = []; // where a gull may stand: the pier, the lighthouse rocks
 
+  // the lighthouse's spot (it is built further down), kept clear of the canopy
+  const LH = [W + ISLAND.x - 2.6, Math.min(H * 0.4, 5)];
   // the canopy: palms rooted just off the lane's long sides, curving in over it
-  const fading = [];
+  const fading = [], crowns = [];
   // two or three per hole, from behind (the camera's far side)
   const arches = 2 + (rand() < 0.5 ? 1 : 0);
   for (let k = 0; k < arches; k++) {
     const x = W * ((k + 0.5) / arches) + (rand() - 0.5) * 3, z = -2.8 - rand() * 0.6;
     if (!dry(x, z, 0) || byWall(x, z, 1) || !free(x, z, 1.2)) continue;
     const fd = fader([P.trunk, P.trunkDark, P.frond, P.frondDark]);
-    // tall enough that its lean carries the crown a third of the way over the
-    // lane, and the crown then hangs well above the kerb
-    // tall enough that the lean carries the crown over the middle of the lane:
-    // how far a unit-high trunk reaches is measured on its own curve
-    // the crown over the middle of the lane; a foot-to-crown lean of 45-55°
-    const want = -z + H * (0.42 + rand() * 0.12);
-    const h = want / Math.tan(THREE.MathUtils.degToRad(45 + rand() * 10));
+    // a real leaning palm: a foot-to-crown lean of 25-40° from the vertical,
+    // its crown over the lane's near side (not flung across it)
+    // tall (its crown well above the lane), so the lean sets its reach
+    const h = 6.5 + rand() * 2, want = h * Math.tan(THREE.MathUtils.degToRad(25 + rand() * 15));
+    // its crown (fronds ~3.3 out) clear of the lighthouse and the other crowns
+    if (Math.hypot(x - LH[0], z + want - LH[1]) < 3.3 + 3.2 || crowns.some((c) => Math.hypot(c.x - x, c.z - z - want) < 6.6)) continue;
     const p = archPalm(rand, new THREE.Vector3(0, 0, 1), want, h, fd);
     p.position.set(x, GRASS + bank(x, z), z);
     g.add(p);
+    // its foot and its trunk: nothing else stands in them (its crown is high
+    // over the lane, above anything low)
     reserve(x, z, 1.4);
+    reserve(x, z + want * 0.5, 0.6);
+    crowns.push({ x, z: z + want });
     const ph = rand() * 6, crown = p.userData.crown;
     animate((t) => (crown.rotation.z = Math.sin(t * 0.9 + ph) * 0.05, crown.rotation.x = Math.cos(t * 0.7 + ph) * 0.04));
     p.updateMatrixWorld(true);
@@ -1297,7 +1358,7 @@ function decor(s, bank = () => 0) {
     // on the right-hand shore, back a little: tall, it must stay in the frame
     // past the board's right end, a little behind it: the overview frames the
     // island's box, and a tower there stays inside it whatever the board's shape
-    const x = W + ISLAND.x - 2.6, z = Math.min(H * 0.4, 5);
+    const [x, z] = LH;
     // the beam lies along +x at rotation 0; rotation.y = θ turns it to
     // (cos θ, -sin θ): this θ points it away from the island, out to sea
     const lh = lighthouse(time !== "day", Math.atan2(-(z - sh.cz), x - sh.cx));
@@ -1343,6 +1404,7 @@ function decor(s, bank = () => 0) {
       // it sways as the trunks it is tied to do (same shader, same foot), or it slips off them
       const net = grows(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(pa, mid, pb), 12, 0.16, 6, false), P.towel);
       net.userData.foot = (a.position.y + b.position.y) / 2;
+      net.userData.flex = 0.6; // as its palms
       g.add(net);
     }
   }
@@ -1430,10 +1492,18 @@ function decor(s, bank = () => 0) {
   scatter(3, X0 + 2, X1 - 2, Z0 + 1, -2.5, 1.6, () => giantHibiscus(rand), undefined, 2);
   scatter(2, W + 1.8, X1 - 1, 0, H, 1.6, () => giantHibiscus(rand), undefined, 2);
   // kites up over the beach
+  // (on the string to a stake in the sand behind; a kite with no dry sand for
+  // its stake is not flown, and none flies in rain or storm)
+  const kites = [];
   for (let i = 0; i < 2; i++) {
-    const kt = kite(rand, [C.cap, P.towel, 0xf5b83d][i % 3]);
-    kt.position.set(W * (0.25 + i * 0.5), 9 + rand() * 2, -4 - rand() * 3);
+    const at = new THREE.Vector3(W * (0.25 + i * 0.5), 9 + rand() * 2, -4 - rand() * 3);
+    const spot = [[3, -2], [-3, -2], [2, -4], [-2, -4], [4, 0], [-4, 0], [0, -6]].map(([dx, dz]) => [at.x + dx, at.z + dz]).find(([x, z]) => dry(x, z, 0.3) && !onBoard(x, z, 1) && free(x, z, 0.3));
+    if (!spot) continue;
+    const kt = kite(rand, [C.cap, P.towel, 0xf5b83d][i % 3], new THREE.Vector3(spot[0] - at.x, GRASS + bank(spot[0], spot[1]) - at.y, spot[1] - at.z));
+    kt.position.copy(at);
+    reserve(spot[0], spot[1], 0.3);
     g.add(kt);
+    kites.push(kt);
   }
   // the fade: a crown near the line from the eye to the ball goes see-through
   g.userData.fade = fadeLoop(fading, { min: 0.22 });
@@ -1457,6 +1527,9 @@ function decor(s, bank = () => 0) {
   flushLeafLines(g);
   // the beach in the weather: in rain or storm no one sunbathes, in wind the parasols lean
   weatherLooks(g, (w) => (w.rain || w.storm || w.snow ? "wet" : w.wind ? "wind" : "clear"));
+  // the kites are landed in the wet, with the sunbathers
+  const dress = g.userData.weather;
+  g.userData.weather = (w) => (dress(w), kites.forEach((k) => (k.visible = !(w && (w.rain || w.storm || w.snow)))));
   return g;
 }
 
@@ -1752,60 +1825,197 @@ function waterZone(z, t, s, { color = P.shallow, stones = true, foam = true } = 
 }
 
 /**
- * A blowhole (a timed tunnel): a dark hole in a flat rim of rock, flush with
- * the lane, and the sea spouting up out of it in its window of substeps —
- * driven by the timed pieces' clock (state.timed), so it spouts on screen
- * when the chain has it throw. A ball thrown out flies an arc over to where
- * it comes down (state.tubes, ridden by the replay at full size).
+ * A blowhole (a timed tunnel): a craggy rim of rock on the zone's own
+ * ellipse, low enough to roll over, around a real hole going down to the
+ * sea. The water in it swells before a spout, the spout shoots up as a
+ * tapered column with a foam cap and spray, and falls back leaving the rock
+ * wet; between spouts a wisp of mist and a few bubbles. All on the timed
+ * pieces' clock (state.timed), so it spouts on screen when the chain throws.
+ * A ball thrown out flies an arc to where it comes down (state.tubes).
+ * The lane's cells over the hole are left open (course.js), so the hole is
+ * a hole, under a lid of two rock slabs that is shut (the ball rolls over
+ * it) except while it spouts. Instanced spray and rocks; nothing allocated
+ * per frame.
  */
+export const BLOWHOLE_MOUTH = 0.5; // the hole's size, a share of the zone's ellipse
 function blowhole(z, t) {
   const g = new THREE.Group();
   const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, a = (x1 - x0) / 2, b = (z1 - z0) / 2;
   const y = ground(t, cx, cz), rand = seeded("blowhole" + z.min.join());
-  // the rock shelf round it, flat: the ball rolls over it
-  const shelf = new THREE.Mesh(new THREE.CircleGeometry(1, 36).scale(a, b, 1).rotateX(-Math.PI / 2), onTop(flat(0x8e96a0, {}), 1));
-  shelf.position.set(cx, y + 0.03, cz);
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(1, 28).scale(a * 0.55, b * 0.55, 1).rotateX(-Math.PI / 2), onTop(new THREE.MeshBasicMaterial({ color: 0x0f2a33 }), 2));
-  hole.position.set(cx, y + 0.04, cz);
-  g.add(shelf, hole);
-  // cracks and barnacles in the rim, flat on it
-  for (let k = 0; k < 9; k++) {
-    const th = (k / 9) * Math.PI * 2 + rand() * 0.4, r = 0.62 + rand() * 0.3;
-    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.08 + rand() * 0.06, 6).rotateX(-Math.PI / 2), onTop(flat(0xdfe5e8, {}), 3));
-    dot.position.set(cx + Math.cos(th) * a * r, y + 0.05, cz + Math.sin(th) * b * r);
-    g.add(dot);
+  const ph1 = rand() * 6, ph2 = rand() * 6;
+  const crag = (th) => 1 + 0.05 * Math.sin(5 * th + ph1) + 0.035 * Math.sin(11 * th + ph2);
+  // the rim, swept round: [radius (share of the ellipse), height, colour];
+  // dry rock outside, wet and darker at the lip, dark down the throat
+  const dry = new THREE.Color(0x9aa3a9), wet = new THREE.Color(0x5f6c74), deep = new THREE.Color(0x26363d);
+  const M = BLOWHOLE_MOUTH;
+  const prof = [[1, 0.01, dry], [0.9, 0.09, dry], [0.79, 0.19, dry], [0.69, 0.22, wet], [0.6, 0.14, wet], [M + 0.02, 0.02, wet], [M - 0.02, -0.3, deep], [M - 0.04, -1.1, deep]];
+  const A = 56, pos = [], col = [], idx = [];
+  for (let k = 0; k <= A; k++) {
+    const th = (k / A) * Math.PI * 2, n = crag(th);
+    prof.forEach(([r, h, c], j) => {
+      const nn = j < 5 ? n : 1 + (n - 1) * 0.4, hh = h > 0 ? h * (0.8 + 0.4 * (0.5 + 0.5 * Math.sin(7 * th + ph2))) : h;
+      pos.push(cx + Math.cos(th) * a * r * nn, y + hh, cz + Math.sin(th) * b * r * nn);
+      col.push(c.r, c.g, c.b);
+    });
   }
-  // the spout: a column of white water with spray at its head
+  const P = prof.length;
+  for (let k = 0; k < A; k++) for (let j = 0; j + 1 < P; j++) {
+    const q0 = k * P + j, q1 = (k + 1) * P + j;
+    idx.push(q0, q1, q0 + 1, q1, q1 + 1, q0 + 1);
+  }
+  const rimGeo = new THREE.BufferGeometry();
+  rimGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  rimGeo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  rimGeo.setIndex(idx);
+  rimGeo.computeVertexNormals();
+  // wound to face up on the outer slope (the ink hull needs it)
+  if (rimGeo.attributes.normal.getY(P + 1) < 0) { rimGeo.setIndex(idx.map((v, i) => idx[i - (i % 3) + [0, 2, 1][i % 3]])); rimGeo.computeVertexNormals(); }
+  g.add(drawn(rimGeo, flat(0xffffff, { vertexColors: true, side: THREE.DoubleSide })));
+  // chunky rocks and barnacles on the rim, all low: the ball rolls over it
+  const dummy = new THREE.Object3D();
+  const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), flat(0x88919a), 7);
+  for (let k = 0; k < 7; k++) {
+    const th = (k / 7) * Math.PI * 2 + rand() * 0.5, r = 0.8 + rand() * 0.1, s = 0.14 + rand() * 0.1;
+    dummy.position.set(cx + Math.cos(th) * a * r * crag(th), y + 0.1, cz + Math.sin(th) * b * r * crag(th));
+    dummy.scale.set(s * 1.3, s * 0.8, s);
+    dummy.rotation.set(rand() * 3, rand() * 3, rand() * 3);
+    dummy.updateMatrix();
+    rocks.setMatrixAt(k, dummy.matrix);
+  }
+  const barn = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1.4, 6), flat(0xe6e0cf), 14);
+  for (let k = 0; k < 14; k++) {
+    const th = rand() * Math.PI * 2, r = 0.62 + rand() * 0.12, s = 0.035 + rand() * 0.03;
+    dummy.position.set(cx + Math.cos(th) * a * r * crag(th), y + 0.17, cz + Math.sin(th) * b * r * crag(th));
+    dummy.scale.set(s, s, s);
+    dummy.rotation.set(0, 0, 0);
+    dummy.updateMatrix();
+    barn.setMatrixAt(k, dummy.matrix);
+  }
+  g.add(rocks, barn);
+  // two tiny pools caught in hollows of the rim
+  for (let k = 0; k < 2; k++) {
+    const th = ph1 + k * 2.6, r = 0.86;
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 14).scale(0.16, 0.11, 1).rotateX(-Math.PI / 2), onTop(new THREE.MeshBasicMaterial({ color: 0x6fc3c9 }), 2));
+    pool.position.set(cx + Math.cos(th) * a * r, y + 0.1, cz + Math.sin(th) * b * r);
+    g.add(pool);
+  }
+  // the water down the hole, sloshing on the clock
+  const mouth = new THREE.CircleGeometry(1, 28).scale(a * M * 0.95, b * M * 0.95, 1).rotateX(-Math.PI / 2);
+  const water = new THREE.Mesh(mouth, flat(0x1d5a6e, {}));
+  const foam = new THREE.Mesh(new THREE.RingGeometry(0.78, 1, 28).scale(a * M * 0.95, b * M * 0.95, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
+  water.position.set(cx, y - 0.48, cz);
+  foam.position.set(cx, y - 0.47, cz);
+  g.add(water, foam);
+  // the spout: a tapered column, toon-shaded, capped with foam
+  const colGeo = new THREE.LatheGeometry([0, 0.2, 0.45, 0.7, 0.88, 1].map((u) => new THREE.Vector2(Math.max(0.05, (1 - u) * 0.62 + 0.24 + 0.06 * Math.sin(u * 9)), u * 4.4)), 14);
+  const column = new THREE.Mesh(colGeo, flat(0xd9f1f7, { transparent: true, opacity: 0.92 }));
+  const cap = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), flat(0xffffff), 6);
+  for (let k = 0; k < 6; k++) {
+    const th = (k / 6) * Math.PI * 2, s = 0.3 + rand() * 0.12;
+    dummy.position.set(Math.cos(th) * 0.28, 4.35 + rand() * 0.2, Math.sin(th) * 0.28);
+    dummy.scale.set(s, s * 0.8, s);
+    dummy.updateMatrix();
+    cap.setMatrixAt(k, dummy.matrix);
+  }
   const spout = new THREE.Group();
-  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.7, 4.2, 14, 1, true), new THREE.MeshBasicMaterial({ color: 0xe8f7fb, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
-  col.position.y = 2.1;
-  const N = 60, pos = new Float32Array(N * 3), seeds = [];
-  for (let k = 0; k < N; k++) seeds.push([rand() * Math.PI * 2, rand(), rand()]);
-  const spray = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(pos, 3)), new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, depthWrite: false }));
-  spray.frustumCulled = false;
-  spout.add(col, spray);
-  spout.position.set(cx, y, cz);
-  spout.userData.live = true;
+  spout.add(column, cap);
+  spout.position.set(cx, y - 0.48, cz);
   g.add(spout);
-  let on = 0, target = 0;
+  // spray (and, between spouts, bubbles): soft round droplets, instanced
+  const N = 48, drops = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), flat(0xffffff), N);
+  drops.frustumCulled = false;
+  const seeds = [];
+  for (let k = 0; k < N; k++) seeds.push([rand() * Math.PI * 2, 0.4 + rand() * 0.6, rand(), 0.05 + rand() * 0.07]);
+  // mist: a few soft puffs
+  const puffs = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, depthWrite: false }), 5);
+  puffs.frustumCulled = false;
+  // the rock left wet round the rim after a spout
+  const wetRing = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.35, 40).scale(a, b, 1).rotateX(-Math.PI / 2), onTop(new THREE.MeshBasicMaterial({ color: 0x2c4a4f, transparent: true, opacity: 0, depthWrite: false }), 2));
+  wetRing.position.set(cx, y + 0.04, cz);
+  g.add(drops, puffs, wetRing);
+  // the lid: two slabs of wet rock over the mouth, flush with the lane, hinged
+  // at its sides. Shut, the ball rolls over them, as the chain has it; the
+  // sea bursts them open for the throw, on the same clock
+  const doors = [];
+  for (const sgn of [-1, 1]) {
+    const rx = a * M * 0.97, rz = b * M * 0.97, pts = [];
+    // its half of the mouth, a crack's width short of the middle, about its hinge
+    for (let k = 0; k <= 16; k++) {
+      const th = -Math.PI / 2 + (k / 16) * Math.PI;
+      pts.push(new THREE.Vector2(sgn * (Math.max(0.03, Math.cos(th) * rx) - rx), Math.sin(th) * rz));
+    }
+    if (sgn < 0) pts.reverse(); // one winding for both
+    const slab = new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: 0.12, bevelEnabled: false });
+    slab.rotateX(-Math.PI / 2).translate(0, -0.12, 0);
+    const hinge = new THREE.Group();
+    hinge.position.set(cx + sgn * rx, y + 0.02, cz);
+    hinge.add(drawn(slab, flat(0x6d7880)));
+    // barnacles and a crack on the slab's top, so it reads as rock
+    for (let k = 0; k < 4; k++) {
+      const bn = new THREE.Mesh(new THREE.CircleGeometry(0.05 + rand() * 0.04, 6).rotateX(-Math.PI / 2), flat(0xe6e0cf));
+      bn.position.set(-sgn * rx * (0.3 + rand() * 0.5), 0.005, (rand() - 0.5) * rz);
+      hinge.add(bn);
+    }
+    hinge.userData.live = true;
+    g.add(hinge);
+    doors.push([hinge, sgn]);
+  }
+  let lid = 0;
+  for (const m of [water, foam, spout, drops, puffs, wetRing]) m.userData.live = true;
+  // the clock: where in its cycle the blowhole is, and whether it spouts
   const every = z.every | 0, onFor = z.on | 0, phase = z.phase | 0;
-  state.timed.push({ at: (step) => (target = !every || ((((Math.floor(step) + phase) % every) + every) % every) < onFor ? 1 : 0) });
-  let last = null;
+  let step = 0;
+  state.timed.push({ at: (st) => (step = st) });
+  let on = 0, lvl = 0, wetK = 0, last = null, fall = 1;
   animate((tt) => {
     const dt = last === null ? 0 : Math.min(0.1, tt - last);
     last = tt;
-    // up fast, down a little slower: the spout is a burst
-    on += (target - on) * Math.min(1, dt * (target > on ? 18 : 9));
-    col.scale.set(0.6 + 0.4 * on, Math.max(0.02, on), 0.6 + 0.4 * on);
-    col.position.y = 2.1 * Math.max(0.02, on);
-    col.material.opacity = 0.85 * Math.min(1, on * 2);
+    const p = every ? ((((step + phase) % every) + every) % every) : 0, spouting = !every || p < onFor;
+    // the water swells over the last three substeps before a spout
+    const want = spouting ? 1 : every && p > every - 3 ? (p - (every - 3)) / 3 : 0;
+    lvl += (want - lvl) * Math.min(1, dt * 10);
+    on += ((spouting ? 1 : 0) - on) * Math.min(1, dt * (spouting ? 20 : 7));
+    if (spouting) (fall = 0), (wetK = 1);
+    else fall = Math.min(1, fall + dt * 1.6);
+    wetK = Math.max(0, wetK - dt * 0.5);
+    const wy = y - 0.48 + 0.4 * lvl + 0.03 * Math.sin(tt * 5);
+    water.position.y = wy;
+    foam.position.y = wy + 0.01;
+    foam.material.opacity = 0.35 + 0.5 * lvl;
+    spout.position.y = wy;
+    spout.visible = on > 0.03;
+    // the lid flies open with the spout, and drops shut after it
+    lid += ((spouting ? 1 : 0) - lid) * Math.min(1, dt * (spouting ? 28 : 10));
+    for (const [hinge, sgn] of doors) hinge.rotation.z = sgn * lid * 1.75;
+    spout.scale.set(0.75 + 0.25 * on + 0.04 * Math.sin(tt * 23), Math.max(0.03, on), 0.75 + 0.25 * on + 0.04 * Math.cos(tt * 19));
+    wetRing.material.opacity = 0.35 * wetK;
+    wetRing.visible = wetRing.material.opacity > 0.01;
     for (let k = 0; k < N; k++) {
-      const [th, r, v] = seeds[k], u = (tt * (0.9 + v) + r) % 1;
-      const h = on * (3.2 + v * 1.8) + u * 1.2 * on, rr = (0.2 + u * 1.4) * (0.3 + on);
-      pos.set([Math.cos(th) * rr, on > 0.05 ? h : 0.15 + u * 0.3, Math.sin(th) * rr], k * 3);
+      const [th, sp, u0, r] = seeds[k];
+      if (on > 0.05 || fall < 1) {
+        // flung out of the column's head and falling round the rim
+        const u = (tt * (0.8 + sp * 0.6) + u0) % 1, top = 4.4 * Math.max(on, 0.25) * sp, out = (0.3 + 1.5 * u) * (a + b) * 0.5 * sp;
+        dummy.position.set(cx + Math.cos(th) * out, wy + top * (1 - (2 * u - 1) * (2 * u - 1) * 0.9) * (1 - fall * 0.7) - fall * u * 1.2, cz + Math.sin(th) * out);
+        dummy.scale.setScalar(r * (1 - u * 0.5) * (1 - fall));
+      } else {
+        // bubbles popping on the water
+        const u = (tt * 0.6 + u0) % 1;
+        dummy.position.set(cx + Math.cos(th) * a * M * 0.7 * sp, wy + 0.03, cz + Math.sin(th) * b * M * 0.7 * sp);
+        dummy.scale.setScalar(k % 3 ? 0 : r * 0.6 * Math.sin(Math.PI * u));
+      }
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      drops.setMatrixAt(k, dummy.matrix);
     }
-    spray.geometry.attributes.position.needsUpdate = true;
-    spray.material.opacity = on > 0.05 ? 0.9 * on : 0.25; // a wisp of mist between spouts
+    drops.instanceMatrix.needsUpdate = true;
+    for (let k = 0; k < 5; k++) {
+      const u = (tt * 0.25 + k / 5) % 1;
+      dummy.position.set(cx + Math.sin(k * 2.1 + tt * 0.4) * 0.25, y + 0.1 + u * 1.3, cz + Math.cos(k * 1.7) * 0.25);
+      dummy.scale.setScalar((0.18 + u * 0.25) * (on > 0.05 ? 0 : Math.sin(Math.PI * u)));
+      dummy.updateMatrix();
+      puffs.setMatrixAt(k, dummy.matrix);
+    }
+    puffs.instanceMatrix.needsUpdate = true;
   });
   // the throw: up out of the hole and over, to where the ball comes down
   const [ox, oz] = z.vec, oy = ground(t, ox, oz);
@@ -1836,43 +2046,8 @@ function wave(z, t) {
     const x = alongX ? (x0 + x1) / 2 : x0 + 0.2 + u * (x1 - x0 - 0.4), zz = alongX ? z0 + 0.2 + u * (z1 - z0 - 0.4) : (z0 + z1) / 2;
     m.position.set(x, ground(t, x, zz) + 0.05, zz);
     m.material.opacity = Math.sin(Math.PI * u) * 0.8;
+    m.visible = m.material.opacity > 0.01;
   }));
-  return g;
-}
-
-function gap(z, t) {
-  // missing planks: the opening sunk below the deck, dark teal water down
-  // there, a shadow under the deck's edge, and the boards round it broken off
-  // in splintered ends
-  const g = new THREE.Group();
-  const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  const y = ground(t, cx, cz), w = x1 - x0, d = z1 - z0;
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), flat(0x3fb3b3)); // the lagoon's turquoise, a shade deeper in the hole
-  water.position.set(cx, y - 0.45, cz);
-  const shade = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0d2f33, transparent: true, opacity: 0.55 }));
-  shade.scale.set(1, 1, 0.25);
-  shade.position.set(cx, y - 0.44, z0 + d * 0.13); // under the far edge of the deck
-  // the hole's walls: the deck's cut thickness, dark
-  const walls = [];
-  for (const [px, pz, sx, sz] of [[cx, z0, w, 0.04], [cx, z1, w, 0.04], [x0, cz, 0.04, d], [x1, cz, 0.04, d]])
-    walls.push(new THREE.BoxGeometry(sx, 0.45, sz).translate(px, y - 0.22, pz));
-  g.add(water, shade, new THREE.Mesh(mergeGeometries(walls), flat(0x3a2818)));
-  // splintered plank ends along the two edges the boards run into
-  const rand = seeded("gap" + cx + cz);
-  const alongX = w <= d; // boards run across the lane: they end on the long sides
-  const n = Math.max(2, Math.round((alongX ? d : w) / 0.5));
-  const ends = [];
-  for (const side of [-1, 1])
-    for (let k = 0; k < n; k++) {
-      const u = (k + 0.5) / n, len = 0.08 + rand() * 0.25;
-      const ex = alongX ? cx + side * (w / 2 - len / 2) : x0 + u * w;
-      const ez = alongX ? z0 + u * d : cz + side * (d / 2 - len / 2);
-      const b = new THREE.BoxGeometry(alongX ? len : 0.42, 0.06, alongX ? 0.42 : len);
-      // a jagged tip: one corner pulled in
-      b.attributes.position.setX(0, b.attributes.position.getX(0) * (0.3 + rand() * 0.5));
-      ends.push(b.translate(ex, y + 0.01, ez));
-    }
-  g.add(drawn(mergeGeometries(ends), flat(0xc99a63)));
   return g;
 }
 
@@ -1958,7 +2133,7 @@ export function piece(kind, item, t, s) {
     if (k === "lagoon") return waterZone(item, t, s, { color: 0x4fc4c9 });
     if (k === "wave") return wave(item, t);
     if (k === "blowhole") return blowhole(item, t);
-    if (k === "gap") return gap(item, t);
+    // (a gap, missing planks, is the shared deckGap in zones.js)
     if (k === "sea") return new THREE.Group(); // the world's sea shows round the lane
     if (item.islandDressed) return null;
     if (k === "shipwreck") return withDefault(item, s, t, wreck(item, t, s));
@@ -2006,6 +2181,7 @@ function lagoonUnder(s) {
     for (let u = 0.5; u < l; u += 3) {
       const x = w.a[0] + ((w.b[0] - w.a[0]) * u) / l, z = w.a[1] + ((w.b[1] - w.a[1]) * u) / l;
       if (x < 0.5 || x > W - 0.5 || z < 0.5 || z > H - 0.5) continue; // the board's own edge fence
+      if (s.zones.some((q) => q.skin === "gap" && x > q.min[0] - 0.4 && x < q.max[0] + 0.4 && z > q.min[1] - 0.4 && z < q.max[1] + 0.4)) continue; // (a gap has its own posts)
       piles.push(new THREE.CylinderGeometry(0.16, 0.2, GRASS - SEA + 0.8, 6).translate(x, (GRASS + SEA - 0.8) / 2, z));
     }
   }

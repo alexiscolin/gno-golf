@@ -68,8 +68,10 @@ export function pushHull(mat, w = 0.055, extra = "") {
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>\n  transformed += normal * ${w.toFixed(3)};` + extra);
   };
-  mat.customProgramCacheKey = () => "hull" + w + extra.length;
-  mat.userData.hook = "hull" + w + extra.length;
+  // keyed on the snippet itself: two of the same length are not one shader
+  mat.customProgramCacheKey = () => "hull" + w + extra;
+  mat.userData.hook = "hull" + w + extra;
+  mat.userData.hull = true; // an outline (the Low tier leaves distant ones out: see bake)
   return mat;
 }
 /** An ink outline material of width w (shared per width and colour). */
@@ -103,45 +105,55 @@ export const windNow = () => wind.value;
 // still be merged into one mesh: the grass barely moves, a treetop moves most.
 const SWAY = `
   vec4 swayW = modelMatrix * vec4(transformed, 1.0);
-  // capped: a treetop sways a few tenths, never metres (a palm's fronds sway
-  // and its trunk does not; uncapped, the fronds flew off the trunk)
-  // weighed from the plant's own foot (swayFoot, see plantFeet): 0 there, so
-  // a trunk never slides off its bed, its pot or its dune
-  float swayH = clamp(swayW.y - swayFoot, 0.0, 2.4);
-  // a gale sways things about twice as much, never more; and they lean a
-  // little downwind — capped, or a tall stem is thrown across the screen
+  // how high above its own foot (swayFoot, see plantFeet): 0 there, so a
+  // trunk never slides off its bed, its pot or its dune
+  float swayH = max(swayW.y - swayFoot.y, 0.0);
+  // the plant turns about its foot by an angle: a gentle arc over its lowest
+  // 0.6, then straight at that angle (C1: never an S, never a kink), so a tall
+  // tree tilts rather than shears
+  float swayB = swayH < 0.6 ? swayH * swayH / 1.2 : swayH - 0.3;
+  // a gale flutters things about twice as much, never more; and they lean
+  // downwind, both capped by the plant's flex (swayFlex: 1 for grass, flowers,
+  // bunting; a stiff pine about 0.28, a lean of 2-4 degrees at the most)
   float swayK = 1.0 + min(length(uWind) * 15.0, 1.0);
-  transformed.x += sin(uTime * 1.3 * (0.8 + swayK * 0.2) + swayW.x * 0.37 + swayW.z * 0.21) * 0.028 * swayK * swayH * swayH;
-  transformed.z += cos(uTime * 1.1 * (0.8 + swayK * 0.2) + swayW.z * 0.31) * 0.018 * swayK * swayH * swayH;
+  // phased by the plant's foot, not the vertex: all of a plant turns as one
+  float swayF = 0.05 * swayK * swayFlex;
+  vec2 swayA = vec2(sin(uTime * 1.3 * (0.8 + swayK * 0.2) + swayFoot.x * 0.37 + swayFoot.z * 0.21), 0.7 * cos(uTime * 1.1 * (0.8 + swayK * 0.2) + swayFoot.z * 0.31)) * swayF;
   // and leans downwind, the board's y being the world's z
-  float swayL = min(swayH, 3.0);
-  transformed.x += clamp(uWind.x, -0.08, 0.08) * 1.5 * swayL;
-  transformed.z += clamp(uWind.y, -0.08, 0.08) * 1.5 * swayL;`;
+  swayA += clamp(uWind, -0.08, 0.08) * 1.75 * swayFlex;
+  transformed.x += swayA.x * swayB;
+  transformed.z += swayA.y * swayB;`;
 const withSway = (m, extra = "") => {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = clock;
     sh.uniforms.uWind = wind;
-    sh.vertexShader = "uniform float uTime;\nuniform vec2 uWind;\nattribute float swayFoot;\n" + sh.vertexShader.replace(
+    sh.vertexShader = "uniform float uTime;\nuniform vec2 uWind;\nattribute vec3 swayFoot;\nattribute float swayFlex;\n" + sh.vertexShader.replace(
       "#include <begin_vertex>",
       "#include <begin_vertex>" + extra + SWAY
     );
   };
-  m.customProgramCacheKey = () => "sway" + extra.length;
-  m.userData.hook = "sway" + extra.length; // same shader whatever the colour: merges
+  m.customProgramCacheKey = () => "sway" + extra;
+  m.userData.hook = "sway" + extra; // same shader whatever the colour: merges (keyed on the snippet, not its length)
   return m;
 };
-/** Gives a swaying geometry its foot: the world height its sway is weighed
- *  from. Every swaying geometry needs one (plantFeet sets them). */
-export function setFoot(geo, y) {
-  geo.setAttribute("swayFoot", new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(y), 1));
-  return geo;
-}
 const footV = new THREE.Vector3();
-/** The world height of o's plant's foot: its nearest ancestor marked with
- *  userData.foot (that foot's local y); unmarked, the grass. */
-export function footOf(o) {
-  for (let p = o; p; p = p.parent) if (p.userData.foot !== undefined) return p.localToWorld(footV.set(0, p.userData.foot, 0)).y;
-  return GRASS;
+/** Gives a swaying geometry the foot and flex of o's plant: its nearest
+ *  ancestor marked with userData.foot (that foot's local y) and userData.flex
+ *  (1 unless stiffer); unmarked, the grass and 1. Every swaying geometry needs
+ *  them (plantFeet sets them). */
+export function setFoot(geo, o) {
+  let flex = 1;
+  o.getWorldPosition(footV).setY(GRASS);
+  for (let p = o; p; p = p.parent) if (p.userData.foot !== undefined) {
+    p.localToWorld(footV.set(0, p.userData.foot, 0));
+    flex = p.userData.flex ?? 1;
+    break;
+  }
+  const n = geo.attributes.position.count, foot = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) foot.set([footV.x, footV.y, footV.z], i * 3);
+  geo.setAttribute("swayFoot", new THREE.BufferAttribute(foot, 3));
+  geo.setAttribute("swayFlex", new THREE.BufferAttribute(new Float32Array(n).fill(flex), 1));
+  return geo;
 }
 /** Sets the foot of every swaying mesh or line under root that has none
  *  (bake() calls it; a shared geometry is copied first, its foot is per plant). */
@@ -152,7 +164,7 @@ export function plantFeet(root) {
     if (!o.geometry || !m || Array.isArray(m) || !String(m.userData.hook).startsWith("sway")) return;
     if (SHARED.has(o.geometry)) o.geometry = o.geometry.clone();
     else if (o.geometry.attributes.swayFoot) return;
-    setFoot(o.geometry, footOf(o));
+    setFoot(o.geometry, o);
   });
 }
 const swayMats = new Map();
@@ -167,6 +179,10 @@ const sway = (color, { double = false } = {}) => {
 };
 // its outline sways with it, or the contour would stay behind
 const hullSway = share(withSway(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), "\n  transformed += normal * 0.055;"));
+hullSway.userData.hull = true;
+/** The graphics tier the next hole is built for: low leaves the ink outlines
+ *  off the decor far from the board (see bake), where they are a pixel wide. */
+export const quality = { low: false };
 const grows = (geometry, color) => drawn(geometry, sway(color), hullSway);
 /** A line that sways with the foliage it is drawn on (a frond's rib, a
  *  leaf's vein): a plain line stayed put while the leaf moved. Shared per colour. */

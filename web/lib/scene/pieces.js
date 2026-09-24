@@ -336,8 +336,49 @@ function lantern(p, y) {
   return g;
 }
 
+/** A tall sunflower in a terracotta pot: the pot is the footprint; the
+ *  stem, the leaves and the head are over the ball. */
+function sunflower(p, y) {
+  const g = new THREE.Group(), [x, z] = p.c, R = p.r;
+  const pot = drawn(new THREE.CylinderGeometry(R, R * 0.78, 0.8, 16), flat(0xc8693f));
+  pot.position.set(x, y + 0.4, z);
+  const lip = drawn(new THREE.TorusGeometry(R * 0.97, 0.09, 6, 20), flat(0xd97c50));
+  lip.rotation.x = Math.PI / 2;
+  lip.position.set(x, y + 0.8, z);
+  const soil = new THREE.Mesh(new THREE.CircleGeometry(R * 0.9, 16).rotateX(-Math.PI / 2), flat(0x5a3d2a));
+  soil.position.set(x, y + 0.76, z);
+  const stem = drawn(new THREE.CylinderGeometry(0.07, 0.1, 2.6, 7), flat(C.leafDark));
+  stem.position.set(x, y + 2.05, z);
+  g.add(pot, lip, soil, stem);
+  for (const [h, a] of [[1.5, 0.3], [2.1, 3.4]]) {
+    const leaf = drawn(new THREE.SphereGeometry(0.3, 8, 5), flat(C.leaf));
+    leaf.scale.set(1, 0.2, 0.55);
+    leaf.rotation.y = a;
+    leaf.position.set(x + Math.cos(a) * 0.3, y + h, z - Math.sin(a) * 0.3);
+    g.add(leaf);
+  }
+  // the head, facing the camera's side of the board (+z), tipped a little
+  const head = new THREE.Group();
+  head.position.set(x, y + 3.35, z);
+  head.rotation.x = -0.35;
+  const petal = new THREE.ConeGeometry(0.16, 0.55, 5);
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2, pe = new THREE.Mesh(petal, flat(k % 2 ? 0xf5c33b : 0xf2b124));
+    pe.position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.55, 0);
+    pe.rotation.z = a - Math.PI / 2;
+    pe.scale.z = 0.35;
+    head.add(pe);
+  }
+  const disc = drawn(new THREE.CylinderGeometry(0.4, 0.4, 0.14, 16), flat(0x6b4226));
+  disc.rotation.x = Math.PI / 2;
+  head.add(disc);
+  g.add(head);
+  return g;
+}
+
 export const POSTS = {
   scarecrow,
+  sunflower,
   lantern,
   sandcastle,
   palm, coral, buoy, crab, lamp, clock, roundabout, chimney,

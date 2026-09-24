@@ -12,6 +12,7 @@ const LOOK = {
   wet: { color: 0x9fd4ec, life: 0.45, streak: false, label: "Slippery" },
   ice: { color: 0xeafaff, life: 0.35, streak: false, label: "Slippery" },
   slope: { color: 0xfff1b8, life: 0.4, streak: true, label: "Downhill" },
+  tilt: { color: 0xfff1b8, life: 0.4, streak: true, label: "Tilting" }, // a timed slope: a seesaw, a tilting board
 };
 
 /** What pushes a ball at (x, y), moving (vx, vy), under these zones and this clock tick. */
@@ -23,12 +24,13 @@ export function causeAt(zones, x, y, vx, vy, tick = 0) {
     if (z.kind === "slope" && on) {
       if (z.skin === "wind" || z.skin === "gust") wind = z.vec;
       // downhill only: a slope the ball climbs slows it, which needs no reason
+      else if (z.every) slope = slope || { tilt: true, vec: z.vec }; // a plank that tilts on a clock, whichever way
       else if (z.vec[0] * vx + z.vec[1] * vy > 0) slope = z.vec;
     }
     if (z.kind === "surface" && (z.skin === "rain" || z.skin === "puddle" || z.skin === "wetsand")) wet = true;
     if (z.kind === "surface" && z.skin === "ice") ice = true;
   }
-  return wind ? { kind: "wind", vec: wind } : ice ? { kind: "ice" } : wet ? { kind: "wet" } : slope ? { kind: "slope", vec: slope } : null;
+  return wind ? { kind: "wind", vec: wind } : ice ? { kind: "ice" } : wet ? { kind: "wet" } : slope ? (slope.tilt ? { kind: "tilt", vec: slope.vec } : { kind: "slope", vec: slope }) : null;
 }
 
 export function makeCauses(scene) {
@@ -81,7 +83,7 @@ export function makeCauses(scene) {
           q.vy = 0.3;
           q.dx = (wx / wl) * 0.7;
           q.dz = (wy / wl) * 0.7;
-        } else if (cause.kind === "slope") {
+        } else if (cause.kind === "slope" || cause.kind === "tilt") {
           // speed lines trailing the ball
           q.vx = -vx * 0.1;
           q.vz = -vz * 0.1;

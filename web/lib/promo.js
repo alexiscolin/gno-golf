@@ -10,7 +10,8 @@ import { shotOf } from "./chain.js";
 import { worldOf } from "./scene/worlds.js";
 import { sound } from "./feel.js";
 
-const on = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("promo");
+// a capture tool: dev builds, or a page opened with ?camlog as well
+const on = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("promo") && (process.env.NODE_ENV !== "production" || /[?&]camlog/.test(window.location.search));
 const FPS = 30;
 
 let E = null; // the engine's insides, given by attach()

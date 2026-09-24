@@ -83,16 +83,19 @@ export function cupTotals(card, allHoles) {
 
 // Gnomes you earn, cup by cup. Front-only, like the card they are earned on;
 // ok() is given cupTotals().
+// cup: the cup whose card earns it (none for the ones earned across cups)
 export const UNLOCKS = {
-  wizard: { need: "Finish the Garden Cup", ok: (t) => t.garden.all },
-  viking: { need: "Garden Cup at par", ok: (t) => t.garden.clean },
+  wizard: { cup: "garden", need: "Finish the Garden Cup", ok: (t) => t.garden.all },
+  viking: { cup: "garden", need: "Garden Cup at par or under", ok: (t) => t.garden.clean },
   golden: { need: "Five holes-in-one", ok: (t) => t.aces >= 5 },
-  pirate: { need: "Finish the Island Cup", ok: (t) => t.island.all },
-  diver: { need: "Island Cup at par", ok: (t) => t.island.clean },
-  baker: { need: "Finish the Town Cup", ok: (t) => t.town.all },
-  mayor: { need: "Town Cup at par", ok: (t) => t.town.clean },
-  king: { need: "Every cup at par", ok: (t) => t.slam },
+  pirate: { cup: "island", need: "Finish the Island Cup", ok: (t) => t.island.all },
+  diver: { cup: "island", need: "Island Cup at par or under", ok: (t) => t.island.clean },
+  baker: { cup: "town", need: "Finish Mushroom Town", ok: (t) => t.town.all },
+  mayor: { cup: "town", need: "Mushroom Town at par or under", ok: (t) => t.town.clean },
+  king: { need: "Every cup at par or under", ok: (t) => t.slam },
 };
+/** Whether finishing this cup at par or under earns a gnome (the Mountain Cup earns none). */
+export const cupHasGnome = (cup) => Object.values(UNLOCKS).some((u) => u.cup === cup);
 
 /** A medal for a finished hole: gold for one stroke, silver under par, bronze at par. */
 export const medalOf = (strokes, par) => (!strokes ? null : strokes === 1 ? "gold" : strokes < par ? "silver" : strokes === par ? "bronze" : null);

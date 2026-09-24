@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, drawn, rbox, windNow, share, texOf } from "./materials.js";
+import { C, ink, flat, drawn, rbox, windNow, share, texOf, fadeable, setFade, fadeLoop } from "./materials.js";
 import { animate } from "./state.js";
 import { timeOf } from "./camera.js";
 import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, brolly, mailbox, signpost, hill, house, pond, puddle, fence, mushroom, tuft, bunting, butterfly } from "./props.js";
@@ -189,11 +189,12 @@ function stream({ rand, X0, X1, reserve }) {
   );
   sheet.userData.live = true;
   g.add(sheet);
+  const p = new THREE.Vector3(), q = new THREE.Vector3(); // written in place each frame
   animate((t) => {
     tex.offset.y = t * 1.4;
     foam.forEach(({ m, off, lane }) => {
       const u = (t * 0.035 + off) % 1;
-      const p = curve.getPoint(u), q = curve.getTangent(u);
+      curve.getPoint(u, p), curve.getTangent(u, q);
       m.position.set(p.x - q.z * lane * Math.min(1, u * 9), GRASS + 0.1, p.z + q.x * lane * Math.min(1, u * 9));
       m.rotation.y = -Math.atan2(q.z, q.x);
     });
@@ -434,7 +435,8 @@ function giants({ rand, X0, X1, reserve, free, W, H }) {
     head.position.copy(curve.getPoint(1));
     head.rotation.x = back ? 2.2 : -2.2;
     const R = 1.6 + rand() * 1.2, colour = pastel[Math.floor(rand() * pastel.length)];
-    const pm = flat(colour, { transparent: true }), hm = flat(C.sun, { transparent: true });
+    // opaque until the canopy fade makes them see-through (setFade)
+    const pm = fadeable(flat(colour, {})), hm = fadeable(flat(C.sun, {}));
     for (let q = 0; q < 9; q++) {
       const a = (q / 9) * Math.PI * 2, pt = new THREE.Mesh(new THREE.SphereGeometry(R * 0.45, 10, 6), pm);
       pt.scale.set(1, 0.18, 0.5);
@@ -463,7 +465,7 @@ function giants({ rand, X0, X1, reserve, free, W, H }) {
   const petals = [];
   for (const f of heads)
     for (let q = 0; q < 3; q++) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(0.16, 6), flat(f.colour, { side: THREE.DoubleSide, transparent: true }));
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.16, 6), fadeable(flat(f.colour, { side: THREE.DoubleSide })));
       m.scale.y = 0.55;
       m.userData.live = true;
       g.add(m);
@@ -476,19 +478,15 @@ function giants({ rand, X0, X1, reserve, free, W, H }) {
       p.f.head.getWorldPosition(top);
       p.m.position.set(top.x + p.dx * u + Math.sin(t * 2 + p.ph * 9) * 0.4, top.y - u * (top.y - 0.1), top.z + p.dz * u);
       p.m.rotation.set(t * 2 + p.ph * 5, t * 1.3, 0);
-      p.m.material.opacity = u < 0.9 ? 1 : (1 - u) * 10;
+      setFade(p.m.material, u < 0.9 ? 1 : (1 - u) * 10); // blended only while it fades
     }
   });
   // fade: a head near the line from the camera to the ball goes see-through
-  const seg = new THREE.Line3(), near = new THREE.Vector3();
+  // (the shared canopy fade, from where each head is now)
+  const fadeHeads = fadeLoop(heads.map((f) => ({ at: f.world, r: f.R, mats: f.mats })));
   g.userData.fade = (eye, ball) => {
-    seg.set(eye, ball);
-    for (const f of heads) {
-      f.head.getWorldPosition(f.world);
-      seg.closestPointToPoint(f.world, true, near);
-      const d = near.distanceTo(f.world), o = d < f.R * 1.3 ? 0.25 : d < f.R * 2.2 ? 0.25 + ((d - f.R * 1.3) / (f.R * 0.9)) * 0.75 : 1;
-      for (const m of f.mats) { m.opacity = o; m.depthWrite = o > 0.99; }
-    }
+    for (const f of heads) f.head.getWorldPosition(f.world);
+    fadeHeads(eye, ball);
   };
   // dandelion puffs on the right
   for (let k = 0; k < 2; k++) {
@@ -533,14 +531,21 @@ function giants({ rand, X0, X1, reserve, free, W, H }) {
     bug.position.set(lx + 0.2, GRASS + 0.22, lz);
     g.add(leaf, bug);
   }
-  // pollen motes drifting over the garden (never through the lane: high up)
+  // pollen motes drifting over the garden (never through the lane: high up):
+  // one instanced draw, live (they were merged where they stood, and never drifted)
   const mote = new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.8 });
-  const motes = Array.from({ length: 24 }, () => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4), mote);
-    g.add(m);
-    return { m, x: X0 + rand() * (X1 - X0), z: -ISLAND.back + rand() * (ISLAND.back - 1), y: 3 + rand() * 7, ph: rand() * 6 };
-  });
-  animate((t) => motes.forEach((p) => p.m.position.set(p.x + Math.sin(t * 0.3 + p.ph) * 1.5, p.y + Math.sin(t * 0.7 + p.ph) * 0.6, p.z + Math.cos(t * 0.25 + p.ph))));
+  const motes = Array.from({ length: 24 }, () => ({ x: X0 + rand() * (X1 - X0), z: -ISLAND.back + rand() * (ISLAND.back - 1), y: 3 + rand() * 7, ph: rand() * 6 }));
+  const moteMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 5, 4), mote, motes.length);
+  moteMesh.userData.live = true;
+  moteMesh.frustumCulled = false; // they drift: bounds measured once would be stale
+  g.add(moteMesh);
+  const mm = new THREE.Matrix4();
+  const drift = (t) => {
+    motes.forEach((p, k) => moteMesh.setMatrixAt(k, mm.makeTranslation(p.x + Math.sin(t * 0.3 + p.ph) * 1.5, p.y + Math.sin(t * 0.7 + p.ph) * 0.6, p.z + Math.cos(t * 0.25 + p.ph))));
+    moteMesh.instanceMatrix.needsUpdate = true;
+  };
+  drift(0);
+  animate(drift);
   return g;
 }
 

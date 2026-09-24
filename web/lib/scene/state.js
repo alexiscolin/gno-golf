@@ -8,5 +8,7 @@ export const state = {
   timed: [], // timed walls: { at(step), walls } each, driven by the engine's clock (userData.timed)
   slopes: new Map(), // slope zone -> { glow(k) }: its contour lines, lit by the replay (userData.slopes)
   water: null, // the hole's water mask { tex, data, nx, nz, cell, w, h }: splashes clip to it
+  smokes: [], // chimneys' marks (props.js smoke): their puffs drawn as one batch (smokeBatch)
+  lifts: [], // (x, z) -> extra height of a moving deck under the ball (a seesaw), or 0 (userData.height)
 };
 export const animate = (fn) => state.live.push(fn);

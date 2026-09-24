@@ -128,6 +128,18 @@ function plateaus(rs, tee) {
     });
     r.plateau = along > r.span && !between;
   }
+  // a run of slopes the same way (a downhill in two pitches, a flight of
+  // terraces): the lower one's top holds its height uphill of it, under the
+  // flat between and the upper one, so the heights add up to one continuous
+  // descent instead of each pitch dropping back to the green and the next
+  // starting high again
+  for (const r of rs)
+    r.run = rs.some((q) => {
+      if (q === r || r.ux * q.ux + r.uz * q.uz < 0.99) return false;
+      if (Math.min(r.a1, q.a1) - Math.max(r.a0, q.a0) < 1) return false; // side by side, not in line
+      const gap = q.lo - (r.lo + r.span); // from r's top to q's foot, along the climb
+      return gap >= -0.01 && gap <= 10;
+    });
   // two ramps whose tops face each other, a short flat between them, are one
   // hill: the ground stays up across the gap (easing from one top's height to
   // the other's) instead of dropping to the green and rising again like two
@@ -240,7 +252,7 @@ export function terrain(s) {
       let k;
       if (along <= r.span) k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? (along / r.span) ** 2 : smooth(along / r.span); // a jump curls up to its lip
       else if (r.bridge && along - r.span < r.bridge.gap) k = 1 + (r.bridge.to / r.rise - 1) * smooth((along - r.span) / r.bridge.gap);
-      else if (r.plateau) k = 1;
+      else if (r.plateau || r.run) k = 1;
       // a quarter-pipe's deck behind its coping: the kerb stands on it, not buried in the ramp
       else if (r.z.skin === "quarter pipe" && along - r.span < 1.2) k = 1;
       else if (r.noLip) continue; // the top of the hill the tee stands on

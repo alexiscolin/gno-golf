@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { CUP_R, BALL_R, inZone, airy } from "../terrain.js";
 import { CELL } from "../terrain.js";
-import { C, ink, flat, drawn, clipTo, rbox } from "./materials.js";
+import { C, ink, flat, drawn, clipTo, rbox, hullOf } from "./materials.js";
 import { animate, state } from "./state.js";
 import { stone, warp, badge, windmill } from "./props.js";
 import { MOUTHS, mouthAt } from "./pieces.js";
 import { seeded } from "./common.js";
-import { drape, fromWorld } from "./course.js";
+import { worldOf } from "./worlds.js";
+import { drape, fromWorld, gapWater, DECK } from "./course.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
  * A rounded, slightly wobbly outline inside a zone's rectangle: water and sand
@@ -135,7 +137,8 @@ const TUNNEL_COLORS = [C.cap, 0x5b6fb5, C.sun, 0xe98fb0];
  * the first entry whose test matches draws the zone (world pieces first).
  */
 const ZONE_DRAW = [
-  [(z) => z.kind === "loop" && (z.skin === "loop-the-loop" || z.skin === "bob loop"), loopTrack],
+  [(z) => z.kind === "loop" && z.skin === "loop-the-loop", loopTrack],
+  [(z) => z.skin === "seesaw", seesaw],
   [(z) => z.skin === "castle tube", (z, s, t, g) => {
     const castle = (s.posts || []).find((p) => p.skin === "sandcastle");
     const [cx, cz] = [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2];
@@ -146,6 +149,7 @@ const ZONE_DRAW = [
   [(z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && (z.vec[0] || z.vec[1]), draw_contours],
   [(z) => z.skin === "mill", draw_mill],
   [(z) => z.skin === "molehill", draw_molehill],
+  [(z) => z.skin === "gap", deckGap],
   [(z) => z.kind === "surface" || z.kind === "hazard", draw_surface],
   [(z) => z.kind === "tunnel", draw_tunnel],
 ];
@@ -161,6 +165,93 @@ function zoneDetail(z, s, t) {
   const hit = ZONE_DRAW.find(([test]) => test(z));
   if (!hit) return g;
   return hit[1] === draw_gap ? draw_gap(z, s, t) : hit[1](z, s, t, g, { w, h, rand, inside, onGreen });
+}
+
+/**
+ * Missing planks in a boardwalk. The ground is open there (course.js cuts it
+ * and gives it the deck's cut face, a joist and piles); this adds the boards
+ * broken off round it, splintered, a post at each corner,
+ * the deck's shadow on the water and a slow ripple. The water is the world's
+ * own (its sea, a lagoon), or a pool as far down where it has none.
+ */
+function deckGap(z, s, t, g) {
+  // the hole as the ground is cut: the cells whose centre is in the zone
+  const cut = (a, b) => [Math.ceil(a / CELL - 0.5) * CELL, (Math.floor(b / CELL - 0.5) + 1) * CELL];
+  const [xa, xb] = cut(z.min[0], z.max[0]), [za, zb] = cut(z.min[1], z.max[1]);
+  const cx = (xa + xb) / 2, cz = (za + zb) / 2, w = xb - xa, d = zb - za;
+  const y = t.height(xa - 0.25, cz), W = gapWater(s), rand = seeded("gap" + s.hole + cx + cz);
+  if (worldOf(s).SEA === undefined) {
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(w + 2, d + 2).rotateX(-Math.PI / 2), flat(0x2f6f86));
+    pool.position.set(cx, W, cz);
+    g.add(pool);
+  }
+  // the boards run across the lane (as course.js lays them): they end, broken,
+  // on the hole's two sides across their length; each is three slats long
+  // and short, a corner of each tip pulled in
+  const alongX = s.board.w >= s.board.h, tones = [0xd4a86c, 0xc99a63, 0xbf8f58], slats = new Map();
+  const [ua, ub] = alongX ? [xa, xb] : [za, zb], [va, vb] = alongX ? [za, zb] : [xa, xb];
+  for (let u = Math.floor(ua); u < ub; u++)
+    for (const [v0, dir] of [[va, 1], [vb, -1]]) {
+      const tone = tones[(u * 7) % 3], list = slats.get(tone) || slats.set(tone, []).get(tone);
+      for (let k = 0; k < 3; k++) {
+        const len = 0.04 + rand() * 0.34, sw = 0.3;
+        const b = new THREE.BoxGeometry(sw, 0.09, len).translate(0, -0.045, len / 2);
+        const P = b.attributes.position;
+        for (let i = 0; i < P.count; i++) if (P.getZ(i) > len - 1e-3 && P.getX(i) > 0) P.setZ(i, len * (0.45 + rand() * 0.4));
+        b.rotateY((alongX ? 0 : Math.PI / 2) + (dir < 0 ? Math.PI : 0)); // (the boards' length is the lane's width)
+        const uu = Math.max(ua, u) + 0.02 + (k + 0.5) * ((Math.min(ub, u + 1) - Math.max(ua, u) - 0.04) / 3);
+        list.push(b.translate(alongX ? uu : v0, y, alongX ? v0 : uu));
+      }
+    }
+  for (const [tone, list] of slats) g.add(drawn(mergeGeometries(list), flat(tone)));
+  // a post at each corner, just under the deck, down into the water, with a
+  // dark wet band and a few barnacles at the waterline
+  const posts = [], wet = [], shells = [];
+  for (const [px, pz] of [[xa - 0.2, za - 0.2], [xb + 0.2, za - 0.2], [xa - 0.2, zb + 0.2], [xb + 0.2, zb + 0.2]]) {
+    const h = y - DECK - (W - 0.7);
+    posts.push(new THREE.CylinderGeometry(0.15, 0.18, h, 7).translate(px, y - DECK - h / 2, pz));
+    wet.push(new THREE.CylinderGeometry(0.19, 0.19, 0.22, 7).translate(px, W + 0.05, pz));
+    for (let k = 0; k < 3; k++) {
+      const a = rand() * Math.PI * 2;
+      shells.push(new THREE.DodecahedronGeometry(0.045, 0).translate(px + Math.cos(a) * 0.19, W + 0.12 + rand() * 0.18, pz + Math.sin(a) * 0.19));
+    }
+  }
+  g.add(drawn(mergeGeometries(posts), flat(0x6b4a2e)), new THREE.Mesh(mergeGeometries(wet), flat(0x3f4a38)), new THREE.Mesh(mergeGeometries(shells), flat(0xe8e2cf)));
+  // the deck's shadow on the water: dark under the boards, fading out
+  // towards the middle of the hole (a frame of three rings, alpha per vertex)
+  // (only as far out as the deck goes: past its edge it would darken the open sea)
+  const deck = (x, zz) => t.onGreen(x, zz) && !["sea", "gap"].includes(t.zoneAt(x, zz)?.skin);
+  const reach = (dx, dz, x, zz) => { let m = 0; while (m < 1.2 && deck(x + dx * (m + 0.1), zz + dz * (m + 0.1))) m += 0.1; return m; };
+  const [ml, mr, mt, mb] = [reach(-1, 0, xa, cz), reach(1, 0, xb, cz), reach(0, -1, cx, za), reach(0, 1, cx, zb)];
+  const ring = (k) => [[xa - ml * k, za - mt * k], [xb + mr * k, za - mt * k], [xb + mr * k, zb + mb * k], [xa - ml * k, zb + mb * k]];
+  const inset = Math.min(0.5, w / 3, d / 3);
+  const rings = [[ring(1), 0.35], [ring(0), 0.6], [[[xa + inset, za + inset], [xb - inset, za + inset], [xb - inset, zb - inset], [xa + inset, zb - inset]], 0.2]], pos = [], col = [];
+  for (let r = 0; r < 2; r++)
+    for (let k = 0; k < 4; k++) {
+      const [A, a] = rings[r], [B, b] = rings[r + 1], k2 = (k + 1) % 4;
+      for (const [p, al] of [[A[k], a], [B[k], b], [B[k2], b], [A[k], a], [B[k2], b], [A[k2], a]]) pos.push(p[0], W + 0.04, p[1]), col.push(0.03, 0.12, 0.15, al);
+    }
+  const I = rings[2][0]; // and the middle, a shade deeper than the open sea
+  for (const p of [I[0], I[1], I[2], I[0], I[2], I[3]]) pos.push(p[0], W + 0.04, p[1]), col.push(0.03, 0.12, 0.15, 0.2);
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  sg.setAttribute("color", new THREE.Float32BufferAttribute(col, 4));
+  const shade = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  shade.renderOrder = 2; // over a lagoon's own see-through water (and kept out of the bake, which drops it)
+  shade.userData.live = true;
+  g.add(shade);
+  // a slow ripple spreading in the open water
+  const rip = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.26, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xdff4fb, transparent: true, depthWrite: false }));
+  const [rx, rz] = [cx + (rand() - 0.5) * w * 0.4, cz + (rand() - 0.5) * d * 0.4], R = Math.min(w, d) * 0.4 / 0.26;
+  rip.userData.live = true;
+  g.add(rip);
+  animate((time) => {
+    const u = (time * 0.25 + rx) % 1;
+    rip.position.set(rx, W + 0.05, rz);
+    rip.scale.setScalar(1 + u * (R - 1));
+    rip.material.opacity = 0.5 * (1 - u);
+  });
+  return g;
 }
 
 /** A real gap in the lane: a crevasse (ice) or a ditch (earth). */
@@ -422,7 +513,7 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
     // a shore of pebbles, reeds at a corner, a lily pad and ripples — none
     // on a wall: a pond that runs up to one would push them through it
     // (nor on a bridge's deck or a causeway, where a pond runs up to one)
-    const onDeck = (x, zz) => s.zones.some((q) => ((q.kind === "slope" && q.skin === "moon bridge") || q.skin === "bridge") && x > q.min[0] - 0.8 && x < q.max[0] + 0.8 && zz > q.min[1] - 0.8 && zz < q.max[1] + 0.8);
+    const onDeck = (x, zz) => s.zones.some((q) => ((q.kind === "slope" && q.skin === "moon bridge") || q.skin === "bridge" || q.skin === "seesaw") && x > q.min[0] - 0.8 && x < q.max[0] + 0.8 && zz > q.min[1] - 0.8 && zz < q.max[1] + 0.8);
     const byWall = (x, zz) => onDeck(x, zz) || s.walls.some((w) => {
       const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
       const u = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (zz - w.a[1]) * dz) / l2));
@@ -659,7 +750,9 @@ function castleSlide(z, s, t, g, castle, [cx, cz], [ox, oz]) {
   // and the tube runs +x a little before it turns round the castle
   const lead = Math.max(0.3, Math.min(0.8, r0 - R0 - 0.6));
   const sit = 0.9; // the mouth's centre: its ring clears the ground
-  const pts = [new THREE.Vector3(cx - 0.05, y0 + sit, cz), new THREE.Vector3(cx + lead, y0 + sit + 0.1, cz)];
+  // the first and last stretches are straight and level, so each end is a
+  // clean cut square to the axis (the lip sits on it)
+  const pts = [new THREE.Vector3(cx - 0.05, y0 + sit, cz), new THREE.Vector3(cx + lead * 0.5, y0 + sit, cz), new THREE.Vector3(cx + lead, y0 + sit + 0.05, cz)];
   const N = 90;
   for (let k = 3; k < N; k++) {
     const u = k / N, a = a0 + (a1 - a0) * u;
@@ -670,30 +763,32 @@ function castleSlide(z, s, t, g, castle, [cx, cz], [ox, oz]) {
     pts.push(new THREE.Vector3(kx + Math.cos(a) * r, yy, kz + Math.sin(a) * r));
   }
   // and out, straightened: the last stretch runs east onto the exit
-  pts.push(new THREE.Vector3(ox - 1.4, y1 + sit + 0.3, oz), new THREE.Vector3(ox, y1 + sit, oz));
+  pts.push(new THREE.Vector3(ox - 1.4, y1 + sit + 0.05, oz), new THREE.Vector3(ox - 0.7, y1 + sit, oz), new THREE.Vector3(ox, y1 + sit, oz));
   const path = new THREE.CatmullRomCurve3(pts);
   const tubeR = 0.6; // the zone is 1.6 across: the mouth fills it
-  g.add(drawn(new THREE.TubeGeometry(path, 200, tubeR, 12, false), flat(0xe0bd7e)));
-  const rim = new THREE.CatmullRomCurve3(pts.map((p) => p.clone().setY(p.y + tubeR * 0.85)));
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(rim, 200, 0.07, 5, false), flat(0xb98f55)));
-  // the two mouths: wet-sand arches, dark inside; the entry faces the tee
-  // (-x), the exit faces the cup (+x)
+  const SAND = 0xe0bd7e, WET = 0xc9a66a;
+  // the tube: sand outside, a dark wall inside (seen only into the ends, so
+  // the throat is closed and dark all the way in), an ink hull just outside
+  const TS = 200, RS = 16;
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(path, TS, tubeR, RS, false), flat(SAND)));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(path, TS, tubeR * 0.96, RS, false), new THREE.MeshBasicMaterial({ color: C.burrow, side: THREE.BackSide })));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(path, TS, tubeR + 0.05, RS, false), hullOf(0)));
+  const rim = new THREE.CatmullRomCurve3(pts.map((p) => p.clone().setY(p.y + tubeR * 0.86)));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(rim, TS, 0.07, 6, false), flat(0xb98f55)));
+  // each end: a flared lip exactly on the cut, concentric with the tube, a
+  // wet band just behind it; all square to the tube's own axis there
   for (const u of [0, 1]) {
-    const p = path.getPoint(u);
-    // square to the lane: the entry faces the tee (-x), the exit the cup (+x)
-    const face = new THREE.Vector3(u === 0 ? -1 : 1, 0, 0);
-    const arch = new THREE.Group();
-    const ring = drawn(new THREE.TorusGeometry(tubeR * 1.35, 0.16, 8, 18), flat(0xc9a66a));
-    // a dark throat going into the tube: it reads "in here" from any angle
-    const hole = new THREE.Mesh(new THREE.CircleGeometry(tubeR * 1.2, 18), new THREE.MeshBasicMaterial({ color: C.burrow }));
-    hole.position.z = -0.35;
-    const throat = new THREE.Mesh(new THREE.CylinderGeometry(tubeR * 1.2, tubeR * 1.2, 0.4, 18, 1, true), new THREE.MeshBasicMaterial({ color: C.burrow, side: THREE.BackSide }));
-    throat.rotation.x = Math.PI / 2;
-    throat.position.z = -0.15;
-    arch.add(ring, hole, throat);
-    arch.position.copy(p);
-    arch.lookAt(p.x + face.x, p.y, p.z + face.z);
-    g.add(arch);
+    const p = path.getPointAt(u), d = path.getTangentAt(u).normalize();
+    const out = u === 0 ? d.clone().negate() : d.clone(); // the way the opening faces
+    const end = new THREE.Group();
+    end.position.copy(p);
+    end.lookAt(p.clone().add(out)); // the group's +z is the opening's outward axis
+    const lip = drawn(new THREE.TorusGeometry(tubeR + 0.06, 0.15, 12, 32), flat(SAND));
+    lip.position.z = -0.02;
+    const band = new THREE.Mesh(new THREE.TorusGeometry(tubeR + 0.01, 0.05, 6, 32), flat(WET));
+    band.position.z = -0.32;
+    end.add(lip, band); // (the dark inner wall closes the throat all the way)
+    g.add(end);
   }
   state.tubes.set(z, path);
   return g;
@@ -829,10 +924,6 @@ export function loopFrame(z) {
 function loopTrack(z, s, t, g) {
   const F = loopFrame(z), { sign, P, Xc, wA, wB, W, r } = F;
   const base = t.height(...P(F.front, wA));
-  // the garden's is timber under a strip of lawn; the bobsleigh's is packed
-  // snow under glassy ice, with red-and-white banks
-  const bob = z.skin === "bob loop";
-  const LOOK = bob ? { body: 0xe9f1f8, top: 0xa9dcf0, rail: C.cap, skirt: 0xd3e0ec } : { body: C.wood, top: C.fairway, rail: C.wood, skirt: C.woodDark };
   const L = F.ax ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0); // across
   const U = F.ax ? new THREE.Vector3(sign, 0, 0) : new THREE.Vector3(0, 0, sign); // along
   const ease = (q) => q * q * (3 - 2 * q);
@@ -872,7 +963,7 @@ function loopTrack(z, s, t, g) {
   body.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   body.setIndex(idx);
   body.computeVertexNormals();
-  g.add(drawn(body, flat(LOOK.body)));
+  g.add(drawn(body, flat(C.wood)));
   // the lane's green on top, a hair over the timber
   const top = [], tIdx = [];
   for (const { c, n } of ring) {
@@ -886,15 +977,15 @@ function loopTrack(z, s, t, g) {
   deck.setAttribute("position", new THREE.Float32BufferAttribute(top, 3));
   deck.setIndex(tIdx);
   deck.computeVertexNormals();
-  g.add(new THREE.Mesh(deck, flat(LOOK.top, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
+  g.add(new THREE.Mesh(deck, flat(C.fairway, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
   // a rail each side, like the lane's kerbs, riding the deck's edges
   for (const sgn of [-1, 1]) {
     const pts = ring.map(({ c, n }) => c.clone().addScaledVector(L, sgn * (W / 2 + 0.12)).addScaledVector(n, 0.22));
-    g.add(drawn(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, 0.17, 8, false), flat(sgn > 0 && bob ? C.cream : LOOK.rail)));
+    g.add(drawn(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, 0.17, 8, false), flat(C.wood)));
   }
   // under its low ends the deck is filled down into the ground: timber faces
   // under both edges, and one across where the fill stops
-  const skirt = flat(LOOK.skirt, { side: THREE.DoubleSide });
+  const skirt = flat(C.woodDark, { side: THREE.DoubleSide });
   const fill = (from, to) => {
     const sp = [], si = [];
     for (let i = from; i <= to; i++) {
@@ -953,6 +1044,67 @@ function loopTrack(z, s, t, g) {
     },
   };
   state.tubes.set(z, curve);
+  return g;
+}
+
+/**
+ * A seesaw (two timed slopes over one plank, pushing opposite ways in turn):
+ * a long plank on a stone over the pond, rocking on the timed pieces' clock
+ * (state.timed) to the chain's tilt: low at the end its push rolls a ball
+ * toward. The ball rides it (state.lifts). Drawn once, by the first half.
+ */
+const SEESAW_TILT = 0.04; // radians either way
+function seesaw(z, s, t, g) {
+  const pair = s.zones.filter((q) => q.skin === "seesaw" && q.min[0] === z.min[0] && q.min[1] === z.min[1]);
+  if (pair[0] !== z) return g; // the other half: already drawn
+  const alongX = Math.abs(z.vec[0]) >= Math.abs(z.vec[1]), k = alongX ? 0 : 1;
+  const u0 = z.min[k], u1 = z.max[k], uc = (u0 + u1) / 2, w0 = z.min[1 - k], w1 = z.max[1 - k], wc = (w0 + w1) / 2;
+  const L = u1 - u0 + 0.4, W = w1 - w0, TOP = 0.34, TH = 0.24;
+  const P = (u, w) => (alongX ? [u, w] : [w, u]);
+  const [cx, cz] = P(uc, wc), y0 = t.height(cx, cz);
+  // the pond carries on under the plank (the chain has a strip of lane there)
+  const under = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? u1 - u0 : W, alongX ? W : u1 - u0).rotateX(-Math.PI / 2), flat(C.pond, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+  under.position.set(cx, y0 + 0.03, cz);
+  // the stone it rocks on, standing in the water
+  const block = drawn(rbox(1.1, TOP - TH, W * 0.9, 0.08), flat(0x9aa39e));
+  block.position.set(cx, y0 + (TOP - TH) / 2, cz);
+  if (!alongX) block.rotation.y = Math.PI / 2;
+  // the plank: boards across it, a rim each side, on a pivot at the stone
+  const pivot = new THREE.Group();
+  pivot.position.set(cx, y0 + TOP - TH / 2, cz);
+  if (!alongX) pivot.rotation.y = -Math.PI / 2;
+  const board = drawn(rbox(L, TH, W, 0.06), flat(C.wood));
+  pivot.add(board);
+  const seam = new THREE.LineBasicMaterial({ color: C.woodDark });
+  const pts = [];
+  for (let a = -L / 2 + 0.6; a < L / 2; a += 0.6) pts.push(new THREE.Vector3(a, TH / 2 + 0.005, -W / 2 + 0.05), new THREE.Vector3(a, TH / 2 + 0.005, W / 2 - 0.05));
+  pivot.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), seam));
+  // painted ends, so the tilt reads from afar
+  for (const sgn of [-1, 1]) {
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, W - 0.1), flat(sgn < 0 ? C.cap : C.sun));
+    cap.position.set(sgn * (L / 2 - 0.35), TH / 2 + 0.01, 0);
+    pivot.add(cap);
+  }
+  pivot.userData.live = true;
+  g.add(under, block, pivot);
+  // the clock: tipped down toward where the first half pushes, then the other way
+  const every = z.every | 0, onFor = z.on | 0, phase = z.phase | 0, down = Math.sign(z.vec[k]) || -1;
+  let step = 0, ang = 0, last = null;
+  state.timed.push({ at: (st) => (step = st) });
+  animate((tt) => {
+    const dt = last === null ? 0 : Math.min(0.1, tt - last);
+    last = tt;
+    const p = every ? ((((step + phase) % every) + every) % every) : 0, first = !every || p < onFor;
+    // +x end up when the first half pushes toward -x
+    const want = (first ? -down : down) * SEESAW_TILT;
+    ang += (want - ang) * Math.min(1, dt * 9);
+    pivot.rotation.z = ang;
+  });
+  // the ball rides the plank's top, as it stands
+  state.lifts.push((x, zz) => {
+    const [u, w] = alongX ? [x, zz] : [zz, x];
+    return u >= u0 && u < u1 && w >= w0 && w < w1 ? TOP + (u - uc) * Math.tan(alongX ? ang : -ang) : 0;
+  });
   return g;
 }
 

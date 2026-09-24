@@ -109,7 +109,7 @@ export function Emblem({ id }) {
   );
 }
 
-export default function Worlds({ counts = {}, stats = {}, current, onPick, onBack, onReset, onResetAll }) {
+export default function Worlds({ counts = {}, stats = {}, current, onPick, onBack, onReset, onResetAll, community = [], onCommunity = () => {} }) {
   const [wipe, setWipe] = useState(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const played = WORLDS.filter((w) => stats[w.id] && stats[w.id].done);
@@ -192,6 +192,19 @@ export default function Worlds({ counts = {}, stats = {}, current, onPick, onBac
             </button>
           </li>
         </ul>
+        {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
+        {community.length > 0 && (
+          <section className="community" aria-label="Community holes">
+            <h3>Community holes <small>not ranked</small></h3>
+            <ul>
+              {community.slice(0, 12).map((h) => (
+                <li key={h.id}>
+                  <button className="linkish" onClick={() => (sound("select"), onCommunity(h.id))}>{h.name}</button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </div>
   );

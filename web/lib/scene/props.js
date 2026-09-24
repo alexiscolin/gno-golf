@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, sway, grows, swayLine, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share } from "./materials.js";
-import { animate } from "./state.js";
+import { C, ink, flat, sway, grows, swayLine, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share, motion } from "./materials.js";
+import { animate, state } from "./state.js";
 import { GRASS } from "./common.js";
 
 const GLASS_GEO = share(new THREE.BoxGeometry(0.3, 0.38, 0.3)), GLASS_MAT = share(new THREE.MeshBasicMaterial({ color: 0xffd98a }));
@@ -58,6 +58,7 @@ function tree(rand) {
   if (kind < 0.22) {
     const g = new THREE.Group(), big = rand() < 0.2 ? 1.6 : 1, h = (1.4 + rand() * 0.8) * big;
     g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
+    g.userData.flex = 0.4; // an oak: stiff, a small lean
     const trunk = grows(new THREE.CylinderGeometry(0.2 * big, 0.3 * big, h, 7), C.bark);
     trunk.position.y = h / 2;
     g.add(trunk);
@@ -72,6 +73,7 @@ function tree(rand) {
   if (kind < 0.34) {
     const g = new THREE.Group(), h = 3 + rand() * 1.5;
     g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
+    g.userData.flex = 0.45; // a birch
     const trunk = grows(new THREE.CylinderGeometry(0.1, 0.14, h, 6), 0xefe9dd);
     trunk.position.y = h / 2;
     const crown = grows(new THREE.IcosahedronGeometry(0.8 + rand() * 0.3, 1), 0x8cc084);
@@ -82,6 +84,7 @@ function tree(rand) {
   }
   const g = new THREE.Group();
   g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  g.userData.flex = 0.28; // a pine: stiffest, 2-4 degrees at most
   const h = 2.2 + rand() * 2.4;
   const trunk = grows(new THREE.CylinderGeometry(0.18, 0.24, h * 0.5, 7), C.bark);
   trunk.position.y = h * 0.25;
@@ -368,10 +371,12 @@ function bunting(a, b) {
   // fixed height, so a pole reaches from its foot up to it. Each sways from
   // its own foot (materials.js plantFeet); line and flags from the lower one
   g.userData.foot = Math.min(a.y, b.y);
+  g.userData.flex = 0.6; // the poles, line and flags alike
   const H = 4.2;
   for (const p of [a, b]) {
     const post = new THREE.Group();
     post.userData.foot = p.y;
+    post.userData.flex = 0.6;
     const pole = grows(new THREE.CylinderGeometry(0.1, 0.12, H - p.y, 8), C.bark);
     pole.position.set(p.x, (H + p.y) / 2, p.z);
     const knob = grows(new THREE.SphereGeometry(0.2, 10, 8), C.cap);
@@ -403,23 +408,54 @@ function bunting(a, b) {
 }
 
 /** Puffs rising from a chimney: each grows and fades, then starts again. */
-const PUFF_GEO = share(new THREE.SphereGeometry(0.22, 10, 8));
+const PUFF_GEO = share(new THREE.SphereGeometry(0.22, 10, 8)); // cloned per hole: each batch adds its alphas
+const PUFFS = 4;
+// A chimney is only a mark where its smoke rises (live: the bake keeps it);
+// the hole draws every chimney's puffs in one batch (smokeBatch)
 function smoke(at) {
   const g = new THREE.Group();
-  const puffs = [0, 1, 2, 3].map((i) => {
-    const m = new THREE.Mesh(PUFF_GEO, new THREE.MeshBasicMaterial({ color: C.cloud, transparent: true, depthWrite: false }));
-    m.userData.live = true;
-    g.add(m);
-    return m;
-  });
   g.userData.live = true;
-  animate((t) => puffs.forEach((m, i) => {
-    const k = ((t * 0.45 + i / puffs.length) % 1);
-    m.position.set(at.x + Math.sin(k * 5 + i) * 0.25 + k * 0.6, at.y + k * 2.6, at.z);
-    m.scale.setScalar(0.6 + k * 2.2);
-    m.material.opacity = 0.75 * (1 - k) * Math.min(1, k * 6);
-  }));
+  g.userData.smokeAt = at.clone();
+  state.smokes.push(g);
   return g;
+}
+/** Every chimney's puffs as one instanced draw, each puff faded by its own
+ *  alpha; the mesh and its tick, for buildHole. null without a chimney. */
+export function smokeBatch(marks) {
+  if (!marks.length || !motion) return null; // still: the puffs sat unseen inside the house
+  const mat = new THREE.MeshBasicMaterial({ color: C.cloud, transparent: true, depthWrite: false });
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = "attribute float puffAlpha;\nvarying float vPuffA;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vPuffA = puffAlpha;");
+    sh.fragmentShader = "varying float vPuffA;\n" + sh.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\n  diffuseColor.a *= vPuffA;");
+  };
+  mat.customProgramCacheKey = () => "puff";
+  const n = marks.length * PUFFS, geo = PUFF_GEO.clone(), mesh = new THREE.InstancedMesh(geo, mat, n);
+  const alpha = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+  alpha.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute("puffAlpha", alpha);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.frustumCulled = false; // its puffs move: bounds measured once would be stale
+  mesh.userData.live = true;
+  const local = new THREE.Matrix4(), world = new THREE.Matrix4(), hide = new THREE.Matrix4().makeScale(0, 0, 0);
+  const shown = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+  const tick = (t) => {
+    if (!mesh.parent) return;
+    marks.forEach((g, c) => {
+      const at = g.userData.smokeAt, on = shown(g);
+      for (let i = 0; i < PUFFS; i++) {
+        const j = c * PUFFS + i;
+        if (!on) { mesh.setMatrixAt(j, hide); continue; }
+        // as before: in the chimney's own frame, then where the chimney is
+        const k = ((t * 0.45 + i / PUFFS) % 1), sc = 0.6 + k * 2.2;
+        local.makeScale(sc, sc, sc).setPosition(at.x + Math.sin(k * 5 + i) * 0.25 + k * 0.6, at.y + k * 2.6, at.z);
+        mesh.setMatrixAt(j, world.multiplyMatrices(g.matrixWorld, local));
+        alpha.array[j] = 0.75 * (1 - k) * Math.min(1, k * 6);
+      }
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    alpha.needsUpdate = true;
+  };
+  return { mesh, tick };
 }
 
 /** A butterfly: two wings flapping, wandering a loop over the garden. */

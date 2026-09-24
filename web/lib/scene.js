@@ -8,9 +8,9 @@
 // The pieces live under scene/; this file is the public face engine.js and
 // the picker import.
 
-export { C, motion, setTime, setWind, windNow, at, disposeCourse } from "./scene/materials.js";
-export { maxDpr, makeRenderer, makeScene, timeOf, setLighting, courseBox, islandBox, isPortrait, applyRig, overviewRig, focusRig, easeRig } from "./scene/camera.js";
-export { buildHole, buildExtras, mergeByMaterial } from "./scene/course.js";
+export { C, motion, setTime, setWind, windNow, at, disposeCourse, quality } from "./scene/materials.js";
+export { maxDpr, makeRenderer, makeScene, timeOf, setLighting, courseBox, islandBox, isPortrait, applyRig, overviewRig, leanRoom, focusRig, easeRig } from "./scene/camera.js";
+export { buildHole, finishHole, buildExtras, mergeByMaterial } from "./scene/course.js";
 export { loadWorld, worldOf } from "./scene/worlds.js";
 export { GNOMES, gnomeById, makeBall, makePreview } from "./scene/gnome.js";
 export { makeSplash, makeConfetti, makeBand, bandTo, makeAim, aimAlong } from "./scene/fx.js";

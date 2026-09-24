@@ -458,6 +458,7 @@ function streetTree(rand, bare = false) {
   const trunk = grows(new THREE.CylinderGeometry(0.12, 0.17, h, 7), C.bark);
   trunk.position.y = h / 2 + 0.2;
   g.userData.foot = 0.2; // the trunk's foot: its sway is weighed from here (materials.js plantFeet)
+  g.userData.flex = 0.32; // a street tree: stiff, a small lean
   // bare: no bed of its own, for a tree planted in a lawn that has one
   if (bare) g.add(trunk);
   else g.add(bed, lawn, trunk);

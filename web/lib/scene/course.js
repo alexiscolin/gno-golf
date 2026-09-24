@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { terrain, CELL, CUP_R, airy } from "../terrain.js";
-import { C, ink, flat, motion, drawn, rbox, ringLine, texOf, setWind, share, plantFeet } from "./materials.js";
+import { C, ink, flat, motion, drawn, rbox, ringLine, texOf, setWind, share, plantFeet, quality } from "./materials.js";
 import { state } from "./state.js";
 import { timeOf, islandBox } from "./camera.js";
-import { bush, stone, flower, tuft, mole, windmill } from "./props.js";
+import { bush, stone, flower, tuft, mole, windmill, smokeBatch } from "./props.js";
 import { seeded, ISLAND, GRASS } from "./common.js";
 import { roughOf } from "./garden.js";
 import { worldOf } from "./worlds.js";
@@ -12,10 +12,13 @@ import { WEATHER_SKINS } from "./weather.js";
 import { POSTS, BARS, roofs, ROOF_Y } from "./pieces.js";
 import { zoneDetail, waterMask, loopFrame } from "./zones.js";
 
-export function buildHole(s) {
+// defer: leave the merge (finishHole) to the caller, to run in a task of its own
+export function buildHole(s, { defer = false } = {}) {
   state.live = [];
   state.tubes = new Map();
   state.timed = [];
+  state.lifts = [];
+  state.smokes = [];
   state.slopes = new Map();
   state.ghosts = null;
   state.mill = null;
@@ -59,7 +62,11 @@ export function buildHole(s) {
 
   g.userData.wear = wear;
   g.userData.flag = flagOf(g);
-  g.userData.height = t.height;
+  // the ground the ball rides: the height field, plus any deck that moves on
+  // the clock (a seesaw), as it stands now
+  const lifts = state.lifts;
+  g.userData.height = lifts.length ? (x, z) => t.height(x, z) + lifts.reduce((h, f) => h + f(x, z), 0) : t.height;
+  g.userData.lifts = lifts.length > 0; // the engine keeps a ball at rest on it
   g.userData.terrain = t;
   g.userData.wind = setWind; // wind(vec): the weather's push [x, y] per substep, or null for calm
   g.userData.fade = dec.userData.fade || null; // a world's canopy fading out of the way: fade(eye, ball)
@@ -81,19 +88,30 @@ export function buildHole(s) {
     const q = t.zoneAt(x, z), SEA = worldOf(s).SEA;
     if (!q) return t.height(x, z);
     if (q.skin === "sea" && SEA !== undefined) return SEA;
-    if (q.skin === "gap") return (SEA ?? -1.2) + 0.2;
+    if (q.skin === "gap") return gapWater(s);
     if (q.skin === "roof") return ROOF_Y - 3.2;
     if (GAPS.has(q.skin)) return CREVASSE_Y + 0.3;
     return t.height(x, z);
   };
   g.userData.ghosts = state.ghosts || (() => {}); // ghosts(aiming): the timed pieces' dashed outlines
   g.userData.mill = state.mill;
-  const ticks = state.live;
+  const ticks = (g.userData.ticks = state.live);
   state.live = [];
   g.userData.tick = (time) => { if (motion) for (const f of ticks) f(time); };
-  if (!s.unbaked) bake(g);
-  else plantFeet(g); // unbaked: kept in pieces, for the trailer's hole that builds itself (web/lib/promo.js)
+  g.userData.smokes = state.smokes;
+  state.smokes = [];
+  if (!defer) finishHole(g);
   return g;
+}
+
+/** The second half of a hole's build: what stands still merged, and every
+ *  chimney's smoke in one draw. */
+export function finishHole(g) {
+  if (!g.userData.state.unbaked) bake(g, quality.low ? g.userData.state.board : null);
+  else plantFeet(g); // unbaked: kept in pieces, for the trailer's hole that builds itself (web/lib/promo.js)
+  const puffs = smokeBatch(g.userData.smokes);
+  g.userData.smokes = null;
+  if (puffs) (g.add(puffs.mesh), g.userData.ticks.push(puffs.tick));
 }
 
 // Skin is a hint, geometry is the contract: re-theming the whole game is this
@@ -227,15 +245,18 @@ function loopStrips(z) {
     rect(F.Xc - F.sign * 1.5, F.Xc + F.sign * 0.6, F.wB - F.W / 2 - 0.6, F.wB + F.W / 2 + 0.6),
   ];
 }
-// the open loops drawn as the lane curling up (zones.js loopTrack): the garden's and the bobsleigh's
-const isLoop = (q) => q.kind === "loop" && (q.skin === "loop-the-loop" || q.skin === "bob loop");
+const isLoop = (q) => q.kind === "loop" && q.skin === "loop-the-loop";
 
 const CREVASSE_Y = -7; // how deep a gap goes
 // the zones drawn as a real gap in the lane: nothing under the ball there
 export const GAPS = new Set(["crevasse", "ditch", "gap", "cliff"]);
-const iceSide = new THREE.Color(0x8fcde6), earthSide = new THREE.Color(0x7a5236), plankSide = new THREE.Color(0x9a6f42), rockSide = new THREE.Color(0x8e96a0);
+const iceSide = new THREE.Color(0x8fcde6), earthSide = new THREE.Color(0x7a5236), plankSide = new THREE.Color(0x9a6f42), joist = new THREE.Color(0x5e412a), rockSide = new THREE.Color(0x8e96a0);
 
 const PLANK = 1; // a boardwalk's board, across the lane
+export const DECK = 0.3; // a boardwalk's planks and joists: its cut face, over open water
+// the water under a boardwalk's missing planks: the world's sea, or a pool as
+// far down where the world has none (zones.js deckGap draws it)
+export const gapWater = (s) => worldOf(s).SEA ?? GRASS - 0.9;
 
 function groundMesh(s, t) {
   const pos = [], col = [], nor = [], edges = [];
@@ -279,7 +300,11 @@ function groundMesh(s, t) {
       else if (q.skin === "stairs") c.set(Math.floor(t.height(x, z) / 0.35) % 2 ? 0xb9c2bd : 0xa5aea9);
       // a skate park's ramps are smooth concrete, a touch lighter as they rise
       else if (q.skin === "quarter pipe" || q.skin === "funbox") c.set(0xb3aea4).offsetHSL(0, 0, Math.min(0.12, t.height(x, z) * 0.09));
-      else c.set(0x62ae98);
+      else {
+        // a world with its own lane colour (mountain snow) keeps it on a slope's edges too
+        const wg = worldOf(s).green, G = typeof wg === "function" ? wg(s) : wg;
+        c.set(Array.isArray(G) ? G[0] : 0x62ae98);
+      }
       return c;
     }
     // mown stripes; a world may give its own pair (world.green = [a, b]:
@@ -331,11 +356,17 @@ function groundMesh(s, t) {
   // a crevasse is a real gap in the lane: open, with ice walls deep down
   const crev = (a, b) => { const q = t.zoneAt((a + 0.5) * CELL, (b + 0.5) * CELL); return !!q && GAPS.has(q.skin); };
   const hasCrev = s.zones.some((q) => GAPS.has(q.skin));
-  if (ownSea || hasRoof || hasCrev)
+  if (ownSea || hasRoof || hasCrev || s.zones.some((q) => q.skin === "blowhole"))
     for (let j = 0; j < t.nz; j++)
       for (let i = 0; i < t.nx; i++) {
         const q = t.zoneAt((i + 0.5) * CELL, (j + 0.5) * CELL);
         if (q && ((ownSea && q.skin === "sea") || q.skin === "roof" || GAPS.has(q.skin))) open_[t.idx(i, j)] = 1;
+        // a blowhole's mouth is a real hole (its rim, drawn by island.js,
+        // covers the cells' stepped edge)
+        if (q && q.skin === "blowhole") {
+          const ex = ((i + 0.5) * CELL - (q.min[0] + q.max[0]) / 2) / ((q.max[0] - q.min[0]) / 2), ez = ((j + 0.5) * CELL - (q.min[1] + q.max[1]) / 2) / ((q.max[1] - q.min[1]) / 2);
+          if (ex * ex + ez * ez < 0.72 * 0.72) open_[t.idx(i, j)] = 2; // 2: no edge is pulled onto it
+        }
         // a plank laid between two roofs: the street shows under it (the
         // world draws the plank); 2, so the roofs' edges are not pulled onto it
         else if (hasRoof && q && q.skin === "plank bridge") open_[t.idx(i, j)] = 2;
@@ -347,6 +378,8 @@ function groundMesh(s, t) {
   // colour: a dark face peeping between kerb posts read as a hole
   else if (!hasRoof && (worldOf(s).rough || roughOf(s))) side.set((worldOf(s).rough || roughOf(s)).lo);
   else if (hasRoof) side.set(0xb8573f); // over the roofs: a brick parapet
+  const wg = worldOf(s).green, planks = (typeof wg === "function" ? wg(s) : wg) === "planks";
+  const piles = [], piled = new Set();
   const drawn_ = (a, b) => a >= 0 && b >= 0 && a < t.nx && b < t.nz && !open_[t.idx(a, b)] && (!!t.green[t.idx(a, b)] || !!edge.cells[t.idx(a, b)]);
   for (let j = 0; j < t.nz; j++)
     for (let i = 0; i < t.nx; i++) {
@@ -375,11 +408,26 @@ function groundMesh(s, t) {
         if (!o) continue;
         const sx = q[2] - p[2], sz = p[0] - q[0], sl = Math.hypot(sx, sz) || 1;
         const gz = hasCrev && crev(...nb[n]) ? t.zoneAt((nb[n][0] + 0.5) * CELL, (nb[n][1] + 0.5) * CELL) : null;
-        // a gap's walls: ice down a crevasse, earth down a ditch, the deck's
-        // own timber down to the water under a boardwalk
-        const gy = gz ? (gz.skin === "gap" ? (worldOf(s).SEA ?? -1.2) - 0.3 : CREVASSE_Y) : foot;
-        const gc = gz ? (gz.skin === "gap" ? plankSide : gz.skin === "ditch" ? earthSide : gz.skin === "cliff" ? rockSide : iceSide) : side;
-        quad([p, [p[0], gy, p[2]], [q[0], gy, q[2]], q], gc, [-sx / sl, 0, -sz / sl]);
+        // a boardwalk (over the sea, or round its missing planks) is a deck on
+        // stilts, not a block: the planks' cut face, a joist set back under
+        // it, piles down into the water; the water shows under the deck
+        if (planks && (gz ? gz.skin === "gap" : ownSea)) {
+          const n_ = [-sx / sl, 0, -sz / sl], bx = sx / sl * 0.18, bz = sz / sl * 0.18, lo = p[1] - DECK, lq = q[1] - DECK;
+          quad([p, [p[0], lo, p[2]], [q[0], lq, q[2]], q], plankSide, n_);
+          quad([[p[0] + bx, lo, p[2] + bz], [p[0] + bx, lo - 0.28, p[2] + bz], [q[0] + bx, lq - 0.28, q[2] + bz], [q[0] + bx, lq, q[2] + bz]], joist, n_);
+          edges.push(p[0], lo, p[2], q[0], lq, q[2]);
+          const key = Math.round(p[0] / CELL) + "," + Math.round(p[2] / CELL);
+          if ((Math.round(p[0] / CELL) + Math.round(p[2] / CELL)) % 5 === 0 && !piled.has(key)) {
+            piled.add(key);
+            const h = lo - (gapWater(s) - 0.7);
+            piles.push(new THREE.CylinderGeometry(0.13, 0.16, h, 6).translate(p[0] + bx, lo - h / 2, p[2] + bz));
+          }
+        } else {
+          // a gap's walls: ice down a crevasse, earth down a ditch
+          const gy = gz ? CREVASSE_Y : foot;
+          const gc = gz ? (gz.skin === "ditch" ? earthSide : gz.skin === "cliff" ? rockSide : iceSide) : side;
+          quad([p, [p[0], gy, p[2]], [q[0], gy, q[2]], q], gc, [-sx / sl, 0, -sz / sl]);
+        }
         // an ink line only where the edge is bare (over the sea, the roofs, a
         // crevasse): under a kerb it flickered through it in black streaks
         const [ni, nj] = nb[n];
@@ -389,7 +437,6 @@ function groundMesh(s, t) {
 
   // a boardwalk's seams: a thin dark line along every board's edge, over the
   // drawn deck, and a nail at each end of each board where it meets a seam
-  const wg = worldOf(s).green, planks = (typeof wg === "function" ? wg(s) : wg) === "planks";
   const seams = [];
   if (planks) {
     const alongX = s.board.w >= s.board.h, per = Math.round(PLANK / CELL);
@@ -397,7 +444,9 @@ function groundMesh(s, t) {
       for (let i = 0; i < t.nx; i++) {
         const a = alongX ? i : j;
         if (a % per || !drawn_(i, j)) continue;
-        const x0 = i * CELL, z0 = j * CELL, x1 = alongX ? x0 : x0 + CELL, z1 = alongX ? z0 + CELL : z0;
+        // (its ends on the lane's outline, as the cells' corners are: not out over the sea)
+        const lane = (x, z) => (seaZone ? onLane(x, z) : [x, z]);
+        const [x0, z0] = lane(i * CELL, j * CELL), [x1, z1] = lane(alongX ? i * CELL : i * CELL + CELL, alongX ? j * CELL + CELL : j * CELL);
         seams.push(x0, t.height(x0, z0) + 0.012, z0, x1, t.height(x1, z1) + 0.012, z1);
       }
   }
@@ -415,6 +464,7 @@ function groundMesh(s, t) {
   eg.setAttribute("position", new THREE.Float32BufferAttribute(edges, 3));
   // a world may hide the green's edge ink (mountain snow: world.edgeInk = false)
   if (worldOf(s).edgeInk !== false) m.add(new THREE.LineSegments(eg, ink));
+  if (piles.length) m.add(drawn(mergeGeometries(piles), flat(0x6b4a2e)));
   if (seams.length) {
     const sg = new THREE.BufferGeometry();
     sg.setAttribute("position", new THREE.Float32BufferAttribute(seams, 3));
@@ -1192,19 +1242,39 @@ function wearLayer(wear, W, H, height) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.magFilter = THREE.LinearFilter; // the blur is the point: grooves, not pixels
 
-  // laid on the ground, ramps included
-  const geo = new THREE.PlaneGeometry(W, H, W * 2, H * 2); // as fine as the ground's cells
-  geo.rotateX(-Math.PI / 2);
-  geo.translate(W / 2, 0.02, H / 2);
-  drape(geo, height);
+  // laid on the ground, ramps included — over the worn cells only (and two
+  // cells round them, as far as the blur reaches): the rest of the lane is
+  // not blended over for nothing
+  const cover = (i0, j0, i1, j1) => {
+    const x0 = (i0 / wear.w) * W, x1 = (i1 / wear.w) * W, z0 = (j0 / wear.h) * H, z1 = (j1 / wear.h) * H;
+    const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.max(1, Math.ceil((x1 - x0) * 2)), Math.max(1, Math.ceil((z1 - z0) * 2))); // as fine as the ground's cells
+    geo.rotateX(-Math.PI / 2);
+    geo.translate((x0 + x1) / 2, 0.02, (z0 + z1) / 2);
+    // the texture spans the whole board, as before
+    const p = geo.attributes.position, uv = geo.attributes.uv;
+    for (let k = 0; k < p.count; k++) uv.setXY(k, p.getX(k) / W, 1 - p.getZ(k) / H);
+    drape(geo, height);
+    return geo;
+  };
   const mesh = new THREE.Mesh(
-    geo,
+    new THREE.BufferGeometry(),
     new THREE.MeshBasicMaterial({ color: C.wear, map: texture, transparent: true, opacity: 0.55, depthWrite: false })
   );
   mesh.userData.live = true; // repainted and shown/hidden: never baked
 
+  let box = "";
   const paint = (cells) => {
     mesh.visible = cells.some(Boolean); // no overlay to draw on a pristine green
+    if (mesh.visible) {
+      let i0 = wear.w, j0 = wear.h, i1 = 0, j1 = 0;
+      cells.forEach((v, i) => {
+        if (!v) return;
+        const x = i % wear.w, y = Math.floor(i / wear.w);
+        (i0 = Math.min(i0, x)), (i1 = Math.max(i1, x)), (j0 = Math.min(j0, y)), (j1 = Math.max(j1, y));
+      });
+      const b = [Math.max(0, i0 - 2), Math.max(0, j0 - 2), Math.min(wear.w, i1 + 3), Math.min(wear.h, j1 + 3)];
+      if (b.join() !== box) (mesh.geometry.dispose(), (mesh.geometry = cover(...b)), (box = b.join()));
+    }
     ctx.clearRect(0, 0, wear.w, wear.h);
     cells.forEach((v, i) => {
       if (!v) return;
@@ -1232,8 +1302,11 @@ let nextHook = 1;
 const hookId = (f) => (f ? (hookIds.has(f) || hookIds.set(f, nextHook++), hookIds.get(f)) : 0);
 
 /** Merges every static mesh under root into one mesh per material kind (see
- *  the signature below). The shared merge helper: worlds use it too. */
-export function bake(root) {
+ *  the signature below). The shared merge helper: worlds use it too. With a
+ *  board (the Low tier), the outlines of what stands over INK_OFF units off
+ *  it are left out. */
+const INK_OFF = 10, _c = new THREE.Vector3();
+export function bake(root, board = null) {
   plantFeet(root); // what sways is weighed from its own foot (before its geometry is merged)
   root.updateMatrixWorld(true);
   const buckets = new Map();
@@ -1258,33 +1331,32 @@ export function bake(root) {
     // a textured piece merges only with others using that same texture, and
     // only if it has the uvs for it
     if ((o.material.map || o.material.alphaMap) && !o.geometry.attributes.uv) return;
+    if (board && o.material.userData.hull) {
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      _c.copy(o.geometry.boundingSphere.center).applyMatrix4(o.matrixWorld);
+      const dx = Math.max(-_c.x, 0, _c.x - board.w), dz = Math.max(-_c.z, 0, _c.z - board.h);
+      if (Math.hypot(dx, dz) > INK_OFF) return void taken.push(o); // dropped, not merged
+    }
     const k = sig(o.material);
     if (!firstOf.has(k)) firstOf.set(k, o.material);
     const mat = firstOf.get(k);
-    const geo = o.geometry.clone();
-    geo.applyMatrix4(o.matrixWorld);
-    if (tint(o.material)) {
-      const c = o.material.color, n = geo.attributes.position.count, col = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) (col[i * 3] = c.r), (col[i * 3 + 1] = c.g), (col[i * 3 + 2] = c.b);
-      geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-    }
+    // the piece as it stands: merged below straight from its own buffers
     if (!buckets.has(mat)) buckets.set(mat, []);
-    buckets.get(mat).push(geo);
+    buckets.get(mat).push({ geo: o.geometry, at: o.matrixWorld, color: tint(o.material) ? o.material.color : null });
     taken.push(o);
   });
   for (const o of taken) o.parent.remove(o);
-  for (const [material, geos] of buckets) {
-    // keep only the attributes every piece has
-    // mergeGeometries wants all indexed or none: un-index only a mixed bucket,
-    // an all-indexed one keeps its shared vertices (a third to a quarter of the size)
-    const mixed = geos.some((g) => g.index) && geos.some((g) => !g.index);
-    const list = mixed ? geos.map((g) => (g.index ? g.toNonIndexed() : g)) : geos;
-    const names = Object.keys(list[0].attributes).filter((n) => list.every((g) => g.attributes[n]));
-    for (const g of list) for (const n of Object.keys(g.attributes)) if (!names.includes(n)) g.deleteAttribute(n);
-    const merged = mergeGeometries(list);
-    geos.forEach((g) => g.dispose());
-    if (mixed) list.forEach((g) => g.dispose());
+  // what the merge emptied: the groups that held those meshes, walked every
+  // frame for nothing (town18 kept 1777 of them) — gone, bottom up
+  const prune = (o) => {
+    for (let i = o.children.length - 1; i >= 0; i--) prune(o.children[i]);
+    if (o !== root && !o.children.length && (o.type === "Group" || o.type === "Object3D") && !isLive(o)) o.parent.remove(o);
+  };
+  prune(root);
+  for (const [material, pieces] of buckets) {
+    const merged = mergeInPlace(pieces) || mergeByCopy(pieces);
     if (!merged) continue;
+
     let m = material;
     if (tint(material)) {
       // one material for all those colours: white, tinted by the vertices
@@ -1295,8 +1367,107 @@ export function bake(root) {
       m.onBeforeCompile = material.onBeforeCompile;
       if (material.customProgramCacheKey) m.customProgramCacheKey = material.customProgramCacheKey;
     }
-    root.add(new THREE.Mesh(merged, m));
+    const mesh = new THREE.Mesh(merged, m);
+    mesh.matrixAutoUpdate = false; // baked in place: its own matrix is the identity, for good
+    root.add(mesh);
   }
+}
+
+// One bucket's pieces into one geometry, in the course's space: each piece's
+// vertices are moved by its matrix straight into buffers sized once for the
+// whole bucket (no copy of each piece, no second copy to merge them). A piece
+// without an index gets one, so a bucket of both kinds keeps the shared
+// vertices of the indexed ones. The attributes kept are those every piece has;
+// a tinted piece's colour is written into its vertices. null for what this
+// does not handle (interleaved or morphed buffers, mismatched attributes).
+const _n = new THREE.Matrix3();
+function mergeInPlace(pieces) {
+  const g0 = pieces[0].geo, tinted = !!pieces[0].color;
+  const names = Object.keys(g0.attributes).filter((n) => n !== "color" && pieces.every((p) => p.geo.attributes[n]));
+  if (!tinted && pieces.every((p) => p.geo.attributes.color)) names.push("color");
+  if (!names.includes("position") || names.includes("tangent")) return null;
+  let verts = 0, idx = 0;
+  const indexed = pieces.some((p) => p.geo.index);
+  for (const { geo } of pieces) {
+    if (Object.keys(geo.morphAttributes).length) return null;
+    for (const n of names) {
+      const a = geo.attributes[n], r = (n === "color" && tinted ? null : g0.attributes[n]);
+      if (a.isInterleavedBufferAttribute || ((n === "position" || n === "normal") && (a.itemSize !== 3 || !(a.array instanceof Float32Array))) || (r && (a.itemSize !== r.itemSize || a.normalized !== r.normalized || a.array.constructor !== r.array.constructor))) return null;
+    }
+    verts += geo.attributes.position.count;
+    idx += geo.index ? geo.index.count : geo.attributes.position.count;
+  }
+  const out = new THREE.BufferGeometry(), arrays = {};
+  for (const n of names) {
+    const r = n === "color" && tinted ? null : g0.attributes[n], size = r ? r.itemSize : 3;
+    arrays[n] = new (r ? r.array.constructor : Float32Array)(verts * size);
+    out.setAttribute(n, new THREE.BufferAttribute(arrays[n], size, r ? r.normalized : false));
+  }
+  if (tinted && !arrays.color) {
+    arrays.color = new Float32Array(verts * 3);
+    out.setAttribute("color", new THREE.BufferAttribute(arrays.color, 3));
+  }
+  const index = indexed ? new (verts > 65535 ? Uint32Array : Uint16Array)(idx) : null;
+  let v0 = 0, i0 = 0;
+  for (const { geo, at, color } of pieces) {
+    const n = geo.attributes.position.count, e = at.elements;
+    for (const name in arrays) {
+      const dst = arrays[name];
+      if (name === "color" && color) {
+        for (let i = 0, o = v0 * 3; i < n; i++, o += 3) (dst[o] = color.r), (dst[o + 1] = color.g), (dst[o + 2] = color.b);
+        continue;
+      }
+      const a = geo.attributes[name], src = a.array, size = a.itemSize;
+      if (name === "position") {
+        for (let i = 0, o = v0 * 3; i < n; i++, o += 3) {
+          const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
+          dst[o] = e[0] * x + e[4] * y + e[8] * z + e[12];
+          dst[o + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
+          dst[o + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+        }
+      } else if (name === "normal") {
+        const m = _n.getNormalMatrix(at).elements;
+        for (let i = 0, o = v0 * 3; i < n; i++, o += 3) {
+          const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
+          const nx = m[0] * x + m[3] * y + m[6] * z, ny = m[1] * x + m[4] * y + m[7] * z, nz = m[2] * x + m[5] * y + m[8] * z;
+          const l = Math.hypot(nx, ny, nz) || 1;
+          (dst[o] = nx / l), (dst[o + 1] = ny / l), (dst[o + 2] = nz / l);
+        }
+      } else if (src.length === n * size) dst.set(src, v0 * size);
+      else for (let i = 0; i < n * size; i++) dst[v0 * size + i] = src[i];
+    }
+    if (index) {
+      if (geo.index) {
+        const s = geo.index.array;
+        for (let k = 0; k < geo.index.count; k++) index[i0 + k] = s[k] + v0;
+        i0 += geo.index.count;
+      } else for (let k = 0; k < n; k++) index[i0++] = v0 + k;
+    }
+    v0 += n;
+  }
+  if (index) out.setIndex(new THREE.BufferAttribute(index, 1));
+  return out;
+}
+// the old way, for what mergeInPlace declines: copy, move, merge
+function mergeByCopy(pieces) {
+  const geos = pieces.map(({ geo, at, color }) => {
+    const g = geo.clone().applyMatrix4(at);
+    if (color) {
+      const n = g.attributes.position.count, col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) (col[i * 3] = color.r), (col[i * 3 + 1] = color.g), (col[i * 3 + 2] = color.b);
+      g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    }
+    return g;
+  });
+  // mergeGeometries wants all indexed or none, and the same attributes
+  const mixed = geos.some((g) => g.index) && geos.some((g) => !g.index);
+  const list = mixed ? geos.map((g) => (g.index ? g.toNonIndexed() : g)) : geos;
+  const names = Object.keys(list[0].attributes).filter((n) => list.every((g) => g.attributes[n]));
+  for (const g of list) for (const n of Object.keys(g.attributes)) if (!names.includes(n)) g.deleteAttribute(n);
+  const merged = mergeGeometries(list);
+  geos.forEach((g) => g.dispose());
+  if (mixed) list.forEach((g) => g.dispose());
+  return merged;
 }
 
 /**

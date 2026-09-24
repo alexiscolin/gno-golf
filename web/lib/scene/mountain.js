@@ -24,6 +24,10 @@ const M = {
 };
 // every piece of snow: lit a little from within like the snow sheet, or the
 // scene's warm light turns it beige
+// powder: lit like the lane's snow (no glow of its own: it must match the
+// piste round it at dusk and night), its edge see-through
+// a drift's surface: opaque, lit like the piste, a hair over it
+const DRIFT_OPAQUE = share(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xb9d0ec, emissiveIntensity: 0.1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
 const SNOW_2SIDE = new THREE.MeshLambertMaterial({ color: 0xf6f9fc, emissive: 0xc4d2e2, emissiveIntensity: 0.55, side: THREE.DoubleSide });
 const SNOW = share(new THREE.MeshLambertMaterial({ color: 0xf6f9fc, emissive: 0xc4d2e2, emissiveIntensity: 0.55 }));
 /**
@@ -62,7 +66,9 @@ function instances(template, n) {
       mat.compose(pos, q, scale);
       for (const m of meshes) m.setMatrixAt(i, mat);
     },
-    done() { for (const m of meshes) m.instanceMatrix.needsUpdate = true; },
+    /** A copy's colour, multiplying its material's (a chair going into a dark shed). */
+    tint(i, c) { for (const m of meshes) m.setColorAt(i, c); },
+    done() { for (const m of meshes) (m.instanceMatrix.needsUpdate = true), m.instanceColor && (m.instanceColor.needsUpdate = true); },
   };
 }
 
@@ -819,7 +825,10 @@ function drift(rand) {
   g.add(shade);
   return g;
 }
-const DRIFT_MOUND = share(new THREE.MeshLambertMaterial({ color: 0xf4f8fd, emissive: 0xa9bdd6, emissiveIntensity: 0.4 }));
+const HEAP_SHADOW = share(new THREE.MeshBasicMaterial({ color: 0x3b4d66, transparent: true, opacity: 0.28, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 }));
+const HEAP_CHUNK_DARK = share(new THREE.MeshLambertMaterial({ color: 0xc9d6e6, emissive: 0x8fa3bb, emissiveIntensity: 0.35 }));
+const HEAP_CREVICE = share(new THREE.LineBasicMaterial({ color: 0x4d6282 }));
+const DRIFT_2SIDE = share(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xc4d2e2, emissiveIntensity: 0.45, side: THREE.DoubleSide }));
 const DRIFT = share(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xc4d2e2, emissiveIntensity: 0.45 }));
 
 /** A rock outcrop: two or three slabs breaking through, snow on their tops. */
@@ -975,6 +984,7 @@ const FROST = share(new THREE.MeshPhongMaterial({ color: 0xf2fbff, emissive: 0xb
 
 /** Which canopy a hole gets: ice arches on some, leaning pines on others. */
 const canopyOf = (s) => {
+  if ((s.walls || []).some((w) => w.skin === "lift")) return "none"; // the lift lines are the lane's overhead
   let h = 0;
   for (const ch of String(s.hole)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return h % 2 ? "arches" : "pines";
@@ -1027,14 +1037,16 @@ function canopy(s, rand) {
       const mats = fadeMats(a);
       for (const u of [0.03, 0.2, 0.5, 0.8, 0.97]) faders.push({ at: new THREE.Vector3(x, GRASS + Math.sin(u * Math.PI) * r, zc + Math.cos(u * Math.PI) * r), r: 2.4, mats });
     }
-  else
+  else if (canopyOf(s) === "pines")
     for (const x of pineSpots(s)) {
       const piv = new THREE.Group();
-      // the trunk curves up and out over the lane, bending more near the top
-      const curve = new THREE.CubicBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 3, 0.2), new THREE.Vector3(0, 5.6, 1.6), new THREE.Vector3(0.3, 6.4, 3.6));
+      // the trunk leans out over the lane in one gentle arc (no hook at the
+      // top: a snow-laden fir is stiff)
+      const curve = new THREE.CubicBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 2.6, 0.35), new THREE.Vector3(0.2, 4.8, 2.0), new THREE.Vector3(0.3, 6.4, 3.6));
       piv.add(drawn(new THREE.TubeGeometry(curve, 16, 0.22, 7, false), flat(M.bark)));
       const top = curve.getPoint(1);
-      // a drooping crown: tiers hanging down and forward, each under its snow
+      // a crown of tiers stacked on the trunk's top, each under its snow,
+      // drooping a little toward the lane (not stepped back: that sheared it)
       for (let k = 0; k < 4; k++) {
         const tier = new THREE.Group();
         const rr = 1.9 - k * 0.35, hh = 1.1;
@@ -1042,8 +1054,8 @@ function canopy(s, rand) {
         const snow = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.8, hh * 0.5, 8), SNOW);
         snow.position.y = hh * 0.3;
         tier.add(cone, snow);
-        tier.position.set(top.x, top.y - 0.9 + k * 0.62, top.z - k * 0.25);
-        tier.rotation.x = 0.35; // drooping toward the lane
+        tier.position.set(top.x, top.y - 0.9 + k * 0.62, top.z);
+        tier.rotation.x = 0.15; // drooping toward the lane
         piv.add(tier);
       }
       compact(piv);
@@ -1064,7 +1076,7 @@ function canopy(s, rand) {
       m.depthWrite = false;
     }
   };
-  animate((t) => sparks.forEach((sp) => (sp.m.material.opacity = Math.max(0, Math.sin(t * 2.3 + sp.ph)) ** 6)));
+  animate((t) => sparks.forEach((sp) => (sp.m.material.opacity = Math.max(0, Math.sin(t * 2.3 + sp.ph)) ** 6, (sp.m.visible = sp.m.material.opacity > 0.01))));
   return g;
 }
 
@@ -1159,9 +1171,14 @@ function decor(s, bank = () => 0) {
       reserve(x, z, 0.8);
     }
   }
+  // the lane lift's stations (mountain8), before the groves take the room
+  {
+    const L = liftPlan(s);
+    if (L) for (const x of [L.xA - 1.3, L.xB + 1.3]) for (const z of [L.zc - L.half - 1.1, L.zc + L.half + 1.1]) reserve(x, z, 1.8);
+  }
   // the canopy's roots and feet, before anything else takes the room
   if (canopyOf(s) === "arches") for (const a of archSpots(s).slice(0, 2)) for (const z of [a.z - a.r, a.z + a.r]) reserve(a.x, z, 0.8);
-  else for (const x of pineSpots(s)) reserve(x, -2.4, 1.2);
+  else if (canopyOf(s) === "pines") for (const x of pineSpots(s)) reserve(x, -2.4, 1.2);
 
   // the chair lift up the slope behind, on the left
   {
@@ -1259,33 +1276,8 @@ function decor(s, bank = () => 0) {
 
   g.add(cableCar(W, H));
   g.add(bobsleigh(X0, X1, H, bank, reserve));
-  // the ski lift over the lane (mountain8): pylons off the board, the cable
-  // along the lane over the chairs' line; the chairs themselves are the
-  // chain's timed bars, drawn by piece()
-  const lifts = (s.walls || []).filter((w) => w.skin === "lift");
-  if (lifts.length) {
-    const zc = lifts.reduce((m, w) => m + (w.a[1] + w.b[1]) / 2, 0) / lifts.length;
-    const top = new THREE.Group();
-    const tube = flat(0x8a97a6);
-    for (const px of [-2.5, W + 2.5]) {
-      const pole = drawn(new THREE.CylinderGeometry(0.14, 0.18, LIFT_Y, 8), tube);
-      pole.position.set(px, GRASS + LIFT_Y / 2, zc);
-      const beam = drawn(rbox(0.18, 0.16, 2.4, 0.04), tube);
-      beam.position.set(px, GRASS + LIFT_Y, zc);
-      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), SNOW);
-      cap.position.set(px, GRASS + LIFT_Y + 0.08, zc);
-      top.add(pole, beam, cap);
-      reserve(px, zc, 0.8);
-    }
-    const pts = [];
-    for (let k = 0; k <= 40; k++) {
-      const u = k / 40;
-      pts.push(new THREE.Vector3(-2.5 + (W + 5) * u, GRASS + LIFT_Y - Math.sin(Math.PI * u) * 0.5, zc));
-    }
-    top.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: M.cable })));
-    g.add(top);
-    g.add(laneLift(lifts, (x, z) => GRASS + bank(x, z), zc));
-  }
+  // the ski lift (mountain8): a line of its own across the lane at each bar
+  if ((s.walls || []).some((w) => w.skin === "lift")) g.add(liftLines(s, night, reserve));
   g.add(eagles(W, H));
   g.add(snowfall(W, H));
   const over = canopy(s, rand);
@@ -1370,27 +1362,65 @@ function extras(ex, s, t) {
     while (d < 4 && t.onGreen && t.onGreen(b.a[0] + b.out[0] * d, b.a[1] + b.out[1] * d)) d += 0.1;
     return d + 0.75;
   };
-  for (const b of bars) g.add(heap(b, height, ground, clear, offLane(b)));
+  const downOf = (b) => {
+    const cx = (b.a[0] + b.b[0]) / 2, cz = (b.a[1] + b.b[1]) / 2;
+    const sl = (s.zones || []).find((q) => q.kind === "slope" && !q.every && (q.vec[0] || q.vec[1]) && inZone(q, cx, cz));
+    if (!sl) return 0;
+    // across the bar: the normal to its axis, signed towards the push
+    const nx = -b.out[1], nz = b.out[0], d = sl.vec[0] * nx + sl.vec[1] * nz;
+    return Math.abs(d) < 1e-6 ? 0 : Math.sign(d);
+  };
+  for (const b of bars) g.add(heap(b, height, ground, clear, offLane(b), downOf(b)));
   for (const w of warns) g.add(warning(w, ground, offLane(w)));
   return { group: g, skins: new Set(["avalanche", "avalanche-warn"]) };
 }
 
 /** The heap: lumps of snow along the bar, and the slide it came down. */
 const M_SHADE = 0xa9bfd8; // the drifts' shadow blue, for the slide's flank
+const HEAP_BASE = 0x7d93b0; // the heap's shadowed base: darker, so it stands off the piste
 
-function heap(b, height, ground, clear, start) {
+function heap(b, height, ground, clear, start, down = 0) {
   const g = new THREE.Group();
   const rand = seeded("heap" + b.a[0].toFixed(1) + b.a[1].toFixed(1));
-  const n = Math.max(3, Math.ceil(b.len / 0.8));
-  for (let k = 0; k <= n; k++) {
-    // deeper at the kerb end, where it came over, thinning into the lane
-    const u = k / n, x = b.b[0] + (b.a[0] - b.b[0]) * u, z = b.b[1] + (b.a[1] - b.b[1]) * u;
-    const r = b.thick * (0.42 + 0.25 * u) * (0.85 + rand() * 0.3);
-    const lump = drawn(new THREE.SphereGeometry(r, 10, 7), SNOW);
-    lump.scale.set(1.1, 0.55 + 0.3 * u, 1);
-    lump.position.set(x + (rand() - 0.5) * 0.3, height(x, z) + r * 0.25, z + (rand() - 0.5) * 0.3);
-    g.add(lump);
+  // the heap on the wall's own footprint: lumps along the bar, never wider
+  // than it on the side the ball comes from. Where the lane runs downhill
+  // across the bar (down = ±1 along the bar's normal), the snow may spill
+  // past the wall on the downhill side only: the uphill face, the one a
+  // stopped ball rests against, is the wall's own line.
+  const nx = -b.out[1], nz = b.out[0]; // across the bar
+  const half = b.thick / 2, spill = down ? 0.5 : 0;
+  // one continuous mound along the bar, lofted: across it from the uphill
+  // face (steep, on the wall's line) over a lumpy crest to the downhill side
+  // (where it may spill a little past the wall); deeper at the kerb end
+  const NH = Math.max(12, Math.ceil(b.len / 0.25)), P = 12, hpos = [], hcol = [], hidx = [];
+  const hw = new THREE.Color(0xf6f9fc), hs = new THREE.Color(HEAP_BASE);
+  const lo = down ? -down * half : -half, hi = down ? down * (half + spill) : half; // across, uphill → downhill
+  for (let k = 0; k <= NH; k++) {
+    const u = k / NH, x0 = b.b[0] + (b.a[0] - b.b[0]) * u, z0 = b.b[1] + (b.a[1] - b.b[1]) * u;
+    const end = Math.min(1, Math.min(u, 1 - u) * b.len / 0.6); // rounded off at both ends
+    const top = (0.85 + 0.35 * u) * (0.85 + 0.15 * Math.sin(u * 17.3) + 0.08 * Math.sin(u * 41)) * Math.sqrt(end);
+    for (let m = 0; m <= P; m++) {
+      const v = m / P, a = lo + (hi - lo) * v; // across offset, signed
+      // steep face at v = 0 (uphill), long spill to v = 1
+      const f = down ? Math.pow(Math.sin(Math.PI * Math.min(1, v * 1.6) / 2), 0.4) * (1 - Math.pow(Math.max(0, (v - 0.35) / 0.65), 1.6)) : Math.pow(Math.sin(Math.PI * v), 0.55);
+      const x = x0 + nx * a, z = z0 + nz * a;
+      hpos.push(x, height(x0, z0) + top * f - 0.03, z);
+      // a blue-grey shadowed base and lower flank, the crest white: it reads
+      // as a heap on the pale piste even from far off
+      const c = hw.clone().lerp(hs, Math.min(1, 0.95 * Math.pow(1 - f, 0.7) + (down ? 0.25 * v : 0.1)));
+      hcol.push(c.r, c.g, c.b);
+    }
+    if (k) for (let m = 0; m < P; m++) {
+      const a0 = (k - 1) * (P + 1) + m, b0 = k * (P + 1) + m;
+      hidx.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1);
+    }
   }
+  const mg = new THREE.BufferGeometry();
+  mg.setAttribute("position", new THREE.Float32BufferAttribute(hpos, 3));
+  mg.setAttribute("color", new THREE.Float32BufferAttribute(hcol, 3));
+  mg.setIndex(hidx);
+  mg.computeVertexNormals();
+  g.add(drawn(mg, DRIFT_2SIDE)); // inked like every piece on the lane
   // the slide it came down: a tongue of snow lying on the ground beyond the
   // kerb, from its outer face out up the slope, lumpy on top and thinning at
   // its edges, shaded like the drifts; nothing of it where a wall or a post is
@@ -1427,14 +1457,40 @@ function heap(b, height, ground, clear, start) {
     blk.rotation.set(rand(), rand(), rand());
     g.add(blk);
   }
-  // a few blocks tumbled on top
-  for (let k = 0; k < 4; k++) {
-    const blk = drawn(new THREE.DodecahedronGeometry(0.28 + rand() * 0.2, 0), SNOW);
-    const u = 0.2 + rand() * 0.8, x = b.b[0] + (b.a[0] - b.b[0]) * u, z = b.b[1] + (b.a[1] - b.b[1]) * u;
-    blk.position.set(x, height(x, z) + b.thick * 0.5, z);
-    blk.rotation.set(rand(), rand(), rand());
-    g.add(blk);
+  // its cast shadow on the lane, on the side away from the light (+z, and
+  // the downhill side where there is one): a soft dark band just past its foot
+  {
+    const sp = [], si = [], NS = 16;
+    const side = down || 1, from = side * half, to = side * (half + spill + 0.55);
+    for (let k = 0; k <= NS; k++) {
+      const u = k / NS, x0 = b.b[0] + (b.a[0] - b.b[0]) * u, z0 = b.b[1] + (b.a[1] - b.b[1]) * u;
+      for (const a of [from, to]) { const x = x0 + nx * a, z = z0 + nz * a; sp.push(x, height(x, z) + 0.05, z); }
+      if (k) si.push((k - 1) * 2, k * 2, (k - 1) * 2 + 1, (k - 1) * 2 + 1, k * 2, k * 2 + 1);
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
+    sg.setIndex(si);
+    g.add(new THREE.Mesh(sg, HEAP_SHADOW));
   }
+  // broken chunks along the crest, inked, with dark crevices between them
+  const crev = [];
+  for (let k = 0; k < Math.max(6, Math.round(b.len / 1.1)); k++) {
+    const u = (k + 0.3 + rand() * 0.4) / Math.max(6, Math.round(b.len / 1.1)), off = (down ? down * 0.2 : 0) + (rand() - 0.5) * half * 0.6;
+    const x = b.b[0] + (b.a[0] - b.b[0]) * u + nx * off, z = b.b[1] + (b.a[1] - b.b[1]) * u + nz * off;
+    const r = 0.26 + rand() * 0.18;
+    const blk = drawn(new THREE.DodecahedronGeometry(r, 0), rand() < 0.35 ? HEAP_CHUNK_DARK : SNOW);
+    blk.scale.set(1, 0.75, 1.15);
+    blk.position.set(x, height(x, z) + (0.85 + 0.35 * u) * 0.8 + r * 0.2, z);
+    blk.rotation.set(rand(), rand() * 6, rand());
+    g.add(blk);
+    // a crevice: a short dark crack down the flank next to it
+    const cx = x - nx * 0.05 * (down || 1), cz = z - nz * 0.05 * (down || 1);
+    for (const a of [-half * 0.1, -half * 0.85]) {
+      const px = cx + nx * a * (down ? -down : 1), pz = cz + nz * a * (down ? -down : 1);
+      crev.push(new THREE.Vector3(px, height(px, pz) + 0.15 + (a > -half * 0.5 ? 0.75 : 0.1), pz));
+    }
+  }
+  g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(crev), HEAP_CREVICE));
   return g;
 }
 
@@ -1485,8 +1541,8 @@ function overlay(z, t, col, bump = () => 0, mat, lane = true, mask = null) {
   const onLane = (x, zz) => !t.onGreen || t.onGreen(x, zz);
   // clipped to the lane only where the zone runs past the rails (a kicker
   // across the whole board); a zone inside the lane keeps its own clean edge
-  let crosses = false;
-  if (lane) for (let k = 0; k < 64 && !crosses; k++) {
+  let crosses = !!mask && lane; // a masked skin (powder) is always kept to the lane
+  if (lane && !crosses) for (let k = 0; k < 64 && !crosses; k++) {
     const x = x0 + ((k % 8) + 0.5) * (x1 - x0) / 8, zz = z0 + (Math.floor(k / 8) + 0.5) * (z1 - z0) / 8;
     if (inZone(z, x, zz) && !onLane(x, zz)) crosses = true;
   }
@@ -1810,85 +1866,237 @@ function cliff(z, t, s) {
   return g;
 }
 
-const LIFT_Y = 5.4;
+// ------------------------------------------------------------ the lane lift
+//
+// mountain8: the chain has three timed bars across the lane, 4.5 apart, each
+// up 4 ticks in 12, in turn up the lane (0-4, 4-8, 8-12): one of them is
+// always up. The look is one chairlift along the lane's centre line, one way,
+// tee to cup, between two gantry stations over the lane either side of the
+// bars, the cable sagging a little between them. Bench chairs, one file,
+// 4.5 apart (one per bar), glide up it at an even pace, easing a little as
+// they pass over a bar: exactly three are out at a time, one coming out of
+// the near station as one goes into the far one, and the loop back is out of
+// sight. Every third chair is the one working: it hangs low, its bench at
+// the ball's height, the whole way through, passing each bar in the middle
+// of that bar's window; the other two ride high. So a bar is up while the
+// low chair is over it (to 2.25 either side at the windows' edges, where one
+// bar hands over to the next). All of it follows the timed clock's fractional
+// tick (state.timed): one instanced set, nothing allocated per frame.
 
-/**
- * The lane lift's chairs, gliding: each timed bar (4 walls: every/on/phase) is
- * a row of seats. In its window it hangs low over its bar, where the chain
- * has it stop the ball; out of it, it rides the cable on, raised and away —
- * coming in from up-cable, leaving down-cable. Positioned from the timed
- * clock's fractional tick (state.timed), so at floor(t) a chair is over the
- * lane exactly when (floor(t)+phase) % every < on.
- */
-function laneLift(walls, ground, zc) {
-  const g = new THREE.Group();
-  g.userData.live = true;
-  const rows = [];
+const LIFT_CABLE = 4.6; // the cable, at the bullwheels up in the sheds
+const LIFT_SAG = 1.2; // down to 3.4 over the middle bar
+const SEAT_LOW = 0.25, SEAT_HANG = 1.45; // a bench's seat: working, on the ball's height; riding, this far under the cable
+const LIFT_FADE = 0.3; // of a bar spacing: a chair fades into (out of) the dark just inside a shed's mouth over this
+const LIFT_IN = 0.45; // of a bar spacing: how far into a shed a chair is still drawn
+const LIFT_EASE = 0.3; // of a bar spacing: the working chair swings down over this inside the near shed (and up inside the far one)
+const LIFT_SLOW = 0.55; // how much the pace eases over a bar (0: even, 1: a stop)
+const LIFT_SWAY = 0.08; // radians: how far a chair swings on its hanger as the pace eases and picks up
+
+/** The lift bars as lines across the lane: [{ x, z0, z1, every, on, phase }], by x. */
+function liftBars(walls) {
+  const out = [];
   for (let i = 0; i + 3 < walls.length; i += 4) {
     const q = walls.slice(i, i + 4), xs = q.flatMap((w) => [w.a[0], w.b[0]]), zs = q.flatMap((w) => [w.a[1], w.b[1]]);
-    const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
-    const along = z1 - z0 >= x1 - x0; // the bar runs across the lane (z): its row of seats along it
-    const len = along ? z1 - z0 : x1 - x0, thick = along ? x1 - x0 : z1 - z0;
-    const chair = liftChair(len, thick);
-    if (!along) chair.rotation.y = Math.PI / 2;
-    const holder = new THREE.Group();
-    holder.add(chair);
-    g.add(holder);
-    rows.push({ holder, x: (x0 + x1) / 2, z: (z0 + z1) / 2, every: q[0].every, on: q[0].on, phase: q[0].phase });
+    out.push({ x: (Math.min(...xs) + Math.max(...xs)) / 2, z0: Math.min(...zs), z1: Math.max(...zs), every: q[0].every, on: q[0].on, phase: q[0].phase });
   }
-  // Where a row is along the cable, u: 0 over its bar; it leaves over the
-  // last step of its window (0 → 1), rides on down-cable while it is not
-  // there (1 → 2, then out of sight and back round from -2 → -1), and comes
-  // in over the step before its window (-1 → 0). At every integer tick in
-  // its window u is 0; at every one outside it, |u| ≥ 1: well away.
-  const AWAY = 6.5, UP = 2.4;
-  const sm = (v) => v * v * (3 - 2 * v);
-  const place = (step) => {
-    for (const r of rows) {
-      const E = r.every, c = (((step + r.phase) % E) + E) % E;
-      let u;
-      if (c < r.on - 1) u = 0;
-      else if (c < r.on) u = sm(c - (r.on - 1));
-      else if (c < E - 1) {
-        u = 1 + (2 * (c - r.on)) / Math.max(1, E - 1 - r.on);
-        if (u > 2) u -= 4;
-      } else u = -(1 - sm(c - (E - 1)));
-      r.holder.visible = Math.abs(u) < 1.8; // past there it is behind the pylons
-      r.holder.position.set(r.x + AWAY * u, ground(r.x, r.z) + UP * Math.min(1, Math.abs(u)), r.z);
+  return out.sort((a, b) => a.x - b.x);
+}
+
+/**
+ * The lift's layout from the hole: the bars, their spacing D, the stations
+ * half a spacing outside the first and last bars (so three chairs D apart
+ * fill the run), the gap between two windows P (every / bars), and the clock
+ * time t0 when a working chair leaves the near station: the first bar's
+ * window opening.
+ */
+function liftPlan(s) {
+  const bars = liftBars((s.walls || []).filter((w) => w.skin === "lift"));
+  if (bars.length < 2) return null;
+  const n = bars.length, every = bars[0].every, on = bars[0].on, P = every / n;
+  const D = (bars[n - 1].x - bars[0].x) / (n - 1);
+  const zc = bars.reduce((a, b) => a + (b.z0 + b.z1) / 2, 0) / n, half = Math.max(...bars.map((b) => (b.z1 - b.z0) / 2));
+  const t0 = (((-bars[0].phase) % every) + every) % every;
+  return { bars, n, every, on, P, D, zc, half, t0, xA: bars[0].x - D / 2, xB: bars[n - 1].x + D / 2, bench: 2 * half - 3 };
+}
+
+/**
+ * The train at tick t: how far it has gone, in bar spacings since a working
+ * chair left the near station at t0 — one spacing every P ticks, easing over
+ * each bar (s + 1/2 an integer) and quickest between two.
+ */
+function liftTrain(L, t) {
+  const u = (t - L.t0) / L.P;
+  return u + (LIFT_SLOW / (2 * Math.PI)) * Math.sin(2 * Math.PI * u);
+}
+
+/**
+ * The chairs out at tick t: [{ x, seat, working }], three of them. Chair j
+ * of the file is at xA + D·(g - j); it is out while that is within the run
+ * (0..n spacings), and the ones with j ≡ 0 (mod n) are the working ones.
+ */
+function liftChairs(L, t) {
+  const g = liftTrain(L, t), out = [];
+  // the chairs' swing on their hangers: forward as the train eases over a
+  // bar, back as it picks up again (the train's deceleration, one curve)
+  const sway = LIFT_SWAY * Math.sin((2 * Math.PI * (t - L.t0)) / L.P);
+  for (let j = Math.floor(g) - L.n - 1; j <= Math.floor(g) + 1; j++) {
+    const a = g - j; // spacings from the near station's mouth
+    // on the lane from mouth to mouth; a little way into each shed, fading
+    if (a < -LIFT_IN || a > L.n + LIFT_IN) continue;
+    const working = ((j % L.n) + L.n) % L.n === 0;
+    // the working chair swings down inside the near shed and up inside the far one
+    const down = working ? smooth01((a + LIFT_EASE) / LIFT_EASE) * smooth01((L.n + LIFT_EASE - a) / LIFT_EASE) : 0;
+    const x = L.xA + L.D * a, high = cableY(L, x) - SEAT_HANG;
+    out.push({ x, seat: high + (SEAT_LOW - high) * down, working, j, sway, fade: smooth01((a + LIFT_FADE) / LIFT_FADE) * smooth01((L.n + LIFT_FADE - a) / LIFT_FADE), onLane: a >= 0 && a < L.n });
+  }
+  return out;
+}
+const smooth01 = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
+
+/** The cable's height at x: at LIFT_CABLE at the stations, sagging between. */
+function cableY(L, x) {
+  const k = Math.max(0, Math.min(1, (x - L.xA) / (L.xB - L.xA)));
+  return LIFT_CABLE - LIFT_SAG * 4 * k * (1 - k);
+}
+
+function liftLines(s, night, reserve) {
+  const L = liftPlan(s);
+  const g = new THREE.Group();
+  g.userData.live = true;
+  if (!L) return g;
+  const wood = flat(M.wood), red = flat(0xd9453d), steel = flat(0x8a97a6);
+  // the cable, station to station, over the lane's middle
+  const pts = [];
+  for (let k = 0; k <= 40; k++) {
+    // from bullwheel to bullwheel, round which it turns inside the sheds
+    const x = L.xA - 1.2 + ((L.xB - L.xA + 2.4) * k) / 40;
+    pts.push(new THREE.Vector3(x, cableY(L, x), L.zc));
+  }
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: M.cable })));
+  // a station at each end: a lift shed up on stilts over the lane, its
+  // stilts off the lane's edges, open on the side the chairs come and go,
+  // dark inside, with the bullwheel the cable turns round; the chairs rise
+  // into the far one's mouth and fade into its dark, and come out of the
+  // near one (the loop back is inside and behind, out of sight)
+  const legZ = [L.zc - L.half - 1.1, L.zc + L.half + 1.1], HW = L.bench / 2 + 0.55, F = 2.55, TOP = 5.35, LEN = 2.6;
+  const inner = new THREE.MeshBasicMaterial({ color: 0x1c232c, side: THREE.BackSide });
+  for (const [x, face, lit] of [[L.xA, 1, true], [L.xB, -1, false]]) {
+    const st = new THREE.Group(), back = -face; // the shed runs back from its mouth, away from the bars
+    // stilts, off the lane, and the beams across under the floor
+    // (open underneath: nothing across the chairs' way, only an outrigger
+    // from each stilt in to the shed's end wall)
+    for (const dx of [0.3, LEN - 0.3]) {
+      for (const z of legZ) {
+        const leg = drawn(rbox(0.26, F + 0.3, 0.26, 0.05), steel);
+        leg.position.set(back * dx, (F + 0.3) / 2, z - L.zc);
+        const arm = drawn(rbox(0.22, 0.22, Math.abs(z - L.zc) - HW + 0.2, 0.04), steel);
+        arm.position.set(back * dx, F + 0.2, (z - L.zc + Math.sign(z - L.zc) * HW) / 2);
+        st.add(leg, arm);
+      }
     }
+    for (const z of legZ) reserve(x + back * LEN * 0.5, z, 1.2);
+    // back wall, the two ends; the roof over; the mouth and the floor left open
+    const box = (w, h, d, px, py, pz, mat = wood) => { const m = drawn(rbox(w, h, d, 0.05), mat); m.position.set(px, py, pz); st.add(m); };
+    box(0.14, TOP - F, 2 * HW, back * (LEN - 0.07), (F + TOP) / 2, 0);
+    for (const z of [-HW, HW]) box(LEN, TOP - F, 0.14, back * LEN / 2, (F + TOP) / 2, z);
+    box(LEN + 0.5, 0.2, 2 * HW + 0.5, back * LEN / 2, TOP + 0.1, 0, SNOW);
+    box(0.16, 0.34, 2 * HW + 0.2, back * 0.08, TOP - 0.17, 0, red); // the lintel over the mouth
+    // the dark inside, and the bullwheel in it
+    const dark = new THREE.Mesh(new THREE.BoxGeometry(LEN - 0.2, TOP - F - 0.2, 2 * HW - 0.2), inner);
+    dark.position.set(back * LEN / 2, (F + TOP) / 2, 0);
+    const wheel = drawn(new THREE.CylinderGeometry(0.9, 0.9, 0.12, 20), flat(M.cable));
+    wheel.position.set(back * 1.2, LIFT_CABLE, 0);
+    st.add(dark, wheel);
+    if (night && lit) {
+      const glow = new THREE.Sprite(lanternGlow());
+      glow.scale.set(1.4, 1.4, 1);
+      glow.position.set(back * LEN / 2, (F + TOP) / 2, HW + 0.3);
+      st.add(glow);
+    }
+    st.position.set(x, 0, L.zc);
+    g.add(st);
+  }
+  // the chairs: a six-seat bench across the lane (x along the lane, z
+  // across it), seat and a tall backrest, a safety bar down in front with its
+  // footrest, and three gnomes riding, their skis dangling; the hanger comes
+  // down from its grip on the cable to a yoke over the backrest (a rod
+  // stretched to length: a working chair hangs low). Its origin is the seat.
+  const W = L.bench, tpl = new THREE.Group(), metal = flat(M.cable);
+  const seat = drawn(rbox(0.75, 0.12, W, 0.05), red);
+  seat.position.x = 0.05;
+  const back = drawn(rbox(0.12, 0.75, W, 0.05), red);
+  back.position.set(-0.36, 0.42, 0);
+  back.rotation.z = 0.12;
+  const yoke = drawn(rbox(0.1, 0.1, W * 0.6, 0.03), metal);
+  yoke.position.set(-0.45, 0.85, 0);
+  tpl.add(seat, back, yoke);
+  for (const zz of [-W / 2, W / 2]) {
+    // a side frame each end, from the yoke down round the seat
+    const side = drawn(rbox(0.08, 0.9, 0.08, 0.02), metal);
+    side.position.set(-0.4, 0.4, zz);
+    const rest = drawn(rbox(0.7, 0.06, 0.08, 0.02), metal);
+    rest.position.set(0.02, 0.35, zz);
+    tpl.add(side, rest);
+  }
+  // the safety bar, lowered: a rail across in front at chest height, two
+  // drops to the footrest under the riders' feet
+  const bar = drawn(rbox(0.06, 0.06, W - 0.2, 0.02), metal);
+  bar.position.set(0.55, 0.62, 0);
+  const foot = drawn(rbox(0.3, 0.05, W - 0.6, 0.02), metal);
+  foot.position.set(0.72, -0.28, 0);
+  tpl.add(bar, foot);
+  for (const zz of [-W / 4, W / 4]) {
+    const drop = drawn(rbox(0.05, 0.9, 0.05, 0.02), metal);
+    drop.position.set(0.63, 0.17, zz);
+    tpl.add(drop);
+  }
+  const lr = seeded("lift riders" + s.hole);
+  for (const k of [0.5, 2.5, 4.5]) {
+    const zz = -W / 2 + (W * k) / 6 + (lr() - 0.5) * 0.2;
+    const gn = gnomelet(lr);
+    gn.scale.setScalar(1.15);
+    gn.position.set(-0.08, 0.06, zz);
+    tpl.add(gn);
+    for (const sk of [-0.09, 0.09]) {
+      // skis off the footrest, tips down a little
+      const ski = drawn(rbox(1.3, 0.035, 0.09, 0.015), flat(M.flags[Math.floor(lr() * M.flags.length)]));
+      ski.position.set(0.95, -0.34, zz + sk);
+      ski.rotation.z = -0.3;
+      tpl.add(ski);
+    }
+  }
+  const rodT = new THREE.Group();
+  rodT.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1, 6).translate(0, -0.5, 0), metal), drawn(rbox(0.24, 0.18, 0.24, 0.05), metal));
+  const benches = instances(tpl, L.n + 2), rods = instances(rodT, L.n + 2);
+  g.add(benches.group, rods.group);
+  const p = new THREE.Vector3(), e = new THREE.Euler(), sc = new THREE.Vector3(), none = new THREE.Vector3(1e-4, 1e-4, 1e-4), one = new THREE.Vector3(1, 1, 1);
+  const tone = new THREE.Color(), DARK = new THREE.Color(0x1c232c);
+  const place = (step) => {
+    const qs = liftChairs(L, step);
+    for (let i = 0; i < L.n + 2; i++) {
+      const q = qs[i];
+      if (!q) {
+        benches.set(i, p.set(0, -50, 0), e.set(0, 0, 0), none);
+        rods.set(i, p.set(0, -50, 0), e, none);
+        continue;
+      }
+      // hung from its grip (over the yoke), swinging round it
+      const gx = q.x - 0.45, top = cableY(L, gx), hang = Math.max(0.2, top - q.seat - 0.85), f = q.sway;
+      const yx = gx + hang * Math.sin(f), yy = top - hang * Math.cos(f);
+      // the seat's origin from the yoke, turned with the swing
+      const ox = 0.45 * Math.cos(f) + 0.85 * Math.sin(f), oy = 0.45 * Math.sin(f) - 0.85 * Math.cos(f);
+      benches.set(i, p.set(yx + ox, yy + oy, L.zc), e.set(0, 0, f), one);
+      rods.set(i, p.set(gx, top, L.zc), e.set(0, 0, f), sc.set(1, hang, 1));
+      // in and out of a shed's dark mouth: faded to its dark, never a pop
+      tone.setRGB(1, 1, 1).lerp(DARK, 1 - q.fade);
+      benches.tint(i, tone);
+      rods.tint(i, tone);
+    }
+    benches.done();
+    rods.done();
   };
   place(0);
   state.timed.push({ at: place });
-  return g;
-} // the over-lane lift's cable height above the snow
-
-/** The lift's chairs as a timed bar: a row of seats across the bar's length,
- *  on one clamp arm up to the cable, swinging a little. */
-function liftChair(len, thick) {
-  const g = new THREE.Group();
-  // hung from the cable: the whole row swings from up there
-  const swing = new THREE.Group();
-  const n = Math.max(2, Math.round(len / 1.3)), w = len / n;
-  const rail = drawn(rbox(0.1, 0.1, len * 0.96, 0.03), flat(M.cable));
-  rail.position.y = -LIFT_Y + 1.05;
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, LIFT_Y - 1.05, 5), flat(M.cable));
-  arm.position.y = -(LIFT_Y - 1.05) / 2;
-  swing.add(rail, arm);
-  for (let k = 0; k < n; k++) {
-    const z = -len / 2 + w * (k + 0.5);
-    const seat = drawn(rbox(thick, 0.12, w * 0.86, 0.05), flat(0xd9453d));
-    seat.position.set(0, -LIFT_Y + 0.3, z);
-    const back = drawn(rbox(0.1, 0.55, w * 0.86, 0.04), flat(0xd9453d));
-    back.position.set(-thick / 2 + 0.05, -LIFT_Y + 0.6, z);
-    const hang = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.75, 4), flat(M.cable));
-    hang.position.set(0, -LIFT_Y + 0.7, z);
-    swing.add(seat, back, hang);
-  }
-  compact(swing);
-  swing.position.y = LIFT_Y;
-  g.add(swing);
-  const ph = seeded("liftchair" + len.toFixed(2) + thick.toFixed(2))() * 6;
-  animate((t) => (swing.rotation.z = Math.sin(t * 1.4 + ph) * 0.03));
   return g;
 }
 
@@ -2198,7 +2406,7 @@ function piece(kind, item, t, s) {
       return onGround(g, item.c[0], item.c[1], t);
     }
     if (skin !== "lift") return undefined;
-    // the chairs glide along the cable, drawn by decor (laneLift): the bar
+    // the chairs glide along the cable, drawn by decor (liftLines): the bar
     // itself, shown and hidden by the replay, is nothing to see
     return new THREE.Group();
   }
@@ -2217,6 +2425,8 @@ function piece(kind, item, t, s) {
       }
       return Math.min(1, Math.min(x - x0, x1 - x, zz - z0, z1 - zz) / 1.2);
     };
+    // scratches and cracks only where the ice is on the lane (a zone may reach past the rails)
+    const onLane = (x, zz) => !t.onGreen || t.onGreen(x, zz);
     const edge = new THREE.Color(0xeef8fd), mid = new THREE.Color(0x9fd6ee), deep = new THREE.Color(0x7cc3e4);
     g.add(overlay(item, t, (x, zz) => edge.clone().lerp(mid, ex(x, zz)).lerp(deep, 0.35 * (0.5 + 0.5 * Math.sin(x * 0.6 + zz * 0.9)) * ex(x, zz)), () => 0.01,
       new THREE.MeshPhongMaterial({ vertexColors: true, emissive: 0x5aa8cc, emissiveIntensity: 0.28, shininess: 120, specular: 0xffffff, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
@@ -2225,14 +2435,15 @@ function piece(kind, item, t, s) {
     for (let k = 0; k < Math.ceil(((x1 - x0) * (z1 - z0)) / 5); k++) {
       const x = x0 + rand() * (x1 - x0), zz = z0 + rand() * (z1 - z0), a = rand() * Math.PI, l = 0.6 + rand() * 1.4;
       const p = [x - Math.cos(a) * l, zz - Math.sin(a) * l], q = [x + Math.cos(a) * l, zz + Math.sin(a) * l];
-      if (inZone(item, ...p) && inZone(item, ...q) && ex(...p) > 0.3 && ex(...q) > 0.3) add(scratch, p, q, 0.06);
+      if (inZone(item, ...p) && inZone(item, ...q) && ex(...p) > 0.3 && ex(...q) > 0.3 && onLane(...p) && onLane(...q)) add(scratch, p, q, 0.06);
     }
     // cracks: a few branching zigzags from a point
     for (let k = 0; k < Math.max(2, Math.round(((x1 - x0) * (z1 - z0)) / 30)); k++) {
       let x = x0 + (0.2 + rand() * 0.6) * (x1 - x0), zz = z0 + (0.2 + rand() * 0.6) * (z1 - z0), a = rand() * Math.PI * 2;
+      if (!onLane(x, zz)) continue;
       for (let m = 0; m < 5; m++) {
         const l = 0.4 + rand() * 0.6, nx = x + Math.cos(a) * l, nz = zz + Math.sin(a) * l;
-        if (!inZone(item, nx, nz) || ex(nx, nz) < 0.2) break;
+        if (!inZone(item, nx, nz) || ex(nx, nz) < 0.2 || !onLane(nx, nz)) break;
         add(crack, [x, zz], [nx, nz], 0.065);
         if (rand() < 0.4) add(crack, [nx, nz], [nx + Math.cos(a + 1.2) * 0.4, nz + Math.sin(a + 1.2) * 0.4], 0.065);
         (x = nx), (zz = nz), (a += (rand() - 0.5) * 1.4);
@@ -2252,55 +2463,91 @@ function piece(kind, item, t, s) {
     return g;
   }
   if (skin === "snowdrift") {
-    // deep powder: soft rounded bumps (still low: the physics is flat), blue
-    // in their hollows, wind ripples across it and a sparkle of light on top
+    // deep soft powder, part of the lane's own snow: a gentle drift surface
+    // on the zone's footprint, always clipped to the lane (never past the
+    // kerb), its edge soft and irregular (the zone's outline broken by noise,
+    // and its colour and height fading into the piste there), wind ripples,
+    // bluer hollows, a faint sparkle. No blobs on top.
     const g = new THREE.Group();
-    // (a soft rim: the bumps die away to the zone's edge, so it swells out of
-    // the lane rather than sitting on it as a disc)
-    const rim = (x, zz) => {
+    const n2 = (x, zz) => Math.sin(x * 1.3 + zz * 0.7) * 0.5 + Math.sin(x * 3.1 - zz * 2.3) * 0.3 + Math.sin(zz * 4.7 + x * 0.9) * 0.2;
+    const inner = (x, zz) => {
+      // how far in, 0 at the zone's edge, 1 about a unit in (ellipse or rect)
       if (item.round) {
         const u = (x - cx) / ((x1 - x0) / 2), v = (zz - cz) / ((z1 - z0) / 2);
-        return Math.max(0, Math.min(1, (1 - Math.hypot(u, v)) * 3));
+        return (1 - Math.hypot(u, v)) * Math.min(x1 - x0, z1 - z0) * 0.5;
       }
-      return Math.max(0, Math.min(1, Math.min(x - x0, x1 - x, zz - z0, z1 - zz) / 1));
+      return Math.min(x - x0, x1 - x, zz - z0, z1 - zz);
     };
-    const wave = (x, zz) => Math.sin(x * 1.7 + zz * 1.3) * Math.cos(zz * 1.1 - x * 0.6);
-    const bump = (x, zz) => rim(x, zz) * (0.2 + 0.14 * wave(x, zz));
-    const hi = new THREE.Color(0xfdfeff), lo = new THREE.Color(0x98b1d0);
-    // lit on the side facing the light (+x, -z), blue in the hollows and at the rim
-    g.add(overlay(item, t, (x, zz) => lo.clone().lerp(hi, Math.max(0, Math.min(1, 0.25 + 0.55 * (0.5 + 0.5 * wave(x + 0.3, zz - 0.3)) + 0.2 * rim(x, zz)))), bump));
-    const rip = [];
-    for (let k = 0; k < Math.ceil(((x1 - x0) * (z1 - z0)) / 3); k++) {
-      const x = x0 + rand() * (x1 - x0), zz = z0 + rand() * (z1 - z0), l = 0.5 + rand() * 0.6;
-      const p = [x - l, zz - l * 0.25], q = [x + l, zz + l * 0.25];
-      if (!inZone(item, ...p) || !inZone(item, ...q)) continue;
-      for (const [a2, b2] of [p, q]) rip.push(new THREE.Vector3(a2, t.height(a2, b2) + bump(a2, b2) + 0.06, b2));
+    // the soft edge: 0 outside the noisy outline, rising to 1 over 1.2 in
+    // (a short ramp: the drift has an edge you can see, soft but not hazy)
+    const rim = (x, zz) => Math.max(0, Math.min(1, (inner(x, zz) - 0.25 + 0.3 * n2(x, zz)) / 0.45));
+    const ripple = (x, zz) => Math.sin(x * 2.4 + zz * 0.9 + 0.8 * Math.sin(zz * 0.6));
+    // a raised lip just inside the edge, catching the light, then the drift
+    const lip = (k) => Math.exp(-((k - 0.45) ** 2) / 0.03);
+    const piste = new THREE.Color(green[1]), hi = new THREE.Color(0xffffff), hollow = new THREE.Color(0xb3cbe8), rimC = new THREE.Color(0xf2f9ff);
+    const col = (x, zz) => {
+      const k = rim(x, zz), lit = 0.2 + 0.8 * (0.5 + 0.5 * ripple(x + 0.25, zz)); // the ripples' lit faces, and their shaded ones
+      // cooler and brighter than the packed piste, the lip brightest of all
+      return piste.clone().lerp(hollow.clone().lerp(hi, lit), Math.min(1, k * 1.4)).lerp(rimC, 0.5 * lip(k));
+    };
+    // the drift itself: a mesh of rings out from the middle to a crisp,
+    // wind-scalloped outline inside the zone, raised in the middle and
+    // falling to the lane at its edge, opaque, lit like the piste; a faint
+    // blue shade just inside the edge gives it a clean contour
+    const ax = (x1 - x0) / 2, az = (z1 - z0) / 2, NT = 96, NR = 10;
+    const edgeR = (th) => 0.9 + 0.06 * Math.sin(th * 5 + 1.3) + 0.04 * Math.sin(th * 11 + 0.4);
+    const at = (th, r) => {
+      const R = edgeR(th) * r, c = Math.cos(th), sn = Math.sin(th);
+      if (item.round) return [cx + ax * R * c, cz + az * R * sn];
+      const e = 0.2, sx = Math.sign(c) * Math.abs(c) ** e, sz = Math.sign(sn) * Math.abs(sn) ** e; // a rectangle with soft corners
+      return [cx + ax * R * sx, cz + az * R * sz];
+    };
+    const pos = [], cols = [], idx = [], keep = [];
+    const shade = new THREE.Color(0x9fb8d6);
+    for (let r = 0; r <= NR; r++)
+      for (let q = 0; q < NT; q++) {
+        const th = (q / NT) * Math.PI * 2, rr = r / NR, [x, zz] = at(th, rr);
+        const k = smooth01((1 - rr) / 0.35); // 0 at the edge, 1 a third of the way in
+        const hgt = k * (0.17 + 0.04 * ripple(x, zz) + 0.04 * n2(x * 0.7, zz * 0.7)) + 0.015;
+        pos.push(x, t.height(x, zz) + hgt, zz);
+        const c = col(x, zz).lerp(piste, 0.25 * (1 - k)).lerp(shade, 0.35 * Math.exp(-(((1 - rr) - 0.06) ** 2) / 0.002));
+        cols.push(c.r, c.g, c.b);
+        keep.push(!t.onGreen || t.onGreen(x, zz));
+      }
+    const id = (r, q) => r * NT + (q % NT);
+    for (let r = 0; r < NR; r++)
+      for (let q = 0; q < NT; q++) {
+        const a = id(r, q), b = id(r, q + 1), c = id(r + 1, q), d = id(r + 1, q + 1);
+        if (keep[a] && keep[c] && keep[d]) idx.push(a, d, c);
+        if (keep[a] && keep[d] && keep[b]) idx.push(a, b, d);
+      }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, DRIFT_OPAQUE);
+    g.add(mesh);
+    // the drift's height at (x, z), as the mesh has it (by its polar rings)
+    const hAt = (x, zz) => {
+      const u = (x - cx) / ax, v = (zz - cz) / az, th = Math.atan2(v, u), rr = Math.hypot(u, v) / edgeR(th);
+      const k = smooth01((1 - rr) / 0.35);
+      return t.height(x, zz) + k * (0.17 + 0.04 * ripple(x, zz) + 0.04 * n2(x * 0.7, zz * 0.7)) + 0.015;
+    };
+    const N = Math.min(60, Math.ceil(((x1 - x0) * (z1 - z0)) * 1.2)), sp = new Float32Array(N * 3);
+    let m = 0;
+    for (let k = 0; k < N * 3 && m < N; k++) {
+      const x = x0 + rand() * (x1 - x0), zz = z0 + rand() * (z1 - z0);
+      if (Math.hypot((x - cx) / ax, (zz - cz) / az) > 0.6 || (t.onGreen && !t.onGreen(x, zz))) continue;
+      sp.set([x, hAt(x, zz) + 0.05, zz], m++ * 3);
     }
-    g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(rip), new THREE.LineBasicMaterial({ color: 0x9fb8d6, transparent: true, opacity: 0.6 })));
-    // a few soft mounds of powder heaped in it, so it reads as deep snow at a glance
-    for (let k = 0; k < Math.max(3, Math.round(((x1 - x0) * (z1 - z0)) / 8)); k++) {
-      const x = x0 + (0.2 + rand() * 0.6) * (x1 - x0), zz = z0 + (0.2 + rand() * 0.6) * (z1 - z0);
-      if (!inZone(item, x, zz) || rim(x, zz) < 0.6) continue;
-      const r = 0.4 + rand() * 0.35;
-      const mound = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), DRIFT_MOUND);
-      mound.scale.set(1.3, 0.45, 1);
-      mound.rotation.y = rand() * 6;
-      mound.position.set(x, t.height(x, zz) + bump(x, zz) - 0.04, zz);
-      g.add(mound);
-    }
-    const N = Math.min(80, Math.ceil(((x1 - x0) * (z1 - z0)) * 1.5)), sp = new Float32Array(N * 3);
-    for (let k = 0; k < N; k++) {
-      let x = x0 + rand() * (x1 - x0), zz = z0 + rand() * (z1 - z0);
-      if (!inZone(item, x, zz)) (x = cx), (zz = cz);
-      sp.set([x, t.height(x, zz) + bump(x, zz) + 0.08, zz], k * 3);
-    }
-    const sparkle = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(sp, 3)), new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.6, depthWrite: false }));
+    const sparkle = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(sp.subarray(0, m * 3), 3)), new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.4, depthWrite: false }));
     sparkle.userData.live = true;
     g.add(sparkle);
-    animate((tt) => (sparkle.material.opacity = 0.35 + 0.35 * Math.sin(tt * 2.1)));
+    animate((tt) => (sparkle.material.opacity = 0.25 + 0.2 * Math.sin(tt * 1.7)));
     return g;
   }
-  if (item.kind === "slope" && ["kicker", "terrace", "downhill", "slope", "saddle crest"].includes(skin)) {
+  if (item.kind === "slope" && ["kicker", "terrace", "downhill", "slope", "saddle crest", "bank"].includes(skin)) {
     const g = new THREE.Group();
     if (skin === "saddle crest" && item.vec[0] < 0) g.add(colCrest(item, t));
     const top = Math.max(0.3, ...[[x0, z0], [x1, z0], [x0, z1], [x1, z1], [cx, cz]].map(([a, b]) => t.height(a, b)));
@@ -2375,4 +2622,4 @@ function piece(kind, item, t, s) {
   return undefined;
 }
 
-export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece };
+export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece, liftPlan, liftChairs };

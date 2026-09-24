@@ -3,6 +3,8 @@
 //
 // A round is recorded as one transaction with two calls: Reset puts the
 // player's ball back on the tee, PlayRound replays the shot list from there.
+// A round too heavy for one transaction goes in two (or more): the first
+// Resets and plays the first strokes, the next continue it (splitRound).
 // The chain re-runs every shot itself — the page sends decisions, never
 // outcomes — so a recorded score is one nobody can type in.
 
@@ -136,29 +138,61 @@ export function onWalletChange(fn) {
   return () => listeners.delete(fn);
 }
 
-// Gas, as measured on the holes as built: ~20M for the call itself, then per
-// replayed shot ~5M plus ~4.5M for every wall or post the ball is tested
-// against (the Corridor, 24 walls, is ~120M a shot). Asked with a third of
-// headroom: the fee is paid on what is asked, so asking blindly high costs
-// the player real money.
+// Gas, by the realm's own model of a commit's work (golf.gno, work): per
+// shot 10M, plus 150K per wall, plus, per point of its path, 1.2M and 15K per
+// piece of any kind (walls, posts, zones, the weather's). That model is fitted
+// to bound every measured shot by 1.25× at least; the call itself, the Reset
+// and the forecast add up to ~170M. Zones are cheap next to walls: counted by
+// path point, not as walls (the old estimate refused rounds that fit).
 // what is asked of the account: the gas at the price, with half again for a
 // price that rises between the reading and the block
 const feeFor = (gasWanted, price) => Math.ceil(gasWanted * price * 1.5);
-// Adena simulates every tx with 2e9 gas at most: a round asking more would fail
-// there, so the ask stays under it (MAX_GAS) and a round over it is refused
-// before Adena opens
+// Adena simulates every tx with 2e9 gas at most: the ask stays under it.
+// Whether a round fits one commit is the chain's to say (SimulateRound's
+// "commit the first N"), not this estimate's: see splitRound.
 export const MAX_GAS = 1_900_000_000;
-const need = (shots, pieces) => Math.ceil((20e6 + shots * (5e6 + 4.5e6 * pieces)) * 1.35);
-const gasFor = (shots, pieces = 8) => Math.min(need(shots, pieces), MAX_GAS);
+const PER_CALL = 170e6;
+/** The gas one commit of these strokes should need. c: { walls, others, pts: [path length per stroke] }. */
+export function gasOf(c, from = 0, to = (c.pts || []).length) {
+  let g = PER_CALL;
+  const pieces = (c.walls || 0) + (c.others || 0);
+  for (let i = from; i < to; i++) g += 10e6 + 150e3 * (c.walls || 0) + ((c.pts || [])[i] || 60) * (1.2e6 + 15e3 * pieces);
+  return Math.min(Math.ceil(g), MAX_GAS);
+}
 
-/** Signs Reset + PlayRound for this round. Resolves with the tx (hash, height). */
-export async function recordRound({ address, realm, hole, shots, pieces, period, mode = "assisted", price = 0.001, chainId, rpc }) {
+/**
+ * The commits a round is recorded in: [[from, to), …]. The chain refuses a
+ * list too heavy for one transaction with "commit the first N, then the
+ * rest"; asked first (check: SimulateRoundAt of the whole list), so that the
+ * split is known before Adena opens. The rest is cut the same way, N at a
+ * time. Throws, in words, when the chain refuses the round for any other
+ * reason: nothing goes to Adena then.
+ */
+export async function splitRound(shots, check) {
+  let n = shots.length;
+  try {
+    await check(shots);
+  } catch (e) {
+    const m = String(e.message || e).match(/commit the first (\d+)/);
+    if (!m) throw e;
+    n = Number(m[1]);
+    if (!(n >= 1)) throw new Error("Even one shot of this round is more than one transaction can replay. It cannot be saved.");
+  }
+  const parts = [];
+  for (let i = 0; i < shots.length; i += n) parts.push([i, Math.min(shots.length, i + n)]);
+  return parts;
+}
+
+/**
+ * Signs one commit of this round: Reset + PlayRound… for the first (reset),
+ * PlayRound… alone for the next ones, which continue the round where the
+ * chain has it. Resolves with the tx (hash, height).
+ */
+export async function recordRound({ address, realm, hole, shots, gas, period, reset = true, mode = "assisted", price = 0.001, chainId, rpc }) {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
-  if (need(shots.length, pieces) > MAX_GAS * 1.35)
-    throw new Error(`This round is too long to record in one transaction (${shots.length} strokes on a hole this busy). Play it again in fewer strokes.`);
   await ensureNetwork(a, { chainId, rpc });
-  const gasWanted = gasFor(shots.length, pieces);
+  const gasWanted = Math.min(gas || MAX_GAS, MAX_GAS);
   const gasFee = feeFor(gasWanted, price);
   // no balance gate here: Adena itself says when an account cannot pay, and
   // the page warns beforehand (shortOf) without keeping the wallet shut
@@ -167,10 +201,10 @@ export async function recordRound({ address, realm, hole, shots, pieces, period,
     value: { caller: address, send: "", pkg_path: realm, func, args },
   });
   const res = await a.DoContract({
-    // in the weather the round was played in (its quarter hour): the chain
-    // takes the current one or the one before
+    // in the weather the round was played in (its period): the chain takes
+    // the current one or the one before
     messages: [
-      call("Reset", [hole]),
+      ...(reset ? [call("Reset", [hole])] : []),
       // a pro round goes on the pro board (the mode is the one it was played in)
       mode === "pro"
         ? call("PlayRoundPro", [hole, shots.join(";"), String(period ?? 0)])
@@ -193,9 +227,29 @@ export async function recordRound({ address, realm, hole, shots, pieces, period,
   return res.data;
 }
 
-/** How much GNOT an account lacks to record a round, 0 if it has enough; null if unknown. */
-export const shortOf = (shots, pieces, price, balance) =>
-  balance == null ? null : Math.max(0, feeFor(gasFor(shots, pieces), price) - balance) / 1e6;
+// The storage a save writes, in bytes (fix-hub.md, measured): a first finish
+// on a hole writes the round, the best and the board entry (~6.6 KB), and a
+// player's first course finish ~2.5 KB more for the ranking; a replay of a
+// hole already saved replaces what is there (~0).
+export const depositBytes = (first) => (first ? 9100 : 300);
 
-/** What a round costs to record, in GNOT, shown before anyone signs. */
-export const costOf = (shots, pieces, price = 0.001) => (feeFor(gasFor(shots, pieces), price) / 1e6).toFixed(3);
+/** How much GNOT an account lacks to save a round (gas and deposit), 0 if it has enough; null if unknown. */
+export const shortOf = (gas, price, deposit, balance) =>
+  balance == null ? null : Math.max(0, feeFor(gas, price) + deposit - balance) / 1e6;
+
+/** What a round's gas costs, in GNOT, shown before anyone signs. */
+export const costOf = (gas, price = 0.001) => (feeFor(gas, price) / 1e6).toFixed(3);
+
+// the self-check: the chain's "first N" cuts the round N at a time; any other refusal stops it
+export async function demoSplit() {
+  const s = Array.from({ length: 8 }, (_, i) => `${i},5`);
+  const refuse = async () => { throw new Error("golf: more shots than one transaction can replay on this hole: commit the first 6, then the rest"); };
+  console.assert(JSON.stringify(await splitRound(s, refuse)) === "[[0,6],[6,8]]", "split");
+  console.assert(JSON.stringify(await splitRound(s, async () => ({}))) === "[[0,8]]", "whole");
+  let bad = null;
+  try { await splitRound(s, async () => { throw new Error("golf: that weather has not come yet"); }); } catch (e) { bad = e.message; }
+  console.assert(bad && /weather/.test(bad), "other refusals pass through");
+  console.assert(gasOf({ walls: 24, others: 10, pts: [50, 50] }) > gasOf({ walls: 24, others: 10, pts: [50] }), "gas grows by the stroke");
+  console.assert(gasOf({ walls: 1000, others: 0, pts: Array(12).fill(500) }) === MAX_GAS, "capped");
+  return "ok";
+}

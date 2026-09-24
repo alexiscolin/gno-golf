@@ -13,8 +13,8 @@ import { behind, chaseState } from "./chase.js";
 import { loadWorld } from "./scene/worlds.js";
 import { makeChain, shotOf, pullShot } from "./chain.js";
 import {
-  makeRenderer, makeScene, maxDpr, buildHole, makeBall, makeAim, aimAlong, at,
-  courseBox, overviewRig, focusRig, applyRig, makeBand, bandTo, gnomeById, makeConfetti, makeSplash, disposeCourse, setTime, buildExtras, setLighting,
+  makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, aimAlong, at,
+  courseBox, overviewRig, leanRoom, focusRig, applyRig, makeBand, bandTo, gnomeById, makeConfetti, makeSplash, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene.js";
 import { BALL_R, inZone } from "./terrain.js";
 import { promo } from "./promo.js";
@@ -45,7 +45,7 @@ const SHOW_SPEED = 26;
 const HUD = { top: 108, bottom: 136, side: 14 };
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
 
-export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather = "", aimMode = "assisted", camMode = "classic", onChange = () => {}, onHoled = () => {} } = {}) {
+export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", onChange = () => {}, onHoled = () => {} } = {}) {
   const chain = makeChain({ rpc, web });
 
   const renderer = makeRenderer(canvas);
@@ -61,6 +61,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     },
   });
   // ?weather= fakes a forecast, for screenshots
+  let fakeWeather = fakeWeather0;
   const faked = () => fakeWeather && [
     fakeWeather.includes("wind") && { skin: "wind", vec: [0.05, -0.03] },
     fakeWeather.includes("rain") && { skin: "rain", vec: [0, 0] },
@@ -77,6 +78,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   const band = makeBand();
   scene.add(ball, aim, band);
   let confetti = null;
+  // a burst kept hidden, so its shader compiles with the hole's (warm), not on the winning putt
+  const confettiWarm = makeConfetti([0, 0]);
+  confettiWarm.group.visible = false;
+  scene.add(confettiWarm.group);
   let blinkAt = 0, blinkUntil = 0;
   // small moods of the gnome: a hop of joy when he holes out, a head shake
   // when he comes out of the water. Cosmetic, timed on the page clock.
@@ -91,7 +96,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       else if (body.rotation.z && !g.flying) body.rotation.z *= 0.8;
     },
   };
-  let holedIn = 0; // the banner's delay after a hole, so the confetti can fly
+  let holedIn = 0, joyIn = 0; // the banner's delay after a hole, so the confetti can fly; the hop's
   let righting = null; // the gnome getting back on his feet after a roll
 
   const g = {
@@ -106,30 +111,69 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   // what the HUD was last told of the aim: a frame that sees it out of date
   // for 300 ms tells it again (a missed update must not leave the power bar gone)
   const told = { aiming: false, bar: -1, at: 0 };
-  const publish = () =>
-    alive &&
-    ((told.aiming = !!g.aiming), (told.bar = Math.round((g.power || 0) * 40)), true) &&
-    onChange({
-      holes: g.list ? inWorld() : [],
-      allHoles: g.list || [], // every cup's, for the cup totals and the grand slam
+  // The interface is told only what changed: the last snapshot is kept, and a
+  // publish that changes nothing tells nothing. During a replay, a change of
+  // the fast-moving fields alone (HOT) is told 10 times a second at most.
+  // The world's hole list and counts are worked out once per list and world.
+  const HOT = new Set(["power", "cause", "flash"]), HOT_MS = 100, NONE = [];
+  let told_ = null, toldAt = 0, toldLater = 0;
+  let wake = 0; // the last input or change: a still scene under reduced motion draws for a second after it
+  const lists = { list: null, world: null, holes: [], worlds: {} };
+  const perList = () => {
+    if (lists.list !== g.list || lists.world !== g.world) {
+      lists.list = g.list;
+      lists.world = g.world;
+      lists.holes = g.list ? inWorld() : [];
+      lists.worlds = g.list ? g.list.reduce((m, h) => ((m[worldOf(h)] = (m[worldOf(h)] || 0) + 1), m), {}) : {};
+    }
+    return lists;
+  };
+  function publish() {
+    if (!alive) return false;
+    told.aiming = !!g.aiming;
+    told.bar = Math.round((g.power || 0) * 40);
+    const snap = snapshot();
+    let changed = !told_, hotOnly = !!told_;
+    if (told_) for (const k in snap) if (snap[k] !== told_[k]) (changed = true), HOT.has(k) || (hotOnly = false);
+    if (!changed) return true;
+    clearTimeout(toldLater);
+    const now = performance.now();
+    if (hotOnly && g.flying && now - toldAt < HOT_MS) {
+      toldLater = setTimeout(publish, HOT_MS - (now - toldAt));
+      return true;
+    }
+    told_ = snap;
+    toldAt = wake = now;
+    onChange(snap);
+    return true;
+  }
+  const snapshot = () => ({
+      holes: perList().holes,
+      allHoles: g.list || NONE, // every cup's, for the cup totals and the grand slam
       world: g.world,
       linked: !!g.linked, // the page's link named a hole that exists
+      ready: !!g.course && warming !== loads, // the hole is built and its shaders ready: the curtain may open
       // this hole's place in its cup, for the address bar and shared links
-      place: g.s ? Math.max(1, inWorld().findIndex((h) => h.id === g.id) + 1) : 0,
+      place: g.s ? Math.max(1, perList().holes.findIndex((h) => h.id === g.id) + 1) : 0,
       look: (g.s && g.s.world) || g.world || "garden", // the world this hole is dressed as
       // how many holes each world has on this chain, for the world screen
-      worlds: g.list ? g.list.reduce((m, h) => ((m[worldOf(h)] = (m[worldOf(h)] || 0) + 1), m), {}) : {},
+      worlds: perList().worlds,
       id: g.id,
       name: g.s ? g.s.name : "",
-      by: g.s ? g.s.by : "",
-      source: g.s ? chain.sourceURL(g.s.by) : "#",
+      // a hole's id is its realm's path: the code a player can read
+      source: g.s ? chain.sourceURL(g.id) : "#",
+      official: !g.s || g.s.official !== false, // one of the course's holes (a community hole is not)
+      community: g.community || NONE, // everyone else's holes, playable outside the cups
       strokes: g.strokes,
       timed: !!(g.s && g.s.timed),
       time: g.course ? g.course.userData.time : "day",
       // what a shot is tested against, for the gas estimate before signing
-      // walls, posts and zones, plus what a timed hole adds each stroke
-      pieces: g.s ? g.s.walls.length + g.s.posts.length + g.s.zones.length + (g.s.timed ? 8 : 0) : 0,
-      shots: g.shots || [],
+      // (the realm's own model: walls cost most, then every other piece per
+      // path point): the walls, everything else, and each stroke's path length
+      walls: g.s ? g.s.walls.length : 0,
+      others: g.s ? g.s.posts.length + g.s.zones.length + ((g.forecast && g.forecast.zones) || []).length + (g.s.timed ? 8 : 0) : 0,
+      pts: g.pts || NONE,
+      shots: g.shots || NONE,
       flying: g.flying,
       aiming: g.aiming,
       power: g.power,
@@ -145,19 +189,47 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       note: g.note || null, // a word on how the shot went
       errorKind: g.error ? g.errorKind : null,
       view: g.view,
+      gfx: gfxMode, // the graphics setting, and what it gives on this device
+      tier,
     });
 
   // ------------------------------------------------------------- rendering
 
   let alive = true;
+  // Graphics: "high" is the game as designed; "low" draws fewer pixels (a
+  // pixel ratio of 1, 0.8 on a phone), leaves the ink off distant decor and
+  // thins the weather. "auto" picks low for a weak or software GPU, and for a
+  // device whose frames were slow (the probe below: remembered for next time).
+  let gfxMode = ["high", "low"].includes(gfx) ? gfx : "auto", tier = "high";
+  const coarse = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+  const weakGpu = (() => {
+    try {
+      const gl = renderer.getContext(), x = gl.getExtension("WEBGL_debug_renderer_info");
+      const name = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+      return /swiftshader|llvmpipe|softpipe|software|mali-[4-7]\d\d|mali-g[57]\d\b|adreno \(tm\) [3-5]\d\d|powervr|intel.*hd graphics [2-5]\d\d/i.test(name);
+    } catch {
+      return false;
+    }
+  })();
+  const SLOW_KEY = "gnogolf.gfx.auto";
+  const wasSlow = () => { try { return localStorage.getItem(SLOW_KEY) === "low"; } catch { return false; } };
   // A slow GPU (seen on some Safari and Firefox setups) gets a lighter canvas:
-  // the first 2 s of drawing are timed, and a median frame over 20 ms drops
-  // the pixel ratio to 1, once.
+  // the first 2 s of drawing are timed, and a median frame over 20 ms turns
+  // Auto to Low, once (and for the next visits).
   let dprCap = Infinity;
+  function setTier() {
+    const was = tier;
+    tier = gfxMode === "auto" ? (weakGpu || wasSlow() ? "low" : "high") : gfxMode;
+    quality.low = tier === "low"; // outlines: from the next hole built
+    weather.thin(quality.low);
+    dprCap = quality.low ? (coarse ? 0.8 : 1) : Infinity;
+    resize();
+    return was !== tier;
+  }
   // only frames drawn back to back count (an idle scene is drawn at 20 fps on purpose)
   const probe = { t0: 0, prev: 0, gaps: [] };
   function probeFrame(now, busy) {
-    if (dprCap !== Infinity || probe.done) return;
+    if (tier === "low" || probe.done) return;
     if (!busy) return void (probe.prev = 0);
     if (!probe.t0) probe.t0 = now;
     if (probe.prev) probe.gaps.push(now - probe.prev);
@@ -165,10 +237,11 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     if (now - probe.t0 < 2000 && probe.gaps.length < 90) return;
     probe.done = true;
     const d = probe.gaps.sort((a, b) => a - b);
-    if (d.length > 10 && d[d.length >> 1] > 20) {
-      dprCap = 1;
-      console.info("gnogolf: slow frames, drawing at pixel ratio 1");
-      resize();
+    if (d.length > 10 && d[d.length >> 1] > 20 && gfxMode === "auto") {
+      try { localStorage.setItem(SLOW_KEY, "low"); } catch {}
+      console.info("gnogolf: slow frames, graphics set to low");
+      setTier();
+      publish();
     }
   }
 
@@ -191,6 +264,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     dprChanged = false;
     if (!g.s) return;
     g.over = overviewRig(camera, courseBox(g.s.board), screen());
+    // the mouse lean of the whole-course view, as far as the whole hole stays in frame
+    g.over.lean = leanRoom(camera, courseBox(g.s.board), screen(), g.over, g.s.board.w * 0.22 + 3);
     if (!g.rig) g.rig = { ...g.over, target: g.over.target.clone() };
   }
 
@@ -214,7 +289,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   function goal() {
     if (g.view !== "ball") {
       if (!g.over || !g.s) return g.over;
-      const span = g.s.board.w * 0.22 + 3;
+      const span = g.over.lean == null ? g.s.board.w * 0.22 + 3 : g.over.lean;
       leant.target.copy(g.over.target);
       leant.target.x += lean.x * span;
       leant.target.z += lean.y * span * 0.25;
@@ -263,10 +338,11 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     v.addScaledVector(_d, dt);
     x.addScaledVector(v, dt);
   }
+  const _sn = { x: 0, v: 0 }; // springN's answer, reused: it runs twice a frame
   function springN(x, v, target, w, dt) {
     const a = w * w * (target - x) - 2 * w * v;
     v += a * dt;
-    return [x + v * dt, v];
+    return ((_sn.x = x + v * dt), (_sn.v = v), _sn);
   }
   let lastMode = null;
   // the third-person follow's own state, reset whenever the mode or the hole changes
@@ -438,8 +514,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     } else {
       springV(sp.pos, sp.vp, want.pos, w, dt);
       springV(sp.look, sp.vl, want.look, urgent ? 18 : w, dt);
-      [sp.fov, sp.vf] = springN(sp.fov, sp.vf, want.fov, 9, dt);
-      [sp.oy, sp.vo] = springN(sp.oy, sp.vo, want.oy, 9, dt);
+      ({ x: sp.fov, v: sp.vf } = springN(sp.fov, sp.vf, want.fov, 9, dt));
+      ({ x: sp.oy, v: sp.vo } = springN(sp.oy, sp.vo, want.oy, 9, dt));
     }
     // a hard floor on the real pose too (the spring lags a ball rolling back
     // at the camera): never nearer than MIN_FLAT across the ground in third person
@@ -604,6 +680,18 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     pen = 0;
     return 0;
   }
+  // points along every closed tube that stands off the ground (a loop zone's
+  // curve, not a thrown ball's arc), made once per hole
+  const TUBE_CLEAR = 2.6; // the tube's 0.6 and the lens probe's 2
+  let tubeFor = null, tubeList = [];
+  function tubeBits() {
+    const tubes = g.course && g.course.userData.tubes;
+    if (tubeFor === g.course) return tubeList;
+    tubeFor = g.course;
+    tubeList = [];
+    if (tubes) for (const [z, curve] of tubes) if (z.kind === "loop" && curve.getPointAt && !(curve.userData && curve.userData.arc) && /tube/.test(z.skin || "")) for (let k = 0; k <= 48; k++) tubeList.push(curve.getPointAt(k / 48));
+    return tubeList;
+  }
   function keepClear(C, B) {
     if (!g.s) return;
     const ox = B.x, oz = B.z;
@@ -623,13 +711,20 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     for (const p of g.s.posts || []) {
       const c = p.c;
       if (!c) continue;
-      const r = (p.r || 0.5) + 1.6, dx = C.x - c[0], dz = C.z - c[1], d = Math.hypot(dx, dz);
+      // a big one (a sandcastle) stands tall: a wider berth
+      const r = (p.r || 0.5) + ((p.r || 0.5) >= 2 ? 2.6 : 1.6), dx = C.x - c[0], dz = C.z - c[1], d = Math.hypot(dx, dz);
       if (d < r && d > 1e-3) {
         (C.x = c[0] + (dx / d) * r), (C.z = c[1] + (dz / d) * r);
         // pushed in towards the ball? keep the distance, round the post's far side
         const fl = Math.hypot(C.x - ox, C.z - oz);
         if (fl < flatFloor) (C.x = ox + ((C.x - ox) / (fl || 1)) * flatFloor), (C.z = oz + ((C.z - oz) / (fl || 1)) * flatFloor);
       }
+    }
+    // a tube in the air (island7's slide round its castle) is never right in
+    // front of the lens either: pushed out of its reach, in 3D
+    for (const q of tubeBits()) {
+      const dx = C.x - q.x, dy = C.y - q.y, dz = C.z - q.z, d = Math.hypot(dx, dy, dz);
+      if (d < TUBE_CLEAR && d > 1e-3) (C.x = q.x + (dx / d) * TUBE_CLEAR), (C.y = q.y + (dy / d) * TUBE_CLEAR), (C.z = q.z + (dz / d) * TUBE_CLEAR);
     }
     // the nearest wall or post between the ball and the camera
     let t = 1;
@@ -700,25 +795,43 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     publish();
   }
   window.addEventListener("resize", resize);
+  setTier();
 
   let last = 0;
   // What the GPU is spared: nothing is drawn behind an opaque screen (the
   // title, the cups, the picker) or in a hidden tab, and a still scene — no
   // shot, no aim, the camera settled, only the garden breathing — is drawn at
   // 30 frames a second instead of the display's 60 or 120.
-  // idle: 30 fps while the weather or timed pieces move, 20 when only the
-  // garden breathes
-  const IDLE_MS = 1000 / 30, STILL_MS = 1000 / 20;
-  let settled = false;
+  // idle: 30 fps while the weather or timed pieces move (a lift, a tram
+  // glide on that), 10 when only the garden breathes; with reduced motion and
+  // nothing moving, nothing is drawn until something changes
+  // and busy (a shot, an aim) at 60 at most, whatever the display's rate.
+  // A window in the background (another app in front) is not drawn either,
+  // unless a shot is on its way.
+  const IDLE_MS = 1000 / 30, STILL_MS = 1000 / 10, BUSY_MS = 1000 / 60;
+  let settled = false, blurred = false;
+  const onBlur = () => (blurred = true);
+  const onFocus = () => ((blurred = false), (wake = performance.now()));
+  const onWake = () => (wake = performance.now());
+  window.addEventListener("blur", onBlur);
+  window.addEventListener("focus", onFocus);
+  window.addEventListener("pointermove", onWake, { passive: true });
+  window.addEventListener("keydown", onWake);
   function frame(now) {
     if (!alive) return;
     requestAnimationFrame(frame);
-    if (!g.started || g.covered || document.hidden) return (last = now);
-    const busy = promo.on || g.flying || dragging || !!morph || (g.cam === "third" && g.aiming) || growing.length || confetti || righting || !settled || everyOf() > 0;
-    const still = !g.weather;
-    if (!busy && now - last < (still ? STILL_MS : IDLE_MS) - 2) return;
+    if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now);
+    // timed pieces glide at the idle rate: they are no reason to draw at 60
+    const busy = promo.on || g.flying || dragging || !!morph || (g.cam === "third" && g.aiming) || growing.length || confetti || righting || !settled;
+    if (blurred && !busy) return (last = now);
+    const still = !g.weather && !(everyOf() > 0);
+    if (!busy && still && !motion && now - wake > 1000) return (last = now); // (a still garden under reduced motion)
+    if (now - last < (busy ? BUSY_MS : still ? STILL_MS : IDLE_MS) - 2) return;
     probeFrame(now, busy);
-    const dt = Math.min((now - last) / 1000, 0.1);
+    // the clock of the timed pieces runs on real time, however far apart the
+    // frames are (never stepped by a capped dt): at any frame rate a piece is
+    // where the time says, never behind it
+    const elapsed = Math.min((now - last) / 1000, 0.5), dt = Math.min(elapsed, 0.1);
     last = now;
     updateCamera(dt);
     promo.camera(camera); // ?promo: the trailer's camera, off otherwise
@@ -743,7 +856,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       // at rest and while aiming the pieces move slowly enough to read and to
       // time (3.5 substeps a second, 1.5 with reduced motion); the replay
       // follows the path's own steps. The chain only sees the tick at release.
-      clock += dt * (reduced ? 1.5 : 3.5);
+      clock += elapsed * (reduced ? 1.5 : 3.5);
       showClock(clock);
       // aiming at moving pieces: the dots follow them
       if (dragging && everyOf() && PREVIEW().stopAt !== "hidden" && now - lastTickPreview > 250) (lastTickPreview = now), preview();
@@ -775,6 +888,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     const floor = BALL_R + ground(ball.position.x, ball.position.z);
     ball.userData.shade.position.y = floor - ball.position.y - BALL_R + 0.02;
     if (!g.flying) {
+      // at rest on a deck that moves (a seesaw), he rides it
+      if (g.course && g.course.userData.lifts && !g.done && !g.holed) ball.position.y = floor; // never a holed ball, it stays down in the cup
       // an idle gnome breathes; his shadow breathes with him, on the ground
       const bob = Math.sin(now / 520) * 0.06;
       ball.userData.body.position.y = bob + mood.hop(now);
@@ -805,7 +920,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   // Loads are ticketed: only the latest one may land, and the round changes
   // before the wait, so any shot still in the air is already somebody else's.
-  let loads = 0;
+  let loads = 0, warming = 0; // warming: the load whose hole is being built and compiled
   async function load(id) {
     const ticket = ++loads;
     // any shot in the air belongs to the old hole: end its round, but ask the
@@ -837,19 +952,32 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       scene.remove(g.course);
       disposeCourse(g.course); // the old island's GPU memory goes with it
     }
+    g.course = null;
     extras = null;
     extrasFor = "";
     growing = [];
+    answers.clear(); // the hole is read anew: so are its previews
+    // from here until its shaders are ready nothing is drawn (the curtain, or
+    // the title, is over the course): the build in two tasks, then the
+    // shaders compiled off the main thread
+    warming = ticket;
+    const built0 = performance.now();
+    let course = null;
     try {
-      g.course = buildHole(g.s);
+      course = buildHole(g.s, { defer: true });
+      await new Promise((r) => setTimeout(r, 0)); // the pieces, then (next task) their merge
+      if (ticket !== loads || !alive) return void disposeCourse(course);
+      finishHole(course);
     } catch (err) {
       // our bug, not the chain's: say so, and leave the game usable
       console.error(err);
-      g.course = null;
+      if (ticket !== loads) return;
+      warming = 0;
       g.error = String(err.message || err);
       g.errorKind = "draw";
       return publish();
     }
+    g.course = course;
     scene.add(g.course);
     setLighting(scene, g.course.userData.time);
     // a hole's own weather, until a stroke's forecast says otherwise
@@ -860,11 +988,40 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     applyWeather();
     // the garden's foliage and bunting lean with the wind (global: set on every hole)
     newRound();
-    renderer.compile(scene, camera); // shaders now, not on the player's first click
+    const built1 = performance.now();
+    await warm(); // shaders now, not on the player's first click
+    if (ticket !== loads || !alive) return;
+    warming = 0;
+    g.buildMs = [Math.round(built1 - built0), Math.round(performance.now() - built1)]; // ?camlog's buildMs(): [build, compile]
     g.rig = null; // a new hole starts from its overview, not from the last one
     resize();
     setView("overview");
     if (g.started) closeIn = setTimeout(() => setView(home()), OVERVIEW_MS);
+  }
+
+  // Every shader the hole can need, compiled now: the scene as it is, and the
+  // see-through variant of what a canopy fade turns transparent (fog and the
+  // lightning's light never change the programs: see weather.js)
+  // (the see-through ones are only started: they are ready long before a fade
+  // needs them). Resolves once the ones drawn now are linked.
+  function warm() {
+    const fades = [];
+    scene.traverse((o) => {
+      const m = o.material;
+      if (m && !Array.isArray(m) && m.userData.fade === 1 && !m.transparent) fades.push(m);
+    });
+    if (fades.length) {
+      for (const m of fades) m.transparent = true;
+      renderer.compile(scene, camera);
+      for (const m of fades) (m.transparent = false), (m.needsUpdate = true);
+    }
+    // (a context without parallel compiling resolves at once: the old way;
+    // and a driver that never says a program is ready is waited 2 s at most)
+    let t = 0;
+    return Promise.race([
+      renderer.compileAsync(scene, camera).catch((e) => console.warn("gnogolf: compileAsync", e)),
+      new Promise((r) => (t = setTimeout(() => (console.warn("gnogolf: shaders not ready after 2 s"), r()), 2000))),
+    ]).finally(() => clearTimeout(t));
   }
 
   // A timed hole's moving pieces, for the stroke about to be played. They grow
@@ -975,6 +1132,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     g.error = null;
     g.strokes = 0;
     g.shots = []; // the round's decisions: what a record replays
+    g.pts = []; // each stroke's path length, for the gas estimate
+    g.rest = null; // the ball exactly as the chain left it: where the next stroke is asked from
     g.facing = Math.PI / 2; // at rest he looks at the player
     dragging = false;
     dropAim();
@@ -1047,6 +1206,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   // the dashed outlines of timed pieces that are away, shown only while aiming
   const ghosts = (on) => g.course && g.course.userData.ghosts && g.course.userData.ghosts(on);
   const dropAim = () => {
+    // a preview on its way is no longer wanted
+    if (asked) asked.abort(), (asked = null), (asking = false);
+    clearTimeout(later);
+    since = 0;
     morph = null;
     ghosts(false);
     aim.visible = band.visible = false;
@@ -1070,8 +1233,22 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   function onMove(ev) {
     if (!dragging || g.flying || !press) return;
+    // the power is the pointer's distance from where the pull began, on the
+    // screen, whatever the camera does meanwhile
     const px = Math.hypot(ev.clientX - press.x, ev.clientY - press.y);
-    if (px < 6) return;
+    if (px < 6) {
+      // back at the start: no pull at all — letting go here shoots nothing.
+      // (This used to return before touching the shot, so a pull brought back
+      // kept the power it had: the elastic would not come back.)
+      if (shot.power > 0) {
+        shot.power = 0;
+        g.power = 0;
+        band.visible = aim.visible = false;
+        lastBar = 0;
+        publish();
+      }
+      return;
+    }
     // both ends through the camera as it is now: an easing camera moves the
     // board under a still hand, and must not turn the shot
     let dir;
@@ -1149,7 +1326,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   // Keyboard: ←/→ turn the aim, ↑/↓ set the power, Space or Enter shoots,
   // Escape drops the aim. The same preview and the same fire() as the mouse.
-  canvas.tabIndex = 0;
+  canvas.tabIndex = -1; // until the course is shown (cover)
   canvas.setAttribute("aria-label", "Course. Arrow keys aim and set the power, Space shoots.");
   const onKey = (ev) => {
     if (g.flying || g.done || !g.s) return;
@@ -1254,7 +1431,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
     let res;
     try {
-      res = await chain.simulateRound(g.id, [...g.shots, shotOf(angleDeg, power, tick)], g.period);
+      res = await strokeFrom(g.id, g.shots, shotOf(angleDeg, power, tick), g.rest);
       if (round !== g.round) return;
     } catch (err) {
       if (round !== g.round) return;
@@ -1274,13 +1451,15 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     }
     if (!g.shots.length) g.roundMode = mode; // this round is played, and recorded, in this mode
     g.lastAim = (angleDeg * Math.PI) / 180;
-    g.shots.push(shotOf(angleDeg, power, tick));
+    g.shots = [...g.shots, shotOf(angleDeg, power, tick)]; // a new list: what changed is seen by reference
+    g.pts = [...g.pts, res.path.length];
+    g.rest = Array.isArray(res.rest) && res.rest.every(Number.isFinite) ? res.rest : null;
     g.tick0 = tick || 0;
-    g.strokes = res.strokes;
+    g.strokes = res.strokes || g.shots.length; // SimulateFrom has no count: a stroke is a shot
     if (res.holed) {
       g.done = true; // no more shots, even before the banner shows
       onHoled({ id: g.id, strokes: res.strokes });
-      setTimeout(() => alive && round === g.round && mood.joy(performance.now()), 500);
+      joyIn = setTimeout(() => alive && round === g.round && mood.joy(performance.now()), 500);
     }
     publish();
     // A safety net: a replay that runs well past what its path should take
@@ -1365,10 +1544,27 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   // returns, bounces included. One request in flight at a time; the latest
   // pull wins.
   let asking = false, wanted = null;
-  // Throttled: the node replays the whole round for every preview, so a pull
-  // asks at most every PREVIEW_MS, and not at all for a change too small to see.
-  const PREVIEW_MS = 70;
-  let sent = null, sentAt = 0, later = 0;
+  // Debounced: every preview is a query on a shared node (one stroke's work,
+  // from the exact ball: see strokeFrom), so a pull
+  // asks once the hand rests PREVIEW_MS (and every PREVIEW_MAX at least while
+  // it keeps moving), not at all for a change too small to see, and never
+  // twice for one shot: the answers are kept by the very shot the chain was
+  // asked (hole, round so far, weather period, angle, power and tick, as
+  // rounded for the chain), for this hole. A request the pull no longer
+  // wants (let go, cancelled, a new round) is cancelled.
+  const PREVIEW_MS = 120, PREVIEW_MAX = 360, KEPT = 256;
+  let sent = null, later = 0, since = 0, asked = null;
+  const answers = new Map();
+  const keyOf = (q) => `${q.id}|${g.period}|${q.shots.join(";")}|${q.shot}`;
+  // One stroke asked of the chain: the first from the tee (SimulateRound of
+  // that one shot: the tee exactly), every other one from the exact ball the
+  // last answer left (SimulateFrom): one shot of work, whatever the round's
+  // length. It is what PlayRoundAt will replay for the same list.
+  function strokeFrom(id, shots, shot, rest, ms, signal) {
+    return shots.length && rest && g.period != null
+      ? chain.simulateFrom(id, rest, shot, shots.length, g.period, ms, signal)
+      : chain.simulateRound(id, [...shots, shot], g.period, ms, signal);
+  }
   // While the chain works out the new aim, the dots it gave for the last one
   // swing round the ball to where the pull points now, so they never lag the
   // hand; the chain's answer replaces them the moment it lands.
@@ -1393,39 +1589,56 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       aim.visible = true;
     }
     wanted = { angle: shot.angle, deg: shot.deg, power: shot.power, shots: g.shots, id: g.id };
-    if (asking) return;
-    // asked again only when the aim changed, or the pieces moved on
+    // asked (or being asked) already: the aim has not changed, nor the pieces moved on
     if (sent && sent.id === wanted.id && sent.n === wanted.shots.length && sent.tick === tickNow() &&
         Math.abs(sent.angle - wanted.angle) < 0.005 && Math.abs(sent.power - wanted.power) < 0.05) return;
-    const wait = PREVIEW_MS - (performance.now() - sentAt);
-    if (wait > 0) {
-      clearTimeout(later);
-      later = setTimeout(() => dragging && preview(), wait);
-      return;
-    }
+    const q = question();
+    if (answers.has(q.key)) return void ((since = 0), clearTimeout(later), (sent = q), answer(q, answers.get(q.key)));
+    if (asking) return; // the one in flight lands first; the latest aim goes out after it
+    const now = performance.now();
+    if (!since) since = now;
+    clearTimeout(later);
+    later = setTimeout(ask, Math.max(0, Math.min(PREVIEW_MS, PREVIEW_MAX - (now - since))));
+  }
+  // the preview for the aim as it is now
+  function question() {
+    const w = wanted, tick = tickNow();
+    const q = { ...w, rest: g.rest, n: w.shots.length, round: g.round, tick, shot: shotOf(w.deg != null ? w.deg : (w.angle * 180) / Math.PI, w.power, tick) };
+    q.key = keyOf(q);
+    return q;
+  }
+  function ask() {
+    if (!dragging || !wanted || asking) return;
+    since = 0;
+    const q = (sent = question());
+    if (answers.has(q.key)) return answer(q, answers.get(q.key));
     asking = true;
-    sentAt = performance.now();
-    const q = (sent = { ...wanted, n: wanted.shots.length, round: g.round, tick: tickNow() });
+    const ac = (asked = new AbortController());
     // a chain slow to answer does not hold the aim: after 1.5 s the request is
     // let go, and the next one (the latest aim) goes out
-    chain
-      .simulateRound(q.id, [...q.shots, shotOf(q.deg != null ? q.deg : (q.angle * 180) / Math.PI, q.power, q.tick)], g.period, 1500)
+    strokeFrom(q.id, q.shots, q.shot, q.rest, 1500, ac.signal)
       .then((res) => {
-        if (dragging && q.id === g.id && q.round === g.round && q.n === g.shots.length) {
-          const was = snapDots();
-          aimAlong(aim, fogged(previewPath(res)), dotPower(q.power), ground, landing, dotTint(q));
-          morphFrom(was);
-          shown = { angle: q.angle };
-                aim.rotation.y = 0;
-          aim.position.set(0, 0, 0);
-          interpolate();
-        }
+        answers.delete(q.key);
+        answers.set(q.key, res);
+        if (answers.size > KEPT) answers.delete(answers.keys().next().value);
+        answer(q, res);
       })
       .catch(() => {})
       .finally(() => {
-        asking = false;
-        if (dragging && wanted !== q) preview();
+        if (asked === ac) (asked = null), (asking = false);
+        if (dragging) preview();
       });
+  }
+  // the chain's dots for q, if the pull still wants them
+  function answer(q, res) {
+    if (!(dragging && q.id === g.id && q.round === g.round && q.n === g.shots.length)) return;
+    const was = snapDots();
+    aimAlong(aim, fogged(previewPath(res)), dotPower(q.power), ground, landing, dotTint(q));
+    morphFrom(was);
+    shown = { angle: q.angle };
+    aim.rotation.y = 0;
+    aim.position.set(0, 0, 0);
+    interpolate();
   }
 
   // The ball really rolls: turned about the axis across its motion by distance
@@ -1511,6 +1724,11 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   // The kind of jump a step makes, for the aim dots: "tunnel", "hazard" or null.
 
+  // whether a wind (the weather's) or a gust covers (x, y), by the zones' skins
+  // a timed slope that is not wind: a seesaw's plank, a tilting board
+  const tilting = (zs, x, y) => zs.some((z) => z.kind === "slope" && z.every && z.skin !== "wind" && z.skin !== "gust" && inZone(z, x, y));
+  const windy = (zs, x, y) => zs.some((z) => z.kind === "slope" && (z.skin === "wind" || z.skin === "gust") && inZone(z, x, y)) || !!(g.weather && g.weather.wind && !zs.some((z) => z.kind === "slope" && z.every && inZone(z, x, y)));
+
   // A slope's contour arrows light up while the ball rolls down it, and fade after.
   const glowing = new Map(); // zone -> glow level 0..1
   function glowSlope(x, y) {
@@ -1530,7 +1748,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   // The dots take the colour of what bends them: wind blue, a downhill slope
   // gold, ice or a wet green cyan — the same causes the replay shows.
-  const TINT = { wind: new THREE.Color(0x8fc9ff), slope: new THREE.Color(0xffd36b), ice: new THREE.Color(0x9ff3ff), wet: new THREE.Color(0x9ff3ff) };
+  const TINT = { wind: new THREE.Color(0x8fc9ff), slope: new THREE.Color(0xffd36b), tilt: new THREE.Color(0xffd36b), ice: new THREE.Color(0x9ff3ff), wet: new THREE.Color(0x9ff3ff) };
   const dotTint = (q) => {
     const zs = [...g.s.zones, ...((g.forecast && g.forecast.zones) || []), ...strokeZones];
     const vx = Math.cos(q.angle), vy = Math.sin(q.angle), t = q.tick || 0;
@@ -1647,8 +1865,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
         if (round !== g.round || cut !== cutAt) return done();
         const k = Math.min((now - start) / T, 1);
         if (tube) {
-          const p = tube.getPoint(k);
-          ball.position.copy(p);
+          tube.getPoint(k, ball.position); // written in place: no vector a frame
           ball.scale.setScalar(tube.userData && tube.userData.arc ? 1 : 0.7); // inside the pipe, a size smaller (thrown through the air: full size)
         } else {
           ball.position.lerpVectors(from, to, k);
@@ -1701,11 +1918,11 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
           const k = Math.min((e - leadT) / T, 1);
           // an overhit ball rides up at pace: no slowing to a crawl near the top
           const u = upTo < 1 ? uEnd * k : U.pace(k);
-          ball.position.copy(tube.getPointAt(Math.min(u, 1)));
+          tube.getPointAt(Math.min(u, 1), ball.position);
           if (k >= 1) {
             if (!land) {
               spinBy(ball.position);
-              ball.position.copy(tube.getPointAt(1));
+              tube.getPointAt(1, ball.position);
               return done();
             }
             // off the track: out of the loop and down in front of it
@@ -1784,7 +2001,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
         if (round !== g.round || cut !== cutAt) return done();
         const k = Math.min((now - start) / T, 1);
         const u = reach * (1 - (2 * k - 1) * (2 * k - 1)); // up, a pause at the top, down
-        ball.position.copy(tube.getPointAt(Math.max(0, u)));
+        tube.getPointAt(Math.max(0, u), ball.position);
         ball.scale.setScalar(tube.userData && tube.userData.open ? 1 : 0.7 + 0.3 * (1 - Math.min(1, u * 20))); // an open track: no pipe to shrink into
         if (k < 1) return requestAnimationFrame(tick);
         ball.scale.setScalar(1);
@@ -2021,8 +2238,11 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
         const guess = () => causeAt(zs, path[i][0], path[i][1], vx, vy, (g.tick0 || 0) + i);
         const push = jump || drop ? null
           : said == null ? guess()
-          : said === "w" ? { kind: "wind", vec: (guess() || {}).vec || (g.weather && g.weather.wind) || [vx, vy] }
-          : said === "s" ? { kind: "slope" }
+          // "w" is anything airy to the chain, a timed slope included: it is wind
+          // only where a wind or a gust covers the point — a seesaw's plank, a
+          // tilting board (another skin) is a slope
+          : said === "w" ? (windy(zs, path[i][0], path[i][1]) ? { kind: "wind", vec: (guess() || {}).vec || (g.weather && g.weather.wind) || [vx, vy] } : { kind: "tilt" })
+          : said === "s" ? (tilting(zs, path[i][0], path[i][1]) ? { kind: "tilt" } : { kind: "slope" })
           : said === "i" ? { kind: g.weather && (g.weather.rain || g.weather.storm) ? "wet" : "ice" }
           : null;
         const perSec = 1000 / ms;
@@ -2061,7 +2281,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
             ball.position.y -= sink * 0.9;
             ball.scale.setScalar(1 - sink * 0.5);
           }
-          if (push && push.kind === "slope") glowSlope(path[i][0], path[i][1]);
+          if (push && (push.kind === "slope" || push.kind === "tilt")) glowSlope(path[i][0], path[i][1]);
           if (push) {
             const label = causes.at(ball.position, vx * perSec, vy * perSec, push);
             if (label) (g.cause = { label, at: performance.now() }), publish();
@@ -2115,7 +2335,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     // a hole another has replaced (same cup, same place) stays playable by its
     // link, but only the current one fills the cup
     g.all = list;
-    g.list = list.filter((h) => !h.next).sort(byNumber);
+    // the cups hold the course's own holes; anyone else's is a community hole,
+    // listed apart and ranked nowhere
+    g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
+    g.community = list.filter((h) => !h.next && h.official === false);
     if (!g.list.length) throw new Error("no hole is registered on this chain");
     // a string is a realm id, as before
     const asked = linked(typeof link === "string" ? { id: link } : link);
@@ -2152,6 +2375,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     /** An opaque screen is over the course (or gone): stop drawing it meanwhile. */
     cover(on) {
       g.covered = !!on;
+      canvas.tabIndex = on ? -1 : 0; // a hidden course is not a place for Tab to land
     },
     /** Leave the title screen: show the hole whole, then close on the ball. */
     play() {
@@ -2253,6 +2477,15 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       scene.add(ball);
       if (g.s) placeBall();
     },
+    /** Graphics: "auto" | "high" | "low". The outlines follow at the next hole
+     *  built — now, if no stroke has been played on this one. */
+    setGfx(m) {
+      gfxMode = ["high", "low"].includes(m) ? m : "auto";
+      if (m === "auto") try { localStorage.removeItem(SLOW_KEY); } catch {} // a fresh look at the device
+      Object.assign(probe, { t0: 0, prev: 0, gaps: [], done: false });
+      if (setTier() && g.id && !g.flying && !(g.shots && g.shots.length)) load(g.id);
+      publish();
+    },
     /** Toggle between the whole course and the ball. */
     toggleView: () => setView(g.view === "ball" ? "overview" : "ball"),
     /** The aim mode for the next round ("assisted" | "pro"); a round under way is restarted. */
@@ -2317,6 +2550,25 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     },
     /** ?camlog only: the radius of what the lens probe hit, counted. */
     lensWho: () => lensWho,
+    /** ?camlog only: the pull as it stands. */
+    pullState: () => ({ power: +shot.power.toFixed(2), deg: shot.deg, aiming: !!g.aiming, band: band.visible, flying: !!g.flying, strokes: g.strokes }),
+    /** ?camlog only: the scene's objects: all, empty groups, drawables, matrices recomposed each frame. */
+    census: () => {
+      const c = { objects: 0, empty: 0, draws: 0, auto: 0, weather: g.weather ? Object.keys(g.weather).filter((k) => g.weather[k]).join(",") : "" };
+      scene.traverse((o) => {
+        c.objects++;
+        if (!o.children.length && (o.type === "Group" || o.type === "Object3D")) c.empty++;
+        if (o.isMesh || o.isLine || o.isPoints || o.isSprite) c.draws++;
+        if (o.matrixAutoUpdate) c.auto++;
+      });
+      return c;
+    },
+    /** ?camlog only: fake the weather now ("fog,storm"…, "" for the forecast's). */
+    fakeWeather: (w) => ((fakeWeather = w), applyWeather()),
+    /** ?camlog only: the timed pieces' clock (substeps). */
+    clock: () => clock,
+    /** ?camlog only: the last hole's [build, shader compile] time, ms. */
+    buildMs: () => g.buildMs,
     /** ?camlog only: where the camera is now. */
     camPose: () => camera.position.toArray(),
     /** The camera: "classic" | "far" | "third". */
@@ -2338,6 +2590,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       alive = false;
       window.removeEventListener("pointermove", onHover);
       window.removeEventListener("blur", onCancel);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pointermove", onWake);
+      window.removeEventListener("keydown", onWake);
       document.removeEventListener("visibilitychange", onHide);
       weather.dispose();
       causes.dispose();
@@ -2351,10 +2607,13 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       canvas.removeEventListener("pointercancel", onCancel);
       canvas.removeEventListener("lostpointercapture", onCancel);
       clearTimeout(holedIn);
+      clearTimeout(joyIn);
       clearTimeout(later);
+      clearTimeout(toldLater);
+      if (asked) asked.abort();
       cut++; // every animation still running stops at its next frame
       if (g.course) disposeCourse(g.course);
-      for (const o of [ball, aim, band, confetti && confetti.group]) if (o) disposeCourse(o);
+      for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group]) if (o) disposeCourse(o);
       renderer.dispose();
     },
   };
