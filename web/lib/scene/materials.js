@@ -312,10 +312,15 @@ export function ownFade(piece) {
   const own = new Map();
   let ink = null;
   piece.traverse((o) => {
-    if (!o.isMesh) return;
-    if (o.material.side === THREE.BackSide) return void (o.material = ink ||= fadeHull());
+    if (!o.isMesh && !o.isLine) return;
+    // a plain outline: one fadeable hull for all of them; a swaying one (its
+    // own shader) is cloned like a solid, so it keeps swaying with it
+    if (o.material.side === THREE.BackSide && !String(o.material.userData.hook).startsWith("sway")) return void (o.material = ink ||= fadeHull());
     if (!own.has(o.material)) {
       const m = fadeable(o.material.clone());
+      // clone() drops the shader hook (sway, a hull's push): keep it
+      m.onBeforeCompile = o.material.onBeforeCompile;
+      m.customProgramCacheKey = o.material.customProgramCacheKey;
       if (o.material.transparent) (m.userData.base = o.material.opacity), (m.depthWrite = false);
       own.set(o.material, m);
     }

@@ -4,7 +4,7 @@
 // mushrooms, and turquoise water to the horizon.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, fadeable, fadeLoop, windNow } from "./materials.js";
+import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, ownFade, fadeLoop, windNow } from "./materials.js";
 import { inZone, mod, segDist, smoothstep } from "../terrain.js";
 import { bake, look, weatherLooks } from "./bake.js";
 import { gnomelet, brolly } from "./props.js";
@@ -849,21 +849,14 @@ function ship() {
 // Each fading piece owns its materials; decor's group carries fade(eye, ball),
 // which the engine calls every frame.
 
-// materials a canopy palm can fade (materials.js fadeLoop): its own, not
-// the shared palette's, which every palm on the island draws with
-function fader(colors) {
-  const mats = Object.fromEntries(colors.map((c) => [c, fadeable(new THREE.MeshToonMaterial({ color: c }))]));
-  // ponytail: three's clone() drops the hull's shader push, so these palms draw
-  // no outline, and their toon has no gradientMap; fadeHull() and flat()'s
-  // bands would match the other palms (a visible change, left for a design call)
-  const ink = fadeable(hullOf().clone());
-  return { mat: (c) => mats[c], ink, all: [...Object.values(mats), ink] };
-}
 
-/** A tall wind-bent palm rooted off the lane, its crown high over it. */
-function archPalm(rand, toward, reach, h, fd) {
+/** A tall wind-bent palm rooted off the lane, its crown high over it: drawn
+ *  as palm() is (toon bands, ink hulls, leaf outlines, the same sway), with
+ *  its own fadeable copies of those materials (ownFade, by the caller). */
+function archPalm(rand, toward, reach, h) {
   const g = new THREE.Group();
-  g.userData.live = true;
+  g.userData.foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  g.userData.flex = 0.45; // taller than a beach palm: a little stiffer
   // from its foot to its crown it leans `reach` over `h`, as a coconut palm
   // grows: leaning most at the foot, then rising towards the crown in one
   // gentle upward curve (the outward step shrinks up the trunk)
@@ -874,13 +867,15 @@ function archPalm(rand, toward, reach, h, fd) {
   }
   const curve = new THREE.CatmullRomCurve3(pts);
   const { bark, rings } = trunkGeometry(curve, 0.32);
-  g.add(new THREE.Mesh(bark, fd.mat(P.trunk)), new THREE.Mesh(bark, fd.ink), new THREE.Mesh(rings, fd.mat(P.trunkDark)));
+  g.add(grows(bark, P.trunk), grows(rings, P.trunkDark));
   const top = curve.getPoint(1);
   const crown = new THREE.Group();
   const cr = crownGeometry(rand, new THREE.Vector3(), 9, 1.15);
-  for (const c of [P.frondDark, P.frond]) fd.mat(c).side = THREE.DoubleSide;
-  crown.add(new THREE.Mesh(cr.rachis, fd.mat(P.trunkDark)), new THREE.Mesh(cr.leaves[0], fd.mat(P.frondDark)), new THREE.Mesh(cr.leaves[1], fd.mat(P.frond)));
-  crown.add(new THREE.Mesh(mergeGeometries([0, 1, 2, 3].map((i) => new THREE.SphereGeometry(0.2, 7, 5).translate(Math.cos(i * 1.7) * 0.26, -0.3, Math.sin(i * 1.7) * 0.26))), fd.mat(P.trunkDark)));
+  crown.add(new THREE.Mesh(cr.rachis, sway(P.trunkDark)));
+  // the blades and their outlines as palm()'s, but kept in the crown: the
+  // outlines fade and nod with it (leafMesh's are gathered into the decor's)
+  for (const [k, geo] of cr.leaves.entries()) crown.add(new THREE.Mesh(geo, sway(k ? P.frond : P.frondDark, { double: true })), new THREE.LineSegments(new THREE.EdgesGeometry(geo, 40), leafInk));
+  coconuts(crown, new THREE.Vector3(0, 0.1, 0), 4);
   crown.position.copy(top);
   g.add(crown);
   g.userData.crown = crown;
@@ -1305,16 +1300,16 @@ function decor(s, bank = () => 0) {
   for (let k = 0; k < arches; k++) {
     const x = W * ((k + 0.5) / arches) + (rand() - 0.5) * 3, z = -2.8 - rand() * 0.6;
     if (!dry(x, z, 0) || byWall(x, z, 1) || !free(x, z, 1.2)) continue;
-    const fd = fader([P.trunk, P.trunkDark, P.frond, P.frondDark]);
     // a real leaning palm: a foot-to-crown lean of 25-40° from the vertical,
     // its crown over the lane's near side (not flung across it)
     // tall (its crown well above the lane), so the lean sets its reach
     const h = 6.5 + rand() * 2, want = h * Math.tan(THREE.MathUtils.degToRad(25 + rand() * 15));
     // its crown (fronds ~3.3 out) clear of the lighthouse and the other crowns
     if (Math.hypot(x - LH[0], z + want - LH[1]) < 3.3 + 3.2 || crowns.some((c) => Math.hypot(c.x - x, c.z - z - want) < 6.6)) continue;
-    const p = archPalm(rand, new THREE.Vector3(0, 0, 1), want, h, fd);
+    const p = archPalm(rand, new THREE.Vector3(0, 0, 1), want, h);
     p.position.set(x, GRASS + bank(x, z), z);
     g.add(p);
+    const mats = ownFade(p); // its own copies of palm()'s materials, to fade
     // its foot and its trunk: nothing else stands in them (its crown is high
     // over the lane, above anything low)
     reserve(x, z, 1.4);
@@ -1323,7 +1318,7 @@ function decor(s, bank = () => 0) {
     const ph = rand() * 6, crown = p.userData.crown;
     animate((t) => (crown.rotation.z = Math.sin(t * 0.9 + ph) * 0.05, crown.rotation.x = Math.cos(t * 0.7 + ph) * 0.04));
     p.updateMatrixWorld(true);
-    fading.push({ at: crown.getWorldPosition(new THREE.Vector3()), r: 2.5, mats: fd.all });
+    fading.push({ at: crown.getWorldPosition(new THREE.Vector3()), r: 2.5, mats });
   }
   // behind the board, the gnomes' beach village: straw mushroom huts in a row,
   // the tiki bar among them, all facing the lane
