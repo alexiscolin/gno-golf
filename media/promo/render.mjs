@@ -8,15 +8,14 @@
 // cached in paths.json, so a re-render replays the same shots.
 // Needs: Node 22+ (built-in WebSocket), Google Chrome, /opt/homebrew/bin/ffmpeg.
 
-import { spawn, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { launch, sleep, APP } from "../lib/cdp.mjs";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const FFMPEG = "/opt/homebrew/bin/ffmpeg";
-const APP = process.env.APP || "http://localhost:3300";
 const WORK = path.join(os.tmpdir(), "gnogolf-promo");
 const STILLS = process.argv.includes("--stills");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
@@ -78,39 +77,12 @@ const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - LAST * BEAT).toFixed(3);
 
 // ------------------------------------------------------------------ chrome
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function chrome() {
-  const dir = path.join(WORK, "profile");
-  fs.mkdirSync(dir, { recursive: true });
-  try { fs.unlinkSync(path.join(dir, "DevToolsActivePort")); } catch {}
-  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0",
-    "--use-angle=metal", "--window-size=1920,1080", "--hide-scrollbars", "--mute-audio", "--no-first-run", "about:blank"], { stdio: "ignore" });
-  let port;
-  for (let i = 0; i < 100 && !port; i++) {
-    await sleep(200);
-    try { port = fs.readFileSync(path.join(dir, "DevToolsActivePort"), "utf8").split("\n")[0]; } catch {}
-  }
-  const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  const ws = new WebSocket(list.find((t) => t.type === "page").webSocketDebuggerUrl);
-  await new Promise((r, j) => ((ws.onopen = r), (ws.onerror = j)));
-  let id = 0;
-  const wait = new Map();
-  ws.onmessage = (m) => {
-    const d = JSON.parse(m.data);
-    if (d.id && wait.has(d.id)) (d.error ? wait.get(d.id)[1](new Error(d.error.message)) : wait.get(d.id)[0](d.result), wait.delete(d.id));
-  };
-  const send = (method, params = {}) => new Promise((r, j) => (wait.set(++id, [r, j]), ws.send(JSON.stringify({ id, method, params }))));
-  const js = async (expr) => {
-    const r = await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
-    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
-    return r.result.value;
-  };
-  await send("Page.enable");
-  await send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+  const { send, js, kill } = await launch({ width: 1920, height: 1080, dir: path.join(WORK, "profile"), args: ["--window-size=1920,1080", "--hide-scrollbars", "--mute-audio"] });
   // the HMR socket never opens: another edit to the app cannot remount the game mid-shot
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `try{localStorage.setItem("gnogolf.earned",${JSON.stringify(JSON.stringify(ALL_GNOMES))})}catch(e){}` });
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `{const W=window.WebSocket;window.WebSocket=function(u,p){return /hmr/.test(String(u))?{readyState:0,send(){},close(){},addEventListener(){},removeEventListener(){}}:new W(u,p)};Object.assign(window.WebSocket,{CONNECTING:0,OPEN:1,CLOSING:2,CLOSED:3});}` });
-  return { send, js, kill: () => { try { ws.close(); process.kill(p.pid); } catch {} } };
+  return { send, js, kill };
 }
 
 // ------------------------------------------------------------------ render

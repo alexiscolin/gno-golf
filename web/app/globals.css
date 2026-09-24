@@ -6,7 +6,15 @@
   --hat: #e0524b;
   --hat-ink: #b83a33; /* the hat's red dark enough for paper text on it (5:1) */
   --paper: #fdf6e9;
-  --shadow: 0 5px 0 var(--ink), 0 12px 24px rgba(20, 65, 52, .18);
+  --ink-rgb: 20, 65, 52; /* the ink, for its see-through shades: rgba(var(--ink-rgb), a) */
+  --shadow: 0 5px 0 var(--ink), 0 12px 24px rgba(var(--ink-rgb), .18);
+  /* the controls (components/ui.jsx): a press sinks, a hover lifts, a focus rings */
+  --press: 3px;
+  --lift: 1px;
+  --ring: 3px solid var(--hat);
+  --shadow-btn: 0 4px 0 var(--ink);
+  /* the page is light by design: native controls and scrollbars too, on a dark OS */
+  color-scheme: light;
 }
 
 * {
@@ -142,7 +150,7 @@ html, body {
   border: 2px solid var(--ink);
   border-radius: 18px;
   padding: 10px 16px;
-  box-shadow: 0 4px 0 var(--ink);
+  box-shadow: var(--shadow-btn);
   height: 76px;
 }
 
@@ -231,7 +239,7 @@ html, body {
   background: var(--paper);
   border: 2px solid var(--ink);
   border-radius: 18px;
-  box-shadow: 0 4px 0 var(--ink);
+  box-shadow: var(--shadow-btn);
   transition: transform .08s, box-shadow .08s;
 }
 
@@ -246,7 +254,7 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 6;
-  background: rgba(20,65,52,.55);
+  background: rgba(var(--ink-rgb), .55);
   animation: fade .2s ease-out;
 }
 
@@ -273,7 +281,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 18px 18px 12px 22px;
-  border-bottom: 2px dashed rgba(20,65,52,.25);
+  border-bottom: 2px dashed rgba(var(--ink-rgb), .25);
 }
 
 .drawer__head h2 {
@@ -300,7 +308,7 @@ html, body {
   border-radius: 16px;
   background: #fff;
   color: var(--ink);
-  box-shadow: 0 4px 0 var(--ink);
+  box-shadow: var(--shadow-btn);
   transition: transform .08s, box-shadow .08s;
 }
 
@@ -379,8 +387,9 @@ html, body {
   font-weight: 600;
   font-size: 15px;
   padding: 12px 22px;
+  min-height: 44px; /* a target a thumb can hit */
   border-radius: 16px;
-  box-shadow: 0 4px 0 var(--ink);
+  box-shadow: var(--shadow-btn);
   transition: transform .08s, box-shadow .08s;
 }
 
@@ -412,7 +421,6 @@ html, body {
 .power span {
   display: block;
   height: 100%;
-  width: var(--p, 0%);
   background: var(--hat);
 }
 
@@ -421,7 +429,7 @@ html, body {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(20,65,52,.45);
+  background: rgba(var(--ink-rgb), .45);
   padding: 20px;
   z-index: 5;
 }
@@ -487,15 +495,6 @@ html, body {
   font-size: 14px;
 }
 
-.boot__ball {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--ink);
-  animation: bounce .7s cubic-bezier(.5,.05,.5,.95) infinite alternate;
-}
-
 @keyframes bounce { to { transform: translateY(-22px) } }
 
 /* Title and picker: full screens in the reference's language — a drawn
@@ -509,6 +508,7 @@ html, body {
   z-index: 4;
   display: grid;
   place-items: center;
+  align-content: center;
   padding: clamp(40px, 9vh, 110px) 28px 28px;
   background: var(--paper);
 }
@@ -542,7 +542,7 @@ html, body {
 }
 
 .title__art {
-  width: min(820px, 94vw, 70vh);
+  width: min(760px, 94vw, 62vh);
   height: auto;
   margin-bottom: -10px;
   overflow: visible;
@@ -552,15 +552,16 @@ html, body {
   font-size: 88px;
   font-weight: 700;
   letter-spacing: .06em;
-  fill: var(--hat);
+  fill: var(--green); /* golf is green: the word and the call to action */
   stroke: var(--ink);
   stroke-width: 5px;
   paint-order: stroke;
   stroke-linejoin: round;
 }
 
+/* three clear colours: dark green text and button, a sunny badge, the red hat */
 .title__burst {
-  fill: var(--green);
+  fill: #f5b83d;
 }
 
 .title__outline { fill: var(--ink); stroke: var(--ink); stroke-width: 9; stroke-linejoin: round; }
@@ -595,18 +596,6 @@ html, body {
   color: var(--green);
 }
 
-.title__small {
-  margin: 22px 0 0;
-  font-size: clamp(15px, 1.8vw, 18px);
-  font-weight: 600;
-  color: var(--ink);
-  max-width: 46ch;
-  background: var(--paper);
-  padding: 6px 14px;
-  border-radius: 999px;
-  line-height: 1.4;
-}
-
 .pick__name {
   margin: 4px 0 0;
   font-size: clamp(44px, 8vw, 84px);
@@ -627,6 +616,9 @@ html, body {
   height: min(500px, 74vw, 48vh);
   display: block;
 }
+/* the picker, slimmer: fits a 13" laptop and a phone without scrolling */
+@media (max-height: 820px) { .pick__canvas { height: 38vh; width: 38vh; } }
+@media (max-width: 600px) { .pick__canvas { width: 56vw; height: 56vw; } }
 
 .pick__line {
   margin: 0 0 14px;
@@ -706,12 +698,12 @@ html, body {
   padding: 0 20px 0 16px;
   cursor: pointer;
   font: inherit;
-  color: var(--paper);
+  color: var(--ink);
   text-align: left;
-  background: #0059ff;
+  background: var(--paper);
   border: 2px solid var(--ink);
   border-radius: 18px;
-  box-shadow: 0 4px 0 var(--ink);
+  box-shadow: var(--shadow-btn);
   transition: transform .08s, box-shadow .08s;
 }
 
@@ -744,6 +736,7 @@ html, body {
 
 .adena--on {
   background: var(--green);
+  color: var(--paper);
 }
 
 .note {
@@ -789,12 +782,6 @@ html, body {
   width: 100%;
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
-}
-
-.real__close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
 }
 
 .real h2 {
@@ -980,7 +967,7 @@ html, body {
 
 /* keyboard users see where they are */
 button:focus-visible, a:focus-visible {
-  outline: 3px solid var(--hat);
+  outline: var(--ring);
   outline-offset: 3px;
 }
 
@@ -990,8 +977,8 @@ button:focus-visible, a:focus-visible {
   top: 108px;
   z-index: 2;
   pointer-events: none;
-  background: var(--hat);
-  color: var(--paper);
+  background: var(--paper);
+  color: var(--ink);
   border: 2px solid var(--ink);
   border-radius: 999px;
   padding: 5px 12px;
@@ -1076,7 +1063,7 @@ button:focus-visible, a:focus-visible {
 }
 
 .scorecard tr + tr td, .scorecard tr + tr th {
-  border-top: 2px solid rgba(20,65,52,.15);
+  border-top: 2px solid rgba(var(--ink-rgb), .15);
 }
 
 .scorecard td.cur {
@@ -1187,7 +1174,7 @@ button:focus-visible, a:focus-visible {
 /* the menu's own section: you, before the holes */
 .drawer__me {
   padding: 14px 16px 12px;
-  border-bottom: 2px dashed rgba(20,65,52,.25);
+  border-bottom: 2px dashed rgba(var(--ink-rgb), .25);
   display: grid;
   gap: 12px;
 }
@@ -1272,7 +1259,7 @@ button:focus-visible, a:focus-visible {
   text-align: center;
   font-weight: 700;
   padding: 4px 0;
-  border-left: 2px solid rgba(20,65,52,.15);
+  border-left: 2px solid rgba(var(--ink-rgb), .15);
   position: relative;
   font-size: 18px;
   height: 40px;
@@ -1284,14 +1271,14 @@ button:focus-visible, a:focus-visible {
 
 .stamp {
   position: absolute;
-  right: -8px;
-  top: -12px;
-  width: 34px;
-  height: 34px;
+  right: -4px;
+  top: -6px;
+  width: 26px;
+  height: 26px;
   pointer-events: none;
-  opacity: .8;
+  opacity: .55;
   mix-blend-mode: multiply;
-  z-index: 1;
+  z-index: 0;
 }
 
 .stamp__ring {
@@ -1325,10 +1312,10 @@ button:focus-visible, a:focus-visible {
 
 .stamp--ace {
   color: var(--hat);
-  width: 40px;
-  height: 40px;
-  right: -10px;
-  top: -15px;
+  width: 30px;
+  height: 30px;
+  right: -6px;
+  top: -8px;
 }
 
 .scorecard td.ace, .scorecard td.under, .scorecard td.par {
@@ -1359,7 +1346,7 @@ button:focus-visible, a:focus-visible {
   height: 22px;
   padding: 0 5px;
   border-radius: 999px;
-  background: rgba(20,65,52,.08);
+  background: rgba(var(--ink-rgb), .08);
   color: var(--ink-soft);
   font-size: 11px;
   font-weight: 700;
@@ -1378,7 +1365,7 @@ button:focus-visible, a:focus-visible {
 .scorecard tr:nth-child(2) td {
   font-size: 13px !important;
   font-weight: 500;
-  color: #8aa39a;
+  color: var(--ink-soft) !important; /* (over the current hole's own colour) */
   height: 28px;
 }
 
@@ -1470,7 +1457,6 @@ button:focus-visible, a:focus-visible {
   .hud--bottom .btn { font-size: 14px; padding: 10px 14px; white-space: nowrap; }
   .round { width: 44px; height: 44px; font-size: 28px; }
   .pick__stage { gap: 6px; }
-  .pick__canvas { width: 60vw; height: 74vw; }
   .screen { padding: 24px 20px; }
   .real__cols { grid-template-columns: 1fr; }
 }
@@ -1498,7 +1484,6 @@ button:focus-visible, a:focus-visible {
   .aimbar .power { width: 180px; }
   .timed { top: 92px; left: 12px; right: 12px; text-align: center; font-size: 12px; }
   .scorecard td { font-size: 14px; height: 32px; }
-  .stamp { width: 24px; height: 24px; right: -5px; top: -9px; }
   .scorecard th { width: 44px; font-size: 10px; }
   .scorecard tr:nth-child(3) td { font-size: 17px; height: 36px; }
 }
@@ -1506,7 +1491,6 @@ button:focus-visible, a:focus-visible {
 @media (max-height: 640px) {
   .screen { padding-top: 28px; }
   .title__tag { margin-bottom: 14px; }
-  .title__small { margin-top: 12px; }
 }
 
 @media (pointer: coarse) {
@@ -1520,13 +1504,9 @@ button:focus-visible, a:focus-visible {
 
 /* UX pass: legibility, targets, motion */
 .card__par { display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-top: 1px; }
-.btn { min-height: 44px; }
 .round--small { width: 44px; height: 44px; }
-.scorecard tr:nth-child(2) td { color: var(--ink-soft) !important; }
 .tile[aria-current="true"] .tile__best { color: var(--paper); opacity: .85; }
 .btn--play[disabled] { background: #dfe5e2; color: var(--ink); }
-.stamp { right: -4px; top: -6px; width: 26px; height: 26px; opacity: .55; z-index: 0; }
-.stamp--ace { width: 30px; height: 30px; right: -6px; top: -8px; }
 .banner--win .banner__row { position: sticky; bottom: -30px; background: var(--paper); padding: 10px 0 6px; flex-wrap: wrap; }
 .real .btn--wide { position: sticky; bottom: 0; }
 .details { margin-top: 6px; text-align: left; }
@@ -1536,63 +1516,45 @@ button:focus-visible, a:focus-visible {
   padding: 10px 12px;
   border-radius: 12px;
   background: #e9ecea;
-  border: 1px solid rgba(20,65,52,.12);
+  border: 1px solid rgba(var(--ink-rgb), .12);
   max-height: 140px;
   overflow: auto;
 }
 .details__box .mono { margin: 0; word-break: break-word; }
 .details__box .mono + .mono { margin-top: 6px; opacity: .75; }
-.timed { background: var(--paper) !important; color: var(--ink) !important; }
-.adena { background: var(--paper) !important; color: var(--ink) !important; }
-.adena--on { background: var(--green) !important; color: var(--paper) !important; }
-.screen { align-content: center; }
-.title__small { max-width: calc(100vw - 72px); }
-@media (max-height: 640px) { .pick__canvas { height: 34vh !important; width: 34vh !important; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
 /* the title: clubs crossed behind the gnome, a ball on its tee, three facts */
-.title__art { width: min(760px, 94vw, 62vh) !important; }
 .title__shaft { fill: #b8c2c0; stroke: var(--ink); stroke-width: 5; }
 .title__grip { fill: var(--ink); }
 .title__head { fill: #d8dedc; stroke: var(--ink); stroke-width: 5; stroke-linejoin: round; }
-.title__tee { fill: var(--wood, #c99a63); stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
-.title__golf { fill: #fff; stroke: var(--ink); stroke-width: 4; }
-.title__dimple { fill: #c9d2cf; }
-.title__facts {
-  list-style: none; margin: 18px 0 0; padding: 0; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
-}
+.title__facts { list-style: none; margin: 44px 0 0; padding: 0; display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; }
+/* facts that read as text on a paper tag, each with its drawn icon */
 .title__facts li {
-  background: var(--paper); border: 2px solid var(--ink); border-radius: 999px; box-shadow: 0 3px 0 var(--ink);
-  padding: 6px 14px; font-size: clamp(13px, 1.5vw, 15px); font-weight: 600;
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  background: var(--paper); border: 0; border-radius: 8px; box-shadow: none;
+  font-size: clamp(15px, 1.7vw, 19px); font-weight: 500; color: var(--ink);
 }
-.title__facts b { margin-right: 4px; }
-@media (max-width: 600px) { .title__facts { flex-direction: column; align-items: center; gap: 8px; } }
-
-/* facts: bigger tiles with drawn icons; the whole title block centred */
-.title { align-content: center; min-height: 100%; }
-.screen:has(.title) { place-items: center; padding-top: 28px; }
-.title__facts { gap: 14px !important; margin-top: 22px !important; }
-.title__facts li {
-  display: flex; align-items: center; gap: 12px; padding: 12px 20px 12px 14px !important;
-  border-radius: 18px !important; box-shadow: 0 4px 0 var(--ink) !important;
-  font-size: clamp(15px, 1.6vw, 17px) !important; font-weight: 500 !important; background: #fff !important;
-}
-.title__facts li b { font-weight: 700; margin: 0; }
-.title__facts svg { width: 34px; height: 34px; flex: 0 0 auto; }
+.title__facts li b { font-weight: 700; margin: 0; color: var(--ink); }
+.title__facts li span { text-align: left; }
+.title__facts svg { width: 34px; height: 34px; flex: 0 0 auto; opacity: .9; }
 .fi { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .fi--paper { fill: var(--paper); }
 .fi--red { fill: var(--hat); }
 .fi--gold { fill: #f2c14e; }
 .fi--band { stroke: var(--hat); stroke-width: 2.6; }
-@media (max-width: 600px) { .title__facts li { width: min(340px, calc(100vw - 72px)); } }
-.title__facts li span { text-align: left; }
+@media (max-width: 600px) { .title__facts { flex-direction: column; align-items: flex-start; gap: 10px; } }
+/* the whole title block centred */
+.title { align-content: center; min-height: 100%; }
+.screen:has(.title) { place-items: center; padding-top: 28px; }
 
-/* the title's one call to action, and facts that read as text, not buttons */
+/* the title's one call to action (its size, padding and corners over the
+   picker's .screen .btn--play, which it also is) */
 .btn--cta {
   display: inline-flex; align-items: center; gap: 12px;
-  background: var(--hat); color: #fff; border: 3px solid var(--ink);
+  background: var(--green); color: #fff; border: 3px solid var(--ink);
   font-size: clamp(24px, 2.8vw, 32px) !important; font-weight: 700; letter-spacing: .01em;
   padding: 18px 44px 18px 56px !important; border-radius: 24px !important;
   box-shadow: 0 7px 0 var(--ink); transition: transform .08s, box-shadow .08s;
@@ -1601,36 +1563,6 @@ button:focus-visible, a:focus-visible {
 .btn--cta:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--ink); }
 .btn--cta svg { width: 30px; height: 30px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .btn--cta[disabled] { background: #dfe5e2; color: var(--ink); }
-.title__facts { gap: 26px !important; margin-top: 30px !important; }
-.title__facts li {
-  background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
-  font-size: clamp(13px, 1.4vw, 15px) !important; color: var(--ink-soft); gap: 8px !important;
-}
-.title__facts li b { color: var(--ink); }
-.title__facts svg { width: 24px; height: 24px; opacity: .9; }
-@media (max-width: 600px) {
-  .title__facts { gap: 10px !important; align-items: flex-start !important; }
-  .title__facts li { width: auto !important; }
-}
-.title__facts li { background: var(--paper) !important; padding: 4px 10px !important; border-radius: 8px !important; color: var(--ink) !important; }
-.title__facts li { font-size: clamp(15px, 1.7vw, 19px) !important; gap: 10px !important; padding: 6px 12px !important; }
-.title__facts svg { width: 34px !important; height: 34px !important; }
-
-/* golf is green: the word and the call to action take the green, the badge the red */
-.title__word { fill: var(--green) !important; }
-.title__burst { fill: #f2c14e !important; }
-.btn--cta { background: var(--green) !important; }
-.btn--cta[disabled] { background: #dfe5e2 !important; }
-.title__hat { fill: #2f8f6f !important; }
-.title__burst { fill: var(--hat) !important; }
-/* balance: the greens carry the page, the red is one accent — the gnome's hat */
-.title__burst { fill: #60ab96 !important; }
-.title__hat { fill: var(--hat) !important; }
-/* three clear colours: dark green text and button, a sunny badge, the red hat */
-.title__burst { fill: #f5b83d !important; }
-.title__facts { margin-top: 44px !important; }
-
-.round--x { display: grid; place-items: center; padding: 0; }
 
 /* the loader: a putting green the ball rolls along to the cup */
 .load { width: min(300px, 78vw); margin: 4px auto 0; text-align: center; }
@@ -1643,7 +1575,6 @@ button:focus-visible, a:focus-visible {
 .load__ball { transition: transform .5s cubic-bezier(.3,.7,.4,1); }
 .load__ball circle, .load__ball path { stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
 .load__white { fill: var(--paper); }
-.load__hat { fill: var(--hat); }
 .load__ball--in > * { animation: drop .35s .45s ease-in forwards; }
 @keyframes drop { 40% { transform: translate(8px, -6px); } 100% { transform: translate(16px, 9px) scale(.4); opacity: 0; } }
 .load__chore { margin: 10px 0 0; font-size: 14px; font-weight: 600; color: var(--ink-soft); min-height: 1.4em; animation: chore .35s ease-out; }
@@ -1655,7 +1586,7 @@ button:focus-visible, a:focus-visible {
 }
 
 /* menu settings: switches, and the two-step "new game" */
-.drawer__settings { display: grid; gap: 8px; padding: 14px 16px; border-bottom: 2px dashed rgba(20,65,52,.25); }
+.drawer__settings { display: grid; gap: 8px; padding: 14px 16px; border-bottom: 2px dashed rgba(var(--ink-rgb), .25); }
 .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 700; cursor: pointer; min-height: 44px; }
 .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .switch i { box-sizing: border-box; display: block; flex: 0 0 auto; width: 52px; height: 30px; border-radius: 15px; background: #d5ddd9; border: 2px solid var(--ink); position: relative; transition: background .15s; }
@@ -1663,7 +1594,7 @@ button:focus-visible, a:focus-visible {
 .switch i::after { content: ""; box-sizing: border-box; position: absolute; top: 50%; left: 3px; width: 20px; height: 20px; margin-top: -10px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); transition: transform .15s; }
 .switch input:checked + i { background: var(--green); }
 .switch input:checked + i::after { transform: translateX(22px); }
-.switch input:focus-visible + i { outline: 3px solid var(--hat); outline-offset: 2px; }
+.switch input:focus-visible + i { outline: var(--ring); outline-offset: 2px; }
 .btn--wipe { width: 100%; }
 .btn--danger { background: var(--hat); color: var(--paper); border-color: var(--ink); }
 .drawer__note { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
@@ -1671,7 +1602,7 @@ button:focus-visible, a:focus-visible {
 /* the world screen: cups to pick, like a kart grand prix, in the garden's ink */
 .worlds__in { position: relative; z-index: 1; width: min(1040px, 94vw); text-align: center; display: grid; justify-items: center; gap: 6px; }
 .worlds__title { margin: 0 0 18px; font-size: clamp(26px, 3.4vw, 40px); color: var(--ink); }
-.worlds__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; width: 100%; }
+.worlds__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; width: 100%; }
 .world {
   width: 100%; height: 100%; display: grid; justify-items: center; align-content: start; gap: 8px;
   padding: 18px 12px 16px; border-radius: 22px; border: 3px solid var(--ink); background: #fff;
@@ -1681,7 +1612,7 @@ button:focus-visible, a:focus-visible {
 .world svg { width: min(150px, 100%); height: auto; transition: transform .25s cubic-bezier(.3,1.6,.5,1); }
 .world:hover:not([disabled]) svg, .world:focus-visible svg { transform: rotate(-6deg) scale(1.06); }
 .world:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
-.world:focus-visible { outline: 3px solid var(--hat); outline-offset: 3px; }
+.world:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .world--on { background: #eaf4ee; }
 .world[disabled] { cursor: default; background: #f1f1ec; }
 .world[disabled] svg { filter: grayscale(.85) opacity(.7); }
@@ -1695,10 +1626,11 @@ button:focus-visible, a:focus-visible {
 .world[disabled] .world__count { color: var(--ink-soft); }
 /* one back button for every screen: round, big, top left */
 .screen__back { position: absolute; top: 34px; left: 34px; z-index: 2; background: var(--paper); }
-.round--back { display: grid; place-items: center; padding: 0; width: 52px !important; height: 52px !important; border-width: 3px; }
-.round--x { width: 48px; height: 48px; }
+.round--back { display: grid; place-items: center; padding: 0; width: 52px; height: 52px; border-width: 3px; }
+.round--x { display: grid; place-items: center; padding: 0; width: 48px; height: 48px; }
 @media (max-width: 600px) { .screen__back { top: 30px; left: 30px; } }
-@media (max-width: 860px) { .worlds__list { grid-template-columns: repeat(2, 1fr); gap: 14px; } .world svg { width: 110px; } }
+@media (max-width: 1100px) { .worlds__list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .worlds__list { gap: 14px; } .world svg { width: 110px; } }
 @media (max-height: 640px) { .world svg { width: 90px; } .world__tag { display: none; } }
 
 /* the emblems' paint */
@@ -1726,7 +1658,7 @@ button:focus-visible, a:focus-visible {
 .w__door { fill: #8a5a35; stroke: var(--ink); stroke-width: 2; }
 .w__window { fill: #ffe39a; stroke: var(--ink); stroke-width: 2; }
 .w__lamp { fill: #ffe39a; stroke: var(--ink); stroke-width: 2; }
-.w__grid { fill: none; stroke: rgba(20,65,52,.25); stroke-width: 1.5; }
+.w__grid { fill: none; stroke: rgba(var(--ink-rgb), .25); stroke-width: 1.5; }
 .w__plan { fill: none; stroke: var(--green); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 2 9; }
 .w__white { fill: var(--paper); stroke: var(--ink); stroke-width: 2.5; }
 .w__head { fill: #8a9a8c; stroke: var(--ink); stroke-width: 2.5; }
@@ -1735,7 +1667,7 @@ button:focus-visible, a:focus-visible {
 .toast {
   position: fixed; left: 50%; top: 108px; transform: translateX(-50%); z-index: 6;
   padding: 10px 18px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper);
-  box-shadow: 0 4px 0 var(--ink); font-weight: 800; color: var(--ink); white-space: nowrap;
+  box-shadow: var(--shadow-btn); font-weight: 800; color: var(--ink); white-space: nowrap;
   animation: toast 3.2s ease forwards; pointer-events: none;
 }
 @keyframes toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 8%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
@@ -1747,8 +1679,7 @@ button:focus-visible, a:focus-visible {
 .weather__vane { width: 50px; height: 50px; flex: 0 0 auto; }
 .weather__side { display: grid; gap: 2px; justify-items: center; }
 .weather__sky { width: 40px; height: 28px; }
-.weather__sock { width: 52px; height: 21px; }
-.weather__say { font-size: 13px; font-weight: 800; color: var(--ink); line-height: 1; }
+.weather__say { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ink); line-height: 1; }
 .wv__dial { fill: #eaf4ee; stroke: var(--ink); stroke-width: 2.5; }
 .wv__tick { fill: var(--ink); opacity: .45; }
 .wv__rod { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; fill: none; }
@@ -1762,13 +1693,9 @@ button:focus-visible, a:focus-visible {
 .ws__rain { stroke: #3d8fb0; stroke-width: 2.5; stroke-linecap: round; }
 .ws__bolt { fill: none; stroke: #f5b83d; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .ws__fog { stroke: #9aa9a2; stroke-width: 2.5; stroke-linecap: round; }
-.sock__on { fill: var(--hat); stroke: var(--ink); stroke-width: 1.5; }
-.sock__on--w { fill: var(--paper); }
-.sock__off { fill: none; stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 2 2; opacity: .35; }
-.lightning { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: #fff; animation: bolt .6s ease-out forwards; }
+.lightning { position: fixed; inset: 0; z-index: 2; pointer-events: none; background: #fff; animation: bolt .6s ease-out forwards; }
 @keyframes bolt { 0% { opacity: 0; } 8% { opacity: .75; } 16% { opacity: .1; } 24% { opacity: .55; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .lightning { animation: none; opacity: 0; } }
-
 
 /* each world has its own sky: a tropical blue over the island, a warm
    rosy haze over the mushroom town (the garden keeps the peach of the title) */
@@ -1789,9 +1716,9 @@ button:focus-visible, a:focus-visible {
 .cup__sum dt { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
 .cup__sum dd { margin: 0; font-size: 20px; font-weight: 800; color: var(--green); }
 .cup__sum dd.good { color: var(--green); } .cup__sum dd.bad { color: var(--hat); }
-.cup__track { list-style: none; margin: 0; padding: 12px 14px; display: grid; grid-template-columns: repeat(9, minmax(0, 42px)); justify-content: space-between; gap: 8px; border-radius: 16px; background: #eaf4ee; border: 2px dashed rgba(20,65,52,.25); }
-.cup__hole { position: relative; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: var(--ink-soft); border: 2px dashed rgba(20,65,52,.35); background: var(--paper); }
-.cup__hole--done { border-style: solid; border-color: var(--ink); color: var(--ink); }
+.cup__track { list-style: none; margin: 0; padding: 12px 14px; display: grid; grid-template-columns: repeat(9, minmax(0, 42px)); justify-content: space-between; gap: 8px; border-radius: 16px; background: #eaf4ee; border: 2px dashed rgba(var(--ink-rgb), .25); }
+.cup__hole { position: relative; overflow: visible; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: var(--ink-soft); border: 2px dashed rgba(var(--ink-rgb), .35); background: var(--paper); }
+.cup__hole--done { border-style: solid; border-color: var(--ink); color: var(--ink); display: grid; place-items: center; align-content: center; gap: 0; }
 .cup__hole--gold { background: #f5c542; } .cup__hole--silver { background: #d7dde0; } .cup__hole--bronze { background: #e0a877; }
 .cup__hole--now { border: 3px solid var(--hat); color: var(--hat); box-shadow: 0 0 0 4px rgba(226,82,72,.18); animation: nowhole 1.4s ease-in-out infinite; }
 @keyframes nowhole { 50% { box-shadow: 0 0 0 7px rgba(226,82,72,.08); } }
@@ -1806,11 +1733,12 @@ button:focus-visible, a:focus-visible {
 @media (prefers-reduced-motion: reduce) { .cup__hole--now { animation: none; } }
 
 /* the menu's head: the cup being played, with a way to another */
-.drawer__cup { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.drawer__cup svg { width: 52px; height: 52px; flex: 0 0 auto; }
-.drawer__cup h2 { margin: 0; font-size: 20px; line-height: 1.1; }
+/* a button: the cup being played, the name big on two lines */
+.drawer__cup { display: flex; align-items: center; gap: 12px; min-width: 0; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 14px; }
+.drawer__cup svg { width: 60px; height: 60px; flex: 0 0 auto; }
+.drawer__cup h2 { margin: 0; font-size: 24px; line-height: 1.02; }
 .linkish { border: 0; background: none; padding: 2px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; cursor: pointer; min-height: 32px; }
-.linkish:focus-visible { outline: 3px solid var(--hat); outline-offset: 2px; border-radius: 4px; }
+.linkish:focus-visible { outline: var(--ring); outline-offset: 2px; border-radius: 4px; }
 
 /* each cup's loader, curtain and hats */
 .hat path, .hat rect, .hat ellipse { stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; }
@@ -1832,11 +1760,10 @@ button:focus-visible, a:focus-visible {
 .boot__gnome .load__white { stroke: var(--ink); stroke-width: 2; }
 @media (prefers-reduced-motion: reduce) { .boot__gnome { animation: none; } }
 
-.world__me { display: grid; gap: 4px; width: 100%; font-size: 12px; font-weight: 700; color: var(--ink); }
-
-
-.worlds__list > li { display: grid; gap: 8px; }
-.world__me { padding: 0 6px; gap: 6px; }
+/* every card the same height */
+.worlds__list > li { display: flex; gap: 8px; }
+.worlds__list > li > .world { flex: 1; }
+.world__me { display: grid; gap: 6px; width: 100%; padding: 0 6px; font-size: 12px; font-weight: 700; color: var(--ink); }
 .world__track { display: block; width: 100%; padding-top: 4px; }
 .world__track svg { width: 100%; height: auto; display: block; overflow: visible; }
 .world__score { font-size: 13px; font-weight: 700; color: var(--ink); display: flex; justify-content: center; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -1844,7 +1771,7 @@ button:focus-visible, a:focus-visible {
 .world__stamp { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--hat); color: var(--hat); font-size: 11px; transform: rotate(-12deg); }
 .world__reset { justify-self: center; border: 2px solid var(--ink); background: var(--paper); border-radius: 12px; padding: 4px 12px; min-height: 36px; font: inherit; font-size: 12px; font-weight: 800; color: var(--ink-soft); cursor: pointer; }
 .world__reset--sure { background: var(--hat); color: var(--paper); }
-.world__reset:focus-visible { outline: 3px solid var(--hat); outline-offset: 2px; }
+.world__reset:focus-visible { outline: var(--ring); outline-offset: 2px; }
 @media (max-width: 600px) {
   .worlds__in { width: calc(100vw - 56px); padding-top: 64px; }
   .worlds__list { gap: 10px; }
@@ -1853,15 +1780,8 @@ button:focus-visible, a:focus-visible {
 
 /* the reset menu at the top of the cup screen */
 .resets { position: relative; margin: -8px 0 16px; }
-.resets__menu { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 3; display: grid; gap: 6px; padding: 10px; min-width: 200px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper); box-shadow: 0 4px 0 var(--ink); }
+.resets__menu { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 3; display: grid; gap: 6px; padding: 10px; min-width: 200px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper); box-shadow: var(--shadow-btn); }
 .resets__menu .world__reset { width: 100%; }
-/* every card the same height */
-.worlds__list > li { display: flex; }
-.worlds__list > li > .world { flex: 1; }
-@media (max-width: 860px) { .worlds__list { grid-template-columns: repeat(2, 1fr); } }
-.worlds__list { grid-template-columns: repeat(5, 1fr); }
-@media (max-width: 1100px) { .worlds__list { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 700px) { .worlds__list { grid-template-columns: repeat(2, 1fr); } }
 /* the Mountain Cup: emblem, loader, hat, sky */
 .w__sky--mountain { fill: #cfe6f7; }
 .w__snowfield { fill: #f4f8fb; stroke: var(--ink); stroke-width: 2.5; }
@@ -1879,8 +1799,6 @@ button:focus-visible, a:focus-visible {
 .sky--night.sky--w-mountain { background: linear-gradient(178deg, #141c3a 0%, #253255 60%, #3a4a72 100%); }
 /* the cup screen scrolls when its cards do not fit (a phone), never cut at the top */
 .screen.worlds { overflow-y: auto; }
-.worlds__list, .worlds__list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@media (max-width: 1100px) { .worlds__list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) {
   .screen.worlds { place-items: start center; align-content: start; padding: 0; }
   .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1889,7 +1807,6 @@ button:focus-visible, a:focus-visible {
 
 /* the forecast as a HUD card, next to the strokes */
 .card--weather { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
-.weather__say { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ink); line-height: 1; }
 @media (max-width: 600px) {
   /* a tight top row: a round badge, the vane alone with the sky tucked on it */
   /* out of the top row (it is full): a round badge under the menu button */
@@ -1903,19 +1820,13 @@ button:focus-visible, a:focus-visible {
 /* rain darkens and wets the scene; a storm more */
 .wet { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30,45,60,.28), rgba(20,40,50,.12)); transition: opacity .8s; }
 .wet--storm { background: linear-gradient(180deg, rgba(15,20,40,.5), rgba(15,25,35,.25)); }
-.lightning { z-index: 2; }
 
 /* a played hole: its strokes big, its number small, its medal a stamp on the corner */
-.cup__hole { overflow: visible; }
-.cup__hole--done { display: grid; place-items: center; align-content: center; gap: 0; }
 .cup__hole small { font-size: 9px; line-height: 1; opacity: .7; }
 .cup__hole b { font-size: 18px; line-height: 1; }
+.cup__hole--done b { font-size: 17px; }
 .cup__hole .stamp { position: absolute; top: -14px; right: -16px; width: 22px; height: 22px; opacity: .95; z-index: 1; }
-/* the menu's cup header: a button, the name big on two lines */
-.drawer__cup { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 14px; }
-.drawer__cup h2 { font-size: 24px; line-height: 1.02; }
-.drawer__cup svg { width: 60px; height: 60px; }
-.drawer__cup:focus-visible { outline: 3px solid var(--hat); outline-offset: 3px; }
+.drawer__cup:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .weather__until { font-size: 10px; font-weight: 700; color: var(--ink-soft); line-height: 1; white-space: nowrap; }
 @media (max-width: 600px) { .card--weather .weather__until { display: none; } }
 /* a long cup name stays on its card on a narrow phone */
@@ -1925,7 +1836,7 @@ button:focus-visible, a:focus-visible {
 /* the game canvas takes focus for the keyboard aim: a quiet frame, not a red
    box round the whole screen */
 #stage:focus { outline: none; }
-#stage:focus-visible { outline: 2px solid rgba(20,65,52,.35); outline-offset: -4px; }
+#stage:focus-visible { outline: 2px solid rgba(var(--ink-rgb), .35); outline-offset: -4px; }
 
 /* the two halves line up column for column; the total sits on its own line */
 .scorecard th { width: 88px; }
@@ -1952,10 +1863,10 @@ button:focus-visible, a:focus-visible {
 /* "strokes" sits level with the share pill (both centred), not on the digit's baseline */
 .win__head .win__score { align-items: center; }
 .win__head .share { position: relative; }
-.win__head .share::before { content: ""; position: absolute; left: -23px; top: 8px; bottom: 8px; border-left: 2px solid rgba(20,65,52,.15); }
+.win__head .share::before { content: ""; position: absolute; left: -23px; top: 8px; bottom: 8px; border-left: 2px solid rgba(var(--ink-rgb), .15); }
 @media (max-width: 600px) { .win__head { gap: 14px; } .win__head .share::before { display: none; } }
 .win__head .win__score { margin: 0; }
-.share { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 14px; border-radius: 999px; background: rgba(20,65,52,.06); }
+.share { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 14px; border-radius: 999px; background: rgba(var(--ink-rgb), .06); }
 .share__label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin-right: 2px; }
 .share__icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; padding: 0; box-shadow: 0 2px 0 var(--ink); transition: transform .1s; }
 .share__icon:hover { transform: translateY(-2px); }
@@ -1966,14 +1877,13 @@ button:focus-visible, a:focus-visible {
 .share__icon--facebook { background: #1877f2; color: #fff; }
 .share__icon--whatsapp { background: #25d366; color: #fff; }
 .share__icon--bluesky { background: #1185fe; color: #fff; }
-.share__icon:focus-visible { outline: 3px solid var(--hat); outline-offset: 2px; }
+.share__icon:focus-visible { outline: var(--ring); outline-offset: 2px; }
 @media (max-width: 600px) { .win__head { gap: 10px; } .share__label { display: none; } .share__icon { width: 34px; height: 34px; } }
 .note--warn { background: #fff3d6; border: 2px solid #e0a44a; color: var(--ink); border-radius: 12px; padding: 8px 12px; font-size: 13px; }
-.cup__hole--done b { font-size: 17px; }
 
 /* the wind's strength on the weather card: four rising bars and the figure */
 .weather__force { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
-.weather__force i { display: block; width: 4px; border-radius: 1px; background: rgba(20,65,52,.2); }
+.weather__force i { display: block; width: 4px; border-radius: 1px; background: rgba(var(--ink-rgb), .2); }
 .weather__force i.on { background: var(--hat); }
 .weather__force b { font-size: 10px; line-height: 1; margin-left: 3px; color: var(--ink); }
 @media (max-width: 600px) { .card--weather .weather__force { display: none; } }
@@ -1984,7 +1894,7 @@ button:focus-visible, a:focus-visible {
 .adena__wrap .adena--on { padding-right: 52px; }
 .adena__off { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); display: grid; place-items: center; padding: 0; cursor: pointer; z-index: 2; }
 .adena__off:hover { background: var(--hat); color: var(--paper); }
-.adena__off:focus-visible { outline: 3px solid var(--hat); outline-offset: 2px; }
+.adena__off:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .drawer__off { display: none; }
 @media (max-width: 600px) { .adena__off { display: none; } .adena__wrap .adena--on { padding-right: 0; } .drawer__off { display: block; grid-column: 1 / -1; } }
 
@@ -1997,12 +1907,9 @@ button:focus-visible, a:focus-visible {
 
 /* the leaderboard: a chip at the bottom right of every hole, a sheet with two tabs */
 /* a phone: the bottom row is Restart and Whole course; the chip goes to the icon alone, above them */
-.boards { max-width: 560px; }
+.boards { max-width: 560px; position: relative; } /* (the close X sits in the sheet's own corner) */
 .boards__tabs { display: flex; gap: 6px; margin: 6px 0 12px; }
-/* the close X sits in the sheet's own corner */
-.boards { position: relative; }
 
-.boards__soon { margin: 0 0 8px; padding: 6px 12px; border-radius: 10px; background: #fff3d6; border: 2px dashed #e0a44a; font-size: 13px; font-weight: 800; color: var(--ink); text-align: center; }
 .boards__more { display: block; margin: 10px auto 0; }
 .boards .lb ol { max-height: 46vh; overflow-y: auto; }
 
@@ -2012,7 +1919,7 @@ button:focus-visible, a:focus-visible {
 .sheet__in { position: relative; }
 .sheet__close { position: absolute; top: 16px; right: 16px; z-index: 2; }
 /* the X sits in the header rows: the few right after it stop short of it */
-.sheet__close ~ .eyebrow, .sheet__close ~ h2, .sheet__close ~ .boards__tabs, .sheet__close ~ .boards__soon { margin-right: 52px; }
+.sheet__close ~ .eyebrow, .sheet__close ~ h2, .sheet__close ~ .boards__tabs { margin-right: 52px; }
 .sheet__in:has(> .sheet__close) { padding-top: 22px; }
 /* until launch */
 .soon { margin: 6px 0 4px; padding: 12px 14px; border-radius: 14px; background: #fff3d6; border: 2px dashed #e0a44a; }
@@ -2020,10 +1927,9 @@ button:focus-visible, a:focus-visible {
 .soon p { margin: 8px 0 0; font-size: 14px; color: var(--ink); }
 
 /* the aim mode: a two-way switch with its note, in the menu and the picker */
-.aimset { display: grid; gap: 6px; margin: 4px 0 10px; }
+.aimset { display: grid; gap: 8px; margin: 4px 0 14px; }
 .aimset__label { font-weight: 800; }
-.aimset__help { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
-.aimset--compact { justify-items: center; text-align: center; margin: 6px auto 12px; max-width: 360px; }
+.aimset__help { font-size: 12px; color: var(--ink-soft); line-height: 1.35; text-align: left; }
 .pro-chip { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 1px 6px; border-radius: 6px; background: var(--ink); color: var(--paper); font-style: normal; }
 .pro-chip--row { margin: 0 0 0 6px; vertical-align: 1px; }
 .boards__modes { margin-bottom: 4px; }
@@ -2033,21 +1939,20 @@ button:focus-visible, a:focus-visible {
 .aimset__info:focus-visible { outline: 2px solid var(--hat); border-radius: 50%; }
 .boards__word { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
 /* the picker, slimmer: fits a 13" laptop and a phone without scrolling */
-.aimset--compact { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; margin: 4px auto 8px; }
+/* (the .aimset grid, centred: a later .aimset rule had always won over its display: flex) */
+.aimset--compact { align-items: center; justify-content: center; justify-items: center; text-align: center; max-width: 360px; }
 .aimset--compact .aimset__label { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
-.aimset--compact .aimset--compact .aimset__help { flex-basis: 100%; text-align: center; font-size: 11px; }
+.aimset--compact .aimset__help { flex-basis: 100%; text-align: center; font-size: 11px; }
 /* the picker's button, the same size whether it says Choose or Locked (the
    line above keeps its own fixed two-line height, in its rule above) */
 .screen .btn--play { font-size: 16px; padding: 10px 26px; min-width: 210px; min-height: 48px; }
-@media (max-height: 820px) { .pick__canvas { height: 38vh !important; width: 38vh !important; } }
-@media (max-width: 600px) { .pick__canvas { width: 56vw !important; height: 56vw !important; } }
 
 /* friends and the named-only line */
 .boards__ranked { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
 .friends h3 { margin: 10px 0 6px; }
 .friends__add { display: flex; gap: 8px; margin: 12px 0 6px; }
 .friends__add input { flex: 1; min-width: 0; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--ink); font: inherit; font-size: 14px; background: #fff; color: var(--ink); }
-.friends__add input:focus-visible { outline: 3px solid var(--hat); outline-offset: 1px; }
+.friends__add input:focus-visible { outline: var(--ring); outline-offset: 1px; }
 .friends__list { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; font-size: 13px; }
 .friends__list li { display: flex; justify-content: space-between; gap: 8px; }
 .friends__invite { margin-top: 6px; }
@@ -2065,7 +1970,6 @@ button:focus-visible, a:focus-visible {
    lifts a little under the pointer, rings when focused, greys when disabled;
    a badge sits in its top-right corner. The segmented switch and the toggle
    are the same family. */
-:root { --press: 3px; --lift: 1px; --ring: 3px solid var(--hat); --shadow-btn: 0 4px 0 var(--ink); }
 .btn, .burger, .adena { position: relative; transition: transform .08s, box-shadow .08s, background .15s; }
 .btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
 .btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
@@ -2090,8 +1994,6 @@ button:focus-visible, a:focus-visible {
 .seg button:active { transform: translateY(1px); }
 .seg button.on { background: var(--green); color: var(--paper); }
 .boards .seg { margin: 6px 0 10px; }
-.aimset { display: grid; gap: 8px; margin: 4px 0 14px; }
-.aimset__help { text-align: left; }
 .aimset--compact .seg { box-shadow: none; }
 .aimset--compact .seg button { padding: 4px 12px; min-height: 30px; font-size: 13px; }
 /* the strokes card: room around its lines, the PRO badge in its corner */

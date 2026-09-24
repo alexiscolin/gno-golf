@@ -6,6 +6,7 @@ out/
 media/*
 !media/gnogolf-demo.gif
 !media/promo/
+!media/lib/
 # promo renders and the music file are rebuilt by media/promo/render.mjs
 media/promo/*.mp4
 media/promo/music/

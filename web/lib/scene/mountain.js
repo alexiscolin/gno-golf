@@ -7,13 +7,13 @@
 // the physics. Tall things stand behind and to the right, as in the garden.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, flat, drawn, rbox, lanternGlow, share, pushHull, fadeable, fadeLoop } from "./materials.js";
+import { C, flat, drawn, rbox, lanternGlow, share, ownFade, fadeLoop } from "./materials.js";
 import { animate, state } from "./state.js";
-import { inZone } from "../terrain.js";
+import { inZone, mod, there, segDist, wallDist, smoothstep } from "../terrain.js";
 import { timeOf } from "./camera.js";
 import { gnomelet, bunting, stone, smoke } from "./props.js";
-import { mergeByMaterial, look, weatherLooks } from "./course.js";
-import { seeded, ISLAND, GRASS } from "./common.js";
+import { bake, look, weatherLooks } from "./bake.js";
+import { seeded, ISLAND, GRASS, placer, onGround } from "./common.js";
 
 const M = {
   snow: 0xf4f8fc, shadow: 0xc9d8ea, rock: 0x7d8490, rockDark: 0x5f6672,
@@ -30,18 +30,11 @@ const M = {
 const DRIFT_OPAQUE = share(new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xb9d0ec, emissiveIntensity: 0.1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
 const SNOW_2SIDE = new THREE.MeshLambertMaterial({ color: 0xf6f9fc, emissive: 0xc4d2e2, emissiveIntensity: 0.55, side: THREE.DoubleSide });
 const SNOW = share(new THREE.MeshLambertMaterial({ color: 0xf6f9fc, emissive: 0xc4d2e2, emissiveIntensity: 0.55 }));
-/**
- * A moving piece made of many meshes costs a draw call per mesh, every frame
- * (bake() only merges what stands still). compact() merges an object's meshes
- * that share a material into one, in the object's own space: a chair of eight
- * parts becomes two or three draws. Sprites, lines and points are left as they are.
- */
-function compact(obj) {
-  // (the shared merge bakes into world space: an object is compacted while it
-  // still stands at the origin, and placed afterwards)
-  mergeByMaterial(obj);
-  return obj;
-}
+// A moving piece made of many meshes costs a draw call per mesh, every frame
+// (the hole's bake only merges what stands still): compact() merges an
+// object's meshes that share a material into one, in the object's own space
+// (bake's local frame): a chair of eight parts becomes two or three draws.
+const compact = (obj) => bake(obj, { local: true });
 
 /**
  * Many copies of one moving thing (chairs on a lift, skiers): the template is
@@ -72,14 +65,13 @@ function instances(template, n) {
   };
 }
 
-const smooth = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
 const CLIFF = 11; // how far in front of the plot the shelf ends: past the overview's bottom edge
 
 /** How high the snow lies above GRASS: flat round the board, rising into
  *  drifts further out and up the slope behind it. */
 function snowAt(W, H, x, z) {
   const d = Math.max(0, -x - 2, x - W - 2, -z - 2);
-  return smooth(d / 14) * (1.5 + 0.9 * Math.sin(x * 0.21 + z * 0.13) + 0.5 * Math.cos(x * 0.07 - z * 0.3)) + smooth(-z / 40) * 6;
+  return smoothstep(d / 14) * (1.5 + 0.9 * Math.sin(x * 0.21 + z * 0.13) + 0.5 * Math.cos(x * 0.07 - z * 0.3)) + smoothstep(-z / 40) * 6;
 }
 
 // ---------------------------------------------------------------- the land
@@ -112,10 +104,10 @@ function base(s, box) {
   const nzz = zs.length - 1;
   const far = new THREE.Color(0xc2d2e2);
   const tint = (x, z, y) => {
-    c.copy(white).lerp(blue, 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(x * 0.4 + z * 0.25)) * smooth(y / 2));
+    c.copy(white).lerp(blue, 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(x * 0.4 + z * 0.25)) * smoothstep(y / 2));
     // aerial perspective: the snow further back goes blue-grey, so it reads
     // as ground running up to the peaks, not as sky
-    return c.lerp(far, 0.6 * smooth(-(z + 3) / 9));
+    return c.lerp(far, 0.6 * smoothstep(-(z + 3) / 9));
   };
   for (let j = 0; j <= nzz; j++)
     for (let i = 0; i <= nx; i++) {
@@ -218,13 +210,12 @@ function base(s, box) {
     g.add(mist);
     animate((t) => (mist.position.x = (X0 + X1) / 2 + Math.sin(t * 0.05 + k * 2) * 8));
   }
-  // rocks breaking through the snow, and along the cliff's lip
+  // rocks breaking through the snow (not on the cliff's lip: there they read as floating over the drop)
   for (let k = 0; k < 16; k++) {
     const r = drawn(new THREE.DodecahedronGeometry(0.8 + rand() * 1.6, 0), flat(rand() < 0.5 ? M.rock : M.rockDark));
-    const onLip = false; // on the lip they read as floating over the drop
-    const x = onLip ? X0 + 8 + rand() * (X1 - X0 - 16) : rand() < 0.5 ? X0 + rand() * 14 : X1 - rand() * 14;
-    const z = onLip ? Z1 - 0.4 : Z0 + 10 + rand() * (Z1 - Z0 - 20);
-    if (!onLip && x > -8 && x < W + 8 && z > -8 && z < H + 8) continue; // well clear of the board
+    const x = rand() < 0.5 ? X0 + rand() * 14 : X1 - rand() * 14;
+    const z = Z0 + 10 + rand() * (Z1 - Z0 - 20);
+    if (x > -8 && x < W + 8 && z > -8 && z < H + 8) continue; // well clear of the board
     if (cracks.some(([a, b]) => x > a - 2.5 && x < b + 2.5)) continue; // and of the crack
     r.position.set(x, GRASS + lift(x, z) - 0.3, z);
     r.scale.set(1, 0.55, 1);
@@ -355,17 +346,26 @@ function peaks(rand, X0, X1, Z0, Z1, drop, box) {
   return g;
 }
 
+/** The rocks on the shelf round a W×H board: where edging draws them, and
+ *  where decor keeps off. */
+function edgeRocks(W, H, seed) {
+  const rand = seeded("mountain-edge" + seed), out = [];
+  for (let k = 0; k < 6; k++) {
+    const size = 0.35 + rand() * 0.3, side = k % 2, slot = Math.floor(k / 2); // three slots a side, one rock each
+    const x = 2 + ((slot + 0.2 + rand() * 0.6) * (W - 4)) / 3, z = side ? -2.4 - rand() : H + 2.4 + rand();
+    out.push({ size, x, z, rot: [rand(), rand() * 6, rand()] });
+  }
+  return out;
+}
+
 /** The shelf round the board: a few rocks half sunk in the snow, no more. */
 function edging(box, seed) {
   const g = new THREE.Group();
-  const rand = seeded("mountain-edge" + seed);
-  const W = box.max.x - ISLAND.x, H = box.max.z - ISLAND.front;
-  for (let k = 0; k < 6; k++) {
-    const r = drawn(new THREE.DodecahedronGeometry(0.35 + rand() * 0.3, 0), flat(M.rock));
-    const side = k % 2, slot = Math.floor(k / 2); // three slots a side, one rock each
-    r.position.set(2 + ((slot + 0.2 + rand() * 0.6) * (W - 4)) / 3, GRASS - 0.1, side ? -2.4 - rand() : H + 2.4 + rand());
+  for (const { size, x, z, rot } of edgeRocks(box.max.x - ISLAND.x, box.max.z - ISLAND.front, seed)) {
+    const r = drawn(new THREE.DodecahedronGeometry(size, 0), flat(M.rock));
+    r.position.set(x, GRASS - 0.1, z);
     r.scale.y = 0.5;
-    r.rotation.set(rand(), rand() * 6, rand());
+    r.rotation.set(...rot);
     g.add(r);
   }
   return g;
@@ -648,7 +648,7 @@ function skiers(rand, path, ground, n) {
  * pylon behind the left end to one behind the right end, the cabin gliding
  * across it in half a minute, then gone (off the far pylon) for a while.
  */
-function cableCar(W, H) {
+function cableCar(W) {
   const g = new THREE.Group();
   const y = GRASS + 12, a = new THREE.Vector3(-14, y, -9), b = new THREE.Vector3(W + 14, y + 1.5, -6);
   g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: M.cable })));
@@ -947,33 +947,6 @@ function skiJump() {
   return g;
 }
 
-// A piece over the lane gets its own fadeable materials (materials.js
-// fadeable/setFade), so it can fade out of the camera's way without fading the
-// shared palette. Returns them, for fadeLoop. Ice keeps its own see-through
-// level: its base opacity is remembered, and applied under the fade.
-const inkFade = () => pushHull(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), 0.055);
-function fadeMats(piece) {
-  const mats = [], own = new Map();
-  let ink = null;
-  piece.traverse((o) => {
-    if (!o.isMesh) return;
-    if (o.material.side === THREE.BackSide) {
-      o.material = ink || (ink = fadeable(inkFade()));
-      return;
-    }
-    if (!own.has(o.material)) {
-      const m = fadeable(o.material.clone());
-      if (o.material.transparent) m.userData.base = o.material.opacity;
-      own.set(o.material, m);
-    }
-    o.material = own.get(o.material);
-  });
-  for (const m of own.values()) mats.push(m);
-  if (ink) mats.push(ink);
-  piece.userData.live = true;
-  return mats;
-}
-
 /**
  * Over the lane: arches of ice spanning it from rim to rim, with icicles
  * hanging from them and a glint running along; they fade where they come
@@ -998,7 +971,6 @@ const canopyOf = (s) => {
  * between the camera and the ball.
  */
 function canopy(s, rand) {
-  const W = s.board.w, H = s.board.h;
   const g = new THREE.Group();
   const faders = [], sparks = [];
   if (canopyOf(s) === "arches")
@@ -1034,7 +1006,7 @@ function canopy(s, rand) {
       a.position.set(x, GRASS, zc);
       a.rotation.y = Math.PI / 2; // across the lane
       g.add(a);
-      const mats = fadeMats(a);
+      const mats = ownFade(a);
       for (const u of [0.03, 0.2, 0.5, 0.8, 0.97]) faders.push({ at: new THREE.Vector3(x, GRASS + Math.sin(u * Math.PI) * r, zc + Math.cos(u * Math.PI) * r), r: 2.4, mats });
     }
   else if (canopyOf(s) === "pines")
@@ -1061,21 +1033,11 @@ function canopy(s, rand) {
       compact(piv);
       piv.position.set(x, GRASS, -2.4);
       g.add(piv);
-      const mats = fadeMats(piv);
+      const mats = ownFade(piv);
       for (const p of [curve.getPoint(0.7), top]) faders.push({ at: p.clone().add(piv.position), r: 2.4, mats });
       animate((t) => (piv.rotation.z = Math.sin(t * 0.5 + x) * 0.02));
     }
-  const loop = fadeLoop(faders, { min: 0.22 });
-  const ice = [...new Set(faders.flatMap((f) => f.mats))].filter((m) => m.userData.base !== undefined);
-  g.userData.fade = (eye, ball) => {
-    loop(eye, ball);
-    // ice is always see-through: its base level, times the fade
-    for (const m of ice) {
-      if (!m.transparent) (m.transparent = true), (m.needsUpdate = true);
-      m.opacity = m.userData.base * m.userData.fade;
-      m.depthWrite = false;
-    }
-  };
+  g.userData.fade = fadeLoop(faders); // (ice stays see-through: its base level, times the fade)
   animate((t) => sparks.forEach((sp) => (sp.m.material.opacity = Math.max(0, Math.sin(t * 2.3 + sp.ph)) ** 6, (sp.m.visible = sp.m.material.opacity > 0.01))));
   return g;
 }
@@ -1111,11 +1073,8 @@ function archSpots(s) {
     }
     return hi > lo ? { z: (lo + hi) / 2, r: (hi - lo) / 2 + 1.35 } : null; // feet clear of the kerb
   };
-  const toWall = (x, z) => Math.min(...s.walls.filter((w) => !w.every).map((w) => {
-    const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
-    const t = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (z - w.a[1]) * dz) / l2));
-    return Math.hypot(x - w.a[0] - t * dx, z - w.a[1] - t * dz);
-  }));
+  const fixed = s.walls.filter((w) => !w.every);
+  const toWall = (x, z) => wallDist(x, z, fixed);
   const feetClear = (x, sp) => {
     for (let k = 0; k < 4; k++, sp.r += 0.35) if (toWall(x, sp.z - sp.r) > 1 && toWall(x, sp.z + sp.r) > 1) return true;
     return false;
@@ -1140,15 +1099,9 @@ function decor(s, bank = () => 0) {
   const Z0 = -ISLAND.back + 0.8, Z1 = H + ISLAND.front - 0.6;
   const night = timeOf(s.hole) !== "day";
 
-  const taken = [];
-  const free = (x, z, r) => taken.every((t) => Math.hypot(t.x - x, t.z - z) >= t.r + r);
-  const reserve = (x, z, r) => taken.push({ x, z, r });
+  const { free, reserve } = placer();
   const onBoard = (x, z, r) => x > -0.8 - r && x < W + 0.8 + r && z > -0.8 - r && z < H + 0.8 + r;
-  const nearWall = (x, z, r) => (s.walls || []).some((w) => {
-    const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
-    const u = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (z - w.a[1]) * dz) / l2));
-    return Math.hypot(x - w.a[0] - u * dx, z - w.a[1] - u * dz) < r + 0.6;
-  });
+  const nearWall = (x, z, r) => (s.walls || []).some((w) => segDist(x, z, w.a, w.b) < r + 0.6);
   const place = (m, x, z, r, rot = 0) => {
     if (!free(x, z, r) || onBoard(x, z, r) || nearWall(x, z, r) || z + r > Z1 + CLIFF - 1) return null; // not over the cliff
     m.position.set(x, GRASS + bank(x, z) - 0.05, z);
@@ -1159,18 +1112,8 @@ function decor(s, bank = () => 0) {
   };
   // the crack, wherever it runs
   for (const [a, b] of crevasses(s)) for (let z = Z0 - 30; z < Z1 + CLIFF; z += 1) reserve((a + b) / 2, z, (b - a) / 2 + 0.8);
-  // the edging's rocks (edging is built on its own; its rocks sit at these
-  // spots, so decor keeps off them)
-  {
-    const er = seeded("mountain-edge" + s.hole);
-    for (let k = 0; k < 6; k++) {
-      er(); // the rock's size
-      const side = k % 2, slot = Math.floor(k / 2);
-      const x = 2 + ((slot + 0.2 + er() * 0.6) * (W - 4)) / 3, z = side ? -2.4 - er() : H + 2.4 + er();
-      er(); er(); er(); // its tilt
-      reserve(x, z, 0.8);
-    }
-  }
+  // the edging's rocks (edging is built on its own): decor keeps off them
+  for (const { x, z } of edgeRocks(W, H, s.hole)) reserve(x, z, 0.8);
   // the lane lift's stations (mountain8), before the groves take the room
   {
     const L = liftPlan(s);
@@ -1274,7 +1217,7 @@ function decor(s, bank = () => 0) {
   // a ski jump far off on the slope behind, left of centre
   place(skiJump(), X0 + (X1 - X0) * 0.36, -11, 2.5, 0);
 
-  g.add(cableCar(W, H));
+  g.add(cableCar(W));
   g.add(bobsleigh(X0, X1, H, bank, reserve));
   // the ski lift (mountain8): a line of its own across the lane at each bar
   if ((s.walls || []).some((w) => w.skin === "lift")) g.add(liftLines(s, night, reserve));
@@ -1320,11 +1263,7 @@ function extras(ex, s, t) {
   const height = (x, z) => (t && t.height ? t.height(x, z) : 0);
   // walls of the lane itself: the slide comes over the one nearest a bar's end
   const walls = (s.walls || []).filter((w) => !w.every);
-  const toWall = (x, z) => Math.min(...walls.map((w) => {
-    const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
-    const u = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (z - w.a[1]) * dz) / l2));
-    return Math.hypot(x - w.a[0] - u * dx, z - w.a[1] - u * dz);
-  }));
+  const toWall = (x, z) => wallDist(x, z, walls);
   // a bar (4 walls) or a box as: its centre line, the end at the lane's edge, the way out
   const pieceOf = (ends, thick) => {
     let [a, b] = ends;
@@ -1529,7 +1468,6 @@ function warning(w, ground, start) {
 // course.js and zones.js ask piece(kind, item, t, s) for every post, wall and
 // zone; nothing back means "draw it the shared way".
 
-const onGround = (m, x, z, t) => (m.position.set(x, t.height(x, z), z), m);
 
 /**
  * A skin laid over a zone's shape, on the ground as it is (a ramp rises, so
@@ -1915,7 +1853,7 @@ function liftPlan(s) {
   const n = bars.length, every = bars[0].every, on = bars[0].on, P = every / n;
   const D = (bars[n - 1].x - bars[0].x) / (n - 1);
   const zc = bars.reduce((a, b) => a + (b.z0 + b.z1) / 2, 0) / n, half = Math.max(...bars.map((b) => (b.z1 - b.z0) / 2));
-  const t0 = (((-bars[0].phase) % every) + every) % every;
+  const t0 = mod(-bars[0].phase, every);
   return { bars, n, every, on, P, D, zc, half, t0, xA: bars[0].x - D / 2, xB: bars[n - 1].x + D / 2, bench: 2 * half - 3 };
 }
 
@@ -1945,13 +1883,12 @@ function liftChairs(L, t) {
     if (a < -LIFT_IN || a > L.n + LIFT_IN) continue;
     const working = ((j % L.n) + L.n) % L.n === 0;
     // the working chair swings down inside the near shed and up inside the far one
-    const down = working ? smooth01((a + LIFT_EASE) / LIFT_EASE) * smooth01((L.n + LIFT_EASE - a) / LIFT_EASE) : 0;
+    const down = working ? smoothstep((a + LIFT_EASE) / LIFT_EASE) * smoothstep((L.n + LIFT_EASE - a) / LIFT_EASE) : 0;
     const x = L.xA + L.D * a, high = cableY(L, x) - SEAT_HANG;
-    out.push({ x, seat: high + (SEAT_LOW - high) * down, working, j, sway, fade: smooth01((a + LIFT_FADE) / LIFT_FADE) * smooth01((L.n + LIFT_FADE - a) / LIFT_FADE), onLane: a >= 0 && a < L.n });
+    out.push({ x, seat: high + (SEAT_LOW - high) * down, working, j, sway, fade: smoothstep((a + LIFT_FADE) / LIFT_FADE) * smoothstep((L.n + LIFT_FADE - a) / LIFT_FADE), onLane: a >= 0 && a < L.n });
   }
   return out;
 }
-const smooth01 = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
 
 /** The cable's height at x: at LIFT_CABLE at the stations, sagging between. */
 function cableY(L, x) {
@@ -2176,7 +2113,7 @@ function snowCannon(z, t, s) {
   g.add(streaks);
   let on = 0, target = 0;
   const every = z.every | 0, onFor = z.on | 0, phase = z.phase | 0;
-  state.timed.push({ at: (step) => (target = every ? (((Math.floor(step) + phase) % every) + every) % every < onFor ? 1 : 0.08 : 1) });
+  state.timed.push({ at: (step) => (target = there(Math.floor(step), every, onFor, phase) ? 1 : 0.08) });
   let last = null;
   animate((tt) => {
     const dt = last === null ? 0 : Math.min(0.1, tt - last);
@@ -2363,7 +2300,7 @@ function serac(z, t, s) {
   let on = false, warn = 0, t0 = -1e9, t1 = -1e9, now = 0;
   state.timed.push({
     at: (step) => {
-      const k = ((((Math.floor(step) + phase) % every) + every) % every);
+      const k = mod(Math.floor(step) + phase, every);
       const was = on;
       on = !every || k < onFor;
       // substeps to go before the next fall
@@ -2507,7 +2444,7 @@ function piece(kind, item, t, s) {
     for (let r = 0; r <= NR; r++)
       for (let q = 0; q < NT; q++) {
         const th = (q / NT) * Math.PI * 2, rr = r / NR, [x, zz] = at(th, rr);
-        const k = smooth01((1 - rr) / 0.35); // 0 at the edge, 1 a third of the way in
+        const k = smoothstep((1 - rr) / 0.35); // 0 at the edge, 1 a third of the way in
         const hgt = k * (0.17 + 0.04 * ripple(x, zz) + 0.04 * n2(x * 0.7, zz * 0.7)) + 0.015;
         pos.push(x, t.height(x, zz) + hgt, zz);
         const c = col(x, zz).lerp(piste, 0.25 * (1 - k)).lerp(shade, 0.35 * Math.exp(-(((1 - rr) - 0.06) ** 2) / 0.002));
@@ -2531,7 +2468,7 @@ function piece(kind, item, t, s) {
     // the drift's height at (x, z), as the mesh has it (by its polar rings)
     const hAt = (x, zz) => {
       const u = (x - cx) / ax, v = (zz - cz) / az, th = Math.atan2(v, u), rr = Math.hypot(u, v) / edgeR(th);
-      const k = smooth01((1 - rr) / 0.35);
+      const k = smoothstep((1 - rr) / 0.35);
       return t.height(x, zz) + k * (0.17 + 0.04 * ripple(x, zz) + 0.04 * n2(x * 0.7, zz * 0.7)) + 0.015;
     };
     const N = Math.min(60, Math.ceil(((x1 - x0) * (z1 - z0)) * 1.2)), sp = new Float32Array(N * 3);
@@ -2616,7 +2553,7 @@ function piece(kind, item, t, s) {
     // drawing would colour a slope green), and the cannon beside it
     const g = snowCannon(item, t, s);
     const drops = (s.zones || []).filter((q) => q.kind === "hazard");
-    g.add(overlay(item, t, (x, zz) => new THREE.Color(Math.floor(x * 1.2) % 2 ? green[0] : green[1]), () => 0, undefined, true, (x, zz) => !drops.some((q) => inZone(q, x, zz))));
+    g.add(overlay(item, t, (x) => new THREE.Color(Math.floor(x * 1.2) % 2 ? green[0] : green[1]), () => 0, undefined, true, (x, zz) => !drops.some((q) => inZone(q, x, zz))));
     return g;
   }
   return undefined;

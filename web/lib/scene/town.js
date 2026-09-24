@@ -7,12 +7,13 @@
 // behind and to the right, as in the garden, so the lane is never hidden.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"; // the skyline
-import { C, flat, drawn, rbox, texOf, ink, lanternGlow, grows, share, pushHull, fadeable as fading, fadeLoop } from "./materials.js";
-import { mergeByMaterial, look, weatherLooks } from "./course.js";
+import { C, flat, drawn, rbox, texOf, ink, lanternGlow, grows, share, ownFade, fadeLoop } from "./materials.js";
+import { bake, look, weatherLooks } from "./bake.js";
 import { animate } from "./state.js";
 import { timeOf } from "./camera.js";
 import { gnomelet, brolly, bunting, mailbox } from "./props.js";
-import { seeded, ISLAND, GRASS } from "./common.js";
+import { seeded, ISLAND, GRASS, placer, onGround } from "./common.js";
+import { inPoly } from "../terrain.js";
 
 const T = {
   cobble: 0xcdbb9f, cobbleDark: 0xa99578, curb: 0xe2d6c0, quay: 0xa89c8a,
@@ -471,41 +472,16 @@ function streetTree(rand, bare = false) {
   return g;
 }
 
-/**
- * One mesh per material for a group that moves as one (a lantern string, a
- * leaning mushroom, the tram): the shared bake, in the group's own frame, so
- * the group can go on moving.
- */
-function mergeLive(group) {
-  group.updateMatrix(); // its position as set, not as last rendered
-  const m = group.matrix.clone(), parent = group.parent;
-  if (parent) parent.remove(group);
-  group.matrix.identity();
-  group.matrix.decompose(group.position, group.quaternion, group.scale);
-  mergeByMaterial(group);
-  m.decompose(group.position, group.quaternion, group.scale);
-  if (parent) parent.add(group);
-  return group;
-}
+/** One mesh per material for a group that moves as one (a lantern string, a
+ *  leaning mushroom, the tram): the shared bake, in the group's own frame. */
+const mergeLive = (group) => bake(group, { local: true });
 
-// A piece over the lane gets its own see-through materials, so it can fade
-// out of the camera's way without fading the shared palette (see fade below).
-function fadeable(piece, points) {
-  const ink = fading(pushHull(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), 0.055));
-  const mats = [ink], own = new Map();
-  piece.traverse((o) => {
-    if (!o.isMesh) return;
-    if (o.material.side === THREE.BackSide) return void (o.material = ink);
-    if (!own.has(o.material)) {
-      const m = fading(o.material.clone());
-      m.transparent = false;
-      own.set(o.material, m);
-      mats.push(m);
-    }
-    o.material = own.get(o.material);
-  });
-  piece.userData.live = true;
-  return points.map((at) => ({ at, r: 1.8, mats })); // see-through within ~2.3 of the view line, back by ~4, as before
+// A piece over the lane gets its own see-through materials (materials.js
+// ownFade), so it can fade out of the camera's way without fading the shared
+// palette: see-through within ~2.3 of the view line at these points, back by ~4.
+function fadeAt(piece, points) {
+  const mats = ownFade(piece);
+  return points.map((at) => ({ at, r: 1.8, mats }));
 }
 
 /**
@@ -560,7 +536,7 @@ function overhead(W, H, rand, night) {
     }
     g.add(line);
     strings.push({ line, ph: rand() * 6 });
-    faders.push(...fadeable(line, pts));
+    faders.push(...fadeAt(line, pts));
   }
   // two giant mushrooms rooted beside the lane's ends, leaning in over them:
   // a red and a violet cap with white spots, cream gills under, a stem you see
@@ -590,7 +566,7 @@ function overhead(W, H, rand, night) {
     piv.add(stem, head);
     g.add(mergeLive(piv));
     leaners.push({ piv, ph: rand() * 6 });
-    faders.push(...fadeable(piv, [curve.getPoint(0.6), top].map((p) => p.clone().add(piv.position))));
+    faders.push(...fadeAt(piv, [curve.getPoint(0.6), top].map((p) => p.clone().add(piv.position))));
   }
   // balloons, bobbing high over the square
   const balloons = [];
@@ -606,7 +582,7 @@ function overhead(W, H, rand, night) {
     g.add(b);
     balloons.push({ b, x: rand() * W, z: -3 - rand() * 3, y: 8 + rand() * 3, ph: rand() * 6 });
   }
-  g.userData.fade = fadeLoop(faders, { min: 0.22 });
+  g.userData.fade = fadeLoop(faders);
 
   animate((t) => {
     for (const s of strings) s.line.rotation.x = Math.sin(t * 0.8 + s.ph) * 0.012;
@@ -815,12 +791,10 @@ function decor(s) {
   const W = s.board.w, H = s.board.h;
   const rand = seeded("town" + s.name + s.hole);
   const X0 = -ISLAND.x + 0.8, X1 = W + ISLAND.x - 0.8;
-  const Z0 = -ISLAND.back + 0.8, Z1 = H + ISLAND.front - 0.6;
+  const Z0 = -ISLAND.back + 0.8;
   const time = timeOf(s.hole), night = time !== "day";
 
-  const taken = [];
-  const free = (x, z, r) => taken.every((t) => Math.hypot(t.x - x, t.z - z) >= t.r + r);
-  const reserve = (x, z, r) => taken.push({ x, z, r });
+  const { free, reserve } = placer();
   // the board and a step round it are the lane's
   // (the walls may reach past the board's nominal size: keep clear of them too)
   let bx0 = 0, bz0 = 0, bx1 = W, bz1 = H;
@@ -854,13 +828,11 @@ function decor(s) {
   for (let x = X0 + 4; x < X1 - 3; x += 7 + rand() * 4) place(stall(rand, time === "night"), x, -5.6, 1.1, (rand() - 0.5) * 0.3);
   const tower = place(clockTower(night), X0 + (X1 - X0) * 0.68, -7.2, 2);
   if (!tower) place(clockTower(night), X1 - 3, -7.2, 2);
-  // two rows of houses, the far one staggered behind the near one
-  // (the row behind is part of the skyline: one mesh, see skyline)
-  for (const [z0, dx] of [[-7.2, 2.8]])
-    for (let x = X0 + 2 + (z0 < -8 ? 1.4 : 0); x < X1 - 1; x += dx + rand() * 1.2) {
-      const sc = (z0 < -8 ? 0.7 : 0.45) + rand() * 0.55, h = townHouse(rand, night); // small and big side by side
-      place(h.g, x, z0 + rand() * 0.6, h.r * sc * 0.88, (rand() - 0.5) * 0.5)?.scale.setScalar(sc);
-    }
+  // the near row of houses (the row behind is part of the skyline: one mesh, see skyline)
+  for (let x = X0 + 2; x < X1 - 1; x += 2.8 + rand() * 1.2) {
+    const sc = 0.45 + rand() * 0.55, h = townHouse(rand, night); // small and big side by side
+    place(h.g, x, -7.2 + rand() * 0.6, h.r * sc * 0.88, (rand() - 0.5) * 0.5)?.scale.setScalar(sc);
+  }
 
   // gnomes selling on the street: in front of the back row, and down the right
   for (let x = X0 + 6; x < X1 - 4; x += 9 + rand() * 4) place(gnomeStand(rand, night, time === "night"), x, -4.6, 0.9, (rand() - 0.5) * 0.4);
@@ -987,7 +959,6 @@ const rough = {
 // ellipse. course.js asks piece(kind, item, t, s) for every post, wall and
 // zone; null means "not a town skin, draw it the usual way".
 
-const onGround = (m, x, z, t) => (m.position.set(x, t.height(x, z), z), m);
 
 /** The door of a house the ball rolls into, or comes out of: a frame, a dark way in. */
 function doorway(out) {
@@ -1186,7 +1157,7 @@ const marbleTex = () => paving("marble", 256, (x, rand, n) => {
   ring(c - 7, 10, "#8d9ca6");
   ring(c - 20, 4, "#c9785a");
   for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2, long = i % 2 === 0, R = long ? c - 26 : c * 0.52, w = long ? 0.2 : 0.2;
+    const a = (i / 16) * Math.PI * 2, long = i % 2 === 0, R = long ? c - 26 : c * 0.52, w = 0.2;
     x.fillStyle = long ? (i % 4 === 0 ? "#c9785a" : "#8d9ca6") : "#d9b99a";
     x.beginPath();
     x.moveTo(c, c);
@@ -1207,14 +1178,6 @@ function outlineOf(z) {
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, hx = (x1 - x0) / 2, hz = (z1 - z0) / 2;
   return Array.from({ length: 72 }, (_, i) => [cx + Math.cos((i / 72) * Math.PI * 2) * hx, cz + Math.sin((i / 72) * Math.PI * 2) * hz]);
 }
-const insidePoly = (pts, x, z) => {
-  let inside = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const [ax, az] = pts[i], [bx, bz] = pts[j];
-    if (az > z !== bz > z && x < ax + ((z - az) * (bx - ax)) / (bz - az)) inside = !inside;
-  }
-  return inside;
-};
 // a flat sheet over pts, lift above the ground; tile > 0 repeats the texture
 // every tile units of the board, 0 stretches it over the zone once. over
 // pulls it forward in depth, over what it lies on
@@ -1262,7 +1225,7 @@ function brickFloor(z, s, t) {
     const cx = q.reduce((a, w) => a + w.a[0] / 4, 0), cz = q.reduce((a, w) => a + w.a[1] / 4, 0);
     const dx = (long.b[0] - long.a[0]) / L, dz = (long.b[1] - long.a[1]) / L;
     for (const side of [-0.6, 0.6]) {
-      const ox = cx - dz * side, oz = cz + dx * side, on = (u) => insidePoly(pts, ox + dx * u, oz + dz * u);
+      const ox = cx - dz * side, oz = cz + dx * side, on = (u) => inPoly(ox + dx * u, oz + dz * u, pts);
       let a = -L / 2 - 3, b = L / 2 + 3;
       while (a < 0 && !(on(a) && on(a - 0.8))) a += 0.25;
       while (b > 0 && !(on(b) && on(b + 0.8))) b -= 0.25;

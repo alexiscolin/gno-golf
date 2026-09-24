@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "npx serve out",
-    "lint": "eslint ."
+    "lint": "eslint . ../media/promo ../media/camera ../media/lib ../scripts"
   },
   "dependencies": {
     "next": "^15.1.6",

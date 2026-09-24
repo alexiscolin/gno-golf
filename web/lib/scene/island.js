@@ -5,12 +5,12 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, fadeable, fadeLoop, windNow } from "./materials.js";
-import { inZone } from "../terrain.js";
-import { mergeByMaterial, look, weatherLooks } from "./course.js";
+import { inZone, mod, segDist, smoothstep } from "../terrain.js";
+import { bake, look, weatherLooks } from "./bake.js";
 import { gnomelet, brolly } from "./props.js";
 import { animate, state } from "./state.js";
 import { timeOf, islandBox } from "./camera.js";
-import { seeded, ISLAND, GRASS } from "./common.js";
+import { seeded, ISLAND, GRASS, placer } from "./common.js";
 import { zoneDetail } from "./zones.js";
 
 // A flat layer lying on another: pulled towards the eye in the depth test, so
@@ -76,7 +76,6 @@ function shape(s) {
   return { box, cx, cz, a, b, inland, shore };
 }
 
-const smooth = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
 
 /** The sea, and the sand shelving into it under the water. */
 function base(s) {
@@ -95,9 +94,9 @@ function base(s) {
       const x = sh.cx + Math.cos(th) * (r + Math.min(sh.a, sh.b) * 0.3), z = sh.cz + Math.sin(th) * (r + Math.min(sh.a, sh.b) * 0.3);
       pos.push(x, SEA, z);
       const off = -sh.inland(x, z); // how far out to sea
-      c.copy(shallow).lerp(deep, smooth(off / 14));
-      const fade = 1 - smooth((r - 110) / 150);
-      col.push(c.r, c.g, c.b, (0.72 + 0.28 * smooth(off / 8)) * fade); // opaque by 8 out: the seabed ends unseen
+      c.copy(shallow).lerp(deep, smoothstep(off / 14));
+      const fade = 1 - smoothstep((r - 110) / 150);
+      col.push(c.r, c.g, c.b, (0.72 + 0.28 * smoothstep(off / 8)) * fade); // opaque by 8 out: the seabed ends unseen
     }
   }
   // and a centre patch under the island, so no hole shows through
@@ -229,9 +228,9 @@ function land(s, sh) {
   return (x, z) => {
     const inn = sh.inland(x, z);
     // the beach: GRASS 3 inland of the shore, sea level at the shore, and on down
-    const beach = inn >= 3 ? 0 : (SEA - GRASS) * (1 - smooth(inn / 3)) + (inn < 0 ? inn * 0.6 : 0);
+    const beach = inn >= 3 ? 0 : (SEA - GRASS) * (1 - smoothstep(inn / 3)) + (inn < 0 ? inn * 0.6 : 0);
     const dx = Math.max(0, -x, x - W), dz = Math.max(0, -z, z - H);
-    const near = smooth((Math.hypot(dx, dz) - 1.2) / 2); // flat by the board
+    const near = smoothstep((Math.hypot(dx, dz) - 1.2) / 2); // flat by the board
     let top = 0;
     for (const d of dunes) {
       const cs = Math.cos(d.a), sn = Math.sin(d.a);
@@ -239,7 +238,7 @@ function land(s, sh) {
       const q = u * u + v * v;
       if (q < 1) top = Math.max(top, d.h * (1 - q) * (1 - q));
     }
-    return beach + top * near * smooth((inn - 2) / 3);
+    return beach + top * near * smoothstep((inn - 2) / 3);
   };
 }
 
@@ -247,7 +246,6 @@ function land(s, sh) {
 function berms(s) {
   const sh = shape(s);
   const height = land(s, sh);
-  const W = s.board.w, H = s.board.h;
   const g = new THREE.Group();
   // out to where the sea is opaque (8 off the shore), so the seabed never shows an edge
   const X0 = sh.cx - sh.a - 10, X1 = sh.cx + sh.a + 10, Z0 = sh.cz - sh.b - 10, Z1 = sh.cz + sh.b + 10;
@@ -268,7 +266,7 @@ function berms(s) {
       // the sand shelves into the lagoon over its last unit and a half
       const lg = boardwalk ? inLag(x, z) : -1;
       const base = drowned(x, z) ? SEA - 1 - GRASS : height(x, z);
-      const h = lg > 0 ? base + (SEA - 0.6 - GRASS - base) * smooth(lg / 1.5) : base, y = GRASS + h;
+      const h = lg > 0 ? base + (SEA - 0.6 - GRASS - base) * smoothstep(lg / 1.5) : base, y = GRASS + h;
       pos.push(x, y, z);
       keep.push(-sh.inland(x, z) < 9);
       if (y < SEA - 0.02) c.copy(under);
@@ -597,7 +595,7 @@ function umbrella(rand, time) {
   return g;
 }
 
-function sandcastle(rand) {
+function sandcastle() {
   const g = new THREE.Group();
   const base = drawn(rbox(1.2, 0.5, 1.2, 0.08), flat(P.wet));
   base.position.y = 0.25;
@@ -851,11 +849,13 @@ function ship() {
 // Each fading piece owns its materials; decor's group carries fade(eye, ball),
 // which the engine calls every frame.
 
-// an ink outline that can fade with its solid (the shared one cannot)
 // materials a canopy palm can fade (materials.js fadeLoop): its own, not
 // the shared palette's, which every palm on the island draws with
 function fader(colors) {
   const mats = Object.fromEntries(colors.map((c) => [c, fadeable(new THREE.MeshToonMaterial({ color: c }))]));
+  // ponytail: three's clone() drops the hull's shader push, so these palms draw
+  // no outline, and their toon has no gradientMap; fadeHull() and flat()'s
+  // bands would match the other palms (a visible change, left for a design call)
   const ink = fadeable(hullOf().clone());
   return { mat: (c) => mats[c], ink, all: [...Object.values(mats), ink] };
 }
@@ -991,12 +991,8 @@ function kite(rand, color, stake) {
 }
 
 /** A whole object that moves as one, merged into a mesh per material by the
- *  shared bake, and marked live so the hole's own bake leaves it be. */
-function mergedMover(group) {
-  mergeByMaterial(group);
-  group.userData.live = true;
-  return group;
-}
+ *  shared bake (in its own frame), and marked live so the hole's own bake leaves it be. */
+const mergedMover = (group) => ((bake(group, { local: true }).userData.live = true), group);
 
 // ------------------------------------------------------------ beach life
 
@@ -1222,7 +1218,7 @@ function wreckPlank(rand) {
   g.add(ribs);
   return g;
 }
-function coconutPile(rand) {
+function coconutPile() {
   const g = new THREE.Group();
   for (let i = 0; i < 6; i++) {
     const nut = drawn(new THREE.SphereGeometry(0.18, 8, 6), flat(0x6b4a2b));
@@ -1270,9 +1266,7 @@ function decor(s, bank = () => 0) {
   const sh = shape(s);
   const time = timeOf(s.hole);
 
-  const taken = [];
-  const free = (x, z, r) => taken.every((t) => Math.hypot(t.x - x, t.z - z) >= t.r + r);
-  const reserve = (x, z, r) => taken.push({ x, z, r });
+  const { free, reserve } = placer();
   // the board and its kerb, which stands a little outside it
   const onBoard = (x, z, r = 0) => x > -1.2 - r && x < W + 1.2 + r && z > -1.2 - r && z < H + 1.2 + r;
   // on the sand, off the beach's slope — and not in a boardwalk's lagoon
@@ -1280,11 +1274,7 @@ function decor(s, bank = () => 0) {
   const inLag = wetBoard ? lagoonShape(s) : null;
   const dry = (x, z, r) => sh.inland(x, z) > 2.2 + r && !(wetBoard && inLag(x, z) > -1 - r);
   // and clear of every wall: a lane's kerb can stand past the board's edge
-  const byWall = (x, z, r) => s.walls.some((w) => {
-    const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
-    const u = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (z - w.a[1]) * dz) / l2));
-    return Math.hypot(x - w.a[0] - u * dx, z - w.a[1] - u * dz) < r + 1;
-  });
+  const byWall = (x, z, r) => s.walls.some((w) => segDist(x, z, w.a, w.b) < r + 1);
   const put = (m, x, z, r, turn = rand() * Math.PI * 2) => {
     m.position.set(x, GRASS + bank(x, z), z);
     m.rotation.y = turn;
@@ -1350,7 +1340,7 @@ function decor(s, bank = () => 0) {
     const x = W * 0.5 + (rand() - 0.5) * 4, z = -3.4;
     if (dry(x, z, 2.2) && free(x, z, 2.4)) {
       put(tikiBar(), x, z, 2.4, (rand() - 0.5) * 0.3).add(shelter(wrand, [[-0.6, -0.1], [0.6, -0.1]])); // behind the counter
-      for (const dx of [-2.9, 2.9]) if (free(x + dx, z, 0.5)) put(coconutPile(rand), x + dx, z, 0.5);
+      for (const dx of [-2.9, 2.9]) if (free(x + dx, z, 0.5)) put(coconutPile(), x + dx, z, 0.5);
     }
   }
   // the lighthouse on its rocks, off the back-right corner, half in the sea
@@ -1427,7 +1417,7 @@ function decor(s, bank = () => 0) {
     () => scatter(2, X0 + 1, X1 - 1, Z0 + 2, -2.5, 0.8, () => surfboards(rand), 0),
     () => scatter(1, X0 + 1, X1 - 1, H + 1.8, sh.cz + sh.b - 2.5, 1.4, () => wreckPlank(rand)),
     () => scatter(3, X0, X1, H + 1.6, sh.cz + sh.b - 2.4, 1.1, () => driftwood(rand)),
-    () => scatter(1, X0 + 1, -1.5, H * 0.3, H + 2.5, 0.9, () => sandcastle(rand)),
+    () => scatter(1, X0 + 1, -1.5, H * 0.3, H + 2.5, 0.9, () => sandcastle()),
     () => { const th = rand() * Math.PI; g.add(seaweedLine(sh, rand, th, bank)); },
   ];
   const kit = [...KIT.keys()].sort(() => rand() - 0.5).slice(0, 3 + Math.floor(rand() * 3));
@@ -1506,7 +1496,7 @@ function decor(s, bank = () => 0) {
     kites.push(kt);
   }
   // the fade: a crown near the line from the eye to the ball goes see-through
-  g.userData.fade = fadeLoop(fading, { min: 0.22 });
+  g.userData.fade = fadeLoop(fading);
 
   // out at sea: a far island or two, a ship on the horizon, gulls overhead
   const isles = [[-55, -80, 9], [70, -95, 12], [-90, 30, 7]];
@@ -1970,7 +1960,7 @@ function blowhole(z, t) {
   animate((tt) => {
     const dt = last === null ? 0 : Math.min(0.1, tt - last);
     last = tt;
-    const p = every ? ((((step + phase) % every) + every) % every) : 0, spouting = !every || p < onFor;
+    const p = every ? mod(step + phase, every) : 0, spouting = !every || p < onFor;
     // the water swells over the last three substeps before a spout
     const want = spouting ? 1 : every && p > every - 3 ? (p - (every - 3)) / 3 : 0;
     lvl += (want - lvl) * Math.min(1, dt * 10);
@@ -2061,7 +2051,7 @@ const withDefault = (z, s, t, dressing) => {
 };
 
 // dressing round a tunnel mouth or its exit
-function wreck(z, t, s) {
+function wreck(z, t) {
   const g = new THREE.Group();
     const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, a = (x1 - x0) / 2, b = (z1 - z0) / 2;
   const rand = seeded("wreck" + cx);
@@ -2098,8 +2088,6 @@ function cave(z, t) {
   const arch = drawn(new THREE.TorusGeometry(a - 0.4, 0.35, 6, 12, Math.PI), flat(P.rock));
   arch.position.set(cx, ground(t, cx, cz), cz);
   g.add(arch);
-  const rand = seeded("cave" + cx);
-  void rand; // (boulders round it stood on the lane's kerb)
   const [ex, ez] = z.vec;
   for (let k = 0; k < 4; k++) {
     const th = (k / 4) * Math.PI * 2 + 0.4, m = drawn(new THREE.DodecahedronGeometry(0.35, 0), flat(P.rock));
@@ -2136,7 +2124,7 @@ export function piece(kind, item, t, s) {
     // (a gap, missing planks, is the shared deckGap in zones.js)
     if (k === "sea") return new THREE.Group(); // the world's sea shows round the lane
     if (item.islandDressed) return null;
-    if (k === "shipwreck") return withDefault(item, s, t, wreck(item, t, s));
+    if (k === "shipwreck") return withDefault(item, s, t, wreck(item, t));
     if (k === "cave") return withDefault(item, s, t, cave(item, t));
     return null;
   }

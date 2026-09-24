@@ -5,7 +5,8 @@
 // the ball (fronds, awnings, roofs) may reach further.
 import * as THREE from "three";
 import { C, flat, drawn, rbox, texOf, share } from "./materials.js";
-import { house } from "./props.js";
+import { house, smoke } from "./props.js";
+import { inZone } from "../terrain.js";
 
 const P = {
   palmTrunk: 0xa47a4c, frond: 0x3f9b62, frondDark: 0x2f7d4f, coconut: 0x6b4a2f,
@@ -608,8 +609,6 @@ export function mouthAt(skin, x, y, z, R, dir) {
 }
 
 // ------------------------------------------------------------- rooftops
-import { smoke } from "./props.js";
-import { inZone } from "../terrain.js";
 
 export const ROOF_Y = -2.6; // the rooftops' eaves, well below the lane
 

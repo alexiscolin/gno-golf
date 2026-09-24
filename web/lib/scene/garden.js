@@ -14,8 +14,9 @@ import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, bro
 // here, and the seed is the hole's own name, so each course keeps its garden
 // from one visit to the next.
 
-import { seeded, ISLAND, GRASS } from "./common.js";
-import { look, weatherLooks } from "./course.js"; // (a cycle, but only called at build time)
+import { seeded, ISLAND, GRASS, placer } from "./common.js";
+import { smoothstep } from "../terrain.js";
+import { look, weatherLooks } from "./bake.js";
 
 /** Pebbles caught in the island's soil, so its sides read as earth. */
 function edging(box, seed) {
@@ -483,11 +484,7 @@ function giants({ rand, X0, X1, reserve, free, W, H }) {
   });
   // fade: a head near the line from the camera to the ball goes see-through
   // (the shared canopy fade, from where each head is now)
-  const fadeHeads = fadeLoop(heads.map((f) => ({ at: f.world, r: f.R, mats: f.mats })));
-  g.userData.fade = (eye, ball) => {
-    for (const f of heads) f.head.getWorldPosition(f.world);
-    fadeHeads(eye, ball);
-  };
+  g.userData.fade = fadeLoop(heads.map((f) => ({ obj: f.head, at: f.world, r: f.R, mats: f.mats })), { min: 0.25 });
   // dandelion puffs on the right
   for (let k = 0; k < 2; k++) {
     const x = W + 2.5 + rand() * (X1 - W - 4), z = 1 + rand() * Math.max(1, H - 2);
@@ -661,9 +658,7 @@ function decor(s, bank = () => 0) {
   // Nothing stands inside anything else: every prop with a footprint reserves
   // it, and a scattered prop that lands on a reserved spot tries elsewhere or
   // is dropped. A tree through the house roof is the first thing an eye finds.
-  const taken = [];
-  const free = (x, z, r) => taken.every((t) => Math.hypot(t.x - x, t.z - z) >= t.r + r);
-  const reserve = (x, z, r) => taken.push({ x, z, r });
+  const { free, reserve } = placer();
   // the picket fence along the front: nothing grows through it
   for (let x = X0 + 1; x <= X1 - 1; x += 0.7) reserve(x, Z1, 0.3);
   // stepping stones from the tee to the fence, laid first so nothing is
@@ -865,7 +860,6 @@ function berms(s) {
   const base = { hills: 1.7, mountains: 1.3, stream: 0.9, giants: 1.1, clouds: 0.8 }[themeOf(s.hole)] || 1.2;
   const amp = base * (0.55 + rand() * 0.9), ph = rand() * 6, ph2 = rand() * 6;
   const X0 = -ISLAND.x, X1 = W + ISLAND.x, Z0 = -ISLAND.back, Z1 = H + ISLAND.front;
-  const smooth = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
   // knolls, not a levee: round mounds of their own sizes dotted round the
   // board, each a soft dome, where a ring of even height read as a square
   const knolls = [];
@@ -895,7 +889,7 @@ function berms(s) {
     }
     const wob = 1 + 0.12 * Math.sin(x * 1.3 + z * 0.9 + ph) * Math.cos(z * 0.7 + ph2);
     // and flat under the picket fence along the front
-    return top * wob * smooth((d - 1.4) / 1.6) * smooth(edge / 1.5) * smooth((Z1 - 1.2 - z) / 1.2);
+    return top * wob * smoothstep((d - 1.4) / 1.6) * smoothstep(edge / 1.5) * smoothstep((Z1 - 1.2 - z) / 1.2);
   };
   const g = new THREE.Group();
   const step = 0.5, nx = Math.round((X1 - X0) / step), nz = Math.round((Z1 - Z0) / step);
@@ -944,4 +938,4 @@ function base(s, box) {
 const CLOUD_ROUGH = { lo: 0xdde6ee, hi: 0xffffff, plant: (rand) => puffs([[0, 0.25, 0, 0.5 + rand() * 0.4, 0.6], [0.5, 0.2, 0.2, 0.35, 0.6]]) };
 const roughOf = (s) => (cloudy(s.hole) ? CLOUD_ROUGH : null);
 
-export { seeded, ISLAND, GRASS, base, edging, decor, berms, roughOf };
+export { base, edging, decor, berms, roughOf };

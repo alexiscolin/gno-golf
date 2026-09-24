@@ -35,7 +35,6 @@ export const C = {
 const SHARED = new Set();
 /** Marks a material, texture or geometry as shared; returns it. */
 export const share = (x) => (x && SHARED.add(x), x);
-export const isShared = (x) => SHARED.has(x);
 
 const ink = share(new THREE.LineBasicMaterial({ color: C.ink, transparent: true, opacity: 0.85 }));
 
@@ -290,25 +289,53 @@ export function fadeable(mat) {
   return mat;
 }
 /** Sets a fadeable material's opacity (0..1), switching transparency on and
- *  off as it crosses 0.99. */
+ *  off as it crosses 0.99. A see-through one (userData.base, its own opacity:
+ *  ice) stays see-through, at base times the fade. */
 export function setFade(mat, o) {
   if (Math.abs(mat.userData.fade - o) < 0.005) return;
   mat.userData.fade = o;
-  const t = o < 0.99;
+  const base = mat.userData.base, t = o < 0.99 || base !== undefined;
   if (t !== mat.transparent) (mat.transparent = t), (mat.needsUpdate = true);
-  mat.opacity = o;
+  mat.opacity = (base ?? 1) * o;
   mat.depthWrite = !t;
+}
+/** An ink outline that can fade with its solid (the shared hull cannot). */
+export const fadeHull = () => fadeable(pushHull(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), 0.055));
+/**
+ * Gives a piece over the lane its own fadeable materials (clones of what it
+ * draws with, one fadeable outline for all its hulls), so it can fade out of
+ * the camera's way without fading the shared palette; marks it live. A
+ * see-through material keeps its opacity as its base (setFade). Returns the
+ * materials, for fadeLoop.
+ */
+export function ownFade(piece) {
+  const own = new Map();
+  let ink = null;
+  piece.traverse((o) => {
+    if (!o.isMesh) return;
+    if (o.material.side === THREE.BackSide) return void (o.material = ink ||= fadeHull());
+    if (!own.has(o.material)) {
+      const m = fadeable(o.material.clone());
+      if (o.material.transparent) (m.userData.base = o.material.opacity), (m.depthWrite = false);
+      own.set(o.material, m);
+    }
+    o.material = own.get(o.material);
+  });
+  piece.userData.live = true;
+  return ink ? [...own.values(), ink] : [...own.values()];
 }
 /**
  * The canopy fade every world uses: each item is { at: THREE.Vector3 (world),
- * r: radius, mats: [materials] }. Returns fade(eye, ball): items near the line
- * from the eye to the ball go see-through, others come back.
+ * r: radius, mats: [materials] }, and with obj (an Object3D that moves) its
+ * at is read from where obj is now. Returns fade(eye, ball): items near the
+ * line from the eye to the ball go see-through, others come back.
  */
-export function fadeLoop(items, { min = 0.25 } = {}) {
+export function fadeLoop(items, { min = 0.22 } = {}) {
   const seg = new THREE.Line3(), near = new THREE.Vector3();
   return (eye, ball) => {
     seg.set(eye, ball);
     for (const it of items) {
+      if (it.obj) it.obj.getWorldPosition(it.at);
       seg.closestPointToPoint(it.at, true, near);
       const d = near.distanceTo(it.at), o = d < it.r * 1.3 ? min : d < it.r * 2.2 ? min + ((d - it.r * 1.3) / (it.r * 0.9)) * (1 - min) : 1;
       for (const m of it.mats) setFade(m, o);
@@ -316,4 +343,13 @@ export function fadeLoop(items, { min = 0.25 } = {}) {
   };
 }
 
-export { hull, swayLine, clipTo, ink, flat, sway, grows, drawn, inked, rbox, texOf, lanternGlow, glowTex, tuftGeo, ringLine };
+/** Lifts a world-space geometry onto the height field, vertex by vertex. */
+export function drape(geo, height) {
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + height(p.getX(i), p.getZ(i)));
+  p.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+
+export { swayLine, clipTo, ink, flat, sway, grows, drawn, inked, rbox, texOf, lanternGlow, glowTex, tuftGeo, ringLine };

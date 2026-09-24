@@ -10,7 +10,7 @@ import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
 import Share from "@/components/Share";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
-import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, medalOf, parOf, setPars, UNLOCKS, cupHasGnome } from "@/lib/card";
+import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, medalOf, parOf, UNLOCKS, cupHasGnome, cupOf } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -182,6 +182,8 @@ const depositText = (saved, bytePrice) =>
 
 
 const short = (a) => (a ? `${a.slice(0, 4)}…${a.slice(-3)}` : "");
+// a player on a board: longer, a row has room
+const shortAddr = (a) => `${String(a).slice(0, 8)}…${String(a).slice(-4)}`;
 
 export default function Golf() {
   const canvas = useRef(null);
@@ -321,16 +323,16 @@ export default function Golf() {
   const holedRef = useRef(() => {});
   const [fresh, setFresh] = useState([]); // gnomes just unlocked, for the banner
   const holesList = (s && s.holes) || NONE;
-  setPars(holesList);
   const tot = useMemo(() => totals(card, holesList), [card, holesList]);
   const allList = (s && s.allHoles) || NONE;
   const cups = useMemo(() => cupTotals(card, allList), [card, allList]);
   // once earned, a gnome stays earned: a hole registered later must not take
   // it back, and the hole list not being loaded yet must not either
+  const had = earned(); // read once a render, not once a gnome
   const unlocked = (id) => {
     const gn = GNOMES.find((x) => x.id === id);
     if (!gn || !gn.unlock) return true;
-    if (earned().includes(id)) return true;
+    if (had.includes(id)) return true;
     return !!(allList.length && UNLOCKS[gn.unlock] && UNLOCKS[gn.unlock].ok(cups));
   };
   // once earned, remembered — outside render, so a render never writes storage
@@ -344,6 +346,7 @@ export default function Golf() {
   const [account, setAccount] = useState(null);
   const [wallet, setWallet] = useState({ busy: false, error: null });
   const [record, setRecord] = useState(null); // null | "signing" | { hash, height } | { error }
+  const onChain = !!(record && record.hash !== undefined && !record.error); // this round is on the chain
 
   const play = () => {
     setScreen("play");
@@ -367,7 +370,7 @@ export default function Golf() {
     let g;
     try {
       g = createGame(canvas.current, {
-      rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx,
+      rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, hooks: cfg.won > 0,
       // the hot fields to their store; the rest re-renders only when it changed
       onChange: (snap) => (hot.current.set(snap), setS((prev) => (prev && sameCold(prev, snap) ? prev : snap))),
       onHoled: ({ id, strokes }) => holedRef.current(id, strokes),
@@ -657,10 +660,8 @@ export default function Golf() {
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
-  // the stroke's weather (?weather= fakes it, for screenshots)
-  const wx = cfg && cfg.weather
-    ? { wind: cfg.weather.includes("wind") ? [0.05, -0.03] : null, rain: cfg.weather.includes("rain"), fog: cfg.weather.includes("fog"), storm: cfg.weather.includes("storm") }
-    : s && s.weather;
+  // the stroke's weather (the engine's: ?weather= fakes it there, for screenshots)
+  const wx = s && s.weather;
 
   // a finished hole goes on the card the moment the chain holes it — even if
   // the player restarts before the banner — and a gnome may unlock with it
@@ -693,7 +694,7 @@ export default function Golf() {
           counts={s.worlds}
           stats={cups}
           onResetAll={() => setCard(clearCard())}
-          onReset={(w) => setCard(clearCup(allList.filter((h) => (h.world || "garden") === w).map((h) => h.id)))}
+          onReset={(w) => setCard(clearCup(allList.filter((h) => cupOf(h) === w).map((h) => h.id)))}
           current={s.world}
           onBack={() => setScreen("title")}
           community={s.community}
@@ -734,7 +735,7 @@ export default function Golf() {
             <div className="card card--score">
               <span className="eyebrow">Strokes</span>
               <strong>{s.strokes}</strong>
-              <span className="card__par">par {parOf(s.id)}</span>
+              <span className="card__par">par {parHere(s)}</span>
               {(s.roundMode || s.mode) === "pro" && <span className="pro-chip" title="Pro: no aim line">PRO</span>}
             </div>
             <LiveWeather hot={hot.current} w={wx} until={s.period != null ? (s.period + 1) * 300 * 1000 : null} />
@@ -841,7 +842,7 @@ export default function Golf() {
                       <span className="tile__num">{holeNumber(s.holes, h.id)}</span>
                       <span className="tile__name">{h.name}</span>
                       <span className="tile__best">
-                        {card[h.id] ? <b>{card[h.id]}</b> : "–"} / par {parOf(h.id)}
+                        {card[h.id] ? <b>{card[h.id]}</b> : "–"} / par {parOf(h)}
                       </span>
                     </button>
                   ))}
@@ -901,7 +902,7 @@ export default function Golf() {
                 <span>stroke{s.strokes > 1 ? "s" : ""}</span>
               </div>
             <Share
-              link={s ? holeLink(s, gnome, "") : ""}
+              link={s ? holeLink(s, gnome) : ""}
                 snapshot={() => game.current && game.current.snapshot(`${s.name} · ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`)}
                 text={shareText({ s, card, cups, fresh })}
               />
@@ -909,13 +910,13 @@ export default function Golf() {
 
 
             <p>
-              {record && record.hash !== undefined && !record.error
+              {onChain
                 ? "Saved on-chain: public, on your address, on any device."
                 : s.official
                   ? "Saved in this browser only. Save it on-chain to make it public and ranked."
                   : "Saved in this browser only. A community hole is not ranked, but its rounds can be saved on-chain."}
             </p>
-            <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} />
+            <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} />
             {fresh.length > 0 && (
               <p className="note note--good">
                 New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b> — pick it from the menu.
@@ -935,10 +936,10 @@ export default function Golf() {
                 </p>
               );
             })()}
-            {!(record && record.hash !== undefined && !record.error) && s.period != null && (
+            {!onChain && s.period != null && (
               <SaveClock by={saveBy(s.period)} stale={record && record.stale} onReplay={() => game.current.reset()} />
             )}
-            {account && !(record && record.hash !== undefined && !record.error) && (() => {
+            {account && !onChain && (() => {
               // said before signing, not by refusing to: Adena still opens
               const short = shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice), funds);
               if (!short) return null;
@@ -953,7 +954,7 @@ export default function Golf() {
               <Button variant="secondary" onClick={() => game.current.reset()}>
                 Play again
               </Button>
-              {!(record && record.hash !== undefined && !record.error) && (
+              {!onChain && (
                 <Button variant="chain" disabled={record === "signing" || !!(record && record.signing) || !!(record && record.stale)} onClick={recordIt}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record === "signing" ? "Waiting for Adena…" : record && record.signing ? `Adena: part ${record.part} of ${record.of}…` : "Save on-chain"}
@@ -969,7 +970,7 @@ export default function Golf() {
                 Next hole →
               </button>
             </div>
-            {account && !(record && record.hash !== undefined && !record.error) && (
+            {account && !onChain && (
               <p className="real__fine">
                 About {costOf(gasOf(s), gasPrice)} GNOT of gas + {depositText(saved, bytePrice)}, shown again in Adena before you sign.
               </p>
@@ -997,9 +998,9 @@ export default function Golf() {
         <Sheet className="cardsheet" label="Scorecard" onClose={() => setCardOpen(false)}>
             <span className="eyebrow">Gnogolf · the cup and its card</span>
             <h2>The cup</h2>
-            <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} />
+            <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
             <Scorecard holes={s.holes} card={card} current={s.id} world={s.world} />
-            <Leaderboard chain={game.current && game.current.chain} me={account && account.address} />
+            <Leaderboard chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
         </Sheet>
       )}
 
@@ -1011,7 +1012,7 @@ export default function Golf() {
             </svg>
             <span className="eyebrow">Hole {curtain.n}</span>
             <h2>{curtain.name}</h2>
-            <p className="curtain__chore">{choresOf((s && s.world) || "garden")[curtain.n % choresOf((s && s.world) || "garden").length]}</p>
+            <p className="curtain__chore">{((c) => c[curtain.n % c.length])(choresOf((s && s.world) || "garden"))}</p>
           </div>
         </div>
       )}
@@ -1246,7 +1247,7 @@ function hadGnome() {
 }
 
 /** The address of this hole, to put in the bar and in shared links. */
-export function holeLink(s, gnome, base) {
+function holeLink(s, gnome) {
   const q = new URLSearchParams();
   const keep = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
   // a page pointed at another chain keeps pointing there
@@ -1254,7 +1255,7 @@ export function holeLink(s, gnome, base) {
   q.set("cup", s.world || "garden");
   q.set("hole", String(s.place || 1));
   if (gnome) q.set("gnome", gnome);
-  return `${base}?${q}`;
+  return `?${q}`;
 }
 
 function savedGnome() {
@@ -1357,9 +1358,6 @@ function holeNumber(holes, id) {
   return m ? m[1] : "1";
 }
 
-/** The card: hole, par and your score, ten holes to a row, with the totals. */
-const i0 = (h, row) => row.indexOf(h);
-
 /**
  * An ink stamp on the card, slightly askew like one pressed by hand: a gnome
  * with a crown for a hole-in-one, a winking gnome under par, a thumbs-up
@@ -1460,6 +1458,10 @@ function shareText({ s, card, cups, fresh }) {
   ]) + tag;
 }
 
+/** The par of the hole being played. */
+const parHere = (s) => parOf(s.holes.find((h) => h.id === s.id) || (s.allHoles || []).find((h) => h.id === s.id));
+
+/** The card: hole, par and your score, ten holes to a row, with the totals. */
 function Scorecard({ holes, card, current, compact = false, world = "garden" }) {
   // two halves of the same width (front nine, back nine), so every column of
   // the second row sits under one of the first; a short last row is padded
@@ -1473,17 +1475,17 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }) 
         <table key={r}>
           <tbody>
             <tr><th>Hole</th>{row.map((h, i) => <td key={h.id} className={h.id === current ? "cur" : ""}><span>{r * per + i + 1}</span></td>)}{pad(row)}</tr>
-            <tr><th>Par</th>{row.map((h) => <td key={h.id}>{parOf(h.id)}</td>)}{pad(row)}</tr>
+            <tr><th>Par</th>{row.map((h) => <td key={h.id}>{parOf(h)}</td>)}{pad(row)}</tr>
             <tr>
               <th>Score</th>
               {row.map((h) => {
                 const sc = card[h.id];
-                const par = parOf(h.id);
+                const par = parOf(h);
                 const kind = !sc ? "" : sc === 1 ? "ace" : sc < par ? "under" : sc === par ? "par" : "over";
                 return (
                   <td key={h.id} className={kind}>
                     {sc || ""}
-                    {kind && kind !== "over" && <Stamp kind={kind} seed={r * per + i0(h, row)} world={world} />}
+                    {kind && kind !== "over" && <Stamp kind={kind} seed={r * per + row.indexOf(h)} world={world} />}
                   </td>
                 );
               })}
@@ -1517,17 +1519,17 @@ const leaderboardOf = (chain, mode = "assisted") => {
   return board[mode].p;
 };
 
-function Standings({ s, card, chain, me }) {
+function Standings({ s, card, chain, me, mode = "assisted" }) {
   const [rank, setRank] = useState(null);
   useEffect(() => {
     if (!chain || !me) return;
     let live = true; // no state set once the card is gone
-    leaderboardOf(chain).then((lb) => {
+    leaderboardOf(chain, mode).then((lb) => {
       const i = lb.rows.findIndex((r) => r.player === me);
       if (live) setRank(i >= 0 ? { at: i + 1, of: lb.rows.length } : null);
     }).catch(() => {});
     return () => (live = false);
-  }, [chain, me]);
+  }, [chain, me, mode]);
   const cup = WORLDS.find((w) => w.id === s.world) || WORLDS[0];
   const t = totals(card, s.holes);
   const vs = t.strokes - t.par;
@@ -1549,12 +1551,12 @@ function Standings({ s, card, chain, me }) {
       </header>
       <ol className="cup__track">
         {s.holes.map((h, i) => {
-          const sc = card[h.id], medal = medalOf(sc, parOf(h.id));
+          const sc = card[h.id], medal = medalOf(sc, parOf(h));
           return (
             <li
               key={h.id}
               className={"cup__hole" + (h.id === s.id ? " cup__hole--now" : "") + (sc ? " cup__hole--done" : "") + (medal ? ` cup__hole--${medal}` : "")}
-              title={`${i + 1}. ${h.name}${sc ? ` — ${sc} (par ${parOf(h.id)})` : ""}`}
+              title={`${i + 1}. ${h.name}${sc ? ` — ${sc} (par ${parOf(h)})` : ""}`}
             >
               {sc ? (
                 <>
@@ -1664,7 +1666,7 @@ function Friends({ s, chain, me, mode }) {
     // who is keyed by its join
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain, s.id, mode, key]);
-  const label = (a) => (a === me ? "You" : (friends.find((f) => f.addr === a) || {}).name || `${a.slice(0, 8)}…${a.slice(-4)}`);
+  const label = (a) => (a === me ? "You" : (friends.find((f) => f.addr === a) || {}).name || shortAddr(a));
   const add = async (e) => {
     e.preventDefault();
     const v = adding.trim().replace(/^@/, "");
@@ -1687,7 +1689,7 @@ function Friends({ s, chain, me, mode }) {
   return (
     <div className="lb friends">
       {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends.</p>}
-      <h3>{s.name} <small>par {(hole && hole.par) || parOf(s.id)}</small></h3>
+      <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>
       {h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet.</p>}
       {h && h.length > 0 && (
         <ol>
@@ -1696,7 +1698,7 @@ function Friends({ s, chain, me, mode }) {
               <span className="lb__rank">{i + 1}</span>
               <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
               <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
-              <strong>{vsPar(r.strokes - ((hole && hole.par) || parOf(s.id)))}</strong>
+              <strong>{vsPar(r.strokes - ((hole && hole.par) || parHere(s)))}</strong>
             </li>
           ))}
         </ol>
@@ -1782,7 +1784,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
       .catch((e) => view.current === asked && setErr(String(e.message || e)))
       .finally(() => setMore(false));
   };
-  const me_ = (p) => (p === me ? "You" : `${String(p).slice(0, 8)}…${String(p).slice(-4)}`);
+  const me_ = (p) => (p === me ? "You" : shortAddr(p));
   const flags = useFlags();
   const [showAll, setShowAll] = useState(false);
   const shownHole = hb ? screen_(hb.rows, flags, showAll) : null;
@@ -1814,7 +1816,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
           <Friends s={s} chain={chain} me={me} mode={mode} />
         ) : tab === "hole" ? (
           <div className="lb">
-            <h3>{s.name} <small>par {parOf(s.id)}{hb ? ` · ${hb.finished ?? hb.players} finished${hb.finished != null && hb.finished !== hb.players ? `, ${hb.players} ranked` : ""}` : ""}</small></h3>
+            <h3>{s.name} <small>par {parHere(s)}{hb ? ` · ${hb.finished ?? hb.players} finished${hb.finished != null && hb.finished !== hb.players ? `, ${hb.players} ranked` : ""}` : ""}</small></h3>
             {newer && (
               <p className="note note--warn">
                 Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
@@ -1830,7 +1832,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
                     <span className="lb__rank">{i + 1}</span>
                     <span className="lb__who">{me_(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}<FlagMark f={showAll && flags[r.player]} /></span>
                     <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
-                    <strong>{vsPar(r.strokes - (hb.par || parOf(s.id)))}</strong>
+                    <strong>{vsPar(r.strokes - (hb.par || parHere(s)))}</strong>
                   </li>
                 ))}
               </ol>
@@ -1882,7 +1884,7 @@ function Leaderboard({ chain, me, mode = "assisted", filter = false }) {
           {v.rows.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{r.player === me ? "You" : `${String(r.player).slice(0, 8)}…${String(r.player).slice(-4)}`}<FlagMark f={showAll && flags[r.player]} /></span>
+              <span className="lb__who">{r.player === me ? "You" : shortAddr(r.player)}<FlagMark f={showAll && flags[r.player]} /></span>
               <span className="lb__holes">{r.holes}/{lb.holes}</span>
               <strong>{r.strokes}</strong>
             </li>

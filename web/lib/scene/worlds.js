@@ -22,13 +22,14 @@
 // s is the hole state (board, walls, zones, cup, start, hole id, world). The
 // board itself (green, rough, walls, zones, cup) is common to all.
 import * as garden from "./garden.js";
+import { GRASS } from "./common.js";
 
 const LOADERS = {
   island: () => import("./island.js"),
   town: () => import("./town.js"),
   mountain: () => import("./mountain.js"),
 };
-export const WORLDS = { garden };
+const WORLDS = { garden };
 const pending = {};
 
 /** Loads a world's module (once; later calls return at once). */
@@ -40,3 +41,20 @@ export function loadWorld(name) {
 }
 
 export const worldOf = (s) => WORLDS[s.world] || garden;
+
+/**
+ * A world's own drawing of an on-lane piece, if it has one: worldOf(s).piece
+ * (kind: "post" | "wall" | "zone", item: the post, the bar {walls, skin, c,
+ * length, thick, ang} or the zone, t: the terrain, s: the hole) returns an
+ * Object3D, or nothing to leave it to the shared drawing.
+ */
+export function fromWorld(s, kind, item, t) {
+  const w = worldOf(s).piece;
+  const m = w && w(kind, item, t, s);
+  return m && m.isObject3D ? m : null;
+}
+
+export const DECK = 0.3; // a boardwalk's planks and joists: its cut face, over open water
+// the water under a boardwalk's missing planks: the world's sea, or a pool as
+// far down where the world has none (zones.js deckGap draws it)
+export const gapWater = (s) => worldOf(s).SEA ?? GRASS - 0.9;

@@ -8,6 +8,7 @@ import { behind, chaseState } from "./chase.js";
 import * as THREE from "three";
 import { shotOf } from "./chain.js";
 import { worldOf } from "./scene/worlds.js";
+import { cupOf } from "./card.js";
 import { sound } from "./feel.js";
 
 // a capture tool: dev builds, or a page opened with ?camlog as well
@@ -176,10 +177,10 @@ function install() {
     /** The hole is built and drawn. */
     ready: () => !!(E && E.g.id && E.g.s && E.g.course && E.g.started),
     info: () => ({
-      id: E.g.id, name: E.g.s.name, world: E.g.s.world || "garden", board: E.g.s.board, cup: E.g.s.cup, start: E.g.s.start,
+      id: E.g.id, name: E.g.s.name, world: cupOf(E.g.s), board: E.g.s.board, cup: E.g.s.cup, start: E.g.s.start,
       timed: !!E.g.s.timed, time: E.g.course.userData.time, posts: E.g.s.posts.length, walls: E.g.s.walls.length, zones: E.g.s.zones.length,
       zoneList: E.g.s.zones, postList: E.g.s.posts, every: E.every ? E.every() : 0,
-      holes: E.g.list.map((h) => ({ id: h.id, world: h.world || "garden", order: h.order, name: h.name })),
+      holes: E.g.list.map((h) => ({ id: h.id, world: cupOf(h), order: h.order, name: h.name })),
     }),
     /** The chain's answer for a round of shots on this hole, straight from the RPC. */
     simulate: (shots) => E.chain.simulateRound(E.g.id, shots.map(([d, p, tick]) => shotOf(d, p, tick ?? null)), E.g.period),

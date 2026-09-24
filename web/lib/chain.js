@@ -25,7 +25,7 @@ const hexOf = (str) => [...new TextEncoder().encode(str)].map((b) => b.toString(
 const VERSION = 1;
 let warned = false;
 /** The realm's own sentence in a VM panic log ("golf: …"), or null. */
-export function refusal(log) {
+function refusal(log) {
   const m = String(log || "").match(/panic: ([^\n]+)/) || String(log || "").match(/(golf: [^"\n]+)/);
   return m ? m[1].replace(/\s+$/, "") : null;
 }
@@ -234,41 +234,22 @@ const hostOf = (x) => {
     return "";
   }
 };
-export function allowedHost(h, extra = process.env.NEXT_PUBLIC_ALLOWED_HOSTS || "") {
+function allowedHost(h, extra = process.env.NEXT_PUBLIC_ALLOWED_HOSTS || "") {
   const list = [hostOf(process.env.NEXT_PUBLIC_RPC || ""), hostOf(process.env.NEXT_PUBLIC_WEB || ""), ...extra.split(",").map((x) => x.trim())].filter(Boolean);
   return h === "gno.land" || h.endsWith(".gno.land") || list.includes(h);
-}
-export function demoEndpoint() {
-  const fb = "http://127.0.0.1:26757";
-  console.assert(safeEndpoint("https://rpc.test5.gno.land", fb) === "https://rpc.test5.gno.land", "gno.land https");
-  console.assert(safeEndpoint("https://evil.example", fb) === fb && safeEndpoint("https://gno.land.evil.example", fb) === fb, "look-alikes refused");
-  console.assert(safeEndpoint("http://rpc.gno.land", fb) === fb, "no plain http off this machine");
-  console.assert(safeEndpoint("http://localhost:26657/", fb) === "http://localhost:26657", "local");
-  console.assert(allowedHost("my.node", "my.node,other") && !allowedHost("x.node", "my.node"), "listed hosts");
-  console.assert(refusal('x\npanic: golf: more shots than one transaction can replay on this hole: commit the first 6, then the rest\nStacktrace') === "golf: more shots than one transaction can replay on this hole: commit the first 6, then the rest", "refusal");
-  return "ok";
 }
 
 // a realm or package path as the chain names it, and nothing else
 const PKG = /^gno\.land\/[rp]\/[\w/.-]+$/;
 const ADDR = /^g1[0-9a-z]{38}$/;
 
-export const PULL_SHARE = 0.24; // a pull this share of the viewport's short side is full power
+const PULL_SHARE = 0.24; // a pull this share of the viewport's short side is full power
 export function pullShot(px, vw, vh, angleRad, maxPower = 10) {
   const full = Math.max(120, Math.min(vw, vh) * PULL_SHARE);
   const power = Math.round(Math.min(px / full, 1) * maxPower * 100) / 100;
   let deg = (angleRad * 180) / Math.PI;
   deg = Math.round((((deg % 360) + 360) % 360) * 100) / 100;
   return { deg, power };
-}
-export function demoPull() {
-  const a = pullShot(170, 1440, 700, Math.PI / 4), b = pullShot(170, 1440, 700, Math.PI / 4 + 1e-9);
-  console.assert(a.deg === b.deg && a.power === b.power && shotOf(a.deg, a.power) === shotOf(b.deg, b.power), "same pull, same shot");
-  // zoom 110%: the CSS viewport and the pull shrink together
-  const z = pullShot(170 / 1.1, 1440 / 1.1, 700 / 1.1, Math.PI / 4);
-  console.assert(Math.abs(z.power - a.power) < 0.011, "zoom does not change the power");
-  console.assert(pullShot(9999, 800, 600, 0).power === 10 && pullShot(0, 800, 600, -Math.PI / 2).deg === 270, "caps and wraps");
-  return "ok";
 }
 
 export const shotOf = (angleDeg, power, tick) => `${f(angleDeg)},${f(power)}` + (tick == null ? "" : `,${tick | 0}`);

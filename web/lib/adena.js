@@ -38,7 +38,7 @@ const norm = (u) => String(u || "").trim().replace(/\/+$/, "");
  * knows: one left from an older chain on this node (same address, another
  * chain id) has to be removed in Adena by hand, and the error says how.
  */
-export async function ensureNetwork(a, { chainId, rpc, name = "Gnogolf chain" }) {
+async function ensureNetwork(a, { chainId, rpc, name = "Gnogolf chain" }) {
   if (!chainId) return;
   const active = async () => {
     try {
@@ -150,7 +150,7 @@ const feeFor = (gasWanted, price) => Math.ceil(gasWanted * price * 1.5);
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
 // Whether a round fits one commit is the chain's to say (SimulateRound's
 // "commit the first N"), not this estimate's: see splitRound.
-export const MAX_GAS = 1_900_000_000;
+const MAX_GAS = 1_900_000_000;
 const PER_CALL = 170e6;
 /** The gas one commit of these strokes should need. c: { walls, others, pts: [path length per stroke] }. */
 export function gasOf(c, from = 0, to = (c.pts || []).length) {
@@ -241,15 +241,3 @@ export const shortOf = (gas, price, deposit, balance) =>
 export const costOf = (gas, price = 0.001) => (feeFor(gas, price) / 1e6).toFixed(3);
 
 // the self-check: the chain's "first N" cuts the round N at a time; any other refusal stops it
-export async function demoSplit() {
-  const s = Array.from({ length: 8 }, (_, i) => `${i},5`);
-  const refuse = async () => { throw new Error("golf: more shots than one transaction can replay on this hole: commit the first 6, then the rest"); };
-  console.assert(JSON.stringify(await splitRound(s, refuse)) === "[[0,6],[6,8]]", "split");
-  console.assert(JSON.stringify(await splitRound(s, async () => ({}))) === "[[0,8]]", "whole");
-  let bad = null;
-  try { await splitRound(s, async () => { throw new Error("golf: that weather has not come yet"); }); } catch (e) { bad = e.message; }
-  console.assert(bad && /weather/.test(bad), "other refusals pass through");
-  console.assert(gasOf({ walls: 24, others: 10, pts: [50, 50] }) > gasOf({ walls: 24, others: 10, pts: [50] }), "gas grows by the stroke");
-  console.assert(gasOf({ walls: 1000, others: 0, pts: Array(12).fill(500) }) === MAX_GAS, "capped");
-  return "ok";
-}

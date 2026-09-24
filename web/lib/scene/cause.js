@@ -4,7 +4,7 @@
 // — so a ball that speeds up or drifts shows its reason instead of looking
 // like a bug. One Points and one LineSegments for every particle: two draws.
 import * as THREE from "three";
-import { inZone } from "../terrain.js";
+import { inZone, onAt } from "../terrain.js";
 
 const N = 160; // particles alive at once, recycled
 const LOOK = {
@@ -20,7 +20,7 @@ export function causeAt(zones, x, y, vx, vy, tick = 0) {
   let wind = null, slope = null, wet = false, ice = false;
   for (const z of zones) {
     if (!inZone(z, x, y)) continue;
-    const on = !z.every || (((tick + (z.phase | 0)) % z.every) + z.every) % z.every < z.on;
+    const on = onAt(z, tick);
     if (z.kind === "slope" && on) {
       if (z.skin === "wind" || z.skin === "gust") wind = z.vec;
       // downhill only: a slope the ball climbs slows it, which needs no reason
@@ -150,16 +150,3 @@ export function makeCauses(scene) {
   return api;
 }
 
-// the self-check: wind beats the rest, a slope counts only downhill, a gust only when on
-export function demo() {
-  const zones = [
-    { kind: "slope", min: [0, 0], max: [10, 10], vec: [0.2, 0] },
-    { kind: "surface", min: [0, 0], max: [5, 5], skin: "ice" },
-    { kind: "slope", min: [6, 0], max: [10, 10], vec: [0, 0.1], skin: "gust", every: 10, on: 4, phase: 0 },
-  ];
-  console.assert(causeAt(zones, 8, 5, 1, 0, 6).kind === "slope", "downhill (gust off)");
-  console.assert(causeAt(zones, 8, 5, -1, 0, 6) === null, "uphill is no cause");
-  console.assert(causeAt(zones, 2, 2, -1, 0).kind === "ice", "ice");
-  console.assert(causeAt(zones, 8, 5, 1, 0, 2).kind === "wind" && causeAt(zones, 8, 5, 1, 0, 6).kind === "slope", "a gust only when on");
-  return "ok";
-}

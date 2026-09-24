@@ -1,13 +1,11 @@
 import * as THREE from "three";
-import { CUP_R, BALL_R, inZone, airy } from "../terrain.js";
-import { CELL } from "../terrain.js";
-import { C, ink, flat, drawn, clipTo, rbox, hullOf } from "./materials.js";
+import { CUP_R, CELL, inZone, airy, mod, segDist } from "../terrain.js";
+import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf } from "./materials.js";
 import { animate, state } from "./state.js";
 import { stone, warp, badge, windmill } from "./props.js";
 import { MOUTHS, mouthAt } from "./pieces.js";
 import { seeded } from "./common.js";
-import { worldOf } from "./worlds.js";
-import { drape, fromWorld, gapWater, DECK } from "./course.js";
+import { worldOf, fromWorld, gapWater, DECK } from "./worlds.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
@@ -116,7 +114,7 @@ function greenMask(t) {
 
 /** The water of a hole as a mask (cells of the green inside a hazard zone),
  *  for clipping ripples and splashes to it. */
-export function waterMask(t, s) {
+export function waterMask(t) {
   if (t.water) return t.water;
   const data = new Uint8Array(t.nx * t.nz * 4);
   for (let j = 0; j < t.nz; j++)
@@ -137,21 +135,20 @@ const TUNNEL_COLORS = [C.cap, 0x5b6fb5, C.sun, 0xe98fb0];
  * the first entry whose test matches draws the zone (world pieces first).
  */
 const ZONE_DRAW = [
-  [(z) => z.kind === "loop" && z.skin === "loop-the-loop", loopTrack],
   [(z) => z.skin === "seesaw", seesaw],
   [(z) => z.skin === "castle tube", (z, s, t, g) => {
     const castle = (s.posts || []).find((p) => p.skin === "sandcastle");
     const [cx, cz] = [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2];
     return castle ? castleSlide(z, s, t, g, castle, [cx, cz], z.vec) : g;
   }],
-  [(z) => z.skin === "crevasse" || z.skin === "ditch", draw_gap],
+  [(z) => z.skin === "crevasse" || z.skin === "ditch", drawGap],
   [(z) => z.kind === "slope" && z.skin === "moon bridge", moonBridge],
-  [(z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && (z.vec[0] || z.vec[1]), draw_contours],
-  [(z) => z.skin === "mill", draw_mill],
-  [(z) => z.skin === "molehill", draw_molehill],
+  [(z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && (z.vec[0] || z.vec[1]), drawContours],
+  [(z) => z.skin === "mill", drawMill],
+  [(z) => z.skin === "molehill", drawMolehill],
   [(z) => z.skin === "gap", deckGap],
-  [(z) => z.kind === "surface" || z.kind === "hazard", draw_surface],
-  [(z) => z.kind === "tunnel", draw_tunnel],
+  [(z) => z.kind === "surface" || z.kind === "hazard", drawSurface],
+  [(z) => z.kind === "tunnel", drawTunnel],
 ];
 
 function zoneDetail(z, s, t) {
@@ -160,11 +157,9 @@ function zoneDetail(z, s, t) {
   const g = new THREE.Group();
   const w = z.max[0] - z.min[0], h = z.max[1] - z.min[1];
   const rand = seeded("zone" + s.hole + z.min + z.max);
-  const inside = () => [z.min[0] + rand() * w, z.min[1] + rand() * h];
-  const onGreen = t.onGreen;
   const hit = ZONE_DRAW.find(([test]) => test(z));
   if (!hit) return g;
-  return hit[1] === draw_gap ? draw_gap(z, s, t) : hit[1](z, s, t, g, { w, h, rand, inside, onGreen });
+  return hit[1](z, s, t, g, { w, h, rand });
 }
 
 /**
@@ -255,7 +250,7 @@ function deckGap(z, s, t, g) {
 }
 
 /** A real gap in the lane: a crevasse (ice) or a ditch (earth). */
-function draw_gap(z, s, t) {
+function drawGap(z, s, t) {
   // a ditch is the garden's crevasse: earth and roots, not ice
   const earth = z.skin === "ditch";
   // the gap itself: ice cliffs down both sides (where the rough and the
@@ -264,7 +259,6 @@ function draw_gap(z, s, t) {
   const g = new THREE.Group();
   const D = -7, x0 = z.min[0], x1 = z.max[0], z0 = z.min[1], z1 = z.max[1];
   const rand = seeded("crevasse" + s.hole + z.min);
-  const onGreen = t.onGreen;
   const cliff = flat(earth ? 0x7a5236 : 0x8fcde6, { side: THREE.DoubleSide });
   for (const x of [x0, x1]) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(z1 - z0 + 8, -0.6 - D), cliff);
@@ -277,7 +271,7 @@ function draw_gap(z, s, t) {
   bottom.position.set((x0 + x1) / 2, D, (z0 + z1) / 2);
   g.add(bottom);
   for (let k = 0; k < Math.round((z1 - z0) * 1.2); k++) {
-    const zz = z0 + rand() * (z1 - z0), x = rand() < 0.5 ? x0 : x1, y = onGreen(x - 0.3, zz) || onGreen(x + 0.3, zz) ? 0 : -0.6;
+    const zz = z0 + rand() * (z1 - z0), x = rand() < 0.5 ? x0 : x1, y = t.onGreen(x - 0.3, zz) || t.onGreen(x + 0.3, zz) ? 0 : -0.6;
     // icicles off an ice lip; roots dangling off an earth one
     const ic = new THREE.Mesh(earth ? new THREE.CylinderGeometry(0.03, 0.05, 0.6 + rand() * 0.7, 4) : new THREE.ConeGeometry(0.1, 0.5 + rand() * 0.6, 5), flat(earth ? 0x5a3a24 : 0xe8f6fb));
     ic.rotation.x = Math.PI;
@@ -346,7 +340,7 @@ function moonBridge(z, s, t, g) {
   return g;
 }
 
-function draw_contours(z, s, t, g, { w, h, rand, inside, onGreen }) {
+function drawContours(z, s, t, g, { w, h }) {
   // Contour lines, like a map: one every half unit of height, across the
   // slope and draped on it. They show where it rises and how steeply —
   // bunched up where it is steep — without an arrow in sight.
@@ -374,7 +368,7 @@ function draw_contours(z, s, t, g, { w, h, rand, inside, onGreen }) {
     for (let b = -reach; b <= reach; b += 0.3) {
       const x = px + vx * b, zz = pz + vz * b;
       const nearCup = Math.hypot(x - s.cup[0], zz - s.cup[1]) < CUP_R + 0.5;
-      if (!onGreen(x, zz) || t.height(x, zz) < 0.15 || nearCup) { flush(); continue; }
+      if (!t.onGreen(x, zz) || t.height(x, zz) < 0.15 || nearCup) { flush(); continue; }
       run.push(new THREE.Vector3(x, t.height(x, zz) + 0.04, zz));
     }
     flush();
@@ -396,7 +390,7 @@ function draw_contours(z, s, t, g, { w, h, rand, inside, onGreen }) {
   return g;
 }
 
-function draw_mill(z, s, t, g, { w, h, rand, inside, onGreen }) {
+function drawMill(z, s, t, g, { w, h }) {
   // the mill standing across the lane: a big tower, its sails turning
   const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
   const k = Math.min(w, h) / 2.4, y0 = t.height(cx, cz);
@@ -433,10 +427,9 @@ function draw_mill(z, s, t, g, { w, h, rand, inside, onGreen }) {
   });
   g.add(m.group);
   return g;
-  return g;
 }
 
-function draw_molehill(z, s, t, g, { w, h, rand, inside, onGreen }) {
+function drawMolehill(z, s, t, g, { rand }) {
   // where the mole lives: a ring of turned earth, flat enough to roll over
   const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
   const y = t.height(cx, cz);
@@ -455,10 +448,11 @@ function draw_molehill(z, s, t, g, { w, h, rand, inside, onGreen }) {
   }
   g.add(ring, hole);
   return g;
-  return g;
 }
 
-function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
+// A surface or a hazard: its patch in the ground (a blob, draped), a deck's
+// planks, the bank's ink; then the detail its kind draws (SURFACE_DETAIL).
+function drawSurface(z, s, t, g, { w, h, rand }) {
   const water = z.kind === "hazard";
   const ice = z.skin === "ice" || (z.kind === "surface" && z.scale > 1);
   // skins the chain names get their own look; an unknown one is the kind's
@@ -471,7 +465,7 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
   // inside the drawn shape and on the green, with a margin: where detail may go
   const inSand = (x, zz) => {
     if (x < 0.4 || zz < 0.4 || x > s.board.w - 0.4 || zz > s.board.h - 0.4) return false;
-    if (!onGreen(x, zz)) return false;
+    if (!t.onGreen(x, zz)) return false;
     if (z.poly) return inZone(z, x, zz);
     if (!z.round) return true;
     const ex = (x - (z.min[0] + z.max[0]) / 2) / (w / 2), ez = (zz - (z.min[1] + z.max[1]) / 2) / (h / 2);
@@ -504,230 +498,258 @@ function draw_surface(z, s, t, g, { w, h, rand, inside, onGreen }) {
   let run = [];
   const flushRim = () => { if (run.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(run), ink)); run = []; };
   for (const [x, zz] of [...blob.points, blob.points[0]]) {
-    if (onGreen(x, zz)) run.push(new THREE.Vector3(x, t.height(x, zz) + 0.06, zz));
+    if (t.onGreen(x, zz)) run.push(new THREE.Vector3(x, t.height(x, zz) + 0.06, zz));
     else flushRim();
   }
   flushRim();
 
-  if (water) {
-    // a shore of pebbles, reeds at a corner, a lily pad and ripples — none
-    // on a wall: a pond that runs up to one would push them through it
-    // (nor on a bridge's deck or a causeway, where a pond runs up to one)
-    const onDeck = (x, zz) => s.zones.some((q) => ((q.kind === "slope" && q.skin === "moon bridge") || q.skin === "bridge" || q.skin === "seesaw") && x > q.min[0] - 0.8 && x < q.max[0] + 0.8 && zz > q.min[1] - 0.8 && zz < q.max[1] + 0.8);
-    const byWall = (x, zz) => onDeck(x, zz) || s.walls.some((w) => {
-      const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
-      const u = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (zz - w.a[1]) * dz) / l2));
-      return Math.hypot(x - w.a[0] - u * dx, zz - w.a[1] - u * dz) < 0.8;
+  const f = { water, puddle, soil, bed, ice, deck };
+  const detail = SURFACE_DETAIL.find(([test]) => test(f));
+  if (detail) detail[1](z, s, t, g, { w, h, rand, blob, inSand, spot, snow });
+  return g;
+}
+
+// the detail on a surface, by what it is: the first that matches draws
+const SURFACE_DETAIL = [
+  [(f) => f.water, waterDetail],
+  [(f) => f.puddle, puddleDetail],
+  [(f) => f.soil, soilDetail],
+  [(f) => f.bed, bedDetail],
+  [(f) => f.ice, iceDetail],
+  [(f) => !f.deck, sandDetail],
+];
+
+/** Water: its shore of pebbles and reeds, ripples, a lily pad (a fountain's basin, a canal's stones). */
+function waterDetail(z, s, t, g, { w, h, rand, blob, spot }) {
+  // a shore of pebbles, reeds at a corner, a lily pad and ripples — none
+  // on a wall: a pond that runs up to one would push them through it
+  // (nor on a bridge's deck or a causeway, where a pond runs up to one)
+  const onDeck = (x, zz) => s.zones.some((q) => ((q.kind === "slope" && q.skin === "moon bridge") || q.skin === "bridge" || q.skin === "seesaw") && x > q.min[0] - 0.8 && x < q.max[0] + 0.8 && zz > q.min[1] - 0.8 && zz < q.max[1] + 0.8);
+  const byWall = (x, zz) => onDeck(x, zz) || s.walls.some((w) => segDist(x, zz, w.a, w.b) < 0.8);
+  // the sea and a wave have no shore of pebbles and reeds: they are open water
+  const shore = !["sea", "wave", "canal", "gap", "fountain"].includes(z.skin);
+  if (z.skin === "fountain") fountainBasin(z, t, g, w, h);
+  if (z.skin === "canal") canalEdges(z, t, g, w, h);
+  for (let k = 0; shore && k < blob.points.length; k += 3) {
+    const [x, zz] = blob.points[k];
+    if (byWall(x, zz) || !t.onGreen(x, zz)) continue;
+    const st = stone(rand);
+    st.scale.setScalar(0.35 + rand() * 0.2);
+    st.position.set(x, t.height(x, zz) + 0.05, zz);
+    g.add(st);
+  }
+  for (let k = 0; shore && k < 5; k++) {
+    const [x, zz] = blob.points[Math.floor(rand() * blob.points.length)];
+    if (byWall(x, zz) || !t.onGreen(x, zz)) continue;
+    const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.9 + rand() * 0.5, 5), flat(C.leafDark));
+    reed.position.set(x, t.height(x, zz) + 0.5, zz);
+    reed.rotation.z = (rand() - 0.5) * 0.4;
+    const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.22, 3, 6), flat(C.bark));
+    tip.position.y = 0.45;
+    reed.add(tip);
+    g.add(reed);
+  }
+  for (let k = 0; k < Math.min(8, Math.max(2, (w * h) / 8)); k++) {
+    const at = spot(1.0);
+    if (!at) continue;
+    const [x, zz] = at;
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.38, 24), clipTo(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }), waterMask(t)));
+    r.rotation.x = -Math.PI / 2;
+    r.position.set(x, t.height(x, zz) + 0.04, zz);
+    const phase = rand() * 3;
+    r.userData.live = true;
+    animate((time) => {
+      const k = ((time + phase) % 3) / 3; // one ring every three seconds
+      r.scale.setScalar(0.6 + k * 1.8);
+      r.material.opacity = 0.55 * (1 - k);
     });
-    // the sea and a wave have no shore of pebbles and reeds: they are open water
-    const shore = !["sea", "wave", "canal", "gap", "fountain"].includes(z.skin);
-    if (z.skin === "fountain") {
-      // a round basin with a rim, and a spout of water in the middle
-      const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, r = Math.min(w, h) / 2, y = t.height(cx, cz);
-      const rim = drawn(new THREE.TorusGeometry(r, 0.18, 8, 32), flat(0xb9c2bd));
-      rim.rotation.x = Math.PI / 2;
-      rim.position.set(cx, y + 0.12, cz);
-      const col = drawn(new THREE.CylinderGeometry(0.18, 0.3, 1.2, 10), flat(0xb9c2bd));
-      col.position.set(cx, y + 0.6, cz);
-      const bowl = drawn(new THREE.SphereGeometry(0.7, 14, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), flat(0xa5aea9, { side: THREE.DoubleSide }));
-      bowl.position.set(cx, y + 1.35, cz);
-      const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.12, 0.9, 8), new THREE.MeshBasicMaterial({ color: 0xdff4fb, transparent: true, opacity: 0.8 }));
-      jet.position.set(cx, y + 1.8, cz);
-      jet.userData.live = true;
-      animate((time) => (jet.scale.y = 0.85 + 0.2 * Math.sin(time * 6)));
-      g.add(rim, col, bowl, jet);
-    }
-    if (z.skin === "canal") {
-      // stone edges along its long sides
-      const alongX = w >= h, n = Math.ceil((alongX ? w : h) / 1.2);
-      for (const sgn of [0, 1])
-        for (let k = 0; k < n; k++) {
-          const u = (k + 0.5) / n;
-          const x = alongX ? z.min[0] + u * w : sgn ? z.max[0] : z.min[0], zz = alongX ? (sgn ? z.max[1] : z.min[1]) : z.min[1] + u * h;
-          if (!onGreen(x, zz) && !onGreen(x + (alongX ? 0 : sgn ? 0.3 : -0.3), zz + (alongX ? (sgn ? 0.3 : -0.3) : 0))) continue;
-          const st = drawn(rbox(alongX ? 1.15 : 0.35, 0.18, alongX ? 0.35 : 1.15, 0.05), flat(k % 2 ? 0xb9c2bd : 0xa5aea9));
-          st.position.set(x, t.height(x, zz) + 0.06, zz);
-          g.add(st);
-        }
-    }
-    for (let k = 0; shore && k < blob.points.length; k += 3) {
-      const [x, zz] = blob.points[k];
-      if (byWall(x, zz) || !onGreen(x, zz)) continue;
-      const st = stone(rand);
-      st.scale.setScalar(0.35 + rand() * 0.2);
-      st.position.set(x, t.height(x, zz) + 0.05, zz);
+    g.add(r);
+  }
+  const padAt = shore && spot(0.6, 0.3, 0.4);
+  if (padAt) {
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.45, 14, 0.3, Math.PI * 1.8), flat(C.leaf));
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(padAt[0], t.height(padAt[0], padAt[1]) + 0.045, padAt[1]);
+    g.add(pad);
+  }
+}
+
+/** A round basin with a rim, and a spout of water in the middle. */
+function fountainBasin(z, t, g, w, h) {
+  const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, r = Math.min(w, h) / 2, y = t.height(cx, cz);
+  const rim = drawn(new THREE.TorusGeometry(r, 0.18, 8, 32), flat(0xb9c2bd));
+  rim.rotation.x = Math.PI / 2;
+  rim.position.set(cx, y + 0.12, cz);
+  const col = drawn(new THREE.CylinderGeometry(0.18, 0.3, 1.2, 10), flat(0xb9c2bd));
+  col.position.set(cx, y + 0.6, cz);
+  const bowl = drawn(new THREE.SphereGeometry(0.7, 14, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), flat(0xa5aea9, { side: THREE.DoubleSide }));
+  bowl.position.set(cx, y + 1.35, cz);
+  const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.12, 0.9, 8), new THREE.MeshBasicMaterial({ color: 0xdff4fb, transparent: true, opacity: 0.8 }));
+  jet.position.set(cx, y + 1.8, cz);
+  jet.userData.live = true;
+  animate((time) => (jet.scale.y = 0.85 + 0.2 * Math.sin(time * 6)));
+  g.add(rim, col, bowl, jet);
+}
+
+/** A canal's stone edges along its long sides. */
+function canalEdges(z, t, g, w, h) {
+  const alongX = w >= h, n = Math.ceil((alongX ? w : h) / 1.2);
+  for (const sgn of [0, 1])
+    for (let k = 0; k < n; k++) {
+      const u = (k + 0.5) / n;
+      const x = alongX ? z.min[0] + u * w : sgn ? z.max[0] : z.min[0], zz = alongX ? (sgn ? z.max[1] : z.min[1]) : z.min[1] + u * h;
+      if (!t.onGreen(x, zz) && !t.onGreen(x + (alongX ? 0 : sgn ? 0.3 : -0.3), zz + (alongX ? (sgn ? 0.3 : -0.3) : 0))) continue;
+      const st = drawn(rbox(alongX ? 1.15 : 0.35, 0.18, alongX ? 0.35 : 1.15, 0.05), flat(k % 2 ? 0xb9c2bd : 0xa5aea9));
+      st.position.set(x, t.height(x, zz) + 0.06, zz);
       g.add(st);
     }
-    for (let k = 0; shore && k < 5; k++) {
-      const [x, zz] = blob.points[Math.floor(rand() * blob.points.length)];
-      if (byWall(x, zz) || !onGreen(x, zz)) continue;
-      const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.9 + rand() * 0.5, 5), flat(C.leafDark));
-      reed.position.set(x, t.height(x, zz) + 0.5, zz);
-      reed.rotation.z = (rand() - 0.5) * 0.4;
-      const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.22, 3, 6), flat(C.bark));
-      tip.position.y = 0.45;
-      reed.add(tip);
-      g.add(reed);
+}
+
+/** A shallow puddle: glints of sky and rings, all inside it. */
+function puddleDetail(z, s, t, g, { rand, spot }) {
+  const ringMat = () => clipTo(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }), waterMask(t));
+  for (let k = 0; k < 3; k++) {
+    const at = spot(0.8);
+    if (!at) continue;
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.36, 24), ringMat());
+    r.rotation.x = -Math.PI / 2;
+    r.position.set(at[0], t.height(at[0], at[1]) + 0.045, at[1]);
+    const phase = rand() * 3;
+    r.userData.live = true;
+    animate((time) => {
+      const k = ((time + phase) % 3) / 3;
+      r.scale.setScalar(0.5 + k * 1.6);
+      r.material.opacity = 0.5 * (1 - k);
+    });
+    g.add(r);
+  }
+  const glint = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+  for (let k = 0; k < 5; k++) {
+    const at = spot(0.5, 0.2, 0.6);
+    if (!at) continue;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5 + rand() * 0.6, 0.07), glint);
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = -0.6;
+    m.position.set(at[0], t.height(at[0], at[1]) + 0.05, at[1]);
+    g.add(m);
+  }
+}
+
+/** A row of the vegetable patch: furrows, and heads planted on the ridges. */
+function soilDetail(z, s, t, g, { w, h, rand, inSand }) {
+  // a row of the vegetable patch: furrows along it, and cabbages and
+  // lettuces planted in lines on the ridges, low enough to roll through
+  const pts = z.poly && z.poly.length > 2 ? z.poly : [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]];
+  let ax = 1, az = 0, best = 0;
+  for (let k = 0; k < pts.length; k++) {
+    const a = pts[k], b = pts[(k + 1) % pts.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (l > best) (best = l), (ax = (b[0] - a[0]) / l), (az = (b[1] - a[1]) / l);
+  }
+  const nx = -az, nz = ax, cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, reach = Math.hypot(w, h) / 2 + 1;
+  const furrow = new THREE.LineBasicMaterial({ color: 0x4f3524 });
+  const heads = [flat(0x8fcb6a), flat(0x6fae55), flat(0xb5d98a)], leaf = new THREE.SphereGeometry(1, 9, 6);
+  const inRow = (x, zz) => inSand(x, zz) && inZone(z, x, zz);
+  for (let b = -reach, line = 0; b <= reach; b += 0.55, line++) {
+    let run = [];
+    const flush = () => { if (run.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(run), furrow)); run = []; };
+    for (let a = -reach; a <= reach; a += 0.3) {
+      const x = cx + ax * a + nx * b, zz = cz + az * a + nz * b;
+      if (!inRow(x, zz)) { flush(); continue; }
+      run.push(new THREE.Vector3(x, t.height(x, zz) + 0.05, zz));
     }
-    for (let k = 0; k < Math.min(8, Math.max(2, (w * h) / 8)); k++) {
-      const at = spot(1.0);
-      if (!at) continue;
-      const [x, zz] = at;
-      const r = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.38, 24), clipTo(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }), waterMask(t, s)));
-      r.rotation.x = -Math.PI / 2;
-      r.position.set(x, t.height(x, zz) + 0.04, zz);
-      const phase = rand() * 3;
-      r.userData.live = true;
-      animate((time) => {
-        const k = ((time + phase) % 3) / 3; // one ring every three seconds
-        r.scale.setScalar(0.6 + k * 1.8);
-        r.material.opacity = 0.55 * (1 - k);
-      });
-      g.add(r);
-    }
-    const padAt = shore && spot(0.6, 0.3, 0.4);
-    if (padAt) {
-      const pad = new THREE.Mesh(new THREE.CircleGeometry(0.45, 14, 0.3, Math.PI * 1.8), flat(C.leaf));
-      pad.rotation.x = -Math.PI / 2;
-      pad.position.set(padAt[0], t.height(padAt[0], padAt[1]) + 0.045, padAt[1]);
-      g.add(pad);
-    }
-  } else if (puddle) {
-    // a shallow puddle: glints of sky and rings, all inside it
-    const ringMat = () => clipTo(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }), waterMask(t, s));
-    for (let k = 0; k < 3; k++) {
-      const at = spot(0.8);
-      if (!at) continue;
-      const r = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.36, 24), ringMat());
-      r.rotation.x = -Math.PI / 2;
-      r.position.set(at[0], t.height(at[0], at[1]) + 0.045, at[1]);
-      const phase = rand() * 3;
-      r.userData.live = true;
-      animate((time) => {
-        const k = ((time + phase) % 3) / 3;
-        r.scale.setScalar(0.5 + k * 1.6);
-        r.material.opacity = 0.5 * (1 - k);
-      });
-      g.add(r);
-    }
-    const glint = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
-    for (let k = 0; k < 5; k++) {
-      const at = spot(0.5, 0.2, 0.6);
-      if (!at) continue;
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5 + rand() * 0.6, 0.07), glint);
-      m.rotation.x = -Math.PI / 2;
-      m.rotation.z = -0.6;
-      m.position.set(at[0], t.height(at[0], at[1]) + 0.05, at[1]);
+    flush();
+    if (line % 2) continue;
+    // every other ridge is planted, a head every 1.1 or so
+    for (let a = -reach + (line % 4 ? 0.55 : 0); a <= reach; a += 1.1) {
+      const x = cx + ax * a + nx * (b + 0.27), zz = cz + az * a + nz * (b + 0.27), r = 0.17 + rand() * 0.08;
+      if (![[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].every(([dx, dz]) => inRow(x + dx, zz + dz))) continue;
+      const m = new THREE.Mesh(leaf, heads[Math.floor(rand() * heads.length)]);
+      m.scale.set(r, r * 0.75, r);
+      m.position.set(x, t.height(x, zz) + 0.04 + r * 0.5, zz);
       g.add(m);
-    }
-  } else if (soil) {
-    // a row of the vegetable patch: furrows along it, and cabbages and
-    // lettuces planted in lines on the ridges, low enough to roll through
-    const pts = z.poly && z.poly.length > 2 ? z.poly : [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]];
-    let ax = 1, az = 0, best = 0;
-    for (let k = 0; k < pts.length; k++) {
-      const a = pts[k], b = pts[(k + 1) % pts.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      if (l > best) (best = l), (ax = (b[0] - a[0]) / l), (az = (b[1] - a[1]) / l);
-    }
-    const nx = -az, nz = ax, cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, reach = Math.hypot(w, h) / 2 + 1;
-    const furrow = new THREE.LineBasicMaterial({ color: 0x4f3524 });
-    const heads = [flat(0x8fcb6a), flat(0x6fae55), flat(0xb5d98a)], leaf = new THREE.SphereGeometry(1, 9, 6);
-    const inRow = (x, zz) => inSand(x, zz) && inZone(z, x, zz);
-    for (let b = -reach, line = 0; b <= reach; b += 0.55, line++) {
-      let run = [];
-      const flush = () => { if (run.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(run), furrow)); run = []; };
-      for (let a = -reach; a <= reach; a += 0.3) {
-        const x = cx + ax * a + nx * b, zz = cz + az * a + nz * b;
-        if (!inRow(x, zz)) { flush(); continue; }
-        run.push(new THREE.Vector3(x, t.height(x, zz) + 0.05, zz));
-      }
-      flush();
-      if (line % 2) continue;
-      // every other ridge is planted, a head every 1.1 or so
-      for (let a = -reach + (line % 4 ? 0.55 : 0); a <= reach; a += 1.1) {
-        const x = cx + ax * a + nx * (b + 0.27), zz = cz + az * a + nz * (b + 0.27), r = 0.17 + rand() * 0.08;
-        if (![[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].every(([dx, dz]) => inRow(x + dx, zz + dz))) continue;
-        const m = new THREE.Mesh(leaf, heads[Math.floor(rand() * heads.length)]);
-        m.scale.set(r, r * 0.75, r);
-        m.position.set(x, t.height(x, zz) + 0.04 + r * 0.5, zz);
-        g.add(m);
-      }
-    }
-  } else if (bed) {
-    // a bed of soil full of flowers, low enough to read as ground you can
-    // roll through (slowly), not a wall of stems
-    const petals = [C.petal, C.cream, C.sun, 0x9b7fd1, 0xf29a6b].map((c) => flat(c));
-    const stemMat = flat(C.leafDark);
-    const head = new THREE.SphereGeometry(0.1, 7, 5), stem = new THREE.CylinderGeometry(0.02, 0.02, 0.24, 4);
-    const leaf = new THREE.SphereGeometry(0.12, 6, 4);
-    for (let k = 0; k < w * h * 3; k++) {
-      const x = z.min[0] + rand() * w, zz = z.min[1] + rand() * h;
-      if (!inSand(x, zz)) continue;
-      const y = t.height(x, zz) + 0.04;
-      if (k % 3 === 2) {
-        const l = new THREE.Mesh(leaf, flat(C.leaf));
-        l.scale.y = 0.4;
-        l.position.set(x, y + 0.03, zz);
-        g.add(l);
-        continue;
-      }
-      const st = new THREE.Mesh(stem, stemMat);
-      st.position.set(x, y + 0.12, zz);
-      const hd = new THREE.Mesh(head, petals[k % petals.length]);
-      hd.position.set(x, y + 0.26, zz);
-      hd.scale.y = 0.7;
-      g.add(st, hd);
-    }
-  } else if (ice) {
-    // ice: long white scratches and a few glints, so it reads frozen, not grey
-    const streak = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
-    for (let k = 0; k < Math.max(6, (w * h) / 6); k++) {
-      const at = spot(1.3, 0.2, 0.6);
-      if (!at) continue;
-      const [x, zz] = at;
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9 + rand() * 1.6, 0.06), streak);
-      m.rotation.x = -Math.PI / 2;
-      m.rotation.z = -0.5 + (rand() - 0.5) * 0.3;
-      m.position.set(x, t.height(x, zz) + 0.045, zz);
-      g.add(m);
-    }
-    for (let k = 0; k < 6; k++) {
-      const at = spot(0.2, 0.2, 0.6);
-      if (!at) continue;
-      const [x, zz] = at;
-      const glint = new THREE.Mesh(new THREE.CircleGeometry(0.12, 4), streak);
-      glint.rotation.x = -Math.PI / 2;
-      glint.position.set(x, t.height(x, zz) + 0.05, zz);
-      g.add(glint);
-    }
-  } else if (!deck) {
-    // sand: grains and raked lines, kept inside the shape's inner margin
-    const grain = new THREE.CircleGeometry(1, 10);
-    const tones = snow ? [flat(0xd6e6ef), flat(0xffffff)] : [flat(0xd9bd82), flat(0xf4e1b2)];
-    for (let i = 0; i < w * h * 4; i++) {
-      const x = z.min[0] + w * (0.2 + rand() * 0.6), zz = z.min[1] + h * (0.2 + rand() * 0.6);
-      if (!inSand(x, zz)) continue;
-      const d = new THREE.Mesh(grain, tones[i % 2]);
-      d.scale.setScalar(0.025 + rand() * 0.035);
-      d.rotation.x = -Math.PI / 2;
-      d.position.set(x, t.height(x, zz) + 0.045, zz);
-      g.add(d);
-    }
-    for (let k = 1; k < Math.floor(h / 0.9); k++) {
-      const zz = z.min[1] + k * 0.9;
-      const pts = [];
-      for (let x = z.min[0] + w * 0.22; x <= z.max[0] - w * 0.22; x += 0.4) {
-        if (!inSand(x, zz)) {
-          if (pts.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: snow ? 0xc9dce8 : 0xd9bd82 })));
-          pts.length = 0;
-          continue;
-        }
-        pts.push(new THREE.Vector3(x, t.height(x, zz) + 0.05, zz + Math.sin(x * 1.3) * 0.12));
-      }
-      if (pts.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: snow ? 0xc9dce8 : 0xd9bd82 })));
     }
   }
-  return g;
+}
+
+/** A bed of soil full of flowers. */
+function bedDetail(z, s, t, g, { w, h, rand, inSand }) {
+  // a bed of soil full of flowers, low enough to read as ground you can
+  // roll through (slowly), not a wall of stems
+  const petals = [C.petal, C.cream, C.sun, 0x9b7fd1, 0xf29a6b].map((c) => flat(c));
+  const stemMat = flat(C.leafDark);
+  const head = new THREE.SphereGeometry(0.1, 7, 5), stem = new THREE.CylinderGeometry(0.02, 0.02, 0.24, 4);
+  const leaf = new THREE.SphereGeometry(0.12, 6, 4);
+  for (let k = 0; k < w * h * 3; k++) {
+    const x = z.min[0] + rand() * w, zz = z.min[1] + rand() * h;
+    if (!inSand(x, zz)) continue;
+    const y = t.height(x, zz) + 0.04;
+    if (k % 3 === 2) {
+      const l = new THREE.Mesh(leaf, flat(C.leaf));
+      l.scale.y = 0.4;
+      l.position.set(x, y + 0.03, zz);
+      g.add(l);
+      continue;
+    }
+    const st = new THREE.Mesh(stem, stemMat);
+    st.position.set(x, y + 0.12, zz);
+    const hd = new THREE.Mesh(head, petals[k % petals.length]);
+    hd.position.set(x, y + 0.26, zz);
+    hd.scale.y = 0.7;
+    g.add(st, hd);
+  }
+}
+
+/** Ice: long white scratches and a few glints, so it reads frozen, not grey. */
+function iceDetail(z, s, t, g, { w, h, rand, spot }) {
+  const streak = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
+  for (let k = 0; k < Math.max(6, (w * h) / 6); k++) {
+    const at = spot(1.3, 0.2, 0.6);
+    if (!at) continue;
+    const [x, zz] = at;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9 + rand() * 1.6, 0.06), streak);
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = -0.5 + (rand() - 0.5) * 0.3;
+    m.position.set(x, t.height(x, zz) + 0.045, zz);
+    g.add(m);
+  }
+  for (let k = 0; k < 6; k++) {
+    const at = spot(0.2, 0.2, 0.6);
+    if (!at) continue;
+    const [x, zz] = at;
+    const glint = new THREE.Mesh(new THREE.CircleGeometry(0.12, 4), streak);
+    glint.rotation.x = -Math.PI / 2;
+    glint.position.set(x, t.height(x, zz) + 0.05, zz);
+    g.add(glint);
+  }
+}
+
+/** Sand (or deep snow): grains and raked lines. */
+function sandDetail(z, s, t, g, { w, h, rand, inSand, snow }) {
+  // sand: grains and raked lines, kept inside the shape's inner margin
+  const grain = new THREE.CircleGeometry(1, 10);
+  const tones = snow ? [flat(0xd6e6ef), flat(0xffffff)] : [flat(0xd9bd82), flat(0xf4e1b2)];
+  for (let i = 0; i < w * h * 4; i++) {
+    const x = z.min[0] + w * (0.2 + rand() * 0.6), zz = z.min[1] + h * (0.2 + rand() * 0.6);
+    if (!inSand(x, zz)) continue;
+    const d = new THREE.Mesh(grain, tones[i % 2]);
+    d.scale.setScalar(0.025 + rand() * 0.035);
+    d.rotation.x = -Math.PI / 2;
+    d.position.set(x, t.height(x, zz) + 0.045, zz);
+    g.add(d);
+  }
+  for (let k = 1; k < Math.floor(h / 0.9); k++) {
+    const zz = z.min[1] + k * 0.9;
+    const pts = [];
+    for (let x = z.min[0] + w * 0.22; x <= z.max[0] - w * 0.22; x += 0.4) {
+      if (!inSand(x, zz)) {
+        if (pts.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: snow ? 0xc9dce8 : 0xd9bd82 })));
+        pts.length = 0;
+        continue;
+      }
+      pts.push(new THREE.Vector3(x, t.height(x, zz) + 0.05, zz + Math.sin(x * 1.3) * 0.12));
+    }
+    if (pts.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: snow ? 0xc9dce8 : 0xd9bd82 })));
+  }
 }
 
 /**
@@ -794,7 +816,7 @@ function castleSlide(z, s, t, g, castle, [cx, cz], [ox, oz]) {
   return g;
 }
 
-function draw_tunnel(z, s, t, g, { w, h, rand, inside, onGreen }) {
+function drawTunnel(z, s, t, g, { w, h }) {
   // A tunnel is a hole in the ground with a coloured rim, and a badge over
   // it pointing down; its way out is a pipe of the same colour with a badge
   // pointing up. Nothing else on a hole looks like that — the cup has its
@@ -890,163 +912,6 @@ function draw_tunnel(z, s, t, g, { w, h, rand, inside, onGreen }) {
   return g;
 }
 
-/** The loop's radius, board units: its top is 2R over the lane. */
-export const LOOP_R = 3;
-
-/**
- * An open loop's layout, from its zone as the chain has it (step.gno Loop):
- * the axis is the one the destination lies furthest along; the lane (A) runs
- * in along it at the mouth's middle, the track comes down on a lane (B)
- * beside it at vec's side. P(u, w) is the board point at u along the axis
- * and w across it; Xc is where the track leaves the lane (a unit in from the
- * mouth's front); fall is where the chain sets down a ball that flew off.
- */
-export function loopFrame(z) {
-  const mx = (z.min[0] + z.max[0]) / 2, mz = (z.min[1] + z.max[1]) / 2;
-  const ax = Math.abs(z.vec[1] - mz) <= Math.abs(z.vec[0] - mx); // along x (as the chain decides)
-  const k = ax ? 0 : 1, o = 1 - k;
-  const sign = z.vec[k] < (ax ? mx : mz) ? -1 : 1;
-  const P = (u, w) => (ax ? [u, w] : [w, u]);
-  const front = sign > 0 ? z.min[k] : z.max[k], back = sign > 0 ? z.max[k] : z.min[k];
-  const wA = (z.min[o] + z.max[o]) / 2, W = z.max[o] - z.min[o];
-  return { ax, sign, P, front, back, Xc: front + sign, wA, W, wB: z.vec[o], vecU: z.vec[k], r: LOOP_R, fall: P(front - sign * 0.01 - sign * 1.5, wA) };
-}
-
-/**
- * The lane itself curling up into a vertical loop and coming down beside
- * itself: a deck with the lane's green on top and timber sides, rails along
- * both edges, and the ground filled in under its two low ends, so the lane
- * bends up rather than a track standing on it. The kerbs it replaces are cut
- * open for it (course.js openings). The replay rides the ball along
- * state.tubes.get(z) (open: no tube round it): round and down onto the second
- * lane, part way up and back, or off the top.
- */
-function loopTrack(z, s, t, g) {
-  const F = loopFrame(z), { sign, P, Xc, wA, wB, W, r } = F;
-  const base = t.height(...P(F.front, wA));
-  const L = F.ax ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0); // across
-  const U = F.ax ? new THREE.Vector3(sign, 0, 0) : new THREE.Vector3(0, 0, sign); // along
-  const ease = (q) => q * q * (3 - 2 * q);
-  const N = 120, TH = 0.28;
-  // the centreline of the deck's top, and the normal into the loop
-  const ring = [];
-  for (let i = 0; i <= N; i++) {
-    const phi = (i / N) * Math.PI * 2;
-    const w = wA + (wB - wA) * ease(i / N);
-    const [x, zz] = P(Xc + sign * r * Math.sin(phi), w);
-    const c = new THREE.Vector3(x, base + 0.03 + r * (1 - Math.cos(phi)), zz);
-    const n = U.clone().multiplyScalar(-Math.sin(phi)).add(new THREE.Vector3(0, Math.cos(phi), 0));
-    ring.push({ c, n, h: r * (1 - Math.cos(phi)), phi });
-  }
-  // the deck: a box section swept round, timber, outlined
-  const pos = [], idx = [];
-  const corners = ({ c, n }) => [
-    c.clone().addScaledVector(L, -W / 2), c.clone().addScaledVector(L, W / 2),
-    c.clone().addScaledVector(L, W / 2).addScaledVector(n, -TH), c.clone().addScaledVector(L, -W / 2).addScaledVector(n, -TH),
-  ];
-  for (const q of ring) for (const v of corners(q)) pos.push(v.x, v.y, v.z);
-  const V = (i) => new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
-  const quad = (a, b, c, d, out) => {
-    // wound so its normal points out of the section (the ink hull needs it)
-    const n = V(b).sub(V(a)).cross(V(d).sub(V(a)));
-    if (n.dot(out) < 0) idx.push(a, d, c, a, c, b);
-    else idx.push(a, b, c, a, c, d);
-  };
-  for (let i = 0; i < N; i++)
-    for (let e = 0; e < 4; e++) {
-      const a = i * 4 + e, b = i * 4 + ((e + 1) % 4), mid = V(a).add(V(b)).multiplyScalar(0.5);
-      const ctr = ring[i].c.clone().addScaledVector(ring[i].n, -TH / 2);
-      quad(a, b, b + 4, a + 4, mid.sub(ctr));
-    }
-  for (const [i, out] of [[0, U.clone().negate()], [N, U.clone()]]) quad(i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 3, out);
-  const body = new THREE.BufferGeometry();
-  body.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  body.setIndex(idx);
-  body.computeVertexNormals();
-  g.add(drawn(body, flat(C.wood)));
-  // the lane's green on top, a hair over the timber
-  const top = [], tIdx = [];
-  for (const { c, n } of ring) {
-    for (const sgn of [-1, 1]) {
-      const v = c.clone().addScaledVector(L, sgn * (W / 2 - 0.02)).addScaledVector(n, 0.015);
-      top.push(v.x, v.y, v.z);
-    }
-  }
-  for (let i = 0; i < N; i++) tIdx.push(i * 2, i * 2 + 1, i * 2 + 3, i * 2, i * 2 + 3, i * 2 + 2);
-  const deck = new THREE.BufferGeometry();
-  deck.setAttribute("position", new THREE.Float32BufferAttribute(top, 3));
-  deck.setIndex(tIdx);
-  deck.computeVertexNormals();
-  g.add(new THREE.Mesh(deck, flat(C.fairway, { side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
-  // a rail each side, like the lane's kerbs, riding the deck's edges
-  for (const sgn of [-1, 1]) {
-    const pts = ring.map(({ c, n }) => c.clone().addScaledVector(L, sgn * (W / 2 + 0.12)).addScaledVector(n, 0.22));
-    g.add(drawn(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, 0.17, 8, false), flat(C.wood)));
-  }
-  // under its low ends the deck is filled down into the ground: timber faces
-  // under both edges, and one across where the fill stops
-  const skirt = flat(C.woodDark, { side: THREE.DoubleSide });
-  const fill = (from, to) => {
-    const sp = [], si = [];
-    for (let i = from; i <= to; i++) {
-      const [, , cB, dB] = corners(ring[i]);
-      for (const v of [dB, cB]) sp.push(v.x, v.y, v.z, v.x, base - 0.7, v.z);
-    }
-    const n = to - from;
-    for (let i = 0; i < n; i++) {
-      for (const e of [0, 2]) {
-        const a = i * 4 + e, b = a + 1, c = a + 4, d = a + 5;
-        si.push(a, b, d, a, d, c);
-      }
-    }
-    // the face across, at the end that stands clear of the ground
-    const end = from === 0 ? n : 0;
-    si.push(end * 4, end * 4 + 1, end * 4 + 3, end * 4, end * 4 + 3, end * 4 + 2);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
-    geo.setIndex(si);
-    geo.computeVertexNormals();
-    g.add(new THREE.Mesh(geo, skirt));
-  };
-  const lowEnd = Math.round(N * 0.12); // ~43°: up to about 0.6 of r
-  fill(0, lowEnd);
-  fill(N - lowEnd, N);
-  // the ride: the ball's centre, BALL_R in from the deck, in along the lane
-  // from the mouth and out along the second lane to where the chain sets it
-  const [fx, fz] = P(F.front, wA);
-  const ride = [new THREE.Vector3(fx, base + BALL_R, fz)];
-  for (const { c, n } of ring) ride.push(c.clone().addScaledVector(n, BALL_R + 0.03));
-  const [ex, ez] = P(F.vecU, wB);
-  ride.push(new THREE.Vector3(ex, t.height(ex, ez) + BALL_R, ez));
-  const curve = new THREE.CatmullRomCurve3(ride, false, "centripetal");
-  // its pace: slower the higher it climbs, as a ball under gravity
-  const lens = curve.getLengths(400), total = lens[lens.length - 1];
-  const times = [0];
-  for (let i = 1; i < lens.length; i++) {
-    const p = curve.getPointAt(lens[i] / total), h = Math.max(0, p.y - base - BALL_R);
-    times.push(times[i - 1] + (lens[i] - lens[i - 1]) / Math.sqrt(Math.max(0.2, 1 - (0.7 * h) / (2 * r))));
-  }
-  const T = times[times.length - 1];
-  const topAt = (lens[Math.round(400 * (1 + N / 2) / (N + 2))] || total / 2) / total;
-  curve.userData = {
-    open: true,
-    top: topAt, // the arc fraction at the top of the loop
-    fall: F.fall, // where a ball that flew off is set down
-    centre: new THREE.Vector3(...((q) => [q[0], base + 0.03 + r, q[1]])(P(Xc, wA))), // the ring's middle
-    across: L, // the axis across the loop
-    base, // the lane's height at the mouth
-    pace(k) {
-      const want = k * T;
-      let lo = 0, hi = times.length - 1;
-      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (times[m] < want) lo = m; else hi = m; }
-      const f = times[hi] > times[lo] ? (want - times[lo]) / (times[hi] - times[lo]) : 0;
-      return (lens[lo] + (lens[hi] - lens[lo]) * f) / total;
-    },
-  };
-  state.tubes.set(z, curve);
-  return g;
-}
-
 /**
  * A seesaw (two timed slopes over one plank, pushing opposite ways in turn):
  * a long plank on a stone over the pond, rocking on the timed pieces' clock
@@ -1094,7 +959,7 @@ function seesaw(z, s, t, g) {
   animate((tt) => {
     const dt = last === null ? 0 : Math.min(0.1, tt - last);
     last = tt;
-    const p = every ? ((((step + phase) % every) + every) % every) : 0, first = !every || p < onFor;
+    const p = every ? mod(step + phase, every) : 0, first = !every || p < onFor;
     // +x end up when the first half pushes toward -x
     const want = (first ? -down : down) * SEESAW_TILT;
     ang += (want - ang) * Math.min(1, dt * 9);

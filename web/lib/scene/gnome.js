@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { BALL_R } from "../terrain.js";
 import { C, flat, inked, disposeCourse, texOf } from "./materials.js";
 import { makeRenderer, makeScene } from "./camera.js";
-import { bake } from "./course.js";
+import { bake } from "./bake.js";
 
 /** The ball is a gnome. Which one is the player's choice — cosmetic only: the
  *  chain moves a point, it never hears about beards. */

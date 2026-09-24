@@ -4,6 +4,7 @@
 // they mean — rain falling, wind lines running, fog — and says what the
 // weather is, for the HUD. Lightning is the page's: a flash over everything.
 import * as THREE from "three";
+import { mod } from "../terrain.js";
 
 /** The zone skins that are weather (drawn here, not as pieces of the course). */
 export const WEATHER_SKINS = ["wind", "rain", "fog", "storm", "snow"];
@@ -381,7 +382,7 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     clock(c) {
       const z = gusts[0];
       if (!z) return void (gustOn = 0);
-      const k = (((c + (z.phase | 0)) % z.every) + z.every) % z.every;
+      const k = mod(c + (z.phase | 0), z.every);
       // on in [0, on), with a quarter-substep swell at each edge
       const on = z.on;
       gustOn = k < on ? Math.min(1, k * 4, (on - k) * 4) : 0;

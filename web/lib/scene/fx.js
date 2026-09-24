@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { BALL_R } from "../terrain.js";
 import { C, flat, drawn, clipTo, share } from "./materials.js";
+import { state } from "./state.js";
 
 // made once, used by every splash and every confetti burst
 const RING_GEO = share(new THREE.RingGeometry(0.8, 1, 32)), DROP_GEO = share(new THREE.SphereGeometry(0.09, 6, 5));
 const HAT_GEO = share(new THREE.ConeGeometry(0.16, 0.36, 8)), PETAL_GEO = share(new THREE.SphereGeometry(0.13, 8, 6).scale(1, 0.35, 0.7));
-import { state } from "./state.js";
 
 /** Into the water: rings spreading out and a few drops thrown up. */
 // How far the water reaches from a point before the bank, from the hole's

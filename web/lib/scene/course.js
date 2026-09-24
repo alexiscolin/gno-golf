@@ -1,16 +1,17 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { terrain, CELL, CUP_R, airy } from "../terrain.js";
-import { C, ink, flat, motion, drawn, rbox, ringLine, texOf, setWind, share, plantFeet, quality } from "./materials.js";
+import { terrain, CELL, CUP_R, airy, there, inPoly, closest, segDist, smoothstep } from "../terrain.js";
+import { C, ink, flat, motion, drawn, drape, rbox, ringLine, texOf, setWind, share, plantFeet, quality } from "./materials.js";
+import { bake } from "./bake.js";
 import { state } from "./state.js";
 import { timeOf, islandBox } from "./camera.js";
 import { bush, stone, flower, tuft, mole, windmill, smokeBatch } from "./props.js";
-import { seeded, ISLAND, GRASS } from "./common.js";
+import { seeded, GRASS } from "./common.js";
 import { roughOf } from "./garden.js";
-import { worldOf } from "./worlds.js";
+import { worldOf, fromWorld, gapWater, DECK } from "./worlds.js";
 import { WEATHER_SKINS } from "./weather.js";
 import { POSTS, BARS, roofs, ROOF_Y } from "./pieces.js";
-import { zoneDetail, waterMask, loopFrame } from "./zones.js";
+import { zoneDetail, waterMask } from "./zones.js";
 
 // defer: leave the merge (finishHole) to the caller, to run in a task of its own
 export function buildHole(s, { defer = false } = {}) {
@@ -24,7 +25,7 @@ export function buildHole(s, { defer = false } = {}) {
   state.mill = null;
   const g = new THREE.Group();
   const t = terrain(s);
-  state.water = waterMask(t, s); // what splashes are clipped to, for this hole
+  state.water = waterMask(t); // what splashes are clipped to, for this hole
 
   // the garden is an island, not a world: a raised plot of grass on a block of
   // soil, with sky all around it — a diorama reads cuter than a plain
@@ -107,7 +108,7 @@ export function buildHole(s, { defer = false } = {}) {
 /** The second half of a hole's build: what stands still merged, and every
  *  chimney's smoke in one draw. */
 export function finishHole(g) {
-  if (!g.userData.state.unbaked) bake(g, quality.low ? g.userData.state.board : null);
+  if (!g.userData.state.unbaked) bake(g, { board: quality.low ? g.userData.state.board : null });
   else plantFeet(g); // unbaked: kept in pieces, for the trailer's hole that builds itself (web/lib/promo.js)
   const puffs = smokeBatch(g.userData.smokes);
   g.userData.smokes = null;
@@ -135,8 +136,8 @@ export function finishHole(g) {
 function greenEdge(s, t) {
   if (t.edge) return t.edge;
   const segs = s.walls;
-  const near = (x, z, r) => segs.some((w) => segDist(x, z, w) < r);
-  const isGreen = (i, j) => i >= 0 && j >= 0 && i < t.nx && j < t.nz && !!t.green[t.idx(i, j)];
+  const near = (x, z, r) => segs.some((w) => segDist(x, z, w.a, w.b) < r);
+  const isGreen = (i, j) => t.inGrid(i, j) && !!t.green[t.idx(i, j)];
   const cells = new Uint8Array(t.nx * t.nz);
   for (let j = 0; j < t.nz; j++)
     for (let i = 0; i < t.nx; i++) {
@@ -155,35 +156,26 @@ function greenEdge(s, t) {
     const ci = Math.round(x / CELL), cj = Math.round(z / CELL);
     if (isGreen(ci, cj) || isGreen(ci - 1, cj) || isGreen(ci, cj - 1) || isGreen(ci - 1, cj - 1)) return [x, z];
     let best = null, bd = Infinity;
-    for (const w of segs) { const d = segDist(x, z, w); if (d < bd) (bd = d), (best = w); }
+    for (const w of segs) { const d = segDist(x, z, w.a, w.b); if (d < bd) (bd = d), (best = w); }
     const LIP = best && inKerb.has(best) ? 0.55 : 0.4;
     if (!best || bd <= LIP) return [x, z];
-    const dx = best.b[0] - best.a[0], dz = best.b[1] - best.a[1], l2 = dx * dx + dz * dz || 1;
-    const u = Math.max(0, Math.min(1, ((x - best.a[0]) * dx + (z - best.a[1]) * dz) / l2));
-    const qx = best.a[0] + u * dx, qz = best.a[1] + u * dz, k = LIP / bd;
+    const { x: qx, z: qz } = closest(x, z, best.a, best.b), k = LIP / bd;
     return [qx + (x - qx) * k, qz + (z - qz) * k];
   };
   return (t.edge = { cells, corner });
 }
 
 /**
- * A wall with the stretches cut out where a loop's track passes over it: the
- * way in (the zone's middle, across to the loop) and the way out (the landing
- * line, vec.y, up to where the ball comes down). Returns the pieces left.
+ * A wall with the stretches cut out where a gap crosses it or an inlet of the
+ * sea opens it. Returns the pieces left.
  */
 function openings(w, zones) {
-  // the strips the track runs on, 1.4 either side of its centreline (the
-  // floor is 2.4 wide, its rails ~0.3 more): in from the mouth to the loop's
-  // middle, and out from there to where the ball comes down
   // a gap across the lane (a crevasse, a ditch) cuts through whatever
   // crosses it: the rails fell in too
   const strips = [];
   // (a polygon gap, "everything but the lane", cuts nothing: the lane's own
   // walls run along its edge)
   for (const z of zones || []) if (GAPS.has(z.skin) && !z.poly) strips.push([z.min[0], z.max[0], z.min[1] - 1, z.max[1] + 1]);
-  // an open loop's track is the lane itself: its kerbs stop where the track
-  // leaves the lane and start again where it comes down (zones.js loopTrack)
-  for (const z of zones || []) if (isLoop(z)) strips.push(...loopStrips(z));
   const inlet = (zones || []).some((z) => z.skin === "sea" && z.poly && !z.outside);
   if (!strips.length && !inlet) return [w];
   const [ax, az] = w.a, dx = w.b[0] - ax, dz = w.b[1] - az, L = segLen(w) || 1;
@@ -220,46 +212,27 @@ function polyCuts(w, pts) {
     if (u > 0 && u < 1 && v >= 0 && v <= 1) us.push(u);
   }
   us.sort((a, b) => a - b);
-  const inside = (x, z) => {
-    let c = false;
-    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++)
-      if ((pts[i][1] > z) !== (pts[j][1] > z) && x < ((pts[j][0] - pts[i][0]) * (z - pts[i][1])) / (pts[j][1] - pts[i][1]) + pts[i][0]) c = !c;
-    return c;
-  };
   const out = [];
   for (let i = 0; i + 1 < us.length; i++) {
     const m = (us[i] + us[i + 1]) / 2;
-    if (inside(ax + dx * m, az + dz * m)) out.push([us[i], us[i + 1]]);
+    if (inPoly(ax + dx * m, az + dz * m, pts)) out.push([us[i], us[i + 1]]);
   }
   return out;
 }
 
-/** The two rectangles [x0, x1, z0, z1] under an open loop's low ends. */
-function loopStrips(z) {
-  const F = loopFrame(z), rect = (u0, u1, w0, w1) => {
-    const [a, b] = [F.P(u0, w0), F.P(u1, w1)];
-    return [Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1])];
-  };
-  return [
-    rect(F.Xc - F.sign * 0.05, F.back + F.sign * 1.5, F.wA - F.W / 2 - 0.6, F.wA + F.W / 2 + 0.6),
-    rect(F.Xc - F.sign * 1.5, F.Xc + F.sign * 0.6, F.wB - F.W / 2 - 0.6, F.wB + F.W / 2 + 0.6),
-  ];
-}
-const isLoop = (q) => q.kind === "loop" && q.skin === "loop-the-loop";
-
 const CREVASSE_Y = -7; // how deep a gap goes
 // the zones drawn as a real gap in the lane: nothing under the ball there
-export const GAPS = new Set(["crevasse", "ditch", "gap", "cliff"]);
+const GAPS = new Set(["crevasse", "ditch", "gap", "cliff"]);
 const iceSide = new THREE.Color(0x8fcde6), earthSide = new THREE.Color(0x7a5236), plankSide = new THREE.Color(0x9a6f42), joist = new THREE.Color(0x5e412a), rockSide = new THREE.Color(0x8e96a0);
 
 const PLANK = 1; // a boardwalk's board, across the lane
-export const DECK = 0.3; // a boardwalk's planks and joists: its cut face, over open water
-// the water under a boardwalk's missing planks: the world's sea, or a pool as
-// far down where the world has none (zones.js deckGap draws it)
-export const gapWater = (s) => worldOf(s).SEA ?? GRASS - 0.9;
 
 function groundMesh(s, t) {
   const pos = [], col = [], nor = [], edges = [];
+  // world.green: [a, b] stripes (mountain packed snow...), or a function of
+  // the hole giving them, or "planks" for a boardwalk: boards across the lane
+  // with dark seams; nothing for the garden's own
+  const wg = worldOf(s).green, G = typeof wg === "function" ? wg(s) : wg, stripes = G || [0x60ab96, 0x5aa38e];
   const c = new THREE.Color();
   const side = new THREE.Color(C.hill);
   // the top is shaded from the slope of the height field itself, so a ramp
@@ -287,8 +260,7 @@ function groundMesh(s, t) {
     // zones' rectangles, so no square patch shows
     const dome = t.domes && t.domes.find((d) => Math.hypot((x - d.x) / d.rx, (z - d.z) / d.rz) < 1);
     if (dome) {
-      const wg = worldOf(s).green, G = (typeof wg === "function" ? wg(s) : wg) || [0x60ab96, 0x5aa38e];
-      c.set(Array.isArray(G) ? (Math.floor(i / 4) % 2 ? G[0] : G[1]) : 0x60ab96);
+      c.set(Array.isArray(stripes) ? (Math.floor(i / 4) % 2 ? stripes[0] : stripes[1]) : 0x60ab96);
       c.offsetHSL(0, 0.03, Math.min(0.1, (t.height(x, z) / dome.h) * 0.1));
       return c;
     }
@@ -302,24 +274,19 @@ function groundMesh(s, t) {
       else if (q.skin === "quarter pipe" || q.skin === "funbox") c.set(0xb3aea4).offsetHSL(0, 0, Math.min(0.12, t.height(x, z) * 0.09));
       else {
         // a world with its own lane colour (mountain snow) keeps it on a slope's edges too
-        const wg = worldOf(s).green, G = typeof wg === "function" ? wg(s) : wg;
         c.set(Array.isArray(G) ? G[0] : 0x62ae98);
       }
       return c;
     }
-    // mown stripes; a world may give its own pair (world.green = [a, b]:
-    // mountain packed snow...)
-    // world.green: [a, b] stripes, or a function of the hole giving them, or
-    // "planks" for a boardwalk: boards across the lane with dark seams
-    const wg = worldOf(s).green, G = (typeof wg === "function" ? wg(s) : wg) || [0x60ab96, 0x5aa38e];
-    if (G === "planks") {
+    // mown stripes, or a boardwalk's planks
+    if (stripes === "planks") {
       // boards a unit wide across the lane, in three warm tones; the seams
       // between them are thin lines (see planks below), not whole cells
       const board = Math.floor(((s.board.w >= s.board.h ? i : j) * CELL) / PLANK);
       c.set([0xd4a86c, 0xc99a63, 0xbf8f58][(board * 7) % 3]);
       return c;
     }
-    c.set(Math.floor(i / 4) % 2 ? G[0] : G[1]);
+    c.set(Math.floor(i / 4) % 2 ? stripes[0] : stripes[1]);
     return c;
   };
 
@@ -336,18 +303,13 @@ function groundMesh(s, t) {
   // the outline, the inner corners of a stair step as much as the outer ones)
   const onLane = (x, z) => {
     const ci = Math.round(x / CELL), cj = Math.round(z / CELL);
-    const rim = [[ci - 1, cj - 1], [ci, cj - 1], [ci - 1, cj], [ci, cj]].some(([a, b]) => a >= 0 && b >= 0 && a < t.nx && b < t.nz && open_[t.idx(a, b)] === 1);
+    const rim = [[ci - 1, cj - 1], [ci, cj - 1], [ci - 1, cj], [ci, cj]].some(([a, b]) => t.inGrid(a, b) && open_[t.idx(a, b)] === 1);
     if (!seaZone || !rim) return [x, z];
     let best = [x, z], bd = Infinity;
     const P = seaZone.poly;
     for (let k = 0; k < P.length; k++) {
-      const a = P[k], b = P[(k + 1) % P.length], w = { a, b };
-      const d = segDist(x, z, w);
-      if (d < bd) {
-        const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1;
-        const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2));
-        (bd = d), (best = [a[0] + u * dx, a[1] + u * dz]);
-      }
+      const q = closest(x, z, P[k], P[(k + 1) % P.length]);
+      if (q.d < bd) (bd = q.d), (best = [q.x, q.z]);
     }
     return best;
   };
@@ -378,9 +340,9 @@ function groundMesh(s, t) {
   // colour: a dark face peeping between kerb posts read as a hole
   else if (!hasRoof && (worldOf(s).rough || roughOf(s))) side.set((worldOf(s).rough || roughOf(s)).lo);
   else if (hasRoof) side.set(0xb8573f); // over the roofs: a brick parapet
-  const wg = worldOf(s).green, planks = (typeof wg === "function" ? wg(s) : wg) === "planks";
+  const planks = G === "planks";
   const piles = [], piled = new Set();
-  const drawn_ = (a, b) => a >= 0 && b >= 0 && a < t.nx && b < t.nz && !open_[t.idx(a, b)] && (!!t.green[t.idx(a, b)] || !!edge.cells[t.idx(a, b)]);
+  const drawn_ = (a, b) => t.inGrid(a, b) && !open_[t.idx(a, b)] && (!!t.green[t.idx(a, b)] || !!edge.cells[t.idx(a, b)]);
   for (let j = 0; j < t.nz; j++)
     for (let i = 0; i < t.nx; i++) {
       const added = !!edge.cells[t.idx(i, j)];
@@ -431,7 +393,7 @@ function groundMesh(s, t) {
         // an ink line only where the edge is bare (over the sea, the roofs, a
         // crevasse): under a kerb it flickered through it in black streaks
         const [ni, nj] = nb[n];
-        if (ni >= 0 && nj >= 0 && ni < t.nx && nj < t.nz && open_[t.idx(ni, nj)]) edges.push(...p, ...q);
+        if (t.inGrid(ni, nj) && open_[t.idx(ni, nj)]) edges.push(...p, ...q);
       }
     }
 
@@ -492,7 +454,7 @@ function roughScenery(s, t) {
   // air: no rough there, nothing planted
   const ownSea = worldOf(s).SEA !== undefined;
   const air = (a, b) => { const q = t.zoneAt((a + 0.5) * CELL, (b + 0.5) * CELL); return !!q && (q.skin === "roof" || GAPS.has(q.skin) || (ownSea && q.skin === "sea")); };
-  const isRough = (a, b) => a >= 0 && b >= 0 && a < t.nx && b < t.nz && !t.green[t.idx(a, b)] && !air(a, b);
+  const isRough = (a, b) => t.inGrid(a, b) && !t.green[t.idx(a, b)] && !air(a, b);
 
   // Distance of every rough cell to the green, in cells: the ground rises
   // with it, so rough is a rounded mound that swells out of the green's edge
@@ -501,7 +463,7 @@ function roughScenery(s, t) {
   const q = [];
   for (let j = 0; j < t.nz; j++)
     for (let i = 0; i < t.nx; i++)
-      if (isRough(i, j) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => !isRough(i + a, j + b) && i + a >= 0 && j + b >= 0 && i + a < t.nx && j + b < t.nz))
+      if (isRough(i, j) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => !isRough(i + a, j + b) && t.inGrid(i + a, j + b)))
         (dist[t.idx(i, j)] = 1), q.push([i, j]);
   for (let k = 0; k < q.length; k++) {
     const [i, j] = q[k];
@@ -535,7 +497,7 @@ function roughScenery(s, t) {
       if (!R.mound) return ROUGH0; // flat unless the world asks for dunes
       const e = Math.min(i, j, t.nx - 1 - i, t.nz - 1 - j) * CELL;
       const k = Math.min(1, e / 2.5, Math.max(0, d - 1) / 2.5);
-      return ROUGH0 + R.mound * k * k * (3 - 2 * k) * (0.7 + 0.3 * Math.sin(i * 0.5 + phase) * Math.cos(j * 0.45));
+      return ROUGH0 + R.mound * smoothstep(k) * (0.7 + 0.3 * Math.sin(i * 0.5 + phase) * Math.cos(j * 0.45));
     }
     const top = n < 60 ? 0.25 : Math.min(1.8, 0.5 + n / 220); // a sliver stays low, a big patch is a hill
     const wobble = 0.85 + 0.15 * Math.sin(i * 0.7 + phase) * Math.cos(j * 0.6 + phase);
@@ -543,7 +505,7 @@ function roughScenery(s, t) {
     // so the mound meets the banks outside instead of ending in a cliff
     const e = Math.min(i, j, t.nx - 1 - i, t.nz - 1 - j) * CELL;
     const k = Math.min(1, e / 1.5);
-    const edgeK = k * k * (3 - 2 * k);
+    const edgeK = smoothstep(k);
     // flat for the first unit off the green: a wall stands on that strip, and
     // a mound rising under it would cut through the timber
     const mound = top * wobble * (1 - Math.exp(-Math.max(0, d - 1.1) / 1.3));
@@ -597,15 +559,10 @@ function roughScenery(s, t) {
   }
 
   // where the mill stands nothing grows: it would come up through it
-  // (nor under a loop's track: its box, and the ring's reach behind it)
   // (nor round a serac's tower uphill of its spot, nor the cairns at a col's saddle)
   const built = [...s.zones.filter((z) => z.skin === "mill"),
     ...s.zones.filter((z) => z.skin === "serac").map((z) => ({ min: [z.min[0] - 2.5, z.min[1] - 9], max: [z.max[0] + 2.5, z.max[1] + 9] })),
-    ...s.zones.filter((z) => z.skin === "saddle crest" && z.vec[0] < 0).map((z) => ({ min: [z.max[0] - 1.5, z.min[1]], max: [z.max[0] + 1.5, z.max[1]] })),
-    ...s.zones.filter(isLoop).map((z) => {
-    const F = loopFrame(z), a = F.P(F.Xc - F.sign * (F.r + 1), Math.min(F.wA, F.wB) - F.W), b = F.P(F.Xc + F.sign * (F.r + 1), Math.max(F.wA, F.wB) + F.W);
-    return { min: [Math.min(a[0], b[0]), Math.min(a[1], b[1])], max: [Math.max(a[0], b[0]), Math.max(a[1], b[1])] };
-  })];
+    ...s.zones.filter((z) => z.skin === "saddle crest" && z.vec[0] < 0).map((z) => ({ min: [z.max[0] - 1.5, z.min[1]], max: [z.max[0] + 1.5, z.max[1]] }))];
   const taken = [];
   const FOOT = [0.75, 0.45, 0.2, 0.2]; // bush, stone, tuft, flower
   for (const cells of t.rough) {
@@ -634,32 +591,8 @@ function roughScenery(s, t) {
   return g;
 }
 
-/** Lifts a world-space geometry onto the height field, vertex by vertex. */
-function drape(geo, height) {
-  const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + height(p.getX(i), p.getZ(i)));
-  p.needsUpdate = true;
-  geo.computeVertexNormals();
-  return geo;
-}
 
-/**
- * A world's own drawing of an on-lane piece, if it has one: worldOf(s).piece
- * (kind: "post" | "wall" | "zone", item: the post, the bar {walls, skin, c,
- * length, thick, ang} or the zone, t: the terrain, s: the hole) returns an
- * Object3D, or nothing to leave it to the shared drawing.
- */
-export function fromWorld(s, kind, item, t) {
-  const w = worldOf(s).piece;
-  const m = w && w(kind, item, t, s);
-  return m && m.isObject3D ? m : null;
-}
 
-const segDist = (x, z, w) => {
-  const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l2 = dx * dx + dz * dz || 1;
-  const u = Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (z - w.a[1]) * dz) / l2));
-  return Math.hypot(x - w.a[0] - u * dx, z - w.a[1] - u * dz);
-};
 const near = (p, q) => Math.abs(p[0] - q[0]) < 1e-3 && Math.abs(p[1] - q[1]) < 1e-3;
 const segLen = (w) => Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
 
@@ -818,7 +751,7 @@ function timedPieces(s, t, out) {
     for (const m of wallPieces({ ...s, walls: q.map(({ a, b, skin }) => ({ a, b, skin })) }, t)) piece.add(m);
     const l0 = segLen(q[0]), l1 = segLen(q[1]), long = l0 >= l1 ? q[0] : q[1];
     const ang = Math.atan2(long.b[1] - long.a[1], long.b[0] - long.a[0]);
-    const there = (k) => ((k + phase) % every + every) % every < on;
+    const at0 = (k) => there(k, every, on, phase);
     // its footprint, faintly dashed, while the player aims: "it comes and goes"
     let ghost = null;
     // not for a clock's hands (the dial says it) nor the lift's chairs (their
@@ -831,7 +764,7 @@ function timedPieces(s, t, out) {
       ghost.visible = false;
       out.push(ghost);
     }
-    pieces.push({ pivot, there, ang, cx, cz, ghost, hand: q[0].skin === "clock hand", walls: q });
+    pieces.push({ pivot, there: at0, ang, cx, cz, ghost, hand: q[0].skin === "clock hand", walls: q });
     out.push(pivot);
   }
   // Between ticks a piece glides: over the last EASE of the substep before
@@ -840,15 +773,14 @@ function timedPieces(s, t, out) {
   // substep of its window, where the chain has it block, it is fully there.
   const EASE = 0.3;
   const hands = pieces.filter((p) => p.hand);
-  const smooth = (u) => u * u * (3 - 2 * u);
   let aiming = false;
   for (const p of pieces) {
     const at = (tick) => {
       const k = Math.floor(tick), f = tick - k;
       let e = 0; // 0 away, 1 in place
       if (p.there(k)) e = 1;
-      else if (p.there(k + 1) && f > 1 - EASE) e = smooth((f - (1 - EASE)) / EASE);
-      else if (p.there(k - 1) && f < EASE) e = 1 - smooth(f / EASE);
+      else if (p.there(k + 1) && f > 1 - EASE) e = smoothstep((f - (1 - EASE)) / EASE);
+      else if (p.there(k - 1) && f < EASE) e = 1 - smoothstep(f / EASE);
       p.pivot.visible = e > 0.001;
       p.pivot.rotation.y = 0;
       p.pivot.scale.y = 1;
@@ -878,6 +810,26 @@ function timedPieces(s, t, out) {
   };
 }
 
+/** A kerb chain cut open where a gap or an inlet crosses it: each run left
+ *  is its own kerb ({ list, ch }), ending at posts. */
+function kerbRuns(W, ch, zones) {
+  const runs = [];
+  let cur = [];
+  const flush = () => { if (cur.length) runs.push({ list: cur, ch: { from: 0, to: cur.length - 1, closed: false } }); cur = []; };
+  for (let k = ch.from; k <= ch.to; k++)
+    for (const piece of openings(W[k], zones)) {
+      if (cur.length && !near(cur[cur.length - 1].b, piece.a)) flush();
+      cur.push(piece);
+    }
+  flush();
+  // a closed chain cut once: its first and last runs are one
+  if (ch.closed && runs.length > 1 && near(runs[runs.length - 1].list[runs[runs.length - 1].list.length - 1].b, runs[0].list[0].a)) {
+    const last = runs.pop(), list = [...last.list, ...runs[0].list];
+    runs[0] = { list, ch: { from: 0, to: list.length - 1, closed: false } };
+  } else if (runs.length === 1 && ch.closed) runs[0].ch.closed = true;
+  return runs;
+}
+
 /**
  * Walls as the eye expects them. physics.Bar makes a free-standing barrier out
  * of four segments; drawn one by one they look like two rails, so four closed
@@ -897,36 +849,13 @@ function wallPieces(s, t) {
   // a world may dress the rails its own way: world.kerb = { color, post }
   // (mountain: grey stone, town: kerbstone...); wood by default
   const K = (s.board && worldOf(s).kerb) || {};
-  const loopRects = (s.zones || []).filter(isLoop).flatMap(loopStrips);
-  const inLoopStrip = ([x, z]) => loopRects.some(([x0, x1, z0, z1]) => x >= x0 - 0.05 && x <= x1 + 0.05 && z >= z0 - 0.05 && z <= z1 + 0.05);
-  const cutAny = (s.zones || []).some((q) => GAPS.has(q.skin) || isLoop(q) || (q.skin === "sea" && q.poly && !q.outside)); // any gap, loop or inlet to cut the kerbs at
+  const cutAny = (s.zones || []).some((q) => GAPS.has(q.skin) || (q.skin === "sea" && q.poly && !q.outside)); // any gap or inlet to cut the kerbs at
   for (const ch of kerbChains(W)) {
     for (let k = ch.from; k <= ch.to; k++) inKerb.add(k);
-    // where a loop's track crosses the kerb it is cut open for it; each run
-    // left is its own kerb, ending at posts
-    const runs = [];
-    if (!cutAny) runs.push({ list: W, ch });
-    else {
-      let cur = [];
-      const flush = () => { if (cur.length) runs.push({ list: cur, ch: { from: 0, to: cur.length - 1, closed: false } }); cur = []; };
-      for (let k = ch.from; k <= ch.to; k++)
-        for (const piece of openings(W[k], s.zones)) {
-          if (cur.length && !near(cur[cur.length - 1].b, piece.a)) flush();
-          cur.push(piece);
-        }
-      flush();
-      // a closed chain cut once: its first and last runs are one
-      if (ch.closed && runs.length > 1 && near(runs[runs.length - 1].list[runs[runs.length - 1].list.length - 1].b, runs[0].list[0].a)) {
-        const last = runs.pop(), list = [...last.list, ...runs[0].list];
-        runs[0] = { list, ch: { from: 0, to: list.length - 1, closed: false } };
-      } else if (runs.length === 1 && ch.closed) runs[0].ch.closed = true;
-    }
-    for (const { list, ch: c } of runs) {
+    for (const { list, ch: c } of cutAny ? kerbRuns(W, ch, s.zones) : [{ list: W, ch }]) {
       out.push(kerb(list, c, t, reachable, { color: K.color ?? C.wood }));
-      // an open run ends at a post, like any wall: no bare cut profile —
-      // except where a loop's track takes over the rail: a post there would
-      // stand inside the ring
-      if (!c.closed) for (const p of [list[c.from].a, list[c.to].b]) if (!inLoopStrip(p)) caps.set(p[0].toFixed(2) + "," + p[1].toFixed(2), [p[0], p[1]]);
+      // an open run ends at a post, like any wall: no bare cut profile
+      if (!c.closed) for (const p of [list[c.from].a, list[c.to].b]) caps.set(p[0].toFixed(2) + "," + p[1].toFixed(2), [p[0], p[1]]);
     }
   }
 
@@ -936,80 +865,7 @@ function wallPieces(s, t) {
     if (q.length === 4 && q.every((w, k) => near(w.b, q[(k + 1) % 4].a))) {
       const l0 = segLen(q[0]), l1 = segLen(q[1]);
       if (Math.min(l0, l1) <= 1.6 || BARS[q[0].skin]) {
-        const long = l0 >= l1 ? q[0] : q[1];
-        const thick = Math.min(l0, l1);
-        const cxz = q.reduce((acc, w) => [acc[0] + w.a[0] / 4, acc[1] + w.a[1] / 4], [0, 0]);
-        const skin = q[0].skin, door = skin === "gate door", gate = skin === "gate";
-        const tint = door ? C.cream : gate ? C.stone : skin === "blade" || skin === "sail" ? C.cream : skin === "hedge" ? C.leafDark : C.wood;
-        // a door fits between its gate posts: drawn at full length it would
-        // share their end faces and the two flicker against each other
-        let L = Math.max(l0, l1) - (door ? thick * 1.4 : 0);
-        const ang = Math.atan2(long.b[1] - long.a[1], long.b[0] - long.a[0]);
-        // an end that meets another wall runs on into it: butted face to
-        // face, the two rounded ends and their outlines leave a dark wedge
-        let L0 = L; const c0 = [...cxz]; // the gate's hats stay on its own ends
-        if (!door) {
-          const ux = Math.cos(ang), uz = Math.sin(ang);
-          const others = W.filter((w) => !q.includes(w));
-          for (const sgn of [-1, 1]) {
-            const ex = cxz[0] + ux * sgn * L / 2, ez = cxz[1] + uz * sgn * L / 2;
-            if (others.some((w) => segDist(ex, ez, w) < 0.35)) {
-              L += 0.35;
-              cxz[0] += ux * sgn * 0.175; cxz[1] += uz * sgn * 0.175;
-            }
-          }
-        }
-        // a tram across the lane is drawn between the lane's walls only: its
-        // physics runs on past them (no ball gets there), but drawn in full it
-        // drove through the rails, the lamps and the street
-        if (skin === "tram") {
-          const ux = Math.cos(ang), uz = Math.sin(ang);
-          let lo = 0, hi = 0;
-          while (lo > -L0 / 2 && reachable(c0[0] + ux * (lo - 0.25), c0[1] + uz * (lo - 0.25))) lo -= 0.25;
-          while (hi < L0 / 2 && reachable(c0[0] + ux * (hi + 0.25), c0[1] + uz * (hi + 0.25))) hi += 0.25;
-          if (hi - lo > 1) {
-            const mid = (lo + hi) / 2;
-            c0[0] += ux * mid; c0[1] += uz * mid;
-            L0 = hi - lo - 0.5;
-          }
-        }
-        const own = s.board && fromWorld(s, "wall", { walls: q, skin, c: c0, length: L0, thick, ang }, t);
-        if (own) {
-          out.push(own);
-          i += 3;
-          continue;
-        }
-        if (skin === "logs" || skin === "hay" || BARS[skin]) {
-          // their own look, on the chain's footprint exactly
-          out.push((BARS[skin] || (skin === "logs" ? logs : hay))(c0, L0, thick, ang, t.height));
-          i += 3;
-          continue;
-        }
-        out.push(timber(cxz, L, door ? thick * 0.8 : thick, ang, t.height, tint));
-        // a gnome's gate: stone pillars with a red hat on each end, and a
-        // picket door with its own little hat
-        const ends = door ? [0] : [-L0 / 2 + thick / 2, L0 / 2 - thick / 2];
-        for (const e of ends) {
-          if (!gate && !door) break;
-          const x = c0[0] + Math.cos(ang) * e, z = c0[1] + Math.sin(ang) * e, y = t.height(x, z);
-          const hat = drawn(new THREE.ConeGeometry(door ? 0.28 : 0.45, door ? 0.6 : 0.95, 12), flat(C.cap));
-          hat.position.set(x, y + 1.1 + (door ? 0.3 : 0.47), z);
-          const brim = drawn(new THREE.TorusGeometry(door ? 0.22 : 0.36, 0.06, 6, 16), flat(C.cap));
-          brim.rotation.x = Math.PI / 2;
-          brim.position.set(x, y + 1.12, z);
-          out.push(hat, brim);
-        }
-        if (door) {
-          // slats: dark lines down the door, so it reads as pickets
-          for (let k = -2; k <= 2; k++) {
-            const off = (k / 5) * L;
-            const x = cxz[0] + Math.cos(ang) * off, z = cxz[1] + Math.sin(ang) * off, y = t.height(x, z);
-            const slat = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.0, thick * 0.84), flat(C.woodDark));
-            slat.position.set(x, y + 0.55, z);
-            slat.rotation.y = -ang;
-            out.push(slat);
-          }
-        }
+        out.push(...barPiece(q, W, s, t));
         i += 3;
         continue;
       }
@@ -1056,6 +912,79 @@ function wallPieces(s, t) {
     out.push(cap, top);
   }
   return out;
+}
+
+/** A bar (four walls round a thin box: a timber, a gate, a tram, a world's
+ *  own piece) drawn as one piece: what to add to the course. */
+function barPiece(q, W, s, t) {
+  const l0 = segLen(q[0]), l1 = segLen(q[1]), parts = [];
+  const long = l0 >= l1 ? q[0] : q[1];
+  const thick = Math.min(l0, l1);
+  const cxz = q.reduce((acc, w) => [acc[0] + w.a[0] / 4, acc[1] + w.a[1] / 4], [0, 0]);
+  const skin = q[0].skin, door = skin === "gate door", gate = skin === "gate";
+  const tint = door ? C.cream : gate ? C.stone : skin === "blade" || skin === "sail" ? C.cream : skin === "hedge" ? C.leafDark : C.wood;
+  // a door fits between its gate posts: drawn at full length it would
+  // share their end faces and the two flicker against each other
+  let L = Math.max(l0, l1) - (door ? thick * 1.4 : 0);
+  const ang = Math.atan2(long.b[1] - long.a[1], long.b[0] - long.a[0]);
+  // an end that meets another wall runs on into it: butted face to
+  // face, the two rounded ends and their outlines leave a dark wedge
+  let L0 = L; const c0 = [...cxz]; // the gate's hats stay on its own ends
+  if (!door) {
+    const ux = Math.cos(ang), uz = Math.sin(ang);
+    const others = W.filter((w) => !q.includes(w));
+    for (const sgn of [-1, 1]) {
+      const ex = cxz[0] + ux * sgn * L / 2, ez = cxz[1] + uz * sgn * L / 2;
+      if (others.some((w) => segDist(ex, ez, w.a, w.b) < 0.35)) {
+        L += 0.35;
+        cxz[0] += ux * sgn * 0.175; cxz[1] += uz * sgn * 0.175;
+      }
+    }
+  }
+  // a tram across the lane is drawn between the lane's walls only: its
+  // physics runs on past them (no ball gets there), but drawn in full it
+  // drove through the rails, the lamps and the street
+  if (skin === "tram") {
+    const ux = Math.cos(ang), uz = Math.sin(ang);
+    let lo = 0, hi = 0;
+    while (lo > -L0 / 2 && t.onGreen(c0[0] + ux * (lo - 0.25), c0[1] + uz * (lo - 0.25))) lo -= 0.25;
+    while (hi < L0 / 2 && t.onGreen(c0[0] + ux * (hi + 0.25), c0[1] + uz * (hi + 0.25))) hi += 0.25;
+    if (hi - lo > 1) {
+      const mid = (lo + hi) / 2;
+      c0[0] += ux * mid; c0[1] += uz * mid;
+      L0 = hi - lo - 0.5;
+    }
+  }
+  const own = s.board && fromWorld(s, "wall", { walls: q, skin, c: c0, length: L0, thick, ang }, t);
+  if (own) return [own];
+  // their own look, on the chain's footprint exactly
+  if (skin === "logs" || skin === "hay" || BARS[skin]) return [(BARS[skin] || (skin === "logs" ? logs : hay))(c0, L0, thick, ang, t.height)];
+  parts.push(timber(cxz, L, door ? thick * 0.8 : thick, ang, t.height, tint));
+  // a gnome's gate: stone pillars with a red hat on each end, and a
+  // picket door with its own little hat
+  const ends = door ? [0] : [-L0 / 2 + thick / 2, L0 / 2 - thick / 2];
+  for (const e of ends) {
+    if (!gate && !door) break;
+    const x = c0[0] + Math.cos(ang) * e, z = c0[1] + Math.sin(ang) * e, y = t.height(x, z);
+    const hat = drawn(new THREE.ConeGeometry(door ? 0.28 : 0.45, door ? 0.6 : 0.95, 12), flat(C.cap));
+    hat.position.set(x, y + 1.1 + (door ? 0.3 : 0.47), z);
+    const brim = drawn(new THREE.TorusGeometry(door ? 0.22 : 0.36, 0.06, 6, 16), flat(C.cap));
+    brim.rotation.x = Math.PI / 2;
+    brim.position.set(x, y + 1.12, z);
+    parts.push(hat, brim);
+  }
+  if (door) {
+    // slats: dark lines down the door, so it reads as pickets
+    for (let k = -2; k <= 2; k++) {
+      const off = (k / 5) * L;
+      const x = cxz[0] + Math.cos(ang) * off, z = cxz[1] + Math.sin(ang) * off, y = t.height(x, z);
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.0, thick * 0.84), flat(C.woodDark));
+      slat.position.set(x, y + 0.55, z);
+      slat.rotation.y = -ang;
+      parts.push(slat);
+    }
+  }
+  return parts;
 }
 
 /** One solid wall: rounded when the ground is flat under it, bent to the
@@ -1288,189 +1217,6 @@ function wearLayer(wear, W, H, height) {
 }
 
 /**
- * Merges everything that does not move into one mesh per material — the look
- * is the same, the draw calls go from a thousand or so to a few dozen. What
- * moves (marked live), what carries a texture, lines and sprites are left as
- * they are. Geometry is baked in the course's own space, so the merged meshes
- * need no transform, and the wind shader reads the same world heights.
- */
-// a stable id per shader hook function, for the bake signature (two hooks
-// with the same source text are not the same shader if they close over
-// different uniforms)
-const hookIds = new WeakMap();
-let nextHook = 1;
-const hookId = (f) => (f ? (hookIds.has(f) || hookIds.set(f, nextHook++), hookIds.get(f)) : 0);
-
-/** Merges every static mesh under root into one mesh per material kind (see
- *  the signature below). The shared merge helper: worlds use it too. With a
- *  board (the Low tier), the outlines of what stands over INK_OFF units off
- *  it are left out. */
-const INK_OFF = 10, _c = new THREE.Vector3();
-export function bake(root, board = null) {
-  plantFeet(root); // what sways is weighed from its own foot (before its geometry is merged)
-  root.updateMatrixWorld(true);
-  const buckets = new Map();
-  const taken = [];
-  const isLive = (o) => {
-    for (let p = o; p && p !== root; p = p.parent) if (p.userData && (p.userData.live || p.userData.isFlag)) return true;
-    return false;
-  };
-  // materials that draw the same are one bucket, not one per material object:
-  // flat(color, opts) makes a fresh material each call, and each was a draw
-  // call of its own. (Only meshes that never change are here: nothing mutates
-  // a baked material afterwards, and none has been rendered yet.)
-  // Plain colours go further: a flat-coloured untextured material's colour is
-  // written into its pieces' vertices, so every colour of a kind (toon, same
-  // side, same shader tweaks) is one draw call. Textured or vertex-coloured
-  // ones keep their own bucket.
-  const tint = (m) => !m.map && !m.alphaMap && !m.vertexColors && m.color && !m.transparent;
-  const sig = (m) => [m.userData.hook || hookId(m.onBeforeCompile), m.userData.maskId || "", m.type, tint(m) ? "tint" : m.color && m.color.getHex(), m.side, m.transparent, m.opacity, m.alphaTest, m.depthWrite, m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits, m.vertexColors, m.map && m.map.uuid, m.alphaMap && m.alphaMap.uuid, m.gradientMap && m.gradientMap.uuid, m.customProgramCacheKey && m.customProgramCacheKey()].join("|");
-  const firstOf = new Map();
-  root.traverse((o) => {
-    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || isLive(o)) return;
-    // a textured piece merges only with others using that same texture, and
-    // only if it has the uvs for it
-    if ((o.material.map || o.material.alphaMap) && !o.geometry.attributes.uv) return;
-    if (board && o.material.userData.hull) {
-      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-      _c.copy(o.geometry.boundingSphere.center).applyMatrix4(o.matrixWorld);
-      const dx = Math.max(-_c.x, 0, _c.x - board.w), dz = Math.max(-_c.z, 0, _c.z - board.h);
-      if (Math.hypot(dx, dz) > INK_OFF) return void taken.push(o); // dropped, not merged
-    }
-    const k = sig(o.material);
-    if (!firstOf.has(k)) firstOf.set(k, o.material);
-    const mat = firstOf.get(k);
-    // the piece as it stands: merged below straight from its own buffers
-    if (!buckets.has(mat)) buckets.set(mat, []);
-    buckets.get(mat).push({ geo: o.geometry, at: o.matrixWorld, color: tint(o.material) ? o.material.color : null });
-    taken.push(o);
-  });
-  for (const o of taken) o.parent.remove(o);
-  // what the merge emptied: the groups that held those meshes, walked every
-  // frame for nothing (town18 kept 1777 of them) — gone, bottom up
-  const prune = (o) => {
-    for (let i = o.children.length - 1; i >= 0; i--) prune(o.children[i]);
-    if (o !== root && !o.children.length && (o.type === "Group" || o.type === "Object3D") && !isLive(o)) o.parent.remove(o);
-  };
-  prune(root);
-  for (const [material, pieces] of buckets) {
-    const merged = mergeInPlace(pieces) || mergeByCopy(pieces);
-    if (!merged) continue;
-
-    let m = material;
-    if (tint(material)) {
-      // one material for all those colours: white, tinted by the vertices
-      m = material.clone();
-      m.color.set(0xffffff);
-      m.vertexColors = true;
-      // the clone keeps its shader hooks (sway, hull push) and cache key
-      m.onBeforeCompile = material.onBeforeCompile;
-      if (material.customProgramCacheKey) m.customProgramCacheKey = material.customProgramCacheKey;
-    }
-    const mesh = new THREE.Mesh(merged, m);
-    mesh.matrixAutoUpdate = false; // baked in place: its own matrix is the identity, for good
-    root.add(mesh);
-  }
-}
-
-// One bucket's pieces into one geometry, in the course's space: each piece's
-// vertices are moved by its matrix straight into buffers sized once for the
-// whole bucket (no copy of each piece, no second copy to merge them). A piece
-// without an index gets one, so a bucket of both kinds keeps the shared
-// vertices of the indexed ones. The attributes kept are those every piece has;
-// a tinted piece's colour is written into its vertices. null for what this
-// does not handle (interleaved or morphed buffers, mismatched attributes).
-const _n = new THREE.Matrix3();
-function mergeInPlace(pieces) {
-  const g0 = pieces[0].geo, tinted = !!pieces[0].color;
-  const names = Object.keys(g0.attributes).filter((n) => n !== "color" && pieces.every((p) => p.geo.attributes[n]));
-  if (!tinted && pieces.every((p) => p.geo.attributes.color)) names.push("color");
-  if (!names.includes("position") || names.includes("tangent")) return null;
-  let verts = 0, idx = 0;
-  const indexed = pieces.some((p) => p.geo.index);
-  for (const { geo } of pieces) {
-    if (Object.keys(geo.morphAttributes).length) return null;
-    for (const n of names) {
-      const a = geo.attributes[n], r = (n === "color" && tinted ? null : g0.attributes[n]);
-      if (a.isInterleavedBufferAttribute || ((n === "position" || n === "normal") && (a.itemSize !== 3 || !(a.array instanceof Float32Array))) || (r && (a.itemSize !== r.itemSize || a.normalized !== r.normalized || a.array.constructor !== r.array.constructor))) return null;
-    }
-    verts += geo.attributes.position.count;
-    idx += geo.index ? geo.index.count : geo.attributes.position.count;
-  }
-  const out = new THREE.BufferGeometry(), arrays = {};
-  for (const n of names) {
-    const r = n === "color" && tinted ? null : g0.attributes[n], size = r ? r.itemSize : 3;
-    arrays[n] = new (r ? r.array.constructor : Float32Array)(verts * size);
-    out.setAttribute(n, new THREE.BufferAttribute(arrays[n], size, r ? r.normalized : false));
-  }
-  if (tinted && !arrays.color) {
-    arrays.color = new Float32Array(verts * 3);
-    out.setAttribute("color", new THREE.BufferAttribute(arrays.color, 3));
-  }
-  const index = indexed ? new (verts > 65535 ? Uint32Array : Uint16Array)(idx) : null;
-  let v0 = 0, i0 = 0;
-  for (const { geo, at, color } of pieces) {
-    const n = geo.attributes.position.count, e = at.elements;
-    for (const name in arrays) {
-      const dst = arrays[name];
-      if (name === "color" && color) {
-        for (let i = 0, o = v0 * 3; i < n; i++, o += 3) (dst[o] = color.r), (dst[o + 1] = color.g), (dst[o + 2] = color.b);
-        continue;
-      }
-      const a = geo.attributes[name], src = a.array, size = a.itemSize;
-      if (name === "position") {
-        for (let i = 0, o = v0 * 3; i < n; i++, o += 3) {
-          const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
-          dst[o] = e[0] * x + e[4] * y + e[8] * z + e[12];
-          dst[o + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
-          dst[o + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
-        }
-      } else if (name === "normal") {
-        const m = _n.getNormalMatrix(at).elements;
-        for (let i = 0, o = v0 * 3; i < n; i++, o += 3) {
-          const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
-          const nx = m[0] * x + m[3] * y + m[6] * z, ny = m[1] * x + m[4] * y + m[7] * z, nz = m[2] * x + m[5] * y + m[8] * z;
-          const l = Math.hypot(nx, ny, nz) || 1;
-          (dst[o] = nx / l), (dst[o + 1] = ny / l), (dst[o + 2] = nz / l);
-        }
-      } else if (src.length === n * size) dst.set(src, v0 * size);
-      else for (let i = 0; i < n * size; i++) dst[v0 * size + i] = src[i];
-    }
-    if (index) {
-      if (geo.index) {
-        const s = geo.index.array;
-        for (let k = 0; k < geo.index.count; k++) index[i0 + k] = s[k] + v0;
-        i0 += geo.index.count;
-      } else for (let k = 0; k < n; k++) index[i0++] = v0 + k;
-    }
-    v0 += n;
-  }
-  if (index) out.setIndex(new THREE.BufferAttribute(index, 1));
-  return out;
-}
-// the old way, for what mergeInPlace declines: copy, move, merge
-function mergeByCopy(pieces) {
-  const geos = pieces.map(({ geo, at, color }) => {
-    const g = geo.clone().applyMatrix4(at);
-    if (color) {
-      const n = g.attributes.position.count, col = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) (col[i * 3] = color.r), (col[i * 3 + 1] = color.g), (col[i * 3 + 2] = color.b);
-      g.setAttribute("color", new THREE.BufferAttribute(col, 3));
-    }
-    return g;
-  });
-  // mergeGeometries wants all indexed or none, and the same attributes
-  const mixed = geos.some((g) => g.index) && geos.some((g) => !g.index);
-  const list = mixed ? geos.map((g) => (g.index ? g.toNonIndexed() : g)) : geos;
-  const names = Object.keys(list[0].attributes).filter((n) => list.every((g) => g.attributes[n]));
-  for (const g of list) for (const n of Object.keys(g.attributes)) if (!names.includes(n)) g.deleteAttribute(n);
-  const merged = mergeGeometries(list);
-  geos.forEach((g) => g.dispose());
-  if (mixed) list.forEach((g) => g.dispose());
-  return merged;
-}
-
-/**
  * The pieces a timed hole adds for one stroke — a blade, a shut gate, a mole —
  * drawn like the rest of the course. They are live: nothing here is baked,
  * since the next stroke replaces them.
@@ -1511,28 +1257,3 @@ export function buildExtras(course, ex) {
   return g;
 }
 
-/**
- * A world's decor dressed for the weather. Its builders tag the parts that
- * change with userData.look = [the looks they show in]; looks are one of
- * "clear", "wind", "wet" (or a world's own). Each look's parts are gathered
- * into one group, merged by material (a few draw calls) and kept out of the
- * hole's bake; root.userData.weather(w) then shows the look pick(w) names,
- * w being the engine's weather ({ wind, rain, fog, storm, snow } | null).
- * A part in two looks is copied, so only one group ever draws.
- */
-/** Tags a decor part with the looks it shows in (see weatherLooks); returns it. */
-export const look = (o, ...looks) => ((o.userData.look = looks), o);
-export function weatherLooks(root, pick) {
-  root.updateMatrixWorld(true);
-  const tagged = [];
-  root.traverse((o) => o.userData.look && tagged.push(o));
-  const looks = {};
-  for (const o of tagged)
-    o.userData.look.forEach((k, i) => (looks[k] ||= new THREE.Group()).attach(i ? o.clone() : o));
-  for (const [k, grp] of Object.entries(looks)) (root.add(grp), bake(grp), (grp.userData.live = true), (grp.name = "look:" + k));
-  const show = (w) => { const on = pick(w || {}); for (const k in looks) looks[k].visible = k === on; };
-  show(null);
-  root.userData.weather = show;
-}
-
-export { drape, bake as mergeByMaterial };

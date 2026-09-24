@@ -1,0 +1,73 @@
+// Chrome over the DevTools protocol, for the media scripts (camera/*.mjs,
+// promo/render.mjs): one headless Chrome with a profile of its own, niced,
+// its port read from the profile (DevToolsActivePort: no clash with another
+// Chrome), killed by PID. Node 22+ (the built-in WebSocket).
+//
+// The paths and addresses can be set from the environment: CHROME (the
+// binary), APP (the running client), RPC (the local chain).
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+export const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+export const APP = process.env.APP || "http://localhost:3300";
+export const RPC = process.env.RPC || "http://127.0.0.1:26757";
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * A headless Chrome on about:blank, the page's viewport set: { send(method,
+ * params), ev(expr) (its value, undefined if it threw), js(expr) (throws),
+ * errors (the page's exceptions and console errors), kill() }.
+ * dir: its profile (a fresh one by default); args: more Chrome flags.
+ */
+export async function launch({ width = 1100, height = 700, mobile = false, dir = "", args = [] } = {}) {
+  dir ||= fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-cdp-"));
+  fs.mkdirSync(dir, { recursive: true });
+  try { fs.unlinkSync(path.join(dir, "DevToolsActivePort")); } catch {}
+  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", ...args, "about:blank"], { stdio: "ignore" });
+  const kill = () => { try { process.kill(p.pid); } catch {} };
+  let port;
+  for (let i = 0; i < 100 && !port; i++) {
+    await sleep(200);
+    try { port = fs.readFileSync(path.join(dir, "DevToolsActivePort"), "utf8").split("\n")[0]; } catch {}
+  }
+  if (!port) throw (kill(), new Error("Chrome did not start"));
+  const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+  const ws = new WebSocket(list.find((t) => t.type === "page").webSocketDebuggerUrl);
+  await new Promise((r, j) => ((ws.onopen = r), (ws.onerror = j)));
+  let id = 0;
+  const wait = new Map(), errors = [];
+  ws.onmessage = (m) => {
+    const d = JSON.parse(m.data);
+    if (d.id && wait.has(d.id)) (d.error ? wait.get(d.id)[1](new Error(d.error.message)) : wait.get(d.id)[0](d.result), wait.delete(d.id));
+    if (d.method === "Runtime.exceptionThrown") errors.push(d.params.exceptionDetails.exception?.description?.slice(0, 160) || d.params.exceptionDetails.text);
+    // (the dev build's own "LOOKS…" notes are not errors)
+    if (d.method === "Runtime.consoleAPICalled" && d.params.type === "error" && !/^LOOKS/.test(String(d.params.args[0] && d.params.args[0].value)))
+      errors.push(d.params.args.map((a) => a.value || a.description).join(" ").slice(0, 160));
+  };
+  const send = (method, params = {}) => new Promise((r, j) => (wait.set(++id, [r, j]), ws.send(JSON.stringify({ id, method, params }))));
+  const js = async (expr) => {
+    const r = await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
+    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
+    return r.result.value;
+  };
+  const ev = (expr) => js(expr).catch(() => undefined);
+  await send("Page.enable");
+  await send("Runtime.enable");
+  await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
+  return { send, ev, js, errors, kill: () => { try { ws.close(); } catch {} kill(); } };
+}
+
+/** Waits until the local chain answers (it restarts on hot reloads): up to tries × 5 s. */
+export async function chainUp(tries = 120) {
+  const hex = Buffer.from("gno.land/r/gnogolf/golf.Period()").toString("hex");
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await (await fetch(`${RPC}/abci_query?path=%22vm/qeval%22&data=0x${hex}`, { signal: AbortSignal.timeout(4000) })).json();
+      if (r.result && r.result.response && !r.result.response.ResponseBase.Error) return true;
+    } catch {}
+    await sleep(5000);
+  }
+  return false;
+}
