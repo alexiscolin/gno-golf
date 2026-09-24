@@ -4,10 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"strconv"
+	"strings"
 	"testing"
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/urequire/v0"
 )
 
@@ -67,13 +69,17 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 
 // golden: fixture -> sha256 prefix of its SimulateRoundAt (weather period
 // chosen per fixture), its Forecast, and its State.
+// 2026-09-25, hub fixes: the JSON shapes changed (a "version" field, the exact
+// "rest", "official" in State, no "by"), not the replays: with those fields
+// taken out, every SimulateRoundAt and State output is byte for byte as it was
+// (integer jnum included). The forecast column did not move.
 var golden = map[string][3]string{
-	"pulse":  {"9719d14aa64e381c", "076ac3e7c0d705a9", "9e3c8794bb1d1d11"},
-	"sea":    {"12b5a8cdb090a87b", "c3224daa821020f4", "f56f3dd4a17ea7ed"},
-	"slope":  {"b573a774ab116bbf", "0757d6c38ca9a9ef", "75dfd3431a6bffc3"},
-	"storm":  {"a067c66d3f85e79b", "217b2a005fc76324", "a387c08076159a8c"},
-	"timed":  {"e6df7a73dd8d8b0f", "c3224daa821020f4", "0063bad2dad04acc"},
-	"tunnel": {"4dfa30294af9fc9b", "c3224daa821020f4", "df901e669ef4d8e6"},
+	"pulse":  {"678f136eb4ef0257", "076ac3e7c0d705a9", "4e9da97515c48b33"},
+	"sea":    {"4ce93b61be350770", "c3224daa821020f4", "807b1e8fc908df52"},
+	"slope":  {"8d9cd7d675a48523", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
+	"storm":  {"27839a2f650ea264", "217b2a005fc76324", "cd0874fd52e8179f"},
+	"timed":  {"88354dc60a8951a0", "c3224daa821020f4", "e4dbc97ea48d1ede"},
+	"tunnel": {"2b8666eb09290dde", "c3224daa821020f4", "335763617c2e9b50"},
 }
 
 func TestGoldenReplays(cur realm, t *testing.T) {
@@ -187,11 +193,13 @@ func TestTheTopIsTen(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/top"))
 	Register(cross(cur), &flat{})
 	for i := 0; i < topSize+3; i++ {
-		p := address("g1top" + strconv.Itoa(i) + "000000000000000000000000000000000")
+		p := testutils.TestAddress("top" + strconv.Itoa(i))
+		giveName(cur, p, "top"+strconv.Itoa(i))
 		testing.SetRealm(testing.NewUserRealm(p))
 		PlayRound(cross(cur), "gno.land/r/gnogolf/top", "0,5;0,5;0,5;0,5")
 	}
-	if len(top[assisted]) > topSize {
-		t.Fatalf("the top keeps %d, got %d", topSize, len(top[assisted]))
+	lb := Leaderboard("assisted")
+	if n := strings.Count(lb, `"player"`); n != topSize {
+		t.Fatalf("the top shows %d, got %d: %s", topSize, n, lb)
 	}
 }

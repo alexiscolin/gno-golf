@@ -35,8 +35,10 @@ var me = course.Fit(&course.Simple{
 		},
 		Zones: []physics.Zone{
 			// the tube spirals up round the castle: hit it hard enough and the
-			// ball comes out by the cup, too soft and it rolls back out
-			{Kind: physics.Loop, Min: physics.V(12.4, 12.2), Max: physics.V(13.4, 13.8), Vec: physics.V(21.6, 17), Scale: 2, Skin: "castle tube"},
+			// ball comes out by the cup, too soft and it rolls back out. The
+			// mouth is 2 deep, more than a move (physics.MaxMove): at 1 a
+			// strong ball stepped over it and met the castle instead.
+			{Kind: physics.Loop, Min: physics.V(11.4, 12.2), Max: physics.V(13.4, 13.8), Vec: physics.V(21.6, 17), Scale: 2, Skin: "castle tube"},
 			{Kind: physics.Slope, Min: physics.V(9.5, 5), Max: physics.V(11.1, 9), Vec: physics.V(-0.3, 0), Skin: "mound"},
 			{Kind: physics.Slope, Min: physics.V(11.9, 5), Max: physics.V(13.5, 9), Vec: physics.V(0.3, 0), Skin: "mound"},
 			{Kind: physics.Slope, Min: physics.V(11.1, 7.4), Max: physics.V(11.9, 9), Vec: physics.V(0, 0.3), Skin: "mound"},

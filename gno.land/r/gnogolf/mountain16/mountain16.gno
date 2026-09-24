@@ -31,8 +31,8 @@ var me = course.Fit(&course.Simple{
 			physics.Outline(physics.Lane(6, 4, physics.V(5, 10), physics.V(25, 6), physics.V(45, 10), physics.V(52, 8))...),
 		),
 		Zones: []physics.Zone{
-			{Kind: physics.Slope, Min: physics.V(8, 0), Max: physics.V(22, 16), Vec: physics.V(0.12, 0), Skin: "downhill"},
-			{Kind: physics.Slope, Min: physics.V(26, 0), Max: physics.V(50, 16), Vec: physics.V(0.12, 0), Skin: "downhill"},
+			{Kind: physics.Slope, Min: physics.V(8, 0), Max: physics.V(18.5, 16), Vec: physics.V(0.2, 0), Skin: "downhill"},
+			{Kind: physics.Slope, Min: physics.V(26, 0), Max: physics.V(50, 16), Vec: physics.V(0.2, 0), Skin: "downhill"},
 			{Kind: physics.Surface, Min: physics.V(34, 7.5), Max: physics.V(39, 12.5), Scale: 0.5, Round: true, Skin: "snowdrift"},
 			{Kind: physics.Hazard, Min: physics.V(55, 5), Max: physics.V(57.5, 11), Vec: physics.V(5, 10), Skin: "cliff"},
 		},

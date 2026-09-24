@@ -33,11 +33,13 @@ func forecastJSON(f course.Forecast) string {
 // the chain plays under. Read-only.
 func Weather(hole string, period int64) string {
 	notAhead(period)
-	return forecastJSON(weatherOf(mustHole(hole), period))
+	return "{" + versionJSON + "," + forecastJSON(weatherOf(mustHole(hole), period))[1:]
 }
 
-// notAhead refuses a period still to come: the weather is read as it comes,
-// not scouted ahead to pick the calmest one to play in.
+// notAhead refuses a period still to come: the hub does not serve the
+// weather ahead. It is no secret (course.ForecastFor is a pure function
+// anyone can run), so this only keeps the reads to the weather a round can
+// be played in.
 func notAhead(period int64) {
 	if period > Period() {
 		panic("golf: that weather has not come yet")
@@ -46,7 +48,8 @@ func notAhead(period int64) {
 
 // playablePeriod checks the period a round is recorded under: the current
 // one, or the one just gone — a round that ran over the turn of the period is
-// recorded in the weather it was played in, and no older.
+// recorded in the weather it was played in, and no older. stroke holds every
+// later stroke of a round to the same rule.
 func playablePeriod(period int64) {
 	now := Period()
 	if period != now && period != now-1 {

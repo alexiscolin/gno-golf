@@ -22,6 +22,13 @@ func (s Segment) Hit(p0, p1 Vec2) (float64, Vec2, bool) {
 	return s.hitN(p0, p1, s.Normal())
 }
 
+// Crosses reports whether the motion p0->p1 crosses the segment: Hit's
+// answer without working out the normal (and its square root).
+func (s Segment) Crosses(p0, p1 Vec2) bool {
+	_, _, ok := s.hitN(p0, p1, Vec2{})
+	return ok
+}
+
 // hitN is Hit with the segment's normal already known: Step works it out
 // once per shot for each wall instead of on every crossing it tests.
 func (s Segment) hitN(p0, p1, normal Vec2) (float64, Vec2, bool) {

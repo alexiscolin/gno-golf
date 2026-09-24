@@ -15,6 +15,8 @@ func TestFitPutsTheWallsInsideTheBoard(t *testing.T) {
 			Zones: []physics.Zone{
 				{Kind: physics.Hazard, Min: physics.V(0, 0), Max: physics.V(20, 8), Vec: physics.V(2, 4), Skin: "sea"},
 				{Kind: physics.Slope, Min: physics.V(5, 0), Max: physics.V(9, 8), Vec: physics.V(0.2, 0)},
+				// a band past both edges once shifted: cut at the board's
+				{Kind: physics.Surface, Min: physics.V(10, -3), Max: physics.V(12, 12), Scale: 0.6},
 			},
 		},
 	}, 1.5)
@@ -31,6 +33,9 @@ func TestFitPutsTheWallsInsideTheBoard(t *testing.T) {
 	}
 	if slope.Vec != physics.V(0.2, 0) {
 		t.Fatalf("a slope's push must not move, got %v", slope.Vec)
+	}
+	if band := h.Course.Zones[2]; band.Min.Y != 0 || band.Max.Y != float64(h.H) {
+		t.Fatalf("a band across the board is cut at its edges, got %v..%v on a %dx%d board", band.Min, band.Max, h.W, h.H)
 	}
 	if sea.Vec != h.Tee {
 		t.Fatalf("the sea sends back to the tee, which moved with it: %v vs %v", sea.Vec, h.Tee)

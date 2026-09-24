@@ -1,4 +1,7 @@
-// Package island18 is two-thirds of a circle on a banked track: aim high on the bank and it carries you round to the cup.
+// Package island18 is two-thirds of a circle on a banked track: aim high on
+// the bank and it carries you round to the cup. The bank only steers a ball
+// that is rolling: one that stops on it stays where it stopped (the tee and
+// the cup both sit on it).
 package island18
 
 import (
@@ -26,6 +29,8 @@ var me = course.Fit(&course.Simple{
 			{Circle: physics.Circle{C: physics.V(36.2, 15), R: 0.6}, Bounce: 0.8, Skin: "palm"},
 		},
 		Zones: []physics.Zone{
+			// the banks lean in at the drag (physics.Drag): they bend a moving
+			// ball, never start a stopped one
 			{Kind: physics.Slope, Min: physics.V(10, 1), Max: physics.V(16, 29), Vec: physics.V(0.12, 0), Skin: "bank"},
 			{Kind: physics.Slope, Min: physics.V(32, 1), Max: physics.V(38, 29), Vec: physics.V(-0.12, 0), Skin: "bank"},
 			{Kind: physics.Slope, Min: physics.V(16, 23), Max: physics.V(32, 29), Vec: physics.V(0, -0.12), Skin: "bank"},

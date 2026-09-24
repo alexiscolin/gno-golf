@@ -37,7 +37,8 @@ var me = course.Fit(&course.Simple{
 			{Circle: physics.Circle{C: physics.V(43, 10), R: 1.0}, Bounce: 0.5, Skin: "boulder"},
 		},
 		Zones: []physics.Zone{
-			// the traverse rises toward the cup: a ball left short rolls back a little
+			// the traverse rises toward the cup: it bends a rolling ball, and is too
+			// gentle to move one that has stopped
 			{Kind: physics.Slope, Min: physics.V(0, 0), Max: physics.V(52, 24), Vec: physics.V(-0.05, 0.02), Mark: '/', Skin: "slope"},
 			serac(physics.V(16, 13), physics.V(21, 19), 0),
 			serac(physics.V(26, 9.5), physics.V(31, 15.5), 8),

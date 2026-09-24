@@ -13,7 +13,8 @@ import (
 // poly, and the Vec of those whose Vec is a point: Tunnel, Hazard, Loop; a
 // Slope's Vec is a push and stays), and the pulses' pieces — and W, H become
 // the walls' extent plus a margin each side. A zone that covered the whole
-// old board (the sea round a lane with no rails) covers the new one.
+// old board (the sea round a lane with no rails) covers the new one; a
+// rectangle that runs past the new board is cut at its edge.
 //
 // Call it once, where the hole is declared:
 //
@@ -81,6 +82,13 @@ func Fit(h *Simple, margin float64) *Simple {
 				z.Min, z.Max = physics.Vec2{}, physics.Vec2{X: float64(newW), Y: float64(newH)}
 			} else {
 				z.Min, z.Max = z.Min.Add(d), z.Max.Add(d)
+				// a band across the board (a bank, a crevasse) is cut at its
+				// edges: past them is no ground. A Round or Poly zone keeps its
+				// box, which is its shape.
+				if !z.Round && len(z.Poly) == 0 {
+					z.Min.X, z.Min.Y = math.Max(z.Min.X, 0), math.Max(z.Min.Y, 0)
+					z.Max.X, z.Max.Y = math.Min(z.Max.X, float64(newW)), math.Min(z.Max.Y, float64(newH))
+				}
 			}
 			for j := range z.Poly {
 				z.Poly[j] = z.Poly[j].Add(d)
@@ -100,5 +108,6 @@ func Fit(h *Simple, margin float64) *Simple {
 	}
 	h.Tee, h.Pin = h.Tee.Add(d), h.Pin.Add(d)
 	h.W, h.H = newW, newH
+	physics.Prepare(f) // the walls are where they stay
 	return h
 }

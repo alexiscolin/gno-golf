@@ -1,65 +1,66 @@
-// Package hole20 is the loop-the-loop, the garden's finale. A narrow chute
-// runs from the tee into the loop: the lane itself curls up into a vertical
-// ring and comes down beside itself onto a second lane. Only a straight ball
-// at the right pace goes round: too soft and it rolls back down, too hard or
-// slanted and it flies off the top. Out of the loop the lane swings round a
-// long bend to the cup.
+// Package hole20 is the seesaw, the garden's finale. A lily pond fills the
+// board from wall to wall, and the only way over is a long plank balanced on
+// a stone in the middle that rocks, all the time, on a clock: tipped toward
+// the tee it rolls a ball back, tipped away it carries it on. A slow ball
+// rocks to and fro on it until the stroke is over and stops wherever it is;
+// it does not reliably come back. Let go when it is about to tip your way. Past the pond the lawn runs round the end of a
+// hedge and back along a row of sunflowers to the cup.
 package hole20
 
 import (
-	"math"
-
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
 	"gno.land/r/gnogolf/golf"
 )
 
-// the tee's lane, funnelling into the chute that runs into the loop
-var approach = physics.Path(
-	physics.Arc(physics.V(5, 6), 2.5, math.Pi/2, 3*math.Pi/2, 6),
-	physics.Pts(physics.V(12, 3.5), physics.V(15.5, 4.4), physics.V(22.9, 4.4),
-		physics.V(22.9, 7.6), physics.V(15.5, 7.6), physics.V(12, 8.5)),
+// the seesaw's clock: it rocks one way for half its period, then the other
+const (
+	rock = 20
+	half = 10
 )
 
-// where the loop comes down, beside the chute, and the long bend to the cup
-var bend = physics.Path(
-	physics.Pts(physics.V(20.5, 8.8), physics.V(40, 8.8)),
-	physics.Arc(physics.V(40, 16.5), 7.7, -math.Pi/2, math.Pi/2, 8),
-	physics.Pts(physics.V(12, 24.2)),
-	physics.Arc(physics.V(12, 21.6), 2.6, math.Pi/2, 3*math.Pi/2, 6),
-	physics.Pts(physics.V(40, 19)),
-	physics.Arc(physics.V(40, 16.5), 2.5, math.Pi/2, -math.Pi/2, 6),
-	physics.Pts(physics.V(27, 14), physics.V(25, 12), physics.V(20.5, 12)),
-)
+// a ball that falls in the pond is fished out on the tee's bank
+var bank = physics.V(11, 13)
 
 var me = course.Fit(&course.Simple{
 	World: "garden", Order: 18,
 	W: 50, H: 26,
-	Title:     "The Loop-the-Loop",
+	Title:     "The Seesaw",
 	Strokes:   4, // par
-	Tee:       physics.V(5, 6),
-	Pin:       physics.V(12, 21.6),
+	Tee:       physics.V(6, 13),
+	Pin:       physics.V(35.6, 6.2),
 	Substeps:  30,
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
 		Walls: physics.Walls(
-			physics.Outline(approach...),
-			physics.Outline(bend...),
-			// a clipped hedge across the way home, one gap in it
-			physics.Bar(physics.V(19, 19), physics.V(19, 20.4), 0.6, '#', "hedge"),
-			physics.Bar(physics.V(19, 22.8), physics.V(19, 24.2), 0.6, '#', "hedge"),
+			physics.Box(physics.V(2, 2), physics.V(48, 24)),
+			// the hedge that sends the lawn round: along the pond's far bank,
+			// then out across the lawn, leaving a gap at the far wall
+			physics.Bar(physics.V(29.6, 2), physics.V(29.6, 10), 0.6, '#', "hedge"),
+			physics.Bar(physics.V(29.6, 10), physics.V(45, 10), 0.6, '#', "hedge"),
 		),
 		Posts: []physics.Post{
-			// a boulder in the bend: a bank round it is never quite the same twice
-			{Circle: physics.Circle{C: physics.V(45.3, 16.5), R: 0.9}, Bounce: 0.6, Skin: "rock"},
+			// sunflowers along the top lawn: two in the way, two either side
+			// of the way in to the cup
+			{Circle: physics.Circle{C: physics.V(46, 4.4), R: 0.8}, Bounce: 0.8, Skin: "sunflower"},
+			{Circle: physics.Circle{C: physics.V(43.2, 6.8), R: 0.8}, Bounce: 0.8, Skin: "sunflower"},
+			{Circle: physics.Circle{C: physics.V(38.8, 4.2), R: 0.8}, Bounce: 0.8, Skin: "sunflower"},
+			{Circle: physics.Circle{C: physics.V(38.8, 8.2), R: 0.8}, Bounce: 0.8, Skin: "sunflower"},
 		},
 		Zones: []physics.Zone{
-			// a flowerbed on the inside of the bend: cut the corner and it holds you up
-			{Kind: physics.Surface, Min: physics.V(38, 12.6), Max: physics.V(44, 20.4), Scale: 0.45, Round: true, Skin: "flowerbed"},
-			// the loop's mouth, the chute's whole width: round at 2.4 to 3.48
-			// a substep, and set down on the second lane heading on
-			{Kind: physics.Loop, Min: physics.V(20, 4.4), Max: physics.V(22.9, 7.6), Vec: physics.V(26.5, 10.4), Scale: 2.4, Mark: '@', Skin: "loop-the-loop"},
+			// the pond, either side of the plank
+			{Kind: physics.Hazard, Min: physics.V(15, 2), Max: physics.V(29.3, 11.8), Vec: bank, Mark: '~', Skin: "water"},
+			{Kind: physics.Hazard, Min: physics.V(15, 14.2), Max: physics.V(29.3, 24), Vec: bank, Mark: '~', Skin: "water"},
+			// a border of flowers across the lawn at the foot of the seesaw:
+			// it takes the pace off a ball that comes off it fast
+			{Kind: physics.Surface, Min: physics.V(30.3, 10.4), Max: physics.V(33.5, 23.6), Scale: 0.45, Mark: ':', Skin: "flowerbed"},
+			// a bed of marigolds at the end of the top lawn: a ball run past
+			// the cup stays there
+			{Kind: physics.Surface, Min: physics.V(29.9, 2.3), Max: physics.V(33.4, 9.7), Scale: 0.4, Mark: ':', Skin: "flowerbed"},
+			// the seesaw: tipped toward the tee (it pushes back), then away
+			{Kind: physics.Slope, Min: physics.V(15, 11.8), Max: physics.V(29.3, 14.2), Vec: physics.V(-0.22, 0), Mark: '<', Skin: "seesaw", Every: rock, On: half, Phase: 0},
+			{Kind: physics.Slope, Min: physics.V(15, 11.8), Max: physics.V(29.3, 14.2), Vec: physics.V(0.22, 0), Mark: '>', Skin: "seesaw", Every: rock, On: half, Phase: half},
 		},
 		Friction: 0.87,
 		Radius:   0.5,

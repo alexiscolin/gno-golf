@@ -117,7 +117,7 @@ type Simple struct {
 What a stroke does in `PreviewWith(ball, angle, power, stroke, tick, weather)`:
 
 1. `Extras(stroke)` gathers the walls and posts of the pulses that are on.
-2. `Unstick` moves the ball out of any of those pieces that appeared on top
+2. `physics.Unstick` moves the ball out of any of those pieces that appeared on top
    of it.
 3. The field is copied, never modified:
    `WithZones(WithExtras(Course, walls, posts), ExtraZones(stroke))`, then
@@ -181,10 +181,10 @@ there's nothing to add):
 func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *physics.Field // appended after f's
 func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field                       // put before f's
 func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field
-func Unstick(ball physics.Vec2, walls []physics.Wall, posts []physics.Post, r float64) physics.Vec2
 ```
 
-`Unstick` treats `walls` as groups of four (`physics.Bar`). A ball inside a
+`physics.Unstick` (it moved to physics, where Step also uses it for timed
+bars) treats `walls` as groups of four (`physics.Bar`). A ball inside a
 bar leaves through the nearest side, and a ball closer than `r` to a bar or a
 post is pushed off it.
 
@@ -266,7 +266,7 @@ LCG seeded with `seed`. Nobody picks the weather, and anyone can recompute it.
 
 What each kind puts on the board (whole-board zones cover `0..W, 0..H`):
 
-- **wind**: one Slope skinned `wind`. `Vec` has a strength between `WindMin`
+- **wind**: one Slope skinned `wind`, with `Air` and `Capped` set. `Vec` has a strength between `WindMin`
   and `WindMax`, capped at `MaxWind()` when that's greater than 0, and a
   direction taken from the seed.
 - **rain**: a Surface `rain` at `RainScale`. Also a copy of each of the hole's

@@ -35,7 +35,7 @@ var me = course.Fit(&course.Simple{
 			{Kind: physics.Hazard, Min: physics.V(16, 4), Max: physics.V(30, 7.6), Vec: physics.V(5, 9), Mark: '~', Skin: "cliff"},
 			{Kind: physics.Hazard, Min: physics.V(16, 10.4), Max: physics.V(30, 14), Vec: physics.V(5, 9), Mark: '~', Skin: "cliff"},
 			// the cannon's bursts, across the spine
-			{Kind: physics.Slope, Min: physics.V(16, 4), Max: physics.V(30, 14), Vec: physics.V(0, 0.35), Mark: '>', Skin: "gust", Every: gustEvery, On: gustOn},
+			{Kind: physics.Slope, Min: physics.V(16, 4), Max: physics.V(30, 14), Vec: physics.V(0, 0.35), Mark: '>', Skin: "gust", Every: gustEvery, On: gustOn, Air: true},
 		},
 		Friction: 0.87,
 		Radius:   0.5,

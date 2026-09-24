@@ -8,7 +8,7 @@ import "math"
 //
 //	gate / archway       two Walls with a gap between them
 //	narrowing, dogleg    Walls
-//	bumper, post, rock   a Post, Bounce above 1 to make it lively
+//	bumper, post, rock   a Post (Bounce up to MaxBounce: nothing adds energy)
 //	tunnel, teleporter   a Tunnel zone
 //	ramp, slope, hill    a Slope zone (uphill pushes back, downhill pulls on)
 //	sand, ice, carpet    a Surface zone
@@ -19,7 +19,8 @@ import "math"
 //	                     (course.Pulse for the simple cases) — nothing here has
 //	                     to know about time
 //
-// Skin carries no meaning for the simulation: it is the name a renderer looks
+// Skin carries no meaning for the simulation (what a zone does is in its
+// fields — Kind, Air, Capped — never in its name): it is the name a renderer looks
 // up to draw a skull, a windmill or a duckling where the geometry says "post".
 // Mark is the same thing for a text renderer.
 //
@@ -97,11 +98,12 @@ func Timed(ws []Wall, every, on, phase int) []Wall {
 	return ws
 }
 
-// Post is a round obstacle: a bumper, a rock, a stump. Bounce above 1 adds
-// energy (a lively bumper), below 1 soaks it up.
+// Post is a round obstacle: a bumper, a rock, a stump. Its Bounce is played
+// at MaxBounce at most: a lively bumper gives back most of the ball's speed,
+// a dead one soaks it up.
 type Post struct {
 	Circle
-	Bounce float64 // 0 = use the field default; above 1 = a bumper that adds energy
+	Bounce float64 // 0 = use the field default; above MaxBounce plays as MaxBounce
 	Mark   rune
 	Skin   string
 }
@@ -115,25 +117,20 @@ const (
 	Slope                   // Vec is added to velocity each substep
 	Tunnel                  // the ball is moved to Vec, keeping its velocity
 	Hazard                  // the ball stops at Vec: water, a pit, a hungry skull
-	// Loop is the mouth of a loop-the-loop: Min..Max is where its track leaves
-	// the lane, Vec where it comes back down, Scale the speed (per substep) a
-	// ball needs to make it round. A ball rolling into the mouth towards Vec
-	// (within 25°) at Scale up to LoopOver×Scale goes round and leaves at Vec
-	// along the track, LoopKeep of its speed left. Slower, it climbs, falls
-	// back and rolls out of the mouth the way it came. Faster, it flies off
-	// the track and is put down at rest in front of the mouth — and so does
-	// one that comes in more than 25° off straight: it falls off the side.
-	// A closed tube (a skin with "tube" in it) has no top to fly off: from
-	// Scale up, any speed goes round.
+	// Loop is the mouth of a closed tube (a loop-the-loop, a spiral): Min..Max
+	// is where its track leaves the lane, Vec where it comes back down, Scale
+	// the speed (per substep) a ball needs to make it round. A ball rolling
+	// into the mouth towards Vec (within 25°) at Scale or faster goes round
+	// and leaves at Vec along the track, LoopKeep of its speed left. Slower,
+	// it climbs, falls back and rolls out of the mouth the way it came. One
+	// that comes in more than 25° off straight falls off the side of the
+	// track and is put down at rest in front of the mouth. The mouth must be
+	// at least MaxMove deep, or a fast ball steps over it.
 	Loop
 )
 
-// LoopKeep is how much speed a ball keeps once round a loop; LoopOver how
-// much faster than it needs a ball may be before it flies off.
-const (
-	LoopKeep = 0.8
-	LoopOver = 1.45
-)
+// LoopKeep is how much speed a ball keeps once round a loop.
+const LoopKeep = 0.8
 
 // Zone is an area of the board that changes how the ball moves: the rectangle
 // Min..Max, or the ellipse inside it (Round), or a polygon (Poly), or all of it
@@ -158,6 +155,12 @@ type Zone struct {
 	// Every, On, Phase time a zone within the stroke, as for a Wall: a gust
 	// of wind that blows for a few substeps, then another from elsewhere.
 	Every, On, Phase int
+	// Air makes a Slope moving air (the weather's wind, a cannon's gust)
+	// rather than a hill: it pushes the ball, but is no hill to take off
+	// from or roll back down, and it hides none under it. Capped air never
+	// speeds the ball up — it bends and brakes it only: the weather's wind,
+	// which stronger than Drag kept a ball drifting for ever on the flat.
+	Air, Capped bool
 }
 
 // There reports whether a timed zone acts in substep i; an untimed one
@@ -202,6 +205,8 @@ type Field struct {
 	// a tram or a mill turning all the time, and the moment of release is a
 	// decision like the angle and the power — so the chain replays it.
 	Tick int
+	// prep is the walls' offsets, worked out once (Prepare).
+	prep []float64
 }
 
 // Bar returns the four walls of a barrier of the given thickness from a to b.

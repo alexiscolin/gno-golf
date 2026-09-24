@@ -31,9 +31,10 @@ var me = course.Fit(&course.Simple{
 			{Circle: physics.Circle{C: physics.V(12, 8), R: 0.6}, Bounce: 0.5, Skin: "pine"},
 		},
 		Zones: []physics.Zone{
-			// the saddle: up to the col, then down the far side
-			{Kind: physics.Slope, Min: physics.V(14, 3), Max: physics.V(24, 23), Vec: physics.V(-0.14, 0), Mark: '/', Skin: "saddle crest"},
-			{Kind: physics.Slope, Min: physics.V(24, 3), Max: physics.V(34, 23), Vec: physics.V(0.14, 0), Mark: '\\', Skin: "saddle crest"},
+			// the saddle: up to the col, then down the far side, steep enough that
+			// a ball stopped on it rolls back down (at 0.14 it only crept)
+			{Kind: physics.Slope, Min: physics.V(14, 3), Max: physics.V(24, 23), Vec: physics.V(-0.17, 0), Mark: '/', Skin: "saddle crest"},
+			{Kind: physics.Slope, Min: physics.V(24, 3), Max: physics.V(34, 23), Vec: physics.V(0.17, 0), Mark: '\\', Skin: "saddle crest"},
 			// a drift on the low line catches a hot descent; a pine shields the cup
 			{Kind: physics.Surface, Min: physics.V(30, 14), Max: physics.V(36, 20), Scale: 0.5, Round: true, Mark: ',', Skin: "snowdrift"},
 		},

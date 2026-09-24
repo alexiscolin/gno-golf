@@ -1,5 +1,9 @@
-// Package mountain8 is the ski lift runs across the lane, its chairs passing one after another,
-// each one over the lane more than half the time.
+// Package mountain8 is the ski lift: a chairlift runs up the lane from the
+// tee to the cup, its benches gliding along it one after another. Each one
+// sinks down onto the lane as it passes over one of three spots, and a ball
+// that meets it there bounces off; the spots take turns, up the lane, a
+// third of the time each. A snowdrift across the run-out stops a ball still
+// running hot off the lift.
 package mountain8
 
 import (
@@ -22,10 +26,14 @@ var me = course.Fit(&course.Simple{
 	Course: &physics.Field{
 		Walls: physics.Walls(
 			physics.Outline(physics.Lane(7, 4, physics.V(5, 8), physics.V(24, 9), physics.V(43, 8))...),
-			physics.Timed(physics.Bar(physics.V(20, 4.8), physics.V(20, 13.2), 0.8, '#', "lift"), 9, 5, 0),
-			physics.Timed(physics.Bar(physics.V(24.5, 5), physics.V(24.5, 13.2), 0.8, '#', "lift"), 9, 5, 3),
-			physics.Timed(physics.Bar(physics.V(29, 4.8), physics.V(29, 13.2), 0.8, '#', "lift"), 9, 5, 6),
+			physics.Timed(physics.Bar(physics.V(20, 4.8), physics.V(20, 13.2), 0.8, '#', "lift"), 12, 4, 0),
+			physics.Timed(physics.Bar(physics.V(24.5, 5), physics.V(24.5, 13.2), 0.8, '#', "lift"), 12, 4, 8),
+			physics.Timed(physics.Bar(physics.V(29, 4.8), physics.V(29, 13.2), 0.8, '#', "lift"), 12, 4, 4),
 		),
+		Zones: []physics.Zone{
+			// a drift across the run-out: a ball still running hot off the lift dies in it
+			{Kind: physics.Surface, Min: physics.V(34, 5), Max: physics.V(40, 12), Scale: 0.5, Round: true, Mark: ',', Skin: "snowdrift"},
+		},
 		Friction: 0.87,
 		Radius:   0.5,
 		Bounce:   0.85,

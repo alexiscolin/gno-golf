@@ -25,7 +25,9 @@ var me = course.Fit(&course.Simple{
 			{Circle: physics.Circle{C: physics.V(29, 6.3), R: 0.7}, Bounce: 0.6, Skin: "stump"},
 		},
 		Zones: []physics.Zone{
-			{Kind: physics.Slope, Min: physics.V(6, 0), Max: physics.V(22, 10), Vec: physics.V(0.15, 0), Mark: '^', Skin: "slope"},
+			// downhill, steep enough to roll a stopped ball on (at 0.15 it
+			// only crept, a fixed 0.15 a substep)
+			{Kind: physics.Slope, Min: physics.V(6, 0), Max: physics.V(22, 10), Vec: physics.V(0.17, 0), Mark: '^', Skin: "slope"},
 			{Kind: physics.Hazard, Min: physics.V(38, 2), Max: physics.V(44, 8), Vec: physics.V(3, 5), Mark: '~', Skin: "water"},
 		},
 		Friction: 0.86,

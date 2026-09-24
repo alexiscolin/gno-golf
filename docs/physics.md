@@ -189,20 +189,26 @@ whole point of it: a renderer replays those points and never simulates again
 
 Each substep does this:
 
+0. A timed bar (four timed walls from `Timed(Bar(…))`) that comes back this
+   substep, or stands on the first one, pushes a ball inside it (or closer
+   than `Radius`) out through its nearest side, as `Unstick` does for a
+   stroke's pieces. A wall never stands on the ball.
 1. The substep is split into `int(|vel| / MaxMove) + 1` moves, so a fast ball
    can't skip past a zone or a wall.
-2. For each move, if the ball is on the ground, the zones that are there
-   (`There`) and contain the ball are applied in order. A hazard or a loop
-   fly-off ends the shot.
+2. For each move, if the ball is on the ground, the surface is reset to grass
+   and the zones that are there (`There`) and contain the ball are applied in
+   order. A hazard or a slanted loop entry ends the shot.
 3. The move is swept against every wall that's there (using each wall's two
-   offset lines at `Radius`, computed once per shot) and every post (radius
-   grown by `Radius`), and the nearest hit wins. A ball already within
-   `Radius` of a wall and moving into it hits it right away.
+   offset lines at `Radius`, worked out once per hole by `Prepare`, which
+   `course.Fit` calls) and every post (radius grown by `Radius`), and the
+   nearest hit wins. A wall or post whose box the move's box misses is
+   skipped first (the broad phase). A ball already within `Radius` of a wall
+   and moving into it hits it right away. A free wall end is a round cap of
+   radius `Radius`, swept like a post.
 4. On a hit, the part of the velocity along the surface keeps `Along` (0.97)
-   of itself. The part into the surface bounces back times the restitution.
-   With a restitution above 1 (a bumper), the ball gets a fixed push of
-   `Push * (restitution - 1)` along the normal instead. Speed is capped at
-   `SpeedCap`.
+   of itself. The part into the surface bounces back times the restitution,
+   which is played at `MaxBounce` (0.92) at most: nothing adds energy. Speed
+   is capped at `SpeedCap`.
 5. A point is appended to the path.
 6. Rolling resistance on the ground: `keep = min((Friction + 0.05) * surface,
    0.98)`, then `speed = |vel| * keep - Drag / surface`. At `speed <= 0.02`
@@ -210,7 +216,9 @@ Each substep does this:
 
 At the end, the last `Air` flag is set to false, and the zones are applied
 once more to the ball at rest, so a ball that stopped in water or in a tunnel
-mouth gets resolved now and not on the next stroke.
+mouth gets resolved now and not on the next stroke. A ball at rest in a
+timed Hazard or Tunnel (falling ice, a blowhole) meets it whatever the tick:
+it would be there when it next comes on.
 
 ### Air and jumps
 
@@ -226,21 +234,29 @@ steepness is `|Vec|` of the slope it was climbing. In the air:
 
 ### Slopes: rolling back and rolling on
 
-A Slope whose `|Vec|` is greater than `Drag` doesn't let a ball rest on it:
+A Slope whose `|Vec|` is greater than `Drag` doesn't let a ball rest on it
+(a slope at or under `Drag` bends a moving ball but never starts a stopped
+one; just above it, up to about 0.152 on grass, a ball set down on it only
+creeps `|Vec|` a substep, so a hole that wants a stopped ball to roll uses
+0.16 or more):
 
 - **Roll-back.** When the ball stops on it, its velocity is set to zero and
   the step goes on, so the slope pulls it back down on the next substep.
 - **Roll-on.** When the stroke's substeps run out while the ball is on the
   ground on such a slope, `Step` adds substeps (up to `MaxRollOn` in total)
-  until the ball leaves the slope.
+  until the ball leaves the slope. Only untimed slopes roll a ball on.
 
-A Slope with `Skin == "wind"` is air, not ground. It pushes the ball, but it's
-never a hill to take off from, roll back down, or roll on along, and it doesn't
-hide a real slope underneath it.
+A timed Slope (hole20's seesaw) is a hill in the substeps it is there.
+
+A Slope with `Air` set is moving air, not ground: the weather's wind, a
+cannon's gust. It pushes the ball, but it's never a hill to take off from,
+roll back down, or roll on along, and it doesn't hide a real slope underneath
+it. `Air` with `Capped` (the weather's wind) never speeds the ball up: it
+bends and brakes it only.
 
 ### Loops
 
-A `Loop` zone is the mouth of a loop-the-loop. `Vec` is where the track comes
+A `Loop` zone is the mouth of a closed tube (a loop-the-loop, a spiral). `Vec` is where the track comes
 back down and `Scale` is the speed (per substep) the ball needs to go round.
 The axis is X or Y, whichever the direction from the mouth's center to `Vec`
 is mostly along. When the ball is in the mouth and heading in (within 45° of
@@ -248,20 +264,17 @@ the axis), it's decided right away:
 
 | Entry | Result |
 |---|---|
-| more than 25° off straight, or faster than `LoopOver * Scale` | falls off: put down, at rest, 1.5 in front of the mouth; the shot ends |
+| more than 25° off straight | falls off the side: put down, at rest, 1.5 in front of the mouth; the shot ends |
 | at least `Scale` | goes round: placed at `Vec`, moving along the axis at `LoopKeep` of its speed |
 | slower | falls back: placed just outside the edge it came in by, at `-0.5` of its velocity |
 
-From `hole20`:
+The mouth must be at least `MaxMove` deep along the axis, or a fast ball
+steps over it. From `island7`, the only loop left:
 
 ```go
-{Kind: physics.Loop, Min: physics.V(19.5, 1.8), Max: physics.V(21.5, 4.2),
-	Vec: physics.V(29.8, 6), Scale: 2.4, Mark: '@', Skin: "loop"},
+{Kind: physics.Loop, Min: physics.V(11.4, 12.2), Max: physics.V(13.4, 13.8),
+	Vec: physics.V(21.6, 17), Scale: 2, Skin: "castle tube"},
 ```
-
-TODO-session.md plans to replace the four loop holes (hole20, island10,
-town10, mountain10) with other obstacles. `Loop` is still in the package as of
-this writing.
 
 ## Helpers
 
@@ -282,8 +295,8 @@ func Skinned(ws []Wall, skin string) []Wall                     // set Skin (boa
 
 Use `Bar` for anything free-standing the ball can hit head-on. A ball moving
 exactly along a zero-width segment never crosses it. An outer wall is fine as
-a bare segment because the ball is always on one side of it. `course.Unstick`
-also assumes that pieces which appear on top of a ball come in groups of four
+a bare segment because the ball is always on one side of it. `Unstick` (and
+Step's timed bars) also assume that pieces which appear on top of a ball come in groups of four
 walls, which is what `Bar` produces.
 
 Points, for `Outline` or `Polyline`:
@@ -342,18 +355,17 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `MaxMove` | 1.5 | longest single move inside a substep |
 | `Drag` | 0.12 | fixed speed lost per substep on grass (divided by the surface scale) |
 | `Along` | 0.97 | share of the speed along a wall kept on a bounce |
-| `Push` | 3.5 | bumper push per unit of restitution above 1 |
+| `MaxBounce` | 0.92 | the most restitution ever played |
 | `SpeedCap` | 8 | top speed, per substep |
 | `JumpSpeed` | 1.5 | speed needed to take off at the top of a slope |
 | `Lift` | 12 | flight distance factor |
 | `MaxRollOn` | 120 | most extra substeps a slope can add |
 | `LoopKeep` | 0.8 | share of the speed kept going round a loop |
-| `LoopOver` | 1.45 | how much faster than `Scale` a ball can be before it flies off a loop |
 
 ## Skins
 
-`Skin` and `Mark` have no effect on the simulation, with one exception: a
-Slope skinned `"wind"` (see above). A renderer has to be able to draw any
+`Skin` and `Mark` have no effect on the simulation: what a zone does is in
+its fields (`Kind`, `Air`, `Capped`). A renderer has to be able to draw any
 field from the geometry alone and treat an unknown skin as the plain shape.
 The skins used so far are listed in the `Field` doc comment in `field.gno`.
 
@@ -374,5 +386,9 @@ The skins used so far are listed in the `Field` doc comment in `field.gno`.
   Keep that in mind before making the package bigger. (That's a measurement
   from an older version of the package, not re-checked for this doc.)
 - **Zone width.** No zone can be crossed without being seen as long as it's
-  at least `MaxMove` wide in the direction of travel. The `MaxMove` comment
-  says every zone on the deployed holes is at least twice that wide.
+  at least `MaxMove` wide in the direction of travel. Several deployed zones
+  are under twice that (town14's door tunnel, hole4's tunnels, island9's and
+  island10's gaps): safe, but near the edge.
+- **Square roots.** `math.Sqrt` is software in the GnoVM (~160K gas a call).
+  `Vec2.LenCmp` compares a length without one unless it has to, and
+  `Segment.Crosses` is `Hit` without its normal.

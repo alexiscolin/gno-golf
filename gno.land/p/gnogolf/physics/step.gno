@@ -9,6 +9,13 @@ import (
 // a slope keeps it moving.
 const MaxRollOn = 120
 
+// pinCheck and pinMove: a ball rolling on that moves less than pinMove in
+// pinCheck substeps is pinned, and stops.
+const (
+	pinCheck = 8
+	pinMove  = 0.1
+)
+
 // Shot is everything a stroke did: where the ball was at every substep, and how
 // many barriers it met on the way.
 //
@@ -68,8 +75,9 @@ func (s Shot) Rest() Vec2 {
 	return s.Path[len(s.Path)-1]
 }
 
-// MaxMove is the longest single move inside a substep. Every zone is at least
-// twice this wide on the holes as built, so none can be crossed unseen.
+// MaxMove is the longest single move inside a substep. Zones are sampled once
+// per move, so a zone must be at least this deep along the way a ball crosses
+// it, or a fast ball can step over it unseen.
 const MaxMove = 1.5
 
 // Along is how much of its speed along a wall a ball keeps when it bounces.
@@ -81,17 +89,12 @@ const Along = 0.97
 // bumpers some holes ask for, up to 1.3) is played at this.
 const MaxBounce = 0.92
 
-// Push is the kick a bumper gave, per unit of its restitution above 1 (kept
-// for the record; nothing adds energy any more, see MaxBounce):
-// a 1.25 bumper pushes the ball out at about 0.9.
-const Push = 3.5
-
 // Drag is the fixed speed a rolling ball loses every substep, on grass.
 const Drag = 0.12
 
 // SpeedCap is the fastest a ball may go, in board units per substep. A full
-// stroke starts at 6; bumpers that add energy may push it a little past that,
-// never further.
+// stroke starts at 6, and nothing adds energy (MaxBounce): a guard, not a
+// rule anything reaches.
 const SpeedCap = 8
 
 // Step rolls a ball through the field until it comes to rest or runs out of
@@ -109,31 +112,11 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	air := 0.0 // distance left to fly; 0 on the ground
 
 	// Each wall's two offset lines — one per side, pushed out by the ball's
-	// radius — are computed once per shot rather than once per move: the same
-	// collisions for a fraction of the gas. Walls are rebuilt between shots
-	// by holes that move them, so per shot is as often as they can change.
-	// Everything a move asks of a wall is here, so the loop never copies the
-	// Wall itself: its timing, its bounce, the two lines' normals.
-	type offset struct {
-		plus, minus      Segment
-		pn, mn           Vec2 // plus.Normal(), minus.Normal()
-		a, n             Vec2
-		length, bounce   float64
-		every, on, phase int
-	}
-	offs := make([]offset, len(f.Walls))
-	for j := range f.Walls {
-		w := &f.Walls[j]
-		n := w.Seg.Normal()
-		o := &offs[j]
-		o.plus = w.Seg.Toward(w.Seg.A.Add(n), f.Radius)
-		o.minus = w.Seg.Toward(w.Seg.A.Sub(n), f.Radius)
-		o.pn, o.mn = o.plus.Normal(), o.minus.Normal()
-		o.a, o.n = w.Seg.A, n
-		o.length = w.Seg.B.Sub(w.Seg.A).Len()
-		o.bounce = orDefault(w.Bounce, f.Bounce)
-		o.every, o.on, o.phase = w.Every, w.On, w.Phase
-	}
+	// radius — are worked out once per hole (Prepare) or, for walls that come
+	// with the stroke, once per shot: never once per move. Everything a move
+	// asks of a wall is here, so the loop never copies the Wall itself.
+	offs := f.offsets()
+	bars := f.timedBars()
 	slopes := f.groundSlopes()
 
 	// A ball does not stop on a slope steeper than the drag: when the stroke's
@@ -141,10 +124,30 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	// MaxRollOn more) until it comes off it — a gnome left on a hill slides
 	// down, it does not wait there for the next stroke.
 	extra := 0
+	// rolling on, a ball pinned against a wall by the slope only jitters in
+	// place: checked every pinCheck substeps, it stops once it has not got
+	// anywhere (a real roll down gathers speed, it always gets somewhere)
+	base, anchor := substeps, pos
 	for i := 0; i < substeps; i++ {
-		if i == substeps-1 && extra < MaxRollOn && air <= 0 && pull(slopes, pos) > Drag {
+		if i >= base && (i-base)%pinCheck == 0 {
+			if i > base && pos.Sub(anchor).Len() < pinMove {
+				break
+			}
+			anchor = pos
+		}
+		if i == substeps-1 && extra < MaxRollOn && air <= 0 && pull(slopes, pos, -1) > Drag {
 			substeps++
 			extra++
+		}
+		// A timed bar that comes back (a tram arriving, a plank swinging
+		// in) where the ball is pushes it out through its nearest side, as
+		// a piece appearing between strokes does (Unstick): a wall never
+		// stands on the ball. On the first substep any bar standing counts.
+		for _, j := range bars {
+			w := &f.Walls[j]
+			if there(i+f.Tick, w.Every, w.On, w.Phase) && (i == 0 || !there(i-1+f.Tick, w.Every, w.On, w.Phase)) {
+				pos = Unstick(pos, f.Walls[j:j+4], nil, f.Radius)
+			}
 		}
 		// A substep is walked in moves of at most MaxMove, so a fast ball
 		// meets every zone and wall it crosses instead of jumping over them,
@@ -158,17 +161,33 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			// tunnel's mouth
 			climb := 0.0
 			if air <= 0 {
+				// the ground under this move: grass unless a zone says
+				// otherwise (a ball that left the sand mid-substep is on grass)
+				surface = 1.0
 				if f.zonesAt(&pos, &vel, &surface, n, i+f.Tick, &out) {
 					return out
 				}
-				climb = climbing(slopes, pos, vel)
+				climb = climbing(slopes, pos, vel, i+f.Tick)
 			}
 
 			move := vel.Scale(1 / float64(n))
 			next := pos.Add(move)
+			// the move's box: a wall or post whose own box it misses cannot
+			// touch it (the broad phase: a lane hole's ball is near a few of
+			// its walls, and each test costs more than these four compares)
+			lo, hi := pos, next
+			if lo.X > hi.X {
+				lo.X, hi.X = hi.X, lo.X
+			}
+			if lo.Y > hi.Y {
+				lo.Y, hi.Y = hi.Y, lo.Y
+			}
 			best, normal, restitution, hit := 1.0, Vec2{}, f.Bounce, false
 			for j := range offs {
 				o := &offs[j]
+				if o.hi.X < lo.X || o.lo.X > hi.X || o.hi.Y < lo.Y || o.lo.Y > hi.Y {
+					continue
+				}
 				if !there(i+f.Tick, o.every, o.on, o.phase) {
 					continue // a timed wall that is not there this substep
 				}
@@ -199,6 +218,9 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 						// its face: push back along the line from that point. The
 						// face's normal there points across the next wall of a
 						// corner and set the ball jittering between the two.
+						// Not touching it yet, it may still meet it on the way:
+						// the end is a round cap, swept like a post (skipping it
+						// let a ball cut through a free wall end).
 						if u >= -f.Radius && u <= o.length+f.Radius {
 							end := o.a
 							if u > o.length {
@@ -210,6 +232,9 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 									best, normal, hit = 0, nrm, true
 									restitution = o.bounce
 								}
+							} else if t, nn, ok := (Circle{C: end, R: f.Radius}).Hit(pos, next); ok && t < best {
+								best, normal, hit = t, nn, true
+								restitution = o.bounce
 							}
 							continue
 						}
@@ -224,6 +249,9 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 				p := &f.Posts[j]
 				c := p.Circle
 				c.R += f.Radius
+				if reach := c.R + boxPad; c.C.X+reach < lo.X || c.C.X-reach > hi.X || c.C.Y+reach < lo.Y || c.C.Y-reach > hi.Y {
+					continue
+				}
 				if t, nn, ok := c.Hit(pos, next); ok && t < best {
 					best, normal, hit = t, nn, true
 					restitution = orDefault(p.Bounce, f.Bounce)
@@ -233,10 +261,9 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			if hit {
 				pos = pos.Add(move.Scale(best)).Add(normal.Scale(skin))
 				// the part of the speed into the surface bounces back by the
-				// restitution; the part along it keeps almost all of itself —
-				// a ball running along a rail is not braked by it. A bumper
-				// (restitution above 1) kicks the ball out with a fixed push
-				// instead of multiplying its speed, so a graze adds little.
+				// restitution (at most MaxBounce); the part along it keeps
+				// almost all of itself — a ball running along a rail is not
+				// braked by it.
 				vn := normal.Scale(vel.Dot(normal))
 				vt := vel.Sub(vn)
 				if restitution > MaxBounce {
@@ -254,7 +281,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			}
 			if air > 0 {
 				air -= move.Len()
-			} else if climb > 0 && !hit && climbing(slopes, pos, vel) == 0 {
+			} else if climb > 0 && !hit && climbing(slopes, pos, vel, i+f.Tick) == 0 {
 				// it went over the top of the slope fast: it takes off (a
 				// bounce back down the slope is not a take-off)
 				if l := vel.Len(); l > JumpSpeed {
@@ -284,7 +311,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		if sp <= 0.02 {
 			// on a slope steeper than the drag a ball does not stay put: it
 			// stops, then rolls back down (the slope pushes it next substep)
-			if pull(slopes, pos) > Drag {
+			if pull(slopes, pos, i+f.Tick) > Drag {
 				vel = Vec2{}
 				continue
 			}
@@ -299,7 +326,25 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	out.Air[len(out.Air)-1] = false
 	var still Vec2
 	surface := 1.0
-	f.zonesAt(&pos, &still, &surface, 1, substeps+f.Tick, &out)
+	if f.zonesAt(&pos, &still, &surface, 1, substeps+f.Tick, &out) {
+		return out
+	}
+	// A ball at rest under a timed hazard or tunnel (falling ice, a
+	// blowhole) waits there for the next stroke, and the hazard comes on
+	// within its period, whatever the tick: it meets it. Checking the one
+	// substep the stroke ended on let a lay-up under a serac survive.
+	for j := range f.Zones {
+		z := &f.Zones[j]
+		if z.Every <= 0 || z.On <= 0 || (z.Kind != Hazard && z.Kind != Tunnel) || !z.contains(pos) {
+			continue
+		}
+		if z.Kind == Hazard {
+			out.add(z.Vec, false)
+			return out
+		}
+		pos = z.Vec
+		out.add(pos, false)
+	}
 	return out
 }
 
@@ -313,23 +358,30 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 		}
 		switch z.Kind {
 		case Surface:
-			*surface = z.Scale // the surface the ball last rolled on this substep
+			*surface = z.Scale // the surface under this move (the last listed wins)
 		case Slope:
-			v0 := vel.Len()
 			if isAir(z) {
 				out.mark('w')
 			} else {
 				out.mark('s')
 			}
+			wind := z.Air && z.Capped
+			v2 := 0.0
+			if wind {
+				v2 = vel.Dot(*vel)
+			}
 			*vel = vel.Add(z.Vec.Scale(1 / float64(n)))
 			// the weather's wind bends a rolling ball and brakes it, but never
 			// speeds it up: stronger than Drag, it kept a ball drifting for
-			// ever on the flat, and sped it up on ice
-			if l := vel.Len(); z.Skin == "wind" && l > v0 {
-				if v0 == 0 {
-					*vel = Vec2{}
-				} else {
-					*vel = vel.Scale(v0 / l)
+			// ever on the flat, and sped it up on ice. (Squared first: the
+			// roots are only taken when it did speed up.)
+			if l2 := vel.Dot(*vel); wind && l2 > v2 {
+				if v0, l := math.Sqrt(v2), math.Sqrt(l2); l > v0 {
+					if v0 == 0 {
+						*vel = Vec2{}
+					} else {
+						*vel = vel.Scale(v0 / l)
+					}
 				}
 			}
 		case Tunnel:
@@ -364,8 +416,8 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 			}
 			side := pos.Sub(axis.Scale(pos.Dot(axis)))
 			switch {
-			case slanted || (sp > z.Scale*LoopOver && !closedLoop(z)):
-				// off the top of the track: down in front of the mouth, still
+			case slanted:
+				// off the side of the track: down in front of the mouth, still
 				*pos = mid.Sub(axis.Scale(mid.Dot(axis))).Add(axis.Scale(front - sign*1.5))
 				out.add(*pos, false)
 				return true
@@ -382,10 +434,6 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 	return false
 }
 
-// closedLoop reports whether a loop is a closed tube (its skin says "tube"):
-// a ball cannot fly off one, so any speed from Scale up goes round.
-func closedLoop(z *Zone) bool { return strings.Contains(z.Skin, "tube") }
-
 func orDefault(v, def float64) float64 {
 	if v == 0 {
 		return def
@@ -393,18 +441,24 @@ func orDefault(v, def float64) float64 {
 	return v
 }
 
-// isAir reports whether a slope is moving air (weather wind, a cannon's gust,
-// anything timed) rather than a hill: it pushes the ball but is no hill to
-// take off from or roll back down, and it must not hide the one under it.
-func isAir(z *Zone) bool { return z.Skin == "wind" || z.Skin == "gust" || z.Every > 0 }
+// isAir reports whether a slope is moving air (Zone.Air) rather than a hill.
+// A timed hill (a seesaw) is still a hill, while it is there.
+func isAir(z *Zone) bool { return z.Air }
+
+// hill is a ground slope and its steepness, |Vec|.
+type hill struct {
+	z *Zone
+	g float64
+}
 
 // groundSlopes is the field's hills, in field order: the only zones climbing
-// and pull look at, found once per shot.
-func (f *Field) groundSlopes() []*Zone {
-	var out []*Zone
+// and pull look at, found (and measured) once per shot. A timed one counts
+// only in the substeps it is there.
+func (f *Field) groundSlopes() []hill {
+	var out []hill
 	for j := range f.Zones {
 		if z := &f.Zones[j]; z.Kind == Slope && !isAir(z) {
-			out = append(out, z)
+			out = append(out, hill{z, z.Vec.Len()})
 		}
 	}
 	return out
@@ -412,20 +466,26 @@ func (f *Field) groundSlopes() []*Zone {
 
 // climbing is how steep the slope the ball is moving up is, or 0 when it is
 // not climbing one.
-func climbing(slopes []*Zone, pos, vel Vec2) float64 {
-	for _, z := range slopes {
-		if z.contains(pos) && vel.Dot(z.Vec) < 0 {
-			return z.Vec.Len()
+func climbing(slopes []hill, pos, vel Vec2, tick int) float64 {
+	for _, s := range slopes {
+		if there(tick, s.z.Every, s.z.On, s.z.Phase) && s.z.contains(pos) && vel.Dot(s.z.Vec) < 0 {
+			return s.g
 		}
 	}
 	return 0
 }
 
-// pull is how hard the slope under the ball pulls it, 0 off a slope.
-func pull(slopes []*Zone, pos Vec2) float64 {
-	for _, z := range slopes {
-		if z.contains(pos) {
-			return z.Vec.Len()
+// pull is how hard the slope under the ball pulls it at tick, 0 off a slope.
+// A tick below 0 asks for the untimed hills only: rolling on past the
+// stroke's substeps is for a ball left on a hill, not on a rocking plank
+// (it would rock there for all MaxRollOn substeps).
+func pull(slopes []hill, pos Vec2, tick int) float64 {
+	for _, s := range slopes {
+		if (tick < 0 && s.z.Every > 0) || (tick >= 0 && !there(tick, s.z.Every, s.z.On, s.z.Phase)) {
+			continue
+		}
+		if s.z.contains(pos) {
+			return s.g
 		}
 	}
 	return 0

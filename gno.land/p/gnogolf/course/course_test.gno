@@ -49,7 +49,7 @@ func TestBallInTheAirFliesOverTheCup(t *testing.T) {
 // A gate that shuts on a resting ball pushes it out instead of trapping it.
 func TestPieceAppearingOnTheBallPushesItOut(t *testing.T) {
 	bar := physics.Bar(physics.Vec2{X: 10, Y: 2}, physics.Vec2{X: 10, Y: 8}, 0.8, 0, "")
-	b := Unstick(physics.Vec2{X: 10.1, Y: 5}, bar, nil, 0.5)
+	b := physics.Unstick(physics.Vec2{X: 10.1, Y: 5}, bar, nil, 0.5)
 	if b.X > 9.1 && b.X < 10.9 {
 		t.Fatalf("still inside the bar at %v", b)
 	}

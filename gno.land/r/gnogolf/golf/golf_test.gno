@@ -7,9 +7,11 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
 	"gno.land/p/nt/ufmt/v0"
 	"gno.land/p/nt/urequire/v0"
+	"gno.land/r/sys/users"
 )
 
 // flat is a hole with nothing in it but its walls — enough to exercise golf
@@ -38,7 +40,28 @@ func (h *flat) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool
 	return shot, holed
 }
 
-const player = address("g1user00000000000000000000000000000000000")
+var player = testutils.TestAddress("user")
+
+// giveName registers a gno.land name for addr in r/sys/users, as its
+// controller does on a dev chain: the rankings take named players only, and
+// the tests go through the real lookup. Registering twice is a no-op.
+func giveName(cur realm, addr address, name string) {
+	if !users.ResolveAddress(addr).IsDeleted() {
+		return
+	}
+	testing.SetRealm(testing.NewCodeRealm("gno.land/r/sys/users/init"))
+	if err := users.RegisterUser(cross(cur), name, addr); err != nil {
+		panic(err.Error())
+	}
+}
+
+// course registers a flat hole as one of the course's own, under r/gnogolf/.
+func courseHole(cur realm, name string) string {
+	id := "gno.land/r/gnogolf/" + name
+	testing.SetRealm(testing.NewCodeRealm(id))
+	Register(cross(cur), &flat{})
+	return id
+}
 
 // register deploys a flat hole as gno.land/r/test/<name> and returns its id.
 func register(cur realm, name string) string {
@@ -103,7 +126,7 @@ func TestRoundCountsStrokesAndFinishes(cur realm, t *testing.T) {
 	r := roundOf(mustHole(count), player)
 	uassert.Equal(t, 2, r.strokes)
 	uassert.False(t, r.done)
-	uassert.True(t, len(r.path) > 1, "a shot must leave a path to animate")
+	uassert.True(t, strings.Contains(Round(count, player), `"path":[[`), "a shot must leave a path to animate: "+Round(count, player))
 
 	// straight at the cup from the tee, 18 units away
 	testing.SetRealm(testing.NewUserRealm(player))
@@ -133,8 +156,8 @@ func TestPlayRoundEqualsTheSameShotsOneByOne(cur realm, t *testing.T) {
 	a := roundOf(mustHole(batch), player)
 	b := roundOf(mustHole(single), player)
 	uassert.Equal(t, a.strokes, b.strokes)
-	uassert.Equal(t, a.ball.X, b.ball.X)
-	uassert.Equal(t, a.ball.Y, b.ball.Y)
+	uassert.Equal(t, a.bx, b.bx)
+	uassert.Equal(t, a.by, b.by)
 }
 
 func TestPlayRoundRejectsGarbage(cur realm, t *testing.T) {
@@ -166,7 +189,10 @@ func TestSimulateRoundEqualsPlayRound(cur realm, t *testing.T) {
 
 	want := ufmt.Sprintf(`"strokes":%d`, r.strokes)
 	uassert.True(t, strings.Contains(preview, want), preview)
-	uassert.True(t, strings.Contains(preview, jvec(r.ball)+`],"air":"`+r.air+`",`), "same resting point: "+preview)
+	uassert.True(t, strings.Contains(preview, `"rest":`+jexact(r.ball())+"}"), "same resting point, exactly: "+preview)
+	// and the path Round replays is the one the preview showed
+	path := func(s string) string { return s[strings.Index(s, `"path"`):strings.Index(s, `,"cause"`)] }
+	uassert.Equal(t, path(preview), path(Round(id, player)))
 }
 
 // A hole's name is author-controlled; whatever it holds, the JSON must parse.
@@ -233,34 +259,67 @@ func TestTimedHoleFollowsTheRoundsStrokes(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(player))
 	PlayRound(cross(cur), id, shots)
 	r := roundOf(mustHole(id), player)
-	uassert.True(t, strings.Contains(preview, jvec(r.ball)+`],"air":"`+r.air+`",`), "preview and record differ: "+preview)
+	uassert.True(t, strings.Contains(preview, `"rest":`+jexact(r.ball())+"}"), "preview and record differ: "+preview)
 
 	testing.SetRealm(testing.NewUserRealm(player))
 	Reset(cross(cur), id)
 	testing.SetRealm(testing.NewUserRealm(player))
 	Launch(cross(cur), id, 0, 9)
-	uassert.True(t, roundOf(mustHole(id), player).ball.X > 10, "the first stroke must find the gate open")
-	uassert.Equal(t, `{"walls":[],"posts":[],"zones":[]}`, Extras(id, 0))
+	uassert.True(t, roundOf(mustHole(id), player).bx > 10, "the first stroke must find the gate open")
+	uassert.Equal(t, `{"version":1,"walls":[],"posts":[],"zones":[]}`, Extras(id, 0))
 	uassert.True(t, strings.Contains(Extras(id, 1), `"a":[`), "stroke 1 has the gate")
 }
 
 func TestLeaderboardRanksFinishedRounds(cur realm, t *testing.T) {
-	id := register(cur, "board")
+	giveName(cur, player, "golfer")
+	id := courseHole(cur, "board31")
 	testing.SetRealm(testing.NewUserRealm(player))
 	Launch(cross(cur), id, 0, 4) // holes out on the flat test hole
 	lb := Leaderboard("pro")
 	uassert.True(t, strings.Contains(lb, `"player":"`+player.String()+`"`), lb)
+	uassert.True(t, strings.HasPrefix(lb, `{"version":1,"mode":"pro","holes":`), lb)
+}
+
+// A finish on anyone's hole keeps no standing and ranks nobody: no 0-hole
+// rows in the top ten, and no totals row to inflate.
+func TestAnyonesHoleRanksNobody(cur realm, t *testing.T) {
+	loner := testutils.TestAddress("loner")
+	giveName(cur, loner, "loner")
+	id := register(cur, "anyones")
+	testing.SetRealm(testing.NewUserRealm(loner))
+	PlayRoundAt(cross(cur), id, "0,4", Period())
+	uassert.True(t, mustHole(id).best[assisted] > 0, "the finish is kept")
+	uassert.False(t, strings.Contains(Leaderboard("assisted"), loner.String()), "not on the course board")
+	uassert.True(t, totals[assisted].Get(loner.String()) == nil, "no standing row")
+	uassert.True(t, strings.Contains(HoleLeaderboard(id, "assisted", 0, 10), loner.String()), "on the hole's own board")
 }
 
 // A replay never erases a player's best, and the board reads its top ten.
 func TestLeaderboardKeepsBests(cur realm, t *testing.T) {
-	id := register(cur, "keep")
+	giveName(cur, player, "golfer")
+	id := courseHole(cur, "keep32")
 	testing.SetRealm(testing.NewUserRealm(player))
 	Launch(cross(cur), id, 0, 4) // holes out
 	testing.SetRealm(testing.NewUserRealm(player))
 	Reset(cross(cur), id) // a replay, not finished
 	lb := Leaderboard("pro")
 	uassert.True(t, strings.Contains(lb, `"player":"`+player.String()+`"`), lb)
+}
+
+// An unknown mode is a mistake, not the assisted board.
+func TestAnUnknownModeIsRefused(cur realm, t *testing.T) {
+	id := register(cur, "modes")
+	for _, read := range []func(){
+		func() { Leaderboard("xyz") },
+		func() { HoleLeaderboard(id, "Pro", 0, 10) },
+		func() { Bests(id, "xyz", "") },
+		func() { Standings("xyz", "") },
+		func() { Records(id, "xyz", "", 10) },
+		func() { Players("xyz", "", 10) },
+	} {
+		uassert.PanicsContains(t, cur, `a mode is "assisted" or "pro"`, read)
+	}
+	uassert.True(t, strings.Contains(Leaderboard(""), `"mode":"assisted"`), `"" is assisted`)
 }
 
 func TestMarksCannotEscapeTheBoard(cur realm, t *testing.T) {
@@ -286,7 +345,13 @@ func TestHolesAreListedWorldByWorld(cur realm, t *testing.T) {
 	uassert.True(t, gi >= 0 && ii > gi, "the garden comes before the island")
 	uassert.True(t, strings.Contains(list, `"world":"island","order":1.000`), "the island hole says where it is")
 	uassert.True(t, strings.Contains(State(id), `"world":"island"`), "State says the world too")
-	uassert.True(t, strings.Contains(Render(""), "## Island"), "the hub has a table per world")
+	uassert.True(t, strings.Contains(Render(""), "## Community holes"), "anyone's holes have their own section")
+	uassert.True(t, strings.Contains(list, `"id":"`+id+`","name":"Flat","official":false`), "Holes says it is not the course's")
+	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/islet4"))
+	Register(cross(cur), &islet{})
+	hub := Render("")
+	uassert.True(t, strings.Contains(hub, "## Island Cup"), "the course has a table per cup")
+	uassert.True(t, strings.Index(hub, "## Island Cup") < strings.Index(hub, "## Community holes"), "the course first")
 }
 
 // a real course.Simple, so it plays in the weather
@@ -389,22 +454,42 @@ func TestNewerHoleTakesTheSlot(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(Holes(), `"next":"`+next+`"`), "Holes says where it went")
 }
 
-// A hole's board lists its players' bests, fewest strokes first.
+// A hole's board lists its named players' bests, fewest strokes first, a
+// page at a time; players counts the board's rows, finished every finisher.
 func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	id := register(cur, "holeboard")
-	e := mustHole(id)
-	e.bests[assisted].Set("g1c", 5)
-	e.bests[assisted].Set("g1a", 2)
-	e.bests[assisted].Set("g1b", 3)
-	uassert.Equal(t, `{"hole":"`+id+`","mode":"assisted","par":3,"players":3,"offset":0,"rows":[{"player":"g1a","strokes":2},{"player":"g1b","strokes":3},{"player":"g1c","strokes":5}]}`, HoleLeaderboard(id, "assisted", 0, 10))
+	a, b, c := testutils.TestAddress("hba"), testutils.TestAddress("hbb"), testutils.TestAddress("hbc")
+	giveName(cur, a, "hba")
+	giveName(cur, b, "hbb")
+	giveName(cur, c, "hbc")
+	// three finishes, the worst first: 3 strokes, 2, then 1
+	for i, p := range []address{c, b, a} {
+		testing.SetRealm(testing.NewUserRealm(p))
+		PlayRoundAt(cross(cur), id, strings.Repeat("0,0.001;", 2-i)+"0,4", Period())
+	}
+	testing.SetRealm(testing.NewUserRealm(stranger)) // unnamed: finished, not on the board
+	PlayRoundAt(cross(cur), id, "0,4", Period())
+	row := func(p address, n int) string { return ufmt.Sprintf(`{"player":"%s","strokes":%d}`, p.String(), n) }
+	head := `{"version":1,"hole":"` + id + `","mode":"assisted","par":3,"players":3,"finished":4,`
+	uassert.Equal(t, head+`"offset":0,"rows":[`+row(a, 1)+","+row(b, 2)+","+row(c, 3)+"]}", HoleLeaderboard(id, "assisted", 0, 10))
 	// ten by ten: the second page starts where the first ended
-	uassert.Equal(t, `{"hole":"`+id+`","mode":"assisted","par":3,"players":3,"offset":1,"rows":[{"player":"g1b","strokes":3}]}`, HoleLeaderboard(id, "assisted", 1, 1))
-	uassert.Equal(t, `{"hole":"`+id+`","mode":"assisted","par":3,"players":3,"offset":3,"rows":[]}`, HoleLeaderboard(id, "assisted", 50, 10))
+	uassert.Equal(t, head+`"offset":1,"rows":[`+row(b, 2)+"]}", HoleLeaderboard(id, "assisted", 1, 1))
+	uassert.Equal(t, head+`"offset":50,"rows":[]}`, HoleLeaderboard(id, "assisted", 50, 10))
+
+	// c improves to 1: its old row goes, the new one sorts by address among the 1s
+	testing.SetRealm(testing.NewUserRealm(c))
+	Reset(cross(cur), id)
+	testing.SetRealm(testing.NewUserRealm(c))
+	PlayRoundAt(cross(cur), id, "0,4", Period())
+	lb := HoleLeaderboard(id, "assisted", 0, 10)
+	uassert.Equal(t, 1, strings.Count(lb, c.String()), lb)
+	uassert.True(t, strings.Index(lb, row(c, 1)) < strings.Index(lb, row(b, 2)), lb)
 }
 
 // A pro round counts on the pro records only, and a round keeps its mode.
 // (Launch plays pro; the assisted board is PlayRoundAt's.)
 func TestProRoundsRankApart(cur realm, t *testing.T) {
+	giveName(cur, player, "golfer")
 	id := register(cur, "promode")
 	testing.SetRealm(testing.NewUserRealm(player))
 	PlayRoundPro(cross(cur), id, "0,4", Period())
@@ -424,16 +509,13 @@ func TestProRoundsRankApart(cur realm, t *testing.T) {
 	})
 }
 
-// stranger has no gno.land name; every other test player is taken as named,
-// so the boards need no r/sys/users registration in tests.
-const stranger = address("g1stranger000000000000000000000000000000")
-
-func init() { named = func(p string) bool { return p != string(stranger) } }
+// stranger never takes a gno.land name.
+var stranger = testutils.TestAddress("stranger")
 
 // An unnamed player's finish is kept, and friends see it, but no ranking
 // lists them.
 func TestOnlyNamedPlayersRank(cur realm, t *testing.T) {
-	id := register(cur, "names")
+	id := courseHole(cur, "names33")
 	testing.SetRealm(testing.NewUserRealm(stranger))
 	PlayRoundAt(cross(cur), id, "0,4", Period())
 	uassert.True(t, mustHole(id).best[assisted] > 0, "the finish is kept")

@@ -293,7 +293,9 @@ func WeatherFor(kind string, h Hole, seed uint64) (physics.Vec2, []physics.Zone)
 	w, hh := BoardOf(h)
 	W, H := float64(w), float64(hh)
 	all := func(k physics.ZoneKind, skin string, scale float64, vec physics.Vec2) physics.Zone {
-		return physics.Zone{Kind: k, Min: physics.V(0, 0), Max: physics.V(W, H), Scale: scale, Vec: vec, Skin: skin}
+		// the wind is air, and never speeds the ball up
+		air := k == physics.Slope
+		return physics.Zone{Kind: k, Min: physics.V(0, 0), Max: physics.V(W, H), Scale: scale, Vec: vec, Skin: skin, Air: air, Capped: air}
 	}
 	r := &rng{s: seed}
 	blow := func() physics.Vec2 {
@@ -347,7 +349,7 @@ func wet(h Hole, r *rng, zs []physics.Zone) []physics.Zone {
 		}
 		clash := false
 		for _, p := range placed {
-			if p.Min.Add(p.Max).Scale(0.5).Sub(c).Len() < p.Max.X-p.Min.X+0.5 {
+			if p.Min.Add(p.Max).Scale(0.5).Sub(c).LenCmp(p.Max.X-p.Min.X+0.5) < 0 {
 				clash = true
 			}
 		}
@@ -362,28 +364,16 @@ func wet(h Hole, r *rng, zs []physics.Zone) []physics.Zone {
 // dryLand says whether a puddle of radius rad can lie at c: on the lane
 // (inside its outline, by the even-odd rule over the fixed walls), out of
 // every zone that is not plain ground, clear of walls, posts, tee and cup.
+// It is a pure conjunction, so the cheap tests go first and the walls last;
+// no test takes a square root (LenCmp, Crosses): on a lane hole every one of
+// the 60 tries fails, and rain paid ~900M gas for them.
 func dryLand(h Hole, c physics.Vec2, rad float64) bool {
 	f := h.Field()
-	if c.Sub(h.Start()).Len() < rad+2 || c.Sub(h.Cup()).Len() < rad+2 {
-		return false
-	}
-	far, in := c.Add(physics.V(1e4, 37)), false
-	for _, wl := range f.Walls {
-		if wl.Every > 0 {
-			continue
-		}
-		if segDist(c, wl.Seg) < rad+0.3 {
-			return false
-		}
-		if _, _, hit := wl.Seg.Hit(c, far); hit {
-			in = !in
-		}
-	}
-	if !in {
+	if c.Sub(h.Start()).LenCmp(rad+2) < 0 || c.Sub(h.Cup()).LenCmp(rad+2) < 0 {
 		return false
 	}
 	for _, p := range f.Posts {
-		if p.C.Sub(c).Len() < p.R+rad+0.3 {
+		if p.C.Sub(c).LenCmp(p.R+rad+0.3) < 0 {
 			return false
 		}
 	}
@@ -395,10 +385,20 @@ func dryLand(h Hole, c physics.Vec2, rad float64) bool {
 			return false // not on the sand or the ice: a puddle is on the green
 		}
 	}
-	return true
+	far, in := c.Add(physics.V(1e4, 37)), false
+	for _, wl := range f.Walls {
+		if wl.Every > 0 {
+			continue
+		}
+		if c.Sub(wl.Seg.Closest(c)).LenCmp(rad+0.3) < 0 {
+			return false
+		}
+		if wl.Seg.Crosses(c, far) {
+			in = !in
+		}
+	}
+	return in
 }
-
-func segDist(p physics.Vec2, s physics.Segment) float64 { return p.Sub(closest(s, p)).Len() }
 
 // WithWeather lays weather over a field: the sky's zones (wind, rain, fog,
 // storm, snow — the whole board) go under its own, so the sand stays sand in
@@ -536,7 +536,7 @@ func (h *Simple) PlayAt(ball physics.Vec2, angle, power float64, stroke int) (ph
 // starting at tick: the stroke's pulses, then the weather, then the clock. Read-only.
 func (h *Simple) PreviewWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	ws, ps := h.Extras(stroke)
-	ball = Unstick(ball, ws, ps, h.Course.Radius)
+	ball = physics.Unstick(ball, ws, ps, h.Course.Radius)
 	// the stroke's own pieces first, then the weather under everything
 	f := WithZones(WithExtras(h.Course, ws, ps), h.ExtraZones(stroke))
 	f = physics.WithTick(WithWeather(f, weather), tick)
@@ -606,8 +606,7 @@ func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bo
 	p := shot.Path
 	for i := 0; i+1 < len(p); i++ {
 		a, d := p[i], p[i+1].Sub(p[i])
-		l := d.Len()
-		if l > CaptureSpeed {
+		if d.LenCmp(CaptureSpeed) > 0 {
 			continue // too fast, or a tunnel jump
 		}
 		if airborne(shot, i) || airborne(shot, i+1) {
@@ -615,9 +614,15 @@ func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bo
 		}
 		// a short step right after a long one is not a slow ball: it is the
 		// rest of a substep after a tunnel exit or a bounce
-		if i > 0 && p[i].Sub(p[i-1]).Len() > CaptureSpeed*1.5 {
+		if i > 0 && p[i].Sub(p[i-1]).LenCmp(CaptureSpeed*1.5) > 0 {
 			continue
 		}
+		// a step whose box is more than radius from the pin cannot drop
+		if b, r := p[i+1], radius+1e-9; (pin.X < a.X-r && pin.X < b.X-r) || (pin.X > a.X+r && pin.X > b.X+r) ||
+			(pin.Y < a.Y-r && pin.Y < b.Y-r) || (pin.Y > a.Y+r && pin.Y > b.Y+r) {
+			continue
+		}
+		l := d.Len()
 		t := 0.0
 		if l > 0 {
 			t = pin.Sub(a).Dot(d) / (l * l)
@@ -644,7 +649,7 @@ func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bo
 			return shot, true
 		}
 	}
-	if shot.Rest().Sub(pin).Len() <= radius {
+	if shot.Rest().Sub(pin).LenCmp(radius) <= 0 {
 		shot.Path = append(shot.Path, pin)
 		if shot.Air != nil {
 			shot.Air = append(shot.Air, false)
@@ -658,65 +663,3 @@ func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bo
 }
 
 func airborne(s physics.Shot, i int) bool { return i < len(s.Air) && s.Air[i] }
-
-// Unstick moves a ball out of a piece that appeared on top of it — a gate
-// shutting, a sail turning, a mole popping up where the ball rests. Walls come
-// in bars of four (physics.Bar): a ball inside one leaves through the nearest
-// side. A ball merely closer to a wall than its radius is pushed off it.
-func Unstick(ball physics.Vec2, walls []physics.Wall, posts []physics.Post, r float64) physics.Vec2 {
-	for i := 0; i+3 < len(walls); i += 4 {
-		q := walls[i : i+4]
-		c := q[0].Seg.A.Add(q[1].Seg.A).Add(q[2].Seg.A).Add(q[3].Seg.A).Scale(0.25)
-		inside := true
-		for _, w := range q {
-			if side(w.Seg, ball) != side(w.Seg, c) {
-				inside = false
-			}
-		}
-		best, bestD := physics.Vec2{}, math.Inf(1)
-		for _, w := range q {
-			p := closest(w.Seg, ball)
-			if d := p.Sub(ball).Len(); d < bestD {
-				best, bestD = p, d
-			}
-		}
-		if inside || bestD < r {
-			out := best.Sub(c)
-			if !inside {
-				out = ball.Sub(best)
-			}
-			if l := out.Len(); l > 0 {
-				ball = best.Add(out.Scale((r + 0.02) / l))
-			}
-		}
-	}
-	for _, p := range posts {
-		d := ball.Sub(p.C)
-		if l := d.Len(); l < p.R+r {
-			if l == 0 {
-				d, l = physics.Vec2{X: 1}, 1
-			}
-			ball = p.C.Add(d.Scale((p.R + r + 0.02) / l))
-		}
-	}
-	return ball
-}
-
-func side(s physics.Segment, p physics.Vec2) bool {
-	return s.B.Sub(s.A).X*(p.Y-s.A.Y)-s.B.Sub(s.A).Y*(p.X-s.A.X) > 0
-}
-
-func closest(s physics.Segment, p physics.Vec2) physics.Vec2 {
-	d := s.B.Sub(s.A)
-	l := d.Dot(d)
-	if l == 0 {
-		return s.A
-	}
-	t := p.Sub(s.A).Dot(d) / l
-	if t < 0 {
-		t = 0
-	} else if t > 1 {
-		t = 1
-	}
-	return s.A.Add(d.Scale(t))
-}

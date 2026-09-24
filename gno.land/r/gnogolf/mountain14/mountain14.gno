@@ -25,7 +25,7 @@ var me = course.Fit(&course.Simple{
 		Zones: []physics.Zone{
 			{Kind: physics.Slope, Min: physics.V(10, 0), Max: physics.V(13, 14), Vec: physics.V(-0.3, 0), Skin: "terrace"},
 			{Kind: physics.Slope, Min: physics.V(18, 0), Max: physics.V(21, 14), Vec: physics.V(-0.3, 0), Skin: "terrace"},
-			{Kind: physics.Slope, Min: physics.V(27, 0), Max: physics.V(39, 14), Vec: physics.V(0.12, 0), Skin: "terrace"},
+			{Kind: physics.Slope, Min: physics.V(27, 0), Max: physics.V(39, 14), Vec: physics.V(0.16, 0), Skin: "downhill"},
 			{Kind: physics.Surface, Min: physics.V(39, 3), Max: physics.V(51, 11), Scale: 1.18, Round: true, Skin: "ice"},
 		},
 		Friction: 0.87,

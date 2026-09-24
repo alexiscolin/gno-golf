@@ -267,20 +267,14 @@ func TestLoopWantsTheRightSpeedAndTheMouth(t *testing.T) {
 	if slow.Rest().X >= 10 {
 		t.Fatalf("a slow ball falls back out of the mouth, stopped at %v", slow.Rest())
 	}
-	fast := f.Step(Vec2{8, 2}, Vec2{3.6, 0}, 20)
-	if fast.Rest().X >= 10 || fast.Rest().X < 7 {
-		t.Fatalf("a ball too fast flies off and is put down in front, at %v", fast.Rest())
+	// a loop is a closed tube, with no top to fly off: a fast ball goes round too
+	if fast := f.Step(Vec2{8, 2}, Vec2{3.6, 0}, 20); fast.Rest().X <= 16 {
+		t.Fatalf("a fast ball goes round the tube, stopped at %v", fast.Rest())
 	}
 	slant := f.Step(Vec2{8, 1.2}, FromPolar(0.6, 2.6), 20) // about 34° off straight
 	if slant.Rest().X >= 10 || slant.Rest().X < 7 {
 		t.Fatalf("a ball coming in slanted falls off the side and is put down in front, at %v", slant.Rest())
 	}
-	// a closed tube has no top to fly off: the fast ball goes round too
-	f.Zones[0].Skin = "castle tube"
-	if tube := f.Step(Vec2{8, 2}, Vec2{3.6, 0}, 20); tube.Rest().X <= 16 {
-		t.Fatalf("a fast ball goes round a closed tube, stopped at %v", tube.Rest())
-	}
-	f.Zones[0].Skin = ""
 	wide := f.Step(Vec2{6, 4.5}, Vec2{2.6, 0}, 20)
 	if wide.Rest().X >= 12 {
 		t.Fatalf("a ball that misses the mouth meets the loop's base, got to %v", wide.Rest())
@@ -352,7 +346,7 @@ func TestWindDoesNotHideTheHillUnderIt(t *testing.T) {
 	f := &Field{
 		Walls: Box(Vec2{0, 0}, Vec2{40, 6}),
 		Zones: []Zone{
-			{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{40, 6}, Vec: Vec2{0.02, 0}, Skin: "wind"},
+			{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{40, 6}, Vec: Vec2{0.02, 0}, Skin: "wind", Air: true, Capped: true},
 			{Kind: Slope, Min: Vec2{10, 0}, Max: Vec2{20, 6}, Vec: Vec2{-0.25, 0}},
 		},
 		Friction: 0.86,
@@ -403,7 +397,7 @@ func TestATimedGustOnlyBlowsInItsWindow(t *testing.T) {
 	gust := func(on int) *Field {
 		return &Field{
 			Walls:    Box(Vec2{0, 0}, Vec2{40, 40}),
-			Zones:    []Zone{{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{40, 40}, Vec: Vec2{0, 0.3}, Skin: "wind", Every: 100, On: on}},
+			Zones:    []Zone{{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{40, 40}, Vec: Vec2{0, 0.3}, Skin: "wind", Every: 100, On: on, Air: true, Capped: true}},
 			Friction: 0.9,
 			Radius:   0.5,
 		}
@@ -476,7 +470,7 @@ func TestABallInAWedgeNeverGains(t *testing.T) {
 // The weather's wind bends a ball but never speeds it up: a ball at rest stays
 // put, and a tailwind on ice cannot beat the shot.
 func TestWindNeverSpeedsTheBallUp(t *testing.T) {
-	wind := Zone{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{100, 100}, Vec: Vec2{0.15, 0}, Skin: "wind"}
+	wind := Zone{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{100, 100}, Vec: Vec2{0.15, 0}, Skin: "wind", Air: true, Capped: true}
 	ice := Zone{Kind: Surface, Min: Vec2{0, 0}, Max: Vec2{100, 100}, Scale: 1.12, Skin: "ice"}
 	f := &Field{Zones: []Zone{ice, wind}, Friction: 0.86, Radius: 0.5}
 	if sh := f.Step(Vec2{50, 50}, Vec2{}, 40); sh.Rest() != (Vec2{50, 50}) {
@@ -502,7 +496,7 @@ func TestReplaysAreDeterministic(t *testing.T) {
 		Walls: Box(Vec2{0, 0}, Vec2{30, 12}),
 		Posts: []Post{{Circle: Circle{C: Vec2{15, 6}, R: 1}, Bounce: 0.6}},
 		Zones: []Zone{
-			{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{30, 12}, Vec: Vec2{0.1, 0.05}, Skin: "wind", Every: 6, On: 3},
+			{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{30, 12}, Vec: Vec2{0.1, 0.05}, Skin: "wind", Every: 6, On: 3, Air: true, Capped: true},
 			{Kind: Slope, Min: Vec2{20, 0}, Max: Vec2{26, 12}, Vec: Vec2{-0.2, 0}},
 			{Kind: Surface, Min: Vec2{0, 0}, Max: Vec2{10, 12}, Scale: 1.12, Skin: "ice"},
 		},
@@ -519,5 +513,127 @@ func TestReplaysAreDeterministic(t *testing.T) {
 	}
 	if len(a.Cause) != len(a.Path) {
 		t.Fatalf("%d causes for %d points", len(a.Cause), len(a.Path))
+	}
+}
+
+// A ball pushed into a wall by a steep slope stops, instead of jittering
+// against it for every substep it may roll on.
+func TestAPinnedBallStops(t *testing.T) {
+	f := &Field{
+		Walls:    Box(Vec2{0, 0}, Vec2{40, 6}),
+		Zones:    []Zone{{Kind: Slope, Min: Vec2{0, 0}, Max: Vec2{40, 6}, Vec: Vec2{0.2, 0}}},
+		Friction: 0.86,
+		Radius:   0.5,
+	}
+	sh := f.Step(Vec2{36, 3}, Vec2{0.5, 0}, 20)
+	if len(sh.Path) > 20+MaxRollOn/2 {
+		t.Fatalf("a pinned ball should stop early, got %d points", len(sh.Path))
+	}
+	if sh.Rest().X < 38 {
+		t.Fatalf("it rests against the downhill wall, at %v", sh.Rest())
+	}
+}
+
+// A timed hill (a seesaw) pulls while it is there: a ball that stops on it
+// rolls back down as on any hill, within the stroke.
+func TestATimedHillPullsWhileItIsThere(t *testing.T) {
+	see := Zone{Kind: Slope, Min: V(10, 0), Max: V(40, 10), Vec: V(0.22, 0), Every: 1000, On: 1000}
+	f := &Field{Walls: Box(V(0, 0), V(60, 10)), Zones: []Zone{see}, Friction: 0.87, Radius: 0.5}
+	s := f.Step(V(30, 5), V(-1.5, 0), 30)
+	if s.Rest().X < 35 {
+		t.Fatalf("the ball stopped against the tilt at %v", s.Rest())
+	}
+}
+
+// Leaving the sand mid-substep, the ball is on grass for the rest of it:
+// calm plays like fog (a whole-board Surface of scale 1).
+func TestCalmPlaysLikeFog(t *testing.T) {
+	sand := Zone{Kind: Surface, Min: V(5, 0), Max: V(8, 10), Scale: 0.6, Skin: "sand"}
+	fog := Zone{Kind: Surface, Min: V(0, 0), Max: V(60, 10), Scale: 1, Skin: "fog"}
+	calm := &Field{Walls: Box(V(0, 0), V(60, 10)), Zones: []Zone{sand}, Friction: 0.86, Radius: 0.5}
+	foggy := &Field{Walls: Box(V(0, 0), V(60, 10)), Zones: []Zone{fog, sand}, Friction: 0.86, Radius: 0.5}
+	for _, v := range []float64{2, 4, 6} {
+		if a, b := calm.Step(V(2, 5), V(v, 0), 30), foggy.Step(V(2, 5), V(v, 0), 30); a.Rest() != b.Rest() {
+			t.Fatalf("speed %v: calm rests at %v, fog at %v", v, a.Rest(), b.Rest())
+		}
+	}
+}
+
+// A free wall end is a round cap: a ball close to the wall's line past its
+// end, but not yet touching the end, still meets it on the way.
+func TestAFreeWallEndCannotBeCut(t *testing.T) {
+	f := &Field{Walls: []Wall{{Seg: Segment{V(10, 0), V(10, 5)}}}, Friction: 1, Bounce: 0.8, Radius: 0.5}
+	s := f.Step(V(9.6, 5.35), V(0.5, -1), 1)
+	if p := s.Path[1]; s.Bounces == 0 || (p.X > 10 && p.Y < 5) {
+		t.Fatalf("the ball cut through the wall's end: %d bounces, at %v", s.Bounces, p)
+	}
+}
+
+// A ball at rest under a timed hazard meets it, whenever in its period the
+// stroke happened to end.
+func TestABallAtRestUnderATimedHazardMeetsIt(t *testing.T) {
+	ice := Zone{Kind: Hazard, Min: V(20, 0), Max: V(30, 10), Vec: V(3, 5), Every: 12, On: 4, Phase: 5}
+	f := &Field{Walls: Box(V(0, 0), V(60, 10)), Zones: []Zone{ice}, Friction: 0.86, Radius: 0.5}
+	for tick := 0; tick < 12; tick++ {
+		if s := WithTick(f, tick).Step(V(24, 5), Vec2{}, 1); s.Rest() != V(3, 5) {
+			t.Fatalf("tick %d: a ball at rest under the ice stayed at %v", tick, s.Rest())
+		}
+	}
+}
+
+// A timed bar that comes back on the ball pushes it out: a wall never stands
+// on the ball.
+func TestATimedBarArrivingOnTheBallPushesItOut(t *testing.T) {
+	// away on substep 0 only: the ball rolls into its track, and it arrives
+	tram := Timed(Bar(V(22, 1), V(22, 9), 3, '#', "tram"), 100, 99, 99)
+	f := &Field{Walls: Walls(Box(V(0, 0), V(60, 10)), tram), Friction: 0.86, Radius: 0.5}
+	s := f.Step(V(20.8, 5), V(1.5, 0), 30)
+	if x := s.Rest().X; x > 20.5-0.5 && x < 23.5+0.5 {
+		t.Fatalf("the ball rests inside the tram, at %v", s.Rest())
+	}
+}
+
+// LenCmp is the comparison Len would give, on either side of the line and on it.
+func TestLenCmpIsLen(t *testing.T) {
+	cmp := func(a, b float64) int {
+		if a < b {
+			return -1
+		}
+		if a > b {
+			return 1
+		}
+		return 0
+	}
+	for i := 0; i < 2000; i++ {
+		v := FromPolar(float64(i)*0.37, 0.01+float64(i%97)*0.29)
+		for _, r := range []float64{v.Len(), v.Len() * (1 + 1e-15), v.Len() * (1 - 1e-15), v.Len() + 1e-9, 1.3, 0} {
+			if got, want := v.LenCmp(r), cmp(v.Len(), r); got != want {
+				t.Fatalf("%v against %v: %d, Len says %d", v, r, got, want)
+			}
+		}
+	}
+}
+
+// Prepare is only a cache: a prepared field plays every shot bit for bit as
+// the same field unprepared, and a wall moved after it still counts.
+func TestPrepareChangesNothing(t *testing.T) {
+	mk := func() *Field {
+		return &Field{Walls: Walls(Box(V(0, 0), V(40, 12)), Bar(V(14, 2), V(20, 9), 0.8, '#', ""), Polyline(V(28, 1), V(31, 6), V(27, 10))),
+			Posts: []Post{{Circle: Circle{C: V(24, 6), R: 0.7}}}, Friction: 0.86, Radius: 0.5, Bounce: 0.85}
+	}
+	plain, prep := mk(), mk()
+	Prepare(prep)
+	prep.Walls[5].Seg.A = V(15, 3) // moved after Prepare: worked out afresh
+	plain.Walls[5].Seg.A = V(15, 3)
+	for a := 0.0; a < 6.28; a += 0.3 {
+		x, y := plain.Step(V(4, 6), FromPolar(a, 5), 30), prep.Step(V(4, 6), FromPolar(a, 5), 30)
+		if len(x.Path) != len(y.Path) || x.Bounces != y.Bounces || string(x.Cause) != string(y.Cause) {
+			t.Fatalf("angle %v: prepared shot differs", a)
+		}
+		for i := range x.Path {
+			if x.Path[i] != y.Path[i] {
+				t.Fatalf("angle %v: point %d %v vs %v", a, i, x.Path[i], y.Path[i])
+			}
+		}
 	}
 }

@@ -70,44 +70,61 @@ func who(addr string) string { return md(short(addr), "/u/"+addr) }
 
 func renderHub() string {
 	var sb strings.Builder
-	sb.WriteString("# Mini-golf\n\nEvery hole is a realm someone deployed, and the chain computes every shot. " +
-		"Play here one shot at a time, or " + md("in 3D", playURL) + ", and record a whole round in one transaction.\n\n")
+	sb.WriteString("# Gnogolf — mini-golf on-chain\n\nEvery hole is a realm someone deployed, and the chain computes every shot. " +
+		"Play here one shot at a time, or " + md("in 3D", playURL) + ", and record a whole round in one transaction.\n\n" +
+		"_To play here: pick a hole, send a Launch with an angle and a power, then add `/<your address>` to the hole's URL to see your ball._\n\n")
 	if holes.Size() == 0 {
 		sb.WriteString("_No hole registered yet._\n")
 		return sb.String()
 	}
-	list := listed()
+	var course, community []*entry
+	for _, e := range listed() {
+		if e.official {
+			course = append(course, e)
+		} else {
+			community = append(community, e)
+		}
+	}
 
-	// one card per cup, above their tables: nothing here calls a hole
+	// one card per cup, above their tables: nothing here calls a hole. A cup
+	// counts its current holes; an archived one is listed, not counted.
 	type cup struct {
 		world      string
 		holes, par int
 		top        *entry
 	}
 	var cups []*cup
-	for _, e := range list {
+	for _, e := range course {
 		if len(cups) == 0 || cups[len(cups)-1].world != e.world {
 			cups = append(cups, &cup{world: e.world})
 		}
 		c := cups[len(cups)-1]
+		if e.next != "" {
+			continue
+		}
 		c.holes++
 		c.par += e.par
-		if c.top == nil || e.plays > c.top.plays {
+		if e.plays > 0 && (c.top == nil || e.plays > c.top.plays) {
 			c.top = e
 		}
 	}
-	sb.WriteString("<gno-columns>\n")
-	for i, c := range cups {
-		if i > 0 {
-			sb.WriteString("<gno-columns-sep />\n")
+	if len(cups) > 0 {
+		sb.WriteString("<gno-columns>\n")
+		for i, c := range cups {
+			if i > 0 {
+				sb.WriteString("<gno-columns-sep />\n")
+			}
+			sb.WriteString(ufmt.Sprintf("**%s**\n\n%d holes · par %d\n", cupName(c.world), c.holes, c.par))
+			if c.top != nil {
+				sb.WriteString("\nmost played: " + c.top.name + "\n")
+			}
 		}
-		sb.WriteString(ufmt.Sprintf("### %s\n%d holes · par %d\n\nmost played: %s\n", cupName(c.world), c.holes, c.par, c.top.name))
+		sb.WriteString("</gno-columns>\n\n")
 	}
-	sb.WriteString("</gno-columns>\n\n")
 
 	world, n := "", 0
-	for _, e := range list {
-		// a table per cup, numbered from 1 in each
+	for _, e := range course {
+		// a table per cup, numbered from 1 in each: its current holes only
 		if e.world != world {
 			if world != "" {
 				sb.WriteString("\n") // a table ends before the next heading
@@ -115,33 +132,61 @@ func renderHub() string {
 			world, n = e.world, 0
 			sb.WriteString("## " + cupName(world) + "\n\n| # | hole | par | best | shots played | code |\n|---|---|---|---|---|---|\n")
 		}
-		n++
-		best := "—"
-		if e.best[assisted] > 0 {
-			best = ufmt.Sprintf("%d strokes, %s", e.best[assisted], who(e.bestBy[assisted].String()))
+		no := "archived"
+		if e.next == "" {
+			n++
+			no = ufmt.Sprintf("%d", n)
 		}
-		if e.best[pro] > 0 {
-			best += ufmt.Sprintf(" · pro %d, %s", e.best[pro], who(e.bestBy[pro].String()))
-		}
-		sb.WriteString(ufmt.Sprintf("| %d | [%s](/r/gnogolf/golf:%s) | %d | %s | %d | %s |\n",
-			n, e.name, e.id, e.par, best, e.plays, source(e.id)))
+		sb.WriteString(ufmt.Sprintf("| %s | [%s](/r/gnogolf/golf:%s) | %d | %s | %d | %s |\n",
+			no, e.name, e.id, e.par, bestCell(e), e.plays, source(e.id)))
 	}
-	sb.WriteString("\n## Leaderboard\n\nEach player's best finish on each hole of the course, added up: most holes first, then fewest strokes. " +
+	if len(community) > 0 {
+		if len(course) > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("## Community holes\n\nAnyone can register a hole. These are not part of the course: they have no cup and do not count in its ranking.\n\n" +
+			"| hole | par | best | shots played | code |\n|---|---|---|---|---|\n")
+		for _, e := range community {
+			sb.WriteString(ufmt.Sprintf("| [%s](/r/gnogolf/golf:%s) | %d | %s | %d | %s |\n",
+				e.name, e.id, e.par, bestCell(e), e.plays, source(e.id)))
+		}
+	}
+	sb.WriteString("\n## Leaderboard\n\nEach named player's best finish on each current hole of the course, added up: most holes first, then fewest strokes. " +
 		"Assisted and pro rounds (the aim preview cut short, on the player's word) are ranked apart.\n\n")
 	for m := 0; m < modes; m++ {
 		sb.WriteString("### " + [modes]string{"Assisted", "Pro"}[m] + "\n\n")
-		if len(top[m]) == 0 {
-			sb.WriteString("_Nobody has finished a hole yet._\n\n")
+		rows := ""
+		i := 0
+		ranks[m].Iterate("", "", func(_ string, v any) bool {
+			p := v.(string)
+			if !named(p) {
+				return false
+			}
+			r := totals[m].Get(p).(*row)
+			i++
+			rows += ufmt.Sprintf("| %d | %s | %d | %d |\n", i, who(r.player), r.holes, r.strokes)
+			return i >= topSize
+		})
+		if rows == "" {
+			sb.WriteString("_Nobody has finished a hole of the course yet._\n\n")
 			continue
 		}
-		sb.WriteString("| rank | player | holes | strokes |\n|---|---|---|---|\n")
-		for i, r := range top[m] {
-			sb.WriteString(ufmt.Sprintf("| %d | %s | %d | %d |\n", i+1, who(r.player), r.holes, r.strokes))
-		}
-		sb.WriteString("\n")
+		sb.WriteString("| rank | player | holes | strokes |\n|---|---|---|---|\n" + rows + "\n")
 	}
 	sb.WriteString(noAdmin())
 	return sb.String()
+}
+
+// bestCell is a hole's records, assisted then pro, for a table cell.
+func bestCell(e *entry) string {
+	best := "—"
+	if e.best[assisted] > 0 {
+		best = ufmt.Sprintf("%d strokes, %s", e.best[assisted], who(e.bestBy[assisted].String()))
+	}
+	if e.best[pro] > 0 {
+		best += ufmt.Sprintf(" · pro %d, %s", e.best[pro], who(e.bestBy[pro].String()))
+	}
+	return best
 }
 
 // weatherNote is the hole's weather now, and how long it lasts: one forecast
@@ -162,22 +207,21 @@ func weatherNote(e *entry) string {
 	case course.Snow:
 		what = "Snow: the green runs slow"
 	}
-	return ufmt.Sprintf("> [!NOTE] Weather now\n> %s — for %d min %02d s more. A round keeps the weather it started in.\n\n",
+	return ufmt.Sprintf("> [!NOTE] Weather now\n> %s — for %d min %02d s more. A round keeps the weather it started in, and can be played on until the next weather is over: after that it must be Reset.\n\n",
 		what, left/60, left%60)
 }
 
-// noAdmin states a property the reader can check in a minute, and that a server
-// cannot claim at all. It is deliberately also an admission.
+// noAdmin states what the reader can check in a minute: who can change what.
+// It is deliberately also an admission.
 func noAdmin() string {
-	return "\n---\n\nEvery hole above is a realm somebody deployed, and this one has no " +
-		"administrator: no owner, no pause, no upgrade, no way to delist a course — " +
-		"not for us either. Six writes (Register, Launch, PlayRound, PlayRoundAt, PlayRoundPro, Reset), all open to anyone. " +
+	return "\n---\n\nThis realm has no administrator: no owner, no pause, no upgrade, and no way to delete a hole or a record. " +
+		"Every write (Register, Launch, PlayRound, PlayRoundAt, PlayRoundPro, Reset) is open to anyone. " +
 		"Check it yourself: " + md("the source", "/r/gnogolf/golf$source") + ".\n\n" +
-		"The other half of that: a bad course cannot be taken down. That is the " +
-		"price of the sentence above.\n\n" +
-		"One thing does change: a newer hole of the course (a realm under r/gnogolf/) " +
-		"can take an older one's place in its cup. The old one is archived, never erased: " +
-		"its records stay, it only stops counting in the course-wide ranking.\n"
+		"One party does hold a real power: whoever may publish under `r/gnogolf/`, which the chain's namespace rule decides, not this realm. " +
+		"A hole published there can take a course hole's place in its cup: the old one is archived, never erased, " +
+		"and it stops counting in the course-wide ranking. So that party can reshape the course, and with it the ranking, " +
+		"and can add course holes. It cannot touch a round, a record or a community hole.\n\n" +
+		"The other half of having no administrator: a bad community hole cannot be taken down either.\n"
 }
 
 // source links a realm path to its code on gnoweb. A player can read the
@@ -206,8 +250,12 @@ func renderHole(e *entry, focus address) string {
 	}
 	s := ufmt.Sprintf("# %s\n\n**Par %d** · %s · %s\n\n", e.name, e.par, cupName(e.world), md("Play in 3D", playLink(e)))
 	if e.next != "" {
-		s += "> [!NOTE]\n> Archived: " + md("a newer version", "/r/gnogolf/golf:"+e.next) +
-			" took this hole's place in its cup. Its records below are kept, and it can still be played, but it no longer counts in the course-wide ranking.\n\n"
+		next := e.next
+		if v := holes.Get(e.next); v != nil {
+			next = v.(*entry).name
+		}
+		s += "> [!NOTE]\n> Archived: " + md(next, "/r/gnogolf/golf:"+e.next) +
+			" took this hole's place in its cup. It can still be played, and your best here still shows on this page, but it no longer counts in the course-wide ranking.\n\n"
 	}
 	s += weatherNote(e)
 	if isTimed(e.h) {
@@ -225,19 +273,20 @@ func renderHole(e *entry, focus address) string {
 	// the one number a text player cannot read off the board: where the cup is
 	from, who := e.h.Start(), "the tee"
 	if mine != nil && !mine.done && mine.strokes > 0 {
-		from, who = mine.ball, "your ball"
+		from, who = mine.ball(), "your ball"
 	}
 	a, d := aim(from, e.h.Cup())
 	s += ufmt.Sprintf("From %s the cup is **%.0f°** away, **%.1f** units in a straight line (0° = right, 90° = down). On flat grass a power of 10 rolls about 40, a 5 about 15.\n\n", who, a, d)
 	if focus == "" {
 		s += "_After a shot, add `/<your address>` to this page's URL to see your ball and aim from it._\n\n"
 	}
-	s += "_Played from here, one shot at a time with no aim line, a round counts as **pro**: it ranks on the pro board._\n\n"
+	s += "_Rounds played here have no aim preview, so they go on the **Pro** board._\n\n"
 	s += "<gno-form exec=\"Launch\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
 	s += "<gno-input name=\"angle\" placeholder=\"angle in degrees (0 = right, 90 = down), decimals allowed\" required=\"true\" />\n"
 	s += "<gno-input name=\"power\" placeholder=\"power, above 0 and up to 10\" required=\"true\" />\n"
 	s += "</gno-form>\n\n"
+	s += ufmt.Sprintf("_After your shot, see your ball at `/r/gnogolf/golf:%s/<your address>`._\n\n", e.id)
 	s += "Holed, or want a fresh start? Put your ball back on the tee:\n\n"
 	s += "<gno-form exec=\"Reset\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
@@ -253,7 +302,7 @@ func renderHole(e *entry, focus address) string {
 				state = "**holed**"
 			}
 			// the shots are golf's own "%.4f,%.4f,%d": digits and punctuation only
-			s += ufmt.Sprintf("%d strokes, %s. Shots: `%s`\n\n", mine.strokes, state, strings.Join(mine.shots, "; "))
+			s += ufmt.Sprintf("%d strokes, %s. Shots: `%s`\n\n", mine.strokes, state, strings.ReplaceAll(mine.shots, ";", "; "))
 		}
 	}
 
@@ -291,9 +340,8 @@ func board(e *entry, f *physics.Field, focus address) string {
 	// the focused player's last flight first, on the grass: pieces drawn after
 	// it stay visible (a mole in a gap was hidden under the dots)
 	if v := e.rounds.Get(focus.String()); v != nil {
-		path := v.(*round).path
-		for j := 0; j+1 < len(path); j += 2 {
-			put(g, physics.Vec2{X: path[j], Y: path[j+1]}, '·')
+		for _, p := range lastShot(e, v.(*round)).Path {
+			put(g, p, '·')
 		}
 	}
 
@@ -337,7 +385,7 @@ func board(e *entry, f *physics.Field, focus address) string {
 
 	// only your own ball: everyone's at once would bury the board
 	if v := e.rounds.Get(focus.String()); v != nil && !v.(*round).done {
-		put(g, v.(*round).ball, '@')
+		put(g, v.(*round).ball(), '@')
 	}
 
 	s := ""
@@ -570,8 +618,12 @@ func worldRank(w string) int {
 	return 4
 }
 
-// before is the course order: world by world, then by order within one.
+// before is the list order: the course's own holes first, then world by
+// world, then by order within one.
 func before(a, b *entry) bool {
+	if a.official != b.official {
+		return a.official
+	}
 	wa, wb := worldRank(a.world), worldRank(b.world)
 	if wa != wb {
 		return wa < wb
@@ -592,9 +644,9 @@ func listed() []*entry {
 		list = append(list, v.(*entry))
 		return len(list) >= maxListed
 	}
-	holes.Iterate(official, officialEnd, add)
+	holes.Iterate(officialPrefix, officialEnd, add)
 	if len(list) < maxListed {
-		holes.Iterate("", official, add)
+		holes.Iterate("", officialPrefix, add)
 	}
 	if len(list) < maxListed {
 		holes.Iterate(officialEnd, "", add)

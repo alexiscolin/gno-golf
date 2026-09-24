@@ -1,9 +1,9 @@
+![Gnogolf: 3D mini-golf on gno.land](docs/img/banner.png)
+
 # Gnogolf
 
 A 3D mini-golf game that runs on [gno.land](https://gno.land). Every hole is a
 realm someone deployed, and the chain computes every shot.
-
-![A round of Gnogolf](media/gnogolf-demo.gif)
 
 ## Why on-chain
 
