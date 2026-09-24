@@ -10,6 +10,34 @@ import { causeAt } from "../scene/cause.js";
 import { aimAlong } from "../scene.js";
 
 export const MAX_POWER = 10;
+
+// Third person's aim: the shot flies opposite the pull, like the classic
+// slingshot, so every direction is reachable — pull straight down to shoot
+// ahead, up to shoot back at the camera, sideways to shoot across. The pull
+// (dx right, dy down, on the screen) is read in the camera frame frozen when
+// the pull began (yaw0: where the view looked), so the camera trailing the aim
+// never feeds back into it. Screen up is yaw0, screen right is yaw0 + 90°.
+// Near the start (DEAD px) the direction holds; fine (Shift) moves the aim a
+// third as far towards where the drag points; otherwise a light smoothing.
+export const DEAD = 18;
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+export function thirdAim(yaw0, dx, dy, prev, fine = false) {
+  if (Math.hypot(dx, dy) < DEAD && prev != null) return prev;
+  const want = yaw0 + Math.atan2(-dx, dy);
+  if (prev == null) return want;
+  return prev + angDiff(want, prev) * (fine ? 0.33 : 0.6);
+}
+// the self-check: the eight directions, the dead zone, the fine step
+export function demoThird() {
+  const deg = (a) => Math.round((((a * 180) / Math.PI) % 360 + 360) % 360);
+  console.assert(deg(thirdAim(0, 0, 100)) === 0, "pull down: ahead");
+  console.assert(deg(thirdAim(0, 0, -100)) === 180, "pull up: back");
+  console.assert(deg(thirdAim(0, -100, 0)) === 90, "pull left: right");
+  console.assert(deg(thirdAim(0, 100, 0)) === 270, "pull right: left");
+  console.assert(thirdAim(0, 3, 4, 1.2) === 1.2, "dead zone holds");
+  console.assert(Math.abs(thirdAim(0, 0, 100, Math.PI / 2, true) - Math.PI / 2 * 0.67) < 1e-9, "fine");
+  return "ok";
+}
 // How much the aim dots give away, by aim mode. Assisted: the chain's whole
 // path, as far as the pull is strong (2 + power × 1.6 units). Pro: no line at
 // all — the elastic and the gnome turning along it are the direction, like a

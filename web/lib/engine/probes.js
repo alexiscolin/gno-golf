@@ -72,6 +72,8 @@ export function probes(E, { cam, onHoled, fakeWeather }) {
     },
     /** ?camlog only: the radius of what the lens probe hit, counted. */
     lensWho: () => cam.lensWho,
+    /** ?camlog only: the third-person heading now, in radians (what a pull starting now is measured from). */
+    camYaw: () => cam.yaw(),
     /** ?camlog only: the pull as it stands. */
     pullState: () => ({ power: +E.shot.power.toFixed(2), deg: E.shot.deg, aiming: !!g.aiming, band: band.visible, flying: !!g.flying, strokes: g.strokes }),
     /** ?camlog only: the scene's objects: all, empty groups, drawables, matrices recomposed each frame. */

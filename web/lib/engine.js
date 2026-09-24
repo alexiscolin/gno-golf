@@ -25,7 +25,7 @@ import { BALL_R } from "./terrain.js";
 import { promo } from "./promo.js";
 import { makeCamera } from "./engine/camera.js";
 import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay.js";
-import { makeAimer, MAX_POWER } from "./engine/aim.js";
+import { makeAimer, MAX_POWER, thirdAim } from "./engine/aim.js";
 import { probes } from "./engine/probes.js";
 
 const MAX_SHOTS = 12; // the realm's limit for one committed round
@@ -699,12 +699,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     // board under a still hand, and must not turn the shot
     let dir;
     if (g.cam === "third" && press.yaw != null) {
-      // behind the gnome: the aim turns from the heading the pull started
-      // with, by the sideways drag — the screen's width is 90°, half that
-      // with Shift — while the camera trails it softly
-      dir = press.yaw - ((ev.clientX - press.baseX) / window.innerWidth) * (Math.PI / 2) * (ev.shiftKey ? 0.5 : 1);
-      press.lastX = ev.clientX;
-      press.moved = performance.now();
+      // behind the gnome: the shot opposite the pull, read in the camera frame
+      // of the pull's start (every direction reachable, the view never feeding back)
+      dir = thirdAim(press.yaw, ev.clientX - press.x, ev.clientY - press.y, press.dir, ev.shiftKey);
+      press.dir = dir;
     } else {
       const from = boardPoint(press), to = boardPoint(ev);
       if (!from || !to) return;
@@ -744,7 +742,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     shot = { angle: 0, power: 0 };
     press = { clientX: ev.clientX, clientY: ev.clientY, x: ev.clientX, y: ev.clientY };
     // third person: the heading the pull is measured from, frozen for the pull
-    if (g.cam === "third" && g.view === "ball") Object.assign(press, { yaw: cam.yaw(), baseX: ev.clientX, lastX: ev.clientX, moved: performance.now() });
+    if (g.cam === "third" && g.view === "ball") Object.assign(press, { yaw: cam.yaw(), dir: null });
     // no dots until the chain has answered for this pull
     if (aim.userData.dots) aim.userData.dots.count = 0;
     else for (const d of aim.children) d.visible = false;
