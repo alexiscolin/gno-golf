@@ -1,0 +1,41 @@
+// Package mountain6 is a long path onto a frozen lake, the cup on its far shore and two boulders out on the ice.
+package mountain6
+
+import (
+	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/physics"
+	"gno.land/r/gnogolf/golf"
+)
+
+var me = course.Fit(&course.Simple{
+	W: 64, H: 22,
+	World:     "mountain",
+	Order:     6,
+	Title:     "Frozen Lake",
+	Strokes:   3, // par
+	Tee:       physics.V(-18, 11),
+	Pin:       physics.V(35.5, 11),
+	Substeps:  26,
+	CupRadius: 1.2,
+
+	Course: &physics.Field{
+		Walls: physics.Walls(
+			physics.Outline(physics.Keyhole(-22, 6, physics.V(30, 11), 9, 6)...),
+		),
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(27, 8.2), R: 0.9}, Bounce: 0.6, Skin: "boulder"},
+			{Circle: physics.Circle{C: physics.V(31, 14.4), R: 0.9}, Bounce: 0.6, Skin: "boulder"},
+			{Circle: physics.Circle{C: physics.V(30.5, 11), R: 0.9}, Bounce: 0.6, Skin: "boulder"},
+		},
+		Zones: []physics.Zone{
+			{Kind: physics.Surface, Min: physics.V(22, 3), Max: physics.V(38, 19), Scale: 1.18, Round: true, Skin: "ice"},
+		},
+		Friction: 0.87,
+		Radius:   0.5,
+		Bounce:   0.85,
+	},
+}, 1.5)
+
+// Register publishes this hole to golf. A hole cannot do it from init(): there
+// is no `cur` there, so it takes one transaction after the deploy.
+func Register(cur realm) { golf.Register(cross(cur), me) }
