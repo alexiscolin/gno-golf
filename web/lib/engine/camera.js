@@ -110,6 +110,7 @@ export function makeCamera(E) {
   // so on a lane that doubles back the camera faces the next stretch, not
   // the cup across the rough.
   let field = null;
+  const CHAMFER = [[-1, 0, 1], [0, -1, 1], [-1, -1, Math.SQRT2], [1, -1, Math.SQRT2]]; // the neighbours already swept
   function courseField() {
     const t = g.course && g.course.userData.terrain;
     if (!t || !g.s) return null;
@@ -129,6 +130,23 @@ export function makeCamera(E) {
         dist[n] = dist[k] + 1;
         q[tail++] = n;
       }
+    }
+    // then relaxed over the diagonals too (1 and √2 a step, passes both ways):
+    // the 4-connected count alone walks a straight lane in a staircase, 45° off
+    for (let pass = 0, changed = true; pass < 24 && changed; pass++) {
+      changed = false;
+      for (const dir of [1, -1])
+        for (let j0 = 0; j0 < nz; j0++)
+          for (let i0 = 0; i0 < nx; i0++) {
+            const i = dir > 0 ? i0 : nx - 1 - i0, j = dir > 0 ? j0 : nz - 1 - j0, k = idx(i, j);
+            if (!green[k]) continue;
+            for (const [di, dj, c] of CHAMFER) {
+              const a = i + di * dir, b = j + dj * dir;
+              if (!inGrid(a, b)) continue;
+              const v = dist[idx(a, b)] + c;
+              if (v < dist[k] - 1e-6) (dist[k] = v), (changed = true);
+            }
+          }
     }
     return (field = { id: g.id, dist, idx, inGrid });
   }
@@ -155,6 +173,57 @@ export function makeCamera(E) {
     return Math.hypot(tx - x, tz - z) > 0.5 ? Math.atan2(tz - z, tx - x) : null;
   }
 
+  // The lane's own axis at (x, z): the rails beside the ball run along it.
+  // The walls within RAIL_R are averaged as axes (180° apart is the same rail
+  // direction), the nearer far more (1/d³) and the longer more; twice — first
+  // those roughly the way the course goes (the distance field's heading, which
+  // cuts a bend's corner), then those along that first axis — so an end wall
+  // across the lane or a bar in it does not count. An open board with no rail
+  // near keeps the field's heading. Never the straight line to the cup, through walls.
+  const RAIL_R = 6;
+  function railAxis(x, z, ref, minAlong) {
+    let c2 = 0, s2 = 0, wsum = 0;
+    for (const w of g.s.walls) {
+      if (w.every || !wallOn(w)) continue;
+      const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], len = Math.hypot(dx, dz);
+      if (len < 0.1) continue;
+      const d = closest(x, z, w.a, w.b).d;
+      if (d > RAIL_R) continue;
+      const th = Math.atan2(dz, dx), along = Math.cos(th - ref);
+      if (along * along < minAlong) continue;
+      const wt = (along * along * Math.min(len, 4)) / (d + 0.5) ** 3;
+      c2 += Math.cos(2 * th) * wt;
+      s2 += Math.sin(2 * th) * wt;
+      wsum += wt;
+    }
+    // no rail near, or rails that disagree
+    return !wsum || Math.hypot(c2, s2) < 0.5 * wsum ? null : Math.atan2(s2, c2) / 2;
+  }
+  function laneHeading(x, z) {
+    const a0 = aheadHeading(x, z);
+    if (a0 == null) return g.s ? Math.atan2(g.s.cup[1] - z, g.s.cup[0] - x) : 0;
+    const a1 = railAxis(x, z, a0, 0.1); // within ~72° of the field's heading
+    if (a1 == null) return a0;
+    const ax = railAxis(x, z, a1, 0.4) ?? a1; // within ~50° of that axis
+    return Math.cos(ax - a0) >= 0 ? ax : ax + Math.PI;
+  }
+
+  // Inside the board: over the green (inside the outline, never out in the
+  // scenery beyond a rail) and at least `gap` from every rail — RAIL_GAP for a
+  // spot of its own; straight behind the ball NEAR_GAP will do, with the
+  // camera then above the rail (keepInside)
+  const RAIL_GAP = 1.5, NEAR_GAP = 0.6;
+  function railGap(x, z) {
+    let d = Infinity;
+    for (const w of g.s.walls) if (wallOn(w)) d = Math.min(d, closest(x, z, w.a, w.b).d);
+    return d;
+  }
+  function inside(x, z, gap = RAIL_GAP) {
+    const t = g.course && g.course.userData.terrain;
+    if (t && !t.onGreen(x, z)) return false;
+    return railGap(x, z) >= gap;
+  }
+
   /** Third person's target, per state: 7 behind, 3 up, looking along the aim, the ball's run, or at the cup. */
   const cupPt = new THREE.Vector3();
   function thirdTarget(dt, state) {
@@ -174,9 +243,8 @@ export function makeCamera(E) {
       turning = hold > 0;
       if (!turning && vel.length() > 1.5) target = Math.atan2(vel.z, vel.x);
     } else if (state === "rest" && g.s) {
-      // where the lane leads next from here (an S or a spiral turns the camera with it), else the cup
-      const a = aheadHeading(B.x, B.z);
-      target = a != null ? a : Math.atan2(g.s.cup[1] - B.z, g.s.cup[0] - B.x);
+      // along the lane's axis here (an S or a spiral turns the camera with it)
+      target = laneHeading(B.x, B.z);
     }
     // a jump, a tunnel exit: the ball is elsewhere at once, and so is the camera
     const teleport = !fresh && B.distanceTo(prevB) > 2.5;
@@ -184,17 +252,18 @@ export function makeCamera(E) {
     prevB.copy(B);
     const d = angDiff(target, yaw);
     // coming back at the camera: rise and back off rather than spin round
-    const reversing = state === "replay" && Math.abs(d) > (2 * Math.PI) / 3;
+    // (unless the board leaves no room to back off into: then it turns round)
+    const reversing = state === "replay" && Math.abs(d) > (2 * Math.PI) / 3 && pen < 1 && squeezed < 0.25;
     if (!reversing) {
-      const step = pulling ? d * (1 - Math.exp(-dt / 0.35)) : d; // aiming: a 0.35 s trail
-      const cap = dt * (pulling ? (2 * Math.PI) / 3 : Math.PI / 2); // at most 120°/s aiming, 90°/s rolling
+      const step = pulling ? d * (1 - Math.exp(-dt / 0.14)) : d; // aiming: a 0.14 s trail (a U-turn within 15° in 0.5 s)
+      const cap = dt * (pulling ? (8 * Math.PI) / 3 : Math.PI / 2); // at most 480°/s aiming, 90°/s rolling
       yaw += Math.max(-cap, Math.min(cap, step));
     }
     const widen = turning || reversing || state === "holed" || (pulling && Math.abs(d) > Math.PI / 2);
     wide += ((widen ? 1 : 0) - wide) * (1 - Math.exp(-dt * (widen ? 5 : 1.5)));
     // behind along the heading — swung round a little if a wall right behind blocks the view
     const up = (state === "holed" ? 4.2 : 3) + wide * 2.5 + rise;
-    if (fresh || ++swingTick % 10 === 0) swingTo = clearHeading(B, 7 + wide * 4, up);
+    if (fresh || ++swingTick % 10 === 0) swingTo = clearHeading(B, 7 + wide * 4, up, pulling);
     swing += (swingTo - swing) * (1 - Math.exp(-dt * 3));
     const back = 7 + wide * 4 - pen;
     cdir.set(Math.cos(yaw + swing), 0, Math.sin(yaw + swing));
@@ -205,13 +274,15 @@ export function makeCamera(E) {
       rawPos.copy(chase.pos);
       keepClear(chase.pos, B);
       push.subVectors(chase.pos, rawPos);
-    } else chase.pos.add(push);
+    } else (chase.pos.add(push), keepInside(chase.pos, B)); // (the reused push may drift it out of the board)
+    squeezed = fresh ? squeeze : squeezed + (squeeze - squeezed) * (1 - Math.exp(-dt * 4));
     // the gnome in the lower third: look a little past it, less the steeper the view
     const hz = Math.hypot(chase.pos.x - B.x, chase.pos.z - B.z), hy = chase.pos.y - B.y;
-    chase.look.copy(B).addScaledVector(cdir, Math.max(0, 1.8 - Math.max(0, hy - hz * 0.5) * 0.4));
+    // (squeezed, steep and close: on the gnome itself, or he drops off the bottom)
+    chase.look.copy(B).addScaledVector(cdir, Math.max(0, 1.8 - Math.max(0, hy - hz * 0.5) * 0.4) * (1 - squeezed));
     want.pos.copy(chase.pos);
     want.look.copy(chase.look);
-    want.fov = TP_FOV;
+    want.fov = TP_FOV + squeezed * SQUEEZE_FOV;
     want.oy = 0;
     want.near = 0.5;
     want.far = 80; // close in: the course and its near scenery, not the far hills (fewer draws, finer depth)
@@ -241,17 +312,77 @@ export function makeCamera(E) {
     return false;
   }
 
+  // The intro glide: from the hole shown whole to the player's camera, once,
+  // on one eased path. The end pose is picked once, before it starts (the
+  // heading search runs that once; nothing leans, searches or pushes during
+  // it); the camera then orbits the gnome — its heading and its distance to
+  // him each eased from the actual pose to that one, so neither ever turns
+  // back — while the look, the lens and the view offset ease along. It starts
+  // on the frame after the one drawn when asked (the hole is built and its
+  // shaders ready: nothing is drawn before); a click or an aim finishes it in
+  // GLIDE_CUT_MS.
+  const GLIDE_MS = 1400, GLIDE_CUT_MS = 250;
+  const _v = new THREE.Vector3();
+  const glide = { on: false, wait: 0, t0: 0, cut: 0, e0: 0, off0: 0, B: new THREE.Vector3(), from: { d: 0, az: 0, el: 0, look: new THREE.Vector3(), fov: 0, oy: 0 }, to: { d: 0, az: 0, el: 0, look: new THREE.Vector3(), fov: 0, oy: 0 } };
+  const inOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const polar = (o, P, B) => {
+    const dx = P.x - B.x, dy = P.y - B.y, dz = P.z - B.z;
+    o.d = Math.hypot(dx, dy, dz) || 1e-3;
+    o.az = Math.atan2(dz, dx);
+    o.el = Math.asin(Math.max(-1, Math.min(1, dy / o.d)));
+  };
+  // this frame's glide, or -1: the share of the path done
+  function glideStep(mode, state) {
+    if (!glide.on) return -1;
+    if (!sp.live) return (glide.on = false), -1; // nothing drawn yet to glide from: the first pose is a snap
+    if (glide.wait > 0) return glide.wait--, 0; // the frame drawn as it is
+    const now = performance.now();
+    if (!glide.t0) {
+      glide.t0 = now;
+      glide.B.copy(E.ball.position);
+      polar(glide.from, sp.pos, glide.B);
+      glide.from.look.copy(sp.look);
+      glide.from.fov = sp.fov;
+      glide.from.oy = sp.oy;
+      // how far off the look the gnome starts (the whole hole's view): the
+      // look is kept that close to him at first, as close as LOOK_OFF at the end
+      _d.subVectors(sp.look, sp.pos);
+      glide.off0 = _d.angleTo(_v.subVectors(E.ball.position, sp.pos));
+      // the end pose, once
+      if (mode === "third") (resetFollow(), thirdTarget(0, state));
+      else rigTarget();
+      polar(glide.to, want.pos, glide.B);
+      glide.to.look.copy(want.look);
+      glide.to.fov = want.fov;
+      glide.to.oy = want.oy;
+    }
+    const t = Math.min(1, (now - glide.t0) / GLIDE_MS);
+    let e = inOut(t);
+    if (glide.cut) e = glide.e0 + (1 - glide.e0) * (1 - Math.pow(1 - Math.min(1, (now - glide.cut) / GLIDE_CUT_MS), 2));
+    const f = glide.from, o = glide.to, d = f.d + (o.d - f.d) * e, az = f.az + angDiff(o.az, f.az) * e, el = f.el + (o.el - f.el) * e;
+    sp.pos.set(glide.B.x + Math.cos(el) * Math.cos(az) * d, glide.B.y + Math.sin(el) * d, glide.B.z + Math.cos(el) * Math.sin(az) * d);
+    sp.look.lerpVectors(f.look, o.look, e);
+    sp.fov = f.fov + (o.fov - f.fov) * e;
+    sp.oy = f.oy + (o.oy - f.oy) * e;
+    sp.vp.set(0, 0, 0), sp.vl.set(0, 0, 0), (sp.vf = sp.vo = 0);
+    if (e >= 1 - 1e-6) (glide.on = false), (glide.t0 = glide.cut = 0);
+    return e;
+  }
+
   function updateCamera(dt) {
     if (!g.s || !g.over) return;
     const mode = g.cam === "third" && g.view === "ball" ? "third" : "rig";
     const state = camState();
-    if (mode !== lastMode) resetFollow();
+    if (mode !== lastMode && !glide.on) resetFollow();
     lastMode = mode;
-    const snap = mode === "third" ? thirdTarget(dt, state) : rigTarget();
+    const gl = glideStep(mode, state);
+    const snap = gl >= 0 ? false : mode === "third" ? thirdTarget(dt, state) : rigTarget();
     const snapped = snap || !sp.live;
     // faster in flight, a touch faster still when the ball would leave the frame
     const w = urgent ? 16 : state === "replay" ? 11 : 9;
-    if (!sp.live || snap) {
+    if (gl >= 0) {
+      // (the glide has put the pose itself)
+    } else if (!sp.live || snap) {
       sp.pos.copy(want.pos), sp.look.copy(want.look), (sp.fov = want.fov), (sp.oy = want.oy), sp.vp.set(0, 0, 0), sp.vl.set(0, 0, 0), (sp.vf = sp.vo = 0), (sp.live = true);
     } else {
       springV(sp.pos, sp.vp, want.pos, w, dt);
@@ -261,14 +392,38 @@ export function makeCamera(E) {
     }
     // a hard floor on the real pose too (the spring lags a ball rolling back
     // at the camera): never nearer than MIN_FLAT across the ground in third person
-    if (mode === "third") {
+    if (mode === "third" && gl < 0) {
       const B0 = E.ball.position, fx = sp.pos.x - B0.x, fz = sp.pos.z - B0.z, fl = Math.hypot(fx, fz);
-      if (fl < MIN_FLAT - 0.3) {
+      if (fl < MIN_FLAT - 0.3 && inside(B0.x + (fx / Math.max(fl, 1e-3)) * (MIN_FLAT - 0.3), B0.z + (fz / Math.max(fl, 1e-3)) * (MIN_FLAT - 0.3), NEAR_GAP)) {
         const k = (MIN_FLAT - 0.3) / Math.max(fl, 1e-3);
         if (fl > 1e-3) (sp.pos.x = B0.x + fx * k), (sp.pos.z = B0.z + fz * k);
         else (sp.pos.x = B0.x - cdir.x * MIN_FLAT), (sp.pos.z = B0.z - cdir.z * MIN_FLAT);
       }
-      sp.pos.y = Math.min(sp.pos.y, B0.y + Math.tan(MAX_PITCH + 0.1) * Math.max(Math.hypot(sp.pos.x - B0.x, sp.pos.z - B0.z), MIN_D));
+      sp.pos.y = Math.min(sp.pos.y, B0.y + Math.tan(MAX_PITCH + squeezed * SQUEEZE_PITCH + 0.1) * Math.max(Math.hypot(sp.pos.x - B0.x, sp.pos.z - B0.z), MIN_D));
+    }
+    // (the springs lag a target that moves: behind a ball leaving a round
+    // end that lag is out past the rail — the real pose slides back in along
+    // its line to the target, which is inside)
+    if (mode === "third" && gl < 0 && !inside(sp.pos.x, sp.pos.z, NEAR_GAP)) {
+      _d.subVectors(want.pos, sp.pos);
+      let q = 1;
+      while (q < 8 && !inside(sp.pos.x + (_d.x * q) / 8, sp.pos.z + (_d.z * q) / 8, NEAR_GAP)) q++;
+      sp.pos.addScaledVector(_d, q / 8);
+    }
+    // the gnome never off the picture: the look turned toward him when it is
+    // more than LOOK_OFF of the lens off him — the springs lagging a ball
+    // rolling back at a camera the board leaves no room to back off in, or
+    // the glide's look still on the middle of a long hole
+    if ((mode === "third" && gl < 0) || gl > 0) {
+      const lens = Math.atan(LOOK_OFF * Math.tan(((sp.fov / 2) * Math.PI) / 180));
+      const off = gl > 0 ? Math.max(lens, glide.off0) + (lens - Math.max(lens, glide.off0)) * gl : lens;
+      _d.subVectors(sp.look, sp.pos);
+      const B1 = E.ball.position, bx = B1.x - sp.pos.x, by = B1.y - sp.pos.y, bz = B1.z - sp.pos.z, bl = Math.hypot(bx, by, bz), ll = _d.length();
+      const cos = ll && bl ? (_d.x * bx + _d.y * by + _d.z * bz) / (ll * bl) : 1;
+      if (cos < Math.cos(off)) {
+        const k = 1 - Math.tan(off) / Math.tan(Math.acos(Math.max(-1, cos))); // the share of the way to him
+        sp.look.lerp(B1, Math.max(0, Math.min(1, k)));
+      }
     }
     const v = screen();
     camera.aspect = v.w / v.h;
@@ -278,7 +433,8 @@ export function makeCamera(E) {
     else camera.clearViewOffset();
     camera.fov = sp.fov;
     camera.near = Math.min(want.near, sp.pos.distanceTo(E.ball.position) * 0.5);
-    camera.far = want.far;
+    // (gliding in from the whole hole: the far plane as far as the pose needs, not the end pose's)
+    camera.far = gl >= 0 ? Math.max(want.far, sp.pos.distanceTo(sp.look) + 220) : want.far;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
     // the ball on screen and in sight: in the middle 70 %, nothing between it
@@ -294,20 +450,20 @@ export function makeCamera(E) {
     // (decor between is the canopy's to fade; a ray through the whole baked course each frame cost 3× the frame)
     const blocked = inFrame && !seen;
     // out of frame or behind a wall: the springs catch up fast until it is back in sight
-    urgent = mode === "third" && (!inFrame || blocked);
+    urgent = mode === "third" && gl < 0 && (!inFrame || blocked);
     rise = blocked ? Math.min(3, rise + dt * 12) : Math.max(0, rise - dt * 6);
     // down a cliff, into water, in a tube: hidden on purpose, and marked
     const under = g.inTube || B.y < ground(B.x, B.z) - 0.3;
     marker.visible = !seen && (under || (mode === "third" && rise >= 3));
     if (marker.visible) (marker.position.copy(B), marker.quaternion.copy(camera.quaternion));
-    settled = sp.vp.lengthSq() < 1e-4 && sp.vl.lengthSq() < 1e-4 && Math.abs(sp.vf) < 1e-3;
+    settled = !glide.on && sp.vp.lengthSq() < 1e-4 && sp.vl.lengthSq() < 1e-4 && Math.abs(sp.vf) < 1e-3;
     if (E.log) {
-      // [yaw°, distance, widening, seen, in a tube, pitch°, flat distance, gnome height (share of screen), ball ndc y, cup ndc x, state, near-wall]
+      // [yaw°, distance, widening, seen, in a tube, pitch°, flat distance, gnome height (share of screen), ball ndc y, cup ndc x, state, near-wall, in frame, snapped, ball ndc x, ms, squeezed, glide share (-1: none), camera azimuth°]
       const fl = Math.hypot(camera.position.x - B.x, camera.position.z - B.z);
       const top = ndcTop.copy(B).setY(B.y + 1.1).project(camera).y, bot = ndcBot.copy(B).setY(B.y - BALL_R).project(camera).y;
       const cupX = ndcTop.set(g.s.cup[0], B.y, g.s.cup[1]).project(camera).x;
       camLog.push([+((yaw * 180) / Math.PI).toFixed(1), +camera.position.distanceTo(B).toFixed(1), +wide.toFixed(2), seen ? 1 : 0, under ? 1 : 0,
-        +((Math.atan2(camera.position.y - B.y, fl) * 180) / Math.PI).toFixed(1), +fl.toFixed(1), +((top - bot) / 2).toFixed(3), +ndcB.y.toFixed(2), +cupX.toFixed(2), state, wallHug(camera.position) ? 1 : 0, inFrame ? 1 : 0, snapped ? 1 : 0, +ndcB.x.toFixed(2), Math.round(performance.now())]);
+        +((Math.atan2(camera.position.y - B.y, fl) * 180) / Math.PI).toFixed(1), +fl.toFixed(1), +((top - bot) / 2).toFixed(3), +ndcB.y.toFixed(2), +cupX.toFixed(2), state, wallHug(camera.position) ? 1 : 0, inFrame ? 1 : 0, snapped ? 1 : 0, +ndcB.x.toFixed(2), Math.round(performance.now()), +squeezed.toFixed(2), +gl.toFixed(3), +((Math.atan2(B.z - camera.position.z, B.x - camera.position.x) * 180) / Math.PI).toFixed(2)]);
     }
   }
   // a camera in a wall's face: within 1 of a wall and below its kerb top
@@ -320,11 +476,15 @@ export function makeCamera(E) {
 
   // The chase camera never sits in or behind a wall: the line from the ball to
   // it is tested against the hole's walls and posts, and a hit brings it in
-  // front of the wall and up over the kerb. It stays over the board, at least
-  // MIN_D from the ball and looking down at least MIN_PITCH; beside a wall it
-  // leans away from it. The chase's own easing then smooths every push.
+  // front of the wall and up over the kerb. It stays inside the board, clear
+  // of the rails, at least MIN_D from the ball and looking down at least
+  // MIN_PITCH. The chase's own easing then smooths every push.
   const TP_FOV = 58; // third person's lens (the others keep 30)
+  const LOOK_OFF = 0.55; // the gnome at most this share of the half lens off the view's centre
   const KERB = 1.1, MIN_D = 3, MIN_PITCH = (18 * Math.PI) / 180, MAX_PITCH = (40 * Math.PI) / 180;
+  const SQUEEZE_PITCH = (16 * Math.PI) / 180, SQUEEZE_FOV = 14;
+  let squeeze = 0, squeezed = 0; // how cramped the last pass found it (0..1), and that eased
+  const maxPitch = () => MAX_PITCH + squeeze * SQUEEZE_PITCH;
   /** Whether the line from B (raised by lift) to C clears the ground (from 1.5 out). */
   function lineClear(B, cx, cy, cz, lift = 0.7) {
     const L = Math.hypot(cx - B.x, cz - B.z) || 1;
@@ -383,25 +543,46 @@ export function makeCamera(E) {
   const MIN_FLAT = 4.5, REST_FLAT = 6.5;
   let flatFloor = MIN_FLAT;
   const SWINGS = [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.8, -1.8];
-  function clearHeading(B, dist, up) {
+  const B_ = new THREE.Vector3(); // clearHeading's ball, for room()
+  function clearHeading(B, dist, up, aiming = false) {
+    B_.copy(B);
     // first a heading it can look from at its own height, then one it can
     // look from by rising (up to MAX_PITCH)
     // (a tight pen: a unit closer is still the framing, and needs no climb)
-    for (const [lim, dd] of [[up, dist], [up, dist - 1], [Math.tan(MAX_PITCH) * dist, dist]])
-      for (const off of SWINGS) {
-        const a = yaw + off, cx = B.x - Math.cos(a) * dd, cz = B.z - Math.sin(a) * dd;
-        // a place off the board and its rim would be pulled in: not one to stand on
-        if (cx < -1.5 || cz < -1.5 || cx > g.s.board.w + 1.5 || cz > g.s.board.h + 1.5) continue;
+    // (straight behind first, by rising if it must: the heading is the lane's
+    // axis, or the aim; a swing only when it cannot see from there at all)
+    for (const off of SWINGS)
+      for (const [lim, dd0] of [[up, dist], [up, dist - 1], [Math.tan(MAX_PITCH) * dist, dist]]) {
+        // straight behind, the board may bring it in (keepInside: closer and
+        // higher); swung, only a spot inside the board at the distance will do
+        const r = off ? dd0 : Math.min(dd0, room(0, dd0));
+        if (r < (off ? dd0 : aiming ? 1 : 2)) continue; // (aiming, it stays behind the aim however close)
+        const dd = r, a = yaw + off, cx = B.x - Math.cos(a) * dd, cz = B.z - Math.sin(a) * dd;
+        if (off && !inside(cx, cz)) continue;
         const t = firstHit(B.x, B.z, cx, cz);
         if (t >= 1) return (pen = dist - dd), off;
         const need = (ground(B.x + (cx - B.x) * t, B.z + (cz - B.z) * t) + KERB + 0.35 - B.y) / Math.max(t, 0.05);
         if (need <= lim && t * dd >= 1) return (pen = dist - dd), off;
       }
     pen = 0;
-    return 0;
+    // nowhere to see from: cramped straight behind (a ball against an end
+    // rail) and much roomier to one side, it looks from that side instead
+    // (not while aiming: the view stays behind the aim, closer in if it must)
+    const r0 = room(0, dist);
+    if (r0 >= 3 || aiming) return 0;
+    let best = 0, br = r0;
+    for (const off of SWINGS) { const r = room(off, dist); if (r > br + 1e-6) (best = off), (br = r); }
+    return br >= 2 * r0 ? best : 0;
+  }
+  // how far behind B (along yaw + off) the board leaves inside, up to dist
+  function room(off, dist) {
+    const a = yaw + off, ux = -Math.cos(a), uz = -Math.sin(a);
+    let r = 0;
+    for (let q = 1; q <= 14; q++) if (inside(B_.x + ux * (dist * q) / 14, B_.z + uz * (dist * q) / 14, NEAR_GAP)) r = (dist * q) / 14; else break;
+    return r;
   }
   // points along every closed tube that stands off the ground (a loop zone's
-  // curve, not a thrown ball's arc), made once per hole
+  // curve, not a thrown ball's arc) or runs along it (a tunnel), made once per hole
   const TUBE_CLEAR = 2.6; // the tube's 0.6 and the lens probe's 2
   let tubeFor = null, tubeList = [];
   function tubeBits() {
@@ -409,21 +590,42 @@ export function makeCamera(E) {
     if (tubeFor === g.course) return tubeList;
     tubeFor = g.course;
     tubeList = [];
-    if (tubes) for (const [z, curve] of tubes) if (z.kind === "loop" && curve.getPointAt && !(curve.userData && curve.userData.arc) && /tube/.test(z.skin || "")) for (let k = 0; k <= 48; k++) tubeList.push(curve.getPointAt(k / 48));
+    // (and a tunnel's tube along the ground: its mouth is no place for the lens either)
+    if (tubes) for (const [z, curve] of tubes) if ((z.kind === "tunnel" || (z.kind === "loop" && /tube/.test(z.skin || ""))) && curve.getPointAt && !(curve.userData && curve.userData.arc)) for (let k = 0; k <= 48; k++) tubeList.push(curve.getPointAt(k / 48));
     return tubeList;
+  }
+  function keepInside(C, B) {
+    const ox = B.x, oz = B.z;
+    if (!inside(C.x, C.z, NEAR_GAP)) {
+      const fx = C.x - ox, fz = C.z - oz, f0 = Math.hypot(fx, fz) || 1, want = Math.hypot(f0, C.y - B.y);
+      // the farthest spot along its line to the ball that is; failing that
+      // (a ball against a rail) the farthest still over the green
+      let k = 0;
+      for (const gap of [NEAR_GAP, 0]) {
+        for (let q = 1; q <= 16 && !k; q++) if (inside(ox + (fx * (16 - q)) / 16, oz + (fz * (16 - q)) / 16, gap)) k = (16 - q) / 16;
+        if (k) break;
+      }
+      if (!k) k = 0.03; // (not even that: over the gnome himself, raised below)
+      C.x = ox + fx * k;
+      C.z = oz + fz * k;
+      const fl = f0 * k;
+      squeeze = Math.min(1, Math.max(0, (flatFloor - fl) / (flatFloor - 2)));
+      C.y = Math.max(C.y, B.y + Math.min(Math.tan(maxPitch()) * fl, Math.sqrt(Math.max(0, want * want - fl * fl))));
+    }
+    // squeezed (a tee in a round end, a corner: brought in here, or by the
+    // heading search's pen): steeper and a wider lens, up to SQUEEZE_PITCH and
+    // SQUEEZE_FOV more, so the gnome is not a close-up
+    squeeze = Math.min(1, Math.max(0, (flatFloor - Math.hypot(C.x - ox, C.z - oz)) / (flatFloor - 2)));
+    // nearer a rail than RAIL_GAP: above it
+    const railUp = railGap(C.x, C.z) < RAIL_GAP;
+    if (railUp) C.y = Math.max(C.y, ground(C.x, C.z) + KERB + 0.6);
+    return railUp;
   }
   function keepClear(C, B) {
     if (!g.s) return;
     const ox = B.x, oz = B.z;
-    // lean away from a wall close beside the ball
-    let nx = 0, nz = 0;
-    for (const w of g.s.walls) {
-      if (!wallOn(w)) continue;
-      const { x: px, z: pz, d } = closest(ox, oz, w.a, w.b);
-      if (d < 1.6 && d > 1e-3) (nx += ((ox - px) / d) * (1.6 - d)), (nz += ((oz - pz) / d) * (1.6 - d));
-    }
-    C.x += nx * 1.5;
-    C.z += nz * 1.5;
+    // (no lean away from a rail beside the ball: it turned the view off the
+    // lane's axis; keepInside keeps the camera off the rail)
     // a post (a bumper, a mushroom) is never right beside the lens: pushed out of its reach
     for (const p of g.s.posts || []) {
       const c = p.c;
@@ -431,6 +633,18 @@ export function makeCamera(E) {
       // a big one (a sandcastle) stands tall: a wider berth
       const r = (p.r || 0.5) + ((p.r || 0.5) >= 2 ? 2.6 : 1.6), dx = C.x - c[0], dz = C.z - c[1], d = Math.hypot(dx, dz);
       if (d < r && d > 1e-3) {
+        // first along its own line to the ball, nearer or further (the
+        // heading stays the lane's), the nearest spot clear of it
+        const fx = C.x - ox, fz = C.z - oz, f0 = Math.hypot(fx, fz) || 1;
+        let moved = false;
+        for (let q = 1; q <= 12 && !moved; q++)
+          for (const sgn of [-1, 1]) {
+            const f = f0 + sgn * q * 0.5;
+            if (f < 2) continue;
+            const x = ox + (fx / f0) * f, z = oz + (fz / f0) * f;
+            if (Math.hypot(x - c[0], z - c[1]) >= r && inside(x, z, NEAR_GAP)) { (C.x = x), (C.z = z), (moved = true); break; }
+          }
+        if (moved) continue;
         (C.x = c[0] + (dx / d) * r), (C.z = c[1] + (dz / d) * r);
         // pushed in towards the ball? keep the distance, round the post's far side
         const fl = Math.hypot(C.x - ox, C.z - oz);
@@ -460,12 +674,14 @@ export function makeCamera(E) {
         blocked = true;
       }
     }
-    // over the board (plus its rim): beyond it the scenery is higher than the
-    // course's own ground, and a camera out there sits in the decor
-    const W = g.s.board.w, H = g.s.board.h, RIM = 1.5;
-    const cx = Math.max(-RIM, Math.min(W + RIM, C.x)), cz = Math.max(-RIM, Math.min(H + RIM, C.z));
-    if (cx !== C.x || cz !== C.z) (C.x = cx), (C.z = cz), (C.y = Math.max(C.y, B.y + 2.5));
+    // inside the board (beyond a rail the scenery is higher than the course's
+    // own ground, and a camera out there sits in the decor, the rail jammed
+    // against the gnome): brought in along its line to the ball as far as it
+    // must, and raised to keep the framing; a ball against a rail leaves no
+    // spot clear of it, and there the camera stays above the rail instead
+    const railUp = keepInside(C, B);
     const base = ground(C.x, C.z);
+    if (railUp) C.y = Math.max(C.y, base + KERB + 0.6);
     if (blocked) C.y = Math.max(C.y, base + KERB + 1.5);
     C.y = Math.max(C.y, base + 1);
     // a rise in the ground between: the camera goes over it, not into it
@@ -479,9 +695,9 @@ export function makeCamera(E) {
     // far enough, looking down at least MIN_PITCH and at most MAX_PITCH
     const flat = Math.hypot(C.x - ox, C.z - oz);
     C.y = Math.max(C.y, B.y + Math.tan(MIN_PITCH) * flat);
-    C.y = Math.min(C.y, B.y + Math.tan(MAX_PITCH) * Math.max(flat, MIN_D));
+    C.y = Math.min(C.y, B.y + Math.tan(maxPitch()) * Math.max(flat, MIN_D));
     const d3 = Math.hypot(flat, C.y - B.y);
-    if (d3 < MIN_D) C.y = Math.min(B.y + Math.tan(MAX_PITCH) * MIN_D, B.y + Math.sqrt(Math.max(0, MIN_D * MIN_D - flat * flat)));
+    if (d3 < MIN_D) C.y = Math.min(B.y + Math.tan(maxPitch()) * MIN_D, B.y + Math.sqrt(Math.max(0, MIN_D * MIN_D - flat * flat)));
   }
 
 
@@ -492,12 +708,25 @@ export function makeCamera(E) {
     resetFollow,
     /** The next frame starts in the target pose, not eased into it (a new round). */
     jump: () => (sp.live = false),
+    /** The intro glide to the player's camera (from the next frame drawn). */
+    glide: () => Object.assign(glide, { on: true, wait: 1, t0: 0, cut: 0 }),
+    /** A click or an aim during the glide: the rest of it in GLIDE_CUT_MS. */
+    finishGlide: () => {
+      if (!glide.on || glide.cut) return;
+      if (!glide.t0) return void (glide.on = false); // not started: no glide at all
+      (glide.cut = performance.now()), (glide.e0 = inOut(Math.min(1, (glide.cut - glide.t0) / GLIDE_MS)));
+    },
+    gliding: () => glide.on,
+    /** A hole just built: what the camera reads of it, made now (no frame is drawn yet), not on the first frame that needs it. */
+    prepare: () => void courseField(),
     /** The mouse over the course (the whole-course view leans with it). */
     hover: onHover,
     yaw: () => yaw,
     settled: () => settled,
     // for the ?camlog probes
     occluded, marker, camLog, lensWho,
+    /** The lane's axis at (x, z), as the rest heading reads it. */
+    laneAt: (x, z) => laneHeading(x, z),
     inner: () => ({ swing: +swing.toFixed(2), pen, rise: +rise.toFixed(2), wide: +wide.toFixed(2), yaw: +yaw.toFixed(2) }),
   };
 }

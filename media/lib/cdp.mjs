@@ -15,18 +15,30 @@ export const APP = process.env.APP || "http://localhost:3300";
 export const RPC = process.env.RPC || "http://127.0.0.1:26757";
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Every Chrome this process started dies with it: at a normal exit, on
+// Ctrl-C or a kill, on an uncaught error, and after CDP_MAX_MS (default an
+// hour) should a run hang. A Chrome left running keeps a game page playing.
+const live = new Set();
+const killAll = () => { for (const pid of live) try { process.kill(pid); } catch {} live.clear(); };
+process.on("exit", killAll);
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => (killAll(), process.exit(130)));
+process.on("uncaughtException", (e) => (console.error(e), killAll(), process.exit(1)));
+process.on("unhandledRejection", (e) => (console.error(e), killAll(), process.exit(1)));
+setTimeout(() => (console.error("cdp: run over CDP_MAX_MS, Chrome killed"), killAll(), process.exit(2)), Number(process.env.CDP_MAX_MS || 3600e3)).unref();
+
 /**
  * A headless Chrome on about:blank, the page's viewport set: { send(method,
  * params), ev(expr) (its value, undefined if it threw), js(expr) (throws),
  * errors (the page's exceptions and console errors), kill() }.
  * dir: its profile (a fresh one by default); args: more Chrome flags.
  */
-export async function launch({ width = 1100, height = 700, mobile = false, dir = "", args = [] } = {}) {
+export async function launch({ width = 1100, height = 700, mobile = false, touch = false, dir = "", args = [] } = {}) {
   dir ||= fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-cdp-"));
   fs.mkdirSync(dir, { recursive: true });
   try { fs.unlinkSync(path.join(dir, "DevToolsActivePort")); } catch {}
   const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, "about:blank"], { stdio: "ignore" });
-  const kill = () => { try { process.kill(p.pid); } catch {} };
+  live.add(p.pid);
+  const kill = () => { try { process.kill(p.pid); } catch {} live.delete(p.pid); };
   let port;
   for (let i = 0; i < 100 && !port; i++) {
     await sleep(200);
@@ -56,6 +68,7 @@ export async function launch({ width = 1100, height = 700, mobile = false, dir =
   await send("Page.enable");
   await send("Runtime.enable");
   await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
+  if (touch) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   return { send, ev, js, errors, kill: () => { try { ws.close(); } catch {} kill(); } };
 }
 

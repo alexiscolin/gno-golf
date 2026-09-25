@@ -2,11 +2,12 @@
 // Attached to createGame()'s API only for a page opened with ?camlog (or
 // with hooks); Golf.jsx puts that game on window.__g.
 import * as THREE from "three";
+import { onAt, closest } from "../terrain.js";
 
 const ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3();
 
 /** E: the engine's live state (engine.js); cam: its camera controller. */
-export function probes(E, { cam, rp, onHoled, fakeWeather }) {
+export function probes(E, { cam, rp, placeBall, onHoled, fakeWeather }) {
   const { g, camera, scene, ground, band, publish } = E;
   return {
     /** For screenshots only (?won): the win card as if the hole was just holed. */
@@ -74,6 +75,24 @@ export function probes(E, { cam, rp, onHoled, fakeWeather }) {
     lensWho: () => cam.lensWho,
     /** ?camlog only: the third-person heading now, in radians (what a pull starting now is measured from). */
     camYaw: () => cam.yaw(),
+    gliding: () => cam.gliding(),
+    laneAt: (x, z) => cam.laneAt(x, z),
+    /** Where the camera stands against the board: over the green, how far from the nearest rail, how high over the ground. */
+    camBoard: () => {
+      const P = camera.position, t = g.course.userData.terrain;
+      let gap = Infinity;
+      for (const w of g.s.walls) if (onAt(w, Math.floor(E.clock))) gap = Math.min(gap, closest(P.x, P.z, w.a, w.b).d);
+      return { green: t.onGreen(P.x, P.z), gap: +gap.toFixed(2), up: +(P.y - ground(P.x, P.z)).toFixed(2), x: +P.x.toFixed(2), z: +P.z.toFixed(2) };
+    },
+    /** The heading the aim points (radians, as camYaw). */
+    aimAngle: () => E.shot.angle,
+    /** The ball put at (x, z) at rest, the camera starting afresh there (the rest tests). */
+    putBall(x, z) {
+      g.ball = { x, y: z };
+      placeBall();
+      cam.resetFollow();
+      cam.jump();
+    },
     /** ?camlog only: the ball's height over the ground under it now, and whether it is flying. */
     groundAt: (x, z) => ground(x, z),
     /** A chain answer's path drawn as a shot would draw it (its air flags, its causes): the flight tests. */

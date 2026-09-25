@@ -265,6 +265,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   const screen = () => ((view.w = window.innerWidth), (view.h = window.innerHeight), view);
 
 
+  // the intro's end: from the hole shown whole to the player's camera, one glide
+  // (Far is the whole hole already: nothing to glide to)
+  const intro = () => (setView(home()), g.view === "ball" && cam.glide());
   function setView(v) {
     clearTimeout(closeIn);
     g.view = v;
@@ -466,9 +469,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     warming = 0;
     g.buildMs = [Math.round(built1 - built0), Math.round(performance.now() - built1)]; // ?camlog's buildMs(): [build, compile]
     g.rig = null; // a new hole starts from its overview, not from the last one
+    cam.prepare();
     resize();
     setView("overview");
-    if (g.started) closeIn = setTimeout(() => setView(home()), OVERVIEW_MS);
+    if (g.started) closeIn = setTimeout(intro, OVERVIEW_MS);
   }
 
   // Every shader the hole can need, compiled now: the scene as it is, and the
@@ -734,6 +738,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     // one finger, one primary button: a second touch or a right-click is not a pull
     if (!ev.isPrimary || ev.button > 0) return;
     if (g.flying || g.done) return;
+    cam.finishGlide(); // the intro glide, if still on: finished now, quickly
     // a new press takes over whatever aim was held (a keyboard aim, a lost pull)
     dragging = true;
     g.aiming = true;
@@ -767,6 +772,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   canvas.setAttribute("aria-label", "Course. Arrow keys aim and set the power, Space shoots.");
   const onKey = (ev) => {
     if (g.flying || g.done || !g.s) return;
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) cam.finishGlide();
     const step = ev.shiftKey ? 1 : 4;
     if (!g.aiming && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
       g.aiming = dragging = true;
@@ -1031,7 +1037,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     /** Leave the title screen: show the hole whole, then close on the ball. */
     play() {
       g.started = true;
-      closeIn = setTimeout(() => setView(home()), OVERVIEW_MS);
+      closeIn = setTimeout(intro, OVERVIEW_MS);
     },
     /**
      * Plays a list of "angle,power" shots as a player would, pulling the
@@ -1144,6 +1150,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       // every switch starts clean: the chase state reset, a pull under way
       // dropped, and the pose eased from where the camera actually is
       cam.resetFollow();
+      cam.finishGlide();
       if (dragging) (dragging = g.aiming = false), (press = null), dropAim();
       setView(home());
     },
@@ -1184,6 +1191,6 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     },
   };
   // the test hooks, only for a page that asks for them
-  if (logCam || hooks) Object.assign(api, probes(E, { cam, rp, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }));
+  if (logCam || hooks) Object.assign(api, probes(E, { cam, rp, placeBall, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }));
   return api;
 }
