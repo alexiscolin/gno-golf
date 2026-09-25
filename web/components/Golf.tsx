@@ -820,7 +820,7 @@ export default function Golf() {
           }}
         />
       )}
-      {screen === "pick" && <Picker aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} onBack={() => {
+      {screen === "pick" && <Picker world={(s && s.world) || "garden"} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} onBack={() => {
         sound("blip");
         // leaving on a locked gnome: back to the one really chosen
         if (!unlocked(gnome)) { let saved: string | null = null; try { saved = localStorage.getItem("gnogolf.gnome"); } catch {} setGnome(saved && unlocked(saved) ? saved : "classic"); }
@@ -1370,6 +1370,8 @@ function holeLink(s: Snapshot, gnome: string) {
 }
 
 interface PickerProps {
+  /** the cup picked: the screen takes its colours */
+  world: string;
   gnome: string;
   onChange: (id: string) => void;
   onPick: () => void;
@@ -1378,7 +1380,7 @@ interface PickerProps {
   aim: Mode;
   onAim: (m: Mode) => void;
 }
-function Picker({ gnome, onChange, onPick, unlocked, onBack, aim, onAim }: PickerProps) {
+function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }: PickerProps) {
   const canvas = useRef<HTMLDivElement>(null);
   const preview = useRef<ReturnType<typeof makePreview> | null>(null);
   const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
@@ -1408,28 +1410,27 @@ function Picker({ gnome, onChange, onPick, unlocked, onBack, aim, onAim }: Picke
   const step = (d: number) => (sound("blip"), onChange(GNOMES[(i + d + GNOMES.length) % GNOMES.length].id));
 
   return (
-    <div className="screen">
+    <div className={`screen screen--pick front tint--${world}`}>
       <button className="round round--small round--back screen__back" aria-label="Back to the cups" onClick={onBack}>
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
-      <div className="screen__frame" />
       <div className="pick">
         <span className="eyebrow">Pick your gnome</span>
         <h2 className="pick__name">{skin.name}</h2>
+        <AimSetting aim={aim} onChange={onAim} compact />
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
           <div ref={canvas} className={"pick__canvas" + (unlocked(skin.id) ? "" : " pick__canvas--locked")} />
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
-        <p className="pick__line">
-          {unlocked(skin.id) ? skin.line : <>🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</>}
-        </p>
         <div className="pick__dots">
           {GNOMES.map((g) => (
             <span key={g.id} aria-current={g.id === skin.id} />
           ))}
         </div>
-        <AimSetting aim={aim} onChange={onAim} compact />
+        <p className="pick__line">
+          {unlocked(skin.id) ? skin.line : <>🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</>}
+        </p>
         <Button variant="primary" className="btn--play" onClick={() => (sound("start"), onPick())} disabled={!unlocked(skin.id)}>
           {unlocked(skin.id) ? "Choose this gnome" : "Locked"}
         </Button>
@@ -1444,13 +1445,15 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
     <div className={"aimset" + (compact ? " aimset--compact" : "")}>
       <span className="aimset__label">Aim</span>
       <Segmented label="Aim" value={aim} full={!compact} options={[["assisted", "Assisted"], ["pro", "Pro"]]} onChange={(m) => (sound("blip"), onChange(m))} />
+      {/* both lines in one cell, the other one hidden: the box keeps the longer one's size, nothing moves on a switch */}
       <small className="aimset__help">
-        {aim === "pro" ? "No aim line · ranked apart" : "Full aim line"}
-        {aim === "pro" && (
-          <span className="aimset__info" tabIndex={0} title="The mode is on your word — the chain can't see your screen." aria-label="The mode is on your word — the chain can't see your screen.">
+        <span className={aim === "pro" ? "" : "off"} aria-hidden={aim !== "pro"}>
+          {compact ? "No aim line: you read the course yourself. Ranked on its own board." : "No aim line · ranked apart"}
+          <span className="aimset__info" tabIndex={aim === "pro" ? 0 : -1} title="The mode is on your word — the chain can't see your screen." aria-label="The mode is on your word — the chain can't see your screen.">
             ⓘ
           </span>
-        )}
+        </span>
+        <span className={aim === "pro" ? "off" : ""} aria-hidden={aim === "pro"}>{compact ? "The chain previews your shot: see the whole aim line before you swing." : "Full aim line"}</span>
       </small>
     </div>
   );

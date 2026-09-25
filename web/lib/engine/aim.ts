@@ -21,9 +21,17 @@ const MAX_POWER = RULES.maxPower;
 // never feeds back into it. Screen up is yaw0, screen right is yaw0 + 90°.
 // Near the start (DEAD px) the direction holds; fine (Shift) moves the aim a
 // third as far towards where the drag points; otherwise a light smoothing.
-const DEAD = 18;
-export function thirdAim(yaw0: number, dx: number, dy: number, prev?: number | null, fine = false) {
-  if (Math.hypot(dx, dy) < DEAD && prev != null) return prev;
+// A move mostly along the pull (mx, my: the pointer's last step), in or out,
+// sets the power and leaves the direction: at a short pull a hand's slight
+// sideways drift would otherwise swing the aim more than the power changes.
+const DEAD = 18, RADIAL = 1.5;
+export function thirdAim(yaw0: number, dx: number, dy: number, prev?: number | null, fine = false, mx = 0, my = 0) {
+  const r = Math.hypot(dx, dy);
+  if (r < DEAD && prev != null) return prev;
+  if (prev != null && r > 0) {
+    const along = (mx * dx + my * dy) / r, across = (mx * dy - my * dx) / r;
+    if (Math.abs(along) > RADIAL * Math.abs(across)) return prev;
+  }
   const want = yaw0 + Math.atan2(-dx, dy);
   if (prev == null) return want;
   return prev + angDiff(want, prev) * (fine ? 0.33 : 0.6);

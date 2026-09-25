@@ -57,3 +57,17 @@ export function remember(id: string) {
     if (!e.includes(id)) localStorage.setItem("gnogolf.earned", JSON.stringify([...e, id]));
   } catch {}
 }
+
+/** Stills and no clips on the cup cards: reduced motion, a data saver or a
+ *  slow link, the Low graphics tier (or Auto on a device found slow). */
+export function stillsOnly() {
+  try {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+    const c = navigator.connection;
+    if (c && (c.saveData || /2g/.test(c.effectiveType || ""))) return true;
+    const gfx = localStorage.getItem("gnogolf.gfx");
+    return gfx === "low" || (gfx !== "high" && localStorage.getItem("gnogolf.gfx.auto") === "low");
+  } catch {
+    return true;
+  }
+}

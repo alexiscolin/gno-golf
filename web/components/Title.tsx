@@ -173,6 +173,8 @@ interface Visit {
   phase: "video" | "splash";
   p: Promise<TitleScene | null> | null; // its scene, or null
   ready: boolean;
+  /** opened by a link to a hole: the default sky alone behind the loader */
+  bare: boolean;
   kill: ReturnType<typeof setTimeout> | undefined;
   notify: () => void;
 }
@@ -249,15 +251,15 @@ function makeFilm(v: Visit) {
 }
 
 function useTitleScene(host: RefObject<HTMLDivElement | null>, film: RefObject<HTMLDivElement | null>) {
-  const [scene, setScene] = useState<{ world: string; live: boolean; phase: Visit["phase"] } | null>(null);
+  const [scene, setScene] = useState<{ world: string; live: boolean; phase: Visit["phase"]; bare: boolean } | null>(null);
   useEffect(() => {
     if (!visit) {
-      // a link to a hole (?hole=, ?cup=): the title is only its loader, so the
-      // still of that hole's cup, with nothing moving behind it
+      // a link to a hole (?hole=, ?cup=): the title is only its loader, on the
+      // default sky, with nothing behind it
       const deep = /[?&](hole|cup)=/.test(location.search);
       const world = deep ? guessWorld() : nextWorld(), live = !deep && !wantsStill(), canvas = live ? document.createElement("canvas") : null;
       if (canvas) canvas.className = "title__canvas";
-      const v: Visit = (visit = { world, canvas, video: null, phase: "splash", p: null, ready: false, kill: undefined, notify() {} });
+      const v: Visit = (visit = { world, canvas, video: null, phase: "splash", p: null, ready: false, bare: deep, kill: undefined, notify() {} });
       if (live && wantsVideo()) (v.phase = "video"), (v.video = makeFilm(v));
       if (live)
         v.p = import("@/lib/scene/title")
@@ -273,7 +275,7 @@ function useTitleScene(host: RefObject<HTMLDivElement | null>, film: RefObject<H
       if (v.phase === "video" && v.video.el.currentSrc && v.video.el.paused) v.video.el.play().catch(v.video.end);
     }
     let on = true;
-    const show = () => on && setScene({ world: v.world, live: v.ready, phase: v.phase });
+    const show = () => on && setScene({ world: v.world, live: v.ready, phase: v.phase, bare: v.bare });
     v.notify = show;
     show();
     if (v.p) void v.p.then((t) => {
@@ -331,7 +333,7 @@ export default function Title({ onStart, loading = false, world: given }: { onSt
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, [ready, onStart]);
-  const sw = scene ? scene.world : null, playing = scene && scene.phase === "video";
+  const sw = scene && !scene.bare ? scene.world : null, playing = scene && scene.phase === "video";
   return (
     <div className={"screen screen--title" + (sw ? ` tsky--${sw}` : "") + (ready ? " screen--ready" : "")} onClick={ready ? start : undefined}>
       <div className="title__sky" aria-hidden="true" />

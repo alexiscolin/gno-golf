@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { HoleRow } from "@/lib/types";
 import type { Cup, CupTotal, cupTotals } from "@/lib/card";
 import { sound } from "@/lib/feel";
+import { stillsOnly } from "@/lib/prefs";
 import { Green } from "@/components/Title";
 import "@/app/title.css";
 
-// The world screen, between the title and the course: one emblem per world,
-// drawn like a cup to win, and the builder to come. A world with no holes on
-// this chain yet is shown, but cannot be picked.
+// The world screen, between the title and the course: one card per world,
+// drawn like a cup to win, and the builder to come under them. A world with
+// no holes on this chain yet is shown, but cannot be picked.
 
 export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
   { id: "garden", name: "Garden Cup", tag: "Mushrooms, ponds and mountains" },
@@ -112,16 +113,43 @@ export function Emblem({ id }: { id: string }) {
   );
 }
 
-// the hover tilt: the card leans toward the pointer, its diorama shifts the
-// other way and the gloss follows (a mouse only; nothing under reduced motion: see title.css)
-const tilt = (e: PointerEvent<HTMLElement>) => {
-  if (e.pointerType !== "mouse") return;
-  const el = e.currentTarget, r = el.getBoundingClientRect();
-  const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-  for (const [k, v] of [["--rx", `${(x * 14).toFixed(1)}deg`], ["--ry", `${(-y * 10).toFixed(1)}deg`], ["--px", x.toFixed(2)], ["--py", y.toFixed(2)], ["--mx", `${Math.round((x + 0.5) * 100)}%`]])
-    el.style.setProperty(k, v);
-};
-const untilt = (e: PointerEvent<HTMLElement>) => ["--rx", "--ry", "--px", "--py", "--mx"].forEach((k) => e.currentTarget.style.removeProperty(k));
+// the best first: AV1, then VP9 (640x480), then H.264 (480x360): each ~150 KB, 10.5 s, 24 fps
+const CLIP = [
+  ["av1.webm", 'video/webm; codecs="av01.0.04M.08"'],
+  ["vp9.webm", 'video/webm; codecs="vp9"'],
+  ["mp4", 'video/mp4; codecs="avc1.640028"'],
+];
+
+/**
+ * A card's diorama: its still (baked by the title's own
+ * scene), and under the pointer or the focus its clip, four of its
+ * holes round and round (rendered by the promo renderer). Its first frame is
+ * the still, so it takes over without a jump. Nothing is fetched before the
+ * first hover; it stops and rewinds when left. Reduced motion, a data saver
+ * and the Low tier keep the still.
+ */
+function Diorama({ id, on }: { id: Cup; on: boolean }) {
+  const v = useRef<HTMLVideoElement>(null);
+  const [armed, setArmed] = useState(false); // the clip is in the page, once asked for
+  const [playing, setPlaying] = useState(false);
+  if (on && !armed && !stillsOnly()) setArmed(true);
+  useEffect(() => {
+    const el = v.current;
+    if (!el) return;
+    if (on) el.play().catch(() => {});
+    else (el.pause(), (el.currentTime = 0));
+  }, [on, armed]);
+  return (
+    <span className="world__art">
+      <img src={`title/cup-${id}.webp`} alt="" width="480" height="360" loading="eager" />
+      {armed && (
+        <video ref={v} className={"world__clip" + (on && playing ? " world__clip--on" : "")} muted loop playsInline preload="none" disablePictureInPicture aria-hidden="true" onPlaying={() => setPlaying(true)}>
+          {CLIP.map(([ext, type]) => <source key={ext} src={`title/cup-${id}.${ext}`} type={type} />)}
+        </video>
+      )}
+    </span>
+  );
+}
 
 interface WorldsProps {
   counts?: Record<string, number>;
@@ -150,13 +178,15 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
     setResets(false);
   };
   return (
-    <div className={`screen worlds worlds--v2 worlds--${hot || current || "garden"}`}>
+    <div className={`screen worlds worlds--v2 front tint--${hot || current || "garden"}`}>
       <button className="round round--small round--back screen__back" aria-label="Back to the title" onClick={() => (sound("blip"), onBack())}>
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
       <div className="worlds__in">
-        <span className="eyebrow">Choose your cup</span>
-        <h2 className="worlds__title">Where do we play?</h2>
+        <div className="front__head">
+          <span className="eyebrow">Choose your cup</span>
+          <h2 className="worlds__title">Where do we play?</h2>
+        </div>
         {played.length > 0 && (
           <div className="resets">
             <button className="world__reset" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>
@@ -185,18 +215,17 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             return (
               <li key={w.id}>
                 <button
-                  className={`world world--${w.id}` + (w.id === current ? " world--on" : "")}
+                  className={`world world--${w.id} tint--${w.id}` + (w.id === current ? " world--on" : "")}
                   disabled={!n}
                   onClick={() => (sound("select"), onPick(w.id))}
-                  onPointerEnter={() => n && setHot(w.id)}
-                  onPointerMove={tilt}
-                  onPointerLeave={(e) => (untilt(e), setHot(null))}
-                  onFocus={() => setHot(w.id)}
+                  // a mouse's hover (a tap goes straight in) or the keyboard's focus
+                  onPointerEnter={(e) => n && e.pointerType === "mouse" && setHot(w.id)}
+                  onPointerLeave={() => setHot(null)}
+                  onFocus={() => n && setHot(w.id)}
                   onBlur={() => setHot(null)}
                   aria-label={`${w.name}: ${n ? `${n} holes` + (t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
                 >
-                  {/* its world in 3D, baked by the title's own scene */}
-                  <span className="world__art"><img src={`title/cup-${w.id}.webp`} alt="" width="480" height="360" loading="eager" /></span>
+                  <Diorama id={w.id} on={hot === w.id && n > 0} />
                   <span className="world__ribbon">{w.name}</span>
                   <span className="world__info">
                   <span className="world__tag">{w.tag}</span>
@@ -219,17 +248,14 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
               </li>
             );
           })}
-          <li>
-            <button className="world world--build" disabled aria-label="Builder: coming soon">
-              <Emblem id="build" />
-              <span className="world__ribbon">Builder</span>
-              <span className="world__info">
-                <span className="world__tag">Draw your own hole, dare the others</span>
-                <span className="world__count">Coming soon</span>
-              </span>
-            </button>
-          </li>
         </ul>
+        {/* another game to come: a tab of its own under the cups, kept small */}
+        <p className="builder">
+          <Emblem id="build" />
+          <b>Builder</b>
+          <span className="builder__tag">Draw your own hole, dare the others</span>
+          <span className="builder__soon">Coming soon</span>
+        </p>
         {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
         {community.length > 0 && (
           <section className="community" aria-label="Community holes">
