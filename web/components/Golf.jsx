@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createGame } from "@/lib/engine";
 import { GNOMES, makePreview } from "@/lib/scene";
-import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint } from "@/lib/chain";
+import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, REALM_PATH } from "@/lib/chain";
 import { hasAdena, connect, current, onOurNode, recordRound, splitRound, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
@@ -11,7 +11,7 @@ import Weather from "@/components/Weather";
 import Share from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
-import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, medalOf, parOf, UNLOCKS, cupHasGnome, cupOf } from "@/lib/card";
+import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, medalOf, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -30,9 +30,10 @@ function useConfig() {
     setCfg({
       rpc: safeEndpoint(p.get("rpc"), process.env.NEXT_PUBLIC_RPC || DEFAULT_RPC),
       web: safeEndpoint(p.get("web"), process.env.NEXT_PUBLIC_WEB || DEFAULT_WEB),
-      // a link to a hole: ?cup=island&hole=3 (its place in the cup), or the
-      // old ?hole=gno.land/r/… realm id; &gnome= the sharer's gnome
-      hole: /^gno\.land\//.test(p.get("hole") || "") ? p.get("hole") : "",
+      // a link to a hole: ?cup=island&hole=3 (its place in the cup), or its
+      // id (?hole=garden/7/v2, a slot's current version ?hole=garden/7, a
+      // community or realm hole's id); &gnome= the sharer's gnome
+      hole: isHoleId(p.get("hole") || "") ? p.get("hole") : "",
       cup: /^[a-z]{2,16}$/.test(p.get("cup") || "") ? p.get("cup") : "",
       place: /^\d{1,3}$/.test(p.get("hole") || "") ? Number(p.get("hole")) : 0,
       gnome: /^[a-z]{2,16}$/.test(p.get("gnome") || "") ? p.get("gnome") : "",
@@ -675,7 +676,7 @@ export default function Golf() {
       setScreen(sc);
       if (sc === "play" && game.current) {
         const cup = p.get("cup"), hv = p.get("hole") || "";
-        const h = game.current.find && game.current.find(/^gno\.land\//.test(hv) ? { id: hv } : { cup, n: Number(hv) });
+        const h = game.current.find && game.current.find(isHoleId(hv) ? { id: hv } : { cup, n: Number(hv) });
         if (h && h !== (game.current.current && game.current.current())) goToRef.current(h);
       }
     };
@@ -690,7 +691,7 @@ export default function Golf() {
   holedRef.current = (id, strokes) => {
     const list = (s && s.allHoles) || [];
     const before = cupTotals(loadCard(), list);
-    const next = recordScore(id, strokes);
+    const next = recordScore(cardKey(list.find((h) => h.id === id) || { id }), strokes);
     const after = cupTotals(next, list);
     setCard(next);
     setFresh(GNOMES.filter((gn) => gn.unlock && UNLOCKS[gn.unlock] && !UNLOCKS[gn.unlock].ok(before) && UNLOCKS[gn.unlock].ok(after)));
@@ -716,7 +717,7 @@ export default function Golf() {
           counts={s.worlds}
           stats={cups}
           onResetAll={() => setCard(clearCard())}
-          onReset={(w) => setCard(clearCup(allList.filter((h) => cupOf(h) === w).map((h) => h.id)))}
+          onReset={(w) => setCard(clearCup(allList.filter((h) => cupOf(h) === w).map(cardKey)))}
           current={s.world}
           onBack={() => setScreen("title")}
           community={s.community}
@@ -864,7 +865,7 @@ export default function Golf() {
                       <span className="tile__num">{holeNumber(s.holes, h.id)}</span>
                       <span className="tile__name">{h.name}</span>
                       <span className="tile__best">
-                        {card[h.id] ? <b>{card[h.id]}</b> : "–"} / par {parOf(h)}
+                        {scoreOf(card, h) ? <b>{scoreOf(card, h)}</b> : "–"} / par {parOf(h)}
                       </span>
                     </button>
                   ))}
@@ -1093,7 +1094,7 @@ export default function Golf() {
               <p>{TEXT[1]}</p>
               {fatal && (kind === "down" || kind === "empty") && <Retry onRetry={() => (setFatal(null), setBoot((b) => b + 1))} />}
               {kind === "webgl" && cfg && (
-                <p><a href={`${cfg.web}/r/gnogolf/golf`} target="_blank" rel="noopener noreferrer">Play it as text on gno.land ↗</a></p>
+                <p><a href={`${cfg.web}${REALM_PATH}`} target="_blank" rel="noopener noreferrer">Play it as text on gno.land ↗</a></p>
               )}
               {kind !== "limit" && (
                 <details className="details">
@@ -1502,7 +1503,7 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }) 
             <tr>
               <th>Score</th>
               {row.map((h) => {
-                const sc = card[h.id];
+                const sc = scoreOf(card, h);
                 const par = parOf(h);
                 const kind = !sc ? "" : sc === 1 ? "ace" : sc < par ? "under" : sc === par ? "par" : "over";
                 return (
@@ -1583,7 +1584,7 @@ function Standings({ s, card, chain, me, mode = "assisted" }) {
   const t = totals(card, s.holes);
   const vs = t.strokes - t.par;
   const at = s.holes.findIndex((h) => h.id === s.id);
-  const next = s.holes.find((h, i) => i > at && !card[h.id]) || s.holes.find((h) => !card[h.id]);
+  const next = s.holes.find((h, i) => i > at && !scoreOf(card, h)) || s.holes.find((h) => !scoreOf(card, h));
   return (
     <section className="cup" aria-label={`${cup.name} standings`}>
       <header className="cup__head">
@@ -1600,7 +1601,7 @@ function Standings({ s, card, chain, me, mode = "assisted" }) {
       </header>
       <ol className="cup__track">
         {s.holes.map((h, i) => {
-          const sc = card[h.id], medal = medalOf(sc, parOf(h));
+          const sc = scoreOf(card, h), medal = medalOf(sc, parOf(h));
           return (
             <li
               key={h.id}

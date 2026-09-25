@@ -1,6 +1,7 @@
 package golf
 
 import (
+	"strconv"
 	"time"
 
 	"gno.land/p/gnogolf/course"
@@ -19,21 +20,26 @@ const PeriodSeconds = 5 * 60
 // Period is the weather period of the chain's current block time.
 func Period() int64 { return time.Now().Unix() / PeriodSeconds }
 
-// weatherOf is the hole's weather in a period.
-func weatherOf(e *entry, period int64) course.Forecast {
-	return course.ForecastFor(e.id, e.world, e.h, period)
+// weatherOf is the hole's weather in a period: seeded by its id, so each
+// version of a slot has weather of its own.
+func weatherOf(e *entry, h course.Hole, period int64) course.Forecast {
+	return course.ForecastFor(e.id, e.world, h, period)
 }
 
-func forecastJSON(f course.Forecast) string {
-	return ufmt.Sprintf(`{"period":%d,"kind":`, f.Period) + jstr(f.Kind) +
-		`,"wind":` + jvec(f.Wind) + `,"zones":` + zonesJSON(f.Zones) + "}"
+// forecastJSON is a forecast as an object, head its first fields if any
+// (as `"version":1,`). A weather zone's air and capped are not printed: the
+// wind is always both, and no other weather zone is either.
+func forecastJSON(head string, f course.Forecast) string {
+	return "{" + head + `"period":` + strconv.FormatInt(f.Period, 10) + `,"kind":` + jstr(f.Kind) +
+		`,"wind":` + jvec(f.Wind) + `,"zones":` + zonesJSON(f.Zones, false) + "}"
 }
 
 // Weather is a hole's weather in a period, as the zones a client draws and
 // the chain plays under. Read-only.
 func Weather(hole string, period int64) string {
 	notAhead(period)
-	return "{" + versionJSON + "," + forecastJSON(weatherOf(mustHole(hole), period))[1:]
+	e := readHole(hole)
+	return forecastJSON(versionJSON+",", weatherOf(e, e.hole(), period))
 }
 
 // notAhead refuses a period still to come: the hub does not serve the

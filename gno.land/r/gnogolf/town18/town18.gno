@@ -30,8 +30,8 @@ var me = course.Fit(&course.Simple{
 
 	// pigeons on the paving: one on each route, never both at once
 	Pulses: []course.Pulse{
-		{Every: 2, On: 1, Offset: 0, Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(45, 11), R: 0.6}, Bounce: 0.6, Skin: "pigeon"}}},
-		{Every: 2, On: 1, Offset: 1, Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(47, 31), R: 0.6}, Bounce: 0.6, Skin: "pigeon"}}},
+		{Every: 2, On: 1, Phase: 0, Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(45, 11), R: 0.6}, Bounce: 0.6, Skin: "pigeon"}}},
+		{Every: 2, On: 1, Phase: 1, Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(47, 31), R: 0.6}, Bounce: 0.6, Skin: "pigeon"}}},
 	},
 
 	Course: &physics.Field{
@@ -67,6 +67,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

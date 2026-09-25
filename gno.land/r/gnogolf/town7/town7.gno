@@ -1,5 +1,5 @@
-// Package town7 is a lane the canal cuts in two, with a narrow bridge the only dry way over
-// and street lamps on the far bank.
+// Package town7 is a lane the canal cuts in two, with a narrow bridge the only
+// dry way over and street lamps on the far bank.
 package town7
 
 import (
@@ -41,6 +41,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

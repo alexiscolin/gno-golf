@@ -21,7 +21,7 @@ import (
 //	posts  : n u16 · per post: Cx Cy R Bounce f64, Mark i32, Skin u16
 //	zones  : n u16 · per zone: Kind u8, flags u8 (Round|Outside|Air|Capped), Min Max Vec f64×6,
 //	         Scale f64, Mark i32, Skin u16, Every/On/Phase i32, npoly u16, poly f64×2n
-//	pulses : n u8 · per pulse: Every/On/Offset i32, then walls (no lengths), posts, zones
+//	pulses : n u8 · per pulse: Every/On/Phase i32, then walls (no lengths), posts, zones
 //
 // A pulse's walls carry no lengths: they are a stroke's extras, and Step
 // works theirs out itself.
@@ -107,7 +107,7 @@ func Encode(h *Simple) string {
 	for _, p := range h.Pulses {
 		e.i32(p.Every)
 		e.i32(p.On)
-		e.i32(p.Offset)
+		e.i32(p.Phase)
 		e.walls(p.Walls, skins, f.Radius, false)
 		e.posts(p.Posts, skins)
 		e.zones(p.Zones, skins)
@@ -300,8 +300,8 @@ func Decode(s string) (*Simple, error) {
 	}
 	for i := range h.Pulses {
 		p := &h.Pulses[i]
-		p.Every, p.On, p.Offset = d.i32(), d.i32(), d.i32()
-		if !timing(p.Every, p.On, p.Offset) {
+		p.Every, p.On, p.Phase = d.i32(), d.i32(), d.i32()
+		if !timing(p.Every, p.On, p.Phase) {
 			d.fail("a pulse's timing is out of bounds")
 		}
 		p.Walls, _ = d.walls(false)
@@ -454,7 +454,7 @@ func (d *decoder) skin() string {
 
 func bounce(b float64) bool { return b >= 0 && b <= 1.5 }
 
-// timing is the bounds of Every/On/Phase (or a pulse's Offset): untimed is
+// timing is the bounds of Every/On/Phase (a pulse's too): untimed is
 // all zeros; timed, on at most every and phase below it.
 func timing(every, on, phase int) bool {
 	if every == 0 {

@@ -1,5 +1,5 @@
 // Package island10 is a boardwalk over the lagoon with two planks missing:
-// one on the near half of the walk, one on the far half of the next stretch.
+// one on the near half of the walk, one on the far half of the last stretch.
 // A gap is the lagoon, and the lagoon sends you back to the start; thread the
 // sound boards between them, and round the crab asleep where the walk turns.
 package island10
@@ -30,7 +30,7 @@ var me = course.Fit(&course.Simple{
 			{Circle: physics.Circle{C: physics.V(24, 7), R: 0.6}, Bounce: 0.8, Skin: "crab"},
 		},
 		Zones: []physics.Zone{
-			// the missing planks: the low half of the first stretch, the high half of the last
+			// the missing planks: the top half (on screen) of the first stretch, the bottom half of the last
 			{Kind: physics.Hazard, Min: physics.V(13, 1.5), Max: physics.V(16, 5.2), Vec: physics.V(5, 5), Mark: '~', Skin: "gap"},
 			{Kind: physics.Hazard, Min: physics.V(34, 9.8), Max: physics.V(37, 13.5), Vec: physics.V(5, 5), Mark: '~', Skin: "gap"},
 		},
@@ -40,6 +40,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

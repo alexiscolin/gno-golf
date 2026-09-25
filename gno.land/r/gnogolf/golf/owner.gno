@@ -5,10 +5,13 @@ import (
 	"chain/runtime"
 	"chain/runtime/unsafe"
 	"strings"
+
+	"gno.land/p/nt/avl/v0"
 )
 
 // The course's owner: whoever deployed golf, captured once at init. It is the
-// only party golf itself gives a power to, and every check of it is by the
+// only party golf itself gives a power to (Publish, Expect, and handing the
+// role on), and every check of it is by the
 // immediate caller (cur.Previous().Address()), never by the transaction's
 // signer, so a realm the owner calls cannot act in their name.
 //
@@ -75,7 +78,25 @@ func Accept(cur realm) {
 	}
 	from := owner
 	owner, pending = caller, ""
+	expected = avl.NewTree() // the old owner's leave goes with them
 	chain.Emit("owner_changed", "from", from.String(), "to", owner.String())
+}
+
+// Expect lets one realm under golf's own namespace register a hole, once:
+// nobody else's realm there is taken for the course's (see Register). Such a
+// hole is a community hole like any other; the course is the owner's data.
+func Expect(cur realm, pkgpath string) {
+	if !isOwner(cur.Previous().Address()) {
+		panic("golf: only the owner can expect a realm under the course's namespace")
+	}
+	if !strings.HasPrefix(pkgpath, officialPrefix) || pkgpath == self {
+		panic("golf: only a realm under " + officialPrefix + " needs expecting: " + pkgpath)
+	}
+	if find(pkgpath) != nil {
+		panic("golf: already registered: " + pkgpath)
+	}
+	expected.Set(pkgpath, true)
+	chain.Emit("hole_expected", "id", pkgpath)
 }
 
 // Renounce gives the role up for good: no owner, no offer, and none possible.
@@ -85,5 +106,6 @@ func Renounce(cur realm) {
 	}
 	from := owner
 	owner, pending = "", ""
+	expected = avl.NewTree()
 	chain.Emit("owner_renounced", "from", from.String())
 }

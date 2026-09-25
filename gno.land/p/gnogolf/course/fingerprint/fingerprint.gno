@@ -3,7 +3,7 @@
 // own test checks it (fingerprint.Check(t, me, "…")), so a change to the
 // physics, the weather or the hole shows up as the list of holes it moves.
 //
-// It is for tests only; nothing on chain calls it.
+// It is for tests only: nothing on chain calls it, and it is never deployed.
 package fingerprint
 
 import (
@@ -11,7 +11,6 @@ import (
 	"encoding/hex"
 	"math"
 	"strconv"
-	"testing"
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
@@ -44,10 +43,19 @@ func Of(h *course.Simple) string {
 	}
 	zones(rain)
 	zones(wind)
+	// A hole with no pulse and nothing timed plays stroke 1 at tick 5 as it
+	// plays stroke 0 at tick 0 (these weathers are untimed): its bytes are
+	// worked out once and hashed twice, the same input either way.
+	still := !h.Varies() && !timed(h.Course)
 	for _, weather := range [][]physics.Zone{nil, rain, wind} {
 		for a := 0; a < 360; a += 15 {
 			for _, pw := range []float64{3, 6.5, 10} {
+				from := len(b)
 				for stroke := 0; stroke < 2; stroke++ {
+					if still && stroke == 1 {
+						b = append(b, b[from:]...)
+						break
+					}
 					sh, holed := h.PreviewWith(h.Tee, float64(a)*math.Pi/180, pw, stroke, 5*stroke, weather)
 					for i, p := range sh.Path {
 						num(p.X)
@@ -68,6 +76,21 @@ func Of(h *course.Simple) string {
 	}
 	s := sha256.Sum256(b)
 	return hex.EncodeToString(s[:8])
+}
+
+// timed is whether any wall or zone of a field comes and goes within a stroke.
+func timed(f *physics.Field) bool {
+	for _, w := range f.Walls {
+		if w.Every > 0 {
+			return true
+		}
+	}
+	for _, z := range f.Zones {
+		if z.Every > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Full is the fingerprint of what Of does not see: every piece's kind,
@@ -145,7 +168,7 @@ func Full(h *course.Simple) string {
 	for _, p := range h.Pulses {
 		whole(p.Every)
 		whole(p.On)
-		whole(p.Offset)
+		whole(p.Phase)
 		pieces(p.Walls, p.Posts, p.Zones)
 		if p.Every > every {
 			every = p.Every
@@ -168,6 +191,15 @@ func Full(h *course.Simple) string {
 	return hex.EncodeToString(s[:8])
 }
 
+// T is what Check needs of a test: *testing.T is one. The package takes it
+// rather than importing testing, which only a test file may.
+type T interface {
+	Logf(format string, args ...any)
+	Errorf(format string, args ...any)
+	Fatalf(format string, args ...any)
+	Fatal(args ...any)
+}
+
 // Check fails the test when the hole's fingerprint is not want, and prints
 // the new one: after a change to the game that is meant, paste it in.
 //
@@ -175,11 +207,14 @@ func Full(h *course.Simple) string {
 // by field (course.Diff, the prep included), encode back to the same bytes,
 // play the same shots (Of, the same want) and have the same Full. Then it
 // logs the data, for scripts/holedata.sh: "data <slot> <sha8> <hex>".
-func Check(t *testing.T, h *course.Simple, want string) {
+//
+// A commit that moves a hole's fingerprint says, for each hole it moves, why
+// (as "hole20: seesaw pivot, par 3").
+func Check(t T, h *course.Simple, want string) {
 	got := Of(h)
 	t.Logf("fingerprint %s", got)
 	if got != want {
-		t.Errorf("fingerprint %s, want %s: this change moves the hole's shots", got, want)
+		t.Errorf("fingerprint %s, want %s: this change moves the hole's shots (paste the new one in, and say why in the commit)", got, want)
 	}
 	data := course.Encode(h)
 	d, err := course.Decode(data)

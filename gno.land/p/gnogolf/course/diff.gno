@@ -47,7 +47,7 @@ func Diff(a, b *Simple) string {
 			k := "Pulses[" + strconv.Itoa(i) + "]."
 			c.whole(k+"Every", p.Every, q.Every)
 			c.whole(k+"On", p.On, q.On)
-			c.whole(k+"Offset", p.Offset, q.Offset)
+			c.whole(k+"Phase", p.Phase, q.Phase)
 			c.walls(k+"Walls", p.Walls, q.Walls)
 			c.posts(k+"Posts", p.Posts, q.Posts)
 			c.zones(k+"Zones", p.Zones, q.Zones)

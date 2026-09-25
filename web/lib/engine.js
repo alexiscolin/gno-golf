@@ -16,7 +16,7 @@ import { makeWeather } from "./scene/weather.js";
 import { makeCauses } from "./scene/cause.js";
 import { loadWorld } from "./scene/worlds.js";
 import { makeChain, shotOf, pullShot } from "./chain.js";
-import { cupOf } from "./card.js";
+import { cupOf, legacyOf, oldToSlot } from "./card.js";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
   courseBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
@@ -155,7 +155,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       worlds: perList().worlds,
       id: g.id,
       name: g.s ? g.s.name : "",
-      // a hole's id is its realm's path: the code a player can read
+      // a realm hole's code, a data hole's data: what a player can read
       source: g.s ? chain.sourceURL(g.id) : "#",
       official: !g.s || g.s.official !== false, // one of the course's holes (a community hole is not)
       community: g.community || NONE, // everyone else's holes, playable outside the cups
@@ -459,7 +459,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     const built0 = performance.now();
     let course = null;
     try {
-      course = buildHole(g.s, { defer: true });
+      course = buildHole(decorOf(g.s), { defer: true });
       await new Promise((r) => setTimeout(r, 0)); // the pieces, then (next task) their merge
       if (ticket !== loads || !alive) return void disposeCourse(course);
       finishHole(course);
@@ -1011,6 +1011,12 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   // ----------------------------------------------------------------- boot
 
+  /** The hole as the scene dresses it. Its decor (the theme, the time of
+   *  day, every seeded layout) is keyed by the hole's name for the scene: a
+   *  course hole that was a realm keeps that realm's, so it looks as it
+   *  always did, and any data hole keeps its slot's through its versions. */
+  const decorOf = (s) => ({ ...s, hole: legacyOf(s.slot) || s.slot || s.hole });
+
   /** hole2 before hole10: the registry is keyed lexicographically, a menu is not. */
   // the chain gives each hole its world and its place in it; an older realm
   // gives neither, and the number in the id orders them
@@ -1031,7 +1037,12 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
    */
   function linked(link) {
     if (!link || !g.list) return null;
-    if (link.id) return (g.all || g.list).find((h) => h.id === link.id) || null; // an archived hole too, by its id
+    // an archived hole too, by its id; an alias (a slot, "<address>/<slug>")
+    // is its current version, and so is a course hole's old realm id
+    if (link.id) {
+      const all = g.all || g.list, alias = oldToSlot(link.id) || link.id;
+      return all.find((h) => h.id === link.id) || all.find((h) => h.slot === alias && !h.next) || null;
+    }
     if (!link.cup || !link.n) return null;
     const cup = g.list.filter((h) => cupOf(h) === link.cup);
     return cup.find((h) => Math.round(h.order) === link.n) || cup[link.n - 1] || null;

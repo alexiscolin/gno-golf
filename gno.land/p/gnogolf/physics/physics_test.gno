@@ -81,13 +81,6 @@ func TestBarStopsABallRollingAlongIt(t *testing.T) {
 	}
 }
 
-func TestReflectFlipsTheNormalComponent(t *testing.T) {
-	got := Reflect(Vec2{1, -1}, Vec2{0, 1})
-	if math.Abs(got.X-1) > 1e-9 || math.Abs(got.Y-1) > 1e-9 {
-		t.Fatalf("want {1 1}, got %v", got)
-	}
-}
-
 // A round ball stops with its edge on the wall: its centre never gets closer
 // than the radius, whether the wall is the box or a free-standing bar.
 func TestRoundBallKeepsItsRadiusFromWalls(t *testing.T) {

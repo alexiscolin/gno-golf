@@ -1,6 +1,7 @@
-// Package mountain16 is a long downhill run with the cup on a landing halfway: too hard and you run to the bottom, by the cliff edge, and must come back up. An avalanche comes
-// down across the run above the landing every other stroke, the first one
-// included: lay up above it, then run down to the cup.
+// Package mountain16 is a long downhill run with the cup on a landing halfway:
+// too hard and you run to the bottom, by the cliff edge, and must come back
+// up. An avalanche comes down across the run above the landing every other
+// stroke, the first one included: lay up above it, then run down to the cup.
 package mountain16
 
 import (
@@ -23,8 +24,8 @@ var me = course.Fit(&course.Simple{
 	// an avalanche heap across the run above the landing on your first
 	// stroke (and every other one), its warning there on the strokes between
 	Pulses: []course.Pulse{
-		{Every: 2, On: 1, Offset: 0, Walls: physics.Walls(physics.Soft(physics.Bar(physics.V(19.6, 3.2), physics.V(20.4, 10.8), 1.4, '#', "avalanche"), 0.3))},
-		{Every: 2, On: 1, Offset: 1, Zones: []physics.Zone{{Kind: physics.Slope, Min: physics.V(19, 3.6), Max: physics.V(21, 10.4), Skin: "avalanche-warn"}}},
+		{Every: 2, On: 1, Phase: 0, Walls: physics.Walls(physics.Soft(physics.Bar(physics.V(19.6, 3.2), physics.V(20.4, 10.8), 1.4, '#', "avalanche"), 0.3))},
+		{Every: 2, On: 1, Phase: 1, Zones: []physics.Zone{{Kind: physics.Slope, Min: physics.V(19, 3.6), Max: physics.V(21, 10.4), Skin: "avalanche-warn"}}},
 	},
 	Course: &physics.Field{
 		Walls: physics.Walls(
@@ -42,6 +43,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

@@ -58,6 +58,3 @@ func (a Vec2) LenCmp(r float64) int {
 func FromPolar(angle, r float64) Vec2 {
 	return Vec2{r * math.Cos(angle), r * math.Sin(angle)}
 }
-
-// Reflect mirrors v across the unit normal n.
-func Reflect(v, n Vec2) Vec2 { return v.Sub(n.Scale(2 * v.Dot(n))) }

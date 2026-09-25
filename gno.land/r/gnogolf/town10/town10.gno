@@ -11,8 +11,6 @@ import (
 	"gno.land/r/gnogolf/golf"
 )
 
-var canal = physics.V(20, 0)
-
 var me = course.Fit(&course.Simple{
 	W: 50, H: 16,
 	World:     "town",
@@ -26,22 +24,24 @@ var me = course.Fit(&course.Simple{
 
 	// the bridge: open for the first stroke, down for the second, open again…
 	Pulses: []course.Pulse{
-		{Every: 2, On: 1, Offset: 1, Zones: []physics.Zone{
+		{Every: 2, On: 1, Phase: 1, Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(20, 0), Max: physics.V(24, 16), Scale: 1, Mark: '=', Skin: "bridge"},
 		}},
-		{Every: 2, On: 1, Offset: 0, Zones: []physics.Zone{
+		{Every: 2, On: 1, Phase: 0, Zones: []physics.Zone{
 			{Kind: physics.Hazard, Min: physics.V(20, 0), Max: physics.V(24, 16), Vec: physics.V(5, 6), Mark: '~', Skin: "canal"},
 		}},
 	},
 
 	Course: &physics.Field{
-		Walls: physics.Outline(physics.Lane(6, 4, physics.V(5, 6), physics.V(18, 6), physics.V(28, 10), physics.V(42, 10))...),
+		Walls:    physics.Outline(physics.Lane(6, 4, physics.V(5, 6), physics.V(18, 6), physics.V(28, 10), physics.V(42, 10))...),
 		Friction: 0.87,
 		Radius:   0.5,
 		Bounce:   0.85,
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

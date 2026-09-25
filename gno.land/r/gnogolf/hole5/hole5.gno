@@ -1,5 +1,6 @@
-// Package hole5 is a lane through a gate to a round green, and the gate shuts every other stroke:
-// shut for the first, so the tee shot lays up and the second goes through.
+// Package hole5 is a lane through a gate to a round green, and the gate shuts
+// every other stroke: shut for the first, so the tee shot lays up and the
+// second goes through.
 package hole5
 
 import (
@@ -20,7 +21,7 @@ var me = course.Fit(&course.Simple{
 
 	// the gate: shut for your first stroke, open for the second, shut again…
 	Pulses: []course.Pulse{{
-		Every: 2, On: 1, Offset: 0,
+		Every: 2, On: 1, Phase: 0,
 		Walls: physics.Bar(physics.V(18, 5.5), physics.V(18, 8.5), 0.8, '=', "gate door"),
 	}},
 	Course: &physics.Field{
@@ -39,6 +40,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

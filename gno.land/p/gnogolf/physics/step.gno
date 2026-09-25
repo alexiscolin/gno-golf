@@ -60,11 +60,33 @@ func (s *Shot) mark(c byte) {
 const causes = "-iwsb"
 
 // JumpSpeed is the speed, per substep, a ball needs to leave the ground at
-// the top of a slope. Past it, it flies Lift times its speed over that times
-// the slope's steepness: faster and off a steeper hill, further.
+// the top of a slope.
+const JumpSpeed = 1.5
+
+// Lift is how far a ball past JumpSpeed flies: Lift times its speed over
+// JumpSpeed times the slope's steepness, so faster and off a steeper hill,
+// further.
+const Lift = 12
+
+// The rolling rules: a substep keeps Friction plus keepBonus of the speed,
+// times the surface, at most maxKeep of it; a ball slower than stopSpeed has
+// stopped.
 const (
-	JumpSpeed = 1.5
-	Lift      = 12
+	keepBonus = 0.05
+	maxKeep   = 0.98
+	stopSpeed = 0.02
+)
+
+// The loop's mouth: a ball heading in within 45° (loopIn, cos 45°) enters,
+// one more than 25° off straight (loopStraight, cos 25°) rides up the side
+// and is set down loopDrop in front, loopFront outside the mouth; one too
+// slow to go round rolls back out at loopBack of its speed.
+const (
+	loopIn       = 0.7071
+	loopStraight = 0.9063
+	loopFront    = 0.01
+	loopDrop     = 1.5
+	loopBack     = 0.5
 )
 
 // Rest is where the ball stopped.
@@ -309,20 +331,20 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		out.add(pos, air > 0)
 		out.Cause[len(out.Cause)-1] = out.why
 
-		// friction never pushes: ice lets the ball run on, it does not speed it up
 		// Rolling resistance: a share of the speed goes each substep, and a
 		// fixed amount too, so a ball comes to a real stop instead of creeping
 		// on until the substeps run out. Sand brakes harder, ice less.
-		keep := (f.Friction + 0.05) * surface
-		if keep > 0.98 {
-			keep = 0.98
+		keep := (f.Friction + keepBonus) * surface
+		// friction never pushes: ice lets the ball run on, it does not speed it up
+		if keep > maxKeep {
+			keep = maxKeep
 		}
 		if air > 0 {
 			continue // no rolling resistance off the ground
 		}
 		l := vel.Len()
 		sp := l*keep - Drag/surface
-		if sp <= 0.02 {
+		if sp <= stopSpeed {
 			// on a slope steeper than the drag a ball does not stay put: it
 			// stops, then rolls back down (the slope pushes it next substep)
 			if pull(slopes, pos, i+f.Tick) > Drag {
@@ -334,10 +356,10 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		vel = vel.Scale(sp / l)
 	}
 
-	// A ball that came to rest in the water or in a tunnel's mouth is resolved
-	// now, not on the player's next stroke.
 	// a ball at rest is on the ground, whatever was left of its flight
 	out.Air[len(out.Air)-1] = false
+	// A ball that came to rest in the water or in a tunnel's mouth is resolved
+	// now, not on the player's next stroke.
 	var still Vec2
 	surface := 1.0
 	if f.zonesAt(&pos, &still, &surface, 1, substeps+f.Tick, &out) {
@@ -374,7 +396,7 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 		case Surface:
 			*surface = z.Scale // the surface under this move (the last listed wins)
 		case Slope:
-			if isAir(z) {
+			if z.Air {
 				out.mark('w')
 			} else {
 				out.mark('s')
@@ -418,21 +440,21 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 			}
 			in := axis.Scale(sign) // the way into the loop
 			sp := vel.Len()
-			if vel.Dot(in) <= sp*0.7071 {
+			if vel.Dot(in) <= sp*loopIn {
 				continue // not heading into the mouth: it rolls across
 			}
 			// slanted in (more than 25° off straight), it rides up the side of
 			// the track and falls off it: put down in front of the mouth, still
-			slanted := vel.Dot(in) <= sp*0.9063
-			front := z.Min.Dot(axis) - 0.01
+			slanted := vel.Dot(in) <= sp*loopStraight
+			front := z.Min.Dot(axis) - loopFront
 			if sign < 0 {
-				front = z.Max.Dot(axis) + 0.01
+				front = z.Max.Dot(axis) + loopFront
 			}
 			side := pos.Sub(axis.Scale(pos.Dot(axis)))
 			switch {
 			case slanted:
 				// off the side of the track: down in front of the mouth, still
-				*pos = mid.Sub(axis.Scale(mid.Dot(axis))).Add(axis.Scale(front - sign*1.5))
+				*pos = mid.Sub(axis.Scale(mid.Dot(axis))).Add(axis.Scale(front - sign*loopDrop))
 				out.add(*pos, false)
 				return true
 			case sp >= z.Scale:
@@ -440,7 +462,7 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, n, tick int, out *Shot
 				*vel = in.Scale(sp * LoopKeep)
 			default:
 				*pos = side.Add(axis.Scale(front))
-				*vel = vel.Scale(-0.5)
+				*vel = vel.Scale(-loopBack)
 			}
 			out.add(*pos, false)
 		}
@@ -454,10 +476,6 @@ func orDefault(v, def float64) float64 {
 	}
 	return v
 }
-
-// isAir reports whether a slope is moving air (Zone.Air) rather than a hill.
-// A timed hill (a seesaw) is still a hill, while it is there.
-func isAir(z *Zone) bool { return z.Air }
 
 // hill is a ground slope, its steepness |Vec|, and its crest: u is the unit
 // uphill (against Vec); the crest is the zone's edge u points at, on the
@@ -539,7 +557,9 @@ func (h *hill) overTheTop(a, b Vec2, rampFrom float64) bool {
 func (f *Field) groundSlopes() []hill {
 	var out []hill
 	for j := range f.Zones {
-		if z := &f.Zones[j]; z.Kind == Slope && !isAir(z) {
+		// air (Zone.Air) is no hill; a timed hill (a seesaw) is still a hill,
+		// while it is there
+		if z := &f.Zones[j]; z.Kind == Slope && !z.Air {
 			out = append(out, newHill(z))
 		}
 	}

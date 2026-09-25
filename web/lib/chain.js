@@ -4,7 +4,13 @@
 // chain resolves every shot — nothing here computes anything about a ball.
 // See CLIENT.md for the contract.
 
-const REALM = "gno.land/r/gnogolf/golf";
+// the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-golfer000/golf on
+// pearl), else the local chain's
+export const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/golf$/.test(process.env.NEXT_PUBLIC_REALM || "")
+  ? process.env.NEXT_PUBLIC_REALM
+  : "gno.land/r/gnogolf/golf";
+/** The hub's gnoweb path ("/r/…/golf"). */
+export const REALM_PATH = REALM.replace(/^gno\.land/, "");
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
 
 export const DEFAULT_RPC = "http://127.0.0.1:26757";
@@ -169,15 +175,21 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
     }, PARAMS_TTL),
     /** gnoweb page of one player's round on a hole. */
     roundURL: (hole, player) =>
-      PKG.test(String(hole)) && ADDR.test(String(player)) ? new URL(`${REALM.replace(/^gno\.land/, "")}:${hole}/${player}`, web + "/").href : "#",
-    /** gnoweb link to a realm's source: a player can read a hole before trusting it. */
-    // links built from what the chain says, checked first: a realm path, an address
-    sourceURL: (pkgPath) => (PKG.test(String(pkgPath)) ? new URL(String(pkgPath).replace(/^gno\.land/, "") + "$source", web + "/").href : "#"),
+      isHoleId(hole) && ADDR.test(String(player)) ? new URL(`${REALM_PATH}:${hole}/${player}`, web + "/").href : "#",
+    /** gnoweb link to what a hole is made of: a realm hole's source, a data
+     *  hole's data page. A player can read a hole before trusting it. */
+    // links built from what the chain says, checked first: a hole id, an address
+    sourceURL: (id) =>
+      PKG.test(String(id))
+        ? new URL(String(id).replace(/^gno\.land/, "") + "$source", web + "/").href
+        : isHoleId(id)
+          ? new URL(`${REALM_PATH}:${id}/data`, web + "/").href
+          : "#",
     /** Every registered hole: id, name, official (one of the course's), world, order, par, plays, best, next (archived for). */
     // kept for the tab (sessionStorage, HOLES_TTL): a reload or a Retry does
     // not pay the list again (163M of query gas); fresh=true reads it anyway
     holes: async (fresh = false) => {
-      const key = `gnogolf.holes|${rpc}`;
+      const key = `gnogolf.holes|${rpc}|${REALM}`;
       try {
         const c = !fresh && JSON.parse(sessionStorage.getItem(key) || "null");
         if (c && Date.now() - c.at < HOLES_TTL && Array.isArray(c.list) && c.list.length) return c.list;
@@ -285,6 +297,11 @@ function allowedHost(h, extra = process.env.NEXT_PUBLIC_ALLOWED_HOSTS || "") {
 // a realm or package path as the chain names it, and nothing else
 const PKG = /^gno\.land\/[rp]\/[\w/.-]+$/;
 const ADDR = /^g1[0-9a-z]{38}$/;
+// a data hole: a course slot "garden/7" or its version "garden/7/v2", a
+// community hole "<address>/<slug>" or its version
+const DATA = /^([a-z]{1,16}\/[1-9]\d{0,2}|g1[0-9a-z]{38}\/[a-z0-9-]{1,32})(\/v[1-9]\d*)?$/;
+/** Whether s names a hole: a realm's path, or a data hole's id or alias. */
+export const isHoleId = (s) => PKG.test(String(s)) || DATA.test(String(s));
 
 const PULL_SHARE = 0.24; // a pull this share of the viewport's short side is full power
 export function pullShot(px, vw, vh, angleRad, maxPower = 10) {

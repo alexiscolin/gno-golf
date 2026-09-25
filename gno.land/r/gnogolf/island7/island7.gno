@@ -1,4 +1,6 @@
-// Package island7 is a round islet cut in two by a great sandcastle and its ramparts: the only way through is the tube that spirals round it, and a soft shot rolls back out.
+// Package island7 is a round islet cut in two by a great sandcastle and its
+// ramparts: the only way through is the tube that spirals round it, and a soft
+// shot rolls back out.
 package island7
 
 import (
@@ -36,8 +38,8 @@ var me = course.Fit(&course.Simple{
 		Zones: []physics.Zone{
 			// the tube spirals up round the castle: hit it hard enough and the
 			// ball comes out by the cup, too soft and it rolls back out. The
-			// mouth is 2 deep, more than a move (physics.MaxMove): at 1 a
-			// strong ball stepped over it and met the castle instead.
+			// mouth is 2 deep, more than a move (physics.MaxMove), or a strong
+			// ball would step over it and meet the castle instead.
 			{Kind: physics.Loop, Min: physics.V(11.4, 12.2), Max: physics.V(13.4, 13.8), Vec: physics.V(21.6, 17), Scale: 2, Skin: "castle tube"},
 			{Kind: physics.Slope, Min: physics.V(9.5, 5), Max: physics.V(11.1, 9), Vec: physics.V(-0.3, 0), Skin: "mound"},
 			{Kind: physics.Slope, Min: physics.V(11.9, 5), Max: physics.V(13.5, 9), Vec: physics.V(0.3, 0), Skin: "mound"},
@@ -50,6 +52,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

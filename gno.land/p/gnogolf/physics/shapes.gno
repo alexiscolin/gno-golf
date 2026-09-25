@@ -15,22 +15,17 @@ func (s Segment) Normal() Vec2 {
 	return Vec2{-d.Y / l, d.X / l}
 }
 
-// Hit reports where the motion p0->p1 crosses the segment: the travel fraction
-// in [0,1] and the normal facing the motion. It returns geometric facts — what
-// to do with them is the caller's decision.
-func (s Segment) Hit(p0, p1 Vec2) (float64, Vec2, bool) {
-	return s.hitN(p0, p1, s.Normal())
-}
-
-// Crosses reports whether the motion p0->p1 crosses the segment: Hit's
-// answer without working out the normal (and its square root).
+// Crosses reports whether the motion p0->p1 crosses the segment, without
+// working out the normal (and its square root).
 func (s Segment) Crosses(p0, p1 Vec2) bool {
 	_, _, ok := s.hitN(p0, p1, Vec2{})
 	return ok
 }
 
-// hitN is Hit with the segment's normal already known: Step works it out
-// once per shot for each wall instead of on every crossing it tests.
+// hitN reports where the motion p0->p1 crosses the segment: the travel
+// fraction in [0,1] and the given normal, turned to face the motion. Step
+// works the normal out once per shot for each wall instead of on every
+// crossing it tests.
 func (s Segment) hitN(p0, p1, normal Vec2) (float64, Vec2, bool) {
 	d := p1.Sub(p0)
 	e := s.B.Sub(s.A)
@@ -49,23 +44,6 @@ func (s Segment) hitN(p0, p1, normal Vec2) (float64, Vec2, bool) {
 		n = n.Scale(-1)
 	}
 	return t, n, true
-}
-
-// Toward is the segment pushed r toward p and lengthened by r at each end:
-// the line the centre of a ball of radius r meets. Colliding the centre with it
-// stops a round ball with its edge on the wall, instead of half inside it.
-func (s Segment) Toward(p Vec2, r float64) Segment {
-	d := s.B.Sub(s.A)
-	l := d.Len()
-	if l == 0 {
-		return s
-	}
-	n := s.Normal()
-	if p.Sub(s.A).Dot(n) < 0 {
-		n = n.Scale(-1)
-	}
-	e, o := d.Scale(r/l), n.Scale(r)
-	return Segment{A: s.A.Sub(e).Add(o), B: s.B.Add(e).Add(o)}
 }
 
 // Circle is a round barrier: a post, a bumper, the rim of a pond.

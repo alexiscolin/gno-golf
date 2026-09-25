@@ -9,6 +9,7 @@
 # slot is world/order, pkgpath the realm the hole is today (what a client
 # maps old ids from), sha8 the first 4 bytes of the data's sha256, hex the
 # data. Sorted by slot, so a change to a hole is a one-line diff to review.
+# Then scripts/paritydata.sh copies it into golf's parity test.
 #
 # GNO is the gno binary (default: the pearl toolchain store), GNOROOT its
 # source tree. The packages run one at a time, at low priority.
@@ -40,3 +41,4 @@ for d in $(ls -d gno.land/r/gnogolf/*/ | sort); do
 done
 sort -t/ -k1,1 -k2,2n "$tmp" >data/holes.txt
 echo "data/holes.txt: $(wc -l <data/holes.txt | tr -d ' ') holes, $(awk '{n += length($4)/2} END {print n}' data/holes.txt) bytes of data"
+"$root/scripts/paritydata.sh"

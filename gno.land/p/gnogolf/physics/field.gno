@@ -30,28 +30,9 @@ import "math"
 // area. That way a course author can ship "giant skull" today and an artist can
 // add the mesh next month without either of them breaking anything.
 //
-// Keep skins to short lower-case ids, not sentences: they are lookup keys. The
-// ones in use so far, which a theme pack should cover first:
-//
-//	hedge  shelf  gate  gate door  sail   walls with a look of their own
-//	bumper  mole                           posts
-//	sand  ice  slope  tunnel  warp  water  the zone kinds, dressed
-//	molehill  mill  loop                   zones that are only scenery
-//	hay  logs                              soft walls (Soft): they soak a shot up
-//	rock  stump                            dead posts, Bounce below 1
-//	flowerbed  puddle                      Round Surface zones that slow the ball
-//	boardwalk  pier                        a lane's own edge (Skinned)
-//	palm  buoy  coral  crab  outcrop       posts on the beach (crab comes and goes)
-//	wetsand  wave  gap  tidepool  lagoon   beach zones: slow, washing, holes, water
-//	shipwreck  cave  lighthouse  dune      a tunnel, a tunnel, a loop, a slope
-//	plank                                  a timed bar across a rope bridge
-//	mound  volcano  bank  terrace  dune    slopes: humps of four arms, a banked bend
-//	sandcastle  rowing boat  castle gate   beach pieces, and a tunnel through a castle
-//	lamp  house  door  stall  awning       town: posts, a door tunnel, market bars
-//	tram  clock hand  lift  avalanche      timed or per-stroke bars
-//	pine  boulder  snowman  chalet         mountain posts
-//	ice  snowdrift  crevasse  cliff        mountain zones (cliff: poly, outside)
-//	wind  rain  fog  storm  snow           the weather: whole-board zones
+// Keep skins to short lower-case ids, not sentences: they are lookup keys,
+// and the client's table is the catalogue. Five are reserved for the weather,
+// which course lays over the whole board: wind, rain, fog, storm and snow.
 
 // Wall is a straight barrier. Bounce overrides the field's restitution (0
 // keeps it); Mark and Skin are for whoever draws it.
@@ -66,10 +47,6 @@ type Wall struct {
 	// every turn of the wheel — time the stroke to slip through between two.
 	Every, On, Phase int
 }
-
-// There reports whether a timed wall stands in substep i; an untimed one
-// always does.
-func (w Wall) There(i int) bool { return there(i, w.Every, w.On, w.Phase) }
 
 // there is the timing rule walls and zones share: in substep i, present when
 // (i+phase) mod every is below on — a sign-safe mod, so a negative phase
@@ -111,7 +88,7 @@ type Post struct {
 // ZoneKind is what a zone does to a ball inside it.
 type ZoneKind int
 
-// The zone kinds.
+// The zone kinds, each named in its own line.
 const (
 	Surface ZoneKind = iota // Scale multiplies friction: sand slows, ice frees
 	Slope                   // Vec is added to velocity each substep
@@ -163,10 +140,6 @@ type Zone struct {
 	Air, Capped bool
 }
 
-// There reports whether a timed zone acts in substep i; an untimed one
-// always does.
-func (z Zone) There(i int) bool { return there(i, z.Every, z.On, z.Phase) }
-
 // Contains says whether p is in the zone, by its shape.
 func (z Zone) Contains(p Vec2) bool { return z.contains(p) }
 
@@ -188,17 +161,17 @@ func (z *Zone) contains(p Vec2) bool {
 }
 
 // Field is a complete course geometry. A hole exposes its own so that any
-// renderer — text today, a 3D client later — can draw it without the hole
-// realm knowing anything about drawing.
+// renderer (the text board, the 3D client) can draw it without the hole realm
+// knowing anything about drawing.
 type Field struct {
 	Walls    []Wall
 	Posts    []Post
 	Zones    []Zone
 	Friction float64 // per substep, 0.8 rolls to a stop in about a dozen
 	Bounce   float64 // default restitution of barriers
-	// Radius of the ball. 0 is a point, the original model. A renderer that
-	// draws a ball of some size needs the physics to know that size, or the
-	// ball is drawn half inside every wall it touches.
+	// Radius of the ball (0 plays it as a point). A renderer that draws a
+	// ball of some size needs the physics to know that size, or the ball is
+	// drawn half inside every wall it touches.
 	Radius float64
 	// Tick is where the stroke starts on the clock of the timed walls and
 	// zones: the substep they were at when the player let go. The page shows
@@ -211,11 +184,11 @@ type Field struct {
 
 // Bar returns the four walls of a barrier of the given thickness from a to b.
 //
-// Free-standing obstacles need it. The ball is a point, and a point travelling
-// exactly along a zero-width segment never crosses it — it slides straight
-// through a blade or a bar it is perfectly aligned with. An outer wall is safe
-// as a bare Segment because the ball is always on one side of it; anything the
-// ball can meet head-on is built with Bar.
+// Free-standing obstacles need it. With Radius 0 the ball is a point, and a
+// point travelling exactly along a zero-width segment never crosses it — it
+// slides straight through a blade or a bar it is perfectly aligned with. An
+// outer wall is safe as a bare Segment because the ball is always on one side
+// of it; anything the ball can meet head-on is built with Bar.
 func Bar(a, b Vec2, thickness float64, mark rune, skin string) []Wall {
 	d := b.Sub(a)
 	l := d.Len()

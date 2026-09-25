@@ -9,15 +9,17 @@ import (
 	"gno.land/p/gnogolf/physics"
 )
 
-// The board a hole plays on unless it says otherwise, in board units — also
-// the character grid the text renderer draws. Wear is a fixed 16x8 grid
-// stretched over whatever board the hole has, so a hole always stores 128
-// counters.
-const (
-	BoardW, BoardH = 32, 16
-	WearW, WearH   = 16, 8
-	MaxBoard       = 96 // no side longer: it bounds the text board and the flood a client runs
-)
+// BoardW and BoardH are the board a hole plays on unless it says otherwise,
+// in board units: also the character grid the text renderer draws.
+const BoardW, BoardH = 32, 16
+
+// WearW and WearH are the wear grid, stretched over whatever board the hole
+// has, so a hole always stores 128 counters.
+const WearW, WearH = 16, 8
+
+// MaxBoard is the longest side a board may have: it bounds the text board
+// and the flood a client runs.
+const MaxBoard = 96
 
 // Sized is what a hole implements to play on a board other than 32x16 — a long
 // corridor, a narrow lane. It is optional, so every hole written before it
@@ -91,8 +93,8 @@ type Hole interface {
 	Start() physics.Vec2
 	Cup() physics.Vec2
 
-	// Field is the geometry, for whoever is drawing: the text board today, a
-	// client later. It is also what makes a hole inspectable before you play it.
+	// Field is the geometry, for whoever draws it: the text board and the 3D
+	// client. It is also what makes a hole inspectable before you play it.
 	Field() *physics.Field
 
 	// Preview resolves a shot and changes nothing. It exists so a client can
@@ -175,13 +177,14 @@ type Timed interface {
 }
 
 // Pulse is a piece that comes and goes: present on the strokes where
-// (stroke+Offset) % Every < On. Every 2, On 1 is every other stroke; Every 3,
-// On 1 is one stroke in three.
+// (stroke+Phase) % Every < On, the same rule as a timed wall's within a
+// stroke. Every 2, On 1 is every other stroke; Every 3, On 1 is one stroke in
+// three.
 type Pulse struct {
-	Every, On, Offset int
-	Walls             []physics.Wall
-	Posts             []physics.Post
-	Zones             []physics.Zone // a puddle a sprinkler leaves, a bridge let down
+	Every, On, Phase int
+	Walls            []physics.Wall
+	Posts            []physics.Post
+	Zones            []physics.Zone // a puddle a sprinkler leaves, a bridge let down
 }
 
 // Weatherable is what a hole implements to be played in the weather: the
@@ -197,43 +200,45 @@ type Weatherable interface {
 	MaxWind() float64
 }
 
-// The weather kinds, which are also the skins of their whole-board zones.
+// The weather kinds. Each but Clear is also the skin of its whole-board zones.
 const (
-	Clear = ""
-	Wind  = "wind"  // a Slope: a steady push, Vec per substep
-	Rain  = "rain"  // a Surface a little quicker than dry grass
-	Fog   = "fog"   // a Surface of scale 1: it only hides the far end
-	Storm = "storm" // rain, and lightning to look at
-	Snow  = "snow"  // a Surface a little slower
+	Clear = ""      // Clear is no weather at all
+	Wind  = "wind"  // Wind is a Slope: a steady push, Vec per substep
+	Rain  = "rain"  // Rain is a Surface a little quicker than dry grass
+	Fog   = "fog"   // Fog is a Surface of scale 1: it only hides the far end
+	Storm = "storm" // Storm is rain and wind in gusts, and lightning to look at
+	Snow  = "snow"  // Snow is a Surface a little slower
 )
 
-// The climate: what the weather is in each world, out of 100. A world not
-// listed has the garden's.
-type Chance struct {
-	Percent int
-	Kind    string
+// chance is one kind of weather in a climate, out of 100.
+type chance struct {
+	percent int
+	kind    string
 }
 
 // climates is the weather of each world: the chance of each kind, out of 100.
-// Read only through ForecastFor; unexported so nothing can reach it to change.
-var climates = map[string][]Chance{
+// A world not listed has the garden's. Read only through ForecastFor;
+// unexported so nothing can reach it to change.
+var climates = map[string][]chance{
 	"garden":   {{55, Clear}, {20, Wind}, {15, Rain}, {10, Fog}},
 	"island":   {{50, Clear}, {25, Wind}, {15, Rain}, {10, Storm}},
 	"town":     {{50, Clear}, {20, Rain}, {15, Fog}, {15, Wind}},
 	"mountain": {{40, Clear}, {25, Snow}, {20, Wind}, {15, Fog}},
 }
 
-// Wind blows between WindMin and WindMax per substep; RainScale, WetIce and
-// SnowScale are the friction multipliers the weather brings.
+// The weather's strengths.
 const (
+	// WindMin is the weakest wind, per substep.
 	WindMin = 0.08
+	// WindMax is the strongest wind, per substep.
 	WindMax = 0.15
-	// how much quicker the green is in the rain, and wet ice quicker again.
-	// Rain is a touch quicker, not ice: on a 0.87 green the ball keeps 94% of
-	// its speed a substep instead of 92%. (At 1.12 it hit the 98% cap and
-	// every board played like pinball: a repeatable ace on half the holes.)
+	// RainScale is how much quicker the green is in the rain: a touch, not
+	// ice. On a 0.87 green the ball keeps 94% of its speed a substep instead
+	// of 92%; much more and the keep cap turns every board to pinball.
 	RainScale = 1.025
-	WetIce    = 1.06
+	// WetIce is how much quicker again the rain makes ice.
+	WetIce = 1.06
+	// SnowScale is how much slower the green is in the snow.
 	SnowScale = 0.9
 )
 
@@ -247,8 +252,8 @@ type Forecast struct {
 	Zones  []physics.Zone
 }
 
-// Hash is 64-bit FNV-1a: small, deterministic, the same on every validator.
-func Hash(s string) uint64 {
+// hash is 64-bit FNV-1a: small, deterministic, the same on every validator.
+func hash(s string) uint64 {
 	h := uint64(14695981039346656037)
 	for i := 0; i < len(s); i++ {
 		h ^= uint64(s[i])
@@ -260,18 +265,18 @@ func Hash(s string) uint64 {
 // ForecastFor is the weather of hole id (in world) for a period: a hash of
 // the two looked up in the world's climate. Nobody picks it.
 func ForecastFor(id, world string, h Hole, period int64) Forecast {
-	seed := Hash(id + "#" + strconv.FormatInt(period, 10))
+	seed := hash(id + "#" + strconv.FormatInt(period, 10))
 	table, ok := climates[world]
 	if !ok {
 		table = climates["garden"]
 	}
 	roll, kind := int(seed%100), Clear
 	for _, c := range table {
-		if roll < c.Percent {
-			kind = c.Kind
+		if roll < c.percent {
+			kind = c.kind
 			break
 		}
-		roll -= c.Percent
+		roll -= c.percent
 	}
 	wind, zones := WeatherFor(kind, h, seed)
 	return Forecast{Period: period, Kind: kind, Wind: wind, Zones: zones}
@@ -316,9 +321,9 @@ func WeatherFor(kind string, h Hole, seed uint64) (physics.Vec2, []physics.Zone)
 		// substeps, then 40° the other
 		v := blow()
 		a, s := math.Atan2(v.Y, v.X), v.Len()
-		g1, g2 := all(physics.Slope, Wind, 0, physics.FromPolar(a+0.7, s)), all(physics.Slope, Wind, 0, physics.FromPolar(a-0.7, s))
-		g1.Every, g1.On, g1.Phase = 6, 3, 0
-		g2.Every, g2.On, g2.Phase = 6, 3, 3
+		g1, g2 := all(physics.Slope, Wind, 0, physics.FromPolar(a+gustTurn, s)), all(physics.Slope, Wind, 0, physics.FromPolar(a-gustTurn, s))
+		g1.Every, g1.On, g1.Phase = gustEvery, gustEvery/2, 0
+		g2.Every, g2.On, g2.Phase = gustEvery, gustEvery/2, gustEvery/2
 		zs := []physics.Zone{all(physics.Surface, Storm, 1, physics.Vec2{}), all(physics.Surface, Rain, RainScale, physics.Vec2{}), g1, g2}
 		return v, wet(h, r, zs)
 	case Fog:
@@ -328,6 +333,28 @@ func WeatherFor(kind string, h Hole, seed uint64) (physics.Vec2, []physics.Zone)
 	}
 	return physics.Vec2{}, nil
 }
+
+// A storm's gusts turn gustTurn radians (about 40°) off its wind, one way
+// then the other, each for half of gustEvery substeps.
+const (
+	gustTurn  = 0.7
+	gustEvery = 6
+)
+
+// Where rain leaves its puddles: minPuddles plus up to morePuddles-1 more,
+// in at most puddleTries tries; each puddleR plus up to puddleGrow wide,
+// puddleAspect as deep, and puddleScale as quick as the grass, kept
+// puddleGap clear of the one before.
+const (
+	minPuddles   = 2
+	morePuddles  = 3
+	puddleTries  = 60
+	puddleR      = 1.1
+	puddleGrow   = 0.7
+	puddleAspect = 0.8
+	puddleScale  = 0.6
+	puddleGap    = 0.5
+)
 
 // wet adds what rain leaves on a hole: its ice quicker still, and two to four
 // puddles on the lane, clear of the kerb, the pieces, the tee and the cup.
@@ -340,23 +367,23 @@ func wet(h Hole, r *rng, zs []physics.Zone) []physics.Zone {
 		}
 	}
 	w, hh := BoardOf(h)
-	want, placed := 2+int(r.next()%3), []physics.Zone{}
-	for try := 0; try < 60 && len(placed) < want; try++ {
+	want, placed := minPuddles+int(r.next()%morePuddles), []physics.Zone{}
+	for try := 0; try < puddleTries && len(placed) < want; try++ {
 		c := physics.V(r.unit()*float64(w), r.unit()*float64(hh))
-		rad := 1.1 + r.unit()*0.7
+		rad := puddleR + r.unit()*puddleGrow
 		if !dryLand(h, c, rad) {
 			continue
 		}
 		clash := false
 		for _, p := range placed {
-			if p.Min.Add(p.Max).Scale(0.5).Sub(c).LenCmp(p.Max.X-p.Min.X+0.5) < 0 {
+			if p.Min.Add(p.Max).Scale(0.5).Sub(c).LenCmp(p.Max.X-p.Min.X+puddleGap) < 0 {
 				clash = true
 			}
 		}
 		if clash {
 			continue
 		}
-		placed = append(placed, physics.Zone{Kind: physics.Surface, Min: c.Sub(physics.V(rad, rad*0.8)), Max: c.Add(physics.V(rad, rad*0.8)), Scale: 0.6, Round: true, Skin: "puddle"})
+		placed = append(placed, physics.Zone{Kind: physics.Surface, Min: c.Sub(physics.V(rad, rad*puddleAspect)), Max: c.Add(physics.V(rad, rad*puddleAspect)), Scale: puddleScale, Round: true, Skin: "puddle"})
 	}
 	return append(zs, placed...)
 }
@@ -366,14 +393,18 @@ func wet(h Hole, r *rng, zs []physics.Zone) []physics.Zone {
 // every zone that is not plain ground, clear of walls, posts, tee and cup.
 // It is a pure conjunction, so the cheap tests go first and the walls last;
 // no test takes a square root (LenCmp, Crosses): on a lane hole every one of
-// the 60 tries fails, and rain paid ~900M gas for them.
+// the tries fails, and rain paid ~900M gas for them.
+//
+// A puddle keeps dryTee from the tee and the cup and dryGap from any piece.
+// The outline test casts a ray to a far point, off any board and at a slant
+// no wall of a grid lies along.
 func dryLand(h Hole, c physics.Vec2, rad float64) bool {
 	f := h.Field()
-	if c.Sub(h.Start()).LenCmp(rad+2) < 0 || c.Sub(h.Cup()).LenCmp(rad+2) < 0 {
+	if c.Sub(h.Start()).LenCmp(rad+dryTee) < 0 || c.Sub(h.Cup()).LenCmp(rad+dryTee) < 0 {
 		return false
 	}
 	for _, p := range f.Posts {
-		if p.C.Sub(c).LenCmp(p.R+rad+0.3) < 0 {
+		if p.C.Sub(c).LenCmp(p.R+rad+dryGap) < 0 {
 			return false
 		}
 	}
@@ -385,12 +416,12 @@ func dryLand(h Hole, c physics.Vec2, rad float64) bool {
 			return false // not on the sand or the ice: a puddle is on the green
 		}
 	}
-	far, in := c.Add(physics.V(1e4, 37)), false
+	far, in := c.Add(physics.V(farX, farY)), false
 	for _, wl := range f.Walls {
 		if wl.Every > 0 {
 			continue
 		}
-		if c.Sub(wl.Seg.Closest(c)).LenCmp(rad+0.3) < 0 {
+		if c.Sub(wl.Seg.Closest(c)).LenCmp(rad+dryGap) < 0 {
 			return false
 		}
 		if wl.Seg.Crosses(c, far) {
@@ -399,6 +430,12 @@ func dryLand(h Hole, c physics.Vec2, rad float64) bool {
 	}
 	return in
 }
+
+const (
+	dryTee     = 2
+	dryGap     = 0.3
+	farX, farY = 1e4, 37
+)
 
 // WithWeather lays weather over a field: the sky's zones (wind, rain, fog,
 // storm, snow — the whole board) go under its own, so the sand stays sand in
@@ -439,11 +476,13 @@ func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field {
 	return &g
 }
 
+// at is whether the pulse is there at a stroke: the rule of a timed wall's
+// Every/On/Phase, sign-safe.
 func (p Pulse) at(stroke int) bool {
 	if p.Every <= 0 {
 		return true
 	}
-	return (stroke+p.Offset)%p.Every < p.On
+	return ((stroke+p.Phase)%p.Every+p.Every)%p.Every < p.On
 }
 
 // WithExtras is the field plus the pieces of one stroke, as a new Field: the
@@ -466,7 +505,11 @@ func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *p
 // realm that declares it — so the wear writes land in that realm's own storage,
 // under its own authority. A hole that wants to invent something the field
 // cannot express writes its own type instead. Pulses cover pieces that come
-// and go with the stroke — hole4's sails, hole5's gate, hole2's mole.
+// and go with the stroke — town10's bridge, island14's log, hole5's gate.
+//
+// Its fields and methods come in pairs (Strokes and Par, Title and Name,
+// Order and Position, World and WorldName, Course and Field) only because a
+// field and a method cannot share a name.
 type Simple struct {
 	Marks
 	W, H      int // the board; 0 means the default 32x16
@@ -566,9 +609,10 @@ func (h *Simple) Cup() physics.Vec2 { return h.Pin }
 // Field is the course as the physics sees it.
 func (h *Simple) Field() *physics.Field { return h.Course }
 
-// Board is the hole's board size: W by H, or the default.
+// Board is the hole's board size: W by H, or the default when either is 0
+// or past MaxBoard, as BoardOf has it.
 func (h *Simple) Board() (int, int) {
-	if h.W > 0 && h.H > 0 {
+	if h.W > 0 && h.H > 0 && h.W <= MaxBoard && h.H <= MaxBoard {
 		return h.W, h.H
 	}
 	return BoardW, BoardH
@@ -584,9 +628,8 @@ func (h *Simple) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bo
 	return h.PlayAt(ball, angle, power, 0)
 }
 
-// Kick turns a stroke's power (0 to 10) into the ball's speed per substep. At
-// 0.6 a full stroke on the usual friction rolls about a board's length; at 1,
-// as it was, it rolled one and a half, and the ball left the elastic behind.
+// Kick turns a stroke's power (0 to 10) into the ball's speed per substep: a
+// full stroke on the usual friction rolls about a board's length.
 const Kick = 0.6
 
 // Launch is the ball's starting velocity for a stroke. Every hole should use
@@ -596,6 +639,10 @@ func Launch(angle, power float64) physics.Vec2 { return physics.FromPolar(angle,
 // CaptureSpeed is the fastest a ball can cross the cup and still drop, in board
 // units per substep — a ball barely rolling. Faster, it skims over — as it does on a real green.
 const CaptureSpeed = 1.3
+
+// jumpStep is how much longer than CaptureSpeed a step must be for the one
+// after it to be the rest of a jump, not a slow ball.
+const jumpStep = 1.5
 
 // Sink decides whether a shot ends in the cup: it stops within radius of the
 // pin, or it rolls across the cup no faster than CaptureSpeed. When it drops
@@ -614,7 +661,7 @@ func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bo
 		}
 		// a short step right after a long one is not a slow ball: it is the
 		// rest of a substep after a tunnel exit or a bounce
-		if i > 0 && p[i].Sub(p[i-1]).LenCmp(CaptureSpeed*1.5) > 0 {
+		if i > 0 && p[i].Sub(p[i-1]).LenCmp(CaptureSpeed*jumpStep) > 0 {
 			continue
 		}
 		// a step whose box is more than radius from the pin cannot drop

@@ -15,13 +15,17 @@ type offset struct {
 	lo, hi           Vec2
 }
 
+// unstickGap is how far clear of a piece Unstick sets a ball down.
+const unstickGap = 0.02
+
 // boxPad grows every broad-phase box: more than the half skin a ball may sit
 // inside a wall's radius (Step's near test), and far more than rounding.
 const boxPad = 1e-6
 
-// lines works out a wall's offset lines for a ball of radius r. It is exactly
-// the arithmetic of Normal and Toward (twice) — the same bits — with each
-// square root taken once: 3 instead of 8.
+// lines works out a wall's offset lines for a ball of radius r: the segment
+// pushed r to each side and lengthened by r at each end, the lines the centre
+// of a round ball meets. It is exactly Normal's arithmetic and that push
+// (twice) — the same bits — with each square root taken once: 3 instead of 8.
 func lines(s Segment, r float64, o *offset) {
 	d := s.B.Sub(s.A)
 	l := d.Len()
@@ -276,7 +280,7 @@ func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2 {
 				out = ball.Sub(best)
 			}
 			if l := out.Len(); l > 0 {
-				ball = best.Add(out.Scale((r + 0.02) / l))
+				ball = best.Add(out.Scale((r + unstickGap) / l))
 			}
 		}
 	}
@@ -286,7 +290,7 @@ func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2 {
 			if l == 0 {
 				d, l = Vec2{X: 1}, 1
 			}
-			ball = p.C.Add(d.Scale((p.R + r + 0.02) / l))
+			ball = p.C.Add(d.Scale((p.R + r + unstickGap) / l))
 		}
 	}
 	return ball

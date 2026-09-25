@@ -35,7 +35,7 @@ func every() *Simple {
 		},
 		Pulses: []Pulse{
 			{Every: 2, On: 1, Walls: physics.Bar(v(10, 9), v(10, 11), 0.5, '=', "gate door")},
-			{Every: 3, On: 1, Offset: 2, Posts: []physics.Post{{Circle: physics.Circle{C: v(22, 10), R: 0.6}, Skin: "crab"}},
+			{Every: 3, On: 1, Phase: 2, Posts: []physics.Post{{Circle: physics.Circle{C: v(22, 10), R: 0.6}, Skin: "crab"}},
 				Zones: []physics.Zone{{Kind: physics.Surface, Min: v(6, 8), Max: v(8, 10), Scale: 0.5, Round: true, Skin: "puddle"}}},
 		},
 	}, 1.5)
@@ -91,7 +91,7 @@ func TestDiffSeesEveryField(t *testing.T) {
 			physics.Prepare(h.Course)
 			h.Course.Walls[0].Seg.A.X -= 1e-9
 		}},
-		{"Pulses[1].Offset", func(h *Simple) { h.Pulses[1].Offset = 1 }},
+		{"Pulses[1].Phase", func(h *Simple) { h.Pulses[1].Phase = 1 }},
 		{"Pulses[1].Zones[0].Skin", func(h *Simple) { h.Pulses[1].Zones[0].Skin = "" }},
 	} {
 		a, b := every(), every()
@@ -173,7 +173,7 @@ func TestHostileDataIsRefused(t *testing.T) {
 		{"negative phase", func(h *Simple) { h.Course.Walls[10].Phase = -1 }},
 		{"untimed phase", func(h *Simple) { h.Course.Walls[0].Phase = 2 }},
 		{"every", func(h *Simple) { h.Course.Walls[10].Every = MaxTiming + 1 }},
-		{"negative offset", func(h *Simple) { h.Pulses[0].Offset = -1 }},
+		{"negative phase", func(h *Simple) { h.Pulses[0].Phase = -1 }},
 		{"a two-point polygon", func(h *Simple) { h.Course.Zones[3].Poly = h.Course.Zones[3].Poly[:2] }},
 		{"a 65-point polygon", func(h *Simple) {
 			z := &h.Course.Zones[3]

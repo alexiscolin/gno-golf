@@ -90,6 +90,8 @@ func Fit(h *Simple, margin float64) *Simple {
 					z.Max.X, z.Max.Y = math.Min(z.Max.X, float64(newW)), math.Min(z.Max.Y, float64(newH))
 				}
 			}
+			// a copy: two zones may share one outline, and each moves once
+			z.Poly = append([]physics.Vec2(nil), z.Poly...)
 			for j := range z.Poly {
 				z.Poly[j] = z.Poly[j].Add(d)
 			}
