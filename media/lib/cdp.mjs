@@ -5,7 +5,8 @@
 // Chrome), killed by PID. Node 22+ (the built-in WebSocket).
 //
 // The paths and addresses can be set from the environment: CHROME (the
-// binary), APP (the running client), RPC (the local chain).
+// binary), APP (the running client), RPC (the local chain), REALM (the golf
+// realm on it).
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,6 +15,7 @@ import path from "node:path";
 export const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 export const APP = process.env.APP || "http://localhost:3300";
 export const RPC = process.env.RPC || "http://127.0.0.1:26757";
+export const REALM = process.env.REALM || "gno.land/r/gnogolf/golf";
 export const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 
 // The course's holes are data in slots now ("garden/17"): a hole the scripts
@@ -98,7 +100,7 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
 
 /** Waits until the local chain answers (it restarts on hot reloads): up to tries × 5 s. */
 export async function chainUp(tries = 120) {
-  const hex = Buffer.from("gno.land/r/gnogolf/golf.Period()").toString("hex");
+  const hex = Buffer.from(`${REALM}.Period()`).toString("hex");
   for (let i = 0; i < tries; i++) {
     try {
       const r = await (await fetch(`${RPC}/abci_query?path=%22vm/qeval%22&data=0x${hex}`, { signal: AbortSignal.timeout(4000) })).json();
