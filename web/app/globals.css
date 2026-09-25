@@ -1716,21 +1716,13 @@ button:focus-visible, a:focus-visible {
 .cup__sum dt { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
 .cup__sum dd { margin: 0; font-size: 20px; font-weight: 800; color: var(--green); }
 .cup__sum dd.good { color: var(--green); } .cup__sum dd.bad { color: var(--hat); }
-.cup__track { list-style: none; margin: 0; padding: 12px 14px; display: grid; grid-template-columns: repeat(9, minmax(0, 42px)); justify-content: space-between; gap: 8px; border-radius: 16px; background: #eaf4ee; border: 2px dashed rgba(var(--ink-rgb), .25); }
-.cup__hole { position: relative; overflow: visible; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: var(--ink-soft); border: 2px dashed rgba(var(--ink-rgb), .35); background: var(--paper); }
-.cup__hole--done { border-style: solid; border-color: var(--ink); color: var(--ink); display: grid; place-items: center; align-content: center; gap: 0; }
-.cup__hole--gold { background: #f5c542; } .cup__hole--silver { background: #d7dde0; } .cup__hole--bronze { background: #e0a877; }
-.cup__hole--now { border: 3px solid var(--hat); color: var(--hat); box-shadow: 0 0 0 4px rgba(226,82,72,.18); animation: nowhole 1.4s ease-in-out infinite; }
-@keyframes nowhole { 50% { box-shadow: 0 0 0 7px rgba(226,82,72,.08); } }
 .cup__next { margin: 0; font-size: 14px; color: var(--ink-soft); }
 @media (max-width: 600px) {
   .cup__head { grid-template-columns: 48px 1fr; }
   .cup__head svg { width: 48px; height: 48px; }
   .cup__sum { grid-column: 1 / -1; justify-content: space-between; }
   .cup__sum div { flex: 1; }
-  .cup__track { grid-template-columns: repeat(6, minmax(0, 42px)); gap: 6px; padding: 10px 8px; }
 }
-@media (prefers-reduced-motion: reduce) { .cup__hole--now { animation: none; } }
 
 /* the menu's head: the cup being played, with a way to another */
 /* a button: the cup being played, the name big on two lines */
@@ -1821,11 +1813,6 @@ button:focus-visible, a:focus-visible {
 .wet { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30,45,60,.28), rgba(20,40,50,.12)); transition: opacity .8s; }
 .wet--storm { background: linear-gradient(180deg, rgba(15,20,40,.5), rgba(15,25,35,.25)); }
 
-/* a played hole: its strokes big, its number small, its medal a stamp on the corner */
-.cup__hole small { font-size: 9px; line-height: 1; opacity: .7; }
-.cup__hole b { font-size: 18px; line-height: 1; }
-.cup__hole--done b { font-size: 17px; }
-.cup__hole .stamp { position: absolute; top: -14px; right: -16px; width: 22px; height: 22px; opacity: .95; z-index: 1; }
 .drawer__cup:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .weather__until { font-size: 10px; font-weight: 700; color: var(--ink-soft); line-height: 1; white-space: nowrap; }
 @media (max-width: 600px) { .card--weather .weather__until { display: none; } }
@@ -1843,6 +1830,24 @@ button:focus-visible, a:focus-visible {
 .scorecard td.pad { background: transparent; }
 .scorecard__total { align-items: center; padding-top: 4px; }
 .scorecard__total strong { min-width: 1.2em; text-align: center; }
+/* the hole being played: its column tinted under its dark number */
+.scorecard td.now { background: rgba(var(--ink-rgb), .08); }
+.scorecard tr:nth-child(3) td.now { box-shadow: inset 0 -3px 0 var(--ink); }
+/* compact (the win card): the same card, tighter */
+.card--compact.scorecard { padding: 8px 10px 6px; margin: 0; }
+.card--compact.scorecard th { width: 52px; }
+.card--compact.scorecard tr:first-child td { height: 24px; }
+.card--compact.scorecard tr:nth-child(2) td { height: 22px; }
+.card--compact.scorecard tr:nth-child(3) td { height: 34px; font-size: 18px; }
+.card--compact.scorecard table { margin-bottom: 4px; }
+.card--compact .scorecard__total strong { font-size: 20px; }
+@media (max-width: 600px) {
+  .card--compact.scorecard { padding: 6px 6px 4px; }
+  .card--compact.scorecard th { width: 40px; font-size: 8px; letter-spacing: .04em; }
+  .card--compact.scorecard tr:first-child td > span { min-width: 0; padding: 0 3px; height: 18px; font-size: 10px; }
+  .card--compact.scorecard tr:nth-child(3) td { font-size: 16px; }
+  .card--compact .stamp { width: 14px; height: 14px; right: -1px; top: -1px; }
+}
 
 /* saving on-chain is the point of the game on gno.land: it stands out, in
    the chain's blue, next to the green "next hole" */

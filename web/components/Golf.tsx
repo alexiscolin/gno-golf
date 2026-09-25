@@ -15,7 +15,7 @@ import Weather from "@/components/Weather";
 import Share from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
-import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, medalOf, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf } from "@/lib/card";
+import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -995,7 +995,7 @@ export default function Golf() {
                   ? "Saved in this browser only. Save it on-chain to make it public and ranked."
                   : "Saved in this browser only. A community hole is not ranked, but its rounds can be saved on-chain."}
             </p>
-            <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} />
+            <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} compact />
             {fresh.length > 0 && (
               <p className="note note--good">
                 New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b> — pick it from the menu.
@@ -1079,7 +1079,6 @@ export default function Golf() {
             <span className="eyebrow">Gnogolf · the cup and its card</span>
             <h2>The cup</h2>
             <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
-            <Scorecard holes={s.holes} card={card} current={s.id} world={s.world} />
             <Leaderboard chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
         </Sheet>
       )}
@@ -1566,7 +1565,7 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }: 
         <table key={r}>
           <tbody>
             <tr><th>Hole</th>{row.map((h, i) => <td key={h.id} className={h.id === current ? "cur" : ""}><span>{r * per + i + 1}</span></td>)}{pad(row)}</tr>
-            <tr><th>Par</th>{row.map((h) => <td key={h.id}>{parOf(h)}</td>)}{pad(row)}</tr>
+            <tr><th>Par</th>{row.map((h) => <td key={h.id} className={h.id === current ? "now" : ""}>{parOf(h)}</td>)}{pad(row)}</tr>
             <tr>
               <th>Score</th>
               {row.map((h) => {
@@ -1574,7 +1573,7 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }: 
                 const par = parOf(h);
                 const kind = !sc ? "" : sc === 1 ? "ace" : sc < par ? "under" : sc === par ? "par" : "over";
                 return (
-                  <td key={h.id} className={kind}>
+                  <td key={h.id} className={kind + (h.id === current ? " now" : "")}>
                     {sc || ""}
                     {kind && kind !== "over" && <Stamp kind={kind} seed={r * per + row.indexOf(h)} world={world} />}
                   </td>
@@ -1596,10 +1595,10 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }: 
 }
 
 /**
- * The cup as a grand prix: its emblem, the 18 holes as a track — medals on
- * the ones played, the hole being played marked, the rest to come — the
- * running total against par, where you stand on the chain's board if you
- * recorded, and what comes next.
+ * The cup as a grand prix: its emblem, its scorecard (every hole with its
+ * par and your score, the hole being played marked), the running total
+ * against par, where you stand on the chain's board if you recorded, and
+ * what comes next.
  */
 interface BoardProps {
   s: Snapshot;
@@ -1607,7 +1606,7 @@ interface BoardProps {
   me?: string | null;
   mode?: Mode;
 }
-function Standings({ s, card, chain, me, mode = "assisted" }: BoardProps & { card: Card }) {
+function Standings({ s, card, chain, me, mode = "assisted", compact = false }: BoardProps & { card: Card; compact?: boolean }) {
   const [rank, setRank] = useState<{ at?: number; unnamed?: boolean } | null>(null);
   useEffect(() => {
     if (!chain || !me) return;
@@ -1635,27 +1634,7 @@ function Standings({ s, card, chain, me, mode = "assisted" }: BoardProps & { car
           <div><dt>On-chain</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{!rank ? "–" : rank.at ? `#${rank.at}` : "unranked"}</dd></div>
         </dl>
       </header>
-      <ol className="cup__track">
-        {s.holes.map((h, i) => {
-          const sc = scoreOf(card, h), medal = medalOf(sc, parOf(h));
-          return (
-            <li
-              key={h.id}
-              className={"cup__hole" + (h.id === s.id ? " cup__hole--now" : "") + (sc ? " cup__hole--done" : "") + (medal ? ` cup__hole--${medal}` : "")}
-              title={`${i + 1}. ${h.name}${sc ? ` — ${sc} (par ${parOf(h)})` : ""}`}
-            >
-              {sc ? (
-                <>
-                  <b aria-label={`hole ${i + 1}: ${sc} stroke${sc > 1 ? "s" : ""}`}>{sc}</b>
-                  {medal && <Stamp kind={medal === "gold" ? "ace" : medal === "silver" ? "under" : "par"} seed={i} world={s.world} />}
-                </>
-              ) : (
-                <span>{i + 1}</span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+      <Scorecard holes={s.holes} card={card} current={s.id} world={s.world} compact={compact} />
       <p className="cup__next">
         {t.all
           ? t.strokes <= t.par ? (cupHasGnome(s.world || "") ? "Cup finished at par or under — a gnome is waiting in the picker." : "Cup finished at par or under!") : "Cup finished. Now beat par."
