@@ -1,4 +1,8 @@
-// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name]
+// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean]
+//
+// --clean: the title screen's background instead (web/public/title/bg.*): a
+// short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
+// small for the web (AV1 and VP9 webm, H.264 mp4, a poster).
 //
 // One headless Chrome (its own profile, killed by PID at the end) opens the
 // running dev client (http://localhost:3300) in promo mode (web/lib/promo.js)
@@ -20,6 +24,9 @@ const WORK = path.join(os.tmpdir(), "gnogolf-promo");
 const STILLS = process.argv.includes("--stills");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
 const FPS = 30;
+const CLEAN = process.argv.includes("--clean");
+// the clean cut's shots, in order: flyovers and rolls, ending on the garden's slow, bright orbit
+const CLEAN_SHOTS = ["snow", "sandcastles", "market", "cold", "mill", "frozen", "jump", "plazaP", "marketW", "tube", "logo"];
 
 // The music: "Dizzy Racing" by Zane Little Music (CC0), 175 BPM. The cut
 // starts on a phrase at 104.53 s and its last hit lands on the end card.
@@ -57,7 +64,16 @@ const title = (t) => t.raw ? t.raw : t.logo ? LOGO(t.logo) : t.pill ? `<div clas
 // swap: a shot cut into slices, one gnome each (a page load per slice), the
 // camera and the titles running on through them. url: the end card's address,
 // left out while it is empty.
-const SHOTS = JSON.parse(fs.readFileSync(path.join(HERE, "shots.json"), "utf8")).flatMap((s) => {
+// clean: the picked shots laid end to end, every overlay and camera jolt left out
+const cleanOf = (all) => {
+  let at = 0;
+  return CLEAN_SHOTS.map((n) => all.find((s) => s.name === n)).map((s) => {
+    const len = s.beats[1] - s.beats[0];
+    const { titles, url, card, burst, rays, blur, dim, drift, flash, punch, whip, hits, dip, ...rest } = s;
+    return { ...rest, weather: s.weather || "clear", beats: [at, (at += len)] }; // "clear": no rain from the live forecast
+  });
+};
+const SHOTS = ((a) => (CLEAN ? cleanOf(a) : a))(JSON.parse(fs.readFileSync(path.join(HERE, "shots.json"), "utf8"))).flatMap((s) => {
   const titles = [...(s.titles || []), ...(s.url ? [{ pill: s.url, at: s.urlAt ?? 1.37, tilt: 0, y: s.urlY ?? 440 }] : [])]
     .map((t) => ({ ...t, html: title(t) }));
   const f0 = F(s.beats[0]), f1 = F(s.beats[1]), dur = (f1 - f0) / FPS;
@@ -78,7 +94,8 @@ const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - LAST * BEAT).toFixed(3);
 // ------------------------------------------------------------------ chrome
 
 async function chrome() {
-  const { send, js, kill } = await launch({ width: 1920, height: 1080, dir: path.join(WORK, "profile"), args: ["--window-size=1920,1080", "--hide-scrollbars", "--mute-audio"] });
+  const [w, h] = CLEAN ? [1280, 720] : [1920, 1080];
+  const { send, js, kill } = await launch({ width: w, height: h, dir: path.join(WORK, "profile"), args: [`--window-size=${w},${h}`, "--hide-scrollbars", "--mute-audio"] });
   // the HMR socket never opens: another edit to the app cannot remount the game mid-shot
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `try{localStorage.setItem("gnogolf.earned",${JSON.stringify(JSON.stringify(ALL_GNOMES))})}catch(e){}` });
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `{const W=window.WebSocket;window.WebSocket=function(u,p){return /hmr/.test(String(u))?{readyState:0,send(){},close(){},addEventListener(){},removeEventListener(){}}:new W(u,p)};Object.assign(window.WebSocket,{CONNECTING:0,OPEN:1,CLOSING:2,CLOSED:3});}` });
@@ -152,16 +169,16 @@ async function shoot(c, s, i, out) {
     fs.writeFileSync(STILLS ? path.join(out, `${String(i).padStart(2, "0")}-${s.name}-${f}.png`) : path.join(out, `${String(s.f0 + f).padStart(5, "0")}.jpg`), Buffer.from(data, "base64"));
     if (f % 15 === 0) await sleep(40); // a modest pace: the laptop stays cool
   }
-  if (!STILLS) {
+  if (!STILLS && !CLEAN) {
     const wav = await c.js(`__promo.audio(${s.pre || 0}, ${dur})`);
     if (wav) fs.writeFileSync(path.join(WORK, `sfx-${i}.wav`), Buffer.from(wav, "base64"));
   }
   console.log(`shot ${i} ${s.name}: ${frames} frames`);
 }
 
-const out = STILLS ? path.join(HERE, "stills-check") : path.join(WORK, "frames");
+const out = STILLS ? path.join(HERE, "stills-check") : path.join(WORK, CLEAN ? "frames-clean" : "frames");
 fs.mkdirSync(out, { recursive: true });
-if (!STILLS && !ONLY && !process.argv.includes("--encode")) for (const f of fs.readdirSync(WORK)) if (f.startsWith("sfx-")) fs.unlinkSync(path.join(WORK, f));
+if (!STILLS && !CLEAN && !ONLY && !process.argv.includes("--encode")) for (const f of fs.readdirSync(WORK)) if (f.startsWith("sfx-")) fs.unlinkSync(path.join(WORK, f));
 const ENCODE = process.argv.includes("--encode"); // only re-encode the frames and sounds already captured
 const c = ENCODE ? { kill() {} } : await chrome();
 try {
@@ -170,6 +187,31 @@ try {
   c.kill();
 }
 if (STILLS) process.exit(0);
+
+// ------------------------------------------------------------ encode: clean
+//
+// 960x540 at 24 fps, no audio track. Toon flat colours: a low two-pass rate
+// holds up. Each file stands alone under ~500 KB (the browser takes one).
+if (CLEAN) {
+  const DEST = path.join(HERE, "..", "..", "web", "public", "title");
+  const ff = (...a) => execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", ...a], { stdio: "inherit", cwd: WORK });
+  const src = ["-framerate", String(FPS), "-i", path.join(out, "%05d.jpg"), "-t", String(LEN)];
+  const vf = `scale=960:540:flags=lanczos,fps=24,format=yuv420p`;
+  const KBPS = Number(process.env.KBPS) || 230;
+  ff(...src, "-vf", vf, "-an", "-c:v", "libsvtav1", "-preset", "4", "-b:v", `${Math.round(KBPS * 0.75)}k`, "-svtav1-params", "tune=0:enable-overlays=1", "-g", "240", path.join(DEST, "bg.av1.webm"));
+  for (const pass of [1, 2])
+    ff(...src, "-vf", vf, "-an", "-c:v", "libvpx-vp9", "-b:v", `${KBPS}k`, "-maxrate", `${KBPS * 1.5}k`, "-bufsize", `${KBPS * 3}k`, "-deadline", "good", "-cpu-used", "1", "-row-mt", "1", "-g", "240",
+      "-pass", String(pass), "-passlogfile", path.join(WORK, "vp9"), ...(pass === 1 ? ["-f", "null", "/dev/null"] : [path.join(DEST, "bg.vp9.webm")]));
+  for (const pass of [1, 2])
+    ff(...src, "-vf", vf, "-an", "-c:v", "libx264", "-preset", "veryslow", "-b:v", `${KBPS}k`, "-maxrate", `${KBPS * 1.5}k`, "-bufsize", `${KBPS * 3}k`, "-profile:v", "high", "-movflags", "+faststart", "-g", "240",
+      "-pass", String(pass), "-passlogfile", path.join(WORK, "x264"), ...(pass === 1 ? ["-f", "null", "/dev/null"] : [path.join(DEST, "bg.mp4")]));
+  // the poster: the first frame, what shows while the video loads
+  ff("-i", path.join(out, "00000.jpg"), "-vf", "scale=960:540:flags=lanczos", path.join(WORK, "poster.png"));
+  execFileSync("cwebp", ["-quiet", "-q", "70", path.join(WORK, "poster.png"), "-o", path.join(DEST, "bg-poster.webp")]);
+  for (const f of ["bg.av1.webm", "bg.vp9.webm", "bg.mp4", "bg-poster.webp"]) console.log(f, Math.round(fs.statSync(path.join(DEST, f)).size / 1024), "KB");
+  console.log("clean cut:", LEN.toFixed(2), "s");
+  process.exit(0);
+}
 
 // ------------------------------------------------------------------ encode
 
