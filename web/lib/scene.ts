@@ -12,4 +12,4 @@ export { motion, setTime, at, disposeCourse, quality } from "./scene/materials";
 export { maxDpr, makeRenderer, makeScene, setLighting, courseBox, applyRig, overviewRig, farRig, ORBIT, focusRig } from "./scene/camera";
 export { buildHole, finishHole, buildExtras } from "./scene/course";
 export { GNOMES, gnomeById, makeBall, makePreview } from "./scene/gnome";
-export { makeSplash, makeConfetti, makeBand, bandTo, makeAim, aimAlong } from "./scene/fx";
+export { makeSplash, makeConfetti, cheer, makeBand, bandTo, makeAim, aimAlong } from "./scene/fx";

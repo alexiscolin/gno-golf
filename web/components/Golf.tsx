@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
-import { GNOMES, makePreview } from "@/lib/scene";
+import { GNOMES, makePreview, cheer, motion } from "@/lib/scene";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
 import type { Bests, HoleLeaderboard, HoleRow, Leaderboard as LeaderboardRows, Mode, StrokesRow, StandingRow } from "@/lib/types";
-import type { Card } from "@/lib/card";
+import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
 import { hasAdena, connect, current, onOurNode, recordRound, splitRound, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
@@ -388,6 +388,9 @@ export default function Golf() {
   }, [tHas, tN, tName, tHoled, tFlying, tAiming, tStrokes, playing]);
   const holedRef = useRef<(id: string, strokes: number) => void>(() => {});
   const [fresh, setFresh] = useState<Skin[]>([]); // gnomes just unlocked, for the banner
+  // the hole that finished its cup (or beat the cup's best): the win card
+  // leads on to the cup's victory screen (open)
+  const [cupWon, setCupWon] = useState<{ cup: Cup; id: string; best: boolean; open?: boolean } | null>(null);
   const holesList = (s && s.holes) || NONE;
   const tot = useMemo(() => totals(card, holesList), [card, holesList]);
   const allList = (s && s.allHoles) || NONE;
@@ -777,6 +780,10 @@ export default function Golf() {
     const after = cupTotals(next, list);
     setCard(next);
     setFresh(GNOMES.filter((gn) => gn.unlock && !UNLOCKS[gn.unlock].ok(before) && UNLOCKS[gn.unlock].ok(after)));
+    // the cup complete now and not before, or complete again in fewer strokes
+    const h = list.find((x) => x.id === id), cup = h && WORLDS.find((w) => w.id === cupOf(h))?.id;
+    const b = cup && before[cup], a = cup && after[cup];
+    if (cup && b && a && a.all && (!b.all || a.strokes < b.strokes)) setCupWon({ cup, id, best: b.all });
   };
 
   return (
@@ -1065,15 +1072,21 @@ export default function Golf() {
                   {record?.at === "signing" ? (record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`) : "Save on-chain"}
                 </Button>
               )}
-              <button
-                className="btn btn--main"
-                onClick={() => {
-                  const i = s.holes.findIndex((h) => h.id === s.id);
-                  goTo(s.holes[(i + 1) % s.holes.length].id);
-                }}
-              >
-                Next hole →
-              </button>
+              {cupWon && cupWon.id === s.id ? (
+                <button className="btn btn--main" onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
+                  Cup complete! →
+                </button>
+              ) : (
+                <button
+                  className="btn btn--main"
+                  onClick={() => {
+                    const i = s.holes.findIndex((h) => h.id === s.id);
+                    goTo(s.holes[(i + 1) % s.holes.length].id);
+                  }}
+                >
+                  Next hole →
+                </button>
+              )}
             </div>
             {account && !onChain && (
               <p className="real__fine">
@@ -1083,6 +1096,23 @@ export default function Golf() {
             {!onChain && !stale && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
           </Dialog>
         </div>
+      )}
+
+      {cupWon && cupWon.open && s && (
+        <Victory
+          cup={cupWon.cup}
+          best={cupWon.best}
+          holes={(s.allHoles || NONE).filter((h) => cupOf(h) === cupWon.cup)}
+          card={card}
+          fresh={fresh}
+          snapshot={() => (game.current ? game.current.snapshot(`${(WORLDS.find((w) => w.id === cupWon.cup) || WORLDS[0]).name} complete`) : Promise.resolve(null))}
+          onBack={() => (setCupWon(null), setScreen("worlds"))}
+          onReplay={() => {
+            setCupWon(null);
+            const first = s.holes[0];
+            if (first) goTo(first.id);
+          }}
+        />
       )}
 
       {askAim && (
@@ -1534,6 +1564,80 @@ function shareText({ s, card, cups, fresh }: { s: Snapshot; card: Card; cups: Re
     `🧙 My gnome sank ${s.name} in ${s.strokes}. Physics by a realm on gno.land, excuses by me.`,
     `⛳ ${s.strokes} strokes on ${s.name}. Every bounce computed on-chain. Beat that, gnome.`,
   ]) + tag;
+}
+
+/** The address of a cup, as the cup screen puts it in the bar: ?cup=<world>. */
+function cupLink(cup: string) {
+  const q = new URLSearchParams();
+  const keep = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  for (const k of ["rpc", "web"]) { const v = keep.get(k); if (v) q.set(k, v); }
+  q.set("cup", cup);
+  return `?${q}`;
+}
+
+/** The confetti over the victory screen: none with reduced motion. */
+function Cheer() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = ref.current;
+    if (!motion || !box) return;
+    // a canvas of its own each time: a context once lost is not given back
+    const el = box.appendChild(document.createElement("canvas"));
+    let stop = () => {};
+    try { stop = cheer(el); } catch {} // no WebGL to spare: no confetti, the screen stands
+    return () => (stop(), el.remove());
+  }, []);
+  return motion ? <div ref={ref} className="victory__cheer" aria-hidden="true" /> : null;
+}
+
+/**
+ * A cup won: its emblem and colours, the total against par, its card, the
+ * gnomes it earned and the ways to tell people, then back to the cups.
+ */
+interface VictoryProps {
+  cup: Cup;
+  best: boolean;
+  holes: readonly HoleRow[];
+  card: Card;
+  fresh: readonly Skin[];
+  snapshot: () => Promise<Blob | null>;
+  onBack: () => void;
+  onReplay: () => void;
+}
+function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay }: VictoryProps) {
+  const w = WORLDS.find((x) => x.id === cup) || WORLDS[0];
+  const t = totals(card, holes), vs = t.strokes - t.par;
+  const vsText = vs === 0 ? "level par" : `${vs > 0 ? "+" : ""}${vs}`;
+  const main = useRef<HTMLButtonElement>(null);
+  // the dialog focuses its first control (a share icon): the main action instead
+  useEffect(() => main.current?.focus({ preventScroll: true }), []);
+  const text = `🏆 ${best ? `New best on the ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on gno.land. #gnoland @_gnoland`;
+  return (
+    <div className={`victory victory--${cup}`}>
+      <Cheer />
+      <Dialog className="victory__in" role="dialog" aria-modal="true" aria-labelledby="victory-title" aria-describedby="victory-sum" onClose={onBack}>
+        <div className="victory__badge"><Emblem id={cup} /></div>
+        <span className="victory__ribbon">{w.name}</span>
+        <h2 id="victory-title">{best ? "New best!" : "Cup complete!"}</h2>
+        <p id="victory-sum" className="victory__sum">
+          <strong>{t.strokes}</strong> strokes · par {t.par} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsText}</b>
+          {t.all && vs <= 0 && <span className="victory__stamp" title="At par or under">★ At par or under</span>}
+          {t.aces > 0 && <span className="victory__stamp">{t.aces} hole{t.aces > 1 ? "s" : ""}-in-one</span>}
+        </p>
+        <Scorecard holes={holes} card={card} current={null} world={cup} compact />
+        {fresh.length > 0 && (
+          <p className="note note--good">
+            New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b> — pick it from the menu.
+          </p>
+        )}
+        <Share text={text} link={cupLink(cup)} snapshot={snapshot} />
+        <div className="banner__row">
+          <Button variant="secondary" onClick={() => (sound("blip"), onReplay())}>Replay the cup</Button>
+          <button ref={main} className="btn btn--main" onClick={() => (sound("select"), onBack())}>Back to cups</button>
+        </div>
+      </Dialog>
+    </div>
+  );
 }
 
 /** The par of the hole being played. */
