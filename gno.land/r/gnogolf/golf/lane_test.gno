@@ -116,29 +116,18 @@ func TestAPieceNeverPushesTheBallThroughAWall(t *testing.T) {
 	}
 }
 
-// leaky is a hole whose walls let every shot out: the ball rests off its
-// board, 10 to the right of it.
-type leaky struct{ flat }
-
-func (h *leaky) Preview(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	return physics.Shot{Path: []physics.Vec2{ball, physics.V(42, 8)}, Air: []bool{false, false}, Cause: []byte("--")}, false
-}
-
-func (h *leaky) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	return h.Preview(ball, angle, power)
-}
-
 // A ball that comes to rest off the board is brought back to where the shot
-// started, and the stroke counts: played, previewed and replayed alike.
+// started, and the stroke counts: played, previewed and replayed alike. A
+// hole with no walls lets every long shot out.
 func TestABallOffTheBoardComesBack(cur realm, t *testing.T) {
-	id := "gno.land/r/test/leaky"
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), &leaky{})
+	leaky := flatHole("Leaky")
+	leaky.Course.Walls, leaky.Course.Friction = nil, 0.97
+	id := mine(cur, "leaky", leaky)
 	testing.SetRealm(testing.NewUserRealm(player))
-	Launch(cross(cur), id, 0, 5)
-	Launch(cross(cur), id, 0, 5)
+	Launch(cross(cur), id, 0, 10)
+	Launch(cross(cur), id, 0, 10)
 	r := roundIn(id, player)
-	tee := (&flat{}).Start()
+	tee := leaky.Tee
 	if r.ball() != tee || r.strokes != 2 {
 		t.Fatalf("after two leaks the ball is at %v after %d strokes", r.ball(), r.strokes)
 	}
@@ -146,7 +135,7 @@ func TestABallOffTheBoardComesBack(cur realm, t *testing.T) {
 	if sim := SimulateRound(id, r.shots); !strings.Contains(sim, want) || !strings.Contains(sim, `"strokes":2`) {
 		t.Fatalf("the replay differs: %s", sim)
 	}
-	if !strings.Contains(Round(id, player), `[42.000,8.000],[2.000,8.000]]`) {
-		t.Fatalf("the last shot is not drawn coming back: %s", Round(id, player))
+	if rd := Round(id, player); !strings.Contains(rd, `,[2.000,8.000]],"air"`) || !strings.Contains(rd, `,"cause":"`) {
+		t.Fatalf("the last shot is not drawn coming back: %s", rd)
 	}
 }

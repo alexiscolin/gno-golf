@@ -183,6 +183,13 @@ export interface HoleRow {
   slot?: string;
 }
 
+/** Holes(): the holes a menu lists, the 3D client's link and the realm the course moved to ("" if none). */
+export interface Holes extends Versioned {
+  play: string;
+  successor: string;
+  holes: readonly HoleRow[];
+}
+
 /** Community(): a page of every community hole, every version. */
 export interface Community extends Versioned {
   rows: readonly HoleRow[];

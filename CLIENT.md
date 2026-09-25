@@ -62,7 +62,6 @@ version keeps its own rounds, records and board.
 | version | `garden/7/v2` | everything, and the only form a write takes |
 | slot | `garden/7` | reads and links: it means the slot's current version |
 | community | `g1…/my-hole/v1`, alias `g1…/my-hole` | someone's own data hole, the same two ways |
-| realm hole | `gno.land/r/alice/myhole` | a hole registered by a realm |
 
 Reads take any of these. **Writes take the exact version id**, the `"hole"`
 that `HoleState` or `State` returned (or the `"id"` in `Holes()`): a write
@@ -102,7 +101,9 @@ const json = JSON.parse(JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndex
 The raw form above is here so the contract does not depend on a library version.
 
 Every object a read returns starts with `"version":1` (the rows inside a
-list don't, and `Holes()` is a bare list).
+list don't). `Holes()` is `{"version":1,"play":…,"successor":…,"holes":[…]}`:
+the rows, the 3D game's link, and the realm the course moved to (`""` if none;
+a client that finds one can offer to go there).
 
 ### Which reads to use
 
@@ -299,7 +300,9 @@ first stroke to the cup.
 - `Weather(hole, period) string` is the same object for any period that has
   come.
 - `SimulateRoundAt`, `SimulateFrom` and `SimulateCommit` preview in the given
-  period's weather, and answer with it.
+  period's weather, and answer with it. `SimulateRoundAt` and `SimulateCommit`
+  refuse the periods the commit would refuse (a first stroke takes the current
+  period or the one before); `SimulateFrom` takes any period that has come.
 - Record with `PlayRoundAt(cur, hole, shots, period)`, passing the period the
   round was previewed in. It is accepted when it is the current period or the
   one before, so a round played across the turn records exactly what was
@@ -340,9 +343,8 @@ the exact version id.
 - `Reset(cur, hole)` puts the ball back on the tee.
 
 A wallet session scoped to the golf realm's `vm/exec` stops the wallet
-prompting for every commit. `Register` and `PublishMine` are how authors add
-holes of their own, and `Publish` is the owner's; none of them is a player's
-concern.
+prompting for every commit. `PublishMine` is how authors add holes of their
+own, and `Publish` is the owner's; neither is a player's concern.
 
 ## Skin vocabulary
 

@@ -12,19 +12,19 @@ import (
 	"gno.land/p/gnogolf/physics"
 )
 
-// Every course hole published as data plays as the same hole registered as
-// a realm, bit for bit, through golf.
+// Every course hole published as data plays through golf as the hole its
+// realm declares, bit for bit.
 //
 // The chain of proof: each hole's own test (fingerprint.Check) proves that
 // Decode(Encode(me)) is its realm value me field by field, prep included,
 // and plays the same shots; data/holes.txt is that Encode(me), logged by the
-// same check (scripts/holedata.sh), and courseData is data/holes.txt. So a
-// realm hole registered here with Decode of that data is the realm hole.
-// This test then plays it against the published version, in the same
-// weather laid on both (the forecast is seeded by the id, which differs):
-// calm, rain, wind and storm, from the tee, on stroke 0 at tick 0 and on
-// stroke 1 at tick 5, previewed and played; and checks that both give a
-// renderer the same pieces.
+// same check (scripts/holedata.sh), and courseData is data/holes.txt. So the
+// course.Simple decoded here from that data is the realm's hole. This test
+// then plays that Simple directly against the published version, in the same
+// weather laid on both: calm, rain, wind and storm, from the tee, on stroke 0
+// at tick 0 and on stroke 1 at tick 5, previewed and played; and checks that
+// both give a renderer the same pieces, and golf's listing the hole's own
+// name, par, world and order.
 func TestDataPlaysAsTheRealmHole(cur realm, t *testing.T) {
 	for _, d := range courseData {
 		raw, err := hex.DecodeString(d[3])
@@ -38,18 +38,16 @@ func TestDataPlaysAsTheRealmHole(cur realm, t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %s", d[0], err.Error())
 		}
-		rid := "gno.land/r/parity/" + strings.ReplaceAll(d[0], "/", "_")
-		testing.SetRealm(testing.NewCodeRealm(rid))
-		Register(cross(cur), me)
 		vid := publish(cur, me)
 		if vid != d[0]+"/v1" {
 			t.Fatalf("%s: published as %s", d[0], vid)
 		}
-		re, de := mustHole(rid), mustHole(vid)
-		rh, dh := re.hole(), de.hole()
+		de := mustHole(vid)
+		var rh course.Hole = me
+		dh := de.hole()
 
-		if re.name != de.name || re.par != de.par || re.world != de.world || re.order != de.order {
-			t.Errorf("%s: the listing differs: %q %d %s %v, data %q %d %s %v", d[0], re.name, re.par, re.world, re.order, de.name, de.par, de.world, de.order)
+		if name := cleanName(me.Title); name != de.name || course.ParOf(me) != de.par || me.World != de.world || me.Order != de.order {
+			t.Errorf("%s: the listing differs: %q %d %s %v, data %q %d %s %v", d[0], name, course.ParOf(me), me.World, me.Order, de.name, de.par, de.world, de.order)
 		}
 		if a, b := pieceJSON(rh), pieceJSON(dh); a != b {
 			t.Errorf("%s: the pieces a client draws differ", d[0])

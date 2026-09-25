@@ -37,11 +37,17 @@ value. That has three costs on a live chain:
 - **The hole realms stay in the repo as the source.** Each one's test proves
   the hole survives encoding bit for bit (`fingerprint.Check`: the same shots,
   field by field, the same bytes back) and prints its data, which is what
-  `data/holes.txt` and the publish scripts are made from.
-- **The open side stays open.** Anyone can publish data of their own
-  (`PublishMine`), and any realm can still register a hole written in code
-  (`Register`). Both are community holes: playable and recorded, in no cup and
-  out of the course ranking.
+  `data/holes.txt` and the publish scripts are made from. They don't call
+  golf, and are never deployed.
+- **The open side stays open, as data.** Anyone can publish data of their own
+  (`PublishMine`): a community hole, playable and recorded, in no cup and out
+  of the course ranking.
+- **Every hole is data (final fixes, 2026-09-25).** The first version also let
+  a realm register a hole written in code (`Register`, and `Expect` under
+  golf's own namespace). The final audit found that golf then runs that code
+  in the player's transaction, with the player's storage deposit (a hostile
+  hole could pad its own realm on every play and collect the refund later).
+  Both are gone: golf only plays data, with its own physics.
 - **The owner role is explicit**: one address, checked on the immediate
   caller, that can be handed on in two steps or renounced for good.
 
@@ -57,8 +63,8 @@ value. That has three costs on a live chain:
 - **Publishing carries the checks**: decoding, the bit-exact length check
   (`course.Exact`), and the canonical-form check, once per version.
 - **The format and its limits are frozen.** A hole that needs more walls, zones
-  or points than GG1 allows, or a mechanic `course.Simple` can't express, is a
-  realm hole (community), or waits for a `GG2` in a new `course` version.
+  or points than GG1 allows, or a mechanic `course.Simple` can't express, waits
+  for a `GG2` in a new `course` version (and a golf that plays it).
 - **The owner holds a real power.** Publishing a new version resets that hole's
   ranking, and a stolen key could archive every slot. That is stated on the hub
   page and in the README; `Renounce` exists so the course can be frozen once
@@ -66,7 +72,14 @@ value. That has three costs on a live chain:
 - **Clients follow slots, not paths.** Old realm paths map to slots through
   `data/holes.txt`, and the web client rewrites saved scores and old links.
 - **The weather follows the version id**, so a new version has weather of its
-  own. That's intended: it's a new hole.
+  own. That's intended: it's a new hole. It is also a trap for a successor
+  realm: a golf/v2 that re-publishes a version gets a new id, so new weather,
+  and a best carried over from v1 was played in other weather. A v2 that
+  wants imported bests to count as the same hole must seed its weather from
+  the v1 id (see deploy-v1.md §9).
+- **No hole realm can follow a v2**: none registers anywhere. A successor
+  re-publishes the data (`HoleData` gives it back, `Versions` its sha), and
+  community authors re-publish theirs.
 
 ## Alternatives considered
 

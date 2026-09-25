@@ -1848,7 +1848,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
         {tab !== "friends" && (
           <p className="boards__ranked">
             Ranked: players with a gno.land name ·{" "}
-            <a href={`${web}/r/gnoland/users`} target="_blank" rel="noopener noreferrer">get a name ↗</a>
+            <a href={`${web}/r/sys/namereg/v1`} target="_blank" rel="noopener noreferrer">get a name ↗</a>
             {me && myName === "" && <> — get one to appear here</>}
           </p>
         )}

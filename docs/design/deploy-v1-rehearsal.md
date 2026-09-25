@@ -100,11 +100,11 @@ Headless Chrome (`media/lib/cdp.mjs`, muted, one page at a time, killed after): 
 |---|---|---|
 | Name deposit | 0.33 | — |
 | Code deposit (3 packages) | 24.43 | ~19 |
-| 74 holes' deposit | 75.90 | ~39 |
-| **Deposit** | **100.65 GNOT** | ~58 (45–80) |
+| 74 holes' deposit | 75.90 (~46 after the final fixes, estimated: problem 10) | ~39 |
+| **Deposit** | **100.65 GNOT** (~71 after the final fixes) | ~58 (45–80) |
 | Fees: the 15 transactions below at their gas-wanted (1.3× measured) and 1.2× the price floor | 11.93 GNOT (7.59 at the floor) | ~3–6 |
-| **Total** | **112.6 GNOT** | ~65 (50–90) |
-| **With a 15% margin** | **~130 GNOT** | |
+| **Total** | **112.6 GNOT** (~83 after the final fixes, estimated) | ~65 (50–90) |
+| **With a 15% margin** | **~130 GNOT** (~95 after the final fixes; keep asking for ~130, the fixes are not re-rehearsed) | |
 
 At the faucet's 10 GNOT a day for one address that is 13 days; ask the faucet operators or GovDAO for ~130 GNOT instead. The deposit is locked for good (published data is never freed). The deploy order also bounds when money is needed: ~25 GNOT for the name and code, then ~6–10 GNOT per publish script.
 
@@ -165,7 +165,7 @@ gnokey maketx addpkg -pkgpath gno.land/r/nym-golfer000/golf -pkgdir /tmp/stage/g
 
 Check: `gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.Owner()' $R` → `<your-address>`; https://pearl.testnets.gno.land/r/nym-golfer000/golf shows the hub ("No hole yet", "the course's owner, now <you>").
 
-**6. Generate the publish scripts** for the namespace (7 holes a script; `OUT` keeps the committed `scripts/publish/` as it is):
+**6. Generate the publish scripts** for the namespace (7 holes a script). Pearl needs `REALM`: the committed `scripts/publish/` import the local `gno.land/r/gnogolf/golf`, and `OUT` keeps them as they are:
 
 ```sh
 REALM=gno.land/r/nym-golfer000/golf OUT=/tmp/pub scripts/publishdata.sh
@@ -231,7 +231,7 @@ Elsewhere:
 7. **`publishdata.sh`'s default split did not match the committed set.** The default was 10 holes a script; the committed set is 7 a script, and 10 of the heavier holes come to ~1.2e9 gas, past gnomcp's 1e9 measuring ceiling. Fixed: the default is now 7, and its output with no arguments is byte-for-byte the committed `scripts/publish/`. (The last script's header still says "holes 71-77" for 71–74; cosmetic, left so the committed files do not change.)
 8. **gnomcp caps a write's gas-wanted at 1e9.** publish-07 used 856.5M of it (14% headroom). It passed; with gnokey the user sets 1.12e9 (step 7). A heavier set of seven would need splitting for gnomcp.
 9. **One of the rehearsal's own hand-copied scripts had a typo in mountain/8's hex.** The chain refused the whole script at simulation ("course: a point lies off the board"), nothing was published, and the corrected script went through. On pearl the scripts are files, so this cannot happen; it does show a corrupted hole cannot be published silently (the decode bounds, `Exact` and the re-`Encode` check stop it, and `verify.gno` checks every sha).
-10. **The data publish costs twice the design's estimate: 75.9 GNOT, not ~39.** 10,256 bytes a hole, of which ~1,900 are the GG1 string; the rest is the `entry` (three `avl.NewTree()` made up front for `rounds` and the two `bests`, the name, slot, sha, note…) and the keys in `courseHoles`, `holeData` and `slots`. A `gno.land/` concern, not fixed here: for example, making `rounds` and `bests` lazily at the first play, as `board` and `wear` already are, would save most of it. It is the one number in the budget worth deciding on before pearl.
+10. **The data publish costs twice the design's estimate: 75.9 GNOT, not ~39.** 10,256 bytes a hole, of which ~1,900 are the GG1 string; the rest is the `entry` (three `avl.NewTree()` made up front for `rounds` and the two `bests`, the name, slot, sha, note…) and the keys in `courseHoles`, `holeData` and `slots`. **Fixed after the rehearsal (final fixes):** a version's rounds and records are made at the first stroke and the first finish, as B+ trees; before that its entry holds no tree, array or record object (each was an object of its own, a few hundred bytes even empty). Measured in filetests on the same eight course holes, a further publish went from 8,993 to 4,975 bytes a hole (−45%: ~3.2 KB besides the data, against ~7.2 KB). Scaled to the rehearsal's 10,256 bytes a hole, that is about 6,240 a hole, ~462 KB and **~46 GNOT for the 74 holes** instead of 75.9 (an estimate from the filetests, not a new rehearsal). The first finisher on a version now pays the first leaves of its trees instead (about 17 KB with a new player's standing, from 9.9 KB); a later player pays less (3.2 KB for a new player's first finish at 50 players, from 6.5 KB; 1.9 KB on a further hole, from 5.3 KB).
 11. **The web client's "get a name" link points at `r/gnoland/users`,** absent on pearl (see above). Reported, not fixed.
 
 ## Left running

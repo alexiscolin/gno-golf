@@ -10,7 +10,7 @@
 // ("chain"), not left to fail somewhere in the scene.
 
 import type {
-  Bests, Extras, HoleLeaderboard, HoleRow, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
+  Bests, Extras, HoleLeaderboard, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
   SimulateRound, Standings, Vec2, Weather,
 } from "./types";
 
@@ -101,6 +101,8 @@ const strokesRow = (r: unknown) => isObj(r) && typeof r.player === "string" && n
 const standingRow = (r: unknown) => strokesRow(r) && nums(r as Obj, "holes");
 const checks = {
   holes: (v: unknown): v is HoleRow[] => Array.isArray(v) && v.every(holeRow),
+  // Holes(): { version, play, successor, holes }
+  holesReply: (v: unknown): v is Holes => isObj(v) && strs(v, "play", "successor") && Array.isArray(v.holes) && v.holes.every(holeRow),
   state: (v: unknown): v is HoleState =>
     isObj(v) && typeof v.hole === "string" && isObj(v.board) && isVec(v.start) && isVec(v.cup) && arrays(v, "walls", "posts", "zones"),
   simFrom,
@@ -304,7 +306,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
         const c = !fresh && (JSON.parse(sessionStorage.getItem(key) || "null") as { at?: number; list?: unknown } | null);
         if (c && Date.now() - Number(c.at) < HOLES_TTL && checks.holes(c.list) && c.list.length) return c.list;
       } catch {}
-      const list = await qeval("Holes()", checks.holes);
+      const list = [...(await qeval("Holes()", checks.holesReply)).holes];
       try {
         sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), list }));
       } catch {}

@@ -52,6 +52,14 @@ func notAhead(period int64) {
 	}
 }
 
+// notOver refuses a round's weather two periods or more behind: a round left
+// for later cannot be finished days on in the weather it picked.
+func notOver(period int64) {
+	if period < Period()-1 {
+		panic(ufmt.Sprintf("golf: this round's weather (period %d) is over: Reset to play again", period))
+	}
+}
+
 // playablePeriod checks the period a round is recorded under: the current
 // one, or the one just gone — a round that ran over the turn of the period is
 // recorded in the weather it was played in, and no older. stroke holds every

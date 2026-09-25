@@ -213,15 +213,20 @@ There is no cross-call cache: it would be persisted, and qeval can't persist any
 ## 9. Upgradability
 
 - **Typed reads for a future golf/v2:**
-  - `HoleData(id)` returns the hex;
+  - `HoleData(id)` returns the hex, and `Versions(alias)` each version's sha;
   - `Current(slot)`;
   - `BestOf(hole, mode, player)`;
   - `StandingOf(mode, player)`;
-  - `HoleOf(id) course.Hole`.
-- **golf/v2** re-publishes v1's data (about 15 GNOT) and shows v1's records as history.
+  - the paged JSON reads (`Records`, `Players`, `Community`) to enumerate.
+  - There is no `HoleOf`: it would hand any realm a value that writes golf's wear (audit Y4).
+- **golf/v2** re-publishes v1's data and shows v1's records as history, or carries bests over lazily (`v2.Import(player)` reading `v1.BestOf`), only where the physics and course are the same.
+- **Deploy v2 as a sibling** (`r/<ns>/golf2`): golf derives `officialPrefix` and the `/p/<ns>/` links from its own path up to the last `/`, so `r/<ns>/golf/v2` would take `r/<ns>/golf/` for its namespace.
+- **Trap: the weather is seeded by the version id** (`ForecastFor(e.id, …)`). A version re-published in v2 gets a new id, so new weather: a v1 best was played in other weather than the v2 round it would be compared with. A v2 that counts imported bests as the same hole must seed its weather from the v1 id (keep a `legacyID` per version).
+- **Trap: no hole comes over by itself.** Holes don't register from realms any more (every hole is data, and the 74 hole realms don't call golf), so nothing re-registers into a v2: it re-publishes every official version from `HoleData`, checked against `Versions`' sha, and community authors re-publish theirs with v2's `PublishMine`.
+- **Pointing players at v2:** v1's owner calls `SetSuccessor(v2)` once. Every v1 page then shows a "moved to" banner and `Holes` gives `"successor"`; v1 goes on playing and blocks nothing.
 - **physics/v2** needs course/v2 and golf/v2, because `course.Hole` uses physics v1 types. The `GG1` magic leaves room for a `GG2`.
-- **Frozen at deploy:** physics, course and the `GG1` format with its limits, the golf code and constants, `playURL`, the namespace.
-- **Updatable:** official hole versions, community holes, the owner, the client.
+- **Frozen at deploy:** physics, course and the `GG1` format with its limits, the golf code and constants, the namespace.
+- **Updatable:** official hole versions, community holes, the owner, the play link (`SetPlayURL`), the successor (once), the client.
 
 ## 10. Deploy pipeline
 
@@ -249,7 +254,7 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
 | 2 | addpkg physics | user, gnokey | ~52 KB, 5.2 GNOT |
 | 3 | addpkg course | user, gnokey | ~3.7 GNOT |
 | 4 | addpkg golf (its init sets the owner) | user, gnokey | ~9.1 GNOT |
-| 5 | 74 × `Publish`, one cup a day if relying on the faucet | gnomcp session as owner, or a gnokey loop | ~0.53 GNOT, ~20–30M gas each |
+| 5 | 74 × `Publish`, 7 a script (`scripts/publishdata.sh`) | the user's key, gnokey | measured in the rehearsal: ~98M gas and ~0.5 GNOT a hole (deploy-v1-rehearsal.md) |
 | 6 | Verify | gnomcp reads | 0 |
 
 - Every package is far below the 1 MB transaction limit.
@@ -370,7 +375,7 @@ That is about 7 faucet-days for one address, or a request to the faucet operator
 1. The name: `nym-golfer000` (decided).
 2. The IC-B physics fixes: **yes, all of them** (decided). Fix the physics as far as possible before it is frozen.
 3. `Transfer` and `Renounce`: **included** (decided).
-4. `playURL`: the final domain.
+4. `playURL`: owner-settable (`SetPlayURL`), starting at `https://gno-golf.netlify.app/` (decided). Realm holes (`Register`, `Expect`) removed: every hole is data (decided, final fixes).
 5. Funding: the official pearl faucet gives up to 300 GNOT, enough for the whole deploy (decided).
 
 ## Critical files

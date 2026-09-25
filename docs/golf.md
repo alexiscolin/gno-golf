@@ -5,15 +5,12 @@ records and the rankings. It routes shots to holes. It knows nothing about any
 particular course: `golf` only understands a hole through
 [`course.Hole`](course.md).
 
-A hole is one of two things:
-
-- **Data.** A GG1 string ([course.md](course.md#holes-as-data-gg1)) that
-  `golf` stores and decodes afresh for every call. The course's own holes are
-  data the owner publishes into **slots** (`garden/7`), each publish a new
-  **version** (`garden/7/v1`, `garden/7/v2`, …). Anyone can publish data of
-  their own the same way (`PublishMine`).
-- **A realm.** A deployed realm that registers a `course.Hole` value of its own
-  (`Register`).
+Every hole is **data**: a GG1 string ([course.md](course.md#holes-as-data-gg1))
+that `golf` stores and decodes afresh for every call, and plays with the
+physics package. No hole runs code of its own. The course's own holes are data
+the owner publishes into **slots** (`garden/7`), each publish a new **version**
+(`garden/7/v1`, `garden/7/v2`, …). Anyone can publish data of their own the
+same way (`PublishMine`).
 
 Only the versions the owner publishes into slots are **course holes**
 (`"official":true`): they make up the cups and count in the course-wide
@@ -36,8 +33,11 @@ The owner can:
   that a new version is playable: a hole can be replaced, never taken down.
 - **Add slots** (`Publish` into a slot that has none yet), in any world, with
   an order from 1 to 999.
-- **Let one realm under golf's own namespace register a hole** (`Expect`).
-  That hole is a community hole like any other.
+- **Move the play link** (`SetPlayURL`): where every page sends a player for
+  the 3D game.
+- **Name a successor, once** (`SetSuccessor`): the realm the course has moved
+  to. It only adds a banner to the pages and a field to `Holes`; it blocks
+  nothing.
 - **Hand the role on** (`Transfer`, then `Accept` by the new owner) or **give it
   up for good** (`Renounce`). After `Renounce` there is no owner, nobody can
   become one, and the course is frozen.
@@ -46,7 +46,7 @@ So the owner shapes the course, and through it the ranking. A stolen owner key
 could archive every slot, and what that does to the rankings can't be undone.
 When a version is published decides its id, and the id seeds its weather.
 Whoever holds the namespace can also deploy lookalike realms under it; they
-aren't course holes, but their URLs look like the course's.
+aren't holes of this realm at all, but their URLs look like the course's.
 
 The owner can't edit or delete a version, a round, a record, a best, a board
 or a standing, can't touch a community hole, the weather, the physics or the
@@ -67,7 +67,6 @@ animating a path, the rules a client must follow), see
 | slot | `garden/7` | alias for the slot's current version |
 | community version | `g1…/my-hole/v1` | one version of someone's own data hole |
 | community alias | `g1…/my-hole` | alias for its current version |
-| realm hole | `gno.land/r/alice/myhole` | the pkgpath of a registered realm |
 
 **Reads take an id or an alias. Writes take the exact id only**, the one
 `State` or `Holes` gave: a round can't be replayed on a version it wasn't
@@ -76,9 +75,9 @@ played on. A write given an alias panics with
 unknown hole with `golf: unknown hole: <id>`. Every JSON answer names the
 version's exact id, never the alias.
 
-The course was once 74 realms, `gno.land/r/gnogolf/hole1` and so on. Those
-paths are not ids of the realm any more; `data/holes.txt` maps each slot to the
-realm its data was built from.
+The course was once 74 realms, `gno.land/r/gnogolf/hole1` and so on. They are
+now only the source of the data: they don't call golf, and their paths are not
+ids. `data/holes.txt` maps each slot to the realm its data was built from.
 
 ## Units and formats
 
@@ -105,12 +104,15 @@ realm its data was built from.
   as `0`. A vector is `[x,y]`. `rest` is the exception: the exact ball, as the
   shortest decimals that read back as the same float64.
 - **Text** from a hole author (names, notes) is cleaned once, when it's
-  published or registered: one line, no control, bidi or zero-width characters,
-  none of ``|[]<>`*_#\&``. A name is at most 40 characters and falls back to
-  `"Untitled hole"`; a note is at most 140. Skins are cut down to
+  published: one line, no control, bidi, zero-width or blank-looking
+  characters (U+00AD, U+115F, U+1160, U+3164, U+FFA0, U+2800, the variation
+  selectors, the tag characters and the like), none of ``|[]<>`*_#\&~@``. A
+  name is at most 40 characters and falls back to `"Untitled hole"` when no
+  letter or digit is left; a note is at most 140. Skins are cut down to
   `[a-z0-9 _-]`, at most 24 bytes. Every string in JSON is escaped.
 - **Every JSON object** a read returns starts with `"version":1` (and so does
-  each round). The rows inside a list don't, and `Holes` is a bare list.
+  each round). The rows inside a list don't. `version` is golf's generation: a
+  golf/v2 answers 2 even where a shape is unchanged.
 
 ## Writes
 
@@ -134,8 +136,8 @@ and returns the new version's id (`"garden/7/v2"`).
   cleaned and shown on the version's data page and in `Versions`.
 - The version it replaces is archived (see [Archived holes](#archived-holes)).
 
-Emits `hole_published` (`id`, `slot`, `sha`), then `hole_retired` (`id`,
-`next`) if a version was replaced.
+Emits `HolePublished` (`hole`, `slot`, `sha`, `by`, `official` `"true"`), then
+`HoleRetired` (`hole`, `next`) if a version was replaced.
 
 ### `PublishMine(cur realm, slug, hexData, note string) string`
 
@@ -148,36 +150,7 @@ its author's business. It's a community hole: playable, recorded and on its
 own board, in no cup and out of the course ranking. A new version archives the
 old one (which never counted anywhere). The publisher pays the storage deposit
 for the bytes it adds, and nothing published can be deleted. Emits
-`hole_published`.
-
-### `Register(cur realm, h course.Hole)`
-
-Lists a hole written in code. It's called by the hole's realm, never by a
-user (`MsgCall` can't build a `course.Hole`), from its `init(cur realm)` or a
-crossing function of its own:
-
-```go
-func Register(cur realm) { golf.Register(cross(cur), me) }
-```
-
-The id is `cur.Previous().PkgPath()`, so nothing can be registered in another
-realm's name. It panics if the caller has no pkgpath, if the path doesn't start
-with `gno.land/r/` (so a `MsgRun` can't register a hole), if the id is already
-registered, or if `h` is nil. Under golf's own namespace (`gno.land/r/gnogolf/`
-for this deployment) it also panics unless the owner has `Expect`ed that exact
-path, and it uses the permission up.
-
-A registered hole is always a community hole. The name, world, order and par
-are read **once**, here, and kept, so listing holes never calls into hole code.
-The world falls back to `garden`; an order that's NaN or beyond ±1e6 falls back
-to the number the path ends with. Emits `hole_registered` (`id`).
-
-### `Expect(cur realm, pkgpath string)`
-
-Owner only. Lets the realm at `pkgpath`, which must be under golf's own
-namespace and not golf itself, `Register` once. It panics if that path is
-already registered. `Accept` and `Renounce` clear every pending permission.
-Emits `hole_expected` (`id`).
+`HolePublished` (`official` `"false"`).
 
 ### `Transfer(cur realm, to address)`, `Accept(cur realm)`, `Renounce(cur realm)`
 
@@ -185,12 +158,27 @@ The owner role, handed on in two steps.
 
 - `Transfer` (owner only) offers the role to `to`, which must be a valid
   address. Offering it to the owner themselves cancels the offer. Emits
-  `owner_transfer_offered` (`owner`, `to`) or `owner_transfer_cancelled`
-  (`owner`).
+  `OwnershipOffered` (`owner`, `to`) or `OwnershipOfferCancelled` (`owner`).
 - `Accept` takes the role, when the caller is the address offered it. Emits
-  `owner_changed` (`from`, `to`).
+  `OwnershipTransfer` (`from`, `to`).
 - `Renounce` (owner only) gives the role up for good: no owner, no offer, and
-  none possible. Emits `owner_renounced` (`from`).
+  none possible. Emits `OwnershipRenounced` (`from`).
+
+### `SetPlayURL(cur realm, url string)`
+
+Owner only. Moves the link every page gives to the 3D game (at deploy,
+`https://gno-golf.netlify.app/`). `url` is `https://` and up to 100 of `a-z`,
+`A-Z`, `0-9` and `-._~/:%`, with no query or fragment of its own: a hole's
+link adds `?cup=…&hole=…` or `?hole=<id>` to it. Emits `PlayURLSet` (`url`).
+
+### `SetSuccessor(cur realm, pkgpath string)`
+
+Owner only, once. Names the realm this course has moved to: a pkgpath under
+`gno.land/r/`, up to 100 of `a-z`, `0-9` and `_-/.`, not golf itself. Once set
+it never changes. It moves nothing and blocks nothing: every page shows a
+"This course has moved" banner and `Holes` gives `"successor"`, while every
+play, record and publish here goes on as before. Emits `SuccessorSet`
+(`successor`). `Successor()` reads it (`""` if none).
 
 ### `Launch(cur realm, hole string, angle, power float64) string`
 
@@ -217,9 +205,12 @@ is**. They don't start from the tee, so to record what `SimulateRound` showed,
 send `Reset` and `PlayRoundAt` in the same transaction (the web client does
 this through Adena).
 
-- `PlayRound` plays in the current weather, assisted. `PlayRoundAt` plays in
-  the weather of `period`, assisted. `PlayRoundPro` is `PlayRoundAt` in pro
-  mode: the aim preview cut short, on the player's word.
+- `PlayRoundAt` plays in the weather of `period`, assisted. `PlayRoundPro` is
+  `PlayRoundAt` in pro mode: the aim preview cut short, on the player's word.
+  `PlayRound` is `PlayRoundAt` for a caller with no period to give (a form, a
+  script): a round's first stroke takes the current period, a round under
+  way its own. Prefer `PlayRoundAt`: a commit included after the weather
+  turned is then played in the weather its shots were chosen in.
 - On a round's first stroke, the period has to be the current one or the one
   before, or it panics. The mode is fixed there too.
 - On a round that's already under way, the period and the mode have to be the
@@ -233,31 +224,38 @@ this through Adena).
 ### `Reset(cur realm, hole string)`
 
 Drops the caller's round on that hole (and frees its storage). The next
-stroke starts a new one from the tee. Their bests are kept. Emits `reset`
-(`hole`, `player`).
+stroke starts a new one from the tee. Their bests are kept. Emits
+`RoundReset` (`hole`, `player`).
 
 ### `Drain(cur realm, n int) int`
 
 Anyone. Takes up to `n` players (clamped to 1..400) of archived course holes
 out of the course standings, oldest archived hole first, and returns how many
-archived holes still have players in them. See
-[Archived holes](#archived-holes).
+archived holes still have players in them. A standing it empties stays, at 0
+holes, so the storage it would free (the player's deposit) is not refunded to
+the caller. See [Archived holes](#archived-holes).
 
 ### Events
 
+The names are exported constants (`golf.EventHolePublished` and so on). A
+hole is always `hole`, a player `player`.
+
 | Event | Keys |
 |---|---|
-| `hole_published` | `id`, `slot`, `sha` |
-| `hole_retired` | `id`, `next` |
-| `hole_registered` | `id` |
-| `hole_expected` | `id` |
-| `shot` | `hole`, `player`, `strokes` |
-| `holed` | `hole`, `player`, `strokes`, `mode` |
-| `reset` | `hole`, `player` |
-| `owner_transfer_offered` | `owner`, `to` |
-| `owner_transfer_cancelled` | `owner` |
-| `owner_changed` | `from`, `to` |
-| `owner_renounced` | `from` |
+| `HolePublished` | `hole`, `slot`, `sha`, `by`, `official` (`"true"` for `Publish`, `"false"` for `PublishMine`) |
+| `HoleRetired` | `hole`, `next` |
+| `Shot` | `hole`, `player`, `strokes`, `mode`, `shot` (the stroke as recorded, `"angle,power,tick"`) |
+| `Holed` | `hole`, `player`, `strokes`, `mode`, `shots` (the whole round, as `Round` gives it) |
+| `RoundReset` | `hole`, `player` |
+| `OwnershipOffered` | `owner`, `to` |
+| `OwnershipOfferCancelled` | `owner` |
+| `OwnershipTransfer` | `from`, `to` |
+| `OwnershipRenounced` | `from` |
+| `PlayURLSet` | `url` |
+| `SuccessorSet` | `successor` |
+
+`Shot` is the stroke that did not hole, `Holed` the one that did: together
+they are every stroke, which is all that outlives a `Reset`.
 
 ## Archived holes
 
@@ -268,10 +266,13 @@ version that took its place.
 On the course, an archived version's bests also leave the course-wide
 standings. That's done in batches, because it costs one standing update per
 player who finished the hole: the `Publish` that replaces it takes the first
-400, every finish anywhere takes 16 more, and anyone can take more with
-`Drain`. Until the last one is out, a player not yet reached still counts the
-old version, and a better finish there still moves their standing. A first
-finish on a version after it was archived never counts.
+150, every finish on a course hole takes 4 more (a community hole's finish
+takes none), and anyone can take up to 400 with `Drain`. Until the last one is
+out, a player not yet reached still counts the old version, and a better
+finish there still moves their standing. A first finish on a version after it
+was archived never counts. A standing the drain empties is kept at 0 holes,
+out of the ranking; the owner's playbook is to `Drain(400)` after a
+republish until it returns 0.
 
 ## Reads
 
@@ -284,21 +285,24 @@ These are all free as `vm/qeval` queries and return JSON strings (except
 #### `Holes() string`
 
 The holes, for a client building a menu, at most 120 in all: the course's
-current holes in course order (world by world, then by order), then its
-archived versions, then everyone's current community versions (at most 3 per
-address), then registered realms. The rest are in `Community`. It decodes
+current holes in course order (world by world, then by order), then at most
+20 of its archived versions (leaving at least 20 places for the rest), then
+everyone's current community versions (at most 3 per address). The rest are
+in `Community`, and every version of a slot is on its data page. It decodes
 nothing.
 
 ```json
-[{"id":"garden/1/v1","name":"The Shelf","official":true,"plays":12,"best":3,"proBest":4,
-  "par":3,"world":"garden","order":1.000,"next":"","slot":"garden/1"}, …]
+{"version":1,"play":"https://gno-golf.netlify.app/","successor":"","holes":[
+  {"id":"garden/1/v1","name":"The Shelf","official":true,"plays":12,"best":3,"proBest":4,
+   "par":3,"world":"garden","order":1.000,"next":"","slot":"garden/1"}, …]}
 ```
 
-`best` and `proBest` are the fewest strokes anyone has holed it in, assisted
-and pro, or 0 if nobody has. `next` is the version that replaced it, `""`
-while it's current. `slot` is a data version's alias and is missing on a
-realm hole. The world order is `garden`, `island`, `town`, `mountain`, then any
-other world.
+`play` is the 3D game's link (`SetPlayURL`), `successor` the realm the course
+moved to, `""` if none (`SetSuccessor`). In a row, `best` and `proBest` are
+the fewest strokes anyone has holed it in, assisted and pro, or 0 if nobody
+has. `next` is the version that replaced it, `""` while it's current. `slot`
+is its alias. The world order is `garden`, `island`, `town`, `mountain`, then
+any other world.
 
 #### `Community(after string, limit int) string`
 
@@ -317,7 +321,8 @@ The id of the version an alias (`"garden/7"`, `"g1…/my-hole"`) plays now, or
 #### `Versions(alias string) string`
 
 Every version of an alias, oldest first (the newest 100 if there are more). An
-alias with no version gives an empty list.
+alias with no version gives `"slot":""` and an empty list: the answer never
+echoes the argument.
 
 ```json
 {"version":1,"slot":"garden/7","versions":[
@@ -330,9 +335,8 @@ sha256 of its data in hex.
 
 #### `HoleData(hole string) string`
 
-A data version's GG1, in hex, as it was published (an alias gives its current
-version's): what a successor realm or an auditor reads back. It panics on a
-realm hole, whose code is on its own realm.
+A version's GG1, in hex, as it was published (an alias gives its current
+version's): what a successor realm or an auditor reads back.
 
 ### Drawing a hole
 
@@ -365,13 +369,13 @@ Everything needed to draw the hole and aim: `State` without `plays`,
 
 (The values are illustrative, not from one real hole.)
 
-- `hole` is always the version's id, the one to write with. A data version
-  also has `slot` and `v` (its number), and an archived one `next`.
+- `hole` is always the version's id, the one to write with, with its `slot`
+  and `v` (its number), and an archived one `next`.
 - `timed`: the hole changes from stroke to stroke. Read `Extras` for each
   stroke.
 - `walls[].every/on/phase` only appear on timed walls, and
   `zones[].every/on/phase` only on timed zones. `zones[].poly` and `outside`
-  only appear on polygon zones (at most 256 points are printed).
+  only appear on polygon zones.
 - `zones[].air` and `zones[].capped` only appear when true: the zone is moving
   air (a cannon's gust), and capped air never speeds the ball up. Draw moving
   air as air, whatever its skin.
@@ -457,7 +461,8 @@ One shot from an exact ball, with every input given: `shot` is
 `"angle,power,tick"`, `stroke` the stroke number it would be (0 to 59; timed
 and pulse holes change with it), `period` the weather (not one still to come).
 It's exactly what `PlayRoundAt` would play for that stroke, for one shot's
-gas. Its JSON is `Simulate`'s.
+gas. Unlike the other previews it takes an old period too, to replay a stroke
+of an old round. Its JSON is `Simulate`'s.
 
 #### `SimulateRound(hole, shots string) string`
 
@@ -465,9 +470,9 @@ gas. Its JSON is `Simulate`'s.
 
 Replay a shot list **from the tee**, read-only (stroke numbers, ticks and the
 period's weather included), and return the last shot. They stop at the first
-holed shot. `SimulateRound` uses `Period()`; `SimulateRoundAt` takes any period
-that isn't still to come. They refuse the lists `PlayRound` would refuse (too
-many shots, too much work).
+holed shot. `SimulateRound` uses `Period()`; `SimulateRoundAt` takes the
+current period or the one before, as a round's first stroke does. They refuse
+the lists `PlayRoundAt` would refuse (too many shots, too much work).
 
 ```json
 {"version":1,"holed":false,"strokes":2,"bounces":0,"period":5920000,
@@ -479,8 +484,9 @@ many shots, too much work).
 One commit of a round under way, read-only: the shots the next `PlayRoundAt`
 or `PlayRoundPro` would take, from the exact ball (`rest`) at stroke number
 `stroke`, in the weather of `period`. It refuses what that commit would refuse
-(too much work, past 60 strokes), so a client can check every commit of a long
-round before it signs any. Its JSON is `SimulateRound`'s, and `strokes` is the
+(too much work, past 60 strokes, a weather over: at stroke 0 the current
+period or the one before, later a period not two behind), so a client can
+check every commit of a long round before it signs any. Its JSON is `SimulateRound`'s, and `strokes` is the
 round's count after the commit.
 
 Use `SimulateCommit` or `SimulateFrom` after the first stroke, from the `rest`
@@ -604,13 +610,24 @@ version's id or an alias.
 
 | path | page |
 |---|---|
-| `""` | the hub: a card per cup, a table per cup (par, best, shots played, data link), the archived course holes, the community holes, both leaderboards, and who can change what |
-| `<hole>` | the hole as a text board, its weather, a `Launch` form, a `Reset` form, and its rounds |
+| `""` | the hub: how to play, a card per cup (to its page), both leaderboards (by name), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
+| `<world>` | a cup: its holes by number (par, best, shots played, data link) |
+| `<address>` | the holes that address published, as their current versions |
+| `<hole>` | the hole as a text board, its weather, a `Launch` form, a `Reset` form, and its best rounds per mode |
 | `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked |
-| `<hole>/data` | a data version's provenance, every version of its alias, and its data in hex |
+| `<hole>/data` | a version's provenance, every version of its alias, and its data in hex |
 
-On gnoweb that's `/r/gnogolf/golf`, `/r/gnogolf/golf:garden/3`,
-`/r/gnogolf/golf:garden/3/v1/g1…` and `/r/gnogolf/golf:garden/3/v1/data`.
+On gnoweb that's `/r/gnogolf/golf`, `/r/gnogolf/golf:garden`,
+`/r/gnogolf/golf:g1…`, `/r/gnogolf/golf:garden/3`,
+`/r/gnogolf/golf:garden/3/v1/g1…` and `/r/gnogolf/golf:garden/3/v1/data`:
+every segment of gnoweb's breadcrumb leads somewhere. A query string
+(`?ref=…`) is ignored. A course hole's page names its cup; a community hole's
+page names its author, never a cup, whatever world its data says. A board
+whose drawing would cost more than about 0.6e9 gas says "too detailed to draw
+here" and links the 3D game instead (none of the course's comes near: the
+heaviest is a seventh of that). Once a successor is set, every page opens
+with a "This course has moved" banner.
+
 Every link golf prints follows its own path, so the same code serves under any
 namespace.
 
@@ -645,9 +662,14 @@ Measured on the course holes; treat them as orders of magnitude:
 - **Publishing** is where the checks land: on the two heaviest holes, decoding
   the hex argument measured 32–45M and the length check (`course.Exact`)
   21–36M, once per version.
-- **Storage**: the first publish into a fresh realm stores about 21 KB (the
+- **Storage**: the first publish into a fresh realm stores about 17 KB (the
   data, its entry, and the first leaf of each index it opens). A later one
-  stores the data (1–3 KB for the course holes) and its entry. Two strokes on a
-  data hole store about 3 KB: the round, its shots and the version's
-  512-byte wear. The decoded hole is never stored.
+  stores the data (1–3 KB for the course holes) and about 3.2 KB more (its
+  entry and index keys): nothing for rounds or records until someone plays.
+  A version's own trees (rounds, bests, board) are B+ trees with leaves of 16,
+  made at their first stroke or finish: the first finisher on a version pays
+  their first leaves (about 17 KB with the round and the standing, measured
+  in a filetest), a later player's first finish about 3.2 KB (1.9 KB on a
+  further hole), at 50 players. The first stroke of a round stores about
+  1.5 KB, a replay after `Reset` nothing. The decoded hole is never stored.
 - **Reads** are free as queries, within the node's query gas limit.

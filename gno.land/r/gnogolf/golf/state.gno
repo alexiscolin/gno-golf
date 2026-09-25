@@ -7,7 +7,6 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
-	"gno.land/p/nt/avl/v0"
 	bptree "gno.land/p/nt/bptree/v0"
 	"gno.land/p/nt/ufmt/v0"
 )
@@ -81,7 +80,7 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 	// Rounds are capped: every address that ever played keeps one, and a
 	// popular hole would otherwise outgrow what one query can print. The total
 	// is given; a client that wants one player's round asks Round().
-	sb.WriteString(`]},"roundsTotal":` + strconv.Itoa(e.rounds.Size()) + `,"rounds":[`)
+	sb.WriteString(`]},"roundsTotal":` + strconv.Itoa(e.roundTree().Size()) + `,"rounds":[`)
 	i := 0
 	eachRound(e, roundsShown, func(player string, r *round) {
 		sb.WriteString(sep(i))
@@ -158,7 +157,7 @@ func airOf(s physics.Shot) string {
 // hole's history. Its path is the last stroke's, replayed: one stroke of gas.
 func Round(hole string, player address) string {
 	e := readHole(hole)
-	v := e.rounds.Get(player.String())
+	v := e.roundTree().Get(player.String())
 	if v == nil {
 		return "null"
 	}
@@ -227,7 +226,7 @@ func jvec(v physics.Vec2) string { return "[" + jnum(v.X) + "," + jnum(v.Y) + "]
 // jstr quotes a string that a course author controls, so it cannot break out of
 // the JSON it lands in.
 //
-// Every byte below 0x20 is escaped, not only \n and \t: registration is open,
+// Every byte below 0x20 is escaped, not only \n and \t: publishing is open,
 // and one raw control character in one hole's name would make Holes() invalid
 // JSON for every client of every hole.
 func jstr(s string) string {
@@ -250,19 +249,20 @@ func jstr(s string) string {
 
 // Holes lists the holes, for a client building a menu: the course's
 // current holes first, in course order (world by world, then by order), then
-// its archived versions, then everyone else's current versions — at most
-// perAuthor of one address's, the rest in Community — up to maxListed in all.
-// official is whether a hole is the course's: only those have a cup number
-// and count in the course-wide ranking. next is the version that took an
-// archived hole's place, slot a data version's alias. Read-only; it decodes
-// nothing.
+// the first maxArchived of its archived versions, then everyone else's
+// current versions — at most perAuthor of one address's, the rest in
+// Community — up to maxListed in all. official is whether a hole is the
+// course's: only those have a cup number and count in the course-wide
+// ranking. next is the version that took an archived hole's place, slot the
+// version's alias. play is the 3D client's link, successor the realm that
+// took the course over ("" if none). Read-only; it decodes nothing.
 func Holes() string {
 	var sb strings.Builder
-	sb.WriteString("[")
+	sb.WriteString("{" + versionJSON + `,"play":` + jstr(playURL) + `,"successor":` + jstr(successor) + `,"holes":[`)
 	for i, e := range listed() {
 		sb.WriteString(sep(i) + holeRow(e))
 	}
-	sb.WriteString("]")
+	sb.WriteString("]}")
 	return sb.String()
 }
 
@@ -272,8 +272,8 @@ func holeRow(e *entry) string {
 		`,"name":` + jstr(e.name) +
 		`,"official":` + strconv.FormatBool(e.official) +
 		`,"plays":` + strconv.Itoa(e.plays) +
-		`,"best":` + strconv.Itoa(e.best[assisted]) +
-		`,"proBest":` + strconv.Itoa(e.best[pro]) +
+		`,"best":` + strconv.Itoa(e.rec(assisted).best) +
+		`,"proBest":` + strconv.Itoa(e.rec(pro).best) +
 		`,"par":` + strconv.Itoa(e.par) +
 		`,"world":` + jstr(e.world) + `,"order":` + jnum(e.order) + `,"next":` + jstr(e.next)
 	if e.slot != "" {
@@ -299,10 +299,11 @@ func Community(after string, limit int) string {
 const perAuthor = 3
 
 // listed is the holes in list order, as many as a list shows: the current
-// course from its slots, the archived course, then anyone's current
-// versions, perAuthor at most per address, then the registered realms. A
-// list anyone can grow is shown in part, never unreadable, and never at the
-// course's expense.
+// course from its slots, at most maxArchived of the archived course (every
+// version is on its slot's data page), then anyone's current versions,
+// perAuthor at most per address. A list anyone can grow is shown in part,
+// never unreadable, and never at the course's expense; and however often the
+// course is republished, it leaves room for everyone else's.
 func listed() []*entry {
 	list := make([]*entry, 0, maxListed)
 	full := func() bool { return len(list) >= maxListed }
@@ -310,12 +311,16 @@ func listed() []*entry {
 		list = append(list, find(v.(string)))
 		return full()
 	})
-	if !full() {
+	if room := maxListed - minCommunity - len(list); room > 0 {
+		if room > maxArchived {
+			room = maxArchived
+		}
 		courseHoles.Iterate("", "", func(_ string, v any) bool {
 			if e := v.(*entry); e.next != "" {
 				list = append(list, e)
+				room--
 			}
-			return full()
+			return room == 0
 		})
 	}
 	// aliases hold only current versions, "<address>/<slug>" in address
@@ -341,15 +346,15 @@ func listed() []*entry {
 		}
 		start = skip
 	}
-	if !full() {
-		// registered realms, the rest of community: each is a deployed realm
-		community.Iterate("gno.land/", "gno.land0", func(_ string, v any) bool {
-			list = append(list, v.(*entry))
-			return full()
-		})
-	}
 	return list
 }
+
+// maxArchived bounds the archived course versions Holes and the hub list,
+// and minCommunity is the room they leave for community holes.
+const (
+	maxArchived  = 20
+	minCommunity = 20
+)
 
 // Simulate answers "what would this shot do" without changing anything: a
 // first stroke (stroke 0, tick 0) from a ball, in the weather of the moment.
@@ -370,7 +375,8 @@ func Simulate(hole string, ballX, ballY, angle, power float64) string {
 // shot "angle,power,tick", the stroke number it would be (0 is the first:
 // timed and pulse holes change with it) and the weather period. It is
 // exactly what PlayRoundAt would play for that stroke, for one shot's gas
-// where SimulateRound replays the whole round. Its JSON is Simulate's.
+// where SimulateRound replays the whole round, and it also replays a stroke
+// of an old round: any period not ahead is taken. Its JSON is Simulate's.
 func SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, period int64) string {
 	notAhead(period)
 	validStroke(stroke)
@@ -424,9 +430,10 @@ func SimulateRound(hole string, shots string) string {
 }
 
 // SimulateRoundAt is SimulateRound in the weather of a given period — the one
-// the client shows, so the preview and a PlayRoundAt of it agree.
+// the client shows, so the preview and a PlayRoundAt of it agree. Like a
+// round's first stroke, it takes the current period or the one before.
 func SimulateRoundAt(hole string, shots string, period int64) string {
-	notAhead(period)
+	playablePeriod(period)
 	e := readHole(hole)
 	h := e.hole()
 	return simulateRound(e, h, h.Start(), 0, shots, period)
@@ -436,11 +443,17 @@ func SimulateRoundAt(hole string, shots string, period int64) string {
 // shots the next PlayRoundAt (or PlayRoundPro) would take, from the exact
 // ball ("rest") at stroke number stroke (0 is the first), in the weather of
 // period. It refuses what that commit would refuse — too much work, too many
-// strokes — so a client can check every commit of a long round before it
-// signs any. Its JSON is SimulateRound's; strokes is the round's count after
-// the commit.
+// strokes, a weather over (a first commit takes the current period or the
+// one before, a later one a period not two behind) — so a client can check
+// every commit of a long round before it signs any. Its JSON is
+// SimulateRound's; strokes is the round's count after the commit.
 func SimulateCommit(hole string, ballX, ballY float64, stroke int, shots string, period int64) string {
-	notAhead(period)
+	if stroke == 0 {
+		playablePeriod(period)
+	} else {
+		notAhead(period)
+		notOver(period)
+	}
 	validStroke(stroke)
 	e := readHole(hole)
 	h := e.hole()
@@ -537,21 +550,13 @@ func timingJSON(every, on, phase int) string {
 	return `,"every":` + strconv.Itoa(every) + `,"on":` + strconv.Itoa(on) + `,"phase":` + strconv.Itoa(phase)
 }
 
-// maxPolyShown is the most points of one outline a read prints: a registered
-// hole's may be longer (data holds 64 at most), and is then drawn cut short.
-const maxPolyShown = 256
-
 // polyJSON is a polygon zone's outline, and whether it is the outside of it;
 // nothing for the usual rectangle or ellipse.
 func polyJSON(z *physics.Zone) string {
 	if len(z.Poly) < 3 {
 		return ""
 	}
-	poly := z.Poly
-	if len(poly) > maxPolyShown {
-		poly = poly[:maxPolyShown] // an outline a query can print
-	}
-	return `,"poly":[` + pathJSON(poly) + `],"outside":` + strconv.FormatBool(z.Outside)
+	return `,"poly":[` + pathJSON(z.Poly) + `],"outside":` + strconv.FormatBool(z.Outside)
 }
 
 // extraZones is what a timed hole lays down at a stroke, if it lays anything.
@@ -590,7 +595,7 @@ func Leaderboard(mode string) string {
 	// out of the course's current holes: archived and anyone's do not count
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"holes":` + strconv.Itoa(slots.Size()) + `,"rows":[`)
 	n := 0
-	eachRanked(m, func(r *row) {
+	eachRanked(m, func(r *row, _ string) {
 		sb.WriteString(sep(n) + standingRow(r.player, r.holes, r.strokes))
 		n++
 	})
@@ -598,16 +603,17 @@ func Leaderboard(mode string) string {
 	return sb.String()
 }
 
-// eachRanked walks a mode's top ten: the first named players of its ranking.
-// A name deleted since is skipped, not shown.
-func eachRanked(m int, fn func(r *row)) {
+// eachRanked walks a mode's top ten: the first named players of its ranking,
+// with their names. A name deleted since is skipped, not shown.
+func eachRanked(m int, fn func(r *row, name string)) {
 	n := 0
 	ranks[m].Iterate("", "", func(_ string, v any) bool {
 		p := v.(string)
-		if !named(p) {
+		name := nameOf(p)
+		if name == "" {
 			return false
 		}
-		fn(totals[m].Get(p).(*row))
+		fn(totals[m].Get(p).(*row), name)
 		n++
 		return n >= topSize
 	})
@@ -669,10 +675,8 @@ const maxListed = 120
 func HoleLeaderboard(hole, mode string, offset, limit int) string {
 	e, m := readHole(hole), modeOf(mode)
 	limit = clampLimit(limit)
-	board, size := e.board[m], 0
-	if board != nil {
-		size = board.Size()
-	}
+	board := &e.rec(m).board
+	size := board.Size()
 	if offset < 0 {
 		offset = 0
 	}
@@ -681,20 +685,18 @@ func HoleLeaderboard(hole, mode string, offset, limit int) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) +
-		`,"par":` + strconv.Itoa(e.par) + `,"players":` + strconv.Itoa(size) + `,"finished":` + strconv.Itoa(e.bests[m].Size()) +
+		`,"par":` + strconv.Itoa(e.par) + `,"players":` + strconv.Itoa(size) + `,"finished":` + strconv.Itoa(e.rec(m).bests.Size()) +
 		`,"offset":` + strconv.Itoa(offset) + `,"rows":[`)
 	n := 0
-	if board != nil {
-		board.IterateByOffset(offset, limit, func(_ string, v any) bool {
-			p := v.(string)
-			if !named(p) {
-				return false // a name deleted since
-			}
-			sb.WriteString(sep(n) + strokesRow(p, e.bests[m].Get(p).(int)))
-			n++
-			return false
-		})
-	}
+	board.IterateByOffset(offset, limit, func(_ string, v any) bool {
+		p := v.(string)
+		if !named(p) {
+			return false // a name deleted since
+		}
+		sb.WriteString(sep(n) + strokesRow(p, e.rec(m).bests.Get(p).(int)))
+		n++
+		return false
+	})
 	next := 0
 	if offset+limit < size {
 		next = offset + limit
@@ -746,7 +748,7 @@ func Bests(hole, mode, players string) string {
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"par":` + strconv.Itoa(e.par) + `,"rows":[`)
 	n := 0
 	for _, p := range friends(players) {
-		if v := e.bests[m].Get(p); v != nil {
+		if v := e.rec(m).bests.Get(p); v != nil {
 			sb.WriteString(sep(n) + strokesRow(p, v.(int)))
 			n++
 		}
@@ -784,7 +786,7 @@ func Records(hole, mode, after string, limit int) string {
 	e, m := readHole(hole), modeOf(mode)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
-	next := page(avlWalk(e.bests[m]), after, limit, func(i int, p string, v any) {
+	next := page(bpWalk(&e.rec(m).bests), after, limit, func(i int, p string, v any) {
 		sb.WriteString(sep(i) + strokesRow(p, v.(int)))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
@@ -812,19 +814,15 @@ func Rounds(hole, after string, limit int) string {
 	e := readHole(hole)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"rows":[`)
-	next := page(avlWalk(e.rounds), after, limit, func(i int, p string, v any) {
+	next := page(bpWalk(e.roundTree()), after, limit, func(i int, p string, v any) {
 		sb.WriteString(sep(i) + roundJSON(e, nil, p, v.(*round), false)) // no path: no hole needed
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()
 }
 
-// walk is a tree's Iterate, whichever kind the tree is: page reads both.
+// walk is a tree's Iterate: what page reads.
 type walk func(start, end string, cb func(key string, v any) bool) bool
-
-func avlWalk(t *avl.Tree) walk {
-	return func(start, end string, cb func(string, any) bool) bool { return t.Iterate(start, end, cb) }
-}
 
 func bpWalk(t *bptree.BPTree) walk {
 	return func(start, end string, cb func(string, any) bool) bool { return t.Iterate(start, end, cb) }

@@ -1,9 +1,13 @@
 # Netlify: a static export (next.config.mjs has output: "export"), no server.
 # Set these in the site's environment before deploying:
-#   NEXT_PUBLIC_SITE_URL  the public address, e.g. https://gnogolf.netlify.app
+#   NEXT_PUBLIC_SITE_URL  the public address, e.g. https://gno-golf.netlify.app
 #                         (link previews, share links)
-#   NEXT_PUBLIC_RPC       the gno.land RPC the game plays on (a testnet node)
-#   NEXT_PUBLIC_WEB       its gnoweb, for "read its code" links
+#   NEXT_PUBLIC_REALM     the golf realm, e.g. gno.land/r/nym-golfer000/golf on
+#                         pearl (unset, it is the local gno.land/r/gnogolf/golf)
+#   NEXT_PUBLIC_RPC       the gno.land RPC the game plays on (a testnet node),
+#                         e.g. https://rpc.pearl.testnets.gno.land:443
+#   NEXT_PUBLIC_WEB       its gnoweb, for "read its code" links,
+#                         e.g. https://pearl.testnets.gno.land
 [build]
   base = "web"
   command = "npm ci && npm run build"

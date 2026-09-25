@@ -196,22 +196,15 @@ shot is nudged, because setup shots are fragile for everyone. Flags feed a
 
 Most holes are just geometry, and `course.Simple` covers that. A hole of your
 own is a community hole: playable, recorded and on its own board, but in no
-cup. It is either GG1 data (`course.Encode`) published with
-`golf.PublishMine(slug, hexData, note)`, or a realm with a `course.Simple`
-value and a `Register` function:
+cup. Every hole is GG1 data: build a `course.Simple`, encode it
+(`course.Encode`) and publish it in hex with
+`golf.PublishMine(slug, hexData, note)`. No hole runs code of its own on the
+chain: golf decodes the data and plays it with its own physics.
 
 ```go
-package myhole
-
-import (
-	"gno.land/p/gnogolf/course"
-	"gno.land/p/gnogolf/physics"
-	"gno.land/r/gnogolf/golf"
-)
-
 var me = &course.Simple{
 	World: "garden", Order: 21,
-	W: 40, H: 12, // the board; 0 means 32x16
+	W: 40, H: 12, // the board: 1 to 96 a side
 	Title:     "First Hole",
 	Strokes:   3, // par
 	Tee:       physics.V(4, 6),
@@ -236,22 +229,21 @@ var me = &course.Simple{
 	},
 }
 
-// Register lists this hole with golf. Call it once after the deploy, or
-// call golf.Register from the realm's own init(cur realm).
-func Register(cur realm) { golf.Register(cross(cur), me) }
+// hexData is what PublishMine takes:
+var hexData = hex.EncodeToString([]byte(course.Encode(me)))
 ```
 
-Deploy it with your own key (sessions can't use `vm/add_package`), then call
-`Register` once. The hole's id is its pkgpath, so nobody else can claim it
-(under golf's own namespace, the owner must `Expect` the path first). A
-`Skin` is only a hint for renderers: a client that doesn't know `"hedge"` draws
-a plain wall.
+Its id is `<your address>/<slug>/v1`, and only your address can add versions
+to it. A `Skin` is only a hint for renderers: a client that doesn't know
+`"hedge"` draws a plain wall.
 
-The hole realms in `gno.land/r/gnogolf/` are the best examples. `hole2` has a
-mole that pops up (`Pulses`), `hole4` has timed sails, `hole20` a seesaw,
-`island7` a loop-the-loop, and `island6` a no-rail lane over the sea (an `Outside` polygon hazard). Every cup hole
-comes with a `fingerprint_test.gno` that pins its shots and checks it survives
-encoding as data.
+The hole realms in `gno.land/r/gnogolf/` are the best examples, and the
+source of the course's data (`scripts/holedata.sh` turns them into
+`data/holes.txt`); they don't call golf. `hole2` has a mole that pops up
+(`Pulses`), `hole4` has timed sails, `hole20` a seesaw, `island7` a
+loop-the-loop, and `island6` a no-rail lane over the sea (an `Outside`
+polygon hazard). Every cup hole comes with a `fingerprint_test.gno` that pins
+its shots and checks it survives encoding as data.
 
 ## Who can change what
 
@@ -268,8 +260,9 @@ it the ranking.
 - A stolen owner key could archive every slot, and what that does to the
   rankings can't be undone.
 - When a version is published decides its id, and the id seeds its weather.
-- The owner can let one realm under golf's own namespace register a hole
-  (`Expect`); it's still a community hole. Whoever holds the namespace can
+- The owner sets where the pages link the 3D game (`SetPlayURL`), and can name,
+  once and for good, the realm the course has moved to (`SetSuccessor`): a
+  banner and a field, which block nothing. Whoever holds the namespace can
   also deploy lookalike realms under it.
 - The owner can hand the role on (`Transfer`, then `Accept`) or give it up for
   good (`Renounce`), which freezes the course.
@@ -285,9 +278,8 @@ Nothing on gno.land is edited in place: a published package is frozen at its
 path. An update is a new package at a new path, and the rules below keep every
 score honest through it.
 
-- **The physics never changes under a hole.** A data hole plays on the physics
-  golf imports, a realm hole on the one it imports, and both are frozen, so
-  scores stay comparable forever. A new physics goes to a new path
+- **The physics never changes under a hole.** A hole plays on the physics
+  golf imports, which is frozen, so scores stay comparable forever. A new physics goes to a new path
   (`p/gnogolf/physics/v2`).
 - **A broken hole is replaced by a new version.** The owner publishes the fixed
   data into the same slot (`Publish("island/7", hexData, note)`), and it plays
@@ -299,9 +291,12 @@ score honest through it.
 - **Say what changed.** The version's note (on its data page, and in
   `Versions`), and the dapp's changelog, name the fix ("Hole 7 v2: closed a
   shortcut, v1 records archived").
-- **The hub itself** has no successor mechanism: if it ever needs one, a
-  `r/gnogolf/golf/v2` can read the v1's public state (`Holes`, `Leaderboard`,
-  `State`, `Round`) and show it as history.
+- **The hub itself** is replaced by a new realm (a sibling path, such as
+  `r/gnogolf/golf2`), which can read the v1's public state (`Holes`,
+  `Versions`, `HoleData`, `BestOf`, `StandingOf`, `Records`, `Players`) and
+  carry it over or show it as history. The v1's owner then calls
+  `SetSuccessor` once: every v1 page says where the course went, and v1 goes
+  on playing. See [deploy-v1.md §9](docs/design/deploy-v1.md).
 - **The dapp** (the web client) is not on-chain and can be updated at any time.
   It lists the current holes (`"next"` is empty in `Holes()`) and links the
   archived ones.

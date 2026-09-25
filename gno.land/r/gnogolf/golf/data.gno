@@ -122,7 +122,7 @@ func Publish(cur realm, slot, hexData, note string) string {
 	courseHoles.Set(e.id, e)
 	holeData.Set(e.id, data)
 	slots.Set(key, e.id)
-	chain.Emit("hole_published", "id", e.id, "slot", slot, "sha", sum)
+	chain.Emit(EventHolePublished, "hole", e.id, "slot", slot, "sha", sum, "by", by.String(), "official", "true")
 	if old != nil {
 		retire(old, e.id)
 	}
@@ -161,7 +161,7 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 	if old != nil {
 		old.next = e.id // archived; it never counted anywhere
 	}
-	chain.Emit("hole_published", "id", e.id, "slot", alias, "sha", sum)
+	chain.Emit(EventHolePublished, "hole", e.id, "slot", alias, "sha", sum, "by", by.String(), "official", "false")
 	return e.id
 }
 
@@ -265,13 +265,10 @@ func validSlug(s string) bool {
 	return true
 }
 
-// HoleData is a data version's GG1, in hex, as it was published (an alias
-// gives its current version's): what a golf/v2 or an auditor reads back.
+// HoleData is a version's GG1, in hex, as it was published (an alias gives
+// its current version's): what a golf/v2 or an auditor reads back.
 func HoleData(hole string) string {
 	e := readHole(hole)
-	if e.h != nil {
-		panic("golf: " + e.id + " is a realm's hole: its code is on its realm")
-	}
 	return hex.EncodeToString([]byte(holeData.Get(e.id).(string)))
 }
 
@@ -281,11 +278,16 @@ func Current(alias string) string { return current(alias) }
 
 // Versions is every version of an alias, oldest first (the newest pageMax if
 // there are more): its id, number, the height it was published at, by whom,
-// its data's sha256, its note, and the version that took its place.
+// its data's sha256, its note, and the version that took its place. slot is
+// the alias, "" (and no versions) for one that has none.
 func Versions(alias string) string {
 	now := find(current(alias))
+	slot := ""
+	if now != nil {
+		slot = now.slot // never the caller's own bytes
+	}
 	var sb strings.Builder
-	sb.WriteString("{" + versionJSON + `,"slot":` + jstr(alias) + `,"versions":[`)
+	sb.WriteString("{" + versionJSON + `,"slot":` + jstr(slot) + `,"versions":[`)
 	if now != nil {
 		from := 1
 		if now.version > pageMax {
@@ -308,7 +310,7 @@ func Versions(alias string) string {
 // BestOf is a player's best finished round on a hole in a mode, 0 if none.
 func BestOf(hole, mode string, player address) int {
 	e, m := readHole(hole), modeOf(mode)
-	if v := e.bests[m].Get(player.String()); v != nil {
+	if v := e.rec(m).bests.Get(player.String()); v != nil {
 		return v.(int)
 	}
 	return 0
