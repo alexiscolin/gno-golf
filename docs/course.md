@@ -185,7 +185,7 @@ func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field
 
 `physics.Unstick` (it moved to physics, where Step also uses it for timed
 bars) treats `walls` as groups of four (`physics.Bar`). A ball inside a
-bar leaves through the nearest side, and a ball closer than `r` to a bar or a
+bar leaves straight out of the nearest side, and a ball closer than `r` to a bar or a
 post is pushed off it.
 
 ## Launch, Kick and Sink

@@ -256,8 +256,16 @@ func (f *Field) timedBars() []int {
 // shutting, a sail turning, a mole popping up where the ball rests, a tram
 // arriving on a rolling ball (Step, for timed bars). Walls come
 // in bars of four (physics.Bar): a ball inside one leaves through the nearest
-// side. A ball merely closer to a wall than its radius is pushed off it.
+// side, straight out of it. A ball merely closer to a wall than its radius is
+// pushed off it.
 func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2 {
+	return unstick(ball, walls, posts, r, nil)
+}
+
+// unstick is Unstick that never pushes the ball across one of the untimed
+// walls of stays: a ball inside a bar leaves through the nearest side it can
+// leave by without, and stays where it is if there is none.
+func unstick(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec2 {
 	for i := 0; i+3 < len(walls); i += 4 {
 		q := walls[i : i+4]
 		c := q[0].Seg.A.Add(q[1].Seg.A).Add(q[2].Seg.A).Add(q[3].Seg.A).Scale(0.25)
@@ -267,6 +275,30 @@ func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2 {
 				inside = false
 			}
 		}
+		if inside {
+			// the sides nearest first, each pushing along its outward normal
+			var tried [4]bool
+			for range q {
+				k, best, bestD := -1, Vec2{}, math.Inf(1)
+				for j, w := range q {
+					if p := w.Seg.Closest(ball); !tried[j] {
+						if d := p.Sub(ball).Len(); d < bestD {
+							k, best, bestD = j, p, d
+						}
+					}
+				}
+				tried[k] = true
+				n := q[k].Seg.Normal()
+				if n.Dot(best.Sub(c)) < 0 {
+					n = n.Scale(-1)
+				}
+				if to := best.Add(n.Scale(r + unstickGap)); !crossesAny(stays, ball, to) {
+					ball = to
+					break
+				}
+			}
+			continue
+		}
 		best, bestD := Vec2{}, math.Inf(1)
 		for _, w := range q {
 			p := w.Seg.Closest(ball)
@@ -274,13 +306,12 @@ func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2 {
 				best, bestD = p, d
 			}
 		}
-		if inside || bestD < r {
-			out := best.Sub(c)
-			if !inside {
-				out = ball.Sub(best)
-			}
+		if bestD < r {
+			out := ball.Sub(best)
 			if l := out.Len(); l > 0 {
-				ball = best.Add(out.Scale((r + unstickGap) / l))
+				if to := best.Add(out.Scale((r + unstickGap) / l)); !crossesAny(stays, ball, to) {
+					ball = to
+				}
 			}
 		}
 	}
@@ -294,6 +325,16 @@ func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2 {
 		}
 	}
 	return ball
+}
+
+// crossesAny reports whether the move a->b crosses one of the untimed walls.
+func crossesAny(walls []Wall, a, b Vec2) bool {
+	for j := range walls {
+		if walls[j].Every <= 0 && walls[j].Seg.Crosses(a, b) {
+			return true
+		}
+	}
+	return false
 }
 
 func side(s Segment, p Vec2) bool {

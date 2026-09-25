@@ -191,8 +191,11 @@ Each substep does this:
 
 0. A timed bar (four timed walls from `Timed(Bar(…))`) that comes back this
    substep, or stands on the first one, pushes a ball inside it (or closer
-   than `Radius`) out through its nearest side, as `Unstick` does for a
-   stroke's pieces. A wall never stands on the ball.
+   than `Radius`) out through its nearest side, straight along that side's
+   normal, as `Unstick` does for a stroke's pieces. A push that would carry
+   the ball across an untimed wall takes the next nearest side instead, and
+   if every side would, the ball stays where it is. A wall never stands on
+   the ball, nor pushes it through another.
 1. The substep is split into `int(|vel| / MaxMove) + 1` moves, so a fast ball
    can't skip past a zone or a wall.
 2. For each move, if the ball is on the ground, the surface is reset to grass
@@ -204,7 +207,8 @@ Each substep does this:
    nearest hit wins. A wall or post whose box the move's box misses is
    skipped first (the broad phase). A ball already within `Radius` of a wall
    and moving into it hits it right away. A free wall end is a round cap of
-   radius `Radius`, swept like a post.
+   radius `Radius`, swept like a post, however far past the end the ball
+   comes from along the wall's line.
 4. On a hit, the part of the velocity along the surface keeps `Along` (0.97)
    of itself. The part into the surface bounces back times the restitution,
    which is played at `MaxBounce` (0.92) at most: nothing adds energy. Speed

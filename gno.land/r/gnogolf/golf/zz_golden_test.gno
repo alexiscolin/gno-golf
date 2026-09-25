@@ -84,7 +84,7 @@ var golden = map[string][3]string{
 	"sea":    {"4ce93b61be350770", "c3224daa821020f4", "807b1e8fc908df52"},
 	"slope":  {"1ae52dd6618cad52", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
 	"storm":  {"27839a2f650ea264", "217b2a005fc76324", "cd0874fd52e8179f"},
-	"timed":  {"88354dc60a8951a0", "c3224daa821020f4", "e4dbc97ea48d1ede"},
+	"timed":  {"932f9c494b5c025f", "c3224daa821020f4", "e4dbc97ea48d1ede"},
 	"tunnel": {"2b8666eb09290dde", "c3224daa821020f4", "335763617c2e9b50"},
 }
 

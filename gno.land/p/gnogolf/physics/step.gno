@@ -167,11 +167,12 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		// A timed bar that comes back (a tram arriving, a plank swinging
 		// in) where the ball is pushes it out through its nearest side, as
 		// a piece appearing between strokes does (Unstick): a wall never
-		// stands on the ball. On the first substep any bar standing counts.
+		// stands on the ball, nor pushes it through another. On the first
+		// substep any bar standing counts.
 		for _, j := range bars {
 			w := &f.Walls[j]
 			if there(i+f.Tick, w.Every, w.On, w.Phase) && (i == 0 || !there(i-1+f.Tick, w.Every, w.On, w.Phase)) {
-				pos = Unstick(pos, f.Walls[j:j+4], nil, f.Radius)
+				pos = unstick(pos, f.Walls[j:j+4], nil, f.Radius, f.Walls)
 			}
 		}
 		// A substep is walked in moves of at most MaxMove, so a fast ball
@@ -256,23 +257,23 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 						// Not touching it yet, it may still meet it on the way:
 						// the end is a round cap, swept like a post (skipping it
 						// let a ball cut through a free wall end).
-						if u >= -f.Radius && u <= o.length+f.Radius {
-							end := o.a
-							if u > o.length {
-								end = o.a.Add(along.Scale(o.length))
-							}
-							rv := pos.Sub(end)
-							if l := rv.Len(); l > 0 && l <= f.Radius+skin/2 {
-								if nrm := rv.Scale(1 / l); move.Dot(nrm) < 0 {
-									best, normal, hit = 0, nrm, true
-									restitution = o.bounce
-								}
-							} else if t, nn, ok := (Circle{C: end, R: f.Radius}).Hit(pos, next); ok && t < best {
-								best, normal, hit = t, nn, true
+						// That holds however far past the end the ball is: a ball
+						// coming along the wall's line meets nothing else.
+						end := o.a
+						if u > o.length {
+							end = o.a.Add(along.Scale(o.length))
+						}
+						rv := pos.Sub(end)
+						if l := rv.Len(); l > 0 && l <= f.Radius+skin/2 {
+							if nrm := rv.Scale(1 / l); move.Dot(nrm) < 0 {
+								best, normal, hit = 0, nrm, true
 								restitution = o.bounce
 							}
-							continue
+						} else if t, nn, ok := (Circle{C: end, R: f.Radius}).Hit(pos, next); ok && t < best {
+							best, normal, hit = t, nn, true
+							restitution = o.bounce
 						}
+						continue
 					}
 				}
 				if t, nn, ok := seg.hitN(pos, next, sn); ok && t < best {
