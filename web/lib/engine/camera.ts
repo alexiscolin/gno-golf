@@ -518,7 +518,7 @@ export function makeCamera(E: Live) {
   const KERB = 1.1, MIN_D = 3, MIN_PITCH = (18 * Math.PI) / 180, MAX_PITCH = (40 * Math.PI) / 180;
   const SQUEEZE_PITCH = (16 * Math.PI) / 180, SQUEEZE_FOV = 14;
   let squeeze = 0, squeezed = 0; // how cramped the last pass found it (0..1), and that eased
-  const maxPitch = () => MAX_PITCH + squeeze * SQUEEZE_PITCH;
+  const maxPitch = () => MAX_PITCH + (aimView ? 0 : squeeze * SQUEEZE_PITCH); // (aiming, never steeper: the view along the aim is the point)
   /** Whether the line from B (raised by lift) to C clears the ground (from 1.5 out). */
   function lineClear(B: THREE.Vector3, cx: number, cy: number, cz: number, lift = 0.7) {
     const L = Math.hypot(cx - B.x, cz - B.z) || 1;
@@ -582,7 +582,7 @@ export function makeCamera(E: Live) {
   // Aiming, the camera stays straight behind the aim, and at least AIM_FLAT
   // back across the ground: over the rail if the board has no room there,
   // never swung to one side nor climbed over the gnome's head
-  const AIM_FLAT = 4.5;
+  const AIM_FLAT = 4.5, AIM_NEAR = 3;
   let aimView = false;
   const SWINGS: readonly number[] = [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.8, -1.8];
   const B_ = new THREE.Vector3(); // clearHeading's ball, for room()
@@ -650,12 +650,16 @@ export function makeCamera(E: Live) {
       }
       if (!k) k = 0.03; // (not even that: over the gnome himself, raised below)
       // aiming: back to AIM_FLAT if it can, over the rail rather than over his
-      // head, but never further out than just past it (not in the scenery)
-      if (aimView)
-        for (let q = Math.min(1, AIM_FLAT / f0); q > k; q -= 0.05) {
+      // head, no further out than just past a rail; with no such spot (a
+      // round end right behind), AIM_NEAR back all the same, never overhead
+      if (aimView) {
+        let q = Math.min(1, AIM_FLAT / f0);
+        for (; q > k; q -= 0.05) {
           const x = ox + fx * q, z = oz + fz * q, t = g.course && g.course.userData.terrain;
-          if ((t && t.onGreen(x, z)) || railGap(x, z) < 0.8) { k = q; break; }
+          if ((t && t.onGreen(x, z)) || railGap(x, z) < 0.8) break;
         }
+        k = Math.max(k, q, Math.min(1, AIM_NEAR / f0));
+      }
       C.x = ox + fx * k;
       C.z = oz + fz * k;
       const fl = f0 * k;
