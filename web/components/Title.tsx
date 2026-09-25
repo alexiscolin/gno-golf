@@ -154,7 +154,7 @@ const burst = (n: number, r0: number, r1: number, cx = 100, cy = 100) =>
 // hydrates it) is the garden's, the client's own render the link's.
 const guessWorld = () => {
   const p = new URLSearchParams(window.location.search);
-  const h = p.get("world") || p.get("hole") || "";
+  const h = p.get("world") || p.get("cup") || p.get("hole") || "";
   return /island/.test(h) ? "island" : /town/.test(h) ? "town" : /mountain/.test(h) ? "mountain" : "garden";
 };
 
@@ -252,7 +252,10 @@ function useTitleScene(host: RefObject<HTMLDivElement | null>, film: RefObject<H
   const [scene, setScene] = useState<{ world: string; live: boolean; phase: Visit["phase"] } | null>(null);
   useEffect(() => {
     if (!visit) {
-      const world = nextWorld(), live = !wantsStill(), canvas = live ? document.createElement("canvas") : null;
+      // a link to a hole (?hole=, ?cup=): the title is only its loader, so the
+      // still of that hole's cup, with nothing moving behind it
+      const deep = /[?&](hole|cup)=/.test(location.search);
+      const world = deep ? guessWorld() : nextWorld(), live = !deep && !wantsStill(), canvas = live ? document.createElement("canvas") : null;
       if (canvas) canvas.className = "title__canvas";
       const v: Visit = (visit = { world, canvas, video: null, phase: "splash", p: null, ready: false, kill: undefined, notify() {} });
       if (live && wantsVideo()) (v.phase = "video"), (v.video = makeFilm(v));
