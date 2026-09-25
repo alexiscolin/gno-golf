@@ -5,8 +5,9 @@
 >   IPFS. There is no server side — the game talks to a gno node over HTTP — so
 >   nothing needs hosting but the files. `npm run dev` to work on it.
 >
-> The engine (`lib/scene.js`, `lib/engine.js`, `lib/chain.js`) is plain ES
-> modules and knows nothing about React; the interface is a thin component on
+> The engine (`lib/scene.ts`, `lib/engine.ts`, `lib/chain.ts`) is plain TypeScript
+> modules and knows nothing about React; the realm's JSON is typed in `lib/types.ts`
+> and parsed in `lib/chain.ts` alone; the interface is a thin component on
 > top. Swapping the framework means rewriting the HUD, never the game.
 > Config travels in the query string, so one build serves any chain:
 > `?rpc=` the node, `?web=` gnoweb for the source links,

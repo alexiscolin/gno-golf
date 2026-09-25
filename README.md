@@ -109,7 +109,7 @@ gno.land/p/gnogolf/physics   2D rolling-ball engine: walls, posts, zones, Step
 gno.land/p/gnogolf/course    the hole contract: Hole interface, course.Simple, weather
 gno.land/r/gnogolf/golf      the game realm: registry, rounds, previews, leaderboard, gnoweb page
 gno.land/r/gnogolf/<hole>    one realm per hole (hole1…, island1…, town1…, mountain1…)
-web/                         Next.js + three.js client (static export)
+web/                         Next.js + three.js client, TypeScript (static export)
 adr/                         architecture decision records
 media/                       screenshots and the demo video
 CLIENT.md                    the contract for writing a client
@@ -119,7 +119,7 @@ BACKLOG.md                   measurements, decisions, what's next
 ## Leaderboards (coming soon)
 
 In the dapp, the leaderboard button and sheet carry a "Coming soon" badge until
-launch. Turning the badge off is one constant, `SOON` in `web/components/Golf.jsx`.
+launch. Turning the badge off is one constant, `SOON` in `web/components/Golf.tsx`.
 Everything below already runs on-chain.
 
 - **Two modes, ranked apart.**
@@ -138,7 +138,7 @@ Everything below already runs on-chain.
 - **Friends first.** `Bests(hole, mode, players)` and `Standings(mode, players)`
   read any list of up to 50 addresses, named or not. The dapp's Friends tab is the
   default view: you compare with people you chose, and no bot can push you off.
-- **Suspected bots are hidden in the dapp only.** `scripts/botcheck.mjs` (see Bot
+- **Suspected bots are hidden in the dapp only.** `scripts/botcheck.ts` (see Bot
   check) writes `web/public/flags.json`. The general tabs hide players scoring at
   least 0.5 by default, with a "Show all" toggle. The Friends tab is never
   filtered. The chain and gnoweb show the raw boards, unfiltered, with no admin
@@ -148,12 +148,12 @@ Everything below already runs on-chain.
 ## Bot check
 
 The physics is public and deterministic, so a bot can play perfectly, and the
-chain cannot tell. `scripts/botcheck.mjs` (Node, no dependencies, reads only)
+chain cannot tell. `scripts/botcheck.ts` (Node, no dependencies, reads only)
 flags rounds that look machine-made:
 
 ```
-nice -n 20 node scripts/botcheck.mjs [--rpc http://127.0.0.1:26757] [--top 10] [--json]
-nice -n 20 node scripts/botcheck.mjs --selftest
+nice -n 20 node --experimental-strip-types scripts/botcheck.ts [--rpc http://127.0.0.1:26757] [--top 10] [--json]
+nice -n 20 node --experimental-strip-types scripts/botcheck.ts --selftest
 ```
 
 It takes the top rows of every official hole's boards and the course boards,

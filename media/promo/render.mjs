@@ -1,3 +1,4 @@
+// @ts-check
 // Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean]
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
