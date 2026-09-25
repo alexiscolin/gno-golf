@@ -249,6 +249,7 @@ export function makeCamera(E: Live) {
     const B = state === "holed" && g.s ? cupPt.set(g.s.cup[0], BALL_R + ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]) : E.ball.position;
     let target = yaw, turning = false;
     const pulling = state === "aiming";
+    aimView = pulling;
     flatFloor = state === "rest" || state === "aiming" ? REST_FLAT : MIN_FLAT;
     if (pulling) target = E.shot.power > 0 ? E.shot.angle : yaw; // trailing the aim (measured from the pull's start heading)
     else if (state === "replay" && dt > 0) {
@@ -578,6 +579,11 @@ export function makeCamera(E: Live) {
   // at rest and aiming the framing wants 6.5 at least; rolling, 4.5 will do
   const MIN_FLAT = 4.5, REST_FLAT = 6.5;
   let flatFloor = MIN_FLAT;
+  // Aiming, the camera stays straight behind the aim, and at least AIM_FLAT
+  // back across the ground: over the rail if the board has no room there,
+  // never swung to one side nor climbed over the gnome's head
+  const AIM_FLAT = 4.5;
+  let aimView = false;
   const SWINGS: readonly number[] = [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.8, -1.8];
   const B_ = new THREE.Vector3(); // clearHeading's ball, for room()
   function clearHeading(B: THREE.Vector3, dist: number, up: number, aiming = false) {
@@ -587,12 +593,13 @@ export function makeCamera(E: Live) {
     // (a tight pen: a unit closer is still the framing, and needs no climb)
     // (straight behind first, by rising if it must: the heading is the lane's
     // axis, or the aim; a swing only when it cannot see from there at all)
-    for (const off of SWINGS)
+    for (const off of aiming ? [0] : SWINGS)
       for (const [lim, dd0] of [[up, dist], [up, dist - 1], [Math.tan(MAX_PITCH) * dist, dist]] as const) {
         // straight behind, the board may bring it in (keepInside: closer and
-        // higher); swung, only a spot inside the board at the distance will do
-        const r = off ? dd0 : Math.min(dd0, room(0, dd0));
-        if (r < (off ? dd0 : aiming ? 1 : 2)) continue; // (aiming, it stays behind the aim however close)
+        // higher), aiming no nearer than AIM_FLAT; swung, only a spot inside
+        // the board at the distance will do
+        const r = off ? dd0 : Math.max(Math.min(dd0, room(0, dd0)), aiming ? AIM_FLAT : 0);
+        if (r < (off ? dd0 : 2)) continue;
         const dd = r, a = yaw + off, cx = B.x - Math.cos(a) * dd, cz = B.z - Math.sin(a) * dd;
         if (off && !inside(cx, cz)) continue;
         const t = firstHit(B.x, B.z, cx, cz);
@@ -642,6 +649,13 @@ export function makeCamera(E: Live) {
         if (k) break;
       }
       if (!k) k = 0.03; // (not even that: over the gnome himself, raised below)
+      // aiming: back to AIM_FLAT if it can, over the rail rather than over his
+      // head, but never further out than just past it (not in the scenery)
+      if (aimView)
+        for (let q = Math.min(1, AIM_FLAT / f0); q > k; q -= 0.05) {
+          const x = ox + fx * q, z = oz + fz * q, t = g.course && g.course.userData.terrain;
+          if ((t && t.onGreen(x, z)) || railGap(x, z) < 0.8) { k = q; break; }
+        }
       C.x = ox + fx * k;
       C.z = oz + fz * k;
       const fl = f0 * k;
