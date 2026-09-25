@@ -275,6 +275,13 @@ export function gnokeyPlan(s, { realm, price = 0.001, chainId, rpc }) {
   const shots = s.shots || [], mode = s.roundMode || "assisted";
   if (!shots.length) return [];
   if (mode === "pro" && s.period == null) return []; // a pro round has its period, or it cannot be saved
+  // the player pastes this into a shell: nothing the chain or the page's link
+  // says goes in unchecked
+  if (s.period != null && !Number.isSafeInteger(s.period)) return [];
+  if (!/^[\w./-]{1,128}$/.test(String(s.id))) return [];
+  const title = String(s.name || s.id).replace(/[^\x20-\x7e]/g, "").slice(0, 60);
+  const chain = /^[\w.-]{1,64}$/.test(chainId || "") ? chainId : "<chain-id>";
+  const remote = /^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "<rpc-url>";
   const q = JSON.stringify; // a Go string literal, for these ASCII ids and shots
   const parts = commitsOf(s, shots.length);
   return parts.map(([from, to], k) => {
@@ -285,7 +292,7 @@ export function gnokeyPlan(s, { realm, price = 0.001, chainId, rpc }) {
           : `golf.PlayRoundAt(cross(cur), ${hole}, ${list}, ${s.period})`;
     const file = parts.length > 1 ? `gnogolf-save-${k + 1}.gno` : "gnogolf-save.gno";
     const script = [
-      `// Gnogolf: ${s.name || s.id}, ${parts.length > 1 ? `part ${k + 1} of ${parts.length}, ` : ""}strokes ${from + 1}-${to} (${mode})`,
+      `// Gnogolf: ${title}, ${parts.length > 1 ? `part ${k + 1} of ${parts.length}, ` : ""}strokes ${from + 1}-${to} (${mode})`,
       "package main",
       "",
       `import "${realm}"`,
@@ -297,7 +304,7 @@ export function gnokeyPlan(s, { realm, price = 0.001, chainId, rpc }) {
       "",
     ].join("\n");
     const gas = Math.min(gasOf(s, from, to) + RUN_EXTRA, MAX_GAS);
-    const command = `gnokey maketx run -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chainId || "<chain-id>"} -remote ${norm(rpc)} <your-key-name> ${file}`;
+    const command = `gnokey maketx run -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chain} -remote ${remote} <your-key-name> ${file}`;
     return { file, script, command };
   });
 }
