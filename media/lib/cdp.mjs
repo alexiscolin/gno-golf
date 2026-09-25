@@ -35,7 +35,9 @@ export function slotOf(name) {
 // Ctrl-C or a kill, on an uncaught error, and after CDP_MAX_MS (default an
 // hour) should a run hang. A Chrome left running keeps a game page playing.
 const live = new Set();
-const killAll = () => { for (const pid of live) try { process.kill(pid); } catch {} live.clear(); };
+// Chrome runs in its own process group (detached), so a kill takes its helpers too
+const stop = (pid) => { try { process.kill(-pid, "SIGKILL"); } catch { try { process.kill(pid, "SIGKILL"); } catch {} } };
+const killAll = () => { for (const pid of live) stop(pid); live.clear(); };
 process.on("exit", killAll);
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => (killAll(), process.exit(130)));
 process.on("uncaughtException", (e) => (console.error(e), killAll(), process.exit(1)));
@@ -53,10 +55,10 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
   dir ||= fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-cdp-"));
   fs.mkdirSync(dir, { recursive: true });
   try { fs.unlinkSync(path.join(dir, "DevToolsActivePort")); } catch {}
-  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, "about:blank"], { stdio: "ignore" });
+  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, "about:blank"], { stdio: "ignore", detached: true });
   const pid = /** @type {number} */ (p.pid);
   live.add(pid);
-  const kill = () => { try { process.kill(pid); } catch {} live.delete(pid); };
+  const kill = () => { stop(pid); live.delete(pid); };
   let port;
   for (let i = 0; i < 100 && !port; i++) {
     await sleep(200);
