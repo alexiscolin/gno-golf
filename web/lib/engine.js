@@ -1053,7 +1053,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     // a string is a realm id, as before
     const asked = linked(typeof link === "string" ? { id: link } : link);
     g.linked = !!asked;
-    g.world = asked ? cupOf(asked) : g.world || "garden";
+    // ?cup=island alone: that cup, on its first hole
+    const cupLink = link && link.cup && g.list.some((h) => cupOf(h) === link.cup) ? link.cup : "";
+    g.world = asked ? cupOf(asked) : cupLink || g.world || "garden";
     const first = asked || inWorld()[0] || g.list[0];
     await load(first.id);
     if (!g.s) throw new Error(g.error || "the first hole could not be loaded");
