@@ -1,4 +1,6 @@
-// Package hole13 is a lane that splits round a long flower bed and meets again: the wide way is through the bunker, the narrow way is clean, but a stump waits where the two meet.
+// Package hole13 is a lane that splits round a long flower bed and meets
+// again: the wide way is through the bunker, the narrow way is clean, but a
+// stump waits where the two meet.
 package hole13
 
 import (
@@ -20,7 +22,8 @@ var me = course.Fit(&course.Simple{
 
 	Course: &physics.Field{
 		Walls: physics.Walls(
-			physics.Walls(physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(46, 16), 8)...), physics.Outline(physics.Stadium(physics.V(13, 4), physics.V(33, 9), 4)...)),
+			physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(46, 16), 8)...),
+			physics.Outline(physics.Stadium(physics.V(13, 4), physics.V(33, 9), 4)...),
 		),
 		// a stump where the two ways meet, in the line off the narrow one
 		Posts: []physics.Post{
@@ -35,6 +38,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

@@ -2,8 +2,8 @@
 
 # Gnogolf
 
-A 3D mini-golf game that runs on [gno.land](https://gno.land). Every hole is a
-realm someone deployed, and the chain computes every shot.
+A 3D mini-golf game that runs on [gno.land](https://gno.land). Every hole lives
+on-chain, and the chain computes every shot.
 
 ## Why on-chain
 
@@ -21,8 +21,10 @@ It also means:
   it.
 - Recording a whole hole takes one transaction (`PlayRound`), not one per
   shot.
-- The golf realm has no admin: no owner, no pause, no upgrade, no delisting.
-  Anyone can publish a hole, and nobody can take one down.
+- The golf realm has one role, its owner, who publishes the course's holes and
+  can hand the role on or renounce it. There is no pause, no upgrade and no
+  delisting: anyone can publish a hole of their own, and nobody can take one
+  down.
 - You can read a hole's source on gnoweb before you play it. The physics you
   trust is code you can read.
 
@@ -41,7 +43,7 @@ five minutes of chain time and is the same for everyone.
 
 There are four cups of 18 holes each:
 
-| Cup | World | Realms |
+| Cup | World | Source realms |
 |---|---|---|
 | Garden Cup | `garden` | `r/gnogolf/hole1` … `hole20` (without `hole10` and `hole16`, which are in `extras`) |
 | Island Cup | `island` | `r/gnogolf/island1` … `island18` |
@@ -69,22 +71,22 @@ gnodev loads every package under `gno.land/` from disk. gnoweb runs on
 `http://127.0.0.1:8888`, and the RPC runs on `http://127.0.0.1:26757`, which is
 the web client's default.
 
-**2. Register the holes.** A deployed hole doesn't count until it registers
-itself with `golf`. It can't do that from `init()`, so it takes one transaction
-per hole: call the hole realm's `Register` function. For example, with a funded
-key on the dev chain:
+**2. Publish the holes.** The course's holes are data (`data/holes.txt`, one
+GG1 string per slot, built from the hole realms by `scripts/holedata.sh`), and
+only golf's owner, the key that deployed it, can publish them. Under gnodev
+that is gnodev's deploy key (`test1` by default). Generate the scripts and run
+them in order as that key:
 
 ```sh
-gnokey maketx call -pkgpath gno.land/r/gnogolf/hole1 -func Register \
-  -gas-fee 40000ugnot -gas-wanted 20000000 \
-  -remote http://127.0.0.1:26757 -chainid dev -broadcast <your-key>
+scripts/publishdata.sh     # writes scripts/publish/publish-NN.gno, 10 holes each
+gnokey maketx run -gas-fee 1000000ugnot -gas-wanted 1000000000 \
+  -remote http://127.0.0.1:26757 -chainid dev -broadcast test1 scripts/publish/publish-01.gno
 ```
 
-Run it again for every hole realm (`hole*`, `island*`, `town*`,
-`mountain*`). A registration used about 13M gas in our runs. You can also do
-all of them in one `MsgRun` that calls each hole's `Register`: that is what
-`scripts/register-*.gno` do, one script per cup.
-Once they're registered, `http://127.0.0.1:8888/r/gnogolf/golf` lists them.
+A Publish costs a few tens of millions of gas and about half a GNOT of storage
+deposit. A slot whose data is already current is skipped, so a script can be
+run again after a failure; `scripts/publish/verify.gno`, run simulated, checks every
+slot. Once they're published, `http://127.0.0.1:8888/r/gnogolf/golf` lists them.
 
 **3. The web client.**
 
@@ -99,11 +101,10 @@ The client reads its config from the query string, so one build works with any
 chain: `?rpc=` for the node, `?web=` for gnoweb, `?hole=` for a hole's pkgpath,
 and `?shot=angle,power` to fire a shot on load.
 
-To run the Gno tests, build `gno` from a `gnolang/gno` checkout that matches
-your chain (`go run ./gnovm/cmd/gno`) and point `GNOROOT` at it; the installed
-binary is often too old. `gno test ./gno.land/...` then runs the physics,
-course and golf suites plus a fingerprint test per hole, which replays a fixed
-set of shots and fails if any path changes by a bit.
+To run the Gno tests, the test harness needs a package cache that matches the
+chain: point `GNOHOME` at a cache holding the gno checkout's `examples/` copies
+of `avl`, `ufmt`, `uassert` and `urequire` (top-level `.gno` and `gnomod.toml`
+only), since the module cache's `p/nt/avl` differs from the chain's.
 
 ## Repo layout
 
@@ -112,17 +113,16 @@ gno.land/p/gnogolf/physics   2D rolling-ball engine: walls, posts, zones, Step
 gno.land/p/gnogolf/course    the hole contract: Hole interface, course.Simple, weather
 gno.land/r/gnogolf/golf      the game realm: registry, rounds, previews, leaderboard, gnoweb page
 gno.land/r/gnogolf/<hole>    one realm per hole (hole1…, island1…, town1…, mountain1…)
-web/                         Next.js + three.js client (static export)
+web/                         Next.js + three.js client, TypeScript (static export)
 adr/                         architecture decision records
 CLIENT.md                    the contract for writing a client
-scripts/                     hole registration, and botcheck.mjs
-docs/                        physics, course and golf references
+data/holes.txt               the course's holes as GG1 data, one line per slot
 ```
 
 ## Leaderboards (coming soon)
 
 In the dapp, the leaderboard button and sheet carry a "Coming soon" badge until
-launch. Turning the badge off is one constant, `SOON` in `web/components/Golf.jsx`.
+launch. Turning the badge off is one constant, `SOON` in `web/components/Golf.tsx`.
 Everything below already runs on-chain.
 
 - **Two modes, ranked apart.**
@@ -141,7 +141,7 @@ Everything below already runs on-chain.
 - **Friends first.** `Bests(hole, mode, players)` and `Standings(mode, players)`
   read any list of up to 50 addresses, named or not. The dapp's Friends tab is the
   default view: you compare with people you chose, and no bot can push you off.
-- **Suspected bots are hidden in the dapp only.** `scripts/botcheck.mjs` (see Bot
+- **Suspected bots are hidden in the dapp only.** `scripts/botcheck.ts` (see Bot
   check) writes `web/public/flags.json`. The general tabs hide players scoring at
   least 0.5 by default, with a "Show all" toggle. The Friends tab is never
   filtered. The chain and gnoweb show the raw boards, unfiltered, with no admin
@@ -151,12 +151,12 @@ Everything below already runs on-chain.
 ## Bot check
 
 The physics is public and deterministic, so a bot can play perfectly, and the
-chain cannot tell. `scripts/botcheck.mjs` (Node, no dependencies, reads only)
+chain cannot tell. `scripts/botcheck.ts` (Node, no dependencies, reads only)
 flags rounds that look machine-made:
 
 ```
-nice -n 20 node scripts/botcheck.mjs [--rpc http://127.0.0.1:26757] [--top 10] [--json]
-nice -n 20 node scripts/botcheck.mjs --selftest
+nice -n 20 node --experimental-strip-types scripts/botcheck.ts [--rpc http://127.0.0.1:26757] [--top 10] [--json]
+nice -n 20 node --experimental-strip-types scripts/botcheck.ts --selftest
 ```
 
 It takes the top rows of every official hole's boards and the course boards,
@@ -190,8 +190,11 @@ shot is nudged, because setup shots are fragile for everyone. Flags feed a
 
 ## Writing a hole
 
-Most holes are just geometry, and `course.Simple` covers that. A hole is a
-realm with a `course.Simple` value and a `Register` function:
+Most holes are just geometry, and `course.Simple` covers that. A hole of your
+own is a community hole: playable, recorded and on its own board, but in no
+cup. It is either GG1 data (`course.Encode`) published with
+`golf.PublishMine(slug, hexData, note)`, or a realm with a `course.Simple`
+value and a `Register` function:
 
 ```go
 package myhole
@@ -235,15 +238,16 @@ func Register(cur realm) { golf.Register(cross(cur), me) }
 ```
 
 Deploy it with your own key (sessions can't use `vm/add_package`), then call
-`Register` once. The hole's id is its pkgpath, so nobody else can claim it. A
+`Register` once. The hole's id is its pkgpath, so nobody else can claim it
+(under golf's own namespace, the owner must `Expect` the path first). A
 `Skin` is only a hint for renderers: a client that doesn't know `"hedge"` draws
 a plain wall.
 
 The hole realms in `gno.land/r/gnogolf/` are the best examples. `hole2` has a
 mole that pops up (`Pulses`), `hole4` has timed sails, `hole20` has a loop, and
 `island6` has a no-rail lane over the sea (an `Outside` polygon hazard). Every cup hole
-comes with a `z_any_test.gno` that solves the hole in calm weather and in
-the worst weather it can get.
+comes with a `fingerprint_test.gno` that pins its shots and checks it survives
+encoding as data.
 
 ## Updating after the deploy
 
@@ -251,21 +255,20 @@ Nothing on gno.land is edited in place: a published package is frozen at its
 path. An update is a new package at a new path, and the rules below keep every
 score honest through it.
 
-- **The physics never changes under a hole.** Each hole imports the physics it
-  was built on, and that version is frozen, so its scores stay comparable
-  forever. A new physics goes to a new path (`p/gnogolf/physics/v2`), and only
-  new holes import it.
-- **A broken hole is replaced by a new hole.** Publish the fix at a new path
-  (`r/gnogolf/island7b`) with the same `World` and `Order`, then register it.
-  The hub gives the newest hole under `r/gnogolf/` that place in the cup. Only
-  the owner of the `gnogolf` namespace can publish there, so the hub still has
-  no admin key.
-- **No score is ever erased.** The old hole is archived: still playable, its
-  records and leaderboard kept and shown ("Archived: a newer version took this
-  hole's place"). Its bests leave the course-wide ranking, and the new hole
-  starts a fresh leaderboard. Unlocked gnomes and grand slams stay earned.
-- **Say what changed.** The new hole's description, and the dapp's changelog,
-  name the fix ("Hole 7 v2: closed a shortcut, v1 records archived").
+- **The physics never changes under a hole.** A data hole plays on the physics
+  golf imports, a realm hole on the one it imports, and both are frozen, so
+  scores stay comparable forever. A new physics goes to a new path
+  (`p/gnogolf/physics/v2`).
+- **A broken hole is replaced by a new version.** The owner publishes the fixed
+  data into the same slot (`Publish("island/7", hexData, note)`), and it plays
+  as `island/7/v2`. Data identical to the current version is refused.
+- **No score is ever erased.** The old version is archived: still playable, its
+  records and leaderboard kept and shown (under "Archived course holes"). Its
+  bests leave the course-wide ranking, and the new version starts a fresh
+  leaderboard. Unlocked gnomes and grand slams stay earned.
+- **Say what changed.** The version's note (on its data page, and in
+  `Versions`), and the dapp's changelog, name the fix ("Hole 7 v2: closed a
+  shortcut, v1 records archived").
 - **The hub itself** has no successor mechanism: if it ever needs one, a
   `r/gnogolf/golf/v2` can read the v1's public state (`Holes`, `Leaderboard`,
   `State`, `Round`) and show it as history.

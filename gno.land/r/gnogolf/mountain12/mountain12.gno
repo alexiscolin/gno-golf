@@ -32,7 +32,7 @@ var me = course.Fit(&course.Simple{
 		},
 		Zones: []physics.Zone{
 			// the saddle: up to the col, then down the far side, steep enough that
-			// a ball stopped on it rolls back down (at 0.14 it only crept)
+			// a ball stopped on it rolls back down
 			{Kind: physics.Slope, Min: physics.V(14, 3), Max: physics.V(24, 23), Vec: physics.V(-0.17, 0), Mark: '/', Skin: "saddle crest"},
 			{Kind: physics.Slope, Min: physics.V(24, 3), Max: physics.V(34, 23), Vec: physics.V(0.17, 0), Mark: '\\', Skin: "saddle crest"},
 			// a drift on the low line catches a hot descent; a pine shields the cup
@@ -44,6 +44,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

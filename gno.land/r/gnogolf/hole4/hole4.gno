@@ -22,16 +22,16 @@ func door(y float64, to physics.Vec2) physics.Zone {
 	}
 }
 
-// The wheel turns once in Turn substeps and has four sails, so what the
+// The wheel turns once in turn substeps and has four sails, so what the
 // doors see repeats every quarter turn. A sail hangs straight down over the
 // middle door at the start of each quarter and stays over it a substep either
 // side; it crosses the side doors, 60° out, a third of the way through the
-// quarter (the low door) and two thirds (the high one).
-const Turn = 24
+// quarter (the top door, on screen) and two thirds (the bottom one).
+const turn = 24
 
 func sail(i, on, at int) []physics.Wall {
 	y := doors[i]
-	q := Turn / 4
+	q := turn / 4
 	return physics.Timed(physics.Bar(physics.V(24.2, y-1.4), physics.V(24.2, y+1.4), 0.5, 'S', "sail"), q, on, (q-at)%q)
 }
 
@@ -51,7 +51,7 @@ var me = course.Fit(&course.Simple{
 			// the mill itself, wall to wall: nothing rolls round it
 			physics.Box(physics.V(27, 0), physics.V(33, 12)),
 			// its sails, over each door while they pass it
-			sail(1, 3, Turn/4-1), sail(0, 1, 2), sail(2, 1, 4),
+			sail(1, 3, turn/4-1), sail(0, 1, 2), sail(2, 1, 4),
 		),
 		Zones: []physics.Zone{
 			// all three come out behind the mill, each at its own height
@@ -67,4 +67,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

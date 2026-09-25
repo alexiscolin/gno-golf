@@ -13,8 +13,7 @@ import (
 )
 
 // roofs is the walkable outline: roof A (the tee), plank 1, roof B (tall),
-// plank 2, roof C, plank 3, roof D (the cup). A fresh copy for each zone:
-// Fit moves every zone's polygon in place.
+// plank 2, roof C, plank 3, roof D (the cup).
 func roofs() []physics.Vec2 {
 	return []physics.Vec2{
 		physics.V(3, 3), physics.V(14, 3), physics.V(14, 6.5), physics.V(22, 6.5), physics.V(22, 3), physics.V(30, 3),
@@ -38,7 +37,7 @@ var me = course.Fit(&course.Simple{
 	Shelter:   0.08, // no rails: the wind is capped so it cannot blow every line off
 	Pulses: []course.Pulse{
 		// the cat, asleep on plank 2 on strokes 1, 3, 5...
-		{Every: 2, On: 1, Offset: 0, Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(33.5, 18.75), R: 0.6}, Bounce: 0.7, Skin: "cat"}}},
+		{Every: 2, On: 1, Phase: 0, Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(33.5, 18.75), R: 0.6}, Bounce: 0.7, Skin: "cat"}}},
 	},
 	Course: &physics.Field{
 		Walls: physics.Walls(
@@ -66,6 +65,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

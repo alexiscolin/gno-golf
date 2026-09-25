@@ -1,6 +1,8 @@
 package golf
 
 import (
+	"encoding/hex"
+	"strconv"
 	"strings"
 	"time"
 
@@ -9,8 +11,17 @@ import (
 	"gno.land/p/nt/ufmt/v0"
 )
 
-// wearRunes escalate with traffic: pristine grass, then a groove.
-const wearRunes = ".:;x%"
+// wearRunes escalate with traffic: pristine grass, then a groove, at up to
+// wearLight, wearWorn and wearGroove balls come to rest in a cell, and past.
+const (
+	wearRunes  = ".:;x%"
+	wearLight  = 2
+	wearWorn   = 6
+	wearGroove = 14
+)
+
+// maxTunnels is how many tunnels the board numbers, 1 to 9.
+const maxTunnels = 9
 
 const (
 	markWall = '#'
@@ -21,27 +32,48 @@ const (
 
 // Render is the game as text: gnoweb draws the board and submits the shot. The
 // 3D client reads the same State and plays the same physics.
+//
+// Paths: "" the hub; "<hole>" a hole's page, "<hole>/<address>" the same
+// with that player's ball, "<hole>/data" a data version's provenance and
+// data. <hole> is a version's id or an alias.
 func Render(path string) string {
 	if path == "" {
 		return renderHub()
 	}
-	// "<pkgpath>" or "<pkgpath>/<player>": the id has slashes of its own, so
-	// the focus is whatever trails it, if that is an address.
-	hole, focus := path, address("")
-	if i := strings.LastIndex(path, "/"); i >= 0 && address(path[i+1:]).IsValid() {
-		hole, focus = path[:i], address(path[i+1:])
+	if e := lookup(path); e != nil {
+		return renderHole(e, e.hole(), "")
 	}
-	v := holes.Get(hole)
-	if v == nil {
-		return "# No such hole\n\n> [!WARNING]\n> `" + cleanName(hole) + "` is not registered. " + md("See every hole", "/r/gnogolf/golf") + ".\n"
+	// the id has slashes of its own, so what trails it is looked at last
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		head, tail := path[:i], path[i+1:]
+		if e := lookup(head); e != nil {
+			if address(tail).IsValid() {
+				return renderHole(e, e.hole(), address(tail))
+			}
+			if tail == "data" {
+				return renderData(e)
+			}
+		}
 	}
-	return renderHole(v.(*entry), focus)
+	return "# No such hole\n\n> [!WARNING]\n> `" + cleanName(path) + "` is not a hole here. " + md("See every hole", hub) + ".\n"
+}
+
+// lookup is readHole that answers nil for no hole.
+func lookup(id string) *entry {
+	if e := find(id); e != nil {
+		return e
+	}
+	return find(current(id))
 }
 
 // playLink is the 3D client on this very hole, as a short link a player can
-// share: its cup and its place in it (the client maps them back to the realm).
+// share: a current course hole by its cup and its place in it (the client
+// maps them back), any other by its id, which no newer version can take.
 func playLink(e *entry) string {
-	return ufmt.Sprintf("%s?cup=%s&hole=%d", playURL, e.world, int(e.order))
+	if !e.official || e.next != "" {
+		return playURL + "?hole=" + e.id
+	}
+	return playURL + "?cup=" + e.world + "&hole=" + strconv.Itoa(int(e.order))
 }
 
 // playURL is the 3D client; a hole's page links straight to it.
@@ -49,15 +81,8 @@ const playURL = "https://gnogolf.netlify.app/"
 
 // cupName is how a world is called on the page.
 func cupName(w string) string {
-	switch w {
-	case "garden":
-		return "Garden Cup"
-	case "island":
-		return "Island Cup"
-	case "town":
-		return "Mushroom Town"
-	case "mountain":
-		return "Mountain Cup"
+	if r := worldRank(w); r < len(worlds) {
+		return worlds[r].name
 	}
 	if w == "" {
 		return "Holes"
@@ -70,24 +95,27 @@ func who(addr string) string { return md(short(addr), "/u/"+addr) }
 
 func renderHub() string {
 	var sb strings.Builder
-	sb.WriteString("# Gnogolf — mini-golf on-chain\n\nEvery hole is a realm someone deployed, and the chain computes every shot. " +
+	sb.WriteString("# Gnogolf — mini-golf on-chain\n\nThe course is data its owner published, anyone can add holes of their own, and the chain computes every shot. " +
 		"Play here one shot at a time, or " + md("in 3D", playURL) + ", and record a whole round in one transaction.\n\n" +
 		"_To play here: pick a hole, send a Launch with an angle and a power, then add `/<your address>` to the hole's URL to see your ball._\n\n")
-	if holes.Size() == 0 {
-		sb.WriteString("_No hole registered yet._\n")
-		return sb.String()
-	}
-	var course, community []*entry
+	var course, archived, others []*entry
 	for _, e := range listed() {
-		if e.official {
+		switch {
+		case e.official && e.next == "":
 			course = append(course, e)
-		} else {
-			community = append(community, e)
+		case e.official:
+			archived = append(archived, e)
+		default:
+			others = append(others, e)
 		}
 	}
+	if len(course)+len(archived)+len(others) == 0 {
+		sb.WriteString("_No hole yet._\n")
+		sb.WriteString(noAdmin())
+		return sb.String()
+	}
 
-	// one card per cup, above their tables: nothing here calls a hole. A cup
-	// counts its current holes; an archived one is listed, not counted.
+	// one card per cup, above their tables: nothing here calls a hole
 	type cup struct {
 		world      string
 		holes, par int
@@ -99,9 +127,6 @@ func renderHub() string {
 			cups = append(cups, &cup{world: e.world})
 		}
 		c := cups[len(cups)-1]
-		if e.next != "" {
-			continue
-		}
 		c.holes++
 		c.par += e.par
 		if e.plays > 0 && (c.top == nil || e.plays > c.top.plays) {
@@ -114,7 +139,7 @@ func renderHub() string {
 			if i > 0 {
 				sb.WriteString("<gno-columns-sep />\n")
 			}
-			sb.WriteString(ufmt.Sprintf("**%s**\n\n%d holes · par %d\n", cupName(c.world), c.holes, c.par))
+			sb.WriteString("**" + cupName(c.world) + "**\n\n" + strconv.Itoa(c.holes) + " holes · par " + strconv.Itoa(c.par) + "\n")
 			if c.top != nil {
 				sb.WriteString("\nmost played: " + c.top.name + "\n")
 			}
@@ -124,48 +149,42 @@ func renderHub() string {
 
 	world, n := "", 0
 	for _, e := range course {
-		// a table per cup, numbered from 1 in each: its current holes only
+		// a table per cup, numbered from 1 in each
 		if e.world != world {
 			if world != "" {
 				sb.WriteString("\n") // a table ends before the next heading
 			}
 			world, n = e.world, 0
-			sb.WriteString("## " + cupName(world) + "\n\n| # | hole | par | best | shots played | code |\n|---|---|---|---|---|---|\n")
+			sb.WriteString("## " + cupName(world) + "\n\n| # | hole | par | best | shots played | data |\n|---|---|---|---|---|---|\n")
 		}
-		no := "archived"
-		if e.next == "" {
-			n++
-			no = ufmt.Sprintf("%d", n)
-		}
-		sb.WriteString(ufmt.Sprintf("| %s | [%s](/r/gnogolf/golf:%s) | %d | %s | %d | %s |\n",
-			no, e.name, e.id, e.par, bestCell(e), e.plays, source(e.id)))
+		n++
+		sb.WriteString("| " + strconv.Itoa(n) + " | " + md(e.name, hub+":"+e.id) + " | " + strconv.Itoa(e.par) + " | " +
+			bestCell(e) + " | " + strconv.Itoa(e.plays) + " | " + source(e) + " |\n")
 	}
-	if len(community) > 0 {
-		if len(course) > 0 {
-			sb.WriteString("\n")
+	if len(archived) > 0 {
+		sb.WriteString("\n## Archived course holes\n\nA newer version took each one's place in its cup. They can still be played, and keep their records, but no longer count in the course-wide ranking.\n\n" +
+			"| hole | version | par | best | shots played | now |\n|---|---|---|---|---|---|\n")
+		for _, e := range archived {
+			sb.WriteString("| " + md(e.name, hub+":"+e.id) + " | " + e.id + " | " + strconv.Itoa(e.par) + " | " + bestCell(e) + " | " +
+				strconv.Itoa(e.plays) + " | " + md(e.next, hub+":"+e.next) + " |\n")
 		}
-		sb.WriteString("## Community holes\n\nAnyone can register a hole. These are not part of the course: they have no cup and do not count in its ranking.\n\n" +
+	}
+	if len(others) > 0 {
+		sb.WriteString("\n## Community holes\n\nAnyone can publish a hole. These are not part of the course: they have no cup and do not count in its ranking.\n\n" +
 			"| hole | par | best | shots played | code |\n|---|---|---|---|---|\n")
-		for _, e := range community {
-			sb.WriteString(ufmt.Sprintf("| [%s](/r/gnogolf/golf:%s) | %d | %s | %d | %s |\n",
-				e.name, e.id, e.par, bestCell(e), e.plays, source(e.id)))
+		for _, e := range others {
+			sb.WriteString("| " + md(e.name, hub+":"+e.id) + " | " + strconv.Itoa(e.par) + " | " + bestCell(e) + " | " +
+				strconv.Itoa(e.plays) + " | " + source(e) + " |\n")
 		}
 	}
 	sb.WriteString("\n## Leaderboard\n\nEach named player's best finish on each current hole of the course, added up: most holes first, then fewest strokes. " +
 		"Assisted and pro rounds (the aim preview cut short, on the player's word) are ranked apart.\n\n")
 	for m := 0; m < modes; m++ {
 		sb.WriteString("### " + [modes]string{"Assisted", "Pro"}[m] + "\n\n")
-		rows := ""
-		i := 0
-		ranks[m].Iterate("", "", func(_ string, v any) bool {
-			p := v.(string)
-			if !named(p) {
-				return false
-			}
-			r := totals[m].Get(p).(*row)
+		rows, i := "", 0
+		eachRanked(m, func(r *row) {
 			i++
-			rows += ufmt.Sprintf("| %d | %s | %d | %d |\n", i, who(r.player), r.holes, r.strokes)
-			return i >= topSize
+			rows += "| " + strconv.Itoa(i) + " | " + who(r.player) + " | " + strconv.Itoa(r.holes) + " | " + strconv.Itoa(r.strokes) + " |\n"
 		})
 		if rows == "" {
 			sb.WriteString("_Nobody has finished a hole of the course yet._\n\n")
@@ -191,8 +210,8 @@ func bestCell(e *entry) string {
 
 // weatherNote is the hole's weather now, and how long it lasts: one forecast
 // per page, only on a hole's own page.
-func weatherNote(e *entry) string {
-	f := weatherOf(e, Period())
+func weatherNote(e *entry, h course.Hole) string {
+	f := weatherOf(e, h, Period())
 	left := PeriodSeconds - time.Now().Unix()%PeriodSeconds
 	what := "Clear"
 	switch f.Kind {
@@ -214,27 +233,43 @@ func weatherNote(e *entry) string {
 // noAdmin states what the reader can check in a minute: who can change what.
 // It is deliberately also an admission.
 func noAdmin() string {
-	return "\n---\n\nThis realm has no administrator: no owner, no pause, no upgrade, and no way to delete a hole or a record. " +
-		"Every write (Register, Launch, PlayRound, PlayRoundAt, PlayRoundPro, Reset) is open to anyone. " +
-		"Check it yourself: " + md("the source", "/r/gnogolf/golf$source") + ".\n\n" +
-		"One party does hold a real power: whoever may publish under `r/gnogolf/`, which the chain's namespace rule decides, not this realm. " +
-		"A hole published there can take a course hole's place in its cup: the old one is archived, never erased, " +
-		"and it stops counting in the course-wide ranking. So that party can reshape the course, and with it the ranking, " +
-		"and can add course holes. It cannot touch a round, a record or a community hole.\n\n" +
-		"The other half of having no administrator: a bad community hole cannot be taken down either.\n"
+	holder := who(owner.String())
+	if owner == "" {
+		holder = "nobody: the role was given up, and the course is frozen for good"
+	}
+	return "\n---\n\n**Who can change what.** Anyone can play (Launch, PlayRound, PlayRoundAt, PlayRoundPro), Reset their own round, " +
+		"publish holes of their own (PublishMine) and settle the ranking sooner (Drain). Nobody can edit or delete a round, a record, a best, a standing or a published version, " +
+		"and nobody can pause or upgrade this realm. Check it yourself: " + md("the source", hub+"$source") + ".\n\n" +
+		"One party holds a real power: the course's owner, now " + holder + ". The owner publishes the course holes and their new versions (Publish). " +
+		"A new version takes its slot: the old one is archived, still playable, its records kept, but its bests leave the course-wide ranking, which the new version starts afresh. " +
+		"So the owner shapes the course, and through it the ranking, and a stolen owner key could archive every slot, for good. " +
+		"A version identical to the current one is refused, but a replacement can still be unplayable: a hole can be replaced, never taken down. " +
+		"When a version is published picks its id, and its id seeds its weather. " +
+		"The owner can also let one realm under `" + strings.TrimPrefix(officialPrefix, "gno.land/") + "` register a hole (Expect), which is never a course hole; " +
+		"and whoever holds that namespace can deploy lookalike realms under it. " +
+		"The owner cannot edit or remove a version, touch a community hole, the weather, the physics or this code, " +
+		"and can only hand the role on (Transfer, then Accept) or give it up for good (Renounce).\n"
 }
 
-// source links a realm path to its code on gnoweb. A player can read the
-// physics of a hole before trusting it with a round — which is the whole
-// difference with a server, where you trust the operator's simulation.
-func source(pkgPath string) string {
-	return md(pkgPath, strings.TrimPrefix(pkgPath, "gno.land")+"$source")
+// source links a hole to what it is made of: a realm hole to its code on
+// gnoweb, a data version to its data page. A player can read the physics of
+// a hole before trusting it with a round — which is the whole difference
+// with a server, where you trust the operator's simulation.
+func source(e *entry) string {
+	if e.h == nil {
+		return md("data", hub+":"+e.id+"/data")
+	}
+	return md(e.id, strings.TrimPrefix(e.id, "gno.land")+"$source")
 }
 
 func md(label, href string) string { return "[" + label + "](" + href + ")" }
 
-func renderHole(e *entry, focus address) string {
-	f := e.h.Field()
+// flatRolls is what the page says a shot rolls on flat grass, from a tee
+// shot's Kick and the usual friction.
+const flatRolls = "On flat grass a power of 10 rolls about 40, a 5 about 15."
+
+func renderHole(e *entry, h course.Hole, focus address) string {
+	f := h.Field()
 	var mine *round // the focused player's round, looked up once
 	if v := e.rounds.Get(focus.String()); v != nil {
 		mine = v.(*round)
@@ -244,39 +279,42 @@ func renderHole(e *entry, focus address) string {
 		stroke = mine.strokes
 	}
 	// a timed hole is drawn as it stands for the focused player's next stroke
-	if t, ok := e.h.(course.Timed); ok {
+	if t, ok := h.(course.Timed); ok {
 		ws, ps := t.Extras(stroke)
-		f = course.WithZones(course.WithExtras(f, ws, ps), extraZones(e.h, stroke))
+		f = course.WithZones(course.WithExtras(f, ws, ps), extraZones(h, stroke))
 	}
 	s := ufmt.Sprintf("# %s\n\n**Par %d** · %s · %s\n\n", e.name, e.par, cupName(e.world), md("Play in 3D", playLink(e)))
 	if e.next != "" {
 		next := e.next
-		if v := holes.Get(e.next); v != nil {
-			next = v.(*entry).name
+		if n := find(e.next); n != nil {
+			next = n.name
 		}
-		s += "> [!NOTE]\n> Archived: " + md(next, "/r/gnogolf/golf:"+e.next) +
-			" took this hole's place in its cup. It can still be played, and your best here still shows on this page, but it no longer counts in the course-wide ranking.\n\n"
+		s += "> [!NOTE]\n> Archived: " + md(next, hub+":"+e.next) + " (" + e.next + ") took its place. It can still be played, and your best here still shows on this page"
+		if e.official {
+			s += ", but it no longer counts in the course-wide ranking"
+		}
+		s += ".\n\n"
 	}
-	s += weatherNote(e)
-	if isTimed(e.h) {
+	s += weatherNote(e, h)
+	if isTimed(h) {
 		if focus == "" {
 			s += "_This hole changes with every stroke. It is drawn for a first shot; add `/<your address>` to the URL to see it for your next one._\n\n"
 		} else {
 			s += ufmt.Sprintf("_This hole changes with every stroke. Drawn for %s's stroke %d._\n\n", short(focus.String()), stroke+1)
 		}
 	}
-	b := board(e, f, focus)
+	b := board(e, h, f, focus)
 	s += "```\n" + b + "```\n\n"
 	s += key(b) + legend(f) + "\n\n"
 
 	s += "## Play\n\n"
 	// the one number a text player cannot read off the board: where the cup is
-	from, who := e.h.Start(), "the tee"
+	from, who := h.Start(), "the tee"
 	if mine != nil && !mine.done && mine.strokes > 0 {
 		from, who = mine.ball(), "your ball"
 	}
-	a, d := aim(from, e.h.Cup())
-	s += ufmt.Sprintf("From %s the cup is **%.0f°** away, **%.1f** units in a straight line (0° = right, 90° = down). On flat grass a power of 10 rolls about 40, a 5 about 15.\n\n", who, a, d)
+	a, d := aim(from, h.Cup())
+	s += ufmt.Sprintf("From %s the cup is **%.0f°** away, **%.1f** units in a straight line (0° = right, 90° = down). %s\n\n", who, a, d, flatRolls)
 	if focus == "" {
 		s += "_After a shot, add `/<your address>` to this page's URL to see your ball and aim from it._\n\n"
 	}
@@ -286,7 +324,7 @@ func renderHole(e *entry, focus address) string {
 	s += "<gno-input name=\"angle\" placeholder=\"angle in degrees (0 = right, 90 = down), decimals allowed\" required=\"true\" />\n"
 	s += "<gno-input name=\"power\" placeholder=\"power, above 0 and up to 10\" required=\"true\" />\n"
 	s += "</gno-form>\n\n"
-	s += ufmt.Sprintf("_After your shot, see your ball at `/r/gnogolf/golf:%s/<your address>`._\n\n", e.id)
+	s += ufmt.Sprintf("_After your shot, see your ball at `%s:%s/<your address>`._\n\n", hub, e.id)
 	s += "Holed, or want a fresh start? Put your ball back on the tee:\n\n"
 	s += "<gno-form exec=\"Reset\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
@@ -314,21 +352,52 @@ func renderHole(e *entry, focus address) string {
 		if r.done {
 			state = "**holed**"
 		}
-		s += ufmt.Sprintf("| [%s](/r/gnogolf/golf:%s/%s) | %d | %s |\n",
-			short(player), e.id, player, r.strokes, state)
+		s += ufmt.Sprintf("| [%s](%s:%s/%s) | %d | %s |\n",
+			short(player), hub, e.id, player, r.strokes, state)
 	})
 	if empty {
 		s += "| _nobody yet_ | | |\n"
 	}
-	return s + ufmt.Sprintf("\n_This hole is %s — read its physics before you trust it with a round._\n",
-		source(e.id))
+	return s + "\n_This hole is " + source(e) + " — read it before you trust it with a round._\n"
+}
+
+// renderData is a data version's page: where it came from, its versions,
+// and its data, which is all the hole there is.
+func renderData(e *entry) string {
+	if e.h != nil {
+		return "# " + e.name + "\n\nThis hole is a realm's code, not data: " + source(e) + ".\n"
+	}
+	pkgs := strings.Replace(officialPrefix, "gno.land/r/", "/p/", 1) // the course's packages, as "/p/<ns>/"
+	s := "# " + e.name + ": its data\n\n**" + e.id + "**, version " + strconv.Itoa(e.version) + " of " + md(e.slot, hub+":"+e.slot) +
+		", published at height " + strconv.FormatInt(e.height, 10) + " by " + who(e.by.String()) + ". " + md("Play it", hub+":"+e.id) + ".\n\n"
+	if e.note != "" {
+		s += "> " + e.note + "\n\n"
+	}
+	if e.next != "" {
+		s += "_Archived: " + md(e.next, hub+":"+e.next) + " took its place._\n\n"
+	}
+	s += "## Versions\n\n| version | height | by | sha256 | note |\n|---|---|---|---|---|\n"
+	now := find(current(e.slot))
+	from := 1
+	if now.version > pageMax {
+		from = now.version - pageMax + 1
+	}
+	for n := from; n <= now.version; n++ {
+		v := find(e.slot + "/v" + strconv.Itoa(n))
+		s += "| " + md(v.id, hub+":"+v.id+"/data") + " | " + strconv.FormatInt(v.height, 10) + " | " + who(v.by.String()) + " | `" + v.sha[:16] + "…` | " + v.note + " |\n"
+	}
+	data := holeData.Get(e.id).(string)
+	s += "\n## The data\n\n" + strconv.Itoa(len(data)) + " bytes of GG1, sha256 `" + e.sha + "`. " +
+		"Every call decodes it with " + md("course", pkgs+"course$source") + " and plays it with " + md("physics", pkgs+"physics$source") +
+		"; " + md("golf", hub+"$source") + " checked it once, when it was published. HoleData gives it back as hex:\n\n"
+	return s + "```\n" + hex.EncodeToString([]byte(data)) + "\n```\n"
 }
 
 // board rasterises the hole: wear, then zones, posts, walls, cup, balls.
-func board(e *entry, f *physics.Field, focus address) string {
-	bw, bh := course.BoardOf(e.h)
+func board(e *entry, h course.Hole, f *physics.Field, focus address) string {
+	bw, bh := course.BoardOf(h)
 	g := make([][]rune, bh)
-	wear := e.h.Wear()
+	wear := h.Wear()
 	for y := 0; y < bh; y++ {
 		row := make([]rune, bw)
 		for x := 0; x < bw; x++ {
@@ -340,7 +409,7 @@ func board(e *entry, f *physics.Field, focus address) string {
 	// the focused player's last flight first, on the grass: pieces drawn after
 	// it stay visible (a mole in a gap was hidden under the dots)
 	if v := e.rounds.Get(focus.String()); v != nil {
-		for _, p := range lastShot(e, v.(*round)).Path {
+		for _, p := range lastShot(e, h, v.(*round)).Path {
 			put(g, p, '·')
 		}
 	}
@@ -348,7 +417,7 @@ func board(e *entry, f *physics.Field, focus address) string {
 	tunnel := 0
 	for _, z := range f.Zones {
 		m := mark(z.Mark, '?')
-		if z.Kind == physics.Tunnel && tunnel < 9 {
+		if z.Kind == physics.Tunnel && tunnel < maxTunnels {
 			// a tunnel's mouth and its exit share a digit: you can see where it leads
 			tunnel++
 			m = rune('0' + tunnel)
@@ -372,16 +441,16 @@ func board(e *entry, f *physics.Field, focus address) string {
 	}
 	tunnel = 0
 	for _, z := range f.Zones {
-		if z.Kind == physics.Tunnel && tunnel < 9 {
+		if z.Kind == physics.Tunnel && tunnel < maxTunnels {
 			tunnel++
 			put(g, z.Vec, rune('0'+tunnel))
 		}
 	}
-	put(g, e.h.Start(), markTee)
-	put(g, e.h.Cup(), markCup)
+	put(g, h.Start(), markTee)
+	put(g, h.Cup(), markCup)
 
 	// ground no ball can reach is not green: blank it, as the 3D client does
-	blankUnreachable(g, f, e.h.Start(), e.h.Cup())
+	blankUnreachable(g, f, h.Start(), h.Cup())
 
 	// only your own ball: everyone's at once would bury the board
 	if v := e.rounds.Get(focus.String()); v != nil && !v.(*round).done {
@@ -478,11 +547,11 @@ func wearRune(wear []int, x, y int) rune {
 	switch v := wear[i]; {
 	case v == 0:
 		return rune(wearRunes[0])
-	case v <= 2:
+	case v <= wearLight:
 		return rune(wearRunes[1])
-	case v <= 6:
+	case v <= wearWorn:
 		return rune(wearRunes[2])
-	case v <= 14:
+	case v <= wearGroove:
 		return rune(wearRunes[3])
 	default:
 		return rune(wearRunes[4])
@@ -600,76 +669,4 @@ func blankUnreachable(g [][]rune, f *physics.Field, seeds ...physics.Vec2) {
 			}
 		}
 	}
-}
-
-// worldRank is a world's place in the order a player goes through them; any
-// other comes after.
-func worldRank(w string) int {
-	switch w {
-	case "garden":
-		return 0
-	case "island":
-		return 1
-	case "town":
-		return 2
-	case "mountain":
-		return 3
-	}
-	return 4
-}
-
-// before is the list order: the course's own holes first, then world by
-// world, then by order within one.
-func before(a, b *entry) bool {
-	if a.official != b.official {
-		return a.official
-	}
-	wa, wb := worldRank(a.world), worldRank(b.world)
-	if wa != wb {
-		return wa < wb
-	}
-	if a.world != b.world {
-		return a.world < b.world
-	}
-	return a.order < b.order
-}
-
-// listed is the holes in course order, as many as a list shows. A list anyone
-// can grow is shown in part, never unreadable.
-func listed() []*entry {
-	// the course's own holes first, then anyone's, up to the cap: holes
-	// registered elsewhere can never push the official course off the list
-	list := make([]*entry, 0, maxListed)
-	add := func(_ string, v any) bool {
-		list = append(list, v.(*entry))
-		return len(list) >= maxListed
-	}
-	holes.Iterate(officialPrefix, officialEnd, add)
-	if len(list) < maxListed {
-		holes.Iterate("", officialPrefix, add)
-	}
-	if len(list) < maxListed {
-		holes.Iterate(officialEnd, "", add)
-	}
-	// Insertion sort:, fine for maxListed (120) holes
-	for i := 1; i < len(list); i++ {
-		for j := i; j > 0 && before(list[j], list[j-1]); j-- {
-			list[j], list[j-1] = list[j-1], list[j]
-		}
-	}
-	return list
-}
-
-// holeNo is the number a hole's path ends with (hole7 → 7), or a large one
-// for a path that has none, so numbered holes come first, in order.
-func holeNo(id string) int {
-	n, mul := 0, 1
-	for i := len(id) - 1; i >= 0 && id[i] >= '0' && id[i] <= '9'; i-- {
-		n += int(id[i]-'0') * mul
-		mul *= 10
-	}
-	if mul == 1 {
-		return 1 << 20
-	}
-	return n
 }

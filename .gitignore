@@ -2,3 +2,5 @@
 node_modules/
 .next/
 out/
+web/next-env.d.ts
+.netlify/

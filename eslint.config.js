@@ -1,54 +1,52 @@
-// Lint: the React hooks rules (the ones that catch real bugs) and the basics,
-// for the web client and the node scripts in scripts/.
-// It sits at the root so it reaches those; its plugins are the client's.
-// Run from web/: `npm run lint` (or `npx eslint .` for the client alone).
+// Lint: typescript-eslint's type-checked rules and the React hooks rules for
+// the web client, and the basics for the node scripts that drive it
+// (scripts/). It sits at the root so it reaches those; its plugins are the
+// client's. Run from web/: `npm run lint` (or `npx eslint .` for the client alone).
 import { createRequire } from "node:module";
 const require = createRequire(new URL("./web/package.json", import.meta.url));
+const tseslint = require("typescript-eslint");
 const reactHooks = require("eslint-plugin-react-hooks");
 const globals = require("globals");
 
-// no-unused-vars does not see a component used as <Name />: this marks it used
-// (what eslint-plugin-react's jsx-uses-vars does, without the dependency)
-const jsx = {
-  rules: {
-    "uses-vars": {
-      create: (context) => ({
-        JSXOpeningElement(node) {
-          let n = node.name;
-          while (n.type === "JSXMemberExpression") n = n.object;
-          if (n.type === "JSXIdentifier") context.sourceCode.markVariableAsUsed(n.name, node);
-        },
-      }),
-    },
-  },
-};
+const web = new URL("./web/", import.meta.url).pathname;
 
-const rules = {
-  "no-undef": "error",
-  "no-unused-vars": ["warn", { args: "after-used", argsIgnorePattern: "^_", ignoreRestSiblings: true }],
-};
-
-export default [
-  { ignores: ["**/.next/**", "**/out/**", "**/node_modules/**"] },
+export default tseslint.config(
+  { ignores: ["**/.next/**", "**/out/**", "**/node_modules/**", "web/next-env.d.ts"] },
   {
-    files: ["web/**/*.{js,jsx}"],
+    files: ["web/**/*.{ts,tsx}"],
+    extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {
-      ecmaVersion: 2023,
-      sourceType: "module",
-      parserOptions: { ecmaFeatures: { jsx: true } },
-      globals: { ...globals.browser, process: "readonly" },
+      parserOptions: { projectService: true, tsconfigRootDir: web },
+      globals: globals.browser,
     },
-    plugins: { "react-hooks": reactHooks, jsx },
+    plugins: { "react-hooks": reactHooks },
     rules: {
-      ...rules,
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-      "jsx/uses-vars": "error",
+      "@typescript-eslint/no-unused-vars": ["warn", { args: "after-used", argsIgnorePattern: "^_", ignoreRestSiblings: true }],
+      "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+      // the client's own style: short statements joined as expressions
+      // ("(a = 1), (b = 2)", "x && f()"), which this rule reads as dead code
+      "@typescript-eslint/no-unused-expressions": "off",
+    },
+  },
+  {
+    files: ["scripts/*.ts"],
+    extends: [tseslint.configs.recommendedTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: new URL("./scripts/", import.meta.url).pathname },
+      globals: globals.node,
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { args: "after-used", argsIgnorePattern: "^_", ignoreRestSiblings: true }],
     },
   },
   {
     files: ["web/*.mjs", "scripts/*.mjs"],
     languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: globals.node },
-    rules,
+    rules: {
+      "no-undef": "error",
+      "no-unused-vars": ["warn", { args: "after-used", argsIgnorePattern: "^_", ignoreRestSiblings: true }],
+    },
   },
-];
+);

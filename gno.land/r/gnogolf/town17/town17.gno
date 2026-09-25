@@ -1,4 +1,5 @@
-// Package town17 is up the market lane to a T junction: the cup is down the left, where a stall's awning comes down across the way every other stroke.
+// Package town17 is up the market lane to a T junction: the cup is down the
+// left, where a stall's awning comes down across the way every other stroke.
 package town17
 
 import (
@@ -19,7 +20,7 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Pulses: []course.Pulse{
-		{Every: 2, On: 1, Offset: 1, Walls: physics.Walls(physics.Bar(physics.V(13, 2.4), physics.V(13, 7.6), 0.8, '#', "awning"))},
+		{Every: 2, On: 1, Phase: 1, Walls: physics.Walls(physics.Bar(physics.V(13, 2.4), physics.V(13, 7.6), 0.8, '#', "awning"))},
 	},
 
 	Course: &physics.Field{
@@ -36,6 +37,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

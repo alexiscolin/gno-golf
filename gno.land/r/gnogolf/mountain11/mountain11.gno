@@ -32,7 +32,7 @@ var me = course.Fit(&course.Simple{
 			// ball never rests on it (straight, so no bank of it faces uphill)
 			{Kind: physics.Slope, Min: physics.V(2, 15.5), Max: physics.V(10, 22), Vec: physics.V(0, 0.16), Mark: 'v', Skin: "downhill"},
 			// the hairpin's bank, leaning in toward the inside of the turn, steep
-			// enough on the ice to slide a stopped ball in (at 0.12 it held it)
+			// enough on the ice to slide a stopped ball in
 			{Kind: physics.Slope, Min: physics.V(0, 27), Max: physics.V(26, 34), Vec: physics.V(0, -0.16), Mark: '^', Skin: "bank"},
 			// the braking stretch climbs back up to the cup: too gentle to move a
 			// stopped ball (the cup sits on it)
@@ -48,6 +48,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }

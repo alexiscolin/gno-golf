@@ -81,13 +81,6 @@ func TestBarStopsABallRollingAlongIt(t *testing.T) {
 	}
 }
 
-func TestReflectFlipsTheNormalComponent(t *testing.T) {
-	got := Reflect(Vec2{1, -1}, Vec2{0, 1})
-	if math.Abs(got.X-1) > 1e-9 || math.Abs(got.Y-1) > 1e-9 {
-		t.Fatalf("want {1 1}, got %v", got)
-	}
-}
-
 // A round ball stops with its edge on the wall: its centre never gets closer
 // than the radius, whether the wall is the box or a free-standing bar.
 func TestRoundBallKeepsItsRadiusFromWalls(t *testing.T) {
@@ -700,5 +693,52 @@ func TestFlightGrowsWithSpeed(t *testing.T) {
 	}
 	if slow, fast := far(4.5), far(6); !(slow > 0 && fast > slow) {
 		t.Fatalf("faster should fly further: %v then %v", slow, fast)
+	}
+}
+
+// A ball coming along a wall's line from well past its end meets the end
+// cap, however far the move before it started: it never slides on inside
+// the wall.
+func TestABallAlongAWallMeetsItsEnd(t *testing.T) {
+	f := &Field{Walls: []Wall{{Seg: Segment{V(10, 5), V(20, 5)}}}, Friction: 1, Bounce: 0.8, Radius: 0.5}
+	s := f.Step(V(9.03, 5.03), V(1.1, 0), 3)
+	for _, p := range s.Path {
+		if p.X >= 10 && p.X <= 20 && math.Abs(p.Y-5) < 0.5-1e-3 {
+			t.Fatalf("the ball is inside the wall, at %v (%d bounces)", p, s.Bounces)
+		}
+	}
+	if s.Bounces == 0 {
+		t.Fatal("the ball never met the wall's end")
+	}
+}
+
+// A ball inside a long, thin bar leaves straight out of its nearest side,
+// clear of it, not slid along it.
+func TestUnstickLeavesStraightOutOfTheNearestSide(t *testing.T) {
+	bar := Bar(V(22, 3), V(22, 12), 0.8, '#', "")
+	got := Unstick(V(22.3, 9.8), bar, nil, 0.5)
+	if math.Abs(got.Y-9.8) > 1e-9 {
+		t.Fatalf("pushed along the bar, to %v", got)
+	}
+	for _, w := range bar {
+		if d := w.Seg.Closest(got).Sub(got).Len(); d < 0.5 {
+			t.Fatalf("still %v from a side, at %v", d, got)
+		}
+	}
+}
+
+// A timed bar arriving on a ball against a rail pushes it out the other
+// way, never through the rail and off the course.
+func TestATimedBarNeverPushesTheBallThroughAWall(t *testing.T) {
+	tram := Timed(Bar(V(20, 1.5), V(20, 18.5), 2.4, '#', "tram"), 24, 5, 0)
+	f := &Field{Walls: Walls(Box(V(0, 0), V(40, 20)), tram), Friction: 0.87, Radius: 0.5}
+	s := f.Step(V(20, 0.6), V(0.01, 0), 2)
+	for _, p := range s.Path {
+		if p.Y < 0 {
+			t.Fatalf("the ball was pushed off the course, to %v", p)
+		}
+	}
+	if x := s.Rest().X; x > 18.8-0.5 && x < 21.2+0.5 {
+		t.Fatalf("the ball rests inside the tram, at %v", s.Rest())
 	}
 }

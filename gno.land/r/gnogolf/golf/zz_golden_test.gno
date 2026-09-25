@@ -69,6 +69,12 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 
 // golden: fixture -> sha256 prefix of its SimulateRoundAt (weather period
 // chosen per fixture), its Forecast, and its State.
+//
+// Deploy v1: the fixtures stay realm holes under golf's namespace, which the
+// owner now has to Expect, and which are no longer the course's (the course
+// is data): State says "official":false where these hashes were taken with
+// true. The State column is checked with that one flag put back, so every
+// other byte is pinned as it was.
 // 2026-09-25, hub fixes: the JSON shapes changed (a "version" field, the exact
 // "rest", "official" in State, no "by"), not the replays: with those fields
 // taken out, every SimulateRoundAt and State output is byte for byte as it was
@@ -78,13 +84,16 @@ var golden = map[string][3]string{
 	"sea":    {"4ce93b61be350770", "c3224daa821020f4", "807b1e8fc908df52"},
 	"slope":  {"1ae52dd6618cad52", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
 	"storm":  {"27839a2f650ea264", "217b2a005fc76324", "cd0874fd52e8179f"},
-	"timed":  {"88354dc60a8951a0", "c3224daa821020f4", "e4dbc97ea48d1ede"},
+	"timed":  {"932f9c494b5c025f", "c3224daa821020f4", "e4dbc97ea48d1ede"},
 	"tunnel": {"2b8666eb09290dde", "c3224daa821020f4", "335763617c2e9b50"},
 }
 
 func TestGoldenReplays(cur realm, t *testing.T) {
 	for name, h := range goldHoles() {
 		id := "gno.land/r/gnogolf/gold_" + name
+		setOwner(deployer)
+		testing.SetRealm(testing.NewUserRealm(deployer))
+		Expect(cross(cur), id)
 		testing.SetRealm(testing.NewCodeRealm(id))
 		Register(cross(cur), h)
 		kind := course.Clear
@@ -102,8 +111,8 @@ func TestGoldenReplays(cur realm, t *testing.T) {
 		// the period's offset from now, not its number, is what repeats
 		got := [3]string{
 			sum(SimulateRoundAt(id, goldShots, p)),
-			sum(forecastJSON(weatherOf(mustHole(id), p))),
-			sum(State(id)),
+			sum(forecastJSON("", weatherOf(mustHole(id), h, p))),
+			sum(strings.Replace(State(id), `"official":false`, `"official":true`, 1)),
 		}
 		want, ok := golden[name]
 		if !ok {
@@ -170,17 +179,16 @@ func TestAFuturePeriodIsRefused(cur realm, t *testing.T) {
 
 func TestOfficialHolesAreListedFirst(cur realm, t *testing.T) {
 	for i := 0; i < maxListed+2; i++ {
-		register(cur, "a"+strconv.Itoa(i)) // under gno.land/r/test/, which sorts after gnogolf
+		register(cur, "a"+strconv.Itoa(i))
 	}
-	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/zz"))
-	Register(cross(cur), &flat{})
+	id := courseHole(cur, 999) // the last slot of the garden
 	l := listed()
 	if len(l) != maxListed {
 		t.Fatalf("the list is capped at %d, got %d", maxListed, len(l))
 	}
 	found := false
 	for _, e := range l {
-		if e.id == "gno.land/r/gnogolf/zz" {
+		if e.id == id {
 			found = true
 		}
 	}
@@ -190,13 +198,12 @@ func TestOfficialHolesAreListedFirst(cur realm, t *testing.T) {
 }
 
 func TestTheTopIsTen(cur realm, t *testing.T) {
-	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/top"))
-	Register(cross(cur), &flat{})
+	id := courseHole(cur, 998)
 	for i := 0; i < topSize+3; i++ {
 		p := testutils.TestAddress("top" + strconv.Itoa(i))
 		giveName(cur, p, "top"+strconv.Itoa(i))
 		testing.SetRealm(testing.NewUserRealm(p))
-		PlayRound(cross(cur), "gno.land/r/gnogolf/top", "0,5;0,5;0,5;0,5")
+		PlayRound(cross(cur), id, "0,0.001;0,1")
 	}
 	lb := Leaderboard("assisted")
 	if n := strings.Count(lb, `"player"`); n != topSize {

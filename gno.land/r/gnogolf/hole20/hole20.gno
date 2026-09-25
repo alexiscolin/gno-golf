@@ -1,10 +1,11 @@
 // Package hole20 is the seesaw, the garden's finale. A lily pond fills the
-// board from wall to wall, and the only way over is a long plank balanced on
-// a stone in the middle that rocks, all the time, on a clock: tipped toward
-// the tee it rolls a ball back, tipped away it carries it on. A slow ball
-// rocks to and fro on it until the stroke is over and stops wherever it is;
-// it does not reliably come back. Let go when it is about to tip your way. Past the pond the lawn runs round the end of a
-// hedge and back along a row of sunflowers to the cup.
+// board from wall to wall, and the only way over is a long plank balanced on a
+// stone in the middle that rocks, all the time, on a clock: tipped toward the
+// tee it rolls a ball back, tipped away it carries it on. A slow ball rocks to
+// and fro on it until the stroke is over and stops wherever it is; it does not
+// reliably come back. Let go when it is about to tip your way. Past the pond
+// the lawn runs round the end of a hedge and back along a row of sunflowers to
+// the cup.
 package hole20
 
 import (
@@ -70,6 +71,8 @@ var me = course.Fit(&course.Simple{
 	},
 }, 1.5)
 
-// Register publishes this hole to golf. A hole cannot do it from init(): there
-// is no `cur` there, so it takes one transaction after the deploy.
+// Register lists this hole's realm with golf, from here or from its own
+// init(cur realm): as a community hole, and under golf's namespace only once
+// golf's owner expects this path. The course plays the hole as data
+// (data/holes.txt), which the owner publishes.
 func Register(cur realm) { golf.Register(cross(cur), me) }
