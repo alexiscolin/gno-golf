@@ -1,0 +1,207 @@
+/* The title and the cup screen, the arcade way: a live scene at golden hour
+   behind the title (lib/scene/title.js), glossy cup cards on a world-coloured
+   backdrop. Everything moving here is a transform or an opacity: the
+   compositor's work, not the page's. */
+
+/* ------------------------------------------------------------ the title */
+
+.screen--title {
+  background: #2c1a78;
+  overflow: hidden;
+  padding: clamp(18px, 4vh, 48px) 20px 20px;
+  cursor: default;
+}
+.screen--title.screen--ready { cursor: pointer; }
+/* the sky: dusk, per world (the scene's own is clear) */
+.title__sky, .title__still, .title__stage { position: absolute; inset: 0; }
+.title__sky { background: linear-gradient(180deg, var(--s0) 0%, var(--s1) 30%, var(--s2) 56%, var(--s3) 78%, var(--s4) 100%); }
+.title__sky::after {
+  /* the low sun's glow on the horizon */
+  content: ""; position: absolute; left: 50%; top: 62%; width: 140vmax; height: 70vmax; transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(255, 236, 170, .75), rgba(255, 170, 110, .25) 45%, transparent 75%);
+}
+.screen--title { --s0: #2c1a78; --s1: #8a2fa8; --s2: #ff5f8f; --s3: #ffa24c; --s4: #ffe08a; }
+.tsky--island { --s0: #0f4fb8; --s1: #1fa2e0; --s2: #7fd8f0; --s3: #ffb070; --s4: #ffe6a0; }
+.tsky--town { --s0: #231552; --s1: #5b2a9e; --s2: #d63d8f; --s3: #ff8a4c; --s4: #ffc56b; }
+.tsky--mountain { --s0: #173a8c; --s1: #4a6fe0; --s2: #a58df0; --s3: #ff9fb4; --s4: #ffd9a8; }
+.title__still img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.title__still--off { opacity: 0; transition: opacity .6s .3s; }
+.title__stage { opacity: 0; transition: opacity .5s; }
+.title__stage--on { opacity: 1; }
+.title__canvas { width: 100%; height: 100%; display: block; }
+
+.screen--title .title { position: relative; z-index: 1; gap: 0; min-height: 0; }
+/* the logo: the promo's sticker lockup, a paper edge and an inked extrusion,
+   on a slow sunburst */
+.title__logo { position: relative; display: grid; place-items: center; }
+.title__sun {
+  position: absolute; left: 50%; top: 56%; width: 170%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(rgba(255, 214, 90, .95) 0deg 7.5deg, rgba(255, 180, 60, .75) 7.5deg 15deg);
+  -webkit-mask-image: radial-gradient(circle, #000 14%, rgba(0, 0, 0, .55) 30%, transparent 52%);
+  mask-image: radial-gradient(circle, #000 14%, rgba(0, 0, 0, .55) 30%, transparent 52%);
+  border-radius: 50%;
+  animation: title-spin 80s linear infinite;
+}
+@keyframes title-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.screen--title .title__art {
+  position: relative;
+  width: min(620px, 88vw, 50vh);
+  margin-bottom: -4px;
+  filter: drop-shadow(5px 0 0 var(--paper)) drop-shadow(-5px 0 0 var(--paper)) drop-shadow(0 5px 0 var(--paper)) drop-shadow(0 -5px 0 var(--paper))
+    drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 3px 0 #0e3027) drop-shadow(0 18px 24px rgba(20, 10, 60, .45));
+  animation: title-float 5s ease-in-out infinite;
+}
+@keyframes title-float { 50% { transform: translateY(-8px) rotate(-1deg); } }
+.screen--title .title__word { fill: url(#title-word); font-size: 92px; }
+.screen--title .title__tag {
+  position: relative;
+  margin: 6px 0 18px; padding: 4px 22px 6px;
+  font-family: Fredoka, ui-rounded, system-ui, sans-serif; font-size: clamp(16px, 2.4vw, 26px); letter-spacing: .1em;
+  color: var(--paper); background: var(--green); border: 3px solid var(--ink); border-radius: 999px; box-shadow: 0 5px 0 var(--ink);
+  transform: rotate(-2deg);
+}
+
+/* the call to action: gold, big, breathing */
+.btn--start {
+  background: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%) !important;
+  color: var(--ink) !important;
+  font-size: clamp(24px, 3vw, 34px) !important;
+  padding: 16px 40px 18px 48px !important;
+  box-shadow: 0 7px 0 var(--ink), 0 0 0 0 rgba(255, 224, 102, .7);
+  animation: pop .35s cubic-bezier(.3, 1.6, .5, 1), cta-pulse 1.6s .4s ease-in-out infinite;
+}
+.btn--start svg { stroke: var(--ink); }
+.btn--start:hover { animation-play-state: paused; }
+.btn--start:focus-visible { outline: 4px solid var(--paper); outline-offset: 4px; }
+@keyframes cta-pulse {
+  50% { transform: scale(1.07); box-shadow: 0 7px 0 var(--ink), 0 0 0 14px rgba(255, 224, 102, 0); }
+}
+.screen--title .load { padding: 10px 18px 8px; background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; box-shadow: 0 5px 0 var(--ink); }
+.screen--title .title__facts { margin-top: clamp(18px, 4vh, 40px); gap: 12px; }
+.screen--title .title__facts li { border: 2.5px solid var(--ink); border-radius: 14px; box-shadow: 0 4px 0 var(--ink); cursor: default; }
+
+/* on a wide screen the facts sit on the foot of it, under the heroes' feet */
+@media (min-aspect-ratio: 1/1) {
+  .screen--title .title__facts { position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); margin: 0; }
+}
+@media (max-height: 720px) {
+  .screen--title .title__facts { display: none; }
+}
+/* a phone upright: the block higher and the logo smaller, the foot of the
+   screen left to the heroes */
+@media (max-aspect-ratio: 1/1) {
+  .screen--title { align-content: start; padding-top: clamp(16px, 4vh, 40px); padding-bottom: 22vh; }
+  .screen--title .title__art { width: min(80vw, 34vh); }
+  .screen--title .title__facts { margin-top: 14px; gap: 8px; }
+}
+@media (max-width: 600px) {
+  .screen--title .title__facts { align-items: stretch; }
+  .screen--title .title__facts li { font-size: 14px; padding: 5px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .title__sun, .screen--title .title__art, .btn--start { animation: none; }
+}
+
+/* ------------------------------------------------------------ the cups */
+
+.worlds--v2 { background: var(--b2); overflow: auto; --b0: #b7f5b0; --b1: #3fbf7f; --b2: #0e6a52; }
+.worlds--v2::before {
+  /* the world's colour, rays turning slowly from the middle, halftone at the foot */
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 45%, transparent 0 30%, rgba(0, 0, 0, .18) 80%),
+    repeating-conic-gradient(from 0deg at 50% 45%, rgba(255, 255, 255, .13) 0deg 6deg, transparent 6deg 18deg),
+    radial-gradient(ellipse at 50% 40%, var(--b0), var(--b1) 45%, var(--b2) 100%);
+  transition: filter .3s;
+}
+.worlds--v2::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, .28) 1.7px, transparent 2.1px);
+  background-size: 14px 14px;
+  -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 45%);
+  mask-image: linear-gradient(to top, #000 10%, transparent 45%);
+}
+.worlds--island { --b0: #aef2ff; --b1: #25a9e6; --b2: #0b4f9e; }
+.worlds--town { --b0: #ffc7de; --b1: #e0508f; --b2: #5d1c6b; }
+.worlds--mountain { --b0: #dde8ff; --b1: #6f8ff0; --b2: #283891; }
+.worlds--v2 .screen__back { box-shadow: 0 4px 0 var(--ink); }
+.worlds--v2 .worlds__in { width: min(1280px, 96vw); }
+.worlds--v2 .eyebrow { color: var(--paper); background: var(--ink); border-radius: 999px; padding: 4px 14px; font-size: 13px; }
+.worlds--v2 .worlds__title {
+  color: var(--paper); font-size: clamp(30px, 4.4vw, 52px); -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--ink); margin-bottom: clamp(10px, 2.4vh, 26px);
+}
+.worlds--v2 .worlds__list { gap: 20px; perspective: 900px; }
+
+/* a card: a glossy frame in its world's colours, the diorama up top, the
+   player's standing on a paper panel below */
+.worlds--v2 .world {
+  --c1: #6ee3a0; --c2: #1f9a6a; --rx: 0deg; --ry: 0deg; --mx: 30%;
+  position: relative; overflow: hidden; gap: 6px; padding: 8px 8px 12px; border-radius: 26px;
+  background: linear-gradient(170deg, var(--c1), var(--c2));
+  box-shadow: 0 7px 0 var(--ink), 0 18px 28px rgba(10, 20, 40, .3);
+  transform: rotateX(var(--ry)) rotateY(var(--rx));
+  transition: transform .25s cubic-bezier(.3, 1.6, .5, 1), box-shadow .2s;
+}
+.worlds--v2 .world::before {
+  /* the gloss: a sheen that follows the pointer */
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(115deg, transparent calc(var(--mx) - 30%), rgba(255, 255, 255, .5) var(--mx), transparent calc(var(--mx) + 22%));
+  mix-blend-mode: soft-light;
+}
+.worlds--v2 .world--garden { --c1: #7fe8a8; --c2: #1f9a6a; }
+.worlds--v2 .world--island { --c1: #7fe0f7; --c2: #1a86d0; }
+.worlds--v2 .world--town { --c1: #ffa3c6; --c2: #cf3f7c; }
+.worlds--v2 .world--mountain { --c1: #b8c9ff; --c2: #5569db; }
+.worlds--v2 .world--build { --c1: #e6ebe8; --c2: #aab6b0; }
+.world__art {
+  position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 19px; overflow: hidden;
+  border: 3px solid var(--ink); background: linear-gradient(180deg, #7ec8ff, #ffd6a8);
+}
+.worlds--v2 .world--island .world__art { background: linear-gradient(180deg, #54b8f5, #b8ecff 70%, #ffe2a8); }
+.worlds--v2 .world--town .world__art { background: linear-gradient(180deg, #6b4bc8, #ff8fb0 60%, #ffcf8a); }
+.worlds--v2 .world--mountain .world__art { background: linear-gradient(180deg, #4d74e0, #bcd2ff 65%, #ffe0c0); }
+.world__art img {
+  position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover; display: block;
+  transform: translate(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -8px));
+  transition: transform .2s ease-out;
+}
+.worlds--v2 .world__art + .world__ribbon { margin-top: -22px; position: relative; z-index: 3; box-shadow: 0 3px 0 var(--ink); }
+.worlds--v2 .world--build svg { width: 70%; margin: 6px auto 0; }
+.worlds--v2 .world--build .world__ribbon { margin-top: -18px; }
+.world__info {
+  display: grid; justify-items: center; gap: 6px; width: 100%; padding: 8px 6px 4px;
+  background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px;
+}
+.worlds--v2 .world__tag { min-height: 2.6em; color: var(--ink-soft); }
+
+/* the pick: the current cup and the one under the pointer or the focus pop */
+.worlds--v2 .world--on,
+.worlds--v2 .world:hover:not([disabled]),
+.worlds--v2 .world:focus-visible {
+  transform: translateY(-10px) scale(1.05) rotateX(var(--ry)) rotateY(var(--rx));
+  box-shadow: 0 0 0 4px #ffe066, 0 0 34px 8px rgba(255, 224, 102, .75), 0 16px 0 var(--ink);
+}
+.worlds--v2 .world--on { animation: cup-bounce .6s cubic-bezier(.3, 1.6, .5, 1); }
+.worlds--v2 .world--on .world__ribbon { background: var(--hat); }
+@keyframes cup-bounce { 0% { transform: scale(.94); } 60% { transform: translateY(-14px) scale(1.07); } }
+.worlds--v2 .world:focus-visible { outline: 4px solid var(--paper); outline-offset: 4px; }
+.worlds--v2 .world:hover:not([disabled]) svg, .worlds--v2 .world:focus-visible svg { transform: none; }
+.worlds--v2 .world:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
+.worlds--v2 .world[disabled] { background: linear-gradient(170deg, #e6ebe8, #aab6b0); }
+.worlds--v2 .world[disabled] .world__art img { filter: grayscale(.85) opacity(.75); }
+.worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: 0 3px 0 var(--ink); color: var(--ink); }
+.worlds--v2 .community { background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px; padding: 10px 14px; box-shadow: 0 4px 0 var(--ink); }
+
+@media (max-height: 760px) { .world__art { aspect-ratio: 16 / 9; } }
+@media (max-height: 640px) { .world__art { aspect-ratio: 2 / 1; } .worlds--v2 .world__tag { display: none; } }
+@media (max-width: 600px) {
+  .worlds--v2 .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .worlds--v2 .world { padding: 6px 6px 10px; border-radius: 20px; }
+  .worlds--v2 .world__ribbon { font-size: 14px; padding: 4px 10px; white-space: normal; }
+  .worlds--v2 .world__tag { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .worlds--v2 .world, .worlds--v2 .world--on, .worlds--v2 .world:hover:not([disabled]), .worlds--v2 .world:focus-visible { transform: none; animation: none; }
+  .world__art img { transform: none; }
+}

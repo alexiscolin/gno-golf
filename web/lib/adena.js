@@ -138,48 +138,77 @@ export function onWalletChange(fn) {
   return () => listeners.delete(fn);
 }
 
-// Gas, by the realm's own model of a commit's work (golf.gno, work): per
-// shot 10M, plus 150K per wall, plus, per point of its path, 1.2M and 15K per
-// piece of any kind (walls, posts, zones, the weather's). That model is fitted
-// to bound every measured shot by 1.25× at least; the call itself, the Reset
-// and the forecast add up to ~170M. Zones are cheap next to walls: counted by
-// path point, not as walls (the old estimate refused rounds that fit).
+// A commit's work, by the realm's own model (golf.gno, work: newWork, next,
+// add), computed here exactly: per shot 10M, plus 150K per wall, plus, per
+// point of its path, 1.2M and 15K per piece on the board (the hole's walls,
+// posts and zones, and the forecast's zones). c: { walls, pieces, pts: [path
+// length per stroke] }, as the engine's snapshot gives them.
+const WORK = { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3 };
+const MAX_LIST = 12; // golf.gno maxShots: the longest list one commit takes
+const workOf = (c, i) => WORK.shot + (c.walls || 0) * WORK.wall + ((c.pts || [])[i] || 60) * (WORK.point + (c.pieces || 0) * WORK.piece);
+
+/**
+ * The commits a round is recorded in: [[from, to), …], cut where the chain
+ * would cut them. Its work.next refuses a shot, after the first of a commit,
+ * once spent + the heaviest so far passes the budget; the list is 12 at most.
+ * The same sums, so no commit of the split is one the chain refuses.
+ */
+export function commitsOf(c, n = (c.pts || []).length) {
+  const parts = [];
+  let from = 0, spent = 0, most = 0;
+  for (let i = 0; i < n; i++) {
+    if (i > from && (i - from >= MAX_LIST || spent + most > WORK.budget)) (parts.push([from, i]), (from = i), (spent = most = 0));
+    const w = workOf(c, i);
+    spent += w;
+    most = Math.max(most, w);
+  }
+  if (n > from) parts.push([from, n]);
+  return parts;
+}
+
+// Gas asked for one commit, calibrated on gno_call simulate=true
+// against the local node: the work model already bounds the shots
+// (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; the
+// forecast is ~7M, except rain (~90M measured) and a storm (~140M: the
+// puddles). Measured totals come out 1.35-1.85x under this.
 // what is asked of the account: the gas at the price, with half again for a
 // price that rises between the reading and the block
 const feeFor = (gasWanted, price) => Math.ceil(gasWanted * price * 1.5);
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
-// Whether a round fits one commit is the chain's to say (SimulateRound's
-// "commit the first N"), not this estimate's: see splitRound.
 const MAX_GAS = 1_900_000_000;
-const PER_CALL = 170e6;
-/** The gas one commit of these strokes should need. c: { walls, others, pts: [path length per stroke] }. */
+const PER_CALL = 30e6;
+const FORECAST = { rain: 100e6, storm: 150e6 };
+/** The gas one commit of these strokes should need. c: { walls, pieces, kind (the forecast's), pts }. */
 export function gasOf(c, from = 0, to = (c.pts || []).length) {
-  let g = PER_CALL;
-  const pieces = (c.walls || 0) + (c.others || 0);
-  for (let i = from; i < to; i++) g += 10e6 + 150e3 * (c.walls || 0) + ((c.pts || [])[i] || 60) * (1.2e6 + 15e3 * pieces);
+  let g = PER_CALL + (FORECAST[c.kind] || 0);
+  for (let i = from; i < to; i++) g += workOf(c, i);
   return Math.min(Math.ceil(g), MAX_GAS);
 }
 
 /**
- * The commits a round is recorded in: [[from, to), …]. The chain refuses a
- * list too heavy for one transaction with "commit the first N, then the
- * rest"; asked first (check: SimulateRoundAt of the whole list), so that the
- * split is known before Adena opens. The rest is cut the same way, N at a
- * time. Throws, in words, when the chain refuses the round for any other
- * reason: nothing goes to Adena then.
+ * The commits a round is recorded in, each checked by the chain before Adena
+ * opens: the split is computed with the realm's work model (commitsOf), then
+ * the first commit (from the tee) is asked of SimulateRoundAt — check(list) —
+ * and every later one must fit the same model. A refusal of any kind throws,
+ * in words: nothing goes to Adena then. A later commit continues the round
+ * from where the chain has it, which no read can replay from the tee (a
+ * SimulateRoundAt of more than one commit is refused by the very budget it
+ * checks), so its check is the work sum, which is the chain's own.
  */
-export async function splitRound(shots, check) {
-  let n = shots.length;
+export async function splitRound(shots, check, c = {}) {
+  const parts = commitsOf(c, shots.length);
   try {
-    await check(shots);
+    await check(shots.slice(0, parts[0][1]));
   } catch (e) {
+    // the chain cut sooner than the model: its N wins, for every commit
     const m = String(e.message || e).match(/commit the first (\d+)/);
     if (!m) throw e;
-    n = Number(m[1]);
+    const n = Number(m[1]);
     if (!(n >= 1)) throw new Error("Even one shot of this round is more than one transaction can replay. It cannot be saved.");
+    const out = [];
+    for (let i = 0; i < shots.length; i += n) out.push([i, Math.min(shots.length, i + n)]);
+    return out;
   }
-  const parts = [];
-  for (let i = 0; i < shots.length; i += n) parts.push([i, Math.min(shots.length, i + n)]);
   return parts;
 }
 
@@ -200,6 +229,11 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
     type: "/vm.m_call",
     value: { caller: address, send: "", pkg_path: realm, func, args },
   });
+  // a pro round always has its period (State gives one): never a 0 the chain refuses
+  const periodArg = (p) => {
+    if (p == null) throw new Error("This round has no weather period, so it cannot be saved. Play it again.");
+    return String(p);
+  };
   const res = await a.DoContract({
     // in the weather the round was played in (its period): the chain takes
     // the current one or the one before
@@ -207,7 +241,7 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
       ...(reset ? [call("Reset", [hole])] : []),
       // a pro round goes on the pro board (the mode is the one it was played in)
       mode === "pro"
-        ? call("PlayRoundPro", [hole, shots.join(";"), String(period ?? 0)])
+        ? call("PlayRoundPro", [hole, shots.join(";"), periodArg(period)])
         : period == null
           ? call("PlayRound", [hole, shots.join(";")])
           : call("PlayRoundAt", [hole, shots.join(";"), String(period)]),
@@ -227,6 +261,47 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
   return res.data;
 }
 
+// The same save for gnokey, Adena's messages in one `maketx run` per commit:
+// a tiny script that Resets (first commit only) and plays the shots, so the
+// transaction is as atomic as Adena's. RUN_EXTRA: what a script's own
+// package costs over a call (an empty run is ~19M).
+const RUN_EXTRA = 20e6;
+/**
+ * [{ file, script, command }] per commit, for the player to run with their
+ * own key (<your-key-name>). s: the engine's snapshot of a holed round
+ * (id, shots, period, roundMode, and the work model's walls, pieces, kind, pts).
+ */
+export function gnokeyPlan(s, { realm, price = 0.001, chainId, rpc }) {
+  const shots = s.shots || [], mode = s.roundMode || "assisted";
+  if (!shots.length) return [];
+  if (mode === "pro" && s.period == null) return []; // a pro round has its period, or it cannot be saved
+  const q = JSON.stringify; // a Go string literal, for these ASCII ids and shots
+  const parts = commitsOf(s, shots.length);
+  return parts.map(([from, to], k) => {
+    const list = q(shots.slice(from, to).join(";")), hole = q(s.id);
+    const play =
+      mode === "pro" ? `golf.PlayRoundPro(cross(cur), ${hole}, ${list}, ${s.period})`
+        : s.period == null ? `golf.PlayRound(cross(cur), ${hole}, ${list})`
+          : `golf.PlayRoundAt(cross(cur), ${hole}, ${list}, ${s.period})`;
+    const file = parts.length > 1 ? `gnogolf-save-${k + 1}.gno` : "gnogolf-save.gno";
+    const script = [
+      `// Gnogolf: ${s.name || s.id}, ${parts.length > 1 ? `part ${k + 1} of ${parts.length}, ` : ""}strokes ${from + 1}-${to} (${mode})`,
+      "package main",
+      "",
+      `import "${realm}"`,
+      "",
+      "func main(cur realm) {",
+      ...(k === 0 ? [`\tgolf.Reset(cross(cur), ${hole})`] : []),
+      `\tprintln(${play})`,
+      "}",
+      "",
+    ].join("\n");
+    const gas = Math.min(gasOf(s, from, to) + RUN_EXTRA, MAX_GAS);
+    const command = `gnokey maketx run -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chainId || "<chain-id>"} -remote ${norm(rpc)} <your-key-name> ${file}`;
+    return { file, script, command };
+  });
+}
+
 // The storage a save writes, in bytes (fix-hub.md, measured): a first finish
 // on a hole writes the round, the best and the board entry (~6.6 KB), and a
 // player's first course finish ~2.5 KB more for the ranking; a replay of a
@@ -237,7 +312,28 @@ export const depositBytes = (first) => (first ? 9100 : 300);
 export const shortOf = (gas, price, deposit, balance) =>
   balance == null ? null : Math.max(0, feeFor(gas, price) + deposit - balance) / 1e6;
 
-/** What a round's gas costs, in GNOT, shown before anyone signs. */
-export const costOf = (gas, price = 0.001) => (feeFor(gas, price) / 1e6).toFixed(3);
+/** What a round's gas costs, in GNOT, shown before anyone signs: the gas at
+ *  today's price (the ask adds half again for a rising price; Adena charges
+ *  what it simulates). */
+export const costOf = (gas, price = 0.001) => ((gas * price) / 1e6).toFixed(3);
 
-// the self-check: the chain's "first N" cuts the round N at a time; any other refusal stops it
+/** The self-check of the split: node lib/adena.js's demoSplit(), or from a test. */
+export function demoSplit() {
+  const heavy = { walls: 100, pieces: 100, pts: Array(12).fill(190) }; // 5.4e8 a shot
+  const p = commitsOf(heavy);
+  console.assert(p.length === 6 && p.every(([a, b]) => b - a === 2), "heavy: two a commit, as next() would cut");
+  const light = { walls: 0, pieces: 0, pts: Array(60).fill(10) };
+  const q = commitsOf(light);
+  console.assert(q.length === 5 && q.every(([a, b]) => b - a === 12), "light: twelve a commit, 60 in five");
+  const mixed = { walls: 100, pieces: 100, pts: [10, 10, 10, 512, 512, 512, 512] };
+  console.assert(commitsOf(mixed).every(([a, b]) => {
+    let spent = 0, most = 0;
+    for (let i = a; i < b; i++) {
+      if (i > a && spent + most > WORK.budget) return false;
+      const w = workOf(mixed, i);
+      (spent += w), (most = Math.max(most, w));
+    }
+    return true;
+  }), "mixed: no commit the chain would refuse");
+  return "ok";
+}

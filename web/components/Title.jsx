@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import "@/app/title.css";
 import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
 
@@ -141,6 +142,70 @@ const guessWorld = () => {
   return /island/.test(h) ? "island" : /town/.test(h) ? "town" : /mountain/.test(h) ? "mountain" : "garden";
 };
 
+// The title's live scene (lib/scene/title.js), one per visit: kept across the
+// two mounts at startup (the page's, while the bundle loads, then the game's)
+// by parking its canvas for a moment instead of dropping it. Each visit flies
+// round the next world. Nothing of it runs where a still is shown instead:
+// reduced motion, the Low graphics tier, no WebGL.
+const SCENES = ["garden", "island", "town", "mountain"];
+let visit = null; // { world, canvas, p (its scene, or null), ready, kill }
+const nextWorld = () => {
+  let i = 0;
+  try {
+    const was = localStorage.getItem("gnogolf.title");
+    i = was == null ? 0 : (Number(was) + 1) % SCENES.length || 0;
+    localStorage.setItem("gnogolf.title", String(i));
+  } catch {}
+  return SCENES[i];
+};
+const wantsStill = () => {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+  try {
+    const gfx = localStorage.getItem("gnogolf.gfx");
+    // Low, or Auto on a device whose frames were slow (the engine's own flag)
+    return gfx === "low" || (gfx !== "high" && localStorage.getItem("gnogolf.gfx.auto") === "low");
+  } catch {
+    return false;
+  }
+};
+
+function useTitleScene(host) {
+  const [scene, setScene] = useState(null); // { world, live }
+  useEffect(() => {
+    if (!visit) {
+      const world = nextWorld(), live = !wantsStill(), canvas = live ? document.createElement("canvas") : null;
+      if (canvas) canvas.className = "title__canvas";
+      const v = (visit = { world, canvas, p: null, ready: false, kill: 0 });
+      if (live)
+        v.p = import("@/lib/scene/title")
+          .then((m) => m.makeTitle(canvas, { world }))
+          .catch((e) => (console.warn("gnogolf: no live title", e), null));
+    }
+    const v = visit;
+    clearTimeout(v.kill);
+    if (host.current && v.canvas) host.current.appendChild(v.canvas);
+    setScene({ world: v.world, live: v.ready });
+    let on = true;
+    if (v.p) v.p.then((t) => {
+      if (!t || !on) return;
+      v.ready = true;
+      t.resize();
+      setScene({ world: v.world, live: true });
+      if (/[?&]camlog/.test(location.search)) window.__title = t; // the perf probe's hook
+    });
+    return () => {
+      on = false;
+      v.kill = setTimeout(() => {
+        if (visit !== v) return;
+        visit = null;
+        if (v.canvas) v.canvas.remove();
+        if (v.p) v.p.then((t) => t && t.destroy());
+      }, 400);
+    };
+  }, [host]);
+  return scene;
+}
+
 export default function Title({ onStart, loading = false, world }) {
   world = world || guessWorld();
   // the loader shows until the game is ready and the ball has dropped; coming
@@ -150,14 +215,44 @@ export default function Title({ onStart, loading = false, world }) {
     if (loading) setReady(false);
   }, [loading]);
   const done = useCallback(() => setReady(true), []);
+  const host = useRef(null);
+  const scene = useTitleScene(host);
+  // ?titlebake (dev): the stills' baker, for the stills script
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) import("@/lib/scene/title").then((m) => (window.__titleStill = m.titleStill));
+  }, []);
+  const start = () => (sound("start"), onStart());
+  // once ready, a click anywhere or Enter starts, like a console's title
+  useEffect(() => {
+    if (!ready) return;
+    const key = (e) => {
+      if ((e.key === "Enter" || e.key === " ") && (document.activeElement === document.body || !document.activeElement)) (e.preventDefault(), sound("start"), onStart());
+    };
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [ready, onStart]);
+  const sw = scene ? scene.world : null;
   return (
-    <div className="screen">
-      <div className="screen__frame" />
-      <div className="screen__dots" />
+    <div className={"screen screen--title" + (sw ? ` tsky--${sw}` : "") + (ready ? " screen--ready" : "")} onClick={ready ? start : undefined}>
+      <div className="title__sky" aria-hidden="true" />
+      {sw && (
+        <picture className={"title__still" + (scene.live ? " title__still--off" : "")} aria-hidden="true">
+          <source media="(orientation: portrait)" srcSet={`title/${sw}-p.webp`} />
+          <img src={`title/${sw}.webp`} alt="" />
+        </picture>
+      )}
+      <div ref={host} className={"title__stage" + (scene && scene.live ? " title__stage--on" : "")} aria-hidden="true" />
       <div className="title">
+        <div className="title__logo">
+          <div className="title__sun" aria-hidden="true" />
         <svg className="title__art" viewBox="0 0 600 505" aria-label="Gnogolf">
           <defs>
             <path id="arc" d="M 70 330 A 230 230 0 0 1 530 330" />
+            <linearGradient id="title-word" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#5fe0a8" />
+              <stop offset=".55" stopColor="#2a9d74" />
+              <stop offset="1" stopColor="#1c7a5a" />
+            </linearGradient>
           </defs>
           <text className="title__word">
             <textPath href="#arc" startOffset="50%" textAnchor="middle">GNOGOLF</textPath>
@@ -194,10 +289,12 @@ export default function Title({ onStart, loading = false, world }) {
             <circle cx="100" cy="134" r="9" className="title__nose" />
           </g>
         </svg>
-        <p className="title__tag">“mini-golf on-chain”</p>
+        </div>
+        <p className="title__tag">mini-golf on-chain</p>
         {ready ? (
-          <Button variant="primary" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), onStart())}>
-            Play
+          <Button variant="primary" className="btn--play btn--cta btn--pop btn--start" aria-label="Play" onClick={(e) => (e.stopPropagation(), start())}>
+            <span className="hint--mouse">Click to start</span>
+            <span className="hint--touch">Tap to start</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12 H18 M13 6 L19 12 L13 18" /></svg>
           </Button>
         ) : (

@@ -28,7 +28,7 @@ import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay.js";
 import { makeAimer, MAX_POWER, thirdAim } from "./engine/aim.js";
 import { probes } from "./engine/probes.js";
 
-const MAX_SHOTS = 12; // the realm's limit for one committed round
+const MAX_SHOTS = 60; // the realm's limit for one round (maxRoundStrokes); a save of more than 12 goes in several commits
 // the part of the screen the HUD covers, in CSS pixels: the camera frames
 // what is left, so the course is centred in what the player can actually see
 const HUD = { top: 108, bottom: 136, side: 14 };
@@ -145,8 +145,11 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       world: g.world,
       linked: !!g.linked, // the page's link named a hole that exists
       ready: !!g.course && warming !== loads, // the hole is built and its shaders ready: the curtain may open
-      // this hole's place in its cup, for the address bar and shared links
-      place: g.s ? Math.max(1, perList().holes.findIndex((h) => h.id === g.id) + 1) : 0,
+      // this hole's place in its cup, for the address bar and shared links; 0
+      // for a hole in no cup (a community or an archived one): linked by its id
+      place: g.s ? perList().holes.findIndex((h) => h.id === g.id) + 1 : 0,
+      // a course hole another has replaced: playable by its link, in no cup
+      archived: !!(g.id && g.all && (g.all.find((h) => h.id === g.id) || {}).next),
       look: (g.s && g.s.world) || g.world || "garden", // the world this hole is dressed as
       // how many holes each world has on this chain, for the world screen
       worlds: perList().worlds,
@@ -159,11 +162,13 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       strokes: g.strokes,
       timed: !!(g.s && g.s.timed),
       time: g.course ? g.course.userData.time : "day",
-      // what a shot is tested against, for the gas estimate before signing
-      // (the realm's own model: walls cost most, then every other piece per
-      // path point): the walls, everything else, and each stroke's path length
+      // what the realm's work model (golf.gno newWork) counts, for the save's
+      // split and its gas: the hole's walls, every piece on the board (walls,
+      // posts, zones and the forecast's zones: a stroke's extras are not
+      // counted there), the forecast's kind, and each stroke's path length
       walls: g.s ? g.s.walls.length : 0,
-      others: g.s ? g.s.posts.length + g.s.zones.length + ((g.forecast && g.forecast.zones) || []).length + (g.s.timed ? 8 : 0) : 0,
+      pieces: g.s ? g.s.walls.length + g.s.posts.length + g.s.zones.length + ((g.forecast && g.forecast.zones) || []).length : 0,
+      kind: (g.forecast && g.forecast.kind) || "",
       pts: g.pts || NONE,
       shots: g.shots || NONE,
       flying: g.flying,
@@ -396,6 +401,21 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   // Loads are ticketed: only the latest one may land, and the round changes
   // before the wait, so any shot still in the air is already somebody else's.
   let loads = 0, warming = 0; // warming: the load whose hole is being built and compiled
+  // the next hole's State, read while the win card shows: "Next hole" then
+  // asks nothing. Kept PREFETCH_MS at most (its weather and wear move on).
+  const PREFETCH_MS = 60e3;
+  let ahead = null; // { id, at, p }
+  function prefetch(id) {
+    if (!id || (ahead && ahead.id === id)) return;
+    const p = chain.state(id);
+    ahead = { id, at: performance.now(), p };
+    p.then((st) => loadWorld(st.world).catch(() => {}), () => ahead && ahead.p === p && (ahead = null));
+  }
+  function stateOf(id) {
+    const a = ahead;
+    ahead = null;
+    return a && a.id === id && performance.now() - a.at < PREFETCH_MS ? a.p.catch(() => chain.state(id)) : chain.state(id);
+  }
   async function load(id) {
     const ticket = ++loads;
     // any shot in the air belongs to the old hole: end its round, but ask the
@@ -403,7 +423,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     newRound(false);
     let s;
     try {
-      s = await chain.state(id);
+      s = await stateOf(id);
     } catch (err) {
       if (ticket === loads && alive) {
         g.error = String(err.message || err);
@@ -535,7 +555,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   function applyWeather(zones) {
     if (zones) strokeZones = zones;
     if (!g.s || !g.course) return;
-    g.weather = weather.set(faked() || [...g.s.zones, ...((g.forecast && g.forecast.zones) || []), ...strokeZones]);
+    const fk = faked();
+    g.weather = weather.set(fk || [...g.s.zones, ...((g.forecast && g.forecast.zones) || []), ...strokeZones], fk ? null : g.forecast);
     everyL = everyNow();
     // the mill's sails count from a quarter turn, sail down: tick 0 of the clock
     const mill = g.course.userData.mill;
@@ -545,8 +566,16 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     if (g.course.userData.weather) g.course.userData.weather(g.weather); // the decor dressed for it (sunbathers in, parasols shut...)
     publish();
   }
-  // between rounds the quarter hour may have turned: a new round takes the new weather
-  async function freshWeather() {
+  // Between rounds the period may have turned: a round not started yet takes
+  // the new weather. Asked only once the loaded period is over on the chain's
+  // clock (State has just given the current one: no Period() behind it).
+  const PERIOD_MS = 300e3;
+  const stale = () => g.period != null && chain.now() >= (g.period + 1) * PERIOD_MS;
+  let freshening = null;
+  function freshWeather() {
+    return (freshening = freshening || refresh().finally(() => (freshening = null)));
+  }
+  async function refresh() {
     const id = g.id, round = g.round;
     try {
       const p = await chain.period();
@@ -558,6 +587,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       applyWeather();
     } catch {}
   }
+  // a hole looked at past its period, no stroke played: the HUD's weather follows
+  const staleTimer = setInterval(() => g.s && !g.flying && !(g.shots && g.shots.length) && stale() && freshWeather(), 5000);
 
   // The timed pieces' clock: one substep per MS_PER_STEP, running all the
   // time. A shot is let go at a tick of it and the chain plays the stroke from
@@ -620,7 +651,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       strokeZones = [];
       strokeWalls = [];
       if (ask) showExtras();
-      if (ask && g.period != null) freshWeather();
+      if (ask && stale()) freshWeather();
     }
     publish();
   }
@@ -664,12 +695,18 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   const rp = makeReplay(E);
   E.landing = rp.landing;
   const aimer = makeAimer(E);
-  const { preview, dropAim, strokeFrom, ghosts } = aimer;
+  const { preview, dropAim, strokeFrom, ghosts, known } = aimer;
   // the pull let go of (or dropped): nothing aimed, the HUD told
   const endPull = () => ((dragging = g.aiming = false), dropAim(), publish());
 
+  // the canvas is a fixed full-window backdrop: its rect changes with the
+  // window only, so it is read once per resize, not twice a pointer move (a
+  // read after the HUD's power bar moved forces a layout in the input path)
+  let rect = null;
+  const dropRect = () => (rect = null);
+  window.addEventListener("resize", dropRect);
   function boardPoint(ev) {
-    const r = canvas.getBoundingClientRect();
+    const r = rect || (rect = canvas.getBoundingClientRect());
     const x = ((ev.clientX - r.left) / r.width) * 2 - 1;
     const y = -((ev.clientY - r.top) / r.height) * 2 + 1;
     ray.setFromCamera(ndc.set(x, y), camera);
@@ -852,6 +889,13 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       g.errorKind = "limit";
       return publish();
     }
+    // the first stroke of a round in a period that is over would make it
+    // unsaveable from the start: the current weather is read first
+    if (!g.shots.length && stale()) {
+      g.flying = true; // no second shot while it is read
+      await freshWeather();
+      if (round !== g.round) return;
+    }
     // round: the one this shot belongs to — if the player restarts or changes
     // hole while it is in the air, its answer is dropped instead of leaking in
     const tick = tickNow(); // where the timed pieces are as it is let go
@@ -867,8 +911,12 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     publish();
 
     let res;
+    const one = shotOf(angleDeg, power, tick);
     try {
-      res = await strokeFrom(g.id, g.shots, shotOf(angleDeg, power, tick), g.rest);
+      // the aim preview already asked the chain this very stroke (same hole,
+      // period, round so far and shot string): its answer is the shot, no
+      // second round trip. Anything else differs by a hair: asked anew.
+      res = known(g.id, g.shots, one) || (await strokeFrom(g.id, g.shots, one, g.rest));
       if (round !== g.round) return;
     } catch (err) {
       if (round !== g.round) return;
@@ -888,7 +936,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     }
     if (!g.shots.length) g.roundMode = mode; // this round is played, and recorded, in this mode
     g.lastAim = (angleDeg * Math.PI) / 180;
-    g.shots = [...g.shots, shotOf(angleDeg, power, tick)]; // a new list: what changed is seen by reference
+    g.shots = [...g.shots, one]; // a new list: what changed is seen by reference
     g.pts = [...g.pts, res.path.length];
     g.rest = Array.isArray(res.rest) && res.rest.every(Number.isFinite) ? res.rest : null;
     g.tick0 = tick || 0;
@@ -898,6 +946,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       // the stroke count as the round has it (SimulateFrom sends none: res.strokes was undefined,
       // and the card saved nothing)
       onHoled({ id: g.id, strokes: g.strokes });
+      // the hole "Next hole" goes to (the win card's: the next in this cup)
+      const cup = perList().holes, i = cup.findIndex((h) => h.id === g.id);
+      if (cup.length) prefetch(cup[(i + 1) % cup.length].id);
       joyIn = setTimeout(() => alive && round === g.round && mood.joy(performance.now()), 500);
     }
     publish();
@@ -987,7 +1038,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   }
 
   async function start(link) {
-    const list = await chain.holes();
+    let list = await chain.holes();
+    // a link to a hole the tab's kept list does not have yet: the chain's own
+    if (typeof link === "string" && link && !list.some((h) => h.id === link)) list = await chain.holes(true);
     if (!alive) return; // destroyed while the chain answered (a remount in dev)
     // a hole another has replaced (same cup, same place) stays playable by its
     // link, but only the current one fills the cup
@@ -1000,7 +1053,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     // a string is a realm id, as before
     const asked = linked(typeof link === "string" ? { id: link } : link);
     g.linked = !!asked;
-    g.world = asked ? cupOf(asked) : g.world || "garden";
+    // ?cup=island alone: that cup, on its first hole
+    const cupLink = link && link.cup && g.list.some((h) => cupOf(h) === link.cup) ? link.cup : "";
+    g.world = asked ? cupOf(asked) : cupLink || g.world || "garden";
     const first = asked || inWorld()[0] || g.list[0];
     await load(first.id);
     if (!g.s) throw new Error(g.error || "the first hole could not be loaded");
@@ -1162,6 +1217,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     chain,
     destroy() {
       alive = false;
+      clearInterval(staleTimer);
+      window.removeEventListener("resize", dropRect);
       window.removeEventListener("pointermove", cam.hover);
       window.removeEventListener("blur", onCancel);
       window.removeEventListener("blur", onBlur);

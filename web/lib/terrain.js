@@ -19,9 +19,10 @@ export const BALL_R = 0.5;
 // The cup is drawn at the radius the chain holes a ball in.
 export const CUP_R = 1.2;
 
-/** A slope that is air, not ground (wind, a gust, anything timed): it pushes
- *  the ball but raises no ramp. */
-export const airy = (z) => z.kind === "slope" && (z.skin === "wind" || z.skin === "gust" || !!z.every);
+/** A slope that is air, not ground: it pushes the ball but raises no ramp.
+ *  The chain's own "air" flag when the zone carries one; else guessed from
+ *  the skin (wind, a gust) or a clock, as the realm has no flag yet. */
+export const airy = (z) => z.kind === "slope" && (typeof z.air === "boolean" ? z.air : z.skin === "wind" || z.skin === "gust" || !!z.every);
 
 // ------------------------------------------------------ shared geometry
 // The small sums every part of the client needs, in one place.

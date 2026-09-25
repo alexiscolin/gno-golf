@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { sound } from "@/lib/feel";
 import { Green } from "@/components/Title";
+import "@/app/title.css";
 
 // The world screen, between the title and the course: one emblem per world,
 // drawn like a cup to win, and the builder to come. A world with no holes on
@@ -109,9 +110,23 @@ export function Emblem({ id }) {
   );
 }
 
+// the hover tilt: the card leans toward the pointer, its diorama shifts the
+// other way and the gloss follows (a mouse only; nothing under reduced motion: see title.css)
+const tilt = (e) => {
+  if (e.pointerType !== "mouse") return;
+  const el = e.currentTarget, r = el.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+  for (const [k, v] of [["--rx", `${(x * 14).toFixed(1)}deg`], ["--ry", `${(-y * 10).toFixed(1)}deg`], ["--px", x.toFixed(2)], ["--py", y.toFixed(2)], ["--mx", `${Math.round((x + 0.5) * 100)}%`]])
+    el.style.setProperty(k, v);
+};
+const untilt = (e) => ["--rx", "--ry", "--px", "--py", "--mx"].forEach((k) => e.currentTarget.style.removeProperty(k));
+
 export default function Worlds({ counts = {}, stats = {}, current, onPick, onBack, onReset, onResetAll, community = [], onCommunity = () => {} }) {
   const [wipe, setWipe] = useState(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
+  const [hot, setHot] = useState(null); // the cup under the pointer or the focus: the backdrop takes its colours
+  const PAGE = 24;
+  const [shown, setShown] = useState(PAGE); // community holes listed, a page more on each "Show more"
   const played = WORLDS.filter((w) => stats[w.id] && stats[w.id].done);
   const clear = (what, run) => {
     if (wipe !== what) return (sound("blip"), setWipe(what));
@@ -120,9 +135,7 @@ export default function Worlds({ counts = {}, stats = {}, current, onPick, onBac
     setResets(false);
   };
   return (
-    <div className="screen worlds">
-      <div className="screen__frame" />
-      <div className="screen__dots" />
+    <div className={`screen worlds worlds--v2 worlds--${hot || current || "garden"}`}>
       <button className="round round--small round--back screen__back" aria-label="Back to the title" onClick={() => (sound("blip"), onBack())}>
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
@@ -157,13 +170,20 @@ export default function Worlds({ counts = {}, stats = {}, current, onPick, onBac
             return (
               <li key={w.id}>
                 <button
-                  className={"world" + (w.id === current ? " world--on" : "")}
+                  className={`world world--${w.id}` + (w.id === current ? " world--on" : "")}
                   disabled={!n}
                   onClick={() => (sound("select"), onPick(w.id))}
-                  aria-label={`${w.name}: ${n ? `${n} holes` : "coming soon"}`}
+                  onPointerEnter={() => n && setHot(w.id)}
+                  onPointerMove={tilt}
+                  onPointerLeave={(e) => (untilt(e), setHot(null))}
+                  onFocus={() => setHot(w.id)}
+                  onBlur={() => setHot(null)}
+                  aria-label={`${w.name}: ${n ? `${n} holes` + (t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
                 >
-                  <Emblem id={w.id} />
+                  {/* its world in 3D, baked by the title's own scene */}
+                  <span className="world__art"><img src={`title/cup-${w.id}.webp`} alt="" width="480" height="360" loading="eager" /></span>
                   <span className="world__ribbon">{w.name}</span>
+                  <span className="world__info">
                   <span className="world__tag">{w.tag}</span>
                   <span className="world__count">{n ? `${n} holes` : "Coming soon"}</span>
                   {n > 0 && (
@@ -179,6 +199,7 @@ export default function Worlds({ counts = {}, stats = {}, current, onPick, onBac
                       </span>
                     </span>
                   )}
+                  </span>
                 </button>
               </li>
             );
@@ -187,8 +208,10 @@ export default function Worlds({ counts = {}, stats = {}, current, onPick, onBac
             <button className="world world--build" disabled aria-label="Builder: coming soon">
               <Emblem id="build" />
               <span className="world__ribbon">Builder</span>
-              <span className="world__tag">Draw your own hole, dare the others</span>
-              <span className="world__count">Coming soon</span>
+              <span className="world__info">
+                <span className="world__tag">Draw your own hole, dare the others</span>
+                <span className="world__count">Coming soon</span>
+              </span>
             </button>
           </li>
         </ul>
@@ -197,12 +220,17 @@ export default function Worlds({ counts = {}, stats = {}, current, onPick, onBac
           <section className="community" aria-label="Community holes">
             <h3>Community holes <small>not ranked</small></h3>
             <ul>
-              {community.slice(0, 12).map((h) => (
+              {community.slice(0, shown).map((h) => (
                 <li key={h.id}>
                   <button className="linkish" onClick={() => (sound("select"), onCommunity(h.id))}>{h.name}</button>
                 </li>
               ))}
             </ul>
+            {community.length > shown && (
+              <button className="linkish" onClick={() => setShown((n) => n + PAGE)}>
+                Show more ({community.length - shown} left)
+              </button>
+            )}
           </section>
         )}
       </div>

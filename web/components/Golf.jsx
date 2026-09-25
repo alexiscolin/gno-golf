@@ -9,6 +9,7 @@ import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
 import Share from "@/components/Share";
+import Gnokey from "@/components/Gnokey";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, medalOf, parOf, UNLOCKS, cupHasGnome, cupOf } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
@@ -116,22 +117,28 @@ function fatalKind(err) {
 
 // A round is saved in the weather it was played in: the chain takes it while
 // that period is the current one or the one just gone, so until the start of
-// period + 2 (weather.gno, five-minute periods). Read on this device's clock:
-// the block that takes the transaction carries the real time.
+// period + 2 (weather.gno, five-minute periods), by the time of the block that
+// takes the transaction. On the chain's clock (chain.now: the last block time
+// read), and SAVE_MARGIN early: the signing and the block's inclusion.
 const PERIOD_MS = 300 * 1000;
-const saveBy = (period) => (period + 2) * PERIOD_MS;
+const SAVE_MARGIN = 15 * 1000;
+const saveBy = (period) => (period + 2) * PERIOD_MS - SAVE_MARGIN;
+// how far this device's clock is behind the chain's (ms): a deadline on the
+// chain's clock, less this, is one on the device's
+const skewOf = (chain) => (chain && chain.now ? chain.now() - Date.now() : 0);
 const mmss = (ms) => {
   const t = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 
 /** "Save within 4:12", then, once the weather is over, a replay in the current one. */
-function SaveClock({ by, stale, onReplay }) {
-  const [now, setNow] = useState(() => Date.now());
+// by and clock (now, ms) on the chain's clock
+function SaveClock({ by, clock = Date.now, stale, onReplay }) {
+  const [now, setNow] = useState(clock);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    const t = setInterval(() => setNow(clock()), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [clock]);
   const left = by - now;
   if (left > 0 && !stale)
     return (
@@ -193,6 +200,7 @@ export default function Golf() {
   const [s, setS] = useState(null);
   const hot = useRef(null);
   if (!hot.current) hot.current = makeHot();
+  const cold = useRef(null); // the snapshot last given to setS
   const [fatal, setFatal] = useState(null); // { msg, kind }: the game could not start
   const [boot, setBoot] = useState(0); // a retry of the start: a new game
   const [gl, setGl] = useState(null); // null | "lost" | "gone": the WebGL context was taken away
@@ -372,7 +380,12 @@ export default function Golf() {
       g = createGame(canvas.current, {
       rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, hooks: cfg.won > 0,
       // the hot fields to their store; the rest re-renders only when it changed
-      onChange: (snap) => (hot.current.set(snap), setS((prev) => (prev && sameCold(prev, snap) ? prev : snap))),
+      // (compared here, not in a setS updater: an updater that returns the
+      // same state still re-renders the whole page, 60 times a second in a pull)
+      onChange: (snap) => {
+        hot.current.set(snap);
+        if (!cold.current || !sameCold(cold.current, snap)) setS((cold.current = snap));
+      },
       onHoled: ({ id, strokes }) => holedRef.current(id, strokes),
       });
     } catch (err) {
@@ -538,20 +551,28 @@ export default function Golf() {
     // re-read when a hole is won: the card is about to offer the record
     return () => void (live = false);
   }, [account, holedNow]);
+  // a hole won: the chain's clock read again (at most once a minute), for the
+  // save's countdown, and the gas price for the gnokey fallback (no Adena)
+  useEffect(() => {
+    if (!holedNow || !game.current) return;
+    const c = game.current.chain;
+    c.sync().catch(() => {});
+    within(c.gasPrice()).then(setGasPrice).catch(() => {});
+  }, [holedNow]);
 
   async function recordIt() {
     if (!account) return setReal(true);
     const round = `${s.id}#${s.shots.join(";")}`;
     const land = (r) => roundKey.current === round && setRecord(r);
     // a round whose weather is over can no longer be saved: the chain would refuse it
-    if (s.period != null && Date.now() >= saveBy(s.period)) return land({ error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
+    if (s.period != null && game.current.chain.now() >= saveBy(s.period)) return land({ error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
     setRecord("signing");
     try {
       const chain = game.current.chain;
       const id = chainId || (await within(chain.chainId()));
       // asked before Adena opens: how many transactions the round needs, or
       // why the chain would refuse it
-      const parts = await splitRound(s.shots, (list) => within(chain.simulateRound(s.id, list, s.period), 8000));
+      const parts = await splitRound(s.shots, (list) => within(chain.simulateRound(s.id, list, s.period), 8000), s);
       let tx = null;
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k];
@@ -620,16 +641,17 @@ export default function Golf() {
   // ?cup=<world>, the picker adds &gnome=, a hole ?cup=&hole=&gnome=. A new
   // screen is a new history entry (Back returns to the one before); moving
   // within a hole — next hole, another gnome — only rewrites the current one.
-  const place = s && s.place, world = s && s.world;
+  const place = s && s.place, world = s && s.world, idHere = s && s.id;
   const lastScreen = useRef(null);
   useEffect(() => {
     if (!cfg) return;
     const keep = new URLSearchParams(window.location.search);
     const q = new URLSearchParams();
     for (const k of ["rpc", "web"]) if (keep.get(k)) q.set(k, keep.get(k));
-    if (screen === "play" && place) {
-      q.set("cup", world || "garden");
-      q.set("hole", String(place));
+    if (screen === "play" && idHere) {
+      // a cup's hole by its place; one in no cup (community, archived) by its id
+      if (place) (q.set("cup", world || "garden"), q.set("hole", String(place)));
+      else q.set("hole", idHere);
       q.set("gnome", gnome);
     } else if (screen === "worlds" && world) q.set("cup", world);
     else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
@@ -641,7 +663,7 @@ export default function Golf() {
     if (url === here) return;
     if (moved) window.history.pushState({ screen }, "", url);
     else window.history.replaceState({ screen }, "", url);
-  }, [cfg, screen, place, world, gnome]);
+  }, [cfg, screen, place, world, gnome, idHere]);
   // Back and Forward: back to that screen, and that hole, without reloading the scene
   // (subscribed once: the latest goTo is read through its ref)
   useEffect(() => {
@@ -652,8 +674,8 @@ export default function Golf() {
       setMenu(false);
       setScreen(sc);
       if (sc === "play" && game.current) {
-        const cup = p.get("cup"), n = Number(p.get("hole"));
-        const h = game.current.find && game.current.find({ cup, n });
+        const cup = p.get("cup"), hv = p.get("hole") || "";
+        const h = game.current.find && game.current.find(/^gno\.land\//.test(hv) ? { id: hv } : { cup, n: Number(hv) });
         if (h && h !== (game.current.current && game.current.current())) goToRef.current(h);
       }
     };
@@ -724,7 +746,7 @@ export default function Golf() {
               </span>
               <div className="card__text">
                 <span className="eyebrow">
-                  {s.official ? <>Hole {Math.max(1, s.holes.findIndex((h) => h.id === s.id) + 1)} of {s.holes.length}</> : "Community hole · not ranked"}
+                  {!s.official ? "Community hole · not ranked" : s.archived || !s.place ? "Archived hole · not in the cup" : <>Hole {s.place} of {s.holes.length}</>}
                 </span>
                 <h1>{s.name}</h1>
                 <a className="src" href={s.source} target="_blank" rel="noopener noreferrer">
@@ -738,7 +760,7 @@ export default function Golf() {
               <span className="card__par">par {parHere(s)}</span>
               {(s.roundMode || s.mode) === "pro" && <span className="pro-chip" title="Pro: no aim line">PRO</span>}
             </div>
-            <LiveWeather hot={hot.current} w={wx} until={s.period != null ? (s.period + 1) * 300 * 1000 : null} />
+            <LiveWeather hot={hot.current} w={wx} until={s.period != null ? (s.period + 1) * PERIOD_MS - skewOf(game.current && game.current.chain) : null} />
             <div className="hud__right">
               <span className="adena__wrap">
               <button
@@ -937,7 +959,7 @@ export default function Golf() {
               );
             })()}
             {!onChain && s.period != null && (
-              <SaveClock by={saveBy(s.period)} stale={record && record.stale} onReplay={() => game.current.reset()} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={record && record.stale} onReplay={() => game.current.reset()} />
             )}
             {account && !onChain && (() => {
               // said before signing, not by refusing to: Adena still opens
@@ -975,6 +997,7 @@ export default function Golf() {
                 About {costOf(gasOf(s), gasPrice)} GNOT of gas + {depositText(saved, bytePrice)}, shown again in Adena before you sign.
               </p>
             )}
+            {!onChain && !(record && record.stale) && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
           </Dialog>
         </div>
       )}
@@ -1252,8 +1275,9 @@ function holeLink(s, gnome) {
   const keep = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
   // a page pointed at another chain keeps pointing there
   for (const k of ["rpc", "web"]) if (keep.get(k)) q.set(k, keep.get(k));
-  q.set("cup", s.world || "garden");
-  q.set("hole", String(s.place || 1));
+  // a hole in no cup (community, archived) is linked by its id, never as place 1
+  if (s.place) (q.set("cup", s.world || "garden"), q.set("hole", String(s.place)));
+  else q.set("hole", s.id);
   if (gnome) q.set("gnome", gnome);
   return `?${q}`;
 }
@@ -1353,9 +1377,8 @@ function AimSetting({ aim, onChange, compact = false }) {
 // — not the number in its realm's name (hole19 is the 17th of the garden).
 function holeNumber(holes, id) {
   const i = holes.findIndex((h) => h.id === id);
-  if (i >= 0) return String(i + 1);
-  const m = String(id).match(/(\d+)$/);
-  return m ? m[1] : "1";
+  // a hole in no cup (community, archived) has no number: never "1"
+  return i >= 0 ? String(i + 1) : "–";
 }
 
 /**
@@ -1519,14 +1542,40 @@ const leaderboardOf = (chain, mode = "assisted") => {
   return board[mode].p;
 };
 
+// Beyond the top ten, the rank is counted from the paged Players read: every
+// standing that beats this player's (more holes, then fewer strokes, then the
+// address, as the chain's rank key orders them). Players lists everyone, named
+// or not, so it is the rank among all who saved. RANK_PAGES pages at most.
+// Note: O(players) reads, a Rank(mode, addr) read on the chain when the course is crowded
+const RANK_PAGES = 5;
+async function rankBeyond(chain, mode, me) {
+  let after = "", mine = null, ahead = 0;
+  const rows = [];
+  for (let k = 0; k < RANK_PAGES; k++) {
+    const pg = await chain.players(mode, after, 100);
+    for (const r of pg.rows || []) {
+      rows.push(r);
+      if (r.player === me) mine = r;
+    }
+    after = pg.next || "";
+    if (!after) break;
+  }
+  if (after && !mine) return { past: 10 }; // too many to count here
+  if (!mine || !(mine.holes > 0)) return null; // nothing saved on the course
+  for (const r of rows) if (r.holes > mine.holes || (r.holes === mine.holes && (r.strokes < mine.strokes || (r.strokes === mine.strokes && r.player < me)))) ahead++;
+  // a page cap reached: the rest may hold players ahead too
+  return after ? { past: 10 } : { at: ahead + 1 };
+}
+
 function Standings({ s, card, chain, me, mode = "assisted" }) {
   const [rank, setRank] = useState(null);
   useEffect(() => {
     if (!chain || !me) return;
     let live = true; // no state set once the card is gone
-    leaderboardOf(chain, mode).then((lb) => {
+    leaderboardOf(chain, mode).then(async (lb) => {
       const i = lb.rows.findIndex((r) => r.player === me);
-      if (live) setRank(i >= 0 ? { at: i + 1, of: lb.rows.length } : null);
+      if (i >= 0) return live && setRank({ at: i + 1, top: true });
+      live && setRank(await rankBeyond(chain, mode, me));
     }).catch(() => {});
     return () => (live = false);
   }, [chain, me, mode]);
@@ -1546,7 +1595,7 @@ function Standings({ s, card, chain, me, mode = "assisted" }) {
         <dl className="cup__sum">
           <div><dt>Holes</dt><dd>{t.done}/{s.holes.length}</dd></div>
           <div><dt>Vs par</dt><dd className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{t.done ? (vs > 0 ? "+" : "") + vs : "–"}</dd></div>
-          <div><dt>On-chain</dt><dd>{rank ? `#${rank.at}` : "–"}</dd></div>
+          <div><dt>On-chain</dt><dd title={rank && !rank.top && rank.at ? "Among every player who saved on the course, named or not" : undefined}>{!rank ? "–" : rank.at ? `#${rank.at}` : `not in the top ${rank.past}`}</dd></div>
         </dl>
       </header>
       <ol className="cup__track">
@@ -1759,9 +1808,11 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
   const [more, setMore] = useState(false); // a page is on its way
   const PAGE = 10;
   // a page is O(page) on the chain now, however deep: paged up to "players",
-  // the named players on the board
+  // the named players on the board. Offsets are the chain's, not the rows
+  // shown: a name deleted since is skipped in its page, which then holds fewer
+  // rows while more still follow.
   const page = (offset) =>
-    chain.holeLeaderboard(s.id, offset, PAGE, mode).then((b) => ({ ...b, rows: b.rows || [], done: (b.rows || []).length < PAGE || offset + PAGE >= (b.players || 0) }));
+    chain.holeLeaderboard(s.id, offset, PAGE, mode).then((b) => ({ ...b, rows: b.rows || [], next: offset + PAGE, done: offset + PAGE >= (b.players || 0) }));
   // what the rows on screen are for: a page asked for another hole or mode is dropped
   const view = useRef("");
   view.current = `${s.id}|${mode}|${tab}`;
@@ -1779,8 +1830,8 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
     if (!hb || hb.done || more) return;
     const asked = view.current;
     setMore(true);
-    page(hb.rows.length)
-      .then((b) => view.current === asked && setHb((h) => (h ? { ...h, rows: [...h.rows, ...b.rows], done: b.done } : h)))
+    page(hb.next)
+      .then((b) => view.current === asked && setHb((h) => (h ? { ...h, rows: [...h.rows, ...b.rows], next: b.next, done: b.done } : h)))
       .catch((e) => view.current === asked && setErr(String(e.message || e)))
       .finally(() => setMore(false));
   };

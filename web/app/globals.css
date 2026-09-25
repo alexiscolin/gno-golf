@@ -2023,3 +2023,8 @@ button:focus-visible, a:focus-visible {
 .community h3 { font-size: 15px; margin: 0 0 6px; color: var(--ink); }
 .community h3 small { font-weight: 600; color: var(--ink-soft); margin-left: 6px; }
 .community ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+
+/* the gnokey fallback of a save: the script and the command, copyable */
+.gnokey { margin-top: 10px; }
+.gnokey__part + .gnokey__part { margin-top: 10px; }
+.gnokey__code { white-space: pre-wrap; word-break: break-all; text-align: left; font-size: 12px; margin: 4px 0; }

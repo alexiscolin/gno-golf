@@ -40,7 +40,7 @@ export const setSilent = (on) => ((silent = !!on), ambience(mood));
 if (typeof window !== "undefined") {
   const touched = () => {
     gestureAt = performance.now();
-    if (ctx && ctx.state === "suspended" && present()) ctx.resume().catch(() => {});
+    if (ctx && ctx.state === "suspended" && present()) ctx.resume().catch(() => {}); // a gesture's own: never deduped
   };
   window.addEventListener("pointerdown", touched, true);
   window.addEventListener("keydown", touched, true);
@@ -54,6 +54,12 @@ if (typeof window !== "undefined") {
     if (ctx && ctx.state === "suspended" && performance.now() - gestureAt < 60 * 60e3) ctx.resume().catch(() => {});
     ambience(mood); // the weather fades back in
   };
+  // Making the context costs ~90 ms, once: made here in idle time, not by the
+  // first creak of the first pull (a stall mid-drag). It starts suspended;
+  // the first gesture resumes it (touched).
+  const early = () => prefs.sound && !ctx && audio();
+  if (window.requestIdleCallback) window.requestIdleCallback(early, { timeout: 4000 });
+  else setTimeout(early, 1500);
   window.addEventListener("blur", away);
   window.addEventListener("focus", back);
   document.addEventListener("visibilitychange", () => (document.hidden ? away() : back()));
@@ -64,9 +70,14 @@ const audio = () => {
     if (!A) return null;
     ctx = new A();
   }
-  if (ctx.state === "suspended" && present()) ctx.resume().catch(() => {}); // no gesture yet: the next one will do
+  if (ctx.state === "suspended" && present()) resume(); // no gesture yet: the next one will do
   return ctx;
 };
+// one resume asked at a time by the sounds: a context the browser keeps
+// suspended (no gesture yet) is not asked again by every creak of a pull (the
+// gesture and focus handlers ask on their own)
+let resuming = null;
+const resume = () => (resuming = resuming || ctx.resume().catch(() => {}).finally(() => (resuming = null)));
 
 function tone(a, { type = "sine", f0, f1 = f0, at = 0, dur, gain = 0.2 }) {
   const t = a.currentTime + at, o = a.createOscillator(), g = a.createGain();
