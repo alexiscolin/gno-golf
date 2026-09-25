@@ -428,8 +428,9 @@ export function makeCamera(E: Live) {
     }
     // (the springs lag a target that moves: behind a ball leaving a round
     // end that lag is out past the rail — the real pose slides back in along
-    // its line to the target, which is inside)
-    if (mode === "third" && gl < 0 && !inside(sp.pos.x, sp.pos.z, NEAR_GAP)) {
+    // its line to the target, which is inside; not while aiming, whose target
+    // may sit just over the rail: pulled in there, the pose sawed back and forth)
+    if (mode === "third" && gl < 0 && !aimView && !inside(sp.pos.x, sp.pos.z, NEAR_GAP)) {
       _d.subVectors(want.pos, sp.pos);
       let q = 1;
       while (q < 8 && !inside(sp.pos.x + (_d.x * q) / 8, sp.pos.z + (_d.z * q) / 8, NEAR_GAP)) q++;

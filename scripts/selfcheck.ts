@@ -140,6 +140,9 @@ check("the third-person aim (engine/aim.ts thirdAim)", () => {
   assert.equal(deg(thirdAim(0, 100, 0)), 270, "pull right: left");
   assert.equal(thirdAim(0, 3, 4, 1.2), 1.2, "dead zone holds");
   assert.ok(Math.abs(thirdAim(0, 0, 100, Math.PI / 2, true) - (Math.PI / 2) * 0.67) < 1e-9, "fine");
+  // a step back along the pull (the power going down) with a little sideways drift keeps the aim
+  assert.equal(thirdAim(0, 5, 40, 0.3, false, 1, -6), 0.3, "radial step: direction held");
+  assert.notEqual(thirdAim(0, 40, 40, 0.3, false, 6, -6), 0.3, "sideways step: direction turns");
 });
 
 if (failed) {

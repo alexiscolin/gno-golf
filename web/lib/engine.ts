@@ -777,7 +777,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   // A slingshot: press anywhere, pull back, let go. The shot flies away from
   // the pull, as if the elastic snapped into the gnome.
-  let press: { clientX: number; clientY: number; x: number; y: number; yaw?: number; dir?: number | null } | null = null;
+  let press: { clientX: number; clientY: number; x: number; y: number; yaw?: number; dir?: number | null; lx?: number; ly?: number } | null = null;
 
   function onMove(ev: PointerEvent) {
     if (!dragging || g.flying || !press) return;
@@ -803,8 +803,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (g.cam === "third" && press.yaw != null) {
       // behind the gnome: the shot opposite the pull, read in the camera frame
       // of the pull's start (every direction reachable, the view never feeding back)
-      dir = thirdAim(press.yaw, ev.clientX - press.x, ev.clientY - press.y, press.dir, ev.shiftKey);
+      dir = thirdAim(press.yaw, ev.clientX - press.x, ev.clientY - press.y, press.dir, ev.shiftKey, ev.clientX - (press.lx ?? press.x), ev.clientY - (press.ly ?? press.y));
       press.dir = dir;
+      (press.lx = ev.clientX), (press.ly = ev.clientY);
     } else {
       const from = boardPoint(press), to = boardPoint(ev);
       if (!from || !to) return;
