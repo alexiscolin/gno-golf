@@ -1449,12 +1449,12 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
       {/* both lines in one cell, the other one hidden: the box keeps the longer one's size, nothing moves on a switch */}
       <small className="aimset__help">
         <span className={aim === "pro" ? "" : "off"} aria-hidden={aim !== "pro"}>
-          No aim line · ranked apart
+          {compact ? "No aim line: you read the course yourself. Ranked on its own board." : "No aim line · ranked apart"}
           <span className="aimset__info" tabIndex={aim === "pro" ? 0 : -1} title="The mode is on your word — the chain can't see your screen." aria-label="The mode is on your word — the chain can't see your screen.">
             ⓘ
           </span>
         </span>
-        <span className={aim === "pro" ? "off" : ""} aria-hidden={aim === "pro"}>Full aim line</span>
+        <span className={aim === "pro" ? "off" : ""} aria-hidden={aim === "pro"}>{compact ? "The chain previews your shot: see the whole aim line before you swing." : "Full aim line"}</span>
       </small>
     </div>
   );
