@@ -46,11 +46,11 @@ The physics changes are bug 1 (a free wall end is met as a round cap from any di
 
 - **Pars:** no par changes. Every moved hole's robust plan still takes par − 1 strokes, the same as before. No hole gained an easier route, and none lost its route.
 - **Old plans:** every stored plan still holes under the new physics.
-  - One exception: garden/17's fragile `raw` plan (`190,10 ; 344,9 ; 124,10 ; 196,6.25`) no longer holes. Its new raw plan is in `scripts/hole-bests.phase5.json`.
-- **`scripts/hole-bests.phase5.json`:** it holds the new plans for the 29 moved holes, plus a period fix for garden/5 (below).
+  - One exception: garden/17's fragile `raw` plan (`190,10 ; 344,9 ; 124,10 ; 196,6.25`) no longer holes. Its new raw plan is in `scripts/hole-bests.json`.
+- **`scripts/hole-bests.json`:** it holds the new plans for the 29 moved holes, and a period that is calm for its data version for every slot (see garden/5 below).
   - Each period is the first period from 5907470 that is calm for the data version's own weather (`<slot>/v1`).
   - Every plan in the file was replayed at its period and holes. garden/5, garden/17 and town/18 were also checked on the local chain.
 - **garden/5 is not a physics change.** Its fingerprint and plan are identical under the old and the new physics.
   - Its stored period, 5907474, was calm for the realm hole's weather seed (`gno.land/r/gnogolf/hole5`). The data version seeds its weather with `garden/5/v1`, and at that period it gets weather that stops the plan.
   - At 5907470, which is calm for `garden/5/v1`, both of its plans hole on chain.
-  - The other stored periods in `hole-bests.json` were chosen the same way and may have the same problem.
+  - 21 other slots' periods had the same problem. They were re-picked, and all 74 slots' plans hole at their periods.
