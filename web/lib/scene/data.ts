@@ -59,7 +59,7 @@ export type CourseTerrain = Terrain & {
 };
 
 /** Keys any Object3D of the scene may carry. */
-export interface ObjData {
+interface ObjData {
   /** moves or changes after the build: never baked */
   live?: boolean;
   /** a plant's foot (its local y) and how much it bends, for the sway */
@@ -95,7 +95,7 @@ export interface ObjData {
   reach?: number;
 }
 /** Keys a Material may carry. */
-export interface MatData {
+interface MatData {
   /** the shader hook it compiles with: meshes merge only with the same */
   hook?: string;
   /** an ink outline (the Low tier drops distant ones) */
@@ -110,6 +110,8 @@ export interface MatData {
 // three types userData as Record<string, any>: read through these, it is typed
 /** An object's userData, typed. */
 export const ud = (o: THREE.Object3D) => o.userData as ObjData;
+/** o with d put on its userData, typed as carrying it: d is built whole, so a key it lacks does not compile. */
+export const withData = <O extends THREE.Object3D, D extends object>(o: O, d: D) => (Object.assign(o.userData, d), o as O & { userData: D });
 /** A material's userData, typed. */
 export const md = (m: THREE.Material) => m.userData as MatData;
 

@@ -76,7 +76,7 @@ const flat = (color: THREE.ColorRepresentation, opts?: THREE.MeshToonMaterialPar
 // normals, drawn from the inside in ink. Unlike edge lines it follows curves,
 // so volumes can be rounded and still read as drawn.
 /** Pushes a material's vertices out along their normals by w (the hull). */
-export function pushHull<M extends THREE.Material>(mat: M, w = 0.055, extra = ""): M {
+function pushHull<M extends THREE.Material>(mat: M, w = 0.055, extra = ""): M {
   mat.onBeforeCompile = (sh: Shader) => {
     sh.vertexShader = sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>\n  transformed += normal * ${w.toFixed(3)};` + extra);
   };
@@ -317,7 +317,7 @@ export function setFade(mat: THREE.Material, o: number) {
   mat.depthWrite = !t;
 }
 /** An ink outline that can fade with its solid (the shared hull cannot). */
-export const fadeHull = () => fadeable(pushHull(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), 0.055));
+const fadeHull = () => fadeable(pushHull(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), 0.055));
 /**
  * Gives a piece over the lane its own fadeable materials (clones of what it
  * draws with, one fadeable outline for all its hulls), so it can fade out of
@@ -350,12 +350,6 @@ export function ownFade(piece: THREE.Object3D) {
   ud(piece).live = true;
   return ink ? [...own.values(), ink] : [...own.values()];
 }
-/**
- * The canopy fade every world uses: each item is { at: THREE.Vector3 (world),
- * r: radius, mats: [materials] }, and with obj (an Object3D that moves) its
- * at is read from where obj is now. Returns fade(eye, ball): items near the
- * line from the eye to the ball go see-through, others come back.
- */
 /** One thing a canopy fade watches: where it is (read from obj if it moves), its radius, its materials. */
 export interface FadeItem {
   at: THREE.Vector3;
@@ -363,6 +357,12 @@ export interface FadeItem {
   mats: readonly THREE.Material[];
   obj?: THREE.Object3D;
 }
+/**
+ * The canopy fade every world uses: each item is { at: THREE.Vector3 (world),
+ * r: radius, mats: [materials] }, and with obj (an Object3D that moves) its
+ * at is read from where obj is now. Returns fade(eye, ball): items near the
+ * line from the eye to the ball go see-through, others come back.
+ */
 export function fadeLoop(items: readonly FadeItem[], { min = 0.22 } = {}) {
   const seg = new THREE.Line3(), near = new THREE.Vector3();
   // nothing that moves by itself, the eye and the ball where they were: every
@@ -380,6 +380,43 @@ export function fadeLoop(items: readonly FadeItem[], { min = 0.22 } = {}) {
       for (const m of it.mats) setFade(m, o);
     }
   };
+}
+
+/** A flat layer lying on another: pulled towards the eye in the depth test
+ *  (k times, by units a step), so at a distance it never shimmers against
+ *  what it lies on. Returns the material. */
+export const onTop = <M extends THREE.Material>(m: M, k = 1, units = 4) => Object.assign(m, { polygonOffset: true, polygonOffsetFactor: -1 * k, polygonOffsetUnits: -units * k });
+
+/** A geometry from flat arrays: positions, an index (none: a triangle soup)
+ *  and vertex colours (none: none), its normals computed. */
+export function geoOf(pos: readonly number[], idx?: number[] | null, col?: readonly number[] | null) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  if (col) geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  if (idx) geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * A sheet of (nx + 1) × (nz + 1) vertices, rows of i along each j: vert(i, j)
+ * pushes each one's position (and colour) onto pos (and col), keep(a, b, d, e)
+ * says whether the cell between those four vertices is drawn (every one by
+ * default). Two triangles a cell, wound a, d, b / b, d, e.
+ */
+export function gridGeo(
+  nx: number, nz: number,
+  vert: (i: number, j: number, pos: number[], col: number[]) => void,
+  keep?: (a: number, b: number, d: number, e: number, i: number, j: number, pos: readonly number[]) => boolean,
+) {
+  const pos: number[] = [], col: number[] = [], idx: number[] = [];
+  for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) vert(i, j, pos, col);
+  for (let j = 0; j < nz; j++)
+    for (let i = 0; i < nx; i++) {
+      const a = j * (nx + 1) + i, b = a + 1, d = a + nx + 1, e = d + 1;
+      if (!keep || keep(a, b, d, e, i, j, pos)) idx.push(a, d, b, b, d, e);
+    }
+  return geoOf(pos, idx, col.length ? col : null);
 }
 
 /** Lifts a world-space geometry onto the height field, vertex by vertex. */

@@ -1,18 +1,18 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { terrain, CELL, CUP_R, airy, there, inPoly, closest, segDist, smoothstep, POOL } from "../terrain";
-import { C, ink, flat, motion, drawn, drape, rbox, ringLine, texOf, setWind, share, plantFeet, quality } from "./materials";
+import { terrain, CELL, CUP_R, airy, there, inPoly, closest, nearestOnPoly, segDist, smoothstep, POOL } from "../terrain";
+import { C, ink, flat, motion, drawn, drape, rbox, ringLine, texOf, setWind, share, plantFeet, quality, geoOf, gridGeo, onTop } from "./materials";
 import { bake } from "./bake";
 import { state } from "./state";
 import { timeOf, islandBox } from "./camera";
 import { bush, stone, flower, tuft, mole, windmill, smokeBatch } from "./props";
 import { seeded, GRASS } from "./common";
 import { roughOf } from "./garden";
-import { worldOf, fromWorld, gapWater, DECK } from "./worlds";
+import { worldOf, fromWorld, gapWater, DECK, GAP_Y } from "./worlds";
 import { WEATHER_SKINS } from "./weather";
 import { POSTS, BARS, roofs, ROOF_Y } from "./pieces";
 import { zoneDetail, waterMask, pondWater } from "./zones";
-import { ud, type Course, type CourseTerrain as T, type Height, type Hole, type Tick } from "./data";
+import { ud, withData, type Course, type CourseData, type CourseTerrain as T, type Height, type Hole, type Tick } from "./data";
 import type { Extras, MutVec2, Post, Vec2, Wall, Wear, Zone } from "../types";
 
 /** A wall as the drawing takes it (a piece of one cut open: `cut`). */
@@ -36,17 +36,17 @@ export function buildHole(s: Hole, { defer = false } = {}): Course {
   state.slopes = new Map();
   state.ghosts = null;
   state.mill = null;
-  const g = new THREE.Group() as Course;
+  const g = new THREE.Group();
   const t: T = terrain(s);
   state.water = waterMask(t); // what splashes are clipped to, for this hole
 
   // the garden is an island, not a world: a raised plot of grass on a block of
   // soil, with sky all around it — a diorama reads cuter than a plain
   // everything round the board is the world's (garden, island, town): one
-  // module per world, all with the same four functions (see worlds.js)
+  // module per world, all with the same four functions (see worlds.ts)
   const world = worldOf(s);
   const box = islandBox(s.board);
-  g.add(world.base(s, box), world.edging(box, s.hole));
+  g.add(world.base(s, box), world.edging(s, box));
   const bank = world.berms(s);
   g.add(bank.group);
   const dec = world.decor(s, bank.height);
@@ -76,56 +76,60 @@ export function buildHole(s: Hole, { defer = false } = {}): Course {
   g.add(hole(s.cup, t.height));
   g.add(tee(s.start, t.height));
 
-  g.userData.wear = wear;
-  g.userData.flag = flagOf(g);
   // the ground the ball rides: the height field, plus any deck that moves on
   // the clock (a seesaw), as it stands now
   const lifts = state.lifts;
-  g.userData.height = lifts.length ? (x: number, z: number) => t.height(x, z) + lifts.reduce((h, f) => h + f(x, z), 0) : t.height;
-  g.userData.lifts = lifts.length > 0; // the engine keeps a ball at rest on it
-  g.userData.terrain = t;
-  g.userData.wind = setWind; // wind(vec): the weather's push [x, y] per substep, or null for calm
-  g.userData.fade = dec.userData.fade || null; // a world's canopy fading out of the way: fade(eye, ball)
-  g.userData.weather = dec.userData.weather || null; // its decor dressed for the weather: weather(w) (see weatherLooks)
-  g.userData.state = s; // for what a stroke adds (buildExtras)
-  // what the course owns that no mesh holds: its masks, freed with it
-  g.userData.owned = [t.water && t.water.tex, t.mask].filter((x): x is THREE.DataTexture => !!x);
-  g.userData.time = timeOf(s.hole);
-  g.userData.world = s.world || "garden"; // for the sky
-  g.userData.tubes = state.tubes;
-  // timed walls (a tram, a clock's hands...): the replay calls at(step) on
-  // each with the substep it is showing; they show and move as the chain has them
-  g.userData.timed = state.timed;
-  g.userData.slopes = state.slopes; // slope zone -> { glow(k) }
-  // where a ball that falls in at (x, z) meets the water or the bottom: the
-  // world's sea under a pier, a gap's water, a crevasse's floor, the streets
-  // under the roofs; a pond on the green is at the green's own height
-  g.userData.surfaceAt = (x: number, z: number) => {
-    const q = t.zoneAt(x, z), SEA = worldOf(s).SEA;
-    if (!q) return t.height(x, z);
-    if (q.skin === "sea" && SEA !== undefined) return SEA;
-    if (q.skin === "gap") return gapWater(s);
-    if (q.skin === "roof") return ROOF_Y - 3.2;
-    if (GAPS.has(q.skin)) return CREVASSE_Y + 0.3;
-    const w = t.pond(x, z); // a garden pond, sunk
-    return w ? w.level : t.height(x, z);
-  };
-  g.userData.ghosts = state.ghosts || (() => {}); // ghosts(aiming): the timed pieces' dashed outlines
-  g.userData.mill = state.mill;
-  const ticks = (g.userData.ticks = state.live);
+  const ticks = state.live, smokes = state.smokes;
   state.live = [];
-  g.userData.tick = (time: number) => { if (motion) for (const f of ticks) f(time); };
-  g.userData.smokes = state.smokes;
   state.smokes = [];
-  if (!defer) finishHole(g);
-  return g;
+  const data: CourseData = {
+    wear,
+    flag: flagOf(g),
+    height: lifts.length ? (x: number, z: number) => t.height(x, z) + lifts.reduce((h, f) => h + f(x, z), 0) : t.height,
+    lifts: lifts.length > 0, // the engine keeps a ball at rest on it
+    terrain: t,
+    wind: setWind, // wind(vec): the weather's push [x, y] per substep, or null for calm
+    fade: ud(dec).fade || null, // a world's canopy fading out of the way: fade(eye, ball)
+    weather: ud(dec).weather || null, // its decor dressed for the weather: weather(w) (see weatherLooks)
+    state: s, // for what a stroke adds (buildExtras)
+    // what the course owns that no mesh holds: its masks, freed with it
+    owned: [t.water && t.water.tex, t.mask].filter((x): x is THREE.DataTexture => !!x),
+    time: timeOf(s.hole),
+    world: s.world || "garden", // for the sky
+    tubes: state.tubes,
+    // timed walls (a tram, a clock's hands...): the replay calls at(step) on
+    // each with the substep it is showing; they show and move as the chain has them
+    timed: state.timed,
+    slopes: state.slopes, // slope zone -> { glow(k) }
+    // where a ball that falls in at (x, z) meets the water or the bottom: the
+    // world's sea under a pier, a gap's water, a crevasse's floor, the streets
+    // under the roofs; a pond on the green is at the green's own height
+    surfaceAt: (x: number, z: number) => {
+      const q = t.zoneAt(x, z), SEA = worldOf(s).SEA;
+      if (!q) return t.height(x, z);
+      if (q.skin === "sea" && SEA !== undefined) return SEA;
+      if (q.skin === "gap") return gapWater(s);
+      if (q.skin === "roof") return ROOF_Y - 3.2;
+      if (GAPS.has(q.skin)) return GAP_Y + 0.3;
+      const w = t.pond(x, z); // a garden pond, sunk
+      return w ? w.level : t.height(x, z);
+    },
+    ghosts: state.ghosts || (() => {}), // ghosts(aiming): the timed pieces' dashed outlines
+    mill: state.mill,
+    ticks,
+    tick: (time: number) => { if (motion) for (const f of ticks) f(time); },
+    smokes,
+  };
+  const course: Course = withData(g, data);
+  if (!defer) finishHole(course);
+  return course;
 }
 
 /** The second half of a hole's build: what stands still merged, and every
  *  chimney's smoke in one draw. */
 export function finishHole(g: Course) {
   if (!g.userData.state.unbaked) bake(g, { board: quality.low ? g.userData.state.board : null });
-  else plantFeet(g); // unbaked: kept in pieces, for the trailer's hole that builds itself (web/lib/promo.js)
+  else plantFeet(g); // unbaked: kept in pieces, for the trailer's hole that builds itself (web/lib/promo.ts)
   const puffs = smokeBatch(g.userData.smokes || []);
   g.userData.smokes = null;
   if (puffs) (g.add(puffs.mesh), g.userData.ticks.push(puffs.tick));
@@ -238,7 +242,6 @@ function polyCuts(w: WallLike, pts: readonly Vec2[]) {
   return out;
 }
 
-const CREVASSE_Y = -7; // how deep a gap goes
 // the zones drawn as a real gap in the lane: nothing under the ball there
 const GAPS = new Set(["crevasse", "ditch", "gap", "cliff"]);
 const iceSide = new THREE.Color(0x8fcde6), earthSide = new THREE.Color(0x7a5236), plankSide = new THREE.Color(0x9a6f42), joist = new THREE.Color(0x5e412a), rockSide = new THREE.Color(0x8e96a0);
@@ -335,13 +338,7 @@ function groundMesh(s: Hole, t: T) {
     const ci = Math.round(x / CELL), cj = Math.round(z / CELL);
     const rim = [[ci - 1, cj - 1], [ci, cj - 1], [ci - 1, cj], [ci, cj]].some(([a, b]) => t.inGrid(a, b) && open_[t.idx(a, b)] === 1);
     if (!seaZone || !rim) return [x, z];
-    let best: MutVec2 = [x, z], bd = Infinity;
-    const P = seaZone.poly!;
-    for (let k = 0; k < P.length; k++) {
-      const q = closest(x, z, P[k], P[(k + 1) % P.length]);
-      if (q.d < bd) (bd = q.d), (best = [q.x, q.z]);
-    }
-    return best;
+    return nearestOnPoly(x, z, seaZone.poly!);
   };
   // likewise over the rooftops of a `roof` zone: the lane is a walkway over them
   const ownSea = worldOf(s).SEA !== undefined, hasRoof = s.zones.some((q) => q.skin === "roof");
@@ -353,7 +350,7 @@ function groundMesh(s: Hole, t: T) {
       for (let i = 0; i < t.nx; i++) {
         const q = t.zoneAt((i + 0.5) * CELL, (j + 0.5) * CELL);
         if (q && ((ownSea && q.skin === "sea") || q.skin === "roof" || GAPS.has(q.skin))) open_[t.idx(i, j)] = 1;
-        // a blowhole's mouth is a real hole (its rim, drawn by island.js,
+        // a blowhole's mouth is a real hole (its rim, drawn by island.ts,
         // covers the cells' stepped edge)
         if (q && q.skin === "blowhole") {
           const ex = ((i + 0.5) * CELL - (q.min[0] + q.max[0]) / 2) / ((q.max[0] - q.min[0]) / 2), ez = ((j + 0.5) * CELL - (q.min[1] + q.max[1]) / 2) / ((q.max[1] - q.min[1]) / 2);
@@ -416,7 +413,7 @@ function groundMesh(s: Hole, t: T) {
           }
         } else {
           // a gap's walls: ice down a crevasse, earth down a ditch
-          const gy = gz ? CREVASSE_Y : foot;
+          const gy = gz ? GAP_Y : foot;
           const gc = gz ? (gz.skin === "ditch" ? earthSide : gz.skin === "cliff" ? rockSide : iceSide) : side;
           quad([p, [p[0], gy, p[2]], [q[0], gy, q[2]], q], gc, [-sx / sl, 0, -sz / sl]);
         }
@@ -559,32 +556,19 @@ function roughScenery(s: Hole, t: T) {
       const level = !!R;
       cornerH[j * NX + i] = onEdge && !touch ? ROUGH0 : touch || !n ? (level ? ROUGH0 : 0.01) : sum / n;
     }
-  const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const c = new THREE.Color(), lo = new THREE.Color(R ? R.lo : C.surround), hi = new THREE.Color(R ? R.hi : 0x5b9a7d);
-  for (let j = 0; j <= t.nz; j++)
-    for (let i = 0; i <= t.nx; i++) {
-      const h = cornerH[j * NX + i];
-      pos.push(i * CELL, h, j * CELL);
-      c.copy(lo).lerp(hi, Math.min(1, Math.max(0, h) / 1.8)); // down at the garden (h < 0) it is garden green, not darker
-      col.push(c.r, c.g, c.b);
-    }
   const edge = greenEdge(s, t);
-  for (let j = 0; j < t.nz; j++)
-    for (let i = 0; i < t.nx; i++) {
-      if (!isRough(i, j) || edge.cells[t.idx(i, j)]) continue; // drawn as green, under a wall
-      const a = j * NX + i, b = a + 1, d = a + NX, e = d + 1;
-      idx.push(a, d, b, b, d, e);
-    }
   // a world with its own flat ground (island sand, town cobbles, mountain
   // snow) shows through where the ball can't go: no rough sheet of ours over
   // it, so no board-sized rectangle, no stepped edge and nothing to z-fight
   const bare = R && !R.mound;
-  if (idx.length && !bare) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
+  const geo = bare ? null : gridGeo(t.nx, t.nz, (i, j, pos, col) => {
+    const h = cornerH[j * NX + i];
+    pos.push(i * CELL, h, j * CELL);
+    c.copy(lo).lerp(hi, Math.min(1, Math.max(0, h) / 1.8)); // down at the garden (h < 0) it is garden green, not darker
+    col.push(c.r, c.g, c.b);
+  }, (_a, _b, _d, _e, i, j) => isRough(i, j) && !edge.cells[t.idx(i, j)]); // (a cell drawn as green, under a wall: none)
+  if (geo && geo.index!.count) {
     g.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: 4 })));
   }
 
@@ -760,10 +744,7 @@ function kerb(W: readonly WallLike[], ch: Chain, t: T, reachable: (x: number, z:
     const a = k * M, b = ((k + 1) % rings) * M;
     for (let m = 0; m < M - 1; m++) idx.push(a + m, b + m, a + m + 1, a + m + 1, b + m, b + m + 1);
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
+  const geo = geoOf(pos, idx);
   return drawn(geo, flat(color, { side: THREE.DoubleSide }));
 }
 
@@ -788,17 +769,8 @@ const TRAM_CREEP = 0.15; // how far it creeps either side of its stop through it
 const TRAM_EASE = 2.5; // ticks to come in (and go away), at most, for a tram alone on its line
 const TRAM_FADE = 1.0; // ticks to fade in out of a tunnel (and into one), at most
 
-/**
- * The tram lines of a hole: [{ u, perp, e0, e1, trams: [...] }]. u is the
- * line's axis (the way its trams drive), e0..e1 the lane's extent along it
- * (from where it first meets the lane to where it leaves it), and each tram
- * { c, sF, lo, hi, Lt, th, w, on, every, Aa, Ad, S0, S1 }: its bar's centre,
- * where its body stops (sF, along u), the lane's crossing either side of the
- * bar's centre (lo, hi), its body's length, its window's opening (w), and its
- * come-in / go-away times and far ends.
- */
 /** One tram: its bar's walls and centre, its axis, the lane's crossing either side (lo, hi), its clock and its timing along the line. */
-export interface Tram {
+interface Tram {
   q: readonly Wall[];
   u: MutVec2;
   c: MutVec2;
@@ -818,7 +790,7 @@ export interface Tram {
   fadeOut: number;
 }
 /** A tram line: its axis, its offset across, its trams, the lane's extent along it and which ends have a tunnel. */
-export interface TramLine {
+interface TramLine {
   u: MutVec2;
   perp: number;
   trams: Tram[];
@@ -826,7 +798,16 @@ export interface TramLine {
   e1: number;
   tunnel: [boolean, boolean];
 }
-export function tramLines(s: Pick<Hole, "walls">, t: Pick<T, "onGreen">): TramLine[] {
+/**
+ * The tram lines of a hole: [{ u, perp, e0, e1, trams: [...] }]. u is the
+ * line's axis (the way its trams drive), e0..e1 the lane's extent along it
+ * (from where it first meets the lane to where it leaves it), and each tram
+ * { c, sF, lo, hi, Lt, th, w, on, every, Aa, Ad, S0, S1 }: its bar's centre,
+ * where its body stops (sF, along u), the lane's crossing either side of the
+ * bar's centre (lo, hi), its body's length, its window's opening (w), and its
+ * come-in / go-away times and far ends.
+ */
+function tramLines(s: Pick<Hole, "walls">, t: Pick<T, "onGreen">): TramLine[] {
   const walls = (s.walls || []).filter((w) => w.skin === "tram" && w.every);
   const bars: Tram[] = [];
   for (let i = 0; i + 3 < walls.length; i += 4) {
@@ -903,7 +884,7 @@ function tramEase(m: number, k: number) {
  * much of it is there (0 in a tunnel, 1 out on the lane) and its speed's
  * change (for its sway). Hidden between its going away and its next coming.
  */
-export function tramAt(b: Tram, t: number) {
+function tramAt(b: Tram, t: number) {
   const E = b.every, tau = (((t - b.w) % E) + E) % E, creep = (2 * TRAM_CREEP) / b.on;
   const inAt = E - b.Aa;
   if (tau <= b.on) return { s: b.sF - TRAM_CREEP + creep * tau, fade: 1, sway: 0 };
@@ -970,10 +951,7 @@ function tramLine(l: TramLine, s: Hole, t: T) {
       }
     }
     for (let k = 0; k < n; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 3, k * 2, k * 2 + 3, k * 2 + 2);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
+    const geo = geoOf(pos, idx);
     g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8d989e, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
   }
   // the level crossings: a low curbstone where the kerb is cut
@@ -1398,7 +1376,7 @@ function stump(p: Post, height: Height) {
 /** A post is a bumper; in this garden a bumper is a mushroom — or, when the
  *  chain says so, a rock or a stump. An unknown skin is a mushroom. */
 function post(p: Post, height: Height, s: Hole, t: T) {
-  // the world draws its own pieces first (see worlds.js, piece()); then ours
+  // the world draws its own pieces first (see worlds.ts, piece()); then ours
   const own = s && fromWorld(s, "post", p, t);
   if (own) return own;
   if (POSTS[p.skin]) return POSTS[p.skin](p, height(p.c[0], p.c[1]));
@@ -1453,7 +1431,7 @@ function hole(cup: Vec2, height: Height) {
   // of the ground (and its outline showed through it at a grazing angle)
   // drawn over whatever lies there (sand, ice, snow at +0.035): pulled
   // forward in depth, or the two flicker against each other
-  const over = (c: number, k: number) => flat(c, { polygonOffset: true, polygonOffsetFactor: -k, polygonOffsetUnits: -k * 4 });
+  const over = (c: number, k: number) => onTop(flat(c, {}), k);
   const pit = new THREE.Mesh(new THREE.CircleGeometry(CUP_R * 0.62, 32), over(C.burrow, 2));
   pit.rotation.x = -Math.PI / 2;
   pit.position.set(x, 0.06, z);

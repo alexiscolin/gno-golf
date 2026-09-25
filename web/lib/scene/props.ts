@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, sway, grows, swayLine, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share, motion } from "./materials";
+import { C, ink, flat, sway, grows, swayLine, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share, motion, onTop } from "./materials";
 import { animate, state } from "./state";
 import { GRASS, type Rand } from "./common";
 import { ud, type Height, type Tick } from "./data";
@@ -59,7 +59,7 @@ function tree(rand: Rand) {
   const kind = rand();
   if (kind < 0.22) {
     const g = new THREE.Group(), big = rand() < 0.2 ? 1.6 : 1, h = (1.4 + rand() * 0.8) * big;
-    ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+    ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
     ud(g).flex = 0.4; // an oak: stiff, a small lean
     const trunk = grows(new THREE.CylinderGeometry(0.2 * big, 0.3 * big, h, 7), C.bark);
     trunk.position.y = h / 2;
@@ -74,7 +74,7 @@ function tree(rand: Rand) {
   }
   if (kind < 0.34) {
     const g = new THREE.Group(), h = 3 + rand() * 1.5;
-    ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+    ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
     ud(g).flex = 0.45; // a birch
     const trunk = grows(new THREE.CylinderGeometry(0.1, 0.14, h, 6), 0xefe9dd);
     trunk.position.y = h / 2;
@@ -85,7 +85,7 @@ function tree(rand: Rand) {
     return g;
   }
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   ud(g).flex = 0.28; // a pine: stiffest, 2-4 degrees at most
   const h = 2.2 + rand() * 2.4;
   const trunk = grows(new THREE.CylinderGeometry(0.18, 0.24, h * 0.5, 7), C.bark);
@@ -98,7 +98,7 @@ function tree(rand: Rand) {
 
 function bush(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   for (let i = 0; i < 3; i++) {
     const r = 0.45 + rand() * 0.4;
     const b = grows(new THREE.IcosahedronGeometry(r, 1), C.leaf);
@@ -118,7 +118,7 @@ function stone(rand: Rand) {
 
 function flower(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 5), sway(C.leafDark));
   stem.position.y = 0.35;
   const head = grows(new THREE.SphereGeometry(0.17, 8, 6), rand() > 0.5 ? C.petal : C.cream);
@@ -222,8 +222,8 @@ function puddle(rx: number, rz: number, rand: Rand, color: number = C.pond) {
     m.position.y = y;
     return m;
   };
-  const bank = flatShape(outline(0.28), flat(C.bark, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }), 0.02);
-  const water = flatShape(outline(0), flat(color, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), 0.035);
+  const bank = flatShape(outline(0.28), onTop(flat(C.bark, {}), 1, 2), 0.02);
+  const water = flatShape(outline(0), onTop(flat(color, {}), 2, 2), 0.035);
   const rim = outline(0).map((p) => new THREE.Vector3(p.x, 0.04, -p.y));
   rim.push(rim[0].clone());
   g.add(bank, water, new THREE.Line(new THREE.BufferGeometry().setFromPoints(rim), ink));
@@ -275,7 +275,7 @@ function fence(x0: number, x1: number, z: number) {
 /** A big garden flower: a tall bending stem, a leaf, a wide head of petals. */
 function bigFlower(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   const H = 1.6 + rand() * 0.9, lean = (rand() - 0.5) * 0.3;
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, H, 6), sway(C.leafDark));
   stem.position.y = H / 2;
@@ -355,7 +355,7 @@ function mushroom(rand: Rand) {
 }
 function tuft(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   const m = sway(rand() > 0.5 ? C.leaf : C.leafDark);
   for (let i = 0; i < 3; i++) {
     const b = new THREE.Mesh(tuftGeo, m);
@@ -371,7 +371,7 @@ function bunting(a: THREE.Vector3, b: THREE.Vector3) {
   const g = new THREE.Group();
   // a and b are the poles' feet, on the ground (their y); the line hangs at a
   // fixed height, so a pole reaches from its foot up to it. Each sways from
-  // its own foot (materials.js plantFeet); line and flags from the lower one
+  // its own foot (materials.ts plantFeet); line and flags from the lower one
   ud(g).foot = Math.min(a.y, b.y);
   ud(g).flex = 0.6; // the poles, line and flags alike
   const H = 4.2;

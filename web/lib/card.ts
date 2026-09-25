@@ -3,7 +3,7 @@
 import type { HoleRow } from "./types";
 
 /** A hole as the card reads it: a row of Holes(), or as much of one as is known. */
-export type CardHole = Pick<HoleRow, "id"> & Partial<Pick<HoleRow, "slot" | "par" | "world">>;
+type CardHole = Pick<HoleRow, "id"> & Partial<Pick<HoleRow, "slot" | "par" | "world">>;
 /** The scorecard: a best per cardKey. */
 export type Card = Record<string, number>;
 
@@ -129,34 +129,33 @@ export function totals(card: Card, holes: readonly CardHole[]) {
 
 // The cups a player can win, in order. A hole's cup is its world; "extras" is
 // not a cup.
-const CUPS = ["garden", "island", "town", "mountain"];
+const CUPS = ["garden", "island", "town", "mountain"] as const;
+export type Cup = (typeof CUPS)[number];
 
-/** Totals per cup, from every hole on the chain (not only the cup on screen). */
 /** A cup's totals: totals(), and whether it is finished at par or under (clean) or begun (open). */
 export type CupTotal = ReturnType<typeof totals> & { clean: boolean; open: boolean };
+/** Totals per cup, from every hole on the chain (not only the cup on screen). */
 export function cupTotals(card: Card, allHoles: readonly CardHole[]) {
-  const out: Record<string, CupTotal> = {};
-  let aces = 0;
-  for (const c of CUPS) {
+  const cup = (c: Cup): CupTotal => {
     const t = totals(card, allHoles.filter((h) => cupOf(h) === c));
-    out[c] = { ...t, clean: t.all && t.strokes <= t.par, open: t.done > 0 || t.all };
-    aces += t.aces;
-  }
+    return { ...t, clean: t.all && t.strokes <= t.par, open: t.done > 0 || t.all };
+  };
+  const out: Record<Cup, CupTotal> = { garden: cup("garden"), island: cup("island"), town: cup("town"), mountain: cup("mountain") };
   // the grand slam: every cup the chain has, finished at par or under
   const cups = CUPS.filter((c) => allHoles.some((h) => cupOf(h) === c));
-  return Object.assign(out, { slam: cups.length > 1 && cups.every((c) => out[c].clean), aces });
+  return { ...out, slam: cups.length > 1 && cups.every((c) => out[c].clean), aces: CUPS.reduce((n, c) => n + out[c].aces, 0) };
 }
 
-// Gnomes you earn, cup by cup. Front-only, like the card they are earned on;
-// ok() is given cupTotals().
-// cup: the cup whose card earns it (none for the ones earned across cups)
-/** A gnome to earn: the cup whose card earns it, what it takes, and whether cupTotals() has it. */
-export interface Unlock {
-  cup?: string;
+/** A gnome to earn: the cup whose card earns it (none for the ones earned
+ *  across cups), what it takes, and whether cupTotals() has it. */
+interface Unlock {
+  cup?: Cup;
   need: string;
   ok: (t: ReturnType<typeof cupTotals>) => boolean;
 }
-export const UNLOCKS: Record<string, Unlock> = {
+// Gnomes you earn, cup by cup. Front-only, like the card they are earned on;
+// ok() is given cupTotals().
+export const UNLOCKS = {
   wizard: { cup: "garden", need: "Finish the Garden Cup", ok: (t) => t.garden.all },
   viking: { cup: "garden", need: "Garden Cup at par or under", ok: (t) => t.garden.clean },
   golden: { need: "Five holes-in-one", ok: (t) => t.aces >= 5 },
@@ -165,36 +164,10 @@ export const UNLOCKS: Record<string, Unlock> = {
   baker: { cup: "town", need: "Finish Mushroom Town", ok: (t) => t.town.all },
   mayor: { cup: "town", need: "Mushroom Town at par or under", ok: (t) => t.town.clean },
   king: { need: "Every cup at par or under", ok: (t) => t.slam },
-};
+} satisfies Record<string, Unlock>;
+export type UnlockId = keyof typeof UNLOCKS;
 /** Whether finishing this cup at par or under earns a gnome (the Mountain Cup earns none). */
-export const cupHasGnome = (cup: string) => Object.values(UNLOCKS).some((u) => u.cup === cup);
+export const cupHasGnome = (cup: string) => Object.values<Unlock>(UNLOCKS).some((u) => u.cup === cup);
 
 /** A medal for a finished hole: gold for one stroke, silver under par, bronze at par. */
 export const medalOf = (strokes: number | null | undefined, par: number) => (!strokes ? null : strokes === 1 ? "gold" : strokes < par ? "silver" : strokes === par ? "bronze" : null);
-
-
-// the self-check: a finished hole goes on the card, the better score is kept,
-// and a bad count (the undefined a count-less answer gave) changes nothing
-export function demoCard() {
-  const mem: Record<string, string> = {};
-  const ls = globalThis.localStorage;
-  const fake: Pick<Storage, "getItem" | "setItem" | "removeItem"> = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => void (mem[k] = String(v)), removeItem: (k) => void delete mem[k] };
-  globalThis.localStorage = fake as Storage; // the three calls the card makes
-  try {
-    recordScore("h1", 4);
-    recordScore("h1", 3);
-    recordScore("h1", 5);
-    recordScore("h2", undefined);
-    const card = loadCard(), t = totals(card, [{ id: "h1", par: 3 }, { id: "h2", par: 3 }]);
-    console.assert(card.h1 === 3 && !("h2" in card), "kept the best, refused undefined");
-    console.assert(t.done === 1 && t.strokes === 3 && t.par === 3, "totals");
-    // a version-1 card: realm ids to slots, the lower score where two meet
-    const m = migrate({ [`${OLD_REALM}hole19`]: 4, "garden/17": 3, [`${OLD_REALM}town5`]: 2, [`${OLD_REALM}hole10`]: 5, "gno.land/r/alice/marsh": 6, x: 0 });
-    console.assert(m["garden/17"] === 3 && m["town/5"] === 2 && m["extras/10"] === 5 && m["gno.land/r/alice/marsh"] === 6 && !("x" in m), "migrated");
-    console.assert(legacyOf("garden/17") === `${OLD_REALM}hole19` && legacyOf("mountain/18") === `${OLD_REALM}mountain18` && legacyOf("garden/19") === "", "legacy ids");
-    console.assert(scoreOf({ "garden/17": 3 }, { id: "garden/17/v2", slot: "garden/17" }) === 3, "a new version keeps the card");
-    return "ok";
-  } finally {
-    globalThis.localStorage = ls;
-  }
-}

@@ -1,12 +1,12 @@
 // The "island" world: the board on a sandy island in a warm sea. Same four
-// functions as garden.js (the contract is in worlds.js). No grass round the
+// functions as garden.ts (the contract is in worlds.ts). No grass round the
 // field, no forest: sand, dunes, palms, the gnomes' straw huts shaped like
 // mushrooms, and turquoise water to the horizon.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, ownFade, fadeLoop, windNow } from "./materials";
+import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, ownFade, fadeLoop, windNow, geoOf, gridGeo, onTop } from "./materials";
 import { inZone, mod, segDist, smoothstep } from "../terrain";
-import { bake, look, weatherLooks } from "./bake";
+import { bakeLocal, look, weatherLooks } from "./bake";
 import { gnomelet, brolly } from "./props";
 import { animate, state } from "./state";
 import { timeOf, islandBox } from "./camera";
@@ -23,9 +23,6 @@ type Dressed = Zone & { islandDressed?: boolean };
 /** The island's outline (shape()). */
 type Shape = ReturnType<typeof shape>;
 
-// A flat layer lying on another: pulled towards the eye in the depth test, so
-// at a distance it never shimmers against what it lies on
-const onTop = <M extends THREE.Material>(m: M, k = 1) => Object.assign(m, { polygonOffset: true, polygonOffsetFactor: -1 * k, polygonOffsetUnits: -4 * k });
 const topMats = new Map<number, THREE.MeshToonMaterial>();
 const flatTop = (color: number) => {
   let m = topMats.get(color);
@@ -203,11 +200,10 @@ function base(s: Hole) {
 }
 
 /** Shells, pebbles and starfish along the beach. */
-function edging(box: THREE.Box3, seed: string) {
+function edging(s: Hole) {
   const g = new THREE.Group();
-  const rand = seeded("shells" + seed);
-  // the same island the berms draw, rebuilt from the hole's box
-  const s = { board: { w: box.max.x - ISLAND.x, h: box.max.z - ISLAND.front }, hole: seed };
+  const rand = seeded("shells" + s.hole);
+  // the same island the berms draw
   const sh = shape(s);
   const height = land(s, sh);
   for (let i = 0; i < 26; i++) {
@@ -260,7 +256,6 @@ function berms(s: Hole) {
   // out to where the sea is opaque (8 off the shore), so the seabed never shows an edge
   const X0 = sh.cx - sh.a - 10, X1 = sh.cx + sh.a + 10, Z0 = sh.cz - sh.b - 10, Z1 = sh.cz + sh.b + 10;
   const step = 0.8, nx = Math.round((X1 - X0) / step), nz = Math.round((Z1 - Z0) / step); // dunes are soft: a coarse grid holds them
-  const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const sand = new THREE.Color(P.sand), hi = new THREE.Color(P.sandHi), wet = new THREE.Color(P.wet), under = new THREE.Color(P.under), c = new THREE.Color();
   // where the chain has the sea inside the board (a lane with no rails, the
   // sea all round it), the sand under the board goes under water too
@@ -270,32 +265,19 @@ function berms(s: Hole) {
   const inLag = boardwalk ? lagoonShape(s) : null;
   const drowned = (x: number, z: number) => seas.some((q) => inZone(q, x, z));
   const keep: boolean[] = [];
-  for (let j = 0; j <= nz; j++)
-    for (let i = 0; i <= nx; i++) {
-      const x = X0 + i * step, z = Z0 + j * step;
-      // the sand shelves into the lagoon over its last unit and a half
-      const lg = inLag ? inLag(x, z) : -1;
-      const base = drowned(x, z) ? SEA - 1 - GRASS : height(x, z);
-      const h = lg > 0 ? base + (SEA - 0.6 - GRASS - base) * smoothstep(lg / 1.5) : base, y = GRASS + h;
-      pos.push(x, y, z);
-      keep.push(-sh.inland(x, z) < 9);
-      if (y < SEA - 0.02) c.copy(under);
-      else if (y < SEA + 0.35) c.copy(wet).lerp(sand, (y - SEA) / 0.35); // the wet band at the water's edge
-      else c.copy(sand).lerp(hi, Math.min(1, Math.max(0, h) / 1.4)); // dune tops paler
-      col.push(c.r, c.g, c.b);
-    }
-  for (let j = 0; j < nz; j++)
-    for (let i = 0; i < nx; i++) {
-      // under the board too: sand, not the sea, shows in any gap of its ground
-      const a = j * (nx + 1) + i, b = a + 1, d = a + nx + 1, e = d + 1;
-      if (!keep[a] && !keep[b] && !keep[d] && !keep[e]) continue;
-      idx.push(a, d, b, b, d, e);
-    }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
+  const geo = gridGeo(nx, nz, (i, j, pos, col) => {
+    const x = X0 + i * step, z = Z0 + j * step;
+    // the sand shelves into the lagoon over its last unit and a half
+    const lg = inLag ? inLag(x, z) : -1;
+    const base = drowned(x, z) ? SEA - 1 - GRASS : height(x, z);
+    const h = lg > 0 ? base + (SEA - 0.6 - GRASS - base) * smoothstep(lg / 1.5) : base, y = GRASS + h;
+    pos.push(x, y, z);
+    keep.push(-sh.inland(x, z) < 9);
+    if (y < SEA - 0.02) c.copy(under);
+    else if (y < SEA + 0.35) c.copy(wet).lerp(sand, (y - SEA) / 0.35); // the wet band at the water's edge
+    else c.copy(sand).lerp(hi, Math.min(1, Math.max(0, h) / 1.4)); // dune tops paler
+    col.push(c.r, c.g, c.b);
+  }, (a, b, d, e) => keep[a] || keep[b] || keep[d] || keep[e]); // under the board too: sand, not the sea, shows in any gap of its ground
   // pushed back in the depth test: where the board's rough meets it at the
   // same height, the board's ground always wins and nothing shimmers
   g.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 6 })));
@@ -368,10 +350,7 @@ function crownGeometry(rand: Rand, top: THREE.Vector3, n = 8, size = 1) {
         rachis.push(place(new THREE.CylinderGeometry(0.03 * size, 0.05 * size, p.distanceTo(q) * 1.05, 3), p.clone().lerp(q, 0.5).setY((p.y + q.y) / 2 + 0.03), q.clone().sub(p)));
       }
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
+    const geo = geoOf(pos, idx);
     leaves[f % 2].push(geo);
   }
   return { rachis: mergeGeometries(rachis), leaves: leaves.map((l) => mergeGeometries(l)) };
@@ -416,7 +395,7 @@ function flushLeafLines(root: THREE.Object3D) {
 /** A standing palm: a gentle wind lean, its crown over its own footprint. */
 function palm(rand: Rand, h = 4.5 + rand() * 2.5) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   ud(g).flex = 0.6; // a palm bends, but not like grass
   const a = rand() * Math.PI * 2;
   const curve = trunkCurve(h, 0.2 + rand() * 0.25, new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
@@ -630,7 +609,7 @@ function sandcastle() {
 
 function hibiscus(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   for (let i = 0; i < 3; i++) {
     const b = grows(new THREE.IcosahedronGeometry(0.35 + rand() * 0.2, 1), P.frond);
     b.position.set((rand() - 0.5) * 0.7, 0.3, (rand() - 0.5) * 0.6);
@@ -647,7 +626,7 @@ function hibiscus(rand: Rand) {
 /** Dune grass, in the sand's own colours: the only "green" out here is the palms. */
 function duneGrass(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   for (let i = 0; i < 5; i++) {
     const b = grows(new THREE.ConeGeometry(0.05, 0.6 + rand() * 0.4, 3), rand() < 0.5 ? 0xc9b06a : 0xb99d58);
     b.position.set((rand() - 0.5) * 0.35, 0.3, (rand() - 0.5) * 0.35);
@@ -866,7 +845,7 @@ function ship() {
  *  its own fadeable copies of those materials (ownFade, by the caller). */
 function archPalm(rand: Rand, toward: THREE.Vector3, reach: number, h: number) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   ud(g).flex = 0.45; // taller than a beach palm: a little stiffer
   // from its foot to its crown it leans `reach` over `h`, as a coconut palm
   // grows: leaning most at the foot, then rising towards the crown in one
@@ -897,8 +876,8 @@ function archPalm(rand: Rand, toward: THREE.Vector3, reach: number, h: number) {
 /** A hibiscus as big as a gnome's house, on a dune. */
 function giantHibiscus(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
-  ud(g).flex = 0.7; // how far it bends: see materials.js SWAY
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
+  ud(g).flex = 0.7; // how far it bends: see materials.ts SWAY
   const stem = grows(new THREE.CylinderGeometry(0.1, 0.16, 2.4, 6), P.frondDark);
   stem.position.y = 1.2;
   stem.rotation.z = (rand() - 0.5) * 0.3;
@@ -998,7 +977,7 @@ function kite(rand: Rand, color: number, stake: THREE.Vector3) {
 
 /** A whole object that moves as one, merged into a mesh per material by the
  *  shared bake (in its own frame), and marked live so the hole's own bake leaves it be. */
-const mergedMover = <T extends THREE.Object3D>(group: T) => ((ud(bake(group, { local: true })).live = true), group);
+const mergedMover = <T extends THREE.Object3D>(group: T) => ((ud(bakeLocal(group)).live = true), group);
 
 // ------------------------------------------------------------ beach life
 
@@ -1529,7 +1508,7 @@ function decor(s: Hole, bank: Height = () => 0): THREE.Group {
   return g;
 }
 
-/** The rough inside the walls, for course.js: sand here, not grass. */
+/** The rough inside the walls, for course.ts: sand here, not grass. */
 // on a boardwalk the rough is lagoon: nothing there; elsewhere a sparse stone
 export const rough: Rough = { lo: P.wet, hi: P.sand, plant: (rand, s) => (green(s) === "planks" || rand() > 0.33 ? null : rock(rand)) };
 
@@ -1537,11 +1516,11 @@ export { base, edging, berms, decor };
 
 // -------------------------------------------------------- on-lane pieces
 //
-// The island's own look for what the chain puts on the lane. course.js /
-// zones.js call piece(kind, item, t, s) for each wall, post and zone, with
+// The island's own look for what the chain puts on the lane. course.ts /
+// zones.ts call piece(kind, item, t, s) for each wall, post and zone, with
 // the chain's JSON for it (a wall comes as its whole bar); this returns an
 // Object3D in world units, or null for the shared default. The lighthouse loop
-// is dressed by zones.js itself.
+// is dressed by zones.ts itself.
 // Every one stands on the ground and keeps to its footprint.
 
 const ground = (t: Terrain, x: number, z: number) => t.height(x, z);
@@ -1639,7 +1618,7 @@ function driftwoodPost(item: Post, t: Terrain) {
   return g;
 }
 
-/** A driftwood log filling a bar: {c, length, thick, ang} from course.js. */
+/** A driftwood log filling a bar: {c, length, thick, ang} from course.ts. */
 function driftwoodBar(bar: Bar, t: Terrain) {
   const [cx, cz] = bar.c, th = bar.thick || 0.5;
   const g = new THREE.Group();
@@ -1738,9 +1717,7 @@ function polyGeometry(poly: readonly Vec2[], cx: number, cz: number) {
         for (const q of up ? [a, b, c] : [a, c, b]) pos.push(q.x - cx, 0, q.y - cz);
       }
     }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  geo.computeVertexNormals();
+  const geo = geoOf(pos);
   return geo;
 }
 
@@ -1828,12 +1805,12 @@ function waterZone(z: Zone, t: Terrain, _s: Hole, { color = P.shallow, stones = 
  * wet; between spouts a wisp of mist and a few bubbles. All on the timed
  * pieces' clock (state.timed), so it spouts on screen when the chain throws.
  * A ball thrown out flies an arc to where it comes down (state.tubes).
- * The lane's cells over the hole are left open (course.js), so the hole is
+ * The lane's cells over the hole are left open (course.ts), so the hole is
  * a hole, under a lid of two rock slabs that is shut (the ball rolls over
  * it) except while it spouts. Instanced spray and rocks; nothing allocated
  * per frame.
  */
-export const BLOWHOLE_MOUTH = 0.5; // the hole's size, a share of the zone's ellipse
+const BLOWHOLE_MOUTH = 0.5; // the hole's size, a share of the zone's ellipse
 function blowhole(z: Zone, t: Terrain) {
   const g = new THREE.Group();
   const [x0, z0] = z.min, [x1, z1] = z.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, a = (x1 - x0) / 2, b = (z1 - z0) / 2;
@@ -1859,11 +1836,7 @@ function blowhole(z: Zone, t: Terrain) {
     const q0 = k * P + j, q1 = (k + 1) * P + j;
     idx.push(q0, q1, q0 + 1, q1, q1 + 1, q0 + 1);
   }
-  const rimGeo = new THREE.BufferGeometry();
-  rimGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  rimGeo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  rimGeo.setIndex(idx);
-  rimGeo.computeVertexNormals();
+  const rimGeo = geoOf(pos, idx, col);
   // wound to face up on the outer slope (the ink hull needs it)
   if (rimGeo.attributes.normal.getY(P + 1) < 0) { rimGeo.setIndex(idx.map((v, i) => idx[i - (i % 3) + [0, 2, 1][i % 3]])); rimGeo.computeVertexNormals(); }
   g.add(drawn(rimGeo, flat(0xffffff, { vertexColors: true, side: THREE.DoubleSide })));
@@ -2134,7 +2107,7 @@ export function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Dressed
     if (k === "lagoon") return waterZone(zone, t, s, { color: 0x4fc4c9 });
     if (k === "wave") return wave(zone, t);
     if (k === "blowhole") return blowhole(zone, t);
-    // (a gap, missing planks, is the shared deckGap in zones.js)
+    // (a gap, missing planks, is the shared deckGap in zones.ts)
     if (k === "sea") return new THREE.Group(); // the world's sea shows round the lane
     if (zone.islandDressed) return null;
     if (k === "shipwreck") return withDefault(zone, s, t, wreck(zone, t));
@@ -2190,7 +2163,7 @@ function lagoonUnder(s: Hole) {
   return g;
 }
 
-/** The lane's own ground, for course.js: boardwalk planks where the lane is a
+/** The lane's own ground, for course.ts: boardwalk planks where the lane is a
  *  boardwalk over the water (the pier and the broken boardwalk), else green. */
 // the rock pools' shelf is flat rock, not a lawn
 export const green = (s: Pick<Hole, "hole">): readonly [number, number] | "planks" | null => (/island(9|10)$/.test(s.hole) ? "planks" : /island8$/.test(s.hole) ? [0xaeb0a6, 0xa5a79d] : null);

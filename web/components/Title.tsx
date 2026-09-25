@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import "@/app/title.css";
 import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
@@ -22,9 +22,8 @@ declare global {
   }
 }
 
-// What the gnomes are up to while the game loads. Silly on purpose: a wait
-// reads shorter when something is going on.
-// What the gnomes are up to, cup by cup. Silly on purpose.
+// What the gnomes are up to while the game loads, cup by cup. Silly on
+// purpose: a wait reads shorter when something is going on.
 const CHORES: Record<string, readonly string[]> = {
   garden: ["Waking the gnomes…", "Mowing the greens…", "Planting mushrooms…", "Oiling the windmill…", "Asking the chain nicely…", "Filling the ponds…", "Hiding the moles…", "Straightening hats…"],
   island: ["Raking the sand…", "Chasing crabs…", "Waxing the palm trees…", "Counting the waves…", "Asking the chain nicely…", "Building sandcastles…", "Shooing the seagulls…"],
@@ -75,10 +74,6 @@ export function Hat({ world, x = 0, y = 0, k = 1, className = "" }: { world: str
 let rolled = 0;
 
 /**
- * The loading bar is a putting green: the ball rolls toward the cup as the
- * game loads, and drops in when it is ready — then the Play button pops up.
- */
-/**
  * The putting green the loader and the cup cards share: a track, its mown part
  * up to p (0..1), the ball in its cup's hat at that point, the cup and its
  * flag (a palm on the island, a lamp in town) at the end.
@@ -115,12 +110,19 @@ export function Green({ p, world = "garden", holed = false, thick = false }: { p
   );
 }
 
+/**
+ * The loading bar is a putting green: the ball rolls toward the cup as the
+ * game loads, and drops in when it is ready — then the Play button pops up.
+ */
 function Loader({ loading, onDone, world = "garden" }: { loading: boolean; onDone: () => void; world?: string }) {
   const chores = choresOf(world);
   const [p, setP] = useState(rolled);
-  const [chore, setChore] = useState(() => Math.floor(Math.random() * chores.length));
+  // the first line is the prerendered one; a random one once on the client
+  // (a random first render would not match the server's HTML)
+  const [chore, setChore] = useState(0);
   useEffect(() => {
     if (loading) {
+      setChore(Math.floor(Math.random() * chores.length));
       // eases toward the cup without reaching it: the last stretch is the
       // chain's to give
       const t = setInterval(() => setP((v) => (rolled = v + (0.9 - v) * 0.05)), 90);
@@ -147,13 +149,10 @@ const burst = (n: number, r0: number, r1: number, cx = 100, cy = 100) =>
     return `${(cx + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`;
   }).join(" ");
 
-/** The title screen. Kept free of three.js so it can show while the game's
- *  bundle is still loading: the first thing on screen is the last thing to go. */
-// The line under the button is fixed text: it shows while the chain is still
-// being reached, so it must not depend on anything the chain answers.
-// Before the chain has said which cup a hole is in, the link does: ?hole=…island3
+// Before the chain has said which cup a hole is in, the link does: ?hole=…island3.
+// Read through useSyncExternalStore: the prerendered page (and the render that
+// hydrates it) is the garden's, the client's own render the link's.
 const guessWorld = () => {
-  if (typeof window === "undefined") return "garden";
   const p = new URLSearchParams(window.location.search);
   const h = p.get("world") || p.get("hole") || "";
   return /island/.test(h) ? "island" : /town/.test(h) ? "town" : /mountain/.test(h) ? "mountain" : "garden";
@@ -161,7 +160,7 @@ const guessWorld = () => {
 
 // The title's backdrop, one per visit: the promo's textless cut
 // (public/title/bg.*) plays first, then cross-fades into the live splash
-// (lib/scene/title.js), which waits, drawn, behind it. Both are kept across
+// (lib/scene/title.ts), which waits, drawn, behind it. Both are kept across
 // the two mounts at startup (the page's, while the bundle loads, then the
 // game's) by parking them for a moment instead of dropping them. Each visit's
 // splash is the next world. Reduced motion, the Low graphics tier and no WebGL
@@ -296,8 +295,16 @@ function useTitleScene(host: RefObject<HTMLDivElement | null>, film: RefObject<H
   return scene;
 }
 
+const noSubscribe = () => () => {};
+const onServer = () => "garden";
+
+/** The title screen. Kept free of three.js so it can show while the game's
+ *  bundle is still loading: the first thing on screen is the last thing to go.
+ *  The line under the button is fixed text: it shows while the chain is still
+ *  being reached, so it must not depend on anything the chain answers. */
 export default function Title({ onStart, loading = false, world: given }: { onStart?: () => void; loading?: boolean; world?: string }) {
-  const world = given || guessWorld();
+  const guessed = useSyncExternalStore(noSubscribe, guessWorld, onServer);
+  const world = given || guessed;
   // the loader shows until the game is ready and the ball has dropped; coming
   // back to the title later skips it
   const [ready, setReady] = useState(!loading && rolled >= 1);

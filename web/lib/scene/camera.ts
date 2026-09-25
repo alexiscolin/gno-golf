@@ -85,7 +85,7 @@ export const islandBox = (board: Board) =>
                  new THREE.Vector3(board.w + ISLAND.x, 4, board.h + ISLAND.front));
 
 /** Portrait screens look down the long axis instead of across it. */
-export const isPortrait = (w: number, h: number) => h > w * 1.05;
+const isPortrait = (w: number, h: number) => h > w * 1.05;
 
 // the two viewing directions, made once: applyRig runs every frame
 const LOOK_PORTRAIT = new THREE.Vector3(-0.7, 0.9, 0).normalize(), LOOK_WIDE = new THREE.Vector3(0, 0.72, 0.8).normalize();
@@ -209,13 +209,4 @@ export function focusRig(point: THREE.Vector3, overview: Pick<Rig, "dist">, view
     ox: 0,
     oy: view.h / 2 - (view.top + (view.h - view.top - view.bottom) / 2),
   });
-}
-
-/** Eases one rig toward another; k is the fraction of the gap closed. */
-export function easeRig(cur: Rig, goal: Rig, k: number) {
-  cur.target.lerp(goal.target, k);
-  cur.dist += (goal.dist - cur.dist) * k;
-  cur.ox += (goal.ox - cur.ox) * k;
-  cur.oy += (goal.oy - cur.oy) * k;
-  cur.tilt = (cur.tilt || 0) + ((goal.tilt || 0) - (cur.tilt || 0)) * k;
 }

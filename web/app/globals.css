@@ -8,7 +8,7 @@
   --paper: #fdf6e9;
   --ink-rgb: 20, 65, 52; /* the ink, for its see-through shades: rgba(var(--ink-rgb), a) */
   --shadow: 0 5px 0 var(--ink), 0 12px 24px rgba(var(--ink-rgb), .18);
-  /* the controls (components/ui.jsx): a press sinks, a hover lifts, a focus rings */
+  /* the controls (components/ui.tsx): a press sinks, a hover lifts, a focus rings */
   --press: 3px;
   --lift: 1px;
   --ring: 3px solid var(--hat);
@@ -1971,7 +1971,7 @@ button:focus-visible, a:focus-visible {
 .sheet:has(.confirm) { z-index: 9; }
 
 /* ---------------------------------------------------------- shared controls
-   One look for every control (components/ui.jsx): a button sinks when pressed,
+   One look for every control (components/ui.tsx): a button sinks when pressed,
    lifts a little under the pointer, rings when focused, greys when disabled;
    a badge sits in its top-right corner. The segmented switch and the toggle
    are the same family. */

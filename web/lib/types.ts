@@ -110,7 +110,7 @@ export interface HoleState extends Versioned {
 }
 
 /** One round as State and Rounds list it (no path). */
-export interface RoundRow extends Versioned {
+interface RoundRow extends Versioned {
   player: string;
   /** where it lies (3 decimals), and the same ball exactly */
   ball: Vec2;

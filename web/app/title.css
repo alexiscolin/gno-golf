@@ -1,5 +1,5 @@
 /* The title and the cup screen, the arcade way: a live scene at golden hour
-   behind the title (lib/scene/title.js), glossy cup cards on a world-coloured
+   behind the title (lib/scene/title.ts), glossy cup cards on a world-coloured
    backdrop. Everything moving here is a transform or an opacity: the
    compositor's work, not the page's. */
 

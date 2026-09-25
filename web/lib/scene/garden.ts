@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { C, ink, flat, drawn, grows, sway, rbox, windNow, share, texOf, fadeable, setFade, fadeLoop } from "./materials";
+import { C, ink, flat, drawn, grows, sway, rbox, windNow, share, texOf, fadeable, setFade, fadeLoop, gridGeo, onTop } from "./materials";
 import { animate } from "./state";
 import { timeOf } from "./camera";
 import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, brolly, mailbox, signpost, hill, house, pond, puddle, fence, mushroom, tuft, bunting, butterfly } from "./props";
@@ -33,7 +33,8 @@ interface Backdrop {
 }
 
 /** Pebbles caught in the island's soil, so its sides read as earth. */
-function edging(box: THREE.Box3, seed: string) {
+function edging(s: Hole, box: THREE.Box3) {
+  const seed = s.hole;
   if (cloudy(seed)) return new THREE.Group();
   const g = new THREE.Group();
   const rand = seeded("edge" + seed);
@@ -142,10 +143,10 @@ function stream({ rand, X0, X1, reserve }: Backdrop) {
   const N = 90, along = Array.from({ length: N + 1 }, (_, k) => curve.getPoint(k / N));
   const across = (k: number) => { const q = curve.getTangent(k / N); return new THREE.Vector3(-q.z, 0, q.x).normalize(); };
   const width = (k: number) => 0.7 * Math.min(1, 0.35 + (k / N) * 9); // narrow at the spring, 1.4 wide soon after
-  const wet = flat(C.bark, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+  const wet = onTop(flat(C.bark, {}), 1, 2);
   const bankPts = along.map((p) => p.clone().setY(GRASS + 0.025));
   g.add(new THREE.Mesh(ribbon(bankPts, (k) => width(k) + 0.22, across), wet));
-  g.add(new THREE.Mesh(ribbon(along, width, across), flat(C.pond, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
+  g.add(new THREE.Mesh(ribbon(along, width, across), onTop(flat(C.pond, {}), 2, 2)));
   for (const sgn of [-1, 1]) {
     const line = along.map((p, k) => p.clone().addScaledVector(across(k), sgn * width(k)).setY(GRASS + 0.05));
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(line), ink));
@@ -510,7 +511,7 @@ function giants({ rand, X0, X1, reserve, free, W, H }: Backdrop) {
     // never floats off the stem. Lit like the rest (toon), not glowing at night
     const dand = new THREE.Group();
     dand.position.set(x, GRASS, z);
-    ud(dand).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+    ud(dand).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
     ud(dand).flex = 0.7; // a thin stem: it bends, but less than grass
     const stem = grows(new THREE.CylinderGeometry(0.035, 0.09, h, 6), C.leafDark);
     stem.position.y = h / 2;
@@ -917,27 +918,16 @@ function berms(s: Hole): { group: THREE.Object3D; height: Height } {
   };
   const g = new THREE.Group();
   const step = 0.5, nx = Math.round((X1 - X0) / step), nz = Math.round((Z1 - Z0) / step);
-  const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const c = new THREE.Color(), lo = new THREE.Color(C.surround), hi = new THREE.Color(0x5b9a7d);
-  for (let j = 0; j <= nz; j++)
-    for (let i = 0; i <= nx; i++) {
-      const x = X0 + i * step, z = Z0 + j * step, h = height(x, z);
-      pos.push(x, GRASS + 0.05 + h, z); // clear of the island grass top: 0.01 z-fought at a distance
-      c.copy(lo).lerp(hi, Math.min(1, Math.max(0, h) / 2));
-      col.push(c.r, c.g, c.b);
-    }
-  for (let j = 0; j < nz; j++)
-    for (let i = 0; i < nx; i++) {
-      const x = X0 + (i + 0.5) * step, z = Z0 + (j + 0.5) * step;
-      if (x > 0 && x < W && z > 0 && z < H) continue; // the board's own ground
-      const a = j * (nx + 1) + i, b = a + 1, d = a + nx + 1, e = d + 1;
-      idx.push(a, d, b, b, d, e);
-    }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
+  const geo = gridGeo(nx, nz, (i, j, pos, col) => {
+    const x = X0 + i * step, z = Z0 + j * step, h = height(x, z);
+    pos.push(x, GRASS + 0.05 + h, z); // clear of the island grass top: 0.01 z-fought at a distance
+    c.copy(lo).lerp(hi, Math.min(1, Math.max(0, h) / 2));
+    col.push(c.r, c.g, c.b);
+  }, (_a, _b, _d, _e, i, j) => {
+    const x = X0 + (i + 0.5) * step, z = Z0 + (j + 0.5) * step;
+    return !(x > 0 && x < W && z > 0 && z < H); // the board's own ground: not ours
+  });
   g.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true })));
   return { group: g, height };
 }

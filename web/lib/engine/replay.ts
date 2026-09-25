@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { buzz, sound } from "../feel";
 import { causeAt } from "../scene/cause";
 import { at, makeSplash, disposeCourse } from "../scene";
-import { BALL_R, inZone, closest } from "../terrain";
+import { BALL_R, inZone, nearestOnPoly, boxOf } from "../terrain";
 import type { MutVec2, Vec2, Zone } from "../types";
 import type { Cause } from "../scene/cause";
 import type { TubePath } from "../scene/data";
@@ -178,12 +178,7 @@ export function makeReplay(E: Live) {
     if (z.poly) {
       // it went in at p (the last point before the chain sends it back): a
       // little further out from the lane's edge, over the water
-      let best: MutVec2 = [p[0], p[1]], bd = Infinity;
-      const P = z.poly;
-      for (let k = 0; k < P.length; k++) {
-        const q = closest(p[0], p[1], P[k], P[(k + 1) % P.length]);
-        if (q.d < bd) (bd = q.d), (best = [q.x, q.z]);
-      }
+      const best = nearestOnPoly(p[0], p[1], z.poly);
       // the chain records the substep before it went over, still on the deck
       // (p inside the lane): then the edge is ahead of it, and it goes in
       // just past the edge on the far side
@@ -196,12 +191,11 @@ export function makeReplay(E: Live) {
       const x = best[0] + (ox / ol) * out, y = best[1] + (oy / ol) * out;
       return at([x, y], BALL_R + ground(x, y));
     }
-    const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
+    const { cx, cz, hx, hz } = boxOf(z);
     // well inside the water, not on the bank: the rings then have water round them
     let x = Math.min(Math.max(p[0], z.min[0] + 1), z.max[0] - 1);
     let y = Math.min(Math.max(p[1], z.min[1] + 1), z.max[1] - 1);
     if (z.round) {
-      const hx = (z.max[0] - z.min[0]) / 2, hz = (z.max[1] - z.min[1]) / 2;
       const ex = (x - cx) / hx, ez = (y - cz) / hz, k = Math.hypot(ex, ez);
       if (k > 0.55) (x = cx + (ex / k) * 0.55 * hx), (y = cz + (ez / k) * 0.55 * hz);
     }
@@ -415,7 +409,7 @@ export function makeReplay(E: Live) {
     const path = path0.slice();
     const round = g.round;
     // without flags (an older realm) the heights are guessed from the ground
-    const flights = typeof flags === "string" && flags.length === path.length ? flightsOf(path, flags) : null;
+    const flights = flags.length === path.length ? flightsOf(path, flags) : null;
     return new Promise<void>((settle) => {
       // a frame that throws ends the replay (the shot's finally puts things right)
       const done = () => settle();

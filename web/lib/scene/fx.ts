@@ -199,5 +199,4 @@ export function aimAlong(aim: Aim, path: readonly Vec2[], power: number, height:
   dots.instanceMatrix.needsUpdate = true;
   if (dots.instanceColor) dots.instanceColor.needsUpdate = true;
 }
-export type Splash = ReturnType<typeof makeSplash>;
 export type Confetti = ReturnType<typeof makeConfetti>;

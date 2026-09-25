@@ -1,11 +1,11 @@
 import * as THREE from "three";
-import { CUP_R, CELL, inZone, inset, airy, mod, segDist, smoothstep } from "../terrain";
+import { CUP_R, CELL, inZone, inset, airy, mod, segDist, smoothstep, boxOf } from "../terrain";
 import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf } from "./materials";
 import { animate, state } from "./state";
 import { stone, warp, badge, windmill } from "./props";
 import { MOUTHS, mouthAt } from "./pieces";
 import { seeded } from "./common";
-import { worldOf, fromWorld, gapWater, DECK } from "./worlds";
+import { worldOf, fromWorld, gapWater, DECK, GAP_Y } from "./worlds";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { ud, type CourseTerrain as T, type Hole } from "./data";
 import type { Rand } from "./common";
@@ -87,8 +87,7 @@ function organic(z: Zone, rand: Rand, board: Board): Blob {
   }
   if (z.round) {
     // the chain's own ellipse, a hair of wobble, cut at the board's edge
-    const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
-    const hx = (z.max[0] - z.min[0]) / 2, hz = (z.max[1] - z.min[1]) / 2;
+    const { cx, cz, hx, hz } = boxOf(z);
     const phase = rand() * 6, raw: Vec2[] = [];
     for (let i = 0; i < 72; i++) {
       const a = (i / 72) * Math.PI * 2, k = 1 + 0.015 * Math.sin(a * 6 + phase);
@@ -170,7 +169,7 @@ const ZONE_DRAW: [(z: Zone) => boolean, ZoneDraw][] = [
   [(z) => z.skin === "seesaw", seesaw],
   [(z) => z.skin === "castle tube", (z, s, t, g) => {
     const castle = (s.posts || []).find((p) => p.skin === "sandcastle");
-    const [cx, cz] = [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2];
+    const { cx, cz } = boxOf(z);
     return castle ? castleSlide(z, s, t, g, castle, [cx, cz], z.vec) : g;
   }],
   [(z) => z.skin === "crevasse" || z.skin === "ditch", drawGap],
@@ -195,7 +194,7 @@ function zoneDetail(z: Zone, s: Hole, t: T) {
 }
 
 /**
- * Missing planks in a boardwalk. The ground is open there (course.js cuts it
+ * Missing planks in a boardwalk. The ground is open there (course.ts cuts it
  * and gives it the deck's cut face, a joist and piles); this adds the boards
  * broken off round it, splintered, a post at each corner,
  * the deck's shadow on the water and a slow ripple. The water is the world's
@@ -212,7 +211,7 @@ function deckGap(z: Zone, s: Hole, t: T, g: THREE.Group) {
     pool.position.set(cx, W, cz);
     g.add(pool);
   }
-  // the boards run across the lane (as course.js lays them): they end, broken,
+  // the boards run across the lane (as course.ts lays them): they end, broken,
   // on the hole's two sides across their length; each is three slats long
   // and short, a corner of each tip pulled in
   const alongX = s.board.w >= s.board.h, tones = [0xd4a86c, 0xc99a63, 0xbf8f58], slats = new Map<number, THREE.BufferGeometry[]>();
@@ -289,7 +288,7 @@ function drawGap(z: Zone, s: Hole, t: T) {
   // world's ground meet it; the lane's own sides are the ground's), a dark
   // blue depth at the bottom, and icicles hanging off the lips
   const g = new THREE.Group();
-  const D = -7, x0 = z.min[0], x1 = z.max[0], z0 = z.min[1], z1 = z.max[1];
+  const D = GAP_Y, x0 = z.min[0], x1 = z.max[0], z0 = z.min[1], z1 = z.max[1];
   const rand = seeded("crevasse" + s.hole + String(z.min));
   const cliff = flat(earth ? 0x7a5236 : 0x8fcde6, { side: THREE.DoubleSide });
   for (const x of [x0, x1]) {
@@ -380,7 +379,7 @@ function drawContours(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
   const ux = -z.vec[0] / l, uz = -z.vec[1] / l; // uphill
   const vx = -uz, vz = ux;                        // across
   const contour = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
-  const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
+  const { cx, cz } = boxOf(z);
   const reach = Math.hypot(w, h) / 2 + 3;
   const segs: THREE.Vector3[] = [];
   let last = t.height(cx - ux * reach, cz - uz * reach);
@@ -424,7 +423,7 @@ function drawContours(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
 
 function drawMill(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
   // the mill standing across the lane: a big tower, its sails turning
-  const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
+  const { cx, cz } = boxOf(z);
   const k = Math.min(w, h) / 2.4, y0 = t.height(cx, cz);
   const m = windmill(cx, y0, cz);
   m.group.scale.setScalar(k);
@@ -463,7 +462,7 @@ function drawMill(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
 
 function drawMolehill(z: Zone, s: Hole, t: T, g: THREE.Group, { rand }: Opts) {
   // where the mole lives: a ring of turned earth, flat enough to roll over
-  const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
+  const { cx, cz } = boxOf(z);
   const y = t.height(cx, cz);
   const ring = drawn(new THREE.TorusGeometry(0.75, 0.2, 8, 20), flat(C.bark));
   ring.rotation.x = -Math.PI / 2;
@@ -486,7 +485,7 @@ function drawMolehill(z: Zone, s: Hole, t: T, g: THREE.Group, { rand }: Opts) {
 // planks, the bank's ink; then the detail its kind draws (SURFACE_DETAIL).
 /**
  * The garden's ponds and streams: one flat sheet at each one's level, cell by
- * cell wherever the ground (terrain.js sinks it) goes down under it, the
+ * cell wherever the ground (terrain.ts sinks it) goes down under it, the
  * banks hiding its edge. Pale over the shallows by the banks, darker out in
  * the deep middle. Null when the hole has none.
  */
@@ -540,7 +539,7 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
     }
     return null;
   };
-  // a garden pond is sunk into the ground (terrain.js, pondWater), with its
+  // a garden pond is sunk into the ground (terrain.ts, pondWater), with its
   // banks; over one, a causeway is a boardwalk on posts
   const sunk = water && z.skin === "water";
   if (deck && t.pond((z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2)) return boardwalk(z, s, t, g);
@@ -756,7 +755,7 @@ function waterDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, blob,
 
 /** A round basin with a rim, and a spout of water in the middle. */
 function fountainBasin(z: Zone, t: T, g: THREE.Group, w: number, h: number) {
-  const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, r = Math.min(w, h) / 2, y = t.height(cx, cz);
+  const { cx, cz } = boxOf(z), r = Math.min(w, h) / 2, y = t.height(cx, cz);
   const rim = drawn(new THREE.TorusGeometry(r, 0.18, 8, 32), flat(0xb9c2bd));
   rim.rotation.x = Math.PI / 2;
   rim.position.set(cx, y + 0.12, cz);
@@ -825,7 +824,7 @@ function soilDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, inSand
     const a = pts[k], b = pts[(k + 1) % pts.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
     if (l > best) (best = l), (ax = (b[0] - a[0]) / l), (az = (b[1] - a[1]) / l);
   }
-  const nx = -az, nz = ax, cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, reach = Math.hypot(w, h) / 2 + 1;
+  const { cx, cz } = boxOf(z), nx = -az, nz = ax, reach = Math.hypot(w, h) / 2 + 1;
   const furrow = new THREE.LineBasicMaterial({ color: 0x4f3524 });
   const heads = [flat(0x8fcb6a), flat(0x6fae55), flat(0xb5d98a)], leaf = new THREE.SphereGeometry(1, 9, 6);
   const inRow = (x: number, zz: number) => inSand(x, zz) && inZone(z, x, zz);
@@ -1107,7 +1106,7 @@ function seesaw(z: Zone, s: Hole, t: T, g: THREE.Group) {
   const L = u1 - u0 + 0.4, W = w1 - w0, TOP = 0.34, TH = 0.24;
   const P = (u: number, w: number): MutVec2 => (alongX ? [u, w] : [w, u]);
   const [cx, cz] = P(uc, wc), y0 = t.height(cx, cz);
-  // (the pond carries on under the plank: terrain.js sinks the ground there)
+  // (the pond carries on under the plank: terrain.ts sinks the ground there)
   // the stone it rocks on, standing in the water, up from the bed
   const bed = (t.ground || t.height)(cx, cz) - 0.1, sh = y0 + TOP - TH - bed;
   const block = drawn(rbox(1.1, sh, W * 0.9, 0.08), flat(0x9aa39e));

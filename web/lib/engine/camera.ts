@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { behind, chaseState } from "../chase";
 import { focusRig, applyRig, ORBIT } from "../scene";
-import { BALL_R, CELL, onAt, closest, segHit, rayCircle } from "../terrain";
+import { BALL_R, CELL, onAt, closest, segHit, rayCircle, angDiff } from "../terrain";
 import type { Post, Wall } from "../types";
 import type { Rig } from "../scene/camera";
 import type { Live } from "./types";
@@ -109,7 +109,6 @@ export function makeCamera(E: Live) {
   const chase = chaseState(), cdir = new THREE.Vector3(1, 0, 0), prevB = new THREE.Vector3(), vel = new THREE.Vector3(), inst = new THREE.Vector3();
   let yaw = 0, wide = 0, hold = 0, rise = 0, swing = 0, swingTo = 0, swingTick = 0, pen = 0, fresh = true, urgent = false;
   const resetFollow = () => ((fresh = true), (wide = hold = rise = swing = 0), vel.set(0, 0, 0));
-  const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
   const ndcB = new THREE.Vector3(), ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3(), camLog: CamRow[] = [];
   let sightOk = true, sightTick = 0, clearTick = 0;
   const lensWho: Record<number, number> = {};

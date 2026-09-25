@@ -1,6 +1,6 @@
 // The bake: every static mesh under a root merged into one mesh per
 // material kind (a few dozen draw calls for a whole course), and the weather
-// looks of the decor. Its own module, on materials.js alone, so the course,
+// looks of the decor. Its own module, on materials.ts alone, so the course,
 // the worlds and the gnome picker share it without importing each other.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -220,6 +220,11 @@ function mergeByCopy(pieces: readonly Piece[]) {
   return merged;
 }
 
+/** A moving piece's meshes merged in its own frame (one draw per material): it moves as one. */
+export const bakeLocal = <T extends THREE.Object3D>(o: T) => bake(o, { local: true });
+
+/** Tags a decor part with the looks it shows in (see weatherLooks); returns it. */
+export const look = <T extends THREE.Object3D>(o: T, ...looks: string[]) => ((ud(o).look = looks), o);
 /**
  * A world's decor dressed for the weather. Its builders tag the parts that
  * change with userData.look = [the looks they show in]; looks are one of
@@ -229,8 +234,6 @@ function mergeByCopy(pieces: readonly Piece[]) {
  * w being the engine's weather ({ wind, rain, fog, storm, snow } | null).
  * A part in two looks is copied, so only one group ever draws.
  */
-/** Tags a decor part with the looks it shows in (see weatherLooks); returns it. */
-export const look = <T extends THREE.Object3D>(o: T, ...looks: string[]) => ((ud(o).look = looks), o);
 export function weatherLooks(root: THREE.Object3D, pick: (w: Partial<WeatherNow>) => string) {
   root.updateMatrixWorld(true);
   const tagged: THREE.Object3D[] = [];

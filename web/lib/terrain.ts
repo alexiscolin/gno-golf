@@ -13,7 +13,7 @@
 import type { HoleState, MutVec2, Timing, Vec2, Wall, Zone } from "./types";
 
 /** A segment a→b on the board. */
-export type Seg = readonly [Vec2, Vec2];
+type Seg = readonly [Vec2, Vec2];
 /** A zone's shape, as inZone reads it. */
 type Shape = Pick<Zone, "min" | "max" | "round" | "poly" | "outside">;
 
@@ -45,6 +45,8 @@ export const onAt = (q: Timing, tick: number) => there(tick, q.every, q.on, q.ph
 
 /** 0 below 0, 1 above 1, and an S between. */
 export const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+/** The signed turn from angle b to angle a, in (-π, π]. */
+export const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 // One result object reused by every call (no allocation in the
 // camera's per-frame wall tests); read it before the next call
@@ -59,6 +61,20 @@ export function closest(x: number, z: number, a: Vec2, b: Vec2) {
   nearest.u = u;
   nearest.d = Math.hypot(x - a[0] - u * dx, z - a[1] - u * dz);
   return nearest;
+}
+/** A zone's box: its centre (cx, cz), its half-sizes (hx, hz) and its sizes (w, h). */
+export const boxOf = (q: Pick<Zone, "min" | "max">) => {
+  const w = q.max[0] - q.min[0], h = q.max[1] - q.min[1];
+  return { cx: (q.min[0] + q.max[0]) / 2, cz: (q.min[1] + q.max[1]) / 2, hx: w / 2, hz: h / 2, w, h };
+};
+/** The point of a polygon's outline nearest (x, z), as a new pair. */
+export function nearestOnPoly(x: number, z: number, poly: readonly Vec2[]): MutVec2 {
+  let best: MutVec2 = [x, z], bd = Infinity;
+  for (let k = 0; k < poly.length; k++) {
+    const q = closest(x, z, poly[k], poly[(k + 1) % poly.length]);
+    if (q.d < bd) (bd = q.d), (best = [q.x, q.z]);
+  }
+  return best;
 }
 /** The distance from (x, z) to segment a→b. */
 export const segDist = (x: number, z: number, a: Vec2, b: Vec2) => closest(x, z, a, b).d;
@@ -95,7 +111,7 @@ export function inPoly(x: number, y: number, poly: readonly Vec2[]) {
 }
 
 /** The edges of a zone's outline, as segments [a, b] (none for a Round one). */
-export const edgesOf = (q: Shape): Seg[] => {
+const edgesOf = (q: Shape): Seg[] => {
   const poly = q.poly;
   if (poly && poly.length > 2) return poly.map((p, i): Seg => [poly[(i + poly.length - 1) % poly.length], p]);
   if (q.round) return [];

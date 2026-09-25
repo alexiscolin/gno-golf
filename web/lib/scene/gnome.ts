@@ -4,6 +4,7 @@ import { C, flat, inked, disposeCourse, texOf } from "./materials";
 import { makeRenderer, makeScene } from "./camera";
 import { bake } from "./bake";
 import { ud, type Gnome } from "./data";
+import type { UnlockId } from "../card";
 
 /** A gnome's look: what makeBall dresses him in. */
 export interface Skin {
@@ -11,7 +12,7 @@ export interface Skin {
   name: string;
   line: string;
   /** the unlock that earns him (lib/card.ts UNLOCKS); none: everyone's */
-  unlock?: string;
+  unlock?: UnlockId;
   hat: number;
   shape?: "tricorn" | "toque" | "tophat";
   beard: "full" | "long" | "bushy" | "moustache" | "none";
@@ -36,7 +37,7 @@ export const GNOMES: readonly Skin[] = [
     hat: 0xf2b94a, beard: "moustache", hair: 0x6b4a2f },
   { id: "gardener", name: "The Gardener", line: "A flower on her hat. She knows every blade of grass out here.",
     hat: 0xe98fb0, beard: "none", flower: true, cheeks: true },
-  // earned, not given: see lib/card.js
+  // earned, not given: see lib/card.ts
   { id: "wizard", name: "The Wizard", line: "Finished the Garden Cup, and now the hat has stars on it.", unlock: "wizard",
     hat: 0x4b3a9a, beard: "long", hair: 0xffffff, stars: true, tall: true },
   { id: "viking", name: "The Viking", line: "The Garden Cup at par or under. The horns are earned.", unlock: "viking",
