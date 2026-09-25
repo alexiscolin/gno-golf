@@ -389,9 +389,12 @@ export function makeReplay(E: Live) {
         const a0 = starts[j - s], a1 = (starts[j - s + 1] as number | undefined) ?? len, k = a1 > a0 ? (d - a0) / (a1 - a0) : 0;
         return [path[j][0] + (path[j + 1][0] - path[j][0]) * k, path[j][1] + (path[j + 1][1] - path[j][1]) * k];
       };
+      // sampled finely: a kicker's lip is narrower than a 24th of a long flight,
+      // and a crest found past the real one leaves from a point already falling
       let crest = 0, top = -Infinity;
-      for (let q = 0; q <= 24; q++) {
-        const d = (q / 24) * len, [x, z] = pt(d), gh = ground(x, z);
+      const n = Math.max(24, Math.ceil(len / 0.05));
+      for (let q = 0; q <= n; q++) {
+        const d = (q / n) * len, [x, z] = pt(d), gh = ground(x, z);
         if (gh > top + 1e-6) (top = gh), (crest = d);
       }
       const dl = Math.hypot(path[s + 1][0] - path[s][0], path[s + 1][1] - path[s][1]) || 1;
@@ -546,7 +549,10 @@ export function makeReplay(E: Live) {
                 // dip, then a hop, at the lip)
                 if (F.top == null) {
                   const [cx, cz] = F.pt(F.crest);
-                  F.top = prev.y - BALL_R;
+                  // from the lip itself: the last frame on the ramp can be well
+                  // short of it (a long frame, a fast ball), and a throw from
+                  // there hid under the lip and rose a second time past it
+                  F.top = Math.max(ground(cx, cz), prev.y - BALL_R);
                   F.s0 = Math.max(0, Math.min(2, (ground(cx, cz) - ground(cx - F.dir[0] * 0.4, cz - F.dir[1] * 0.4)) / 0.4));
                 }
                 const top = F.top, s0 = F.s0 ?? 0;

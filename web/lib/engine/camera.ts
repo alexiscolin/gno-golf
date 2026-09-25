@@ -404,10 +404,16 @@ export function makeCamera(E: Live) {
     } else if (!sp.live || snap) {
       sp.pos.copy(want.pos), sp.look.copy(want.look), (sp.fov = want.fov), (sp.oy = want.oy), sp.vp.set(0, 0, 0), sp.vl.set(0, 0, 0), (sp.vf = sp.vo = 0), (sp.live = true);
     } else {
-      springV(sp.pos, sp.vp, want.pos, w, dt);
-      springV(sp.look, sp.vl, want.look, urgent ? 18 : w, dt);
-      ({ x: sp.fov, v: sp.vf } = springN(sp.fov, sp.vf, want.fov, 9, dt));
-      ({ x: sp.oy, v: sp.vo } = springN(sp.oy, sp.vo, want.oy, 9, dt));
+      // in steps of 1/60 s at most: one step over an idle frame (0.1 s) is
+      // unstable at these rates, and the springs never came to rest — the
+      // still scene kept being drawn twice as often as it should
+      const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)), h = dt / n;
+      for (let k = 0; k < n; k++) {
+        springV(sp.pos, sp.vp, want.pos, w, h);
+        springV(sp.look, sp.vl, want.look, urgent ? 18 : w, h);
+        ({ x: sp.fov, v: sp.vf } = springN(sp.fov, sp.vf, want.fov, 9, h));
+        ({ x: sp.oy, v: sp.vo } = springN(sp.oy, sp.vo, want.oy, 9, h));
+      }
     }
     // a hard floor on the real pose too (the spring lags a ball rolling back
     // at the camera): never nearer than MIN_FLAT across the ground in third person

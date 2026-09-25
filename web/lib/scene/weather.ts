@@ -307,13 +307,22 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
   // material — and pushed far past the far plane (no effect) when there is none
   const OFF = 1e5;
   const fog = (scene.fog = new THREE.Fog(0xdfe6e2, OFF, OFF * 10));
-  let fogOn = false;
-  const setFog = (on: boolean) => {
-    if (on === fogOn) return;
-    fogOn = on;
-    if (on) (fog.near = 20), (fog.far = 60);
-    else (fog.near = OFF), (fog.far = OFF * 10);
-  };
+  // It rolls in and out over FOG_IN seconds (k: 0 none, 1 all of it), from
+  // beyond the course toward its range, and that range follows the camera's
+  // real distance (want): at once when the camera backs off, eased when it
+  // closes in. A range set for where the camera is going, not where it is,
+  // put the whole course past the fog's far end: one flat pale plane.
+  const FOG_IN = 1.5;
+  let fogOn = false, fogK = 0, fogD = 0, fogWant = 0;
+  const setFog = (on: boolean) => void (fogOn = on);
+  function fogStep(dt: number) {
+    fogK = fogOn ? Math.min(1, fogK + dt / FOG_IN) : Math.max(0, fogK - dt / FOG_IN);
+    fogD = !fogD || fogWant >= fogD ? fogWant : fogD + (fogWant - fogD) * Math.min(1, dt * 4);
+    const e = fogK * fogK * (3 - 2 * fogK), push = (1 - e) * fogD * 4;
+    if (e <= 0 || !fogD) (fog.near = OFF), (fog.far = OFF * 10);
+    else (fog.near = fogD * 0.75 + push), (fog.far = fogD * 1.9 + push);
+    bankMat.opacity = 0.55 * e;
+  }
 
   let last: number | null = null, lastZones: readonly WeatherZone[] = [], lastFc: Pick<Forecast, "wind"> | null = null;
   // the Low tier: a third of the rain, half the banks, clouds, rings and gusts
@@ -337,6 +346,8 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       drops.forEach((d) => seed(d, false));
       placeWeather();
       wet = 0;
+      fogK = 0; // a new hole: its fog rolls in again
+      fogD = 0;
     },
     /** The weather zones for this stroke (the hole's own and the stroke's); fc,
      *  the chain's forecast ({ kind, wind }), names the wind when it has one. */
@@ -399,7 +410,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     /** The fog is set by how far the camera stands: the near end of the
      *  course clear, the far end and the garden beyond it lost in it. */
     view(dist: number) {
-      if (fogOn) (fog.near = dist * 0.75), (fog.far = dist * 1.9);
+      fogWant = dist;
     },
     /** The timed pieces' clock (substeps, fractional): gusts blow when the chain has them on. */
     clock(c: number) {
@@ -419,6 +430,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     tick(t: number) {
       const dt = last === null ? 0 : Math.min(0.05, t - last);
       last = t;
+      fogStep(dt);
       const z = gustNow;
       gustMat.opacity = z ? 0.85 * gustOn : 0;
       gustLines.visible = !!z && gustOn > 0;

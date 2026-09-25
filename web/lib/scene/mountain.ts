@@ -13,7 +13,7 @@ import { inZone, mod, there, segDist, wallDist, smoothstep } from "../terrain";
 import { timeOf } from "./camera";
 import { gnomelet, bunting, stone, smoke } from "./props";
 import { bake, look, weatherLooks } from "./bake";
-import { seeded, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
+import { seeded, ISLAND, GRASS, placer, onGround, tangentInto, type Rand } from "./common";
 import { ud, type Hole, type Height } from "./data";
 import type { Bar } from "./worlds";
 import type { Terrain } from "../terrain";
@@ -635,13 +635,13 @@ function skiers(rand: Rand, path: THREE.Curve<THREE.Vector3>, ground: Height, n:
     ski.position.set(x, 0.02, 0);
     tpl.add(ski);
   }
-  const set = instances(tpl, n), p = new THREE.Vector3(), tan = new THREE.Vector3(), e = new THREE.Euler();
+  const set = instances(tpl, n), p = new THREE.Vector3(), tan = new THREE.Vector3(), tmp = new THREE.Vector3(), e = new THREE.Euler();
   animate((t) => {
     for (let k = 0; k < n; k++) {
       const u = (t * 0.035 + k / n) % 1;
       path.getPoint(u, p);
       p.y = GRASS + ground(p.x, p.z);
-      path.getTangent(u, tan);
+      tangentInto(path, u, tan, tmp);
       e.set(0, Math.atan2(tan.x, tan.z), 0);
       set.set(k, p, e);
     }
@@ -725,14 +725,14 @@ function bobsleigh(X0: number, X1: number, H: number, bank: Height, reserve: Res
   compact(bob);
   ud(bob).live = true;
   g.add(bob);
-  const PERIOD = 18, RIDE = 3.2, bobTan = new THREE.Vector3();
+  const PERIOD = 18, RIDE = 3.2, bobTan = new THREE.Vector3(), bobTmp = new THREE.Vector3();
   animate((t) => {
     const u = (t % PERIOD) / RIDE;
     bob.visible = u < 1;
     if (u >= 1) return;
     const e = u * u; // it gathers speed
     curve.getPoint(e, bob.position);
-    const tan = curve.getTangent(e, bobTan);
+    const tan = tangentInto(curve, e, bobTan, bobTmp);
     bob.rotation.y = Math.atan2(-tan.z, tan.x);
   });
   return g;

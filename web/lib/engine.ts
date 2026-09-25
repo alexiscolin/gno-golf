@@ -64,6 +64,7 @@ const piecesOf = (zs: readonly { poly?: readonly unknown[] }[]) => zs.reduce((n,
 // what is left, so the course is centred in what the player can actually see
 const HUD = { top: 108, bottom: 136, side: 14 };
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
+export const TICKS_PER_S = 3.5; // the timed pieces' clock at rest and while aiming, in substeps a second (the title's splash runs on it too)
 
 export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", hooks = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
   const chain = makeChain({ rpc, web });
@@ -381,7 +382,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       // at rest and while aiming the pieces move slowly enough to read and to
       // time (3.5 substeps a second, 1.5 with reduced motion); the replay
       // follows the path's own steps. The chain only sees the tick at release.
-      clock += elapsed * (reduced ? 1.5 : 3.5);
+      clock += elapsed * (reduced ? 1.5 : TICKS_PER_S);
       showClock(clock);
       // aiming at moving pieces: the dots follow them
       if (dragging && everyOf() && aimer.shows() && now - lastTickPreview > 250) (lastTickPreview = now), preview();
@@ -392,7 +393,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     causes.tick(now / 1000);
     aimer.step(now);
     rp.fadeSlopes(dt);
-    if (g.rig) weather.view(g.rig.dist);
+    // the fog's range: the rig's framing, or the camera's real distance to
+    // the gnome when that is further (a glide starts far out while the rig
+    // already names the close framing)
+    if (g.rig) weather.view(g.view === "ball" ? Math.max(g.rig.dist, camera.position.distanceTo(ball.position)) : g.rig.dist);
     const exTick = extras && ud(extras).tick;
     if (exTick) exTick(now / 1000);
     const flag = g.course && g.course.userData.flag;

@@ -365,7 +365,13 @@ export interface FadeItem {
 }
 export function fadeLoop(items: readonly FadeItem[], { min = 0.22 } = {}) {
   const seg = new THREE.Line3(), near = new THREE.Vector3();
+  // nothing that moves by itself, the eye and the ball where they were: every
+  // fade stands as it is (a still camera on a ball at rest, frame after frame)
+  const lastEye = new THREE.Vector3(NaN, 0, 0), lastBall = new THREE.Vector3(), moving = items.some((it) => it.obj);
   return (eye: THREE.Vector3, ball: THREE.Vector3) => {
+    if (!moving && eye.equals(lastEye) && ball.equals(lastBall)) return;
+    lastEye.copy(eye);
+    lastBall.copy(ball);
     seg.set(eye, ball);
     for (const it of items) {
       if (it.obj) it.obj.getWorldPosition(it.at);

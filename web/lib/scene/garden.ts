@@ -14,7 +14,7 @@ import { lantern, fireflies, tree, bush, stone, flower, bigFlower, gnomelet, bro
 // here, and the seed is the hole's own name, so each course keeps its garden
 // from one visit to the next.
 
-import { seeded, ISLAND, GRASS, placer, type Rand } from "./common";
+import { seeded, ISLAND, GRASS, placer, tangentInto, type Rand } from "./common";
 import { smoothstep } from "../terrain";
 import { look, weatherLooks } from "./bake";
 import { ud, type Hole, type Height } from "./data";
@@ -204,12 +204,12 @@ function stream({ rand, X0, X1, reserve }: Backdrop) {
   );
   ud(sheet).live = true;
   g.add(sheet);
-  const p = new THREE.Vector3(), q = new THREE.Vector3(); // written in place each frame
+  const p = new THREE.Vector3(), q = new THREE.Vector3(), tmp = new THREE.Vector3(); // written in place each frame
   animate((t) => {
     tex.offset.y = t * 1.4;
     foam.forEach(({ m, off, lane }) => {
       const u = (t * 0.035 + off) % 1;
-      curve.getPoint(u, p), curve.getTangent(u, q);
+      curve.getPoint(u, p), tangentInto(curve, u, q, tmp);
       m.position.set(p.x - q.z * lane * Math.min(1, u * 9), GRASS + 0.1, p.z + q.x * lane * Math.min(1, u * 9));
       m.rotation.y = -Math.atan2(q.z, q.x);
     });

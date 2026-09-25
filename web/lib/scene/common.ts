@@ -36,3 +36,12 @@ export function placer() {
 
 /** Stands m on the course's ground at (x, z); returns it. */
 export const onGround = <T extends THREE.Object3D>(m: T, x: number, z: number, t: { height: Height }) => (m.position.set(x, t.height(x, z), z), m);
+
+/** A curve's unit tangent at u, written into out: three's own getTangent
+ *  (two points 1e-4 either side) without the two vectors it makes a call,
+ *  for what moves along a curve every frame. tmp: a scratch vector. */
+export function tangentInto(c: THREE.Curve<THREE.Vector3>, u: number, out: THREE.Vector3, tmp: THREE.Vector3) {
+  c.getPoint(Math.max(0, u - 1e-4), tmp);
+  c.getPoint(Math.min(1, u + 1e-4), out);
+  return out.sub(tmp).normalize();
+}
