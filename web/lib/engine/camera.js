@@ -426,16 +426,25 @@ export function makeCamera(E) {
       }
     }
     const v = screen();
-    camera.aspect = v.w / v.h;
     camera.position.copy(sp.pos);
     camera.lookAt(sp.look);
-    if (Math.abs(sp.oy) > 0.5) camera.setViewOffset(v.w, v.h, 0, sp.oy, v.w, v.h);
-    else camera.clearViewOffset();
-    camera.fov = sp.fov;
-    camera.near = Math.min(want.near, sp.pos.distanceTo(E.ball.position) * 0.5);
+    // the lens: rebuilt only when one of its numbers moved (a camera at rest
+    // rebuilds nothing), and once (setViewOffset and clearViewOffset rebuild it themselves)
+    const aspect = v.w / v.h, oy = Math.abs(sp.oy) > 0.5 ? sp.oy : 0;
+    const near = Math.min(want.near, sp.pos.distanceTo(E.ball.position) * 0.5);
     // (gliding in from the whole hole: the far plane as far as the pose needs, not the end pose's)
-    camera.far = gl >= 0 ? Math.max(want.far, sp.pos.distanceTo(sp.look) + 220) : want.far;
-    camera.updateProjectionMatrix();
+    const far = gl >= 0 ? Math.max(want.far, sp.pos.distanceTo(sp.look) + 220) : want.far;
+    const vw = camera.view && camera.view.enabled ? camera.view : null;
+    const viewNow = oy ? !!vw && vw.offsetX === 0 && vw.offsetY === oy && vw.fullWidth === v.w && vw.fullHeight === v.h && vw.width === v.w && vw.height === v.h : !vw;
+    if (camera.aspect !== aspect || camera.fov !== sp.fov || camera.near !== near || camera.far !== far || !viewNow) {
+      camera.aspect = aspect;
+      camera.fov = sp.fov;
+      camera.near = near;
+      camera.far = far;
+      if (oy) camera.setViewOffset(v.w, v.h, 0, oy, v.w, v.h);
+      else if (vw) camera.clearViewOffset();
+      else camera.updateProjectionMatrix();
+    }
     camera.updateMatrixWorld();
     // the ball on screen and in sight: in the middle 70 %, nothing between it
     // and the camera (board-space test, no ray); out of frame → catch up fast;

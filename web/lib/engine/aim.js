@@ -166,10 +166,16 @@ export function makeAimer(E) {
       aim.visible = true;
     }
     wanted = { angle: E.shot.angle, deg: E.shot.deg, power: E.shot.power, shots: g.shots, id: g.id };
-    // asked (or being asked) already: the aim has not changed, nor the pieces moved on
-    if (sent && sent.id === wanted.id && sent.n === wanted.shots.length && sent.tick === E.tickNow() &&
-        Math.abs(sent.angle - wanted.angle) < 0.005 && Math.abs(sent.power - wanted.power) < 0.05) return;
+    // asked (or being asked) already: the aim has not changed enough to see,
+    // nor the pieces moved on. The dots stay; but once the hand rests on this
+    // exact aim it is asked once, so that the release finds its answer kept
+    // (fire: no second round trip)
     const q = question();
+    if (sent && sent.id === wanted.id && sent.n === wanted.shots.length && sent.tick === E.tickNow() &&
+        Math.abs(sent.angle - wanted.angle) < 0.005 && Math.abs(sent.power - wanted.power) < 0.05) {
+      if (sent.key !== q.key && !answers.has(q.key) && !asking) (clearTimeout(later), (later = setTimeout(ask, PREVIEW_MS)));
+      return;
+    }
     if (answers.has(q.key)) return void ((since = 0), clearTimeout(later), (sent = q), answer(q, answers.get(q.key)));
     if (asking) return; // the one in flight lands first; the latest aim goes out after it
     const now = performance.now();
@@ -271,6 +277,8 @@ export function makeAimer(E) {
     moving: () => !!morph,
     /** Whether this round's mode shows the dots at all (pro: no). */
     shows: () => PREVIEW().stopAt !== "hidden",
+    /** The preview answer for exactly this stroke (same hole, period, round so far and shot string), or undefined. */
+    known: (id, shots, shot) => answers.get(keyOf({ id, shots, shot })),
     /** The hole is read anew: so are its previews. */
     forget: () => answers.clear(),
   };

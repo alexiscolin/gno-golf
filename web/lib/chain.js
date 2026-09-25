@@ -5,6 +5,7 @@
 // See CLIENT.md for the contract.
 
 const REALM = "gno.land/r/gnogolf/golf";
+const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
 
 export const DEFAULT_RPC = "http://127.0.0.1:26757";
 export const DEFAULT_WEB = "http://127.0.0.1:8888";
@@ -99,16 +100,50 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
   // a mode is sent exactly: the realm refuses any other word
   const m = (mode) => (mode === "pro" ? "pro" : "assisted");
 
+  // Params that do not move within a session (the chain id, the gas and
+  // storage prices) are read once per ttl, not once a hole: the answer is kept,
+  // a failure is not.
+  const memo = (fn, ttl) => {
+    let at = 0, p = null;
+    return () => {
+      if (!p || performance.now() - at > ttl) {
+        at = performance.now();
+        p = fn().catch((e) => ((p = null), Promise.reject(e)));
+      }
+      return p;
+    };
+  };
+  // The chain's clock: the node's last block time against this device's, from
+  // /status (re-read once a minute at most). The chain judges a period by the
+  // block a transaction lands in, never by the device.
+  let skew = 0;
+  const status = memo(async () => {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), 4000);
+    try {
+      const res = await fetch(`${rpc}/status`, { signal: c.signal });
+      if (!res.ok) throw new Error(`RPC ${res.status}`);
+      const r = (await res.json()).result;
+      const bt = Date.parse(r.sync_info && r.sync_info.latest_block_time);
+      if (Number.isFinite(bt)) skew = bt - Date.now();
+      return r;
+    } catch (e) {
+      throw down(e);
+    } finally {
+      clearTimeout(t);
+    }
+  }, 60e3);
+  const PARAMS_TTL = 10 * 60e3;
+
   return {
     rpc,
     web,
     realm: REALM,
     /** The node's current gas price, as ugnot per gas: { gas, price } → price / gas. */
-    gasPrice: async () => {
+    gasPrice: memo(async () => {
       const r = await abci("auth/gasprice");
       const j = JSON.parse(r);
       return Number(String(j.price).replace(/[^0-9.]/g, "")) / Number(j.gas);
-    },
+    }, PARAMS_TTL),
     /** How much ugnot an address holds here; 0 for an account the chain has never seen. */
     // null when the node cannot say: an RPC outage is not an empty account
     balance: async (addr) => {
@@ -122,23 +157,16 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
       }
     },
     /** The chain id the node reports — what a wallet must be switched to. */
-    chainId: async () => {
-      const c = new AbortController(), t = setTimeout(() => c.abort(), 4000);
-      try {
-        const res = await fetch(`${rpc}/status`, { signal: c.signal });
-        if (!res.ok) throw new Error(`RPC ${res.status}`);
-        return (await res.json()).result.node_info.network;
-      } catch (e) {
-        throw down(e);
-      } finally {
-        clearTimeout(t);
-      }
-    },
+    chainId: async () => (await status()).node_info.network,
+    /** Now on the chain's clock (ms): the device's, set by the last block time read. */
+    now: () => Date.now() + skew,
+    /** Reads /status again if its last read is a minute old: the clock follows. */
+    sync: () => status().then(() => skew),
     /** What the chain charges per byte a transaction stores, in ugnot (vm params). */
-    storagePrice: async () => {
+    storagePrice: memo(async () => {
       const m = String(JSON.parse(await abci("params/vm:p:storage_price"))).match(/^(\d+)ugnot$/);
       return m ? Number(m[1]) : 100;
-    },
+    }, PARAMS_TTL),
     /** gnoweb page of one player's round on a hole. */
     roundURL: (hole, player) =>
       PKG.test(String(hole)) && ADDR.test(String(player)) ? new URL(`${REALM.replace(/^gno\.land/, "")}:${hole}/${player}`, web + "/").href : "#",
@@ -146,7 +174,20 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
     // links built from what the chain says, checked first: a realm path, an address
     sourceURL: (pkgPath) => (PKG.test(String(pkgPath)) ? new URL(String(pkgPath).replace(/^gno\.land/, "") + "$source", web + "/").href : "#"),
     /** Every registered hole: id, name, official (one of the course's), world, order, par, plays, best, next (archived for). */
-    holes: () => qeval("Holes()"),
+    // kept for the tab (sessionStorage, HOLES_TTL): a reload or a Retry does
+    // not pay the list again (163M of query gas); fresh=true reads it anyway
+    holes: async (fresh = false) => {
+      const key = `gnogolf.holes|${rpc}`;
+      try {
+        const c = !fresh && JSON.parse(sessionStorage.getItem(key) || "null");
+        if (c && Date.now() - c.at < HOLES_TTL && Array.isArray(c.list) && c.list.length) return c.list;
+      } catch {}
+      const list = await qeval("Holes()");
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), list }));
+      } catch {}
+      return list;
+    },
     /** One hole's geometry, skins, wear and rounds in flight. */
     state: (hole) => qeval(`State(${s(hole)})`),
     /**
@@ -166,7 +207,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
       period == null
         ? qeval(`SimulateRound(${s(hole)}, ${s(shots.join(";"))})`, ms, signal)
         : qeval(`SimulateRoundAt(${s(hole)}, ${s(shots.join(";"))}, ${period | 0})`, ms, signal),
-    /** The weather's quarter hour on the chain (block time / 900), and its forecast for a hole. */
+    /** The weather's five minutes on the chain (block time / 300), and its forecast for a hole. */
     // an int64, not a string: its own unwrapping
     period: async () => {
       const raw = await query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${REALM}.Period()`)}`);
@@ -183,6 +224,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
     bests: (hole, mode, players) => qeval(`Bests(${s(hole)}, ${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`),
     /** These players across the course: { mode, holes, rows: [{ player, holes, strokes }] }. */
     standings: (mode, players) => qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`),
+    /** A page of every course standing in a mode, named or not, by address: { rows: [{ player, holes, strokes }], next ("" at the end) }. */
+    players: (mode, after = "", limit = 100) => qeval(`Players(${s(m(mode))}, ${s(after)}, ${limit | 0})`),
     /** A gno.land name's address, or "" (r/sys/users). */
     resolveName: (name) =>
       /^[a-z0-9._-]{1,64}$/i.test(name)
@@ -248,7 +291,8 @@ export function pullShot(px, vw, vh, angleRad, maxPower = 10) {
   const full = Math.max(120, Math.min(vw, vh) * PULL_SHARE);
   const power = Math.round(Math.min(px / full, 1) * maxPower * 100) / 100;
   let deg = (angleRad * 180) / Math.PI;
-  deg = Math.round((((deg % 360) + 360) % 360) * 100) / 100;
+  // in [0, 360): 359.996 rounds to 0, as the chain records it, not to 360
+  deg = (Math.round((((deg % 360) + 360) % 360) * 100) / 100) % 360;
   return { deg, power };
 }
 

@@ -22,7 +22,11 @@ export function causeAt(zones, x, y, vx, vy, tick = 0) {
     if (!inZone(z, x, y)) continue;
     const on = onAt(z, tick);
     if (z.kind === "slope" && on) {
-      if (z.skin === "wind" || z.skin === "gust") wind = z.vec;
+      // wind: the chain's "air" flag when it sends one, else the skin (a capped
+      // one only brakes the ball: nothing to name)
+      if (typeof z.air === "boolean" ? z.air : z.skin === "wind" || z.skin === "gust") {
+        if (!z.capped) wind = z.vec;
+      }
       // downhill only: a slope the ball climbs slows it, which needs no reason
       else if (z.every) slope = slope || { tilt: true, vec: z.vec }; // a plank that tilts on a clock, whichever way
       else if (z.vec[0] * vx + z.vec[1] * vy > 0) slope = z.vec;

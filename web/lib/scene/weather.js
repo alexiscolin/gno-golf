@@ -283,7 +283,7 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
   const gustLines = new THREE.LineSegments(gustGeo, gustMat);
   gustLines.frustumCulled = false;
   scene.add(gustLines);
-  let gusts = [], gustOn = 0;
+  let gusts = [], gustOn = 0, gustNow = null;
   const streaks = Array.from({ length: GS }, () => ({ u: Math.random(), v: Math.random(), s: 0.6 + Math.random() * 0.8 }));
 
   // fog: the scene's own, always there — fog coming or going recompiles every
@@ -298,7 +298,7 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     else (fog.near = OFF), (fog.far = OFF * 10);
   };
 
-  let last = null, lastZones = [];
+  let last = null, lastZones = [], lastFc = null;
   // the Low tier: a third of the rain, half the banks, clouds, rings and gusts
   let thin = false;
   const share = (n) => (thin ? Math.ceil(n / (n === RAIN ? 3 : 2)) : n);
@@ -308,7 +308,7 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     thin(on) {
       if (thin === !!on) return;
       thin = !!on;
-      this.set(lastZones);
+      this.set(lastZones, lastFc);
     },
     /** The board it hangs over: rain falls there and a little around. */
     board(w, h, world = "garden", onGreen = () => true) {
@@ -321,16 +321,22 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
       placeWeather();
       wet = 0;
     },
-    /** The weather zones for this stroke (the hole's own and the stroke's). */
-    set(zones) {
+    /** The weather zones for this stroke (the hole's own and the stroke's); fc,
+     *  the chain's forecast ({ kind, wind }), names the wind when it has one. */
+    set(zones, fc = null) {
       lastZones = zones || [];
+      lastFc = fc;
       rainN = share(RAIN);
       rainGeo.setDrawRange(0, rainN * 2);
-      gusts = (zones || []).filter((q) => q.skin === "gust" && q.every > 0);
+      // a storm's wind blows in timed gusts (skinned "wind"): streaked like a hole's own
+      gusts = (zones || []).filter((q) => (q.skin === "gust" || q.skin === "wind") && q.every > 0);
+      if (!gusts.includes(gustNow)) (gustNow = null), (gustOn = 0);
       const z = (zones || []).filter((q) => WEATHER_SKINS.includes(q.skin));
       const wind = z.find((q) => q.skin === "wind");
+      // the forecast's own wind (a storm's gusts are 40° off it), else the first wind zone's
+      const fw = fc && Array.isArray(fc.wind) && (fc.wind[0] || fc.wind[1]) ? fc.wind : null;
       now = {
-        wind: wind ? [wind.vec[0], wind.vec[1]] : null,
+        wind: fw ? [fw[0], fw[1]] : wind ? [wind.vec[0], wind.vec[1]] : null,
         rain: z.some((q) => q.skin === "rain"),
         fog: z.some((q) => q.skin === "fog"),
         storm: z.some((q) => q.skin === "storm"),
@@ -380,17 +386,23 @@ export function makeWeather(scene, { onFlash = () => {}, camera = null } = {}) {
     },
     /** The timed pieces' clock (substeps, fractional): gusts blow when the chain has them on. */
     clock(c) {
-      const z = gusts[0];
-      if (!z) return void (gustOn = 0);
-      const k = mod(c + (z.phase | 0), z.every);
-      // on in [0, on), with a quarter-substep swell at each edge
-      const on = z.on;
-      gustOn = k < on ? Math.min(1, k * 4, (on - k) * 4) : 0;
+      // the gust blowing now (a storm's two take turns), else none
+      gustOn = 0;
+      gustNow = gusts[0] || null;
+      for (const z of gusts) {
+        const k = mod(c + (z.phase | 0), z.every);
+        // on in [0, on), with a quarter-substep swell at each edge
+        if (k < z.on) {
+          gustNow = z;
+          gustOn = Math.min(1, k * 4, (z.on - k) * 4);
+          break;
+        }
+      }
     },
     tick(t) {
       const dt = last === null ? 0 : Math.min(0.05, t - last);
       last = t;
-      const z = gusts[0];
+      const z = gustNow;
       gustMat.opacity = z ? 0.85 * gustOn : 0;
       gustLines.visible = !!z && gustOn > 0;
       if (gustLines.visible) {
