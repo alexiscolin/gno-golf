@@ -1,29 +1,26 @@
 /* The front screens: the title, the cups, the gnome picker and a cup won,
-   one look, the arcade way: a golden-hour sky in the world's colours with a
-   slow sunburst (behind the logo, the heading, the gnome), glossy cards in
-   inked frames, paper panels, gold for the call to action, and everything
+   one look: a calm sky-to-fairway fade with halftone dots rising from the
+   foot, and the style on the cards: glossy inked frames, paper panels, gold
+   for the call to action, and everything
    moving a transform or an opacity: the compositor's work, not the page's.
    The live scene behind the title is lib/scene/title.ts. */
 
 /* ------------------------------------------------------------ the system */
 
-/* the sky's colours, registered so a new world's cross-fades in */
-@property --s0 { syntax: "<color>"; inherits: true; initial-value: #8fc3e6; }
-@property --s1 { syntax: "<color>"; inherits: true; initial-value: #b5d8ea; }
-@property --s2 { syntax: "<color>"; inherits: true; initial-value: #e2ecdc; }
-@property --s3 { syntax: "<color>"; inherits: true; initial-value: #f6e2c3; }
-@property --s4 { syntax: "<color>"; inherits: true; initial-value: #fbefdc; }
+/* the backdrop's two colours, registered so a new world's cross-fades in */
+@property --s0 { syntax: "<color>"; inherits: true; initial-value: #9fd3ef; }
+@property --s1 { syntax: "<color>"; inherits: true; initial-value: #d7ecd9; }
 
-/* the tokens, the garden's by default (a soft daylight sky, pale blue into
-   warm cream, each world's only a light tint of it); a world's tint over them (.tint--<world>,
-   and the title's and the cup won's own classes) */
+/* the tokens, the garden's by default; a world's tint over them (.tint--<world>,
+   and the title's and the cup won's own classes). The colours are the
+   course's day skies (globals.css .sky--day.sky--w-*) fading to a pale
+   fairway (lib/scene/materials.ts C.moss), each world's a light tint. */
 .screen--title, .front, .victory, .tint--garden {
   /* the sky, top to horizon; a card's frame, light to deep; a diorama's sky */
-  --s0: #8fc3e6; --s1: #b5d8ea; --s2: #e2ecdc; --s3: #f6e2c3; --s4: #fbefdc;
+  --s0: #9fd3ef; --s1: #d7ecd9;
   --c1: #7fe8a8; --c2: #1f9a6a;
   --art: linear-gradient(180deg, #7ec8ff, #ffd6a8);
-  --sky: linear-gradient(180deg, var(--s0) 0%, var(--s1) 30%, var(--s2) 56%, var(--s3) 78%, var(--s4) 100%);
-  --sun: radial-gradient(ellipse 75% 55% at 50% 62%, rgba(255, 244, 214, .55), rgba(255, 214, 170, .16) 45%, transparent 75%);
+  --sky: linear-gradient(180deg, var(--s0), var(--s1));
   --gold: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%);
   --glow: #ffe066;
   /* type: a display heading, a card's name, a pill's label */
@@ -44,46 +41,37 @@
   --t-press: .08s;
 }
 .tsky--island, .tint--island, .victory--island {
-  --s0: #7dbde2; --s1: #a8d8ea; --s2: #d6eeea; --s3: #f5e3c2; --s4: #fbf1de;
+  --s0: #93d6ef; --s1: #d9f1ea;
   --c1: #7fe0f7; --c2: #1a86d0;
   --art: linear-gradient(180deg, #54b8f5, #b8ecff 70%, #ffe2a8);
 }
 .tsky--town, .tint--town, .victory--town {
-  --s0: #9eaad6; --s1: #c3c3e2; --s2: #eadbe0; --s3: #f5dcc4; --s4: #fbecdc;
+  --s0: #a9c9ea; --s1: #efe4d6;
   --c1: #ffa3c6; --c2: #cf3f7c;
   --art: linear-gradient(180deg, #6b4bc8, #ff8fb0 60%, #ffcf8a);
 }
 .tsky--mountain, .tint--mountain, .victory--mountain {
-  --s0: #97b0da; --s1: #bfcfe9; --s2: #e3e8f1; --s3: #f3e2d6; --s4: #faf0e7;
+  --s0: #a9c4e8; --s1: #e6eef4;
   --c1: #b8c9ff; --c2: #5569db;
   --art: linear-gradient(180deg, #4d74e0, #bcd2ff 65%, #ffe0c0);
 }
-.front, .screen--title { transition: --s0 .45s, --s1 .45s, --s2 .45s, --s3 .45s, --s4 .45s; }
+.front, .screen--title { transition: --s0 .45s, --s1 .45s; }
 
-/* the backdrop: the sky and its low sun, a halftone rising from the foot */
+/* the backdrop: the fade, and a halftone rising from the foot */
 .front { background: var(--s0); overflow: auto; }
-.front::before, .front::after { content: ""; position: fixed; inset: 0; pointer-events: none; }
-.front::before { background: radial-gradient(circle at 50% 45%, transparent 0 45%, rgba(20, 50, 60, .1) 100%), var(--sun), var(--sky); }
-.front::after {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, .45) 1.7px, transparent 2.1px);
+.front::before, .front::after, .victory::before, .victory::after { content: ""; position: fixed; inset: 0; pointer-events: none; }
+.front::before, .victory::before { background: var(--sky); }
+.front::after, .victory::after, .title__sky::after {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, .5) 1.7px, transparent 2.1px);
   background-size: 14px 14px;
   -webkit-mask-image: linear-gradient(to top, #000 8%, transparent 42%);
   mask-image: linear-gradient(to top, #000 8%, transparent 42%);
 }
+.title__sky::after { content: ""; position: absolute; inset: 0; }
 .front > * { position: relative; z-index: 1; }
 .front > .screen__back { position: absolute; z-index: 2; }
-
-/* the sunburst behind what matters on each screen (the title's logo too) */
-.title__sun, .sunburst {
-  position: absolute; left: 50%; top: 56%; width: 170%; aspect-ratio: 1; transform: translate(-50%, -50%); pointer-events: none;
-  background: repeating-conic-gradient(rgba(255, 214, 90, .95) 0deg 7.5deg, rgba(255, 180, 60, .75) 7.5deg 15deg);
-  -webkit-mask-image: radial-gradient(circle, #000 14%, rgba(0, 0, 0, .55) 30%, transparent 52%);
-  mask-image: radial-gradient(circle, #000 14%, rgba(0, 0, 0, .55) 30%, transparent 52%);
-  border-radius: 50%;
-  animation: title-spin 80s linear infinite;
-}
-.sunburst { opacity: .35; }
-@keyframes title-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+/* no shape behind the logo: the cards carry the style */
+.title__sun { display: none; }
 
 /* a display heading: paper, inked thick, standing on its shadow */
 .front .worlds__title, .front .pick__name {
@@ -115,7 +103,7 @@
 .front .btn--play:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
 .front .btn--play:focus-visible, .btn--start:focus-visible { outline: 4px solid var(--paper); outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) {
-  .title__sun, .sunburst, .front .btn--play { animation: none; }
+  .front .btn--play { animation: none; }
   .front, .screen--title { transition: none; }
 }
 
@@ -130,7 +118,7 @@
 .screen--title.screen--ready { cursor: pointer; }
 /* the sky: the front's own, per world (the scene's is clear) */
 .title__sky, .title__still, .title__stage { position: absolute; inset: 0; }
-.title__sky { background: var(--sun), var(--sky); }
+.title__sky { background: var(--sky); }
 .title__still img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .title__still--off { opacity: 0; transition: opacity .6s .3s; }
 .title__stage { opacity: 0; transition: opacity .5s; }
@@ -151,8 +139,7 @@
 .title__scrim--film { opacity: 1; }
 
 .screen--title .title { position: relative; z-index: 1; gap: 0; min-height: 0; }
-/* the logo: the promo's sticker lockup, a paper edge and an inked extrusion,
-   on the sunburst (above) */
+/* the logo: the promo's sticker lockup, a paper edge and an inked extrusion */
 .title__logo { position: relative; display: grid; place-items: center; }
 .screen--title .title__art {
   position: relative;
@@ -214,8 +201,6 @@
 
 .worlds--v2 .worlds__in { width: min(1320px, 94vw); }
 .front__head { position: relative; display: grid; justify-items: center; gap: 4px; margin-bottom: clamp(14px, 2.6vh, 30px); }
-.front__head .sunburst { width: min(760px, 120vw); top: 60%; }
-.front__head > :not(.sunburst) { position: relative; }
 .worlds--v2 .worlds__list { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); }
 
 /* a card: a glossy frame in its world's colours, the diorama up top, the
@@ -298,7 +283,7 @@
 /* ------------------------------------------------------------ the picker */
 
 /* top to bottom: the name, the aim (one row, its line beside it), the gnome
-   on a glossy card in the cup's colours with the sunburst behind, his dots
+   on a glossy card in the cup's colours, his dots
    and his line, then the one button alone */
 .screen--pick .pick__name { margin-bottom: var(--gap-m); }
 /* the aim: its label and switch in a row, what the mode means under them,
@@ -315,8 +300,7 @@
 .aimset__help > span { grid-area: 1 / 1; }
 .aimset__help > .off { visibility: hidden; }
 .screen--pick .pick__stage { position: relative; margin: var(--gap-l) 0 var(--gap-m); }
-.screen--pick .pick__stage .sunburst { top: 50%; width: min(900px, 150vw); z-index: -1; } /* under the name above it too */
-.screen--pick .pick__stage > :not(.sunburst) { position: relative; }
+.screen--pick .pick__stage > * { position: relative; }
 .screen--pick .pick__stage > .pick__canvas {
   width: min(380px, 60vw, 40vh); height: min(420px, 40vh);
   border: 3px solid var(--ink); border-radius: 28px; overflow: hidden; box-shadow: var(--deep-card);
@@ -347,12 +331,10 @@
    its emblem on top, the paper panel inside */
 .victory {
   position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; padding: 16px; overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 45%, transparent 0 45%, rgba(20, 50, 60, .1) 100%),
-    repeating-conic-gradient(from 0deg at 50% 45%, rgba(255, 214, 90, .12) 0deg 7.5deg, transparent 7.5deg 15deg),
-    var(--sun), var(--sky);
+  background: var(--s0);
   animation: fade .3s;
 }
+.victory__in { z-index: 1; }
 .victory__cheer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
 .victory__in {
   position: relative; width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto;

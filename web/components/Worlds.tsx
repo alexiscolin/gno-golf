@@ -184,7 +184,6 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
       </button>
       <div className="worlds__in">
         <div className="front__head">
-          <div className="sunburst" aria-hidden="true" />
           <span className="eyebrow">Choose your cup</span>
           <h2 className="worlds__title">Where do we play?</h2>
         </div>

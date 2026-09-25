@@ -1419,7 +1419,6 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
         <h2 className="pick__name">{skin.name}</h2>
         <AimSetting aim={aim} onChange={onAim} compact />
         <div className="pick__stage">
-          <div className="sunburst" aria-hidden="true" />
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
           <div ref={canvas} className={"pick__canvas" + (unlocked(skin.id) ? "" : " pick__canvas--locked")} />
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
