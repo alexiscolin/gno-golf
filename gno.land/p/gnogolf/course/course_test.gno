@@ -49,7 +49,7 @@ func TestBallInTheAirFliesOverTheCup(t *testing.T) {
 // A gate that shuts on a resting ball pushes it out instead of trapping it.
 func TestPieceAppearingOnTheBallPushesItOut(t *testing.T) {
 	bar := physics.Bar(physics.Vec2{X: 10, Y: 2}, physics.Vec2{X: 10, Y: 8}, 0.8, 0, "")
-	b := physics.Unstick(physics.Vec2{X: 10.1, Y: 5}, bar, nil, 0.5)
+	b := physics.UnstickIn(physics.Vec2{X: 10.1, Y: 5}, bar, nil, 0.5, nil)
 	if b.X > 9.1 && b.X < 10.9 {
 		t.Fatalf("still inside the bar at %v", b)
 	}
@@ -114,5 +114,51 @@ func TestWeatherIsLaidUnderTheCourse(t *testing.T) {
 	wind, _ := WeatherFor(Wind, h, 9)
 	if wind.Len() < WindMin-1e-9 || wind.Len() > WindMax+1e-9 {
 		t.Fatalf("wind %v out of %v..%v", wind.Len(), WindMin, WindMax)
+	}
+}
+
+// fickle answers once as a hole should, then otherwise.
+type fickle struct {
+	*Simple
+	calls int
+}
+
+func (f *fickle) Par() int {
+	f.calls++
+	if f.calls > 1 {
+		return -7
+	}
+	return 5
+}
+
+func (f *fickle) Position() float64 {
+	f.calls++
+	if f.calls > 1 {
+		return -1
+	}
+	return 4
+}
+
+func (f *fickle) WorldName() string {
+	f.calls++
+	if f.calls > 1 {
+		return ""
+	}
+	return "town"
+}
+
+// ParOf, OrderOf and WorldOf ask a hole once, and check what it said.
+func TestTheHelpersAskTheHoleOnce(t *testing.T) {
+	f := &fickle{Simple: &Simple{}}
+	if p := ParOf(f); p != 5 || f.calls != 1 {
+		t.Fatalf("ParOf gave %d after %d calls", p, f.calls)
+	}
+	f.calls = 0
+	if o := OrderOf(f, 9); o != 4 || f.calls != 1 {
+		t.Fatalf("OrderOf gave %v after %d calls", o, f.calls)
+	}
+	f.calls = 0
+	if w := WorldOf(f); w != "town" || f.calls != 1 {
+		t.Fatalf("WorldOf gave %q after %d calls", w, f.calls)
 	}
 }

@@ -105,44 +105,6 @@ func hexOf2(data string) string {
 	return string(b)
 }
 
-// Under golf's own namespace a realm registers only once the owner expects
-// that exact path, and even then it is a community hole.
-func TestTheNamespaceIsTheOwners(cur realm, t *testing.T) {
-	id := "gno.land/r/gnogolf/squat5"
-	testing.SetRealm(testing.NewCodeRealm(id))
-	urequire.AbortsContains(t, cur, "only once the owner expects it", func() { Register(cross(cur), &islet{}) })
-	setOwner(deployer)
-	testing.SetRealm(testing.NewUserRealm(player))
-	urequire.AbortsContains(t, cur, "only the owner", func() { Expect(cross(cur), id) })
-	testing.SetRealm(testing.NewUserRealm(deployer))
-	urequire.AbortsContains(t, cur, "needs expecting", func() { Expect(cross(cur), "gno.land/r/test/elsewhere") })
-	testing.SetRealm(testing.NewUserRealm(deployer))
-	Expect(cross(cur), id)
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), &islet{})
-	e := mustHole(id)
-	uassert.False(t, e.official, "a realm hole is never the course's")
-	uassert.True(t, !slots.Has(slotKey("island", 1)) || slots.Get(slotKey("island", 1)).(string) != id, "no slot taken")
-	uassert.True(t, strings.Contains(Holes(), `"id":"`+id+`","name":"Flat","official":false`))
-	// the expectation is used up: another realm there is refused again
-	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/squat6"))
-	urequire.AbortsContains(t, cur, "only once the owner expects it", func() { Register(cross(cur), &islet{}) })
-	// an expectation leaves with the owner who gave it
-	testing.SetRealm(testing.NewUserRealm(deployer))
-	Expect(cross(cur), "gno.land/r/gnogolf/squat8")
-	testing.SetRealm(testing.NewUserRealm(deployer))
-	Transfer(cross(cur), heir)
-	testing.SetRealm(testing.NewUserRealm(heir))
-	Accept(cross(cur))
-	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/squat8"))
-	urequire.AbortsContains(t, cur, "only once the owner expects it", func() { Register(cross(cur), &islet{}) })
-	// and once renounced, no realm there registers at all
-	setOwner("")
-	testing.SetRealm(testing.NewUserRealm(deployer))
-	urequire.AbortsContains(t, cur, "only the owner", func() { Expect(cross(cur), "gno.land/r/gnogolf/squat7") })
-	setOwner(deployer)
-}
-
 // Writes take a version's exact id; reads take its alias too, and answer
 // with the id to write with.
 func TestWritesTakeExactIds(cur realm, t *testing.T) {
@@ -226,7 +188,6 @@ func TestADataHoleIsNeverStored(cur realm, t *testing.T) {
 	h.Pulses = []course.Pulse{{Every: 2, On: 1, Walls: physics.Bar(physics.V(10, 4), physics.V(10, 12), 0.5, '=', "gate")}}
 	id := publish(cur, h)
 	e := mustHole(id)
-	uassert.True(t, e.h == nil, "no hole on a data entry")
 	_, isData := e.hole().(*dataHole)
 	uassert.True(t, isData)
 	testing.SetRealm(testing.NewUserRealm(player))
@@ -243,7 +204,6 @@ func TestADataHoleIsNeverStored(cur realm, t *testing.T) {
 	}
 	uassert.True(t, strings.Contains(Extras(id, 0), `"skin":"gate"`), "the pulse is there at stroke 0")
 	uassert.Equal(t, `{"version":1,"walls":[],"posts":[],"zones":[]}`, Extras(id, 1), "and gone at stroke 1")
-	uassert.True(t, e.h == nil, "still none after playing")
 	uassert.Equal(t, 2, sumWear(e))
 }
 
@@ -500,7 +460,8 @@ func TestPlayLinks(cur realm, t *testing.T) {
 	v2 := publish(cur, cupHole("island", 70, "Linked again"))
 	uassert.Equal(t, playURL+"?hole="+v1, playLink(mustHole(v1)), "an archived version links by id")
 	uassert.Equal(t, playURL+"?cup=island&hole=70", playLink(mustHole(v2)))
-	uassert.Equal(t, playURL+"?hole=gno.land/r/test/linked", playLink(mustHole(register(cur, "linked"))))
+	linked := register(cur, "linked")
+	uassert.Equal(t, playURL+"?hole="+linked, playLink(mustHole(linked)))
 }
 
 func TestDrainIsOpen(cur realm, t *testing.T) {
@@ -515,7 +476,7 @@ func TestThePagesSayWhoHoldsPower(cur realm, t *testing.T) {
 	id := publish(cur, cupHole("town", 73, "Paged"))
 	hub := Render("")
 	uassert.True(t, strings.Contains(hub, "One party holds a real power: the course's owner, now [g1"), hub)
-	uassert.True(t, strings.Contains(hub, "| [data](/r/gnogolf/golf:"+id+"/data) |"), "a course hole links its data")
+	uassert.True(t, strings.Contains(Render("town"), "| [data](/r/gnogolf/golf:"+id+"/data) |"), "a course hole links its data")
 	page := Render("town/73")
 	uassert.True(t, strings.Contains(page, `value="`+id+`"`), "the page plays the version by id")
 	data := Render(id + "/data")
@@ -523,6 +484,7 @@ func TestThePagesSayWhoHoldsPower(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(data, hexOf(cupHole("town", 73, "Paged"))), "the data, as published")
 	uassert.True(t, strings.Contains(Render("town/73/data"), "**"+id+"**"), "by alias too")
 	uassert.True(t, strings.Contains(Render("no/such"), "# No such hole"))
+	uassert.True(t, strings.Contains(Render("[[["), "That page is not a hole here"))
 	setOwner("")
 	uassert.True(t, strings.Contains(Render(""), "now nobody: the role was given up"))
 	setOwner(deployer)
@@ -539,4 +501,80 @@ func TestTextIsCleanedAtPublish(cur realm, t *testing.T) {
 	uassert.Equal(t, "Evilemanx", e.name)
 	uassert.Equal(t, maxNote, len([]rune(e.note)))
 	uassert.False(t, strings.ContainsAny(e.note, "`⁦"))
+}
+
+// However often the course is republished, the list keeps room for
+// everyone else's holes, and shows a few archived versions only.
+func TestArchivedVersionsLeaveRoomInTheList(cur realm, t *testing.T) {
+	for i := 0; i < maxArchived+5; i++ {
+		publish(cur, cupHole("garden", 85, "Again "+strconv.Itoa(i)))
+	}
+	for i := 0; i < minCommunity; i++ {
+		register(cur, "room"+strconv.Itoa(i))
+	}
+	archived, others := 0, 0
+	for _, e := range listed() {
+		switch {
+		case e.official && e.next != "":
+			archived++
+		case !e.official:
+			others++
+		}
+	}
+	uassert.True(t, archived <= maxArchived, strconv.Itoa(archived))
+	uassert.True(t, others >= minCommunity, strconv.Itoa(others))
+}
+
+// The pages gnoweb links: a query string is ignored, a cup and an author
+// have a page, a community hole names its author, and a board too detailed
+// to draw says so.
+func TestThePagesGnowebLinks(cur realm, t *testing.T) {
+	h := cupHole("pond", 5, "Hedged")
+	h.Course.Walls = append(h.Course.Walls, physics.Bar(physics.V(10, 2), physics.V(10, 6), 0.5, 0, "hedge")...)
+	author := testutils.TestAddress("pager")
+	testing.SetRealm(testing.NewUserRealm(author))
+	id := PublishMine(cross(cur), "hedged", hexOf(h), "")
+	uassert.Equal(t, Render(id), Render(id+"?ref=x&b=[a](c)"))
+	uassert.Equal(t, Render(""), Render("?utm=1"))
+	page := Render(id)
+	uassert.True(t, strings.Contains(page, "· Community hole by [g1"), "the author, not a cup")
+	uassert.True(t, strings.Contains(page, "`#` wall (hedge)") && !strings.Contains(page, "`#` hedge"), "the wall's skins go with the wall, once")
+	uassert.True(t, strings.Contains(Render(author.String()), "| [Hedged](/r/gnogolf/golf:"+author.String()+"/hedged) | 1 |"), "the author's page")
+	uassert.True(t, strings.Contains(Render(testutils.TestAddress("nobody").String()), "published no hole"))
+	uassert.True(t, strings.Contains(Render("nosuchcup"), "No course hole in this cup"))
+	// a board past the budget is not drawn
+	big := flatHole("Big")
+	big.W, big.H = 96, 96
+	for i := 0; i < 100; i++ {
+		big.Course.Zones = append(big.Course.Zones, physics.Zone{Kind: physics.Surface, Min: physics.V(0, 0), Max: physics.V(96, 96), Scale: 1})
+	}
+	uassert.True(t, boardWork(big.Course, big) > maxBoardWork)
+	e := mustHole(id)
+	uassert.True(t, strings.Contains(renderHole(e, big, ""), "too detailed to draw here"))
+	uassert.False(t, strings.Contains(page, "too detailed"))
+}
+
+// Community rows are the newest first: sixteen addresses that sort low
+// (bech32 "g1qqq…", cheap to grind for) publishing three holes each, on a
+// course of 74, cannot keep a later author's hole off the list or the hub.
+func TestNewestCommunityHolesAreListed(cur realm, t *testing.T) {
+	for i := slots.Size(); i < 74; i++ {
+		publish(cur, cupHole("filler", i+1, "Filler"))
+	}
+	data := hexOf(cupHole("pond", 1, "Low"))
+	for i := 0; i < 16; i++ {
+		low := testutils.TestAddress("\x00\x00\x00\x00" + string([]byte{byte(i)}))
+		for j := 0; j < perAuthor; j++ {
+			testing.SetRealm(testing.NewUserRealm(low))
+			PublishMine(cross(cur), "low"+strconv.Itoa(j), data, "")
+		}
+	}
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(testutils.TestAddress("latecomer")))
+	late := PublishMine(cross(cur), "late", hexOf(cupHole("pond", 2, "Latecomer")), "")
+	list := Holes()
+	uassert.True(t, strings.Contains(list, `"id":"`+late+`"`), "the newest hole is listed")
+	low := strings.Index(list, `"slot":"g1qqqqqqq`)
+	uassert.True(t, low < 0 || strings.Index(list, `"id":"`+late+`"`) < low, "ahead of the older ones")
+	uassert.True(t, strings.Contains(Render(""), "Latecomer"), "and on the hub")
 }

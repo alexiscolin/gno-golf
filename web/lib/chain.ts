@@ -10,14 +10,37 @@
 // ("chain"), not left to fail somewhere in the scene.
 
 import type {
-  Bests, Extras, HoleLeaderboard, HoleRow, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
+  Bests, Extras, HoleLeaderboard, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
   SimulateRound, Standings, Vec2, Weather,
 } from "./types";
+
+/**
+ * The realm's rules the client plays by, copied from gno.land/r/gnogolf/golf
+ * (golf.gno, weather.gno): scripts/selfcheck.ts reads them there and fails on
+ * any drift. A split or a gas figure that disagrees with the realm sends a
+ * commit the chain refuses.
+ */
+export const RULES = {
+  /** golf.gno maxShots: the longest shot list one commit takes */
+  maxShots: 12,
+  /** golf.gno maxRoundStrokes: the most strokes one round holds */
+  maxRoundStrokes: 60,
+  /** golf.gno maxPath: the longest path a stroke may return */
+  maxPath: 512,
+  /** golf.gno maxPower */
+  maxPower: 10,
+  /** weather.gno PeriodSeconds, in ms: one weather's length */
+  periodMs: 300e3,
+  /** golf.gno's work model (workBudget, workPerShot, workPerWall, workPerPoint, workPerPiece) */
+  work: { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3 },
+  /** golf.gno's measured gas of the forecast in a commit, at most (the rain on the lane holes) */
+  forecastGas: 170e6,
+} as const;
 
 // the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-golfer000/golf on
 // pearl), else the local chain's
 const REALM_ENV = process.env.NEXT_PUBLIC_REALM || "";
-export const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/golf$/.test(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
+const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/golf$/.test(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
 /** The hub's gnoweb path ("/r/…/golf"). */
 export const REALM_PATH = REALM.replace(/^gno\.land/, "");
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
@@ -26,7 +49,7 @@ export const DEFAULT_RPC = "http://127.0.0.1:26757";
 export const DEFAULT_WEB = "http://127.0.0.1:8888";
 
 /** An error from a read, tagged: "down" the node did not answer, "chain" it refused (log: the VM's). */
-export interface ChainError extends Error {
+interface ChainError extends Error {
   kind?: "down" | "chain";
   log?: string;
 }
@@ -62,19 +85,37 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isVec = (p: unknown): p is Vec2 => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]);
 const arrays = (v: Obj, ...keys: string[]) => keys.every((k) => Array.isArray(v[k]));
+const nums = (v: Obj, ...keys: string[]) => keys.every((k) => Number.isFinite(v[k]));
+const strs = (v: Obj, ...keys: string[]) => keys.every((k) => typeof v[k] === "string");
+const isMode = (m: unknown): m is Mode => m === "assisted" || m === "pro";
 const holeRow = (h: unknown) => isObj(h) && typeof h.id === "string";
-const rows = (v: unknown) => isObj(v) && Array.isArray(v.rows);
+// a path is points of two finite numbers
+const isPath = (p: unknown): p is Vec2[] => Array.isArray(p) && p.every(isVec);
+// a stroke's flight: its path (at least one point, or it is not one), one air
+// flag and one cause letter per point, and where it rests exactly
+const isFlight = (v: Obj) => isPath(v.path) && v.path.length > 0 && isVec(v.rest) && strs(v, "air", "cause");
+const simFrom = (v: unknown): v is SimulateFrom => isObj(v) && isFlight(v) && typeof v.holed === "boolean" && nums(v, "bounces");
+// a board: its rows (each checked by row), its mode and the numbers it says
+const board = (v: unknown, row: (r: unknown) => boolean, ...keys: string[]): v is Obj => isObj(v) && isMode(v.mode) && Array.isArray(v.rows) && v.rows.every(row) && nums(v, ...keys);
+const strokesRow = (r: unknown) => isObj(r) && typeof r.player === "string" && nums(r, "strokes");
+const standingRow = (r: unknown) => strokesRow(r) && nums(r as Obj, "holes");
 const checks = {
   holes: (v: unknown): v is HoleRow[] => Array.isArray(v) && v.every(holeRow),
+  // Holes(): { version, play, successor, holes }
+  holesReply: (v: unknown): v is Holes => isObj(v) && strs(v, "play", "successor") && Array.isArray(v.holes) && v.holes.every(holeRow),
   state: (v: unknown): v is HoleState =>
     isObj(v) && typeof v.hole === "string" && isObj(v.board) && isVec(v.start) && isVec(v.cup) && arrays(v, "walls", "posts", "zones"),
-  // a path is points of two finite numbers, and at least one, or it is not one
-  stroke: <T extends SimulateFrom>(v: unknown): v is T => isObj(v) && Array.isArray(v.path) && v.path.length > 0 && v.path.every(isVec),
+  simFrom,
+  simRound: (v: unknown): v is SimulateRound => isObj(v) && Number.isInteger(v.strokes) && nums(v, "period") && simFrom(v),
   weather: (v: unknown): v is Weather => isObj(v) && Array.isArray(v.zones),
   extras: (v: unknown): v is Extras => isObj(v) && arrays(v, "walls", "posts", "zones"),
-  rows: <T extends { rows: readonly unknown[] }>(v: unknown): v is T => rows(v),
-  rank: (v: unknown): v is Rank => isObj(v) && Number.isFinite(v.rank),
-  round: (v: unknown): v is Round | null => v === null || (isObj(v) && typeof v.shots === "string"),
+  leaderboard: (v: unknown): v is Leaderboard => board(v, standingRow, "holes"),
+  bests: (v: unknown): v is Bests => board(v, strokesRow, "par") && typeof v.hole === "string",
+  standings: (v: unknown): v is Standings => board(v, standingRow, "holes"),
+  holeLeaderboard: (v: unknown): v is HoleLeaderboard => board(v, strokesRow, "par", "players", "finished", "offset", "next") && typeof v.hole === "string",
+  rank: (v: unknown): v is Rank => isObj(v) && isMode(v.mode) && typeof v.player === "string" && nums(v, "rank", "of", "holes", "strokes"),
+  round: (v: unknown): v is Round | null =>
+    v === null || (isObj(v) && isPath(v.path) && isVec(v.rest) && isVec(v.ball) && strs(v, "player", "shots", "air", "cause") && typeof v.done === "boolean" && isMode(v.mode) && Number.isInteger(v.strokes) && nums(v, "period")),
 };
 // what a refused stroke says, as the engine always said it
 const NO_PATH = "The chain answered without a path for that shot.";
@@ -136,19 +177,31 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   /** A raw ABCI query; returns the decoded data string. */
   const abci = (path: string) => query(`${rpc}/abci_query?path=%22${path}%22`);
 
-  // a string answer from any realm (r/sys/users): ("…" string), unwrapped once
-  async function qstr(realm: string, expr: string, ms?: number) {
-    const raw = await query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${realm}.${expr}`)}`, ms);
-    return String(JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)"))));
-  }
+  // an expression evaluated in a realm, read-only: the VM's typed result as it printed it
+  const vm = (realm: string, expr: string, ms?: number, signal?: AbortSignal | null) =>
+    query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${realm}.${expr}`)}`, ms, signal);
+  // a string result — ("…" string) — unwrapped; an answer that is not one is the chain's to answer for
+  const unquote = (raw: string, expr: string) => {
+    try {
+      return String(JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)"))));
+    } catch {
+      throw refused(`The chain's answer to ${expr.slice(0, expr.indexOf("("))} is not a string.`);
+    }
+  };
+
+  // a string answer from any realm (r/sys/users)
+  const qstr = async (realm: string, expr: string, ms?: number) => unquote(await vm(realm, expr, ms), expr);
 
   // a realm read, checked: T when the answer has T's shape, refused otherwise
   async function qeval<T>(expr: string, ok: (v: unknown) => v is T, ms?: number, signal?: AbortSignal | null, bad?: string): Promise<T> {
-    const hex = hexOf(`${REALM}.${expr}`);
     // the reply is a Gno typed result — ("<json>" string) — so it unwraps twice
-    const raw = await query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hex}`, ms, signal);
-    const inner = raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)"));
-    const v = JSON.parse(JSON.parse(inner) as string) as unknown;
+    const json = unquote(await vm(REALM, expr, ms, signal), expr);
+    let v: unknown;
+    try {
+      v = JSON.parse(json);
+    } catch {
+      throw refused(`The chain's answer to ${expr.slice(0, expr.indexOf("("))} is not JSON.`);
+    }
     // every object the realm returns says its version: a newer realm may have
     // moved a field this page reads
     if (isObj(v) && Number(v.version) > VERSION && !warned) {
@@ -253,7 +306,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
         const c = !fresh && (JSON.parse(sessionStorage.getItem(key) || "null") as { at?: number; list?: unknown } | null);
         if (c && Date.now() - Number(c.at) < HOLES_TTL && checks.holes(c.list) && c.list.length) return c.list;
       } catch {}
-      const list = await qeval("Holes()", checks.holes);
+      const list = [...(await qeval("Holes()", checks.holesReply)).holes];
       try {
         sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), list }));
       } catch {}
@@ -268,7 +321,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      * { holed, bounces, path, air, cause, rest }.
      */
     simulateFrom: (hole: string, ball: Vec2, shot: string, stroke: number, period: number, ms?: number, signal?: AbortSignal | null) =>
-      qeval(`SimulateFrom(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${s(shot)}, ${stroke | 0}, ${period | 0})`, checks.stroke, ms, signal, NO_PATH),
+      qeval(`SimulateFrom(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${s(shot)}, ${stroke | 0}, ${period | 0})`, checks.simFrom, ms, signal, NO_PATH),
     /**
      * A round replayed from the tee, read-only: the last shot's path and the
      * stroke count, exactly what PlayRound would record for the same list.
@@ -276,19 +329,19 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      */
     simulateRound: (hole: string, shots: readonly string[], period: number | null | undefined, ms?: number, signal?: AbortSignal | null) =>
       period == null
-        ? qeval(`SimulateRound(${s(hole)}, ${s(shots.join(";"))})`, checks.stroke<SimulateRound>, ms, signal, NO_PATH)
-        : qeval(`SimulateRoundAt(${s(hole)}, ${s(shots.join(";"))}, ${period | 0})`, checks.stroke<SimulateRound>, ms, signal, NO_PATH),
+        ? qeval(`SimulateRound(${s(hole)}, ${s(shots.join(";"))})`, checks.simRound, ms, signal, NO_PATH)
+        : qeval(`SimulateRoundAt(${s(hole)}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
     /**
      * One commit of a round under way, read-only: what the next PlayRoundAt
      * (or PlayRoundPro) of these shots would do from the exact ball ("rest")
      * at stroke number stroke, refused as that commit would be. SimulateRound's JSON.
      */
     simulateCommit: (hole: string, ball: Vec2, stroke: number, shots: readonly string[], period: number, ms?: number, signal?: AbortSignal | null) =>
-      qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.stroke<SimulateRound>, ms, signal, NO_PATH),
+      qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
     /** The weather's five minutes on the chain (block time / 300), and its forecast for a hole. */
     // an int64, not a string: its own unwrapping
     period: async () => {
-      const raw = await query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${REALM}.Period()`)}`);
+      const raw = await vm(REALM, "Period()");
       const n = Number((raw.match(/^\((-?\d+) int64\)/) || [])[1]);
       if (!Number.isFinite(n)) throw new Error("The chain's period is not a number.");
       return n;
@@ -297,13 +350,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** What a timed hole adds at one stroke of a round (0 = first shot). */
     extras: (hole: string, stroke: number) => qeval(`Extras(${s(hole)}, ${Math.max(0, stroke | 0)})`, checks.extras),
     /** The course-wide ranking of recorded rounds. */
-    leaderboard: (mode = "assisted") => qeval(`Leaderboard(${s(m(mode))})`, checks.rows<Leaderboard>),
+    leaderboard: (mode = "assisted") => qeval(`Leaderboard(${s(m(mode))})`, checks.leaderboard),
     /** The best rounds of these players (at most 50) on a hole: { hole, mode, par, rows: [{ player, strokes }] }. */
     bests: (hole: string, mode: string, players: readonly string[]) =>
-      qeval(`Bests(${s(hole)}, ${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.rows<Bests>),
+      qeval(`Bests(${s(hole)}, ${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.bests),
     /** These players across the course: { mode, holes, rows: [{ player, holes, strokes }] }. */
     standings: (mode: string, players: readonly string[]) =>
-      qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.rows<Standings>),
+      qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.standings),
     /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes }. */
     rank: (mode: string, player: string) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`, checks.rank),
     /** A gno.land name's address, or "" (r/sys/users). */
@@ -318,22 +371,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
         : Promise.resolve(""),
     /** A page of a hole's board: { hole, mode, par, players (named), finished (everyone), offset, rows: [{ player, strokes }], next (the next page's offset, 0 at the end) }. */
     holeLeaderboard: (hole: string, offset = 0, limit = 10, mode = "assisted") =>
-      qeval(`HoleLeaderboard(${s(hole)}, ${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.rows<HoleLeaderboard>),
+      qeval(`HoleLeaderboard(${s(hole)}, ${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.holeLeaderboard),
     /** One player's round on a hole ({ shots, strokes, done, period, rest, path… }), or null: none, or Reset since. */
     round: (hole: string, player: string) => qeval(`Round(${s(hole)}, address(${s(player)}))`, checks.round),
   };
 }
 export type Chain = ReturnType<typeof makeChain>;
 
-/** One shot as the realm parses it. The same string goes to SimulateRound and
- *  to PlayRound, so the preview and the record decide the same shot. */
-/**
- * The pull, as a shot: the same pull always gives the same numbers. Its length
- * is measured in CSS pixels against the viewport's short side, so neither the
- * pixel density nor the browser's zoom changes it, and nothing depends on the
- * frame rate. Angle and power are rounded here, once, to what the chain is
- * sent: the preview and the shot use exactly these.
- */
 /**
  * An RPC or gnoweb address from the page's own link (?rpc=, ?web=) is taken
  * only from an allowlist: this machine (http or https), the build's own
@@ -376,7 +420,14 @@ export const isHoleId = (s: unknown) => PKG.test(String(s)) || DATA.test(String(
 export const isAddress = (s: unknown) => typeof s === "string" && ADDR.test(s);
 
 const PULL_SHARE = 0.24; // a pull this share of the viewport's short side is full power
-export function pullShot(px: number, vw: number, vh: number, angleRad: number, maxPower = 10) {
+/**
+ * The pull, as a shot: the same pull always gives the same numbers. Its length
+ * is measured in CSS pixels against the viewport's short side, so neither the
+ * pixel density nor the browser's zoom changes it, and nothing depends on the
+ * frame rate. Angle and power are rounded here, once, to what the chain is
+ * sent: the preview and the shot use exactly these.
+ */
+export function pullShot(px: number, vw: number, vh: number, angleRad: number, maxPower: number = RULES.maxPower) {
   const full = Math.max(120, Math.min(vw, vh) * PULL_SHARE);
   const power = Math.round(Math.min(px / full, 1) * maxPower * 100) / 100;
   let deg = (angleRad * 180) / Math.PI;
@@ -385,4 +436,6 @@ export function pullShot(px: number, vw: number, vh: number, angleRad: number, m
   return { deg, power };
 }
 
+/** One shot as the realm parses it. The same string goes to SimulateRound and
+ *  to PlayRound, so the preview and the record decide the same shot. */
 export const shotOf = (angleDeg: number, power: number, tick?: number | null) => `${f(angleDeg)},${f(power)}` + (tick == null ? "" : `,${tick | 0}`);

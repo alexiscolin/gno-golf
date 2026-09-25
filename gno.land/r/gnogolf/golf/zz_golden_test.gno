@@ -70,11 +70,13 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 // golden: fixture -> sha256 prefix of its SimulateRoundAt (weather period
 // chosen per fixture), its Forecast, and its State.
 //
-// Deploy v1: the fixtures stay realm holes under golf's namespace, which the
-// owner now has to Expect, and which are no longer the course's (the course
-// is data): State says "official":false where these hashes were taken with
-// true. The State column is checked with that one flag put back, so every
-// other byte is pinned as it was.
+// Deploy v1: the fixtures were realm holes under golf's namespace, which
+// are no longer the course's (the course is data): State says
+// "official":false where these hashes were taken with true. The State column
+// is checked with that one flag put back, so every other byte is pinned as
+// it was. Final fixes: holes are only data now, so each fixture is kept as
+// data under its old id (goldAt): the id seeds the weather, and every hash
+// stayed as it was.
 // 2026-09-25, hub fixes: the JSON shapes changed (a "version" field, the exact
 // "rest", "official" in State, no "by"), not the replays: with those fields
 // taken out, every SimulateRoundAt and State output is byte for byte as it was
@@ -88,14 +90,21 @@ var golden = map[string][3]string{
 	"tunnel": {"2b8666eb09290dde", "c3224daa821020f4", "335763617c2e9b50"},
 }
 
+// goldAt keeps h as data under id, listed as its realm hole was: the world
+// "garden" when it names none (data always names one), and no order of its
+// own.
+func goldAt(id string, h *course.Simple) {
+	if h.World == "" {
+		h.World = "garden"
+	}
+	community.Set(id, newEntry(id, cleanName(h.Title), course.ParOf(h), h.World, course.OrderOf(h, 1<<20)))
+	holeData.Set(id, course.Encode(h))
+}
+
 func TestGoldenReplays(cur realm, t *testing.T) {
 	for name, h := range goldHoles() {
 		id := "gno.land/r/gnogolf/gold_" + name
-		setOwner(deployer)
-		testing.SetRealm(testing.NewUserRealm(deployer))
-		Expect(cross(cur), id)
-		testing.SetRealm(testing.NewCodeRealm(id))
-		Register(cross(cur), h)
+		goldAt(id, h)
 		kind := course.Clear
 		if name == "storm" {
 			kind = "storm"
@@ -110,7 +119,7 @@ func TestGoldenReplays(cur realm, t *testing.T) {
 		p := periodOf(id, world, h, kind)
 		// the period's offset from now, not its number, is what repeats
 		got := [3]string{
-			sum(SimulateRoundAt(id, goldShots, p)),
+			sum(simAt(id, goldShots, p)),
 			sum(forecastJSON("", weatherOf(mustHole(id), h, p))),
 			sum(strings.Replace(State(id), `"official":false`, `"official":true`, 1)),
 		}
@@ -123,26 +132,6 @@ func TestGoldenReplays(cur realm, t *testing.T) {
 			t.Errorf("%s changed: got %v, want %v", name, got, want)
 		}
 	}
-}
-
-// long is a hostile hole: its path is far longer than any honest one.
-type long struct{ flat }
-
-func (h *long) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	sh := physics.Shot{}
-	for i := 0; i <= maxPath; i++ {
-		sh.Path = append(sh.Path, ball)
-		sh.Air = append(sh.Air, false)
-	}
-	return sh, false
-}
-
-func TestAnOversizedPathIsRefused(cur realm, t *testing.T) {
-	id := "gno.land/r/test/long"
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), &long{})
-	testing.SetRealm(testing.NewUserRealm(player))
-	urequire.AbortsContains(t, cur, "oversized path", func() { Launch(cross(cur), id, 0, 1) })
 }
 
 func TestARoundHasAStrokeLimit(cur realm, t *testing.T) {

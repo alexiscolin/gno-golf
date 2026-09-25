@@ -10,7 +10,7 @@
 # checks nothing of the old one is left; then lints the result with the
 # pearl toolchain and prints each package's size.
 #
-# GNO is the gno binary to lint with (default: the pearl toolchain store,
+# GNO is the gno binary to lint with (default: the pearl toolchain store
 # under ~/.cache/gno-toolchains/pearl), GNOROOT its source tree.
 set -eu
 

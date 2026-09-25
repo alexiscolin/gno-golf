@@ -5,7 +5,6 @@ package island3
 import (
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
-	"gno.land/r/gnogolf/golf"
 )
 
 var lane = physics.Lane(10, 4, physics.V(5, 9), physics.V(24, 10), physics.V(44, 8))
@@ -45,9 +44,3 @@ var me = course.Fit(&course.Simple{
 		Bounce:   0.85,
 	},
 }, 1.5)
-
-// Register lists this hole's realm with golf, from here or from its own
-// init(cur realm): as a community hole, and under golf's namespace only once
-// golf's owner expects this path. The course plays the hole as data
-// (data/holes.txt), which the owner publishes.
-func Register(cur realm) { golf.Register(cross(cur), me) }

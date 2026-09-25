@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import { createGame, type Game, type Snapshot } from "@/lib/engine";
-import { GNOMES, makePreview } from "@/lib/scene";
-import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, type Chain } from "@/lib/chain";
+import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
+import { GNOMES, makePreview, cheer, motion } from "@/lib/scene";
+import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, type Chain } from "@/lib/chain";
+import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
 import type { Bests, HoleLeaderboard, HoleRow, Leaderboard as LeaderboardRows, Mode, StrokesRow, StandingRow } from "@/lib/types";
-import type { Card } from "@/lib/card";
+import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
 import { hasAdena, connect, current, onOurNode, recordRound, splitRound, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
@@ -17,6 +18,8 @@ import Gnokey from "@/components/Gnokey";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
+import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
+import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } from "@/lib/prefs";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
 // dev build, or on a page opened with ?camlog (the camera and capture rigs);
@@ -30,22 +33,18 @@ declare global {
   }
 }
 
-type Screen = "title" | "worlds" | "pick" | "play";
+const SCREENS = ["title", "worlds", "pick", "play"] as const;
+type Screen = (typeof SCREENS)[number];
+const isScreen = (v: unknown): v is Screen => SCREENS.some((x) => x === v);
 type Gfx = "auto" | "high" | "low";
 /** The connected Adena account. */
 type Account = NonNullable<Awaited<ReturnType<typeof current>>>;
-/** Where the current round's save stands: being signed, signed in parts, refused, or on the chain. */
-interface Saving {
-  signing?: boolean;
-  part?: number;
-  of?: number;
-  error?: string;
-  stale?: boolean;
-  hash?: string;
-  height?: number;
-  parts?: number;
-}
-type Rec = null | "signing" | Saving;
+/** Where the current round's save stands: being signed (a part of it, when it
+ *  goes in several), refused (stale: its weather is over), or on the chain. */
+type Rec = null
+  | { at: "signing"; part?: number; of?: number }
+  | { at: "refused"; error: string; stale: boolean }
+  | { at: "saved"; hash: string; height?: number; parts: number };
 /** The error's own sentence, or the value said as it is. */
 const messageOf = (e: unknown) => String((e && typeof e === "object" && "message" in e && e.message) || e);
 
@@ -103,7 +102,6 @@ const rolling = { k: 0 };
 // The game's fast-moving fields — the power bar, the cause of a push, the
 // storm's flashes — are read from a store of their own by the few parts that
 // show them; everything else re-renders only when a slower field changes.
-const HOT = ["power", "cause", "flash"] as const;
 const HOT_KEYS = new Set<string>(HOT);
 type HotFields = Pick<Snapshot, (typeof HOT)[number]>;
 function makeHot() {
@@ -155,22 +153,33 @@ function lockedNote() {
   return `${gn.name.replace(/^The /, "")} is locked — playing as ${mine.name.replace(/^The /, "")}`;
 }
 
-/** What kind of failure stopped the start: the chain not answering, a chain with no hole, or ours. */
-function fatalKind(err: unknown) {
+/** What stopped the start: the chain not answering, a chain with no hole, ours, or no WebGL here. */
+type FatalKind = "down" | "empty" | "bug" | "webgl";
+function fatalKind(err: unknown): FatalKind {
   const m = messageOf(err);
   if (/no hole is registered/.test(m)) return "empty";
-  if (errorKind(err) === "down" || /fetch|network|timed? ?out|timeout|abort|rpc|abci|http|connect|load failed|did not answer|unexpected token/i.test(m)) return "down";
+  if (errorKind(err) === "down" || /fetch|network|timed? ?out|timeout|abort|rpc|abci|http|connect|load failed|did not answer/i.test(m)) return "down";
   return "bug";
 }
+// what the error banner says, per kind: its title and its sentence
+const BANNER = {
+  down: ["The course is not reachable right now", "The chain the game plays on did not answer. It may be restarting."],
+  webgl: ["Your browser can't draw 3D here", "Turn on hardware acceleration in the browser's settings, then reload. The course is also playable as text on gno.land."],
+  empty: ["No hole on this chain yet", "The chain answered, but no hole is registered on it. Try again once the course is deployed."],
+  bug: ["Something went wrong", "The game hit an error in this browser. Reloading the page usually fixes it."],
+  load: ["That hole did not load", "The chain did not send this hole. Try again, or pick another one from the menu."],
+  draw: ["That hole could not be drawn", "Something broke on our side while building it. Pick another hole from the menu — your scores are safe."],
+  limit: ["That is the most strokes a round holds", "Restart the hole to play it again."],
+  shot: ["That shot did not go through", "The chain could not play that shot. Nothing was lost; you can shoot again."],
+} as const satisfies Record<FatalKind | ErrorKind, readonly [string, string]>;
 
 // A round is saved in the weather it was played in: the chain takes it while
 // that period is the current one or the one just gone, so until the start of
 // period + 2 (weather.gno, five-minute periods), by the time of the block that
 // takes the transaction. On the chain's clock (chain.now: the last block time
 // read), and SAVE_MARGIN early: the signing and the block's inclusion.
-const PERIOD_MS = 300 * 1000;
 const SAVE_MARGIN = 15 * 1000;
-const saveBy = (period: number) => (period + 2) * PERIOD_MS - SAVE_MARGIN;
+const saveBy = (period: number) => (period + 2) * RULES.periodMs - SAVE_MARGIN;
 // how far this device's clock is behind the chain's (ms): a deadline on the
 // chain's clock, less this, is one on the device's
 const skewOf = (chain: Chain | null | undefined) => (chain && chain.now ? chain.now() - Date.now() : 0);
@@ -249,7 +258,7 @@ export default function Golf() {
   const hot = useRef<Hot | null>(null);
   if (!hot.current) hot.current = makeHot();
   const cold = useRef<Snapshot | null>(null); // the snapshot last given to setS
-  const [fatal, setFatal] = useState<{ msg: string; kind: string } | null>(null); // the game could not start
+  const [fatal, setFatal] = useState<{ msg: string; kind: FatalKind } | null>(null); // the game could not start
   const [boot, setBoot] = useState(0); // a retry of the start: a new game
   const [gl, setGl] = useState<null | "lost" | "gone">(null); // the WebGL context was taken away
   // title -> pick a gnome -> play; the title shows at once, the hole loads behind it
@@ -379,6 +388,9 @@ export default function Golf() {
   }, [tHas, tN, tName, tHoled, tFlying, tAiming, tStrokes, playing]);
   const holedRef = useRef<(id: string, strokes: number) => void>(() => {});
   const [fresh, setFresh] = useState<Skin[]>([]); // gnomes just unlocked, for the banner
+  // the hole that finished its cup (or beat the cup's best): the win card
+  // leads on to the cup's victory screen (open)
+  const [cupWon, setCupWon] = useState<{ cup: Cup; id: string; best: boolean; open?: boolean } | null>(null);
   const holesList = (s && s.holes) || NONE;
   const tot = useMemo(() => totals(card, holesList), [card, holesList]);
   const allList = (s && s.allHoles) || NONE;
@@ -390,12 +402,12 @@ export default function Golf() {
     const gn = GNOMES.find((x) => x.id === id);
     if (!gn || !gn.unlock) return true;
     if (had.includes(id)) return true;
-    return !!(allList.length && UNLOCKS[gn.unlock] && UNLOCKS[gn.unlock].ok(cups));
+    return !!(allList.length && UNLOCKS[gn.unlock].ok(cups));
   };
   // once earned, remembered — outside render, so a render never writes storage
   useEffect(() => {
     if (!allList.length) return;
-    for (const gn of GNOMES) if (gn.unlock && UNLOCKS[gn.unlock] && UNLOCKS[gn.unlock].ok(cups)) remember(gn.id);
+    for (const gn of GNOMES) if (gn.unlock && UNLOCKS[gn.unlock].ok(cups)) remember(gn.id);
   }, [allList, cups]);
 
   // playing for real: who is connected, and where the current round's record is
@@ -403,13 +415,13 @@ export default function Golf() {
   const [account, setAccount] = useState<Account | null>(null);
   const [wallet, setWallet] = useState<{ busy: boolean; error: string | null; note?: string }>({ busy: false, error: null });
   const [record, setRecord] = useState<Rec>(null);
-  const rec = record && record !== "signing" ? record : null; // the save's outcome, once there is one
-  const onChain = !!(rec && rec.hash !== undefined && !rec.error); // this round is on the chain
+  const onChain = record?.at === "saved"; // this round is on the chain
+  const stale = record?.at === "refused" && record.stale; // its weather is over: no save any more
 
-  const play = () => {
+  const play = (direct = false) => {
     setScreen("play");
     if (!game.current) return;
-    game.current.play();
+    game.current.play(direct);
     // after the overview has had its moment and the camera is on the gnome
     if (cfg && cfg.demo) later(() => void (game.current && game.current.demo(cfg.demo.split(";"))), 2600);
   };
@@ -424,56 +436,68 @@ export default function Golf() {
 
   useEffect(() => {
     if (!cfg || !canvas.current) return;
-
-    let g: Game;
-    try {
-      g = createGame(canvas.current, {
-      rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, hooks: cfg.won > 0,
-      // the hot fields to their store; the rest re-renders only when it changed
-      // (compared here, not in a setS updater: an updater that returns the
-      // same state still re-renders the whole page, 60 times a second in a pull)
-      onChange: (snap: Snapshot) => {
-        hot.current!.set(snap);
-        if (!cold.current || !sameCold(cold.current, snap)) setS((cold.current = snap));
-      },
-      onHoled: ({ id, strokes }: { id: string; strokes: number }) => holedRef.current(id, strokes),
-      });
-    } catch (err) {
-      // no WebGL here (hardware acceleration off, a blocklisted GPU, Lockdown Mode)
-      console.error(err);
-      setFatal({ msg: messageOf(err), kind: "webgl" });
-      return;
-    }
-    game.current = g;
-    // ?camlog: the game within reach of the camera probe (a test hook)
-    if (/[?&]camlog/.test(window.location.search)) window.__g = g;
-
+    const el = canvas.current;
     // a dev remount destroys this game while it is still starting: it must
     // not then drive the live one
-    let cancelled = false;
-    g.start(cfg.hole || (cfg.cup ? { cup: cfg.cup, n: cfg.place } : null))
-      .then(() => {
-        if (cancelled) return;
-        if (cfg.play) play();
-        else if (cfg.hole || cfg.cup) {
-          // a shared link: straight to that hole (a first-time player picks a
-          // gnome first); a link to nothing lands on the cups, quietly
-          if (!g.linked()) setScreen("worlds");
-          else if (cfg.gnome || hadGnome()) play();
-          else setScreen("pick");
-        }
-        // ?won=N shows the win card for N strokes — dev screenshots only
-        if (DEV && cfg.won) later(() => g.fakeWin?.(cfg.won), 400);
-        // ?shot=angle,power fires one on load — for screenshots and smoke tests
-        if (cfg.shot) {
-          const [a, p] = cfg.shot.split(",").map(Number);
-          later(() => void g.shoot(a, p), 300);
-        }
-      })
-      .catch((err: unknown) => !cancelled && setFatal({ msg: messageOf(err), kind: fatalKind(err) }));
+    let cancelled = false, g: Game | null = null;
+    const make = (promo?: GameOptions["promo"], probes?: GameOptions["probes"]) => {
+      try {
+        g = createGame(el, {
+        rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, promo, probes, log: camlog,
+        // the hot fields to their store; the rest re-renders only when it changed
+        // (compared here, not in a setS updater: an updater that returns the
+        // same state still re-renders the whole page, 60 times a second in a pull)
+        onChange: (snap: Snapshot) => {
+          hot.current!.set(snap);
+          if (!cold.current || !sameCold(cold.current, snap)) setS((cold.current = snap));
+        },
+        onHoled: ({ id, strokes }: { id: string; strokes: number }) => holedRef.current(id, strokes),
+        });
+      } catch (err) {
+        // no WebGL here (hardware acceleration off, a blocklisted GPU, Lockdown Mode)
+        console.error(err);
+        setFatal({ msg: messageOf(err), kind: "webgl" });
+        return;
+      }
+      const game_ = (game.current = g);
+      // ?camlog: the game within reach of the camera probe (a test hook)
+      if (camlog) window.__g = game_;
+
+      game_.start(cfg.hole || (cfg.cup ? { cup: cfg.cup, n: cfg.place } : null))
+        .then(() => {
+          if (cancelled) return;
+          if (cfg.play) play();
+          else if (cfg.hole || cfg.cup) {
+            // a shared link: straight to that hole (a first-time player picks a
+            // gnome first); a link to nothing lands on the cups, quietly
+            if (!game_.linked()) setScreen("worlds");
+            else if (cfg.gnome || hadGnome()) play(true); // straight onto the ball: the link said where
+            else setScreen("pick");
+          }
+          // ?won=N shows the win card for N strokes — dev screenshots only
+          if (DEV && cfg.won) later(() => game_.fakeWin?.(cfg.won), 400);
+          // ?shot=angle,power fires one on load — for screenshots and smoke tests
+          if (cfg.shot) {
+            const [a, p] = cfg.shot.split(",").map(Number);
+            later(() => void game_.shoot(a, p), 300);
+          }
+        })
+        .catch((err: unknown) => !cancelled && setFatal({ msg: messageOf(err), kind: fatalKind(err) }));
+    };
+    // The trailer's rig (?promo, which patches the page's clock: loaded before
+    // the game's first frame) and the test hooks (?camlog, a dev ?won) are
+    // modules of their own, fetched only for a page that asks for them.
+    const q = window.location.search, camlog = /[?&]camlog/.test(q);
+    const wantPromo = /[?&]promo/.test(q) && (DEV || camlog), wantProbes = camlog || cfg.won > 0;
+    if (!wantPromo && !wantProbes) make();
+    else
+      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined])
+        .then(([promo, probes]) => !cancelled && make(promo, probes))
+        .catch((err: unknown) => !cancelled && setFatal({ msg: messageOf(err), kind: fatalKind(err) }));
 
     return () => {
       cancelled = true;
+      if (!g) return;
       g.destroy();
       if (window.__g === g) delete window.__g;
     };
@@ -579,15 +603,16 @@ export default function Golf() {
     if (!account || !holeId || !game.current) return;
     let live = true;
     void within(game.current.chain.bests(holeId, saveMode, [account.address]))
-      .then((b) => live && setSaved(!!(b && b.rows && b.rows.length)))
+      .then((b) => live && setSaved(b.rows.length > 0))
       .catch(() => {});
     return () => void (live = false);
   }, [account, holeId, saveMode, holedNow]);
+  const waiting = record?.at === "signing" && record.of === undefined; // Adena open, the round in one transaction
   useEffect(() => {
-    if (record !== "signing") return setSlowSign(false);
+    if (!waiting) return setSlowSign(false);
     const t = setTimeout(() => setSlowSign(true), 10000);
     return () => clearTimeout(t);
-  }, [record]);
+  }, [waiting]);
   useEffect(() => {
     if (!account || !game.current) return;
     // what lands after the account changed (or the page went) is dropped
@@ -617,8 +642,8 @@ export default function Golf() {
     const round = `${s.id}#${s.shots.join(";")}`;
     const land = (r: Rec) => roundKey.current === round && setRecord(r);
     // a round whose weather is over can no longer be saved: the chain would refuse it
-    if (s.period != null && game.current.chain.now() >= saveBy(s.period)) return land({ error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
-    setRecord("signing");
+    if (s.period != null && game.current.chain.now() >= saveBy(s.period)) return land({ at: "refused", error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
+    setRecord({ at: "signing" });
     try {
       const chain = game.current.chain, hole = s.id!;
       const id = chainId || (await within(chain.chainId()));
@@ -631,7 +656,7 @@ export default function Golf() {
       let tx: Awaited<ReturnType<typeof recordRound>> | null = null;
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k];
-        if (parts.length > 1) land({ signing: true, part: k + 1, of: parts.length });
+        if (parts.length > 1) land({ at: "signing", part: k + 1, of: parts.length });
         tx = await recordRound({
           address: account.address, realm: chain.realm, hole, shots: s.shots.slice(from, to), reset: k === 0,
           gas: gasOf(s, from, to), period: s.period, mode: s.roundMode || "assisted", price: gasPrice, chainId: id, rpc: chain.rpc,
@@ -657,15 +682,17 @@ export default function Golf() {
         if (mine && mine.done && mine.strokes === s.strokes) break;
         await new Promise((r) => setTimeout(r, 1000));
       }
-      if (mine && mine.done && mine.strokes === s.strokes) land({ ...(tx || {}), hash: (tx && tx.hash) || "", parts: parts.length }), setSaved(true);
+      if (mine && mine.done && mine.strokes === s.strokes) land({ at: "saved", hash: tx?.hash ?? "", height: tx?.height, parts: parts.length }), setSaved(true);
       else
         land({
+          at: "refused",
+          stale: false,
           error: mine
             ? `The chain replayed your shots and got a different round: ${mine.strokes} strokes, ${mine.done ? "holed" : "not holed"}. This hole changes between shots, so a replay can differ from what you saw.`
             : "The transaction went through, but the chain has no round for you on this hole.",
         });
     } catch (err) {
-      land((err as SendError).cancelled ? null : { error: messageOf(err), stale: /weather .* is over|is not the current weather/.test(String((err as SendError).message)) });
+      land((err as SendError).cancelled ? null : { at: "refused", error: messageOf(err), stale: /weather .* is over|is not the current weather/.test(String((err as SendError).message)) });
     }
   }
 
@@ -713,6 +740,8 @@ export default function Golf() {
     else if (screen === "play") return; // the hole is not known yet: wait for it
     const url = window.location.pathname + (String(q) ? `?${q}` : "");
     const here = window.location.pathname + window.location.search;
+    // a link to a hole keeps its address while the title shows (the game on its way to it)
+    if (screen === "title" && lastScreen.current === null && (cfg.hole || cfg.cup)) return;
     const moved = lastScreen.current !== null && lastScreen.current !== screen;
     lastScreen.current = screen;
     if (url === here) return;
@@ -725,7 +754,7 @@ export default function Golf() {
     const onPop = (e: PopStateEvent) => {
       const p = new URLSearchParams(window.location.search);
       const st: unknown = e.state; // a history entry's state: this page's own, or anyone's
-      const was = st && typeof st === "object" && "screen" in st ? (st.screen as Screen) : null;
+      const was = st && typeof st === "object" && "screen" in st && isScreen(st.screen) ? st.screen : null;
       const sc: Screen = was || (p.get("hole") ? "play" : p.get("cup") ? "worlds" : "title");
       lastScreen.current = sc; // arriving here is not a new step
       setMenu(false);
@@ -750,7 +779,11 @@ export default function Golf() {
     const next = recordScore(cardKey(list.find((h) => h.id === id) || { id }), strokes);
     const after = cupTotals(next, list);
     setCard(next);
-    setFresh(GNOMES.filter((gn) => gn.unlock && UNLOCKS[gn.unlock] && !UNLOCKS[gn.unlock].ok(before) && UNLOCKS[gn.unlock].ok(after)));
+    setFresh(GNOMES.filter((gn) => gn.unlock && !UNLOCKS[gn.unlock].ok(before) && UNLOCKS[gn.unlock].ok(after)));
+    // the cup complete now and not before, or complete again in fewer strokes
+    const h = list.find((x) => x.id === id), cup = h && WORLDS.find((w) => w.id === cupOf(h))?.id;
+    const b = cup && before[cup], a = cup && after[cup];
+    if (cup && b && a && a.all && (!b.all || a.strokes < b.strokes)) setCupWon({ cup, id, best: b.all });
   };
 
   return (
@@ -817,7 +850,7 @@ export default function Golf() {
               <span className="card__par">par {parHere(s)}</span>
               {(s.roundMode || s.mode) === "pro" && <span className="pro-chip" title="Pro: no aim line">PRO</span>}
             </div>
-            <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * PERIOD_MS - skewOf(game.current && game.current.chain) : null} />
+            <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
             <div className="hud__right">
               <span className="adena__wrap">
               <button
@@ -957,7 +990,7 @@ export default function Golf() {
               title={`Camera: ${CAMS[s.cam] || "Classic"} — click to change`}
               onClick={() => {
                 const next = CAM_ORDER[(CAM_ORDER.indexOf(s.cam || "classic") + 1) % CAM_ORDER.length];
-                try { sessionStorage.setItem(CAM_KEY, next); } catch {}
+                saveCam(next);
                 sound("blip");
                 game.current?.setCam(next);
               }}
@@ -1016,7 +1049,7 @@ export default function Golf() {
               );
             })()}
             {!onChain && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={!!(rec && rec.stale)} onReplay={() => game.current?.reset()} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={stale} onReplay={() => game.current?.reset()} />
             )}
             {account && !onChain && (() => {
               // said before signing, not by refusing to: Adena still opens
@@ -1034,29 +1067,52 @@ export default function Golf() {
                 Play again
               </Button>
               {!onChain && (
-                <Button variant="chain" disabled={record === "signing" || !!(rec && rec.signing) || !!(rec && rec.stale)} onClick={() => void recordIt()}>
+                <Button variant="chain" disabled={record?.at === "signing" || stale} onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
-                  {record === "signing" ? "Waiting for Adena…" : rec && rec.signing ? `Adena: part ${rec.part} of ${rec.of}…` : "Save on-chain"}
+                  {record?.at === "signing" ? (record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`) : "Save on-chain"}
                 </Button>
               )}
-              <button
-                className="btn btn--main"
-                onClick={() => {
-                  const i = s.holes.findIndex((h) => h.id === s.id);
-                  goTo(s.holes[(i + 1) % s.holes.length].id);
-                }}
-              >
-                Next hole →
-              </button>
+              {cupWon && cupWon.id === s.id ? (
+                <button className="btn btn--main" onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
+                  Cup complete! →
+                </button>
+              ) : (
+                <button
+                  className="btn btn--main"
+                  onClick={() => {
+                    const i = s.holes.findIndex((h) => h.id === s.id);
+                    goTo(s.holes[(i + 1) % s.holes.length].id);
+                  }}
+                >
+                  Next hole →
+                </button>
+              )}
             </div>
             {account && !onChain && (
               <p className="real__fine">
                 About {costOf(gasOf(s), gasPrice)} GNOT of gas + {depositText(saved, bytePrice)}, shown again in Adena before you sign.
               </p>
             )}
-            {!onChain && !(rec && rec.stale) && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
+            {!onChain && !stale && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
           </Dialog>
         </div>
+      )}
+
+      {cupWon && cupWon.open && s && (
+        <Victory
+          cup={cupWon.cup}
+          best={cupWon.best}
+          holes={(s.allHoles || NONE).filter((h) => cupOf(h) === cupWon.cup)}
+          card={card}
+          fresh={fresh}
+          snapshot={() => (game.current ? game.current.snapshot(`${(WORLDS.find((w) => w.id === cupWon.cup) || WORLDS[0]).name} complete`) : Promise.resolve(null))}
+          onBack={() => (setCupWon(null), setScreen("worlds"))}
+          onReplay={() => {
+            setCupWon(null);
+            const first = s.holes[0];
+            if (first) goTo(first.id);
+          }}
+        />
       )}
 
       {askAim && (
@@ -1129,18 +1185,9 @@ export default function Golf() {
       {(fatal || (s && s.error)) && (() => {
         // say what actually went wrong: the chain not answering, a shot it
         // refused, or a bug of ours while drawing — and offer the fix that fits
-        const kind = fatal ? fatal.kind : (s && s.errorKind) || "shot";
+        const kind: FatalKind | ErrorKind = fatal ? fatal.kind : (s && s.errorKind) || "shot";
         const holeNow = s && s.id;
-        const TEXT = ({
-          down: ["The course is not reachable right now", "The chain the game plays on did not answer. It may be restarting."],
-          webgl: ["Your browser can't draw 3D here", "Turn on hardware acceleration in the browser's settings, then reload. The course is also playable as text on gno.land."],
-          empty: ["No hole on this chain yet", "The chain answered, but no hole is registered on it. Try again once the course is deployed."],
-          bug: ["Something went wrong", "The game hit an error in this browser. Reloading the page usually fixes it."],
-          load: ["That hole did not load", "The chain did not send this hole. Try again, or pick another one from the menu."],
-          draw: ["That hole could not be drawn", "Something broke on our side while building it. Pick another hole from the menu — your scores are safe."],
-          limit: ["That is the most strokes a round holds", "Restart the hole to play it again."],
-          shot: ["That shot did not go through", "The chain could not play that shot. Nothing was lost; you can shoot again."],
-        } as Record<string, readonly [string, string]>)[kind];
+        const TEXT = BANNER[kind];
         const g = game.current;
         return (
           <div className="banner" role="alertdialog" aria-labelledby="banner-title">
@@ -1195,10 +1242,13 @@ export default function Golf() {
 }
 
 function RecordState({ record, account, s, chain }: { record: Rec; account: Account | null; s: Snapshot; chain: Chain | null }) {
-  if (!record || record === "signing" || record.signing) {
-    return record && record !== "signing" && record.signing ? <p className="note">This round is saved in {record.of} transactions: one shot list is more than one transaction can replay here. Adena asks {record.of} times.</p> : null;
+  if (!record) return null;
+  switch (record.at) {
+    case "signing":
+      return record.of === undefined ? null : <p className="note">This round is saved in {record.of} transactions: one shot list is more than one transaction can replay here. Adena asks {record.of} times.</p>;
+    case "refused":
+      return record.stale ? null : <p className="note note--bad">{record.error}</p>;
   }
-  if (record.error) return record.stale ? null : <p className="note note--bad">{record.error}</p>;
   return (
     <p className="note note--good">
       Recorded{record.height ? ` in block ${record.height}` : ""}.{" "}
@@ -1303,29 +1353,8 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName, cost }:
   );
 }
 
-// the camera modes, in the order the button goes through them. A page always
-// opens in Classic; a mode picked since is kept for this tab's session only.
-const CAM_ORDER: readonly string[] = ["classic", "third", "far"];
-const CAMS: Record<string, string> = { classic: "Classic", far: "Far", third: "Third person" };
-const CAM_KEY = "gnogolf.cam.session";
-function savedCam() {
-  try {
-    localStorage.removeItem("gnogolf.cam"); // the old, lasting choice: forgotten
-    const c = sessionStorage.getItem(CAM_KEY);
-    return c && CAM_ORDER.includes(c) ? c : "classic";
-  } catch {
-    return "classic";
-  }
-}
-
-/** Whether this player ever picked a gnome (a first visit has not). */
-function hadGnome() {
-  try {
-    return !!localStorage.getItem("gnogolf.gnome");
-  } catch {
-    return false;
-  }
-}
+/** The camera modes' names, on the camera button. */
+const CAMS: Record<CamMode, string> = { classic: "Classic", far: "Far", third: "Third person" };
 
 /** The address of this hole, to put in the bar and in shared links. */
 function holeLink(s: Snapshot, gnome: string) {
@@ -1338,17 +1367,6 @@ function holeLink(s: Snapshot, gnome: string) {
   else q.set("hole", s.id || "");
   if (gnome) q.set("gnome", gnome);
   return `?${q}`;
-}
-
-function savedGnome() {
-  try {
-    const id = localStorage.getItem("gnogolf.gnome");
-    const gn = GNOMES.find((x) => x.id === id);
-    if (!gn || (gn.unlock && !earned().includes(id))) return GNOMES[0].id;
-    return gn.id;
-  } catch {
-    return GNOMES[0].id;
-  }
 }
 
 interface PickerProps {
@@ -1404,7 +1422,7 @@ function Picker({ gnome, onChange, onPick, unlocked, onBack, aim, onAim }: Picke
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
         <p className="pick__line">
-          {unlocked(skin.id) ? skin.line : <>🔒 {((skin.unlock && UNLOCKS[skin.unlock]) || { need: "Keep playing" }).need}</>}
+          {unlocked(skin.id) ? skin.line : <>🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</>}
         </p>
         <div className="pick__dots">
           {GNOMES.map((g) => (
@@ -1546,6 +1564,80 @@ function shareText({ s, card, cups, fresh }: { s: Snapshot; card: Card; cups: Re
     `🧙 My gnome sank ${s.name} in ${s.strokes}. Physics by a realm on gno.land, excuses by me.`,
     `⛳ ${s.strokes} strokes on ${s.name}. Every bounce computed on-chain. Beat that, gnome.`,
   ]) + tag;
+}
+
+/** The address of a cup, as the cup screen puts it in the bar: ?cup=<world>. */
+function cupLink(cup: string) {
+  const q = new URLSearchParams();
+  const keep = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  for (const k of ["rpc", "web"]) { const v = keep.get(k); if (v) q.set(k, v); }
+  q.set("cup", cup);
+  return `?${q}`;
+}
+
+/** The confetti over the victory screen: none with reduced motion. */
+function Cheer() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = ref.current;
+    if (!motion || !box) return;
+    // a canvas of its own each time: a context once lost is not given back
+    const el = box.appendChild(document.createElement("canvas"));
+    let stop = () => {};
+    try { stop = cheer(el); } catch {} // no WebGL to spare: no confetti, the screen stands
+    return () => (stop(), el.remove());
+  }, []);
+  return motion ? <div ref={ref} className="victory__cheer" aria-hidden="true" /> : null;
+}
+
+/**
+ * A cup won: its emblem and colours, the total against par, its card, the
+ * gnomes it earned and the ways to tell people, then back to the cups.
+ */
+interface VictoryProps {
+  cup: Cup;
+  best: boolean;
+  holes: readonly HoleRow[];
+  card: Card;
+  fresh: readonly Skin[];
+  snapshot: () => Promise<Blob | null>;
+  onBack: () => void;
+  onReplay: () => void;
+}
+function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay }: VictoryProps) {
+  const w = WORLDS.find((x) => x.id === cup) || WORLDS[0];
+  const t = totals(card, holes), vs = t.strokes - t.par;
+  const vsText = vs === 0 ? "level par" : `${vs > 0 ? "+" : ""}${vs}`;
+  const main = useRef<HTMLButtonElement>(null);
+  // the dialog focuses its first control (a share icon): the main action instead
+  useEffect(() => main.current?.focus({ preventScroll: true }), []);
+  const text = `🏆 ${best ? `New best on the ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on gno.land. #gnoland @_gnoland`;
+  return (
+    <div className={`victory victory--${cup}`}>
+      <Cheer />
+      <Dialog className="victory__in" role="dialog" aria-modal="true" aria-labelledby="victory-title" aria-describedby="victory-sum" onClose={onBack}>
+        <div className="victory__badge"><Emblem id={cup} /></div>
+        <span className="victory__ribbon">{w.name}</span>
+        <h2 id="victory-title">{best ? "New best!" : "Cup complete!"}</h2>
+        <p id="victory-sum" className="victory__sum">
+          <strong>{t.strokes}</strong> strokes · par {t.par} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsText}</b>
+          {t.all && vs <= 0 && <span className="victory__stamp" title="At par or under">★ At par or under</span>}
+          {t.aces > 0 && <span className="victory__stamp">{t.aces} hole{t.aces > 1 ? "s" : ""}-in-one</span>}
+        </p>
+        <Scorecard holes={holes} card={card} current={null} world={cup} compact />
+        {fresh.length > 0 && (
+          <p className="note note--good">
+            New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b> — pick it from the menu.
+          </p>
+        )}
+        <Share text={text} link={cupLink(cup)} snapshot={snapshot} />
+        <div className="banner__row">
+          <Button variant="secondary" onClick={() => (sound("blip"), onReplay())}>Replay the cup</Button>
+          <button ref={main} className="btn btn--main" onClick={() => (sound("select"), onBack())}>Back to cups</button>
+        </div>
+      </Dialog>
+    </div>
+  );
 }
 
 /** The par of the hole being played. */
@@ -1691,33 +1783,6 @@ const FlagMark = ({ f }: { f: Flag | false | undefined }) =>
     <em className="flag-mark" tabIndex={0} title={`Possibly automated: ${(f.reasons || []).join(", ") || "flagged"}`} aria-label={`Possibly automated: ${(f.reasons || []).join(", ")}`}>?</em>
   ) : null;
 
-// Friends: addresses (or gno.land names, resolved once) kept in this browser.
-const FRIENDS = "gnogolf.friends";
-/** A friend: an address, and the gno.land name it was added by ("" for none). */
-interface Friend {
-  addr: string;
-  name: string;
-}
-export const loadFriends = (): Friend[] => {
-  try {
-    const f: unknown = JSON.parse(localStorage.getItem(FRIENDS) || "[]");
-    return Array.isArray(f) ? f.filter((x: unknown): x is Friend => !!x && typeof x === "object" && "addr" in x && isAddress(x.addr)) : [];
-  } catch {
-    return [];
-  }
-};
-export const saveFriends = (f: Friend[]) => {
-  try {
-    localStorage.setItem(FRIENDS, JSON.stringify(f.slice(0, 49)));
-  } catch {}
-  return f;
-};
-export function addFriend(addr: string, name = "") {
-  const f = loadFriends();
-  if (!isAddress(addr) || f.some((x) => x.addr === addr)) return f;
-  return saveFriends([...f, { addr, name }]);
-}
-
 /**
  * You and your friends, on this hole and across the course, in the mode shown.
  * Read with Bests / Standings, which rank anyone, named or not.
@@ -1762,7 +1827,7 @@ function Friends({ s, chain, me, mode = "assisted" }: BoardProps) {
   };
   const drop = (addr: string) => setFriends(saveFriends(loadFriends().filter((f) => f.addr !== addr)));
   const invite = me && `${window.location.origin}${window.location.pathname}?friend=${me}`;
-  const rows = <R,>(b: { rows?: readonly R[] } | null, pick: (a: R, b: R) => number) => (b && b.rows ? [...b.rows].sort(pick) : null);
+  const rows = <R,>(b: { rows: readonly R[] } | null, pick: (a: R, b: R) => number) => (b ? [...b.rows].sort(pick) : null);
   const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
   return (
     <div className="lb friends">
@@ -1840,7 +1905,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
   // one starts (0 at the end). Offsets are the chain's, not the rows shown: a
   // name deleted since is skipped in its page, which then holds fewer rows
   // while more still follow.
-  const page = (offset: number) => chain!.holeLeaderboard(s.id || "", offset, PAGE, mode).then((b) => ({ ...b, rows: b.rows || [], done: !(b.next > offset) }));
+  const page = (offset: number) => chain!.holeLeaderboard(s.id || "", offset, PAGE, mode).then((b) => ({ ...b, done: !(b.next > offset) }));
   // what the rows on screen are for: a page asked for another hole or mode is dropped
   const view = useRef("");
   view.current = `${s.id}|${mode}|${tab}`;
@@ -1887,7 +1952,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
         {tab !== "friends" && (
           <p className="boards__ranked">
             Ranked: players with a gno.land name ·{" "}
-            <a href={`${web}/r/gnoland/users`} target="_blank" rel="noopener noreferrer">get a name ↗</a>
+            <a href={`${web}/r/sys/namereg/v1`} target="_blank" rel="noopener noreferrer">get a name ↗</a>
             {me && myName === "" && <> — get one to appear here</>}
           </p>
         )}
@@ -1895,7 +1960,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
           <Friends s={s} chain={chain} me={me} mode={mode} />
         ) : tab === "hole" ? (
           <div className="lb">
-            <h3>{s.name} <small>par {parHere(s)}{hb ? ` · ${hb.finished ?? hb.players} finished${hb.finished != null && hb.finished !== hb.players ? `, ${hb.players} ranked` : ""}` : ""}</small></h3>
+            <h3>{s.name} <small>par {parHere(s)}{hb ? ` · ${hb.finished} finished${hb.finished !== hb.players ? `, ${hb.players} ranked` : ""}` : ""}</small></h3>
             {newer && (
               <p className="note note--warn">
                 Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
@@ -1979,19 +2044,4 @@ function Leaderboard({ chain, me, mode = "assisted", filter = false }: { chain: 
       })()}
     </div>
   );
-}
-
-function earned(): unknown[] {
-  try {
-    const e: unknown = JSON.parse(localStorage.getItem("gnogolf.earned") || "[]");
-    return Array.isArray(e) ? e : []; // a hand edit or an older format must not blank the page
-  } catch {
-    return [];
-  }
-}
-function remember(id: string) {
-  try {
-    const e = earned();
-    if (!e.includes(id)) localStorage.setItem("gnogolf.earned", JSON.stringify([...e, id]));
-  } catch {}
 }

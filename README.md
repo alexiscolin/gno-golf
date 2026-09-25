@@ -20,11 +20,11 @@ It also means:
   hole without a wallet or an account. Nothing gets recorded until you ask for
   it.
 - Recording a whole hole takes one transaction (`PlayRound`), not one per
-  shot.
-- The golf realm has one role, its owner, who publishes the course's holes and
-  can hand the role on or renounce it. There is no pause, no upgrade and no
-  delisting: anyone can publish a hole of their own, and nobody can take one
-  down.
+  shot (a long round on a heavy hole may take a few).
+- The golf realm has one role, its owner, who publishes the course's holes.
+  There is no pause, no upgrade and no delisting: anyone can publish a hole of
+  their own, and nobody can edit or delete a hole, a round or a score. See
+  [Who can change what](#who-can-change-what).
 - You can read a hole's source on gnoweb before you play it. The physics you
   trust is code you can read.
 
@@ -37,11 +37,13 @@ top of a fast slope. Get it in the cup in as few strokes as you can. Each hole
 has a par.
 
 Some holes move: a mill's sails turn, a tram crosses, a gate closes every other
-stroke. Some depend on when you let go, so timing is part of the shot. Every cup hole
+stroke. Some depend on when you let go, so timing is part of the shot. Every
 hole also has weather (clear, wind, rain, fog, storm or snow). It changes every
 five minutes of chain time and is the same for everyone.
 
-There are four cups of 18 holes each:
+There are four cups of 18 holes each, plus two extra holes. The course is data
+(see [Updating after the deploy](#updating-after-the-deploy)); each hole was
+written as a realm, which is kept here as its source:
 
 | Cup | World | Source realms |
 |---|---|---|
@@ -63,8 +65,8 @@ older than the checkout and fail with `pubKeyAddress does not have a body`,
 so build `gnodev` from source:
 
 ```sh
-cd ~/Server/gnoland/gno/contribs/gnodev && go build -o /usr/local/bin/gnodev .
-cd ~/Server/gnoland/gnogolf && gnodev local -node-rpc-listener 127.0.0.1:26757
+(cd ../gno/contribs/gnodev && go build -o /usr/local/bin/gnodev .)
+gnodev local -node-rpc-listener 127.0.0.1:26757   # from this repo's root
 ```
 
 gnodev loads every package under `gno.land/` from disk. gnoweb runs on
@@ -78,13 +80,13 @@ that is gnodev's deploy key (`test1` by default). Generate the scripts and run
 them in order as that key:
 
 ```sh
-scripts/publishdata.sh     # writes scripts/publish/publish-NN.gno, 10 holes each
+scripts/publishdata.sh 7   # writes scripts/publish/publish-NN.gno, 7 holes each
 gnokey maketx run -gas-fee 1000000ugnot -gas-wanted 1000000000 \
   -remote http://127.0.0.1:26757 -chainid dev -broadcast test1 scripts/publish/publish-01.gno
 ```
 
-A Publish costs a few tens of millions of gas and about half a GNOT of storage
-deposit. A slot whose data is already current is skipped, so a script can be
+A Publish decodes and checks its data, the costliest thing golf does once per
+version, and locks about half a GNOT of storage deposit. A slot whose data is already current is skipped, so a script can be
 run again after a failure; `scripts/publish/verify.gno`, run simulated, checks every
 slot. Once they're published, `http://127.0.0.1:8888/r/gnogolf/golf` lists them.
 
@@ -98,8 +100,10 @@ npm run build        # static export to web/out/, host it anywhere
 ```
 
 The client reads its config from the query string, so one build works with any
-chain: `?rpc=` for the node, `?web=` for gnoweb, `?hole=` for a hole's pkgpath,
-and `?shot=angle,power` to fire a shot on load.
+chain: `?rpc=` for the node, `?web=` for gnoweb, `?hole=` for a hole's id
+(`garden/7`, `garden/7/v2`, or an old realm path), `?cup=garden&hole=7` for a
+course hole by its place, and `?shot=angle,power` to fire a shot on load. The
+golf realm's path is set at build time (`NEXT_PUBLIC_REALM`).
 
 To run the Gno tests, the test harness needs a package cache that matches the
 chain: point `GNOHOME` at a cache holding the gno checkout's `examples/` copies
@@ -111,8 +115,8 @@ only), since the module cache's `p/nt/avl` differs from the chain's.
 ```
 gno.land/p/gnogolf/physics   2D rolling-ball engine: walls, posts, zones, Step
 gno.land/p/gnogolf/course    the hole contract: Hole interface, course.Simple, weather
-gno.land/r/gnogolf/golf      the game realm: registry, rounds, previews, leaderboard, gnoweb page
-gno.land/r/gnogolf/<hole>    one realm per hole (hole1…, island1…, town1…, mountain1…)
+gno.land/r/gnogolf/golf      the game realm: holes, versions, rounds, previews, leaderboards, gnoweb page
+gno.land/r/gnogolf/<hole>    each hole's source, as a realm (hole1…, island1…, town1…, mountain1…)
 web/                         Next.js + three.js client, TypeScript (static export)
 adr/                         architecture decision records
 CLIENT.md                    the contract for writing a client
@@ -134,8 +138,8 @@ Everything below already runs on-chain.
   - The mode is the player's word: the chain cannot see a screen, and
     `Simulate` is open to all.
 - **Only named players are ranked.** `Leaderboard(mode)` (the course-wide top ten)
-  and `HoleLeaderboard(hole, mode, offset, limit)` (a hole's top 100, read ten by
-  ten) list only addresses with a gno.land name (`r/sys/users`). An address is
+  and `HoleLeaderboard(hole, mode, offset, limit)` (a hole's board, a page of
+  up to 100 at a time) list only addresses with a gno.land name (`r/sys/users`). An address is
   free, a name is not, so a script cannot flood the boards. Unnamed finishes are
   still kept, and count as soon as the player takes a name.
 - **Friends first.** `Bests(hole, mode, players)` and `Standings(mode, players)`
@@ -192,22 +196,15 @@ shot is nudged, because setup shots are fragile for everyone. Flags feed a
 
 Most holes are just geometry, and `course.Simple` covers that. A hole of your
 own is a community hole: playable, recorded and on its own board, but in no
-cup. It is either GG1 data (`course.Encode`) published with
-`golf.PublishMine(slug, hexData, note)`, or a realm with a `course.Simple`
-value and a `Register` function:
+cup. Every hole is GG1 data: build a `course.Simple`, encode it
+(`course.Encode`) and publish it in hex with
+`golf.PublishMine(slug, hexData, note)`. No hole runs code of its own on the
+chain: golf decodes the data and plays it with its own physics.
 
 ```go
-package myhole
-
-import (
-	"gno.land/p/gnogolf/course"
-	"gno.land/p/gnogolf/physics"
-	"gno.land/r/gnogolf/golf"
-)
-
 var me = &course.Simple{
 	World: "garden", Order: 21,
-	W: 40, H: 12, // the board; 0 means 32x16
+	W: 40, H: 12, // the board: 1 to 96 a side
 	Title:     "First Hole",
 	Strokes:   3, // par
 	Tee:       physics.V(4, 6),
@@ -232,22 +229,48 @@ var me = &course.Simple{
 	},
 }
 
-// Register publishes this hole to golf. It can't run from init(): there is no
-// `cur` there, so it takes one transaction after the deploy.
-func Register(cur realm) { golf.Register(cross(cur), me) }
+// hexData is what PublishMine takes:
+var hexData = hex.EncodeToString([]byte(course.Encode(me)))
 ```
 
-Deploy it with your own key (sessions can't use `vm/add_package`), then call
-`Register` once. The hole's id is its pkgpath, so nobody else can claim it
-(under golf's own namespace, the owner must `Expect` the path first). A
-`Skin` is only a hint for renderers: a client that doesn't know `"hedge"` draws
-a plain wall.
+Its id is `<your address>/<slug>/v1`, and only your address can add versions
+to it. A `Skin` is only a hint for renderers: a client that doesn't know
+`"hedge"` draws a plain wall.
 
-The hole realms in `gno.land/r/gnogolf/` are the best examples. `hole2` has a
-mole that pops up (`Pulses`), `hole4` has timed sails, `hole20` has a loop, and
-`island6` has a no-rail lane over the sea (an `Outside` polygon hazard). Every cup hole
-comes with a `fingerprint_test.gno` that pins its shots and checks it survives
-encoding as data.
+The hole realms in `gno.land/r/gnogolf/` are the best examples, and the
+source of the course's data (`scripts/holedata.sh` turns them into
+`data/holes.txt`); they don't call golf. `hole2` has a mole that pops up
+(`Pulses`), `hole4` has timed sails, `hole20` a seesaw, `island7` a
+loop-the-loop, and `island6` a no-rail lane over the sea (an `Outside`
+polygon hazard). Every cup hole comes with a `fingerprint_test.gno` that pins
+its shots and checks it survives encoding as data.
+
+## Who can change what
+
+The golf realm has one role, its owner: the account that deployed it. The
+owner publishes the course's holes and their new versions (`Publish`), and can
+add slots. A new version takes its slot: the old one is archived, still
+playable, its records kept, but its bests leave the course-wide ranking, which
+the new version starts from zero. So the owner shapes the course, and through
+it the ranking.
+
+- A version identical to the current one is refused, but nothing checks that
+  a new one is playable. A hole can be replaced, never taken down, so "nobody
+  can take a hole down" is only true in the letter.
+- A stolen owner key could archive every slot, and what that does to the
+  rankings can't be undone.
+- When a version is published decides its id, and the id seeds its weather.
+- The owner sets where the pages link the 3D game (`SetPlayURL`), and can name,
+  once and for good, the realm the course has moved to (`SetSuccessor`): a
+  banner and a field, which block nothing. Whoever holds the namespace can
+  also deploy lookalike realms under it.
+- The owner can hand the role on (`Transfer`, then `Accept`) or give it up for
+  good (`Renounce`), which freezes the course.
+
+The owner can't edit or delete a version, a round, a record, a best or a
+standing, can't touch a community hole, the weather, the physics or the code,
+and can't pause or upgrade the realm. The hub page says the same, with the
+current owner's name. The full list is in [docs/golf.md](docs/golf.md#who-can-change-what).
 
 ## Updating after the deploy
 
@@ -255,9 +278,8 @@ Nothing on gno.land is edited in place: a published package is frozen at its
 path. An update is a new package at a new path, and the rules below keep every
 score honest through it.
 
-- **The physics never changes under a hole.** A data hole plays on the physics
-  golf imports, a realm hole on the one it imports, and both are frozen, so
-  scores stay comparable forever. A new physics goes to a new path
+- **The physics never changes under a hole.** A hole plays on the physics
+  golf imports, which is frozen, so scores stay comparable forever. A new physics goes to a new path
   (`p/gnogolf/physics/v2`).
 - **A broken hole is replaced by a new version.** The owner publishes the fixed
   data into the same slot (`Publish("island/7", hexData, note)`), and it plays
@@ -269,9 +291,12 @@ score honest through it.
 - **Say what changed.** The version's note (on its data page, and in
   `Versions`), and the dapp's changelog, name the fix ("Hole 7 v2: closed a
   shortcut, v1 records archived").
-- **The hub itself** has no successor mechanism: if it ever needs one, a
-  `r/gnogolf/golf/v2` can read the v1's public state (`Holes`, `Leaderboard`,
-  `State`, `Round`) and show it as history.
+- **The hub itself** is replaced by a new realm (a sibling path, such as
+  `r/gnogolf/golf2`), which can read the v1's public state (`Holes`,
+  `Versions`, `HoleData`, `BestOf`, `StandingOf`, `Records`, `Players`) and
+  carry it over or show it as history. The v1's owner then calls
+  `SetSuccessor` once: every v1 page says where the course went, and v1 goes
+  on playing.
 - **The dapp** (the web client) is not on-chain and can be updated at any time.
   It lists the current holes (`"next"` is empty in `Holes()`) and links the
   archived ones.
@@ -287,3 +312,5 @@ score honest through it.
   unwrap, animating a path, the four rules).
 - [adr/adr-001-architecture.md](adr/adr-001-architecture.md): the original
   architecture.
+- [adr/adr-002-holes-as-data.md](adr/adr-002-holes-as-data.md): why the course
+  is data rather than one realm per hole.

@@ -8,6 +8,7 @@
 // The chain re-runs every shot itself — the page sends decisions, never
 // outcomes — so a recorded score is one nobody can type in.
 
+import { RULES, isAddress } from "./chain";
 import type { Mode, Vec2 } from "./types";
 
 /** An Adena answer: its status, and a code, a type or a message when it failed. */
@@ -49,7 +50,7 @@ export interface SendError extends Error {
 }
 /** What the work model counts for a round (the engine's snapshot has them):
  *  walls, pieces, the forecast's kind, each stroke's path length. */
-export interface Work {
+interface Work {
   walls?: number;
   pieces?: number;
   kind?: string;
@@ -92,7 +93,7 @@ async function ensureNetwork(a: Adena, { chainId, rpc, name = "Gnogolf chain" }:
   if (!chainId) return;
   const active = async () => {
     try {
-      const n = await a.GetNetwork!();
+      const n = await a.GetNetwork?.();
       return n && n.data ? { id: n.data.chainId, rpc: norm(n.data.rpcUrl || n.data.rpc_url) } : null;
     } catch {
       return null;
@@ -125,8 +126,11 @@ export async function connect({ chainId, rpc, name = "Gnogolf chain" }: { chainI
   if (est.status !== "success" && est.type !== "ALREADY_CONNECTED") throw new Error(why(est, "Adena did not connect."));
   const acc = await a.GetAccount();
   if (acc.status !== "success") throw new Error(why(acc, "Adena did not share an account."));
-  const { address } = acc.data!;
-  let on = acc.data!.chainId;
+  // a success without an account is no account
+  const data = acc.data;
+  if (!data || !isAddress(data.address)) throw new Error(why(acc, "Adena did not share an account."));
+  const { address } = data;
+  let on = data.chainId;
 
   if (chainId && on !== chainId) {
     await ensureNetwork(a, { chainId, rpc, name });
@@ -195,9 +199,9 @@ export function onWalletChange(fn: (...x: unknown[]) => void) {
 // pts: [path length per stroke] }, as the engine's snapshot gives them: walls
 // are the hole's and its pulses', pieces every wall, post and zone of the
 // hole, its pulses and the forecast, each polygon edge one more.
-const WORK = { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3 };
-const MAX_LIST = 12; // golf.gno maxShots: the longest list one commit takes
-const workOf = (c: Work, i: number) => WORK.shot + (c.walls || 0) * WORK.wall + ((c.pts || [])[i] || 60) * (WORK.point + (c.pieces || 0) * WORK.piece);
+// (a stroke whose length is not known counts as the longest path the realm takes)
+const WORK = RULES.work;
+const workOf = (c: Work, i: number) => WORK.shot + (c.walls || 0) * WORK.wall + ((c.pts || [])[i] ?? RULES.maxPath) * (WORK.point + (c.pieces || 0) * WORK.piece);
 
 /**
  * The commits a round is recorded in: [[from, to), …], cut where the chain
@@ -210,7 +214,7 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
   const parts: [number, number][] = [];
   let from = start, spent = 0, most = 0;
   for (let i = start; i < n; i++) {
-    if (i > from && (i - from >= MAX_LIST || spent + most > WORK.budget)) (parts.push([from, i]), (from = i), (spent = most = 0));
+    if (i > from && (i - from >= RULES.maxShots || spent + most > WORK.budget)) (parts.push([from, i]), (from = i), (spent = most = 0));
     const w = workOf(c, i);
     spent += w;
     most = Math.max(most, w);
@@ -219,18 +223,18 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
   return parts;
 }
 
-// Gas asked for one commit, calibrated on gno_call simulate=true:
-// the work model already bounds the shots
-// (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; the
-// forecast is ~7M, except rain (~90M measured) and a storm (~140M: the
-// puddles). Measured totals come out 1.35-1.85x under this.
 // what is asked of the account: the gas at the price, with half again for a
 // price that rises between the reading and the block
 const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
+// Gas asked for one commit, calibrated on gno_call simulate=true:
+// the work model already bounds the shots
+// (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; the
+// forecast is ~7M, except rain (up to 170M measured on the lane holes, as
+// golf.gno's budget says) and a storm (~140M measured: the puddles).
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
 const MAX_GAS = 1_900_000_000;
 const PER_CALL = 30e6;
-const FORECAST: Record<string, number> = { rain: 100e6, storm: 150e6 };
+const FORECAST: Record<string, number> = { rain: RULES.forecastGas, storm: 150e6 };
 /** The gas one commit of these strokes should need. c: { walls, pieces, kind (the forecast's), pts }. */
 export function gasOf(c: Work, from = 0, to = (c.pts || []).length) {
   let g = PER_CALL + (FORECAST[c.kind || ""] || 0);
@@ -316,7 +320,7 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
     e.cancelled = res.code === CANCELLED;
     throw e;
   }
-  return res.data!;
+  return res.data ?? null;
 }
 
 // The same save for gnokey, Adena's messages in one `maketx run` per commit:
@@ -324,19 +328,19 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
 // transaction is as atomic as Adena's. RUN_EXTRA: what a script's own
 // package costs over a call (an empty run is ~19M).
 const RUN_EXTRA = 20e6;
-/**
- * [{ file, script, command }] per commit, for the player to run with their
- * own key (<your-key-name>). s: the engine's snapshot of a holed round
- * (id, shots, period, roundMode, and the work model's walls, pieces, kind, pts).
- */
 /** A holed round as gnokeyPlan reads it: the engine's snapshot. */
-export interface SaveRound extends Work {
+interface SaveRound extends Work {
   id: string | null;
   name?: string;
   shots?: readonly string[];
   period?: number | null;
   roundMode?: Mode | null;
 }
+/**
+ * [{ file, script, command }] per commit, for the player to run with their
+ * own key (<your-key-name>). s: the engine's snapshot of a holed round
+ * (id, shots, period, roundMode, and the work model's walls, pieces, kind, pts).
+ */
 export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc }: { realm: string; price?: number; chainId?: string | null; rpc: string }) {
   const shots = s.shots || [], mode = s.roundMode || "assisted";
   if (!shots.length) return [];
@@ -375,7 +379,7 @@ export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc }:
   });
 }
 
-// The storage a save writes, in bytes (fix-hub.md, measured): a first finish
+// The storage a save writes, in bytes (measured): a first finish
 // on a hole writes the round, the best and the board entry (~6.6 KB), and a
 // player's first course finish ~2.5 KB more for the ranking; a replay of a
 // hole already saved replaces what is there (~0).
@@ -389,26 +393,3 @@ export const shortOf = (gas: number, price: number, deposit: number, balance: nu
  *  today's price (the ask adds half again for a rising price; Adena charges
  *  what it simulates). */
 export const costOf = (gas: number, price = 0.001) => ((gas * price) / 1e6).toFixed(3);
-
-/** The self-check of the split: node lib/adena.js's demoSplit(), or from a test. */
-export function demoSplit() {
-  const heavy = { walls: 100, pieces: 100, pts: Array<number>(12).fill(190) }; // 5.4e8 a shot
-  const p = commitsOf(heavy);
-  console.assert(p.length === 6 && p.every(([a, b]) => b - a === 2), "heavy: two a commit, as next() would cut");
-  const light = { walls: 0, pieces: 0, pts: Array<number>(60).fill(10) };
-  const q = commitsOf(light);
-  console.assert(q.length === 5 && q.every(([a, b]) => b - a === 12), "light: twelve a commit, 60 in five");
-  const mixed = { walls: 100, pieces: 100, pts: [10, 10, 10, 512, 512, 512, 512] };
-  console.assert(commitsOf(mixed).every(([a, b]) => {
-    let spent = 0, most = 0;
-    for (let i = a; i < b; i++) {
-      if (i > a && spent + most > WORK.budget) return false;
-      const w = workOf(mixed, i);
-      (spent += w), (most = Math.max(most, w));
-    }
-    return true;
-  }), "mixed: no commit the chain would refuse");
-  const late = commitsOf(heavy, 12, 5);
-  console.assert(late[0][0] === 5 && late.every(([a, b]) => b - a <= 2) && late[late.length - 1][1] === 12, "a split from a later stroke");
-  return "ok";
-}

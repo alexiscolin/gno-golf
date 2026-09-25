@@ -3,7 +3,7 @@
 // the others load on demand (loadWorld, once each). Each world module exports:
 //
 //   base(s, box)      -> Object3D   the island itself: ground slab and sides
-//   edging(box, seed) -> Object3D   detail on its rim and sides
+//   edging(s, box)    -> Object3D   detail on its rim and sides
 //   berms(s)          -> { group, height(x, z) }  the ground round the board
 //   decor(s, bank)    -> Object3D   everything planted round it; off the board
 //                                   rect, footprints reserved. decor.userData.fade
@@ -49,7 +49,7 @@ export interface Rough {
 /** A world module (see the list above). */
 export interface World {
   base(s: Hole, box: THREE.Box3): THREE.Object3D;
-  edging(box: THREE.Box3, seed: string): THREE.Object3D;
+  edging(s: Hole, box: THREE.Box3): THREE.Object3D;
   berms(s: Hole): { group: THREE.Object3D; height: Height };
   decor(s: Hole, bank: Height): Decor;
   rough?: Rough;
@@ -99,6 +99,9 @@ export function fromWorld(s: Hole, kind: "post" | "wall" | "zone", item: Post | 
 }
 
 export const DECK = 0.3; // a boardwalk's planks and joists: its cut face, over open water
+// how deep a gap in the lane goes (a crevasse, a ditch, a cliff): the ground's
+// gap sides (course.ts) and the walls drawn down them (zones.ts, mountain.ts) meet there
+export const GAP_Y = -7;
 // the water under a boardwalk's missing planks: the world's sea, or a pool as
-// far down where the world has none (zones.js deckGap draws it)
+// far down where the world has none (zones.ts deckGap draws it)
 export const gapWater = (s: Hole) => worldOf(s).SEA ?? GRASS - 0.9;

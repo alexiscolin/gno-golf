@@ -15,7 +15,7 @@ type offset struct {
 	lo, hi           Vec2
 }
 
-// unstickGap is how far clear of a piece Unstick sets a ball down.
+// unstickGap is how far clear of a piece UnstickIn sets a ball down.
 const unstickGap = 0.02
 
 // boxPad grows every broad-phase box: more than the half skin a ball may sit
@@ -252,20 +252,20 @@ func (f *Field) timedBars() []int {
 	return out
 }
 
-// Unstick moves a ball out of a piece that appeared on top of it — a gate
+// UnstickIn moves a ball out of a piece that appeared on top of it — a gate
 // shutting, a sail turning, a mole popping up where the ball rests, a tram
-// arriving on a rolling ball (Step, for timed bars). Walls come
-// in bars of four (physics.Bar): a ball inside one leaves through the nearest
-// side, straight out of it. A ball merely closer to a wall than its radius is
-// pushed off it.
-func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2 {
-	return unstick(ball, walls, posts, r, nil)
-}
-
-// unstick is Unstick that never pushes the ball across one of the untimed
-// walls of stays: a ball inside a bar leaves through the nearest side it can
-// leave by without, and stays where it is if there is none.
-func unstick(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec2 {
+// arriving on a rolling ball (Step, for timed bars). Walls come in bars of
+// four (physics.Bar): a ball inside one leaves through the nearest side it
+// can, straight out of it. A ball merely closer to a wall or a post than its
+// radius is pushed off it.
+//
+// No push carries the ball across one of the untimed walls of stays (the
+// hole's own walls, those that do not come and go): a ball inside a bar
+// leaves by the nearest side it can leave by without, and stays where it is
+// if there is none; any other push that would cross one is not made. A ball
+// left inside a post rolls out of it on the shot (Circle.Hit: a post never
+// traps a ball).
+func UnstickIn(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec2 {
 	for i := 0; i+3 < len(walls); i += 4 {
 		q := walls[i : i+4]
 		c := q[0].Seg.A.Add(q[1].Seg.A).Add(q[2].Seg.A).Add(q[3].Seg.A).Scale(0.25)
@@ -286,6 +286,9 @@ func unstick(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec
 							k, best, bestD = j, p, d
 						}
 					}
+				}
+				if k < 0 {
+					break // a NaN ball: no side is nearest
 				}
 				tried[k] = true
 				n := q[k].Seg.Normal()
@@ -321,7 +324,9 @@ func unstick(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec
 			if l == 0 {
 				d, l = Vec2{X: 1}, 1
 			}
-			ball = p.C.Add(d.Scale((p.R + r + unstickGap) / l))
+			if to := p.C.Add(d.Scale((p.R + r + unstickGap) / l)); !crossesAny(stays, ball, to) {
+				ball = to
+			}
 		}
 	}
 	return ball

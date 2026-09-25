@@ -5,6 +5,7 @@
 // into an offline buffer. Driven by the promo renderer via window.__promo.
 
 import { behind, chaseState } from "./chase";
+import { smoothstep } from "./terrain";
 import * as THREE from "three";
 import { shotOf } from "./chain";
 import { worldOf } from "./scene/worlds";
@@ -77,7 +78,10 @@ interface Shot {
 }
 
 // a capture tool: dev builds, or a page opened with ?camlog as well
-const on = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("promo") && (process.env.NODE_ENV !== "production" || /[?&]camlog/.test(window.location.search));
+// read from the link the page was opened with: the page loads this module only
+// once it has asked for it, and by then its address bar may say another thing
+const opened = typeof window !== "undefined" ? new URL(performance.getEntriesByType("navigation")[0]?.name || window.location.href).search : "";
+const on = new URLSearchParams(opened).has("promo") && (process.env.NODE_ENV !== "production" || /[?&]camlog/.test(opened));
 const FPS = 30;
 
 let E: PromoEngine | null = null; // the engine's insides, given by attach()
@@ -90,7 +94,7 @@ export const promo = {
     if (!on) return;
     E = e;
     // ?promo&build: the hole is drawn in pieces (not merged), so they can pop in one by one
-    if (new URLSearchParams(window.location.search).has("build")) {
+    if (new URLSearchParams(opened).has("build")) {
       const state = e.chain.state;
       e.chain.state = async (hole) => ({ ...(await state(hole)), unbaked: true });
     }
@@ -437,7 +441,7 @@ function aim(camera: THREE.PerspectiveCamera, c: Cam) {
   const B = ball().position, t = Math.max(tt, 0), T = c.dur || 2;
   // [u, y, v, dz]: board fractions across and along, height and an extra depth in units
   const u = (p: Key) => tmp.set(p[0] * b.w, p[1], p[2] * b.h + (p[3] || 0));
-  const k = Math.min(Math.max(tt / T, 0), 1), sk = k * k * (3 - 2 * k);
+  const k = Math.min(Math.max(tt / T, 0), 1), sk = smoothstep(k);
   if (c.mode === "follow") {
     // low behind the ball, looking where it goes: the direction follows its motion
     const d = tmp.subVectors(B, prevBall).setY(0);

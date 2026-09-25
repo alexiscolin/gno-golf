@@ -57,7 +57,8 @@ func there(i, every, on, phase int) bool {
 
 // WithTick is the field with its clock moved on by tick substeps: the tram,
 // the sails, the clock hand and the gusts where they were when the player let
-// go. Untimed fields play the same at any tick.
+// go. Untimed fields play the same at any tick. It may return f itself (tick
+// 0): do not mutate what it returns.
 func WithTick(f *Field, tick int) *Field {
 	if tick == 0 {
 		return f

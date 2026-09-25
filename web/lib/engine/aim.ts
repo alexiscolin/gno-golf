@@ -4,13 +4,14 @@
 //
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
-import { shotOf } from "../chain";
+import { shotOf, RULES } from "../chain";
+import { angDiff } from "../terrain";
 import { causeAt } from "../scene/cause";
 import { aimAlong } from "../scene";
 import type { Mode, MutVec2, Stroke, Vec2 } from "../types";
 import type { Live } from "./types";
 
-export const MAX_POWER = 10;
+const MAX_POWER = RULES.maxPower;
 
 // Third person's aim: the shot flies opposite the pull, like the classic
 // slingshot, so every direction is reachable — pull straight down to shoot
@@ -20,24 +21,12 @@ export const MAX_POWER = 10;
 // never feeds back into it. Screen up is yaw0, screen right is yaw0 + 90°.
 // Near the start (DEAD px) the direction holds; fine (Shift) moves the aim a
 // third as far towards where the drag points; otherwise a light smoothing.
-export const DEAD = 18;
-const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+const DEAD = 18;
 export function thirdAim(yaw0: number, dx: number, dy: number, prev?: number | null, fine = false) {
   if (Math.hypot(dx, dy) < DEAD && prev != null) return prev;
   const want = yaw0 + Math.atan2(-dx, dy);
   if (prev == null) return want;
   return prev + angDiff(want, prev) * (fine ? 0.33 : 0.6);
-}
-// the self-check: the eight directions, the dead zone, the fine step
-export function demoThird() {
-  const deg = (a: number) => Math.round((((a * 180) / Math.PI) % 360 + 360) % 360);
-  console.assert(deg(thirdAim(0, 0, 100)) === 0, "pull down: ahead");
-  console.assert(deg(thirdAim(0, 0, -100)) === 180, "pull up: back");
-  console.assert(deg(thirdAim(0, -100, 0)) === 90, "pull left: right");
-  console.assert(deg(thirdAim(0, 100, 0)) === 270, "pull right: left");
-  console.assert(thirdAim(0, 3, 4, 1.2) === 1.2, "dead zone holds");
-  console.assert(Math.abs(thirdAim(0, 0, 100, Math.PI / 2, true) - Math.PI / 2 * 0.67) < 1e-9, "fine");
-  return "ok";
 }
 // How much the aim dots give away, by aim mode. Assisted: the chain's whole
 // path, as far as the pull is strong (2 + power × 1.6 units). Pro: no line at
@@ -56,7 +45,7 @@ const PREVIEWS: Record<Mode, Preview> = {
 };
 // in pro, aimAlong is given the power that makes its reach maxLen (and the
 // dots' size), the same whatever the pull
-const proPower = (p: Preview) => Math.min(10, ((p.maxLen - 2) / 16) * 10 + 0.5);
+const proPower = (p: Preview) => Math.min(MAX_POWER, ((p.maxLen - 2) / 16) * MAX_POWER + 0.5);
 
 /** The first len units along path (of its first n points), the last one cut short. */
 function clipPath(path: readonly Vec2[], len: number, n = path.length) {
@@ -264,7 +253,7 @@ export function makeAimer(E: Live) {
   // The chain's path cut where the preview stops (see PREVIEW): at the first
   // contact, and at maxLen units along it whatever the power.
   function previewPath(res: Stroke) {
-    const path = res.path, why = typeof res.cause === "string" && res.cause.length === path.length ? res.cause : "";
+    const path = res.path, why = res.cause.length === path.length ? res.cause : "";
     let stop = path.length;
     const P = PREVIEW();
     if (P.stopAt === "first-contact") {

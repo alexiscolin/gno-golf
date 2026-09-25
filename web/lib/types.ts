@@ -110,7 +110,7 @@ export interface HoleState extends Versioned {
 }
 
 /** One round as State and Rounds list it (no path). */
-export interface RoundRow extends Versioned {
+interface RoundRow extends Versioned {
   player: string;
   /** where it lies (3 decimals), and the same ball exactly */
   ball: Vec2;
@@ -181,6 +181,13 @@ export interface HoleRow {
   /** "" unless archived: the version that took its place */
   next: string;
   slot?: string;
+}
+
+/** Holes(): the holes a menu lists, the 3D client's link and the realm the course moved to ("" if none). */
+export interface Holes extends Versioned {
+  play: string;
+  successor: string;
+  holes: readonly HoleRow[];
 }
 
 /** Community(): a page of every community hole, every version. */

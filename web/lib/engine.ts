@@ -5,9 +5,9 @@
 // owns the canvas and the pointer; it reports what it is doing through
 // onChange, and the interface is free to be whatever it likes.
 //
-// Its parts: engine/camera.js (where the camera goes), engine/aim.js (the
-// preview dots), engine/replay.js (walking the chain's path), and
-// engine/probes.js (the ?camlog test hooks). This file holds the game's state,
+// Its parts: engine/camera.ts (where the camera goes), engine/aim.ts (the
+// preview dots), engine/replay.ts (walking the chain's path), and
+// engine/probes.ts (the ?camlog test hooks). This file holds the game's state,
 // the frame loop, loading, the weather and the clock, input and the shot.
 
 import * as THREE from "three";
@@ -15,24 +15,24 @@ import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
 import { loadWorld } from "./scene/worlds";
-import { makeChain, shotOf, pullShot } from "./chain";
+import { makeChain, shotOf, pullShot, RULES } from "./chain";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
   courseBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene";
 import { BALL_R } from "./terrain";
-import { promo } from "./promo";
 import { makeCamera } from "./engine/camera";
 import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
-import { makeAimer, MAX_POWER, thirdAim } from "./engine/aim";
-import { probes } from "./engine/probes";
+import { makeAimer, thirdAim } from "./engine/aim";
 import type { Extras, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
 import type { WeatherZone } from "./scene/weather";
 import type { Confetti } from "./scene/fx";
-import type { CamMode, ErrorKind, GameState, GfxMode, Link, Live, Mood, Shot, Snapshot, Tier } from "./engine/types";
+import type { promo as Promo } from "./promo";
+import type { probes as Probes } from "./engine/probes";
+import { HOT as HOT_FIELDS, TICKS_PER_S, type CamMode, type ErrorKind, type GameState, type GfxMode, type Link, type Live, type Mood, type Shot, type Snapshot, type Tier } from "./engine/types";
 
 export type { CamMode, GameState, GfxMode, Link, Snapshot } from "./engine/types";
 export type Game = ReturnType<typeof createGame>;
@@ -44,10 +44,15 @@ export interface GameOptions {
   gnome?: string;
   world?: string;
   weather?: string;
-  aimMode?: string;
-  camMode?: string;
-  gfx?: string;
-  hooks?: boolean;
+  aimMode?: Mode;
+  camMode?: CamMode;
+  gfx?: GfxMode;
+  /** the trailer's capture rig (lib/promo.ts) and the test hooks (engine/probes.ts):
+   *  the page loads them only when its link asks for them */
+  promo?: typeof Promo;
+  probes?: typeof Probes;
+  /** ?camlog: the camera logs every frame (for the probes' camLog) */
+  log?: boolean;
   onChange?: (snap: Snapshot) => void;
   onHoled?: (r: { id: string; strokes: number }) => void;
 }
@@ -57,16 +62,19 @@ const errText = (e: unknown) => String((e instanceof Error && e.message) || e);
 const camOf = (m: string): CamMode => (m === "far" || m === "third" ? m : "classic");
 const gfxOf = (m: string): GfxMode => (m === "high" || m === "low" ? m : "auto");
 
-const MAX_SHOTS = 60; // the realm's limit for one round (maxRoundStrokes); a save of more than 12 goes in several commits
+// the realm's limits: the strokes one round holds (a save of more than 12 goes in several commits), the power of a shot
+const { maxRoundStrokes, maxPower: MAX_POWER } = RULES;
 // zones as the work model counts them: one piece each, and one per polygon edge
 const piecesOf = (zs: readonly { poly?: readonly unknown[] }[]) => zs.reduce((n, z) => n + 1 + ((z.poly && z.poly.length) || 0), 0);
 // the part of the screen the HUD covers, in CSS pixels: the camera frames
 // what is left, so the course is centred in what the player can actually see
 const HUD = { top: 108, bottom: 136, side: 14 };
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
-export const TICKS_PER_S = 3.5; // the timed pieces' clock at rest and while aiming, in substeps a second (the title's splash runs on it too)
 
-export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", hooks = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
+/** No trailer rig: what the engine calls on it does nothing. */
+const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
+
+export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
   const chain = makeChain({ rpc, web });
 
   const renderer = makeRenderer(canvas);
@@ -134,10 +142,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   /** The ground height under a board point — cosmetic, the chain's physics is flat. */
   const ground = (x: number, z: number) => (g.course ? g.course.userData.height(x, z) : 0);
   const lift = (p: readonly [number, number]) => at(p, BALL_R + ground(p[0], p[1]));
-  // ?camlog: the camera's per-frame log, and the probes (engine/probes.js)
-  // that the camera test scripts drive; hooks (a dev ?won) gets the probes alone
-  const logCam = typeof location !== "undefined" && /[?&]camlog/.test(location.search);
-  // the camera mode (engine/camera.js): the rig on the gnome, the whole hole, or behind him
+  // the camera mode (engine/camera.ts): the rig on the gnome, the whole hole, or behind him
   g.cam = camOf(camMode);
   const home = () => (g.cam === "far" ? "overview" : "ball");
 
@@ -145,7 +150,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // publish that changes nothing tells nothing. During a replay, a change of
   // the fast-moving fields alone (HOT) is told 10 times a second at most.
   // The world's hole list and counts are worked out once per list and world.
-  const HOT = new Set<keyof Snapshot>(["power", "cause", "flash"]), HOT_MS = 100, NONE: readonly never[] = [];
+  const HOT = new Set<keyof Snapshot>(HOT_FIELDS), HOT_MS = 100, NONE: readonly never[] = [];
   let told: Snapshot | null = null, toldAt = 0, toldLater: ReturnType<typeof setTimeout> | undefined;
   let wake = 0; // the last input or change: a still scene under reduced motion draws for a second after it
   const lists: { list: HoleRow[] | null; world: string | undefined | null; holes: HoleRow[]; worlds: Record<string, number> } = { list: null, world: null, holes: [], worlds: {} };
@@ -230,7 +235,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       period: g.period == null ? null : g.period, // the round's weather quarter hour: what a record is played in
       cause: g.cause || null, // a word on why the ball speeds up or drifts, once a shot
       note: g.note || null, // a word on how the shot went
-      errorKind: g.error ? g.errorKind : null,
+      errorKind: (g.error && g.errorKind) || null,
       view: g.view,
       gfx: gfxMode, // the graphics setting, and what it gives on this device
       tier,
@@ -539,7 +544,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   // Every shader the hole can need, compiled now: the scene as it is, and the
   // see-through variant of what a canopy fade turns transparent (fog and the
-  // lightning's light never change the programs: see weather.js)
+  // lightning's light never change the programs: see weather.ts)
   // (the see-through ones are only started: they are ready long before a fade
   // needs them). Resolves once the ones drawn now are linked.
   function warm() {
@@ -629,8 +634,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // Between rounds the period may have turned: a round not started yet takes
   // the new weather. Asked only once the loaded period is over on the chain's
   // clock (State has just given the current one: no Period() behind it).
-  const PERIOD_MS = 300e3;
-  const stale = () => g.period != null && chain.now() >= (g.period + 1) * PERIOD_MS;
+  const stale = () => g.period != null && chain.now() >= (g.period + 1) * RULES.periodMs;
   let freshening: Promise<void> | null = null;
   function freshWeather() {
     return (freshening = freshening || refresh().finally(() => (freshening = null)));
@@ -944,8 +948,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   async function shoot(angleDeg: number, power: number, round: number | undefined) {
     if (!g.id || !g.s) return;
     const id = g.id, s = g.s;
-    if (g.shots.length >= MAX_SHOTS) {
-      g.error = `${MAX_SHOTS} strokes is the most one round can hold.`;
+    if (g.shots.length >= maxRoundStrokes) {
+      g.error = `${maxRoundStrokes} strokes is the most one round can hold.`;
       g.errorKind = "limit";
       void publish();
       return;
@@ -990,7 +994,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.lastAim = (angleDeg * Math.PI) / 180;
     g.shots = [...g.shots, one]; // a new list: what changed is seen by reference
     g.pts = [...g.pts, res.path.length];
-    g.rest = Array.isArray(res.rest) && res.rest.every((v) => Number.isFinite(v)) ? res.rest : null;
+    g.rest = res.rest;
     g.tick0 = tick || 0;
     g.strokes = res.strokes || g.shots.length; // SimulateFrom has no count: a stroke is a shot
     if (res.holed) {
@@ -1088,7 +1092,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!link || !g.list) return null;
     // an archived hole too, by its id; an alias (a slot, "<address>/<slug>")
     // is its current version, and so is a course hole's old realm id
-    if (link.id) {
+    if ("id" in link) {
       const all = g.all || g.list, alias = oldToSlot(link.id) || link.id;
       return all.find((h) => h.id === link.id) || all.find((h) => h.slot === alias && !h.next) || null;
     }
@@ -1115,7 +1119,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const asked = linked(typeof link === "string" ? { id: link } : link);
     g.linked = !!asked;
     // ?cup=island alone: that cup, on its first hole
-    const cupWant = typeof link === "object" && link ? link.cup : undefined;
+    const cupWant = typeof link === "object" && link && "cup" in link ? link.cup : undefined;
     const cupLink = cupWant && g.list.some((h) => cupOf(h) === cupWant) ? cupWant : "";
     g.world = asked ? cupOf(asked) : cupLink || g.world || "garden";
     const first = asked || inWorld()[0] || g.list[0];
@@ -1151,10 +1155,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       g.covered = !!on;
       canvas.tabIndex = on ? -1 : 0; // a hidden course is not a place for Tab to land
     },
-    /** Leave the title screen: show the hole whole, then close on the ball. */
-    play() {
+    /** Leave the title screen: show the hole whole, then close on the ball;
+     *  direct (a link to this hole): straight to the player's camera. */
+    play(direct = false) {
       g.started = true;
-      closeIn = setTimeout(intro, OVERVIEW_MS);
+      if (!direct) return void (closeIn = setTimeout(intro, OVERVIEW_MS));
+      cam.jump(); // in its framing at once, not glided in
+      setView(home());
     },
     /**
      * Plays a list of "angle,power" shots as a player would, pulling the
@@ -1311,6 +1318,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   };
   // the test hooks, only for a page that asks for them
   // (always there in the type: undefined unless the page asked for them)
-  const hooked: Partial<ReturnType<typeof probes>> = logCam || hooks ? probes(E, { cam, rp, placeBall, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }) : {};
+  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }) : {};
   return Object.assign(api, hooked);
 }

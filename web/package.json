@@ -7,7 +7,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && next build",
     "start": "npx serve out",
-    "lint": "eslint . ../scripts"
+    "lint": "eslint . ../scripts",
+    "selfcheck": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/selfcheck.ts"
   },
   "dependencies": {
     "next": "^15.1.6",

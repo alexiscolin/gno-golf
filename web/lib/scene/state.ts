@@ -12,7 +12,7 @@ export const state = {
   timed: [] as Timed[], // timed walls: { at(step), walls } each, driven by the engine's clock (userData.timed)
   slopes: new Map<Zone, SlopeGlow>(), // slope zone -> { glow(k) }: its contour lines, lit by the replay (userData.slopes)
   water: null as WaterMask | null, // the hole's water mask { tex, data, nx, nz, cell, w, h }: splashes clip to it
-  smokes: [] as THREE.Object3D[], // chimneys' marks (props.js smoke): their puffs drawn as one batch (smokeBatch)
+  smokes: [] as THREE.Object3D[], // chimneys' marks (props.ts smoke): their puffs drawn as one batch (smokeBatch)
   lifts: [] as Height[], // (x, z) -> extra height of a moving deck under the ball (a seesaw), or 0 (userData.height)
   ghosts: null as ((aiming: boolean) => void) | null, // the timed pieces' dashed outlines, shown while aiming
 };

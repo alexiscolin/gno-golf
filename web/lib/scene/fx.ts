@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { BALL_R } from "../terrain";
-import { C, flat, drawn, clipTo, share } from "./materials";
+import { C, flat, drawn, clipTo, share, disposeCourse } from "./materials";
+import { makeRenderer, makeScene } from "./camera";
 import { state } from "./state";
 import type { Aim, Height, WaterMask } from "./data";
 import type { Vec2 } from "../types";
@@ -199,5 +200,47 @@ export function aimAlong(aim: Aim, path: readonly Vec2[], power: number, height:
   dots.instanceMatrix.needsUpdate = true;
   if (dots.instanceColor) dots.instanceColor.needsUpdate = true;
 }
-export type Splash = ReturnType<typeof makeSplash>;
 export type Confetti = ReturnType<typeof makeConfetti>;
+
+/** A cup won: two confetti bursts up from under a transparent canvas laid
+ *  over the page, one each side, gone once they fall. Returns its stop(). */
+export function cheer(canvas: HTMLCanvasElement) {
+  const renderer = makeRenderer(canvas), scene = makeScene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  // the view's foot a little above where they land: they fall back out of it
+  // rather than piling up over the page
+  camera.position.set(0, 0.3, 9);
+  camera.lookAt(0, 0.3, 0);
+  const bursts = [makeConfetti([0, 0], -3.6), makeConfetti([0, 0], -3.6)];
+  for (const b of bursts) scene.add(b.group);
+  let alive = true, last = performance.now();
+  const stop = () => {
+    if (!alive) return;
+    alive = false;
+    for (const b of bursts) disposeCourse(b.group);
+    renderer.dispose();
+    renderer.forceContextLoss();
+  };
+  const tick = (now: number) => {
+    if (!alive) return;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (canvas.width !== Math.round(w * renderer.getPixelRatio())) {
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      // each burst halfway out to its edge, whatever the screen's shape, and
+      // smaller on a narrow one (a phone), still landing out of sight
+      const edge = 9 * Math.tan(THREE.MathUtils.degToRad(20)) * camera.aspect, k = camera.aspect < 1 ? 0.65 : 1;
+      bursts.forEach((b, i) => (b.group.scale.setScalar(k), b.group.position.set((i ? 1 : -1) * edge * 0.6, -3.6 * (1 - k), 0)));
+    }
+    const dt = Math.min(Math.max(now - last, 0) / 1000, 0.05); // a frame's time can come before the start
+    last = now;
+    let busy = false;
+    for (const b of bursts) busy = b.step(dt) || busy;
+    renderer.render(scene, camera);
+    if (busy) requestAnimationFrame(tick);
+    else stop();
+  };
+  requestAnimationFrame(tick);
+  return stop;
+}

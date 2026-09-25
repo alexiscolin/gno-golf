@@ -343,5 +343,5 @@ point.
 
 `gnoverse/gno-mcp` (Apache-2.0) is the chain toolchain this project was built with:
 local `gnodev` profile, realm build/test/deploy flow, and — relevant to
-Milestone 0 — `Render()` conventions in its docs. It is pre-release and
+Milestone 0 — `Render()` conventions in its skill layer. It is pre-release and
 unaudited by its own README; writes are confined to dev/testnet by design.

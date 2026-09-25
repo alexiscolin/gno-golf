@@ -16,30 +16,12 @@ import (
 	"gno.land/r/sys/users"
 )
 
-// flat is a hole with nothing in it but its walls — enough to exercise golf
-// without depending on a real course.
-type flat struct{ course.Marks }
-
-var flatField = &physics.Field{
-	Walls:    physics.Box(physics.Vec2{X: 0, Y: 0}, physics.Vec2{X: 32, Y: 16}),
-	Friction: 0.8,
-	Bounce:   0.9,
-}
-
-func (h *flat) Name() string          { return "Flat" }
-func (h *flat) Start() physics.Vec2   { return physics.Vec2{X: 2, Y: 8} }
-func (h *flat) Cup() physics.Vec2     { return physics.Vec2{X: 20, Y: 8} }
-func (h *flat) Field() *physics.Field { return flatField }
-
-func (h *flat) Preview(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	shot := flatField.Step(ball, physics.FromPolar(angle, power), 14)
-	return shot, shot.Rest().Sub(h.Cup()).Len() <= 1.5
-}
-
-func (h *flat) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	shot, holed := h.Preview(ball, angle, power)
-	h.Mark(shot.Rest())
-	return shot, holed
+// flatHole is a box with nothing in it but its walls, the cup 18 units from
+// the tee: enough to exercise golf without depending on a real course.
+func flatHole(title string) *course.Simple {
+	return &course.Simple{W: 32, H: 16, World: "garden", Title: title, Strokes: 3,
+		Tee: physics.V(2, 8), Pin: physics.V(20, 8), Substeps: 14, CupRadius: 1.5, Shelter: 0.01,
+		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9}}
 }
 
 var player = testutils.TestAddress("user")
@@ -88,64 +70,47 @@ func roundIn(id string, p address) *round {
 	return roundOf(e, e.hole(), p)
 }
 
-// register deploys a flat hole as gno.land/r/test/<name> and returns its id.
-func register(cur realm, name string) string {
-	id := "gno.land/r/test/" + name
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), &flat{})
-	return id
+// mine publishes h as the community hole <slug> of an author of its
+// own, and returns its id.
+func mine(cur realm, slug string, h *course.Simple) string {
+	testing.SetRealm(testing.NewUserRealm(testutils.TestAddress("au" + slug)))
+	return PublishMine(cross(cur), slug, hexOf(h), "")
 }
 
-func TestRegisterNeedsARealm(cur realm, t *testing.T) {
-	testing.SetRealm(testing.NewUserRealm(player))
-	urequire.AbortsContains(t, cur, "a hole registers itself", func() {
-		Register(cross(cur), &flat{})
-	})
-}
+// holeIt is a power that holes a flat hole from its tee, straight at the
+// cup, and holeShot the same as a shot.
+const (
+	holeIt   = 7.0
+	holeShot = "0,7"
+)
 
-// The id is the caller's pkgpath: a realm registers once, and cannot register
-// under anybody else's name.
-func TestRegisterIsKeyedByPkgpath(cur realm, t *testing.T) {
-	id := register(cur, "dup")
-	uassert.Equal(t, id, mustHole(id).id)
-	testing.SetRealm(testing.NewCodeRealm(id)) // the same realm again
-	urequire.AbortsContains(t, cur, "already registered", func() {
-		Register(cross(cur), &flat{})
-	})
-}
+// register publishes a flat community hole and returns its id.
+func register(cur realm, slug string) string { return mine(cur, slug, flatHole("Flat")) }
 
-// A hole nested under another hole's path must not leak its rounds into it.
-func TestNestedPathsKeepTheirOwnRounds(cur realm, t *testing.T) {
-	outer := register(cur, "nest")
-	inner := register(cur, "nest/inner")
-	testing.SetRealm(testing.NewUserRealm(player))
-	Launch(cross(cur), inner, 0, 1)
-	n := 0
-	eachRound(mustHole(outer), roundsShown, func(string, *round) { n++ })
-	uassert.Equal(t, 0, n)
+// simAt is SimulateRoundAt in any period, old ones included: what the
+// weather tests compare.
+func simAt(id, shots string, period int64) string {
+	e := readHole(id)
+	h := e.hole()
+	return simulateRound(e, h, h.Start(), 0, shots, period)
 }
 
 // TestPreviewMatchesPlay pins the invariant the whole client model rests on: a
 // shot resolved by the free query and the same shot committed must land in the
 // same place, or players animate something that did not happen.
 func TestPreviewMatchesPlay(cur realm, t *testing.T) {
-	h := &flat{}
-	ball := physics.Vec2{X: 2, Y: 8}
-
-	preview, previewHoled := h.Preview(ball, 0.3, 5)
-	played, playedHoled := h.Play(ball, 0.3, 5)
-
-	uassert.Equal(t, preview.Rest().X, played.Rest().X)
-	uassert.Equal(t, preview.Rest().Y, played.Rest().Y)
-	uassert.Equal(t, len(preview.Path), len(played.Path))
-	uassert.Equal(t, previewHoled, playedHoled)
+	id := register(cur, "mirror1")
+	preview := Simulate(id, 2, 8, 17, 5)
+	testing.SetRealm(testing.NewUserRealm(player))
+	Launch(cross(cur), id, 17, 5)
+	uassert.True(t, strings.HasSuffix(preview, `"rest":`+jexact(roundIn(id, player).ball())+"}"), preview)
 }
 
 func TestRoundCountsStrokesAndFinishes(cur realm, t *testing.T) {
 	count := register(cur, "count")
 	testing.SetRealm(testing.NewUserRealm(player))
 
-	// two soft shots: 9 units short of the cup, so the round is still open
+	// two soft shots, well short of the cup, so the round is still open
 	Launch(cross(cur), count, 0, 1)
 	Launch(cross(cur), count, 0, 1)
 
@@ -158,29 +123,30 @@ func TestRoundCountsStrokesAndFinishes(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(player))
 	Reset(cross(cur), count)
 	testing.SetRealm(testing.NewUserRealm(player))
-	Launch(cross(cur), count, 0, 4)
+	Launch(cross(cur), count, 0, holeIt)
 
 	r = roundIn(count, player)
-	uassert.True(t, r.done, "a 4-power shot down the line should hole out")
-	uassert.Equal(t, 1, mustHole(count).best[pro])
+	uassert.True(t, r.done, "a shot down the line should hole out")
+	uassert.Equal(t, 1, mustHole(count).rec(pro).best)
 }
 
 // TestPlayRoundEqualsTheSameShotsOneByOne is what makes committing a whole hole
 // safe: the replay is not a shortcut, it is the same strokes.
 func TestPlayRoundEqualsTheSameShotsOneByOne(cur realm, t *testing.T) {
-	batch := register(cur, "batch")
-	single := register(cur, "single")
+	// one hole, so one weather: two players, one commit and two strokes
+	id := register(cur, "batch")
+	other := testutils.TestAddress("single")
 
 	testing.SetRealm(testing.NewUserRealm(player))
-	PlayRound(cross(cur), batch, "10,2 ; -20,3")
+	PlayRoundPro(cross(cur), id, "10,2 ; -20,3", Period())
 
-	testing.SetRealm(testing.NewUserRealm(player))
-	Launch(cross(cur), single, 10, 2)
-	testing.SetRealm(testing.NewUserRealm(player))
-	Launch(cross(cur), single, -20, 3)
+	testing.SetRealm(testing.NewUserRealm(other))
+	Launch(cross(cur), id, 10, 2)
+	testing.SetRealm(testing.NewUserRealm(other))
+	Launch(cross(cur), id, -20, 3)
 
-	a := roundIn(batch, player)
-	b := roundIn(single, player)
+	a := roundIn(id, player)
+	b := roundIn(id, other)
 	uassert.Equal(t, a.strokes, b.strokes)
 	uassert.Equal(t, a.bx, b.bx)
 	uassert.Equal(t, a.by, b.by)
@@ -247,39 +213,32 @@ func TestNamesAreCleaned(cur realm, t *testing.T) {
 	uassert.Equal(t, "Azwnj;B", cleanName("A&zwnj;B")) // no HTML entity: no hidden or turned-around text
 	uassert.Equal(t, "rlm; note", cleanText("&rlm; note", maxNote))
 	uassert.Equal(t, "turning bladescript", cleanSkin("turning blade<script>")) // no tag survives
+	// nothing that looks blank, strikes through, mentions or mails
+	uassert.Equal(t, "Untitled hole", cleanName(strings.Repeat("\u3164", 40)))
+	uassert.Equal(t, "Untitled hole", cleanName("\u115f\u1160\uffa0\u2800 \u00ad\u034f\u2060\ufe0f\U000e0041"))
+	uassert.Equal(t, "Untitled hole", cleanName("--- ..."))
+	uassert.Equal(t, "Garden Cup", cleanName("~~Garden~~ Cup"))
+	uassert.Equal(t, "g1abc x.y", cleanName("@g1abc x@.y"))
+	uassert.Equal(t, "ab", cleanText("a\u0085\u2028b", maxNote))
+	// format characters and nonspacing marks: Mongolian variation
+	// selectors, interlinear annotation, musical formatting, shorthand
+	// format controls, a stack of combining accents; a precomposed é stays
+	uassert.Equal(t, "Untitled hole", cleanName("\u180b\u180c\u180d\u180f\ufff9\ufffa\ufffb\U0001d173\U0001d17a\U0001bca0\U0001bca3"))
+	uassert.Equal(t, "Zalgo", cleanName("Z\u0301\u0302\u0303a\u0336lgo"))
+	uassert.Equal(t, "Café Élysée", cleanName("Café Élysée"))
 }
 
-// timed is a flat hole with a wall across it on odd strokes only.
-type timed struct{ flat }
-
-var gate = physics.Bar(physics.Vec2{X: 10, Y: 0}, physics.Vec2{X: 10, Y: 16}, 0.8, 0, "")
-
-func (h *timed) Varies() bool { return true }
-
-func (h *timed) Extras(stroke int) ([]physics.Wall, []physics.Post) {
-	if stroke%2 == 1 {
-		return gate, nil
-	}
-	return nil, nil
-}
-
-func (h *timed) PreviewAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool) {
-	ws, _ := h.Extras(stroke)
-	f := course.WithExtras(flatField, ws, nil)
-	shot := f.Step(ball, course.Launch(angle, power), 14)
-	return shot, false
-}
-
-func (h *timed) PlayAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool) {
-	return h.PreviewAt(ball, angle, power, stroke)
+// timedHole is a flat hole with a gate across it on odd strokes only.
+func timedHole() *course.Simple {
+	h := flatHole("Timed")
+	h.Pulses = []course.Pulse{{Every: 2, On: 1, Phase: 1, Walls: physics.Bar(physics.V(10, 0), physics.V(10, 16), 0.8, 0, "")}}
+	return h
 }
 
 // A timed hole meets the same course in the preview and in the record, stroke
 // by stroke, and the course depends on the player's own stroke count only.
 func TestTimedHoleFollowsTheRoundsStrokes(cur realm, t *testing.T) {
-	id := "gno.land/r/test/timed"
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), &timed{})
+	id := mine(cur, "timed", timedHole())
 
 	// stroke 0 is open: a soft shot rolls past x=10; stroke 1 meets the gate
 	shots := "0,3 ; 0,3"
@@ -315,8 +274,8 @@ func TestAnyonesHoleRanksNobody(cur realm, t *testing.T) {
 	giveName(cur, loner, "loner")
 	id := register(cur, "anyones")
 	testing.SetRealm(testing.NewUserRealm(loner))
-	PlayRoundAt(cross(cur), id, "0,4", Period())
-	uassert.True(t, mustHole(id).best[assisted] > 0, "the finish is kept")
+	PlayRoundAt(cross(cur), id, holeShot, Period())
+	uassert.True(t, mustHole(id).rec(assisted).best > 0, "the finish is kept")
 	uassert.False(t, strings.Contains(Leaderboard("assisted"), loner.String()), "not on the course board")
 	uassert.True(t, totals[assisted].Get(loner.String()) == nil, "no standing row")
 	uassert.True(t, strings.Contains(HoleLeaderboard(id, "assisted", 0, 10), loner.String()), "on the hole's own board")
@@ -356,44 +315,40 @@ func TestMarksCannotEscapeTheBoard(cur realm, t *testing.T) {
 	uassert.Equal(t, '~', mark('~', '#'))
 }
 
-// an island hole placed first in its world
-type islet struct{ flat }
-
-func (h *islet) WorldName() string { return "island" }
-func (h *islet) Position() float64 { return 1 }
-
 // Holes lists the course world by world, then by order within one, then
 // anyone's, and says which is which.
 func TestHolesAreListedWorldByWorld(cur realm, t *testing.T) {
-	id := "gno.land/r/test/islet9"
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), &islet{})
+	islet := flatHole("Flat")
+	islet.World, islet.Order = "island", 1
+	id := mine(cur, "islet9", islet)
 	island := publish(cur, cupHole("island", 41, "Isle"))
 	garden := publish(cur, cupHole("garden", 941, "Late garden"))
 	list := Holes()
+	uassert.True(t, strings.HasPrefix(list, `{"version":1,"play":"`+playURL+`","successor":"","holes":[{`), list)
 	gi, ii, ci := strings.Index(list, `"id":"`+garden+`"`), strings.Index(list, `"id":"`+island+`"`), strings.Index(list, `"id":"`+id+`"`)
 	uassert.True(t, gi >= 0 && ii > gi && ci > ii, "the garden, then the island, then anyone's: "+list)
 	uassert.True(t, strings.Contains(list, `"world":"island","order":41.000,"next":"","slot":"island/41"}`), "the island hole says where it is")
 	uassert.True(t, strings.Contains(State(id), `"world":"island"`), "State says the world too")
-	uassert.True(t, strings.Contains(Render(""), "## Community holes"), "anyone's holes have their own section")
 	uassert.True(t, strings.Contains(list, `"id":"`+id+`","name":"Flat","official":false`), "Holes says it is not the course's")
 	hub := Render("")
-	uassert.True(t, strings.Contains(hub, "## Island Cup"), "the course has a table per cup")
-	uassert.True(t, strings.Index(hub, "## Island Cup") < strings.Index(hub, "## Community holes"), "the course first")
+	uassert.True(t, strings.Contains(hub, "## Community holes"), "anyone's holes have their own section")
+	uassert.True(t, strings.Contains(hub, "### [Island Cup](/r/gnogolf/golf:island)"), "the course has a card per cup, to its page")
+	uassert.True(t, strings.Index(hub, "Island Cup") < strings.Index(hub, "## Community holes"), "the course first")
+	uassert.True(t, strings.Contains(Render("island"), "| 41 | [Isle](/r/gnogolf/golf:island/41) |"), "a cup's page lists its holes by their number")
+	uassert.True(t, strings.Contains(Render(id), "Community hole by [g1"), "a community hole has no cup, whatever its world")
+	uassert.False(t, strings.Contains(Render(id), "Island Cup"))
 }
 
-// a real course.Simple, so it plays in the weather
+// a hole open to the wind
 var windy = &course.Simple{
-	World: "island", Title: "Windy", Tee: physics.V(2, 8), Pin: physics.V(40, 8), Substeps: 20, CupRadius: 1,
+	W: 44, H: 16, World: "island", Title: "Windy", Tee: physics.V(2, 8), Pin: physics.V(40, 8), Substeps: 20, CupRadius: 1,
 	Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(44, 16)), Friction: 0.9, Radius: 0.5},
 }
 
 // The weather is a function of (hole, period): the same for everyone, it
 // changes the shot, and a recorded round cannot pick an old one.
 func TestWeatherOfTheMoment(cur realm, t *testing.T) {
-	id := "gno.land/r/test/windy"
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), windy)
+	id := mine(cur, "windy", windy)
 
 	uassert.Equal(t, Weather(id, 7), Weather(id, 7))
 	// find a windy period and a clear one
@@ -408,7 +363,7 @@ func TestWeatherOfTheMoment(cur realm, t *testing.T) {
 		}
 	}
 	uassert.True(t, windyAt >= 0 && clearAt >= 0, "an island has windy and clear spells")
-	calm, blown := SimulateRoundAt(id, "0,4", clearAt), SimulateRoundAt(id, "0,4", windyAt)
+	calm, blown := simAt(id, "0,4", clearAt), simAt(id, "0,4", windyAt)
 	uassert.True(t, calm[strings.Index(calm, `"path"`):] != blown[strings.Index(blown, `"path"`):], "the wind moves the ball")
 
 	testing.SetRealm(testing.NewUserRealm(player))
@@ -421,7 +376,7 @@ func TestWeatherOfTheMoment(cur realm, t *testing.T) {
 
 // a gate that swings across the lane within each stroke
 var swing = &course.Simple{
-	Title: "Swing", Tee: physics.V(2, 3), Pin: physics.V(26, 3), Substeps: 20, CupRadius: 1,
+	W: 32, H: 16, World: "garden", Title: "Swing", Tee: physics.V(2, 3), Pin: physics.V(26, 3), Substeps: 20, CupRadius: 1,
 	Course: &physics.Field{
 		Walls:    physics.Walls(physics.Box(physics.V(0, 0), physics.V(30, 6)), physics.Timed(physics.Bar(physics.V(10, 0), physics.V(10, 6), 0.5, '=', "gate"), 8, 4, 0)),
 		Friction: 0.95,
@@ -432,13 +387,12 @@ var swing = &course.Simple{
 // The third field of a shot is the player's timing: it decides whether the
 // gate is there, replays the same, and is kept with the round.
 func TestTimingIsPartOfTheShot(cur realm, t *testing.T) {
-	id := "gno.land/r/test/swing"
-	testing.SetRealm(testing.NewCodeRealm(id))
-	Register(cross(cur), swing)
-	p := Period()
+	id := mine(cur, "swing", swing)
+	e := mustHole(id)
+	p := periodOf(id, e.world, e.hole(), course.Clear) // in calm weather
 	past := 0
 	for tick := 0; tick < 8; tick++ {
-		out := SimulateRoundAt(id, ufmt.Sprintf("0,5,%d", tick), p)
+		out := simAt(id, ufmt.Sprintf("0,5,%d", tick), p)
 		if !strings.Contains(out, `"path":[[2.000,3.000],[5.000`) {
 			continue
 		}
@@ -448,11 +402,11 @@ func TestTimingIsPartOfTheShot(cur realm, t *testing.T) {
 		}
 	}
 	uassert.True(t, past > 0 && past < 8, "some timings get past the gate, some do not")
-	uassert.Equal(t, SimulateRoundAt(id, "0,5", p), SimulateRoundAt(id, "0,5,0", p), "no tick is tick 0")
-	uassert.Equal(t, SimulateRoundAt(id, "0,5,2000", p), SimulateRoundAt(id, "0,5,1023", p), "the tick is clamped")
+	uassert.Equal(t, simAt(id, "0,5", p), simAt(id, "0,5,0", p), "no tick is tick 0")
+	uassert.Equal(t, simAt(id, "0,5,2000", p), simAt(id, "0,5,1023", p), "the tick is clamped")
 
 	testing.SetRealm(testing.NewUserRealm(player))
-	PlayRoundAt(cross(cur), id, "0,5,3", p)
+	PlayRoundAt(cross(cur), id, "0,5,3", Period())
 	uassert.True(t, strings.Contains(Round(id, player), `"shots":"0.0000,5.0000,3"`), "the round keeps the timing")
 }
 
@@ -470,7 +424,7 @@ func TestNewerHoleTakesTheSlot(cur realm, t *testing.T) {
 	uassert.Equal(t, next, mustHole(old).next)
 	uassert.Equal(t, "", mustHole(next).next)
 	uassert.Equal(t, was-1, totals[pro].Get(player.String()).(*row).holes)
-	uassert.True(t, mustHole(old).best[pro] > 0, "the old hole keeps its record")
+	uassert.True(t, mustHole(old).rec(pro).best > 0, "the old hole keeps its record")
 
 	// replaying the archived hole ranks nothing
 	testing.SetRealm(testing.NewUserRealm(player))
@@ -492,13 +446,14 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	// three finishes, the worst first: 3 strokes, 2, then 1
 	for i, p := range []address{c, b, a} {
 		testing.SetRealm(testing.NewUserRealm(p))
-		PlayRoundAt(cross(cur), id, strings.Repeat("0,0.001;", 2-i)+"0,4", Period())
+		PlayRoundAt(cross(cur), id, strings.Repeat("0,0.001;", 2-i)+holeShot, Period())
 	}
 	testing.SetRealm(testing.NewUserRealm(stranger)) // unnamed: finished, not on the board
-	PlayRoundAt(cross(cur), id, "0,4", Period())
+	PlayRoundAt(cross(cur), id, holeShot, Period())
 	row := func(p address, n int) string { return ufmt.Sprintf(`{"player":"%s","strokes":%d}`, p.String(), n) }
 	head := `{"version":1,"hole":"` + id + `","mode":"assisted","par":3,"players":3,"finished":4,`
 	uassert.Equal(t, head+`"offset":0,"rows":[`+row(a, 1)+","+row(b, 2)+","+row(c, 3)+`],"next":0}`, HoleLeaderboard(id, "assisted", 0, 10))
+	uassert.True(t, strings.Contains(Render(id), "| 1 | [@hba](/r/gnogolf/golf:"+id+"/"+a.String()+") | 1 |\n| 2 | [@hbb]"), "the page shows the best rounds, best first")
 	// a page at a time: next is where the following page starts
 	uassert.Equal(t, head+`"offset":1,"rows":[`+row(b, 2)+`],"next":2}`, HoleLeaderboard(id, "assisted", 1, 1))
 	// an offset past the board is the board's end, however large
@@ -509,7 +464,7 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(c))
 	Reset(cross(cur), id)
 	testing.SetRealm(testing.NewUserRealm(c))
-	PlayRoundAt(cross(cur), id, "0,4", Period())
+	PlayRoundAt(cross(cur), id, holeShot, Period())
 	lb := HoleLeaderboard(id, "assisted", 0, 10)
 	uassert.Equal(t, 1, strings.Count(lb, c.String()), lb)
 	uassert.True(t, strings.Index(lb, row(c, 1)) < strings.Index(lb, row(b, 2)), lb)
@@ -521,10 +476,10 @@ func TestProRoundsRankApart(cur realm, t *testing.T) {
 	giveName(cur, player, "golfer")
 	id := register(cur, "promode")
 	testing.SetRealm(testing.NewUserRealm(player))
-	PlayRoundPro(cross(cur), id, "0,4", Period())
+	PlayRoundPro(cross(cur), id, holeShot, Period())
 	e := mustHole(id)
-	uassert.True(t, e.best[pro] > 0, "the pro record is set")
-	uassert.Equal(t, 0, e.best[assisted])
+	uassert.True(t, e.rec(pro).best > 0, "the pro record is set")
+	uassert.Equal(t, 0, e.rec(assisted).best)
 	uassert.True(t, strings.Contains(HoleLeaderboard(id, "pro", 0, 10), player.String()), "on the pro board")
 	uassert.False(t, strings.Contains(HoleLeaderboard(id, "assisted", 0, 10), player.String()), "not on the assisted one")
 
@@ -547,7 +502,7 @@ func TestOnlyNamedPlayersRank(cur realm, t *testing.T) {
 	id := courseHole(cur, 33)
 	testing.SetRealm(testing.NewUserRealm(stranger))
 	PlayRoundAt(cross(cur), id, "0,1", Period())
-	uassert.True(t, mustHole(id).best[assisted] > 0, "the finish is kept")
+	uassert.True(t, mustHole(id).rec(assisted).best > 0, "the finish is kept")
 	uassert.False(t, strings.Contains(HoleLeaderboard(id, "assisted", 0, 100), stranger.String()), "not on the hole's board")
 	uassert.False(t, strings.Contains(Leaderboard("assisted"), stranger.String()), "not on the course's board")
 	uassert.True(t, strings.Contains(Bests(id, "assisted", " g1nobody, "+stranger.String()), `"player":"`+stranger.String()+`"`), "friends see it")

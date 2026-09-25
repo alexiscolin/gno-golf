@@ -5,11 +5,11 @@
 // Everything here is built from the hole's own geometry — this file knows the
 // shapes, never the rules.
 //
-// The pieces live under scene/; this file is the public face engine.js and
+// The pieces live under scene/; this file is the public face engine.ts and
 // the picker import.
 
 export { motion, setTime, at, disposeCourse, quality } from "./scene/materials";
 export { maxDpr, makeRenderer, makeScene, setLighting, courseBox, applyRig, overviewRig, farRig, ORBIT, focusRig } from "./scene/camera";
 export { buildHole, finishHole, buildExtras } from "./scene/course";
 export { GNOMES, gnomeById, makeBall, makePreview } from "./scene/gnome";
-export { makeSplash, makeConfetti, makeBand, bandTo, makeAim, aimAlong } from "./scene/fx";
+export { makeSplash, makeConfetti, cheer, makeBand, bandTo, makeAim, aimAlong } from "./scene/fx";

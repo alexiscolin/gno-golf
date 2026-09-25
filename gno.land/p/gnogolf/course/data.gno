@@ -220,9 +220,10 @@ func (e *encoder) zones(zs []physics.Zone, skins map[string]int) {
 }
 
 // Decode reads a GG1 hole and prepares its walls from the stored lengths
-// (physics.PrepareWith), which it trusts: check them once with Exact before
-// accepting data from anyone. Anything outside the format, its limits or
-// its value bounds is an error, and nothing is returned with it.
+// (physics.PrepareWith), which it trusts: check them once with Exact, or
+// use DecodeChecked, before accepting data from anyone. Anything outside the
+// format, its limits or its value bounds is an error, and nothing is
+// returned with it.
 func Decode(s string) (*Simple, error) {
 	d := &decoder{s: s}
 	if len(s) < len(Magic) || s[:len(Magic)] != Magic {
@@ -322,9 +323,27 @@ func Decode(s string) (*Simple, error) {
 	return h, nil
 }
 
+// DecodeChecked is Decode, then Exact: a hole from data anyone wrote, its
+// stored lengths checked. It costs a Prepare more than Decode; data once
+// checked (kept by the realm that checked it) can be read back with Decode.
+func DecodeChecked(s string) (*Simple, error) {
+	h, err := Decode(s)
+	if err != nil {
+		return nil, err
+	}
+	if !Exact(h) {
+		return nil, errors.New("course: the stored wall lengths are not the walls' own")
+	}
+	return h, nil
+}
+
 // Exact reports whether a decoded hole's stored lengths are its walls' own:
 // whether its prep is, bit for bit, the one Prepare works out. Run it once on
-// data from anyone, before trusting it (Decode does not).
+// data from anyone, before trusting it (Decode does not; DecodeChecked does).
+//
+// It is for a value fresh from Decode, in the caller's own hands: it copies
+// the field and prepares the copy, which can panic on a hole stored in another
+// realm (the copy keeps that realm's read-only mark).
 func Exact(h *Simple) bool {
 	if h.Course == nil {
 		return false

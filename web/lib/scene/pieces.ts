@@ -2,7 +2,10 @@
 // a lamp...), bars (a tram, a stall...) and tunnel ends (a cave, a well...).
 // Every one stands exactly on its physics footprint: a post's circle is the
 // widest part the ball can touch; a bar fills its rectangle. What is above
-// the ball (fronds, awnings, roofs) may reach further.
+// the ball (fronds, awnings, roofs) may reach further. The island and town
+// draw some of these skins their own way (their piece()): the ones here are
+// then the fallbacks, on purpose, for a hole of another world that uses that
+// skin (a skin is a free string: a community hole may).
 import * as THREE from "three";
 import { C, flat, drawn, rbox, texOf, share } from "./materials";
 import { house, smoke } from "./props";
@@ -13,9 +16,9 @@ import type { Post, Vec2, Zone } from "../types";
 /** A post as a drawing takes it: its centre and radius. */
 type PostLike = Pick<Post, "c" | "r">;
 /** A post's drawing: (p, y) with y the ground there. */
-export type PostFn = (p: PostLike, y: number) => THREE.Object3D;
+type PostFn = (p: PostLike, y: number) => THREE.Object3D;
 /** A bar's drawing: (centre, length, thickness, angle, height). */
-export type BarFn = (c: Vec2, L: number, th: number, ang: number, height: Height) => THREE.Object3D;
+type BarFn = (c: Vec2, L: number, th: number, ang: number, height: Height) => THREE.Object3D;
 
 const P = {
   palmTrunk: 0xa47a4c, frond: 0x3f9b62, frondDark: 0x2f7d4f, coconut: 0x6b4a2f,

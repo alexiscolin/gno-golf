@@ -716,7 +716,7 @@ func TestABallAlongAWallMeetsItsEnd(t *testing.T) {
 // clear of it, not slid along it.
 func TestUnstickLeavesStraightOutOfTheNearestSide(t *testing.T) {
 	bar := Bar(V(22, 3), V(22, 12), 0.8, '#', "")
-	got := Unstick(V(22.3, 9.8), bar, nil, 0.5)
+	got := UnstickIn(V(22.3, 9.8), bar, nil, 0.5, nil)
 	if math.Abs(got.Y-9.8) > 1e-9 {
 		t.Fatalf("pushed along the bar, to %v", got)
 	}
@@ -740,5 +740,97 @@ func TestATimedBarNeverPushesTheBallThroughAWall(t *testing.T) {
 	}
 	if x := s.Rest().X; x > 18.8-0.5 && x < 21.2+0.5 {
 		t.Fatalf("the ball rests inside the tram, at %v", s.Rest())
+	}
+}
+
+// crossed is the first wall of ws a path steps across, or -1.
+func crossed(ws []Wall, path []Vec2) int {
+	for i := 1; i < len(path); i++ {
+		for j, w := range ws {
+			if w.Seg.Crosses(path[i-1], path[i]) {
+				return j
+			}
+		}
+	}
+	return -1
+}
+
+// A ball aimed at the tip of an acute corner meets the tip: the square caps
+// of the two walls left a gap in front of it, and a ball in the gap went
+// through the solid.
+func TestAnAcuteTipIsSolid(t *testing.T) {
+	for _, deg := range []float64{45, 60, 63, 75, 85} {
+		half := deg / 2 * math.Pi / 180
+		tip := V(20, 10)
+		a := tip.Add(FromPolar(math.Pi/2-half, 8)) // the wedge points up (-Y), solid below
+		b := tip.Add(FromPolar(math.Pi/2+half, 8))
+		ws := []Wall{{Seg: Segment{a, tip}}, {Seg: Segment{tip, b}}}
+		f := &Field{Walls: ws, Friction: 0.87, Bounce: 0.8, Radius: 0.5}
+		Prepare(f)
+		for off := -0.6; off <= 0.6; off += 0.05 {
+			for _, dist := range []float64{1.6, 1.874, 2.3, 3.1} {
+				for _, speed := range []float64{1.8, 3, 4.2, 6} {
+					s := f.Step(tip.Add(V(off, -dist)), V(0, speed), 3)
+					if j := crossed(ws, s.Path); j >= 0 {
+						t.Fatalf("%v° tip, offset %v, %v away, speed %v: through wall %d, rest %v", deg, off, dist, speed, j, s.Rest())
+					}
+				}
+			}
+		}
+	}
+}
+
+// A ball coming diagonally at a free wall end from afar meets the end: the
+// square cap had no end face to stop it.
+func TestAFreeEndCannotBeCutFromAfar(t *testing.T) {
+	ws := []Wall{{Seg: Segment{V(0, 0), V(5, 0)}}}
+	f := &Field{Walls: ws, Friction: 0.9, Bounce: 0.8, Radius: 0.5}
+	Prepare(f)
+	s := f.Step(V(6.8450752494799332, 1.1982058770330597), V(-2.5462835171612519, -1.387962625661413), 1)
+	if crossed(ws, s.Path) >= 0 || s.Bounces == 0 {
+		t.Fatalf("cut through the wall's end to %v, %d bounces", s.Rest(), s.Bounces)
+	}
+}
+
+// A piece that comes back on a ball never pushes it across a wall that
+// stays: not out of a bar, not off a post.
+func TestUnstickInNeverCrossesAStayingWall(t *testing.T) {
+	rail := []Wall{{Seg: Segment{V(0, 5), V(10, 5)}}}
+	post := []Post{{Circle: Circle{C: V(5, 4.6), R: 0.5}}}
+	ball := V(5, 4.9)
+	if got := UnstickIn(ball, nil, post, 0.5, nil); !rail[0].Seg.Crosses(ball, got) {
+		t.Fatalf("with nothing staying, the post pushes the ball to %v, over the rail", got)
+	}
+	if got := UnstickIn(ball, nil, post, 0.5, rail); got != ball {
+		t.Fatalf("the post pushed the ball across the rail, to %v", got)
+	}
+	// a bar whose nearest side is across the rail: the ball leaves by another
+	bar := Bar(V(2, 4.8), V(8, 4.8), 0.8, 0, "")
+	got := UnstickIn(ball, bar, nil, 0.5, rail)
+	if rail[0].Seg.Crosses(ball, got) {
+		t.Fatalf("the bar pushed the ball across the rail, to %v", got)
+	}
+	for _, w := range bar {
+		if w.Seg.Closest(got).Sub(got).Len() < 0.5 {
+			t.Fatalf("the ball is still on the bar, at %v", got)
+		}
+	}
+}
+
+// A slope on ice would speed a ball up for ever: it is held to SpeedCap at
+// every substep, not only at a bounce, so no substep takes more than a few
+// moves.
+func TestSpeedIsCappedEverySubstep(t *testing.T) {
+	down := V(1, 1)
+	f := &Field{
+		Walls:    Box(V(0, 0), V(96, 96)),
+		Zones:    []Zone{{Kind: Surface, Min: V(0, 0), Max: V(96, 96), Scale: 8}, {Kind: Slope, Min: V(0, 0), Max: V(96, 96), Vec: down}},
+		Friction: 0.9, Radius: 0.5,
+	}
+	s := f.Step(V(3, 3), V(7, 7), 30)
+	for i := 1; i < len(s.Path); i++ {
+		if d := s.Path[i].Sub(s.Path[i-1]).Len(); d > SpeedCap+down.Len()+1e-9 {
+			t.Fatalf("substep %d went %v", i, d)
+		}
 	}
 }

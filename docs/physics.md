@@ -6,8 +6,8 @@ by step. Scoring, turns, and what "holed" means belong to the caller (see
 [course.md](course.md)), so the package works for any Gno game with a ball
 rolling on a board.
 
-Source: `vec2.gno`, `shapes.gno`, `field.gno`, `step.gno`. Tests:
-`physics_test.gno`.
+Source: `vec2.gno`, `shapes.gno`, `field.gno`, `walls.gno`, `step.gno`.
+Tests: `physics_test.gno`, `prepare_test.gno`.
 
 ## Conventions
 
@@ -28,28 +28,30 @@ func (a Vec2) Sub(b Vec2) Vec2
 func (a Vec2) Scale(s float64) Vec2
 func (a Vec2) Dot(b Vec2) float64
 func (a Vec2) Len() float64
+func (a Vec2) LenCmp(r float64) int   // compares Len() with r: -1, 0 or 1
 func FromPolar(angle, r float64) Vec2 // length r, pointing at angle (radians)
-func Reflect(v, n Vec2) Vec2           // mirror v across the unit normal n
 ```
 
 ```go
 type Segment struct{ A, B Vec2 }
-func (s Segment) Normal() Vec2                              // unit left-normal
-func (s Segment) Hit(p0, p1 Vec2) (float64, Vec2, bool)    // travel fraction, normal facing the motion
-func (s Segment) Toward(p Vec2, r float64) Segment         // pushed r toward p, lengthened r at each end
+func (s Segment) Normal() Vec2             // unit left-normal
+func (s Segment) Crosses(p0, p1 Vec2) bool // does the motion p0->p1 cross it
+func (s Segment) Closest(p Vec2) Vec2      // the point of the segment nearest p
 
 type Circle struct { C Vec2; R float64 }
 func (c Circle) Hit(p0, p1 Vec2) (float64, Vec2, bool)     // swept point vs circle
 ```
 
 `Circle.Hit` doesn't report a hit when the motion starts inside the circle, so
-a post can't trap a ball that somehow got in.
+a post can't trap a ball that somehow got in. `LenCmp` gives exactly what
+comparing `Len()` would, but takes the square root only when the two are
+within a hair of each other.
 
 ## The field
 
 A `Field` is everything a ball rolls through: walls, posts and zones. There's
 no Windmill or Tunnel type. Every mini-golf obstacle is built from these three
-(the table in the `Field` doc comment in `field.gno` shows how).
+(the table at the top of `field.gno` shows how).
 
 ```go
 type Field struct {
@@ -60,11 +62,12 @@ type Field struct {
 	Bounce   float64 // default restitution of walls and posts
 	Radius   float64 // ball radius; 0 is a point
 	Tick     int     // where the stroke starts on the clock of timed walls and zones
+	// and, unexported, the walls' prep (see Wall prep)
 }
 ```
 
 With `Radius > 0` the ball's edge touches walls and posts. Its center stays
-`Radius` away from them. All the deployed holes use 0.5.
+`Radius` away from them. Every course hole uses 0.5.
 
 ### Wall
 
@@ -76,7 +79,6 @@ type Wall struct {
 	Skin   string  // for any other renderer
 	Every, On, Phase int // timing, see below
 }
-func (w Wall) There(i int) bool
 ```
 
 ### Post
@@ -84,7 +86,7 @@ func (w Wall) There(i int) bool
 ```go
 type Post struct {
 	Circle
-	Bounce float64 // 0 = Field.Bounce; above 1 = a bumper that adds energy
+	Bounce float64 // 0 = Field.Bounce; played at MaxBounce (0.92) at most
 	Mark   rune
 	Skin   string
 }
@@ -104,9 +106,9 @@ type Zone struct {
 	Poly     []Vec2  // a polygon (within Min..Max)
 	Outside  bool    // with Poly: everything in Min..Max except the polygon
 	Every, On, Phase int
+	Air, Capped bool // a Slope that is moving air; capped air never speeds the ball up
 }
 func (z Zone) Contains(p Vec2) bool
-func (z Zone) There(i int) bool
 ```
 
 The zone kinds:
@@ -148,8 +150,8 @@ substep `i` when
 (i + Field.Tick + Phase) % Every < On
 ```
 
-(`There(i)` checks `(i+Phase)%Every < On`, and `Step` calls it with
-`i + f.Tick`.) Walls and zones with `Every <= 0` are always there.
+(a sign-safe mod, so a negative phase works too). Walls and zones with
+`Every <= 0` are always there.
 
 `Field.Tick` is where the clock stands when the stroke starts, i.e. where the
 moving pieces were when the player let go. `WithTick` returns a copy with the
@@ -176,9 +178,10 @@ the next, see `course.Pulse` and `course.Timed`.
 func (f *Field) Step(pos, vel Vec2, substeps int) Shot
 
 type Shot struct {
-	Path    []Vec2 // one point per substep, plus tunnel/hazard/loop points
+	Path    []Vec2 // the start, one point per substep, plus tunnel/hazard/loop points
 	Bounces int    // walls and posts hit
 	Air     []bool // same length as Path: true where the ball is off the ground
+	Cause   []byte // same length as Path: what most acted on the ball in that substep
 }
 func (s Shot) Rest() Vec2 // last point of Path, or the zero vector
 ```
@@ -187,32 +190,40 @@ func (s Shot) Rest() Vec2 // last point of Path, or the zero vector
 whole point of it: a renderer replays those points and never simulates again
 (see [CLIENT.md](../CLIENT.md)).
 
+`Cause` is one letter per path point, the strongest of what acted on the ball
+in the substep that ended there: `b` a bounce, `s` a hill, `w` wind or a gust
+(a Slope with `Air`), `i` a slippery surface (scale above 1: ice, rain), `-`
+nothing but friction.
+
 Each substep does this:
 
 0. A timed bar (four timed walls from `Timed(Bar(…))`) that comes back this
    substep, or stands on the first one, pushes a ball inside it (or closer
    than `Radius`) out through its nearest side, straight along that side's
-   normal, as `Unstick` does for a stroke's pieces. A push that would carry
+   normal, as [`UnstickIn`](#unstickin) does for a stroke's pieces. A push that would carry
    the ball across an untimed wall takes the next nearest side instead, and
    if every side would, the ball stays where it is. A wall never stands on
    the ball, nor pushes it through another.
-1. The substep is split into `int(|vel| / MaxMove) + 1` moves, so a fast ball
-   can't skip past a zone or a wall.
+1. A ball faster than `SpeedCap` is slowed to it. The substep is then split
+   into `int(|vel| / MaxMove) + 1` moves (at most 6), so a fast ball can't
+   skip past a zone or a wall.
 2. For each move, if the ball is on the ground, the surface is reset to grass
-   and the zones that are there (`There`) and contain the ball are applied in
+   and the zones that are there (by their timing) and contain the ball are applied in
    order. A hazard or a slanted loop entry ends the shot.
 3. The move is swept against every wall that's there (using each wall's two
-   offset lines at `Radius`, worked out once per hole by `Prepare`, which
-   `course.Fit` calls) and every post (radius grown by `Radius`), and the
+   offset lines at `Radius`, worked out once per hole: see
+   [Wall prep](#wall-prep)) and every post (radius grown by `Radius`), and the
    nearest hit wins. A wall or post whose box the move's box misses is
    skipped first (the broad phase). A ball already within `Radius` of a wall
-   and moving into it hits it right away. A free wall end is a round cap of
-   radius `Radius`, swept like a post, however far past the end the ball
-   comes from along the wall's line.
+   and moving into it hits it right away. Both ends of every wall are round
+   caps of radius `Radius`, swept like posts from wherever the ball comes:
+   the offset lines are square caps with no end face, which left a gap in
+   front of an acute corner's tip and let a diagonal move cut a free end.
 4. On a hit, the part of the velocity along the surface keeps `Along` (0.97)
    of itself. The part into the surface bounces back times the restitution,
    which is played at `MaxBounce` (0.92) at most: nothing adds energy. Speed
-   is capped at `SpeedCap`.
+   is capped at `SpeedCap` again. Within a substep, a slope can add up to its
+   own `Vec` on top of it; no course hole's ball ever passes 6 (a full stroke).
 5. A point is appended to the path.
 6. Rolling resistance on the ground: `keep = min((Friction + 0.05) * surface,
    0.98)`, then `speed = |vel| * keep - Drag / surface`. At `speed <= 0.02`
@@ -259,7 +270,9 @@ creeps `|Vec|` a substep, so a hole that wants a stopped ball to roll uses
   the step goes on, so the slope pulls it back down on the next substep.
 - **Roll-on.** When the stroke's substeps run out while the ball is on the
   ground on such a slope, `Step` adds substeps (up to `MaxRollOn` in total)
-  until the ball leaves the slope. Only untimed slopes roll a ball on.
+  until the ball leaves the slope. Only untimed slopes roll a ball on. A ball
+  the slope only pins against a wall would jitter in place: while rolling on,
+  every 8 substeps, a ball that moved less than 0.1 stops.
 
 A timed Slope (hole20's seesaw) is a hill in the substeps it is there.
 
@@ -291,6 +304,53 @@ steps over it. From `island7`, the only loop left:
 	Vec: physics.V(21.6, 17), Scale: 2, Skin: "castle tube"},
 ```
 
+## UnstickIn
+
+```go
+func UnstickIn(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec2
+```
+
+`UnstickIn` moves a ball out of pieces that appeared on top of it: a gate
+shutting, a mole popping up where the ball rests (`course.Simple` calls it
+before each stroke, with that stroke's pulse pieces and the hole's own walls
+as `stays`). `walls` are read in groups of four, as `Bar` makes them.
+
+- A ball **inside** a bar leaves through the nearest side: it's put on the
+  outward normal of that side, from the side's nearest point, `r + 0.02` out.
+- A ball merely **closer than `r`** to a bar is pushed off it, along the line
+  from the nearest point of the bar, to `r + 0.02`.
+- A ball closer than `r` to a post is pushed off it radially, the same way.
+
+No push carries the ball across an untimed wall of `stays`. Out of a bar, the
+ball takes the next nearest side instead, and if every side would cross one,
+it stays where it is. Off a bar or a post, a push that would cross one is not
+made: a ball left inside a post rolls out of it on the shot (a post never
+traps a ball). `Step` does the same for timed bars during a stroke (step 0
+above), with the field's walls as `stays`.
+
+## Wall prep
+
+A wall is swept as its two offset lines at the ball's radius (one on each
+side, lengthened by the radius at each end). Working them out takes three
+square roots per wall, which in the GnoVM is expensive, so it's done once per
+hole and kept in the field.
+
+```go
+func Prepare(f *Field)                        // works out every wall's offsets
+func Lengths(s Segment, r float64) (l, lp, lm float64) // the three square roots Prepare takes
+func PrepareWith(f *Field, lens []float64)    // Prepare with each wall's Lengths given
+func Prepared(f *Field) []float64             // a copy of the prep, for tests
+```
+
+- `Prepare` is called by `course.Fit`, once the walls are where they stay.
+  Walls that change afterwards (a stroke's extras) are only a cost: `Step`
+  checks each entry against its wall and works out any that no longer match.
+- `PrepareWith` takes three lengths per wall, in wall order, and gives the same
+  prep, bit for bit, when they're the walls' own, without any square root.
+  It doesn't check them: whoever stored them must have, once, by comparing
+  `Prepared(f)` against `Prepare`'s. With the wrong count it is `Prepare`.
+  `course.Decode` uses it, and `course.Exact` is that check.
+
 ## Helpers
 
 Walls:
@@ -307,12 +367,13 @@ func Skinned(ws []Wall, skin string) []Wall                     // set Skin (boa
 ```
 
 `Timed`, `Soft` and `Skinned` change the slice you pass in and return it.
+`Bar` returns nil for a zero-length bar.
 
 Use `Bar` for anything free-standing the ball can hit head-on. A ball moving
 exactly along a zero-width segment never crosses it. An outer wall is fine as
 a bare segment because the ball is always on one side of it. `Unstick` (and
-Step's timed bars) also assume that pieces which appear on top of a ball come in groups of four
-walls, which is what `Bar` produces.
+Step's timed bars) also assume that pieces which appear on top of a ball come
+in groups of four walls, which is what `Bar` produces.
 
 Points, for `Outline` or `Polyline`:
 
@@ -383,7 +444,9 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 `Skin` and `Mark` have no effect on the simulation: what a zone does is in
 its fields (`Kind`, `Air`, `Capped`). A renderer has to be able to draw any
 field from the geometry alone and treat an unknown skin as the plain shape.
-The skins used so far are listed in the `Field` doc comment in `field.gno`.
+Keep skins to short lower-case ids: they're lookup keys, and a client's table
+is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
+`storm` and `snow`.
 
 ## Determinism and gas
 
@@ -392,19 +455,18 @@ The skins used so far are listed in the `Field` doc comment in `field.gno`.
   client should replay `Shot.Path` rather than port the engine to another
   language, which would have to match GnoVM float64 behavior exactly.
 - **Cost of a shot.** `Step` is `O(moves × (walls + posts + zones))`, with
-  `ceil(speed / MaxMove)` moves per substep. The player pays it on every
+  `int(speed / MaxMove) + 1` moves per substep, and a broad phase that skips
+  the walls and posts a move's box misses. The player pays it on every
   stroke, so the number of obstacles and the `n` you pass to `Arc`, `Lane`
-  and `Stadium` are gas budgets. We measured about 7.3M gas fixed per
-  shot plus about 860k gas per substep against 4 obstacles, on the early
-  holes.
-- **Cost of importing.** We measured about 275 gas per byte of
-  imported source on every call of an importer, even for code it never calls.
-  Keep that in mind before making the package bigger. (That's a measurement
-  from an older version of the package, not re-checked for this doc.)
+  and `Stadium` are gas budgets. A full-power shot measured about 25M gas on
+  a 30-wall and a 48-wall hole; the heaviest full-power shot on the course
+  measured 78M.
 - **Zone width.** No zone can be crossed without being seen as long as it's
   at least `MaxMove` wide in the direction of travel. Several deployed zones
   are under twice that (town14's door tunnel, hole4's tunnels, island9's and
   island10's gaps): safe, but near the edge.
 - **Square roots.** `math.Sqrt` is software in the GnoVM (~160K gas a call).
-  `Vec2.LenCmp` compares a length without one unless it has to, and
-  `Segment.Crosses` is `Hit` without its normal.
+  `Vec2.LenCmp` compares a length without one unless it has to,
+  `Segment.Crosses` tests a crossing without working out a normal, and the
+  wall prep is worked out once per hole (`Prepare`, or `PrepareWith` from
+  stored lengths).

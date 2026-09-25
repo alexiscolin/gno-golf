@@ -1,4 +1,4 @@
-// The title's splash (components/Title.jsx), where its video ends: a real
+// The title's splash (components/Title.tsx), where its video ends: a real
 // hole of one world at golden hour, seen close from the green, three gnomes
 // on it round the cup, and a camera that drifts only a little. The hole is
 // drawn by buildHole from the game's own pieces and shared materials; its
@@ -15,8 +15,8 @@ import { buildHole } from "./course";
 import { makeRenderer, makeScene } from "./camera";
 import { makeBall, gnomeById } from "./gnome";
 import { makeConfetti } from "./fx";
-import { BALL_R } from "../terrain";
-import { TICKS_PER_S } from "../engine";
+import { BALL_R, smoothstep } from "../terrain";
+import { TICKS_PER_S } from "../engine/types";
 import { C, flat, inked, texOf, disposeCourse, setTime } from "./materials";
 import { ud, type Course, type Gnome, type Hole, type LitScene } from "./data";
 import type { Board } from "../types";
@@ -78,14 +78,11 @@ function golfBall() {
 }
 
 // Per world: how far up the lane the ride starts (clear of the garden's tunnel
-// mouths, the island's castle, the town's second tram line: its trams leave
-// the crossing clear for half a second at most, too short for the ride to
-// cross, so it starts past the rails and the tram goes by behind it), and the camera: how far off, from how far
+// mouths and the island's castle), and the camera: how far off, from how far
 // round (th, radians behind the cup > 0; pth upright, from beyond the cup by
 // default) and how high (h, times R)
 const SPOT: Record<string, { ride: number; R: number; h?: number; th?: number; pth?: number }> = { garden: { ride: 5.5, R: 13 }, island: { ride: 4.2, R: 12, h: 0.7 }, town: { ride: 6, R: 13 }, mountain: { ride: 8, R: 13 } };
 const RIDE_AT = 1.2, RIDE_S = 7; // the ride's start and length (s)
-const smooth = (k: number) => k * k * (3 - 2 * k);
 
 /**
  * The three gnomes on the green, at the game's own scale, round the cup: one
@@ -135,7 +132,7 @@ function makeCast(s: Hole, course: Course, world: string) {
       const dt = Math.min(Math.max(t - lastT, 0), 0.1);
       lastT = t;
       // the ride: eases in and out, the ball turning by its roll, the gnome upright on it
-      const k = smooth(Math.min(Math.max((t - RIDE_AT) / RIDE_S, 0), 1));
+      const k = smoothstep((t - RIDE_AT) / RIDE_S);
       p.lerpVectors(rideFrom, rideTo, k);
       onGround(rider, p, 0.45);
       ball.rotation.set(0, Math.atan2(d.x, d.z), 0);
@@ -190,7 +187,7 @@ function frameCast(camera: THREE.PerspectiveCamera, c: ReturnType<typeof makeCas
 
 // ------------------------------------------------------------- the stage
 
-// the engine's own test (engine.js weakGpu), kept apart: that file is the game loop's
+// the engine's own test (engine.ts weakGpu), kept apart: that file is the game loop's
 const weakGpu = (renderer: THREE.WebGLRenderer) => {
   try {
     const gl = renderer.getContext(), x = gl.getExtension("WEBGL_debug_renderer_info");

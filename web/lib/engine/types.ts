@@ -1,6 +1,6 @@
 // The engine's shapes: the game's state (g), the live state its parts read
-// (E), and what the interface is told (Snapshot). Type-only, so engine.ts and
-// engine/*.ts import it without importing each other.
+// (E), and what the interface is told (Snapshot). It imports types only, so
+// engine.ts and engine/*.ts import it without importing each other.
 import type * as THREE from "three";
 import type { Chain } from "../chain";
 import type { Forecast, HoleRow, Mode, Vec2, Zone, ZoneKind } from "../types";
@@ -9,6 +9,9 @@ import type { Rig, View } from "../scene/camera";
 import type { WeatherNow } from "../scene/weather";
 import type { Band } from "../scene/fx";
 import type { Causes } from "../scene/cause";
+
+/** The timed pieces' clock at rest and while aiming, in substeps a second (the title's splash runs on it too). */
+export const TICKS_PER_S = 3.5;
 
 /** The camera modes: the rig on the gnome, the whole hole, or behind him. */
 export type CamMode = "classic" | "far" | "third";
@@ -127,6 +130,11 @@ export interface Live {
   readonly strokeZones: readonly Zone[];
 }
 
+/** The snapshot's fast-moving fields (the power bar, a push's cause, the
+ *  storm's flashes): told at most 10 times a second in a replay, and read by
+ *  the page from a store of their own. */
+export const HOT = ["power", "cause", "flash"] as const satisfies readonly (keyof Snapshot)[];
+
 /** What the interface is told, each time it changes. */
 export interface Snapshot {
   holes: readonly HoleRow[];
@@ -164,15 +172,11 @@ export interface Snapshot {
   period: number | null;
   cause: CauseNote | null;
   note: string | null;
-  errorKind: ErrorKind | null | undefined;
+  errorKind: ErrorKind | null;
   view: "overview" | "ball";
   gfx: GfxMode;
   tier: Tier;
 }
 
 /** A hole a link names: its id, or a cup and a place in it. */
-export interface Link {
-  id?: string;
-  cup?: string;
-  n?: number;
-}
+export type Link = { id: string } | { cup: string; n?: number };

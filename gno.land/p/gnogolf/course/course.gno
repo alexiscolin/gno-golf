@@ -42,9 +42,14 @@ type Ordered interface {
 }
 
 // OrderOf is the hole's place in the course, or fallback when it has none.
+//
+// OrderOf, WorldOf and ParOf call the hole's method once and check the value
+// they return: a hole is anyone's code, and may answer differently each time.
 func OrderOf(h Hole, fallback float64) float64 {
-	if o, ok := h.(Ordered); ok && o.Position() > 0 {
-		return o.Position()
+	if o, ok := h.(Ordered); ok {
+		if n := o.Position(); n > 0 {
+			return n
+		}
 	}
 	return fallback
 }
@@ -58,16 +63,20 @@ type Worlded interface {
 
 // WorldOf is the hole's world.
 func WorldOf(h Hole) string {
-	if w, ok := h.(Worlded); ok && w.WorldName() != "" {
-		return w.WorldName()
+	if w, ok := h.(Worlded); ok {
+		if n := w.WorldName(); n != "" {
+			return n
+		}
 	}
 	return "garden"
 }
 
 // ParOf is the hole's par.
 func ParOf(h Hole) int {
-	if p, ok := h.(Parred); ok && p.Par() > 0 && p.Par() < 20 {
-		return p.Par()
+	if p, ok := h.(Parred); ok {
+		if n := p.Par(); n > 0 && n < 20 {
+			return n
+		}
 	}
 	return 3
 }
@@ -439,7 +448,8 @@ const (
 
 // WithWeather lays weather over a field: the sky's zones (wind, rain, fog,
 // storm, snow — the whole board) go under its own, so the sand stays sand in
-// the rain; what the rain leaves (puddles, wet ice) goes over them.
+// the rain; what the rain leaves (puddles, wet ice) goes over them. It may
+// return f itself: do not mutate what it returns.
 func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field {
 	if len(weather) == 0 {
 		return f
@@ -465,8 +475,9 @@ type Zoned interface {
 	ExtraZones(stroke int) []physics.Zone
 }
 
-// WithZones is the field plus some zones, as a new Field. The extra zones come
-// first: a puddle over the sand is the puddle.
+// WithZones is the field plus some zones. The extra zones come first: a
+// puddle over the sand is the puddle. It may return f itself (no zones): do
+// not mutate what it returns.
 func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field {
 	if len(zones) == 0 {
 		return f
@@ -485,8 +496,9 @@ func (p Pulse) at(stroke int) bool {
 	return ((stroke+p.Phase)%p.Every+p.Every)%p.Every < p.On
 }
 
-// WithExtras is the field plus the pieces of one stroke, as a new Field: the
-// hole's own is never modified, so nothing persists between shots.
+// WithExtras is the field plus the pieces of one stroke: the hole's own is
+// never modified, so nothing persists between shots. It may return f itself
+// (no pieces): do not mutate what it returns.
 func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *physics.Field {
 	if len(walls) == 0 && len(posts) == 0 {
 		return f
@@ -577,9 +589,11 @@ func (h *Simple) PlayAt(ball physics.Vec2, angle, power float64, stroke int) (ph
 
 // PreviewWith is a stroke of a round in some weather, the timed pieces
 // starting at tick: the stroke's pulses, then the weather, then the clock. Read-only.
+// A pulse piece that came back on the ball pushes it out, never across one
+// of the hole's own walls (physics.UnstickIn).
 func (h *Simple) PreviewWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	ws, ps := h.Extras(stroke)
-	ball = physics.Unstick(ball, ws, ps, h.Course.Radius)
+	ball = physics.UnstickIn(ball, ws, ps, h.Course.Radius, h.Course.Walls)
 	// the stroke's own pieces first, then the weather under everything
 	f := WithZones(WithExtras(h.Course, ws, ps), h.ExtraZones(stroke))
 	f = physics.WithTick(WithWeather(f, weather), tick)

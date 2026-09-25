@@ -1,6 +1,6 @@
 // The test hooks: what the camera test scripts (and a dev ?won) read of a game.
 // Attached to createGame()'s API only for a page opened with ?camlog (or
-// with hooks); Golf.jsx puts that game on window.__g.
+// with hooks); Golf.tsx puts that game on window.__g.
 import * as THREE from "three";
 import { onAt, closest } from "../terrain";
 import { isDrawn } from "../scene/materials";

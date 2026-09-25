@@ -1,5 +1,5 @@
-// The "town" world: Mushroom Town, same four functions as garden.js (see
-// worlds.js for the contract). The board is a raised green in the middle of a
+// The "town" world: Mushroom Town, same four functions as garden.ts (see
+// worlds.ts for the contract). The board is a raised green in the middle of a
 // cobbled square: houses with mushroom caps all round, a clock tower, a
 // bakery, market stalls, lamp posts, a fountain, a tram going by at the back,
 // a canal down the left with a bridge over it, and rooftops to the horizon.
@@ -7,15 +7,15 @@
 // behind and to the right, as in the garden, so the lane is never hidden.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"; // the skyline
-import { C, flat, drawn, rbox, texOf, ink, lanternGlow, grows, share, ownFade, fadeLoop, type FadeItem } from "./materials";
-import { bake, look, weatherLooks } from "./bake";
+import { C, flat, drawn, rbox, texOf, ink, lanternGlow, grows, share, ownFade, fadeLoop, type FadeItem, onTop } from "./materials";
+import { bakeLocal, look, weatherLooks } from "./bake";
 import { animate } from "./state";
 import { timeOf } from "./camera";
 import { gnomelet, brolly, bunting, mailbox } from "./props";
 import { seeded, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
 import { ud, type Hole } from "./data";
 import type { Bar } from "./worlds";
-import type { Terrain } from "../terrain";
+import { boxOf, type Terrain } from "../terrain";
 import type { Extras, MutVec2, Post, Vec2, Zone } from "../types";
 
 const T = {
@@ -136,10 +136,10 @@ function base(s: Hole, box: THREE.Box3) {
 }
 
 /** Curbs and small street furniture along the plinth. */
-function edging(box: THREE.Box3, seed: string) {
+function edging(s: Hole) {
   const g = new THREE.Group();
-  const rand = seeded("town-edge" + seed);
-  const W = box.max.x - ISLAND.x, H = box.max.z - ISLAND.front; // the board, from the plot box
+  const rand = seeded("town-edge" + s.hole);
+  const W = s.board.w, H = s.board.h;
   // drain grates in the square, a step off the plinth
   for (let x = 3; x < W - 2; x += 9 + rand() * 4)
     for (const z of [-1.3, H + 1.3]) {
@@ -193,7 +193,7 @@ function tflower(rand: Rand) {
 
 function tbush(rand: Rand) {
   const g = new THREE.Group();
-  ud(g).foot = 0; // its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0; // its sway is weighed from here (materials.ts plantFeet)
   for (let i = 0; i < 3; i++) {
     const r = 0.45 + rand() * 0.35;
     const puff = grows(new THREE.IcosahedronGeometry(r, 0), rand() < 0.5 ? C.leaf : C.leafDark);
@@ -461,7 +461,7 @@ function streetTree(rand: Rand, bare = false) {
   const h = 1.6 + rand() * 0.8;
   const trunk = grows(new THREE.CylinderGeometry(0.12, 0.17, h, 7), C.bark);
   trunk.position.y = h / 2 + 0.2;
-  ud(g).foot = 0.2; // the trunk's foot: its sway is weighed from here (materials.js plantFeet)
+  ud(g).foot = 0.2; // the trunk's foot: its sway is weighed from here (materials.ts plantFeet)
   ud(g).flex = 0.32; // a street tree: stiff, a small lean
   // bare: no bed of its own, for a tree planted in a lawn that has one
   if (bare) g.add(trunk);
@@ -475,11 +475,8 @@ function streetTree(rand: Rand, bare = false) {
   return g;
 }
 
-/** One mesh per material for a group that moves as one (a lantern string, a
- *  leaning mushroom, the tram): the shared bake, in the group's own frame. */
-const mergeLive = <T extends THREE.Object3D>(group: T) => bake(group, { local: true });
 
-// A piece over the lane gets its own see-through materials (materials.js
+// A piece over the lane gets its own see-through materials (materials.ts
 // ownFade), so it can fade out of the camera's way without fading the shared
 // palette: see-through within ~2.3 of the view line at these points, back by ~4.
 function fadeAt(piece: THREE.Object3D, points: readonly THREE.Vector3[]): FadeItem[] {
@@ -531,7 +528,7 @@ function overhead(W: number, H: number, rand: Rand, night: boolean) {
       bl.position.set(b.x + (k - 1) * 0.55, GRASS + Y + 1.1 + (k % 2) * 0.35, b.z);
       line.add(bl);
     }
-    mergeLive(line);
+    bakeLocal(line);
     if (glowAt.length) {
       // the string's glows as one set of points, swaying with it
       const m = lanternGlow();
@@ -567,7 +564,7 @@ function overhead(W: number, H: number, rand: Rand, night: boolean) {
     head.position.copy(top);
     head.rotation.z = -dir * 0.35; // tipped toward the lane, like the stem
     piv.add(stem, head);
-    g.add(mergeLive(piv));
+    g.add(bakeLocal(piv));
     leaners.push({ piv, ph: rand() * 6 });
     faders.push(...fadeAt(piv, [curve.getPoint(0.6), top].map((p) => p.clone().add(piv.position))));
   }
@@ -580,7 +577,7 @@ function overhead(W: number, H: number, rand: Rand, night: boolean) {
     const str = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1.4, 3), flat(C.ink));
     str.position.y = -1.2;
     b.add(ball, str);
-    mergeLive(b);
+    bakeLocal(b);
     ud(b).live = true;
     g.add(b);
     balloons.push({ b, x: rand() * W, z: -3 - rand() * 3, y: 8 + rand() * 3, ph: rand() * 6 });
@@ -699,7 +696,7 @@ function tram(z: number, x0: number, x1: number, night: boolean) {
     inside.position.set(0, 1.4, 0.9);
     car.add(front, inside);
   }
-  mergeLive(car);
+  bakeLocal(car);
   ud(car).live = true;
   car.position.set(x0, GRASS, z);
   g.add(car);
@@ -946,7 +943,7 @@ function decor(s: Hole) {
 
 /** How the board's rough (ground inside the walls a ball never reaches)
  *  looks in town: planter soil and flower pots, not wild garden. For
- *  course.js roughScenery, when it asks the world. */
+ *  course.ts roughScenery, when it asks the world. */
 const rough = {
   lo: 0x6f9f7e, hi: 0x86b58f, // a park lawn inside the walls: the green heart of the square
   // mostly pots and flowers; a bush now and then (a bush is three spheres,
@@ -959,7 +956,7 @@ const rough = {
 //
 // What the town's holes put on the lane, drawn in town's look. Each matches
 // its physics footprint: a post's circle, a bar's box, a zone's rectangle or
-// ellipse. course.js asks piece(kind, item, t, s) for every post, wall and
+// ellipse. course.ts asks piece(kind, item, t, s) for every post, wall and
 // zone; null means "not a town skin, draw it the usual way".
 
 
@@ -1196,12 +1193,11 @@ function sheet(pts: readonly Vec2[], z: Zone, t: Terrain, mat: THREE.Material, t
   for (let i = 0; i < p.count; i++) p.setY(i, t.height(p.getX(i), p.getZ(i)) + lift);
   return new THREE.Mesh(geo, mat);
 }
-const overMat = (map: THREE.Texture, color: number, k: number) => flat(color, { map, polygonOffset: true, polygonOffsetFactor: -k, polygonOffsetUnits: -k * 2 });
+const overMat = (map: THREE.Texture, color: number, k: number) => onTop(flat(color, { map }), k, 2);
 // a patch of paving with a stone kerb flush round it and an ink line
 function patch(z: Zone, t: Terrain, map: THREE.Texture, tile: number, kerb: number) {
   const g = new THREE.Group(), pts = outlineOf(z);
-  const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2;
-  const hx = (z.max[0] - z.min[0]) / 2, hz = (z.max[1] - z.min[1]) / 2;
+  const { cx, cz, hx, hz } = boxOf(z);
   g.add(sheet(pts, z, t, overMat(map, 0xffffff, 1), tile, 0.02));
   // the kerb: the outline, and inside it the same outline pulled in by 0.3
   const inner = pts.map(([x, zz]): Vec2 => [cx + (x - cx) * (1 - 0.3 / hx), cz + (zz - cz) * (1 - 0.3 / hz)]);
@@ -1211,7 +1207,7 @@ function patch(z: Zone, t: Terrain, map: THREE.Texture, tile: number, kerb: numb
   geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position;
   for (let i = 0; i < p.count; i++) p.setY(i, t.height(p.getX(i), p.getZ(i)) + 0.03);
-  g.add(new THREE.Mesh(geo, flat(kerb, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
+  g.add(new THREE.Mesh(geo, onTop(flat(kerb, {}), 2, 2)));
   g.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts.map(([x, zz]) => new THREE.Vector3(x, t.height(x, zz) + 0.04, zz))), ink));
   return g;
 }
@@ -1219,7 +1215,7 @@ function patch(z: Zone, t: Terrain, map: THREE.Texture, tile: number, kerb: numb
 function brickFloor(z: Zone, s: Hole, t: Terrain) {
   const g = new THREE.Group(), pts = outlineOf(z);
   g.add(sheet(pts, z, t, flat(0xffffff, { map: brickTex() }), 4, 0.012));
-  // (the tram rails are the tram lines' own: course.js tramLine)
+  // (the tram rails are the tram lines' own: course.ts tramLine)
   return g;
 }
 const PLAZA_GROUND: Record<string, (z: Zone, s: Hole, t: Terrain) => THREE.Group> = {
@@ -1230,7 +1226,7 @@ const PLAZA_GROUND: Record<string, (z: Zone, s: Hole, t: Terrain) => THREE.Group
   // ground a ball rolls through (slowly), not a wall of stems
   flowerbed: (z, s, t) => {
     const g = patch(z, t, bedTex(), 3, T.curb), rand = seeded("bed" + z.min.join() + z.max.join());
-    const cx = (z.min[0] + z.max[0]) / 2, cz = (z.min[1] + z.max[1]) / 2, hx = (z.max[0] - z.min[0]) / 2, hz = (z.max[1] - z.min[1]) / 2;
+    const { cx, cz, hx, hz } = boxOf(z);
     for (let i = 0; i < hx * hz * 2.2; i++) {
       const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.82;
       const x = cx + Math.cos(a) * hx * d, zz = cz + Math.sin(a) * hz * d, f = tflower(rand);
@@ -1419,7 +1415,7 @@ const PLAZA_POSTS: Record<string, (r: number, rand: Rand, night: boolean) => THR
 
 // ------------------------------------------------------------- the skate park
 //
-// town6: concrete ramps (the ground itself rises: terrain.js), a funbox, a
+// town6: concrete ramps (the ground itself rises: terrain.ts), a funbox, a
 // ledge down the middle and a grind rail. The park's floor is concrete, not a
 // lawn (green below).
 const CONCRETE = 0xd0cbc1, STEEL = 0x8e9aa3;
@@ -1598,15 +1594,15 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
     const [cx, cz] = bar.c, len = bar.length, thick = bar.thick, ang = bar.ang, g = new THREE.Group();
     const make: Record<string, () => THREE.Group> = { tram: () => tramAcross(len, thick, night), "clock hand": () => clockHand(len, thick), stall: () => stallAcross(len, thick, rand), awning: () => awningAcross(len, thick), rail: () => grindRail(len, thick), ledge: () => skateLedge(len, thick) };
     g.add(make[skin]());
-    g.rotation.y = -ang; // a timed bar is drawn still: course.js shows and slides it with the replay
+    g.rotation.y = -ang; // a timed bar is drawn still: course.ts shows and slides it with the replay
     // one mesh per kind of material: a timed bar stays out of the bake
     // (a ledge stands on the park's floor, whatever ramp runs up beside it)
     if (skin === "ledge") {
-      const m = mergeLive(g);
+      const m = bakeLocal(g);
       m.position.set(cx, 0, cz);
       return m;
     }
-    return onGround(mergeLive(g), cx, cz, t);
+    return onGround(bakeLocal(g), cx, cz, t);
   }
   if (kind === "zone") {
     const zone = item as Zone; // (kind says which)
@@ -1708,7 +1704,7 @@ function swingBridge(z: Zone, open: boolean, t: Terrain) {
     rail.position.set(0.3 + w / 2, 0.55, side);
     deck.add(rail);
   }
-  hinge.add(mergeLive(deck));
+  hinge.add(bakeLocal(deck));
   // swung open: turned round its pier out over the bank, clear of the water
   hinge.rotation.y = open ? Math.PI / 2 : 0;
   g.add(hinge);

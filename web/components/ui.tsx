@@ -68,7 +68,7 @@ export function Toggle({ label, checked, onChange }: { label: ReactNode; checked
 }
 
 /** The X in a sheet's corner, the same everywhere. */
-export const CloseX = () => (
+const CloseX = () => (
   <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4 16 16M16 4 4 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
 );
 export function SheetClose({ onClose, inline = false }: { onClose: () => void; inline?: boolean }) {

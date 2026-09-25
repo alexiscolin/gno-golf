@@ -2,7 +2,7 @@
 
 import { useState, type PointerEvent, type ReactNode } from "react";
 import type { HoleRow } from "@/lib/types";
-import type { CupTotal, cupTotals } from "@/lib/card";
+import type { Cup, CupTotal, cupTotals } from "@/lib/card";
 import { sound } from "@/lib/feel";
 import { Green } from "@/components/Title";
 import "@/app/title.css";
@@ -11,7 +11,7 @@ import "@/app/title.css";
 // drawn like a cup to win, and the builder to come. A world with no holes on
 // this chain yet is shown, but cannot be picked.
 
-export const WORLDS = [
+export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
   { id: "garden", name: "Garden Cup", tag: "Mushrooms, ponds and mountains" },
   { id: "island", name: "Island Cup", tag: "Sand spits, palms and the sea" },
   { id: "town", name: "Mushroom Town", tag: "Streets, lanterns and rooftops" },
