@@ -573,7 +573,10 @@ export default function Golf() {
       const id = chainId || (await within(chain.chainId()));
       // asked before Adena opens: how many transactions the round needs, or
       // why the chain would refuse it
-      const parts = await splitRound(s.shots, (list) => within(chain.simulateRound(s.id, list, s.period), 8000), s);
+      // every commit asked of the chain: the first from the tee, the next
+      // from where the one before leaves the ball
+      const period = s.period != null ? s.period : await within(chain.period());
+      const parts = await splitRound(s.shots, (list, from, ball) => within(from ? chain.simulateCommit(s.id, ball, from, list, period) : chain.simulateRound(s.id, list, s.period), 8000), s);
       let tx = null;
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k];
@@ -1534,50 +1537,13 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }) 
  * running total against par, where you stand on the chain's board if you
  * recorded, and what comes next.
  */
-// The chain's leaderboard, read once for the sheets that show it at the same
-// time (Standings and Leaderboard): the same answer for 5 s.
-let board = {};
-const leaderboardOf = (chain, mode = "assisted") => {
-  const b = board[mode];
-  if (!b || Date.now() - b.at > 5000) board[mode] = { at: Date.now(), p: chain.leaderboard(mode) };
-  return board[mode].p;
-};
-
-// Beyond the top ten, the rank is counted from the paged Players read: every
-// standing that beats this player's (more holes, then fewer strokes, then the
-// address, as the chain's rank key orders them). Players lists everyone, named
-// or not, so it is the rank among all who saved. RANK_PAGES pages at most.
-// ponytail: O(players) reads, a Rank(mode, addr) read on the chain when the course is crowded
-const RANK_PAGES = 5;
-async function rankBeyond(chain, mode, me) {
-  let after = "", mine = null, ahead = 0;
-  const rows = [];
-  for (let k = 0; k < RANK_PAGES; k++) {
-    const pg = await chain.players(mode, after, 100);
-    for (const r of pg.rows || []) {
-      rows.push(r);
-      if (r.player === me) mine = r;
-    }
-    after = pg.next || "";
-    if (!after) break;
-  }
-  if (after && !mine) return { past: 10 }; // too many to count here
-  if (!mine || !(mine.holes > 0)) return null; // nothing saved on the course
-  for (const r of rows) if (r.holes > mine.holes || (r.holes === mine.holes && (r.strokes < mine.strokes || (r.strokes === mine.strokes && r.player < me)))) ahead++;
-  // a page cap reached: the rest may hold players ahead too
-  return after ? { past: 10 } : { at: ahead + 1 };
-}
-
 function Standings({ s, card, chain, me, mode = "assisted" }) {
   const [rank, setRank] = useState(null);
   useEffect(() => {
     if (!chain || !me) return;
     let live = true; // no state set once the card is gone
-    leaderboardOf(chain, mode).then(async (lb) => {
-      const i = lb.rows.findIndex((r) => r.player === me);
-      if (i >= 0) return live && setRank({ at: i + 1, top: true });
-      live && setRank(await rankBeyond(chain, mode, me));
-    }).catch(() => {});
+    // the chain's own rank, among the named players it ranks
+    chain.rank(mode, me).then((r) => live && setRank(r.rank > 0 ? { at: r.rank } : r.holes > 0 ? { unnamed: true } : null)).catch(() => {});
     return () => (live = false);
   }, [chain, me, mode]);
   const cup = WORLDS.find((w) => w.id === s.world) || WORLDS[0];
@@ -1596,7 +1562,7 @@ function Standings({ s, card, chain, me, mode = "assisted" }) {
         <dl className="cup__sum">
           <div><dt>Holes</dt><dd>{t.done}/{s.holes.length}</dd></div>
           <div><dt>Vs par</dt><dd className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{t.done ? (vs > 0 ? "+" : "") + vs : "–"}</dd></div>
-          <div><dt>On-chain</dt><dd title={rank && !rank.top && rank.at ? "Among every player who saved on the course, named or not" : undefined}>{!rank ? "–" : rank.at ? `#${rank.at}` : `not in the top ${rank.past}`}</dd></div>
+          <div><dt>On-chain</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{!rank ? "–" : rank.at ? `#${rank.at}` : "unranked"}</dd></div>
         </dl>
       </header>
       <ol className="cup__track">
@@ -1808,12 +1774,11 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
   const [err, setErr] = useState(null);
   const [more, setMore] = useState(false); // a page is on its way
   const PAGE = 10;
-  // a page is O(page) on the chain now, however deep: paged up to "players",
-  // the named players on the board. Offsets are the chain's, not the rows
-  // shown: a name deleted since is skipped in its page, which then holds fewer
-  // rows while more still follow.
-  const page = (offset) =>
-    chain.holeLeaderboard(s.id, offset, PAGE, mode).then((b) => ({ ...b, rows: b.rows || [], next: offset + PAGE, done: offset + PAGE >= (b.players || 0) }));
+  // a page is O(page) on the chain, however deep, and says where the next
+  // one starts (0 at the end). Offsets are the chain's, not the rows shown: a
+  // name deleted since is skipped in its page, which then holds fewer rows
+  // while more still follow.
+  const page = (offset) => chain.holeLeaderboard(s.id, offset, PAGE, mode).then((b) => ({ ...b, rows: b.rows || [], done: !(b.next > offset) }));
   // what the rows on screen are for: a page asked for another hole or mode is dropped
   const view = useRef("");
   view.current = `${s.id}|${mode}|${tab}`;
@@ -1919,7 +1884,7 @@ function Leaderboard({ chain, me, mode = "assisted", filter = false }) {
     let live = true;
     setLb(null);
     setErr(null);
-    leaderboardOf(chain, mode).then((b) => live && setLb(b)).catch((e) => live && setErr(String(e.message || e)));
+    chain.leaderboard(mode).then((b) => live && setLb(b)).catch((e) => live && setErr(String(e.message || e)));
     return () => (live = false);
   }, [chain, mode]);
   return (

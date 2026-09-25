@@ -15,6 +15,17 @@ export const APP = process.env.APP || "http://localhost:3300";
 export const RPC = process.env.RPC || "http://127.0.0.1:26757";
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// The course's holes are data in slots now ("garden/17"): a hole the scripts
+// name as its old realm ("hole19", "town1") is its slot, from data/holes.txt
+// (lines "<slot> <pkgpath> <sha8> <hex>"). A slot or a version id is kept.
+let slots = null;
+export function slotOf(name) {
+  if (name.includes("/")) return name;
+  slots ||= Object.fromEntries(fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").split("\n").filter(Boolean).map((l) => l.split(" ")).map(([slot, pkg]) => [pkg.split("/").pop(), slot]));
+  if (!slots[name]) throw new Error(`no slot for ${name} in data/holes.txt`);
+  return slots[name];
+}
+
 // Every Chrome this process started dies with it: at a normal exit, on
 // Ctrl-C or a kill, on an uncaught error, and after CDP_MAX_MS (default an
 // hour) should a run hang. A Chrome left running keeps a game page playing.

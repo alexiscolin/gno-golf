@@ -39,7 +39,7 @@ export const onAt = (q, tick) => there(tick, q.every, q.on, q.phase);
 /** 0 below 0, 1 above 1, and an S between. */
 export const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
-// ponytail: one result object reused by every call (no allocation in the
+// One result object reused by every call (no allocation in the
 // camera's per-frame wall tests); read it before the next call
 const nearest = { x: 0, z: 0, u: 0, d: 0 };
 /** The point of segment a→b nearest (x, z): { x, z, u (the fraction along

@@ -200,8 +200,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
       } catch {}
       return list;
     },
-    /** One hole's geometry, skins, wear and rounds in flight. */
-    state: (hole) => qeval(`State(${s(hole)})`),
+    /** One hole's geometry, skins, weather and wear (HoleState: State without the rounds, which the page never reads). */
+    state: (hole) => qeval(`HoleState(${s(hole)})`),
     /**
      * One stroke, read-only, from an exact ball: what PlayRoundAt would play
      * for stroke `stroke` (0 = the first) of a round in `period`. ball is the
@@ -219,6 +219,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
       period == null
         ? qeval(`SimulateRound(${s(hole)}, ${s(shots.join(";"))})`, ms, signal)
         : qeval(`SimulateRoundAt(${s(hole)}, ${s(shots.join(";"))}, ${period | 0})`, ms, signal),
+    /**
+     * One commit of a round under way, read-only: what the next PlayRoundAt
+     * (or PlayRoundPro) of these shots would do from the exact ball ("rest")
+     * at stroke number stroke, refused as that commit would be. SimulateRound's JSON.
+     */
+    simulateCommit: (hole, ball, stroke, shots, period, ms, signal) =>
+      qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, ms, signal),
     /** The weather's five minutes on the chain (block time / 300), and its forecast for a hole. */
     // an int64, not a string: its own unwrapping
     period: async () => {
@@ -236,8 +243,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
     bests: (hole, mode, players) => qeval(`Bests(${s(hole)}, ${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`),
     /** These players across the course: { mode, holes, rows: [{ player, holes, strokes }] }. */
     standings: (mode, players) => qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`),
-    /** A page of every course standing in a mode, named or not, by address: { rows: [{ player, holes, strokes }], next ("" at the end) }. */
-    players: (mode, after = "", limit = 100) => qeval(`Players(${s(m(mode))}, ${s(after)}, ${limit | 0})`),
+    /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes }. */
+    rank: (mode, player) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`),
     /** A gno.land name's address, or "" (r/sys/users). */
     resolveName: (name) =>
       /^[a-z0-9._-]{1,64}$/i.test(name)
@@ -248,7 +255,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB } = {}) {
       /^g1[0-9a-z]{38}$/.test(addr)
         ? qstr("gno.land/r/sys/users", `func() string { d := ResolveAddress(address(${s(addr)})); if d == nil { return "" }; return d.Name() }()`)
         : Promise.resolve(""),
-    /** A page of a hole's board: { hole, mode, par, players (named, what to page through), finished (everyone), offset, rows: [{ player, strokes }] }. */
+    /** A page of a hole's board: { hole, mode, par, players (named), finished (everyone), offset, rows: [{ player, strokes }], next (the next page's offset, 0 at the end) }. */
     holeLeaderboard: (hole, offset = 0, limit = 10, mode = "assisted") => qeval(`HoleLeaderboard(${s(hole)}, ${s(m(mode))}, ${offset | 0}, ${limit | 0})`),
     /** One player's round on a hole ({ shots, strokes, done, period, rest, path… }), or null: none, or Reset since. */
     round: (hole, player) => qeval(`Round(${s(hole)}, address(${s(player)}))`),

@@ -35,8 +35,9 @@ const SELFTEST = opt("selftest", false);
 
 try { os.setPriority(19); } catch {} // as nice as we are allowed, whoever launched us
 
-const OFFICIAL = "gno.land/r/gnogolf/";
-const BESTS = JSON.parse(fs.readFileSync(here("./hole-bests.json"), "utf8")); // solver results, see README
+// solver results, see README, keyed by slot ("garden/7"): a hole is its slot
+// here, which every read resolves to the slot's current version
+const BESTS = JSON.parse(fs.readFileSync(here("./hole-bests.json"), "utf8"));
 
 // --- rate-limited chain -------------------------------------------------------
 
@@ -94,7 +95,7 @@ async function fragility(r) {
   return tried ? 1 - held / tried : null;
 }
 
-// Scores one player: bests = { hole: strokes } over the official holes,
+// Scores one player: bests = { slot: strokes } over the official holes,
 // rounds = the finished rounds on record [{ hole, shots: ["a,p,t"], strokes, period }].
 export async function scorePlayer({ bests, rounds }) {
   const reasons = [];
@@ -122,7 +123,7 @@ export async function scorePlayer({ bests, rounds }) {
   const below = known.filter(([h, n]) => n < BESTS[h].best);
   s.optimal = known.length ? (atBest.length / known.length) * Math.min(1, known.length / 3) : 0;
   if (atBest.length) reasons.push(`${atBest.length}/${known.length} holes at the solver's best`);
-  if (below.length) reasons.push(`beats the solver on ${below.map(([h]) => h.slice(OFFICIAL.length)).join(", ")}`);
+  if (below.length) reasons.push(`beats the solver on ${below.map(([h]) => h).join(", ")}`);
 
   s.volume = Math.min(1, atBest.length / 20);
 
@@ -133,7 +134,7 @@ export async function scorePlayer({ bests, rounds }) {
 // --- the live run -------------------------------------------------------------
 
 async function run() {
-  const holes = (await rpc((c) => c.holes())).filter((h) => h.id.startsWith(OFFICIAL) && !h.next).map((h) => h.id);
+  const holes = (await rpc((c) => c.holes())).filter((h) => h.official && !h.next && h.slot).map((h) => h.slot);
   const candidates = new Set();
   for (const mode of ["assisted", "pro"]) {
     for (const r of (await rpc((c) => c.leaderboard(mode))).rows) candidates.add(r.player);

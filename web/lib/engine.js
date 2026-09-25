@@ -29,6 +29,8 @@ import { makeAimer, MAX_POWER, thirdAim } from "./engine/aim.js";
 import { probes } from "./engine/probes.js";
 
 const MAX_SHOTS = 60; // the realm's limit for one round (maxRoundStrokes); a save of more than 12 goes in several commits
+// zones as the work model counts them: one piece each, and one per polygon edge
+const piecesOf = (zs) => zs.reduce((n, z) => n + 1 + ((z.poly && z.poly.length) || 0), 0);
 // the part of the screen the HUD covers, in CSS pixels: the camera frames
 // what is left, so the course is centred in what the player can actually see
 const HUD = { top: 108, bottom: 136, side: 14 };
@@ -163,11 +165,12 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       timed: !!(g.s && g.s.timed),
       time: g.course ? g.course.userData.time : "day",
       // what the realm's work model (golf.gno newWork) counts, for the save's
-      // split and its gas: the hole's walls, every piece on the board (walls,
-      // posts, zones and the forecast's zones: a stroke's extras are not
-      // counted there), the forecast's kind, and each stroke's path length
-      walls: g.s ? g.s.walls.length : 0,
-      pieces: g.s ? g.s.walls.length + g.s.posts.length + g.s.zones.length + ((g.forecast && g.forecast.zones) || []).length : 0,
+      // split and its gas: the walls of the hole and of its pulses, every
+      // piece on the board (the hole's, its pulses' as if always there, the
+      // forecast's zones; a polygon's every edge), the forecast's kind, and
+      // each stroke's path length. A pulse is known from the strokes' extras.
+      walls: g.s ? g.s.walls.length + pulse.walls : 0,
+      pieces: g.s ? g.s.walls.length + g.s.posts.length + piecesOf(g.s.zones) + piecesOf((g.forecast && g.forecast.zones) || []) + pulse.pieces : 0,
       kind: (g.forecast && g.forecast.kind) || "",
       pts: g.pts || NONE,
       shots: g.shots || NONE,
@@ -450,6 +453,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     g.course = null;
     extras = null;
     extrasFor = "";
+    pulse = { seen: new Set(), walls: 0, pieces: 0 };
     growing = [];
     aimer.forget(); // the hole is read anew: so are its previews
     // from here until its shaders are ready nothing is drawn (the curtain, or
@@ -523,6 +527,21 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   // A timed hole's moving pieces, for the stroke about to be played. They grow
   // up out of the ground when they appear, and the old ones sink away.
   let extras = null, extrasFor = "";
+  // the pulses' pieces seen so far on this hole, each once: what the work
+  // model counts for them (newWork: every pulse, as if always there)
+  let pulse = { seen: new Set(), walls: 0, pieces: 0 };
+  function sawPulse(ex) {
+    const add = (list, wall) => {
+      for (const x of list || []) {
+        const k = JSON.stringify(x);
+        if (pulse.seen.has(k)) continue;
+        pulse.seen.add(k);
+        pulse.pieces += 1 + ((x.poly && x.poly.length) || 0);
+        if (wall) pulse.walls++;
+      }
+    };
+    add(ex.walls, true), add(ex.posts), add(ex.zones);
+  }
   async function showExtras() {
     if (!g.s || !g.s.timed || !g.course) return;
     const key = `${g.id}#${g.round}#${g.shots.length}`;
@@ -536,6 +555,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       return;
     }
     if (extrasFor !== key || !alive || !g.course) return;
+    sawPulse(ex);
     // this stroke's weather: the hole's, and whatever the stroke brings
     strokeWalls = ex.walls || [];
     applyWeather(ex.zones);
@@ -1051,7 +1071,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
   async function start(link) {
     let list = await chain.holes();
     // a link to a hole the tab's kept list does not have yet: the chain's own
-    if (typeof link === "string" && link && !list.some((h) => h.id === link)) list = await chain.holes(true);
+    if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);
     if (!alive) return; // destroyed while the chain answered (a remount in dev)
     // a hole another has replaced (same cup, same place) stays playable by its
     // link, but only the current one fills the cup

@@ -140,23 +140,25 @@ export function onWalletChange(fn) {
 
 // A commit's work, by the realm's own model (golf.gno, work: newWork, next,
 // add), computed here exactly: per shot 10M, plus 150K per wall, plus, per
-// point of its path, 1.2M and 15K per piece on the board (the hole's walls,
-// posts and zones, and the forecast's zones). c: { walls, pieces, pts: [path
-// length per stroke] }, as the engine's snapshot gives them.
+// point of its path, 1.2M and 15K per piece on the board. c: { walls, pieces,
+// pts: [path length per stroke] }, as the engine's snapshot gives them: walls
+// are the hole's and its pulses', pieces every wall, post and zone of the
+// hole, its pulses and the forecast, each polygon edge one more.
 const WORK = { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3 };
 const MAX_LIST = 12; // golf.gno maxShots: the longest list one commit takes
 const workOf = (c, i) => WORK.shot + (c.walls || 0) * WORK.wall + ((c.pts || [])[i] || 60) * (WORK.point + (c.pieces || 0) * WORK.piece);
 
 /**
  * The commits a round is recorded in: [[from, to), …], cut where the chain
- * would cut them. Its work.next refuses a shot, after the first of a commit,
- * once spent + the heaviest so far passes the budget; the list is 12 at most.
- * The same sums, so no commit of the split is one the chain refuses.
+ * would cut them, starting at stroke start. Its work.next refuses a shot,
+ * after the first of a commit, once spent + the heaviest so far passes the
+ * budget; the list is 12 at most. The same sums, so no commit of the split is
+ * one the chain refuses.
  */
-export function commitsOf(c, n = (c.pts || []).length) {
+export function commitsOf(c, n = (c.pts || []).length, start = 0) {
   const parts = [];
-  let from = 0, spent = 0, most = 0;
-  for (let i = 0; i < n; i++) {
+  let from = start, spent = 0, most = 0;
+  for (let i = start; i < n; i++) {
     if (i > from && (i - from >= MAX_LIST || spent + most > WORK.budget)) (parts.push([from, i]), (from = i), (spent = most = 0));
     const w = workOf(c, i);
     spent += w;
@@ -187,29 +189,32 @@ export function gasOf(c, from = 0, to = (c.pts || []).length) {
 
 /**
  * The commits a round is recorded in, each checked by the chain before Adena
- * opens: the split is computed with the realm's work model (commitsOf), then
- * the first commit (from the tee) is asked of SimulateRoundAt — check(list) —
- * and every later one must fit the same model. A refusal of any kind throws,
- * in words: nothing goes to Adena then. A later commit continues the round
- * from where the chain has it, which no read can replay from the tee (a
- * SimulateRoundAt of more than one commit is refused by the very budget it
- * checks), so its check is the work sum, which is the chain's own.
+ * opens. Each is cut by the realm's work model (commitsOf), then asked of the
+ * chain — check(list, from, ball) resolves with the chain's answer for that
+ * commit (its "rest" is where the next one starts) — so every commit is one
+ * the chain has already accepted as a read. If the chain cuts sooner than the
+ * model, its "commit the first N" wins and the rest is split again from
+ * there. Any other refusal throws, in words: nothing goes to Adena then.
  */
 export async function splitRound(shots, check, c = {}) {
-  const parts = commitsOf(c, shots.length);
-  try {
-    await check(shots.slice(0, parts[0][1]));
-  } catch (e) {
-    // the chain cut sooner than the model: its N wins, for every commit
-    const m = String(e.message || e).match(/commit the first (\d+)/);
-    if (!m) throw e;
-    const n = Number(m[1]);
-    if (!(n >= 1)) throw new Error("Even one shot of this round is more than one transaction can replay. It cannot be saved.");
-    const out = [];
-    for (let i = 0; i < shots.length; i += n) out.push([i, Math.min(shots.length, i + n)]);
-    return out;
+  const out = [];
+  for (let from = 0, ball = null; from < shots.length; ) {
+    let to = commitsOf(c, shots.length, from)[0][1], r;
+    try {
+      r = await check(shots.slice(from, to), from, ball);
+    } catch (e) {
+      const m = String(e.message || e).match(/commit the first (\d+)/);
+      if (!m) throw e;
+      const n = Number(m[1]);
+      if (!(n >= 1 && n < to - from)) throw new Error("Even one shot of this round is more than one transaction can replay. It cannot be saved.");
+      to = from + n;
+      r = await check(shots.slice(from, to), from, ball);
+    }
+    out.push([from, to]);
+    ball = r && r.rest;
+    from = to;
   }
-  return parts;
+  return out;
 }
 
 /**
@@ -342,5 +347,7 @@ export function demoSplit() {
     }
     return true;
   }), "mixed: no commit the chain would refuse");
+  const late = commitsOf(heavy, 12, 5);
+  console.assert(late[0][0] === 5 && late.every(([a, b]) => b - a <= 2) && late[late.length - 1][1] === 12, "a split from a later stroke");
   return "ok";
 }
