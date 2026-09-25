@@ -216,10 +216,21 @@ func TestNoZeroHoleRows(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(solo))
 	PlayRoundAt(cross(cur), old, "0,1", Period())
 	uassert.True(t, strings.Contains(Leaderboard("assisted"), solo.String()))
-	publish(cur, cupHole("island", 48, "Solo again")) // the same island slot
+	of := ranks[assisted].Size()
+	again := publish(cur, cupHole("island", 48, "Solo again")) // the same island slot
 	lb := Leaderboard("assisted")
 	uassert.False(t, strings.Contains(lb, solo.String()), lb)
 	uassert.False(t, strings.Contains(lb, `"holes":0`), lb)
+	// the ranking key is kept aside, not freed (whoever drained would be
+	// refunded its deposit), and nothing ranked counts it
+	r := totals[assisted].Get(solo.String()).(*row)
+	uassert.True(t, idle[assisted].Has(rankKey(r)), "the key is kept aside")
+	uassert.Equal(t, of-1, ranks[assisted].Size())
+	uassert.True(t, strings.Contains(Rank("assisted", solo), `"rank":0,"of":`+strconv.Itoa(of-1)+`,"holes":0`), Rank("assisted", solo))
+	testing.SetRealm(testing.NewUserRealm(solo))
+	PlayRoundAt(cross(cur), again, "0,1", Period())
+	uassert.False(t, idle[assisted].Has(rankKey(&row{player: solo.String()})), "and back in the ranking at the next hole")
+	uassert.Equal(t, of, ranks[assisted].Size())
 	uassert.True(t, strings.Contains(Render(old), "> Archived: [Solo again](/r/gnogolf/golf:island/48/v2)"), "an archived hole says what took its place")
 }
 

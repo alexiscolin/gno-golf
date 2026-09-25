@@ -158,11 +158,23 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 	community.Set(e.id, e)
 	holeData.Set(e.id, data)
 	aliases.Set(alias, e.id)
+	a := by.String() + " "
+	// the author's row moves to this height: their latest hole's height is
+	// in its key, "<address> <height> <slug>"
+	latest := ""
+	byAuthor.ReverseIterate(a, a[:len(a)-1]+"!", func(k string, _ any) bool {
+		latest = k[len(a) : len(a)+12]
+		return true
+	})
+	if latest != "" {
+		byAuthor.Remove(latest + " " + by.String())
+	}
+	byAuthor.Set(recentKey(e.height, by.String()), nil)
 	if old != nil {
 		old.next = e.id // archived; it never counted anywhere
-		newest.Remove(recentKey(old.height, alias))
+		byAuthor.Remove(a + recentKey(old.height, slug))
 	}
-	newest.Set(recentKey(e.height, alias), e.id)
+	byAuthor.Set(a+recentKey(e.height, slug), e.id)
 	chain.Emit(EventHolePublished, "hole", e.id, "slot", alias, "sha", sum, "by", by.String(), "official", "false")
 	return e.id
 }

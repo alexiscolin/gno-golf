@@ -578,3 +578,46 @@ func TestNewestCommunityHolesAreListed(cur realm, t *testing.T) {
 	uassert.True(t, low < 0 || strings.Index(list, `"id":"`+late+`"`) < low, "ahead of the older ones")
 	uassert.True(t, strings.Contains(Render(""), "Latecomer"), "and on the hub")
 }
+
+// One author publishing as many holes as they like fills perAuthor rows and
+// no more: everyone else's, older or newer, stay listed. 1000 is the bound
+// the list once scanned (maxScanned): as many newer holes of one author
+// took every older one off the list and the hub.
+func TestOneAuthorCannotFloodTheList(cur realm, t *testing.T) {
+	data := hexOf(cupHole("pond", 1, "Flood"))
+	testing.SkipHeights(1)
+	var early []string
+	for _, name := range []string{"early1", "early2"} {
+		testing.SetRealm(testing.NewUserRealm(testutils.TestAddress(name)))
+		early = append(early, PublishMine(cross(cur), "old", data, ""))
+	}
+	testing.SkipHeights(1)
+	flooder := testutils.TestAddress("flooder")
+	for i := 0; i < 1000; i++ {
+		testing.SetRealm(testing.NewUserRealm(flooder))
+		PublishMine(cross(cur), "f"+strconv.Itoa(i), data, "")
+	}
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(testutils.TestAddress("late1")))
+	late := PublishMine(cross(cur), "new", data, "")
+	var ids []string
+	flood := 0
+	for _, e := range listed() {
+		if !e.official {
+			ids = append(ids, e.id)
+		}
+		if e.by == flooder {
+			flood++
+		}
+	}
+	uassert.Equal(t, perAuthor, flood, "the flooder's rows")
+	list := strings.Join(ids, " ")
+	at := func(id string) int {
+		i := strings.Index(list, id)
+		uassert.True(t, i >= 0, id+" is listed")
+		return i
+	}
+	uassert.True(t, at(late) < at(flooder.String()+"/f999/v1"), "newest first")
+	uassert.True(t, at(flooder.String()+"/f997/v1") < at(early[0]) && at(early[1]) >= 0, "and the older authors after the flood")
+	uassert.True(t, strings.Contains(Holes(), `"id":"`+early[0]+`"`) && strings.Contains(Render(""), ":"+strings.TrimSuffix(early[1], "/v1")+")"), "in Holes and on the hub")
+}
