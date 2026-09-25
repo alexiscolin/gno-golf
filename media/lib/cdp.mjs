@@ -25,7 +25,7 @@ export async function launch({ width = 1100, height = 700, mobile = false, dir =
   dir ||= fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-cdp-"));
   fs.mkdirSync(dir, { recursive: true });
   try { fs.unlinkSync(path.join(dir, "DevToolsActivePort")); } catch {}
-  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", ...args, "about:blank"], { stdio: "ignore" });
+  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, "about:blank"], { stdio: "ignore" });
   const kill = () => { try { process.kill(p.pid); } catch {} };
   let port;
   for (let i = 0; i < 100 && !port; i++) {
