@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"math"
+	"strconv"
 	"testing"
 
 	"gno.land/p/gnogolf/course"
@@ -69,12 +70,137 @@ func Of(h *course.Simple) string {
 	return hex.EncodeToString(s[:8])
 }
 
+// Full is the fingerprint of what Of does not see: every piece's kind,
+// flags, timing, mark and skin, the header (title, world, order, par, board,
+// shelter, substeps), and on a pulse hole the shots of every stroke its
+// pulses cycle through beyond Of's first two. Check compares it between a
+// hole and the same hole encoded and decoded; it pins no value of its own.
+func Full(h *course.Simple) string {
+	var b []byte
+	num := func(x float64) {
+		u := math.Float64bits(x)
+		for i := 0; i < 8; i++ {
+			b = append(b, byte(u>>(8*i)))
+		}
+	}
+	whole := func(n int) { num(float64(n)) }
+	str := func(s string) {
+		whole(len(s))
+		b = append(b, s...)
+	}
+	flag := func(v bool) {
+		if v {
+			b = append(b, 1)
+		} else {
+			b = append(b, 0)
+		}
+	}
+	pieces := func(ws []physics.Wall, ps []physics.Post, zs []physics.Zone) {
+		whole(len(ws))
+		for _, w := range ws {
+			num(w.Bounce)
+			whole(int(w.Mark))
+			str(w.Skin)
+			whole(w.Every)
+			whole(w.On)
+			whole(w.Phase)
+		}
+		whole(len(ps))
+		for _, p := range ps {
+			num(p.Bounce)
+			whole(int(p.Mark))
+			str(p.Skin)
+		}
+		whole(len(zs))
+		for _, z := range zs {
+			whole(int(z.Kind))
+			flag(z.Air)
+			flag(z.Capped)
+			flag(z.Round)
+			flag(z.Outside)
+			whole(z.Every)
+			whole(z.On)
+			whole(z.Phase)
+			whole(int(z.Mark))
+			str(z.Skin)
+			whole(len(z.Poly))
+		}
+	}
+	str(h.Title)
+	str(h.World)
+	num(h.Order)
+	whole(h.Strokes)
+	whole(h.W)
+	whole(h.H)
+	whole(h.Substeps)
+	num(h.Shelter)
+	num(h.CupRadius)
+	f := h.Course
+	pieces(f.Walls, f.Posts, f.Zones)
+	num(f.Friction)
+	num(f.Bounce)
+	num(f.Radius)
+	whole(f.Tick)
+	every := 0
+	for _, p := range h.Pulses {
+		whole(p.Every)
+		whole(p.On)
+		whole(p.Offset)
+		pieces(p.Walls, p.Posts, p.Zones)
+		if p.Every > every {
+			every = p.Every
+		}
+	}
+	// the strokes past Of's two, up to the longest pulse's cycle: 8 angles,
+	// one power, calm
+	for stroke := 2; stroke < every; stroke++ {
+		for a := 0; a < 360; a += 45 {
+			sh, holed := h.PreviewWith(h.Tee, float64(a)*math.Pi/180, 6.5, stroke, 0, nil)
+			for _, p := range sh.Path {
+				num(p.X)
+				num(p.Y)
+			}
+			b = append(b, sh.Cause...)
+			flag(holed)
+		}
+	}
+	s := sha256.Sum256(b)
+	return hex.EncodeToString(s[:8])
+}
+
 // Check fails the test when the hole's fingerprint is not want, and prints
 // the new one: after a change to the game that is meant, paste it in.
+//
+// It also proves the hole survives as data: Decode(Encode(h)) must be h field
+// by field (course.Diff, the prep included), encode back to the same bytes,
+// play the same shots (Of, the same want) and have the same Full. Then it
+// logs the data, for scripts/holedata.sh: "data <slot> <sha8> <hex>".
 func Check(t *testing.T, h *course.Simple, want string) {
 	got := Of(h)
 	t.Logf("fingerprint %s", got)
 	if got != want {
 		t.Errorf("fingerprint %s, want %s: this change moves the hole's shots", got, want)
 	}
+	data := course.Encode(h)
+	d, err := course.Decode(data)
+	if err != nil {
+		t.Fatalf("the hole does not decode: %s", err.Error())
+	}
+	if diff := course.Diff(h, d); diff != "" {
+		t.Fatalf("the decoded hole differs: %s", diff)
+	}
+	if !course.Exact(d) {
+		t.Fatal("the decoded hole's stored lengths are not its walls' own")
+	}
+	if course.Encode(d) != data {
+		t.Fatal("the decoded hole encodes to other bytes")
+	}
+	if got := Of(d); got != want {
+		t.Errorf("the decoded hole's fingerprint is %s, want %s", got, want)
+	}
+	if a, b := Full(h), Full(d); a != b {
+		t.Errorf("the decoded hole's full fingerprint is %s, want %s", b, a)
+	}
+	sum := sha256.Sum256([]byte(data))
+	t.Logf("data %s/%s %s %s", h.World, strconv.Itoa(int(h.Order)), hex.EncodeToString(sum[:4]), hex.EncodeToString([]byte(data)))
 }

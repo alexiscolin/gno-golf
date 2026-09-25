@@ -8,6 +8,7 @@ import (
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
 	"gno.land/p/nt/avl/v0"
+	bptree "gno.land/p/nt/bptree/v0"
 	"gno.land/p/nt/ufmt/v0"
 )
 
@@ -554,7 +555,7 @@ func Records(hole, mode, after string, limit int) string {
 	e, m := mustHole(hole), modeOf(mode)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
-	next := page(e.bests[m], after, limit, func(i int, p string, v any) {
+	next := page(avlWalk(e.bests[m]), after, limit, func(i int, p string, v any) {
 		sb.WriteString(sep(i) + "{" + `"player":` + jstr(p) + ufmt.Sprintf(`,"strokes":%d}`, v.(int)))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
@@ -567,7 +568,7 @@ func Players(mode, after string, limit int) string {
 	m := modeOf(mode)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
-	next := page(totals[m], after, limit, func(i int, p string, v any) {
+	next := page(bpWalk(totals[m]), after, limit, func(i int, p string, v any) {
 		r := v.(*row)
 		sb.WriteString(sep(i) + "{" + `"player":` + jstr(p) + ufmt.Sprintf(`,"holes":%d,"strokes":%d}`, r.holes, r.strokes))
 	})
@@ -580,16 +581,27 @@ func Rounds(hole, after string, limit int) string {
 	e := mustHole(hole)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"rows":[`)
-	next := page(e.rounds, after, limit, func(i int, p string, v any) {
+	next := page(avlWalk(e.rounds), after, limit, func(i int, p string, v any) {
 		sb.WriteString(sep(i) + roundJSON(e, p, v.(*round), false))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()
 }
 
+// walk is a tree's Iterate, whichever kind the tree is: page reads both.
+type walk func(start, end string, cb func(key string, v any) bool) bool
+
+func avlWalk(t *avl.Tree) walk {
+	return func(start, end string, cb func(string, any) bool) bool { return t.Iterate(start, end, cb) }
+}
+
+func bpWalk(t *bptree.BPTree) walk {
+	return func(start, end string, cb func(string, any) bool) bool { return t.Iterate(start, end, cb) }
+}
+
 // page walks up to limit entries of t after the key after, and returns the
 // key to continue from, "" at the end.
-func page(t *avl.Tree, after string, limit int, fn func(i int, key string, v any)) string {
+func page(t walk, after string, limit int, fn func(i int, key string, v any)) string {
 	if limit < 1 {
 		limit = 1
 	}
@@ -601,7 +613,7 @@ func page(t *avl.Tree, after string, limit int, fn func(i int, key string, v any
 		start = after + "\x00" // the first key past after
 	}
 	n, next, last := 0, "", ""
-	t.Iterate(start, "", func(k string, v any) bool {
+	t(start, "", func(k string, v any) bool {
 		if n == limit {
 			next = last
 			return true

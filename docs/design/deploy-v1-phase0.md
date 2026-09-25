@@ -58,6 +58,8 @@ Before tuning, decode + shot on hole4 was 50.0M, 110% of the cached form: exactl
 | mountain7 | 3,041 B | 145,632 B | 48× |
 | island6 | 1,033 B | 38,019 B | 37× |
 
+All 74 holes come to 141,107 B of GG1 data (`data/holes.txt`): 995 B to 3,003 B each, mean 1,907 B. That is about 14.1 GNOT of data at 100 ugnot/byte, against the design's ~15.
+
 At pearl's `storage_price` of 100 ugnot/byte, hole4 costs 0.23 GNOT as data and 10.1 GNOT decoded. That price is from the skill's network reference; it wasn't read live (see "Not measured").
 
 ### Index trees: avl vs bptree
@@ -117,6 +119,14 @@ Everything is well inside `workBudget` (1.4e9) and `maxGasQuery` (3e9). The othe
 | Stored data entry | ~3.3 KB with index | 2.3–3.0 KB string, plus the index entry | yes |
 | bptree entry | ~660 B | ~410 B marginal, 5.7 KB fixed per tree | marginal yes, fixed cost no (D5) |
 | Per-call total vs realm hole | 5× cheaper | 0.95–0.99× | parity: the saving is the deposit only (D6) |
+
+## One bound widened in Phase 2
+
+Audit Y5 bounds every coordinate to `[-1, W+1] × [-1, H+1]`. hole7 breaks this:
+- Fit keeps a round or polygon zone's box whole, so hole7's round pond has `Max.X` = 48.5 on a 47-wide board.
+- So a zone's `Min`/`Max` corners are bounded to a board's largest side (96) beyond the board.
+
+Every other point is held to the audit's ±1: wall ends, posts, tee, pin, polygon points, and the destinations of tunnels, hazards and loops. All 73 other holes pass it.
 
 ## What Phase 1 took from this (D5)
 

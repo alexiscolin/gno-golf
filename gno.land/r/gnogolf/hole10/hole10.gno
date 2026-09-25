@@ -9,7 +9,7 @@ import (
 
 var me = course.Fit(&course.Simple{
 	// moved out of the garden's eighteen: kept, listed under extras
-	World: "extras",
+	World: "extras", Order: 10,
 	W: 41, H: 16,
 	Title:     "Toadstool Ring",
 	Strokes:   2, // par

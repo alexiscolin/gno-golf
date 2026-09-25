@@ -2,13 +2,16 @@
 // nothing about any particular course: a hole is a realm that registered
 // itself, and the only thing golf understands about it is course.Hole.
 //
-// There is no owner, no pause and no upgrade here, and no way to delete a
-// hole or a record. The writes are Register, Launch, PlayRound, PlayRoundAt,
+// There is no pause and no upgrade here, and no way to delete a hole or a
+// record. The writes are Register, Launch, PlayRound, PlayRoundAt,
 // PlayRoundPro and Reset, all open to anyone. The other half of that is that
-// a bad hole cannot be taken down.
+// a bad hole cannot be taken down. The deployer is captured as the owner at
+// init (owner.gno); the role can so far only be handed on (Transfer, Accept)
+// or given up (Renounce).
 //
-// One party does hold a real power: whoever may publish under r/gnogolf/ (the
-// chain's namespace rule, not a key held here). A realm there that registers
+// One party does hold a real power: whoever may publish under golf's own
+// namespace, officialPrefix (the chain's namespace rule, not a key held
+// here). A realm there that registers
 // the same world and order as a course hole takes its place in the cup, so
 // that party can archive any course hole and so shape the course-wide
 // ranking, and can publish new course holes. The old hole is archived, never
@@ -34,6 +37,7 @@ import (
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
 	"gno.land/p/nt/avl/v0"
+	bptree "gno.land/p/nt/bptree/v0"
 	"gno.land/p/nt/ufmt/v0"
 	"gno.land/r/sys/names"
 	"gno.land/r/sys/users"
@@ -113,15 +117,24 @@ func modeOf(name string) int {
 
 var modeNames = [modes]string{"assisted", "pro"}
 
+// The index each tree is chosen for its size. The global ones, which hold
+// every hole or every player, are B+ trees: a leaf holds 32 entries, so past
+// the first few an entry costs about 410 bytes instead of an AVL node's
+// 2,030. A hole's own trees (rounds, bests, board) stay AVL: a B+ tree's
+// first leaf costs 5,660 bytes, and most of a hole's trees hold a handful.
+// Both iterate in the same order, so what is read out is the same.
+//
+// A B+ tree must not change while it is iterated: no callback below writes
+// to the tree it walks (drain walks a hole's bests and writes the standings).
 var (
-	holes = avl.NewTree() // id -> *entry
-	slots = avl.NewTree() // "world/order" -> id of the current official hole there
+	holes = bptree.NewBPTree32() // id -> *entry
+	slots = bptree.NewBPTree32() // "world/order" -> id of the current official hole there
 	// per mode: player -> *row, their standing over the official holes (only
 	// players with an official finish have one)
-	totals = [modes]*avl.Tree{avl.NewTree(), avl.NewTree()}
+	totals = [modes]*bptree.BPTree{bptree.NewBPTree32(), bptree.NewBPTree32()}
 	// per mode: rankKey(row) -> player, the named players with at least one
 	// hole, best first. The course top ten is its first ten entries.
-	ranks = [modes]*avl.Tree{avl.NewTree(), avl.NewTree()}
+	ranks = [modes]*bptree.BPTree{bptree.NewBPTree32(), bptree.NewBPTree32()}
 	// archived holes whose players still count in the standings, oldest
 	// first: drain takes them out a batch at a time
 	archiving []string
@@ -145,9 +158,9 @@ func named(player string) bool {
 }
 
 // official reports whether a hole's id makes it one of the course's own: it
-// is under r/gnogolf/, and the chain enforces namespaces, so only the
+// is under golf's own namespace (officialPrefix), and the chain enforces namespaces, so only the
 // namespace's holder can publish there. Without enforcement anyone could
-// deploy under r/gnogolf/ and take over the cups.
+// deploy under that namespace and take over the cups.
 //
 // Two local chains are let through without it, so a gnodev course is
 // playable: "dev" and "test-gnogolf". On any public chain (pearl-1 and the
@@ -344,12 +357,12 @@ func Launch(cur realm, hole string, angle, power float64) string {
 	}
 
 	if _, holed := stroke(e, r, player, hole, angle, power, 0, weatherOf(e, r.period).Zones); holed {
-		return ufmt.Sprintf("Holed in %d! Your round: /r/gnogolf/golf:%s/%s", r.strokes, hole, player.String())
+		return ufmt.Sprintf("Holed in %d! Your round: %s:%s/%s", r.strokes, hub, hole, player.String())
 	}
 	// what a player on gnoweb needs for the next shot, with no 3D to look at
 	a, d := aim(r.ball(), e.h.Cup())
-	return ufmt.Sprintf("Stroke %d: the ball stopped %.1f from the cup, which is at %.0f° from it. Your round: /r/gnogolf/golf:%s/%s",
-		r.strokes, d, a, hole, player.String())
+	return ufmt.Sprintf("Stroke %d: the ball stopped %.1f from the cup, which is at %.0f° from it. Your round: %s:%s/%s",
+		r.strokes, d, a, hub, hole, player.String())
 }
 
 // aim is the angle, in the shot's own degrees (0 = right, 90 = down), and the
@@ -598,14 +611,6 @@ func stroke(e *entry, r *round, player address, hole string, angle, power float6
 		"strokes", strconv.Itoa(r.strokes))
 	return shot, false
 }
-
-// officialPrefix is the range of the course's own holes (the realms under
-// r/gnogolf/): they are listed first, and on a chain that enforces
-// namespaces they are the only ones ranked.
-const (
-	officialPrefix = "gno.land/r/gnogolf/"
-	officialEnd    = "gno.land/r/gnogolf0" // the key just past every official hole ('/'+1)
-)
 
 // maxRoundStrokes bounds one round's history (State shows it); maxPath the
 // path a hole may return for one stroke — an honest one is its substeps plus

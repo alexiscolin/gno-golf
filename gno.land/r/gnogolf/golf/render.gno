@@ -33,7 +33,7 @@ func Render(path string) string {
 	}
 	v := holes.Get(hole)
 	if v == nil {
-		return "# No such hole\n\n> [!WARNING]\n> `" + cleanName(hole) + "` is not registered. " + md("See every hole", "/r/gnogolf/golf") + ".\n"
+		return "# No such hole\n\n> [!WARNING]\n> `" + cleanName(hole) + "` is not registered. " + md("See every hole", hub) + ".\n"
 	}
 	return renderHole(v.(*entry), focus)
 }
@@ -137,8 +137,8 @@ func renderHub() string {
 			n++
 			no = ufmt.Sprintf("%d", n)
 		}
-		sb.WriteString(ufmt.Sprintf("| %s | [%s](/r/gnogolf/golf:%s) | %d | %s | %d | %s |\n",
-			no, e.name, e.id, e.par, bestCell(e), e.plays, source(e.id)))
+		sb.WriteString(ufmt.Sprintf("| %s | [%s](%s:%s) | %d | %s | %d | %s |\n",
+			no, e.name, hub, e.id, e.par, bestCell(e), e.plays, source(e.id)))
 	}
 	if len(community) > 0 {
 		if len(course) > 0 {
@@ -147,8 +147,8 @@ func renderHub() string {
 		sb.WriteString("## Community holes\n\nAnyone can register a hole. These are not part of the course: they have no cup and do not count in its ranking.\n\n" +
 			"| hole | par | best | shots played | code |\n|---|---|---|---|---|\n")
 		for _, e := range community {
-			sb.WriteString(ufmt.Sprintf("| [%s](/r/gnogolf/golf:%s) | %d | %s | %d | %s |\n",
-				e.name, e.id, e.par, bestCell(e), e.plays, source(e.id)))
+			sb.WriteString(ufmt.Sprintf("| [%s](%s:%s) | %d | %s | %d | %s |\n",
+				e.name, hub, e.id, e.par, bestCell(e), e.plays, source(e.id)))
 		}
 	}
 	sb.WriteString("\n## Leaderboard\n\nEach named player's best finish on each current hole of the course, added up: most holes first, then fewest strokes. " +
@@ -216,8 +216,8 @@ func weatherNote(e *entry) string {
 func noAdmin() string {
 	return "\n---\n\nThis realm has no administrator: no owner, no pause, no upgrade, and no way to delete a hole or a record. " +
 		"Every write (Register, Launch, PlayRound, PlayRoundAt, PlayRoundPro, Reset) is open to anyone. " +
-		"Check it yourself: " + md("the source", "/r/gnogolf/golf$source") + ".\n\n" +
-		"One party does hold a real power: whoever may publish under `r/gnogolf/`, which the chain's namespace rule decides, not this realm. " +
+		"Check it yourself: " + md("the source", hub+"$source") + ".\n\n" +
+		"One party does hold a real power: whoever may publish under `" + strings.TrimPrefix(officialPrefix, "gno.land/") + "`, which the chain's namespace rule decides, not this realm. " +
 		"A hole published there can take a course hole's place in its cup: the old one is archived, never erased, " +
 		"and it stops counting in the course-wide ranking. So that party can reshape the course, and with it the ranking, " +
 		"and can add course holes. It cannot touch a round, a record or a community hole.\n\n" +
@@ -254,7 +254,7 @@ func renderHole(e *entry, focus address) string {
 		if v := holes.Get(e.next); v != nil {
 			next = v.(*entry).name
 		}
-		s += "> [!NOTE]\n> Archived: " + md(next, "/r/gnogolf/golf:"+e.next) +
+		s += "> [!NOTE]\n> Archived: " + md(next, hub+":"+e.next) +
 			" took this hole's place in its cup. It can still be played, and your best here still shows on this page, but it no longer counts in the course-wide ranking.\n\n"
 	}
 	s += weatherNote(e)
@@ -286,7 +286,7 @@ func renderHole(e *entry, focus address) string {
 	s += "<gno-input name=\"angle\" placeholder=\"angle in degrees (0 = right, 90 = down), decimals allowed\" required=\"true\" />\n"
 	s += "<gno-input name=\"power\" placeholder=\"power, above 0 and up to 10\" required=\"true\" />\n"
 	s += "</gno-form>\n\n"
-	s += ufmt.Sprintf("_After your shot, see your ball at `/r/gnogolf/golf:%s/<your address>`._\n\n", e.id)
+	s += ufmt.Sprintf("_After your shot, see your ball at `%s:%s/<your address>`._\n\n", hub, e.id)
 	s += "Holed, or want a fresh start? Put your ball back on the tee:\n\n"
 	s += "<gno-form exec=\"Reset\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
@@ -314,8 +314,8 @@ func renderHole(e *entry, focus address) string {
 		if r.done {
 			state = "**holed**"
 		}
-		s += ufmt.Sprintf("| [%s](/r/gnogolf/golf:%s/%s) | %d | %s |\n",
-			short(player), e.id, player, r.strokes, state)
+		s += ufmt.Sprintf("| [%s](%s:%s/%s) | %d | %s |\n",
+			short(player), hub, e.id, player, r.strokes, state)
 	})
 	if empty {
 		s += "| _nobody yet_ | | |\n"

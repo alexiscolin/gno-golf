@@ -73,13 +73,126 @@ func Prepare(f *Field) {
 	for j := range f.Walls {
 		s := f.Walls[j].Seg
 		lines(s, f.Radius, &o)
-		p = append(p, s.A.X, s.A.Y, s.B.X, s.B.Y,
-			o.plus.A.X, o.plus.A.Y, o.plus.B.X, o.plus.B.Y,
-			o.minus.A.X, o.minus.A.Y, o.minus.B.X, o.minus.B.Y,
-			o.pn.X, o.pn.Y, o.mn.X, o.mn.Y, o.n.X, o.n.Y, o.length,
-			o.lo.X, o.lo.Y, o.hi.X, o.hi.Y)
+		p = appendPrep(p, s, &o)
 	}
 	f.prep = p
+}
+
+func appendPrep(p []float64, s Segment, o *offset) []float64 {
+	return append(p, s.A.X, s.A.Y, s.B.X, s.B.Y,
+		o.plus.A.X, o.plus.A.Y, o.plus.B.X, o.plus.B.Y,
+		o.minus.A.X, o.minus.A.Y, o.minus.B.X, o.minus.B.Y,
+		o.pn.X, o.pn.Y, o.mn.X, o.mn.Y, o.n.X, o.n.Y, o.length,
+		o.lo.X, o.lo.Y, o.hi.X, o.hi.Y)
+}
+
+// Lengths is the three square roots lines takes for a wall and a ball of
+// radius r: the wall's own length, then its plus and minus offset lines'.
+// A hole stored as data keeps them, so PrepareWith needs no square root.
+func Lengths(s Segment, r float64) (l, lp, lm float64) {
+	var o offset
+	lines(s, r, &o)
+	return o.length, o.plus.B.Sub(o.plus.A).Len(), o.minus.B.Sub(o.minus.A).Len()
+}
+
+// PrepareWith is Prepare with each wall's Lengths given, three per wall in
+// wall order: the same prep, bit for bit, when they are the wall's own. It
+// does not check them — whoever stored them must have (Prepared(f) against
+// Prepare's, once). With the wrong count it is Prepare.
+func PrepareWith(f *Field, lens []float64) {
+	if len(lens) != 3*len(f.Walls) {
+		Prepare(f)
+		return
+	}
+	p := make([]float64, 1, 1+stride*len(f.Walls))
+	p[0] = f.Radius
+	var o offset
+	for j := range f.Walls {
+		s := f.Walls[j].Seg
+		linesWith(s, f.Radius, &o, lens[3*j], lens[3*j+1], lens[3*j+2])
+		p = appendPrep(p, s, &o)
+	}
+	f.prep = p
+}
+
+// Prepared is a copy of the field's prep, for a test to compare bit for bit.
+func Prepared(f *Field) []float64 {
+	out := make([]float64, len(f.prep))
+	copy(out, f.prep)
+	return out
+}
+
+// linesWith is lines with its three square roots given (Lengths): the same
+// operations on the same operands, in the same order, so the same bits —
+// written out by hand, without lines' closure, slice and method calls, since
+// a data hole runs it on every call. lines itself is left as it is, so a
+// hole that calls Prepare cannot move.
+func linesWith(s Segment, r float64, o *offset, l, lp, lm float64) {
+	dx, dy := s.B.X-s.A.X, s.B.Y-s.A.Y
+	o.a, o.length = s.A, l
+	if l == 0 {
+		o.plus, o.minus, o.n, o.pn, o.mn = s, s, Vec2{}, Vec2{}, Vec2{}
+	} else {
+		nx, ny := -dy/l, dx/l
+		q := r / l
+		ex, ey := dx*q, dy*q
+		o.n = Vec2{nx, ny}
+		o.plus = towardWith(s, nx, ny, ex, ey, r, s.A.X+nx, s.A.Y+ny)
+		o.minus = towardWith(s, nx, ny, ex, ey, r, s.A.X-nx, s.A.Y-ny)
+		o.pn = normalWith(o.plus, lp)
+		o.mn = normalWith(o.minus, lm)
+	}
+	lo, hi := o.plus.A, o.plus.A
+	if p := o.plus.B; p.X < lo.X {
+		lo.X = p.X
+	} else if p.X > hi.X {
+		hi.X = p.X
+	}
+	if p := o.plus.B; p.Y < lo.Y {
+		lo.Y = p.Y
+	} else if p.Y > hi.Y {
+		hi.Y = p.Y
+	}
+	if p := o.minus.A; p.X < lo.X {
+		lo.X = p.X
+	} else if p.X > hi.X {
+		hi.X = p.X
+	}
+	if p := o.minus.A; p.Y < lo.Y {
+		lo.Y = p.Y
+	} else if p.Y > hi.Y {
+		hi.Y = p.Y
+	}
+	if p := o.minus.B; p.X < lo.X {
+		lo.X = p.X
+	} else if p.X > hi.X {
+		hi.X = p.X
+	}
+	if p := o.minus.B; p.Y < lo.Y {
+		lo.Y = p.Y
+	} else if p.Y > hi.Y {
+		hi.Y = p.Y
+	}
+	o.lo, o.hi = Vec2{lo.X - boxPad, lo.Y - boxPad}, Vec2{hi.X + boxPad, hi.Y + boxPad}
+}
+
+// towardWith is lines' toward for the point (px, py): the offset line on
+// that point's side of the wall.
+func towardWith(s Segment, nx, ny, ex, ey, r, px, py float64) Segment {
+	mx, my := nx, ny
+	if (px-s.A.X)*mx+(py-s.A.Y)*my < 0 {
+		mx, my = mx*-1, my*-1
+	}
+	ox, oy := mx*r, my*r
+	return Segment{A: Vec2{(s.A.X - ex) + ox, (s.A.Y - ey) + oy}, B: Vec2{(s.B.X + ex) + ox, (s.B.Y + ey) + oy}}
+}
+
+// normalWith is Segment.Normal with the length given.
+func normalWith(s Segment, l float64) Vec2 {
+	if l == 0 {
+		return Vec2{}
+	}
+	return Vec2{-(s.B.Y - s.A.Y) / l, (s.B.X - s.A.X) / l}
 }
 
 // offsets is every wall's offset for this shot: from Prepare where it still
