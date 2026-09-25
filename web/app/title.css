@@ -29,6 +29,19 @@
 .title__stage { opacity: 0; transition: opacity .5s; }
 .title__stage--on { opacity: 1; }
 .title__canvas { width: 100%; height: 100%; display: block; }
+/* the film: full bleed, then cross-fading into the splash under it */
+.title__film { position: absolute; inset: 0; transition: opacity 1.4s ease-in-out; }
+.title__film--off { opacity: 0; pointer-events: none; }
+.title__video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* a light scrim: the logo and the button read over any shot; less of it on the calm splash */
+.title__scrim {
+  position: absolute; inset: 0; pointer-events: none; opacity: .5; transition: opacity 1.4s;
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 42%, rgba(255, 236, 190, .28), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(24, 12, 60, .45) 100%),
+    linear-gradient(to top, rgba(24, 12, 60, .4), transparent 28%);
+}
+.title__scrim--film { opacity: 1; }
 
 .screen--title .title { position: relative; z-index: 1; gap: 0; min-height: 0; }
 /* the logo: the promo's sticker lockup, a paper edge and an inked extrusion,
@@ -80,7 +93,7 @@
 .screen--title .title__facts { margin-top: clamp(18px, 4vh, 40px); gap: 12px; }
 .screen--title .title__facts li { border: 2.5px solid var(--ink); border-radius: 14px; box-shadow: 0 4px 0 var(--ink); cursor: default; }
 
-/* on a wide screen the facts sit on the foot of it, under the heroes' feet */
+/* on a wide screen the facts sit on the foot of it */
 @media (min-aspect-ratio: 1/1) {
   .screen--title .title__facts { position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); margin: 0; }
 }
@@ -88,7 +101,7 @@
   .screen--title .title__facts { display: none; }
 }
 /* a phone upright: the block higher and the logo smaller, the foot of the
-   screen left to the heroes */
+   screen left to the gnomes on the green */
 @media (max-aspect-ratio: 1/1) {
   .screen--title { align-content: start; padding-top: clamp(16px, 4vh, 40px); padding-bottom: 22vh; }
   .screen--title .title__art { width: min(80vw, 34vh); }

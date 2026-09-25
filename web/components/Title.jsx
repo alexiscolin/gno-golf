@@ -142,13 +142,15 @@ const guessWorld = () => {
   return /island/.test(h) ? "island" : /town/.test(h) ? "town" : /mountain/.test(h) ? "mountain" : "garden";
 };
 
-// The title's live scene (lib/scene/title.js), one per visit: kept across the
-// two mounts at startup (the page's, while the bundle loads, then the game's)
-// by parking its canvas for a moment instead of dropping it. Each visit flies
-// round the next world. Nothing of it runs where a still is shown instead:
-// reduced motion, the Low graphics tier, no WebGL.
+// The title's backdrop, one per visit: the promo's textless cut
+// (public/title/bg.*) plays first, then cross-fades into the live splash
+// (lib/scene/title.js), which waits, drawn, behind it. Both are kept across
+// the two mounts at startup (the page's, while the bundle loads, then the
+// game's) by parking them for a moment instead of dropping them. Each visit's
+// splash is the next world. Reduced motion, the Low graphics tier and no WebGL
+// get a still instead; a data saver, a slow link or no autoplay skip the video.
 const SCENES = ["garden", "island", "town", "mountain"];
-let visit = null; // { world, canvas, p (its scene, or null), ready, kill }
+let visit = null; // { world, canvas, video, phase ("video" | "splash"), p (its scene, or null), ready, kill, notify }
 const nextWorld = () => {
   let i = 0;
   try {
@@ -168,30 +170,90 @@ const wantsStill = () => {
     return false;
   }
 };
+const wantsVideo = () => {
+  const c = navigator.connection;
+  return !(c && (c.saveData || /2g/.test(c.effectiveType || "")));
+};
+// the smallest first: AV1, then VP9, then H.264 (each ~350 KB, 12 s, 540p)
+const FILM = [
+  ["title/bg.av1.webm", 'video/webm; codecs="av01.0.04M.08"'],
+  ["title/bg.vp9.webm", 'video/webm; codecs="vp9"'],
+  ["title/bg.mp4", 'video/mp4; codecs="avc1.640020"'],
+];
 
-function useTitleScene(host) {
-  const [scene, setScene] = useState(null); // { world, live }
+/** The film: muted, inline, and nothing fetched until the page is up and idle. */
+function makeFilm(v) {
+  const el = document.createElement("video");
+  el.className = "title__video";
+  el.muted = el.defaultMuted = el.playsInline = true;
+  el.preload = "none";
+  el.setAttribute("aria-hidden", "true");
+  el.disablePictureInPicture = true;
+  let waited = 0;
+  const end = () => {
+    clearTimeout(waited);
+    if (v.phase === "splash") return;
+    v.phase = "splash";
+    el.pause(); // it fades out; no decoding behind the splash
+    if (v.p) v.p.then((t) => t && t.go());
+    v.notify();
+  };
+  el.addEventListener("ended", end);
+  el.addEventListener("playing", () => clearTimeout(waited));
+  // it stops for data half way: a few seconds' grace, then the splash
+  el.addEventListener("waiting", () => (clearTimeout(waited), (waited = setTimeout(end, 4000))));
+  const load = () => {
+    if (visit !== v || v.phase !== "video") return;
+    el.poster = "title/bg-poster.webp";
+    for (const [src, type] of FILM) {
+      const so = document.createElement("source");
+      so.src = src;
+      so.type = type;
+      el.appendChild(so);
+    }
+    el.lastChild.addEventListener("error", end); // every source failed
+    el.load();
+    el.play().catch(end); // no autoplay here
+    waited = setTimeout(end, 6000); // a slow link: the splash, rather than a wait
+  };
+  const idle = () => (window.requestIdleCallback ? requestIdleCallback(load, { timeout: 1500 }) : setTimeout(load, 200));
+  if (document.readyState === "complete") idle();
+  else addEventListener("load", idle, { once: true });
+  return { el, end, stop: () => (clearTimeout(waited), el.pause(), el.replaceChildren(), el.removeAttribute("src"), el.load()) };
+}
+
+function useTitleScene(host, film) {
+  const [scene, setScene] = useState(null); // { world, live, phase }
   useEffect(() => {
     if (!visit) {
       const world = nextWorld(), live = !wantsStill(), canvas = live ? document.createElement("canvas") : null;
       if (canvas) canvas.className = "title__canvas";
-      const v = (visit = { world, canvas, p: null, ready: false, kill: 0 });
+      const v = (visit = { world, canvas, video: null, phase: "splash", p: null, ready: false, kill: 0, notify() {} });
+      if (live && wantsVideo()) (v.phase = "video"), (v.video = makeFilm(v));
       if (live)
         v.p = import("@/lib/scene/title")
-          .then((m) => m.makeTitle(canvas, { world }))
+          .then((m) => m.makeTitle(canvas, { world, held: v.phase === "video" }))
           .catch((e) => (console.warn("gnogolf: no live title", e), null));
     }
     const v = visit;
     clearTimeout(v.kill);
     if (host.current && v.canvas) host.current.appendChild(v.canvas);
-    setScene({ world: v.world, live: v.ready });
+    if (film.current && v.video) {
+      film.current.appendChild(v.video.el);
+      // taken out of the page between the two mounts, it paused: on again
+      if (v.phase === "video" && v.video.el.currentSrc && v.video.el.paused) v.video.el.play().catch(v.video.end);
+    }
     let on = true;
+    const show = () => on && setScene({ world: v.world, live: v.ready, phase: v.phase });
+    v.notify = show;
+    show();
     if (v.p) v.p.then((t) => {
       if (!t || !on) return;
       v.ready = true;
       t.resize();
-      setScene({ world: v.world, live: true });
-      if (/[?&]camlog/.test(location.search)) window.__title = t; // the perf probe's hook
+      if (v.phase === "splash") t.go();
+      show();
+      if (/[?&]camlog/.test(location.search)) (window.__title = t), (window.__titleFilm = v.video); // the perf probe's hook
     });
     return () => {
       on = false;
@@ -199,10 +261,11 @@ function useTitleScene(host) {
         if (visit !== v) return;
         visit = null;
         if (v.canvas) v.canvas.remove();
+        if (v.video) v.video.stop(), v.video.el.remove();
         if (v.p) v.p.then((t) => t && t.destroy());
       }, 400);
     };
-  }, [host]);
+  }, [host, film]);
   return scene;
 }
 
@@ -215,8 +278,8 @@ export default function Title({ onStart, loading = false, world }) {
     if (loading) setReady(false);
   }, [loading]);
   const done = useCallback(() => setReady(true), []);
-  const host = useRef(null);
-  const scene = useTitleScene(host);
+  const host = useRef(null), film = useRef(null);
+  const scene = useTitleScene(host, film);
   // ?titlebake (dev): the stills' baker, for the stills script
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) import("@/lib/scene/title").then((m) => (window.__titleStill = m.titleStill));
@@ -231,17 +294,19 @@ export default function Title({ onStart, loading = false, world }) {
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, [ready, onStart]);
-  const sw = scene ? scene.world : null;
+  const sw = scene ? scene.world : null, playing = scene && scene.phase === "video";
   return (
     <div className={"screen screen--title" + (sw ? ` tsky--${sw}` : "") + (ready ? " screen--ready" : "")} onClick={ready ? start : undefined}>
       <div className="title__sky" aria-hidden="true" />
       {sw && (
-        <picture className={"title__still" + (scene.live ? " title__still--off" : "")} aria-hidden="true">
+        <picture className={"title__still" + (scene.live && !playing ? " title__still--off" : "")} aria-hidden="true">
           <source media="(orientation: portrait)" srcSet={`title/${sw}-p.webp`} />
           <img src={`title/${sw}.webp`} alt="" />
         </picture>
       )}
-      <div ref={host} className={"title__stage" + (scene && scene.live ? " title__stage--on" : "")} aria-hidden="true" />
+      <div ref={host} className={"title__stage" + (scene && scene.live && !playing ? " title__stage--on" : "")} aria-hidden="true" />
+      <div ref={film} className={"title__film" + (playing ? "" : " title__film--off")} aria-hidden="true" />
+      <div className={"title__scrim" + (playing ? " title__scrim--film" : "")} aria-hidden="true" />
       <div className="title">
         <div className="title__logo">
           <div className="title__sun" aria-hidden="true" />

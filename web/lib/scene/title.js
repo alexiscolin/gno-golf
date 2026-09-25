@@ -1,32 +1,26 @@
-// The title's live backdrop (components/Title.jsx): a real hole of one world
-// flown round slowly at golden hour, three gnomes in hero poses up front and
-// fireworks in the sky. The hole is drawn by buildHole from the game's own
-// pieces and shared materials; its state is baked from the chain once
-// (title-holes.json: one hole a world, its landmark in it), so the title needs
-// no node and no query gas.
+// The title's splash (components/Title.jsx), where its video ends: a real
+// hole of one world at golden hour, seen close from the green, three gnomes
+// on it round the cup, and a camera that drifts only a little. The hole is
+// drawn by buildHole from the game's own pieces and shared materials; its
+// state is baked from the chain once (title-holes.json: one hole a world, its
+// landmark in it), so the title needs no node and no query gas.
 //
 // Light on the machine: its own small renderer (like the gnome picker's), at
 // most 30 frames a second, and no frame at all while the tab is hidden or the
-// window is behind another. The fireworks are one draw, moved by the GPU.
+// window is behind another.
 import * as THREE from "three";
 import HOLES from "./title-holes.json";
 import { loadWorld } from "./worlds.js";
 import { buildHole } from "./course.js";
 import { makeRenderer, makeScene } from "./camera.js";
 import { makeBall, gnomeById } from "./gnome.js";
-import { C, flat, inked, rbox, texOf, disposeCourse, setTime } from "./materials.js";
+import { makeConfetti } from "./fx.js";
+import { BALL_R } from "../terrain.js";
+import { C, flat, inked, texOf, disposeCourse, setTime } from "./materials.js";
 
 const FRAME_MS = 1000 / 30;
 const STEP_MS = 72 / 3.5; // the timed pieces (the mill's sails, the tram) at the game's idle pace (engine: 3.5 substeps a second)
 
-// Where each world's flight starts (radians round the board) and how far out
-// it flies: its landmark in view first.
-const FLY = {
-  garden: { a0: 1.1, r: 1, h: 1 },
-  island: { a0: 0.9, r: 1, h: 1 },
-  town: { a0: 1.3, r: 0.9, h: 0.9 },
-  mountain: { a0: 1.2, r: 1, h: 1.1 },
-};
 // The cup cards' dioramas: a fixed three-quarter view on the landmark
 const CUP = {
   garden: { a: 1.25, r: 0.78, h: 1.15 },
@@ -47,7 +41,7 @@ function golden(scene, world) {
   sun.position.set(-26, 18, 22);
 }
 
-/** A ring round the board: the flight's camera at angle a. */
+/** A ring round the board: the cup card's camera at angle a. */
 function orbit(camera, b, a, { r = 1, h = 1 } = {}, portrait = false, lift = 4) {
   const k = portrait ? 1.35 : 1;
   const rx = (b.w * 0.55 + 30) * r * k, rz = (b.h * 0.55 + 36) * r * k;
@@ -56,34 +50,7 @@ function orbit(camera, b, a, { r = 1, h = 1 } = {}, portrait = false, lift = 4) 
   camera.lookAt(cx, lift, cz);
 }
 
-// ------------------------------------------------------------- the heroes
-
-function putter() {
-  const p = new THREE.Group();
-  const shaft = inked(new THREE.CylinderGeometry(0.04, 0.04, 1.35, 8), flat(0xc9d2d0));
-  shaft.position.y = -0.7;
-  const grip = inked(new THREE.CylinderGeometry(0.07, 0.07, 0.34, 8), flat(C.ink));
-  grip.position.y = -0.12;
-  const head = inked(rbox(0.46, 0.16, 0.18, 0.05), flat(0xe3e8e6));
-  head.position.set(-0.16, -1.38, 0);
-  p.add(shaft, grip, head);
-  return p;
-}
-
-function pennant() {
-  const p = new THREE.Group();
-  const stick = inked(new THREE.CylinderGeometry(0.035, 0.035, 1.1, 8), flat(C.woodDark));
-  stick.position.y = 0.55;
-  const s = new THREE.Shape();
-  s.moveTo(0, 0);
-  s.lineTo(0.7, -0.17);
-  s.lineTo(0, -0.36);
-  const flag = new THREE.Mesh(new THREE.ShapeGeometry(s), flat(C.sun, { side: THREE.DoubleSide }));
-  flag.position.set(0.03, 1.08, 0);
-  p.add(stick, flag);
-  p.userData.flag = flag;
-  return p;
-}
+// ------------------------------------------------------------- the gnomes
 
 function golfBall() {
   const g = new THREE.Group();
@@ -104,143 +71,113 @@ function golfBall() {
   return g;
 }
 
-const gnome = (id) => {
-  const m = makeBall(gnomeById(id));
-  m.userData.shade.visible = false; // up front they stand on nothing
-  return m;
-};
+// Per world: how far up the lane the ride starts (clear of the garden's tunnel
+// mouths, the island's castle), and the camera: how far off, from how far
+// round (th, radians behind the cup > 0; pth upright, from beyond the cup by
+// default) and how high (h, times R)
+const SPOT = { garden: { ride: 5.5, R: 13 }, island: { ride: 4.2, R: 12, h: 0.7 }, town: { ride: 8, R: 13 }, mountain: { ride: 8, R: 13 } };
+const RIDE_AT = 1.2, RIDE_S = 7; // the ride's start and length (s)
+const smooth = (k) => k * k * (3 - 2 * k);
 
-/** Three gnomes, each in a pose: a swing, a cheer, a ride. */
-function makeHeroes() {
-  const swing = new THREE.Group();
-  const sg = gnome("classic");
-  const club = putter();
-  club.position.set(-0.42, -0.02, 0.28); // on his left: toward the middle of the screen
-  swing.add(sg, club);
-  swing.rotation.y = -0.35;
+/**
+ * The three gnomes on the green, at the game's own scale, round the cup: one
+ * standing by it, watching; one beside the flag, hopping; and the Ginger
+ * riding a golf ball slowly up the lane to the cup, where one burst of
+ * confetti greets him. Nothing in their hands: they have none.
+ */
+function makeCast(s, course, world) {
+  const height = course.userData.height;
+  const cup = new THREE.Vector3(s.cup[0], height(s.cup[0], s.cup[1]), s.cup[1]);
+  const d = new THREE.Vector3(s.cup[0] - s.start[0], 0, s.cup[1] - s.start[1]).normalize();
+  const n = new THREE.Vector3(-d.z, 0, d.x);
+  if (n.z < 0) n.negate(); // the camera's side: toward the low sun
+  const spot = SPOT[world] || SPOT.town;
+  const onGround = (o, p, lift = BALL_R) => o.position.set(p.x, height(p.x, p.z) + lift, p.z);
+  const face = (m, dir) => (m.userData.body.rotation.y = Math.PI / 2 - Math.atan2(dir.z, dir.x));
+  const group = new THREE.Group();
 
-  const cheer = new THREE.Group();
-  const cg = gnome("gardener");
-  const flagStick = pennant();
-  flagStick.position.set(-0.52, -0.1, 0.1);
-  flagStick.rotation.z = 0.3;
-  cheer.add(cg, flagStick);
-  cheer.rotation.y = 0.35;
+  const aimer = makeBall(gnomeById("classic"));
+  const aimAt = cup.clone().addScaledVector(d, -1.9).addScaledVector(n, 1.5);
+  onGround(aimer, aimAt);
 
-  const ride = new THREE.Group();
+  const fan = makeBall(gnomeById("gardener"));
+  const fanAt = cup.clone().addScaledVector(d, 1.4).addScaledVector(n, 0.3);
+  onGround(fan, fanAt);
+
+  const rider = new THREE.Group();
   const ball = golfBall();
-  const rg = gnome("ginger");
-  rg.position.y = 0.95;
-  ride.add(ball, rg);
-  ride.rotation.y = 0.5;
+  const ginger = makeBall(gnomeById("ginger"));
+  ginger.userData.shade.visible = false; // the ball's is enough
+  ginger.position.y = 0.95;
+  rider.add(ball, ginger);
+  const rideFrom = cup.clone().addScaledVector(d, -spot.ride).addScaledVector(n, -0.5);
+  const rideTo = cup.clone().addScaledVector(d, -1.2).addScaledVector(n, -0.5);
+  const rideLen = rideFrom.distanceTo(rideTo);
+  face(ginger, d);
+  group.add(aimer, fan, rider);
 
-  const all = new THREE.Group();
-  all.add(swing, cheer, ride);
+  let confetti = null, cheered = false, lastT = 0;
+  const blink = [aimer, fan, ginger].map(() => ({ at: 1 + Math.random() * 3, until: 0 }));
+  const p = new THREE.Vector3();
   return {
-    group: all,
-    swing, cheer, ride,
-    /** The idle poses at time t (s). */
+    group,
+    cup, d, n, spot,
+    /** The cast at time t (s). */
     pose(t) {
-      // the swing: a slow back-swing, a quick stroke through, a hold
-      const ph = (t % 3.2) / 3.2;
-      const s = ph < 0.55 ? -0.9 * Math.sin((ph / 0.55) * Math.PI * 0.5) : ph < 0.68 ? -0.9 + 2.1 * ((ph - 0.55) / 0.13) : 1.2 - 1.2 * ((ph - 0.68) / 0.32);
-      club.rotation.z = s;
-      sg.rotation.z = -s * 0.12;
-      sg.userData.body.rotation.y = Math.sin(t * 0.8) * 0.15;
-      // the cheer: hops with a squash on landing, the pennant waving
-      const hop = Math.abs(Math.sin(t * 3.4));
-      cg.position.y = hop * 0.42;
-      cg.scale.set(1 + (1 - hop) * 0.08, 1 - (1 - hop) * 0.1, 1 + (1 - hop) * 0.08);
-      flagStick.position.y = -0.1 + hop * 0.42;
-      flagStick.rotation.z = 0.3 + Math.sin(t * 6.8) * 0.28;
-      flagStick.userData.flag.rotation.y = Math.sin(t * 9) * 0.5;
-      // the ride: the ball rolls on, the gnome bobs and leans back on it
-      ball.rotation.x = t * 2.2;
-      rg.position.y = 0.95 + Math.abs(Math.sin(t * 4.4)) * 0.1;
-      rg.rotation.z = Math.sin(t * 1.3) * 0.1;
-      rg.rotation.x = -0.18;
+      const dt = Math.min(Math.max(t - lastT, 0), 0.1);
+      lastT = t;
+      // the ride: eases in and out, the ball turning by its roll, the gnome upright on it
+      const k = smooth(Math.min(Math.max((t - RIDE_AT) / RIDE_S, 0), 1));
+      p.lerpVectors(rideFrom, rideTo, k);
+      onGround(rider, p, 0.45);
+      ball.rotation.set(0, Math.atan2(d.x, d.z), 0);
+      ball.rotateX(k * rideLen / 0.45);
+      const moving = k > 0 && k < 1;
+      ginger.position.y = 0.95 + (moving ? Math.abs(Math.sin(t * 4.4)) * 0.05 : Math.sin(t * 1.9) * 0.02);
+      ginger.userData.body.rotation.z = moving ? Math.sin(t * 1.6) * 0.1 : 0;
+      // the arrival: one burst from the cup, the fan's hop of joy
+      if (!cheered && k >= 1) {
+        cheered = true;
+        confetti = makeConfetti([cup.x, cup.z], height(cup.x, cup.z));
+        group.add(confetti.group);
+      }
+      if (confetti && !confetti.step(dt)) (group.remove(confetti.group), disposeCourse(confetti.group), (confetti = null));
+      // the fan: breathes, and hops now and then (the game's joy), squashing on landing
+      const joy = cheered ? Math.max(0, 1 - (t - RIDE_AT - RIDE_S) / 1.6) : 0;
+      const hop = joy > 0 ? Math.abs(Math.sin(t * 5.5)) * 0.7 * joy : (t % 6 < 0.9 ? Math.abs(Math.sin((t % 6) * 3.5)) * 0.35 : 0);
+      const fb = fan.userData.body;
+      fb.position.y = hop + Math.sin(t * 1.9) * 0.05;
+      const sq = hop < 0.05 && (joy > 0 || t % 6 < 1) ? 0.06 : 0;
+      fb.scale.set(1 + sq, 1 - sq, 1 + sq).multiplyScalar(BALL_R / 0.55);
+      fan.userData.shade.scale.setScalar(1 - hop * 0.8);
+      // turned toward the rider on its way (and a little to the camera), then to the camera
+      face(fan, joy > 0 || k < 1 ? p.clone().sub(fanAt).normalize().addScaledVector(n, 0.9) : n);
+      // the watcher: breathes, leans a little, follows the ride with his eyes, then the cup
+      aimer.userData.body.position.y = Math.sin(t * 1.9 + 1) * 0.05;
+      aimer.userData.body.rotation.z = Math.sin(t * 0.7) * 0.05;
+      face(aimer, (k < 1 ? p : cup).clone().sub(aimAt).normalize().addScaledVector(n, 0.9)); // three-quarters to the camera
+      // they blink every few seconds, like the player's gnome
+      [aimer, fan, ginger].forEach((m, i) => {
+        const b = blink[i];
+        if (t > b.at) (b.until = t + 0.13), (b.at = t + 2.2 + Math.random() * 3.2);
+        for (const e of m.userData.eyes) e.scale.y = t < b.until ? 0.12 : 1;
+      });
     },
   };
 }
 
-/** Where the heroes stand for this aspect: flanking the logo, feet on one
- *  line (over the facts row); along the foot of a phone's screen. */
-function placeHeroes(h, cam) {
-  const hh = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.position.z, hw = hh * cam.aspect;
-  const portrait = cam.aspect < 1;
-  const k = portrait ? Math.min(0.62, hw * 0.4) : Math.min(1, hh * 0.36);
-  const feet = portrait ? -hh * 0.93 : -hh * 0.6;
-  // each pose's lowest point under its origin: the ball, the club head, the body
-  h.ride.position.set(-hw * (portrait ? 0.62 : 0.74), feet + 0.45 * k, 0);
-  h.swing.position.set(hw * (portrait ? 0.6 : 0.74), feet + 1.45 * k, 0.3);
-  h.cheer.position.set(portrait ? hw * 0.02 : -hw * 0.52, feet + 0.5 * k * 0.8 + (portrait ? 0 : hh * 0.06), -1);
-  h.cheer.visible = !portrait || hw > 1.6;
-  for (const g of [h.ride, h.swing, h.cheer]) g.scale.setScalar(k);
-  h.cheer.scale.multiplyScalar(0.8);
-}
-
-// ------------------------------------------------------------- the fireworks
-
-const FW_VS = `
-  attribute vec3 aDir;
-  attribute vec2 aSeed; // burst, speed
-  uniform float uT;
-  uniform vec2 uArea; // half the view at z = 0
-  uniform float uPx;
-  varying vec3 vColor;
-  varying float vFade;
-  vec3 hash3(float n) { return fract(sin(vec3(n, n + 1.7, n + 3.1)) * vec3(43758.5453, 22578.1459, 19642.3490)); }
-  void main() {
-    float P = 3.4;
-    float tt = uT + aSeed.x * 1.13;
-    float cyc = floor(tt / P), age = mod(tt, P);
-    vec3 h = hash3(aSeed.x * 17.0 + cyc * 3.7);
-    // up in the sky, away from the middle where the logo is
-    float side = h.x < 0.5 ? -1.0 : 1.0;
-    vec3 c = vec3(side * uArea.x * (0.3 + 0.62 * fract(h.x * 2.0)), uArea.y * (0.12 + 0.8 * h.y), -3.0 - h.z * 3.0);
-    float k = 1.0 - exp(-age * 2.8);
-    vec3 p = c + aDir * aSeed.y * k * (1.1 + h.z * 0.8) - vec3(0.0, 0.22 * age * age, 0.0);
-    vec3 pal[5];
-    pal[0] = vec3(1.0, 0.36, 0.55); pal[1] = vec3(1.0, 0.8, 0.25); pal[2] = vec3(0.35, 0.9, 1.0);
-    pal[3] = vec3(0.7, 0.45, 1.0); pal[4] = vec3(0.45, 1.0, 0.55);
-    int ci = int(floor(fract(h.y * 7.0 + h.z) * 5.0));
-    vec3 col = pal[0];
-    for (int i = 1; i < 5; i++) if (i == ci) col = pal[i];
-    vColor = mix(vec3(1.0), col, smoothstep(0.0, 0.35, age));
-    vFade = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.9, 2.3, age)) * (0.7 + 0.3 * sin(age * 38.0 + aSeed.y * 60.0));
-    vec4 mv = modelViewMatrix * vec4(p, 1.0);
-    gl_Position = projectionMatrix * mv;
-    gl_PointSize = uPx * (1.0 - 0.45 * smoothstep(0.0, 2.3, age)) / -mv.z;
-  }`;
-const FW_FS = `
-  varying vec3 vColor;
-  varying float vFade;
-  void main() {
-    float d = length(gl_PointCoord - 0.5);
-    float a = (smoothstep(0.5, 0.0, d) * 0.5 + smoothstep(0.3, 0.05, d)) * vFade;
-    if (a < 0.01) discard;
-    gl_FragColor = vec4(vColor * a, a);
-  }`;
-
-function makeFireworks(bursts = 6, per = 140) {
-  const n = bursts * per, dir = new Float32Array(n * 3), seed = new Float32Array(n * 2);
-  for (let i = 0; i < n; i++) {
-    // an even sphere of sparks, a few slower ones inside it
-    const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, s = Math.sqrt(1 - u * u);
-    dir.set([Math.cos(a) * s, u, Math.sin(a) * s * 0.4], i * 3);
-    seed.set([Math.floor(i / per), i % 3 === 0 ? 0.55 : 0.95 + Math.random() * 0.08], i * 2); // two shells, crisp
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  geo.setAttribute("aDir", new THREE.BufferAttribute(dir, 3));
-  geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 2));
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: FW_VS, fragmentShader: FW_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { uT: { value: 0 }, uArea: { value: new THREE.Vector2(4, 2.5) }, uPx: { value: 60 } },
-  });
-  const pts = new THREE.Points(geo, mat);
-  pts.frustumCulled = false; // placed by the shader
-  return pts;
+/** The camera: a slow drift round the three, from the sun's side (landscape),
+ *  from behind the one lining up (portrait). It looks at the cup and a lens
+ *  shift puts the cup off the middle, where the logo and the button are not. */
+function frameCast(camera, c, t, portrait) {
+  const th = (portrait ? (c.spot.pth ?? -0.9) : (c.spot.th ?? 0.15)) + Math.sin(t * 0.17) * 0.05;
+  const R = (portrait ? c.spot.R * 1.05 : c.spot.R) + Math.sin(t * 0.13) * 0.3, H = R * (portrait ? 0.55 : c.spot.h || 0.5) + Math.sin(t * 0.21) * 0.2;
+  const dir = c.n.clone().multiplyScalar(Math.cos(th)).addScaledVector(c.d, -Math.sin(th));
+  camera.position.copy(c.cup).addScaledVector(dir, R).y += H;
+  camera.lookAt(c.cup.x, c.cup.y + 0.5, c.cup.z);
+  const [x0, y0] = portrait ? [0.1, -0.74] : [0.52, -0.3]; // upright: under the facts, at the foot
+  const a = camera.aspect; // (setViewOffset takes its aspect from these sizes)
+  camera.setViewOffset(a, 1, (-x0 * a) / 2, y0 / 2, a, 1);
 }
 
 // ------------------------------------------------------------- the stage
@@ -265,78 +202,54 @@ async function holeOf(world) {
 }
 
 /**
- * The live title: makeTitle(canvas, { world }) -> { resize(), destroy() }.
- * fireworks: false leaves them out (a still, reduced motion).
+ * The splash: makeTitle(canvas, { world, held }) -> { resize(), go(), destroy() }.
+ * held: its first frame drawn, then nothing until go() (the video plays
+ * first). still: one frame at time `at`, for the baked stills.
  */
-export async function makeTitle(canvas, { world = "garden", fireworks = true } = {}) {
+export async function makeTitle(canvas, { world = "garden", held = false, still = false, at = 0 } = {}) {
   const renderer = makeRenderer(canvas);
   // a weak or software GPU gets the still, as the engine's Auto gives it Low
-  if (fireworks && weakGpu(renderer)) return renderer.dispose(), renderer.forceContextLoss(), null;
-  renderer.autoClear = false;
-  renderer.info.autoReset = false; // two scenes a frame: counted together
+  if (!still && weakGpu(renderer)) return renderer.dispose(), renderer.forceContextLoss(), null;
   renderer.setClearColor(0x000000, 0); // clear: the page paints the sky
   const scene = makeScene();
   golden(scene, world);
-  const front = makeScene();
-  // the heroes in a whiter light than the hole, so their colours stay their own
-  front.userData.lights.sky.color.set(0xfff4e8);
-  front.userData.lights.sky.groundColor.set(0xffe2c4);
-  front.userData.lights.sky.intensity = 1.35;
-  front.userData.lights.sun.color.set(0xffe6c8);
-  front.userData.lights.sun.intensity = 0.9;
-  front.userData.lights.sun.position.set(-3, 6, 10); // from the front left
   const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 600);
-  const cam2 = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
-  cam2.position.set(0, 0, 10);
-  const heroes = makeHeroes();
-  front.add(heroes.group);
-  const fw = fireworks ? makeFireworks() : null;
-  if (fw) front.add(fw);
 
-  let alive = true, raf = 0, last = 0, blurred = false, portrait = false;
+  let alive = true, raf = 0, last = 0, blurred = false, portrait = false, t0 = performance.now() - at * 1000;
   const { s, course } = await holeOf(world);
   if (!alive) return null;
   scene.add(course);
-  const fly = FLY[world] || FLY.garden, t0 = performance.now();
+  const cast = makeCast(s, course, world);
+  scene.add(cast.group);
+  const flag = course.userData.flag;
 
   function resize() {
     const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
     renderer.setSize(w, h, false);
-    camera.aspect = cam2.aspect = w / h;
+    camera.aspect = w / h;
     portrait = w < h;
-    camera.fov = portrait ? 55 : 40;
-    camera.updateProjectionMatrix();
-    cam2.updateProjectionMatrix();
-    placeHeroes(heroes, cam2);
-    if (fw) {
-      const hh = Math.tan(THREE.MathUtils.degToRad(15)) * 13;
-      fw.material.uniforms.uArea.value.set(hh * cam2.aspect, hh);
-      fw.material.uniforms.uPx.value = 380 * renderer.getPixelRatio() * (h / 900);
-    }
+    camera.fov = portrait ? 50 : 36;
   }
 
   let frames = 0, spent = 0; // frames drawn, and the main thread's time on them (ms)
   function draw(now) {
     const c0 = performance.now();
-    renderer.info.reset();
     const t = (now - t0) / 1000;
     setTime(now / 1000);
     course.userData.tick(now / 1000);
     const clock = now / STEP_MS;
     if (course.userData.mill && course.userData.mill.at) course.userData.mill.at(clock);
     for (const p of course.userData.timed || []) p.at(clock);
-    orbit(camera, s.board, fly.a0 + t * 0.045, fly, portrait);
-    heroes.pose(t);
-    if (fw) fw.material.uniforms.uT.value = t;
-    renderer.clear();
+    // the cup's arrow turns and bobs, slower than in play
+    if (flag) (flag.rotation.y = t * 0.6), (flag.position.y = flag.userData.baseY + Math.abs(Math.sin(t * 1.4)) * 0.3);
+    cast.pose(t);
+    frameCast(camera, cast, t, portrait); // (it updates the projection)
     renderer.render(scene, camera);
-    renderer.clearDepth();
-    renderer.render(front, cam2);
     frames++;
     spent += performance.now() - c0;
   }
 
-  const running = () => alive && !document.hidden && !blurred;
+  const running = () => alive && !held && !document.hidden && !blurred;
   function frame(now) {
     raf = 0;
     if (!running()) return; // woken again by focus or visibility
@@ -359,6 +272,13 @@ export async function makeTitle(canvas, { world = "garden", fireworks = true } =
 
   return {
     resize,
+    /** Starts a held splash, its story from the top. */
+    go() {
+      if (!held) return;
+      held = false;
+      t0 = performance.now();
+      wake();
+    },
     /** The last frame's draw calls and triangles, the frames drawn so far and their mean main-thread ms (a test hook). */
     info: () => ({ world, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, frames, ms: +(spent / Math.max(frames, 1)).toFixed(2) }),
     destroy() {
@@ -369,7 +289,6 @@ export async function makeTitle(canvas, { world = "garden", fireworks = true } =
       document.removeEventListener("visibilitychange", wake);
       removeEventListener("resize", resize);
       disposeCourse(scene);
-      disposeCourse(front);
       renderer.dispose();
       renderer.forceContextLoss();
     },
@@ -387,7 +306,7 @@ export async function titleStill(kind, world, w, h) {
   document.body.appendChild(canvas);
   try {
     if (kind === "title") {
-      const t = await makeTitle(canvas, { world, fireworks: false });
+      const t = await makeTitle(canvas, { world, still: true, at: RIDE_AT + RIDE_S * 0.55 }); // the ride half way up the lane
       const url = canvas.toDataURL("image/png"); // right after its first frame
       t.destroy();
       return url;
