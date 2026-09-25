@@ -220,6 +220,12 @@ func TestNamesAreCleaned(cur realm, t *testing.T) {
 	uassert.Equal(t, "Garden Cup", cleanName("~~Garden~~ Cup"))
 	uassert.Equal(t, "g1abc x.y", cleanName("@g1abc x@.y"))
 	uassert.Equal(t, "ab", cleanText("a\u0085\u2028b", maxNote))
+	// format characters and nonspacing marks: Mongolian variation
+	// selectors, interlinear annotation, musical formatting, shorthand
+	// format controls, a stack of combining accents; a precomposed é stays
+	uassert.Equal(t, "Untitled hole", cleanName("\u180b\u180c\u180d\u180f\ufff9\ufffa\ufffb\U0001d173\U0001d17a\U0001bca0\U0001bca3"))
+	uassert.Equal(t, "Zalgo", cleanName("Z\u0301\u0302\u0303a\u0336lgo"))
+	uassert.Equal(t, "Café Élysée", cleanName("Café Élysée"))
 }
 
 // timedHole is a flat hole with a gate across it on odd strokes only.

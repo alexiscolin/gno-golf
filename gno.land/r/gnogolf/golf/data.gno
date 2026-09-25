@@ -160,7 +160,9 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 	aliases.Set(alias, e.id)
 	if old != nil {
 		old.next = e.id // archived; it never counted anywhere
+		newest.Remove(recentKey(old.height, alias))
 	}
+	newest.Set(recentKey(e.height, alias), e.id)
 	chain.Emit(EventHolePublished, "hole", e.id, "slot", alias, "sha", sum, "by", by.String(), "official", "false")
 	return e.id
 }
@@ -310,7 +312,7 @@ func Versions(alias string) string {
 // BestOf is a player's best finished round on a hole in a mode, 0 if none.
 func BestOf(hole, mode string, player address) int {
 	e, m := readHole(hole), modeOf(mode)
-	if v := e.rec(m).bests.Get(player.String()); v != nil {
+	if v := e.bests(m).Get(player.String()); v != nil {
 		return v.(int)
 	}
 	return 0

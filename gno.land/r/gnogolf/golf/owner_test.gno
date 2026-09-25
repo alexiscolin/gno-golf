@@ -128,7 +128,8 @@ func TestTheSuccessorIsSetOnce(cur realm, t *testing.T) {
 	setOwner(deployer)
 	testing.SetRealm(testing.NewUserRealm(heir))
 	urequire.AbortsContains(t, cur, "only the owner", func() { SetSuccessor(cross(cur), "gno.land/r/gnogolf/golf2") })
-	for _, bad := range []string{"", "gno.land/p/gnogolf/golf2", "gno.land/r/", "gno.land/r/x/", self, "gno.land/r/x/Golf", "gno.land/r/x)[a](b"} {
+	for _, bad := range []string{"", "gno.land/p/gnogolf/golf2", "gno.land/r/", "gno.land/r/x/", self, "gno.land/r/x/Golf", "gno.land/r/x)[a](b",
+		"gno.land/r/x/../golf", "gno.land/r/./golf", "gno.land/r/x//golf", "gno.land/r/x/golf/", "gno.land/r/..", "gno.land/r//x"} {
 		testing.SetRealm(testing.NewUserRealm(deployer))
 		urequire.AbortsContains(t, cur, "a successor is", func() { SetSuccessor(cross(cur), bad) })
 	}

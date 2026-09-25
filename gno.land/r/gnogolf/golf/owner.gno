@@ -131,9 +131,14 @@ func validURL(u string) bool {
 }
 
 // SetSuccessor names the realm that takes this course over, once and for
-// good: a pkgpath under gno.land/r/, not golf itself. Only the owner can. It
-// moves nothing and blocks nothing: the pages say where the course went, and
-// Holes gives it, while every play and record here goes on as before.
+// good: a pkgpath under gno.land/r/, not golf itself, whose segments are
+// names ("", "." and ".." are not). Only the owner can. It moves nothing and
+// blocks nothing: the pages say where the course went, and Holes gives it,
+// while every play and record here goes on as before.
+//
+// golf cannot tell cheaply whether the realm exists, and does not try: the
+// call is permanent, so check the path (deployed, and the right one) before
+// sending it.
 func SetSuccessor(cur realm, pkgpath string) {
 	if !isOwner(cur.Previous().Address()) {
 		panic("golf: only the owner can name a successor")
@@ -149,8 +154,13 @@ func SetSuccessor(cur realm, pkgpath string) {
 }
 
 func validPkgPath(p string) bool {
-	if len(p) > maxURL || !strings.HasPrefix(p, "gno.land/r/") || len(p) == len("gno.land/r/") || strings.HasSuffix(p, "/") {
+	if len(p) > maxURL || !strings.HasPrefix(p, "gno.land/r/") {
 		return false
+	}
+	for _, seg := range strings.Split(p[len("gno.land/r/"):], "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return false
+		}
 	}
 	for i := 0; i < len(p); i++ {
 		c := p[i]

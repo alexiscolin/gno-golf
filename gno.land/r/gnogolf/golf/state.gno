@@ -249,9 +249,9 @@ func jstr(s string) string {
 
 // Holes lists the holes, for a client building a menu: the course's
 // current holes first, in course order (world by world, then by order), then
-// the first maxArchived of its archived versions, then everyone else's
-// current versions — at most perAuthor of one address's, the rest in
-// Community — up to maxListed in all. official is whether a hole is the
+// its maxArchived latest archived versions, latest first, then everyone
+// else's current versions, newest first — at most perAuthor of one
+// address's, the rest in Community — up to maxListed in all (see listed). official is whether a hole is the
 // course's: only those have a cup number and count in the course-wide
 // ranking. next is the version that took an archived hole's place, slot the
 // version's alias. play is the 3D client's link, successor the realm that
@@ -298,12 +298,19 @@ func Community(after string, limit int) string {
 // list: one address publishing a hundred cannot push everyone else's out.
 const perAuthor = 3
 
-// listed is the holes in list order, as many as a list shows: the current
-// course from its slots, at most maxArchived of the archived course (every
-// version is on its slot's data page), then anyone's current versions,
-// perAuthor at most per address. A list anyone can grow is shown in part,
-// never unreadable, and never at the course's expense; and however often the
-// course is republished, it leaves room for everyone else's.
+// listed is the holes in list order, as many as a list shows (maxListed):
+//   - every current course hole, from its slot, in course order;
+//   - then, if they leave room for minCommunity more, up to maxArchived
+//     archived course versions, the most recently archived first (every
+//     version is on its slot's data page);
+//   - then community holes, current versions only, newest publish first
+//     (by block height; within one block, by alias, last first), at most
+//     perAuthor of one address: of the maxScanned newest, those that fit.
+//
+// So a new hole is listed as long as fewer than maxListed holes of other
+// authors (perAuthor each) were published after it, and not before them;
+// the older ones are in Community. How many addresses an author holds, or
+// what they are, changes nothing but how many rows they fill.
 func listed() []*entry {
 	list := make([]*entry, 0, maxListed)
 	full := func() bool { return len(list) >= maxListed }
@@ -315,39 +322,34 @@ func listed() []*entry {
 		if room > maxArchived {
 			room = maxArchived
 		}
-		courseHoles.Iterate("", "", func(_ string, v any) bool {
-			if e := v.(*entry); e.next != "" {
-				list = append(list, e)
-				room--
-			}
+		archived.ReverseIterate("", "", func(_ string, v any) bool {
+			list = append(list, find(v.(string)))
+			room--
 			return room == 0
 		})
 	}
-	// aliases hold only current versions, "<address>/<slug>" in address
-	// order: past an address's perAuthor-th, the walk jumps to the next
-	// address ("<address>0" is the key just past every "<address>/…"), so
-	// however many one address publishes, it reads no more of them.
-	for start := ""; !full(); {
-		by, n, skip := "", 0, ""
-		aliases.Iterate(start, "", func(k string, v any) bool {
-			if a := k[:strings.IndexByte(k, '/')]; a != by {
-				by, n = a, 0
-			}
-			if n == perAuthor {
-				skip = by + "0"
-				return true
-			}
-			list = append(list, find(v.(string)))
-			n++
-			return full()
-		})
-		if skip == "" {
-			break
-		}
-		start = skip
+	if full() {
+		return list
 	}
+	// the author is in the key ("<height> <address>/<slug>"): a row past an
+	// author's perAuthor-th is skipped without loading it
+	n, scanned := map[string]int{}, 0
+	newest.ReverseIterate("", "", func(k string, v any) bool {
+		alias := k[strings.IndexByte(k, ' ')+1:]
+		if a := alias[:strings.IndexByte(alias, '/')]; n[a] < perAuthor {
+			n[a]++
+			list = append(list, find(v.(string)))
+		}
+		scanned++
+		return full() || scanned == maxScanned
+	})
 	return list
 }
+
+// maxScanned bounds the community rows listed reads: an author past their
+// perAuthor still costs a read for each of their newer holes, and what one
+// list reads must not grow with what anyone publishes.
+const maxScanned = 1000
 
 // maxArchived bounds the archived course versions Holes and the hub list,
 // and minCommunity is the room they leave for community holes.
@@ -643,17 +645,7 @@ func Rank(mode string, player address) string {
 		holes, strokes = r.holes, r.strokes
 		key := rankKey(r)
 		if ranks[m].Has(key) {
-			// the number of keys before it: a binary search by index
-			lo, hi := 0, ranks[m].Size()
-			for lo < hi {
-				mid := (lo + hi) / 2
-				if k, _ := ranks[m].GetByIndex(mid); k < key {
-					lo = mid + 1
-				} else {
-					hi = mid
-				}
-			}
-			rank = lo + 1
+			rank = ranks[m].index(key) + 1
 		}
 	}
 	return "{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(p) +
@@ -675,7 +667,7 @@ const maxListed = 120
 func HoleLeaderboard(hole, mode string, offset, limit int) string {
 	e, m := readHole(hole), modeOf(mode)
 	limit = clampLimit(limit)
-	board := &e.rec(m).board
+	board := e.board(m)
 	size := board.Size()
 	if offset < 0 {
 		offset = 0
@@ -685,7 +677,7 @@ func HoleLeaderboard(hole, mode string, offset, limit int) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) +
-		`,"par":` + strconv.Itoa(e.par) + `,"players":` + strconv.Itoa(size) + `,"finished":` + strconv.Itoa(e.rec(m).bests.Size()) +
+		`,"par":` + strconv.Itoa(e.par) + `,"players":` + strconv.Itoa(size) + `,"finished":` + strconv.Itoa(e.bests(m).Size()) +
 		`,"offset":` + strconv.Itoa(offset) + `,"rows":[`)
 	n := 0
 	board.IterateByOffset(offset, limit, func(_ string, v any) bool {
@@ -693,7 +685,7 @@ func HoleLeaderboard(hole, mode string, offset, limit int) string {
 		if !named(p) {
 			return false // a name deleted since
 		}
-		sb.WriteString(sep(n) + strokesRow(p, e.rec(m).bests.Get(p).(int)))
+		sb.WriteString(sep(n) + strokesRow(p, e.bests(m).Get(p).(int)))
 		n++
 		return false
 	})
@@ -748,7 +740,7 @@ func Bests(hole, mode, players string) string {
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"par":` + strconv.Itoa(e.par) + `,"rows":[`)
 	n := 0
 	for _, p := range friends(players) {
-		if v := e.rec(m).bests.Get(p); v != nil {
+		if v := e.bests(m).Get(p); v != nil {
 			sb.WriteString(sep(n) + strokesRow(p, v.(int)))
 			n++
 		}
@@ -786,7 +778,7 @@ func Records(hole, mode, after string, limit int) string {
 	e, m := readHole(hole), modeOf(mode)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
-	next := page(bpWalk(&e.rec(m).bests), after, limit, func(i int, p string, v any) {
+	next := page(e.bests(m).Iterate, after, limit, func(i int, p string, v any) {
 		sb.WriteString(sep(i) + strokesRow(p, v.(int)))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
@@ -800,7 +792,7 @@ func Players(mode, after string, limit int) string {
 	m := modeOf(mode)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
-	next := page(bpWalk(totals[m]), after, limit, func(i int, p string, v any) {
+	next := page(totals[m].Iterate, after, limit, func(i int, p string, v any) {
 		r := v.(*row)
 		sb.WriteString(sep(i) + standingRow(p, r.holes, r.strokes))
 	})
@@ -814,7 +806,7 @@ func Rounds(hole, after string, limit int) string {
 	e := readHole(hole)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"rows":[`)
-	next := page(bpWalk(e.roundTree()), after, limit, func(i int, p string, v any) {
+	next := page(e.roundTree().Iterate, after, limit, func(i int, p string, v any) {
 		sb.WriteString(sep(i) + roundJSON(e, nil, p, v.(*round), false)) // no path: no hole needed
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")

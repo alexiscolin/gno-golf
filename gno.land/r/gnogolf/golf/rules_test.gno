@@ -204,7 +204,7 @@ func TestRetireDrainsInBatches(cur realm, t *testing.T) {
 	}
 	uassert.True(t, e.out.done[assisted] && e.out.done[pro])
 	uassert.False(t, counts(e, assisted, late.String(), 1), "archived and drained: counts no more")
-	uassert.Equal(t, 1, e.rec(assisted).bests.Get(late.String()).(int), "the record is kept")
+	uassert.Equal(t, 1, e.bests(assisted).Get(late.String()).(int), "the record is kept")
 }
 
 // A player whose only course hole is replaced leaves the top ten: no

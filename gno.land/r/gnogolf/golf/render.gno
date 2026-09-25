@@ -402,15 +402,15 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	}
 
 	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; %d finished it assisted, %d pro. The named players' bests:\n\n",
-		e.roundTree().Size(), e.rec(assisted).bests.Size(), e.rec(pro).bests.Size())
+		e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
 	for m := 0; m < modes; m++ {
 		rows := ""
 		n := 0
-		e.rec(m).board.Iterate("", "", func(_ string, v any) bool {
+		e.board(m).Iterate("", "", func(_ string, v any) bool {
 			p := v.(string)
 			if name := nameOf(p); name != "" { // a name deleted since is skipped
 				n++
-				rows += ufmt.Sprintf("| %d | [@%s](%s:%s/%s) | %d |\n", n, name, hub, e.id, p, e.rec(m).bests.Get(p).(int))
+				rows += ufmt.Sprintf("| %d | [@%s](%s:%s/%s) | %d |\n", n, name, hub, e.id, p, e.bests(m).Get(p).(int))
 			}
 			return n >= topSize
 		})
@@ -529,9 +529,9 @@ func board(e *entry, h course.Hole, f *physics.Field, focus address) string {
 
 // drawZone marks the cells a zone holds: a cell is the zone's if its centre
 // is, so a round pond is drawn round, as the physics sees it
-// (physics.Zone.Contains). Each row is drawn as the runs of cells it holds,
-// found with the physics' own test at their ends: a polygon from where the
-// row's centre line crosses its edges, an ellipse from its middle out.
+// (physics.Zone.Contains). A polygon's row is drawn from where the row's
+// centre line crosses its edges; an ellipse's as the run of cells it holds,
+// found with the physics' own test at its ends, from its middle out.
 func drawZone(g [][]rune, z *physics.Zone, m rune) {
 	bh := len(g)
 	if bh == 0 {
@@ -544,30 +544,36 @@ func drawZone(g [][]rune, z *physics.Zone, m rune) {
 		return
 	}
 	poly := len(z.Poly) >= 3
-	var xs []float64
-	var ends []int
+	var flip []bool
+	if poly {
+		flip = make([]bool, x1+1)
+	}
 	for y := y0; y < y1; y++ {
 		row, py := g[y], float64(y)+0.5
 		switch {
 		case poly:
-			// inPoly counts the crossings right of the centre: a cell left of
-			// end k has crossing k right of it
-			xs = crossings(z.Poly, py, xs[:0])
-			ends = ends[:0]
-			for _, c := range xs {
-				ends = append(ends, firstCell(x0, x1, func(x int) bool { return !(float64(x)+0.5 < c) }))
+			// inPoly counts the crossings right of the centre, even-odd: a
+			// crossing is right of every cell before the first whose centre
+			// is at or past it, so a sweep from the right turns in and out
+			// at each one's cell. No sort: a row costs its edges and cells.
+			for x := x0; x <= x1; x++ {
+				flip[x] = false
 			}
-			from := x0
-			for k := 0; k <= len(ends); k++ {
-				to := x1
-				if k < len(ends) {
-					to = ends[k]
+			a := z.Poly[len(z.Poly)-1]
+			for _, b := range z.Poly { // the edge from a to b
+				if (a.Y > py) != (b.Y > py) {
+					c := cellAt(a.X+(py-a.Y)*(b.X-a.X)/(b.Y-a.Y), x0, x1)
+					flip[c] = !flip[c]
 				}
-				if (len(ends)-k)%2 == 1 != z.Outside {
-					fillRow(row, from, to, m)
+				a = b
+			}
+			in := false
+			for x := x1 - 1; x >= x0; x-- {
+				if flip[x+1] {
+					in = !in
 				}
-				if to > from {
-					from = to
+				if in != z.Outside {
+					row[x] = m
 				}
 			}
 		case z.Round:
@@ -613,6 +619,26 @@ func boxCells(lo, hi float64, n int) (int, int) {
 	return a, firstCell(a, b, func(x int) bool { return !(float64(x)+0.5 < hi) })
 }
 
+// cellAt is the first cell x in [lo, hi) whose centre is at or past c
+// (!(x+0.5 < c), as the physics compares), hi if none: ceil(c-0.5), as
+// arithmetic. lo is 0 or more.
+func cellAt(c float64, lo, hi int) int {
+	if !(float64(lo)+0.5 < c) { // NaN too, as a search would find
+		return lo
+	}
+	if c >= float64(hi) {
+		return hi
+	}
+	x := int(c) // c > 0.5: its floor
+	if float64(x)+0.5 < c {
+		x++
+	}
+	if x > hi {
+		x = hi
+	}
+	return x
+}
+
 // firstCell is the first x in [lo, hi) where ok turns true, hi if it never
 // does: ok is false up to some x, and true from there.
 func firstCell(lo, hi int, ok func(x int) bool) int {
@@ -645,44 +671,27 @@ func span(lo, hi float64, n int) (int, int) {
 	return a, b
 }
 
-// crossings is where the line y crosses a polygon's edges, sorted: the x of
-// each edge the physics' even-odd test (physics inPoly) counts, computed as
-// it computes them.
-func crossings(pts []physics.Vec2, y float64, xs []float64) []float64 {
-	for i := range pts {
-		a, b := pts[i], pts[(i+1)%len(pts)]
-		if (a.Y > y) != (b.Y > y) {
-			xs = append(xs, a.X+(y-a.Y)*(b.X-a.X)/(b.Y-a.Y))
-		}
-	}
-	for i := 1; i < len(xs); i++ { // a few crossings: insertion sort
-		for j := i; j > 0 && xs[j] < xs[j-1]; j-- {
-			xs[j], xs[j-1] = xs[j-1], xs[j]
-		}
-	}
-	return xs
-}
-
 // maxBoardWork bounds what drawing one board may cost, in thousands of gas
 // as boardWork estimates it: past it, the page says so instead of drawing,
 // and stays far under the 3e9 a query may use. The course's boards cost at
-// most a tenth of it; the worst the format allows, three times it.
+// most a quarter of it; the worst the format allows, five times it.
 const maxBoardWork = 600000
 
 // boardWork estimates what board costs for this field, in thousands of gas,
-// from what it does (measured on the worst hole GG1 allows): 18 a board
-// cell (the wear, the flood fill, the blanking), 3 a cell a zone fills and
-// 2 an edge a polygon's row crosses, 10 a step along a wall, 20 a cell of a
-// post's box.
+// from what it does (measured on 96×96 boards, the largest GG1 allows): 32 a
+// board cell (the wear, the flood fill, the blanking); for each row of a
+// zone's box, 5 a cell and 16 an edge of its polygon, as if every edge
+// crossed the row, as a zigzag's all do; 10 a step along a wall; 20 a cell of
+// a post's box.
 func boardWork(f *physics.Field, h course.Hole) int {
 	bw, bh := course.BoardOf(h)
-	n := 18 * bw * bh
+	n := 32 * bw * bh
 	for i := range f.Zones {
 		z := &f.Zones[i]
 		x0, x1 := span(z.Min.X, z.Max.X, bw)
 		y0, y1 := span(z.Min.Y, z.Max.Y, bh)
 		if x1 > x0 && y1 > y0 {
-			n += (y1 - y0) * (3*(x1-x0) + 2*len(z.Poly))
+			n += (y1 - y0) * (5*(x1-x0) + 16*len(z.Poly))
 		}
 	}
 	for i := range f.Walls {
@@ -924,28 +933,51 @@ func blankUnreachable(g, wall [][]rune, f *physics.Field, seeds ...physics.Vec2)
 			seeds = append(seeds, z.Vec)
 		}
 	}
+	// a run of a row at a time, with no closure: a board has thousands of
+	// cells
 	seen := make([][]bool, bh)
 	for y := range seen {
 		seen[y] = make([]bool, bw)
 	}
-	var stack []int // y*bw + x
-	visit := func(x, y int) {
-		if x >= 0 && y >= 0 && x < bw && y < bh && !seen[y][x] && wall[y][x] == 0 {
-			seen[y][x] = true
+	var stack []int // y*bw + x: a cell whose run is yet to fill
+	for _, p := range seeds {
+		if x, y := int(p.X), int(p.Y); x >= 0 && y >= 0 && x < bw && y < bh {
 			stack = append(stack, y*bw+x)
 		}
-	}
-	for _, p := range seeds {
-		visit(int(p.X), int(p.Y))
 	}
 	for len(stack) > 0 {
 		c := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 		x, y := c%bw, c/bw
-		visit(x+1, y)
-		visit(x-1, y)
-		visit(x, y+1)
-		visit(x, y-1)
+		s, w := seen[y], wall[y]
+		if s[x] || w[x] != 0 {
+			continue
+		}
+		l, r := x, x+1
+		for l > 0 && !s[l-1] && w[l-1] == 0 {
+			l--
+		}
+		for r < bw && !s[r] && w[r] == 0 {
+			r++
+		}
+		for i := l; i < r; i++ {
+			s[i] = true
+		}
+		// the rows above and below: a cell for each open run under this one
+		for ny := y - 1; ny <= y+1; ny += 2 {
+			if ny < 0 || ny >= bh {
+				continue
+			}
+			ns, nw := seen[ny], wall[ny]
+			open := false
+			for i := l; i < r; i++ {
+				o := !ns[i] && nw[i] == 0
+				if o && !open {
+					stack = append(stack, ny*bw+i)
+				}
+				open = o
+			}
+		}
 	}
 	for y := 0; y < bh; y++ {
 		for x := 0; x < bw; x++ {

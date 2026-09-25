@@ -25,6 +25,7 @@ package golf
 
 import (
 	"chain"
+	"chain/runtime"
 	"math"
 	"strconv"
 	"strings"
@@ -63,81 +64,106 @@ type entry struct {
 	sha     string // sha256 of its data, hex
 	note    string
 	wear    []byte // WearW*WearH little-endian u32 counters, made at its first play
-	// What players add is made when they first add it, not at publish: a
-	// tree or a struct is an object of its own, a few hundred bytes each
-	// even empty, and most versions are played by few. The trees are B+
-	// trees: a popular hole reaches thousands of players.
-	rounds *bptree.BPTree // player address -> *round; nil until the first stroke (roundTree)
-	plays  int
-	// the assisted and the pro records, nil until the mode's first finish
-	// (rec, recFor)
-	recAssisted, recPro *record
-	next                string // the version that took this one's place, "" while it is current
+	// What players add (rounds, bests, the board) is rows of the shared
+	// indexes, under the version's id (roundTree, bests, board), not trees of
+	// its own: a tree's first leaf is a few KB, which the version's first
+	// player would pay.
+	plays int
+	// the assisted and the pro records (rec), flat: an array or a pointer is
+	// an object of its own, a few hundred bytes more
+	best, proBest     int
+	bestBy, proBestBy address
+	next              string // the version that took this one's place, "" while it is current
 	// while archived players still count in the standings (see drain); nil
 	// for a hole never archived
 	out *draining
 }
 
-// record is one mode's results on a version: each player's best finished
-// round there, kept across replays, the named players' board, and the
-// hole's record, 0 if never completed.
+// record is the hole's record in one mode: who holds it, in how many
+// strokes, 0 if never completed.
 type record struct {
-	bests bptree.BPTree // player address -> int
-	board bptree.BPTree // boardKey(strokes, player) -> player: the named players' bests, fewest strokes first
-	by    address
-	best  int
+	by   address
+	best int
 }
 
-// rec is the entry's record in mode m, to read: an empty one if nobody
-// finished it in m. Only recFor's may be written to.
-func (e *entry) rec(m int) *record {
-	r := e.recAssisted
+// rec is the entry's record in mode m.
+func (e *entry) rec(m int) record {
 	if m == pro {
-		r = e.recPro
+		return record{e.proBestBy, e.proBest}
 	}
-	if r == nil {
-		return noRecord
-	}
-	return r
+	return record{e.bestBy, e.best}
 }
 
-// recFor is the entry's record in mode m, made at its first finish.
-func (e *entry) recFor(m int) *record {
-	if m == pro {
-		if e.recPro == nil {
-			e.recPro = newRecord()
+// roundTree is the version's rounds: player address -> *round.
+func (e *entry) roundTree() view { return view{rounds, e.id + " "} }
+
+// bests is the version's results in mode m: player address -> their best
+// finished round there, kept across replays.
+func (e *entry) bests(m int) view { return view{bests, e.id + " " + modeNames[m] + " "} }
+
+// board is the version's board in mode m: boardKey(strokes, player) ->
+// player, the named players' bests, fewest strokes first.
+func (e *entry) board(m int) view { return view{boards, e.id + " " + modeNames[m] + " "} }
+
+// view is the rows of a shared index under one prefix, read and written
+// without it: a version's rounds, a mode's standings. p ends with a space,
+// which no id holds, so the rows are exactly the keys from p to p with the
+// space made a "!".
+type view struct {
+	t *bptree.BPTree
+	p string
+}
+
+func (v view) end() string                 { return v.p[:len(v.p)-1] + "!" }
+func (v view) Get(k string) any            { return v.t.Get(v.p + k) }
+func (v view) Has(k string) bool           { return v.t.Has(v.p + k) }
+func (v view) Set(k string, x any) bool    { return v.t.Set(v.p+k, x) }
+func (v view) Remove(k string) (any, bool) { return v.t.Remove(v.p + k) }
+func (v view) Size() int                   { return before(v.t, v.end()) - before(v.t, v.p) }
+func (v view) index(k string) int          { return before(v.t, v.p+k) - before(v.t, v.p) }
+func (v view) strip(cb func(string, any) bool) func(string, any) bool {
+	return func(k string, x any) bool { return cb(k[len(v.p):], x) }
+}
+
+// Iterate is the rows in [start, end) ascending, end "" for no bound.
+func (v view) Iterate(start, end string, cb func(key string, x any) bool) bool {
+	hi := v.end()
+	if end != "" {
+		hi = v.p + end
+	}
+	return v.t.Iterate(v.p+start, hi, v.strip(cb))
+}
+
+// IterateByOffset is count rows from the offset-th, fewer at the end.
+func (v view) IterateByOffset(offset, count int, cb func(key string, x any) bool) bool {
+	end := v.end()
+	return v.t.IterateByOffset(before(v.t, v.p)+offset, count, func(k string, x any) bool {
+		return k >= end || v.strip(cb)(k, x)
+	})
+}
+
+// before is how many keys of t sort before k: a binary search by index.
+func before(t *bptree.BPTree, k string) int {
+	lo, hi := 0, t.Size()
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if key, _ := t.GetByIndex(mid); key < k {
+			lo = mid + 1
+		} else {
+			hi = mid
 		}
-		return e.recPro
 	}
-	if e.recAssisted == nil {
-		e.recAssisted = newRecord()
-	}
-	return e.recAssisted
+	return lo
 }
 
-// holeFanout is the leaf size of a version's own trees. Measured: 16 costs
-// the first finisher of a version 3 KB less than 32, and a player past the
-// first few the same; 8 costs every player more.
-const holeFanout = 16
-
-func newRecord() *record {
-	return &record{bests: *bptree.NewBPTreeN(holeFanout), board: *bptree.NewBPTreeN(holeFanout)}
+// seeded is a shared index with its first leaf made at init, paid by golf's
+// deployer, not by the first player to write to it. Its one key, "", sorts
+// before every view's rows, so no view sees it.
+func seeded() *bptree.BPTree {
+	t := bptree.NewBPTree32()
+	t.Set("", nil)
+	return t
 }
-
-// roundTree is the entry's rounds, to read: an empty tree before the first
-// stroke. roundOf makes it.
-func (e *entry) roundTree() *bptree.BPTree {
-	if e.rounds == nil {
-		return noTree
-	}
-	return e.rounds
-}
-
-// noRecord and noTree are what nobody has written yet: read, never written.
-var (
-	noRecord = &record{}
-	noTree   = &bptree.BPTree{}
-)
 
 func newEntry(id, name string, par int, world string, order float64) *entry {
 	return &entry{id: id, name: name, par: par, world: world, order: order}
@@ -201,9 +227,10 @@ func modeOf(name string) int {
 var modeNames = [modes]string{"assisted", "pro"}
 
 // The indexes are B+ trees: a leaf holds 32 entries, so past the first few
-// an entry costs about 410 bytes instead of an AVL node's 2,030. A hole's own
-// trees (rounds, bests, board, on its entry) are too, made at their first
-// Set: a popular hole reaches thousands of players.
+// an entry costs about 410 bytes instead of an AVL node's 2,030. What players
+// add is in five of them, shared by every version and both modes and seeded
+// at init (views): a version's first player pays for their own rows only,
+// like any other.
 //
 // A B+ tree must not change while it is iterated: no callback below writes
 // to the tree it walks (drain walks a hole's bests and writes the standings).
@@ -220,12 +247,23 @@ var (
 	slots = bptree.NewBPTree32()
 	// "<address>/<slug>" -> id of the current version of a community hole
 	aliases = bptree.NewBPTree32()
+	// recentKey(its publish height, alias) -> id of the current version of a
+	// community hole: the newest last
+	newest = bptree.NewBPTree32()
+	// recentKey(the height it was archived at, id) -> id of an archived
+	// course version: the latest last
+	archived = bptree.NewBPTree32()
+	// every version's rounds, bests and boards, under its id (roundTree,
+	// bests, board)
+	rounds, bests, boards = seeded(), seeded(), seeded()
 	// per mode: player -> *row, their standing over the official holes (only
 	// players with an official finish have one)
-	totals = [modes]*bptree.BPTree{bptree.NewBPTree32(), bptree.NewBPTree32()}
+	allTotals = seeded()
+	totals    = [modes]view{{allTotals, "assisted "}, {allTotals, "pro "}}
 	// per mode: rankKey(row) -> player, the named players with at least one
 	// hole, best first. The course top ten is its first ten entries.
-	ranks = [modes]*bptree.BPTree{bptree.NewBPTree32(), bptree.NewBPTree32()}
+	allRanks = seeded()
+	ranks    = [modes]view{{allRanks, "assisted "}, {allRanks, "pro "}}
 	// archived holes whose players still count in the standings, oldest
 	// first: drain takes them out a batch at a time
 	archiving []string
@@ -306,6 +344,9 @@ func readHole(id string) *entry {
 	panic("golf: unknown hole: " + id)
 }
 
+// recentKey orders by height, then by what is at that height.
+func recentKey(height int64, what string) string { return pad(int(height), 12) + " " + what }
+
 // pad writes n in width digits, zeros first: keys that sort as numbers.
 func pad(n, width int) string {
 	s := strconv.Itoa(n)
@@ -368,6 +409,7 @@ func improve(m int, player string, was, best int) {
 // reached still counts the old hole.
 func retire(old *entry, next string) {
 	old.next, old.out = next, &draining{}
+	archived.Set(recentKey(runtime.ChainHeight(), old.id), old.id)
 	archiving = append(archiving, old.id)
 	chain.Emit(EventHoleRetired, "hole", old.id, "next", next)
 	drain(retireBatch)
@@ -394,7 +436,7 @@ func drain(n int) {
 			if d.done[m] {
 				continue
 			}
-			stopped := e.rec(m).bests.Iterate(d.from[m], "", func(p string, v any) bool {
+			stopped := e.bests(m).Iterate(d.from[m], "", func(p string, v any) bool {
 				if n == 0 {
 					d.from[m] = p
 					return true
@@ -674,9 +716,7 @@ func (w *work) add(s physics.Shot) {
 func Reset(cur realm, hole string) {
 	e := mustHole(hole)
 	player := cur.Previous().Address().String()
-	if e.rounds != nil {
-		e.rounds.Remove(player)
-	}
+	e.roundTree().Remove(player)
 	chain.Emit(EventRoundReset, "hole", e.id, "player", player)
 }
 
@@ -762,19 +802,22 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	}
 	r.done = true
 	m := r.mode
-	rec := e.recFor(m)
-	if rec.best == 0 || r.strokes < rec.best {
-		rec.best, rec.by = r.strokes, player
+	if rec := e.rec(m); rec.best == 0 || r.strokes < rec.best {
+		if m == pro {
+			e.proBest, e.proBestBy = r.strokes, player
+		} else {
+			e.best, e.bestBy = r.strokes, player
+		}
 	}
 	// a player's best stays theirs: replaying the hole never erases it
 	p := player.String()
-	if v := rec.bests.Get(p); v == nil || r.strokes < v.(int) {
+	if v := e.bests(m).Get(p); v == nil || r.strokes < v.(int) {
 		was := 0
 		if v != nil {
 			was = v.(int)
-			rec.board.Remove(boardKey(was, p))
+			e.board(m).Remove(boardKey(was, p))
 		}
-		rec.bests.Set(p, r.strokes)
+		e.bests(m).Set(p, r.strokes)
 		if counts(e, m, p, was) {
 			improve(m, p, was, r.strokes)
 		} else if was == 0 && e.official && e.next != "" && !e.out.done[m] && p >= e.out.from[m] {
@@ -802,10 +845,9 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 // not it improved, so a player who took a name after their best ranks at
 // their next finish.
 func seat(e *entry, m int, p string) {
-	rec := e.recFor(m)
-	k := boardKey(rec.bests.Get(p).(int), p)
-	if !rec.board.Has(k) {
-		rec.board.Set(k, p)
+	k := boardKey(e.bests(m).Get(p).(int), p)
+	if !e.board(m).Has(k) {
+		e.board(m).Set(k, p)
 	}
 	if v := totals[m].Get(p); v != nil && v.(*row).holes > 0 {
 		if rk := rankKey(v.(*row)); !ranks[m].Has(rk) {
@@ -891,10 +933,7 @@ func roundOf(e *entry, h course.Hole, player address) *round {
 	}
 	s := h.Start()
 	r := &round{bx: s.X, by: s.Y}
-	if e.rounds == nil {
-		e.rounds = bptree.NewBPTreeN(holeFanout)
-	}
-	e.rounds.Set(player.String(), r)
+	e.roundTree().Set(player.String(), r)
 	return r
 }
 
@@ -917,11 +956,13 @@ func cleanName(n string) string {
 }
 
 // cleanText keeps an author's text to one line of plain text of at most max
-// characters: no control characters, no bidi, zero-width or blank-looking
-// ones (they turn a line around, hide what it says, or name a hole with
-// nothing), nothing that ends a markdown table cell or opens a link, a tag,
-// an HTML entity ("&zwnj;" is a zero-width one), a strikethrough, a mention
-// or an email link.
+// characters: no control characters, no format characters (Cf: bidi,
+// zero-width, tags, interlinear annotation), no nonspacing marks (Mn:
+// combining accents stacked without end, variation selectors), no
+// blank-looking ones (they turn a line around, hide what it says, or name a
+// hole with nothing), nothing that ends a markdown table cell or opens a
+// link, a tag, an HTML entity ("&zwnj;" is a zero-width one), a
+// strikethrough, a mention or an email link.
 func cleanText(n string, max int) string {
 	b := make([]rune, 0, max)
 	for _, c := range n {
@@ -935,6 +976,11 @@ func cleanText(n string, max int) string {
 			c >= 0x200b && c <= 0x200f, c >= 0x2028 && c <= 0x202e, c >= 0x2060 && c <= 0x206f,
 			c == 0x2800, c == 0x3164, c >= 0xfe00 && c <= 0xfe0f, c == 0xfeff, c == 0xffa0,
 			c >= 0xe0000 && c <= 0xe0fff:
+			continue
+		case unicode.In(c, unicode.Mn, unicode.Cf):
+			// an accented letter typed as one (NFC, as keyboards give it) is
+			// neither: é stays; a script written with combining marks
+			// (Devanagari, Thai) loses them
 			continue
 		case strings.ContainsRune("|[]<>`*_#\\&~@", c):
 			continue

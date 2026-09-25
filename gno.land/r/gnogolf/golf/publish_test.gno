@@ -553,3 +553,28 @@ func TestThePagesGnowebLinks(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(renderHole(e, big, ""), "too detailed to draw here"))
 	uassert.False(t, strings.Contains(page, "too detailed"))
 }
+
+// Community rows are the newest first: sixteen addresses that sort low
+// (bech32 "g1qqq…", cheap to grind for) publishing three holes each, on a
+// course of 74, cannot keep a later author's hole off the list or the hub.
+func TestNewestCommunityHolesAreListed(cur realm, t *testing.T) {
+	for i := slots.Size(); i < 74; i++ {
+		publish(cur, cupHole("filler", i+1, "Filler"))
+	}
+	data := hexOf(cupHole("pond", 1, "Low"))
+	for i := 0; i < 16; i++ {
+		low := testutils.TestAddress("\x00\x00\x00\x00" + string([]byte{byte(i)}))
+		for j := 0; j < perAuthor; j++ {
+			testing.SetRealm(testing.NewUserRealm(low))
+			PublishMine(cross(cur), "low"+strconv.Itoa(j), data, "")
+		}
+	}
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(testutils.TestAddress("latecomer")))
+	late := PublishMine(cross(cur), "late", hexOf(cupHole("pond", 2, "Latecomer")), "")
+	list := Holes()
+	uassert.True(t, strings.Contains(list, `"id":"`+late+`"`), "the newest hole is listed")
+	low := strings.Index(list, `"slot":"g1qqqqqqq`)
+	uassert.True(t, low < 0 || strings.Index(list, `"id":"`+late+`"`) < low, "ahead of the older ones")
+	uassert.True(t, strings.Contains(Render(""), "Latecomer"), "and on the hub")
+}
