@@ -57,6 +57,7 @@ cd web
 npm install
 npm run dev     # development server
 npm run build   # static export to web/out/, host it anywhere
+npm run typecheck && npm run lint && npm run selfcheck   # selfcheck fails if the client's copy of the realm's rules drifts
 ```
 
 The client takes its config from the URL, so one build works with any chain:
