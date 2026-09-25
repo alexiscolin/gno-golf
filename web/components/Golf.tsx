@@ -415,10 +415,10 @@ export default function Golf() {
   const onChain = record?.at === "saved"; // this round is on the chain
   const stale = record?.at === "refused" && record.stale; // its weather is over: no save any more
 
-  const play = () => {
+  const play = (direct = false) => {
     setScreen("play");
     if (!game.current) return;
-    game.current.play();
+    game.current.play(direct);
     // after the overview has had its moment and the camera is on the gnome
     if (cfg && cfg.demo) later(() => void (game.current && game.current.demo(cfg.demo.split(";"))), 2600);
   };
@@ -468,7 +468,7 @@ export default function Golf() {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first); a link to nothing lands on the cups, quietly
             if (!game_.linked()) setScreen("worlds");
-            else if (cfg.gnome || hadGnome()) play();
+            else if (cfg.gnome || hadGnome()) play(true); // straight onto the ball: the link said where
             else setScreen("pick");
           }
           // ?won=N shows the win card for N strokes — dev screenshots only
@@ -737,6 +737,8 @@ export default function Golf() {
     else if (screen === "play") return; // the hole is not known yet: wait for it
     const url = window.location.pathname + (String(q) ? `?${q}` : "");
     const here = window.location.pathname + window.location.search;
+    // a link to a hole keeps its address while the title shows (the game on its way to it)
+    if (screen === "title" && lastScreen.current === null && (cfg.hole || cfg.cup)) return;
     const moved = lastScreen.current !== null && lastScreen.current !== screen;
     lastScreen.current = screen;
     if (url === here) return;

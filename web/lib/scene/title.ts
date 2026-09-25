@@ -78,9 +78,7 @@ function golfBall() {
 }
 
 // Per world: how far up the lane the ride starts (clear of the garden's tunnel
-// mouths, the island's castle, the town's second tram line: its trams leave
-// the crossing clear for half a second at most, too short for the ride to
-// cross, so it starts past the rails and the tram goes by behind it), and the camera: how far off, from how far
+// mouths and the island's castle), and the camera: how far off, from how far
 // round (th, radians behind the cup > 0; pth upright, from beyond the cup by
 // default) and how high (h, times R)
 const SPOT: Record<string, { ride: number; R: number; h?: number; th?: number; pth?: number }> = { garden: { ride: 5.5, R: 13 }, island: { ride: 4.2, R: 12, h: 0.7 }, town: { ride: 6, R: 13 }, mountain: { ride: 8, R: 13 } };

@@ -1155,10 +1155,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       g.covered = !!on;
       canvas.tabIndex = on ? -1 : 0; // a hidden course is not a place for Tab to land
     },
-    /** Leave the title screen: show the hole whole, then close on the ball. */
-    play() {
+    /** Leave the title screen: show the hole whole, then close on the ball;
+     *  direct (a link to this hole): straight to the player's camera. */
+    play(direct = false) {
       g.started = true;
-      closeIn = setTimeout(intro, OVERVIEW_MS);
+      if (!direct) return void (closeIn = setTimeout(intro, OVERVIEW_MS));
+      cam.jump(); // in its framing at once, not glided in
+      setView(home());
     },
     /**
      * Plays a list of "angle,power" shots as a player would, pulling the
