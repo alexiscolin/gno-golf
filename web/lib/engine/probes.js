@@ -6,7 +6,7 @@ import * as THREE from "three";
 const ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3();
 
 /** E: the engine's live state (engine.js); cam: its camera controller. */
-export function probes(E, { cam, onHoled, fakeWeather }) {
+export function probes(E, { cam, rp, onHoled, fakeWeather }) {
   const { g, camera, scene, ground, band, publish } = E;
   return {
     /** For screenshots only (?won): the win card as if the hole was just holed. */
@@ -74,6 +74,12 @@ export function probes(E, { cam, onHoled, fakeWeather }) {
     lensWho: () => cam.lensWho,
     /** ?camlog only: the third-person heading now, in radians (what a pull starting now is measured from). */
     camYaw: () => cam.yaw(),
+    /** ?camlog only: the ball's height over the ground under it now, and whether it is flying. */
+    groundAt: (x, z) => ground(x, z),
+    /** A chain answer's path drawn as a shot would draw it (its air flags, its causes): the flight tests. */
+    replayPath: (path, air, cause) => ((g.flying = true), rp.replay(path, false, air, cause).finally(() => (g.flying = false))),
+    /** The ball over the ground, and the step of the replay (with the chain's air flags) it is on. */
+    ballLift: () => ({ lift: +(E.ball.position.y - E.ground(E.ball.position.x, E.ball.position.z)).toFixed(3), y: +E.ball.position.y.toFixed(3), flying: !!g.flying, at: g.replaying ? g.replaying.at : -1, flags: g.replaying ? g.replaying.flags : null }),
     /** ?camlog only: the pull as it stands. */
     pullState: () => ({ power: +E.shot.power.toFixed(2), deg: E.shot.deg, aiming: !!g.aiming, band: band.visible, flying: !!g.flying, strokes: g.strokes }),
     /** ?camlog only: the scene's objects: all, empty groups, drawables, matrices recomposed each frame. */
@@ -119,5 +125,18 @@ export function probes(E, { cam, onHoled, fakeWeather }) {
     buildMs: () => g.buildMs,
     /** ?camlog only: where the camera is now. */
     camPose: () => camera.position.toArray(),
+    /** The Far rig: the orbit share it has room for, its pitch blend, its distance. */
+    farOrbit: () => g.far && { orbit: +g.far.orbit.toFixed(2), tilt: g.far.tilt, dist: +g.far.dist.toFixed(1) },
+    // the course box's corners on screen, as the camera is now: [x0, y0, x1, y1] in CSS px
+    boardFrame: () => {
+      const b = g.s.board, r = [1e9, 1e9, -1e9, -1e9], q = new THREE.Vector3();
+      for (const x of [-1.5, b.w + 1.5]) for (const y of [-1, 1.5]) for (const z of [-1.5, b.h + 1.5]) {
+        q.set(x, y, z).project(camera);
+        const px = ((q.x + 1) / 2) * innerWidth, py = ((1 - q.y) / 2) * innerHeight;
+        r[0] = Math.min(r[0], px); r[1] = Math.min(r[1], py); r[2] = Math.max(r[2], px); r[3] = Math.max(r[3], py);
+      }
+      const d = camera.getWorldDirection(q);
+      return { r: r.map(Math.round), w: innerWidth, h: innerHeight, pitch: Math.round((Math.asin(-d.y) * 180) / Math.PI), view: g.view, cam: g.cam, board: [b.w, b.h] };
+    },
   };
 }

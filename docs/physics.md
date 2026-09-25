@@ -222,10 +222,21 @@ it would be there when it next comes on.
 
 ### Air and jumps
 
-If the ball is climbing a slope (moving against its `Vec`), gets over the top
-without hitting anything, and is still faster than `JumpSpeed`, it takes off.
-It flies `(speed - JumpSpeed) * steepness * Lift` board units, where
-steepness is `|Vec|` of the slope it was climbing. In the air:
+A ball takes off only when it goes over a hill's crest, the edge its `Vec`
+points away from (the uphill end):
+
+- it was climbing the hill (moving against its `Vec`) and a move, without
+  hitting anything, carries it out through that edge, onto no other climb;
+- its speed up the hill (`vel · uphill`) is above `JumpSpeed`;
+- the hill is steeper than `Drag`;
+- it climbed at least `JumpRun` (half) of the hill's depth, counted from
+  where it came onto it: a ball that clipped the hill near its top has not
+  ridden it.
+
+Leaving a hill by a side, by its foot, or by turning on it is no take-off. It
+flies `(uphill speed - JumpSpeed) * steepness * Lift` board units, where
+steepness is `|Vec|` of the hill: head-on that is the whole speed, and a
+slanted crossing flies shorter. In the air:
 
 - no zone applies: it goes over water, sand and tunnel mouths;
 - walls and posts still stop it;
@@ -359,6 +370,7 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `SpeedCap` | 8 | top speed, per substep |
 | `JumpSpeed` | 1.5 | speed needed to take off at the top of a slope |
 | `Lift` | 12 | flight distance factor |
+| `JumpRun` | 0.5 | share of a hill's depth climbed before its crest can launch |
 | `MaxRollOn` | 120 | most extra substeps a slope can add |
 | `LoopKeep` | 0.8 | share of the speed kept going round a loop |
 

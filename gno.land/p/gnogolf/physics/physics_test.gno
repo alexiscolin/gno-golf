@@ -637,3 +637,68 @@ func TestPrepareChangesNothing(t *testing.T) {
 		}
 	}
 }
+
+// flew reports whether any path point of the shot is in the air.
+func flew(sh Shot) bool {
+	for _, a := range sh.Air {
+		if a {
+			return true
+		}
+	}
+	return false
+}
+
+// A ramp (uphill toward +X, its crest at x=20) in the middle of a wide lane.
+func ramp() *Field {
+	return &Field{
+		Walls:    Box(V(0, 0), V(60, 30)),
+		Zones:    []Zone{{Kind: Slope, Min: V(16, 10), Max: V(20, 20), Vec: V(-0.3, 0)}},
+		Friction: 0.87,
+		Radius:   0.5,
+	}
+}
+
+// Only the crest launches: a ball up the ramp head-on flies off its top, one
+// that leaves by a side — crossing it on a slant, or turning off it — rolls.
+func TestOnlyTheCrestLaunches(t *testing.T) {
+	f := ramp()
+	if !flew(f.Step(V(12, 15), V(5, 0), 30)) {
+		t.Fatalf("a fast ball up the ramp head-on should fly off its crest")
+	}
+	// up and across: out through the side (y=20) while still climbing
+	if sh := f.Step(V(15, 16), V(2, 3), 30); flew(sh) {
+		t.Fatalf("a ball leaving the ramp by its side took off")
+	}
+	// fast, but mostly across: its speed up the ramp is under JumpSpeed
+	if sh := f.Step(V(17, 8), V(1.2, 5), 30); flew(sh) {
+		t.Fatalf("a ball crossing the ramp on a slant took off")
+	}
+}
+
+// A ball that clipped the ramp near its crest has not ridden it: no jump.
+func TestAClippedRampDoesNotLaunch(t *testing.T) {
+	f := ramp()
+	if sh := f.Step(V(18.8, 9.4), V(3, 2), 30); flew(sh) {
+		t.Fatalf("a ball that only clipped the ramp's top corner took off")
+	}
+}
+
+// Head-on, the flight grows with the speed up the ramp.
+func TestFlightGrowsWithSpeed(t *testing.T) {
+	far := func(v float64) float64 {
+		sh := ramp().Step(V(12, 15), V(v, 0), 30)
+		for i, a := range sh.Air {
+			if a {
+				k := i
+				for k < len(sh.Air) && sh.Air[k] {
+					k++
+				}
+				return sh.Path[k].X - sh.Path[i-1].X
+			}
+		}
+		return 0
+	}
+	if slow, fast := far(4.5), far(6); !(slow > 0 && fast > slow) {
+		t.Fatalf("faster should fly further: %v then %v", slow, fast)
+	}
+}

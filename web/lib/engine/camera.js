@@ -6,7 +6,7 @@
 // ball, dragging, shot, clock (read as they change), log (?camlog) }.
 import * as THREE from "three";
 import { behind, chaseState } from "../chase.js";
-import { focusRig, applyRig } from "../scene.js";
+import { focusRig, applyRig, ORBIT } from "../scene.js";
 import { BALL_R, CELL, onAt, closest, segHit, rayCircle } from "../terrain.js";
 
 const FOLLOW_CLOSER = 0.7; // the follow camera, nearer the gnome than the rig frames it
@@ -17,26 +17,29 @@ export function makeCamera(E) {
   const cupAt = new THREE.Vector3();
   // the camera's goal, filled in place every frame instead of made anew
   const focus = { target: new THREE.Vector3(), dist: 0, ox: 0, oy: 0 };
-  // In the whole-course view the mouse leans the camera: over to the side it
-  // is on, a little further or nearer, to look past the ends of the island.
-  // A pointer that is not a mouse (a finger) leaves it still.
+  // In the Far view the mouse orbits the camera a few degrees round the hole:
+  // over to the side it is on, a little higher or lower — as far as the whole
+  // hole stays in frame. A pointer that is not a mouse (a finger) leaves it still.
   const lean = { x: 0, y: 0 };
   const onHover = (ev) => {
     if (ev.pointerType !== "mouse" || E.dragging) return;
     lean.x = Math.max(-1, Math.min(1, (ev.clientX / window.innerWidth - 0.5) * 2));
     lean.y = Math.max(-1, Math.min(1, (ev.clientY / window.innerHeight - 0.5) * 2));
   };
-  const leant = { target: new THREE.Vector3(), dist: 0, ox: 0, oy: 0 };
+  const leant = { target: new THREE.Vector3(), dist: 0, ox: 0, oy: 0, tilt: 0, yaw: 0 };
   function goal() {
-    if (g.view !== "ball") {
-      if (!g.over || !g.s) return g.over;
-      const span = g.over.lean == null ? g.s.board.w * 0.22 + 3 : g.over.lean;
-      leant.target.copy(g.over.target);
-      leant.target.x += lean.x * span;
-      leant.target.z += lean.y * span * 0.25;
-      leant.dist = g.over.dist;
-      leant.ox = g.over.ox;
-      leant.oy = g.over.oy;
+    // Far is the whole hole, whatever the view: never the ball's framing
+    const far = g.cam === "far" && g.far;
+    if (g.view !== "ball" || far) {
+      const o = far || g.over;
+      if (!o || !g.s) return o;
+      const k = o.orbit || 0;
+      leant.target.copy(o.target);
+      leant.dist = o.dist;
+      leant.ox = o.ox;
+      leant.oy = o.oy;
+      leant.yaw = lean.x * k * ORBIT.yaw;
+      leant.tilt = (o.tilt || 0) + lean.y * k * ORBIT.tilt;
       return leant;
     }
     // in flight, follow the ball; at rest, keep the cup in the picture too

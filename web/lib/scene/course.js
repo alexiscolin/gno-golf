@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { terrain, CELL, CUP_R, airy, there, inPoly, closest, segDist, smoothstep } from "../terrain.js";
+import { terrain, CELL, CUP_R, airy, there, inPoly, closest, segDist, smoothstep, POOL } from "../terrain.js";
 import { C, ink, flat, motion, drawn, drape, rbox, ringLine, texOf, setWind, share, plantFeet, quality } from "./materials.js";
 import { bake } from "./bake.js";
 import { state } from "./state.js";
@@ -11,7 +11,7 @@ import { roughOf } from "./garden.js";
 import { worldOf, fromWorld, gapWater, DECK } from "./worlds.js";
 import { WEATHER_SKINS } from "./weather.js";
 import { POSTS, BARS, roofs, ROOF_Y } from "./pieces.js";
-import { zoneDetail, waterMask } from "./zones.js";
+import { zoneDetail, waterMask, pondWater } from "./zones.js";
 
 // defer: leave the merge (finishHole) to the caller, to run in a task of its own
 export function buildHole(s, { defer = false } = {}) {
@@ -41,6 +41,8 @@ export function buildHole(s, { defer = false } = {}) {
 
   // the ground of the board: green where a ball can go, rough where it cannot
   g.add(groundMesh(s, t));
+  const pond = pondWater(s, t);
+  if (pond) g.add(pond);
   g.add(roughScenery(s, t));
 
   // wear: one counter per cell, painted as a soft trodden patch
@@ -92,7 +94,8 @@ export function buildHole(s, { defer = false } = {}) {
     if (q.skin === "gap") return gapWater(s);
     if (q.skin === "roof") return ROOF_Y - 3.2;
     if (GAPS.has(q.skin)) return CREVASSE_Y + 0.3;
-    return t.height(x, z);
+    const w = t.pond(x, z); // a garden pond, sunk
+    return w ? w.level : t.height(x, z);
   };
   g.userData.ghosts = state.ghosts || (() => {}); // ghosts(aiming): the timed pieces' dashed outlines
   g.userData.mill = state.mill;
@@ -169,13 +172,15 @@ function greenEdge(s, t) {
  * A wall with the stretches cut out where a gap crosses it or an inlet of the
  * sea opens it. Returns the pieces left.
  */
-function openings(w, zones) {
+function openings(w, zones, lines = []) {
   // a gap across the lane (a crevasse, a ditch) cuts through whatever
   // crosses it: the rails fell in too
   const strips = [];
   // (a polygon gap, "everything but the lane", cuts nothing: the lane's own
   // walls run along its edge)
   for (const z of zones || []) if (GAPS.has(z.skin) && !z.poly) strips.push([z.min[0], z.max[0], z.min[1] - 1, z.max[1] + 1]);
+  // (and where a tram's rails cross it: a level crossing, a low curb instead)
+  strips.push(...lines);
   const inlet = (zones || []).some((z) => z.skin === "sea" && z.poly && !z.outside);
   if (!strips.length && !inlet) return [w];
   const [ax, az] = w.a, dx = w.b[0] - ax, dz = w.b[1] - az, L = segLen(w) || 1;
@@ -238,16 +243,28 @@ function groundMesh(s, t) {
   // the top is shaded from the slope of the height field itself, so a ramp
   // reads as one smooth surface and not as a patchwork of triangles
   const e = 0.05;
+  const gh = t.ground || t.height;
   const up = (x, z) => {
-    const dx = (t.height(x + e, z) - t.height(x - e, z)) / (2 * e);
-    const dz = (t.height(x, z + e) - t.height(x, z - e)) / (2 * e);
+    const dx = (gh(x + e, z) - gh(x - e, z)) / (2 * e);
+    const dz = (gh(x, z + e) - gh(x, z - e)) / (2 * e);
     const l = Math.hypot(dx, 1, dz);
     return [-dx / l, 1 / l, -dz / l];
   };
+  // a pond's bank: the lane's grass, turning to earth as it goes down, dark
+  // and wet at the water
+  const earth = new THREE.Color(0x8a6a45), wet = new THREE.Color(0x4f4232), bank = new THREE.Color();
+  const banked = (color, p) => {
+    const w = t.pond(p[0], p[2]), dd = w ? w.k * -POOL.bed : 0; // how far down the bank
+    if (dd < 0.01) return color;
+    return bank.copy(color).lerp(earth, smoothstep(dd / 0.22)).lerp(wet, smoothstep((dd - 0.25) / 0.2));
+  };
+  // (split along the diagonal whose ends are nearer in height: a bank's lip
+  // across the cells then runs straight, not in a saw of triangles)
   const quad = (p, color, n) => {
-    for (const k of [0, 1, 2, 0, 2, 3]) {
+    for (const k of Math.abs(p[0][1] - p[2][1]) > Math.abs(p[1][1] - p[3][1]) + 1e-4 ? [0, 1, 3, 1, 2, 3] : [0, 1, 2, 0, 2, 3]) {
       pos.push(...p[k]);
-      col.push(color.r, color.g, color.b);
+      const cc = n || !t.pond ? color : banked(color, p[k]);
+      col.push(cc.r, cc.g, cc.b);
       nor.push(...(n || up(p[k][0], p[k][2])));
     }
   };
@@ -562,7 +579,9 @@ function roughScenery(s, t) {
   // (nor round a serac's tower uphill of its spot, nor the cairns at a col's saddle)
   const built = [...s.zones.filter((z) => z.skin === "mill"),
     ...s.zones.filter((z) => z.skin === "serac").map((z) => ({ min: [z.min[0] - 2.5, z.min[1] - 9], max: [z.max[0] + 2.5, z.max[1] + 9] })),
-    ...s.zones.filter((z) => z.skin === "saddle crest" && z.vec[0] < 0).map((z) => ({ min: [z.max[0] - 1.5, z.min[1]], max: [z.max[0] + 1.5, z.max[1]] }))];
+    ...s.zones.filter((z) => z.skin === "saddle crest" && z.vec[0] < 0).map((z) => ({ min: [z.max[0] - 1.5, z.min[1]], max: [z.max[0] + 1.5, z.max[1]] })),
+    // (nor on a tram's rails, into its tunnels)
+    ...tramCuts(tramLines(s, t)).map(([x0, x1, z0, z1]) => ({ min: [x0 - 3, z0 - 3], max: [x1 + 3, z1 + 3] }))];
   const taken = [];
   const FOOT = [0.75, 0.45, 0.2, 0.2]; // bush, stone, tuft, flower
   for (const cells of t.rough) {
@@ -735,9 +754,230 @@ function kerb(W, ch, t, reachable, { TH = 0.72, TOP = 0.6, smooth = true, foot =
  * each a live piece of its own, there only on the substeps the chain has it.
  * Each registers { at(step), walls } in state.timed for the engine's clock.
  */
+// ------------------------------------------------------------ trams
+//
+// A tram is a timed bar across the lane: the chain has it standing through
+// its window. It is drawn as a tram driving along its rails, the bar's own
+// axis: out of a tunnel mouth off one side of the lane, slowing as it comes,
+// creeping over the crossing through its window (its body covering the bar's
+// footprint on the lane all the while), then picking up and away into the
+// tunnel on the far side, where it fades into the dark, to come round again
+// from the start. Every tram on a line drives the same way; two trams on one
+// line (town18) go one after the other and never meet. All of it follows the
+// timed clock's fractional tick (state.timed).
+
+const TRAM_CREEP = 0.15; // how far it creeps either side of its stop through its window
+const TRAM_EASE = 2.5; // ticks to come in (and go away), at most, for a tram alone on its line
+const TRAM_FADE = 1.0; // ticks to fade in out of a tunnel (and into one), at most
+
+/**
+ * The tram lines of a hole: [{ u, perp, e0, e1, trams: [...] }]. u is the
+ * line's axis (the way its trams drive), e0..e1 the lane's extent along it
+ * (from where it first meets the lane to where it leaves it), and each tram
+ * { c, sF, lo, hi, Lt, th, w, on, every, Aa, Ad, S0, S1 }: its bar's centre,
+ * where its body stops (sF, along u), the lane's crossing either side of the
+ * bar's centre (lo, hi), its body's length, its window's opening (w), and its
+ * come-in / go-away times and far ends.
+ */
+export function tramLines(s, t) {
+  const walls = (s.walls || []).filter((w) => w.skin === "tram" && w.every);
+  const bars = [];
+  for (let i = 0; i + 3 < walls.length; i += 4) {
+    const q = walls.slice(i, i + 4), l0 = segLen(q[0]), l1 = segLen(q[1]), long = l0 >= l1 ? q[0] : q[1];
+    let ux = (long.b[0] - long.a[0]) / segLen(long), uz = (long.b[1] - long.a[1]) / segLen(long);
+    if (Math.abs(ux) >= Math.abs(uz) ? ux < 0 : uz < 0) (ux = -ux), (uz = -uz); // every line drives toward +x or +z
+    const c = [q.reduce((a, w) => a + w.a[0] / 4, 0), q.reduce((a, w) => a + w.a[1] / 4, 0)];
+    const L = Math.max(l0, l1);
+    // the lane's crossing of this bar: where its axis is on the green
+    const on = (d) => t.onGreen(c[0] + ux * d, c[1] + uz * d);
+    let lo = 0, hi = 0;
+    while (lo > -L / 2 && on(lo - 0.25)) lo -= 0.25;
+    while (hi < L / 2 && on(hi + 0.25)) hi += 0.25;
+    bars.push({ q, u: [ux, uz], c, th: Math.min(l0, l1), lo, hi, every: q[0].every, on: q[0].on, w: (((-q[0].phase) % q[0].every) + q[0].every) % q[0].every });
+  }
+  const lines = [];
+  for (const b of bars) {
+    const perp = -b.u[1] * b.c[0] + b.u[0] * b.c[1];
+    const line = lines.find((l) => Math.abs(l.u[0] * b.u[0] + l.u[1] * b.u[1]) > 0.99 && Math.abs(l.perp - perp) < 0.5);
+    if (line) line.trams.push(b);
+    else lines.push({ u: b.u, perp, trams: [b] });
+  }
+  for (const l of lines) {
+    const [ux, uz] = l.u, S = (p) => p[0] * ux + p[1] * uz;
+    l.trams.sort((a, b) => S(a.c) - S(b.c));
+    // the lane along the whole line, first tram's side to last's
+    const f = l.trams[0], g = l.trams[l.trams.length - 1];
+    const onAt = (b, d) => t.onGreen(b.c[0] + ux * d, b.c[1] + uz * d);
+    let a = f.lo, z = g.hi;
+    while (onAt(f, a - 0.25) && a > -200) a -= 0.25;
+    while (onAt(g, z + 0.25) && z < 200) z += 0.25;
+    l.e0 = S(f.c) + a;
+    l.e1 = S(g.c) + z;
+    for (const b of l.trams) {
+      b.sF = S(b.c) + (b.lo + b.hi) / 2;
+      b.Lt = b.hi - b.lo + 2 * TRAM_CREEP + 0.3;
+      // time to come in: since the last window on this line closed; to go
+      // away: until the next one opens (a tram behind it must not catch it up)
+      const gap = (from, to) => ((((to - from) % b.every) + b.every) % b.every) || b.every;
+      const before = Math.min(...l.trams.map((o) => gap(o.w + o.on, b.w))), after = Math.min(...l.trams.map((o) => gap(b.w + b.on, o.w)));
+      // (one tram on a line comes and goes in the same gap: half each; two on
+      // one line go and come in it together, one behind the other: all of it)
+      const tandem = l.trams.length > 1;
+      b.Aa = tandem ? before : Math.min(TRAM_EASE, before / 2);
+      b.Ad = tandem ? after : Math.min(TRAM_EASE, after / 2);
+      b.S0 = l.e0 - b.Lt / 2 - 0.4; // its middle, back in the start tunnel
+      b.S1 = l.e1 + b.Lt / 2 + 0.4; // and in the far one
+      // a tunnel only at an end that runs away from the camera (-z); at an
+      // end toward it, the line runs off the town's edge and the tram fades
+      // as it goes (a tunnel there would stand between the view and the lane)
+      l.tunnel = [tramTunnelAt(l.u, -1), tramTunnelAt(l.u, 1)];
+      b.fadeIn = l.tunnel[0] ? Math.min(TRAM_FADE, b.Aa * 0.5) : b.Aa;
+      b.fadeOut = l.tunnel[1] ? Math.min(TRAM_FADE, b.Ad * 0.5) : b.Ad;
+    }
+  }
+  return lines;
+}
+
+/**
+ * The come-in and go-away curve, 0 to 1 over [0, 1]: an S, leaving and
+ * arriving at slope m (the creep's, so the speed never jumps). One curve for
+ * both: two trams on one line, one going as the other comes over the same
+ * ticks and the same distance, keep their distance exactly.
+ */
+function tramEase(m, k) {
+  const k2 = k * k, k3 = k2 * k;
+  return (k3 - 2 * k2 + k) * m + (-2 * k3 + 3 * k2) + (k3 - k2) * m;
+}
+
+/**
+ * Tram b at tick t: { s, fade, moving } — its middle along the line, how
+ * much of it is there (0 in a tunnel, 1 out on the lane) and its speed's
+ * change (for its sway). Hidden between its going away and its next coming.
+ */
+export function tramAt(b, t) {
+  const E = b.every, tau = (((t - b.w) % E) + E) % E, creep = (2 * TRAM_CREEP) / b.on;
+  const inAt = E - b.Aa;
+  if (tau <= b.on) return { s: b.sF - TRAM_CREEP + creep * tau, fade: 1, sway: 0 };
+  if (tau <= b.on + b.Ad) {
+    // away: from its creep, picking up, into the far tunnel
+    const k = (tau - b.on) / b.Ad, from = b.sF + TRAM_CREEP, dist = b.S1 - from;
+    return { s: from + dist * tramEase((creep * b.Ad) / dist, k), fade: smoothstep((b.on + b.Ad - tau) / b.fadeOut), sway: Math.sin(2 * Math.PI * k) };
+  }
+  if (tau >= inAt) {
+    // coming: out of the start tunnel, slowing to its stop
+    const k = (tau - inAt) / b.Aa, dist = b.sF - TRAM_CREEP - b.S0;
+    return { s: b.S0 + dist * tramEase((creep * b.Aa) / dist, k), fade: smoothstep((tau - inAt) / b.fadeIn), sway: Math.sin(2 * Math.PI * k) };
+  }
+  return { s: b.S0, fade: 0, sway: 0 };
+}
+
+/** Whether a line's end (dir -1: where its trams come from, 1: where they go) runs away from the camera, into a tunnel. */
+const tramTunnelAt = (u, dir) => u[1] * dir < -0.3;
+
+/** The strips the tram lines run on, [x0, x1, z0, z1]: the kerbs are cut there (a level crossing). */
+function tramCuts(lines) {
+  const out = [];
+  for (const l of lines) {
+    const [ux, uz] = l.u, th = Math.max(...l.trams.map((b) => b.th)), P = (sv, off) => [ux * sv - uz * off + -uz * 0, uz * sv + ux * off];
+    // the line's points: s along u, off across it (perp is its offset)
+    const pt = (sv, off) => { const q = P(sv, off); return [q[0] - uz * l.perp, q[1] + ux * l.perp]; };
+    const ps = [pt(l.e0 - 1, -th / 2 - 0.05), pt(l.e0 - 1, th / 2 + 0.05), pt(l.e1 + 1, -th / 2 - 0.05), pt(l.e1 + 1, th / 2 + 0.05)];
+    out.push([Math.min(...ps.map((p) => p[0])), Math.max(...ps.map((p) => p[0])), Math.min(...ps.map((p) => p[1])), Math.max(...ps.map((p) => p[1]))]);
+  }
+  return out;
+}
+
+/** Where a line's tunnels stand: [{ at, dir, depth }] (at: the mouth, along u; dir: which way the tunnel runs). */
+function tramPortals(l, s) {
+  const [ux, uz] = l.u, th = Math.max(...l.trams.map((b) => b.th));
+  const toEdge = (sv, dir) => {
+    // how far from the mouth, along the line, to the board's edge
+    const x = ux * sv - uz * l.perp, z = uz * sv + ux * l.perp, dx = ux * dir, dz = uz * dir;
+    const tx = dx > 1e-6 ? (s.board.w - x) / dx : dx < -1e-6 ? -x / dx : Infinity, tz = dz > 1e-6 ? (s.board.h - z) / dz : dz < -1e-6 ? -z / dz : Infinity;
+    return Math.min(tx, tz);
+  };
+  return [[l.e0 - 0.45, -1], [l.e1 + 0.45, 1]].map(([at, dir]) => ({ at, dir, depth: Math.max(1.2, Math.min(3.2, toEdge(at, dir) + 1.6)), width: th + 0.9 }));
+}
+
+/**
+ * A tram line's fixed dressing: its two rails set in the lane from tunnel to
+ * tunnel, a low curb where it crosses the lane's kerbs (a level crossing),
+ * the overhead wire, and a tunnel mouth at each end, off the lane, dark
+ * inside, where the trams come out and go in.
+ */
+function tramLine(l, s, t) {
+  const g = new THREE.Group(), [ux, uz] = l.u, th = Math.max(...l.trams.map((b) => b.th));
+  const P = (sv, off = 0) => [ux * sv - uz * (l.perp + off), uz * sv + ux * (l.perp + off)];
+  const ang = Math.atan2(uz, ux), portals = tramPortals(l, s);
+  const gauge = Math.min(0.75, th * 0.28);
+  // the rails, on the lane only (the tunnels' floors carry them on out of sight)
+  for (const off of [-gauge, gauge]) {
+    const n = Math.max(2, Math.ceil((l.e1 - l.e0) / 0.5)), pos = [], idx = [];
+    for (let k = 0; k <= n; k++) {
+      const sv = l.e0 + ((l.e1 - l.e0) * k) / n;
+      for (const w of [-0.07, 0.07]) {
+        const [x, z] = P(sv, off + w);
+        pos.push(x, t.height(x, z) + 0.02, z);
+      }
+    }
+    for (let k = 0; k < n; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 3, k * 2, k * 2 + 3, k * 2 + 2);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8d989e, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })));
+  }
+  // the level crossings: a low curbstone where the kerb is cut
+  for (const sv of [l.e0 - 0.2, l.e1 + 0.2]) {
+    const [x, z] = P(sv), curb = drawn(rbox(0.3, 0.16, th + 0.3, 0.05), flat(0xb8ad9c));
+    curb.position.set(x, t.height(...P(sv + (sv < l.e0 ? 0.3 : -0.3))) + 0.08, z);
+    curb.rotation.y = -ang;
+    g.add(curb);
+  }
+  // off the lane each end: the track bed, raised to the lane's level over
+  // the lower ground out to the board's edge, the rails on it; then a low
+  // tunnel mouth at an end away from the camera, dark inside
+  const stone = flat(0xb0a594), bedMat = flat(0x9d9383), roofMat = flat(0x8d4f3a), dark = new THREE.MeshBasicMaterial({ color: 0x141a20, side: THREE.BackSide });
+  const HP = 2.4, base = GRASS - 0.3; // (a tunnel over the pantograph)
+  portals.forEach((pt, end) => {
+    const grp = new THREE.Group(), D = pt.depth, Wd = pt.width;
+    const box = (w, h, d, x, y, z, m) => { const b = drawn(rbox(w, h, d, 0.05), m); b.position.set(x, y, z); grp.add(b); };
+    box(D + 0.3, -base, th + 0.5, (D - 0.3) / 2, base / 2, 0, bedMat);
+    for (const off of [-gauge, gauge]) box(D + 0.3, 0.05, 0.14, (D - 0.3) / 2, 0.02, off, flat(0x8d989e));
+    if (l.tunnel[end]) {
+      for (const side of [-1, 1]) box(D, HP - base, 0.25, D / 2, (HP + base) / 2, side * (Wd / 2 + 0.12), stone);
+      box(D, 0.18, Wd + 0.5, D / 2, HP + 0.09, 0, roofMat);
+      box(0.3, 0.35, Wd + 0.5, 0.15, HP - 0.18, 0, stone); // the lintel over the mouth
+      box(0.25, HP - base, Wd + 0.5, D - 0.12, (HP + base) / 2, 0, stone); // the far end, closed
+      const inside = new THREE.Mesh(new THREE.BoxGeometry(D - 0.2, HP - base - 0.1, Wd - 0.05), dark);
+      inside.position.set(D / 2, (HP + base) / 2, 0);
+      grp.add(inside);
+    }
+    else {
+      // no tunnel: a pole beside the bed holds the wire's end
+      const pole = drawn(rbox(0.14, HP + 0.2 - base, 0.14, 0.03), flat(0x3d4a45));
+      pole.position.set(0.3, (HP + 0.2 + base) / 2, th / 2 + 0.45);
+      const arm = drawn(rbox(0.1, 0.1, th / 2 + 0.5, 0.02), flat(0x3d4a45));
+      arm.position.set(0.3, HP + 0.1, (th / 2 + 0.45) / 2);
+      grp.add(pole, arm);
+    }
+    const [x, z] = P(pt.at);
+    grp.position.set(x, 0, z);
+    grp.rotation.y = pt.dir > 0 ? -ang : -ang + Math.PI; // its depth runs away from the lane
+    g.add(grp);
+  });
+  // the overhead wire, mouth to mouth
+  const wy = 2.27, wire = [P(portals[0].at), P(portals[1].at)].map(([x, z]) => new THREE.Vector3(x, wy, z));
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(wire), new THREE.LineBasicMaterial({ color: C.ink })));
+  return g;
+}
+
 function timedPieces(s, t, out) {
   const timed = s.walls.filter((w) => w.every && w.skin !== "sail");
   const pieces = [];
+  const lines = tramLines(s, t), tramOf = new Map();
+  for (const l of lines) for (const b of l.trams) tramOf.set(b.q[0], b);
+  for (const l of lines) out.push(tramLine(l, s, t));
   for (let i = 0; i + 3 < timed.length; i += 4) {
     const q = timed.slice(i, i + 4), [every, on, phase] = [q[0].every, q[0].on, q[0].phase];
     // built in world coordinates, then hung from a pivot at its centre, so a
@@ -764,7 +1004,10 @@ function timedPieces(s, t, out) {
       ghost.visible = false;
       out.push(ghost);
     }
-    pieces.push({ pivot, there: at0, ang, cx, cz, ghost, hand: q[0].skin === "clock hand", walls: q });
+    // a tram fades in and out of its tunnels: its own materials
+    const tr = tramOf.get(q[0]), mats = [];
+    if (tr) piece.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
+    pieces.push({ pivot, there: at0, ang, cx, cz, ghost, hand: q[0].skin === "clock hand", walls: q, tram: tr, mats });
     out.push(pivot);
   }
   // Between ticks a piece glides: over the last EASE of the substep before
@@ -775,6 +1018,26 @@ function timedPieces(s, t, out) {
   const hands = pieces.filter((p) => p.hand);
   let aiming = false;
   for (const p of pieces) {
+    if (p.tram) {
+      const [ux, uz] = p.tram.u, axis = new THREE.Vector3(ux, 0, uz);
+      const at = (tick) => {
+        const r = tramAt(p.tram, tick), d = r.s - p.tram.sF;
+        p.pivot.position.set(p.cx + ux * d, 0, p.cz + uz * d);
+        // a little roll on its bogies as it picks up and slows
+        p.pivot.quaternion.setFromAxisAngle(axis, 0.018 * r.sway);
+        p.pivot.visible = r.fade > 0.01;
+        for (const m of p.mats) {
+          m.opacity = r.fade;
+          const see = r.fade < 0.999;
+          if (m.transparent !== see) (m.transparent = see), (m.needsUpdate = true);
+          m.depthWrite = !see;
+        }
+        if (p.ghost) p.ghost.visible = aiming && !p.there(Math.floor(tick));
+      };
+      at(0);
+      state.timed.push({ at, walls: p.walls });
+      continue;
+    }
     const at = (tick) => {
       const k = Math.floor(tick), f = tick - k;
       let e = 0; // 0 away, 1 in place
@@ -812,12 +1075,12 @@ function timedPieces(s, t, out) {
 
 /** A kerb chain cut open where a gap or an inlet crosses it: each run left
  *  is its own kerb ({ list, ch }), ending at posts. */
-function kerbRuns(W, ch, zones) {
+function kerbRuns(W, ch, zones, cuts = []) {
   const runs = [];
   let cur = [];
   const flush = () => { if (cur.length) runs.push({ list: cur, ch: { from: 0, to: cur.length - 1, closed: false } }); cur = []; };
   for (let k = ch.from; k <= ch.to; k++)
-    for (const piece of openings(W[k], zones)) {
+    for (const piece of openings(W[k], zones, cuts)) {
       if (cur.length && !near(cur[cur.length - 1].b, piece.a)) flush();
       cur.push(piece);
     }
@@ -849,10 +1112,11 @@ function wallPieces(s, t) {
   // a world may dress the rails its own way: world.kerb = { color, post }
   // (mountain: grey stone, town: kerbstone...); wood by default
   const K = (s.board && worldOf(s).kerb) || {};
-  const cutAny = (s.zones || []).some((q) => GAPS.has(q.skin) || (q.skin === "sea" && q.poly && !q.outside)); // any gap or inlet to cut the kerbs at
+  const cuts = tramCuts(tramLines(s, t));
+  const cutAny = cuts.length > 0 || (s.zones || []).some((q) => GAPS.has(q.skin) || (q.skin === "sea" && q.poly && !q.outside)); // any gap, inlet or tram line to cut the kerbs at
   for (const ch of kerbChains(W)) {
     for (let k = ch.from; k <= ch.to; k++) inKerb.add(k);
-    for (const { list, ch: c } of cutAny ? kerbRuns(W, ch, s.zones) : [{ list: W, ch }]) {
+    for (const { list, ch: c } of cutAny ? kerbRuns(W, ch, s.zones, cuts) : [{ list: W, ch }]) {
       out.push(kerb(list, c, t, reachable, { color: K.color ?? C.wood }));
       // an open run ends at a post, like any wall: no bare cut profile
       if (!c.closed) for (const p of [list[c.from].a, list[c.to].b]) caps.set(p[0].toFixed(2) + "," + p[1].toFixed(2), [p[0], p[1]]);
@@ -876,7 +1140,7 @@ function wallPieces(s, t) {
       out.push(rampart(whole, t));
       continue;
     }
-    const parts = openings(whole, s.zones);
+    const parts = openings(whole, s.zones, cuts);
     for (const w of parts) {
     const len = segLen(w);
     if (len < 1e-6) continue;
@@ -952,7 +1216,7 @@ function barPiece(q, W, s, t) {
     if (hi - lo > 1) {
       const mid = (lo + hi) / 2;
       c0[0] += ux * mid; c0[1] += uz * mid;
-      L0 = hi - lo - 0.5;
+      L0 = hi - lo + 2 * TRAM_CREEP + 0.3; // over the whole crossing as it creeps, into the level crossings
     }
   }
   const own = s.board && fromWorld(s, "wall", { walls: q, skin, c: c0, length: L0, thick, ang }, t);

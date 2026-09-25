@@ -38,9 +38,10 @@ var me = course.Fit(&course.Simple{
 		Walls: physics.Walls(
 			physics.Outline(plaza...),
 			// the two trams cross the plaza's gate on one line, north and south,
-			// half a turn apart: the middle of the gate is always open
-			physics.Timed(physics.Bar(physics.V(20, 1.5), physics.V(20, 18.5), 2.4, '#', "tram"), 12, 5, 0),
-			physics.Timed(physics.Bar(physics.V(20, 25.5), physics.V(20, 42.5), 2.4, '#', "tram"), 12, 5, 6),
+			// half a turn apart, each up 5 ticks in 24: the middle of the gate is
+			// always open, and a tram has time to cross the plaza between two
+			physics.Timed(physics.Bar(physics.V(20, 1.5), physics.V(20, 18.5), 2.4, '#', "tram"), 24, 5, 0),
+			physics.Timed(physics.Bar(physics.V(20, 25.5), physics.V(20, 42.5), 2.4, '#', "tram"), 24, 5, 12),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(38, 22), R: 4.2}, Bounce: 0.7, Skin: "bandstand"},

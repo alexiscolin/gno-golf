@@ -69,14 +69,22 @@ export function makeReplay(E) {
   // gravity and lands with a little bounce. Cosmetic: the chain's ball is a
   // point on a flat board.
   const air = { y: 0, vy: 0, gvy: 0, up: false, t: 0 };
-  // On the ground, the ball follows it up at once but comes down a drop (the
-  // end of a ramp too slow to take off, a ledge) under gravity, never in one
-  // frame. The chain's air flags handle real flights.
-  let dropY = null, dropV = 0, dropT = 0;
-  function fallTo(floor, now) {
+  // On the ground, the ball follows it — up a slope and down one, as the
+  // chain has it (no air flag: on the ground). Only off a ledge (the ground
+  // dropping steeper than any slope: the end of a ramp too slow to take off)
+  // does it come down under gravity, never in one frame. The chain's air
+  // flags handle real flights.
+  let dropY = null, dropV = 0, dropT = 0, dropX = 0, dropZ = 0;
+  const LEDGE = 1.5; // a drop steeper than this per unit across is a ledge, not a slope
+  function fallTo(floor, now, x, z) {
     const dt = dropT ? Math.min((now - dropT) / 1000, 0.05) : 0;
+    const was = BALL_R + ground(dropX, dropZ), across = Math.hypot(x - dropX, z - dropZ);
     dropT = now;
-    if (dropY === null || floor >= dropY - 0.02 || !dt) {
+    dropX = x;
+    dropZ = z;
+    // on the ground last frame and the ground going down no steeper than a slope: stay on it
+    const onSlope = dropY !== null && dropY <= was + 0.02 && was - floor <= LEDGE * across + 0.02;
+    if (dropY === null || floor >= dropY - 0.02 || !dt || onSlope) {
       dropY = floor;
       dropV = 0;
       return floor;
@@ -336,7 +344,7 @@ export function makeReplay(E) {
   /** Walk the path the chain returned. One segment, one slice of time. */
   // The chain says where the ball is in the air ("air": one 0/1 per path
   // point). Each run of 1s is one flight: from the ground point before it to
-  // the ground point after, drawn as an arc as high as the flight is long.
+  // the ground point after, drawn as the arc a ball thrown off that ramp flies.
   function flightsOf(path, flags) {
     const at = new Map(); // segment index -> { s, e, len, start }
     for (let i = 0; i < path.length; i++) {
@@ -349,7 +357,6 @@ export function makeReplay(E) {
         f.starts.push(f.len);
         f.len += Math.hypot(path[j + 1][0] - path[j][0], path[j + 1][1] - path[j][1]);
       }
-      f.h = Math.min(0.35 + f.len * 0.16, 2.6);
       // one flight, one arc. The flight's first point is still on the ramp:
       // the ball rolls up it to the crest (the highest ground under the
       // flight) and leaves the ground there; from the crest it flies one
@@ -367,8 +374,11 @@ export function makeReplay(E) {
         const d = (q / 24) * f.len, [x, z] = pt(d), gh = ground(x, z);
         if (gh > top + 1e-6) (top = gh), (crest = d);
       }
-      const [lx, lz] = path[e];
-      f.crest = crest; f.top = top; f.land = ground(lx, lz);
+      f.top = null; // the height he leaves at: taken as he leaves
+      f.pt = pt;
+      const dl = Math.hypot(path[s + 1][0] - path[s][0], path[s + 1][1] - path[s][1]) || 1;
+      f.dir = [(path[s + 1][0] - path[s][0]) / dl, (path[s + 1][1] - path[s][1]) / dl];
+      f.crest = crest; f.lx = path[e][0]; f.lz = path[e][1];
       for (let j = s; j < e; j++) at.set(j, { f, off: f.starts[j - s], seg: f.starts[j - s + 1] ?? f.len });
     }
     return at;
@@ -402,9 +412,11 @@ export function makeReplay(E) {
       air.vy = air.gvy = 0;
       air.up = false;
       air.t = 0;
+      g.replaying = { flags, at: 0 }; // (?camlog's ballLift: which step of which flags)
       const step = () => {
         // a restart or a new hole mid-flight ends this replay where it is
         if (i >= path.length - 1 || round !== g.round || E.cut !== cutAt) return done();
+        g.replaying.at = i;
 
         const from = lift(path[i]), to = lift(path[i + 1]);
         const jump = tunnelled(path[i], path[i + 1]); // do not slide across the board
@@ -498,17 +510,31 @@ export function makeReplay(E) {
               const F = fl.f, d = fl.off + (fl.seg - fl.off) * k, gh = ground(E.ball.position.x, E.ball.position.z);
               if (d <= F.crest) E.ball.position.y = BALL_R + gh; // still rolling up to the lip
               else {
-                const v = (d - F.crest) / Math.max(1e-6, F.len - F.crest);
-                // from the lip's height down to the landing's, plus one arc; never
-                // through the ground it flies over
-                const y = F.top + (F.land - F.top) * v + F.h * 4 * v * (1 - v);
+                const L = Math.max(1e-6, F.len - F.crest), u = d - F.crest;
+                // One parabola from the lip to where the chain lands him: it
+                // leaves along the ramp (its slope under the lip, read as he
+                // leaves: a timed deck, a seesaw's plank, moves) and falls under
+                // gravity from there — no arc of its own on top, no hop at the
+                // lip; never through the ground it flies over. The heights too
+                // are read as the flight goes (one taken before the shot put a
+                // dip, then a hop, at the lip)
+                if (F.top == null) {
+                  const [cx, cz] = F.pt(F.crest);
+                  F.top = prev.y - BALL_R;
+                  F.s0 = Math.max(0, Math.min(2, (ground(cx, cz) - ground(cx - F.dir[0] * 0.4, cz - F.dir[1] * 0.4)) / 0.4));
+                }
+                const land = ground(F.lx, F.lz), fall = land - F.top - F.s0 * L;
+                // (a landing above the ramp's line: no throw reaches it rising, a straight climb)
+                const y = fall <= 0 ? F.top + F.s0 * u + fall * (u / L) ** 2 : F.top + (land - F.top) * (u / L);
                 E.ball.position.y = BALL_R + Math.max(gh, y);
               }
               // a flight lands where it lands: no fall left over from before it
               dropY = E.ball.position.y;
               dropV = 0;
               dropT = now;
-            } else if (flights) E.ball.position.y = fallTo(BALL_R + ground(E.ball.position.x, E.ball.position.z), now);
+              dropX = E.ball.position.x;
+              dropZ = E.ball.position.z;
+            } else if (flights) E.ball.position.y = fallTo(BALL_R + ground(E.ball.position.x, E.ball.position.z), now, E.ball.position.x, E.ball.position.z);
             else fly(E.ball.position);
           }
           if (drop && raw > 0.6) {

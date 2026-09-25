@@ -76,7 +76,7 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 var golden = map[string][3]string{
 	"pulse":  {"678f136eb4ef0257", "076ac3e7c0d705a9", "4e9da97515c48b33"},
 	"sea":    {"4ce93b61be350770", "c3224daa821020f4", "807b1e8fc908df52"},
-	"slope":  {"8d9cd7d675a48523", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
+	"slope":  {"1ae52dd6618cad52", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
 	"storm":  {"27839a2f650ea264", "217b2a005fc76324", "cd0874fd52e8179f"},
 	"timed":  {"88354dc60a8951a0", "c3224daa821020f4", "e4dbc97ea48d1ede"},
 	"tunnel": {"2b8666eb09290dde", "c3224daa821020f4", "335763617c2e9b50"},

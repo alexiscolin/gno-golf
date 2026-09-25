@@ -26,6 +26,8 @@ export function loadCard() {
 /** Keeps the better of the old and new score. Returns the updated card. */
 export function recordScore(id, strokes) {
   const card = loadCard();
+  // a score is a whole number of strokes; anything else is a bug upstream, not a score
+  if (!id || !Number.isInteger(strokes) || strokes < 1) return (console.warn("gnogolf: no score recorded for", id, strokes), card);
   if (!card[id] || strokes < card[id]) card[id] = strokes;
   return save(card);
 }
@@ -98,3 +100,23 @@ export const cupHasGnome = (cup) => Object.values(UNLOCKS).some((u) => u.cup ===
 /** A medal for a finished hole: gold for one stroke, silver under par, bronze at par. */
 export const medalOf = (strokes, par) => (!strokes ? null : strokes === 1 ? "gold" : strokes < par ? "silver" : strokes === par ? "bronze" : null);
 
+
+// the self-check: a finished hole goes on the card, the better score is kept,
+// and a bad count (the undefined a count-less answer gave) changes nothing
+export function demoCard() {
+  const mem = {};
+  const ls = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => (mem[k] = String(v)), removeItem: (k) => delete mem[k] };
+  try {
+    recordScore("h1", 4);
+    recordScore("h1", 3);
+    recordScore("h1", 5);
+    recordScore("h2", undefined);
+    const card = loadCard(), t = totals(card, [{ id: "h1", par: 3 }, { id: "h2", par: 3 }]);
+    console.assert(card.h1 === 3 && !("h2" in card), "kept the best, refused undefined");
+    console.assert(t.done === 1 && t.strokes === 3 && t.par === 3, "totals");
+    return "ok";
+  } finally {
+    globalThis.localStorage = ls;
+  }
+}

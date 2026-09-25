@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CUP_R, CELL, inZone, airy, mod, segDist } from "../terrain.js";
+import { CUP_R, CELL, inZone, inset, airy, mod, segDist, smoothstep } from "../terrain.js";
 import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf } from "./materials.js";
 import { animate, state } from "./state.js";
 import { stone, warp, badge, windmill } from "./props.js";
@@ -293,7 +293,7 @@ function moonBridge(z, s, t, g) {
   const [b0, b1] = alongX ? [z.min[1], z.max[1]] : [z.min[0], z.max[0]];
   const P = (a, b) => (alongX ? [a, b] : [b, a]);
   const H = (a) => t.height(...P(a, (b0 + b1) / 2));
-  const wood = flat(0xb9804c), red = flat(0xc8452f), shade = flat(0x2f5f75, { side: THREE.DoubleSide });
+  const wood = flat(0xb9804c), red = flat(0xc8452f);
   const n = Math.max(2, Math.round((a1 - a0) / 0.42));
   for (let k = 0; k < n; k++) {
     const a = a0 + ((k + 0.5) / n) * (a1 - a0), d = 0.1, slope = (H(Math.min(a1 - 0.01, a + d)) - H(Math.max(a0, a - d))) / (2 * d);
@@ -304,38 +304,38 @@ function moonBridge(z, s, t, g) {
     else plank.rotation.x = -Math.atan(slope);
     g.add(plank);
   }
-  // each side: a red face from the deck's edge down into the water, with the
-  // arch's shadow cut in under the crest
-  const crest = Math.abs(H(a0)) > Math.abs(H(a1)) ? a0 : a1, foot = crest === a0 ? a1 : a0;
+  // each side: a red face under the deck's edge, down to the bank where the
+  // bridge stands on land and a band under the deck over the water, so the
+  // stream runs through under its arch
+  const gh = t.ground || t.height;
   for (const b of [b0 - 0.02, b1 + 0.02]) {
-    const prof = [];
-    for (let k = 0; k <= 16; k++) {
-      const a = a0 + (k / 16) * (a1 - a0);
-      prof.push([a, H(a) + 0.06]);
+    const prof = [], foot = [];
+    for (let k = 0; k <= 24; k++) {
+      const a = a0 + (k / 24) * (a1 - a0), top = H(a) + 0.06, [x, zz] = P(a, b), p = t.pond(x, zz);
+      prof.push([a, top]);
+      foot.push([a, (gh(x, zz) - 0.05) + (top - 0.32 - (gh(x, zz) - 0.05)) * Math.min(1, (p ? p.k : 0) * 1.6)]);
     }
-    const side = [...prof, [a1, -0.3], [a0, -0.3]];
-    const hole = [];
-    for (let k = 0; k <= 12; k++) {
-      // a quarter ellipse from the crest down to the stream, the arch's inside
-      const q = (k / 12) * (Math.PI / 2), a = crest + (foot - crest) * Math.sin(q) * 0.55, y = -0.3 + (H(crest) * 0.6) * Math.cos(q);
-      hole.push([a, Math.max(-0.3, y)]);
+    const shp = new THREE.Shape([...prof, ...foot.reverse()].map(([a, y]) => new THREE.Vector2(a, y)));
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(shp), flat(0xc8452f, { side: THREE.DoubleSide }));
+    // the shape's x is along the bridge, its y is height: stand it up on the side
+    if (alongX) m.position.set(0, 0, b);
+    else {
+      m.rotation.y = -Math.PI / 2;
+      m.position.set(b, 0, 0);
     }
-    hole.push([crest, -0.3]);
-    for (const [pts, mat, off] of [[side, red, 0], [hole, shade, 0.012]]) {
-      const shp = new THREE.Shape(pts.map(([a, y]) => new THREE.Vector2(a, y)));
-      const geo = new THREE.ShapeGeometry(shp);
-      const m = new THREE.Mesh(geo, mat === red ? flat(0xc8452f, { side: THREE.DoubleSide }) : mat);
-      // the shape's x is along the bridge, its y is height: stand it up on the side
-      if (alongX) m.position.set(0, 0, b + (b === b0 - 0.02 ? -off : off));
-      else {
-        m.rotation.y = -Math.PI / 2;
-        m.position.set(b + (b === b0 - 0.02 ? -off : off), 0, 0);
-      }
-      g.add(m);
-    }
+    g.add(m);
     // the red beam along the top of the side
     const beam = new THREE.CatmullRomCurve3(prof.map(([a, y]) => { const [x, zz] = P(a, b); return new THREE.Vector3(x, y - 0.04, zz); }));
     g.add(drawn(new THREE.TubeGeometry(beam, 24, 0.09, 6, false), red));
+  }
+  // the arch's shade on the water under it
+  const [cx, cz] = P((a0 + a1) / 2, (b0 + b1) / 2), p = t.pond(cx, cz);
+  if (p) {
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(z.max[0] - z.min[0], z.max[1] - z.min[1]).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0b2530, transparent: true, opacity: 0.3, depthWrite: false }));
+    sh.position.set(cx, p.level + 0.01, cz);
+    sh.renderOrder = 2;
+    sh.userData.live = true; // (kept out of the bake)
+    g.add(sh);
   }
   return g;
 }
@@ -452,6 +452,35 @@ function drawMolehill(z, s, t, g, { rand }) {
 
 // A surface or a hazard: its patch in the ground (a blob, draped), a deck's
 // planks, the bank's ink; then the detail its kind draws (SURFACE_DETAIL).
+/**
+ * The garden's ponds and streams: one flat sheet at each one's level, cell by
+ * cell wherever the ground (terrain.js sinks it) goes down under it, the
+ * banks hiding its edge. Pale over the shallows by the banks, darker out in
+ * the deep middle. Null when the hole has none.
+ */
+export function pondWater(s, t) {
+  const pos = [], col = [], deep = new THREE.Color(0x2c6479), shallow = new THREE.Color(0x86c3cc), c = new THREE.Color();
+  const gh = t.ground || t.height;
+  for (let j = 0; j < t.nz; j++)
+    for (let i = 0; i < t.nx; i++) {
+      if (!t.green[t.idx(i, j)]) continue;
+      const cs = [[i, j], [i, j + 1], [i + 1, j + 1], [i + 1, j]].map(([a, b]) => [a * CELL, b * CELL]);
+      const ws = cs.map(([x, zz]) => t.pond(x, zz)), p = ws.find(Boolean);
+      if (!p || cs.every(([x, zz]) => gh(x, zz) > p.level + 0.01)) continue;
+      for (const k of [0, 1, 2, 0, 2, 3]) {
+        const [x, zz] = cs[k], d = ws[k] ? ws[k].d : 0;
+        c.copy(shallow).lerp(deep, smoothstep((d - 0.3) / 2.2));
+        pos.push(x, p.level, zz);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true }));
+}
+
 function drawSurface(z, s, t, g, { w, h, rand }) {
   const water = z.kind === "hazard";
   const ice = z.skin === "ice" || (z.kind === "surface" && z.scale > 1);
@@ -479,6 +508,14 @@ function drawSurface(z, s, t, g, { w, h, rand }) {
     }
     return null;
   };
+  // a garden pond is sunk into the ground (terrain.js, pondWater), with its
+  // banks; over one, a causeway is a boardwalk on posts
+  const sunk = water && z.skin === "water";
+  if (deck && t.pond((z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2)) return boardwalk(z, s, t, g);
+  if (sunk) {
+    pondDetail(z, s, t, g, { w, h, rand });
+    return g;
+  }
   const geo = new THREE.ShapeGeometry(blob.shape, 6);
   geo.rotateX(-Math.PI / 2);
   // sunk a touch below the green for water, laid on it for sand
@@ -518,6 +555,117 @@ const SURFACE_DETAIL = [
   [(f) => f.ice, iceDetail],
   [(f) => !f.deck, sandDetail],
 ];
+
+/** A causeway over a pond: a boardwalk on posts, planks across it, two
+ *  stringers under them, the water running on beneath and shaded by it. The
+ *  ball rides its top, at the lane's own height. */
+function boardwalk(z, s, t, g) {
+  const [x0, z0] = z.min, [x1, z1] = z.max, alongX = x1 - x0 >= z1 - z0;
+  const L = alongX ? x1 - x0 : z1 - z0, W = alongX ? z1 - z0 : x1 - x0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const y = t.height(cx, cz), gh = t.ground || t.height, rand = seeded("walk" + cx + cz), p = t.pond(cx, cz);
+  const P = (u, v) => (alongX ? [x0 + u, cz + v] : [cx + v, z0 + u]); // u along it, v across
+  const tones = new Map(), n = Math.round(L / 0.5);
+  for (let k = 0; k < n; k++) {
+    const tone = [0xb9804c, 0xa9733f, 0xc38a55][(k * 7) % 3], list = tones.get(tone) || tones.set(tone, []).get(tone);
+    const [x, zz] = P((k + 0.5) * (L / n), (rand() - 0.5) * 0.08);
+    const b = new THREE.BoxGeometry(L / n - 0.05, 0.08, W + 0.1).rotateX((rand() - 0.5) * 0.02);
+    if (!alongX) b.rotateY(Math.PI / 2);
+    list.push(b.translate(x, y - 0.035 + (rand() - 0.5) * 0.012, zz));
+  }
+  for (const [tone, list] of tones) g.add(drawn(mergeGeometries(list), flat(tone)));
+  const beams = [], posts = [], bands = [];
+  for (const v of [-W / 2 + 0.2, W / 2 - 0.2]) {
+    const [bx, bz] = P(L / 2, v);
+    beams.push(new THREE.BoxGeometry(alongX ? L : 0.14, 0.2, alongX ? 0.14 : L).translate(bx, y - 0.18, bz));
+    for (let u = 0.4; u < L; u += 1.6) {
+      const [x, zz] = P(u, v), foot = gh(x, zz) - 0.1, h = y - 0.28 - foot;
+      if (h < 0.1) continue; // on the bank: the stringer rests on it
+      posts.push(new THREE.CylinderGeometry(0.1, 0.12, h, 6).translate(x, foot + h / 2, zz));
+      if (p) bands.push(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 6).translate(x, p.level + 0.03, zz));
+    }
+  }
+  g.add(drawn(mergeGeometries(beams), flat(0x6b4a2e)));
+  if (posts.length) g.add(drawn(mergeGeometries(posts), flat(0x6b4a2e)));
+  if (bands.length) g.add(new THREE.Mesh(mergeGeometries(bands), flat(0x3f4a38)));
+  // its shadow on the water
+  if (p) {
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? L : W + 0.7, alongX ? W + 0.7 : L).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0b2530, transparent: true, opacity: 0.28, depthWrite: false }));
+    sh.position.set(cx, p.level + 0.01, cz);
+    sh.renderOrder = 2;
+    sh.userData.live = true; // (kept out of the bake)
+    g.add(sh);
+  }
+  return g;
+}
+
+/** A sunk garden pond (the water itself is pondWater's): lily pads out on
+ *  it, a glint of sky, slow rings, reeds in clumps at the banks by the walls
+ *  (off the lane, where no ball goes). */
+function pondDetail(z, s, t, g, { w, h, rand }) {
+  const clear = (x, zz) => !s.zones.some((q) => ((q.kind === "slope" && (q.skin === "moon bridge" || q.skin === "seesaw")) || q.skin === "bridge") && x > q.min[0] - 0.9 && x < q.max[0] + 0.9 && zz > q.min[1] - 0.9 && zz < q.max[1] + 0.9);
+  // somewhere on the water at least d in from its edge, clear of what crosses it
+  const out = (d) => {
+    for (let n = 0; n < 30; n++) {
+      const x = z.min[0] + rand() * w, zz = z.min[1] + rand() * h, p = t.pond(x, zz);
+      if (p && inZone(z, x, zz) && inset(z, x, zz) > d && clear(x, zz) && t.onGreen(x, zz)) return [x, zz, p.level];
+    }
+    return null;
+  };
+  const area = w * h;
+  // lily pads, in twos and threes, one with a flower
+  const pads = [], flowers = [];
+  for (let k = 0; k < Math.min(4, 1 + area / 25); k++) {
+    const at = out(1.1);
+    if (!at) continue;
+    for (let n = 0; n < 2 + (rand() * 2 | 0); n++) {
+      const r = 0.28 + rand() * 0.2, a = rand() * 6.3, x = at[0] + (n ? Math.cos(a) * 0.7 : 0), zz = at[1] + (n ? Math.sin(a) * 0.7 : 0);
+      if (!t.pond(x, zz) || inset(z, x, zz) < 0.7) continue;
+      pads.push(new THREE.CircleGeometry(r, 12, 0.3, Math.PI * 1.82).rotateX(-Math.PI / 2).rotateY(rand() * 6.3).translate(x, at[2] + 0.012, zz));
+      if (!k && !n) flowers.push(new THREE.ConeGeometry(0.12, 0.14, 6).translate(x, at[2] + 0.08, zz));
+    }
+  }
+  if (pads.length) g.add(new THREE.Mesh(mergeGeometries(pads), flat(C.leaf)));
+  if (flowers.length) g.add(new THREE.Mesh(mergeGeometries(flowers), flat(0xf2a7c3)));
+  // a glint: the sky on the water, long and soft
+  const glint = out(1.4);
+  if (glint) {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(0.5, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, depthWrite: false }));
+    m.scale.set(2.2, 1, 0.35);
+    m.rotation.y = 0.5;
+    m.position.set(glint[0], glint[2] + 0.01, glint[1]);
+    g.add(m);
+  }
+  // two slow rings
+  for (let k = 0; k < 2; k++) {
+    const at = out(1.2);
+    if (!at) continue;
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.36, 28).rotateX(-Math.PI / 2), clipTo(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false }), waterMask(t)));
+    r.position.set(at[0], at[2] + 0.015, at[1]);
+    const phase = rand() * 4;
+    r.userData.live = true;
+    animate((time) => {
+      const u = ((time + phase) % 4) / 4;
+      r.scale.setScalar(0.6 + u * 2.2);
+      r.material.opacity = 0.32 * (1 - u);
+    });
+    g.add(r);
+  }
+  // reeds: clumps standing in the shallows at the banks by a wall
+  const gh = t.ground || t.height, stems = [], tips = [];
+  for (let n = 0, clumps = 0; n < 80 && clumps < 3; n++) {
+    const x = z.min[0] + rand() * w, zz = z.min[1] + rand() * h, d = inset(z, x, zz);
+    if (d < 0.25 || d > 0.6 || !t.onGreen(x, zz) || !clear(x, zz) || !s.walls.some((q) => segDist(x, zz, q.a, q.b) < 1.2)) continue;
+    clumps++;
+    for (let k = 0; k < 5; k++) {
+      const sx = x + (rand() - 0.5) * 0.5, sz = zz + (rand() - 0.5) * 0.5, l = 0.7 + rand() * 0.6, y = gh(sx, sz);
+      const lean = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler((rand() - 0.5) * 0.3, 0, (rand() - 0.5) * 0.3));
+      stems.push(new THREE.CylinderGeometry(0.025, 0.04, l, 4).translate(0, l / 2, 0).applyMatrix4(lean).translate(sx, y, sz));
+      if (k % 2 === 0) tips.push(new THREE.CapsuleGeometry(0.055, 0.2, 2, 5).translate(0, l + 0.05, 0).applyMatrix4(lean).translate(sx, y, sz));
+    }
+  }
+  if (stems.length) g.add(new THREE.Mesh(mergeGeometries(stems), flat(C.leafDark)));
+  if (tips.length) g.add(new THREE.Mesh(mergeGeometries(tips), flat(C.bark)));
+}
 
 /** Water: its shore of pebbles and reeds, ripples, a lily pad (a fountain's basin, a canal's stones). */
 function waterDetail(z, s, t, g, { w, h, rand, blob, spot }) {
@@ -918,7 +1066,7 @@ function drawTunnel(z, s, t, g, { w, h }) {
  * (state.timed) to the chain's tilt: low at the end its push rolls a ball
  * toward. The ball rides it (state.lifts). Drawn once, by the first half.
  */
-const SEESAW_TILT = 0.04; // radians either way
+const SEESAW_TILT = 0.045; // radians either way: its low end just clears the bank
 function seesaw(z, s, t, g) {
   const pair = s.zones.filter((q) => q.skin === "seesaw" && q.min[0] === z.min[0] && q.min[1] === z.min[1]);
   if (pair[0] !== z) return g; // the other half: already drawn
@@ -927,12 +1075,11 @@ function seesaw(z, s, t, g) {
   const L = u1 - u0 + 0.4, W = w1 - w0, TOP = 0.34, TH = 0.24;
   const P = (u, w) => (alongX ? [u, w] : [w, u]);
   const [cx, cz] = P(uc, wc), y0 = t.height(cx, cz);
-  // the pond carries on under the plank (the chain has a strip of lane there)
-  const under = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? u1 - u0 : W, alongX ? W : u1 - u0).rotateX(-Math.PI / 2), flat(C.pond, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
-  under.position.set(cx, y0 + 0.03, cz);
-  // the stone it rocks on, standing in the water
-  const block = drawn(rbox(1.1, TOP - TH, W * 0.9, 0.08), flat(0x9aa39e));
-  block.position.set(cx, y0 + (TOP - TH) / 2, cz);
+  // (the pond carries on under the plank: terrain.js sinks the ground there)
+  // the stone it rocks on, standing in the water, up from the bed
+  const bed = (t.ground || t.height)(cx, cz) - 0.1, sh = y0 + TOP - TH - bed;
+  const block = drawn(rbox(1.1, sh, W * 0.9, 0.08), flat(0x9aa39e));
+  block.position.set(cx, bed + sh / 2, cz);
   if (!alongX) block.rotation.y = Math.PI / 2;
   // the plank: boards across it, a rim each side, on a pivot at the stone
   const pivot = new THREE.Group();
@@ -951,7 +1098,7 @@ function seesaw(z, s, t, g) {
     pivot.add(cap);
   }
   pivot.userData.live = true;
-  g.add(under, block, pivot);
+  g.add(block, pivot);
   // the clock: tipped down toward where the first half pushes, then the other way
   const every = z.every | 0, onFor = z.on | 0, phase = z.phase | 0, down = Math.sign(z.vec[k]) || -1;
   let step = 0, ang = 0, last = null;

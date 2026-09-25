@@ -9,7 +9,7 @@
 // the picker import.
 
 export { motion, setTime, at, disposeCourse, quality } from "./scene/materials.js";
-export { maxDpr, makeRenderer, makeScene, setLighting, courseBox, applyRig, overviewRig, leanRoom, focusRig } from "./scene/camera.js";
+export { maxDpr, makeRenderer, makeScene, setLighting, courseBox, applyRig, overviewRig, farRig, ORBIT, focusRig } from "./scene/camera.js";
 export { buildHole, finishHole, buildExtras } from "./scene/course.js";
 export { GNOMES, gnomeById, makeBall, makePreview } from "./scene/gnome.js";
 export { makeSplash, makeConfetti, makeBand, bandTo, makeAim, aimAlong } from "./scene/fx.js";

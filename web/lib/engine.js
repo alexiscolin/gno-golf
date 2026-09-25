@@ -11,7 +11,7 @@
 // the frame loop, loading, the weather and the clock, input and the shot.
 
 import * as THREE from "three";
-import { buzz, sound, ambience } from "./feel.js";
+import { buzz, sound, ambience, setSilent } from "./feel.js";
 import { makeWeather } from "./scene/weather.js";
 import { makeCauses } from "./scene/cause.js";
 import { loadWorld } from "./scene/worlds.js";
@@ -19,7 +19,7 @@ import { makeChain, shotOf, pullShot } from "./chain.js";
 import { cupOf } from "./card.js";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
-  courseBox, overviewRig, leanRoom, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
+  courseBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene.js";
 import { BALL_R } from "./terrain.js";
 import { promo } from "./promo.js";
@@ -39,13 +39,12 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
 
   const renderer = makeRenderer(canvas);
   const scene = makeScene();
-  // a storm's lightning: the scene lights up, the page flashes, thunder follows
+  // a storm's lightning: the scene lights up, the page flashes (silently)
   const causes = makeCauses(scene);
   const weather = makeWeather(scene, {
     camera: () => camera, // made further down
     onFlash() {
       g.flash = (g.flash || 0) + 1;
-      setTimeout(() => alive && sound("thunder"), 350 + Math.random() * 900);
       publish();
     },
   });
@@ -257,8 +256,8 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     dprChanged = false;
     if (!g.s) return;
     g.over = overviewRig(camera, courseBox(g.s.board), screen());
-    // the mouse lean of the whole-course view, as far as the whole hole stays in frame
-    g.over.lean = leanRoom(camera, courseBox(g.s.board), screen(), g.over, g.s.board.w * 0.22 + 3);
+    // the Far camera: the whole hole with a margin, room left for the mouse orbit
+    g.far = farRig(camera, courseBox(g.s.board), screen());
     if (!g.rig) g.rig = { ...g.over, target: g.over.target.clone() };
   }
 
@@ -890,7 +889,9 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     g.strokes = res.strokes || g.shots.length; // SimulateFrom has no count: a stroke is a shot
     if (res.holed) {
       g.done = true; // no more shots, even before the banner shows
-      onHoled({ id: g.id, strokes: res.strokes });
+      // the stroke count as the round has it (SimulateFrom sends none: res.strokes was undefined,
+      // and the card saved nothing)
+      onHoled({ id: g.id, strokes: g.strokes });
       joyIn = setTimeout(() => alive && round === g.round && mood.joy(performance.now()), 500);
     }
     publish();
@@ -1044,6 +1045,7 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
       // twice. Only the moment of release has to be exact.
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       let n = 0;
+      setSilent(true); // a demo is nobody's pull: no creak, no putt, no knock
       for (const item of list) {
         const [deg, power] = item.split(",").map(Number);
         const off = [9, -7, 5, -11][n % 4], over = [1.18, 1.1, 1.22, 1.14][n % 4];
@@ -1076,9 +1078,10 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
         await wait([450, 700, 350, 600][n % 4]); // holding it, then letting go
         endPull();
         await fire(deg, power);
-        if (g.done || !alive) return;
+        if (g.done || !alive) return setSilent(false);
         n++;
       }
+      setSilent(false);
     },
     /** A picture to share: the course as it is now, the score on a card over it. */
     snapshot(caption = "") {
@@ -1181,6 +1184,6 @@ export function createGame(canvas, { rpc, web, gnome, world: forceWorld = "", we
     },
   };
   // the test hooks, only for a page that asks for them
-  if (logCam || hooks) Object.assign(api, probes(E, { cam, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }));
+  if (logCam || hooks) Object.assign(api, probes(E, { cam, rp, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }));
   return api;
 }

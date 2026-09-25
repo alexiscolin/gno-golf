@@ -123,3 +123,57 @@ The hub agent recomputes the hash against its new JSON.
 - **mountain8** is being reworked by another agent. Its golden (`357d7be6965f6255`) is its state at the end of this pass. Re-record it when the rework lands: run its test, paste the logged hash.
 - **Client.** island7's tube mouth centre moved 0.5 to the left, and `zones.js` draws the castle tube from the zone centre. hub `zonesJSON` doesn't carry `Air`/`Capped`, and the client still reads skins for wind. Adding an `air` field to the JSON is the hub's call.
 - **Scratch.** The scratch tests used here (gas, peek) are deleted. The scratch trees live in the session scratchpad only.
+
+## Take-off: only over the crest (deep-physics finding 9, added after the pass)
+
+**Reported:** after a ramp or kicker the ball jumped when it shouldn't.
+
+**Cause:** a climbing ball took off as soon as it stopped climbing. That included leaving the hill by a side, or turning while still on it. The flight length also used the whole speed, not the speed up the hill.
+
+**New rule** (`physics/step.gno`: `newHill`, `along`, `overTheTop`, `JumpRun`; used in Step's move loop). A ball takes off only when all of these hold:
+- a move carries it out through the hill's crest (the edge its `Vec` points away from), onto no other climb;
+- its uphill speed is above `JumpSpeed`;
+- the hill is steeper than `Drag`;
+- it climbed at least half the hill's depth, counted from where it came onto it.
+
+The flight is `(uphill speed − JumpSpeed) × |Vec| × Lift`, so a head-on jump flies exactly as far as before.
+
+Tests: `TestOnlyTheCrestLaunches` and `TestAClippedRampDoesNotLaunch` (both fail on the old code), and `TestFlightGrowsWithSpeed`.
+
+**Take-offs over the calm tee grid, before → after:**
+
+| hole | before | after |
+|---|---|---|
+| hole12 (moon bridge) | 10, all side exits | 0 |
+| island3 (mounds) | 11 crest, 2 side, 8 mid-substep | 6 crest, 8 mid-substep (all head-on crossings) |
+| island7 (mounds) | 16 crest, 20 mid-substep | 2 crest, 10 mid-substep |
+| mountain16 (downhill) | 12 crest at low uphill speed, 2 mid-slope turns | 0 |
+| mountain14 (terraces) | 28 crest, 2 mid-substep | 26 crest, 2 mid-substep |
+| mountain5, mountain12, hole9, hole20 | the same | the same |
+
+**Aimed shots:** from 2.5 below each ramp's foot, straight up it and 30° or 60° off, at powers 3 to 10, plus a tee shot at it.
+- **Head-on (0°):** unchanged on every ramp. That covers the mountain5 kicker, the hole12 crown, the mountain14 terraces, the saddle and the mountain5/town6 lips.
+- **hole12,** from (16.5, 5.5) on the bank:
+  - 0° and 10° off: unchanged. p5 flies 3.5, p8 flies 11.9.
+  - 20° p10: before, it launched from the bank for 19.9; now it rolls off the side into the stream.
+  - 30° p4 to p10: before, it flew 3.8 to 22.6; now it rolls.
+  - This matches the doc: "a ball that flies off at an angle comes down in the stream".
+  - On chain, `Simulate(hole12, 16.5, 5.5, 120, 8)` gives air "000", in the stream.
+- **mountain5 kicker:**
+  - 0° is unchanged; on chain, `SimulateRound(mountain5, "0,10")` still flies.
+  - 30° p10: the flight goes 16.5 → 12.7.
+  - 60° p10: before, it flew 4.5 off the side; now it doesn't fly.
+- **town6:**
+  - funbox 60° p7/p10: side launches before (5.6 to 5.9), no flight now; one of them now holes.
+  - funbox 30° p5: no flight now.
+  - quarter pipe 30° p10: the flight goes 7.0 → 5.2.
+- **island16 volcano:** 60° side launches of 4 to 13 are gone; 0° is unchanged.
+- **mountain11:** its bank and downhill side launches of 3.3 to 8.0 are gone.
+
+**Arc check:** the flight grows with uphill speed (`TestFlightGrowsWithSpeed`). In the air the ball keeps its speed, meets walls and no zones, and lands with the speed it took off at. On the moon bridge, p5 flies 3.5 and p8 flies 11.9, and the landing is on the far half of the arch or the lawn. Unchanged, a design choice: a jump loses nothing on landing, and the flight is linear in the speed over `JumpSpeed`.
+
+**Fingerprints moved (re-recorded):** hole9, hole12, island3, island7, mountain5, mountain12, mountain14, mountain16.
+
+**Holes to re-verify for par:** those 8, plus town6, island16 and mountain11. Their ramp shots change, but the tee grid doesn't reach them.
+
+**Golden:** fixture "slope", column 1, moves. Stroke 3 (−30°) goes over the crest on a slant and now flies a shorter, uphill-speed flight. The rest moves from (33.25, 9.02) to (33.83, 8.62). Columns 2 and 3 and the other fixtures don't move.

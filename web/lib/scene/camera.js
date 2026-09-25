@@ -70,7 +70,7 @@ const LOOK_PORTRAIT = new THREE.Vector3(-0.7, 0.9, 0).normalize(), LOOK_WIDE = n
 // the ground instead of 42°): closer to the grass, the cup still in view.
 // A rig's tilt (0 overview, 1 follow) blends the two, eased like the rest.
 const LOOK_PORTRAIT_LOW = new THREE.Vector3(-0.78, 0.8, 0).normalize(), LOOK_WIDE_LOW = new THREE.Vector3(0, 0.6, 0.83).normalize();
-const _dir = new THREE.Vector3();
+const _dir = new THREE.Vector3(), _yawed = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
 const lookDir = (w, h, tilt = 0) => {
   const hi = isPortrait(w, h) ? LOOK_PORTRAIT : LOOK_WIDE, lo = isPortrait(w, h) ? LOOK_PORTRAIT_LOW : LOOK_WIDE_LOW;
   return tilt <= 0 ? hi : _dir.copy(hi).lerp(lo, Math.min(1, tilt)).normalize();
@@ -80,7 +80,9 @@ const lookDir = (w, h, tilt = 0) => {
  *  slid so that point lands in the middle of the space the HUD leaves free. */
 export function applyRig(camera, rig, view) {
   camera.aspect = view.w / view.h;
-  camera.position.copy(rig.target).addScaledVector(lookDir(view.w, view.h, rig.tilt || 0), rig.dist);
+  const dir = lookDir(view.w, view.h, rig.tilt || 0);
+  // a yaw (the Far view's mouse orbit) swings the camera round the target, a few degrees
+  camera.position.copy(rig.target).addScaledVector(rig.yaw ? _yawed.copy(dir).applyAxisAngle(UP, rig.yaw) : dir, rig.dist);
   camera.lookAt(rig.target);
   camera.setViewOffset(view.w, view.h, rig.ox, rig.oy, view.w, view.h);
   camera.updateMatrixWorld();
@@ -94,24 +96,29 @@ export function applyRig(camera, rig, view) {
 /**
  * The overview: the whole island inside the free part of the screen, whatever
  * its shape. The distance is searched, not guessed — a guess is right for one
- * aspect ratio and cuts the garden off on every other one.
+ * aspect ratio and cuts the garden off on every other one. `fill` below 1
+ * leaves a margin round it; `tilt` lowers the view toward the follow angle.
  */
-export function overviewRig(camera, box, view) {
+export function overviewRig(camera, box, view, { fill = 1, tilt = 0 } = {}) {
   const { w, h, top, bottom, side } = view;
   const target = box.getCenter(new THREE.Vector3());
-  let lo = 5, hi = 240; // no overview is further off than this
+  const fw = (w - 2 * side) * fill, fh = (h - top - bottom) * fill;
+  const rig = { target, dist: 0, ox: 0, oy: 0, tilt };
+  let lo = 5, hi = 480; // no overview is further off than this (a long town hole on a phone: ~250)
   for (let i = 0; i < 32; i++) {
-    const mid = (lo + hi) / 2, r = frameOf(camera, box, view, target, mid);
-    if (r.x1 - r.x0 <= w - 2 * side && r.y1 - r.y0 <= h - top - bottom) hi = mid; else lo = mid;
+    rig.dist = (lo + hi) / 2;
+    const r = frameOf(camera, box, view, rig);
+    if (r.x1 - r.x0 <= fw && r.y1 - r.y0 <= fh) hi = rig.dist; else lo = rig.dist;
   }
-  const r = frameOf(camera, box, view, target, hi);
-  return { target, dist: hi, ox: (r.x0 + r.x1) / 2 - w / 2, oy: (r.y0 + r.y1) / 2 - (top + (h - top - bottom) / 2) };
+  rig.dist = hi;
+  const r = frameOf(camera, box, view, rig);
+  return Object.assign(rig, { ox: (r.x0 + r.x1) / 2 - w / 2, oy: (r.y0 + r.y1) / 2 - (top + (h - top - bottom) / 2) });
 }
 
-// where the box's corners land on screen, in CSS pixels, for a rig on target at dist
+// where the box's corners land on screen, in CSS pixels, for a rig
 const _corner = new THREE.Vector3();
-function frameOf(camera, box, view, target, dist, ox = 0, oy = 0) {
-  applyRig(camera, { target, dist, ox, oy }, view);
+function frameOf(camera, box, view, rig) {
+  applyRig(camera, rig, view);
   const r = { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9 };
   for (const x of [box.min.x, box.max.x])
     for (const y of [box.min.y, box.max.y])
@@ -124,30 +131,34 @@ function frameOf(camera, box, view, target, dist, ox = 0, oy = 0) {
   return r;
 }
 
+/** The Far view's mouse orbit at its widest: this much yaw, this much tilt either way. */
+export const ORBIT = { yaw: (6 * Math.PI) / 180, tilt: 0.35 };
+
 /**
- * How far the overview's target may lean (along x, a quarter of it along z)
- * with the whole box still inside the free part of the screen: the mouse
- * lean in the whole-course view looks around, it never cuts the hole off.
- * A long hole the overview fits end to end has almost no room.
+ * The Far view: the whole hole with a margin round it, a little lower than
+ * the overview (a 3/4 view), and `orbit`, the share of ORBIT the mouse may
+ * swing it with the whole box still inside the free part of the screen — the
+ * margin is what leaves it the room.
  */
-export function leanRoom(camera, box, view, rig, span) {
+export function farRig(camera, box, view) {
+  const rig = overviewRig(camera, box, view, { fill: 0.86, tilt: 0.5 });
   const { w, h, top, bottom, side } = view;
-  const t = new THREE.Vector3();
-  const fits = (s) =>
+  const t = { ...rig, ox: 0 }; // (the live camera slides the picture up or down, never sideways)
+  const fits = (k) =>
     [[1, 1], [1, -1], [-1, 1], [-1, -1]].every(([a, b]) => {
-      t.copy(rig.target);
-      t.x += a * s;
-      t.z += b * s * 0.25;
-      const r = frameOf(camera, box, view, t, rig.dist, rig.ox, rig.oy);
+      t.yaw = a * k * ORBIT.yaw;
+      t.tilt = rig.tilt + b * k * ORBIT.tilt;
+      const r = frameOf(camera, box, view, t);
       return r.x0 >= side - 0.5 && r.x1 <= w - side + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
     });
-  if (fits(span)) return span;
-  let lo = 0, hi = span;
-  for (let i = 0; i < 12; i++) {
+  let lo = 0, hi = 1;
+  if (fits(1)) lo = 1;
+  else for (let i = 0; i < 12; i++) {
     const mid = (lo + hi) / 2;
     if (fits(mid)) lo = mid; else hi = mid;
   }
-  return lo;
+  rig.orbit = lo;
+  return rig;
 }
 
 /** Close on a point — the ball — centred in the free part of the screen. */

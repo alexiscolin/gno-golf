@@ -13,7 +13,6 @@ import { animate } from "./state.js";
 import { timeOf } from "./camera.js";
 import { gnomelet, brolly, bunting, mailbox } from "./props.js";
 import { seeded, ISLAND, GRASS, placer, onGround } from "./common.js";
-import { inPoly } from "../terrain.js";
 
 const T = {
   cobble: 0xcdbb9f, cobbleDark: 0xa99578, curb: 0xe2d6c0, quay: 0xa89c8a,
@@ -1212,30 +1211,11 @@ function patch(z, t, map, tile, kerb) {
   g.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts.map(([x, zz]) => new THREE.Vector3(x, t.height(x, zz) + 0.04, zz))), ink));
   return g;
 }
-// the floor: bricks over the whole plaza, and the tram rails set in them
-// along every tram's track, as far as the plaza goes
+// the floor: bricks over the whole plaza
 function brickFloor(z, s, t) {
   const g = new THREE.Group(), pts = outlineOf(z);
   g.add(sheet(pts, z, t, flat(0xffffff, { map: brickTex() }), 4, 0.012));
-  const trams = (s.walls || []).filter((w) => w.skin === "tram" && w.every);
-  const steel = flat(0x8d989e, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-  const len = (w) => Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
-  for (let i = 0; i + 3 < trams.length; i += 4) {
-    const q = trams.slice(i, i + 4), long = len(q[0]) >= len(q[1]) ? q[0] : q[1], L = len(long);
-    const cx = q.reduce((a, w) => a + w.a[0] / 4, 0), cz = q.reduce((a, w) => a + w.a[1] / 4, 0);
-    const dx = (long.b[0] - long.a[0]) / L, dz = (long.b[1] - long.a[1]) / L;
-    for (const side of [-0.6, 0.6]) {
-      const ox = cx - dz * side, oz = cz + dx * side, on = (u) => inPoly(ox + dx * u, oz + dz * u, pts);
-      let a = -L / 2 - 3, b = L / 2 + 3;
-      while (a < 0 && !(on(a) && on(a - 0.8))) a += 0.25;
-      while (b > 0 && !(on(b) && on(b + 0.8))) b -= 0.25;
-      const rail = new THREE.Mesh(new THREE.PlaneGeometry(b - a, 0.14), steel);
-      rail.rotation.set(-Math.PI / 2, 0, Math.atan2(-dz, dx));
-      const mx = ox + dx * (a + b) / 2, mz = oz + dz * (a + b) / 2;
-      rail.position.set(mx, t.height(mx, mz) + 0.02, mz);
-      g.add(rail);
-    }
-  }
+  // (the tram rails are the tram lines' own: course.js tramLine)
   return g;
 }
 const PLAZA_GROUND = {

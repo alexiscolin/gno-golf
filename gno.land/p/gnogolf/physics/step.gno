@@ -124,6 +124,9 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	// MaxRollOn more) until it comes off it — a gnome left on a hill slides
 	// down, it does not wait there for the next stroke.
 	extra := 0
+	// the hill being climbed, and how far up it the climb began
+	var ramp *hill
+	rampFrom, from := 0.0, pos
 	// rolling on, a ball pinned against a wall by the slope only jitters in
 	// place: checked every pinCheck substeps, it stops once it has not got
 	// anywhere (a real roll down gathers speed, it always gets somewhere)
@@ -159,7 +162,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		for k := 0; k < n; k++ {
 			// in the air no zone acts: the ball flies over water, sand, a
 			// tunnel's mouth
-			climb := 0.0
+			var up *hill
 			if air <= 0 {
 				// the ground under this move: grass unless a zone says
 				// otherwise (a ball that left the sand mid-substep is on grass)
@@ -167,8 +170,18 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 				if f.zonesAt(&pos, &vel, &surface, n, i+f.Tick, &out) {
 					return out
 				}
-				climb = climbing(slopes, pos, vel, i+f.Tick)
+				up = climbing(slopes, pos, vel, i+f.Tick)
+				if up != ramp {
+					// a new climb: it counts from where the ball came onto
+					// the hill (the start of the move that brought it here,
+					// no further back than the hill's foot)
+					ramp = up
+					if up != nil {
+						rampFrom = up.along(from)
+					}
+				}
 			}
+			from = pos
 
 			move := vel.Scale(1 / float64(n))
 			next := pos.Add(move)
@@ -281,11 +294,12 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			}
 			if air > 0 {
 				air -= move.Len()
-			} else if climb > 0 && !hit && climbing(slopes, pos, vel, i+f.Tick) == 0 {
-				// it went over the top of the slope fast: it takes off (a
-				// bounce back down the slope is not a take-off)
-				if l := vel.Len(); l > JumpSpeed {
-					air = (l - JumpSpeed) * climb * Lift
+			} else if up != nil && !hit && climbing(slopes, pos, vel, i+f.Tick) == nil && up.overTheTop(from, pos, rampFrom) {
+				// it went over the top of the hill fast: it takes off, and
+				// flies further the faster it went up and the steeper the
+				// hill (a bounce back down the slope is not a take-off)
+				if vu := vel.Dot(up.u); vu > JumpSpeed {
+					air = (vu - JumpSpeed) * up.g * Lift
 				}
 			}
 		}
@@ -445,10 +459,78 @@ func orDefault(v, def float64) float64 {
 // A timed hill (a seesaw) is still a hill, while it is there.
 func isAir(z *Zone) bool { return z.Air }
 
-// hill is a ground slope and its steepness, |Vec|.
+// hill is a ground slope, its steepness |Vec|, and its crest: u is the unit
+// uphill (against Vec); the crest is the zone's edge u points at, on the
+// axis u mostly runs along (every hill on the holes is a rectangle square to
+// the board, so that edge is the whole top).
 type hill struct {
-	z *Zone
-	g float64
+	z      *Zone
+	g      float64
+	u      Vec2
+	onX    bool    // the crest is an edge across X (u mostly along X)
+	crest  float64 // where it is, on that axis
+	foot   float64 // the opposite edge, where a climb starts
+	depth  float64 // foot to crest
+	upward float64 // +1 when uphill runs toward +X (or +Y), -1 the other way
+}
+
+func newHill(z *Zone) hill {
+	h := hill{z: z, g: z.Vec.Len()}
+	if h.g == 0 {
+		return h // decor: never climbed
+	}
+	h.u = z.Vec.Scale(-1 / h.g)
+	h.onX = math.Abs(h.u.X) >= math.Abs(h.u.Y)
+	lo, hi, dir := z.Min.Y, z.Max.Y, h.u.Y
+	if h.onX {
+		lo, hi, dir = z.Min.X, z.Max.X, h.u.X
+	}
+	h.crest, h.foot, h.upward = hi, lo, 1
+	if dir < 0 {
+		h.crest, h.foot, h.upward = lo, hi, -1
+	}
+	h.depth = hi - lo
+	return h
+}
+
+// along is how far up the hill p is from its foot (0 at the foot or below).
+func (h *hill) along(p Vec2) float64 {
+	c := p.Y
+	if h.onX {
+		c = p.X
+	}
+	if d := (c - h.foot) * h.upward; d > 0 {
+		return d
+	}
+	return 0
+}
+
+// JumpRun is the share of a hill's depth a ball must have climbed to take off
+// at its top: one that only clipped the hill near its crest has not ridden it.
+const JumpRun = 0.5
+
+// overTheTop reports whether the move a→b, from on the hill, left it through
+// its crest — not a side, not its foot — after a climb from rampFrom (a
+// height along it) of at least JumpRun of the hill. A hill no steeper than
+// Drag launches nothing: it cannot even start a ball rolling.
+func (h *hill) overTheTop(a, b Vec2, rampFrom float64) bool {
+	if h.g <= Drag || h.z.contains(b) {
+		return false
+	}
+	ac, bc, oa, ob := a.Y, b.Y, a.X, b.X
+	lo, hi := h.z.Min.X, h.z.Max.X
+	if h.onX {
+		ac, bc, oa, ob = a.X, b.X, a.Y, b.Y
+		lo, hi = h.z.Min.Y, h.z.Max.Y
+	}
+	if (bc-h.crest)*h.upward < 0 || ac == bc {
+		return false // it did not get past the crest's line
+	}
+	// where the move crosses the crest's line must be on the crest
+	if o := oa + (h.crest-ac)/(bc-ac)*(ob-oa); o < lo || o >= hi {
+		return false
+	}
+	return h.depth-rampFrom >= JumpRun*h.depth
 }
 
 // groundSlopes is the field's hills, in field order: the only zones climbing
@@ -458,21 +540,22 @@ func (f *Field) groundSlopes() []hill {
 	var out []hill
 	for j := range f.Zones {
 		if z := &f.Zones[j]; z.Kind == Slope && !isAir(z) {
-			out = append(out, hill{z, z.Vec.Len()})
+			out = append(out, newHill(z))
 		}
 	}
 	return out
 }
 
-// climbing is how steep the slope the ball is moving up is, or 0 when it is
-// not climbing one.
-func climbing(slopes []hill, pos, vel Vec2, tick int) float64 {
-	for _, s := range slopes {
+// climbing is the hill the ball is moving up, or nil when it is not
+// climbing one.
+func climbing(slopes []hill, pos, vel Vec2, tick int) *hill {
+	for j := range slopes {
+		s := &slopes[j]
 		if there(tick, s.z.Every, s.z.On, s.z.Phase) && s.z.contains(pos) && vel.Dot(s.z.Vec) < 0 {
-			return s.g
+			return s
 		}
 	}
-	return 0
+	return nil
 }
 
 // pull is how hard the slope under the ball pulls it at tick, 0 off a slope.

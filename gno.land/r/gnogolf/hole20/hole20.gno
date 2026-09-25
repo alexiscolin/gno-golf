@@ -26,7 +26,7 @@ var me = course.Fit(&course.Simple{
 	World: "garden", Order: 18,
 	W: 50, H: 26,
 	Title:     "The Seesaw",
-	Strokes:   4, // par
+	Strokes:   3, // par
 	Tee:       physics.V(6, 13),
 	Pin:       physics.V(35.6, 6.2),
 	Substeps:  30,
@@ -50,8 +50,10 @@ var me = course.Fit(&course.Simple{
 		},
 		Zones: []physics.Zone{
 			// the pond, either side of the plank
-			{Kind: physics.Hazard, Min: physics.V(15, 2), Max: physics.V(29.3, 11.8), Vec: bank, Mark: '~', Skin: "water"},
-			{Kind: physics.Hazard, Min: physics.V(15, 14.2), Max: physics.V(29.3, 24), Vec: bank, Mark: '~', Skin: "water"},
+			{Kind: physics.Hazard, Min: physics.V(14.5, 2), Max: physics.V(29.3, 11.8), Vec: bank, Mark: '~', Skin: "water",
+				Poly: []physics.Vec2{physics.V(15, 2), physics.V(29.3, 2), physics.V(29.3, 11.8), physics.V(15, 11.8), physics.V(14.6, 10.4), physics.V(15.35, 9), physics.V(14.5, 7.6), physics.V(15.3, 6.2), physics.V(14.6, 4.8), physics.V(15.35, 3.4)}},
+			{Kind: physics.Hazard, Min: physics.V(14.5, 14.2), Max: physics.V(29.7, 24), Vec: bank, Mark: '~', Skin: "water",
+				Poly: []physics.Vec2{physics.V(15, 14.2), physics.V(29.3, 14.2), physics.V(28.95, 15.6), physics.V(29.7, 17), physics.V(29, 18.4), physics.V(29.65, 19.8), physics.V(28.9, 21.2), physics.V(29.6, 22.6), physics.V(29.3, 24), physics.V(15, 24), physics.V(14.6, 22.6), physics.V(15.35, 21.2), physics.V(14.55, 19.8), physics.V(15.3, 18.4), physics.V(14.6, 17), physics.V(15.35, 15.6)}},
 			// a border of flowers across the lawn at the foot of the seesaw:
 			// it takes the pace off a ball that comes off it fast
 			{Kind: physics.Surface, Min: physics.V(30.3, 10.4), Max: physics.V(33.5, 23.6), Scale: 0.45, Mark: ':', Skin: "flowerbed"},

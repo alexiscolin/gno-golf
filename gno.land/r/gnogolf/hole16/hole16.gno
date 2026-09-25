@@ -28,7 +28,8 @@ var me = course.Fit(&course.Simple{
 			// downhill, steep enough to roll a stopped ball on (at 0.15 it
 			// only crept, a fixed 0.15 a substep)
 			{Kind: physics.Slope, Min: physics.V(6, 0), Max: physics.V(22, 10), Vec: physics.V(0.17, 0), Mark: '^', Skin: "slope"},
-			{Kind: physics.Hazard, Min: physics.V(38, 2), Max: physics.V(44, 8), Vec: physics.V(3, 5), Mark: '~', Skin: "water"},
+			{Kind: physics.Hazard, Min: physics.V(37.8, 2), Max: physics.V(44, 8), Vec: physics.V(3, 5), Mark: '~', Skin: "water",
+				Poly: []physics.Vec2{physics.V(38.6, 2), physics.V(44, 2), physics.V(44, 8), physics.V(38.8, 8), physics.V(38.3, 7), physics.V(37.8, 5.6), physics.V(38.5, 4.4), physics.V(38, 3.2)}},
 		},
 		Friction: 0.86,
 		Radius:   0.5,

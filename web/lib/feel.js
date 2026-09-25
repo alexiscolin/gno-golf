@@ -26,13 +26,45 @@ export function buzz(p) {
 // one context, made on the first sound: browsers only allow it after a gesture,
 // and every sound here follows one
 let ctx = null;
+// When the game may make a sound at all: its tab shown AND focused, never in
+// a demo (a scripted pull is no player's), and — away from a hole (the
+// title, the cups, the picker) — only right after the player's own click.
+// Leaving the tab or the window suspends the audio and drops every pending
+// sound; coming back resumes it (after a gesture, if the browser wants one)
+// and the weather fades in again.
+let gestureAt = 0, silent = false;
+const present = () => typeof document !== "undefined" && !document.hidden && (document.hasFocus ? document.hasFocus() : true);
+const audible = () => prefs.sound && !silent && present() && (!hushed || performance.now() - gestureAt < 1500);
+/** A demo or a recording plays silent. */
+export const setSilent = (on) => ((silent = !!on), ambience(mood));
+if (typeof window !== "undefined") {
+  const touched = () => {
+    gestureAt = performance.now();
+    if (ctx && ctx.state === "suspended" && present()) ctx.resume().catch(() => {});
+  };
+  window.addEventListener("pointerdown", touched, true);
+  window.addEventListener("keydown", touched, true);
+  const away = () => {
+    clearTimeout(gusts);
+    if (bed) bed.g.gain.value = 0;
+    if (ctx && ctx.state === "running") ctx.suspend().catch(() => {});
+  };
+  const back = () => {
+    if (!present()) return;
+    if (ctx && ctx.state === "suspended" && performance.now() - gestureAt < 60 * 60e3) ctx.resume().catch(() => {});
+    ambience(mood); // the weather fades back in
+  };
+  window.addEventListener("blur", away);
+  window.addEventListener("focus", back);
+  document.addEventListener("visibilitychange", () => (document.hidden ? away() : back()));
+}
 const audio = () => {
   if (!ctx) {
     const A = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
     if (!A) return null;
     ctx = new A();
   }
-  if (ctx.state === "suspended") ctx.resume().catch(() => {}); // no gesture yet: the next one will do
+  if (ctx.state === "suspended" && present()) ctx.resume().catch(() => {}); // no gesture yet: the next one will do
   return ctx;
 };
 
@@ -91,12 +123,6 @@ const SOUNDS = {
   flowers: (a, k = 1) => noise(a, { dur: 0.12, f0: 2600, f1: 1500, q: 0.9, gain: 0.18 * k }),
   // landing in the scenery: a dull thud
   thud: (a) => (tone(a, { f0: 140, f1: 55, dur: 0.18, gain: 0.3 }), noise(a, { dur: 0.08, f0: 400, q: 1, gain: 0.15 })),
-  // thunder: a crack, then a long low roll
-  thunder: (a) => {
-    noise(a, { dur: 0.25, f0: 900, f1: 200, q: 0.6, gain: 0.25 });
-    noise(a, { at: 0.1, dur: 2.4, f0: 160, f1: 50, q: 0.5, gain: 0.45 });
-    tone(a, { f0: 70, f1: 38, at: 0.1, dur: 1.8, gain: 0.18 });
-  },
   whoosh: (a) => noise(a, { dur: 0.5, f0: 300, f1: 1600, q: 1.5, gain: 0.18 }),
   // the confetti going off: a party-popper crack and a fizz of paper
   pop: (a) => {
@@ -124,13 +150,16 @@ const SOUNDS = {
 let mood = {}, bed = null, gusts = null, hushed = false;
 /** Off the course (title, cup and gnome screens) the weather is silent; back on
  *  it, the hole's weather plays again. */
+// ?camlog: every sound asked for, played or not (a test counts them)
+const soundLog = typeof location !== "undefined" && /[?&]camlog/.test(location.search) ? [] : null;
+if (soundLog && typeof window !== "undefined") window.__soundLog = soundLog;
 export function hush(off) {
   hushed = !!off;
   ambience(mood);
 }
 export function ambience(w = {}) {
   mood = w;
-  const on = prefs.sound && !document.hidden && !hushed;
+  const on = prefs.sound && !silent && present() && !hushed;
   const a = on ? audio() : ctx;
   if (!a) return;
   // the rain bed: looped noise through a band-pass, its gain ramped
@@ -168,6 +197,7 @@ export function ambience(w = {}) {
   if (on && (s || w.snow)) {
     const next = () => {
       gusts = setTimeout(() => {
+        if (!present() || hushed || silent) return; // gone meanwhile: no gust into an empty room
         if (w.snow && !s) noise(a, { dur: 1.6, f0: 500, f1: 900, q: 0.8, gain: 0.02 });
         else noise(a, { dur: 1.4 + Math.random(), f0: 250, f1: 700 + s * 4000, q: 0.9, gain: Math.min(0.12, 0.03 + s * 0.9) });
         next();
@@ -176,10 +206,10 @@ export function ambience(w = {}) {
     next();
   }
 }
-if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => ambience(mood));
 
 export function sound(name, k) {
-  if (!prefs.sound) return;
+  if (soundLog) soundLog.push([name, audible() ? 1 : 0, Math.round(performance.now())]);
+  if (!audible()) return;
   const a = audio();
   if (!a || !SOUNDS[name]) return;
   try { SOUNDS[name](a, k); } catch {}

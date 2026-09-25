@@ -86,6 +86,32 @@ export function inPoly(x, y, poly) {
   return inside;
 }
 
+/** The edges of a zone's outline, as segments [a, b] (none for a Round one). */
+export const edgesOf = (q) => {
+  if (q.poly && q.poly.length > 2) return q.poly.map((p, i) => [q.poly[(i + q.poly.length - 1) % q.poly.length], p]);
+  if (q.round) return [];
+  const [x0, y0] = q.min, [x1, y1] = q.max;
+  return [[[x0, y0], [x1, y0]], [[x1, y0], [x1, y1]], [[x1, y1], [x0, y1]], [[x0, y1], [x0, y0]]];
+};
+
+/** How far (x, y) is inside zone q: its distance to the zone's edge, 0
+ *  outside. edges: the ones to measure from (all of them by default). */
+export function inset(q, x, y, edges = edgesOf(q)) {
+  if (!inZone(q, x, y)) return 0;
+  let d = Infinity;
+  for (const [a, b] of edges) d = Math.min(d, segDist(x, y, a, b));
+  if (q.round) {
+    const hx = (q.max[0] - q.min[0]) / 2, hy = (q.max[1] - q.min[1]) / 2;
+    d = Math.min(d, (1 - Math.hypot((x - q.min[0] - hx) / hx, (y - q.min[1] - hy) / hy)) * Math.min(hx, hy));
+  }
+  return Math.max(0, d);
+}
+
+// garden water, sunk into the ground: from the zone's own edge (where the
+// chain drowns the ball) a bank falls to the water, and on to the bed. Heights
+// under the lane's lowest point round the pond; bank: how wide it is
+export const POOL = { water: -0.42, bed: -0.8, bank: 0.6 };
+
 /**
  * Whether (x, y) is in a zone, as the chain tests it: its rectangle; a Round
  * zone is the ellipse in it; a zone with `poly` is that polygon (within the
@@ -275,8 +301,8 @@ export function terrain(s) {
 
   const rs = plateaus(ramps(s.zones), s.start);
   const domes = mounds(s.zones);
-  // mesh: the ground as drawn, a moon bridge's sides tucked in under its deck
-  const raw = (x, z, mesh = false) => {
+  // flat: without a moon bridge's arch (the ground under it)
+  const raw = (x, z, flat = false) => {
     let h = 0, arch = 0;
     for (const r of rs) {
       const along = x * r.ux + z * r.uz - r.lo, side = x * r.vx + z * r.vz;
@@ -298,7 +324,7 @@ export function terrain(s) {
       if (!walled && edge < SHOULDER) k *= smoothstep(edge / SHOULDER);
       // a moon bridge's two halves meet at its crown: the higher, not the sum
       if (r.z.skin === "moon bridge") {
-        arch = Math.max(arch, k * r.rise * (mesh && edge < 0.5 ? smoothstep(edge / 0.5) : 1));
+        if (!flat) arch = Math.max(arch, k * r.rise);
         continue;
       }
       h += k * r.rise;
@@ -331,11 +357,49 @@ export function terrain(s) {
     return raw(x, z);
   };
 
-  // the ground mesh's own heights: height() but for a moon bridge's sides,
-  // which drop to the water under the deck's edge (the deck is drawn at
-  // height(), and the ball rides on that)
+  // the ground mesh's own heights: height(), but sunk under garden water
+  // (the ball rides height(): it drops in where the chain drowns it)
   const bridges = s.zones.filter((q) => q.kind === "slope" && q.skin === "moon bridge");
-  const ground = (x, z) => (bridges.some((q) => x >= q.min[0] && x <= q.max[0] && z >= q.min[1] && z <= q.max[1]) ? raw(x, z, true) : height(x, z));
+  const inRect = (q, x, z) => x >= q.min[0] && x <= q.max[0] && z >= q.min[1] && z <= q.max[1];
+  // the ponds and streams, each flat at its own level
+  // what crosses the water (a bridge's deck, a causeway, the seesaw): the
+  // water runs on under it, its banks from the one side's to the other's.
+  // c: the axis the water crosses along
+  const spans = s.zones.filter((q) => (q.kind === "slope" && (q.skin === "moon bridge" || q.skin === "seesaw")) || q.skin === "bridge").map((q) => ({
+    q, c: q.skin === "moon bridge" ? (Math.abs(q.vec[0]) > Math.abs(q.vec[1]) ? 1 : 0) : q.max[0] - q.min[0] >= q.max[1] - q.min[1] ? 1 : 0,
+  }));
+  // (a pond's edge along one of those is no bank: the water goes on under it)
+  const along = ([a, b], { q, c }) => [a, b].every((p) => Math.abs(p[c] - q.min[c]) < 0.05 || Math.abs(p[c] - q.max[c]) < 0.05) && Math.abs(a[c] - b[c]) < 0.05
+    && Math.max(a[1 - c], b[1 - c]) > q.min[1 - c] - 0.05 && Math.min(a[1 - c], b[1 - c]) < q.max[1 - c] + 0.05;
+  const pools = s.zones.filter((q) => q.kind === "hazard" && q.skin === "water").map((q) => {
+    const edges = edgesOf(q).filter((e) => !spans.some((sp) => along(e, sp)));
+    let lo = Infinity;
+    for (let u = 0; u <= 1; u += 0.25) for (let v = 0; v <= 1; v += 0.25) lo = Math.min(lo, raw(q.min[0] + u * (q.max[0] - q.min[0]), q.min[1] + v * (q.max[1] - q.min[1])));
+    return { q, edges, level: lo + POOL.water, bed: lo + POOL.bed };
+  });
+  const poolAt = (x, z) => {
+    let best = null;
+    for (const p of pools) {
+      const d = inset(p.q, x, z, p.edges);
+      if (d > 0 && (!best || d > best.d)) best = { k: Math.min(1, d / POOL.bank), d, level: p.level, bed: p.bed };
+    }
+    if (best) best.k = smoothstep(best.k);
+    return best;
+  };
+  const water = (x, z) => {
+    const sp = pools.length ? spans.find((p) => inRect(p.q, x, z)) : null;
+    if (!sp) return pools.length ? poolAt(x, z) : null;
+    const { q, c } = sp, lo = q.min[c] - 0.05, hi = q.max[c] + 0.05, f = ((c ? z : x) - lo) / (hi - lo);
+    const a = poolAt(c ? x : lo, c ? lo : z), b = poolAt(c ? x : hi, c ? hi : z);
+    const k = (a ? a.k : 0) * (1 - f) + (b ? b.k : 0) * f, d = (a ? a.d : 0) * (1 - f) + (b ? b.d : 0) * f, p = a || b;
+    return p && k > 0 ? { k, d, level: p.level, bed: p.bed } : null;
+  };
+  // (under a moon bridge the ground is the banks and the stream: its arch is
+  // drawn apart, and the ball rides that)
+  const ground = (x, z) => {
+    const base = bridges.some((q) => inRect(q, x, z)) ? raw(x, z, true) : height(x, z), w = water(x, z);
+    return w ? base + (w.bed - base) * w.k : base;
+  };
 
   const zoneAt = (x, z) => s.zones.find((q) => inZone(q, x, z)) || null;
 
@@ -344,6 +408,6 @@ export function terrain(s) {
     const i = Math.floor(x / CELL), j = Math.floor(z / CELL);
     return inGrid(i, j) && !!green[idx(i, j)];
   };
-  return { nx, nz, idx, inGrid, green, rough, height, ground, zoneAt, centre, onGreen, domes };
+  return { nx, nz, idx, inGrid, green, rough, height, ground, pond: water, zoneAt, centre, onGreen, domes };
 }
 
