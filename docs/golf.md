@@ -674,3 +674,32 @@ Measured on the course holes; treat them as orders of magnitude:
   further hole), at 50 players. The first stroke of a round stores about
   1.5 KB, a replay after `Reset` nothing. The decoded hole is never stored.
 - **Reads** are free as queries, within the node's query gas limit.
+
+## Updating after the deploy
+
+Nothing on gno.land is edited in place: a published package is frozen at its
+path. An update is a new package at a new path, and the rules below keep every
+score honest through it.
+
+- **The physics never changes under a hole.** A hole plays on the physics
+  golf imports, which is frozen, so scores stay comparable forever. A new physics goes to a new path
+  (`p/gnogolf/physics/v2`).
+- **A broken hole is replaced by a new version.** The owner publishes the fixed
+  data into the same slot (`Publish("island/7", hexData, note)`), and it plays
+  as `island/7/v2`. Data identical to the current version is refused.
+- **No score is ever erased.** The old version is archived: still playable, its
+  records and leaderboard kept and shown (under "Archived course holes"). Its
+  bests leave the course-wide ranking, and the new version starts a fresh
+  leaderboard. Unlocked gnomes and grand slams stay earned.
+- **Say what changed.** The version's note (on its data page, and in
+  `Versions`), and the dapp's changelog, name the fix ("Hole 7 v2: closed a
+  shortcut, v1 records archived").
+- **The hub itself** is replaced by a new realm (a sibling path, such as
+  `r/gnogolf/golf2`), which can read the v1's public state (`Holes`,
+  `Versions`, `HoleData`, `BestOf`, `StandingOf`, `Records`, `Players`) and
+  carry it over or show it as history. The v1's owner then calls
+  `SetSuccessor` once: every v1 page says where the course went, and v1 goes
+  on playing. See [deploy-v1.md §9](design/deploy-v1.md).
+- **The dapp** (the web client) is not on-chain and can be updated at any time.
+  It lists the current holes (`"next"` is empty in `Holes()`) and links the
+  archived ones.
