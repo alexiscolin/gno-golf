@@ -16,10 +16,10 @@ set -eu
 
 ns=${1:?usage: stage.sh <ns> <out>}
 out=${2:?usage: stage.sh <ns> <out>}
-case $ns in
-nym-[a-z][a-z][a-z][a-z][a-z]*[0-9][0-9][0-9]) ;;
-*) echo "stage.sh: $ns is not a pearl nym name (nym-<5 to 13 letters><3 digits>)" >&2; exit 1 ;;
-esac
+if ! printf %s "$ns" | grep -Eqx 'nym-[a-z]{5,13}[0-9]{3}'; then
+	echo "stage.sh: $ns is not a pearl nym name (nym-<5 to 13 letters><3 digits>)" >&2
+	exit 1
+fi
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 src=$root/gno.land
