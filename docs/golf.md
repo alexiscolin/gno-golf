@@ -94,6 +94,11 @@ realm its data was built from.
   skipped, an empty list panics, and one commit takes at most 12 shots (fewer
   on a heavy hole, see [the work budget](#the-work-budget)).
 - **A round** has at most 60 strokes, then it must be `Reset`.
+- **A ball off the board**: a stroke whose ball comes to rest outside the
+  hole's board (a leak in its walls) brings it back to where the stroke
+  started. The stroke counts, as a hazard's does, with no penalty. Play,
+  every simulation and the replayed last shot (whose path ends with that
+  point) agree.
 - **Mode**: `"assisted"` (or `""`) or `"pro"`. Anything else panics. Each mode
   has its own records, boards and ranking.
 - **Numbers in JSON** are printed with three decimals. NaN and Inf are printed
@@ -117,9 +122,9 @@ and returns the new version's id (`"garden/7/v2"`).
 - `hexData` is the hole as `course.Encode` wrote it, in hex, at most 32 KB of
   data (a hole at every limit of the format is about 21 KB).
 - The data must decode within the format's limits, its stored wall lengths
-  must be its walls' own (`course.Exact`), and it must be exactly the bytes
-  `course.Encode` would write for the hole it decodes to. So the same hole
-  can't come back under another sha.
+  must be its walls' own (`course.DecodeChecked`: `Decode`, then `Exact`),
+  and it must be exactly the bytes `course.Encode` would write for the hole
+  it decodes to. So the same hole can't come back under another sha.
 - The slot must be the data's own world and order (`"garden/7"` for world
   `garden`, order 7), so a mis-edited file can't replace the wrong hole. The
   order must be a whole number from 1 to 999.

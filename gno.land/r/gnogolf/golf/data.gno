@@ -168,7 +168,8 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 // decodeData checks a version's data as it arrives: hex, GG1 within the
 // format's limits, stored lengths bit-exact, and in the one form Encode
 // gives. After this the lengths are
-// trusted on every call (course.Decode does not check them).
+// trusted on every call (course.Decode does not check them; DecodeChecked,
+// here, does).
 func decodeData(hexData string) (*course.Simple, string, string) {
 	if len(hexData) > 2*maxData {
 		panic("golf: the data is too long")
@@ -178,12 +179,9 @@ func decodeData(hexData string) (*course.Simple, string, string) {
 		panic("golf: the data is not hex")
 	}
 	data := string(b)
-	h, err := course.Decode(data)
+	h, err := course.DecodeChecked(data)
 	if err != nil {
 		panic("golf: " + err.Error())
-	}
-	if !course.Exact(h) {
-		panic("golf: the data's stored wall lengths are not its walls' own")
 	}
 	// one hole, one string: data that decodes to a hole Encode would write
 	// otherwise (a skin never used, a style run split, a stored length a

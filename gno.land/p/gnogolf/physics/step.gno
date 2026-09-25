@@ -114,9 +114,12 @@ const MaxBounce = 0.92
 // Drag is the fixed speed a rolling ball loses every substep, on grass.
 const Drag = 0.12
 
-// SpeedCap is the fastest a ball may go, in board units per substep. A full
-// stroke starts at 6, and nothing adds energy (MaxBounce): a guard, not a
-// rule anything reaches.
+// SpeedCap is the fastest a ball may go, in board units per substep: it is
+// held at the start of every substep and after every bounce (within a
+// substep, a slope can add up to its own Vec on top). A full stroke starts at
+// 6 and nothing adds energy (MaxBounce), so no course hole reaches it; it
+// bounds a substep to 6 moves on a hole that would run a ball down a slope on
+// ice for ever.
 const SpeedCap = 8
 
 // Step rolls a ball through the field until it comes to rest or runs out of
@@ -166,20 +169,24 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		}
 		// A timed bar that comes back (a tram arriving, a plank swinging
 		// in) where the ball is pushes it out through its nearest side, as
-		// a piece appearing between strokes does (Unstick): a wall never
+		// a piece appearing between strokes does (UnstickIn): a wall never
 		// stands on the ball, nor pushes it through another. On the first
 		// substep any bar standing counts.
 		for _, j := range bars {
 			w := &f.Walls[j]
 			if there(i+f.Tick, w.Every, w.On, w.Phase) && (i == 0 || !there(i-1+f.Tick, w.Every, w.On, w.Phase)) {
-				pos = unstick(pos, f.Walls[j:j+4], nil, f.Radius, f.Walls)
+				pos = UnstickIn(pos, f.Walls[j:j+4], nil, f.Radius, f.Walls)
 			}
 		}
 		// A substep is walked in moves of at most MaxMove, so a fast ball
 		// meets every zone and wall it crosses instead of jumping over them,
 		// and a bounce keeps what is left of the substep. The path still gets
 		// one point per substep: it is what a renderer replays.
-		n := int(vel.Len()/MaxMove) + 1
+		speed := vel.Len()
+		if speed > SpeedCap {
+			vel, speed = vel.Scale(SpeedCap/speed), SpeedCap
+		}
+		n := int(speed/MaxMove) + 1
 		surface := 1.0
 		out.why = '-'
 		for k := 0; k < n; k++ {
@@ -279,6 +286,22 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 				if t, nn, ok := seg.hitN(pos, next, sn); ok && t < best {
 					best, normal, hit = t, nn, true
 					restitution = o.bounce
+				}
+				// The offset lines are lengthened by the radius at each end:
+				// square caps, with no end face, that leave a gap in front of
+				// an acute corner's tip. The ends are round caps, swept like
+				// posts, from afar too: a ball coming head-on at a tip, or
+				// diagonally at a free end, meets the end point, not the
+				// solid behind it. A round cap lies inside its square one, so
+				// a ball that the offset line stops first is not touched.
+				if f.Radius > 0 && o.length > 0 {
+					along := Vec2{o.n.Y, -o.n.X}
+					for _, end := range [2]Vec2{o.a, o.a.Add(along.Scale(o.length))} {
+						if t, nn, ok := (Circle{C: end, R: f.Radius}).Hit(pos, next); ok && t < best {
+							best, normal, hit = t, nn, true
+							restitution = o.bounce
+						}
+					}
 				}
 			}
 			for j := range f.Posts {

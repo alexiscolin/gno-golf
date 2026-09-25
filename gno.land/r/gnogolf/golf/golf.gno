@@ -709,6 +709,23 @@ func resolve(shot physics.Shot, holed bool) (physics.Shot, bool) {
 	return shot, holed
 }
 
+// back is the shot, with a ball that came to rest off the board brought back
+// to from, where the shot started: a leak in a hole's walls must not leave a
+// round in the void. The stroke counts, as a hazard's does, with no penalty.
+// Every stroke golf plays or replays goes through it, so a record replays.
+func back(h course.Hole, from physics.Vec2, shot physics.Shot, holed bool) physics.Shot {
+	rest := shot.Rest()
+	w, hh := course.BoardOf(h)
+	if holed || len(shot.Path) == 0 || (rest.X >= 0 && rest.X <= float64(w) && rest.Y >= 0 && rest.Y <= float64(hh)) {
+		return shot
+	}
+	// copies: the hole's own slices are the hole's
+	shot.Path = append(append(make([]physics.Vec2, 0, len(shot.Path)+1), shot.Path...), from)
+	shot.Air = append(append(make([]bool, 0, len(shot.Air)+1), shot.Air...), false)
+	shot.Cause = append(append(make([]byte, 0, len(shot.Cause)+1), shot.Cause...), '-')
+	return shot
+}
+
 // stroke resolves one shot into the round and reports whether it was holed.
 func stroke(e *entry, h course.Hole, r *round, player address, angle, power float64, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	if r.strokes >= maxRoundStrokes {
@@ -724,6 +741,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 
 	from := r.ball()
 	shot, holed := resolve(playAt(h, from, angle*math.Pi/180, power, r.strokes, tick, weather))
+	shot = back(h, from, shot, holed)
 	// the decisions, as played: what anyone needs to replay the round
 	if r.shots != "" {
 		r.shots += ";"

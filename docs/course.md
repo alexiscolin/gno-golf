@@ -124,8 +124,8 @@ type Simple struct {
 What a stroke does in `PreviewWith(ball, angle, power, stroke, tick, weather)`:
 
 1. `Extras(stroke)` gathers the walls and posts of the pulses that are on.
-2. `physics.Unstick` moves the ball out of any of those pieces that appeared on
-   top of it.
+2. `physics.UnstickIn` moves the ball out of any of those pieces that appeared
+   on top of it, never across one of the hole's own walls.
 3. The field is copied, never modified:
    `WithZones(WithExtras(Course, walls, posts), ExtraZones(stroke))`, then
    `WithWeather(..., weather)`, then `physics.WithTick(..., tick)`.
@@ -209,10 +209,14 @@ func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field           
 func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field
 ```
 
-`physics.Unstick` treats `walls` as groups of four (`physics.Bar`). A ball
-inside a bar leaves through the nearest side, pushed straight out along that
-side's normal to just clear of it. A ball closer than the radius to a bar or a
-post is pushed off it. See [physics.md](physics.md#unstick).
+Each may return `f` itself (nothing to add): do not mutate what they return.
+
+`physics.UnstickIn` treats `walls` as groups of four (`physics.Bar`). A ball
+inside a bar leaves through the nearest side it can leave by without crossing
+one of the hole's own walls, pushed straight out along that side's normal to
+just clear of it. A ball closer than the radius to a bar or a post is pushed
+off it, unless the push would cross one of those walls. See
+[physics.md](physics.md#unstickin).
 
 ## Launch, Kick and Sink
 

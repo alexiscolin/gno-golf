@@ -200,12 +200,13 @@ Each substep does this:
 0. A timed bar (four timed walls from `Timed(Bar(…))`) that comes back this
    substep, or stands on the first one, pushes a ball inside it (or closer
    than `Radius`) out through its nearest side, straight along that side's
-   normal, as [`Unstick`](#unstick) does for a stroke's pieces. A push that would carry
+   normal, as [`UnstickIn`](#unstickin) does for a stroke's pieces. A push that would carry
    the ball across an untimed wall takes the next nearest side instead, and
    if every side would, the ball stays where it is. A wall never stands on
    the ball, nor pushes it through another.
-1. The substep is split into `int(|vel| / MaxMove) + 1` moves, so a fast ball
-   can't skip past a zone or a wall.
+1. A ball faster than `SpeedCap` is slowed to it. The substep is then split
+   into `int(|vel| / MaxMove) + 1` moves (at most 6), so a fast ball can't
+   skip past a zone or a wall.
 2. For each move, if the ball is on the ground, the surface is reset to grass
    and the zones that are there (by their timing) and contain the ball are applied in
    order. A hazard or a slanted loop entry ends the shot.
@@ -214,13 +215,15 @@ Each substep does this:
    [Wall prep](#wall-prep)) and every post (radius grown by `Radius`), and the
    nearest hit wins. A wall or post whose box the move's box misses is
    skipped first (the broad phase). A ball already within `Radius` of a wall
-   and moving into it hits it right away. A free wall end is a round cap of
-   radius `Radius`, swept like a post, however far past the end the ball
-   comes from along the wall's line.
+   and moving into it hits it right away. Both ends of every wall are round
+   caps of radius `Radius`, swept like posts from wherever the ball comes:
+   the offset lines are square caps with no end face, which left a gap in
+   front of an acute corner's tip and let a diagonal move cut a free end.
 4. On a hit, the part of the velocity along the surface keeps `Along` (0.97)
    of itself. The part into the surface bounces back times the restitution,
    which is played at `MaxBounce` (0.92) at most: nothing adds energy. Speed
-   is capped at `SpeedCap`.
+   is capped at `SpeedCap` again. Within a substep, a slope can add up to its
+   own `Vec` on top of it; no course hole's ball ever passes 6 (a full stroke).
 5. A point is appended to the path.
 6. Rolling resistance on the ground: `keep = min((Friction + 0.05) * surface,
    0.98)`, then `speed = |vel| * keep - Drag / surface`. At `speed <= 0.02`
@@ -301,16 +304,16 @@ steps over it. From `island7`, the only loop left:
 	Vec: physics.V(21.6, 17), Scale: 2, Skin: "castle tube"},
 ```
 
-## Unstick
+## UnstickIn
 
 ```go
-func Unstick(ball Vec2, walls []Wall, posts []Post, r float64) Vec2
+func UnstickIn(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec2
 ```
 
-`Unstick` moves a ball out of pieces that appeared on top of it: a gate
+`UnstickIn` moves a ball out of pieces that appeared on top of it: a gate
 shutting, a mole popping up where the ball rests (`course.Simple` calls it
-before each stroke, with that stroke's pulse pieces). `walls` are read in
-groups of four, as `Bar` makes them.
+before each stroke, with that stroke's pulse pieces and the hole's own walls
+as `stays`). `walls` are read in groups of four, as `Bar` makes them.
 
 - A ball **inside** a bar leaves through the nearest side: it's put on the
   outward normal of that side, from the side's nearest point, `r + 0.02` out.
@@ -318,10 +321,12 @@ groups of four, as `Bar` makes them.
   from the nearest point of the bar, to `r + 0.02`.
 - A ball closer than `r` to a post is pushed off it radially, the same way.
 
-`Step` does the same for timed bars during a stroke (step 0 below), with one
-more rule: a push that would carry the ball across an untimed wall of the
-field takes the next nearest side instead, and if every side would, the ball
-stays where it is.
+No push carries the ball across an untimed wall of `stays`. Out of a bar, the
+ball takes the next nearest side instead, and if every side would cross one,
+it stays where it is. Off a bar or a post, a push that would cross one is not
+made: a ball left inside a post rolls out of it on the shot (a post never
+traps a ball). `Step` does the same for timed bars during a stroke (step 0
+above), with the field's walls as `stays`.
 
 ## Wall prep
 

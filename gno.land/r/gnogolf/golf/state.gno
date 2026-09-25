@@ -126,8 +126,9 @@ func lastShot(e *entry, h course.Hole, r *round) physics.Shot {
 		s = s[i+1:]
 	}
 	angle, power, tick := parseShot(s)
-	shot, _ := previewAt(h, physics.Vec2{X: r.fx, Y: r.fy}, angle*math.Pi/180, power, r.strokes-1, tick, weatherOf(e, h, r.period).Zones)
-	return shot
+	from := physics.Vec2{X: r.fx, Y: r.fy}
+	shot, holed := previewAt(h, from, angle*math.Pi/180, power, r.strokes-1, tick, weatherOf(e, h, r.period).Zones)
+	return back(h, from, shot, holed)
 }
 
 // pathJSON is a shot's path points, comma separated.
@@ -398,6 +399,7 @@ func simulateFrom(e *entry, h course.Hole, ballX, ballY, angle, power float64, s
 	ball := onBoard(h, ballX, ballY)
 	angle, power = validShot(angle, power)
 	shot, holed := resolve(previewAt(h, ball, angle*math.Pi/180, power, stroke, tick, weatherOf(e, h, period).Zones))
+	shot = back(h, ball, shot, holed)
 	return "{" + versionJSON + `,"holed":` + strconv.FormatBool(holed) + `,"bounces":` + strconv.Itoa(shot.Bounces) + shotJSON(shot) + "}"
 }
 
@@ -459,6 +461,7 @@ func simulateRound(e *entry, h course.Hole, ball physics.Vec2, strokes int, shot
 		angle, power, tick := parseShot(s)
 		angle, power = validShot(angle, power)
 		last, holed = resolve(previewAt(h, ball, angle*math.Pi/180, power, strokes, tick, weather))
+		last = back(h, ball, last, holed)
 		w.add(last)
 		ball = last.Rest()
 		strokes++

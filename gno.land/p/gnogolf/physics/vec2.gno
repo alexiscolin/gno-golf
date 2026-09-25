@@ -5,6 +5,11 @@
 // Conventions: +X is right, +Y is down, 1.0 is one board unit, angles are in
 // radians. Determinism contract: float64 only, no map iteration, no clock, no
 // randomness — same inputs, same outputs, on every validator.
+//
+// Inputs must be finite: a NaN or an infinity in a ball, a velocity or a
+// field gives no panic and no endless loop, but no meaningful answer either.
+// Callers check them (course.Decode refuses them in data; golf refuses a
+// non-finite shot and a non-finite rest).
 package physics
 
 import "math"

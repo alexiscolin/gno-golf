@@ -285,6 +285,12 @@ func TestHostileDataIsRefused(t *testing.T) {
 	if good, _ := Decode(data); !Exact(good) {
 		t.Fatal("Exact fails the hole's own lengths")
 	}
+	if c, err := DecodeChecked(off); err == nil || c != nil {
+		t.Fatal("DecodeChecked passes a length an ulp off")
+	}
+	if c, err := DecodeChecked(data); err != nil || Encode(c) != data {
+		t.Fatal("DecodeChecked refuses the hole's own lengths")
+	}
 
 	// the bytes no Encode writes: an unknown flag, a skin past the table
 	z := zonesAt(h, data)
