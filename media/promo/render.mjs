@@ -191,23 +191,27 @@ if (STILLS) process.exit(0);
 
 // ------------------------------------------------------------ encode: clean
 //
-// 960x540 at 24 fps, no audio track. Toon flat colours: a low two-pass rate
-// holds up. Each file stands alone under ~500 KB (the browser takes one).
+// 24 fps, no audio track, each file under ~520 KB (below the site's gzipped
+// JS; the browser takes one). A very light denoise first, so the toon flats
+// code clean, without blocks. AV1: 1280x720, constant quality at the
+// slowest preset worth it, visual tuning, no film grain (the grain's noise
+// shows on the flats). VP9: 1280x720, two passes. H.264 holds up better at
+// 960x540 for the same bytes (two passes, animation tuning).
 if (CLEAN) {
   const DEST = path.join(HERE, "..", "..", "web", "public", "title");
   const ff = (...a) => execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", ...a], { stdio: "inherit", cwd: WORK });
   const src = ["-framerate", String(FPS), "-i", path.join(out, "%05d.jpg"), "-t", String(LEN)];
-  const vf = `scale=960:540:flags=lanczos,fps=24,format=yuv420p`;
-  const KBPS = Number(process.env.KBPS) || 230;
-  ff(...src, "-vf", vf, "-an", "-c:v", "libsvtav1", "-preset", "4", "-b:v", `${Math.round(KBPS * 0.75)}k`, "-svtav1-params", "tune=0:enable-overlays=1", "-g", "240", path.join(DEST, "bg.av1.webm"));
+  const vf = (size) => `scale=${size}:flags=lanczos,fps=24,hqdn3d=1.5:1.5:3:3,format=yuv420p`;
+  const CRF = Number(process.env.CRF) || 60, KBPS = Number(process.env.KBPS) || 330;
+  ff(...src, "-vf", vf("1280:720"), "-an", "-c:v", "libsvtav1", "-preset", "2", "-crf", String(CRF), "-svtav1-params", "tune=0:enable-overlays=1:scd=1", "-g", "240", path.join(DEST, "bg.av1.webm"));
   for (const pass of [1, 2])
-    ff(...src, "-vf", vf, "-an", "-c:v", "libvpx-vp9", "-b:v", `${KBPS}k`, "-maxrate", `${KBPS * 1.5}k`, "-bufsize", `${KBPS * 3}k`, "-deadline", "good", "-cpu-used", "1", "-row-mt", "1", "-g", "240",
+    ff(...src, "-vf", vf("1280:720"), "-an", "-c:v", "libvpx-vp9", "-b:v", `${KBPS}k`, "-maxrate", `${Math.round(KBPS * 1.5)}k`, "-bufsize", `${KBPS * 3}k`, "-deadline", "good", "-cpu-used", "0", "-row-mt", "1", "-auto-alt-ref", "1", "-lag-in-frames", "25", "-aq-mode", "0", "-g", "240",
       "-pass", String(pass), "-passlogfile", path.join(WORK, "vp9"), ...(pass === 1 ? ["-f", "null", "/dev/null"] : [path.join(DEST, "bg.vp9.webm")]));
   for (const pass of [1, 2])
-    ff(...src, "-vf", vf, "-an", "-c:v", "libx264", "-preset", "veryslow", "-b:v", `${KBPS}k`, "-maxrate", `${KBPS * 1.5}k`, "-bufsize", `${KBPS * 3}k`, "-profile:v", "high", "-movflags", "+faststart", "-g", "240",
+    ff(...src, "-vf", vf("960:540"), "-an", "-c:v", "libx264", "-preset", "veryslow", "-tune", "animation", "-b:v", `${KBPS}k`, "-maxrate", `${Math.round(KBPS * 1.5)}k`, "-bufsize", `${KBPS * 3}k`, "-profile:v", "high", "-movflags", "+faststart", "-g", "240",
       "-pass", String(pass), "-passlogfile", path.join(WORK, "x264"), ...(pass === 1 ? ["-f", "null", "/dev/null"] : [path.join(DEST, "bg.mp4")]));
   // the poster: the first frame, what shows while the video loads
-  ff("-i", path.join(out, "00000.jpg"), "-vf", "scale=960:540:flags=lanczos", path.join(WORK, "poster.png"));
+  ff("-i", path.join(out, "00000.jpg"), "-vf", "scale=1280:720:flags=lanczos", path.join(WORK, "poster.png"));
   execFileSync("cwebp", ["-quiet", "-q", "70", path.join(WORK, "poster.png"), "-o", path.join(DEST, "bg-poster.webp")]);
   for (const f of ["bg.av1.webm", "bg.vp9.webm", "bg.mp4", "bg-poster.webp"]) console.log(f, Math.round(fs.statSync(path.join(DEST, f)).size / 1024), "KB");
   console.log("clean cut:", LEN.toFixed(2), "s");

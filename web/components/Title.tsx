@@ -201,11 +201,11 @@ const wantsVideo = () => {
   const c = navigator.connection;
   return !(c && (c.saveData || /2g/.test(c.effectiveType || "")));
 };
-// the smallest first: AV1, then VP9, then H.264 (each ~350 KB, 12 s, 540p)
+// the best first: AV1, then VP9 (720p), then H.264 (540p): each under ~500 KB, 12 s, 24 fps
 const FILM = [
-  ["title/bg.av1.webm", 'video/webm; codecs="av01.0.04M.08"'],
+  ["title/bg.av1.webm", 'video/webm; codecs="av01.0.05M.08"'],
   ["title/bg.vp9.webm", 'video/webm; codecs="vp9"'],
-  ["title/bg.mp4", 'video/mp4; codecs="avc1.640020"'],
+  ["title/bg.mp4", 'video/mp4; codecs="avc1.640028"'],
 ];
 
 /** The film: muted, inline, and nothing fetched until the page is up and idle. */

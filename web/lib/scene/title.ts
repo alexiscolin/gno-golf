@@ -16,6 +16,7 @@ import { makeRenderer, makeScene } from "./camera";
 import { makeBall, gnomeById } from "./gnome";
 import { makeConfetti } from "./fx";
 import { BALL_R } from "../terrain";
+import { TICKS_PER_S } from "../engine";
 import { C, flat, inked, texOf, disposeCourse, setTime } from "./materials";
 import { ud, type Course, type Gnome, type Hole, type LitScene } from "./data";
 import type { Board } from "../types";
@@ -25,7 +26,6 @@ import type { Board } from "../types";
 const HOLES = TITLE_HOLES as unknown as Record<string, Hole>;
 
 const FRAME_MS = 1000 / 30;
-const STEP_MS = 72 / 3.5; // the timed pieces (the mill's sails, the tram) at the game's idle pace (engine: 3.5 substeps a second)
 
 // The cup cards' dioramas: a fixed three-quarter view on the landmark
 const CUP: Record<string, { a: number; r: number; h: number }> = {
@@ -78,10 +78,12 @@ function golfBall() {
 }
 
 // Per world: how far up the lane the ride starts (clear of the garden's tunnel
-// mouths, the island's castle), and the camera: how far off, from how far
+// mouths, the island's castle, the town's second tram line: its trams leave
+// the crossing clear for half a second at most, too short for the ride to
+// cross, so it starts past the rails and the tram goes by behind it), and the camera: how far off, from how far
 // round (th, radians behind the cup > 0; pth upright, from beyond the cup by
 // default) and how high (h, times R)
-const SPOT: Record<string, { ride: number; R: number; h?: number; th?: number; pth?: number }> = { garden: { ride: 5.5, R: 13 }, island: { ride: 4.2, R: 12, h: 0.7 }, town: { ride: 8, R: 13 }, mountain: { ride: 8, R: 13 } };
+const SPOT: Record<string, { ride: number; R: number; h?: number; th?: number; pth?: number }> = { garden: { ride: 5.5, R: 13 }, island: { ride: 4.2, R: 12, h: 0.7 }, town: { ride: 6, R: 13 }, mountain: { ride: 8, R: 13 } };
 const RIDE_AT = 1.2, RIDE_S = 7; // the ride's start and length (s)
 const smooth = (k: number) => k * k * (3 - 2 * k);
 
@@ -243,7 +245,8 @@ export async function makeTitle(canvas: HTMLCanvasElement, { world = "garden", h
     const t = (now - t0) / 1000;
     setTime(now / 1000);
     course.userData.tick(now / 1000);
-    const clock = now / STEP_MS;
+    // the timed pieces on the game's own clock, from the story's start
+    const clock = t * TICKS_PER_S;
     if (course.userData.mill && course.userData.mill.at) course.userData.mill.at(clock);
     for (const p of course.userData.timed || []) p.at(clock);
     // the cup's arrow turns and bobs, slower than in play
