@@ -331,6 +331,40 @@ func TestPublishMine(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(playLink(mustHole(v2)), "?hole="+v2))
 }
 
+// One address publishing fifty holes shows perAuthor of them in Holes, and
+// hides nobody else's; Community pages through every version of all of them.
+func TestPublishMineSpamHidesNobody(cur realm, t *testing.T) {
+	spam, other := testutils.TestAddress("spam"), testutils.TestAddress("spamfree")
+	data := hexOf(cupHole("pond", 1, "Spam"))
+	for i := 0; i < 50; i++ {
+		testing.SetRealm(testing.NewUserRealm(spam))
+		PublishMine(cross(cur), "s"+strconv.Itoa(i), data, "")
+	}
+	testing.SetRealm(testing.NewUserRealm(other))
+	mine := PublishMine(cross(cur), "mine", hexOf(cupHole("pond", 2, "Mine")), "")
+	testing.SetRealm(testing.NewUserRealm(other))
+	v2 := PublishMine(cross(cur), "mine", hexOf(cupHole("pond", 2, "Mine, v2")), "")
+	list := Holes()
+	uassert.True(t, strings.Contains(list, `"id":"`+v2+`"`), "another author's hole is listed")
+	uassert.False(t, strings.Contains(list, `"id":"`+mine+`"`), "an archived version is not")
+	uassert.Equal(t, perAuthor, strings.Count(list, `"slot":"`+spam.String()+"/"))
+	uassert.True(t, strings.Contains(Render(""), "Mine, v2"), "nor on the hub")
+	// Community has them all, a page at a time
+	seen, pages, after := 0, 0, ""
+	for {
+		p := Community(after, 7)
+		seen += strings.Count(p, `{"id":`)
+		pages++
+		i := strings.LastIndex(p, `"next":"`)
+		after = p[i+8 : len(p)-2]
+		if after == "" {
+			break
+		}
+	}
+	uassert.Equal(t, community.Size(), seen)
+	uassert.True(t, seen >= 52 && pages > 7)
+}
+
 // A first finish on an archived course hole, before the drain reaches its
 // player, is kept as a record and never counted, so the drain leaves the
 // player's standing alone; an improvement on it later does not count either.

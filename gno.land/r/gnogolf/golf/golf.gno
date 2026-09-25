@@ -892,7 +892,7 @@ func cleanName(n string) string {
 // cleanText keeps an author's text to one line of plain text of at most max
 // characters: no control characters, no bidi or zero-width ones (they turn a
 // line around or hide what it says), nothing that ends a markdown table cell
-// or opens a link or a tag.
+// or opens a link, a tag or an HTML entity ("&zwnj;" is a zero-width one).
 func cleanText(n string, max int) string {
 	b := make([]rune, 0, max)
 	for _, c := range n {
@@ -904,7 +904,7 @@ func cleanText(n string, max int) string {
 			continue
 		case c >= 0x200b && c <= 0x200f, c >= 0x202a && c <= 0x202e, c >= 0x2066 && c <= 0x2069, c == 0xfeff:
 			continue
-		case strings.ContainsRune("|[]<>`*_#\\", c):
+		case strings.ContainsRune("|[]<>`*_#\\&", c):
 			continue
 		}
 		b = append(b, c)

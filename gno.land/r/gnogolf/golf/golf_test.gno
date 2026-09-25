@@ -2,6 +2,7 @@ package golf
 
 import (
 	"encoding/hex"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -243,6 +244,8 @@ func TestPoisonShotsAreRefused(cur realm, t *testing.T) {
 func TestNamesAreCleaned(cur realm, t *testing.T) {
 	uassert.Equal(t, "Fake  row", cleanName("Fake |\n| row"))
 	uassert.Equal(t, "Untitled hole", cleanName("\x01\x02"))
+	uassert.Equal(t, "Azwnj;B", cleanName("A&zwnj;B")) // no HTML entity: no hidden or turned-around text
+	uassert.Equal(t, "rlm; note", cleanText("&rlm; note", maxNote))
 	uassert.Equal(t, "turning bladescript", cleanSkin("turning blade<script>")) // no tag survives
 }
 
@@ -498,7 +501,9 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	uassert.Equal(t, head+`"offset":0,"rows":[`+row(a, 1)+","+row(b, 2)+","+row(c, 3)+`],"next":0}`, HoleLeaderboard(id, "assisted", 0, 10))
 	// a page at a time: next is where the following page starts
 	uassert.Equal(t, head+`"offset":1,"rows":[`+row(b, 2)+`],"next":2}`, HoleLeaderboard(id, "assisted", 1, 1))
-	uassert.Equal(t, head+`"offset":50,"rows":[],"next":0}`, HoleLeaderboard(id, "assisted", 50, 10))
+	// an offset past the board is the board's end, however large
+	uassert.Equal(t, head+`"offset":3,"rows":[],"next":0}`, HoleLeaderboard(id, "assisted", 50, 10))
+	uassert.Equal(t, head+`"offset":3,"rows":[],"next":0}`, HoleLeaderboard(id, "assisted", math.MaxInt, 100))
 
 	// c improves to 1: its old row goes, the new one sorts by address among the 1s
 	testing.SetRealm(testing.NewUserRealm(c))

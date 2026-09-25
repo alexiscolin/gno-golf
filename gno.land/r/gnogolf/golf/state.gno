@@ -249,7 +249,8 @@ func jstr(s string) string {
 
 // Holes lists the holes, for a client building a menu: the course's
 // current holes first, in course order (world by world, then by order), then
-// its archived versions, then everyone else's, up to maxListed in all.
+// its archived versions, then everyone else's current versions — at most
+// perAuthor of one address's, the rest in Community — up to maxListed in all.
 // official is whether a hole is the course's: only those have a cup number
 // and count in the course-wide ranking. next is the version that took an
 // archived hole's place, slot a data version's alias. Read-only; it decodes
@@ -258,27 +259,49 @@ func Holes() string {
 	var sb strings.Builder
 	sb.WriteString("[")
 	for i, e := range listed() {
-		sb.WriteString(sep(i) + `{"id":` + jstr(e.id) +
-			`,"name":` + jstr(e.name) +
-			`,"official":` + strconv.FormatBool(e.official) +
-			`,"plays":` + strconv.Itoa(e.plays) +
-			`,"best":` + strconv.Itoa(e.best[assisted]) +
-			`,"proBest":` + strconv.Itoa(e.best[pro]) +
-			`,"par":` + strconv.Itoa(e.par) +
-			`,"world":` + jstr(e.world) + `,"order":` + jnum(e.order) + `,"next":` + jstr(e.next))
-		if e.slot != "" {
-			sb.WriteString(`,"slot":` + jstr(e.slot))
-		}
-		sb.WriteString("}")
+		sb.WriteString(sep(i) + holeRow(e))
 	}
 	sb.WriteString("]")
 	return sb.String()
 }
 
+// holeRow is one hole as Holes and Community list it.
+func holeRow(e *entry) string {
+	s := `{"id":` + jstr(e.id) +
+		`,"name":` + jstr(e.name) +
+		`,"official":` + strconv.FormatBool(e.official) +
+		`,"plays":` + strconv.Itoa(e.plays) +
+		`,"best":` + strconv.Itoa(e.best[assisted]) +
+		`,"proBest":` + strconv.Itoa(e.best[pro]) +
+		`,"par":` + strconv.Itoa(e.par) +
+		`,"world":` + jstr(e.world) + `,"order":` + jnum(e.order) + `,"next":` + jstr(e.next)
+	if e.slot != "" {
+		s += `,"slot":` + jstr(e.slot)
+	}
+	return s + "}"
+}
+
+// Community is a page of every community hole, every version of each, by id:
+// all that Holes leaves out. It is paged like Records.
+func Community(after string, limit int) string {
+	var sb strings.Builder
+	sb.WriteString("{" + versionJSON + `,"rows":[`)
+	next := page(bpWalk(community), after, limit, func(i int, _ string, v any) {
+		sb.WriteString(sep(i) + holeRow(v.(*entry)))
+	})
+	sb.WriteString(`],"next":` + jstr(next) + "}")
+	return sb.String()
+}
+
+// perAuthor is the most published holes of one address Holes and the hub
+// list: one address publishing a hundred cannot push everyone else's out.
+const perAuthor = 3
+
 // listed is the holes in list order, as many as a list shows: the current
-// course from its slots, the archived course, then anyone's. A list anyone
-// can grow is shown in part, never unreadable, and never at the course's
-// expense.
+// course from its slots, the archived course, then anyone's current
+// versions, perAuthor at most per address, then the registered realms. A
+// list anyone can grow is shown in part, never unreadable, and never at the
+// course's expense.
 func listed() []*entry {
 	list := make([]*entry, 0, maxListed)
 	full := func() bool { return len(list) >= maxListed }
@@ -294,8 +317,32 @@ func listed() []*entry {
 			return full()
 		})
 	}
+	// aliases hold only current versions, "<address>/<slug>" in address
+	// order: past an address's perAuthor-th, the walk jumps to the next
+	// address ("<address>0" is the key just past every "<address>/…"), so
+	// however many one address publishes, it reads no more of them.
+	for start := ""; !full(); {
+		by, n, skip := "", 0, ""
+		aliases.Iterate(start, "", func(k string, v any) bool {
+			if a := k[:strings.IndexByte(k, '/')]; a != by {
+				by, n = a, 0
+			}
+			if n == perAuthor {
+				skip = by + "0"
+				return true
+			}
+			list = append(list, find(v.(string)))
+			n++
+			return full()
+		})
+		if skip == "" {
+			break
+		}
+		start = skip
+	}
 	if !full() {
-		community.Iterate("", "", func(_ string, v any) bool {
+		// registered realms, the rest of community: each is a deployed realm
+		community.Iterate("gno.land/", "gno.land0", func(_ string, v any) bool {
 			list = append(list, v.(*entry))
 			return full()
 		})
@@ -610,7 +657,7 @@ const maxListed = 120
 
 // HoleLeaderboard is a page of one hole's board in a mode: each named
 // player's best finished round there, fewest strokes first, from rank
-// offset+1, at most limit rows (clamped to 1..100). players is how many
+// offset+1 (clamped to 0..players), at most limit rows (clamped to 1..100). players is how many
 // named players the board holds (what a client pages through), finished how
 // many players finished it, named or not. next is the offset of the next
 // page, 0 once there is none: a name deleted since is skipped, so a page may
@@ -618,13 +665,16 @@ const maxListed = 120
 // long the board.
 func HoleLeaderboard(hole, mode string, offset, limit int) string {
 	e, m := readHole(hole), modeOf(mode)
-	if offset < 0 {
-		offset = 0
-	}
 	limit = clampLimit(limit)
 	board, size := e.board[m], 0
 	if board != nil {
 		size = board.Size()
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > size {
+		offset = size // and offset+limit cannot overflow
 	}
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) +

@@ -25,7 +25,6 @@ func TestTheNamespaceIsGolfsOwn(t *testing.T) {
 	uassert.Equal(t, "gno.land/r/gnogolf/golf", self)
 	uassert.Equal(t, "/r/gnogolf/golf", hub)
 	uassert.Equal(t, "gno.land/r/gnogolf/", officialPrefix)
-	uassert.Equal(t, "gno.land/r/gnogolf0", officialEnd)
 }
 
 func TestAnEmptyOwnerHoldsNoPower(cur realm, t *testing.T) {

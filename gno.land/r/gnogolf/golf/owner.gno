@@ -29,8 +29,7 @@ var (
 var (
 	self           = unsafe.CurrentRealm().PkgPath()
 	hub            = strings.TrimPrefix(self, "gno.land")
-	officialPrefix = self[:strings.LastIndex(self, "/")+1]        // the namespace's realms, as "…/"
-	officialEnd    = officialPrefix[:len(officialPrefix)-1] + "0" // the key just past every one ('/'+1)
+	officialPrefix = self[:strings.LastIndex(self, "/")+1] // the namespace's realms, as "…/"
 )
 
 func init() {
