@@ -1,17 +1,22 @@
 #!/bin/sh
 # publishdata.sh [per]: data/holes.txt as MsgRun scripts that Publish every
-# course hole into its slot, per holes a script (default 10), written to
+# course hole into its slot, per holes a script (default 7: the heaviest
+# seven publish in 0.86e9 gas, and gnomcp measures a write at 1e9), written to
 # scripts/publish/. Run each one as the course's owner (gnomcp gno_run, or
 # `gnokey maketx run`), in order; a slot whose data is already its current
 # version is skipped, so a script can be run again after a failure.
 #
-# REALM is the golf realm to publish to (default gno.land/r/gnogolf/golf).
+# REALM is the golf realm to publish to (default gno.land/r/gnogolf/golf),
+# OUT where the scripts go (default scripts/publish; it is emptied first), so
+# a namespaced set does not overwrite the committed one:
+#
+#   REALM=gno.land/r/nym-golfer000/golf OUT=/tmp/pub scripts/publishdata.sh
 # scripts/publish/verify.gno then checks every slot (run it simulated).
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
-per=${1:-10}
+per=${1:-7}
 realm=${REALM:-gno.land/r/gnogolf/golf}
-out=$root/scripts/publish
+out=${OUT:-$root/scripts/publish}
 rm -rf "$out"
 mkdir -p "$out"
 awk -v per="$per" -v realm="$realm" -v out="$out" '
