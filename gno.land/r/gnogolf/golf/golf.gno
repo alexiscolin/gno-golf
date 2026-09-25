@@ -247,9 +247,14 @@ var (
 	slots = bptree.NewBPTree32()
 	// "<address>/<slug>" -> id of the current version of a community hole
 	aliases = bptree.NewBPTree32()
-	// recentKey(its publish height, alias) -> id of the current version of a
-	// community hole: the newest last
-	newest = bptree.NewBPTree32()
+	// the community holes by author, two kinds of rows in one tree (a tree's
+	// first leaf is a few KB, which the first to publish would pay):
+	//   - "<address> " + recentKey(its publish height, slug) -> id of the
+	//     current version of a community hole: an author's own, newest last;
+	//   - recentKey(their latest publish height, address) -> nil: one row per
+	//     author, the latest to publish last (authorRows).
+	// A height is digits and an address "g1…": the two never mix.
+	byAuthor = bptree.NewBPTree32()
 	// recentKey(the height it was archived at, id) -> id of an archived
 	// course version: the latest last
 	archived = bptree.NewBPTree32()
@@ -264,6 +269,9 @@ var (
 	// hole, best first. The course top ten is its first ten entries.
 	allRanks = seeded()
 	ranks    = [modes]view{{allRanks, "assisted "}, {allRanks, "pro "}}
+	// per mode: rankKey(row) -> player, the keys of those who had a ranking
+	// key and have no hole left (setRow), which nothing ranks
+	idle = [modes]view{{allRanks, "idle assisted "}, {allRanks, "idle pro "}}
 	// archived holes whose players still count in the standings, oldest
 	// first: drain takes them out a batch at a time
 	archiving []string
@@ -365,17 +373,23 @@ func rankKey(r *row) string {
 // boardKey orders a hole's board: fewest strokes first, then the address.
 func boardKey(strokes int, player string) string { return pad(strokes, 3) + "/" + player }
 
-// setRow moves a player's standing and keeps the ranking in step. A row
-// with no hole left ranks nowhere, and stays: its storage deposit is the
-// player's, and freeing it would refund whoever drained it.
+// setRow moves a player's standing and keeps the ranking in step. A
+// standing with no hole left ranks nowhere, and neither it nor its ranking
+// key is freed: the key moves to idle, apart from the ranking and 5 bytes
+// longer, since its storage deposit is the player's, and freeing it would
+// refund whoever drained it. It moves back at the player's next hole.
 func setRow(m int, r *row, holes, strokes int) {
-	ranks[m].Remove(rankKey(r))
-	r.holes, r.strokes = holes, strokes
-	if r.holes <= 0 {
-		return
+	k := rankKey(r)
+	_, had := ranks[m].Remove(k)
+	if _, ok := idle[m].Remove(k); ok {
+		had = true
 	}
-	if named(r.player) {
+	r.holes, r.strokes = holes, strokes
+	switch {
+	case r.holes > 0 && named(r.player):
 		ranks[m].Set(rankKey(r), r.player)
+	case had:
+		idle[m].Set(rankKey(r), r.player)
 	}
 }
 
@@ -466,8 +480,9 @@ func drain(n int) {
 // Drain takes up to n players (1 to 400) of archived holes out of the
 // course standings, for anyone who wants the ranking settled sooner than the
 // finishes would settle it. It returns how many archived holes still have
-// players in the standings. A standing it empties is kept at 0 holes, so
-// nothing it frees is refunded to the caller.
+// players in the standings. A standing it empties is kept at 0 holes, its
+// ranking key kept aside (setRow), so no player's row is freed and refunded
+// to the caller.
 func Drain(cur realm, n int) int {
 	if n < 1 {
 		n = 1

@@ -12,9 +12,10 @@ import (
 // A data hole is stored as its data: publishing one adds its string and its
 // entry to golf, and playing it adds a round and the wear, never the decoded
 // hole (about 40 KB for this one, were it kept). z_storage_publish_filetest
-// publishes only (22,297 bytes: the data, its entry, and the first leaf of
-// each index golf opens for it, the community's first; nothing for rounds or
-// records until someone plays); z_storage_play_filetest also plays two
+// publishes only (22,700 bytes: the data, its entry, and the first leaf of
+// each index golf opens for it, the community's first; its author's row in
+// it, 403 of them, paid once per author; nothing for rounds or records until
+// someone plays); z_storage_play_filetest also plays two
 // strokes, which store 2,516 more: the round and its row in the shared
 // rounds index, its shots and the version's 512-byte wear. (With a rounds
 // tree per version, made at its first stroke, they stored 6,209.)
@@ -28,7 +29,7 @@ func main(cur realm) {
 }
 
 // Storage:
-// gno.land/r/gnogolf/golf: 24813
+// gno.land/r/gnogolf/golf: 25216
 // gno.land/r/test/storedplay: 0
 
 // Output:

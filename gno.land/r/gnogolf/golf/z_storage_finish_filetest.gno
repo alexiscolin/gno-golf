@@ -15,9 +15,10 @@ import (
 // bests and board as rows of indexes every version shares, made when golf
 // is deployed, so its first finisher pays for their own rows only, as every
 // later one does, and not for trees of its own. Publishing this hole alone
-// stores 22,317 bytes; its first finish (unnamed, in one stroke) 3,059 more,
-// the wear included; the second player's 2,051. With a tree per version, the
-// first finish on a version stored about 14.7 KB.
+// stores 22,720 bytes (its author's row, 403 of them, included); its first
+// finish (unnamed, in one stroke) 3,059 more, the wear included; the second
+// player's 2,051. With a tree per version, the first finish on a version
+// stored about 14.7 KB.
 func main(cur realm) {
 	h := &course.Simple{W: 32, H: 16, World: "garden", Title: "Finished", Strokes: 3,
 		Tee: physics.V(2, 8), Pin: physics.V(4, 8), Substeps: 14, CupRadius: 1.2, Shelter: 0.01,
@@ -34,6 +35,6 @@ func main(cur realm) {
 // holed in 1 strokes
 
 // Storage:
-// gno.land/r/gnogolf/golf: 27427
+// gno.land/r/gnogolf/golf: 27830
 // gno.land/r/sys/users: 0
 // gno.land/r/test/storedfinish: 0

@@ -232,8 +232,8 @@ stroke starts a new one from the tee. Their bests are kept. Emits
 Anyone. Takes up to `n` players (clamped to 1..400) of archived course holes
 out of the course standings, oldest archived hole first, and returns how many
 archived holes still have players in them. A standing it empties stays, at 0
-holes, so the storage it would free (the player's deposit) is not refunded to
-the caller. See [Archived holes](#archived-holes).
+holes, and its ranking key is kept aside, out of the ranking, so the storage
+it would free (the player's deposit) is not refunded to the caller. See [Archived holes](#archived-holes).
 
 ### Events
 
@@ -287,8 +287,9 @@ These are all free as `vm/qeval` queries and return JSON strings (except
 The holes, for a client building a menu, at most 120 in all: the course's
 current holes in course order (world by world, then by order), then at most
 20 of its archived versions (leaving at least 20 places for the rest), then
-everyone's current community versions (at most 3 per address). The rest are
-in `Community`, and every version of a slot is on its data page. It decodes
+everyone's current community versions, newest first: each address's 3
+newest at most, so however many one address publishes, it fills 3 rows and
+pushes nobody else further down. The rest are in `Community`, and every version of a slot is on its data page. It decodes
 nothing.
 
 ```json

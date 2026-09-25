@@ -303,14 +303,22 @@ const perAuthor = 3
 //   - then, if they leave room for minCommunity more, up to maxArchived
 //     archived course versions, the most recently archived first (every
 //     version is on its slot's data page);
-//   - then community holes, current versions only, newest publish first
-//     (by block height; within one block, by alias, last first), at most
-//     perAuthor of one address: of the maxScanned newest, those that fit.
+//   - then, in the room left, community holes, current versions only: the
+//     newest of the holes that are among their author's perAuthor newest,
+//     newest publish first (by block height; within one block, by alias,
+//     last first).
 //
-// So a new hole is listed as long as fewer than maxListed holes of other
-// authors (perAuthor each) were published after it, and not before them;
-// the older ones are in Community. How many addresses an author holds, or
-// what they are, changes nothing but how many rows they fill.
+// So a community hole is listed if and only if it is one of its author's
+// perAuthor newest and fewer than that room of such holes, anyone's, were
+// published after it. However many holes an author publishes, they fill
+// perAuthor rows at most and push nobody else further down than that; the
+// rest are in Community. How many addresses an author holds, or what they
+// are, changes nothing but how many rows they fill.
+//
+// It reads no more than it lists, near enough: authors, the latest to
+// publish first, each with their perAuthor newest holes, until the next
+// author's latest is older than every row it keeps — at most room+1 authors,
+// perAuthor keys each, however much anyone publishes.
 func listed() []*entry {
 	list := make([]*entry, 0, maxListed)
 	full := func() bool { return len(list) >= maxListed }
@@ -328,28 +336,49 @@ func listed() []*entry {
 			return room == 0
 		})
 	}
-	if full() {
+	room := maxListed - len(list)
+	if room <= 0 {
 		return list
 	}
-	// the author is in the key ("<height> <address>/<slug>"): a row past an
-	// author's perAuthor-th is skipped without loading it
-	n, scanned := map[string]int{}, 0
-	newest.ReverseIterate("", "", func(k string, v any) bool {
-		alias := k[strings.IndexByte(k, ' ')+1:]
-		if a := alias[:strings.IndexByte(alias, '/')]; n[a] < perAuthor {
-			n[a]++
-			list = append(list, find(v.(string)))
+	// the newest room of the rows seen, newest first, by recentKey(height,
+	// alias): an author walked later has only older holes than the one
+	// before's latest, so a row past room never comes back
+	type seen struct{ key, id string }
+	top := make([]seen, 0, room)
+	byAuthor.ReverseIterate("", authorRows, func(ak string, _ any) bool {
+		if len(top) == room && ak < top[room-1].key {
+			return true // their latest, and so all theirs, are older than all kept
 		}
-		scanned++
-		return full() || scanned == maxScanned
+		a := ak[13:] + " "
+		n := 0
+		byAuthor.ReverseIterate(a, a[:len(a)-1]+"!", func(k string, v any) bool {
+			// "<address> <height> <slug>" -> "<height> <address>/<slug>"
+			key := k[len(a):len(a)+12] + " " + a[:len(a)-1] + "/" + k[len(a)+13:]
+			i := len(top)
+			for i > 0 && top[i-1].key < key {
+				i--
+			}
+			if i < room {
+				if len(top) < room {
+					top = append(top, seen{})
+				}
+				copy(top[i+1:], top[i:len(top)-1])
+				top[i] = seen{key, v.(string)}
+			}
+			n++
+			return n == perAuthor
+		})
+		return false
 	})
+	for _, s := range top {
+		list = append(list, find(s.id))
+	}
 	return list
 }
 
-// maxScanned bounds the community rows listed reads: an author past their
-// perAuthor still costs a read for each of their newer holes, and what one
-// list reads must not grow with what anyone publishes.
-const maxScanned = 1000
+// authorRows is past the last of byAuthor's author rows ("<height> <address>")
+// and before its first hole ("g1…"): no key is ":".
+const authorRows = ":"
 
 // maxArchived bounds the archived course versions Holes and the hub list,
 // and minCommunity is the room they leave for community holes.
