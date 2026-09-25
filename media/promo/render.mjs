@@ -1,5 +1,5 @@
 // @ts-check
-// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean]
+// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups]
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
@@ -17,7 +17,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { launch, sleep, APP } from "../lib/cdp.mjs";
+import { launch, sleep, APP, RPC, REALM } from "../lib/cdp.mjs";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const FFMPEG = "/opt/homebrew/bin/ffmpeg";
@@ -26,6 +26,7 @@ const STILLS = process.argv.includes("--stills");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
 const FPS = 30;
 const CLEAN = process.argv.includes("--clean");
+const CUPS = process.argv.includes("--cups");
 // the clean cut's shots, in order: flyovers and rolls, ending on the garden's slow, bright orbit
 const CLEAN_SHOTS = ["snow", "sandcastles", "market", "cold", "mill", "frozen", "jump", "plazaP", "marketW", "tube", "logo"];
 
@@ -176,6 +177,85 @@ async function shoot(c, s, i, out) {
   }
   console.log(`shot ${i} ${s.name}: ${frames} frames`);
 }
+
+// ------------------------------------------------------------- the cups
+//
+// Each cup card plays a clip on hover: four of its holes (cups.json), each
+// an orbit a third of the way round, closing in a little from above, drawn
+// by the title's own scene at golden hour on the card's sky (web/lib/scene/
+// title.ts cupClip, ?titlebake). The first hole starts on the card's still,
+// and the loop cross-fades back to it: the still, the clip and its loop meet
+// without a jump. 640x480 for a card about 300 px wide at 2x, 24 fps.
+/** A hole's state as the chain gives it (HoleState: a JSON string in a Gno typed result). */
+async function holeState(slot) {
+  const hex = Buffer.from(`${REALM}.HoleState(${JSON.stringify(slot)})`).toString("hex");
+  const r = await (await fetch(`${RPC}/abci_query?path=%22vm/qeval%22&data=0x${hex}`)).json();
+  const raw = Buffer.from(r.result.response.ResponseBase.Data || "", "base64").toString();
+  return JSON.parse(JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)"))));
+}
+async function renderCups() {
+  const W = 640, H = 480, CFPS = 24, D = 3, X = 0.5; // each hole's seconds, the cross-fades'
+  const plan = JSON.parse(fs.readFileSync(path.join(HERE, "cups.json"), "utf8"));
+  const worlds = Object.keys(plan).filter((w) => !ONLY || ONLY.split(",").includes(w));
+  const dir = (w, k) => path.join(WORK, "cups", w, String(k));
+  if (!process.argv.includes("--encode")) {
+    const b = await launch({ width: W, height: H, dir: path.join(WORK, "profile") });
+    try {
+      await b.send("Page.navigate", { url: `${APP}/?titlebake` });
+      for (let i = 0; i < 120 && !(await b.ev("!!window.__cupClip")); i++) await sleep(500);
+      for (const w of worlds)
+        for (const [k, shot] of plan[w].entries()) {
+          // the hole as the chain has it (the first, the card's landmark, as the title has it)
+          const hole = shot.still ? null : await holeState(shot.hole);
+          const out = STILLS ? path.join(HERE, "stills-check") : dir(w, k), n = D * CFPS;
+          if (!STILLS) fs.rmSync(out, { recursive: true, force: true });
+          fs.mkdirSync(out, { recursive: true });
+          await b.js(`(async () => { window.__clip = await window.__cupClip(${JSON.stringify(w)}, ${JSON.stringify(hole)}, ${W}, ${H}, ${JSON.stringify(shot)}); })()`);
+          for (let f = 0; f < n; f++) {
+            if (STILLS && ![0, n >> 1, n - 1].includes(f)) continue;
+            const url = await b.js(`__clip.frame(${f / (n - 1)}, ${f / CFPS})`);
+            fs.writeFileSync(path.join(out, STILLS ? `cup-${w}-${k}-${f}.jpg` : `${String(f).padStart(3, "0")}.jpg`), Buffer.from(url.split(",")[1], "base64"));
+            if (f % 12 === 11) await sleep(40); // a modest pace
+          }
+          await b.js("__clip.destroy()");
+          console.log(`cup ${w} ${k} ${shot.hole}: ${STILLS ? 3 : n} frames`);
+        }
+      if (b.errors.length) console.log(b.errors.slice(0, 5));
+    } finally {
+      b.kill();
+    }
+  }
+  if (STILLS) return;
+  // one ffmpeg at a time: the four holes cross-faded, the last into the first's
+  // first frame; a light denoise, so the toon flats code clean. Under ~150 KB
+  // each at about 100 kbps: AV1 (a constant quality this small blocks up or
+  // runs over), VP9 in two passes, H.264 in two at 480x360 (it holds up
+  // better smaller for the bytes).
+  const DEST = path.join(HERE, "..", "..", "web", "public", "title");
+  const ff = (...a) => execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", ...a], { stdio: "inherit", cwd: WORK });
+  const KBPS = Number(process.env.KBPS) || 100;
+  for (const w of worlds) {
+    const seq = (k) => ["-framerate", String(CFPS), "-i", path.join(dir(w, k), "%03d.jpg")];
+    const xf = (a, b, o, to) => `[${a}][${b}]xfade=transition=fade:duration=${X}:offset=${o}[${to}]`;
+    const len = 4 * D - 3 * X;
+    const mid = path.join(WORK, `cup-${w}.mkv`);
+    ff(...seq(0), ...seq(1), ...seq(2), ...seq(3), "-loop", "1", "-framerate", String(CFPS), "-t", String(X), "-i", path.join(dir(w, 0), "000.jpg"),
+      "-filter_complex", [xf(0, 1, D - X, "a"), xf("a", 2, 2 * (D - X), "b"), xf("b", 3, 3 * (D - X), "c"), xf("c", 4, len - X, "d"), "[d]hqdn3d=1.5:1.5:3:3,format=yuv420p[v]"].join(";"),
+      "-map", "[v]", "-t", String(len), "-c:v", "ffv1", mid);
+    const src = ["-i", mid];
+    const dst = (ext) => path.join(DEST, `cup-${w}.${ext}`);
+    ff(...src, "-an", "-c:v", "libsvtav1", "-preset", "3", "-b:v", `${KBPS}k`, "-svtav1-params", "tune=0:enable-overlays=1:scd=1", "-g", String(len * CFPS), dst("av1.webm"));
+    const two = (codec, kbps, file, extra) => {
+      for (const pass of [1, 2])
+        ff(...src, "-an", ...codec, "-b:v", `${kbps}k`, "-maxrate", `${Math.round(kbps * 1.5)}k`, "-bufsize", `${kbps * 3}k`, ...extra, "-g", String(len * CFPS),
+          "-pass", String(pass), "-passlogfile", path.join(WORK, `cup-${w}`), ...(pass === 1 ? ["-f", "null", "/dev/null"] : [file]));
+    };
+    two(["-c:v", "libvpx-vp9", "-deadline", "good", "-cpu-used", "1", "-row-mt", "1", "-auto-alt-ref", "1", "-lag-in-frames", "25", "-aq-mode", "0"], KBPS, dst("vp9.webm"), []);
+    two(["-vf", "scale=480:360:flags=lanczos", "-c:v", "libx264", "-preset", "veryslow", "-tune", "animation", "-profile:v", "high"], Math.round(KBPS * 1.2), dst("mp4"), ["-movflags", "+faststart"]);
+    console.log(w, len, "s:", ["av1.webm", "vp9.webm", "mp4"].map((e) => `${e} ${Math.round(fs.statSync(dst(e)).size / 1024)} KB`).join(", "));
+  }
+}
+if (CUPS) await renderCups(), process.exit(0);
 
 const out = STILLS ? path.join(HERE, "stills-check") : path.join(WORK, CLEAN ? "frames-clean" : "frames");
 fs.mkdirSync(out, { recursive: true });
