@@ -1427,9 +1427,8 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
           ))}
         </div>
         <h2 className="pick__name">{skin.name}</h2>
-        <p className="pick__line">
-          {unlocked(skin.id) ? skin.line : <>🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</>}
-        </p>
+        {/* a locked gnome says what earns him; an unlocked one needs no line */}
+        {!unlocked(skin.id) && <p className="pick__line">🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</p>}
         <AimSetting aim={aim} onChange={onAim} compact />
         <Button variant="primary" className="btn--play" onClick={() => (sound("start"), onPick())} disabled={!unlocked(skin.id)}>
           {unlocked(skin.id) ? "Choose this gnome" : "Locked"}
