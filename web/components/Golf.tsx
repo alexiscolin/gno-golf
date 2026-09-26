@@ -22,6 +22,7 @@ import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
 import { messageOf, holeLink, parHere, HONEST } from "@/components/common";
 import { Boards, FullBoard, Podium, NameForm, useRankNudge, useSavedPlace, type BoardProps } from "@/components/Leaderboard";
+import { networkOf, OTHER_URL } from "@/lib/network";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } from "@/lib/prefs";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -71,6 +72,9 @@ function useConfig() {
     const hooks = DEV || p0.has("camlog");
     const TEST = ["shot", "play", "demo", "weather", "world", "won"];
     const p = new URLSearchParams([...p0].filter(([k]) => (hooks || !TEST.includes(k)) && (DEV || k !== "won")));
+    // a hole's own page (app/h): /h/garden-3/ its slot, /h/garden/ its cup; a ?hole= or ?cup= wins
+    const [, pw, pn] = /^\/h\/([a-z]{2,16})(?:-(\d{1,3}))?\/?$/.exec(window.location.pathname) || [];
+    if (pw && !p.has("hole") && !p.has("cup")) p.set(pn ? "hole" : "cup", pn ? `${pw}/${pn}` : pw);
     setCfg({
       rpc: safeEndpoint(p.get("rpc"), process.env.NEXT_PUBLIC_RPC || DEFAULT_RPC),
       web: safeEndpoint(p.get("web"), process.env.NEXT_PUBLIC_WEB || DEFAULT_WEB),
@@ -823,7 +827,9 @@ export default function Golf() {
     } else if (screen === "worlds" && world) q.set("cup", world);
     else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
     else if (screen === "play") return; // the hole is not known yet: wait for it
-    const url = window.location.pathname + (String(q) ? `?${q}` : "");
+    // a hole's own page (/h/…) is left for the game's address once it moves on
+    const base = window.location.pathname.startsWith("/h/") ? "/" : window.location.pathname;
+    const url = base + (String(q) ? `?${q}` : "");
     const here = window.location.pathname + window.location.search;
     // a link to a hole keeps its address while the title shows (the game on its way to it)
     if (screen === "title" && lastScreen.current === null && (cfg.hole || cfg.cup)) return;
@@ -945,6 +951,8 @@ export default function Golf() {
                 className={"adena" + (account ? " adena--on" : "")}
                 onClick={() => setReal(true)}
                 aria-label={account ? `Saving on-chain as ${account.address}` : "Save on-chain with Adena"}
+                // why a wallet, for the one who never opens the sheet: playing is free, keeping is on-chain
+                title={account ? undefined : "Playing is free. Adena keeps your score on gno.land: public, replayed by the chain, on the boards."}
               >
                 <img className="adena__logo" src="adena.svg" alt="" width="34" height="34" />
                 <span className="adena__text">
@@ -1261,6 +1269,7 @@ export default function Golf() {
 
       {(screen === "worlds" || screen === "pick") && <AboutButton onClick={() => setAbout(true)} />}
       {about && <About web={cfg ? cfg.web : ""} onClose={() => setAbout(false)} />}
+      {cfg && <NetBanner rpc={cfg.rpc} />}
 
       {real && (
         <RealPlay
@@ -1536,6 +1545,23 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Which chain the page plays on, on every screen but mainnet's: a local node
+ * or the testnet, where scores are practice. The other deployment one click
+ * away when there is one.
+ */
+function NetBanner({ rpc }: { rpc: string }) {
+  const net = networkOf(rpc);
+  if (net === "mainnet") return null;
+  return (
+    <p className={`netbanner netbanner--${net}`}>
+      <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
+      <span>{net === "local" ? "a node on this machine" : "practice scores, free test GNOT"}</span>
+      {net === "testnet" && OTHER_URL && <a className="netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
+    </p>
   );
 }
 

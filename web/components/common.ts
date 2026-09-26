@@ -15,11 +15,12 @@ export function holeLink(s: Snapshot, gnome: string) {
   const keep = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
   // a page pointed at another chain keeps pointing there
   for (const k of ["rpc", "web"]) { const v = keep.get(k); if (v) q.set(k, v); }
-  // a hole in no cup (community, archived) is linked by its id, never as place 1
-  if (s.place) (q.set("cup", s.world || "garden"), q.set("hole", String(s.place)));
-  else q.set("hole", s.id || "");
+  // a cup's hole by its own page (app/h, its link card); one in no cup
+  // (community, archived) by its id, never as place 1
+  const slot = s.place ? /^([a-z]+)\/(\d+)(\/v\d+)?$/.exec(s.id || "") : null;
+  if (!slot) q.set("hole", s.id || "");
   if (gnome) q.set("gnome", gnome);
-  return `?${q}`;
+  return (slot ? `h/${slot[1]}-${slot[2]}/` : "") + (String(q) ? `?${q}` : "");
 }
 
 /** The par of the hole being played. */

@@ -35,7 +35,7 @@ export function savedGnome() {
   try {
     const id = localStorage.getItem("gnogolf.gnome");
     const gn = GNOMES.find((x) => x.id === id);
-    if (!gn || (gn.unlock && !earned().includes(id))) return GNOMES[0].id;
+    if (!gn || (gn.unlock && !earned().includes(gn.id))) return GNOMES[0].id;
     return gn.id;
   } catch {
     return GNOMES[0].id;
@@ -43,10 +43,11 @@ export function savedGnome() {
 }
 
 /** The gnomes earned in this browser. */
-export function earned(): unknown[] {
+export function earned(): string[] {
   try {
     const e: unknown = JSON.parse(localStorage.getItem("gnogolf.earned") || "[]");
-    return Array.isArray(e) ? e : []; // a hand edit or an older format must not blank the page
+    // a hand edit or an older format must not blank the page: gnome ids only
+    return Array.isArray(e) ? e.filter((x): x is string => typeof x === "string") : [];
   } catch {
     return [];
   }

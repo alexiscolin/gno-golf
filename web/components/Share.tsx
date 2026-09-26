@@ -28,7 +28,7 @@ interface ShareProps {
  *  site's own (NEXT_PUBLIC_SITE_URL), never a local dev address. */
 export function siteURL(link = "") {
   const site = process.env.NEXT_PUBLIC_SITE_URL;
-  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
+  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/h\/.*$/, "/") : ""; // a hole's page (app/h) links from the site's root
   const origin = site && /localhost|127\.0\.0\.1/.test(here) ? site.replace(/\/$/, "") : here.replace(/\/$/, "");
   return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
 }

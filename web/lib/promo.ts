@@ -10,7 +10,7 @@ import * as THREE from "three";
 import { shotOf } from "./chain";
 import { worldOf } from "./scene/worlds";
 import { cupOf } from "./card";
-import { sound } from "./feel";
+import { sound, type SoundName } from "./feel";
 import type { Chain } from "./chain";
 import type { HoleRow, SimulateRound } from "./types";
 import type { Course, Gnome, Hole } from "./scene/data";
@@ -57,7 +57,7 @@ interface Title {
   kind?: string;
   y?: number;
   sparkle?: number;
-  sfx?: string;
+  sfx?: SoundName;
   bounce?: number;
   pulse?: readonly number[];
   tilt3d?: boolean;

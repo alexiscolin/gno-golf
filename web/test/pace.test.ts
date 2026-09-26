@@ -1,0 +1,79 @@
+// Frame pacing: pace()'s carried budget, slowFrames()'s trimmed-mean hitch
+// detector, and frameMs()'s tier table (60/30/10/sleep).
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { AWAY_MS, frameMs, pace, slowFrames } from "../lib/engine/pace.ts";
+
+void test("pace draws once a whole interval (less 1ms jitter) is owed, else carries the gap", () => {
+  // a 10ms interval: an 8ms gap alone is not owed yet
+  let out = pace(0, 8, 10);
+  assert.equal(out.draw, false);
+  assert.equal(out.budget, 8);
+  // 2ms more reaches the interval: drawn, nothing left over
+  out = pace(out.budget, 2, 10);
+  assert.equal(out.draw, true);
+  assert.equal(out.budget, 0);
+});
+
+void test("pace carries at most one interval, so a stalled tab does not burst-draw", () => {
+  // a huge gap (tab was backgrounded) is capped to one interval's worth carried forward
+  const interval = 1000 / 60;
+  const out = pace(0, 5000, interval);
+  assert.equal(out.draw, true);
+  assert.ok(Math.abs(out.budget - interval) < 1e-9);
+});
+
+void test("pace returns the same object every call", () => {
+  const a = pace(0, 0, 16);
+  const b = pace(0, 0, 16);
+  assert.equal(a, b);
+});
+
+void test("pace averages a 90Hz display to 60 draws a second (30 of every 3 refreshes)", () => {
+  const interval = 1000 / 60, refresh = 1000 / 90;
+  let budget = 0, drawn = 0;
+  for (let i = 0; i < 90; i++) {
+    const out = pace(budget, refresh, interval);
+    budget = out.budget;
+    if (out.draw) drawn++;
+  }
+  assert.equal(drawn, 60);
+});
+
+void test("slowFrames flags a GPU averaging over 20ms, the slowest tenth left out", () => {
+  const busy = Array.from({ length: 20 }, () => 25); // steady 25ms: over the 16.7ms cap
+  assert.equal(slowFrames(busy), true);
+  const fine = Array.from({ length: 20 }, () => 15);
+  assert.equal(slowFrames(fine), false);
+});
+
+void test("slowFrames drops the slowest 10% so one hitch does not read as a slow GPU", () => {
+  const mostlyFine = [...Array.from({ length: 18 }, () => 10), 500, 500]; // two huge hitches among 18 fine frames
+  assert.equal(slowFrames(mostlyFine), false);
+});
+
+void test("slowFrames on a single sample keeps it (ceil(0.9) of 1 is 1: nothing to drop)", () => {
+  assert.equal(slowFrames([100]), true);
+  assert.equal(slowFrames([10]), false);
+});
+
+void test("frameMs: busy always wins, 60fps regardless of anything else", () => {
+  assert.equal(frameMs(true, false, false, 0, 0), 1000 / 60);
+  assert.equal(frameMs(true, true, true, 999999, 999999), 1000 / 60);
+});
+
+void test("frameMs: nothing moving sleeps a second after the last change, else ticks at 10fps", () => {
+  assert.equal(frameMs(false, false, false, 0, 500), 1000 / 10);
+  assert.equal(frameMs(false, false, false, 0, 1000), 1000 / 10); // boundary: not yet past 1000
+  assert.equal(frameMs(false, false, false, 0, 1001), 0);
+});
+
+void test("frameMs: moving but away (no input past AWAY_MS) settles to 10fps", () => {
+  assert.equal(frameMs(false, true, false, AWAY_MS, 0), 1000 / 30); // boundary: not yet past AWAY_MS
+  assert.equal(frameMs(false, true, false, AWAY_MS + 1, 0), 1000 / 10);
+});
+
+void test("frameMs: present and moving, fast movers get 60fps, slow decor 30fps", () => {
+  assert.equal(frameMs(false, true, true, 0, 0), 1000 / 60);
+  assert.equal(frameMs(false, true, false, 0, 0), 1000 / 30);
+});

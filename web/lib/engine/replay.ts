@@ -4,7 +4,7 @@
 //
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
-import { buzz, sound } from "../feel";
+import { buzz, sound, type SoundName } from "../feel";
 import { causeAt } from "../scene/cause";
 import { at, makeSplash, disposeCourse } from "../scene";
 import { BALL_R, inZone, nearestOnPoly, boxOf } from "../terrain";
@@ -48,7 +48,7 @@ function viaEllipse(p: Vec2, u: Vec2, q: Vec2, d: number): Vec2 | null {
   return [p[0] + u[0] * a, p[1] + u[1] * a];
 }
 // what it rolls over sounds like what it is
-const SURFACE_SOUNDS: Readonly<Record<string, string | undefined>> = { sand: "sand", wetsand: "sand", ice: "ice", puddle: "puddle", flowerbed: "flowers" };
+const SURFACE_SOUNDS: Readonly<Record<string, SoundName | undefined>> = { sand: "sand", wetsand: "sand", ice: "ice", puddle: "puddle", flowerbed: "flowers" };
 
 export function makeReplay(E: Live) {
   const { g, scene, ground, lift } = E;
@@ -201,6 +201,20 @@ export function makeReplay(E: Live) {
   }
 
   /** Through a tunnel: down the mouth, along the tube, out of the exit pipe. */
+  // A frame of a tunnel, a climb back or a splash that throws ends that move:
+  // warned, the ball put right (E.stop), and the move settled, so the replay
+  // awaiting it goes on instead of waiting for good.
+  const framesOf = (done: () => void) => (f: FrameRequestCallback) =>
+    window.requestAnimationFrame((now) => {
+      try {
+        f(now);
+      } catch (err) {
+        console.warn("gnogolf: the replay threw", err);
+        E.stop();
+        done();
+      }
+    });
+
   function through(z: Zone, from: THREE.Vector3, to: THREE.Vector3, round: number | undefined) {
     const cutAt = E.cut;
     const tube = g.course?.userData.tubes.get(z);
@@ -209,6 +223,7 @@ export function makeReplay(E: Live) {
     g.inTube = true;
     return new Promise<void>((settle) => {
       const done = () => ((g.inTube = false), settle());
+      const requestAnimationFrame = framesOf(done);
       // a longer tube (a spiral slide) takes longer, at the same pace as a straight one
       const start = performance.now(), T = tube ? Math.min(2400, Math.max(900, tube.getLength() * 75)) : 350;
       const tick = (now: number) => {
@@ -261,6 +276,7 @@ export function makeReplay(E: Live) {
     const cutAt = E.cut;
     const L = tube.getLength(), T = Math.max(450, Math.min(2200, 350 + Math.sqrt(reach * L) * 520));
     return new Promise<void>((done) => {
+      const requestAnimationFrame = framesOf(done);
       const start = performance.now();
       const tick = (now: number) => {
         if (round !== g.round || E.cut !== cutAt) return done();
@@ -308,6 +324,7 @@ export function makeReplay(E: Live) {
     const from = edge || at.clone();
     const land = at.clone().setY(surf + BALL_R * 0.4);
     return new Promise<void>((done) => {
+      const requestAnimationFrame = framesOf(done);
       const t0 = performance.now();
       let rings: { group: THREE.Object3D; step(t: number): void } | null = null, start = 0;
       const tick = (now: number) => {

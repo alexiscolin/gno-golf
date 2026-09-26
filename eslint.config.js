@@ -31,6 +31,13 @@ export default tseslint.config(
     },
   },
   {
+    // the unit tests (npm test): their own tsconfig, and node:test's test()
+    // returns a promise the runner awaits itself
+    files: ["web/test/*.ts"],
+    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: new URL("./web/test/", import.meta.url).pathname }, globals: globals.node },
+    rules: { "@typescript-eslint/no-floating-promises": "off" },
+  },
+  {
     files: ["scripts/*.ts"],
     extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {

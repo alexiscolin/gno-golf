@@ -74,7 +74,8 @@ function why(res: AdenaRes | null | undefined, fallback: string) {
   if (code === NOT_CONNECTED) return "Adena is not connected to this page yet.";
   // a refused transaction: the chain's own words, where Adena passes them on
   const d = res && (res.data as { error?: { message?: string } | string; log?: string } | undefined);
-  const chain = d && ((typeof d.error === "object" && d.error.message) || d.log || d.error);
+  // (typeof null is "object": an error of null falls through to the log)
+  const chain = d && ((d.error && typeof d.error === "object" && d.error.message) || d.log || d.error);
   return (typeof chain === "string" && chain) || (res && res.message) || fallback;
 }
 

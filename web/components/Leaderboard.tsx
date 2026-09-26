@@ -624,7 +624,7 @@ function ClaimRounds({ chain, me, mode, onDone }: { chain: Chain; me: string; mo
     let live = true;
     chain.rank(mode, me).then((r) => live && setHoles(r.rank === 0 ? r.holes : 0)).catch(() => {});
     return () => void (live = false);
-  }, [chain, me, mode, state]);
+  }, [chain, me, mode]); // read once: after "Rank them" the board itself is read again
   if (state === "done") return <p className="note note--good">Your rounds are on the boards.</p>;
   if (!holes) return null;
   const go = async () => {

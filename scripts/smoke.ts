@@ -129,7 +129,20 @@ try {
     await b.send("Page.navigate", { url: `${APP}/?play&camlog&hole=${hole.replace(/\/v\d+$/, "")}` });
     assert.ok(await until<boolean>(`!!(window.__g && document.querySelector('.cam-btn'))`, 100), "the game did not load");
     await sleep(1200);
-    await b.ev(`window.__g.shoot(0, 9.25)`);
+    // the weather moves the ball: a shot that holes now, asked of the chain
+    // around the known one (a free read), then played for real
+    const p = await chain.period();
+    let shot: [number, number] | null = null;
+    search: for (const da of [0, -0.5, 0.5, -1, 1, -1.5, 1.5, -2, 2, -3, 3])
+      for (const pw of [9.25, 9, 9.5, 8.75, 9.75, 8.5, 10]) {
+        const r = await chain.simulateRound(hole, [`${da},${pw}`], p);
+        if (r.holed && r.strokes === 1) {
+          shot = [da, pw];
+          break search;
+        }
+      }
+    assert.ok(shot, "no holing shot found in this weather");
+    await b.ev(`window.__g.shoot(${shot[0]}, ${shot[1]})`);
     assert.ok(await until<boolean>(`!!document.querySelector('.banner--win')`), "no hole-finished banner");
     await sleep(1200);
     assert.match(await b.ev<string>(`(document.querySelector('.saveclock')||{}).textContent||""`), /Save it within/, "the save clock");

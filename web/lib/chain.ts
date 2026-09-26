@@ -157,7 +157,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       } catch (e) {
         throw signal && signal.aborted ? e : down(e);
       }
-      if (body.error) throw new Error(body.error.data || body.error.message);
+      if (body.error) throw down(new Error(body.error.data || body.error.message)); // the node refused the request itself
       const r = body.result && body.result.response && body.result.response.ResponseBase;
       if (!r) throw down(new Error("The node's answer had no response in it."));
       if (r.Error) throw refused(refusal(r.Log) || JSON.stringify(r.Error), r.Log);
@@ -268,8 +268,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** The node's current gas price, as ugnot per gas: { gas, price } → price / gas. */
     gasPrice: memo(async () => {
       const r = await abci("auth/gasprice");
-      const j = JSON.parse(r) as { price: unknown; gas: unknown };
-      return Number(String(j.price).replace(/[^0-9.]/g, "")) / Number(j.gas);
+      let j: { price?: unknown; gas?: unknown } = {};
+      try {
+        j = JSON.parse(r) as typeof j;
+      } catch {}
+      const p = Number(String(j.price).replace(/[^0-9.]/g, "")) / Number(j.gas);
+      if (!Number.isFinite(p) || p <= 0) throw refused("The chain's gas price could not be read.");
+      return p;
     }, PARAMS_TTL),
     /** How much ugnot an address holds here; 0 for an account the chain has never seen. */
     // null when the node cannot say: an RPC outage is not an empty account
@@ -355,7 +360,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     period: async () => {
       const raw = await vm(REALM, "Period()");
       const n = Number((raw.match(/^\((-?\d+) int64\)/) || [])[1]);
-      if (!Number.isFinite(n)) throw new Error("The chain's period is not a number.");
+      if (!Number.isFinite(n)) throw refused("The chain's period is not a number.");
       return n;
     },
     weather: (hole: string, period: number) => qeval(`Weather(${s(hole)}, ${period | 0})`, checks.weather),

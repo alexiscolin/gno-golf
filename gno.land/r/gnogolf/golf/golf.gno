@@ -1115,7 +1115,9 @@ func cleanText(n string, max int) string {
 		}
 		b = append(b, c)
 	}
-	return strings.TrimSpace(string(b))
+	// no bare link: a page might make "https://…" in a hole's name clickable
+	// (": /" keeps the length, so max still holds)
+	return strings.TrimSpace(strings.ReplaceAll(string(b), "://", ": /"))
 }
 
 // maxSkin bounds a skin's length.
