@@ -21,6 +21,42 @@ After V1 comes the Builder: players draw a hole in the browser and publish it
 with `PublishMine`. The realm needs nothing new for it; the work is a GG1
 encoder on the client side (see ADR-002).
 
+## The hole of the day — an idea, to decide before the pearl deploy
+
+One hole a day, the same for everyone, with a board that starts empty every
+morning: a reason to come back, and something to post ("#3 today on Down the
+Tunnel"). It runs on its own: no owner, no cron, no server.
+
+**How it would work**
+
+- **The day comes from the chain's clock**, like the weather: `Day()` is the
+  block time divided by 86,400 (UTC days). Nobody has to start it or end it.
+- **The chain picks the hole.** `HoleOfTheDay()` maps the day to one of the
+  course's current slots with a hash of the day (so the order doesn't simply
+  walk the course), and returns its version id. Anyone can compute tomorrow's:
+  it's public, like everything here.
+- **A finish counts twice.** When a named player finishes today's hole (any
+  `PlayRound*` in the day's weather), golf also seats their best of the day on
+  a daily board keyed by day, mode, strokes and player. A new day is a new key,
+  so the board "resets" by itself; old days stay readable as history.
+- **Reads, paged like the others**: `DailyBoard(day, mode, offset, limit)` and
+  `DailyRank(day, mode, player)`.
+- **The client** shows the hole of the day on the cups screen with a countdown
+  to the next one, opens straight on it, and shares "#N today".
+
+**Costs and limits**
+
+- About one extra row (a few hundred bytes) per player and day, paid by the
+  player's own deposit like the rest; reads are O(page).
+- **It has to live in golf.** A separate realm can't see golf's finishes (there
+  are no hooks), so this is a golf change: either in the V1 we deploy on pearl,
+  or later in a golf v2 through `SetSuccessor`. Putting it in V1 avoids a
+  migration.
+- **Bots know the hole in advance**, since the pick and the physics are public:
+  fine for a board played for fun, not enough for prizes (those would need a
+  hole revealed at the start of the day by something no one can predict, and a
+  tournament design of their own).
+
 One dependency has never been exercised: a real `create_session` from a web page
 with Adena. The whole no-popup, we-pay-the-gas story rests on it.
 
