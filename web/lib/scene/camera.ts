@@ -157,7 +157,9 @@ function frameOf(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: Pick<Vi
 /** The Far view's mouse orbit at its widest: this much yaw, this much tilt either way. */
 export const ORBIT = { yaw: (24 * Math.PI) / 180, tilt: 0.35 };
 /** How far back the Far view may stand, times its framing, to leave the orbit its room. */
-const FAR_BACK = 1.1;
+const FAR_BACK = 1;
+/** The least share of ORBIT the mouse always has, room or not. */
+const FAR_MIN_ORBIT = 0.35;
 
 /**
  * The Far view: the whole hole with a margin round it, a little lower than
@@ -167,15 +169,16 @@ const FAR_BACK = 1.1;
  * up orbit rather than distance.
  */
 export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: View): Rig & { orbit: number; tilt: number } {
-  const rig = overviewRig(camera, box, view, { fill: 0.96, tilt: 0.5 });
-  const { w, h, top, bottom, side } = view;
+  const rig = overviewRig(camera, box, view, { fill: 1, tilt: 0.5 });
+  const { w, h, top, bottom } = view;
   const t: Rig = { ...rig, ox: 0 }; // (the live camera slides the picture up or down, never sideways)
   const fits = (k: number) =>
     [[1, 1], [1, -1], [-1, 1], [-1, -1]].every(([a, b]) => {
       t.yaw = a * k * ORBIT.yaw;
       t.tilt = (rig.tilt ?? 0) + b * k * ORBIT.tilt;
       const r = frameOf(camera, box, view, t);
-      return r.x0 >= side - 0.5 && r.x1 <= w - side + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
+      // (swung, the box may reach into the side gutters: the orbit is a glance, the HUD is above and below)
+      return r.x0 >= -0.5 && r.x1 <= w + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
     });
   const d0 = rig.dist;
   if (!fits(1)) {
@@ -196,7 +199,8 @@ export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: V
     const mid = (lo + hi) / 2;
     if (fits(mid)) lo = mid; else hi = mid;
   }
-  return Object.assign(rig, { orbit: lo, tilt: rig.tilt ?? 0 });
+  // a little orbit always: at its ends the hole may leave the frame for a glance
+  return Object.assign(rig, { orbit: Math.max(lo, FAR_MIN_ORBIT), tilt: rig.tilt ?? 0 });
 }
 
 /** Close on a point — the ball — centred in the free part of the screen. */
