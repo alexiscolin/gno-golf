@@ -286,10 +286,13 @@ export function makeCamera(E: Live) {
     const widen = turning || reversing || state === "holed" || (pulling && Math.abs(d) > Math.PI / 2);
     wide += ((widen ? 1 : 0) - wide) * (1 - Math.exp(-dt * (widen ? 5 : 1.5)));
     // behind along the heading — swung round a little if a wall right behind blocks the view
-    const up = (state === "holed" ? 4.2 : 3) + wide * 2.5 + rise;
-    if (fresh || ++swingTick % 10 === 0) swingTo = clearHeading(B, 7 + wide * 4, up, pulling);
+    // an upright screen shows little of the lane either side: further back and
+    // higher there, or the gnome fills a third of the picture
+    const sv = screen(), far = sv.w < sv.h ? 1 + (1 - sv.w / sv.h) * 0.9 : 1;
+    const up = ((state === "holed" ? 4.2 : 3) + wide * 2.5) * far + rise;
+    if (fresh || ++swingTick % 10 === 0) swingTo = clearHeading(B, (7 + wide * 4) * far, up, pulling);
     swing += (swingTo - swing) * (1 - Math.exp(-dt * 3));
-    const back = 7 + wide * 4 - pen;
+    const back = (7 + wide * 4) * far - pen;
     cdir.set(Math.cos(yaw + swing), 0, Math.sin(yaw + swing));
     behind(chase, B, cdir, { back, up, ahead: 0, lookUp: 0 });
     // the collision pass (walls, posts, ground under the line) three times in
@@ -309,7 +312,9 @@ export function makeCamera(E: Live) {
     want.fov = TP_FOV + squeezed * SQUEEZE_FOV;
     want.oy = 0;
     want.near = 0.5;
-    want.far = 80; // close in: the course and its near scenery, not the far hills (fewer draws, finer depth)
+    // the whole scenery, sea and far hills to the horizon: a nearer far plane
+    // cut them off with a hard edge and culled nothing (the merged decor spans it)
+    want.far = 260;
     fresh = false;
     return teleport; // a teleport jumps; a mode switch eases from the actual pose
   }

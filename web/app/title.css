@@ -269,17 +269,20 @@
 .won__star { fill: #fff; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
 
 /* the pick: the card under the pointer or the focus grows, its name-button
-   tilts; the current cup keeps a gold ring */
-.worlds--v2 .world--on { box-shadow: 0 0 0 4px var(--glow), 0 0 28px 6px rgba(255, 224, 102, .6), var(--deep-card); }
+   tilts. Only the pointer's card glows; the focus has a ring of its own, and
+   the cup last played a "Last played" tag, so one card at most looks picked */
 .worlds--v2 .world--on .world__ribbon { background: var(--hat); }
-.worlds--v2 .world:hover:not([disabled]),
-.worlds--v2 .world:focus-visible {
-  z-index: 1; transform: translateY(-10px) scale(1.06);
-  box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(255, 224, 102, .75), 0 16px 0 var(--ink);
+.world__last {
+  position: absolute; top: 14px; left: 14px; z-index: 3; pointer-events: none;
+  padding: 3px 10px; border-radius: 999px; background: var(--ink); color: var(--paper);
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
+.worlds--v2 .world:hover:not([disabled]),
+.worlds--v2 .world:focus-visible { z-index: 1; transform: translateY(-10px) scale(1.06); }
+.worlds--v2 .world:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(255, 224, 102, .75), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) .world__ribbon,
 .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
-.worlds--v2 .world:focus-visible { outline: 4px solid var(--paper); outline-offset: 4px; }
+.worlds--v2 .world:focus-visible { outline: 4px solid var(--ink); outline-offset: 5px; box-shadow: 0 0 0 5px var(--paper), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) svg, .worlds--v2 .world:focus-visible svg { transform: none; }
 .worlds--v2 .world:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
 .worlds--v2 .world[disabled] { background: linear-gradient(170deg, #e6ebe8, #aab6b0); }
@@ -287,11 +290,13 @@
 .worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--deep-panel); color: var(--ink); }
 .worlds--v2 .community { background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px; padding: 10px 14px; box-shadow: var(--deep-panel); }
 
-/* the builder: another game, to come; a small tab under the cups */
+/* the builder: another game, to come; a small tab under the cups, plainly
+   not a button yet (dashed, flat, dimmed) */
 .builder {
   display: inline-flex; align-items: center; gap: 10px; margin: clamp(18px, 3vh, 30px) auto 0; padding: 5px 8px 5px 5px;
   border-radius: 999px; color: var(--ink); font-size: 14px; line-height: 1.2; cursor: default;
 }
+.worlds--v2 .builder { border-style: dashed; box-shadow: none; opacity: .72; }
 .builder svg { width: 34px; height: 34px; flex: none; display: block; }
 .builder b { font-size: 16px; }
 .builder__tag { color: var(--ink-soft); }
@@ -367,7 +372,7 @@
   transform: rotate(-6deg); box-shadow: 0 4px 0 rgba(20, 65, 52, .35);
 }
 .screen--pick .pick__dots { justify-content: center; flex-wrap: wrap; gap: 6px; margin: 0; padding: 4px 10px 12px; }
-.screen--pick .pick__dots span { width: 8px; height: 8px; border-color: var(--ink); background: var(--paper); }
+.screen--pick .pick__dots span { width: 10px; height: 10px; border-color: var(--ink); background: var(--paper); }
 .screen--pick .pick__dots span[aria-current="true"] { background: var(--glow); transform: scale(1.3); }
 @media (max-width: 600px) {
   .screen--pick .pick__stage { gap: 8px; }

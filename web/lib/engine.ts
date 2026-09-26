@@ -459,6 +459,40 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (confetti && !confetti.step(dt)) dropConfetti();
     // nothing to see behind the title and picker screens, which are opaque
     if (g.started) renderer.render(scene, camera);
+    cupPip();
+  }
+
+  // The cup off the picture, before the first stroke (Classic and Third
+  // person, the camera on the gnome): a small inked pip at the edge of the free
+  // screen, pointing to it. It fades once the cup is in view or a shot is played.
+  const pip = document.createElement("div");
+  pip.className = "cuppip";
+  pip.setAttribute("aria-hidden", "true");
+  pip.innerHTML = '<svg viewBox="-24 -24 48 48" width="56" height="56"><path d="M 13 -6 L 22 0 L 13 6 Z" class="cuppip__arrow"/><circle r="13" class="cuppip__disc"/><path d="M -4 7 V -8 L 7 -4 L -4 0" class="cuppip__flag"/></svg>';
+  canvas.parentElement?.appendChild(pip);
+  const cupNdc = new THREE.Vector3();
+  let pipOn = false;
+  function cupPip() {
+    const want = !!g.s && g.started && g.view === "ball" && g.cam !== "far" && !g.shots.length && !g.flying && !g.holed && !g.covered;
+    let show = false;
+    if (want && g.s) {
+      cupNdc.set(g.s.cup[0], ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]).project(camera);
+      const behind = cupNdc.z > 1, w = window.innerWidth, h = window.innerHeight;
+      const x = behind ? -cupNdc.x : cupNdc.x, y = behind ? -cupNdc.y : cupNdc.y;
+      // the free part of the screen, in NDC: inside the HUD's bands
+      const x1 = 1 - (2 * (HUD.side + 26)) / w, y1 = 1 - (2 * (HUD.top + 26)) / h, y0 = -1 + (2 * (HUD.bottom + 26)) / h, cy = (y0 + y1) / 2, ry = (y1 - y0) / 2;
+      show = behind || Math.abs(x) > x1 || y < y0 || y > y1;
+      if (show) {
+        // on the line from the free part's centre toward the cup, at its edge
+        let dx = x, dy = y - cy;
+        if (Math.hypot(dx, dy) < 1e-6) (dx = 0), (dy = -1); // right behind: at the bottom
+        const k = Math.min(Math.abs(dx) > 1e-6 ? x1 / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? ry / Math.abs(dy) : Infinity);
+        const px = ((dx * k + 1) / 2) * w, py = ((1 - (cy + dy * k)) / 2) * h;
+        pip.style.transform = `translate(${(px - 28).toFixed(1)}px, ${(py - 28).toFixed(1)}px)`;
+        pip.style.setProperty("--a", `${Math.atan2(-dy * h, dx * w).toFixed(3)}rad`);
+      }
+    }
+    if (show !== pipOn) pip.classList.toggle("cuppip--on", (pipOn = show));
   }
 
   // --------------------------------------------------------------- loading
@@ -1367,6 +1401,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       if (g.course) disposeCourse(g.course);
       for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group]) if (o) disposeCourse(o);
       renderer.dispose();
+      pip.remove();
     },
   };
   // the test hooks, only for a page that asks for them
