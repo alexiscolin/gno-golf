@@ -39,12 +39,12 @@ func giveName(cur realm, addr address, name string) {
 	}
 }
 
-// cupHole is a small course hole: a box with the cup two units from the
+// cupHole is a small course hole: a box with the cup 1.3 units from the
 // tee, so a soft "0,1" stops in it whatever the weather (sheltered from
 // the wind), and "0,0.001" hardly moves.
 func cupHole(world string, order int, title string) *course.Simple {
 	return &course.Simple{W: 32, H: 16, World: world, Order: float64(order), Title: title, Strokes: 3,
-		Tee: physics.V(2, 8), Pin: physics.V(4, 8), Substeps: 14, CupRadius: 1.2, Shelter: 0.01,
+		Tee: physics.V(2, 8), Pin: physics.V(3.3, 8), Substeps: 14, CupRadius: 1.2, Shelter: 0.01,
 		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9, Radius: 0.5}}
 }
 
@@ -80,8 +80,8 @@ func mine(cur realm, slug string, h *course.Simple) string {
 // holeIt is a power that holes a flat hole from its tee, straight at the
 // cup, and holeShot the same as a shot.
 const (
-	holeIt   = 7.0
-	holeShot = "0,7"
+	holeIt   = 7.5
+	holeShot = "0,7.5"
 )
 
 // register publishes a flat community hole and returns its id.
@@ -393,7 +393,7 @@ func TestTimingIsPartOfTheShot(cur realm, t *testing.T) {
 	past := 0
 	for tick := 0; tick < 8; tick++ {
 		out := simAt(id, ufmt.Sprintf("0,5,%d", tick), p)
-		if !strings.Contains(out, `"path":[[2.000,3.000],[5.000`) {
+		if !strings.Contains(out, `"path":[[2.000,3.000],[4.58`) {
 			continue
 		}
 		last := out[strings.LastIndex(out, "[")+1:]

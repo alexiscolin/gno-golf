@@ -231,11 +231,12 @@ is `"assisted"` or `"pro"`, and each has its own records and ranking.
   centre stays that far from walls and posts, so draw a ball of that radius and
   it touches walls instead of sinking into them.
 - **A ball drops in when it rolls over the cup slowly** — no faster than
-  `course.CaptureSpeed` (1.3 units per substep, a ball barely rolling) — not only when it stops on it.
+  `course.Capture` allows (Holmes's criterion: 1.9 units per substep over the
+  middle of the cup, less nearer its rim) — not only when it stops on it.
   The path is cut there and ends on the pin. Never while the ball is in the air.
 - **A board has the hole's own size.** `board` is 32×16 by default, and a hole
   can be up to 96 on a side. Wear stays a 16×8 grid stretched over the board.
-- **A stroke's power is scaled by `course.Kick` (0.6)**, and a substep is
+- **A stroke's power p is a speed of `course.Kick`·p^(3/4) (0.79, 4.44 at full power)**, and a substep is
   walked in moves of at most `physics.MaxMove` (1.5), so a fast ball meets
   every zone it crosses. A tunnel or hazard jump is recognised by where the
   step *lands* (the zone's `vec`), not by where it starts — a fast ball enters

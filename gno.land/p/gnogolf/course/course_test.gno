@@ -1,6 +1,7 @@
 package course
 
 import (
+	"math"
 	"testing"
 
 	"gno.land/p/gnogolf/physics"
@@ -16,7 +17,7 @@ func roll(speed float64) physics.Shot {
 }
 
 func TestSlowBallDropsWhileCrossing(t *testing.T) {
-	shot, holed := Sink(roll(1), physics.Vec2{X: 10, Y: 5.5}, 1.4)
+	shot, holed := Sink(roll(1), physics.Vec2{X: 10, Y: 5.5}, 1.4, 0.5)
 	if !holed {
 		t.Fatal("a slow ball rolling over the cup must drop")
 	}
@@ -29,19 +30,52 @@ func TestSlowBallDropsWhileCrossing(t *testing.T) {
 }
 
 func TestFastBallSkimsOver(t *testing.T) {
-	if _, holed := Sink(roll(3), physics.Vec2{X: 10, Y: 5}, 1.4); holed {
-		t.Fatal("a ball faster than CaptureSpeed must skim over")
+	if _, holed := Sink(roll(3), physics.Vec2{X: 10, Y: 5}, 1.4, 0.5); holed {
+		t.Fatal("a ball faster than Capture allows must skim over")
+	}
+}
+
+// Holmes's criterion: over the middle of a 1.2 cup a 0.5 ball drops up to
+// (2·1.2 − 0.5)·sqrt(G/1) = 1.9 a substep; off the middle the chord is
+// shorter, and a ball that crosses near the rim must be slower; a graze past
+// about 1.17 never drops.
+func TestTheCupCapturesByHolmes(t *testing.T) {
+	if c := Capture(1.2, 0.5, 0); math.Abs(c-1.9) > 1e-12 {
+		t.Fatalf("over the middle: %v, want 1.9", c)
+	}
+	want := func(b float64) float64 { return (2*math.Sqrt(1.44-b*b) - 0.5) * math.Sqrt(physics.G/1) }
+	for _, b := range []float64{0.3, 0.6, 0.9, 1.1} {
+		if c := Capture(1.2, 0.5, b); math.Abs(c-want(b)) > 1e-12 || !(c < Capture(1.2, 0.5, b-0.3)) {
+			t.Fatalf("off by %v: %v, want %v, below the one nearer the middle", b, c, want(b))
+		}
+	}
+	if Capture(1.2, 0.5, 1.18) != 0 || Capture(1.2, 0.5, 1.3) != 0 {
+		t.Fatal("a graze does not drop")
+	}
+	pin := physics.Vec2{X: 10, Y: 5.5}
+	for _, c := range []struct {
+		speed, off float64
+		drops      bool
+	}{{1.85, 0, true}, {1.95, 0, false}, {1.5, 0.6, true}, {1.65, 0.6, false}, {0.4, 1.1, true}, {0.5, 1.1, false}} {
+		shot := roll(c.speed)
+		for i := range shot.Path {
+			shot.Path[i].Y += c.off
+			shot.Path[i].X += 10 - 4 - 2*c.speed - c.speed/2 // the pin halfway along a step
+		}
+		if _, holed := Sink(shot, pin, 1.2, 0.5); holed != c.drops {
+			t.Errorf("at %v, %v off the middle: holed %v", c.speed, c.off, holed)
+		}
 	}
 }
 
 func TestBallInTheAirFliesOverTheCup(t *testing.T) {
 	shot := roll(1)
 	shot.Air = []bool{false, false, false, false, true, true, true, false}
-	if _, holed := Sink(shot, physics.Vec2{X: 9, Y: 5.5}, 1.4); holed {
+	if _, holed := Sink(shot, physics.Vec2{X: 9, Y: 5.5}, 1.4, 0.5); holed {
 		t.Fatal("a ball flying over the cup must not drop into it")
 	}
 	shot.Air = make([]bool, len(shot.Path))
-	if sunk, holed := Sink(shot, physics.Vec2{X: 9, Y: 5.5}, 1.4); !holed || len(sunk.Air) != len(sunk.Path) {
+	if sunk, holed := Sink(shot, physics.Vec2{X: 9, Y: 5.5}, 1.4, 0.5); !holed || len(sunk.Air) != len(sunk.Path) {
 		t.Fatal("the same roll on the ground drops, and keeps its air flags in step")
 	}
 }

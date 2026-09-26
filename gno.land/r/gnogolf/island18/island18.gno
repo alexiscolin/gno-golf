@@ -28,8 +28,8 @@ var me = course.Fit(&course.Simple{
 			{Circle: physics.Circle{C: physics.V(36.2, 15), R: 0.6}, Bounce: 0.8, Skin: "palm"},
 		},
 		Zones: []physics.Zone{
-			// the banks lean in at the drag (physics.Drag): they bend a moving
-			// ball, never start a stopped one
+			// the banks lean in under the green's rolling resistance
+			// (physics.Rolling): they bend a moving ball, never start a stopped one
 			{Kind: physics.Slope, Min: physics.V(10, 1), Max: physics.V(16, 29), Vec: physics.V(0.12, 0), Skin: "bank"},
 			{Kind: physics.Slope, Min: physics.V(32, 1), Max: physics.V(38, 29), Vec: physics.V(-0.12, 0), Skin: "bank"},
 			{Kind: physics.Slope, Min: physics.V(16, 23), Max: physics.V(32, 29), Vec: physics.V(0, -0.12), Skin: "bank"},

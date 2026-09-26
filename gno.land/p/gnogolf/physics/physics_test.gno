@@ -29,7 +29,7 @@ func TestShortWallIsNotAnInfiniteLine(t *testing.T) {
 
 func TestPostBouncesBack(t *testing.T) {
 	f := &Field{Posts: []Post{{Circle: Circle{C: Vec2{5, 5}, R: 1}}}, Friction: 1, Bounce: 1}
-	sh := f.Step(Vec2{1, 5}, Vec2{1, 0}, 6)
+	sh := f.Step(Vec2{1, 5}, Vec2{1.5, 0}, 6)
 	if sh.Bounces == 0 {
 		t.Fatal("a head-on shot at a post must bounce")
 	}
@@ -158,10 +158,10 @@ func TestBumpersCannotPumpForever(t *testing.T) {
 	}
 }
 
-// No bounce ever gives a ball more speed than it had: not a wall, not the
-// liveliest bumper, head on or at a graze.
+// No passive piece ever gives a ball more speed than it had, head on or at a
+// graze: only a bumper (a Bounce above 1) does.
 func TestNoBounceAddsSpeed(t *testing.T) {
-	for _, b := range []float64{0.5, 0.85, 1, 1.15, 1.3} {
+	for _, b := range []float64{0.5, 0.85, 1} {
 		f := &Field{
 			Walls:    Box(Vec2{0, 0}, Vec2{40, 20}),
 			Posts:    []Post{{Circle: Circle{C: Vec2{20, 10}, R: 1.2}, Bounce: b}},
@@ -208,7 +208,7 @@ func TestStadiumHoldsTheBall(t *testing.T) {
 // a lane with a hill, then a pond right behind its top
 func hillAndPond() *Field {
 	return &Field{
-		Walls: Box(Vec2{0, 0}, Vec2{40, 8}),
+		Walls: Box(Vec2{0, 0}, Vec2{60, 8}),
 		Zones: []Zone{
 			{Kind: Slope, Min: Vec2{5, 0}, Max: Vec2{15, 8}, Vec: Vec2{-0.2, 0}},
 			{Kind: Hazard, Min: Vec2{15.5, 0}, Max: Vec2{19, 8}, Vec: Vec2{1, 4}},
@@ -237,8 +237,8 @@ func TestFastBallFliesOverThePondBehindAHill(t *testing.T) {
 }
 
 func TestSlowBallOverTheTopLandsInThePond(t *testing.T) {
-	sh := hillAndPond().Step(Vec2{2, 4}, Vec2{4.2, 0}, 30)
-	// it may hop off the top, but not far enough to clear the water
+	sh := hillAndPond().Step(Vec2{2, 4}, Vec2{3.6, 0}, 30)
+	// too slow at the top to take off: it rolls over it into the water
 	if sh.Rest() != (Vec2{1, 4}) {
 		t.Fatalf("it should drown and go back, rested at %v; path %v", sh.Rest(), sh.Path)
 	}
@@ -404,7 +404,7 @@ func TestATimedGustOnlyBlowsInItsWindow(t *testing.T) {
 func TestABallLeftOnASlopeRollsDown(t *testing.T) {
 	f := &Field{
 		Walls:    Box(Vec2{0, 0}, Vec2{60, 6}),
-		Zones:    []Zone{{Kind: Slope, Min: Vec2{10, 0}, Max: Vec2{40, 6}, Vec: Vec2{0.2, 0}}},
+		Zones:    []Zone{{Kind: Slope, Min: Vec2{10, 0}, Max: Vec2{40, 6}, Vec: Vec2{0.3, 0}}},
 		Friction: 0.86,
 		Radius:   0.5,
 	}
@@ -530,7 +530,7 @@ func TestAPinnedBallStops(t *testing.T) {
 // A timed hill (a seesaw) pulls while it is there: a ball that stops on it
 // rolls back down as on any hill, within the stroke.
 func TestATimedHillPullsWhileItIsThere(t *testing.T) {
-	see := Zone{Kind: Slope, Min: V(10, 0), Max: V(40, 10), Vec: V(0.22, 0), Every: 1000, On: 1000}
+	see := Zone{Kind: Slope, Min: V(10, 0), Max: V(40, 10), Vec: V(0.3, 0), Every: 1000, On: 1000}
 	f := &Field{Walls: Box(V(0, 0), V(60, 10)), Zones: []Zone{see}, Friction: 0.87, Radius: 0.5}
 	s := f.Step(V(30, 5), V(-1.5, 0), 30)
 	if s.Rest().X < 35 {

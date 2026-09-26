@@ -8,7 +8,7 @@ import "math"
 //
 //	gate / archway       two Walls with a gap between them
 //	narrowing, dogleg    Walls
-//	bumper, post, rock   a Post (Bounce up to MaxBounce: nothing adds energy)
+//	bumper, post, rock   a Post (a Bounce above 1 is a bumper that kicks)
 //	tunnel, teleporter   a Tunnel zone
 //	ramp, slope, hill    a Slope zone (uphill pushes back, downhill pulls on)
 //	sand, ice, carpet    a Surface zone
@@ -76,12 +76,14 @@ func Timed(ws []Wall, every, on, phase int) []Wall {
 	return ws
 }
 
-// Post is a round obstacle: a bumper, a rock, a stump. Its Bounce is played
-// at MaxBounce at most: a lively bumper gives back most of the ball's speed,
-// a dead one soaks it up.
+// Post is a round obstacle: a bumper, a rock, a stump. Its Bounce is the
+// restitution of the contact, played at MaxBounce at most up to 1: a lively
+// post gives back most of the ball's speed, a dead one soaks it up. Above 1
+// it is a bumper, an active one that kicks the ball back faster than it came
+// (at most MaxKick times).
 type Post struct {
 	Circle
-	Bounce float64 // 0 = use the field default; above MaxBounce plays as MaxBounce
+	Bounce float64 // 0 = use the field default; up to 1 played at MaxBounce at most; above 1 a bumper
 	Mark   rune
 	Skin   string
 }
@@ -91,8 +93,8 @@ type ZoneKind int
 
 // The zone kinds, each named in its own line.
 const (
-	Surface ZoneKind = iota // Scale multiplies friction: sand slows, ice frees
-	Slope                   // Vec is added to velocity each substep
+	Surface ZoneKind = iota // Scale sets the rolling resistance (Rolling): sand holds, ice frees
+	Slope                   // a hill: Vec, gravity along it, is added to velocity each substep
 	Tunnel                  // the ball is moved to Vec, keeping its velocity
 	Hazard                  // the ball stops at Vec: water, a pit, a hungry skull
 	// Loop is the mouth of a closed tube (a loop-the-loop, a spiral): Min..Max
@@ -116,8 +118,8 @@ const LoopKeep = 0.8
 type Zone struct {
 	Kind     ZoneKind
 	Min, Max Vec2
-	Vec      Vec2    // Slope: acceleration. Tunnel / Hazard: destination. Loop: where its track comes down.
-	Scale    float64 // Surface: friction multiplier. Loop: the speed to go round.
+	Vec      Vec2    // Slope: acceleration (G·sin θ downhill). Tunnel / Hazard: destination. Loop: where its track comes down.
+	Scale    float64 // Surface: its rolling resistance (Rolling). Loop: the speed to go round.
 	Mark     rune
 	Skin     string
 	// Round makes the zone the ellipse inscribed in Min..Max rather than the
@@ -137,7 +139,7 @@ type Zone struct {
 	// rather than a hill: it pushes the ball, but is no hill to take off
 	// from or roll back down, and it hides none under it. Capped air never
 	// speeds the ball up — it bends and brakes it only: the weather's wind,
-	// which stronger than Drag kept a ball drifting for ever on the flat.
+	// which on ice would beat the rolling resistance and keep a ball drifting.
 	Air, Capped bool
 }
 
@@ -168,7 +170,7 @@ type Field struct {
 	Walls    []Wall
 	Posts    []Post
 	Zones    []Zone
-	Friction float64 // per substep, 0.8 rolls to a stop in about a dozen
+	Friction float64 // the green's rolling resistance, as Rolling maps it: 0.87 is Crr 0.224
 	Bounce   float64 // default restitution of barriers
 	// Radius of the ball (0 plays it as a point). A renderer that draws a
 	// ball of some size needs the physics to know that size, or the ball is
