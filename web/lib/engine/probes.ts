@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { onAt, closest } from "../terrain";
 import { isDrawn } from "../scene/materials";
+import { laneBox } from "../scene/camera";
 import { ud } from "../scene/data";
 import type { Vec2 } from "../types";
 import type { Live } from "./types";
@@ -175,17 +176,17 @@ export function probes(E: Live, { cam, rp, placeBall, onHoled, fakeWeather }: In
     camPose: () => camera.position.toArray(),
     /** The Far rig: the orbit share it has room for, its pitch blend, its distance. */
     farOrbit: () => g.far && { orbit: +g.far.orbit.toFixed(2), tilt: g.far.tilt, dist: +g.far.dist.toFixed(1) },
-    // the course box's corners on screen, as the camera is now: [x0, y0, x1, y1] in CSS px
+    // the Far view's lane box (laneBox, as the engine frames it): its corners on screen, as the camera is now: [x0, y0, x1, y1] in CSS px
     boardFrame: () => {
       if (!g.s) return null;
-      const b = g.s.board, r = [1e9, 1e9, -1e9, -1e9], q = new THREE.Vector3();
-      for (const x of [-1.5, b.w + 1.5]) for (const y of [-1, 1.5]) for (const z of [-1.5, b.h + 1.5]) {
+      const b = g.s.board, box = laneBox(g.s, E.ground), r = [1e9, 1e9, -1e9, -1e9], q = new THREE.Vector3();
+      for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
         q.set(x, y, z).project(camera);
         const px = ((q.x + 1) / 2) * innerWidth, py = ((1 - q.y) / 2) * innerHeight;
         r[0] = Math.min(r[0], px); r[1] = Math.min(r[1], py); r[2] = Math.max(r[2], px); r[3] = Math.max(r[3], py);
       }
       const d = camera.getWorldDirection(q);
-      return { r: r.map(Math.round), w: innerWidth, h: innerHeight, pitch: Math.round((Math.asin(-d.y) * 180) / Math.PI), view: g.view, cam: g.cam, board: [b.w, b.h] };
+      return { r: r.map(Math.round), w: innerWidth, h: innerHeight, pitch: Math.round((Math.asin(-d.y) * 180) / Math.PI), view: g.view, cam: g.cam, board: [b.w, b.h], box: [box.min.toArray(), box.max.toArray()].map((v) => v.map((n) => +n.toFixed(2))) };
     },
   };
 }
