@@ -157,7 +157,7 @@ function frameOf(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: Pick<Vi
 /** The Far view's mouse orbit at its widest: this much yaw, this much tilt either way. */
 export const ORBIT = { yaw: (24 * Math.PI) / 180, tilt: 0.35 };
 /** How far back the Far view may stand, times its framing, to leave the orbit its room. */
-const FAR_BACK = 1.25;
+const FAR_BACK = 1.1;
 
 /**
  * The Far view: the whole hole with a margin round it, a little lower than
@@ -167,7 +167,7 @@ const FAR_BACK = 1.25;
  * up orbit rather than distance.
  */
 export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: View): Rig & { orbit: number; tilt: number } {
-  const rig = overviewRig(camera, box, view, { fill: 0.86, tilt: 0.5 });
+  const rig = overviewRig(camera, box, view, { fill: 0.96, tilt: 0.5 });
   const { w, h, top, bottom, side } = view;
   const t: Rig = { ...rig, ox: 0 }; // (the live camera slides the picture up or down, never sideways)
   const fits = (k: number) =>

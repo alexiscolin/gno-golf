@@ -5,7 +5,7 @@
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
 import { shotOf, RULES } from "../chain";
-import { angDiff } from "../terrain";
+import { angDiff, onAt, segHit, rayCircle, BALL_R } from "../terrain";
 import { causeAt } from "../scene/cause";
 import { aimAlong } from "../scene";
 import type { Mode, MutVec2, Stroke, Vec2 } from "../types";
@@ -172,14 +172,36 @@ export function makeAimer(E: Live) {
     const c = Math.cos(d), sn = Math.sin(d);
     aim.position.set(bx - (bx * c - bz * sn), 0, bz - (bx * sn + bz * c));
   }
+  // the share of a straight run of len along angle the ball goes before its edge meets a wall or a post (1: nothing)
+  const SWING_MAX = 0.12; // radians
+  function firstHit(angle: number, len: number) {
+    if (!g.s) return 1;
+    const ox = g.ball.x, oz = g.ball.y, cx = ox + Math.cos(angle) * len, cz = oz + Math.sin(angle) * len, tick = Math.floor(E.clock);
+    let t = 1;
+    for (const w of g.s.walls) {
+      if (!onAt(w, tick)) continue;
+      const h = segHit(ox, oz, cx, cz, w.a, w.b);
+      if (h >= 0 && h < t) t = h;
+    }
+    for (const p of g.s.posts) {
+      const h = rayCircle(ox, oz, cx, cz, p.c, p.r + BALL_R);
+      if (h > 0 && h < t) t = h;
+    }
+    return Math.max(0, t - BALL_R / len);
+  }
   function preview() {
     interpolate();
     if (!(E.shot.power > 0.3)) return; // too soft to shoot: nothing to ask
     if (PREVIEW().stopAt === "hidden") return void (aim.visible = false); // pro: no line, no request
+    // the chain's dots swung round the ball stand for the new aim only while
+    // it is close to theirs: past that they would cross walls, and the
+    // straight line (stopped at the first thing in the way) says it better
+    if (shown && Math.abs(angDiff(E.shot.angle, shown.angle)) > SWING_MAX) shown = null;
     // no answer from the chain yet for this pull: a straight line of dots
-    // along the aim, replaced by the chain's the moment it lands
+    // along the aim, stopped at the first wall or post, replaced by the
+    // chain's the moment it lands
     if (!shown && g.ball) {
-      const len = Math.min(PREVIEW().maxLen, 2 + (E.shot.power / MAX_POWER) * 16);
+      const reach = Math.min(PREVIEW().maxLen, 2 + (E.shot.power / MAX_POWER) * 16), len = reach * firstHit(E.shot.angle, reach);
       straight[0][0] = g.ball.x, straight[0][1] = g.ball.y;
       straight[1][0] = g.ball.x + Math.cos(E.shot.angle) * len, straight[1][1] = g.ball.y + Math.sin(E.shot.angle) * len;
       aimAlong(aim, straight, dotPower(E.shot.power), ground);
