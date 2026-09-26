@@ -15,6 +15,7 @@ import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
 import Share from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
+import About from "@/components/About";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
@@ -296,6 +297,7 @@ export default function Golf() {
   });
   const [menu, setMenu] = useState(false);
   const [board, setBoard] = useState(false); // the leaderboard sheet
+  const [about, setAbout] = useState(false); // the about sheet
   // the aim mode, kept in this browser: assisted (the whole path) or pro
   const [aim, setAimState] = useState<Mode>(() => {
     try {
@@ -800,7 +802,7 @@ export default function Golf() {
       {/* rain and storm darken and wet the whole scene a little */}
       {playing && wx && (wx.rain || wx.storm) && <div className={"wet" + (wx.storm ? " wet--storm" : "")} aria-hidden="true" />}
 
-      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => setScreen("worlds")} />}
+      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => setScreen("worlds")} onAbout={() => setAbout(true)} />}
       {screen === "worlds" && s && (
         <Worlds
           counts={s.worlds}
@@ -913,6 +915,7 @@ export default function Golf() {
                     <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}>The cup</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("pick"); }}>Change gnome</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("title"); }}>Main menu</Button>
+                    <Button variant="secondary" onClick={() => { setMenu(false); setAbout(true); }}>About</Button>
                     {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
@@ -1151,6 +1154,8 @@ export default function Golf() {
           </div>
         </div>
       )}
+
+      {about && <About web={cfg ? cfg.web : ""} onClose={() => setAbout(false)} />}
 
       {real && (
         <RealPlay
