@@ -165,6 +165,7 @@ interface Ramp {
   lo: number; span: number; rise: number; noLip: boolean;
   a0: number; a1: number;
   plateau?: boolean; run?: boolean; bridge?: { gap: number; to: number };
+  in0?: boolean; in1?: boolean; // its side at a0 / a1 meets another hill: the shoulder tapers inside
 }
 /** A ramp per Slope zone: 0 on its downhill edge, rising against the push. */
 function ramps(zones: readonly Zone[]): Ramp[] {
@@ -333,13 +334,25 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
     }
 
   const rs = plateaus(ramps(s.zones), s.start);
+  // a side that meets another hill (a volcano's cone, a bowl's corner) tapers
+  // inside, into the seam; any other falls away outside the zone, over ground
+  // the physics leaves flat. Inside, a slope is its push's own ramp: a taper
+  // there drew a side hill the ball does not feel, and it sped up climbing it
+  const hills = s.zones.filter((q) => q.kind === "slope" && !airy(q));
+  const seam = (r: Ramp, side: number) => [0.25, 0.5, 0.75].some((f) => {
+    const a = r.lo + f * r.span;
+    return hills.some((q) => q !== r.z && inZone(q, a * r.ux + side * r.vx, a * r.uz + side * r.vz));
+  });
+  for (const r of rs) (r.in0 = seam(r, r.a0 - 0.25)), (r.in1 = seam(r, r.a1 + 0.25));
   const domes = mounds(s.zones);
   // flat: without a moon bridge's arch (the ground under it)
   const raw = (x: number, z: number, flat = false) => {
     let h = 0, arch = 0;
     for (const r of rs) {
       const along = x * r.ux + z * r.uz - r.lo, side = x * r.vx + z * r.vz;
-      if (along < 0 || side < r.a0 || side > r.a1) continue;
+      // how far outside its sides (the shoulder's own ground, see seam)
+      const out = Math.max(r.a0 - side, side - r.a1);
+      if (along < 0 || (out > 0 && (out >= SHOULDER || (side < r.a0 ? r.in0 : r.in1) || r.z.skin === "moon bridge" || !(x > 0 && z > 0 && x < W && z < H)))) continue;
       let k: number;
       if (along <= r.span) k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? (along / r.span) ** 2 : smoothstep(along / r.span); // a jump curls up to its lip
       else if (r.bridge && along - r.span < r.bridge.gap) k = 1 + (r.bridge.to / r.rise - 1) * smoothstep((along - r.span) / r.bridge.gap);
@@ -349,12 +362,13 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
       else if (r.noLip) continue; // the top of the hill the tee stands on
       else if (along - r.span < BANK * 0.4 && x > 0 && z > 0 && x < W && z < H) k = 1 - smoothstep((along - r.span) / (BANK * 0.4)); // a short lip, not a slope the physics lacks
       else continue;
-      // shoulders: a ramp inside the green tapers at its sides; one that runs
-      // wall to wall does not (its sides are the walls)
-      const edge = Math.min(side - r.a0, r.a1 - side);
-      // (nor does a bridge: its deck is full width, over the water)
-      const walled = r.a0 <= 0.01 || r.a1 >= Math.max(W, H) - 0.01 || r.z.skin === "moon bridge";
-      if (!walled && edge < SHOULDER) k *= smoothstep(edge / SHOULDER);
+      // shoulders, so it reads as a hill: falling away outside its sides, or
+      // into a seam with the next hill (a bridge's deck is full width, over the water)
+      if (out > 0) k *= 1 - smoothstep(out / SHOULDER);
+      else {
+        const edge = Math.min(r.in0 ? side - r.a0 : SHOULDER, r.in1 ? r.a1 - side : SHOULDER);
+        if (edge < SHOULDER) k *= smoothstep(edge / SHOULDER);
+      }
       // a moon bridge's two halves meet at its crown: the higher, not the sum
       if (r.z.skin === "moon bridge") {
         if (!flat) arch = Math.max(arch, k * r.rise);
@@ -374,6 +388,10 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
   // a cup inside a slope zone sits on the slope: flattening it would show a
   // landing the ball does not have
   const onSlope = s.zones.some((q) => q.kind === "slope" && !airy(q) && s.cup[0] >= q.min[0] && s.cup[0] < q.max[0] && s.cup[1] >= q.min[1] && s.cup[1] < q.max[1]);
+  // a landing stops short of a slope near it: reaching onto one, it dug a
+  // dip in the hill that a ball rolling back sped up climbing out of
+  const landR = Math.min(CUP_R + 1.6, ...hills.map((q) => Math.hypot(Math.max(q.min[0] - s.cup[0], 0, s.cup[0] - q.max[0]), Math.max(q.min[1] - s.cup[1], 0, s.cup[1] - q.max[1]))));
+  const flatR = Math.min(CUP_R + 0.3, landR);
   const height = (x: number, z: number) => {
     // on a slope the landing is just the cup itself: the rings lie flat, the
     // slope comes back right after
@@ -382,9 +400,9 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
       return d <= CUP_R + 0.15 ? cupH : d < CUP_R + 0.9 ? cupH + (raw(x, z) - cupH) * smoothstep((d - CUP_R - 0.15) / 0.75) : raw(x, z);
     }
     const d = Math.hypot(x - s.cup[0], z - s.cup[1]);
-    if (d <= CUP_R + 0.3) return cupH;
-    if (d < CUP_R + 1.6) {
-      const k = smoothstep((d - CUP_R - 0.3) / 1.3);
+    if (d <= flatR) return cupH;
+    if (d < landR) {
+      const k = smoothstep((d - flatR) / (landR - flatR));
       return cupH * (1 - k) + raw(x, z) * k;
     }
     return raw(x, z);
