@@ -32,7 +32,7 @@ substeps: speeds are per substep, accelerations per substep².
 | Contact (walls, posts) | normal impulse `jn = −(1+e)·vn`; tangential impulse `jt = min(µ·jn, TangentMass·|vt|)` | `µ = WallFriction = 0.05`, `TangentMass = 2/7` |
 | Resting contact | under `RestSpeed` into the surface, `e = 0` and no bounce is counted | `RestSpeed = 0.35` |
 | Restitution | `e = min(Bounce, MaxBounce)`; a *bumper* (`Bounce > 1`) kicks at `e = min(Bounce, MaxKick)` | `MaxBounce = 0.92`, `MaxKick = 1.5` |
-| Take-off | over a hill's crest, when `(v·uphill)² > G·CrestRadius` | `CrestRadius = 2.25` (1.5 per substep) |
+| Take-off | over a hill's crest, when `(v·uphill)² > G·CrestRadius` | `CrestRadius = 0.5`, a kicker's sharp lip (0.71 per substep) |
 | Flight | up at `vz = vu·tan θ`, in the air `2·vz/G`, so it lands `2·vu²·tan θ/G` on; no zone, no rolling resistance | |
 | Landing | `jn = (1+e)·vz` with `e = GroundBounce`; the speed along loses `min(LandFriction·jn, TangentMass·|v|)`; a rebound over `HopSpeed` hops again | `GroundBounce = 0.4`, `LandFriction = 0.3`, `HopSpeed = 0.25` |
 | Cup (in `course`) | Holmes: drops when crossing at `b` off the middle no faster than `(2·sqrt(R² − b²) − r)·sqrt(G/2r)` | see [course.md](course.md#launch-kick-and-sink) |
@@ -79,7 +79,8 @@ least, and `Capped`, the weather's, never speeds a ball up).
 
 **Grades.** A hill's `Vec` is its gravity along the plane, so `sin θ = |Vec|/G`:
 0.3 is 17.5°, 0.12 is 7°. Grades past 72° are played as 72° (`tan θ` at most
-3.05; no course hill passes 20°). On the usual green a hill steeper than
+3.05; no course hill passes 20°), and `course.Decode` refuses a push past
+`G·MaxSin`. On the usual green a hill steeper than
 0.219 (12.6°) does not let a ball rest on it; one gentler bends and slows a moving
 ball, and holds a stopped one.
 
@@ -315,7 +316,8 @@ points away from (the uphill end), faster than the crest's curve can hold it:
   hitting anything, carries it out through that edge, onto no other climb;
 - its speed up the hill `vu = vel · uphill` has `vu² > G·CrestRadius`: the
   ground curves away (radius `CrestRadius`) faster than gravity can bend the
-  ball round it, 1.5 per substep;
+  ball round it, 0.71 per substep: a ball that makes the top at any real pace
+  flies;
 - the hill is steeper than `MinRamp` (0.12, 7°): a gentler one is a lawn's
   undulation;
 - it climbed at least `JumpRun` (half) of the hill's depth, counted from
@@ -519,7 +521,7 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `RestSpeed` | 0.35 | under it into a surface, a contact is resting: no bounce |
 | `MaxBounce` | 0.92 | the most restitution a passive piece plays |
 | `MaxKick` | 1.5 | the most restitution a bumper (`Bounce > 1`) plays |
-| `CrestRadius` | 2.25 | a crest's radius: take-off at `vu² > G·CrestRadius` |
+| `CrestRadius` | 0.5 | a crest's lip radius: take-off at `vu² > G·CrestRadius` |
 | `MinRamp` | 0.12 | the gentlest hill that launches |
 | `JumpRun` | 0.5 | share of a hill's depth climbed before its crest can launch |
 | `GroundBounce` | 0.4 | the ground's restitution on landing |
@@ -528,6 +530,8 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `MaxMove` | 1.5 | longest single move inside a substep |
 | `SpeedCap` | 8 | top speed, per substep |
 | `MaxRollOn` | 120 | most extra substeps a slope or a flight can add |
+| `MaxWork` | 1e6 | the most work units (about a thousand gas each) one stroke may cost |
+| `MaxSin` | 0.95 | the steepest grade a hill plays, and the most `|Vec|/G` Decode takes |
 | `LoopKeep` | 0.8 | share of the speed kept going round a loop |
 
 ## Skins
@@ -549,9 +553,25 @@ is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
   `int(speed / MaxMove) + 1` moves per substep, and a broad phase that skips
   the walls and posts a move's box misses. The player pays it on every
   stroke, so the number of obstacles and the `n` you pass to `Arc`, `Lane`
-  and `Stadium` are gas budgets. A full-power shot measured about 25M gas on
-  a 30-wall and a 48-wall hole; the heaviest full-power shot on the course
-  measured 78M.
+  and `Stadium` are gas budgets. The heaviest full-power tee shot on the
+  course measured 45M gas.
+- **MaxWork.** `Step` counts what a stroke does as it goes, in `Shot.Work`,
+  units of about a thousand gas: a substep 700, a move 15, a wall or post a
+  move's broad phase looks at 6, a wall tested for a contact 200 and a post
+  300, a zone a move looks at 8 (twice: the zones, then the ground's checks)
+  and each polygon point 3, a zone that takes a square root (a loop's mouth,
+  capped wind) 200 more, and a wall a timed bar's push checks 20 a side.
+  Fitted on the GnoVM's gas and raised by about a third. A stroke that
+  reaches `MaxWork` (1e6) ends where the ball is; it is checked before each
+  timed bar's push, each move and each contact, so a stroke passes it by
+  `MaxWorkStep` (1e5) at most. That holds a hostile field (bumper walls
+  across the whole board, the steepest hill keeping the ball rolling on,
+  polygons under every move) to under 1e9 gas. The heaviest course stroke
+  found, a full shot in a storm's gusts on mountain/11's ice that rolls on
+  for 120 substeps, costs 0.57 of `MaxWork` (0.4e9 gas); a tee shot, 0.05.
+- **Steepest grade.** A hill's push is `G·sin θ`: `course.Decode` refuses a
+  Slope whose `|Vec|` passes `G·MaxSin` (0.95, 72°). The course's steepest is
+  0.35.
 - **Zone width.** No zone can be crossed without being seen as long as it's
   at least `MaxMove` wide in the direction of travel. Several deployed zones
   are under twice that (town14's door tunnel, hole4's tunnels, island9's and

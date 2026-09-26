@@ -327,3 +327,37 @@ func TestATimedSegmentIsNeverCrossed(t *testing.T) {
 		}
 	}
 }
+
+// A stroke costs at most MaxWork (and one step past it): a hostile field of
+// bumper walls across the whole board, the steepest hill and polygons under
+// every move, which rolled on for ever, ends there, and says so in its Work.
+// A course stroke is far from it.
+func TestAStrokeCostsAtMostMaxWork(t *testing.T) {
+	var ws []Wall
+	for i := 0; i < 160; i++ {
+		x := float64(i) * 96 / 160
+		ws = append(ws, Wall{Seg: Segment{A: V(x, 0), B: V(96-x, 96)}, Bounce: 1.5})
+	}
+	zs := []Zone{{Kind: Slope, Min: V(0, 0), Max: V(96, 96), Vec: V(0.67, 0.67)}}
+	for i := 0; i < 31; i++ {
+		z := Zone{Kind: Surface, Min: V(0, 0), Max: V(96, 96), Scale: 8}
+		if i < 8 {
+			for k := 0; k < 64; k++ {
+				z.Poly = append(z.Poly, V(48, 48).Add(FromPolar(float64(k)*2*math.Pi/64, 40+float64(i))))
+			}
+		}
+		zs = append(zs, z)
+	}
+	f := &Field{Walls: ws, Zones: zs, Friction: 0.99, Bounce: 1.5, Radius: 0.5}
+	Prepare(f)
+	s := f.Step(V(20, 20), V(-3, 3), 60)
+	if s.Work <= MaxWork || s.Work > MaxWork+MaxWorkStep {
+		t.Fatalf("the hostile stroke cost %d, want just past %d", s.Work, MaxWork)
+	}
+	if n := len(s.Path); n > 60+MaxRollOn+2 {
+		t.Fatalf("%d path points", n)
+	}
+	if c := flat().Step(V(0, 0), V(4.44, 0), 30); c.Work > MaxWork/50 {
+		t.Fatalf("a full stroke on the flat cost %d", c.Work)
+	}
+}

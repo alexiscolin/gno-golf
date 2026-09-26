@@ -280,7 +280,7 @@ func TestAStaleRoundMustBeReset(cur realm, t *testing.T) {
 // heavyShot is a shot of which heavyFit fit in one commit on limitsHole.
 const (
 	heavyShot = "30,10"
-	heavyFit  = 10
+	heavyFit  = 9
 )
 
 // PlayRound goes on with a round in the round's own weather, across the

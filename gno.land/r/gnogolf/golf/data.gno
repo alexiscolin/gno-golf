@@ -204,6 +204,12 @@ func decodeData(hexData string) (*course.Simple, string, string) {
 	if course.Encode(h) != data {
 		panic("golf: the data is not as course.Encode writes it")
 	}
+	// a hole whose heaviest shot a transaction could not replay is refused:
+	// the physics ends a stroke at MaxWork, so this holds a hole's walls
+	w := newWork(h, nil)
+	if w.bound > maxShotGas {
+		panic("golf: one shot on this hole could cost more than a transaction can replay")
+	}
 	sum := sha256.Sum256(b)
 	return h, data, hex.EncodeToString(sum[:])
 }

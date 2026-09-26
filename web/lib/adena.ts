@@ -200,6 +200,10 @@ export function onWalletChange(fn: (...x: unknown[]) => void) {
 // are the hole's and its pulses', pieces every wall, post and zone of the
 // hole, its pulses and the forecast, each polygon edge one more.
 // (a stroke whose length is not known counts as the longest path the realm takes)
+// The realm also counts a shot by the work its physics did (Shot.Work, not in
+// the path) and takes the larger: its estimate is never below this one, so its
+// cut is never later. Where it is sooner, it refuses with "commit the first N"
+// and splitRound follows it.
 const WORK = RULES.work;
 const workOf = (c: Work, i: number) => WORK.shot + (c.walls || 0) * WORK.wall + ((c.pts || [])[i] ?? RULES.maxPath) * (WORK.point + (c.pieces || 0) * WORK.piece);
 

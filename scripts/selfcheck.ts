@@ -69,6 +69,11 @@ check("golf.gno work model", () => {
   // the formula and the cut rule adena.ts copies (workOf, commitsOf)
   assert.ok(has(golf, "c := workPerShot + w.walls*workPerWall + int64(len(s.Path))*(workPerPoint+w.pieces*workPerPiece)"), "add(): the work of a shot changed");
   assert.ok(has(golf, "if w.played > 0 && w.spent+w.most > workBudget {"), "next(): the cut rule changed");
+  // the chain also counts a shot by its physics work (Shot.Work), which a
+  // path alone does not show: its estimate is never below the one mirrored
+  // here, so where it is above, the chain cuts sooner and says so, and
+  // splitRound follows its cut
+  assert.ok(has(golf, "if u := workPerShot + w.walls*workPerWall + int64(s.Work)*workPerUnit; u > c {"), "add(): the work term changed");
 });
 check("golf.gno forecast gas", () => {
   const m = /forecast \(up\s*(?:\/\/)?\s*to ([\d.e]+) measured/.exec(golf);

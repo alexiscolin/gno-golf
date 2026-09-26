@@ -431,7 +431,7 @@ inside them.
   outside `[0, 1)`, a ball radius outside `[0, 1]`;
 - a bounce (the field's, a wall's or a post's) outside `[0, 1.5]`, a post
   radius outside `(0, 8]`, a zone scale outside `[0, 8]`;
-- a Surface or Slope `Vec` with a component beyond ±1;
+- a Surface or Slope `Vec` longer than `G·MaxSin` (0.95: a hill no steeper than 72°);
 - a tee, pin, wall end, post centre, polygon point, or a Tunnel, Hazard or
   Loop destination off the board by more than 1 (`[-1, W+1] × [-1, H+1]`);
 - a zone's box corner off the board by more than 96 (`Fit` keeps a round or

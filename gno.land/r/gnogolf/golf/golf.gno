@@ -635,27 +635,38 @@ func shotList(shots string) []string {
 
 // work is what a commit has cost so far, estimated from what its shots did.
 //
-// A stroke's gas is mostly the physics: a fixed part, a set-up per wall, then
-// per path point (one per substep, roll-on included) a cost of its own and a
-// test per piece on the board, each polygon edge a piece. The constants were
-// fitted on the 592 full-power shots of the 74 holes (8 angles each, from the
-// tee, the forecast's own gas taken out), as the tightest fit that is at
-// least the measured gas of every one of them, then raised by a fifth. The
-// heaviest shot measured 78M; its estimate is 125M.
+// A stroke's gas is mostly the physics. The estimate of a shot is the larger
+// of two:
 //
-// Before each shot but the first, a commit that would pass workBudget with
-// one more shot as heavy as its heaviest so far is refused, with the number
-// of shots that fit: a transaction the chain could not finish is refused with
-// a clear sentence instead of running out of gas, and the rest goes in the
-// next commit (PlayRound* continue the round). SimulateRound and
-// SimulateCommit refuse the same list the same way, so a client learns it
-// before it signs.
+//   - by its path: a fixed part, a set-up per wall, then per path point (one
+//     per substep, roll-on included) a cost of its own and a test per piece
+//     on the board, each polygon edge a piece. Fitted on the 592 full-power
+//     shots of the 74 holes and raised by a fifth; a client can work it out
+//     from the path alone (web/lib/adena.ts).
+//   - by its work: the fixed part and the set-up, then Shot.Work, what the
+//     physics counted the stroke doing (its substeps, moves, contacts tested,
+//     zones and polygon points looked at) in units of about a thousand gas.
+//     The physics ends a stroke at MaxWork, so this one bounds every shot,
+//     a hostile hole's too: fitted on the course shots (0.72 of it at the
+//     most) and on hostile probes at the format's limits (bumper walls across
+//     the whole board, the steepest hill rolling the ball on, 512 polygon
+//     points, loops and capped wind under every move: 0.92 at the most).
+//
+// Before the first shot of a commit, the hole's own bound (shotBound, its
+// heaviest shot) must fit workBudget; before each later one, a commit that
+// would pass workBudget with one more shot as heavy as its heaviest so far
+// is refused, with the number of shots that fit: a transaction the chain
+// could not finish is refused with a clear sentence instead of running out of
+// gas, and the rest goes in the next commit (PlayRound* continue the round).
+// SimulateRound and SimulateCommit refuse the same list the same way, so a
+// client learns it before it signs.
 //
 // It is an estimate, not a gas meter (gno has none). If the physics gets
 // cheaper these constants only err on the safe side; refit them if it gets
 // dearer.
 type work struct {
 	walls, pieces int64 // on the board this commit: walls, and every piece and polygon edge
+	bound         int64 // shotBound
 	spent, most   int64
 	played        int
 }
@@ -671,7 +682,12 @@ const (
 	workPerWall  = 150000
 	workPerPoint = 1200000
 	workPerPiece = 15000
+	workPerUnit  = 1100
 )
+
+// maxShotGas is the most one shot of a hole may be estimated at: a hole
+// whose shotBound passes it is refused when it is published.
+const maxShotGas = 1300000000
 
 // newWork is a commit's work on a hole, before any shot: its walls and
 // pieces, a pulse's as if always there, and the weather's.
@@ -686,7 +702,15 @@ func newWork(h course.Hole, weather []physics.Zone) *work {
 		w.pieces += pieces(p.Walls, p.Posts, p.Zones)
 	}
 	w.pieces += pieces(nil, nil, weather)
+	w.bound = shotBound(w.walls)
 	return w
+}
+
+// shotBound is the heaviest one shot on a board of walls walls can cost, by
+// its work: the physics ends a stroke at MaxWork (passing it by MaxWorkStep
+// at most).
+func shotBound(walls int64) int64 {
+	return workPerShot + walls*workPerWall + (physics.MaxWork+physics.MaxWorkStep)*workPerUnit
 }
 
 // pieces counts what a ball is tested against: each wall, post and zone, and
@@ -712,6 +736,9 @@ func pulsesOf(h course.Hole) []course.Pulse {
 
 // next refuses the next shot if it could overrun the budget.
 func (w *work) next() {
+	if w.played == 0 && w.bound > workBudget {
+		panic("golf: one shot on this hole could cost more than a transaction can replay")
+	}
 	if w.played > 0 && w.spent+w.most > workBudget {
 		panic(ufmt.Sprintf("golf: more shots than one transaction can replay on this hole: commit the first %d, then the rest", w.played))
 	}
@@ -719,6 +746,9 @@ func (w *work) next() {
 
 func (w *work) add(s physics.Shot) {
 	c := workPerShot + w.walls*workPerWall + int64(len(s.Path))*(workPerPoint+w.pieces*workPerPiece)
+	if u := workPerShot + w.walls*workPerWall + int64(s.Work)*workPerUnit; u > c {
+		c = u // a shot that did more than its path shows
+	}
 	w.spent += c
 	if c > w.most {
 		w.most = c

@@ -166,6 +166,7 @@ func TestHostileDataIsRefused(t *testing.T) {
 		{"kind 5", func(h *Simple) { h.Course.Zones[0].Kind = 5 }},
 		{"scale", func(h *Simple) { h.Course.Zones[0].Scale = 9 }},
 		{"slope push", func(h *Simple) { h.Course.Zones[1].Vec.Y = -1.2 }},
+		{"a slope past its steepest grade", func(h *Simple) { h.Course.Zones[1].Vec = physics.V(0.7, 0.7) }},
 		{"a tunnel off the board", func(h *Simple) { h.Course.Zones[2].Vec.X = -3 }},
 		{"a zone's box far off the board", func(h *Simple) { h.Course.Zones[0].Max.X = float64(h.W) + MaxBoard + 1 }},
 		{"phase = every", func(h *Simple) { h.Course.Zones[1].Phase = 6 }},
