@@ -1,10 +1,8 @@
 # Leaderboards and the bot check
 
-## Leaderboards (coming soon)
+## Leaderboards
 
-In the dapp, the leaderboard button and sheet carry a "Coming soon" badge until
-launch. Turning the badge off is one constant, `SOON` in `web/components/Golf.tsx`.
-Everything below already runs on-chain.
+Everything below runs on-chain; the dapp reads it.
 
 - **Two modes, ranked apart.**
   - **Assisted:** the full aim line (the chain's preview). It is recorded with
@@ -14,14 +12,20 @@ Everything below already runs on-chain.
   - A round keeps the mode of its first stroke.
   - The mode is the player's word: the chain cannot see a screen, and
     `Simulate` is open to all.
-- **Only named players are ranked.** `Leaderboard(mode)` (the course-wide top ten)
-  and `HoleLeaderboard(hole, mode, offset, limit)` (a hole's board, a page of
-  up to 100 at a time) list only addresses with a gno.land name (`r/sys/users`). An address is
-  free, a name is not, so a script cannot flood the boards. Unnamed finishes are
-  still kept, and count as soon as the player takes a name.
+- **Only named players are ranked.** `Leaderboard(mode)` (the course-wide top ten),
+  `CourseLeaderboard(mode, offset, limit)` (the whole course ranking) and
+  `HoleLeaderboard(hole, mode, offset, limit)` (a hole's board) list only
+  addresses with a gno.land name (`r/sys/users`), a page of up to 100 at a
+  time. `Rank(mode, player)` and `HoleRank(hole, mode, player)` give one
+  player's place. An address is free, a name costs a transaction, so a script
+  cannot flood the boards for nothing. Unnamed finishes are still kept, and
+  rank from the player's next finish once named. The dapp lists them folded
+  under each board ("Also finished, no name"), greyed and without a place,
+  from `Records` and `Players`.
 - **Friends first.** `Bests(hole, mode, players)` and `Standings(mode, players)`
-  read any list of up to 50 addresses, named or not. The dapp's Friends tab is the
-  default view: you compare with people you chose, and no bot can push you off.
+  read any list of up to 50 addresses, named or not. The dapp's Friends tab
+  compares you with people you chose, and no bot can push you off. The sheet
+  opens on this hole's board during a round, on the course's elsewhere.
 - **Suspected bots are hidden in the dapp only.** `scripts/botcheck.ts` (see [the bot check](#bot-check))
   writes `web/public/flags.json`. The general tabs hide players scoring at
   least 0.5 by default, with a "Show all" toggle. The Friends tab is never
@@ -36,7 +40,7 @@ chain cannot tell. `scripts/botcheck.ts` (Node, no dependencies, reads only)
 flags rounds that look machine-made:
 
 ```
-nice -n 20 node --experimental-strip-types scripts/botcheck.ts [--rpc http://127.0.0.1:26757] [--top 10] [--json]
+nice -n 20 node --experimental-strip-types scripts/botcheck.ts [--rpc http://127.0.0.1:26657] [--top 10] [--json]
 nice -n 20 node --experimental-strip-types scripts/botcheck.ts --selftest
 ```
 
@@ -48,7 +52,7 @@ The score, 0 to 1, is a weighted mean of four signals:
 
 | signal | weight | what it measures |
 |---|---|---|
-| knife-edge | 0.35 | the holing shot is replayed (`SimulateRoundAt`, same period) with ±0.2°, ±0.05 power and, on a timed hole, ±1 tick. If 75% or more of the nudges stop holing in as few strokes, that hole counts as knife-edge. The signal is knife-edge holes / max(3, holes checked), so one lucky shot is not enough. |
+| knife-edge | 0.35 | the holing shot is replayed (`SimulateRoundIn`, in the record's own period however old) with ±0.2°, ±0.05 power and, on a timed hole, ±1 tick. If 75% or more of the nudges stop holing in as few strokes, that hole counts as knife-edge. The signal is knife-edge holes / max(3, holes checked), so one lucky shot is not enough. |
 | values | 0.30 | the dapp sends angle and power in 0.01 steps, so a human shot lands on the solver's grid (whole degrees, power in 0.25) about 1 time in 2,500. A grid shot counts 1. A shot finer than 0.01, which means another client, counts 0.5. The mean is damped below 5 shots. |
 | optimality | 0.20 | the share of the player's holes finished at or below the solver's best (`scripts/hole-bests.json`, from the verification pass), damped below 3 holes. Beating the solver is listed as a reason. |
 | volume | 0.15 | how many holes they finished at the optimum, capped at 20. |

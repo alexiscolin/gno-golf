@@ -460,6 +460,12 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	uassert.Equal(t, head+`"offset":3,"rows":[],"next":0}`, HoleLeaderboard(id, "assisted", 50, 10))
 	uassert.Equal(t, head+`"offset":3,"rows":[],"next":0}`, HoleLeaderboard(id, "assisted", math.MaxInt, 100))
 
+	// each player's place on it; nobody's for the unnamed finisher
+	place := `{"version":1,"hole":"` + id + `","mode":"assisted","player":"`
+	uassert.Equal(t, place+b.String()+`","rank":2,"of":3,"strokes":2}`, HoleRank(id, "assisted", b))
+	uassert.Equal(t, place+stranger.String()+`","rank":0,"of":3,"strokes":1}`, HoleRank(id, "assisted", stranger))
+	uassert.Equal(t, place+player.String()+`","rank":0,"of":3,"strokes":0}`, HoleRank(id, "assisted", player)) // no finish here
+
 	// c improves to 1: its old row goes, the new one sorts by address among the 1s
 	testing.SetRealm(testing.NewUserRealm(c))
 	Reset(cross(cur), id)

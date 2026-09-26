@@ -114,7 +114,7 @@ check("the save's split (adena.ts commitsOf)", () => {
 
 check("the gnokey plan (adena.ts gnokeyPlan)", () => {
   const round = { id: "garden/1/v1", name: "The Shelf", shots: ["1.0000,2.0000", "3.0000,4.0000", "5.0000,6.0000"], period: 7, roundMode: "pro" as const, walls: 4, pieces: 6, pts: [10, 10, 10] };
-  const opts = { realm: "gno.land/r/gnogolf/golf", chainId: "dev", rpc: "http://127.0.0.1:26757" };
+  const opts = { realm: "gno.land/r/gnogolf/golf", chainId: "dev", rpc: "http://127.0.0.1:26657" };
   const gas = (p: { command: string }) => Number(/-gas-wanted (\d+)/.exec(p.command)?.[1]);
   // the chain's own cut, when it was asked, is what gnokey sends
   const cut = gnokeyPlan(round, { ...opts, parts: [[0, 1], [1, 3]] });

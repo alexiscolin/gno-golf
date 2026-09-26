@@ -376,6 +376,27 @@ func TestANameTakenLaterRanksAtTheNextFinish(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(Rank("", late), `"rank":`) && !strings.Contains(Rank("", late), `"rank":0,`), Rank("", late))
 }
 
+// Claim ranks at once what a name taken later would rank at the next finish:
+// the caller's own bests, never anyone else's, and only with a name.
+func TestClaimRanksRoundsKeptWithoutAName(cur realm, t *testing.T) {
+	late := testutils.TestAddress("claimer")
+	id := courseHole(cur, 65)
+	testing.SetRealm(testing.NewUserRealm(late))
+	PlayRoundAt(cross(cur), id, "0,1", Period())
+	testing.SetRealm(testing.NewUserRealm(late))
+	urequire.AbortsContains(t, cur, "take a gno.land name first", func() { Claim(cross(cur)) })
+	uassert.False(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), late.String()))
+	giveName(cur, late, "claimer")
+	testing.SetRealm(testing.NewUserRealm(late))
+	uassert.Equal(t, 1, Claim(cross(cur)))
+	uassert.True(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), `{"player":"`+late.String()+`","strokes":1}`))
+	uassert.False(t, strings.Contains(Rank("", late), `"rank":0,`), Rank("", late))
+	// twice is harmless: the same seats
+	testing.SetRealm(testing.NewUserRealm(late))
+	uassert.Equal(t, 1, Claim(cross(cur)))
+	uassert.Equal(t, 1, strings.Count(HoleLeaderboard(id, "", 0, 100), late.String()))
+}
+
 // Rank is a player's place in the course ranking.
 func TestRankCountsThePlayersAhead(cur realm, t *testing.T) {
 	a, b := testutils.TestAddress("rka"), testutils.TestAddress("rkb")
@@ -396,6 +417,13 @@ func TestRankCountsThePlayersAhead(cur realm, t *testing.T) {
 	}
 	uassert.True(t, rank(a) > 0 && rank(a) < rank(b), Rank("pro", a)+Rank("pro", b))
 	uassert.True(t, strings.HasPrefix(Rank("pro", stranger), `{"version":1,"mode":"pro","player":"`+stranger.String()+`","rank":0,`), Rank("pro", stranger))
+	// the whole ranking, a page at a time, in Rank's order
+	lb := CourseLeaderboard("pro", rank(a)-1, 1)
+	uassert.True(t, strings.Contains(lb, `"rows":[{"player":"`+a.String()+`","holes":2,`), lb)
+	lb = CourseLeaderboard("pro", rank(b)-1, 1)
+	uassert.True(t, strings.Contains(lb, `"rows":[{"player":"`+b.String()+`","holes":1,`), lb)
+	uassert.True(t, strings.HasSuffix(CourseLeaderboard("pro", math.MaxInt, 100), `"rows":[],"next":0}`), "past the end: an empty last page")
+	uassert.True(t, strings.HasSuffix(CourseLeaderboard("pro", 0, 1), `],"next":1}`), "a page short of the end says where the next one starts")
 }
 
 // SimulateCommit is the next commit of a round under way, as PlayRoundAt

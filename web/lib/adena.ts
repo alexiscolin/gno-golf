@@ -338,6 +338,44 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
   return res.data ?? null;
 }
 
+/** One transaction of plain calls from the connected account: Adena simulates it and sets the final fee. */
+async function calls(address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string) {
+  const a = wallet();
+  if (!a) throw new Error("Adena is not installed in this browser.");
+  await ensureNetwork(a, { chainId, rpc });
+  const res = await a.DoContract({
+    messages: list.map(([pkg_path, func, args]) => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args } })),
+    gasFee: feeFor(gasWanted, price),
+    gasWanted,
+    memo: "gnogolf",
+    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
+  });
+  if (res.status !== "success") {
+    const e: SendError = new Error(why(res, failed));
+    e.cancelled = res.code === CANCELLED;
+    throw e;
+  }
+  return res.data ?? null;
+}
+
+// golf's Claim reads the course's holes once (74 slots, two modes): measured
+// well under this; Register was 25.4M on a pearl rehearsal
+const CLAIM_GAS = 90_000_000, REGISTER_GAS = 60_000_000;
+
+/**
+ * Takes a gno.land name for the connected account, and ranks at once the
+ * rounds it saved without one (golf's Claim): one transaction, two calls.
+ * Register is free on pearl and mainnet (nothing is sent with it), and only
+ * a direct call registers, which a message of this transaction is.
+ */
+export const registerName = ({ address, registrar, realm, name, price = 0.001, chainId, rpc }: {
+  address: string; registrar: string; realm: string; name: string; price?: number; chainId?: string | null; rpc: string;
+}) => calls(address, [[registrar, "Register", [name]], [realm, "Claim", []]], REGISTER_GAS + CLAIM_GAS, price, chainId, rpc, "The name was not registered.");
+
+/** Ranks the rounds a player saved before they had a name (golf's Claim). */
+export const claimRounds = ({ address, realm, price = 0.001, chainId, rpc }: { address: string; realm: string; price?: number; chainId?: string | null; rpc: string }) =>
+  calls(address, [[realm, "Claim", []]], CLAIM_GAS, price, chainId, rpc, "Your rounds were not ranked.");
+
 // The same save for gnokey, Adena's messages in one `maketx run` per commit:
 // a tiny script that Resets (first commit only) and plays the shots, so the
 // transaction is as atomic as Adena's. RUN_EXTRA: what a script's own
@@ -404,11 +442,14 @@ export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc, p
   });
 }
 
-// The storage a save writes, in bytes (fix-hub.md, measured): a first finish
-// on a hole writes the round, the best and the board entry (~6.6 KB), and a
-// player's first course finish ~2.5 KB more for the ranking; a replay of a
-// hole already saved replaces what is there (~0).
-export const depositBytes = (first: boolean) => (first ? 9100 : 300);
+// The storage a save writes, in bytes, measured on a local chain from the
+// final realm: a player's first finish on a hole, which is also their first
+// course finish (the dearest case: round, best, board and ranking rows), wrote
+// 3,258 bytes; a replay of a hole already saved replaces what is there (~0).
+// A player's very first finish in a mode also writes their course standing
+// and ranking rows: 5,404 bytes in the pearl rehearsal. Asked with about a
+// tenth more; the chain charges what is really written.
+export const depositBytes = (first: boolean, firstOnCourse = false) => (!first ? 300 : firstOnCourse ? 6000 : 3600);
 
 /** How much GNOT an account lacks to save a round (gas and deposit), 0 if it has enough; null if unknown. */
 export const shortOf = (gas: number, price: number, deposit: number, balance: number | null | undefined) =>

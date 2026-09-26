@@ -15,7 +15,12 @@ replay of your shots, and anyone can replay it again.
 - Playing is free. A shot's preview is a read-only query, so you need no wallet
   to play the whole course.
 - Keeping a score takes one transaction per hole (two for a long round),
-  signed with [Adena](https://www.adena.app/). It then goes on the leaderboard.
+  signed with [Adena](https://www.adena.app/). The first save on a hole costs
+  about 0.4 GNOT (most of it a storage deposit), a later one about 0.06.
+- The boards list players with a gno.land name, so a script can't flood them
+  with throwaway addresses. You can take a name without leaving the game, in
+  the same signature that ranks the rounds you saved before it. Rounds saved
+  without a name are still kept, and shown apart under each board.
 - You can read a hole's code on gnoweb before you play it.
 
 There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain) and
@@ -27,28 +32,44 @@ chain time and is the same for everyone.
 
 You need a `gnolang/gno` checkout next to this repo, Go, and Node.
 
-**1. The chain.** The installed `gnodev` is older than the checkout (it fails
-with `pubKeyAddress does not have a body`), so build it from source:
+**1. The chain.** The `gnodev` and `gnokey` you may have installed are older
+than the checkout (they fail with `pubKeyAddress does not have a body`), so
+build them from source:
 
 ```sh
 (cd ../gno/contribs/gnodev && go build -o /usr/local/bin/gnodev .)
-gnodev local -node-rpc-listener 127.0.0.1:26757   # from this repo's root
+(cd ../gno/gno.land && go build -o /usr/local/bin/gnokey ./cmd/gnokey)
+gnodev local -empty-blocks -empty-blocks-interval 5   # from this repo's root
 ```
 
-gnoweb is then on `http://127.0.0.1:8888` and the RPC on
-`http://127.0.0.1:26757`, the web client's default.
+That gives you gnoweb on `http://127.0.0.1:8888` and the RPC on
+`http://127.0.0.1:26657`, the web client's default. Three things we learned
+the hard way:
+
+- **Keep `-empty-blocks`.** Without it gnodev only makes a block when a
+  transaction arrives, so its clock stops. The weather changes every five
+  minutes of chain time, and a frozen clock makes every new round look like
+  its weather is already over.
+- **Keep port 26657.** Adena's built-in `dev` network points there, with
+  chain id `dev`. Run the node anywhere else and Adena can't sign for it (it
+  won't add a second `dev` network).
+- **Open `http://127.0.0.1:8888/r/sys/namereg/v0` once.** gnodev loads
+  packages lazily, and registering a name straight after a restart fails
+  until the registrar has been loaded. Pearl and mainnet deploy it at genesis,
+  so this is local only.
 
 **2. The holes.** The course is data (`data/holes.txt`), and only golf's owner
 can publish it. Under gnodev that's the deploy key, `test1`:
 
 ```sh
 scripts/publishdata.sh 7   # writes scripts/publish/publish-NN.gno, 7 holes each
-gnokey maketx run -gas-fee 1000000ugnot -gas-wanted 1000000000 \
-  -remote http://127.0.0.1:26757 -chainid dev -broadcast test1 scripts/publish/publish-01.gno
+gnokey maketx run -gas-fee 100000000ugnot -gas-wanted 2000000000 \
+  -remote http://127.0.0.1:26657 -chainid dev -broadcast test1 scripts/publish/publish-01.gno
 ```
 
 Run them in order. A slot already up to date is skipped, so a failed script
-can just be run again.
+can just be run again. To save a round from the game, fund your Adena account
+from `test1` with `gnokey maketx send`.
 
 **3. The web client.**
 

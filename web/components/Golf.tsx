@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { GNOMES, makePreview, cheer, motion } from "@/lib/scene";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
-import type { Bests, HoleLeaderboard, HoleRow, Leaderboard as LeaderboardRows, Mode, StrokesRow, StandingRow } from "@/lib/types";
+import type { Bests, HoleRow, Mode, StrokesRow, StandingRow } from "@/lib/types";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
-import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
+import { hasAdena, connect, current, onOurNode, recordRound, registerName, claimRounds, chainSplit, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
@@ -241,14 +241,38 @@ function Toast({ text, onDone }: { text: string; onDone: () => void }) {
 // The storage deposit of a save, in ugnot: a first save on a hole writes the
 // round, the best and the board entry; a hole saved before is replaced.
 // saved: null when not known yet (counted as a first save: the larger).
-const depositOf = (saved: boolean | null, bytePrice: number) => depositBytes(saved !== true) * bytePrice;
-const depositText = (saved: boolean | null, bytePrice: number) =>
-  saved === true ? "almost no storage deposit (this hole is saved already)" : `a storage deposit of about ${(depositOf(saved, bytePrice) / 1e6).toFixed(2)} GNOT (a first save on this hole)`;
+// gno.land's mainnet: no faucet there, and its GNOT is the real one
+const MAINNET = "gnoland-1";
+const depositOf = (saved: boolean | null, bytePrice: number, firstOnCourse = false) => depositBytes(saved !== true, firstOnCourse) * bytePrice;
 
 
+/** A round's cost in one short line: the total, then what it is made of. */
+const costLine = (gas: number, gasPrice: number, saved: boolean | null, bytePrice: number, firstOnCourse = false) => {
+  const g = Number(costOf(gas, gasPrice)), d = depositOf(saved, bytePrice, firstOnCourse) / 1e6;
+  return saved === true ? `≈ ${g.toFixed(2)} GNOT of gas` : `≈ ${(g + d).toFixed(2)} GNOT (${g.toFixed(2)} gas + ${d.toFixed(2)} storage, first save here only)`;
+};
 const short = (a: string | null | undefined) => (a ? `${a.slice(0, 4)}…${a.slice(-3)}` : "");
 // a player on a board: longer, a row has room
 const shortAddr = (a: string) => `${String(a).slice(0, 8)}…${String(a).slice(-4)}`;
+// address → gno.land name, read once a page; "" is not kept, so a name taken since shows
+const names = new Map<string, Promise<string>>();
+/** A page's names in one read, kept for the Who of each row: one query a page, not one a row. */
+function primeNames(chain: Chain, addrs: readonly string[]) {
+  const todo = addrs.filter((a) => !names.has(a));
+  if (!todo.length) return;
+  const all = chain.namesOf(todo).catch(() => [] as { player: string; name: string }[]);
+  // a name found is kept; "" is not, like nameOnce's
+  for (const a of todo) names.set(a, all.then((l) => l.find((x) => x.player === a)?.name || "").then((n) => (n || names.delete(a), n)));
+}
+function nameOnce(chain: Chain, addr: string) {
+  let p = names.get(addr);
+  if (!p) {
+    p = chain.nameOf(addr).catch(() => "");
+    names.set(addr, p);
+    void p.then((n) => n || names.delete(addr));
+  }
+  return p;
+}
 
 export default function Golf() {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -427,6 +451,39 @@ export default function Golf() {
   const [record, setRecord] = useState<Rec>(null);
   const onChain = record?.at === "saved"; // this round is on the chain
   const stale = record?.at === "refused" && record.stale; // its weather is over: no save any more
+  // the save window runs out on the clock, not at the next click: the button goes with it
+  const [over, setOver] = useState(false);
+  const period = s ? s.period : null;
+  useEffect(() => {
+    setOver(false);
+    const g = game.current;
+    if (period == null || !g) return;
+    let live = true, t: ReturnType<typeof setTimeout> | undefined;
+    // the chain's clock decides, not this browser's: when the time looks up, the
+    // last block's time is read again first. A chain running late (or a clock
+    // set wrong here) keeps the save open for as long as the chain would take it.
+    // a chain that cannot be read is asked again every 10 s, not every second
+    const arm = (floor = 1000) =>
+      (t = setTimeout(
+        () =>
+          void g.chain.sync().then(
+            () => live && (g.chain.now() >= saveBy(period) ? setOver(true) : arm()),
+            () => live && arm(10000),
+          ),
+        Math.max(floor, saveBy(period) - g.chain.now()),
+      ));
+    arm();
+    return () => ((live = false), clearTimeout(t));
+  }, [period]);
+  const closed = stale || over; // no save possible any more
+  // the place a finished hole would take on its board, shown on the save button
+  const nudge = useRankNudge(s, game.current && game.current.chain, account && account.address, (s && s.roundMode) || aim, onChain, closed);
+  // a name just taken in the game, said until the next hole
+  const [namedAs, setNamedAs] = useState("");
+  const holeNow = s && s.id;
+  useEffect(() => setNamedAs(""), [holeNow]);
+  // and the place it took, once saved
+  const savedPlace = useSavedPlace(s, game.current && game.current.chain, account && account.address, (s && s.roundMode) || aim, onChain);
 
   const play = (direct = false) => {
     setScreen("play");
@@ -613,13 +670,19 @@ export default function Golf() {
   const [slowSign, setSlowSign] = useState(false); // Adena open for more than 10 s
   const [bytePrice, setBytePrice] = useState(100); // ugnot per stored byte (vm params)
   const [saved, setSaved] = useState<boolean | null>(null); // whether this player already has a best on this hole, in this round's mode (null: unknown)
+  const [firstOnCourse, setFirstOnCourse] = useState(false); // no finish yet anywhere on the course in this mode: a dearer first save
   const saveMode = (s && (s.roundMode || s.mode)) === "pro" ? "pro" : "assisted";
   useEffect(() => {
     setSaved(null);
+    setFirstOnCourse(false);
     if (!account || !holeId || !game.current) return;
     let live = true;
-    void within(game.current.chain.bests(holeId, saveMode, [account.address]))
+    const c = game.current.chain;
+    void within(c.bests(holeId, saveMode, [account.address]))
       .then((b) => live && setSaved(b.rows.length > 0))
+      .catch(() => {});
+    void within(c.rank(saveMode, account.address))
+      .then((r) => live && setFirstOnCourse(r.holes === 0))
       .catch(() => {});
     return () => void (live = false);
   }, [account, holeId, saveMode, holedNow]);
@@ -657,9 +720,13 @@ export default function Golf() {
     if (!s || !game.current) return;
     const round = `${s.id}#${s.shots.join(";")}`;
     const land = (r: Rec) => roundKey.current === round && setRecord(r);
-    // a round whose weather is over can no longer be saved: the chain would refuse it
-    if (s.period != null && game.current.chain.now() >= saveBy(s.period)) return land({ at: "refused", error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
+    // busy before anything is awaited: a second click must not start a second save
+    if (record?.at === "signing") return;
     setRecord({ at: "signing" });
+    // a round whose weather is over can no longer be saved: the chain would refuse it
+    // (its clock read again first: the chain's time decides, not this browser's)
+    await game.current.chain.sync().catch(() => {});
+    if (s.period != null && game.current.chain.now() >= saveBy(s.period)) return land({ at: "refused", error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
     try {
       const chain = game.current.chain, hole = s.id!;
       const id = chainId || (await within(chain.chainId()));
@@ -675,13 +742,29 @@ export default function Golf() {
         // the player has left this round (Play again, another hole): no more of it goes to Adena
         if (roundKey.current !== round) return;
         if (parts.length > 1) land({ at: "signing", part: k + 1, of: parts.length });
-        tx = await recordRound({
+        // the chain's round before this commit: a new one there is this commit landing
+        const before = JSON.stringify(await chain.round(hole, account.address).catch(() => null));
+        const sent = recordRound({
           address: account.address, realm: chain.realm, hole, shots: s.shots.slice(from, to), reset: k === 0,
           gas: gasOf(s, from, to), period: s.period, mode: s.roundMode || "assisted", price: gasPrice, chainId: id, rpc: chain.rpc,
         }).catch((err: SendError) => {
           if (k > 0) err.message = `Part ${k} of ${parts.length} is on-chain, part ${k + 1} was not sent (${err.message}). Save again to send the whole round.`, (err.cancelled = false);
           throw err;
         });
+        // Adena answers only once its window is closed: the chain is watched
+        // meanwhile, and a commit it holds counts as sent (Adena's answer, if
+        // it comes later, changes nothing)
+        let open = true;
+        const landed = (async () => {
+          for (let w = 0; w < 120 && open; w++) {
+            await new Promise((r) => setTimeout(r, 1500));
+            const r = await chain.round(hole, account.address).catch(() => null);
+            if (r && r.strokes >= to && JSON.stringify(r) !== before) return true;
+          }
+          return false;
+        })();
+        void sent.catch(() => {}); // raced below; a late refusal after the chain has it is moot
+        tx = await Promise.race([sent, landed.then((ok) => (ok ? null : sent))]).finally(() => (open = false));
         // the next part continues the round: it waits until the chain has this one
         if (k + 1 < parts.length) {
           for (let w = 0; w < 10; w++) {
@@ -833,6 +916,7 @@ export default function Golf() {
           current={s.world}
           onBack={() => setScreen("title")}
           community={s.community}
+          podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} onOpen={() => setBoard(true)} />}
           onCommunity={(id) => {
             if (game.current) void game.current.load(id);
             setScreen("pick");
@@ -1041,11 +1125,17 @@ export default function Golf() {
               <div className="win__score">
                 <strong>{s.strokes}</strong>
                 <span>stroke{s.strokes > 1 ? "s" : ""}</span>
+                {savedPlace && (
+                  <b className="win__place" title="Your place on this hole's board, on-chain">
+                    #{savedPlace.rank}
+                    <small>of {savedPlace.of}</small>
+                  </b>
+                )}
               </div>
             <Share
               link={s ? holeLink(s, gnome) : ""}
                 snapshot={() => (game.current ? game.current.snapshot(`${s.name} · ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`) : Promise.resolve(null))}
-                text={shareText({ s, card, cups, fresh })}
+                text={shareText({ s, card, cups, fresh, place: savedPlace })}
               />
             </div>
 
@@ -1064,41 +1154,49 @@ export default function Golf() {
               </p>
             )}
             <RecordState record={record} account={account} s={s} chain={game.current && game.current.chain} />
-            {account && (ourNode === false || slowSign) && (() => {
-              const rpc = (game.current && game.current.chain.rpc) || "";
-              const host = rpc.replace(/^https?:\/\//, "");
-              return (
-                <p className="note note--warn">
-                  {ourNode === false
-                    ? `Adena is on another node than this game (${host}), so it cannot work out the fee.`
-                    : "Adena is still working out the fee."}{" "}
-                  In Adena, open the network list and pick the one whose RPC is <b>{host}</b>
-{chainId ? <> (chain id <b>{chainId}</b>)</> : null}.
-                </p>
-              );
+            {(() => {
+              // one note at a time, the one in the way first: the node, the funds, then the name
+              const chain = game.current && game.current.chain;
+              const host = ((chain && chain.rpc) || "").replace(/^https?:\/\//, "");
+              const short = account && !onChain && funds != null ? shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice, firstOnCourse), funds) : 0;
+              const warn =
+                account && (ourNode === false || slowSign) ? (
+                  <>
+                    {ourNode === false ? "Adena is on another network." : "Adena is still working out the fee."} In Adena, pick the one whose RPC is <b>{host}</b>
+                    {chainId ? <> (chain id <b>{chainId}</b>)</> : null}.
+                  </>
+                ) : short && funds != null ? (
+                  <>
+                    {funds === 0 ? "Your Adena account has no GNOT here yet." : `Your account is about ${short.toFixed(3)} GNOT short.`}{" "}
+                    {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : chainId === MAINNET ? "It needs some GNOT on gno.land to pay the gas." : "The faucet gives some for free."}
+                  </>
+                ) : null;
+              if (!warn && namedAs) return <p className="note note--good">You are <b>{namedAs}</b> now{onChain ? ": your rounds are on the boards." : ": save your round to take your place."}</p>;
+              if (!warn && nudge.noName && account && chain)
+                return (
+                  <NameForm chain={chain} account={account.address} chainId={chainId} price={gasPrice} onNamed={(n) => (setNamedAs(n), nudge.named())}
+                    lead={onChain ? "Saved! Now put it on the board" : nudge.at ? `Put your #${nudge.at} on the board` : "Get on the board"} />
+                );
+              return warn && <p className="note note--warn">{warn}</p>;
             })()}
             {!onChain && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={stale} onReplay={() => game.current?.reset()} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} onReplay={() => game.current?.reset()} />
             )}
-            {account && !onChain && (() => {
-              // said before signing, not by refusing to: Adena still opens
-              const short = shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice), funds);
-              if (!short || funds == null) return null;
-              return (
-                <p className="note note--warn">
-                  {funds === 0 ? "Your Adena account has no GNOT on this chain yet" : `Your account holds ${(funds / 1e6).toFixed(3)} GNOT, about ${short.toFixed(3)} short`} — it needs some to pay the gas and the storage deposit.
-                  {/localhost|127\.0\.0\.1/.test((game.current && game.current.chain.rpc) || "") ? " On this local chain, fund it from the node's test account (gnokey send, or the dev faucet)." : " On a testnet, the faucet gives some for free."}
-                </p>
-              );
-            })()}
             <div className="banner__row">
               <Button variant="secondary" onClick={() => game.current?.reset()}>
                 Play again
               </Button>
               {!onChain && (
-                <Button variant="secondary" className="btn--save" disabled={record?.at === "signing" || stale} onClick={() => void recordIt()}>
+                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={record?.at === "signing" || closed} onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
-                  {record?.at === "signing" ? (record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`) : "Save on-chain"}
+                  {record?.at === "signing" ? (
+                    record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`
+                  ) : (
+                    "Save on-chain"
+                  )}
+                  {nudge.at > 0 && record?.at !== "signing" && (
+                    <span className="btn__rank">{nudge.noName ? `#${nudge.at} here with a name` : `Take #${nudge.at} on this hole!`}</span>
+                  )}
                 </Button>
               )}
               {cupWon && cupWon.id === s.id ? (
@@ -1120,10 +1218,10 @@ export default function Golf() {
             </div>
             {account && !onChain && (
               <p className="real__fine">
-                About {costOf(gasOf(s), gasPrice)} GNOT of gas + {depositText(saved, bytePrice)}, shown again in Adena before you sign.
+                {costLine(gasOf(s), gasPrice, saved, bytePrice, firstOnCourse)}, confirmed in Adena.
               </p>
             )}
-            {!onChain && !stale && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
+            {!onChain && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
           </Dialog>
         </div>
       )}
@@ -1157,7 +1255,7 @@ export default function Golf() {
       )}
 
       {board && s && (
-        <Boards web={(game.current && game.current.chain.web) || ""} mode={aim} s={s} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} />
+        <Boards mode={aim} s={s} inHole={screen === "play"} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} />
       )}
 
       {cardOpen && s && (
@@ -1165,7 +1263,7 @@ export default function Golf() {
             <span className="eyebrow">Gnogolf · the cup and its card</span>
             <h2>The cup</h2>
             <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
-            <Leaderboard chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
+            <FullBoard key={aim} kind="course" s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
         </Sheet>
       )}
 
@@ -1193,7 +1291,7 @@ export default function Golf() {
           onClose={() => setReal(false)}
           rpc={cfg && cfg.rpc}
           chainName={chainName}
-          cost={s && s.holed ? `about ${costOf(gasOf(s), gasPrice)} GNOT of gas + ${depositText(saved, bytePrice)} for this round` : null}
+          cost={s && s.holed ? costLine(gasOf(s), gasPrice, saved, bytePrice, firstOnCourse) : null}
         />
       )}
 
@@ -1345,14 +1443,10 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName, cost }:
           <li>
             <b>Hole out, then sign</b>
             <span>
-              One transaction replays your shots on the chain (a long round on a busy
-              hole takes two). You pay its gas, roughly 0.1 to 0.7 GNOT depending on
-              the hole, and a storage deposit, about 0.9 GNOT the first time you save a
-              hole and almost nothing after. Both are shown before you sign. The chain
-              re-runs every shot itself, so the score is the chain's own, not one you
-              type in.
+              Adena signs once, the chain replays your shots: the score is the chain's
+              own. The cost is shown before you sign.
             </span>
-            {cost && <span className="real__cost">This round: {cost}.</span>}
+            {cost && <span className="real__cost">This round: {cost}</span>}
           </li>
         </ol>
 
@@ -1380,7 +1474,7 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName, cost }:
         <p className="real__fine">
           Network: <span className="mono">{chainName}</span>
           {/* the public faucet only feeds public testnets: a node on this machine has none */}
-          {chainName && !/localhost|127\.0\.0\.1|\[::1\]/.test(rpc || "") && (
+          {chainName && chainName !== MAINNET && !/localhost|127\.0\.0\.1|\[::1\]/.test(rpc || "") && (
             <> · Needs a little GNOT: <a href="https://faucet.gno.land" target="_blank" rel="noopener noreferrer">Get test GNOT ↗</a></>
           )}
         </p>
@@ -1589,7 +1683,7 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
  * gno.land flavoured (the realm replays every shot; the score is on the
  * chain). One line is picked per moment, from the hole so it varies.
  */
-function shareText({ s, card, cups, fresh }: { s: Snapshot; card: Card; cups: ReturnType<typeof cupTotals>; fresh: readonly Skin[] }) {
+function shareText({ s, card, cups, fresh, place }: { s: Snapshot; card: Card; cups: ReturnType<typeof cupTotals>; fresh: readonly Skin[]; place?: { rank: number; of: number } | null }) {
   const t = totals(card, s.holes), cup = (WORLDS.find((w) => w.id === s.world) || WORLDS[0]).name;
   const d = t.strokes - t.par, vs = d === 0 ? "level par" : vsPar(d);
   const pick = (list: readonly string[]) => list[[...String(s.id || "")].reduce((a, c) => a + c.charCodeAt(0), s.strokes) % list.length];
@@ -1599,6 +1693,7 @@ function shareText({ s, card, cups, fresh }: { s: Snapshot; card: Card; cups: Re
     `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on gno.land.`,
     `⛳ ${t.strokes} strokes round the whole ${cup} (${vs}). My gnome is tired, the chain is not.`,
   ]) + tag;
+  if (place) return `🏆 #${place.rank} of ${place.of} on ${s.name} in Gnogolf: ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}, saved on-chain. Come and take my place.` + tag;
   if (fresh.length) return `🍄 New gnome unlocked on Gnogolf: ${fresh.map((g) => g.name).join(" and ")}. Earned the hard way, one putt at a time.` + tag;
   if (s.strokes === 1) return pick([
     `🕳️ Hole in one on ${s.name}! Every bounce computed by a realm on gno.land.`,
@@ -1795,16 +1890,18 @@ function Standings({ s, card, chain, me, mode = "pro", compact = false }: BoardP
   );
 }
 
-// Leaderboards are shown as "coming soon" until launch: false here, and the
-// badge and ribbon are gone
-const SOON = true;
-
-/** Until launch, an empty leaderboard says when it opens. */
-const ComingSoon = () => (
-  <div className="soon">
-    <span className="soon__badge">Coming soon</span>
-    <p>Leaderboards open at launch: record your rounds with Adena to take your place.</p>
-  </div>
+/** An empty board's places, drawn blank: the table is there before its first row. */
+const Ghosts = ({ n = 3 }: { n?: number }) => (
+  <ol className="lb__ghosts" aria-hidden="true">
+    {Array.from({ length: n }, (_, i) => (
+      <li key={i}>
+        <span className="lb__rank">{i + 1}</span>
+        <i />
+        <i />
+        <i />
+      </li>
+    ))}
+  </ol>
 );
 
 // Players another script flags as likely bots (public/flags.json: { flags:
@@ -1846,7 +1943,7 @@ const FlagMark = ({ f }: { f: Flag | false | undefined }) =>
  * You and your friends, on this hole and across the course, in the mode shown.
  * Read with Bests / Standings, which rank anyone, named or not.
  */
-function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
+function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { inHole?: boolean }) {
   const [friends, setFriends] = useState(loadFriends);
   // (a failed read shows as no rows)
   const [hole, setHole] = useState<(Partial<Bests> & { rows: readonly StrokesRow[] }) | null>(null);
@@ -1862,12 +1959,12 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
     if (!chain || !who.length) return;
     let live = true;
     const id = s.id || "";
-    chain.bests(id, mode, who).then((b) => live && setHole(b)).catch(() => live && setHole({ rows: [] }));
+    if (inHole) chain.bests(id, mode, who).then((b) => live && setHole(b)).catch(() => live && setHole({ rows: [] }));
     chain.standings(mode, who).then((b) => live && setCourse(b)).catch(() => live && setCourse({ rows: [] }));
     return () => void (live = false);
     // who is keyed by its join
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chain, s.id, mode, key]);
+  }, [chain, s.id, mode, key, inHole]);
   const label = (a: string) => (a === me ? "You" : friends.find((f) => f.addr === a)?.name || shortAddr(a));
   const add = async (e: FormEvent) => {
     e.preventDefault();
@@ -1892,10 +1989,10 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
     <div className="lb friends">
       {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
       {who.length > 0 && (<>
-      <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>
-      {!h && <p className="lb__empty">Reading the chain…</p>}
-      {h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet: be the first.</p>}
-      {h && h.length > 0 && (
+      {inHole && <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>}
+      {inHole && !h && <p className="lb__empty">Reading the chain…</p>}
+      {inHole && h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet: be the first.</p>}
+      {inHole && h && h.length > 0 && (
         <ol>
           {h.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
@@ -1923,6 +2020,8 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
         </ol>
       )}
       </>)}
+      <section className="friends__manage" aria-label="Your friends">
+      <h4>Your friends</h4>
       <form className="friends__add" onSubmit={(e) => void add(e)}>
         <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Add a friend: address or gno.land name" aria-label="Add a friend by address or gno.land name" />
         <Button variant="secondary" type="submit">Add</Button>
@@ -1946,6 +2045,7 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
           {copied ? "Link copied — send it to a friend" : "Copy an “add me as a friend” link"}
         </button>
       )}
+      </section>
     </div>
   );
 }
@@ -1956,50 +2056,17 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
  * The leaderboards, in a sheet: this hole's best rounds, and the whole
  * course's. Read from the chain when the sheet opens, not before.
  */
-function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", web = "" }: BoardProps & { onClose: () => void; goTo: (id: string) => void; web?: string }) {
-  const [tab, setTab] = useState<"friends" | "hole" | "course">("friends");
+function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean }) {
+  const [claimed, setClaimed] = useState(0); // rounds just ranked: the board is read again
+  // "This hole" is the hole being played: opened from the cups, there is none
+  const [tab, setTab] = useState<"friends" | "hole" | "course">(inHole ? "hole" : "course");
   const [mode, setMode] = useState<Mode>(mine);
-  const [hb, setHb] = useState<(HoleLeaderboard & { done: boolean }) | null>(null); // as loaded so far
-  const [err, setErr] = useState<string | null>(null);
-  const [more, setMore] = useState(false); // a page is on its way
-  const PAGE = 10;
-  // a page is O(page) on the chain, however deep, and says where the next
-  // one starts (0 at the end). Offsets are the chain's, not the rows shown: a
-  // name deleted since is skipped in its page, which then holds fewer rows
-  // while more still follow.
-  const page = (offset: number) => chain!.holeLeaderboard(s.id || "", offset, PAGE, mode).then((b) => ({ ...b, done: !(b.next > offset) }));
-  // what the rows on screen are for: a page asked for another hole or mode is dropped
-  const view = useRef("");
-  view.current = `${s.id}|${mode}|${tab}`;
-  useEffect(() => {
-    if (!chain || tab !== "hole") return;
-    let live = true;
-    setHb(null);
-    setErr(null);
-    page(0).then((b) => live && setHb(b)).catch((e: unknown) => live && setErr(messageOf(e)));
-    return () => void (live = false);
-    // page() reads chain and s.id, both listed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chain, s.id, tab, mode]);
-  const loadMore = () => {
-    if (!hb || hb.done || more) return;
-    const asked = view.current;
-    setMore(true);
-    page(hb.next)
-      .then((b) => view.current === asked && setHb((h) => (h ? { ...h, rows: [...h.rows, ...b.rows], next: b.next, done: b.done } : h)))
-      .catch((e: unknown) => view.current === asked && setErr(messageOf(e)))
-      .finally(() => setMore(false));
-  };
-  const me_ = (p: string) => (p === me ? "You" : shortAddr(p));
-  const flags = useFlags();
-  const [showAll, setShowAll] = useState(false);
-  const shownHole = hb ? screen_(hb.rows, flags, showAll) : null;
   // the connected player's gno.land name: the general boards list only named players
   const [myName, setMyName] = useState<string | null>(null);
   useEffect(() => {
     if (!chain || !me) return;
     let live = true;
-    chain.nameOf(me).then((n) => live && setMyName(n)).catch(() => {});
+    void nameOnce(chain, me).then((n) => live && setMyName(n));
     return () => void (live = false);
   }, [chain, me]);
   const self = (s.allHoles || []).find((h) => h.id === s.id);
@@ -2008,102 +2075,510 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", web = "" }: B
     <Sheet className="boards" label="Leaderboard" onClose={onClose}>
         <span className="eyebrow">Recorded on-chain</span>
         <h2>Leaderboard</h2>
-        <Segmented className="boards__modes" full role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
-        <p className="boards__word">{HONEST}</p>
-        <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={[["friends", "Friends"], ["hole", "This hole"], ["course", "The course"]]} />
+        <div className="boards__modes">
+          <Segmented role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
+          <p className="boards__word">{HONEST}</p>
+        </div>
+        <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={inHole ? [["hole", "This hole"], ["course", "The course"], ["friends", "Friends"]] : [["course", "The course"], ["friends", "Friends"]]} />
         {tab !== "friends" && (
           <p className="boards__ranked">
-            Ranked: players with a gno.land name ·{" "}
-            <a href={`${web}/r/sys/namereg/v1`} target="_blank" rel="noopener noreferrer">get a name ↗</a>
-            {me && myName === "" && <> — get one to appear here</>}
+            Ranked: players with a gno.land name
+            {!(me && myName) && (
+              <>
+                {" "}· <NameLink chain={chain}>get a name ↗</NameLink>
+                {me && myName === "" && <> — get one to appear here</>}
+              </>
+            )}
           </p>
         )}
-        {tab === "friends" ? (
-          <Friends s={s} chain={chain} me={me} mode={mode} />
-        ) : tab === "hole" ? (
-          <div className="lb">
-            <h3>{s.name} <small>par {parHere(s)}{hb ? ` · ${hb.finished} finished${hb.finished !== hb.players ? `, ${hb.players} ranked` : ""}` : ""}</small></h3>
-            {newer && (
-              <p className="note note--warn">
-                Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
-              </p>
-            )}
-            {err && <p className="note note--bad">{err}</p>}
-            {!hb && !err && <p className="lb__empty">Reading the chain…</p>}
-            {hb && hb.rows.length === 0 && (SOON ? <ComingSoon /> : <p className="lb__empty">No recorded round yet — connect Adena and be the first.</p>)}
-            {shownHole && shownHole.rows.length > 0 && (
-              <ol>
-                {shownHole.rows.map((r, i) => (
-                  <li key={r.player} className={r.player === me ? "me" : ""}>
-                    <span className="lb__rank">{i + 1}</span>
-                    <span className="lb__who">{me_(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}<FlagMark f={showAll && flags[r.player]} /></span>
-                    <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
-                    <strong>{vsPar(r.strokes - (hb?.par || parHere(s)))}</strong>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {shownHole && (shownHole.hidden > 0 || showAll) && (
-              <button className="linkish" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? "Hide flagged players" : `Show all (${shownHole.hidden} hidden)`}
-              </button>
-            )}
-            {hb && !hb.done && (
-              <Button className="boards__more" disabled={more} onClick={loadMore}>
-                {more ? "Reading…" : "Show more"}
-              </Button>
-            )}
-          </div>
-        ) : (
-          <Leaderboard chain={chain} me={me} mode={mode} filter />
+        {tab !== "friends" && me && myName && chain && <ClaimRounds chain={chain} me={me} mode={mode} onDone={() => setClaimed((n) => n + 1)} />}
+        {tab === "hole" && newer && (
+          <p className="note note--warn">
+            Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
+          </p>
         )}
-        {!SOON && <p className="real__fine">Only rounds recorded with Adena appear here: free play is computed by the chain but not kept.</p>}
+        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} />}
+        <p className="real__fine">Only rounds saved on-chain appear here.</p>
     </Sheet>
   );
 }
 
-/** The chain's course ranking: rounds the chain replayed itself, named players only. */
-function Leaderboard({ chain, me, mode = "pro", filter = false }: { chain: Chain | null; me?: string | null; mode?: Mode; filter?: boolean }) {
-  const [lb, setLb] = useState<LeaderboardRows | null>(null);
-  const flags = useFlags();
-  const [showAll, setShowAll] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    if (!chain) return;
-    let live = true;
-    setLb(null);
-    setErr(null);
-    chain.leaderboard(mode).then((b) => live && setLb(b)).catch((e: unknown) => live && setErr(messageOf(e)));
-    return () => void (live = false);
-  }, [chain, mode]);
+/**
+ * The players who finished without a gno.land name: kept by the chain, never
+ * ranked (an address is free, a name is not), listed folded under the board,
+ * greyed and without a place. Read only when opened, 100 by address a page,
+ * named ones left out with one read of their names per page.
+ */
+function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"; chain: Chain | null; id: string; mode: Mode; me?: string | null; count?: number }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<readonly (StrokesRow & { holes?: number })[] | null>(null);
+  const [after, setAfter] = useState(""); // the next page's cursor, "" at the end
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+  const load = (from: string) => {
+    if (!chain || busy) return;
+    setBusy(true);
+    setErr(false);
+    (kind === "hole" ? chain.records(id, mode, from) : chain.players(mode, from))
+      .then(async (b) => {
+        // names through the shared cache: one read a page, kept for the boards' rows
+        primeNames(chain, b.rows.map((r) => r.player));
+        const named = await Promise.all(b.rows.map((r) => nameOnce(chain, r.player)));
+        // no name today: a player named since their finish ranks from their next
+        // one, and until then is on neither list (the realm keeps no such index)
+        const page = b.rows.filter((_, i) => !named[i]);
+        const order = (a: StrokesRow & { holes?: number }, z: StrokesRow & { holes?: number }) => (z.holes || 0) - (a.holes || 0) || a.strokes - z.strokes;
+        setRows((r) => [...(from ? r || [] : []), ...page].sort(order));
+        setAfter(b.next);
+      })
+      .catch(() => setErr(true))
+      .finally(() => setBusy(false));
+  };
+  if (count === 0) return null;
   return (
-    <div className="lb">
-      <h3>The course <small>top ten</small></h3>
-      {err && <p className="note note--bad">{err}</p>}
-      {!lb && !err && <p className="lb__empty">Reading the chain…</p>}
-      {lb && lb.rows.length === 0 && (SOON ? <ComingSoon /> : <p className="lb__empty">Nobody has recorded a round yet. Connect Adena and be the first.</p>)}
-      {lb && lb.rows.length > 0 && (() => {
-        const v = filter ? screen_(lb.rows, flags, showAll) : { rows: lb.rows, hidden: 0 };
-        return (
-          <>
-        <ol>
-          {v.rows.map((r, i) => (
+    <details className="unnamed" onToggle={(e) => { const o = (e.target as HTMLDetailsElement).open; setOpen(o); if (o && !rows) load(""); }}>
+      <summary>Also finished, no name{count ? ` (${count})` : ""}</summary>
+      {open && !rows && !err && <p className="lb__empty">Reading the chain…</p>}
+      {err && <p className="note note--bad">The chain did not answer. <button className="linkish" onClick={() => load(rows ? after : "")}>Try again</button></p>}
+      {rows && rows.length === 0 && !after && !err && <p className="lb__empty">Nobody without a name here.</p>}
+      {rows && rows.length > 0 && (
+        <ul>
+          {rows.map((r) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
-              <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{r.player === me ? "You" : shortAddr(r.player)}<FlagMark f={showAll && flags[r.player]} /></span>
-              <span className="lb__holes">{r.holes}/{lb.holes}</span>
-              <strong>{r.strokes}</strong>
+              {kind === "hole" && chain ? (
+                <a href={chain.roundURL(id, r.player)} target="_blank" rel="noopener noreferrer">{r.player === me ? "You" : shortAddr(r.player)}</a>
+              ) : (
+                <span>{r.player === me ? "You" : shortAddr(r.player)}</span>
+              )}
+              <span>{kind === "hole" ? `${r.strokes} stroke${r.strokes === 1 ? "" : "s"}` : `${r.holes} holes · ${r.strokes}`}</span>
             </li>
           ))}
+        </ul>
+      )}
+      {after && (
+        <button className="linkish" disabled={busy} onClick={() => load(after)}>
+          {busy ? "Reading…" : "Show more"}
+        </button>
+      )}
+    </details>
+  );
+}
+
+/** A row of a full board: its place on the chain's board (the page's offset on), and the score. */
+type Placed = StrokesRow & { holes?: number; at: number };
+
+/**
+ * A whole board, the hole's or the course's, read a page at a time as it is
+ * scrolled: a page is O(page) on the chain however deep. Every row links to
+ * what proves it, and the connected player sees their own place, pinned under
+ * the list when it is further down, with a way to share it.
+ */
+function FullBoard({ kind, s, chain, me, mode = "pro" }: BoardProps & { kind: "hole" | "course" }) {
+  const PAGE = 20;
+  const id = s.id || "";
+  const [rows, setRows] = useState<readonly Placed[] | null>(null);
+  const [head, setHead] = useState<{ par: number; holes: number; players: number; finished?: number } | null>(null);
+  const [next, setNext] = useState(0); // the next page's offset, 0 at the end
+  const [err, setErr] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const [mine, setMine] = useState<{ rank: number; of: number; strokes: number; holes?: number } | null>(null);
+  const flags = useFlags();
+  const [showAll, setShowAll] = useState(false);
+  // Offsets are the chain's, not the rows shown: a name deleted since is
+  // skipped in its page, which then holds fewer rows while more still follow.
+  const read = (offset: number) =>
+    kind === "hole"
+      ? chain!.holeLeaderboard(id, offset, PAGE, mode).then((b) => ({ b, head: { par: b.par, holes: 0, players: b.players, finished: b.finished } }))
+      : chain!.courseLeaderboard(offset, PAGE, mode).then((b) => ({ b, head: { par: 0, holes: b.holes, players: b.players } }));
+  const alive = useRef(true);
+  // set on each mount too: React's dev double mount runs the cleanup once in between
+  useEffect(() => ((alive.current = true), () => void (alive.current = false)), []);
+  const add = (offset: number) =>
+    read(offset).then(({ b, head: h }) => {
+      if (!alive.current) return;
+      primeNames(chain!, b.rows.map((x) => x.player));
+      setHead(h);
+      setRows((r) => {
+        const had = offset ? r || [] : [];
+        // a place is the rows shown before it: the chain's offsets also count
+        // names deleted since, skipped in their page. A row already shown (the
+        // board moved between two reads) is not listed twice.
+        const seen = new Set(had.map((x) => x.player));
+        const fresh = b.rows.filter((x) => !seen.has(x.player));
+        return [...had, ...fresh.map((x, i) => ({ ...x, at: had.length + i + 1 }))];
+      });
+      setNext(b.next > offset ? b.next : 0);
+    });
+  useEffect(() => {
+    if (!chain) return;
+    add(0).catch((e: unknown) => setErr(messageOf(e)));
+    // the board is keyed by kind, mode and hole: one mount, one first page
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain]);
+  useEffect(() => {
+    if (!chain || !me) return;
+    let live = true;
+    (kind === "hole" ? chain.holeRank(id, mode, me) : chain.rank(mode, me)).then((r) => live && setMine(r.rank > 0 ? r : null)).catch(() => {});
+    return () => void (live = false);
+  }, [chain, me, kind, id, mode]);
+  const loadMore = () => {
+    if (!next || more) return;
+    setMore(true);
+    add(next)
+      .catch((e: unknown) => setErr(messageOf(e)))
+      .finally(() => setMore(false));
+  };
+  // the next page loads as the end of the list comes into view
+  const end = useRef<HTMLLIElement>(null);
+  const moreRef = useRef(loadMore);
+  moreRef.current = loadMore;
+  useEffect(() => {
+    const el = end.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    // watched inside the list's own scroll: it comes into view only at the end
+    const o = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && moreRef.current(), { root: el.parentElement });
+    o.observe(el);
+    return () => o.disconnect();
+  }, [rows]);
+  // places are counted on the rows shown, flagged ones left out unless shown:
+  // the same numbers as the podium and the save button's
+  const screened = rows ? screen_(rows, flags, showAll) : null;
+  const shown = screened && { ...screened, rows: screened.rows.map((r, i) => ({ ...r, at: i + 1 })) };
+  const listed = !!rows && !!me && rows.some((r) => r.player === me);
+  const par = head ? head.par || parHere(s) : parHere(s);
+  const link = (p: string) => (kind === "hole" ? chain?.roundURL(id, p) : undefined);
+  const score = (r: { strokes: number; holes?: number }) =>
+    kind === "hole" ? (
+      <>
+        <span className="lb__holes">
+          {r.strokes === 1 ? <em className="ace-chip">ACE</em> : `${r.strokes} strokes`}
+        </span>
+        <strong className={r.strokes < par ? "good" : r.strokes > par ? "bad" : ""}>{vsPar(r.strokes - par)}</strong>
+      </>
+    ) : (
+      <>
+        <span className="lb__holes">
+          {r.holes}/{head ? head.holes : "–"} holes
+        </span>
+        <strong>{r.strokes}</strong>
+      </>
+    );
+  // your place, listed or further down: said once under the list, with the game's share
+  const myRow = rows && me ? rows.find((r) => r.player === me) : undefined;
+  const myPlace = myRow && head ? { at: myRow.at, of: head.players } : mine ? { at: mine.rank, of: mine.of } : null;
+  const title = kind === "hole" ? s.name : "The course";
+  const sub = !head ? "" : kind === "hole" ? `par ${par} · ${head.finished} finished${head.finished !== head.players ? `, ${head.players} ranked` : ""}` : `${head.players} ranked`;
+  return (
+    <div className="lb lb--full">
+      <h3>
+        {title} <small>{sub}</small>
+      </h3>
+      {err && <p className="note note--bad">{err}</p>}
+      {!rows && !err && <Ghosts />}
+      {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No recorded round yet — connect Adena and be the first.</p></>)}
+      {shown && shown.rows.length > 0 && (
+        <ol>
+          {shown.rows.map((r) => (
+            <li key={r.player} className={(r.player === me ? "me " : "") + (r.at <= 3 ? `medal medal--${r.at}` : "")}>
+              <span className="lb__rank">{r.at}</span>
+              <span className="lb__who">
+                <Who chain={chain} addr={r.player} me={me} full link={link(r.player)} />
+                <FlagMark f={showAll && flags[r.player]} />
+              </span>
+              {score(r)}
+            </li>
+          ))}
+          {next > 0 && (
+            <li className="lb__more" ref={end}>
+              <Button className="boards__more" disabled={more} onClick={loadMore}>
+                {more ? "Reading…" : "Show more"}
+              </Button>
+            </li>
+          )}
         </ol>
-            {(v.hidden > 0 || (filter && showAll)) && (
-              <button className="linkish" onClick={() => setShowAll((x) => !x)}>
-                {showAll ? "Hide flagged players" : `Show all (${v.hidden} hidden)`}
-              </button>
-            )}
-          </>
-        );
-      })()}
+      )}
+      {shown && (shown.hidden > 0 || showAll) && (
+        <button className="linkish" onClick={() => setShowAll((v) => !v)}>
+          {showAll ? "Hide flagged players" : `Show all (${shown.hidden} hidden)`}
+        </button>
+      )}
+      <Unnamed kind={kind} chain={chain} id={id} mode={mode} me={me} count={head && kind === "hole" && head.finished != null ? head.finished - head.players : undefined} />
+      {/* your place, when the list shown does not reach it yet */}
+      {mine && me && !listed && (
+        <ol className="lb__mine">
+          <li className="me">
+            <span className="lb__rank">{mine.rank}</span>
+            <span className="lb__who">You</span>
+            {score(mine)}
+          </li>
+        </ol>
+      )}
+      {myPlace && (
+        <div className="lb__myshare">
+          <span>
+            You are <b>#{myPlace.at}</b> of {myPlace.of} {kind === "hole" ? `on ${s.name}` : "on the course"}
+          </span>
+          <Share
+            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place. #gnoland @_gnoland`}
+            link={kind === "hole" ? holeLink(s, "") : ""}
+          />
+        </div>
+      )}
     </div>
   );
 }
+
+/**
+ * A finished hole's place on its board if saved (0: not on the first page, or
+ * nothing to take), and whether the connected player lacks the gno.land name
+ * the boards need.
+ */
+function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean, stale: boolean) {
+  const [at, setAt] = useState(0);
+  const [named, setNamed] = useState<boolean | null>(null);
+  const id = (s && s.id) || "", strokes = s ? s.strokes : 0;
+  // an archived version, or a community hole, ranks nobody
+  const ranked = !!(s && s.official) && !((s && s.allHoles) || []).find((h) => h.id === id)?.next;
+  const done = !!(s && s.holed);
+  useEffect(() => {
+    setAt(0);
+    if (!chain || !done || saved || stale || !ranked || !id) return;
+    let live = true;
+    const PAGE = 10;
+    Promise.all([chain.holeLeaderboard(id, 0, PAGE, mode), flagsOf()])
+      .then(([board, flags]) => {
+        if (!live) return;
+        // as the board shows it: flagged players are hidden there, so not ahead here
+        const b = { ...board, rows: screen_(board.rows, flags, false).rows };
+        const mine = me ? b.rows.find((r) => r.player === me) : undefined;
+        if (mine && mine.strokes <= strokes) return; // no better than the player's own best
+        // the board orders equal strokes by address; not connected, a tie counts as ahead
+        const ahead = b.rows.filter((r) => r.player !== me && (r.strokes < strokes || (r.strokes === strokes && (!me || r.player < me)))).length;
+        // sorted rows: a row not ahead, or the end of the board, makes the place exact
+        // (a page can hold fewer rows than asked while more follow)
+        if (ahead < b.rows.length || b.next === 0) setAt(ahead + 1);
+      })
+      .catch(() => {});
+    return () => void (live = false);
+  }, [chain, id, mode, me, strokes, done, saved, stale, ranked]);
+  useEffect(() => {
+    if (!chain || !me) return;
+    let live = true;
+    const check = () => void nameOnce(chain, me).then((n) => live && setNamed(!!n));
+    check();
+    // a name taken in another tab (gnoweb) shows on coming back: "" is never cached
+    const back = () => document.visibilityState === "visible" && check();
+    document.addEventListener("visibilitychange", back);
+    return () => ((live = false), document.removeEventListener("visibilitychange", back));
+  }, [chain, me]);
+  // a player with no name is not listed yet: the place is what a name would give
+  return { at, noName: !!me && named === false && ranked, named: () => setNamed(true) };
+}
+
+/** The chain's own name registrar on gnoweb (pearl: v1, a local gno and mainnet: v0), NEXT_PUBLIC_NAMEREG if set. */
+function NameLink({ chain, children }: { chain: Chain | null; children: ReactNode }) {
+  const [reg, setReg] = useState(process.env.NEXT_PUBLIC_NAMEREG || "");
+  useEffect(() => {
+    if (reg || !chain) return;
+    let live = true;
+    void chain.nameReg().then((r) => live && setReg(r), () => {});
+    return () => void (live = false);
+  }, [chain, reg]);
+  if (!chain || !reg) return <>{children}</>;
+  return (
+    <a href={chain.web + "/" + reg.replace(/^(gno\.land)?\//, "")} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+/**
+ * Takes a gno.land name without leaving the game: the registrar's rules
+ * checked as it is typed out, then one transaction in Adena. The boards list
+ * named players only, so this comes before the save that should rank.
+ */
+function NameForm({ chain, account, chainId, price, lead, onNamed }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void }) {
+  const [stem, setStem] = useState(""); // what follows "nym-"
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState("");
+  const name = "nym-" + stem;
+  // the registrar's rule, said while typing; the chain checks it again (and
+  // whether it is taken) before Adena opens
+  const hint = !stem
+    ? "5 to 13 letters, then 3 digits"
+    : !/^[a-z]+\d{0,3}$/.test(stem)
+      ? "lowercase letters, then digits"
+      : /^(gno|gl|g1|atom|atone|photon|cosmos)/.test(stem)
+        ? "it cannot start with gno, gl, atom, photon or cosmos"
+        : !/^[a-z]{5,13}(\d|$)/.test(stem)
+          ? "5 to 13 letters"
+          : !/^[a-z]{5,13}\d{3}$/.test(stem)
+            ? "and 3 digits to end"
+            : "";
+  const take = async (e: FormEvent) => {
+    e.preventDefault();
+    if (hint) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const why = await chain.nameProblem(name);
+      if (why) return setErr(why);
+      await registerName({ address: account, registrar: await chain.nameReg(), realm: chain.realm, name, price, chainId, rpc: chain.rpc });
+      // read back: the name is the chain's once a block has it
+      for (let k = 0; k < 10; k++) {
+        names.delete(account);
+        if ((await nameOnce(chain, account)) === name) break;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      setDone(name);
+      onNamed(name);
+    } catch (x) {
+      if (!(x as SendError).cancelled) setErr(messageOf(x));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (done) return <p className="note note--good">You are <b>{done}</b> now: save your round to take your place.</p>;
+  return (
+    <form className="nameform" onSubmit={(e) => void take(e)}>
+      <b className="nameform__title">{lead}</b>
+      <span className="nameform__why">The boards list gno.land names. Take yours once: one signature, about 0.5 GNOT.</span>
+      <span className="nameform__row">
+        <label className="nameform__field">
+          <span aria-hidden="true">nym-</span>
+          <input value={stem} onChange={(e) => setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim())} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
+        </label>
+        <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint}>{busy ? "Adena…" : "Take it"}</Button>
+      </span>
+      <small className={hint ? "" : "nameform__ok"} aria-live="polite">{hint ? `nym-… ${hint}` : `✓ ${name} is well formed`} · <NameLink chain={chain}>names on gno.land ↗</NameLink></small>
+      {err && <small className="nameform__err" role="alert">{err}</small>}
+    </form>
+  );
+}
+
+/**
+ * A named player whose saved rounds are on no board (the name came after
+ * them): one button ranks them now, instead of at their next finish.
+ */
+function ClaimRounds({ chain, me, mode, onDone }: { chain: Chain; me: string; mode: Mode; onDone: () => void }) {
+  const [holes, setHoles] = useState(0); // saved holes the course ranking does not hold
+  const [state, setState] = useState(""); // "", "busy", "done", or what went wrong
+  useEffect(() => {
+    let live = true;
+    chain.rank(mode, me).then((r) => live && setHoles(r.rank === 0 ? r.holes : 0)).catch(() => {});
+    return () => void (live = false);
+  }, [chain, me, mode, state]);
+  if (state === "done") return <p className="note note--good">Your rounds are on the boards.</p>;
+  if (!holes) return null;
+  const go = async () => {
+    setState("busy");
+    try {
+      await claimRounds({ address: me, realm: chain.realm, chainId: await chain.chainId(), rpc: chain.rpc });
+      setState("done");
+      onDone();
+    } catch (x) {
+      setState((x as SendError).cancelled ? "" : messageOf(x));
+    }
+  };
+  return (
+    <p className="note note--warn">
+      {holes} saved hole{holes === 1 ? " is" : "s are"} not ranked yet: the name came after them.{" "}
+      <Button variant="secondary" disabled={state === "busy"} onClick={() => void go()}>{state === "busy" ? "Adena…" : "Rank them"}</Button>
+      {state && state !== "busy" && <small className="nameform__err"> {state}</small>}
+    </p>
+  );
+}
+
+/** Your place on the hole's board once the round is saved: shown by the score, and in what is shared. */
+function useSavedPlace(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean) {
+  const [p, setP] = useState<{ rank: number; of: number } | null>(null);
+  const id = (s && s.official && s.id) || "";
+  useEffect(() => {
+    setP(null);
+    if (!chain || !me || !id || !saved) return;
+    let live = true;
+    // the round was just read back: the board has it too
+    chain.holeRank(id, mode, me).then((r) => live && r.rank > 0 && setP(r)).catch(() => {});
+    return () => void (live = false);
+  }, [chain, me, id, mode, saved]);
+  return p;
+}
+
+/** A ranked player as the boards show them: "You", their gno.land name, or a short address while it is read. */
+function Who({ chain, addr, me, full = false, link }: { chain: Chain | null; addr: string; me?: string | null; full?: boolean; link?: string }) {
+  const [name, setName] = useState("");
+  useEffect(() => {
+    if (!chain || addr === me) return;
+    let live = true;
+    void nameOnce(chain, addr).then((n) => live && setName(n));
+    return () => void (live = false);
+  }, [chain, addr, me]);
+  const label = addr === me ? "You" : name || shortAddr(addr);
+  const body = full && (name || addr === me) ? (
+    <span className="who">
+      <span className="who__name">{label}</span>
+      <small>{shortAddr(addr)}</small>
+    </span>
+  ) : (
+    label
+  );
+  return link && link !== "#" ? (
+    <a href={link} target="_blank" rel="noopener noreferrer" title="See this round on gno.land">
+      {body}
+    </a>
+  ) : (
+    <>{body}</>
+  );
+}
+
+/** The course's top three on the cups screen, flagged players left out; nothing while the board is empty. */
+function Podium({ chain, me, mode = "pro", onOpen }: { chain: Chain | null; me?: string | null; mode?: Mode; onOpen: () => void }) {
+  const [top, setTop] = useState<{ rows: readonly StandingRow[]; holes: number } | null>(null);
+  useEffect(() => {
+    setTop(null);
+    if (!chain) return;
+    let live = true;
+    Promise.all([chain.leaderboard(mode), flagsOf()])
+      .then(([b, flags]) =>
+        {
+          const rows = screen_(b.rows, flags, false).rows.slice(0, 3);
+          primeNames(chain, rows.map((r) => r.player));
+          if (live) setTop({ rows, holes: b.holes });
+        },
+      )
+      .catch(() => {});
+    return () => void (live = false);
+  }, [chain, mode]);
+  if (!chain) return null;
+  const empty = !!top && !top.rows.length;
+  return (
+    <section className="podium" aria-label="Top players">
+      <header className="podium__head">
+        <h3>Top players <small>{mode === "pro" ? "Pro" : "Assisted"} · on-chain</small></h3>
+        <button className="linkish" onClick={() => (sound("blip"), onOpen())}>See the leaderboard →</button>
+      </header>
+      <ol className="podium__row">
+        {/* always three places: the ones nobody holds yet drawn blank */}
+        {[0, 1, 2].map((i) => (top && top.rows[i]) || i).map((r, i) =>
+          typeof r === "number" ? (
+            <li key={r} className="podium__ghost" aria-hidden="true">
+              <span className={`podium__medal podium__medal--${i + 1}`}>{i + 1}</span>
+              <i />
+            </li>
+          ) : (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              <span className={`podium__medal podium__medal--${i + 1}`}>{i + 1}</span>
+              <span className="podium__who"><Who chain={chain} addr={r.player} me={me} full /></span>
+              <span className="podium__score">
+                <b>{r.strokes}</b> · {r.holes}/{top!.holes}
+              </span>
+            </li>
+          ),
+        )}
+      </ol>
+      {empty && <p className="podium__empty">Nobody yet: save a round on-chain to take the first place.</p>}
+    </section>
+  );
+}
+

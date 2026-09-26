@@ -15,7 +15,7 @@ import (
 // wearRunes escalate with traffic: pristine grass, then a groove, at up to
 // wearLight, wearWorn and wearGroove balls come to rest in a cell, and past.
 const (
-	wearRunes  = ".:;x%"
+	wearRunes  = " :;x%" // pristine grass blank: a shot's dots stand out on it
 	wearLight  = 2
 	wearWorn   = 6
 	wearGroove = 14
@@ -350,6 +350,9 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 		}
 		s += ".\n\n"
 	}
+	if focus != "" {
+		s += roundSummary(e, focus, mine)
+	}
 	s += weatherNote(e, h)
 	if isTimed(h) {
 		if focus == "" {
@@ -368,6 +371,9 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	}
 
 	s += "## Play\n\n"
+	if mine != nil && mine.done {
+		s += "_This round is holed: it is kept as it is. To play the hole again, Reset first (below), then shoot._\n\n"
+	}
 	// the one number a text player cannot read off the board: where the cup is
 	from, who := h.Start(), "the tee"
 	if mine != nil && !mine.done && mine.strokes > 0 {
@@ -387,22 +393,12 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
 	s += "</gno-form>\n\n"
 
-	if focus != "" {
-		s += "## " + short(focus.String()) + "'s round\n\n"
-		if mine == nil {
-			s += "_No round on this hole yet._\n\n"
-		} else {
-			state := "playing"
-			if mine.done {
-				state = "**holed**"
-			}
-			// the shots are golf's own "%.4f,%.4f,%d": digits and punctuation only
-			s += ufmt.Sprintf("%d strokes, %s. Shots: `%s`\n\n", mine.strokes, state, strings.ReplaceAll(mine.shots, ";", "; "))
-		}
+	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; %d finished it assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
+	if e.board(assisted).Size()+e.board(pro).Size() == 0 {
+		s += " No named player has finished it yet.\n\n"
+	} else {
+		s += " The named players' bests:\n\n"
 	}
-
-	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; %d finished it assisted, %d pro. The named players' bests:\n\n",
-		e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
 	for m := 0; m < modes; m++ {
 		rows := ""
 		n := 0
@@ -419,6 +415,40 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 		}
 	}
 	return s + "\n_This hole is " + source(e) + " — read it before you trust it with a round._\n"
+}
+
+// roundSummary is a player's round on this hole, at the top of their page:
+// how it stands, and where their best puts them on the hole's board, or why
+// nowhere.
+func roundSummary(e *entry, p address, r *round) string {
+	who := short(p.String())
+	name := nameOf(p.String())
+	if name != "" {
+		who = "@" + name
+	}
+	if r == nil {
+		return "> [!NOTE]\n> " + who + " has no round on this hole yet.\n\n"
+	}
+	// the shots are golf's own "%.4f,%.4f,%d": digits and punctuation only
+	shots := "Shots: `" + strings.ReplaceAll(r.shots, ";", "; ") + "`"
+	if !r.done {
+		return ufmt.Sprintf("> [!NOTE]\n> %s's round: %d strokes so far, not holed yet.\n>\n> %s\n\n", who, r.strokes, shots)
+	}
+	vs := "even"
+	if d := r.strokes - e.par; d != 0 {
+		vs = ufmt.Sprintf("%+d", d)
+	}
+	s := ufmt.Sprintf("> [!NOTE]\n> **%s holed it in %d** (par %d, %s), %s.\n>\n", who, r.strokes, e.par, vs, modeNames[r.mode])
+	b := e.board(r.mode)
+	switch v := e.bests(r.mode).Get(p.String()); {
+	case v != nil && b.Has(boardKey(v.(int), p.String())):
+		s += ufmt.Sprintf("> Best here: %d strokes, **#%d of %d** on the %s board.\n>\n", v.(int), b.index(boardKey(v.(int), p.String()))+1, b.Size(), modeNames[r.mode])
+	case name == "":
+		s += "> Not on the board: only players with a gno.land name are ranked.\n>\n"
+	default:
+		s += "> Not on the board yet: the name came after this round. The game's \"Rank them\" (golf's `Claim`) ranks it now.\n>\n"
+	}
+	return s + "> " + shots + "\n\n"
 }
 
 // renderData is a data version's page: where it came from, its versions,

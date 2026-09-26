@@ -12,6 +12,7 @@
   --press: 3px;
   --lift: 1px;
   --ring: 3px solid var(--hat);
+  --gold: #f2c14e; --silver: #d9dee3; --bronze: #e3a877; /* the podium's metals */
   --shadow-btn: 0 4px 0 var(--ink);
   /* the page is light by design: native controls and scrollbars too, on a dark OS */
   color-scheme: light;
@@ -758,14 +759,23 @@ html, body {
   font-weight: 600;
 }
 
+/* a done thing and a failed one: the paper, an inked border in their colour, like the warning */
 .note--good {
-  background: #dff3e7;
+  background: var(--paper);
+  border: 2px solid var(--green);
+  color: var(--ink);
+}
+
+.note--good::before {
+  content: "✓ ";
   color: var(--green);
+  font-weight: 800;
 }
 
 .note--bad {
-  background: #fde3df;
-  color: #9b2c22;
+  background: var(--paper);
+  border: 2px solid var(--hat-ink);
+  color: var(--hat-ink);
 }
 
 .btn[disabled] {
@@ -833,10 +843,10 @@ html, body {
 
 .real__steps {
   list-style: none;
-  margin: 0;
+  margin: 0 0 20px; /* apart from the notes and the button under it */
   padding: 0;
   display: grid;
-  gap: 12px;
+  gap: 16px;
   counter-reset: step;
 }
 
@@ -1550,7 +1560,7 @@ button:focus-visible, a:focus-visible {
 .fi { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .fi--paper { fill: var(--paper); }
 .fi--red { fill: var(--hat); }
-.fi--gold { fill: #f2c14e; }
+.fi--gold { fill: var(--gold); }
 .fi--band { stroke: var(--hat); stroke-width: 2.6; }
 @media (max-width: 600px) { .title__facts { flex-direction: column; align-items: flex-start; gap: 10px; } }
 /* the whole title block centred */
@@ -1778,8 +1788,14 @@ button:focus-visible, a:focus-visible {
 }
 
 /* the reset menu at the top of the cup screen */
-.resets { position: relative; margin: -8px 0 16px; }
-.resets__menu { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 3; display: grid; gap: 6px; padding: 10px; min-width: 200px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper); box-shadow: var(--shadow-btn); }
+/* top right, beside the about button (52px at 34px from the corner); it
+   scrolls away with the screen like the back button, never over the cups */
+.front > .resets { position: absolute; top: 34px; right: 98px; z-index: 6; margin: 0; } /* over .front > * (relative) */
+@media (max-width: 600px) { .front > .resets { top: 30px; right: 94px; } }
+/* the round corner button, stretched to hold a label: same ink, border and shadow */
+.round--pill { width: auto; height: 52px; border-radius: 999px; padding: 0 18px; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; background: var(--paper); }
+@media (max-width: 600px) { .round--pill { height: 44px; margin-top: 4px; padding: 0 14px; font-size: 13px; } } /* after the base rule: same specificity */
+.resets__menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 3; display: grid; gap: 6px; padding: 10px; min-width: 200px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper); box-shadow: var(--shadow-btn); }
 .resets__menu .world__reset { width: 100%; }
 /* the Mountain Cup: emblem, loader, hat, sky */
 .w__sky--mountain { fill: #cfe6f7; }
@@ -1801,7 +1817,7 @@ button:focus-visible, a:focus-visible {
 @media (max-width: 700px) {
   .screen.worlds { place-items: start center; align-content: start; padding: 0; }
   .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .worlds__in { padding: 76px 0 40px; }
+  .worlds__in { padding: 96px 0 40px; } /* clear of the corner buttons */
 }
 
 /* the forecast as a HUD card, next to the strokes */
@@ -1920,7 +1936,7 @@ button:focus-visible, a:focus-visible {
 /* the leaderboard: a chip at the bottom right of every hole, a sheet with two tabs */
 /* a phone: the bottom row is Restart and Whole course; the chip goes to the icon alone, above them */
 .boards { max-width: 560px; position: relative; } /* (the close X sits in the sheet's own corner) */
-.boards__tabs { display: flex; gap: 6px; margin: 6px 0 12px; }
+.boards__tabs { display: flex; margin: 6px 0 12px; } /* no gap: a segmented control, the gap showed as a stripe */
 
 .boards__more { display: block; margin: 10px auto 0; }
 .boards .lb ol { max-height: 46vh; overflow-y: auto; }
@@ -1934,9 +1950,6 @@ button:focus-visible, a:focus-visible {
 .sheet__close ~ .eyebrow, .sheet__close ~ h2, .sheet__close ~ .boards__tabs { margin-right: 52px; }
 .sheet__in:has(> .sheet__close) { padding-top: 22px; }
 /* until launch */
-.soon { margin: 6px 0 4px; padding: 12px 14px; border-radius: 14px; background: #fff3d6; border: 2px dashed #e0a44a; }
-.soon__badge { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); border: 2px solid var(--ink); }
-.soon p { margin: 8px 0 0; font-size: 14px; color: var(--ink); }
 
 /* the aim mode: a two-way switch with its note, in the menu and the picker */
 .aimset { display: grid; gap: 8px; margin: 4px 0 14px; }
@@ -1944,7 +1957,16 @@ button:focus-visible, a:focus-visible {
 .aimset__help { font-size: 12px; color: var(--ink-soft); line-height: 1.35; text-align: left; }
 .pro-chip { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 1px 6px; border-radius: 6px; background: var(--ink); color: var(--paper); font-style: normal; }
 .pro-chip--row { margin: 0 0 0 6px; vertical-align: 1px; }
-.boards__modes { margin-bottom: 4px; }
+/* the mode: a small switch with its word beside it, the tabs below stay the big control */
+.boards__modes { display: flex; align-items: center; gap: 12px; margin: 2px 0 8px; }
+.boards .boards__modes .seg { margin: 0; box-shadow: 0 2px 0 var(--ink); border-radius: 12px; flex: 0 0 auto; }
+.boards__modes .seg button { min-height: 32px; padding: 4px 14px; font-size: 13px; }
+.boards__modes .boards__word { margin: 0; line-height: 1.3; }
+/* the sheet's rhythm: title, mode, tabs, the rule, then the board */
+.boards h2 { margin-bottom: 16px; }
+.boards .boards__modes { margin: 0 0 20px; }
+.boards .seg.boards__tabs { margin: 0 0 12px; }
+.boards .boards__ranked { margin: 0 0 20px; }
 
 /* one short line under the switch; the honesty note behind an (i) */
 .aimset__info { margin-left: 6px; cursor: pointer; font: inherit; font-style: normal; color: inherit; background: none; border: 0; padding: 0 2px; }
@@ -1964,14 +1986,18 @@ button:focus-visible, a:focus-visible {
 /* friends and the named-only line */
 .boards__ranked { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
 .friends h3 { margin: 10px 0 6px; }
-.friends__add { display: flex; gap: 8px; margin: 12px 0 6px; }
+/* managing friends: its own section under the board, not a board row */
+.friends__manage { margin-top: 28px; padding-top: 18px; border-top: 2px dashed rgba(var(--ink-rgb), .25); }
+.friends__manage h4 { margin: 0 0 10px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+.friends__add { display: flex; gap: 10px; margin: 0 0 12px; }
 /* a text field: the friend to add, the gnokey key's name */
 .friends__add input, .gnokey__key { min-width: 0; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--ink); font: inherit; font-size: 14px; background: #fff; color: var(--ink); }
-.friends__add input:focus-visible, .gnokey__key:focus-visible { outline: var(--ring); outline-offset: 1px; }
+/* the ring drawn as the field's own border: an outline beside the ink border reads as two frames */
+.friends__add input:focus-visible, .gnokey__key:focus-visible { outline: none; border-color: var(--hat); box-shadow: inset 0 0 0 1px var(--hat); }
 .friends__add input { flex: 1; }
-.friends__list { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; font-size: 13px; }
-.friends__list li { display: flex; justify-content: space-between; gap: 8px; }
-.friends__invite { margin-top: 6px; }
+.friends__list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; font-size: 13px; }
+.lb .friends__list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 12px; border: 0; border-radius: 10px; background: rgba(var(--ink-rgb), .05); } /* a name to manage, not a place */
+.friends__invite { margin-top: 12px; }
 .boards .lb { max-height: 58vh; overflow-y: auto; }
 
 .cam-btn { display: inline-flex; align-items: center; gap: 6px; }
@@ -1989,7 +2015,10 @@ button:focus-visible, a:focus-visible {
 .btn, .burger, .adena { position: relative; transition: transform .08s, box-shadow .08s, background .15s; }
 .btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
 .btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
-.btn:focus-visible, .burger:focus-visible, .adena:focus-visible, .seg button:focus-visible { outline: var(--ring); outline-offset: 3px; }
+.btn:focus-visible, .burger:focus-visible, .adena:focus-visible { outline: var(--ring); outline-offset: 3px; }
+/* inside the button: .seg clips its overflow, so a ring outside shows as a stripe beside the next segment */
+.seg button:focus-visible { outline: var(--ring); outline-offset: -5px; }
+.seg button.on:focus-visible { outline-color: var(--paper); } /* red on the green segment is under 3:1 */
 .btn[disabled] { cursor: default; opacity: .7; box-shadow: 0 2px 0 var(--ink); transform: none; }
 .badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); border: 2px solid var(--ink); white-space: nowrap; pointer-events: none; }
 /* a HUD card that is a button (the leaderboard) */
@@ -2034,8 +2063,94 @@ button:focus-visible, a:focus-visible {
 .saveclock--soon b { color: var(--hat-ink); }
 .banner__retry { font-size: 14px; color: var(--ink-soft); margin: 4px 0 0; }
 .real__cost { display: block; margin-top: 6px; font-weight: 700; color: var(--ink); }
+.real__steps .real__cost { grid-column: 2; margin-top: 8px; } /* under the step's text, not in its number's column */
 /* community holes: a small list under the cups */
 .community { margin: 18px auto 0; max-width: 640px; text-align: left; }
+/* the course's top three: a slim strip under the cups' title, seen without scrolling */
+.podium { margin: 4px auto 32px; width: 100%; max-width: 980px; text-align: left; }
+.podium__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.podium__head h3 { font-size: 14px; margin: 0; }
+.podium__head h3 small { font-weight: 600; color: var(--ink-soft); margin-left: 6px; }
+.podium__head .linkish { font-size: 13px; }
+.podium__row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.podium__row li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 14px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; box-shadow: 0 3px 0 var(--ink); }
+.podium__row li.me { background: var(--ink); color: var(--paper); }
+.podium__medal { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--ink); border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--ink); }
+.podium__medal--1 { background: var(--gold); } .podium__medal--2 { background: var(--silver); } .podium__medal--3 { background: var(--bronze); }
+.podium__who { min-width: 0; font-weight: 700; font-size: 14px; }
+.podium__who .who { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.podium__who .who small { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium__score { font-size: 12px; white-space: nowrap; opacity: .8; }
+.podium__score b { font-size: 15px; }
+.podium__ghost { border-style: dashed !important; border-color: rgba(var(--ink-rgb), .25) !important; background: transparent !important; box-shadow: none !important; }
+.podium__ghost .podium__medal { opacity: .45; }
+.podium__ghost i { height: 8px; width: 60%; border-radius: 6px; background: rgba(var(--ink-rgb), .1); }
+.podium__empty { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); }
+@media (max-width: 1100px) { .podium__who .who small { display: none; } }
+@media (max-width: 700px) { .podium__row { grid-template-columns: 1fr; gap: 4px; } .podium__ghost { display: none !important; } }
+/* a full board: name over address, medals for the podium, your pinned place */
+.who { display: grid; line-height: 1.15; }
+.who small { font-size: 11px; opacity: .6; }
+.who__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb__who a { color: inherit; text-decoration: none; }
+.lb__who a:hover .who, .lb__who a:hover { text-decoration: underline; }
+.lb--full li, .lb__mine li { grid-template-columns: 34px minmax(0, 1fr) auto 44px; }
+.lb li.medal--1 { background: #fbe6a6; } .lb li.medal--2 { background: #e9ecef; } .lb li.medal--3 { background: #f3d6bd; }
+/* a medal keeps its metal and its ink digit on any row, yours (dark) included */
+.lb li.medal .lb__rank { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 50%; background: #fff; color: var(--ink); }
+.lb li.medal--1 .lb__rank { background: var(--gold); } .lb li.medal--2 .lb__rank { background: var(--silver); } .lb li.medal--3 .lb__rank { background: var(--bronze); }
+.lb li.me.medal .lb__rank { border-color: var(--paper); }
+.lb li.me.medal { background: var(--ink); }
+.ace-chip { font-style: normal; font-weight: 800; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); }
+.lb strong.good { color: var(--green); } .lb strong.bad { color: var(--hat-ink); }
+.lb li.me strong.good, .lb li.me strong.bad { color: inherit; }
+.lb__mine { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 2px dashed rgba(var(--ink-rgb), .3); }
+.lb__mine li { display: grid; gap: 10px; align-items: center; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 12px; }
+@media (max-width: 480px) { .lb--full li, .lb__mine li { grid-template-columns: 30px minmax(0, 1fr) auto 40px; } }
+/* a full board scrolls in its list only: a toon scrollbar in its own gutter,
+   and the rows fade out at the bottom edge instead of being cut */
+.boards .lb--full { max-height: none; overflow: visible; }
+.lb--full ol { max-height: 46vh; overflow-y: auto; scrollbar-gutter: stable; padding: 2px 8px 22px 0; mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
+.lb--full ol::-webkit-scrollbar { width: 12px; }
+.lb--full ol::-webkit-scrollbar-track { background: rgba(var(--ink-rgb), .08); border-radius: 999px; margin: 4px 0 20px; }
+.lb--full ol::-webkit-scrollbar-thumb { background: var(--green); border: 2px solid var(--ink); border-radius: 999px; }
+@supports not selector(::-webkit-scrollbar) { .lb--full ol { scrollbar-width: thin; scrollbar-color: var(--green) rgba(var(--ink-rgb), .08); } }
+.lb li.lb__more { display: block; padding: 4px 0 0; border: 0; background: none; }
+/* players with no name: folded under the board, greyed, no place */
+.unnamed { margin: 14px 0 0; font-size: 13px; color: var(--ink-soft); }
+.unnamed summary { cursor: pointer; font-weight: 700; width: max-content; padding: 10px 2px; } /* a 44px tap */
+.unnamed summary:focus-visible { outline: var(--ring); outline-offset: 2px; border-radius: 4px; }
+.unnamed ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; max-height: 30vh; overflow-y: auto; }
+/* its own quiet rows, not the board's cards (.lb li): no border, ink text, yours tinted */
+.lb .unnamed li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.lb .unnamed li:nth-child(odd) { background: rgba(var(--ink-rgb), .04); }
+.lb .unnamed li.me { background: rgba(var(--ink-rgb), .12); color: var(--ink); font-weight: 700; }
+.unnamed a { color: inherit; }
+/* taking a name in the game: a card, its title, the fixed nym- prefix, the rule said live */
+.nameform { display: grid; gap: 8px; margin: 12px 0; padding: 14px 16px; text-align: left; border: 2px solid var(--ink); border-radius: 16px; background: #fff; box-shadow: 0 3px 0 var(--ink); }
+.nameform__title { font-size: 17px; color: var(--ink); }
+.nameform__why { font-size: 13px; color: var(--ink-soft); }
+.nameform__row { display: flex; gap: 10px; align-items: stretch; }
+.nameform__field { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 48px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); font-family: ui-monospace, Menlo, monospace; font-size: 16px; }
+.nameform__field > span { padding: 0 2px 0 12px; color: var(--ink-soft); }
+.nameform__field input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none; }
+.nameform__field:focus-within { border-color: var(--hat); box-shadow: inset 0 0 0 1px var(--hat); }
+.nameform small { font-size: 12px; color: var(--ink-soft); }
+.nameform .nameform__ok { color: var(--green); font-weight: 700; }
+.nameform .nameform__err { color: var(--hat-ink); font-weight: 700; }
+@media (max-width: 480px) { .nameform__row { flex-direction: column; } }
+/* your place once saved, by the score: the level, big and gold */
+.win__place { display: inline-grid; justify-items: center; align-self: center; margin-left: 10px; padding: 4px 14px 5px; border: 3px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 26px; line-height: 1; box-shadow: 0 3px 0 var(--ink); transform: rotate(-4deg); }
+.win__place small { font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+/* your place under the board, with the game's share */
+.lb__myshare { display: grid; justify-items: center; gap: 8px; margin: 16px 0 0; padding-top: 14px; border-top: 2px dashed rgba(var(--ink-rgb), .2); text-align: center; }
+.lb__myshare > span { font-size: 15px; color: var(--ink); }
+/* an empty board's blank places */
+.lb__ghosts { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.lb__ghosts li { display: grid; grid-template-columns: 30px 1fr 56px 44px; gap: 10px; align-items: center; padding: 8px 12px; border: 2px dashed rgba(var(--ink-rgb), .25); border-radius: 12px; color: rgba(var(--ink-rgb), .35); font-weight: 700; }
+.lb__ghosts i { height: 10px; border-radius: 6px; background: rgba(var(--ink-rgb), .1); }
+.lb__ghosts li:nth-child(2) i:first-of-type { width: 70%; }
+.lb__ghosts li:nth-child(3) i:first-of-type { width: 50%; }
 .community h3 { font-size: 15px; margin: 0 0 6px; color: var(--ink); }
 .community h3 small { font-weight: 600; color: var(--ink-soft); margin-left: 6px; }
 .community ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
@@ -2080,7 +2195,7 @@ button:focus-visible, a:focus-visible {
 .about__links b { font-size: 14px; }
 .about__links span { font-size: 12.5px; color: var(--ink-soft); }
 .about__credit { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(var(--ink-rgb), .15); font-size: 13px; color: var(--ink-soft); }
-.about__credit a { color: var(--ink); }
+.about__credit a, .boards__ranked a, .nameform a { color: var(--ink); } /* inline links in soft text: ink, one rule */
 @media (max-width: 600px) { .about__steps { grid-template-columns: 1fr; } .about__links { grid-template-columns: 1fr; } }
 /* a sheet open: the screens' corner buttons (back, about) step aside, so the sheet's own close is the one tapped */
 body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hidden; }
@@ -2105,3 +2220,11 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .cuppip__arrow { fill: var(--ink); transform: rotate(var(--a, 0rad)); transform-origin: 0 0; }
 @media (prefers-reduced-motion: reduce) { .cuppip { transition: none; } }
 .btn--save { display: inline-flex; align-items: center; gap: 8px; }
+/* Adena's blue: the one action that puts the round on the chain */
+.btn--save:not([disabled]) { background: #2f5ae8; color: #fff; } /* 5.6:1 with white */
+.btn--save:not([disabled]):hover { background: #264bd1; }
+/* the place the save would take: a gold sticker on the button's corner */
+.btn__rank { position: absolute; top: -14px; right: -10px; padding: 3px 10px; border: 2px solid var(--ink); border-radius: 999px; background: var(--gold); color: var(--ink); font-size: 13px; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 0 var(--ink); transform: rotate(4deg); pointer-events: none; }
+.btn--save-rank:not([disabled]) { animation: save-pulse 1.8s ease-in-out 2; }
+@keyframes save-pulse { 50% { transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) { .btn--save-rank:not([disabled]) { animation: none; } }

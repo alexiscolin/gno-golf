@@ -470,6 +470,18 @@ func SimulateRoundAt(hole string, shots string, period int64) string {
 	return simulateRound(e, h, h.Start(), 0, shots, period)
 }
 
+// SimulateRoundIn is SimulateRound in the weather of any period gone by: a
+// recorded round replayed as the chain played it, days on, for anyone
+// checking one (scripts/botcheck.ts nudges a record's shots to see how
+// knife-edge they are). Read-only like the others; the weather still to come
+// is not served.
+func SimulateRoundIn(hole string, shots string, period int64) string {
+	notAhead(period)
+	e := readHole(hole)
+	h := e.hole()
+	return simulateRound(e, h, h.Start(), 0, shots, period)
+}
+
 // SimulateCommit previews one commit of a round under way, read-only: the
 // shots the next PlayRoundAt (or PlayRoundPro) would take, from the exact
 // ball ("rest") at stroke number stroke (0 is the first), in the weather of
@@ -682,6 +694,62 @@ func Rank(mode string, player address) string {
 	return "{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(p) +
 		`,"rank":` + strconv.Itoa(rank) + `,"of":` + strconv.Itoa(ranks[m].Size()) +
 		`,"holes":` + strconv.Itoa(holes) + `,"strokes":` + strconv.Itoa(strokes) + "}"
+}
+
+// CourseLeaderboard is a page of a mode's course ranking, paged like
+// HoleLeaderboard: from rank offset+1 (clamped to 0..players), at most limit
+// rows (clamped to 1..100). holes is the course's current holes, players how
+// many the ranking holds, next the offset of the next page (0 once there is
+// none). A name deleted since is skipped, so a page may hold fewer rows than
+// it covers. A page reads its own rows only, however long the ranking.
+func CourseLeaderboard(mode string, offset, limit int) string {
+	m := modeOf(mode)
+	limit = clampLimit(limit)
+	size := ranks[m].Size()
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > size {
+		offset = size // and offset+limit cannot overflow
+	}
+	var sb strings.Builder
+	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"holes":` + strconv.Itoa(slots.Size()) +
+		`,"players":` + strconv.Itoa(size) + `,"offset":` + strconv.Itoa(offset) + `,"rows":[`)
+	n := 0
+	ranks[m].IterateByOffset(offset, limit, func(_ string, v any) bool {
+		p := v.(string)
+		if !named(p) {
+			return false // a name deleted since
+		}
+		r := totals[m].Get(p).(*row)
+		sb.WriteString(sep(n) + standingRow(p, r.holes, r.strokes))
+		n++
+		return false
+	})
+	next := 0
+	if offset+limit < size {
+		next = offset + limit
+	}
+	sb.WriteString(`],"next":` + strconv.Itoa(next) + "}")
+	return sb.String()
+}
+
+// HoleRank is a player's place on a hole's board in a mode: "rank" 1 is the
+// top, out of "of" named players, with their best. It is 0 for a player the
+// board does not hold: unnamed, or no finish there. Like Rank, a name deleted
+// since still takes its place until its next change.
+func HoleRank(hole, mode string, player address) string {
+	e, m := readHole(hole), modeOf(mode)
+	p := player.String()
+	rank, strokes := 0, 0
+	if v := e.bests(m).Get(p); v != nil {
+		strokes = v.(int)
+		if k := boardKey(strokes, p); e.board(m).Has(k) {
+			rank = e.board(m).index(k) + 1
+		}
+	}
+	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(p) +
+		`,"rank":` + strconv.Itoa(rank) + `,"of":` + strconv.Itoa(e.board(m).Size()) + `,"strokes":` + strconv.Itoa(strokes) + "}"
 }
 
 // maxListed bounds Holes() and the hub: anyone can add a hole.
