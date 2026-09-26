@@ -86,31 +86,9 @@ export function makeReplay(E: Live) {
   // gravity and lands with a little bounce. Cosmetic: the chain's ball is a
   // point on a flat board.
   const air = { y: 0, vy: 0, gvy: 0, up: false, t: 0 };
-  // On the ground, the ball follows it — up a slope and down one, as the
-  // chain has it (no air flag: on the ground). Only off a ledge (the ground
-  // dropping steeper than any slope: the end of a ramp too slow to take off)
-  // does it come down under gravity, never in one frame. The chain's air
-  // flags handle real flights.
-  let dropY: number | null = null, dropV = 0, dropT = 0, dropX = 0, dropZ = 0;
-  const LEDGE = 1.5; // a drop steeper than this per unit across is a ledge, not a slope
-  function fallTo(floor: number, now: number, x: number, z: number) {
-    const dt = dropT ? Math.min((now - dropT) / 1000, 0.05) : 0;
-    const was = BALL_R + ground(dropX, dropZ), across = Math.hypot(x - dropX, z - dropZ);
-    dropT = now;
-    dropX = x;
-    dropZ = z;
-    // on the ground last frame and the ground going down no steeper than a slope: stay on it
-    const onSlope = dropY !== null && dropY <= was + 0.02 && was - floor <= LEDGE * across + 0.02;
-    if (dropY === null || floor >= dropY - 0.02 || !dt || onSlope) {
-      dropY = floor;
-      dropV = 0;
-      return floor;
-    }
-    dropV -= GRAVITY * dt;
-    dropY = Math.max(floor, dropY + dropV * dt);
-    if (dropY === floor) dropV = 0;
-    return dropY;
-  }
+  // On the ground (no air flag) the ball is on the drawn ground, down a slope
+  // or off a ledge alike: the chain says when it leaves the ground (a take-off
+  // is flagged), so a step it does not flag is never drawn in the air.
   const GRAVITY = 30;
   function fly(p: THREE.Vector3) {
     const now = performance.now();
@@ -443,8 +421,6 @@ export function makeReplay(E: Live) {
       const requestAnimationFrame = (f: FrameRequestCallback) => window.requestAnimationFrame(guard(f));
       let i = 0;
       rolledBack = -1;
-      dropY = null;
-      dropT = 0;
       air.y = BALL_R + ground(path[0][0], path[0][1]);
       air.vy = air.gvy = 0;
       air.up = false;
@@ -581,13 +557,7 @@ export function makeReplay(E: Live) {
                 const y = top + a * v + h * 4 * v * (1 - v);
                 E.ball.position.y = BALL_R + Math.max(gh, y);
               }
-              // a flight lands where it lands: no fall left over from before it
-              dropY = E.ball.position.y;
-              dropV = 0;
-              dropT = now;
-              dropX = E.ball.position.x;
-              dropZ = E.ball.position.z;
-            } else if (flights) E.ball.position.y = fallTo(BALL_R + ground(E.ball.position.x, E.ball.position.z), now, E.ball.position.x, E.ball.position.z);
+            } else if (flights) E.ball.position.y = BALL_R + ground(E.ball.position.x, E.ball.position.z);
             else fly(E.ball.position);
           }
           if (drop && raw > 0.6) {
