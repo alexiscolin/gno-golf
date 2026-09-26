@@ -15,7 +15,7 @@ import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
 import Share from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
-import About from "@/components/About";
+import About, { AboutButton, CornerButton } from "@/components/About";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
@@ -1155,6 +1155,7 @@ export default function Golf() {
         </div>
       )}
 
+      {(screen === "worlds" || screen === "pick") && <AboutButton onClick={() => setAbout(true)} />}
       {about && <About web={cfg ? cfg.web : ""} onClose={() => setAbout(false)} />}
 
       {real && (
@@ -1416,9 +1417,9 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
 
   return (
     <div className={`screen screen--pick front tint--${world}`}>
-      <button className="round round--small round--back screen__back" aria-label="Back to the cups" onClick={onBack}>
+      <CornerButton side="back" label="Back to the cups" onClick={onBack}>
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
+      </CornerButton>
       <div className="pick">
         <span className="eyebrow">Pick your gnome</span>
         <h2 className="pick__name">{skin.name}</h2>

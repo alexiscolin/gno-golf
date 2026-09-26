@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import "@/app/title.css";
 import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
+import { AboutButton } from "@/components/About";
 import type { makeTitle, titleStill } from "@/lib/scene/title";
 
 /** The live title scene, once its module has loaded and made it. */
@@ -346,11 +347,7 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
       <div ref={host} className={"title__stage" + (scene && scene.live && !playing ? " title__stage--on" : "")} aria-hidden="true" />
       <div ref={film} className={"title__film" + (playing ? "" : " title__film--off")} aria-hidden="true" />
       <div className={"title__scrim" + (playing ? " title__scrim--film" : "")} aria-hidden="true" />
-      {onAbout && (
-        <button className="round round--small title__about" aria-label="About Gnogolf" title="About" onClick={(e) => (e.stopPropagation(), onAbout())}>
-          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.2" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
-        </button>
-      )}
+      {onAbout && <AboutButton onClick={onAbout} />}
       <div className="title">
         <div className="title__logo">
           <div className="title__sun" aria-hidden="true" />
