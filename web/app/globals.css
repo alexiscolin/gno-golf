@@ -2045,3 +2045,18 @@ button:focus-visible, a:focus-visible {
 .gnokey__row .real__fine { margin: 0; text-align: left; }
 .btn.gnokey__copy { min-width: 110px; }
 .btn.gnokey__copy:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+
+/* about: who made it, how it works, where to go next */
+.title__about { position: absolute; top: 34px; right: 34px; z-index: 3; background: var(--paper); }
+@media (max-width: 600px) { .title__about { top: 18px; right: 18px; } }
+.about { position: relative; max-width: 480px; width: 100%; max-height: calc(100dvh - 40px); overflow-y: auto; text-align: left; }
+.about h2 { margin: 2px 0 4px; font-size: 30px; }
+.about__lead { margin: 0 0 16px; font-size: 15px; color: var(--ink); }
+.about__how { margin: 0 0 18px; padding-left: 20px; display: grid; gap: 10px; font-size: 14px; line-height: 1.45; color: var(--ink); }
+.about__how code { font-size: 12px; background: rgba(var(--ink-rgb), .08); padding: 1px 6px; border-radius: 6px; }
+.about__links { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 8px; }
+.about__links li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 14px; }
+.about__links a { font-weight: 700; color: var(--ink); }
+.about__links span { color: var(--ink-soft); font-size: 13px; }
+.about__credit { margin: 0; padding-top: 12px; border-top: 1px solid rgba(var(--ink-rgb), .15); font-size: 13px; color: var(--ink-soft); }
+.about__credit a { color: var(--ink); }

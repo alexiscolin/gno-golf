@@ -307,7 +307,7 @@ const onServer = () => "garden";
  *  bundle is still loading: the first thing on screen is the last thing to go.
  *  The line under the button is fixed text: it shows while the chain is still
  *  being reached, so it must not depend on anything the chain answers. */
-export default function Title({ onStart, loading = false, world: given }: { onStart?: () => void; loading?: boolean; world?: string }) {
+export default function Title({ onStart, onAbout, loading = false, world: given }: { onStart?: () => void; onAbout?: () => void; loading?: boolean; world?: string }) {
   const guessed = useSyncExternalStore(noSubscribe, guessWorld, onServer);
   const world = given || guessed;
   // the loader shows until the game is ready and the ball has dropped; coming
@@ -346,6 +346,11 @@ export default function Title({ onStart, loading = false, world: given }: { onSt
       <div ref={host} className={"title__stage" + (scene && scene.live && !playing ? " title__stage--on" : "")} aria-hidden="true" />
       <div ref={film} className={"title__film" + (playing ? "" : " title__film--off")} aria-hidden="true" />
       <div className={"title__scrim" + (playing ? " title__scrim--film" : "")} aria-hidden="true" />
+      {onAbout && (
+        <button className="round round--small title__about" aria-label="About Gnogolf" title="About" onClick={(e) => (e.stopPropagation(), onAbout())}>
+          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.2" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
+        </button>
+      )}
       <div className="title">
         <div className="title__logo">
           <div className="title__sun" aria-hidden="true" />
