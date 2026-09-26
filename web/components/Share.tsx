@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { sound } from "@/lib/feel";
 import { clipSupport } from "@/lib/clip";
 import type { ClipRun } from "@/lib/engine/clip";
-import { SITE } from "@/lib/site";
+import { siteURL } from "@/lib/site";
 import { pasted, shareLinks } from "./common";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
@@ -26,14 +26,6 @@ interface ShareProps {
   /** a picture of the course to share, where the system sheet can take one */
   snapshot?: (() => Promise<Blob | null>) | null;
   link?: string;
-}
-/** The public address of a page of the game (link: its "?cup=…&hole=…"): the
- *  page's own site, or on this machine the public one (lib/site.ts), never a
- *  local dev address. */
-export function siteURL(link = "") {
-  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/h\/.*$/, "/") : ""; // a hole's page (app/h) links from the site's root
-  const origin = /localhost|127\.0\.0\.1/.test(here) ? SITE : here.replace(/\/$/, "");
-  return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
 }
 // the system sheet only where it is the phone's own (on a desktop it is a
 // bare OS panel without the networks people mean)

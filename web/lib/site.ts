@@ -6,6 +6,17 @@
 export const PREVIEW = !!process.env.CONTEXT && process.env.CONTEXT !== "production";
 export const SITE = ((PREVIEW && process.env.DEPLOY_PRIME_URL) || process.env.NEXT_PUBLIC_SITE_URL || process.env.URL || "http://localhost:3300").replace(/\/$/, "");
 
+/** The public address of a page of the game (link: its "?cup=…&hole=…"): the
+ *  page's own site, or on this machine the public one (SITE), never a
+ *  local dev address. */
+export function siteURL(link = "") {
+  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/h\/.*$/, "/") : ""; // a hole's page (app/h) links from the site's root
+  const origin = /localhost|127\.0\.0\.1/.test(here) ? SITE : here.replace(/\/$/, "");
+  return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
+}
+/** The site's name as a player types it: gnogolf.xyz. */
+export const siteHost = () => new URL(siteURL()).host;
+
 // the home page's words, also its text for crawlers (app/intro.tsx): a title
 // of 50-60 characters and a description under 160, as search results show them
 export const TITLE = "Gnogolf — free 3D mini-golf in your browser, on-chain";

@@ -1234,7 +1234,7 @@ export default function Golf() {
           holes={(s.allHoles || NONE).filter((h) => cupOf(h) === cupWon.cup)}
           card={card}
           fresh={fresh}
-          snapshot={() => (game.current ? game.current.snapshot(`${(WORLDS.find((w) => w.id === cupWon.cup) || WORLDS[0]).name} complete`) : Promise.resolve(null))}
+          snapshot={() => (game.current ? game.current.snapshot({ eyebrow: "Grand prix", title: (WORLDS.find((w) => w.id === cupWon.cup) || WORLDS[0]).name, score: "complete" }) : Promise.resolve(null))}
           onBack={() => (setCupWon(null), setScreen("worlds"))}
           onReplay={() => {
             setCupWon(null);
@@ -1685,7 +1685,11 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
 }
 
 /** The line on a shared picture's card, and on the clip's: the hole and the score. */
-const caption = (s: Snapshot) => `${s.name} · ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`;
+/** The hole on the shared picture and clip, as its link card has it (media/og). */
+const caption = (s: Snapshot) => {
+  const cup = s.place ? (WORLDS.find((w) => w.id === s.world) || WORLDS[0]).name : "Community hole", par = parHere(s);
+  return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: `${s.strokes} stroke${s.strokes > 1 ? "s" : ""}` };
+};
 
 /**
  * What a player says when they share: short, a little cheeky, gnome and

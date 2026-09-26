@@ -17,6 +17,7 @@ import { makeRenderer, makeBall, gnomeById, makeConfetti, disposeCourse, overvie
 import { makeCauses } from "../scene/cause";
 import { BALL_R } from "../terrain";
 import { CLIP, clipWindow, skyStops } from "../clip";
+import { drawOutro } from "../brand";
 import { makeCamera } from "./camera";
 import { makeReplay, showMs } from "./replay";
 import type { LitScene } from "../scene/data";
@@ -96,7 +97,7 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card }: ClipOf, 
   const sky = x.createLinearGradient(0, 0, 0, H);
   for (const [k, c] of skyStops(getComputedStyle(document.querySelector(".sky") || document.body).backgroundImage)) sky.addColorStop(k, c);
 
-  let confetti: Confetti | null = null;
+  let confetti: Confetti | null = null, dropped = 0; // dropped: when the ball went in (performance.now)
   function draw(dt: number, now: number) {
     cam.update(dt);
     causes.tick(now / 1000);
@@ -120,12 +121,15 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card }: ClipOf, 
     x.fillRect(0, 0, W, H);
     x.drawImage(renderer.domElement, 0, 0);
     card(x, W, H);
+    // the closing card, after the confetti
+    const end = dropped ? now - dropped - CLIP.tail : -1;
+    if (end >= 0) drawOutro(x, W, H, end / CLIP.fade);
   }
 
   return new Promise<Blob | null>((resolve) => {
     const stream = out.captureStream(FPS);
     const chunks: Blob[] = [];
-    let rec: MediaRecorder | null = null, raf = 0, t0 = 0, last = 0, played = false, dropped = 0, told = -1, over = false;
+    let rec: MediaRecorder | null = null, raf = 0, t0 = 0, last = 0, played = false, told = -1, over = false;
     const finish = (keep: boolean) => {
       if (over) return;
       over = true;
@@ -166,10 +170,10 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card }: ClipOf, 
         });
       }
       draw(dt, now);
-      const k = Math.min(0.99, t / win.length);
+      const k = Math.min(0.99, t / (win.length + CLIP.outro));
       if (Math.floor(k * 20) !== told) progress((told = Math.floor(k * 20)) / 20);
       // done: the tail after the drop; or well past what it should take (a replay stuck)
-      if ((dropped && now - dropped >= CLIP.tail) || t > win.length + 4000) finish(true);
+      if ((dropped && now - dropped >= CLIP.tail + CLIP.outro) || t > win.length + CLIP.outro + 4000) finish(true);
     };
     try {
       // one draw first, not recorded: the second renderer's shaders compiled

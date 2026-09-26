@@ -21,8 +21,9 @@ export function clipSupport(w: { MediaRecorder?: { isTypeSupported(type: string)
 }
 
 /** How long a clip holds on each part, in ms: the gnome still before the
- *  release, the moment after the drop (the confetti), the whole at most. */
-export const CLIP = { lead: 700, tail: 1500, max: 8000 };
+ *  release, the moment after the drop (the confetti), the stroke's part at
+ *  most, then the closing card (the game's name and address) and its fade in. */
+export const CLIP = { lead: 700, tail: 1500, max: 8000, outro: 1800, fade: 300 };
 
 /**
  * The stretch of the holing stroke a clip shows, from each path step's time

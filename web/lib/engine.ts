@@ -34,6 +34,7 @@ import type { Confetti } from "./scene/fx";
 import type { promo as Promo } from "./promo";
 import type { probes as Probes } from "./engine/probes";
 import type { ClipOf, ClipRun } from "./engine/clip";
+import { drawCard, loadBadge, type Caption } from "./brand";
 import { HOT as HOT_FIELDS, TICKS_PER_S, type CamMode, type ErrorKind, type GameState, type GfxMode, type Link, type Live, type Mood, type Shot, type Snapshot, type Tier } from "./engine/types";
 
 export type { CamMode, GameState, GfxMode, Link, Snapshot } from "./engine/types";
@@ -63,26 +64,6 @@ export interface GameOptions {
 const errText = (e: unknown) => String((e instanceof Error && e.message) || e);
 /** The score's card along the bottom of a picture W×H (a shared image, the
  *  clip's frames): "Gnogolf" and the caption, at k times its size. */
-function drawCard(x: CanvasRenderingContext2D, W: number, H: number, caption: string, k = 1) {
-  const w = W / k;
-  x.save();
-  x.translate(0, H);
-  x.scale(k, k);
-  x.fillStyle = "#fdf6ea";
-  x.strokeStyle = "#16433a";
-  x.lineWidth = 5;
-  x.beginPath();
-  x.roundRect(32, -132, w - 64, 100, 22);
-  x.fill();
-  x.stroke();
-  x.fillStyle = "#16433a";
-  x.font = "700 44px system-ui, sans-serif";
-  x.fillText("Gnogolf", 64, -66);
-  x.font = "600 34px system-ui, sans-serif";
-  x.textAlign = "right";
-  x.fillText(caption, w - 64, -68);
-  x.restore();
-}
 const camOf = (m: string): CamMode => (m === "far" || m === "third" ? m : "classic");
 const gfxOf = (m: string): GfxMode => (m === "high" || m === "low" ? m : "auto");
 
@@ -1334,7 +1315,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       setSilent(false);
     },
     /** A picture to share: the course as it is now, the score on a card over it. */
-    snapshot(caption = "") {
+    async snapshot(caption: Caption) {
+      await loadBadge(); // the card's badge, before the draw
       // drawn and read in the same task, so the drawing buffer is still there
       renderer.render(scene, camera);
       const src = renderer.domElement, W = 1200, H = Math.round((W * src.height) / src.width);
@@ -1349,11 +1331,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** The holing stroke played again and recorded, for sharing (ADR-003):
      *  an MP4, or null (no hole won this round, cancelled). Its module is
      *  fetched when first asked: a build without clips never loads it. */
-    clip(run: ClipRun, caption = "") {
+    clip(run: ClipRun, caption: Caption) {
       const stroke = won;
       if (!stroke || !g.s) return Promise.resolve(null);
       const hide = () => [ball, aim, band, confetti && confetti.group, cam.marker];
-      return import("./engine/clip").then((m) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6) }, run));
+      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6) }, run));
     },
     /** Dismiss a shot error and keep playing. */
     clearError() {
