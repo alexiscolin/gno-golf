@@ -323,12 +323,12 @@
 
 /* ------------------------------------------------------------ the picker */
 
-/* top to bottom: the pill (spaced like the cups'), the gnome on a flat card
-   in the cup's muted colour, his dots, his name (the one heading; a locked
-   gnome's unlock line under it), the aim as one bounded unit, the button */
-.screen--pick .eyebrow { margin-bottom: var(--gap-l); }
-.screen--pick .pick__name { font-size: clamp(30px, 3.8vw, 46px); margin-bottom: var(--gap-l); }
-.screen--pick .pick__line { margin: calc(-1 * var(--gap-m)) 0 var(--gap-l); padding: 0; min-height: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+/* top to bottom: the pill and the name (the one heading), the gnome on a
+   flat card in the cup's muted colour, his dots, a locked gnome's unlock
+   line, the aim as one bounded unit, the button */
+.screen--pick .eyebrow { margin-bottom: var(--gap-s); }
+.screen--pick .pick__name { font-size: clamp(30px, 3.8vw, 46px); margin: 0 0 var(--gap-l); }
+.screen--pick .pick__line { margin: 0 0 var(--gap-l); padding: 0; min-height: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
 /* the aim: one ink-outlined unit, its label and switch in a row, its meaning
    in ink under them, sized for the longer of its two lines (both stacked, one shown) */
 .front .aimset--compact {
@@ -354,7 +354,7 @@
 /* locked: the gnome dark, not his card */
 .screen--pick .pick__canvas--locked { filter: none; opacity: 1; }
 .screen--pick .pick__canvas--locked > canvas { filter: brightness(.15) saturate(0); opacity: .7; }
-.screen--pick .pick__dots { margin: 0 0 var(--gap-m); }
+.screen--pick .pick__dots { margin: 0 0 var(--gap-l); }
 .screen--pick .pick__dots span { border-color: var(--ink); background: var(--paper); }
 .screen--pick .pick__dots span[aria-current="true"] { background: var(--glow); transform: scale(1.3); }
 @media (max-height: 820px) { .screen--pick .pick__stage > .pick__canvas { width: 34vh; height: 34vh; } }

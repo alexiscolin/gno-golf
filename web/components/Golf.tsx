@@ -17,7 +17,7 @@ import Share from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
 import About from "@/components/About";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
-import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf } from "@/lib/card";
+import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } from "@/lib/prefs";
@@ -907,7 +907,7 @@ export default function Golf() {
                     <div><strong>{tot.done}/{s.holes.length}</strong><span>holes</span></div>
                     <div><strong>{tot.strokes || "–"}</strong><span>strokes</span></div>
                     <div>
-                      <strong>{tot.done ? (tot.strokes - tot.par > 0 ? "+" : "") + (tot.strokes - tot.par) : "–"}</strong>
+                      <strong>{tot.done ? vsPar(tot.strokes - tot.par) : "–"}</strong>
                       <span>vs par</span>
                     </div>
                   </div>
@@ -1421,6 +1421,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
       </button>
       <div className="pick">
         <span className="eyebrow">Pick your gnome</span>
+        <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
           <div ref={canvas} className={"pick__canvas" + (unlocked(skin.id) ? "" : " pick__canvas--locked")} />
@@ -1431,7 +1432,6 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
             <span key={g.id} aria-current={g.id === skin.id} />
           ))}
         </div>
-        <h2 className="pick__name">{skin.name}</h2>
         {/* a locked gnome says what earns him; an unlocked one needs no line */}
         {!unlocked(skin.id) && <p className="pick__line">🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</p>}
         <AimSetting aim={aim} onChange={onAim} compact />
@@ -1553,7 +1553,7 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
  */
 function shareText({ s, card, cups, fresh }: { s: Snapshot; card: Card; cups: ReturnType<typeof cupTotals>; fresh: readonly Skin[] }) {
   const t = totals(card, s.holes), cup = (WORLDS.find((w) => w.id === s.world) || WORLDS[0]).name;
-  const d = t.strokes - t.par, vs = d === 0 ? "level par" : `${d > 0 ? "+" : ""}${d}`;
+  const d = t.strokes - t.par, vs = d === 0 ? "level par" : vsPar(d);
   const pick = (list: readonly string[]) => list[[...String(s.id || "")].reduce((a, c) => a + c.charCodeAt(0), s.strokes) % list.length];
   const tag = " #gnoland @_gnoland";
   if (cups.slam) return "👑 Grand slam on Gnogolf: every cup at par or under. The Gnome King bows." + tag;
@@ -1614,7 +1614,7 @@ interface VictoryProps {
 function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay }: VictoryProps) {
   const w = WORLDS.find((x) => x.id === cup) || WORLDS[0];
   const t = totals(card, holes), vs = t.strokes - t.par;
-  const vsText = vs === 0 ? "level par" : `${vs > 0 ? "+" : ""}${vs}`;
+  const vsText = vs === 0 ? "level par" : vsPar(vs);
   const main = useRef<HTMLButtonElement>(null);
   // the dialog focuses its first control (a share icon): the main action instead
   useEffect(() => main.current?.focus({ preventScroll: true }), []);
@@ -1729,7 +1729,7 @@ function Standings({ s, card, chain, me, mode = "assisted", compact = false }: B
         </div>
         <dl className="cup__sum">
           <div><dt>Holes</dt><dd>{t.done}/{s.holes.length}</dd></div>
-          <div><dt>Vs par</dt><dd className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{t.done ? (vs > 0 ? "+" : "") + vs : "–"}</dd></div>
+          <div><dt>Vs par</dt><dd className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{t.done ? vsPar(vs) : "–"}</dd></div>
           <div><dt>On-chain</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{!rank ? "–" : rank.at ? `#${rank.at}` : "unranked"}</dd></div>
         </dl>
       </header>
@@ -1895,7 +1895,6 @@ function Friends({ s, chain, me, mode = "assisted" }: BoardProps) {
 }
 
 /** Strokes against par, the golf way: −1, E, +2. */
-const vsPar = (n: number) => (n === 0 ? "E" : n > 0 ? `+${n}` : `−${-n}`);
 
 /**
  * The leaderboards, in a sheet: this hole's best rounds, and the whole
