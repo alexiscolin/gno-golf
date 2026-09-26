@@ -187,9 +187,11 @@ interface WorldsProps {
   onResetAll: () => void;
   community?: readonly HoleRow[];
   onCommunity?: (id: string) => void;
+  /** the course's top players, under the cups */
+  podium?: ReactNode;
 }
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onReset, onResetAll, community = [], onCommunity = () => {} }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onReset, onResetAll, community = [], onCommunity = () => {}, podium }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -205,30 +207,31 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   return (
     <div className={`screen worlds worlds--v2 front tint--${hot || current || "garden"}`}>
       <BackButton label="Back to the title" onClick={() => (sound("blip"), onBack())} />
+      {played.length > 0 && (
+        <div className="resets">
+          <button className="round round--pill" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>
+            Reset scores ▾
+          </button>
+          {resets && (
+            <div className="resets__menu" role="menu">
+              {played.map((w) => (
+                <button key={w.id} role="menuitem" className={"world__reset" + (wipe === w.id ? " world__reset--sure" : "")} onClick={() => clear(w.id, () => onReset(w.id))}>
+                  {wipe === w.id ? "Sure? Tap again" : w.name}
+                </button>
+              ))}
+              <button role="menuitem" className={"world__reset" + (wipe === "all" ? " world__reset--sure" : "")} onClick={() => clear("all", onResetAll)}>
+                {wipe === "all" ? "Sure? Tap again" : "Every cup"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="worlds__in">
         <div className="front__head">
           <span className="eyebrow">Choose your cup</span>
           <h2 className="worlds__title">Where do we play?</h2>
         </div>
-        {played.length > 0 && (
-          <div className="resets">
-            <button className="world__reset" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>
-              Reset scores ▾
-            </button>
-            {resets && (
-              <div className="resets__menu" role="menu">
-                {played.map((w) => (
-                  <button key={w.id} role="menuitem" className={"world__reset" + (wipe === w.id ? " world__reset--sure" : "")} onClick={() => clear(w.id, () => onReset(w.id))}>
-                    {wipe === w.id ? "Sure? Tap again" : w.name}
-                  </button>
-                ))}
-                <button role="menuitem" className={"world__reset" + (wipe === "all" ? " world__reset--sure" : "")} onClick={() => clear("all", onResetAll)}>
-                  {wipe === "all" ? "Sure? Tap again" : "Every cup"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {podium}
         <ul className="worlds__list">
           {WORLDS.map((w) => {
             const n = counts[w.id] || 0;

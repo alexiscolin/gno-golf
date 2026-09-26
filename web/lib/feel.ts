@@ -117,7 +117,7 @@ function noise(a: AudioContext, { at = 0, dur, f0, f1 = f0, q = 1, gain = 0.2 }:
   src.start(t);
 }
 
-const SOUNDS: Record<string, (a: AudioContext, k?: number) => void> = {
+const SOUNDS = {
   // the putter on the ball: a dry tock
   putt: (a, k = 1) => (noise(a, { dur: 0.04, f0: 2400, q: 3, gain: 0.25 * k }), tone(a, { f0: 900, f1: 380, dur: 0.07, gain: 0.18 * k })),
   // off a timber rail
@@ -163,7 +163,7 @@ const SOUNDS: Record<string, (a: AudioContext, k?: number) => void> = {
   start: (a) => [523, 784, 1047].forEach((f, i) => tone(a, { type: "triangle", f0: f, at: i * 0.07, dur: i === 2 ? 0.35 : 0.1, gain: 0.1 })),
   // into the cup: the plop of the ball dropping (the fanfare comes with the confetti)
   cup: (a) => (tone(a, { f0: 520, f1: 180, dur: 0.12, gain: 0.22 }), tone(a, { type: "triangle", f0: 140, f1: 90, at: 0.08, dur: 0.1, gain: 0.1 })),
-};
+} satisfies Record<string, (a: AudioContext, k?: number) => void>;
 
 // The weather's own sound, underneath the rest and quiet: a rain bed that
 // fades in and out, a gust of wind now and then (harder in a gale), the odd
@@ -228,7 +228,10 @@ export function ambience(w: Mood = {}) {
   }
 }
 
-export function sound(name: string, k?: number) {
+/** A sound the game knows: a typo is a type error, not a silent no-op. */
+export type SoundName = keyof typeof SOUNDS;
+
+export function sound(name: SoundName, k?: number) {
   if (soundLog) soundLog.push([name, audible() ? 1 : 0, Math.round(performance.now())]);
   if (!audible()) return;
   const a = audio();

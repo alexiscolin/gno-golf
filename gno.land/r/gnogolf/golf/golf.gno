@@ -901,7 +901,9 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	}
 	r.done = true
 	m := r.mode
-	if rec := e.rec(m); rec.best == 0 || r.strokes < rec.best {
+	// the hole's record is shown on the hub and its pages: a named player's,
+	// like the boards, or a throwaway address could hold it for good
+	if rec := e.rec(m); (rec.best == 0 || r.strokes < rec.best) && named(player.String()) {
 		if m == pro {
 			e.proBest, e.proBestBy = r.strokes, player
 		} else {
@@ -950,9 +952,36 @@ func seat(e *entry, m int, p string) {
 	}
 	if v := totals[m].Get(p); v != nil && v.(*row).holes > 0 {
 		if rk := rankKey(v.(*row)); !ranks[m].Has(rk) {
+			idle[m].Remove(rk) // a standing parked while unnamed leaves idle as it ranks
 			ranks[m].Set(rk, p)
 		}
 	}
+}
+
+// Claim ranks the caller's rounds kept while they had no name. A player who
+// takes a name after finishing is on no board until they finish again: this
+// seats them now, wherever their bests on the course's current holes put
+// them, in both modes, and in the course ranking. It reads the course's
+// holes only, so it costs the same whoever calls it; it returns how many
+// bests it seated. The dapp sends it with the name's Register, in one
+// transaction.
+func Claim(cur realm) int {
+	p := cur.Previous().Address().String()
+	if !named(p) {
+		panic("golf: take a gno.land name first: only named players are ranked")
+	}
+	n := 0
+	slots.Iterate("", "", func(_ string, v any) bool {
+		e := find(v.(string))
+		for m := 0; m < modes; m++ {
+			if e.bests(m).Has(p) {
+				seat(e, m, p)
+				n++
+			}
+		}
+		return false
+	})
+	return n
 }
 
 // maxRoundStrokes bounds one round's history (State shows it); maxPath the
@@ -1086,7 +1115,9 @@ func cleanText(n string, max int) string {
 		}
 		b = append(b, c)
 	}
-	return strings.TrimSpace(string(b))
+	// no bare link: a page might make "https://…" in a hole's name clickable
+	// (": /" keeps the length, so max still holds)
+	return strings.TrimSpace(strings.ReplaceAll(string(b), "://", ": /"))
 }
 
 // maxSkin bounds a skin's length.

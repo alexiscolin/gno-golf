@@ -24,17 +24,22 @@ interface ShareProps {
   snapshot?: (() => Promise<Blob | null>) | null;
   link?: string;
 }
+/** The public address of a page of the game (link: its "?cup=…&hole=…"): the
+ *  site's own (NEXT_PUBLIC_SITE_URL), never a local dev address. */
+export function siteURL(link = "") {
+  const site = process.env.NEXT_PUBLIC_SITE_URL;
+  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/h\/.*$/, "/") : ""; // a hole's page (app/h) links from the site's root
+  const origin = site && /localhost|127\.0\.0\.1/.test(here) ? site.replace(/\/$/, "") : here.replace(/\/$/, "");
+  return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
+}
+
 export default function Share({ text, snapshot, link = "" }: ShareProps) {
   const [copied, setCopied] = useState(false);
   const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the card goes first
   useEffect(() => () => clearTimeout(copiedT.current), []);
-  // the game's public address (set NEXT_PUBLIC_SITE_URL when building for
-  // Netlify); a local dev address is never worth sharing, the page is
-  const site = process.env.NEXT_PUBLIC_SITE_URL;
-  const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
-  const origin = site && /localhost|127\.0\.0\.1/.test(here) ? site.replace(/\/$/, "") : here.replace(/\/$/, "");
-  // this hole, this cup, this gnome (link is the page's "?cup=…&hole=…&gnome=…")
-  const url = origin + (link ? "/" + link.replace(/^\/?/, "") : "");
+  // this hole, this cup, this gnome, at the game's public address (set
+  // NEXT_PUBLIC_SITE_URL when building for Netlify)
+  const url = siteURL(link);
   // the system sheet only where it is the phone's own (on a desktop it is a
   // bare OS panel without the networks people mean)
   const phone = typeof navigator !== "undefined" && !!navigator.share && typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;

@@ -59,7 +59,10 @@ const TIMES: Record<string, { sky: readonly [number, number, number]; sun: reado
 };
 
 /** Day for most holes, evening or night for some — stable per hole. */
+// ?og: every hole by day, for its link card (media/og/og.mjs)
+const DAY = typeof location !== "undefined" && /[?&]og(&|=|$)/.test(location.search);
 export const timeOf = (id: unknown) => {
+  if (DAY) return "day";
   const n = Number((String(id).match(/(\d+)$/) || [])[1]);
   const h = Number.isFinite(n) ? n : [...String(id)].reduce((a, c) => (a * 33 + c.charCodeAt(0)) >>> 0, 7);
   return ["day", "day", "dusk", "day", "night", "dusk"][h % 6];

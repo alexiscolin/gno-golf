@@ -17,7 +17,7 @@
    mirrored by hand: keep them in step with their sources.
      garden   day sky #fff3df (scene/camera.ts makeScene) -> moss #8fcba8 (scene/materials.ts C)
      island   shallow #5fd0cc softened to #8fd8d0 -> sandHi #f7e6ba (scene/island.ts P)
-     town     wall #f6ead3 -> roofFar #e2c9c4 (scene/town.ts T)
+     town     wall #f6ead3 -> roofFar #e2c9c4 (scene/town.ts T; globals.css --town-roof)
      mountain haze #eef3f8 -> ice #bfe6f4 (scene/mountain.ts M) */
 .screen--title, .front, .victory, .tint--garden {
   /* the sky, top to horizon; a card's frame, light to deep; a diorama's sky */
@@ -26,9 +26,9 @@
   --stage: #d3e8c8; /* the picker's card behind the gnome: a flat, muted colour of the world */
   --art: linear-gradient(180deg, #7ec8ff, #ffd6a8);
   --sky: linear-gradient(180deg, var(--s0), var(--s1));
-  --dots: radial-gradient(circle, rgba(20, 65, 52, .09) 1.7px, transparent 2.1px) 0 0 / 14px 14px;
+  --dots: radial-gradient(circle, rgba(var(--ink-rgb), .09) 1.7px, transparent 2.1px) 0 0 / 14px 14px;
   --gold: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%);
-  --glow: #ffe066;
+  --glow: #ffe066; --glow-rgb: 255, 224, 102;
   /* type: a display heading, a card's name, a pill's label */
   --fs-display: clamp(30px, 4.4vw, 54px);
   --fs-name: clamp(15px, 1.4vw, 18px);
@@ -52,7 +52,7 @@
   --art: linear-gradient(180deg, #54b8f5, #b8ecff 70%, #ffe2a8);
 }
 .tsky--town, .tint--town, .victory--town {
-  --s0: #f6ead3; --s1: #e2c9c4;
+  --s0: #f6ead3; --s1: var(--town-roof);
   --c1: #ffa3c6; --c2: #cf3f7c; --stage: #eee0d6;
   --art: linear-gradient(180deg, #6b4bc8, #ff8fb0 60%, #ffcf8a);
 }
@@ -64,7 +64,7 @@
 .front, .screen--title { transition: --s0 .45s, --s1 .45s; }
 
 /* the backdrop: the world's fade under an even halftone (::before), and the
-   game's first frame round the screen (::after: globals.css .screen__frame) */
+   game's first frame round the screen (::after) */
 .front { background: var(--s0); overflow: auto; }
 .front::before, .victory::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: var(--dots), var(--sky); }
 .title__sky { background: var(--dots), var(--sky); }
@@ -72,8 +72,9 @@
   content: ""; position: fixed; inset: 16px; pointer-events: none;
   border: 3px solid var(--green); border-radius: 10px;
 }
-.front > * { position: relative; z-index: 1; }
-.front > .screen__back { position: absolute; z-index: 2; }
+/* the screen's own children over the backdrop; :where() keeps it at no weight,
+   so a child's own position (.screen__back, .resets) wins without a fight */
+:where(.front) > * { position: relative; z-index: 1; }
 @media (max-width: 600px) { .front::after, .victory::after, .screen--title::after { inset: 8px; border-width: 2.5px; } }
 /* the title's film and live scene stay as they are: the frame is its still's only */
 .screen--title:has(.title__film:not(.title__film--off))::after, .screen--title:has(.title__stage--on)::after { display: none; }
@@ -91,7 +92,7 @@
   font-size: var(--fs-pill); font-weight: 700; letter-spacing: .12em; color: var(--paper); background: var(--ink);
 }
 /* a paper panel: a card's standing, the title's facts, the builder's tab */
-.front .panel, .world__info, .screen--title .title__facts li, .builder {
+.world__info, .screen--title .title__facts li, .builder {
   background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px; box-shadow: var(--deep-panel);
 }
 /* a round button: paper, inked, on its shadow (back, previous, next) */
@@ -101,9 +102,10 @@
 }
 .front .round:hover { background: var(--paper); transform: translateY(-2px); box-shadow: 0 6px 0 var(--ink); }
 .front .round:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
-/* the call to action: gold, inked, on its shadow (the title's start, the picker's pick) */
+/* the call to action: gold, inked, on its shadow (the title's start, the picker's pick);
+   this file loads after globals.css, so .btn--start is over .btn--cta and .btn--main */
 .btn--start, .front .btn--play:not([disabled]) {
-  background: var(--gold) !important; color: var(--ink) !important; border: 3px solid var(--ink);
+  background: var(--gold); color: var(--ink); border: 3px solid var(--ink);
 }
 .front .btn--play { font-size: clamp(18px, 2vw, 22px); font-weight: 700; padding: 12px 34px; border-radius: 20px; box-shadow: 0 6px 0 var(--ink); animation: pop .35s var(--spring); }
 .front .btn--play:hover:not([disabled]) { transform: translateY(-2px); box-shadow: 0 8px 0 var(--ink); }
@@ -165,17 +167,19 @@
   transform: rotate(-2deg);
 }
 
-/* the call to action: gold, big, breathing */
+/* the call to action: gold, big, breathing (its size over the picker's .screen .btn--play) */
+.screen--title .btn--start {
+  font-size: clamp(24px, 3vw, 34px);
+  padding: 16px 40px 18px 48px;
+}
 .btn--start {
-  font-size: clamp(24px, 3vw, 34px) !important;
-  padding: 16px 40px 18px 48px !important;
-  box-shadow: 0 7px 0 var(--ink), 0 0 0 0 rgba(255, 224, 102, .7);
+  box-shadow: 0 7px 0 var(--ink), 0 0 0 0 rgba(var(--glow-rgb), .7);
   animation: pop .35s cubic-bezier(.3, 1.6, .5, 1), cta-pulse 1.6s .4s ease-in-out infinite;
 }
 .btn--start svg { stroke: var(--ink); }
 .btn--start:hover { animation-play-state: paused; }
 @keyframes cta-pulse {
-  50% { transform: scale(1.07); box-shadow: 0 7px 0 var(--ink), 0 0 0 14px rgba(255, 224, 102, 0); }
+  50% { transform: scale(1.07); box-shadow: 0 7px 0 var(--ink), 0 0 0 14px rgba(var(--glow-rgb), 0); }
 }
 .screen--title .load { padding: 10px 18px 8px; background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; box-shadow: 0 5px 0 var(--ink); }
 .screen--title .title__facts { margin-top: clamp(18px, 4vh, 40px); gap: 12px; }
@@ -279,7 +283,7 @@
 }
 .worlds--v2 .world:hover:not([disabled]),
 .worlds--v2 .world:focus-visible { z-index: 1; transform: translateY(-10px) scale(1.06); }
-.worlds--v2 .world:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(255, 224, 102, .75), 0 16px 0 var(--ink); }
+.worlds--v2 .world:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) .world__ribbon,
 .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
 .worlds--v2 .world:focus-visible { outline: 4px solid var(--ink); outline-offset: 5px; box-shadow: 0 0 0 5px var(--paper), 0 16px 0 var(--ink); }
@@ -359,7 +363,7 @@
 .screen--pick .pick__tile {
   position: relative; display: grid; grid-template-rows: 1fr auto; width: var(--pick-w); height: calc(var(--pick-w) * 1.12);
   border: 3px solid var(--ink); border-radius: 28px; overflow: hidden; box-shadow: var(--deep-card);
-  background: radial-gradient(circle, rgba(20, 65, 52, .07) 1.7px, transparent 2.1px) 0 0 / 14px 14px, var(--stage);
+  background: radial-gradient(circle, rgba(var(--ink-rgb), .07) 1.7px, transparent 2.1px) 0 0 / 14px 14px, var(--stage);
 }
 .screen--pick .pick__tile > .pick__canvas { width: 100%; height: 100%; min-height: 0; }
 /* locked: the gnome greyed as he always was (the filter on his canvas's
@@ -369,7 +373,7 @@
   position: absolute; z-index: 2; left: -8%; right: -8%; top: 60%; margin: 0; padding: 8px 12%;
   background: var(--ink); color: var(--paper); border-block: 3px solid var(--paper);
   font-size: clamp(16px, 1.9vw, 22px); font-weight: 800; line-height: 1.2; text-align: center;
-  transform: rotate(-6deg); box-shadow: 0 4px 0 rgba(20, 65, 52, .35);
+  transform: rotate(-6deg); box-shadow: 0 4px 0 rgba(var(--ink-rgb), .35);
 }
 .screen--pick .pick__dots { justify-content: center; flex-wrap: wrap; gap: 6px; margin: 0; padding: 4px 10px 12px; }
 .screen--pick .pick__dots span { width: 10px; height: 10px; border-color: var(--ink); background: var(--paper); }

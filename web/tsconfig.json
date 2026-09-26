@@ -23,5 +23,5 @@
     "paths": { "@/*": ["./*"] }
   },
   "include": ["next-env.d.ts", ".next/types/**/*.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "out", ".next/cache"]
+  "exclude": ["node_modules", "out", ".next/cache", "test"]
 }

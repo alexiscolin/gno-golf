@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { C, flat, drawn, rbox, lanternGlow, share, ownFade, fadeLoop, type FadeItem, geoOf, gridGeo } from "./materials";
 import { animate, state } from "./state";
-import { inZone, mod, there, segDist, wallDist, smoothstep, boxOf } from "../terrain";
+import { inZone, mod, there, segDist, wallDist, smoothstep, boxOf, closest, terrain } from "../terrain";
 import { timeOf } from "./camera";
 import { gnomelet, bunting, stone, smoke } from "./props";
 import { bakeLocal, look, weatherLooks } from "./bake";
@@ -78,6 +78,87 @@ function snowAt(W: number, H: number, x: number, z: number) {
   return smoothstep(d / 14) * (1.5 + 0.9 * Math.sin(x * 0.21 + z * 0.13) + 0.5 * Math.cos(x * 0.07 - z * 0.3)) + smoothstep(-z / 40) * 6;
 }
 
+/**
+ * The snow as drawn round the lane, over GRASS: a lip piled against the
+ * kerb's outer face (a little under its top, whatever the lane's height
+ * there), soft dunes rolling away from it between the lanes and round the
+ * board, and snowAt's slopes further out. On the lane's side of a wall it
+ * stays at GRASS, below the lane; it comes down to GRASS by
+ * a cliff or a crack, whose rock walls start there. Decoration only: the ball
+ * never leaves the green, and the green's heights are the chain's.
+ */
+const fields = new WeakMap<Hole, { h: Height; snap: (x: number, z: number) => MutVec2; green: (x: number, z: number) => boolean }>();
+function snowField(s: Hole) {
+  const had = fields.get(s);
+  if (had) return had;
+  const W = s.board.w, H = s.board.h, t = terrain(s);
+  const walls = (s.walls || []).filter((w) => !w.every);
+  const open = (s.zones || []).filter((q) => q.skin === "cliff" || q.skin === "crevasse");
+  const cracks = crevasses(s);
+  // the nearest wall: its point, the way from it to (x, z), and whether
+  // that side is the lane's — a probe 0.75 past it (no wall's cell reaches
+  // that far) is on the green or not
+  const near = { d: Infinity, qx: 0, qz: 0, ux: 0, uz: 0, lane: false };
+  const nearest = (x: number, z: number) => {
+    near.d = Infinity;
+    if (x > -7 && x < W + 7 && z > -7 && z < H + 7)
+      for (const w of walls) {
+        const c = closest(x, z, w.a, w.b);
+        if (c.d < near.d) (near.d = c.d), (near.qx = c.x), (near.qz = c.z);
+      }
+    if (near.d < Infinity && near.d > 1e-3) {
+      near.ux = (x - near.qx) / near.d, near.uz = (z - near.qz) / near.d;
+      near.lane = t.onGreen(near.qx + near.ux * 0.75, near.qz + near.uz * 0.75);
+    } else near.lane = near.d < Infinity;
+    return near;
+  };
+  const f = (x: number, z: number) => {
+    const { d, qx, qz, ux, uz, lane: inLane } = nearest(x, z);
+    let lane = 0;
+    if (d < Infinity) {
+      if (inLane) return 0; // under the lane: below it
+      // the lane's height just inside the wall (on its line the ground is the
+      // rough's): the lower of two probes, so on a banked lane (the bobsleigh)
+      // the lip stays under the kerb's top and under the lane's edge
+      const lh = (k: number) => t.height(Math.min(Math.max(qx - ux * k, 0), W), Math.min(Math.max(qz - uz * k, 0), H));
+      lane = Math.min(lh(0.75), lh(0.3));
+    } else if (t.onGreen(x, z)) return 0;
+    const e = Math.max(0, d - 0.5); // from the kerb's outer face
+    const n = 0.5 * Math.sin(x * 0.55 + z * 0.3) + 0.5 * Math.sin(x * 0.23 - z * 0.62); // -1..1, slow
+    // the lip: from nothing at the wall's line (the lane's side of it stays
+    // under the lane) up inside the kerb to 0.25 over the lane at its outer
+    // face, falling off over 2.4: a function of the distance, so it meets
+    // the kerb along a clean line, not in cell steps
+    const lip = Math.max(0, lane - GRASS + 0.25 + 0.06 * n) * smoothstep(d / 0.3) * (1 - smoothstep(e / 2.4));
+    // dunes: rising from a trough just past the lip; low in front (the
+    // camera looks over it) and flat again at the shelf's lip
+    const front = 1 - 0.55 * smoothstep((z - H) / 4) - 0.45 * smoothstep((z - H - 8) / 5);
+    const dune = 1.6 * (0.65 + 0.35 * n) * smoothstep((e - 0.7) / 3.2) * front;
+    let h = Math.max(lip, dune + snowAt(W, H, x, z));
+    // down to GRASS at a cliff's or a crack's edge
+    for (const q of open) {
+      const dx = Math.max(q.min[0] - x, 0, x - q.max[0]), dz = Math.max(q.min[1] - z, 0, z - q.max[1]);
+      h *= smoothstep(Math.hypot(dx, dz) / 1.6);
+    }
+    for (const [a, b] of cracks) h *= smoothstep(Math.max(a - x, 0, x - b) / 1.6);
+    return h;
+  };
+  // A mesh vertex within 0.75 of a wall goes onto one of two lines:
+  // the wall's own (the lane's side: under the lane) or the kerb's outer
+  // face (the lip's top). Every triangle rising from one to the other then
+  // lies inside the kerb, and the snow meets its face along a straight line
+  // instead of dipping between the grid's vertices in a sawtooth.
+  const snap = (x: number, z: number): MutVec2 => {
+    const { d, qx, qz, ux, uz, lane } = nearest(x, z);
+    if (d >= 0.75 || d <= 1e-3) return [x, z]; // (a grid step and more: no triangle spans the kerb unsnapped)
+    const to = lane ? 0.02 : 0.5;
+    return [qx + ux * to, qz + uz * to];
+  };
+  const out = { h: f, snap, green: t.onGreen };
+  fields.set(s, out);
+  return out;
+}
+
 // ---------------------------------------------------------------- the land
 
 /** The snow shelf, its cliff at the front, the valley far below, the peaks. */
@@ -85,70 +166,61 @@ function base(s: Hole, box: THREE.Box3) {
   const g = new THREE.Group();
   const rand = seeded("mountain" + s.hole);
   const X0 = box.min.x - 36, X1 = box.max.x + 36, Z0 = box.min.z - 34, Z1 = box.max.z + CLIFF;
-  // the snow: one sheet, gently rolling away from the board, blue in its hollows
-  const nz = 30;
+  // the snow: one sheet, fine (a cell a vertex) over the board and a margin
+  // round it, where the kerb's lip and the dunes are, coarse further out
   const white = new THREE.Color(M.snow), blue = new THREE.Color(M.shadow), c = new THREE.Color();
   const W = s.board.w, H = s.board.h;
-  const lift = (x: number, z: number) => snowAt(W, H, x, z);
+  const { h: lift, snap, green } = snowField(s);
   // a crevasse splits the mountain, not only the board: the sheet has a
   // column edge on each side of it, and nothing in between
   const cracks = crevasses(s);
-  const xs: number[] = [];
-  for (let i = 0; i <= 48; i++) xs.push(X0 + ((X1 - X0) * i) / 48);
-  for (const [a, b] of cracks) xs.push(a, b);
-  xs.push(0, W);
-  xs.sort((p, q) => p - q);
-  const nx = xs.length - 1;
-  // rows: the board's own edges are rows too, so the sheet can leave the
-  // board's rectangle out (under.. below fills it, open where the ground is)
-  const zs: number[] = [];
-  for (let j = 0; j <= nz; j++) zs.push(Z0 + ((Z1 - Z0) * j) / nz);
-  zs.push(0, H);
-  zs.sort((p, q) => p - q);
-  const nzz = zs.length - 1;
-  const far = new THREE.Color(0xc2d2e2);
-  const tint = (x: number, z: number, y: number) => {
+  const MG = 5, STEP = 0.7; // the fine part: the lip and the dunes' rise (snap keeps the kerb line clean)
+  const axis = (lo: number, hi: number, n: number, a: number, b: number, more: number[]) => {
+    const v: number[] = [...more];
+    for (let i = 0; i <= n; i++) { const u = lo + ((hi - lo) * i) / n; if (u < a || u > b) v.push(u); }
+    for (let u = a; u <= b + 1e-6; u += STEP) v.push(u);
+    return v.sort((p, q) => p - q).filter((u, i, all) => !i || u - all[i - 1] > 1e-4);
+  };
+  const xs = axis(X0, X1, 48, -MG, W + MG, cracks.flat());
+  const zs = axis(Z0, Z1, 30, -MG, H + MG, []);
+  const nx = xs.length - 1, nzz = zs.length - 1;
+  const hs = new Float32Array((nx + 1) * (nzz + 1)), at: MutVec2[] = [];
+  for (let j = 0; j <= nzz; j++)
+    for (let i = 0; i <= nx; i++) {
+      const p = snap(xs[i], zs[j]);
+      at.push(p);
+      hs[j * (nx + 1) + i] = lift(p[0], p[1]);
+    }
+  const far = new THREE.Color(0xc2d2e2), deep = new THREE.Color(0xa9bfd8);
+  const tint = (x: number, z: number, y: number, slope: number, gx: number) => {
     c.copy(white).lerp(blue, 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(x * 0.4 + z * 0.25)) * smoothstep(y / 2));
+    // a bank's steep face in blue shadow, its crest white: the relief reads
+    // in the toon light, which flattens the snow's own shading
+    // (and more so turned from the sun, which stands off to +x)
+    c.lerp(deep, Math.min(0.8, 0.45 * smoothstep(slope / 0.9) + 0.4 * smoothstep(gx / 0.6)));
     // aerial perspective: the snow further back goes blue-grey, so it reads
     // as ground running up to the peaks, not as sky
     return c.lerp(far, 0.6 * smoothstep(-(z + 3) / 9));
   };
+  const hAt = (i: number, j: number) => hs[Math.min(nzz, Math.max(0, j)) * (nx + 1) + Math.min(nx, Math.max(0, i))];
   const geo = gridGeo(nx, nzz, (i, j, pos, col) => {
-    const x = xs[i], z = zs[j];
-    const y = lift(x, z);
+    const [x, z] = at[j * (nx + 1) + i], y = hAt(i, j);
     pos.push(x, GRASS + y, z);
-    tint(x, z, y);
+    const gx = (hAt(i + 1, j) - hAt(i - 1, j)) / Math.max(1e-3, xs[Math.min(nx, i + 1)] - xs[Math.max(0, i - 1)]);
+    const gz = (hAt(i, j + 1) - hAt(i, j - 1)) / Math.max(1e-3, zs[Math.min(nzz, j + 1)] - zs[Math.max(0, j - 1)]);
+    tint(x, z, y, Math.hypot(gx, gz), gx);
     col.push(c.r, c.g, c.b);
   }, (_a, _b, _d, _e, i, j) => {
     const mx = (xs[i] + xs[i + 1]) / 2, mz = (zs[j] + zs[j + 1]) / 2;
+    // under the lane, all at GRASS: never seen (the lane's own side faces
+    // close its edge), so not drawn — that pays for the fine margin round it
+    if (!hAt(i, j) && !hAt(i + 1, j) && !hAt(i, j + 1) && !hAt(i + 1, j + 1) && green(mx, mz)) return false;
     if (cracks.some(([a, b]) => mx > a && mx < b)) return false; // the gap
-    return !(mx > 0 && mx < W && mz > 0 && mz < H); // the board's: under() below
+    // open wherever the board is (a cliff, a crack), so the drop is a drop
+    return !(s.zones || []).some((q) => (q.skin === "cliff" || q.skin === "crevasse") && inZone(q, mx, mz));
   });
-  let under: THREE.BufferGeometry | null = null;
-  // under the board, fine snow at the garden's level: open wherever the board
-  // is (a cliff, a crack), so the drop is a drop and not a floor of snow
-  {
-    const open = (s.zones || []).filter((q) => q.skin === "cliff" || q.skin === "crevasse");
-    const step = 0.5, un = Math.ceil(W / step), vn = Math.ceil(H / step), up: number[] = [], uc: number[] = [], ui: number[] = [];
-    for (let j = 0; j <= vn; j++)
-      for (let i = 0; i <= un; i++) {
-        const x = Math.min(W, i * step), z = Math.min(H, j * step);
-        up.push(x, GRASS + lift(x, z), z);
-        tint(x, z, lift(x, z)); // the same snow as the sheet round it: no seam at the board's edge
-        uc.push(c.r, c.g, c.b);
-      }
-    for (let j = 0; j < vn; j++)
-      for (let i = 0; i < un; i++) {
-        const mx = (i + 0.5) * step, mz = (j + 0.5) * step;
-        if (open.some((q) => inZone(q, mx, mz))) continue;
-        const a = j * (un + 1) + i;
-        ui.push(a, a + un + 1, a + 1, a + 1, a + un + 1, a + un + 2);
-      }
-    const ug = geoOf(up, ui, uc);
-    under = ug;
-  }
   // the chasm beyond the board, behind it and in front, down to the depth
-  const ground = { height: (x: number, z: number) => GRASS + snowAt(W, H, x, z) };
+  const ground = { height: (x: number, z: number) => GRASS + lift(x, z) };
   for (const [a, b] of cracks) {
     g.add(crevasse({ min: [a, Z0 + 4], max: [b, -0.2] }, ground));
     g.add(crevasse({ min: [a, H + 0.2], max: [b, Z1] }, ground));
@@ -158,7 +230,6 @@ function base(s: Hole, box: THREE.Box3) {
   const day = timeOf(s.hole) === "day";
   const snowMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: day ? 0xc4d2e2 : 0x9fb2c8, emissiveIntensity: day ? 0.6 : 0.45 });
   g.add(new THREE.Mesh(geo, snowMat));
-  if (under) g.add(new THREE.Mesh(under, snowMat));
 
   // the cliff: a rock face dropping from the shelf's front edge, jagged, with
   // snow lying on its ledges
@@ -351,9 +422,10 @@ function edgeRocks(W: number, H: number, seed: string) {
 /** The shelf round the board: a few rocks half sunk in the snow, no more. */
 function edging(s: Hole) {
   const g = new THREE.Group();
+  const lift = snowField(s).h;
   for (const { size, x, z, rot } of edgeRocks(s.board.w, s.board.h, s.hole)) {
     const r = drawn(new THREE.DodecahedronGeometry(size, 0), flat(M.rock));
-    r.position.set(x, GRASS - 0.1, z);
+    r.position.set(x, GRASS + lift(x, z) - 0.1, z);
     r.scale.y = 0.5;
     r.rotation.set(...rot);
     g.add(r);
@@ -363,7 +435,7 @@ function edging(s: Hole) {
 
 // the snow sheet is base's; its height is what decor stands on
 function berms(s: Hole) {
-  return { group: new THREE.Group(), height: (x: number, z: number) => snowAt(s.board.w, s.board.h, x, z) };
+  return { group: new THREE.Group(), height: snowField(s).h };
 }
 
 // ---------------------------------------------------------------- props
@@ -867,7 +939,7 @@ function snowFence(rand: Rand) {
 }
 
 /** Ski tracks and footprints across the front snow, where no one stands. */
-function tracks(rand: Rand, X0: number, X1: number, z0: number, z1: number, W: number, gaps: readonly (readonly [number, number])[] = []) {
+function tracks(rand: Rand, X0: number, X1: number, z0: number, z1: number, W: number, bank: Height, gaps: readonly (readonly [number, number])[] = []) {
   const inGap = (x: number) => gaps.some(([a, b]) => x > a - 0.4 && x < b + 0.4);
   const g = new THREE.Group();
   const mat = new THREE.MeshBasicMaterial({ color: M.shadow, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
@@ -879,6 +951,7 @@ function tracks(rand: Rand, X0: number, X1: number, z0: number, z1: number, W: n
     const c = new THREE.CatmullRomCurve3(pts), runs: THREE.Vector3[][] = [[]];
     for (let k = 0; k <= 120; k++) {
       const p = c.getPoint(k / 120);
+      p.y = bank(p.x, p.z) / 0.2; // on the snow as drawn (the line is squashed to 0.2 below)
       if (inGap(p.x)) { if (runs[runs.length - 1].length) runs.push([]); continue; }
       runs[runs.length - 1].push(p);
     }
@@ -899,7 +972,8 @@ function tracks(rand: Rand, X0: number, X1: number, z0: number, z1: number, W: n
     const f = new THREE.Mesh(new THREE.CircleGeometry(0.11, 8), mat);
     f.rotation.x = -Math.PI / 2;
     f.scale.y = 1.6;
-    f.position.set(W * 0.55 - k * 0.7, GRASS + 0.06, z1 - 1 - k * 0.12 + (k % 2) * 0.28);
+    const fx = W * 0.55 - k * 0.7, fz = z1 - 1 - k * 0.12 + (k % 2) * 0.28;
+    f.position.set(fx, GRASS + bank(fx, fz) + 0.06, fz);
     g.add(f);
   }
   return g;
@@ -1189,7 +1263,7 @@ function decor(s: Hole, bank: Height = () => 0) {
   grove(X1 + 5, H + 5, 4, 0.6);
   // snow fences half buried along the front, ski tracks and footprints
   for (let x = X0 + 4; x < X1 - 6; x += 11 + rand() * 6) place(snowFence(rand), x, front0 + 1 + rand() * 2, 1.8, (rand() - 0.5) * 0.4);
-  g.add(tracks(rand, X0, X1, front0, front1, W, crevasses(s)));
+  g.add(tracks(rand, X0, X1, front0, front1, W, bank, crevasses(s)));
   // a ski jump far off on the slope behind, left of centre
   place(skiJump(), X0 + (X1 - X0) * 0.36, -11, 2.5, 0);
 
@@ -1210,11 +1284,16 @@ function decor(s: Hole, bank: Height = () => 0) {
 /** The board's rough in the mountains: flat snow, a rock now and then. */
 const rough = {
   lo: 0xdde7f1, hi: 0xf7fafd, mound: 0,
-  plant: (rand: Rand) => {
+  plant: (rand: Rand, s: Hole, x: number, z: number) => {
     if (rand() < 0.7) return new THREE.Group(); // bare snow, mostly
     const st = stone(rand);
     st.scale.multiplyScalar(0.6);
-    return st;
+    // course.ts sets it at the flat rough's level and scales it by 0.8: up
+    // onto the snow as drawn here
+    st.position.y = (GRASS + snowField(s).h(x, z) - (GRASS + 0.03)) / 0.8;
+    const g = new THREE.Group();
+    g.add(st);
+    return g;
   },
 };
 
@@ -1267,9 +1346,9 @@ function extras(ex: Extras, s: Hole, t: Terrain) {
     return pieceOf(along ? [[z.min[0], cz], [z.max[0], cz]] : [[cx, z.min[1]], [cx, z.max[1]]], along ? h : w);
   });
 
-  // the ground as drawn: the board's own inside it, the world's snow outside
-  const W = s.board.w, H = s.board.h;
-  const ground = (x: number, z: number) => (x >= 0 && x <= W && z >= 0 && z <= H ? height(x, z) : GRASS + snowAt(W, H, x, z));
+  // the ground as drawn: the lane's own on the green, the world's snow off it
+  const snow = snowField(s).h;
+  const ground = (x: number, z: number) => (t.onGreen && t.onGreen(x, z) ? height(x, z) : GRASS + snow(x, z));
   const clear = (x: number, z: number, r: number) => toWall(x, z) > r && (s.posts || []).every((p) => Math.hypot(p.c[0] - x, p.c[1] - z) > p.r + r);
   // where the slide meets the lane: just past the kerb's outer face (its posts too)
   const offLane = (b: Slide) => {
@@ -1319,10 +1398,20 @@ function heap(b: Slide, height: Height, ground: Height, clear: (x: number, z: nu
   const NH = Math.max(12, Math.ceil(b.len / 0.25)), P = 12, hpos: number[] = [], hcol: number[] = [], hidx: number[] = [];
   const hw = new THREE.Color(0xf6f9fc), hs = new THREE.Color(HEAP_BASE);
   const lo = down ? -down * half : -half, hi = down ? down * (half + spill) : half; // across, uphill → downhill
+  // the bar runs on into the kerb: the heap sinks to nothing where a wall or
+  // a post is, so it meets the wall's face instead of poking through its top
+  // (the slide outside carries on over it). Eased over the rows either side.
+  const at = (k: number) => [b.b[0] + (b.a[0] - b.b[0]) * (k / NH), b.b[1] + (b.a[1] - b.b[1]) * (k / NH)] as const;
+  const free = Array.from({ length: NH + 1 }, (_, k) => (clear(at(k)[0], at(k)[1], 0.2) ? 1 : 0));
+  const ease = (k: number) => {
+    let n = 0, sum = 0;
+    for (let j = k - 2; j <= k + 2; j++) if (j >= 0 && j <= NH) (n++, (sum += free[j]));
+    return free[k] ? sum / n : 0;
+  };
   for (let k = 0; k <= NH; k++) {
-    const u = k / NH, x0 = b.b[0] + (b.a[0] - b.b[0]) * u, z0 = b.b[1] + (b.a[1] - b.b[1]) * u;
+    const u = k / NH, [x0, z0] = at(k);
     const end = Math.min(1, Math.min(u, 1 - u) * b.len / 0.6); // rounded off at both ends
-    const top = (0.85 + 0.35 * u) * (0.85 + 0.15 * Math.sin(u * 17.3) + 0.08 * Math.sin(u * 41)) * Math.sqrt(end);
+    const top = (0.85 + 0.35 * u) * (0.85 + 0.15 * Math.sin(u * 17.3) + 0.08 * Math.sin(u * 41)) * Math.sqrt(end) * ease(k);
     for (let m = 0; m <= P; m++) {
       const v = m / P, a = lo + (hi - lo) * v; // across offset, signed
       // steep face at v = 0 (uphill), long spill to v = 1
@@ -1394,6 +1483,7 @@ function heap(b: Slide, height: Height, ground: Height, clear: (x: number, z: nu
     const u = (k + 0.3 + rand() * 0.4) / Math.max(6, Math.round(b.len / 1.1)), off = (down ? down * 0.2 : 0) + (rand() - 0.5) * half * 0.6;
     const x = b.b[0] + (b.a[0] - b.b[0]) * u + nx * off, z = b.b[1] + (b.a[1] - b.b[1]) * u + nz * off;
     const r = 0.26 + rand() * 0.18;
+    if (!clear(x, z, r)) continue; // none in a wall: the heap is gone there too
     const blk = drawn(new THREE.DodecahedronGeometry(r, 0), rand() < 0.35 ? HEAP_CHUNK_DARK : SNOW);
     blk.scale.set(1, 0.75, 1.15);
     blk.position.set(x, height(x, z) + (0.85 + 0.35 * u) * 0.8 + r * 0.2, z);

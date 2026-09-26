@@ -152,7 +152,7 @@ function edging(s: Hole) {
   // drain grates in the square, a step off the plinth
   for (let x = 3; x < W - 2; x += 9 + rand() * 4)
     for (const z of [-1.3, H + 1.3]) {
-      const grate = drawn(rbox(0.9, 0.05, 0.5, 0.03), flat(T.iron));
+      const grate = drawn(box3(0.9, 0.05, 0.5), flat(T.iron));
       grate.position.set(x, GRASS + 0.08, z);
       g.add(grate);
     }
@@ -190,7 +190,10 @@ function berms() {
 // the town's bush: three low-poly puffs (the garden's is round and heavy,
 // and the town has hundreds of them in its beds and pots)
 // and its flower: a stem and a round head, a fraction of the garden's
-const flowerHead = share(new THREE.IcosahedronGeometry(0.16, 0)), flowerStem = share(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 4));
+// (a head is a five-sided bead, round enough at a few pixels across; the stem
+// is open, its ends in the soil and in the head)
+const bead = (r: number) => new THREE.SphereGeometry(r, 5, 2);
+const flowerHead = share(bead(0.16)), flowerStem = share(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 3, 1, true));
 function tflower(rand: Rand) {
   const g = new THREE.Group();
   const stem = new THREE.Mesh(flowerStem, flat(C.leafDark));
@@ -215,6 +218,16 @@ function tbush(rand: Rand) {
 
 // a plain box, for the small and the many (benches, stalls, planks)
 const box3 = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
+/** A drum standing on something: its wall (outlined) and its top, no bottom
+ *  (what it stands on hides it, and it was a quarter of the triangles; the top
+ *  is not outlined — seen from above, the wall's outline rings it as before). */
+function drum(rTop: number, rFoot: number, h: number, n: number, material: THREE.Material) {
+  const g = drawn(new THREE.CylinderGeometry(rTop, rFoot, h, n, 1, true), material);
+  const top = new THREE.Mesh(new THREE.CircleGeometry(rTop, n, -Math.PI / 2).rotateX(-Math.PI / 2), material); // (thetaStart: on the wall's corners)
+  top.position.y = h / 2;
+  g.children[0].add(top);
+  return g;
+}
 const lit = (on: boolean) => (on ? new THREE.MeshBasicMaterial({ color: T.lampLit }) : flat(0x7f9aa6));
 
 /** A tower of a house: a taller body, its cap, a clock face on the front. */
@@ -298,17 +311,17 @@ function townHouse(rand: Rand, night: boolean, only: number | null = null) {
   const kind = only ?? Math.floor(rand() * 4);
   const cap = T.caps[Math.floor(rand() * T.caps.length)];
   const [r, h] = [[1.05, 1.9], [0.75, 3], [1.4, 1.4], [1, 2.2]][kind];
-  const body = drawn(new THREE.CylinderGeometry(r, r * 1.12, h, 10), flat(rand() < 0.5 ? T.wall : T.wallWarm));
+  const body = drawn(new THREE.CylinderGeometry(r, r * 1.12, h, 10, 1, true), flat(rand() < 0.5 ? T.wall : T.wallWarm));
   body.position.y = h / 2;
   g.add(body);
   const top = (rr: number, y: number, c: number) => {
-    const m = drawn(new THREE.SphereGeometry(rr, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), flat(c));
+    const m = drawn(new THREE.SphereGeometry(rr, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2), flat(c));
     m.position.y = y;
     m.scale.y = kind === 1 ? 1.1 : 0.8;
     g.add(m);
     for (let i = 0; i < 3; i++) {
       const a = i * 2.1 + rand(), t = 0.7 + (i % 2) * 0.3;
-      const spot = new THREE.Mesh(new THREE.SphereGeometry(rr * 0.13, 6, 4), flat(C.cream));
+      const spot = new THREE.Mesh(bead(rr * 0.13), flat(C.cream));
       spot.position.set(Math.cos(a) * Math.sin(t) * rr * 0.95, y + Math.cos(t) * rr * m.scale.y * 0.95, Math.sin(a) * Math.sin(t) * rr * 0.95);
       spot.scale.y = 0.5;
       g.add(spot);
@@ -329,7 +342,7 @@ function townHouse(rand: Rand, night: boolean, only: number | null = null) {
   for (let f = 0; f < floors; f++) {
     const a = (f % 2 ? -1 : 1) * 0.55, y = 1.05 + f * 1.05;
     if (y > h - 0.3) break;
-    const win = new THREE.Mesh(new THREE.CircleGeometry(0.2, 12), lit(night));
+    const win = new THREE.Mesh(new THREE.CircleGeometry(0.2, 8), lit(night));
     win.position.set(Math.sin(a) * r * 1.02, y, Math.cos(a) * r * 1.02);
     win.rotation.y = a;
     g.add(win);
@@ -361,7 +374,7 @@ function gnomeStand(rand: Rand, night: boolean, late = night) {
   shade.position.set(0, 2.1, 0);
   g.add(pole, shade);
   for (let i = 0; i < 3; i++) {
-    const good = drawn(new THREE.SphereGeometry(0.1, 8, 6), flat([0xf2a93b, C.cap, 0x8fcba8][i]));
+    const good = drawn(new THREE.SphereGeometry(0.1, 6, 4), flat([0xf2a93b, C.cap, 0x8fcba8][i]));
     good.position.set(-0.3 + i * 0.3, 0.88, 0.05);
     g.add(good);
   }
@@ -384,7 +397,7 @@ function stall(rand: Rand, night: boolean) {
   counter.position.y = 0.4;
   g.add(counter);
   for (const [x, z] of [[-0.85, -0.4], [0.85, -0.4], [-0.85, 0.4], [0.85, 0.4]]) {
-    const pole = drawn(new THREE.CylinderGeometry(0.05, 0.05, 1.9, 6), flat(C.woodDark));
+    const pole = drawn(new THREE.CylinderGeometry(0.05, 0.05, 1.9, 6, 1, true), flat(C.woodDark));
     pole.position.set(x, 0.95, z);
     g.add(pole);
   }
@@ -395,7 +408,7 @@ function stall(rand: Rand, night: boolean) {
     g.add(p);
   }
   for (let i = 0; i < 5; i++) {
-    const fruit = drawn(new THREE.SphereGeometry(0.13, 8, 6), flat([C.cap, 0xf2a93b, 0x8fcba8][i % 3]));
+    const fruit = drawn(new THREE.SphereGeometry(0.13, 6, 4), flat([C.cap, 0xf2a93b, 0x8fcba8][i % 3]));
     fruit.position.set(-0.6 + i * 0.3, 0.9, 0.15);
     g.add(fruit);
   }
@@ -413,11 +426,11 @@ function stall(rand: Rand, night: boolean) {
 /** A street lamp: an iron post and a lantern that glows after dark. */
 function lamp(on: boolean) {
   const g = new THREE.Group();
-  const post = drawn(new THREE.CylinderGeometry(0.07, 0.1, 2.6, 8), flat(T.iron));
+  const post = drawn(new THREE.CylinderGeometry(0.07, 0.1, 2.6, 8, 1, true), flat(T.iron)); // (its ends: the street, the lantern's hood)
   post.position.y = 1.3;
   const head = drawn(new THREE.ConeGeometry(0.34, 0.3, 8), flat(T.iron));
   head.position.y = 2.95;
-  const glass = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), on ? new THREE.MeshBasicMaterial({ color: T.lampLit }) : flat(T.lampOff));
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), on ? new THREE.MeshBasicMaterial({ color: T.lampLit }) : flat(T.lampOff));
   glass.position.y = 2.72;
   g.add(post, head, glass);
   if (on) {
@@ -432,7 +445,7 @@ function lamp(on: boolean) {
 /** A fountain: a stone basin, water, and a jet that rises and falls. */
 function fountain() {
   const g = new THREE.Group();
-  const basin = drawn(new THREE.CylinderGeometry(1.5, 1.6, 0.45, 20), flat(T.quay));
+  const basin = drum(1.5, 1.6, 0.45, 20, flat(T.quay));
   basin.position.y = 0.22;
   const rim = drawn(new THREE.TorusGeometry(1.42, 0.14, 8, 24), flat(T.quay));
   rim.rotation.x = -Math.PI / 2;
@@ -441,7 +454,7 @@ function fountain() {
   water.rotation.x = -Math.PI / 2;
   water.position.y = 0.5;
   g.add(rim);
-  const column = drawn(new THREE.CylinderGeometry(0.18, 0.26, 1.1, 10), flat(T.curb));
+  const column = drawn(new THREE.CylinderGeometry(0.18, 0.26, 1.1, 10, 1, true), flat(T.curb)); // (its ends: in the water, under the bowl)
   column.position.y = 0.95;
   const bowl = drawn(new THREE.CylinderGeometry(0.55, 0.3, 0.2, 14), flat(T.curb));
   bowl.position.y = 1.55;
@@ -464,12 +477,12 @@ function fountain() {
  */
 function streetTree(rand: Rand, bare = false) {
   const g = new THREE.Group();
-  const bed = drawn(new THREE.CylinderGeometry(0.85, 0.9, 0.22, 14), flat(T.curb));
+  const bed = drum(0.85, 0.9, 0.22, 12, flat(T.curb));
   bed.position.y = 0.11;
-  const lawn = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.05, 14), flat(C.leaf));
-  lawn.position.y = 0.23;
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(0.72, 12).rotateX(-Math.PI / 2), flat(C.leaf)); // only ever seen from above
+  lawn.position.y = 0.255;
   const h = 1.6 + rand() * 0.8;
-  const trunk = grows(new THREE.CylinderGeometry(0.12, 0.17, h, 7), C.bark);
+  const trunk = grows(new THREE.CylinderGeometry(0.12, 0.17, h, 7, 1, true), C.bark);
   trunk.position.y = h / 2 + 0.2;
   ud(g).foot = 0.2; // the trunk's foot: its sway is weighed from here (materials.ts plantFeet)
   ud(g).flex = 0.32; // a street tree: stiff, a small lean
@@ -557,9 +570,9 @@ function overhead(W: number, H: number, rand: Rand, night: boolean, foot: number
     const piv = new THREE.Group();
     piv.position.set(bx, GRASS + foot, zc);
     const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 4.2 - foot, 0), new THREE.Vector3(dir * 3.2, 5.6 - foot, -0.6));
-    const stem = drawn(new THREE.TubeGeometry(curve, 16, 0.32, 8, false), flat(C.cream));
+    const stem = drawn(new THREE.TubeGeometry(curve, 12, 0.32, 8, false), flat(C.cream));
     const top = curve.getPoint(1), R = 2.5;
-    const cap = drawn(new THREE.SphereGeometry(R, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), flat(colour));
+    const cap = drawn(new THREE.SphereGeometry(R, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), flat(colour));
     cap.scale.y = 0.55;
     const gills = new THREE.Mesh(new THREE.CircleGeometry(R * 0.98, 20), flat(C.cream));
     gills.rotation.x = Math.PI / 2;
@@ -567,7 +580,7 @@ function overhead(W: number, H: number, rand: Rand, night: boolean, foot: number
     head.add(cap, gills);
     for (let i = 0; i < 7; i++) {
       const a = i * 0.95, t = 0.45 + (i % 2) * 0.45;
-      const spot = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), flat(C.cream));
+      const spot = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 4), flat(C.cream));
       spot.position.set(Math.cos(a) * Math.sin(t) * R * 0.97, Math.cos(t) * R * 0.55 * 0.97, Math.sin(a) * Math.sin(t) * R * 0.97);
       spot.scale.y = 0.5;
       head.add(spot);
@@ -583,7 +596,7 @@ function overhead(W: number, H: number, rand: Rand, night: boolean, foot: number
   const balloons: { b: THREE.Group; x: number; z: number; y: number; ph: number }[] = [];
   for (let i = 0; i < 2; i++) {
     const b = new THREE.Group();
-    const ball = drawn(new THREE.SphereGeometry(0.45, 12, 10), paper(colours[(i + 1) % colours.length]));
+    const ball = drawn(new THREE.SphereGeometry(0.45, 10, 8), paper(colours[(i + 1) % colours.length]));
     ball.scale.y = 1.2;
     const str = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1.4, 3), flat(C.ink));
     str.position.y = -1.2;
@@ -615,11 +628,11 @@ function parkBed(rx: number, rz: number, rand: Rand) {
     pts.push([Math.cos(a) * rx * k, Math.sin(a) * rz * k]);
   }
   shape.setFromPoints(pts.map(([x, z]) => new THREE.Vector2(x, z)));
-  const lawn = drawn(new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.12, bevelSegments: 2, curveSegments: 3 }).rotateX(Math.PI / 2).translate(0, 0.24, 0), flat(0x7fb28a));
+  const lawn = drawn(new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.12, bevelSegments: 1, curveSegments: 3 }).rotateX(Math.PI / 2).translate(0, 0.24, 0), flat(0x7fb28a));
   g.add(lawn);
   pts.forEach(([x, z], i) => {
     if (i % 2) return;
-    const st = drawn(new THREE.DodecahedronGeometry(0.2 + rand() * 0.1, 0), flat(T.quay));
+    const st = drawn(bead(0.2 + rand() * 0.1), flat(T.quay));
     st.position.set(x * 1.08, 0.1, z * 1.08);
     st.scale.y = 0.6;
     g.add(st);
@@ -659,7 +672,7 @@ function bench() {
 /** A potted plant: a clay pot, and a bush or flowers in it. */
 function pot(rand: Rand) {
   const g = new THREE.Group();
-  const p = drawn(new THREE.CylinderGeometry(0.32, 0.24, 0.5, 10), flat(0xc9774a));
+  const p = drum(0.32, 0.24, 0.5, 10, flat(0xc9774a));
   p.position.y = 0.25;
   const plant = rand() < 0.5 ? tbush(rand) : tflower(rand);
   plant.scale.multiplyScalar(0.6);
@@ -675,14 +688,14 @@ function pot(rand: Rand) {
 function tram(z: number, x0: number, x1: number, night: boolean) {
   const g = new THREE.Group();
   for (const dz of [-0.45, 0.45]) {
-    const rail = drawn(rbox(x1 - x0, 0.06, 0.08, 0.02), flat(T.iron));
+    const rail = drawn(box3(x1 - x0, 0.06, 0.08), flat(T.iron));
     rail.position.set((x0 + x1) / 2, GRASS + 0.08, z + dz);
     g.add(rail);
   }
   const car = new THREE.Group();
   const body = drawn(rbox(4, 1.7, 1.6, 0.3), flat(0xf2a93b));
   body.position.y = 1.15;
-  const roof = drawn(rbox(4.2, 0.2, 1.7, 0.08), flat(C.cream));
+  const roof = drawn(box3(4.2, 0.2, 1.7), flat(C.cream));
   roof.position.y = 2.05;
   car.add(body, roof);
   for (let i = 0; i < 4; i++) {
@@ -762,7 +775,15 @@ function skyline(rand: Rand, X0: number, X1: number, Z0: number) {
   const g = new THREE.Group();
   // all of it one mesh, the colours in the vertices: hundreds of far houses
   // for one draw call (a material per shade was a draw call per shade)
-  const body = new THREE.CylinderGeometry(1, 1.1, 2, 6).toNonIndexed(), cap = new THREE.SphereGeometry(1.6, 7, 3, 0, Math.PI * 2, 0, Math.PI / 2).toNonIndexed();
+  // Only what a camera can see is built: every camera is over the board, so
+  // a far house is only ever seen from the square's side — its walls and cap
+  // are the two thirds turned that way (+z, turned round for the right-hand
+  // rows), open at the foot and under the cap; the rows deep in the haze get
+  // a cap of two rings, a speck on screen. (A third of the triangles.)
+  const ARC = (Math.PI * 4) / 3;
+  const body = new THREE.CylinderGeometry(1, 1.1, 2, 4, 1, true, -ARC / 2, ARC).toNonIndexed();
+  const near = new THREE.SphereGeometry(1.6, 5, 3, Math.PI / 2 - ARC / 2, ARC, 0, Math.PI / 2).toNonIndexed(), far = new THREE.SphereGeometry(1.6, 5, 2, Math.PI / 2 - ARC / 2, ARC, 0, Math.PI / 2).toNonIndexed();
+  const facing = new THREE.Quaternion(), toLeft = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
   const parts: THREE.BufferGeometry[] = [], hazeC = new THREE.Color(HAZE), col = new THREE.Color();
   const tinted = (geo: THREE.BufferGeometry, c: number, k: number, m: THREE.Matrix4) => {
     const gg = geo.clone().applyMatrix4(m);
@@ -773,10 +794,11 @@ function skyline(rand: Rand, X0: number, X1: number, Z0: number) {
     gg.deleteAttribute("uv");
     parts.push(gg);
   };
-  const put = (x: number, z: number, sc: number, k: number, colour: number) => {
+  const put = (x: number, z: number, sc: number, k: number, colour: number, q = facing) => {
+    const cap = k < 0.4 ? near : far;
     const hy = sc * (0.8 + rand() * 0.9);
-    tinted(body, T.wall, k, new THREE.Matrix4().compose(new THREE.Vector3(x, GRASS + hy, z), new THREE.Quaternion(), new THREE.Vector3(sc, hy, sc)));
-    tinted(cap, colour, k, new THREE.Matrix4().compose(new THREE.Vector3(x, GRASS + hy * 2 - 0.1, z), new THREE.Quaternion(), new THREE.Vector3(sc, sc * 0.8, sc)));
+    tinted(body, T.wall, k, new THREE.Matrix4().compose(new THREE.Vector3(x, GRASS + hy, z), q, new THREE.Vector3(sc, hy, sc)));
+    tinted(cap, colour, k, new THREE.Matrix4().compose(new THREE.Vector3(x, GRASS + hy * 2 - 0.1, z), q, new THREE.Vector3(sc, sc * 0.8, sc)));
   };
   // rows back from the square: nearer rows full colour, far ones in the haze
   for (let row = -1; row < 6; row++) {
@@ -788,7 +810,7 @@ function skyline(rand: Rand, X0: number, X1: number, Z0: number) {
   // and down the far right, beyond the bakery
   for (let row = 0; row < 3; row++)
     for (let z = Z0 - 1; z < 26; z += 2.6 + rand() * 1.2)
-      put(X1 + 9 + row * 3.4 + rand(), z, 0.9 - row * 0.1, 0.25 + row * 0.2, T.caps[Math.floor(rand() * T.caps.length)]);
+      put(X1 + 9 + row * 3.4 + rand(), z, 0.9 - row * 0.1, 0.25 + row * 0.2, T.caps[Math.floor(rand() * T.caps.length)], toLeft);
   g.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshToonMaterial({ vertexColors: true })));
   // the ground itself fading into haze past the square
   const c = document.createElement("canvas");
@@ -1032,7 +1054,7 @@ function tramAcross(len: number, thick: number, night: boolean) {
   // low and bright: a tram, not a wall across the view
   const body = drawn(rbox(len, 1.3, thick, 0.35), flat(0xf2a93b));
   body.position.y = 0.85;
-  const band = drawn(rbox(len + 0.04, 0.22, thick + 0.04, 0.06), flat(C.cap));
+  const band = drawn(box3(len + 0.04, 0.22, thick + 0.04), flat(C.cap)); // (a stripe: too thin to show a rounding)
   band.position.y = 0.45;
   // seen mostly from above: a red roof with skylights and a pantograph,
   // so it reads as a tram and not as a slab
@@ -1040,7 +1062,7 @@ function tramAcross(len: number, thick: number, night: boolean) {
   roof.position.y = 1.6;
   g.add(body, band, roof);
   for (let i = 0; i < Math.floor(len / 2); i++) {
-    const sky = drawn(rbox(0.9, 0.12, thick * 0.4, 0.04), flat(C.cream));
+    const sky = drawn(box3(0.9, 0.12, thick * 0.4), flat(C.cream));
     sky.position.set(-len / 2 + 1.2 + i * 2, 1.75, 0);
     g.add(sky);
   }
@@ -1269,24 +1291,24 @@ const bedTex = () => paving("bed", 128, (x, rand, n) => {
 /** The bandstand: a stone drum, a ring of slim columns, a mushroom-cap roof. */
 function bandstand(r: number, rand: Rand, night: boolean) {
   const g = new THREE.Group();
-  const drum = drawn(new THREE.CylinderGeometry(r, r, 0.6, 36), flat(T.curb));
-  drum.position.y = 0.3;
-  const deck = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.15, r - 0.15, 0.06, 36), flat(C.wood));
-  deck.position.y = 0.63;
-  g.add(drum, deck);
+  const base = drum(r, r, 0.6, 36, flat(T.curb));
+  base.position.y = 0.3;
+  const deck = new THREE.Mesh(new THREE.CircleGeometry(r - 0.15, 36).rotateX(-Math.PI / 2), flat(C.wood)); // its top is all that shows
+  deck.position.y = 0.66;
+  g.add(base, deck);
   const cr = r - 0.45;
   for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2, col = drawn(new THREE.CylinderGeometry(0.11, 0.14, 1.9, 8), flat(C.cream));
+    const a = (i / 10) * Math.PI * 2, col = drawn(new THREE.CylinderGeometry(0.11, 0.14, 1.9, 8, 1, true), flat(C.cream)); // (ends in the deck and the roof)
     col.position.set(Math.cos(a) * cr, 1.6, Math.sin(a) * cr);
     g.add(col);
   }
-  const rail = drawn(new THREE.TorusGeometry(cr, 0.05, 5, 48), flat(C.cream));
+  const rail = drawn(new THREE.TorusGeometry(cr, 0.05, 4, 32), flat(C.cream));
   rail.rotation.x = Math.PI / 2;
   rail.position.y = 1.2;
   g.add(rail);
   // the roof, a red cap with white spots, overhanging a little in the air
   const R = r + 0.15, k = 0.38, y0 = 2.5;
-  const cap = drawn(new THREE.SphereGeometry(R, 32, 10, 0, Math.PI * 2, 0, Math.PI / 2), flat(C.cap));
+  const cap = drawn(new THREE.SphereGeometry(R, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2), flat(C.cap));
   cap.scale.y = k;
   cap.position.y = y0;
   const under = new THREE.Mesh(new THREE.CircleGeometry(R, 32), flat(C.cream, { side: THREE.DoubleSide }));
@@ -1295,7 +1317,7 @@ function bandstand(r: number, rand: Rand, night: boolean) {
   g.add(cap, under);
   for (let i = 0; i < 11; i++) {
     const th = 0.35 + rand() * 0.9, ph = rand() * Math.PI * 2;
-    const spot = new THREE.Mesh(new THREE.SphereGeometry(0.34 + rand() * 0.2, 10, 6), flat(C.cream));
+    const spot = new THREE.Mesh(new THREE.SphereGeometry(0.34 + rand() * 0.2, 8, 4), flat(C.cream));
     spot.scale.y = 0.3;
     spot.position.set(Math.sin(th) * Math.cos(ph) * R * 0.99, y0 + Math.cos(th) * R * k, Math.sin(th) * Math.sin(ph) * R * 0.99);
     spot.lookAt(spot.position.x * 2, y0 + (spot.position.y - y0) * 2 / (k * k), spot.position.z * 2);
@@ -1365,18 +1387,18 @@ function obelisk(r: number, night: boolean) {
 /** A round market stall: a counter all round, fruit on it, a striped parasol. */
 function marketStall(r: number, rand: Rand) {
   const g = new THREE.Group();
-  const counter = drawn(new THREE.CylinderGeometry(r * 0.94, r, 0.85, 18), flat(C.wood));
+  const counter = drawn(new THREE.CylinderGeometry(r * 0.94, r, 0.85, 18, 1, true), flat(C.wood)); // (its top: the board laid on it)
   counter.position.y = 0.425;
-  const top = drawn(new THREE.CylinderGeometry(r * 0.97, r * 0.97, 0.08, 18), flat(C.woodDark));
+  const top = drum(r * 0.97, r * 0.97, 0.08, 18, flat(C.woodDark));
   top.position.y = 0.89;
   g.add(counter, top);
   const fruit = [C.cap, 0xf2a93b, 0x8fcba8, 0x9b7fd1];
   for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2, f = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(fruit[i % 4]));
+    const a = (i / 12) * Math.PI * 2, f = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 4), flat(fruit[i % 4]));
     f.position.set(Math.cos(a) * r * 0.66, 1.05, Math.sin(a) * r * 0.66);
     g.add(f);
   }
-  const pole = drawn(new THREE.CylinderGeometry(0.06, 0.06, 2.3, 6), flat(C.woodDark));
+  const pole = drawn(new THREE.CylinderGeometry(0.06, 0.06, 2.3, 6, 1, true), flat(C.woodDark));
   pole.position.y = 2.05;
   g.add(pole);
   const colour = [C.cap, 0x5b6fb5, 0xf2a93b][Math.floor(rand() * 3)];
@@ -1394,7 +1416,7 @@ function pigeons(r: number, rand: Rand) {
   const grey = flat(0x9ba4b6), dark = flat(0x757e91), neck = flat(0x6f9e8e);
   for (const [px, pz] of [[-r * 0.35, -r * 0.2], [r * 0.3, r * 0.3]]) {
     const b = new THREE.Group();
-    const body = drawn(new THREE.SphereGeometry(0.15, 10, 8), grey);
+    const body = drawn(new THREE.SphereGeometry(0.15, 8, 6), grey);
     body.scale.set(1.4, 0.95, 0.95);
     body.position.y = 0.2;
     const tail = drawn(new THREE.ConeGeometry(0.09, 0.24, 4), dark);

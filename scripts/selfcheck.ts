@@ -53,6 +53,43 @@ const constOf = (src: string, name: string) => {
 };
 const has = (src: string, code: string) => src.replace(/\s+/g, "").includes(code.replace(/\s+/g, ""));
 
+// every golf function the client calls exists, with as many arguments: the
+// reads chain.ts evaluates and the transactions adena.ts sends
+check("realm calls", () => {
+  const src = ["golf.gno", "state.gno", "data.gno", "owner.gno", "weather.gno", "render.gno"].map(realm).join("\n");
+  const arity = new Map<string, number>();
+  for (const m of src.matchAll(/^func ([A-Z]\w*)\(([^)]*)\)/gm)) {
+    const params = m[2].split(",").map((x) => x.trim()).filter((x) => x && !/^cur realm$/.test(x));
+    arity.set(m[1], params.length);
+  }
+  /** the top-level arguments of the call that starts at text[i] (just past its "(") */
+  const argsAt = (text: string, i: number) => {
+    let depth = 0, n = 0, any = false;
+    for (; i < text.length; i++) {
+      const c = text[i];
+      if (c === "(" || c === "{" || c === "[") depth++;
+      else if (c === ")" || c === "}" || c === "]") {
+        if (depth === 0) break;
+        depth--;
+      } else if (c === "," && depth === 0) n++;
+      else if (!/\s/.test(c)) any = true;
+    }
+    return any ? n + 1 : 0;
+  };
+  const web = (f: string) => fs.readFileSync(new URL(`../web/lib/${f}`, import.meta.url), "utf8");
+  const reads = web("chain.ts"), writes = web("adena.ts");
+  const calls: [string, number, string][] = [];
+  // reads: qeval(`Name(…)`) and vm(REALM, "Name(…)")
+  for (const m of reads.matchAll(/(?:qeval\(`|vm\(REALM, ")([A-Z]\w*)\(/g)) calls.push([m[1], argsAt(reads, m.index + m[0].length), "chain.ts"]);
+  // writes: call("Name", [..]) and [realm, "Name", [..]]
+  for (const m of writes.matchAll(/(?:call\("|\[realm, ")([A-Z]\w*)", \[/g)) calls.push([m[1], argsAt(writes, m.index + m[0].length), "adena.ts"]);
+  assert.ok(calls.length > 20, `only ${calls.length} calls found: the patterns drifted`);
+  for (const [name, n, where] of calls) {
+    assert.ok(arity.has(name), `${where} calls ${name}, which golf does not export`);
+    assert.equal(n, arity.get(name), `${where}: ${name} takes ${arity.get(name)} arguments, called with ${n}`);
+  }
+});
+
 check("golf.gno limits", () => {
   assert.equal(RULES.maxShots, constOf(golf, "maxShots"), "maxShots");
   assert.equal(RULES.maxRoundStrokes, constOf(golf, "maxRoundStrokes"), "maxRoundStrokes");
@@ -114,7 +151,7 @@ check("the save's split (adena.ts commitsOf)", () => {
 
 check("the gnokey plan (adena.ts gnokeyPlan)", () => {
   const round = { id: "garden/1/v1", name: "The Shelf", shots: ["1.0000,2.0000", "3.0000,4.0000", "5.0000,6.0000"], period: 7, roundMode: "pro" as const, walls: 4, pieces: 6, pts: [10, 10, 10] };
-  const opts = { realm: "gno.land/r/gnogolf/golf", chainId: "dev", rpc: "http://127.0.0.1:26757" };
+  const opts = { realm: "gno.land/r/gnogolf/golf", chainId: "dev", rpc: "http://127.0.0.1:26657" };
   const gas = (p: { command: string }) => Number(/-gas-wanted (\d+)/.exec(p.command)?.[1]);
   // the chain's own cut, when it was asked, is what gnokey sends
   const cut = gnokeyPlan(round, { ...opts, parts: [[0, 1], [1, 3]] });

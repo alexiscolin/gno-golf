@@ -10,8 +10,8 @@
 // ("chain"), not left to fail somewhere in the scene.
 
 import type {
-  Bests, Extras, HoleLeaderboard, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
-  SimulateRound, Standings, Vec2, Weather,
+  Bests, CourseLeaderboard, Extras, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
+  SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Weather,
 } from "./types";
 
 /**
@@ -45,7 +45,7 @@ const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/golf$/.test(REALM_ENV) ? REALM_ENV : 
 export const REALM_PATH = REALM.replace(/^gno\.land/, "");
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
 
-export const DEFAULT_RPC = "http://127.0.0.1:26757";
+export const DEFAULT_RPC = "http://127.0.0.1:26657";
 export const DEFAULT_WEB = "http://127.0.0.1:8888";
 
 /** An error from a read, tagged: "down" the node did not answer, "chain" it refused (log: the VM's). */
@@ -113,6 +113,10 @@ const checks = {
   bests: (v: unknown): v is Bests => board(v, strokesRow, "par") && typeof v.hole === "string",
   standings: (v: unknown): v is Standings => board(v, standingRow, "holes"),
   holeLeaderboard: (v: unknown): v is HoleLeaderboard => board(v, strokesRow, "par", "players", "finished", "offset", "next") && typeof v.hole === "string",
+  records: (v: unknown): v is { rows: StrokesRow[]; next: string } => isObj(v) && Array.isArray(v.rows) && v.rows.every(strokesRow) && typeof v.next === "string",
+  players: (v: unknown): v is { rows: StandingRow[]; next: string } => isObj(v) && Array.isArray(v.rows) && v.rows.every(standingRow) && typeof v.next === "string",
+  courseLeaderboard: (v: unknown): v is CourseLeaderboard => board(v, standingRow, "holes", "players", "offset", "next"),
+  holeRank: (v: unknown): v is HoleRank => isObj(v) && isMode(v.mode) && typeof v.hole === "string" && typeof v.player === "string" && nums(v, "rank", "of", "strokes"),
   rank: (v: unknown): v is Rank => isObj(v) && isMode(v.mode) && typeof v.player === "string" && nums(v, "rank", "of", "holes", "strokes"),
   round: (v: unknown): v is Round | null =>
     v === null || (isObj(v) && isPath(v.path) && isVec(v.rest) && isVec(v.ball) && strs(v, "player", "shots", "air", "cause") && typeof v.done === "boolean" && isMode(v.mode) && Number.isInteger(v.strokes) && nums(v, "period")),
@@ -153,7 +157,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       } catch (e) {
         throw signal && signal.aborted ? e : down(e);
       }
-      if (body.error) throw new Error(body.error.data || body.error.message);
+      if (body.error) throw down(new Error(body.error.data || body.error.message)); // the node refused the request itself
       const r = body.result && body.result.response && body.result.response.ResponseBase;
       if (!r) throw down(new Error("The node's answer had no response in it."));
       if (r.Error) throw refused(refusal(r.Log) || JSON.stringify(r.Error), r.Log);
@@ -252,6 +256,11 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   }, 60e3);
   const PARAMS_TTL = 10 * 60e3;
 
+  /** The name registrar this chain runs, "" if none: pearl has r/sys/namereg/v1, a local gno and mainnet v0. */
+  const nameReg = memo(async () => {
+    for (const v of ["gno.land/r/sys/namereg/v1", "gno.land/r/sys/namereg/v0"]) if (await vm(v, "IsPaused()").then(() => true, () => false)) return v;
+    return "";
+  }, 3600e3);
   return {
     rpc,
     web,
@@ -259,8 +268,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** The node's current gas price, as ugnot per gas: { gas, price } → price / gas. */
     gasPrice: memo(async () => {
       const r = await abci("auth/gasprice");
-      const j = JSON.parse(r) as { price: unknown; gas: unknown };
-      return Number(String(j.price).replace(/[^0-9.]/g, "")) / Number(j.gas);
+      let j: { price?: unknown; gas?: unknown } = {};
+      try {
+        j = JSON.parse(r) as typeof j;
+      } catch {}
+      const p = Number(String(j.price).replace(/[^0-9.]/g, "")) / Number(j.gas);
+      if (!Number.isFinite(p) || p <= 0) throw refused("The chain's gas price could not be read.");
+      return p;
     }, PARAMS_TTL),
     /** How much ugnot an address holds here; 0 for an account the chain has never seen. */
     // null when the node cannot say: an RPC outage is not an empty account
@@ -331,6 +345,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       period == null
         ? qeval(`SimulateRound(${s(hole)}, ${s(shots.join(";"))})`, checks.simRound, ms, signal, NO_PATH)
         : qeval(`SimulateRoundAt(${s(hole)}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
+    /** A recorded round replayed in its own weather, however old (the previews above take the current one only): for checking a record. */
+    replayRound: (hole: string, shots: readonly string[], period: number, ms?: number) =>
+      qeval(`SimulateRoundIn(${s(hole)}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, null, NO_PATH),
     /**
      * One commit of a round under way, read-only: what the next PlayRoundAt
      * (or PlayRoundPro) of these shots would do from the exact ball ("rest")
@@ -343,7 +360,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     period: async () => {
       const raw = await vm(REALM, "Period()");
       const n = Number((raw.match(/^\((-?\d+) int64\)/) || [])[1]);
-      if (!Number.isFinite(n)) throw new Error("The chain's period is not a number.");
+      if (!Number.isFinite(n)) throw refused("The chain's period is not a number.");
       return n;
     },
     weather: (hole: string, period: number) => qeval(`Weather(${s(hole)}, ${period | 0})`, checks.weather),
@@ -369,6 +386,37 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       isAddress(addr)
         ? qstr("gno.land/r/sys/users", `func() string { d := ResolveAddress(address(${s(addr)})); if d == nil { return "" }; return d.Name() }()`)
         : Promise.resolve(""),
+    /** A page of every player's best on a hole, named or not, by address: { rows: [{ player, strokes }], next ("" at the end) }. */
+    records: (hole: string, mode: string, after = "", limit = 100) =>
+      qeval(`Records(${s(hole)}, ${s(m(mode))}, ${s(after)}, ${limit | 0})`, checks.records),
+    /** A page of every course standing, named or not, by address: { rows: [{ player, holes, strokes }], next ("" at the end) }. */
+    players: (mode: string, after = "", limit = 100) => qeval(`Players(${s(m(mode))}, ${s(after)}, ${limit | 0})`, checks.players),
+    nameReg,
+    /** Why a name cannot be taken here ("" if it can): the registrar's own format rules, then whether it is taken. */
+    nameProblem: async (name: string) => {
+      const reg = await nameReg();
+      if (!reg) return "This chain has no name registrar.";
+      if (!/^[a-z0-9_-]{1,64}$/.test(name)) return "Lowercase letters, digits and dashes only.";
+      const bad = await qstr(reg, `func() string { if e := ValidateNymFormat(${s(name)}); e != nil { return e.Error() }; return "" }()`);
+      if (bad) return bad.replace(/^namereg: /, "");
+      if ((await vm("gno.land/r/sys/users", `IsNameTaken(${s(name)})`)).startsWith("(true")) return "That name is taken.";
+      // the registrar also refuses a lookalike of a name taken (l/i/1, 0/o, dashes)
+      return (await vm("gno.land/r/sys/users", `IsCanonicalTaken(${s(name)})`)).includes("(true bool)") ? "Too close to a name already taken." : "";
+    },
+    /** Many addresses' gno.land names in one read, "" for none, in order. */
+    namesOf: async (addrs: readonly string[]) => {
+      const ok = addrs.filter(isAddress).slice(0, 100); // checked before they go in the expression
+      if (!ok.length) return [];
+      const list = ok.map((a) => `address(${s(a)})`).join(", ");
+      const out = await qstr("gno.land/r/sys/users", `func() string { o := ""; for _, a := range []address{${list}} { if d := ResolveAddress(a); d != nil { o += d.Name() }; o += "," }; return o }()`);
+      const names = out.split(",");
+      return ok.map((a, i) => ({ player: a, name: names[i] || "" }));
+    },
+    /** A page of the course ranking: { mode, holes, players, offset, rows: [{ player, holes, strokes }], next (0 at the end) }. */
+    courseLeaderboard: (offset = 0, limit = 10, mode = "assisted") =>
+      qeval(`CourseLeaderboard(${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.courseLeaderboard),
+    /** A player's place on a hole's board: { rank (0: not on it), of, strokes }. */
+    holeRank: (hole: string, mode: string, player: string) => qeval(`HoleRank(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.holeRank),
     /** A page of a hole's board: { hole, mode, par, players (named), finished (everyone), offset, rows: [{ player, strokes }], next (the next page's offset, 0 at the end) }. */
     holeLeaderboard: (hole: string, offset = 0, limit = 10, mode = "assisted") =>
       qeval(`HoleLeaderboard(${s(hole)}, ${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.holeLeaderboard),

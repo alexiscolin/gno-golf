@@ -414,6 +414,11 @@ func TestThePreviewsRefuseAStalePeriod(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(SimulateCommit(id, 2, 8, 3, "0,1", Period()-1), `"strokes":4`))
 	uassert.True(t, strings.Contains(SimulateRoundAt(id, "0,1", Period()-1), `"strokes":1`))
 	uassert.True(t, strings.Contains(SimulateFrom(id, 2, 8, "0,1", 0, stale), `"holed":`))
+	// a record is checked in its own weather however old: SimulateRoundIn,
+	// the same replay, the weather to come still refused
+	uassert.Equal(t, SimulateRoundAt(id, "0,1", Period()-1), SimulateRoundIn(id, "0,1", Period()-1))
+	uassert.True(t, strings.Contains(SimulateRoundIn(id, "0,1", stale-1000), `"strokes":1`))
+	uassert.PanicsContains(t, cur, "has not come yet", func() { SimulateRoundIn(id, "0,1", Period()+1) })
 }
 
 // Versions answers for its own alias only, never with the caller's bytes

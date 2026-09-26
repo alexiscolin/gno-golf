@@ -397,7 +397,9 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
           </g>
         </svg>
         </div>
-        <p className="title__tag">mini-golf on-chain</p>
+        <p className="title__tag">
+          mini-golf on-chain
+        </p>
         {ready ? (
           <Button variant="primary" className="btn--play btn--cta btn--pop btn--start" aria-label="Play" onClick={(e) => (e.stopPropagation(), start())}>
             <span className="hint--mouse">Click to start</span>

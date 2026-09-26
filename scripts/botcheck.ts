@@ -3,7 +3,7 @@
 //
 // The physics is public and deterministic, so a bot can play perfectly and
 // nothing on chain can stop it. This only flags: it reads the boards, replays
-// the candidates' holing shots with small nudges through SimulateRoundAt (a
+// the candidates' holing shots with small nudges through SimulateRoundIn (a
 // free query), and writes a 0-1 score per player for the dapp to hide behind
 // a "show all" toggle. An indicator, not proof: see README.md, "Bot check".
 //
@@ -54,7 +54,8 @@ async function rpc<T>(fn: (c: Chain) => Promise<T>): Promise<T> {
   calls++;
   return fn(chain);
 }
-const simulate = (hole: string, shots: string[], period: number) => (sims++, rpc((c) => c.simulateRound(hole, shots, period, 15000)));
+// in the record's own weather however old: SimulateRoundIn, not the previews' SimulateRoundAt
+const simulate = (hole: string, shots: string[], period: number) => (sims++, rpc((c) => c.replayRound(hole, shots, period, 15000)));
 
 // --- signals ------------------------------------------------------------------
 

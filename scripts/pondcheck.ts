@@ -32,7 +32,7 @@ const { worldOf, loadWorld } = await import("../web/lib/scene/worlds.ts");
 type Vec2 = readonly [number, number];
 
 const slots = process.argv.slice(2).length ? process.argv.slice(2) : fs.readFileSync(new URL("../data/holes.txt", import.meta.url), "utf8").split("\n").filter(Boolean).map((l) => l.split(" ")[0]);
-const chain = makeChain({ rpc: process.env.RPC || "http://127.0.0.1:26757" });
+const chain = makeChain({ rpc: process.env.RPC || "http://127.0.0.1:26657" });
 const STEP = 0.1;
 let bad = 0, waters = 0;
 for (const slot of slots) {

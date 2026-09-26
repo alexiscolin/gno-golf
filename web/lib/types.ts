@@ -239,6 +239,28 @@ export interface Rank extends Versioned {
   strokes: number;
 }
 
+/** CourseLeaderboard(): a page of a mode's course ranking. */
+export interface CourseLeaderboard extends Versioned {
+  mode: Mode;
+  /** the course's current holes, and the players the ranking holds */
+  holes: number;
+  players: number;
+  offset: number;
+  rows: readonly StandingRow[];
+  /** the next page's offset, 0 at the end */
+  next: number;
+}
+
+/** HoleRank(): a player's place on a hole's board (rank 0: not on it). */
+export interface HoleRank extends Versioned {
+  hole: string;
+  mode: Mode;
+  player: string;
+  rank: number;
+  of: number;
+  strokes: number;
+}
+
 /** HoleLeaderboard(): a page of one hole's board. */
 export interface HoleLeaderboard extends Versioned {
   hole: string;

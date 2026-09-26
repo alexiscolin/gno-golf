@@ -1,6 +1,6 @@
 // Lint: typescript-eslint's type-checked rules and the React hooks rules for
 // the web client, and the basics for the node scripts that drive it
-// (scripts/). It sits at the root so it reaches those; its plugins are the
+// (scripts/, media/lib and media/og). It sits at the root so it reaches those; its plugins are the
 // client's. Run from web/: `npm run lint` (or `npx eslint .` for the client alone).
 import { createRequire } from "node:module";
 const require = createRequire(new URL("./web/package.json", import.meta.url));
@@ -31,6 +31,13 @@ export default tseslint.config(
     },
   },
   {
+    // the unit tests (npm test): their own tsconfig, and node:test's test()
+    // returns a promise the runner awaits itself
+    files: ["web/test/*.ts"],
+    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: new URL("./web/test/", import.meta.url).pathname }, globals: globals.node },
+    rules: { "@typescript-eslint/no-floating-promises": "off" },
+  },
+  {
     files: ["scripts/*.ts"],
     extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {
@@ -42,7 +49,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["web/*.mjs", "scripts/*.mjs"],
+    files: ["web/*.mjs", "media/lib/*.mjs", "media/og/*.mjs", "scripts/*.mjs"],
     languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: globals.node },
     rules: {
       "no-undef": "error",

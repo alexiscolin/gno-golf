@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { GNOMES, makePreview, cheer, motion } from "@/lib/scene";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
-import type { Bests, HoleLeaderboard, HoleRow, Leaderboard as LeaderboardRows, Mode, StrokesRow, StandingRow } from "@/lib/types";
+import type { HoleRow, Mode } from "@/lib/types";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
 import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
@@ -19,7 +19,10 @@ import About, { AboutButton, BackButton } from "@/components/About";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
-import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
+import { addFriend } from "@/lib/friends";
+import { messageOf, holeLink, parHere, HONEST } from "@/components/common";
+import { Boards, FullBoard, Podium, NameForm, useRankNudge, useSavedPlace, type BoardProps } from "@/components/Leaderboard";
+import { networkOf, OTHER_URL } from "@/lib/network";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } from "@/lib/prefs";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -46,8 +49,6 @@ type Rec = null
   | { at: "signing"; part?: number; of?: number }
   | { at: "refused"; error: string; stale: boolean }
   | { at: "saved"; hash: string; height?: number; parts: number };
-/** The error's own sentence, or the value said as it is. */
-const messageOf = (e: unknown) => String((e && typeof e === "object" && "message" in e && e.message) || e);
 
 /** Config travels in the query string, so one build serves any chain. */
 interface Config {
@@ -71,6 +72,9 @@ function useConfig() {
     const hooks = DEV || p0.has("camlog");
     const TEST = ["shot", "play", "demo", "weather", "world", "won"];
     const p = new URLSearchParams([...p0].filter(([k]) => (hooks || !TEST.includes(k)) && (DEV || k !== "won")));
+    // a hole's own page (app/h): /h/garden-3/ its slot, /h/garden/ its cup; a ?hole= or ?cup= wins
+    const [, pw, pn] = /^\/h\/([a-z]{2,16})(?:-(\d{1,3}))?\/?$/.exec(window.location.pathname) || [];
+    if (pw && !p.has("hole") && !p.has("cup")) p.set(pn ? "hole" : "cup", pn ? `${pw}/${pn}` : pw);
     setCfg({
       rpc: safeEndpoint(p.get("rpc"), process.env.NEXT_PUBLIC_RPC || DEFAULT_RPC),
       web: safeEndpoint(p.get("web"), process.env.NEXT_PUBLIC_WEB || DEFAULT_WEB),
@@ -241,14 +245,17 @@ function Toast({ text, onDone }: { text: string; onDone: () => void }) {
 // The storage deposit of a save, in ugnot: a first save on a hole writes the
 // round, the best and the board entry; a hole saved before is replaced.
 // saved: null when not known yet (counted as a first save: the larger).
-const depositOf = (saved: boolean | null, bytePrice: number) => depositBytes(saved !== true) * bytePrice;
-const depositText = (saved: boolean | null, bytePrice: number) =>
-  saved === true ? "almost no storage deposit (this hole is saved already)" : `a storage deposit of about ${(depositOf(saved, bytePrice) / 1e6).toFixed(2)} GNOT (a first save on this hole)`;
+// gno.land's mainnet: no faucet there, and its GNOT is the real one
+const MAINNET = "gnoland-1";
+const depositOf = (saved: boolean | null, bytePrice: number, firstOnCourse = false) => depositBytes(saved !== true, firstOnCourse) * bytePrice;
 
 
+/** A round's cost in one short line: the total, then what it is made of. */
+const costLine = (gas: number, gasPrice: number, saved: boolean | null, bytePrice: number, firstOnCourse = false) => {
+  const g = Number(costOf(gas, gasPrice)), d = depositOf(saved, bytePrice, firstOnCourse) / 1e6;
+  return saved === true ? `≈ ${g.toFixed(2)} GNOT of gas` : `≈ ${(g + d).toFixed(2)} GNOT (${g.toFixed(2)} gas + ${d.toFixed(2)} storage, first save here only)`;
+};
 const short = (a: string | null | undefined) => (a ? `${a.slice(0, 4)}…${a.slice(-3)}` : "");
-// a player on a board: longer, a row has room
-const shortAddr = (a: string) => `${String(a).slice(0, 8)}…${String(a).slice(-4)}`;
 
 export default function Golf() {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -427,6 +434,39 @@ export default function Golf() {
   const [record, setRecord] = useState<Rec>(null);
   const onChain = record?.at === "saved"; // this round is on the chain
   const stale = record?.at === "refused" && record.stale; // its weather is over: no save any more
+  // the save window runs out on the clock, not at the next click: the button goes with it
+  const [over, setOver] = useState(false);
+  const period = s ? s.period : null;
+  useEffect(() => {
+    setOver(false);
+    const g = game.current;
+    if (period == null || !g) return;
+    let live = true, t: ReturnType<typeof setTimeout> | undefined;
+    // the chain's clock decides, not this browser's: when the time looks up, the
+    // last block's time is read again first. A chain running late (or a clock
+    // set wrong here) keeps the save open for as long as the chain would take it.
+    // a chain that cannot be read is asked again every 10 s, not every second
+    const arm = (floor = 1000) =>
+      (t = setTimeout(
+        () =>
+          void g.chain.sync().then(
+            () => live && (g.chain.now() >= saveBy(period) ? setOver(true) : arm()),
+            () => live && arm(10000),
+          ),
+        Math.max(floor, saveBy(period) - g.chain.now()),
+      ));
+    arm();
+    return () => ((live = false), clearTimeout(t));
+  }, [period]);
+  const closed = stale || over; // no save possible any more
+  // the place a finished hole would take on its board, shown on the save button
+  const nudge = useRankNudge(s, game.current && game.current.chain, account && account.address, (s && s.roundMode) || aim, onChain, closed);
+  // a name just taken in the game, said until the next hole
+  const [namedAs, setNamedAs] = useState("");
+  const holeNow = s && s.id;
+  useEffect(() => setNamedAs(""), [holeNow]);
+  // and the place it took, once saved
+  const savedPlace = useSavedPlace(s, game.current && game.current.chain, account && account.address, (s && s.roundMode) || aim, onChain);
 
   const play = (direct = false) => {
     setScreen("play");
@@ -613,13 +653,19 @@ export default function Golf() {
   const [slowSign, setSlowSign] = useState(false); // Adena open for more than 10 s
   const [bytePrice, setBytePrice] = useState(100); // ugnot per stored byte (vm params)
   const [saved, setSaved] = useState<boolean | null>(null); // whether this player already has a best on this hole, in this round's mode (null: unknown)
+  const [firstOnCourse, setFirstOnCourse] = useState(false); // no finish yet anywhere on the course in this mode: a dearer first save
   const saveMode = (s && (s.roundMode || s.mode)) === "pro" ? "pro" : "assisted";
   useEffect(() => {
     setSaved(null);
+    setFirstOnCourse(false);
     if (!account || !holeId || !game.current) return;
     let live = true;
-    void within(game.current.chain.bests(holeId, saveMode, [account.address]))
+    const c = game.current.chain;
+    void within(c.bests(holeId, saveMode, [account.address]))
       .then((b) => live && setSaved(b.rows.length > 0))
+      .catch(() => {});
+    void within(c.rank(saveMode, account.address))
+      .then((r) => live && setFirstOnCourse(r.holes === 0))
       .catch(() => {});
     return () => void (live = false);
   }, [account, holeId, saveMode, holedNow]);
@@ -657,9 +703,13 @@ export default function Golf() {
     if (!s || !game.current) return;
     const round = `${s.id}#${s.shots.join(";")}`;
     const land = (r: Rec) => roundKey.current === round && setRecord(r);
-    // a round whose weather is over can no longer be saved: the chain would refuse it
-    if (s.period != null && game.current.chain.now() >= saveBy(s.period)) return land({ at: "refused", error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
+    // busy before anything is awaited: a second click must not start a second save
+    if (record?.at === "signing") return;
     setRecord({ at: "signing" });
+    // a round whose weather is over can no longer be saved: the chain would refuse it
+    // (its clock read again first: the chain's time decides, not this browser's)
+    await game.current.chain.sync().catch(() => {});
+    if (s.period != null && game.current.chain.now() >= saveBy(s.period)) return land({ at: "refused", error: "This round's weather is over, so the chain can no longer save it. Play the hole again in the current weather.", stale: true });
     try {
       const chain = game.current.chain, hole = s.id!;
       const id = chainId || (await within(chain.chainId()));
@@ -675,13 +725,29 @@ export default function Golf() {
         // the player has left this round (Play again, another hole): no more of it goes to Adena
         if (roundKey.current !== round) return;
         if (parts.length > 1) land({ at: "signing", part: k + 1, of: parts.length });
-        tx = await recordRound({
+        // the chain's round before this commit: a new one there is this commit landing
+        const before = JSON.stringify(await chain.round(hole, account.address).catch(() => null));
+        const sent = recordRound({
           address: account.address, realm: chain.realm, hole, shots: s.shots.slice(from, to), reset: k === 0,
           gas: gasOf(s, from, to), period: s.period, mode: s.roundMode || "assisted", price: gasPrice, chainId: id, rpc: chain.rpc,
         }).catch((err: SendError) => {
           if (k > 0) err.message = `Part ${k} of ${parts.length} is on-chain, part ${k + 1} was not sent (${err.message}). Save again to send the whole round.`, (err.cancelled = false);
           throw err;
         });
+        // Adena answers only once its window is closed: the chain is watched
+        // meanwhile, and a commit it holds counts as sent (Adena's answer, if
+        // it comes later, changes nothing)
+        let open = true;
+        const landed = (async () => {
+          for (let w = 0; w < 120 && open; w++) {
+            await new Promise((r) => setTimeout(r, 1500));
+            const r = await chain.round(hole, account.address).catch(() => null);
+            if (r && r.strokes >= to && JSON.stringify(r) !== before) return true;
+          }
+          return false;
+        })();
+        void sent.catch(() => {}); // raced below; a late refusal after the chain has it is moot
+        tx = await Promise.race([sent, landed.then((ok) => (ok ? null : sent))]).finally(() => (open = false));
         // the next part continues the round: it waits until the chain has this one
         if (k + 1 < parts.length) {
           for (let w = 0; w < 10; w++) {
@@ -761,7 +827,9 @@ export default function Golf() {
     } else if (screen === "worlds" && world) q.set("cup", world);
     else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
     else if (screen === "play") return; // the hole is not known yet: wait for it
-    const url = window.location.pathname + (String(q) ? `?${q}` : "");
+    // a hole's own page (/h/…) is left for the game's address once it moves on
+    const base = window.location.pathname.startsWith("/h/") ? "/" : window.location.pathname;
+    const url = base + (String(q) ? `?${q}` : "");
     const here = window.location.pathname + window.location.search;
     // a link to a hole keeps its address while the title shows (the game on its way to it)
     if (screen === "title" && lastScreen.current === null && (cfg.hole || cfg.cup)) return;
@@ -833,6 +901,7 @@ export default function Golf() {
           current={s.world}
           onBack={() => setScreen("title")}
           community={s.community}
+          podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} onOpen={() => setBoard(true)} />}
           onCommunity={(id) => {
             if (game.current) void game.current.load(id);
             setScreen("pick");
@@ -882,6 +951,8 @@ export default function Golf() {
                 className={"adena" + (account ? " adena--on" : "")}
                 onClick={() => setReal(true)}
                 aria-label={account ? `Saving on-chain as ${account.address}` : "Save on-chain with Adena"}
+                // why a wallet, for the one who never opens the sheet: playing is free, keeping is on-chain
+                title={account ? undefined : "Playing is free. Adena keeps your score on gno.land: public, replayed by the chain, on the boards."}
               >
                 <img className="adena__logo" src="adena.svg" alt="" width="34" height="34" />
                 <span className="adena__text">
@@ -1041,11 +1112,17 @@ export default function Golf() {
               <div className="win__score">
                 <strong>{s.strokes}</strong>
                 <span>stroke{s.strokes > 1 ? "s" : ""}</span>
+                {savedPlace && (
+                  <b className="win__place" title="Your place on this hole's board, on-chain">
+                    #{savedPlace.rank}
+                    <small>of {savedPlace.of}</small>
+                  </b>
+                )}
               </div>
             <Share
               link={s ? holeLink(s, gnome) : ""}
                 snapshot={() => (game.current ? game.current.snapshot(`${s.name} · ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`) : Promise.resolve(null))}
-                text={shareText({ s, card, cups, fresh })}
+                text={shareText({ s, card, cups, fresh, place: savedPlace })}
               />
             </div>
 
@@ -1064,41 +1141,49 @@ export default function Golf() {
               </p>
             )}
             <RecordState record={record} account={account} s={s} chain={game.current && game.current.chain} />
-            {account && (ourNode === false || slowSign) && (() => {
-              const rpc = (game.current && game.current.chain.rpc) || "";
-              const host = rpc.replace(/^https?:\/\//, "");
-              return (
-                <p className="note note--warn">
-                  {ourNode === false
-                    ? `Adena is on another node than this game (${host}), so it cannot work out the fee.`
-                    : "Adena is still working out the fee."}{" "}
-                  In Adena, open the network list and pick the one whose RPC is <b>{host}</b>
-{chainId ? <> (chain id <b>{chainId}</b>)</> : null}.
-                </p>
-              );
+            {(() => {
+              // one note at a time, the one in the way first: the node, the funds, then the name
+              const chain = game.current && game.current.chain;
+              const host = ((chain && chain.rpc) || "").replace(/^https?:\/\//, "");
+              const short = account && !onChain && funds != null ? shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice, firstOnCourse), funds) : 0;
+              const warn =
+                account && (ourNode === false || slowSign) ? (
+                  <>
+                    {ourNode === false ? "Adena is on another network." : "Adena is still working out the fee."} In Adena, pick the one whose RPC is <b>{host}</b>
+                    {chainId ? <> (chain id <b>{chainId}</b>)</> : null}.
+                  </>
+                ) : short && funds != null ? (
+                  <>
+                    {funds === 0 ? "Your Adena account has no GNOT here yet." : `Your account is about ${short.toFixed(3)} GNOT short.`}{" "}
+                    {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : chainId === MAINNET ? "It needs some GNOT on gno.land to pay the gas." : "The faucet gives some for free."}
+                  </>
+                ) : null;
+              if (!warn && namedAs) return <p className="note note--good">You are <b>{namedAs}</b> now{onChain ? ": your rounds are on the boards." : ": save your round to take your place."}</p>;
+              if (!warn && nudge.noName && account && chain)
+                return (
+                  <NameForm chain={chain} account={account.address} chainId={chainId} price={gasPrice} onNamed={(n) => (setNamedAs(n), nudge.named())}
+                    lead={onChain ? "Saved! Now put it on the board" : nudge.at ? `Put your #${nudge.at} on the board` : "Get on the board"} />
+                );
+              return warn && <p className="note note--warn">{warn}</p>;
             })()}
             {!onChain && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={stale} onReplay={() => game.current?.reset()} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} onReplay={() => game.current?.reset()} />
             )}
-            {account && !onChain && (() => {
-              // said before signing, not by refusing to: Adena still opens
-              const short = shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice), funds);
-              if (!short || funds == null) return null;
-              return (
-                <p className="note note--warn">
-                  {funds === 0 ? "Your Adena account has no GNOT on this chain yet" : `Your account holds ${(funds / 1e6).toFixed(3)} GNOT, about ${short.toFixed(3)} short`} — it needs some to pay the gas and the storage deposit.
-                  {/localhost|127\.0\.0\.1/.test((game.current && game.current.chain.rpc) || "") ? " On this local chain, fund it from the node's test account (gnokey send, or the dev faucet)." : " On a testnet, the faucet gives some for free."}
-                </p>
-              );
-            })()}
             <div className="banner__row">
               <Button variant="secondary" onClick={() => game.current?.reset()}>
                 Play again
               </Button>
               {!onChain && (
-                <Button variant="secondary" className="btn--save" disabled={record?.at === "signing" || stale} onClick={() => void recordIt()}>
+                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={record?.at === "signing" || closed} onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
-                  {record?.at === "signing" ? (record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`) : "Save on-chain"}
+                  {record?.at === "signing" ? (
+                    record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`
+                  ) : (
+                    "Save on-chain"
+                  )}
+                  {nudge.at > 0 && record?.at !== "signing" && (
+                    <span className="btn__rank">{nudge.noName ? `#${nudge.at} here with a name` : `Take #${nudge.at} on this hole!`}</span>
+                  )}
                 </Button>
               )}
               {cupWon && cupWon.id === s.id ? (
@@ -1120,10 +1205,10 @@ export default function Golf() {
             </div>
             {account && !onChain && (
               <p className="real__fine">
-                About {costOf(gasOf(s), gasPrice)} GNOT of gas + {depositText(saved, bytePrice)}, shown again in Adena before you sign.
+                {costLine(gasOf(s), gasPrice, saved, bytePrice, firstOnCourse)}, confirmed in Adena.
               </p>
             )}
-            {!onChain && !stale && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
+            {!onChain && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
           </Dialog>
         </div>
       )}
@@ -1157,7 +1242,7 @@ export default function Golf() {
       )}
 
       {board && s && (
-        <Boards web={(game.current && game.current.chain.web) || ""} mode={aim} s={s} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} />
+        <Boards mode={aim} s={s} inHole={screen === "play"} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} />
       )}
 
       {cardOpen && s && (
@@ -1165,7 +1250,7 @@ export default function Golf() {
             <span className="eyebrow">Gnogolf · the cup and its card</span>
             <h2>The cup</h2>
             <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
-            <Leaderboard chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
+            <FullBoard key={aim} kind="course" s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
         </Sheet>
       )}
 
@@ -1184,6 +1269,7 @@ export default function Golf() {
 
       {(screen === "worlds" || screen === "pick") && <AboutButton onClick={() => setAbout(true)} />}
       {about && <About web={cfg ? cfg.web : ""} onClose={() => setAbout(false)} />}
+      {cfg && <NetBanner rpc={cfg.rpc} />}
 
       {real && (
         <RealPlay
@@ -1193,7 +1279,7 @@ export default function Golf() {
           onClose={() => setReal(false)}
           rpc={cfg && cfg.rpc}
           chainName={chainName}
-          cost={s && s.holed ? `about ${costOf(gasOf(s), gasPrice)} GNOT of gas + ${depositText(saved, bytePrice)} for this round` : null}
+          cost={s && s.holed ? costLine(gasOf(s), gasPrice, saved, bytePrice, firstOnCourse) : null}
         />
       )}
 
@@ -1345,14 +1431,10 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName, cost }:
           <li>
             <b>Hole out, then sign</b>
             <span>
-              One transaction replays your shots on the chain (a long round on a busy
-              hole takes two). You pay its gas, roughly 0.1 to 0.7 GNOT depending on
-              the hole, and a storage deposit, about 0.9 GNOT the first time you save a
-              hole and almost nothing after. Both are shown before you sign. The chain
-              re-runs every shot itself, so the score is the chain's own, not one you
-              type in.
+              Adena signs once, the chain replays your shots: the score is the chain's
+              own. The cost is shown before you sign.
             </span>
-            {cost && <span className="real__cost">This round: {cost}.</span>}
+            {cost && <span className="real__cost">This round: {cost}</span>}
           </li>
         </ol>
 
@@ -1380,7 +1462,7 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName, cost }:
         <p className="real__fine">
           Network: <span className="mono">{chainName}</span>
           {/* the public faucet only feeds public testnets: a node on this machine has none */}
-          {chainName && !/localhost|127\.0\.0\.1|\[::1\]/.test(rpc || "") && (
+          {chainName && chainName !== MAINNET && !/localhost|127\.0\.0\.1|\[::1\]/.test(rpc || "") && (
             <> · Needs a little GNOT: <a href="https://faucet.gno.land" target="_blank" rel="noopener noreferrer">Get test GNOT ↗</a></>
           )}
         </p>
@@ -1391,18 +1473,6 @@ function RealPlay({ account, wallet, onConnect, onClose, rpc, chainName, cost }:
 /** The camera modes' names, on the camera button. */
 const CAMS: Record<CamMode, string> = { classic: "Classic", far: "Far", third: "Third person" };
 
-/** The address of this hole, to put in the bar and in shared links. */
-function holeLink(s: Snapshot, gnome: string) {
-  const q = new URLSearchParams();
-  const keep = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  // a page pointed at another chain keeps pointing there
-  for (const k of ["rpc", "web"]) { const v = keep.get(k); if (v) q.set(k, v); }
-  // a hole in no cup (community, archived) is linked by its id, never as place 1
-  if (s.place) (q.set("cup", s.world || "garden"), q.set("hole", String(s.place)));
-  else q.set("hole", s.id || "");
-  if (gnome) q.set("gnome", gnome);
-  return `?${q}`;
-}
 
 interface PickerProps {
   /** the cup picked: the screen takes its colours */
@@ -1478,8 +1548,24 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
   );
 }
 
+/**
+ * Which chain the page plays on, on every screen but mainnet's: a local node
+ * or the testnet, where scores are practice. The other deployment one click
+ * away when there is one.
+ */
+function NetBanner({ rpc }: { rpc: string }) {
+  const net = networkOf(rpc);
+  if (net === "mainnet") return null;
+  return (
+    <p className={`netbanner netbanner--${net}`}>
+      <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
+      <span>{net === "local" ? "a node on this machine" : "practice scores, free test GNOT"}</span>
+      {net === "testnet" && OTHER_URL && <a className="netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
+    </p>
+  );
+}
+
 /** Assisted or Pro aim, with what it means — and what the chain can't check. */
-const HONEST = "We can't check which mode you used, so each mode has its own board.";
 function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (m: Mode) => void; compact?: boolean }) {
   const [why, setWhy] = useState(false); // the (i)'s note, a tap away (a tooltip never shows on touch)
   return (
@@ -1589,7 +1675,7 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
  * gno.land flavoured (the realm replays every shot; the score is on the
  * chain). One line is picked per moment, from the hole so it varies.
  */
-function shareText({ s, card, cups, fresh }: { s: Snapshot; card: Card; cups: ReturnType<typeof cupTotals>; fresh: readonly Skin[] }) {
+function shareText({ s, card, cups, fresh, place }: { s: Snapshot; card: Card; cups: ReturnType<typeof cupTotals>; fresh: readonly Skin[]; place?: { rank: number; of: number } | null }) {
   const t = totals(card, s.holes), cup = (WORLDS.find((w) => w.id === s.world) || WORLDS[0]).name;
   const d = t.strokes - t.par, vs = d === 0 ? "level par" : vsPar(d);
   const pick = (list: readonly string[]) => list[[...String(s.id || "")].reduce((a, c) => a + c.charCodeAt(0), s.strokes) % list.length];
@@ -1599,6 +1685,7 @@ function shareText({ s, card, cups, fresh }: { s: Snapshot; card: Card; cups: Re
     `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on gno.land.`,
     `⛳ ${t.strokes} strokes round the whole ${cup} (${vs}). My gnome is tired, the chain is not.`,
   ]) + tag;
+  if (place) return `🏆 #${place.rank} of ${place.of} on ${s.name} in Gnogolf: ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}, saved on-chain. Come and take my place.` + tag;
   if (fresh.length) return `🍄 New gnome unlocked on Gnogolf: ${fresh.map((g) => g.name).join(" and ")}. Earned the hard way, one putt at a time.` + tag;
   if (s.strokes === 1) return pick([
     `🕳️ Hole in one on ${s.name}! Every bounce computed by a realm on gno.land.`,
@@ -1692,8 +1779,6 @@ function golfTerm(strokes: number, par: number) {
   return d <= -3 ? "Albatross!" : d === -2 ? "Eagle!" : d === -1 ? "Birdie!" : d === 0 ? "Par" : d === 1 ? "Bogey" : d === 2 ? "Double bogey" : d === 3 ? "Triple bogey" : `${d} over par`;
 }
 
-/** The par of the hole being played. */
-const parHere = (s: Snapshot) => parOf(s.holes.find((h) => h.id === s.id) || (s.allHoles || []).find((h) => h.id === s.id));
 
 /** The card: hole, par and your score, ten holes to a row, with the totals. */
 function Scorecard({ holes, card, current, compact = false, world = "garden" }: { holes: readonly HoleRow[]; card: Card; current: string | null; compact?: boolean; world?: string }) {
@@ -1745,18 +1830,6 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }: 
   );
 }
 
-/**
- * The cup as a grand prix: its emblem, its scorecard (every hole with its
- * par and your score, the hole being played marked), the running total
- * against par, where you stand on the chain's board if you recorded, and
- * what comes next.
- */
-interface BoardProps {
-  s: Snapshot;
-  chain: Chain | null;
-  me?: string | null;
-  mode?: Mode;
-}
 function Standings({ s, card, chain, me, mode = "pro", compact = false }: BoardProps & { card: Card; compact?: boolean }) {
   const [rank, setRank] = useState<{ at?: number; unnamed?: boolean } | null>(null);
   useEffect(() => {
@@ -1792,318 +1865,5 @@ function Standings({ s, card, chain, me, mode = "pro", compact = false }: BoardP
           : next && <>Next up: <b>{next.name}</b></>}
       </p>
     </section>
-  );
-}
-
-// Leaderboards are shown as "coming soon" until launch: false here, and the
-// badge and ribbon are gone
-const SOON = true;
-
-/** Until launch, an empty leaderboard says when it opens. */
-const ComingSoon = () => (
-  <div className="soon">
-    <span className="soon__badge">Coming soon</span>
-    <p>Leaderboards open at launch: record your rounds with Adena to take your place.</p>
-  </div>
-);
-
-// Players another script flags as likely bots (public/flags.json: { flags:
-// { addr: { score, reasons } } }), read once a session when a board opens.
-// Missing or broken: nobody is hidden.
-/** What the checker says of one player: a score (0..1) and its reasons. */
-interface Flag {
-  score: number;
-  reasons?: string[];
-}
-type Flags = Record<string, Flag | undefined>;
-let flagsOnce: Promise<Flags> | null = null;
-const flagsOf = () =>
-  (flagsOnce ||= fetch("flags.json", { cache: "no-cache" })
-    .then((r) => (r.ok ? (r.json() as Promise<unknown>) : {}))
-    .then((j) => (j && typeof j === "object" && "flags" in j && j.flags && typeof j.flags === "object" ? (j.flags as Flags) : {}))
-    .catch(() => ({})));
-const HIDE_AT = 0.5; // the checker's own self-test bot scores 0.61, a strong human up to 0.35
-function useFlags() {
-  const [f, setF] = useState<Flags>({});
-  useEffect(() => {
-    let live = true;
-    void flagsOf().then((x) => live && setF(x));
-    return () => void (live = false);
-  }, []);
-  return f;
-}
-/** Rows with the flagged ones taken out unless shown; the count taken out. */
-const screen_ = <R extends { player: string }>(rows: readonly R[], flags: Flags, all: boolean) => {
-  const out = all ? rows : rows.filter((r) => !((flags[r.player]?.score ?? 0) >= HIDE_AT));
-  return { rows: out, hidden: rows.length - out.length };
-};
-const FlagMark = ({ f }: { f: Flag | false | undefined }) =>
-  f && f.score >= HIDE_AT ? (
-    <em className="flag-mark" tabIndex={0} title={`Possibly automated: ${(f.reasons || []).join(", ") || "flagged"}`} aria-label={`Possibly automated: ${(f.reasons || []).join(", ")}`}>?</em>
-  ) : null;
-
-/**
- * You and your friends, on this hole and across the course, in the mode shown.
- * Read with Bests / Standings, which rank anyone, named or not.
- */
-function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
-  const [friends, setFriends] = useState(loadFriends);
-  // (a failed read shows as no rows)
-  const [hole, setHole] = useState<(Partial<Bests> & { rows: readonly StrokesRow[] }) | null>(null);
-  const [course, setCourse] = useState<{ holes?: number; rows: readonly StandingRow[] } | null>(null);
-  const [adding, setAdding] = useState("");
-  const [note, setNote] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the sheet goes first
-  useEffect(() => () => clearTimeout(copiedT.current), []);
-  const who = [me, ...friends.map((f) => f.addr)].filter((x): x is string => !!x);
-  const key = who.join(",");
-  useEffect(() => {
-    if (!chain || !who.length) return;
-    let live = true;
-    const id = s.id || "";
-    chain.bests(id, mode, who).then((b) => live && setHole(b)).catch(() => live && setHole({ rows: [] }));
-    chain.standings(mode, who).then((b) => live && setCourse(b)).catch(() => live && setCourse({ rows: [] }));
-    return () => void (live = false);
-    // who is keyed by its join
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chain, s.id, mode, key]);
-  const label = (a: string) => (a === me ? "You" : friends.find((f) => f.addr === a)?.name || shortAddr(a));
-  const add = async (e: FormEvent) => {
-    e.preventDefault();
-    const v = adding.trim().replace(/^@/, "");
-    if (!v) return;
-    setNote(null);
-    let addr = v, name = "";
-    if (!isAddress(v)) {
-      addr = chain ? await chain.resolveName(v).catch(() => "") : "";
-      name = v;
-      if (!addr) return setNote(`No gno.land name “${v}” on this chain.`);
-    }
-    if (addr === me) return setNote("That's you — you're always here.");
-    setFriends(addFriend(addr, name));
-    setAdding("");
-  };
-  const drop = (addr: string) => setFriends(saveFriends(loadFriends().filter((f) => f.addr !== addr)));
-  const invite = me && `${window.location.origin}${window.location.pathname}?friend=${me}`;
-  const rows = <R,>(b: { rows: readonly R[] } | null, pick: (a: R, b: R) => number) => (b ? [...b.rows].sort(pick) : null);
-  const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
-  return (
-    <div className="lb friends">
-      {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
-      {who.length > 0 && (<>
-      <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>
-      {!h && <p className="lb__empty">Reading the chain…</p>}
-      {h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet: be the first.</p>}
-      {h && h.length > 0 && (
-        <ol>
-          {h.map((r, i) => (
-            <li key={r.player} className={r.player === me ? "me" : ""}>
-              <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
-              <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
-              <strong>{vsPar(r.strokes - ((hole && hole.par) || parHere(s)))}</strong>
-            </li>
-          ))}
-        </ol>
-      )}
-      <h3>The course <small>{course ? `${course.holes} holes` : ""}</small></h3>
-      {!c && <p className="lb__empty">Reading the chain…</p>}
-      {c && c.length === 0 && <p className="lb__empty">No recorded rounds yet: be the first.</p>}
-      {c && c.length > 0 && (
-        <ol>
-          {c.map((r, i) => (
-            <li key={r.player} className={r.player === me ? "me" : ""}>
-              <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{label(r.player)}</span>
-              <span className="lb__holes">{r.holes} holes</span>
-              <strong>{r.strokes}</strong>
-            </li>
-          ))}
-        </ol>
-      )}
-      </>)}
-      <form className="friends__add" onSubmit={(e) => void add(e)}>
-        <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Add a friend: address or gno.land name" aria-label="Add a friend by address or gno.land name" />
-        <Button variant="secondary" type="submit">Add</Button>
-      </form>
-      {note && <p className="note note--warn">{note}</p>}
-      {friends.length > 0 && (
-        <ul className="friends__list">
-          {friends.map((f) => (
-            <li key={f.addr}>
-              <span>{f.name || `${f.addr.slice(0, 10)}…${f.addr.slice(-4)}`}</span>
-              <button className="linkish" onClick={() => drop(f.addr)} aria-label={`Remove ${f.name || f.addr}`}>remove</button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {invite && (
-        <button
-          className="linkish friends__invite"
-          onClick={() => void navigator.clipboard.writeText(invite).then(() => (setCopied(true), clearTimeout(copiedT.current), (copiedT.current = setTimeout(() => setCopied(false), 1600))), () => {})}
-        >
-          {copied ? "Link copied — send it to a friend" : "Copy an “add me as a friend” link"}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Strokes against par, the golf way: −1, E, +2. */
-
-/**
- * The leaderboards, in a sheet: this hole's best rounds, and the whole
- * course's. Read from the chain when the sheet opens, not before.
- */
-function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", web = "" }: BoardProps & { onClose: () => void; goTo: (id: string) => void; web?: string }) {
-  const [tab, setTab] = useState<"friends" | "hole" | "course">("friends");
-  const [mode, setMode] = useState<Mode>(mine);
-  const [hb, setHb] = useState<(HoleLeaderboard & { done: boolean }) | null>(null); // as loaded so far
-  const [err, setErr] = useState<string | null>(null);
-  const [more, setMore] = useState(false); // a page is on its way
-  const PAGE = 10;
-  // a page is O(page) on the chain, however deep, and says where the next
-  // one starts (0 at the end). Offsets are the chain's, not the rows shown: a
-  // name deleted since is skipped in its page, which then holds fewer rows
-  // while more still follow.
-  const page = (offset: number) => chain!.holeLeaderboard(s.id || "", offset, PAGE, mode).then((b) => ({ ...b, done: !(b.next > offset) }));
-  // what the rows on screen are for: a page asked for another hole or mode is dropped
-  const view = useRef("");
-  view.current = `${s.id}|${mode}|${tab}`;
-  useEffect(() => {
-    if (!chain || tab !== "hole") return;
-    let live = true;
-    setHb(null);
-    setErr(null);
-    page(0).then((b) => live && setHb(b)).catch((e: unknown) => live && setErr(messageOf(e)));
-    return () => void (live = false);
-    // page() reads chain and s.id, both listed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chain, s.id, tab, mode]);
-  const loadMore = () => {
-    if (!hb || hb.done || more) return;
-    const asked = view.current;
-    setMore(true);
-    page(hb.next)
-      .then((b) => view.current === asked && setHb((h) => (h ? { ...h, rows: [...h.rows, ...b.rows], next: b.next, done: b.done } : h)))
-      .catch((e: unknown) => view.current === asked && setErr(messageOf(e)))
-      .finally(() => setMore(false));
-  };
-  const me_ = (p: string) => (p === me ? "You" : shortAddr(p));
-  const flags = useFlags();
-  const [showAll, setShowAll] = useState(false);
-  const shownHole = hb ? screen_(hb.rows, flags, showAll) : null;
-  // the connected player's gno.land name: the general boards list only named players
-  const [myName, setMyName] = useState<string | null>(null);
-  useEffect(() => {
-    if (!chain || !me) return;
-    let live = true;
-    chain.nameOf(me).then((n) => live && setMyName(n)).catch(() => {});
-    return () => void (live = false);
-  }, [chain, me]);
-  const self = (s.allHoles || []).find((h) => h.id === s.id);
-  const newer = self && self.next;
-  return (
-    <Sheet className="boards" label="Leaderboard" onClose={onClose}>
-        <span className="eyebrow">Recorded on-chain</span>
-        <h2>Leaderboard</h2>
-        <Segmented className="boards__modes" full role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
-        <p className="boards__word">{HONEST}</p>
-        <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={[["friends", "Friends"], ["hole", "This hole"], ["course", "The course"]]} />
-        {tab !== "friends" && (
-          <p className="boards__ranked">
-            Ranked: players with a gno.land name ·{" "}
-            <a href={`${web}/r/sys/namereg/v1`} target="_blank" rel="noopener noreferrer">get a name ↗</a>
-            {me && myName === "" && <> — get one to appear here</>}
-          </p>
-        )}
-        {tab === "friends" ? (
-          <Friends s={s} chain={chain} me={me} mode={mode} />
-        ) : tab === "hole" ? (
-          <div className="lb">
-            <h3>{s.name} <small>par {parHere(s)}{hb ? ` · ${hb.finished} finished${hb.finished !== hb.players ? `, ${hb.players} ranked` : ""}` : ""}</small></h3>
-            {newer && (
-              <p className="note note--warn">
-                Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
-              </p>
-            )}
-            {err && <p className="note note--bad">{err}</p>}
-            {!hb && !err && <p className="lb__empty">Reading the chain…</p>}
-            {hb && hb.rows.length === 0 && (SOON ? <ComingSoon /> : <p className="lb__empty">No recorded round yet — connect Adena and be the first.</p>)}
-            {shownHole && shownHole.rows.length > 0 && (
-              <ol>
-                {shownHole.rows.map((r, i) => (
-                  <li key={r.player} className={r.player === me ? "me" : ""}>
-                    <span className="lb__rank">{i + 1}</span>
-                    <span className="lb__who">{me_(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}<FlagMark f={showAll && flags[r.player]} /></span>
-                    <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
-                    <strong>{vsPar(r.strokes - (hb?.par || parHere(s)))}</strong>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {shownHole && (shownHole.hidden > 0 || showAll) && (
-              <button className="linkish" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? "Hide flagged players" : `Show all (${shownHole.hidden} hidden)`}
-              </button>
-            )}
-            {hb && !hb.done && (
-              <Button className="boards__more" disabled={more} onClick={loadMore}>
-                {more ? "Reading…" : "Show more"}
-              </Button>
-            )}
-          </div>
-        ) : (
-          <Leaderboard chain={chain} me={me} mode={mode} filter />
-        )}
-        {!SOON && <p className="real__fine">Only rounds recorded with Adena appear here: free play is computed by the chain but not kept.</p>}
-    </Sheet>
-  );
-}
-
-/** The chain's course ranking: rounds the chain replayed itself, named players only. */
-function Leaderboard({ chain, me, mode = "pro", filter = false }: { chain: Chain | null; me?: string | null; mode?: Mode; filter?: boolean }) {
-  const [lb, setLb] = useState<LeaderboardRows | null>(null);
-  const flags = useFlags();
-  const [showAll, setShowAll] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    if (!chain) return;
-    let live = true;
-    setLb(null);
-    setErr(null);
-    chain.leaderboard(mode).then((b) => live && setLb(b)).catch((e: unknown) => live && setErr(messageOf(e)));
-    return () => void (live = false);
-  }, [chain, mode]);
-  return (
-    <div className="lb">
-      <h3>The course <small>top ten</small></h3>
-      {err && <p className="note note--bad">{err}</p>}
-      {!lb && !err && <p className="lb__empty">Reading the chain…</p>}
-      {lb && lb.rows.length === 0 && (SOON ? <ComingSoon /> : <p className="lb__empty">Nobody has recorded a round yet. Connect Adena and be the first.</p>)}
-      {lb && lb.rows.length > 0 && (() => {
-        const v = filter ? screen_(lb.rows, flags, showAll) : { rows: lb.rows, hidden: 0 };
-        return (
-          <>
-        <ol>
-          {v.rows.map((r, i) => (
-            <li key={r.player} className={r.player === me ? "me" : ""}>
-              <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{r.player === me ? "You" : shortAddr(r.player)}<FlagMark f={showAll && flags[r.player]} /></span>
-              <span className="lb__holes">{r.holes}/{lb.holes}</span>
-              <strong>{r.strokes}</strong>
-            </li>
-          ))}
-        </ol>
-            {(v.hidden > 0 || (filter && showAll)) && (
-              <button className="linkish" onClick={() => setShowAll((x) => !x)}>
-                {showAll ? "Hide flagged players" : `Show all (${v.hidden} hidden)`}
-              </button>
-            )}
-          </>
-        );
-      })()}
-    </div>
   );
 }

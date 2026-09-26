@@ -3,6 +3,7 @@
 // static host, or on IPFS.
 export default {
   output: "export",
+  trailingSlash: true, // a hole's page is out/h/garden-3/index.html: /h/garden-3/ on any static host
   images: { unoptimized: true },
   devIndicators: false, // the dev badge sits on the HUD's bottom-left button
 };

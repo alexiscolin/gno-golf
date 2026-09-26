@@ -4,3 +4,6 @@ node_modules/
 out/
 web/next-env.d.ts
 .netlify/
+# a local gnokey keybase (private keys) and editor swap files: never in the repo
+gnohome/data/
+*.swp

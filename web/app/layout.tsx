@@ -24,14 +24,14 @@ export const metadata: Metadata = {
     title,
     description:
       "Every hole is a contract. Every shot is computed by the chain. Play free in your browser.",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Gnogolf: a gnome on a 3D mini-golf hole, with a tunnel, a bunker and a mountain" }],
+    images: [{ url: "/og/default.jpg", width: 1200, height: 630, alt: "Gnogolf: the gnome badge, mini-golf on-chain, every shot computed by the chain" }],
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
     title,
     description: "Every hole is a contract. Every shot is computed by the chain. Play free in your browser.",
-    images: ["/og.png"],
+    images: ["/og/default.jpg"],
   },
 };
 
