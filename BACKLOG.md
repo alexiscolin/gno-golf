@@ -21,7 +21,7 @@ After V1 comes the Builder: players draw a hole in the browser and publish it
 with `PublishMine`. The realm needs nothing new for it; the work is a GG1
 encoder on the client side (see ADR-002).
 
-## The hole of the day — an idea, to decide before the pearl deploy
+## The hole of the day — an idea, not for V1 (the whole course stays open from day one)
 
 One hole a day, the same for everyone, with a board that starts empty every
 morning: a reason to come back, and something to post ("#3 today on Down the
