@@ -217,6 +217,80 @@ const inked = (geometry: THREE.BufferGeometry, material: THREE.Material) => draw
 // 2 segments: round enough under an ink outline, a third of the triangles of 3
 const rbox = (w: number, h: number, d: number, r = 0.12) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2, h / 2, d / 2) * 0.98);
 
+// ---------------------------------------------------------------- relief
+//
+// Borders (kerbs, rails, their posts, a bank's face, a quay) get some volume
+// and a light texture, the same way in every world: their colour darkens down
+// to the foot (baked into vertex colours by shade()), the top catches a
+// little more light, and a fine grain runs over them — soft value noise of
+// the world position, in the shader. No texture, nothing done per frame; one
+// material per side, so the bake merges every border of a hole into one draw.
+
+/** A soft grain, scaled by k, on the vertical faces only (sides) or on all;
+ *  and a touch more light on what faces up. Adds to any lit material. */
+function withGrain<M extends THREE.Material>(m: M, k = 0.07, sides = false): M {
+  const key = "grain" + k + (sides ? "s" : "");
+  m.onBeforeCompile = (sh: Shader) => {
+    sh.vertexShader = "varying vec3 vGrainW;\nvarying vec3 vGrainN;\n" + sh.vertexShader.replace(
+      "#include <begin_vertex>",
+      "#include <begin_vertex>\n  vGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;\n  vGrainN = normalize(mat3(modelMatrix) * objectNormal);",
+    );
+    sh.fragmentShader = `varying vec3 vGrainW;
+varying vec3 vGrainN;
+float grainHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+float grainNoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(grainHash(i), grainHash(i + vec3(1, 0, 0)), f.x), mix(grainHash(i + vec3(0, 1, 0)), grainHash(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(grainHash(i + vec3(0, 0, 1)), grainHash(i + vec3(1, 0, 1)), f.x), mix(grainHash(i + vec3(0, 1, 1)), grainHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+` + sh.fragmentShader.replace(
+      "#include <color_fragment>",
+      `#include <color_fragment>
+  {
+    // fine grain, stretched along the ground (a kerb's run, a bank's strata), over a broader mottle
+    float g = grainNoise(vGrainW * vec3(3.0, 9.0, 3.0)) - 0.5 + 0.6 * (grainNoise(vGrainW * 1.3) - 0.5);
+    float up = ${sides ? "1.0 - abs(vGrainN.y)" : "1.0"};
+    diffuseColor.rgb *= 1.0 + ${k.toFixed(3)} * 2.0 * g * up${sides ? "" : " + 0.08 * smoothstep(0.55, 0.95, vGrainN.y)"};
+  }`,
+    );
+  };
+  m.customProgramCacheKey = () => key;
+  md(m).hook = key;
+  return m;
+}
+const reliefs = new Map<number, THREE.MeshToonMaterial>();
+/** The material of a border built with shade(): white toon over its vertex
+ *  colours, with the grain. Shared per side. */
+export function relief(side: THREE.Side = THREE.FrontSide) {
+  let m = reliefs.get(side);
+  if (!m) reliefs.set(side, (m = share(withGrain(new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: bands, side })))));
+  return m;
+}
+/** The grain on the vertical faces of a vertex-coloured ground (a lane's
+ *  side face down to the sea, a bank). Returns m. */
+export const grainSides = <M extends THREE.Material>(m: M) => withGrain(m, 0.08, true);
+
+/** Colours a geometry color times k per vertex (vertex colours, for relief()):
+ *  by default darker toward its foot, k from 0.62 at its lowest to 1.06 at its
+ *  top; k(y01, i) for a builder that knows better (i: the vertex). */
+export function shade(geo: THREE.BufferGeometry, color: THREE.ColorRepresentation, k: (y01: number, i: number) => number = (y) => 0.62 + 0.44 * Math.sqrt(y)) {
+  const p = geo.attributes.position, c = new THREE.Color(color), col = new Float32Array(p.count * 3);
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const lo = geo.boundingBox!.min.y, span = geo.boundingBox!.max.y - lo || 1;
+  for (let i = 0; i < p.count; i++) {
+    const f = k((p.getY(i) - lo) / span, i);
+    col[i * 3] = c.r * f;
+    col[i * 3 + 1] = c.g * f;
+    col[i * 3 + 2] = c.b * f;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+/** A border piece with volume: shaded to its foot, grained, outlined. */
+export const carved = (geo: THREE.BufferGeometry, color: THREE.ColorRepresentation, side: THREE.Side = THREE.FrontSide, k?: (y01: number, i: number) => number) =>
+  drawn(shade(geo, color, k), relief(side));
+
 /** Board coordinates are (x right, y away); the world uses y for height. */
 export const at = (p: Vec2, h = 0) => new THREE.Vector3(p[0], h, p[1]);
 

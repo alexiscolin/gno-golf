@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, ownFade, fadeLoop, windNow, geoOf, gridGeo, onTop } from "./materials";
-import { inZone, mod, segDist, smoothstep } from "../terrain";
+import { inZone, mod, segDist, smoothstep, terrain } from "../terrain";
 import { bakeLocal, look, weatherLooks } from "./bake";
 import { gnomelet, brolly } from "./props";
 import { animate, state } from "./state";
@@ -231,6 +231,7 @@ function land(s: Pick<Hole, "board" | "hole">, sh: Shape): Height {
     const z = side === 0 ? -3.5 - rand() * 5 : rand() * H;
     dunes.push({ x, z, rx: 3 + rand() * 4, rz: 1.8 + rand() * 1.6, h: 0.6 + rand() * 1.1, a: rand() * Math.PI });
   }
+  const ph = [rand() * 6, rand() * 6, rand() * 6];
   return (x, z) => {
     const inn = sh.inland(x, z);
     // the beach: GRASS 3 inland of the shore, sea level at the shore, and on down
@@ -244,7 +245,11 @@ function land(s: Pick<Hole, "board" | "hole">, sh: Shape): Height {
       const q = u * u + v * v;
       if (q < 1) top = Math.max(top, d.h * (1 - q) * (1 - q));
     }
-    return beach + top * near * smoothstep((inn - 2) / 3);
+    // and the whole beach rolls a little (low, broad swells and a finer
+    // ripple across them): flat sand read as a floor. Faint by the board,
+    // where its rails and what stands round it are set on the sand
+    const roll = 0.22 * Math.sin(x * 0.42 + ph[0]) * Math.cos(z * 0.37 + ph[1]) + 0.08 * Math.sin(x * 0.9 - z * 0.7 + ph[2]);
+    return beach + top * near * smoothstep((inn - 2) / 3) + roll * (0.15 + 0.85 * near) * smoothstep((inn - 0.6) / 2.4);
   };
 }
 
@@ -264,18 +269,37 @@ function berms(s: Hole) {
   const boardwalk = green(s) === "planks";
   const inLag = boardwalk ? lagoonShape(s) : null;
   const drowned = (x: number, z: number) => seas.some((q) => inZone(q, x, z));
+  // how deep under the sea, 0..1. Tested vertex by vertex (0.8 apart), the
+  // sand under a lane's edge stood up out of the water in a saw of triangles
+  // along its foot, and met the beach in a straight step. So: by how much of
+  // the ground round it is sea — deep right up under the lane, where its side
+  // faces hide the shelf — and shelving up, along a wavy line, only where
+  // the sea meets open sand (neither sea nor lane)
+  const RING = [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6], [0.8, 0.8], [-0.8, 0.8], [0.8, -0.8], [-0.8, -0.8], [0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]];
+  const lane = seas.length ? terrain(s).onGreen : () => false, ph = seeded("shelf" + s.hole)() * 6;
+  const sunk = (x: number, z: number) => {
+    let sea = 0, open = 0;
+    for (const [a, b] of RING) {
+      if (drowned(x + a, z + b)) sea++;
+      else if (!lane(x + a, z + b)) open++;
+    }
+    if (!sea) return 0;
+    const wob = 0.25 * Math.sin(x * 0.61 + ph) * Math.cos(z * 0.53 - ph) + 0.12 * Math.sin((x - z) * 1.3 + ph);
+    return smoothstep((sea / RING.length) * 2) * (1 - smoothstep((open / RING.length) * 2.2 + wob));
+  };
   const keep: boolean[] = [];
   const geo = gridGeo(nx, nz, (i, j, pos, col) => {
     const x = X0 + i * step, z = Z0 + j * step;
     // the sand shelves into the lagoon over its last unit and a half
     const lg = inLag ? inLag(x, z) : -1;
-    const base = drowned(x, z) ? SEA - 1 - GRASS : height(x, z);
+    const land_ = height(x, z), k = seas.length ? sunk(x, z) : 0;
+    const base = land_ + (SEA - 1 - GRASS - land_) * k;
     const h = lg > 0 ? base + (SEA - 0.6 - GRASS - base) * smoothstep(lg / 1.5) : base, y = GRASS + h;
     pos.push(x, y, z);
     keep.push(-sh.inland(x, z) < 9);
     if (y < SEA - 0.02) c.copy(under);
     else if (y < SEA + 0.35) c.copy(wet).lerp(sand, (y - SEA) / 0.35); // the wet band at the water's edge
-    else c.copy(sand).lerp(hi, Math.min(1, Math.max(0, h) / 1.4)); // dune tops paler
+    else c.copy(sand).lerp(hi, Math.min(1, Math.max(0, h) / 1.4)).lerp(wet, Math.min(0.3, Math.max(0, -h) * 0.6)); // dune tops paler, the hollows and the lower beach a little damp
     col.push(c.r, c.g, c.b);
   }, (a, b, d, e) => keep[a] || keep[b] || keep[d] || keep[e]); // under the board too: sand, not the sea, shows in any gap of its ground
   // pushed back in the depth test: where the board's rough meets it at the

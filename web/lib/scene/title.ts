@@ -12,6 +12,7 @@ import * as THREE from "three";
 import TITLE_HOLES from "./title-holes.json";
 import { loadWorld } from "./worlds";
 import { buildHole } from "./course";
+import { state } from "./state";
 import { makeRenderer, makeScene } from "./camera";
 import { makeBall, gnomeById } from "./gnome";
 import { makeConfetti } from "./fx";
@@ -204,7 +205,10 @@ async function holeOf(world: string, given?: Hole) {
   try {
     await loadWorld(s.world);
   } catch {} // offline: drawn as the garden
-  return { s, course: buildHole(s) };
+  // (what a hole's splashes read is the played hole's: the title's own build leaves it be)
+  const { water, fallAt } = state, course = buildHole(s);
+  Object.assign(state, { water, fallAt });
+  return { s, course };
 }
 
 /**

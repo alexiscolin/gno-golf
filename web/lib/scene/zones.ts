@@ -372,38 +372,38 @@ function moonBridge(z: Zone, s: Hole, t: T, g: THREE.Group) {
 }
 
 function drawContours(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
-  // Contour lines, like a map: one every half unit of height, across the
-  // slope and draped on it. They show where it rises and how steeply —
-  // bunched up where it is steep — without an arrow in sight.
-  const l = Math.hypot(z.vec[0], z.vec[1]);
-  const ux = -z.vec[0] / l, uz = -z.vec[1] / l; // uphill
-  const vx = -uz, vz = ux;                        // across
+  // Contour lines, like a map: one every half unit of height, where the
+  // ground really is at that height, inside this slope only (each slope of a
+  // volcano draws its own side of the rings). They show where it rises and
+  // how steeply — bunched up where it is steep — without an arrow in sight.
+  // (Lines ruled straight across the slope's axis and far past it crossed the
+  // next slope's in a grid of streaks.)
   const contour = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
-  const { cx, cz } = boxOf(z);
-  const reach = Math.hypot(w, h) / 2 + 3;
   const segs: THREE.Vector3[] = [];
-  let last = t.height(cx - ux * reach, cz - uz * reach);
-  for (let a = -reach; a <= reach; a += 0.25) {
-    const px = cx + ux * a, pz = cz + uz * a;
-    const hh = t.height(px, pz);
-    if (Math.floor(hh / 0.5) === Math.floor(last / 0.5) || hh < 0.2) { last = hh; continue; }
-    last = hh;
-    // walk across the slope at this height, keeping the pieces on the green
-    let run: THREE.Vector3[] = [];
-    const flush = () => {
-      // as pairs, all in one LineSegments per slope (one draw, and one
-      // material the replay can light up)
-      for (let k = 1; k < run.length; k++) segs.push(run[k - 1], run[k]);
-      run = [];
-    };
-    for (let b = -reach; b <= reach; b += 0.3) {
-      const x = px + vx * b, zz = pz + vz * b;
-      const nearCup = Math.hypot(x - s.cup[0], zz - s.cup[1]) < CUP_R + 0.5;
-      if (!t.onGreen(x, zz) || t.height(x, zz) < 0.15 || nearCup) { flush(); continue; }
-      run.push(new THREE.Vector3(x, t.height(x, zz) + 0.04, zz));
+  const S = 0.25, nx = Math.max(1, Math.round(w / S)), nz = Math.max(1, Math.round(h / S)), dx = w / nx, dz = h / nz;
+  const H = new Float32Array((nx + 1) * (nz + 1));
+  for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) H[j * (nx + 1) + i] = t.height(z.min[0] + i * dx, z.min[1] + j * dz);
+  const keep = (x: number, zz: number) => t.onGreen(x, zz) && Math.hypot(x - s.cup[0], zz - s.cup[1]) >= CUP_R + 0.5;
+  for (let j = 0; j < nz; j++)
+    for (let i = 0; i < nx; i++) {
+      const x0 = z.min[0] + i * dx, z0 = z.min[1] + j * dz;
+      if (!keep(x0 + dx / 2, z0 + dz / 2)) continue;
+      // the cell's corners round it, and where each edge crosses a level
+      const c = [H[j * (nx + 1) + i], H[j * (nx + 1) + i + 1], H[(j + 1) * (nx + 1) + i + 1], H[(j + 1) * (nx + 1) + i]];
+      const P: [number, number][] = [[x0, z0], [x0 + dx, z0], [x0 + dx, z0 + dz], [x0, z0 + dz]];
+      const lo = Math.min(...c), hi = Math.max(...c);
+      for (let L = Math.max(0.5, Math.ceil(lo / 0.5) * 0.5); L < hi; L += 0.5) {
+        const cut: THREE.Vector3[] = [];
+        for (let e = 0; e < 4; e++) {
+          const a = c[e], b = c[(e + 1) % 4];
+          if ((a < L) === (b < L)) continue;
+          const f = (L - a) / (b - a), [ax, az] = P[e], [bx, bz] = P[(e + 1) % 4];
+          cut.push(new THREE.Vector3(ax + (bx - ax) * f, L + 0.06, az + (bz - az) * f)); // (a hair over the ground mesh, which is flat between its corners)
+        }
+        // two crossings: one piece; four (a saddle): paired round the cell
+        for (let k = 0; k + 1 < cut.length; k += 2) segs.push(cut[k], cut[k + 1]);
+      }
     }
-    flush();
-  }
   if (segs.length) {
     const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(segs), contour);
     ud(lines).live = true; // lit by the replay: never baked

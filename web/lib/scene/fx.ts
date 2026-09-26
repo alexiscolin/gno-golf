@@ -13,6 +13,7 @@ export interface Band extends THREE.Group {
 
 // made once, used by every splash and every confetti burst
 const RING_GEO = share(new THREE.RingGeometry(0.8, 1, 32)), DROP_GEO = share(new THREE.SphereGeometry(0.09, 6, 5));
+const PUFF_GEO = share(new THREE.IcosahedronGeometry(0.5, 1)), CHIP_GEO = share(new THREE.BoxGeometry(0.18, 0.07, 0.13));
 const HAT_GEO = share(new THREE.ConeGeometry(0.16, 0.36, 8)), PETAL_GEO = share(new THREE.SphereGeometry(0.13, 8, 6).scale(1, 0.35, 0.7));
 
 /** Into the water: rings spreading out and a few drops thrown up. */
@@ -36,7 +37,9 @@ function toShore(at: THREE.Vector3, water: WaterMask | null, reach = 3) {
 
 // open: in open water (the sea under a pier, a gap's water): not clipped to
 // the green's ponds, which do not reach there
+// (off the rooftops there is no water: the ball falls, and lands in a puff)
 export function makeSplash(at: THREE.Vector3, { open = false } = {}) {
+  if (state.fallAt && state.fallAt(at.x, at.z)) return makePuff(at.clone().setY(at.y - 0.5));
   const group = new THREE.Group();
   const room = open ? 2.4 : Math.max(0.35, toShore(at, state.water) - 0.15); // the rings' widest
   const rings = [0, 0.25, 0.5].map((delay) => {
@@ -73,6 +76,53 @@ export function makeSplash(at: THREE.Vector3, { open = false } = {}) {
         p.d.position.addScaledVector(p.v, dt);
         p.d.visible = p.d.position.y > at.y - 0.5;
       }
+    },
+  };
+}
+
+/** Off the roofs: a puff of dust where the ball lands, down in the street or
+ *  on a roof, and a few chips of tile knocked flying that bounce and settle.
+ *  Two instanced draws; the same { group, step(t) } as a splash. */
+export function makePuff(at: THREE.Vector3) {
+  const group = new THREE.Group();
+  const dust = new THREE.MeshBasicMaterial({ color: 0xe6dccb, transparent: true, depthWrite: false });
+  const puffs = new THREE.InstancedMesh(PUFF_GEO, dust, 8), chips = new THREE.InstancedMesh(CHIP_GEO, flat(0xb8573f), 6);
+  for (const m of [puffs, chips]) (m.frustumCulled = false), m.instanceMatrix.setUsage(THREE.DynamicDrawUsage), group.add(m);
+  const o = new THREE.Object3D();
+  const out = Array.from({ length: 8 }, (_, i) => (i / 8) * Math.PI * 2 + Math.random() * 0.5);
+  const bits = Array.from({ length: 6 }, () => {
+    const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 1.5;
+    return { p: at.clone(), v: new THREE.Vector3(Math.cos(a) * v, 3.5 + Math.random() * 2, Math.sin(a) * v), spin: Math.random() * 10 };
+  });
+  let last = 0;
+  return {
+    group,
+    step(t: number) {
+      const dt = Math.min(0.05, t - last), k = Math.min(1, t / 1.1);
+      last = t;
+      // the dust rolls out and billows up, out of an alley too, swelling as it thins
+      const e = 1 - (1 - k) * (1 - k);
+      out.forEach((a, i) => {
+        const r = 0.2 + e * (0.7 + (i % 3) * 0.2);
+        o.position.set(at.x + Math.cos(a) * r, at.y + 0.2 + e * (1.2 + (i % 4) * 0.45), at.z + Math.sin(a) * r);
+        o.rotation.set(0, 0, 0);
+        o.scale.setScalar(0.6 + e * 1.5);
+        o.updateMatrix();
+        puffs.setMatrixAt(i, o.matrix);
+      });
+      dust.opacity = 0.9 * (1 - k);
+      bits.forEach((b, i) => {
+        b.v.y -= 16 * dt;
+        b.p.addScaledVector(b.v, dt);
+        // they land where they fell from: a hop, a smaller hop, still
+        if (b.p.y < at.y) (b.p.y = at.y), (b.v.y *= -0.35), b.v.multiplyScalar(0.55);
+        o.position.copy(b.p);
+        o.rotation.set(b.spin * t, b.spin * 0.7 * t, 0);
+        o.scale.setScalar(t > 1.1 ? Math.max(0, 1 - (t - 1.1) * 4) : 1);
+        o.updateMatrix();
+        chips.setMatrixAt(i, o.matrix);
+      });
+      puffs.instanceMatrix.needsUpdate = chips.instanceMatrix.needsUpdate = true;
     },
   };
 }
