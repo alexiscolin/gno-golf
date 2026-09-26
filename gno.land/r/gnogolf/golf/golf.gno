@@ -255,6 +255,9 @@ var (
 	//     author, the latest to publish last (authorRows).
 	// A height is digits and an address "g1…": the two never mix.
 	byAuthor = bptree.NewBPTree32()
+	// "<address>/<slug>" -> true: community holes the owner took off the
+	// lists (Hide), every version; still playable, still in Community
+	hidden = avl.NewTree()
 	// recentKey(the height it was archived at, id) -> id of an archived
 	// course version: the latest last
 	archived = bptree.NewBPTree32()

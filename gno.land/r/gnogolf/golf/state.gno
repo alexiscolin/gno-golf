@@ -352,6 +352,10 @@ func listed() []*entry {
 		a := ak[13:] + " "
 		n := 0
 		byAuthor.ReverseIterate(a, a[:len(a)-1]+"!", func(k string, v any) bool {
+			if hidden.Has(a[:len(a)-1] + "/" + k[len(a)+13:]) {
+				n++ // taken off the lists (Hide), but walked: the walk stays bounded
+				return n == perAuthor
+			}
 			// "<address> <height> <slug>" -> "<height> <address>/<slug>"
 			key := k[len(a):len(a)+12] + " " + a[:len(a)-1] + "/" + k[len(a)+13:]
 			i := len(top)

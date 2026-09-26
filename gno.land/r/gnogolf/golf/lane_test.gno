@@ -3,11 +3,13 @@ package golf
 import (
 	"encoding/hex"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/nt/testutils/v0"
 )
 
 // courseHoleData is a course hole decoded from its data, by its realm path.
@@ -281,6 +283,31 @@ func TestNothingGetsBehindIsland5sRocks(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+// The record is text ("%.4f"), and a replay reads it back: a shot at -0, or
+// one that rounds to it (-0.00001, -359.99996), plays, records and replays as
+// the 0 it is. If a VM or ufmt change ever printed or parsed -0 otherwise,
+// old rounds would replay differently: this says so.
+func TestMinusZeroRecordsAndReplays(cur realm, t *testing.T) {
+	id := mine(cur, "zero", flatHole("Zero"))
+	var rests []string
+	for i, a := range []float64{0, math.Copysign(0, -1), -0.00001, -359.99996, 359.99996} {
+		p := testutils.TestAddress("zero" + strconv.Itoa(i))
+		testing.SetRealm(testing.NewUserRealm(p))
+		Launch(cross(cur), id, a, 3)
+		r := roundIn(id, p)
+		want := `"rest":` + jexact(r.ball()) + "}"
+		if sim := SimulateRound(id, r.shots); !strings.Contains(sim, want) {
+			t.Fatalf("angle %v, recorded %q, replays elsewhere: %s", a, r.shots, sim)
+		}
+		rests = append(rests, jexact(r.ball()))
+	}
+	for i, r := range rests {
+		if r != rests[0] {
+			t.Fatalf("angle #%d stops at %s, 0 at %s", i, r, rests[0])
 		}
 	}
 }

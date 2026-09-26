@@ -38,6 +38,8 @@ The owner can:
 - **Name a successor, once** (`SetSuccessor`): the realm the course has moved
   to. It only adds a banner to the pages and a field to `Holes`; it blocks
   nothing.
+- **Take a community hole off the lists** (`Hide`), and put it back: a scam or
+  abuse in its name or note. It stays playable, its page and data kept.
 - **Hand the role on** (`Transfer`, then `Accept` by the new owner) or **give it
   up for good** (`Renounce`). After `Renounce` there is no owner, nobody can
   become one, and the course is frozen.
@@ -150,8 +152,9 @@ The data is held to what `Publish` holds it to, but its world and order are
 its author's business. It's a community hole: playable, recorded and on its
 own board, in no cup and out of the course ranking. A new version archives the
 old one (which never counted anywhere). The publisher pays the storage deposit
-for the bytes it adds, and nothing published can be deleted. Emits
-`HolePublished` (`official` `"false"`).
+for the bytes it adds, and nothing published can be deleted. Its name and note
+carry no web address: `www`, or a dot between a letter or digit and a letter
+(`claim.xyz`), is refused. Emits `HolePublished` (`official` `"false"`).
 
 ### `Transfer(cur realm, to address)`, `Accept(cur realm)`, `Renounce(cur realm)`
 
@@ -164,6 +167,13 @@ The owner role, handed on in two steps.
   `OwnershipTransfer` (`from`, `to`).
 - `Renounce` (owner only) gives the role up for good: no owner, no offer, and
   none possible. Emits `OwnershipRenounced` (`from`).
+
+### `Hide(cur realm, slot string, hide bool)`
+
+Owner only. Takes a community hole (`"<address>/<slug>"`, every version of
+it) off the lists: the hub and `Holes`, so the 3D game's too. Its rounds, page
+and data stay, `Community` still has it, and anyone can still play it by id.
+`hide` false puts it back. Emits `HoleHidden` (`slot`, `hidden`).
 
 ### `SetPlayURL(cur realm, url string)`
 

@@ -294,6 +294,38 @@ func TestPublishMine(cur realm, t *testing.T) {
 
 // One address publishing fifty holes shows perAuthor of them in Holes, and
 // hides nobody else's; Community pages through every version of all of them.
+// A community hole's name or note carries no web address, and what gets past
+// that the owner can take off the lists: never off the chain.
+func TestCommunityTextAndHide(cur realm, t *testing.T) {
+	eve := testutils.TestAddress("eve")
+	for _, bad := range []string{"claim at bonus.xyz", "see www bonus", "t.me/golf", "GNOGOLF.APP"} {
+		testing.SetRealm(testing.NewUserRealm(eve))
+		urequire.AbortsContains(t, cur, "no web address", func() { PublishMine(cross(cur), "scam", hexOf(cupHole("pond", 1, "Nice")), bad) })
+		testing.SetRealm(testing.NewUserRealm(eve))
+		urequire.AbortsContains(t, cur, "no web address", func() { PublishMine(cross(cur), "scam", hexOf(cupHole("pond", 1, bad)), "") })
+	}
+	uassert.False(t, linkish("Par 3. Mind the pond, then 2.5 and a hill"))
+	testing.SetRealm(testing.NewUserRealm(eve))
+	id := PublishMine(cross(cur), "rude", hexOf(cupHole("pond", 1, "Rude words")), "")
+	slot := eve.String() + "/rude"
+	uassert.True(t, strings.Contains(Holes(), `"id":"`+id+`"`))
+	setOwner(deployer)
+	testing.SetRealm(testing.NewUserRealm(eve))
+	urequire.AbortsContains(t, cur, "only the owner", func() { Hide(cross(cur), slot, true) })
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	urequire.AbortsContains(t, cur, "not a community hole", func() { Hide(cross(cur), "garden/1", true) })
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), slot, true)
+	uassert.False(t, strings.Contains(Holes(), `"id":"`+id+`"`), "off the 3D game's list")
+	uassert.False(t, strings.Contains(Render(""), "Rude words"), "and the hub's")
+	uassert.True(t, strings.Contains(Community("", 100), `"id":"`+id+`"`), "still in Community")
+	testing.SetRealm(testing.NewUserRealm(eve))
+	PlayRoundAt(cross(cur), id, "0,1", Period()) // still playable
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), slot, false)
+	uassert.True(t, strings.Contains(Holes(), `"id":"`+id+`"`), "back")
+}
+
 func TestPublishMineSpamHidesNobody(cur realm, t *testing.T) {
 	spam, other := testutils.TestAddress("spam"), testutils.TestAddress("spamfree")
 	data := hexOf(cupHole("pond", 1, "Spam"))

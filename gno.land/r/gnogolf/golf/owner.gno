@@ -4,6 +4,7 @@ import (
 	"chain"
 	"chain/runtime"
 	"chain/runtime/unsafe"
+	"strconv"
 	"strings"
 )
 
@@ -153,6 +154,26 @@ func SetSuccessor(cur realm, pkgpath string) {
 	chain.Emit(EventSuccessorSet, "successor", pkgpath)
 }
 
+// Hide takes a community hole ("<address>/<slug>", every version of it) off
+// the lists: the hub and Holes, so the 3D game's too. Its data, rounds and
+// page stay, and Community still has it; hide=false puts it back. Only the
+// owner can: a name or note that is a scam or abuse would otherwise sit on
+// the course's front page for good.
+func Hide(cur realm, slot string, hide bool) {
+	if !isOwner(cur.Previous().Address()) {
+		panic("golf: only the owner can hide a hole")
+	}
+	if aliases.Get(slot) == nil {
+		panic("golf: " + slot + " is not a community hole")
+	}
+	if hide {
+		hidden.Set(slot, true)
+	} else {
+		hidden.Remove(slot)
+	}
+	chain.Emit(EventHoleHidden, "slot", slot, "hidden", strconv.FormatBool(hide))
+}
+
 func validPkgPath(p string) bool {
 	if len(p) > maxURL || !strings.HasPrefix(p, "gno.land/r/") {
 		return false
@@ -185,4 +206,5 @@ const (
 	EventOwnershipRenounced      = "OwnershipRenounced"      // from
 	EventPlayURLSet              = "PlayURLSet"              // url
 	EventSuccessorSet            = "SuccessorSet"            // successor
+	EventHoleHidden              = "HoleHidden"              // slot, hidden ("true"/"false")
 )

@@ -303,7 +303,8 @@ func noAdmin() string {
 		"When a version is published picks its id, and its id seeds its weather. " +
 		"The owner also sets where the pages link the 3D game (SetPlayURL), and can name, once and for good, a successor this course has moved to (SetSuccessor): a banner, which blocks nothing. " +
 		"Whoever holds `" + strings.TrimPrefix(officialPrefix, "gno.land/") + "` can deploy lookalike realms under it. " +
-		"The owner cannot edit or remove a version, touch a community hole, the weather, the physics or this code, " +
+		"The owner can take a community hole off the lists (Hide: a scam or abuse in its name or note), and put it back; it stays playable, its page and data kept. " +
+		"The owner cannot edit or remove a version, change a community hole, the weather, the physics or this code, " +
 		"and can only hand the role on (Transfer, then Accept) or give it up for good (Renounce).\n"
 }
 

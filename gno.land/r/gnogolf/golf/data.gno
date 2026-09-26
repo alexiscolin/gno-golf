@@ -155,6 +155,9 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 		n = old.version + 1
 	}
 	e := dataEntry(alias, n, h, by, sum, note)
+	if linkish(e.name) || linkish(e.note) {
+		panic("golf: a community hole's name and note carry no web address")
+	}
 	community.Set(e.id, e)
 	holeData.Set(e.id, data)
 	aliases.Set(alias, e.id)
@@ -177,6 +180,24 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 	byAuthor.Set(a+recentKey(e.height, slug), e.id)
 	chain.Emit(EventHolePublished, "hole", e.id, "slot", alias, "sha", sum, "by", by.String(), "official", "false")
 	return e.id
+}
+
+// linkish spots a web address in a community hole's name or note, which the
+// lists show on the course's front page: "www", or a dot between a letter or
+// digit and a letter ("claim.xyz", "t.me"). A sentence's dot has a space after
+// it. Basic on purpose: what gets past it, the owner can Hide.
+func linkish(s string) bool {
+	low := strings.ToLower(s)
+	if strings.Contains(low, "www") {
+		return true
+	}
+	for i := 1; i+1 < len(low); i++ {
+		p, c := low[i-1], low[i+1]
+		if low[i] == '.' && (p >= 'a' && p <= 'z' || p >= '0' && p <= '9') && c >= 'a' && c <= 'z' {
+			return true
+		}
+	}
+	return false
 }
 
 // decodeData checks a version's data as it arrives: hex, GG1 within the
