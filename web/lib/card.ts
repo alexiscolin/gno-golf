@@ -132,6 +132,9 @@ export function totals(card: Card, holes: readonly CardHole[]) {
 const CUPS = ["garden", "island", "town", "mountain"] as const;
 export type Cup = (typeof CUPS)[number];
 
+/** A score against par as the game prints it: E, +3, −2 (a real minus sign). */
+export const vsPar = (n: number) => (n === 0 ? "E" : n > 0 ? `+${n}` : `−${-n}`);
+
 /** A cup's totals: totals(), and whether it is finished at par or under (clean) or begun (open). */
 export type CupTotal = ReturnType<typeof totals> & { clean: boolean; open: boolean };
 /** Totals per cup, from every hole on the chain (not only the cup on screen). */

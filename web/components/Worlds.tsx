@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { HoleRow } from "@/lib/types";
-import type { Cup, CupTotal, cupTotals } from "@/lib/card";
+import { vsPar, type Cup, type CupTotal, type cupTotals } from "@/lib/card";
 import { sound } from "@/lib/feel";
 import { stillsOnly } from "@/lib/prefs";
 import { Green } from "@/components/Title";
@@ -236,7 +236,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             // where the player stands in it: holes done, and strokes against par
             const t = stats[w.id] || NOT_PLAYED;
             const vs = t.strokes - t.par, won = n > 0 && t.done >= n;
-            const score = `${t.strokes} · ${vs > 0 ? "+" : vs < 0 ? "−" : "±"}${Math.abs(vs)}`;
+            const score = `${t.strokes} · ${vsPar(vs)}`;
             return (
               <li key={w.id}>
                 <button
@@ -262,7 +262,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                       <span className="world__score">
                         {t.done ? (
                           <>
-                            <b>{t.done}/{n}</b> · {t.strokes} stroke{t.strokes === 1 ? "" : "s"} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vs > 0 ? "+" : ""}{vs}</b>
+                            <b>{t.done}/{n}</b> · {t.strokes} stroke{t.strokes === 1 ? "" : "s"} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsPar(vs)}</b>
                             {t.clean && <span className="world__stamp" title="At par or under">★</span>}
                           </>
                         ) : "Not played yet"}
