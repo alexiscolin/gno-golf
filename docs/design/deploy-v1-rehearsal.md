@@ -81,12 +81,12 @@ The storage is the same as in run 3 to within a byte: a first finish costs 3.3�
 
 | Call | Signer | Result |
 |---|---|---|
-| `SetPlayURL("https://gno-golf.netlify.app/")` | `default` (owner) | ok, 11.6M gas (run 3: 11.5M) |
+| `SetPlayURL("https://gnogolf.xyz/")` | `default` (owner) | ok, 11.6M gas (run 3: 11.5M) |
 | `SetSuccessor("gno.land/r/nym-golfer000/golf2")` | `default` (owner) | ok, 11.8M gas (run 3: 11.7M) |
 | `SetPlayURL("https://evil.example/")` | `heir` | **refused**: "golf: only the owner can move the play link" |
 | `SetSuccessor("gno.land/r/nym-golfer000/golf2")` | `heir` | **refused**: "golf: only the owner can name a successor" |
 
-These calls were simulated only, so `Successor()` is still `""` afterwards. The hub page already links to `https://gno-golf.netlify.app/` (the default `playURL`), so **pearl does not need `SetPlayURL`**. The command list keeps it as an optional step, for use if the site moves.
+These calls were simulated only, so `Successor()` is still `""` afterwards. The hub page already links to `https://gnogolf.xyz/` (the default `playURL`), so **pearl does not need `SetPlayURL`**. The command list keeps it as an optional step, for use if the site moves.
 
 Run 1 checked the handover (`Transfer(heir)` → `Accept()` → back again), and every step worked as specified. Pearl does not need it: the user deploys golf with their own key, so golf's init makes the user the owner.
 
@@ -202,7 +202,7 @@ The hub (`Render("")`) and a hole page render.
 
 | Call | Signer | Result |
 |---|---|---|
-| `SetPlayURL("https://gno-golf.netlify.app/")` | `default` | ok, 11.8M gas |
+| `SetPlayURL("https://gnogolf.xyz/")` | `default` | ok, 11.8M gas |
 | `SetSuccessor("gno.land/r/nym-golfer000/golf2")` | `default` | ok, 12.0M gas |
 | `SetPlayURL("https://evil.example/")` | `heir` | refused: "golf: only the owner can move the play link" |
 | `SetSuccessor(…)` | `heir` | refused: "golf: only the owner can name a successor" |
@@ -318,7 +318,7 @@ gnokey maketx addpkg -pkgpath gno.land/r/nym-golfer000/golf -pkgdir /tmp/stage/g
   -gas-wanted 270000000 -gas-fee 324000ugnot -max-deposit 28000000ugnot -broadcast $P <your-key-name>
 ```
 
-Check: `gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.Owner()' $R` returns `<your-address>`. https://pearl.testnets.gno.land/r/nym-golfer000/golf shows the hub, with its "open the game" link going to https://gno-golf.netlify.app/.
+Check: `gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.Owner()' $R` returns `<your-address>`. https://pearl.testnets.gno.land/r/nym-golfer000/golf shows the hub, with its "open the game" link going to https://gnogolf.xyz/.
 
 **6. Generate the publish scripts** for the namespace, 7 holes a script. The committed `scripts/publish/` import the local `gno.land/r/gnogolf/golf`, so pearl needs `REALM`. `OUT` leaves the committed scripts as they are.
 
@@ -352,7 +352,7 @@ gnokey maketx run -simulate only -gas-wanted 460000000 -gas-fee 552000ugnot $P <
 
 It must print `74 slots hold their data; missing or other:` with nothing after it.
 
-**(9. Only if the site moves) Set the play link.** The default is already `https://gno-golf.netlify.app/`, so skip this step for that site. It measured 11.8M gas and no deposit:
+**(9. Only if the site moves) Set the play link.** The default is already `https://gnogolf.xyz/`, so skip this step for that site. It measured 11.8M gas and no deposit:
 
 ```sh
 gnokey maketx call -pkgpath gno.land/r/nym-golfer000/golf -func SetPlayURL -args https://<new-site>/ \
@@ -377,7 +377,7 @@ These are the values for the site (see `netlify.toml`; `web/.env.example` carrie
 
 | Variable | Value |
 |---|---|
-| `NEXT_PUBLIC_SITE_URL` | `https://gno-golf.netlify.app` |
+| `NEXT_PUBLIC_SITE_URL` | `https://gnogolf.xyz` |
 | `NEXT_PUBLIC_REALM` | `gno.land/r/nym-golfer000/golf` |
 | `NEXT_PUBLIC_RPC` | `https://rpc.pearl.testnets.gno.land:443` |
 | `NEXT_PUBLIC_WEB` | `https://pearl.testnets.gno.land` |

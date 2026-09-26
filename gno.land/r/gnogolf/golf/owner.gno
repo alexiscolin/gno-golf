@@ -33,7 +33,7 @@ var (
 
 // playURL is the 3D client: every page links to it. The owner can move it
 // (SetPlayURL), since a site can be renamed or lost.
-var playURL = "https://gno-golf.netlify.app/"
+var playURL = "https://gnogolf.xyz/"
 
 // successor is the realm that took this course over, "" until the owner
 // names it, once (SetSuccessor).

@@ -375,7 +375,7 @@ That is about 7 faucet-days for one address, or a request to the faucet operator
 1. The name: `nym-golfer000` (decided).
 2. The IC-B physics fixes: **yes, all of them** (decided). Fix the physics as far as possible before it is frozen.
 3. `Transfer` and `Renounce`: **included** (decided).
-4. `playURL`: owner-settable (`SetPlayURL`), starting at `https://gno-golf.netlify.app/` (decided). Realm holes (`Register`, `Expect`) removed: every hole is data (decided, final fixes).
+4. `playURL`: owner-settable (`SetPlayURL`), starting at `https://gnogolf.xyz/` (decided). Realm holes (`Register`, `Expect`) removed: every hole is data (decided, final fixes).
 5. Funding: the official pearl faucet gives up to 300 GNOT, enough for the whole deploy (decided).
 
 ## Critical files

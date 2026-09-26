@@ -1,6 +1,6 @@
 # Netlify: a static export (next.config.mjs has output: "export"), no server.
 # Set these in the site's environment before deploying:
-#   NEXT_PUBLIC_SITE_URL  the public address, e.g. https://gno-golf.netlify.app
+#   NEXT_PUBLIC_SITE_URL  the public address, e.g. https://gnogolf.xyz
 #                         (link previews, share links)
 #   NEXT_PUBLIC_REALM     the golf realm, e.g. gno.land/r/nym-golfer000/golf on
 #                         pearl (unset, it is the local gno.land/r/gnogolf/golf)

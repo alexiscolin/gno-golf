@@ -44,7 +44,7 @@ test("a page pointed at another chain keeps pointing there", () => {
 });
 
 test("X puts the link after the text, the others put it first, for its card", () => {
-  const text = "Ace on Down the Tunnel. Somewhere on gno.land a realm just nodded.", url = "https://gno-golf.netlify.app/h/garden-3/";
+  const text = "Ace on Down the Tunnel. Somewhere on gno.land a realm just nodded.", url = "https://gnogolf.xyz/h/garden-3/";
   const l = Object.fromEntries(shareLinks(text, url));
   const x = new URL(l.X).searchParams;
   assert.equal(x.get("text"), text);

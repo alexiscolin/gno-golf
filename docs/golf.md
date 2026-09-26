@@ -178,7 +178,7 @@ and data stay, `Community` still has it, and anyone can still play it by id.
 ### `SetPlayURL(cur realm, url string)`
 
 Owner only. Moves the link every page gives to the 3D game (at deploy,
-`https://gno-golf.netlify.app/`). `url` is `https://` and up to 100 of `a-z`,
+`https://gnogolf.xyz/`). `url` is `https://` and up to 100 of `a-z`,
 `A-Z`, `0-9` and `-._~/:%`, with no query or fragment of its own: a hole's
 link adds `?cup=…&hole=…` or `?hole=<id>` to it. Emits `PlayURLSet` (`url`).
 
@@ -316,7 +316,7 @@ pushes nobody else further down. The rest are in `Community`, and every version 
 nothing.
 
 ```json
-{"version":1,"play":"https://gno-golf.netlify.app/","successor":"","holes":[
+{"version":1,"play":"https://gnogolf.xyz/","successor":"","holes":[
   {"id":"garden/1/v1","name":"The Shelf","official":true,"plays":12,"best":3,"proBest":4,
    "par":3,"world":"garden","order":1.000,"next":"","slot":"garden/1"}, …]}
 ```

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { sound } from "@/lib/feel";
 import { clipMime } from "@/lib/clip";
 import type { ClipRun } from "@/lib/engine/clip";
+import { SITE } from "@/lib/site";
 import { pasted, shareLinks } from "./common";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
@@ -27,11 +28,11 @@ interface ShareProps {
   link?: string;
 }
 /** The public address of a page of the game (link: its "?cup=…&hole=…"): the
- *  site's own (NEXT_PUBLIC_SITE_URL), never a local dev address. */
+ *  page's own site, or on this machine the public one (lib/site.ts), never a
+ *  local dev address. */
 export function siteURL(link = "") {
-  const site = process.env.NEXT_PUBLIC_SITE_URL;
   const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/h\/.*$/, "/") : ""; // a hole's page (app/h) links from the site's root
-  const origin = site && /localhost|127\.0\.0\.1/.test(here) ? site.replace(/\/$/, "") : here.replace(/\/$/, "");
+  const origin = /localhost|127\.0\.0\.1/.test(here) ? SITE : here.replace(/\/$/, "");
   return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
 }
 // the system sheet only where it is the phone's own (on a desktop it is a
@@ -42,8 +43,7 @@ export default function Share({ text, snapshot, link = "" }: ShareProps) {
   const [copied, setCopied] = useState(false);
   const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the card goes first
   useEffect(() => () => clearTimeout(copiedT.current), []);
-  // this hole, this cup, this gnome, at the game's public address (set
-  // NEXT_PUBLIC_SITE_URL when building for Netlify)
+  // this hole, this cup, this gnome, at the game's public address
   const url = siteURL(link);
   const phone = onPhone();
   const sheet = async () => {
