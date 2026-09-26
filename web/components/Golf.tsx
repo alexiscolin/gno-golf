@@ -13,7 +13,7 @@ import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, 
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
-import Share from "@/components/Share";
+import Share, { ShareClip } from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
 import About, { AboutButton, BackButton } from "@/components/About";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
@@ -21,6 +21,7 @@ import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, U
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
 import { messageOf, holeLink, parHere, HONEST } from "@/components/common";
+import { clipName } from "@/lib/clip";
 import { Boards, FullBoard, Podium, NameForm, useRankNudge, useSavedPlace, type BoardProps } from "@/components/Leaderboard";
 import { networkOf, OTHER_URL } from "@/lib/network";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } from "@/lib/prefs";
@@ -29,6 +30,9 @@ import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } 
 // dev build, or on a page opened with ?camlog (the camera and capture rigs);
 // ?won, a win card for a round nobody played, in a dev build only.
 const DEV = process.env.NODE_ENV !== "production";
+// the shot clip in the hole-finished card (ADR-003): NEXT_PUBLIC_CLIPS=1, or
+// ?clips in a dev build (the flag is read when the dev server starts)
+const CLIPS = process.env.NEXT_PUBLIC_CLIPS === "1";
 
 declare global {
   interface Window {
@@ -64,6 +68,7 @@ interface Config {
   weather: string;
   world: string;
   won: number;
+  clips: boolean;
 }
 function useConfig() {
   const [cfg, setCfg] = useState<Config | null>(null);
@@ -95,6 +100,7 @@ function useConfig() {
       // ?world=island|town dresses the hole in that world's look — for building one
       world: p.get("world") || "",
       won: Number(p.get("won")) || 0,
+      clips: CLIPS || (DEV && p0.has("clips")),
     });
   }, []);
   return cfg;
@@ -1121,10 +1127,18 @@ export default function Golf() {
               </div>
             <Share
               link={s ? holeLink(s, gnome) : ""}
-                snapshot={() => (game.current ? game.current.snapshot(`${s.name} · ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`) : Promise.resolve(null))}
+                snapshot={() => (game.current ? game.current.snapshot(caption(s)) : Promise.resolve(null))}
                 text={shareText({ s, card, cups, fresh, place: savedPlace })}
               />
             </div>
+            {cfg && cfg.clips && (
+              <ShareClip
+                make={(run) => (game.current ? game.current.clip(run, caption(s)) : Promise.resolve(null))}
+                link={holeLink(s, gnome)}
+                text={shareText({ s, card, cups, fresh, place: savedPlace })}
+                name={clipName(s.id || "")}
+              />
+            )}
 
 
             <p>
@@ -1669,6 +1683,9 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
     </svg>
   );
 }
+
+/** The line on a shared picture's card, and on the clip's: the hole and the score. */
+const caption = (s: Snapshot) => `${s.name} · ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`;
 
 /**
  * What a player says when they share: short, a little cheeky, gnome and

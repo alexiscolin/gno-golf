@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { sound } from "@/lib/feel";
+import { clipMime } from "@/lib/clip";
+import type { ClipRun } from "@/lib/engine/clip";
 import { pasted, shareLinks } from "./common";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
@@ -32,6 +34,9 @@ export function siteURL(link = "") {
   const origin = site && /localhost|127\.0\.0\.1/.test(here) ? site.replace(/\/$/, "") : here.replace(/\/$/, "");
   return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
 }
+// the system sheet only where it is the phone's own (on a desktop it is a
+// bare OS panel without the networks people mean)
+const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
 
 export default function Share({ text, snapshot, link = "" }: ShareProps) {
   const [copied, setCopied] = useState(false);
@@ -40,9 +45,7 @@ export default function Share({ text, snapshot, link = "" }: ShareProps) {
   // this hole, this cup, this gnome, at the game's public address (set
   // NEXT_PUBLIC_SITE_URL when building for Netlify)
   const url = siteURL(link);
-  // the system sheet only where it is the phone's own (on a desktop it is a
-  // bare OS panel without the networks people mean)
-  const phone = typeof navigator !== "undefined" && !!navigator.share && typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+  const phone = onPhone();
   const sheet = async () => {
     sound("blip");
     try {
@@ -80,5 +83,104 @@ export default function Share({ text, snapshot, link = "" }: ShareProps) {
         </button>
       )}
     </span>
+  );
+}
+
+interface ClipProps {
+  /** records the clip (the engine's clip()): an MP4, or null */
+  make: (run: ClipRun) => Promise<Blob | null>;
+  text: string;
+  link?: string;
+  /** the file's name (lib/clip.ts clipName) */
+  name: string;
+}
+/** The shot as a clip (ADR-003; NEXT_PUBLIC_CLIPS): made once the hole is
+ *  won, looped in the card above its buttons, and shared as a file — the
+ *  phone's sheet, or a download and a post on X the player adds it to. Only
+ *  where the browser records MP4; elsewhere nothing shows. A computer makes it
+ *  as the card opens; a phone when asked (a second renderer for a few seconds
+ *  is a lot to spend unasked on a phone, and on its battery). */
+export function ShareClip({ make, text, link = "", name }: ClipProps) {
+  const [mime] = useState(() => (typeof MediaRecorder !== "undefined" ? clipMime((t) => MediaRecorder.isTypeSupported(t)) : ""));
+  const [go, setGo] = useState(() => typeof matchMedia !== "undefined" && !matchMedia("(pointer: coarse)").matches);
+  const [k, setK] = useState(0);
+  // undefined while it is being made; null: none came of it
+  const [clip, setClip] = useState<{ url: string; file: File } | null>();
+  const [still] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const [playing, setPlaying] = useState(false);
+  const video = useRef<HTMLVideoElement>(null);
+  // made once, from when it is asked for; the card closing cancels it and frees it all
+  const run = useRef({ make, name });
+  useEffect(() => {
+    if (!go || !mime) return;
+    const ac = new AbortController();
+    let url = "";
+    void run.current
+      .make({ mime, signal: ac.signal, progress: setK })
+      .catch(() => null)
+      .then((blob) => {
+        if (ac.signal.aborted) return;
+        url = blob ? URL.createObjectURL(blob) : "";
+        setClip(blob ? { url, file: new File([blob], run.current.name, { type: "video/mp4" }) } : null);
+      });
+    return () => {
+      ac.abort();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [go, mime]);
+  if (!mime || clip === null) return null;
+  if (!go)
+    return (
+      <div className="clip">
+        <button className="btn btn--ghost" onClick={() => (sound("blip"), setGo(true))}>Make a clip of the shot</button>
+      </div>
+    );
+  const url = siteURL(link);
+  const files = clip ? [clip.file] : [];
+  const sheet = onPhone() && !!navigator.canShare && files.length > 0 && navigator.canShare({ files });
+  const share = async () => {
+    sound("blip");
+    try {
+      await navigator.share({ title: "Gnogolf", text, url, files });
+    } catch {} // cancelled, or refused
+  };
+  return (
+    <div className="clip">
+      <div className="clip__screen">
+        {!clip ? (
+          <div className="clip__making" role="status" aria-live="polite">
+            <span>Making the clip of your shot…</span>
+            <span className="clip__bar" aria-hidden="true"><span style={{ width: `${Math.round(k * 100)}%` }} /></span>
+          </div>
+        ) : (
+          <>
+            <video ref={video} src={clip.url} muted playsInline loop autoPlay={!still} controls={still && playing} onPlay={() => setPlaying(true)} aria-label="A clip of the holing shot, looping" />
+            {still && !playing && (
+              <button className="clip__play" aria-label="Play the clip" onClick={() => void video.current?.play()}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      {clip && (
+        <div className="clip__row">
+          {sheet && (
+            <button className="btn btn--main" onClick={() => void share()}>
+              Share clip
+            </button>
+          )}
+          <a className="btn btn--ghost" href={clip.url} download={clip.file.name} onClick={() => sound("blip")}>
+            Download clip
+          </a>
+          {!sheet && (
+            <a className="btn btn--ghost" target="_blank" rel="noopener noreferrer" href={Object.fromEntries(shareLinks(text, url)).X} onClick={() => sound("blip")}>
+              <svg className="btn__mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={GLYPH.X} /></svg> Post on X
+            </a>
+          )}
+        </div>
+      )}
+      {clip && !sheet && <p className="clip__hint">Download it, then add it to your post.</p>}
+    </div>
   );
 }

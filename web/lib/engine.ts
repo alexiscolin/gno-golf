@@ -33,6 +33,7 @@ import type { WeatherZone } from "./scene/weather";
 import type { Confetti } from "./scene/fx";
 import type { promo as Promo } from "./promo";
 import type { probes as Probes } from "./engine/probes";
+import type { ClipOf, ClipRun } from "./engine/clip";
 import { HOT as HOT_FIELDS, TICKS_PER_S, type CamMode, type ErrorKind, type GameState, type GfxMode, type Link, type Live, type Mood, type Shot, type Snapshot, type Tier } from "./engine/types";
 
 export type { CamMode, GameState, GfxMode, Link, Snapshot } from "./engine/types";
@@ -60,6 +61,28 @@ export interface GameOptions {
 
 /** A thrown value's message, for the HUD. */
 const errText = (e: unknown) => String((e instanceof Error && e.message) || e);
+/** The score's card along the bottom of a picture W×H (a shared image, the
+ *  clip's frames): "Gnogolf" and the caption, at k times its size. */
+function drawCard(x: CanvasRenderingContext2D, W: number, H: number, caption: string, k = 1) {
+  const w = W / k;
+  x.save();
+  x.translate(0, H);
+  x.scale(k, k);
+  x.fillStyle = "#fdf6ea";
+  x.strokeStyle = "#16433a";
+  x.lineWidth = 5;
+  x.beginPath();
+  x.roundRect(32, -132, w - 64, 100, 22);
+  x.fill();
+  x.stroke();
+  x.fillStyle = "#16433a";
+  x.font = "700 44px system-ui, sans-serif";
+  x.fillText("Gnogolf", 64, -66);
+  x.font = "600 34px system-ui, sans-serif";
+  x.textAlign = "right";
+  x.fillText(caption, w - 64, -68);
+  x.restore();
+}
 const camOf = (m: string): CamMode => (m === "far" || m === "third" ? m : "classic");
 const gfxOf = (m: string): GfxMode => (m === "high" || m === "low" ? m : "auto");
 
@@ -70,6 +93,8 @@ const piecesOf = (zs: readonly { poly?: readonly unknown[] }[]) => zs.reduce((n,
 // the part of the screen the HUD covers, in CSS pixels: the camera frames
 // what is left, so the course is centred in what the player can actually see
 const HUD = { top: 108, bottom: 136, side: 14 };
+// the community's holes listed with the cups (off until the builder is out)
+const COMMUNITY = process.env.NEXT_PUBLIC_COMMUNITY === "1";
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
 
 /** No trailer rig: what the engine calls on it does nothing. */
@@ -100,7 +125,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // island overview, and the lean) with three times the depth precision of
   // 1..400 — what kept far-off faces from flickering into each other
   const camera = new THREE.PerspectiveCamera(30, 1, 3, 260);
-  let ball: Gnome = makeBall(gnomeById(gnome));
+  let ball: Gnome = makeBall(gnomeById(gnome)), gnomeId = gnome || "";
   const aim = makeAim();
   const band = makeBand();
   scene.add(ball, aim, band);
@@ -142,6 +167,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     cam: "classic", shots: [], pts: [], rest: null,
   };
   let closeIn: ReturnType<typeof setTimeout> | undefined;
+  // the round's holing stroke, kept for the shot clip (api.clip)
+  let won: ClipOf["stroke"] | null = null;
   /** The ground height under a board point — cosmetic, the chain's physics is flat. */
   const ground = (x: number, z: number) => (g.course ? g.course.userData.height(x, z) : 0);
   const lift = (p: readonly [number, number]) => at(p, BALL_R + ground(p[0], p[1]));
@@ -766,6 +793,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.shots = []; // the round's decisions: what a record replays
     g.pts = []; // each stroke's path length, for the gas estimate
     g.rest = null; // the ball exactly as the chain left it: where the next stroke is asked from
+    won = null;
     g.facing = Math.PI / 2; // at rest he looks at the player
     dragging = false;
     dropAim();
@@ -900,8 +928,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   let lastBar = -1;
 
   const onDown = (ev: PointerEvent) => {
-    // one finger, one primary button: a second touch or a right-click is not a pull
-    if (!ev.isPrimary || ev.button > 0) return;
+    // one finger, one primary button: a right-click is not a pull, and a
+    // second finger (a pinch, by reflex: there is no zoom) drops the pull
+    // the first began instead of letting it shoot
+    if (!ev.isPrimary) return onCancel();
+    if (ev.button > 0) return;
     if (g.flying || g.done) return;
     cam.finishGlide(); // the intro glide, if still on: finished now, quickly
     // a new press takes over whatever aim was held (a keyboard aim, a lost pull)
@@ -1062,6 +1093,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.pts = [...g.pts, res.path.length];
     g.rest = res.rest;
     g.tick0 = tick || 0;
+    if (res.holed) won = { path: res.path, air: res.air, cause: res.cause, angle: angleDeg }; // what the shot clip plays again
     g.strokes = res.strokes || g.shots.length; // SimulateFrom has no count: a stroke is a shot
     if (res.holed) {
       g.done = true; // no more shots, even before the banner shows
@@ -1176,7 +1208,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // the cups hold the course's own holes; anyone else's is a community hole,
     // listed apart and ranked nowhere
     g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
-    g.community = list.filter((h) => !h.next && h.official === false);
+    // not listed until the builder is out (NEXT_PUBLIC_COMMUNITY=1 lists
+    // them): the chain takes anyone's hole, the game shows the course's
+    g.community = COMMUNITY ? list.filter((h) => !h.next && h.official === false) : [];
   }
 
   async function start(link: string | Link | null) {
@@ -1309,20 +1343,17 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       c.height = H;
       const x = c.getContext("2d")!;
       x.drawImage(src, 0, 0, W, H);
-      x.fillStyle = "#fdf6ea";
-      x.strokeStyle = "#16433a";
-      x.lineWidth = 5;
-      x.beginPath();
-      x.roundRect(32, H - 132, W - 64, 100, 22);
-      x.fill();
-      x.stroke();
-      x.fillStyle = "#16433a";
-      x.font = "700 44px system-ui, sans-serif";
-      x.fillText("Gnogolf", 64, H - 66);
-      x.font = "600 34px system-ui, sans-serif";
-      x.textAlign = "right";
-      x.fillText(caption, W - 64, H - 68);
+      drawCard(x, W, H, caption);
       return new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+    },
+    /** The holing stroke played again and recorded, for sharing (ADR-003):
+     *  an MP4, or null (no hole won this round, cancelled). Its module is
+     *  fetched when first asked: a build without clips never loads it. */
+    clip(run: ClipRun, caption = "") {
+      const stroke = won;
+      if (!stroke || !g.s) return Promise.resolve(null);
+      const hide = () => [ball, aim, band, confetti && confetti.group, cam.marker];
+      return import("./engine/clip").then((m) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6) }, run));
     },
     /** Dismiss a shot error and keep playing. */
     clearError() {
@@ -1334,7 +1365,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     setGnome(id: string) {
       scene.remove(ball);
       disposeCourse(ball);
-      ball = makeBall(gnomeById(id));
+      ball = makeBall(gnomeById((gnomeId = id)));
       scene.add(ball);
       if (g.s) placeBall();
     },

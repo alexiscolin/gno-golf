@@ -11,6 +11,9 @@
 #   NEXT_PUBLIC_NETWORK   testnet or mainnet: the faucet link, the title's tag
 #   NEXT_PUBLIC_OTHER_URL the other deployment, linked from the About sheet
 #   NEXT_PUBLIC_NAMEREG   optional: the name registrar (found on the chain otherwise)
+#   NEXT_PUBLIC_COMMUNITY optional: 1 lists the community's holes with the cups
+#                         (off until the builder is out)
+#   NEXT_PUBLIC_CLIPS     optional: 1 offers a clip of the holing shot (ADR-003)
 [build]
   base = "web"
   command = "npm ci && npm run build"

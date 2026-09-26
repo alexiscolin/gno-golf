@@ -1,6 +1,6 @@
 /* gno.land's own palette: #226C57 primary, #60AB96 light, #144134 deep.
    The breakpoints (a custom property cannot sit in @media), here and in title.css:
-     width   1100, 900, 860, 720 (min), 700, 600 (the phone), 520, 480, 400
+     width   1280, 1100, 900, 860, 720 (min), 700, 600 (the phone), 520, 480, 400
      height  820 (a 13" laptop), 760, 720, 640
      shape   aspect-ratio 1/1 (wide vs upright), pointer: coarse, reduced motion */
 :root {
@@ -775,13 +775,14 @@ html, body {
   margin-top: 16px;
 }
 
+/* a sheet taller than the window scrolls inside it */
+.real, .cardsheet, .about, .boards { max-height: calc(100dvh - 40px); overflow-y: auto; }
+
 /* the play-for-real explainer */
 .real {
   position: relative;
   max-width: 520px;
   width: 100%;
-  max-height: calc(100dvh - 40px);
-  overflow-y: auto;
 }
 
 .real h2 {
@@ -1096,8 +1097,6 @@ button:focus-visible, a:focus-visible {
   position: relative;
   max-width: 860px;
   width: 100%;
-  max-height: calc(100dvh - 40px);
-  overflow-y: auto;
 }
 
 .cardsheet h2 {
@@ -1450,6 +1449,11 @@ button:focus-visible, a:focus-visible {
   .card h1 { font-size: 22px; }
 }
 
+/* up to a phone on its side: Adena as an icon, room for the hole's card */
+@media (max-width: 700px) {
+  .adena { width: 76px; padding: 0; justify-content: center; } .adena__text { display: none; }
+}
+
 @media (max-width: 600px) {
   .hud--top { gap: 8px; padding: 12px; }
   .card { padding: 8px 12px; height: 64px; border-radius: 16px; }
@@ -1459,8 +1463,7 @@ button:focus-visible, a:focus-visible {
   .burger { width: 64px; height: 64px; }
   .card--hole .src { display: none; }
   .hud__right { gap: 8px; }
-  .adena { height: 64px; width: 64px; padding: 0; justify-content: center; }
-  .adena__text { display: none; }
+  .adena { height: 64px; width: 64px; }
   .card--hole .eyebrow { display: none; }
   .card--score { min-width: 0; padding: 8px 10px; }
   .card--score .eyebrow { font-size: 9px; letter-spacing: .06em; }
@@ -1736,7 +1739,7 @@ button:focus-visible, a:focus-visible {
 .world__reset--sure { background: var(--hat); color: var(--paper); }
 .world__reset:focus-visible { outline: var(--ring); outline-offset: 2px; }
 @media (max-width: 600px) {
-  .worlds__in { width: calc(100vw - 56px); padding-top: 64px; }
+  .worlds__in { width: calc(100vw - 56px); }
   .worlds__list { gap: 10px; }
   .world { padding: 14px 8px 12px; }
 }
@@ -1778,7 +1781,11 @@ button:focus-visible, a:focus-visible {
 .weather__until { font-size: 10px; font-weight: 700; color: var(--ink-soft); line-height: 1; white-space: nowrap; }
 /* a long cup name stays on its card on a narrow phone */
 .world__ribbon { max-width: calc(100% + 8px); white-space: normal; line-height: 1.1; text-align: center; }
-@media (max-width: 400px) { .world__ribbon { font-size: 14px; padding: 5px 10px; } .world__tag { font-size: 12px; } }
+@media (max-width: 400px) {
+  .world__ribbon { font-size: 14px; padding: 5px 10px; } .world__tag { font-size: 12px; }
+  /* the hole's name gets the room: "Down the Tunnel" on two lines, not "Down the…" */
+  .card--hole { gap: 8px; padding: 8px 10px; } .card__num { min-width: 34px; height: 34px; font-size: 19px; } .card h1 { font-size: 13px; }
+}
 /* the course takes the keyboard (arrows aim, space shoots): show when it has it */
 /* the game canvas takes focus for the keyboard aim: a quiet frame, not a red
    box round the whole screen */
@@ -2103,7 +2110,7 @@ button:focus-visible, a:focus-visible {
 /* the about button: the back button's twin, top right, over every front screen */
 .screen__about { position: fixed; top: 34px; right: 34px; z-index: 6; background: var(--paper); }
 .screen__about svg { display: block; }
-.about { position: relative; max-width: 620px; width: 100%; max-height: calc(100dvh - 40px); overflow-y: auto; text-align: left; }
+.about { position: relative; max-width: 620px; width: 100%; text-align: left; }
 .about h2 { margin: 2px 0 6px; font-size: 34px; }
 .about__lead { margin: 0 0 18px; font-size: 15px; line-height: 1.5; color: var(--ink); max-width: 46ch; }
 .about__steps { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -2156,6 +2163,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
    so no one takes a practice score for a real one, with the way to mainnet */
 .netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: 2px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; box-shadow: var(--shadow-btn); } /* the bottom buttons' height, edge and shadow */
 .netbanner--testnet { background: var(--hat); color: var(--paper); }
+.screen ~ .netbanner { z-index: 4; } /* over the title, cups and gnome screens too, under the sheets (5) */
 .netbanner b { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .netbanner span { font-weight: 600; opacity: .9; }
 .netbanner:not(:has(.netbanner__go)) { padding-right: 16px; }
@@ -2198,21 +2206,45 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
   .netbanner { left: 8px; height: 44px; padding: 0 8px; font-size: 11px; border-radius: 12px; }
   .netbanner b { font-size: 0; } .netbanner b::after { content: attr(data-short); font-size: 11px; }
   .netbanner span, .netbanner__go { display: none; }
+  .netbanner { left: 12px; } /* the top cards' gutter */
+  /* the play buttons start right of it, not under it */
+  body:has(.netbanner) .hud--bottom { padding-left: 84px; }
+  .share__icon { width: 40px; height: 40px; }
+  /* the hole-finished buttons: Save across, Play again and Next hole on one line, not a third of the screen */
+  .banner--win .banner__row { gap: 8px; }
+  .banner--win .banner__row .btn { font-size: 15px; padding: 10px 12px; }
+  .banner--win .banner__row .btn--save { order: -1; flex: 1 0 100%; }
 }
+
+/* where the centred play buttons reach the banner at the bottom left: its
+   words go first, then (a phone on its side, a tablet) its mainnet link */
+@media (max-width: 1280px) { .netbanner span { display: none; } }
+@media (min-width: 601px) and (max-width: 900px) { .netbanner__go { display: none; } .netbanner { padding-right: 16px; } }
 
 @media (max-width: 1100px) {
   .worlds__list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 700px) {
-  .screen.worlds { place-items: start center; align-content: start; padding: 0; }
   .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .worlds__in { padding: 96px 0 40px; } /* clear of the corner buttons */
   .podium__row { grid-template-columns: 1fr; gap: 4px; } .podium__row .podium__ghost { display: none; }
 }
 
+/* narrow, short (a phone on its side) or upright (a tablet): the cups screen
+   scrolls from its top instead of spilling over it, clear of the corner
+   buttons, and of the network banner at the end */
+@media (max-width: 700px), (max-height: 640px), (max-aspect-ratio: 1/1) {
+  .screen.worlds { place-items: start center; align-content: start; padding: 0; }
+  .worlds__in { padding: 96px 0 72px; }
+}
+/* a tablet on its side: the fact pills wrap onto "Tap to start" */
+@media (max-width: 1100px) and (min-aspect-ratio: 1/1) { .screen--title .title__facts { display: none; } }
+/* a finger's targets */
+@media (pointer: coarse) { .seg button, .details summary, .unnamed summary { min-height: 44px; } }
+
 @media (max-width: 480px) {
   .nameform__row { flex-direction: column; }
+  .nameform { grid-template-columns: minmax(0, 1fr); } /* the field fits the card, not its own natural width */
   /* on a phone the sticker sits under the label, not over the next button */
   .btn--save-rank { flex-wrap: wrap; justify-content: center; } .btn__rank { position: static; transform: none; box-shadow: none; flex-basis: 100%; text-align: center; margin-top: 4px; }
 }
@@ -2228,3 +2260,24 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
   .cuppip { transition: none; }
   .btn--save-rank:not([disabled]) { animation: none; }
 }
+
+/* ------------------------------------------------------------ the shot clip
+   (ADR-003, NEXT_PUBLIC_CLIPS; components/Share.tsx ShareClip): the holing
+   stroke, recorded after the hole, looped in the win card above its buttons.
+   Its own classes only: without the flag no element carries them. */
+.clip { margin: 0 auto 16px; max-width: 560px; }
+.clip__screen { position: relative; aspect-ratio: 16 / 9; border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; background: var(--sky-day); box-shadow: var(--shadow-btn); }
+.clip__screen video { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* making it: a word and the power capsule's look, filling as it records */
+.clip__making { display: grid; place-items: center; align-content: center; gap: 12px; height: 100%; font-weight: 700; color: var(--ink); }
+.clip__bar { width: min(60%, 240px); height: 16px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); box-shadow: 0 3px 0 var(--ink); overflow: hidden; }
+.clip__bar span { display: block; height: 100%; background: var(--hat); transition: width .3s linear; }
+/* reduced motion: no autoplay, a round play button over the first frame */
+.clip__play { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
+.clip__play:focus-visible { outline: var(--ring); outline-offset: 2px; }
+/* its buttons: the card's own, a size down, links drawn as buttons */
+.clip__row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+.clip .btn { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; padding: 10px 18px; text-decoration: none; }
+.clip .btn--ghost { color: var(--ink); }
+.banner--win .banner__in p.clip__hint { margin: 8px 0 0; font-size: 13px; }

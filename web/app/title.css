@@ -356,8 +356,11 @@
    edges at every size */
 .screen--pick { --pick-w: min(380px, 60vw, 40vh); }
 @media (max-height: 820px) { .screen--pick { --pick-w: min(340px, 60vw, 36vh); } }
-@media (max-width: 600px) { .screen--pick { --pick-w: min(64vw, 40vh); } }
-.front.screen--pick .aimset--compact { width: var(--pick-w); }
+@media (max-width: 600px) { .screen--pick { --pick-w: min(64vw, calc(100vw - 144px), 40vh); } } /* 144: the screen's padding and the two arrows, so the stage fits a 360 phone */
+/* the aim card never narrower than its switch (a phone on its side: 36vh is 140px) */
+.front.screen--pick .aimset--compact { width: max(var(--pick-w), 230px); }
+/* short: taller than the window, it scrolls from its top (safe), not both ends */
+@media (max-height: 640px) { .screen--pick { align-content: safe center; } }
 .screen--pick .pick__stage { position: relative; margin: 0 0 var(--gap-l); }
 .screen--pick .pick__stage > * { position: relative; }
 .screen--pick .pick__tile {

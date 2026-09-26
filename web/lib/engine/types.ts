@@ -114,6 +114,8 @@ export interface Live {
   readonly ground: Height;
   readonly lift: (p: Vec2) => THREE.Vector3;
   readonly log: boolean;
+  /** no sound, no buzz (a replay nobody watches live: the shot clip's) */
+  readonly quiet?: boolean;
   readonly tickNow: () => number | null;
   /** cut every animation */
   readonly stop: () => number;
