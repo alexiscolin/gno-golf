@@ -91,7 +91,8 @@ const norm = (u: string | null | undefined) => String(u || "").trim().replace(/\
  * chain id) has to be removed in Adena by hand, and the error says how.
  */
 async function ensureNetwork(a: Adena, { chainId, rpc, name = "Gnogolf chain" }: { chainId?: string | null; rpc: string; name?: string }) {
-  if (!chainId) return;
+  // no chain id, no signature: Adena would sign on whatever network it has on
+  if (!chainId) throw new Error("The chain's id is not known yet (is the node up?). Try again in a moment.");
   const active = async () => {
     try {
       const n = await a.GetNetwork?.();

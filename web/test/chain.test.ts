@@ -118,6 +118,9 @@ test("safeEndpoint keeps a local http(s) override, or gno.land's own https, and 
   assert.equal(safeEndpoint("http://rpc.gno.land", DEFAULT_RPC), DEFAULT_RPC); // gno.land, but not https
   assert.equal(safeEndpoint("https://evil.example.com", DEFAULT_RPC), DEFAULT_RPC); // not allowlisted
   assert.equal(safeEndpoint("not a url", DEFAULT_RPC), DEFAULT_RPC);
+  // a public build on a public address keeps its own chain, whatever the link says
+  assert.equal(safeEndpoint("https://rpc.gno.land", DEFAULT_RPC, true), DEFAULT_RPC);
+  assert.equal(safeEndpoint("http://127.0.0.1:36657", DEFAULT_RPC, true), DEFAULT_RPC);
 });
 
 test("pullShot rounds power to maxPower and wraps the angle into [0, 360)", () => {

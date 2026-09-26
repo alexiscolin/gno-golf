@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { holeLink } from "../components/common.ts";
+import { holeLink, pasted, shareLinks } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -41,4 +41,15 @@ test("a page pointed at another chain keeps pointing there", () => {
     assert.equal(q.get("web"), "https://web.example");
     assert.equal(q.get("other"), null, "only rpc and web are kept");
   });
+});
+
+test("X puts the link after the text, the others put it first, for its card", () => {
+  const text = "Ace on Down the Tunnel. Somewhere on gno.land a realm just nodded.", url = "https://gno-golf.netlify.app/h/garden-3/";
+  const l = Object.fromEntries(shareLinks(text, url));
+  const x = new URL(l.X).searchParams;
+  assert.equal(x.get("text"), text);
+  assert.equal(x.get("url"), url);
+  for (const k of ["WhatsApp", "Bluesky"]) assert.ok(new URL(l[k]).searchParams.get("text")!.startsWith(url + "\n"), k);
+  assert.equal(new URL(l.Facebook).searchParams.get("u"), url);
+  assert.ok(pasted(text, url).startsWith(url));
 });

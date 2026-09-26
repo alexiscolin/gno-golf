@@ -434,16 +434,21 @@ export type Chain = ReturnType<typeof makeChain>;
  * falls back: a link must not point the game, Adena and every "read its code"
  * link at a look-alike node.
  */
-export function safeEndpoint(given: string | null | undefined, fallback: string) {
-  if (!given) return fallback;
+export function safeEndpoint(given: string | null | undefined, fallback: string, pinned = pinnedPage()) {
+  if (!given || pinned) return fallback;
   try {
     const u = new URL(given);
-    const local = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+    const local = LOCAL.includes(u.hostname);
     const ok = local ? /^https?:$/.test(u.protocol) : u.protocol === "https:" && allowedHost(u.hostname);
     if (ok) return u.origin + u.pathname.replace(/\/$/, "");
   } catch {}
   return fallback;
 }
+const LOCAL = ["localhost", "127.0.0.1", "[::1]"];
+/** A built site on a public address plays its own chain only: a shared link's
+ *  ?rpc= could otherwise send the wallet to a look-alike realm on another
+ *  gno.land chain. The overrides are for dev builds and this machine. */
+const pinnedPage = () => process.env.NODE_ENV === "production" && typeof location !== "undefined" && !LOCAL.includes(location.hostname);
 const hostOf = (x: string) => {
   try {
     return new URL(x).hostname;

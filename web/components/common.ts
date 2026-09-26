@@ -28,3 +28,20 @@ export const parHere = (s: Snapshot) => parOf(s.holes.find((h) => h.id === s.id)
 
 /** Why each aim mode has its own board: the chain can't see a screen. */
 export const HONEST = "We can't check which mode you used, so each mode has its own board.";
+
+const enc = encodeURIComponent;
+/** Each network's share page for this text and link. X shows the card of a
+ *  post's last link, and takes ours apart (url=), so it comes after the text.
+ *  The others (WhatsApp, Bluesky, a pasted message) preview the first link,
+ *  and the text names gno.land: ours goes first, or theirs takes the card. */
+export function shareLinks(text: string, url: string): [string, string][] {
+  const post = enc(pasted(text, url));
+  return [
+    ["X", `https://x.com/intent/post?text=${enc(text)}&url=${enc(url)}`],
+    ["Facebook", `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}&quote=${enc(text)}`],
+    ["WhatsApp", `https://wa.me/?text=${post}`],
+    ["Bluesky", `https://bsky.app/intent/compose?text=${post}`],
+  ];
+}
+/** The message a copied link pastes: the link first, for its card. */
+export const pasted = (text: string, url: string) => `${url}\n\n${text}`;

@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { sound } from "@/lib/feel";
+import { pasted, shareLinks } from "./common";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
 // with the score (X, Facebook, WhatsApp, Bluesky, copy link), each opening
 // that network's own share page with the text and the link. On a phone one
 // more icon opens the system share sheet, with a picture of the course.
 
-const enc = encodeURIComponent;
 
 // simple filled glyphs, 24×24
 const GLYPH: Record<string, string> = {
@@ -56,18 +56,13 @@ export default function Share({ text, snapshot, link = "" }: ShareProps) {
   const copy = async () => {
     sound("blip");
     try {
-      await navigator.clipboard.writeText(`${text} ${url}`);
+      await navigator.clipboard.writeText(pasted(text, url));
       setCopied(true);
       clearTimeout(copiedT.current);
       copiedT.current = setTimeout(() => setCopied(false), 1800);
     } catch {}
   };
-  const links: [string, string][] = [
-    ["X", `https://x.com/intent/post?text=${enc(text)}&url=${enc(url)}`],
-    ["Facebook", `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}&quote=${enc(text)}`],
-    ["WhatsApp", `https://wa.me/?text=${enc(`${text} ${url}`)}`],
-    ["Bluesky", `https://bsky.app/intent/compose?text=${enc(`${text} ${url}`)}`],
-  ];
+  const links = shareLinks(text, url);
   return (
     <span className="share" role="group" aria-label="Share">
       <span className="share__label">Share</span>

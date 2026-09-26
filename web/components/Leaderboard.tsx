@@ -580,7 +580,7 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed }: { ch
     try {
       const why = await chain.nameProblem(name);
       if (why) return setErr(why);
-      await registerName({ address: account, registrar: await chain.nameReg(), realm: chain.realm, name, price, chainId, rpc: chain.rpc });
+      await registerName({ address: account, registrar: await chain.nameReg(), realm: chain.realm, name, price, chainId: chainId || (await chain.chainId()), rpc: chain.rpc });
       // read back: the name is the chain's once a block has it
       for (let k = 0; k < 10; k++) {
         names.delete(account);
