@@ -29,7 +29,7 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
 const FACTS = ["4 cups · 72 holes", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
 
 /** The round corner button every screen has: back at the top left, about at the top right. */
-export function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
+function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
   return (
     <button className={`round round--small round--back screen__${side}`} aria-label={label} title={label} onClick={(e) => (e.stopPropagation(), onClick())}>
       {children}

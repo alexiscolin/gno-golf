@@ -23,6 +23,7 @@ import {
 } from "./scene";
 import { BALL_R } from "./terrain";
 import { makeCamera } from "./engine/camera";
+import { pace, slowFrames, SLOW_KEY } from "./engine/pace";
 import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
 import type { Extras, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
@@ -260,10 +261,14 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       return false;
     }
   })();
-  const SLOW_KEY = "gnogolf.gfx.auto";
+  const OLD_SLOW_KEY = "gnogolf.gfx.auto";
+  // (a Low found by the probe before it knew the display's own rate: 75, 90
+  // and 144 Hz screens were marked slow by the frame cap alone, and are probed again)
+  try { if (localStorage.getItem(OLD_SLOW_KEY) === "low") localStorage.removeItem(OLD_SLOW_KEY); } catch {}
   const wasSlow = () => { try { return localStorage.getItem(SLOW_KEY) === "low"; } catch { return false; } };
   // A slow GPU (seen on some Safari and Firefox setups) gets a lighter canvas:
-  // the first 2 s of drawing are timed, and a median frame over 20 ms turns
+  // the first 2 s of busy drawing are timed, and frames drawn over 20 ms apart
+  // on average (the cap aims at one every 16.7 ms, whatever the display) turn
   // Auto to Low, once (and for the next visits).
   let dprCap = Infinity;
   function setTier() {
@@ -275,7 +280,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     resize();
     return was !== tier;
   }
-  // only frames drawn back to back count (an idle scene is drawn at 20 fps on purpose)
+  // only frames drawn back to back count (an idle scene is drawn at 10 or 30 fps on purpose)
   const probe = { t0: 0, prev: 0, gaps: [] as number[], done: false };
   function probeFrame(now: number, busy: boolean) {
     if (tier === "low" || probe.done) return;
@@ -285,8 +290,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     probe.prev = now;
     if (now - probe.t0 < 2000 && probe.gaps.length < 90) return;
     probe.done = true;
-    const d = probe.gaps.sort((a, b) => a - b);
-    if (d.length > 10 && d[d.length >> 1] > 20 && gfxMode === "auto") {
+    if (probe.gaps.length > 10 && slowFrames(probe.gaps) && gfxMode === "auto") {
       try { localStorage.setItem(SLOW_KEY, "low"); } catch {}
       console.info("gnogolf: slow frames, graphics set to low");
       setTier();
@@ -345,6 +349,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // A window in the background (another app in front) is not drawn either,
   // unless a shot is on its way.
   const IDLE_MS = 1000 / 30, STILL_MS = 1000 / 10, BUSY_MS = 1000 / 60;
+  // the frames skipped add up (a budget): on a 75, 90 or 144 Hz display the
+  // drawn ones land every one or two refreshes, 60 a second on average, not
+  // on every second or third refresh (37 to 48 a second)
+  let budget = 0, prevRaf = 0;
   let blurred = false;
   const onBlur = () => (blurred = true);
   const onFocus = () => ((blurred = false), (wake = performance.now()));
@@ -356,13 +364,18 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   function frame(now: number) {
     if (!alive) return;
     requestAnimationFrame(frame);
-    if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now);
+    const gap = prevRaf ? now - prevRaf : 0;
+    prevRaf = now;
+    if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now), (budget = 0);
     // timed pieces glide at the idle rate: they are no reason to draw at 60
     const busy = promo.on || g.flying || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
-    if (blurred && !busy) return (last = now);
-    const still = !g.weather && !(everyOf() > 0);
-    if (!busy && still && !motion && now - wake > 1000) return (last = now); // (a still garden under reduced motion)
-    if (now - last < (busy ? BUSY_MS : still ? STILL_MS : IDLE_MS) - 2) return;
+    if (blurred && !busy) return (last = now), (budget = 0);
+    // (under reduced motion the weather stands still: no reason to draw either)
+    const still = (!g.weather || !motion) && !(everyOf() > 0);
+    if (!busy && still && !motion && now - wake > 1000) return (last = now), (budget = 0); // (a still garden under reduced motion)
+    const p = pace(budget, gap, busy ? BUSY_MS : still ? STILL_MS : IDLE_MS);
+    budget = p.budget;
+    if (!p.draw) return;
     probeFrame(now, busy);
     // the clock of the timed pieces runs on real time, however far apart the
     // frames are (never stepped by a capped dt): at any frame rate a piece is

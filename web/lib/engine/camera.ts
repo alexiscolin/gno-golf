@@ -242,11 +242,17 @@ export function makeCamera(E: Live) {
   }
 
   /** Third person's target, per state: 7 behind, 3 up, looking along the aim, the ball's run, or at the cup. */
-  const cupPt = new THREE.Vector3();
+  const cupPt = new THREE.Vector3(), fallPt = new THREE.Vector3();
+  let laneY = 0; // the ball's height the last time it was over the lane
   function thirdTarget(dt: number, state: CamState) {
     // holed: framed on the cup, up and back a little — the ball sinking into
     // it is not followed down (that was a close-up of the hat)
-    const B = state === "holed" && g.s ? cupPt.set(g.s.cup[0], BALL_R + ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]) : E.ball.position;
+    // off the lane in a replay (off the rooftops into the street, into the
+    // sea): followed across at the height it left at, never down among the houses
+    const P = E.ball.position, t = g.course && g.course.userData.terrain;
+    const off = state === "replay" && !g.inTube && !!t && !t.onGreen(P.x, P.z);
+    if (!off) laneY = P.y;
+    const B = state === "holed" && g.s ? cupPt.set(g.s.cup[0], BALL_R + ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]) : off ? fallPt.copy(P).setY(Math.max(P.y, laneY)) : P;
     let target = yaw, turning = false;
     const pulling = state === "aiming";
     aimView = pulling;

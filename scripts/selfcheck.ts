@@ -29,6 +29,7 @@ const { RULES } = await import("../web/lib/chain.ts");
 const { commitsOf, gnokeyPlan } = await import("../web/lib/adena.ts");
 const card = await import("../web/lib/card.ts");
 const { thirdAim } = await import("../web/lib/engine/aim.ts");
+const { pace, slowFrames } = await import("../web/lib/engine/pace.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -156,6 +157,34 @@ check("the third-person aim (engine/aim.ts thirdAim)", () => {
   // a step back along the pull (the power going down) with a little sideways drift keeps the aim
   assert.equal(thirdAim(0, 5, 40, 0.3, false, 1, -6), 0.3, "radial step: direction held");
   assert.notEqual(thirdAim(0, 40, 40, 0.3, false, 6, -6), 0.3, "sideways step: direction turns");
+});
+
+check("the frame pacing (engine/pace.ts)", () => {
+  // a second of refreshes at hz, drawn at interval: the frames drawn, and the gaps between them
+  const run = (hz: number, interval: number) => {
+    let budget = 0, drawn = 0, since = 0;
+    const gaps: number[] = [];
+    for (let i = 0; i < hz * 4; i++) {
+      since += 1000 / hz;
+      const p = pace(budget, 1000 / hz, interval);
+      budget = p.budget;
+      if (!p.draw) continue;
+      drawn++;
+      gaps.push(since);
+      since = 0;
+    }
+    return { fps: drawn / 4, gaps };
+  };
+  for (const hz of [60, 75, 90, 120, 144, 165]) {
+    const busy = run(hz, 1000 / 60), idle = run(hz, 1000 / 30), still = run(hz, 1000 / 10);
+    assert.ok(Math.abs(busy.fps - 60) <= 2, `${hz} Hz busy: ${busy.fps} fps`);
+    assert.ok(Math.abs(idle.fps - 30) <= 1.5, `${hz} Hz idle: ${idle.fps} fps`);
+    assert.ok(Math.abs(still.fps - 10) <= 1, `${hz} Hz still: ${still.fps} fps`);
+    assert.ok(!slowFrames(busy.gaps), `${hz} Hz on time: not slow`);
+  }
+  // a GPU that makes every refresh late: 30 a second at best
+  assert.ok(slowFrames(Array<number>(60).fill(33.3)), "30 fps busy: slow");
+  assert.ok(!slowFrames([...Array<number>(55).fill(16.7), 200, 180, 150, 120, 90]), "a few hitches: not slow");
 });
 
 if (failed) {

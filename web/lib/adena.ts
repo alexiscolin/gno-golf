@@ -251,7 +251,7 @@ export function gasOf(c: Work, from = 0, to = (c.pts || []).length) {
  * model, its "commit the first N" wins and the rest is split again from
  * there. Any other refusal throws, in words: nothing goes to Adena then.
  */
-export async function splitRound(shots: readonly string[], check: (list: string[], from: number, ball: Vec2 | null | undefined) => Promise<{ rest?: Vec2 } | null | undefined>, c: Work = {}) {
+async function splitRound(shots: readonly string[], check: (list: string[], from: number, ball: Vec2 | null | undefined) => Promise<{ rest?: Vec2 } | null | undefined>, c: Work = {}) {
   const out: [number, number][] = [];
   for (let from = 0, ball: Vec2 | null | undefined = null; from < shots.length; ) {
     let to = commitsOf(c, shots.length, from)[0][1], r;

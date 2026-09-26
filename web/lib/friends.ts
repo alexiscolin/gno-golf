@@ -3,7 +3,7 @@ import { isAddress } from "./chain";
 
 const FRIENDS = "gnogolf.friends";
 /** A friend: an address, and the gno.land name it was added by ("" for none). */
-export interface Friend {
+interface Friend {
   addr: string;
   name: string;
 }

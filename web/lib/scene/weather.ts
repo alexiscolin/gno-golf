@@ -5,6 +5,7 @@
 // weather is, for the HUD. Lightning is the page's: a flash over everything.
 import * as THREE from "three";
 import { mod } from "../terrain";
+import { motion } from "./materials";
 import type { Forecast, MutVec2, Zone } from "../types";
 
 /** The weather drawn now, for the HUD and the decor: null for none. */
@@ -428,9 +429,12 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       }
     },
     tick(t: number) {
-      const dt = last === null ? 0 : Math.min(0.05, t - last);
+      const step = last === null ? 0 : Math.min(0.05, t - last);
       last = t;
-      fogStep(dt);
+      // reduced motion: the weather is shown still (drops, rings, banks, gusts,
+      // blown bits all where they are), the fog simply there, no lightning
+      fogStep(motion ? step : 1);
+      const dt = motion ? step : 0;
       const z = gustNow;
       gustMat.opacity = z ? 0.85 * gustOn : 0;
       gustLines.visible = !!z && gustOn > 0;
@@ -480,16 +484,16 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
           sp.m.scale.setScalar(1 + sp.t * 3);
           sp.m.material.opacity = 0.7 * (1 - sp.t);
         }
-        wet = Math.min(1, wet + dt / 8);
+        wet = motion ? Math.min(1, wet + dt / 8) : 1;
         puddleMat.opacity = 0.45 * wet;
       }
       if (now.fog)
         for (const b of banks) {
           b.x += b.v * dt;
           if (b.x > area.x + area.w + 6) b.x = area.x - 6;
-          b.m.position.set(b.x, b.y + Math.sin(t * 0.3 + b.s) * 0.2, b.z);
+          b.m.position.set(b.x, b.y + (motion ? Math.sin(t * 0.3 + b.s) * 0.2 : 0), b.z);
         }
-      if (now.storm) {
+      if (now.storm && motion) {
         // now and then a flash: the scene lit white, and the page told
         if (t > nextFlash) {
           flashAt = t;

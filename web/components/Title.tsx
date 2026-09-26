@@ -5,6 +5,7 @@ import "@/app/title.css";
 import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
 import { AboutButton } from "@/components/About";
+import { SLOW_KEY } from "@/lib/engine/pace";
 import type { makeTitle, titleStill } from "@/lib/scene/title";
 
 /** The live title scene, once its module has loaded and made it. */
@@ -194,7 +195,7 @@ const wantsStill = () => {
   try {
     const gfx = localStorage.getItem("gnogolf.gfx");
     // Low, or Auto on a device whose frames were slow (the engine's own flag)
-    return gfx === "low" || (gfx !== "high" && localStorage.getItem("gnogolf.gfx.auto") === "low");
+    return gfx === "low" || (gfx !== "high" && localStorage.getItem(SLOW_KEY) === "low");
   } catch {
     return false;
   }

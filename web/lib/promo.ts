@@ -16,7 +16,7 @@ import type { HoleRow, SimulateRound } from "./types";
 import type { Course, Gnome, Hole } from "./scene/data";
 
 /** What the engine hands the rig (engine.ts: promo.attach). */
-export interface PromoEngine {
+interface PromoEngine {
   g: {
     id: string | null;
     s: Hole | null;

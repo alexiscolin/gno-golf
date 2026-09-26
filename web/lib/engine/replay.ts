@@ -285,6 +285,19 @@ export function makeReplay(E: Live) {
    *  hazard's destination. 1.4 s in all: long enough to feel the loss. */
   // skin: the hazard's — a serac (mountain) catches the ball in falling ice:
   // no water there, so no rings and no splash, a burst of ice shards instead
+  /** Just past the edge of zone z a ball crossed on its way from p (the last
+   *  point on the lane) to q: the crossing found by halving, a little beyond it. */
+  function offEdge(z: Zone, p: Vec2, q: Vec2, from: THREE.Vector3) {
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 12; k++) {
+      const m = (lo + hi) / 2;
+      if (inZone(z, p[0] + (q[0] - p[0]) * m, p[1] + (q[1] - p[1]) * m)) hi = m;
+      else lo = m;
+    }
+    const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1, u = Math.min(1, hi + 0.3 / l);
+    return from.clone().set(p[0] + (q[0] - p[0]) * u, from.y, p[1] + (q[1] - p[1]) * u);
+  }
+
   function splashDown(at: THREE.Vector3, back: THREE.Vector3, round: number | undefined, edge: THREE.Vector3 | null = null, skin = "") {
     const cutAt = E.cut;
     buzz(25);
@@ -315,7 +328,11 @@ export function makeReplay(E: Live) {
         if (!rings) {
           start = now;
           at = land;
-          if (skin === "serac") {
+          if (skin === "roof") {
+            // a fall, not a splash: a thud and a puff of dust in the street (makeSplash gives the puff there)
+            sound("thud");
+            rings = makeSplash(land.clone().setY(surf + 0.5), { open: false });
+          } else if (skin === "serac") {
             sound("thud");
             for (let n = 0; n < 6; n++) E.causes.at(E.ball.position, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, { kind: "ice" });
             rings = { group: new THREE.Group(), step() {} };
@@ -333,7 +350,8 @@ export function makeReplay(E: Live) {
         }
         rings.step(t);
         if (t < 0.7) {
-          const k = t / 0.7;
+          // (in the street it lies where it fell, whole: it only sinks in water)
+          const k = skin === "roof" ? 0 : t / 0.7;
           E.ball.position.set(at.x, at.y - k * 1.1, at.z);
           E.ball.scale.setScalar(1 - k * 0.6);
         } else if (t < 1.1) {
@@ -446,7 +464,10 @@ export function makeReplay(E: Live) {
         // into the water: splash, sink, a beat, then back where the hazard sends it
         if (drowned(path[i], path[i + 1])) {
           const hz = jumpFrom(path[i], path[i + 1]);
-          return void splashDown(sinkPoint(path[i], path[i + 1], from), to, round, E.ball.position.clone(), hz ? hz.skin : "").then(() => {
+          // off a rooftop: it drops into the street just past the edge it left
+          // from, not well inside the hazard as into water
+          const at = hz && hz.skin === "roof" ? offEdge(hz, path[i], path[i + 1], from) : sinkPoint(path[i], path[i + 1], from);
+          return void splashDown(at, to, round, E.ball.position.clone(), hz ? hz.skin : "").then(() => {
             E.mood.shake(performance.now());
             air.t = 0;
             i++;

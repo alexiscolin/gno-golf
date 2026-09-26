@@ -172,5 +172,3 @@ export type UnlockId = keyof typeof UNLOCKS;
 /** Whether finishing this cup at par or under earns a gnome (the Mountain Cup earns none). */
 export const cupHasGnome = (cup: string) => Object.values<Unlock>(UNLOCKS).some((u) => u.cup === cup);
 
-/** A medal for a finished hole: gold for one stroke, silver under par, bronze at par. */
-export const medalOf = (strokes: number | null | undefined, par: number) => (!strokes ? null : strokes === 1 ? "gold" : strokes < par ? "silver" : strokes === par ? "bronze" : null);
