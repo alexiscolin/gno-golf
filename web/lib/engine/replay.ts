@@ -41,15 +41,18 @@ export function makeReplay(E: Live) {
   // Recognised by where the step lands, not where it starts: the physics
   // checks zones between recorded points, so a fast ball enters the zone after
   // the last point it recorded outside it.
-  // Several zones may send the ball to the same point (a tunnel exit and a
-  // pond's "back to" can coincide), so the zone is the one the step came
-  // from: of those that land there, the nearest to where the ball was.
-  const jumpFrom = (p: Vec2, q: Vec2): Zone | null => {
+  // A hazard sends the ball back to where the stroke was played from, the
+  // path's first point (start); an older realm sent it to the zone's vec.
+  // Several zones may send the ball to the same point, so the zone is the one
+  // the step came from: of those that land there, the nearest to where the
+  // ball was.
+  const jumpFrom = (p: Vec2, q: Vec2, start?: Vec2): Zone | null => {
     if (!g.s || Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-3) return null;
     let best: Zone | null = null, bd = Infinity;
     for (const z of g.s.zones) {
       // a loop with a tube (island7's castle tube) is ridden like a tunnel
-      if ((z.kind !== "tunnel" && z.kind !== "hazard" && z.kind !== "loop") || Math.abs(q[0] - z.vec[0]) > 1e-3 || Math.abs(q[1] - z.vec[1]) > 1e-3) continue;
+      const at = (v: Vec2) => Math.abs(q[0] - v[0]) <= 1e-3 && Math.abs(q[1] - v[1]) <= 1e-3;
+      if ((z.kind !== "tunnel" && z.kind !== "hazard" && z.kind !== "loop") || !(at(z.vec) || (z.kind === "hazard" && start && at(start)))) continue;
       const dx = Math.max(z.min[0] - p[0], 0, p[0] - z.max[0]), dz = Math.max(z.min[1] - p[1], 0, p[1] - z.max[1]);
       const d = Math.hypot(dx, dz);
       if (d < bd) (bd = d), (best = z);
@@ -58,8 +61,8 @@ export function makeReplay(E: Live) {
   };
   const tunnelled = (p: Vec2, q: Vec2) => { const z = jumpFrom(p, q); return z && (z.kind === "tunnel" || z.kind === "loop") ? z : null; };
 
-  const landing = (p: Vec2, q: Vec2) => {
-    const z = jumpFrom(p, q);
+  const landing = (p: Vec2, q: Vec2, start?: Vec2) => {
+    const z = jumpFrom(p, q, start);
     return z ? z.kind : null;
   };
 
@@ -148,8 +151,8 @@ export function makeReplay(E: Live) {
 
   /** Where a ball sinks: the pond's nearest point to where it went in — the
    *  recorded point is outside the water when a fast ball enters mid-step. */
-  function sinkPoint(p: Vec2, q: Vec2, from: THREE.Vector3) {
-    const z = jumpFrom(p, q);
+  function sinkPoint(p: Vec2, q: Vec2, from: THREE.Vector3, start?: Vec2) {
+    const z = jumpFrom(p, q, start);
     if (!z) return from;
     // a shaped sea (a polygon, or all but one): it sinks where it went in,
     // a little further on
@@ -257,7 +260,7 @@ export function makeReplay(E: Live) {
   }
 
   /** A hazard step: from inside a hazard zone, straight to its destination. */
-  const drowned = (p: Vec2, q: Vec2) => { const z = jumpFrom(p, q); return !!z && z.kind === "hazard"; };
+  const drowned = (p: Vec2, q: Vec2, start?: Vec2) => { const z = jumpFrom(p, q, start); return !!z && z.kind === "hazard"; };
 
   /** The ball sinks where it went in — ripples, a pause — then pops up at the
    *  hazard's destination. 1.4 s in all: long enough to feel the loss. */
@@ -438,11 +441,11 @@ export function makeReplay(E: Live) {
         // to the pin, then down — never a snap across the cup
         const drop = holed && i === path.length - 2;
         // into the water: splash, sink, a beat, then back where the hazard sends it
-        if (drowned(path[i], path[i + 1])) {
-          const hz = jumpFrom(path[i], path[i + 1]);
+        if (drowned(path[i], path[i + 1], path[0])) {
+          const hz = jumpFrom(path[i], path[i + 1], path[0]);
           // off a rooftop: it drops into the street just past the edge it left
           // from, not well inside the hazard as into water
-          const at = hz && hz.skin === "roof" ? offEdge(hz, path[Math.max(0, i - 1)], path[i], from) : sinkPoint(path[i], path[i + 1], from);
+          const at = hz && hz.skin === "roof" ? offEdge(hz, path[Math.max(0, i - 1)], path[i], from) : sinkPoint(path[i], path[i + 1], from, path[0]);
           return void splashDown(at, to, round, E.ball.position.clone(), hz ? hz.skin : "").then(() => {
             E.mood.shake(performance.now());
             air.t = 0;

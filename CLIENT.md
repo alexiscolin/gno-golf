@@ -143,7 +143,8 @@ numbers, rankings); anyone else's hole is a community hole. `slot` and `v` are
 a data version's alias and number, and `next` appears once it's archived.
 
 `zones[].vec` means a different thing per kind: an acceleration for `slope`, a
-destination for `tunnel` and `hazard`, nothing for `surface` (which uses
+destination for `tunnel`, nothing for `hazard` (a hazard sends the ball back
+to where the stroke was played from, the path's first point) and `surface` (which uses
 `scale`, a friction multiplier). A `loop` is a loop-the-loop: `vec` is where
 its track comes back down, `scale` the speed per substep needed to go round. A
 ball heading in fast enough is put at `vec` with 0.8 of its speed; a slower one
@@ -238,8 +239,9 @@ is `"assisted"` or `"pro"`, and each has its own records and ranking.
   can be up to 96 on a side. Wear stays a 16×8 grid stretched over the board.
 - **A stroke's power p is a speed of `course.Kick`·p^(3/4) (0.79, 4.44 at full power)**, and a substep is
   walked in moves of at most `physics.MaxMove` (1.5), so a fast ball meets
-  every zone it crosses. A tunnel or hazard jump is recognised by where the
-  step *lands* (the zone's `vec`), not by where it starts — a fast ball enters
+  every zone it crosses. A tunnel jump is recognised by where the step
+  *lands* (the zone's `vec`), a hazard's by landing back on the path's first
+  point, not by where it starts — a fast ball enters
   the zone after the last point it recorded outside it.
 - **Some holes change with the stroke** (`timed`): a gate shuts every other
   stroke, a mole pops up one stroke in three. The clock is the stroke number in

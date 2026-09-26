@@ -31,7 +31,7 @@ substeps: speeds are per substep, accelerations per substep².
 | Rest on a hill | a ball at rest rolls away when `G·sin θ > Crr·G·cos θ` (`tan θ > Crr`), and does not move at all otherwise | |
 | Contact (walls, posts) | normal impulse `jn = −(1+e)·vn`; tangential impulse `jt = min(µ·jn, TangentMass·|vt|)` | `µ = WallFriction = 0.05`, `TangentMass = 2/7` |
 | Resting contact | under `RestSpeed` into the surface, `e = 0` and no bounce is counted | `RestSpeed = 0.35` |
-| Restitution | `e = min(Bounce, MaxBounce)`; a *bumper* (`Bounce > 1`) kicks at `e = min(Bounce, MaxKick)` | `MaxBounce = 0.92`, `MaxKick = 1.5` |
+| Restitution | `e = min(Bounce, MaxBounce)`; a *bumper* (`Bounce > 1` and a bumper's skin, `Kicks`) kicks at `e = min(Bounce, MaxKick)`; any other piece above 1 plays at `MaxBounce` | `MaxBounce = 0.75` (a mini-golf rail gives back 0.6 to 0.75), `MaxKick = 1.5` |
 | Take-off | over a hill's crest, when `(v·uphill)² > G·CrestRadius` | `CrestRadius = 0.5`, a kicker's sharp lip (0.71 per substep) |
 | Flight | up at `vz = vu·tan θ`, in the air `2·vz/G`, so it lands `2·vu²·tan θ/G` on; no zone, no rolling resistance | |
 | Landing | `jn = (1+e)·vz` with `e = GroundBounce`; the speed along loses `min(LandFriction·jn, TangentMass·|v|)`; a rebound over `HopSpeed` hops again | `GroundBounce = 0.4`, `LandFriction = 0.3`, `HopSpeed = 0.25` |
@@ -153,7 +153,7 @@ type Wall struct {
 ```go
 type Post struct {
 	Circle
-	Bounce float64 // 0 = Field.Bounce; up to 1 played at MaxBounce (0.92) at most; above 1 a bumper
+	Bounce float64 // 0 = Field.Bounce; played at MaxBounce (0.75) at most; above 1 a bumper, if its skin is one (Kicks)
 	Mark   rune
 	Skin   string
 }
@@ -165,7 +165,7 @@ type Post struct {
 type Zone struct {
 	Kind     ZoneKind
 	Min, Max Vec2
-	Vec      Vec2    // Slope: acceleration. Tunnel / Hazard: destination. Loop: where it comes down.
+	Vec      Vec2    // Slope: acceleration. Tunnel: destination. Loop: where it comes down. Hazard: unused.
 	Scale    float64 // Surface: friction multiplier. Loop: speed needed to go round.
 	Mark     rune
 	Skin     string
@@ -185,7 +185,7 @@ The zone kinds:
 | `Surface` | Sets the move's surface to `Scale`, which sets the rolling resistance (`Rolling`): sand is below 1 (a high Crr), ice above 1 (a low one). If several Surface zones overlap, the last one in `Zones` wins. |
 | `Slope` | A hill: gravity along it, `Vec` (`G·sin θ` downhill), added to the velocity every substep (spread over the moves of that substep). Uphill pushes back, downhill pulls. The ground under a ball is one hill: where two overlap, the first in `Zones` is the hill. With `Air`, moving air: a constant acceleration on top of the hill. |
 | `Tunnel` | Moves the ball to `Vec` and keeps its velocity. The path gets a point at `Vec`, so two consecutive path points far apart mean a tunnel. |
-| `Hazard` | Ends the shot at `Vec` (water, a pit), with a last path point there. |
+| `Hazard` | Ends the shot back where the stroke was played from (water, a pit, the void, a fall off a roof), with a last path point there. One rule for every hazard: its `Vec` is not read. The stroke counts, with no penalty. |
 | `Loop` | A loop-the-loop mouth. See [Loops](#loops). |
 
 `ZoneKind.String()` returns `"surface"`, `"slope"`, `"tunnel"`, `"hazard"`,
@@ -519,8 +519,8 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `WallFriction` | 0.05 | Coulomb µ of a wall or post |
 | `TangentMass` | 2/7 | the most of its speed along a surface a solid ball loses to friction |
 | `RestSpeed` | 0.35 | under it into a surface, a contact is resting: no bounce |
-| `MaxBounce` | 0.92 | the most restitution a passive piece plays |
-| `MaxKick` | 1.5 | the most restitution a bumper (`Bounce > 1`) plays |
+| `MaxBounce` | 0.75 | the most restitution a passive piece plays |
+| `MaxKick` | 1.5 | the most restitution a bumper (`Bounce > 1`, a skin `Kicks` names) plays |
 | `CrestRadius` | 0.5 | a crest's lip radius: take-off at `vu² > G·CrestRadius` |
 | `MinRamp` | 0.12 | the gentlest hill that launches |
 | `JumpRun` | 0.5 | share of a hill's depth climbed before its crest can launch |
@@ -531,13 +531,18 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `SpeedCap` | 8 | top speed, per substep |
 | `MaxRollOn` | 120 | most extra substeps a slope or a flight can add |
 | `MaxWork` | 1e6 | the most work units (about a thousand gas each) one stroke may cost |
+| `MaxWorkStep` | 2.25e5 | the most a stroke's work passes `MaxWork` by |
 | `MaxSin` | 0.95 | the steepest grade a hill plays, and the most `|Vec|/G` Decode takes |
 | `LoopKeep` | 0.8 | share of the speed kept going round a loop |
 
 ## Skins
 
-`Skin` and `Mark` have no effect on the simulation: what a zone does is in
-its fields (`Kind`, `Air`, `Capped`). A renderer has to be able to draw any
+`Skin` and `Mark` have no effect on the simulation, with one exception:
+only a piece whose skin names a bumper (`Kicks`: `bumper`, `pinball`,
+`mushroom` in it) kicks the ball back faster than it came. A rail, a statue
+or a mole marked with a Bounce above 1 plays at `MaxBounce`, so no passive
+piece adds energy. What a zone does is in its fields (`Kind`, `Air`,
+`Capped`). A renderer has to be able to draw any
 field from the geometry alone and treat an unknown skin as the plain shape.
 Keep skins to short lower-case ids: they're lookup keys, and a client's table
 is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
@@ -556,19 +561,33 @@ is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
   and `Stadium` are gas budgets. The heaviest full-power tee shot on the
   course measured 45M gas.
 - **MaxWork.** `Step` counts what a stroke does as it goes, in `Shot.Work`,
-  units of about a thousand gas: a substep 700, a move 15, a wall or post a
-  move's broad phase looks at 6, a wall tested for a contact 200 and a post
-  300, a zone a move looks at 8 (twice: the zones, then the ground's checks)
-  and each polygon point 3, a zone that takes a square root (a loop's mouth,
-  capped wind) 200 more, and a wall a timed bar's push checks 20 a side.
-  Fitted on the GnoVM's gas and raised by about a third. A stroke that
-  reaches `MaxWork` (1e6) ends where the ball is; it is checked before each
-  timed bar's push, each move and each contact, so a stroke passes it by
-  `MaxWorkStep` (1e5) at most. That holds a hostile field (bumper walls
-  across the whole board, the steepest hill keeping the ball rolling on,
-  polygons under every move) to under 1e9 gas. The heaviest course stroke
-  found, a full shot in a storm's gusts on mountain/11's ice that rolls on
-  for 120 substeps, costs 0.57 of `MaxWork` (0.4e9 gas); a tee shot, 0.05.
+  units of about a thousand gas, wherever it does it: every zone the moves,
+  the rest checks and the roll-on checks look at (`ground`, `resistance`,
+  `rolls`, `climbs`, `overTheTop` and the zones where the ball stopped
+  included), every polygon edge and ellipse tested, every wall and post of
+  every sweep, every timed bar checked and pushed. The weights: a substep
+  700, a move 15, a timed bar checked 12, a wall or post a move's broad phase
+  looks at 18, a wall tested for a contact 200 and a post 300, a zone any
+  check looks at 20, and 25 more when its box holds the ball, a polygon edge
+  14 (each edge counted as if it straddled the ball, the worst case: a
+  64-point zigzag costs 0.86M gas a test), an ellipse 12, a push (a hill's or
+  the wind's) 50, a square root (a loop's mouth, capped wind) 200, and a wall
+  a timed bar's push checks 20 a side. Measured with probes that add one kind
+  of piece at a time to a rolling ball (the most any costs is 0.97K gas a
+  unit), then raised a little. A stroke that reaches `MaxWork` (1e6) ends
+  where the ball is; it is checked at each substep, after the timed bars'
+  pushes (every bar is pushed first, so the ball never ends inside one),
+  before each move and each contact, so a stroke passes it by `MaxWorkStep`
+  (2.25e5) at most: the most that goes between two checks, under any
+  weather on a Decode-limited field, is a roll-on check and every bar's push
+  (164K), then the looks at the zones where the ball stopped (44K). Hostile
+  holes at the format's limits (zigzag polygons as ice or as hills, rain and
+  storm over them, 40 timed bars, bumper walls across the board, loops and
+  tunnels) cost at most 1.44e9 for a whole Launch, the hole's decoding and
+  forecast included (see golf.md). The heaviest course stroke found by an
+  adversarial search (angle, power, tick, weather, start), a full shot in a
+  storm's gusts on mountain/11's ice that rolls on past its substeps, costs
+  0.69 of `MaxWork` (about 0.5e9 gas); a tee shot, 0.05.
 - **Steepest grade.** A hill's push is `G·sin θ`: `course.Decode` refuses a
   Slope whose `|Vec|` passes `G·MaxSin` (0.95, 72°). The course's steepest is
   0.35.

@@ -7,4 +7,4 @@ import (
 )
 
 // The hole's shots, pinned: see fingerprint.Of.
-func TestFingerprint(t *testing.T) { fingerprint.Check(t, me, "6e8bba18baa1658d") }
+func TestFingerprint(t *testing.T) { fingerprint.Check(t, me, "5c55efa15d70763b") }

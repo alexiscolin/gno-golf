@@ -220,7 +220,7 @@ func (f *Field) offsets() []offset {
 		} else {
 			lines(w.Seg, f.Radius, o)
 		}
-		o.bounce = orDefault(w.Bounce, f.Bounce)
+		o.bounce = bounceOf(w.Bounce, f.Bounce, w.Skin)
 		o.every, o.on, o.phase = w.Every, w.On, w.Phase
 	}
 	return offs

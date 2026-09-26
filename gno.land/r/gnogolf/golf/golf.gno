@@ -645,12 +645,13 @@ func shotList(shots string) []string {
 //     from the path alone (web/lib/adena.ts).
 //   - by its work: the fixed part and the set-up, then Shot.Work, what the
 //     physics counted the stroke doing (its substeps, moves, contacts tested,
-//     zones and polygon points looked at) in units of about a thousand gas.
-//     The physics ends a stroke at MaxWork, so this one bounds every shot,
-//     a hostile hole's too: fitted on the course shots (0.72 of it at the
-//     most) and on hostile probes at the format's limits (bumper walls across
-//     the whole board, the steepest hill rolling the ball on, 512 polygon
-//     points, loops and capped wind under every move: 0.92 at the most).
+//     every zone and polygon edge any check looks at) in units of at most
+//     about a thousand gas: 0.97K at the most on probes that add one kind of
+//     piece at a time, 0.72K to 0.78K on the heaviest course shots. The
+//     physics ends a stroke at MaxWork, so this one bounds every shot, a
+//     hostile hole's too (zigzag polygons as ice or hills, rain and storm
+//     over them, timed bars, bumper walls across the board: a Launch of
+//     1.44e9 at the most, decoding and forecast included).
 //
 // Before the first shot of a commit, the hole's own bound (shotBound, its
 // heaviest shot) must fit workBudget; before each later one, a commit that
@@ -673,7 +674,8 @@ type work struct {
 
 // The budget: of the 2e9 gas Adena lets a transaction simulate, 1.4e9 for the
 // shots, and the rest for one shot heavier than estimated, the forecast (up
-// to 0.17e9 measured, in the rain on the lane holes), decoding a data hole
+// to 0.17e9 measured in the rain on the lane holes, 0.55e9 on a hostile
+// hole's zigzag polygons and board-wide walls), decoding a data hole
 // (up to 0.07e9 at the format's limits), the package loads and the
 // bookkeeping.
 const (
@@ -682,7 +684,7 @@ const (
 	workPerWall  = 150000
 	workPerPoint = 1200000
 	workPerPiece = 15000
-	workPerUnit  = 1100
+	workPerUnit  = 1000
 )
 
 // maxShotGas is the most one shot of a hole may be estimated at: a hole

@@ -49,15 +49,14 @@ func TestTunnelMovesTheBallAndKeepsItRolling(t *testing.T) {
 	}
 }
 
-func TestHazardStopsTheBallAtItsTarget(t *testing.T) {
-	tee := Vec2{1, 1}
+func TestHazardSendsTheBallBack(t *testing.T) {
 	f := &Field{
-		Zones:    []Zone{{Kind: Hazard, Min: Vec2{4, 0}, Max: Vec2{6, 10}, Vec: tee}},
+		Zones:    []Zone{{Kind: Hazard, Min: Vec2{4, 0}, Max: Vec2{6, 10}, Vec: Vec2{1, 1}}},
 		Friction: 1,
 	}
 	sh := f.Step(Vec2{1, 5}, Vec2{2, 0}, 6)
-	if sh.Rest() != tee {
-		t.Fatalf("water should send the ball back to %v, got %v", tee, sh.Rest())
+	if sh.Rest() != (Vec2{1, 5}) {
+		t.Fatalf("water should send the ball back to where it was played from, got %v", sh.Rest())
 	}
 }
 
@@ -188,8 +187,8 @@ func TestBallThatStopsInWaterIsResolved(t *testing.T) {
 		Zones:    []Zone{{Kind: Hazard, Min: Vec2{5, 0}, Max: Vec2{30, 16}, Vec: Vec2{1, 1}}},
 		Friction: 0.5,
 	}
-	if r := f.Step(Vec2{2, 8}, Vec2{4, 0}, 30).Rest(); r.X != 1 || r.Y != 1 {
-		t.Fatalf("resting in the water, the ball should be back at the hazard's target, not %v", r)
+	if r := f.Step(Vec2{2, 8}, Vec2{4, 0}, 30).Rest(); r != (Vec2{2, 8}) {
+		t.Fatalf("resting in the water, the ball should be back where it was played from, not %v", r)
 	}
 }
 
@@ -239,7 +238,7 @@ func TestFastBallFliesOverThePondBehindAHill(t *testing.T) {
 func TestSlowBallOverTheTopLandsInThePond(t *testing.T) {
 	sh := hillAndPond().Step(Vec2{2, 4}, Vec2{3.6, 0}, 30)
 	// too slow at the top to take off: it rolls over it into the water
-	if sh.Rest() != (Vec2{1, 4}) {
+	if sh.Rest() != (Vec2{2, 4}) {
 		t.Fatalf("it should drown and go back, rested at %v; path %v", sh.Rest(), sh.Path)
 	}
 }
@@ -568,8 +567,8 @@ func TestABallAtRestUnderATimedHazardMeetsIt(t *testing.T) {
 	ice := Zone{Kind: Hazard, Min: V(20, 0), Max: V(30, 10), Vec: V(3, 5), Every: 12, On: 4, Phase: 5}
 	f := &Field{Walls: Box(V(0, 0), V(60, 10)), Zones: []Zone{ice}, Friction: 0.86, Radius: 0.5}
 	for tick := 0; tick < 12; tick++ {
-		if s := WithTick(f, tick).Step(V(24, 5), Vec2{}, 1); s.Rest() != V(3, 5) {
-			t.Fatalf("tick %d: a ball at rest under the ice stayed at %v", tick, s.Rest())
+		if s := WithTick(f, tick).Step(V(24, 5), Vec2{}, 1); s.Rest() != V(24, 5) || len(s.Path) != 2 {
+			t.Fatalf("tick %d: a ball at rest under the ice was not caught: %v", tick, s.Path)
 		}
 	}
 }

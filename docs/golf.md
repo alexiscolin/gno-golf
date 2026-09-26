@@ -95,7 +95,8 @@ ids. `data/holes.txt` maps each slot to the realm its data was built from.
 - **A round** has at most 60 strokes, then it must be `Reset`.
 - **A ball off the board**: a stroke whose ball comes to rest outside the
   hole's board (a leak in its walls) brings it back to where the stroke
-  started. The stroke counts, as a hazard's does, with no penalty. Play,
+  started, as a hazard does (water, the sea, a fall off a roof: back to
+  where the stroke was played from). The stroke counts, with no penalty. Play,
   every simulation and the replayed last shot (whose path ends with that
   point) agree.
 - **Mode**: `"assisted"` (or `""`) or `"pro"`. Anything else panics. Each mode
@@ -637,19 +638,18 @@ namespace.
 A commit's gas is mostly the physics, and a heavy hole can't replay 12 full
 shots in one transaction. The physics counts what a stroke does as it goes,
 `Shot.Work`: its substeps, moves, the walls and posts each move is swept
-against and tested, and the zones and polygon points it looks at, in units of
-about a thousand gas; and it ends a stroke once that reaches
-`physics.MaxWork` (1e6), so no hole, however hostile, has a shot a
-transaction can't finish. A commit's estimate of its work is, per shot,
-`10M + 150K × walls + 1100 × Shot.Work` (walls: the hole's and its pulses').
-Fitted on the 592 full-power shots of the 74 course holes (the most any took
-of its estimate is 0.72; the heaviest measured 45M) and on hostile probes at
-the format's limits (bumper walls across the whole board, the steepest hill
-rolling a ball on for all its extra substeps, 512 polygon points, loops and
-capped wind under every move: 0.92 at the most).
+against and tested, every zone any check looks at and every polygon edge it
+tests, in units of about a thousand gas (see physics.md, MaxWork); and it
+ends a stroke once that reaches `physics.MaxWork` (1e6), so no hole, however
+hostile, has a shot a transaction can't finish. A commit's estimate of its
+work is, per shot, the larger of `10M + 150K × walls + points × (1.2M + 15K ×
+pieces)` (by its path) and `10M + 150K × walls + 1000 × Shot.Work` (by its
+work; walls: the hole's and its pulses'). The weights are measured so that a
+unit costs at most about 0.97K gas; a course shot runs at 0.72K to 0.78K a
+unit.
 
-A hole's heaviest shot is bounded: `shotBound = 10M + 150K × walls + 1100 ×
-(MaxWork + MaxWorkStep)`, 1.22e9 to 1.24e9 for the course holes. A hole whose
+A hole's heaviest shot is bounded: `shotBound = 10M + 150K × walls + 1000 ×
+(MaxWork + MaxWorkStep)`, 1.24e9 to 1.26e9 for the course holes. A hole whose
 bound passes 1.3e9 is refused when it is published, and before the first
 shot of a commit the bound must fit the 1.4e9 budget. Before each later shot,
 a commit that would pass 1.4e9 with one more shot as heavy as its heaviest so
@@ -658,9 +658,24 @@ far is refused:
 first N, then the rest`. `SimulateRound*` and `SimulateCommit` refuse the same
 list the same way, so a client learns it before it signs. The rest of the 2e9
 a wallet lets a transaction simulate is left for the forecast, decoding a data
-hole, the package loads and the bookkeeping. The heaviest single shot the
-probes found (`z_worst_shot_filetest`) is a Launch of 0.92e9, the hole's
-decoding and forecast included.
+hole, the package loads and the bookkeeping.
+
+The heaviest Launches the probes found (`z_worst_shot*_filetest`), the hole's
+decoding and forecast included, at the format's limits:
+
+| Probe | Launch |
+|---|---|
+| 8 zigzag ice polygons (64 points, every edge across the ball) under 23 more ice zones, a board-wide hill, bumper walls, in the rain (the ice doubled) | 1.27e9 |
+| the same in a storm (4 more board-wide zones) | 1.25e9 |
+| 8 zigzag polygons as hills (the ground, scanned several times a substep), in a storm | 0.99e9 |
+| 160 bumper walls across the board, 8 zigzag ice polygons, a hill, in the rain: the forecast alone (60 puddle tries over them) is 0.5e9 to 0.55e9, by the period's rain | 1.39e9 to 1.44e9 |
+| 38 timed bars (the ball pushed out of each as it comes back), in the rain | 0.69e9 |
+| 30 loop mouths rolled across, a storm's gusts | 0.59e9 |
+| 15 tunnels and 8 zigzag polygons, in the rain | 1.02e9 |
+
+A commit of many cheap shots on a hostile hole can still come near the 2e9:
+the shots take up to their 1.4e9 budget, and that hole's forecast up to
+0.55e9 on top.
 
 ## Gas and storage
 
