@@ -27,9 +27,26 @@ interface Flight {
 }
 
 export const MS_PER_STEP = 72; // one path segment is one substep: a constant slice of time
-// how fast the ball may cross the screen, in board units per second: a long
-// substep is stretched to this instead of flashing past the elastic
+// the speed the engine's safety net budgets a replay at (board units a second)
 export const SHOW_SPEED = 26;
+// How fast the ball crosses the screen, in board units a second, for a chain
+// speed of v: its own up to SHOW_FROM, then eased (v0 + k·ln(1 + (v − v0)/k)),
+// so a fast shot stays watchable and a faster step is always drawn faster —
+// never a hard cap, under which a slower step could look quicker.
+const SHOW_FROM = 16, SHOW_EASE = 12;
+/** The time, in ms, one substep that runs d board units takes on screen. */
+function showMs(d: number) {
+  const v = (d / MS_PER_STEP) * 1000;
+  const s = v <= SHOW_FROM ? v : SHOW_FROM + SHOW_EASE * Math.log(1 + (v - SHOW_FROM) / SHOW_EASE);
+  return s > 0 ? Math.max(MS_PER_STEP, (d / s) * 1000) : MS_PER_STEP;
+}
+/** A ray from p along unit u, and the point on it a run of d away from p by way of q: the ellipse of foci p, q. */
+function viaEllipse(p: Vec2, u: Vec2, q: Vec2, d: number): Vec2 | null {
+  const rx = q[0] - p[0], ry = q[1] - p[1], r2 = rx * rx + ry * ry, ru = rx * u[0] + ry * u[1];
+  if (d * d <= r2 + 1e-6 || d - ru < 1e-6) return null;
+  const a = (d * d - r2) / (2 * (d - ru));
+  return [p[0] + u[0] * a, p[1] + u[1] * a];
+}
 // what it rolls over sounds like what it is
 const SURFACE_SOUNDS: Readonly<Record<string, string | undefined>> = { sand: "sand", wetsand: "sand", ice: "ice", puddle: "puddle", flowerbed: "flowers" };
 
@@ -403,12 +420,54 @@ export function makeReplay(E: Live) {
     return at;
   }
 
+  /** Where each bounce hit, a step's corner (null: none, or none to be found).
+   *  The chain records one point a substep, so a substep that hits a rail
+   *  ends past it: drawn as the chord, it cuts the corner and looks slow, and
+   *  the step after looks fast. The corner is where the line in (from the
+   *  step before, or its own corner) meets the line out (the step after); a
+   *  head-on hit, the two lines near parallel, is placed on the line in at
+   *  the run the speeds either side give. */
+  function cornersOf(path: readonly Vec2[], why: string, flights: ReturnType<typeof flightsOf> | null) {
+    const out: (Vec2 | null)[] = [];
+    const run = (j: number) => { const c = out[j], a = path[j], b = path[j + 1]; return c ? Math.hypot(c[0] - a[0], c[1] - a[1]) + Math.hypot(b[0] - c[0], b[1] - c[1]) : Math.hypot(b[0] - a[0], b[1] - a[1]); };
+    const jumps = (j: number) => j >= 0 && j + 1 < path.length && !!jumpFrom(path[j], path[j + 1], path[0]);
+    for (let i = 0; i + 1 < path.length; i++) {
+      out.push(null);
+      if (why.length !== path.length || why[i + 1] !== "b" || i === 0 || (flights && (flights.has(i) || flights.has(i - 1))) || jumps(i - 1) || jumps(i) || jumps(i + 1)) continue;
+      const p = path[i], q = path[i + 1], o = out[i - 1] || path[i - 1];
+      let ux = p[0] - o[0], uy = p[1] - o[1];
+      const ul = Math.hypot(ux, uy);
+      if (ul < 1e-3) continue;
+      (ux /= ul), (uy /= ul);
+      // the speed out: the first step after it that hits nothing (a bounce's
+      // own chord cuts its corner), no faster than a step before it
+      let j = i + 1;
+      while (j + 1 < path.length && why[j + 1] === "b") j++;
+      const chord = (k: number) => (k + 1 < path.length ? Math.hypot(path[k + 1][0] - path[k][0], path[k + 1][1] - path[k][1]) : 0);
+      const vin = run(i - 1), vout = chord(j);
+      const rx = q[0] - p[0], ry = q[1] - p[1], len = Math.hypot(rx, ry);
+      let c: Vec2 | null = null;
+      if (j === i + 1 && vout > 1e-3) {
+        const wx = (path[i + 2][0] - q[0]) / vout, wy = (path[i + 2][1] - q[1]) / vout;
+        const x = ux * wy - uy * wx;
+        if (Math.abs(x) > 0.25) {
+          const a = (rx * wy - ry * wx) / x, b = (ux * ry - uy * rx) / x;
+          // a run between the speeds either side (a bumper's out faster), a little over
+          if (a >= 0 && b >= 0 && a + b >= 0.9 * Math.min(vin, vout) && a + b <= 1.1 * Math.max(vin, vout) + 0.05) c = [p[0] + ux * a, p[1] + uy * a];
+        }
+      }
+      out[i] = c || viaEllipse(p, [ux, uy], q, Math.max(len, (vin + vout) / 2));
+    }
+    return out;
+  }
+
   function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "") {
     const cutAt = E.cut;
     const path = path0.slice();
     const round = g.round;
     // without flags (an older realm) the heights are guessed from the ground
     const flights = flags.length === path.length ? flightsOf(path, flags) : null;
+    const corners = cornersOf(path, why, flights);
     return new Promise<void>((settle) => {
       // a frame that throws ends the replay (the shot's finally puts things right)
       const done = () => settle();
@@ -464,7 +523,8 @@ export function makeReplay(E: Live) {
         // a bounce: a knock off timber, a boing off a mushroom. The chain marks
         // every one ("b"), glancing and slow ones too; an older realm says
         // nothing, and a sharp turn in the path stands in for it
-        if (i > 0) {
+        // (a step drawn through its corner knocks there, not after it)
+        if (i > 0 && !corners[i - 1]) {
           const ax = path[i][0] - path[i - 1][0], ay = path[i][1] - path[i - 1][1], l0 = Math.hypot(ax, ay);
           const cos = l0 > 0.15 && len > 0.15 ? (ax * (path[i + 1][0] - path[i][0]) + ay * (path[i + 1][1] - path[i][1])) / (l0 * len) : 1;
           const marked = typeof why === "string" && why.length === path.length;
@@ -474,7 +534,13 @@ export function makeReplay(E: Live) {
             sound(post ? "boing" : "knock", Math.max(0.2, Math.min(1, Math.max(l0, len) / 2)));
           }
         }
-        const ms = drop ? 320 : Math.max(MS_PER_STEP, (len / SHOW_SPEED) * 1000);
+        // a bounce's step runs through where it hit: in, then out, at the one speed of its run
+        const corner = !drop && corners[i];
+        const via = corner ? lift(corner) : null;
+        const reach = corner ? Math.hypot(corner[0] - path[i][0], corner[1] - path[i][1]) : 0;
+        const run = corner ? reach + Math.hypot(path[i + 1][0] - corner[0], path[i + 1][1] - corner[1]) : len;
+        let knocked = false;
+        const ms = drop ? 320 : showMs(run);
         // a roll-back at a tube's mouth: the ball climbs part way into it and
         // slides back down before the path goes on (once per point)
         const back = !jump && i > 0 && rolledBack !== i && rollBackAt(path, i);
@@ -526,7 +592,16 @@ export function makeReplay(E: Live) {
           // the pieces where the chain had them: the release tick, plus the step
           E.showAt((g.tick0 || 0) + i + raw);
           const k = drop ? 1 - Math.pow(1 - raw, 2) : raw;
-          E.ball.position.lerpVectors(from, to, k);
+          if (via) {
+            const d = k * run;
+            if (d < reach) E.ball.position.lerpVectors(from, via, d / reach);
+            else E.ball.position.lerpVectors(via, to, run > reach ? (d - reach) / (run - reach) : 1);
+            if (d >= reach && !knocked && corner) {
+              knocked = true;
+              const post = s.posts.some((p) => Math.hypot(p.c[0] - corner[0], p.c[1] - corner[1]) < p.r + 1.2);
+              sound(post ? "boing" : "knock", Math.max(0.2, Math.min(1, run / 2)));
+            }
+          } else E.ball.position.lerpVectors(from, to, k);
           if (!jump && !drop) {
             const fl = flights && flights.get(i);
             if (fl) {
