@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ISLAND } from "./common";
 import type { LitScene } from "./data";
-import type { Board } from "../types";
+import type { Board, HoleState } from "../types";
 
 /** The screen the camera frames: its size in CSS pixels, and what the HUD covers of it. */
 export interface View {
@@ -78,6 +78,22 @@ export function setLighting(scene: LitScene, time: string) {
  *  it. The island may run off the edges; the green is what the player needs. */
 export const courseBox = (board: Board) =>
   new THREE.Box3(new THREE.Vector3(-1.5, -1, -1.5), new THREE.Vector3(board.w + 1.5, 1.5, board.h + 1.5));
+
+/** What the Far view frames: the lane itself (its rails, pieces, tee and
+ *  cup), not the whole board, which a narrow or an L-shaped lane fills only
+ *  in part, with the same margin. */
+export function laneBox(s: Pick<HoleState, "board" | "walls" | "posts" | "zones" | "start" | "cup">) {
+  const b = new THREE.Box3(), p = new THREE.Vector3();
+  const add = (x: number, z: number) => b.expandByPoint(p.set(Math.min(Math.max(x, 0), s.board.w), 0, Math.min(Math.max(z, 0), s.board.h)));
+  for (const w of s.walls) add(w.a[0], w.a[1]), add(w.b[0], w.b[1]);
+  for (const q of s.posts) add(q.c[0] - q.r, q.c[1] - q.r), add(q.c[0] + q.r, q.c[1] + q.r);
+  for (const z of s.zones) add(z.min[0], z.min[1]), add(z.max[0], z.max[1]);
+  add(s.start[0], s.start[1]), add(s.cup[0], s.cup[1]);
+  if (b.isEmpty()) return courseBox(s.board);
+  b.min.set(b.min.x - 1.5, -1, b.min.z - 1.5);
+  b.max.set(b.max.x + 1.5, 1.5, b.max.z + 1.5);
+  return b;
+}
 
 /** Where the island sits in the world. */
 export const islandBox = (board: Board) =>

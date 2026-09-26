@@ -19,7 +19,7 @@ import { makeChain, shotOf, pullShot, RULES } from "./chain";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
-  courseBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
+  courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene";
 import { BALL_R } from "./terrain";
 import { makeCamera } from "./engine/camera";
@@ -313,7 +313,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!g.s) return;
     g.over = overviewRig(camera, courseBox(g.s.board), screen());
     // the Far camera: the whole hole with a margin, room left for the mouse orbit
-    g.far = farRig(camera, courseBox(g.s.board), screen());
+    g.far = farRig(camera, laneBox(g.s), screen());
     if (!g.rig) g.rig = { ...g.over, target: g.over.target.clone() };
   }
 
