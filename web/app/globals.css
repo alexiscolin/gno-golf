@@ -284,6 +284,12 @@ html, body {
   border-bottom: 2px dashed rgba(var(--ink-rgb), .25);
 }
 
+.drawer__tools { display: flex; gap: 8px; align-items: center; }
+/* in the menu: the switch's note at the right of its label, the switch under both */
+.drawer__settings .aimset { grid-template-columns: auto 1fr; align-items: baseline; }
+.drawer__settings .aimset > .seg { grid-column: 1 / -1; grid-row: 2; }
+.drawer__settings .aimset__help { grid-column: 2; grid-row: 1; justify-self: end; text-align: right; }
+
 .drawer__head h2 {
   margin: 0;
   font-size: 24px;
@@ -2047,9 +2053,10 @@ button:focus-visible, a:focus-visible {
 .btn.gnokey__copy:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 
 /* about: how it works, what is in it, where to go next, who made it */
-.title__about { position: absolute; top: 34px; right: 34px; z-index: 3; background: var(--paper); display: grid; place-items: center; padding: 0; }
-.title__about svg { display: block; }
-@media (max-width: 600px) { .title__about { top: 18px; right: 18px; } }
+/* the about button: the back button's twin, top right, over every front screen */
+.screen__about { position: fixed; top: 34px; right: 34px; z-index: 6; background: var(--paper); }
+.screen__about svg { display: block; }
+@media (max-width: 600px) { .screen__about { top: 30px; right: 30px; } }
 .about { position: relative; max-width: 620px; width: 100%; max-height: calc(100dvh - 40px); overflow-y: auto; text-align: left; }
 .about h2 { margin: 2px 0 6px; font-size: 34px; }
 .about__lead { margin: 0 0 18px; font-size: 15px; line-height: 1.5; color: var(--ink); max-width: 46ch; }

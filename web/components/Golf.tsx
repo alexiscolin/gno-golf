@@ -900,7 +900,12 @@ export default function Golf() {
                       </button>
                     );
                   })()}
-                  <SheetClose onClose={() => setMenu(false)} inline />
+                  <div className="drawer__tools">
+                    <button className="round round--small round--x" aria-label="About Gnogolf" title="About" onClick={() => { setMenu(false); setAbout(true); }}>
+                      <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+                    </button>
+                    <SheetClose onClose={() => setMenu(false)} inline />
+                  </div>
                 </div>
                 <section className="drawer__me">
                   <div className="me__stats">
@@ -915,7 +920,6 @@ export default function Golf() {
                     <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}>The cup</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("pick"); }}>Change gnome</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("title"); }}>Main menu</Button>
-                    <Button variant="secondary" onClick={() => { setMenu(false); setAbout(true); }}>About</Button>
                     {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
@@ -925,7 +929,6 @@ export default function Golf() {
                   <div className="aimset">
                     <span className="aimset__label">Graphics</span>
                     <Segmented label="Graphics" value={gfx} full options={[["auto", "Auto"], ["high", "High"], ["low", "Low"]]} onChange={(m) => (sound("blip"), setGfx(m))} />
-                    <small className="aimset__help">{gfx === "auto" ? `Set by this device · ${s.tier === "low" ? "low" : "high"} now` : gfx === "low" ? "Lighter: fewer pixels and effects" : "The full look"}</small>
                   </div>
                   {([["sound", "Sound"], ["vibe", "Vibration"]] as const).map(([k, label]) => (
                     <Toggle key={k} label={label} checked={prefs[k]} onChange={() => toggle(k)} />

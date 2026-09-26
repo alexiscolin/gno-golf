@@ -155,13 +155,16 @@ function frameOf(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: Pick<Vi
 }
 
 /** The Far view's mouse orbit at its widest: this much yaw, this much tilt either way. */
-export const ORBIT = { yaw: (6 * Math.PI) / 180, tilt: 0.35 };
+export const ORBIT = { yaw: (24 * Math.PI) / 180, tilt: 0.35 };
+/** How far back the Far view may stand, times its framing, to leave the orbit its room. */
+const FAR_BACK = 1.25;
 
 /**
  * The Far view: the whole hole with a margin round it, a little lower than
  * the overview (a 3/4 view), and `orbit`, the share of ORBIT the mouse may
- * swing it with the whole box still inside the free part of the screen — the
- * margin is what leaves it the room.
+ * swing it with the whole box still inside the free part of the screen. It
+ * stands back as far as the full orbit needs (FAR_BACK at most), then gives
+ * up orbit rather than distance.
  */
 export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: View): Rig & { orbit: number; tilt: number } {
   const rig = overviewRig(camera, box, view, { fill: 0.86, tilt: 0.5 });
@@ -174,6 +177,19 @@ export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: V
       const r = frameOf(camera, box, view, t);
       return r.x0 >= side - 0.5 && r.x1 <= w - side + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
     });
+  const d0 = rig.dist;
+  if (!fits(1)) {
+    let near = 1, far = FAR_BACK;
+    t.dist = d0 * far;
+    if (fits(1)) {
+      for (let i = 0; i < 12; i++) {
+        const mid = (near + far) / 2;
+        t.dist = d0 * mid;
+        if (fits(1)) far = mid; else near = mid;
+      }
+    }
+    rig.dist = t.dist = d0 * far;
+  }
   let lo = 0, hi = 1;
   if (fits(1)) lo = 1;
   else for (let i = 0; i < 12; i++) {
