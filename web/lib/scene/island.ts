@@ -2141,8 +2141,7 @@ export function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Dressed
   }
   if (kind === "zone") {
     const zone = item as Dressed;
-    if (k === "wetsand") return footprint(zone, t, flatTop(P.wet));
-    if (k === "sand") return footprint(zone, t, flatTop(P.sand));
+    // (sand on the lane is the shared natural patch on its dish: zones.ts)
     // (a rock pool and a lagoon on the lane are sunk into it, as every
     // water is: the shared pond draws them, with their banks and rocks)
     const [mx, mz] = [(zone.min[0] + zone.max[0]) / 2, (zone.min[1] + zone.max[1]) / 2];
