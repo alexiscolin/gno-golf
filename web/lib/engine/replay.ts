@@ -285,17 +285,17 @@ export function makeReplay(E: Live) {
    *  hazard's destination. 1.4 s in all: long enough to feel the loss. */
   // skin: the hazard's — a serac (mountain) catches the ball in falling ice:
   // no water there, so no rings and no splash, a burst of ice shards instead
-  /** Just past the edge of zone z a ball crossed on its way from p (the last
-   *  point on the lane) to q: the crossing found by halving, a little beyond it. */
-  function offEdge(z: Zone, p: Vec2, q: Vec2, from: THREE.Vector3) {
-    let lo = 0, hi = 1;
-    for (let k = 0; k < 12; k++) {
-      const m = (lo + hi) / 2;
-      if (inZone(z, p[0] + (q[0] - p[0]) * m, p[1] + (q[1] - p[1]) * m)) hi = m;
-      else lo = m;
+  /** Just past the edge of zone z a ball left the lane at p (the last point
+   *  on it; prev the one before): the nearest point of the zone's outline, a
+   *  little beyond it, or along its way when the zone has no outline. (The
+   *  path's next point is where the hazard sends it back, not where it fell.) */
+  function offEdge(z: Zone, prev: Vec2, p: Vec2, from: THREE.Vector3) {
+    if (z.poly) {
+      const e = nearestOnPoly(p[0], p[1], z.poly), dx = e[0] - p[0], dz = e[1] - p[1], l = Math.hypot(dx, dz);
+      if (l > 1e-3) return from.clone().set(e[0] + (dx / l) * 0.3, from.y, e[1] + (dz / l) * 0.3);
     }
-    const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1, u = Math.min(1, hi + 0.3 / l);
-    return from.clone().set(p[0] + (q[0] - p[0]) * u, from.y, p[1] + (q[1] - p[1]) * u);
+    const dx = p[0] - prev[0], dz = p[1] - prev[1], l = Math.hypot(dx, dz) || 1;
+    return from.clone().set(p[0] + (dx / l) * 0.6, from.y, p[1] + (dz / l) * 0.6);
   }
 
   function splashDown(at: THREE.Vector3, back: THREE.Vector3, round: number | undefined, edge: THREE.Vector3 | null = null, skin = "") {
@@ -466,7 +466,7 @@ export function makeReplay(E: Live) {
           const hz = jumpFrom(path[i], path[i + 1]);
           // off a rooftop: it drops into the street just past the edge it left
           // from, not well inside the hazard as into water
-          const at = hz && hz.skin === "roof" ? offEdge(hz, path[i], path[i + 1], from) : sinkPoint(path[i], path[i + 1], from);
+          const at = hz && hz.skin === "roof" ? offEdge(hz, path[Math.max(0, i - 1)], path[i], from) : sinkPoint(path[i], path[i + 1], from);
           return void splashDown(at, to, round, E.ball.position.clone(), hz ? hz.skin : "").then(() => {
             E.mood.shake(performance.now());
             air.t = 0;
