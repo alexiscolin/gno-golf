@@ -151,6 +151,30 @@ function Diorama({ id, on }: { id: Cup; on: boolean }) {
   );
 }
 
+/** A won cup's badge on its diorama: its total and its score against par, a
+ *  gold trophy at par or under, a silver medal over it. */
+function Won({ clean, score }: { clean: boolean; score: string }) {
+  return (
+    <span className={"world__won world__won--" + (clean ? "gold" : "silver")} aria-hidden="true">
+      {clean ? (
+        <svg viewBox="0 0 40 40">
+          <path d="M11 9 H5 Q5 18 12 18 M29 9 H35 Q35 18 28 18" className="won__ink" />
+          <path d="M10 5 H30 V13 Q30 24 20 24 Q10 24 10 13 Z" className="won__cup" />
+          <path d="M17 24 H23 V29 H17 Z M12 35 Q12 29 20 29 Q28 29 28 35 Z" className="won__cup" />
+          <path d="M15 9 V14" className="won__shine" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 40 40">
+          <path d="M12 3 L20 17 L28 3 H22 L20 7 L18 3 Z" className="won__ribbon" />
+          <circle cx="20" cy="25" r="11" className="won__medal" />
+          <path d="M20 19 L21.8 23 L26 23.4 L22.8 26 L23.8 30 L20 27.8 L16.2 30 L17.2 26 L14 23.4 L18.2 23 Z" className="won__star" />
+        </svg>
+      )}
+      <span>{score}</span>
+    </span>
+  );
+}
+
 interface WorldsProps {
   counts?: Record<string, number>;
   /** where the player stands in each cup (cupTotals) */
@@ -211,7 +235,8 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             const n = counts[w.id] || 0;
             // where the player stands in it: holes done, and strokes against par
             const t = stats[w.id] || NOT_PLAYED;
-            const vs = t.strokes - t.par;
+            const vs = t.strokes - t.par, won = n > 0 && t.done >= n;
+            const score = `${t.strokes} · ${vs > 0 ? "+" : vs < 0 ? "−" : "±"}${Math.abs(vs)}`;
             return (
               <li key={w.id}>
                 <button
@@ -223,9 +248,10 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                   onPointerLeave={() => setHot(null)}
                   onFocus={() => n && setHot(w.id)}
                   onBlur={() => setHot(null)}
-                  aria-label={`${w.name}: ${n ? `${n} holes` + (t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
+                  aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
                 >
                   <Diorama id={w.id} on={hot === w.id && n > 0} />
+                  {won && <Won clean={t.clean} score={score} />}
                   <span className="world__ribbon">{w.name}</span>
                   <span className="world__info">
                   <span className="world__tag">{w.tag}</span>

@@ -1,6 +1,6 @@
 /* The front screens: the title, the cups, the gnome picker and a cup won,
-   one look: a calm sky-to-fairway fade with halftone dots rising from the
-   foot, and the style on the cards: glossy inked frames, paper panels, gold
+   one look: a calm fade in the world's colours under even halftone dots,
+   the inked frame round the screen, and the style on the cards: glossy inked frames, paper panels, gold
    for the call to action, and everything
    moving a transform or an opacity: the compositor's work, not the page's.
    The live scene behind the title is lib/scene/title.ts. */
@@ -8,19 +8,21 @@
 /* ------------------------------------------------------------ the system */
 
 /* the backdrop's two colours, registered so a new world's cross-fades in */
-@property --s0 { syntax: "<color>"; inherits: true; initial-value: #9fd3ef; }
-@property --s1 { syntax: "<color>"; inherits: true; initial-value: #d7ecd9; }
+@property --s0 { syntax: "<color>"; inherits: true; initial-value: #86c8ee; }
+@property --s1 { syntax: "<color>"; inherits: true; initial-value: #bfe2a8; }
 
 /* the tokens, the garden's by default; a world's tint over them (.tint--<world>,
    and the title's and the cup won's own classes). The colours are the
-   course's day skies (globals.css .sky--day.sky--w-*) fading to a pale
-   fairway (lib/scene/materials.ts C.moss), each world's a light tint. */
+   worlds' own: the garden's sky into fairway green, the island's turquoise
+   into sand, the town's lilac dusk into cream, the mountain's ice into snow. */
 .screen--title, .front, .victory, .tint--garden {
   /* the sky, top to horizon; a card's frame, light to deep; a diorama's sky */
-  --s0: #9fd3ef; --s1: #d7ecd9;
+  --s0: #86c8ee; --s1: #bfe2a8;
   --c1: #7fe8a8; --c2: #1f9a6a;
+  --stage: #d3e8c8; /* the picker's card behind the gnome: a flat, muted colour of the world */
   --art: linear-gradient(180deg, #7ec8ff, #ffd6a8);
   --sky: linear-gradient(180deg, var(--s0), var(--s1));
+  --dots: radial-gradient(circle, rgba(255, 255, 255, .38) 1.7px, transparent 2.1px) 0 0 / 14px 14px;
   --gold: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%);
   --glow: #ffe066;
   /* type: a display heading, a card's name, a pill's label */
@@ -41,35 +43,36 @@
   --t-press: .08s;
 }
 .tsky--island, .tint--island, .victory--island {
-  --s0: #93d6ef; --s1: #d9f1ea;
-  --c1: #7fe0f7; --c2: #1a86d0;
+  --s0: #56cfdc; --s1: #f3dcaa;
+  --c1: #7fe0f7; --c2: #1a86d0; --stage: #f1e2c2;
   --art: linear-gradient(180deg, #54b8f5, #b8ecff 70%, #ffe2a8);
 }
 .tsky--town, .tint--town, .victory--town {
-  --s0: #a9c9ea; --s1: #efe4d6;
-  --c1: #ffa3c6; --c2: #cf3f7c;
+  --s0: #b3a3da; --s1: #f8e5cc;
+  --c1: #ffa3c6; --c2: #cf3f7c; --stage: #eee0d6;
   --art: linear-gradient(180deg, #6b4bc8, #ff8fb0 60%, #ffcf8a);
 }
 .tsky--mountain, .tint--mountain, .victory--mountain {
-  --s0: #a9c4e8; --s1: #e6eef4;
-  --c1: #b8c9ff; --c2: #5569db;
+  --s0: #9ccbee; --s1: #f6fafc;
+  --c1: #b8c9ff; --c2: #5569db; --stage: #e4edf3;
   --art: linear-gradient(180deg, #4d74e0, #bcd2ff 65%, #ffe0c0);
 }
 .front, .screen--title { transition: --s0 .45s, --s1 .45s; }
 
-/* the backdrop: the fade, and a halftone rising from the foot */
+/* the backdrop: the world's fade under an even halftone (::before), and the
+   game's first frame round the screen (::after: globals.css .screen__frame) */
 .front { background: var(--s0); overflow: auto; }
-.front::before, .front::after, .victory::before, .victory::after { content: ""; position: fixed; inset: 0; pointer-events: none; }
-.front::before, .victory::before { background: var(--sky); }
-.front::after, .victory::after, .title__sky::after {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, .5) 1.7px, transparent 2.1px);
-  background-size: 14px 14px;
-  -webkit-mask-image: linear-gradient(to top, #000 8%, transparent 42%);
-  mask-image: linear-gradient(to top, #000 8%, transparent 42%);
+.front::before, .victory::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: var(--dots), var(--sky); }
+.title__sky { background: var(--dots), var(--sky); }
+.front::after, .victory::after, .screen--title::after {
+  content: ""; position: fixed; inset: 16px; pointer-events: none;
+  border: 3px solid var(--green); border-radius: 10px;
 }
-.title__sky::after { content: ""; position: absolute; inset: 0; }
 .front > * { position: relative; z-index: 1; }
 .front > .screen__back { position: absolute; z-index: 2; }
+@media (max-width: 600px) { .front::after, .victory::after, .screen--title::after { inset: 8px; border-width: 2.5px; } }
+/* the title's film and live scene stay as they are: the frame is its still's only */
+.screen--title:has(.title__film:not(.title__film--off))::after, .screen--title:has(.title__stage--on)::after { display: none; }
 /* no shape behind the logo: the cards carry the style */
 .title__sun { display: none; }
 
@@ -118,7 +121,6 @@
 .screen--title.screen--ready { cursor: pointer; }
 /* the sky: the front's own, per world (the scene's is clear) */
 .title__sky, .title__still, .title__stage { position: absolute; inset: 0; }
-.title__sky { background: var(--sky); }
 .title__still img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .title__still--off { opacity: 0; transition: opacity .6s .3s; }
 .title__stage { opacity: 0; transition: opacity .5s; }
@@ -143,7 +145,7 @@
 .title__logo { position: relative; display: grid; place-items: center; }
 .screen--title .title__art {
   position: relative;
-  width: min(620px, 88vw, 50vh);
+  width: min(800px, 92vw, 62vh);
   margin-bottom: -4px;
   filter: drop-shadow(5px 0 0 var(--paper)) drop-shadow(-5px 0 0 var(--paper)) drop-shadow(0 5px 0 var(--paper)) drop-shadow(0 -5px 0 var(--paper))
     drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 3px 0 #0e3027) drop-shadow(0 18px 24px rgba(20, 10, 60, .45));
@@ -186,7 +188,7 @@
    screen left to the gnomes on the green */
 @media (max-aspect-ratio: 1/1) {
   .screen--title { align-content: start; padding-top: clamp(16px, 4vh, 40px); padding-bottom: 22vh; }
-  .screen--title .title__art { width: min(80vw, 34vh); }
+  .screen--title .title__art { width: min(94vw, 42vh); }
   .screen--title .title__facts { margin-top: 14px; gap: 8px; }
 }
 @media (max-width: 600px) {
@@ -232,6 +234,35 @@
 }
 .world__info { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 8px 6px 6px; }
 .worlds--v2 .world__tag { min-height: 2.6em; color: var(--ink-soft); }
+/* the standing reads first, the green under it supports it */
+.worlds--v2 .world__count { font-size: 14px; }
+.worlds--v2 .world__score { font-size: 15px; }
+.worlds--v2 .world__track { padding: 2px 8% 0; }
+
+/* a won cup: its badge on the diorama's corner, over the clip too; gold at
+   par or under, silver over it; a shine across it on hover */
+.world__won {
+  position: absolute; z-index: 4; top: 14px; right: 14px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden;
+  padding: 3px 12px 3px 4px; border: 2.5px solid var(--ink); border-radius: 999px; box-shadow: 0 3px 0 var(--ink);
+  font-size: 15px; font-weight: 800; color: var(--ink); white-space: nowrap;
+  transform: rotate(4deg);
+}
+.world__won svg { width: 34px; height: 34px; flex: none; }
+.world__won--gold { background: var(--gold); }
+.world__won--silver { background: linear-gradient(180deg, #f7fafb, #cfd9de); }
+.world__won::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .8) 50%, transparent 70%);
+  transform: translateX(-120%);
+}
+.world:hover .world__won::after, .world:focus-visible .world__won::after { animation: won-shine 1.4s ease-in-out infinite; }
+@keyframes won-shine { 60%, 100% { transform: translateX(120%); } }
+.won__ink { fill: none; stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+.won__cup { fill: #ffd34d; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.won__shine { stroke: #fff6c9; stroke-width: 2.5; stroke-linecap: round; }
+.won__ribbon { fill: var(--hat); stroke: var(--ink); stroke-width: 2.2; stroke-linejoin: round; }
+.won__medal { fill: #dfe7eb; stroke: var(--ink); stroke-width: 2.5; }
+.won__star { fill: #fff; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
 
 /* the pick: the card under the pointer or the focus grows, its name-button
    tilts; the current cup keeps a gold ring */
@@ -243,7 +274,7 @@
   box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(255, 224, 102, .75), 0 16px 0 var(--ink);
 }
 .worlds--v2 .world:hover:not([disabled]) .world__ribbon,
-.worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.08); }
+.worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
 .worlds--v2 .world:focus-visible { outline: 4px solid var(--paper); outline-offset: 4px; }
 .worlds--v2 .world:hover:not([disabled]) svg, .worlds--v2 .world:focus-visible svg { transform: none; }
 .worlds--v2 .world:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
@@ -273,17 +304,23 @@
   .worlds--v2 .world { padding: 6px 6px 10px; border-radius: 20px; }
   .worlds--v2 .world__ribbon { font-size: 14px; padding: 4px 10px; white-space: normal; }
   .worlds--v2 .world__tag, .builder__tag { display: none; }
+  .worlds--v2 .world:hover:not([disabled]) .world__ribbon, .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.12); }
+  .world__won { top: 10px; right: 10px; font-size: 13px; padding-right: 9px; }
+  .world__won svg { width: 26px; height: 26px; }
+  .worlds--v2 .world__count { font-size: 13px; }
+  .worlds--v2 .world__score { font-size: 13px; }
   .front .worlds__title, .front .pick__name { -webkit-text-stroke-width: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .worlds--v2 .world, .worlds--v2 .world__ribbon { transition: none; }
+  .world:hover .world__won::after, .world:focus-visible .world__won::after { animation: none; }
   .worlds--v2 .world:hover:not([disabled]), .worlds--v2 .world:focus-visible { transform: none; }
 }
 
 /* ------------------------------------------------------------ the picker */
 
 /* top to bottom: the name, the aim (one row, its line beside it), the gnome
-   on a glossy card in the cup's colours, his dots
+   on a flat card in the cup's muted colour, his dots
    and his line, then the one button alone */
 .screen--pick .pick__name { margin-bottom: var(--gap-m); }
 /* the aim: its label and switch in a row, what the mode means under them,
@@ -304,11 +341,7 @@
 .screen--pick .pick__stage > .pick__canvas {
   width: min(380px, 60vw, 40vh); height: min(420px, 40vh);
   border: 3px solid var(--ink); border-radius: 28px; overflow: hidden; box-shadow: var(--deep-card);
-  background: radial-gradient(ellipse 70% 55% at 50% 42%, rgba(255, 255, 255, .7), transparent 70%), linear-gradient(170deg, var(--c1), var(--c2));
-}
-.screen--pick .pick__stage > .pick__canvas::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(115deg, transparent 10%, rgba(255, 255, 255, .45) 32%, transparent 52%); mix-blend-mode: soft-light;
+  background: radial-gradient(circle, rgba(20, 65, 52, .07) 1.7px, transparent 2.1px) 0 0 / 14px 14px, var(--stage);
 }
 /* locked: the gnome dark, not his card */
 .screen--pick .pick__canvas--locked { filter: none; opacity: 1; }
