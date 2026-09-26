@@ -15,7 +15,7 @@ import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
 import Share from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
-import About from "@/components/About";
+import About, { AboutButton, BackButton } from "@/components/About";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
@@ -301,9 +301,9 @@ export default function Golf() {
   // the aim mode, kept in this browser: assisted (the whole path) or pro
   const [aim, setAimState] = useState<Mode>(() => {
     try {
-      return localStorage.getItem("gnogolf.aim") === "pro" ? "pro" : "assisted";
+      return localStorage.getItem("gnogolf.aim") === "assisted" ? "assisted" : "pro"; // Pro unless the player chose Assisted
     } catch {
-      return "assisted";
+      return "pro";
     }
   });
   // graphics, kept in this browser: auto (by the device), high or low
@@ -850,7 +850,7 @@ export default function Golf() {
               <span className="eyebrow">Strokes</span>
               <strong>{s.strokes}</strong>
               <span className="card__par">par {parHere(s)}</span>
-              {(s.roundMode || s.mode) === "pro" && <span className="pro-chip" title="Pro: no aim line">PRO</span>}
+              {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
             </div>
             <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
             <div className="hud__right">
@@ -1155,6 +1155,7 @@ export default function Golf() {
         </div>
       )}
 
+      {(screen === "worlds" || screen === "pick") && <AboutButton onClick={() => setAbout(true)} />}
       {about && <About web={cfg ? cfg.web : ""} onClose={() => setAbout(false)} />}
 
       {real && (
@@ -1416,24 +1417,25 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
 
   return (
     <div className={`screen screen--pick front tint--${world}`}>
-      <button className="round round--small round--back screen__back" aria-label="Back to the cups" onClick={onBack}>
-        <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
+      <BackButton label="Back to the cups" onClick={onBack} />
       <div className="pick">
         <span className="eyebrow">Pick your gnome</span>
         <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
-          <div ref={canvas} className={"pick__canvas" + (unlocked(skin.id) ? "" : " pick__canvas--locked")} />
+          {/* the tile: the gnome's own renderer (its canvas mount) and his dots along its foot */}
+          <div className="pick__tile">
+            <div ref={canvas} className={"pick__canvas" + (unlocked(skin.id) ? "" : " pick__canvas--locked")} />
+            {/* a locked gnome: what earns him, on a band across him */}
+            {!unlocked(skin.id) && <p className="pick__lock">🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</p>}
+            <div className="pick__dots">
+              {GNOMES.map((g) => (
+                <span key={g.id} aria-current={g.id === skin.id} />
+              ))}
+            </div>
+          </div>
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
-        <div className="pick__dots">
-          {GNOMES.map((g) => (
-            <span key={g.id} aria-current={g.id === skin.id} />
-          ))}
-        </div>
-        {/* a locked gnome says what earns him; an unlocked one needs no line */}
-        {!unlocked(skin.id) && <p className="pick__line">🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</p>}
         <AimSetting aim={aim} onChange={onAim} compact />
         <Button variant="primary" className="btn--play" onClick={() => (sound("start"), onPick())} disabled={!unlocked(skin.id)}>
           {unlocked(skin.id) ? "Choose this gnome" : "Locked"}
@@ -1448,7 +1450,7 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
   return (
     <div className={"aimset" + (compact ? " aimset--compact" : "")}>
       <span className="aimset__label">Aim</span>
-      <Segmented label="Aim" value={aim} full={!compact} options={[["assisted", "Assisted"], ["pro", "Pro"]]} onChange={(m) => (sound("blip"), onChange(m))} />
+      <Segmented label="Aim" value={aim} full={!compact} options={[["pro", "Pro"], ["assisted", "Assisted"]]} onChange={(m) => (sound("blip"), onChange(m))} />
       {/* both lines in one cell, the other one hidden: the box keeps the longer one's size, nothing moves on a switch */}
       <small className="aimset__help">
         <span className={aim === "pro" ? "" : "off"} aria-hidden={aim !== "pro"}>
@@ -1705,7 +1707,7 @@ interface BoardProps {
   me?: string | null;
   mode?: Mode;
 }
-function Standings({ s, card, chain, me, mode = "assisted", compact = false }: BoardProps & { card: Card; compact?: boolean }) {
+function Standings({ s, card, chain, me, mode = "pro", compact = false }: BoardProps & { card: Card; compact?: boolean }) {
   const [rank, setRank] = useState<{ at?: number; unnamed?: boolean } | null>(null);
   useEffect(() => {
     if (!chain || !me) return;
@@ -1794,7 +1796,7 @@ const FlagMark = ({ f }: { f: Flag | false | undefined }) =>
  * You and your friends, on this hole and across the course, in the mode shown.
  * Read with Bests / Standings, which rank anyone, named or not.
  */
-function Friends({ s, chain, me, mode = "assisted" }: BoardProps) {
+function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
   const [friends, setFriends] = useState(loadFriends);
   // (a failed read shows as no rows)
   const [hole, setHole] = useState<(Partial<Bests> & { rows: readonly StrokesRow[] }) | null>(null);
@@ -1900,7 +1902,7 @@ function Friends({ s, chain, me, mode = "assisted" }: BoardProps) {
  * The leaderboards, in a sheet: this hole's best rounds, and the whole
  * course's. Read from the chain when the sheet opens, not before.
  */
-function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = "" }: BoardProps & { onClose: () => void; goTo: (id: string) => void; web?: string }) {
+function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", web = "" }: BoardProps & { onClose: () => void; goTo: (id: string) => void; web?: string }) {
   const [tab, setTab] = useState<"friends" | "hole" | "course">("friends");
   const [mode, setMode] = useState<Mode>(mine);
   const [hb, setHb] = useState<(HoleLeaderboard & { done: boolean }) | null>(null); // as loaded so far
@@ -1952,7 +1954,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
     <Sheet className="boards" label="Leaderboard" onClose={onClose}>
         <span className="eyebrow">Recorded on-chain</span>
         <h2>Leaderboard</h2>
-        <Segmented className="boards__modes" full role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["assisted", "Assisted"], ["pro", "Pro"]]} />
+        <Segmented className="boards__modes" full role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
         {mode === "pro" && <p className="boards__word">Pro rounds are ranked apart. The mode is on your word — the chain can't see your screen.</p>}
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={[["friends", "Friends"], ["hole", "This hole"], ["course", "The course"]]} />
         {tab !== "friends" && (
@@ -2007,7 +2009,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "assisted", web = ""
 }
 
 /** The chain's course ranking: rounds the chain replayed itself, named players only. */
-function Leaderboard({ chain, me, mode = "assisted", filter = false }: { chain: Chain | null; me?: string | null; mode?: Mode; filter?: boolean }) {
+function Leaderboard({ chain, me, mode = "pro", filter = false }: { chain: Chain | null; me?: string | null; mode?: Mode; filter?: boolean }) {
   const [lb, setLb] = useState<LeaderboardRows | null>(null);
   const flags = useFlags();
   const [showAll, setShowAll] = useState(false);

@@ -6,6 +6,7 @@ import { vsPar, type Cup, type CupTotal, type cupTotals } from "@/lib/card";
 import { sound } from "@/lib/feel";
 import { stillsOnly } from "@/lib/prefs";
 import { Green } from "@/components/Title";
+import { BackButton } from "@/components/About";
 import "@/app/title.css";
 
 // The world screen, between the title and the course: one card per world,
@@ -203,9 +204,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   };
   return (
     <div className={`screen worlds worlds--v2 front tint--${hot || current || "garden"}`}>
-      <button className="round round--small round--back screen__back" aria-label="Back to the title" onClick={() => (sound("blip"), onBack())}>
-        <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
+      <BackButton label="Back to the title" onClick={() => (sound("blip"), onBack())} />
       <div className="worlds__in">
         <div className="front__head">
           <span className="eyebrow">Choose your cup</span>

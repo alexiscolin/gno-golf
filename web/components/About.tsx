@@ -28,6 +28,27 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
 ];
 const FACTS = ["4 cups · 72 holes", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
 
+/** The round corner button every screen has: back at the top left, about at the top right. */
+export function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button className={`round round--small round--back screen__${side}`} aria-label={label} title={label} onClick={(e) => (e.stopPropagation(), onClick())}>
+      {children}
+    </button>
+  );
+}
+/** A screen's back button: an inked arrow in the top-left corner. */
+export const BackButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
+  <CornerButton side="back" label={label} onClick={onClick}>
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  </CornerButton>
+);
+/** The about screen's corner button (an inked ⓘ). */
+export const AboutButton = ({ onClick }: { onClick: () => void }) => (
+  <CornerButton side="about" label="About Gnogolf" onClick={onClick}>
+    <svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+  </CornerButton>
+);
+
 export default function About({ onClose, web }: { onClose: () => void; web: string }) {
   const links: readonly [string, string, string][] = [
     ...(web ? [["The golf realm", `${web}${REALM_PATH}`, "its code and boards, on gnoweb"] as [string, string, string]] : []),
