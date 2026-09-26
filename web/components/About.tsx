@@ -36,6 +36,12 @@ export function CornerButton({ side, label, onClick, children }: { side: "back" 
     </button>
   );
 }
+/** A screen's back button: an inked arrow in the top-left corner. */
+export const BackButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
+  <CornerButton side="back" label={label} onClick={onClick}>
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  </CornerButton>
+);
 /** The about screen's corner button (an inked ⓘ). */
 export const AboutButton = ({ onClick }: { onClick: () => void }) => (
   <CornerButton side="about" label="About Gnogolf" onClick={onClick}>
