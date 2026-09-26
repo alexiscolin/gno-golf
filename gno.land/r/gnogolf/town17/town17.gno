@@ -11,7 +11,7 @@ var me = course.Fit(&course.Simple{
 	W: 44, H: 24,
 	World:     "town",
 	Order:     17,
-	Title:     "Night Market",
+	Title:     "T-Junction",
 	Strokes:   3, // par
 	Tee:       physics.V(22, 19.5),
 	Pin:       physics.V(5, 5),

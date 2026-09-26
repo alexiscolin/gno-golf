@@ -84,7 +84,7 @@ func main() {
 		{"town/14", "0c934d84"},
 		{"town/15", "488ada9b"},
 		{"town/16", "9ddd6312"},
-		{"town/17", "7b545758"},
+		{"town/17", "2ae29355"},
 		{"town/18", "c4cc0105"},
 	} {
 		// the current version's entry in Versions, up to its end
