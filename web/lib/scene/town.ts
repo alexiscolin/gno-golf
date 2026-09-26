@@ -16,6 +16,7 @@ import { seeded, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
 import { ud, type Hole } from "./data";
 import type { Bar } from "./worlds";
 import { boxOf, smoothstep, type Terrain } from "../terrain";
+import { STREET_Y } from "./pieces";
 import type { Extras, MutVec2, Post, Vec2, Zone } from "../types";
 
 export const T = {
@@ -25,6 +26,13 @@ export const T = {
   lampLit: 0xffd98a, lampOff: 0xe9e2cf, iron: 0x3d4a45, awningA: C.cap, awningB: C.cream,
 };
 const CANAL = { x0: -ISLAND.x - 6.5, x1: -ISLAND.x - 1.5 }; // down the left, just off the plot
+/** How far down this hole's town stands: a lane over the rooftops (a `roof`
+ *  zone) looks down on the streets, so the square and all round it are at
+ *  street level (base, edging and decor are moved down by it as a whole). */
+const sunk = (s: Pick<Hole, "zones">) => ((s.zones || []).some((z) => z.skin === "roof") ? STREET_Y - GRASS : 0);
+const MAST_Z = -2.1; // the lantern strings' masts: between the tram's rails and the board's curb
+/** Where the lantern strings cross the board (their masts at x - 1.5). */
+const stringXs = (W: number) => { const xs: number[] = []; for (let x = W * 0.16; x < W - 1; x += Math.max(8, W / 4)) xs.push(x); return xs; };
 
 // cobbles: a canvas of rounded stones, repeated over the square
 let cobbleTex: THREE.CanvasTexture | null = null;
@@ -132,6 +140,7 @@ function base(s: Hole, box: THREE.Box3) {
     piece.position.set(x, GRASS + hgt / 2, z);
     g.add(piece);
   }
+  g.position.y = sunk(s);
   return g;
 }
 
@@ -148,6 +157,7 @@ function edging(s: Hole) {
       g.add(grate);
     }
   g.add(flowerBoxes(W, H, rand));
+  g.position.y = sunk(s);
   return g;
 }
 
@@ -490,7 +500,7 @@ function fadeAt(piece: THREE.Object3D, points: readonly THREE.Vector3[]): FadeIt
  * over its ends; balloons drifting. It sways a little and glows after dark,
  * and fades out of the way when it comes between the camera and the ball.
  */
-function overhead(W: number, H: number, rand: Rand, night: boolean) {
+function overhead(W: number, H: number, rand: Rand, night: boolean, foot: number) {
   const g = new THREE.Group();
   const faders: FadeItem[] = [];
   const Y = 6.2, colours = [C.cap, 0xf2a93b, 0x9b7fd1, C.cream, 0x5b6fb5];
@@ -501,12 +511,13 @@ function overhead(W: number, H: number, rand: Rand, night: boolean) {
     return litMat.get(c)!;
   };
   const strings: { line: THREE.Group; ph: number }[] = [];
-  for (let x = W * 0.16; x < W - 1; x += Math.max(8, W / 4)) {
-    const a = new THREE.Vector3(x - 1.5, 0, -2.6), b = new THREE.Vector3(x + 1.5, 0, H + 2.6);
+  for (const x of stringXs(W)) {
+    const a = new THREE.Vector3(x - 1.5, 0, MAST_Z), b = new THREE.Vector3(x + 1.5, 0, H + 2.6);
     // a mast at the back; the front end is held up by a bunch of balloons —
     // a pole there would stand between the camera and the lane
-    const mast = drawn(new THREE.CylinderGeometry(0.06, 0.08, Y + 0.4, 6), flat(T.iron));
-    mast.position.set(a.x, GRASS + (Y + 0.4) / 2, a.z);
+    // (from the ground: the street, `foot` down, round the rooftops)
+    const mast = drawn(new THREE.CylinderGeometry(0.06, 0.08, Y + 0.4 - foot, 6), flat(T.iron));
+    mast.position.set(a.x, GRASS + foot + (Y + 0.4 - foot) / 2, a.z);
     g.add(mast);
     const line = new THREE.Group();
     const pts: THREE.Vector3[] = [], n = 10, glowAt: THREE.Vector3[] = [];
@@ -544,8 +555,8 @@ function overhead(W: number, H: number, rand: Rand, night: boolean) {
   const zc = H / 2;
   for (const [bx, dir, colour] of [[-2.6, 1, C.cap], [W + 2.6, -1, 0x9b7fd1]]) {
     const piv = new THREE.Group();
-    piv.position.set(bx, GRASS, zc);
-    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 4.2, 0), new THREE.Vector3(dir * 3.2, 5.6, -0.6));
+    piv.position.set(bx, GRASS + foot, zc);
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 4.2 - foot, 0), new THREE.Vector3(dir * 3.2, 5.6 - foot, -0.6));
     const stem = drawn(new THREE.TubeGeometry(curve, 16, 0.32, 8, false), flat(C.cream));
     const top = curve.getPoint(1), R = 2.5;
     const cap = drawn(new THREE.SphereGeometry(R, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), flat(colour));
@@ -657,7 +668,10 @@ function pot(rand: Rand) {
   return g;
 }
 
-/** A tram on its rails along the back street, going by and coming round again. */
+/** A tram on its rails along the back street: from the end of the line by
+ *  the canal to a stop halfway, on out of sight and back the same way, easing
+ *  into and out of every stop. Where it is is a function of the render clock
+ *  alone: steady at any frame rate, and never a jump back to the start. */
 function tram(z: number, x0: number, x1: number, night: boolean) {
   const g = new THREE.Group();
   for (const dz of [-0.45, 0.45]) {
@@ -700,11 +714,21 @@ function tram(z: number, x0: number, x1: number, night: boolean) {
   ud(car).live = true;
   car.position.set(x0, GRASS, z);
   g.add(car);
+  // the timetable: runs at V, braking at A, a DWELL at each stop
+  const V = 1.8, A = 0.6, DWELL = 5;
+  const stops = [x0 + 2.3, (x0 + x1) / 2, x1 - 2.3], route = [0, 1, 2, 1].map((i) => stops[i]);
+  let cycle = 0;
+  const legs = route.map((a, i) => {
+    const b = route[(i + 1) % route.length], D = Math.abs(b - a), ta = Math.min(V / A, Math.sqrt(D / A)), T = 2 * ta + (D - A * ta * ta) / (A * ta);
+    const leg = { a, dir: Math.sign(b - a), D, ta, T, t0: cycle };
+    cycle += T + DWELL;
+    return leg;
+  });
   animate((t) => {
-    // along the line and off its far end, then in again from the canal side
-    const span = x1 - x0 + 6;
-    car.position.x = x0 + 2 + ((t * 2.2) % span);
-    car.visible = car.position.x < x1 + 2;
+    const u = t % cycle, l = legs.find((q) => u < q.t0 + q.T + DWELL) || legs[legs.length - 1];
+    const s = Math.min(u - l.t0, l.T), r = l.T - s;
+    const d = s < l.ta ? (A * s * s) / 2 : r < l.ta ? l.D - (A * r * r) / 2 : (A * l.ta * l.ta) / 2 + A * l.ta * (s - l.ta);
+    car.position.x = l.a + l.dir * d;
   });
   return g;
 }
@@ -818,6 +842,7 @@ function decor(s: Hole) {
   const TX0 = CANAL.x1 + 1.2;
   g.add(tram(TZ, TX0, X1 + 6, night));
   for (let x = TX0; x <= X1 + 6; x += 1) reserve(x, TZ, 1.1);
+  for (const x of stringXs(W)) reserve(x - 1.5, MAST_Z, 0.3);
   // lamps along the back street, just behind the rails, before the stalls take the room
   for (let x = X0 + 2; x < X1 - 1; x += 6.5) place(lamp(night), x, TZ - 1.5, 0.35);
   // and a tree between every two lamps, before the stalls take the room
@@ -921,13 +946,16 @@ function decor(s: Hole) {
   }
   // town10's canal and its lifting bridge: always there, raised or lowered by each stroke's pieces (extras)
   if (String(s.hole).endsWith("town10")) g.add(swingRig(s));
-  const over = overhead(W, H, rand, night);
+  // round the rooftops the town stands at street level, the strings over the lane where they were
+  const drop = sunk(s), over = overhead(W, H, rand, night, drop);
+  over.position.y = -drop;
   g.add(over);
   ud(g).fade = ud(over).fade;
   reserve(-2.6, H / 2, 0.8);
   reserve(W + 2.6, H / 2, 0.8);
   g.add(skyline(rand, X0, X1, Z0));
   weatherLooks(g, (w) => (w.rain || w.storm || w.snow ? "wet" : "clear"));
+  g.position.y = drop; // (after the glows: they are where the pieces stood in g)
   return g;
 }
 
@@ -1522,12 +1550,9 @@ function sleepingCat(r: number) {
 }
 
 /**
- * A canal across the lane (running along z): its water and a stone quay
- * each side, only where the lane is — it ends under the lane's kerbs, which
- * cross it as its end walls (drawn out over the park it ran on under them and
- * out past them). The quays stand proud of the water with their inner faces
- * in shade, and the water darkens toward them: a cut with some depth, on a
- * ground that stays flat for the ball.
+ * A canal across the lane (running along z): a stone quay each side, only
+ * where the lane is — it ends under the lane's kerbs, which cross it as its
+ * end walls. Its water lies down a cut between them, as every water does.
  */
 function canalOnLane(z: Zone, t: Terrain) {
   const g = new THREE.Group(), [x0, z0] = z.min, [x1, z1] = z.max, w = x1 - x0;
@@ -1543,23 +1568,8 @@ function canalOnLane(z: Zone, t: Terrain) {
     }
     runs.push(out);
   }
-  const pos: number[] = [], col: number[] = [], edge = new THREE.Color(0x2f5f7a), deep = new THREE.Color(C.pond), c = new THREE.Color();
-  runs.forEach((list, i) => {
-    const xa = x0 + (w * i) / NX, xb = x0 + (w * (i + 1)) / NX;
-    for (const [za, zb] of list)
-      for (const [x, zz] of [[xa, za], [xa, zb], [xb, zb], [xa, za], [xb, zb], [xb, za]]) {
-        // darker by the quays: their shadow down the cut
-        c.copy(edge).lerp(deep, smoothstep(Math.min(x - x0, x1 - x) / (w * 0.4)));
-        pos.push(x, t.height(x, zz) + 0.04, zz);
-        col.push(c.r, c.g, c.b);
-      }
-  });
-  if (!pos.length) return g;
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  geo.computeVertexNormals();
-  g.add(new THREE.Mesh(geo, new THREE.MeshToonMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 })));
+  // (the water itself is sunk into the lane, a quay wall each side down to
+  // it, and drawn with every other water: terrain.ts POOLS, zones.ts pondWater)
   // the quays, along each side's runs (the first and last strips')
   for (const [i, ex] of [[0, x0], [NX - 1, x1]] as const)
     for (const [za, zb] of runs[i]) {

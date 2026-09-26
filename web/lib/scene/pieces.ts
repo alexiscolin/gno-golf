@@ -10,7 +10,7 @@ import * as THREE from "three";
 import { C, flat, drawn, rbox, texOf, share } from "./materials";
 import { house, smoke } from "./props";
 import { inZone, CELL } from "../terrain";
-import { seeded, GRASS } from "./common";
+import { seeded } from "./common";
 import { timeOf } from "./camera";
 import { T } from "./town";
 import { ud, type Hole, type Height } from "./data";
@@ -648,18 +648,12 @@ export function roofs(z: Zone, s: Pick<Hole, "board" | "zones" | "hole">) {
   const walls = [T.wall, T.wallWarm, T.roofFar, T.curb], caps = [...T.caps, 0xc4633f, 0xd07a4f];
   const W = s.board.w, H = s.board.h;
   const x0 = Math.max(0, z.min[0]), y0 = Math.max(0, z.min[1]), x1 = Math.min(W, z.max[0]), y1 = Math.min(H, z.max[1]);
-  // the streets, and the town's own wall round the board: the square stands
-  // over the streets there, and no gap under its edge shows the sky
+  // the streets: round the board the town's square is down at their level
+  // too (town.ts sunk), so the roofs stand over a town, not in a pit
   const street = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, y1 - y0), flat(0x8a7b67));
   street.rotation.x = -Math.PI / 2;
   street.position.set((x0 + x1) / 2, STREET_Y, (y0 + y1) / 2);
   g.add(street);
-  const rim = GRASS - STREET_Y;
-  for (const [w, d, x, y] of [[W, 0.3, W / 2, -0.15], [W, 0.3, W / 2, H + 0.15], [0.3, H, -0.15, H / 2], [0.3, H, W + 0.15, H / 2]]) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, rim, d), flat(T.quay));
-    m.position.set(x, STREET_Y + rim / 2, y);
-    g.add(m);
-  }
   /** A window on a wall at (x, y, z), its face turned to `ang` (radians round y). */
   const win = (x: number, y: number, zz: number, ang: number) => {
     const f = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.82), frame), p = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.62), glass);
