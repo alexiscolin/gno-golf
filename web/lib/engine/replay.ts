@@ -535,10 +535,10 @@ export function makeReplay(E: Live) {
               else {
                 const L = Math.max(1e-6, F.len - F.crest), u = d - F.crest;
                 // One parabola from the lip to where the chain lands him: it
-                // leaves along the ramp (its slope under the lip, read as he
-                // leaves: a timed deck, a seesaw's plank, moves) and falls under
-                // gravity from there — no arc of its own on top, no hop at the
-                // lip; never through the ground it flies over. The heights too
+                // leaves at least as steep as the ramp (its slope under the
+                // lip, read as he leaves: a timed deck, a seesaw's plank,
+                // moves), one hump, no second rise; never through the ground
+                // it flies over. The heights too
                 // are read as the flight goes (one taken before the shot put a
                 // dip, then a hop, at the lip)
                 if (F.top == null) {
@@ -550,9 +550,14 @@ export function makeReplay(E: Live) {
                   F.s0 = Math.max(0, Math.min(2, (ground(cx, cz) - ground(cx - F.dir[0] * 0.4, cz - F.dir[1] * 0.4)) / 0.4));
                 }
                 const top = F.top, s0 = F.s0 ?? 0;
-                const land = ground(F.lx, F.lz), fall = land - top - s0 * L;
-                // (a landing above the ramp's line: no throw reaches it rising, a straight climb)
-                const y = fall <= 0 ? top + s0 * u + fall * (u / L) ** 2 : top + (land - top) * (u / L);
+                const land = ground(F.lx, F.lz), v = u / L, a = land - top;
+                // The arc over the lip-to-landing line: its top at least a hop
+                // D over the lip (or a higher landing), and a start at least
+                // as steep as the ramp. A shallow lip alone threw him flat, a
+                // few hundredths up, and a steep fall after it ate any hop.
+                const D = Math.max(0, a) + Math.min(0.35 + L * 0.16, 2.6);
+                const h = Math.max((s0 * L - a) / 4, (2 * D - a + 2 * Math.sqrt(D * (D - a))) / 4);
+                const y = top + a * v + h * 4 * v * (1 - v);
                 E.ball.position.y = BALL_R + Math.max(gh, y);
               }
               // a flight lands where it lands: no fall left over from before it
