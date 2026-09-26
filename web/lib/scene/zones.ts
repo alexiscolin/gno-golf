@@ -425,13 +425,11 @@ function drawMill(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
   // the mill standing across the lane: a big tower, its sails turning
   const { cx, cz } = boxOf(z);
   const k = Math.min(w, h) / 2.4, y0 = t.height(cx, cz);
-  const m = windmill(cx, y0, cz);
-  m.group.scale.setScalar(k);
-  m.group.rotation.y = -Math.PI / 2; // the sails face the tee
   // long sweeps, so a sail reaches down over whichever door it blocks
   // (the tips pass just clear of the mill's low base kerb)
-  for (const arm of m.hub.children.slice(1)) arm.scale.y = 1.1;
-  ud(m.hub).live = true;
+  const m = windmill(cx, y0, cz, 1.1);
+  m.group.scale.setScalar(k);
+  m.group.rotation.y = -Math.PI / 2; // the sails face the tee
   // The chain turns the wheel within the stroke: its sails are timed
   // walls over the doors (hole4: a turn in 24 substeps, a sail down over
   // the middle door at every quarter). So the replay drives it — at step u
@@ -1134,19 +1132,22 @@ function seesaw(z: Zone, s: Hole, t: T, g: THREE.Group) {
   const every = (z.every ?? 0) | 0, onFor = (z.on ?? 0) | 0, phase = (z.phase ?? 0) | 0, down = Math.sign(z.vec[k]) || -1;
   let step = 0, ang = 0, last: number | null = null;
   state.timed.push({ at: (st) => (step = st) });
+  // the chain's tilt at the clock's step: +x end up when the first half pushes toward -x
+  const tilt = () => {
+    const p = every ? mod(step + phase, every) : 0, first = !every || p < onFor;
+    return (first ? -down : down) * SEESAW_TILT;
+  };
   animate((tt) => {
     const dt = last === null ? 0 : Math.min(0.1, tt - last);
     last = tt;
-    const p = every ? mod(step + phase, every) : 0, first = !every || p < onFor;
-    // +x end up when the first half pushes toward -x
-    const want = (first ? -down : down) * SEESAW_TILT;
-    ang += (want - ang) * Math.min(1, dt * 9);
+    ang += (tilt() - ang) * Math.min(1, dt * 9); // the plank eases over
     pivot.rotation.z = ang;
   });
-  // the ball rides the plank's top, as it stands
+  // the ball rides the plank's top as the chain has it (not the eased plank,
+  // which lags a frame or two behind a flip)
   state.lifts.push((x, zz) => {
     const [u, w] = alongX ? [x, zz] : [zz, x];
-    return u >= u0 && u < u1 && w >= w0 && w < w1 ? TOP + (u - uc) * Math.tan(alongX ? ang : -ang) : 0;
+    return u >= u0 && u < u1 && w >= w0 && w < w1 ? TOP + (u - uc) * Math.tan(alongX ? tilt() : -tilt()) : 0;
   });
   return g;
 }

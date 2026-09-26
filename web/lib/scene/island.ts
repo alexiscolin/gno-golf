@@ -951,35 +951,49 @@ function kite(rand: Rand, color: number, stake: THREE.Vector3) {
   const peg = drawn(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 5), flat(P.trunkDark));
   peg.position.copy(stake).add(new THREE.Vector3(0, 0.2, 0));
   g.add(peg);
-  // the flier: all that flutters, about the knot at the spars' cross
+  // the flier: all that flutters, about the knot at the spars' cross, as one
+  // mesh coloured by its vertices: the sail and its spars as built, then the
+  // tail's ribbon and its bows, rewritten every frame at the end of it
   const fly = new THREE.Group();
+  ud(fly).live = true;
   const top = new THREE.Vector2(0, 0.75), right = new THREE.Vector2(0.6, 0), bottom = new THREE.Vector2(0, -1.05), left = new THREE.Vector2(-0.6, 0);
-  fly.add(new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([top, right, bottom, left])), dside(color)));
+  const paint = (geo: THREE.BufferGeometry, hex: number) => {
+    const c = new THREE.Color(hex), n = geo.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+    geo.deleteAttribute("uv");
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    if (!geo.index) geo.setIndex([...Array(n).keys()]);
+    return geo;
+  };
+  const parts = [paint(new THREE.ShapeGeometry(new THREE.Shape([top, right, bottom, left])), color)];
   const v3 = (p: THREE.Vector2, z = 0.02) => new THREE.Vector3(p.x, p.y, z);
   fly.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([top, right, bottom, left].map((p) => v3(p, 0.01))), ink));
-  const spar = flat(P.trunkDark);
   for (const [a, b] of [[top, bottom], [left, right]]) {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, a.distanceTo(b), 4), spar);
-    m.position.copy(v3(a.clone().lerp(b, 0.5), 0.04));
-    m.rotation.z = Math.atan2(b.y - a.y, b.x - a.x) - Math.PI / 2;
-    fly.add(m);
+    const mid = v3(a.clone().lerp(b, 0.5), 0.04);
+    parts.push(paint(new THREE.CylinderGeometry(0.025, 0.025, a.distanceTo(b), 4).rotateZ(Math.atan2(b.y - a.y, b.x - a.x) - Math.PI / 2).translate(mid.x, mid.y, mid.z), P.trunkDark));
   }
   // the tail: one ribbon from the bottom tip, its bows riding on it
   const N = 14, LEN = 2.6, W = 0.05;
-  const rib = new THREE.PlaneGeometry(W * 2, LEN, 1, N);
-  const ribbon = new THREE.Mesh(rib, dside(0xffffff));
-  ribbon.frustumCulled = false; // its vertices move every frame, away from its first bounds
-  const bows: { b: THREE.Mesh; at: number }[] = [];
-  const bow = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.2, 0.1, 0), new THREE.Vector3(-0.2, -0.1, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.2, -0.1, 0), new THREE.Vector3(0.2, 0.1, 0)]);
+  const bowAt = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.2, 0.1, 0), new THREE.Vector3(-0.2, -0.1, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.2, -0.1, 0), new THREE.Vector3(0.2, 0.1, 0)];
+  const bow = new THREE.BufferGeometry().setFromPoints(bowAt);
   bow.computeVertexNormals();
+  const bows: { v0: number; at: number }[] = [];
+  let v0 = parts.reduce((n, p) => n + p.attributes.position.count, 0);
   for (let i = 1; i <= 4; i++) {
-    const b = new THREE.Mesh(bow, dside(i % 2 ? color : 0xffffff));
-    fly.add(b);
-    bows.push({ b, at: (i * N) / 5 | 0 });
+    parts.push(paint(bow.clone(), i % 2 ? color : 0xffffff));
+    bows.push({ v0, at: (i * N) / 5 | 0 });
+    v0 += bowAt.length;
   }
-  fly.add(ribbon);
+  parts.push(paint(new THREE.PlaneGeometry(W * 2, LEN, 1, N), 0xffffff));
+  const flier = new THREE.Mesh(mergeGeometries(parts), flat(0xffffff, { side: THREE.DoubleSide, vertexColors: true }));
+  parts.forEach((p) => p.dispose());
+  // its tail moves every frame, away from its first bounds: bounds that hold
+  // all of its reach (from the sail's top to the tail's end, swung either way)
+  flier.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, bottom.y - LEN / 2 + 0.9, 0), LEN / 2 + 1.2);
+  fly.add(flier);
   g.add(fly);
-  const pos = rib.attributes.position, ph = rand() * 6, spine: [number, number][] = [];
+  bakeLocal(g); // the stake and its string: a mesh per material, the flier left live
+  const pos = flier.geometry.attributes.position as THREE.BufferAttribute, ph = rand() * 6, spine: [number, number][] = [];
   animate((t) => {
     const w = windNow(), k = 1 + Math.min(w.length() * 15, 1);
     // the whole kite flutters about its knot, leaning a little downwind
@@ -989,12 +1003,10 @@ function kite(rand: Rand, color: number, stake: THREE.Vector3) {
       const u = j / N;
       spine[j] = [Math.sin(t * 2.6 * k - u * 5 + ph) * 0.22 * u + Math.max(-0.08, Math.min(0.08, w.x)) * 9 * u * u, bottom.y - u * LEN];
     }
-    for (let i = 0; i < pos.count; i++) {
-      const j = i >> 1; // PlaneGeometry: two vertices a row, from the top (the kite) down
-      pos.setXYZ(i, spine[j][0] + (i % 2 ? W : -W), spine[j][1], 0);
-    }
+    // PlaneGeometry: two vertices a row, from the top (the kite) down
+    for (let i = 0; i <= 2 * N + 1; i++) pos.setXYZ(v0 + i, spine[i >> 1][0] + (i % 2 ? W : -W), spine[i >> 1][1], 0);
+    for (const b of bows) for (let i = 0; i < bowAt.length; i++) pos.setXYZ(b.v0 + i, bowAt[i].x + spine[b.at][0], bowAt[i].y + spine[b.at][1], 0.01);
     pos.needsUpdate = true;
-    for (const { b, at } of bows) b.position.set(spine[at][0], spine[at][1], 0.01);
   });
   return g;
 }
@@ -1323,13 +1335,17 @@ function decor(s: Hole, bank: Height = () => 0): THREE.Group {
     const p = archPalm(rand, new THREE.Vector3(0, 0, 1), want, h);
     p.position.set(x, GRASS + bank(x, z), z);
     g.add(p);
+    // its crown nods on its trunk: each merged in its own frame, a mesh per material
+    const crown = ud(p).crown!;
+    ud(bakeLocal(crown)).live = true;
+    bakeLocal(p);
     const mats = ownFade(p); // its own copies of palm()'s materials, to fade
     // its foot and its trunk: nothing else stands in them (its crown is high
     // over the lane, above anything low)
     reserve(x, z, 1.4);
     reserve(x, z + want * 0.5, 0.6);
     crowns.push({ x, z: z + want });
-    const ph = rand() * 6, crown = ud(p).crown!;
+    const ph = rand() * 6;
     animate((t) => (crown.rotation.z = Math.sin(t * 0.9 + ph) * 0.05, crown.rotation.x = Math.cos(t * 0.7 + ph) * 0.04));
     p.updateMatrixWorld(true);
     fading.push({ at: crown.getWorldPosition(new THREE.Vector3()), r: 2.5, mats });

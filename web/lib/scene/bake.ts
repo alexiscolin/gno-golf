@@ -11,10 +11,11 @@ import type { WeatherNow } from "./weather";
 
 /**
  * Merges everything that does not move into one mesh per material — the look
- * is the same, the draw calls go from a thousand or so to a few dozen. What
- * moves (marked live), what carries a texture, lines and sprites are left as
- * they are. Geometry is baked in the course's own space, so the merged meshes
- * need no transform, and the wind shader reads the same world heights.
+ * is the same, the draw calls go from a thousand or so to a few dozen. Lines
+ * are batched the same way, as line segments. What moves (marked live), what
+ * carries a texture, dashed lines and sprites are left as they are. Geometry
+ * is baked in the course's own space, so the merged meshes need no transform,
+ * and the wind shader reads the same world heights.
  */
 // a stable id per shader hook function, for the bake signature (two hooks
 // with the same source text are not the same shader if they close over
@@ -32,13 +33,16 @@ const hookId = (f: object | null | undefined) => {
  *  board (the Low tier), the outlines of what stands over INK_OFF units off
  *  it are left out. local: merged in root's own frame, so a group that moves
  *  as one (a boat, a chair lift, the tram) can go on moving; returns root. */
-const INK_OFF = 10, _c = new THREE.Vector3();
+const INK_OFF = 4, _c = new THREE.Vector3();
 /** A material as the bake reads it: any of three's, with the fields some kinds have. */
 type Mat = THREE.Material & { map?: THREE.Texture | null; alphaMap?: THREE.Texture | null; color?: THREE.Color; gradientMap?: THREE.Texture | null };
 /** One mesh to merge: its geometry, where it stands, and its colour when tinted in. */
 interface Piece { geo: THREE.BufferGeometry; at: THREE.Matrix4; color: THREE.Color | null }
 export function bake<T extends THREE.Object3D>(root: T, { board = null, local = false }: { board?: Board | null; local?: boolean } = {}): T {
   if (local) {
+    // what sways is weighed from its foot in the world, where it stands now
+    root.updateWorldMatrix(true, false);
+    plantFeet(root);
     // out of its parent and back to the identity while it merges, then put back as it was set
     root.updateMatrix(); // its position as set, not as last rendered
     const m = root.matrix.clone(), parent = root.parent;
@@ -71,7 +75,18 @@ export function bake<T extends THREE.Object3D>(root: T, { board = null, local = 
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const sig = (m: Mat) => [md(m).hook || hookId(m.onBeforeCompile), md(m).maskId || "", m.type, tint(m) ? "tint" : m.color && m.color.getHex(), m.side, m.transparent, m.opacity, m.alphaTest, m.depthWrite, m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits, m.vertexColors, m.map && m.map.uuid, m.alphaMap && m.alphaMap.uuid, m.gradientMap && m.gradientMap.uuid, m.customProgramCacheKey()].join("|");
   const firstOf = new Map<string, Mat>();
+  const lineMats = new Set<THREE.Material>();
   root.traverse((o) => {
+    if (o instanceof THREE.Line) {
+      const line = o as THREE.Line<THREE.BufferGeometry, Mat | Mat[]>, m = line.material, d = line.geometry.drawRange;
+      if (Array.isArray(m) || m instanceof THREE.LineDashedMaterial || d.start || d.count !== Infinity || isLive(o)) return;
+      const k = "line|" + sig(m);
+      if (!firstOf.has(k)) (firstOf.set(k, m), lineMats.add(m));
+      const mat = firstOf.get(k)!;
+      if (!buckets.has(mat)) buckets.set(mat, []);
+      buckets.get(mat)!.push({ geo: segmentsOf(line), at: line.matrixWorld, color: tint(m) ? m.color! : null });
+      return void taken.push(o);
+    }
     if (!(o instanceof THREE.Mesh) || o instanceof THREE.InstancedMesh || Array.isArray(o.material) || isLive(o)) return;
     const mesh = o as THREE.Mesh<THREE.BufferGeometry, Mat>;
     // a textured piece merges only with others using that same texture, and
@@ -116,11 +131,26 @@ export function bake<T extends THREE.Object3D>(root: T, { board = null, local = 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       m.customProgramCacheKey = material.customProgramCacheKey;
     }
-    const mesh = new THREE.Mesh(merged, m);
+    const mesh = lineMats.has(material) ? new THREE.LineSegments(merged, m) : new THREE.Mesh(merged, m);
     mesh.matrixAutoUpdate = false; // baked in place: its own matrix is the identity, for good
     root.add(mesh);
   }
   return root;
+}
+
+// A line of any kind as the pairs of vertices of its segments (an index over
+// its own attributes): a strip, a loop and segments then merge as one set
+function segmentsOf(o: THREE.Line) {
+  const geo = o.geometry, n = geo.index ? geo.index.count : geo.attributes.position.count;
+  const at = (i: number) => (geo.index ? geo.index.getX(i) : i);
+  if (o instanceof THREE.LineSegments) return geo;
+  const idx: number[] = [];
+  for (let i = 0; i + 1 < n; i++) idx.push(at(i), at(i + 1));
+  if (o instanceof THREE.LineLoop && n > 2) idx.push(at(n - 1), at(0));
+  const out = new THREE.BufferGeometry();
+  for (const k in geo.attributes) out.setAttribute(k, geo.attributes[k]);
+  out.setIndex(idx);
+  return out;
 }
 
 // One bucket's pieces into one geometry, in the course's space: each piece's

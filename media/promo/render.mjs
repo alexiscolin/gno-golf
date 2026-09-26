@@ -183,7 +183,7 @@ async function shoot(c, s, i, out) {
 // Each cup card plays a clip on hover: four of its holes (cups.json), each
 // an orbit a third of the way round, closing in a little from above, drawn
 // by the title's own scene at golden hour on the card's sky (web/lib/scene/
-// title.ts cupClip, ?titlebake). The first hole starts on the card's still,
+// titlebake.ts cupClip, ?titlebake). The first hole starts on the card's still,
 // and the loop cross-fades back to it: the still, the clip and its loop meet
 // without a jump. 640x480 for a card about 300 px wide at 2x, 24 fps.
 /** A hole's state as the chain gives it (HoleState: a JSON string in a Gno typed result). */

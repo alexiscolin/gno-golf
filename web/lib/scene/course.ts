@@ -1619,6 +1619,9 @@ export function buildExtras(course: Course, ex: Extras) {
   const t = course.userData.terrain;
   const g = new THREE.Group();
   ud(g).live = true;
+  // what the pieces below animate (animate() pushes to state.live) runs with
+  // the extras, and goes with them when the next stroke replaces them
+  const ticks: Tick[] = (state.live = []);
   // a world may draw a stroke's pieces itself (an avalanche, a wave): it
   // returns { group, skins }, and what it drew is left out of the rest
   const own = worldOf(course.userData.state).extras?.(ex, course.userData.state, t);
@@ -1627,7 +1630,6 @@ export function buildExtras(course: Course, ex: Extras) {
     g.add(own.group);
     ex = { ...ex, walls: ex.walls.filter((w) => !own.skins.has(w.skin)), posts: ex.posts.filter((p) => !own.skins.has(p.skin)), zones: (ex.zones || []).filter((z) => !own.skins.has(z.skin)) };
   }
-  const ticks: Tick[] = [];
   for (const w of wallPieces({ ...course.userData.state, walls: ex.walls, zones: ex.zones || [] }, t)) g.add(w);
   for (const p of ex.posts) g.add(p.skin === "mole" ? mole(p, t.height) : post(p, t.height, course.userData.state, t));
   // what a stroke adds on the lane (a wave washing across...); the weather is
@@ -1639,10 +1641,10 @@ export function buildExtras(course: Course, ex: Extras) {
     const cx = blade.reduce((a, w) => a + w.a[0], 0) / blade.length;
     const cz = blade.reduce((a, w) => a + w.a[1], 0) / blade.length;
     const m = windmill(cx, t.height(cx, cz), cz);
-    ud(m.hub).live = true;
     g.add(m.group);
     ticks.push(m.spin);
   }
+  state.live = [];
   ud(g).tick = (time: number) => { if (motion) for (const f of ticks) f(time); };
   bake(g); // walls, posts, moles: merged; a mill's sails stay live
   return g;

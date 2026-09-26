@@ -226,6 +226,14 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     const d = cam ? m.position.distanceTo(cam.position) : Infinity;
     return d >= FAR_BANK ? 1 : d <= NEAR_BANK ? 0 : ((d - NEAR_BANK) / (FAR_BANK - NEAR_BANK)) ** 2;
   };
+  // the wind near the lens (Third person stands in it): a gust or a blown bit
+  // closer than NEAR_WIND is not drawn, and comes back in by FAR_WIND; in the
+  // lens's face it was a white smear across the screen
+  const NEAR_WIND = 1.5, FAR_WIND = 5;
+  const nearFade = (d: number) => (d >= FAR_WIND ? 1 : d <= NEAR_WIND ? 0 : ((d - NEAR_WIND) / (FAR_WIND - NEAR_WIND)) ** 2);
+  const bitFade = (m: Proxy) => (cam ? nearFade(m.position.distanceTo(cam.position)) : 1);
+  const shrink = new THREE.Vector3();
+  // fade: a piece's opacity (into alpha when the batch has one, else its size)
   function inst<T>(mesh: THREE.InstancedMesh, list: readonly T[], get: (x: T) => Proxy, face: boolean, color: ((m: Proxy) => THREE.Color) | null, fade: ((m: Proxy) => number) | null = null, alpha: THREE.InstancedBufferAttribute | null = null) {
     if (!mesh.visible) return; // a hidden batch is not rewritten
     for (let k = 0; k < list.length; k++) {
@@ -238,6 +246,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       }
       if (face && cam) m.quaternion.copy(cam.quaternion);
       m.updateMatrix();
+      if (!alpha && a < 1) m.matrix.scale(shrink.setScalar(a));
       mesh.setMatrixAt(k, m.matrix);
       if (color) mesh.setColorAt(k, color(m));
     }
@@ -247,7 +256,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
   }
   function flush() {
     cam = typeof camera === "function" ? camera() : camera;
-    inst(bitMesh, bits, piece, false, bitColor);
+    inst(bitMesh, bits, piece, false, bitColor, bitFade);
     inst(ringMesh, splashes, piece, false, ringColor);
     inst(puddleMesh, puddles, self, false, null);
     inst(bankMesh, banks, piece, true, null, bankFade, bankA);
@@ -261,7 +270,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       for (let v = 0; v < V; v++) {
         tv.fromArray(tr.local, v * 3).applyMatrix4(m.matrix).toArray(trailPos, (o + v) * 3);
         const step = v >> 1;
-        trailCol[(o + v) * 4 + 3] = step >= i0 && step <= i1 ? a : 0;
+        trailCol[(o + v) * 4 + 3] = step >= i0 && step <= i1 && a > 0 ? a * (cam ? nearFade(tv.distanceTo(cam.position)) : 1) : 0;
       }
     });
     trailGeo.attributes.position.needsUpdate = true;
@@ -308,6 +317,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
   // material — and pushed far past the far plane (no effect) when there is none
   const OFF = 1e5;
   const fog = (scene.fog = new THREE.Fog(0xdfe6e2, OFF, OFF * 10));
+  const BANK_TINT = new THREE.Color(bankMat.color.r / fog.color.r, bankMat.color.g / fog.color.g, bankMat.color.b / fog.color.b);
   // It rolls in and out over FOG_IN seconds (k: 0 none, 1 all of it), from
   // beyond the course toward its range, and that range follows the camera's
   // real distance (want): at once when the camera backs off, eased when it
@@ -323,6 +333,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     if (e <= 0 || !fogD) (fog.near = OFF), (fog.far = OFF * 10);
     else (fog.near = fogD * 0.75 + push), (fog.far = fogD * 1.9 + push);
     bankMat.opacity = 0.55 * e;
+    bankMat.color.copy(fog.color).multiply(BANK_TINT); // the banks as pale as the fog, day or night (setLighting sets its colour)
   }
 
   let last: number | null = null, lastZones: readonly WeatherZone[] = [], lastFc: Pick<Forecast, "wind"> | null = null;

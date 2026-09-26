@@ -6,7 +6,7 @@ import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
 import { AboutButton } from "@/components/About";
 import { SLOW_KEY } from "@/lib/engine/pace";
-import type { makeTitle, titleStill } from "@/lib/scene/title";
+import type { makeTitle } from "@/lib/scene/title";
 
 /** The live title scene, once its module has loaded and made it. */
 type TitleScene = NonNullable<Awaited<ReturnType<typeof makeTitle>>>;
@@ -16,7 +16,6 @@ declare global {
     // the perf probe's and the stills baker's hooks (?camlog, ?titlebake)
     __title?: TitleScene;
     __titleFilm?: Film | null;
-    __titleStill?: typeof titleStill;
   }
   interface Navigator {
     // the Network Information API (Chromium): not in the DOM types
@@ -321,9 +320,10 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
   const done = useCallback(() => setReady(true), []);
   const host = useRef<HTMLDivElement>(null), film = useRef<HTMLDivElement>(null);
   const scene = useTitleScene(host, film);
-  // ?titlebake (dev): the stills' baker, for media/camera/titlebake.mjs
+  // ?titlebake (dev): the stills' and clips' baker (window.__titleStill,
+  // __cupClip), for media/camera/titlebake.mjs and media/promo/render.mjs
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) void import("@/lib/scene/title").then((m) => (window.__titleStill = m.titleStill));
+    if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) void import("@/lib/scene/titlebake");
   }, []);
   const start = () => (sound("start"), onStart?.());
   // once ready, a click anywhere or Enter starts, like a console's title

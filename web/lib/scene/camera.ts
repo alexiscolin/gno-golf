@@ -50,11 +50,12 @@ export function makeScene(): LitScene {
 // ------------------------------------------------------------ time of day
 //
 // A hole is played at one moment of the day, and keeps it: day, evening or
-// night. The light changes here; the sky behind the canvas is the page's.
-const TIMES: Record<string, { sky: readonly [number, number, number]; sun: readonly [number, number, readonly [number, number, number]] }> = {
-  day:   { sky: [0xfff3df, 0x9fc4b3, 1.3], sun: [0xfff6e2, 0.7, [24, 40, 6]] },
-  dusk:  { sky: [0xffd2b0, 0x6f7fa8, 1.05], sun: [0xff9d62, 0.95, [-20, 14, 10]] },
-  night: { sky: [0x8ea2dc, 0x1f3342, 0.62], sun: [0xc4d4ff, 0.38, [10, 30, -10]] },
+// night. The light changes here, and the fog's colour (a pale mist by day, a
+// rosy haze at dusk, a blue murk at night); the sky behind the canvas is the page's.
+const TIMES: Record<string, { sky: readonly [number, number, number]; sun: readonly [number, number, readonly [number, number, number]]; fog: number }> = {
+  day:   { sky: [0xfff3df, 0x9fc4b3, 1.3], sun: [0xfff6e2, 0.7, [24, 40, 6]], fog: 0xdfe6e2 },
+  dusk:  { sky: [0xffd2b0, 0x6f7fa8, 1.05], sun: [0xff9d62, 0.95, [-20, 14, 10]], fog: 0xd9b3a4 },
+  night: { sky: [0x8ea2dc, 0x1f3342, 0.62], sun: [0xc4d4ff, 0.38, [10, 30, -10]], fog: 0x3e5372 },
 };
 
 /** Day for most holes, evening or night for some — stable per hole. */
@@ -72,6 +73,7 @@ export function setLighting(scene: LitScene, time: string) {
   sun.color.set(t.sun[0]);
   sun.intensity = t.sun[1];
   sun.position.set(...t.sun[2]);
+  if (scene.fog) scene.fog.color.set(t.fog);
 }
 
 /** What the overview frames: the course, with a little of the garden around
