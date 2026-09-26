@@ -84,12 +84,18 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 // 2026-09-26, physics rework (rolling resistance, contact impulses, ballistic
 // flight, Holmes's cup, the new Launch): the replay column moved, on all six;
 // the forecast and State columns did not.
+// 2026-09-26, work and rebound: counting every zone look in Shot.Work moved
+// nothing; a passive piece playing at most 0.75 (MaxBounce), and only a
+// bumper kicking, moved the replay column of the four whose lane's 0.85
+// walls are met (pulse, slope, storm, timed); sea and tunnel did not move.
+// 2026-09-26, a hazard sends the ball back where the stroke was played
+// from, not to its Vec: the sea's replay moved (its later strokes).
 var golden = map[string][3]string{
-	"pulse":  {"c3390a110cd2a014", "076ac3e7c0d705a9", "4e9da97515c48b33"},
-	"sea":    {"fea56bd04abd67f7", "c3224daa821020f4", "807b1e8fc908df52"},
-	"slope":  {"a5912e486e23a247", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
-	"storm":  {"c4776d5b081b957f", "217b2a005fc76324", "cd0874fd52e8179f"},
-	"timed":  {"1a7677200435735c", "c3224daa821020f4", "e4dbc97ea48d1ede"},
+	"pulse":  {"deb2fa81ccd4573d", "076ac3e7c0d705a9", "4e9da97515c48b33"},
+	"sea":    {"d841bb88749cafa5", "c3224daa821020f4", "807b1e8fc908df52"},
+	"slope":  {"ee9475088019c6cd", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
+	"storm":  {"384620ca83b7330d", "217b2a005fc76324", "cd0874fd52e8179f"},
+	"timed":  {"3d16130d4e52c06b", "c3224daa821020f4", "e4dbc97ea48d1ede"},
 	"tunnel": {"ff92e949423cf8b8", "c3224daa821020f4", "335763617c2e9b50"},
 }
 

@@ -318,9 +318,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (sz.x !== w || sz.y !== h || dprChanged) renderer.setSize(w, h);
     dprChanged = false;
     if (!g.s) return;
-    g.over = overviewRig(camera, courseBox(g.s.board), screen());
+    g.over = overviewRig(courseBox(g.s.board), screen());
     // the Far camera: the whole hole with a margin, room left for the mouse orbit
-    g.far = farRig(camera, laneBox(g.s), screen());
+    g.far = farRig(laneBox(g.s, ground), screen());
     if (!g.rig) g.rig = { ...g.over, target: g.over.target.clone() };
   }
 

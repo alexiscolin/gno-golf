@@ -83,8 +83,9 @@ export const courseBox = (board: Board) =>
 
 /** What the Far view frames: the lane itself (its rails, pieces, tee and
  *  cup), not the whole board, which a narrow or an L-shaped lane fills only
- *  in part, with the same margin. */
-export function laneBox(s: Pick<HoleState, "board" | "walls" | "posts" | "zones" | "start" | "cup">) {
+ *  in part, with the same margin. Given the ground's height, its floor and
+ *  top follow the relief (a hill, a sunk pond) under it. */
+export function laneBox(s: Pick<HoleState, "board" | "walls" | "posts" | "zones" | "start" | "cup">, height?: (x: number, z: number) => number) {
   const b = new THREE.Box3(), p = new THREE.Vector3();
   const add = (x: number, z: number) => b.expandByPoint(p.set(Math.min(Math.max(x, 0), s.board.w), 0, Math.min(Math.max(z, 0), s.board.h)));
   for (const w of s.walls) add(w.a[0], w.a[1]), add(w.b[0], w.b[1]);
@@ -92,8 +93,16 @@ export function laneBox(s: Pick<HoleState, "board" | "walls" | "posts" | "zones"
   for (const z of s.zones) add(z.min[0], z.min[1]), add(z.max[0], z.max[1]);
   add(s.start[0], s.start[1]), add(s.cup[0], s.cup[1]);
   if (b.isEmpty()) return courseBox(s.board);
-  b.min.set(b.min.x - 1.5, -1, b.min.z - 1.5);
-  b.max.set(b.max.x + 1.5, 1.5, b.max.z + 1.5);
+  let y0 = 0, y1 = 0;
+  // the relief under the lane, sampled every unit (a hole is 60 by 40 at most: a few thousand calls, once per hole or resize)
+  if (height)
+    for (let x = b.min.x; x <= b.max.x + 0.5; x++)
+      for (let z = b.min.z; z <= b.max.z + 0.5; z++) {
+        const y = height(Math.min(x, b.max.x), Math.min(z, b.max.z));
+        if (Number.isFinite(y)) (y0 = Math.min(y0, y)), (y1 = Math.max(y1, y));
+      }
+  b.min.set(b.min.x - 1.5, y0 - 1, b.min.z - 1.5);
+  b.max.set(b.max.x + 1.5, y1 + 1.5, b.max.z + 1.5);
   return b;
 }
 
@@ -134,13 +143,20 @@ export function applyRig(camera: THREE.PerspectiveCamera, rig: Rig, view: Pick<V
   camera.updateProjectionMatrix();
 }
 
+// The lens the rig modes draw with (engine/camera.ts: 30° for classic and far).
+// The framing is solved through a camera of its own with that lens, never the
+// live one: that one may be mid third person (58° and more) when a hole loads
+// or the window is resized, and a rig solved through it came out twice too close.
+const RIG_FOV = 30;
+const _lens = new THREE.PerspectiveCamera(RIG_FOV, 1, 3, 260);
+
 /**
  * The overview: the whole island inside the free part of the screen, whatever
  * its shape. The distance is searched, not guessed — a guess is right for one
  * aspect ratio and cuts the garden off on every other one. `fill` below 1
  * leaves a margin round it; `tilt` lowers the view toward the follow angle.
  */
-export function overviewRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: View, { fill = 1, tilt = 0 } = {}): Rig {
+export function overviewRig(box: THREE.Box3, view: View, { fill = 1, tilt = 0 } = {}): Rig {
   const { w, h, top, bottom, side } = view;
   const target = box.getCenter(new THREE.Vector3());
   const fw = (w - 2 * side) * fill, fh = (h - top - bottom) * fill;
@@ -148,23 +164,25 @@ export function overviewRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, vi
   let lo = 5, hi = 480; // no overview is further off than this (a long town hole on a phone: ~250)
   for (let i = 0; i < 32; i++) {
     rig.dist = (lo + hi) / 2;
-    const r = frameOf(camera, box, view, rig);
+    const r = frameOf(box, view, rig);
     if (r.x1 - r.x0 <= fw && r.y1 - r.y0 <= fh) hi = rig.dist; else lo = rig.dist;
   }
   rig.dist = hi;
-  const r = frameOf(camera, box, view, rig);
+  const r = frameOf(box, view, rig);
   return Object.assign(rig, { ox: (r.x0 + r.x1) / 2 - w / 2, oy: (r.y0 + r.y1) / 2 - (top + (h - top - bottom) / 2) });
 }
 
-// where the box's corners land on screen, in CSS pixels, for a rig
+// where the box's 8 corners land on screen, in CSS pixels, for a rig (its
+// slide included), or null when one is behind the lens
 const _corner = new THREE.Vector3();
-function frameOf(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: Pick<View, "w" | "h">, rig: Rig) {
-  applyRig(camera, rig, view);
-  const r = { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9 };
+function frameOf(box: THREE.Box3, view: Pick<View, "w" | "h">, rig: Rig) {
+  applyRig(_lens, rig, view);
+  const r = { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9, behind: false };
   for (const x of [box.min.x, box.max.x])
     for (const y of [box.min.y, box.max.y])
       for (const z of [box.min.z, box.max.z]) {
-        const q = _corner.set(x, y, z).project(camera);
+        const q = _corner.set(x, y, z).project(_lens);
+        if (q.z >= 1) r.behind = true;
         const px = ((q.x + 1) / 2) * view.w, py = ((1 - q.y) / 2) * view.h;
         r.x0 = Math.min(r.x0, px); r.x1 = Math.max(r.x1, px);
         r.y0 = Math.min(r.y0, py); r.y1 = Math.max(r.y1, py);
@@ -174,51 +192,64 @@ function frameOf(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: Pick<Vi
 
 /** The Far view's mouse orbit at its widest: this much yaw, this much tilt either way. */
 export const ORBIT = { yaw: (24 * Math.PI) / 180, tilt: 0.35 };
-/** How far back the Far view may stand, times its framing, to leave the orbit its room. */
-const FAR_BACK = 1;
-/** The least share of ORBIT the mouse always has, room or not. */
+/** The least share of ORBIT the mouse always has (±8° of yaw). */
 const FAR_MIN_ORBIT = 0.35;
+/** The Far view's pitch: halfway from the overview's to the follow camera's (a 3/4 view). */
+const FAR_TILT = 0.5;
+// the mouse's reach: the centre, the four corners and the four edges' middles
+const LEANS = [[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]];
 
 /**
- * The Far view: the whole hole with a margin round it, a little lower than
- * the overview (a 3/4 view), and `orbit`, the share of ORBIT the mouse may
- * swing it with the whole box still inside the free part of the screen. It
- * stands back as far as the full orbit needs (FAR_BACK at most), then gives
- * up orbit rather than distance.
+ * The Far view: the whole hole (`box`, laneBox) inside the free part of the
+ * screen, from the mouse orbit's one end to the other, as close as that
+ * allows. For a distance, every pose the mouse can lean the camera to is
+ * projected (the box's 8 corners through the real lens and pitch); their
+ * union must fit the free width with no sideways slide (the live camera
+ * slides up or down only) and the free height, which the slide `oy` then
+ * centres it in. The distance is the least that fits, with FAR_MIN_ORBIT of
+ * the orbit (none on a screen with no mouse); `orbit`, the share of ORBIT
+ * the mouse then gets, is as much as still fits at that distance.
  */
-export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: View): Rig & { orbit: number; tilt: number } {
-  const rig = overviewRig(camera, box, view, { fill: 1, tilt: 0.5 });
-  const { w, h, top, bottom } = view;
-  const t: Rig = { ...rig, ox: 0 }; // (the live camera slides the picture up or down, never sideways)
-  const fits = (k: number) =>
-    [[1, 1], [1, -1], [-1, 1], [-1, -1]].every(([a, b]) => {
+export function farRig(box: THREE.Box3, view: View, mouse = typeof matchMedia === "undefined" || matchMedia("(any-pointer: fine)").matches): Rig & { orbit: number; tilt: number } {
+  const { w, h, top, bottom, side } = view;
+  const rig = { target: box.getCenter(new THREE.Vector3()), dist: 0, ox: 0, oy: 0, tilt: FAR_TILT, orbit: 0 };
+  const t: Rig = { ...rig, target: rig.target };
+  // the union of the poses' frames at rig.dist with orbit share k, unslid
+  const span = (k: number) => {
+    const u = { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9, behind: false };
+    t.dist = rig.dist;
+    for (const [a, b] of LEANS) {
       t.yaw = a * k * ORBIT.yaw;
-      t.tilt = (rig.tilt ?? 0) + b * k * ORBIT.tilt;
-      const r = frameOf(camera, box, view, t);
-      // (swung, the box may reach into the side gutters: the orbit is a glance, the HUD is above and below)
-      return r.x0 >= -0.5 && r.x1 <= w + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
-    });
-  const d0 = rig.dist;
-  if (!fits(1)) {
-    let near = 1, far = FAR_BACK;
-    t.dist = d0 * far;
-    if (fits(1)) {
-      for (let i = 0; i < 12; i++) {
-        const mid = (near + far) / 2;
-        t.dist = d0 * mid;
-        if (fits(1)) far = mid; else near = mid;
-      }
+      t.tilt = FAR_TILT + b * k * ORBIT.tilt;
+      const r = frameOf(box, view, t);
+      u.x0 = Math.min(u.x0, r.x0); u.x1 = Math.max(u.x1, r.x1);
+      u.y0 = Math.min(u.y0, r.y0); u.y1 = Math.max(u.y1, r.y1);
+      u.behind ||= r.behind;
     }
-    rig.dist = t.dist = d0 * far;
+    return u;
+  };
+  const fits = (k: number) => {
+    const u = span(k);
+    return !u.behind && u.x0 >= side && u.x1 <= w - side && u.y1 - u.y0 <= h - top - bottom;
+  };
+  const k0 = mouse ? FAR_MIN_ORBIT : 0;
+  let lo = 5, hi = 480;
+  for (let i = 0; i < 32; i++) {
+    rig.dist = (lo + hi) / 2;
+    if (fits(k0)) hi = rig.dist; else lo = rig.dist;
   }
-  let lo = 0, hi = 1;
-  if (fits(1)) lo = 1;
-  else for (let i = 0; i < 12; i++) {
-    const mid = (lo + hi) / 2;
-    if (fits(mid)) lo = mid; else hi = mid;
+  rig.dist = hi;
+  // more orbit where the screen has room for it (a wide hole on a tall screen)
+  let a = k0, b = mouse ? 1 : 0;
+  if (fits(b)) a = b;
+  else for (let i = 0; i < 10; i++) {
+    const mid = (a + b) / 2;
+    if (fits(mid)) a = mid; else b = mid;
   }
-  // a little orbit always: at its ends the hole may leave the frame for a glance
-  return Object.assign(rig, { orbit: Math.max(lo, FAR_MIN_ORBIT), tilt: rig.tilt ?? 0 });
+  // the slide centres the orbit's span in the free height (the picture's
+  // slide moves every pose alike: the one oy suits them all)
+  const u = span(a);
+  return Object.assign(rig, { orbit: a, oy: (u.y0 + u.y1) / 2 - (top + (h - top - bottom) / 2) });
 }
 
 /** Close on a point — the ball — centred in the free part of the screen. */

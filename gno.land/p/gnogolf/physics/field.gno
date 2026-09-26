@@ -8,7 +8,7 @@ import "math"
 //
 //	gate / archway       two Walls with a gap between them
 //	narrowing, dogleg    Walls
-//	bumper, post, rock   a Post (a Bounce above 1 is a bumper that kicks)
+//	bumper, post, rock   a Post (a Bounce above 1, with a bumper's skin, kicks)
 //	tunnel, teleporter   a Tunnel zone
 //	ramp, slope, hill    a Slope zone (uphill pushes back, downhill pulls on)
 //	sand, ice, carpet    a Surface zone
@@ -35,7 +35,8 @@ import "math"
 // which course lays over the whole board: wind, rain, fog, storm and snow.
 
 // Wall is a straight barrier. Bounce overrides the field's restitution (0
-// keeps it); Mark and Skin are for whoever draws it.
+// keeps it); Mark and Skin are for whoever draws it, except that only a
+// bumper's skin kicks (Kicks).
 type Wall struct {
 	Seg    Segment
 	Bounce float64 // 0 = use the field default
@@ -77,13 +78,13 @@ func Timed(ws []Wall, every, on, phase int) []Wall {
 }
 
 // Post is a round obstacle: a bumper, a rock, a stump. Its Bounce is the
-// restitution of the contact, played at MaxBounce at most up to 1: a lively
-// post gives back most of the ball's speed, a dead one soaks it up. Above 1
-// it is a bumper, an active one that kicks the ball back faster than it came
-// (at most MaxKick times).
+// restitution of the contact, played at MaxBounce at most: a lively post
+// gives back most of the ball's speed, a dead one soaks it up. Above 1, with
+// a bumper's skin (Kicks), it is a bumper, an active one that kicks the ball
+// back faster than it came (at most MaxKick times).
 type Post struct {
 	Circle
-	Bounce float64 // 0 = use the field default; up to 1 played at MaxBounce at most; above 1 a bumper
+	Bounce float64 // 0 = use the field default; played at MaxBounce at most; above 1 a bumper, if Kicks(Skin)
 	Mark   rune
 	Skin   string
 }
@@ -96,7 +97,7 @@ const (
 	Surface ZoneKind = iota // Scale sets the rolling resistance (Rolling): sand holds, ice frees
 	Slope                   // a hill: Vec, gravity along it, is added to velocity each substep
 	Tunnel                  // the ball is moved to Vec, keeping its velocity
-	Hazard                  // the ball stops at Vec: water, a pit, a hungry skull
+	Hazard                  // the ball goes back where the stroke was played from: water, a pit, the void
 	// Loop is the mouth of a closed tube (a loop-the-loop, a spiral): Min..Max
 	// is where its track leaves the lane, Vec where it comes back down, Scale
 	// the speed (per substep) a ball needs to make it round. A ball rolling
@@ -118,7 +119,7 @@ const LoopKeep = 0.8
 type Zone struct {
 	Kind     ZoneKind
 	Min, Max Vec2
-	Vec      Vec2    // Slope: acceleration (G·sin θ downhill). Tunnel / Hazard: destination. Loop: where its track comes down.
+	Vec      Vec2    // Slope: acceleration (G·sin θ downhill). Tunnel: destination. Loop: where its track comes down. Hazard: unused (a hazard sends the ball back to the stroke's start).
 	Scale    float64 // Surface: its rolling resistance (Rolling). Loop: the speed to go round.
 	Mark     rune
 	Skin     string
@@ -181,6 +182,10 @@ type Field struct {
 	// a tram or a mill turning all the time, and the moment of release is a
 	// decision like the angle and the power — so the chain replays it.
 	Tick int
+	// Cap, above 0 and under MaxWork, is what a stroke may cost in its
+	// place (golf gives a commit's shot what is left of its budget). A
+	// stroke that reaches it ends as one that reaches MaxWork does.
+	Cap int
 	// prep is the walls' offsets, worked out once (Prepare).
 	prep []float64
 }

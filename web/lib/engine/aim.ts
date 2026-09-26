@@ -289,7 +289,7 @@ export function makeAimer(E: Live) {
     if (P.stopAt === "first-contact") {
       for (let i = 1; i < path.length; i++) {
         const c = why[i];
-        const hit = (c && c !== "-") || E.landing(path[i - 1], path[i]) != null;
+        const hit = (c && c !== "-") || E.landing(path[i - 1], path[i], path[0]) != null;
         // a sharp turn is a bounce, for a realm that does not say
         let turn = false;
         if (!why && i + 1 < path.length) {

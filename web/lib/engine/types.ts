@@ -122,7 +122,7 @@ export interface Live {
   /** the zones that act on the ball now: the hole's, the forecast's, the stroke's */
   readonly zones: () => Zone[];
   /** the kind of jump a step makes (the replay's) */
-  landing: (p: Vec2, q: Vec2) => ZoneKind | null;
+  landing: (p: Vec2, q: Vec2, start?: Vec2) => ZoneKind | null;
   readonly ball: Gnome;
   readonly dragging: boolean;
   readonly shot: Shot;

@@ -530,7 +530,13 @@ func Launch(cur realm, hole string, angle, power float64) string {
 		panic("golf: this round is being played in " + modeNames[r.mode] + " mode")
 	}
 
-	if _, holed := stroke(e, h, r, player, angle, power, 0, weatherOf(e, h, r.period).Zones); holed {
+	fc := weatherOf(e, h, r.period)
+	w := newWork(h, fc.Zones)
+	w.fixed = fixedGas(e, fc)
+	w.next(h)
+	shot, holed := stroke(e, h, r, player, angle, power, 0, fc.Zones)
+	w.add(shot)
+	if holed {
 		return ufmt.Sprintf("Holed in %d on %s! Your round: %s:%s/%s", r.strokes, e.id, hub, e.id, player.String())
 	}
 	// what a player on gnoweb needs for the next shot, with no 3D to look at
@@ -599,10 +605,12 @@ func playRound(e *entry, player address, shots string, period int64, mode int) s
 	}
 
 	list := shotList(shots)
-	weather := weatherOf(e, h, r.period).Zones // once for the whole commit
+	fc := weatherOf(e, h, r.period) // once for the whole commit
+	weather := fc.Zones
 	w := newWork(h, weather)
+	w.fixed = fixedGas(e, fc)
 	for _, s := range list {
-		w.next()
+		w.next(h)
 		angle, power, tick := parseShot(s)
 		shot, holed := stroke(e, h, r, player, angle, power, tick, weather)
 		w.add(shot)
@@ -644,22 +652,31 @@ func shotList(shots string) []string {
 //     shots of the 74 holes and raised by a fifth; a client can work it out
 //     from the path alone (web/lib/adena.ts).
 //   - by its work: the fixed part and the set-up, then Shot.Work, what the
-//     physics counted the stroke doing (its substeps, moves, contacts tested,
-//     zones and polygon points looked at) in units of about a thousand gas.
-//     The physics ends a stroke at MaxWork, so this one bounds every shot,
-//     a hostile hole's too: fitted on the course shots (0.72 of it at the
-//     most) and on hostile probes at the format's limits (bumper walls across
-//     the whole board, the steepest hill rolling the ball on, 512 polygon
-//     points, loops and capped wind under every move: 0.92 at the most).
+//     physics counted the stroke doing (its substeps, moves, contacts tested
+//     and every square root they take, every zone and polygon edge any check
+//     looks at) in units of at most about a thousand gas: 0.87K at the most
+//     on probes that add one kind of piece at a time, less on the course.
+//
+// What a commit spends before its shots is counted too (fixed): decoding the
+// hole, at most decodeBase and decodePerByte a byte of its data, and drawing
+// its forecast, Forecast.Work units (the rain's puddle tries, counted as
+// they go: up to 1.1e9 on a hostile hole's walls and polygons).
 //
 // Before the first shot of a commit, the hole's own bound (shotBound, its
 // heaviest shot) must fit workBudget; before each later one, a commit that
 // would pass workBudget with one more shot as heavy as its heaviest so far
-// is refused, with the number of shots that fit: a transaction the chain
-// could not finish is refused with a clear sentence instead of running out of
-// gas, and the rest goes in the next commit (PlayRound* continue the round).
-// SimulateRound and SimulateCommit refuse the same list the same way, so a
-// client learns it before it signs.
+// is refused, with the number of shots that fit. And each shot is played
+// with a work cap of its own (physics.Field.Cap): what is left of workBudget
+// once the fixed part and the shots before it are counted, MaxWorkStep kept
+// for its overshoot, MaxWork at the most. A shot that reaches a cap under
+// MaxWork is refused the same way, before anything is kept: so a commit, a
+// Launch too, never costs more than workBudget, forecast and decoding
+// included, whatever its shots. A course shot never comes near its cap, and
+// a shot refused in a commit is the first of the next, with the most room.
+// A transaction the chain could not finish is refused with a clear sentence
+// instead of running out of gas, and the rest goes in the next commit
+// (PlayRound* continue the round). SimulateRound and SimulateCommit refuse
+// the same list the same way, so a client learns it before it signs.
 //
 // It is an estimate, not a gas meter (gno has none). If the physics gets
 // cheaper these constants only err on the safe side; refit them if it gets
@@ -667,14 +684,15 @@ func shotList(shots string) []string {
 type work struct {
 	walls, pieces int64 // on the board this commit: walls, and every piece and polygon edge
 	bound         int64 // shotBound
+	fixed         int64 // spent before the shots: decoding, forecast
 	spent, most   int64
 	played        int
+	cap           int // the work cap of the shot being played
 }
 
-// The budget: of the 2e9 gas Adena lets a transaction simulate, 1.4e9 for the
-// shots, and the rest for one shot heavier than estimated, the forecast (up
-// to 0.17e9 measured, in the rain on the lane holes), decoding a data hole
-// (up to 0.07e9 at the format's limits), the package loads and the
+// The budget: of the 2e9 gas Adena lets a transaction simulate, 1.4e9 for a
+// commit, its forecast (up to 0.17e9 measured in the rain on the lane holes)
+// and decoding included, and the rest for the package loads and the
 // bookkeeping.
 const (
 	workBudget   = 1400000000
@@ -682,8 +700,21 @@ const (
 	workPerWall  = 150000
 	workPerPoint = 1200000
 	workPerPiece = 15000
-	workPerUnit  = 1100
+	workPerUnit  = 1000
 )
+
+// Decoding a hole's data costs at most decodeBase and decodePerByte a byte
+// (3.4K to 3.9K a byte measured, the course and the probes).
+const (
+	decodeBase    = 6000000
+	decodePerByte = 4000
+)
+
+// fixedGas is what a commit on e spends before its shots, in the forecast
+// fc: decoding the hole, and drawing the forecast.
+func fixedGas(e *entry, fc course.Forecast) int64 {
+	return decodeBase + decodePerByte*int64(len(holeData.Get(e.id).(string))) + int64(fc.Work)*workPerUnit
+}
 
 // maxShotGas is the most one shot of a hole may be estimated at: a hole
 // whose shotBound passes it is refused when it is published.
@@ -734,17 +765,40 @@ func pulsesOf(h course.Hole) []course.Pulse {
 	return nil
 }
 
-// next refuses the next shot if it could overrun the budget.
-func (w *work) next() {
+// next refuses the next shot if it could overrun the budget, and caps its
+// work at what is left of it.
+func (w *work) next(h course.Hole) {
 	if w.played == 0 && w.bound > workBudget {
 		panic("golf: one shot on this hole could cost more than a transaction can replay")
 	}
 	if w.played > 0 && w.spent+w.most > workBudget {
 		panic(ufmt.Sprintf("golf: more shots than one transaction can replay on this hole: commit the first %d, then the rest", w.played))
 	}
+	c := (workBudget-w.fixed-w.spent-workPerShot-w.walls*workPerWall)/workPerUnit - physics.MaxWorkStep
+	if c < 1 {
+		w.refuse()
+	}
+	if c > physics.MaxWork {
+		c = physics.MaxWork
+	}
+	w.cap = int(c)
+	if f := h.Field(); f != nil {
+		f.Cap = w.cap // the decoded hole of this call only: never stored
+	}
+}
+
+// refuse refuses the shot being played: it does not fit the budget.
+func (w *work) refuse() {
+	if w.played == 0 {
+		panic("golf: one shot on this hole could cost more than a transaction can replay")
+	}
+	panic(ufmt.Sprintf("golf: more shots than one transaction can replay on this hole: commit the first %d, then the rest", w.played))
 }
 
 func (w *work) add(s physics.Shot) {
+	if w.cap < physics.MaxWork && s.Work > w.cap {
+		w.refuse() // it reached its cap: it would have gone further
+	}
 	c := workPerShot + w.walls*workPerWall + int64(len(s.Path))*(workPerPoint+w.pieces*workPerPiece)
 	if u := workPerShot + w.walls*workPerWall + int64(s.Work)*workPerUnit; u > c {
 		c = u // a shot that did more than its path shows

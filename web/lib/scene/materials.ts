@@ -228,15 +228,16 @@ const rbox = (w: number, h: number, d: number, r = 0.12) => new RoundedBoxGeomet
 
 /** A soft grain, scaled by k, on the vertical faces only (sides) or on all;
  *  and a touch more light on what faces up. Adds to any lit material. */
-function withGrain<M extends THREE.Material>(m: M, k = 0.07, sides = false): M {
-  const key = "grain" + k + (sides ? "s" : "");
+function withGrain<M extends THREE.Material>(m: M, k = 0.07, sides = false, wet = false): M {
+  const key = "grain" + k + (sides ? "s" : "") + (wet ? "w" : "");
   m.onBeforeCompile = (sh: Shader) => {
-    sh.vertexShader = "varying vec3 vGrainW;\nvarying vec3 vGrainN;\n" + sh.vertexShader.replace(
+    sh.vertexShader = "varying vec3 vGrainW;\nvarying vec3 vGrainN;\n" + (wet ? "attribute float wetY;\nvarying float vWetY;\n" : "") + sh.vertexShader.replace(
       "#include <begin_vertex>",
-      "#include <begin_vertex>\n  vGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;\n  vGrainN = normalize(mat3(modelMatrix) * objectNormal);",
+      "#include <begin_vertex>\n  vGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;\n  vGrainN = normalize(mat3(modelMatrix) * objectNormal);" + (wet ? "\n  vWetY = wetY;" : ""),
     );
     sh.fragmentShader = `varying vec3 vGrainW;
 varying vec3 vGrainN;
+${wet ? "varying float vWetY;" : ""}
 float grainHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 float grainNoise(vec3 p) {
   vec3 i = floor(p), f = fract(p);
@@ -251,7 +252,11 @@ float grainNoise(vec3 p) {
     // fine grain, stretched along the ground (a kerb's run, a bank's strata), over a broader mottle
     float g = grainNoise(vGrainW * vec3(3.0, 9.0, 3.0)) - 0.5 + 0.6 * (grainNoise(vGrainW * 1.3) - 0.5);
     float up = ${sides ? "1.0 - abs(vGrainN.y)" : "1.0"};
-    diffuseColor.rgb *= 1.0 + ${k.toFixed(3)} * 2.0 * g * up${sides ? "" : " + 0.08 * smoothstep(0.55, 0.95, vGrainN.y)"};
+    diffuseColor.rgb *= 1.0 + ${k.toFixed(3)} * 2.0 * g * up${sides ? "" : " + 0.08 * smoothstep(0.55, 0.95, vGrainN.y)"};${wet ? `
+    // a bank running down into water: wet and darker just over the waterline
+    // (vWetY: that water's level; far under the ground where there is none)
+    float above = vGrainW.y - vWetY;
+    diffuseColor.rgb *= 1.0 - 0.32 * step(-0.04, above) * (1.0 - smoothstep(0.035, 0.11 + 0.03 * g, above));` : ""}
   }`,
     );
   };
@@ -270,6 +275,9 @@ export function relief(side: THREE.Side = THREE.FrontSide) {
 /** The grain on the vertical faces of a vertex-coloured ground (a lane's
  *  side face down to the sea, a bank). Returns m. */
 export const grainSides = <M extends THREE.Material>(m: M) => withGrain(m, 0.08, true);
+/** grainSides, and the wet band a bank takes over the water it runs into:
+ *  its geometry carries wetY per vertex (that water's level, or far below). */
+export const wetSides = <M extends THREE.Material>(m: M) => withGrain(m, 0.08, true, true);
 
 /** Colours a geometry color times k per vertex (vertex colours, for relief()):
  *  by default darker toward its foot, k from 0.62 at its lowest to 1.06 at its
@@ -295,13 +303,17 @@ export const carved = (geo: THREE.BufferGeometry, color: THREE.ColorRepresentati
 //
 // One look for every body of water on a lane (a pond, a moat, a rock pool, a
 // lagoon, a canal): its colour per vertex, from waterTone — pale in the
-// shallows, deep in the middle, a line of foam where it laps the bank — and
-// a slow shimmer of light drifting over it, done in the shader from the world
-// position and the shared clock: nothing per frame on the CPU, still for a
-// player who asked for less motion. One material: all a hole's water is one
-// draw call.
+// shallows, deep in the middle, a line of foam where it laps the bank — and,
+// in the shader, from the world position and the shared clock: a surface of
+// small waves (their normal, not their height: the water stays flat for the
+// ball and the banks), the sky caught at a grazing angle and the deep seen
+// looking straight down, a soft band of glint that slides with the view,
+// and thin light crests where the ripples ride. Nothing per frame on the
+// CPU; the waves stand still for a player who asked for less motion. One
+// material: all a hole's water is one draw call.
 
-/** The shallows and the deep of each water, by skin (a pond's by default). */
+/** The shallows and the deep of each water, by skin (a pond's by default):
+ *  a rock pool and a lagoon near the island's sea, a canal greyer. */
 const WATERS: Record<string, readonly [number, number]> = {
   water: [0x86c3cc, 0x2c6479],
   tidepool: [0x8fe3d6, 0x2e8f9e],
@@ -323,20 +335,36 @@ export function waterMat() {
   const m = new THREE.MeshBasicMaterial({ vertexColors: true });
   m.onBeforeCompile = (sh: Shader) => {
     sh.uniforms.uTime = clock;
-    sh.vertexShader = "varying vec2 vWaterXZ;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vWaterXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
-    sh.fragmentShader = "uniform float uTime;\nvarying vec2 vWaterXZ;\n" + sh.fragmentShader.replace(
+    sh.vertexShader = "varying vec3 vWaterW;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vWaterW = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+    sh.fragmentShader = "uniform float uTime;\nvarying vec3 vWaterW;\n" + sh.fragmentShader.replace(
       "#include <color_fragment>",
       `#include <color_fragment>
   {
-    // long soft streaks of sky, drifting and crossing: the water is never still
-    vec2 p = vWaterXZ;
-    float a = sin(p.x * 0.9 + p.y * 1.7 + uTime * 0.55) * sin(p.x * 2.3 - p.y * 0.6 - uTime * 0.4 + sin(p.y * 0.5));
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), 0.2 * smoothstep(0.72, 0.95, a));
+    vec2 p = vWaterW.xz;
+    float t = uTime;
+    // three trains of small waves crossing: their slope (the height's
+    // gradient), which tilts the normal; and the height itself, for crests
+    vec2 d1 = vec2(0.8, 0.6), d2 = vec2(-0.47, 0.88), d3 = vec2(0.96, -0.28);
+    float a1 = dot(p, d1) * 2.6 + t * 0.9, a2 = dot(p, d2) * 4.3 - t * 1.25, a3 = dot(p, d3) * 7.9 + t * 1.8 + sin(p.y * 0.7);
+    vec2 slope = d1 * cos(a1) * 2.6 * 0.3 + d2 * cos(a2) * 4.3 * 0.35 + d3 * cos(a3) * 7.9 * 0.35;
+    float h = sin(a1) * 0.3 + sin(a2) * 0.35 + sin(a3) * 0.35;
+    vec3 n = normalize(vec3(-slope.x * 0.035, 1.0, -slope.y * 0.035));
+    vec3 V = normalize(cameraPosition - vWaterW);
+    float facing = max(dot(n, V), 0.0);
+    // looking down you see into it (deeper), at a grazing angle the sky
+    diffuseColor.rgb *= mix(1.04, 0.9, smoothstep(0.55, 0.98, facing));
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.95, 0.97), 0.4 * pow(1.0 - facing, 4.0));
+    // the sun's glint: a soft band where the waves turn it to the eye, stepped (toon)
+    vec3 L = normalize(vec3(-0.35, 0.75, -0.55));
+    float sp = max(dot(reflect(-L, n), V), 0.0);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), 0.18 * smoothstep(0.95, 0.965, sp) + 0.36 * smoothstep(0.988, 0.993, sp));
+    // thin light crests where the ripples ride
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), 0.1 * smoothstep(0.7, 0.78, h));
   }`,
     );
   };
-  m.customProgramCacheKey = () => "water";
-  md(m).hook = "water";
+  m.customProgramCacheKey = () => "water2";
+  md(m).hook = "water2";
   return (waterM = share(m));
 }
 

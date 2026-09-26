@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CELL, inZone, inset, mod, segDist, boxOf, POOLS } from "../terrain";
+import { CELL, inZone, inset, mod, segDist, boxOf, POOLS, DISH, sandIn } from "../terrain";
 import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf, waterTone, waterMat } from "./materials";
 import { animate, state } from "./state";
 import { stone, warp, badge, windmill } from "./props";
@@ -9,7 +9,7 @@ import { worldOf, fromWorld, gapWater, DECK, GAP_Y } from "./worlds";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { ud, type CourseTerrain as T, type Hole } from "./data";
 import type { Rand } from "./common";
-import type { Board, MutVec2, Post, Vec2, Zone } from "../types";
+import type { Board, MutVec2, Post, Vec2, Wall, Zone } from "../types";
 
 /** What every zone drawing gets: its rectangle's size and its own random. */
 interface Opts {
@@ -501,7 +501,7 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
   const WATER: Record<string, number> = { sea: 0x4ea3cf, wave: 0x8fd0ee, lagoon: 0x5fd0cc, tidepool: 0x6fc3c9, fountain: 0x8fd0ee, canal: 0x4d8fb3, gap: 0x1f3d4a };
   // in the mountains a bunker is a patch of deep snow: same drag, white
   const snow = s.world === "mountain" && !water && !ice && !puddle && !bed && !deck && (z.skin === "sand" || !z.skin);
-  const color = snow ? 0xf3f7fa : water ? WATER[z.skin] ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : soil ? 0x6e4d33 : deck ? C.wood : z.skin === "wetsand" ? 0xc8a46e : ice ? 0xbfe6f0 : 0xecd49c;
+  const color = snow ? 0xf3f7fa : water ? WATER[z.skin] ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : soil ? 0x6e4d33 : deck ? C.wood : z.skin === "wetsand" ? 0xd4b77e : ice ? 0xbfe6f0 : 0xecd49c;
   const blob = organic(z, rand, s.board);
   // inside the drawn shape and on the green, with a margin: where detail may go
   const inSand = (x: number, zz: number) => {
@@ -526,6 +526,14 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
   if (deck && t.pond((z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2)) return boardwalk(z, s, t, g);
   if (sunk) {
     pondDetail(z, s, t, g, { w, h, rand });
+    return g;
+  }
+  // sand (a bunker, a beach's wet sand; a snow bunker): its own natural patch
+  if (DISH[z.skin] && DISH[z.skin].depth > 0 && !water && !deck) {
+    const walls = s.walls.filter((q) => !q.every);
+    const inside = (x: number, zz: number, m = 0.15) => x > 0.4 && zz > 0.4 && x < s.board.w - 0.4 && zz < s.board.h - 0.4 && t.onGreen(x, zz) && sandIn(z, walls, x, zz) > m;
+    g.add(sandPatch(z, walls, t, color, snow));
+    sandDetail(z, s, t, g, { w, h, rand, blob, inSand: inside, spot, snow });
     return g;
   }
   // a drawn outline (not the chain's polygon) is round its middle: rings out
@@ -909,19 +917,86 @@ function iceDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, spot }:
   }
 }
 
-/** Sand (or deep snow): grains and raked lines. */
+/**
+ * A sand's patch, drawn to its natural outline (terrain sandIn: corners
+ * rounded off inward, an uneven margin, never past the zone) and laid on its
+ * dish: a fine grid, each vertex coloured and its alpha 0 past the outline
+ * (cut there by alphaTest, and off the lane by the green's mask). The colour
+ * carries the relief the eye reads from afar: a damp, darker rim, a pale lip
+ * just inside it, the floor shaded by its slope to the light (the far side
+ * lit, the near side in shade) and darker as it deepens, and the ripples the
+ * ground carries (terrain) in light and shade. One mesh.
+ */
+function sandPatch(z: Zone, walls: readonly Wall[], t: T, color: number, snow: boolean) {
+  const S = 0.2, x0 = Math.max(0, z.min[0]), z0 = Math.max(0, z.min[1]), x1 = Math.min(t.nx * CELL, z.max[0]), z1 = Math.min(t.nz * CELL, z.max[1]);
+  const nx = Math.max(1, Math.ceil((x1 - x0) / S)), nz = Math.max(1, Math.ceil((z1 - z0) / S)), dx = (x1 - x0) / nx, dz = (z1 - z0) / nz;
+  const pos: number[] = [], col: number[] = [], idx: number[] = [], D: number[] = [];
+  const base = new THREE.Color(color), c = new THREE.Color();
+  const Lx = -0.45, Lz = -0.6; // toward the light, across the ground
+  for (let j = 0; j <= nz; j++)
+    for (let i = 0; i <= nx; i++) {
+      const x = x0 + i * dx, zz = z0 + j * dz, d = sandIn(z, walls, x, zz), y = t.height(x, zz);
+      D.push(d);
+      pos.push(x, y + 0.035, zz);
+      // the slope, from the ground itself (dish, lip, ripples)
+      const gx = (t.height(x + 0.06, zz) - t.height(x - 0.06, zz)) / 0.12, gz = (t.height(x, zz + 0.06) - t.height(x, zz - 0.06)) / 0.12;
+      const lit = Math.min(1.14, Math.max(0.8, 1 - 1.3 * (gx * Lx + gz * Lz) / Math.hypot(gx, 1, gz)));
+      const rim = 1 - Math.min(1, Math.max(0, d / 0.16)), lip = Math.exp(-(((d - 0.2) / 0.1) ** 2));
+      const k = lit * (snow ? 1 + 0.06 * rim : 1 - 0.15 * rim * rim) * (1 + 0.05 * lip) * (1 - 0.08 * smooth01(d / DISH[z.skin].run));
+      c.copy(base).multiplyScalar(k);
+      // (alpha along the outline's distance, on a slow ramp: the cut between
+      // two vertices falls where the outline is, not on the grid)
+      col.push(c.r, c.g, c.b, Math.min(1, Math.max(0, 0.5 + d * 1.5)));
+    }
+  const at = (i: number, j: number) => j * (nx + 1) + i;
+  for (let j = 0; j < nz; j++)
+    for (let i = 0; i < nx; i++) {
+      const q = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
+      if (q.every((v) => D[v] < -0.05)) continue;
+      idx.push(q[0], q[3], q[2], q[0], q[2], q[1]);
+    }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 4));
+  // (uv as a shape's: (x, -z), for the green's mask)
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(pos.flatMap((v, i) => (i % 3 === 0 ? [v] : i % 3 === 2 ? [-v] : [])), 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  // (drawn over the lane's coarser mesh, which may bulge through a dish between its vertices)
+  return new THREE.Mesh(geo, flat(0xffffff, { alphaMap: greenMask(t), alphaTest: 0.5, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
+}
+const smooth01 = (x: number) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };
+
+/** Sand (or deep snow): fine grains, and raked lines in a bunker, or on a
+ *  beach's wet sand a few pebbles and shells instead. */
 function sandDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, inSand, snow, blob }: Detail) {
-  // sand: grains and raked lines, kept inside the shape's inner margin
+  // grains, kept inside the shape's inner margin
+  const beach = z.skin === "wetsand";
   const grain = new THREE.CircleGeometry(1, 10);
-  const tones = snow ? [flat(0xd6e6ef), flat(0xffffff)] : [flat(0xd9bd82), flat(0xf4e1b2)];
-  for (let i = 0; i < w * h * 4; i++) {
-    const x = z.min[0] + w * (0.2 + rand() * 0.6), zz = z.min[1] + h * (0.2 + rand() * 0.6);
+  const tones = snow ? [flat(0xd6e6ef), flat(0xffffff)] : beach ? [flat(0xb08e5c), flat(0xe0c795)] : [flat(0xd9bd82), flat(0xf4e1b2)];
+  for (let i = 0; i < w * h * (beach ? 2 : 4); i++) {
+    const x = z.min[0] + w * (0.05 + rand() * 0.9), zz = z.min[1] + h * (0.05 + rand() * 0.9);
     if (!inSand(x, zz)) continue;
     const d = new THREE.Mesh(grain, tones[i % 2]);
     d.scale.setScalar(0.025 + rand() * 0.035);
     d.rotation.x = -Math.PI / 2;
     d.position.set(x, t.height(x, zz) + 0.045, zz);
     g.add(d);
+  }
+  if (beach) {
+    // pebbles and shells, one here and there
+    const stones: THREE.BufferGeometry[] = [], shells: THREE.BufferGeometry[] = [];
+    for (let n = 0, k = 0; n < 60 && k < Math.min(9, 1 + (w * h) / 8); n++) {
+      const x = z.min[0] + rand() * w, zz = z.min[1] + rand() * h;
+      if (!inSand(x, zz)) continue;
+      k++;
+      const y = t.height(x, zz) + 0.035, r = 0.05 + rand() * 0.06;
+      if (k % 3) stones.push(new THREE.DodecahedronGeometry(r, 0).scale(1, 0.55, 0.8).rotateY(rand() * 6).translate(x, y + r * 0.2, zz));
+      else shells.push(new THREE.ConeGeometry(0.09, 0.07, 7, 1, true).rotateY(rand() * 6).rotateX(-0.25).translate(x, y + 0.02, zz));
+    }
+    if (stones.length) g.add(drawn(mergeGeometries(stones), flat(0x9c978a)));
+    if (shells.length) g.add(drawn(mergeGeometries(shells), flat(0xf3dcd2)));
+    return;
   }
   // raked: arcs round the middle, following its outline, each one broken off
   // where the rake was lifted

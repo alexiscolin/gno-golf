@@ -76,17 +76,21 @@ func TestRoundsStoreShotsNotPaths(cur realm, t *testing.T) {
 // it is refused before the shot that would overrun it, with the number that
 // fit, and the preview refuses it the same way. A light hole takes all 12.
 func TestACommitIsBoundedByWork(cur realm, t *testing.T) {
-	id := mine(cur, "heavy", limitsHole())
+	id := dryMine(cur, "heavy", limitsHole(), course.Clear) // the forecast counts: in the dry
 	shots := strings.Repeat(heavyShot+";", 12)
 	uassert.PanicsContains(t, cur, "commit the first "+strconv.Itoa(heavyFit)+", then the rest", func() { SimulateRound(id, shots) })
 	testing.SetRealm(testing.NewUserRealm(player))
 	urequire.AbortsContains(t, cur, "commit the first "+strconv.Itoa(heavyFit)+", then the rest", func() { PlayRound(cross(cur), id, shots) })
 	testing.SetRealm(testing.NewUserRealm(player))
 	Reset(cross(cur), id) // a test does not revert what the aborted commit did; a transaction does
-	testing.SetRealm(testing.NewUserRealm(player))
-	PlayRound(cross(cur), id, strings.Repeat(heavyShot+";", heavyFit))
-	testing.SetRealm(testing.NewUserRealm(player))
-	PlayRound(cross(cur), id, strings.Repeat(heavyShot+";", 12-heavyFit)) // the rest, in the next commit
+	for left := 12; left > 0; left -= heavyFit { // the rest, in the next commits
+		n := heavyFit
+		if left < n {
+			n = left
+		}
+		testing.SetRealm(testing.NewUserRealm(player))
+		PlayRound(cross(cur), id, strings.Repeat(heavyShot+";", n))
+	}
 	uassert.Equal(t, 12, roundIn(id, player).strokes)
 
 	light := register(cur, "light")
@@ -277,10 +281,109 @@ func TestAStaleRoundMustBeReset(cur realm, t *testing.T) {
 	Launch(cross(cur), id, 0, 1)
 }
 
+// iceCage is 160 bumper walls round a board of ice: a tap stays put, a
+// full shot bounces on until its work runs out.
+func iceCage() *course.Simple {
+	var walls []physics.Wall
+	for len(walls) < course.MaxWalls {
+		for _, w := range physics.Box(physics.V(10, 10), physics.V(30, 30)) {
+			w.Bounce, w.Skin = 1.5, "bumper"
+			walls = append(walls, w)
+		}
+	}
+	var zones []physics.Zone
+	for i := 0; i < course.MaxZones-8; i++ {
+		zones = append(zones, physics.Zone{Kind: physics.Surface, Min: physics.V(0, 0), Max: physics.V(96, 96), Scale: 8, Skin: "ice"})
+	}
+	return &course.Simple{W: 96, H: 96, World: "garden", Title: "Ice cage", Strokes: 5,
+		Tee: physics.V(20, 20), Pin: physics.V(93, 3), Substeps: course.MaxSubsteps, CupRadius: 1,
+		Course: &physics.Field{Walls: walls, Zones: zones, Friction: 0.99, Bounce: 1.5, Radius: 0.5}}
+}
+
+// dryMine publishes h under the first slug of prefix whose weather now is
+// kind, and returns its id.
+func dryMine(cur realm, prefix string, h *course.Simple, kind string) string {
+	for i := 0; ; i++ {
+		slug := prefix + strconv.Itoa(i)
+		if course.ForecastFor(testutils.TestAddress("au"+slug).String()+"/"+slug+"/v1", h.World, h, Period()).Kind == kind {
+			return mine(cur, slug, h)
+		}
+	}
+}
+
+// A commit is held to its budget whatever its shots: eleven taps, then a
+// full shot that would bounce on to MaxWork. The heaviest shot so far was a
+// tap, so the old cut let it through, and the commit went past its budget;
+// now the full shot is played with the room left as its cap, reaches it,
+// and the commit is refused with the eleven that fit. Played first in the
+// next commit, the full shot has the whole budget, and plays out.
+func TestACommitNeverPassesItsBudget(cur realm, t *testing.T) {
+	id := dryMine(cur, "cage", iceCage(), course.Clear)
+	taps, full := strings.Repeat("0,0.01;", 11), "135,10"
+	p := Period()
+	uassert.PanicsContains(t, cur, "commit the first 11, then the rest", func() { SimulateRoundAt(id, taps+full, p) })
+	testing.SetRealm(testing.NewUserRealm(player))
+	urequire.AbortsContains(t, cur, "commit the first 11, then the rest", func() { PlayRoundAt(cross(cur), id, taps+full, p) })
+	testing.SetRealm(testing.NewUserRealm(player))
+	Reset(cross(cur), id) // a test does not revert what the aborted commit did; a transaction does
+	testing.SetRealm(testing.NewUserRealm(player))
+	PlayRoundAt(cross(cur), id, taps, p)
+	testing.SetRealm(testing.NewUserRealm(player))
+	PlayRoundAt(cross(cur), id, full, p)
+	uassert.Equal(t, 12, roundIn(id, player).strokes)
+
+	// the cap each shot was given: MaxWork on a fresh commit, what is left
+	// after the taps, and nothing once the forecast alone takes it all
+	e := mustHole(id)
+	h := e.hole()
+	fc := weatherOf(e, h, p)
+	w := newWork(h, fc.Zones)
+	w.fixed = fixedGas(e, fc)
+	w.next(h)
+	uassert.Equal(t, physics.MaxWork, w.cap)
+	uassert.Equal(t, physics.MaxWork, h.Field().Cap)
+	w.played, w.spent = 11, 800000000
+	w.next(h)
+	room := (workBudget-w.fixed-w.spent-workPerShot-w.walls*workPerWall)/workPerUnit - physics.MaxWorkStep
+	uassert.Equal(t, int(room), w.cap)
+	uassert.True(t, w.cap < physics.MaxWork/2, "the room left")
+	w.fixed = workBudget
+	uassert.PanicsContains(t, cur, "commit the first 11, then the rest", func() { w.next(h) })
+}
+
+// A Launch is held to the same budget: on a hole whose rain costs most of
+// it (every puddle try testing 160 walls and every edge of 8 thin hazard
+// polygons), the one shot has what is left, and one that reaches it is
+// refused before anything is kept.
+func TestALaunchNeverPassesItsBudget(cur realm, t *testing.T) {
+	walls := physics.Box(physics.V(3, 3), physics.V(7, 7))
+	for len(walls) < course.MaxWalls {
+		walls = append(walls, physics.Box(physics.V(3, 3), physics.V(7, 7))...)
+	}
+	for i := range walls {
+		walls[i].Bounce, walls[i].Skin = 1.5, "bumper"
+	}
+	var zones []physics.Zone
+	for i := 0; i < course.MaxPolyTotal/course.MaxPoly; i++ {
+		z := physics.Zone{Kind: physics.Hazard, Min: physics.V(0, 0), Max: physics.V(96, 96), Vec: physics.V(5, 5)}
+		for k := 0; k < course.MaxPoly; k++ {
+			z.Poly = append(z.Poly, physics.V(float64(k)*1.5+float64(i)*0.1, 95.9+float64(k%2)*0.1))
+		}
+		zones = append(zones, z)
+	}
+	h := &course.Simple{W: 96, H: 96, World: "garden", Title: "Corner", Strokes: 5,
+		Tee: physics.V(5, 5), Pin: physics.V(93, 3), Substeps: course.MaxSubsteps, CupRadius: 1,
+		Course: &physics.Field{Walls: walls, Zones: zones, Friction: 0.99, Bounce: 1.5, Radius: 0.5}}
+	wet := dryMine(cur, "corner", h, course.Rain)
+	testing.SetRealm(testing.NewUserRealm(player))
+	urequire.AbortsContains(t, cur, "one shot on this hole could cost more than a transaction can replay", func() { Launch(cross(cur), wet, 30, 10) })
+	uassert.True(t, strings.Contains(SimulateCommit(dryMine(cur, "corner", h, course.Clear), 5, 5, 0, "30,10", Period()), `"strokes":1`), "in the dry it plays")
+}
+
 // heavyShot is a shot of which heavyFit fit in one commit on limitsHole.
 const (
 	heavyShot = "30,10"
-	heavyFit  = 9
+	heavyFit  = 5
 )
 
 // PlayRound goes on with a round in the round's own weather, across the

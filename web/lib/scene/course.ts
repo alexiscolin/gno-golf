@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { terrain, CELL, CUP_R, BALL_R, airy, there, inPoly, inZone, closest, nearestOnPoly, segDist, smoothstep, POOL, inSea } from "../terrain";
-import { C, bankRows, ink, flat, motion, drawn, drape, rbox, ringLine, texOf, setWind, share, plantFeet, quality, geoOf, gridGeo, onTop, carved, grainSides } from "./materials";
+import { terrain, CELL, CUP_R, BALL_R, airy, there, inPoly, inZone, closest, nearestOnPoly, segDist, smoothstep, POOL, POOLS, DISH, inSea } from "../terrain";
+import { C, bankRows, ink, flat, motion, drawn, drape, rbox, ringLine, texOf, setWind, share, plantFeet, quality, geoOf, gridGeo, onTop, carved, grainSides, wetSides } from "./materials";
 import { bake } from "./bake";
 import { state } from "./state";
 import { timeOf, islandBox } from "./camera";
@@ -42,8 +42,9 @@ export function buildHole(s: Hole, { defer = false } = {}): Course {
   // where a ball off the lane falls instead of splashing: the rooftops' streets
   state.fallAt = s.zones.some((q) => q.skin === "roof") ? (x, z) => t.zoneAt(x, z)?.skin === "roof" : null;
   // where rain lies (puddles, splashes): the lane as drawn, not the water in
-  // or round it, a gap or the rooftops, nor under a wall
-  const open = s.zones.filter((q) => q.kind === "hazard" || GAPS.has(q.skin));
+  // or round it, a gap or the rooftops, nor under a wall; nor a sand's dish
+  // (a puddle is flat: it soaks into the sand)
+  const open = s.zones.filter((q) => q.kind === "hazard" || GAPS.has(q.skin) || (q.kind === "surface" && (DISH[q.skin]?.depth ?? 0) > 0));
   t.dry = (x, z) => t.onGreen(x, z) && !open.some((q) => inZone(q, x, z)) && !s.walls.some((w) => segDist(x, z, w.a, w.b) < 0.3);
 
   // the garden is an island, not a world: a raised plot of grass on a block of
@@ -255,8 +256,11 @@ const footOf = new THREE.Color(), iceSide = new THREE.Color(0x8fcde6), earthSide
 
 const PLANK = 1; // a boardwalk's board, across the lane
 
-function groundMesh(s: Hole, t: T) {
+export function groundMesh(s: Hole, t: T) {
   const pos: number[] = [], col: number[] = [], nor: number[] = [], edges: number[] = [];
+  // a hole with sunk water: each vertex's water level (wetSides: the wet
+  // band over the waterline), far under the ground where there is none
+  const wetY: number[] | null = s.zones.some((q) => q.kind === "hazard" && POOLS[q.skin]) ? [] : null;
   // world.green: [a, b] stripes (mountain packed snow...), or a function of
   // the hole giving them, or "planks" for a boardwalk: boards across the lane
   // with dark seams; nothing for the garden's own
@@ -291,6 +295,7 @@ function groundMesh(s: Hole, t: T) {
   const quad = (p: readonly (readonly number[])[], color: THREE.Color, n?: readonly number[], low?: THREE.Color) => {
     for (const k of Math.abs(p[0][1] - p[2][1]) > Math.abs(p[1][1] - p[3][1]) + 1e-4 ? [0, 1, 3, 1, 2, 3] : [0, 1, 2, 0, 2, 3]) {
       pos.push(...p[k]);
+      if (wetY) wetY.push(t.pond(p[k][0], p[k][2])?.level ?? -99);
       const cc = low && (k === 1 || k === 2) ? low : n || !t.pond ? color : banked(color, p[k]);
       col.push(cc.r, cc.g, cc.b);
       nor.push(...(n || up(p[k][0], p[k][2])));
@@ -365,7 +370,10 @@ function groundMesh(s: Hole, t: T) {
     for (let j = 0; j < t.nz; j++)
       for (let i = 0; i < t.nx; i++) {
         const q = t.zoneAt((i + 0.5) * CELL, (j + 0.5) * CELL);
-        if (q && ((ownSea && q.skin === "sea") || q.skin === "roof" || GAPS.has(q.skin))) open_[t.idx(i, j)] = 1;
+        // (an inlet only on the lane: its corners reaching past the kerb stay
+        // drawn, the lane's edge closing its mouth, or the sea showed through
+        // in a slot by the kerb's end post)
+        if (q && ((ownSea && q.skin === "sea" && (q.outside || !!t.green[t.idx(i, j)])) || q.skin === "roof" || GAPS.has(q.skin))) open_[t.idx(i, j)] = 1;
         // a blowhole's mouth is a real hole (its rim, drawn by island.ts,
         // covers the cells' stepped edge)
         if (q && q.skin === "blowhole") {
@@ -491,12 +499,13 @@ function groundMesh(s: Hole, t: T) {
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+  if (wetY) geo.setAttribute("wetY", new THREE.Float32BufferAttribute(wetY, 1));
   const m = new THREE.Group();
   // pushed back in depth: walls, lines and pads sit exactly on this ground, and
   // two surfaces on one plane flicker as the camera moves
   // Lambert, not toon: on a slope the three toon bands turn into jagged steps
   // that follow the triangles; smooth light is what makes a hill read as one
-  m.add(new THREE.Mesh(geo, grainSides(new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: 4 }))));
+  m.add(new THREE.Mesh(geo, (wetY ? wetSides : grainSides)(new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: 4 }))));
   const eg = new THREE.BufferGeometry();
   eg.setAttribute("position", new THREE.Float32BufferAttribute(edges, 3));
   // a world may hide the green's edge ink (mountain snow: world.edgeInk = false)
@@ -1262,35 +1271,6 @@ function unreached(walls: readonly Wall[], zones: readonly Zone[]) {
 }
 
 /**
- * A glass rail: a low clear pane along each wall, from the water up to a
- * little over the lane, with a faint ink line along its top and a soft
- * highlight under it. No posts. One mesh and one line batch for all of them;
- * drawn after the sea (renderOrder), never writing depth, so it cannot flicker
- * against the water. Kept out of the bake: it is see-through.
- */
-function glassRail(walls: readonly Wall[], s: Hole, t: T) {
-  const g = new THREE.Group(), panes: THREE.BufferGeometry[] = [], top: number[] = [], shine: number[] = [];
-  const foot = (worldOf(s).SEA ?? GRASS - 0.9) - 0.1;
-  for (const w of walls) {
-    const len = segLen(w), ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]);
-    const mx = (w.a[0] + w.b[0]) / 2, mz = (w.a[1] + w.b[1]) / 2, y1 = t.height(mx, mz) + 0.45;
-    panes.push(new THREE.BoxGeometry(len, y1 - foot, 0.06).rotateY(-ang).translate(mx, (y1 + foot) / 2, mz));
-    top.push(w.a[0], y1, w.a[1], w.b[0], y1, w.b[1]);
-    shine.push(w.a[0], y1 - 0.08, w.a[1], w.b[0], y1 - 0.08, w.b[1]);
-  }
-  const glass = new THREE.Mesh(mergeGeometries(panes), new THREE.MeshBasicMaterial({ color: 0xdff4fb, transparent: true, opacity: 0.16, depthWrite: false }));
-  const lines = (pos: number[], color: number, opacity: number) => {
-    const l = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
-    l.renderOrder = 2;
-    return l;
-  };
-  glass.renderOrder = 1;
-  g.add(glass, lines(top, C.ink, 0.55), lines(shine, 0xffffff, 0.6));
-  ud(g).live = true;
-  return g;
-}
-
-/**
  * Walls as the eye expects them. physics.Bar makes a free-standing barrier out
  * of four segments; drawn one by one they look like two rails, so four closed
  * thin segments are drawn as one solid timber. A lone segment is a board edge:
@@ -1302,9 +1282,9 @@ function wallPieces(s: Hole, t: T) {
   // a timed wall (a mill's sail) is drawn by what it belongs to, not as a bar
   // (nor a run of walls no ball can reach: see outOfReach)
   const gone = unreached(s.walls, s.zones);
-  // a frame out in the sea a ball can still reach is a clear pane, not a fence
+  // a frame out in the sea is not drawn at all: the sea is the edge a player
+  // reads (the wall still stands on the chain: a rare ball can bounce off it)
   const clear = new Set(s.walls.filter((w) => !gone.has(w) && inSea(w, s.zones)));
-  if (clear.size) out.push(glassRail([...clear], s, t));
   const W = s.walls.filter((w) => !w.every && !gone.has(w) && !clear.has(w));
   timedPieces(s, t, out);
   const caps = new Map<string, MutVec2>();

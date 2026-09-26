@@ -2141,8 +2141,7 @@ export function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Dressed
   }
   if (kind === "zone") {
     const zone = item as Dressed;
-    if (k === "wetsand") return footprint(zone, t, flatTop(P.wet));
-    if (k === "sand") return footprint(zone, t, flatTop(P.sand));
+    // (sand on the lane is the shared natural patch on its dish: zones.ts)
     // (a rock pool and a lagoon on the lane are sunk into it, as every
     // water is: the shared pond draws them, with their banks and rocks)
     const [mx, mz] = [(zone.min[0] + zone.max[0]) / 2, (zone.min[1] + zone.max[1]) / 2];
@@ -2193,13 +2192,24 @@ function lagoonUnder(s: Hole) {
   water.position.y = SEA + 0.02;
   g.add(water);
   const piles: THREE.BufferGeometry[] = [];
+  // one pile every PILE along the deck's edge, the spacing carried on from one
+  // wall to the next where they join, so the short walls of a rounded end do
+  // not each start a pile of their own
+  const PILE = 3, placed: [number, number][] = [];
+  let carry = PILE / 2, end: readonly number[] | null = null;
   for (const w of s.walls) {
-    if (w.every || inSea(w, s.zones)) continue; // (a frame out in the sea is clear glass: no piles)
+    if (w.every || inSea(w, s.zones)) continue; // (a frame out in the sea is invisible: no piles)
     const l = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
-    for (let u = 0.5; u < l; u += 3) {
+    if (!end || Math.hypot(w.a[0] - end[0], w.a[1] - end[1]) > 0.05) carry = PILE / 2; // a new run of walls
+    end = w.b;
+    let u = carry;
+    carry = u >= l ? u - l : PILE - ((l - u) % PILE);
+    for (; u < l; u += PILE) {
       const x = w.a[0] + ((w.b[0] - w.a[0]) * u) / l, z = w.a[1] + ((w.b[1] - w.a[1]) * u) / l;
       if (x < 0.5 || x > W - 0.5 || z < 0.5 || z > H - 0.5) continue; // the board's own edge fence
       if (s.zones.some((q) => q.skin === "gap" && x > q.min[0] - 0.4 && x < q.max[0] + 0.4 && z > q.min[1] - 0.4 && z < q.max[1] + 0.4)) continue; // (a gap has its own posts)
+      if (placed.some(([px, pz]) => Math.hypot(px - x, pz - z) < PILE * 0.8)) continue; // (walls meet in any order: no crowding)
+      placed.push([x, z]);
       piles.push(new THREE.CylinderGeometry(0.16, 0.2, GRASS - SEA + 0.8, 6).translate(x, (GRASS + SEA - 0.8) / 2, z));
     }
   }

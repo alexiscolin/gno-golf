@@ -211,7 +211,7 @@ const _m = new THREE.Matrix4(), _c = new THREE.Color(), FADED = new THREE.Color(
 
 // tint(i, x, z) -> a THREE.Color (or null) colours dot i: where wind or a
 // slope bends the path, the engine can say so
-export function aimAlong(aim: Aim, path: readonly Vec2[], power: number, height: Height, landing: (p: Vec2, q: Vec2) => string | null = () => null, tint: ((i: number, x: number, z: number) => THREE.Color | null) | null = null) {
+export function aimAlong(aim: Aim, path: readonly Vec2[], power: number, height: Height, landing: (p: Vec2, q: Vec2, start?: Vec2) => string | null = () => null, tint: ((i: number, x: number, z: number) => THREE.Color | null) | null = null) {
   const dots = aim.userData.dots!, cap = dots.instanceMatrix.count;
   const k = power / 10;
   const reach = 2 + k * 16;
@@ -222,7 +222,7 @@ export function aimAlong(aim: Aim, path: readonly Vec2[], power: number, height:
   for (let i = 0; i + 1 < path.length && left > 0 && used < cap; i++) {
     const [ax, az] = path[i], [bx, bz] = path[i + 1];
     const l = Math.hypot(bx - ax, bz - az);
-    const jump = landing(path[i], path[i + 1]);
+    const jump = landing(path[i], path[i + 1], path[0]);
     if (jump === "hazard") break; // in the water: the dots stop at the bank
     if (jump === "tunnel") { next = gap * 0.8; continue; } // no dots underground; they resume at the exit
     let d = next;

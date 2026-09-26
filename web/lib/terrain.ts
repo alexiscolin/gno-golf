@@ -143,13 +143,32 @@ export const POOLS: Record<string, { bank: number }> = { water: { bank: 0.6 }, t
 const SHORE = 0.35;
 // the relief of a surface, by skin: how far its middle sinks (a bunker's
 // dish; less than 0 heaps it up, a bed of soil), over how far in from its
-// edge, and the lip just inside that edge
-export const DISH: Record<string, { depth: number; run: number; lip: number }> = {
-  sand: { depth: 0.18, run: 0.8, lip: 0.05 },
-  wetsand: { depth: 0.05, run: 0.6, lip: 0.02 },
+// drawn outline (sandIn), and the soft lip just inside that outline
+// (ripple: how high the wind's ripple marks stand, and a slow swell under them)
+export const DISH: Record<string, { depth: number; run: number; lip: number; ripple?: number }> = {
+  sand: { depth: 0.3, run: 1.4, lip: 0.07 },
+  wetsand: { depth: 0.15, run: 1.2, lip: 0.05, ripple: 0.016 },
   flowerbed: { depth: -0.08, run: 0.5, lip: 0 },
   soil: { depth: -0.06, run: 0.5, lip: 0 },
 };
+
+/**
+ * How far (x, y) is inside the outline a sand is drawn to (or a bed of
+ * soil): its zone's edges, and the walls that cross it, blended by a soft
+ * minimum so every corner rounds off inward, less an uneven margin of 0.08
+ * to 0.26 — a natural shape, never past the chain's zone. Under 0 outside it
+ * (-1 outside the zone). The dish (terrain) and the patch (zones.ts
+ * sandPatch) both follow it, so the ball rides what is drawn.
+ */
+export function sandIn(q: Shape, walls: readonly Pick<Wall, "a" | "b">[], x: number, y: number) {
+  if (!inZone(q, x, y)) return -1;
+  let sum = 0;
+  for (const [a, b] of edgesOf(q)) sum += Math.exp(-segDist(x, y, a, b) / SHORE);
+  for (const w of walls) sum += Math.exp(-segDist(x, y, w.a, w.b) / SHORE);
+  const d = Math.min(q.round ? inset(q, x, y) : Infinity, sum ? -SHORE * Math.log(sum) : Infinity);
+  const n = 0.75 * Math.sin(x * 1.3 + y * 0.6) * Math.cos(y * 1.1 - x * 0.4) + 0.25 * Math.sin(x * 2.9 - y * 2.3 + 1.1);
+  return d - (0.17 + 0.09 * n);
+}
 
 /**
  * Whether (x, y) is in a zone, as the chain tests it: its rectangle; a Round
@@ -168,7 +187,7 @@ export function inZone(q: Shape, x: number, y: number) {
 
 /** Whether a plain wall stands wholly out in an Outside hazard (the sea
  *  round a lane with no rails): the board's frame there, not a rail —
- *  drawn as clear glass (course.ts glassRail), with no posts nor piles. */
+ *  not drawn at all (course.ts wallPieces), with no posts nor piles. */
 export function inSea(w: Pick<Wall, "a" | "b" | "skin" | "every">, zones: readonly Zone[]) {
   if (w.skin || w.every) return false;
   const sea = zones.filter((q) => q.kind === "hazard" && q.outside && q.poly && !q.every);
@@ -473,11 +492,15 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
   }));
   const dish = (x: number, z: number) => {
     let h = 0;
-    for (const { q, walls, depth, run, lip } of dishes) {
+    for (const { q, walls, depth, run, lip, ripple } of dishes) {
       if (!inZone(q, x, z)) continue;
-      let d = inset(q, x, z);
-      for (const w of walls) d = Math.min(d, segDist(x, z, w.a, w.b));
-      h += lip * Math.exp(-(((d - 0.14) / 0.09) ** 2)) - depth * smoothstep((d - 0.2) / run);
+      // a lip just inside the drawn outline, then the floor sinking away
+      // (a slow smoothstep: the lane's coarser mesh under the patch keeps
+      // within its lift)
+      const d = sandIn(q, walls, x, z);
+      if (d > -0.3) h += lip * Math.exp(-(((d - 0.14) / 0.14) ** 2)) - depth * smoothstep((d - 0.16) / run);
+      // the wind's ripple marks, bent, over a slow swell; none at the rim
+      if (ripple && d > 0) h += smoothstep(d / 0.4) * ripple * (Math.sin(x * 7.3 + z * 4.1 + 1.2 * Math.sin(z * 1.1 + x * 0.3)) + 1.6 * Math.sin(x * 0.7 + z * 0.4) * Math.cos(z * 0.5 - x * 0.2));
     }
     return h;
   };
@@ -540,8 +563,16 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
   };
   // (under a moon bridge the ground is the banks and the stream: its arch is
   // drawn apart, and the ball rides that)
+  // (and a hair under a sand's patch, which is drawn on height() itself: the
+  // lane's coarser mesh, cut across its dish and lip, kept from showing through)
+  const sands = dishes.filter((d) => d.depth > 0);
+  const underSand = (x: number, z: number) => {
+    let k = 0;
+    for (const { q, walls } of sands) if (inZone(q, x, z)) k = Math.max(k, smoothstep(sandIn(q, walls, x, z) / 0.25));
+    return 0.12 * k;
+  };
   const ground = (x: number, z: number) => {
-    const base = bridges.some((q) => inRect(q, x, z)) ? raw(x, z, true) : height(x, z), w = water(x, z);
+    const base = bridges.some((q) => inRect(q, x, z)) ? raw(x, z, true) : height(x, z) - (sands.length ? underSand(x, z) : 0), w = water(x, z);
     return w ? base + (w.bed - base) * w.k : base;
   };
 
