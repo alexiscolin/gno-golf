@@ -168,7 +168,7 @@ export function inZone(q: Shape, x: number, y: number) {
 
 /** Whether a plain wall stands wholly out in an Outside hazard (the sea
  *  round a lane with no rails): the board's frame there, not a rail —
- *  drawn as clear glass (course.ts glassRail), with no posts nor piles. */
+ *  not drawn at all (course.ts wallPieces), with no posts nor piles. */
 export function inSea(w: Pick<Wall, "a" | "b" | "skin" | "every">, zones: readonly Zone[]) {
   if (w.skin || w.every) return false;
   const sea = zones.filter((q) => q.kind === "hazard" && q.outside && q.poly && !q.every);

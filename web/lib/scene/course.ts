@@ -1262,35 +1262,6 @@ function unreached(walls: readonly Wall[], zones: readonly Zone[]) {
 }
 
 /**
- * A glass rail: a low clear pane along each wall, from the water up to a
- * little over the lane, with a faint ink line along its top and a soft
- * highlight under it. No posts. One mesh and one line batch for all of them;
- * drawn after the sea (renderOrder), never writing depth, so it cannot flicker
- * against the water. Kept out of the bake: it is see-through.
- */
-function glassRail(walls: readonly Wall[], s: Hole, t: T) {
-  const g = new THREE.Group(), panes: THREE.BufferGeometry[] = [], top: number[] = [], shine: number[] = [];
-  const foot = (worldOf(s).SEA ?? GRASS - 0.9) - 0.1;
-  for (const w of walls) {
-    const len = segLen(w), ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]);
-    const mx = (w.a[0] + w.b[0]) / 2, mz = (w.a[1] + w.b[1]) / 2, y1 = t.height(mx, mz) + 0.45;
-    panes.push(new THREE.BoxGeometry(len, y1 - foot, 0.06).rotateY(-ang).translate(mx, (y1 + foot) / 2, mz));
-    top.push(w.a[0], y1, w.a[1], w.b[0], y1, w.b[1]);
-    shine.push(w.a[0], y1 - 0.08, w.a[1], w.b[0], y1 - 0.08, w.b[1]);
-  }
-  const glass = new THREE.Mesh(mergeGeometries(panes), new THREE.MeshBasicMaterial({ color: 0xdff4fb, transparent: true, opacity: 0.16, depthWrite: false }));
-  const lines = (pos: number[], color: number, opacity: number) => {
-    const l = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
-    l.renderOrder = 2;
-    return l;
-  };
-  glass.renderOrder = 1;
-  g.add(glass, lines(top, C.ink, 0.55), lines(shine, 0xffffff, 0.6));
-  ud(g).live = true;
-  return g;
-}
-
-/**
  * Walls as the eye expects them. physics.Bar makes a free-standing barrier out
  * of four segments; drawn one by one they look like two rails, so four closed
  * thin segments are drawn as one solid timber. A lone segment is a board edge:
@@ -1302,9 +1273,9 @@ function wallPieces(s: Hole, t: T) {
   // a timed wall (a mill's sail) is drawn by what it belongs to, not as a bar
   // (nor a run of walls no ball can reach: see outOfReach)
   const gone = unreached(s.walls, s.zones);
-  // a frame out in the sea a ball can still reach is a clear pane, not a fence
+  // a frame out in the sea is not drawn at all: the sea is the edge a player
+  // reads (the wall still stands on the chain: a rare ball can bounce off it)
   const clear = new Set(s.walls.filter((w) => !gone.has(w) && inSea(w, s.zones)));
-  if (clear.size) out.push(glassRail([...clear], s, t));
   const W = s.walls.filter((w) => !w.every && !gone.has(w) && !clear.has(w));
   timedPieces(s, t, out);
   const caps = new Map<string, MutVec2>();
