@@ -80,5 +80,6 @@ func TestPrepareWithTheWrongCountIsPrepare(t *testing.T) {
 
 // The tripwire for course's GG1 data: every field of a Field by position. A
 // field added here stops this from building until course.Encode, Decode and
-// Diff store it (the other types' tripwire is in course).
-var _ = Field{nil, nil, nil, 0, 0, 0, 0, nil}
+// Diff store it (the other types' tripwire is in course). Cap is not data:
+// golf sets it for one stroke.
+var _ = Field{nil, nil, nil, 0, 0, 0, 0, 0, nil}

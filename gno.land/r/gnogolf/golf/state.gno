@@ -492,16 +492,18 @@ func SimulateCommit(hole string, ballX, ballY float64, stroke int, shots string,
 }
 
 func simulateRound(e *entry, h course.Hole, ball physics.Vec2, strokes int, shots string, period int64) string {
-	weather := weatherOf(e, h, period).Zones
+	fc := weatherOf(e, h, period)
+	weather := fc.Zones
 	list := shotList(shots)
 	w := newWork(h, weather)
+	w.fixed = fixedGas(e, fc)
 	holed := false
 	var last physics.Shot
 	for _, s := range list {
 		if strokes >= maxRoundStrokes {
 			panic("golf: this round is over its stroke limit, Reset to play again")
 		}
-		w.next()
+		w.next(h)
 		angle, power, tick := parseShot(s)
 		angle, power = validShot(angle, power)
 		last, holed = resolve(previewAt(h, ball, angle*math.Pi/180, power, strokes, tick, weather))

@@ -638,15 +638,21 @@ namespace.
 A commit's gas is mostly the physics, and a heavy hole can't replay 12 full
 shots in one transaction. The physics counts what a stroke does as it goes,
 `Shot.Work`: its substeps, moves, the walls and posts each move is swept
-against and tested, every zone any check looks at and every polygon edge it
-tests, in units of about a thousand gas (see physics.md, MaxWork); and it
-ends a stroke once that reaches `physics.MaxWork` (1e6), so no hole, however
-hostile, has a shot a transaction can't finish. A commit's estimate of its
-work is, per shot, the larger of `10M + 150K × walls + points × (1.2M + 15K ×
-pieces)` (by its path) and `10M + 150K × walls + 1000 × Shot.Work` (by its
-work; walls: the hole's and its pulses'). The weights are measured so that a
-unit costs at most about 0.97K gas; a course shot runs at 0.72K to 0.78K a
-unit.
+against and tested and every square root those tests take, every zone any
+check looks at and every polygon edge it tests, in units of about a thousand
+gas (see physics.md, MaxWork); and it ends a stroke once that reaches
+`physics.MaxWork` (1e6), or the lower cap golf gives it. A commit's estimate
+of its work is, per shot, the larger of `10M + 150K × walls + points × (1.2M +
+15K × pieces)` (by its path) and `10M + 150K × walls + 1000 × Shot.Work` (by
+its work; walls: the hole's and its pulses'). The weights are measured so
+that a unit costs at most about 0.87K gas; a course shot runs at 0.6K to
+0.83K a unit.
+
+What a commit spends before its first shot is counted in too: decoding the
+hole (at most `6M + 4K ×` its data's bytes; 3.4K to 3.9K a byte measured)
+and drawing its forecast (`Forecast.Work` units, counted as it is drawn: the
+rain's puddle tries test every post, zone, polygon edge and wall, up to 0.14e9
+on the course and 1.1e9 on a hostile hole).
 
 A hole's heaviest shot is bounded: `shotBound = 10M + 150K × walls + 1000 ×
 (MaxWork + MaxWorkStep)`, 1.24e9 to 1.26e9 for the course holes. A hole whose
@@ -655,27 +661,43 @@ shot of a commit the bound must fit the 1.4e9 budget. Before each later shot,
 a commit that would pass 1.4e9 with one more shot as heavy as its heaviest so
 far is refused:
 `golf: more shots than one transaction can replay on this hole: commit the
-first N, then the rest`. `SimulateRound*` and `SimulateCommit` refuse the same
-list the same way, so a client learns it before it signs. The rest of the 2e9
-a wallet lets a transaction simulate is left for the forecast, decoding a data
-hole, the package loads and the bookkeeping.
+first N, then the rest`. And every shot, a Launch's too, is played with a
+work cap of its own (`physics.Field.Cap`): what is left of the 1.4e9 once the
+decoding, the forecast and the shots before it are counted, less
+`MaxWorkStep` for its overshoot, `MaxWork` at the most. A shot that reaches a
+cap under `MaxWork` is refused the same way (the first shot of a commit with
+`golf: one shot on this hole could cost more than a transaction can
+replay`), before anything is kept, so a commit never costs more than the
+budget, whatever its shots: eleven taps and a full shot on a hostile hole is
+cut after the taps, and the full shot, first in the next commit, has the
+whole budget. A course shot never comes near its cap: 0.74 of `MaxWork` at the most (an
+adversarial search over angle, power, tick, weather and start), and a course
+hole's first shot has 0.95 of `MaxWork` or more, even in its heaviest rain.
+`SimulateRound*` and `SimulateCommit` refuse the same list the same way, so a
+client learns it before it signs. The rest of the 2e9 a wallet lets a
+transaction simulate is left for the package loads and the bookkeeping.
 
-The heaviest Launches the probes found (`z_worst_shot*_filetest`), the hole's
-decoding and forecast included, at the format's limits:
+The heaviest Launches the probes found (`z_worst_shot_filetest`), decode,
+forecast and shot, measured end to end on a local chain (the qeval filler
+method), at the format's limits:
 
 | Probe | Launch |
 |---|---|
-| 8 zigzag ice polygons (64 points, every edge across the ball) under 23 more ice zones, a board-wide hill, bumper walls, in the rain (the ice doubled) | 1.27e9 |
-| the same in a storm (4 more board-wide zones) | 1.25e9 |
-| 8 zigzag polygons as hills (the ground, scanned several times a substep), in a storm | 0.99e9 |
-| 160 bumper walls across the board, 8 zigzag ice polygons, a hill, in the rain: the forecast alone (60 puddle tries over them) is 0.5e9 to 0.55e9, by the period's rain | 1.39e9 to 1.44e9 |
-| 38 timed bars (the ball pushed out of each as it comes back), in the rain | 0.69e9 |
-| 30 loop mouths rolled across, a storm's gusts | 0.59e9 |
-| 15 tunnels and 8 zigzag polygons, in the rain | 1.02e9 |
+| 160 bumper walls across the board, the steepest hill, 31 ice zones, 8 of them 64-point circles | 0.87e9 |
+| 8 zigzag ice polygons (64 points, every edge across the ball) under 23 more ice zones, a board-wide hill, bumper walls, in the rain (the ice doubled): refused at its cap | 1.07e9 |
+| 8 zigzag polygons as hills (the ground, scanned several times a substep), in a storm | 1.00e9 |
+| 160 bumper walls across the board, 8 zigzag ice polygons, a hill, in the rain: the forecast alone 0.54e9 to 0.63e9, refused at its cap | 1.03e9 |
+| 38 timed bars (the ball pushed out of each as it comes back), in the rain | 0.72e9 |
+| 30 loop mouths rolled across, a storm's gusts | 0.87e9 |
+| 15 tunnels and 8 zigzag polygons, in the rain | 1.04e9 |
+| 160 short walls stacked beside a ball of radius 1, a hill holding it there (each test two square roots) | 0.57e9 (1.00e9 in the rain, refused) |
+| the same above their faces (both round caps hit: four roots a wall) | 1.00e9 (1.01e9 in the rain, refused) |
+| 32 posts stacked, 4 walls round them | 0.31e9 (0.39e9 in the rain) |
+| 160 bumper walls and 32 posts caged in a corner round the ball, 8 thin hazard polygons along the far edge, in the rain: the forecast alone 1.1e9, the shot refused with no room left | 1.19e9 |
+| the same in the dry | 0.77e9 |
+| a commit of 11 taps and a full shot on 160 bumper walls round a board of ice: refused at the full shot's cap, "commit the first 11" (7 or 8 in the rain) | 0.80e9 (0.89e9) |
 
-A commit of many cheap shots on a hostile hole can still come near the 2e9:
-the shots take up to their 1.4e9 budget, and that hole's forecast up to
-0.55e9 on top.
+Every one is under 1.6e9, however its shots are split.
 
 ## Gas and storage
 

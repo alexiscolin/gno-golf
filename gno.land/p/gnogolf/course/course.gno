@@ -259,6 +259,10 @@ type Forecast struct {
 	Kind   string
 	Wind   physics.Vec2
 	Zones  []physics.Zone
+	// Work is what drawing it cost, in the physics' units of about a
+	// thousand gas (physics.MaxWork): the rain's puddle tries, counted as
+	// they go (see wet). golf counts it in a commit's budget.
+	Work int
 }
 
 // hash is 64-bit FNV-1a: small, deterministic, the same on every validator.
@@ -287,8 +291,9 @@ func ForecastFor(id, world string, h Hole, period int64) Forecast {
 		}
 		roll -= c.percent
 	}
-	wind, zones := WeatherFor(kind, h, seed)
-	return Forecast{Period: period, Kind: kind, Wind: wind, Zones: zones}
+	f := Forecast{Period: period, Kind: kind, Work: forecastWork}
+	f.Wind, f.Zones = weatherFor(kind, h, seed, &f.Work)
+	return f
 }
 
 // rng is a tiny deterministic generator from a seed (Knuth's LCG).
@@ -304,6 +309,12 @@ func (r *rng) unit() float64 { return float64(r.next()%1000000) / 1000000 }
 // WeatherFor is the wind and zones of one kind of weather on a hole, drawn
 // from seed: the wind's side and strength, where the rain leaves its puddles.
 func WeatherFor(kind string, h Hole, seed uint64) (physics.Vec2, []physics.Zone) {
+	var work int
+	return weatherFor(kind, h, seed, &work)
+}
+
+// weatherFor is WeatherFor, adding what it cost to *work (see wet).
+func weatherFor(kind string, h Hole, seed uint64, work *int) (physics.Vec2, []physics.Zone) {
 	w, hh := BoardOf(h)
 	W, H := float64(w), float64(hh)
 	all := func(k physics.ZoneKind, skin string, scale float64, vec physics.Vec2) physics.Zone {
@@ -324,17 +335,18 @@ func WeatherFor(kind string, h Hole, seed uint64) (physics.Vec2, []physics.Zone)
 		v := blow()
 		return v, []physics.Zone{all(physics.Slope, Wind, 0, v)}
 	case Rain:
-		return physics.Vec2{}, wet(h, r, []physics.Zone{all(physics.Surface, Rain, RainScale, physics.Vec2{})})
+		return physics.Vec2{}, wet(h, r, []physics.Zone{all(physics.Surface, Rain, RainScale, physics.Vec2{})}, work)
 	case Storm:
 		// the storm's rain, and its wind in gusts: 40° one way for three
 		// substeps, then 40° the other
+		*work += stormWork
 		v := blow()
 		a, s := math.Atan2(v.Y, v.X), v.Len()
 		g1, g2 := all(physics.Slope, Wind, 0, physics.FromPolar(a+gustTurn, s)), all(physics.Slope, Wind, 0, physics.FromPolar(a-gustTurn, s))
 		g1.Every, g1.On, g1.Phase = gustEvery, gustEvery/2, 0
 		g2.Every, g2.On, g2.Phase = gustEvery, gustEvery/2, gustEvery/2
 		zs := []physics.Zone{all(physics.Surface, Storm, 1, physics.Vec2{}), all(physics.Surface, Rain, RainScale, physics.Vec2{}), g1, g2}
-		return v, wet(h, r, zs)
+		return v, wet(h, r, zs, work)
 	case Fog:
 		return physics.Vec2{}, []physics.Zone{all(physics.Surface, Fog, 1, physics.Vec2{})}
 	case Snow:
@@ -365,10 +377,27 @@ const (
 	puddleGap    = 0.5
 )
 
+// The work of a forecast and its rain's puddle tries, in physics.MaxWork's
+// units (about a thousand gas), measured on the GnoVM's gas as the physics'
+// weights are: any forecast, a storm's gusts, a try, and in it each post, zone, polygon edge
+// and fixed wall dryLand tests, and each zone wet looks at for ice.
+const (
+	forecastWork = 3000 // drawing any forecast, before the rain's tries
+	stormWork    = 5000 // a storm's gusts, on top
+	tryWork      = 35
+	dryPostWork  = 22
+	dryZoneWork  = 20
+	dryEdgeWork  = 16
+	dryWallWork  = 100
+	iceWork      = 5
+)
+
 // wet adds what rain leaves on a hole: its ice quicker still, and two to four
 // puddles on the lane, clear of the kerb, the pieces, the tee and the cup.
-func wet(h Hole, r *rng, zs []physics.Zone) []physics.Zone {
+// What it costs goes in *work.
+func wet(h Hole, r *rng, zs []physics.Zone, work *int) []physics.Zone {
 	f := h.Field()
+	*work += iceWork * len(f.Zones)
 	for _, z := range f.Zones {
 		if z.Kind == physics.Surface && z.Skin == "ice" {
 			z.Scale *= WetIce
@@ -380,7 +409,8 @@ func wet(h Hole, r *rng, zs []physics.Zone) []physics.Zone {
 	for try := 0; try < puddleTries && len(placed) < want; try++ {
 		c := physics.V(r.unit()*float64(w), r.unit()*float64(hh))
 		rad := puddleR + r.unit()*puddleGrow
-		if !dryLand(h, c, rad) {
+		*work += tryWork
+		if !dryLand(h, c, rad, work) {
 			continue
 		}
 		clash := false
@@ -407,17 +437,22 @@ func wet(h Hole, r *rng, zs []physics.Zone) []physics.Zone {
 // A puddle keeps dryTee from the tee and the cup and dryGap from any piece.
 // The outline test casts a ray to a far point, off any board and at a slant
 // no wall of a grid lies along.
-func dryLand(h Hole, c physics.Vec2, rad float64) bool {
+func dryLand(h Hole, c physics.Vec2, rad float64, work *int) bool {
 	f := h.Field()
 	if c.Sub(h.Start()).LenCmp(rad+dryTee) < 0 || c.Sub(h.Cup()).LenCmp(rad+dryTee) < 0 {
 		return false
 	}
 	for _, p := range f.Posts {
+		*work += dryPostWork
 		if p.C.Sub(c).LenCmp(p.R+rad+dryGap) < 0 {
 			return false
 		}
 	}
 	for _, z := range f.Zones {
+		*work += dryZoneWork
+		if (z.Kind != physics.Surface && z.Kind != physics.Slope) || (z.Kind == physics.Surface && z.Skin != "") {
+			*work += dryEdgeWork * len(z.Poly) // Contains, at its dearest
+		}
 		if z.Kind != physics.Surface && z.Kind != physics.Slope && z.Contains(c) {
 			return false
 		}
@@ -430,6 +465,7 @@ func dryLand(h Hole, c physics.Vec2, rad float64) bool {
 		if wl.Every > 0 {
 			continue
 		}
+		*work += dryWallWork
 		if c.Sub(wl.Seg.Closest(c)).LenCmp(rad+dryGap) < 0 {
 			return false
 		}

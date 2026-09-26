@@ -130,28 +130,34 @@ const (
 // where the ball is. The units are counted as the stroke goes, from what
 // it does (the weights below, measured in the GnoVM), wherever it does it:
 // every zone a move, a rest check or a roll-on check looks at, every
-// polygon edge and ellipse it tests, every wall and post of every sweep.
-// No course shot comes near it (0.69 of it at the most); it holds a hostile
-// hole's stroke (bumper walls across the whole board, a hill that keeps the
-// ball rolling on, zigzag polygons as ice or as hills, 40 timed bars, rain
-// or a storm over them) to about 1.1e9 gas.
+// polygon edge and ellipse it tests, every wall and post of every sweep and
+// every square root those tests take. No course shot comes near it (0.74
+// of it at the most); it holds a hostile hole's stroke (bumper walls across
+// the whole board, 160 walls stacked where the ball sits, a hill that keeps
+// the ball rolling on, zigzag polygons as ice or as hills, 40 timed bars,
+// rain or a storm over them) to about 1.07e9 gas. A Field's Cap lowers it
+// for one stroke (golf gives a commit's shot what is left of its budget).
 const MaxWork = 1000000
 
 // The work weights, in units: a substep, a move, a timed bar checked, a
 // wall or post a move's broad phase looks at, a wall and a post it tests
 // for a contact, a zone any check looks at, and one whose box holds the
 // ball, a polygon edge (each may straddle the ball: the worst case), an
-// ellipse, a push (a hill's or the wind's), a square root (a loop's mouth,
-// capped wind), and a wall a timed bar's push is checked against, per side.
-// Measured on the GnoVM's gas with probes that add one kind of piece at a
-// time, and set so that a unit costs at most 0.97K gas on any of them.
+// ellipse, a push (a hill's or the wind's), a square root (a wall end's
+// distance or swept cap, a post's swept circle and its normal, a contact's,
+// the one that holds it to SpeedCap, a loop's mouth, capped wind), and a
+// wall a timed bar's push is checked against, per side. Measured on the
+// GnoVM's gas with probes that add one kind of piece at a time, and set so
+// that a unit costs at most 0.87K gas on any of them. A root costs about
+// 170K; a wall test, its roots aside, 39K to 130K (the most: onto a face,
+// both round caps hit), a post test 24K to 43K.
 const (
 	substepWork  = 700
 	moveWork     = 15
 	barWork      = 12
 	broadWork    = 18
-	wallTestWork = 200
-	postTestWork = 300
+	wallTestWork = 130
+	postTestWork = 50
 	zoneWork     = 20
 	inWork       = 25
 	edgeWork     = 14
@@ -161,15 +167,24 @@ const (
 	unstickWork  = 5
 )
 
-// MaxWorkStep is the most a stroke's Work passes MaxWork by. It is checked
-// at each substep, after its timed bars' pushes, before each move and each
-// contact. On a Decode-limited field under any weather (72 zones, 1024
-// polygon points, 160 walls, 32 posts) the most that goes between two
-// checks is a roll-on check (35K) and every bar's push (40 bars: 129K),
-// and then the looks at the zones where the ball stopped (44K): 208K. A
-// substep's end, its sweep and its rest checks come to 90K. MaxWork plus
+// MaxWorkStep is the most a stroke's Work passes its limit (MaxWork, or a
+// lower Cap) by. It is checked at each substep, after its timed bars'
+// pushes, before each move and each contact. On a Decode-limited field under
+// any weather (72 zones, 1024 polygon points, 160 walls, 32 posts) the most
+// that goes between two checks is one sweep, every root taken (167K), and
+// then the substep's end and the looks at the zones where the ball stopped
+// (45K): 212K; or a roll-on check (35K) and every bar's push (40 bars:
+// 129K), then the zones where the ball stopped (44K): 208K. Its limit plus
 // MaxWorkStep is what golf holds a shot to (shotBound).
 const MaxWorkStep = 225000
+
+// limit is the work the stroke may cost: MaxWork, or the field's Cap under it.
+func (f *Field) limit() int {
+	if f.Cap > 0 && f.Cap < MaxWork {
+		return f.Cap
+	}
+	return MaxWork
+}
 
 // maxHits is the most contacts one move resolves: a move that hits spends
 // what is left of it from the contact, and a ball in a corner may meet the
@@ -303,9 +318,10 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	// the rolling deceleration the ball meets, per substep: where it starts,
 	// then the last substep's
 	drag := f.resistance(slopes, pos, f.Tick, &out.Work)
+	limit := f.limit()
 	for i := 0; i < substeps; i++ {
 		tick := i + f.Tick
-		if out.Work > MaxWork {
+		if out.Work > limit {
 			break // spent: the ball stops where the last substep left it
 		}
 		if i >= base && (i-base)%pinCheck == 0 {
@@ -333,7 +349,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 				out.Work += 4 * unstickWork * len(f.Walls)
 			}
 		}
-		spent := out.Work > MaxWork
+		spent := out.Work > limit
 		if spent {
 			if pos != out.Rest() {
 				out.add(pos, false)
@@ -373,7 +389,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		roll := 0.0 // the rolling deceleration, summed over the moves on the ground
 		out.why = '-'
 		for k := 0; k < n; k++ {
-			if out.Work > MaxWork {
+			if out.Work > limit {
 				spent = true // the stroke has cost all it may: it ends here
 				break
 			}
@@ -424,7 +440,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			// contact left it.
 			hit, left := false, 1.0
 			for h := 0; h < maxHits && left > 0; h++ {
-				if out.Work > MaxWork {
+				if out.Work > limit {
 					break // spent: the ball stops where it is
 				}
 				move := vel.Scale(left * dt)
@@ -438,8 +454,10 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 				pos = pos.Add(move.Scale(best)).Add(normal.Scale(skin))
 				var impact bool
 				vel, impact = contact(vel, normal, bounce)
-				if l := vel.Len(); l > SpeedCap {
-					vel = vel.Scale(SpeedCap / l) // two bumpers facing each other
+				out.Work += rootWork // contact's
+				if vel.LenCmp(SpeedCap) > 0 {
+					out.Work += rootWork
+					vel = vel.Scale(SpeedCap / vel.Len()) // two bumpers facing each other
 				}
 				if impact {
 					out.Bounces++
@@ -630,12 +648,13 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 					end = o.a.Add(along.Scale(o.length))
 				}
 				rv := pos.Sub(end)
+				out.Work += rootWork
 				if l := rv.Len(); l > 0 && l <= f.Radius+skin/2 {
 					if nrm := rv.Scale(1 / l); move.Dot(nrm) < 0 {
 						best, normal, hit = 0, nrm, true
 						restitution = o.bounce
 					}
-				} else if t, nn, ok := (Circle{C: end, R: f.Radius}).Hit(pos, next); ok && t < best {
+				} else if t, nn, ok := (Circle{C: end, R: f.Radius}).hit(pos, next, &out.Work); ok && t < best {
 					best, normal, hit = t, nn, true
 					restitution = o.bounce
 				}
@@ -656,7 +675,7 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 		if f.Radius > 0 && o.length > 0 {
 			along := Vec2{o.n.Y, -o.n.X}
 			for _, end := range [2]Vec2{o.a, o.a.Add(along.Scale(o.length))} {
-				if t, nn, ok := (Circle{C: end, R: f.Radius}).Hit(pos, next); ok && t < best {
+				if t, nn, ok := (Circle{C: end, R: f.Radius}).hit(pos, next, &out.Work); ok && t < best {
 					best, normal, hit = t, nn, true
 					restitution = o.bounce
 				}
@@ -671,7 +690,7 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 			continue
 		}
 		out.Work += postTestWork
-		if t, nn, ok := c.Hit(pos, next); ok && t < best {
+		if t, nn, ok := c.hit(pos, next, &out.Work); ok && t < best {
 			best, normal, hit = t, nn, true
 			restitution = bounceOf(p.Bounce, f.Bounce, p.Skin)
 		}
@@ -727,7 +746,7 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, under **hill, slopes [
 			// keep a ball drifting. (Squared first: the roots are only taken
 			// when it did speed up.)
 			if l2 := vel.Dot(*vel); wind && l2 > v2 {
-				out.Work += rootWork
+				out.Work += 2 * rootWork // two roots
 				if v0, l := math.Sqrt(v2), math.Sqrt(l2); l > v0 {
 					if v0 == 0 {
 						*vel = Vec2{}

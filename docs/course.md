@@ -290,6 +290,7 @@ type Forecast struct {
 	Kind   string
 	Wind   physics.Vec2
 	Zones  []physics.Zone
+	Work   int // what drawing it cost, in physics.MaxWork's units
 }
 
 func ForecastFor(id, world string, h Hole, period int64) Forecast
@@ -322,7 +323,13 @@ What each kind puts on the board (whole-board zones cover `0..W, 0..H`):
   over the untimed walls), off any skinned Surface zone and any Tunnel,
   Hazard or Loop zone, at least 0.3 clear of the untimed walls and the posts,
   at least 2 clear of the tee and the cup, and not overlapping each other. It
-  makes up to 60 tries.
+  makes up to 60 tries. Each try tests every post, zone (a polygon's every
+  edge) and untimed wall until one refuses it, so a hostile hole's rain can
+  cost more than its shot: 160 walls and 8 thin hazard polygons that no try
+  passes cost 1.1e9 gas. `Forecast.Work` counts it as it goes (any forecast
+  3000 units, a storm's gusts 5000 more, a try 35, and in it a post 22, a zone
+  20, a polygon edge 16, a wall 100, a zone looked at for ice 5: at most
+  0.86K gas a unit measured), and golf counts it in a commit's budget.
 - **storm**: a Surface `storm` at 1, the rain as above, and two gusting Slope
   zones `wind` (air, capped), each 0.7 rad (about 40°) on either side of the
   forecast wind, with `Every: 6, On: 3` and `Phase` 0 and 3.

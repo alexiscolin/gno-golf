@@ -129,6 +129,7 @@ type Field struct {
 	Bounce   float64 // default restitution of walls and posts
 	Radius   float64 // ball radius; 0 is a point
 	Tick     int     // where the stroke starts on the clock of timed walls and zones
+	Cap      int     // above 0 and under MaxWork, the stroke's work cap in its place (not data)
 	// and, unexported, the walls' prep (see Wall prep)
 }
 ```
@@ -531,7 +532,7 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `SpeedCap` | 8 | top speed, per substep |
 | `MaxRollOn` | 120 | most extra substeps a slope or a flight can add |
 | `MaxWork` | 1e6 | the most work units (about a thousand gas each) one stroke may cost |
-| `MaxWorkStep` | 2.25e5 | the most a stroke's work passes `MaxWork` by |
+| `MaxWorkStep` | 2.25e5 | the most a stroke's work passes `MaxWork` (or its `Cap`) by |
 | `MaxSin` | 0.95 | the steepest grade a hill plays, and the most `|Vec|/G` Decode takes |
 | `LoopKeep` | 0.8 | share of the speed kept going round a loop |
 
@@ -565,29 +566,45 @@ is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
   the rest checks and the roll-on checks look at (`ground`, `resistance`,
   `rolls`, `climbs`, `overTheTop` and the zones where the ball stopped
   included), every polygon edge and ellipse tested, every wall and post of
-  every sweep, every timed bar checked and pushed. The weights: a substep
-  700, a move 15, a timed bar checked 12, a wall or post a move's broad phase
-  looks at 18, a wall tested for a contact 200 and a post 300, a zone any
-  check looks at 20, and 25 more when its box holds the ball, a polygon edge
-  14 (each edge counted as if it straddled the ball, the worst case: a
-  64-point zigzag costs 0.86M gas a test), an ellipse 12, a push (a hill's or
-  the wind's) 50, a square root (a loop's mouth, capped wind) 200, and a wall
-  a timed bar's push checks 20 a side. Measured with probes that add one kind
-  of piece at a time to a rolling ball (the most any costs is 0.97K gas a
-  unit), then raised a little. A stroke that reaches `MaxWork` (1e6) ends
-  where the ball is; it is checked at each substep, after the timed bars'
-  pushes (every bar is pushed first, so the ball never ends inside one),
-  before each move and each contact, so a stroke passes it by `MaxWorkStep`
-  (2.25e5) at most: the most that goes between two checks, under any
-  weather on a Decode-limited field, is a roll-on check and every bar's push
-  (164K), then the looks at the zones where the ball stopped (44K). Hostile
-  holes at the format's limits (zigzag polygons as ice or as hills, rain and
-  storm over them, 40 timed bars, bumper walls across the board, loops and
-  tunnels) cost at most 1.44e9 for a whole Launch, the hole's decoding and
-  forecast included (see golf.md). The heaviest course stroke found by an
-  adversarial search (angle, power, tick, weather, start), a full shot in a
-  storm's gusts on mountain/11's ice that rolls on past its substeps, costs
-  0.69 of `MaxWork` (about 0.5e9 gas); a tee shot, 0.05.
+  every sweep and every square root their tests take, every timed bar
+  checked and pushed. The weights: a substep 700, a move 15, a timed bar
+  checked 12, a wall or post a move's broad phase looks at 18, a wall tested
+  for a contact 130 and a post 50, a zone any check looks at 20, and 25 more
+  when its box holds the ball, a polygon edge 14 (each edge counted as if it
+  straddled the ball, the worst case: a 64-point zigzag costs 0.86M gas a
+  test), an ellipse 12, a push (a hill's or the wind's) 50, a square root
+  200, and a wall a timed bar's push checks 20 a side. The roots are counted
+  where they are taken: a wall end's distance and its swept cap (a ball
+  past the end of a wall, or meeting its round caps from afar), a post's
+  swept circle and its normal (each only when the test gets that far), a
+  contact's (and a second when it has to hold the ball to `SpeedCap`), a
+  loop's mouth, capped wind. A root costs about 170K gas, most of a wall
+  test: 160 short walls stacked beside a ball of radius 1 cost 433K a test
+  (two roots) and, above their faces with both caps hit, 816K (four), where
+  a flat 218 units had been charged; a test's own part, its roots aside, is
+  39K to 130K, a post's 24K to 43K. Measured with probes that add one kind of
+  piece at a time to a rolling ball (the most any costs is 0.87K gas a
+  unit). A stroke that reaches `MaxWork`
+  (1e6) ends where the ball is; it is checked at each substep, after the
+  timed bars' pushes (every bar is pushed first, so the ball never ends
+  inside one), before each move and each contact, so a stroke passes it by
+  `MaxWorkStep` (2.25e5) at most: the most that goes between two checks,
+  under any weather on a Decode-limited field, is one sweep with every root
+  taken (167K) and then the substep's end and the looks at the zones where
+  the ball stopped (45K), or a roll-on check and every bar's push (164K),
+  then those looks (44K). A field's `Cap`, above 0 and under `MaxWork`,
+  takes its place for one stroke: golf gives each shot of a commit what is
+  left of its budget, and refuses a shot that reaches it (see golf.md, the
+  work budget); a stroke that reaches neither plays exactly as it did.
+  Hostile holes at the format's limits (zigzag polygons as ice or as hills,
+  rain and storm over them, 40 timed bars, bumper walls across the board,
+  160 walls or 32 posts stacked on the ball, loops and tunnels) cost at most
+  1.19e9 for a whole Launch, the hole's decoding and forecast included (see
+  golf.md). The heaviest course stroke found by an adversarial search
+  (angle, power, tick, weather, start), a full shot in a storm's gusts
+  (weather a mountain never gets) on mountain/11's ice that rolls on past its
+  substeps, costs 0.74 of `MaxWork` (about 0.5e9 gas); every other hole stays
+  under 0.25.
 - **Steepest grade.** A hill's push is `G·sin θ`: `course.Decode` refuses a
   Slope whose `|Vec|` passes `G·MaxSin` (0.95, 72°). The course's steepest is
   0.35.
@@ -595,7 +612,8 @@ is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
   at least `MaxMove` wide in the direction of travel. Several deployed zones
   are under twice that (town14's door tunnel, hole4's tunnels, island9's and
   island10's gaps): safe, but near the edge.
-- **Square roots.** `math.Sqrt` is software in the GnoVM (~160K gas a call).
+- **Square roots.** `math.Sqrt` is software in the GnoVM (~170K gas a call,
+  counted in `Shot.Work` wherever a stroke takes one).
   `Vec2.LenCmp` compares a length without one unless it has to,
   `Segment.Crosses` tests a crossing without working out a normal, and the
   wall prep is worked out once per hole (`Prepare`, or `PrepareWith` from

@@ -434,10 +434,70 @@ func TestAStrokeCostsAtMostMaxWork(t *testing.T) {
 	if s.Work <= MaxWork || s.Work > MaxWork+MaxWorkStep {
 		t.Fatalf("the hostile stroke cost %d, want just past %d", s.Work, MaxWork)
 	}
+	// a Cap under MaxWork ends it there, on the same path so far
+	for _, c := range []int{1, 50000, MaxWork / 3} {
+		f.Cap = c
+		k := f.Step(V(20, 20), V(-3, 3), 60)
+		if k.Work <= c || k.Work > c+MaxWorkStep || len(k.Path) > len(s.Path) {
+			t.Fatalf("capped at %d, the stroke cost %d in %d points", c, k.Work, len(k.Path))
+		}
+		for i := 0; i < len(k.Path)-1; i++ {
+			if k.Path[i] != s.Path[i] {
+				t.Fatalf("capped at %d, point %d moved", c, i)
+			}
+		}
+	}
+	f.Cap = 2 * MaxWork // above MaxWork, MaxWork holds
+	if k := f.Step(V(20, 20), V(-3, 3), 60); k.Work != s.Work || len(k.Path) != len(s.Path) {
+		t.Fatalf("a Cap above MaxWork changed the stroke: %d, want %d", k.Work, s.Work)
+	}
 	if n := len(s.Path); n > 60+MaxRollOn+2 {
 		t.Fatalf("%d path points", n)
 	}
 	if c := flat().Step(V(0, 0), V(4.44, 0), 30); c.Work > MaxWork/50 {
 		t.Fatalf("a full stroke on the flat cost %d", c.Work)
+	}
+}
+
+// Every square root a sweep takes is counted: a ball of radius 1 beside the
+// end of 160 short walls tests each end cap, the distance to it and the
+// swept circle (two roots), and above their faces both caps are hit (two
+// each). Those roots are most of what a test costs.
+func TestASweepCountsItsSquareRoots(t *testing.T) {
+	f := &Field{Radius: 1}
+	for i := 0; i < 160; i++ {
+		f.Walls = append(f.Walls, Wall{Seg: Segment{V(0, 0), V(0.2, 0)}})
+	}
+	Prepare(f)
+	offs := f.offsets()
+	for _, c := range []struct {
+		from, to Vec2
+		roots    int
+	}{
+		{V(1, 0.8), V(1.1, 0.8), 2},   // past the end, the cap swept
+		{V(0.5, 0.8), V(0.6, 0.8), 1}, // past the end, touching the cap
+		{V(0.1, 1.6), V(0.1, 0.8), 4}, // onto the face, both caps met
+		{V(0.1, 0.5), V(0.1, 0.4), 0}, // on the face already
+	} {
+		var s Shot
+		f.sweep(offs, c.from, c.to, c.to.Sub(c.from), 0, &s)
+		if want := 160 * (broadWork + wallTestWork + c.roots*rootWork); s.Work != want {
+			t.Errorf("%v→%v: work %d, want %d (%d roots a wall)", c.from, c.to, s.Work, want, c.roots)
+		}
+	}
+	p := &Field{Radius: 1, Posts: []Post{{Circle: Circle{C: V(0, 0), R: 0.5}}}}
+	for _, c := range []struct {
+		from, to Vec2
+		roots    int
+	}{
+		{V(1.6, 0), V(1.2, 0), 2},      // hit
+		{V(1.5, 0.1), V(1.55, 0.1), 1}, // its line through the post, going away
+		{V(1.55, 1.4), V(1.5, 1.45), 0},
+	} {
+		var s Shot
+		p.sweep(nil, c.from, c.to, c.to.Sub(c.from), 0, &s)
+		if want := broadWork + postTestWork + c.roots*rootWork; s.Work != want {
+			t.Errorf("post %v→%v: work %d, want %d", c.from, c.to, s.Work, want)
+		}
 	}
 }

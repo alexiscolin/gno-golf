@@ -182,6 +182,10 @@ type Field struct {
 	// a tram or a mill turning all the time, and the moment of release is a
 	// decision like the angle and the power — so the chain replays it.
 	Tick int
+	// Cap, above 0 and under MaxWork, is what a stroke may cost in its
+	// place (golf gives a commit's shot what is left of its budget). A
+	// stroke that reaches it ends as one that reaches MaxWork does.
+	Cap int
 	// prep is the walls' offsets, worked out once (Prepare).
 	prep []float64
 }
