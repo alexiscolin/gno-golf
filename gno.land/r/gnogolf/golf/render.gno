@@ -392,6 +392,7 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	s += "<gno-form exec=\"Reset\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
 	s += "</gno-form>\n\n"
+	s += "Took a gno.land name after saving rounds? Put them on the boards now:\n\n<gno-form exec=\"Claim\">\n</gno-form>\n\n"
 
 	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; %d finished it assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
 	if e.board(assisted).Size()+e.board(pro).Size() == 0 {
@@ -434,9 +435,12 @@ func roundSummary(e *entry, p address, r *round) string {
 	if !r.done {
 		return ufmt.Sprintf("> [!NOTE]\n> %s's round: %d strokes so far, not holed yet.\n>\n> %s\n\n", who, r.strokes, shots)
 	}
+	// ufmt has no %+d: the sign is written out
 	vs := "even"
-	if d := r.strokes - e.par; d != 0 {
-		vs = ufmt.Sprintf("%+d", d)
+	if d := r.strokes - e.par; d > 0 {
+		vs = "+" + strconv.Itoa(d)
+	} else if d < 0 {
+		vs = strconv.Itoa(d)
 	}
 	s := ufmt.Sprintf("> [!NOTE]\n> **%s holed it in %d** (par %d, %s), %s.\n>\n", who, r.strokes, e.par, vs, modeNames[r.mode])
 	b := e.board(r.mode)
@@ -446,7 +450,7 @@ func roundSummary(e *entry, p address, r *round) string {
 	case name == "":
 		s += "> Not on the board: only players with a gno.land name are ranked.\n>\n"
 	default:
-		s += "> Not on the board yet: the name came after this round. The game's \"Rank them\" (golf's `Claim`) ranks it now.\n>\n"
+		s += "> Not on the board yet: the name came after this round. Claim (below, or the game's \"Rank them\") ranks it now.\n>\n"
 	}
 	return s + "> " + shots + "\n\n"
 }

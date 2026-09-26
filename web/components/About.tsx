@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
 import { REALM_PATH } from "@/lib/chain";
 
@@ -54,7 +55,9 @@ export default function About({ onClose, web }: { onClose: () => void; web: stri
     ...(web ? [["The golf realm", `${web}${REALM_PATH}`, "its code and boards, on gnoweb"] as [string, string, string]] : []),
     ["gno.land", "https://gno.land", "the chain it runs on"],
     ["Adena", "https://adena.app", "the wallet that saves your rounds"],
-    ["Faucet", "https://faucet.gno.land", "free test GNOT, for pearl-1"],
+    // the faucet feeds the testnet only; the other deployment, when there is one
+    ...(NETWORK === "testnet" ? [["Faucet", "https://faucet.gno.land", "free test GNOT for the testnet"] as [string, string, string]] : []),
+    ...(OTHER_URL ? [NETWORK === "testnet" ? ["Play on mainnet", OTHER_URL, "the real chain: scores for keeps"] : ["Play on the testnet", OTHER_URL, "free test GNOT, same course"]] as [string, string, string][] : []),
     ["Gno docs", "https://docs.gno.land", "write a realm of your own"],
   ];
   return (

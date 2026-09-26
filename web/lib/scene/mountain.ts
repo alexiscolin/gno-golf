@@ -1319,10 +1319,20 @@ function heap(b: Slide, height: Height, ground: Height, clear: (x: number, z: nu
   const NH = Math.max(12, Math.ceil(b.len / 0.25)), P = 12, hpos: number[] = [], hcol: number[] = [], hidx: number[] = [];
   const hw = new THREE.Color(0xf6f9fc), hs = new THREE.Color(HEAP_BASE);
   const lo = down ? -down * half : -half, hi = down ? down * (half + spill) : half; // across, uphill → downhill
+  // the bar runs on into the kerb: the heap sinks to nothing where a wall or
+  // a post is, so it meets the wall's face instead of poking through its top
+  // (the slide outside carries on over it). Eased over the rows either side.
+  const at = (k: number) => [b.b[0] + (b.a[0] - b.b[0]) * (k / NH), b.b[1] + (b.a[1] - b.b[1]) * (k / NH)] as const;
+  const free = Array.from({ length: NH + 1 }, (_, k) => (clear(at(k)[0], at(k)[1], 0.2) ? 1 : 0));
+  const ease = (k: number) => {
+    let n = 0, sum = 0;
+    for (let j = k - 2; j <= k + 2; j++) if (j >= 0 && j <= NH) (n++, (sum += free[j]));
+    return free[k] ? sum / n : 0;
+  };
   for (let k = 0; k <= NH; k++) {
-    const u = k / NH, x0 = b.b[0] + (b.a[0] - b.b[0]) * u, z0 = b.b[1] + (b.a[1] - b.b[1]) * u;
+    const u = k / NH, [x0, z0] = at(k);
     const end = Math.min(1, Math.min(u, 1 - u) * b.len / 0.6); // rounded off at both ends
-    const top = (0.85 + 0.35 * u) * (0.85 + 0.15 * Math.sin(u * 17.3) + 0.08 * Math.sin(u * 41)) * Math.sqrt(end);
+    const top = (0.85 + 0.35 * u) * (0.85 + 0.15 * Math.sin(u * 17.3) + 0.08 * Math.sin(u * 41)) * Math.sqrt(end) * ease(k);
     for (let m = 0; m <= P; m++) {
       const v = m / P, a = lo + (hi - lo) * v; // across offset, signed
       // steep face at v = 0 (uphill), long spill to v = 1
@@ -1394,6 +1404,7 @@ function heap(b: Slide, height: Height, ground: Height, clear: (x: number, z: nu
     const u = (k + 0.3 + rand() * 0.4) / Math.max(6, Math.round(b.len / 1.1)), off = (down ? down * 0.2 : 0) + (rand() - 0.5) * half * 0.6;
     const x = b.b[0] + (b.a[0] - b.b[0]) * u + nx * off, z = b.b[1] + (b.a[1] - b.b[1]) * u + nz * off;
     const r = 0.26 + rand() * 0.18;
+    if (!clear(x, z, r)) continue; // none in a wall: the heap is gone there too
     const blk = drawn(new THREE.DodecahedronGeometry(r, 0), rand() < 0.35 ? HEAP_CHUNK_DARK : SNOW);
     blk.scale.set(1, 0.75, 1.15);
     blk.position.set(x, height(x, z) + (0.85 + 0.35 * u) * 0.8 + r * 0.2, z);

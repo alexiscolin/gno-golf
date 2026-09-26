@@ -228,6 +228,18 @@ Drops the caller's round on that hole (and frees its storage). The next
 stroke starts a new one from the tee. Their bests are kept. Emits
 `RoundReset` (`hole`, `player`).
 
+### `Claim(cur realm) int`
+
+For a player who took a gno.land name after saving rounds. Those rounds are
+kept but on no board, because only named players rank; without this they'd
+only count from the player's next finish. `Claim` puts them on the boards now:
+the caller's bests on the course's current holes, in both modes, and their
+course standing. It returns how many bests it placed, and panics if the
+caller has no name yet. Calling it twice changes nothing. The game sends it in
+the same transaction as the name's `Register`, and offers a "Rank them" button
+to anyone who took their name elsewhere. It reads the course's holes only, so
+it costs the same for everyone (about 60M gas and 1 KB).
+
 ### `Drain(cur realm, n int) int`
 
 Anyone. Takes up to `n` players (clamped to 1..400) of archived course holes
@@ -481,6 +493,14 @@ the lists `PlayRoundAt` would refuse (too many shots, too much work).
  "path":[…],"air":"00…0","cause":"-…-","rest":[…]}
 ```
 
+#### `SimulateRoundIn(hole, shots string, period int64) string`
+
+The same replay in the weather of **any period gone by**, however old. It's
+there to check a recorded round the way the chain played it: the bot check
+nudges a record's shots and replays them here. Only weather still to come is
+refused. It gives nothing away: the forecast is a public function, and
+`SimulateFrom` already took any past period.
+
 #### `SimulateCommit(hole string, ballX, ballY float64, stroke int, shots string, period int64) string`
 
 One commit of a round under way, read-only: the shots the next `PlayRoundAt`
@@ -505,8 +525,10 @@ A page of every round on a hole, as `State` lists them (no path). Paged like
 Only players with a gno.land name (`r/sys/users`) enter the boards and the
 course ranking: an address is free, a name is not, so a script can't fill the
 boards with a thousand accounts. Every finish is still kept, named or not. A
-player who takes a name later ranks at their next finish, and `Bests`,
-`Standings`, `Records` and `Players` read anyone.
+player who takes a name later ranks at their next finish, or at once with
+[`Claim`](#claimcur-realm-int). `Bests`, `Standings`, `Records` and `Players`
+read anyone. A hole's own record (`best`, shown on the hub and its pages) is a
+named player's too.
 
 The course ranking adds up each player's best on each **current course hole**:
 most holes first, then fewest strokes. It's kept in order as rounds finish, so
@@ -535,6 +557,29 @@ A player's place in a mode's course ranking.
 ranking doesn't hold (unnamed, or no current course hole finished); `holes`
 and `strokes` are still their standing. A ranked name deleted since keeps its
 place until its next change, so a rank can be that many too low.
+
+#### `CourseLeaderboard(mode string, offset, limit int) string`
+
+The whole course ranking, a page at a time, the way `HoleLeaderboard` pages a
+hole: from rank `offset+1`, at most `limit` rows (1..100).
+
+```json
+{"version":1,"mode":"pro","holes":74,"players":213,"offset":0,
+ "rows":[{"player":"g1…","holes":18,"strokes":61}, …],"next":20}
+```
+
+`players` is how many the ranking holds, `next` the offset of the next page (0
+at the end). A page reads its own rows only, however long the ranking.
+
+#### `HoleRank(hole, mode string, player address) string`
+
+A player's place on one hole's board.
+
+```json
+{"version":1,"hole":"garden/3/v1","mode":"pro","player":"g1…","rank":4,"of":57,"strokes":2}
+```
+
+`rank` 0 means the board doesn't hold them: no name, or no finish there.
 
 #### `HoleLeaderboard(hole, mode string, offset, limit int) string`
 

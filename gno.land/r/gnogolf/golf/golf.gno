@@ -901,7 +901,9 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	}
 	r.done = true
 	m := r.mode
-	if rec := e.rec(m); rec.best == 0 || r.strokes < rec.best {
+	// the hole's record is shown on the hub and its pages: a named player's,
+	// like the boards, or a throwaway address could hold it for good
+	if rec := e.rec(m); (rec.best == 0 || r.strokes < rec.best) && named(player.String()) {
 		if m == pro {
 			e.proBest, e.proBestBy = r.strokes, player
 		} else {

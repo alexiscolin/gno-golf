@@ -1,0 +1,741 @@
+"use client";
+
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import type { Snapshot } from "@/lib/engine";
+import { isAddress, type Chain } from "@/lib/chain";
+import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
+import { vsPar } from "@/lib/card";
+import { sound } from "@/lib/feel";
+import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
+import { registerName, claimRounds, type SendError } from "@/lib/adena";
+import { Button, Segmented, Sheet } from "@/components/ui";
+import Share from "@/components/Share";
+import { messageOf, shortAddr, holeLink, parHere, HONEST } from "@/components/common";
+
+// The leaderboards: the sheet (this hole, the course, friends), the top three
+// on the cups screen, a player's place and name, and the names read on-chain.
+
+// address → gno.land name, read once a page; "" is not kept, so a name taken since shows
+const names = new Map<string, Promise<string>>();
+/** A page's names in one read, kept for the Who of each row: one query a page, not one a row. */
+export function primeNames(chain: Chain, addrs: readonly string[]) {
+  const todo = addrs.filter((a) => !names.has(a));
+  if (!todo.length) return;
+  const all = chain.namesOf(todo).catch(() => [] as { player: string; name: string }[]);
+  // a name found is kept; "" is not, like nameOnce's
+  for (const a of todo) names.set(a, all.then((l) => l.find((x) => x.player === a)?.name || "").then((n) => (n || names.delete(a), n)));
+}
+export function nameOnce(chain: Chain, addr: string) {
+  let p = names.get(addr);
+  if (!p) {
+    p = chain.nameOf(addr).catch(() => "");
+    names.set(addr, p);
+    void p.then((n) => n || names.delete(addr));
+  }
+  return p;
+}
+
+export /**
+ * The cup as a grand prix: its emblem, its scorecard (every hole with its
+ * par and your score, the hole being played marked), the running total
+ * against par, where you stand on the chain's board if you recorded, and
+ * what comes next.
+ */
+interface BoardProps {
+  s: Snapshot;
+  chain: Chain | null;
+  me?: string | null;
+  mode?: Mode;
+}
+
+/** An empty board's places, drawn blank: the table is there before its first row. */
+const Ghosts = ({ n = 3 }: { n?: number }) => (
+  <ol className="lb__ghosts" aria-hidden="true">
+    {Array.from({ length: n }, (_, i) => (
+      <li key={i}>
+        <span className="lb__rank">{i + 1}</span>
+        <i />
+        <i />
+        <i />
+      </li>
+    ))}
+  </ol>
+);
+
+// Players another script flags as likely bots (public/flags.json: { flags:
+// { addr: { score, reasons } } }), read once a session when a board opens.
+// Missing or broken: nobody is hidden.
+/** What the checker says of one player: a score (0..1) and its reasons. */
+interface Flag {
+  score: number;
+  reasons?: string[];
+}
+type Flags = Record<string, Flag | undefined>;
+let flagsOnce: Promise<Flags> | null = null;
+const flagsOf = () =>
+  (flagsOnce ||= fetch("flags.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? (r.json() as Promise<unknown>) : {}))
+    .then((j) => (j && typeof j === "object" && "flags" in j && j.flags && typeof j.flags === "object" ? (j.flags as Flags) : {}))
+    .catch(() => ({})));
+const HIDE_AT = 0.5; // the checker's own self-test bot scores 0.61, a strong human up to 0.35
+function useFlags() {
+  const [f, setF] = useState<Flags>({});
+  useEffect(() => {
+    let live = true;
+    void flagsOf().then((x) => live && setF(x));
+    return () => void (live = false);
+  }, []);
+  return f;
+}
+/** Rows with the flagged ones taken out unless shown; the count taken out. */
+const screen_ = <R extends { player: string }>(rows: readonly R[], flags: Flags, all: boolean) => {
+  const out = all ? rows : rows.filter((r) => !((flags[r.player]?.score ?? 0) >= HIDE_AT));
+  return { rows: out, hidden: rows.length - out.length };
+};
+const FlagMark = ({ f }: { f: Flag | false | undefined }) =>
+  f && f.score >= HIDE_AT ? (
+    <em className="flag-mark" tabIndex={0} title={`Possibly automated: ${(f.reasons || []).join(", ") || "flagged"}`} aria-label={`Possibly automated: ${(f.reasons || []).join(", ")}`}>?</em>
+  ) : null;
+
+/**
+ * You and your friends, on this hole and across the course, in the mode shown.
+ * Read with Bests / Standings, which rank anyone, named or not.
+ */
+function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { inHole?: boolean }) {
+  const [friends, setFriends] = useState(loadFriends);
+  // (a failed read shows as no rows)
+  const [hole, setHole] = useState<(Partial<Bests> & { rows: readonly StrokesRow[] }) | null>(null);
+  const [course, setCourse] = useState<{ holes?: number; rows: readonly StandingRow[] } | null>(null);
+  const [adding, setAdding] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the sheet goes first
+  useEffect(() => () => clearTimeout(copiedT.current), []);
+  const who = [me, ...friends.map((f) => f.addr)].filter((x): x is string => !!x);
+  const key = who.join(",");
+  useEffect(() => {
+    if (!chain || !who.length) return;
+    let live = true;
+    const id = s.id || "";
+    if (inHole) chain.bests(id, mode, who).then((b) => live && setHole(b)).catch(() => live && setHole({ rows: [] }));
+    chain.standings(mode, who).then((b) => live && setCourse(b)).catch(() => live && setCourse({ rows: [] }));
+    return () => void (live = false);
+    // who is keyed by its join
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain, s.id, mode, key, inHole]);
+  const label = (a: string) => (a === me ? "You" : friends.find((f) => f.addr === a)?.name || shortAddr(a));
+  const add = async (e: FormEvent) => {
+    e.preventDefault();
+    const v = adding.trim().replace(/^@/, "");
+    if (!v) return;
+    setNote(null);
+    let addr = v, name = "";
+    if (!isAddress(v)) {
+      addr = chain ? await chain.resolveName(v).catch(() => "") : "";
+      name = v;
+      if (!addr) return setNote(`No gno.land name “${v}” on this chain.`);
+    }
+    if (addr === me) return setNote("That's you — you're always here.");
+    setFriends(addFriend(addr, name));
+    setAdding("");
+  };
+  const drop = (addr: string) => setFriends(saveFriends(loadFriends().filter((f) => f.addr !== addr)));
+  const invite = me && `${window.location.origin}${window.location.pathname}?friend=${me}`;
+  const rows = <R,>(b: { rows: readonly R[] } | null, pick: (a: R, b: R) => number) => (b ? [...b.rows].sort(pick) : null);
+  const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
+  return (
+    <div className="lb friends">
+      {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
+      {who.length > 0 && (<>
+      {inHole && <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>}
+      {inHole && !h && <p className="lb__empty">Reading the chain…</p>}
+      {inHole && h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet: be the first.</p>}
+      {inHole && h && h.length > 0 && (
+        <ol>
+          {h.map((r, i) => (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              <span className="lb__rank">{i + 1}</span>
+              <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
+              <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
+              <strong>{vsPar(r.strokes - ((hole && hole.par) || parHere(s)))}</strong>
+            </li>
+          ))}
+        </ol>
+      )}
+      <h3>The course <small>{course ? `${course.holes} holes` : ""}</small></h3>
+      {!c && <p className="lb__empty">Reading the chain…</p>}
+      {c && c.length === 0 && <p className="lb__empty">No recorded rounds yet: be the first.</p>}
+      {c && c.length > 0 && (
+        <ol>
+          {c.map((r, i) => (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              <span className="lb__rank">{i + 1}</span>
+              <span className="lb__who">{label(r.player)}</span>
+              <span className="lb__holes">{r.holes} holes</span>
+              <strong>{r.strokes}</strong>
+            </li>
+          ))}
+        </ol>
+      )}
+      </>)}
+      <section className="friends__manage" aria-label="Your friends">
+      <h4>Your friends</h4>
+      <form className="friends__add" onSubmit={(e) => void add(e)}>
+        <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Add a friend: address or gno.land name" aria-label="Add a friend by address or gno.land name" />
+        <Button variant="secondary" type="submit">Add</Button>
+      </form>
+      {note && <p className="note note--warn">{note}</p>}
+      {friends.length > 0 && (
+        <ul className="friends__list">
+          {friends.map((f) => (
+            <li key={f.addr}>
+              <span>{f.name || `${f.addr.slice(0, 10)}…${f.addr.slice(-4)}`}</span>
+              <button className="linkish" onClick={() => drop(f.addr)} aria-label={`Remove ${f.name || f.addr}`}>remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {invite && (
+        <button
+          className="linkish friends__invite"
+          onClick={() => void navigator.clipboard.writeText(invite).then(() => (setCopied(true), clearTimeout(copiedT.current), (copiedT.current = setTimeout(() => setCopied(false), 1600))), () => {})}
+        >
+          {copied ? "Link copied — send it to a friend" : "Copy an “add me as a friend” link"}
+        </button>
+      )}
+      </section>
+    </div>
+  );
+}
+
+/**
+ * The leaderboards, in a sheet: this hole's best rounds, and the whole
+ * course's. Read from the chain when the sheet opens, not before.
+ */
+export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean }) {
+  const [claimed, setClaimed] = useState(0); // rounds just ranked: the board is read again
+  // "This hole" is the hole being played: opened from the cups, there is none
+  const [tab, setTab] = useState<"friends" | "hole" | "course">(inHole ? "hole" : "course");
+  const [mode, setMode] = useState<Mode>(mine);
+  // the connected player's gno.land name: the general boards list only named players
+  const [myName, setMyName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!chain || !me) return;
+    let live = true;
+    void nameOnce(chain, me).then((n) => live && setMyName(n));
+    return () => void (live = false);
+  }, [chain, me]);
+  const self = (s.allHoles || []).find((h) => h.id === s.id);
+  const newer = self && self.next;
+  return (
+    <Sheet className="boards" label="Leaderboard" onClose={onClose}>
+        <span className="eyebrow">Recorded on-chain</span>
+        <h2>Leaderboard</h2>
+        <div className="boards__modes">
+          <Segmented role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
+          <p className="boards__word">{HONEST}</p>
+        </div>
+        <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={inHole ? [["hole", "This hole"], ["course", "The course"], ["friends", "Friends"]] : [["course", "The course"], ["friends", "Friends"]]} />
+        {tab !== "friends" && (
+          <p className="boards__ranked">
+            Ranked: players with a gno.land name
+            {!(me && myName) && (
+              <>
+                {" "}· <NameLink chain={chain}>get a name ↗</NameLink>
+                {me && myName === "" && <> — get one to appear here</>}
+              </>
+            )}
+          </p>
+        )}
+        {tab !== "friends" && me && myName && chain && <ClaimRounds chain={chain} me={me} mode={mode} onDone={() => setClaimed((n) => n + 1)} />}
+        {tab === "hole" && newer && (
+          <p className="note note--warn">
+            Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
+          </p>
+        )}
+        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} />}
+        <p className="real__fine">Only rounds saved on-chain appear here.</p>
+    </Sheet>
+  );
+}
+
+/**
+ * The players who finished without a gno.land name: kept by the chain, never
+ * ranked (an address is free, a name is not), listed folded under the board,
+ * greyed and without a place. Read only when opened, 100 by address a page,
+ * named ones left out with one read of their names per page.
+ */
+function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"; chain: Chain | null; id: string; mode: Mode; me?: string | null; count?: number }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<readonly (StrokesRow & { holes?: number })[] | null>(null);
+  const [after, setAfter] = useState(""); // the next page's cursor, "" at the end
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+  const load = (from: string) => {
+    if (!chain || busy) return;
+    setBusy(true);
+    setErr(false);
+    (kind === "hole" ? chain.records(id, mode, from) : chain.players(mode, from))
+      .then(async (b) => {
+        // names through the shared cache: one read a page, kept for the boards' rows
+        primeNames(chain, b.rows.map((r) => r.player));
+        const named = await Promise.all(b.rows.map((r) => nameOnce(chain, r.player)));
+        // no name today: a player named since their finish ranks from their next
+        // one, and until then is on neither list (the realm keeps no such index)
+        const page = b.rows.filter((_, i) => !named[i]);
+        const order = (a: StrokesRow & { holes?: number }, z: StrokesRow & { holes?: number }) => (z.holes || 0) - (a.holes || 0) || a.strokes - z.strokes;
+        setRows((r) => [...(from ? r || [] : []), ...page].sort(order));
+        setAfter(b.next);
+      })
+      .catch(() => setErr(true))
+      .finally(() => setBusy(false));
+  };
+  if (count === 0) return null;
+  return (
+    <details className="unnamed" onToggle={(e) => { const o = (e.target as HTMLDetailsElement).open; setOpen(o); if (o && !rows) load(""); }}>
+      <summary>Also finished, no name{count ? ` (${count})` : ""}</summary>
+      {open && !rows && !err && <p className="lb__empty">Reading the chain…</p>}
+      {err && <p className="note note--bad">The chain did not answer. <button className="linkish" onClick={() => load(rows ? after : "")}>Try again</button></p>}
+      {rows && rows.length === 0 && !after && !err && <p className="lb__empty">Nobody without a name here.</p>}
+      {rows && rows.length > 0 && (
+        <ul>
+          {rows.map((r) => (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              {kind === "hole" && chain ? (
+                <a href={chain.roundURL(id, r.player)} target="_blank" rel="noopener noreferrer">{r.player === me ? "You" : shortAddr(r.player)}</a>
+              ) : (
+                <span>{r.player === me ? "You" : shortAddr(r.player)}</span>
+              )}
+              <span>{kind === "hole" ? `${r.strokes} stroke${r.strokes === 1 ? "" : "s"}` : `${r.holes} holes · ${r.strokes}`}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {after && (
+        <button className="linkish" disabled={busy} onClick={() => load(after)}>
+          {busy ? "Reading…" : "Show more"}
+        </button>
+      )}
+    </details>
+  );
+}
+
+/** A row of a full board: its place on the chain's board (the page's offset on), and the score. */
+type Placed = StrokesRow & { holes?: number; at: number };
+
+/**
+ * A whole board, the hole's or the course's, read a page at a time as it is
+ * scrolled: a page is O(page) on the chain however deep. Every row links to
+ * what proves it, and the connected player sees their own place, pinned under
+ * the list when it is further down, with a way to share it.
+ */
+export function FullBoard({ kind, s, chain, me, mode = "pro" }: BoardProps & { kind: "hole" | "course" }) {
+  const PAGE = 20;
+  const id = s.id || "";
+  const [rows, setRows] = useState<readonly Placed[] | null>(null);
+  const [head, setHead] = useState<{ par: number; holes: number; players: number; finished?: number } | null>(null);
+  const [next, setNext] = useState(0); // the next page's offset, 0 at the end
+  const [err, setErr] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const [mine, setMine] = useState<{ rank: number; of: number; strokes: number; holes?: number } | null>(null);
+  const flags = useFlags();
+  const [showAll, setShowAll] = useState(false);
+  // Offsets are the chain's, not the rows shown: a name deleted since is
+  // skipped in its page, which then holds fewer rows while more still follow.
+  const read = (offset: number) =>
+    kind === "hole"
+      ? chain!.holeLeaderboard(id, offset, PAGE, mode).then((b) => ({ b, head: { par: b.par, holes: 0, players: b.players, finished: b.finished } }))
+      : chain!.courseLeaderboard(offset, PAGE, mode).then((b) => ({ b, head: { par: 0, holes: b.holes, players: b.players } }));
+  const alive = useRef(true);
+  // set on each mount too: React's dev double mount runs the cleanup once in between
+  useEffect(() => ((alive.current = true), () => void (alive.current = false)), []);
+  const add = (offset: number) =>
+    read(offset).then(({ b, head: h }) => {
+      if (!alive.current) return;
+      primeNames(chain!, b.rows.map((x) => x.player));
+      setHead(h);
+      setRows((r) => {
+        const had = offset ? r || [] : [];
+        // a place is the rows shown before it: the chain's offsets also count
+        // names deleted since, skipped in their page. A row already shown (the
+        // board moved between two reads) is not listed twice.
+        const seen = new Set(had.map((x) => x.player));
+        const fresh = b.rows.filter((x) => !seen.has(x.player));
+        return [...had, ...fresh.map((x, i) => ({ ...x, at: had.length + i + 1 }))];
+      });
+      setNext(b.next > offset ? b.next : 0);
+    });
+  useEffect(() => {
+    if (!chain) return;
+    add(0).catch((e: unknown) => setErr(messageOf(e)));
+    // the board is keyed by kind, mode and hole: one mount, one first page
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain]);
+  useEffect(() => {
+    if (!chain || !me) return;
+    let live = true;
+    (kind === "hole" ? chain.holeRank(id, mode, me) : chain.rank(mode, me)).then((r) => live && setMine(r.rank > 0 ? r : null)).catch(() => {});
+    return () => void (live = false);
+  }, [chain, me, kind, id, mode]);
+  const loadMore = () => {
+    if (!next || more) return;
+    setMore(true);
+    add(next)
+      .catch((e: unknown) => setErr(messageOf(e)))
+      .finally(() => setMore(false));
+  };
+  // the next page loads as the end of the list comes into view
+  const end = useRef<HTMLLIElement>(null);
+  const moreRef = useRef(loadMore);
+  moreRef.current = loadMore;
+  useEffect(() => {
+    const el = end.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    // watched inside the list's own scroll: it comes into view only at the end
+    const o = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && moreRef.current(), { root: el.parentElement });
+    o.observe(el);
+    return () => o.disconnect();
+  }, [rows]);
+  // places are counted on the rows shown, flagged ones left out unless shown:
+  // the same numbers as the podium and the save button's
+  const screened = rows ? screen_(rows, flags, showAll) : null;
+  const shown = screened && { ...screened, rows: screened.rows.map((r, i) => ({ ...r, at: i + 1 })) };
+  const listed = !!rows && !!me && rows.some((r) => r.player === me);
+  const par = head ? head.par || parHere(s) : parHere(s);
+  const link = (p: string) => (kind === "hole" ? chain?.roundURL(id, p) : undefined);
+  const score = (r: { strokes: number; holes?: number }) =>
+    kind === "hole" ? (
+      <>
+        <span className="lb__holes">
+          {r.strokes === 1 ? <em className="ace-chip">ACE</em> : `${r.strokes} strokes`}
+        </span>
+        <strong className={r.strokes < par ? "good" : r.strokes > par ? "bad" : ""}>{vsPar(r.strokes - par)}</strong>
+      </>
+    ) : (
+      <>
+        <span className="lb__holes">
+          {r.holes}/{head ? head.holes : "–"} holes
+        </span>
+        <strong>{r.strokes}</strong>
+      </>
+    );
+  // your place, listed or further down: said once under the list, with the game's share
+  const myRow = rows && me ? rows.find((r) => r.player === me) : undefined;
+  const myPlace = myRow && head ? { at: myRow.at, of: head.players } : mine ? { at: mine.rank, of: mine.of } : null;
+  const title = kind === "hole" ? s.name : "The course";
+  const sub = !head ? "" : kind === "hole" ? `par ${par} · ${head.finished} finished${head.finished !== head.players ? `, ${head.players} ranked` : ""}` : `${head.players} ranked`;
+  return (
+    <div className="lb lb--full">
+      <h3>
+        {title} <small>{sub}</small>
+      </h3>
+      {err && <p className="note note--bad">{err}</p>}
+      {!rows && !err && <Ghosts />}
+      {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No recorded round yet — connect Adena and be the first.</p></>)}
+      {shown && shown.rows.length > 0 && (
+        <ol>
+          {shown.rows.map((r) => (
+            <li key={r.player} className={(r.player === me ? "me " : "") + (r.at <= 3 ? `medal medal--${r.at}` : "")}>
+              <span className="lb__rank">{r.at}</span>
+              <span className="lb__who">
+                <Who chain={chain} addr={r.player} me={me} full link={link(r.player)} />
+                <FlagMark f={showAll && flags[r.player]} />
+              </span>
+              {score(r)}
+            </li>
+          ))}
+          {next > 0 && (
+            <li className="lb__more" ref={end}>
+              <Button className="boards__more" disabled={more} onClick={loadMore}>
+                {more ? "Reading…" : "Show more"}
+              </Button>
+            </li>
+          )}
+        </ol>
+      )}
+      {shown && (shown.hidden > 0 || showAll) && (
+        <button className="linkish" onClick={() => setShowAll((v) => !v)}>
+          {showAll ? "Hide flagged players" : `Show all (${shown.hidden} hidden)`}
+        </button>
+      )}
+      <Unnamed kind={kind} chain={chain} id={id} mode={mode} me={me} count={head && kind === "hole" && head.finished != null ? head.finished - head.players : undefined} />
+      {/* your place, when the list shown does not reach it yet */}
+      {mine && me && !listed && (
+        <ol className="lb__mine">
+          <li className="me">
+            <span className="lb__rank">{mine.rank}</span>
+            <span className="lb__who">You</span>
+            {score(mine)}
+          </li>
+        </ol>
+      )}
+      {myPlace && (
+        <div className="lb__myshare">
+          <span>
+            You are <b>#{myPlace.at}</b> of {myPlace.of} {kind === "hole" ? `on ${s.name}` : "on the course"}
+          </span>
+          <Share
+            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place. #gnoland @_gnoland`}
+            link={kind === "hole" ? holeLink(s, "") : ""}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A finished hole's place on its board if saved (0: not on the first page, or
+ * nothing to take), and whether the connected player lacks the gno.land name
+ * the boards need.
+ */
+export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean, stale: boolean) {
+  const [at, setAt] = useState(0);
+  const [named, setNamed] = useState<boolean | null>(null);
+  const id = (s && s.id) || "", strokes = s ? s.strokes : 0;
+  // an archived version, or a community hole, ranks nobody
+  const ranked = !!(s && s.official) && !((s && s.allHoles) || []).find((h) => h.id === id)?.next;
+  const done = !!(s && s.holed);
+  useEffect(() => {
+    setAt(0);
+    if (!chain || !done || saved || stale || !ranked || !id) return;
+    let live = true;
+    const PAGE = 10;
+    Promise.all([chain.holeLeaderboard(id, 0, PAGE, mode), flagsOf()])
+      .then(([board, flags]) => {
+        if (!live) return;
+        // as the board shows it: flagged players are hidden there, so not ahead here
+        const b = { ...board, rows: screen_(board.rows, flags, false).rows };
+        const mine = me ? b.rows.find((r) => r.player === me) : undefined;
+        if (mine && mine.strokes <= strokes) return; // no better than the player's own best
+        // the board orders equal strokes by address; not connected, a tie counts as ahead
+        const ahead = b.rows.filter((r) => r.player !== me && (r.strokes < strokes || (r.strokes === strokes && (!me || r.player < me)))).length;
+        // sorted rows: a row not ahead, or the end of the board, makes the place exact
+        // (a page can hold fewer rows than asked while more follow)
+        if (ahead < b.rows.length || b.next === 0) setAt(ahead + 1);
+      })
+      .catch(() => {});
+    return () => void (live = false);
+  }, [chain, id, mode, me, strokes, done, saved, stale, ranked]);
+  useEffect(() => {
+    if (!chain || !me) return;
+    let live = true;
+    const check = () => void nameOnce(chain, me).then((n) => live && setNamed(!!n));
+    check();
+    // a name taken in another tab (gnoweb) shows on coming back: "" is never cached
+    const back = () => document.visibilityState === "visible" && check();
+    document.addEventListener("visibilitychange", back);
+    return () => ((live = false), document.removeEventListener("visibilitychange", back));
+  }, [chain, me]);
+  // a player with no name is not listed yet: the place is what a name would give
+  return { at, noName: !!me && named === false && ranked, named: () => setNamed(true) };
+}
+
+/** The chain's own name registrar on gnoweb (pearl: v1, a local gno and mainnet: v0), NEXT_PUBLIC_NAMEREG if set. */
+export function NameLink({ chain, children }: { chain: Chain | null; children: ReactNode }) {
+  const [reg, setReg] = useState(process.env.NEXT_PUBLIC_NAMEREG || "");
+  useEffect(() => {
+    if (reg || !chain) return;
+    let live = true;
+    void chain.nameReg().then((r) => live && setReg(r), () => {});
+    return () => void (live = false);
+  }, [chain, reg]);
+  if (!chain || !reg) return <>{children}</>;
+  return (
+    <a href={chain.web + "/" + reg.replace(/^(gno\.land)?\//, "")} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+/**
+ * Takes a gno.land name without leaving the game: the registrar's rules
+ * checked as it is typed out, then one transaction in Adena. The boards list
+ * named players only, so this comes before the save that should rank.
+ */
+export function NameForm({ chain, account, chainId, price, lead, onNamed }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void }) {
+  const [stem, setStem] = useState(""); // what follows "nym-"
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState("");
+  const name = "nym-" + stem;
+  // the registrar's rule, said while typing; the chain checks it again (and
+  // whether it is taken) before Adena opens
+  const hint = !stem
+    ? "5 to 13 letters, then 3 digits"
+    : !/^[a-z]+\d{0,3}$/.test(stem)
+      ? "lowercase letters, then digits"
+      : /^(gno|gl|g1|atom|atone|photon|cosmos)/.test(stem)
+        ? "it cannot start with gno, gl, atom, photon or cosmos"
+        : !/^[a-z]{5,13}(\d|$)/.test(stem)
+          ? "5 to 13 letters"
+          : !/^[a-z]{5,13}\d{3}$/.test(stem)
+            ? "and 3 digits to end"
+            : "";
+  const take = async (e: FormEvent) => {
+    e.preventDefault();
+    if (hint) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const why = await chain.nameProblem(name);
+      if (why) return setErr(why);
+      await registerName({ address: account, registrar: await chain.nameReg(), realm: chain.realm, name, price, chainId, rpc: chain.rpc });
+      // read back: the name is the chain's once a block has it
+      for (let k = 0; k < 10; k++) {
+        names.delete(account);
+        if ((await nameOnce(chain, account)) === name) break;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      setDone(name);
+      onNamed(name);
+    } catch (x) {
+      if (!(x as SendError).cancelled) setErr(messageOf(x));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (done) return <p className="note note--good">You are <b>{done}</b> now: save your round to take your place.</p>;
+  return (
+    <form className="nameform" onSubmit={(e) => void take(e)}>
+      <b className="nameform__title">{lead}</b>
+      <span className="nameform__why">The boards list gno.land names. Take yours once: one signature, about 0.5 GNOT.</span>
+      <span className="nameform__row">
+        <label className="nameform__field">
+          <span aria-hidden="true">nym-</span>
+          <input value={stem} onChange={(e) => setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim())} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
+        </label>
+        <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint}>{busy ? "Adena…" : "Take it"}</Button>
+      </span>
+      <small className={hint ? "" : "nameform__ok"} aria-live="polite">{hint ? `nym-… ${hint}` : `✓ ${name} is well formed`} · <NameLink chain={chain}>names on gno.land ↗</NameLink></small>
+      {err && <small className="nameform__err" role="alert">{err}</small>}
+    </form>
+  );
+}
+
+/**
+ * A named player whose saved rounds are on no board (the name came after
+ * them): one button ranks them now, instead of at their next finish.
+ */
+function ClaimRounds({ chain, me, mode, onDone }: { chain: Chain; me: string; mode: Mode; onDone: () => void }) {
+  const [holes, setHoles] = useState(0); // saved holes the course ranking does not hold
+  const [state, setState] = useState(""); // "", "busy", "done", or what went wrong
+  useEffect(() => {
+    let live = true;
+    chain.rank(mode, me).then((r) => live && setHoles(r.rank === 0 ? r.holes : 0)).catch(() => {});
+    return () => void (live = false);
+  }, [chain, me, mode, state]);
+  if (state === "done") return <p className="note note--good">Your rounds are on the boards.</p>;
+  if (!holes) return null;
+  const go = async () => {
+    setState("busy");
+    try {
+      await claimRounds({ address: me, realm: chain.realm, chainId: await chain.chainId(), rpc: chain.rpc });
+      setState("done");
+      onDone();
+    } catch (x) {
+      setState((x as SendError).cancelled ? "" : messageOf(x));
+    }
+  };
+  return (
+    <p className="note note--warn">
+      {holes} saved hole{holes === 1 ? " is" : "s are"} not ranked yet: the name came after them.{" "}
+      <Button variant="secondary" disabled={state === "busy"} onClick={() => void go()}>{state === "busy" ? "Adena…" : "Rank them"}</Button>
+      {state && state !== "busy" && <small className="nameform__err"> {state}</small>}
+    </p>
+  );
+}
+
+/** Your place on the hole's board once the round is saved: shown by the score, and in what is shared. */
+export function useSavedPlace(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean) {
+  const [p, setP] = useState<{ rank: number; of: number } | null>(null);
+  const id = (s && s.official && s.id) || "";
+  useEffect(() => {
+    setP(null);
+    if (!chain || !me || !id || !saved) return;
+    let live = true;
+    // the round was just read back: the board has it too
+    chain.holeRank(id, mode, me).then((r) => live && r.rank > 0 && setP(r)).catch(() => {});
+    return () => void (live = false);
+  }, [chain, me, id, mode, saved]);
+  return p;
+}
+
+/** A ranked player as the boards show them: "You", their gno.land name, or a short address while it is read. */
+function Who({ chain, addr, me, full = false, link }: { chain: Chain | null; addr: string; me?: string | null; full?: boolean; link?: string }) {
+  const [name, setName] = useState("");
+  useEffect(() => {
+    if (!chain || addr === me) return;
+    let live = true;
+    void nameOnce(chain, addr).then((n) => live && setName(n));
+    return () => void (live = false);
+  }, [chain, addr, me]);
+  const label = addr === me ? "You" : name || shortAddr(addr);
+  const body = full && (name || addr === me) ? (
+    <span className="who">
+      <span className="who__name">{label}</span>
+      <small>{shortAddr(addr)}</small>
+    </span>
+  ) : (
+    label
+  );
+  return link && link !== "#" ? (
+    <a href={link} target="_blank" rel="noopener noreferrer" title="See this round on gno.land">
+      {body}
+    </a>
+  ) : (
+    <>{body}</>
+  );
+}
+
+/** The course's top three on the cups screen, flagged players left out; nothing while the board is empty. */
+export function Podium({ chain, me, mode = "pro", onOpen }: { chain: Chain | null; me?: string | null; mode?: Mode; onOpen: () => void }) {
+  const [top, setTop] = useState<{ rows: readonly StandingRow[]; holes: number } | null>(null);
+  useEffect(() => {
+    setTop(null);
+    if (!chain) return;
+    let live = true;
+    Promise.all([chain.leaderboard(mode), flagsOf()])
+      .then(([b, flags]) =>
+        {
+          const rows = screen_(b.rows, flags, false).rows.slice(0, 3);
+          primeNames(chain, rows.map((r) => r.player));
+          if (live) setTop({ rows, holes: b.holes });
+        },
+      )
+      .catch(() => {});
+    return () => void (live = false);
+  }, [chain, mode]);
+  if (!chain) return null;
+  const empty = !!top && !top.rows.length;
+  return (
+    <section className="podium" aria-label="Top players">
+      <header className="podium__head">
+        <h3>Top players <small>{mode === "pro" ? "Pro" : "Assisted"} · on-chain</small></h3>
+        <button className="linkish" onClick={() => (sound("blip"), onOpen())}>See the leaderboard →</button>
+      </header>
+      <ol className="podium__row">
+        {/* always three places: the ones nobody holds yet drawn blank */}
+        {[0, 1, 2].map((i) => (top && top.rows[i]) || i).map((r, i) =>
+          typeof r === "number" ? (
+            <li key={r} className="podium__ghost" aria-hidden="true">
+              <span className={`podium__medal podium__medal--${i + 1}`}>{i + 1}</span>
+              <i />
+            </li>
+          ) : (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              <span className={`podium__medal podium__medal--${i + 1}`}>{i + 1}</span>
+              <span className="podium__who"><Who chain={chain} addr={r.player} me={me} full /></span>
+              <span className="podium__score">
+                <b>{r.strokes}</b> · {r.holes}/{top!.holes}
+              </span>
+            </li>
+          ),
+        )}
+      </ol>
+      {empty && <p className="podium__empty">Nobody yet: save a round on-chain to take the first place.</p>}
+    </section>
+  );
+}
+
+

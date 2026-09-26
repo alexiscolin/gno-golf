@@ -127,7 +127,7 @@ func TestRoundCountsStrokesAndFinishes(cur realm, t *testing.T) {
 
 	r = roundIn(count, player)
 	uassert.True(t, r.done, "a shot down the line should hole out")
-	uassert.Equal(t, 1, mustHole(count).rec(pro).best)
+	uassert.Equal(t, 1, mustHole(count).bests(pro).Get(player.String()).(int), "the player's best is kept")
 }
 
 // TestPlayRoundEqualsTheSameShotsOneByOne is what makes committing a whole hole
@@ -465,6 +465,9 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	uassert.Equal(t, place+b.String()+`","rank":2,"of":3,"strokes":2}`, HoleRank(id, "assisted", b))
 	uassert.Equal(t, place+stranger.String()+`","rank":0,"of":3,"strokes":1}`, HoleRank(id, "assisted", stranger))
 	uassert.Equal(t, place+player.String()+`","rank":0,"of":3,"strokes":0}`, HoleRank(id, "assisted", player)) // no finish here
+	// a round's page sums it up: over and under par written out (ufmt has no %+d)
+	uassert.True(t, strings.Contains(Render(id+"/"+b.String()), "holed it in 2** (par 3, -1), assisted"), Render(id+"/"+b.String()))
+	uassert.True(t, strings.Contains(Render(id+"/"+c.String()), "(par 3, even)"), "par is even")
 
 	// c improves to 1: its old row goes, the new one sorts by address among the 1s
 	testing.SetRealm(testing.NewUserRealm(c))
@@ -508,7 +511,8 @@ func TestOnlyNamedPlayersRank(cur realm, t *testing.T) {
 	id := courseHole(cur, 33)
 	testing.SetRealm(testing.NewUserRealm(stranger))
 	PlayRoundAt(cross(cur), id, "0,1", Period())
-	uassert.True(t, mustHole(id).rec(assisted).best > 0, "the finish is kept")
+	uassert.Equal(t, 1, mustHole(id).bests(assisted).Get(stranger.String()).(int), "the finish is kept")
+	uassert.Equal(t, 0, mustHole(id).rec(assisted).best, "but holds no public record: records are named players' too")
 	uassert.False(t, strings.Contains(HoleLeaderboard(id, "assisted", 0, 100), stranger.String()), "not on the hole's board")
 	uassert.False(t, strings.Contains(Leaderboard("assisted"), stranger.String()), "not on the course's board")
 	uassert.True(t, strings.Contains(Bests(id, "assisted", " g1nobody, "+stranger.String()), `"player":"`+stranger.String()+`"`), "friends see it")

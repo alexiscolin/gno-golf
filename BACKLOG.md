@@ -2,29 +2,24 @@
 
 ## Where this stands
 
-Working, on a local gnodev: two `/p/` packages, the `golf` realm, **18 holes**,
-and the 3D client in `web/` (Next static export). 16 tests pass. Everything below marked *measured* came from a real
-deploy, not from reading.
+The V1 is built and runs end to end on a local chain: the physics and course
+packages, the `golf` realm, the full course (four cups of 18 holes and two
+extras, all stored as data), the 3D client in `web/`, and the boards: every
+hole and the whole course ranked on-chain, a page at a time, with your place,
+your name taken in the game, and the bot check scoring old records. What's
+left before pearl is a fresh deploy rehearsal on the current code (the last
+one predates the boards). This file is the longer view: what we measured
+along the way, and what comes after V1.
 
-To pick it up again:
+To pick it up again, follow "Running it locally" in the README: build gnodev
+and gnokey from the gno checkout, run `gnodev local -empty-blocks`, publish
+the course with `scripts/publishdata.sh`, then `npm run dev` in `web/`.
+`npm run selfcheck` and `npm run smoke` tell you whether the client and the
+realm still agree.
 
-```sh
-# the chain + gnoweb  (the installed gno/gnodev binaries are stale — build them)
-cd ~/Server/gnoland/gno/contribs/gnodev && go build -o /usr/local/bin/gnodev .
-cd ~/Server/gnoland/gnogolf && gnodev local -node-rpc-listener 127.0.0.1:26757
-#   gnoweb lands on :8888, the 18 holes deploy from disk automatically
-
-# register the holes once (one MsgRun does all of them; see git history)
-#   or call Register on each hole realm
-
-# the site
-cd web && npm run dev        # or: npm run build → out/, static, host anywhere
-```
-
-Next, in order: the visual client is done, so what is missing is **the board** —
-records, other people's courses ranked by what makes them worth replaying. That
-is the real paid feature, and it is half built. Then wear-as-physics, which is
-v2 and already collecting its data.
+After V1 comes the Builder: players draw a hole in the browser and publish it
+with `PublishMine`. The realm needs nothing new for it; the work is a GG1
+encoder on the client side (see ADR-002).
 
 One dependency has never been exercised: a real `create_session` from a web page
 with Adena. The whole no-popup, we-pay-the-gas story rests on it.
@@ -173,10 +168,10 @@ Modes worth having, and no more until the first has an audience:
 A pot or a tournament waits until the course interface is frozen and audited: a
 hostile hole can already lie about `holed`.
 
-**"The round exists" is worth nothing without somewhere it is seen.** The real
-paid feature is the board — records, other people's courses ranked by what makes
-them worth replaying. It is half built. After the 3D client, build that, not a
-third mode.
+**"The round exists" is worth nothing without somewhere it is seen.** That was
+the case for the boards, and they are now built: every hole and the course,
+paged on-chain, in the game and on gnoweb. Ranking other people's courses by
+what makes them worth replaying is the part still to come, with the Builder.
 
 ## The course maker — compatible, with three things to fix first
 

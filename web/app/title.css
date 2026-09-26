@@ -435,3 +435,6 @@
   .victory, .victory__in, .victory__badge { animation: none; }
 }
 .victory__cheer canvas { width: 100%; height: 100%; display: block; }
+
+/* the other network's site, under the title: a link, not a button */
+.title__switch { color: inherit; text-decoration: underline; text-underline-offset: 3px; }

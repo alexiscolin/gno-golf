@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && next build",
     "start": "npx serve out",
     "lint": "eslint . ../media/promo ../media/camera ../media/lib ../scripts",
-    "selfcheck": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/selfcheck.ts"
+    "selfcheck": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/selfcheck.ts",
+    "smoke": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/smoke.ts"
   },
   "dependencies": {
     "next": "^15.1.6",

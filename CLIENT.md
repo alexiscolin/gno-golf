@@ -115,8 +115,10 @@ a client that finds one can offer to go there).
 | preview any later stroke | `SimulateFrom(hole, x, y, shot, stroke, period)` from the last `"rest"` |
 | check a commit before signing | `SimulateCommit(hole, x, y, stroke, shots, period)` |
 | read back a recorded round | `Round(hole, player)` |
-| a player's place | `Rank(mode, player)`, not the whole `Players` list |
-| the boards | `Leaderboard(mode)`, `HoleLeaderboard(hole, mode, offset, limit)`, `Bests`, `Standings` |
+| a player's place | `Rank(mode, player)` on the course, `HoleRank(hole, mode, player)` on a hole, not the whole `Players` list |
+| the boards | `Leaderboard(mode)` for a top ten, `CourseLeaderboard(mode, offset, limit)` and `HoleLeaderboard(hole, mode, offset, limit)` a page at a time, `Bests`, `Standings` |
+| check an old recorded round | `SimulateRoundIn(hole, shots, period)`, in its own weather however old |
+| rank rounds saved before a name | the write `Claim()`, best sent with the name's `Register` in one transaction |
 
 `State(hole)` is `HoleState` plus the play count and up to 24 rounds; a client
 that only draws the hole doesn't need them.

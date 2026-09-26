@@ -1,5 +1,6 @@
 "use client";
 
+import { NETWORK, OTHER_URL } from "@/lib/network";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import "@/app/title.css";
 import { sound } from "@/lib/feel";
@@ -397,7 +398,18 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
           </g>
         </svg>
         </div>
-        <p className="title__tag">mini-golf on-chain</p>
+        <p className="title__tag">
+          mini-golf on-chain{NETWORK === "testnet" && <span className="title__net"> · testnet</span>}
+          {/* the other deployment, one click away: its own address, its own chain */}
+          {OTHER_URL && (
+            <>
+              {" · "}
+              <a className="title__switch" href={OTHER_URL} onClick={(e) => e.stopPropagation()}>
+                {NETWORK === "testnet" ? "play on mainnet" : "try the testnet"} →
+              </a>
+            </>
+          )}
+        </p>
         {ready ? (
           <Button variant="primary" className="btn--play btn--cta btn--pop btn--start" aria-label="Play" onClick={(e) => (e.stopPropagation(), start())}>
             <span className="hint--mouse">Click to start</span>

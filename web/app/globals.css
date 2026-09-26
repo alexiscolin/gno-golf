@@ -2226,5 +2226,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 /* the place the save would take: a gold sticker on the button's corner */
 .btn__rank { position: absolute; top: -14px; right: -10px; padding: 3px 10px; border: 2px solid var(--ink); border-radius: 999px; background: var(--gold); color: var(--ink); font-size: 13px; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 0 var(--ink); transform: rotate(4deg); pointer-events: none; }
 .btn--save-rank:not([disabled]) { animation: save-pulse 1.8s ease-in-out 2; }
+/* on a phone the sticker sits under the label, not over the next button */
+@media (max-width: 480px) { .btn--save-rank { flex-wrap: wrap; justify-content: center; } .btn__rank { position: static; transform: none; box-shadow: none; flex-basis: 100%; text-align: center; margin-top: 4px; } }
 @keyframes save-pulse { 50% { transform: scale(1.04); } }
 @media (prefers-reduced-motion: reduce) { .btn--save-rank:not([disabled]) { animation: none; } }
