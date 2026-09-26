@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, ownFade, fadeLoop, windNow, geoOf, gridGeo, onTop } from "./materials";
-import { inZone, mod, segDist, smoothstep, terrain } from "../terrain";
+import { inZone, inSea, mod, segDist, smoothstep, terrain } from "../terrain";
 import { bakeLocal, look, weatherLooks } from "./bake";
 import { gnomelet, brolly } from "./props";
 import { animate, state } from "./state";
@@ -2143,6 +2143,10 @@ export function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Dressed
     const zone = item as Dressed;
     if (k === "wetsand") return footprint(zone, t, flatTop(P.wet));
     if (k === "sand") return footprint(zone, t, flatTop(P.sand));
+    // (a rock pool and a lagoon on the lane are sunk into it, as every
+    // water is: the shared pond draws them, with their banks and rocks)
+    const [mx, mz] = [(zone.min[0] + zone.max[0]) / 2, (zone.min[1] + zone.max[1]) / 2];
+    if ((k === "tidepool" || k === "lagoon") && t.onGreen(mx, mz) && t.pond(mx, mz)) return null;
     if (k === "tidepool") return waterZone(zone, t, s);
     if (k === "lagoon") return waterZone(zone, t, s, { color: 0x4fc4c9 });
     if (k === "wave") return wave(zone, t);
@@ -2190,7 +2194,7 @@ function lagoonUnder(s: Hole) {
   g.add(water);
   const piles: THREE.BufferGeometry[] = [];
   for (const w of s.walls) {
-    if (w.every) continue;
+    if (w.every || inSea(w, s.zones)) continue; // (a frame out in the sea is clear glass: no piles)
     const l = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
     for (let u = 0.5; u < l; u += 3) {
       const x = w.a[0] + ((w.b[0] - w.a[0]) * u) / l, z = w.a[1] + ((w.b[1] - w.a[1]) * u) / l;

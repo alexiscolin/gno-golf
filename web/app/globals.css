@@ -1818,7 +1818,7 @@ button:focus-visible, a:focus-visible {
 }
 /* rain darkens and wets the scene; a storm more */
 .wet { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30,45,60,.28), rgba(20,40,50,.12)); transition: opacity .8s; }
-.wet--storm { background: linear-gradient(180deg, rgba(15,20,40,.5), rgba(15,25,35,.25)); }
+.wet--storm { background: linear-gradient(180deg, rgba(18,26,48,.34), rgba(18,28,40,.12)); }
 
 .drawer__cup:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .weather__until { font-size: 10px; font-weight: 700; color: var(--ink-soft); line-height: 1; white-space: nowrap; }

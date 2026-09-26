@@ -23,7 +23,7 @@ import {
 } from "./scene";
 import { BALL_R } from "./terrain";
 import { makeCamera } from "./engine/camera";
-import { pace, slowFrames, SLOW_KEY } from "./engine/pace";
+import { pace, slowFrames, frameMs, SLOW_KEY } from "./engine/pace";
 import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
 import type { Extras, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
@@ -93,7 +93,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   let fakeWeather = fakeWeather0;
   const faked = (): WeatherZone[] | "" => fakeWeather && (["wind", "rain", "fog", "storm", "snow"] as const)
     .filter((skin) => fakeWeather.includes(skin))
-    .map((skin) => ({ skin, vec: skin === "wind" ? ([0.05, -0.03] as const) : ([0, 0] as const) }));
+    .map((skin): WeatherZone => ({ skin, vec: skin === "wind" ? ([0.05, -0.03] as const) : ([0, 0] as const) }))
+    // a storm as the chain has it: its wind in two gusts 40° either side, taking turns
+    .concat(fakeWeather.includes("storm") && g.s ? [0.7, -0.7].map((a, k): WeatherZone => ({ skin: "wind", vec: [0.11 * Math.cos(a), 0.11 * Math.sin(a)], min: [0, 0], max: [g.s!.board.w, g.s!.board.h], every: 6, on: 3, phase: 3 * k })) : []);
   // near 3, far 260: the whole of any cup's scenery (measured, 210 at most on the
   // island overview, and the lean) with three times the depth precision of
   // 1..400 — what kept far-off faces from flickering into each other
@@ -280,7 +282,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     resize();
     return was !== tier;
   }
-  // only frames drawn back to back count (an idle scene is drawn at 10 or 30 fps on purpose)
+  // only busy frames count (an idle scene may be drawn at 10 or 30 fps on purpose)
   const probe = { t0: 0, prev: 0, gaps: [] as number[], done: false };
   function probeFrame(now: number, busy: boolean) {
     if (tier === "low" || probe.done) return;
@@ -339,41 +341,39 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   let last = 0;
   // What the GPU is spared: nothing is drawn behind an opaque screen (the
-  // title, the cups, the picker) or in a hidden tab, and a still scene — no
-  // shot, no aim, the camera settled, only the garden breathing — is drawn at
-  // 30 frames a second instead of the display's 60 or 120.
-  // idle: 30 fps while the weather or timed pieces move (a lift, a tram
-  // glide on that), 10 when only the garden breathes; with reduced motion and
-  // nothing moving, nothing is drawn until something changes
-  // and busy (a shot, an aim) at 60 at most, whatever the display's rate.
-  // A window in the background (another app in front) is not drawn either,
-  // unless a shot is on its way.
-  const IDLE_MS = 1000 / 30, STILL_MS = 1000 / 10, BUSY_MS = 1000 / 60;
+  // title, the cups, the picker) or in a hidden tab, and a window in the
+  // background (another app in front) is not drawn unless a shot is on its way.
+  // In view (engine/pace.ts frameMs): 60 fps busy (a shot, an aim) or with
+  // fast movers (timed pieces: a tram, a lift; a mill), 30 while anything else
+  // moves, 10 after a minute with no input; with reduced motion and nothing
+  // moving, nothing is drawn until something changes. At most 60 whatever
+  // the display's rate.
   // the frames skipped add up (a budget): on a 75, 90 or 144 Hz display the
   // drawn ones land every one or two refreshes, 60 a second on average, not
   // on every second or third refresh (37 to 48 a second)
   let budget = 0, prevRaf = 0;
-  let blurred = false;
+  let blurred = false, input = performance.now(); // the last input: a minute past it, the scene dozes (AWAY_MS)
+  const INPUTS = ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"] as const;
   const onBlur = () => (blurred = true);
-  const onFocus = () => ((blurred = false), (wake = performance.now()));
-  const onWake = () => (wake = performance.now());
+  const onFocus = () => ((blurred = false), (wake = input = performance.now()));
+  const onWake = () => (wake = input = performance.now());
   window.addEventListener("blur", onBlur);
   window.addEventListener("focus", onFocus);
-  window.addEventListener("pointermove", onWake, { passive: true });
-  window.addEventListener("keydown", onWake);
+  for (const e of INPUTS) window.addEventListener(e, onWake, { passive: true, capture: true });
   function frame(now: number) {
     if (!alive) return;
     requestAnimationFrame(frame);
     const gap = prevRaf ? now - prevRaf : 0;
     prevRaf = now;
     if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now), (budget = 0);
-    // timed pieces glide at the idle rate: they are no reason to draw at 60
     const busy = promo.on || g.flying || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
     if (blurred && !busy) return (last = now), (budget = 0);
-    // (under reduced motion the weather stands still: no reason to draw either)
-    const still = (!g.weather || !motion) && !(everyOf() > 0);
-    if (!busy && still && !motion && now - wake > 1000) return (last = now), (budget = 0); // (a still garden under reduced motion)
-    const p = pace(budget, gap, busy ? BUSY_MS : still ? STILL_MS : IDLE_MS);
+    // moving: the sway, water, weather and decor (all still under reduced
+    // motion), or timed pieces (their clock runs under reduced motion too)
+    const timed = everyOf() > 0, fast = motion && (timed || !!(g.course && g.course.userData.mill));
+    const ms = frameMs(busy, motion || timed, fast, now - input, now - wake);
+    if (!ms) return (last = now), (budget = 0); // (a still garden under reduced motion)
+    const p = pace(budget, gap, ms);
     budget = p.budget;
     if (!p.draw) return;
     probeFrame(now, busy);
@@ -588,7 +588,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     scene.add(course);
     setLighting(scene, course.userData.time);
     // a hole's own weather, until a stroke's forecast says otherwise
-    weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.onGreen);
+    weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.dry || course.userData.terrain.onGreen);
     // the round's weather: the chain's forecast for its quarter hour
     g.period = s.period;
     g.forecast = s.weather || null;
@@ -1379,8 +1379,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       window.removeEventListener("blur", onCancel);
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("focus", onFocus);
-      window.removeEventListener("pointermove", onWake);
-      window.removeEventListener("keydown", onWake);
+      for (const e of INPUTS) window.removeEventListener(e, onWake, { capture: true });
       document.removeEventListener("visibilitychange", onHide);
       weather.dispose();
       causes.dispose();

@@ -29,7 +29,7 @@ const { RULES } = await import("../web/lib/chain.ts");
 const { commitsOf, gnokeyPlan } = await import("../web/lib/adena.ts");
 const card = await import("../web/lib/card.ts");
 const { thirdAim } = await import("../web/lib/engine/aim.ts");
-const { pace, slowFrames } = await import("../web/lib/engine/pace.ts");
+const { pace, slowFrames, frameMs, AWAY_MS } = await import("../web/lib/engine/pace.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -180,12 +180,27 @@ check("the frame pacing (engine/pace.ts)", () => {
     }
     return { fps: drawn / 4, gaps };
   };
+  // the policy (frameMs): busy, fast movers, anything moving, away, nothing moving
+  const fps = (ms: number) => (ms ? Math.round(1000 / ms) : 0);
+  const S = 1000; // a second since the last input
+  assert.equal(fps(frameMs(true, false, false, 10 * AWAY_MS, 1e9)), 60, "busy: 60");
+  assert.equal(fps(frameMs(false, true, true, S, S)), 60, "a tram, a lift in view: 60");
+  assert.equal(fps(frameMs(false, true, false, S, S)), 30, "only the sway: 30");
+  assert.equal(AWAY_MS, 60_000, "the doze: after a minute");
+  assert.ok(fps(frameMs(false, true, false, AWAY_MS - 1, S)) >= 25 && fps(frameMs(false, true, true, AWAY_MS - 1, S)) >= 25, "moving, the player about: never under 25");
+  assert.ok(fps(frameMs(false, true, true, AWAY_MS + 1, AWAY_MS + 1)) <= 10, "away a minute: 10 at most");
+  assert.equal(fps(frameMs(false, true, true, 0, 0)), 60, "the first input after: back at once");
+  assert.equal(fps(frameMs(true, true, false, AWAY_MS + 1, AWAY_MS + 1)), 60, "a shot on its way: never dozing");
+  assert.equal(fps(frameMs(false, false, false, S, 500)), 10, "nothing moving, just changed: 10");
+  assert.equal(frameMs(false, false, false, S, 1001), 0, "nothing moving: not drawn");
   for (const hz of [60, 75, 90, 120, 144, 165]) {
-    const busy = run(hz, 1000 / 60), idle = run(hz, 1000 / 30), still = run(hz, 1000 / 10);
+    const busy = run(hz, 1000 / 60), idle = run(hz, 1000 / 30), doze = run(hz, 1000 / 10);
     assert.ok(Math.abs(busy.fps - 60) <= 2, `${hz} Hz busy: ${busy.fps} fps`);
     assert.ok(Math.abs(idle.fps - 30) <= 1.5, `${hz} Hz idle: ${idle.fps} fps`);
-    assert.ok(Math.abs(still.fps - 10) <= 1, `${hz} Hz still: ${still.fps} fps`);
+    assert.ok(Math.abs(doze.fps - 10) <= 1, `${hz} Hz away: ${doze.fps} fps`);
     assert.ok(!slowFrames(busy.gaps), `${hz} Hz on time: not slow`);
+    // an even strip: no idle gap over two refreshes past the interval
+    assert.ok(Math.max(...idle.gaps.slice(1)) <= 1000 / 30 + 1000 / hz + 1, `${hz} Hz idle: even gaps`);
   }
   // a GPU that makes every refresh late: 30 a second at best
   assert.ok(slowFrames(Array<number>(60).fill(33.3)), "30 fps busy: slow");

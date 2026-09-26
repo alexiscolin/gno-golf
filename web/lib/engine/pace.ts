@@ -26,3 +26,20 @@ export function slowFrames(gaps: readonly number[]) {
   const d = [...gaps].sort((a, b) => a - b).slice(0, Math.max(1, Math.ceil(gaps.length * 0.9)));
   return d.reduce((s, x) => s + x, 0) / d.length > 20;
 }
+
+/** No input (pointer, key, touch, wheel) for this long, no shot on its way: the scene dozes. */
+export const AWAY_MS = 60_000;
+/**
+ * The frame interval (ms) a scene in view is drawn at, or 0: not drawn.
+ * busy (a shot, an aim, the camera moving) and fast movers in view (a tram, a
+ * lift, a mill's sails): 60 fps. Anything else moving (the garden's sway, the
+ * water, the weather, the decor): 30, never less while the player is about;
+ * 10 once away (sinceInput past AWAY_MS). Nothing moving (reduced motion, no
+ * timed piece): 10 for a second after the last input or change (sinceWake), then nothing.
+ */
+export function frameMs(busy: boolean, moving: boolean, fast: boolean, sinceInput: number, sinceWake: number) {
+  if (busy) return 1000 / 60;
+  if (!moving) return sinceWake > 1000 ? 0 : 1000 / 10;
+  if (sinceInput > AWAY_MS) return 1000 / 10;
+  return fast ? 1000 / 60 : 1000 / 30;
+}

@@ -56,6 +56,8 @@ export type CourseTerrain = Terrain & {
   mask?: THREE.DataTexture;
   water?: WaterMask;
   edge?: { cells: Uint8Array; corner: (x: number, z: number) => MutVec2 };
+  /** where rain lies: the drawn lane, off its water and gaps and from under its walls */
+  dry?: (x: number, z: number) => boolean;
 };
 
 /** Keys any Object3D of the scene may carry. */
@@ -121,7 +123,7 @@ export interface CourseData extends ObjData {
   flag: THREE.Object3D | null;
   height: Height;
   lifts: boolean;
-  terrain: Terrain;
+  terrain: CourseTerrain;
   wind: (v: readonly [number, number] | null) => void;
   fade: Fade | null;
   weather: Dress | null;

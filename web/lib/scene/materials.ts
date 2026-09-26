@@ -291,6 +291,86 @@ export function shade(geo: THREE.BufferGeometry, color: THREE.ColorRepresentatio
 export const carved = (geo: THREE.BufferGeometry, color: THREE.ColorRepresentation, side: THREE.Side = THREE.FrontSide, k?: (y01: number, i: number) => number) =>
   drawn(shade(geo, color, k), relief(side));
 
+// ---------------------------------------------------------------- water
+//
+// One look for every body of water on a lane (a pond, a moat, a rock pool, a
+// lagoon, a canal): its colour per vertex, from waterTone — pale in the
+// shallows, deep in the middle, a line of foam where it laps the bank — and
+// a slow shimmer of light drifting over it, done in the shader from the world
+// position and the shared clock: nothing per frame on the CPU, still for a
+// player who asked for less motion. One material: all a hole's water is one
+// draw call.
+
+/** The shallows and the deep of each water, by skin (a pond's by default). */
+const WATERS: Record<string, readonly [number, number]> = {
+  water: [0x86c3cc, 0x2c6479],
+  tidepool: [0x8fe3d6, 0x2e8f9e],
+  lagoon: [0x8fe8dc, 0x2fa3ad],
+  canal: [0x7fb2c4, 0x2a5a73],
+};
+const shallowC = new THREE.Color(), deepC = new THREE.Color(), foamC = new THREE.Color(0xeef8f6);
+/** The colour of water `skin` at a point d in from its shore, over `depth`
+ *  of water (0 where it laps the bank: foam), into c. */
+export function waterTone(c: THREE.Color, skin: string, d: number, depth: number) {
+  const [a, b] = WATERS[skin] || WATERS.water;
+  return c.copy(shallowC.set(a)).lerp(deepC.set(b), smoothstep01((d - 0.3) / 2.2)).lerp(foamC, 0.6 * (1 - smoothstep01(depth / 0.1)));
+}
+const smoothstep01 = (x: number) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };
+let waterM: THREE.MeshBasicMaterial | null = null;
+/** The shared water material (vertex colours from waterTone). */
+export function waterMat() {
+  if (waterM) return waterM;
+  const m = new THREE.MeshBasicMaterial({ vertexColors: true });
+  m.onBeforeCompile = (sh: Shader) => {
+    sh.uniforms.uTime = clock;
+    sh.vertexShader = "varying vec2 vWaterXZ;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vWaterXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    sh.fragmentShader = "uniform float uTime;\nvarying vec2 vWaterXZ;\n" + sh.fragmentShader.replace(
+      "#include <color_fragment>",
+      `#include <color_fragment>
+  {
+    // long soft streaks of sky, drifting and crossing: the water is never still
+    vec2 p = vWaterXZ;
+    float a = sin(p.x * 0.9 + p.y * 1.7 + uTime * 0.55) * sin(p.x * 2.3 - p.y * 0.6 - uTime * 0.4 + sin(p.y * 0.5));
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), 0.2 * smoothstep(0.72, 0.95, a));
+  }`,
+    );
+  };
+  m.customProgramCacheKey = () => "water";
+  md(m).hook = "water";
+  return (waterM = share(m));
+}
+
+/** One row of a bank's face: its height, how far out it leans, the colour
+ *  of the band below it. */
+export type BankRow = readonly [y: number, out: number, color: number];
+const BANK_BANDS = [0xe6cb98, 0xbd9466, 0xd9bb88, 0xa98158] as const; // sand, earth, sand, earth
+/**
+ * A natural bank of earth and sand, from its lip (top) down to foot, where
+ * it meets water at level `water`: a turf lip of colour `turf` with an uneven
+ * edge, overhanging a little; strata of sand and earth, leaning out as they
+ * go down; a darker wet band, a line of foam at the water, and the dark
+ * under it. Rows top to foot; (x, z) wobbles them, so a corner two faces
+ * share has the same rows on both. With shade()'s darkening to each band's
+ * foot and grainSides() on the material, it has volume, not a flat band.
+ */
+export function bankRows(x: number, z: number, top: number, water: number, foot: number, turf: number): BankRow[] {
+  const w1 = Math.sin(x * 1.7 + z * 0.9) * Math.cos(z * 1.3 - x * 0.4), w2 = Math.sin(x * 2.9 - z * 1.9 + 1.3), w3 = Math.cos(x * 0.8 + z * 2.3 - 0.7);
+  const raw: [number, number, number][] = [
+    [top, 0, turf],
+    [top - 0.11 - 0.05 * w1, -0.08, BANK_BANDS[0]], // under the turf: the lip overhangs
+    [top - 0.32 + 0.07 * w2, -0.02, BANK_BANDS[1]],
+    [top - 0.56 + 0.06 * w3, 0.04 + 0.04 * w1, BANK_BANDS[2]],
+    [top - 0.8 + 0.06 * w2, 0.08, BANK_BANDS[3]],
+    [water + 0.34 + 0.04 * w3, 0.12, 0x7d6448], // wet
+    [water + 0.13 + 0.02 * w1, 0.15, 0xeef7f3], // foam, just over the water
+    [water + 0.02, 0.17, 0x4a3e30], // and under it
+    [foot, 0.22, 0x4a3e30],
+  ];
+  // never folding back up: a low lip squeezes its strata
+  for (let k = 1; k < raw.length; k++) raw[k][0] = Math.min(raw[k][0], raw[k - 1][0] - 0.03);
+  return raw;
+}
+
 /** Board coordinates are (x right, y away); the world uses y for height. */
 export const at = (p: Vec2, h = 0) => new THREE.Vector3(p[0], h, p[1]);
 
