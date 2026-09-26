@@ -1416,8 +1416,6 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
       </button>
       <div className="pick">
         <span className="eyebrow">Pick your gnome</span>
-        <h2 className="pick__name">{skin.name}</h2>
-        <AimSetting aim={aim} onChange={onAim} compact />
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
           <div ref={canvas} className={"pick__canvas" + (unlocked(skin.id) ? "" : " pick__canvas--locked")} />
@@ -1428,9 +1426,11 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
             <span key={g.id} aria-current={g.id === skin.id} />
           ))}
         </div>
+        <h2 className="pick__name">{skin.name}</h2>
         <p className="pick__line">
           {unlocked(skin.id) ? skin.line : <>🔒 {skin.unlock ? UNLOCKS[skin.unlock].need : "Keep playing"}</>}
         </p>
+        <AimSetting aim={aim} onChange={onAim} compact />
         <Button variant="primary" className="btn--play" onClick={() => (sound("start"), onPick())} disabled={!unlocked(skin.id)}>
           {unlocked(skin.id) ? "Choose this gnome" : "Locked"}
         </Button>
