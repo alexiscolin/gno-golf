@@ -284,6 +284,12 @@ html, body {
   border-bottom: 2px dashed rgba(var(--ink-rgb), .25);
 }
 
+.drawer__tools { display: flex; gap: 8px; align-items: center; }
+/* in the menu: the switch's note at the right of its label, the switch under both */
+.drawer__settings .aimset { grid-template-columns: auto 1fr; align-items: baseline; }
+.drawer__settings .aimset > .seg { grid-column: 1 / -1; grid-row: 2; }
+.drawer__settings .aimset__help { grid-column: 2; grid-row: 1; justify-self: end; text-align: right; }
+
 .drawer__head h2 {
   margin: 0;
   font-size: 24px;
