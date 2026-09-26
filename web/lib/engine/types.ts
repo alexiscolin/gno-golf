@@ -50,6 +50,8 @@ export interface GameState {
   done?: boolean;
   error: string | null;
   errorKind?: ErrorKind;
+  /** the hole the last load failed on (the banner's Try again loads it) */
+  failed?: string | null;
   view: "overview" | "ball";
   cam: CamMode;
   rig: Rig | null;
@@ -173,6 +175,7 @@ export interface Snapshot {
   cause: CauseNote | null;
   note: string | null;
   errorKind: ErrorKind | null;
+  failed: string | null;
   view: "overview" | "ball";
   gfx: GfxMode;
   tier: Tier;

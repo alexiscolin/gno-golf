@@ -8,7 +8,7 @@
 // The chain re-runs every shot itself — the page sends decisions, never
 // outcomes — so a recorded score is one nobody can type in.
 
-import { RULES, isAddress } from "./chain";
+import { RULES, isAddress, type Chain } from "./chain";
 import type { Mode, Vec2 } from "./types";
 
 /** An Adena answer: its status, and a code, a type or a message when it failed. */
@@ -273,6 +273,17 @@ export async function splitRound(shots: readonly string[], check: (list: string[
 }
 
 /**
+ * A round's commits as the chain itself cuts them (splitRound), each one asked
+ * of it: from the tee a SimulateRound(At), every next one a SimulateCommit from
+ * where the one before leaves the ball. What Adena and gnokey both send.
+ * ms: each read's time limit.
+ */
+export function chainSplit(chain: Pick<Chain, "simulateRound" | "simulateCommit">, s: SaveRound & { id: string }, period: number, ms = 8000) {
+  const hole = s.id, shots = s.shots || [];
+  return splitRound(shots, (list, from, ball) => (from && ball ? chain.simulateCommit(hole, ball, from, list, period, ms) : chain.simulateRound(hole, list, s.period, ms)), s);
+}
+
+/**
  * Signs one commit of this round: Reset + PlayRound… for the first (reset),
  * PlayRound… alone for the next ones, which continue the round where the
  * chain has it. Resolves with the tx (hash, height).
@@ -328,9 +339,18 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
 // transaction is as atomic as Adena's. RUN_EXTRA: what a script's own
 // package costs over a call (an empty run is ~19M).
 const RUN_EXTRA = 20e6;
+// Decoding a hole's data is in each commit's gas too. Measured with
+// simulate=true on the heaviest course holes (mountain/7, town/14, rain):
+// 58.5M and 199.4M used against 100M and 277M asked, so the work model's own
+// margin covers a course hole. A community hole may be as large as the
+// format allows (golf.gno: up to 0.07e9 to decode), so gnokey (which, unlike
+// Adena, does not simulate first) asks that much more for one.
+const DECODE_MAX = 70e6;
 /** A holed round as gnokeyPlan reads it: the engine's snapshot. */
 interface SaveRound extends Work {
   id: string | null;
+  /** one of the course's holes (false: a community hole, of any size) */
+  official?: boolean;
   name?: string;
   shots?: readonly string[];
   period?: number | null;
@@ -341,7 +361,7 @@ interface SaveRound extends Work {
  * own key (<your-key-name>). s: the engine's snapshot of a holed round
  * (id, shots, period, roundMode, and the work model's walls, pieces, kind, pts).
  */
-export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc }: { realm: string; price?: number; chainId?: string | null; rpc: string }) {
+export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc, parts: checked }: { realm: string; price?: number; chainId?: string | null; rpc: string; parts?: readonly (readonly [number, number])[] | null }) {
   const shots = s.shots || [], mode = s.roundMode || "assisted";
   if (!shots.length) return [];
   if (mode === "pro" && s.period == null) return []; // a pro round has its period, or it cannot be saved
@@ -353,7 +373,8 @@ export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc }:
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
   const remote = /^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "<rpc-url>";
   const q = JSON.stringify; // a Go string literal, for these ASCII ids and shots
-  const parts = commitsOf(s, shots.length);
+  // the chain's own cut when it was asked (chainSplit); the work model's otherwise
+  const parts = checked && checked.length ? checked : commitsOf(s, shots.length);
   return parts.map(([from, to], k) => {
     const list = q(shots.slice(from, to).join(";")), hole = q(s.id);
     const play =
@@ -373,7 +394,7 @@ export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc }:
       "}",
       "",
     ].join("\n");
-    const gas = Math.min(gasOf(s, from, to) + RUN_EXTRA, MAX_GAS);
+    const gas = Math.min(gasOf(s, from, to) + RUN_EXTRA + (s.official === false ? DECODE_MAX : 0), MAX_GAS);
     const command = `gnokey maketx run -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chain} -remote ${remote} <your-key-name> ${file}`;
     return { file, script, command };
   });

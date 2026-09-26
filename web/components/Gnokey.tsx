@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { gnokeyPlan } from "@/lib/adena";
+import { gnokeyPlan, chainSplit } from "@/lib/adena";
 import { Button } from "@/components/ui";
 import type { Chain } from "@/lib/chain";
 import type { Snapshot } from "@/lib/engine";
@@ -28,9 +28,22 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
   const [copied, setCopied] = useState(false);
   const [key, setKey] = useState(savedKey);
   const t = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // the commits as the chain itself cuts them, asked when the panel opens:
+  // the same split an Adena save sends (keyed by the round it is for)
+  const round = s ? `${s.id}#${s.shots.join(";")}#${s.period}` : "";
+  const [split, setSplit] = useState<{ round: string; parts: readonly (readonly [number, number])[] | null; bad?: string } | null>(null);
+  const ask = () => {
+    if (!s || !chain || !s.id || s.period == null || (split && split.round === round)) return;
+    setSplit({ round, parts: null });
+    chainSplit(chain, { ...s, id: s.id }, s.period)
+      .then((parts) => setSplit((v) => (v && v.round === round ? { round, parts } : v)))
+      .catch((e: unknown) => setSplit((v) => (v && v.round === round ? { round, parts: null, bad: e instanceof Error ? e.message : String(e) } : v)));
+  };
   if (!s || !chain) return null;
-  const plan = gnokeyPlan(s, { realm: chain.realm, price, chainId, rpc: chain.rpc });
+  const mine = split && split.round === round ? split : null;
+  const plan = gnokeyPlan(s, { realm: chain.realm, price, chainId, rpc: chain.rpc, parts: mine && mine.parts });
   if (!plan.length) return null;
+  const checking = !!mine && !mine.parts && !mine.bad;
   const name = key.trim(), ready = keyOk(name);
   // what is shown is what is copied: a subshell that stops at the first failure
   const who = `'${ready ? name : "YOUR_KEY_NAME"}'`;
@@ -49,7 +62,7 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
   const copy = () =>
     void navigator.clipboard.writeText(all).then(() => (setCopied(true), clearTimeout(t.current), (t.current = setTimeout(() => setCopied(false), 1600))), () => {});
   return (
-    <details className="details gnokey">
+    <details className="details gnokey" onToggle={(e) => e.currentTarget.open && ask()}>
       <summary>Save with gnokey instead</summary>
       <div className="details__box gnokey__box">
         <ol className="gnokey__steps">
@@ -61,8 +74,12 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
         </ol>
         <pre className="mono gnokey__code">{all}</pre>
         <div className="gnokey__row">
-          <Button variant="primary" className="gnokey__copy" disabled={!ready} onClick={copy}>{copied ? "Copied" : "Copy"}</Button>
-          <span className="real__fine">{ready ? <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b>{plan.length > 1 ? " for each" : ""}.</> : "Type your key name first."}</span>
+          <Button variant="primary" className="gnokey__copy" disabled={!ready || checking} onClick={copy}>{copied ? "Copied" : checking ? "Checking…" : "Copy"}</Button>
+          <span className="real__fine">
+            {mine && mine.bad ? <span className="gnokey__bad">{mine.bad}</span>
+              : checking ? "Asking the chain how it cuts this round…"
+              : ready ? <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b>{plan.length > 1 ? " for each" : ""}.</> : "Type your key name first."}
+          </span>
         </div>
       </div>
     </details>

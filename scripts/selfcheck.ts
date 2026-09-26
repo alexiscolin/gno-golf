@@ -26,7 +26,7 @@ register(
 );
 
 const { RULES } = await import("../web/lib/chain.ts");
-const { commitsOf } = await import("../web/lib/adena.ts");
+const { commitsOf, gnokeyPlan } = await import("../web/lib/adena.ts");
 const card = await import("../web/lib/card.ts");
 const { thirdAim } = await import("../web/lib/engine/aim.ts");
 
@@ -104,6 +104,19 @@ check("the save's split (adena.ts commitsOf)", () => {
   assert.ok(!commitsOf(mixed).some((part) => refused(mixed, part)), "mixed: no commit the chain would refuse");
   const late = commitsOf(heavy, 12, 5);
   assert.ok(late[0][0] === 5 && late.every(([a, b]) => b - a <= 2) && late[late.length - 1][1] === 12, "a split from a later stroke");
+});
+
+check("the gnokey plan (adena.ts gnokeyPlan)", () => {
+  const round = { id: "garden/1/v1", name: "The Shelf", shots: ["1.0000,2.0000", "3.0000,4.0000", "5.0000,6.0000"], period: 7, roundMode: "pro" as const, walls: 4, pieces: 6, pts: [10, 10, 10] };
+  const opts = { realm: "gno.land/r/gnogolf/golf", chainId: "dev", rpc: "http://127.0.0.1:26757" };
+  const gas = (p: { command: string }) => Number(/-gas-wanted (\d+)/.exec(p.command)?.[1]);
+  // the chain's own cut, when it was asked, is what gnokey sends
+  const cut = gnokeyPlan(round, { ...opts, parts: [[0, 1], [1, 3]] });
+  assert.equal(cut.length, 2, "the chain's split is used");
+  assert.ok(cut[1].script.includes('"3.0000,4.0000;5.0000,6.0000"') && !cut[1].script.includes("Reset"), "part 2: the rest of the shots, no Reset");
+  assert.equal(gnokeyPlan(round, opts).length, 1, "without it, the work model's cut");
+  // a community hole may take up to 70M more to decode
+  assert.equal(gas(gnokeyPlan({ ...round, official: false }, opts)[0]) - gas(gnokeyPlan(round, opts)[0]), 70e6, "community decode allowance");
 });
 
 check("the scorecard (card.ts)", () => {

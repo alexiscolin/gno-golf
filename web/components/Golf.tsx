@@ -9,7 +9,7 @@ import type { Skin } from "@/lib/scene/gnome";
 import type { Bests, HoleLeaderboard, HoleRow, Leaderboard as LeaderboardRows, Mode, StrokesRow, StandingRow } from "@/lib/types";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
-import { hasAdena, connect, current, onOurNode, recordRound, splitRound, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
+import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
@@ -654,10 +654,12 @@ export default function Golf() {
       // every commit asked of the chain: the first from the tee, the next
       // from where the one before leaves the ball
       const period = s.period != null ? s.period : await within(chain.period());
-      const parts = await splitRound(s.shots, (list, from, ball) => within(from && ball ? chain.simulateCommit(hole, ball, from, list, period) : chain.simulateRound(hole, list, s.period), 8000), s);
+      const parts = await chainSplit(chain, { ...s, id: hole }, period);
       let tx: Awaited<ReturnType<typeof recordRound>> | null = null;
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k];
+        // the player has left this round (Play again, another hole): no more of it goes to Adena
+        if (roundKey.current !== round) return;
         if (parts.length > 1) land({ at: "signing", part: k + 1, of: parts.length });
         tx = await recordRound({
           address: account.address, realm: chain.realm, hole, shots: s.shots.slice(from, to), reset: k === 0,
@@ -712,6 +714,11 @@ export default function Golf() {
   unlockedRef.current = unlocked;
   // the new hole is on screen, built and its shaders ready: open the curtain
   const holeReady = !!(s && s.ready);
+  // a hole that would not load or draw: the curtain goes, so its banner (Try again, Pick a hole) is seen
+  const errorNow = !!(s && s.error);
+  useEffect(() => {
+    if (errorNow) setCurtain(null);
+  }, [errorNow]);
   useEffect(() => {
     if (curtain && holeId === curtain.id && holeReady && !curtain.open) {
       const t = setTimeout(() => setCurtain((c) => c && { ...c, open: true }), 250);
@@ -1195,7 +1202,8 @@ export default function Golf() {
         // say what actually went wrong: the chain not answering, a shot it
         // refused, or a bug of ours while drawing — and offer the fix that fits
         const kind: FatalKind | ErrorKind = fatal ? fatal.kind : (s && s.errorKind) || "shot";
-        const holeNow = s && s.id;
+        // (Try again: the hole the load failed on, not the one still on screen)
+        const holeNow = (s && (s.failed || s.id)) || null;
         const TEXT = BANNER[kind];
         const g = game.current;
         return (

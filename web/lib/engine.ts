@@ -15,7 +15,7 @@ import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
 import { loadWorld } from "./scene/worlds";
-import { makeChain, shotOf, pullShot, RULES } from "./chain";
+import { makeChain, shotOf, pullShot, isHoleId, RULES } from "./chain";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
@@ -236,6 +236,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       cause: g.cause || null, // a word on why the ball speeds up or drifts, once a shot
       note: g.note || null, // a word on how the shot went
       errorKind: (g.error && g.errorKind) || null,
+      failed: g.error ? g.failed || null : null, // the hole a load failed on (Try again)
       view: g.view,
       gfx: gfxMode, // the graphics setting, and what it gives on this device
       tier,
@@ -476,12 +477,29 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     try {
       s = await stateOf(id);
     } catch (err) {
-      if (ticket === loads && alive) fail(err, "load");
+      // (the hole it failed on, for the banner's Try again: g.id is still the last one's)
+      if (ticket === loads && alive) (g.failed = id), fail(err, "load");
       return;
     }
     if (ticket !== loads || !alive) return;
+    // a hole the kept list has as current that the chain has replaced since
+    // (its State names the version that took its place): the list read anew,
+    // and its current version played
+    if (s.next && g.list.some((h) => h.id === id)) {
+      try {
+        setList(await chain.holes(true));
+      } catch {}
+      if (ticket !== loads || !alive) return;
+      if (!g.list.some((h) => h.id === id)) return load(s.next);
+    }
 
     g.id = id;
+    g.failed = null;
+    // the cup follows the hole played (Back to another cup's hole, a link): a
+    // course hole's cup, an archived one's too; a community hole keeps the cup
+    const row = g.list.find((h) => h.id === id);
+    if (row) g.world = cupOf(row);
+    else if (s.official !== false) g.world = cupOf(s);
     // ?world= dresses any hole in another world's look — for building one
     if (forceWorld) s = { ...s, world: forceWorld };
     // a cup's own look is fetched the first time one of its holes is played
@@ -1103,11 +1121,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     return cup.find((h) => Math.round(h.order) === n) || cup[n - 1] || null;
   }
 
-  async function start(link: string | Link | null) {
-    let list = await chain.holes();
-    // a link to a hole the tab's kept list does not have yet: the chain's own
-    if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);
-    if (!alive) return; // destroyed while the chain answered (a remount in dev)
+  /** The chain's hole list taken in: every hole, the cups', the community's. */
+  function setList(list: HoleRow[]) {
     // a hole another has replaced (same cup, same place) stays playable by its
     // link, but only the current one fills the cup
     g.all = list;
@@ -1115,9 +1130,30 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // listed apart and ranked nowhere
     g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
     g.community = list.filter((h) => !h.next && h.official === false);
+  }
+
+  async function start(link: string | Link | null) {
+    let list = await chain.holes();
+    // a link to a hole the tab's kept list does not have yet: the chain's own
+    if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);
+    if (!alive) return; // destroyed while the chain answered (a remount in dev)
+    setList(list);
     if (!g.list.length) throw new Error("no hole is registered on this chain");
     // a string is a realm id, as before
     const asked = linked(typeof link === "string" ? { id: link } : link);
+    // an older archived version, past what Holes() lists: the chain may
+    // still have it, so it is asked for; one it has not lands on the cups
+    if (!asked && typeof link === "string" && link) {
+      await load(link);
+      if (!alive) return;
+      if (g.s) {
+        g.linked = true;
+        requestAnimationFrame(frame);
+        return;
+      }
+      g.error = null;
+      g.failed = null;
+    }
     g.linked = !!asked;
     // ?cup=island alone: that cup, on its first hole
     const cupWant = typeof link === "object" && link && "cup" in link ? link.cup : undefined;
@@ -1136,7 +1172,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** The hole a cup and place name ({ cup, n }), or null. */
     find: (link: Link) => {
       const h = linked(link);
-      return h ? h.id : null;
+      // (an archived id past what Holes() lists: the load will ask the chain)
+      return h ? h.id : "id" in link && isHoleId(link.id) ? link.id : null;
     },
     /** The hole being played. */
     current: () => g.id,
@@ -1145,7 +1182,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** Play a world: its first hole, and its holes in the menu. */
     setWorld(w: string) {
       loadWorld(w).catch(() => {}); // fetched while the player picks a gnome
-      if (!g.list || w === g.world) return;
+      // (the cup asked for, and its hole on screen already: nothing to load)
+      if (!g.list || (w === g.world && inWorld().some((h) => h.id === g.id))) return;
       g.world = w;
       const first = inWorld()[0];
       if (first) void load(first.id);
@@ -1242,6 +1280,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** Dismiss a shot error and keep playing. */
     clearError() {
       g.error = null;
+      g.failed = null;
       void publish();
     },
     /** Swap the gnome; cosmetic only, the chain never sees it. */
