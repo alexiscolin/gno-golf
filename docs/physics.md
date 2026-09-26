@@ -17,6 +17,73 @@ Tests: `physics_test.gno`, `prepare_test.gno`.
 - Velocities are in board units **per substep**.
 - float64 only. No map iteration, no clock, no randomness.
 
+## The model
+
+A rigid ball on the board's plane, stepped at a fixed timestep (the
+*substep*), with a height only a renderer draws. The laws are the textbook
+ones a rigid-body engine (Box2D, cannon.js) uses, in board units and
+substeps: speeds are per substep, accelerations per substep².
+
+| Law | Formula | Constants |
+|---|---|---|
+| Gravity | `G`; along a hill, its `Vec` = `G·sin θ` downhill | `G = 1` |
+| Rolling resistance | a constant deceleration `a = Crr·G·cos θ` against the velocity; a ball it would stop, it stops | `Crr = Rolling(Friction, Scale)` |
+| Rest on a hill | a ball at rest rolls away when `G·sin θ > Crr·G·cos θ` (`tan θ > Crr`), and does not move at all otherwise | |
+| Contact (walls, posts) | normal impulse `jn = −(1+e)·vn`; tangential impulse `jt = min(µ·jn, TangentMass·|vt|)` | `µ = WallFriction = 0.05`, `TangentMass = 2/7` |
+| Resting contact | under `RestSpeed` into the surface, `e = 0` and no bounce is counted | `RestSpeed = 0.35` |
+| Restitution | `e = min(Bounce, MaxBounce)`; a *bumper* (`Bounce > 1`) kicks at `e = min(Bounce, MaxKick)` | `MaxBounce = 0.92`, `MaxKick = 1.5` |
+| Take-off | over a hill's crest, when `(v·uphill)² > G·CrestRadius` | `CrestRadius = 0.5`, a kicker's sharp lip (0.71 per substep) |
+| Flight | up at `vz = vu·tan θ`, in the air `2·vz/G`, so it lands `2·vu²·tan θ/G` on; no zone, no rolling resistance | |
+| Landing | `jn = (1+e)·vz` with `e = GroundBounce`; the speed along loses `min(LandFriction·jn, TangentMass·|v|)`; a rebound over `HopSpeed` hops again | `GroundBounce = 0.4`, `LandFriction = 0.3`, `HopSpeed = 0.25` |
+| Cup (in `course`) | Holmes: drops when crossing at `b` off the middle no faster than `(2·sqrt(R² − b²) − r)·sqrt(G/2r)` | see [course.md](course.md#launch-kick-and-sink) |
+
+**Integration.** Each substep is a semi-implicit Euler step, walked in moves
+of at most `MaxMove`:
+
+1. rolling resistance takes half a kick, `a/2`, at the deceleration the ball
+   met at the end of the last substep (velocity Verlet: the ball covers
+   `v − a/2` in a substep that takes `a` off it, so a ball rolls exactly
+   `v²/2a` when `v` is a whole number of `a`, and never more than `a/8` off);
+2. each move: the zones under the ball push it (a hill by its `Vec/n`, the
+   wind by its own), it moves, and a move that meets a wall or a post takes
+   the contact impulse there and spends what is left of it from the contact
+   (up to 4 contacts a move);
+3. rolling resistance takes its second half-kick, at the mean deceleration of
+   the substep's moves on the ground.
+
+**Calibration.** `Friction` (the field's) and a Surface's `Scale` were the two
+rules of a speed-dependent drag: a substep kept a share `keep` of the speed
+and lost a fixed amount. `Rolling` maps them onto `Crr`, fitted by least
+squares so that a full stroke stops where it did on every Friction and Scale
+the course uses (within about 3%):
+
+```
+keep = min((Friction + 0.05) · Scale, 0.98)
+Crr  = ((1 − keep) · RollSpeed + RollDrag / Scale) / G     RollSpeed = 1.8, RollDrag = 0.08
+```
+
+| Surface | Scale | Crr (Friction 0.87) |
+|---|---|---|
+| green | 1 | 0.224 |
+| rain | 1.025 | 0.181 |
+| ice | 1.18 | 0.104 |
+| brick | 0.92 | 0.36 |
+| snow | 0.9 | 0.40 |
+| sand, snowdrift | 0.5 | 1.13 |
+
+A Scale of 0 is an infinite Crr: the ball stops where it is. With that, and
+`course.Launch`'s `Kick·p^(3/4)`, a full stroke rolls 44 on the usual green.
+The wind stays a constant acceleration, which never beats the rolling
+resistance of a ball at rest (0.08 to 0.15 against 0.100 on wet ice at the
+least, and `Capped`, the weather's, never speeds a ball up).
+
+**Grades.** A hill's `Vec` is its gravity along the plane, so `sin θ = |Vec|/G`:
+0.3 is 17.5°, 0.12 is 7°. Grades past 72° are played as 72° (`tan θ` at most
+3.05; no course hill passes 20°), and `course.Decode` refuses a push past
+`G·MaxSin`. On the usual green a hill steeper than
+0.219 (12.6°) does not let a ball rest on it; one gentler bends and slows a moving
+ball, and holds a stopped one.
+
 ## Vectors and shapes
 
 ```go
@@ -58,7 +125,7 @@ type Field struct {
 	Walls    []Wall
 	Posts    []Post
 	Zones    []Zone
-	Friction float64 // per substep; 0.8 rolls to a stop in about a dozen
+	Friction float64 // the green's rolling resistance, as Rolling maps it (0.87 is Crr 0.224)
 	Bounce   float64 // default restitution of walls and posts
 	Radius   float64 // ball radius; 0 is a point
 	Tick     int     // where the stroke starts on the clock of timed walls and zones
@@ -86,7 +153,7 @@ type Wall struct {
 ```go
 type Post struct {
 	Circle
-	Bounce float64 // 0 = Field.Bounce; played at MaxBounce (0.92) at most
+	Bounce float64 // 0 = Field.Bounce; up to 1 played at MaxBounce (0.92) at most; above 1 a bumper
 	Mark   rune
 	Skin   string
 }
@@ -115,8 +182,8 @@ The zone kinds:
 
 | Kind | Effect while the ball is in it (on the ground) |
 |---|---|
-| `Surface` | Sets the substep's surface to `Scale`, which multiplies friction: sand is below 1, ice is above 1. If several Surface zones overlap, the last one in `Zones` wins. |
-| `Slope` | Adds `Vec` to the velocity every substep (spread over the moves of that substep). Uphill pushes back, downhill pulls. |
+| `Surface` | Sets the move's surface to `Scale`, which sets the rolling resistance (`Rolling`): sand is below 1 (a high Crr), ice above 1 (a low one). If several Surface zones overlap, the last one in `Zones` wins. |
+| `Slope` | A hill: gravity along it, `Vec` (`G·sin θ` downhill), added to the velocity every substep (spread over the moves of that substep). Uphill pushes back, downhill pulls. The ground under a ball is one hill: where two overlap, the first in `Zones` is the hill. With `Air`, moving air: a constant acceleration on top of the hill. |
 | `Tunnel` | Moves the ball to `Vec` and keeps its velocity. The path gets a point at `Vec`, so two consecutive path points far apart mean a tunnel. |
 | `Hazard` | Ends the shot at `Vec` (water, a pit), with a last path point there. |
 | `Loop` | A loop-the-loop mouth. See [Loops](#loops). |
@@ -203,13 +270,17 @@ Each substep does this:
    normal, as [`UnstickIn`](#unstickin) does for a stroke's pieces. A push that would carry
    the ball across an untimed wall takes the next nearest side instead, and
    if every side would, the ball stays where it is. A wall never stands on
-   the ball, nor pushes it through another.
-1. A ball faster than `SpeedCap` is slowed to it. The substep is then split
-   into `int(|vel| / MaxMove) + 1` moves (at most 6), so a fast ball can't
-   skip past a zone or a wall.
+   the ball, nor pushes it through another. A timed wall of a single segment
+   is never crossed either: a ball within its radius of it is stopped by it
+   (the near test below).
+1. A ball faster than `SpeedCap` is slowed to it. On the ground, rolling
+   resistance takes its first half-kick; a ball it stops, where no hill can
+   move it, is at rest and the step ends. The substep is then split into
+   `int(|vel| / MaxMove) + 1` moves (at most 6), so a fast ball can't skip
+   past a zone or a wall.
 2. For each move, if the ball is on the ground, the surface is reset to grass
-   and the zones that are there (by their timing) and contain the ball are applied in
-   order. A hazard or a slanted loop entry ends the shot.
+   and the zones that are there (by their timing) and contain the ball are
+   applied in order. A hazard or a slanted loop entry ends the shot.
 3. The move is swept against every wall that's there (using each wall's two
    offset lines at `Radius`, worked out once per hole: see
    [Wall prep](#wall-prep)) and every post (radius grown by `Radius`), and the
@@ -219,15 +290,16 @@ Each substep does this:
    caps of radius `Radius`, swept like posts from wherever the ball comes:
    the offset lines are square caps with no end face, which left a gap in
    front of an acute corner's tip and let a diagonal move cut a free end.
-4. On a hit, the part of the velocity along the surface keeps `Along` (0.97)
-   of itself. The part into the surface bounces back times the restitution,
-   which is played at `MaxBounce` (0.92) at most: nothing adds energy. Speed
-   is capped at `SpeedCap` again. Within a substep, a slope can add up to its
-   own `Vec` on top of it; no course hole's ball ever passes 6 (a full stroke).
+4. On a hit, the contact impulse: the part of the velocity into the surface
+   comes back times the restitution, the part along it loses the Coulomb
+   friction (see [the model](#the-model)). Slower into it than `RestSpeed`,
+   it is a resting contact. Speed is capped at `SpeedCap` again, and the move
+   goes on from the contact with what is left of it.
 5. A point is appended to the path.
-6. Rolling resistance on the ground: `keep = min((Friction + 0.05) * surface,
-   0.98)`, then `speed = |vel| * keep - Drag / surface`. At `speed <= 0.02`
-   the ball stops. None of this applies in the air.
+6. On the ground, rolling resistance takes its second half-kick. A ball it
+   stops, on a hill steeper than its rolling resistance, is set at rest and
+   the step goes on (the hill pulls it next substep); anywhere else, it has
+   stopped. None of this applies in the air.
 
 At the end, the last `Air` flag is set to false, and the zones are applied
 once more to the ball at rest, so a ball that stopped in water or in a tunnel
@@ -238,33 +310,44 @@ it would be there when it next comes on.
 ### Air and jumps
 
 A ball takes off only when it goes over a hill's crest, the edge its `Vec`
-points away from (the uphill end):
+points away from (the uphill end), faster than the crest's curve can hold it:
 
 - it was climbing the hill (moving against its `Vec`) and a move, without
   hitting anything, carries it out through that edge, onto no other climb;
-- its speed up the hill (`vel · uphill`) is above `JumpSpeed`;
-- the hill is steeper than `Drag`;
+- its speed up the hill `vu = vel · uphill` has `vu² > G·CrestRadius`: the
+  ground curves away (radius `CrestRadius`) faster than gravity can bend the
+  ball round it, 0.71 per substep: a ball that makes the top at any real pace
+  flies;
+- the hill is steeper than `MinRamp` (0.12, 7°): a gentler one is a lawn's
+  undulation;
 - it climbed at least `JumpRun` (half) of the hill's depth, counted from
   where it came onto it: a ball that clipped the hill near its top has not
   ridden it.
 
 Leaving a hill by a side, by its foot, or by turning on it is no take-off. It
-flies `(uphill speed - JumpSpeed) * steepness * Lift` board units, where
-steepness is `|Vec|` of the hill: head-on that is the whole speed, and a
-slanted crossing flies shorter. In the air:
+flies a ballistic arc: up at `vz = vu·tan θ`, for `2·vz/G` substeps, landing at
+the height it took off from, `2·vu²·tan θ/G` on along the hill (its speed
+across the hill carries on too). Landing is a contact with the ground: the
+rebound is `GroundBounce` of `vz`, the speed along loses the Coulomb friction
+`LandFriction·(1+GroundBounce)·vz` (at most 2/7 of it), and a rebound above
+`HopSpeed` hops again once the ground it came down on has had its say (water
+there still catches it). In the air:
 
 - no zone applies: it goes over water, sand and tunnel mouths;
 - walls and posts still stop it;
 - there's no rolling resistance;
 - it can't drop into a cup (`course.Sink` checks `Air`).
 
+A ball still in the air when the stroke's substeps run out flies on and
+lands, within `MaxRollOn`.
+
 ### Slopes: rolling back and rolling on
 
-A Slope whose `|Vec|` is greater than `Drag` doesn't let a ball rest on it
-(a slope at or under `Drag` bends a moving ball but never starts a stopped
-one; just above it, up to about 0.152 on grass, a ball set down on it only
-creeps `|Vec|` a substep, so a hole that wants a stopped ball to roll uses
-0.16 or more):
+A ball stops on a hill only where the hill can't move it: `G·sin θ` at most
+`Crr·G·cos θ`, i.e. `|Vec|` at most the rolling resistance there (0.2186 on
+the usual green, so its 0.22 hills just roll a ball back). A ball rolling up a hill slows down on every
+substep it climbs: gravity and rolling resistance both take from it. On a
+hill steeper than its rolling resistance:
 
 - **Roll-back.** When the ball stops on it, its velocity is set to zero and
   the step goes on, so the slope pulls it back down on the next substep.
@@ -274,13 +357,16 @@ creeps `|Vec|` a substep, so a hole that wants a stopped ball to roll uses
   the slope only pins against a wall would jitter in place: while rolling on,
   every 8 substeps, a ball that moved less than 0.1 stops.
 
+A ball pressed into a rail by a hill slides along it: a resting contact,
+with no bounce and the rail's Coulomb friction.
+
 A timed Slope (hole20's seesaw) is a hill in the substeps it is there.
 
 A Slope with `Air` set is moving air, not ground: the weather's wind, a
-cannon's gust. It pushes the ball, but it's never a hill to take off from,
-roll back down, or roll on along, and it doesn't hide a real slope underneath
-it. `Air` with `Capped` (the weather's wind) never speeds the ball up: it
-bends and brakes it only.
+cannon's gust. It pushes the ball with a constant acceleration, but it's
+never a hill to take off from, roll back down, or roll on along, and it
+doesn't hide a real slope underneath it. `Air` with `Capped` (the weather's
+wind) never speeds the ball up: it bends and brakes it only.
 
 ### Loops
 
@@ -428,15 +514,24 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 
 | Name | Value | Meaning |
 |---|---|---|
-| `MaxMove` | 1.5 | longest single move inside a substep |
-| `Drag` | 0.12 | fixed speed lost per substep on grass (divided by the surface scale) |
-| `Along` | 0.97 | share of the speed along a wall kept on a bounce |
-| `MaxBounce` | 0.92 | the most restitution ever played |
-| `SpeedCap` | 8 | top speed, per substep |
-| `JumpSpeed` | 1.5 | speed needed to take off at the top of a slope |
-| `Lift` | 12 | flight distance factor |
+| `G` | 1 | gravity, board units per substep² |
+| `RollSpeed`, `RollDrag` | 1.8, 0.08 | the calibration of `Rolling` (Friction, Scale → Crr) |
+| `WallFriction` | 0.05 | Coulomb µ of a wall or post |
+| `TangentMass` | 2/7 | the most of its speed along a surface a solid ball loses to friction |
+| `RestSpeed` | 0.35 | under it into a surface, a contact is resting: no bounce |
+| `MaxBounce` | 0.92 | the most restitution a passive piece plays |
+| `MaxKick` | 1.5 | the most restitution a bumper (`Bounce > 1`) plays |
+| `CrestRadius` | 0.5 | a crest's lip radius: take-off at `vu² > G·CrestRadius` |
+| `MinRamp` | 0.12 | the gentlest hill that launches |
 | `JumpRun` | 0.5 | share of a hill's depth climbed before its crest can launch |
-| `MaxRollOn` | 120 | most extra substeps a slope can add |
+| `GroundBounce` | 0.4 | the ground's restitution on landing |
+| `LandFriction` | 0.3 | the ground's Coulomb µ on landing |
+| `HopSpeed` | 0.25 | a landing rebound under it is a roll, not a hop |
+| `MaxMove` | 1.5 | longest single move inside a substep |
+| `SpeedCap` | 8 | top speed, per substep |
+| `MaxRollOn` | 120 | most extra substeps a slope or a flight can add |
+| `MaxWork` | 1e6 | the most work units (about a thousand gas each) one stroke may cost |
+| `MaxSin` | 0.95 | the steepest grade a hill plays, and the most `|Vec|/G` Decode takes |
 | `LoopKeep` | 0.8 | share of the speed kept going round a loop |
 
 ## Skins
@@ -458,9 +553,25 @@ is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
   `int(speed / MaxMove) + 1` moves per substep, and a broad phase that skips
   the walls and posts a move's box misses. The player pays it on every
   stroke, so the number of obstacles and the `n` you pass to `Arc`, `Lane`
-  and `Stadium` are gas budgets. A full-power shot measured about 25M gas on
-  a 30-wall and a 48-wall hole; the heaviest full-power shot on the course
-  measured 78M.
+  and `Stadium` are gas budgets. The heaviest full-power tee shot on the
+  course measured 45M gas.
+- **MaxWork.** `Step` counts what a stroke does as it goes, in `Shot.Work`,
+  units of about a thousand gas: a substep 700, a move 15, a wall or post a
+  move's broad phase looks at 6, a wall tested for a contact 200 and a post
+  300, a zone a move looks at 8 (twice: the zones, then the ground's checks)
+  and each polygon point 3, a zone that takes a square root (a loop's mouth,
+  capped wind) 200 more, and a wall a timed bar's push checks 20 a side.
+  Fitted on the GnoVM's gas and raised by about a third. A stroke that
+  reaches `MaxWork` (1e6) ends where the ball is; it is checked before each
+  timed bar's push, each move and each contact, so a stroke passes it by
+  `MaxWorkStep` (1e5) at most. That holds a hostile field (bumper walls
+  across the whole board, the steepest hill keeping the ball rolling on,
+  polygons under every move) to under 1e9 gas. The heaviest course stroke
+  found, a full shot in a storm's gusts on mountain/11's ice that rolls on
+  for 120 substeps, costs 0.57 of `MaxWork` (0.4e9 gas); a tee shot, 0.05.
+- **Steepest grade.** A hill's push is `G·sin θ`: `course.Decode` refuses a
+  Slope whose `|Vec|` passes `G·MaxSin` (0.95, 72°). The course's steepest is
+  0.35.
 - **Zone width.** No zone can be crossed without being seen as long as it's
   at least `MaxMove` wide in the direction of travel. Several deployed zones
   are under twice that (town14's door tunnel, hole4's tunnels, island9's and

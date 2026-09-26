@@ -9,7 +9,10 @@
 import * as THREE from "three";
 import { C, flat, drawn, rbox, texOf, share } from "./materials";
 import { house, smoke } from "./props";
-import { inZone } from "../terrain";
+import { inZone, CELL } from "../terrain";
+import { seeded } from "./common";
+import { timeOf } from "./camera";
+import { T } from "./town";
 import { ud, type Hole, type Height } from "./data";
 import type { Post, Vec2, Zone } from "../types";
 
@@ -623,49 +626,161 @@ export function mouthAt(skin: string, x: number, y: number, z: number, R: number
 
 // ------------------------------------------------------------- rooftops
 
-export const ROOF_Y = -2.6; // the rooftops' eaves, well below the lane
+export const ROOF_Y = -2; // the houses' eaves round the lane: their ridges come up to just under it
+export const STREET_Y = -4.6; // the streets down between the houses, where a ball off the roofs lands
+export const SLAB = 0.4; // the lane's roof slab, its edge down from the lane's top (course.ts draws it)
+const SET = 0.15; // the lane buildings' walls, set back under the slab's edge
+const ALLEY = 0.9; // the houses stand this far off the lane: a ball off it drops into the alley
 
 /**
- * The town's roofs below and round a lane that runs over them (a `roof` zone,
- * everything off the lane): rows of pitched tiled roofs with ridges and
- * chimneys, whose walls go on down out of sight. Nothing floats: every roof
- * is a house seen from above.
+ * The town under a lane that runs over its roofs (a `roof` zone: everything
+ * off the lane). The lane is the flat roofs of the buildings under it: their
+ * walls go down to the street under its slab, window over window. Round them
+ * the houses, their ridges just under the lane: pitched and hipped roofs in
+ * the town's caps, windows, chimneys. Nothing floats, and all of it is plain
+ * colours the bake merges. Returns the group and floor(x, z): the height a
+ * ball dropping off the lane meets there (a house's roof, or the street).
  */
-export function roofs(z: Zone, s: Pick<Hole, "board">) {
-  const g = new THREE.Group();
-  const tiles = [0xc4633f, 0xb0553a, 0xd07a4f, 0x9b7fd1];
-  const S = 4; // a house every 4 units
-  const x0 = Math.max(0, z.min[0]), y0 = Math.max(0, z.min[1]), x1 = Math.min(s.board.w, z.max[0]), y1 = Math.min(s.board.h, z.max[1]);
-  // the streets down between the houses, so no gap shows the sky
-  const street = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, y1 - y0), flat(0x5a5048));
+export function roofs(z: Zone, s: Pick<Hole, "board" | "zones" | "hole">) {
+  const g = new THREE.Group(), rand = seeded("rooftops" + s.hole);
+  const night = timeOf(s.hole) !== "day";
+  const glass = night ? new THREE.MeshBasicMaterial({ color: T.lampLit }) : flat(0x7f9aa6), frame = flat(C.cream);
+  const walls = [T.wall, T.wallWarm, T.roofFar, T.curb], caps = [...T.caps, 0xc4633f, 0xd07a4f];
+  const W = s.board.w, H = s.board.h;
+  const x0 = Math.max(0, z.min[0]), y0 = Math.max(0, z.min[1]), x1 = Math.min(W, z.max[0]), y1 = Math.min(H, z.max[1]);
+  // the streets: round the board the town's square is down at their level
+  // too (town.ts sunk), so the roofs stand over a town, not in a pit
+  const street = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, y1 - y0), flat(0x8a7b67));
   street.rotation.x = -Math.PI / 2;
-  street.position.set((x0 + x1) / 2, ROOF_Y - 3.2, (y0 + y1) / 2);
+  street.position.set((x0 + x1) / 2, STREET_Y, (y0 + y1) / 2);
   g.add(street);
-  let k = 0;
-  for (let y = y0; y + 1 < y1; y += S)
-    for (let x = x0; x + 1 < x1; x += S, k++) {
-      const w = Math.min(S, x1 - x) - 0.3, d = Math.min(S, y1 - y) - 0.3;
-      if (w < 1.2 || d < 1.2) continue;
-      // a whole house or none: every corner of it off the lane
-      const cx = x + w / 2 + 0.15, cz = y + d / 2 + 0.15;
-      if (![[x, y], [x + w, y], [x, y + d], [x + w, y + d], [cx, cz]].every(([a, b]) => inZone(z, a + 0.15, b + 0.15))) continue;
-      const along = (k + Math.floor(y)) % 2 === 0; // ridges turn, row by row
-      const h = 1.2 + ((k * 7) % 3) * 0.3;
-      const walls = drawn(rbox(w, 3, d, 0.08), flat(C.cream));
-      walls.position.set(cx, ROOF_Y - 1.5 - ((k * 5) % 3) * 0.3, cz);
-      const shape = new THREE.Shape([new THREE.Vector2(-(along ? d : w) / 2 - 0.2, 0), new THREE.Vector2((along ? d : w) / 2 + 0.2, 0), new THREE.Vector2(0, h)]);
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: (along ? w : d) + 0.2, bevelEnabled: false });
-      geo.translate(0, 0, -((along ? w : d) + 0.2) / 2);
-      if (along) geo.rotateY(Math.PI / 2);
-      const roof = drawn(geo, flat(tiles[k % tiles.length]));
-      roof.position.set(cx, walls.position.y + 1.5, cz);
-      g.add(walls, roof);
-      if (k % 3 === 0) {
-        const ch = drawn(rbox(0.5, 1.2, 0.5, 0.04), flat(0xb8573f));
-        const top = new THREE.Vector3(cx + w * 0.25, walls.position.y + 1.5 + h * 0.6, cz - d * 0.2);
-        ch.position.copy(top);
-        g.add(ch, smoke(top.clone().setY(top.y + 0.7)));
-      }
+  /** A window on a wall at (x, y, z), its face turned to `ang` (radians round y). */
+  const win = (x: number, y: number, zz: number, ang: number) => {
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.82), frame), p = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.62), glass);
+    const nx = Math.sin(ang), nz = Math.cos(ang);
+    f.position.set(x + nx * 0.01, y, zz + nz * 0.01);
+    p.position.set(x + nx * 0.02, y, zz + nz * 0.02);
+    f.rotation.y = p.rotation.y = ang;
+    g.add(f, p);
+  };
+  /** Windows along a wall face from (ax, az) to (bx, bz), facing `ang`, at these heights. */
+  const windows = (ax: number, az: number, bx: number, bz: number, ang: number, rows: readonly number[]) => {
+    const L = Math.hypot(bx - ax, bz - az), n = Math.floor((L - 0.5) / 1.3);
+    for (let k = 0; k < n; k++) {
+      const u = (k + 0.5) / n;
+      for (const y of rows) win(ax + (bx - ax) * u, y, az + (bz - az) * u, ang);
     }
-  return g;
+  };
+
+  // the lane's buildings: the lane's cells (off the planks) as rectangles,
+  // row runs stacked while they match. A side is set back under the slab
+  // where nothing of the lane goes on beyond it.
+  const planks = s.zones.filter((q) => q.skin === "plank bridge");
+  const nx = Math.round(W / CELL), nz = Math.round(H / CELL);
+  const lane = (i: number, j: number) => {
+    if (i < 0 || j < 0 || i >= nx || j >= nz) return false;
+    const x = (i + 0.5) * CELL, y = (j + 0.5) * CELL;
+    return !inZone(z, x, y) && !planks.some((q) => inZone(q, x, y));
+  };
+  const rects: [number, number, number, number][] = []; // [i0, i1, j0, j1), cells
+  let open = new Map<string, [number, number, number, number]>();
+  for (let j = 0; j <= nz; j++) {
+    const next = new Map<string, [number, number, number, number]>();
+    for (let i = 0; i < nx; ) {
+      if (!lane(i, j)) { i++; continue; }
+      const a = i;
+      while (lane(i, j)) i++;
+      const key = a + "," + i, r = open.get(key);
+      if (r) (r[3] = j + 1), open.delete(key), next.set(key, r);
+      else next.set(key, [a, i, j, j + 1]);
+    }
+    rects.push(...open.values());
+    open = next;
+  }
+  const rows = [-1.25, -2.55, -3.85];
+  rects.forEach(([i0, i1, j0, j1], k) => {
+    const bare = (side: number) => {
+      for (let c = side < 2 ? i0 : j0; c < (side < 2 ? i1 : j1); c++)
+        if (side === 0 ? lane(c, j0 - 1) : side === 1 ? lane(c, j1) : side === 2 ? lane(i0 - 1, c) : lane(i1, c)) return false;
+      return true;
+    };
+    const [n, so, we, ea] = [0, 1, 2, 3].map(bare);
+    const bx0 = i0 * CELL + (we ? SET : 0), bx1 = i1 * CELL - (ea ? SET : 0), bz0 = j0 * CELL + (n ? SET : 0), bz1 = j1 * CELL - (so ? SET : 0);
+    const top = -SLAB, hgt = top - STREET_Y + 0.2;
+    const body = drawn(new THREE.BoxGeometry(bx1 - bx0, hgt, bz1 - bz0), flat(walls[(k + 1) % walls.length]));
+    body.position.set((bx0 + bx1) / 2, top - hgt / 2, (bz0 + bz1) / 2);
+    g.add(body);
+    if (n) windows(bx0, bz0, bx1, bz0, Math.PI, rows);
+    if (so) windows(bx0, bz1, bx1, bz1, 0, rows);
+    if (we) windows(bx0, bz0, bx0, bz1, -Math.PI / 2, rows);
+    if (ea) windows(bx1, bz0, bx1, bz1, Math.PI / 2, rows);
+  });
+
+  // the houses round them, a street's width off the lane and its planks
+  const tops: { x0: number; x1: number; z0: number; z1: number; eave: number; h: number; hip: boolean; along: boolean }[] = [];
+  const off = (ax: number, az: number, bx: number, bz: number) => {
+    for (let x = ax; x <= bx + 1e-6; x += (bx - ax) / 6)
+      for (let y = az; y <= bz + 1e-6; y += (bz - az) / 6) if (!inZone(z, x, y) || planks.some((q) => inZone(q, x, y))) return false;
+    return true;
+  };
+  // a house every 4 units, or where one will not fit, up to four small ones
+  let k = 0;
+  const house = (x: number, y: number, S: number) => {
+    const w = Math.min(S, x1 - x) - 0.3 - rand() * 0.1 * S, d = Math.min(S, y1 - y) - 0.3 - rand() * 0.1 * S;
+    if (w < 1.2 || d < 1.2) return false;
+    const hx0 = x + 0.15, hz0 = y + 0.15, hx1 = hx0 + w, hz1 = hz0 + d;
+    if (!off(Math.max(0.01, hx0 - ALLEY), Math.max(0.01, hz0 - ALLEY), Math.min(W - 0.01, hx1 + ALLEY), Math.min(H - 0.01, hz1 + ALLEY))) return false;
+    k++;
+    const cx = (hx0 + hx1) / 2, cz = (hz0 + hz1) / 2, h = Math.min(1.65, (0.45 + rand() * 0.3) * Math.min(w, d)), hip = rand() < 0.3, along = rand() < 0.5;
+    const eave = ROOF_Y - rand() * 0.15, hgt = eave - STREET_Y + 0.2;
+    const body = drawn(new THREE.BoxGeometry(w, hgt, d), flat(walls[Math.floor(rand() * walls.length)]));
+    body.position.set(cx, eave - hgt / 2, cz);
+    g.add(body);
+    const upper = [eave - 0.75], lower = [eave - 0.75, eave - 2.05];
+    windows(hx0, hz1, hx1, hz1, 0, lower), windows(hx0, hz0, hx1, hz0, Math.PI, upper);
+    windows(hx0, hz0, hx0, hz1, -Math.PI / 2, upper), windows(hx1, hz0, hx1, hz1, Math.PI / 2, upper);
+    const cap = caps[Math.floor(rand() * caps.length)];
+    let roof: THREE.Object3D;
+    if (hip) {
+      // a hipped roof: four slopes up to a point
+      roof = drawn(new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4), flat(cap));
+      roof.scale.set(w + 0.4, h, d + 0.4);
+      roof.position.set(cx, eave + h / 2, cz);
+    } else {
+      // a pitched roof, its gables to the ends and a ridge tile along the top
+      const across = (along ? d : w) / 2 + 0.2, len = (along ? w : d) + 0.2;
+      const geo = new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(-across, 0), new THREE.Vector2(across, 0), new THREE.Vector2(0, h)]), { depth: len, bevelEnabled: false });
+      geo.translate(0, 0, -len / 2);
+      if (along) geo.rotateY(Math.PI / 2);
+      roof = drawn(geo, flat(cap));
+      roof.position.set(cx, eave, cz);
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(along ? len : 0.16, 0.1, along ? 0.16 : len), flat(C.cream));
+      ridge.position.set(cx, eave + h, cz);
+      g.add(ridge);
+    }
+    g.add(roof);
+    tops.push({ x0: hx0 - 0.2, x1: hx1 + 0.2, z0: hz0 - 0.2, z1: hz1 + 0.2, eave, h, hip, along });
+    if (k % 3 === 0 && S > 2) {
+      // a chimney through the roof, its lip, its smoke
+      const ch = drawn(rbox(0.45, 1.1, 0.45, 0.04), flat(0xb8573f)), lip = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.12, 0.58), flat(T.quay));
+      const at = new THREE.Vector3(cx + w * 0.22, eave + h * 0.5, cz - d * 0.18);
+      ch.position.copy(at);
+      lip.position.set(at.x, at.y + 0.56, at.z);
+      g.add(ch, lip, smoke(at.clone().setY(at.y + 0.7)));
+    }
+    return true;
+  };
+  for (let y = y0; y + 1 < y1; y += 4)
+    for (let x = x0; x + 1 < x1; x += 4)
+      if (!house(x, y, 4)) for (const [a, b] of [[0, 0], [2, 0], [0, 2], [2, 2]]) house(x + a, y + b, 2);
+  const floor = (x: number, y: number) => {
+    // (the slit between two houses counts as their eaves: nothing lands down it unseen)
+    for (const r of tops) {
+      if (x < r.x0 - 0.3 || x > r.x1 + 0.3 || y < r.z0 - 0.3 || y > r.z1 + 0.3) continue;
+      const ex = Math.min(1, Math.abs(x - (r.x0 + r.x1) / 2) / ((r.x1 - r.x0) / 2)), ez = Math.min(1, Math.abs(y - (r.z0 + r.z1) / 2) / ((r.z1 - r.z0) / 2));
+      return r.eave + r.h * (1 - (r.hip ? Math.max(ex, ez) : r.along ? ez : ex));
+    }
+    return STREET_Y;
+  };
+  return { group: g, floor };
 }

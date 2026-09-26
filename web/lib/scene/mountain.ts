@@ -1761,8 +1761,12 @@ function cliff(z: Zone, t: Terrain, s: Hole) {
 const LIFT_CABLE = 4.6; // the cable, at the bullwheels up in the sheds
 const LIFT_SAG = 1.2; // down to 3.4 over the middle bar
 const SEAT_LOW = 0.25, SEAT_HANG = 1.45; // a bench's seat: working, on the ball's height; riding, this far under the cable
-const LIFT_FADE = 0.3; // of a bar spacing: a chair fades into (out of) the dark just inside a shed's mouth over this
-const LIFT_IN = 0.45; // of a bar spacing: how far into a shed a chair is still drawn
+const LIFT_FADE = 0.3; // of a bar spacing: a chair fades into (out of) the dark just inside a shed's mouth over this, at most
+// how far into a shed a chair is still drawn, in units: so far that none of
+// it reaches the back wall (2.46 in), swinging included — its skis 1.75
+// ahead of its seat going into the far shed, its back and grip 0.8 behind
+// coming out of the near one. Deeper, they stuck out through the wall.
+const LIFT_IN_FAR = 2.46 - 1.75, LIFT_IN_NEAR = 2.46 - 0.8;
 const LIFT_EASE = 0.3; // of a bar spacing: the working chair swings down over this inside the near shed (and up inside the far one)
 const LIFT_SLOW = 0.55; // how much the pace eases over a bar (0: even, 1: a stop)
 const LIFT_SWAY = 0.08; // radians: how far a chair swings on its hanger as the pace eases and picks up
@@ -1820,12 +1824,13 @@ function liftChairs(L: LiftPlan, t: number) {
   for (let j = Math.floor(g) - L.n - 1; j <= Math.floor(g) + 1; j++) {
     const a = g - j; // spacings from the near station's mouth
     // on the lane from mouth to mouth; a little way into each shed, fading
-    if (a < -LIFT_IN || a > L.n + LIFT_IN) continue;
+    const inN = LIFT_IN_NEAR / L.D, inF = LIFT_IN_FAR / L.D;
+    if (a < -inN || a > L.n + inF) continue;
     const working = ((j % L.n) + L.n) % L.n === 0;
     // the working chair swings down inside the near shed and up inside the far one
     const down = working ? smoothstep((a + LIFT_EASE) / LIFT_EASE) * smoothstep((L.n + LIFT_EASE - a) / LIFT_EASE) : 0;
     const x = L.xA + L.D * a, high = cableY(L, x) - SEAT_HANG;
-    out.push({ x, seat: high + (SEAT_LOW - high) * down, working, j, sway, fade: smoothstep((a + LIFT_FADE) / LIFT_FADE) * smoothstep((L.n + LIFT_FADE - a) / LIFT_FADE), onLane: a >= 0 && a < L.n });
+    out.push({ x, seat: high + (SEAT_LOW - high) * down, working, j, sway, fade: smoothstep((a + Math.min(LIFT_FADE, inN)) / Math.min(LIFT_FADE, inN)) * smoothstep((L.n + Math.min(LIFT_FADE, inF) - a) / Math.min(LIFT_FADE, inF)), onLane: a >= 0 && a < L.n });
   }
   return out;
 }

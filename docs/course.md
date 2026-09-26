@@ -221,24 +221,42 @@ off it, unless the push would cross one of those walls. See
 ## Launch, Kick and Sink
 
 ```go
-const Kick = 0.6
-func Launch(angle, power float64) physics.Vec2 // FromPolar(angle, power*Kick)
+const Kick = 0.79
+func Launch(angle, power float64) physics.Vec2 // FromPolar(angle, Kick·power^(3/4))
 
-const CaptureSpeed = 1.3
-func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bool)
+func Capture(cup, ball, off float64) float64
+func Sink(shot physics.Shot, pin physics.Vec2, radius, ball float64) (physics.Shot, bool)
 ```
 
 Every hole should use `Launch`, so the same pull means the same shot
-everywhere. A full stroke (power 10) starts at 6 units per substep.
+everywhere. The speed is `Kick·p^(3/4)`: under a constant rolling
+deceleration a ball rolls `v²/2a`, so the distance grows as `p^(3/2)`, the
+way it grew before the physics rework. A full stroke (power 10) starts at 4.44
+units per substep and rolls 44 on a green of Friction 0.87; a pull of 3 rolls
+7.2, one of 1 rolls 1.4. `Kick` is the calibration that keeps every course
+hole's par.
+
+`Capture` is Holmes's capture criterion (B. W. Holmes, *Am. J. Phys.* 59,
+1991). A ball of radius `r` crossing a cup of radius `R` off its centre by
+`b` has its centre over a chord `2·sqrt(R² − b²)`. It falls freely from the
+near rim, and it drops if it has fallen its own radius by the time its leading
+edge meets the far rim, a chord less `r` later:
+
+```
+Capture(R, r, b) = (2·sqrt(R² − b²) − r) · sqrt(G / 2r)
+```
+
+That's 1.9 units per substep over the middle of a 1.2 cup for the course's 0.5
+ball, and 0 from about 1.17 off the middle: a graze is not a hole. A ball
+smaller than 0.5, a point ball included, drops as one of 0.5.
 
 `Sink` decides whether the ball is holed. It is, if either:
 
-- one step of the path passes within `radius` of the pin, slower than
-  `CaptureSpeed * sqrt(1 - (off/radius)²)`, where `off` is how far the step
-  passes from the pin (so near the rim it has to be slower). Steps in the air,
-  steps longer than `CaptureSpeed`, and a short step right after one longer
-  than `1.5 * CaptureSpeed` (the rest of a tunnel exit or a bounce) don't
-  count; or
+- one step of the path passes within `radius` of the pin, off it by `off`,
+  no longer than `Capture(radius, ball, off)`. Steps in the air, steps longer
+  than the fastest drop (`Capture(radius, ball, 0)`), and a short step right
+  after one longer than 1.5 times it (the rest of a tunnel exit or a bounce)
+  don't count; or
 - the ball comes to rest within `radius` of the pin.
 
 When the ball is holed, the path is cut there and ends on the pin, and `Air`
@@ -413,7 +431,7 @@ inside them.
   outside `[0, 1)`, a ball radius outside `[0, 1]`;
 - a bounce (the field's, a wall's or a post's) outside `[0, 1.5]`, a post
   radius outside `(0, 8]`, a zone scale outside `[0, 8]`;
-- a Surface or Slope `Vec` with a component beyond ±1;
+- a Surface or Slope `Vec` longer than `G·MaxSin` (0.95: a hill no steeper than 72°);
 - a tee, pin, wall end, post centre, polygon point, or a Tunnel, Hazard or
   Loop destination off the board by more than 1 (`[-1, W+1] × [-1, H+1]`);
 - a zone's box corner off the board by more than 96 (`Fit` keeps a round or

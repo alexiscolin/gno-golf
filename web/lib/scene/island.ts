@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { C, ink, flat, drawn, grows, sway, swayLine, setFoot, rbox, lanternGlow, glowTex, share, hullOf, ownFade, fadeLoop, windNow, geoOf, gridGeo, onTop } from "./materials";
-import { inZone, mod, segDist, smoothstep } from "../terrain";
+import { inZone, inSea, mod, segDist, smoothstep, terrain } from "../terrain";
 import { bakeLocal, look, weatherLooks } from "./bake";
 import { gnomelet, brolly } from "./props";
 import { animate, state } from "./state";
@@ -231,6 +231,7 @@ function land(s: Pick<Hole, "board" | "hole">, sh: Shape): Height {
     const z = side === 0 ? -3.5 - rand() * 5 : rand() * H;
     dunes.push({ x, z, rx: 3 + rand() * 4, rz: 1.8 + rand() * 1.6, h: 0.6 + rand() * 1.1, a: rand() * Math.PI });
   }
+  const ph = [rand() * 6, rand() * 6, rand() * 6];
   return (x, z) => {
     const inn = sh.inland(x, z);
     // the beach: GRASS 3 inland of the shore, sea level at the shore, and on down
@@ -244,7 +245,11 @@ function land(s: Pick<Hole, "board" | "hole">, sh: Shape): Height {
       const q = u * u + v * v;
       if (q < 1) top = Math.max(top, d.h * (1 - q) * (1 - q));
     }
-    return beach + top * near * smoothstep((inn - 2) / 3);
+    // and the whole beach rolls a little (low, broad swells and a finer
+    // ripple across them): flat sand read as a floor. Faint by the board,
+    // where its rails and what stands round it are set on the sand
+    const roll = 0.22 * Math.sin(x * 0.42 + ph[0]) * Math.cos(z * 0.37 + ph[1]) + 0.08 * Math.sin(x * 0.9 - z * 0.7 + ph[2]);
+    return beach + top * near * smoothstep((inn - 2) / 3) + roll * (0.15 + 0.85 * near) * smoothstep((inn - 0.6) / 2.4);
   };
 }
 
@@ -264,18 +269,37 @@ function berms(s: Hole) {
   const boardwalk = green(s) === "planks";
   const inLag = boardwalk ? lagoonShape(s) : null;
   const drowned = (x: number, z: number) => seas.some((q) => inZone(q, x, z));
+  // how deep under the sea, 0..1. Tested vertex by vertex (0.8 apart), the
+  // sand under a lane's edge stood up out of the water in a saw of triangles
+  // along its foot, and met the beach in a straight step. So: by how much of
+  // the ground round it is sea — deep right up under the lane, where its side
+  // faces hide the shelf — and shelving up, along a wavy line, only where
+  // the sea meets open sand (neither sea nor lane)
+  const RING = [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6], [0.8, 0.8], [-0.8, 0.8], [0.8, -0.8], [-0.8, -0.8], [0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]];
+  const lane = seas.length ? terrain(s).onGreen : () => false, ph = seeded("shelf" + s.hole)() * 6;
+  const sunk = (x: number, z: number) => {
+    let sea = 0, open = 0;
+    for (const [a, b] of RING) {
+      if (drowned(x + a, z + b)) sea++;
+      else if (!lane(x + a, z + b)) open++;
+    }
+    if (!sea) return 0;
+    const wob = 0.25 * Math.sin(x * 0.61 + ph) * Math.cos(z * 0.53 - ph) + 0.12 * Math.sin((x - z) * 1.3 + ph);
+    return smoothstep((sea / RING.length) * 2) * (1 - smoothstep((open / RING.length) * 2.2 + wob));
+  };
   const keep: boolean[] = [];
   const geo = gridGeo(nx, nz, (i, j, pos, col) => {
     const x = X0 + i * step, z = Z0 + j * step;
     // the sand shelves into the lagoon over its last unit and a half
     const lg = inLag ? inLag(x, z) : -1;
-    const base = drowned(x, z) ? SEA - 1 - GRASS : height(x, z);
+    const land_ = height(x, z), k = seas.length ? sunk(x, z) : 0;
+    const base = land_ + (SEA - 1 - GRASS - land_) * k;
     const h = lg > 0 ? base + (SEA - 0.6 - GRASS - base) * smoothstep(lg / 1.5) : base, y = GRASS + h;
     pos.push(x, y, z);
     keep.push(-sh.inland(x, z) < 9);
     if (y < SEA - 0.02) c.copy(under);
     else if (y < SEA + 0.35) c.copy(wet).lerp(sand, (y - SEA) / 0.35); // the wet band at the water's edge
-    else c.copy(sand).lerp(hi, Math.min(1, Math.max(0, h) / 1.4)); // dune tops paler
+    else c.copy(sand).lerp(hi, Math.min(1, Math.max(0, h) / 1.4)).lerp(wet, Math.min(0.3, Math.max(0, -h) * 0.6)); // dune tops paler, the hollows and the lower beach a little damp
     col.push(c.r, c.g, c.b);
   }, (a, b, d, e) => keep[a] || keep[b] || keep[d] || keep[e]); // under the board too: sand, not the sea, shows in any gap of its ground
   // pushed back in the depth test: where the board's rough meets it at the
@@ -927,35 +951,49 @@ function kite(rand: Rand, color: number, stake: THREE.Vector3) {
   const peg = drawn(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 5), flat(P.trunkDark));
   peg.position.copy(stake).add(new THREE.Vector3(0, 0.2, 0));
   g.add(peg);
-  // the flier: all that flutters, about the knot at the spars' cross
+  // the flier: all that flutters, about the knot at the spars' cross, as one
+  // mesh coloured by its vertices: the sail and its spars as built, then the
+  // tail's ribbon and its bows, rewritten every frame at the end of it
   const fly = new THREE.Group();
+  ud(fly).live = true;
   const top = new THREE.Vector2(0, 0.75), right = new THREE.Vector2(0.6, 0), bottom = new THREE.Vector2(0, -1.05), left = new THREE.Vector2(-0.6, 0);
-  fly.add(new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([top, right, bottom, left])), dside(color)));
+  const paint = (geo: THREE.BufferGeometry, hex: number) => {
+    const c = new THREE.Color(hex), n = geo.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+    geo.deleteAttribute("uv");
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    if (!geo.index) geo.setIndex([...Array(n).keys()]);
+    return geo;
+  };
+  const parts = [paint(new THREE.ShapeGeometry(new THREE.Shape([top, right, bottom, left])), color)];
   const v3 = (p: THREE.Vector2, z = 0.02) => new THREE.Vector3(p.x, p.y, z);
   fly.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([top, right, bottom, left].map((p) => v3(p, 0.01))), ink));
-  const spar = flat(P.trunkDark);
   for (const [a, b] of [[top, bottom], [left, right]]) {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, a.distanceTo(b), 4), spar);
-    m.position.copy(v3(a.clone().lerp(b, 0.5), 0.04));
-    m.rotation.z = Math.atan2(b.y - a.y, b.x - a.x) - Math.PI / 2;
-    fly.add(m);
+    const mid = v3(a.clone().lerp(b, 0.5), 0.04);
+    parts.push(paint(new THREE.CylinderGeometry(0.025, 0.025, a.distanceTo(b), 4).rotateZ(Math.atan2(b.y - a.y, b.x - a.x) - Math.PI / 2).translate(mid.x, mid.y, mid.z), P.trunkDark));
   }
   // the tail: one ribbon from the bottom tip, its bows riding on it
   const N = 14, LEN = 2.6, W = 0.05;
-  const rib = new THREE.PlaneGeometry(W * 2, LEN, 1, N);
-  const ribbon = new THREE.Mesh(rib, dside(0xffffff));
-  ribbon.frustumCulled = false; // its vertices move every frame, away from its first bounds
-  const bows: { b: THREE.Mesh; at: number }[] = [];
-  const bow = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.2, 0.1, 0), new THREE.Vector3(-0.2, -0.1, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.2, -0.1, 0), new THREE.Vector3(0.2, 0.1, 0)]);
+  const bowAt = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.2, 0.1, 0), new THREE.Vector3(-0.2, -0.1, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.2, -0.1, 0), new THREE.Vector3(0.2, 0.1, 0)];
+  const bow = new THREE.BufferGeometry().setFromPoints(bowAt);
   bow.computeVertexNormals();
+  const bows: { v0: number; at: number }[] = [];
+  let v0 = parts.reduce((n, p) => n + p.attributes.position.count, 0);
   for (let i = 1; i <= 4; i++) {
-    const b = new THREE.Mesh(bow, dside(i % 2 ? color : 0xffffff));
-    fly.add(b);
-    bows.push({ b, at: (i * N) / 5 | 0 });
+    parts.push(paint(bow.clone(), i % 2 ? color : 0xffffff));
+    bows.push({ v0, at: (i * N) / 5 | 0 });
+    v0 += bowAt.length;
   }
-  fly.add(ribbon);
+  parts.push(paint(new THREE.PlaneGeometry(W * 2, LEN, 1, N), 0xffffff));
+  const flier = new THREE.Mesh(mergeGeometries(parts), flat(0xffffff, { side: THREE.DoubleSide, vertexColors: true }));
+  parts.forEach((p) => p.dispose());
+  // its tail moves every frame, away from its first bounds: bounds that hold
+  // all of its reach (from the sail's top to the tail's end, swung either way)
+  flier.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, bottom.y - LEN / 2 + 0.9, 0), LEN / 2 + 1.2);
+  fly.add(flier);
   g.add(fly);
-  const pos = rib.attributes.position, ph = rand() * 6, spine: [number, number][] = [];
+  bakeLocal(g); // the stake and its string: a mesh per material, the flier left live
+  const pos = flier.geometry.attributes.position as THREE.BufferAttribute, ph = rand() * 6, spine: [number, number][] = [];
   animate((t) => {
     const w = windNow(), k = 1 + Math.min(w.length() * 15, 1);
     // the whole kite flutters about its knot, leaning a little downwind
@@ -965,12 +1003,10 @@ function kite(rand: Rand, color: number, stake: THREE.Vector3) {
       const u = j / N;
       spine[j] = [Math.sin(t * 2.6 * k - u * 5 + ph) * 0.22 * u + Math.max(-0.08, Math.min(0.08, w.x)) * 9 * u * u, bottom.y - u * LEN];
     }
-    for (let i = 0; i < pos.count; i++) {
-      const j = i >> 1; // PlaneGeometry: two vertices a row, from the top (the kite) down
-      pos.setXYZ(i, spine[j][0] + (i % 2 ? W : -W), spine[j][1], 0);
-    }
+    // PlaneGeometry: two vertices a row, from the top (the kite) down
+    for (let i = 0; i <= 2 * N + 1; i++) pos.setXYZ(v0 + i, spine[i >> 1][0] + (i % 2 ? W : -W), spine[i >> 1][1], 0);
+    for (const b of bows) for (let i = 0; i < bowAt.length; i++) pos.setXYZ(b.v0 + i, bowAt[i].x + spine[b.at][0], bowAt[i].y + spine[b.at][1], 0.01);
     pos.needsUpdate = true;
-    for (const { b, at } of bows) b.position.set(spine[at][0], spine[at][1], 0.01);
   });
   return g;
 }
@@ -1299,13 +1335,17 @@ function decor(s: Hole, bank: Height = () => 0): THREE.Group {
     const p = archPalm(rand, new THREE.Vector3(0, 0, 1), want, h);
     p.position.set(x, GRASS + bank(x, z), z);
     g.add(p);
+    // its crown nods on its trunk: each merged in its own frame, a mesh per material
+    const crown = ud(p).crown!;
+    ud(bakeLocal(crown)).live = true;
+    bakeLocal(p);
     const mats = ownFade(p); // its own copies of palm()'s materials, to fade
     // its foot and its trunk: nothing else stands in them (its crown is high
     // over the lane, above anything low)
     reserve(x, z, 1.4);
     reserve(x, z + want * 0.5, 0.6);
     crowns.push({ x, z: z + want });
-    const ph = rand() * 6, crown = ud(p).crown!;
+    const ph = rand() * 6;
     animate((t) => (crown.rotation.z = Math.sin(t * 0.9 + ph) * 0.05, crown.rotation.x = Math.cos(t * 0.7 + ph) * 0.04));
     p.updateMatrixWorld(true);
     fading.push({ at: crown.getWorldPosition(new THREE.Vector3()), r: 2.5, mats });
@@ -2103,6 +2143,10 @@ export function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Dressed
     const zone = item as Dressed;
     if (k === "wetsand") return footprint(zone, t, flatTop(P.wet));
     if (k === "sand") return footprint(zone, t, flatTop(P.sand));
+    // (a rock pool and a lagoon on the lane are sunk into it, as every
+    // water is: the shared pond draws them, with their banks and rocks)
+    const [mx, mz] = [(zone.min[0] + zone.max[0]) / 2, (zone.min[1] + zone.max[1]) / 2];
+    if ((k === "tidepool" || k === "lagoon") && t.onGreen(mx, mz) && t.pond(mx, mz)) return null;
     if (k === "tidepool") return waterZone(zone, t, s);
     if (k === "lagoon") return waterZone(zone, t, s, { color: 0x4fc4c9 });
     if (k === "wave") return wave(zone, t);
@@ -2150,7 +2194,7 @@ function lagoonUnder(s: Hole) {
   g.add(water);
   const piles: THREE.BufferGeometry[] = [];
   for (const w of s.walls) {
-    if (w.every) continue;
+    if (w.every || inSea(w, s.zones)) continue; // (a frame out in the sea is clear glass: no piles)
     const l = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
     for (let u = 0.5; u < l; u += 3) {
       const x = w.a[0] + ((w.b[0] - w.a[0]) * u) / l, z = w.a[1] + ((w.b[1] - w.a[1]) * u) / l;

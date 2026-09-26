@@ -9,7 +9,7 @@ import type { Skin } from "@/lib/scene/gnome";
 import type { Bests, HoleLeaderboard, HoleRow, Leaderboard as LeaderboardRows, Mode, StrokesRow, StandingRow } from "@/lib/types";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
-import { hasAdena, connect, current, onOurNode, recordRound, splitRound, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
+import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
@@ -201,7 +201,7 @@ function SaveClock({ by, clock = Date.now, stale, onReplay }: { by: number; cloc
   if (left > 0 && !stale)
     return (
       <p className={"saveclock" + (left < 60000 ? " saveclock--soon" : "")}>
-        Save within <b>{mmss(left)}</b> or replay in the new weather.
+        Save it within <b>{mmss(left)}</b>: the weather changes every 5 minutes, and a round is only saved in its own.
       </p>
     );
   return (
@@ -286,6 +286,14 @@ export default function Golf() {
   // the gnome: a shared link's if this player has it, else their own; a link
   // never unlocks one, and is never saved as the player's choice
   const [linkNote, setLinkNote] = useState(lockedNote);
+  // a player's first hole: once, where to see all of it
+  const [farHint, setFarHint] = useState(() => {
+    try {
+      return !localStorage.getItem("gnogolf.hint.far");
+    } catch {
+      return false;
+    }
+  });
   const [gnome, setGnome] = useState(() => {
     const own = savedGnome();
     if (typeof window === "undefined") return own;
@@ -435,6 +443,12 @@ export default function Golf() {
     game.current && game.current.setGnome(id);
   };
   const unlockedRef = useRef<(id: string) => boolean>(() => true);
+  /** The gnome really chosen (the one the game plays), whatever the picker shows. */
+  const chosenGnome = () => {
+    let id: string | null = null;
+    try { id = localStorage.getItem("gnogolf.gnome"); } catch {}
+    return id && unlocked(id) ? id : "classic";
+  };
 
   useEffect(() => {
     if (!cfg || !canvas.current) return;
@@ -654,10 +668,12 @@ export default function Golf() {
       // every commit asked of the chain: the first from the tee, the next
       // from where the one before leaves the ball
       const period = s.period != null ? s.period : await within(chain.period());
-      const parts = await splitRound(s.shots, (list, from, ball) => within(from && ball ? chain.simulateCommit(hole, ball, from, list, period) : chain.simulateRound(hole, list, s.period), 8000), s);
+      const parts = await chainSplit(chain, { ...s, id: hole }, period);
       let tx: Awaited<ReturnType<typeof recordRound>> | null = null;
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k];
+        // the player has left this round (Play again, another hole): no more of it goes to Adena
+        if (roundKey.current !== round) return;
         if (parts.length > 1) land({ at: "signing", part: k + 1, of: parts.length });
         tx = await recordRound({
           address: account.address, realm: chain.realm, hole, shots: s.shots.slice(from, to), reset: k === 0,
@@ -712,6 +728,11 @@ export default function Golf() {
   unlockedRef.current = unlocked;
   // the new hole is on screen, built and its shaders ready: open the curtain
   const holeReady = !!(s && s.ready);
+  // a hole that would not load or draw: the curtain goes, so its banner (Try again, Pick a hole) is seen
+  const errorNow = !!(s && s.error);
+  useEffect(() => {
+    if (errorNow) setCurtain(null);
+  }, [errorNow]);
   useEffect(() => {
     if (curtain && holeId === curtain.id && holeReady && !curtain.open) {
       const t = setTimeout(() => setCurtain((c) => c && { ...c, open: true }), 250);
@@ -822,12 +843,14 @@ export default function Golf() {
           }}
         />
       )}
-      {screen === "pick" && <Picker world={(s && s.world) || "garden"} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} onBack={() => {
-        sound("blip");
-        // leaving on a locked gnome: back to the one really chosen
-        if (!unlocked(gnome)) { let saved: string | null = null; try { saved = localStorage.getItem("gnogolf.gnome"); } catch {} setGnome(saved && unlocked(saved) ? saved : "classic"); }
-        setScreen("worlds");
-      }} />}
+      {screen === "pick" && <Picker world={(s && s.world) || "garden"} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
+        onPlayAs={(id) => (setGnome(id), play())}
+        onBack={() => {
+          sound("blip");
+          // leaving on a locked gnome: back to the one really chosen
+          if (!unlocked(gnome)) setGnome(chosenGnome());
+          setScreen("worlds");
+        }} />}
 
       {s && playing && (
         <>
@@ -904,7 +927,7 @@ export default function Golf() {
                     <button className="round round--small round--x" aria-label="About Gnogolf" title="About" onClick={() => { setMenu(false); setAbout(true); }}>
                       <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
                     </button>
-                    <SheetClose onClose={() => setMenu(false)} inline />
+                    <SheetClose onClose={() => setMenu(false)} inline first />
                   </div>
                 </div>
                 <section className="drawer__me">
@@ -917,12 +940,31 @@ export default function Golf() {
                     </div>
                   </div>
                   <div className="me__row">
-                    <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}>The cup</Button>
+                    <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}>Cup overview</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("pick"); }}>Change gnome</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("title"); }}>Main menu</Button>
                     {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
+                <nav className="drawer__list">
+                  {s.holes.map((h) => (
+                    <button
+                      key={h.id}
+                      className="tile"
+                      aria-current={h.id === s.id}
+                      onClick={() => {
+                        setMenu(false);
+                        goTo(h.id);
+                      }}
+                    >
+                      <span className="tile__num">{holeNumber(s.holes, h.id)}</span>
+                      <span className="tile__name">{h.name}</span>
+                      <span className="tile__best">
+                        {scoreOf(card, h) ? <b>{scoreOf(card, h)}</b> : "–"} / par {parOf(h)}
+                      </span>
+                    </button>
+                  ))}
+                </nav>
                 <section className="drawer__settings" aria-label="Settings">
                   <span className="eyebrow">Settings</span>
                   <AimSetting aim={aim} onChange={setAim} />
@@ -946,25 +988,6 @@ export default function Golf() {
                   </button>
                   <small className="drawer__note">Clears this browser's scorecard. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
                 </section>
-                <nav className="drawer__list">
-                  {s.holes.map((h) => (
-                    <button
-                      key={h.id}
-                      className="tile"
-                      aria-current={h.id === s.id}
-                      onClick={() => {
-                        setMenu(false);
-                        goTo(h.id);
-                      }}
-                    >
-                      <span className="tile__num">{holeNumber(s.holes, h.id)}</span>
-                      <span className="tile__name">{h.name}</span>
-                      <span className="tile__best">
-                        {scoreOf(card, h) ? <b>{scoreOf(card, h)}</b> : "–"} / par {parOf(h)}
-                      </span>
-                    </button>
-                  ))}
-                </nav>
               </Dialog>
             </div>
           )}
@@ -984,7 +1007,7 @@ export default function Golf() {
             </div>
           )}
 
-          <Button variant="chip" className="lbchip" badge={SOON ? "Coming soon" : null} onClick={() => (sound("blip"), setBoard(true))} aria-label="Leaderboard">
+          <Button variant="chip" className="lbchip" onClick={() => (sound("blip"), setBoard(true))} aria-label="Leaderboard">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v4a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6" /></svg>
             <span>Leaderboard</span>
           </Button>
@@ -1011,8 +1034,8 @@ export default function Golf() {
       {holed && playing && (
         <div className="banner banner--win">
           <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label="Hole finished">
-            <span className="eyebrow">{s.name}</span>
-            <h2>{s.strokes === 1 ? "Hole in one!" : "In the hole!"}</h2>
+            <span className="eyebrow">In the hole! · {s.name}</span>
+            <h2>{golfTerm(s.strokes, parHere(s))}</h2>
             {/* the score, and beside it the ways to tell people about it */}
             <div className="win__head">
               <div className="win__score">
@@ -1073,7 +1096,7 @@ export default function Golf() {
                 Play again
               </Button>
               {!onChain && (
-                <Button variant="chain" disabled={record?.at === "signing" || stale} onClick={() => void recordIt()}>
+                <Button variant="secondary" className="btn--save" disabled={record?.at === "signing" || stale} onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record?.at === "signing" ? (record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`) : "Save on-chain"}
                 </Button>
@@ -1085,6 +1108,7 @@ export default function Golf() {
               ) : (
                 <button
                   className="btn btn--main"
+                  data-autofocus
                   onClick={() => {
                     const i = s.holes.findIndex((h) => h.id === s.id);
                     goTo(s.holes[(i + 1) % s.holes.length].id);
@@ -1175,6 +1199,7 @@ export default function Golf() {
 
       {playing && s && s.note && !s.flying && <div className="toast" role="status">{s.note}</div>}
       {playing && linkNote && <Toast text={linkNote} onDone={() => setLinkNote(null)} />}
+      {playing && !linkNote && farHint && s && s.ready && !s.flying && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
       {playing && s && s.flying && <CauseNote hot={hot.current} />}
 
       {gl && !fatal && (
@@ -1195,7 +1220,8 @@ export default function Golf() {
         // say what actually went wrong: the chain not answering, a shot it
         // refused, or a bug of ours while drawing — and offer the fix that fits
         const kind: FatalKind | ErrorKind = fatal ? fatal.kind : (s && s.errorKind) || "shot";
-        const holeNow = s && s.id;
+        // (Try again: the hole the load failed on, not the one still on screen)
+        const holeNow = (s && (s.failed || s.id)) || null;
         const TEXT = BANNER[kind];
         const g = game.current;
         return (
@@ -1385,11 +1411,14 @@ interface PickerProps {
   onChange: (id: string) => void;
   onPick: () => void;
   unlocked: (id: string) => boolean;
+  /** the gnome really chosen: a locked one on show plays as it */
+  chosen: string;
+  onPlayAs: (id: string) => void;
   onBack: () => void;
   aim: Mode;
   onAim: (m: Mode) => void;
 }
-function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }: PickerProps) {
+function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, aim, onAim }: PickerProps) {
   const canvas = useRef<HTMLDivElement>(null);
   const preview = useRef<ReturnType<typeof makePreview> | null>(null);
   const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
@@ -1440,8 +1469,9 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
         <AimSetting aim={aim} onChange={onAim} compact />
-        <Button variant="primary" className="btn--play" onClick={() => (sound("start"), onPick())} disabled={!unlocked(skin.id)}>
-          {unlocked(skin.id) ? "Choose this gnome" : "Locked"}
+        {/* a locked gnome on show: the button still plays, as the gnome really chosen */}
+        <Button variant="primary" className="btn--play" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>
+          {unlocked(skin.id) ? "Choose this gnome" : `Play as ${(GNOMES.find((x) => x.id === chosen) || GNOMES[0]).name}`}
         </Button>
       </div>
     </div>
@@ -1449,7 +1479,9 @@ function Picker({ world, gnome, onChange, onPick, unlocked, onBack, aim, onAim }
 }
 
 /** Assisted or Pro aim, with what it means — and what the chain can't check. */
+const HONEST = "We can't check which mode you used, so each mode has its own board.";
 function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (m: Mode) => void; compact?: boolean }) {
+  const [why, setWhy] = useState(false); // the (i)'s note, a tap away (a tooltip never shows on touch)
   return (
     <div className={"aimset" + (compact ? " aimset--compact" : "")}>
       <span className="aimset__label">Aim</span>
@@ -1458,9 +1490,10 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
       <small className="aimset__help">
         <span className={aim === "pro" ? "" : "off"} aria-hidden={aim !== "pro"}>
           {compact ? "No aim line: you read the course yourself. Ranked on its own board." : "No aim line · ranked apart"}
-          <span className="aimset__info" tabIndex={aim === "pro" ? 0 : -1} title="The mode is on your word — the chain can't see your screen." aria-label="The mode is on your word — the chain can't see your screen.">
+          <button type="button" className="aimset__info" tabIndex={aim === "pro" ? 0 : -1} aria-expanded={why} aria-label="Why ranked apart?" onClick={() => setWhy((v) => !v)} onBlur={() => setWhy(false)}>
             ⓘ
-          </span>
+          </button>
+          {why && <span className="aimset__pop" role="note">{HONEST}</span>}
         </span>
         <span className={aim === "pro" ? "off" : ""} aria-hidden={aim === "pro"}>{compact ? "The chain previews your shot: see the whole aim line before you swing." : "Full aim line"}</span>
       </small>
@@ -1652,15 +1685,28 @@ function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay }: 
   );
 }
 
+/** A score in golf's own words, from the strokes against par. */
+function golfTerm(strokes: number, par: number) {
+  if (strokes === 1) return "Hole in one!";
+  const d = strokes - par;
+  return d <= -3 ? "Albatross!" : d === -2 ? "Eagle!" : d === -1 ? "Birdie!" : d === 0 ? "Par" : d === 1 ? "Bogey" : d === 2 ? "Double bogey" : d === 3 ? "Triple bogey" : `${d} over par`;
+}
+
 /** The par of the hole being played. */
 const parHere = (s: Snapshot) => parOf(s.holes.find((h) => h.id === s.id) || (s.allHoles || []).find((h) => h.id === s.id));
 
 /** The card: hole, par and your score, ten holes to a row, with the totals. */
 function Scorecard({ holes, card, current, compact = false, world = "garden" }: { holes: readonly HoleRow[]; card: Card; current: string | null; compact?: boolean; world?: string }) {
+  // compact, with a hole being played (the win card): that hole and four either
+  // side, one row, the whole card a tap away
+  const at = holes.findIndex((h) => h.id === current), windowed = compact && at >= 0 && holes.length > 9;
+  const [all, setAll] = useState(false);
+  const from = windowed && !all ? Math.max(0, Math.min(at - 4, holes.length - 9)) : 0;
+  const shown = windowed && !all ? holes.slice(from, from + 9) : holes;
   // two halves of the same width (front nine, back nine), so every column of
   // the second row sits under one of the first; a short last row is padded
-  const per = Math.ceil(holes.length / 2) || 1, rows: (readonly HoleRow[])[] = [];
-  for (let i = 0; i < holes.length; i += per) rows.push(holes.slice(i, i + per));
+  const per = (windowed && !all ? shown.length : Math.ceil(shown.length / 2)) || 1, rows: (readonly HoleRow[])[] = [];
+  for (let i = 0; i < shown.length; i += per) rows.push(shown.slice(i, i + per));
   const pad = (row: readonly HoleRow[]) => Array.from({ length: per - row.length }, (_, k) => <td key={"pad" + k} className="pad" />);
   const t = totals(card, holes);
   return (
@@ -1668,7 +1714,7 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }: 
       {rows.map((row, r) => (
         <table key={r}>
           <tbody>
-            <tr><th>Hole</th>{row.map((h, i) => <td key={h.id} className={h.id === current ? "cur" : ""}><span>{r * per + i + 1}</span></td>)}{pad(row)}</tr>
+            <tr><th>Hole</th>{row.map((h, i) => <td key={h.id} className={h.id === current ? "cur" : ""}><span>{from + r * per + i + 1}</span></td>)}{pad(row)}</tr>
             <tr><th>Par</th>{row.map((h) => <td key={h.id} className={h.id === current ? "now" : ""}>{parOf(h)}</td>)}{pad(row)}</tr>
             <tr>
               <th>Score</th>
@@ -1693,6 +1739,7 @@ function Scorecard({ holes, card, current, compact = false, world = "garden" }: 
         <strong>{t.strokes || "–"}</strong>
         <span>par {t.par || "–"}</span>
         <span>{t.done}/{holes.length} holes</span>
+        {windowed && <button className="linkish scorecard__all" onClick={() => setAll((v) => !v)} aria-expanded={all}>{all ? "Fewer holes" : "The whole card"}</button>}
       </div>
     </div>
   );
@@ -1843,9 +1890,11 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
   const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
   return (
     <div className="lb friends">
-      {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends.</p>}
+      {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
+      {who.length > 0 && (<>
       <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>
-      {h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet.</p>}
+      {!h && <p className="lb__empty">Reading the chain…</p>}
+      {h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet: be the first.</p>}
       {h && h.length > 0 && (
         <ol>
           {h.map((r, i) => (
@@ -1859,7 +1908,8 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
         </ol>
       )}
       <h3>The course <small>{course ? `${course.holes} holes` : ""}</small></h3>
-      {c && c.length === 0 && <p className="lb__empty">No recorded rounds yet.</p>}
+      {!c && <p className="lb__empty">Reading the chain…</p>}
+      {c && c.length === 0 && <p className="lb__empty">No recorded rounds yet: be the first.</p>}
       {c && c.length > 0 && (
         <ol>
           {c.map((r, i) => (
@@ -1872,6 +1922,7 @@ function Friends({ s, chain, me, mode = "pro" }: BoardProps) {
           ))}
         </ol>
       )}
+      </>)}
       <form className="friends__add" onSubmit={(e) => void add(e)}>
         <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Add a friend: address or gno.land name" aria-label="Add a friend by address or gno.land name" />
         <Button variant="secondary" type="submit">Add</Button>
@@ -1958,7 +2009,7 @@ function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", web = "" }: B
         <span className="eyebrow">Recorded on-chain</span>
         <h2>Leaderboard</h2>
         <Segmented className="boards__modes" full role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
-        {mode === "pro" && <p className="boards__word">Pro rounds are ranked apart. The mode is on your word — the chain can't see your screen.</p>}
+        <p className="boards__word">{HONEST}</p>
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={[["friends", "Friends"], ["hole", "This hole"], ["course", "The course"]]} />
         {tab !== "friends" && (
           <p className="boards__ranked">

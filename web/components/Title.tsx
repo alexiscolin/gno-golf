@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import "@/app/title.css";
 import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
-import type { makeTitle, titleStill } from "@/lib/scene/title";
+import { AboutButton } from "@/components/About";
+import { SLOW_KEY } from "@/lib/engine/pace";
+import type { makeTitle } from "@/lib/scene/title";
 
 /** The live title scene, once its module has loaded and made it. */
 type TitleScene = NonNullable<Awaited<ReturnType<typeof makeTitle>>>;
@@ -14,7 +16,6 @@ declare global {
     // the perf probe's and the stills baker's hooks (?camlog, ?titlebake)
     __title?: TitleScene;
     __titleFilm?: Film | null;
-    __titleStill?: typeof titleStill;
   }
   interface Navigator {
     // the Network Information API (Chromium): not in the DOM types
@@ -193,7 +194,7 @@ const wantsStill = () => {
   try {
     const gfx = localStorage.getItem("gnogolf.gfx");
     // Low, or Auto on a device whose frames were slow (the engine's own flag)
-    return gfx === "low" || (gfx !== "high" && localStorage.getItem("gnogolf.gfx.auto") === "low");
+    return gfx === "low" || (gfx !== "high" && localStorage.getItem(SLOW_KEY) === "low");
   } catch {
     return false;
   }
@@ -319,9 +320,10 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
   const done = useCallback(() => setReady(true), []);
   const host = useRef<HTMLDivElement>(null), film = useRef<HTMLDivElement>(null);
   const scene = useTitleScene(host, film);
-  // ?titlebake (dev): the stills' baker, for the title bake script
+  // ?titlebake (dev): the stills' and clips' baker (window.__titleStill,
+  // __cupClip), for the title bake script and the promo renderer
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) void import("@/lib/scene/title").then((m) => (window.__titleStill = m.titleStill));
+    if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) void import("@/lib/scene/titlebake");
   }, []);
   const start = () => (sound("start"), onStart?.());
   // once ready, a click anywhere or Enter starts, like a console's title
@@ -346,11 +348,7 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
       <div ref={host} className={"title__stage" + (scene && scene.live && !playing ? " title__stage--on" : "")} aria-hidden="true" />
       <div ref={film} className={"title__film" + (playing ? "" : " title__film--off")} aria-hidden="true" />
       <div className={"title__scrim" + (playing ? " title__scrim--film" : "")} aria-hidden="true" />
-      {onAbout && (
-        <button className="round round--small title__about" aria-label="About Gnogolf" title="About" onClick={(e) => (e.stopPropagation(), onAbout())}>
-          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.2" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
-        </button>
-      )}
+      {onAbout && <AboutButton onClick={onAbout} />}
       <div className="title">
         <div className="title__logo">
           <div className="title__sun" aria-hidden="true" />

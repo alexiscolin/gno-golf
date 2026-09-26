@@ -597,7 +597,7 @@ func (h *Simple) PreviewWith(ball physics.Vec2, angle, power float64, stroke, ti
 	// the stroke's own pieces first, then the weather under everything
 	f := WithZones(WithExtras(h.Course, ws, ps), h.ExtraZones(stroke))
 	f = physics.WithTick(WithWeather(f, weather), tick)
-	return Sink(f.Step(ball, Launch(angle, power), h.Substeps), h.Pin, h.CupRadius)
+	return Sink(f.Step(ball, Launch(angle, power), h.Substeps), h.Pin, h.CupRadius, h.Course.Radius)
 }
 
 // PlayWith is PreviewWith, and it marks the wear where the ball stops.
@@ -642,32 +642,75 @@ func (h *Simple) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bo
 	return h.PlayAt(ball, angle, power, 0)
 }
 
-// Kick turns a stroke's power (0 to 10) into the ball's speed per substep: a
-// full stroke on the usual friction rolls about a board's length.
-const Kick = 0.6
+// Kick turns a stroke's power (0 to 10) into the ball's speed per substep:
+// the speed is Kick·p^(3/4), so the ball's energy grows as p^(3/2), and so
+// does how far it rolls (v²/2a on a green of constant rolling resistance a).
+// A full stroke starts at 4.44 and rolls 44 on the usual green (Friction
+// 0.87, a = 0.224), a board's length; a pull of 3 rolls 7.2, one of 1 1.4.
+// Kick is the calibration that keeps every course hole's par: the solver
+// finds the same robust stroke count on all 74 as before the rework.
+const Kick = 0.79
 
 // Launch is the ball's starting velocity for a stroke. Every hole should use
 // it, so that the same pull means the same shot on every course.
-func Launch(angle, power float64) physics.Vec2 { return physics.FromPolar(angle, power*Kick) }
+func Launch(angle, power float64) physics.Vec2 {
+	if !(power > 0) {
+		return physics.Vec2{}
+	}
+	return physics.FromPolar(angle, Kick*math.Sqrt(power*math.Sqrt(power)))
+}
 
-// CaptureSpeed is the fastest a ball can cross the cup and still drop, in board
-// units per substep — a ball barely rolling. Faster, it skims over — as it does on a real green.
-const CaptureSpeed = 1.3
+// A ball drops into the cup by Holmes's criterion (B. W. Holmes, "Putting:
+// how a golf ball and hole interact", Am. J. Phys. 59, 1991): crossing the
+// cup off its centre by b, the ball's centre is over a chord of length
+// 2·sqrt(R² − b²); it falls freely from the near rim, and it drops when it
+// has fallen its own radius r by the time its leading edge meets the far
+// rim, a chord less r later. Falling r takes sqrt(2r/G), so the fastest
+// ball that drops is
+//
+//	Capture(R, r, b) = (2·sqrt(R² − b²) − r) · sqrt(G / 2r)
+//
+// 1.9 per substep over the middle of a 1.2 cup for the course's 0.5 ball,
+// and nothing past about 1.17 off it: a graze is not a hole.
 
-// jumpStep is how much longer than CaptureSpeed a step must be for the one
-// after it to be the rest of a jump, not a slow ball.
+// minDrop is the least a ball falls to drop: a ball smaller than the
+// course's (Radius 0.5), a point ball included, drops as one of 0.5. A point
+// would drop into any cup at any speed.
+const minDrop = 0.5
+
+// Capture is the fastest a ball of radius ball crossing a cup of radius cup,
+// off its centre by off, can go and still drop, in board units per substep;
+// 0 when it cannot drop at all.
+func Capture(cup, ball, off float64) float64 {
+	c := cup*cup - off*off
+	if !(c > 0) {
+		return 0
+	}
+	if !(ball >= minDrop) {
+		ball = minDrop
+	}
+	chord := 2*math.Sqrt(c) - ball
+	if !(chord > 0) {
+		return 0
+	}
+	return chord * math.Sqrt(physics.G/(2*ball))
+}
+
+// jumpStep is how much longer than the fastest drop a step must be for the
+// one after it to be the rest of a jump, not a slow ball.
 const jumpStep = 1.5
 
 // Sink decides whether a shot ends in the cup: it stops within radius of the
-// pin, or it rolls across the cup no faster than CaptureSpeed. When it drops
-// the path is cut there and ends on the pin, so a renderer shows the ball
-// falling in rather than rolling on. Both Preview and Play go through it, so
-// the preview still equals the commit.
-func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bool) {
+// pin, or it rolls across the cup no faster than Capture allows a ball of
+// radius ball. When it drops the path is cut there and ends on the pin, so a
+// renderer shows the ball falling in rather than rolling on. Both Preview
+// and Play go through it, so the preview still equals the commit.
+func Sink(shot physics.Shot, pin physics.Vec2, radius, ball float64) (physics.Shot, bool) {
 	p := shot.Path
+	top := Capture(radius, ball, 0) // over the middle: the fastest drop
 	for i := 0; i+1 < len(p); i++ {
 		a, d := p[i], p[i+1].Sub(p[i])
-		if d.LenCmp(CaptureSpeed) > 0 {
+		if d.LenCmp(top) > 0 {
 			continue // too fast, or a tunnel jump
 		}
 		if airborne(shot, i) || airborne(shot, i+1) {
@@ -675,7 +718,7 @@ func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bo
 		}
 		// a short step right after a long one is not a slow ball: it is the
 		// rest of a substep after a tunnel exit or a bounce
-		if i > 0 && p[i].Sub(p[i-1]).LenCmp(CaptureSpeed*jumpStep) > 0 {
+		if i > 0 && p[i].Sub(p[i-1]).LenCmp(top*jumpStep) > 0 {
 			continue
 		}
 		// a step whose box is more than radius from the pin cannot drop
@@ -694,10 +737,8 @@ func Sink(shot physics.Shot, pin physics.Vec2, radius float64) (physics.Shot, bo
 			}
 		}
 		at := a.Add(d.Scale(t))
-		// over the middle of the cup a ball drops up to CaptureSpeed; nearer
-		// the rim it has to be slower — a graze is not a hole
-		off := at.Sub(pin).Len()
-		if off <= radius && l <= CaptureSpeed*math.Sqrt(1-(off*off)/(radius*radius)) {
+		// the step's nearest point to the pin is where it crosses the cup
+		if off := at.Sub(pin).Len(); off <= radius && l <= Capture(radius, ball, off) {
 			cut := make([]physics.Vec2, 0, i+3)
 			cut = append(cut, p[:i+1]...)
 			shot.Path = append(cut, at, pin)

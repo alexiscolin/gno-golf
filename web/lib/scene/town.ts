@@ -7,7 +7,7 @@
 // behind and to the right, as in the garden, so the lane is never hidden.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"; // the skyline
-import { C, flat, drawn, rbox, texOf, ink, lanternGlow, grows, share, ownFade, fadeLoop, type FadeItem, onTop } from "./materials";
+import { C, flat, drawn, rbox, texOf, ink, lanternGlow, grows, share, ownFade, fadeLoop, type FadeItem, onTop, motion, carved } from "./materials";
 import { bakeLocal, look, weatherLooks } from "./bake";
 import { animate } from "./state";
 import { timeOf } from "./camera";
@@ -15,16 +15,24 @@ import { gnomelet, brolly, bunting, mailbox } from "./props";
 import { seeded, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
 import { ud, type Hole } from "./data";
 import type { Bar } from "./worlds";
-import { boxOf, type Terrain } from "../terrain";
+import { boxOf, smoothstep, type Terrain } from "../terrain";
+import { STREET_Y } from "./pieces";
 import type { Extras, MutVec2, Post, Vec2, Zone } from "../types";
 
-const T = {
+export const T = {
   cobble: 0xcdbb9f, cobbleDark: 0xa99578, curb: 0xe2d6c0, quay: 0xa89c8a,
   wall: 0xf6ead3, wallWarm: 0xf1d9b8, roofFar: 0xe2c9c4, roofFarCap: 0xd4b3b5,
   caps: [C.cap, 0xf2a93b, 0x9b7fd1, 0xc98b5a, 0x5b6fb5],
   lampLit: 0xffd98a, lampOff: 0xe9e2cf, iron: 0x3d4a45, awningA: C.cap, awningB: C.cream,
 };
 const CANAL = { x0: -ISLAND.x - 6.5, x1: -ISLAND.x - 1.5 }; // down the left, just off the plot
+/** How far down this hole's town stands: a lane over the rooftops (a `roof`
+ *  zone) looks down on the streets, so the square and all round it are at
+ *  street level (base, edging and decor are moved down by it as a whole). */
+const sunk = (s: Pick<Hole, "zones">) => ((s.zones || []).some((z) => z.skin === "roof") ? STREET_Y - GRASS : 0);
+const MAST_Z = -2.1; // the lantern strings' masts: between the tram's rails and the board's curb
+/** Where the lantern strings cross the board (their masts at x - 1.5). */
+const stringXs = (W: number) => { const xs: number[] = []; for (let x = W * 0.16; x < W - 1; x += Math.max(8, W / 4)) xs.push(x); return xs; };
 
 // cobbles: a canvas of rounded stones, repeated over the square
 let cobbleTex: THREE.CanvasTexture | null = null;
@@ -132,6 +140,7 @@ function base(s: Hole, box: THREE.Box3) {
     piece.position.set(x, GRASS + hgt / 2, z);
     g.add(piece);
   }
+  g.position.y = sunk(s);
   return g;
 }
 
@@ -148,6 +157,7 @@ function edging(s: Hole) {
       g.add(grate);
     }
   g.add(flowerBoxes(W, H, rand));
+  g.position.y = sunk(s);
   return g;
 }
 
@@ -490,7 +500,7 @@ function fadeAt(piece: THREE.Object3D, points: readonly THREE.Vector3[]): FadeIt
  * over its ends; balloons drifting. It sways a little and glows after dark,
  * and fades out of the way when it comes between the camera and the ball.
  */
-function overhead(W: number, H: number, rand: Rand, night: boolean) {
+function overhead(W: number, H: number, rand: Rand, night: boolean, foot: number) {
   const g = new THREE.Group();
   const faders: FadeItem[] = [];
   const Y = 6.2, colours = [C.cap, 0xf2a93b, 0x9b7fd1, C.cream, 0x5b6fb5];
@@ -501,12 +511,13 @@ function overhead(W: number, H: number, rand: Rand, night: boolean) {
     return litMat.get(c)!;
   };
   const strings: { line: THREE.Group; ph: number }[] = [];
-  for (let x = W * 0.16; x < W - 1; x += Math.max(8, W / 4)) {
-    const a = new THREE.Vector3(x - 1.5, 0, -2.6), b = new THREE.Vector3(x + 1.5, 0, H + 2.6);
+  for (const x of stringXs(W)) {
+    const a = new THREE.Vector3(x - 1.5, 0, MAST_Z), b = new THREE.Vector3(x + 1.5, 0, H + 2.6);
     // a mast at the back; the front end is held up by a bunch of balloons —
     // a pole there would stand between the camera and the lane
-    const mast = drawn(new THREE.CylinderGeometry(0.06, 0.08, Y + 0.4, 6), flat(T.iron));
-    mast.position.set(a.x, GRASS + (Y + 0.4) / 2, a.z);
+    // (from the ground: the street, `foot` down, round the rooftops)
+    const mast = drawn(new THREE.CylinderGeometry(0.06, 0.08, Y + 0.4 - foot, 6), flat(T.iron));
+    mast.position.set(a.x, GRASS + foot + (Y + 0.4 - foot) / 2, a.z);
     g.add(mast);
     const line = new THREE.Group();
     const pts: THREE.Vector3[] = [], n = 10, glowAt: THREE.Vector3[] = [];
@@ -544,8 +555,8 @@ function overhead(W: number, H: number, rand: Rand, night: boolean) {
   const zc = H / 2;
   for (const [bx, dir, colour] of [[-2.6, 1, C.cap], [W + 2.6, -1, 0x9b7fd1]]) {
     const piv = new THREE.Group();
-    piv.position.set(bx, GRASS, zc);
-    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 4.2, 0), new THREE.Vector3(dir * 3.2, 5.6, -0.6));
+    piv.position.set(bx, GRASS + foot, zc);
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 4.2 - foot, 0), new THREE.Vector3(dir * 3.2, 5.6 - foot, -0.6));
     const stem = drawn(new THREE.TubeGeometry(curve, 16, 0.32, 8, false), flat(C.cream));
     const top = curve.getPoint(1), R = 2.5;
     const cap = drawn(new THREE.SphereGeometry(R, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), flat(colour));
@@ -657,7 +668,10 @@ function pot(rand: Rand) {
   return g;
 }
 
-/** A tram on its rails along the back street, going by and coming round again. */
+/** A tram on its rails along the back street: from the end of the line by
+ *  the canal to a stop halfway, on out of sight and back the same way, easing
+ *  into and out of every stop. Where it is is a function of the render clock
+ *  alone: steady at any frame rate, and never a jump back to the start. */
 function tram(z: number, x0: number, x1: number, night: boolean) {
   const g = new THREE.Group();
   for (const dz of [-0.45, 0.45]) {
@@ -700,11 +714,21 @@ function tram(z: number, x0: number, x1: number, night: boolean) {
   ud(car).live = true;
   car.position.set(x0, GRASS, z);
   g.add(car);
+  // the timetable: runs at V, braking at A, a DWELL at each stop
+  const V = 1.8, A = 0.6, DWELL = 5;
+  const stops = [x0 + 2.3, (x0 + x1) / 2, x1 - 2.3], route = [0, 1, 2, 1].map((i) => stops[i]);
+  let cycle = 0;
+  const legs = route.map((a, i) => {
+    const b = route[(i + 1) % route.length], D = Math.abs(b - a), ta = Math.min(V / A, Math.sqrt(D / A)), T = 2 * ta + (D - A * ta * ta) / (A * ta);
+    const leg = { a, dir: Math.sign(b - a), D, ta, T, t0: cycle };
+    cycle += T + DWELL;
+    return leg;
+  });
   animate((t) => {
-    // along the line and off its far end, then in again from the canal side
-    const span = x1 - x0 + 6;
-    car.position.x = x0 + 2 + ((t * 2.2) % span);
-    car.visible = car.position.x < x1 + 2;
+    const u = t % cycle, l = legs.find((q) => u < q.t0 + q.T + DWELL) || legs[legs.length - 1];
+    const s = Math.min(u - l.t0, l.T), r = l.T - s;
+    const d = s < l.ta ? (A * s * s) / 2 : r < l.ta ? l.D - (A * r * r) / 2 : (A * l.ta * l.ta) / 2 + A * l.ta * (s - l.ta);
+    car.position.x = l.a + l.dir * d;
   });
   return g;
 }
@@ -818,6 +842,7 @@ function decor(s: Hole) {
   const TX0 = CANAL.x1 + 1.2;
   g.add(tram(TZ, TX0, X1 + 6, night));
   for (let x = TX0; x <= X1 + 6; x += 1) reserve(x, TZ, 1.1);
+  for (const x of stringXs(W)) reserve(x - 1.5, MAST_Z, 0.3);
   // lamps along the back street, just behind the rails, before the stalls take the room
   for (let x = X0 + 2; x < X1 - 1; x += 6.5) place(lamp(night), x, TZ - 1.5, 0.35);
   // and a tree between every two lamps, before the stalls take the room
@@ -919,25 +944,18 @@ function decor(s: Hole) {
     const m = lanternGlow();
     g.add(new THREE.Points(geo, new THREE.PointsMaterial({ map: m.map, color: m.color, size: 2.6, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
   }
-  // town10's canal is always there; the bridge over it comes with each stroke
-  if (String(s.hole).endsWith("town10")) {
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(4, H + 3.2), new THREE.MeshToonMaterial({ color: C.pond, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
-    water.rotation.x = -Math.PI / 2;
-    water.position.set(22, GRASS + 0.63, H / 2);
-    g.add(water);
-    for (const x of [20, 24]) {
-      const quay = drawn(box3(0.3, 0.16, H + 3.2), flat(T.quay));
-      quay.position.set(x, GRASS + 0.66, H / 2);
-      g.add(quay);
-    }
-  }
-  const over = overhead(W, H, rand, night);
+  // town10's canal and its lifting bridge: always there, raised or lowered by each stroke's pieces (extras)
+  if (String(s.hole).endsWith("town10")) g.add(swingRig(s));
+  // round the rooftops the town stands at street level, the strings over the lane where they were
+  const drop = sunk(s), over = overhead(W, H, rand, night, drop);
+  over.position.y = -drop;
   g.add(over);
   ud(g).fade = ud(over).fade;
   reserve(-2.6, H / 2, 0.8);
   reserve(W + 2.6, H / 2, 0.8);
   g.add(skyline(rand, X0, X1, Z0));
   weatherLooks(g, (w) => (w.rain || w.storm || w.snow ? "wet" : "clear"));
+  g.position.y = drop; // (after the glows: they are where the pieces stood in g)
   return g;
 }
 
@@ -1531,6 +1549,37 @@ function sleepingCat(r: number) {
   return g;
 }
 
+/**
+ * A canal across the lane (running along z): a stone quay each side, only
+ * where the lane is — it ends under the lane's kerbs, which cross it as its
+ * end walls. Its water lies down a cut between them, as every water does.
+ */
+function canalOnLane(z: Zone, t: Terrain) {
+  const g = new THREE.Group(), [x0, z0] = z.min, [x1, z1] = z.max, w = x1 - x0;
+  // per strip across, the runs along it that are on the lane
+  const NX = 6, runs: [number, number][][] = [];
+  for (let i = 0; i < NX; i++) {
+    const x = x0 + (w * (i + 0.5)) / NX, out: [number, number][] = [];
+    let lo: number | null = null;
+    for (let zz = z0; zz <= z1 + 1e-6; zz += 0.25) {
+      const on = t.onGreen(x, Math.min(zz, z1 - 1e-3));
+      if (on && lo === null) lo = zz;
+      if ((!on || zz + 0.25 > z1 + 1e-6) && lo !== null) (out.push([Math.max(z0, lo - 0.1), Math.min(z1, on ? z1 : zz - 0.1)]), (lo = null));
+    }
+    runs.push(out);
+  }
+  // (the water itself is sunk into the lane, a quay wall each side down to
+  // it, and drawn with every other water: terrain.ts POOLS, zones.ts pondWater)
+  // the quays, along each side's runs (the first and last strips')
+  for (const [i, ex] of [[0, x0], [NX - 1, x1]] as const)
+    for (const [za, zb] of runs[i]) {
+      const q = carved(rbox(0.3, 0.2, zb - za, 0.05), T.quay);
+      q.position.set(ex, t.height(ex, (za + zb) / 2) + 0.08, (za + zb) / 2);
+      g.add(q);
+    }
+  return g;
+}
+
 function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terrain, s: Hole) {
   const night = timeOf(s.hole) !== "day";
   // seeded by where it stands: two pieces of one skin get different looks
@@ -1616,24 +1665,12 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
       f.scale.set(w / 3.2, 0.45, d / 3.2); // a low rim: the ball rolls in, it does not bounce off
       return onGround(f, cx, cz, t);
     }
-    if (skin === "canal") {
-      const g = new THREE.Group();
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshToonMaterial({ color: C.pond, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
-      water.rotation.x = -Math.PI / 2;
-      water.position.y = 0.06;
-      g.add(water);
-      for (const ex of [-w / 2, w / 2]) {
-        const edge = drawn(rbox(0.25, 0.12, d, 0.04), flat(T.quay));
-        edge.position.set(ex, 0.06, 0);
-        g.add(edge);
-      }
-      return onGround(g, cx, cz, t);
-    }
+    if (skin === "canal") return canalOnLane(zone, t);
     if (skin === "bridge") {
       const g = new THREE.Group();
       const n = Math.max(4, Math.round(w / 0.5));
       for (let i = 0; i < n; i++) {
-        const plank = drawn(rbox(w / n - 0.04, 0.1, d, 0.03), flat(i % 2 ? C.wood : C.woodDark));
+        const plank = carved(rbox(w / n - 0.04, 0.1, d, 0.03), i % 2 ? C.wood : C.woodDark);
         plank.position.set(-w / 2 + (w / n) * (i + 0.5), 0.06, 0);
         g.add(plank);
       }
@@ -1679,47 +1716,149 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
 // ------------------------------------------------------------- the swing bridge
 //
 // town10: a canal across the lane, and a bridge that is down on one stroke
-// and swung open on the next (the chain's pulse zones: a "bridge" surface or
-// a "canal" hazard over the same strip). The canal is always drawn; each
-// stroke the bridge is drawn down or open, by what the stroke brings.
-function swingBridge(z: Zone, open: boolean, t: Terrain) {
-  const [x0, z0] = z.min, [x1, z1] = z.max, w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2;
-  const g = new THREE.Group();
-  const y = t.height(cx, (z0 + z1) / 2);
-  // the deck, hinged at its near end on a stone pier on the bank
-  const pier = drawn(box3(1, 1.2, 1.4), flat(T.quay));
-  pier.position.set(x0 - 0.3, y + 0.1, z0 + 0.7);
-  g.add(pier);
-  const hinge = new THREE.Group();
-  hinge.position.set(x0 - 0.3, y + 0.12, z0 + 0.7);
-  const deck = new THREE.Group();
-  const n = Math.max(4, Math.round(w / 0.55));
-  for (let i = 0; i < n; i++) {
-    const plank = drawn(box3(w / n - 0.05, 0.12, d - 0.4), flat(i % 2 ? C.wood : C.woodDark));
-    plank.position.set(0.3 + (w / n) * (i + 0.5), 0, (d - 0.4) / 2 - 0.5);
-    deck.add(plank);
+// and up on the next (the chain's pulse zones: a "bridge" surface or a
+// "canal" hazard over the same strip, per stroke, not per tick). Drawn as a
+// Dutch double-leaf lift bridge: two leaves hinged on the quays, a stone
+// tower with a signal lamp at each corner. The rig is built once with the
+// hole (decor) and never regrown; each stroke's extras only tell it down or
+// up. Between strokes it rings (the lamps blink amber, the leaves shiver),
+// then swings on a smoothstep, like the trams' come-in curve; at rest it is
+// wholly in the stroke's pose, and the lamps say which: green, cross; red, water.
+
+const LEAF_UP = 1.2; // radians: how far a raised leaf stands (about 70 degrees)
+const WARN_S = 0.45, SWING_S = 0.9; // the bell before it moves, then the swing
+const LAMP = { down: 0x5fd17a, up: 0xe0524b, warn: 0xffc34d, dark: 0x3a3f3c };
+
+interface Rig { set(open: boolean, z: Zone): void }
+const rigs = new WeakMap<Hole, Rig>();
+
+function swingRig(s: Hole): THREE.Group {
+  // the canal's strip, as the chain lays it (course.Fit moved the source's
+  // x 20..24 by the tee's shift): corrected to the zone at the first stroke
+  const CW = 4;
+  const rig = new THREE.Group();
+  ud(rig).live = true; // it moves: kept out of the hole's bake
+  rig.position.set(s.start[0] + 15, 0, 0);
+  const x0 = rig.position.x, H = s.board.h;
+  // the deck is as wide as the lane where it crosses (its walls, clipped to the canal)
+  let lo = Infinity, hi = -Infinity;
+  for (const w of s.walls || []) {
+    const [ax, az] = w.a, [bx, bz] = w.b;
+    for (const x of [x0, x0 + CW, ax, bx]) {
+      if (x < x0 || x > x0 + CW || x < Math.min(ax, bx) || x > Math.max(ax, bx) || ax === bx) continue;
+      const zz = az + ((bz - az) * (x - ax)) / (bx - ax);
+      lo = Math.min(lo, zz), hi = Math.max(hi, zz);
+    }
   }
-  for (const side of [-0.5, d - 0.9]) {
-    const rail = drawn(box3(w, 0.1, 0.1), flat(C.woodDark));
-    rail.position.set(0.3 + w / 2, 0.55, side);
-    deck.add(rail);
+  if (!(hi > lo)) (lo = 0), (hi = H);
+  const D = hi - lo + 0.9, zc = (lo + hi) / 2, L = CW / 2 - 0.04;
+
+  // what stands still: the water, the quays, the hinge axles, the four towers
+  const still = new THREE.Group();
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(CW, H + 3.2), new THREE.MeshToonMaterial({ color: C.pond, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(CW / 2, 0.03, H / 2);
+  still.add(water);
+  // the towers' lenses: one mesh, its own material, recoloured (the bake would tint a colour in for good)
+  const lamp = new THREE.MeshBasicMaterial({ color: LAMP.up }), lenses: THREE.BufferGeometry[] = [];
+  for (const x of [0, CW]) {
+    const quay = drawn(box3(0.3, 0.16, H + 3.2), flat(T.quay));
+    quay.position.set(x, 0.06, H / 2);
+    const axle = drawn(new THREE.CylinderGeometry(0.13, 0.13, D + 0.3, 8), flat(T.iron));
+    axle.rotation.x = Math.PI / 2;
+    axle.position.set(x, 0.08, zc);
+    still.add(quay, axle);
+    const out = x ? 1 : -1; // the bank it stands on
+    for (const z of [lo - 0.75, hi + 0.75]) {
+      const tower = drawn(rbox(0.8, 1.5, 0.8, 0.1), flat(T.curb));
+      tower.position.set(x + out * 0.25, 0.75, z);
+      const roof = drawn(new THREE.ConeGeometry(0.66, 0.6, 4), flat(C.cap));
+      roof.position.set(x + out * 0.25, 1.8, z);
+      roof.rotation.y = Math.PI / 4;
+      const band = drawn(rbox(0.86, 0.12, 0.86, 0.04), flat(T.iron));
+      band.position.set(x + out * 0.25, 1.46, z);
+      still.add(tower, roof, band);
+      // the signal: a lens on the canal side and one facing the camera
+      for (const [dx, dz, ry] of [[-out * 0.42, 0, out * -Math.PI / 2], [0, 0.42, 0]] as const)
+        lenses.push(new THREE.CircleGeometry(0.19, 12).applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x + out * 0.25 + dx, 1.12, z + dz), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry), new THREE.Vector3(1, 1, 1))));
+    }
   }
-  hinge.add(bakeLocal(deck));
-  // swung open: turned round its pier out over the bank, clear of the water
-  hinge.rotation.y = open ? Math.PI / 2 : 0;
-  g.add(hinge);
-  return g;
+  rig.add(bakeLocal(still), new THREE.Mesh(mergeGeometries(lenses), lamp));
+
+  // a leaf: planks across the way, a white rail each side, a striped tip
+  const leaf = (dir: 1 | -1) => {
+    const hinge = new THREE.Group(), deck = new THREE.Group();
+    hinge.position.set(dir > 0 ? 0 : CW, 0.12, zc);
+    const n = 4;
+    for (let i = 0; i < n; i++) {
+      const plank = drawn(rbox(L / n - 0.04, 0.14, D, 0.03), flat(i % 2 ? C.wood : C.woodDark));
+      plank.position.set(dir * (L / n) * (i + 0.5), -0.07, 0);
+      deck.add(plank);
+    }
+    const tip = 6; // a yellow-and-ink band at the free end: where it parts
+    for (let k = 0; k < tip; k++) {
+      const b = drawn(box3(0.22, 0.03, D / tip), flat(k % 2 ? T.iron : 0xf2c14e));
+      b.position.set(dir * (L - 0.14), 0.015, -D / 2 + (D / tip) * (k + 0.5));
+      deck.add(b);
+    }
+    for (const side of [-1, 1]) {
+      const rail = drawn(rbox(L, 0.09, 0.09, 0.03), flat(C.cream));
+      rail.position.set((dir * L) / 2, 0.6, side * (D / 2 - 0.06));
+      deck.add(rail);
+      for (const u of [0.12, L / 2, L - 0.12]) {
+        const post = drawn(rbox(0.09, 0.6, 0.09, 0.03), flat(C.cream));
+        post.position.set(dir * u, 0.3, side * (D / 2 - 0.06));
+        deck.add(post);
+      }
+    }
+    hinge.add(bakeLocal(deck));
+    rig.add(hinge);
+    return hinge;
+  };
+  const leaves = [leaf(1), leaf(-1)];
+
+  // the pose: a (0 down, 1 up) and the lamps' colour
+  let cur = 1;
+  const pose = (a: number, shiver: number) => {
+    cur = a;
+    leaves[0].rotation.z = a * LEAF_UP + shiver;
+    leaves[1].rotation.z = -(a * LEAF_UP + shiver);
+  };
+  let from = 1, to = 1, t0 = -1, pending = false, moving = false, first = true;
+  const settle = () => { pose(to, 0); lamp.color.setHex(to ? LAMP.up : LAMP.down); moving = false; };
+  settle();
+  rigs.set(s, {
+    set(open, z) {
+      rig.position.x = z.min[0]; // the chain's strip, exactly
+      const want = open ? 1 : 0;
+      if (first || !motion) return void ((first = false), (from = to = want), settle());
+      if (want === to && !moving) return;
+      (from = cur), (to = want); // (from wherever it is, mid-swing or at rest)
+      pending = true;
+    },
+  });
+  animate((time) => {
+    if (pending) (t0 = time), (pending = false), (moving = true);
+    if (!moving) return;
+    const e = time - t0;
+    // the bell: amber blinking till it is over, the leaves shivering on their hinges; then the swing
+    lamp.color.setHex(Math.floor(e * 7) % 2 ? LAMP.dark : LAMP.warn);
+    if (e < WARN_S) return pose(from, 0.025 * Math.sin(e * 55) * (1 - e / WARN_S));
+    const k = (e - WARN_S) / SWING_S;
+    if (k >= 1) return settle();
+    pose(from + (to - from) * smoothstep(k), 0);
+  });
+  return rig;
 }
 
-/** A stroke's pieces town draws itself: the swing bridge, down or open. */
-function extras(ex: Extras, s: Hole, t: Terrain) {
-  const bridge = (ex.zones || []).find((z) => z.skin === "bridge" && z.max[1] - z.min[1] >= s.board.h - 0.01);
+/** A stroke's pieces town draws itself: the swing bridge, down or up (its rig is the hole's). */
+function extras(ex: Extras, s: Hole) {
+  const bridge = (ex.zones || []).find((z) => z.skin === "bridge");
   const canal = (ex.zones || []).find((z) => z.skin === "canal");
-  const z = bridge || canal;
-  if (!z || s.hole.indexOf("town10") < 0) return undefined;
-  const group = new THREE.Group();
-  group.add(swingBridge(z, !bridge, t));
-  return { group, skins: new Set(["bridge", "canal"]) };
+  const z = bridge || canal, rig = rigs.get(s);
+  if (!z || !rig) return undefined;
+  rig.set(!bridge, z);
+  return { group: new THREE.Group(), skins: new Set(["bridge", "canal"]) };
 }
 
 export { base, edging, berms, decor, rough, green, piece, extras };

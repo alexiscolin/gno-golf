@@ -15,7 +15,8 @@ import (
 // walls across it, 32 posts of radius 8, and 32 zones whose boxes cover the
 // whole board, 8 of them 64-point polygons; and four zigzag holes, where
 // every row of a board crosses every edge of 2 or 8 polygons.
-// z_worst_play_filetest publishes them all and plays a shot on the worst;
+// z_worst_play_filetest publishes them all and plays a shot on the worst
+// (the heaviest single shot is z_worst_shot_filetest's);
 // z_worst_render_filetest does the same, then renders the worst's page and
 // its player's page, and each zigzag's page. The difference of their gas is
 // the six pages, about 1.62e9. The worst's two cost 0.36e9, since its board
@@ -97,4 +98,4 @@ func main(cur realm) {
 // g15cnntx0j5e7j0ff5r4t970wmx47lynkv5magnu/worst/v1
 
 // Gas:
-// 2311350660
+// 2588047010

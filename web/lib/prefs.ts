@@ -1,6 +1,7 @@
 // What this browser remembers of the player: the camera picked this session,
 // the gnome, and the gnomes earned.
 import { GNOMES } from "./scene/gnome";
+import { SLOW_KEY } from "./engine/pace";
 import type { CamMode } from "./engine/types";
 
 // the camera modes, in the order the button goes through them. A page always
@@ -66,7 +67,7 @@ export function stillsOnly() {
     const c = navigator.connection;
     if (c && (c.saveData || /2g/.test(c.effectiveType || ""))) return true;
     const gfx = localStorage.getItem("gnogolf.gfx");
-    return gfx === "low" || (gfx !== "high" && localStorage.getItem("gnogolf.gfx.auto") === "low");
+    return gfx === "low" || (gfx !== "high" && localStorage.getItem(SLOW_KEY) === "low");
   } catch {
     return true;
   }

@@ -71,9 +71,9 @@ export function Toggle({ label, checked, onChange }: { label: ReactNode; checked
 const CloseX = () => (
   <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4 16 16M16 4 4 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
 );
-export function SheetClose({ onClose, inline = false }: { onClose: () => void; inline?: boolean }) {
+export function SheetClose({ onClose, inline = false, first = false }: { onClose: () => void; inline?: boolean; first?: boolean }) {
   return (
-    <button className={"round round--small round--x" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose}>
+    <button className={"round round--small round--x" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose} data-autofocus={first || undefined}>
       <CloseX />
     </button>
   );
@@ -82,6 +82,11 @@ export function SheetClose({ onClose, inline = false }: { onClose: () => void; i
 // Dialogs open over one another (a confirm over the menu): only the top one
 // hears Escape and keeps Tab inside it.
 const open: object[] = [];
+// the control last pressed: a click does not focus a button everywhere
+// (Safari, a scripted click), so a dialog knows what opened it all the same
+let pressed: HTMLElement | null = null;
+if (typeof document !== "undefined")
+  document.addEventListener("pointerdown", (e) => { pressed = e.target instanceof Element ? e.target.closest<HTMLElement>("button, a, summary, [tabindex]") : null; }, true);
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
@@ -97,9 +102,12 @@ export function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => v
   useEffect(() => {
     const me = {};
     open.push(me);
-    const back = document.activeElement;
-    const el = ref.current;
-    const first = el && el.querySelector<HTMLElement>(FOCUSABLE);
+    const active = document.activeElement, el = ref.current;
+    // what opened it: the focused control, else the one last pressed (never one
+    // of its own: a dev remount finds its own control focused already)
+    const back = [active instanceof HTMLElement && active !== document.body ? active : null, pressed].find((x) => x && !(el && el.contains(x))) || null;
+    // its main action when it names one (data-autofocus), else its first control
+    const first = el && (el.querySelector<HTMLElement>("[data-autofocus]") || el.querySelector<HTMLElement>(FOCUSABLE));
     (first || el)?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (open[open.length - 1] !== me || !ref.current) return;
@@ -116,7 +124,14 @@ export function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => v
     return () => {
       document.removeEventListener("keydown", onKey, true);
       open.splice(open.indexOf(me), 1);
-      if (back instanceof HTMLElement && back.isConnected) back.focus({ preventScroll: true });
+      // on the next task: the page's styles have caught up by then (a trigger
+      // hidden while the dialog was open can take focus again), and a dialog
+      // opened meanwhile (the menu's About) keeps its own focus
+      if (back instanceof HTMLElement)
+        setTimeout(() => {
+          const now = document.activeElement;
+          if (back.isConnected && (!now || now === document.body)) back.focus({ preventScroll: true });
+        }, 0);
     };
   }, []);
   return ref;

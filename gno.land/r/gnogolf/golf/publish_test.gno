@@ -216,6 +216,7 @@ func TestTheEstimatorRefusesAHoleAtTheLimits(cur realm, t *testing.T) {
 	w := newWork(mustHole(id).hole(), nil)
 	uassert.Equal(t, int64(course.MaxWalls), w.walls, "fixed and pulsed walls")
 	uassert.Equal(t, int64(course.MaxWalls+course.MaxPosts+course.MaxZones+course.MaxPolyTotal), w.pieces, "pieces and polygon edges")
+	uassert.True(t, w.bound <= maxShotGas && w.bound <= workBudget, "its heaviest shot fits one transaction")
 	shots := strings.TrimSuffix(strings.Repeat("30,10;", maxShots), ";")
 	uassert.PanicsContains(t, cur, "commit the first", func() { SimulateRound(id, shots) })
 	testing.SetRealm(testing.NewUserRealm(player))

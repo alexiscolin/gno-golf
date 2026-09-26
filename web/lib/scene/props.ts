@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { C, ink, flat, sway, grows, swayLine, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share, motion, onTop } from "./materials";
 import { animate, state } from "./state";
+import { bakeLocal } from "./bake";
 import { GRASS, type Rand } from "./common";
 import { ud, type Height, type Tick } from "./data";
 import type { MutVec2, Post } from "../types";
@@ -592,9 +593,10 @@ function mole(p: Pick<Post, "c" | "r">, height: Height) {
   return g;
 }
 
-/** The mill on the blade's hub: a round tower, a cone roof, four sails turning.
+/** The mill on the blade's hub: a round tower, a cone roof, four sails turning
+ *  (their length times sweep), merged as one live piece that turns.
  *  The sails are decoration; what the ball meets is the sweep on the ground. */
-function windmill(x: number, y: number, z: number) {
+function windmill(x: number, y: number, z: number, sweep = 1) {
   const group = new THREE.Group();
   group.position.set(x, y, z);
   const tower = drawn(new THREE.CylinderGeometry(0.85, 1.15, 3.2, 14), flat(C.cream));
@@ -614,6 +616,7 @@ function windmill(x: number, y: number, z: number) {
   for (let i = 0; i < 4; i++) {
     const arm = new THREE.Group();
     arm.rotation.z = (i * Math.PI) / 2;
+    arm.scale.y = sweep;
     const spar = drawn(rbox(0.12, 2.6, 0.08, 0.04), flat(C.woodDark));
     spar.position.y = 1.3;
     const sail = drawn(rbox(0.7, 1.9, 0.05, 0.03), flat(C.cream));
@@ -622,6 +625,7 @@ function windmill(x: number, y: number, z: number) {
     hub.add(arm);
   }
   group.add(hub);
+  ud(bakeLocal(hub)).live = true;
   return { group, hub, spin: (t: number) => (hub.rotation.z = -t * 0.9) };
 }
 

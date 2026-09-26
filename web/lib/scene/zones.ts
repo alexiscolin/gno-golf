@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { CUP_R, CELL, inZone, inset, airy, mod, segDist, smoothstep, boxOf } from "../terrain";
-import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf } from "./materials";
+import { CELL, inZone, inset, mod, segDist, boxOf, POOLS } from "../terrain";
+import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf, waterTone, waterMat } from "./materials";
 import { animate, state } from "./state";
 import { stone, warp, badge, windmill } from "./props";
 import { MOUTHS, mouthAt } from "./pieces";
@@ -68,6 +68,39 @@ function clipRect(pts: Vec2[], x0: number, z0: number, x1: number, z1: number): 
     if (!out.length) break;
   }
   return out;
+}
+
+/** A patch out to a closed outline that is round its middle (cx, cz): rings
+ *  of it shrunk toward the middle, so the patch has points inside it to lie
+ *  on the ground by, not only its edge. uv as ShapeGeometry's: (x, -z);
+ *  userData.f per vertex, how far out (0 middle, 1 edge). */
+const RINGS = [0, 0.25, 0.5, 0.7, 0.84, 0.93, 1];
+function rings(rim: readonly Vec2[], cx: number, cz: number) {
+  const pos: number[] = [], uv: number[] = [], f: number[] = [], idx: number[] = [], n = rim.length;
+  for (const k of RINGS)
+    for (const [x, zz] of rim) {
+      const px = cx + (x - cx) * k, pz = cz + (zz - cz) * k;
+      pos.push(px, 0, pz);
+      uv.push(px, -pz);
+      f.push(k);
+    }
+  for (let r = 0; r + 1 < RINGS.length; r++)
+    for (let i = 0; i < n; i++) {
+      const a = r * n + i, b = r * n + ((i + 1) % n), c = a + n, d = b + n;
+      idx.push(a, b, d, a, d, c);
+    }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.userData.f = f;
+  return geo;
+}
+/** Vertex colours: color times k(f) per vertex of a rings() patch. */
+function tone(geo: THREE.BufferGeometry, color: number, k: (f: number) => number) {
+  const c = new THREE.Color(color), f = geo.userData.f as number[], col: number[] = [];
+  for (const v of f) col.push(c.r * k(v), c.g * k(v), c.b * k(v));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
 }
 
 function organic(z: Zone, rand: Rand, board: Board): Blob {
@@ -174,7 +207,6 @@ const ZONE_DRAW: [(z: Zone) => boolean, ZoneDraw][] = [
   }],
   [(z) => z.skin === "crevasse" || z.skin === "ditch", drawGap],
   [(z) => z.kind === "slope" && z.skin === "moon bridge", moonBridge],
-  [(z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && !!(z.vec[0] || z.vec[1]), drawContours],
   [(z) => z.skin === "mill", drawMill],
   [(z) => z.skin === "molehill", drawMolehill],
   [(z) => z.skin === "gap", deckGap],
@@ -371,67 +403,15 @@ function moonBridge(z: Zone, s: Hole, t: T, g: THREE.Group) {
   return g;
 }
 
-function drawContours(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
-  // Contour lines, like a map: one every half unit of height, across the
-  // slope and draped on it. They show where it rises and how steeply —
-  // bunched up where it is steep — without an arrow in sight.
-  const l = Math.hypot(z.vec[0], z.vec[1]);
-  const ux = -z.vec[0] / l, uz = -z.vec[1] / l; // uphill
-  const vx = -uz, vz = ux;                        // across
-  const contour = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
-  const { cx, cz } = boxOf(z);
-  const reach = Math.hypot(w, h) / 2 + 3;
-  const segs: THREE.Vector3[] = [];
-  let last = t.height(cx - ux * reach, cz - uz * reach);
-  for (let a = -reach; a <= reach; a += 0.25) {
-    const px = cx + ux * a, pz = cz + uz * a;
-    const hh = t.height(px, pz);
-    if (Math.floor(hh / 0.5) === Math.floor(last / 0.5) || hh < 0.2) { last = hh; continue; }
-    last = hh;
-    // walk across the slope at this height, keeping the pieces on the green
-    let run: THREE.Vector3[] = [];
-    const flush = () => {
-      // as pairs, all in one LineSegments per slope (one draw, and one
-      // material the replay can light up)
-      for (let k = 1; k < run.length; k++) segs.push(run[k - 1], run[k]);
-      run = [];
-    };
-    for (let b = -reach; b <= reach; b += 0.3) {
-      const x = px + vx * b, zz = pz + vz * b;
-      const nearCup = Math.hypot(x - s.cup[0], zz - s.cup[1]) < CUP_R + 0.5;
-      if (!t.onGreen(x, zz) || t.height(x, zz) < 0.15 || nearCup) { flush(); continue; }
-      run.push(new THREE.Vector3(x, t.height(x, zz) + 0.04, zz));
-    }
-    flush();
-  }
-  if (segs.length) {
-    const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(segs), contour);
-    ud(lines).live = true; // lit by the replay: never baked
-    g.add(lines);
-    // glow(k): 0 at rest, 1 fully lit (a pale gold) while the ball rolls on it
-    const rest = new THREE.Color(0xffffff), lit = new THREE.Color(0xffe38a);
-    state.slopes.set(z, {
-      glow(k) {
-        k = Math.max(0, Math.min(1, k));
-        contour.color.copy(rest).lerp(lit, k);
-        contour.opacity = 0.55 + 0.45 * k;
-      },
-    });
-  }
-  return g;
-}
-
 function drawMill(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
   // the mill standing across the lane: a big tower, its sails turning
   const { cx, cz } = boxOf(z);
   const k = Math.min(w, h) / 2.4, y0 = t.height(cx, cz);
-  const m = windmill(cx, y0, cz);
-  m.group.scale.setScalar(k);
-  m.group.rotation.y = -Math.PI / 2; // the sails face the tee
   // long sweeps, so a sail reaches down over whichever door it blocks
   // (the tips pass just clear of the mill's low base kerb)
-  for (const arm of m.hub.children.slice(1)) arm.scale.y = 1.1;
-  ud(m.hub).live = true;
+  const m = windmill(cx, y0, cz, 1.1);
+  m.group.scale.setScalar(k);
+  m.group.rotation.y = -Math.PI / 2; // the sails face the tee
   // The chain turns the wheel within the stroke: its sails are timed
   // walls over the doors (hole4: a turn in 24 substeps, a sail down over
   // the middle door at every quarter). So the replay drives it — at step u
@@ -490,7 +470,7 @@ function drawMolehill(z: Zone, s: Hole, t: T, g: THREE.Group, { rand }: Opts) {
  * the deep middle. Null when the hole has none.
  */
 export function pondWater(s: Hole, t: T) {
-  const pos = [], col = [], deep = new THREE.Color(0x2c6479), shallow = new THREE.Color(0x86c3cc), c = new THREE.Color();
+  const pos = [], col = [], c = new THREE.Color();
   const gh = t.ground || t.height;
   for (let j = 0; j < t.nz; j++)
     for (let i = 0; i < t.nx; i++) {
@@ -500,7 +480,8 @@ export function pondWater(s: Hole, t: T) {
       if (!p || cs.every(([x, zz]) => gh(x, zz) > p.level + 0.01)) continue;
       for (const k of [0, 1, 2, 0, 2, 3]) {
         const [x, zz] = cs[k], d = ws[k] ? ws[k].d : 0;
-        c.copy(shallow).lerp(deep, smoothstep((d - 0.3) / 2.2));
+        // and a faint line of foam where it laps the bank (waterTone)
+        waterTone(c, p.skin, d, p.level - gh(x, zz));
         pos.push(x, p.level, zz);
         col.push(c.r, c.g, c.b);
       }
@@ -509,7 +490,7 @@ export function pondWater(s: Hole, t: T) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true }));
+  return new THREE.Mesh(geo, waterMat());
 }
 
 function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opts) {
@@ -541,17 +522,26 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
   };
   // a garden pond is sunk into the ground (terrain.ts, pondWater), with its
   // banks; over one, a causeway is a boardwalk on posts
-  const sunk = water && z.skin === "water";
+  const sunk = water && !!POOLS[z.skin];
   if (deck && t.pond((z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2)) return boardwalk(z, s, t, g);
   if (sunk) {
     pondDetail(z, s, t, g, { w, h, rand });
     return g;
   }
-  const geo = new THREE.ShapeGeometry(blob.shape, 6);
-  geo.rotateX(-Math.PI / 2);
+  // a drawn outline (not the chain's polygon) is round its middle: rings out
+  // to it, so the patch follows the ground inside it too (a bunker's dish)
+  const geo = z.poly ? new THREE.ShapeGeometry(blob.shape, 6).rotateX(-Math.PI / 2) : rings(blob.points, (z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2);
   // sunk a touch below the green for water, laid on it for sand
   drape(geo, (x, zz) => t.height(x, zz) + (water ? 0.025 : 0.035));
-  g.add(new THREE.Mesh(geo, flat(color, { alphaMap: greenMask(t), alphaTest: 0.5 })));
+  // an edge that reads as the material's: a bunker's lip catches the light
+  // over a deeper floor, water pales to its shore and darkens out in the
+  // middle, frost rims ice, a bed of soil or flowers darkens at its edge
+  const edge = z.skin === "sand" ? (f: number) => (f > 0.86 ? 1.07 : 0.93 + 0.08 * f)
+    : water ? (f: number) => (f > 0.9 ? 1.16 : 0.9 + 0.1 * f)
+    : ice ? (f: number) => (f > 0.9 ? 1.08 : 1)
+    : (f: number) => (f > 0.9 ? 0.88 : 1);
+  if (!z.poly) tone(geo, color, edge);
+  g.add(new THREE.Mesh(geo, flat(z.poly ? color : 0xffffff, { alphaMap: greenMask(t), alphaTest: 0.5, vertexColors: !z.poly })));
   if (deck) {
     // planks across the deck, and a rail each side
     const alongX = w >= h, n = Math.floor((alongX ? w : h) / 0.45);
@@ -642,10 +632,10 @@ function pondDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opts
     }
     return null;
   };
-  const area = w * h;
+  const area = w * h, garden = z.skin === "water"; // (a rock pool, a lagoon, a canal: no lilies nor reeds)
   // lily pads, in twos and threes, one with a flower
   const pads = [], flowers = [];
-  for (let k = 0; k < Math.min(4, 1 + area / 25); k++) {
+  for (let k = 0; garden && k < Math.min(4, 1 + area / 25); k++) {
     const at = out(1.1);
     if (!at) continue;
     for (let n = 0; n < 2 + (rand() * 2 | 0); n++) {
@@ -683,7 +673,7 @@ function pondDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opts
   }
   // reeds: clumps standing in the shallows at the banks by a wall
   const gh = t.ground || t.height, stems = [], tips = [];
-  for (let n = 0, clumps = 0; n < 80 && clumps < 3; n++) {
+  for (let n = 0, clumps = 0; garden && n < 80 && clumps < 3; n++) {
     const x = z.min[0] + rand() * w, zz = z.min[1] + rand() * h, d = inset(z, x, zz);
     if (d < 0.25 || d > 0.6 || !t.onGreen(x, zz) || !clear(x, zz) || !s.walls.some((q) => segDist(x, zz, q.a, q.b) < 1.2)) continue;
     clumps++;
@@ -696,6 +686,30 @@ function pondDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opts
   }
   if (stems.length) g.add(new THREE.Mesh(mergeGeometries(stems), flat(C.leafDark)));
   if (tips.length) g.add(new THREE.Mesh(mergeGeometries(tips), flat(C.bark)));
+  if (z.skin !== "canal") bankRocks(z, t, g, rand, (x, zz) => { const d = inset(z, x, zz); return d > 0.04 && d < 0.4 && t.onGreen(x, zz) && clear(x, zz) && !s.walls.some((q) => segDist(x, zz, q.a, q.b) < 0.9); }, gh);
+}
+
+/**
+ * Rocks on a pond's bank: a few clusters of one to three, a big one and
+ * smaller ones by it, in two or three greys, half sunk where the bank goes
+ * into the water. ok(x, z): where one may lie; y: the ground there.
+ */
+function bankRocks(z: Zone, t: T, g: THREE.Group, rand: Rand, ok: (x: number, z: number) => boolean, y: (x: number, z: number) => number) {
+  const w = z.max[0] - z.min[0], h = z.max[1] - z.min[1], tones = [C.stone, 0x9c978a, 0x8a8577];
+  for (let n = 0, clusters = 0; n < 160 && clusters < Math.min(7, 1 + (w + h) / 4); n++) {
+    const x = z.min[0] + rand() * w, zz = z.min[1] + rand() * h;
+    if (!ok(x, zz)) continue;
+    clusters++;
+    for (let k = 0, m = 1 + Math.floor(rand() * 3); k < m; k++) {
+      const a = rand() * Math.PI * 2, r = k ? 0.3 + rand() * 0.25 : 0, px = x + Math.cos(a) * r, pz = zz + Math.sin(a) * r;
+      if (k && !ok(px, pz)) continue;
+      const st = stone(rand), size = k ? 0.22 + rand() * 0.2 : 0.4 + rand() * 0.3;
+      (st.children[0] as THREE.Mesh).material = flat(tones[Math.floor(rand() * tones.length)]);
+      st.scale.set(size, size * (0.55 + rand() * 0.25), size);
+      st.position.set(px, y(px, pz) + 0.08 * size, pz);
+      g.add(st);
+    }
+  }
 }
 
 /** Water: its shore of pebbles and reeds, ripples, a lily pad (a fountain's basin, a canal's stones). */
@@ -709,14 +723,7 @@ function waterDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, blob,
   const shore = !["sea", "wave", "canal", "gap", "fountain"].includes(z.skin);
   if (z.skin === "fountain") fountainBasin(z, t, g, w, h);
   if (z.skin === "canal") canalEdges(z, t, g, w, h);
-  for (let k = 0; shore && k < blob.points.length; k += 3) {
-    const [x, zz] = blob.points[k];
-    if (byWall(x, zz) || !t.onGreen(x, zz)) continue;
-    const st = stone(rand);
-    st.scale.setScalar(0.35 + rand() * 0.2);
-    st.position.set(x, t.height(x, zz) + 0.05, zz);
-    g.add(st);
-  }
+  if (shore) bankRocks(z, t, g, rand, (x, zz) => { const d = inset(z, x, zz); return d > 0.02 && d < 0.35 && !byWall(x, zz) && t.onGreen(x, zz); }, t.height);
   for (let k = 0; shore && k < 5; k++) {
     const [x, zz] = blob.points[Math.floor(rand() * blob.points.length)];
     if (byWall(x, zz) || !t.onGreen(x, zz)) continue;
@@ -903,7 +910,7 @@ function iceDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, spot }:
 }
 
 /** Sand (or deep snow): grains and raked lines. */
-function sandDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, inSand, snow }: Detail) {
+function sandDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, inSand, snow, blob }: Detail) {
   // sand: grains and raked lines, kept inside the shape's inner margin
   const grain = new THREE.CircleGeometry(1, 10);
   const tones = snow ? [flat(0xd6e6ef), flat(0xffffff)] : [flat(0xd9bd82), flat(0xf4e1b2)];
@@ -916,18 +923,20 @@ function sandDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, inSand
     d.position.set(x, t.height(x, zz) + 0.045, zz);
     g.add(d);
   }
-  for (let k = 1; k < Math.floor(h / 0.9); k++) {
-    const zz = z.min[1] + k * 0.9;
-    const pts = [];
-    for (let x = z.min[0] + w * 0.22; x <= z.max[0] - w * 0.22; x += 0.4) {
-      if (!inSand(x, zz)) {
-        if (pts.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: snow ? 0xc9dce8 : 0xd9bd82 })));
-        pts.length = 0;
-        continue;
-      }
-      pts.push(new THREE.Vector3(x, t.height(x, zz) + 0.05, zz + Math.sin(x * 1.3) * 0.12));
+  // raked: arcs round the middle, following its outline, each one broken off
+  // where the rake was lifted
+  const rake = new THREE.LineBasicMaterial({ color: snow ? 0xc9dce8 : 0xcfb179 }), P = blob.points, n = P.length;
+  const cx = z.min[0] + w / 2, cz = z.min[1] + h / 2;
+  for (const k of [0.28, 0.4, 0.52, 0.64, 0.76]) {
+    const from = Math.floor(rand() * n), len = Math.floor(n * (0.3 + rand() * 0.45));
+    let pts: THREE.Vector3[] = [];
+    const flush = () => { if (pts.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), rake)); pts = []; };
+    for (let i = 0; i <= len; i++) {
+      const [px, pz] = P[(from + i) % n], x = cx + (px - cx) * k, zz = cz + (pz - cz) * k;
+      if (!inSand(x, zz)) { flush(); continue; }
+      pts.push(new THREE.Vector3(x, t.height(x, zz) + 0.05, zz));
     }
-    if (pts.length > 1) g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: snow ? 0xc9dce8 : 0xd9bd82 })));
+    flush();
   }
 }
 
@@ -1134,19 +1143,22 @@ function seesaw(z: Zone, s: Hole, t: T, g: THREE.Group) {
   const every = (z.every ?? 0) | 0, onFor = (z.on ?? 0) | 0, phase = (z.phase ?? 0) | 0, down = Math.sign(z.vec[k]) || -1;
   let step = 0, ang = 0, last: number | null = null;
   state.timed.push({ at: (st) => (step = st) });
+  // the chain's tilt at the clock's step: +x end up when the first half pushes toward -x
+  const tilt = () => {
+    const p = every ? mod(step + phase, every) : 0, first = !every || p < onFor;
+    return (first ? -down : down) * SEESAW_TILT;
+  };
   animate((tt) => {
     const dt = last === null ? 0 : Math.min(0.1, tt - last);
     last = tt;
-    const p = every ? mod(step + phase, every) : 0, first = !every || p < onFor;
-    // +x end up when the first half pushes toward -x
-    const want = (first ? -down : down) * SEESAW_TILT;
-    ang += (want - ang) * Math.min(1, dt * 9);
+    ang += (tilt() - ang) * Math.min(1, dt * 9); // the plank eases over
     pivot.rotation.z = ang;
   });
-  // the ball rides the plank's top, as it stands
+  // the ball rides the plank's top as the chain has it (not the eased plank,
+  // which lags a frame or two behind a flip)
   state.lifts.push((x, zz) => {
     const [u, w] = alongX ? [x, zz] : [zz, x];
-    return u >= u0 && u < u1 && w >= w0 && w < w1 ? TOP + (u - uc) * Math.tan(alongX ? ang : -ang) : 0;
+    return u >= u0 && u < u1 && w >= w0 && w < w1 ? TOP + (u - uc) * Math.tan(alongX ? tilt() : -tilt()) : 0;
   });
   return g;
 }

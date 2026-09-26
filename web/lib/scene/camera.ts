@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ISLAND } from "./common";
 import type { LitScene } from "./data";
-import type { Board } from "../types";
+import type { Board, HoleState } from "../types";
 
 /** The screen the camera frames: its size in CSS pixels, and what the HUD covers of it. */
 export interface View {
@@ -50,11 +50,12 @@ export function makeScene(): LitScene {
 // ------------------------------------------------------------ time of day
 //
 // A hole is played at one moment of the day, and keeps it: day, evening or
-// night. The light changes here; the sky behind the canvas is the page's.
-const TIMES: Record<string, { sky: readonly [number, number, number]; sun: readonly [number, number, readonly [number, number, number]] }> = {
-  day:   { sky: [0xfff3df, 0x9fc4b3, 1.3], sun: [0xfff6e2, 0.7, [24, 40, 6]] },
-  dusk:  { sky: [0xffd2b0, 0x6f7fa8, 1.05], sun: [0xff9d62, 0.95, [-20, 14, 10]] },
-  night: { sky: [0x8ea2dc, 0x1f3342, 0.62], sun: [0xc4d4ff, 0.38, [10, 30, -10]] },
+// night. The light changes here, and the fog's colour (a pale mist by day, a
+// rosy haze at dusk, a blue murk at night); the sky behind the canvas is the page's.
+const TIMES: Record<string, { sky: readonly [number, number, number]; sun: readonly [number, number, readonly [number, number, number]]; fog: number }> = {
+  day:   { sky: [0xfff3df, 0x9fc4b3, 1.3], sun: [0xfff6e2, 0.7, [24, 40, 6]], fog: 0xdfe6e2 },
+  dusk:  { sky: [0xffd2b0, 0x6f7fa8, 1.05], sun: [0xff9d62, 0.95, [-20, 14, 10]], fog: 0xd9b3a4 },
+  night: { sky: [0x8ea2dc, 0x1f3342, 0.62], sun: [0xc4d4ff, 0.38, [10, 30, -10]], fog: 0x3e5372 },
 };
 
 /** Day for most holes, evening or night for some — stable per hole. */
@@ -72,12 +73,29 @@ export function setLighting(scene: LitScene, time: string) {
   sun.color.set(t.sun[0]);
   sun.intensity = t.sun[1];
   sun.position.set(...t.sun[2]);
+  if (scene.fog) scene.fog.color.set(t.fog);
 }
 
 /** What the overview frames: the course, with a little of the garden around
  *  it. The island may run off the edges; the green is what the player needs. */
 export const courseBox = (board: Board) =>
   new THREE.Box3(new THREE.Vector3(-1.5, -1, -1.5), new THREE.Vector3(board.w + 1.5, 1.5, board.h + 1.5));
+
+/** What the Far view frames: the lane itself (its rails, pieces, tee and
+ *  cup), not the whole board, which a narrow or an L-shaped lane fills only
+ *  in part, with the same margin. */
+export function laneBox(s: Pick<HoleState, "board" | "walls" | "posts" | "zones" | "start" | "cup">) {
+  const b = new THREE.Box3(), p = new THREE.Vector3();
+  const add = (x: number, z: number) => b.expandByPoint(p.set(Math.min(Math.max(x, 0), s.board.w), 0, Math.min(Math.max(z, 0), s.board.h)));
+  for (const w of s.walls) add(w.a[0], w.a[1]), add(w.b[0], w.b[1]);
+  for (const q of s.posts) add(q.c[0] - q.r, q.c[1] - q.r), add(q.c[0] + q.r, q.c[1] + q.r);
+  for (const z of s.zones) add(z.min[0], z.min[1]), add(z.max[0], z.max[1]);
+  add(s.start[0], s.start[1]), add(s.cup[0], s.cup[1]);
+  if (b.isEmpty()) return courseBox(s.board);
+  b.min.set(b.min.x - 1.5, -1, b.min.z - 1.5);
+  b.max.set(b.max.x + 1.5, 1.5, b.max.z + 1.5);
+  return b;
+}
 
 /** Where the island sits in the world. */
 export const islandBox = (board: Board) =>
@@ -157,7 +175,9 @@ function frameOf(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: Pick<Vi
 /** The Far view's mouse orbit at its widest: this much yaw, this much tilt either way. */
 export const ORBIT = { yaw: (24 * Math.PI) / 180, tilt: 0.35 };
 /** How far back the Far view may stand, times its framing, to leave the orbit its room. */
-const FAR_BACK = 1.25;
+const FAR_BACK = 1;
+/** The least share of ORBIT the mouse always has, room or not. */
+const FAR_MIN_ORBIT = 0.35;
 
 /**
  * The Far view: the whole hole with a margin round it, a little lower than
@@ -167,15 +187,16 @@ const FAR_BACK = 1.25;
  * up orbit rather than distance.
  */
 export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: View): Rig & { orbit: number; tilt: number } {
-  const rig = overviewRig(camera, box, view, { fill: 0.86, tilt: 0.5 });
-  const { w, h, top, bottom, side } = view;
+  const rig = overviewRig(camera, box, view, { fill: 1, tilt: 0.5 });
+  const { w, h, top, bottom } = view;
   const t: Rig = { ...rig, ox: 0 }; // (the live camera slides the picture up or down, never sideways)
   const fits = (k: number) =>
     [[1, 1], [1, -1], [-1, 1], [-1, -1]].every(([a, b]) => {
       t.yaw = a * k * ORBIT.yaw;
       t.tilt = (rig.tilt ?? 0) + b * k * ORBIT.tilt;
       const r = frameOf(camera, box, view, t);
-      return r.x0 >= side - 0.5 && r.x1 <= w - side + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
+      // (swung, the box may reach into the side gutters: the orbit is a glance, the HUD is above and below)
+      return r.x0 >= -0.5 && r.x1 <= w + 0.5 && r.y0 >= top - 0.5 && r.y1 <= h - bottom + 0.5;
     });
   const d0 = rig.dist;
   if (!fits(1)) {
@@ -196,7 +217,8 @@ export function farRig(camera: THREE.PerspectiveCamera, box: THREE.Box3, view: V
     const mid = (lo + hi) / 2;
     if (fits(mid)) lo = mid; else hi = mid;
   }
-  return Object.assign(rig, { orbit: lo, tilt: rig.tilt ?? 0 });
+  // a little orbit always: at its ends the hole may leave the frame for a glance
+  return Object.assign(rig, { orbit: Math.max(lo, FAR_MIN_ORBIT), tilt: rig.tilt ?? 0 });
 }
 
 /** Close on a point — the ball — centred in the free part of the screen. */

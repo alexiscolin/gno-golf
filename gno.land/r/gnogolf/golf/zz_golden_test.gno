@@ -81,13 +81,16 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 // "rest", "official" in State, no "by"), not the replays: with those fields
 // taken out, every SimulateRoundAt and State output is byte for byte as it was
 // (integer jnum included). The forecast column did not move.
+// 2026-09-26, physics rework (rolling resistance, contact impulses, ballistic
+// flight, Holmes's cup, the new Launch): the replay column moved, on all six;
+// the forecast and State columns did not.
 var golden = map[string][3]string{
-	"pulse":  {"678f136eb4ef0257", "076ac3e7c0d705a9", "4e9da97515c48b33"},
-	"sea":    {"4ce93b61be350770", "c3224daa821020f4", "807b1e8fc908df52"},
-	"slope":  {"1ae52dd6618cad52", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
-	"storm":  {"27839a2f650ea264", "217b2a005fc76324", "cd0874fd52e8179f"},
-	"timed":  {"932f9c494b5c025f", "c3224daa821020f4", "e4dbc97ea48d1ede"},
-	"tunnel": {"2b8666eb09290dde", "c3224daa821020f4", "335763617c2e9b50"},
+	"pulse":  {"c3390a110cd2a014", "076ac3e7c0d705a9", "4e9da97515c48b33"},
+	"sea":    {"fea56bd04abd67f7", "c3224daa821020f4", "807b1e8fc908df52"},
+	"slope":  {"a5912e486e23a247", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
+	"storm":  {"c4776d5b081b957f", "217b2a005fc76324", "cd0874fd52e8179f"},
+	"timed":  {"1a7677200435735c", "c3224daa821020f4", "e4dbc97ea48d1ede"},
+	"tunnel": {"ff92e949423cf8b8", "c3224daa821020f4", "335763617c2e9b50"},
 }
 
 // goldAt keeps h as data under id, listed as its realm hole was: the world

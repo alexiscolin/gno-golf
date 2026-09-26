@@ -86,31 +86,9 @@ export function makeReplay(E: Live) {
   // gravity and lands with a little bounce. Cosmetic: the chain's ball is a
   // point on a flat board.
   const air = { y: 0, vy: 0, gvy: 0, up: false, t: 0 };
-  // On the ground, the ball follows it — up a slope and down one, as the
-  // chain has it (no air flag: on the ground). Only off a ledge (the ground
-  // dropping steeper than any slope: the end of a ramp too slow to take off)
-  // does it come down under gravity, never in one frame. The chain's air
-  // flags handle real flights.
-  let dropY: number | null = null, dropV = 0, dropT = 0, dropX = 0, dropZ = 0;
-  const LEDGE = 1.5; // a drop steeper than this per unit across is a ledge, not a slope
-  function fallTo(floor: number, now: number, x: number, z: number) {
-    const dt = dropT ? Math.min((now - dropT) / 1000, 0.05) : 0;
-    const was = BALL_R + ground(dropX, dropZ), across = Math.hypot(x - dropX, z - dropZ);
-    dropT = now;
-    dropX = x;
-    dropZ = z;
-    // on the ground last frame and the ground going down no steeper than a slope: stay on it
-    const onSlope = dropY !== null && dropY <= was + 0.02 && was - floor <= LEDGE * across + 0.02;
-    if (dropY === null || floor >= dropY - 0.02 || !dt || onSlope) {
-      dropY = floor;
-      dropV = 0;
-      return floor;
-    }
-    dropV -= GRAVITY * dt;
-    dropY = Math.max(floor, dropY + dropV * dt);
-    if (dropY === floor) dropV = 0;
-    return dropY;
-  }
+  // On the ground (no air flag) the ball is on the drawn ground, down a slope
+  // or off a ledge alike: the chain says when it leaves the ground (a take-off
+  // is flagged), so a step it does not flag is never drawn in the air.
   const GRAVITY = 30;
   function fly(p: THREE.Vector3) {
     const now = performance.now();
@@ -285,6 +263,19 @@ export function makeReplay(E: Live) {
    *  hazard's destination. 1.4 s in all: long enough to feel the loss. */
   // skin: the hazard's — a serac (mountain) catches the ball in falling ice:
   // no water there, so no rings and no splash, a burst of ice shards instead
+  /** Just past the edge of zone z a ball left the lane at p (the last point
+   *  on it; prev the one before): the nearest point of the zone's outline, a
+   *  little beyond it, or along its way when the zone has no outline. (The
+   *  path's next point is where the hazard sends it back, not where it fell.) */
+  function offEdge(z: Zone, prev: Vec2, p: Vec2, from: THREE.Vector3) {
+    if (z.poly) {
+      const e = nearestOnPoly(p[0], p[1], z.poly), dx = e[0] - p[0], dz = e[1] - p[1], l = Math.hypot(dx, dz);
+      if (l > 1e-3) return from.clone().set(e[0] + (dx / l) * 0.3, from.y, e[1] + (dz / l) * 0.3);
+    }
+    const dx = p[0] - prev[0], dz = p[1] - prev[1], l = Math.hypot(dx, dz) || 1;
+    return from.clone().set(p[0] + (dx / l) * 0.6, from.y, p[1] + (dz / l) * 0.6);
+  }
+
   function splashDown(at: THREE.Vector3, back: THREE.Vector3, round: number | undefined, edge: THREE.Vector3 | null = null, skin = "") {
     const cutAt = E.cut;
     buzz(25);
@@ -315,7 +306,11 @@ export function makeReplay(E: Live) {
         if (!rings) {
           start = now;
           at = land;
-          if (skin === "serac") {
+          if (skin === "roof") {
+            // a fall, not a splash: a thud and a puff of dust in the street (makeSplash gives the puff there)
+            sound("thud");
+            rings = makeSplash(land.clone().setY(surf + 0.5), { open: false });
+          } else if (skin === "serac") {
             sound("thud");
             for (let n = 0; n < 6; n++) E.causes.at(E.ball.position, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, { kind: "ice" });
             rings = { group: new THREE.Group(), step() {} };
@@ -333,7 +328,8 @@ export function makeReplay(E: Live) {
         }
         rings.step(t);
         if (t < 0.7) {
-          const k = t / 0.7;
+          // (in the street it lies where it fell, whole: it only sinks in water)
+          const k = skin === "roof" ? 0 : t / 0.7;
           E.ball.position.set(at.x, at.y - k * 1.1, at.z);
           E.ball.scale.setScalar(1 - k * 0.6);
         } else if (t < 1.1) {
@@ -425,8 +421,6 @@ export function makeReplay(E: Live) {
       const requestAnimationFrame = (f: FrameRequestCallback) => window.requestAnimationFrame(guard(f));
       let i = 0;
       rolledBack = -1;
-      dropY = null;
-      dropT = 0;
       air.y = BALL_R + ground(path[0][0], path[0][1]);
       air.vy = air.gvy = 0;
       air.up = false;
@@ -446,7 +440,10 @@ export function makeReplay(E: Live) {
         // into the water: splash, sink, a beat, then back where the hazard sends it
         if (drowned(path[i], path[i + 1])) {
           const hz = jumpFrom(path[i], path[i + 1]);
-          return void splashDown(sinkPoint(path[i], path[i + 1], from), to, round, E.ball.position.clone(), hz ? hz.skin : "").then(() => {
+          // off a rooftop: it drops into the street just past the edge it left
+          // from, not well inside the hazard as into water
+          const at = hz && hz.skin === "roof" ? offEdge(hz, path[Math.max(0, i - 1)], path[i], from) : sinkPoint(path[i], path[i + 1], from);
+          return void splashDown(at, to, round, E.ball.position.clone(), hz ? hz.skin : "").then(() => {
             E.mood.shake(performance.now());
             air.t = 0;
             i++;
@@ -535,10 +532,10 @@ export function makeReplay(E: Live) {
               else {
                 const L = Math.max(1e-6, F.len - F.crest), u = d - F.crest;
                 // One parabola from the lip to where the chain lands him: it
-                // leaves along the ramp (its slope under the lip, read as he
-                // leaves: a timed deck, a seesaw's plank, moves) and falls under
-                // gravity from there — no arc of its own on top, no hop at the
-                // lip; never through the ground it flies over. The heights too
+                // leaves at least as steep as the ramp (its slope under the
+                // lip, read as he leaves: a timed deck, a seesaw's plank,
+                // moves), one hump, no second rise; never through the ground
+                // it flies over. The heights too
                 // are read as the flight goes (one taken before the shot put a
                 // dip, then a hop, at the lip)
                 if (F.top == null) {
@@ -550,18 +547,17 @@ export function makeReplay(E: Live) {
                   F.s0 = Math.max(0, Math.min(2, (ground(cx, cz) - ground(cx - F.dir[0] * 0.4, cz - F.dir[1] * 0.4)) / 0.4));
                 }
                 const top = F.top, s0 = F.s0 ?? 0;
-                const land = ground(F.lx, F.lz), fall = land - top - s0 * L;
-                // (a landing above the ramp's line: no throw reaches it rising, a straight climb)
-                const y = fall <= 0 ? top + s0 * u + fall * (u / L) ** 2 : top + (land - top) * (u / L);
+                const land = ground(F.lx, F.lz), v = u / L, a = land - top;
+                // The arc over the lip-to-landing line: its top at least a hop
+                // D over the lip (or a higher landing), and a start at least
+                // as steep as the ramp. A shallow lip alone threw him flat, a
+                // few hundredths up, and a steep fall after it ate any hop.
+                const D = Math.max(0, a) + Math.min(0.35 + L * 0.16, 2.6);
+                const h = Math.max((s0 * L - a) / 4, (2 * D - a + 2 * Math.sqrt(D * (D - a))) / 4);
+                const y = top + a * v + h * 4 * v * (1 - v);
                 E.ball.position.y = BALL_R + Math.max(gh, y);
               }
-              // a flight lands where it lands: no fall left over from before it
-              dropY = E.ball.position.y;
-              dropV = 0;
-              dropT = now;
-              dropX = E.ball.position.x;
-              dropZ = E.ball.position.z;
-            } else if (flights) E.ball.position.y = fallTo(BALL_R + ground(E.ball.position.x, E.ball.position.z), now, E.ball.position.x, E.ball.position.z);
+            } else if (flights) E.ball.position.y = BALL_R + ground(E.ball.position.x, E.ball.position.z);
             else fly(E.ball.position);
           }
           if (drop && raw > 0.6) {

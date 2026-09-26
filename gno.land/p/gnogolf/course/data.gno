@@ -614,8 +614,10 @@ func (d *decoder) zones() []physics.Zone {
 			z.Vec = d.point() // a place on the board
 		default:
 			z.Vec = physics.Vec2{X: d.f64(), Y: d.f64()} // a push
-			if !(z.Vec.X >= -1 && z.Vec.X <= 1 && z.Vec.Y >= -1 && z.Vec.Y <= 1) {
-				d.fail("a slope pushes at most 1 each way")
+			// a hill's push is G·sin θ: no more than its steepest grade
+			// (squared: no root; a NaN fails the comparison)
+			if max := physics.G * physics.MaxSin; !(z.Vec.X*z.Vec.X+z.Vec.Y*z.Vec.Y <= max*max) {
+				d.fail("a slope pushes at most G·MaxSin (0.95)")
 			}
 		}
 		z.Scale = d.f64()

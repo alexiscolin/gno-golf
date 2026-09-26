@@ -3,7 +3,7 @@
 import * as THREE from "three";
 
 /** A camera's pose: where it stands, what it looks at. */
-export interface Chase {
+interface Chase {
   pos: THREE.Vector3;
   look: THREE.Vector3;
 }

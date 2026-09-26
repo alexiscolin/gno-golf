@@ -250,6 +250,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                   aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
                 >
                   <Diorama id={w.id} on={hot === w.id && n > 0} />
+                  {w.id === current && <span className="world__last" aria-hidden="true">Last played</span>}
                   {won && <Won clean={t.clean} score={score} />}
                   <span className="world__ribbon">{w.name}</span>
                   <span className="world__info">

@@ -635,21 +635,32 @@ namespace.
 ## The work budget
 
 A commit's gas is mostly the physics, and a heavy hole can't replay 12 full
-shots in one transaction. So each commit keeps an estimate of its work,
-from what its shots did: a fixed part per shot, a set-up per wall, and per
-path point a cost of its own plus one per piece on the board (every wall,
-post and zone, and every polygon edge, the hole's pulses and the weather
-included). The constants were fitted on 592 full-power shots over the 74 course
-holes and raised by a fifth: the heaviest shot measured 78M gas, and its
-estimate is 125M.
+shots in one transaction. The physics counts what a stroke does as it goes,
+`Shot.Work`: its substeps, moves, the walls and posts each move is swept
+against and tested, and the zones and polygon points it looks at, in units of
+about a thousand gas; and it ends a stroke once that reaches
+`physics.MaxWork` (1e6), so no hole, however hostile, has a shot a
+transaction can't finish. A commit's estimate of its work is, per shot,
+`10M + 150K × walls + 1100 × Shot.Work` (walls: the hole's and its pulses').
+Fitted on the 592 full-power shots of the 74 course holes (the most any took
+of its estimate is 0.72; the heaviest measured 45M) and on hostile probes at
+the format's limits (bumper walls across the whole board, the steepest hill
+rolling a ball on for all its extra substeps, 512 polygon points, loops and
+capped wind under every move: 0.92 at the most).
 
-Before each shot but the first, a commit that would pass 1.4e9 with one more
-shot as heavy as its heaviest so far is refused:
+A hole's heaviest shot is bounded: `shotBound = 10M + 150K × walls + 1100 ×
+(MaxWork + MaxWorkStep)`, 1.22e9 to 1.24e9 for the course holes. A hole whose
+bound passes 1.3e9 is refused when it is published, and before the first
+shot of a commit the bound must fit the 1.4e9 budget. Before each later shot,
+a commit that would pass 1.4e9 with one more shot as heavy as its heaviest so
+far is refused:
 `golf: more shots than one transaction can replay on this hole: commit the
 first N, then the rest`. `SimulateRound*` and `SimulateCommit` refuse the same
 list the same way, so a client learns it before it signs. The rest of the 2e9
 a wallet lets a transaction simulate is left for the forecast, decoding a data
-hole, the package loads and the bookkeeping.
+hole, the package loads and the bookkeeping. The heaviest single shot the
+probes found (`z_worst_shot_filetest`) is a Launch of 0.92e9, the hole's
+decoding and forecast included.
 
 ## Gas and storage
 
@@ -699,7 +710,7 @@ score honest through it.
   `Versions`, `HoleData`, `BestOf`, `StandingOf`, `Records`, `Players`) and
   carry it over or show it as history. The v1's owner then calls
   `SetSuccessor` once: every v1 page says where the course went, and v1 goes
-  on playing. See [deploy-v1.md §9](design/deploy-v1.md).
+  on playing.
 - **The dapp** (the web client) is not on-chain and can be updated at any time.
   It lists the current holes (`"next"` is empty in `Holes()`) and links the
   archived ones.

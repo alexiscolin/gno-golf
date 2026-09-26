@@ -120,7 +120,7 @@ export function probes(E: Live, { cam, rp, placeBall, onHoled, fakeWeather }: In
     /** ?camlog only: the ball's height over the ground under it now, and whether it is flying. */
     groundAt: (x: number, z: number) => ground(x, z),
     /** A chain answer's path drawn as a shot would draw it (its air flags, its causes): the flight tests. */
-    replayPath: (path: readonly Vec2[], air: string, cause: string) => ((g.flying = true), rp.replay(path, false, air, cause).finally(() => (g.flying = false))),
+    replayPath: (path: readonly Vec2[], air: string, cause: string, tick = 0) => ((g.flying = true), (g.tick0 = tick), rp.replay(path, false, air, cause).finally(() => (g.flying = false))),
     /** The ball over the ground, and the step of the replay (with the chain's air flags) it is on. */
     ballLift: () => ({ lift: +(E.ball.position.y - E.ground(E.ball.position.x, E.ball.position.z)).toFixed(3), y: +E.ball.position.y.toFixed(3), flying: !!g.flying, at: g.replaying ? g.replaying.at : -1, flags: g.replaying ? g.replaying.flags : null }),
     /** ?camlog only: the pull as it stands. */

@@ -12,6 +12,7 @@ import * as THREE from "three";
 import TITLE_HOLES from "./title-holes.json";
 import { loadWorld } from "./worlds";
 import { buildHole } from "./course";
+import { state } from "./state";
 import { makeRenderer, makeScene } from "./camera";
 import { makeBall, gnomeById } from "./gnome";
 import { makeConfetti } from "./fx";
@@ -29,7 +30,7 @@ const FRAME_MS = 1000 / 30;
 
 // The cup cards' dioramas: a fixed three-quarter view on the landmark (y: the
 // height looked at, the garden's higher for its tall mill, seen from its door side)
-const CUP: Record<string, { a: number; r: number; h: number; y?: number }> = {
+export const CUP: Record<string, { a: number; r: number; h: number; y?: number }> = {
   garden: { a: 2.3, r: 0.95, h: 0.85, y: 3 },
   island: { a: 1.0, r: 0.8, h: 1.1 },
   town: { a: 1.35, r: 0.85, h: 1.1 },
@@ -38,7 +39,7 @@ const CUP: Record<string, { a: number; r: number; h: number; y?: number }> = {
 
 /** Golden hour: a warm low sun, a pink sky light, violet shadows (the
  *  snow in a brighter alpenglow: under the garden's it greys). */
-function golden(scene: LitScene, world: string) {
+export function golden(scene: LitScene, world: string) {
   const { sky, sun } = scene.userData.lights, snow = world === "mountain";
   sky.color.set(snow ? 0xffeadc : 0xffd6b0);
   sky.groundColor.set(snow ? 0x9aa4ee : 0x7d78c8);
@@ -49,7 +50,7 @@ function golden(scene: LitScene, world: string) {
 }
 
 /** A ring round the board: the cup card's camera at angle a. */
-function orbit(camera: THREE.PerspectiveCamera, b: Board, a: number, { r = 1, h = 1 } = {}, portrait = false, lift = 4) {
+export function orbit(camera: THREE.PerspectiveCamera, b: Board, a: number, { r = 1, h = 1 } = {}, portrait = false, lift = 4) {
   const k = portrait ? 1.35 : 1;
   const rx = (b.w * 0.55 + 30) * r * k, rz = (b.h * 0.55 + 36) * r * k;
   const cx = b.w / 2, cz = b.h / 2, y = (16 + Math.max(b.w, b.h) * 0.22) * h * k;
@@ -83,7 +84,7 @@ function golfBall() {
 // round (th, radians behind the cup > 0; pth upright, from beyond the cup by
 // default) and how high (h, times R)
 const SPOT: Record<string, { ride: number; R: number; h?: number; th?: number; pth?: number }> = { garden: { ride: 5.5, R: 13 }, island: { ride: 4.2, R: 12, h: 0.7 }, town: { ride: 6, R: 13 }, mountain: { ride: 8, R: 13 } };
-const RIDE_AT = 1.2, RIDE_S = 7; // the ride's start and length (s)
+export const RIDE_AT = 1.2, RIDE_S = 7; // the ride's start and length (s)
 
 /**
  * The three gnomes on the green, at the game's own scale, round the cup: one
@@ -199,12 +200,15 @@ const weakGpu = (renderer: THREE.WebGLRenderer) => {
   }
 };
 
-async function holeOf(world: string, given?: Hole) {
+export async function holeOf(world: string, given?: Hole) {
   const s = given || HOLES[world] || HOLES.garden;
   try {
     await loadWorld(s.world);
   } catch {} // offline: drawn as the garden
-  return { s, course: buildHole(s) };
+  // (what a hole's splashes read is the played hole's: the title's own build leaves it be)
+  const { water, fallAt } = state, course = buildHole(s);
+  Object.assign(state, { water, fallAt });
+  return { s, course };
 }
 
 /**
@@ -302,112 +306,5 @@ export async function makeTitle(canvas: HTMLCanvasElement, { world = "garden", h
   };
 }
 
-/**
- * A still of the title or of a cup card's diorama, as a PNG data URL on a
- * clear background (the page paints the sky): what the Low tier, no WebGL
- * and reduced motion show. Dev only: the title bake script calls it.
- */
-export async function titleStill(kind: string, world: string, w: number, h: number) {
-  const canvas = document.createElement("canvas");
-  canvas.style.cssText = `position:fixed;left:0;top:0;width:${w}px;height:${h}px`;
-  document.body.appendChild(canvas);
-  try {
-    if (kind === "title") {
-      const t = await makeTitle(canvas, { world, still: true, at: RIDE_AT + RIDE_S * 0.55 }); // the ride half way up the lane
-      const url = canvas.toDataURL("image/png"); // right after its first frame
-      t!.destroy();
-      return url;
-    }
-    const renderer = makeRenderer(canvas);
-    renderer.setPixelRatio(1);
-    renderer.setSize(w, h, false);
-    const scene = makeScene();
-    golden(scene, world);
-    const { s, course } = await holeOf(world);
-    scene.add(course);
-    setTime(3);
-    course.userData.tick(3);
-    if (course.userData.mill && course.userData.mill.at) course.userData.mill.at(6);
-    for (const p of course.userData.timed || []) p.at(6);
-    const camera = new THREE.PerspectiveCamera(34, w / h, 0.5, 600);
-    const c = CUP[world] || CUP.garden;
-    orbit(camera, s.board, c.a, c, false, c.y ?? -1.5);
-    renderer.render(scene, camera);
-    const url = canvas.toDataURL("image/png");
-    disposeCourse(scene);
-    renderer.dispose();
-    renderer.forceContextLoss();
-    return url;
-  } finally {
-    canvas.remove();
-  }
-}
-
-// the cup cards' skies behind their dioramas: title.css's .world__art, stop for stop
-const TILE_SKY: Record<string, [number, string][]> = {
-  garden: [[0, "#7ec8ff"], [1, "#ffd6a8"]],
-  island: [[0, "#54b8f5"], [0.7, "#b8ecff"], [1, "#ffe2a8"]],
-  town: [[0, "#6b4bc8"], [0.6, "#ff8fb0"], [1, "#ffcf8a"]],
-  mountain: [[0, "#4d74e0"], [0.65, "#bcd2ff"], [1, "#ffe0c0"]],
-};
-
-/** One hole of a cup card's hover clip: the orbit starts at a (radians round
- *  the board), r and h (times the ring's own), and in its length turns by
- *  turn, closes in by adv and comes down by drop (fractions), eased at both
- *  ends so the clips cross-fade on a calm frame. still: the card's own view
- *  and moment, so the clip's first frame is its still. */
-export interface CupShot { a: number; r: number; h: number; turn: number; adv: number; drop: number; still?: boolean }
-
-/**
- * A cup card's clip, a frame at a time: clip(world, hole, w, h, shot) ->
- * { frame(k, t) (JPEG data URL at k of the move, 0..1, t s in), destroy() },
- * each frame on the card's own sky. Dev only: the promo renderer's cup clips.
- */
-export async function cupClip(world: string, hole: Hole | null, w: number, h: number, shot: CupShot) {
-  const canvas = document.createElement("canvas");
-  canvas.style.cssText = `position:fixed;left:0;top:0;width:${w}px;height:${h}px`;
-  document.body.appendChild(canvas);
-  const renderer = makeRenderer(canvas);
-  renderer.setPixelRatio(1);
-  renderer.setSize(w, h, false);
-  const scene = makeScene();
-  golden(scene, world);
-  const { s, course } = await holeOf(world, hole || undefined);
-  scene.add(course);
-  const camera = new THREE.PerspectiveCamera(34, w / h, 0.5, 600);
-  const out = document.createElement("canvas");
-  out.width = w;
-  out.height = h;
-  const x = out.getContext("2d")!, sky = x.createLinearGradient(0, 0, 0, h);
-  for (const [at, c] of TILE_SKY[world] || TILE_SKY.garden) sky.addColorStop(at, c);
-  const c0: CupShot & { y?: number } = shot.still ? { ...shot, ...(CUP[world] || CUP.garden) } : shot;
-  return {
-    frame(k: number, t: number) {
-      // the still's moment (3 s in, the timed pieces at 6 ticks), running on
-      setTime(3 + t);
-      course.userData.tick(3 + t);
-      if (course.userData.mill && course.userData.mill.at) course.userData.mill.at(6 + t * TICKS_PER_S);
-      for (const p of course.userData.timed || []) p.at(6 + t * TICKS_PER_S);
-      const e = smoothstep(k);
-      orbit(camera, s.board, c0.a + shot.turn * e, { r: c0.r * (1 - shot.adv * e), h: c0.h * (1 - shot.drop * e) }, false, c0.y ?? -1.5);
-      renderer.render(scene, camera);
-      x.fillStyle = sky;
-      x.fillRect(0, 0, w, h);
-      x.drawImage(canvas, 0, 0);
-      return out.toDataURL("image/jpeg", 0.95);
-    },
-    destroy() {
-      disposeCourse(scene);
-      renderer.dispose();
-      renderer.forceContextLoss();
-      canvas.remove();
-    },
-  };
-}
 export type Title = NonNullable<Awaited<ReturnType<typeof makeTitle>>>;
 
-// ?titlebake (dev): the clips' hook, beside the stills' (Title.tsx loads this module for it)
-declare global {
-  interface Window { __cupClip?: typeof cupClip }
-}
-if (process.env.NODE_ENV !== "production" && typeof window !== "undefined" && /[?&]titlebake/.test(location.search)) window.__cupClip = cupClip;

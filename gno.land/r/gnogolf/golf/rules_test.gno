@@ -77,7 +77,7 @@ func TestRoundsStoreShotsNotPaths(cur realm, t *testing.T) {
 // fit, and the preview refuses it the same way. A light hole takes all 12.
 func TestACommitIsBoundedByWork(cur realm, t *testing.T) {
 	id := mine(cur, "heavy", limitsHole())
-	shots := strings.Repeat(heavyShot+";", 8)
+	shots := strings.Repeat(heavyShot+";", 12)
 	uassert.PanicsContains(t, cur, "commit the first "+strconv.Itoa(heavyFit)+", then the rest", func() { SimulateRound(id, shots) })
 	testing.SetRealm(testing.NewUserRealm(player))
 	urequire.AbortsContains(t, cur, "commit the first "+strconv.Itoa(heavyFit)+", then the rest", func() { PlayRound(cross(cur), id, shots) })
@@ -86,8 +86,8 @@ func TestACommitIsBoundedByWork(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(player))
 	PlayRound(cross(cur), id, strings.Repeat(heavyShot+";", heavyFit))
 	testing.SetRealm(testing.NewUserRealm(player))
-	PlayRound(cross(cur), id, strings.Repeat(heavyShot+";", 8-heavyFit)) // the rest, in the next commit
-	uassert.Equal(t, 8, roundIn(id, player).strokes)
+	PlayRound(cross(cur), id, strings.Repeat(heavyShot+";", 12-heavyFit)) // the rest, in the next commit
+	uassert.Equal(t, 12, roundIn(id, player).strokes)
 
 	light := register(cur, "light")
 	uassert.True(t, strings.Contains(SimulateRound(light, strings.TrimSuffix(strings.Repeat("180,0.2;", maxShots), ";")), `"strokes":12`), "a light hole takes a full commit")
@@ -112,7 +112,7 @@ func TestSimulateFromIsTheNextStroke(cur realm, t *testing.T) {
 	r := roundIn(id, player)
 	uassert.True(t, strings.Contains(sim, `"rest":`+jexact(r.ball())+"}"), sim)
 	// the stroke number is the timed hole's: stroke 1 meets the gate, 0 does not
-	open, shut := SimulateFrom(id, 2, 8, "0,9", 0, Period()), SimulateFrom(id, 2, 8, "0,9", 1, Period())
+	open, shut := SimulateFrom(id, 2, 8, "0,10", 0, Period()), SimulateFrom(id, 2, 8, "0,10", 1, Period())
 	uassert.NotEqual(t, open, shut)
 	uassert.True(t, strings.HasPrefix(open, `{"version":1,"holed":false,"bounces":0,"path":[`), open)
 	uassert.True(t, strings.Contains(open, `,"cause":"`), "with its cause")
@@ -280,7 +280,7 @@ func TestAStaleRoundMustBeReset(cur realm, t *testing.T) {
 // heavyShot is a shot of which heavyFit fit in one commit on limitsHole.
 const (
 	heavyShot = "30,10"
-	heavyFit  = 6
+	heavyFit  = 9
 )
 
 // PlayRound goes on with a round in the round's own weather, across the

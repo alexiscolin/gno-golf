@@ -15,14 +15,15 @@ import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
 import { loadWorld } from "./scene/worlds";
-import { makeChain, shotOf, pullShot, RULES } from "./chain";
+import { makeChain, shotOf, pullShot, isHoleId, RULES } from "./chain";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
-  courseBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
+  courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene";
 import { BALL_R } from "./terrain";
 import { makeCamera } from "./engine/camera";
+import { pace, slowFrames, frameMs, SLOW_KEY } from "./engine/pace";
 import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
 import type { Extras, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
@@ -92,7 +93,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   let fakeWeather = fakeWeather0;
   const faked = (): WeatherZone[] | "" => fakeWeather && (["wind", "rain", "fog", "storm", "snow"] as const)
     .filter((skin) => fakeWeather.includes(skin))
-    .map((skin) => ({ skin, vec: skin === "wind" ? ([0.05, -0.03] as const) : ([0, 0] as const) }));
+    .map((skin): WeatherZone => ({ skin, vec: skin === "wind" ? ([0.05, -0.03] as const) : ([0, 0] as const) }))
+    // a storm as the chain has it: its wind in two gusts 40° either side, taking turns
+    .concat(fakeWeather.includes("storm") && g.s ? [0.7, -0.7].map((a, k): WeatherZone => ({ skin: "wind", vec: [0.11 * Math.cos(a), 0.11 * Math.sin(a)], min: [0, 0], max: [g.s!.board.w, g.s!.board.h], every: 6, on: 3, phase: 3 * k })) : []);
   // near 3, far 260: the whole of any cup's scenery (measured, 210 at most on the
   // island overview, and the lean) with three times the depth precision of
   // 1..400 — what kept far-off faces from flickering into each other
@@ -236,6 +239,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       cause: g.cause || null, // a word on why the ball speeds up or drifts, once a shot
       note: g.note || null, // a word on how the shot went
       errorKind: (g.error && g.errorKind) || null,
+      failed: g.error ? g.failed || null : null, // the hole a load failed on (Try again)
       view: g.view,
       gfx: gfxMode, // the graphics setting, and what it gives on this device
       tier,
@@ -259,10 +263,14 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       return false;
     }
   })();
-  const SLOW_KEY = "gnogolf.gfx.auto";
+  const OLD_SLOW_KEY = "gnogolf.gfx.auto";
+  // (a Low found by the probe before it knew the display's own rate: 75, 90
+  // and 144 Hz screens were marked slow by the frame cap alone, and are probed again)
+  try { if (localStorage.getItem(OLD_SLOW_KEY) === "low") localStorage.removeItem(OLD_SLOW_KEY); } catch {}
   const wasSlow = () => { try { return localStorage.getItem(SLOW_KEY) === "low"; } catch { return false; } };
   // A slow GPU (seen on some Safari and Firefox setups) gets a lighter canvas:
-  // the first 2 s of drawing are timed, and a median frame over 20 ms turns
+  // the first 2 s of busy drawing are timed, and frames drawn over 20 ms apart
+  // on average (the cap aims at one every 16.7 ms, whatever the display) turn
   // Auto to Low, once (and for the next visits).
   let dprCap = Infinity;
   function setTier() {
@@ -274,7 +282,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     resize();
     return was !== tier;
   }
-  // only frames drawn back to back count (an idle scene is drawn at 20 fps on purpose)
+  // only busy frames count (an idle scene may be drawn at 10 or 30 fps on purpose)
   const probe = { t0: 0, prev: 0, gaps: [] as number[], done: false };
   function probeFrame(now: number, busy: boolean) {
     if (tier === "low" || probe.done) return;
@@ -284,8 +292,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     probe.prev = now;
     if (now - probe.t0 < 2000 && probe.gaps.length < 90) return;
     probe.done = true;
-    const d = probe.gaps.sort((a, b) => a - b);
-    if (d.length > 10 && d[d.length >> 1] > 20 && gfxMode === "auto") {
+    if (probe.gaps.length > 10 && slowFrames(probe.gaps) && gfxMode === "auto") {
       try { localStorage.setItem(SLOW_KEY, "low"); } catch {}
       console.info("gnogolf: slow frames, graphics set to low");
       setTier();
@@ -313,7 +320,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!g.s) return;
     g.over = overviewRig(camera, courseBox(g.s.board), screen());
     // the Far camera: the whole hole with a margin, room left for the mouse orbit
-    g.far = farRig(camera, courseBox(g.s.board), screen());
+    g.far = farRig(camera, laneBox(g.s), screen());
     if (!g.rig) g.rig = { ...g.over, target: g.over.target.clone() };
   }
 
@@ -334,34 +341,41 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   let last = 0;
   // What the GPU is spared: nothing is drawn behind an opaque screen (the
-  // title, the cups, the picker) or in a hidden tab, and a still scene — no
-  // shot, no aim, the camera settled, only the garden breathing — is drawn at
-  // 30 frames a second instead of the display's 60 or 120.
-  // idle: 30 fps while the weather or timed pieces move (a lift, a tram
-  // glide on that), 10 when only the garden breathes; with reduced motion and
-  // nothing moving, nothing is drawn until something changes
-  // and busy (a shot, an aim) at 60 at most, whatever the display's rate.
-  // A window in the background (another app in front) is not drawn either,
-  // unless a shot is on its way.
-  const IDLE_MS = 1000 / 30, STILL_MS = 1000 / 10, BUSY_MS = 1000 / 60;
-  let blurred = false;
+  // title, the cups, the picker) or in a hidden tab, and a window in the
+  // background (another app in front) is not drawn unless a shot is on its way.
+  // In view (engine/pace.ts frameMs): 60 fps busy (a shot, an aim) or with
+  // fast movers (timed pieces: a tram, a lift; a mill), 30 while anything else
+  // moves, 10 after a minute with no input; with reduced motion and nothing
+  // moving, nothing is drawn until something changes. At most 60 whatever
+  // the display's rate.
+  // the frames skipped add up (a budget): on a 75, 90 or 144 Hz display the
+  // drawn ones land every one or two refreshes, 60 a second on average, not
+  // on every second or third refresh (37 to 48 a second)
+  let budget = 0, prevRaf = 0;
+  let blurred = false, input = performance.now(); // the last input: a minute past it, the scene dozes (AWAY_MS)
+  const INPUTS = ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"] as const;
   const onBlur = () => (blurred = true);
-  const onFocus = () => ((blurred = false), (wake = performance.now()));
-  const onWake = () => (wake = performance.now());
+  const onFocus = () => ((blurred = false), (wake = input = performance.now()));
+  const onWake = () => (wake = input = performance.now());
   window.addEventListener("blur", onBlur);
   window.addEventListener("focus", onFocus);
-  window.addEventListener("pointermove", onWake, { passive: true });
-  window.addEventListener("keydown", onWake);
+  for (const e of INPUTS) window.addEventListener(e, onWake, { passive: true, capture: true });
   function frame(now: number) {
     if (!alive) return;
     requestAnimationFrame(frame);
-    if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now);
-    // timed pieces glide at the idle rate: they are no reason to draw at 60
+    const gap = prevRaf ? now - prevRaf : 0;
+    prevRaf = now;
+    if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now), (budget = 0);
     const busy = promo.on || g.flying || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
-    if (blurred && !busy) return (last = now);
-    const still = !g.weather && !(everyOf() > 0);
-    if (!busy && still && !motion && now - wake > 1000) return (last = now); // (a still garden under reduced motion)
-    if (now - last < (busy ? BUSY_MS : still ? STILL_MS : IDLE_MS) - 2) return;
+    if (blurred && !busy) return (last = now), (budget = 0);
+    // moving: the sway, water, weather and decor (all still under reduced
+    // motion), or timed pieces (their clock runs under reduced motion too)
+    const timed = everyOf() > 0, fast = motion && (timed || !!(g.course && g.course.userData.mill));
+    const ms = frameMs(busy, motion || timed, fast, now - input, now - wake);
+    if (!ms) return (last = now), (budget = 0); // (a still garden under reduced motion)
+    const p = pace(budget, gap, ms);
+    budget = p.budget;
+    if (!p.draw) return;
     probeFrame(now, busy);
     // the clock of the timed pieces runs on real time, however far apart the
     // frames are (never stepped by a capped dt): at any frame rate a piece is
@@ -445,6 +459,40 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (confetti && !confetti.step(dt)) dropConfetti();
     // nothing to see behind the title and picker screens, which are opaque
     if (g.started) renderer.render(scene, camera);
+    cupPip();
+  }
+
+  // The cup off the picture, before the first stroke (Classic and Third
+  // person, the camera on the gnome): a small inked pip at the edge of the free
+  // screen, pointing to it. It fades once the cup is in view or a shot is played.
+  const pip = document.createElement("div");
+  pip.className = "cuppip";
+  pip.setAttribute("aria-hidden", "true");
+  pip.innerHTML = '<svg viewBox="-24 -24 48 48" width="56" height="56"><path d="M 13 -6 L 22 0 L 13 6 Z" class="cuppip__arrow"/><circle r="13" class="cuppip__disc"/><path d="M -4 7 V -8 L 7 -4 L -4 0" class="cuppip__flag"/></svg>';
+  canvas.parentElement?.appendChild(pip);
+  const cupNdc = new THREE.Vector3();
+  let pipOn = false;
+  function cupPip() {
+    const want = !!g.s && g.started && g.view === "ball" && g.cam !== "far" && !g.shots.length && !g.flying && !g.holed && !g.covered;
+    let show = false;
+    if (want && g.s) {
+      cupNdc.set(g.s.cup[0], ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]).project(camera);
+      const behind = cupNdc.z > 1, w = window.innerWidth, h = window.innerHeight;
+      const x = behind ? -cupNdc.x : cupNdc.x, y = behind ? -cupNdc.y : cupNdc.y;
+      // the free part of the screen, in NDC: inside the HUD's bands
+      const x1 = 1 - (2 * (HUD.side + 26)) / w, y1 = 1 - (2 * (HUD.top + 26)) / h, y0 = -1 + (2 * (HUD.bottom + 26)) / h, cy = (y0 + y1) / 2, ry = (y1 - y0) / 2;
+      show = behind || Math.abs(x) > x1 || y < y0 || y > y1;
+      if (show) {
+        // on the line from the free part's centre toward the cup, at its edge
+        let dx = x, dy = y - cy;
+        if (Math.hypot(dx, dy) < 1e-6) (dx = 0), (dy = -1); // right behind: at the bottom
+        const k = Math.min(Math.abs(dx) > 1e-6 ? x1 / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? ry / Math.abs(dy) : Infinity);
+        const px = ((dx * k + 1) / 2) * w, py = ((1 - (cy + dy * k)) / 2) * h;
+        pip.style.transform = `translate(${(px - 28).toFixed(1)}px, ${(py - 28).toFixed(1)}px)`;
+        pip.style.setProperty("--a", `${Math.atan2(-dy * h, dx * w).toFixed(3)}rad`);
+      }
+    }
+    if (show !== pipOn) pip.classList.toggle("cuppip--on", (pipOn = show));
   }
 
   // --------------------------------------------------------------- loading
@@ -476,12 +524,29 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     try {
       s = await stateOf(id);
     } catch (err) {
-      if (ticket === loads && alive) fail(err, "load");
+      // (the hole it failed on, for the banner's Try again: g.id is still the last one's)
+      if (ticket === loads && alive) (g.failed = id), fail(err, "load");
       return;
     }
     if (ticket !== loads || !alive) return;
+    // a hole the kept list has as current that the chain has replaced since
+    // (its State names the version that took its place): the list read anew,
+    // and its current version played
+    if (s.next && g.list.some((h) => h.id === id)) {
+      try {
+        setList(await chain.holes(true));
+      } catch {}
+      if (ticket !== loads || !alive) return;
+      if (!g.list.some((h) => h.id === id)) return load(s.next);
+    }
 
     g.id = id;
+    g.failed = null;
+    // the cup follows the hole played (Back to another cup's hole, a link): a
+    // course hole's cup, an archived one's too; a community hole keeps the cup
+    const row = g.list.find((h) => h.id === id);
+    if (row) g.world = cupOf(row);
+    else if (s.official !== false) g.world = cupOf(s);
     // ?world= dresses any hole in another world's look — for building one
     if (forceWorld) s = { ...s, world: forceWorld };
     // a cup's own look is fetched the first time one of its holes is played
@@ -523,7 +588,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     scene.add(course);
     setLighting(scene, course.userData.time);
     // a hole's own weather, until a stroke's forecast says otherwise
-    weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.onGreen);
+    weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.dry || course.userData.terrain.onGreen);
     // the round's weather: the chain's forecast for its quarter hour
     g.period = s.period;
     g.forecast = s.weather || null;
@@ -1103,11 +1168,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     return cup.find((h) => Math.round(h.order) === n) || cup[n - 1] || null;
   }
 
-  async function start(link: string | Link | null) {
-    let list = await chain.holes();
-    // a link to a hole the tab's kept list does not have yet: the chain's own
-    if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);
-    if (!alive) return; // destroyed while the chain answered (a remount in dev)
+  /** The chain's hole list taken in: every hole, the cups', the community's. */
+  function setList(list: HoleRow[]) {
     // a hole another has replaced (same cup, same place) stays playable by its
     // link, but only the current one fills the cup
     g.all = list;
@@ -1115,9 +1177,30 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // listed apart and ranked nowhere
     g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
     g.community = list.filter((h) => !h.next && h.official === false);
+  }
+
+  async function start(link: string | Link | null) {
+    let list = await chain.holes();
+    // a link to a hole the tab's kept list does not have yet: the chain's own
+    if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);
+    if (!alive) return; // destroyed while the chain answered (a remount in dev)
+    setList(list);
     if (!g.list.length) throw new Error("no hole is registered on this chain");
     // a string is a realm id, as before
     const asked = linked(typeof link === "string" ? { id: link } : link);
+    // an older archived version, past what Holes() lists: the chain may
+    // still have it, so it is asked for; one it has not lands on the cups
+    if (!asked && typeof link === "string" && link) {
+      await load(link);
+      if (!alive) return;
+      if (g.s) {
+        g.linked = true;
+        requestAnimationFrame(frame);
+        return;
+      }
+      g.error = null;
+      g.failed = null;
+    }
     g.linked = !!asked;
     // ?cup=island alone: that cup, on its first hole
     const cupWant = typeof link === "object" && link && "cup" in link ? link.cup : undefined;
@@ -1136,7 +1219,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** The hole a cup and place name ({ cup, n }), or null. */
     find: (link: Link) => {
       const h = linked(link);
-      return h ? h.id : null;
+      // (an archived id past what Holes() lists: the load will ask the chain)
+      return h ? h.id : "id" in link && isHoleId(link.id) ? link.id : null;
     },
     /** The hole being played. */
     current: () => g.id,
@@ -1145,7 +1229,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** Play a world: its first hole, and its holes in the menu. */
     setWorld(w: string) {
       loadWorld(w).catch(() => {}); // fetched while the player picks a gnome
-      if (!g.list || w === g.world) return;
+      // (the cup asked for, and its hole on screen already: nothing to load)
+      if (!g.list || (w === g.world && inWorld().some((h) => h.id === g.id))) return;
       g.world = w;
       const first = inWorld()[0];
       if (first) void load(first.id);
@@ -1242,6 +1327,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** Dismiss a shot error and keep playing. */
     clearError() {
       g.error = null;
+      g.failed = null;
       void publish();
     },
     /** Swap the gnome; cosmetic only, the chain never sees it. */
@@ -1293,8 +1379,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       window.removeEventListener("blur", onCancel);
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("focus", onFocus);
-      window.removeEventListener("pointermove", onWake);
-      window.removeEventListener("keydown", onWake);
+      for (const e of INPUTS) window.removeEventListener(e, onWake, { capture: true });
       document.removeEventListener("visibilitychange", onHide);
       weather.dispose();
       causes.dispose();
@@ -1315,6 +1400,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       if (g.course) disposeCourse(g.course);
       for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group]) if (o) disposeCourse(o);
       renderer.dispose();
+      pip.remove();
     },
   };
   // the test hooks, only for a page that asks for them

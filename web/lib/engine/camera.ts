@@ -242,11 +242,17 @@ export function makeCamera(E: Live) {
   }
 
   /** Third person's target, per state: 7 behind, 3 up, looking along the aim, the ball's run, or at the cup. */
-  const cupPt = new THREE.Vector3();
+  const cupPt = new THREE.Vector3(), fallPt = new THREE.Vector3();
+  let laneY = 0; // the ball's height the last time it was over the lane
   function thirdTarget(dt: number, state: CamState) {
     // holed: framed on the cup, up and back a little — the ball sinking into
     // it is not followed down (that was a close-up of the hat)
-    const B = state === "holed" && g.s ? cupPt.set(g.s.cup[0], BALL_R + ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]) : E.ball.position;
+    // off the lane in a replay (off the rooftops into the street, into the
+    // sea): followed across at the height it left at, never down among the houses
+    const P = E.ball.position, t = g.course && g.course.userData.terrain;
+    const off = state === "replay" && !g.inTube && !!t && !t.onGreen(P.x, P.z);
+    if (!off) laneY = P.y;
+    const B = state === "holed" && g.s ? cupPt.set(g.s.cup[0], BALL_R + ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]) : off ? fallPt.copy(P).setY(Math.max(P.y, laneY)) : P;
     let target = yaw, turning = false;
     const pulling = state === "aiming";
     aimView = pulling;
@@ -280,10 +286,13 @@ export function makeCamera(E: Live) {
     const widen = turning || reversing || state === "holed" || (pulling && Math.abs(d) > Math.PI / 2);
     wide += ((widen ? 1 : 0) - wide) * (1 - Math.exp(-dt * (widen ? 5 : 1.5)));
     // behind along the heading — swung round a little if a wall right behind blocks the view
-    const up = (state === "holed" ? 4.2 : 3) + wide * 2.5 + rise;
-    if (fresh || ++swingTick % 10 === 0) swingTo = clearHeading(B, 7 + wide * 4, up, pulling);
+    // an upright screen shows little of the lane either side: further back and
+    // higher there, or the gnome fills a third of the picture
+    const sv = screen(), far = sv.w < sv.h ? 1 + (1 - sv.w / sv.h) * 0.9 : 1;
+    const up = ((state === "holed" ? 4.2 : 3) + wide * 2.5) * far + rise;
+    if (fresh || ++swingTick % 10 === 0) swingTo = clearHeading(B, (7 + wide * 4) * far, up, pulling);
     swing += (swingTo - swing) * (1 - Math.exp(-dt * 3));
-    const back = 7 + wide * 4 - pen;
+    const back = (7 + wide * 4) * far - pen;
     cdir.set(Math.cos(yaw + swing), 0, Math.sin(yaw + swing));
     behind(chase, B, cdir, { back, up, ahead: 0, lookUp: 0 });
     // the collision pass (walls, posts, ground under the line) three times in
@@ -303,7 +312,9 @@ export function makeCamera(E: Live) {
     want.fov = TP_FOV + squeezed * SQUEEZE_FOV;
     want.oy = 0;
     want.near = 0.5;
-    want.far = 80; // close in: the course and its near scenery, not the far hills (fewer draws, finer depth)
+    // the whole scenery, sea and far hills to the horizon: a nearer far plane
+    // cut them off with a hard edge and culled nothing (the merged decor spans it)
+    want.far = 260;
     fresh = false;
     return teleport; // a teleport jumps; a mode switch eases from the actual pose
   }
