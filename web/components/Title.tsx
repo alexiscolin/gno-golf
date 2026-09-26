@@ -79,8 +79,8 @@ let rolled = 0;
  * flag (a palm on the island, a lamp in town) at the end.
  */
 export function Green({ p, world = "garden", holed = false, thick = false }: { p: number; world?: string; holed?: boolean; thick?: boolean }) {
-  // thick: the cup cards' own, twice the track for a narrow card, ball and flag to match
-  const k = thick ? 1.8 : 1;
+  // thick: the cup cards' own, a thicker track for a narrow card, ball and flag to match
+  const k = thick ? 1.4 : 1;
   const H = 26 * k, top = 64 * k - H - 8, mid = top + H / 2, cx = 300 - 32 * k, x = 16 * k + p * (cx - 32 * k);
   const pole = mid - 38 * k;
   return (
