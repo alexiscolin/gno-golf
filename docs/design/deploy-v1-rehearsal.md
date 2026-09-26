@@ -4,6 +4,8 @@ This rehearsal took the exact artefacts of the pearl deploy and ran them on a th
 
 There were four runs. The **first** ran on the code of `162a6e9`. The **second** ran on HEAD `82c7196`, which is `62488e6` ("golf before the freeze") plus a `cdp.mjs` change that has no effect on the chain. The **third** ran on HEAD `3432d52` ("shared indexes make a first finish cost about 3.4 KB; board render bounded for any polygon"). The **fourth**, which this page reports, ran on the final code, HEAD `3858f19`: the new physics, the gas bound per shot (strokes stop at `MaxWork`, publishing refuses a hole whose shot bound exceeds 1.3e9), and the final golf. It started from a fresh genesis and followed run 3's method step for step. All the numbers below come from run 4. Run 3's numbers are given next to them, and run 1's where they help. The owner handover (`Transfer`/`Accept`) and the reading of pearl's own values come from run 1 only.
 
+A **fifth** run (2026-09-27) ran on the current code, HEAD `f1bef35` plus the uncommitted work (the only chain change in it is one line of golf's `cleanText`). It has its own section, [Run 5 (current code)](#run-5-current-code). The projection and the command list for pearl now follow run 5; the run-4 tables are kept as history.
+
 ## The rehearsal chain
 
 - **Binary:** `gnoland` built from `chain/pearl` = `c4c72fdd288c` and installed as `~/.cache/gno-toolchains/pearl/gnoland`. This is the tag that the pearl `gno` in `~/.cache/gno-toolchains/pearl/` is built from. It is not gnodev.
@@ -98,6 +100,122 @@ Headless Chrome ran through `media/lib/cdp.mjs`: muted, one browser, killed afte
 - The page talked only to `127.0.0.1:3310`, `127.0.0.1:26767`, and Google Fonts.
 - Screenshots: `media/rehearsal-{extras-10,island-6,mountain-7,town-18}.jpg`.
 
+## Run 5 (current code)
+
+Run 5 took the code as it stands after the leaderboards: the charged square roots in physics (`843df86`), the course and hole leaderboards, `Claim` and `SimulateRoundIn` (`d596aaa`), and the pre-deploy review fixes (`f1bef35`). It rebuilt the rehearsal chain from nothing, because run 4's `node/` was gone from the scratch.
+
+### How it differs from run 4
+
+- **The chain is built the same way.** The pearl `gnoland` (`c4c72fdd288c`) started with `-lazy` over a GNOROOT whose `examples/` holds pearl's 85 packages (pearl's `FILTERED_PACKAGES` through `gno tool deplist -test-dep`, one symlink per file), `-skip-genesis-sig-verification`, and the seven creator addresses funded. Chain id `test-rehearsal`, RPC `127.0.0.1:26767`, P2P `:26766`, under `nice`. `names.Enable` is still not set.
+- **The storage price is pearl's own, 100 ugnot a byte.** Run 4 lowered it to 1 ugnot so gnomcp's 10 GNOT cap would pass. Run 5 did not need to: every deposit below is what the chain charged, not bytes × 100 worked out afterwards.
+- **Every write went through gnokey, with pearl's command list as written.** The gnokey is the pearl tag's own (`go install …/gnokey@c4c72fdd288c`, into the scratch). Its keys are three throwaway keys made in the scratch for this run: `default` (the deployer and owner), `heir` (a second player), and `third` (a player funded by `default`, for the name taken in one transaction). No real key was used, and nothing was sent to pearl.
+- **Byte identity:** the 15 `.gno` files read back over `vm/qfile` are byte-identical to the staged tree.
+
+### Name and code
+
+`scripts/stage.sh nym-golfer000` linted clean with the pearl `gno`. Source sizes: physics 66,788 B, course 53,903 B, golf 131,768 B (run 4: 62,914 / 52,507 / 124,141).
+
+| Step | Gas | Bytes | Deposit | Run 4 |
+|---|---|---|---|---|
+| `namereg/v1.Register("nym-golfer000")` | 25.6M | 3,332 | 0.33 GNOT | 25.4M, 3,326 (0.33) |
+| addpkg physics | 95.3M | 44,998 | 4.50 GNOT | 90.1M, 43,170 (4.32) |
+| addpkg course | 83.0M | 47,823 | 4.78 GNOT | 80.9M, 45,806 (4.58) |
+| addpkg golf | 206.7M | 211,748 | **21.17 GNOT** | 196.2M, 206,282 (20.63) |
+| **Name + code** | 410.6M | 307,901 | **30.79 GNOT** | 392.6M, 298,584 (29.86) |
+
+- The code costs 0.93 GNOT more than in run 4: physics +0.18 (its gas accounting for every square root, +3.9 KB of source), course +0.20 (+1.4 KB), golf +0.55 (+7.6 KB: the paged leaderboards, `HoleRank`, `Claim`, `SimulateRoundIn`, the round summaries on gnoweb).
+- Each addpkg passed with run 4's flags, but with less room than the 1.3× rule wants: golf used 206.7M of its 260M, and physics 95.3M of its 120M. The command list below raises both.
+- `Owner()` returns the deployer.
+
+### The 74 holes as data
+
+The scripts come from `REALM=gno.land/r/nym-golfer000/golf OUT=<scratch> scripts/publishdata.sh`, and each ran with the flags of the command list.
+
+| Script | Gas | Bytes | Deposit | Run 4 gas |
+|---|---|---|---|---|
+| publish-01 | 635.1M | 47,862 | 4.79 | 633.9M |
+| publish-02 | 485.6M | 32,208 | 3.22 | 484.4M |
+| publish-03 | 710.3M | 35,357 | 3.54 | 709.0M |
+| publish-04 | 617.5M | 34,449 | 3.44 | 616.3M |
+| publish-05 | 776.5M | 65,942 | 6.59 | 775.2M |
+| publish-06 | 745.0M | 35,650 | 3.56 | 743.8M |
+| publish-07 | **860.9M** | 53,102 | 5.31 | 859.7M |
+| publish-08 | 792.8M | 37,296 | 3.73 | 791.6M |
+| publish-09 | 683.0M | 34,494 | 3.45 | 681.7M |
+| publish-10 | 741.2M | 59,326 | 5.93 | 739.9M |
+| publish-11 | 255.6M | 18,675 | 1.87 | 254.7M |
+| **74 holes** | **7,303.6M** | **454,361** | **45.44 GNOT** | 7,290.2M |
+
+- The bytes are exactly run 4's, script by script: the hole data has not changed. The gas rose by 1.2–1.3M a script (about 0.2%), from the charged square roots.
+- publish-02 and publish-08 cross a 10M step of the 1.3× rule (630M → 640M, 1,030M → 1,040M).
+- `verify.gno`, simulated, printed **"74 slots hold their data; missing or other:"** with nothing after it, in 348.8M gas (run 4: 346.2M).
+
+### Playing
+
+Real transactions, in period 5968131. extras/10's plan (`14,8.5`) did not hole in that period's weather, so the first finish was on extras/16 (`22,7.5`), and the second hole was garden/3 (`0,9.25`). Both held in 1, as did garden/14's `14,8.5`. `default` has a name; `heir` and `third` had none when they played.
+
+| Call | Gas | Bytes | Deposit | Run 4 |
+|---|---|---|---|---|
+| `PlayRoundAt(extras/16/v1)` by `default`: the course's first finish | 51.2M | 5,404 | **0.54 GNOT** | 50.7M, 5,404 |
+| `PlayRoundAt(garden/3/v1)` by `default`: a second hole | 54.1M | 3,401 | 0.34 GNOT | 51.3M, 3,405 |
+| `Reset(extras/16/v1)` | 13.9M | −1,513 | −0.15 GNOT | 13.7M, −1,513 |
+| `PlayRoundAt(extras/16/v1)` again: a replay, same score | 49.0M | 1,525 | 0.15 GNOT | 48.5M, 1,525 |
+| `PlayRoundAt(extras/16/v1)` by `heir`, unnamed: a first finish on a hole finished before | 49.3M | 3,300 | 0.33 GNOT | 49.4M, 3,312 |
+| `PlayRoundAt(garden/3/v1)` by `heir`, unnamed: its second hole | 51.7M | 1,997 | 0.20 GNOT | — |
+| A MsgRun of `Reset` + `PlayRoundAt(extras/16/v1)`, as the client records a replay | 59.6M | 6 | ~0 | 58.6M, −6 |
+| `PlayRoundPro(garden/14/v1)` by `default`: the course's first pro finish | 53.0M | 5,204 | **0.52 GNOT** | — |
+| `Reset(garden/3/v1)`, then `PlayRoundPro(garden/3/v1)` by `default`: a pro best on a hole it had finished assisted | 13.9M, then 54.6M | −1,523, then 2,529 | 0.25 GNOT net 0.10 | — |
+
+- The storage is run 4's to within 12 bytes. A named player's new hole costs 0.34 GNOT, the course's first finish in a mode about 0.53, a replay after a Reset 0.15.
+- An unnamed player pays less on its later holes (0.20 GNOT for heir's second), because it takes no board row. It pays the rest when it claims (below).
+- `PlayRoundPro` on a hole already finished assisted is refused at simulation ("this hole is finished — Reset it to play again"), so it cost nothing. A round is one per hole and player, whatever the mode.
+- No call used more than 59.6M.
+
+### A name, and Claim
+
+| Call | Gas | Bytes | Deposit |
+|---|---|---|---|
+| `Register("nym-heirputter007")` by `heir`, alone | 28.5M | 3,184 | 0.32 GNOT |
+| `Claim()` by `heir`, alone: returned 2 (assisted bests on extras/16 and garden/3) | 54.3M | 1,528 | 0.15 GNOT |
+| **`Register("nym-thirdwedge042")` + `Claim()` by `third`, one transaction**: Claim returned 2 (extras/16 assisted, garden/14 pro) | **80.1M** | **5,216** | **0.52 GNOT** |
+
+- **gnokey can put both calls in one transaction, but not with `maketx` alone.** `maketx call` takes one message. The two-message transaction was built as the dapp builds it: `maketx call … -broadcast=false` for each call, their `msg` arrays joined with `jq`, then `gnokey sign` (with the account number and sequence from `query auth/accounts`) and `gnokey broadcast`. Claim saw the name registered by the message before it.
+- Of the 5,216 bytes, 829 are namereg's, 2,367 the users registry's, and 2,020 golf's (the two bests seated on their boards and the course ranking).
+- `heir`'s name and Claim went in two transactions, by mistake, and are kept as a measure of each call alone: **the pearl gnokey broadcasts by default** (`-broadcast=true`), so a `maketx` meant to only print a transaction sends it. Claim's gas does not depend on the caller: it reads the course's 74 slots in both modes.
+- The client budgets 60M + 90M for the pair; 80.1M was used.
+
+### Reads
+
+Each read was checked over `vm/qeval`, and its gas measured in a simulated MsgRun (which adds a few million for the script itself).
+
+| Read | Gas (MsgRun) | Result |
+|---|---|---|
+| `CourseLeaderboard("assisted", 0, 10)` | 24.8M | 74 holes, 3 players: `default` 2 holes in 2, `heir` 2 in 2, `third` 1 in 1; `next` 0. Pro: `default` and `third` |
+| `HoleRank("extras/16/v1", "assisted", heir)` | 21.3M | rank 3 of 3, 1 stroke. `third` is rank 1 of 2 on garden/14 in pro |
+| `HoleLeaderboard("extras/16/v1", "assisted", 0, 10)` | 25.7M | 3 players, 3 finished |
+| `SimulateRoundIn("extras/10/v1", "14,8.5", 5967998)` | 53.8M | holed in 1, in a period 133 behind (the one `hole-bests.json` recorded) |
+| `SimulateRoundIn(…, 5999999)` | — | refused: "that weather has not come yet" |
+
+The hub (`Render("")`) and a hole page render.
+
+### Owner functions (simulated)
+
+| Call | Signer | Result |
+|---|---|---|
+| `SetPlayURL("https://gno-golf.netlify.app/")` | `default` | ok, 11.8M gas |
+| `SetSuccessor("gno.land/r/nym-golfer000/golf2")` | `default` | ok, 12.0M gas |
+| `SetPlayURL("https://evil.example/")` | `heir` | refused: "golf: only the owner can move the play link" |
+| `SetSuccessor(…)` | `heir` | refused: "golf: only the owner can name a successor" |
+
+`Successor()` is still `""` afterwards.
+
+### Run 5 in short
+
+- Every step passed. No problem was found in the code.
+- The deploy costs 0.93 GNOT more than in run 4, all in the code deposit; the holes cost the same. The fees rise by 0.05 GNOT.
+- The command list as run 4 wrote it would have worked on pearl: every transaction passed with those flags. It is updated below all the same, so that each flag keeps its 1.3× margin: physics 130M gas, course `-max-deposit` 7 GNOT, golf 270M gas and 28 GNOT, publish-02 640M, publish-08 1,040M.
+- The web client was not run against the rehearsal chain this time.
+
 ## Pearl, read live (run 1: profile `testnet`, `pearl-1`, height ~700,460)
 
 | Fact | Value | How |
@@ -114,31 +232,32 @@ Headless Chrome ran through `media/lib/cdp.mjs`: muted, one browser, killed afte
 | Faucet | 10 GNOT a grant, 1 per address per 24 h | `gno_status`, `faucet-agent.pearl…/limits` |
 | Our imports | `p/nt/avl/v0`, `p/nt/bptree/v0`, `p/nt/ufmt/v0`, `r/sys/users` all deployed | `gno_packages` |
 
-## Projection for pearl (measured, run 4)
+## Projection for pearl (measured, run 5)
 
-| Item | GNOT | Run 3 | Run 1 |
+| Item | GNOT | Run 4 | Run 1 |
 |---|---|---|---|
 | Name deposit | 0.33 | 0.33 | 0.33 |
-| Code deposit (3 packages) | 29.53 | 29.05 | 24.43 |
+| Code deposit (3 packages) | 30.46 | 29.53 | 24.43 |
 | 74 holes' deposit | 45.44 | 45.44 | 75.90 |
-| **Deposit** | **75.29** | 74.82 | 100.65 |
-| Fees: the 15 transactions below, each at its gas-wanted (1.3× measured) and 1.2× the price floor | 12.07 (7.68 at the floor) | 12.02 | 11.93 |
-| **Total** | **87.37** | 86.84 | 112.6 |
-| **With a 15% margin** | **100.5, so ask for 105 GNOT** | 99.9 | ~130 |
+| **Deposit** | **76.23** | 75.29 | 100.65 |
+| Fees: the 15 transactions below, each at its gas-wanted (1.3× measured) and 1.2× the price floor | 12.12 (7.71 at the floor) | 12.07 | 11.93 |
+| **Total** | **88.35** | 87.37 | 112.6 |
+| **With a 15% margin** | **101.6, so ask for 105 GNOT** | 100.5 | ~130 |
 
-The margin now passes 100 GNOT, so ask for **105 GNOT**. That also leaves room for one failed-and-rerun publish script. At the faucet's 10 GNOT a day for one address, 100 GNOT takes 10 days, so ask the faucet operators or GovDAO instead. The deposit is locked for good, because published data is never freed.
+Ask for **105 GNOT**, as in run 4. That still leaves room for one failed-and-rerun publish script. At the faucet's 10 GNOT a day for one address, 100 GNOT takes 10 days, so ask the faucet operators or GovDAO instead. The deposit is locked for good, because published data is never freed.
 
 The deploy order also bounds when the money is needed:
 
-- about 30 GNOT for the name and the code, of which golf alone takes 20.6;
+- about 31 GNOT for the name and the code, of which golf alone takes 21.2;
 - then 2–7 GNOT for each publish script.
 
 For players on pearl:
 
-- A round costs 0.05–0.06 GNOT in fees at the floor (48–59M gas).
-- A first finish on a hole also costs a deposit of about 0.34 GNOT (3.3–3.4 KB), whether or not someone has finished the hole before.
-- The very first finish in a mode on the whole course costs 0.54 GNOT.
+- A round costs 0.05–0.06 GNOT in fees at the floor (49–60M gas).
+- A named player's first finish on a hole also costs a deposit of about 0.34 GNOT (3.3–3.4 KB), whether or not someone has finished the hole before.
+- The very first finish in a mode on the whole course costs about 0.53 GNOT (0.54 assisted, 0.52 pro).
 - A replay after a Reset costs 0.15 GNOT, which is what the Reset refunds.
+- An unnamed player pays less on its later holes (0.20 GNOT), and the rest when it takes a name: Register + Claim in one transaction measured 80.1M gas and 0.52 GNOT of deposit.
 
 ## The command list for pearl
 
@@ -149,13 +268,13 @@ P="-chainid pearl-1 -remote https://rpc.pearl.testnets.gno.land:443"   # for mak
 R="-remote https://rpc.pearl.testnets.gno.land:443"                    # for query
 ```
 
-How each flag is sized, from the run-4 measurements:
+How each flag is sized, from the run-5 measurements:
 
 - **Gas-wanted:** the measured gas × 1.3, rounded up to 10M.
 - **Fee:** gas-wanted at 1.2× the floor. The chain takes the whole fee, so the margin stays small.
 - **`-max-deposit`:** the measured deposit × 1.3, rounded up to 1 GNOT.
 
-gnokey simulates a transaction before it broadcasts it (`-simulate test`, the default), so a transaction that would fail costs nothing.
+gnokey simulates a transaction before it broadcasts it (`-simulate test`, the default), so a transaction that would fail costs nothing. The pearl gnokey also broadcasts by default (`-broadcast=true`): leaving out `-broadcast` does not make a dry run. Only `-simulate only` does.
 
 **0. Fund** the key with ~105 GNOT. Check: `gnokey query auth/accounts/<your-address> $R`.
 
@@ -168,35 +287,35 @@ gnokey maketx call -pkgpath gno.land/r/sys/namereg/v1 -func Register -args nym-g
 
 Check: `gnokey query vm/qeval -data 'gno.land/r/sys/names.IsAuthorizedAddressForNamespace(address("<your-address>"), "nym-golfer000")' $R` returns `true`. Or open https://pearl.testnets.gno.land/u/nym-golfer000.
 
-**2. Stage** the three packages. This also lints them with the pearl toolchain and prints their sizes: 52,507 / 62,914 / 124,141 B.
+**2. Stage** the three packages. This also lints them with the pearl toolchain and prints their sizes: 53,903 / 66,788 / 131,768 B.
 
 ```sh
 scripts/stage.sh nym-golfer000 /tmp/stage
 ```
 
-**3. Deploy physics** (4.32 GNOT):
+**3. Deploy physics** (4.50 GNOT):
 
 ```sh
 gnokey maketx addpkg -pkgpath gno.land/p/nym-golfer000/physics -pkgdir /tmp/stage/gno.land/p/nym-golfer000/physics \
-  -gas-wanted 120000000 -gas-fee 144000ugnot -max-deposit 6000000ugnot -broadcast $P <your-key-name>
+  -gas-wanted 130000000 -gas-fee 156000ugnot -max-deposit 6000000ugnot -broadcast $P <your-key-name>
 ```
 
 Check: https://pearl.testnets.gno.land/p/nym-golfer000/physics$source.
 
-**4. Deploy course** (4.58 GNOT):
+**4. Deploy course** (4.78 GNOT):
 
 ```sh
 gnokey maketx addpkg -pkgpath gno.land/p/nym-golfer000/course -pkgdir /tmp/stage/gno.land/p/nym-golfer000/course \
-  -gas-wanted 110000000 -gas-fee 132000ugnot -max-deposit 6000000ugnot -broadcast $P <your-key-name>
+  -gas-wanted 110000000 -gas-fee 132000ugnot -max-deposit 7000000ugnot -broadcast $P <your-key-name>
 ```
 
 Check: https://pearl.testnets.gno.land/p/nym-golfer000/course$source.
 
-**5. Deploy golf** (20.63 GNOT; its init makes you the owner):
+**5. Deploy golf** (21.17 GNOT; its init makes you the owner):
 
 ```sh
 gnokey maketx addpkg -pkgpath gno.land/r/nym-golfer000/golf -pkgdir /tmp/stage/gno.land/r/nym-golfer000/golf \
-  -gas-wanted 260000000 -gas-fee 312000ugnot -max-deposit 27000000ugnot -broadcast $P <your-key-name>
+  -gas-wanted 270000000 -gas-fee 324000ugnot -max-deposit 28000000ugnot -broadcast $P <your-key-name>
 ```
 
 Check: `gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.Owner()' $R` returns `<your-address>`. https://pearl.testnets.gno.land/r/nym-golfer000/golf shows the hub, with its "open the game" link going to https://gno-golf.netlify.app/.
@@ -211,13 +330,13 @@ REALM=gno.land/r/nym-golfer000/golf OUT=/tmp/pub scripts/publishdata.sh
 
 ```sh
 gnokey maketx run -gas-wanted  830000000 -gas-fee  996000ugnot -max-deposit 7000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-01.gno
-gnokey maketx run -gas-wanted  630000000 -gas-fee  756000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-02.gno
+gnokey maketx run -gas-wanted  640000000 -gas-fee  768000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-02.gno
 gnokey maketx run -gas-wanted  930000000 -gas-fee 1116000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-03.gno
 gnokey maketx run -gas-wanted  810000000 -gas-fee  972000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-04.gno
 gnokey maketx run -gas-wanted 1010000000 -gas-fee 1212000ugnot -max-deposit 9000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-05.gno
 gnokey maketx run -gas-wanted  970000000 -gas-fee 1164000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-06.gno
 gnokey maketx run -gas-wanted 1120000000 -gas-fee 1344000ugnot -max-deposit 7000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-07.gno
-gnokey maketx run -gas-wanted 1030000000 -gas-fee 1236000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-08.gno
+gnokey maketx run -gas-wanted 1040000000 -gas-fee 1248000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-08.gno
 gnokey maketx run -gas-wanted  890000000 -gas-fee 1068000ugnot -max-deposit 5000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-09.gno
 gnokey maketx run -gas-wanted  970000000 -gas-fee 1164000ugnot -max-deposit 8000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-10.gno
 gnokey maketx run -gas-wanted  340000000 -gas-fee  408000ugnot -max-deposit 3000000ugnot -broadcast $P <your-key-name> /tmp/pub/publish-11.gno
@@ -233,7 +352,7 @@ gnokey maketx run -simulate only -gas-wanted 460000000 -gas-fee 552000ugnot $P <
 
 It must print `74 slots hold their data; missing or other:` with nothing after it.
 
-**(9. Only if the site moves) Set the play link.** The default is already `https://gno-golf.netlify.app/`, so skip this step for that site. It measured 11.6M gas and no deposit:
+**(9. Only if the site moves) Set the play link.** The default is already `https://gno-golf.netlify.app/`, so skip this step for that site. It measured 11.8M gas and no deposit:
 
 ```sh
 gnokey maketx call -pkgpath gno.land/r/nym-golfer000/golf -func SetPlayURL -args https://<new-site>/ \
@@ -250,7 +369,7 @@ The same list as gnomcp calls (what the rehearsal ran):
 4. `gno_run` ×11, with the publish scripts
 5. `gno_run(verify.gno, simulate)`
 
-gnomcp cannot run step 5 on pearl as it stands, for two reasons. It pins `-max-deposit` to 10 GNOT on addpkg, and golf needs 20.63 GNOT (problem 5). It also deploys as its agent key, not as the user.
+gnomcp cannot run step 5 on pearl as it stands, for two reasons. It pins `-max-deposit` to 10 GNOT on addpkg, and golf needs 21.17 GNOT (problem 5). It also deploys as its agent key, not as the user.
 
 ## Netlify environment
 
@@ -290,9 +409,9 @@ Problems from run 1:
 2. **A lazy genesis loads every example.** Fix: a GNOROOT of symlinks with an `examples/` holding only pearl's 85 packages.
 3. **Genesis panicked with "PubKey does not match Signer address g1manfred…".** Fix: `-skip-genesis-sig-verification`, which pearl's own genesis uses, and the seven creator addresses funded in the balances file.
 4. **A restart over the same secrets stalled at height 0,** because the old `priv_validator_state.json` refused to sign again. Fix: delete it together with `db/` and `wal/`. Run 2 did exactly that for its fresh genesis, and the chain was producing blocks within seconds.
-5. **gnomcp cannot deploy golf on pearl.** `gno_addpkg` pins `-max-deposit` to 10 GNOT, and golf now needs **20.63** GNOT at pearl's price (20.35 in run 3, 17.35 in run 2, 15.69 in run 1).
+5. **gnomcp cannot deploy golf on pearl.** `gno_addpkg` pins `-max-deposit` to 10 GNOT, and golf now needs **21.17** GNOT at pearl's price (20.63 in run 4, 20.35 in run 3, 17.35 in run 2, 15.69 in run 1).
    - Workaround for the rehearsal: `storage_price` = 1 ugnot in the genesis, with the bytes read from the events and multiplied by 100 for pearl.
-   - On pearl, the user deploys with gnokey and `-max-deposit 27000000ugnot` (step 5).
+   - On pearl, the user deploys with gnokey and `-max-deposit 28000000ugnot` (step 5). Run 5 needed no workaround: it used gnokey at pearl's own price.
    - Still worth raising with gnomcp: a `max_deposit` argument on `gno_addpkg`.
 6. **`publishdata.sh` overwrote the committed scripts.** Fixed: `OUT` sets the output directory.
 7. **`publishdata.sh`'s default split did not match the committed set.** Fixed: the default is 7 holes a script.
@@ -317,6 +436,10 @@ Run 4 found no new problem in the code. Every step passed on the first try. Thre
 - Run 3's one-shot plans no longer hole under the new physics. The plans in the current `scripts/hole-bests.json` held in period 5967999, on chain and in the web client. This is expected with a physics change, not a bug.
 - Gas moved in three places, and every change is small against its limit: physics' addpkg +15.6M (its source grew by 11.9 KB), so its gas-wanted goes from 100M to 120M; golf's addpkg +5.9M (250M → 260M); publish-04 crosses a 10M step (800M → 810M); `verify.gno` 460M. publish-07 (859.7M) still fits gnomcp's 1e9 cap, and the heaviest round (58.6M) is far below any limit. The gas bound per shot did not refuse any of the 74 holes.
 
+Run 5 found no new problem in the code either, and every step passed on the first try. Its notes are in [Run 5 in short](#run-5-in-short). One finding about the tools: the pearl gnokey broadcasts unless told `-broadcast=false`, which the command list now says.
+
 ## Left running
 
 Nothing is left running after run 4. The rehearsal chain (`:26767`) and the second dev server (`:3310`) were stopped, and the Chrome started by the smoke test was killed. The existing gnodev (`:26757`) and dev server (`:3300`) were not touched. The rehearsal chain's state is kept in the session scratch (`node/`), and it restarts with the same `gnoland start` line. Run 4's outputs are in `r4/` there.
+
+Nothing is left running after run 5 either: its chain (`:26767`) was stopped. The gnodev on `:26657` and the dev server on `:3300` were not touched. Its chain, keys and outputs are in the session scratch, under `rehearsal5/` (`node/`, `keys/`, `out/`).
