@@ -11,6 +11,15 @@ export function clipMime(supported: (type: string) => boolean) {
   return MP4.find((t) => { try { return supported(t); } catch { return false; } }) || "";
 }
 
+/** The MP4 this browser can make a clip in, or "" when it can't: it needs a
+ *  canvas it can film (captureStream) and a MediaRecorder that writes MP4.
+ *  Anything missing, and there is no clip at all: no button, no loader. */
+export function clipSupport(w: { MediaRecorder?: { isTypeSupported(type: string): boolean }; HTMLCanvasElement?: { prototype: object } } = globalThis) {
+  if (!w.MediaRecorder || !w.HTMLCanvasElement || !("captureStream" in w.HTMLCanvasElement.prototype)) return "";
+  const rec = w.MediaRecorder;
+  return clipMime((t) => rec.isTypeSupported(t));
+}
+
 /** How long a clip holds on each part, in ms: the gnome still before the
  *  release, the moment after the drop (the confetti), the whole at most. */
 export const CLIP = { lead: 700, tail: 1500, max: 8000 };

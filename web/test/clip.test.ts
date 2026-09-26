@@ -2,7 +2,7 @@
 // stroke shown, the sky's stops, the file's name.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLIP, clipMime, clipName, clipWindow, skyStops } from "../lib/clip.ts";
+import { CLIP, clipMime, clipName, clipSupport, clipWindow, skyStops } from "../lib/clip.ts";
 
 void test("the best MP4 the browser records, or none at all (no WebM: X takes MP4 only)", () => {
   assert.equal(clipMime(() => true), "video/mp4;codecs=avc1.640028");
@@ -42,4 +42,14 @@ void test("the file is named after its hole", () => {
   assert.equal(clipName("mountain/18"), "gnogolf-mountain-18.mp4");
   assert.equal(clipName("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5/My Hole!/v1"), "gnogolf-my-hole.mp4");
   assert.equal(clipName(""), "gnogolf.mp4");
+});
+
+test("clipSupport: no clip at all without a filmable canvas or an MP4 recorder", () => {
+  const Canvas = { prototype: { captureStream() {} } };
+  const mp4 = { isTypeSupported: (t: string) => t === "video/mp4" };
+  assert.equal(clipSupport({ MediaRecorder: mp4, HTMLCanvasElement: Canvas }), "video/mp4");
+  assert.equal(clipSupport({ HTMLCanvasElement: Canvas }), ""); // no MediaRecorder (an old browser)
+  assert.equal(clipSupport({ MediaRecorder: mp4, HTMLCanvasElement: { prototype: {} } }), ""); // a canvas it can't film
+  assert.equal(clipSupport({ MediaRecorder: { isTypeSupported: () => false }, HTMLCanvasElement: Canvas }), ""); // WebM only (Firefox)
+  assert.equal(clipSupport({}), ""); // no DOM (the build)
 });

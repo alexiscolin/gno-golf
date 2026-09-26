@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { sound } from "@/lib/feel";
-import { clipMime } from "@/lib/clip";
+import { clipSupport } from "@/lib/clip";
 import type { ClipRun } from "@/lib/engine/clip";
 import { SITE } from "@/lib/site";
 import { pasted, shareLinks } from "./common";
@@ -101,7 +101,7 @@ interface ClipProps {
  *  as the card opens; a phone when asked (a second renderer for a few seconds
  *  is a lot to spend unasked on a phone, and on its battery). */
 export function ShareClip({ make, text, link = "", name }: ClipProps) {
-  const [mime] = useState(() => (typeof MediaRecorder !== "undefined" ? clipMime((t) => MediaRecorder.isTypeSupported(t)) : ""));
+  const [mime] = useState(() => clipSupport());
   const [go, setGo] = useState(() => typeof matchMedia !== "undefined" && !matchMedia("(pointer: coarse)").matches);
   const [k, setK] = useState(0);
   // undefined while it is being made; null: none came of it
