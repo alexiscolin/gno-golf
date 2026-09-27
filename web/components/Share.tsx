@@ -47,6 +47,9 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
   // this hole, this cup, this gnome, at the game's public address
   const url = siteURL(link);
   const phone = onPhone();
+  // the system sheet: a phone's always; a computer's once there is a clip it
+  // can send (macOS, Windows: AirDrop, Messages, an installed X), the file joined
+  const sheetClip = !!clip && typeof navigator !== "undefined" && !!navigator.share && !!navigator.canShare && navigator.canShare({ files: [clip.file] });
   const sheet = async () => {
     sound("blip");
     try {
@@ -83,8 +86,8 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
       <button className="share__icon share__icon--copy" aria-label={copied ? "Link copied" : "Copy the link"} title={copied ? "Copied" : "Copy link"} onClick={() => void copy()}>
         <svg viewBox="0 0 24 24" aria-hidden="true" className="share__stroke">{copied ? <path d="M5 12l5 5 9-10" /> : <path d="M9 15l6-6M10.5 6.5l1.8-1.8a4 4 0 0 1 5.7 5.7l-1.8 1.8M13.5 17.5l-1.8 1.8a4 4 0 0 1-5.7-5.7l1.8-1.8" />}</svg>
       </button>
-      {phone && (
-        <button className="share__icon share__icon--more" aria-label="More ways to share" title="More" onClick={() => void sheet()}>
+      {(phone || sheetClip) && (
+        <button className="share__icon share__icon--more" aria-label={clip ? "Share the clip" : "More ways to share"} title={clip ? "Share the clip, the file joined" : "More"} onClick={() => void sheet()}>
           <svg viewBox="0 0 24 24" aria-hidden="true" className="share__stroke"><path d="M12 3v12M7 8l5-5 5 5M5 13v6h14v-6" /></svg>
         </button>
       )}
