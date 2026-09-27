@@ -557,28 +557,29 @@
    {
     "deg": 0,
     "power": 10,
-    "at": -1.55
+    "at": -1.45
    }
   ],
   "cam": {
    "mode": "orbit",
-   "center": [
-    0.89,
-    0.6,
-    0.28
-   ],
-   "r": 9,
-   "h": 1.8,
+   "center": "ball",
+   "r": 4.5,
+   "h": 1.2,
    "a0": 150,
-   "speed": -50,
-   "fov": 44,
-   "lookUp": 0
+   "speed": -110,
+   "fov": 52,
+   "lookUp": 0.5
   },
   "whip": 1,
   "name": "skatepark",
   "beats": [
    54,
    57
+  ],
+  "ramp": [
+   0,
+   1.03,
+   1.6
   ]
  },
  {
@@ -709,28 +710,28 @@
   "weather": "wind"
  },
  {
-  "cup": "garden",
-  "hole": 3,
+  "cup": "mountain",
+  "hole": 12,
   "gnome": "sage",
   "pre": 2.5,
   "eventAt": 0.3,
   "fire": [
    {
-    "deg": 5,
-    "power": 5,
-    "eventT": 0.535
+    "deg": -9,
+    "power": 8,
+    "event": 6
    }
   ],
   "cam": {
    "mode": "follow",
-   "deg": 5,
-   "back": 5,
-   "up": 1.6,
+   "deg": -9,
+   "back": 5.5,
+   "up": 2,
    "ahead": 4,
    "fov": 46
   },
   "punch": 0.12,
-  "name": "bunker",
+  "name": "rebound",
   "beats": [
    65,
    67
