@@ -112,11 +112,10 @@ export function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => v
     // what opened it: the focused control, else the one last pressed (never one
     // of its own: a dev remount finds its own control focused already)
     const back = [active instanceof HTMLElement && active !== document.body ? active : null, pressed].find((x) => x && !(el && el.contains(x))) || null;
-    // its main action when it names one (data-autofocus), else its first control
-    // (its main action always: Enter does it)
-    const main = el && el.querySelector<HTMLElement>("[data-autofocus]");
+    // its main action when it names one (data-autofocus: Enter does it; a
+    // disabled one can't take focus), else by key its first control, else itself
+    const main = el && el.querySelector<HTMLElement>("[data-autofocus]:not([disabled])");
     const first = main || (byKey && el ? el.querySelector<HTMLElement>("[data-keyfocus]") || el.querySelector<HTMLElement>(FOCUSABLE) : null);
-    if (el && !first && !el.hasAttribute("tabindex")) el.tabIndex = -1;
     (first || el)?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (open[open.length - 1] !== me || !ref.current) return;

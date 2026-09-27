@@ -417,7 +417,7 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
               <path d="M12 14 H22 M12 18 H22 M12 22 H17" className="fi" />
               <circle cx="22" cy="23" r="3.5" className="fi fi--red" />
             </svg>
-            <span><b>Every hole</b> is a smart contract</span>
+            <span><b>Every hole</b> lives on-chain</span>
           </li>
           <li>
             <svg viewBox="0 0 32 32" aria-hidden="true">

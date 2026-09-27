@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { holeLink, pasted, shareLinks, suggestName } from "../components/common.ts";
+import { holeLink, pasted, pendingOf, shareLinks, strokesWord, suggestName } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -23,6 +23,12 @@ test("a cup's hole links to its own page, whatever its version", () => {
 
 test("the gnome rides along as a query", () => {
   assert.equal(holeLink(snap({ id: "island/9/v1", place: 9, world: "island" }), "wizard"), "h/island-9/?gnome=wizard");
+});
+
+test("a sharer with a round on the chain dares the friend: their address rides along", () => {
+  const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  assert.equal(holeLink(snap({ id: "island/9/v1", place: 9, world: "island" }), "wizard", me), `h/island-9/?gnome=wizard&by=${me}`);
+  assert.equal(holeLink(snap({ id: "island/9/v1", place: 9, world: "island" }), "", "not-an-address"), "h/island-9/");
 });
 
 test("a hole in no cup (community, archived) links by its id", () => {
@@ -60,4 +66,24 @@ test("a name to start from: the gnome's letters and 3 digits, as the registrar w
   assert.equal(suggestName("bob", 0.5), "golfer550"); // too short
   assert.equal(suggestName("gnomey", 0), "golfer100"); // the registrar refuses gno…
   assert.match(suggestName("the ultimate champion"), /^[a-z]{5,13}\d{3}$/);
+});
+
+test("a round kept for the tab is taken back only in the shape a save sends", () => {
+  const ok = { id: "garden/3/v1", name: "Down the Tunnel", shots: ["0.0000,9.2500", "-25.0000,9.5000,5"], strokes: 2, period: 5968, roundMode: "pro", official: true, walls: 12, pieces: 30, kind: "", pts: [10, 12] };
+  assert.deepEqual(pendingOf(JSON.parse(JSON.stringify(ok))), ok);
+  assert.equal(pendingOf(null), null);
+  assert.equal(pendingOf({ ...ok, id: "../../evil" }), null);
+  assert.equal(pendingOf({ ...ok, shots: ["0,9;Reset"] }), null); // no shot list smuggled in one shot
+  assert.equal(pendingOf({ ...ok, shots: [] }), null);
+  assert.equal(pendingOf({ ...ok, shots: Array(61).fill("0,1") }), null);
+  assert.equal(pendingOf({ ...ok, period: 5.9 }), null);
+  assert.equal(pendingOf({ ...ok, strokes: "2" }), null);
+  assert.equal(pendingOf({ ...ok, roundMode: "god" }), null);
+  assert.equal(pendingOf({ ...ok, pts: [1, "x"] }), null);
+  assert.equal(pendingOf({ ...ok, name: "x".repeat(200) })!.name!.length, 60);
+});
+
+test("strokes are said in the singular for one", () => {
+  assert.equal(strokesWord(1), "1 stroke");
+  assert.equal(strokesWord(3), "3 strokes");
 });

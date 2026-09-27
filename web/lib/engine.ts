@@ -62,8 +62,6 @@ export interface GameOptions {
 
 /** A thrown value's message, for the HUD. */
 const errText = (e: unknown) => String((e instanceof Error && e.message) || e);
-/** The score's card along the bottom of a picture W×H (a shared image, the
- *  clip's frames): "Gnogolf" and the caption, at k times its size. */
 const camOf = (m: string): CamMode => (m === "far" || m === "third" ? m : "classic");
 const gfxOf = (m: string): GfxMode => (m === "high" || m === "low" ? m : "auto");
 

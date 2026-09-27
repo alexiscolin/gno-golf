@@ -21,7 +21,7 @@ export const siteHost = () => new URL(siteURL()).host;
 // of 50-60 characters and a description under 160, as search results show them
 export const TITLE = "Gnogolf — free 3D mini-golf in your browser, on-chain";
 export const DESCRIPTION =
-  "A free 3D mini-golf in your browser: every hole is a smart contract on gno.land, every shot is computed by the chain. Pick a gnome and play, no wallet needed.";
+  "A free 3D mini-golf in your browser: every hole lives on gno.land and every shot is computed by the chain. Pick a gnome and play, no wallet needed.";
 
 /** The course's cups, in order, and how one is called. */
 export const CUPS = ["garden", "island", "town", "mountain"];

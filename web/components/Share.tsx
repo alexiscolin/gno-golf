@@ -5,7 +5,7 @@ import { sound } from "@/lib/feel";
 import { clipSupport } from "@/lib/clip";
 import type { ClipRun } from "@/lib/engine/clip";
 import { siteURL } from "@/lib/site";
-import { pasted, shareLinks } from "./common";
+import { isTouch, pasted, shareLinks } from "./common";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
 // with the score (X, Facebook, WhatsApp, Bluesky, copy link), each opening
@@ -28,12 +28,14 @@ interface ShareProps {
   /** the shot's clip, once made (ShareClip): shared in the picture's place */
   clip?: Clip | null;
   link?: string;
+  /** the row's word ("Share your #2" once a save ranks) */
+  label?: string;
 }
 // the system sheet only where it is the phone's own (on a desktop it is a
 // bare OS panel without the networks people mean)
-const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && isTouch();
 
-export default function Share({ text, snapshot, link = "", clip = null }: ShareProps) {
+export default function Share({ text, snapshot, link = "", clip = null, label = "Share" }: ShareProps) {
   const [copied, setCopied] = useState(false);
   const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the card goes first
   useEffect(() => () => clearTimeout(copiedT.current), []);
@@ -71,7 +73,7 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
   const links = shareLinks(text, url);
   return (
     <span className="share" role="group" aria-label="Share">
-      <span className="share__label">Share</span>
+      <span className="share__label">{label}</span>
       {links.map(([name, href]) => (
         <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name} onClick={() => sound("blip")}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d={GLYPH[name]} /></svg>
@@ -110,7 +112,7 @@ interface ClipProps {
  *  renderer for a few seconds is a lot to spend unasked on a phone). */
 export function ShareClip({ make, name, onClip }: ClipProps) {
   const [mime] = useState(() => clipSupport());
-  const [go, setGo] = useState(() => typeof matchMedia !== "undefined" && !matchMedia("(pointer: coarse)").matches);
+  const [go, setGo] = useState(() => typeof matchMedia !== "undefined" && !isTouch());
   const [k, setK] = useState(0);
   // undefined while it is being made; null: none came of it
   const [clip, setClip] = useState<Clip | null>();

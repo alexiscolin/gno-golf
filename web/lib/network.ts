@@ -1,8 +1,8 @@
 // Which deployment this build is, and where the other one is: one code, two
-// sites (Netlify env). The testnet plays for free with faucet GNOT; mainnet's
-// GNOT is real and it has no faucet.
+// sites (Netlify env). The testnet plays with free faucet GNOT; mainnet's GNOT
+// is real (the faucet hub drips a little of it).
 export const NETWORK: "testnet" | "mainnet" = process.env.NEXT_PUBLIC_NETWORK === "mainnet" ? "mainnet" : "testnet";
-/** Where a testnet's players get free GNOT (NEXT_PUBLIC_FAUCET; mainnet has none). */
+/** Where a testnet's players get free GNOT (NEXT_PUBLIC_FAUCET). */
 export const FAUCET = process.env.NEXT_PUBLIC_FAUCET || "https://faucet.gno.land";
 /** Where mainnet players get GNOT (NEXT_PUBLIC_GNOT_URL): the faucet hub's small drip by default. */
 export const GNOT_URL = process.env.NEXT_PUBLIC_GNOT_URL || FAUCET;

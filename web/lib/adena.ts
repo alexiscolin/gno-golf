@@ -316,6 +316,8 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
     if (p == null) throw new Error("This round has no weather period, so it cannot be saved. Play it again.");
     return String(p);
   };
+  // the period the chain checked (as a whole number) is the one signed
+  if (period != null && !Number.isSafeInteger(period)) throw new Error("This round's weather period is not one the chain knows. Play it again.");
   const res = await a.DoContract({
     // in the weather the round was played in (its period): the chain takes
     // the current one or the one before
@@ -368,6 +370,9 @@ async function calls(address: string, list: readonly (readonly [string, string, 
 // golf's Claim reads the course's holes once (74 slots, two modes): measured
 // well under this; Register was 25.4M on a pearl rehearsal
 const CLAIM_GAS = 90_000_000, REGISTER_GAS = 60_000_000;
+/** What a name taken with a save adds to it: Register and Claim's gas, and
+ *  the bytes they store (5,216 measured for both, docs/design/deploy-v1-rehearsal.md). */
+export const NAME_GAS = REGISTER_GAS + CLAIM_GAS, NAME_BYTES = 5216;
 
 /**
  * Takes a gno.land name for the connected account, and ranks at once the

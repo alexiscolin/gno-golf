@@ -36,7 +36,7 @@ function about(slot: string) {
     title: `${n ? (h ? `${name} · ${place}` : place) : heading} · Gnogolf`,
     description: n
       ? `${heading}: can you hole it in one? Free 3D mini-golf in your browser, every shot computed by the chain on gno.land.`
-      : `The ${cup}: ${holes.length} holes of free 3D mini-golf in your browser. Every hole is a smart contract on gno.land, every shot is computed by the chain.`,
+      : `The ${cup}: ${holes.length} holes of free 3D mini-golf in your browser. Every hole lives on gno.land, every shot is computed by the chain.`,
   };
 }
 

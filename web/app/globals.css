@@ -1708,6 +1708,7 @@ html, body {
 .cup__head h3 { margin: 0; font-size: 20px; color: var(--ink); }
 .cup__sum { display: flex; gap: 8px; margin: 0; }
 .cup__sum div { background: rgba(var(--green-rgb), .1); border-radius: 12px; padding: 6px 10px; text-align: center; min-width: 58px; }
+@media (max-width: 600px) { .cup__sum div { min-width: 0; padding: 6px 8px; } }
 .cup__sum dt { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
 .cup__sum dd { margin: 0; font-size: 20px; font-weight: 800; color: var(--green); }
 .cup__sum dd.good { color: var(--green); } .cup__sum dd.bad { color: var(--hat); }
@@ -1790,7 +1791,9 @@ html, body {
 .screen.worlds { overflow-y: auto; }
 
 /* the forecast as a HUD card, next to the strokes */
-.card--weather { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.card--weather { display: flex; align-items: center; gap: 8px; padding: 8px 12px; position: relative; font: inherit; color: inherit; cursor: pointer; }
+.weather__pop { left: 0; right: auto; } /* (the aim's note, under the badge) */
+@media (max-width: 600px) { .weather__pop { left: auto; right: 0; } } /* (a phone's badge is at the right edge) */
 /* rain darkens and wets the scene; a storm more */
 .wet { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30,45,60,.28), rgba(20,40,50,.12)); transition: opacity .8s; }
 .wet--storm { background: linear-gradient(180deg, rgba(18,26,48,.34), rgba(18,28,40,.12)); }
@@ -1890,6 +1893,7 @@ html, body {
 /* the leaderboard: a chip at the bottom right of every hole, a sheet with two tabs */
 /* a phone: the bottom row is Restart and Whole course; the chip goes to the icon alone, above them */
 .boards { max-width: 560px; position: relative; } /* (the close X sits in the sheet's own corner) */
+.sheet:has(> .boards) { place-items: start center; } /* from the top: its tabs stay put when a tab is shorter */
 .boards__tabs { display: flex; margin: 6px 0 12px; } /* no gap: a segmented control, the gap showed as a stripe */
 
 .boards__more { display: block; margin: 10px auto 0; }
@@ -2216,7 +2220,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
   /* on a phone the title's logo starts under the about button, not beside it */
   .screen--title .title { padding-top: 52px; }
   /* on a phone it joins the bottom row, left of the play buttons: a short word, no link (About has it) */
-  .netbanner { left: 8px; height: 44px; padding: 0 8px; font-size: 11px; border-radius: 12px; }
+  .netbanner { height: 44px; padding: 0 8px; font-size: 11px; border-radius: 12px; }
   .netbanner b { font-size: 0; } .netbanner b::after { content: attr(data-short); font-size: 11px; }
   .netbanner span, .netbanner__go { display: none; }
   .netbanner { left: 12px; } /* the top cards' gutter */
@@ -2289,7 +2293,6 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 /* reduced motion: no autoplay, a round play button over the first frame */
 .clip__play { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); cursor: pointer; display: grid; place-items: center; padding: 0; }
 .clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
-/* its download, a main button under it, and why: a post with a video goes further */
 /* its download, on it: a paper pill in the top corner, the brand's card having the bottom */
 .clip__save { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 9px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 2px 0 var(--ink); }
 .clip__save svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -2305,6 +2308,11 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 /* on the play screen, in the top row between its cards (its height, centred on them); under them when the row is full */
 body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-height: 76px; }
 @media (max-width: 1600px) { body:has(.hud--top) .pending { top: 104px; min-height: 0; } }
-@media (max-width: 600px) { .pending { flex-wrap: wrap; justify-content: center; text-align: center; } }
+/* a phone: one row, the hole's name cut short before the button */
+@media (max-width: 600px) {
+  .pending { gap: 8px; padding: 6px 6px 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); }
+  .pending .btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+  .pending__say { min-width: 0; } .pending__say > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 /* the faucet and the address to paste there, on one line */
 .getgnot { white-space: nowrap; }

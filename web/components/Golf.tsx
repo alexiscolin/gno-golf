@@ -9,7 +9,7 @@ import type { Skin } from "@/lib/scene/gnome";
 import type { HoleRow, Mode } from "@/lib/types";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
-import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, costOf, shortOf, depositBytes, ADENA_URL, onWalletChange, type SendError } from "@/lib/adena";
+import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, costOf, shortOf, depositBytes, ADENA_URL, NAME_BYTES, NAME_GAS, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
@@ -20,9 +20,9 @@ import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/componen
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
-import { messageOf, holeLink, parHere, HONEST, suggestName } from "@/components/common";
+import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, isTouch, type SaveOf } from "@/components/common";
 import { clipName } from "@/lib/clip";
-import { Boards, FullBoard, Podium, NameForm, useRankNudge, useSavedPlace, type BoardProps } from "@/components/Leaderboard";
+import { Boards, FullBoard, Podium, NameForm, nameOnce, useRankNudge, useSavedPlace, type BoardProps } from "@/components/Leaderboard";
 import { FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } from "@/lib/prefs";
 
@@ -49,13 +49,12 @@ type Gfx = "auto" | "high" | "low";
 type Account = NonNullable<Awaited<ReturnType<typeof current>>>;
 /** Where the current round's save stands: being signed (a part of it, when it
  *  goes in several), refused (stale: its weather is over), or on the chain. */
-/** A finished round, as far as saving it goes: what the save and its gas read. */
-type SaveOf = { id: string; name?: string; shots: readonly string[]; strokes: number; period?: number | null; roundMode?: Mode | null; official?: boolean; walls?: number; pieces?: number; kind?: string; pts?: readonly number[] };
-const saveOf = (s: SaveOf): SaveOf => ({ id: s.id, name: s.name, shots: s.shots, strokes: s.strokes, period: s.period, roundMode: s.roundMode, official: s.official, walls: s.walls, pieces: s.pieces, kind: s.kind, pts: s.pts });
 // the last finished round not yet on the chain, kept for this tab: installing
 // Adena means reloading the page, and the round it was installed for must not go
 const PENDING = "gnogolf.pending";
+const roundOf = (r: SaveOf) => `${r.id}#${r.shots.join(";")}`; // a round's key: its hole and shots
 
+/** How a save goes: signing (part of of), refused (why; stale: its weather is over), or saved. */
 type Rec = null
   | { at: "signing"; part?: number; of?: number }
   | { at: "refused"; error: string; stale: boolean }
@@ -206,15 +205,21 @@ const mmss = (ms: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 
-/** Where the round is and how long it can still go on-chain ("within 4:12"),
- *  then, once the weather is over, a replay in the current one. */
-// by and clock (now, ms) on the chain's clock; ranked: a course hole (a community one ranks nobody)
-function SaveClock({ by, clock = Date.now, stale, ranked }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean }) {
+/** The time now on a clock (the chain's), read again every second. */
+function useNow(clock: () => number) {
   const [now, setNow] = useState(clock);
   useEffect(() => {
     const t = setInterval(() => setNow(clock()), 1000);
     return () => clearInterval(t);
   }, [clock]);
+  return now;
+}
+
+/** Where the round is and how long it can still go on-chain ("within 4:12"),
+ *  then, once the weather is over, a replay in the current one. */
+// by and clock (now, ms) on the chain's clock; ranked: a course hole (a community one ranks nobody)
+function SaveClock({ by, clock = Date.now, stale, ranked }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean }) {
+  const now = useNow(clock);
   const left = by - now;
   if (left > 0 && !stale)
     return (
@@ -265,8 +270,9 @@ const depositOf = (saved: boolean | null, bytePrice: number, firstOnCourse = fal
 
 /** A round's cost in one short line: the total, then what it is made of. */
 // test: a testnet's GNOT, free from its faucet
-const costLine = (gas: number, gasPrice: number, saved: boolean | null, bytePrice: number, firstOnCourse = false, test = false) => {
-  const g = Number(costOf(gas, gasPrice)), d = depositOf(saved, bytePrice, firstOnCourse) / 1e6, unit = test ? "test GNOT" : "GNOT";
+// deposit: what the save stores, in ugnot (depositOf)
+const costLine = (gas: number, gasPrice: number, saved: boolean | null, deposit: number, test = false) => {
+  const g = Number(costOf(gas, gasPrice)), d = deposit / 1e6, unit = test ? "test GNOT" : "GNOT";
   return saved === true ? `About ${g.toFixed(2)} ${unit}` : `About ${(g + d).toFixed(2)} ${unit} (first save on this hole)`;
 };
 const short = (a: string | null | undefined) => (a ? `${a.slice(0, 4)}…${a.slice(-3)}` : "");
@@ -483,30 +489,37 @@ export default function Golf() {
   // the name typed on the win card, taken with the save (null: none, or not one the chain would take)
   const [saveName, setSaveName] = useState<string | null>(null);
   const [nameReady, setNameReady] = useState(true); // no name typed, or one checked: the save may go
-  const saving = useRef(false); // a save under way: a second click starts no second one
-  // the round kept through a reload (PENDING), and how its save goes
+  useEffect(() => (setSaveName(null), setNameReady(true)), [holeNow]); // a name is typed for its own hole's card
+  // a save under way, one per card (the win card's, the waiting round's): a second click starts no second one
+  const savingWin = useRef(false), savingKept = useRef(false);
+  // the last won round not on the chain yet (PENDING): offered again on a card of its own once the
+  // win card is gone, on any screen and after a reload, until saved, forgotten or too late;
+  // pendingRec: how its save goes, for that round only (round: its key)
   const [pending, setPending] = useState<SaveOf | null>(null);
-  const [pendingRec, setPendingRec] = useState<Rec>(null);
+  const [pendingRec, setPendingRec] = useState<{ round: string; rec: Rec } | null>(null);
+  const pendingNow = useRef<SaveOf | null>(null);
+  pendingNow.current = pending;
   const keepPending = (r: SaveOf | null) => {
     setPending(r);
     try { if (r) sessionStorage.setItem(PENDING, JSON.stringify(r)); else sessionStorage.removeItem(PENDING); } catch {}
   };
   const chainUp = !!(s || game.current);
   useEffect(() => {
-    // read once the chain is here: a round whose weather is over is dropped
+    // read once the chain is here: only a round in the shape a save sends, and not over
     const c = game.current && game.current.chain;
     if (!c) return;
-    let r: SaveOf | null = null;
-    try { r = JSON.parse(sessionStorage.getItem(PENDING) || "null") as SaveOf | null; } catch {}
-    if (!r || !r.id || !Array.isArray(r.shots)) return;
-    const kept = r;
+    let raw: unknown = null;
+    try { raw = JSON.parse(sessionStorage.getItem(PENDING) || "null"); } catch {}
+    const kept = pendingOf(raw);
+    if (!kept) return void (raw && keepPending(null));
     void c.sync().catch(() => {}).then(() => (kept.period == null || c.now() < saveBy(kept.period) ? setPending(kept) : keepPending(null)));
   }, [chainUp]);
   // a round won and not on the chain yet is the one kept; saved or too late, it goes
   useEffect(() => {
     if (!s || !s.holed || !s.id) return;
-    if (onChain || closed) return void (pending && pending.id === s.id && keepPending(null));
-    keepPending(saveOf({ ...s, id: s.id }));
+    const r = saveOf({ ...s, id: s.id });
+    if (onChain || closed) return void (pendingNow.current && roundOf(pendingNow.current) === roundOf(r) && keepPending(null));
+    keepPending(r);
     // (on these moments only: the round is s as the hole is won, not each of its frames)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holedNow, onChain, closed]);
@@ -646,6 +659,26 @@ export default function Golf() {
     return () => void (live = false);
   }, [holeId, chainName]);
 
+  // a dare in the link (by: the sharer): their best here, read on the chain, said on landing; they join the friends
+  const [dare] = useState(() => {
+    const by = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("by") : null;
+    return by && isAddress(by) ? by : "";
+  });
+  const dared = useRef("");
+  useEffect(() => {
+    const c = game.current && game.current.chain;
+    if (!dare || !c || !holeId || !s || !s.ready || dared.current) return;
+    dared.current = holeId;
+    addFriend(dare);
+    const who = (n: string) => n || `${dare.slice(0, 8)}…`;
+    void Promise.all([c.bests(holeId, "assisted", [dare]), c.bests(holeId, "pro", [dare]), nameOnce(c, dare)])
+      .then(([a, p, n]) => {
+        const best = Math.min(...[...a.rows, ...p.rows].map((r) => r.strokes));
+        if (Number.isFinite(best)) setLinkNote(`${who(n)} holed it in ${best} ✓ on-chain. Beat it!`);
+      })
+      .catch(() => {});
+  }, [dare, holeId, s]);
+
   // a different account or network in Adena: forget the connection
   // an "add me as a friend" link: the address joins this browser's friends
   useEffect(() => {
@@ -717,6 +750,16 @@ export default function Golf() {
     return () => void (live = false);
   }, [account, holeId, saveMode, holedNow]);
   const waiting = record?.at === "signing" && record.of === undefined; // Adena open, the round in one transaction
+  // what saving the won round costs, a name taken with it included, and what the account lacks for it
+  const withName = !!(account && canSave && nudge.noName && saveName);
+  const saveGas = s && s.holed ? gasOf(s) + (withName ? NAME_GAS : 0) : 0;
+  const saveDeposit = depositOf(saved, bytePrice, firstOnCourse) + (withName ? NAME_BYTES * bytePrice : 0);
+  const costNow = s && s.holed ? costLine(saveGas, gasPrice, saved, saveDeposit, chainName !== MAINNET) : null;
+  const lackNow = s && s.holed && account && !onChain && funds != null ? shortOf(saveGas, gasPrice, saveDeposit, funds) : null;
+  // the same for the waiting round (whether the hole holds a round of the player's is not known: a first save's deposit)
+  const keptName = !!(account && pending && nudge.isNamed === false && saveName);
+  const keptGas = pending ? gasOf(pending) + (keptName ? NAME_GAS : 0) : 0, keptDeposit = depositOf(null, bytePrice) + (keptName ? NAME_BYTES * bytePrice : 0);
+  const lackKept = pending && account && funds != null ? shortOf(keptGas, gasPrice, keptDeposit, funds) : null;
   useEffect(() => {
     if (!waiting) return setSlowSign(false);
     const t = setTimeout(() => setSlowSign(true), 10000);
@@ -749,10 +792,19 @@ export default function Golf() {
   }, [holedNow]);
 
   // the round kept through a reload: saved from its own card, connecting first if need be
+  // the waiting round's card: the checklist first while a step is missing (no
+  // wallet, too few GNOT, no name), which saves it from there; else at once
   const savePending = () => {
     if (!pending) return;
-    if (!account) return setReal(true);
-    void saveRound(pending, setPendingRec, () => true);
+    if (!account || (lackKept != null && lackKept > 0) || nudge.isNamed === false) return setReal(true);
+    keptSave();
+  };
+  const keptSave = () => {
+    const r = pending;
+    if (!r) return;
+    const round = roundOf(r);
+    // (its state is its own round's; forgotten or replaced, no later part goes)
+    void saveRound(r, (rec) => setPendingRec({ round, rec }), () => !!pendingNow.current && roundOf(pendingNow.current) === round, savingKept, nudge.isNamed === false ? saveName : null);
   };
 
   // the round the win card offers to save, or the one kept through a reload (pending)
@@ -760,20 +812,20 @@ export default function Golf() {
     if (!account) return setReal(true);
     if (!s || !game.current || !s.id) return;
     const round = `${s.id}#${s.shots.join(";")}`;
-    await saveRound({ ...s, id: s.id }, (r) => roundKey.current === round && setRecord(r), () => roundKey.current === round);
+    await saveRound({ ...s, id: s.id }, (r) => roundKey.current === round && setRecord(r), () => roundKey.current === round, savingWin, nudge.noName ? saveName : null);
   }
 
   /**
    * Puts a finished round on the chain: in as many commits as the chain cuts
    * it into, each signed in Adena, then read back. land says how it goes;
-   * alive: the player is still on it (a later commit is not sent otherwise).
-   * A name typed on the card (saveName) is taken in the first signature.
+   * alive: the player is still on it (a later commit is not sent otherwise);
+   * lock: that card's save under way; name: taken in the first signature.
    */
-  async function saveRound(r: SaveOf, land: (rec: Rec) => void, alive: () => boolean) {
+  async function saveRound(r: SaveOf, land: (rec: Rec) => void, alive: () => boolean, lock: { current: boolean }, name: string | null) {
     if (!account || !game.current) return;
     // busy before anything is awaited: a second click must not start a second save
-    if (saving.current) return;
-    saving.current = true;
+    if (lock.current) return;
+    lock.current = true;
     land({ at: "signing" });
     try {
       // a round whose weather is over can no longer be saved: the chain would refuse it
@@ -789,7 +841,7 @@ export default function Golf() {
       const period = r.period != null ? r.period : await within(chain.period());
       const parts = await chainSplit(chain, r, period);
       // the name typed on the card goes in the first signature, before the round
-      const named = nudge.noName && saveName ? { registrar: await chain.nameReg(), name: saveName } : null;
+      const named = name ? { registrar: await chain.nameReg(), name } : null;
       let tx: Awaited<ReturnType<typeof recordRound>> | null = null;
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k];
@@ -819,6 +871,8 @@ export default function Golf() {
         })();
         void sent.catch(() => {}); // raced below; a late refusal after the chain has it is moot
         tx = await Promise.race([sent, landed.then((ok) => (ok ? null : sent))]).finally(() => (open = false));
+        // the name is the player's once the first part is in: a retry of the rest must not take it again
+        if (k === 0 && named) setNamedAs(named.name), nudge.named();
         // the next part continues the round: it waits until the chain has this one
         if (k + 1 < parts.length) {
           for (let w = 0; w < 10; w++) {
@@ -829,7 +883,6 @@ export default function Golf() {
         }
       }
       void within(chain.balance(account.address)).then(setFunds).catch(() => {});
-      if (named) setNamedAs(named.name), nudge.named();
       // signed is not recorded: read the round back and say what the chain has
       // the block may land a moment after Adena answers: read back for up to 8 s
       let mine: Awaited<ReturnType<Chain["round"]>> = null;
@@ -840,7 +893,7 @@ export default function Golf() {
       }
       if (mine && mine.done && mine.strokes === r.strokes) {
         land({ at: "saved", hash: tx?.hash ?? "", height: tx?.height, parts: parts.length });
-        if (hole === holeId) setSaved(true); // (a round kept through a reload may be another hole's)
+        if (roundKey.current.startsWith(hole + "#")) setSaved(true); // (still on that hole: a kept round may be another's)
       } else
         land({
           at: "refused",
@@ -852,7 +905,7 @@ export default function Golf() {
     } catch (err) {
       land((err as SendError).cancelled ? null : { at: "refused", error: messageOf(err), stale: /weather .* is over|is not the current weather/.test(String((err as SendError).message)) });
     } finally {
-      saving.current = false;
+      lock.current = false;
     }
   }
 
@@ -884,6 +937,8 @@ export default function Golf() {
   }, [holeId, holeReady, curtain]);
 
   const holed = s && s.holed;
+  // the hole the gnome picker leads to (a shared link's, or the cup's first), named over the gnomes
+  const linked = s && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
   // The address bar follows the screen: the title is the bare page, the cups
   // ?cup=<world>, the picker adds &gnome=, a hole ?cup=&hole=&gnome=. A new
   // screen is a new history entry (Back returns to the one before); moving
@@ -988,7 +1043,7 @@ export default function Golf() {
           }}
         />
       )}
-      {screen === "pick" && <Picker world={(s && s.world) || "garden"} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
+      {screen === "pick" && <Picker world={(s && s.world) || "garden"} hole={linked} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         onBack={() => {
           sound("blip");
@@ -1033,7 +1088,7 @@ export default function Golf() {
                 <img className="adena__logo" src="adena.svg" alt="" width="34" height="34" />
                 <span className="adena__text">
                   <small>{account ? "Adena · connected" : "Adena"}</small>
-                  <b>{account ? short(account.address) : "Save on-chain"}</b>
+                  <b>{account ? short(account.address) : s && s.holed ? "Save on-chain" : "Connect"}</b>
                 </span>
               </button>
               {account && (
@@ -1089,29 +1144,10 @@ export default function Golf() {
                   <div className="me__row">
                     <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}>Cup overview</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("pick"); }}>Change gnome</Button>
-                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("title"); }}>Main menu</Button>
+                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("worlds"); }}>All cups</Button>
                     {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
-                <nav className="drawer__list">
-                  {s.holes.map((h) => (
-                    <button
-                      key={h.id}
-                      className="tile"
-                      aria-current={h.id === s.id}
-                      onClick={() => {
-                        setMenu(false);
-                        goTo(h.id);
-                      }}
-                    >
-                      <span className="tile__num">{holeNumber(s.holes, h.id)}</span>
-                      <span className="tile__name">{h.name}</span>
-                      <span className="tile__best">
-                        {scoreOf(card, h) ? <b>{scoreOf(card, h)}</b> : "–"} / par {parOf(h)}
-                      </span>
-                    </button>
-                  ))}
-                </nav>
                 <section className="drawer__settings" aria-label="Settings">
                   <span className="eyebrow">Settings</span>
                   <AimSetting aim={aim} onChange={setAim} />
@@ -1135,6 +1171,25 @@ export default function Golf() {
                   </button>
                   <small className="drawer__note">Clears this browser's scorecard. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
                 </section>
+                <nav className="drawer__list">
+                  {s.holes.map((h) => (
+                    <button
+                      key={h.id}
+                      className="tile"
+                      aria-current={h.id === s.id}
+                      onClick={() => {
+                        setMenu(false);
+                        goTo(h.id);
+                      }}
+                    >
+                      <span className="tile__num">{holeNumber(s.holes, h.id)}</span>
+                      <span className="tile__name">{h.name}</span>
+                      <span className="tile__best">
+                        {scoreOf(card, h) ? <b>{scoreOf(card, h)}</b> : "–"} / par {parOf(h)}
+                      </span>
+                    </button>
+                  ))}
+                </nav>
               </Dialog>
             </div>
           )}
@@ -1159,7 +1214,7 @@ export default function Golf() {
             <span>Leaderboard</span>
           </Button>
           <footer className="hud hud--bottom">
-            <Button onClick={() => game.current?.reset()}>Restart</Button>
+            <Button disabled={!s.strokes} onClick={() => game.current?.reset()}>Restart</Button>
             <Button
               className="cam-btn"
               aria-label={`Camera: ${CAMS[s.cam] || "Classic"} — click to change`}
@@ -1196,7 +1251,9 @@ export default function Golf() {
                 )}
               </div>
             <Share
-              link={s ? holeLink(s, gnome) : ""}
+              // with a round of the sharer's on the chain here, the link dares the friend to beat it
+              link={s ? holeLink(s, gnome, account && (onChain || saved) ? account.address : "") : ""}
+              label={savedPlace ? `Share your #${savedPlace.rank}` : "Share"}
                 snapshot={() => (game.current ? game.current.snapshot(caption(s)) : Promise.resolve(null))}
                 text={shareText({ s, card, cups, fresh, place: savedPlace })}
                 clip={clip}
@@ -1226,7 +1283,7 @@ export default function Golf() {
               // one note at a time, the one in the way first: the node, the funds, then the name
               const chain = game.current && game.current.chain;
               const host = ((chain && chain.rpc) || "").replace(/^https?:\/\//, "");
-              const short = account && !onChain && funds != null ? shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice, firstOnCourse), funds) : 0;
+              const short = lackNow || 0;
               const warn =
                 account && (ourNode === false || slowSign) ? (
                   <>
@@ -1236,7 +1293,7 @@ export default function Golf() {
                 ) : short && funds != null ? (
                   <>
                     {funds === 0 ? "Your Adena account has no GNOT here yet." : `You need about ${short.toFixed(2)} more GNOT.`}{" "}
-                    {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : account && <GetGnot address={account.address} href={chainId === MAINNET ? GNOT_URL : FAUCET} label={`Get ${chainId === MAINNET ? "" : "free test "}GNOT (${chainId}) ↗`} />}
+                    {chain && networkOf(chain.rpc) === "local" ? "Fund it from the node's test account." : account && <GetGnot address={account.address} href={chainId === MAINNET ? GNOT_URL : FAUCET} label={`Get ${chainId === MAINNET ? "" : "free test "}GNOT (${chainId}) ↗`} />}
                   </>
                 ) : null;
               // (once saved, the saved line says the name too)
@@ -1272,7 +1329,8 @@ export default function Golf() {
                   ) : (
                     "Save on-chain"
                   )}
-                  {nudge.at > 0 && record?.at !== "signing" && (
+                  {nudge.at > 0 && record?.at !== "signing" && !(!account && isTouch() && !hasAdena()) && (
+                    // (a phone with no wallet can't take it: no promise there)
                     <span className="btn__rank">{!account ? `Could be #${nudge.at}` : nudge.noName && !saveName ? `#${nudge.at} with a name` : `Take #${nudge.at} on this hole!`}</span>
                   )}
                 </Button>
@@ -1289,7 +1347,7 @@ export default function Golf() {
             </div>
             {account && !onChain && (
               <p className="real__fine">
-                {costLine(gasOf(s), gasPrice, saved, bytePrice, firstOnCourse, chainName !== MAINNET)}. You confirm in Adena.
+                {costNow}. You confirm in Adena.
               </p>
             )}
             {!onChain && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
@@ -1304,7 +1362,7 @@ export default function Golf() {
           holes={(s.allHoles || NONE).filter((h) => cupOf(h) === cupWon.cup)}
           card={card}
           fresh={fresh}
-          snapshot={() => (game.current ? game.current.snapshot({ eyebrow: "Grand prix", title: (WORLDS.find((w) => w.id === cupWon.cup) || WORLDS[0]).name, score: "complete" }) : Promise.resolve(null))}
+          snapshot={() => (game.current ? game.current.snapshot({ eyebrow: "Cup", title: (WORLDS.find((w) => w.id === cupWon.cup) || WORLDS[0]).name, score: "complete" }) : Promise.resolve(null))}
           onBack={() => (setCupWon(null), setScreen("worlds"))}
           onReplay={() => {
             setCupWon(null);
@@ -1356,7 +1414,7 @@ export default function Golf() {
       {cfg && <NetBanner rpc={cfg.rpc} />}
 
       {pending && !(holed && s && s.id === pending.id) && (
-        <PendingSave r={pending} rec={pendingRec} by={pending.period != null ? saveBy(pending.period) : null} clock={game.current ? game.current.chain.now : undefined}
+        <PendingSave r={pending} rec={pendingRec && pendingRec.round === roundOf(pending) ? pendingRec.rec : null} by={pending.period != null ? saveBy(pending.period) : null} clock={game.current ? game.current.chain.now : undefined}
           onSave={savePending} onForget={() => (keepPending(null), setPendingRec(null))} />
       )}
       {real && (
@@ -1366,23 +1424,27 @@ export default function Golf() {
           onConnect={() => void connectWallet()}
           onClose={() => setReal(false)}
           // from a won hole (or one kept through a reload), connecting leads straight to its save
-          onSave={s && s.holed && canSave ? () => (setReal(false), void recordIt()) : pending ? () => (setReal(false), savePending()) : null}
+          onSave={s && s.holed && canSave ? () => (setReal(false), void recordIt()) : pending ? () => (setReal(false), keptSave()) : null}
           rpc={cfg && cfg.rpc}
           chainName={chainName}
-          cost={s && s.holed ? costLine(gasOf(s), gasPrice, saved, bytePrice, firstOnCourse, chainName !== MAINNET) : null}
+          cost={s && s.holed && canSave ? costNow : pending ? costLine(keptGas, gasPrice, null, keptDeposit, chainName !== MAINNET) : costNow}
           funds={funds}
-          lack={s && s.holed && account && funds != null ? shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice, firstOnCourse), funds) : null}
+          lack={s && s.holed && canSave ? lackNow : pending ? lackKept : lackNow}
+          // with a round to save, the name goes in its signature: typed there as on the win card
+          pick={(n, ok) => (setSaveName(n), setNameReady(ok))}
+          nameOk={nameReady}
+          suggest={suggestName(gnome)}
           named={account ? nudge.isNamed : null}
           chain={game.current && game.current.chain}
           price={gasPrice}
           onNamed={(n) => (setNamedAs(n), nudge.named())}
-          waiting={pending ? `your ${pending.strokes} stroke${pending.strokes > 1 ? "s" : ""} on ${pending.name || "this hole"}` : s && s.holed && canSave ? "this round" : null}
+          waiting={pending ? `your ${strokesWord(pending.strokes)} on ${pending.name || "this hole"}` : s && s.holed && canSave ? "this round" : null}
         />
       )}
 
       {playing && s && s.note && !s.flying && <div className="toast" role="status">{s.note}</div>}
       {playing && linkNote && <Toast text={linkNote} onDone={() => setLinkNote(null)} />}
-      {playing && !linkNote && farHint && s && s.ready && !s.flying && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
+      {playing && !linkNote && farHint && s && s.ready && !s.flying && s.strokes > 0 && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
       {playing && s && s.flying && <CauseNote hot={hot.current} />}
 
       {gl && !fatal && (
@@ -1486,11 +1548,7 @@ function RecordState({ record, account, s, chain, named = "" }: { record: Rec; a
  * late. by and clock on the chain's clock.
  */
 function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: SaveOf; rec: Rec; by: number | null; clock?: () => number; onSave: () => void; onForget: () => void }) {
-  const [now, setNow] = useState(clock);
-  useEffect(() => {
-    const t = setInterval(() => setNow(clock()), 1000);
-    return () => clearInterval(t);
-  }, [clock]);
+  const now = useNow(clock);
   const done = rec?.at === "saved";
   // said for a moment once saved, then gone
   const forget = useRef(onForget);
@@ -1501,16 +1559,19 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
     return () => clearTimeout(t);
   }, [done]);
   const left = by == null ? null : by - now;
-  if (!done && left != null && left <= 0) return null;
+  // too late to save: the round goes (and the sheet stops offering it)
+  const over = !done && left != null && left <= 0;
+  useEffect(() => void (over && forget.current()), [over]);
+  if (over) return null;
   return (
-    <div className="pending" role="status">
+    <div className="pending">
       {done ? (
-        <span className="pending__say">Saved on-chain ✓ Your round on <b>{r.name}</b> is public.</span>
+        <span className="pending__say" role="status">Saved on-chain ✓ Your round on <b>{r.name}</b> is public.</span>
       ) : (
         <>
           <span className="pending__say">
-            <span>Your <b>{r.strokes} stroke{r.strokes > 1 ? "s" : ""}</b> on <b>{r.name}</b> {r.strokes > 1 ? "are" : "is"} waiting{left != null && <> · <b>{mmss(left)}</b> left</>}</span>
-            {rec?.at === "refused" && <small className="pending__err">{rec.error}</small>}
+            <span>Your <b>{strokesWord(r.strokes)}</b> on <b>{r.name}</b> {r.strokes > 1 ? "are" : "is"} waiting{left != null && <> · <b>{mmss(left)}</b> left</>}</span>
+            {rec?.at === "refused" && <small className="pending__err" role="alert">{rec.error}</small>}
           </span>
           <Button variant="secondary" className="btn--save" disabled={rec?.at === "signing"} onClick={onSave}>
             {rec?.at === "signing" ? "Waiting for Adena…" : "Save on-chain"}
@@ -1529,15 +1590,21 @@ function GetGnot({ address, href = FAUCET, label = "Get free test GNOT ↗", pas
   return (
     <span className="getgnot">
       {href && <><a href={href} target="_blank" rel="noopener noreferrer">{label}</a>{" · "}</>}
-      <button className="linkish" onClick={() => void navigator.clipboard.writeText(paste).then(() => setCopied(true), () => {})}>
+      <button className="linkish" onClick={() => void navigator.clipboard.writeText(paste).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1800)), () => {})}>
         {copied ? "Copied ✓" : `Copy ${what}`}
       </button>
     </span>
   );
 }
 /** A node on this machine sends this address some GNOT from its test1 account: gnokey's command. */
-const fundCmd = (address: string, chainId: string, rpc: string) =>
-  `gnokey maketx send -send 50000000ugnot -to ${address} -gas-fee 1000000ugnot -gas-wanted 2000000 -chainid ${chainId} -remote ${rpc.replace(/^https?:\/\//, "")} -broadcast test1`;
+const fundCmd = (address: string, chainId: string, rpc: string) => {
+  // (only an address, a chain id and a host go in a command the player pastes into a shell)
+  let host = "";
+  try { host = new URL(rpc).host; } catch {}
+  return isAddress(address) && /^[\w.-]+$/.test(chainId) && /^[\w.:[\]-]+$/.test(host)
+    ? `gnokey maketx send -send 50000000ugnot -to ${address} -gas-fee 1000000ugnot -gas-wanted 2000000 -chainid ${chainId} -remote ${host} -broadcast test1`
+    : "";
+};
 
 /**
  * Getting on the boards, once: what saving gives, and each step ticked as it
@@ -1546,10 +1613,12 @@ const fundCmd = (address: string, chainId: string, rpc: string) =>
  * playing free. lack: the GNOT the account lacks for the round on offer
  * (null: unknown); waiting: that round, said while Adena is installed.
  */
-function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed }: {
+function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed, pick, nameOk, suggest }: {
   account: Account | null; wallet: { busy: boolean; error: string | null; note?: string }; onConnect: () => void; onClose: () => void; onSave: (() => void) | null;
   rpc: string | null; chainName: string; cost: string | null; funds: number | null; lack: number | null; named: boolean | null; waiting: string | null;
   chain: Chain | null; price: number; onNamed: (name: string) => void;
+  /** with a round to save: the name typed goes in its signature (NameForm's onPick), nameOk: the save may go */
+  pick: (name: string | null, ready: boolean) => void; nameOk: boolean; suggest: string;
 }) {
   // a round of this account's on the chain already, in either mode: the last step done
   const [savedAny, setSavedAny] = useState(false);
@@ -1561,14 +1630,17 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
     return () => void (live = false);
   }, [chain, me]);
   const installed = hasAdena();
-  const phone = !installed && typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
-  const local = /localhost|127\.0\.0\.1|\[::1\]/.test(rpc || ""), main = chainName === MAINNET;
+  const phone = !installed && isTouch();
+  const local = networkOf(rpc || "") === "local", main = chainName === MAINNET;
   const funded = funds != null && (lack != null ? lack === 0 : funds > 0);
   // one step at a time: each ticked on its own (a name and no GNOT left is
   // step 3 to do again), and only the first not done shows what to do
   const done = [installed, !!account, funded, !!named, savedAny];
   const now = done.indexOf(false);
   const step = (i: number) => (done[i] ? "done" : i === now ? "now" : "later");
+  // the step to do, in view (a phone's sheet is taller than the screen)
+  const steps = useRef<HTMLOListElement>(null);
+  useEffect(() => void steps.current?.querySelector(".now")?.scrollIntoView({ block: "nearest" }), [now]); // (void: it may return a promise, not a clean-up)
   const [sent, setSent] = useState(false);
   // a phone has no Adena: the hole goes to the player's computer
   const sendOn = async () => {
@@ -1583,7 +1655,7 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
         <h2>Get on the boards</h2>
         <p className="real__lead">Same game, still free to play. Saving puts your round on gno.land: public, ranked, yours on any device.</p>
 
-        <div className="real__cols">
+        {!account && <div className="real__cols">
           <div className="real__col">
             <h3>Free play</h3>
             <ul>
@@ -1600,9 +1672,9 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
               <li>With a gno.land name, your best rounds are ranked</li>
             </ul>
           </div>
-        </div>
+        </div>}
 
-        <ol className="real__steps">
+        <ol className="real__steps" ref={steps}>
           <li className={step(0)}>
             <b>Get Adena</b>
             <span>{phone ? "A computer's browser extension: save from there." : "The gno.land wallet, a browser extension."}</span>
@@ -1627,7 +1699,9 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
           <li className={step(3)}>
             <b>Pick your gno.land name</b>
             <span>{named ? "Your saved rounds are ranked." : "Only named players are ranked."}</span>
-            {account && now === 3 && chain && <NameForm chain={chain} account={account.address} chainId={chainName || null} price={price} lead="Your name" onNamed={onNamed} />}
+            {account && now === 3 && chain && (onSave
+              ? <NameForm chain={chain} account={account.address} chainId={chainName || null} price={price} lead="Your name" onNamed={onNamed} onPick={pick} suggest={suggest} />
+              : <NameForm chain={chain} account={account.address} chainId={chainName || null} price={price} lead="Your name" onNamed={onNamed} />)}
           </li>
           <li className={step(4)}>
             <b>Hole out, then save</b>
@@ -1641,7 +1715,10 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
 
         {!installed ? (
           phone ? (
-            <Button variant="primary" className="btn--wide" onClick={() => void sendOn()}>{sent ? "Link copied: open it on your computer" : "Send this hole to my computer"}</Button>
+            <>
+              <Button variant="primary" className="btn--wide" onClick={() => void sendOn()}>{sent ? "Link copied: open it on your computer" : "Play it on my computer"}</Button>
+              <p className="real__fine">This round stays on this phone: play the hole there to save it.</p>
+            </>
           ) : (
             <>
               <a className="btn btn--main btn--wide" href={ADENA_URL} target="_blank" rel="noopener noreferrer">
@@ -1656,13 +1733,13 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
         ) : account ? (
           // the button does the step at hand: GNOT first, then the round waiting, else back to the game
           now === 2 && local ? (
-            <Button variant="primary" className="btn--wide" onClick={() => void navigator.clipboard.writeText(fundCmd(account.address, chainName, rpc || "")).then(() => setSent(true), () => {})}>
+            <Button variant="primary" className="btn--wide" disabled={!fundCmd(account.address, chainName, rpc || "")} onClick={() => void navigator.clipboard.writeText(fundCmd(account.address, chainName, rpc || "")).then(() => setSent(true), () => {})}>
               {sent ? "Copied: run it in a terminal ✓" : "Copy the gnokey command"}
             </Button>
           ) : now === 2 ? (
             <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (
-            <Button variant="primary" className="btn--wide" onClick={onSave}>Save this round</Button>
+            <Button variant="primary" className="btn--wide" disabled={!nameOk} onClick={onSave}>Save on-chain</Button>
           ) : (
             <Button variant={now === -1 || now === 4 ? "primary" : "secondary"} className="btn--wide" onClick={onClose}>
               {now === -1 ? "All set: play" : now === 4 ? "Play a hole, then save it" : "Later: keep playing"}
@@ -1687,6 +1764,8 @@ const CAMS: Record<CamMode, string> = { classic: "Classic", far: "Far", third: "
 interface PickerProps {
   /** the cup picked: the screen takes its colours */
   world: string;
+  /** the hole a shared link opened, named over the gnomes ("Hole 3 · Down the Tunnel") */
+  hole?: string;
   gnome: string;
   onChange: (id: string) => void;
   onPick: () => void;
@@ -1698,7 +1777,7 @@ interface PickerProps {
   aim: Mode;
   onAim: (m: Mode) => void;
 }
-function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, aim, onAim }: PickerProps) {
+function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, aim, onAim, hole = "" }: PickerProps) {
   const canvas = useRef<HTMLDivElement>(null);
   const preview = useRef<ReturnType<typeof makePreview> | null>(null);
   const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
@@ -1731,7 +1810,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
     <div className={`screen screen--pick front tint--${world}`}>
       <BackButton label="Back to the cups" onClick={onBack} />
       <div className="pick">
-        <span className="eyebrow">Pick your gnome</span>
+        <span className="eyebrow">{hole ? `${hole} · pick your gnome` : "Pick your gnome"}</span>
         <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
@@ -1880,11 +1959,10 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
   );
 }
 
-/** The line on a shared picture's card, and on the clip's: the hole and the score. */
-/** The hole on the shared picture and clip, as its link card has it (media/og). */
+/** The hole on the shared picture's card and the clip's, as its link card has it (media/og): the hole and the score. */
 const caption = (s: Snapshot) => {
   const cup = s.place ? (WORLDS.find((w) => w.id === s.world) || WORLDS[0]).name : "Community hole", par = parHere(s);
-  return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: `${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`, term: golfTerm(s.strokes, par).replace(/!?$/, "!") }; // the clip shouts it
+  return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: strokesWord(s.strokes), term: golfTerm(s.strokes, par).replace(/!?$/, "!") }; // the clip shouts it
 };
 
 /**
@@ -1902,7 +1980,7 @@ function shareText({ s, card, cups, fresh, place }: { s: Snapshot; card: Card; c
     `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on gno.land.`,
     `⛳ ${t.strokes} strokes round the whole ${cup} (${vs}). My gnome is tired, the chain is not.`,
   ]) + tag;
-  if (place) return `🏆 #${place.rank} of ${place.of} on ${s.name} in Gnogolf: ${s.strokes} stroke${s.strokes > 1 ? "s" : ""}, saved on-chain. Come and take my place.` + tag;
+  if (place) return `🏆 #${place.rank} of ${place.of} on ${s.name} in Gnogolf: ${strokesWord(s.strokes)}, saved on-chain. Come and take my place.` + tag;
   if (fresh.length) return `🍄 New gnome unlocked on Gnogolf: ${fresh.map((g) => g.name).join(" and ")}. Earned the hard way, one putt at a time.` + tag;
   if (s.strokes === 1) return pick([
     `🕳️ Hole in one on ${s.name}! Every bounce computed by a realm on gno.land.`,
@@ -2071,13 +2149,13 @@ function Standings({ s, card, chain, me, mode = "pro", compact = false }: BoardP
       <header className="cup__head">
         <Emblem id={cup.id} />
         <div>
-          <span className="eyebrow">Grand prix</span>
+          <span className="eyebrow">Your cup</span>
           <h3>{cup.name}</h3>
         </div>
         <dl className="cup__sum">
           <div><dt>Holes</dt><dd>{t.done}/{s.holes.length}</dd></div>
           <div><dt>Vs par</dt><dd className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{t.done ? vsPar(vs) : "–"}</dd></div>
-          <div><dt>On-chain</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{!rank ? "–" : rank.at ? `#${rank.at}` : "unranked"}</dd></div>
+          <div><dt>On-chain</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{!rank || !rank.at ? "–" : `#${rank.at}`}</dd></div>
         </dl>
       </header>
       <Scorecard holes={s.holes} card={card} current={s.id} world={s.world} compact={compact} />

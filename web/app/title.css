@@ -187,6 +187,7 @@
 /* on a wide screen the facts sit on the foot of it */
 @media (min-aspect-ratio: 1/1) {
   .screen--title .title__facts { position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); margin: 0; }
+  body:has(.netbanner) .screen--title .title__facts { bottom: 84px; } /* above the network banner's row */
 }
 @media (max-height: 720px) {
   .screen--title .title__facts { display: none; }

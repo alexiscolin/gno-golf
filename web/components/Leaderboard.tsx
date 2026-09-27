@@ -149,7 +149,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { i
       {who.length > 0 && (<>
       {inHole && <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>}
       {inHole && !h && <p className="lb__empty">Reading the chain…</p>}
-      {inHole && h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet: be the first.</p>}
+      {inHole && h && h.length === 0 && <p className="lb__empty">None of you has a saved round here yet: be the first.</p>}
       {inHole && h && h.length > 0 && (
         <ol>
           {h.map((r, i) => (
@@ -164,7 +164,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { i
       )}
       <h3>The course <small>{course ? `${course.holes} holes` : ""}</small></h3>
       {!c && <p className="lb__empty">Reading the chain…</p>}
-      {c && c.length === 0 && <p className="lb__empty">No recorded rounds yet: be the first.</p>}
+      {c && c.length === 0 && <p className="lb__empty">No saved rounds yet: be the first.</p>}
       {c && c.length > 0 && (
         <ol>
           {c.map((r, i) => (
@@ -229,7 +229,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
   const newer = self && self.next;
   return (
     <Sheet className="boards" label="Leaderboard" onClose={onClose}>
-        <span className="eyebrow">Recorded on-chain</span>
+        <span className="eyebrow">Saved on-chain</span>
         <h2>Leaderboard</h2>
         <div className="boards__modes">
           <Segmented role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
@@ -238,13 +238,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={inHole ? [["hole", "This hole"], ["course", "The course"], ["friends", "Friends"]] : [["course", "The course"], ["friends", "Friends"]]} />
         {tab !== "friends" && (
           <p className="boards__ranked">
-            Ranked: players with a gno.land name
-            {!(me && myName) && (
-              <>
-                {" "}· <NameLink chain={chain}>get a name ↗</NameLink>
-                {me && myName === "" && <> — get one to appear here</>}
-              </>
-            )}
+            Ranked: players with a gno.land name{!(me && myName) && ", taken when you save"}
           </p>
         )}
         {tab !== "friends" && me && myName && chain && <ClaimRounds chain={chain} me={me} mode={mode} onDone={() => setClaimed((n) => n + 1)} />}
@@ -431,7 +425,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro" }: BoardProps & { k
       </h3>
       {err && <p className="note note--bad">{err}</p>}
       {!rows && !err && <Ghosts />}
-      {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No recorded round yet — connect Adena and be the first.</p></>)}
+      {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No saved round yet — connect Adena and be the first.</p></>)}
       {shown && shown.rows.length > 0 && (
         <ol>
           {shown.rows.map((r) => (

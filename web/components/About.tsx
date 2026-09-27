@@ -27,7 +27,7 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
     icon: (<><path d="M10 5 H22 V12 Q22 19 16 19 Q10 19 10 12 Z" className="fi fi--gold" /><path d="M10 8 H6 Q6 14 10 14 M22 8 H26 Q26 14 22 14" className="fi" /><path d="M16 19 V24 M11 28 H21 V24 H11 Z" className="fi" /></>),
   },
 ];
-const FACTS = ["4 cups · 72 holes", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
+const FACTS = ["4 cups · 72 holes · 2 extras", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
 
 /** The round corner button every screen has: back at the top left, about at the top right. */
 function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
