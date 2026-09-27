@@ -4,6 +4,8 @@
 export const NETWORK: "testnet" | "mainnet" = process.env.NEXT_PUBLIC_NETWORK === "mainnet" ? "mainnet" : "testnet";
 /** Where a testnet's players get free GNOT (NEXT_PUBLIC_FAUCET; mainnet has none). */
 export const FAUCET = process.env.NEXT_PUBLIC_FAUCET || "https://faucet.gno.land";
+/** Where mainnet players read how to get GNOT (NEXT_PUBLIC_GNOT_URL; none said: only their address to copy). */
+export const GNOT_URL = process.env.NEXT_PUBLIC_GNOT_URL || "";
 /** The other deployment's address ("" when there is none yet). */
 export const OTHER_URL = process.env.NEXT_PUBLIC_OTHER_URL || "";
 

@@ -23,7 +23,7 @@ import { addFriend } from "@/lib/friends";
 import { messageOf, holeLink, parHere, HONEST, suggestName } from "@/components/common";
 import { clipName } from "@/lib/clip";
 import { Boards, FullBoard, Podium, NameForm, useRankNudge, useSavedPlace, type BoardProps } from "@/components/Leaderboard";
-import { FAUCET, networkOf, OTHER_URL } from "@/lib/network";
+import { FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember } from "@/lib/prefs";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -1371,6 +1371,9 @@ export default function Golf() {
           funds={funds}
           lack={s && s.holed && account && funds != null ? shortOf(gasOf(s), gasPrice, depositOf(saved, bytePrice, firstOnCourse), funds) : null}
           named={account ? nudge.isNamed : null}
+          chain={game.current && game.current.chain}
+          price={gasPrice}
+          onNamed={(n) => (setNamedAs(n), nudge.named())}
           waiting={pending ? `your ${pending.strokes} stroke${pending.strokes > 1 ? "s" : ""} on ${pending.name || "this hole"}` : s && s.holed && canSave ? "this round" : null}
         />
       )}
@@ -1516,19 +1519,23 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
   );
 }
 
-/** Test GNOT for this account: the faucet, and the address to paste there. */
-function GetGnot({ address }: { address: string }) {
+/** GNOT for this account: where to get some (the faucet by default), and
+ *  what to paste there (the address; on this machine, gnokey's command). */
+function GetGnot({ address, href = FAUCET, label = "Get free test GNOT ↗", paste = address, what = "my address" }: { address: string; href?: string; label?: string; paste?: string; what?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <span className="getgnot">
-      <a href={FAUCET} target="_blank" rel="noopener noreferrer">Get free test GNOT ↗</a>
-      {" · "}
-      <button className="linkish" onClick={() => void navigator.clipboard.writeText(address).then(() => setCopied(true), () => {})}>
-        {copied ? "Address copied ✓" : "Copy my address"}
+      {href && <><a href={href} target="_blank" rel="noopener noreferrer">{label}</a>{" · "}</>}
+      <button className="linkish" onClick={() => void navigator.clipboard.writeText(paste).then(() => setCopied(true), () => {})}>
+        {copied ? "Copied ✓" : `Copy ${what}`}
       </button>
     </span>
   );
 }
+/** A dev node's test1 account, the same on every gno.land dev chain (its
+ *  phrase is public, in gno's own repo): imported in Adena, it sends GNOT to
+ *  the player's account. Only for a node on this machine. */
+const TEST1 = "source bonus chronic canvas draft south burst lottery vacant surface solve popular case indicate oppose farm nothing bullet exhibit title speed wink action roast";
 
 /**
  * Getting on the boards, once: what saving gives, and each step ticked as it
@@ -1537,14 +1544,29 @@ function GetGnot({ address }: { address: string }) {
  * playing free. lack: the GNOT the account lacks for the round on offer
  * (null: unknown); waiting: that round, said while Adena is installed.
  */
-function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting }: {
+function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed }: {
   account: Account | null; wallet: { busy: boolean; error: string | null; note?: string }; onConnect: () => void; onClose: () => void; onSave: (() => void) | null;
   rpc: string | null; chainName: string; cost: string | null; funds: number | null; lack: number | null; named: boolean | null; waiting: string | null;
+  chain: Chain | null; price: number; onNamed: (name: string) => void;
 }) {
+  // a round of this account's on the chain already, in either mode: the last step done
+  const [savedAny, setSavedAny] = useState(false);
+  const me = account && account.address;
+  useEffect(() => {
+    if (!chain || !me) return setSavedAny(false);
+    let live = true;
+    for (const m of ["assisted", "pro"] as const) void within(chain.rank(m, me)).then((r) => live && r.holes > 0 && setSavedAny(true)).catch(() => {});
+    return () => void (live = false);
+  }, [chain, me]);
   const installed = hasAdena();
   const phone = !installed && typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
   const local = /localhost|127\.0\.0\.1|\[::1\]/.test(rpc || ""), main = chainName === MAINNET;
   const funded = funds != null && (lack != null ? lack === 0 : funds > 0);
+  // one step at a time: each ticked on its own (a name and no GNOT left is
+  // step 3 to do again), and only the first not done shows what to do
+  const done = [installed, !!account, funded, !!named, savedAny];
+  const now = done.indexOf(false);
+  const step = (i: number) => (done[i] ? "done" : i === now ? "now" : "later");
   const [sent, setSent] = useState(false);
   // a phone has no Adena: the hole goes to the player's computer
   const sendOn = async () => {
@@ -1579,29 +1601,35 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
         </div>
 
         <ol className="real__steps">
-          <li className={installed ? "done" : ""}>
+          <li className={step(0)}>
             <b>Get Adena</b>
-            <span>{phone ? "Adena is a browser extension for a computer: save from there. Free play works here." : "The gno.land wallet, a browser extension. About a minute."}</span>
+            <span>{phone ? "A computer's browser extension: save from there." : "The gno.land wallet, a browser extension."}</span>
           </li>
-          <li className={account ? "done" : ""}>
+          <li className={step(1)}>
             <b>Connect it</b>
-            <span>Gnogolf sees your address. Nothing moves without your signature in Adena.</span>
+            <span>Nothing moves without your signature.</span>
           </li>
-          <li className={funded ? "done" : ""}>
+          <li className={step(2)}>
             <b>{main ? "Have some GNOT" : "Get test GNOT"}</b>
             <span>
-              {local ? "From the node's test account." : main ? "GNOT on gno.land, for the fee." : "Free, from the faucet."}
-              {!local && !main && account && <> <GetGnot address={account.address} /></>}
+              {local ? "In Adena, import the node's test1 and send yourself GNOT." : main ? "Buy or receive some, for the fee." : "Free, from the faucet."}
+              {account && now === 2 && (
+                <>
+                  {" "}
+                  {local ? null : main ? <GetGnot address={account.address} href={GNOT_URL} label="How to get GNOT ↗" /> : <GetGnot address={account.address} href="" />}
+                </>
+              )}
               {account && funds != null && <> · You have {(funds / 1e6).toFixed(2)} GNOT.</>}
             </span>
           </li>
-          <li className={named ? "done" : ""}>
+          <li className={step(3)}>
             <b>Pick your gno.land name</b>
-            <span>{named ? "Done: your saved rounds are ranked." : "Only named players are ranked. You pick it on your next save: same signature."}</span>
+            <span>{named ? "Your saved rounds are ranked." : "Only named players are ranked."}</span>
+            {account && now === 3 && chain && <NameForm chain={chain} account={account.address} chainId={chainName || null} price={price} lead="Your name" onNamed={onNamed} />}
           </li>
-          <li>
+          <li className={step(4)}>
             <b>Hole out, then save</b>
-            <span>The chain replays your shots, so no one can fake a score. You see the fee first.</span>
+            <span>The chain replays your shots: no faked scores.</span>
             {cost && <span className="real__cost">This round: {cost}</span>}
           </li>
         </ol>
@@ -1624,10 +1652,17 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
             </>
           )
         ) : account ? (
-          onSave ? (
+          // the button does the step at hand: GNOT first, then the round waiting, else back to the game
+          now === 2 && local ? (
+            <Button variant="primary" className="btn--wide" onClick={() => void navigator.clipboard.writeText(TEST1).then(() => setSent(true), () => {})}>
+              {sent ? "Copied: import it in Adena, send GNOT, come back" : "Copy test1's recovery phrase"}
+            </Button>
+          ) : now === 2 && (!main || GNOT_URL) ? (
+            <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "How to get GNOT ↗" : "Get free test GNOT ↗"}</a>
+          ) : onSave && funded ? (
             <Button variant="primary" className="btn--wide" onClick={onSave}>Save this round</Button>
           ) : (
-            <Button variant="primary" className="btn--wide" onClick={onClose}>Connected as {short(account.address)}: keep playing</Button>
+            <Button variant={now === -1 ? "primary" : "secondary"} className="btn--wide" onClick={onClose}>{now === -1 ? "All set: play" : "Later: keep playing"}</Button>
           )
         ) : (
           <Button variant="primary" className="btn--wide" disabled={wallet.busy} onClick={onConnect}>
@@ -1635,7 +1670,7 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
           </Button>
         )}
         <p className="real__fine">
-          Network: <span className="mono">{chainName}</span>
+          {account && <>Connected as <span className="mono">{short(account.address)}</span> · </>}Network: <span className="mono">{chainName}</span>
         </p>
     </Sheet>
   );

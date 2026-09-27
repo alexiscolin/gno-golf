@@ -110,7 +110,6 @@
 .front .btn--play { font-size: clamp(18px, 2vw, 22px); font-weight: 700; padding: 12px 34px; border-radius: 20px; box-shadow: 0 6px 0 var(--ink); animation: pop .35s var(--spring); }
 .front .btn--play:hover:not([disabled]) { transform: translateY(-2px); box-shadow: 0 8px 0 var(--ink); }
 .front .btn--play:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
-.front .btn--play:focus-visible, .btn--start:focus-visible { outline: 4px solid var(--paper); outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) {
   .front .btn--play { animation: none; }
   .front, .screen--title { transition: none; }
@@ -286,7 +285,6 @@
 .worlds--v2 .world:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) .world__ribbon,
 .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
-.worlds--v2 .world:focus-visible { outline: 4px solid var(--ink); outline-offset: 5px; box-shadow: 0 0 0 5px var(--paper), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) svg, .worlds--v2 .world:focus-visible svg { transform: none; }
 .worlds--v2 .world:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
 .worlds--v2 .world[disabled] { background: linear-gradient(170deg, #e6ebe8, #aab6b0); }

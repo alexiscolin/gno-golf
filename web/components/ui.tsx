@@ -73,7 +73,7 @@ const CloseX = () => (
 );
 export function SheetClose({ onClose, inline = false, first = false }: { onClose: () => void; inline?: boolean; first?: boolean }) {
   return (
-    <button className={"round round--small round--x" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose} data-autofocus={first || undefined}>
+    <button className={"round round--small round--x" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose} data-keyfocus={first || undefined}>
       <CloseX />
     </button>
   );
@@ -85,8 +85,14 @@ const open: object[] = [];
 // the control last pressed: a click does not focus a button everywhere
 // (Safari, a scripted click), so a dialog knows what opened it all the same
 let pressed: HTMLElement | null = null;
-if (typeof document !== "undefined")
-  document.addEventListener("pointerdown", (e) => { pressed = e.target instanceof Element ? e.target.closest<HTMLElement>("button, a, summary, [tabindex]") : null; }, true);
+// and whether the last thing the player did was a key: a dialog opened by
+// one puts focus on its first control, ring and all; opened by a pointer, on
+// itself, with no ring on a control nobody went to
+let byKey = false;
+if (typeof document !== "undefined") {
+  document.addEventListener("pointerdown", (e) => { byKey = false; pressed = e.target instanceof Element ? e.target.closest<HTMLElement>("button, a, summary, [tabindex]") : null; }, true);
+  document.addEventListener("keydown", () => void (byKey = true), true);
+}
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
@@ -107,7 +113,10 @@ export function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => v
     // of its own: a dev remount finds its own control focused already)
     const back = [active instanceof HTMLElement && active !== document.body ? active : null, pressed].find((x) => x && !(el && el.contains(x))) || null;
     // its main action when it names one (data-autofocus), else its first control
-    const first = el && (el.querySelector<HTMLElement>("[data-autofocus]") || el.querySelector<HTMLElement>(FOCUSABLE));
+    // (its main action always: Enter does it)
+    const main = el && el.querySelector<HTMLElement>("[data-autofocus]");
+    const first = main || (byKey && el ? el.querySelector<HTMLElement>("[data-keyfocus]") || el.querySelector<HTMLElement>(FOCUSABLE) : null);
+    if (el && !first && !el.hasAttribute("tabindex")) el.tabIndex = -1;
     (first || el)?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (open[open.length - 1] !== me || !ref.current) return;

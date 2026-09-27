@@ -15,7 +15,7 @@
   /* the controls (components/ui.tsx): a press sinks, a hover lifts, a focus rings */
   --press: 3px;
   --lift: 1px;
-  --ring: 3px solid var(--hat);
+  --ring: 3px solid var(--gold); /* the focus ring's band (see "keyboard users"), inked both sides */
   --gold: #f2c14e; --silver: #d9dee3; --bronze: #e3a877; /* the podium's metals */
   --shadow-btn: 0 4px 0 var(--ink);
   /* what only shows (the HUD's hole, strokes and weather cards, the scorecard,
@@ -650,6 +650,7 @@ html, body {
 }
 
 .round {
+  position: relative; /* (its focus ring is drawn round it; placed ones set their own) */
   width: 64px;
   height: 64px;
   border-radius: 50%;
@@ -862,6 +863,12 @@ html, body {
   background: var(--paper);
 }
 
+.real__steps li > .nameform { grid-column: 2; margin: 8px 0 0; } /* under its step's words */
+
+/* the step to do now stands out; the ones after it wait */
+.real__steps li.now::before { background: var(--gold); }
+.real__steps li.later { opacity: .5; }
+
 .real__steps li.done::before {
   content: "✓";
   background: var(--green);
@@ -974,11 +981,20 @@ html, body {
   border-radius: 999px;
 }
 
-/* keyboard users see where they are */
-button:focus-visible, a:focus-visible {
-  outline: var(--ring);
-  outline-offset: 3px;
-}
+/* keyboard users see where they are: one ring everywhere, the stickers'
+   gold inked on both sides, which reads on the paper and on the course.
+   A control with an ink shadow under it (--drop) has it drawn round its face
+   and that shadow, even on every side; anything else, an outline on an ink
+   rim. Fields show it on their own frame. */
+/* (in :where, the plain default: any control's own rule wins over it) */
+:where(button, a, summary, [tabindex]):where(:not(.btn, .burger, .adena, .round, .share__icon, .world__reset, .clip__save, .clip__play)):focus-visible { outline: var(--ring); outline-offset: 2px; box-shadow: 0 0 0 2px var(--ink); }
+:is(.btn, .burger, .adena, .round, .share__icon, .world__reset, .clip__save, .clip__play):focus-visible { outline: none; }
+:is(.btn, .burger, .adena, .round, .share__icon, .world__reset, .clip__save, .clip__play):focus-visible::after { content: ""; position: absolute; inset: -8px -8px calc(-8px - var(--drop, 4px)); border: var(--ring); border-radius: inherit; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--ink); pointer-events: none; }
+.round { --drop: 3px; } .share__icon, .clip__save { --drop: 2px; } .world__reset { --drop: 0px; }
+.share__icon, .world__reset { position: relative; } /* (the ring is drawn round them) */
+/* a cup's tile clips what overflows it: its ring is the outline, over its own shadow */
+.world:focus-visible { outline-offset: 4px; box-shadow: 0 0 0 2px var(--ink), 0 6px 0 var(--ink); }
+.worlds--v2 .world:focus-visible { box-shadow: 0 0 0 2px var(--ink), var(--deep-card); }
 
 .timed {
   position: fixed;
@@ -1502,7 +1518,6 @@ button:focus-visible, a:focus-visible {
 .real .btn--wide { position: sticky; bottom: 0; }
 .details { margin-top: 6px; text-align: left; }
 .details summary { cursor: pointer; font-size: 13px; color: var(--ink-soft); }
-.details summary:focus-visible { outline: var(--ring); outline-offset: 2px; border-radius: 6px; }
 .details__box {
   margin-top: 8px;
   padding: 10px 12px;
@@ -1599,7 +1614,6 @@ button:focus-visible, a:focus-visible {
 .world svg { width: min(150px, 100%); height: auto; transition: transform .25s cubic-bezier(.3,1.6,.5,1); }
 .world:hover:not([disabled]) svg, .world:focus-visible svg { transform: rotate(-6deg) scale(1.06); }
 .world:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
-.world:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .world--on { background: var(--mint); }
 .world[disabled] { cursor: default; background: #f1f1ec; }
 .world[disabled] svg { filter: grayscale(.85) opacity(.7); }
@@ -1711,7 +1725,6 @@ button:focus-visible, a:focus-visible {
 .drawer__cup svg { width: 60px; height: 60px; flex: 0 0 auto; }
 .drawer__cup h2 { margin: 0; font-size: 24px; line-height: 1.02; }
 .linkish { border: 0; background: none; padding: 2px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; cursor: pointer; min-height: 32px; }
-.linkish:focus-visible { outline: var(--ring); outline-offset: 2px; border-radius: 4px; }
 
 /* each cup's loader, curtain and hats */
 .hat path, .hat rect, .hat ellipse { stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; }
@@ -1743,7 +1756,6 @@ button:focus-visible, a:focus-visible {
 .world__stamp { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--hat); color: var(--hat); font-size: 11px; transform: rotate(-12deg); }
 .world__reset { justify-self: center; border: 2px solid var(--ink); background: var(--paper); border-radius: 12px; padding: 4px 12px; min-height: 36px; font: inherit; font-size: 12px; font-weight: 800; color: var(--ink-soft); cursor: pointer; }
 .world__reset--sure { background: var(--hat); color: var(--paper); }
-.world__reset:focus-visible { outline: var(--ring); outline-offset: 2px; }
 @media (max-width: 600px) {
   .worlds__in { width: calc(100vw - 56px); }
   .worlds__list { gap: 10px; }
@@ -1783,7 +1795,6 @@ button:focus-visible, a:focus-visible {
 .wet { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30,45,60,.28), rgba(20,40,50,.12)); transition: opacity .8s; }
 .wet--storm { background: linear-gradient(180deg, rgba(18,26,48,.34), rgba(18,28,40,.12)); }
 
-.drawer__cup:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .weather__until { font-size: 10px; font-weight: 700; color: var(--ink-soft); line-height: 1; white-space: nowrap; }
 /* a long cup name stays on its card on a narrow phone */
 .world__ribbon { max-width: calc(100% + 8px); white-space: normal; line-height: 1.1; text-align: center; }
@@ -1855,7 +1866,6 @@ button:focus-visible, a:focus-visible {
 .share__icon--facebook { background: #1877f2; color: var(--white); }
 .share__icon--whatsapp { background: #25d366; color: var(--white); }
 .share__icon--bluesky { background: #1185fe; color: var(--white); }
-.share__icon:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .note--warn { background: #fff3d6; border: 2px solid #e0a44a; color: var(--ink); border-radius: 12px; padding: 8px 12px; font-size: 13px; }
 
 /* the wind's strength on the weather card: four rising bars and the figure */
@@ -1870,7 +1880,6 @@ button:focus-visible, a:focus-visible {
 .adena__wrap .adena--on { padding-right: 52px; }
 .adena__off { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); display: grid; place-items: center; padding: 0; cursor: pointer; z-index: 2; }
 .adena__off:hover { background: var(--hat); color: var(--paper); }
-.adena__off:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .drawer__off { display: none; }
 
 /* a word on why the ball speeds up or drifts: once a shot, gone in a moment */
@@ -1915,7 +1924,6 @@ button:focus-visible, a:focus-visible {
 
 /* one short line under the switch; the honesty note behind an (i) */
 .aimset__info { margin-left: 6px; cursor: pointer; font: inherit; font-style: normal; color: inherit; background: none; border: 0; padding: 0 2px; }
-.aimset__info:focus-visible { outline: 2px solid var(--hat); border-radius: 50%; }
 .aimset__help > span:has(.aimset__pop) { position: relative; }
 .aimset__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); font-size: 12.5px; line-height: 1.4; text-align: left; box-shadow: 0 3px 0 var(--ink); }
 .boards__word { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
@@ -1938,7 +1946,7 @@ button:focus-visible, a:focus-visible {
 /* a text field: the friend to add, the gnokey key's name */
 .friends__add input, .gnokey__key { min-width: 0; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--ink); font: inherit; font-size: 14px; background: var(--white); color: var(--ink); }
 /* the ring drawn as the field's own border: an outline beside the ink border reads as two frames */
-.friends__add input:focus-visible, .gnokey__key:focus-visible { outline: none; border-color: var(--hat); box-shadow: inset 0 0 0 1px var(--hat); }
+.friends__add input:focus-visible, .gnokey__key:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--gold); }
 .friends__add input { flex: 1; }
 .friends__list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; font-size: 13px; }
 .lb .friends__list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 12px; border: 0; border-radius: 10px; background: rgba(var(--ink-rgb), .05); } /* a name to manage, not a place */
@@ -1960,14 +1968,8 @@ button:focus-visible, a:focus-visible {
 .btn, .burger, .adena { position: relative; transition: transform .08s, box-shadow .08s, background .15s; }
 .btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
 .btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
-/* the focus ring round the button and its ink shadow (4px under it), even on
-   every side: an outline would hug the face only and look low-slung */
-.btn:focus-visible, .burger:focus-visible, .adena:focus-visible { outline: none; }
-/* gold inked both sides, as the stickers: it reads on the paper and on the course */
-.btn:focus-visible::after, .burger:focus-visible::after, .adena:focus-visible::after { content: ""; position: absolute; inset: -8px -8px -12px; border: 3px solid var(--gold); border-radius: inherit; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--ink); pointer-events: none; }
 /* inside the button: .seg clips its overflow, so a ring outside shows as a stripe beside the next segment */
-.seg button:focus-visible { outline: var(--ring); outline-offset: -5px; }
-.seg button.on:focus-visible { outline-color: var(--paper); } /* red on the green segment is under 3:1 */
+.seg button:focus-visible { outline: var(--ring); outline-offset: -5px; box-shadow: none; }
 .btn[disabled] { cursor: default; opacity: .7; box-shadow: 0 2px 0 var(--ink); transform: none; }
 .badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); border: 2px solid var(--ink); white-space: nowrap; pointer-events: none; }
 /* a HUD card that is a button (the leaderboard) */
@@ -1999,7 +2001,6 @@ button:focus-visible, a:focus-visible {
 /* the same press on the remaining controls: the round buttons, the cup cards, the switches */
 .round { box-shadow: 0 3px 0 var(--green); transition: transform .08s, box-shadow .08s, background .15s; }
 .round:active { transform: translateY(2px) scale(.97); box-shadow: 0 1px 0 var(--green); }
-.round:focus-visible { outline: var(--ring); outline-offset: 3px; }
 .world:active:not([disabled]) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
 .switch:active i { transform: scale(.96); }
 .seg button:active { background: #dcebe2; }
@@ -2066,7 +2067,6 @@ button:focus-visible, a:focus-visible {
 /* players with no name: folded under the board, greyed, no place */
 .unnamed { margin: 14px 0 0; font-size: 13px; color: var(--ink-soft); }
 .unnamed summary { cursor: pointer; font-weight: 700; width: max-content; padding: 10px 2px; } /* a 44px tap */
-.unnamed summary:focus-visible { outline: var(--ring); outline-offset: 2px; border-radius: 4px; }
 .unnamed ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; max-height: 30vh; overflow-y: auto; }
 /* its own quiet rows, not the board's cards (.lb li): no border, ink text, yours tinted */
 .lb .unnamed li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
@@ -2081,7 +2081,8 @@ button:focus-visible, a:focus-visible {
 .nameform__field { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 48px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); font-family: ui-monospace, Menlo, monospace; font-size: 16px; }
 .nameform__field > span { padding: 0 2px 0 12px; color: var(--ink-soft); }
 .nameform__field input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none; }
-.nameform__field:focus-within { border-color: var(--hat); box-shadow: inset 0 0 0 1px var(--hat); }
+.nameform__field:focus-within { box-shadow: 0 0 0 3px var(--gold); }
+.nameform__field input:focus-visible { outline: none; box-shadow: none; } /* (its frame shows it) */
 .nameform small { font-size: 12px; color: var(--ink-soft); }
 .nameform .nameform__ok { color: var(--green); font-weight: 700; }
 .nameform .nameform__err { color: var(--hat-ink); font-weight: 700; }
@@ -2136,7 +2137,6 @@ button:focus-visible, a:focus-visible {
 .about__links li:nth-child(odd):last-child { grid-column: 1 / -1; } /* an odd one out spans the row */
 .about__links a { display: grid; gap: 2px; height: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; border: 2px solid rgba(var(--ink-rgb), .18); background: rgba(255, 255, 255, .55); color: var(--ink); text-decoration: none; transition: border-color .12s, transform .12s; }
 .about__links a:hover { border-color: var(--ink); transform: translateY(-1px); }
-.about__links a:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .about__links b { font-size: 14px; }
 .about__links span { font-size: 12.5px; color: var(--ink-soft); }
 .about__credit { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(var(--ink-rgb), .15); font-size: 13px; color: var(--ink-soft); }
@@ -2173,7 +2173,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 
 /* which chain this is (under the sheets and banners, z 5–9, like the leaderboard chip), bottom left on every screen but mainnet's: coloured,
    so no one takes a practice score for a real one, with the way to mainnet */
-.netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: 2px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; box-shadow: var(--shadow-btn); } /* the bottom buttons' height, edge and shadow */
+.netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: 2px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; } /* the bottom buttons' height and edge, flat: it says, it is not pressed */
 .netbanner--testnet { background: var(--hat); color: var(--paper); }
 .screen ~ .netbanner { z-index: 4; } /* over the title, cups and gnome screens too, under the sheets (5) */
 .netbanner b { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -2288,13 +2288,11 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 /* reduced motion: no autoplay, a round play button over the first frame */
 .clip__play { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); cursor: pointer; display: grid; place-items: center; padding: 0; }
 .clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
-.clip__play:focus-visible { outline: var(--ring); outline-offset: 2px; }
 /* its download, a main button under it, and why: a post with a video goes further */
 /* its download, on it: a paper pill in the top corner, the brand's card having the bottom */
 .clip__save { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 9px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 2px 0 var(--ink); }
 .clip__save svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
 .clip__save:hover { background: var(--gold); }
-.clip__save:focus-visible { outline: var(--ring); outline-offset: 2px; }
 
 /* ------------------------------------------------------------ a round waiting
    for its save after a reload (Adena installed meanwhile): a card at the top,
