@@ -1688,7 +1688,7 @@ button:focus-visible, a:focus-visible {
 .sky--night.sky--w-town { background: linear-gradient(178deg, #2e3159 0%, #4a3c5c 60%, #6b4a5e 100%); }
 
 /* the cup standings: a grand prix board, the 18 as a track of medals */
-.cup { display: grid; gap: 12px; margin: 10px 0 4px; text-align: left; }
+.cup { display: grid; gap: 12px; margin: 10px 0 18px; text-align: left; }
 .cup__head { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; }
 .cup__head svg { width: 64px; height: 64px; }
 .cup__head h3 { margin: 0; font-size: 20px; color: var(--ink); }
