@@ -179,6 +179,7 @@ if (soundLog && typeof window !== "undefined") (window as Window & { __soundLog?
  *  made before, and the ambience on it, are dropped; the next sound makes one
  *  of the new kind. */
 export function freshAudio() {
+  clearTimeout(gusts);
   if (bed) bed.src.stop();
   bed = null;
   void ctx?.close().catch(() => {});

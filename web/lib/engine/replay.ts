@@ -567,7 +567,9 @@ export function makeReplay(E: Live) {
         const reach = corner ? Math.hypot(corner[0] - path[i][0], corner[1] - path[i][1]) : 0;
         const run = corner ? reach + Math.hypot(path[i + 1][0] - corner[0], path[i + 1][1] - corner[1]) : len;
         let knocked = false;
-        const ms = drop ? 320 : showMs(run);
+        // (the step into a tube is drawn longer than the chain's, to the mouth:
+        // at the chain's own speed, at most four times as long)
+        const ms = drop ? 320 : showMs(run) * (mouth ? Math.min(4, from.distanceTo(to) / Math.max(run, 1e-3)) : 1);
         // a roll-back at a tube's mouth: the ball climbs part way into it and
         // slides back down before the path goes on (once per point)
         const back = !jump && i > 0 && rolledBack !== i && rollBackAt(path, i);
@@ -692,13 +694,14 @@ export function makeReplay(E: Live) {
   // The chain keeps the ball's centre BALL_R off a wall; the gnome drawn round
   // it reaches further (his nose, his beard, a brim), so against a wall he is
   // drawn pushed off it by the difference, along the wall's normal. Display
-  // only: the ball (E.ball.position) stays where the chain has it. The walls
-  // near him are gathered again once he has gone a unit (not every frame);
-  // a gnome that has not moved costs one comparison.
+  // only: the ball (E.ball.position) stays where the chain has it. Riding a
+  // tube he is clear of every wall (the pipe passes over and under them). The
+  // walls near him are gathered again once he has gone a unit (not every
+  // frame); a gnome that has not moved costs a few comparisons.
   const near: Wall[] = [];
   let seenBall: Gnome | null = null, seenWalls: readonly Wall[] | null = null, sx = NaN, sz = NaN, nx = NaN, nz = NaN;
   function offWalls() {
-    const B = E.ball, { x, z } = B.position, walls = g.s ? g.s.walls : NO_WALLS;
+    const B = E.ball, { x, z } = B.position, walls = g.s && !g.inTube ? g.s.walls : NO_WALLS;
     if (x === sx && z === sz && B === seenBall && walls === seenWalls) return;
     const { body, shade, reach } = B.userData;
     if (walls !== seenWalls || B !== seenBall || Math.hypot(x - nx, z - nz) > 1) {
@@ -708,10 +711,12 @@ export function makeReplay(E: Live) {
       (nx = x), (nz = z);
     }
     (sx = x), (sz = z), (seenBall = B), (seenWalls = walls);
+    // one wall at a time, from where the walls before put him: at a corner or
+    // a join the second wall sees him already pushed, and adds only what is left
     let px = 0, pz = 0;
     for (const w of near) {
-      const c = closest(x, z, w.a, w.b);
-      if (c.d < reach && c.d > 1e-6) (px += ((x - c.x) * (reach - c.d)) / c.d), (pz += ((z - c.z) * (reach - c.d)) / c.d);
+      const qx = x + px, qz = z + pz, c = closest(qx, qz, w.a, w.b);
+      if (c.d < reach && c.d > 1e-6) (px += ((qx - c.x) * (reach - c.d)) / c.d), (pz += ((qz - c.z) * (reach - c.d)) / c.d);
     }
     body.position.x = shade.position.x = px;
     body.position.z = shade.position.z = pz;

@@ -6,6 +6,8 @@ There were four runs. The **first** ran on the code of `162a6e9`. The **second**
 
 A **fifth** run (2026-09-27) ran on the current code, HEAD `f1bef35` plus the uncommitted work (the only chain change in it is one line of golf's `cleanText`). It has its own section, [Run 5 (current code)](#run-5-current-code). The projection and the command list for pearl now follow run 5; the run-4 tables are kept as history.
 
+A **sixth** run (2026-09-27, evening) ran on the code about to deploy (publishing switch, Hide's index, each shot's work and a commit's fixed gas in the reads). Only golf moved; the projection and step 5 below follow it.
+
 ## The rehearsal chain
 
 - **Binary:** `gnoland` built from `chain/pearl` = `c4c72fdd288c` and installed as `~/.cache/gno-toolchains/pearl/gnoland`. This is the tag that the pearl `gno` in `~/.cache/gno-toolchains/pearl/` is built from. It is not gnodev.
@@ -232,7 +234,7 @@ The hub (`Render("")`) and a hole page render.
 | Faucet | 10 GNOT a grant, 1 per address per 24 h | `gno_status`, `faucet-agent.pearl…/limits` |
 | Our imports | `p/nt/avl/v0`, `p/nt/bptree/v0`, `p/nt/ufmt/v0`, `r/sys/users` all deployed | `gno_packages` |
 
-## Projection for pearl (measured, run 5)
+## Projection for pearl (measured, run 6)
 
 | Item | GNOT (run 6) | Run 5 | Run 4 | Run 1 |
 |---|---|---|---|---|
@@ -250,7 +252,7 @@ Ask for **105 GNOT**, as in run 4. That still leaves room for one failed-and-rer
 
 The deploy order also bounds when the money is needed:
 
-- about 31 GNOT for the name and the code, of which golf alone takes 21.2;
+- about 32 GNOT for the name and the code, of which golf alone takes 22.4;
 - then 2–7 GNOT for each publish script.
 
 For players on pearl:
@@ -371,7 +373,7 @@ The same list as gnomcp calls (what the rehearsal ran):
 4. `gno_run` ×11, with the publish scripts
 5. `gno_run(verify.gno, simulate)`
 
-gnomcp cannot run step 5 on pearl as it stands, for two reasons. It pins `-max-deposit` to 10 GNOT on addpkg, and golf needs 21.17 GNOT (problem 5). It also deploys as its agent key, not as the user.
+gnomcp cannot run step 5 on pearl as it stands, for two reasons. It pins `-max-deposit` to 10 GNOT on addpkg, and golf needs 22.37 GNOT (problem 5). It also deploys as its agent key, not as the user.
 
 ## Netlify environment
 
@@ -411,7 +413,7 @@ Problems from run 1:
 2. **A lazy genesis loads every example.** Fix: a GNOROOT of symlinks with an `examples/` holding only pearl's 85 packages.
 3. **Genesis panicked with "PubKey does not match Signer address g1manfred…".** Fix: `-skip-genesis-sig-verification`, which pearl's own genesis uses, and the seven creator addresses funded in the balances file.
 4. **A restart over the same secrets stalled at height 0,** because the old `priv_validator_state.json` refused to sign again. Fix: delete it together with `db/` and `wal/`. Run 2 did exactly that for its fresh genesis, and the chain was producing blocks within seconds.
-5. **gnomcp cannot deploy golf on pearl.** `gno_addpkg` pins `-max-deposit` to 10 GNOT, and golf now needs **21.17** GNOT at pearl's price (20.63 in run 4, 20.35 in run 3, 17.35 in run 2, 15.69 in run 1).
+5. **gnomcp cannot deploy golf on pearl.** `gno_addpkg` pins `-max-deposit` to 10 GNOT, and golf now needs **22.37** GNOT at pearl's price (21.17 in run 5, 20.63 in run 4, 20.35 in run 3, 17.35 in run 2, 15.69 in run 1).
    - Workaround for the rehearsal: `storage_price` = 1 ugnot in the genesis, with the bytes read from the events and multiplied by 100 for pearl.
    - On pearl, the user deploys with gnokey and `-max-deposit 30000000ugnot` (step 5). Run 5 needed no workaround: it used gnokey at pearl's own price.
    - Still worth raising with gnomcp: a `max_deposit` argument on `gno_addpkg`.

@@ -610,12 +610,12 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // the garden's foliage and bunting lean with the wind (global: set on every hole)
     newRound();
     // the fixed gas a commit here spends (decoding, the forecast) is only in
-    // Weather(), not in HoleState's forecast: read once, kept while the round
-    // has no stroke and the period is the same
-    const round = g.round;
+    // Weather(), not in HoleState's forecast: read once, kept while the hole
+    // and the period are the same (the same period is the same forecast, a
+    // stroke played meanwhile or not)
     if (s.period != null)
       void chain.weather(id, s.period).then((fc) => {
-        if (ticket === loads && round === g.round && !g.shots.length && fc.period === g.period) g.forecast = fc;
+        if (ticket === loads && fc.period === g.period) g.forecast = fc;
       }, () => {});
     const built1 = performance.now();
     await warm(); // shaders now, not on the player's first click
@@ -807,7 +807,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   function placeBall() {
     ball.position.set(g.ball.x, BALL_R + ground(g.ball.x, g.ball.y), g.ball.y);
-    ball.userData.shade.position.set(0, -BALL_R + 0.02, 0); // on the ground, under him
+    ball.userData.shade.position.y = -BALL_R + 0.02; // on the ground, under him (offWalls keeps its x, z)
     righting = null; // placing him overrides any righting in progress
     ball.scale.setScalar(1); // back out of the cup after a hole
     ball.userData.body.rotation.set(0, Math.PI / 2 - g.facing, 0);
