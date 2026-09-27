@@ -2180,7 +2180,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
    so no one takes a practice score for a real one, with the way to mainnet */
 .netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: 2px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; } /* the bottom buttons' height and edge, flat: it says, it is not pressed */
 .netbanner--testnet { background: var(--hat); color: var(--paper); }
-.screen ~ .netbanner { z-index: 4; } /* over the title, cups and gnome screens too, under the sheets (5) */
+.screen ~ .netbanner { z-index: 4; left: 34px; bottom: max(34px, env(safe-area-inset-bottom)); } /* over the title, cups and gnome screens too (under the sheets, 5), inside their frame, where their corner buttons are */
 .netbanner b { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .netbanner span { font-weight: 600; opacity: .9; }
 .netbanner:not(:has(.netbanner__go)) { padding-right: 16px; }
@@ -2224,6 +2224,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
   .netbanner b { font-size: 0; } .netbanner b::after { content: attr(data-short); font-size: 11px; }
   .netbanner span, .netbanner__go { display: none; }
   .netbanner { left: 12px; } /* the top cards' gutter */
+  .screen ~ .netbanner { left: 30px; bottom: max(30px, env(safe-area-inset-bottom)); } /* (a phone's corner buttons) */
   /* the play buttons start right of it, not under it */
   body:has(.netbanner) .hud--bottom { padding-left: 84px; }
   .share__icon { width: 40px; height: 40px; }
