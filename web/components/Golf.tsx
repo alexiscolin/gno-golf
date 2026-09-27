@@ -1532,10 +1532,9 @@ function GetGnot({ address, href = FAUCET, label = "Get free test GNOT ↗", pas
     </span>
   );
 }
-/** A dev node's test1 account, the same on every gno.land dev chain (its
- *  phrase is public, in gno's own repo): imported in Adena, it sends GNOT to
- *  the player's account. Only for a node on this machine. */
-const TEST1 = "source bonus chronic canvas draft south burst lottery vacant surface solve popular case indicate oppose farm nothing bullet exhibit title speed wink action roast";
+/** A node on this machine sends this address some GNOT from its test1 account: gnokey's command. */
+const fundCmd = (address: string, chainId: string, rpc: string) =>
+  `gnokey maketx send -send 50000000ugnot -to ${address} -gas-fee 1000000ugnot -gas-wanted 2000000 -chainid ${chainId} -remote ${rpc.replace(/^https?:\/\//, "")} -broadcast test1`;
 
 /**
  * Getting on the boards, once: what saving gives, and each step ticked as it
@@ -1612,7 +1611,7 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
           <li className={step(2)}>
             <b>{main ? "Have some GNOT" : "Get test GNOT"}</b>
             <span>
-              {local ? "In Adena, import the node's test1 and send yourself GNOT." : main ? "Buy or receive some, for the fee." : "Free, from the faucet."}
+              {local ? "From the node's test1 account, with gnokey." : main ? "Buy or receive some, for the fee." : "Free, from the faucet."}
               {account && now === 2 && (
                 <>
                   {" "}
@@ -1654,18 +1653,9 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
         ) : account ? (
           // the button does the step at hand: GNOT first, then the round waiting, else back to the game
           now === 2 && local ? (
-            <>
-              <Button variant="primary" className="btn--wide" onClick={() => void navigator.clipboard.writeText(TEST1).then(() => setSent(true), () => {})}>
-                {sent ? "test1's phrase copied ✓" : "Copy test1's recovery phrase"}
-              </Button>
-              {sent && (
-                <ol className="real__howto">
-                  <li>In Adena: <b>Add account › Import with seed phrase</b>, paste it.</li>
-                  <li>From that test1 account, <b>Send</b> some GNOT to <GetGnot address={account.address} href="" what="your address" />.</li>
-                  <li>Switch back to your account: this step ticks itself.</li>
-                </ol>
-              )}
-            </>
+            <Button variant="primary" className="btn--wide" onClick={() => void navigator.clipboard.writeText(fundCmd(account.address, chainName, rpc || "")).then(() => setSent(true), () => {})}>
+              {sent ? "Copied: run it in a terminal ✓" : "Copy the gnokey command"}
+            </Button>
           ) : now === 2 && (!main || GNOT_URL) ? (
             <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "How to get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (

@@ -864,8 +864,6 @@ html, body {
 }
 
 .real__steps li > .nameform { grid-column: 2; margin: 8px 0 0; } /* under its step's words */
-/* a local node's GNOT, through Adena: what to do there, under the button */
-.real__howto { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; color: var(--ink-soft); text-align: left; }
 
 /* the step to do now stands out; the ones after it wait */
 .real__steps li.now::before { background: var(--gold); }
