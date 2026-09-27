@@ -1654,9 +1654,18 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
         ) : account ? (
           // the button does the step at hand: GNOT first, then the round waiting, else back to the game
           now === 2 && local ? (
-            <Button variant="primary" className="btn--wide" onClick={() => void navigator.clipboard.writeText(TEST1).then(() => setSent(true), () => {})}>
-              {sent ? "Copied: import it in Adena, send GNOT, come back" : "Copy test1's recovery phrase"}
-            </Button>
+            <>
+              <Button variant="primary" className="btn--wide" onClick={() => void navigator.clipboard.writeText(TEST1).then(() => setSent(true), () => {})}>
+                {sent ? "test1's phrase copied ✓" : "Copy test1's recovery phrase"}
+              </Button>
+              {sent && (
+                <ol className="real__howto">
+                  <li>In Adena: <b>Add account › Import with seed phrase</b>, paste it.</li>
+                  <li>From that test1 account, <b>Send</b> some GNOT to <GetGnot address={account.address} href="" what="your address" />.</li>
+                  <li>Switch back to your account: this step ticks itself.</li>
+                </ol>
+              )}
+            </>
           ) : now === 2 && (!main || GNOT_URL) ? (
             <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "How to get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (
