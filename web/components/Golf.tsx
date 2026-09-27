@@ -202,7 +202,7 @@ const mmss = (ms: number) => {
 /** Where the round is and how long it can still go on-chain ("within 4:12"),
  *  then, once the weather is over, a replay in the current one. */
 // by and clock (now, ms) on the chain's clock; ranked: a course hole (a community one ranks nobody)
-function SaveClock({ by, clock = Date.now, stale, ranked, onReplay }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean; onReplay: () => void }) {
+function SaveClock({ by, clock = Date.now, stale, ranked }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean }) {
   const [now, setNow] = useState(clock);
   useEffect(() => {
     const t = setInterval(() => setNow(clock()), 1000);
@@ -212,13 +212,12 @@ function SaveClock({ by, clock = Date.now, stale, ranked, onReplay }: { by: numb
   if (left > 0 && !stale)
     return (
       <p className={"saveclock" + (left < 60000 ? " saveclock--soon" : "")}>
-        Saved in this browser only. Save it on-chain within <b>{mmss(left)}</b> {ranked ? "to make it public and ranked" : "to keep it on your address"}: a round is only saved in its own weather, which changes every 5 minutes.
+        Only in this browser. Save within <b>{mmss(left)}</b> {ranked ? "to be ranked" : "to keep it on your address"}, while its weather lasts.
       </p>
     );
   return (
     <p className="note note--warn">
-      This round's weather is over: it can no longer be saved on-chain.{" "}
-      <button className="linkish" onClick={onReplay}>Replay in the current weather</button>
+      This round's weather is over: it can no longer be saved on-chain. Play again in the new one.
     </p>
   );
 }
@@ -466,6 +465,7 @@ export default function Golf() {
     return () => ((live = false), clearTimeout(t));
   }, [period]);
   const closed = stale || over; // no save possible any more
+  const canSave = !onChain && !closed; // the card's one action while it lasts
   // the place a finished hole would take on its board, shown on the save button
   const nudge = useRankNudge(s, game.current && game.current.chain, account && account.address, (s && s.roundMode) || aim, onChain, closed);
   // a name just taken in the game, said until the next hole
@@ -1181,14 +1181,19 @@ export default function Golf() {
               return warn && <p className="note note--warn">{warn}</p>;
             })()}
             {!onChain && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} onReplay={() => game.current?.reset()} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} />
             )}
+            {/* one solid action at a time: saving while it can, else going on */}
             <div className="banner__row">
-              <Button variant="secondary" onClick={() => game.current?.reset()}>
-                Play again
-              </Button>
-              {!onChain && (
-                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={record?.at === "signing" || closed} onClick={() => void recordIt()}>
+              {canSave ? (
+                <button className="linkish" onClick={() => game.current?.reset()}>Play again</button>
+              ) : (
+                <Button variant="secondary" onClick={() => game.current?.reset()}>
+                  Play again
+                </Button>
+              )}
+              {canSave && (
+                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={record?.at === "signing"} data-autofocus onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record?.at === "signing" ? (
                     record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`
@@ -1201,18 +1206,11 @@ export default function Golf() {
                 </Button>
               )}
               {cupWon && cupWon.id === s.id ? (
-                <button className="btn btn--main" onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
+                <button className={"btn " + (canSave ? "btn--ghost" : "btn--main")} data-autofocus={!canSave || undefined} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
                   Cup complete! →
                 </button>
               ) : (
-                <button
-                  className="btn btn--main"
-                  data-autofocus
-                  onClick={() => {
-                    const i = s.holes.findIndex((h) => h.id === s.id);
-                    goTo(s.holes[(i + 1) % s.holes.length].id);
-                  }}
-                >
+                <button className={"btn " + (canSave ? "btn--ghost" : "btn--main")} data-autofocus={!canSave || undefined} onClick={() => goTo((nextHole(s, card) || s.holes[0]).id)}>
                   Next hole →
                 </button>
               )}
@@ -1801,6 +1799,12 @@ function golfTerm(strokes: number, par: number) {
 }
 
 
+/** The hole to play next: the first after this one not yet played, else the first not played at all. */
+const nextHole = (s: Snapshot, card: Card) => {
+  const at = s.holes.findIndex((h) => h.id === s.id);
+  return s.holes.find((h, i) => i > at && !scoreOf(card, h)) || s.holes.find((h) => !scoreOf(card, h));
+};
+
 /** The card: hole, par and your score, ten holes to a row, with the totals. */
 function Scorecard({ holes, card, current, compact = false, world = "garden" }: { holes: readonly HoleRow[]; card: Card; current: string | null; compact?: boolean; world?: string }) {
   // compact, with a hole being played (the win card): that hole and four either
@@ -1863,8 +1867,7 @@ function Standings({ s, card, chain, me, mode = "pro", compact = false }: BoardP
   const cup = WORLDS.find((w) => w.id === s.world) || WORLDS[0];
   const t = totals(card, s.holes);
   const vs = t.strokes - t.par;
-  const at = s.holes.findIndex((h) => h.id === s.id);
-  const next = s.holes.find((h, i) => i > at && !scoreOf(card, h)) || s.holes.find((h) => !scoreOf(card, h));
+  const next = nextHole(s, card);
   return (
     <section className="cup" aria-label={`${cup.name} standings`}>
       <header className="cup__head">
@@ -1880,11 +1883,11 @@ function Standings({ s, card, chain, me, mode = "pro", compact = false }: BoardP
         </dl>
       </header>
       <Scorecard holes={s.holes} card={card} current={s.id} world={s.world} compact={compact} />
-      <p className="cup__next">
+      {(!compact || t.all) && <p className="cup__next">
         {t.all
           ? t.strokes <= t.par ? (cupHasGnome(s.world || "") ? "Cup finished at par or under — a gnome is waiting in the picker." : "Cup finished at par or under!") : "Cup finished. Now beat par."
           : next && <>Next up: <b>{next.name}</b></>}
-      </p>
+      </p>}
     </section>
   );
 }

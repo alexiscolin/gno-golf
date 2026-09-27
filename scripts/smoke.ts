@@ -145,7 +145,7 @@ try {
     await b.ev(`window.__g.shoot(${shot[0]}, ${shot[1]})`);
     assert.ok(await until<boolean>(`!!document.querySelector('.banner--win')`), "no hole-finished banner");
     await sleep(1200);
-    assert.match(await b.ev<string>(`(document.querySelector('.saveclock')||{}).textContent||""`), /Save it on-chain within/, "the save clock");
+    assert.match(await b.ev<string>(`(document.querySelector('.saveclock')||{}).textContent||""`), /Save within/, "the save clock");
   });
   await step("the leaderboard from the cups screen", async () => {
     await b.send("Page.navigate", { url: `${APP}/` });

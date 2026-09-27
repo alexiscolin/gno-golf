@@ -166,15 +166,9 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
         )}
       </div>
       {clip && (
-        <div className="clip__get">
-          <a className="btn btn--main" href={clip.url} download={clip.file.name} onClick={() => sound("blip")}>
-            <svg className="btn__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            Download your clip
-          </a>
-          <p className="clip__why">
-            <b>Show them the shot!</b> {onPhone() ? "Send it with the share button: videos get way more views." : "Videos get way more views than links: drop it into your post."}
-          </p>
-        </div>
+        <p className="clip__get">
+          <a className="linkish" href={clip.url} download={clip.file.name} onClick={() => sound("blip")}>Download the clip</a> · videos get way more views than links
+        </p>
       )}
     </div>
   );
