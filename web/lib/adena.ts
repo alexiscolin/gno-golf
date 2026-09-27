@@ -55,6 +55,10 @@ interface Work {
   pieces?: number;
   kind?: string;
   pts?: readonly number[];
+  /** each stroke's work (Shot.Work, the realm's SimulateFrom "work") */
+  works?: readonly number[];
+  /** what the realm says a commit spends before its shots (Weather() "gas"; 0 or none: not said) */
+  fixed?: number;
 }
 
 const wallet = () => (typeof window !== "undefined" ? window.adena : undefined);
@@ -202,12 +206,15 @@ export function onWalletChange(fn: (...x: unknown[]) => void) {
 // are the hole's and its pulses', pieces every wall, post and zone of the
 // hole, its pulses and the forecast, each polygon edge one more.
 // (a stroke whose length is not known counts as the longest path the realm takes)
-// The realm also counts a shot by the work its physics did (Shot.Work, not in
-// the path) and takes the larger: its estimate is never below this one, so its
-// cut is never later. Where it is sooner, it refuses with "commit the first N"
-// and splitRound follows it.
+// The realm also counts a shot by the work its physics did (Shot.Work, which
+// SimulateFrom says) and takes the larger, as here. A round kept from before
+// it said so has no work: the realm may then cut sooner, with "commit the
+// first N", and splitRound follows it.
 const WORK = RULES.work;
-const workOf = (c: Work, i: number) => WORK.shot + (c.walls || 0) * WORK.wall + ((c.pts || [])[i] ?? RULES.maxPath) * (WORK.point + (c.pieces || 0) * WORK.piece);
+const workOf = (c: Work, i: number) => {
+  const base = WORK.shot + (c.walls || 0) * WORK.wall;
+  return Math.max(base + ((c.pts || [])[i] ?? RULES.maxPath) * (WORK.point + (c.pieces || 0) * WORK.piece), base + ((c.works || [])[i] || 0) * WORK.unit);
+};
 
 /**
  * The commits a round is recorded in: [[from, to), …], cut where the chain
@@ -234,16 +241,18 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
 const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
 // Gas asked for one commit, calibrated on gno_call simulate=true
 // (docs/reviews/fix-sync-client.md): the work model already bounds the shots
-// (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; the
-// forecast is ~7M, except rain (up to 170M measured on the lane holes, as
-// golf.gno's budget says) and a storm (~140M measured: the puddles).
+// (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; what the
+// commit spends before its shots (decoding the hole, drawing the forecast) is
+// the realm's own figure (Weather() "gas"). A round without it: the forecast's
+// most, rain and a storm on the heaviest course holes (town/14, island/14:
+// 193M and 204M), the rest ~7M.
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
 const MAX_GAS = 1_900_000_000;
 const PER_CALL = 30e6;
-const FORECAST: Record<string, number> = { rain: RULES.forecastGas, storm: 150e6 };
-/** The gas one commit of these strokes should need. c: { walls, pieces, kind (the forecast's), pts }. */
+const FORECAST: Record<string, number> = { rain: 200e6, storm: 210e6 };
+/** The gas one commit of these strokes should need. c: { walls, pieces, kind (the forecast's), pts, works, fixed }. */
 export function gasOf(c: Work, from = 0, to = (c.pts || []).length) {
-  let g = PER_CALL + (FORECAST[c.kind || ""] || 0);
+  let g = PER_CALL + (c.fixed || FORECAST[c.kind || ""] || 0);
   for (let i = from; i < to; i++) g += workOf(c, i);
   return Math.min(Math.ceil(g), MAX_GAS);
 }
@@ -289,6 +298,9 @@ export function chainSplit(chain: Pick<Chain, "simulateRound" | "simulateCommit"
   return splitRound(shots, (list, from, ball) => (from && ball ? chain.simulateCommit(hole, ball, from, list, period, ms) : chain.simulateRound(hole, list, s.period, ms)), s);
 }
 
+// a chain without a registrar (chain.nameReg() ""): nothing is sent to an empty package path
+const NO_REGISTRAR = "This chain has no name registrar: no name can be taken here.";
+
 /**
  * Signs one commit of this round: Reset + PlayRound… for the first (reset),
  * PlayRound… alone for the next ones, which continue the round where the
@@ -302,6 +314,7 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
 }) {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
+  if (named && !named.registrar) throw new Error(NO_REGISTRAR);
   await ensureNetwork(a, { chainId, rpc });
   const gasWanted = Math.min((gas || MAX_GAS) + (named ? REGISTER_GAS + CLAIM_GAS : 0), MAX_GAS);
   const gasFee = feeFor(gasWanted, price);
@@ -370,9 +383,17 @@ async function calls(address: string, list: readonly (readonly [string, string, 
 // golf's Claim reads the course's holes once (74 slots, two modes): measured
 // well under this; Register was 25.4M on a pearl rehearsal
 const CLAIM_GAS = 90_000_000, REGISTER_GAS = 60_000_000;
-/** What a name taken with a save adds to it: Register and Claim's gas, and
- *  the bytes they store (5,216 measured for both, docs/design/deploy-v1-rehearsal.md). */
-export const NAME_GAS = REGISTER_GAS + CLAIM_GAS, NAME_BYTES = 5216;
+/** What a name taken with a save adds to its gas: Register and Claim's. */
+export const NAME_GAS = REGISTER_GAS + CLAIM_GAS;
+/**
+ * The bytes a name taken with a save stores: Register's (5,216 measured with
+ * a Claim of 2 bests, docs/design/deploy-v1-rehearsal.md, less that Claim's
+ * 1,588), and Claim's, which seats the player's unranked bests of each mode:
+ * 580 and 504 a best (golf filetests: 0, 1,084, 1,588, 2,596, 4,612 bytes for
+ * 0, 1, 2, 4, 8). holes: the player's bests per mode (Rank() "holes"), this
+ * save's counted in.
+ */
+export const nameBytes = (holes: readonly number[]) => 3628 + holes.reduce((b, n) => b + (n > 0 ? 580 + 504 * n : 0), 0);
 
 /**
  * Takes a gno.land name for the connected account, and ranks at once the
@@ -382,7 +403,10 @@ export const NAME_GAS = REGISTER_GAS + CLAIM_GAS, NAME_BYTES = 5216;
  */
 export const registerName = ({ address, registrar, realm, name, price = 0.001, chainId, rpc }: {
   address: string; registrar: string; realm: string; name: string; price?: number; chainId?: string | null; rpc: string;
-}) => calls(address, [[registrar, "Register", [name]], [realm, "Claim", []]], REGISTER_GAS + CLAIM_GAS, price, chainId, rpc, "The name was not registered.");
+}) =>
+  registrar
+    ? calls(address, [[registrar, "Register", [name]], [realm, "Claim", []]], REGISTER_GAS + CLAIM_GAS, price, chainId, rpc, "The name was not registered.")
+    : Promise.reject(new Error(NO_REGISTRAR));
 
 /** Ranks the rounds a player saved before they had a name (golf's Claim). */
 export const claimRounds = ({ address, realm, price = 0.001, chainId, rpc }: { address: string; realm: string; price?: number; chainId?: string | null; rpc: string }) =>
@@ -393,13 +417,12 @@ export const claimRounds = ({ address, realm, price = 0.001, chainId, rpc }: { a
 // transaction is as atomic as Adena's. RUN_EXTRA: what a script's own
 // package costs over a call (an empty run is ~19M).
 const RUN_EXTRA = 20e6;
-// Decoding a hole's data is in each commit's gas too. Measured with
-// simulate=true on the heaviest course holes (mountain/7, town/14, rain):
-// 58.5M and 199.4M used against 100M and 277M asked, so the work model's own
-// margin covers a course hole. A community hole may be as large as the
-// format allows (golf.gno: up to 0.07e9 to decode), so gnokey (which, unlike
-// Adena, does not simulate first) asks that much more for one.
-const DECODE_MAX = 70e6;
+// Decoding a hole's data is in each commit's gas too, in the realm's figure
+// (fixed). Without it, a community hole may be as large as the format allows
+// (golf.gno decodeBase + decodePerByte a byte: 115M for the largest one
+// publishable), so gnokey (which, unlike Adena, does not simulate first) asks
+// that much more for one.
+const DECODE_MAX = 115e6;
 /** A holed round as gnokeyPlan reads it: the engine's snapshot. */
 interface SaveRound extends Work {
   id: string | null;
@@ -448,7 +471,7 @@ export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc, p
       "}",
       "",
     ].join("\n");
-    const gas = Math.min(gasOf(s, from, to) + RUN_EXTRA + (s.official === false ? DECODE_MAX : 0), MAX_GAS);
+    const gas = Math.min(gasOf(s, from, to) + RUN_EXTRA + (s.official === false && !s.fixed ? DECODE_MAX : 0), MAX_GAS);
     const command = `gnokey maketx run -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chain} -remote ${remote} <your-key-name> ${file}`;
     return { file, script, command };
   });

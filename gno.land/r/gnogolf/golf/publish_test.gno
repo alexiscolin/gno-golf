@@ -315,6 +315,8 @@ func TestCommunityTextAndHide(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(deployer))
 	urequire.AbortsContains(t, cur, "not a community hole", func() { Hide(cross(cur), "garden/1", true) })
 	testing.SetRealm(testing.NewUserRealm(deployer))
+	urequire.AbortsContains(t, cur, id+" is a version: hide its hole, "+slot, func() { Hide(cross(cur), id, true) })
+	testing.SetRealm(testing.NewUserRealm(deployer))
 	Hide(cross(cur), slot, true)
 	uassert.False(t, strings.Contains(Holes(), `"id":"`+id+`"`), "off the 3D game's list")
 	uassert.False(t, strings.Contains(Render(""), "Rude words"), "and the hub's")
@@ -324,6 +326,112 @@ func TestCommunityTextAndHide(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(deployer))
 	Hide(cross(cur), slot, false)
 	uassert.True(t, strings.Contains(Holes(), `"id":"`+id+`"`), "back")
+}
+
+// A hidden hole leaves the lists and its author's places: their next newest
+// shows in its stead, it comes back as it was, a new version of it stays
+// hidden, and an author with only hidden holes is not in the index the lists
+// walk. Hiding it twice changes nothing.
+func TestAHiddenHoleTakesNoPlace(cur realm, t *testing.T) {
+	hider := testutils.TestAddress("hider")
+	var ids []string
+	for i := 1; i <= perAuthor+1; i++ {
+		testing.SkipHeights(1)
+		testing.SetRealm(testing.NewUserRealm(hider))
+		ids = append(ids, PublishMine(cross(cur), "h"+strconv.Itoa(i), hexOf(cupHole("pond", i, "Hider "+strconv.Itoa(i))), ""))
+	}
+	shown := func(id string) bool { return strings.Contains(Holes(), `"id":"`+id+`"`) }
+	uassert.False(t, shown(ids[0]), "the 4th newest: past its author's places")
+	slot := func(i int) string { return hider.String() + "/h" + strconv.Itoa(i) }
+	setOwner(deployer)
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), slot(4), true)
+	uassert.True(t, shown(ids[0]) && shown(ids[1]) && shown(ids[2]) && !shown(ids[3]), "the 4th newest takes the hidden one's place")
+	uassert.True(t, strings.Contains(Render(""), "Hider 1") && !strings.Contains(Render(""), "Hider 4"), "on the hub too")
+
+	// hiding it again writes nothing
+	rows := byAuthor.Size()
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), slot(4), true)
+	uassert.Equal(t, rows, byAuthor.Size())
+	uassert.True(t, hidden.Has(slot(4)))
+
+	// a new version of a hidden hole stays hidden, and nobody's place moves
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(hider))
+	v2 := PublishMine(cross(cur), "h4", hexOf(cupHole("pond", 4, "Hider 4, again")), "")
+	uassert.False(t, shown(v2), "still hidden")
+	uassert.True(t, shown(ids[0]), "the others as they were")
+	uassert.Equal(t, rows, byAuthor.Size(), "no row for it")
+
+	// put back, as its current version, and the oldest steps out again
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), slot(4), false)
+	uassert.True(t, shown(v2) && !shown(ids[3]) && !shown(ids[0]), "back, and the 4th newest out")
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), slot(4), false) // already shown: nothing
+	uassert.False(t, hidden.Has(slot(4)))
+
+	// an author with only hidden holes has no row the lists could walk
+	ghost := testutils.TestAddress("ghost")
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(ghost))
+	PublishMine(cross(cur), "boo", hexOf(cupHole("pond", 1, "Ghost")), "")
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	Hide(cross(cur), ghost.String()+"/boo", true)
+	byAuthor.Iterate("", "", func(k string, _ any) bool {
+		uassert.False(t, strings.Contains(k, ghost.String()), "a row of a hidden-only author: "+k)
+		return false
+	})
+}
+
+// Community publishing is the owner's to open, and to close again: closed,
+// PublishMine is refused, and the holes already published play and list on.
+func TestPublishingIsTheOwnersSwitch(cur realm, t *testing.T) {
+	defer func() { publishing = true }() // as the other tests find it (setUp)
+	setOwner(deployer)
+	publishing = false // as a deploy leaves it
+	author := testutils.TestAddress("switch")
+	testing.SetRealm(testing.NewUserRealm(author))
+	urequire.AbortsContains(t, cur, "publishing community holes is not open yet", func() { PublishMine(cross(cur), "a", hexOf(cupHole("pond", 1, "Switch")), "") })
+	uassert.False(t, Publishing())
+	testing.SetRealm(testing.NewUserRealm(author))
+	urequire.AbortsContains(t, cur, "only the owner", func() { SetPublishing(cross(cur), true) })
+
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	SetPublishing(cross(cur), true)
+	uassert.True(t, Publishing())
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	SetPublishing(cross(cur), true) // as it is: nothing
+	uassert.True(t, Publishing())
+	testing.SetRealm(testing.NewUserRealm(author))
+	id := PublishMine(cross(cur), "a", hexOf(cupHole("pond", 1, "Switch")), "")
+
+	testing.SetRealm(testing.NewUserRealm(deployer))
+	SetPublishing(cross(cur), false)
+	uassert.False(t, Publishing())
+	testing.SetRealm(testing.NewUserRealm(author))
+	urequire.AbortsContains(t, cur, "not open yet", func() { PublishMine(cross(cur), "a", hexOf(cupHole("pond", 1, "Switch, v2")), "") })
+	testing.SetRealm(testing.NewUserRealm(author))
+	PlayRoundAt(cross(cur), id, "0,1", Period())
+	uassert.Equal(t, 1, BestOf(id, "assisted", author))
+	uassert.True(t, strings.Contains(Holes(), `"id":"`+id+`"`), "still listed")
+}
+
+// A deploy has a signer, who owns the course, and leaves publishing closed;
+// only `gno test`'s signerless init (chain "dev") starts it open, and on any
+// other chain a signerless one is refused.
+func TestADeployStartsClosed(cur realm, t *testing.T) {
+	was := owner
+	defer func() { owner, publishing = was, true }()
+	setUp(deployer, "dev")
+	uassert.Equal(t, deployer, owner)
+	uassert.False(t, publishing)
+	setUp(deployer, "pearl")
+	uassert.False(t, publishing)
+	setUp("", "dev")
+	uassert.True(t, publishing)
+	uassert.PanicsWithMessage(t, cur, "golf: no owner: golf must be deployed by an account", func() { setUp("", "pearl") })
 }
 
 // One address publishing fifty holes shows perAuthor of them in Holes, and

@@ -103,6 +103,7 @@ check("golf.gno work model", () => {
   assert.equal(w.wall, constOf(golf, "workPerWall"), "workPerWall");
   assert.equal(w.point, constOf(golf, "workPerPoint"), "workPerPoint");
   assert.equal(w.piece, constOf(golf, "workPerPiece"), "workPerPiece");
+  assert.equal(w.unit, constOf(golf, "workPerUnit"), "workPerUnit");
   // the formula and the cut rule adena.ts copies (workOf, commitsOf)
   assert.ok(has(golf, "c := workPerShot + w.walls*workPerWall + int64(len(s.Path))*(workPerPoint+w.pieces*workPerPiece)"), "add(): the work of a shot changed");
   assert.ok(has(golf, "if w.played > 0 && w.spent+w.most > workBudget {"), "next(): the cut rule changed");
@@ -112,10 +113,12 @@ check("golf.gno work model", () => {
   // splitRound follows its cut
   assert.ok(has(golf, "if u := workPerShot + w.walls*workPerWall + int64(s.Work)*workPerUnit; u > c {"), "add(): the work term changed");
 });
-check("golf.gno forecast gas", () => {
-  const m = /forecast \(up\s*(?:\/\/)?\s*to ([\d.e]+) measured/.exec(golf);
-  assert.ok(m, "the forecast's measured gas is no longer in golf.gno's budget comment");
-  assert.equal(RULES.forecastGas, Number(m[1]));
+check("golf's own figures the gas model reads", () => {
+  // each shot's work (SimulateFrom, SimulateRound: adena.ts workOf) and what a
+  // commit spends before its shots (Weather: adena.ts gasOf's fixed)
+  const state = realm("state.gno");
+  assert.ok(has(state, '`,"work":` + strconv.Itoa(shot.Work)'), "a shot's JSON no longer says its work");
+  assert.ok(has(weather, '`,"gas":`+strconv.FormatInt(fixedGas(e, fc), 10)'), "Weather() no longer says the commit's fixed gas");
 });
 check("weather.gno period", () => {
   assert.equal(RULES.periodMs, constOf(weather, "PeriodSeconds") * 1000, "PeriodSeconds");
@@ -158,8 +161,8 @@ check("the gnokey plan (adena.ts gnokeyPlan)", () => {
   assert.equal(cut.length, 2, "the chain's split is used");
   assert.ok(cut[1].script.includes('"3.0000,4.0000;5.0000,6.0000"') && !cut[1].script.includes("Reset"), "part 2: the rest of the shots, no Reset");
   assert.equal(gnokeyPlan(round, opts).length, 1, "without it, the work model's cut");
-  // a community hole may take up to 70M more to decode
-  assert.equal(gas(gnokeyPlan({ ...round, official: false }, opts)[0]) - gas(gnokeyPlan(round, opts)[0]), 70e6, "community decode allowance");
+  // a community hole may take up to 115M more to decode (the largest publishable), unless the realm said its figure
+  assert.equal(gas(gnokeyPlan({ ...round, official: false }, opts)[0]) - gas(gnokeyPlan(round, opts)[0]), 115e6, "community decode allowance");
 });
 
 check("the scorecard (card.ts)", () => {
@@ -170,11 +173,11 @@ check("the scorecard (card.ts)", () => {
   console.warn = () => {}; // (the refused count says so)
   try {
     card.recordScore("h1", 4);
-    card.recordScore("h1", 3);
     card.recordScore("h1", 5);
+    card.recordScore("h1", 3);
     card.recordScore("h2", undefined);
     const c = card.loadCard(), t = card.totals(c, [{ id: "h1", par: 3 }, { id: "h2", par: 3 }]);
-    assert.ok(c.h1 === 3 && !("h2" in c), "kept the best, refused undefined");
+    assert.ok(c.h1 === 3 && !("h2" in c), "kept the latest, refused undefined");
     assert.ok(t.done === 1 && t.strokes === 3 && t.par === 3, "totals");
     // a version-1 card: realm ids to slots, the lower score where two meet
     const old = "gno.land/r/gnogolf/";

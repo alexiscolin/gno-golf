@@ -105,12 +105,10 @@ func (s Segment) Normal() Vec2             // unit left-normal
 func (s Segment) Crosses(p0, p1 Vec2) bool // does the motion p0->p1 cross it
 func (s Segment) Closest(p Vec2) Vec2      // the point of the segment nearest p
 
-type Circle struct { C Vec2; R float64 }
-func (c Circle) Hit(p0, p1 Vec2) (float64, Vec2, bool)     // swept point vs circle
+type Circle struct { C Vec2; R float64 } // a post's shape (Field.Posts)
 ```
 
-`Circle.Hit` doesn't report a hit when the motion starts inside the circle, so
-a post can't trap a ball that somehow got in. `LenCmp` gives exactly what
+`LenCmp` gives exactly what
 comparing `Len()` would, but takes the square root only when the two are
 within a hair of each other.
 

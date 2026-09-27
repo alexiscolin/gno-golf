@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { holeLink, pasted, pendingOf, shareLinks, strokesWord, suggestName } from "../components/common.ts";
+import { costLine, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -69,7 +69,7 @@ test("a name to start from: the gnome's letters and 3 digits, as the registrar w
 });
 
 test("a round kept for the tab is taken back only in the shape a save sends", () => {
-  const ok = { id: "garden/3/v1", name: "Down the Tunnel", shots: ["0.0000,9.2500", "-25.0000,9.5000,5"], strokes: 2, period: 5968, roundMode: "pro", official: true, walls: 12, pieces: 30, kind: "", pts: [10, 12] };
+  const ok = { id: "garden/3/v1", name: "Down the Tunnel", shots: ["0.0000,9.2500", "-25.0000,9.5000,5"], strokes: 2, period: 5968, roundMode: "pro", official: true, walls: 12, pieces: 30, kind: "", pts: [10, 12], works: [900, 1200], fixed: 15_728_000 };
   assert.deepEqual(pendingOf(JSON.parse(JSON.stringify(ok))), ok);
   assert.equal(pendingOf(null), null);
   assert.equal(pendingOf({ ...ok, id: "../../evil" }), null);
@@ -86,4 +86,50 @@ test("a round kept for the tab is taken back only in the shape a save sends", ()
 test("strokes are said in the singular for one", () => {
   assert.equal(strokesWord(1), "1 stroke");
   assert.equal(strokesWord(3), "3 strokes");
+});
+
+test("a name is checked as the registrar has it: 5 to 13 letters, 3 digits, no reserved start", () => {
+  assert.equal(nameHint("golfer123"), "");
+  assert.equal(nameHint(""), "5 to 13 letters, then 3 digits");
+  assert.equal(nameHint("Golfer123"), "lowercase letters, then digits");
+  assert.match(nameHint("gnomey123"), /cannot start/);
+  assert.match(nameHint("atoneme123"), /cannot start/);
+  assert.equal(nameHint("bob123"), "5 to 13 letters");
+  assert.equal(nameHint("golfer12"), "and 3 digits to end");
+  assert.equal(holesWord(1), "1 hole");
+  assert.equal(holesWord(6), "6 holes");
+});
+
+test("a save's deadline: the end of the period after its own, less the margin, said as a clock", () => {
+  assert.equal(saveBy(10), 12 * 300e3 - 15e3);
+  assert.equal(mmss(0), "0:00");
+  assert.equal(mmss(61001), "1:02"); // rounded up: never 0:00 while a second is left
+  assert.equal(mmss(-5), "0:00");
+});
+
+test("a cost line: the total, a first save's deposit counted in", () => {
+  assert.equal(costLine(200e6, 0.001, true, 360000), "About 0.20 GNOT");
+  assert.equal(costLine(200e6, 0.001, false, 360000, true), "About 0.56 test GNOT (first save on this hole)");
+});
+
+test("the funding command: only a checked address, chain id and host go in the shell", () => {
+  const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  assert.equal(fundCmd(me, "dev", "http://127.0.0.1:26657"), `gnokey maketx send -send 50000000ugnot -to ${me} -gas-fee 1000000ugnot -gas-wanted 2000000 -chainid dev -remote 127.0.0.1:26657 -broadcast test1`);
+  assert.equal(fundCmd("g1; rm -rf ~", "dev", "http://127.0.0.1:26657"), "");
+  assert.equal(fundCmd(me, "dev; ls", "http://127.0.0.1:26657"), "");
+  assert.equal(fundCmd(me, "dev", "not a url"), "");
+});
+
+test("hole numbers, the next hole, the next cup, golf's words", () => {
+  const holes = [{ id: "garden/1/v1" }, { id: "garden/2/v1" }, { id: "garden/3/v1" }];
+  assert.equal(holeNumber(holes, "garden/2/v1"), "2");
+  assert.equal(holeNumber(holes, "someone/hole/v1"), "–");
+  assert.equal(nextHole({ holes, id: "garden/1/v1" }, { "garden/2/v1": 3 })?.id, "garden/3/v1");
+  assert.equal(nextHole({ holes, id: "garden/3/v1" }, { "garden/2/v1": 3 })?.id, "garden/1/v1");
+  assert.equal(nextCup("garden", { island: 0, town: 18 }), "town");
+  assert.equal(nextCup("mountain", { garden: 18 }), "");
+  assert.equal(golfTerm(1, 3), "Hole in one!");
+  assert.equal(golfTerm(2, 4), "Eagle!");
+  assert.equal(golfTerm(3, 3), "Par");
+  assert.equal(golfTerm(9, 3), "6 over par");
 });

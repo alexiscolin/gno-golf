@@ -56,6 +56,10 @@ export interface ClipRun {
 export function recordClip({ E, stroke, gnome, showClock, hide, card, term, challenge }: ClipOf, { mime, signal, progress = () => {} }: ClipRun): Promise<Blob | null> {
   const { g, scene, ground } = E, s = g.s, round = g.round, { path } = stroke;
   if (!s || signal.aborted || path.length < 2) return Promise.resolve(null);
+  // its renderer first: a device out of WebGL contexts refuses here, before anything is built to free
+  const renderer = makeRenderer(document.createElement("canvas"));
+  renderer.setPixelRatio(1);
+  renderer.setSize(W, H, false);
   // the clip's framing: the card's band at the bottom kept clear
   const view = { w: W, h: H, top: 24, bottom: 96, side: 24 };
   // the clip's own things, in the scene only while the clip draws
@@ -90,9 +94,6 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term, chal
   clock = (g.tick0 || 0) + win.from;
   cam.jump();
 
-  const renderer = makeRenderer(document.createElement("canvas"));
-  renderer.setPixelRatio(1);
-  renderer.setSize(W, H, false);
   const out = document.createElement("canvas");
   out.width = W;
   out.height = H;

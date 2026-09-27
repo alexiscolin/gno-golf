@@ -8,6 +8,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
@@ -26,19 +28,11 @@ import (
 
 // dataHole is a decoded data version for one call. It plays as its Simple,
 // and marks the wear on its entry: the Simple's own Marks would be lost with
-// it. Play, PlayAt and PlayWith all come here, since Simple's own call each
-// other and not the wrapper.
+// it. golf plays every stroke with PlayWith (playAt), the one that marks it:
+// the Simple's own Play and PlayAt would not.
 type dataHole struct {
 	*course.Simple
 	e *entry
-}
-
-func (d *dataHole) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	return d.PlayWith(ball, angle, power, 0, 0, nil)
-}
-
-func (d *dataHole) PlayAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool) {
-	return d.PlayWith(ball, angle, power, stroke, 0, nil)
 }
 
 // PlayWith is Simple's PlayWith, the wear marked on the entry.
@@ -113,7 +107,7 @@ func Publish(cur realm, slot, hexData, note string) string {
 	if v := slots.Get(key); v != nil {
 		old = find(v.(string))
 		if old.sha == sum {
-			panic("golf: this data is already " + old.id + ": nothing to publish")
+			panic(nothingNew(old))
 		}
 		n = old.version + 1
 	}
@@ -130,15 +124,20 @@ func Publish(cur realm, slot, hexData, note string) string {
 }
 
 // PublishMine publishes a hole of one's own, as data, and returns its id:
-// "<caller>/<slug>/v1" the first time, then v2 and on. Anyone can, and only
-// the same address can add versions to it. slug is 1 to 32 of a-z, 0-9 and
-// "-". It is a community hole: playable, recorded and on its own board, in no
-// cup and not in the course ranking. The data is held to what Publish holds
-// it to, but its world and order are its author's own business.
+// "<caller>/<slug>/v1" the first time, then v2 and on. Anyone can while the
+// owner has publishing open (SetPublishing), and only the same address can
+// add versions to it. slug is 1 to 32 of a-z, 0-9 and "-". It is a community
+// hole: playable, recorded and on its own board, in no cup and not in the
+// course ranking. The data is held to what Publish holds it to, but its world
+// and order are its author's own business. A new version of a hidden hole
+// (Hide) stays hidden.
 //
 // The publisher pays the storage deposit for the bytes it adds, about half a
 // GNOT a version, and nothing published can be deleted.
 func PublishMine(cur realm, slug, hexData, note string) string {
+	if !publishing {
+		panic("golf: publishing community holes is not open yet")
+	}
 	by := cur.Previous().Address()
 	if !validSlug(slug) {
 		panic("golf: a slug is 1 to 32 of a-z, 0-9 and -")
@@ -150,7 +149,7 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 	if v := aliases.Get(alias); v != nil {
 		old = find(v.(string))
 		if old.sha == sum {
-			panic("golf: this data is already " + old.id + ": nothing to publish")
+			panic(nothingNew(old))
 		}
 		n = old.version + 1
 	}
@@ -161,55 +160,114 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 	community.Set(e.id, e)
 	holeData.Set(e.id, data)
 	aliases.Set(alias, e.id)
-	a := by.String() + " "
-	// the author's row moves to this height: their latest hole's height is
-	// in its key, "<address> <height> <slug>"
-	latest := ""
-	byAuthor.ReverseIterate(a, a[:len(a)-1]+"!", func(k string, _ any) bool {
-		latest = k[len(a) : len(a)+12]
-		return true
-	})
-	if latest != "" {
-		byAuthor.Remove(latest + " " + by.String())
-	}
-	byAuthor.Set(recentKey(e.height, by.String()), nil)
 	if old != nil {
 		old.next = e.id // archived; it never counted anywhere
-		byAuthor.Remove(a + recentKey(old.height, slug))
 	}
-	byAuthor.Set(a+recentKey(e.height, slug), e.id)
+	if !hidden.Has(alias) { // a hidden hole has no row (Hide)
+		a := by.String()
+		// the newest row: the author's own moves to its height
+		moveAuthor(a, newestRow(a), pad(int(e.height), 12))
+		if old != nil {
+			byAuthor.Remove(a + " " + recentKey(old.height, slug))
+		}
+		byAuthor.Set(a+" "+recentKey(e.height, slug), e.id)
+	}
 	chain.Emit(EventHolePublished, "hole", e.id, "slot", alias, "sha", sum, "by", by.String(), "official", "false")
 	return e.id
+}
+
+// newestRow is the height of an author's newest row in byAuthor
+// ("<address> <height> <slug>"), "" if they have none.
+func newestRow(a string) string {
+	latest := ""
+	byAuthor.ReverseIterate(a+" ", a+"!", func(k string, _ any) bool {
+		latest = k[len(a)+1 : len(a)+13]
+		return true
+	})
+	return latest
+}
+
+// moveAuthor moves an author's own row in byAuthor (recentKey(height,
+// address)) from the height was to now, "" for none: it stays at their
+// newest row's, and goes with their last.
+func moveAuthor(a, was, now string) {
+	if was == now {
+		return
+	}
+	if was != "" {
+		byAuthor.Remove(was + " " + a)
+	}
+	if now != "" {
+		byAuthor.Set(now+" "+a, nil)
+	}
 }
 
 // linkish spots a web address in a community hole's name or note, which the
 // lists show on the course's front page: "www.", a dot between a letter or
 // digit and two letters ("claim.xyz", "t.me"; not "e.g." nor a sentence's dot,
 // which has a space after it), or an IP address ("1.2.3.4"), the dots written
-// as look-alikes (．。․﹒) read as dots. Basic on purpose: what gets past it,
-// the owner can Hide.
+// as look-alikes (．。․﹒) read as dots, letters in any case. Basic on purpose:
+// what gets past it, the owner can Hide. And strict on purpose: a dot between
+// letters is what a domain looks like, so "St.Andrews" is refused with
+// "claim.xyz", and its author writes "St. Andrews".
+//
+// It reads s once, a byte at a time: every mark it looks for is ASCII, and
+// the only characters that lower-case to ASCII are İ and the Kelvin sign, so
+// a character past ASCII is decoded only to tell those, the look-alike dots
+// and the spaces that end a word apart from the rest.
 func linkish(s string) bool {
-	low := strings.ToLower(s)
-	for _, d := range []string{"．", "。", "․", "﹒"} {
-		low = strings.ReplaceAll(low, d, ".")
-	}
-	if strings.Contains(low, "www.") {
-		return true
-	}
-	letter := func(c byte) bool { return c >= 'a' && c <= 'z' }
-	digit := func(c byte) bool { return c >= '0' && c <= '9' }
-	for i := 1; i+2 < len(low); i++ {
-		if p := low[i-1]; low[i] == '.' && (letter(p) || digit(p)) && letter(low[i+1]) && letter(low[i+2]) {
+	var c1, c2, c3 byte // the three characters before c, lower-cased
+	// the word so far, as strings.Fields splits: an IP address is only
+	// digits and three dots
+	word, ip, dots := false, true, 0
+	for i := 0; i < len(s); {
+		c, size, space := s[i], 1, false
+		switch {
+		case c >= 'A' && c <= 'Z':
+			c += 'a' - 'A'
+		case c >= utf8.RuneSelf:
+			var r rune
+			r, size = utf8.DecodeRuneInString(s[i:])
+			switch r {
+			case 'İ':
+				c = 'i'
+			case '\u212a': // the Kelvin sign
+				c = 'k'
+			case '．', '。', '․', '﹒':
+				c = '.'
+			default:
+				c, space = utf8.RuneSelf, unicode.IsSpace(r) // none of the marks
+			}
+		case c == ' ' || c >= '\t' && c <= '\r':
+			space = true
+		}
+		i += size
+		switch {
+		case c == '.' && c1 == 'w' && c2 == 'w' && c3 == 'w':
+			return true
+		case isLower(c) && isLower(c1) && c2 == '.' && (isLower(c3) || isDigit(c3)):
 			return true
 		}
-	}
-	for _, w := range strings.Fields(low) {
-		if strings.Count(w, ".") == 3 && strings.Trim(w, "0123456789.") == "" {
-			return true
+		c1, c2, c3 = c, c1, c2
+		if space {
+			if word && ip && dots == 3 {
+				return true
+			}
+			word, ip, dots = false, true, 0
+			continue
+		}
+		word = true
+		if c == '.' {
+			dots++
+		} else if !isDigit(c) {
+			ip = false
 		}
 	}
-	return false
+	return word && ip && dots == 3
 }
+
+func isLower(c byte) bool { return c >= 'a' && c <= 'z' }
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 
 // decodeData checks a version's data as it arrives: hex, GG1 within the
 // format's limits, stored lengths bit-exact, and in the one form Encode
@@ -240,10 +298,16 @@ func decodeData(hexData string) (*course.Simple, string, string) {
 	// the physics ends a stroke at MaxWork, so this holds a hole's walls
 	w := newWork(h, nil)
 	if w.bound > maxShotGas {
-		panic("golf: one shot on this hole could cost more than a transaction can replay")
+		panic(errShotTooHeavy)
 	}
 	sum := sha256.Sum256(b)
 	return h, data, hex.EncodeToString(sum[:])
+}
+
+// nothingNew refuses a version whose data is its alias's current one's: it
+// would reset the hole's ranking for nothing.
+func nothingNew(old *entry) string {
+	return "golf: this data is already " + old.id + ": nothing to publish"
 }
 
 func dataEntry(alias string, n int, h *course.Simple, by address, sum, note string) *entry {

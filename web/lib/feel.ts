@@ -3,6 +3,7 @@
 // off in the menu; the choice is kept in this browser.
 
 import type { WeatherNow } from "./scene/weather";
+import { camlog } from "./testhooks";
 
 /** The player's choices: sound on, vibration on. */
 export interface Feel {
@@ -172,7 +173,7 @@ let mood: Mood = {}, bed: { src: AudioBufferSourceNode; g: GainNode; stop?: Retu
 /** Off the course (title, cup and gnome screens) the weather is silent; back on
  *  it, the hole's weather plays again. */
 // ?camlog: every sound asked for, played or not (a test counts them)
-const soundLog: [string, number, number][] | null = typeof location !== "undefined" && /[?&]camlog/.test(location.search) ? [] : null;
+const soundLog: [string, number, number][] | null = camlog() ? [] : null;
 if (soundLog && typeof window !== "undefined") (window as Window & { __soundLog?: typeof soundLog }).__soundLog = soundLog;
 export function hush(off: boolean) {
   hushed = !!off;

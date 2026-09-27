@@ -352,11 +352,18 @@ test("commitsOf: the work budget cuts sooner than maxShots for heavy (unknown-le
 
 test("gasOf: PER_CALL alone for an empty range; the forecast and the shots add on top, capped at MAX_GAS", () => {
   assert.equal(gasOf({}), 30_000_000);
-  assert.equal(gasOf({ kind: "rain", pts: [100] }, 0, 1), 30_000_000 + RULES.forecastGas + 10_000_000 + 100 * 1_200_000);
-  // "storm" mirrors adena.ts's private FORECAST.storm (150e6); RULES has no
-  // entry for it, so this one is hard-coded rather than reused
-  assert.equal(gasOf({ kind: "storm", pts: [100] }, 0, 1), 30_000_000 + 150_000_000 + 10_000_000 + 100 * 1_200_000);
+  // without the realm's own figure, the forecast's most (adena.ts FORECAST: rain 200M, a storm 210M)
+  assert.equal(gasOf({ kind: "rain", pts: [100] }, 0, 1), 30_000_000 + 200_000_000 + 10_000_000 + 100 * 1_200_000);
+  assert.equal(gasOf({ kind: "storm", pts: [100] }, 0, 1), 30_000_000 + 210_000_000 + 10_000_000 + 100 * 1_200_000);
+  // with it (Weather() "gas"), that figure, whatever the kind
+  assert.equal(gasOf({ kind: "storm", fixed: 15_728_000, pts: [100] }, 0, 1), 30_000_000 + 15_728_000 + 10_000_000 + 100 * 1_200_000);
   assert.equal(gasOf({ walls: 1000, pieces: 1000, pts: [2000] }, 0, 1), 1_900_000_000);
+});
+
+test("gasOf: a shot is counted by its path or by its physics' work (Shot.Work), the larger, as the realm does", () => {
+  const path = 10_000_000 + 100 * 1_200_000;
+  assert.equal(gasOf({ pts: [100], works: [50_000] }, 0, 1), 30_000_000 + path); // the path's is larger
+  assert.equal(gasOf({ pts: [100], works: [637_500] }, 0, 1), 30_000_000 + 10_000_000 + 637_500 * RULES.work.unit); // the work's
 });
 
 // ------------------------------------------------------------------ chainSplit
@@ -667,7 +674,10 @@ test("gnokeyPlan: a community hole (official: false) asks DECODE_MAX more gas th
   const off = gnokeyPlan({ ...s, official: true }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const comm = gnokeyPlan({ ...s, official: false }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const gasOfCmd = (c: string) => Number(/-gas-wanted (\d+)/.exec(c)![1]);
-  assert.equal(gasOfCmd(comm[0].command) - gasOfCmd(off[0].command), 70_000_000);
+  assert.equal(gasOfCmd(comm[0].command) - gasOfCmd(off[0].command), 115_000_000);
+  // the realm's own figure said (Weather() "gas"): it holds the decoding already
+  const said = gnokeyPlan({ ...s, official: false, fixed: 40_000_000 }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
+  assert.equal(gasOfCmd(said[0].command) - gasOfCmd(off[0].command), 40_000_000);
 });
 
 test("gnokeyPlan: an invalid chain id or rpc falls back to a placeholder in the command", () => {

@@ -16,21 +16,19 @@ interface Inner {
   cam: ReturnType<typeof makeCamera>;
   rp: ReturnType<typeof makeReplay>;
   placeBall: () => void;
-  onHoled: (r: { id: string; strokes: number }) => void;
   fakeWeather: (w: string) => void;
 }
 
 const ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3();
 
 /** E: the engine's live state; cam: its camera controller. */
-export function probes(E: Live, { cam, rp, placeBall, onHoled, fakeWeather }: Inner) {
+export function probes(E: Live, { cam, rp, placeBall, fakeWeather }: Inner) {
   const { g, camera, scene, ground, band, publish } = E;
   return {
     /** For screenshots only (?won): the win card as if the hole was just holed. */
     fakeWin(strokes = 2) {
       g.strokes = strokes;
-      g.done = g.holed = true;
-      if (g.id) onHoled({ id: g.id, strokes });
+      g.done = g.holed = true; // (not on the player's card: nobody played it)
       void publish();
     },
     /** ?camlog only: [yaw°, distance to the ball, widening] per frame. */

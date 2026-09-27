@@ -5,12 +5,14 @@ import { sound } from "@/lib/feel";
 import { clipSupport } from "@/lib/clip";
 import type { ClipRun } from "@/lib/engine/clip";
 import { siteURL } from "@/lib/site";
-import { isTouch, pasted, shareLinks } from "./common";
+import { pasted, shareLinks, useCopied } from "./common";
+import { isTouch, reducedMotion } from "@/lib/device";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
 // with the score (X, Facebook, WhatsApp, Bluesky, copy link), each opening
-// that network's own share page with the text and the link. On a phone one
-// more icon opens the system share sheet, with a picture of the course.
+// that network's own share page with the text and the link. One more icon
+// opens the system share sheet: on a phone always (with a picture of the
+// course), on a computer once there is a clip it can send.
 
 
 // simple filled glyphs, 24×24
@@ -36,9 +38,7 @@ interface ShareProps {
 const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && isTouch();
 
 export default function Share({ text, snapshot, link = "", clip = null, label = "Share" }: ShareProps) {
-  const [copied, setCopied] = useState(false);
-  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the card goes first
-  useEffect(() => () => clearTimeout(copiedT.current), []);
+  const [copied, copyText] = useCopied();
   // this hole, this cup, this gnome, at the game's public address
   const url = siteURL(link);
   const phone = onPhone();
@@ -61,15 +61,7 @@ export default function Share({ text, snapshot, link = "", clip = null, label = 
       await navigator.share(data);
     } catch {} // cancelled, or refused: nothing to say
   };
-  const copy = async () => {
-    sound("blip");
-    try {
-      await navigator.clipboard.writeText(pasted(text, url));
-      setCopied(true);
-      clearTimeout(copiedT.current);
-      copiedT.current = setTimeout(() => setCopied(false), 1800);
-    } catch {}
-  };
+  const copy = () => (sound("blip"), copyText(pasted(text, url)));
   const links = shareLinks(text, url);
   return (
     <span className="share" role="group" aria-label="Share">
@@ -116,7 +108,7 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
   const [k, setK] = useState(0);
   // undefined while it is being made; null: none came of it
   const [clip, setClip] = useState<Clip | null>();
-  const [still] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const [still] = useState(reducedMotion);
   const [playing, setPlaying] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   // made once, from when it is asked for; the card closing cancels it and frees it all
@@ -154,7 +146,7 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
         {!clip ? (
           <div className="clip__making" role="status" aria-live="polite">
             <span>Making the clip of your shot…</span>
-            <span className="clip__bar" aria-hidden="true"><span style={{ width: `${Math.round(k * 100)}%` }} /></span>
+            <span className="bar" aria-hidden="true"><span style={{ width: `${Math.round(k * 100)}%` }} /></span>
           </div>
         ) : (
           <>

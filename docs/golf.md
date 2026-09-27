@@ -10,7 +10,7 @@ that `golf` stores and decodes afresh for every call, and plays with the
 physics package. No hole runs code of its own. The course's own holes are data
 the owner publishes into **slots** (`garden/7`), each publish a new **version**
 (`garden/7/v1`, `garden/7/v2`, …). Anyone can publish data of their own the
-same way (`PublishMine`).
+same way (`PublishMine`), once the owner opens publishing (`SetPublishing`).
 
 Only the versions the owner publishes into slots are **course holes**
 (`"official":true`): they make up the cups and count in the course-wide
@@ -40,6 +40,10 @@ The owner can:
   nothing.
 - **Take a community hole off the lists** (`Hide`), and put it back: a scam or
   abuse in its name or note. It stays playable, its page and data kept.
+- **Open community publishing, and close it again** (`SetPublishing`). It is
+  closed at deploy: the first 3D game has no hole builder, and publishing
+  opens with the one that does, without a redeploy. Closed, nobody can add a
+  hole or a version; every hole already published plays on, listed.
 - **Hand the role on** (`Transfer`, then `Accept` by the new owner) or **give it
   up for good** (`Renounce`). After `Renounce` there is no owner, nobody can
   become one, and the course is frozen.
@@ -53,8 +57,8 @@ aren't holes of this realm at all, but their URLs look like the course's.
 The owner can't edit or delete a version, a round, a record, a best, a board
 or a standing, can't touch a community hole, the weather, the physics or the
 code, and can't pause or upgrade the realm. Everyone else can play, reset
-their own round, publish holes of their own and settle the ranking sooner
-(`Drain`). The hub page says the same, with the current owner's name
+their own round, publish holes of their own while publishing is open, and
+settle the ranking sooner (`Drain`). The hub page says the same, with the current owner's name
 (see [Render](#renderpath-string-string)).
 
 For how a client calls all this (the `vm/qeval` query, the double unwrap,
@@ -144,9 +148,11 @@ Emits `HolePublished` (`hole`, `slot`, `sha`, `by`, `official` `"true"`), then
 
 ### `PublishMine(cur realm, slug, hexData, note string) string`
 
-Anyone. Publishes a hole of one's own as data and returns its id:
-`"<caller>/<slug>/v1"` the first time, then `v2` and on. Only the same address
-can add versions to it. `slug` is 1 to 32 of `a-z`, `0-9` and `-`.
+Anyone, while the owner has publishing open (`Publishing()`; closed, it panics
+`golf: publishing community holes is not open yet`). Publishes a hole of one's
+own as data and returns its id: `"<caller>/<slug>/v1"` the first time, then
+`v2` and on. Only the same address can add versions to it. `slug` is 1 to 32
+of `a-z`, `0-9` and `-`.
 
 The data is held to what `Publish` holds it to, but its world and order are
 its author's business. It's a community hole: playable, recorded and on its
@@ -155,7 +161,10 @@ old one (which never counted anywhere). The publisher pays the storage deposit
 for the bytes it adds, and nothing published can be deleted. Its name and note
 carry no web address: `www.`, a dot between a letter or digit and two letters
 (`claim.xyz`, `t.me`; not `e.g.`), or an IP address, look-alike dots read as
-dots, is refused. Emits `HolePublished` (`official` `"false"`).
+dots and letters in any case, is refused. It is strict on purpose: a dot
+between letters is what a domain looks like, so `St.Andrews` is refused with
+`claim.xyz`, and its author writes `St. Andrews`. A new version of a hidden
+hole stays hidden. Emits `HolePublished` (`official` `"false"`).
 
 ### `Transfer(cur realm, to address)`, `Accept(cur realm)`, `Renounce(cur realm)`
 
@@ -174,7 +183,21 @@ The owner role, handed on in two steps.
 Owner only. Takes a community hole (`"<address>/<slug>"`, every version of
 it) off the lists: the hub and `Holes`, so the 3D game's too. Its rounds, page
 and data stay, `Community` still has it, and anyone can still play it by id.
-`hide` false puts it back. Emits `HoleHidden` (`slot`, `hidden`).
+A hidden hole takes none of its author's 3 places on the lists (their next
+newest shows instead), a new version of it stays hidden, and the lists never
+read it: it leaves the index they walk, so hiding any number costs them
+nothing. `hide` false puts it back, as its current version. A version's id
+(`…/v2`) is refused with the hole to hide instead; a hole already as asked is
+left alone, with no event. Emits `HoleHidden` (`slot`, `hidden`).
+
+### `SetPublishing(cur realm, open bool)`
+
+Owner only. Opens community publishing (`PublishMine`) or closes it again;
+`Publishing()` reads it. It is closed at deploy, because the first 3D game
+has no hole builder: it opens with the one that does, without a redeploy, and
+can be closed again. Closing it stops new holes and new versions only: every
+hole published stays playable, listed and on its boards. Setting it as it is
+does nothing, with no event. Emits `PublishingSet` (`open`).
 
 ### `SetPlayURL(cur realm, url string)`
 
@@ -249,7 +272,11 @@ course standing. It returns how many bests it placed, and panics if the
 caller has no name yet. Calling it twice changes nothing. The game sends it in
 the same transaction as the name's `Register`, and offers a "Rank them" button
 to anyone who took their name elsewhere. It reads the course's holes only, so
-it costs the same for everyone (about 60M gas and 1 KB).
+its gas is the same for everyone (about 60M). Its storage grows with what it
+seats: 504 bytes a best, and 580 once for each mode it ranks the player in, so
+`580 + 504 × n` a mode with `n` bests (none for none). `Rank(mode, player)`'s
+`holes` gives a client `n` beforehand; it can be more than Claim seats while
+an archived hole is draining, never less.
 
 ### `Drain(cur realm, n int) int`
 
@@ -277,6 +304,8 @@ hole is always `hole`, a player `player`.
 | `OwnershipRenounced` | `from` |
 | `PlayURLSet` | `url` |
 | `SuccessorSet` | `successor` |
+| `HoleHidden` | `slot`, `hidden` (`"true"`/`"false"`) |
+| `PublishingSet` | `open` (`"true"`/`"false"`) |
 
 `Shot` is the stroke that did not hole, `Holed` the one that did: together
 they are every stroke, which is all that outlives a `Reset`.
@@ -301,8 +330,8 @@ republish until it returns 0.
 ## Reads
 
 These are all free as `vm/qeval` queries and return JSON strings (except
-`Current`, `HoleData`, `BestOf`, `StandingOf`, `Owner`, `Pending` and
-`Period`, which return plain values).
+`Current`, `HoleData`, `BestOf`, `StandingOf`, `Owner`, `Pending`,
+`Publishing` and `Period`, which return plain values).
 
 ### Holes and versions
 
@@ -313,8 +342,10 @@ current holes in course order (world by world, then by order), then at most
 20 of its archived versions (leaving at least 20 places for the rest), then
 everyone's current community versions, newest first: each address's 3
 newest at most, so however many one address publishes, it fills 3 rows and
-pushes nobody else further down. The rest are in `Community`, and every version of a slot is on its data page. It decodes
-nothing.
+pushes nobody else further down. A hidden hole (`Hide`) is not listed and
+takes none of those 3 places. The rest are in `Community`, and every version
+of a slot is on its data page. It decodes nothing, and its cost does not grow
+with what anyone publishes or the owner hides.
 
 ```json
 {"version":1,"play":"https://gnogolf.xyz/","successor":"","holes":[
@@ -426,10 +457,14 @@ All three lists are empty for a hole that isn't `course.Timed`, and for
 #### `Weather(hole string, period int64) string`
 
 The hole's weather in a period, as the zones a client draws and the chain
-plays under. A period still to come panics.
+plays under, and `gas`: what a commit on the hole spends in that weather
+before its first shot (decoding the hole and drawing its forecast, see
+[The work budget](#the-work-budget)), counted against the commit's budget:
+15.7M on `garden/2` in the clear, 159M on `garden/1` in the rain, whose
+puddles take the most tries. A period still to come panics.
 
 ```json
-{"version":1,"period":5920000,"kind":"storm","wind":[0.09,0.05],
+{"version":1,"gas":159140000,"period":5920000,"kind":"storm","wind":[0.09,0.05],
  "zones":[{"kind":"surface",…,"skin":"storm"},{"kind":"surface",…,"skin":"rain"},
           {"kind":"slope",…,"every":6,"on":3,"phase":0,"skin":"wind"}, …]}
 ```
@@ -477,8 +512,10 @@ What one shot from `(ballX, ballY)` would do, in the current weather, as
 
 ```json
 {"version":1,"holed":false,"bounces":1,"path":[[3,8],[9,8],…,[4.301,8]],
- "air":"000…0","cause":"--b…-","rest":[4.3012…,8]}
+ "air":"000…0","cause":"--b…-","work":15520,"rest":[4.3012…,8]}
 ```
+
+`work` is the shot's `Shot.Work` (see [The work budget](#the-work-budget)).
 
 #### `SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, period int64) string`
 
@@ -501,7 +538,7 @@ the lists `PlayRoundAt` would refuse (too many shots, too much work).
 
 ```json
 {"version":1,"holed":false,"strokes":2,"bounces":0,"period":5920000,
- "path":[…],"air":"00…0","cause":"-…-","rest":[…]}
+ "path":[…],"air":"00…0","cause":"-…-","work":15520,"rest":[…]}
 ```
 
 #### `SimulateRoundIn(hole, shots string, period int64) string`
@@ -661,6 +698,10 @@ A page of every course standing in a mode, named or not.
 The owner, `""` once renounced, and the address a `Transfer` offered the role
 to, `""` if none.
 
+#### `Publishing() bool`
+
+Whether `PublishMine` is open (`SetPublishing`).
+
 ## `Render(path string) string`
 
 The gnoweb page, a second client that plays the same physics. `<hole>` is a
@@ -708,7 +749,9 @@ What a commit spends before its first shot is counted in too: decoding the
 hole (at most `6M + 4K ×` its data's bytes; 3.4K to 3.9K a byte measured)
 and drawing its forecast (`Forecast.Work` units, counted as it is drawn: the
 rain's puddle tries test every post, zone, polygon edge and wall, up to 0.14e9
-on the course and 1.1e9 on a hostile hole).
+on the course and 1.1e9 on a hostile hole). `Weather` gives this part as
+`gas`, and every `Simulate*` answer its shot's `work`, so a client adds up a
+commit as the chain does.
 
 A hole's heaviest shot is bounded: `shotBound = 10M + 150K × walls + 1000 ×
 (MaxWork + MaxWorkStep)`, 1.24e9 to 1.26e9 for the course holes. A hole whose

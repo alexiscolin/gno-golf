@@ -49,7 +49,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["web/*.mjs", "media/promo/*.mjs", "media/camera/*.mjs", "media/lib/*.mjs", "scripts/*.mjs"],
+    files: ["web/*.mjs", "media/promo/*.mjs", "media/camera/*.mjs", "media/lib/*.mjs", "media/og/*.mjs", "scripts/*.mjs"],
     languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: globals.node },
     rules: {
       "no-undef": "error",

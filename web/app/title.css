@@ -27,24 +27,18 @@
   --art: linear-gradient(180deg, #7ec8ff, #ffd6a8);
   --sky: linear-gradient(180deg, var(--s0), var(--s1));
   --dots: radial-gradient(circle, rgba(var(--ink-rgb), .09) 1.7px, transparent 2.1px) 0 0 / 14px 14px;
-  --gold: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%);
+  --gold-grad: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%); /* the call to action's and a won cup's badge (--gold, the flat metal, everywhere else) */
   --glow: #ffe066; --glow-rgb: 255, 224, 102;
   /* type: a display heading, a card's name, a pill's label */
   --fs-display: clamp(30px, 4.4vw, 54px);
   --fs-name: clamp(15px, 1.4vw, 18px);
   --fs-pill: 15px;
-  /* the ink's depth under a card, a panel, a button */
-  --deep-card: 0 7px 0 var(--ink), 0 18px 28px rgba(20, 10, 60, .3);
-  --deep-panel: 0 4px 0 var(--ink);
   /* space: the vertical rhythm, small to large */
   --gap-s: 8px;
   --gap-m: clamp(12px, 1.8vh, 18px);
   --gap-l: clamp(18px, 3vh, 30px);
   --gap-xl: clamp(24px, 4.5vh, 48px);
-  /* motion: a springy pop, a quick press */
-  --spring: cubic-bezier(.3, 1.6, .5, 1);
-  --t-pop: .28s;
-  --t-press: .08s;
+  --t-pop: .28s; /* a card's springy pop (--spring, --t-press: :root) */
 }
 .tsky--island, .tint--island, .victory--island {
   --s0: #8fd8d0; --s1: #f7e6ba;
@@ -78,8 +72,6 @@
 @media (max-width: 600px) { .front::after, .victory::after, .screen--title::after { inset: 8px; border-width: 2.5px; } }
 /* the title's film and live scene stay as they are: the frame is its still's only */
 .screen--title:has(.title__film:not(.title__film--off))::after, .screen--title:has(.title__stage--on)::after { display: none; }
-/* no shape behind the logo: the cards carry the style */
-.title__sun { display: none; }
 
 /* a display heading: paper, inked thick, standing on its shadow */
 .front .worlds__title, .front .pick__name {
@@ -88,16 +80,16 @@
 }
 /* a pill: the eyebrows, and the title's tag */
 .front .eyebrow, .newgnome .eyebrow {
-  display: inline-block; padding: 4px 14px; border-radius: 999px;
+  display: inline-block; padding: 4px 14px; border-radius: var(--pill);
   font-size: var(--fs-pill); font-weight: 700; letter-spacing: .12em; color: var(--paper); background: var(--ink);
 }
-/* a paper panel: a card's standing, the title's facts, the builder's tab */
-.world__info, .screen--title .title__facts li, .builder {
-  background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px; box-shadow: var(--deep-panel);
-}
+/* a paper panel: a card's standing (on its card's face, and its drop), the
+   title's facts, the builder's tab (flat: they only show) */
+.world__info, .screen--title .title__facts li, .builder { background: var(--paper); border: var(--edge); border-radius: 16px; }
+.world__info { border-width: 2.5px; box-shadow: var(--shadow-btn); }
 /* a round button: paper, inked, on its shadow (back, previous, next) */
-.front .round, .front .round--small {
-  background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: var(--deep-panel);
+.front .round {
+  background: var(--paper); color: var(--ink); border: var(--edge-bold); box-shadow: var(--shadow-btn);
   transition: transform var(--t-press), box-shadow var(--t-press);
 }
 .front .round:hover { background: var(--paper); transform: translateY(-2px); box-shadow: 0 6px 0 var(--ink); }
@@ -105,25 +97,23 @@
 /* the call to action: gold, inked, on its shadow (the title's start, the picker's pick);
    this file loads after globals.css, so .btn--start is over .btn--cta and .btn--main */
 .btn--start, .front .btn--play:not([disabled]) {
-  background: var(--gold); color: var(--ink); border: 3px solid var(--ink);
+  background: var(--gold-grad); color: var(--ink); border: var(--edge-bold);
 }
 .front .btn--play { font-size: clamp(18px, 2vw, 22px); font-weight: 700; padding: 12px 34px; border-radius: 20px; box-shadow: 0 6px 0 var(--ink); animation: pop .35s var(--spring); }
 .front .btn--play:hover:not([disabled]) { transform: translateY(-2px); box-shadow: 0 8px 0 var(--ink); }
 .front .btn--play:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
-@media (prefers-reduced-motion: reduce) {
-  .front .btn--play { animation: none; }
-  .front, .screen--title { transition: none; }
-}
 
 /* ------------------------------------------------------------ the title */
 
 .screen--title {
   background: var(--s0);
   overflow: hidden;
-  padding: clamp(18px, 4vh, 48px) 20px 20px;
+  padding: 28px 20px 20px;
   cursor: default;
 }
 .screen--title.screen--ready { cursor: pointer; }
+/* in the middle of what the network banner's row leaves (34px + its 48) */
+body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 /* the sky: the front's own, per world (the scene's is clear) */
 .title__sky, .title__still, .title__stage { position: absolute; inset: 0; }
 .title__still img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -147,22 +137,28 @@
 
 .screen--title .title { position: relative; z-index: 1; gap: 0; min-height: 0; }
 /* the logo: the promo's sticker lockup, a paper edge and an inked extrusion */
-.title__logo { position: relative; display: grid; place-items: center; }
+/* (the float on the logo, not on its art: its eight drop shadows are painted once and the layer moves) */
+.title__logo { position: relative; display: grid; place-items: center; animation: title-float 5s ease-in-out infinite; }
 .screen--title .title__art {
   position: relative;
   width: min(800px, 92vw, 62vh);
+  height: auto;
   margin-bottom: -4px;
+  overflow: visible;
   filter: drop-shadow(5px 0 0 var(--paper)) drop-shadow(-5px 0 0 var(--paper)) drop-shadow(0 5px 0 var(--paper)) drop-shadow(0 -5px 0 var(--paper))
     drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 3px 0 #0e3027) drop-shadow(0 18px 24px rgba(20, 10, 60, .45));
-  animation: title-float 5s ease-in-out infinite;
 }
 @keyframes title-float { 50% { transform: translateY(-8px) rotate(-1deg); } }
-.screen--title .title__word { fill: url(#title-word); font-size: 92px; }
+.screen--title .title__word {
+  fill: url(#title-word); font-size: 92px; font-weight: 700; letter-spacing: .06em;
+  stroke: var(--ink); stroke-width: 5px; paint-order: stroke; stroke-linejoin: round;
+}
+/* a sticker, flat: it only says */
 .screen--title .title__tag {
   position: relative;
   margin: 6px 0 18px; padding: 4px 22px 6px;
-  font-family: Fredoka, ui-rounded, system-ui, sans-serif; font-size: clamp(16px, 2.4vw, 26px); letter-spacing: .1em;
-  color: var(--paper); background: var(--green); border: 3px solid var(--ink); border-radius: 999px; box-shadow: var(--deep-panel);
+  font-size: clamp(16px, 2.4vw, 26px); font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--paper); background: var(--green); border: var(--edge-bold); border-radius: var(--pill);
   transform: rotate(-2deg);
 }
 
@@ -173,38 +169,42 @@
 }
 .btn--start {
   box-shadow: 0 7px 0 var(--ink), 0 0 0 0 rgba(var(--glow-rgb), .7);
-  animation: pop .35s cubic-bezier(.3, 1.6, .5, 1), cta-pulse 1.6s .4s ease-in-out infinite;
+  animation: pop .35s var(--spring), cta-pulse 1.6s .4s ease-in-out infinite;
 }
 .btn--start svg { stroke: var(--ink); }
 .btn--start:hover { animation-play-state: paused; }
 @keyframes cta-pulse {
   50% { transform: scale(1.07); box-shadow: 0 7px 0 var(--ink), 0 0 0 14px rgba(var(--glow-rgb), 0); }
 }
-.screen--title .load { padding: 10px 18px 8px; background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; box-shadow: 0 5px 0 var(--ink); }
-.screen--title .title__facts { margin-top: clamp(18px, 4vh, 40px); gap: 12px; }
+.screen--title .load { padding: 10px 18px 8px; background: var(--paper); border: var(--edge-bold); border-radius: 20px; } /* flat: it only shows */
+.screen--title .title__facts { margin-top: 30px; gap: 12px; } /* clear of the button's drop */
 .screen--title .title__facts li { cursor: default; }
 
 /* on a wide screen the facts sit on the foot of it */
 @media (min-aspect-ratio: 1/1) {
-  .screen--title .title__facts { position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); margin: 0; }
-  body:has(.netbanner) .screen--title .title__facts { bottom: 84px; } /* above the network banner's row */
+  .screen--title .title__facts { position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); }
+  /* with a network banner there, under the button as upright, unless wide
+     enough for the banner beside them (the facts are 1086px, the local
+     banner 291, the testnet's 459): then on its row, the same middle line */
+  body:has(.netbanner) .screen--title .title__facts { position: static; transform: none; }
+}
+@media (min-aspect-ratio: 1/1) and (min-width: 1784px) {
+  body:has(.netbanner--local) .screen--title .title__facts { position: fixed; transform: translateX(-50%); bottom: max(33px, env(safe-area-inset-bottom)); }
+}
+@media (min-aspect-ratio: 1/1) and (min-width: 2120px) {
+  body:has(.netbanner--testnet) .screen--title .title__facts { position: fixed; transform: translateX(-50%); bottom: max(33px, env(safe-area-inset-bottom)); }
 }
 @media (max-height: 720px) {
   .screen--title .title__facts { display: none; }
 }
-/* a phone upright: the block higher and the logo smaller, the foot of the
-   screen left to the gnomes on the green */
+/* upright: the logo smaller */
 @media (max-aspect-ratio: 1/1) {
-  .screen--title { align-content: start; padding-top: clamp(16px, 4vh, 40px); padding-bottom: 22vh; }
   .screen--title .title__art { width: min(94vw, 42vh); }
-  .screen--title .title__facts { margin-top: 14px; gap: 8px; }
+  .screen--title .title__facts { gap: 8px; }
 }
 @media (max-width: 600px) {
   .screen--title .title__facts { align-items: stretch; }
   .screen--title .title__facts li { font-size: 14px; padding: 5px 10px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .screen--title .title__art, .btn--start { animation: none; }
 }
 
 /* ------------------------------------------------------------ the cups */
@@ -216,7 +216,7 @@
 /* a card: a glossy frame in its world's colours, the diorama up top, the
    player's standing on a paper panel below */
 .worlds--v2 .world {
-  position: relative; overflow: hidden; gap: 6px; padding: 8px 8px 12px; border-radius: 26px; border: 3px solid var(--ink);
+  position: relative; overflow: hidden; gap: 6px; padding: 8px 8px 12px; border-radius: 26px; border: var(--edge-bold);
   background: linear-gradient(170deg, var(--c1), var(--c2));
   box-shadow: var(--deep-card);
   transition: transform var(--t-pop) var(--spring), box-shadow .2s;
@@ -229,7 +229,7 @@
 }
 .world__art {
   position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 19px; overflow: hidden;
-  border: 3px solid var(--ink); background: var(--art);
+  border: var(--edge-bold); background: var(--art);
 }
 /* the still and its clip, one over the other on the same sky: the clip's
    first frame is the still, so it takes over without a jump */
@@ -241,7 +241,6 @@
   transition: transform var(--t-pop) var(--spring);
 }
 .world__info { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 8px 6px 6px; }
-.worlds--v2 .world__tag { min-height: 2.6em; color: var(--ink-soft); }
 /* the standing reads first, the green under it supports it */
 .worlds--v2 .world__count { font-size: 14px; }
 .worlds--v2 .world__score { font-size: 15px; }
@@ -251,12 +250,12 @@
    par or under, silver over it; a shine across it on hover */
 .world__won {
   position: absolute; z-index: 4; top: 14px; right: 14px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden;
-  padding: 3px 12px 3px 4px; border: 2.5px solid var(--ink); border-radius: 999px; box-shadow: 0 3px 0 var(--ink);
+  padding: 3px 12px 3px 4px; border: 2.5px solid var(--ink); border-radius: var(--pill); box-shadow: 0 3px 0 var(--ink);
   font-size: 15px; font-weight: 800; color: var(--ink); white-space: nowrap;
   transform: rotate(4deg);
 }
 .world__won svg { width: 34px; height: 34px; flex: none; }
-.world__won--gold { background: var(--gold); }
+.world__won--gold { background: var(--gold-grad); }
 .world__won--silver { background: linear-gradient(180deg, #f7fafb, #cfd9de); }
 .world__won::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -278,7 +277,7 @@
 .worlds--v2 .world--on .world__ribbon { background: var(--hat); }
 .world__last {
   position: absolute; top: 14px; left: 14px; z-index: 3; pointer-events: none;
-  padding: 3px 10px; border-radius: 999px; background: var(--ink); color: var(--paper);
+  padding: 3px 10px; border-radius: var(--pill); background: var(--ink); color: var(--paper);
   font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
 .worlds--v2 .world:hover:not([disabled]),
@@ -286,25 +285,24 @@
 .worlds--v2 .world:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) .world__ribbon,
 .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
-.worlds--v2 .world:hover:not([disabled]) svg, .worlds--v2 .world:focus-visible svg { transform: none; }
 .worlds--v2 .world:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
 .worlds--v2 .world[disabled] { background: linear-gradient(170deg, #e6ebe8, #aab6b0); }
 .worlds--v2 .world[disabled] .world__art img { filter: grayscale(.85) opacity(.75); }
-.worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--deep-panel); color: var(--ink); }
-.worlds--v2 .community { background: var(--paper); border: 2.5px solid var(--ink); border-radius: 16px; padding: 10px 14px; box-shadow: var(--deep-panel); }
+.worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--shadow-btn); color: var(--ink); }
+.worlds--v2 .community { background: var(--paper); border: var(--edge); border-radius: 16px; padding: 10px 14px; } /* flat: a list to read */
 
 /* the builder: another game, to come; a small tab under the cups, plainly
    not a button yet (dashed, flat, dimmed) */
 .builder {
   display: inline-flex; align-items: center; gap: 10px; margin: clamp(18px, 3vh, 30px) auto 0; padding: 5px 8px 5px 5px;
-  border-radius: 999px; color: var(--ink); font-size: 14px; line-height: 1.2; cursor: default;
+  border-radius: var(--pill); color: var(--ink); font-size: 14px; line-height: 1.2; cursor: default;
 }
-.worlds--v2 .builder { border-style: dashed; box-shadow: none; opacity: .72; }
+.worlds--v2 .builder { border-style: dashed; opacity: .72; }
 .builder svg { width: 34px; height: 34px; flex: none; display: block; }
 .builder b { font-size: 16px; }
 .builder__tag { color: var(--ink-soft); }
 .builder__soon {
-  padding: 3px 10px; border-radius: 999px; background: var(--ink); color: var(--paper);
+  padding: 3px 10px; border-radius: var(--pill); background: var(--ink); color: var(--paper);
   font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
 
@@ -323,9 +321,8 @@
   .worlds--v2 .world__score { font-size: 13px; }
   .front .worlds__title, .front .pick__name { -webkit-text-stroke-width: 6px; }
 }
+/* (the motion itself: the global switch, globals.css; the card still, not grown) */
 @media (prefers-reduced-motion: reduce) {
-  .worlds--v2 .world, .worlds--v2 .world__ribbon { transition: none; }
-  .world:hover .world__won::after, .world:focus-visible .world__won::after { animation: none; }
   .worlds--v2 .world:hover:not([disabled]), .worlds--v2 .world:focus-visible { transform: none; }
 }
 
@@ -340,13 +337,14 @@
    in ink under them, sized for the longer of its two lines (both stacked, one shown) */
 .front .aimset--compact {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px;
-  width: min(400px, 100%); max-width: none; margin: 0 0 var(--gap-xl); padding: 8px 16px 10px;
-  background: var(--paper); border: 2px solid var(--ink); border-radius: 18px; box-shadow: none;
+  width: min(400px, 100%); margin: 0 0 var(--gap-xl); padding: 8px 16px 10px;
+  background: var(--paper); border: var(--edge); border-radius: 18px;
 }
 .screen--pick .aimset--compact .aimset__label { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
 .screen--pick .aimset--compact .aimset__help { flex-basis: 100%; font-size: 13.5px; font-weight: 400; line-height: 1.35; text-align: center; color: var(--ink); }
-.screen--pick .aimset--compact .seg { box-shadow: none; border-width: 2px; }
+.screen--pick .aimset--compact .seg { box-shadow: none; }
 .screen--pick .aimset--compact .seg button { min-height: 30px; padding: 2px 14px; font-size: 13px; }
+@media (pointer: coarse) { .screen--pick .aimset--compact .seg button { min-height: 44px; } }
 /* (the aim's help, here and in the menu: its two lines stacked, one shown) */
 .aimset__help { display: grid; }
 .aimset__help > span { grid-area: 1 / 1; }
@@ -364,7 +362,7 @@
 .screen--pick .pick__stage > * { position: relative; }
 /* the gnome's stage: the picker's tile, and a new gnome's on the cup's card */
 .screen--pick .pick__tile, .newgnome__stage {
-  border: 3px solid var(--ink); border-radius: 28px; overflow: hidden; box-shadow: var(--deep-card);
+  border: var(--edge-bold); border-radius: 28px; overflow: hidden; box-shadow: var(--deep-card);
   background: radial-gradient(circle, rgba(var(--ink-rgb), .07) 1.7px, transparent 2.1px) 0 0 / 14px 14px, var(--stage);
 }
 .screen--pick .pick__tile {
@@ -396,7 +394,7 @@
 /* the front's own backdrop with the cup's card over it: its glossy frame,
    its emblem on top, the paper panel inside */
 .victory {
-  position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; padding: 16px; overflow: hidden;
+  position: fixed; inset: 0; z-index: var(--z-victory); display: grid; place-items: center; padding: 16px; overflow: hidden;
   background: var(--s0);
   animation: fade .3s;
 }
@@ -405,17 +403,19 @@
 .victory__in {
   position: relative; width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto;
   display: grid; justify-items: center; gap: 10px; padding: 18px clamp(14px, 3vw, 30px) 22px; text-align: center;
-  background: var(--paper); border: 3px solid var(--ink); border-radius: 28px;
+  background: var(--paper); border: var(--edge-bold); border-radius: 28px;
   box-shadow: 0 0 0 8px var(--c1), 0 0 0 11px var(--ink), 0 16px 0 3px var(--ink), 0 26px 40px rgba(10, 20, 40, .35);
-  animation: pop .45s cubic-bezier(.3, 1.6, .5, 1);
+  animation: pop .45s var(--spring);
 }
 .victory__in:focus { outline: none; }
-.victory__badge { width: clamp(76px, 12vh, 108px); filter: drop-shadow(0 4px 0 var(--ink)); animation: cup-bounce .7s .15s cubic-bezier(.3, 1.6, .5, 1) both; }
+.victory__badge { width: clamp(76px, 12vh, 108px); filter: drop-shadow(0 4px 0 var(--ink)); animation: cup-bounce .7s .15s var(--spring) both; }
+/* the cup drops in and bounces on the spring (reduced motion: there at once, the global switch) */
+@keyframes cup-bounce { from { transform: translateY(-48px) scale(.5); opacity: 0; } }
 .victory__badge svg { display: block; width: 100%; }
 .victory__ribbon {
-  margin-top: -18px; position: relative; padding: 5px 18px; border-radius: 12px; border: 2.5px solid var(--ink);
+  margin-top: -18px; position: relative; padding: 5px 18px; border-radius: 12px; border: var(--edge);
   background: linear-gradient(170deg, var(--c1), var(--c2)); color: var(--paper); font-weight: 800; font-size: 17px;
-  -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; box-shadow: 0 3px 0 var(--ink);
+  -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill;
 }
 .victory h2 {
   margin: 2px 0 0; font-size: clamp(34px, 6vw, 58px); line-height: 1.05; color: var(--glow);
@@ -424,14 +424,14 @@
 .victory__sum { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 10px; margin: 0; font-size: 18px; font-weight: 700; color: var(--ink-soft); }
 .victory__sum strong { font-size: clamp(36px, 6vw, 52px); line-height: 1; color: var(--ink); }
 .victory__sum .good { color: var(--green); }
-.victory__sum .bad { color: var(--hat); }
+.victory__sum .bad { color: var(--hat-ink); }
 .victory__stamp {
-  align-self: center; padding: 3px 10px; border: 2px solid var(--hat); border-radius: 999px; color: var(--hat);
+  align-self: center; padding: 3px 10px; border: 2px solid var(--hat-ink); border-radius: var(--pill); color: var(--hat-ink);
   font-size: 13px; font-weight: 800; transform: rotate(-4deg);
 }
 .victory .scorecard { width: 100%; margin: 0; min-height: auto; } /* its full height: the card scrolls, nothing slides under the next block */
 /* a gnome just unlocked: its stage and its words, the one solid action under them */
-.newgnome { display: flex; align-items: center; gap: 18px; width: 100%; padding: 12px 16px; border: 2px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: var(--deep-panel); text-align: left; }
+.newgnome { display: flex; align-items: center; gap: 18px; width: 100%; padding: 12px 16px; border: var(--edge); border-radius: 22px; background: var(--paper); text-align: left; } /* flat: its button is the thing to press */
 .victory .newgnome__stage { flex: 0 0 auto; width: 120px; height: 134px; border-radius: 22px; }
 .newgnome__say { display: grid; justify-items: start; gap: 4px; }
 .newgnome__say small { color: var(--ink-soft); font-size: 13px; }
@@ -447,8 +447,5 @@
   .victory .banner__row { width: 100%; flex-direction: column-reverse; }
   .victory .banner__row .btn { width: 100%; }
   .newgnome { gap: 12px; padding: 10px; } .victory .newgnome__stage { width: 96px; height: 108px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .victory, .victory__in, .victory__badge { animation: none; }
 }
 .victory__cheer canvas { width: 100%; height: 100%; display: block; }

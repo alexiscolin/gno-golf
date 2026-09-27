@@ -8,7 +8,9 @@
   --ink-soft: #4f7a6c;
   --green: #226c57;
   --hat: #e0524b;
-  --hat-ink: #b83a33; /* the hat's red dark enough for paper text on it (5:1) */
+  --hat-ink: #b83a33; /* the hat's red dark enough for paper text on it (5:1), and for small text on the paper */
+  --hat-rgb: 224, 82, 75;
+  --chain: #2f5ae8; /* Adena's blue: the one action that puts a round on the chain (5.6:1 with white) */
   --paper: #fdf6e9;
   --ink-rgb: 20, 65, 52; /* the ink, for its see-through shades: rgba(var(--ink-rgb), a) */
   --shadow: 0 5px 0 var(--ink), 0 12px 24px rgba(var(--ink-rgb), .18);
@@ -18,6 +20,16 @@
   --ring: 3px solid var(--gold); /* the focus ring's band (see "keyboard users"), inked both sides */
   --gold: #f2c14e; --silver: #d9dee3; --bronze: #e3a877; /* the podium's metals */
   --shadow-btn: 0 4px 0 var(--ink);
+  --deep-card: 0 7px 0 var(--ink), 0 18px 28px rgba(20, 10, 60, .3); /* a front card's depth: a cup, the gnome's tile */
+  /* motion: a springy pop, a quick press */
+  --spring: cubic-bezier(.3, 1.6, .5, 1);
+  --t-press: .08s;
+  /* the outlines: an inked one (the controls, a paper card), a bolder one (the front's big pieces) */
+  --edge: 2px solid var(--ink);
+  --edge-bold: 3px solid var(--ink);
+  --pill: 999px; /* a radius that rounds any height's ends */
+  --rule: 2px dashed rgba(var(--ink-rgb), .25); /* a dashed rule between a sheet's parts */
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   /* what only shows (the HUD's hole, strokes and weather cards, the scorecard,
      a note on the lane): flat, a soft edge and no drop shadow; what can be
      pressed keeps --shadow-btn, so the two never look alike */
@@ -34,6 +46,14 @@
   --sunny: #f5b83d; --lamp: #ffe39a; --pine: #2f6b53; --wood: #8a5a35; --rock: #8a9a8c; --mint: #eaf4ee; --stone: #9aa9a2;
   /* the worlds' own, shared across files (title.css mirrors the scenes) */
   --garden-sky: #fdebcf; --town-roof: #e2c9c4; --mountain-snow: #f4f8fb;
+  /* the page's layers, bottom to top (a component's own stacking inside it
+     stays a plain number): the course's marks (the cup's pip, a lightning
+     flash) 2; its notes and chips (a moving hole's note, the leaderboard chip,
+     the network banner) 3; the front screens and a round waiting for its save
+     4, the banner over them 4 too; the sheets and the win card 5; the menu and
+     a toast 6; a cup won 7; the curtain between holes 8; a confirm over a
+     sheet 9; the boot screen 10 */
+  --z-mark: 2; --z-chip: 3; --z-screen: 4; --z-sheet: 5; --z-menu: 6; --z-victory: 7; --z-curtain: 8; --z-confirm: 9; --z-boot: 10;
   /* the page is light by design: native controls and scrollbars too, on a dark OS */
   color-scheme: light;
 }
@@ -85,7 +105,7 @@ html, body {
   position: absolute;
   left: 0;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--pill);
   --cloud: #fff6e6; /* the puff and its three bumps */
   background: var(--cloud);
   box-shadow: 34px 8px 0 -6px var(--cloud), -32px 9px 0 -8px var(--cloud), 12px -12px 0 -4px var(--cloud);
@@ -203,7 +223,7 @@ html, body {
   color: var(--paper);
   font-size: 30px;
   font-weight: 700;
-  border: 2px solid var(--ink);
+  border: var(--edge);
 }
 
 .card__text {
@@ -265,10 +285,9 @@ html, body {
   justify-items: center;
   gap: 6px;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: var(--edge);
   border-radius: 18px;
   box-shadow: var(--shadow-btn);
-  transition: transform .08s, box-shadow .08s;
 }
 
 .burger span {
@@ -281,7 +300,7 @@ html, body {
 .drawer {
   position: fixed;
   inset: 0;
-  z-index: 6;
+  z-index: var(--z-menu);
   background: rgba(var(--ink-rgb), .55);
   animation: fade .2s ease-out;
 }
@@ -293,12 +312,12 @@ html, body {
   bottom: 12px;
   width: min(360px, calc(100vw - 24px));
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: var(--edge);
   border-radius: 24px;
   box-shadow: -6px 6px 0 var(--ink);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden auto; /* the menu scrolls as one: its holes right under the player's stats, the settings after them */
   animation: slide .28s cubic-bezier(.2,1.2,.4,1);
 }
 
@@ -309,7 +328,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 18px 18px 12px 22px;
-  border-bottom: 2px dashed rgba(var(--ink-rgb), .25);
+  border-bottom: var(--rule);
 }
 
 .drawer__tools { display: flex; gap: 8px; align-items: center; }
@@ -324,7 +343,6 @@ html, body {
 }
 
 .drawer__list {
-  overflow-y: auto;
   padding: 14px 16px 20px;
   display: grid;
   gap: 12px;
@@ -338,12 +356,12 @@ html, body {
   cursor: pointer;
   font: inherit;
   padding: 10px 14px 10px 10px;
-  border: 2px solid var(--ink);
+  border: var(--edge);
   border-radius: 16px;
   background: var(--white);
   color: var(--ink);
   box-shadow: var(--shadow-btn);
-  transition: transform .08s, box-shadow .08s;
+  transition: transform var(--t-press), box-shadow var(--t-press);
 }
 
 .tile:hover {
@@ -362,11 +380,11 @@ html, body {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: var(--green-light);
+  background: var(--green); /* paper on it: 6:1 (on the light green, 2.5:1) */
   color: var(--paper);
   font-weight: 700;
   font-size: 19px;
-  border: 2px solid var(--ink);
+  border: var(--edge);
 }
 
 .tile__name {
@@ -389,15 +407,6 @@ html, body {
   background: var(--hat);
 }
 
-.round--small {
-  width: 42px;
-  height: 42px;
-  font-size: 28px;
-  padding-bottom: 4px;
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
 .hint {
   position: fixed;
   left: 50%;
@@ -408,14 +417,14 @@ html, body {
   color: var(--ink-soft);
   background: rgba(var(--paper-rgb), .88);
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--pill);
   pointer-events: none;
   transition: opacity .3s;
   white-space: nowrap;
 }
 
 .btn {
-  border: 2px solid var(--ink);
+  border: var(--edge);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
@@ -424,7 +433,7 @@ html, body {
   min-height: 44px; /* a target a thumb can hit */
   border-radius: 16px;
   box-shadow: var(--shadow-btn);
-  transition: transform .08s, box-shadow .08s;
+  text-decoration: none; /* an a.btn too */
 }
 
 .btn--main {
@@ -444,10 +453,9 @@ html, body {
   bottom: 100px;
   width: 150px;
   height: 18px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
+  border: var(--edge);
+  border-radius: var(--pill);
   background: var(--paper);
-  box-shadow: 0 3px 0 var(--ink);
   overflow: hidden;
   pointer-events: none;
 }
@@ -465,12 +473,12 @@ html, body {
   place-items: center;
   background: rgba(var(--ink-rgb), .45);
   padding: 20px;
-  z-index: 5;
+  z-index: var(--z-sheet);
 }
 
 .banner__in, .sheet__in {
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: var(--edge);
   border-radius: 26px;
   padding: 26px;
   max-width: 380px;
@@ -503,7 +511,7 @@ html, body {
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--mono);
   font-size: 11px;
 }
 
@@ -515,7 +523,7 @@ html, body {
   align-content: center;
   gap: 18px;
   background: var(--sky-day);
-  z-index: 10;
+  z-index: var(--z-boot);
   transition: opacity .4s;
   text-align: center;
   padding: 24px;
@@ -537,7 +545,7 @@ html, body {
 .screen {
   position: fixed;
   inset: 0;
-  z-index: 4;
+  z-index: var(--z-screen);
   display: grid;
   place-items: center;
   align-content: center;
@@ -552,24 +560,6 @@ html, body {
   text-align: center;
   display: grid;
   justify-items: center;
-}
-
-.title__art {
-  width: min(760px, 94vw, 62vh);
-  height: auto;
-  margin-bottom: -10px;
-  overflow: visible;
-}
-
-.title__word {
-  font-size: 88px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  fill: var(--green); /* golf is green: the word and the call to action */
-  stroke: var(--ink);
-  stroke-width: 5px;
-  paint-order: stroke;
-  stroke-linejoin: round;
 }
 
 /* three clear colours: dark green text and button, a sunny badge, the red hat */
@@ -598,16 +588,13 @@ html, body {
 .title__beard {
   fill: var(--white);
 }
-
-.title__tag {
-  margin: 0 0 26px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: clamp(22px, 4vw, 40px);
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--green);
-}
+/* the gnome's cel shading: light from the left, one shade a shape, each clipped to its shape */
+.title__disc { fill: #ffd66b; }                  /* the sun's inner disc, a tone lighter than --sunny */
+.title__beardshade { fill: #e8eeec; }            /* the beard's shade (band and right side), a hint of cool green-grey */
+.title__shade { fill: #c9443d; }                 /* the cone's shadow side, and the brim */
+.title__hatink { fill: var(--hat-ink); }         /* the hat's deepest shade: the brim's shadow side, the cone's far edge */
+.title__faceshade { fill: #f2e2cc; }             /* the brim's shadow on the face, a warm tone under --paper */
+.title__glint { fill: none; stroke: var(--paper); stroke-width: 6; stroke-linecap: round; opacity: .85; }
 
 .pick__name {
   margin: 4px 0 0;
@@ -623,14 +610,6 @@ html, body {
   gap: clamp(8px, 5vw, 70px);
   margin: clamp(12px, 2.5vh, 32px) 0 6px;
 }
-
-.pick__canvas {
-  width: min(420px, 60vw, 42vh);
-  height: min(500px, 74vw, 48vh);
-  display: block;
-}
-/* the picker, slimmer: fits a 13" laptop and a phone without scrolling */
-@media (max-height: 820px) { .pick__canvas { height: 38vh; width: 38vh; } }
 
 .pick__dots {
   display: flex;
@@ -654,16 +633,18 @@ html, body {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 3px solid var(--green);
+  --round: var(--green); /* its ring, its sign and its drop */
+  border: 3px solid var(--round);
   background: transparent;
-  color: var(--green);
+  color: var(--round);
   font: inherit;
   font-size: 40px;
   line-height: 1;
   padding-bottom: 6px;
   cursor: pointer;
   flex: 0 0 auto;
-  transition: transform .1s, background .15s;
+  box-shadow: 0 3px 0 var(--round);
+  transition: transform var(--t-press), box-shadow var(--t-press), background .15s;
 }
 
 .round:hover {
@@ -671,7 +652,8 @@ html, body {
 }
 
 .round:active {
-  transform: scale(.94);
+  transform: translateY(2px) scale(.97);
+  box-shadow: 0 1px 0 var(--round);
 }
 
 .btn--play {
@@ -699,10 +681,9 @@ html, body {
   color: var(--ink);
   text-align: left;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: var(--edge);
   border-radius: 18px;
   box-shadow: var(--shadow-btn);
-  transition: transform .08s, box-shadow .08s;
 }
 
 .adena__logo {
@@ -769,21 +750,23 @@ html, body {
   color: var(--hat-ink);
 }
 
-.btn[disabled] {
-  opacity: .6;
-  cursor: wait;
-}
-
 .btn--wide {
   display: block;
   width: 100%;
   text-align: center;
-  text-decoration: none;
   margin-top: 16px;
 }
 
 /* a sheet taller than the window scrolls inside it */
 .real, .cardsheet, .about, .boards { max-height: calc(100dvh - 40px); overflow-y: auto; }
+/* and says so: a soft shade at its foot while more is under it (the paper
+   carried at the end of its content covers the shade once there) */
+.real, .about, .drawer__panel {
+  background:
+    linear-gradient(rgba(var(--paper-rgb), 0), var(--paper) 50%) 0 100% / 100% 32px no-repeat local,
+    linear-gradient(rgba(var(--ink-rgb), 0), rgba(var(--ink-rgb), .12)) 0 100% / 100% 14px no-repeat scroll,
+    var(--paper);
+}
 
 /* the play-for-real explainer */
 .real {
@@ -811,7 +794,7 @@ html, body {
 }
 
 .real__col {
-  border: 2px solid var(--ink);
+  border: var(--edge);
   border-radius: 16px;
   padding: 12px 14px;
   background: var(--white);
@@ -859,7 +842,7 @@ html, body {
   display: grid;
   place-items: center;
   font-weight: 700;
-  border: 2px solid var(--ink);
+  border: var(--edge);
   background: var(--paper);
 }
 
@@ -867,7 +850,7 @@ html, body {
 
 /* the step to do now stands out; the ones after it wait */
 .real__steps li.now::before { background: var(--gold); }
-.real__steps li.later { opacity: .5; }
+.real__steps li.later { opacity: .7; } /* dimmed, still read (the soft text 3.4:1) */
 
 .real__steps li.done::before {
   content: "✓";
@@ -978,7 +961,7 @@ html, body {
   color: var(--ink);
   background: rgba(var(--paper-rgb), .9);
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--pill);
 }
 
 /* keyboard users see where they are: one ring everywhere, the stickers'
@@ -987,25 +970,26 @@ html, body {
    and that shadow, even on every side; anything else, an outline on an ink
    rim. Fields show it on their own frame. */
 /* (in :where, the plain default: any control's own rule wins over it) */
-:where(button, a, summary, [tabindex]):where(:not(.btn, .burger, .adena, .round, .share__icon, .world__reset, .clip__save, .clip__play)):focus-visible { outline: var(--ring); outline-offset: 2px; box-shadow: 0 0 0 2px var(--ink); }
+:where(button, a, summary, [tabindex]:not([tabindex="-1"])):where(:not(.btn, .burger, .adena, .round, .share__icon, .world__reset, .clip__save, .clip__play)):focus-visible { outline: var(--ring); outline-offset: 2px; box-shadow: 0 0 0 2px var(--ink); }
 :is(.btn, .burger, .adena, .round, .share__icon, .world__reset, .clip__save, .clip__play):focus-visible { outline: none; }
+[tabindex="-1"]:focus { outline: none; } /* a dialog holding focus itself (useDialog): no ring until a Tab */
 :is(.btn, .burger, .adena, .round, .share__icon, .world__reset, .clip__save, .clip__play):focus-visible::after { content: ""; position: absolute; inset: -8px -8px calc(-8px - var(--drop, 4px)); border: var(--ring); border-radius: inherit; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--ink); pointer-events: none; }
 .round { --drop: 3px; } .share__icon, .clip__save { --drop: 2px; } .world__reset { --drop: 0px; }
 .share__icon, .world__reset { position: relative; } /* (the ring is drawn round them) */
 /* a cup's tile clips what overflows it: its ring is the outline, over its own shadow */
-.world:focus-visible { outline-offset: 4px; box-shadow: 0 0 0 2px var(--ink), 0 6px 0 var(--ink); }
+.world:focus-visible { outline-offset: 4px; }
 .worlds--v2 .world:focus-visible { box-shadow: 0 0 0 2px var(--ink), var(--deep-card); }
 
 .timed {
   position: fixed;
   left: 16px;
   top: 108px;
-  z-index: 2;
+  z-index: var(--z-chip); /* over the cup's pip */
   pointer-events: none;
   background: var(--info-bg);
   color: var(--ink);
   border: var(--info-edge);
-  border-radius: 999px;
+  border-radius: var(--pill);
   padding: 5px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -1097,14 +1081,13 @@ html, body {
   color: var(--green);
 }
 
-.scorecard td.over {
+.scorecard td.over, .scorecard td.oops {
   color: #9b6b2c;
 }
 
 .scorecard__total {
   display: flex;
   gap: 14px;
-  align-items: baseline;
   justify-content: flex-end;
   font-size: 13px;
   color: var(--ink-soft);
@@ -1152,7 +1135,7 @@ html, body {
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
-  border: 2px solid var(--ink);
+  border: var(--edge);
   border-radius: 12px;
   background: var(--white);
 }
@@ -1167,7 +1150,7 @@ html, body {
 }
 
 .lb__who {
-  font-family: ui-monospace, Menlo, monospace;
+  font-family: var(--mono);
   font-size: 13px;
 }
 
@@ -1189,7 +1172,7 @@ html, body {
 /* the menu's own section: you, before the holes */
 .drawer__me {
   padding: 14px 16px 12px;
-  border-bottom: 2px dashed rgba(var(--ink-rgb), .25);
+  border-bottom: var(--rule);
   display: grid;
   gap: 12px;
 }
@@ -1240,11 +1223,6 @@ html, body {
 
 .tile[aria-current="true"] .tile__best b {
   color: var(--paper);
-}
-
-.btn--play[disabled] {
-  background: #9aa5a0;
-  cursor: not-allowed;
 }
 
 /* the success screen and its card: wider, and the card reads like paper */
@@ -1328,7 +1306,7 @@ html, body {
   top: -8px;
 }
 
-.scorecard td.ace, .scorecard td.under, .scorecard td.par {
+.scorecard td.ace, .scorecard td.under, .scorecard td.par, .scorecard td.oops {
   font-size: 20px;
 }
 
@@ -1339,6 +1317,14 @@ html, body {
 .stamp--par {
   color: #b08a3c;
 }
+
+.stamp--oops {
+  color: var(--ink-soft);
+}
+
+/* the seal of a score saved on-chain: the chain's glyph on its green, in the cell's foot */
+.seal { position: absolute; left: 2px; bottom: 2px; width: 14px; height: 14px; }
+.seal__face { fill: var(--green-light); stroke: var(--ink); stroke-width: 1.5; }
 
 /* three rows, three jobs: the hole is a tag, the par a quiet reference, the
    score the thing you read */
@@ -1355,7 +1341,7 @@ html, body {
   min-width: 24px;
   height: 22px;
   padding: 0 5px;
-  border-radius: 999px;
+  border-radius: var(--pill);
   background: rgba(var(--ink-rgb), .08);
   color: var(--ink-soft);
   font-size: 11px;
@@ -1399,7 +1385,6 @@ html, body {
   text-transform: uppercase;
   color: var(--ink-soft);
   padding: 4px 6px 4px 0;
-  width: 64px;
   font-size: 10px;
 }
 
@@ -1408,7 +1393,7 @@ html, body {
 .curtain {
   position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: var(--z-curtain);
   display: grid;
   place-items: center;
   background: var(--paper);
@@ -1451,18 +1436,10 @@ html, body {
   display: block;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .cloud { animation: none; }
-  .stars { animation: none; }
-  .curtain, .curtain--open { animation-duration: .01s; }
-  .curtain__hat { animation: none; }
-}
-
 @media (max-width: 520px) {
   .hud--bottom { gap: 10px; padding-left: 12px; padding-right: 12px; }
   .hud--bottom .btn { font-size: 14px; padding: 10px 14px; white-space: nowrap; }
   .round { width: 44px; height: 44px; font-size: 28px; }
-  .pick__stage { gap: 6px; }
   .screen { padding: 24px 20px; }
   .real__cols { grid-template-columns: 1fr; }
 }
@@ -1487,20 +1464,18 @@ html, body {
   .hud__right { gap: 8px; }
   .adena { height: 64px; width: 64px; }
   .card--hole .eyebrow { display: none; }
-  .card--score { min-width: 0; padding: 8px 10px; }
+  .card--score { min-width: 0; }
   .card--score .eyebrow { font-size: 9px; letter-spacing: .06em; }
   .card h1 { font-size: 15px; white-space: normal; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .aimbar small { white-space: nowrap; font-size: 11px; }
   .aimbar .power { width: 180px; }
   .timed { top: 92px; left: 12px; right: 12px; text-align: center; font-size: 12px; }
   .scorecard td { font-size: 14px; height: 32px; }
-  .scorecard th { width: 44px; font-size: 10px; }
   .scorecard tr:nth-child(3) td { font-size: 17px; height: 36px; }
 }
 
 @media (max-height: 640px) {
   .screen { padding-top: 28px; }
-  .title__tag { margin-bottom: 14px; }
 }
 
 @media (pointer: coarse) {
@@ -1511,7 +1486,6 @@ html, body {
 
 /* UX pass: legibility, targets, motion */
 .card__par { display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-top: 1px; }
-.round--small { width: 44px; height: 44px; }
 .tile[aria-current="true"] .tile__best { color: var(--paper); opacity: .85; }
 .btn--play[disabled] { background: var(--disabled); color: var(--ink); }
 .banner--win .banner__row { position: sticky; bottom: -30px; background: var(--paper); padding: 10px 0 6px; flex-wrap: wrap; }
@@ -1538,7 +1512,6 @@ html, body {
 /* facts that read as text on a paper tag, each with its drawn icon */
 .title__facts li {
   display: flex; align-items: center; gap: 10px; padding: 6px 12px;
-  background: var(--paper); border: 0; border-radius: 8px; box-shadow: none;
   font-size: clamp(15px, 1.7vw, 19px); font-weight: 500; color: var(--ink);
 }
 .title__facts li b { font-weight: 700; margin: 0; color: var(--ink); }
@@ -1547,19 +1520,17 @@ html, body {
 .fi { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .fi--paper { fill: var(--paper); }
 .fi--red { fill: var(--hat); }
-.fi--gold { fill: var(--gold); }
 .fi--band { stroke: var(--hat); stroke-width: 2.6; }
 /* the whole title block centred */
-.title { align-content: center; min-height: 100%; }
-.screen:has(.title) { place-items: center; padding-top: 28px; }
+.title { align-content: center; }
 
 /* the title's one call to action (its size and padding: title.css .btn--start) */
 .btn--cta {
   display: inline-flex; align-items: center; gap: 12px;
-  background: var(--green); color: var(--white); border: 3px solid var(--ink);
+  background: var(--green); color: var(--white); border: var(--edge-bold);
   font-weight: 700; letter-spacing: .01em;
   border-radius: 24px;
-  box-shadow: 0 7px 0 var(--ink); transition: transform .08s, box-shadow .08s;
+  box-shadow: 0 7px 0 var(--ink);
 }
 .btn--cta:hover { transform: translateY(-2px); box-shadow: 0 9px 0 var(--ink); }
 .btn--cta:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--ink); }
@@ -1581,56 +1552,47 @@ html, body {
 @keyframes drop { 40% { transform: translate(8px, -6px); } 100% { transform: translate(16px, 9px) scale(.4); opacity: 0; } }
 .load__chore { margin: 10px 0 0; font-size: 14px; font-weight: 600; color: var(--ink-soft); min-height: 1.4em; animation: chore .35s ease-out; }
 @keyframes chore { from { opacity: 0; transform: translateY(6px); } }
-.btn--pop { animation: pop .35s cubic-bezier(.3,1.6,.5,1); }
+.btn--pop { animation: pop .35s var(--spring); }
 @keyframes pop { from { transform: scale(.6); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .load__ball, .load__ball--in > *, .load__chore, .btn--pop { animation: none; transition: none; }
-}
 
 /* menu settings: switches, and the two-step "new game" */
-.drawer__settings { display: grid; gap: 8px; padding: 14px 16px; border-bottom: 2px dashed rgba(var(--ink-rgb), .25); }
+.drawer__settings { display: grid; gap: 8px; padding: 14px 16px; border-bottom: var(--rule); }
 .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 700; cursor: pointer; min-height: 44px; }
 .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.switch i { box-sizing: border-box; display: block; flex: 0 0 auto; width: 52px; height: 30px; border-radius: 15px; background: #d5ddd9; border: 2px solid var(--ink); position: relative; transition: background .15s; }
+.switch i { box-sizing: border-box; display: block; flex: 0 0 auto; width: 52px; height: 30px; border-radius: 15px; background: #d5ddd9; border: var(--edge); position: relative; transition: background .15s; }
 /* the knob: centred in the track (26px inside), 3px clear of each end */
-.switch i::after { content: ""; box-sizing: border-box; position: absolute; top: 50%; left: 3px; width: 20px; height: 20px; margin-top: -10px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); transition: transform .15s; }
+.switch i::after { content: ""; box-sizing: border-box; position: absolute; top: 50%; left: 3px; width: 20px; height: 20px; margin-top: -10px; border-radius: 50%; background: var(--paper); border: var(--edge); transition: transform .15s; }
 .switch input:checked + i { background: var(--green); }
 .switch input:checked + i::after { transform: translateX(22px); }
-.switch input:focus-visible + i { outline: var(--ring); outline-offset: 2px; }
+.switch input:focus-visible + i { outline: var(--ring); outline-offset: 2px; box-shadow: 0 0 0 7px var(--ink); } /* the gold inked on both sides */
 .btn--wipe { width: 100%; color: var(--hat-ink); border-color: var(--hat-ink); } /* it clears the card: red from the start, and a second tap to confirm */
 .btn--danger { background: var(--hat); color: var(--paper); border-color: var(--ink); }
 .drawer__note { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
 
 /* the world screen: cups to pick, like a kart grand prix, in the garden's ink */
-.worlds__in { position: relative; z-index: 1; width: min(1040px, 94vw); text-align: center; display: grid; justify-items: center; gap: 6px; }
+.worlds__in { position: relative; z-index: 1; text-align: center; display: grid; justify-items: center; gap: 6px; }
 .worlds__title { margin: 0 0 18px; font-size: clamp(26px, 3.4vw, 40px); color: var(--ink); }
-.worlds__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; width: 100%; }
+.worlds__list { list-style: none; margin: 0; padding: 0; display: grid; width: 100%; }
 .world {
-  width: 100%; height: 100%; display: grid; justify-items: center; align-content: start; gap: 8px;
-  padding: 18px 12px 16px; border-radius: 22px; border: 3px solid var(--ink); background: var(--white);
-  box-shadow: 0 6px 0 var(--ink); font: inherit; color: var(--ink); cursor: pointer;
-  transition: transform .12s, box-shadow .12s;
+  width: 100%; height: 100%; display: grid; justify-items: center; align-content: start;
+  font: inherit; color: var(--ink); cursor: pointer;
 }
-.world svg { width: min(150px, 100%); height: auto; transition: transform .25s cubic-bezier(.3,1.6,.5,1); }
-.world:hover:not([disabled]) svg, .world:focus-visible svg { transform: rotate(-6deg) scale(1.06); }
-.world:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
-.world--on { background: var(--mint); }
-.world[disabled] { cursor: default; background: #f1f1ec; }
+.world[disabled] { cursor: default; }
 .world[disabled] svg { filter: grayscale(.85) opacity(.7); }
 .world__ribbon {
-  margin-top: -18px; padding: 6px 16px; border-radius: 12px; border: 2.5px solid var(--ink);
-  background: var(--green); color: var(--paper); font-weight: 800; font-size: 17px; white-space: nowrap;
+  padding: 6px 16px; border-radius: 12px; border: 2.5px solid var(--ink);
+  background: var(--green); color: var(--paper); font-weight: 800;
 }
 .world[disabled] .world__ribbon { background: var(--stone); }
 .world__tag { font-size: 13px; color: var(--ink-soft); min-height: 2.6em; }
 .world__count { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--green); }
 .world[disabled] .world__count { color: var(--ink-soft); }
 /* one back button for every screen: round, big, top left */
-.screen__back { position: absolute; top: 34px; left: 34px; z-index: 2; background: var(--paper); }
+/* a screen's corner buttons, back and about: in the screen, they scroll with it */
+.screen__back, .screen__about { position: absolute; top: 34px; z-index: 2; background: var(--paper); }
+.screen__back { left: 34px; } .screen__about { right: 34px; }
 .round--back { display: grid; place-items: center; padding: 0; width: 52px; height: 52px; border-width: 3px; }
-.round--x { display: grid; place-items: center; padding: 0; width: 48px; height: 48px; }
-@media (max-width: 860px) { .worlds__list { gap: 14px; } .world svg { width: 110px; } }
-@media (max-height: 640px) { .world svg { width: 90px; } .world__tag { display: none; } }
+.round--x { display: grid; place-items: center; padding: 0; width: 48px; height: 48px; --round: var(--ink); } /* a sheet's close: ink, not the go-ahead green */
 
 /* the emblems' paint */
 .w__ring { fill: none; stroke: var(--ink); stroke-width: 4; }
@@ -1664,9 +1626,9 @@ html, body {
 
 /* a word on how the shot went, over the course for a moment */
 .toast {
-  position: fixed; left: 50%; top: 108px; transform: translateX(-50%); z-index: 6;
-  padding: 10px 18px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper);
-  box-shadow: var(--shadow-btn); font-weight: 800; color: var(--ink); white-space: nowrap;
+  position: fixed; left: 50%; top: 108px; transform: translateX(-50%); z-index: var(--z-menu);
+  padding: 10px 18px; border-radius: 14px; border: var(--edge); background: var(--paper);
+  font-weight: 800; color: var(--ink); white-space: nowrap;
   animation: toast 3.2s ease forwards; pointer-events: none;
 }
 @keyframes toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 8%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
@@ -1689,7 +1651,7 @@ html, body {
 .ws__rain { stroke: #3d8fb0; stroke-width: 2.5; stroke-linecap: round; }
 .ws__bolt { fill: none; stroke: var(--sunny); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .ws__fog { stroke: var(--stone); stroke-width: 2.5; stroke-linecap: round; }
-.lightning { position: fixed; inset: 0; z-index: 2; pointer-events: none; background: var(--white); animation: bolt .6s ease-out forwards; }
+.lightning { position: fixed; inset: 0; z-index: var(--z-mark); pointer-events: none; background: var(--white); animation: bolt .6s ease-out forwards; }
 @keyframes bolt { 0% { opacity: 0; } 8% { opacity: .75; } 16% { opacity: .1; } 24% { opacity: .55; } 100% { opacity: 0; } }
 
 /* each world has its own sky: a tropical blue over the island, a warm
@@ -1708,17 +1670,10 @@ html, body {
 .cup__head h3 { margin: 0; font-size: 20px; color: var(--ink); }
 .cup__sum { display: flex; gap: 8px; margin: 0; }
 .cup__sum div { background: rgba(var(--green-rgb), .1); border-radius: 12px; padding: 6px 10px; text-align: center; min-width: 58px; }
-@media (max-width: 600px) { .cup__sum div { min-width: 0; padding: 6px 8px; } }
 .cup__sum dt { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
 .cup__sum dd { margin: 0; font-size: 20px; font-weight: 800; color: var(--green); }
-.cup__sum dd.good { color: var(--green); } .cup__sum dd.bad { color: var(--hat); }
+.cup__sum dd.bad { color: var(--hat); }
 .cup__next { margin: 0; font-size: 14px; color: var(--ink-soft); }
-@media (max-width: 600px) {
-  .cup__head { grid-template-columns: 48px 1fr; }
-  .cup__head svg { width: 48px; height: 48px; }
-  .cup__sum { grid-column: 1 / -1; justify-content: space-between; }
-  .cup__sum div { flex: 1; }
-}
 
 /* the menu's head: the cup being played, with a way to another */
 /* a button: the cup being played, the name big on two lines */
@@ -1753,24 +1708,18 @@ html, body {
 .world__track { display: block; width: 100%; padding-top: 4px; }
 .world__track svg { width: 100%; height: auto; display: block; overflow: visible; }
 .world__score { font-size: 13px; font-weight: 700; color: var(--ink); display: flex; justify-content: center; align-items: center; gap: 4px; flex-wrap: wrap; }
-.world__score .good { color: var(--green); } .world__score .bad { color: var(--hat); }
-.world__stamp { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--hat); color: var(--hat); font-size: 11px; transform: rotate(-12deg); }
-.world__reset { justify-self: center; border: 2px solid var(--ink); background: var(--paper); border-radius: 12px; padding: 4px 12px; min-height: 36px; font: inherit; font-size: 12px; font-weight: 800; color: var(--ink-soft); cursor: pointer; }
+.world__score .good { color: var(--green); } .world__score .bad { color: var(--hat-ink); }
+.world__stamp { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--hat-ink); color: var(--hat-ink); font-size: 11px; transform: rotate(-12deg); }
+.world__reset { justify-self: center; border: var(--edge); background: var(--paper); border-radius: 12px; padding: 4px 12px; min-height: 36px; font: inherit; font-size: 12px; font-weight: 800; color: var(--ink-soft); cursor: pointer; }
 .world__reset--sure { background: var(--hat); color: var(--paper); }
-@media (max-width: 600px) {
-  .worlds__in { width: calc(100vw - 56px); }
-  .worlds__list { gap: 10px; }
-  .world { padding: 14px 8px 12px; }
-}
-
 /* the reset menu at the top of the cup screen */
 /* top right, beside the about button (52px at 34px from the corner); it
    scrolls away with the screen like the back button, never over the cups */
 .resets { position: absolute; top: 34px; right: 98px; z-index: 6; margin: 0; }
 /* the round corner button, stretched to hold a label: same ink, border and shadow */
-.round--pill { width: auto; height: 52px; border-radius: 999px; padding: 0 18px; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; background: var(--paper); }
+.round--pill { width: auto; height: 52px; border-radius: var(--pill); padding: 0 18px; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; background: var(--paper); }
  /* after the base rule: same specificity */
-.resets__menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 3; display: grid; gap: 6px; padding: 10px; min-width: 200px; border-radius: 14px; border: 2.5px solid var(--ink); background: var(--paper); box-shadow: var(--shadow-btn); }
+.resets__menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 3; display: grid; gap: 6px; padding: 10px; min-width: 200px; border-radius: 14px; border: var(--edge); background: var(--paper); box-shadow: var(--shadow-btn); }
 .resets__menu .world__reset { width: 100%; }
 /* the Mountain Cup: emblem, loader, hat, sky */
 .w__sky--mountain { fill: #cfe6f7; }
@@ -1792,17 +1741,15 @@ html, body {
 
 /* the forecast as a HUD card, next to the strokes */
 .card--weather { display: flex; align-items: center; gap: 8px; padding: 8px 12px; position: relative; font: inherit; color: inherit; cursor: pointer; }
-.weather__pop { left: 0; right: auto; } /* (the aim's note, under the badge) */
-@media (max-width: 600px) { .weather__pop { left: auto; right: 0; } } /* (a phone's badge is at the right edge) */
+.weather__pop { left: 0; } /* (the aim's note, under the badge) */
 /* rain darkens and wets the scene; a storm more */
 .wet { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30,45,60,.28), rgba(20,40,50,.12)); transition: opacity .8s; }
 .wet--storm { background: linear-gradient(180deg, rgba(18,26,48,.34), rgba(18,28,40,.12)); }
 
-.weather__until { font-size: 10px; font-weight: 700; color: var(--ink-soft); line-height: 1; white-space: nowrap; }
+.weather__until { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); line-height: 1; white-space: nowrap; }
 /* a long cup name stays on its card on a narrow phone */
-.world__ribbon { max-width: calc(100% + 8px); white-space: normal; line-height: 1.1; text-align: center; }
+.world__ribbon { max-width: calc(100% + 8px); line-height: 1.1; text-align: center; }
 @media (max-width: 400px) {
-  .world__ribbon { font-size: 14px; padding: 5px 10px; } .world__tag { font-size: 12px; }
   /* the hole's name gets the room: "Down the Tunnel" on two lines, not "Down the…" */
   .card--hole { gap: 8px; padding: 8px 10px; } .card__num { min-width: 34px; height: 34px; font-size: 19px; } .card h1 { font-size: 13px; }
 }
@@ -1828,24 +1775,7 @@ html, body {
 .card--compact.scorecard tr:nth-child(3) td { height: 34px; font-size: 18px; }
 .card--compact.scorecard table { margin-bottom: 4px; }
 .card--compact .scorecard__total strong { font-size: 20px; }
-@media (max-width: 600px) {
-  .card--compact.scorecard { padding: 6px 6px 4px; }
-  .card--compact.scorecard th { width: 40px; font-size: 8px; letter-spacing: .04em; }
-  .card--compact.scorecard tr:first-child td > span { min-width: 0; padding: 0 3px; height: 18px; font-size: 10px; }
-  .card--compact.scorecard tr:nth-child(3) td { font-size: 16px; }
-  .card--compact .stamp { width: 14px; height: 14px; right: -1px; top: -1px; }
-}
-
-/* saving on-chain is the point of the game on gno.land: it stands out, in
-   the chain's blue, next to the green "next hole" */
-.btn--chain {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: #2f5fd0; color: var(--white); border-color: var(--ink);
-  box-shadow: 0 4px 0 var(--ink), 0 0 0 4px rgba(47,95,208,.18);
-}
-.btn--chain:hover { background: #2a55bb; }
-.btn--chain:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--ink); }
-.btn--chain[disabled] { background: #8ea6de; }
+/* the save's mark: two links of a chain */
 .btn__mark { flex: 0 0 auto; width: 20px; height: 20px; min-width: 20px; }
 
 /* share: a cluster of round network icons beside the score, in the card */
@@ -1856,11 +1786,10 @@ html, body {
 .win__head .win__score { align-items: center; }
 .win__head .share { position: relative; }
 .win__head .share::before { content: ""; position: absolute; left: -23px; top: 8px; bottom: 8px; border-left: 2px solid rgba(var(--ink-rgb), .15); }
-@media (max-width: 600px) { .win__head { gap: 14px; } .win__head .share::before { display: none; } }
 .win__head .win__score { margin: 0; }
-.share { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 14px; border-radius: 999px; background: rgba(var(--ink-rgb), .06); }
+.share { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 14px; border-radius: var(--pill); background: rgba(var(--ink-rgb), .06); }
 .share__label { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); margin-right: 2px; }
-.share__icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--ink); background: var(--white); color: var(--ink); cursor: pointer; padding: 0; box-shadow: 0 2px 0 var(--ink); transition: transform .1s; }
+.share__icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; border: var(--edge); background: var(--white); color: var(--ink); cursor: pointer; padding: 0; box-shadow: 0 2px 0 var(--ink); transition: transform .1s; }
 .share__icon:hover { transform: translateY(-2px); }
 .share__icon:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--ink); }
 .share__icon svg { width: 18px; height: 18px; fill: currentColor; }
@@ -1875,29 +1804,37 @@ html, body {
 .weather__force { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
 .weather__force i { display: block; width: 4px; border-radius: 1px; background: rgba(var(--ink-rgb), .2); }
 .weather__force i.on { background: var(--hat); }
-.weather__force b { font-size: 10px; line-height: 1; margin-left: 3px; color: var(--ink); }
+.weather__force b { font-size: 11.5px; line-height: 1; margin-left: 3px; color: var(--ink); }
 
 /* disconnecting Adena: a small round x on the chip's corner; in the menu on a phone */
 .adena__wrap { position: relative; display: inline-flex; }
 /* connected: room at the right end of the chip for the disconnect button */
 .adena__wrap .adena--on { padding-right: 52px; }
-.adena__off { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); display: grid; place-items: center; padding: 0; cursor: pointer; z-index: 2; }
+.adena__off { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; border: var(--edge); background: var(--paper); color: var(--ink); display: grid; place-items: center; padding: 0; cursor: pointer; z-index: 2; }
 .adena__off:hover { background: var(--hat); color: var(--paper); }
 .drawer__off { display: none; }
 
 /* a word on why the ball speeds up or drifts: once a shot, gone in a moment */
 /* a small caption at the bottom, above the buttons: the trails behind the ball say the rest */
-.cause { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 5; pointer-events: none; padding: 3px 10px; border-radius: 999px; background: rgba(253,246,234,.85); font-size: 12px; font-weight: 700; color: var(--ink-soft); animation: cause 1.4s ease forwards; }
+.cause { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: var(--z-sheet); pointer-events: none; padding: 3px 10px; border-radius: var(--pill); background: rgba(var(--paper-rgb), .85); font-size: 12px; font-weight: 700; color: var(--ink-soft); animation: cause 1.4s ease forwards; }
 @keyframes cause { 0% { opacity: 0; transform: translate(-50%, 6px); } 15%, 60% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -8px); } }
 
 /* the leaderboard: a chip at the bottom right of every hole, a sheet with two tabs */
 /* a phone: the bottom row is Restart and Whole course; the chip goes to the icon alone, above them */
-.boards { max-width: 560px; position: relative; } /* (the close X sits in the sheet's own corner) */
-.sheet:has(> .boards) { place-items: start center; } /* from the top: its tabs stay put when a tab is shorter */
+/* one height whatever its tab and mode, so its tabs never move, centred like
+   every sheet (800: the course's board on a 900px screen); the board takes
+   what is left under them and scrolls in its list */
+.boards { max-width: 560px; position: relative; height: min(800px, calc(100dvh - 40px)); display: flex; flex-direction: column; } /* (the close X sits in the sheet's own corner) */
+.boards > * { flex: none; }
+.boards > .lb { flex: 1 1 auto; min-height: 180px; overflow-y: auto; }
+.boards > .lb > :first-child { margin-top: 0; } /* (a flex item: its first margin no longer falls through it to the tabs') */
+.boards > .lb--full { display: flex; flex-direction: column; overflow: visible; }
+.boards > .lb--full > * { flex: none; }
+.boards > .lb--full > ol { flex: 0 1 auto; min-height: 0; max-height: none; }
 .boards__tabs { display: flex; margin: 6px 0 12px; } /* no gap: a segmented control, the gap showed as a stripe */
 
 .boards__more { display: block; margin: 10px auto 0; }
-.boards .lb ol { max-height: 46vh; overflow-y: auto; }
+.boards .friends ol { max-height: 46vh; overflow-y: auto; }
 
 /* Every sheet: its close X 16 px in from the corner, and the space for it
    kept free — the first rows of content leave room on the right, so nothing
@@ -1929,64 +1866,52 @@ html, body {
 /* one short line under the switch; the honesty note behind an (i) */
 .aimset__info { margin-left: 6px; cursor: pointer; font: inherit; font-style: normal; color: inherit; background: none; border: 0; padding: 0 2px; }
 .aimset__help > span:has(.aimset__pop) { position: relative; }
-.aimset__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); font-size: 12.5px; line-height: 1.4; text-align: left; box-shadow: 0 3px 0 var(--ink); }
+.aimset__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 8px 10px; border-radius: 10px; border: var(--edge); background: var(--paper); color: var(--ink); font-size: 12.5px; line-height: 1.4; text-align: left; }
 .boards__word { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
-/* the picker, slimmer: fits a 13" laptop and a phone without scrolling */
-/* (the .aimset grid, centred: a later .aimset rule had always won over its display: flex) */
-.aimset--compact { align-items: center; justify-content: center; justify-items: center; text-align: center; max-width: 360px; }
-.aimset--compact .aimset__label { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
-.aimset--compact .aimset__help { flex-basis: 100%; text-align: center; font-size: 11px; }
-/* the picker's button, the same size whether it says Choose or Locked (the
-   line above keeps its own fixed two-line height, in its rule above) */
-.screen .btn--play { font-size: 16px; padding: 10px 26px; min-width: 210px; min-height: 48px; }
+/* the picker's button, the same size whether it says Choose or Locked */
+.screen .btn--play { min-width: 210px; min-height: 48px; }
 
 /* friends and the named-only line */
 .boards__ranked { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
 .friends h3 { margin: 10px 0 6px; }
 /* managing friends: its own section under the board, not a board row */
-.friends__manage { margin-top: 28px; padding-top: 18px; border-top: 2px dashed rgba(var(--ink-rgb), .25); }
+.friends__manage { margin-top: 28px; padding-top: 18px; border-top: var(--rule); }
 .friends__manage h4 { margin: 0 0 10px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
 .friends__add { display: flex; gap: 10px; margin: 0 0 12px; }
 /* a text field: the friend to add, the gnokey key's name */
-.friends__add input, .gnokey__key { min-width: 0; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--ink); font: inherit; font-size: 14px; background: var(--white); color: var(--ink); }
+.friends__add input, .gnokey__key { min-width: 0; min-height: 40px; padding: 0 12px; border-radius: 12px; border: var(--edge); font: inherit; font-size: 14px; background: var(--white); color: var(--ink); }
 /* the ring drawn as the field's own border: an outline beside the ink border reads as two frames */
-.friends__add input:focus-visible, .gnokey__key:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--gold); }
+.friends__add input:focus-visible, .gnokey__key:focus-visible, .nameform__field:focus-within { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--ink); }
 .friends__add input { flex: 1; }
 .friends__list { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; font-size: 13px; }
 .lb .friends__list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 12px; border: 0; border-radius: 10px; background: rgba(var(--ink-rgb), .05); } /* a name to manage, not a place */
 .friends__invite { margin-top: 12px; }
-.boards .lb { max-height: 58vh; overflow-y: auto; }
 
 .cam-btn { display: inline-flex; align-items: center; gap: 6px; }
 .cam-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
 .flag-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 6px; border-radius: 50%; border: 1.5px solid var(--ink-soft); color: var(--ink-soft); font-size: 10px; font-style: normal; font-weight: 800; cursor: help; vertical-align: 1px; }
 .confirm { max-width: 360px; }
 .confirm h2 { margin-right: 52px; }
-.sheet:has(.confirm) { z-index: 9; }
+.sheet:has(.confirm) { z-index: var(--z-confirm); }
 
 /* ---------------------------------------------------------- shared controls
    One look for every control (components/ui.tsx): a button sinks when pressed,
    lifts a little under the pointer, rings when focused, greys when disabled;
    a badge sits in its top-right corner. The segmented switch and the toggle
    are the same family. */
-.btn, .burger, .adena { position: relative; transition: transform .08s, box-shadow .08s, background .15s; }
+.btn, .burger, .adena { position: relative; transition: transform var(--t-press), box-shadow var(--t-press), background .15s; }
 .btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
 .btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
 /* inside the button: .seg clips its overflow, so a ring outside shows as a stripe beside the next segment */
-.seg button:focus-visible { outline: var(--ring); outline-offset: -5px; box-shadow: none; }
+.seg button:focus-visible { outline: var(--ring); outline-offset: -5px; box-shadow: inset 0 0 0 7px var(--ink); } /* the gold inked on both sides (ink 0-2, gold 2-5, ink 5-7) */
 .btn[disabled] { cursor: default; opacity: .7; box-shadow: 0 2px 0 var(--ink); transform: none; }
-.badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); border: 2px solid var(--ink); white-space: nowrap; pointer-events: none; }
+.badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: var(--pill); background: var(--hat-ink); color: var(--paper); border: var(--edge); white-space: nowrap; pointer-events: none; }
 /* a HUD card that is a button (the leaderboard) */
 .btn--chip { background: var(--paper); color: var(--ink); display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 800; }
 .btn--chip svg { width: 22px; height: 22px; fill: #f5c542; stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
-.lbchip { position: fixed; right: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 3; }
-@media (max-width: 600px) {
-  .lbchip { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 118px); right: 14px; }
-  .lbchip span { display: none; }
-  .lbchip .badge { top: -8px; right: -10px; font-size: 10px; padding: 1px 5px; }
-}
+.lbchip { position: fixed; right: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: var(--z-chip); }
 /* the segmented switch: the aim mode, the board's tabs */
-.seg { display: inline-flex; border: 2px solid var(--ink); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-btn); background: var(--paper); }
+.seg { display: inline-flex; border: var(--edge); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-btn); background: var(--paper); }
 .seg--full { display: flex; width: 100%; }
 .seg button { flex: 1; border: 0; background: transparent; font: inherit; font-weight: 800; font-size: 15px; padding: 10px 16px; min-height: 48px; color: var(--ink); cursor: pointer; transition: background .15s; }
 .seg button + button { border-left: 2px solid var(--ink); }
@@ -1994,18 +1919,13 @@ html, body {
 .seg button:active { transform: translateY(1px); }
 .seg button.on { background: var(--green); color: var(--paper); }
 .boards .seg { margin: 6px 0 10px; }
-.aimset--compact .seg { box-shadow: none; }
-.aimset--compact .seg button { padding: 4px 12px; min-height: 30px; font-size: 13px; }
 /* the strokes card: room around its lines, the PRO badge in its corner */
 .card--score { position: relative; padding: 10px 14px; display: grid; align-content: center; gap: 2px; }
 .card--score .eyebrow { line-height: 1; }
 .card--score strong { line-height: 1; }
 .card--score .card__par { line-height: 1.1; }
 .card--score .pro-chip { position: absolute; top: -9px; right: -8px; margin: 0; border: 2px solid var(--paper); }
-/* the same press on the remaining controls: the round buttons, the cup cards, the switches */
-.round { box-shadow: 0 3px 0 var(--green); transition: transform .08s, box-shadow .08s, background .15s; }
-.round:active { transform: translateY(2px) scale(.97); box-shadow: 0 1px 0 var(--green); }
-.world:active:not([disabled]) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+/* the same press on the remaining controls: the switches */
 .switch:active i { transform: scale(.96); }
 .seg button:active { background: #dcebe2; }
 .seg button.on:active { background: #1d5d4a; }
@@ -2025,47 +1945,47 @@ html, body {
 .podium__head h3 { font-size: 14px; margin: 0; }
 .podium__head h3 small { font-weight: 600; color: var(--ink-soft); margin-left: 6px; }
 .podium__head .linkish { font-size: 13px; }
+.podium__links { display: flex; gap: 16px; }
 .podium__row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.podium__row li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 14px; border: 2px solid var(--ink); border-radius: 12px; background: var(--white); box-shadow: 0 3px 0 var(--ink); }
+.podium__row li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 14px; border: var(--edge); border-radius: 12px; background: var(--white); }
 .podium__row li.me { background: var(--ink); color: var(--paper); }
-.podium__medal { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--ink); border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--ink); }
+.podium__medal { display: inline-grid; place-items: center; width: 24px; height: 24px; border: var(--edge); border-radius: 50%; font-size: 13px; font-weight: 800; color: var(--ink); }
 .podium__medal--1 { background: var(--gold); } .podium__medal--2 { background: var(--silver); } .podium__medal--3 { background: var(--bronze); }
 .podium__who { min-width: 0; font-weight: 700; font-size: 14px; }
 .podium__who .who { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.podium__who .who small { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium__who .who small { font-weight: 500; }
 .podium__score { font-size: 12px; white-space: nowrap; opacity: .8; }
 .podium__score b { font-size: 15px; }
-.podium__row .podium__ghost { border-style: dashed; border-color: rgba(var(--ink-rgb), .25); background: transparent; box-shadow: none; }
+.podium__row .podium__ghost { border-style: dashed; border-color: rgba(var(--ink-rgb), .25); background: transparent; }
 .podium__ghost .podium__medal { opacity: .45; }
 .podium__ghost i { height: 8px; width: 60%; border-radius: 6px; background: rgba(var(--ink-rgb), .1); }
 .podium__empty { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); }
 @media (max-width: 1100px) { .podium__who .who small { display: none; } }
 /* a full board: name over address, medals for the podium, your pinned place */
 .who { display: grid; line-height: 1.15; }
-.who small { font-size: 11px; opacity: .6; }
+.who small { font-size: 11px; opacity: .6; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .who__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb__who a { color: inherit; text-decoration: none; }
 .lb__who a:hover .who, .lb__who a:hover { text-decoration: underline; }
 .lb--full li, .lb__mine li { grid-template-columns: 34px minmax(0, 1fr) auto 44px; }
 .lb li.medal--1 { background: #fbe6a6; } .lb li.medal--2 { background: #e9ecef; } .lb li.medal--3 { background: #f3d6bd; }
 /* a medal keeps its metal and its ink digit on any row, yours (dark) included */
-.lb li.medal .lb__rank { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 50%; background: var(--white); color: var(--ink); }
+.lb li.medal .lb__rank { display: inline-grid; place-items: center; width: 28px; height: 28px; border: var(--edge); border-radius: 50%; background: var(--white); color: var(--ink); }
 .lb li.medal--1 .lb__rank { background: var(--gold); } .lb li.medal--2 .lb__rank { background: var(--silver); } .lb li.medal--3 .lb__rank { background: var(--bronze); }
 .lb li.me.medal .lb__rank { border-color: var(--paper); }
 .lb li.me.medal { background: var(--ink); }
-.ace-chip { font-style: normal; font-weight: 800; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--hat-ink); color: var(--paper); }
+.ace-chip { font-style: normal; font-weight: 800; font-size: 11px; padding: 1px 7px; border-radius: var(--pill); background: var(--hat-ink); color: var(--paper); }
 .lb strong.good { color: var(--green); } .lb strong.bad { color: var(--hat-ink); }
 .lb li.me strong.good, .lb li.me strong.bad { color: inherit; }
-.lb__mine { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 2px dashed rgba(var(--ink-rgb), .3); }
-.lb__mine li { display: grid; gap: 10px; align-items: center; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 12px; }
+.lb__mine { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: var(--rule); }
+.lb__mine li { display: grid; gap: 10px; align-items: center; padding: 8px 12px; border: var(--edge); border-radius: 12px; }
 @media (max-width: 480px) { .lb--full li, .lb__mine li { grid-template-columns: 30px minmax(0, 1fr) auto 40px; } }
 /* a full board scrolls in its list only: a toon scrollbar in its own gutter,
    and the rows fade out at the bottom edge instead of being cut */
-.boards .lb--full { max-height: none; overflow: visible; }
 .lb--full ol { max-height: 46vh; overflow-y: auto; scrollbar-width: auto; scrollbar-gutter: stable; padding: 2px 8px 22px 0; mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
 .lb--full ol::-webkit-scrollbar { display: block; width: 12px; }
-.lb--full ol::-webkit-scrollbar-track { background: rgba(var(--ink-rgb), .08); border-radius: 999px; margin: 4px 0 20px; }
-.lb--full ol::-webkit-scrollbar-thumb { background: var(--green); border: 2px solid var(--ink); border-radius: 999px; }
+.lb--full ol::-webkit-scrollbar-track { background: rgba(var(--ink-rgb), .08); border-radius: var(--pill); margin: 4px 0 20px; }
+.lb--full ol::-webkit-scrollbar-thumb { background: var(--green); border: var(--edge); border-radius: var(--pill); }
 @supports not selector(::-webkit-scrollbar) { .lb--full ol { scrollbar-width: thin; scrollbar-color: var(--green) rgba(var(--ink-rgb), .08); } }
 .lb li.lb__more { display: block; padding: 4px 0 0; border: 0; background: none; }
 /* players with no name: folded under the board, greyed, no place */
@@ -2073,33 +1993,32 @@ html, body {
 .unnamed summary { cursor: pointer; font-weight: 700; width: max-content; padding: 10px 2px; } /* a 44px tap */
 .unnamed ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; max-height: 30vh; overflow-y: auto; }
 /* its own quiet rows, not the board's cards (.lb li): no border, ink text, yours tinted */
-.lb .unnamed li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.lb .unnamed li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font-family: var(--mono); font-size: 12px; }
 .lb .unnamed li:nth-child(odd) { background: rgba(var(--ink-rgb), .04); }
 .lb .unnamed li.me { background: rgba(var(--ink-rgb), .12); color: var(--ink); font-weight: 700; }
 .unnamed a { color: inherit; }
 /* taking a name in the game: a card, its title, the fixed nym- prefix, the rule said live */
-.nameform { display: grid; gap: 8px; margin: 12px 0; padding: 14px 16px; text-align: left; border: 2px solid var(--ink); border-radius: 16px; background: var(--white); box-shadow: 0 3px 0 var(--ink); }
+.nameform { display: grid; gap: 8px; margin: 12px 0; padding: 14px 16px; text-align: left; border: var(--edge); border-radius: 16px; background: var(--white); }
 .nameform__title { font-size: 17px; color: var(--ink); }
 .nameform__why { font-size: 13px; color: var(--ink-soft); }
 .nameform__row { display: flex; gap: 10px; align-items: stretch; }
-.nameform__field { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 48px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); font-family: ui-monospace, Menlo, monospace; font-size: 16px; }
+.nameform__field { flex: 1; min-width: 0; display: flex; align-items: center; min-height: 48px; border: var(--edge); border-radius: 12px; background: var(--paper); font-family: var(--mono); font-size: 16px; }
 .nameform__field > span { padding: 0 2px 0 12px; color: var(--ink-soft); }
 .nameform__field input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none; }
-.nameform__field:focus-within { box-shadow: 0 0 0 3px var(--gold); }
-.nameform__field--bad, .nameform__field--bad:focus-within { border-color: var(--hat-ink); box-shadow: 0 0 0 3px rgba(224, 82, 75, .25); } /* a name the chain won't take */
+.nameform__field--bad, .nameform__field--bad:focus-within { border-color: var(--hat-ink); box-shadow: 0 0 0 3px rgba(var(--hat-rgb), .25); } /* a name the chain won't take */
 .nameform__field input:focus-visible { outline: none; box-shadow: none; } /* (its frame shows it) */
 .nameform small { font-size: 12px; color: var(--ink-soft); }
 .nameform .nameform__ok { color: var(--green); font-weight: 700; }
 .nameform .nameform__err { color: var(--hat-ink); font-weight: 700; }
 /* your place once saved, by the score: the level, big and gold */
-.win__place { display: inline-grid; justify-items: center; align-self: center; margin-left: 10px; padding: 4px 14px 5px; border: 3px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 26px; line-height: 1; box-shadow: 0 3px 0 var(--ink); transform: rotate(-4deg); }
+.win__place { display: inline-grid; justify-items: center; align-self: center; margin-left: 10px; padding: 4px 14px 5px; border: var(--edge-bold); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 26px; line-height: 1; transform: rotate(-4deg); }
 .win__place small { font-size: 11px; font-weight: 800; letter-spacing: .04em; }
 /* your place under the board, with the game's share */
-.lb__myshare { display: grid; justify-items: center; gap: 8px; margin: 16px 0 0; padding-top: 14px; border-top: 2px dashed rgba(var(--ink-rgb), .2); text-align: center; }
+.lb__myshare { display: grid; justify-items: center; gap: 8px; margin: 16px 0 0; padding-top: 14px; border-top: var(--rule); text-align: center; }
 .lb__myshare > span { font-size: 15px; color: var(--ink); }
 /* an empty board's blank places */
 .lb__ghosts { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
-.lb__ghosts li { display: grid; grid-template-columns: 30px 1fr 56px 44px; gap: 10px; align-items: center; padding: 8px 12px; border: 2px dashed rgba(var(--ink-rgb), .25); border-radius: 12px; color: rgba(var(--ink-rgb), .35); font-weight: 700; }
+.lb__ghosts li { display: grid; grid-template-columns: 30px 1fr 56px 44px; gap: 10px; align-items: center; padding: 8px 12px; border: var(--rule); border-radius: 12px; color: rgba(var(--ink-rgb), .35); font-weight: 700; }
 .lb__ghosts i { height: 10px; border-radius: 6px; background: rgba(var(--ink-rgb), .1); }
 .lb__ghosts li:nth-child(2) i:first-of-type { width: 70%; }
 .lb__ghosts li:nth-child(3) i:first-of-type { width: 50%; }
@@ -2124,20 +2043,49 @@ html, body {
 
 /* about: how it works, what is in it, where to go next, who made it */
 /* the about button: the back button's twin, top right, over every front screen */
-.screen__about { position: fixed; top: 34px; right: 34px; z-index: 6; background: var(--paper); }
 .screen__about svg { display: block; }
 .about { position: relative; max-width: 620px; width: 100%; text-align: left; }
 .about h2 { margin: 2px 0 6px; font-size: 34px; }
 .about__lead { margin: 0 0 18px; font-size: 15px; line-height: 1.5; color: var(--ink); max-width: 46ch; }
 .about__steps { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.about__steps li { background: var(--white); border: 2px solid var(--ink); border-radius: 16px; box-shadow: 0 3px 0 var(--ink); padding: 12px 12px 10px; }
+.about__steps li { background: var(--white); border: var(--edge); border-radius: 16px; padding: 12px 12px 10px; }
 .about__steps svg { width: 34px; height: 34px; display: block; margin-bottom: 6px; }
 .about__steps b { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--ink); }
 .about__n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 12px; }
 .about__steps p { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
 .about__facts { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.about__facts li { font-size: 12.5px; font-weight: 600; color: var(--ink); background: rgba(var(--ink-rgb), .07); border-radius: 999px; padding: 4px 10px; }
-.about__h { margin: 0 0 8px; font-size: 15px; color: var(--ink); }
+.about__facts li { font-size: 12.5px; font-weight: 600; color: var(--ink); background: rgba(var(--ink-rgb), .07); border-radius: var(--pill); padding: 4px 10px; }
+/* a chapter of a sheet (the rules', the about's "Go further"): a dashed rule over it */
+.about__h { margin: 0 0 10px; padding-top: 14px; border-top: var(--rule); font-size: 18px; color: var(--ink); }
+.about__rules { margin: -8px 0 20px; }
+.rules { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 8px; }
+.rules li { display: grid; grid-template-columns: 9em 1fr; gap: 12px; font-size: 14px; line-height: 1.45; color: var(--ink-soft); }
+.rules b { color: var(--ink); }
+/* the badges: a medal each, its family's colour; grey and dashed until earned */
+.bar.badges__bar { width: 100%; margin: 4px 0 6px; }
+.badges { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.badges li { position: relative; display: grid; grid-template-columns: 46px 1fr; column-gap: 10px; align-items: center; padding: 8px 12px 8px 8px; border: var(--edge); border-radius: 14px; background: var(--white); }
+.badges li > svg { grid-row: span 2; width: 46px; height: 52px; }
+.badges b { align-self: end; font-size: 14px; color: var(--ink); }
+.badges span { align-self: start; font-size: 12.5px; line-height: 1.35; color: var(--ink-soft); }
+.badges .badges__off { border-style: dashed; border-color: rgba(var(--ink-rgb), .35); background: transparent; }
+.badges .badges__off b { color: var(--ink-soft); }
+.badges__new { position: absolute; top: -10px; right: -6px; font-style: normal; transform: rotate(4deg); }
+.medal__ribbon { fill: var(--hat); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.medal__rim { fill: var(--paper); stroke: var(--ink); stroke-width: 2.5; }
+.medal__face { stroke: var(--ink); stroke-width: 1.5; }
+.medal__glyph { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.medal--skill .medal__face { fill: var(--gold); }
+.medal--weather .medal__face { fill: #a9d8ef; }
+.medal--chain .medal__face { fill: var(--green-light); }
+.medal--fun .medal__face { fill: #f4b6c8; }
+.medal--off .medal__ribbon, .medal--off .medal__face { fill: var(--disabled); }
+.medal--off .medal__rim { stroke-dasharray: 5 3.5; }
+.medal--off :is(.medal__ribbon, .medal__rim, .medal__face, .medal__glyph) { stroke: var(--ink-soft); }
+/* the win card's line: the medal by the words, no tick (the medal says it) */
+.newbadge { display: flex; align-items: center; gap: 10px; }
+.newbadge::before { content: none; }
+.newbadge > svg { flex: 0 0 auto; width: 34px; height: 38px; }
 .about__links { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .about__links li:nth-child(odd):last-child { grid-column: 1 / -1; } /* an odd one out spans the row */
 .about__links a { display: grid; gap: 2px; height: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; border: 2px solid rgba(var(--ink-rgb), .18); background: rgba(255, 255, 255, .55); color: var(--ink); text-decoration: none; transition: border-color .12s, transform .12s; }
@@ -2148,51 +2096,78 @@ html, body {
 .about__credit a, .boards__ranked a, .nameform a { color: var(--ink); } /* inline links in soft text: ink, one rule */
 /* a sheet open: the screens' corner buttons (back, about) step aside, so the sheet's own close is the one tapped */
 body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hidden; }
-/* the menu scrolls as one: its holes right under the player's stats, the settings after them */
-.drawer__panel { overflow-y: auto; }
-.drawer__panel .drawer__list { overflow: visible; border-bottom: 2px dashed rgba(var(--ink-rgb), .25); }
+.drawer__panel .drawer__list { border-bottom: var(--rule); }
 .drawer__panel .drawer__settings { border-bottom: 0; }
-.scorecard__all { margin-left: auto; font-size: 13px; }
-/* legibility floor for the HUD's small print: the weather's "for 2 min", its force */
-.weather__until { font-size: 11.5px; }
-.weather__force b { font-size: 11.5px; }
+.scorecard__links { margin-left: auto; display: flex; gap: 14px; font-size: 13px; }
 /* the camera button keeps one width whatever its mode's name, so Restart never shifts */
 .cam-btn { min-width: 150px; justify-content: center; }
 /* the cup off the picture: a pip at the edge of the screen pointing to it (engine.ts cupPip) */
-.cuppip { position: fixed; left: 0; top: 0; z-index: 3; width: 56px; height: 56px; pointer-events: none; opacity: 0; transition: opacity .35s; }
+.cuppip { position: fixed; left: 0; top: 0; z-index: var(--z-mark); width: 56px; height: 56px; pointer-events: none; opacity: 0; transition: opacity .35s; }
 .cuppip--on { opacity: 1; }
 .cuppip svg { display: block; overflow: visible; }
 .cuppip__disc { fill: var(--paper); stroke: var(--ink); stroke-width: 2.5; }
 .cuppip__flag { fill: var(--hat); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
 .cuppip__arrow { fill: var(--ink); transform: rotate(var(--a, 0rad)); transform-origin: 0 0; }
-.btn--save { display: inline-flex; align-items: center; gap: 8px; }
+.btn--save { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 /* the win card's second action a size under its one solid button */
 .banner--win .banner__row .btn--ghost:not(.btn--save) { font-size: 15px; padding: 10px 18px; }
-/* Adena's blue: the one action that puts the round on the chain */
-.btn--save:not([disabled]) { background: #2f5ae8; color: var(--white); } /* 5.6:1 with white */
+.btn--save:not([disabled]) { background: var(--chain); color: var(--white); }
 .btn--save:not([disabled]):hover { background: #264bd1; }
 /* the place the save would take: a gold sticker on the button's corner */
-.btn__rank { position: absolute; top: -14px; right: -10px; padding: 3px 10px; border: 2px solid var(--ink); border-radius: 999px; background: var(--gold); color: var(--ink); font-size: 13px; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 0 var(--ink); transform: rotate(4deg); pointer-events: none; }
+/* a gold sticker: the place a save would take, a shared link's dare, a badge just earned */
+.btn__rank, .dare, .badges__new { padding: 3px 10px; border: var(--edge); border-radius: var(--pill); background: var(--gold); color: var(--ink); font-size: 13px; font-weight: 800; }
+.btn__rank { position: absolute; z-index: 1; top: -14px; right: -10px; white-space: nowrap; box-shadow: 0 2px 0 var(--ink); transform: rotate(4deg); pointer-events: none; }
+.dare { display: inline-block; margin: 8px 0 10px; max-width: min(90vw, 460px); transform: rotate(-2deg); }
 .btn--save-rank:not([disabled]) { animation: save-pulse 1.8s ease-in-out 2; }
 @keyframes save-pulse { 50% { transform: scale(1.04); } }
 
 /* which chain this is (under the sheets and banners, z 5–9, like the leaderboard chip), bottom left on every screen but mainnet's: coloured,
    so no one takes a practice score for a real one, with the way to mainnet */
-.netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: 2px solid var(--ink); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; } /* the bottom buttons' height and edge, flat: it says, it is not pressed */
+.netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: var(--z-chip); display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: var(--edge); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; } /* the bottom buttons' height and edge, flat: it says, it is not pressed */
 .netbanner--testnet { background: var(--hat); color: var(--paper); }
-.screen ~ .netbanner { z-index: 4; left: 34px; bottom: max(34px, env(safe-area-inset-bottom)); } /* over the title, cups and gnome screens too (under the sheets, 5), inside their frame, where their corner buttons are */
+.screen ~ .netbanner { z-index: var(--z-screen); left: 34px; bottom: max(34px, env(safe-area-inset-bottom)); } /* over the title, cups and gnome screens too (under the sheets, 5), inside their frame, where their corner buttons are */
 .netbanner b { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .netbanner span { font-weight: 600; opacity: .9; }
 .netbanner:not(:has(.netbanner__go)) { padding-right: 16px; }
-.netbanner__go { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); color: var(--ink); font-weight: 800; text-decoration: none; white-space: nowrap; }
+.netbanner__go { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border: var(--edge); border-radius: 12px; background: var(--paper); color: var(--ink); font-weight: 800; text-decoration: none; white-space: nowrap; }
 .netbanner__go:hover { background: var(--gold); }
 
+/* ------------------------------------------------------------ the shot clip
+   (ADR-003, NEXT_PUBLIC_CLIPS; components/Share.tsx ShareClip): the holing
+   stroke, recorded after the hole, looped in the win card above its buttons.
+   Its own classes only: without the flag no element carries them. */
+.clip { margin: 0 auto 16px; }
+.clip__screen { position: relative; max-width: 440px; margin: 0 auto; aspect-ratio: 16 / 9; border: var(--edge); border-radius: 18px; overflow: hidden; background: var(--sky-day); }
+/* (440: a window the card still reads around) */
+.clip__screen video { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* making it: a word and the power capsule's look, filling as it records */
+.clip__making { display: grid; place-items: center; align-content: center; gap: 12px; height: 100%; font-weight: 700; color: var(--ink); }
+/* an inked bar filling in red: the clip being made, the badges earned */
+.bar { display: block; width: min(60%, 240px); height: 16px; border: var(--edge); border-radius: var(--pill); background: var(--paper); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--hat); transition: width .3s linear; }
+/* reduced motion: no autoplay, a round play button over the first frame */
+.clip__play { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; border: var(--edge); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
+/* its download, on it: a paper pill in the top corner, the brand's card having the bottom */
+.clip__save { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 9px; border: var(--edge); border-radius: var(--pill); background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 2px 0 var(--ink); }
+.clip__save svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.clip__save:hover { background: var(--gold); }
+
+/* ------------------------------------------------------------ a round waiting
+   for its save after a reload (Adena installed meanwhile): a card at the top,
+   on any screen, under the sheets (5) */
+.pending { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: var(--z-screen); display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border: var(--edge); border-radius: 18px; background: var(--paper); color: var(--ink); font-size: 15px; }
+.pending__say { display: grid; gap: 2px; }
+.pending .btn { padding: 8px 14px; font-size: 15px; }
+.pending__err { font-size: 12px; color: var(--hat-ink); }
+/* on the play screen, in the top row between its cards (its height, centred on them); under them when the row is full */
+body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-height: 76px; }
+@media (max-width: 1600px) { body:has(.hud--top) .pending { top: 104px; min-height: 0; } }
 /* ------------------------------------------------ by breakpoint
    The media rules no later rule fights, gathered here: wide to narrow, the
    motion switch last. The ones a later rule overrides stay where they are. */
 
 @media (max-width: 600px) {
-  .pick__canvas { width: 56vw; height: 56vw; }
   /* a phone: the hint wraps inside the screen instead of running off both sides */
   .hint { white-space: normal; text-align: center; width: calc(100vw - 32px); }
   .title__facts { flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -2206,17 +2181,19 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
   .card--weather { position: fixed; top: 92px; right: 12px; width: 60px; height: 60px; padding: 0; justify-content: center; border-radius: 50%; }
   body:has(.card--weather) .timed { right: 84px; }
   .card--weather .weather__vane { width: 46px; height: 46px; }
-  .card--weather .weather__side { position: absolute; right: -8px; bottom: -8px; background: var(--paper); border: 2px solid var(--ink); border-radius: 12px; padding: 1px 3px; }
+  .weather__pop { left: auto; right: 0; } /* (a phone's badge is at the right edge) */
+  .card--weather .weather__side { position: absolute; right: -8px; bottom: -8px; background: var(--paper); border: var(--edge); border-radius: 12px; padding: 1px 3px; }
   .card--weather .weather__sky { width: 26px; height: 18px; }
   .card--weather .weather__say { display: none; }
   .card--weather .weather__until { display: none; }
-  .win__head { gap: 10px; } .share__label { display: none; } .share__icon { width: 34px; height: 34px; }
+  .win__head { gap: 10px; } .win__head .share::before { display: none; } .share__label { display: none; }
   .card--weather .weather__force { display: none; }
   .adena__off { display: none; } .adena__wrap .adena--on { padding-right: 0; } .drawer__off { display: block; grid-column: 1 / -1; }
   .cause { bottom: 104px; }
   .card--score { padding-top: 14px; } .card--score .pro-chip { top: -11px; right: -6px; font-size: 9px; }
   .screen__about { top: 30px; right: 30px; }
   .about__steps { grid-template-columns: 1fr; } .about__links { grid-template-columns: 1fr; }
+  .rules li { grid-template-columns: 1fr; gap: 2px; }
   /* on a phone the title's logo starts under the about button, not beside it */
   .screen--title .title { padding-top: 52px; }
   /* on a phone it joins the bottom row, left of the play buttons: a short word, no link (About has it) */
@@ -2232,6 +2209,28 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
   .banner--win .banner__row { gap: 8px; }
   .banner--win .banner__row .btn { font-size: 15px; padding: 10px 12px; }
   .banner--win .banner__row .btn--save { order: -1; flex: 1 0 100%; }
+  /* the leaderboard chip: the icon alone, above the bottom row (Restart and Whole course) */
+  .lbchip { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 118px); right: 14px; }
+  .lbchip span { display: none; }
+  .lbchip .badge { top: -8px; right: -10px; font-size: 10px; padding: 1px 5px; }
+  /* the leaderboard: the screen's full height */
+  .boards { height: calc(100dvh - 40px); }
+  /* a cup's standings: the emblem smaller, the sums on their own row */
+  .cup__head { grid-template-columns: 48px 1fr; }
+  .cup__head svg { width: 48px; height: 48px; }
+  .cup__sum { grid-column: 1 / -1; justify-content: space-between; }
+  .cup__sum div { flex: 1; min-width: 0; padding: 6px 8px; }
+  /* the win card's compact scorecard, tighter still */
+  .card--compact.scorecard { padding: 6px 6px 4px; }
+  .card--compact.scorecard th { width: 40px; font-size: 8px; letter-spacing: .04em; }
+  .card--compact.scorecard tr:first-child td > span { min-width: 0; padding: 0 3px; height: 18px; font-size: 10px; }
+  .card--compact.scorecard tr:nth-child(3) td { font-size: 16px; }
+  .card--compact .stamp { width: 14px; height: 14px; right: -1px; top: -1px; }
+  /* a round waiting for its save: under the weather badge (92px + its 60), its words wrapping */
+  .pending { gap: 8px; padding: 6px 6px 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); }
+  body:has(.hud--top) .pending { top: 160px; }
+  .pending .btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+  .pending__say { min-width: 0; }
 }
 
 /* where the centred play buttons reach the banner at the bottom left: its
@@ -2239,12 +2238,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 @media (max-width: 1280px) { .netbanner span { display: none; } }
 @media (min-width: 601px) and (max-width: 900px) { .netbanner__go { display: none; } .netbanner { padding-right: 16px; } }
 
-@media (max-width: 1100px) {
-  .worlds__list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
 @media (max-width: 700px) {
-  .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .podium__row { grid-template-columns: 1fr; gap: 4px; } .podium__row .podium__ghost { display: none; }
 }
 
@@ -2255,10 +2249,23 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
   .screen.worlds { place-items: start center; align-content: start; padding: 0; }
   .worlds__in { padding: 96px 0 72px; }
 }
+/* wide and a 13" laptop's height, centred: in the middle of what the network
+   banner's row leaves (34px + its 48), as the title, the cards clear of it */
+@media (min-width: 701px) and (min-height: 641px) and (max-height: 820px) and (min-aspect-ratio: 1/1) {
+  body:has(.netbanner) .screen.worlds { padding-bottom: 90px; }
+}
 /* a tablet on its side: the fact pills wrap onto "Tap to start" */
 @media (max-width: 1100px) and (min-aspect-ratio: 1/1) { .screen--title .title__facts { display: none; } }
-/* a finger's targets */
-@media (pointer: coarse) { .seg button, .details summary, .unnamed summary { min-height: 44px; } }
+/* a finger's targets, 44px (the picker's aim switch: title.css) */
+@media (pointer: coarse) {
+  .seg button, .boards__modes .seg button, .details summary, .unnamed summary, .world__reset, :not(p, span, small) > .linkish { min-height: 44px; }
+  /* what stays small to the eye takes the tap round it: the clip's download,
+     the share icons (8px apart), the aim's (i) (its line's, not the switch's above) */
+  .clip__save::before, .share__icon::before, .screen--pick .aimset__info::before { content: ""; position: absolute; inset: -7px; }
+  .share__icon::before { inset: -3px; }
+  .screen--pick .aimset__info { position: relative; }
+  .screen--pick .aimset__info::before { inset: -6px -13px -20px; }
+}
 
 @media (max-width: 480px) {
   .nameform__row { flex-direction: column; }
@@ -2270,50 +2277,12 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 @media (prefers-reduced-motion: reduce) {
   /* !important on purpose: the one switch over every rule's own motion */
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-  /* after the global reduced-motion rule: a toast stays put and is taken away by its timer */
+  /* what the switch would end gone: a toast and a shot's cause stay put, taken
+     away by their timers; the loader's ball stays in sight on its green */
   .toast { animation: none !important; opacity: 1; }
-  .lightning { animation: none; opacity: 0; }
-  .boot__gnome { animation: none; }
   .cause { animation: none; opacity: 1; }
-  .cuppip { transition: none; }
-  .btn--save-rank:not([disabled]) { animation: none; }
+  .load__ball--in > * { animation: none; }
 }
 
-/* ------------------------------------------------------------ the shot clip
-   (ADR-003, NEXT_PUBLIC_CLIPS; components/Share.tsx ShareClip): the holing
-   stroke, recorded after the hole, looped in the win card above its buttons.
-   Its own classes only: without the flag no element carries them. */
-.clip { margin: 0 auto 16px; }
-.clip__screen { position: relative; max-width: 440px; margin: 0 auto; aspect-ratio: 16 / 9; border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; background: var(--sky-day); box-shadow: var(--shadow-btn); }
-/* (440: a window the card still reads around) */
-.clip__screen video { display: block; width: 100%; height: 100%; object-fit: cover; }
-/* making it: a word and the power capsule's look, filling as it records */
-.clip__making { display: grid; place-items: center; align-content: center; gap: 12px; height: 100%; font-weight: 700; color: var(--ink); }
-.clip__bar { width: min(60%, 240px); height: 16px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); box-shadow: 0 3px 0 var(--ink); overflow: hidden; }
-.clip__bar span { display: block; height: 100%; background: var(--hat); transition: width .3s linear; }
-/* reduced motion: no autoplay, a round play button over the first frame */
-.clip__play { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); cursor: pointer; display: grid; place-items: center; padding: 0; }
-.clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
-/* its download, on it: a paper pill in the top corner, the brand's card having the bottom */
-.clip__save { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 9px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 2px 0 var(--ink); }
-.clip__save svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
-.clip__save:hover { background: var(--gold); }
-
-/* ------------------------------------------------------------ a round waiting
-   for its save after a reload (Adena installed meanwhile): a card at the top,
-   on any screen, under the sheets (5) */
-.pending { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border: 2px solid var(--ink); border-radius: 18px; background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); font-size: 15px; }
-.pending__say { display: grid; gap: 2px; }
-.pending .btn { padding: 8px 14px; font-size: 15px; }
-.pending__err { font-size: 12px; color: var(--hat-ink); }
-/* on the play screen, in the top row between its cards (its height, centred on them); under them when the row is full */
-body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-height: 76px; }
-@media (max-width: 1600px) { body:has(.hud--top) .pending { top: 104px; min-height: 0; } }
-/* a phone: one row, the hole's name cut short before the button */
-@media (max-width: 600px) {
-  .pending { gap: 8px; padding: 6px 6px 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); }
-  .pending .btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
-  .pending__say { min-width: 0; } .pending__say > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-}
 /* the faucet and the address to paste there, on one line */
 .getgnot { white-space: nowrap; }

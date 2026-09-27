@@ -6,7 +6,7 @@ import { vsPar, type Cup, type CupTotal, type cupTotals } from "@/lib/card";
 import { sound } from "@/lib/feel";
 import { stillsOnly } from "@/lib/prefs";
 import { Green } from "@/components/Title";
-import { BackButton } from "@/components/About";
+import { AboutButton, BackButton } from "@/components/About";
 import "@/app/title.css";
 
 // The world screen, between the title and the course: one card per world,
@@ -19,6 +19,8 @@ export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
   { id: "town", name: "Mushroom Town", tag: "Streets, lanterns and rooftops" },
   { id: "mountain", name: "Mountain Cup", tag: "Snowy peaks, pines and a chalet" },
 ];
+/** A cup by its id: the garden's when it is none of them. */
+export const worldOf = (id: string | null | undefined) => WORLDS.find((w) => w.id === id) || WORLDS[0];
 
 // the scene is clipped to the round badge, and the ink ring drawn over it
 function Frame({ id, children }: { id: string; children?: ReactNode }) {
@@ -183,6 +185,7 @@ interface WorldsProps {
   current?: string | null;
   onPick: (world: string) => void;
   onBack: () => void;
+  onAbout: () => void;
   onReset: (world: string) => void;
   onResetAll: () => void;
   community?: readonly HoleRow[];
@@ -191,7 +194,7 @@ interface WorldsProps {
   podium?: ReactNode;
 }
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onReset, onResetAll, community = [], onCommunity = () => {}, podium }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, community = [], onCommunity = () => {}, podium }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -207,6 +210,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   return (
     <div className={`screen worlds worlds--v2 front tint--${hot || current || "garden"}`}>
       <BackButton label="Back to the title" onClick={() => (sound("blip"), onBack())} />
+      <AboutButton onClick={onAbout} />
       {played.length > 0 && (
         <div className="resets">
           <button className="round round--pill" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>

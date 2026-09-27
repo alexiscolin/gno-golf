@@ -35,11 +35,15 @@ func forecastJSON(head string, f course.Forecast) string {
 }
 
 // Weather is a hole's weather in a period, as the zones a client draws and
-// the chain plays under. Read-only.
+// the chain plays under. Read-only. Its "gas" is what a commit on the hole
+// spends in that weather before its first shot (fixedGas: decoding the hole
+// and drawing its forecast), which the chain counts against the commit's
+// budget: a client adds it to its shots' estimate.
 func Weather(hole string, period int64) string {
 	notAhead(period)
 	e := readHole(hole)
-	return forecastJSON(versionJSON+",", weatherOf(e, e.hole(), period))
+	fc := weatherOf(e, e.hole(), period)
+	return forecastJSON(versionJSON+`,"gas":`+strconv.FormatInt(fixedGas(e, fc), 10)+",", fc)
 }
 
 // notAhead refuses a period still to come: the hub does not serve the

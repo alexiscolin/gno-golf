@@ -6,7 +6,7 @@
 // down the screen is +y) — a windsock for how hard, and what falls from the sky.
 // A storm's flashes are the scene's (flash counts them): the screen lights
 // up with the 3D lightning, not on a clock of its own.
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { WeatherNow } from "@/lib/scene/weather";
 
 export default function Weather({ w: given, flash = 0, until = null }: { w: WeatherNow | null; flash?: number; until?: number | null }) {
@@ -14,6 +14,7 @@ export default function Weather({ w: given, flash = 0, until = null }: { w: Weat
   // said in minutes, which a drifting clock spoils less than a time of day
   const [now, setNow] = useState(() => Date.now());
   const [why, setWhy] = useState(false); // what it does to the ball, a tap away (a tooltip never shows on touch)
+  const popId = useId();
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(t);
@@ -41,6 +42,7 @@ export default function Weather({ w: given, flash = 0, until = null }: { w: Weat
         className="card card--weather"
         aria-label={`Weather: ${said || "clear"}. What it does`}
         aria-expanded={why}
+        aria-describedby={why ? popId : undefined}
         onClick={() => setWhy((v) => !v)}
         onBlur={() => setWhy(false)}
       >
@@ -79,7 +81,7 @@ export default function Weather({ w: given, flash = 0, until = null }: { w: Weat
           )}
           {until && <span className="weather__until">{until - now > 60000 ? `for ${Math.ceil((until - now) / 60000)} min` : "changing soon"}</span>}
         </div>
-        {why && <span className="aimset__pop weather__pop" role="note">{note}</span>}
+        {why && <span id={popId} className="aimset__pop weather__pop" role="note">{note}</span>}
       </button>
       {flash > 0 && <div key={flash} className="lightning" aria-hidden="true" />}
     </>

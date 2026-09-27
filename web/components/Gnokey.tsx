@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { gnokeyPlan, chainSplit } from "@/lib/adena";
 import { Button } from "@/components/ui";
+import { useCopied } from "@/components/common";
 import type { Chain } from "@/lib/chain";
 import type { Snapshot } from "@/lib/engine";
 
@@ -25,9 +26,8 @@ const savedKey = () => {
 };
 
 export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | null; chain: Chain | null; price: number; chainId: string | null }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, copyText] = useCopied(1600);
   const [key, setKey] = useState(savedKey);
-  const t = useRef<ReturnType<typeof setTimeout>>(undefined);
   // the commits as the chain itself cuts them, asked when the panel opens:
   // the same split an Adena save sends (keyed by the round it is for)
   const round = s ? `${s.id}#${s.shots.join(";")}#${s.period}` : "";
@@ -59,8 +59,7 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
     setKey(v);
     try { localStorage.setItem(KEY, v.trim()); } catch {}
   };
-  const copy = () =>
-    void navigator.clipboard.writeText(all).then(() => (setCopied(true), clearTimeout(t.current), (t.current = setTimeout(() => setCopied(false), 1600))), () => {});
+  const copy = () => void copyText(all);
   return (
     <details className="details gnokey" onToggle={(e) => e.currentTarget.open && ask()}>
       <summary>Save with gnokey instead</summary>

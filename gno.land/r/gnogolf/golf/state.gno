@@ -251,9 +251,9 @@ func jstr(s string) string {
 // current holes first, in course order (world by world, then by order), then
 // its maxArchived latest archived versions, latest first, then everyone
 // else's current versions, newest first — at most perAuthor of one
-// address's, the rest in Community — up to maxListed in all (see listed). official is whether a hole is the
-// course's: only those have a cup number and count in the course-wide
-// ranking. next is the version that took an archived hole's place, slot the
+// address's, none the owner hid (Hide), the rest in Community — up to
+// maxListed in all (see listed). official is whether a hole is the course's:
+// only those have a cup number and count in the course-wide ranking. next is the version that took an archived hole's place, slot the
 // version's alias. play is the 3D client's link, successor the realm that
 // took the course over ("" if none). Read-only; it decodes nothing.
 func Holes() string {
@@ -303,14 +303,14 @@ const perAuthor = 3
 //   - then, if they leave room for minCommunity more, up to maxArchived
 //     archived course versions, the most recently archived first (every
 //     version is on its slot's data page);
-//   - then, in the room left, community holes, current versions only: the
-//     newest of the holes that are among their author's perAuthor newest,
-//     newest publish first (by block height; within one block, by alias,
-//     last first).
+//   - then, in the room left, community holes, current versions only and
+//     none hidden (Hide): the newest of the holes that are among their
+//     author's perAuthor newest shown, newest publish first (by block
+//     height; within one block, by alias, last first).
 //
-// So a community hole is listed if and only if it is one of its author's
-// perAuthor newest and fewer than that room of such holes, anyone's, were
-// published after it. However many holes an author publishes, they fill
+// So a community hole is listed if and only if it is shown, one of its
+// author's perAuthor newest shown, and fewer than that room of such holes,
+// anyone's, were published after it. However many holes an author publishes, they fill
 // perAuthor rows at most and push nobody else further down than that; the
 // rest are in Community. How many addresses an author holds, or what they
 // are, changes nothing but how many rows they fill.
@@ -318,7 +318,9 @@ const perAuthor = 3
 // It reads no more than it lists, near enough: authors, the latest to
 // publish first, each with their perAuthor newest holes, until the next
 // author's latest is older than every row it keeps — at most room+1 authors,
-// perAuthor keys each, however much anyone publishes.
+// perAuthor keys each, however much anyone publishes or the owner hides. A
+// hidden hole has no row in byAuthor, and an author with none shown no
+// author row: nothing hidden is walked.
 func listed() []*entry {
 	list := make([]*entry, 0, maxListed)
 	full := func() bool { return len(list) >= maxListed }
@@ -352,10 +354,6 @@ func listed() []*entry {
 		a := ak[13:] + " "
 		n := 0
 		byAuthor.ReverseIterate(a, a[:len(a)-1]+"!", func(k string, v any) bool {
-			if hidden.Has(a[:len(a)-1] + "/" + k[len(a)+13:]) {
-				n++ // taken off the lists (Hide), but walked: the walk stays bounded
-				return n == perAuthor
-			}
 			// "<address> <height> <slug>" -> "<height> <address>/<slug>"
 			key := k[len(a):len(a)+12] + " " + a[:len(a)-1] + "/" + k[len(a)+13:]
 			i := len(top)
@@ -401,8 +399,7 @@ const (
 // a visitor who has no account at all — the physics is the chain's either way.
 // Nothing is recorded until someone sends a real Launch.
 func Simulate(hole string, ballX, ballY, angle, power float64) string {
-	e := readHole(hole)
-	return simulateFrom(e, e.hole(), ballX, ballY, angle, power, 0, 0, Period())
+	return simulateFrom(hole, ballX, ballY, angle, power, 0, 0, Period())
 }
 
 // SimulateFrom previews one shot from an exact ball state, read-only: the
@@ -416,8 +413,7 @@ func SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, pe
 	notAhead(period)
 	validStroke(stroke)
 	angle, power, tick := parseShot(shot)
-	e := readHole(hole)
-	return simulateFrom(e, e.hole(), ballX, ballY, angle, power, stroke, tick, period)
+	return simulateFrom(hole, ballX, ballY, angle, power, stroke, tick, period)
 }
 
 func validStroke(stroke int) {
@@ -436,7 +432,10 @@ func onBoard(h course.Hole, x, y float64) physics.Vec2 {
 	return physics.Vec2{X: x, Y: y}
 }
 
-func simulateFrom(e *entry, h course.Hole, ballX, ballY, angle, power float64, stroke, tick int, period int64) string {
+// simulateFrom is Simulate and SimulateFrom: one shot on a hole, read-only.
+func simulateFrom(hole string, ballX, ballY, angle, power float64, stroke, tick int, period int64) string {
+	e := readHole(hole)
+	h := e.hole()
 	ball := onBoard(h, ballX, ballY)
 	angle, power = validShot(angle, power)
 	shot, holed := resolve(previewAt(h, ball, angle*math.Pi/180, power, stroke, tick, weatherOf(e, h, period).Zones))
@@ -444,10 +443,13 @@ func simulateFrom(e *entry, h course.Hole, ballX, ballY, angle, power float64, s
 	return "{" + versionJSON + `,"holed":` + strconv.FormatBool(holed) + `,"bounces":` + strconv.Itoa(shot.Bounces) + shotJSON(shot) + "}"
 }
 
-// shotJSON is a shot's path, air, cause and exact resting point.
+// shotJSON is a shot's path, air, cause, work and exact resting point. work
+// is Shot.Work, what the physics counted the stroke doing: a commit charges a
+// shot the larger of its path's estimate and work×workPerUnit, and so can a
+// client (see work).
 func shotJSON(shot physics.Shot) string {
 	return `,"path":[` + pathJSON(shot.Path) + `],"air":` + jstr(airOf(shot)) + `,"cause":` + jstr(string(shot.Cause)) +
-		`,"rest":` + jexact(shot.Rest())
+		`,"work":` + strconv.Itoa(shot.Work) + `,"rest":` + jexact(shot.Rest())
 }
 
 // SimulateRound replays a round from the tee, read-only, and returns its last
@@ -459,9 +461,7 @@ func shotJSON(shot physics.Shot) string {
 // gas of one shot. The rounded "ball" and path points are for drawing only:
 // after a bounce or two a rounding error is a different ball.
 func SimulateRound(hole string, shots string) string {
-	e := readHole(hole)
-	h := e.hole()
-	return simulateRound(e, h, h.Start(), 0, shots, Period())
+	return simulateRound(hole, nil, 0, shots, Period())
 }
 
 // SimulateRoundAt is SimulateRound in the weather of a given period — the one
@@ -469,9 +469,7 @@ func SimulateRound(hole string, shots string) string {
 // round's first stroke, it takes the current period or the one before.
 func SimulateRoundAt(hole string, shots string, period int64) string {
 	playablePeriod(period)
-	e := readHole(hole)
-	h := e.hole()
-	return simulateRound(e, h, h.Start(), 0, shots, period)
+	return simulateRound(hole, nil, 0, shots, period)
 }
 
 // SimulateRoundIn is SimulateRound in the weather of any period gone by: a
@@ -481,9 +479,7 @@ func SimulateRoundAt(hole string, shots string, period int64) string {
 // is not served.
 func SimulateRoundIn(hole string, shots string, period int64) string {
 	notAhead(period)
-	e := readHole(hole)
-	h := e.hole()
-	return simulateRound(e, h, h.Start(), 0, shots, period)
+	return simulateRound(hole, nil, 0, shots, period)
 }
 
 // SimulateCommit previews one commit of a round under way, read-only: the
@@ -502,12 +498,19 @@ func SimulateCommit(hole string, ballX, ballY float64, stroke int, shots string,
 		notOver(period)
 	}
 	validStroke(stroke)
-	e := readHole(hole)
-	h := e.hole()
-	return simulateRound(e, h, onBoard(h, ballX, ballY), stroke, shots, period)
+	return simulateRound(hole, &physics.Vec2{X: ballX, Y: ballY}, stroke, shots, period)
 }
 
-func simulateRound(e *entry, h course.Hole, ball physics.Vec2, strokes int, shots string, period int64) string {
+// simulateRound is the SimulateRound* and SimulateCommit replay, read-only:
+// shots on a hole from from (nil for its tee), the first of them stroke
+// number strokes, in the weather of period.
+func simulateRound(hole string, from *physics.Vec2, strokes int, shots string, period int64) string {
+	e := readHole(hole)
+	h := e.hole()
+	ball := h.Start()
+	if from != nil {
+		ball = onBoard(h, from.X, from.Y)
+	}
 	fc := weatherOf(e, h, period)
 	weather := fc.Zones
 	list := shotList(shots)
@@ -517,7 +520,7 @@ func simulateRound(e *entry, h course.Hole, ball physics.Vec2, strokes int, shot
 	var last physics.Shot
 	for _, s := range list {
 		if strokes >= maxRoundStrokes {
-			panic("golf: this round is over its stroke limit, Reset to play again")
+			panic(errStrokeLimit)
 		}
 		w.next(h)
 		angle, power, tick := parseShot(s)
@@ -783,12 +786,12 @@ func HoleLeaderboard(hole, mode string, offset, limit int) string {
 		`,"par":` + strconv.Itoa(e.par) + `,"players":` + strconv.Itoa(size) + `,"finished":` + strconv.Itoa(e.bests(m).Size()) +
 		`,"offset":` + strconv.Itoa(offset) + `,"rows":[`)
 	n := 0
-	board.IterateByOffset(offset, limit, func(_ string, v any) bool {
+	board.IterateByOffset(offset, limit, func(k string, v any) bool {
 		p := v.(string)
 		if !named(p) {
 			return false // a name deleted since
 		}
-		sb.WriteString(sep(n) + strokesRow(p, e.bests(m).Get(p).(int)))
+		sb.WriteString(sep(n) + strokesRow(p, boardStrokes(k)))
 		n++
 		return false
 	})

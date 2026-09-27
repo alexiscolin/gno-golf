@@ -263,7 +263,7 @@ func (f *Field) timedBars() []int {
 // hole's own walls, those that do not come and go): a ball inside a bar
 // leaves by the nearest side it can leave by without, and stays where it is
 // if there is none; any other push that would cross one is not made. A ball
-// left inside a post rolls out of it on the shot (Circle.Hit: a post never
+// left inside a post rolls out of it on the shot (Circle.hit: a post never
 // traps a ball).
 func UnstickIn(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec2 {
 	for i := 0; i+3 < len(walls); i += 4 {

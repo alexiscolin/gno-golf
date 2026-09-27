@@ -1,3 +1,5 @@
+import { isLoopback } from "./network";
+
 // The site's public address, for link cards, the canonical links and the
 // sitemap (all need absolute URLs). On Netlify it follows the site by itself:
 // a preview or branch deploy is at DEPLOY_PRIME_URL, production at URL (the
@@ -11,7 +13,7 @@ export const SITE = ((PREVIEW && process.env.DEPLOY_PRIME_URL) || process.env.NE
  *  local dev address. */
 export function siteURL(link = "") {
   const here = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/h\/.*$/, "/") : ""; // a hole's page (app/h) links from the site's root
-  const origin = /localhost|127\.0\.0\.1/.test(here) ? SITE : here.replace(/\/$/, "");
+  const origin = typeof window !== "undefined" && isLoopback(window.location.hostname) ? SITE : here.replace(/\/$/, "");
   return origin + (link ? "/" + link.replace(/^\/?/, "") : "");
 }
 /** The site's name as a player types it: gnogolf.xyz. */

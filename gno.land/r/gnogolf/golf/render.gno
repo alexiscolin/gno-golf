@@ -162,7 +162,7 @@ func renderHub() string {
 		if m > 0 {
 			sb.WriteString("<gno-columns-sep />\n")
 		}
-		sb.WriteString("### " + [modes]string{"Assisted", "Pro"}[m] + "\n\n")
+		sb.WriteString("### " + modeTitles[m] + "\n\n")
 		rows, i := "", 0
 		eachRanked(m, func(r *row, name string) {
 			i++
@@ -176,10 +176,15 @@ func renderHub() string {
 	}
 	sb.WriteString("</gno-columns>\n\n")
 
-	sb.WriteString("## Community holes\n\nAnyone can publish a hole of their own with PublishMine. These are not part of the course: they have no cup and do not count in its ranking.\n\n")
-	if len(others) == 0 {
+	sb.WriteString("## Community holes\n\nAnyone can publish a hole of their own with PublishMine while the owner keeps publishing open. These are not part of the course: they have no cup and do not count in its ranking.\n\n")
+	switch {
+	case len(others) > 0:
+	case publishing:
 		sb.WriteString("_None yet. Publish yours with " + md("PublishMine", hub+"$help&func=PublishMine") + "._\n")
-	} else {
+	default:
+		sb.WriteString("_None yet: publishing opens with the game's hole builder._\n")
+	}
+	if len(others) > 0 {
 		sb.WriteString("| hole | by | par | best | shots played |\n|---|---|---|---|---|\n")
 		for _, e := range others {
 			sb.WriteString("| " + md(e.name, hub+":"+e.slot) + " | " + md(short(e.by.String()), hub+":"+e.by.String()) + " | " + strconv.Itoa(e.par) + " | " + bestCell(e) + " | " +
@@ -294,7 +299,7 @@ func noAdmin() string {
 	}
 	return "\n> [!INFO]- Who can change what\n" +
 		"> Anyone can play (Launch, PlayRound, PlayRoundAt, PlayRoundPro), Reset their own round, " +
-		"publish holes of their own (PublishMine) and settle the ranking sooner (Drain). Nobody can edit or delete a round, a record, a best, a standing or a published version, " +
+		"publish holes of their own (PublishMine) while publishing is open, and settle the ranking sooner (Drain). Nobody can edit or delete a round, a record, a best, a standing or a published version, " +
 		"and nobody can pause or upgrade this realm. Every hole is data, played by golf's own physics: no hole runs code of its own. Check it yourself: " + md("the source", hub+"$source") + ".\n>\n" +
 		"> One party holds a real power: the course's owner, now " + holder + ". The owner publishes the course holes and their new versions (Publish). " +
 		"A new version takes its slot: the old one is archived, still playable, its records kept, but its bests leave the course-wide ranking, which the new version starts afresh. " +
@@ -304,6 +309,7 @@ func noAdmin() string {
 		"The owner also sets where the pages link the 3D game (SetPlayURL), and can name, once and for good, a successor this course has moved to (SetSuccessor): a banner, which blocks nothing. " +
 		"Whoever holds `" + strings.TrimPrefix(officialPrefix, "gno.land/") + "` can deploy lookalike realms under it. " +
 		"The owner can take a community hole off the lists (Hide: a scam or abuse in its name or note), and put it back; it stays playable, its page and data kept. " +
+		"The owner opens community publishing and can close it again (SetPublishing): closed, nobody adds a hole or a version, and every hole published plays on. " +
 		"The owner cannot edit or remove a version, change a community hole, the weather, the physics or this code, " +
 		"and can only hand the role on (Transfer, then Accept) or give it up for good (Renounce).\n"
 }
@@ -365,7 +371,7 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	if boardWork(f, h) > maxBoardWork {
 		s += "_This hole is too detailed to draw here: " + md("play it in 3D", playLink(e)) + "._\n\n"
 	} else {
-		b := board(e, h, f, focus)
+		b := board(e, h, f, mine)
 		leg, walls := legend(f)
 		s += "```\n" + b + "```\n\n"
 		s += key(b, walls) + leg + "\n\n"
@@ -404,16 +410,16 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	for m := 0; m < modes; m++ {
 		rows := ""
 		n := 0
-		e.board(m).Iterate("", "", func(_ string, v any) bool {
+		e.board(m).Iterate("", "", func(k string, v any) bool {
 			p := v.(string)
 			if name := nameOf(p); name != "" { // a name deleted since is skipped
 				n++
-				rows += ufmt.Sprintf("| %d | [@%s](%s:%s/%s) | %d |\n", n, name, hub, e.id, p, e.bests(m).Get(p).(int))
+				rows += ufmt.Sprintf("| %d | [@%s](%s:%s/%s) | %d |\n", n, name, hub, e.id, p, boardStrokes(k))
 			}
 			return n >= topSize
 		})
 		if rows != "" {
-			s += "### " + [modes]string{"Assisted", "Pro"}[m] + "\n\n| rank | player | strokes |\n|---|---|---|\n" + rows + "\n"
+			s += "### " + modeTitles[m] + "\n\n| rank | player | strokes |\n|---|---|---|\n" + rows + "\n"
 		}
 	}
 	return s + "\n_This hole is " + source(e) + " — read it before you trust it with a round._\n"
@@ -485,8 +491,9 @@ func renderData(e *entry) string {
 	return s + "```\n" + hex.EncodeToString([]byte(data)) + "\n```\n"
 }
 
-// board rasterises the hole: wear, then zones, posts, walls, cup, balls.
-func board(e *entry, h course.Hole, f *physics.Field, focus address) string {
+// board rasterises the hole: wear, then zones, posts, walls, cup, and mine,
+// the focused player's round (nil for none).
+func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 	bw, bh := course.BoardOf(h)
 	g := make([][]rune, bh)
 	wear := h.Wear()
@@ -509,8 +516,8 @@ func board(e *entry, h course.Hole, f *physics.Field, focus address) string {
 
 	// the focused player's last flight first, on the grass: pieces drawn after
 	// it stay visible (a mole in a gap was hidden under the dots)
-	if v := e.roundTree().Get(focus.String()); v != nil {
-		for _, p := range lastShot(e, h, v.(*round)).Path {
+	if mine != nil {
+		for _, p := range lastShot(e, h, mine).Path {
 			put(g, p, '·')
 		}
 	}
@@ -551,8 +558,8 @@ func board(e *entry, h course.Hole, f *physics.Field, focus address) string {
 	blankUnreachable(g, wall, f, h.Start(), h.Cup())
 
 	// only your own ball: everyone's at once would bury the board
-	if v := e.roundTree().Get(focus.String()); v != nil && !v.(*round).done {
-		put(g, v.(*round).ball(), '@')
+	if mine != nil && !mine.done {
+		put(g, mine.ball(), '@')
 	}
 
 	var sb strings.Builder

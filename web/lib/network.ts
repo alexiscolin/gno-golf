@@ -9,5 +9,15 @@ export const GNOT_URL = process.env.NEXT_PUBLIC_GNOT_URL || FAUCET;
 /** The other deployment's address ("" when there is none yet). */
 export const OTHER_URL = process.env.NEXT_PUBLIC_OTHER_URL || "";
 
+/** A host on this machine (a URL's hostname: "[::1]" keeps its brackets). */
+export const isLoopback = (host: string) => host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+/** A URL's hostname, "" when it is no URL. */
+export const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+};
 /** What the page is playing on, from its RPC: a node on this machine, or this build's network. */
-export const networkOf = (rpc: string): "local" | "testnet" | "mainnet" => (/\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(rpc) ? "local" : NETWORK);
+export const networkOf = (rpc: string): "local" | "testnet" | "mainnet" => (isLoopback(hostOf(rpc)) ? "local" : NETWORK);

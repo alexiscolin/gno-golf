@@ -151,8 +151,8 @@ try {
     await b.send("Page.navigate", { url: `${APP}/` });
     assert.ok(await until<boolean>(`!!document.querySelector('.btn--start')`, 100), "no title screen");
     await b.ev(`document.querySelector('.btn--start').click()`);
-    assert.ok(await until<boolean>(`!!document.querySelector('.podium__head .linkish')`, 50), "no top players on the cups screen");
-    await b.ev(`document.querySelector('.podium__head .linkish').click()`);
+    assert.ok(await until<boolean>(`!!document.querySelector('.podium__open')`, 50), "no top players on the cups screen");
+    await b.ev(`document.querySelector('.podium__open').click()`);
     const rows = await until<number>(`document.querySelectorAll('.lb--full ol:not(.lb__ghosts) > li:not(.lb__more)').length`, 40);
     assert.ok(rows > 0, "no board rows");
     return `${rows} rows`;
@@ -171,7 +171,7 @@ try {
     const podium = await b.ev<string>(`document.querySelector('.podium__row').textContent`);
     const name = (await chain.namesOf([player]))[0].name;
     assert.ok(!name || !podium.includes(name), `the flagged ${name} is on the podium`);
-    await b.ev(`document.querySelector('.podium__head .linkish').click()`);
+    await b.ev(`document.querySelector('.podium__open').click()`);
     assert.ok(await until<boolean>(`[...document.querySelectorAll('.lb--full .linkish')].some((x) => /hidden/.test(x.textContent))`, 40), "no \"Show all (… hidden)\" toggle");
     const shown = await b.ev<string>(`document.querySelector('.lb--full ol:not(.lb__ghosts)').textContent`);
     assert.ok(!name || !shown.includes(name), `the flagged ${name} is listed`);

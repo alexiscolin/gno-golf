@@ -49,7 +49,7 @@ async function shoot(/** @type {string} */ slot) {
   if (!(await ev(`!!(window.__g&&window.__g.farOrbit())`))) throw new Error(`${slot} did not load ${b.errors.slice(-2)}`);
   for (let i = 0; i < 30; i++) { await sleep(200); if (await ev(`window.__g.boardFrame().view === "ball" && !window.__g.cam?.gliding?.()`)) break; }
   const name = await js(`document.querySelector(".card--hole h1").textContent`);
-  const par = Number((await js(`document.querySelector(".card__par").textContent`)).replace(/\D/g, "")) || 3;
+  const par = Number(/\d+/.exec(await js(`document.querySelector(".card__par").textContent`))?.[0]) || 3; // "par 3 · last 4": the first number
   await js(`(() => { const s = document.createElement("style"); s.textContent = "#stage ~ *, nextjs-portal { display: none !important; }"; document.head.append(s); })()`);
   await ev(`window.__g.setCam("far")`);
   await sleep(2400);

@@ -9,6 +9,7 @@
 // without), and a reply that is not that shape is refused here, as the realm's
 // ("chain"), not left to fail somewhere in the scene.
 
+import { hostOf, isLoopback } from "./network";
 import type {
   Bests, CourseLeaderboard, Extras, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
   SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Weather,
@@ -31,10 +32,8 @@ export const RULES = {
   maxPower: 10,
   /** weather.gno PeriodSeconds, in ms: one weather's length */
   periodMs: 300e3,
-  /** golf.gno's work model (workBudget, workPerShot, workPerWall, workPerPoint, workPerPiece) */
-  work: { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3 },
-  /** golf.gno's measured gas of the forecast in a commit, at most (the rain on the lane holes) */
-  forecastGas: 170e6,
+  /** golf.gno's work model (workBudget, workPerShot, workPerWall, workPerPoint, workPerPiece, workPerUnit) */
+  work: { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3, unit: 1000 },
 } as const;
 
 // the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-golfer000/golf on
@@ -257,8 +256,19 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   const PARAMS_TTL = 10 * 60e3;
 
   /** The name registrar this chain runs, "" if none: pearl has r/sys/namereg/v1, a local gno and mainnet v0. */
+  // the chain's name registrar ("" when it has none): a registrar the chain
+  // doesn't know is its answer; a node not answering is thrown, not kept
+  const has = async (pkg: string) => {
+    try {
+      await vm(pkg, "IsPaused()");
+      return true;
+    } catch (e) {
+      if (errorKind(e) === "chain") return false;
+      throw e;
+    }
+  };
   const nameReg = memo(async () => {
-    for (const v of ["gno.land/r/sys/namereg/v1", "gno.land/r/sys/namereg/v0"]) if (await vm(v, "IsPaused()").then(() => true, () => false)) return v;
+    for (const v of ["gno.land/r/sys/namereg/v1", "gno.land/r/sys/namereg/v0"]) if (await has(v)) return v;
     return "";
   }, 3600e3);
   return {
@@ -438,24 +448,16 @@ export function safeEndpoint(given: string | null | undefined, fallback: string,
   if (!given || pinned) return fallback;
   try {
     const u = new URL(given);
-    const local = LOCAL.includes(u.hostname);
+    const local = isLoopback(u.hostname);
     const ok = local ? /^https?:$/.test(u.protocol) : u.protocol === "https:" && allowedHost(u.hostname);
     if (ok) return u.origin + u.pathname.replace(/\/$/, "");
   } catch {}
   return fallback;
 }
-const LOCAL = ["localhost", "127.0.0.1", "[::1]"];
 /** A built site on a public address plays its own chain only: a shared link's
  *  ?rpc= could otherwise send the wallet to a look-alike realm on another
  *  gno.land chain. The overrides are for dev builds and this machine. */
-const pinnedPage = () => process.env.NODE_ENV === "production" && typeof location !== "undefined" && !LOCAL.includes(location.hostname);
-const hostOf = (x: string) => {
-  try {
-    return new URL(x).hostname;
-  } catch {
-    return "";
-  }
-};
+const pinnedPage = () => process.env.NODE_ENV === "production" && typeof location !== "undefined" && !isLoopback(location.hostname);
 function allowedHost(h: string, extra = process.env.NEXT_PUBLIC_ALLOWED_HOSTS || "") {
   const list = [hostOf(process.env.NEXT_PUBLIC_RPC || ""), hostOf(process.env.NEXT_PUBLIC_WEB || ""), ...extra.split(",").map((x) => x.trim())].filter(Boolean);
   return h === "gno.land" || h.endsWith(".gno.land") || list.includes(h);

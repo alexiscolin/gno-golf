@@ -1,5 +1,6 @@
-// The scorecard: your best score on each hole, kept in this browser. It is a
-// player's own record of free play — the chain's record is the leaderboard.
+// The scorecard: your score on each hole, the latest round's, kept in this
+// browser: the player's own run of free play. The chain keeps the best, on
+// the leaderboard.
 import type { HoleRow } from "./types";
 
 /** A hole as the card reads it: a row of Holes(), or as much of one as is known. */
@@ -66,6 +67,26 @@ export const cardKey = (h: Pick<CardHole, "id" | "slot"> | null | undefined) => 
 /** A player's best on a hole, from the card. */
 export const scoreOf = (card: Card, h: Pick<CardHole, "id" | "slot">): number | undefined => card[cardKey(h)];
 
+// The card's scores that are on the chain too: the strokes a save put there,
+// per cardKey. A cell shows the seal while its score is that one (the latest
+// round replaced by another, it goes).
+const CHAIN_KEY = "gnogolf.onchain";
+/** The scores saved on-chain, per cardKey. */
+export function loadOnChain(): Card {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(CHAIN_KEY) || "{}");
+    return v && typeof v === "object" && !Array.isArray(v) ? migrate(v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+/** A score saved on-chain, kept. Returns them all. */
+export function markOnChain(key: string, strokes: number) {
+  const all = { ...loadOnChain(), [key]: strokes };
+  try { localStorage.setItem(CHAIN_KEY, JSON.stringify(all)); } catch {}
+  return all;
+}
+
 /** The card as version 1 kept it (by realm id) rewritten by slot, the lower
  *  score kept where two land on one slot; a key it cannot map stays as it is. */
 export function migrate(old: Record<string, unknown> | null | undefined) {
@@ -87,13 +108,13 @@ export function loadCard(): Card {
   }
 }
 
-/** Keeps the better of the old and new score, under the hole's cardKey.
+/** The latest round on a hole replaces the one before, under its cardKey.
  *  Returns the updated card. */
 export function recordScore(id: string, strokes: number | undefined) {
   const card = loadCard();
   // a score is a whole number of strokes; anything else is a bug upstream, not a score
   if (!id || strokes === undefined || !Number.isInteger(strokes) || strokes < 1) return (console.warn("gnogolf: no score recorded for", id, strokes), card);
-  if (!card[id] || strokes < card[id]) card[id] = strokes;
+  card[id] = strokes;
   return save(card);
 }
 
@@ -115,7 +136,7 @@ export function clearCup(ids: Iterable<string>) {
 }
 
 export function totals(card: Card, holes: readonly CardHole[]) {
-  let done = 0, strokes = 0, par = 0, aces = 0;
+  let done = 0, strokes = 0, par = 0, aces = 0, under = 0;
   for (const h of holes) {
     const sc = scoreOf(card, h);
     if (!sc) continue;
@@ -123,13 +144,14 @@ export function totals(card: Card, holes: readonly CardHole[]) {
     strokes += sc;
     par += parOf(h);
     if (sc === 1) aces++;
+    if (sc < parOf(h)) under++;
   }
-  return { done, strokes, par, aces, all: holes.length > 0 && done === holes.length };
+  return { done, strokes, par, aces, under, all: holes.length > 0 && done === holes.length };
 }
 
 // The cups a player can win, in order. A hole's cup is its world; "extras" is
 // not a cup.
-const CUPS = ["garden", "island", "town", "mountain"] as const;
+export const CUPS = ["garden", "island", "town", "mountain"] as const;
 export type Cup = (typeof CUPS)[number];
 
 /** A score against par as the game prints it: E, +3, −2 (a real minus sign). */
@@ -172,3 +194,46 @@ export type UnlockId = keyof typeof UNLOCKS;
 /** Whether finishing this cup at par or under earns a gnome (the Mountain Cup earns none). */
 export const cupHasGnome = (cup: string) => Object.values<Unlock>(UNLOCKS).some((u) => u.cup === cup);
 
+/** A course hole finished, as the badges read it: its strokes and par, Pro
+ *  aim or not, its weather (the forecast's kind, "" calm), moving pieces or
+ *  not, the cups after it, and every weather a hole was finished in. */
+export interface Finish {
+  strokes: number;
+  par: number;
+  pro: boolean;
+  kind: string;
+  timed: boolean;
+  cups: ReturnType<typeof cupTotals>;
+  weathers: readonly string[];
+}
+/** A badge: a moment to collect. family: its medal's colour; ok: earned by a
+ *  finish (none: given by a save, the chain's two). */
+export interface Badge {
+  id: string;
+  name: string;
+  need: string;
+  family: "skill" | "weather" | "chain" | "fun";
+  ok?: (f: Finish) => boolean;
+}
+/** The six weathers (the forecast's kinds; "" is the calm one). */
+export const WEATHERS = ["", "wind", "fog", "rain", "storm", "snow"] as const;
+// Badges, front-only as the gnomes, earned once and kept (lib/prefs.ts). In the
+// order they are said when several come at once: the rarest first.
+export const BADGES: readonly Badge[] = [
+  { id: "first", name: "Number one", need: "Take first place on a hole's board", family: "chain" },
+  { id: "perfect", name: "Perfect cup", need: "A whole cup, every hole under par", family: "skill", ok: (f) => CUPS.some((c) => f.cups[c].all && f.cups[c].under === f.cups[c].done) },
+  { id: "ace", name: "Hole in one", need: "Hole a ball in one stroke", family: "skill", ok: (f) => f.strokes === 1 },
+  { id: "weathers", name: "All weathers", need: "Finish a hole in all six weathers", family: "weather", ok: (f) => WEATHERS.every((k) => f.weathers.includes(k)) },
+  { id: "eagle", name: "Eagle eye", need: "Two under par on a hole", family: "skill", ok: (f) => f.strokes <= f.par - 2 },
+  { id: "pro", name: "Pro shot", need: "Under par with no aim line (Pro)", family: "skill", ok: (f) => f.pro && f.strokes < f.par },
+  { id: "clock", name: "Clockwork", need: "Par or better on a hole with moving pieces", family: "skill", ok: (f) => f.timed && f.strokes <= f.par },
+  { id: "storm", name: "Storm chaser", need: "Finish a hole in a storm", family: "weather", ok: (f) => f.kind === "storm" },
+  { id: "snow", name: "Snow day", need: "Finish a hole in the snow", family: "weather", ok: (f) => f.kind === "snow" },
+  { id: "fog", name: "Fog walker", need: "Par or better in the fog", family: "weather", ok: (f) => f.kind === "fog" && f.strokes <= f.par },
+  { id: "chain", name: "On the chain", need: "Save a round on-chain", family: "chain" },
+  { id: "snail", name: "Never give up", need: "Finish a hole in 15 strokes or more", family: "fun", ok: (f) => f.strokes >= 15 },
+];
+/** The badges a finish earns that are not earned yet, rarest first. */
+export const badgesFor = (f: Finish, had: readonly string[]) => BADGES.filter((b) => b.ok && !had.includes(b.id) && b.ok(f)).map((b) => b.id);
+/** Badge ids, rarest first (the order the win card says them in). */
+export const byRarity = (ids: readonly string[]) => BADGES.filter((b) => ids.includes(b.id)).map((b) => b.id);

@@ -196,7 +196,7 @@ test("stillsOnly: gnogolf.gfx=high overrides a measured-slow device", () => {
   assert.equal(stillsOnly(), false);
 });
 
-test("stillsOnly: a throwing check (no matchMedia at all) defaults to true", () => {
-  // matchMedia left undefined by beforeEach: calling it throws a ReferenceError
-  assert.equal(stillsOnly(), true);
+test("stillsOnly: no matchMedia to ask (lib/device.ts) says no reduced motion; the rest decides", () => {
+  // matchMedia left undefined by beforeEach
+  assert.equal(stillsOnly(), false);
 });

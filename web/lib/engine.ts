@@ -11,6 +11,7 @@
 // the frame loop, loading, the weather and the clock, input and the shot.
 
 import * as THREE from "three";
+import { isTouch, reducedMotion } from "./device";
 import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
@@ -143,7 +144,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     facing: Math.PI / 2, power: 0, aiming: false, holed: false, error: null,
     // the camera: "overview" frames the island, "ball" follows the gnome
     view: "overview", rig: null, over: null, started: false,
-    cam: "classic", shots: [], pts: [], rest: null,
+    cam: "classic", shots: [], pts: [], works: [], rest: null,
   };
   let closeIn: ReturnType<typeof setTimeout> | undefined;
   // the round's holing stroke, kept for the shot clip (api.clip)
@@ -224,12 +225,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       // what the realm's work model (golf.gno newWork) counts, for the save's
       // split and its gas: the walls of the hole and of its pulses, every
       // piece on the board (the hole's, its pulses' as if always there, the
-      // forecast's zones; a polygon's every edge), the forecast's kind, and
-      // each stroke's path length. A pulse is known from the strokes' extras.
+      // forecast's zones; a polygon's every edge), the forecast's kind, each
+      // stroke's path length and work, and what the realm says a commit spends
+      // before its shots. A pulse is known from the strokes' extras.
       walls: g.s ? g.s.walls.length + pulse.walls : 0,
       pieces: g.s ? g.s.walls.length + g.s.posts.length + piecesOf(g.s.zones) + piecesOf((g.forecast && g.forecast.zones) || []) + pulse.pieces : 0,
       kind: (g.forecast && g.forecast.kind) || "",
       pts: g.pts,
+      works: g.works,
+      fixed: (g.forecast && g.forecast.gas) || 0,
       shots: g.shots,
       flying: g.flying,
       aiming: g.aiming,
@@ -259,7 +263,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // thins the weather. "auto" picks low for a weak or software GPU, and for a
   // device whose frames were slow (the probe below: remembered for next time).
   let gfxMode: GfxMode = gfxOf(gfx), tier: Tier = "high";
-  const coarse = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+  const coarse = isTouch();
   const weakGpu = (() => {
     try {
       const gl = renderer.getContext(), x = gl.getExtension("WEBGL_debug_renderer_info");
@@ -407,7 +411,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       // at rest and while aiming the pieces move slowly enough to read and to
       // time (3.5 substeps a second, 1.5 with reduced motion); the replay
       // follows the path's own steps. The chain only sees the tick at release.
-      clock += elapsed * (reduced ? 1.5 : TICKS_PER_S);
+      // (kept within the pieces' period, as the tick sent is: past the 1,024
+      // ticks the chain counts, what is shown is what the ball meets)
+      const L = everyOf();
+      clock = (clock + elapsed * (reduced ? 1.5 : TICKS_PER_S)) % (L || Infinity);
       showClock(clock);
       // aiming at moving pieces: the dots follow them
       if (dragging && everyOf() && aimer.shows() && now - lastTickPreview > 250) (lastTickPreview = now), preview();
@@ -730,7 +737,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // there, so what is on screen when you shoot is what the ball meets. It
   // stops during a replay, where the path's own steps drive it.
   let clock = 0, lastTickPreview = 0;
-  const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced = reducedMotion();
   let everyL = 0; // the timed pieces' common period, kept per round
   const everyOf = () => everyL;
   const everyNow = () => {
@@ -770,7 +777,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.error = null;
     g.strokes = 0;
     g.shots = []; // the round's decisions: what a record replays
-    g.pts = []; // each stroke's path length, for the gas estimate
+    g.pts = []; // each stroke's path length and work, for the gas estimate
+    g.works = [];
     g.rest = null; // the ball exactly as the chain left it: where the next stroke is asked from
     won = null;
     g.facing = Math.PI / 2; // at rest he looks at the player
@@ -1070,6 +1078,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.lastAim = (angleDeg * Math.PI) / 180;
     g.shots = [...g.shots, one]; // a new list: what changed is seen by reference
     g.pts = [...g.pts, res.path.length];
+    g.works = [...g.works, res.work || 0];
     g.rest = res.rest;
     g.tick0 = tick || 0;
     if (res.holed) won = { path: res.path, air: res.air, cause: res.cause, angle: angleDeg }; // what the shot clip plays again
@@ -1416,6 +1425,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   };
   // the test hooks, only for a page that asks for them
   // (always there in the type: undefined unless the page asked for them)
-  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }) : {};
+  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }) : {};
   return Object.assign(api, hooked);
 }
