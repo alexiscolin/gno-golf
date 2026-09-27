@@ -1872,7 +1872,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
       <BackButton label="Back to the cups" onClick={onBack} />
       <AboutButton onClick={onAbout} />
       <div className="pick">
-        <span className="eyebrow">{hole ? `${hole} · pick your gnome` : "Pick your gnome"}</span>
+        <span className="eyebrow">{hole ? <>{hole}<span className="pick__ask"> · pick your gnome</span></> : "Pick your gnome"}</span>
         {dare && <p className="dare">{dare}</p>}
         <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">

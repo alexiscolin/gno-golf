@@ -1087,6 +1087,8 @@ html, body {
 
 .scorecard__total {
   display: flex;
+  flex-wrap: wrap; /* short of room, its links go to a line of their own, on the right */
+  row-gap: 4px;
   gap: 14px;
   justify-content: flex-end;
   font-size: 13px;
@@ -2194,8 +2196,14 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .screen__about { top: 30px; right: 30px; }
   .about__steps { grid-template-columns: 1fr; } .about__links { grid-template-columns: 1fr; }
   .rules li { grid-template-columns: 1fr; gap: 2px; }
-  /* on a phone the title's logo starts under the about button, not beside it */
+  /* on a phone the title's logo and the picker's head start under the corner buttons, not beside them
+     (the picker's head is a full-width pill: clear of their foot, 30px + 52) */
   .screen--title .title { padding-top: 52px; }
+  .screen--pick .pick { padding-top: 60px; }
+  /* and the picker's button clear of the network banner's row, as the title's */
+  body:has(.netbanner) .screen--pick { padding-bottom: 90px; }
+  /* the win card scrolls under its sticky buttons: a paper fade says there is more under them */
+  .banner--win .banner__row::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 14px; background: linear-gradient(rgba(var(--paper-rgb), 0), var(--paper)); pointer-events: none; }
   /* on a phone it joins the bottom row, left of the play buttons: a short word, no link (About has it) */
   .netbanner { height: 44px; padding: 0 8px; font-size: 11px; border-radius: 12px; }
   .netbanner b { font-size: 0; } .netbanner b::after { content: attr(data-short); font-size: 11px; }
