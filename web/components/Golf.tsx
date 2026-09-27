@@ -792,6 +792,9 @@ export default function Golf() {
   }, [holedNow]);
 
   // the round kept through a reload: saved from its own card, connecting first if need be
+  // a gnome just unlocked, met on the picker's stage (the cup's card, if open, goes)
+  const meet = (id: string) => (setCupWon(null), setGnome(id), setScreen("pick"));
+
   // the waiting round's card: the checklist first while a step is missing (no
   // wallet, too few GNOT, no name), which saves it from there; else at once
   const savePending = () => {
@@ -1088,7 +1091,7 @@ export default function Golf() {
                 <img className="adena__logo" src="adena.svg" alt="" width="34" height="34" />
                 <span className="adena__text">
                   <small>{account ? "Adena · connected" : "Adena"}</small>
-                  <b>{account ? short(account.address) : s && s.holed ? "Save on-chain" : "Connect"}</b>
+                  <b>{account ? short(account.address) : "Save on-chain"}</b>
                 </span>
               </button>
               {account && (
@@ -1273,11 +1276,7 @@ export default function Golf() {
               </p>
             )}
             <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} compact />
-            {fresh.length > 0 && (
-              <p className="note note--good">
-                New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b> — pick it from the menu.
-              </p>
-            )}
+            <Unlocked fresh={fresh} onMeet={meet} />
             <RecordState record={record} account={account} s={s} chain={game.current && game.current.chain} named={namedAs} />
             {(() => {
               // one note at a time, the one in the way first: the node, the funds, then the name
@@ -1369,6 +1368,7 @@ export default function Golf() {
             const first = s.holes[0];
             if (first) goTo(first.id);
           }}
+          onMeet={meet}
         />
       )}
 
@@ -2030,8 +2030,9 @@ interface VictoryProps {
   snapshot: () => Promise<Blob | null>;
   onBack: () => void;
   onReplay: () => void;
+  onMeet: (id: string) => void;
 }
-function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay }: VictoryProps) {
+function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay, onMeet }: VictoryProps) {
   const w = WORLDS.find((x) => x.id === cup) || WORLDS[0];
   const t = totals(card, holes), vs = t.strokes - t.par;
   const vsText = vs === 0 ? "level par" : vsPar(vs);
@@ -2052,11 +2053,7 @@ function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay }: 
           {t.aces > 0 && <span className="victory__stamp">{t.aces} hole{t.aces > 1 ? "s" : ""}-in-one</span>}
         </p>
         <Scorecard holes={holes} card={card} current={null} world={cup} compact />
-        {fresh.length > 0 && (
-          <p className="note note--good">
-            New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b> — pick it from the menu.
-          </p>
-        )}
+        <Unlocked fresh={fresh} onMeet={onMeet} />
         <Share text={text} link={cupLink(cup)} snapshot={snapshot} />
         <div className="banner__row">
           <Button variant="secondary" onClick={() => (sound("blip"), onReplay())}>Replay the cup</Button>
@@ -2064,6 +2061,22 @@ function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay }: 
         </div>
       </Dialog>
     </div>
+  );
+}
+
+/** Gnomes just unlocked: said, and each one a tap from the picker, shown there on its stage. */
+function Unlocked({ fresh, onMeet }: { fresh: readonly Skin[]; onMeet: (id: string) => void }) {
+  if (!fresh.length) return null;
+  return (
+    <p className="note note--good">
+      New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b>
+      {fresh.map((gn) => (
+        <span key={gn.id}>
+          {" · "}
+          <button className="linkish" onClick={() => (sound("select"), onMeet(gn.id))}>Meet {gn.name} →</button>
+        </span>
+      ))}
+    </p>
   );
 }
 
