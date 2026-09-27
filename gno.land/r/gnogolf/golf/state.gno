@@ -750,7 +750,7 @@ func HoleRank(hole, mode string, player address) string {
 	p := player.String()
 	rank, strokes := 0, 0
 	if v := e.bests(m).Get(p); v != nil {
-		strokes = v.(int)
+		strokes = bestStrokes(v)
 		if k := boardKey(strokes, p); e.board(m).Has(k) {
 			rank = e.board(m).index(k) + 1
 		}
@@ -847,7 +847,7 @@ func Bests(hole, mode, players string) string {
 	n := 0
 	for _, p := range friends(players) {
 		if v := e.bests(m).Get(p); v != nil {
-			sb.WriteString(sep(n) + strokesRow(p, v.(int)))
+			sb.WriteString(sep(n) + strokesRow(p, bestStrokes(v)))
 			n++
 		}
 	}
@@ -885,7 +885,7 @@ func Records(hole, mode, after string, limit int) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
 	next := page(e.bests(m).Iterate, after, limit, func(i int, p string, v any) {
-		sb.WriteString(sep(i) + strokesRow(p, v.(int)))
+		sb.WriteString(sep(i) + strokesRow(p, bestStrokes(v)))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()

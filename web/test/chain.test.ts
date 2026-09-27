@@ -452,6 +452,22 @@ test("holeRank reads one player's place on a hole", async () => {
   assert.equal((await chain.holeRank("garden/1", "assisted", ADDR1)).rank, 1);
 });
 
+test("ghost reads a best with its round, null for none, and never asks for a bad address", async () => {
+  const chain = makeChain();
+  const asked: string[] = [];
+  const GHOST = { version: 1, hole: "garden/1", mode: "pro", player: ADDR1, strokes: 2, period: 5912345, shots: "12.5000,6.2000,0;0.0000,1.0000,0" };
+  let reply: unknown = GHOST;
+  setFetch((url) => (asked.push(decoded(url).expr), qevalReply(reply)));
+  assert.deepEqual(await chain.ghost("garden/1", "pro", ADDR1), GHOST);
+  assert.match(asked[0], /Ghost\("garden\/1", "pro", address\("g1/);
+  reply = null;
+  assert.equal(await chain.ghost("garden/1", "pro", ADDR1), null);
+  reply = { ...GHOST, strokes: 0 };
+  await assert.rejects(chain.ghost("garden/1", "pro", ADDR1), "a best of 0 strokes is no best");
+  assert.equal(await chain.ghost("garden/1", "pro", 'g1") + x'), null);
+  assert.equal(asked.length, 3, "a bad address is never asked");
+});
+
 test("holeLeaderboard pages one hole's board", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply(HOLE_BOARD_REPLY));

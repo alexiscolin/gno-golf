@@ -108,8 +108,22 @@ func (e *entry) rec(m int) record {
 func (e *entry) roundTree() view { return view{rounds, e.id + " "} }
 
 // bests is the version's results in mode m: player address -> their best
-// finished round there, kept across replays.
+// finished round there, kept across replays, as bestOf writes it.
 func (e *entry) bests(m int) view { return view{bests, e.id + " " + modeNames[m] + " "} }
+
+// bestOf is how a best is kept: "<strokes> <period> <shots>", the round's
+// shots as played, so the best replays in its own weather (Ghost) for as long
+// as the realm stands. The mode is in the key.
+func bestOf(r *round) string {
+	return strconv.Itoa(r.strokes) + " " + strconv.FormatInt(r.period, 10) + " " + r.shots
+}
+
+// bestStrokes is a kept best's strokes.
+func bestStrokes(v any) int {
+	s := v.(string)
+	n, _ := strconv.Atoi(s[:strings.Index(s, " ")])
+	return n
+}
 
 // board is the version's board in mode m: boardKey(strokes, player) ->
 // player, the named players' bests, fewest strokes first.
@@ -485,7 +499,7 @@ func drain(n int) {
 				}
 				if d.fresh[m] == nil || !d.fresh[m].Has(p) {
 					if r := totals[m].Get(p); r != nil {
-						setRow(m, r.(*row), r.(*row).holes-1, r.(*row).strokes-v.(int))
+						setRow(m, r.(*row), r.(*row).holes-1, r.(*row).strokes-bestStrokes(v))
 					}
 				}
 				n--
@@ -941,14 +955,15 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 			e.best, e.bestBy = r.strokes, player
 		}
 	}
-	// a player's best stays theirs: replaying the hole never erases it
-	if v := e.bests(m).Get(p); v == nil || r.strokes < v.(int) {
+	// a player's best stays theirs: replaying the hole never erases it, and a
+	// tie keeps the older round, shots and all
+	if v := e.bests(m).Get(p); v == nil || r.strokes < bestStrokes(v) {
 		was := 0
 		if v != nil {
-			was = v.(int)
+			was = bestStrokes(v)
 			e.board(m).Remove(boardKey(was, p))
 		}
-		e.bests(m).Set(p, r.strokes)
+		e.bests(m).Set(p, bestOf(r))
 		if counts(e, m, p, was) {
 			improve(m, p, was, r.strokes)
 		} else if was == 0 && e.official && e.next != "" && !e.out.done[m] && p >= e.out.from[m] {
@@ -976,7 +991,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 // not it improved, so a player who took a name after their best ranks at
 // their next finish.
 func seat(e *entry, m int, p string) {
-	k := boardKey(e.bests(m).Get(p).(int), p)
+	k := boardKey(bestStrokes(e.bests(m).Get(p)), p)
 	if !e.board(m).Has(k) {
 		e.board(m).Set(k, p)
 	}

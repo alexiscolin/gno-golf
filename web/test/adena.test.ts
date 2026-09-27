@@ -695,8 +695,10 @@ test("gnokeyPlan: the title strips non-ASCII and is cut to 60 characters", () =>
 // ------------------------------------------------------- depositBytes/shortOf/costOf
 test("depositBytes: later saves are cheap; a first finish is dearer still on the whole course", () => {
   assert.equal(depositBytes(false), 300);
-  assert.equal(depositBytes(true), 3600);
-  assert.equal(depositBytes(true, true), 6000);
+  assert.equal(depositBytes(true), 3630);
+  assert.equal(depositBytes(true, true), 6030);
+  assert.equal(depositBytes(true, false, 12), 3630 + 276, "a first best keeps its shots");
+  assert.equal(depositBytes(false, false, 12), 300, "an improving best frees more than it writes");
 });
 
 test("shortOf: null balance is unknown; enough balance is 0 short; otherwise the gap in GNOT", () => {

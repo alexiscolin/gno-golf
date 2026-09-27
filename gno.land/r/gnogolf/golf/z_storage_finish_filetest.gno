@@ -35,6 +35,6 @@ func main(cur realm) {
 // holed in 1 strokes
 
 // Storage:
-// gno.land/r/gnogolf/golf: 27766
+// gno.land/r/gnogolf/golf: 27864
 // gno.land/r/sys/users: 0
 // gno.land/r/test/storedfinish: 0

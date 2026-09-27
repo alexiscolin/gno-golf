@@ -451,9 +451,10 @@ func roundSummary(e *entry, p address, r *round) string {
 	}
 	s := ufmt.Sprintf("> [!NOTE]\n> **%s holed it in %d** (par %d, %s), %s.\n>\n", who, r.strokes, e.par, vs, modeNames[r.mode])
 	b := e.board(r.mode)
-	switch v := e.bests(r.mode).Get(p.String()); {
-	case v != nil && b.Has(boardKey(v.(int), p.String())):
-		s += ufmt.Sprintf("> Best here: %d strokes, **#%d of %d** on the %s board.\n>\n", v.(int), b.index(boardKey(v.(int), p.String()))+1, b.Size(), modeNames[r.mode])
+	best := BestOf(e.id, modeNames[r.mode], p)
+	switch k := boardKey(best, p.String()); {
+	case best > 0 && b.Has(k):
+		s += ufmt.Sprintf("> Best here: %d strokes, **#%d of %d** on the %s board.\n>\n", best, b.index(k)+1, b.Size(), modeNames[r.mode])
 	case name == "":
 		s += "> Not on the board: only players with a gno.land name are ranked.\n>\n"
 	default:

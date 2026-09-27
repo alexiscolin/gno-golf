@@ -265,6 +265,16 @@ export interface HoleRank extends Versioned {
   strokes: number;
 }
 
+/** Ghost(): a player's best on a hole in a mode with its round ("angle,power,tick;…" in its period): what a duel races. */
+export interface Ghost extends Versioned {
+  hole: string;
+  mode: Mode;
+  player: string;
+  strokes: number;
+  period: number;
+  shots: string;
+}
+
 /** HoleLeaderboard(): a page of one hole's board. */
 export interface HoleLeaderboard extends Versioned {
   hole: string;

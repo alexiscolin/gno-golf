@@ -669,6 +669,18 @@ Each given player's course-wide standing, with the same list rules as
 The same as plain values: a player's best on a hole (0 if none), and their
 holes and strokes over the current course (0, 0 if none).
 
+#### `Ghost(hole, mode string, player address) string`
+
+A player's best on a hole in a mode with the round that made it, named or
+not, or `null`: what a duel races ([ADR-004](../adr/adr-004-duels.md)). A best
+keeps its period and shots from the save that set it; a worse round or a tie
+leaves them. It replays in its own weather however old: its first stroke with
+`SimulateRoundIn`, each later one with `SimulateFrom` from the `rest` before.
+
+```json
+{"version":1,"hole":"garden/3/v1","mode":"pro","player":"g1…","strokes":2,"period":5912345,"shots":"12.5000,6.2000,0;0.0000,1.0000,0"}
+```
+
 #### `Records(hole, mode, after string, limit int) string`
 
 A page of every player's best on a hole, named or not.
@@ -820,6 +832,8 @@ Measured on the course holes; treat them as orders of magnitude:
   in a filetest), a later player's first finish about 3.2 KB (1.9 KB on a
   further hole), at 50 players. The first stroke of a round stores about
   1.5 KB, a replay after `Reset` nothing. The decoded hole is never stored.
+  A best keeps its round for `Ghost`: about 30 bytes and 18 to 23 a stroke,
+  written only when it improves (a shorter best frees the longer one).
 - **Reads** are free as queries, within the node's query gas limit.
 
 ## Updating after the deploy

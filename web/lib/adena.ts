@@ -488,9 +488,11 @@ export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc, p
 // course finish (the dearest case: round, best, board and ranking rows), wrote
 // 3,258 bytes; a replay of a hole already saved replaces what is there (~0).
 // A player's very first finish in a mode also writes their course standing
-// and ranking rows: 5,404 bytes in the pearl rehearsal. Asked with about a
-// tenth more; the chain charges what is really written.
-export const depositBytes = (first: boolean, firstOnCourse = false) => (!first ? 300 : firstOnCourse ? 6000 : 3600);
+// and ranking rows: 5,404 bytes in the pearl rehearsal. A first best also
+// keeps its shots, the ghost a duel races (Ghost): about 30 bytes and 23 a
+// stroke more; an improving best is shorter than the one it frees. Asked with
+// about a tenth more; the chain charges what is really written.
+export const depositBytes = (first: boolean, firstOnCourse = false, strokes = 0) => (!first ? 300 : (firstOnCourse ? 6000 : 3600) + 30 + 23 * strokes);
 
 /** How much GNOT an account lacks to save a round (gas and deposit), 0 if it has enough; null if unknown. */
 export const shortOf = (gas: number, price: number, deposit: number, balance: number | null | undefined) =>

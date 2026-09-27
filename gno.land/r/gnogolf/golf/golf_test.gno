@@ -123,7 +123,7 @@ func TestRoundCountsStrokesAndFinishes(cur realm, t *testing.T) {
 
 	r = roundIn(count, player)
 	uassert.True(t, r.done, "a shot down the line should hole out")
-	uassert.Equal(t, 1, mustHole(count).bests(pro).Get(player.String()).(int), "the player's best is kept")
+	uassert.Equal(t, 1, bestStrokes(mustHole(count).bests(pro).Get(player.String())), "the player's best is kept")
 }
 
 // TestPlayRoundEqualsTheSameShotsOneByOne is what makes committing a whole hole
@@ -507,10 +507,52 @@ func TestOnlyNamedPlayersRank(cur realm, t *testing.T) {
 	id := courseHole(cur, 33)
 	testing.SetRealm(testing.NewUserRealm(stranger))
 	PlayRoundAt(cross(cur), id, "0,1", Period())
-	uassert.Equal(t, 1, mustHole(id).bests(assisted).Get(stranger.String()).(int), "the finish is kept")
+	uassert.Equal(t, 1, bestStrokes(mustHole(id).bests(assisted).Get(stranger.String())), "the finish is kept")
 	uassert.Equal(t, 0, mustHole(id).rec(assisted).best, "but holds no public record: records are named players' too")
 	uassert.False(t, strings.Contains(HoleLeaderboard(id, "assisted", 0, 100), stranger.String()), "not on the hole's board")
 	uassert.False(t, strings.Contains(Leaderboard("assisted"), stranger.String()), "not on the course's board")
 	uassert.True(t, strings.Contains(Bests(id, "assisted", " g1nobody, "+stranger.String()), `"player":"`+stranger.String()+`"`), "friends see it")
 	uassert.True(t, strings.Contains(Standings("assisted", stranger.String()), stranger.String()), "and its standing")
+}
+
+// replayAs plays a round afresh on a hole as p: Reset, then PlayRound.
+func replayAs(cur realm, p address, id, shots string) {
+	testing.SetRealm(testing.NewUserRealm(p))
+	Reset(cross(cur), id)
+	testing.SetRealm(testing.NewUserRealm(p))
+	PlayRound(cross(cur), id, shots)
+}
+
+// TestGhostKeepsTheBestRound: a best keeps its period and shots, a worse round
+// or a tie leaves them, a better one replaces them, and the best replays
+// stroke by stroke in its own period, long after, to the same strokes: what a
+// duel races.
+func TestGhostKeepsTheBestRound(cur realm, t *testing.T) {
+	id := mine(cur, "ghost", cupHole("garden", 1, "Ghost"))
+	racer := testutils.TestAddress("racer")
+	uassert.Equal(t, "null", Ghost(id, "assisted", racer), "no best, no ghost")
+	play := func(shots string) { replayAs(cur, racer, id, shots) }
+	play("0,0.001;0,1")
+	period := Period()
+	two := ufmt.Sprintf(`"strokes":2,"period":%d,"shots":"0.0000,0.0010,0;0.0000,1.0000,0"}`, period)
+	urequire.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), Ghost(id, "assisted", racer))
+	uassert.Equal(t, "null", Ghost(id, "pro", racer), "a best is kept in its own mode")
+
+	play("0,0.001;0,0.001;0,1")
+	play("0,0.002;0,1")
+	uassert.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), "a worse round and a tie leave the ghost: "+Ghost(id, "assisted", racer))
+	uassert.Equal(t, 2, BestOf(id, "assisted", racer))
+
+	// long after, the ghost replays in its own weather, one read a stroke
+	testing.SkipHeights(2000)
+	uassert.True(t, Period() > period+2, "the ghost's weather is over")
+	first := SimulateRoundIn(id, "0.0000,0.0010,0", period)
+	rest := strings.Split(strings.SplitN(first[strings.Index(first, `"rest":[`)+8:], "]", 2)[0], ",")
+	x, _ := strconv.ParseFloat(rest[0], 64)
+	y, _ := strconv.ParseFloat(rest[1], 64)
+	uassert.True(t, strings.Contains(SimulateFrom(id, x, y, "0.0000,1.0000,0", 1, period), `"holed":true`), "the ghost holes in its own strokes")
+
+	testing.SkipHeights(1)
+	play("0,1")
+	uassert.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), ufmt.Sprintf(`"strokes":1,"period":%d,"shots":"0.0000,1.0000,0"}`, Period())), "a better round is the ghost now")
 }
