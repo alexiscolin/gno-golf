@@ -16,16 +16,21 @@ export interface Caption {
   term?: string;
 }
 
-// the badge (app/icon.svg, the favicon): fetched once, drawn when it is in;
-// relative, as the game's other files, for a site served under a path
-let badge: HTMLImageElement | null = null;
+// the badge (app/icon.svg, the favicon; its PNG, apple-icon.png, where a
+// browser won't draw the SVG): fetched once, drawn when it is in; relative,
+// as the game's other files, for a site served under a path
+let badge: Promise<HTMLImageElement | null> | null = null;
+let drawn: HTMLImageElement | null = null;
+const fetchImg = (src: string) => {
+  const img = Object.assign(new Image(), { src });
+  return img.decode().then(() => (img.naturalWidth ? img : null), () => null);
+};
 /** The badge, loaded (null if it can't be: the cards go without it). */
 export function loadBadge(): Promise<HTMLImageElement | null> {
   if (typeof Image === "undefined") return Promise.resolve(null);
-  const img = (badge ||= Object.assign(new Image(), { src: "icon.svg" }));
-  return img.decode().then(() => img, () => null);
+  return (badge ||= fetchImg("icon.svg").then((img) => img || fetchImg("apple-icon.png")).then((img) => (drawn = img)));
 }
-const ready = () => (badge && badge.complete && badge.naturalWidth ? badge : null);
+const ready = () => drawn;
 
 /**
  * The card at the bottom: the badge, "Gnogolf" and the site's address on the
@@ -121,7 +126,7 @@ export function drawTerm(x: CanvasRenderingContext2D, W: number, H: number, term
   x.translate(W / 2, H * 0.42);
   x.scale(k, k);
   x.rotate(-0.04);
-  shout(x, term, Math.min(130, ((W * 0.78) / Math.max(term.length, 6)) * 1.9) * s, HAT);
+  shout(x, term, Math.min(190, ((W * 0.85) / Math.max(term.length, 5)) * 1.9) * s, HAT);
   x.restore();
 }
 
@@ -169,11 +174,11 @@ export function drawOutro(x: CanvasRenderingContext2D, W: number, H: number, a: 
   x.rotate(-0.03);
   shout(x, "Can you beat it?", 92 * s, GREEN); // green, as the logo's letters
   x.restore();
-  pill(x, W / 2, 475 * s, [[challenge.toUpperCase(), PAPER]], 30 * s, GREEN);
-  pill(x, W / 2, 575 * s, [["Play free at ", INK], [siteHost(), HAT]], 36 * s, PAPER);
+  pill(x, W / 2, 478 * s, [[challenge.toUpperCase(), PAPER]], 36 * s, GREEN);
+  pill(x, W / 2, 585 * s, [["Play free at ", INK], [siteHost(), HAT]], 44 * s, PAPER);
   x.fillStyle = INK;
   x.textAlign = "center";
-  x.font = `600 ${22 * s}px ${FONT}`;
-  x.fillText("Every shot computed by the chain on gno.land", W / 2, 650 * s);
+  x.font = `600 ${27 * s}px ${FONT}`;
+  x.fillText("Every shot computed by the chain on gno.land", W / 2, 668 * s);
   x.restore();
 }
