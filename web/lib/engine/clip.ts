@@ -17,7 +17,7 @@ import { makeRenderer, makeBall, gnomeById, makeConfetti, disposeCourse, overvie
 import { makeCauses } from "../scene/cause";
 import { BALL_R } from "../terrain";
 import { CLIP, clipWindow, skyStops } from "../clip";
-import { drawOutro } from "../brand";
+import { drawOutro, drawTerm } from "../brand";
 import { makeCamera } from "./camera";
 import { makeReplay, showMs } from "./replay";
 import type { LitScene } from "../scene/data";
@@ -40,6 +40,8 @@ export interface ClipOf {
   hide: () => readonly (THREE.Object3D | null | undefined)[];
   /** the score's card, painted over each frame */
   card: (x: CanvasRenderingContext2D, w: number, h: number) => void;
+  /** the result in words (Hole in one!), large once the ball is in */
+  term?: string;
 }
 /** How it is run: the format, a way to cancel it, its progress (0..1). */
 export interface ClipRun {
@@ -49,7 +51,7 @@ export interface ClipRun {
 }
 
 /** Records the clip: an MP4 Blob, or null (cancelled, the round gone, nothing recorded). */
-export function recordClip({ E, stroke, gnome, showClock, hide, card }: ClipOf, { mime, signal, progress = () => {} }: ClipRun): Promise<Blob | null> {
+export function recordClip({ E, stroke, gnome, showClock, hide, card, term }: ClipOf, { mime, signal, progress = () => {} }: ClipRun): Promise<Blob | null> {
   const { g, scene, ground } = E, s = g.s, round = g.round, { path } = stroke;
   if (!s || signal.aborted || path.length < 2) return Promise.resolve(null);
   // the clip's framing: the card's band at the bottom kept clear
@@ -121,8 +123,9 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card }: ClipOf, 
     x.fillRect(0, 0, W, H);
     x.drawImage(renderer.domElement, 0, 0);
     card(x, W, H);
-    // the closing card, after the confetti
+    // the result over the confetti, then the closing card
     const end = dropped ? now - dropped - CLIP.tail : -1;
+    if (dropped && term && end < 0) drawTerm(x, W, H, term, (now - dropped - CLIP.pop) / CLIP.fade);
     if (end >= 0) drawOutro(x, W, H, end / CLIP.fade);
   }
 

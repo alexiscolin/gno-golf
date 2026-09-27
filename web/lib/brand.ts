@@ -8,11 +8,12 @@ const INK = "#144134", INK_SOFT = "#4f7a6c", PAPER = "#fdf6e9", HAT = "#e0524b";
 const FONT = "Fredoka, ui-rounded, system-ui, sans-serif";
 
 /** What the card says of the hole, as its link card does: its cup, number and
- *  par over its name, and the score. */
+ *  par over its name, and the score; term, the clip's word for it (Birdie!). */
 export interface Caption {
   eyebrow: string;
   title: string;
   score: string;
+  term?: string;
 }
 
 // the badge (app/icon.svg, the favicon): fetched once, drawn when it is in;
@@ -62,6 +63,34 @@ export function drawCard(x: CanvasRenderingContext2D, W: number, H: number, { ey
   const room = x.measureText(score).width + 24;
   x.fillStyle = INK;
   x.fillText(title, w - 64 - room, -52);
+  x.restore();
+}
+
+/**
+ * The result, large over the course once the ball is in ("Triple bogey!"), as
+ * the card's own title: the hat's red, inked round. t (0..1) pops it in.
+ */
+export function drawTerm(x: CanvasRenderingContext2D, W: number, H: number, term: string, t: number) {
+  const p = Math.max(0, Math.min(1, t)), s = H / 720;
+  // an ease out that overshoots a little, then settles
+  const k = 1 + 2.2 * Math.pow(p - 1, 3) + 1.2 * Math.pow(p - 1, 2);
+  x.save();
+  x.globalAlpha = p;
+  x.translate(W / 2, H * 0.42);
+  x.scale(k, k);
+  x.rotate(-0.04);
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  x.font = `700 ${Math.min(140, (W * 0.85) / Math.max(term.length, 6) * 1.9) * s}px ${FONT}`;
+  x.lineJoin = "round";
+  x.lineWidth = 22 * s;
+  x.strokeStyle = PAPER;
+  x.strokeText(term, 0, 0);
+  x.lineWidth = 10 * s;
+  x.strokeStyle = INK;
+  x.strokeText(term, 0, 0);
+  x.fillStyle = HAT;
+  x.fillText(term, 0, 0);
   x.restore();
 }
 

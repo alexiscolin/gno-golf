@@ -1688,7 +1688,7 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
 /** The hole on the shared picture and clip, as its link card has it (media/og). */
 const caption = (s: Snapshot) => {
   const cup = s.place ? (WORLDS.find((w) => w.id === s.world) || WORLDS[0]).name : "Community hole", par = parHere(s);
-  return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: `${s.strokes} stroke${s.strokes > 1 ? "s" : ""}` };
+  return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: `${s.strokes} stroke${s.strokes > 1 ? "s" : ""}`, term: golfTerm(s.strokes, par).replace(/!?$/, "!") }; // the clip shouts it
 };
 
 /**

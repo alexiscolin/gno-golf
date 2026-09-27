@@ -1335,7 +1335,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       const stroke = won;
       if (!stroke || !g.s) return Promise.resolve(null);
       const hide = () => [ball, aim, band, confetti && confetti.group, cam.marker];
-      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6) }, run));
+      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term }, run));
     },
     /** Dismiss a shot error and keep playing. */
     clearError() {
