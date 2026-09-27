@@ -41,7 +41,7 @@ const F = (beat) => Math.round(beat * BEAT * FPS); // a beat's frame
 
 const burst = (n, r0, r1, cx = 100, cy = 100) =>
   Array.from({ length: n * 2 }, (_, i) => {
-    const a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2, r = i % 2 ? r0 : r1;
+    const a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2, r = i % 2 ? r1 : r0; // a dip at the top: the hat's tip stands clear, no ray behind it
     return `${(cx + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`;
   }).join(" ");
 // the title screen's own logo (components/Title.tsx), with its classes (app/globals.css): keep the two alike
@@ -63,6 +63,7 @@ const LOGO = (w = 900) => `<svg class="logo" style="width:${w}px" viewBox="0 0 6
 <clipPath id="clip-hat"><use href="#gnome-hat" /></clipPath>
 <clipPath id="clip-brim"><use href="#gnome-brim" /></clipPath>
 <clipPath id="clip-face"><use href="#gnome-face" /></clipPath>
+<clipPath id="clip-ball"><circle cx="300" cy="462" r="17" /></clipPath>
 <clipPath id="clip-beard"><use href="#gnome-beard" /></clipPath>
 </defs>
 <text class="title__word">
@@ -72,15 +73,29 @@ const LOGO = (w = 900) => `<svg class="logo" style="width:${w}px" viewBox="0 0 6
 <g transform="rotate(-44 300 330)">
 <rect x="293" y="118" width="14" height="360" rx="7" class="title__shaft" />
 <rect x="289" y="118" width="22" height="62" rx="9" class="title__grip" />
-<path d="M 283 470 L 343 470 Q 355 470 355 482 L 355 492 Q 355 500 345 500 L 283 500 Z" class="title__head" />
-<path d="M 289 478 H 340" class="title__glint" />
+<path d="M 293 460 L 307 460 L 311 477 L 348 466 Q 362 462 362 474 L 361 489 Q 359 499 348 499 L 299 500 Q 290 500 291 491 Z" class="title__head" />
+<rect x="316" y="480" width="34" height="2.6" rx="1.3" class="title__grip" />
+<rect x="314" y="486" width="38" height="2.6" rx="1.3" class="title__grip" />
+<rect x="312" y="492" width="40" height="2.6" rx="1.3" class="title__grip" />
 </g>
 <g transform="rotate(44 300 330)">
 <rect x="293" y="118" width="14" height="360" rx="7" class="title__shaft" />
 <rect x="289" y="118" width="22" height="62" rx="9" class="title__grip" />
-<path d="M 317 470 L 257 470 Q 245 470 245 482 L 245 492 Q 245 500 255 500 L 317 500 Z" class="title__head" />
-<path d="M 311 478 H 260" class="title__glint" />
+<g transform="translate(600 0) scale(-1 1)">
+<path d="M 293 460 L 307 460 L 311 477 L 348 466 Q 362 462 362 474 L 361 489 Q 359 499 348 499 L 299 500 Q 290 500 291 491 Z" class="title__head" />
+<rect x="316" y="480" width="34" height="2.6" rx="1.3" class="title__grip" />
+<rect x="314" y="486" width="38" height="2.6" rx="1.3" class="title__grip" />
+<rect x="312" y="492" width="40" height="2.6" rx="1.3" class="title__grip" />
 </g>
+</g>
+</g>
+<g transform="translate(0 5)">
+<path d="M 288 476 Q 300 483 312 476 L 305 483 L 302 496 Q 300 500 298 496 L 295 483 Z" class="title__hat title__inked" />
+<circle cx="300" cy="462" r="17" class="title__beard title__inked" />
+<path d="M 305 441 A 21 21 0 0 1 305 483 A 13 21 0 0 0 305 441 Z" clip-path="url(#clip-ball)" class="title__beardshade" />
+<circle cx="292" cy="457" r="2.2" class="title__beardshade" />
+<circle cx="301" cy="453" r="2.2" class="title__beardshade" />
+<circle cx="296" cy="465" r="2.2" class="title__beardshade" />
 </g>
 <g transform="translate(300 298) scale(1.25) translate(-100 -110)">
 <use href="#badge" y="8" class="title__outline" />

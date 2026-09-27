@@ -595,6 +595,7 @@ html, body {
 .title__hatink { fill: var(--hat-ink); }         /* the hat's deepest shade: the brim's shadow side, the cone's far edge */
 .title__faceshade { fill: #f2e2cc; }             /* the brim's shadow on the face, a warm tone under --paper */
 .title__glint { fill: none; stroke: var(--paper); stroke-width: 6; stroke-linecap: round; opacity: .85; }
+.title__inked { stroke: var(--ink); stroke-width: 5; stroke-linejoin: round; } /* an ink edge on a fill class: the ball (.title__beard), the tee (.title__hat) */
 
 .pick__name {
   margin: 4px 0 0;
