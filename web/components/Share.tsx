@@ -35,15 +35,8 @@ const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && t
 
 export default function Share({ text, snapshot, link = "", clip = null }: ShareProps) {
   const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState(false); // the clip just downloaded for X: said under the buttons
-  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the notes' timer, cleared if the card goes first
+  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the card goes first
   useEffect(() => () => clearTimeout(copiedT.current), []);
-  /** Says one of the notes for a moment. */
-  const flash = (set: (on: boolean) => void, ms: number) => {
-    set(true);
-    clearTimeout(copiedT.current);
-    copiedT.current = setTimeout(() => set(false), ms);
-  };
   // this hole, this cup, this gnome, at the game's public address
   const url = siteURL(link);
   const phone = onPhone();
@@ -70,16 +63,17 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
     sound("blip");
     try {
       await navigator.clipboard.writeText(pasted(text, url));
-      flash(setCopied, 1800);
+      setCopied(true);
+      clearTimeout(copiedT.current);
+      copiedT.current = setTimeout(() => setCopied(false), 1800);
     } catch {}
   };
   const links = shareLinks(text, url);
   return (
     <span className="share" role="group" aria-label="Share">
-      <span className="share__label">{clip ? "Share the clip" : "Share"}</span>
+      <span className="share__label">Share</span>
       {links.map(([name, href]) => (
-        // X takes no file from a page: with a clip, its post opens and the clip downloads, to drop in
-        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name === "X" && clip && !phone ? "X: the clip downloads, drop it into the post" : name} onClick={() => (sound("blip"), name === "X" && clip && !phone && (save(clip), flash(setSaved, 6000)))}>
+        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name} onClick={() => sound("blip")}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d={GLYPH[name]} /></svg>
         </a>
       ))}
@@ -91,7 +85,6 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
           <svg viewBox="0 0 24 24" aria-hidden="true" className="share__stroke"><path d="M12 3v12M7 8l5-5 5 5M5 13v6h14v-6" /></svg>
         </button>
       )}
-      {saved && <span className="share__note" role="status">Clip saved: drop it into your post</span>}
     </span>
   );
 }
@@ -109,11 +102,6 @@ interface ClipProps {
   /** the clip once made, null when gone: the share buttons send it */
   onClip: (clip: Clip | null) => void;
 }
-/** Saves the clip as a download. */
-function save(clip: Clip) {
-  Object.assign(document.createElement("a"), { href: clip.url, download: clip.file.name }).click();
-}
-
 /** The shot as a clip (ADR-003; NEXT_PUBLIC_CLIPS): made once the hole is
  *  won and looped in the card, with a download in its corner; the share
  *  buttons above send it (the phone's sheet as a file, X as a download to
@@ -174,12 +162,21 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
               </button>
             )}
-            <a className="clip__save" href={clip.url} download={clip.file.name} aria-label="Download the clip" title="Download the clip" onClick={() => sound("blip")}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
-            </a>
           </>
         )}
       </div>
+      {clip && (
+        <div className="clip__get">
+          <a className="btn btn--main" href={clip.url} download={clip.file.name} onClick={() => sound("blip")}>
+            <svg className="btn__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Download your clip
+          </a>
+          <p className="clip__why">
+            <b>Show them the shot!</b> A video gets way more views than a link:{" "}
+            {onPhone() ? "send it with the share button above, or save it for your stories." : "drop it into your post on X, Discord or anywhere."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
