@@ -81,7 +81,7 @@ export function drawTerm(x: CanvasRenderingContext2D, W: number, H: number, term
   x.rotate(-0.04);
   x.textAlign = "center";
   x.textBaseline = "middle";
-  x.font = `700 ${Math.min(140, (W * 0.85) / Math.max(term.length, 6) * 1.9) * s}px ${FONT}`;
+  x.font = `700 ${Math.min(104, (W * 0.6) / Math.max(term.length, 6) * 1.9) * s}px ${FONT}`;
   x.lineJoin = "round";
   x.lineWidth = 22 * s;
   x.strokeStyle = PAPER;

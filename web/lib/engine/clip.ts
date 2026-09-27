@@ -99,9 +99,22 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term }: Cl
   const sky = x.createLinearGradient(0, 0, 0, H);
   for (const [k, c] of skyStops(getComputedStyle(document.querySelector(".sky") || document.body).backgroundImage)) sky.addColorStop(k, c);
 
-  let confetti: Confetti | null = null, dropped = 0; // dropped: when the ball went in (performance.now)
+  let confetti: Confetti | null = null, dropped = 0, t0 = 0; // when the ball went in, when the clip began (performance.now)
+  // a camera with some life, over the player's own framing: a slow swing round
+  // the point it looks at, closing in as the stroke goes, a punch in on the drop
+  const UP = new THREE.Vector3(0, 1, 0), fwd = new THREE.Vector3(), look = new THREE.Vector3(), rel = new THREE.Vector3();
+  function lively(now: number) {
+    const t = t0 ? (now - t0) / 1000 : 0, drop = dropped ? Math.min(1, (now - dropped) / 450) : 0;
+    camera.getWorldDirection(fwd);
+    look.copy(camera.position).addScaledVector(fwd, camera.position.distanceTo(ball.position));
+    const k = 1 - 0.14 * Math.min(1, (t * 1000) / win.length) - 0.12 * Math.sin((drop * Math.PI) / 2);
+    rel.copy(camera.position).sub(look).applyAxisAngle(UP, 0.3 * Math.sin(t * 0.75)).multiplyScalar(k);
+    camera.position.copy(look).add(rel);
+    camera.lookAt(look);
+  }
   function draw(dt: number, now: number) {
     cam.update(dt);
+    lively(now);
     causes.tick(now / 1000);
     if (confetti) confetti.step(dt);
     // his shadow on the ground under him, whatever he is doing above it
@@ -132,7 +145,7 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term }: Cl
   return new Promise<Blob | null>((resolve) => {
     const stream = out.captureStream(FPS);
     const chunks: Blob[] = [];
-    let rec: MediaRecorder | null = null, raf = 0, t0 = 0, last = 0, played = false, told = -1, over = false;
+    let rec: MediaRecorder | null = null, raf = 0, last = 0, played = false, told = -1, over = false;
     const finish = (keep: boolean) => {
       if (over) return;
       over = true;

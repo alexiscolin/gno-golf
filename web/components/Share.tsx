@@ -86,6 +86,12 @@ interface ClipProps {
   /** the file's name (lib/clip.ts clipName) */
   name: string;
 }
+/** Saves the clip as a download (X opens beside it: the player drops it in). */
+function save(clip: { url: string; file: File }) {
+  const a = Object.assign(document.createElement("a"), { href: clip.url, download: clip.file.name });
+  a.click();
+}
+
 /** The shot as a clip (ADR-003; NEXT_PUBLIC_CLIPS): made once the hole is
  *  won, looped in the card above its buttons, and shared as a file — the
  *  phone's sheet, or a download and a post on X the player adds it to. Only
@@ -166,13 +172,13 @@ export function ShareClip({ make, text, link = "", name }: ClipProps) {
             Download clip
           </a>
           {!sheet && (
-            <a className="btn btn--ghost" target="_blank" rel="noopener noreferrer" href={Object.fromEntries(shareLinks(text, url)).X} onClick={() => sound("blip")}>
+            <a className="btn btn--ghost" target="_blank" rel="noopener noreferrer" href={Object.fromEntries(shareLinks(text, url)).X} onClick={() => (sound("blip"), save(clip))}>
               <svg className="btn__mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={GLYPH.X} /></svg> Post on X
             </a>
           )}
         </div>
       )}
-      {clip && !sheet && <p className="clip__hint">Download it, then add it to your post.</p>}
+      {clip && !sheet && <p className="clip__hint">X can&apos;t take the clip from a page: Post on X saves it too, drop it into your post.</p>}
     </div>
   );
 }
