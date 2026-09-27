@@ -1611,7 +1611,7 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
           <li className={step(2)}>
             <b>{main ? "Have some GNOT" : "Get test GNOT"}</b>
             <span>
-              {local ? "From the node's test1 account, with gnokey." : main ? "Buy or receive some, for the fee." : "Free, from the faucet."}
+              {local ? "They pay each save's small fee: from the node's test1, with gnokey." : main ? "They pay each save's small fee: buy or receive some." : "They pay each save's small fee: free from the faucet."}
               {account && now === 2 && (
                 <>
                   {" "}
