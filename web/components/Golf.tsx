@@ -482,6 +482,7 @@ export default function Golf() {
   useEffect(() => setNamedAs(""), [holeNow]);
   // the name typed on the win card, taken with the save (null: none, or not one the chain would take)
   const [saveName, setSaveName] = useState<string | null>(null);
+  const [nameReady, setNameReady] = useState(true); // no name typed, or one checked: the save may go
   const saving = useRef(false); // a save under way: a second click starts no second one
   // the round kept through a reload (PENDING), and how its save goes
   const [pending, setPending] = useState<SaveOf | null>(null);
@@ -1244,7 +1245,7 @@ export default function Golf() {
                 return canSave ? (
                   // while it can be saved, the name goes in the save's own signature
                   <NameForm chain={chain} account={account.address} chainId={chainId} price={gasPrice} onNamed={(n) => (setNamedAs(n), nudge.named())}
-                    onPick={setSaveName} suggest={suggestName(gnome)} lead={nudge.at ? `Your name at #${nudge.at} on the board` : "Your name on the board"} />
+                    onPick={(n, ok) => (setSaveName(n), setNameReady(ok))} suggest={suggestName(gnome)} lead={nudge.at ? `Your name at #${nudge.at} on the board` : "Your name on the board"} />
                 ) : (
                   <NameForm chain={chain} account={account.address} chainId={chainId} price={gasPrice} onNamed={(n) => (setNamedAs(n), nudge.named())}
                     lead={onChain ? "Saved! Now put it on the board" : "Get on the board"} />
@@ -1264,7 +1265,7 @@ export default function Golf() {
                 </Button>
               )}
               {canSave && (
-                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={record?.at === "signing"} data-autofocus onClick={() => void recordIt()}>
+                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={record?.at === "signing" || (nudge.noName && !nameReady)} data-autofocus onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record?.at === "signing" ? (
                     record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`

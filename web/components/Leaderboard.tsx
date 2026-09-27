@@ -553,10 +553,12 @@ export function NameLink({ chain, children }: { chain: Chain | null; children: R
  * checked as it is typed out, then one transaction in Adena. The boards list
  * named players only, so this comes before the save that should rank.
  * onPick: the field alone, part of the save below it (the name goes in the
- * save's own signature): each name typed that the chain would take is
- * handed up, null otherwise; suggest fills it to start with.
+ * save's own signature): a name the chain would take is handed up, else
+ * null, with ready: whether the save may go (a name checked, or none typed:
+ * no name), never while a typed one is wrong or still being checked; suggest
+ * fills it to start with.
  */
-export function NameForm({ chain, account, chainId, price, lead, onNamed, onPick, suggest = "" }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; onPick?: (name: string | null) => void; suggest?: string }) {
+export function NameForm({ chain, account, chainId, price, lead, onNamed, onPick, suggest = "" }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; onPick?: (name: string | null, ready: boolean) => void; suggest?: string }) {
   const [stem, setStem] = useState(suggest); // what follows "nym-"
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -580,13 +582,13 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, onPick
   pick.current = onPick;
   useEffect(() => {
     if (!pick.current) return;
-    pick.current(null);
     setErr(null);
+    pick.current(null, !stem); // none typed: the save goes with no name
     if (hint) return;
     let live = true;
-    const t = setTimeout(() => void chain.nameProblem(name).then((why) => live && (setErr(why || null), pick.current?.(why ? null : name)), () => {}), 400);
+    const t = setTimeout(() => void chain.nameProblem(name).then((why) => live && (setErr(why || null), pick.current?.(why ? null : name, !why)), () => {}), 400);
     return () => ((live = false), clearTimeout(t));
-  }, [chain, name, hint]);
+  }, [chain, name, hint, stem]);
   const take = async (e: FormEvent) => {
     e.preventDefault();
     if (hint) return;
@@ -611,19 +613,22 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, onPick
     }
   };
   if (done) return <p className="note note--good">You are <b>{done}</b> now: save your round to take your place.</p>;
+  const bad = !!stem && !!(hint || err); // a name typed that the chain would not take
   return (
     <form className="nameform" onSubmit={(e) => void (onPick ? e.preventDefault() : take(e))}>
       <b className="nameform__title">{lead}</b>
       <span className="nameform__why">{onPick ? "Only named players are ranked. It's taken once, with this save: same signature." : "Only named players are ranked. Take yours once: one signature."}</span>
       <span className="nameform__row">
-        <label className="nameform__field">
+        <label className={"nameform__field" + (bad ? " nameform__field--bad" : "")}>
           <span aria-hidden="true">nym-</span>
           <input value={stem} onChange={(e) => setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim())} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
         </label>
         {!onPick && <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint}>{busy ? "Adena…" : "Get this name"}</Button>}
       </span>
-      <small className={hint ? "" : "nameform__ok"} aria-live="polite">{hint ? `nym-… ${hint}` : err ? "" : `✓ ${name}`} · <NameLink chain={chain}>names on gno.land ↗</NameLink></small>
-      {err && <small className="nameform__err" role="alert">{err}</small>}
+      <small className={bad ? "nameform__err" : hint ? "" : "nameform__ok"} aria-live="polite">
+        {onPick && !stem ? "No name: this round is saved, not ranked." : hint ? `✗ nym-… ${hint}` : err ? `✗ ${err}` : `✓ ${name}`}
+        {bad && onPick ? " Fix it, or clear it to save without a name." : ""} · <NameLink chain={chain}>names on gno.land ↗</NameLink>
+      </small>
     </form>
   );
 }
