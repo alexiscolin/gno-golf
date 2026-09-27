@@ -1235,7 +1235,7 @@ export default function Golf() {
                 ) : short && funds != null ? (
                   <>
                     {funds === 0 ? "Your Adena account has no GNOT here yet." : `You need about ${short.toFixed(2)} more GNOT.`}{" "}
-                    {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : chainId === MAINNET ? account && <GetGnot address={account.address} href={GNOT_URL} label="How to get GNOT ↗" /> : account && <GetGnot address={account.address} />}
+                    {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : account && <GetGnot address={account.address} href={chainId === MAINNET ? GNOT_URL : FAUCET} label={`Get ${chainId === MAINNET ? "" : "free test "}GNOT (${chainId}) ↗`} />}
                   </>
                 ) : null;
               // (once saved, the saved line says the name too)
@@ -1613,11 +1613,11 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
           <li className={step(2)}>
             <b>{main ? "Have some GNOT" : "Get test GNOT"}</b>
             <span>
-              {local ? "They pay each save's small fee: from the node's test1, with gnokey." : main ? "They pay each save's small fee: buy or receive some." : "They pay each save's small fee: free from the faucet."}
+              {local ? "They pay each save's small fee: from the node's test1, with gnokey." : <>They pay each save&apos;s small fee: {main ? "a little from the faucet hub, or bought" : "free from the faucet hub"}{chainName && <>, choose <b>{chainName}</b> in its list</>}.</>}
               {account && now === 2 && (
                 <>
                   {" "}
-                  {local ? null : main ? <GetGnot address={account.address} href={GNOT_URL} label="How to get GNOT ↗" /> : <GetGnot address={account.address} href="" />}
+                  {local ? null : <GetGnot address={account.address} href="" />}
                 </>
               )}
               {account && funds != null && <> · You have {(funds / 1e6).toFixed(2)} GNOT.</>}
@@ -1658,8 +1658,8 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
             <Button variant="primary" className="btn--wide" onClick={() => void navigator.clipboard.writeText(fundCmd(account.address, chainName, rpc || "")).then(() => setSent(true), () => {})}>
               {sent ? "Copied: run it in a terminal ✓" : "Copy the gnokey command"}
             </Button>
-          ) : now === 2 && (!main || GNOT_URL) ? (
-            <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "How to get GNOT ↗" : "Get free test GNOT ↗"}</a>
+          ) : now === 2 ? (
+            <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (
             <Button variant="primary" className="btn--wide" onClick={onSave}>Save this round</Button>
           ) : (
