@@ -793,7 +793,12 @@ export default function Golf() {
 
   // the round kept through a reload: saved from its own card, connecting first if need be
   // a gnome just unlocked, met on the picker's stage (the cup's card, if open, goes)
-  const meet = (id: string) => (setCupWon(null), setGnome(id), setScreen("pick"));
+  const meet = (id: string) => (setCupWon(null), choose(id), setScreen("pick"));
+  // into a cup: its first hole set, then the gnome, the last one played already picked
+  const enterCup = (w: string) => {
+    game.current && game.current.setWorld(w);
+    setScreen("pick");
+  };
 
   // the waiting round's card: the checklist first while a step is missing (no
   // wallet, too few GNOT, no name), which saves it from there; else at once
@@ -940,6 +945,7 @@ export default function Golf() {
   }, [holeId, holeReady, curtain]);
 
   const holed = s && s.holed;
+  const nextAfter = cupWon && s ? nextCup(cupWon.cup, s.worlds) : ""; // the cup after the one just complete
   // the hole the gnome picker leads to (a shared link's, or the cup's first), named over the gnomes
   const linked = s && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
   // The address bar follows the screen: the title is the bare page, the cups
@@ -1040,10 +1046,7 @@ export default function Golf() {
             if (game.current) void game.current.load(id);
             setScreen("pick");
           }}
-          onPick={(w) => {
-            game.current && game.current.setWorld(w);
-            setScreen("pick"); // then the gnome, the last one played already picked
-          }}
+          onPick={enterCup}
         />
       )}
       {screen === "pick" && <Picker world={(s && s.world) || "garden"} hole={linked} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
@@ -1368,7 +1371,15 @@ export default function Golf() {
             const first = s.holes[0];
             if (first) goTo(first.id);
           }}
-          onMeet={meet}
+          next={nextAfter}
+          // on to the next cup (after the last, its first hole again), the new gnome picked when there is one
+          onNext={(id) => {
+            setCupWon(null);
+            if (id) choose(id);
+            if (nextAfter) return enterCup(nextAfter);
+            if (s.holes[0]) goTo(s.holes[0].id);
+            setScreen("pick");
+          }}
         />
       )}
 
@@ -1777,12 +1788,11 @@ interface PickerProps {
   aim: Mode;
   onAim: (m: Mode) => void;
 }
-function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, aim, onAim, hole = "" }: PickerProps) {
-  const canvas = useRef<HTMLDivElement>(null);
+/** A gnome turning on a stage of its own (the preview renderer): the ref of
+ *  the box it is drawn in. The picker's tile, the cup's new-gnome card. */
+function useGnomeStage(skin: Skin) {
+  const box = useRef<HTMLDivElement>(null);
   const preview = useRef<ReturnType<typeof makePreview> | null>(null);
-  const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
-  const skin = GNOMES[i];
-
   useEffect(() => {
     // a canvas of its own each time: a WebGL context that was released cannot
     // be taken again from the same element (React mounts twice in dev)
@@ -1790,8 +1800,9 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
     // its size only: the locked look is the wrapper's filter, and a copied
     // "--locked" class stayed on this canvas for good (every gnome went dark)
     el.className = "pick__canvas";
-    canvas.current!.appendChild(el);
-    const p = (preview.current = makePreview(el));
+    box.current!.appendChild(el);
+    let p: ReturnType<typeof makePreview>;
+    try { p = preview.current = makePreview(el); } catch { return () => el.remove(); } // no WebGL to spare: no stage, the screen stands
     const onResize = () => p.resize();
     window.addEventListener("resize", onResize);
     return () => {
@@ -1803,6 +1814,13 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
   useEffect(() => {
     preview.current && preview.current.show(skin);
   }, [skin]);
+  return box;
+}
+
+function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, aim, onAim, hole = "" }: PickerProps) {
+  const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
+  const skin = GNOMES[i];
+  const canvas = useGnomeStage(skin);
 
   const step = (d: number) => (sound("blip"), onChange(GNOMES[(i + d + GNOMES.length) % GNOMES.length].id));
 
@@ -2030,15 +2048,16 @@ interface VictoryProps {
   snapshot: () => Promise<Blob | null>;
   onBack: () => void;
   onReplay: () => void;
-  onMeet: (id: string) => void;
+  /** the cup after this one ("" after the last) */
+  next: string;
+  /** on to it, as this gnome when one is given (just unlocked) */
+  onNext: (gnome?: string) => void;
 }
-function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay, onMeet }: VictoryProps) {
+function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay, next, onNext }: VictoryProps) {
   const w = WORLDS.find((x) => x.id === cup) || WORLDS[0];
   const t = totals(card, holes), vs = t.strokes - t.par;
   const vsText = vs === 0 ? "level par" : vsPar(vs);
-  const main = useRef<HTMLButtonElement>(null);
-  // the dialog focuses its first control (a share icon): the main action instead
-  useEffect(() => main.current?.focus({ preventScroll: true }), []);
+  const to = WORLDS.find((x) => x.id === next);
   const text = `🏆 ${best ? `New best on the ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on gno.land. #gnoland @_gnoland`;
   return (
     <div className={`victory victory--${cup}`}>
@@ -2053,13 +2072,47 @@ function Victory({ cup, best, holes, card, fresh, snapshot, onBack, onReplay, on
           {t.aces > 0 && <span className="victory__stamp">{t.aces} hole{t.aces > 1 ? "s" : ""}-in-one</span>}
         </p>
         <Scorecard holes={holes} card={card} current={null} world={cup} compact />
-        <Unlocked fresh={fresh} onMeet={onMeet} />
+        {fresh.length > 0 && <NewGnome skin={fresh[0]} also={fresh.slice(1)} where={to ? to.name : ""} onPlay={() => (sound("select"), onNext(fresh[0].id))} />}
         <Share text={text} link={cupLink(cup)} snapshot={snapshot} />
+        {/* one solid action: the new gnome's (in its card), else the next cup, else back to the cups */}
         <div className="banner__row">
-          <Button variant="secondary" onClick={() => (sound("blip"), onReplay())}>Replay the cup</Button>
-          <button ref={main} className="btn btn--main" onClick={() => (sound("select"), onBack())}>Back to cups</button>
+          <button className="linkish" onClick={() => (sound("blip"), onReplay())}>Replay the cup</button>
+          {fresh.length > 0 || !to ? (
+            <Button variant={fresh.length ? "secondary" : "primary"} data-autofocus={!fresh.length || undefined} onClick={() => (sound("select"), onBack())}>Back to cups</Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={() => (sound("select"), onBack())}>Back to cups</Button>
+              <Button variant="primary" data-autofocus onClick={() => (sound("select"), onNext())}>Next: {to.name} →</Button>
+            </>
+          )}
         </div>
       </Dialog>
+    </div>
+  );
+}
+
+/** The cup after this one that has holes ("" after the last). */
+const nextCup = (cup: string, counts: Readonly<Record<string, number>>) =>
+  WORLDS.slice(WORLDS.findIndex((w) => w.id === cup) + 1).find((w) => (counts[w.id] || 0) > 0)?.id || "";
+
+/**
+ * A gnome just unlocked, on the cup's card: turning on its stage as in the
+ * picker, what earned it, and the one action: play as it (in the next cup,
+ * where: its name). also: the others unlocked with it.
+ */
+function NewGnome({ skin, also, where, onPlay }: { skin: Skin; also: readonly Skin[]; where: string; onPlay: () => void }) {
+  const stage = useGnomeStage(skin);
+  const earned = skin.unlock ? UNLOCKS[skin.unlock].need : "";
+  return (
+    <div className="newgnome">
+      <div ref={stage} className="pick__canvas newgnome__stage" />
+      <div className="newgnome__say">
+        <span className="eyebrow">New gnome!</span>
+        <b className="newgnome__name">{skin.name}</b>
+        {earned && <small>{earned}{also.length > 0 && ` · ${also.map((g) => g.name).join(", ")} too`}</small>}
+        <Button variant="primary" data-autofocus onClick={onPlay}>Play as {skin.name} →</Button>
+        {where && <small>Next up: {where}</small>}
+      </div>
     </div>
   );
 }

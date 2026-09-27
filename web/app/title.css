@@ -87,7 +87,7 @@
   -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill; text-shadow: 0 5px 0 var(--ink);
 }
 /* a pill: the eyebrows, and the title's tag */
-.front .eyebrow {
+.front .eyebrow, .newgnome .eyebrow {
   display: inline-block; padding: 4px 14px; border-radius: 999px;
   font-size: var(--fs-pill); font-weight: 700; letter-spacing: .12em; color: var(--paper); background: var(--ink);
 }
@@ -362,10 +362,13 @@
 @media (max-height: 640px) { .screen--pick { align-content: safe center; } }
 .screen--pick .pick__stage { position: relative; margin: 0 0 var(--gap-l); }
 .screen--pick .pick__stage > * { position: relative; }
-.screen--pick .pick__tile {
-  position: relative; display: grid; grid-template-rows: 1fr auto; width: var(--pick-w); height: calc(var(--pick-w) * 1.12);
+/* the gnome's stage: the picker's tile, and a new gnome's on the cup's card */
+.screen--pick .pick__tile, .newgnome__stage {
   border: 3px solid var(--ink); border-radius: 28px; overflow: hidden; box-shadow: var(--deep-card);
   background: radial-gradient(circle, rgba(var(--ink-rgb), .07) 1.7px, transparent 2.1px) 0 0 / 14px 14px, var(--stage);
+}
+.screen--pick .pick__tile {
+  position: relative; display: grid; grid-template-rows: 1fr auto; width: var(--pick-w); height: calc(var(--pick-w) * 1.12);
 }
 .screen--pick .pick__tile > .pick__canvas { width: 100%; height: 100%; min-height: 0; }
 /* locked: the gnome greyed as he always was (the filter on his canvas's
@@ -398,7 +401,7 @@
   animation: fade .3s;
 }
 .victory__in { z-index: 1; }
-.victory__cheer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+.victory__cheer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; } /* behind the card: the words stay clear */
 .victory__in {
   position: relative; width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto;
   display: grid; justify-items: center; gap: 10px; padding: 18px clamp(14px, 3vw, 30px) 22px; text-align: center;
@@ -426,7 +429,14 @@
   align-self: center; padding: 3px 10px; border: 2px solid var(--hat); border-radius: 999px; color: var(--hat);
   font-size: 13px; font-weight: 800; transform: rotate(-4deg);
 }
-.victory .scorecard { width: 100%; margin: 0; }
+.victory .scorecard { width: 100%; margin: 0; min-height: auto; } /* its full height: the card scrolls, nothing slides under the next block */
+/* a gnome just unlocked: its stage and its words, the one solid action under them */
+.newgnome { display: flex; align-items: center; gap: 18px; width: 100%; padding: 12px 16px; border: 2px solid var(--ink); border-radius: 22px; background: var(--paper); box-shadow: var(--deep-panel); text-align: left; }
+.victory .newgnome__stage { flex: 0 0 auto; width: 120px; height: 134px; border-radius: 22px; }
+.newgnome__say { display: grid; justify-items: start; gap: 4px; }
+.newgnome__say small { color: var(--ink-soft); font-size: 13px; }
+.newgnome__name { font-size: 28px; line-height: 1.1; color: var(--paper); -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); } /* the picker's name, a size down */
+.newgnome .btn { white-space: nowrap; }
 .victory .note { margin: 0; }
 .victory .banner__row { margin-top: 6px; gap: 12px; flex-wrap: wrap; }
 .victory .btn { font-size: 17px; padding: 12px 24px; }
@@ -436,6 +446,7 @@
   .victory__sum { font-size: 15px; }
   .victory .banner__row { width: 100%; flex-direction: column-reverse; }
   .victory .banner__row .btn { width: 100%; }
+  .newgnome { gap: 12px; padding: 10px; } .victory .newgnome__stage { width: 96px; height: 108px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .victory, .victory__in, .victory__badge { animation: none; }

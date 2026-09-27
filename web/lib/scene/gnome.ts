@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { BALL_R } from "../terrain";
-import { C, flat, inked, disposeCourse, texOf } from "./materials";
+import { C, flat, inked, disposeCourse, texOf, motion } from "./materials";
 import { makeRenderer, makeScene } from "./camera";
 import { bake } from "./bake";
 import { ud, type Gnome } from "./data";
@@ -340,6 +340,8 @@ export function makePreview(canvas: HTMLCanvasElement) {
     requestAnimationFrame(tick);
     if (gnome) {
       // the gnome hops; his shadow stays on the ground and shrinks as he rises
+      // (with reduced motion, he stands still, a little turned)
+      if (!motion) now = 900;
       const hop = Math.abs(Math.sin(now / 380)) * 0.22;
       const { body, shade } = gnome.userData;
       body.rotation.y = Math.sin(now / 1400) * 0.7;
