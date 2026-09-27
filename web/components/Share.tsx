@@ -25,13 +25,15 @@ interface ShareProps {
   text: string;
   /** a picture of the course to share, where the system sheet can take one */
   snapshot?: (() => Promise<Blob | null>) | null;
+  /** the shot's clip, once made (ShareClip): shared in the picture's place */
+  clip?: Clip | null;
   link?: string;
 }
 // the system sheet only where it is the phone's own (on a desktop it is a
 // bare OS panel without the networks people mean)
 const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
 
-export default function Share({ text, snapshot, link = "" }: ShareProps) {
+export default function Share({ text, snapshot, link = "", clip = null }: ShareProps) {
   const [copied, setCopied] = useState(false);
   const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the card goes first
   useEffect(() => () => clearTimeout(copiedT.current), []);
@@ -41,8 +43,9 @@ export default function Share({ text, snapshot, link = "" }: ShareProps) {
   const sheet = async () => {
     sound("blip");
     try {
-      const blob = snapshot ? await snapshot() : null;
-      const file = blob && new File([blob], "gnogolf.png", { type: "image/png" });
+      // the clip when there is one, else a picture of the course
+      const blob = clip ? null : snapshot ? await snapshot() : null;
+      const file = clip ? clip.file : blob && new File([blob], "gnogolf.png", { type: "image/png" });
       const data: ShareData = { title: "Gnogolf", text, url };
       if (file && navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
       await navigator.share(data);
@@ -62,7 +65,8 @@ export default function Share({ text, snapshot, link = "" }: ShareProps) {
     <span className="share" role="group" aria-label="Share">
       <span className="share__label">Share</span>
       {links.map(([name, href]) => (
-        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name} onClick={() => sound("blip")}>
+        // X takes no file from a page: with a clip, its post opens and the clip downloads, to drop in
+        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name === "X" && clip && !phone ? "X: the clip downloads, drop it into the post" : name} onClick={() => (sound("blip"), name === "X" && clip && !phone && save(clip))}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d={GLYPH[name]} /></svg>
         </a>
       ))}
@@ -78,51 +82,58 @@ export default function Share({ text, snapshot, link = "" }: ShareProps) {
   );
 }
 
+/** A made clip: its file, and an address the page plays and saves it from. */
+export interface Clip {
+  url: string;
+  file: File;
+}
 interface ClipProps {
   /** records the clip (the engine's clip()): an MP4, or null */
   make: (run: ClipRun) => Promise<Blob | null>;
-  text: string;
-  link?: string;
   /** the file's name (lib/clip.ts clipName) */
   name: string;
+  /** the clip once made, null when gone: the share buttons send it */
+  onClip: (clip: Clip | null) => void;
 }
-/** Saves the clip as a download (X opens beside it: the player drops it in). */
-function save(clip: { url: string; file: File }) {
-  const a = Object.assign(document.createElement("a"), { href: clip.url, download: clip.file.name });
-  a.click();
+/** Saves the clip as a download. */
+function save(clip: Clip) {
+  Object.assign(document.createElement("a"), { href: clip.url, download: clip.file.name }).click();
 }
 
 /** The shot as a clip (ADR-003; NEXT_PUBLIC_CLIPS): made once the hole is
- *  won, looped in the card above its buttons, and shared as a file — the
- *  phone's sheet, or a download and a post on X the player adds it to. Only
- *  where the browser records MP4; elsewhere nothing shows. A computer makes it
- *  as the card opens; a phone when asked (a second renderer for a few seconds
- *  is a lot to spend unasked on a phone, and on its battery). */
-export function ShareClip({ make, text, link = "", name }: ClipProps) {
+ *  won and looped in the card, with a download in its corner; the share
+ *  buttons above send it (the phone's sheet as a file, X as a download to
+ *  drop in its post). Only where the browser records MP4; elsewhere nothing
+ *  shows. A computer makes it as the card opens; a phone when asked (a second
+ *  renderer for a few seconds is a lot to spend unasked on a phone). */
+export function ShareClip({ make, name, onClip }: ClipProps) {
   const [mime] = useState(() => clipSupport());
   const [go, setGo] = useState(() => typeof matchMedia !== "undefined" && !matchMedia("(pointer: coarse)").matches);
   const [k, setK] = useState(0);
   // undefined while it is being made; null: none came of it
-  const [clip, setClip] = useState<{ url: string; file: File } | null>();
+  const [clip, setClip] = useState<Clip | null>();
   const [still] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [playing, setPlaying] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   // made once, from when it is asked for; the card closing cancels it and frees it all
-  const run = useRef({ make, name });
+  const run = useRef({ make, name, onClip });
   useEffect(() => {
     if (!go || !mime) return;
-    const ac = new AbortController();
+    const ac = new AbortController(), r = run.current;
     let url = "";
-    void run.current
+    void r
       .make({ mime, signal: ac.signal, progress: setK })
       .catch(() => null)
       .then((blob) => {
         if (ac.signal.aborted) return;
         url = blob ? URL.createObjectURL(blob) : "";
-        setClip(blob ? { url, file: new File([blob], run.current.name, { type: "video/mp4" }) } : null);
+        const made = blob ? { url, file: new File([blob], r.name, { type: "video/mp4" }) } : null;
+        setClip(made);
+        r.onClip(made);
       });
     return () => {
       ac.abort();
+      r.onClip(null);
       if (url) URL.revokeObjectURL(url);
     };
   }, [go, mime]);
@@ -133,15 +144,6 @@ export function ShareClip({ make, text, link = "", name }: ClipProps) {
         <button className="btn btn--ghost" onClick={() => (sound("blip"), setGo(true))}>Make a clip of the shot</button>
       </div>
     );
-  const url = siteURL(link);
-  const files = clip ? [clip.file] : [];
-  const sheet = onPhone() && !!navigator.canShare && files.length > 0 && navigator.canShare({ files });
-  const share = async () => {
-    sound("blip");
-    try {
-      await navigator.share({ title: "Gnogolf", text, url, files });
-    } catch {} // cancelled, or refused
-  };
   return (
     <div className="clip">
       <div className="clip__screen">
@@ -158,27 +160,12 @@ export function ShareClip({ make, text, link = "", name }: ClipProps) {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
               </button>
             )}
+            <a className="clip__save" href={clip.url} download={clip.file.name} aria-label="Download the clip" title="Download the clip" onClick={() => sound("blip")}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
+            </a>
           </>
         )}
       </div>
-      {clip && (
-        <div className="clip__row">
-          {sheet && (
-            <button className="btn btn--main" onClick={() => void share()}>
-              Share clip
-            </button>
-          )}
-          <a className="btn btn--ghost" href={clip.url} download={clip.file.name} onClick={() => sound("blip")}>
-            Download clip
-          </a>
-          {!sheet && (
-            <a className="btn btn--ghost" target="_blank" rel="noopener noreferrer" href={Object.fromEntries(shareLinks(text, url)).X} onClick={() => (sound("blip"), save(clip))}>
-              <svg className="btn__mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={GLYPH.X} /></svg> Post on X
-            </a>
-          )}
-        </div>
-      )}
-      {clip && !sheet && <p className="clip__hint">X can&apos;t take the clip from a page: Post on X saves it too, drop it into your post.</p>}
     </div>
   );
 }

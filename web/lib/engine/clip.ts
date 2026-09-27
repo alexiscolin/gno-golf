@@ -42,6 +42,8 @@ export interface ClipOf {
   card: (x: CanvasRenderingContext2D, w: number, h: number) => void;
   /** the result in words (Hole in one!), large once the ball is in */
   term?: string;
+  /** the shot to beat, on the closing card (Down the Tunnel · 1 stroke) */
+  challenge: string;
 }
 /** How it is run: the format, a way to cancel it, its progress (0..1). */
 export interface ClipRun {
@@ -51,7 +53,7 @@ export interface ClipRun {
 }
 
 /** Records the clip: an MP4 Blob, or null (cancelled, the round gone, nothing recorded). */
-export function recordClip({ E, stroke, gnome, showClock, hide, card, term }: ClipOf, { mime, signal, progress = () => {} }: ClipRun): Promise<Blob | null> {
+export function recordClip({ E, stroke, gnome, showClock, hide, card, term, challenge }: ClipOf, { mime, signal, progress = () => {} }: ClipRun): Promise<Blob | null> {
   const { g, scene, ground } = E, s = g.s, round = g.round, { path } = stroke;
   if (!s || signal.aborted || path.length < 2) return Promise.resolve(null);
   // the clip's framing: the card's band at the bottom kept clear
@@ -99,7 +101,7 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term }: Cl
   const sky = x.createLinearGradient(0, 0, 0, H);
   for (const [k, c] of skyStops(getComputedStyle(document.querySelector(".sky") || document.body).backgroundImage)) sky.addColorStop(k, c);
 
-  let confetti: Confetti | null = null, dropped = 0, t0 = 0; // when the ball went in, when the clip began (performance.now)
+  let confetti: Confetti | null = null, still: HTMLCanvasElement | null = null, dropped = 0, t0 = 0; // when the ball went in, when the clip began (performance.now)
   // a camera with some life, over the player's own framing: a slow swing round
   // the point it looks at, closing in as the stroke goes, a punch in on the drop
   const UP = new THREE.Vector3(0, 1, 0), fwd = new THREE.Vector3(), look = new THREE.Vector3(), rel = new THREE.Vector3();
@@ -139,7 +141,11 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term }: Cl
     // the result over the confetti, then the closing card
     const end = dropped ? now - dropped - CLIP.tail : -1;
     if (dropped && term && end < 0) drawTerm(x, W, H, term, (now - dropped - CLIP.pop) / CLIP.fade);
-    if (end >= 0) drawOutro(x, W, H, end / CLIP.fade);
+    if (end >= 0) {
+      // the course's last moment, kept: the closing card blurs it behind itself
+      if (!still) still = Object.assign(document.createElement("canvas"), { width: W, height: H }), still.getContext("2d")!.drawImage(out, 0, 0);
+      drawOutro(x, W, H, end / CLIP.fade, still, challenge);
+    }
   }
 
   return new Promise<Blob | null>((resolve) => {

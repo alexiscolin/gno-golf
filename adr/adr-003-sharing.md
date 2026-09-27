@@ -42,12 +42,15 @@ Sharing is how the game spreads, and today it undersells it:
   is deterministic (the chain's path, walked by the game's own replay), so
   it needs nothing from the live shot but its path. It is drawn at 720p into
   a canvas of its own and recorded there (`canvas.captureStream()` and
-  `MediaRecorder`, native, no library), from just before the release to a
-  second after the ball drops: a few seconds, 8 at most. The hole-finished
-  banner shows a loader while it is made, then loops it above its buttons:
-  on a phone the system share sheet takes the file (with the text and the
-  hole's link) and "Download clip"; on a computer "Download clip" and "Post
-  on X" (the text and the link filled in; the player adds the file). Only
+  `MediaRecorder`, native, no library), from just before the release to the
+  ball's drop, the result shouted over it ("Triple bogey!"), then a closing
+  card in the link cards' style (the badge, "Can you beat it?", the shot to
+  beat, the site's address); the brand's card runs along the bottom, and the
+  camera swings and closes in as it goes. The hole-finished banner shows a
+  loader while it is made, then loops it with a download in its corner; the
+  share buttons already there send it: on a phone the system sheet takes the
+  file (with the text and the hole's link), on a computer X's post opens and
+  the clip downloads beside it (X takes no file from a page). Only
   where the browser records MP4, the one format X takes (Safari, recent
   Chrome); elsewhere there is no clip, and the image and the link are shared
   as before. Behind `NEXT_PUBLIC_CLIPS=1`: unset, there is nothing of it.

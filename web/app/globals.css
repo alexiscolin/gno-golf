@@ -2276,8 +2276,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .clip__play { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); cursor: pointer; display: grid; place-items: center; padding: 0; }
 .clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
 .clip__play:focus-visible { outline: var(--ring); outline-offset: 2px; }
-/* its buttons: the card's own, a size down, links drawn as buttons */
-.clip__row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
-.clip .btn { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; padding: 10px 18px; text-decoration: none; }
-.clip .btn--ghost { color: var(--ink); }
-.banner--win .banner__in p.clip__hint { margin: 10px 0 0; font-size: 13px; }
+/* its download, a round button in its corner (the share buttons above send it) */
+.clip__save { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 40px; height: 40px; border: 2px solid var(--ink); border-radius: 50%; background: var(--paper); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.clip__save svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.clip__save:focus-visible { outline: var(--ring); outline-offset: 2px; }

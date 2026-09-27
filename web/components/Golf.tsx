@@ -13,7 +13,7 @@ import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, 
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, Emblem } from "@/components/Worlds";
 import Weather from "@/components/Weather";
-import Share, { ShareClip } from "@/components/Share";
+import Share, { ShareClip, type Clip } from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
 import About, { AboutButton, BackButton } from "@/components/About";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
@@ -472,6 +472,8 @@ export default function Golf() {
   const holeNow = s && s.id;
   useEffect(() => setNamedAs(""), [holeNow]);
   // and the place it took, once saved
+  // the shot's clip once made (ShareClip), for the share buttons to send
+  const [clip, setClip] = useState<Clip | null>(null);
   const savedPlace = useSavedPlace(s, game.current && game.current.chain, account && account.address, (s && s.roundMode) || aim, onChain);
 
   const play = (direct = false) => {
@@ -1129,16 +1131,10 @@ export default function Golf() {
               link={s ? holeLink(s, gnome) : ""}
                 snapshot={() => (game.current ? game.current.snapshot(caption(s)) : Promise.resolve(null))}
                 text={shareText({ s, card, cups, fresh, place: savedPlace })}
+                clip={clip}
               />
             </div>
-            {cfg && cfg.clips && (
-              <ShareClip
-                make={(run) => (game.current ? game.current.clip(run, caption(s)) : Promise.resolve(null))}
-                link={holeLink(s, gnome)}
-                text={shareText({ s, card, cups, fresh, place: savedPlace })}
-                name={clipName(s.id || "")}
-              />
-            )}
+            {cfg && cfg.clips && <ShareClip make={(run) => (game.current ? game.current.clip(run, caption(s)) : Promise.resolve(null))} name={clipName(s.id || "")} onClip={setClip} />}
 
 
             <p>

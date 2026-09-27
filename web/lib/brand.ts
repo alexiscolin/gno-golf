@@ -4,7 +4,7 @@
 // on a 2D canvas in the page's own colours and font (Fredoka, once loaded).
 import { siteHost } from "./site";
 
-const INK = "#144134", INK_SOFT = "#4f7a6c", PAPER = "#fdf6e9", HAT = "#e0524b";
+const INK = "#144134", INK_SOFT = "#4f7a6c", GREEN = "#226c57", PAPER = "#fdf6e9", HAT = "#e0524b";
 const FONT = "Fredoka, ui-rounded, system-ui, sans-serif";
 
 /** What the card says of the hole, as its link card does: its cup, number and
@@ -66,9 +66,51 @@ export function drawCard(x: CanvasRenderingContext2D, W: number, H: number, { ey
   x.restore();
 }
 
+/** A word shouted over the picture, as the win card's title: filled, inked
+ *  round, and a paper halo so it reads on any ground. Centred at (0, 0). */
+function shout(x: CanvasRenderingContext2D, text: string, px: number, fill: string) {
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  x.font = `700 ${px}px ${FONT}`;
+  x.lineJoin = "round";
+  x.lineWidth = px * 0.17;
+  x.strokeStyle = PAPER;
+  x.strokeText(text, 0, 0);
+  x.lineWidth = px * 0.08;
+  x.strokeStyle = INK;
+  x.strokeText(text, 0, 0);
+  x.fillStyle = fill;
+  x.fillText(text, 0, 0);
+}
+
+/** A pill, centred at (cx, cy), as the game's buttons: ink edge, a hard shadow under it. */
+function pill(x: CanvasRenderingContext2D, cx: number, cy: number, parts: readonly [string, string][], px: number, bg: string) {
+  x.font = `700 ${px}px ${FONT}`;
+  const widths = parts.map(([t]) => x.measureText(t).width), w = widths.reduce((a, b) => a + b, 0) + px * 1.6, h = px * 1.9;
+  x.fillStyle = INK;
+  x.beginPath();
+  x.roundRect(cx - w / 2, cy - h / 2 + px * 0.22, w, h, h / 2);
+  x.fill();
+  x.fillStyle = bg;
+  x.strokeStyle = INK;
+  x.lineWidth = px * 0.12;
+  x.beginPath();
+  x.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+  x.fill();
+  x.stroke();
+  x.textAlign = "left";
+  x.textBaseline = "middle";
+  let at = cx - w / 2 + px * 0.8;
+  parts.forEach(([t, c], i) => {
+    x.fillStyle = c;
+    x.fillText(t, at, cy + px * 0.04);
+    at += widths[i];
+  });
+}
+
 /**
  * The result, large over the course once the ball is in ("Triple bogey!"), as
- * the card's own title: the hat's red, inked round. t (0..1) pops it in.
+ * the card's own title. t (0..1) pops it in.
  */
 export function drawTerm(x: CanvasRenderingContext2D, W: number, H: number, term: string, t: number) {
   const p = Math.max(0, Math.min(1, t)), s = H / 720;
@@ -79,41 +121,59 @@ export function drawTerm(x: CanvasRenderingContext2D, W: number, H: number, term
   x.translate(W / 2, H * 0.42);
   x.scale(k, k);
   x.rotate(-0.04);
-  x.textAlign = "center";
-  x.textBaseline = "middle";
-  x.font = `700 ${Math.min(104, (W * 0.6) / Math.max(term.length, 6) * 1.9) * s}px ${FONT}`;
-  x.lineJoin = "round";
-  x.lineWidth = 22 * s;
-  x.strokeStyle = PAPER;
-  x.strokeText(term, 0, 0);
-  x.lineWidth = 10 * s;
-  x.strokeStyle = INK;
-  x.strokeText(term, 0, 0);
-  x.fillStyle = HAT;
-  x.fillText(term, 0, 0);
+  shout(x, term, Math.min(130, ((W * 0.78) / Math.max(term.length, 6)) * 1.9) * s, HAT);
   x.restore();
 }
 
 /**
- * The clip's last card, faded in by a (0..1): the badge large, a dare, the
- * site's address, and what the game is, on the page's paper.
+ * The clip's last card, faded in by a (0..1), as the site's link card: the
+ * course's last moment blurred under the sky's light and its dots, an inked
+ * frame, the badge, the dare, the shot to beat, and where to play.
  */
-export function drawOutro(x: CanvasRenderingContext2D, W: number, H: number, a: number) {
-  const logo = ready(), s = H / 720;
+export function drawOutro(x: CanvasRenderingContext2D, W: number, H: number, a: number, still: CanvasImageSource | null, challenge: string) {
+  const logo = ready(), s = H / 720, p = Math.max(0, Math.min(1, a));
   x.save();
-  x.globalAlpha = Math.max(0, Math.min(1, a));
-  x.fillStyle = PAPER;
+  x.globalAlpha = p;
+  if (still) {
+    x.filter = `blur(${14 * s}px)`;
+    x.drawImage(still, -30 * s, -30 * s, W + 60 * s, H + 60 * s);
+    x.filter = "none";
+  }
+  const sky = x.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, "rgba(120, 190, 235, .55)");
+  sky.addColorStop(0.55, "rgba(253, 246, 233, .5)");
+  sky.addColorStop(1, "rgba(240, 190, 120, .45)");
+  x.fillStyle = sky;
   x.fillRect(0, 0, W, H);
+  x.fillStyle = "rgba(255, 255, 255, .35)";
+  for (let yy = 12 * s; yy < H; yy += 22 * s) for (let xx = 12 * s; xx < W; xx += 22 * s) x.fillRect(xx, yy, 2.5 * s, 2.5 * s);
+  x.strokeStyle = INK;
+  x.lineWidth = 3 * s;
+  x.beginPath();
+  x.roundRect(24 * s, 24 * s, W - 48 * s, H - 48 * s, 18 * s);
+  x.stroke();
+  // pops in a little behind the fade
+  const k = 0.9 + 0.1 * Math.min(1, p * 1.4);
+  x.translate(W / 2, H / 2);
+  x.scale(k, k);
+  x.translate(-W / 2, -H / 2);
+  if (logo) {
+    x.fillStyle = "rgba(253, 246, 233, .9)";
+    x.beginPath();
+    x.arc(W / 2, 175 * s, 118 * s, 0, Math.PI * 2);
+    x.fill();
+    x.drawImage(logo, W / 2 - 105 * s, 70 * s, 210 * s, 210 * s);
+  }
+  x.save();
+  x.translate(W / 2, 360 * s);
+  x.rotate(-0.03);
+  shout(x, "Can you beat it?", 92 * s, GREEN); // green, as the logo's letters
+  x.restore();
+  pill(x, W / 2, 475 * s, [[challenge.toUpperCase(), PAPER]], 30 * s, GREEN);
+  pill(x, W / 2, 575 * s, [["Play free at ", INK], [siteHost(), HAT]], 36 * s, PAPER);
+  x.fillStyle = INK;
   x.textAlign = "center";
-  if (logo) x.drawImage(logo, W / 2 - 110 * s, 90 * s, 220 * s, 220 * s);
-  x.fillStyle = INK;
-  x.font = `700 ${76 * s}px ${FONT}`;
-  x.fillText("Can you beat it?", W / 2, 400 * s);
-  x.fillStyle = HAT;
-  x.font = `700 ${58 * s}px ${FONT}`;
-  x.fillText(siteHost(), W / 2, 490 * s);
-  x.fillStyle = INK;
-  x.font = `500 ${30 * s}px ${FONT}`;
-  x.fillText("Play free in your browser · every shot computed on gno.land", W / 2, 560 * s);
+  x.font = `600 ${22 * s}px ${FONT}`;
+  x.fillText("Every shot computed by the chain on gno.land", W / 2, 650 * s);
   x.restore();
 }
