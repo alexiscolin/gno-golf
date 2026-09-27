@@ -1235,7 +1235,7 @@ export default function Golf() {
                 ) : short && funds != null ? (
                   <>
                     {funds === 0 ? "Your Adena account has no GNOT here yet." : `You need about ${short.toFixed(2)} more GNOT.`}{" "}
-                    {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : chainId === MAINNET ? "It needs some GNOT on gno.land to pay the fee." : account && <GetGnot address={account.address} />}
+                    {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : chainId === MAINNET ? account && <GetGnot address={account.address} href={GNOT_URL} label="How to get GNOT ↗" /> : account && <GetGnot address={account.address} />}
                   </>
                 ) : null;
               // (once saved, the saved line says the name too)
