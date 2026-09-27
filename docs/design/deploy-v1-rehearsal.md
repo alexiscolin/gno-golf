@@ -246,7 +246,7 @@ The hub (`Render("")`) and a hole page render.
 | **Total** | **89.56** | 88.35 | 87.37 | 112.6 |
 | **With a 15% margin** | **103.0, so ask for 105 GNOT** | 101.6 | 100.5 | ~130 |
 
-Run 6 (2026-09-27) is today's code on a pearl-tag chain: only golf grew (131,768 → 139,209 B, +1.19 GNOT: the publishing switch, Hide's index, each shot's work and a commit's fixed gas in the reads). Its addpkg measured 217.1M gas and 22.37 GNOT of deposit, so step 5's flags are raised to keep a 1.3× margin. Every other step measured as run 5.
+Run 6 (2026-09-27) is today's code on a pearl-tag chain: only golf grew (131,768 → 139,209 B, +1.19 GNOT: the publishing switch, Hide's index, each shot's work and a commit's fixed gas in the reads). Its addpkg measured 217.1M gas and 22.37 GNOT of deposit, so step 5's flags are raised to keep a 1.3× margin. Every other step measured as run 5. Since run 6, golf keeps each best's round for the ghost duels (ADR-004): about 1.4 KB more source, some 2M gas and 0.14 GNOT more at addpkg, well inside step 5's flags.
 
 Ask for **105 GNOT**, as in run 4. That still leaves room for one failed-and-rerun publish script. At the faucet's 10 GNOT a day for one address, 100 GNOT takes 10 days, so ask the faucet operators or GovDAO instead. The deposit is locked for good, because published data is never freed.
 

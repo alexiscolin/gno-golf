@@ -523,36 +523,73 @@ func replayAs(cur realm, p address, id, shots string) {
 	PlayRound(cross(cur), id, shots)
 }
 
+// jfield is the raw value of a field of a flat JSON object: a number, or a
+// string's inside.
+func jfield(j, k string) string {
+	v := j[strings.Index(j, `"`+k+`":`)+len(k)+3:]
+	if v[0] == '"' {
+		return v[1:strings.Index(v[1:], `"`)+1]
+	}
+	return v[:strings.IndexAny(v, ",}]")]
+}
+
+// ghostHoles replays a player's Ghost as a duel does, from its own JSON: the
+// first stroke with SimulateRoundIn, each later one with SimulateFrom from the
+// rest before, all in the ghost's period. It reports whether the last stroke
+// holes, and only the last.
+func ghostHoles(id, mode string, p address) bool {
+	gj := Ghost(id, mode, p)
+	period, _ := strconv.ParseInt(jfield(gj, "period"), 10, 64)
+	shots := strings.Split(jfield(gj, "shots"), ";")
+	sim := SimulateRoundIn(id, shots[0], period)
+	for i := 1; i < len(shots); i++ {
+		if strings.Contains(sim, `"holed":true`) {
+			return false // holed early: not the round it was
+		}
+		rest := strings.Split(strings.SplitN(sim[strings.Index(sim, `"rest":[`)+8:], "]", 2)[0], ",")
+		x, _ := strconv.ParseFloat(rest[0], 64)
+		y, _ := strconv.ParseFloat(rest[1], 64)
+		sim = SimulateFrom(id, x, y, shots[i], i, period)
+	}
+	return strings.Contains(sim, `"holed":true`)
+}
+
 // TestGhostKeepsTheBestRound: a best keeps its period and shots, a worse round
 // or a tie leaves them, a better one replaces them, and the best replays
-// stroke by stroke in its own period, long after, to the same strokes: what a
-// duel races.
+// stroke by stroke from Ghost's own answer in its own period, long after, to
+// the same strokes: what a duel races.
 func TestGhostKeepsTheBestRound(cur realm, t *testing.T) {
 	id := mine(cur, "ghost", cupHole("garden", 1, "Ghost"))
 	racer := testutils.TestAddress("racer")
 	uassert.Equal(t, "null", Ghost(id, "assisted", racer), "no best, no ghost")
-	play := func(shots string) { replayAs(cur, racer, id, shots) }
-	play("0,0.001;0,1")
+	replayAs(cur, racer, id, "0,0.001;0,1")
 	period := Period()
 	two := ufmt.Sprintf(`"strokes":2,"period":%d,"shots":"0.0000,0.0010,0;0.0000,1.0000,0"}`, period)
 	urequire.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), Ghost(id, "assisted", racer))
 	uassert.Equal(t, "null", Ghost(id, "pro", racer), "a best is kept in its own mode")
 
-	play("0,0.001;0,0.001;0,1")
-	play("0,0.002;0,1")
+	replayAs(cur, racer, id, "0,0.001;0,0.001;0,1")
+	replayAs(cur, racer, id, "0,0.002;0,1")
 	uassert.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), "a worse round and a tie leave the ghost: "+Ghost(id, "assisted", racer))
 	uassert.Equal(t, 2, BestOf(id, "assisted", racer))
 
-	// long after, the ghost replays in its own weather, one read a stroke
 	testing.SkipHeights(2000)
 	uassert.True(t, Period() > period+2, "the ghost's weather is over")
-	first := SimulateRoundIn(id, "0.0000,0.0010,0", period)
-	rest := strings.Split(strings.SplitN(first[strings.Index(first, `"rest":[`)+8:], "]", 2)[0], ",")
-	x, _ := strconv.ParseFloat(rest[0], 64)
-	y, _ := strconv.ParseFloat(rest[1], 64)
-	uassert.True(t, strings.Contains(SimulateFrom(id, x, y, "0.0000,1.0000,0", 1, period), `"holed":true`), "the ghost holes in its own strokes")
+	uassert.True(t, ghostHoles(id, "assisted", racer), "the ghost holes in its own strokes, long after")
 
-	testing.SkipHeights(1)
-	play("0,1")
+	replayAs(cur, racer, id, "0,1")
 	uassert.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), ufmt.Sprintf(`"strokes":1,"period":%d,"shots":"0.0000,1.0000,0"}`, Period())), "a better round is the ghost now")
+}
+
+// TestGhostOnATimedHole: each stroke of a ghost meets the pieces of its own
+// stroke number, at its own tick, so it replays to the round it was.
+func TestGhostOnATimedHole(cur realm, t *testing.T) {
+	id := mine(cur, "ghosttimed", timedHole())
+	racer := testutils.TestAddress("racer")
+	// stroke 1 meets the gate (a pulse every 2 strokes): a nudge there, then through
+	replayAs(cur, racer, id, "0,0.001,3;0,0.001,7;"+holeShot+",11")
+	urequire.Equal(t, 3, BestOf(id, "assisted", racer))
+	uassert.True(t, strings.Contains(Ghost(id, "assisted", racer), `"shots":"0.0000,0.0010,3;0.0000,0.0010,7;0.0000,7.5000,11"`), Ghost(id, "assisted", racer))
+	testing.SkipHeights(100)
+	uassert.True(t, ghostHoles(id, "assisted", racer), "the timed ghost holes in its own strokes")
 }

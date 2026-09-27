@@ -254,7 +254,8 @@ function Toast({ text, onDone }: { text: string; onDone: () => void }) {
 // gno.land's mainnet: its GNOT is the real one
 const MAINNET = "gnoland-1";
 // The storage deposit of a save, in ugnot: a first save on a hole writes the
-// round, the best and the board entry; a hole saved before is replaced.
+// round, the best (with its strokes' shots) and the board entry; a hole saved
+// before is replaced.
 // saved: null when not known yet (counted as a first save: the larger).
 const depositOf = (saved: boolean | null, bytePrice: number, firstOnCourse: boolean, strokes: number) => depositBytes(saved !== true, firstOnCourse, strokes) * bytePrice;
 
@@ -785,7 +786,7 @@ export default function Golf() {
   // a name's Claim seats every best of the player's, this one's included
   const firstOnCourse = !!onCourse && onCourse[saveMode] === 0;
   const bests = onCourse ? { ...onCourse, [saveMode]: onCourse[saveMode] + (saved === true ? 0 : 1) } : { assisted: 0, pro: 0, [saveMode]: 1 };
-  const saveDeposit = depositOf(saved, bytePrice, firstOnCourse, toSave?.shots?.length ?? 0) + (saveName ? nameBytes([bests.assisted, bests.pro]) * bytePrice : 0);
+  const saveDeposit = depositOf(saved, bytePrice, firstOnCourse, toSave ? toSave.strokes : 0) + (saveName ? nameBytes([bests.assisted, bests.pro]) * bytePrice : 0);
   const costNow = toSave ? costLine(saveGas, gasPrice, saved, saveDeposit, chainName !== MAINNET) : null;
   const lackNow = toSave && account && funds != null ? shortOf(saveGas, gasPrice, saveDeposit, funds) : null;
   useEffect(() => {

@@ -574,8 +574,8 @@ Only players with a gno.land name (`r/sys/users`) enter the boards and the
 course ranking: an address is free, a name is not, so a script can't fill the
 boards with a thousand accounts. Every finish is still kept, named or not. A
 player who takes a name later ranks at their next finish, or at once with
-[`Claim`](#claimcur-realm-int). `Bests`, `Standings`, `Records` and `Players`
-read anyone. A hole's own record (`best`, shown on the hub and its pages) is a
+[`Claim`](#claimcur-realm-int). `Bests`, `Standings`, `Records`, `Players` and
+`Ghost` read anyone. A hole's own record (`best`, shown on the hub and its pages) is a
 named player's too.
 
 The course ranking adds up each player's best on each **current course hole**:
@@ -826,11 +826,10 @@ Measured on the course holes; treat them as orders of magnitude:
   data, its entry, and the first leaf of each index it opens). A later one
   stores the data (1–3 KB for the course holes) and about 3.2 KB more (its
   entry and index keys): nothing for rounds or records until someone plays.
-  A version's own trees (rounds, bests, board) are B+ trees with leaves of 16,
-  made at their first stroke or finish: the first finisher on a version pays
-  their first leaves (about 17 KB with the round and the standing, measured
-  in a filetest), a later player's first finish about 3.2 KB (1.9 KB on a
-  further hole), at 50 players. The first stroke of a round stores about
+  A version's rounds, bests and board are rows of B+ trees every version
+  shares (32 a leaf), seeded when golf is deployed: no version pays for trees
+  of its own, and a player's first finish pays for their own rows, about
+  3.2 KB (1.9 KB on a further hole), at 50 players. The first stroke of a round stores about
   1.5 KB, a replay after `Reset` nothing. The decoded hole is never stored.
   A best keeps its round for `Ghost`: about 30 bytes and 18 to 23 a stroke,
   written only when it improves (a shorter best frees the longer one).

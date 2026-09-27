@@ -957,10 +957,14 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	}
 	// a player's best stays theirs: replaying the hole never erases it, and a
 	// tie keeps the older round, shots and all
-	if v := e.bests(m).Get(p); v == nil || r.strokes < bestStrokes(v) {
-		was := 0
-		if v != nil {
-			was = bestStrokes(v)
+	best, was := r.strokes, 0
+	if v := e.bests(m).Get(p); v != nil {
+		was = bestStrokes(v)
+	}
+	if was > 0 && was <= r.strokes {
+		best = was
+	} else {
+		if was > 0 {
 			e.board(m).Remove(boardKey(was, p))
 		}
 		e.bests(m).Set(p, bestOf(r))
@@ -976,7 +980,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 		}
 	}
 	if isNamed {
-		seat(e, m, p)
+		seat(e, m, p, best)
 	}
 	if e.official {
 		drain(finishBatch) // only the course's finishes pay for the course's drain
@@ -990,8 +994,8 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 // and in the course ranking if they stand in it. A finish does it whether or
 // not it improved, so a player who took a name after their best ranks at
 // their next finish.
-func seat(e *entry, m int, p string) {
-	k := boardKey(bestStrokes(e.bests(m).Get(p)), p)
+func seat(e *entry, m int, p string, best int) {
+	k := boardKey(best, p)
 	if !e.board(m).Has(k) {
 		e.board(m).Set(k, p)
 	}
@@ -1019,8 +1023,8 @@ func Claim(cur realm) int {
 	slots.Iterate("", "", func(_ string, v any) bool {
 		e := find(v.(string))
 		for m := 0; m < modes; m++ {
-			if e.bests(m).Has(p) {
-				seat(e, m, p)
+			if v := e.bests(m).Get(p); v != nil {
+				seat(e, m, p, bestStrokes(v))
 				n++
 			}
 		}
