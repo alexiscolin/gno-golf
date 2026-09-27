@@ -1,6 +1,6 @@
 /* gno.land's own palette: #226C57 primary, #60AB96 light, #144134 deep.
    The breakpoints (a custom property cannot sit in @media), here and in title.css:
-     width   1280, 1100, 900, 860, 720 (min), 700, 600 (the phone), 520, 480, 400
+     width   1600, 1280, 1100, 900, 860, 720 (min), 700, 600 (the phone), 520, 480, 400
      height  820 (a 13" laptop), 760, 720, 640
      shape   aspect-ratio 1/1 (wide vs upright), pointer: coarse, reduced motion */
 :root {
@@ -2302,7 +2302,9 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .pending__say { display: grid; gap: 2px; }
 .pending .btn { padding: 8px 14px; font-size: 15px; }
 .pending__err { font-size: 12px; color: var(--hat-ink); }
-body:has(.hud--top) .pending { top: 104px; } /* under the play screen's top cards */
+/* on the play screen, in the top row between its cards (its height, centred on them); under them when the row is full */
+body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-height: 76px; }
+@media (max-width: 1600px) { body:has(.hud--top) .pending { top: 104px; min-height: 0; } }
 @media (max-width: 600px) { .pending { flex-wrap: wrap; justify-content: center; text-align: center; } }
 /* the faucet and the address to paste there, on one line */
 .getgnot { white-space: nowrap; }
