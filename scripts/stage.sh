@@ -10,8 +10,8 @@
 # checks nothing of the old one is left; then lints the result with the
 # pearl toolchain and prints each package's size.
 #
-# GNO is the gno binary to lint with (default: the pearl toolchain store
-# under ~/.cache/gno-toolchains/pearl), GNOROOT its source tree.
+# GNO is the gno binary to lint with (default: the pearl toolchain store,
+# see docs/design/deploy-v1.md), GNOROOT its source tree.
 set -eu
 
 ns=${1:?usage: stage.sh <ns> <out>}

@@ -89,11 +89,7 @@ func register(cur realm, slug string) string { return mine(cur, slug, flatHole("
 
 // simAt is SimulateRoundAt in any period, old ones included: what the
 // weather tests compare.
-func simAt(id, shots string, period int64) string {
-	e := readHole(id)
-	h := e.hole()
-	return simulateRound(e, h, h.Start(), 0, shots, period)
-}
+func simAt(id, shots string, period int64) string { return simulateRound(id, nil, 0, shots, period) }
 
 // TestPreviewMatchesPlay pins the invariant the whole client model rests on: a
 // shot resolved by the free query and the same shot committed must land in the

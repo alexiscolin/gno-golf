@@ -181,18 +181,17 @@ test("onOurNode: null with no wallet, no GetNetwork or no rpc; true/false by por
 });
 
 // ------------------------------------------------------ ensureNetwork (via recordRound)
-// ensureNetwork is not exported; recordRound always runs it first (unless
-// chainId is falsy), so every SwitchNetwork/AddNetwork/GetNetwork path and
-// message is reachable through it.
+// ensureNetwork is not exported; recordRound always runs it first, so every
+// SwitchNetwork/AddNetwork/GetNetwork path and message is reachable through it.
 const roundArgs = (over: Record<string, unknown> = {}) => ({
   address: ADDR, realm: REALM, hole: "garden/7", shots: ["1,1"], chainId: CHAIN, rpc: RPC, ...over,
 });
 
-test("ensureNetwork: no chainId skips it entirely", async () => {
+test("ensureNetwork: no chainId, no signature (Adena would sign on its own network)", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ chainId: null }));
-  assert.deepEqual(calls.map((c) => c.name), ["DoContract"]);
+  await assert.rejects(recordRound(roundArgs({ chainId: null })), /chain's id is not known/);
+  assert.deepEqual(calls.map((c) => c.name), []);
 });
 
 test("ensureNetwork: already on the right network (with or without an rpc in the reply) never switches", async () => {
@@ -353,11 +352,18 @@ test("commitsOf: the work budget cuts sooner than maxShots for heavy (unknown-le
 
 test("gasOf: PER_CALL alone for an empty range; the forecast and the shots add on top, capped at MAX_GAS", () => {
   assert.equal(gasOf({}), 30_000_000);
-  assert.equal(gasOf({ kind: "rain", pts: [100] }, 0, 1), 30_000_000 + RULES.forecastGas + 10_000_000 + 100 * 1_200_000);
-  // "storm" mirrors adena.ts's private FORECAST.storm (150e6); RULES has no
-  // entry for it, so this one is hard-coded rather than reused
-  assert.equal(gasOf({ kind: "storm", pts: [100] }, 0, 1), 30_000_000 + 150_000_000 + 10_000_000 + 100 * 1_200_000);
+  // without the realm's own figure, the forecast's most (adena.ts FORECAST: rain 200M, a storm 210M)
+  assert.equal(gasOf({ kind: "rain", pts: [100] }, 0, 1), 30_000_000 + 200_000_000 + 10_000_000 + 100 * 1_200_000);
+  assert.equal(gasOf({ kind: "storm", pts: [100] }, 0, 1), 30_000_000 + 210_000_000 + 10_000_000 + 100 * 1_200_000);
+  // with it (Weather() "gas"), that figure, whatever the kind
+  assert.equal(gasOf({ kind: "storm", fixed: 15_728_000, pts: [100] }, 0, 1), 30_000_000 + 15_728_000 + 10_000_000 + 100 * 1_200_000);
   assert.equal(gasOf({ walls: 1000, pieces: 1000, pts: [2000] }, 0, 1), 1_900_000_000);
+});
+
+test("gasOf: a shot is counted by its path or by its physics' work (Shot.Work), the larger, as the realm does", () => {
+  const path = 10_000_000 + 100 * 1_200_000;
+  assert.equal(gasOf({ pts: [100], works: [50_000] }, 0, 1), 30_000_000 + path); // the path's is larger
+  assert.equal(gasOf({ pts: [100], works: [637_500] }, 0, 1), 30_000_000 + 10_000_000 + 637_500 * RULES.work.unit); // the work's
 });
 
 // ------------------------------------------------------------------ chainSplit
@@ -428,28 +434,38 @@ test("chainSplit: any other refusal is not retried", async () => {
 // ------------------------------------------------------------------ recordRound
 test("recordRound: not installed", async () => {
   setWindow(undefined);
-  await assert.rejects(() => recordRound(roundArgs({ chainId: null })), /not installed/);
+  await assert.rejects(() => recordRound(roundArgs()), /not installed/);
 });
 
 test("recordRound: Reset + PlayRound for a fresh, period-less, assisted round", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ chainId: null, shots: ["1,1", "2,2"] }));
+  await recordRound(roundArgs({ shots: ["1,1", "2,2"] }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string; args: string[] } }[]; gasFee: number; gasWanted: number; networkInfo?: unknown };
   assert.deepEqual(
     tx.messages.map((m) => m.value.func),
     ["Reset", "PlayRound"],
   );
   assert.deepEqual(tx.messages[1].value.args, ["garden/7", "1,1;2,2"]);
-  assert.equal(tx.networkInfo, undefined); // no chainId: no pinned network
+  assert.deepEqual(tx.networkInfo, { chainId: CHAIN, rpcUrl: RPC }); // the network the tx is signed for
   assert.equal(tx.gasWanted, 1_900_000_000); // no gas given: MAX_GAS
   assert.equal(tx.gasFee, Math.ceil(1_900_000_000 * 0.001 * 1.5));
+});
+
+test("recordRound: a name taken in the same signature, Register first and Claim last, their gas added", async () => {
+  const { a, calls } = fakeAdena();
+  setWindow({ adena: a });
+  await recordRound(roundArgs({ shots: ["1,1"], gas: 100_000_000, named: { registrar: "gno.land/r/sys/namereg/v1", name: "nym-golfer482" } }));
+  const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
+  assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func]), [["gno.land/r/sys/namereg/v1", "Register"], [REALM, "Reset"], [REALM, "PlayRound"], [REALM, "Claim"]]);
+  assert.deepEqual(tx.messages[0].value.args, ["nym-golfer482"]);
+  assert.equal(tx.gasWanted, 100_000_000 + 60_000_000 + 90_000_000);
 });
 
 test("recordRound: reset=false continues a round with PlayRound alone", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ chainId: null, reset: false }));
+  await recordRound(roundArgs({ reset: false }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string } }[] };
   assert.deepEqual(tx.messages.map((m) => m.value.func), ["PlayRound"]);
 });
@@ -457,7 +473,7 @@ test("recordRound: reset=false continues a round with PlayRound alone", async ()
 test("recordRound: a period sends PlayRoundAt", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ chainId: null, period: 5 }));
+  await recordRound(roundArgs({ period: 5 }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string; args: string[] } }[] };
   assert.deepEqual(tx.messages[1].value, { caller: ADDR, send: "", pkg_path: REALM, func: "PlayRoundAt", args: ["garden/7", "1,1", "5"] });
 });
@@ -475,14 +491,14 @@ test("recordRound: mode=pro sends PlayRoundPro, and networkInfo is pinned when c
 test("recordRound: a pro round without a period cannot be saved, and nothing is sent", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await assert.rejects(() => recordRound(roundArgs({ chainId: null, mode: "pro", period: null })), /no weather period/);
+  await assert.rejects(() => recordRound(roundArgs({ mode: "pro", period: null })), /no weather period/);
   assert.equal(calls.some((c) => c.name === "DoContract"), false);
 });
 
 test("recordRound: gas is capped at MAX_GAS, and the fee follows it", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ chainId: null, gas: 5_000_000_000 }));
+  await recordRound(roundArgs({ gas: 5_000_000_000 }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { gasWanted: number; gasFee: number };
   assert.equal(tx.gasWanted, 1_900_000_000);
   assert.equal(tx.gasFee, Math.ceil(1_900_000_000 * 0.001 * 1.5));
@@ -491,7 +507,7 @@ test("recordRound: gas is capped at MAX_GAS, and the fee follows it", async () =
 test("recordRound: an ordinary gas figure and price set the fee (gas * price * 1.5, rounded up)", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ chainId: null, gas: 1000, price: 0.001 }));
+  await recordRound(roundArgs({ gas: 1000, price: 0.001 }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { gasWanted: number; gasFee: number };
   assert.equal(tx.gasWanted, 1000);
   assert.equal(tx.gasFee, 2); // ceil(1000 * 0.001 * 1.5) = ceil(1.5)
@@ -500,7 +516,7 @@ test("recordRound: an ordinary gas figure and price set the fee (gas * price * 1
 test("recordRound: cancelled in Adena is flagged; a refused (chain) error is not", async () => {
   const cancelled = fakeAdena({ DoContract: () => ({ status: "failure", code: 4000 }) });
   setWindow({ adena: cancelled.a });
-  await assert.rejects(() => recordRound(roundArgs({ chainId: null })), (e: unknown) => {
+  await assert.rejects(() => recordRound(roundArgs()), (e: unknown) => {
     assert.ok(e instanceof Error);
     assert.match(e.message, /Cancelled in Adena — nothing was sent\./);
     assert.equal((e as SendError).cancelled, true);
@@ -509,7 +525,7 @@ test("recordRound: cancelled in Adena is flagged; a refused (chain) error is not
 
   const refused = fakeAdena({ DoContract: () => ({ status: "failure", data: { error: { message: "golf: hole not found" } } }) });
   setWindow({ adena: refused.a });
-  await assert.rejects(() => recordRound(roundArgs({ chainId: null })), (e: unknown) => {
+  await assert.rejects(() => recordRound(roundArgs()), (e: unknown) => {
     assert.ok(e instanceof Error);
     assert.match(e.message, /golf: hole not found/);
     assert.equal((e as SendError).cancelled, false);
@@ -533,7 +549,7 @@ test("why(): every status code and refusal shape reads out in words", async () =
   for (const { res, expect } of cases) {
     const { a } = fakeAdena({ DoContract: () => res });
     setWindow({ adena: a });
-    await assert.rejects(() => recordRound(roundArgs({ chainId: null })), expect, JSON.stringify(res));
+    await assert.rejects(() => recordRound(roundArgs()), expect, JSON.stringify(res));
   }
 });
 
@@ -541,14 +557,14 @@ test("why(): an error of null falls back to the chain's log, not a TypeError", a
   // typeof null is "object": why() must not read .message on it
   const { a } = fakeAdena({ DoContract: () => ({ status: "failure", data: { error: null, log: "chain boom" } }) });
   setWindow({ adena: a });
-  await assert.rejects(() => recordRound(roundArgs({ chainId: null })), (e: Error) => e.message === "chain boom");
+  await assert.rejects(() => recordRound(roundArgs()), (e: Error) => e.message === "chain boom");
 });
 
 // ------------------------------------------------------ calls(), registerName, claimRounds
 test("registerName: Register then Claim in one transaction, gas = REGISTER_GAS + CLAIM_GAS", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v1", realm: REALM, name: "nym", rpc: RPC, chainId: null });
+  await registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v1", realm: REALM, name: "nym", rpc: RPC, chainId: CHAIN });
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
   assert.deepEqual(
     tx.messages.map((m) => [m.value.pkg_path, m.value.func, m.value.args]),
@@ -561,7 +577,7 @@ test("registerName: refused names the default failure", async () => {
   const { a } = fakeAdena({ DoContract: () => ({ status: "failure" }) });
   setWindow({ adena: a });
   await assert.rejects(
-    () => registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v1", realm: REALM, name: "nym", rpc: RPC, chainId: null }),
+    () => registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v1", realm: REALM, name: "nym", rpc: RPC, chainId: CHAIN }),
     /The name was not registered\./,
   );
 });
@@ -579,7 +595,7 @@ test("claimRounds: Claim alone, gas = CLAIM_GAS, and runs ensureNetwork like any
 test("claimRounds: refused names its own default failure, and cancellation is flagged", async () => {
   const { a } = fakeAdena({ DoContract: () => ({ status: "failure" }) });
   setWindow({ adena: a });
-  await assert.rejects(() => claimRounds({ address: ADDR, realm: REALM, rpc: RPC, chainId: null }), (e: unknown) => {
+  await assert.rejects(() => claimRounds({ address: ADDR, realm: REALM, rpc: RPC, chainId: CHAIN }), (e: unknown) => {
     assert.ok(e instanceof Error);
     assert.match(e.message, /Your rounds were not ranked\./);
     assert.equal((e as SendError).cancelled, false);
@@ -588,7 +604,7 @@ test("claimRounds: refused names its own default failure, and cancellation is fl
 
   const cancelled = fakeAdena({ DoContract: () => ({ status: "failure", code: 4000 }) });
   setWindow({ adena: cancelled.a });
-  await assert.rejects(() => claimRounds({ address: ADDR, realm: REALM, rpc: RPC, chainId: null }), (e: unknown) => {
+  await assert.rejects(() => claimRounds({ address: ADDR, realm: REALM, rpc: RPC, chainId: CHAIN }), (e: unknown) => {
     assert.equal((e as SendError).cancelled, true);
     return true;
   });
@@ -658,7 +674,10 @@ test("gnokeyPlan: a community hole (official: false) asks DECODE_MAX more gas th
   const off = gnokeyPlan({ ...s, official: true }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const comm = gnokeyPlan({ ...s, official: false }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const gasOfCmd = (c: string) => Number(/-gas-wanted (\d+)/.exec(c)![1]);
-  assert.equal(gasOfCmd(comm[0].command) - gasOfCmd(off[0].command), 70_000_000);
+  assert.equal(gasOfCmd(comm[0].command) - gasOfCmd(off[0].command), 115_000_000);
+  // the realm's own figure said (Weather() "gas"): it holds the decoding already
+  const said = gnokeyPlan({ ...s, official: false, fixed: 40_000_000 }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
+  assert.equal(gasOfCmd(said[0].command) - gasOfCmd(off[0].command), 40_000_000);
 });
 
 test("gnokeyPlan: an invalid chain id or rpc falls back to a placeholder in the command", () => {

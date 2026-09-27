@@ -7,11 +7,11 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
 
 /**
- * A button. variant: "primary" (green), "secondary" (paper), "chain" (the
- * blue on-chain one), "chip" (a HUD card that is a button), "icon" (round).
- * badge: a small label pinned to its top-right corner ("Coming soon", PRO).
+ * A button. variant: "primary" (green), "secondary" (paper), "chip" (a HUD
+ * card that is a button). badge: a small label pinned to its top-right corner
+ * ("Coming soon", PRO).
  */
-const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", chain: "btn--chain", chip: "btn--chip", icon: "btn--icon" };
+const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", chip: "btn--chip" };
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: keyof typeof VARIANTS;
   badge?: ReactNode;
@@ -71,9 +71,9 @@ export function Toggle({ label, checked, onChange }: { label: ReactNode; checked
 const CloseX = () => (
   <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4 16 16M16 4 4 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
 );
-export function SheetClose({ onClose, inline = false, first = false }: { onClose: () => void; inline?: boolean; first?: boolean }) {
+export function SheetClose({ onClose, inline = false }: { onClose: () => void; inline?: boolean }) {
   return (
-    <button className={"round round--small round--x" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose} data-autofocus={first || undefined}>
+    <button className={"round round--small round--x" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose}>
       <CloseX />
     </button>
   );
@@ -86,12 +86,13 @@ const open: object[] = [];
 // (Safari, a scripted click), so a dialog knows what opened it all the same
 let pressed: HTMLElement | null = null;
 if (typeof document !== "undefined")
-  document.addEventListener("pointerdown", (e) => { pressed = e.target instanceof Element ? e.target.closest<HTMLElement>("button, a, summary, [tabindex]") : null; }, true);
+  document.addEventListener("pointerdown", (e) => void (pressed = e.target instanceof Element ? e.target.closest<HTMLElement>("button, a, summary, [tabindex]") : null), true);
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
- * What every dialog does: focus moves into it when it opens (its first
- * control, the close button in a sheet), Tab and Shift-Tab stay inside it,
+ * What every dialog does: focus moves into it when it opens (the dialog
+ * itself: no control is picked for the player, no ring shows until they Tab),
+ * Tab and Shift-Tab stay inside it,
  * Escape closes it (when it can be closed), and focus goes back to what
  * opened it once it is gone. Returns the ref for the dialog's element.
  */
@@ -106,9 +107,7 @@ export function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => v
     // what opened it: the focused control, else the one last pressed (never one
     // of its own: a dev remount finds its own control focused already)
     const back = [active instanceof HTMLElement && active !== document.body ? active : null, pressed].find((x) => x && !(el && el.contains(x))) || null;
-    // its main action when it names one (data-autofocus), else its first control
-    const first = el && (el.querySelector<HTMLElement>("[data-autofocus]") || el.querySelector<HTMLElement>(FOCUSABLE));
-    (first || el)?.focus({ preventScroll: true });
+    el?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (open[open.length - 1] !== me || !ref.current) return;
       if (e.key === "Escape" && close.current) return e.stopPropagation(), close.current();
@@ -116,7 +115,8 @@ export function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => v
       const all = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null);
       if (!all.length) return e.preventDefault();
       const a = all[0], z = all[all.length - 1];
-      if (!ref.current.contains(document.activeElement)) return e.preventDefault(), a.focus();
+      // from outside, or from the dialog itself: to its first control (its last going back)
+      if (!ref.current.contains(document.activeElement) || document.activeElement === ref.current) return e.preventDefault(), (e.shiftKey ? z : a).focus();
       if (e.shiftKey && document.activeElement === a) e.preventDefault(), z.focus();
       else if (!e.shiftKey && document.activeElement === z) e.preventDefault(), a.focus();
     };

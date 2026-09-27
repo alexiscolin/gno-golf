@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { reducedMotion } from "../device";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { GRASS } from "./common";
 import { ud, md, type Height, type WaterMask } from "./data";
@@ -103,7 +104,7 @@ const hullThin = hullOf(0.028);
 // it is decoration, and all of it stops for a player who asked the system for
 // less motion.
 
-export const motion = typeof matchMedia === "undefined" || !matchMedia("(prefers-reduced-motion: reduce)").matches;
+export const motion = !reducedMotion();
 const clock = { value: 0 };
 /** Advances the garden's clock; the engine calls it once a frame. */
 export const setTime = (t: number) => { if (motion) clock.value = t; };

@@ -2,7 +2,7 @@
 // the URL. It hides the HUD, runs the page on a clock it steps one frame at a
 // time (so a capture is smooth whatever the machine), lets a script move the
 // camera and draw titles over the course, and records the game's own sounds
-// into an offline buffer. Driven by the promo renderer via window.__promo.
+// into an offline buffer. Driven from media/promo/render.mjs via window.__promo.
 
 import { behind, chaseState } from "./chase";
 import { smoothstep } from "./terrain";
@@ -36,7 +36,7 @@ interface PromoEngine {
 }
 /** A board point for the camera: [u, y, v, dz]: fractions across and along the board, a height, an extra depth. */
 type Key = readonly [number, number, number, number?];
-/** A shot's camera (from the promo's shot list): one of four moves and its numbers. */
+/** A shot's camera (media/promo/shots.json): one of four moves and its numbers. */
 interface Cam {
   mode?: "follow" | "track" | "orbit" | "keys";
   dur?: number;

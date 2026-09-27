@@ -90,13 +90,18 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 // walls are met (pulse, slope, storm, timed); sea and tunnel did not move.
 // 2026-09-26, a hazard sends the ball back where the stroke was played
 // from, not to its Vec: the sea's replay moved (its later strokes).
+// 2026-09-27, each shot's "work" in the Simulate* answers: the replay column
+// moved on all six; with "work" taken out it hashes as it did (pulse
+// deb2fa81ccd4573d, sea d841bb88749cafa5, slope ee9475088019c6cd, storm
+// 384620ca83b7330d, timed 3d16130d4e52c06b, tunnel ff92e949423cf8b8). The
+// forecast and State columns did not move.
 var golden = map[string][3]string{
-	"pulse":  {"deb2fa81ccd4573d", "076ac3e7c0d705a9", "4e9da97515c48b33"},
-	"sea":    {"d841bb88749cafa5", "c3224daa821020f4", "807b1e8fc908df52"},
-	"slope":  {"ee9475088019c6cd", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
-	"storm":  {"384620ca83b7330d", "217b2a005fc76324", "cd0874fd52e8179f"},
-	"timed":  {"3d16130d4e52c06b", "c3224daa821020f4", "e4dbc97ea48d1ede"},
-	"tunnel": {"ff92e949423cf8b8", "c3224daa821020f4", "335763617c2e9b50"},
+	"pulse":  {"2df4849397343b5c", "076ac3e7c0d705a9", "4e9da97515c48b33"},
+	"sea":    {"9cc043701ff301c4", "c3224daa821020f4", "807b1e8fc908df52"},
+	"slope":  {"0983305ba509f74d", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
+	"storm":  {"51af6518629e6a99", "217b2a005fc76324", "cd0874fd52e8179f"},
+	"timed":  {"d32d1dc343013582", "c3224daa821020f4", "e4dbc97ea48d1ede"},
+	"tunnel": {"325ffde22c9b1a13", "c3224daa821020f4", "335763617c2e9b50"},
 }
 
 // goldAt keeps h as data under id, listed as its realm hole was: the world

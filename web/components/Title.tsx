@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import "@/app/title.css";
 import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
-import { AboutButton } from "@/components/About";
+import { AboutButton, ICON } from "@/components/About";
 import { SLOW_KEY } from "@/lib/engine/pace";
+import { camlog } from "@/lib/testhooks";
+import { reducedMotion } from "@/lib/device";
 import type { makeTitle } from "@/lib/scene/title";
 
 /** The live title scene, once its module has loaded and made it. */
@@ -190,7 +192,7 @@ const nextWorld = () => {
   return SCENES[i];
 };
 const wantsStill = () => {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+  if (reducedMotion()) return true;
   try {
     const gfx = localStorage.getItem("gnogolf.gfx");
     // Low, or Auto on a device whose frames were slow (the engine's own flag)
@@ -285,7 +287,7 @@ function useTitleScene(host: RefObject<HTMLDivElement | null>, film: RefObject<H
       t.resize();
       if (v.phase === "splash") t.go();
       show();
-      if (/[?&]camlog/.test(location.search)) (window.__title = t), (window.__titleFilm = v.video); // the perf probe's hook
+      if (camlog()) (window.__title = t), (window.__titleFilm = v.video); // the perf probe's hook
     });
     return () => {
       on = false;
@@ -321,7 +323,7 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
   const host = useRef<HTMLDivElement>(null), film = useRef<HTMLDivElement>(null);
   const scene = useTitleScene(host, film);
   // ?titlebake (dev): the stills' and clips' baker (window.__titleStill,
-  // __cupClip), for the title bake script and the promo renderer
+  // __cupClip), for media/camera/titlebake.mjs and media/promo/render.mjs
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) void import("@/lib/scene/titlebake");
   }, []);
@@ -351,7 +353,6 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
       {onAbout && <AboutButton onClick={onAbout} />}
       <div className="title">
         <div className="title__logo">
-          <div className="title__sun" aria-hidden="true" />
         <svg className="title__art" viewBox="0 0 600 505" aria-label="Gnogolf">
           <defs>
             <path id="arc" d="M 70 330 A 230 230 0 0 1 530 330" />
@@ -360,37 +361,62 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
               <stop offset=".55" stopColor="#2a9d74" />
               <stop offset="1" stopColor="#1c7a5a" />
             </linearGradient>
+            {/* the badge and the gnome's head, once: their ink outline, their
+                extrusion and their fills are all <use>s of these */}
+            <polygon id="badge" points={burst(18, 86, 104)} />
+            <g id="gnome">
+              <rect id="gnome-face" x="40" y="100" width="120" height="44" rx="6" />
+              <path id="gnome-beard" d="M 40 116 Q 34 190 100 214 Q 166 190 160 116 Q 140 146 100 142 Q 60 146 40 116 Z" />
+              <path id="gnome-hat" d="M 28 95 Q 40 91 48.7 76 L 96.5 7 Q 100 -1.5 103.5 7 L 151.3 76 Q 160 91 172 95 Z" />
+              <rect id="gnome-brim" x="26" y="90" width="148" height="20" rx="10" />
+            </g>
+            {/* each shade is clipped to its own shape, so it follows that shape's rounded edges */}
+            <clipPath id="clip-hat"><use href="#gnome-hat" /></clipPath>
+            <clipPath id="clip-brim"><use href="#gnome-brim" /></clipPath>
+            <clipPath id="clip-face"><use href="#gnome-face" /></clipPath>
+            <clipPath id="clip-beard"><use href="#gnome-beard" /></clipPath>
           </defs>
           <text className="title__word">
             <textPath href="#arc" startOffset="50%" textAnchor="middle">GNOGOLF</textPath>
           </text>
-          {/* two clubs crossed behind the badge, heads down, and a ball on its tee */}
           <g className="title__clubs">
             <g transform="rotate(-44 300 330)">
               <rect x="293" y="118" width="14" height="360" rx="7" className="title__shaft" />
               <rect x="289" y="118" width="22" height="62" rx="9" className="title__grip" />
               <path d="M 283 470 L 343 470 Q 355 470 355 482 L 355 492 Q 355 500 345 500 L 283 500 Z" className="title__head" />
+              <path d="M 289 478 H 340" className="title__glint" />
             </g>
             <g transform="rotate(44 300 330)">
               <rect x="293" y="118" width="14" height="360" rx="7" className="title__shaft" />
               <rect x="289" y="118" width="22" height="62" rx="9" className="title__grip" />
               <path d="M 317 470 L 257 470 Q 245 470 245 482 L 245 492 Q 245 500 255 500 L 317 500 Z" className="title__head" />
+              <path d="M 311 478 H 260" className="title__glint" />
             </g>
           </g>
           <g transform="translate(300 298) scale(1.25) translate(-100 -110)">
-            <polygon points={burst(18, 86, 104)} className="title__burst" />
-            {/* the outline is the same shapes drawn first with a thick ink
-                stroke: it hugs every edge, and no inner line shows */}
-            <g className="title__outline">
-              <rect x="40" y="100" width="120" height="44" rx="6" />
-              <path d="M 40 116 Q 34 190 100 214 Q 166 190 160 116 Q 140 146 100 142 Q 60 146 40 116 Z" />
-              <path d="M 32 100 L 100 2 L 168 100 Z" />
-              <rect x="26" y="90" width="148" height="20" rx="10" />
-            </g>
-            <rect x="40" y="100" width="120" height="44" rx="6" className="title__face" />
-            <path d="M 40 116 Q 34 190 100 214 Q 166 190 160 116 Q 140 146 100 142 Q 60 146 40 116 Z" className="title__beard" />
-            <path d="M 32 100 L 100 2 L 168 100 Z" className="title__hat" />
-            <rect x="26" y="90" width="148" height="20" rx="10" className="title__hat" />
+            {/* the badge a block like the word: inked, on its extrusion, a lighter sun in it */}
+            <use href="#badge" y="8" className="title__outline" />
+            <use href="#badge" className="title__outline" />
+            <use href="#badge" className="title__burst" />
+            <circle cx="100" cy="100" r="78" className="title__disc" />
+            {/* the head on its own extrusion, then its fills: lit from the left */}
+            <use href="#gnome" y="8" className="title__outline" />
+            <use href="#gnome" className="title__outline" />
+            <use href="#gnome-face" className="title__face" />
+            {/* the brim's shadow cast on the forehead, deeper to the right */}
+            <path d="M 20 90 H 180 V 119 C 150 119 120 117 100 116 C 70 115 45 113 20 113 Z" clipPath="url(#clip-face)" className="title__faceshade" />
+            <use href="#gnome-beard" className="title__beard" />
+            {/* the beard lit from the left, as the hat: the band under the face and its right side, one cool shade */}
+            <path d="M 20 100 H 180 V 230 H 100 Q 136 192 129 162 Q 124 150 106 151 C 82 153 60 150 40 136 L 20 128 Z" clipPath="url(#clip-beard)" className="title__beardshade" />
+            <use href="#gnome-hat" className="title__hat" />
+            {/* the cone's shadow side: its edge a soft arc bowing into the shade, the lit side full */}
+            <path d="M 100 -8 C 118.4 35.5 125.3 68.1 127 100 L 127 120 L 200 120 L 200 -8 Z" clipPath="url(#clip-hat)" className="title__shade" />
+            {/* the cone's far edge, in the brim's deeper shade: a band along the outline, thin at the tip */}
+            <path d="M 101 -5 L 200 -5 L 200 120 L 172 120 L 163 90 Q 149.2 88 146 80 C 135.2 53.3 120.8 28.7 103 6 Z" clipPath="url(#clip-hat)" className="title__hatink" />
+            <use href="#gnome-brim" className="title__shade" />
+            {/* the hem's shadow: a squashed half-ellipse at its right end, a rolled tube */}
+            <path d="M 126 85 L 126 90 A 16 10 0 0 0 126 110 L 126 115 L 200 115 L 200 85 Z" clipPath="url(#clip-brim)" className="title__hatink" />
+            <path d="M 86 30 L 64 62" className="title__glint" />
             <circle cx="80" cy="120" r="7" className="title__ink" />
             <circle cx="120" cy="120" r="7" className="title__ink" />
             <circle cx="100" cy="134" r="9" className="title__nose" />
@@ -411,29 +437,15 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
         )}
         <ul className="title__facts">
           <li>
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-              <path d="M8 4 H21 L26 9 V28 H8 Z" className="fi fi--paper" />
-              <path d="M21 4 V9 H26" className="fi" />
-              <path d="M12 14 H22 M12 18 H22 M12 22 H17" className="fi" />
-              <circle cx="22" cy="23" r="3.5" className="fi fi--red" />
-            </svg>
-            <span><b>Every hole</b> is a smart contract</span>
+            <svg viewBox="0 0 32 32" aria-hidden="true">{ICON.chain}</svg>
+            <span><b>Every hole</b> lives on-chain</span>
           </li>
           <li>
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-              <path d="M9 6 L16 16 L23 6" className="fi" />
-              <path d="M16 16 V28" className="fi" />
-              <path d="M9 6 Q16 24 23 6" className="fi fi--band" />
-              <circle cx="16" cy="19" r="3.5" className="fi fi--paper" />
-            </svg>
+            <svg viewBox="0 0 32 32" aria-hidden="true">{ICON.aim}</svg>
             <span><b>Pull back</b> and let go, like a slingshot</span>
           </li>
           <li>
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-              <path d="M10 5 H22 V12 Q22 19 16 19 Q10 19 10 12 Z" className="fi fi--gold" />
-              <path d="M10 8 H6 Q6 14 10 14 M22 8 H26 Q26 14 22 14" className="fi" />
-              <path d="M16 19 V24 M11 28 H21 V24 H11 Z" className="fi" />
-            </svg>
+            <svg viewBox="0 0 32 32" aria-hidden="true">{ICON.keep}</svg>
             <span><b>Free to play</b> · save your score on-chain</span>
           </li>
         </ul>

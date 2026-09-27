@@ -1,6 +1,7 @@
 // What this browser remembers of the player: the camera picked this session,
 // the gnome, and the gnomes earned.
 import { GNOMES } from "./scene/gnome";
+import { reducedMotion } from "./device";
 import { SLOW_KEY } from "./engine/pace";
 import type { CamMode } from "./engine/types";
 
@@ -42,29 +43,40 @@ export function savedGnome() {
   }
 }
 
-/** The gnomes earned in this browser. */
-export function earned(): string[] {
+// A list of ids this browser keeps for good (the gnomes earned, the badges,
+// the weathers holed out in): read back as strings only, a hand edit or an
+// older format must not blank the page.
+function kept(key: string): string[] {
   try {
-    const e: unknown = JSON.parse(localStorage.getItem("gnogolf.earned") || "[]");
-    // a hand edit or an older format must not blank the page: gnome ids only
+    const e: unknown = JSON.parse(localStorage.getItem(key) || "[]");
     return Array.isArray(e) ? e.filter((x): x is string => typeof x === "string") : [];
   } catch {
     return [];
   }
 }
-/** A gnome earned, kept for good. */
-export function remember(id: string) {
+function keep(key: string, ids: readonly string[]) {
   try {
-    const e = earned();
-    if (!e.includes(id)) localStorage.setItem("gnogolf.earned", JSON.stringify([...e, id]));
+    const e = kept(key), add = ids.filter((id) => !e.includes(id));
+    if (add.length) localStorage.setItem(key, JSON.stringify([...e, ...add]));
   } catch {}
 }
+
+/** The gnomes earned in this browser. */
+export const earned = () => kept("gnogolf.earned");
+/** A gnome earned, kept for good. */
+export const remember = (id: string) => keep("gnogolf.earned", [id]);
+/** The badges earned in this browser (lib/card.ts BADGES), and new ones kept for good. */
+export const badgesEarned = () => kept("gnogolf.badges");
+export const rememberBadges = (ids: readonly string[]) => keep("gnogolf.badges", ids);
+/** The weathers a hole was finished in ("" the calm one), for All weathers. */
+export const weathersSeen = () => kept("gnogolf.weathers");
+export const seeWeather = (kind: string) => keep("gnogolf.weathers", [kind]);
 
 /** Stills and no clips on the cup cards: reduced motion, a data saver or a
  *  slow link, the Low graphics tier (or Auto on a device found slow). */
 export function stillsOnly() {
   try {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+    if (reducedMotion()) return true;
     const c = navigator.connection;
     if (c && (c.saveData || /2g/.test(c.effectiveType || ""))) return true;
     const gfx = localStorage.getItem("gnogolf.gfx");

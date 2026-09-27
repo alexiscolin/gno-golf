@@ -1,9 +1,10 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  vsPar, parOf, cupOf, cardKey, scoreOf, legacyOf, oldToSlot, migrate, loadCard, recordScore, clearCard, clearCup,
+  vsPar, parOf, cupOf, cardKey, scoreOf, legacyOf, oldToSlot, migrate, loadCard, recordScore, clearCard, clearCup, badgesFor, byRarity, loadOnChain, markOnChain,
   totals, cupTotals, UNLOCKS, cupHasGnome,
 } from "../lib/card.ts";
+import type { Finish } from "../lib/card.ts";
 
 beforeEach(() => {
   localStorage.clear();
@@ -126,12 +127,12 @@ test("loadCard: corrupt JSON in storage reads as an empty card", () => {
   assert.deepEqual(loadCard(), {});
 });
 
-test("recordScore: keeps the better (lower) of the old and new score", () => {
+test("recordScore: the latest round on a hole replaces the one before, better or worse", () => {
   recordScore("garden/1", 5);
   assert.deepEqual(loadCard(), { "garden/1": 5 });
-  recordScore("garden/1", 7); // worse: ignored
-  assert.deepEqual(loadCard(), { "garden/1": 5 });
-  recordScore("garden/1", 3); // better: kept
+  recordScore("garden/1", 7);
+  assert.deepEqual(loadCard(), { "garden/1": 7 });
+  recordScore("garden/1", 3);
   assert.deepEqual(loadCard(), { "garden/1": 3 });
 });
 
@@ -279,4 +280,38 @@ test("cupHasGnome: true for cups with an unlock, false for the Mountain Cup", ()
   assert.equal(cupHasGnome("town"), true);
   assert.equal(cupHasGnome("mountain"), false);
   assert.equal(cupHasGnome("extras"), false);
+});
+
+// ---- badges ----
+const cupsOf = (card: Record<string, number>) => cupTotals(card, [{ id: "a", slot: "garden/1", par: 3, world: "garden" }, { id: "b", slot: "garden/2", par: 4, world: "garden" }]);
+const finish = (f: Partial<Finish>): Finish => ({ strokes: 3, par: 3, pro: false, kind: "", timed: false, cups: cupsOf({}), weathers: [""], ...f });
+
+test("badges: what a finish earns, rarest first, never twice", () => {
+  assert.deepEqual(badgesFor(finish({ strokes: 1 }), []), ["ace", "eagle"]); // a par 3 in one is also two under
+  assert.deepEqual(badgesFor(finish({ strokes: 1 }), ["ace"]), ["eagle"]);
+  assert.deepEqual(badgesFor(finish({ strokes: 2, pro: true }), []), ["pro"]);
+  assert.deepEqual(badgesFor(finish({ strokes: 3, timed: true, kind: "fog" }), []), ["clock", "fog"]);
+  assert.deepEqual(badgesFor(finish({ strokes: 5, kind: "fog" }), []), []); // over par in the fog: no Fog walker
+  assert.deepEqual(badgesFor(finish({ strokes: 16, kind: "storm" }), []), ["storm", "snail"]);
+  assert.deepEqual(badgesFor(finish({ weathers: ["", "wind", "fog", "rain", "storm", "snow"] }), []), ["weathers"]);
+});
+
+test("badges: a perfect cup is every hole of a cup under par", () => {
+  assert.ok(badgesFor(finish({ cups: cupsOf({ "garden/1": 2, "garden/2": 3 }) }), []).includes("perfect"));
+  assert.ok(!badgesFor(finish({ cups: cupsOf({ "garden/1": 2, "garden/2": 4 }) }), []).includes("perfect")); // one at par
+  assert.ok(!badgesFor(finish({ cups: cupsOf({ "garden/1": 2 }) }), []).includes("perfect")); // not all played
+});
+
+test("badges: the chain's two come from a save, and ids sort rarest first", () => {
+  assert.ok(!badgesFor(finish({ strokes: 1 }), []).some((id) => id === "chain" || id === "first"));
+  assert.deepEqual(byRarity(["snail", "chain", "first", "ace"]), ["first", "ace", "chain", "snail"]);
+});
+
+test("the card's scores saved on-chain: kept per cardKey, the latest save wins", () => {
+  assert.deepEqual(loadOnChain(), {});
+  markOnChain("garden/3", 2);
+  assert.deepEqual(markOnChain("garden/3", 1), { "garden/3": 1 });
+  assert.deepEqual(loadOnChain(), { "garden/3": 1 });
+  localStorage.setItem("gnogolf.onchain", "[1,2]"); // not a map: none
+  assert.deepEqual(loadOnChain(), {});
 });

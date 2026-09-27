@@ -5,11 +5,13 @@
 // Every hole is data: a GG1 string (see p/…/course). A course hole is
 // published by the course's owner into a slot of a cup ("garden/7"), each
 // version its own entry ("garden/7/v1", "garden/7/v2"). Anyone can publish
-// data of their own the same way ("<address>/<slug>/v1", PublishMine): a
-// community hole, playable and recorded, never part of the course or its
-// ranking. No hole runs code of its own: golf decodes the data and plays it
-// with p/…/physics. Who can change what is on the hub page (noAdmin); in
-// short, the owner holds one power, the course itself.
+// data of their own the same way ("<address>/<slug>/v1", PublishMine) once
+// the owner opens publishing: a community hole, playable and recorded, never
+// part of the course or its ranking. No hole runs code of its own: golf
+// decodes the data and plays it with p/…/physics. Who can change what is on
+// the hub page (noAdmin); in short, the owner holds one power, the course
+// itself: its holes (Publish), what the lists show (Hide), and whether
+// anyone can publish (SetPublishing).
 //
 // Reads take a version's id or its alias ("garden/7", "<address>/<slug>"),
 // which is the current version. Writes take the exact id only, the one State
@@ -44,6 +46,14 @@ const (
 	// maxShots is the longest shot list one commit takes. What really bounds a
 	// commit is its work (see workBudget): on a heavy hole fewer shots fit.
 	maxShots = 12
+)
+
+// The refusals said in more than one place.
+const (
+	errShot         = "golf: a shot is an angle and a power between 0 and 10"
+	errStrokeLimit  = "golf: this round is over its stroke limit, Reset to play again"
+	errShotTooHeavy = "golf: one shot on this hole could cost more than a transaction can replay"
+	errUnknownHole  = "golf: unknown hole: "
 )
 
 type entry struct {
@@ -226,6 +236,9 @@ func modeOf(name string) int {
 
 var modeNames = [modes]string{"assisted", "pro"}
 
+// modeTitles is how the pages head a mode's board.
+var modeTitles = [modes]string{"Assisted", "Pro"}
+
 // The indexes are B+ trees: a leaf holds 32 entries, so past the first few
 // an entry costs about 410 bytes instead of an AVL node's 2,030. What players
 // add is in five of them, shared by every version and both modes and seeded
@@ -247,14 +260,21 @@ var (
 	slots = bptree.NewBPTree32()
 	// "<address>/<slug>" -> id of the current version of a community hole
 	aliases = bptree.NewBPTree32()
-	// the community holes by author, two kinds of rows in one tree (a tree's
-	// first leaf is a few KB, which the first to publish would pay):
+	// the community holes shown by author (listed), two kinds of rows in one
+	// tree (a tree's first leaf is a few KB, which the first to publish would
+	// pay):
 	//   - "<address> " + recentKey(its publish height, slug) -> id of the
-	//     current version of a community hole: an author's own, newest last;
-	//   - recentKey(their latest publish height, address) -> nil: one row per
-	//     author, the latest to publish last (authorRows).
+	//     current version of a community hole not hidden: an author's own,
+	//     newest last;
+	//   - recentKey(their newest row's height, address) -> nil: one row per
+	//     author with a row (moveAuthor), the latest to publish last
+	//     (authorRows).
 	// A height is digits and an address "g1…": the two never mix.
 	byAuthor = bptree.NewBPTree32()
+	// "<address>/<slug>" -> true: community holes the owner took off the
+	// lists (Hide), every version, and out of byAuthor; still playable,
+	// still in Community
+	hidden = avl.NewTree()
 	// recentKey(the height it was archived at, id) -> id of an archived
 	// course version: the latest last
 	archived = bptree.NewBPTree32()
@@ -337,7 +357,7 @@ func mustHole(id string) *entry {
 	if now := current(id); now != "" {
 		panic("golf: " + id + " is an alias: play its version by id, " + now)
 	}
-	panic("golf: unknown hole: " + id)
+	panic(errUnknownHole + id)
 }
 
 // readHole is the hole a read names: an exact id, or an alias for its
@@ -349,7 +369,7 @@ func readHole(id string) *entry {
 	if now := current(id); now != "" {
 		return find(now)
 	}
-	panic("golf: unknown hole: " + id)
+	panic(errUnknownHole + id)
 }
 
 // recentKey orders by height, then by what is at that height.
@@ -371,7 +391,15 @@ func rankKey(r *row) string {
 }
 
 // boardKey orders a hole's board: fewest strokes first, then the address.
+// A board's rows read the strokes back from it (boardStrokes), not from the
+// bests.
 func boardKey(strokes int, player string) string { return pad(strokes, 3) + "/" + player }
+
+// boardStrokes is the strokes of a board's key: always its three digits.
+func boardStrokes(k string) int {
+	n, _ := strconv.Atoi(k[:3])
+	return n
+}
 
 // setRow moves a player's standing and keeps the ranking in step. A
 // standing with no hole left ranks nowhere, and neither it nor its ranking
@@ -527,7 +555,7 @@ func Launch(cur realm, hole string, angle, power float64) string {
 		// a pro round by construction
 		r.mode = pro
 	} else if r.mode != pro {
-		panic("golf: this round is being played in " + modeNames[r.mode] + " mode")
+		panic(otherMode(r))
 	}
 
 	fc := weatherOf(e, h, r.period)
@@ -601,7 +629,7 @@ func playRound(e *entry, player address, shots string, period int64, mode int) s
 	} else if r.period != period {
 		panic(ufmt.Sprintf("golf: this round is being played in the weather of period %d", r.period))
 	} else if r.mode != mode {
-		panic("golf: this round is being played in " + modeNames[r.mode] + " mode")
+		panic(otherMode(r))
 	}
 
 	list := shotList(shots)
@@ -620,6 +648,11 @@ func playRound(e *entry, player address, shots string, period int64, mode int) s
 	}
 	return ufmt.Sprintf("%d shots replayed, ball at %.1f,%.1f after %d strokes",
 		w.played, r.bx, r.by, r.strokes)
+}
+
+// otherMode refuses to go on with a round in a mode it was not started in.
+func otherMode(r *round) string {
+	return "golf: this round is being played in " + modeNames[r.mode] + " mode"
 }
 
 // shotList is a commit's shots: the non-empty entries of "a,p;a,p;…", at
@@ -769,10 +802,10 @@ func pulsesOf(h course.Hole) []course.Pulse {
 // work at what is left of it.
 func (w *work) next(h course.Hole) {
 	if w.played == 0 && w.bound > workBudget {
-		panic("golf: one shot on this hole could cost more than a transaction can replay")
+		w.refuse()
 	}
 	if w.played > 0 && w.spent+w.most > workBudget {
-		panic(ufmt.Sprintf("golf: more shots than one transaction can replay on this hole: commit the first %d, then the rest", w.played))
+		w.refuse()
 	}
 	c := (workBudget-w.fixed-w.spent-workPerShot-w.walls*workPerWall)/workPerUnit - physics.MaxWorkStep
 	if c < 1 {
@@ -790,7 +823,7 @@ func (w *work) next(h course.Hole) {
 // refuse refuses the shot being played: it does not fit the budget.
 func (w *work) refuse() {
 	if w.played == 0 {
-		panic("golf: one shot on this hole could cost more than a transaction can replay")
+		panic(errShotTooHeavy)
 	}
 	panic(ufmt.Sprintf("golf: more shots than one transaction can replay on this hole: commit the first %d, then the rest", w.played))
 }
@@ -827,12 +860,9 @@ func Reset(cur realm, hole string) {
 // inside the physics, and after rounding too, so a -359.99996 is recorded as
 // the -0 it is played at, not as -360.
 func validShot(angle, power float64) (float64, float64) {
-	if math.IsNaN(angle) || math.IsInf(angle, 0) || math.IsNaN(power) {
-		panic("golf: a shot is an angle and a power between 0 and 10")
-	}
 	power = q4(power)
-	if !(power > 0 && power <= maxPower) {
-		panic("golf: a shot is an angle and a power between 0 and 10")
+	if math.IsNaN(angle) || math.IsInf(angle, 0) || !(power > 0 && power <= maxPower) {
+		panic(errShot)
 	}
 	angle = q4(math.Mod(angle, 360))
 	if angle <= -360 || angle >= 360 {
@@ -874,7 +904,7 @@ func back(h course.Hole, from physics.Vec2, shot physics.Shot, holed bool) physi
 // stroke resolves one shot into the round and reports whether it was holed.
 func stroke(e *entry, h course.Hole, r *round, player address, angle, power float64, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	if r.strokes >= maxRoundStrokes {
-		panic("golf: this round is over its stroke limit, Reset to play again")
+		panic(errStrokeLimit)
 	}
 	notOver(r.period) // every stroke, not only the first
 	// played exactly as it is recorded, so the record replays
@@ -900,10 +930,11 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 		return shot, false
 	}
 	r.done = true
-	m := r.mode
+	m, p := r.mode, player.String()
+	isNamed := named(p) // a call to r/sys/users: once
 	// the hole's record is shown on the hub and its pages: a named player's,
 	// like the boards, or a throwaway address could hold it for good
-	if rec := e.rec(m); (rec.best == 0 || r.strokes < rec.best) && named(player.String()) {
+	if rec := e.rec(m); (rec.best == 0 || r.strokes < rec.best) && isNamed {
 		if m == pro {
 			e.proBest, e.proBestBy = r.strokes, player
 		} else {
@@ -911,7 +942,6 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 		}
 	}
 	// a player's best stays theirs: replaying the hole never erases it
-	p := player.String()
 	if v := e.bests(m).Get(p); v == nil || r.strokes < v.(int) {
 		was := 0
 		if v != nil {
@@ -930,7 +960,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 			e.out.fresh[m].Set(p, true)
 		}
 	}
-	if named(p) {
+	if isNamed {
 		seat(e, m, p)
 	}
 	if e.official {
@@ -1135,24 +1165,12 @@ func cleanSkin(s string) string {
 	return string(b)
 }
 
-// previewAt and playAt resolve a stroke of a round: a timed hole is given the
-// stroke number, any other hole is played as it always was.
+// previewAt and playAt resolve a stroke of a round: every hole is data
+// (dataHole), played with its stroke number, tick and weather.
 func previewAt(h course.Hole, ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
-	if w, ok := h.(course.Weatherable); ok {
-		return w.PreviewWith(ball, angle, power, stroke, tick, weather)
-	}
-	if t, ok := h.(course.Timed); ok {
-		return t.PreviewAt(ball, angle, power, stroke)
-	}
-	return h.Preview(ball, angle, power)
+	return h.(course.Weatherable).PreviewWith(ball, angle, power, stroke, tick, weather)
 }
 
 func playAt(h course.Hole, ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
-	if w, ok := h.(course.Weatherable); ok {
-		return w.PlayWith(ball, angle, power, stroke, tick, weather)
-	}
-	if t, ok := h.(course.Timed); ok {
-		return t.PlayAt(ball, angle, power, stroke)
-	}
-	return h.Play(ball, angle, power)
+	return h.(course.Weatherable).PlayWith(ball, angle, power, stroke, tick, weather)
 }

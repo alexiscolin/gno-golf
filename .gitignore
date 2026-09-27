@@ -2,8 +2,17 @@
 node_modules/
 .next/
 out/
-web/next-env.d.ts
-.netlify/
-# a local gnokey keybase (private keys) and editor swap files: never in the repo
-gnohome/data/
+# working screenshots stay local; the README's demo and the promo are kept
+media/*
+!media/gnogolf-demo.gif
+!media/promo/
+!media/lib/
+!media/og/
+# promo renders and the music file are rebuilt by media/promo/render.mjs
+media/promo/*.mp4
+media/promo/music/
+media/promo/stills-v4/
+media/promo/stills-check/
+# gnohome/ (a local package cache and gnokey keybase: private keys) and editor swap files: never in the repo
+gnohome/
 *.swp

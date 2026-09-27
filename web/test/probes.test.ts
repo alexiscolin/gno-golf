@@ -46,7 +46,6 @@ function makeRig() {
   const cam = makeCam();
   const replayCalls: unknown[][] = [];
   const rp = { replay: (...args: unknown[]) => (replayCalls.push(args), Promise.resolve()) };
-  const onHoledCalls: unknown[] = [];
   const fakeWeatherCalls: unknown[] = [];
   const placeBallCalls: unknown[] = [];
 
@@ -91,27 +90,19 @@ function makeRig() {
     cam,
     rp,
     placeBall: (...a: unknown[]) => placeBallCalls.push(a),
-    onHoled: (r: { id: string; strokes: number }) => onHoledCalls.push(r),
     fakeWeather: (w: string) => fakeWeatherCalls.push(w),
   };
 
-  return { E, g, camera, scene, course, cam, rp, replayCalls, onHoledCalls, fakeWeatherCalls, placeBallCalls, p: probes(E, inner as never) };
+  return { E, g, camera, scene, course, cam, rp, replayCalls, fakeWeatherCalls, placeBallCalls, p: probes(E, inner as never) };
 }
 
-void test("fakeWin marks the hole done and tells onHoled when a hole is loaded", () => {
-  const { p, g, onHoledCalls } = makeRig();
+void test("fakeWin marks the hole done, and keeps it off the player's card (nobody played it)", () => {
+  const { p, g } = makeRig();
   p.fakeWin(3);
   assert.equal(g.strokes, 3);
   assert.equal(g.done, true);
   assert.equal(g.holed, true);
-  assert.deepEqual(onHoledCalls, [{ id: "garden/1", strokes: 3 }]);
-});
-
-void test("fakeWin says nothing to onHoled without a loaded hole", () => {
-  const { p, g, onHoledCalls } = makeRig();
-  g.id = null;
   p.fakeWin();
-  assert.equal(onHoledCalls.length, 0);
   assert.equal(g.strokes, 2); // the default
 });
 

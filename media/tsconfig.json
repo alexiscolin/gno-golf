@@ -1,0 +1,22 @@
+{
+  // The media scripts stay plain node .mjs, run as they are: each carries
+  // // @ts-check and is checked from its JSDoc and what TypeScript infers,
+  // `web/node_modules/.bin/tsc -p media` from the repo root. cdp.mjs, the
+  // library every driver uses, is typed in full; a driver's own lambdas may
+  // stay unannotated (noImplicitAny off), the rest of strict holds.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["es2023", "dom"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowJs": true,
+    "checkJs": false,
+    "strict": true,
+    "noImplicitAny": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "typeRoots": ["../web/node_modules/@types"]
+  },
+  "include": ["lib/*.mjs", "promo/*.mjs", "camera/*.mjs"]
+}

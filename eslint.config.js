@@ -1,6 +1,6 @@
 // Lint: typescript-eslint's type-checked rules and the React hooks rules for
-// the web client, and the basics for the node scripts that drive it
-// (scripts/, media/lib and media/og). It sits at the root so it reaches those; its plugins are the
+// the web client, and the basics for the node scripts that drive it (media/,
+// scripts/). It sits at the root so it reaches those; its plugins are the
 // client's. Run from web/: `npm run lint` (or `npx eslint .` for the client alone).
 import { createRequire } from "node:module";
 const require = createRequire(new URL("./web/package.json", import.meta.url));
@@ -49,7 +49,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["web/*.mjs", "media/lib/*.mjs", "media/og/*.mjs", "scripts/*.mjs"],
+    files: ["web/*.mjs", "media/promo/*.mjs", "media/camera/*.mjs", "media/lib/*.mjs", "media/og/*.mjs", "scripts/*.mjs"],
     languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: globals.node },
     rules: {
       "no-undef": "error",

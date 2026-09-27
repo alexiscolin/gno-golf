@@ -1,8 +1,8 @@
 #!/bin/sh
 # publishdata.sh [per]: data/holes.txt as MsgRun scripts that Publish every
 # course hole into its slot, per holes a script (default 7: the heaviest
-# seven publish in 0.86e9 gas, which keeps each script under 1e9), written to
-# scripts/publish/. Run each one as the course's owner (a MsgRun, e.g.
+# seven publish in 0.86e9 gas, and gnomcp measures a write at 1e9), written to
+# scripts/publish/. Run each one as the course's owner (gnomcp gno_run, or
 # `gnokey maketx run`), in order; a slot whose data is already its current
 # version is skipped, so a script can be run again after a failure.
 #
@@ -49,7 +49,7 @@ function tail(f) {
 }
 END { if (f != "") tail(f) }
 ' "$root/data/holes.txt"
-# and a read-only check to run after them (run it simulated): the current
+# and a read-only check to run after them (gno_run simulate): the current
 # version of every slot holds the data it is listed with
 {
 	cat <<EOF

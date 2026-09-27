@@ -6,13 +6,15 @@
 // down the screen is +y) — a windsock for how hard, and what falls from the sky.
 // A storm's flashes are the scene's (flash counts them): the screen lights
 // up with the 3D lightning, not on a clock of its own.
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { WeatherNow } from "@/lib/scene/weather";
 
 export default function Weather({ w: given, flash = 0, until = null }: { w: WeatherNow | null; flash?: number; until?: number | null }) {
   // how long this weather lasts: the chain's period ends at until (epoch ms);
   // said in minutes, which a drifting clock spoils less than a time of day
   const [now, setNow] = useState(() => Date.now());
+  const [why, setWhy] = useState(false); // what it does to the ball, a tap away (a tooltip never shows on touch)
+  const popId = useId();
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(t);
@@ -29,13 +31,20 @@ export default function Weather({ w: given, flash = 0, until = null }: { w: Weat
   const said = [w.wind && `${NAMES[force].toLowerCase()}, force ${force} of 4`, w.rain && "rain, the green runs fast", w.fog && "fog", w.storm && "storm"]
     .filter(Boolean)
     .join(" · ");
+  // what it does to the ball, said on a tap
+  const note = [w.wind && `${NAMES[force]}, force ${force}/4: it pushes the ball on the chain; the aim dots include it.`, w.rain && "Rain: the green runs fast.", w.fog && "Fog: the far end is hard to see.", w.storm && "Storm: gusts come and go.", w.snow && "Snow."]
+    .filter(Boolean)
+    .join(" ") || "A clear sky: nothing pushes the ball.";
   return (
     <>
-      <div
+      <button
+        type="button"
         className="card card--weather"
-        role="status"
-        aria-label={`Weather: ${said}`}
-        title={w.wind ? `${NAMES[force]}, force ${force}/4 — it pushes the ball on the chain; the aim dots already include it` : undefined}
+        aria-label={`Weather: ${said || "clear"}. What it does`}
+        aria-expanded={why}
+        aria-describedby={why ? popId : undefined}
+        onClick={() => setWhy((v) => !v)}
+        onBlur={() => setWhy(false)}
       >
         <svg viewBox="0 0 64 64" className="weather__vane" aria-hidden="true">
           <circle cx="32" cy="32" r="29" className="wv__dial" />
@@ -72,7 +81,8 @@ export default function Weather({ w: given, flash = 0, until = null }: { w: Weat
           )}
           {until && <span className="weather__until">{until - now > 60000 ? `for ${Math.ceil((until - now) / 60000)} min` : "changing soon"}</span>}
         </div>
-      </div>
+        {why && <span id={popId} className="aimset__pop weather__pop" role="note">{note}</span>}
+      </button>
       {flash > 0 && <div key={flash} className="lightning" aria-hidden="true" />}
     </>
   );

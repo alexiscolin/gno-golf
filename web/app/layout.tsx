@@ -1,14 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { DESCRIPTION as description, PREVIEW, SITE, TITLE as title } from "@/lib/site";
 
-// Link previews need absolute URLs. Set NEXT_PUBLIC_SITE_URL to where the
-// static export is served (Netlify, Vercel, IPFS gateway…) before building.
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3300";
-
-const title = "Gnogolf — mini-golf on-chain";
-const description =
-  "A 3D mini-golf where every hole is a smart contract someone deployed on gno.land and every shot is computed by the chain. Pick a gnome, pull the slingshot, play free in your browser — no wallet needed. Connect Adena to put your score on-chain.";
+// the link card's: shorter than the search result's
+const card = "Every hole is a contract. Every shot is computed by the chain. Play free in your browser.";
+const image = { url: "/og/default.jpg", type: "image/jpeg", width: 1200, height: 630, alt: "Gnogolf: the gnome badge, mini-golf on-chain, every shot computed by the chain" };
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
@@ -17,21 +14,22 @@ export const metadata: Metadata = {
   applicationName: "Gnogolf",
   keywords: ["mini-golf", "gno.land", "gnolang", "on-chain game", "web3 game", "three.js", "Adena", "smart contracts"],
   authors: [{ name: "gno.land" }],
+  // a preview is a copy of the site: kept out of search results
+  robots: PREVIEW ? { index: false, follow: false } : { index: true, follow: true },
   openGraph: {
     type: "website",
     url: "/",
     siteName: "Gnogolf",
     title,
-    description:
-      "Every hole is a contract. Every shot is computed by the chain. Play free in your browser.",
-    images: [{ url: "/og/default.jpg", width: 1200, height: 630, alt: "Gnogolf: the gnome badge, mini-golf on-chain, every shot computed by the chain" }],
+    description: card,
+    images: [image],
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
     title,
-    description: "Every hole is a contract. Every shot is computed by the chain. Play free in your browser.",
-    images: ["/og/default.jpg"],
+    description: card,
+    images: [image],
   },
 };
 

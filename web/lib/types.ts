@@ -66,6 +66,8 @@ export interface Forecast {
   kind: string;
   wind: Vec2;
   zones: readonly Zone[];
+  /** Weather() only: the gas a commit on the hole spends before its shots in it (decoding, the forecast) */
+  gas?: number;
 }
 
 /** Weather(): a forecast on its own. */
@@ -143,6 +145,8 @@ export interface Flight {
   air: string;
   cause: string;
   rest: Vec2;
+  /** the work the realm's physics did for it (Shot.Work), as its work model counts it */
+  work?: number;
 }
 
 /** SimulateFrom() (and Simulate()): one stroke. */

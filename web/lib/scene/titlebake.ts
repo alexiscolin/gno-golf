@@ -1,6 +1,6 @@
 // The title's and the cup cards' stills and clips, rendered from the live
-// scene (title.ts): dev only, for the title bake script and
-// the promo renderer. Title.tsx loads it on a dev page with
+// scene (title.ts): dev only, for media/camera/titlebake.mjs and
+// media/promo/render.mjs --cups. Title.tsx loads it on a dev page with
 // ?titlebake, which puts both on window; production builds never load it.
 import * as THREE from "three";
 import { makeTitle, golden, holeOf, orbit, CUP, RIDE_AT, RIDE_S } from "./title";
@@ -13,7 +13,7 @@ import type { Hole } from "./data";
 /**
  * A still of the title or of a cup card's diorama, as a PNG data URL on a
  * clear background (the page paints the sky): what the Low tier, no WebGL
- * and reduced motion show. Dev only: the title bake script calls it.
+ * and reduced motion show. Dev only: media/camera/titlebake.mjs calls it.
  */
 export async function titleStill(kind: string, world: string, w: number, h: number) {
   const canvas = document.createElement("canvas");
@@ -69,7 +69,7 @@ export interface CupShot { a: number; r: number; h: number; turn: number; adv: n
 /**
  * A cup card's clip, a frame at a time: clip(world, hole, w, h, shot) ->
  * { frame(k, t) (JPEG data URL at k of the move, 0..1, t s in), destroy() },
- * each frame on the card's own sky. Dev only: the promo renderer calls it.
+ * each frame on the card's own sky. Dev only: media/promo/render.mjs --cups.
  */
 export async function cupClip(world: string, hole: Hole | null, w: number, h: number, shot: CupShot) {
   const canvas = document.createElement("canvas");

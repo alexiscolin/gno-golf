@@ -4,14 +4,16 @@ import (
 	"chain"
 	"chain/runtime"
 	"chain/runtime/unsafe"
+	"strconv"
 	"strings"
 )
 
 // The course's owner: whoever deployed golf, captured once at init. It is the
-// only party golf itself gives a power to (Publish, the play link, the
-// successor, and handing the role on), and every check of it is by the
-// immediate caller (cur.Previous().Address()), never by the transaction's
-// signer, so a realm the owner calls cannot act in their name.
+// only party golf itself gives a power to (Publish, Hide, opening community
+// publishing, the play link, the successor, and handing the role on), and
+// every check of it is by the immediate caller (cur.Previous().Address()),
+// never by the transaction's signer, so a realm the owner calls cannot act in
+// their name.
 //
 // The role passes in two steps (Transfer, then Accept by the recipient), and
 // Renounce gives it up for good: the course is then frozen, with no owner
@@ -32,20 +34,24 @@ var (
 
 // playURL is the 3D client: every page links to it. The owner can move it
 // (SetPlayURL), since a site can be renamed or lost.
-var playURL = "https://gno-golf.netlify.app/"
+var playURL = "https://gnogolf.xyz/"
 
 // successor is the realm that took this course over, "" until the owner
 // names it, once (SetSuccessor).
 var successor string
 
-func init() {
-	owner = unsafe.OriginCaller()
-	// A deploy always has a signer. `gno test` runs init with none (chain
-	// "dev"): there the owner stays "", which holds no power, and the tests
-	// set it themselves.
-	if owner == "" && runtime.ChainID() != "dev" {
+func init() { setUp(unsafe.OriginCaller(), runtime.ChainID()) }
+
+// setUp is init: the deployer owns the course, and community publishing
+// starts closed. A deploy always has a signer. `gno test` runs init with none
+// (chain "dev"): there the owner stays "", which holds no power, and the unit
+// tests set it themselves. Its filetests load golf that way too, with nobody
+// who could open publishing, so there, and only there, it starts open.
+func setUp(deployer address, chainID string) {
+	if deployer == "" && chainID != "dev" {
 		panic("golf: no owner: golf must be deployed by an account")
 	}
+	owner, publishing = deployer, deployer == ""
 }
 
 // Owner is the course's owner, "" once renounced.
@@ -99,8 +105,11 @@ func Renounce(cur realm) {
 	chain.Emit(EventOwnershipRenounced, "from", from.String())
 }
 
-// maxURL bounds the play link.
-const maxURL = 100
+// maxURL bounds the play link, maxPkgPath a successor's pkgpath.
+const (
+	maxURL     = 100
+	maxPkgPath = 100
+)
 
 // SetPlayURL moves the link every page gives to the 3D client. Only the
 // owner can. url is https://, at most 100 characters of letters, digits and
@@ -153,8 +162,69 @@ func SetSuccessor(cur realm, pkgpath string) {
 	chain.Emit(EventSuccessorSet, "successor", pkgpath)
 }
 
+// Hide takes a community hole ("<address>/<slug>", every version of it) off
+// the lists: the hub and Holes, so the 3D game's too. Its data, rounds and
+// page stay, and Community still has it; hide=false puts it back. A hidden
+// hole takes none of its author's perAuthor places, and a new version of it
+// stays hidden. Only the owner can: a name or note that is a scam or abuse
+// would otherwise sit on the course's front page for good. A hole already as
+// asked is left alone: nothing written, no event.
+func Hide(cur realm, slot string, hide bool) {
+	if !isOwner(cur.Previous().Address()) {
+		panic("golf: only the owner can hide a hole")
+	}
+	v := aliases.Get(slot)
+	if v == nil {
+		if e := find(slot); e != nil && !e.official {
+			panic("golf: " + slot + " is a version: hide its hole, " + e.slot)
+		}
+		panic("golf: " + slot + " is not a community hole")
+	}
+	if hidden.Has(slot) == hide {
+		return
+	}
+	// off the lists is out of byAuthor, which is all listed walks: however
+	// many holes are hidden, the lists read none of them
+	e := find(v.(string))
+	a := e.by.String()
+	row := a + " " + recentKey(e.height, slot[len(a)+1:])
+	was := newestRow(a)
+	if hide {
+		hidden.Set(slot, true)
+		byAuthor.Remove(row)
+	} else {
+		hidden.Remove(slot)
+		byAuthor.Set(row, e.id)
+	}
+	moveAuthor(a, was, newestRow(a))
+	chain.Emit(EventHoleHidden, "slot", slot, "hidden", strconv.FormatBool(hide))
+}
+
+// publishing is whether anyone can publish a community hole (PublishMine).
+// It starts closed (setUp): the first 3D client has no hole builder, and
+// publishing opens with the one that does, without a redeploy.
+var publishing bool
+
+// Publishing is whether PublishMine is open.
+func Publishing() bool { return publishing }
+
+// SetPublishing opens community publishing (PublishMine) or closes it again.
+// Only the owner can. Closing it stops new holes and new versions only:
+// every hole published stays playable, listed and on its board. Setting it
+// as it is writes nothing and emits nothing.
+func SetPublishing(cur realm, open bool) {
+	if !isOwner(cur.Previous().Address()) {
+		panic("golf: only the owner can open or close publishing")
+	}
+	if publishing == open {
+		return
+	}
+	publishing = open
+	chain.Emit(EventPublishingSet, "open", strconv.FormatBool(open))
+}
+
 func validPkgPath(p string) bool {
-	if len(p) > maxURL || !strings.HasPrefix(p, "gno.land/r/") {
+	if len(p) > maxPkgPath || !strings.HasPrefix(p, "gno.land/r/") {
 		return false
 	}
 	for _, seg := range strings.Split(p[len("gno.land/r/"):], "/") {
@@ -185,4 +255,6 @@ const (
 	EventOwnershipRenounced      = "OwnershipRenounced"      // from
 	EventPlayURLSet              = "PlayURLSet"              // url
 	EventSuccessorSet            = "SuccessorSet"            // successor
+	EventHoleHidden              = "HoleHidden"              // slot, hidden ("true"/"false")
+	EventPublishingSet           = "PublishingSet"           // open ("true"/"false")
 )

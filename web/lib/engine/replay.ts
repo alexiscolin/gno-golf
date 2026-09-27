@@ -4,7 +4,7 @@
 //
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
-import { buzz, sound, type SoundName } from "../feel";
+import { buzz as shake, sound as say, type SoundName } from "../feel";
 import { causeAt } from "../scene/cause";
 import { at, makeSplash, disposeCourse } from "../scene";
 import { BALL_R, inZone, nearestOnPoly, boxOf } from "../terrain";
@@ -35,7 +35,7 @@ export const SHOW_SPEED = 26;
 // never a hard cap, under which a slower step could look quicker.
 const SHOW_FROM = 16, SHOW_EASE = 12;
 /** The time, in ms, one substep that runs d board units takes on screen. */
-function showMs(d: number) {
+export function showMs(d: number) {
   const v = (d / MS_PER_STEP) * 1000;
   const s = v <= SHOW_FROM ? v : SHOW_FROM + SHOW_EASE * Math.log(1 + (v - SHOW_FROM) / SHOW_EASE);
   return s > 0 ? Math.max(MS_PER_STEP, (d / s) * 1000) : MS_PER_STEP;
@@ -52,6 +52,8 @@ const SURFACE_SOUNDS: Readonly<Record<string, SoundName | undefined>> = { sand: 
 
 export function makeReplay(E: Live) {
   const { g, scene, ground, lift } = E;
+  // a replay nobody watches live (the shot clip's) makes no sound
+  const sound: typeof say = E.quiet ? () => {} : say, buzz: typeof shake = E.quiet ? () => {} : shake;
   /** A tunnel is the one place the ball is somewhere else: the step lands on a
    *  tunnel's destination from inside that tunnel. Distance alone cannot tell —
    *  a full-power first substep is longer than some tunnels. */
@@ -478,7 +480,8 @@ export function makeReplay(E: Live) {
     return out;
   }
 
-  function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "") {
+  /** from: the step it starts at (the clip of a long putt opens mid-roll). */
+  function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "", from = 0) {
     const cutAt = E.cut;
     const path = path0.slice();
     const round = g.round;
@@ -498,9 +501,9 @@ export function makeReplay(E: Live) {
         }
       };
       const requestAnimationFrame = (f: FrameRequestCallback) => window.requestAnimationFrame(guard(f));
-      let i = 0;
+      let i = from;
       rolledBack = -1;
-      air.y = BALL_R + ground(path[0][0], path[0][1]);
+      air.y = BALL_R + ground(path[i][0], path[i][1]);
       air.vy = air.gvy = 0;
       air.up = false;
       air.t = 0;

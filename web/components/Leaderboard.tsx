@@ -10,7 +10,7 @@ import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
-import { messageOf, shortAddr, holeLink, parHere, HONEST } from "@/components/common";
+import { messageOf, shortAddr, holeLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied } from "@/components/common";
 
 // The leaderboards: the sheet (this hole, the course, friends), the top three
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -18,7 +18,7 @@ import { messageOf, shortAddr, holeLink, parHere, HONEST } from "@/components/co
 // address → gno.land name, read once a page; "" is not kept, so a name taken since shows
 const names = new Map<string, Promise<string>>();
 /** A page's names in one read, kept for the Who of each row: one query a page, not one a row. */
-export function primeNames(chain: Chain, addrs: readonly string[]) {
+function primeNames(chain: Chain, addrs: readonly string[]) {
   const todo = addrs.filter((a) => !names.has(a));
   if (!todo.length) return;
   const all = chain.namesOf(todo).catch(() => [] as { player: string; name: string }[]);
@@ -35,18 +35,18 @@ export function nameOnce(chain: Chain, addr: string) {
   return p;
 }
 
-export /**
- * The cup as a grand prix: its emblem, its scorecard (every hole with its
- * par and your score, the hole being played marked), the running total
- * against par, where you stand on the chain's board if you recorded, and
- * what comes next.
- */
-interface BoardProps {
+/** What every board reads: the hole on screen, the chain, the player, the mode. */
+export interface BoardProps {
   s: Snapshot;
   chain: Chain | null;
   me?: string | null;
   mode?: Mode;
+  /** not connected: the way to (the Adena checklist) */
+  onConnect?: () => void;
 }
+/** "Connect Adena", where a board asks for it: a link to the checklist, or the words alone. */
+const ConnectLink = ({ onConnect }: { onConnect?: () => void }) =>
+  onConnect ? <button className="linkish" onClick={onConnect}>Connect Adena</button> : <>Connect Adena</>;
 
 /** An empty board's places, drawn blank: the table is there before its first row. */
 const Ghosts = ({ n = 3 }: { n?: number }) => (
@@ -101,16 +101,14 @@ const FlagMark = ({ f }: { f: Flag | false | undefined }) =>
  * You and your friends, on this hole and across the course, in the mode shown.
  * Read with Bests / Standings, which rank anyone, named or not.
  */
-function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { inHole?: boolean }) {
+function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: BoardProps & { inHole?: boolean }) {
   const [friends, setFriends] = useState(loadFriends);
   // (a failed read shows as no rows)
   const [hole, setHole] = useState<(Partial<Bests> & { rows: readonly StrokesRow[] }) | null>(null);
   const [course, setCourse] = useState<{ holes?: number; rows: readonly StandingRow[] } | null>(null);
   const [adding, setAdding] = useState("");
   const [note, setNote] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the sheet goes first
-  useEffect(() => () => clearTimeout(copiedT.current), []);
+  const [copied, copy] = useCopied();
   const who = [me, ...friends.map((f) => f.addr)].filter((x): x is string => !!x);
   const key = who.join(",");
   useEffect(() => {
@@ -145,18 +143,18 @@ function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { i
   const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
   return (
     <div className="lb friends">
-      {!me && <p className="lb__empty">Connect Adena to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
+      {!me && <p className="lb__empty"><ConnectLink onConnect={onConnect} /> to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
       {who.length > 0 && (<>
       {inHole && <h3>{s.name} <small>par {(hole && hole.par) || parHere(s)}</small></h3>}
       {inHole && !h && <p className="lb__empty">Reading the chain…</p>}
-      {inHole && h && h.length === 0 && <p className="lb__empty">None of you has a recorded round here yet: be the first.</p>}
+      {inHole && h && h.length === 0 && <p className="lb__empty">None of you has a saved round here yet: be the first.</p>}
       {inHole && h && h.length > 0 && (
         <ol>
           {h.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
               <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
-              <span className="lb__holes">{r.strokes} stroke{r.strokes === 1 ? "" : "s"}</span>
+              <span className="lb__holes">{strokesWord(r.strokes)}</span>
               <strong>{vsPar(r.strokes - ((hole && hole.par) || parHere(s)))}</strong>
             </li>
           ))}
@@ -164,14 +162,14 @@ function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { i
       )}
       <h3>The course <small>{course ? `${course.holes} holes` : ""}</small></h3>
       {!c && <p className="lb__empty">Reading the chain…</p>}
-      {c && c.length === 0 && <p className="lb__empty">No recorded rounds yet: be the first.</p>}
+      {c && c.length === 0 && <p className="lb__empty">No saved rounds yet: be the first.</p>}
       {c && c.length > 0 && (
         <ol>
           {c.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
               <span className="lb__who">{label(r.player)}</span>
-              <span className="lb__holes">{r.holes} holes</span>
+              <span className="lb__holes">{holesWord(r.holes)}</span>
               <strong>{r.strokes}</strong>
             </li>
           ))}
@@ -198,7 +196,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { i
       {invite && (
         <button
           className="linkish friends__invite"
-          onClick={() => void navigator.clipboard.writeText(invite).then(() => (setCopied(true), clearTimeout(copiedT.current), (copiedT.current = setTimeout(() => setCopied(false), 1600))), () => {})}
+          onClick={() => void copy(invite)}
         >
           {copied ? "Link copied — send it to a friend" : "Copy an “add me as a friend” link"}
         </button>
@@ -212,7 +210,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true }: BoardProps & { i
  * The leaderboards, in a sheet: this hole's best rounds, and the whole
  * course's. Read from the chain when the sheet opens, not before.
  */
-export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean }) {
+export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true, onConnect }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean }) {
   const [claimed, setClaimed] = useState(0); // rounds just ranked: the board is read again
   // "This hole" is the hole being played: opened from the cups, there is none
   const [tab, setTab] = useState<"friends" | "hole" | "course">(inHole ? "hole" : "course");
@@ -229,7 +227,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
   const newer = self && self.next;
   return (
     <Sheet className="boards" label="Leaderboard" onClose={onClose}>
-        <span className="eyebrow">Recorded on-chain</span>
+        <span className="eyebrow">Saved on-chain</span>
         <h2>Leaderboard</h2>
         <div className="boards__modes">
           <Segmented role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
@@ -238,13 +236,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={inHole ? [["hole", "This hole"], ["course", "The course"], ["friends", "Friends"]] : [["course", "The course"], ["friends", "Friends"]]} />
         {tab !== "friends" && (
           <p className="boards__ranked">
-            Ranked: players with a gno.land name
-            {!(me && myName) && (
-              <>
-                {" "}· <NameLink chain={chain}>get a name ↗</NameLink>
-                {me && myName === "" && <> — get one to appear here</>}
-              </>
-            )}
+            Ranked: players with a gno.land name{!(me && myName) && ", taken when you save"}
           </p>
         )}
         {tab !== "friends" && me && myName && chain && <ClaimRounds chain={chain} me={me} mode={mode} onDone={() => setClaimed((n) => n + 1)} />}
@@ -253,7 +245,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
             Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
           </p>
         )}
-        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} />}
+        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} />}
         <p className="real__fine">Only rounds saved on-chain appear here.</p>
     </Sheet>
   );
@@ -306,7 +298,7 @@ function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"
               ) : (
                 <span>{r.player === me ? "You" : shortAddr(r.player)}</span>
               )}
-              <span>{kind === "hole" ? `${r.strokes} stroke${r.strokes === 1 ? "" : "s"}` : `${r.holes} holes · ${r.strokes}`}</span>
+              <span>{kind === "hole" ? strokesWord(r.strokes) : `${holesWord(r.holes || 0)} · ${strokesWord(r.strokes)}`}</span>
             </li>
           ))}
         </ul>
@@ -329,7 +321,7 @@ type Placed = StrokesRow & { holes?: number; at: number };
  * what proves it, and the connected player sees their own place, pinned under
  * the list when it is further down, with a way to share it.
  */
-export function FullBoard({ kind, s, chain, me, mode = "pro" }: BoardProps & { kind: "hole" | "course" }) {
+export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect }: BoardProps & { kind: "hole" | "course" }) {
   const PAGE = 20;
   const id = s.id || "";
   const [rows, setRows] = useState<readonly Placed[] | null>(null);
@@ -423,7 +415,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro" }: BoardProps & { k
   const myRow = rows && me ? rows.find((r) => r.player === me) : undefined;
   const myPlace = myRow && head ? { at: myRow.at, of: head.players } : mine ? { at: mine.rank, of: mine.of } : null;
   const title = kind === "hole" ? s.name : "The course";
-  const sub = !head ? "" : kind === "hole" ? `par ${par} · ${head.finished} finished${head.finished !== head.players ? `, ${head.players} ranked` : ""}` : `${head.players} ranked`;
+  const sub = !head ? "" : kind === "hole" ? `par ${par} · ${head.finished} finished${head.finished !== head.players ? `, ${head.players} ranked` : ""}` : `${head.players} ranked · most holes, then fewest strokes`;
   return (
     <div className="lb lb--full">
       <h3>
@@ -431,7 +423,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro" }: BoardProps & { k
       </h3>
       {err && <p className="note note--bad">{err}</p>}
       {!rows && !err && <Ghosts />}
-      {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No recorded round yet — connect Adena and be the first.</p></>)}
+      {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No saved round yet: {me ? "save one and be the first." : <><ConnectLink onConnect={onConnect} /> and be the first.</>}</p></>)}
       {shown && shown.rows.length > 0 && (
         <ol>
           {shown.rows.map((r) => (
@@ -528,11 +520,11 @@ export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string
     return () => ((live = false), document.removeEventListener("visibilitychange", back));
   }, [chain, me]);
   // a player with no name is not listed yet: the place is what a name would give
-  return { at, noName: !!me && named === false && ranked, named: () => setNamed(true) };
+  return { at, noName: !!me && named === false && ranked, isNamed: named, named: () => setNamed(true) };
 }
 
 /** The chain's own name registrar on gnoweb (pearl: v1, a local gno and mainnet: v0), NEXT_PUBLIC_NAMEREG if set. */
-export function NameLink({ chain, children }: { chain: Chain | null; children: ReactNode }) {
+function NameLink({ chain, children }: { chain: Chain | null; children: ReactNode }) {
   const [reg, setReg] = useState(process.env.NEXT_PUBLIC_NAMEREG || "");
   useEffect(() => {
     if (reg || !chain) return;
@@ -552,35 +544,55 @@ export function NameLink({ chain, children }: { chain: Chain | null; children: R
  * Takes a gno.land name without leaving the game: the registrar's rules
  * checked as it is typed out, then one transaction in Adena. The boards list
  * named players only, so this comes before the save that should rank.
+ * onPick: the field alone, part of the save below it (the name goes in the
+ * save's own signature): a name the chain would take is handed up, else
+ * null, with ready: whether the save may go (a name checked, or none typed:
+ * no name), never while a typed one is wrong or still being checked; suggest
+ * fills it to start with.
  */
-export function NameForm({ chain, account, chainId, price, lead, onNamed }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void }) {
-  const [stem, setStem] = useState(""); // what follows "nym-"
-  const [err, setErr] = useState<string | null>(null);
+/**
+ * A name typed (what follows "nym-"), the chain asked about it once the typing
+ * rests: taken, too close to one taken. why: "" free, a reason, null when the
+ * chain did not answer (retry asks again), undefined while not asked yet.
+ * ready: none typed, or one the chain would take. chain null: not asked.
+ */
+export function useNameCheck(chain: Chain | null, stem: string) {
+  const name = "nym-" + stem, hint = stem ? nameHint(stem) : "";
+  const [asked, setAsked] = useState<{ name: string; why: string | null } | null>(null);
+  const [tries, setTries] = useState(0);
+  useEffect(() => {
+    if (!chain || !stem || hint) return;
+    let live = true;
+    const t = setTimeout(() => void chain.nameProblem(name).then((why) => live && setAsked({ name, why }), () => live && setAsked({ name, why: null })), 400);
+    return () => ((live = false), clearTimeout(t));
+  }, [chain, name, stem, hint, tries]);
+  const why = asked && asked.name === name ? asked.why : undefined;
+  return { stem, name, hint, why, ready: !stem || why === "", retry: () => setTries((n) => n + 1) };
+}
+export type NameCheck = ReturnType<typeof useNameCheck>;
+
+/**
+ * Taking a gno.land name. On its own: typed, then "Get this name" signs it.
+ * With a save (typed): the name typed and checked by the card's owner, taken
+ * in the save's own signature; no button here.
+ */
+export function NameForm({ chain, account, chainId, price, lead, onNamed, typed }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; typed?: { check: NameCheck; set: (stem: string) => void } }) {
+  const [own, setOwn] = useState("");
+  const mine = useNameCheck(typed ? null : chain, own);
+  const { stem, name, hint, why, retry } = typed ? typed.check : mine;
+  const setStem = typed ? typed.set : setOwn;
+  const [err, setErr] = useState<string | null>(null); // Adena's refusal
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState("");
-  const name = "nym-" + stem;
-  // the registrar's rule, said while typing; the chain checks it again (and
-  // whether it is taken) before Adena opens
-  const hint = !stem
-    ? "5 to 13 letters, then 3 digits"
-    : !/^[a-z]+\d{0,3}$/.test(stem)
-      ? "lowercase letters, then digits"
-      : /^(gno|gl|g1|atom|atone|photon|cosmos)/.test(stem)
-        ? "it cannot start with gno, gl, atom, photon or cosmos"
-        : !/^[a-z]{5,13}(\d|$)/.test(stem)
-          ? "5 to 13 letters"
-          : !/^[a-z]{5,13}\d{3}$/.test(stem)
-            ? "and 3 digits to end"
-            : "";
   const take = async (e: FormEvent) => {
     e.preventDefault();
-    if (hint) return;
+    if (hint || !stem) return;
     setErr(null);
     setBusy(true);
     try {
-      const why = await chain.nameProblem(name);
-      if (why) return setErr(why);
-      await registerName({ address: account, registrar: await chain.nameReg(), realm: chain.realm, name, price, chainId, rpc: chain.rpc });
+      const problem = await chain.nameProblem(name); // asked again: taken since?
+      if (problem) return setErr(problem);
+      await registerName({ address: account, registrar: await chain.nameReg(), realm: chain.realm, name, price, chainId: chainId || (await chain.chainId()), rpc: chain.rpc });
       // read back: the name is the chain's once a block has it
       for (let k = 0; k < 10; k++) {
         names.delete(account);
@@ -596,19 +608,33 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed }: { ch
     }
   };
   if (done) return <p className="note note--good">You are <b>{done}</b> now: save your round to take your place.</p>;
+  const problem = err || why;
+  const bad = !!stem && !!(hint || problem || why === null); // a name typed that the chain would not take, or could not check
   return (
-    <form className="nameform" onSubmit={(e) => void take(e)}>
+    <form className="nameform" onSubmit={(e) => void (typed ? e.preventDefault() : take(e))}>
       <b className="nameform__title">{lead}</b>
-      <span className="nameform__why">The boards list gno.land names. Take yours once: one signature, about 0.5 GNOT.</span>
+      <span className="nameform__why">{typed ? "Only named players are ranked. Yours is taken with this save." : "Only named players are ranked. Take yours once."}</span>
       <span className="nameform__row">
-        <label className="nameform__field">
+        <label className={"nameform__field" + (bad ? " nameform__field--bad" : "")}>
           <span aria-hidden="true">nym-</span>
-          <input value={stem} onChange={(e) => setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim())} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
+          <input value={stem} onChange={(e) => (setErr(null), setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim()))} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
         </label>
-        <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint}>{busy ? "Adena…" : "Take it"}</Button>
+        {!typed && <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint || !stem}>{busy ? "Adena…" : "Get this name"}</Button>}
       </span>
-      <small className={hint ? "" : "nameform__ok"} aria-live="polite">{hint ? `nym-… ${hint}` : `✓ ${name} is well formed`} · <NameLink chain={chain}>names on gno.land ↗</NameLink></small>
-      {err && <small className="nameform__err" role="alert">{err}</small>}
+      <small className={bad ? "nameform__err" : !stem || hint || why === undefined ? "" : "nameform__ok"} aria-live="polite">
+        {typed && !stem
+          ? "No name: this round is saved, not ranked."
+          : hint
+            ? `✗ nym-… ${hint}`
+            : problem
+              ? `✗ ${problem}`
+              : why === null
+                ? <>✗ The chain did not answer. <button type="button" className="linkish" onClick={retry}>Try again</button></>
+                : why === undefined
+                  ? `Checking ${name}…`
+                  : `✓ ${name}`}
+        {bad && typed ? " · Fix it, or clear it to save without a name." : ""} · <NameLink chain={chain}>names on gno.land ↗</NameLink>
+      </small>
     </form>
   );
 }
@@ -689,7 +715,7 @@ function Who({ chain, addr, me, full = false, link }: { chain: Chain | null; add
 }
 
 /** The course's top three on the cups screen, flagged players left out; nothing while the board is empty. */
-export function Podium({ chain, me, mode = "pro", onOpen }: { chain: Chain | null; me?: string | null; mode?: Mode; onOpen: () => void }) {
+export function Podium({ chain, me, mode = "pro", onOpen, extra }: { chain: Chain | null; me?: string | null; mode?: Mode; onOpen: () => void; extra?: ReactNode }) {
   const [top, setTop] = useState<{ rows: readonly StandingRow[]; holes: number } | null>(null);
   useEffect(() => {
     setTop(null);
@@ -712,7 +738,10 @@ export function Podium({ chain, me, mode = "pro", onOpen }: { chain: Chain | nul
     <section className="podium" aria-label="Top players">
       <header className="podium__head">
         <h3>Top players <small>{mode === "pro" ? "Pro" : "Assisted"} · on-chain</small></h3>
-        <button className="linkish" onClick={() => (sound("blip"), onOpen())}>See the leaderboard →</button>
+        <span className="podium__links">
+          {extra}
+          <button className="linkish podium__open" onClick={() => (sound("blip"), onOpen())}>See the leaderboard →</button>
+        </span>
       </header>
       <ol className="podium__row">
         {/* always three places: the ones nobody holds yet drawn blank */}
@@ -727,7 +756,7 @@ export function Podium({ chain, me, mode = "pro", onOpen }: { chain: Chain | nul
               <span className={`podium__medal podium__medal--${i + 1}`}>{i + 1}</span>
               <span className="podium__who"><Who chain={chain} addr={r.player} me={me} full /></span>
               <span className="podium__score">
-                <b>{r.strokes}</b> · {r.holes}/{top!.holes}
+                <b>{r.strokes}</b> strokes · {r.holes}/{top!.holes}
               </span>
             </li>
           ),

@@ -65,7 +65,7 @@ func TestRoundsStoreShotsNotPaths(cur realm, t *testing.T) {
 	// the path Round gives is the last stroke's, from where it started
 	want := SimulateFrom(id, roundIn(id, player).fx, roundIn(id, player).fy, "-20,3", 1, Period())
 	got := Round(id, player)
-	uassert.Equal(t, want[strings.Index(want, `"path"`):strings.Index(want, `,"rest"`)], got[strings.Index(got, `"path"`):len(got)-1])
+	uassert.Equal(t, want[strings.Index(want, `"path"`):strings.Index(want, `,"work"`)], got[strings.Index(got, `"path"`):len(got)-1])
 
 	testing.SetRealm(testing.NewUserRealm(player))
 	Reset(cross(cur), id)

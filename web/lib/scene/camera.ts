@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { isTouch } from "../device";
 import { ISLAND } from "./common";
 import type { LitScene } from "./data";
 import type { Board, HoleState } from "../types";
@@ -26,7 +27,7 @@ export interface Rig {
 
 /** The pixel ratio cap: 1.25 on a desktop (sharp on retina, 30% fewer pixels
  *  than 1.5), 1 on a phone or tablet, whose screens are dense already. */
-export const maxDpr = () => (typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches ? 1 : 1.25);
+export const maxDpr = () => (isTouch() ? 1 : 1.25);
 
 export function makeRenderer(canvas: HTMLCanvasElement) {
   // Light on the machine: the integrated GPU where there are two (the fans

@@ -70,9 +70,10 @@ export interface GameState {
   flash?: number;
   cause?: CauseNote | null;
   note?: string | null;
-  /** the round's decisions, each stroke's path length, the ball exactly as the chain left it */
+  /** the round's decisions, each stroke's path length and its physics' work (Shot.Work), the ball exactly as the chain left it */
   shots: string[];
   pts: number[];
+  works: number[];
   rest: Vec2 | null;
   /** the last shot's heading (radians), and the clock tick it was let go at */
   lastAim?: number | null;
@@ -114,6 +115,8 @@ export interface Live {
   readonly ground: Height;
   readonly lift: (p: Vec2) => THREE.Vector3;
   readonly log: boolean;
+  /** no sound, no buzz (a replay nobody watches live: the shot clip's) */
+  readonly quiet?: boolean;
   readonly tickNow: () => number | null;
   /** cut every animation */
   readonly stop: () => number;
@@ -160,6 +163,9 @@ export interface Snapshot {
   pieces: number;
   kind: string;
   pts: readonly number[];
+  works: readonly number[];
+  /** what a commit on this hole, in this weather, spends before its shots (Weather() "gas"; 0: not said) */
+  fixed: number;
   shots: readonly string[];
   flying: boolean;
   aiming: boolean;

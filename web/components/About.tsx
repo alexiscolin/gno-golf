@@ -9,25 +9,31 @@ import { REALM_PATH } from "@/lib/chain";
 const GITHUB = "https://github.com/alexiscolin", REPO = `${GITHUB}/gno-golf`;
 const out = { target: "_blank", rel: "noopener noreferrer" } as const;
 
-// the game's own inked icons (the title's facts): 32×32, .fi strokes
+// the game's own inked icons (the title's facts): 32×32, .fi ink over
+// paper, one touch of red each
+export const ICON = {
+  aim: (<><path d="M9 6 L16 16 L23 6" className="fi" /><path d="M16 16 V28" className="fi" /><path d="M9 6 Q16 24 23 6" className="fi fi--band" /><circle cx="16" cy="19" r="3.5" className="fi fi--paper" /></>),
+  chain: (<><path d="M8 4 H21 L26 9 V28 H8 Z" className="fi fi--paper" /><path d="M21 4 V9 H26" className="fi" /><path d="M12 14 H22 M12 18 H22 M12 22 H17" className="fi" /><circle cx="22" cy="23" r="3.5" className="fi fi--red" /></>),
+  keep: (<><path d="M10 5 H22 V12 Q22 19 16 19 Q10 19 10 12 Z" className="fi fi--paper" /><path d="M10 8 H6 Q6 14 10 14 M22 8 H26 Q26 14 22 14 M16 19 V24" className="fi" /><path d="M11 24 H21 V28 H11 Z" className="fi fi--red" /></>),
+};
 const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
   {
     title: "You aim",
     text: "Pull back and let go. The game sends your decision, an angle and a power, to the golf realm.",
-    icon: (<><path d="M9 6 L16 16 L23 6" className="fi" /><path d="M16 16 V28" className="fi" /><path d="M9 6 Q16 24 23 6" className="fi fi--band" /><circle cx="16" cy="19" r="3.5" className="fi fi--paper" /></>),
+    icon: ICON.aim,
   },
   {
     title: "The chain plays it",
     text: "The realm runs the physics and sends back the ball's path. Every preview is a free read: no wallet needed to play.",
-    icon: (<><path d="M8 4 H21 L26 9 V28 H8 Z" className="fi fi--paper" /><path d="M21 4 V9 H26" className="fi" /><path d="M12 14 H22 M12 18 H22 M12 22 H17" className="fi" /><circle cx="22" cy="23" r="3.5" className="fi fi--red" /></>),
+    icon: ICON.chain,
   },
   {
     title: "You keep it",
     text: "Adena signs one transaction, the chain replays your shots and the round goes on the board. Nobody can type in a score.",
-    icon: (<><path d="M10 5 H22 V12 Q22 19 16 19 Q10 19 10 12 Z" className="fi fi--gold" /><path d="M10 8 H6 Q6 14 10 14 M22 8 H26 Q26 14 22 14" className="fi" /><path d="M16 19 V24 M11 28 H21 V24 H11 Z" className="fi" /></>),
+    icon: ICON.keep,
   },
 ];
-const FACTS = ["4 cups · 72 holes", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
+const FACTS = ["4 cups · 72 holes · 2 extras", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
 
 /** The round corner button every screen has: back at the top left, about at the top right. */
 function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
@@ -50,7 +56,46 @@ export const AboutButton = ({ onClick }: { onClick: () => void }) => (
   </CornerButton>
 );
 
-export default function About({ onClose, web }: { onClose: () => void; web: string }) {
+// the rules as the chain plays them (golf.gno, docs/golf.md) and the card keeps them (lib/card.ts)
+const RULES: readonly (readonly [string, readonly (readonly [string, string])[]])[] = [
+  ["On the course", [
+    ["Strokes", "Pull back and let go: every shot is a stroke. Hole out in as few as you can; par is the number to beat."],
+    ["Water and falls", "In the water, the sea, off a roof or off the board, the ball goes back where you shot from. The stroke counts, nothing more."],
+    ["Moving pieces", "On a timed hole the pieces run on a clock: the moment you let go decides where they are."],
+    ["Weather", "It changes every 5 minutes, the same for everyone: calm, wind, fog, rain, storm or snow, and the ball runs with it."],
+    ["Aim", "Assisted shows the whole aim line, Pro shows none. Each is ranked on its own boards."],
+    ["Limit", "A round stops at 60 strokes: start the hole again."],
+  ]],
+  ["Your card", [
+    ["Your score", "The cup card keeps your latest score on each hole, in this browser: play a hole again and the new score replaces it. Your best stays on the boards once saved."],
+    ["Cups and gnomes", "A cup is complete once its 18 holes are on your card. Finishing a cup, playing one at par or under and five holes-in-one unlock gnomes."],
+  ]],
+  ["On the boards", [
+    ["Save on-chain", "To rank a round, save it with Adena before the next weather is over (the card counts down). The chain plays your shots again: nobody can type in a score."],
+    ["Ranked", "Players with a gno.land name are ranked. A hole's board keeps each player's best; the course ranking counts holes first, then strokes."],
+  ]],
+];
+
+/** The rules, on a sheet of their own (from the cup card and the about sheet). */
+export function Rules({ onClose, onBadges }: { onClose: () => void; onBadges: () => void }) {
+  return (
+    <Sheet className="about" label="The rules" onClose={onClose}>
+      <span className="eyebrow">How to play</span>
+      <h2>The rules</h2>
+      {RULES.map(([title, list]) => (
+        <section key={title}>
+          <h3 className="about__h">{title}</h3>
+          <ul className="rules">
+            {list.map(([b, text]) => <li key={b}><b>{b}</b> {text}</li>)}
+          </ul>
+        </section>
+      ))}
+      <p className="about__rules"><button className="linkish" onClick={onBadges}>The badges to earn →</button></p>
+    </Sheet>
+  );
+}
+
+export default function About({ onClose, onRules, web }: { onClose: () => void; onRules: () => void; web: string }) {
   const links: readonly [string, string, string][] = [
     ...(web ? [["The golf realm", `${web}${REALM_PATH}`, "its code and boards, on gnoweb"] as [string, string, string]] : []),
     ["gno.land", "https://gno.land", "the chain it runs on"],
@@ -79,6 +124,7 @@ export default function About({ onClose, web }: { onClose: () => void; web: stri
       <ul className="about__facts" aria-label="In the game">
         {FACTS.map((f) => <li key={f}>{f}</li>)}
       </ul>
+      <p className="about__rules"><button className="linkish" onClick={onRules}>The rules of the game →</button></p>
 
       <h3 className="about__h">Go further</h3>
       <ul className="about__links">

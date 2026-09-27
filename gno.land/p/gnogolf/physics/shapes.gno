@@ -52,14 +52,9 @@ type Circle struct {
 	R float64
 }
 
-// Hit is the swept point-vs-circle test. A ball that starts inside reports no
-// hit, so a post can never trap a ball that somehow got in.
-func (c Circle) Hit(p0, p1 Vec2) (float64, Vec2, bool) {
-	var w int
-	return c.hit(p0, p1, &w)
-}
-
-// hit is Hit, adding rootWork to *w for each square root it takes.
+// hit is the swept point-vs-circle test, adding rootWork to *w for each
+// square root it takes. A ball that starts inside reports no hit, so a post
+// can never trap a ball that somehow got in.
 func (c Circle) hit(p0, p1 Vec2, w *int) (float64, Vec2, bool) {
 	d := p1.Sub(p0)
 	a := d.Dot(d)

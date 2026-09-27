@@ -11,6 +11,7 @@
 // the frame loop, loading, the weather and the clock, input and the shot.
 
 import * as THREE from "three";
+import { isTouch, reducedMotion } from "./device";
 import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
@@ -33,6 +34,8 @@ import type { WeatherZone } from "./scene/weather";
 import type { Confetti } from "./scene/fx";
 import type { promo as Promo } from "./promo";
 import type { probes as Probes } from "./engine/probes";
+import type { ClipOf, ClipRun } from "./engine/clip";
+import { drawCard, loadBadge, type Caption } from "./brand";
 import { HOT as HOT_FIELDS, TICKS_PER_S, type CamMode, type ErrorKind, type GameState, type GfxMode, type Link, type Live, type Mood, type Shot, type Snapshot, type Tier } from "./engine/types";
 
 export type { CamMode, GameState, GfxMode, Link, Snapshot } from "./engine/types";
@@ -70,6 +73,8 @@ const piecesOf = (zs: readonly { poly?: readonly unknown[] }[]) => zs.reduce((n,
 // the part of the screen the HUD covers, in CSS pixels: the camera frames
 // what is left, so the course is centred in what the player can actually see
 const HUD = { top: 108, bottom: 136, side: 14 };
+// the community's holes listed with the cups (off until the builder is out)
+const COMMUNITY = process.env.NEXT_PUBLIC_COMMUNITY === "1";
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
 
 /** No trailer rig: what the engine calls on it does nothing. */
@@ -100,7 +105,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // island overview, and the lean) with three times the depth precision of
   // 1..400 — what kept far-off faces from flickering into each other
   const camera = new THREE.PerspectiveCamera(30, 1, 3, 260);
-  let ball: Gnome = makeBall(gnomeById(gnome));
+  let ball: Gnome = makeBall(gnomeById(gnome)), gnomeId = gnome || "";
   const aim = makeAim();
   const band = makeBand();
   scene.add(ball, aim, band);
@@ -139,9 +144,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     facing: Math.PI / 2, power: 0, aiming: false, holed: false, error: null,
     // the camera: "overview" frames the island, "ball" follows the gnome
     view: "overview", rig: null, over: null, started: false,
-    cam: "classic", shots: [], pts: [], rest: null,
+    cam: "classic", shots: [], pts: [], works: [], rest: null,
   };
   let closeIn: ReturnType<typeof setTimeout> | undefined;
+  // the round's holing stroke, kept for the shot clip (api.clip)
+  let won: ClipOf["stroke"] | null = null;
   /** The ground height under a board point — cosmetic, the chain's physics is flat. */
   const ground = (x: number, z: number) => (g.course ? g.course.userData.height(x, z) : 0);
   const lift = (p: readonly [number, number]) => at(p, BALL_R + ground(p[0], p[1]));
@@ -218,12 +225,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       // what the realm's work model (golf.gno newWork) counts, for the save's
       // split and its gas: the walls of the hole and of its pulses, every
       // piece on the board (the hole's, its pulses' as if always there, the
-      // forecast's zones; a polygon's every edge), the forecast's kind, and
-      // each stroke's path length. A pulse is known from the strokes' extras.
+      // forecast's zones; a polygon's every edge), the forecast's kind, each
+      // stroke's path length and work, and what the realm says a commit spends
+      // before its shots. A pulse is known from the strokes' extras.
       walls: g.s ? g.s.walls.length + pulse.walls : 0,
       pieces: g.s ? g.s.walls.length + g.s.posts.length + piecesOf(g.s.zones) + piecesOf((g.forecast && g.forecast.zones) || []) + pulse.pieces : 0,
       kind: (g.forecast && g.forecast.kind) || "",
       pts: g.pts,
+      works: g.works,
+      fixed: (g.forecast && g.forecast.gas) || 0,
       shots: g.shots,
       flying: g.flying,
       aiming: g.aiming,
@@ -253,7 +263,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // thins the weather. "auto" picks low for a weak or software GPU, and for a
   // device whose frames were slow (the probe below: remembered for next time).
   let gfxMode: GfxMode = gfxOf(gfx), tier: Tier = "high";
-  const coarse = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+  const coarse = isTouch();
   const weakGpu = (() => {
     try {
       const gl = renderer.getContext(), x = gl.getExtension("WEBGL_debug_renderer_info");
@@ -401,7 +411,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       // at rest and while aiming the pieces move slowly enough to read and to
       // time (3.5 substeps a second, 1.5 with reduced motion); the replay
       // follows the path's own steps. The chain only sees the tick at release.
-      clock += elapsed * (reduced ? 1.5 : TICKS_PER_S);
+      // (kept within the pieces' period, as the tick sent is: past the 1,024
+      // ticks the chain counts, what is shown is what the ball meets)
+      const L = everyOf();
+      clock = (clock + elapsed * (reduced ? 1.5 : TICKS_PER_S)) % (L || Infinity);
       showClock(clock);
       // aiming at moving pieces: the dots follow them
       if (dragging && everyOf() && aimer.shows() && now - lastTickPreview > 250) (lastTickPreview = now), preview();
@@ -724,7 +737,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // there, so what is on screen when you shoot is what the ball meets. It
   // stops during a replay, where the path's own steps drive it.
   let clock = 0, lastTickPreview = 0;
-  const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced = reducedMotion();
   let everyL = 0; // the timed pieces' common period, kept per round
   const everyOf = () => everyL;
   const everyNow = () => {
@@ -764,8 +777,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.error = null;
     g.strokes = 0;
     g.shots = []; // the round's decisions: what a record replays
-    g.pts = []; // each stroke's path length, for the gas estimate
+    g.pts = []; // each stroke's path length and work, for the gas estimate
+    g.works = [];
     g.rest = null; // the ball exactly as the chain left it: where the next stroke is asked from
+    won = null;
     g.facing = Math.PI / 2; // at rest he looks at the player
     dragging = false;
     dropAim();
@@ -900,8 +915,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   let lastBar = -1;
 
   const onDown = (ev: PointerEvent) => {
-    // one finger, one primary button: a second touch or a right-click is not a pull
-    if (!ev.isPrimary || ev.button > 0) return;
+    // one finger, one primary button: a right-click is not a pull, and a
+    // second finger (a pinch, by reflex: there is no zoom) drops the pull
+    // the first began instead of letting it shoot
+    if (!ev.isPrimary) return onCancel();
+    if (ev.button > 0) return;
     if (g.flying || g.done) return;
     cam.finishGlide(); // the intro glide, if still on: finished now, quickly
     // a new press takes over whatever aim was held (a keyboard aim, a lost pull)
@@ -1060,8 +1078,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.lastAim = (angleDeg * Math.PI) / 180;
     g.shots = [...g.shots, one]; // a new list: what changed is seen by reference
     g.pts = [...g.pts, res.path.length];
+    g.works = [...g.works, res.work || 0];
     g.rest = res.rest;
     g.tick0 = tick || 0;
+    if (res.holed) won = { path: res.path, air: res.air, cause: res.cause, angle: angleDeg }; // what the shot clip plays again
     g.strokes = res.strokes || g.shots.length; // SimulateFrom has no count: a stroke is a shot
     if (res.holed) {
       g.done = true; // no more shots, even before the banner shows
@@ -1176,7 +1196,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // the cups hold the course's own holes; anyone else's is a community hole,
     // listed apart and ranked nowhere
     g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
-    g.community = list.filter((h) => !h.next && h.official === false);
+    // not listed until the builder is out (NEXT_PUBLIC_COMMUNITY=1 lists
+    // them): the chain takes anyone's hole, the game shows the course's
+    g.community = COMMUNITY ? list.filter((h) => !h.next && h.official === false) : [];
   }
 
   async function start(link: string | Link | null) {
@@ -1300,7 +1322,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       setSilent(false);
     },
     /** A picture to share: the course as it is now, the score on a card over it. */
-    snapshot(caption = "") {
+    async snapshot(caption: Caption) {
+      await loadBadge(); // the card's badge, before the draw
       // drawn and read in the same task, so the drawing buffer is still there
       renderer.render(scene, camera);
       const src = renderer.domElement, W = 1200, H = Math.round((W * src.height) / src.width);
@@ -1309,20 +1332,17 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       c.height = H;
       const x = c.getContext("2d")!;
       x.drawImage(src, 0, 0, W, H);
-      x.fillStyle = "#fdf6ea";
-      x.strokeStyle = "#16433a";
-      x.lineWidth = 5;
-      x.beginPath();
-      x.roundRect(32, H - 132, W - 64, 100, 22);
-      x.fill();
-      x.stroke();
-      x.fillStyle = "#16433a";
-      x.font = "700 44px system-ui, sans-serif";
-      x.fillText("Gnogolf", 64, H - 66);
-      x.font = "600 34px system-ui, sans-serif";
-      x.textAlign = "right";
-      x.fillText(caption, W - 64, H - 68);
+      drawCard(x, W, H, caption);
       return new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+    },
+    /** The holing stroke played again and recorded, for sharing (ADR-003):
+     *  an MP4, or null (no hole won this round, cancelled). Its module is
+     *  fetched when first asked: a build without clips never loads it. */
+    clip(run: ClipRun, caption: Caption) {
+      const stroke = won;
+      if (!stroke || !g.s) return Promise.resolve(null);
+      const hide = () => [ball, aim, band, confetti && confetti.group, cam.marker];
+      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: `${caption.title} · ${caption.score}` }, run));
     },
     /** Dismiss a shot error and keep playing. */
     clearError() {
@@ -1334,7 +1354,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     setGnome(id: string) {
       scene.remove(ball);
       disposeCourse(ball);
-      ball = makeBall(gnomeById(id));
+      ball = makeBall(gnomeById((gnomeId = id)));
       scene.add(ball);
       if (g.s) placeBall();
     },
@@ -1405,6 +1425,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   };
   // the test hooks, only for a page that asks for them
   // (always there in the type: undefined unless the page asked for them)
-  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, onHoled, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }) : {};
+  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }) : {};
   return Object.assign(api, hooked);
 }
