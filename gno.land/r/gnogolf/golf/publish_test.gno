@@ -292,19 +292,19 @@ func TestPublishMine(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(playLink(mustHole(v2)), "?hole="+v2))
 }
 
-// One address publishing fifty holes shows perAuthor of them in Holes, and
-// hides nobody else's; Community pages through every version of all of them.
 // A community hole's name or note carries no web address, and what gets past
 // that the owner can take off the lists: never off the chain.
 func TestCommunityTextAndHide(cur realm, t *testing.T) {
 	eve := testutils.TestAddress("eve")
-	for _, bad := range []string{"claim at bonus.xyz", "see www bonus", "t.me/golf", "GNOGOLF.APP"} {
+	for _, bad := range []string{"claim at bonus.xyz", "see www.bonus", "t.me/golf", "GNOGOLF.APP", "at 10.0.0.1 now", "bonus．xyz", "win。app"} {
 		testing.SetRealm(testing.NewUserRealm(eve))
 		urequire.AbortsContains(t, cur, "no web address", func() { PublishMine(cross(cur), "scam", hexOf(cupHole("pond", 1, "Nice")), bad) })
 		testing.SetRealm(testing.NewUserRealm(eve))
 		urequire.AbortsContains(t, cur, "no web address", func() { PublishMine(cross(cur), "scam", hexOf(cupHole("pond", 1, bad)), "") })
 	}
-	uassert.False(t, linkish("Par 3. Mind the pond, then 2.5 and a hill"))
+	for _, fine := range []string{"Par 3. Mind the pond, then 2.5 and a hill", "e.g. a pond, i.e. water", "awww, so close"} {
+		uassert.False(t, linkish(fine), fine)
+	}
 	testing.SetRealm(testing.NewUserRealm(eve))
 	id := PublishMine(cross(cur), "rude", hexOf(cupHole("pond", 1, "Rude words")), "")
 	slot := eve.String() + "/rude"
@@ -326,6 +326,8 @@ func TestCommunityTextAndHide(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(Holes(), `"id":"`+id+`"`), "back")
 }
 
+// One address publishing fifty holes shows perAuthor of them in Holes, and
+// hides nobody else's; Community pages through every version of all of them.
 func TestPublishMineSpamHidesNobody(cur realm, t *testing.T) {
 	spam, other := testutils.TestAddress("spam"), testutils.TestAddress("spamfree")
 	data := hexOf(cupHole("pond", 1, "Spam"))

@@ -183,17 +183,28 @@ func PublishMine(cur realm, slug, hexData, note string) string {
 }
 
 // linkish spots a web address in a community hole's name or note, which the
-// lists show on the course's front page: "www", or a dot between a letter or
-// digit and a letter ("claim.xyz", "t.me"). A sentence's dot has a space after
-// it. Basic on purpose: what gets past it, the owner can Hide.
+// lists show on the course's front page: "www.", a dot between a letter or
+// digit and two letters ("claim.xyz", "t.me"; not "e.g." nor a sentence's dot,
+// which has a space after it), or an IP address ("1.2.3.4"), the dots written
+// as look-alikes (．。․﹒) read as dots. Basic on purpose: what gets past it,
+// the owner can Hide.
 func linkish(s string) bool {
 	low := strings.ToLower(s)
-	if strings.Contains(low, "www") {
+	for _, d := range []string{"．", "。", "․", "﹒"} {
+		low = strings.ReplaceAll(low, d, ".")
+	}
+	if strings.Contains(low, "www.") {
 		return true
 	}
-	for i := 1; i+1 < len(low); i++ {
-		p, c := low[i-1], low[i+1]
-		if low[i] == '.' && (p >= 'a' && p <= 'z' || p >= '0' && p <= '9') && c >= 'a' && c <= 'z' {
+	letter := func(c byte) bool { return c >= 'a' && c <= 'z' }
+	digit := func(c byte) bool { return c >= '0' && c <= '9' }
+	for i := 1; i+2 < len(low); i++ {
+		if p := low[i-1]; low[i] == '.' && (letter(p) || digit(p)) && letter(low[i+1]) && letter(low[i+2]) {
+			return true
+		}
+	}
+	for _, w := range strings.Fields(low) {
+		if strings.Count(w, ".") == 3 && strings.Trim(w, "0123456789.") == "" {
 			return true
 		}
 	}

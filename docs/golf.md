@@ -153,8 +153,9 @@ its author's business. It's a community hole: playable, recorded and on its
 own board, in no cup and out of the course ranking. A new version archives the
 old one (which never counted anywhere). The publisher pays the storage deposit
 for the bytes it adds, and nothing published can be deleted. Its name and note
-carry no web address: `www`, or a dot between a letter or digit and a letter
-(`claim.xyz`), is refused. Emits `HolePublished` (`official` `"false"`).
+carry no web address: `www.`, a dot between a letter or digit and two letters
+(`claim.xyz`, `t.me`; not `e.g.`), or an IP address, look-alike dots read as
+dots, is refused. Emits `HolePublished` (`official` `"false"`).
 
 ### `Transfer(cur realm, to address)`, `Accept(cur realm)`, `Renounce(cur realm)`
 
