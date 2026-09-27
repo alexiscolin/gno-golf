@@ -13,6 +13,6 @@ media/promo/*.mp4
 media/promo/music/
 media/promo/stills-v4/
 media/promo/stills-check/
-# a local gnokey keybase (private keys) and editor swap files: never in the repo
-gnohome/data/
+# gnohome/ (a local package cache and gnokey keybase: private keys) and editor swap files: never in the repo
+gnohome/
 *.swp
