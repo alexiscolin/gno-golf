@@ -1220,7 +1220,7 @@ export default function Golf() {
                 New gnome unlocked: <b>{fresh.map((gn) => gn.name).join(", ")}</b> — pick it from the menu.
               </p>
             )}
-            <RecordState record={record} account={account} s={s} chain={game.current && game.current.chain} />
+            <RecordState record={record} account={account} s={s} chain={game.current && game.current.chain} named={namedAs} />
             {(() => {
               // one note at a time, the one in the way first: the node, the funds, then the name
               const chain = game.current && game.current.chain;
@@ -1238,7 +1238,8 @@ export default function Golf() {
                     {/localhost|127\.0\.0\.1/.test(host) ? "Fund it from the node's test account." : chainId === MAINNET ? "It needs some GNOT on gno.land to pay the fee." : account && <GetGnot address={account.address} />}
                   </>
                 ) : null;
-              if (!warn && namedAs) return <p className="note note--good">You are <b>{namedAs}</b> now{onChain ? ": your rounds are on the boards." : ": save your round to take your place."}</p>;
+              // (once saved, the saved line says the name too)
+              if (!warn && namedAs) return onChain ? null : <p className="note note--good">You are <b>{namedAs}</b> now: save your round to take your place.</p>;
               if (!warn && nudge.noName && account && chain)
                 return canSave ? (
                   // while it can be saved, the name goes in the save's own signature
@@ -1457,7 +1458,8 @@ export default function Golf() {
   );
 }
 
-function RecordState({ record, account, s, chain }: { record: Rec; account: Account | null; s: Snapshot; chain: Chain | null }) {
+// named: a name just taken with it, said in the same line
+function RecordState({ record, account, s, chain, named = "" }: { record: Rec; account: Account | null; s: Snapshot; chain: Chain | null; named?: string }) {
   if (!record) return null;
   switch (record.at) {
     case "signing":
@@ -1467,7 +1469,7 @@ function RecordState({ record, account, s, chain }: { record: Rec; account: Acco
   }
   return (
     <p className="note note--good">
-      Recorded{record.height ? ` in block ${record.height}` : ""}.{" "}
+      Saved on-chain{named ? <> as <b>{named}</b>: you&apos;re on the boards</> : ""}.{" "}
       {chain && account && (
         <a href={chain.roundURL(s.id || "", account.address)} target="_blank" rel="noopener noreferrer">
           See your round on gno.land ↗
