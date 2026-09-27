@@ -1835,6 +1835,8 @@ button:focus-visible, a:focus-visible {
 /* "strokes" sits level with the share pill (both centred), not on the digit's baseline */
 .win__head .win__score { align-items: center; }
 .win__head .share { position: relative; }
+/* the clip just saved for X's post, said for a moment under the buttons */
+.share__note { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%) rotate(-2deg); z-index: 2; white-space: nowrap; padding: 4px 12px; border: 2px solid var(--ink); border-radius: 12px; background: var(--gold); color: var(--ink); font-size: 13px; font-weight: 800; box-shadow: 0 3px 0 var(--ink); }
 .win__head .share::before { content: ""; position: absolute; left: -23px; top: 8px; bottom: 8px; border-left: 2px solid rgba(var(--ink-rgb), .15); }
 @media (max-width: 600px) { .win__head { gap: 14px; } .win__head .share::before { display: none; } }
 .win__head .win__score { margin: 0; }

@@ -35,8 +35,15 @@ const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && t
 
 export default function Share({ text, snapshot, link = "", clip = null }: ShareProps) {
   const [copied, setCopied] = useState(false);
-  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the "copied" note's timer, cleared if the card goes first
+  const [saved, setSaved] = useState(false); // the clip just downloaded for X: said under the buttons
+  const copiedT = useRef<ReturnType<typeof setTimeout>>(undefined); // the notes' timer, cleared if the card goes first
   useEffect(() => () => clearTimeout(copiedT.current), []);
+  /** Says one of the notes for a moment. */
+  const flash = (set: (on: boolean) => void, ms: number) => {
+    set(true);
+    clearTimeout(copiedT.current);
+    copiedT.current = setTimeout(() => set(false), ms);
+  };
   // this hole, this cup, this gnome, at the game's public address
   const url = siteURL(link);
   const phone = onPhone();
@@ -60,18 +67,16 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
     sound("blip");
     try {
       await navigator.clipboard.writeText(pasted(text, url));
-      setCopied(true);
-      clearTimeout(copiedT.current);
-      copiedT.current = setTimeout(() => setCopied(false), 1800);
+      flash(setCopied, 1800);
     } catch {}
   };
   const links = shareLinks(text, url);
   return (
     <span className="share" role="group" aria-label="Share">
-      <span className="share__label">Share</span>
+      <span className="share__label">{clip ? "Share the clip" : "Share"}</span>
       {links.map(([name, href]) => (
         // X takes no file from a page: with a clip, its post opens and the clip downloads, to drop in
-        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name === "X" && clip && !phone ? "X: the clip downloads, drop it into the post" : name} onClick={() => (sound("blip"), name === "X" && clip && !phone && save(clip))}>
+        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name === "X" && clip && !phone ? "X: the clip downloads, drop it into the post" : name} onClick={() => (sound("blip"), name === "X" && clip && !phone && (save(clip), flash(setSaved, 6000)))}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d={GLYPH[name]} /></svg>
         </a>
       ))}
@@ -83,6 +88,7 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
           <svg viewBox="0 0 24 24" aria-hidden="true" className="share__stroke"><path d="M12 3v12M7 8l5-5 5 5M5 13v6h14v-6" /></svg>
         </button>
       )}
+      {saved && <span className="share__note" role="status">Clip saved: drop it into your post</span>}
     </span>
   );
 }
