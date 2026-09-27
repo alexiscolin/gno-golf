@@ -449,6 +449,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // the shadow is on the ground under him, whatever he is doing above it
     const floor = BALL_R + ground(ball.position.x, ball.position.z);
     ball.userData.shade.position.y = floor - ball.position.y - BALL_R + 0.02;
+    rp.offWalls(); // and clear of the walls he runs along
     if (!g.flying) {
       // at rest on a deck that moves (a seesaw), he rides it
       if (g.course && g.course.userData.lifts && !g.done && !g.holed) ball.position.y = floor; // never a holed ball, it stays down in the cup
