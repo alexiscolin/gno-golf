@@ -39,7 +39,12 @@ await js(`(() => { const s = document.createElement("style"); s.textContent = "h
 await send("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
 await sleep(1500);
 const r = JSON.parse(await js(`JSON.stringify(document.querySelector(".title__art").getBoundingClientRect())`));
-const LOGO = await png({ clip: { x: r.x - 12, y: r.y - 12, width: r.width + 24, height: r.height + 40, scale: 2 } });
+// with room for all of its shadow (its soft drop reaches ~56px under it), so nothing is cut square;
+// the cards size the art itself, whatever that margin (LOGO_W, LOGO_H: its box in the picture)
+const M = { x: 32, top: 16, bottom: 56 };
+const LOGO = await png({ clip: { x: r.x - M.x, y: r.y - M.top, width: r.width + 2 * M.x, height: r.height + M.top + M.bottom, scale: 2 } });
+const LOGO_W = (w) => `width: ${Math.round((w * (r.width + 2 * M.x)) / r.width)}px; margin: ${-Math.round((w * M.top) / r.width)}px 0 0 ${-Math.round((w * M.x) / r.width)}px;`;
+const LOGO_H = (h) => `height: ${Math.round((h * (r.height + M.top + M.bottom)) / r.height)}px; margin: ${-Math.round((h * M.top) / r.height)}px 0 ${-Math.round((h * M.bottom) / r.height)}px;`;
 await send("Emulation.setDefaultBackgroundColorOverride", {});
 
 /** The hole in the Far view, by day, the HUD hidden: its image, name, par. */
@@ -66,7 +71,7 @@ async function card(/** @type {string} */ img, /** @type {string} */ eyebrow, /*
   body { width: ${W}px; height: ${H}px; overflow: hidden; font-family: Fredoka, ui-rounded, system-ui, sans-serif; color: var(--ink);
     background: var(--paper) url(${img}) center / cover; position: relative; }
   body::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(20,65,52,.28), transparent 38%); }
-  .logo { position: absolute; left: 22px; top: 14px; width: 230px; z-index: 1; }
+  .logo { position: absolute; left: 34px; top: 26px; z-index: 1; ${LOGO_W(206)} }
   .label { position: absolute; left: 36px; bottom: 34px; max-width: 900px; z-index: 1; padding: 18px 28px 20px; background: var(--paper);
     border: 4px solid var(--ink); border-radius: 22px; box-shadow: 0 7px 0 var(--ink), 0 18px 30px rgba(20,65,52,.35); transform: rotate(-1.2deg); }
   .eyebrow { font-weight: 600; font-size: 24px; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
@@ -121,7 +126,7 @@ await render(`<!doctype html><meta charset="utf-8">
   .dots { position: absolute; inset: 0; background: radial-gradient(rgba(255,255,255,.28) 1.6px, transparent 2px) 0 0 / 18px 18px; }
   .frame { position: absolute; inset: 16px; border: 3px solid #226c57; border-radius: 10px; }
   .hero { position: absolute; inset: 0; display: grid; justify-items: center; align-content: center; gap: 4px; padding-bottom: 6px; }
-  .logo { height: 430px; margin: -8px 0 -14px; }
+  .logo { ${LOGO_H(378)} }
   .tag { padding: 4px 30px 7px; font-size: 38px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #fdf6e9;
     background: #226c57; border: 4px solid #144134; border-radius: 999px; box-shadow: 0 6px 0 #144134; transform: rotate(-2deg); }
   .line { margin-top: 14px; padding: 4px 18px 6px; font-size: 27px; font-weight: 600; color: #144134; background: #fdf6e9;
