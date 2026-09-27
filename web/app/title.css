@@ -149,7 +149,8 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
     drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 3px 0 #0e3027) drop-shadow(0 18px 24px rgba(20, 10, 60, .45));
 }
 @keyframes title-float { 50% { transform: translateY(-8px) rotate(-1deg); } }
-.screen--title .title__word {
+/* the word, wherever the logo is drawn (the title, the trailer's cards) */
+.title__word {
   fill: url(#title-word); font-size: 92px; font-weight: 700; letter-spacing: .06em;
   stroke: var(--ink); stroke-width: 5px; paint-order: stroke; stroke-linejoin: round;
 }

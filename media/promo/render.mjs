@@ -1,5 +1,7 @@
 // @ts-check
-// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups]
+// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups] [--cut=v4]
+//
+// --cut=v4: another cut of it, shots-v4.json, rendered to gnogolf-promo-v4.mp4.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
@@ -27,6 +29,8 @@ const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
 const FPS = 30;
 const CLEAN = process.argv.includes("--clean");
 const CUPS = process.argv.includes("--cups");
+const CUT = (process.argv.find((a) => a.startsWith("--cut=")) || "").slice(6).replace(/[^\w-]/g, "");
+const SUFFIX = CUT ? `-${CUT}` : ""; // the cut's shots and its video: shots-v4.json, gnogolf-promo-v4.mp4
 // the clean cut's shots, in order: flyovers and rolls, ending on the garden's slow, bright orbit
 const CLEAN_SHOTS = ["snow", "sandcastles", "market", "cold", "mill", "frozen", "jump", "plazaP", "marketW", "tube", "logo"];
 
@@ -140,7 +144,7 @@ const cleanOf = (all) => {
     return { ...rest, weather: s.weather || "clear", beats: [at, (at += len)] }; // "clear": no rain from the live forecast
   });
 };
-const SHOTS = ((a) => (CLEAN ? cleanOf(a) : a))(JSON.parse(fs.readFileSync(path.join(HERE, "shots.json"), "utf8"))).flatMap((s) => {
+const SHOTS = ((a) => (CLEAN ? cleanOf(a) : a))(JSON.parse(fs.readFileSync(path.join(HERE, `shots${SUFFIX}.json`), "utf8"))).flatMap((s) => {
   const titles = [...(s.titles || []), ...(s.url ? [{ pill: s.url, at: s.urlAt ?? 1.37, tilt: 0, y: s.urlY ?? 440 }] : [])]
     .map((t) => ({ ...t, html: title(t) }));
   const f0 = F(s.beats[0]), f1 = F(s.beats[1]), dur = (f1 - f0) / FPS;
@@ -163,6 +167,8 @@ const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - LAST * BEAT).toFixed(3);
 async function chrome() {
   const [w, h] = CLEAN ? [1280, 720] : [1920, 1080];
   const { send, js, kill } = await launch({ width: w, height: h, dir: path.join(WORK, "profile"), args: [`--window-size=${w},${h}`, "--hide-scrollbars", "--mute-audio"] });
+  // a headless page never has the focus, and the game plays no sound without it (feel.ts present())
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   // the HMR socket never opens: another edit to the app cannot remount the game mid-shot
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `try{localStorage.setItem("gnogolf.earned",${JSON.stringify(JSON.stringify(ALL_GNOMES))})}catch(e){}` });
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `{const W=window.WebSocket;window.WebSocket=function(u,p){return /hmr/.test(String(u))?{readyState:0,send(){},close(){},addEventListener(){},removeEventListener(){}}:new W(u,p)};Object.assign(window.WebSocket,{CONNECTING:0,OPEN:1,CLOSING:2,CLOSED:3});}` });
@@ -378,10 +384,10 @@ const filter = [
   `[mus][key]sidechaincompress=threshold=0.05:ratio=4:attack=5:release=250[duck]`,
   `[duck][fx]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]`,
 ].join(";");
-const MP4 = path.join(HERE, "gnogolf-promo.mp4");
+const MP4 = path.join(HERE, `gnogolf-promo${SUFFIX}.mp4`);
 execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", ...inputs, "-filter_complex", filter, "-map", "0:v", "-map", "[a]",
   "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p", "-r", String(FPS), "-movflags", "+faststart",
   "-c:a", "aac", "-b:a", "192k", "-t", String(LEN), MP4], { stdio: "inherit" });
 execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", "-i", MP4, "-vf", "scale=1280:720:flags=lanczos", "-c:v", "libx264",
-  "-preset", "slow", "-crf", "21", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "copy", path.join(HERE, "gnogolf-promo-720p.mp4")], { stdio: "inherit" });
+  "-preset", "slow", "-crf", "21", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "copy", path.join(HERE, `gnogolf-promo${SUFFIX}-720p.mp4`)], { stdio: "inherit" });
 console.log("done:", MP4);

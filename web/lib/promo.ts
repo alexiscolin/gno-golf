@@ -10,7 +10,7 @@ import * as THREE from "three";
 import { shotOf } from "./chain";
 import { worldOf } from "./scene/worlds";
 import { cupOf } from "./card";
-import { sound, type SoundName } from "./feel";
+import { freshAudio, sound, type SoundName } from "./feel";
 import type { Chain } from "./chain";
 import type { HoleRow, SimulateRound } from "./types";
 import type { Course, Gnome, Hole } from "./scene/data";
@@ -159,6 +159,7 @@ function install() {
   } as unknown as typeof AudioContext;
   window.AudioContext = Offline;
   (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext = Offline;
+  freshAudio(); // one the page made early (feel.ts, on its first idle moment) would not be recorded
 
   const css = document.createElement("style");
   css.textContent = `
