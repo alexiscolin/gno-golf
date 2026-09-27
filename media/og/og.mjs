@@ -39,7 +39,12 @@ await js(`(() => { const s = document.createElement("style"); s.textContent = "h
 await send("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
 await sleep(1500);
 const r = JSON.parse(await js(`JSON.stringify(document.querySelector(".title__art").getBoundingClientRect())`));
-const LOGO = await png({ clip: { x: r.x - 12, y: r.y - 12, width: r.width + 24, height: r.height + 40, scale: 2 } });
+// with room for all of its shadow (its soft drop reaches ~56px under it), so nothing is cut square;
+// the cards size the art itself, whatever that margin (LOGO_W, LOGO_H: its box in the picture)
+const M = { x: 32, top: 16, bottom: 56 };
+const LOGO = await png({ clip: { x: r.x - M.x, y: r.y - M.top, width: r.width + 2 * M.x, height: r.height + M.top + M.bottom, scale: 2 } });
+const LOGO_W = (w) => `width: ${Math.round((w * (r.width + 2 * M.x)) / r.width)}px; margin: ${-Math.round((w * M.top) / r.width)}px ${-Math.round((w * M.x) / r.width)}px 0;`;
+const LOGO_H = (h) => `height: ${Math.round((h * (r.height + M.top + M.bottom)) / r.height)}px; margin: ${-Math.round((h * M.top) / r.height)}px 0 ${-Math.round((h * M.bottom) / r.height)}px;`;
 await send("Emulation.setDefaultBackgroundColorOverride", {});
 
 /** The hole in the Far view, by day, the HUD hidden: its image, name, par. */
@@ -66,7 +71,7 @@ async function card(/** @type {string} */ img, /** @type {string} */ eyebrow, /*
   body { width: ${W}px; height: ${H}px; overflow: hidden; font-family: Fredoka, ui-rounded, system-ui, sans-serif; color: var(--ink);
     background: var(--paper) url(${img}) center / cover; position: relative; }
   body::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(20,65,52,.28), transparent 38%); }
-  .logo { position: absolute; left: 22px; top: 14px; width: 230px; z-index: 1; }
+  .logo { position: absolute; right: 34px; top: 26px; z-index: 1; ${LOGO_W(206)} } /* the corner opposite the label */
   .label { position: absolute; left: 36px; bottom: 34px; max-width: 900px; z-index: 1; padding: 18px 28px 20px; background: var(--paper);
     border: 4px solid var(--ink); border-radius: 22px; box-shadow: 0 7px 0 var(--ink), 0 18px 30px rgba(20,65,52,.35); transform: rotate(-1.2deg); }
   .eyebrow { font-weight: 600; font-size: 24px; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
@@ -107,30 +112,36 @@ fs.writeFileSync(NAMES, JSON.stringify(Object.fromEntries(ALL.filter((s) => know
 if (CUPS.every((c) => firsts[c])) { // (npm run og -- garden/1 island/1 town/1 mountain/1: just these)
   for (const c of CUPS) await card(firsts[c], `${ALL.filter((s) => s.startsWith(c + "/")).length} holes`, cupName(c), "", `${c}.jpg`);
 }
-// the home page: the title screen as a poster, the badge its hero over the
-// island's sky, the course only a soft backdrop
-const still = "data:image/webp;base64," + fs.readFileSync(new URL("public/title/island.webp", WEB)).toString("base64");
+// the home page: the trailer's end card, the badge over golden rays and
+// sparkles, and the one thing to do, big
+const ADENA = "data:image/svg+xml;base64," + fs.readFileSync(new URL("public/adena.svg", WEB)).toString("base64");
+const STAR = (x, y, s, rot = 0) => `<svg class="star" style="left:${x}px;top:${y}px;width:${s}px;height:${s}px;transform:rotate(${rot}deg)" viewBox="-11 -11 22 22"><path d="M0-10Q1.8-1.8 10 0Q1.8 1.8 0 10Q-1.8 1.8-10 0Q-1.8-1.8 0-10Z" fill="#fffaf0" stroke="#144134" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 await render(`<!doctype html><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=block" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { width: ${W}px; height: ${H}px; overflow: hidden; position: relative; font-family: Fredoka, ui-rounded, system-ui, sans-serif;
-    background: radial-gradient(circle at 50% 44%, #fff6d8 0 18%, transparent 48%), linear-gradient(180deg, #54b8f5, #b8ecff 62%, #ffe2a8); }
-  .bg { position: absolute; inset: -30px; background: url(${still}) center 70% / cover; filter: blur(9px) saturate(1.1); opacity: .5;
-    -webkit-mask: linear-gradient(transparent 30%, #000 75%); }
-  .dots { position: absolute; inset: 0; background: radial-gradient(rgba(255,255,255,.28) 1.6px, transparent 2px) 0 0 / 18px 18px; }
-  .frame { position: absolute; inset: 16px; border: 3px solid #226c57; border-radius: 10px; }
-  .hero { position: absolute; inset: 0; display: grid; justify-items: center; align-content: center; gap: 4px; padding-bottom: 6px; }
-  .logo { height: 430px; margin: -8px 0 -14px; }
-  .tag { padding: 4px 30px 7px; font-size: 38px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #fdf6e9;
-    background: #226c57; border: 4px solid #144134; border-radius: 999px; box-shadow: 0 6px 0 #144134; transform: rotate(-2deg); }
-  .line { margin-top: 14px; padding: 4px 18px 6px; font-size: 27px; font-weight: 600; color: #144134; background: #fdf6e9;
-    border: 3px solid #144134; border-radius: 14px; box-shadow: 0 4px 0 #144134; }
-  .line b { color: #e0524b; font-weight: 700; }
+    background: radial-gradient(circle at 50% 36%, #fff8e2 0 16%, #f8e6bb 52%, #ecd49c 100%); }
+  .rays { position: absolute; left: 50%; top: 36%; width: 2000px; height: 2000px; margin: -1000px 0 0 -1000px;
+    background: repeating-conic-gradient(rgba(255,252,240,.6) 0deg 3deg, transparent 3deg 15deg);
+    -webkit-mask-image: radial-gradient(circle, #000 8%, rgba(0,0,0,.5) 24%, transparent 46%); }
+  .dots { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(34,108,87,.35) 1.6px, transparent 2.2px); background-size: 16px 16px;
+    -webkit-mask-image: linear-gradient(to top, #000 8%, transparent 55%); }
+  .frame { position: absolute; inset: 16px; border: 3px solid #226c57; border-radius: 12px; }
+  .hero { position: absolute; inset: 0; display: grid; justify-items: center; align-content: center; gap: 14px; padding-bottom: 8px; }
+  .logo { ${LOGO_H(318)} }
+  .cta { margin-top: 6px; font-weight: 700; font-size: 46px; letter-spacing: .02em; color: #fdf6e9; background: #226c57;
+    border: 5px solid #144134; border-radius: 20px; padding: 6px 42px 10px; box-shadow: 0 8px 0 #144134; }
+  .sub { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 25px; color: #fdf6e9; background: #226c57;
+    border: 4px solid #144134; border-radius: 999px; padding: 5px 24px 7px; box-shadow: 0 5px 0 #144134; }
+  .sub img { width: 30px; height: 30px; border-radius: 7px; }
+  .star { position: absolute; }
 </style>
-<div class="bg"></div><div class="dots"></div><div class="frame"></div>
-<div class="hero"><img class="logo" src="${LOGO}"><div class="tag">Mini-golf on-chain</div>
-<div class="line">Every shot computed by the chain · play free on <b>gno.land</b></div></div>`, "default.jpg");
+<div class="rays"></div><div class="dots"></div><div class="frame"></div>
+${STAR(360, 70, 44, -8)}${STAR(820, 96, 36, 12)}${STAR(330, 262, 64, 6)}${STAR(846, 250, 30, -14)}
+<div class="hero"><img class="logo" src="${LOGO}">
+<div class="cta">PLAY ON GNO.LAND</div>
+<div class="sub">Free to play · Your records on-chain with <img src="${ADENA}" alt=""> Adena</div></div>`, "default.jpg");
 if (b.errors.length) console.log("page errors:", b.errors.slice(0, 5));
 b.kill();
 process.exit(0);

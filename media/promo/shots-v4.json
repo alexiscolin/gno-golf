@@ -1,14 +1,14 @@
 [
  {
   "cup": "town",
-  "hole": 3,
+  "hole": 13,
   "gnome": "ginger",
   "pre": 4,
   "dropAt": 0.686,
   "fire": [
    {
-    "deg": -6,
-    "power": 8.5
+    "deg": -53.5,
+    "power": 9
    }
   ],
   "cam": {
@@ -23,12 +23,13 @@
   "hits": [
    0.686
   ],
-  "dropLag": 0.21,
+  "dropLag": 0.024,
   "name": "cold",
   "beats": [
    0,
    4
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "garden",
@@ -54,7 +55,7 @@
   "titles": [
    {
     "logo": 820,
-    "at": 0.0,
+    "at": 0,
     "bounce": 3.2,
     "tilt": -3,
     "y": -70,
@@ -80,7 +81,8 @@
   "beats": [
    4,
    12
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "island",
@@ -91,15 +93,15 @@
   "cam": {
    "mode": "keys",
    "from": [
-    0.0,
+    0,
     16,
-    1.0,
+    1,
     12
    ],
    "to": [
     0.85,
     10,
-    1.0,
+    1,
     7
    ],
    "lookFrom": [
@@ -252,19 +254,26 @@
   "eventAt": 0.95,
   "fire": [
    {
-    "deg": -45,
-    "power": 3.5,
-    "eventT": 0.8
+    "deg": 0,
+    "power": 5,
+    "eventT": 0.211
    }
   ],
   "cam": {
-   "mode": "follow",
-   "deg": -45,
-   "back": 6.5,
-   "up": 2.2,
-   "ahead": 4,
-   "fov": 46,
-   "lag": 6
+   "mode": "orbit",
+   "center": [
+    0.54,
+    0,
+    0.49
+   ],
+   "r0": 16,
+   "r": 20,
+   "h0": 5,
+   "h": 10,
+   "a0": 195,
+   "speed": -8,
+   "fov": 44,
+   "lookUp": 2
   },
   "punch": 0.12,
   "titles": [
@@ -279,7 +288,8 @@
   "beats": [
    25,
    29
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "garden",
@@ -315,7 +325,8 @@
   "beats": [
    29,
    32
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "town",
@@ -348,7 +359,8 @@
   "beats": [
    32,
    35
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "town",
@@ -384,7 +396,8 @@
   "beats": [
    35,
    38
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "mountain",
@@ -395,14 +408,14 @@
   "pre": 1.1,
   "fire": [
    {
-    "deg": 4.5,
+    "deg": 0,
     "power": 9.5,
     "at": -1.05
    }
   ],
   "cam": {
    "mode": "follow",
-   "deg": 4.5,
+   "deg": 0,
    "back": 5,
    "up": 1.4,
    "ahead": 4,
@@ -531,39 +544,42 @@
   "beats": [
    48,
    54
-  ]
+  ],
+  "weather": "clear"
  },
  {
-  "cup": "mountain",
-  "hole": 17,
+  "cup": "town",
+  "hole": 6,
   "gnome": "wizard",
+  "weather": "clear",
   "pre": 2.5,
-  "eventAt": 0.343,
   "fire": [
    {
-    "deg": -25,
-    "power": 9,
-    "eventT": 1.038
+    "deg": 0,
+    "power": 10,
+    "at": -1.45
    }
   ],
   "cam": {
-   "mode": "track",
-   "off": [
-    -2,
-    4.5,
-    -7.5
-   ],
-   "fov": 46,
-   "lag": 4,
-   "lookUp": -0.3,
-   "hold": true
+   "mode": "orbit",
+   "center": "ball",
+   "r": 4.5,
+   "h": 1.2,
+   "a0": 150,
+   "speed": -110,
+   "fov": 52,
+   "lookUp": 0.5
   },
-  "weather": "snow",
   "whip": 1,
-  "name": "crevasse",
+  "name": "skatepark",
   "beats": [
    54,
    57
+  ],
+  "ramp": [
+   0,
+   1.03,
+   1.6
   ]
  },
  {
@@ -576,7 +592,7 @@
    {
     "deg": -23,
     "power": 9,
-    "eventT": 0.718
+    "eventT": 0.847
    }
   ],
   "cam": {
@@ -595,19 +611,20 @@
   "beats": [
    57,
    59
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "island",
-  "hole": 10,
+  "hole": 9,
   "gnome": "diver",
   "pre": 2.5,
   "eventAt": 0.343,
   "fire": [
    {
-    "deg": -18,
+    "deg": 0,
     "power": 9,
-    "eventT": 0.423
+    "eventT": 0.955
    }
   ],
   "cam": {
@@ -622,11 +639,12 @@
    "hold": true
   },
   "whip": -1,
-  "name": "boardwalk",
+  "name": "pier",
   "beats": [
    59,
    61
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "garden",
@@ -646,8 +664,8 @@
    "center": "ball",
    "r": 5,
    "h": 2,
-   "a0": 230,
-   "speed": 70,
+   "a0": 60,
+   "speed": 60,
    "fov": 46,
    "lookUp": 0.4
   },
@@ -656,7 +674,8 @@
   "beats": [
    61,
    63
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "town",
@@ -673,12 +692,14 @@
    }
   ],
   "cam": {
-   "mode": "follow",
-   "deg": 6,
-   "back": 6,
-   "up": 2.4,
-   "ahead": 4,
-   "fov": 46
+   "mode": "track",
+   "off": [
+    -2,
+    4,
+    7
+   ],
+   "fov": 46,
+   "lag": 4
   },
   "whip": 1,
   "name": "clockhand",
@@ -689,36 +710,37 @@
   "weather": "wind"
  },
  {
-  "cup": "garden",
-  "hole": 3,
+  "cup": "mountain",
+  "hole": 12,
   "gnome": "sage",
   "pre": 2.5,
   "eventAt": 0.3,
   "fire": [
    {
-    "deg": 5,
-    "power": 5,
-    "eventT": 0.11
+    "deg": -9,
+    "power": 8,
+    "event": 6
    }
   ],
   "cam": {
    "mode": "follow",
-   "deg": 5,
-   "back": 5,
-   "up": 1.6,
+   "deg": -9,
+   "back": 5.5,
+   "up": 2,
    "ahead": 4,
    "fov": 46
   },
   "punch": 0.12,
-  "name": "bunker",
+  "name": "rebound",
   "beats": [
    65,
    67
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "island",
-  "hole": 16,
+  "hole": 13,
   "gnome": "mayor",
   "whip": 1,
   "cam": {
@@ -737,11 +759,12 @@
    "fov": 40,
    "lookUp": 2
   },
-  "name": "volcano",
+  "name": "lagoon",
   "beats": [
    67,
    68
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "town",
@@ -770,7 +793,8 @@
   "beats": [
    68,
    70
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "town",
@@ -824,12 +848,13 @@
    0.62,
    0.35
   ],
-  "dropLag": 0.06,
+  "dropLag": 0.007,
   "name": "ace-cup",
   "beats": [
    70,
    82
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "garden",
@@ -837,7 +862,7 @@
   "gnome": "king",
   "flash": 0.85,
   "build": {
-   "ground": 0.0,
+   "ground": 0,
    "walls": 0.686,
    "drop": 1.371,
    "flag": 2.057
@@ -881,7 +906,8 @@
   "beats": [
    82,
    92
-  ]
+  ],
+  "weather": "clear"
  },
  {
   "cup": "town",
@@ -905,7 +931,7 @@
   "titles": [
    {
     "logo": 600,
-    "at": 0.0,
+    "at": 0,
     "bounce": 3.2,
     "tilt": -3,
     "y": -190,
@@ -924,7 +950,7 @@
     ]
    },
    {
-    "raw": "<div class='sub' style='text-transform:none;letter-spacing:.01em;font-size:44px;display:flex;align-items:center;gap:14px'>Free to try \u00b7 Your records on-chain with <img src='/adena.svg' alt='' style='height:46px;width:46px'> Adena</div>",
+    "raw": "<div class='sub' style='text-transform:none;letter-spacing:.01em;font-size:44px;display:flex;align-items:center;gap:14px'>Free to try · Your records on-chain with <img src='/adena.svg' alt='' style='height:46px;width:46px'> Adena</div>",
     "at": 2.057,
     "bounce": 2.6,
     "tilt": 0,
@@ -939,6 +965,7 @@
   "beats": [
    92,
    112.5
-  ]
+  ],
+  "weather": "clear"
  }
 ]
