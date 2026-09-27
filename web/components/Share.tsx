@@ -43,11 +43,16 @@ export default function Share({ text, snapshot, link = "", clip = null }: ShareP
   const sheet = async () => {
     sound("blip");
     try {
-      // the clip when there is one, else a picture of the course
-      const blob = clip ? null : snapshot ? await snapshot() : null;
-      const file = clip ? clip.file : blob && new File([blob], "gnogolf.png", { type: "image/png" });
+      // the clip when there is one and the phone can send a video, else a
+      // picture of the course, else the words and the link alone
+      const can = (f: File) => !!navigator.canShare && navigator.canShare({ files: [f] });
+      let file: File | null = clip && can(clip.file) ? clip.file : null;
+      if (!file && snapshot) {
+        const blob = await snapshot();
+        file = blob && new File([blob], "gnogolf.png", { type: "image/png" });
+      }
       const data: ShareData = { title: "Gnogolf", text, url };
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
+      if (file && can(file)) data.files = [file];
       await navigator.share(data);
     } catch {} // cancelled, or refused: nothing to say
   };
