@@ -149,7 +149,8 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
     drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 3px 0 #0e3027) drop-shadow(0 18px 24px rgba(20, 10, 60, .45));
 }
 @keyframes title-float { 50% { transform: translateY(-8px) rotate(-1deg); } }
-.screen--title .title__word {
+/* the word, wherever the logo is drawn (the title, the trailer's cards) */
+.title__word {
   fill: url(#title-word); font-size: 92px; font-weight: 700; letter-spacing: .06em;
   stroke: var(--ink); stroke-width: 5px; paint-order: stroke; stroke-linejoin: round;
 }
@@ -351,13 +352,17 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .aimset__help > .off { visibility: hidden; }
 /* the tile and the aim card under it share one width (--pick-w): the same
    edges at every size */
-.screen--pick { --pick-w: min(380px, 60vw, 40vh); }
+.screen--pick { --pick-w: min(380px, 60vw, 40vh); align-content: safe center; } /* taller than the window: from its top, never cut above it */
 @media (max-height: 820px) { .screen--pick { --pick-w: min(340px, 60vw, 36vh); } }
-@media (max-width: 600px) { .screen--pick { --pick-w: min(64vw, calc(100vw - 144px), 40vh); } } /* 144: the screen's padding and the two arrows, so the stage fits a 360 phone */
+/* a phone: the stage fits a 360 one (144: the screen's padding and the two
+   arrows), a tighter rhythm, and a named hole says its name only (the
+   button asks for the gnome), so it all fits above the network banner */
+@media (max-width: 600px) {
+  .screen--pick { --pick-w: min(64vw, calc(100vw - 144px), 40vh); --gap-l: 12px; --gap-xl: 16px; }
+  .pick__ask { display: none; }
+}
 /* the aim card never narrower than its switch (a phone on its side: 36vh is 140px) */
 .front.screen--pick .aimset--compact { width: max(var(--pick-w), 230px); }
-/* short: taller than the window, it scrolls from its top (safe), not both ends */
-@media (max-height: 640px) { .screen--pick { align-content: safe center; } }
 .screen--pick .pick__stage { position: relative; margin: 0 0 var(--gap-l); }
 .screen--pick .pick__stage > * { position: relative; }
 /* the gnome's stage: the picker's tile, and a new gnome's on the cup's card */
@@ -408,6 +413,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   animation: pop .45s var(--spring);
 }
 .victory__in:focus { outline: none; }
+.victory__in > * { min-width: 0; max-width: 100%; } /* a grid's items shrink to the card, never widen it past a phone */
 .victory__badge { width: clamp(76px, 12vh, 108px); filter: drop-shadow(0 4px 0 var(--ink)); animation: cup-bounce .7s .15s var(--spring) both; }
 /* the cup drops in and bounces on the spring (reduced motion: there at once, the global switch) */
 @keyframes cup-bounce { from { transform: translateY(-48px) scale(.5); opacity: 0; } }
@@ -446,6 +452,8 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   .victory__sum { font-size: 15px; }
   .victory .banner__row { width: 100%; flex-direction: column-reverse; }
   .victory .banner__row .btn { width: 100%; }
-  .newgnome { gap: 12px; padding: 10px; } .victory .newgnome__stage { width: 96px; height: 108px; }
+  /* the new gnome above its words and its button, the button the card's width */
+  .newgnome { flex-direction: column; gap: 8px; padding: 10px; text-align: center; } .victory .newgnome__stage { width: 96px; height: 108px; }
+  .newgnome__say { justify-items: center; width: 100%; } .newgnome .btn { width: 100%; white-space: normal; }
 }
 .victory__cheer canvas { width: 100%; height: 100%; display: block; }

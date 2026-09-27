@@ -175,6 +175,15 @@ let mood: Mood = {}, bed: { src: AudioBufferSourceNode; g: GainNode; stop?: Retu
 // ?camlog: every sound asked for, played or not (a test counts them)
 const soundLog: [string, number, number][] | null = camlog() ? [] : null;
 if (soundLog && typeof window !== "undefined") (window as Window & { __soundLog?: typeof soundLog }).__soundLog = soundLog;
+/** The page's audio swapped (the trailer's rig records it offline): a context
+ *  made before, and the ambience on it, are dropped; the next sound makes one
+ *  of the new kind. */
+export function freshAudio() {
+  if (bed) bed.src.stop();
+  bed = null;
+  void ctx?.close().catch(() => {});
+  ctx = null;
+}
 export function hush(off: boolean) {
   hushed = !!off;
   ambience(mood);

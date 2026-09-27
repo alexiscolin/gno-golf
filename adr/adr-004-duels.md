@@ -2,10 +2,30 @@
 
 ## Status
 
-Proposed. The product decisions were taken with the user on 2026-09-27. One
-realm change has to land before mainnet: a best keeps its shots and its
-period. Everything else is client work and can ship after mainnet. There is
-no on-chain duel record in V1.
+Proposed, accepted for V1 in slices. The product decisions were taken with
+the user on 2026-09-27. One realm change has to land before mainnet: a best
+keeps its shots, its period and its mode. Everything else is client work and
+ships in slices after it: the dare link first, then the board and Friends
+entries. There is no on-chain duel record in V1.
+
+## Summary
+
+- A duel is a normal hole played against another player's best, shown as a
+  see-through gnome. It is turn by turn: the player shoots, then the ghost
+  replays its stroke with the same number. The ghost's turn lasts at most
+  2 s, and a tap or the start of an aim skips it.
+- Before mainnet, the realm's best keeps its shots, period and mode, written
+  in the same save transaction as the finish. A new read,
+  `Ghost(hole, mode, player)`, returns it.
+- Replaying a ghost costs only reads. Only the player's own save costs gas,
+  as today.
+- V1 enters a duel from the dare link first, the smallest slice. The ⚔ on
+  the hole's board and in Friends come later in V1.
+- V1's result is the client's arithmetic, and nothing records it. The end
+  card says `Duel records on-chain · soon`.
+- The aim mode stays free. A mixed race is marked and earns nothing. A win
+  that cannot be saved offers `Dare a friend`. "Ghost buster" is a gnome,
+  earned only against a best at par or under.
 
 ## Context
 
@@ -15,7 +35,7 @@ it plays turn by turn:
 
 1. the player shoots;
 2. the rival's stroke with the same number replays, fast, and can be skipped;
-3. the HUD says "You 2 · nym-ace123 3".
+3. the HUD says `You 2 · nym-ace123 3`.
 
 The chain is what makes this worth building. The rival's round is on-chain,
 so nobody can fake it, and replaying it is a free read. Today the game has
@@ -24,7 +44,7 @@ everything a duel needs except one thing:
 - **A round keeps its shots, a best does not.** A round is
   `{bx, by, fx, fy, strokes, done, period, shots, mode}` (golf.gno:203-211).
   `shots` is the decisions as played, `"angle,power,tick;…"`, written with
-  `%.4f,%.4f,%d` (golf.gno:917-921). A finish writes only the stroke count
+  `%.4f,%.4f,%d` (golf.gno:916-921). A finish writes only the stroke count
   into the version's bests, `e.bests(m).Set(p, r.strokes)` (golf.gno:945-951),
   keyed by player under `id + " " + mode + " "` (golf.gno:112). The round
   itself stays until the player's next save: the client records with
@@ -45,7 +65,7 @@ everything a duel needs except one thing:
 - **The client already has the pieces**:
   - a dare link, `?by=<address>` (`holeLink`, common.ts:30-39). Landing on it
     reads the sharer's best in both modes, shows it on the picker and in a
-    toast, and adds the sharer to the friends (Golf.tsx:660-682);
+    toast, and adds the sharer to the friends (Golf.tsx:676-698);
   - friends kept in the browser (friends.ts:1-28), read with `Bests`, which
     covers named and unnamed players alike (state.gno:843-857);
   - a second, silent replay on a gnome of its own, which the share clip
@@ -61,20 +81,21 @@ everything a duel needs except one thing:
 - The rival is one player's **best** on this exact version, in one mode.
 - The result (win, loss or tie) is worked out in the client from two numbers
   the chain already vouches for: the player's strokes and the rival's best.
-  V1 does not write it anywhere.
+  V1 does not write it anywhere. The end card says so:
+  `Duel records on-chain · soon`.
 
-### 2. The realm: a best keeps its shots and its period (before mainnet)
+### 2. The realm: a best keeps its shots, period and mode (before mainnet)
 
 **What is stored.** The value in the bests tree changes from an `int` to a
 string, `"<strokes> <period> <shots>"`, for example
 `"3 5912345 12.5000,6.2000,0;…"`. The mode is already part of the key
-(golf.gno:112), so it is not repeated. The shots are the round's own
-`r.shots`, copied as they are, in the format `SimulateFrom` and
+(golf.gno:112), so it is kept without being repeated. The shots are the
+round's own `r.shots`, copied as they are, in the format `SimulateFrom` and
 `SimulateRoundIn` already read. This needs no encoder, and gnoweb can print
 it.
 
 **When it is written.** In `stroke`, in the branch that already replaces a
-best (golf.gno:945-951), and in the same transaction as the finish:
+best (golf.gno:945-951), so in the same save transaction as the finish:
 
 - a better round overwrites the string. The old shots are freed, and the
   refund goes to the player saving, who is the one who paid for them;
@@ -83,18 +104,19 @@ best (golf.gno:945-951), and in the same transaction as the finish:
   the ghost.
 
 **What reads it.** Every place that reads a best as `v.(int)` goes through one
-helper, `bestStrokes(v any) int`. There are nine such places:
+helper, `bestStrokes(v any) int`. There are ten such lines in eight
+functions:
 
 | File | Line | What reads it |
 |---|---|---|
 | golf.gno | 488 | `drain` |
 | golf.gno | 945, 948 | `stroke` |
 | golf.gno | 979 | `seat` |
-| state.gno | 752 | `HoleRank` |
-| state.gno | 849 | `Bests` |
-| state.gno | 887 | `Records` |
-| data.gno | 429 | `BestOf` |
-| render.gno | 454 | `roundSummary` |
+| state.gno | 753 | `HoleRank` |
+| state.gno | 850 | `Bests` |
+| state.gno | 888 | `Records` |
+| data.gno | 430 | `BestOf` |
+| render.gno | 455, 456 | `roundSummary` |
 
 The tests that read a best directly change too (golf_test.gno:126,
 golf_test.gno:510, rules_test.gno:211).
@@ -102,9 +124,8 @@ golf_test.gno:510, rules_test.gno:211).
 **A new read.** `Ghost(hole, mode string, player address) string` returns
 `{"version":1,"hole":…,"mode":…,"player":…,"strokes":3,"period":5912345,"shots":"…"}`,
 or `null` when the player has no best. The argument order follows `BestOf`
-and `HoleRank` (`hole, mode, player`) rather than the `(hole, player, mode)`
-first sketched. Like `Bests`, it serves any address, named or not. It decodes
-nothing: it is a tree lookup.
+and `HoleRank` (`hole, mode, player`). Like `Bests`, it serves any address,
+named or not. It decodes nothing: it is a tree lookup.
 
 **Measured, not estimated.** These numbers come from a scratch copy of the
 realm, run with the pearl toolchain `check.sh` uses. The setup is the
@@ -120,8 +141,8 @@ realm, run with the pearl toolchain `check.sh` uses. The setup is the
 - **Per shot.** The string grows by about 18 bytes a shot, and each best
   carries about 30 bytes of fixed overhead. A shot's text is 15 to 22 bytes
   plus its `;`: `90.0000,0.2000,0` at the short end, `-359.9999,10.0000,1023`
-  at the long end. **The "~12 bytes a shot" estimate in BACKLOG.md:323-328 is
-  low by about half.** It is still cheap.
+  at the long end. **The "about 12 bytes a shot" estimate in
+  BACKLOG.md:323-328 is low by about half.** It is still cheap.
 - **Cost at the local chain's price.** `params/vm:p:storage_price` on
   127.0.0.1 is 100 ugnot a byte:
   - a 3-stroke best adds about 85 B, 0.0085 GNOT;
@@ -129,15 +150,14 @@ realm, run with the pearl toolchain `check.sh` uses. The setup is the
   - the worst case, 60 strokes of the longest shot text, about 1.4 KB, 0.14 GNOT.
 
   The price on other chains is read at run time (`storagePrice`,
-  chain.ts:307-311).
+  chain.ts:308-312).
 - **Gas.** About +54K a finish (251,995,306 against 251,727,378 for five
   12-stroke finishes). That is nothing next to the replay itself.
 
 **Why before mainnet.** Packages are frozen at their path. If a best is an
 `int` on mainnet, adding its shots later means a golf/v2 and a migration of
-every best. Worse, the shots of any best a player has since beaten with
-nothing (their latest round replaced it in the rounds tree) are already lost,
-and no migration can bring them back.
+every best. Worse, a best whose round has since been replaced in the rounds
+tree has already lost its shots, and no migration can bring them back.
 
 ### 3. Replaying the ghost costs only reads
 
@@ -154,7 +174,7 @@ and no migration can bring them back.
   refuses a later stroke whose weather is over (`notOver`, state.gno:494-499).
   **Neither can replay a ghost.**
 - **Why not the whole round in one read.** `SimulateRound*` returns only the
-  last shot's path (state.gno:538-540). It also takes at most 12 shots
+  last shot's path (state.gno:537-539). It also takes at most 12 shots
   (`maxShots`, golf.gno:48) and one commit's work budget, 1.4e9
   (golf.gno:730-731). So a 60-stroke ghost cannot be replayed in one read.
   One read per stroke also matches the turn-by-turn play: one read a turn.
@@ -176,10 +196,10 @@ and no migration can bring them back.
   the rival's stroke N meets the same pieces as the player's stroke N, at its
   own tick.
 - **Name gate.** A best is kept for every address; only the boards are for
-  named players (golf.gno:308-315, 963-965). `Ghost`, like `Bests`, reads
+  named players (golf.gno:308-316, 963-965). `Ghost`, like `Bests`, reads
   anyone. So an unnamed friend, or an unnamed sharer of a dare link, can be
-  raced. Only the ⚔ buttons on the hole's board are limited to named
-  players, because that board only lists them.
+  raced. Only the ⚔ on the hole's board is limited to named players, because
+  that board only lists them.
 
 ### 4. Drawing the ghost
 
@@ -206,7 +226,7 @@ and no migration can bring them back.
 - **Cost.** The ghost adds a handful of draw calls to the live scene. It
   needs no second WebGL context (the clip does, the ghost does not), and it
   is one more transparent object in the sort. Two details matter:
-  - its fade materials are not in `warm()` (engine.ts:623-646), so they
+  - its fade materials are not in `warm()` (engine.ts:628-646), so they
     compile at the ghost's first frame; they should be warmed when a duel is
     armed;
   - frames run at 60 fps only while `busy` (engine.ts:379, pace.ts:40-45), so
@@ -215,7 +235,7 @@ and no migration can bring them back.
   (`disposeCourse` skips shared materials, materials.ts:443-458). It is added
   to `hide()` (engine.ts:1344), so the clip never draws it by accident.
 - **Name clash.** "Ghosts" already names the blank rows of an empty board
-  (Leaderboard.tsx:51-62) and the dashed outlines of timed pieces while
+  (Leaderboard.tsx:51-63) and the dashed outlines of timed pieces while
   aiming (engine/aim.ts:125-126). The code calls this one `rival`.
 
 ### 5. Turn by turn, inside today's stroke flow
@@ -230,15 +250,18 @@ aim. In `shoot`, that is after `restTimed()` and before `showExtras()`
      (`showAt((tick0||0)+i)`);
    - its cause words use the rival's weather (`cg.weather`, replay.ts:152
      and 601-603);
-   - it plays at twice the speed. `replay.ts` has no speed factor today, so
-     one is added for `showMs`, the tunnel, climb and splash durations
-     (replay.ts:230, 279, 317-390, 563) and `fly()`'s gravity (115-147).
+   - it plays at twice the speed, **capped at 2 s**: a longer stroke plays
+     faster to fit. `replay.ts` has no speed factor today, so one is added
+     for `showMs`, the tunnel, climb and splash durations (replay.ts:230,
+     279, 317-390, 563) and `fly()`'s gravity (115-147).
 3. `showExtras()` runs for the next stroke, then the aim comes back.
 
 **Skip.** The `cut` token already stops every animation of a replay
 (replay.ts:484-514, 609). Skipping puts the ghost's ball at its `rest`.
-`onDown` ignores taps while `g.flying` (engine.ts:923), so the ghost's turn
-uses a flag of its own, and a tap on the canvas, or the Skip chip, cuts it.
+`onDown` ignores presses while `g.flying` (engine.ts:923), so the ghost's
+turn uses a flag of its own. A tap on the canvas, or the `Skip ›` chip, cuts
+it. A press that starts a pull-back cuts it **and** starts the aim, in the
+same gesture.
 
 **The network never blocks the player.** If the rival's stroke has not
 arrived 1.5 s after the player's ball rests, the aim comes back anyway. When
@@ -253,49 +276,52 @@ the player's.
 
 - **Mode.** The ghost is a best in one mode. The duel races the rival's best
   in the player's aim mode if there is one, and otherwise the other mode,
-  with the aim set to match and the picker saying so. Assisted and pro are
+  with the aim set to match and the picker saying so. Assisted and Pro are
   ranked apart because the chain cannot see a screen (golf.gno:215-218). The
   dare's reading today takes the lower best of the two modes
-  (Golf.tsx:673-676). A duel must keep the mode it took the best from.
-  - The aim toggle on the picker stays free (recommended, open question 1).
-    A player who races a Pro ghost with Assisted aim still gets a duel; the
-    end card says `Your Assisted vs their Pro`, and it earns no Ghost buster.
+  (Golf.tsx:689-691). A duel must keep the mode it took the best from.
+  - The aim toggle on the picker stays free. A player who races a Pro ghost
+    with Assisted aim still gets a duel. The race is marked
+    (`Your Assisted vs their Pro.` on the end card) and earns no Ghost buster.
     Locking the toggle would drop a newcomer from a dare link into Pro, with
-    no aim line, on their first hole ever.
+    no aim line, on their first hole ever. Leaving it free is also less code.
 - **Weather.** The ghost replays in its own period, and the player plays
   today's weather. The scene draws a single weather (`makeWeather`,
   engine.ts:90; `scene.fog` and `set()` in weather.ts:380 and 428), so the
-  ghost's weather cannot be drawn at the same time. Its effect is already
-  in its path. The screen says so plainly (see the UX section). No attempt
-  is made to make the weather fair: a ghost is a record, and records keep
-  the weather they were set in.
+  ghost's weather cannot be drawn at the same time. Its effect is already in
+  its path. The difference is said on screen, never equalised (see "Game
+  design notes").
 - **The rival holes first** (R < the player's strokes). The ghost drops into
   the cup and stays there, and the HUD shows ✓. When the player passes R
   strokes without holing, one toast says the duel is lost. The round goes on
   and can still be saved.
 - **The player holes first.** The result is known, because R is known. The
   win card opens straight away, and the rival's remaining strokes are not
-  replayed.
-- **Tie.** Same strokes: "Tied with nym-ace123". When the player holes in
+  replayed. There is no `Watch their round`: the win card is the moment to
+  save and dare back.
+- **Tie.** Same strokes: `Tied with {rival}`. When the player holes in
   exactly R, the ghost's last stroke still replays: seeing it drop too is
   the moment. On a win (fewer than R) it does not.
 - **An ace ghost.** R = 1 cannot be beaten, only tied. The picker says so
   up front (see the UX section), so the loss is not a surprise.
 - **No record.** When `Ghost` is `null` in both modes, there is no duel. The
-  dare line says what it says today: "nym-ace123 dares you on this hole."
-  (Golf.tsx:677).
+  dare line says what it says today: `{rival} dares you on this hole.`
+  (Golf.tsx:693).
 - **Another version.** A cup hole's link is its slot page, which opens the
   *current* version (common.ts:32-38). A sharer whose best is on an older
-  version has no best on the one that opens. That case is shown as "No
-  saved round on this version". Racing the archived version is an open
-  question.
+  version has no best on the one that opens. The picker says
+  `{rival} has no saved round on this version yet.`, and there is no duel.
+  The archived version is not offered: a link is made right after a save,
+  so this happens only when a version is published between the share and
+  the click, and "out of the cup" would be one more state to explain on a
+  first visit.
 - **Beat yourself.** The player's own row on a board races their own best:
-  "Race your best".
+  `Race your best`.
 - **The best changes during a duel.** `Ghost` is read once, when the duel is
   armed, and the duel runs against that copy. The end card reads `BestOf`
   again, and if the rival's best has improved it says so. Rematch reads
   `Ghost` again.
-- **Restart.** Restart (Golf.tsx:1238) starts both rounds again from the tee.
+- **Restart.** Restart (Golf.tsx:1271) starts both rounds again from the tee.
 - **Network down.** Arming a duel needs the `Ghost` read. After that, the
   result needs only R, so a failed replay read costs the animation, never
   the score.
@@ -313,30 +339,36 @@ period). Wear does not change a stroke. A rival cannot claim a round they did
 not play, and a client cannot hand anyone a better ghost.
 
 What a client *can* do is lie to its own player. The duel's result in V1 is
-the client's arithmetic. A "You beat nym-ace123" shared without a save proves
+the client's arithmetic. A `You beat {rival}!` shared without a save proves
 nothing, but anyone can check it against the two bests on the chain. The
 paths come from the node, like every read today, so a dishonest RPC could
 lie about them. That trust is already the same for every shot.
 
-### 8. Later, not in V1
+### 8. Ghost buster is a gnome
+
+- It is earned by a duel won against another address's best, in the same
+  mode, with the winning round saved on-chain. The saved round makes the
+  claim checkable: the player's public best is lower than the rival's.
+- The rival's best must be **at par or under**. Without that floor, the
+  cheapest way to earn it is to race the worst row on any board, or a second
+  account's 9 on a par 3. A tie does not earn it, and neither does a mixed
+  race.
+- It is a gnome, not a stamp on the card. The gnomes are the game's one
+  reward: they are on the picker, in the share link (`&gnome=`), and seen by
+  friends. A stamp would be a second system seen by no one. It carries a
+  lantern and is never see-through, so it does not look like the ghost it
+  races.
+- In V1 it is earned in the front end, like the other gnomes (card.ts:160-171).
+  Once `Duel` exists, the chain holds it.
+
+### 9. Later, not in V1
 
 - **`Duel(hole, rival)` on-chain.** It needs no replay. Both rounds were
   already replayed when they were saved: the caller's finished round (its
   `done` round in the rounds tree) and the rival's best. The chain compares
   them and keeps wins, losses and streaks on a board of their own. Because
   the ghost is stored, a result can later point at the exact rounds that
-  decided it.
-- **"Ghost buster"**: beat a ranked player's ghost.
-  - In V1 it is earned in the front end, like the gnomes (card.ts:160-171,
-    front-only): a duel won against another address's best, in the same
-    mode, with the winning round saved on-chain. The saved round makes the
-    claim checkable, since the player's public best is lower than the
-    rival's.
-  - The rival's best must be **at par or under**. Without that floor, the
-    cheapest way to earn it is to race the worst row on any board, or a
-    second account's 9 on a par 3.
-  - Once `Duel` exists, the chain holds it.
-  - Whether it is a stamp on the card or a gnome is an open question.
+  decided it. Until then the end card says `Duel records on-chain · soon`.
 - **The clip with both balls.** The clip plays the holing stroke only
   (engine.ts:1084; engine/clip.ts:35), framed on one ball (`lively()`,
   clip.ts:109-117). Showing the rival too means:
@@ -363,20 +395,21 @@ The site's rules hold throughout:
 
 In the strings below, `{rival}` is the gno.land name, or the short address
 (`shortAddr`, common.ts:14) for a player without a name. On a phone it is
-cut to 12 characters with "…".
+cut to 12 characters with `…`.
 
 ### Entries
 
 **The link landing (`?by=`).** A dare link arms a duel by itself, which saves
-a step. It lands on the title screen first (Golf.tsx:275), and today that
-screen says nothing about the dare: the friend taps Start blind.
+a step on the path that matters most; the `×` makes it free to leave. It
+lands on the title screen first (Golf.tsx:276), and today that screen says
+nothing about the dare: the friend taps Start blind.
 
 - **Title screen.** One flat line above Start, in the tag's place:
   `⚔ {rival} holed {hole} in {n}. Race their ghost.` (no record:
   `⚔ {rival} dares you on {hole}.`). The Start button and its copy do not
   change. The facts under it stay; the third one already says
   `Free to play`, which is what a friend with no wallet needs to read.
-- **Picker.** The dare line (Golf.tsx:1839) becomes a flat badge:
+- **Picker.** The dare line (Golf.tsx:1876) becomes a flat badge:
   - `⚔ Racing {rival} · {n} to beat` with an `×` (aria-label
     `Stop racing {rival}`);
   - under it, in small type, `Their round is on the chain, replayed, not
@@ -384,8 +417,8 @@ screen says nothing about the dare: the friend taps Start blind.
     before play;
   - then `They played in {weather}.` The weather is `Weather(hole, period)`
     for the ghost's period, which any past period can read
-    (weather.gno:42-47): "sun", "a breeze", "wind", "rain", "fog", "a
-    storm", "snow";
+    (weather.gno:42-47): `sun`, `a breeze`, `wind`, `rain`, `fog`,
+    `a storm`, `snow`;
   - the ghost's mode: `Their aim: Pro.` (or `Assisted`). If the player picks
     the other one: `You: Assisted. Them: Pro. Still a race, not a record.`;
   - an ace ghost: `{rival} aced it. Match it to tie.`;
@@ -396,11 +429,11 @@ screen says nothing about the dare: the friend taps Start blind.
   - another version: `{rival} has no saved round on this version yet.`
 
 The solid action stays `Choose this gnome`. The toast on opening the hole
-(`setLinkNote`, Golf.tsx:679) becomes `{rival} holed it in {n}. Your turn.`
+(`setLinkNote`, Golf.tsx:695) becomes `{rival} holed it in {n}. Your turn.`
 
-**The board ⚔.** On the Leaderboard sheet:
+**The board ⚔** (later in V1). On the Leaderboard sheet:
 
-- each row of "This hole" (Leaderboard.tsx:428-437) gets a flat ink `⚔` icon
+- each row of "This hole" (Leaderboard.tsx:428-439) gets a flat ink `⚔` icon
   button, aria-label `Race {rival}'s {n}`, visible text `Race` from 480 px up.
   It is not red: the red stays with the one solid action;
 - the player's own row shows `Race your best`;
@@ -413,9 +446,9 @@ round, the sheet first asks, inline in the row:
 - `Restart and race {rival}?`
 - two plain buttons, `Race` and `Not now`.
 
-**Friends.** In the Friends tab, each row of the hole list
-(Leaderboard.tsx:152-161) gets the same ⚔. The friend-adding field stays as
-it is (Leaderboard.tsx:180-183): it is how a name becomes a rival, and no
+**Friends** (later in V1). In the Friends tab, each row of the hole list
+(Leaderboard.tsx:151-161) gets the same ⚔. The friend-adding field stays as
+it is (Leaderboard.tsx:181-184): it is how a name becomes a rival, and no
 other name field is added.
 
 - A friend whose best here is lower than yours shows a flat `beat you` after
@@ -425,14 +458,14 @@ other name field is added.
 
 ### The HUD
 
-- **The score card** (Golf.tsx:1093-1098) keeps its place:
+- **The score card** (Golf.tsx:1125-1130) keeps its place:
   - the eyebrow says `Race` instead of `Strokes`;
   - the line reads `You 2 · {rival} 3`, with a ✓ after the rival's number
     once their ball is in;
   - in portrait on a phone, the two counts stack: `You 2`, then `{rival} 3`;
   - `par 3` stays under it.
 - **The rival's number** is the strokes replayed so far, not their total.
-  That keeps the tension: it goes up in step with the player's.
+  It goes up in step with the player's, which keeps the tension.
 - **The duel badge** sits under the score card: a flat chip
   `⚔ {rival} · {n} to beat` with its `×`. The HUD line counts up; the badge
   keeps the target in sight.
@@ -443,10 +476,10 @@ other name field is added.
     `⚔ {rival} won · Rematch`, `Rematch` a text link that restarts from the
     tee. A lost duel then costs one tap to retry, not a trip to the end card.
 - **While the player aims,** the ghost's ball stays where it rests, with its
-  ink ring: where it sits is the "who is ahead" signal, and it needs no
-  meter. The ghost gnome drops to about 0.2 opacity so it does not clutter
-  the aim, and comes back to 0.45 for its turn. No distance-to-cup number:
-  on a hole with walls, the straight line lies.
+  ink ring. Where the two balls lie is the "who is ahead" signal, and it
+  needs no meter. The ghost gnome drops to about 0.2 opacity so it does not
+  clutter the aim, and comes back to 0.45 for its turn. There is no
+  distance-to-cup number: on a hole with walls, the straight line lies.
 - **The Adena pill, the weather and the camera button do not change.** The
   weather badge keeps showing *today's* weather, because it is the player's.
 
@@ -454,13 +487,11 @@ other name field is added.
 
 1. The player's ball rolls and rests as today.
 2. After 250 ms, a small flat tag shows over the ghost, `{rival} · stroke 2`,
-   and the ghost's stroke replays at double speed, **capped at 2 s**: a
-   longer stroke plays faster to fit. A ghost's turn is then never longer
-   than the wait it replaces. A `Skip ›` chip takes the aim bar's place
-   (Golf.tsx:1225), and a tap anywhere also skips.
-   - A press that starts a pull-back skips the ghost **and** starts the aim,
-     in the same gesture. The player who wants to shoot is never made to tap
-     twice.
+   and the ghost's stroke replays at double speed, capped at 2 s (section 5).
+   A ghost's turn is then never longer than the wait it replaces. A `Skip ›`
+   chip takes the aim bar's place (Golf.tsx:1258), and a tap anywhere also
+   skips. A press that starts a pull-back skips the ghost and starts the
+   aim: the player who wants to shoot is never made to tap twice.
 3. The rival's number in the HUD goes up with a small pop, or none under
    reduced motion. The polite live region says `{rival}, stroke 2: stopped.`
    or `{rival}, stroke 3: in the hole.`
@@ -472,7 +503,7 @@ other name field is added.
 
 ### The end card
 
-The hole-finished banner (Golf.tsx:1258-1345) keeps its structure. Only the
+The hole-finished banner (Golf.tsx:1290-1407) keeps its structure. Only the
 title, a line and the buttons change.
 
 The eyebrow stays `In the hole! · {hole name}`. The title (`h2`, today's
@@ -499,7 +530,7 @@ More lines can appear under the result, each fine print, flat:
 - the rematch count, this session only: `Race 3 against {rival}.` It is
   kept in memory, not stored, and resets with the page.
 
-Under the standings, in muted type, a flat line with no link:
+At the foot of the card, in muted type, a flat line with no link:
 `Duel records on-chain · soon`.
 
 **Buttons, one solid at a time:**
@@ -509,10 +540,12 @@ Under the standings, in muted type, a flat line with no link:
     it says why now: `Saved, your round becomes the ghost they race.`;
   - `Rematch` is secondary;
   - `Dare them back` is a text link.
-- *Once saved, or when it cannot be saved:*
+- *Once saved:*
   - a win makes `Dare them back` solid, with `Rematch` secondary;
   - a loss or a tie makes `Rematch` solid, with `Dare them back` as a text
     link.
+- *When it cannot be saved:* `Rematch` is solid, and `Dare a friend` takes
+  the place of `Dare them back` (see below).
 - `Play again` becomes `Rematch` in a duel. It resets the round and reads
   `Ghost` again. `Play solo` sits next to it as a text link.
 
@@ -520,7 +553,7 @@ Under the standings, in muted type, a flat line with no link:
 
 **Dare them back** opens the existing `Share` with the link
 `holeLink(s, gnome, me)`, which carries `by=` only once the round is saved
-on-chain (Golf.tsx:1276). The texts:
+on-chain (Golf.tsx:1309). The texts:
 
 | Result | Share text |
 |---|---|
@@ -528,12 +561,13 @@ on-chain (Golf.tsx:1276). The texts:
 | Loss | `⚔ {rival} beat me by {d} on {hole}. Race my ghost while I rematch. #gnoland @_gnoland` |
 | Tie | `⚔ {rival} and I both holed {hole} in {n}. Settle it. #gnoland @_gnoland` |
 
-- The texts say `ghost` because that is what the friend will race. `Free to
-  play, no wallet needed` goes on the win text, the one most sent to new
-  people: a crypto-shy friend reads it before the link.
-- Once saved, the text may add `Both rounds are on gno.land.` It is never
-  added before a save: an unsaved result is the client's own arithmetic
-  (section 7), and the copy must not claim more than the chain holds.
+- The texts say `ghost` because that is what the friend will race.
+  `Free to play, no wallet needed` goes on the win text, the one most sent
+  to new people: a crypto-shy friend reads it before the link.
+- The text may add `Both rounds are on gno.land.` Share texts are sent only
+  once saved, so this is always true. An unsaved result is the client's own
+  arithmetic (section 7), and the copy must not claim more than the chain
+  holds.
 - **Not saved yet.** `Dare them back` is not disabled: a disabled control
   gives no reason and no way on. It stays a text link, and a tap shows in
   place `A dare races your saved round. Save it first.` The link must race a
@@ -543,14 +577,15 @@ on-chain (Golf.tsx:1276). The texts:
   link reads `Dare a friend` and shares the *rival's* link,
   `holeLink(s, gnome, rival)`, with
   `⚔ Can you beat {rival}'s {n} on {hole}? Free to play, no wallet needed.`
-  The dare keeps travelling through a player who cannot sign. This is the
-  loop's biggest leak (see "Launch and marketing"); it is recommended, not
-  yet decided (open question 8).
+  The usual case is a win on a first visit from a link. The dare keeps
+  travelling through a player who cannot sign, and it shares a round the
+  chain holds (the rival's), so it claims nothing the chain does not vouch
+  for. This plugs the loop's biggest leak (see "Launch and marketing").
 - **Rematch** keeps the rival and the mode, reads `Ghost` again, and starts
   from the tee.
-- **Ghost buster** (when it ships): a gnome, not a stamp (open question 5).
-  It shows on the win card through the existing `Unlocked` block
-  (Golf.tsx:1320), with its need: `Beat a friend's ghost at par or under.`
+- **Ghost buster** shows on the win card through the existing `Unlocked`
+  block (Golf.tsx:1330), with its need:
+  `Beat another player's ghost at par or under.`
 
 ### Empty, error and slow states
 
@@ -562,7 +597,7 @@ on-chain (Golf.tsx:1276). The texts:
 | No record on this version | picker | `{rival} has no saved round on this version yet.` |
 | A ghost stroke is slow (> 1.5 s) | tag over the ghost | `{rival} · stroke 2 …` then a jump to its rest |
 | A ghost stroke failed | tag, once | `Their stroke didn't load. The race still counts.` |
-| Board row with no name | Friends tab | ⚔ still offered (`Ghost` reads anyone) |
+| A friend with no name | Friends tab | ⚔ still offered (`Ghost` reads anyone) |
 
 ### Accessibility
 
@@ -574,11 +609,12 @@ on-chain (Golf.tsx:1276). The texts:
   each stroke"), so the duel can be followed without seeing the ghost.
 - Colour is never the only signal. The ghost carries its name tag, and the
   HUD writes both numbers out.
-- The ghost is at least 3:1 against the grass. This is paper-white with an
-  ink outline, so it holds on the ice and snow holes too, and the outline
-  carries it there.
+- The ghost is at least 3:1 against the grass. It is paper-white with an ink
+  outline, so it holds on the ice and snow holes too, where the outline
+  carries it.
 - Reduced motion: no flight, the ghost at its rest with a still path, no pop
-  in the HUD, and confetti follows `motion`, as the cup card's `Cheer` does (Golf.tsx:2021-2033).
+  in the HUD, and confetti follows `motion`, as the cup card's `Cheer` does
+  (Golf.tsx:2066-2079).
 - The end card's title is the dialog's label. Nothing is autofocused, and
   focus rings show for the keyboard only.
 
@@ -614,23 +650,18 @@ putt is short: the ghost's answer is a reveal, not a wait.
   hands out the route to an ace. Shooting first keeps each turn a question:
   "did they do better?"
 - The cost is waiting. It is kept small by the 2 s cap, skip by tap, and
-  skip by starting to aim. If skips run high (see "What to measure"), the
+  skip by starting to aim. Waiting is the one thing that can make a duel
+  feel worse than solo play. If skips run high (see "What to measure"), the
   next step is to replay the ghost's turn while the player's ball is still
   slowing, not to make it live.
-
-**Tension, stroke by stroke.** The HUD counts up in step (`You 2 · nym 2`),
-the badge keeps the target (`3 to beat`), and the ghost's ball stays on the
-green while the player aims. Where the two balls lie is the "who is ahead"
-signal. No distance meter: on a hole with walls, the straight line to the cup
-lies.
 
 **Fairness is said, not fixed.** A record keeps its weather, as a track
 record keeps its wind. The copy says it three times, each time small: the
 picker (`They played in wind.`), the ghost's cause words (its own weather),
 and the end card, only when the weathers differ. A loss in a storm against a
-calm ghost is a reason to rematch in five minutes, which is good for the
-loop. Mode is different: it changes what the player can see, so a mixed race
-is marked on the card and earns nothing.
+calm ghost is a reason to rematch once the weather changes, which is good
+for the loop. Mode is different: it changes what the player can see, so a
+mixed race is marked on the card and earns nothing.
 
 **Frustration cases.**
 
@@ -639,21 +670,15 @@ is marked on the card and earns nothing.
 | Ace ghost | Said on the picker: `Match it to tie.` A tie gets its own title. | A loss the player was warned about is a challenge, not a trap. |
 | Rival far worse | A plain win. No Ghost buster unless their best is at par or under. | An easy win is fine; an easy reward is not. |
 | Racing yourself | `Racing your best`, `You beat your best!` | This is the Mario Kart time trial. It is also the ⚔ a new player can use with no friends. |
-| Tie | `Tied with {rival}`, Rematch solid. | Ties are common on par 2 and 3. They should push to a rematch, not end flat. |
-| Lost mid-round | Badge turns to `Rematch`. | Nobody should play out 20 strokes of a lost duel to get a retry. |
+| Tie | `Tied with {rival}`, `Rematch` solid. | Ties are common on par 2 and 3. They should push to a rematch, not end flat. |
+| Lost mid-round | The badge turns to `Rematch`. | Nobody should play out 20 strokes of a lost duel to get a retry. |
 
 **Rematch loops.** Rematch is one tap, keeps the rival and the mode, and
-reads `Ghost` again. The session count (`Race 3 against {rival}`) gives the
+reads `Ghost` again. The session count (`Race 3 against {rival}.`) gives the
 loop a shape without storing anything. A stored head-to-head
 (`You 2 – 1 {rival}`) and streaks wait for `Duel`, where the chain can
 vouch for them; a local one would be easy to inflate and would disagree
 across devices.
-
-**Rewards.** The gnomes are the game's one reward currency: they are on the
-picker, in the share link (`&gnome=`), and seen by friends. A stamp would be
-a second system seen by no one. So Ghost buster is a gnome (a gnome with a
-lantern, never a see-through one: it must not look like the ghost it races).
-Its bar: another address's best, same mode, at par or under, the win saved.
 
 **What makes a player send the dare back.**
 
@@ -663,17 +688,7 @@ Its bar: another address's best, same mode, at par or under, the win saved.
   race.` The wallet then serves the brag, not the other way round.
 - A tie: `Settle it.` is the strongest single ask in the set.
 - A loss rarely sends a dare back to the winner, who would race a worse
-  ghost. The loser's moves are Rematch, and passing the rival's dare on
-  (`Dare a friend`, open question 8).
-
-**The best three changes for fun,** in order:
-
-1. Skip by aiming, and the 2 s cap. Waiting is the one thing that can make
-   a duel feel worse than solo play.
-2. `{n} to beat` on the badge, and the ghost's ball left on the green while
-   aiming. The target and the rival's lie are the whole tension.
-3. `Rematch` on the badge the moment the duel is lost, and a solid Rematch on
-   a tie or loss.
+  ghost. The loser's move is `Rematch`.
 
 ## Launch and marketing
 
@@ -681,9 +696,9 @@ Its bar: another address's best, same mode, at par or under, the win saved.
 
 | Step | Leak | Plug |
 |---|---|---|
-| 1. Save | A player with no reason to save doesn't. | On a duel win: `Saved, your round becomes the ghost they race.` |
+| 1. Save | A player with no reason to save doesn't. | On a win or a tie: `Saved, your round becomes the ghost they race.` |
 | 2. Share the dare | Text only; the link card is the hole's, static. | The number and `Free to play, no wallet needed` are in the text, which the card cannot carry without a server. |
-| 3. Friend lands | Title screen is silent about the dare. | The title's dare line. |
+| 3. Friend lands | The title screen is silent about the dare. | The title's dare line. |
 | 4. Friend races | A Pro ghost puts a first-timer in Pro. | The aim stays free; mixed races are marked. |
 | 5. Friend wins | No wallet: cannot save, so cannot dare back. **The biggest leak.** | `Dare a friend`: the rival's link passes on. The friend's first save stays one tap away. |
 | 6. Dare comes back | The sharer never learns they were beaten unless the friend sends it. | Partly. `beat you` on the Friends tab, but only for friends the sharer already added: opening a dare adds the sharer to the friend's list, not the other way round. With no server, the dare sent back is the notification, so it is the win card's solid action once saved. |
@@ -701,10 +716,11 @@ nowhere else:
 It is never said about the *result* before `Duel` exists: V1's win is the
 client's arithmetic (section 7).
 
-**Title facts and About.** At launch, the title's second fact (`Pull back and
-let go`) becomes `⚔ Race a friend's ghost · it can't be faked`, with the
-aim icon kept. About's facts list (About.tsx:36) gains `Duels against any
-player's ghost`. The about steps do not change: a duel is not a fourth step.
+**Title facts and About.** At launch, the title's second fact
+(`Pull back and let go, like a slingshot`) becomes
+`⚔ Race a friend's ghost · it can't be faked`, with the aim icon kept.
+About's facts list (About.tsx:36) gains `Duels against any player's ghost`.
+The about steps do not change: a duel is not a fourth step.
 
 **First visit from a dare, with no wallet.** Nothing on the way asks for a
 wallet: title, picker, race and end card are all reads. The first mention of
@@ -715,15 +731,15 @@ player who never saves still gets the full duel and can pass the dare on.
 
 - The link card stays the hole's own (ADR-003). A card per dare needs a
   server and is not worth one.
-- In V1 the clip hides the ghost; the share image shows it where it stands.
-  The clip with both balls (stage 3) is the best launch asset there is: two
-  balls, one cup, one of them see-through. For the launch post, record it by
-  hand from a local chain rather than wait for stage 3.
+- In V1 the clip hides the ghost, and the share image shows it where it
+  stands (section 9). The clip with both balls, after V1, is the clearest
+  launch asset: two balls, one cup, one of them see-through. For the launch
+  post, record it by hand from a local chain rather than wait for it.
 
 **Launch plan, no code.**
 
 - Seed a ghost on every course hole: the team saves a round at par or under
-  on all 72, named. Every board then has a ⚔ from day one.
+  on all 72, named. Every board then has a ⚔ once the board entry ships.
 - `Beat the maker`: post one dare link a week from the team's address, on a
   hole where the team's ghost is good but beatable.
 - Post the realm's gnoweb page of a best next to its replay. It shows,
@@ -742,7 +758,7 @@ no IP kept. The events worth counting:
 | `duel_drop` (the `×`) | whether the ghost annoys |
 | `duel_end` (win, loss, tie; d as 0, 1, 2+) | balance |
 | `duel_save` | the wallet conversion a duel brings |
-| `dare_back`, `dare_forward` | the loop's k-factor |
+| `dare_back`, `dare_forward` | how far a dare travels |
 | `rematch` | stickiness |
 
 One is free and public today: the save's transaction memo, `"gnogolf"`
@@ -757,7 +773,7 @@ Nothing is built yet.
 **The realm** (gno.land/r/gnogolf/golf):
 
 - in `stroke`: the best becomes a string with its period and shots;
-- `bestStrokes` at the nine read sites;
+- `bestStrokes` at the ten read lines;
 - the `Ghost` read;
 - docs/golf.md: `Ghost`, and the deposit numbers.
 
@@ -770,20 +786,22 @@ Nothing is built yet.
 - `engine.ts`:
   - the ghost's turn in `shoot`;
   - `busy`, `hide()`, dispose, warm-up;
-  - a skip input path.
-- `replay.ts`: a speed factor.
+  - a skip input path, including the pull-back that skips and aims.
+- `replay.ts`: a speed factor, with the 2 s cap.
 - `Golf.tsx`:
   - the duel's state, armed from `?by=` or from a board;
   - the picker badge, the HUD and the end card;
-  - Rematch and Dare them back.
+  - `Rematch`, `Dare them back` and `Dare a friend`;
+  - the Ghost buster gnome's unlock.
 - `Title.tsx`: the dare line above Start; at launch, the duel fact.
 - `About.tsx`: the `Duels` rule and fact.
-- `adena.ts`: the memo `"gnogolf duel"` on a duel's save.
+- `adena.ts`:
+  - the memo `"gnogolf duel"` on a duel's save;
+  - `depositBytes` (adena.ts:482-487) adds about 30 + 23 bytes a stroke on
+    a first finish or an improving one.
 - `Leaderboard.tsx`: the ⚔ on the hole's rows and the Friends rows, and
   `beat you` on Friends.
 - CSS for the badge, the tag and the chip.
-- `adena.ts`: `depositBytes` (adena.ts:484-487) adds about 30 + 23 bytes a
-  stroke on a first finish or an improving one.
 
 ## Complexity and plan
 
@@ -824,7 +842,7 @@ Nothing is built yet.
   - `depositBytes`.
 - Smoke: a duel on the local chain against a seeded best.
 
-**Stages:**
+**Stages.** Stages 1 to 3 are V1.
 
 0. **The realm change, before mainnet.** This is the only deadline. It
    ships even if no client uses it yet.
@@ -832,7 +850,8 @@ Nothing is built yet.
    - the ghost gnome and ball, turn by turn, at double speed capped at 2 s,
      with skip, and a pull-back that skips and aims in one gesture;
    - the title screen's dare line, the picker badge with `×` and
-     `{n} to beat`, the HUD line, the end card titles;
+     `{n} to beat`, the HUD line, the end card titles and
+     `Duel records on-chain · soon`;
    - `Rematch` and `Dare them back` (the existing Share, new text), and
      `Dare a friend` when the round cannot be saved;
    - under reduced motion, the ghost appears at its rest: this is the skip
@@ -840,19 +859,19 @@ Nothing is built yet.
 
    There are no board buttons in this stage. It proves the loop, and the
    dare link already exists.
-2. **The ⚔ entries**: the hole board, Friends (with `beat you`), and "Race
-   your best".
+2. **The ⚔ entries**: the hole board, Friends (with `beat you`), and
+   `Race your best`.
 3. **Polish**: the still dotted path under reduced motion, the camera framing
-   both balls, the Ghost buster gnome, and the clip with both balls.
-4. **`Duel(hole, rival)` on-chain**, with its board and streaks, in a later
-   realm.
+   both balls, and the Ghost buster gnome.
+4. **After V1**: the clip with both balls, and `Duel(hole, rival)` on-chain
+   with its board and streaks, in a later realm.
 
-**Prototype on today's realm.** `Round(hole, player)` returns a player's
-latest saved round with its `shots`, `period` and `mode` (state.gno:101-117).
-When that round is done and its strokes equal `BestOf`, it *is* their best,
-so stage 1 can be built and played on the local chain before the realm
-change lands. It is not a fallback for mainnet: a player's latest saved round
-is often not their best.
+**Prototype on today's realm.** `Round(hole, player)` (state.gno:158) returns
+a player's latest saved round with its `shots`, `period` and `mode`
+(`roundJSON`, state.gno:101-117). When that round is done and its strokes
+equal `BestOf`, it *is* their best, so stage 1 can be built and played on the
+local chain before the realm change lands. It is not a fallback for mainnet:
+a player's latest saved round is often not their best.
 
 ## Consequences
 
@@ -884,10 +903,10 @@ is often not their best.
   through the two bests.
 - **A duel is tied to one version.** A new version of a hole starts with no
   ghosts, as it starts with no board.
-- **If wear ever becomes physical** (BACKLOG.md "wear becomes physical"), a
-  stored best would no longer replay the same way. That already applies to
-  the records themselves, and is one more reason why that change needs a new
-  realm.
+- **If wear ever becomes physical** (BACKLOG.md, "v2 — wear becomes
+  physical"), a stored best would no longer replay the same way. That
+  already applies to the records themselves, and is one more reason why that
+  change needs a new realm.
 - **The bests tree holds strings.** A `drain` or a `Records` page parses one
   number per row: a few thousand gas, measured as noise next to the
   standings writes.
@@ -904,49 +923,15 @@ is often not their best.
 | A read that returns every stroke's path (`GhostPaths`) | A 60-stroke round is far past one read's work budget, and one read per turn is what the turn-by-turn play needs anyway. |
 | Replaying the ghost in today's weather | It would not be the rival's round: a different path, maybe a different score. The ghost must be the record. |
 | Both balls live at once (real-time race) | The two replays share the scene's clock on timed holes and fight for the camera. Turn by turn is also clearer. |
+| Locking the aim to the ghost's mode | It drops a newcomer from a dare link into Pro, with no aim line, on their first hole. A free toggle with a marked race is also less code. |
+| Racing a sharer's best on an archived version | Rare (a version published between the share and the click), and "out of the cup" is one more state to explain on a first visit. |
+| Ghost buster as a stamp on the card | A second reward system that nobody else sees. Gnomes are already chased and shown. |
 | A duel mode screen, or a name field to pick a rival | A duel is about one hole, so the hole is known. Friends already adds people by name. |
 | Recording the duel's result on-chain in V1 | It needs a record, a board and anti-farming rules (a player racing their own second account). Deferred to `Duel`, which the stored ghosts make cheap. |
 
 ## Open questions
 
-1. **Mode.** Does a duel force the ghost's mode, as proposed (the aim
-   switches to it, and the picker says so), or may a player race a pro
-   ghost with assisted aim, the result marked as such?
-   - **(recommended)** Set the aim to the ghost's mode by default, leave the
-     toggle free, and mark a mixed race: `Your Assisted vs their Pro.`, no
-     Ghost buster. Locking drops a newcomer from a dare link into Pro on
-     their first hole. Freeing it is also less code than locking it.
-2. **Another version.** When a dare link's slot now opens a newer version
-   than the sharer's best, do we offer to race on the archived version? It
-   is still playable, but out of the cup and the ranking. Or do we just say
-   "no saved round on this version"?
-   - **(recommended)** Just say it, and keep the plain dare line. A link is
-     made right after a save, on the current version, so this happens only
-     when a version is published between the share and the click. Racing an
-     archived hole adds a state ("out of the cup") to explain on a first
-     visit, for a rare case.
-3. **The rest of the rival's round.** After the player wins by holing first,
-   offer `Watch their round` (the rival's remaining strokes, skippable), or
-   end there?
-   - **(recommended)** End there. The winner does not need it, and the win
-     card is the moment to save and dare back; a second screen before it
-     costs that moment. On a tie, the ghost's last stroke still plays (see
-     section 6).
-4. **The dare link lands armed.** Proposed: yes, with `×` to drop it. Or does
-   the landing ask first?
-   - **(recommended)** Armed. Asking adds a step to the path that matters
-     most, and the `×` makes it free to leave.
-5. **Ghost buster.** A stamp on the card, or an unlockable gnome? And does
-   V1 grant it front-only, or wait for `Duel`?
-   - **(recommended)** A gnome, front-only in V1, like the others. Its bar:
-     another address's best, same mode, at par or under, the win saved
-     on-chain. Gnomes are the one reward players already chase and already
-     show (the picker, `&gnome=` in links). It moves to the chain with
-     `Duel`.
-6. **`Ghost` signature.** `Ghost(hole, mode, player)`, to match `BestOf` and
-   `HoleRank`, rather than `(hole, player, mode)`. Is that fine?
-   - **(recommended)** Yes. The realm's own order wins over a sketch.
-7. **Carrying ghosts over.** Should `Records` (the paged read a golf/v2
+1. **Carrying ghosts over.** Should `Records` (the paged read a golf/v2
    carries bests over with, state.gno:876-882) also return each best's
    period and shots? That lets a successor keep the ghosts, but makes a page
    up to about 140 KB. The alternative is one `Ghost` read per player.
@@ -954,14 +939,3 @@ is often not their best.
      successor every address, a page at a time, and `Ghost` then gives each
      best's shots. Rank reads stay small, and nothing is lost: the data is
      on-chain either way.
-8. **A duel that cannot be saved.** A player with no wallet who wins has no
-   saved round, so `Dare them back` has nothing to race. Do we offer
-   `Dare a friend`, which passes on the *rival's* link?
-   - **(recommended)** Yes. It is the one way the loop keeps going through a
-     player who cannot sign, which is most first visits from a link. It
-     shares a round the chain holds (the rival's), so it claims nothing the
-     chain does not vouch for. The same link fits a loss.
-9. **The weather's fairness.** Do we say it more loudly, or equalise it?
-   - **(recommended)** Neither. Said small, three times (picker, the ghost's
-     cause words, the end card when it differs). A record keeps its weather,
-     and a bad-weather loss is a reason to rematch after the next change.

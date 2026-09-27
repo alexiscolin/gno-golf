@@ -1,5 +1,7 @@
 // @ts-check
-// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups]
+// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups] [--cut=v4]
+//
+// --cut=v4: another cut of it, shots-v4.json, rendered to gnogolf-promo-v4.mp4.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
@@ -27,6 +29,8 @@ const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
 const FPS = 30;
 const CLEAN = process.argv.includes("--clean");
 const CUPS = process.argv.includes("--cups");
+const CUT = (process.argv.find((a) => a.startsWith("--cut=")) || "").slice(6).replace(/[^\w-]/g, "");
+const SUFFIX = CUT ? `-${CUT}` : ""; // the cut's shots and its video: shots-v4.json, gnogolf-promo-v4.mp4
 // the clean cut's shots, in order: flyovers and rolls, ending on the garden's slow, bright orbit
 const CLEAN_SHOTS = ["snow", "sandcastles", "market", "cold", "mill", "frozen", "jump", "plazaP", "marketW", "tube", "logo"];
 
@@ -41,7 +45,7 @@ const F = (beat) => Math.round(beat * BEAT * FPS); // a beat's frame
 
 const burst = (n, r0, r1, cx = 100, cy = 100) =>
   Array.from({ length: n * 2 }, (_, i) => {
-    const a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2, r = i % 2 ? r0 : r1;
+    const a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2, r = i % 2 ? r1 : r0; // a dip at the top: the hat's tip stands clear, no ray behind it
     return `${(cx + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`;
   }).join(" ");
 // the title screen's own logo (components/Title.tsx), with its classes (app/globals.css): keep the two alike
@@ -63,6 +67,7 @@ const LOGO = (w = 900) => `<svg class="logo" style="width:${w}px" viewBox="0 0 6
 <clipPath id="clip-hat"><use href="#gnome-hat" /></clipPath>
 <clipPath id="clip-brim"><use href="#gnome-brim" /></clipPath>
 <clipPath id="clip-face"><use href="#gnome-face" /></clipPath>
+<clipPath id="clip-ball"><circle cx="300" cy="462" r="17" /></clipPath>
 <clipPath id="clip-beard"><use href="#gnome-beard" /></clipPath>
 </defs>
 <text class="title__word">
@@ -72,15 +77,29 @@ const LOGO = (w = 900) => `<svg class="logo" style="width:${w}px" viewBox="0 0 6
 <g transform="rotate(-44 300 330)">
 <rect x="293" y="118" width="14" height="360" rx="7" class="title__shaft" />
 <rect x="289" y="118" width="22" height="62" rx="9" class="title__grip" />
-<path d="M 283 470 L 343 470 Q 355 470 355 482 L 355 492 Q 355 500 345 500 L 283 500 Z" class="title__head" />
-<path d="M 289 478 H 340" class="title__glint" />
+<path d="M 293 460 L 307 460 L 311 477 L 348 466 Q 362 462 362 474 L 361 489 Q 359 499 348 499 L 299 500 Q 290 500 291 491 Z" class="title__head" />
+<rect x="316" y="480" width="34" height="2.6" rx="1.3" class="title__grip" />
+<rect x="314" y="486" width="38" height="2.6" rx="1.3" class="title__grip" />
+<rect x="312" y="492" width="40" height="2.6" rx="1.3" class="title__grip" />
 </g>
 <g transform="rotate(44 300 330)">
 <rect x="293" y="118" width="14" height="360" rx="7" class="title__shaft" />
 <rect x="289" y="118" width="22" height="62" rx="9" class="title__grip" />
-<path d="M 317 470 L 257 470 Q 245 470 245 482 L 245 492 Q 245 500 255 500 L 317 500 Z" class="title__head" />
-<path d="M 311 478 H 260" class="title__glint" />
+<g transform="translate(600 0) scale(-1 1)">
+<path d="M 293 460 L 307 460 L 311 477 L 348 466 Q 362 462 362 474 L 361 489 Q 359 499 348 499 L 299 500 Q 290 500 291 491 Z" class="title__head" />
+<rect x="316" y="480" width="34" height="2.6" rx="1.3" class="title__grip" />
+<rect x="314" y="486" width="38" height="2.6" rx="1.3" class="title__grip" />
+<rect x="312" y="492" width="40" height="2.6" rx="1.3" class="title__grip" />
 </g>
+</g>
+</g>
+<g transform="translate(0 5)">
+<path d="M 288 476 Q 300 483 312 476 L 305 483 L 302 496 Q 300 500 298 496 L 295 483 Z" class="title__hat title__inked" />
+<circle cx="300" cy="462" r="17" class="title__beard title__inked" />
+<path d="M 305 441 A 21 21 0 0 1 305 483 A 13 21 0 0 0 305 441 Z" clip-path="url(#clip-ball)" class="title__beardshade" />
+<circle cx="292" cy="457" r="2.2" class="title__beardshade" />
+<circle cx="301" cy="453" r="2.2" class="title__beardshade" />
+<circle cx="296" cy="465" r="2.2" class="title__beardshade" />
 </g>
 <g transform="translate(300 298) scale(1.25) translate(-100 -110)">
 <use href="#badge" y="8" class="title__outline" />
@@ -125,7 +144,7 @@ const cleanOf = (all) => {
     return { ...rest, weather: s.weather || "clear", beats: [at, (at += len)] }; // "clear": no rain from the live forecast
   });
 };
-const SHOTS = ((a) => (CLEAN ? cleanOf(a) : a))(JSON.parse(fs.readFileSync(path.join(HERE, "shots.json"), "utf8"))).flatMap((s) => {
+const SHOTS = ((a) => (CLEAN ? cleanOf(a) : a))(JSON.parse(fs.readFileSync(path.join(HERE, `shots${SUFFIX}.json`), "utf8"))).flatMap((s) => {
   const titles = [...(s.titles || []), ...(s.url ? [{ pill: s.url, at: s.urlAt ?? 1.37, tilt: 0, y: s.urlY ?? 440 }] : [])]
     .map((t) => ({ ...t, html: title(t) }));
   const f0 = F(s.beats[0]), f1 = F(s.beats[1]), dur = (f1 - f0) / FPS;
@@ -148,6 +167,8 @@ const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - LAST * BEAT).toFixed(3);
 async function chrome() {
   const [w, h] = CLEAN ? [1280, 720] : [1920, 1080];
   const { send, js, kill } = await launch({ width: w, height: h, dir: path.join(WORK, "profile"), args: [`--window-size=${w},${h}`, "--hide-scrollbars", "--mute-audio"] });
+  // a headless page never has the focus, and the game plays no sound without it (feel.ts present())
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   // the HMR socket never opens: another edit to the app cannot remount the game mid-shot
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `try{localStorage.setItem("gnogolf.earned",${JSON.stringify(JSON.stringify(ALL_GNOMES))})}catch(e){}` });
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `{const W=window.WebSocket;window.WebSocket=function(u,p){return /hmr/.test(String(u))?{readyState:0,send(){},close(){},addEventListener(){},removeEventListener(){}}:new W(u,p)};Object.assign(window.WebSocket,{CONNECTING:0,OPEN:1,CLOSING:2,CLOSED:3});}` });
@@ -363,10 +384,10 @@ const filter = [
   `[mus][key]sidechaincompress=threshold=0.05:ratio=4:attack=5:release=250[duck]`,
   `[duck][fx]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]`,
 ].join(";");
-const MP4 = path.join(HERE, "gnogolf-promo.mp4");
+const MP4 = path.join(HERE, `gnogolf-promo${SUFFIX}.mp4`);
 execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", ...inputs, "-filter_complex", filter, "-map", "0:v", "-map", "[a]",
   "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p", "-r", String(FPS), "-movflags", "+faststart",
   "-c:a", "aac", "-b:a", "192k", "-t", String(LEN), MP4], { stdio: "inherit" });
 execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", "-i", MP4, "-vf", "scale=1280:720:flags=lanczos", "-c:v", "libx264",
-  "-preset", "slow", "-crf", "21", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "copy", path.join(HERE, "gnogolf-promo-720p.mp4")], { stdio: "inherit" });
+  "-preset", "slow", "-crf", "21", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-c:a", "copy", path.join(HERE, `gnogolf-promo${SUFFIX}-720p.mp4`)], { stdio: "inherit" });
 console.log("done:", MP4);
