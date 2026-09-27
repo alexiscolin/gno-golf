@@ -528,7 +528,7 @@ export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string
     return () => ((live = false), document.removeEventListener("visibilitychange", back));
   }, [chain, me]);
   // a player with no name is not listed yet: the place is what a name would give
-  return { at, noName: !!me && named === false && ranked, named: () => setNamed(true) };
+  return { at, noName: !!me && named === false && ranked, isNamed: named, named: () => setNamed(true) };
 }
 
 /** The chain's own name registrar on gnoweb (pearl: v1, a local gno and mainnet: v0), NEXT_PUBLIC_NAMEREG if set. */
@@ -552,9 +552,12 @@ export function NameLink({ chain, children }: { chain: Chain | null; children: R
  * Takes a gno.land name without leaving the game: the registrar's rules
  * checked as it is typed out, then one transaction in Adena. The boards list
  * named players only, so this comes before the save that should rank.
+ * onPick: the field alone, part of the save below it (the name goes in the
+ * save's own signature): each name typed that the chain would take is
+ * handed up, null otherwise; suggest fills it to start with.
  */
-export function NameForm({ chain, account, chainId, price, lead, onNamed }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void }) {
-  const [stem, setStem] = useState(""); // what follows "nym-"
+export function NameForm({ chain, account, chainId, price, lead, onNamed, onPick, suggest = "" }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; onPick?: (name: string | null) => void; suggest?: string }) {
+  const [stem, setStem] = useState(suggest); // what follows "nym-"
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState("");
@@ -572,6 +575,18 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed }: { ch
           : !/^[a-z]{5,13}\d{3}$/.test(stem)
             ? "and 3 digits to end"
             : "";
+  // with the save: the chain asked (taken?) once the typing rests
+  const pick = useRef(onPick);
+  pick.current = onPick;
+  useEffect(() => {
+    if (!pick.current) return;
+    pick.current(null);
+    setErr(null);
+    if (hint) return;
+    let live = true;
+    const t = setTimeout(() => void chain.nameProblem(name).then((why) => live && (setErr(why || null), pick.current?.(why ? null : name)), () => {}), 400);
+    return () => ((live = false), clearTimeout(t));
+  }, [chain, name, hint]);
   const take = async (e: FormEvent) => {
     e.preventDefault();
     if (hint) return;
@@ -597,17 +612,17 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed }: { ch
   };
   if (done) return <p className="note note--good">You are <b>{done}</b> now: save your round to take your place.</p>;
   return (
-    <form className="nameform" onSubmit={(e) => void take(e)}>
+    <form className="nameform" onSubmit={(e) => void (onPick ? e.preventDefault() : take(e))}>
       <b className="nameform__title">{lead}</b>
-      <span className="nameform__why">The boards list gno.land names. Take yours once: one signature, about 0.5 GNOT.</span>
+      <span className="nameform__why">{onPick ? "Only named players are ranked. It's taken once, with this save: same signature." : "Only named players are ranked. Take yours once: one signature."}</span>
       <span className="nameform__row">
         <label className="nameform__field">
           <span aria-hidden="true">nym-</span>
           <input value={stem} onChange={(e) => setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim())} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
         </label>
-        <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint}>{busy ? "Adena…" : "Take it"}</Button>
+        {!onPick && <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint}>{busy ? "Adena…" : "Get this name"}</Button>}
       </span>
-      <small className={hint ? "" : "nameform__ok"} aria-live="polite">{hint ? `nym-… ${hint}` : `✓ ${name} is well formed`} · <NameLink chain={chain}>names on gno.land ↗</NameLink></small>
+      <small className={hint ? "" : "nameform__ok"} aria-live="polite">{hint ? `nym-… ${hint}` : err ? "" : `✓ ${name}`} · <NameLink chain={chain}>names on gno.land ↗</NameLink></small>
       {err && <small className="nameform__err" role="alert">{err}</small>}
     </form>
   );

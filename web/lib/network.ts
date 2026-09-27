@@ -2,6 +2,8 @@
 // sites (Netlify env). The testnet plays for free with faucet GNOT; mainnet's
 // GNOT is real and it has no faucet.
 export const NETWORK: "testnet" | "mainnet" = process.env.NEXT_PUBLIC_NETWORK === "mainnet" ? "mainnet" : "testnet";
+/** Where a testnet's players get free GNOT (NEXT_PUBLIC_FAUCET; mainnet has none). */
+export const FAUCET = process.env.NEXT_PUBLIC_FAUCET || "https://faucet.gno.land";
 /** The other deployment's address ("" when there is none yet). */
 export const OTHER_URL = process.env.NEXT_PUBLIC_OTHER_URL || "";
 

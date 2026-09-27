@@ -66,7 +66,7 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
       <summary>Save with gnokey instead</summary>
       <div className="details__box gnokey__box">
         <ol className="gnokey__steps">
-          <li>Your gnokey key's name (<code>gnokey list</code> shows them). It pays the fees: about 1 GNOT for a first save on a hole.
+          <li>Your gnokey key's name (<code>gnokey list</code> shows them). It pays the fee, shown before you send.
             <input className="gnokey__key" value={key} onChange={(e) => onKey(e.target.value)} placeholder="my-key" aria-label="Your gnokey key name" aria-invalid={!!name && !ready} spellCheck={false} autoCapitalize="off" autoComplete="off" />
             {name && !ready && <small className="gnokey__bad">A key name here can't hold a quote ( ' ) or a backslash.</small>}
           </li>

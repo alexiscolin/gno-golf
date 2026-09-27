@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { holeLink, pasted, shareLinks } from "../components/common.ts";
+import { holeLink, pasted, shareLinks, suggestName } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -52,4 +52,12 @@ test("X puts the link after the text, the others put it first, for its card", ()
   for (const k of ["WhatsApp", "Bluesky"]) assert.ok(new URL(l[k]).searchParams.get("text")!.startsWith(url + "\n"), k);
   assert.equal(new URL(l.Facebook).searchParams.get("u"), url);
   assert.ok(pasted(text, url).startsWith(url));
+});
+
+test("a name to start from: the gnome's letters and 3 digits, as the registrar wants", () => {
+  assert.equal(suggestName("classic", 0), "classic100");
+  assert.equal(suggestName("Big-Viking", 0.999), "bigviking999");
+  assert.equal(suggestName("bob", 0.5), "golfer550"); // too short
+  assert.equal(suggestName("gnomey", 0), "golfer100"); // the registrar refuses gno…
+  assert.match(suggestName("the ultimate champion"), /^[a-z]{5,13}\d{3}$/);
 });

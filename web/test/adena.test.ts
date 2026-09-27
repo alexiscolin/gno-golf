@@ -445,6 +445,16 @@ test("recordRound: Reset + PlayRound for a fresh, period-less, assisted round", 
   assert.equal(tx.gasFee, Math.ceil(1_900_000_000 * 0.001 * 1.5));
 });
 
+test("recordRound: a name taken in the same signature, Register first and Claim last, their gas added", async () => {
+  const { a, calls } = fakeAdena();
+  setWindow({ adena: a });
+  await recordRound(roundArgs({ shots: ["1,1"], gas: 100_000_000, named: { registrar: "gno.land/r/sys/namereg/v1", name: "nym-golfer482" } }));
+  const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
+  assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func]), [["gno.land/r/sys/namereg/v1", "Register"], [REALM, "Reset"], [REALM, "PlayRound"], [REALM, "Claim"]]);
+  assert.deepEqual(tx.messages[0].value.args, ["nym-golfer482"]);
+  assert.equal(tx.gasWanted, 100_000_000 + 60_000_000 + 90_000_000);
+});
+
 test("recordRound: reset=false continues a round with PlayRound alone", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });

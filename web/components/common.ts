@@ -45,3 +45,10 @@ export function shareLinks(text: string, url: string): [string, string][] {
 }
 /** The message a copied link pastes: the link first, for its card. */
 export const pasted = (text: string, url: string) => `${url}\n\n${text}`;
+
+/** A name to start from: the gnome's (letters only, 5 to 13, "golfer" if too
+ *  short) and 3 digits, as the registrar wants them. rnd: 0..1. */
+export const suggestName = (gnome: string, rnd = Math.random()) => {
+  const l = gnome.toLowerCase().replace(/[^a-z]/g, "").slice(0, 13);
+  return (l.length >= 5 && !/^(gno|gl|g1|atom|atone|photon|cosmos)/.test(l) ? l : "golfer") + String(100 + Math.floor(rnd * 900));
+};

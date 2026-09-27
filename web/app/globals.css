@@ -1960,7 +1960,11 @@ button:focus-visible, a:focus-visible {
 .btn, .burger, .adena { position: relative; transition: transform .08s, box-shadow .08s, background .15s; }
 .btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
 .btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
-.btn:focus-visible, .burger:focus-visible, .adena:focus-visible { outline: var(--ring); outline-offset: 3px; }
+/* the focus ring round the button and its ink shadow (4px under it), even on
+   every side: an outline would hug the face only and look low-slung */
+.btn:focus-visible, .burger:focus-visible, .adena:focus-visible { outline: none; }
+/* gold inked both sides, as the stickers: it reads on the paper and on the course */
+.btn:focus-visible::after, .burger:focus-visible::after, .adena:focus-visible::after { content: ""; position: absolute; inset: -8px -8px -12px; border: 3px solid var(--gold); border-radius: inherit; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--ink); pointer-events: none; }
 /* inside the button: .seg clips its overflow, so a ring outside shows as a stripe beside the next segment */
 .seg button:focus-visible { outline: var(--ring); outline-offset: -5px; }
 .seg button.on:focus-visible { outline-color: var(--paper); } /* red on the green segment is under 3:1 */
@@ -2291,3 +2295,15 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .clip__save svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
 .clip__save:hover { background: var(--gold); }
 .clip__save:focus-visible { outline: var(--ring); outline-offset: 2px; }
+
+/* ------------------------------------------------------------ a round waiting
+   for its save after a reload (Adena installed meanwhile): a card at the top,
+   on any screen, under the sheets (5) */
+.pending { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100vw - 32px); padding: 8px 8px 8px 16px; border: 2px solid var(--ink); border-radius: 18px; background: var(--paper); color: var(--ink); box-shadow: var(--shadow-btn); font-size: 15px; }
+.pending__say { display: grid; gap: 2px; }
+.pending .btn { padding: 8px 14px; font-size: 15px; }
+.pending__err { font-size: 12px; color: var(--hat-ink); }
+body:has(.hud--top) .pending { top: 104px; } /* under the play screen's top cards */
+@media (max-width: 600px) { .pending { flex-wrap: wrap; justify-content: center; text-align: center; } }
+/* the faucet and the address to paste there, on one line */
+.getgnot { white-space: nowrap; }

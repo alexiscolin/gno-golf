@@ -90,7 +90,7 @@ const norm = (u: string | null | undefined) => String(u || "").trim().replace(/\
  * knows: one left from an older chain on this node (same address, another
  * chain id) has to be removed in Adena by hand, and the error says how.
  */
-async function ensureNetwork(a: Adena, { chainId, rpc, name = "Gnogolf chain" }: { chainId?: string | null; rpc: string; name?: string }) {
+async function ensureNetwork(a: Adena, { chainId, rpc, name = `gno.land (${chainId})` }: { chainId?: string | null; rpc: string; name?: string }) {
   // no chain id, no signature: Adena would sign on whatever network it has on
   if (!chainId) throw new Error("The chain's id is not known yet (is the node up?). Try again in a moment.");
   const active = async () => {
@@ -120,7 +120,7 @@ async function ensureNetwork(a: Adena, { chainId, rpc, name = "Gnogolf chain" }:
 }
 
 /** Connects, and moves Adena onto the chain this page plays on. */
-export async function connect({ chainId, rpc, name = "Gnogolf chain" }: { chainId?: string | null; rpc: string; name?: string }) {
+export async function connect({ chainId, rpc, name = `gno.land (${chainId})` }: { chainId?: string | null; rpc: string; name?: string }) {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
 
@@ -292,15 +292,18 @@ export function chainSplit(chain: Pick<Chain, "simulateRound" | "simulateCommit"
 /**
  * Signs one commit of this round: Reset + PlayRound… for the first (reset),
  * PlayRound… alone for the next ones, which continue the round where the
- * chain has it. Resolves with the tx (hash, height).
+ * chain has it. named: a gno.land name taken in the same signature, before
+ * the round (Register), so it is ranked as it lands, and the rounds saved
+ * before it after (Claim). Resolves with the tx (hash, height).
  */
-export async function recordRound({ address, realm, hole, shots, gas, period, reset = true, mode = "assisted", price = 0.001, chainId, rpc }: {
+export async function recordRound({ address, realm, hole, shots, gas, period, reset = true, mode = "assisted", price = 0.001, chainId, rpc, named }: {
   address: string; realm: string; hole: string; shots: readonly string[]; gas?: number; period?: number | null; reset?: boolean; mode?: Mode; price?: number; chainId?: string | null; rpc: string;
+  named?: { registrar: string; name: string } | null;
 }) {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
   await ensureNetwork(a, { chainId, rpc });
-  const gasWanted = Math.min(gas || MAX_GAS, MAX_GAS);
+  const gasWanted = Math.min((gas || MAX_GAS) + (named ? REGISTER_GAS + CLAIM_GAS : 0), MAX_GAS);
   const gasFee = feeFor(gasWanted, price);
   // no balance gate here: Adena itself says when an account cannot pay, and
   // the page warns beforehand (shortOf) without keeping the wallet shut
@@ -317,6 +320,7 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
     // in the weather the round was played in (its period): the chain takes
     // the current one or the one before
     messages: [
+      ...(named ? [{ type: "/vm.m_call", value: { caller: address, send: "", pkg_path: named.registrar, func: "Register", args: [named.name] } } as Call] : []),
       ...(reset ? [call("Reset", [hole])] : []),
       // a pro round goes on the pro board (the mode is the one it was played in)
       mode === "pro"
@@ -324,6 +328,7 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
         : period == null
           ? call("PlayRound", [hole, shots.join(";")])
           : call("PlayRoundAt", [hole, shots.join(";"), String(period)]),
+      ...(named ? [call("Claim", [])] : []),
     ],
     // a starting point: Adena simulates the tx and sets the final fee itself
     gasFee,
