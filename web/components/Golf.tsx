@@ -1661,7 +1661,9 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
           ) : onSave && funded ? (
             <Button variant="primary" className="btn--wide" onClick={onSave}>Save this round</Button>
           ) : (
-            <Button variant={now === -1 ? "primary" : "secondary"} className="btn--wide" onClick={onClose}>{now === -1 ? "All set: play" : "Later: keep playing"}</Button>
+            <Button variant={now === -1 || now === 4 ? "primary" : "secondary"} className="btn--wide" onClick={onClose}>
+              {now === -1 ? "All set: play" : now === 4 ? "Play a hole, then save it" : "Later: keep playing"}
+            </Button>
           )
         ) : (
           <Button variant="primary" className="btn--wide" disabled={wallet.busy} onClick={onConnect}>
