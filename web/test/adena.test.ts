@@ -711,3 +711,14 @@ test("costOf: gas at today's price, in GNOT to three decimals", () => {
   assert.equal(costOf(1_000_000_000), "1.000"); // default price 0.001
   assert.equal(costOf(500_000_000, 0.002), "1.000");
 });
+
+test("commitsOf: a shot heavier than what is left of the budget (less its fixed gas and MaxWorkStep) starts a commit, as golf's work.next refuses it", () => {
+  // 11 light shots, then one of 606K work: the chain says "commit the first 11"
+  const works: number[] = [...Array<number>(11).fill(40_000), 606_000];
+  assert.deepEqual(commitsOf({ pts: works.map(() => 60), works, fixed: 150_000_000 }), [[0, 11], [11, 12]]);
+  // heavy shots, ~600K each: one a commit, as the chain cut them
+  const heavy = Array<number>(4).fill(600_000);
+  assert.deepEqual(commitsOf({ pts: heavy.map(() => 200), works: heavy, fixed: 150_000_000 }), [[0, 1], [1, 2], [2, 3], [3, 4]]);
+  // without the works (a round kept from before they were said): the path's model alone
+  assert.deepEqual(commitsOf({ pts: [60, 60] }), [[0, 2]]);
+});

@@ -6,6 +6,8 @@ There were four runs. The **first** ran on the code of `162a6e9`. The **second**
 
 A **fifth** run (2026-09-27) ran on the current code, HEAD `f1bef35` plus the uncommitted work (the only chain change in it is one line of golf's `cleanText`). It has its own section, [Run 5 (current code)](#run-5-current-code). The projection and the command list for pearl now follow run 5; the run-4 tables are kept as history.
 
+A **sixth** run (2026-09-27, evening) ran on the code about to deploy (publishing switch, Hide's index, each shot's work and a commit's fixed gas in the reads). Only golf moved; the projection and step 5 below follow it.
+
 ## The rehearsal chain
 
 - **Binary:** `gnoland` built from `chain/pearl` = `c4c72fdd288c` and installed as `~/.cache/gno-toolchains/pearl/gnoland`. This is the tag that the pearl `gno` in `~/.cache/gno-toolchains/pearl/` is built from. It is not gnodev.
@@ -232,23 +234,25 @@ The hub (`Render("")`) and a hole page render.
 | Faucet | 10 GNOT a grant, 1 per address per 24 h | `gno_status`, `faucet-agent.pearl…/limits` |
 | Our imports | `p/nt/avl/v0`, `p/nt/bptree/v0`, `p/nt/ufmt/v0`, `r/sys/users` all deployed | `gno_packages` |
 
-## Projection for pearl (measured, run 5)
+## Projection for pearl (measured, run 6)
 
-| Item | GNOT | Run 4 | Run 1 |
-|---|---|---|---|
-| Name deposit | 0.33 | 0.33 | 0.33 |
-| Code deposit (3 packages) | 30.46 | 29.53 | 24.43 |
-| 74 holes' deposit | 45.44 | 45.44 | 75.90 |
-| **Deposit** | **76.23** | 75.29 | 100.65 |
-| Fees: the 15 transactions below, each at its gas-wanted (1.3× measured) and 1.2× the price floor | 12.12 (7.71 at the floor) | 12.07 | 11.93 |
-| **Total** | **88.35** | 87.37 | 112.6 |
-| **With a 15% margin** | **101.6, so ask for 105 GNOT** | 100.5 | ~130 |
+| Item | GNOT (run 6) | Run 5 | Run 4 | Run 1 |
+|---|---|---|---|---|
+| Name deposit | 0.33 | 0.33 | 0.33 | 0.33 |
+| Code deposit (3 packages) | 31.65 | 30.46 | 29.53 | 24.43 |
+| 74 holes' deposit | 45.44 | 45.44 | 45.44 | 75.90 |
+| **Deposit** | **77.42** | 76.23 | 75.29 | 100.65 |
+| Fees: the 15 transactions below, each at its gas-wanted (1.3× measured) and 1.2× the price floor | 12.14 | 12.12 (7.71 at the floor) | 12.07 | 11.93 |
+| **Total** | **89.56** | 88.35 | 87.37 | 112.6 |
+| **With a 15% margin** | **103.0, so ask for 105 GNOT** | 101.6 | 100.5 | ~130 |
+
+Run 6 (2026-09-27) is today's code on a pearl-tag chain: only golf grew (131,768 → 139,209 B, +1.19 GNOT: the publishing switch, Hide's index, each shot's work and a commit's fixed gas in the reads). Its addpkg measured 217.1M gas and 22.37 GNOT of deposit, so step 5's flags are raised to keep a 1.3× margin. Every other step measured as run 5.
 
 Ask for **105 GNOT**, as in run 4. That still leaves room for one failed-and-rerun publish script. At the faucet's 10 GNOT a day for one address, 100 GNOT takes 10 days, so ask the faucet operators or GovDAO instead. The deposit is locked for good, because published data is never freed.
 
 The deploy order also bounds when the money is needed:
 
-- about 31 GNOT for the name and the code, of which golf alone takes 21.2;
+- about 32 GNOT for the name and the code, of which golf alone takes 22.4;
 - then 2–7 GNOT for each publish script.
 
 For players on pearl:
@@ -287,7 +291,7 @@ gnokey maketx call -pkgpath gno.land/r/sys/namereg/v1 -func Register -args nym-g
 
 Check: `gnokey query vm/qeval -data 'gno.land/r/sys/names.IsAuthorizedAddressForNamespace(address("<your-address>"), "nym-golfer000")' $R` returns `true`. Or open https://pearl.testnets.gno.land/u/nym-golfer000.
 
-**2. Stage** the three packages. This also lints them with the pearl toolchain and prints their sizes: 53,903 / 66,788 / 131,768 B.
+**2. Stage** the three packages. This also lints them with the pearl toolchain and prints their sizes: 53,903 / 66,788 / 139,209 B.
 
 ```sh
 scripts/stage.sh nym-golfer000 /tmp/stage
@@ -311,11 +315,11 @@ gnokey maketx addpkg -pkgpath gno.land/p/nym-golfer000/course -pkgdir /tmp/stage
 
 Check: https://pearl.testnets.gno.land/p/nym-golfer000/course$source.
 
-**5. Deploy golf** (21.17 GNOT; its init makes you the owner):
+**5. Deploy golf** (22.37 GNOT; its init makes you the owner, with community publishing closed until `SetPublishing`):
 
 ```sh
 gnokey maketx addpkg -pkgpath gno.land/r/nym-golfer000/golf -pkgdir /tmp/stage/gno.land/r/nym-golfer000/golf \
-  -gas-wanted 270000000 -gas-fee 324000ugnot -max-deposit 28000000ugnot -broadcast $P <your-key-name>
+  -gas-wanted 290000000 -gas-fee 348000ugnot -max-deposit 30000000ugnot -broadcast $P <your-key-name>
 ```
 
 Check: `gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.Owner()' $R` returns `<your-address>`. https://pearl.testnets.gno.land/r/nym-golfer000/golf shows the hub, with its "open the game" link going to https://gnogolf.xyz/.
@@ -369,7 +373,7 @@ The same list as gnomcp calls (what the rehearsal ran):
 4. `gno_run` ×11, with the publish scripts
 5. `gno_run(verify.gno, simulate)`
 
-gnomcp cannot run step 5 on pearl as it stands, for two reasons. It pins `-max-deposit` to 10 GNOT on addpkg, and golf needs 21.17 GNOT (problem 5). It also deploys as its agent key, not as the user.
+gnomcp cannot run step 5 on pearl as it stands, for two reasons. It pins `-max-deposit` to 10 GNOT on addpkg, and golf needs 22.37 GNOT (problem 5). It also deploys as its agent key, not as the user.
 
 ## Netlify environment
 
@@ -409,9 +413,9 @@ Problems from run 1:
 2. **A lazy genesis loads every example.** Fix: a GNOROOT of symlinks with an `examples/` holding only pearl's 85 packages.
 3. **Genesis panicked with "PubKey does not match Signer address g1manfred…".** Fix: `-skip-genesis-sig-verification`, which pearl's own genesis uses, and the seven creator addresses funded in the balances file.
 4. **A restart over the same secrets stalled at height 0,** because the old `priv_validator_state.json` refused to sign again. Fix: delete it together with `db/` and `wal/`. Run 2 did exactly that for its fresh genesis, and the chain was producing blocks within seconds.
-5. **gnomcp cannot deploy golf on pearl.** `gno_addpkg` pins `-max-deposit` to 10 GNOT, and golf now needs **21.17** GNOT at pearl's price (20.63 in run 4, 20.35 in run 3, 17.35 in run 2, 15.69 in run 1).
+5. **gnomcp cannot deploy golf on pearl.** `gno_addpkg` pins `-max-deposit` to 10 GNOT, and golf now needs **22.37** GNOT at pearl's price (21.17 in run 5, 20.63 in run 4, 20.35 in run 3, 17.35 in run 2, 15.69 in run 1).
    - Workaround for the rehearsal: `storage_price` = 1 ugnot in the genesis, with the bytes read from the events and multiplied by 100 for pearl.
-   - On pearl, the user deploys with gnokey and `-max-deposit 28000000ugnot` (step 5). Run 5 needed no workaround: it used gnokey at pearl's own price.
+   - On pearl, the user deploys with gnokey and `-max-deposit 30000000ugnot` (step 5). Run 5 needed no workaround: it used gnokey at pearl's own price.
    - Still worth raising with gnomcp: a `max_deposit` argument on `gno_addpkg`.
 6. **`publishdata.sh` overwrote the committed scripts.** Fixed: `OUT` sets the output directory.
 7. **`publishdata.sh`'s default split did not match the committed set.** Fixed: the default is 7 holes a script.

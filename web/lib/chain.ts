@@ -34,6 +34,9 @@ export const RULES = {
   periodMs: 300e3,
   /** golf.gno's work model (workBudget, workPerShot, workPerWall, workPerPoint, workPerPiece, workPerUnit) */
   work: { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3, unit: 1000 },
+  /** physics MaxWork and MaxWorkStep: a stroke's work cap, and the most a stroke passes it by (golf's work.next caps a shot by what is left, less this) */
+  maxWork: 1_000_000,
+  maxWorkStep: 225_000,
 } as const;
 
 // the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-golfer000/golf on

@@ -69,29 +69,21 @@ const LOGO = (w = 900) => `<svg class="logo" style="width:${w}px" viewBox="0 0 6
 <clipPath id="clip-face"><use href="#gnome-face" /></clipPath>
 <clipPath id="clip-ball"><circle cx="300" cy="462" r="17" /></clipPath>
 <clipPath id="clip-beard"><use href="#gnome-beard" /></clipPath>
+  <g id="iron">
+    <rect x="293" y="118" width="14" height="360" rx="7" class="title__shaft" />
+    <rect x="289" y="118" width="22" height="62" rx="9" class="title__grip" />
+    <path d="M 293 460 L 307 460 L 311 477 L 348 466 Q 362 462 362 474 L 361 489 Q 359 499 348 499 L 299 500 Q 290 500 291 491 Z" class="title__head" />
+    <rect x="316" y="480" width="34" height="2.6" rx="1.3" class="title__grip" />
+    <rect x="314" y="486" width="38" height="2.6" rx="1.3" class="title__grip" />
+    <rect x="312" y="492" width="40" height="2.6" rx="1.3" class="title__grip" />
+  </g>
 </defs>
 <text class="title__word">
 <textPath href="#arc" startOffset="50%" text-anchor="middle">GNOGOLF</textPath>
 </text>
 <g class="title__clubs">
-<g transform="rotate(-44 300 330)">
-<rect x="293" y="118" width="14" height="360" rx="7" class="title__shaft" />
-<rect x="289" y="118" width="22" height="62" rx="9" class="title__grip" />
-<path d="M 293 460 L 307 460 L 311 477 L 348 466 Q 362 462 362 474 L 361 489 Q 359 499 348 499 L 299 500 Q 290 500 291 491 Z" class="title__head" />
-<rect x="316" y="480" width="34" height="2.6" rx="1.3" class="title__grip" />
-<rect x="314" y="486" width="38" height="2.6" rx="1.3" class="title__grip" />
-<rect x="312" y="492" width="40" height="2.6" rx="1.3" class="title__grip" />
-</g>
-<g transform="rotate(44 300 330)">
-<rect x="293" y="118" width="14" height="360" rx="7" class="title__shaft" />
-<rect x="289" y="118" width="22" height="62" rx="9" class="title__grip" />
-<g transform="translate(600 0) scale(-1 1)">
-<path d="M 293 460 L 307 460 L 311 477 L 348 466 Q 362 462 362 474 L 361 489 Q 359 499 348 499 L 299 500 Q 290 500 291 491 Z" class="title__head" />
-<rect x="316" y="480" width="34" height="2.6" rx="1.3" class="title__grip" />
-<rect x="314" y="486" width="38" height="2.6" rx="1.3" class="title__grip" />
-<rect x="312" y="492" width="40" height="2.6" rx="1.3" class="title__grip" />
-</g>
-</g>
+  <use href="#iron" transform="rotate(-44 300 330)" />
+  <use href="#iron" transform="rotate(44 300 330) translate(600 0) scale(-1 1)" />
 </g>
 <g transform="translate(0 5)">
 <path d="M 288 476 Q 300 483 312 476 L 305 483 L 302 496 Q 300 500 298 496 L 295 483 Z" class="title__hat title__inked" />

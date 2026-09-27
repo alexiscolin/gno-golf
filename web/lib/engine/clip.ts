@@ -122,6 +122,7 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term, chal
     if (confetti) confetti.step(dt);
     // his shadow on the ground under him, whatever he is doing above it
     ball.userData.shade.position.y = BALL_R + ground(ball.position.x, ball.position.z) - ball.position.y - BALL_R + 0.02;
+    rp.offWalls(); // and clear of the walls he runs along
     // the live gnome and its things out, the clip's in, for this draw only
     // (in one task: the live canvas never shows it)
     const live = hide().filter((o): o is THREE.Object3D => !!o && o.visible);

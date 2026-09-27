@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CELL, inZone, inset, mod, segDist, boxOf, POOLS, DISH, sandIn } from "../terrain";
+import { BALL_R, CELL, inZone, inset, mod, segDist, boxOf, POOLS, DISH, sandIn } from "../terrain";
 import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf, waterTone, waterMat } from "./materials";
 import { animate, state } from "./state";
 import { stone, warp, badge, windmill } from "./props";
@@ -1034,7 +1034,7 @@ function castleSlide(z: Zone, s: Hole, t: T, g: THREE.Group, castle: Post, [cx, 
   // in straight from the tee side: the mouth opens at -x, square to the zone,
   // and the tube runs +x a little before it turns round the castle
   const lead = Math.max(0.3, Math.min(0.8, r0 - R0 - 0.6));
-  const sit = 0.9; // the mouth's centre: its ring clears the ground
+  const sit = BALL_R; // the mouth's centre: a rolling ball's, so it rolls straight in (its ring sunk in the sand)
   // the first and last stretches are straight and level, so each end is a
   // clean cut square to the axis (the lip sits on it)
   const pts = [new THREE.Vector3(cx - 0.05, y0 + sit, cz), new THREE.Vector3(cx + lead * 0.5, y0 + sit, cz), new THREE.Vector3(cx + lead, y0 + sit + 0.05, cz)];
@@ -1112,11 +1112,13 @@ function drawTunnel(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
     g.add(warp(cx, y, cz, Math.min(w, h) / 2, pair), warp(ox, oy, oz, 1.1, pair));
     return g;
   }
-  // the mouth lies on the ground, its opening right where the chain swallows
-  // the ball: you roll into the pipe, you do not drop into a hole next to it
-  const R = Math.max(0.6, Math.min(w, h) * 0.32), lift = R * 1.4 + 0.15; // the bell's lip clears the grass
+  // each end is sunk in the ground, an arch over the grass, its axis at the
+  // height of a rolling ball's centre: the replay rolls the ball in along it
+  // (and out onto the grass at the exit, which the pipe ends on), never up or
+  // down through the bell
+  const R = Math.max(0.6, Math.min(w, h) * 0.32), lift = BALL_R;
   const mouth = new THREE.Vector3(cx, y + lift, cz).addScaledVector(dirIn, 0.25);
-  const out = new THREE.Vector3(ox, oy + lift, oz).addScaledVector(dirOut, 0.25);
+  const out = new THREE.Vector3(ox, oy + lift, oz);
   const span = mouth.distanceTo(out), top = Math.max(y, oy) + Math.min(4.5, 1.6 + span * 0.12);
   // a pipe that would cross a mill goes under it instead: over the top it
   // would pass through the turning sails. It dives into the ground right

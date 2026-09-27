@@ -314,10 +314,14 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   // the body is exactly the ball the chain rolls (Field.Radius), so a gnome
   // against a wall touches it instead of sinking into it
   g.scale.setScalar(BALL_R / 0.55);
+  // ...but his nose, beard and hat stick out past it: how far, standing (the
+  // replay keeps that much off a wall, engine/replay.ts offWalls)
+  const box = new THREE.Box3().setFromObject(g, true);
+  const reach = Math.max(-box.min.x, box.max.x, -box.min.z, box.max.z);
 
   const root = new THREE.Group() as Gnome;
   root.add(g, shade);
-  root.userData = { body: g, eyes, shade };
+  root.userData = { body: g, eyes, shade, reach };
   return root;
 }
 

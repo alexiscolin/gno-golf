@@ -211,8 +211,10 @@ export function onWalletChange(fn: (...x: unknown[]) => void) {
 // it said so has no work: the realm may then cut sooner, with "commit the
 // first N", and splitRound follows it.
 const WORK = RULES.work;
+// what every shot of a commit costs before its own: the shot and the walls
+const baseOf = (c: Work) => WORK.shot + (c.walls || 0) * WORK.wall;
 const workOf = (c: Work, i: number) => {
-  const base = WORK.shot + (c.walls || 0) * WORK.wall;
+  const base = baseOf(c);
   return Math.max(base + ((c.pts || [])[i] ?? RULES.maxPath) * (WORK.point + (c.pieces || 0) * WORK.piece), base + ((c.works || [])[i] || 0) * WORK.unit);
 };
 
@@ -220,14 +222,18 @@ const workOf = (c: Work, i: number) => {
  * The commits a round is recorded in: [[from, to), …], cut where the chain
  * would cut them, starting at stroke start. Its work.next refuses a shot,
  * after the first of a commit, once spent + the heaviest so far passes the
- * budget; the list is 12 at most. The same sums, so no commit of the split is
- * one the chain refuses.
+ * budget, or once the shot's own work passes what is left of the budget (less
+ * its fixed gas and MaxWorkStep, in work units: the shot's cap); the list is
+ * 12 at most. The same sums, so no commit of the split is one the chain refuses.
  */
 export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
   const parts: [number, number][] = [];
+  const base = baseOf(c);
   let from = start, spent = 0, most = 0;
   for (let i = start; i < n; i++) {
-    if (i > from && (i - from >= RULES.maxShots || spent + most > WORK.budget)) (parts.push([from, i]), (from = i), (spent = most = 0));
+    const cap = Math.min(RULES.maxWork, Math.trunc((WORK.budget - (c.fixed || 0) - spent - base) / WORK.unit) - RULES.maxWorkStep);
+    const over = cap < 1 || (cap < RULES.maxWork && ((c.works || [])[i] || 0) > cap);
+    if (i > from && (i - from >= RULES.maxShots || spent + most > WORK.budget || over)) (parts.push([from, i]), (from = i), (spent = most = 0));
     const w = workOf(c, i);
     spent += w;
     most = Math.max(most, w);
