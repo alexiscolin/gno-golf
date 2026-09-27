@@ -38,6 +38,12 @@
   color-scheme: light;
 }
 
+/* no system scrollbar anywhere (Windows draws its grey ones over the cards):
+   everything still scrolls, by wheel, finger and keys; the full board keeps
+   its own toon bar (.lb--full) */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -2047,8 +2053,8 @@ button:focus-visible, a:focus-visible {
 /* a full board scrolls in its list only: a toon scrollbar in its own gutter,
    and the rows fade out at the bottom edge instead of being cut */
 .boards .lb--full { max-height: none; overflow: visible; }
-.lb--full ol { max-height: 46vh; overflow-y: auto; scrollbar-gutter: stable; padding: 2px 8px 22px 0; mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
-.lb--full ol::-webkit-scrollbar { width: 12px; }
+.lb--full ol { max-height: 46vh; overflow-y: auto; scrollbar-width: auto; scrollbar-gutter: stable; padding: 2px 8px 22px 0; mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
+.lb--full ol::-webkit-scrollbar { display: block; width: 12px; }
 .lb--full ol::-webkit-scrollbar-track { background: rgba(var(--ink-rgb), .08); border-radius: 999px; margin: 4px 0 20px; }
 .lb--full ol::-webkit-scrollbar-thumb { background: var(--green); border: 2px solid var(--ink); border-radius: 999px; }
 @supports not selector(::-webkit-scrollbar) { .lb--full ol { scrollbar-width: thin; scrollbar-color: var(--green) rgba(var(--ink-rgb), .08); } }
@@ -2277,6 +2283,6 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
 .clip__play:focus-visible { outline: var(--ring); outline-offset: 2px; }
 /* its download, a main button under it, and why: a post with a video goes further */
-.clip__get { display: grid; justify-items: center; gap: 8px; margin-top: 14px; }
-.clip__get .btn { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-.banner--win .banner__in p.clip__why { margin: 0; max-width: 400px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.clip__get { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 14px; margin-top: 12px; }
+.clip__get .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 15px; text-decoration: none; }
+.banner--win .banner__in p.clip__why { margin: 0; max-width: 250px; text-align: left; font-size: 13px; line-height: 1.3; color: var(--ink); }

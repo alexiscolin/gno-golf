@@ -172,8 +172,7 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
             Download your clip
           </a>
           <p className="clip__why">
-            <b>Show them the shot!</b> A video gets way more views than a link:{" "}
-            {onPhone() ? "send it with the share button above, or save it for your stories." : "drop it into your post on X, Discord or anywhere."}
+            <b>Show them the shot!</b> {onPhone() ? "Send it with the share button: videos get way more views." : "Videos get way more views than links: drop it into your post."}
           </p>
         </div>
       )}
