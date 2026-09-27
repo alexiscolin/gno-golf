@@ -16,3 +16,6 @@ media/promo/stills-check/
 # gnohome/ (a local package cache and gnokey keybase: private keys) and editor swap files: never in the repo
 gnohome/
 *.swp
+
+# agents' isolated worktrees (Claude Code)
+.claude/worktrees/

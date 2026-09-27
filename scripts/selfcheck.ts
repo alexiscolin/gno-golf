@@ -104,6 +104,11 @@ check("golf.gno work model", () => {
   assert.equal(w.point, constOf(golf, "workPerPoint"), "workPerPoint");
   assert.equal(w.piece, constOf(golf, "workPerPiece"), "workPerPiece");
   assert.equal(w.unit, constOf(golf, "workPerUnit"), "workPerUnit");
+  const step = fs.readFileSync(new URL("../gno.land/p/gnogolf/physics/step.gno", import.meta.url), "utf8");
+  assert.equal(RULES.maxWork, constOf(step, "MaxWork"), "physics MaxWork");
+  assert.equal(RULES.maxWorkStep, constOf(step, "MaxWorkStep"), "physics MaxWorkStep");
+  // a shot's cap, as commitsOf mirrors it
+  assert.ok(has(golf, "c := (workBudget-w.fixed-w.spent-workPerShot-w.walls*workPerWall)/workPerUnit - physics.MaxWorkStep"), "next(): the shot's cap changed");
   // the formula and the cut rule adena.ts copies (workOf, commitsOf)
   assert.ok(has(golf, "c := workPerShot + w.walls*workPerWall + int64(len(s.Path))*(workPerPoint+w.pieces*workPerPiece)"), "add(): the work of a shot changed");
   assert.ok(has(golf, "if w.played > 0 && w.spent+w.most > workBudget {"), "next(): the cut rule changed");

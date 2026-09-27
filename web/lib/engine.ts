@@ -608,6 +608,14 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     applyWeather();
     // the garden's foliage and bunting lean with the wind (global: set on every hole)
     newRound();
+    // the fixed gas a commit here spends (decoding, the forecast) is only in
+    // Weather(), not in HoleState's forecast: read once, kept while the round
+    // has no stroke and the period is the same
+    const round = g.round;
+    if (s.period != null)
+      void chain.weather(id, s.period).then((fc) => {
+        if (ticket === loads && round === g.round && !g.shots.length && fc.period === g.period) g.forecast = fc;
+      }, () => {});
     const built1 = performance.now();
     await warm(); // shaders now, not on the player's first click
     if (ticket !== loads || !alive) return;
