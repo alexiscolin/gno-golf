@@ -199,9 +199,10 @@ const mmss = (ms: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 
-/** "Save within 4:12", then, once the weather is over, a replay in the current one. */
-// by and clock (now, ms) on the chain's clock
-function SaveClock({ by, clock = Date.now, stale, onReplay }: { by: number; clock?: () => number; stale?: boolean; onReplay: () => void }) {
+/** Where the round is and how long it can still go on-chain ("within 4:12"),
+ *  then, once the weather is over, a replay in the current one. */
+// by and clock (now, ms) on the chain's clock; ranked: a course hole (a community one ranks nobody)
+function SaveClock({ by, clock = Date.now, stale, ranked, onReplay }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean; onReplay: () => void }) {
   const [now, setNow] = useState(clock);
   useEffect(() => {
     const t = setInterval(() => setNow(clock()), 1000);
@@ -211,7 +212,7 @@ function SaveClock({ by, clock = Date.now, stale, onReplay }: { by: number; cloc
   if (left > 0 && !stale)
     return (
       <p className={"saveclock" + (left < 60000 ? " saveclock--soon" : "")}>
-        Save it within <b>{mmss(left)}</b>: the weather changes every 5 minutes, and a round is only saved in its own.
+        Saved in this browser only. Save it on-chain within <b>{mmss(left)}</b> {ranked ? "to make it public and ranked" : "to keep it on your address"}: a round is only saved in its own weather, which changes every 5 minutes.
       </p>
     );
   return (
@@ -1137,13 +1138,16 @@ export default function Golf() {
             {cfg && cfg.clips && <ShareClip make={(run) => (game.current ? game.current.clip(run, caption(s)) : Promise.resolve(null))} name={clipName(s.id || "")} onClip={setClip} />}
 
 
-            <p>
-              {onChain
-                ? "Saved on-chain: public, on your address, on any device."
-                : s.official
-                  ? "Saved in this browser only. Save it on-chain to make it public and ranked."
-                  : "Saved in this browser only. A community hole is not ranked, but its rounds can be saved on-chain."}
-            </p>
+            {/* where the round is: said by the save clock below while it can still go on-chain */}
+            {(onChain || s.period == null) && (
+              <p>
+                {onChain
+                  ? "Saved on-chain: public, on your address, on any device."
+                  : s.official
+                    ? "Saved in this browser only. Save it on-chain to make it public and ranked."
+                    : "Saved in this browser only. A community hole is not ranked, but its rounds can be saved on-chain."}
+              </p>
+            )}
             <Standings s={s} card={card} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} compact />
             {fresh.length > 0 && (
               <p className="note note--good">
@@ -1177,7 +1181,7 @@ export default function Golf() {
               return warn && <p className="note note--warn">{warn}</p>;
             })()}
             {!onChain && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} onReplay={() => game.current?.reset()} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} onReplay={() => game.current?.reset()} />
             )}
             <div className="banner__row">
               <Button variant="secondary" onClick={() => game.current?.reset()}>
