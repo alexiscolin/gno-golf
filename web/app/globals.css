@@ -2271,8 +2271,9 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
    (ADR-003, NEXT_PUBLIC_CLIPS; components/Share.tsx ShareClip): the holing
    stroke, recorded after the hole, looped in the win card above its buttons.
    Its own classes only: without the flag no element carries them. */
-.clip { margin: 0 auto 28px; max-width: 440px; } /* a 16:9 window the card still reads around */
-.clip__screen { position: relative; aspect-ratio: 16 / 9; border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; background: var(--sky-day); box-shadow: var(--shadow-btn); }
+.clip { margin: 0 auto 28px; }
+.clip__screen { position: relative; max-width: 440px; margin: 0 auto; aspect-ratio: 16 / 9; border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; background: var(--sky-day); box-shadow: var(--shadow-btn); }
+/* (440: a window the card still reads around) */
 .clip__screen video { display: block; width: 100%; height: 100%; object-fit: cover; }
 /* making it: a word and the power capsule's look, filling as it records */
 .clip__making { display: grid; place-items: center; align-content: center; gap: 12px; height: 100%; font-weight: 700; color: var(--ink); }
