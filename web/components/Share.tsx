@@ -162,20 +162,14 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
               </button>
             )}
+            {/* on the video, top right (the brand's card has the bottom): a post with a video gets way more views */}
+            <a className="clip__save" href={clip.url} download={clip.file.name} title="Download the video: posts with a video get way more views" onClick={() => sound("blip")}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
+              Show off your shot
+            </a>
           </>
         )}
       </div>
-      {clip && (
-        <p className="clip__get">
-          {/* as the share pill: a word and a round button — a post with a video gets way more views */}
-          <span className="share">
-            <span className="share__label">Show off your shot</span>
-            <a className="share__icon share__icon--copy" href={clip.url} download={clip.file.name} aria-label="Download the video" title="Download the video: posts with a video get way more views" onClick={() => sound("blip")}>
-              <svg viewBox="0 0 24 24" aria-hidden="true" className="share__stroke"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
-            </a>
-          </span>
-        </p>
-      )}
     </div>
   );
 }

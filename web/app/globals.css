@@ -2286,5 +2286,8 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .clip__play svg { width: 28px; height: 28px; fill: currentColor; margin-left: 4px; }
 .clip__play:focus-visible { outline: var(--ring); outline-offset: 2px; }
 /* its download, a main button under it, and why: a post with a video goes further */
-.banner--win .banner__in p.clip__get { margin: 10px 0 0; }
-.clip__get .share__label { display: inline; } /* the phone hides the share pill's word: this pill is its word */
+/* its download, on it: a paper pill in the top corner, the brand's card having the bottom */
+.clip__save { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 9px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 2px 0 var(--ink); }
+.clip__save svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.clip__save:hover { background: var(--gold); }
+.clip__save:focus-visible { outline: var(--ring); outline-offset: 2px; }
