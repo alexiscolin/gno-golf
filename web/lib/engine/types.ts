@@ -126,6 +126,8 @@ export interface Live {
   readonly zones: () => Zone[];
   /** the kind of jump a step makes (the replay's) */
   landing: (p: Vec2, q: Vec2, start?: Vec2) => ZoneKind | null;
+  /** a duel's ghost while it plays (engine/rival.ts): the camera frames it with the gnome */
+  rivalAt?: () => THREE.Vector3 | null;
   readonly ball: Gnome;
   readonly dragging: boolean;
   readonly shot: Shot;
@@ -187,6 +189,7 @@ export interface Snapshot {
   tier: Tier;
   rival: number | null;
   rivalIn: boolean;
+  done: boolean;
 }
 
 /** A hole a link names: its id, or a cup and a place in it. */

@@ -60,6 +60,15 @@ export function makeCamera(E: Live) {
       leant.tilt = (o.tilt || 0) + lean.y * k * ORBIT.tilt;
       return leant;
     }
+    // a duel's ghost playing: the gnome and the ghost both in the picture, the
+    // camera backed off as far as the gap between them asks (the lens is 30°)
+    const ghost = E.rivalAt && E.rivalAt();
+    if (ghost && !g.flying) {
+      const v = screen(), r = focusRig(E.ball.position, g.over!, v, null, focus), gap = E.ball.position.distanceTo(ghost);
+      r.target.lerp(ghost, 0.5);
+      r.dist = Math.max(r.dist * FOLLOW_CLOSER, (gap / 2 + 3) / (Math.tan(Math.PI / 12) * Math.min(1, v.w / v.h)));
+      return r;
+    }
     // in flight, follow the ball; at rest, keep the cup in the picture too
     if (g.flying || !g.s) {
       const r = focusRig(E.ball.position, g.over!, screen(), null, focus);

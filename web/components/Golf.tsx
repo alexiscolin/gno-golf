@@ -10,7 +10,7 @@ import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
 import type { Ghost, HoleRow, Mode } from "@/lib/types";
 import { duelResult, duelShare, pickGhost, type Duel } from "@/lib/duel";
-import { DuelFine, DuelNote } from "@/components/Duel";
+import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
 import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, shortOf, depositBytes, ADENA_URL, nameBytes, NAME_GAS, onWalletChange, type SendError } from "@/lib/adena";
@@ -588,7 +588,8 @@ export default function Golf() {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first); a link to nothing lands on the cups, quietly
             if (!game_.linked()) setScreen("worlds");
-            else if (cfg.gnome || hadGnome()) play(true); // straight onto the ball: the link said where
+            // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo)
+            else if ((cfg.gnome || hadGnome()) && !dare) play(true);
             else setScreen("pick");
           }
           // ?won=N shows the win card for N strokes — dev screenshots only
@@ -692,7 +693,8 @@ export default function Golf() {
     if (!dare || !c || !holeId || !holeReady || dared.current) return;
     dared.current = true;
     if (dare !== me) addFriend(dare); // (a player opening their own link is not their own friend)
-    void Promise.all([c.ghost(holeId, "assisted", dare), c.ghost(holeId, "pro", dare), nameOnce(c, dare)])
+    // (a ghost unread is no duel: the dare is still said)
+    void Promise.all([c.ghost(holeId, "assisted", dare).catch(() => null), c.ghost(holeId, "pro", dare).catch(() => null), nameOnce(c, dare)])
       .then(([a, p, n]) => {
         const name = n || shortAddr(dare), best = Math.min(...[a, p].map((g) => (g ? g.strokes : Infinity)));
         if (a || p) setRival({ hole: holeId, name, self: dare === me, ghosts: { assisted: a, pro: p } });
@@ -709,11 +711,19 @@ export default function Golf() {
     return g && rival ? { ghost: g, name: rival.name, self: rival.self } : null;
   }, [rival, holeId, duelMode]);
   useEffect(() => game.current?.race(duel ? duel.ghost : null), [duel]);
-  // out of reach: the rival holed in fewer strokes than the player has played, said once a round
-  const duelLost = !!(duel && s && !s.holed && s.strokes >= duel.ghost.strokes);
+  // the weather the ghost was played in (read once a duel is armed), said when it was not today's
+  const [ghostSky, setGhostSky] = useState<{ ghost: Ghost; kind: string } | null>(null);
   useEffect(() => {
-    if (duelLost && duel) setLinkNote(`${duel.self ? "Your best" : duel.name} holed it in ${duel.ghost.strokes}. Finish for your score, or rematch.`);
-  }, [duelLost]); // eslint-disable-line react-hooks/exhaustive-deps -- once as it turns
+    const c = game.current && game.current.chain;
+    if (duel && c) void c.weather(duel.ghost.hole, duel.ghost.period).then((w) => setGhostSky({ ghost: duel.ghost, kind: w.kind || "" }), () => {});
+  }, [duel]);
+  const sky: Sky = duel && s && ghostSky && ghostSky.ghost === duel.ghost ? { theirs: ghostSky.kind, mine: s.kind } : null;
+  // out of reach: the rival's holing stroke shown and the player's ball at rest out of the cup, said once a round
+  const duelLost = !!(duel && s && s.rivalIn && !s.flying && !s.done && s.strokes >= duel.ghost.strokes);
+  const lostNote = duel ? (duel.ghost.strokes === 1 ? "Missed the ace. Rematch?" : `${duel.self ? "Your best" : duel.name} holed it in ${duel.ghost.strokes}. Finish for your score, or rematch.`) : "";
+  useEffect(() => {
+    setLinkNote((n) => (duelLost ? lostNote : n === lostNote ? null : n)); // (gone with the rematch)
+  }, [duelLost]); // eslint-disable-line react-hooks/exhaustive-deps -- as it turns
   const dropDuel = () => (setRival(null), setDareNote(""), setLinkNote("Solo now. Your strokes still count."));
 
   // an "add me as a friend" link: the address joins this browser's friends
@@ -1117,7 +1127,7 @@ export default function Golf() {
           onPick={enterCup}
         />
       )}
-      {screen === "pick" && <Picker world={(s && s.world) || "garden"} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} onDrop={dropDuel} /> : dareNote} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
+      {screen === "pick" && <Picker world={(s && s.world) || "garden"} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} /> : dareNote} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         onAbout={() => setAbout(true)}
         onBack={() => {
@@ -1145,8 +1155,8 @@ export default function Golf() {
               </div>
             </div>
             {/* in a duel: both counts, the player's first, and the strokes to beat */}
-            <div className="card card--score" aria-label={duel ? `You ${s.strokes}, ${duel.name} ${s.rival ?? 0}${s.rivalIn ? ", in" : ""}; ${duel.ghost.strokes} to beat` : undefined}>
-              <span className="eyebrow">{duel ? "Race" : "Strokes"}</span>
+            <div className="card card--score" role={duel ? "group" : undefined} aria-live={duel ? "polite" : undefined} aria-label={duel ? `You ${s.strokes}, ${duel.name} ${s.rival ?? 0}${s.rivalIn ? ", in" : ""}; ${duel.ghost.strokes} to beat` : undefined}>
+              <span className="eyebrow">{duel ? (duel.self ? "You – best" : "You – them") : "Strokes"}</span>
               <strong>{s.strokes}{duel && <> – {s.rival ?? 0}{s.rivalIn && "✓"}</>}</strong>
               <span className="card__par">{duel ? (duelLost ? "they won" : `${duel.ghost.strokes} to beat`) : <>par {parHere(s)}{last ? ` · last ${last}` : ""}</>}</span>
               {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
@@ -1351,7 +1361,7 @@ export default function Golf() {
                     : "Saved in this browser only. A community hole is not ranked, but its rounds can be saved on-chain."}
               </p>
             )}
-            {won && <DuelFine duel={won.duel} mode={s.roundMode || aim} />}
+            {won && <DuelFine duel={won.duel} mode={s.roundMode || aim} sky={sky} />}
             <Standings s={s} card={card} saved={onChainCard} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} compact onRules={() => setRules(true)} />
             <Unlocked fresh={fresh} onMeet={meet} />
             <NewBadges ids={freshBadges} onOpen={() => setBadgesOpen(true)} />
@@ -1391,10 +1401,10 @@ export default function Golf() {
             )}
             {/* one solid action at a time: saving while it can, else going on (a duel lost or tied: the rematch) */}
             <div className="banner__row">
-              {canSave ? (
+              {canSave && !rematch ? (
                 <button className="linkish" onClick={() => game.current?.reset()}>{won ? "Rematch" : "Play again"}</button>
               ) : (
-                <Button variant={rematch ? "primary" : "secondary"} onClick={() => game.current?.reset()}>
+                <Button variant={rematch && !canSave ? "primary" : "secondary"} onClick={() => game.current?.reset()}>
                   {won ? "Rematch" : "Play again"}
                 </Button>
               )}
@@ -1533,7 +1543,7 @@ export default function Golf() {
 
       {playing && s && s.note && !s.flying && <div className="toast" role="status">{s.note}</div>}
       {playing && linkNote && <Toast text={linkNote} onDone={() => setLinkNote(null)} />}
-      {playing && !linkNote && farHint && s && s.ready && !s.flying && s.strokes > 0 && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
+      {playing && !linkNote && !duel && farHint && s && s.ready && !s.flying && s.strokes > 0 && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
       {playing && s && s.flying && <CauseNote hot={hot.current} />}
 
       {gl && !fatal && (

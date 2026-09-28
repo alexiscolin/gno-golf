@@ -45,3 +45,10 @@ test("the share text dares back once saved, and passes the rival's dare on befor
   assert.match(duelShare("tie", duel(3), "The Mill", 3, true), /both holed The Mill in 3\. Settle it\./);
   assert.match(duelShare("win", duel(3), "The Mill", 2, false), /^⚔ Can you beat ace's 3 on The Mill\? Free to play, no wallet needed\./);
 });
+
+test("racing your own best says so in the line and the share", () => {
+  assert.equal(duelResult(2, duel(3, true), "Birdie").line, "2 to your 3 · Birdie");
+  assert.equal(duelResult(1, duel(1, true), "Ace").title, "You matched your ace!");
+  assert.match(duelShare("win", duel(3, true), "The Mill", 2, true), /^⚔ The Mill in 2, raced against my own ghost\./);
+  assert.match(duelShare("win", duel(3, true), "The Mill", 2, false), /^⚔ Can you beat my 3 on The Mill\?/);
+});

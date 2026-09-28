@@ -19,7 +19,7 @@ import { BALL_R } from "../terrain";
 import { CLIP, clipWindow, skyStops } from "../clip";
 import { drawOutro, drawTerm } from "../brand";
 import { makeCamera } from "./camera";
-import { makeReplay, showMs } from "./replay";
+import { makeReplay, stepsMs } from "./replay";
 import type { LitScene } from "../scene/data";
 import type { Confetti } from "../scene/fx";
 import type { Vec2 } from "../types";
@@ -86,7 +86,8 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term, chal
   };
   const cam = makeCamera(C), rp = makeReplay(C);
   // each step's time on screen, as the replay takes it: what the window is cut from
-  const ms = path.slice(1).map((q, i) => (i === path.length - 2 ? DROP_MS : showMs(Math.hypot(q[0] - path[i][0], q[1] - path[i][1]))));
+  const ms = stepsMs(path);
+  ms[ms.length - 1] = DROP_MS;
   const win = clipWindow(ms);
   // the gnome where the clip opens, facing the shot as he was at its release
   ball.position.copy(E.lift(path[win.from]));

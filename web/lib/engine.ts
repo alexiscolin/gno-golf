@@ -200,6 +200,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     onChange(snap);
     return true;
   }
+  // a duel's rival: their strokes replayed so far (null: no duel), and their ball in
+  const duelOf = (r: { strokes: number; holed: boolean } | null) => ({ rival: r ? r.strokes : null, rivalIn: !!r && r.holed });
   const snapshot = (): Snapshot => ({
       holes: perList().holes,
       allHoles: g.list || NONE, // every cup's, for the cup totals and the grand slam
@@ -254,9 +256,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       view: g.view,
       gfx: gfxMode, // the graphics setting, and what it gives on this device
       tier,
-      // a duel's rival: their strokes replayed so far (null: no duel), and their ball in
-      rival: rival.state()?.strokes ?? null,
-      rivalIn: !!rival.state()?.holed,
+      ...duelOf(rival.state()),
+      done: !!g.done, // no more shots (holed, even before the banner)
     });
 
   // ------------------------------------------------------------- rendering
@@ -853,7 +854,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   const rp = makeReplay(E);
   E.landing = rp.landing;
   // a duel's ghost (ADR-004): another player's best, a stroke after each of the player's
-  const rival = makeRival(E, { showClock, restTimed, told: () => void publish() });
+  const rival = makeRival(E, { showClock, restTimed, told: () => void publish(), warm: () => void warm() });
+  E.rivalAt = rival.at;
   const aimer = makeAimer(E);
   const { preview, dropAim, strokeFrom, ghosts, known } = aimer;
   // the pull let go of (or dropped): nothing aimed, the HUD told
@@ -1362,7 +1364,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     clip(run: ClipRun, caption: Caption) {
       const stroke = won;
       if (!stroke || !g.s) return Promise.resolve(null);
-      const hide = () => [ball, rival.ball, aim, band, confetti && confetti.group, cam.marker];
+      const hide = () => [ball, rival.ball(), aim, band, confetti && confetti.group, cam.marker];
       return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: `${caption.title} · ${caption.score}` }, run));
     },
     /** Races a ghost on this hole, from the tee (ADR-004); null drops the duel. */
