@@ -26,11 +26,11 @@ test("a ghost's stroke plays twice as fast, and never longer than 2 s", () => {
 });
 
 test("the result reads a win, a loss by one in words, a tie, an ace matched", () => {
-  assert.deepEqual(duelResult(2, duel(3), "Birdie"), { result: "win", title: "You beat ace!", line: "2 to their 3 · Birdie" });
-  assert.equal(duelResult(4, duel(3), "Bogey").title, "ace wins by one");
-  assert.equal(duelResult(5, duel(3), "Bogey").title, "ace wins by 2");
-  assert.deepEqual(duelResult(3, duel(3), "Par"), { result: "tie", title: "Tied with ace", line: "3 strokes each · Par" });
-  assert.deepEqual(duelResult(1, duel(1), "Ace"), { result: "tie", title: "You matched ace's ace!", line: "1 stroke each · Ace" });
+  assert.deepEqual(duelResult(2, duel(3), "Birdie"), { result: "win", title: "You win!", line: "You beat ace by one · 2 to their 3 · Birdie" });
+  assert.deepEqual(duelResult(4, duel(3), "Bogey"), { result: "loss", title: "You lose", line: "ace wins by one · 4 to their 3 · Bogey" });
+  assert.equal(duelResult(5, duel(3), "Bogey").line, "ace wins by 2 · 5 to their 3 · Bogey");
+  assert.deepEqual(duelResult(3, duel(3), "Par"), { result: "tie", title: "Tie!", line: "Tied with ace · 3 strokes each · Par" });
+  assert.deepEqual(duelResult(1, duel(1), "Ace"), { result: "tie", title: "Ace for ace!", line: "Tied with ace · 1 stroke each · Ace" });
 });
 
 test("racing your own best reads as such", () => {

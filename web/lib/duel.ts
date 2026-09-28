@@ -42,11 +42,12 @@ const inWords = (d: number) => (d === 1 ? "one" : String(d));
 
 /** How a finished duel reads: the card's title and its line. */
 export function duelResult(mine: number, d: Duel, term: string) {
-  const theirs = d.ghost.strokes, gap = Math.abs(mine - theirs);
-  const line = mine === theirs ? `${mine} ${mine === 1 ? "stroke" : "strokes"} each · ${term}` : `${mine} to ${d.self ? "your" : "their"} ${theirs} · ${term}`;
-  if (mine === theirs) return { result: "tie" as const, title: mine === 1 ? (d.self ? "You matched your ace!" : `You matched ${d.name}'s ace!`) : d.self ? "You tied your best" : `Tied with ${d.name}`, line };
-  if (mine < theirs) return { result: "win" as const, title: d.self ? "You beat your best!" : `You beat ${d.name}!`, line };
-  return { result: "loss" as const, title: d.self ? `Your best still stands, by ${inWords(gap)}` : `${d.name} wins by ${inWords(gap)}`, line };
+  const theirs = d.ghost.strokes, by = inWords(Math.abs(mine - theirs));
+  // the title from the player's side, short and big; who and by how much in the line under it
+  const line = (who: string) => `${who}${mine === theirs ? `${mine} ${mine === 1 ? "stroke" : "strokes"} each` : `${mine} to ${d.self ? "your" : "their"} ${theirs}`} · ${term}`;
+  if (mine === theirs) return { result: "tie" as const, title: d.self ? (mine === 1 ? "You matched your ace!" : "You tied your best") : mine === 1 ? "Ace for ace!" : "Tie!", line: line(d.self ? "" : `Tied with ${d.name} · `) };
+  if (mine < theirs) return { result: "win" as const, title: d.self ? "You beat your best!" : "You win!", line: line(d.self ? "" : `You beat ${d.name} by ${by} · `) };
+  return { result: "loss" as const, title: d.self ? `Your best still stands, by ${by}` : "You lose", line: line(d.self ? "" : `${d.name} wins by ${by} · `) };
 }
 
 /** The share text of a finished duel: once saved (a dare back), or the rival's
