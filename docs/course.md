@@ -214,9 +214,10 @@ Every hole should use `Launch`, so the same pull means the same shot
 everywhere. The speed is `Kick·p^(3/4)`: under a constant rolling
 deceleration a ball rolls `v²/2a`, so the distance grows as `p^(3/2)`, the
 way it grew before the physics rework. A full stroke (power 10) starts at 4.44
-units per substep and rolls 44 on a green of Friction 0.87; a pull of 3 rolls
-7.2, one of 1 rolls 1.4. `Kick` is the calibration that keeps every course
-hole's par.
+units per substep and rolls 44, a board's length, on a green of Friction 0.87
+(rolling deceleration `a = 0.224`); a pull of 3 rolls 7.2, one of 1 rolls 1.4.
+`Kick` is the calibration that keeps every course hole's par: with it the
+solver finds the same robust stroke count on all 74 course holes.
 
 `Capture` is Holmes's capture criterion (B. W. Holmes, *Am. J. Phys.* 59,
 1991). A ball of radius `r` crossing a cup of radius `R` off its centre by
@@ -299,8 +300,10 @@ What each kind puts on the board (whole-board zones cover `0..W, 0..H`):
 - **wind**: one Slope skinned `wind`, with `Air` and `Capped` set. `Vec` has a
   strength between `WindMin` and `WindMax`, capped at `MaxWind()` when that's
   greater than 0, and a direction taken from the seed.
-- **rain**: a Surface `rain` at `RainScale`. Also a copy of each of the hole's
-  Surface zones skinned `ice`, at `WetIce` times its scale. Also 2 to 4
+- **rain**: a Surface `rain` at `RainScale`: a touch, not ice. On a 0.87
+  green the ball keeps 94% of its speed a substep instead of 92%; much more
+  and the keep cap turns every board to pinball. Also a copy of each of the
+  hole's Surface zones skinned `ice`, at `WetIce` times its scale. Also 2 to 4
   `puddle`s: Round Surface zones at scale 0.6 with half-width 1.1 to 1.8
   (height 0.8 times that), placed only inside the lane's outline (even-odd
   over the untimed walls), off any skinned Surface zone and any Tunnel,
@@ -309,10 +312,13 @@ What each kind puts on the board (whole-board zones cover `0..W, 0..H`):
   makes up to 60 tries. Each try tests every post, zone (a polygon's every
   edge) and untimed wall until one refuses it, so a hostile hole's rain can
   cost more than its shot: 160 walls and 8 thin hazard polygons that no try
-  passes cost 1.1e9 gas. `Forecast.Work` counts it as it goes (any forecast
-  3000 units, a storm's gusts 5000 more, a try 35, and in it a post 22, a zone
-  20, a polygon edge 16, a wall 100, a zone looked at for ice 5: at most
-  0.86K gas a unit measured), and golf counts it in a commit's budget.
+  passes cost 1.1e9 gas. So the tests go cheapest first (tee and cup, posts,
+  zones, then walls) and none takes a square root (`LenCmp`, `Crosses`). The
+  outline test casts a ray to a far point `(1e4, 37)` away, off any board and
+  at a slant no wall of a grid lies along. `Forecast.Work` counts it as it
+  goes (any forecast 3000 units, a storm's gusts 5000 more, a try 35, and in
+  it a post 22, a zone 20, a polygon edge 16, a wall 100, a zone looked at
+  for ice 5: at most 0.86K gas a unit measured), and golf counts it in a commit's budget.
 - **storm**: a Surface `storm` at 1, the rain as above, and two gusting Slope
   zones `wind` (air, capped), each 0.7 rad (about 40°) on either side of the
   forecast wind, with `Every: 6, On: 3` and `Phase` 0 and 3.

@@ -16,6 +16,10 @@ Tests: `physics_test.gno`, `prepare_test.gno`.
   and converts them.)
 - Velocities are in board units **per substep**.
 - float64 only. No map iteration, no clock, no randomness.
+- Inputs must be finite. A NaN or an infinity in a ball, a velocity or a
+  field gives no panic and no endless loop, but no meaningful answer either,
+  so callers check them: `course.Decode` refuses them in data, and golf
+  refuses a non-finite shot and a non-finite rest.
 
 ## The model
 
@@ -115,8 +119,20 @@ within a hair of each other.
 ## The field
 
 A `Field` is everything a ball rolls through: walls, posts and zones. There's
-no Windmill or Tunnel type. Every mini-golf obstacle is built from these three
-(the table at the top of `field.gno` shows how).
+no Windmill or Tunnel type. Every mini-golf obstacle is built from these three:
+
+| Obstacle | Built as |
+|---|---|
+| gate, archway | two Walls with a gap between them |
+| narrowing, dogleg | Walls |
+| bumper, post, rock | a Post (a Bounce above 1, with a bumper's skin, kicks) |
+| tunnel, teleporter | a Tunnel zone |
+| ramp, slope, hill | a Slope zone |
+| sand, ice, carpet | a Surface zone |
+| water, pit, the void | a Hazard zone |
+| loop-the-loop | a Loop zone: round it only when fast enough |
+| upper floor | a Tunnel to another part of the board, drawn apart |
+| moving obstacle | timed walls and zones within a stroke; from one stroke to the next, `course.Timed` (`course.Pulse` for the simple cases) |
 
 ```go
 type Field struct {
@@ -195,7 +211,8 @@ Inside it:
 
 - with `len(Poly) >= 3`, even-odd point-in-polygon, inverted if `Outside` is
   set;
-- otherwise with `Round`, the inscribed ellipse;
+- otherwise with `Round`, the inscribed ellipse (a renderer draws exactly
+  that ellipse, so what looks wet is wet);
 - otherwise the whole rectangle.
 
 `Outside` is how you build a lane with no rails: a `Hazard` covering the board
@@ -220,7 +237,9 @@ substep `i` when
 `Every <= 0` are always there.
 
 `Field.Tick` is where the clock stands when the stroke starts, i.e. where the
-moving pieces were when the player let go. `WithTick` returns a copy with the
+moving pieces were when the player let go. The page shows them moving all the
+time, and the moment of release is a choice like the angle and the power, so
+the chain replays it. `WithTick` returns a copy with the
 clock moved forward. It returns the same pointer when `tick == 0`:
 
 ```go
@@ -287,7 +306,10 @@ Each substep does this:
    [Wall prep](#wall-prep)) and every post (radius grown by `Radius`), and the
    nearest hit wins. A wall or post whose box the move's box misses is
    skipped first (the broad phase). A ball already within `Radius` of a wall
-   and moving into it hits it right away. Both ends of every wall are round
+   and moving into it hits it right away; past the wall's end, it meets the
+   end point, pushed back along the line from it (the face's normal there
+   points across a corner's next wall, and set the ball jittering between
+   the two). Both ends of every wall are round
    caps of radius `Radius`, swept like posts from wherever the ball comes:
    the offset lines are square caps with no end face, which left a gap in
    front of an acute corner's tip and let a diagonal move cut a free end.
@@ -318,14 +340,17 @@ points away from (the uphill end), faster than the crest's curve can hold it:
 - its speed up the hill `vu = vel · uphill` has `vu² > G·CrestRadius`: the
   ground curves away (radius `CrestRadius`) faster than gravity can bend the
   ball round it, 0.71 per substep: a ball that makes the top at any real pace
-  flies;
+  flies (a kicker's lip is sharp, a quarter of the ball's width);
 - the hill is steeper than `MinRamp` (0.12, 7°): a gentler one is a lawn's
   undulation;
 - it climbed at least `JumpRun` (half) of the hill's depth, counted from
   where it came onto it: a ball that clipped the hill near its top has not
   ridden it.
 
-Leaving a hill by a side, by its foot, or by turning on it is no take-off. It
+The crest is the zone's edge the uphill direction mostly points at. Every
+course hill is a rectangle square to the board, so that edge is the whole
+top. Leaving a hill by a side, by its foot, or by turning on it is no
+take-off. It
 flies a ballistic arc: up at `vz = vu·tan θ`, for `2·vz/G` substeps, landing at
 the height it took off from, `2·vu²·tan θ/G` on along the hill (its speed
 across the hill carries on too). Landing is a contact with the ground: the
@@ -437,6 +462,11 @@ func Prepared(f *Field) []float64             // a copy of the prep, for tests
   It doesn't check them: whoever stored them must have, once, by comparing
   `Prepared(f)` against `Prepare`'s. With the wrong count it is `Prepare`.
   `course.Decode` uses it, and `course.Exact` is that check.
+- `PrepareWith` runs on every call of a data hole, so its arithmetic
+  (`linesWith`) is written out by hand, without the closure, slice and method
+  calls of `lines`: the same operations on the same operands in the same
+  order, so the same bits. `lines` is left as it is, so the prep of a hole
+  that calls `Prepare` cannot move. Change one, change the other.
 
 ## Building walls (`physics/build`)
 
@@ -525,8 +555,8 @@ rest := shot.Rest() // shot.Path, shot.Air, shot.Bounces
 | `G` | 1 | gravity, board units per substep² |
 | `RollSpeed`, `RollDrag` | 1.8, 0.08 | the calibration of `Rolling` (Friction, Scale → Crr) |
 | `WallFriction` | 0.05 | Coulomb µ of a wall or post |
-| `TangentMass` | 2/7 | the most of its speed along a surface a solid ball loses to friction |
-| `RestSpeed` | 0.35 | under it into a surface, a contact is resting: no bounce |
+| `TangentMass` | 2/7 | the most of its speed along a surface a solid ball loses to friction: with a moment of inertia of 2/5·m·r², the tangential impulse that stops its contact point slipping is m·v·2/7 |
+| `RestSpeed` | 0.35 | under it into a surface, a contact is resting: no bounce (Box2D's velocity threshold). It is at least what the steepest course hill (0.35) adds in a substep, so a ball a hill presses into a rail slides along it and does not jitter off it; a bounce it drops would have rolled the ball back a fifth of a unit |
 | `MaxBounce` | 0.75 | the most restitution a passive piece plays |
 | `MaxKick` | 1.5 | the most restitution a bumper (`Bounce > 1`, a skin `Kicks` names) plays |
 | `CrestRadius` | 0.5 | a crest's lip radius: take-off at `vu² > G·CrestRadius` |
@@ -551,7 +581,10 @@ only a piece whose skin names a bumper (`Kicks`: `bumper`, `pinball`,
 or a mole marked with a Bounce above 1 plays at `MaxBounce`, so no passive
 piece adds energy. What a zone does is in its fields (`Kind`, `Air`,
 `Capped`). A renderer has to be able to draw any
-field from the geometry alone and treat an unknown skin as the plain shape.
+field from the geometry alone and treat an unknown skin as the plain shape: a
+Wall it does not know is a wall, a Post a post, a Zone a tinted area. So a
+course author can ship a new skin before an artist draws it, and neither
+breaks anything.
 Keep skins to short lower-case ids: they're lookup keys, and a client's table
 is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
 `storm` and `snow`.
@@ -574,7 +607,10 @@ is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
   `rolls`, `climbs`, `overTheTop` and the zones where the ball stopped
   included), every polygon edge and ellipse tested, every wall and post of
   every sweep and every square root their tests take, every timed bar
-  checked and pushed. The weights: a substep 700, a move 15, a timed bar
+  checked and pushed. One stroke of a hostile hole (bumper walls across the
+  board, 160 walls stacked where the ball sits, a hill that keeps it rolling
+  on, zigzag polygons as ice or as hills, 40 timed bars, rain or a storm over
+  them) is held to about 1.07e9 gas. The weights: a substep 700, a move 15, a timed bar
   checked 12, a wall or post a move's broad phase looks at 18, a wall tested
   for a contact 130 and a post 50, a zone any check looks at 20, and 25 more
   when its box holds the ball, a polygon edge 14 (each edge counted as if it
@@ -596,10 +632,12 @@ is the catalogue. Five are reserved for the weather: `wind`, `rain`, `fog`,
   timed bars' pushes (every bar is pushed first, so the ball never ends
   inside one), before each move and each contact, so a stroke passes it by
   `MaxWorkStep` (2.25e5) at most: the most that goes between two checks,
-  under any weather on a Decode-limited field, is one sweep with every root
-  taken (167K) and then the substep's end and the looks at the zones where
-  the ball stopped (45K), or a roll-on check and every bar's push (164K),
-  then those looks (44K). A field's `Cap`, above 0 and under `MaxWork`,
+  under any weather on a Decode-limited field (72 zones, 1024 polygon points,
+  160 walls, 32 posts), is one sweep with every root taken (167K) and then
+  the substep's end and the looks at the zones where the ball stopped (45K),
+  or a roll-on check (35K) and every bar's push (40 bars, 129K), then those
+  looks (44K). Golf holds a shot to its limit plus `MaxWorkStep`
+  (`shotBound`). A field's `Cap`, above 0 and under `MaxWork`,
   takes its place for one stroke: golf gives each shot of a commit what is
   left of its budget, and refuses a shot that reaches it (see golf.md, the
   work budget); a stroke that reaches neither plays exactly as it did.

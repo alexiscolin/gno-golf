@@ -328,6 +328,11 @@ was archived never counts. A standing the drain empties is kept at 0 holes,
 out of the ranking; the owner's playbook is to `Drain(400)` after a
 republish until it returns 0.
 
+Each player taken out costs a standing read and write and a ranking key:
+about 0.43M gas of compute and 2 to 4M on chain. So a `Publish` stays under
+about 0.8e9 however many played the version it archives, and a course finish
+pays 8 to 16M more while a drain is under way.
+
 ## Reads
 
 These are all free as `vm/qeval` queries and return JSON strings (except
@@ -432,6 +437,11 @@ Everything needed to draw the hole and aim: `State` without `plays`,
   stroke.
 - `cupR` and `ballR` are the cup's and the ball's radii: 1.2 and 0.5 on the
   course, anything the format allows on a community hole.
+- `work` (`{"walls":…,"pieces":…,"setup":…}`, `HoleState` too) is what a
+  commit counts on the hole before the weather: its walls and pieces, every
+  pulse's as if always there, and each shot's share of setting the pulses up.
+  The web client splits a round's save into commits and sets their gas by it
+  (see [The work budget](#the-work-budget)).
 - `walls[].every/on/phase` only appear on timed walls, and
   `zones[].every/on/phase` only on timed zones. `zones[].poly` and `outside`
   only appear on polygon zones.
@@ -743,8 +753,13 @@ every segment of gnoweb's breadcrumb leads somewhere. A query string
 page names its author, never a cup, whatever world its data says. A board
 whose drawing would cost more than about 0.6e9 gas says "too detailed to draw
 here" and links the 3D game instead (none of the course's comes near: the
-heaviest is a seventh of that). Once a successor is set, every page opens
-with a "This course has moved" banner.
+heaviest is a seventh of that; the worst the format allows would be about five
+times it, and a query may use 3e9). The estimate (`boardWork`) weighs, in
+thousands of gas measured on 96×96 boards (the largest GG1 allows), 32 a board
+cell (the wear, the flood fill, the blanking); per row of a zone's box, 5 a
+cell and 16 a polygon edge; 10 a step along a wall; 20 a cell of a post's box.
+Once a successor is set, every page opens with a "This course has moved"
+banner.
 
 Every link golf prints follows its own path, so the same code serves under any
 namespace.
@@ -764,7 +779,16 @@ its work; walls: the hole's and its pulses'), plus `700K × pulse walls + 200K
 × pulse posts`: a pulse's pieces are set up afresh for each shot, outside its
 `Shot.Work` (806K a wall and 175K a post measured). The weights are measured so
 that a unit costs at most about 0.87K gas; a course shot runs at 0.6K to
-0.83K a unit.
+0.83K a unit. The path estimate (a fixed part, a set-up per wall, then per
+path point, one per substep with the roll-on, a cost of its own and a test
+per piece, each polygon edge a piece) was fitted on the 592 full-power shots
+of the 74 holes and raised by a fifth. A client can work it out from the path
+alone: `web/lib/adena.ts` mirrors the model, and `scripts/selfcheck.ts` checks
+its constants and formulas against `golf.gno`.
+
+It is an estimate, not a gas meter (gno has none). If the physics gets
+cheaper, the constants only err on the safe side; refit them if it gets
+dearer.
 
 What a commit spends before its first shot is counted in too: decoding the
 hole (at most `6M + 4K ×` its data's bytes; 3.4K to 3.9K a byte measured)

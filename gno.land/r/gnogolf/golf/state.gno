@@ -11,23 +11,14 @@ import (
 	"gno.land/p/nt/ufmt/v0"
 )
 
-// State is the hole as data: geometry, skins, wear and the rounds in flight.
-// hole is a version's id or an alias; "hole" in the answer is always the
-// version's id, the one to write with. A data version also says its "slot"
-// (its alias) and "v" (its number), and an archived one its "next".
+// State is the hole as JSON for a client: geometry, skins (names the client
+// looks up), weather, wear and the rounds in flight, without their paths
+// (Round has one). hole is a version's id or an alias; "hole" in the answer
+// is always the version's id, the one to write with, with its "slot" and
+// "v", and an archived one's "next".
 //
-// It exists for renderers that are not this file — a 3D client reads it over
-// vm/qeval and draws a windmill where the geometry says "a bar with skin
-// 'sail'". Nothing here decides how anything looks; Skin is a name to
-// look up, and the client owns the lookup table.
-//
-// The rounds listed here carry no path: a client that animates one player's
-// last shot reads it with Round, which replays it.
-//
-// A shot's `path` (Round, Simulate*) is the flight the chain computed. A
-// client replays it. It must not re-simulate: the ball would drift away from
-// where the chain says it is. Consecutive points far apart mean a tunnel — the
-// ball is elsewhere, do not interpolate.
+// A shot's path (Round, Simulate*) is the flight the chain computed: replay
+// it, never re-simulate. Points far apart are a tunnel: do not interpolate.
 func State(hole string) string {
 	e := readHole(hole)
 	return stateJSON(e, e.hole(), true)
@@ -63,9 +54,8 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 		`,"start":` + jvec(h.Start()) +
 		`,"cup":` + jvec(h.Cup()) +
 		`,"cupR":` + jnum(h.(*course.Simple).CupRadius) + `,"ballR":` + jnum(f.Radius))
-	// what a commit counts on the board before the weather (newWork: every
-	// pulse as if always there, and each shot's share of setting them up):
-	// the client splits a round's save and sets its gas by it
+	// the hole's work before the weather (newWork): the client splits a save
+	// and sets its gas by it
 	w := newWork(h, nil)
 	sb.WriteString(ufmt.Sprintf(`,"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup))
 	if rounds {
@@ -83,9 +73,7 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 		return sb.String()
 	}
 
-	// Rounds are capped: every address that ever played keeps one, and a
-	// popular hole would otherwise outgrow what one query can print. The total
-	// is given; a client that wants one player's round asks Round().
+	// capped (roundsShown): every address that ever played keeps a round
 	sb.WriteString(`]},"roundsTotal":` + strconv.Itoa(e.roundTree().Size()) + `,"rounds":[`)
 	i := 0
 	eachRound(e, roundsShown, func(player string, r *round) {
@@ -100,10 +88,8 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 // roundsShown is how many rounds State and the page list at most.
 const roundsShown = 24
 
-// roundJSON is one player's round. ball is where it lies (3 decimals), rest
-// the same ball exactly (shortest round-trip float), which SimulateFrom takes.
-// With path, the last stroke's path, air and cause, replayed from where that
-// stroke started: rounds store their shots, not their paths.
+// roundJSON is one player's round: ball rounded, rest exact (for SimulateFrom)
+// and, with path, the last stroke replayed: rounds store shots, not paths.
 func roundJSON(e *entry, h course.Hole, player string, r *round, path bool) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"player":` + jstr(player) +
@@ -119,9 +105,8 @@ func roundJSON(e *entry, h course.Hole, player string, r *round, path bool) stri
 	return sb.String()
 }
 
-// lastShot replays a round's last stroke from where it started, read-only:
-// the same hole, stroke number, tick and weather, so the same flight (a hole
-// plays its Preview as its Play, less the wear). Nothing before a first stroke.
+// lastShot replays a round's last stroke, read-only, with its stroke number,
+// tick and weather: the same flight, less the wear. Empty before a first one.
 func lastShot(e *entry, h course.Hole, r *round) physics.Shot {
 	if r.strokes == 0 || r.shots == "" {
 		return physics.Shot{}
@@ -158,9 +143,8 @@ func airOf(s physics.Shot) string {
 	return string(b)
 }
 
-// Round is one player's round on a hole, or null if they have none (or Reset
-// it) — what a client reads back after recording, whatever the size of the
-// hole's history. Its path is the last stroke's, replayed: one stroke of gas.
+// Round is one player's round on a hole with its last stroke's path, or null
+// if they have none (or Reset it). It costs one stroke of gas.
 func Round(hole string, player address) string {
 	e := readHole(hole)
 	v := e.roundTree().Get(player.String())
@@ -177,14 +161,11 @@ func sep(i int) string {
 	return ","
 }
 
-// jnum is a number with 3 decimals, the bytes of ufmt's "%.3f" at a
-// fraction of its gas (it formats most JSON numbers). It never prints NaN or
-// Inf, which are not JSON: a hostile hole returning them breaks nothing but
-// shows 0.
-//
-// v*1000 is off from the exact decimal by less than 1.2e-4 below 1e12, so the
-// rounding is decided by the integer part unless the fraction lies within
-// 1e-3 of a half: those, and huge numbers, go to strconv, which is exact.
+// jnum is a number with 3 decimals, the bytes of ufmt's "%.3f" at a fraction
+// of its gas. NaN and Inf, not JSON, print 0. Below 1e12, v*1000 is within
+// 1.2e-4 of the exact decimal, so its integer part decides the rounding
+// unless the fraction is within 1e-3 of a half: those, and huge numbers, go
+// to strconv, which is exact.
 func jnum(v float64) string {
 	if math.IsNaN(v) || math.IsInf(v, 0) {
 		return "0"
@@ -229,12 +210,9 @@ const versionJSON = `"version":1`
 
 func jvec(v physics.Vec2) string { return "[" + jnum(v.X) + "," + jnum(v.Y) + "]" }
 
-// jstr quotes a string that a course author controls, so it cannot break out of
-// the JSON it lands in.
-//
-// Every byte below 0x20 is escaped, not only \n and \t: publishing is open,
-// and one raw control character in one hole's name would make Holes() invalid
-// JSON for every client of every hole.
+// jstr quotes an author's string so it cannot break out of its JSON. Every
+// byte below 0x20 is escaped: one in one hole's name would make Holes()
+// invalid JSON for every client.
 func jstr(s string) string {
 	const hex = "0123456789abcdef"
 	b := make([]byte, 0, len(s)+2)
@@ -253,15 +231,13 @@ func jstr(s string) string {
 	return string(append(b, '"'))
 }
 
-// Holes lists the holes, for a client building a menu: the course's
-// current holes first, in course order (world by world, then by order), then
-// its maxArchived latest archived versions, latest first, then everyone
-// else's current versions, newest first — at most perAuthor of one
-// address's, none the owner hid (Hide), the rest in Community — up to
-// maxListed in all (see listed). official is whether a hole is the course's:
-// only those have a cup number and count in the course-wide ranking. next is the version that took an archived hole's place, slot the
-// version's alias. play is the 3D client's link, successor the realm that
-// took the course over ("" if none). Read-only; it decodes nothing.
+// Holes lists at most maxListed holes for a client's menu, as listed orders
+// them: the course's current holes, its latest archived versions, then
+// community holes, newest first, perAuthor an address, none hidden (the rest
+// are in Community). official marks the course's holes, the only ones in a
+// cup and the course ranking; next is the version that replaced a hole, slot
+// its alias, play the 3D client's link, successor the realm that took the
+// course over ("" if none). It decodes nothing.
 func Holes() string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"play":` + jstr(playURL) + `,"successor":` + jstr(successor) + `,"holes":[`)
@@ -304,29 +280,16 @@ func Community(after string, limit int) string {
 // list: one address publishing a hundred cannot push everyone else's out.
 const perAuthor = 3
 
-// listed is the holes in list order, as many as a list shows (maxListed):
-//   - every current course hole, from its slot, in course order;
-//   - then, if they leave room for minCommunity more, up to maxArchived
-//     archived course versions, the most recently archived first (every
-//     version is on its slot's data page);
-//   - then, in the room left, community holes, current versions only and
-//     none hidden (Hide): the newest of the holes that are among their
-//     author's perAuthor newest shown, newest publish first (by block
-//     height; within one block, by alias, last first).
+// listed is the holes in list order, at most maxListed: every current course
+// hole in course order; then, if minCommunity places stay free, up to
+// maxArchived archived course versions, latest archived first; then, in the
+// room left, the newest shown community holes (current, not hidden) among
+// each author's perAuthor newest, by block height then alias, last first. An
+// author fills perAuthor rows at most, however many holes they publish.
 //
-// So a community hole is listed if and only if it is shown, one of its
-// author's perAuthor newest shown, and fewer than that room of such holes,
-// anyone's, were published after it. However many holes an author publishes, they fill
-// perAuthor rows at most and push nobody else further down than that; the
-// rest are in Community. How many addresses an author holds, or what they
-// are, changes nothing but how many rows they fill.
-//
-// It reads no more than it lists, near enough: authors, the latest to
-// publish first, each with their perAuthor newest holes, until the next
-// author's latest is older than every row it keeps — at most room+1 authors,
-// perAuthor keys each, however much anyone publishes or the owner hides. A
-// hidden hole has no row in byAuthor, and an author with none shown no
-// author row: nothing hidden is walked.
+// It reads about what it lists: authors latest first, perAuthor keys each,
+// until an author's latest is older than every row kept (room+1 authors at
+// most). Hidden holes have no byAuthor row: nothing hidden is walked.
 func listed() []*entry {
 	list := make([]*entry, 0, maxListed)
 	full := func() bool { return len(list) >= maxListed }
@@ -395,26 +358,17 @@ const (
 	minCommunity = 20
 )
 
-// Simulate answers "what would this shot do" without changing anything: a
-// first stroke (stroke 0, tick 0) from a ball, in the weather of the moment.
-// SimulateFrom is the same with every input given.
-//
-// It is meant to be called as a read-only query (vm/qeval): no transaction, no
-// gas, no block to wait for, no wallet. That is what lets a client animate a
-// shot the instant the player releases, and it is also a whole hole playable by
-// a visitor who has no account at all — the physics is the chain's either way.
-// Nothing is recorded until someone sends a real Launch.
+// Simulate previews a first stroke (stroke 0, tick 0) from a ball in the
+// current weather, changing nothing. As a vm/qeval query it needs no
+// transaction or wallet: a client animates a shot the instant it is released.
 func Simulate(hole string, ballX, ballY, angle, power float64) string {
 	return simulateFrom(hole, ballX, ballY, angle, power, 0, 0, Period())
 }
 
-// SimulateFrom previews one shot from an exact ball state, read-only: the
-// ball (as Round, SimulateRound or SimulateFrom returned it in "rest"), the
-// shot "angle,power,tick", the stroke number it would be (0 is the first:
-// timed and pulse holes change with it) and the weather period. It is
-// exactly what PlayRoundAt would play for that stroke, for one shot's gas
-// where SimulateRound replays the whole round, and it also replays a stroke
-// of an old round: any period not ahead is taken. Its JSON is Simulate's.
+// SimulateFrom previews one shot, read-only: from an exact ball (a "rest"
+// answered before), shot "angle,power,tick", its stroke number (0 is the
+// first; timed and pulse holes change with it) and any period not ahead.
+// It is what PlayRoundAt would play, for one shot's gas. JSON as Simulate.
 func SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, period int64) string {
 	notAhead(period)
 	validStroke(stroke)
@@ -428,8 +382,7 @@ func validStroke(stroke int) {
 	}
 }
 
-// onBoard refuses a ball off the hole's board (or not a number): no round
-// ever leaves one there, and a preview from one would answer anything.
+// onBoard refuses a ball off the board (or NaN): no round leaves one there.
 func onBoard(h course.Hole, x, y float64) physics.Vec2 {
 	w, hh := course.BoardOf(h)
 	if !(x >= 0 && x <= float64(w) && y >= 0 && y <= float64(hh)) {
@@ -449,53 +402,39 @@ func simulateFrom(hole string, ballX, ballY, angle, power float64, stroke, tick 
 	return "{" + versionJSON + `,"holed":` + strconv.FormatBool(holed) + `,"bounces":` + strconv.Itoa(shot.Bounces) + shotJSON(shot) + "}"
 }
 
-// shotJSON is a shot's path, air, cause, work and exact resting point. work
-// is Shot.Work, what the physics counted the stroke doing: a commit charges a
-// shot the larger of its path's estimate and work×workPerUnit, and so can a
-// client (see work).
+// shotJSON is a shot's path, air, cause, work (Shot.Work, which a client adds
+// up as a commit does) and exact resting point.
 func shotJSON(shot physics.Shot) string {
 	return `,"path":[` + pathJSON(shot.Path) + `],"air":` + jstr(airOf(shot)) + `,"cause":` + jstr(string(shot.Cause)) +
 		`,"work":` + strconv.Itoa(shot.Work) + `,"rest":` + jexact(shot.Rest())
 }
 
-// SimulateRound replays a round from the tee, read-only, and returns its last
-// shot plus the stroke count: exactly what PlayRound would record for the same
-// shot list, including its refusal of a list too heavy for one commit.
-//
-// A client can preview shot N this way, sending all N decisions, or with
-// SimulateFrom from the exact ball ("rest") the previous answer gave, for the
-// gas of one shot. The rounded "ball" and path points are for drawing only:
-// after a bounce or two a rounding error is a different ball.
+// SimulateRound replays a shot list from the tee, read-only, and returns its
+// last shot and stroke count: what PlayRound would record, refusals included.
+// Continue from an exact "rest" (SimulateFrom): rounded points are for drawing.
 func SimulateRound(hole string, shots string) string {
 	return simulateRound(hole, nil, 0, shots, Period())
 }
 
-// SimulateRoundAt is SimulateRound in the weather of a given period — the one
-// the client shows, so the preview and a PlayRoundAt of it agree. Like a
-// round's first stroke, it takes the current period or the one before.
+// SimulateRoundAt is SimulateRound in a period's weather, the current one or
+// the one before, as a round's first stroke: it agrees with PlayRoundAt.
 func SimulateRoundAt(hole string, shots string, period int64) string {
 	playablePeriod(period)
 	return simulateRound(hole, nil, 0, shots, period)
 }
 
-// SimulateRoundIn is SimulateRound in the weather of any period gone by: a
-// recorded round replayed as the chain played it, days on, for anyone
-// checking one (scripts/botcheck.ts nudges a record's shots to see how
-// knife-edge they are). Read-only like the others; the weather still to come
-// is not served.
+// SimulateRoundIn is SimulateRound in any period gone by, to check a recorded
+// round as the chain played it. Weather still to come is refused.
 func SimulateRoundIn(hole string, shots string, period int64) string {
 	notAhead(period)
 	return simulateRound(hole, nil, 0, shots, period)
 }
 
-// SimulateCommit previews one commit of a round under way, read-only: the
-// shots the next PlayRoundAt (or PlayRoundPro) would take, from the exact
-// ball ("rest") at stroke number stroke (0 is the first), in the weather of
-// period. It refuses what that commit would refuse — too much work, too many
-// strokes, a weather over (a first commit takes the current period or the
-// one before, a later one a period not two behind) — so a client can check
-// every commit of a long round before it signs any. Its JSON is
-// SimulateRound's; strokes is the round's count after the commit.
+// SimulateCommit previews the next PlayRoundAt (or PlayRoundPro) commit,
+// read-only: shots from the exact ball ("rest") at stroke number stroke (0 is
+// the first) in period's weather. It refuses what that commit would (too much
+// work, too many strokes, a weather over), so a client checks every commit
+// before it signs any. JSON as SimulateRound; strokes counts after the commit.
 func SimulateCommit(hole string, ballX, ballY float64, stroke int, shots string, period int64) string {
 	if stroke == 0 {
 		playablePeriod(period)
@@ -507,9 +446,8 @@ func SimulateCommit(hole string, ballX, ballY float64, stroke int, shots string,
 	return simulateRound(hole, &physics.Vec2{X: ballX, Y: ballY}, stroke, shots, period)
 }
 
-// simulateRound is the SimulateRound* and SimulateCommit replay, read-only:
-// shots on a hole from from (nil for its tee), the first of them stroke
-// number strokes, in the weather of period.
+// simulateRound is the SimulateRound* and SimulateCommit replay: from nil is
+// the tee, and the first shot is stroke number strokes.
 func simulateRound(hole string, from *physics.Vec2, strokes int, shots string, period int64) string {
 	e := readHole(hole)
 	h := e.hole()
@@ -574,10 +512,8 @@ func postsJSON(ps []physics.Post) string {
 	return sb.String()
 }
 
-// zonesJSON is a hole's zones, or the weather's. With flags, a zone that is
-// air or capped air says so ("air":true, "capped":true), only when it is: a
-// client draws moving air as air whatever its skin. The weather's are always
-// printed without (see forecastJSON).
+// zonesJSON is a hole's zones, or the weather's (forecastJSON: no flags).
+// With flags, "air" and "capped" are printed only when true.
 func zonesJSON(zs []physics.Zone, flags bool) string {
 	var sb strings.Builder
 	sb.WriteString("[")
@@ -630,9 +566,8 @@ func isTimed(h course.Hole) bool {
 	return ok && t.Varies()
 }
 
-// Extras is what a timed hole adds at one stroke of a round (0 is the first
-// shot): the blade where it stands, the gate if it is closed. A client draws
-// these over State's field for the shot being aimed. Empty for other holes.
+// Extras is what a timed hole adds at one stroke of a round (0 is the first),
+// to draw over State's field. Empty for other holes.
 func Extras(hole string, stroke int) string {
 	h := readHole(hole).hole()
 	t, ok := h.(course.Timed)
@@ -643,15 +578,13 @@ func Extras(hole string, stroke int) string {
 	return "{" + versionJSON + `,"walls":` + wallsJSON(ws) + `,"posts":` + postsJSON(ps) + `,"zones":` + zonesJSON(extraZones(h, stroke), true) + "}"
 }
 
-// Leaderboard is a mode's course-wide top ten ("assisted" or "pro"): each
-// named player, with their name, and their best finish on each current course
-// hole, summed; most holes first, then fewest strokes, then the first there.
-// It reads the first rows of a ranking kept in order as rounds finish, so it
-// costs nothing that grows with the players.
+// Leaderboard is a mode's course-wide top ten ("assisted" or "pro"): named
+// players' bests on the current course holes, summed; most holes, then
+// fewest strokes, then the first there. Its cost does not grow with players.
 func Leaderboard(mode string) string {
 	m := modeOf(mode)
 	var sb strings.Builder
-	// out of the course's current holes: archived and anyone's do not count
+	// holes: the course's current ones, the only ones that count
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"holes":` + strconv.Itoa(slots.Size()) + `,"rows":[`)
 	n := 0
 	eachRanked(m, func(r *row, name string) {
@@ -667,7 +600,7 @@ func Leaderboard(mode string) string {
 func eachRanked(m int, fn func(r *row, name string)) {
 	n, walked := 0, 0
 	ranks[m].Iterate("", "", func(_ string, v any) bool {
-		walked++ // (names deleted since are skipped: the walk still stops, maxWalked rows at most)
+		walked++ // skipped names count: the walk stays bounded
 		p := v.(string)
 		if name := nameOf(p); name != "" {
 			fn(totals[m].Get(p).(*row), name)
@@ -677,12 +610,11 @@ func eachRanked(m int, fn func(r *row, name string)) {
 	})
 }
 
-// maxWalked is how many rows a top ten walks at most, the deleted names it skips counted.
+// maxWalked is the most rows a top ten walks, skipped names included.
 const maxWalked = 4 * topSize
 
-// strokesRow and standingRow are the rows the reads list: a player and a
-// best, or a player and a standing. The boards read each name to skip a
-// deleted one, and give it (name); the other reads resolve none ("").
+// strokesRow and standingRow are a player's best or standing row; name is ""
+// on the reads that resolve no names.
 func strokesRow(p, name string, strokes int) string {
 	return `{"player":` + jstr(p) + nameField(name) + `,"strokes":` + strconv.Itoa(strokes) + "}"
 }
@@ -698,11 +630,10 @@ func nameField(name string) string {
 	return `,"name":` + jstr(name)
 }
 
-// Rank is a player's place in a mode's course ranking: "rank" 1 is the top,
-// out of "of" ranked players, with their standing. It is 0 for a player the
-// ranking does not hold: unnamed, or with no current course hole finished.
-// A ranked name deleted since still takes its place until its next change,
-// so the rank may be that many too low; Leaderboard skips such names.
+// Rank is a player's place in a mode's course ranking, with their standing:
+// "rank" 1 is the top, out of "of"; 0 if unnamed or no current course hole
+// finished. A name deleted since keeps its place until its next change, so a
+// rank may be that many too low.
 func Rank(mode string, player address) string {
 	m := modeOf(mode)
 	p := player.String()
@@ -721,12 +652,8 @@ func Rank(mode string, player address) string {
 }
 
 // CourseLeaderboard is a page of a mode's course ranking, paged like
-// HoleLeaderboard: from rank offset+1 (clamped to 0..players), at most limit
-// rows (clamped to 1..100), each with its name. holes is the course's
-// current holes, players how many the ranking holds, next the offset of the
-// next page (0 once there is none). A name deleted since is skipped, so a
-// page may hold fewer rows than it covers. A page reads its own rows only,
-// however long the ranking.
+// HoleLeaderboard. holes is the course's current holes, players how many the
+// ranking holds.
 func CourseLeaderboard(mode string, offset, limit int) string {
 	m := modeOf(mode)
 	limit = clampLimit(limit)
@@ -760,10 +687,9 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 	return sb.String()
 }
 
-// Ghost is a player's best finished round on a hole in a mode, with the
-// period it was played in and its shots, or null if none: what a duel races.
-// It replays stroke by stroke in its own weather, SimulateRoundIn for the
-// first stroke, then SimulateFrom from each rest. Named or not, like Bests.
+// Ghost is a player's best round on a hole in a mode, named or not, with its
+// period and shots, or null: what a duel races. It replays in its own weather
+// (SimulateRoundIn for the first stroke, then SimulateFrom from each rest).
 func Ghost(hole, mode string, player address) string {
 	e, m := readHole(hole), modeOf(mode)
 	v := e.bests(m).Get(player.String())
@@ -776,10 +702,8 @@ func Ghost(hole, mode string, player address) string {
 		`,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(shots) + "}"
 }
 
-// HoleRank is a player's place on a hole's board in a mode: "rank" 1 is the
-// top, out of "of" named players, with their best. It is 0 for a player the
-// board does not hold: unnamed, or no finish there. Like Rank, a name deleted
-// since still takes its place until its next change.
+// HoleRank is a player's place on a hole's board in a mode, with their best,
+// as Rank: 0 if unnamed or no finish there.
 func HoleRank(hole, mode string, player address) string {
 	e, m := readHole(hole), modeOf(mode)
 	p := player.String()
@@ -797,15 +721,12 @@ func HoleRank(hole, mode string, player address) string {
 // maxListed bounds Holes() and the hub: anyone can add a hole.
 const maxListed = 120
 
-// HoleLeaderboard is a page of one hole's board in a mode: each named
-// player, with their name, and their best finished round there, fewest
-// strokes first, then the first to make them, from rank
-// offset+1 (clamped to 0..players), at most limit rows (clamped to 1..100). players is how many
-// named players the board holds (what a client pages through), finished how
-// many players finished it, named or not. next is the offset of the next
-// page, 0 once there is none: a name deleted since is skipped, so a page may
-// hold fewer rows than it covers. A page reads its own rows only, however
-// long the board.
+// HoleLeaderboard is a page of a hole's board in a mode: named players' bests,
+// fewest strokes then first there, from rank offset+1 (clamped to
+// 0..players), at most limit rows (1..100). players is the named players,
+// finished anyone who finished; next is the next offset, 0 at the end. A name
+// deleted since is skipped, so a page may hold fewer rows. A page reads its
+// own rows only.
 func HoleLeaderboard(hole, mode string, offset, limit int) string {
 	e, m := readHole(hole), modeOf(mode)
 	limit = clampLimit(limit)
@@ -911,12 +832,9 @@ func Standings(mode, players string) string {
 }
 
 // Records is a page of every player's best on a hole in a mode, named or not.
-//
-// The paged reads (Records, Players, Rounds) walk everything by address, so
-// that anyone — a friends' board, an indexer, a golf/v2 carrying the records
-// over — can read all of it a page at a time: after is the last address of
-// the page before ("" for the first), limit is clamped to 1..100, and next is
-// the after of the next page ("" once there is none).
+// The paged reads (Records, Players, Rounds, Community) walk everything by
+// key: after is the last key of the page before ("" for the first), limit is
+// clamped to 1..100, next is the after of the next page ("" at the end).
 func Records(hole, mode, after string, limit int) string {
 	e, m := readHole(hole), modeOf(mode)
 	var sb strings.Builder
@@ -928,9 +846,8 @@ func Records(hole, mode, after string, limit int) string {
 	return sb.String()
 }
 
-// Players is a page of every course standing in a mode, named or not: the
-// holes finished among the current course holes, and their strokes. It is
-// paged like Records.
+// Players is a page of every course standing in a mode, named or not, paged
+// like Records.
 func Players(mode, after string, limit int) string {
 	m := modeOf(mode)
 	var sb strings.Builder
@@ -943,8 +860,8 @@ func Players(mode, after string, limit int) string {
 	return sb.String()
 }
 
-// Rounds is a page of every round on a hole, as State lists them (no path).
-// It is paged like Records.
+// Rounds is a page of every round on a hole, as State lists them, paged like
+// Records.
 func Rounds(hole, after string, limit int) string {
 	e := readHole(hole)
 	var sb strings.Builder

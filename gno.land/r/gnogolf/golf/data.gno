@@ -14,19 +14,13 @@ import (
 	"gno.land/p/gnogolf/course"
 )
 
-// Holes as data. A version is a GG1 string (course.Encode), sent as hex,
-// checked once when it is published — it decodes within the format's limits
-// and its stored wall lengths are its walls' own (course.Exact) — and kept as
-// bytes. Each call decodes it again into a *course.Simple that lives for that
-// call only: nothing of it is ever stored, so a hole costs its data and its
-// records, not its geometry.
-//
-// A version is never edited or removed. A new one takes the alias (a slot
-// of the course, or "<address>/<slug>"), and the old one is archived: still
-// playable, its records kept, and, on the course, out of the ranking.
+// Holes as data: a version is a GG1 string, checked once at publish and kept
+// as bytes; each call decodes it afresh and stores nothing of it. A version
+// is never edited or removed: a new one takes its alias, and the old one is
+// archived, still playable, its records kept.
 
-// wearGrid is the entry's wear: a count per cell of the WearW by WearH
-// grid, row-major. golf's stroke marks it where the round's ball rests.
+// wearGrid is the entry's wear: a count of balls at rest per cell of the
+// WearW by WearH grid, row-major.
 func (e *entry) wearGrid() []int {
 	out := make([]int, wearCells)
 	if b := e.wear; b != nil {
@@ -57,20 +51,13 @@ func (e *entry) mark(i int) {
 // about 21 KB.
 const maxData = 32 << 10
 
-// Publish puts a course hole's data into its slot, as its next version, and
-// returns the new version's id ("garden/7/v2"). Only the owner can.
-//
-// hexData is the hole as course.Encode wrote it, in hex. The slot must be the
-// data's own world and order ("garden/7"), so a mis-edited file cannot
-// replace the wrong hole; the order is a whole number from 1 to 999. The name,
-// par, world and order are frozen with the version. Data identical to the
-// current version's is refused: it would reset the hole's ranking for
-// nothing.
-//
-// A version already in the slot is archived: its records stay, its bests
-// leave the course-wide standing (a batch now, the rest as players finish or
-// anyone Drains), and the new version starts the ranking afresh. note (140
-// characters at most, cleaned) says why, on the hole's data page.
+// Publish puts a course hole's data into its slot as its next version and
+// returns the new id ("garden/7/v2"). Only the owner can. hexData is the hole
+// as course.Encode wrote it, in hex. slot must be the data's own world and
+// order ("garden/7", order 1 to 999), so a mis-edited file cannot replace the
+// wrong hole. Data identical to the current version's is refused. The version
+// it replaces is archived: its records stay, its bests leave the course
+// standings. note (at most 140 characters, cleaned) says why.
 func Publish(cur realm, slot, hexData, note string) string {
 	by := cur.Previous().Address()
 	if !isOwner(by) {
@@ -109,17 +96,14 @@ func Publish(cur realm, slot, hexData, note string) string {
 	return e.id
 }
 
-// PublishMine publishes a hole of one's own, as data, and returns its id:
-// "<caller>/<slug>/v1" the first time, then v2 and on. Anyone can while the
-// owner has publishing open (SetPublishing), and only the same address can
-// add versions to it. slug is 1 to 32 of a-z, 0-9 and "-". It is a community
-// hole: playable, recorded and on its own board, in no cup and not in the
-// course ranking. The data is held to what Publish holds it to, but its world
-// and order are its author's own business. A new version of a hidden hole
-// (Hide) stays hidden.
-//
-// The publisher pays the storage deposit for the bytes it adds, about half a
-// GNOT a version, and nothing published can be deleted.
+// PublishMine publishes a community hole of the caller's own and returns its
+// id: "<caller>/<slug>/v1", then v2 and on. Anyone can while publishing is
+// open (SetPublishing); only the same address adds versions. slug is 1 to 32
+// of a-z, 0-9 and "-". The data is checked as Publish checks it, its world
+// and order aside; its name and note carry no web address. It is playable and
+// recorded, in no cup and not in the course ranking; a new version of a
+// hidden hole stays hidden. The publisher pays the storage deposit (about
+// half a GNOT a version), and nothing published can be deleted.
 func PublishMine(cur realm, slug, hexData, note string) string {
 	if !publishing {
 		panic("golf: publishing community holes is not open yet")
@@ -188,23 +172,16 @@ func moveAuthor(a, was, now string) {
 	}
 }
 
-// linkish spots a web address in a community hole's name or note, which the
-// lists show on the course's front page: "www.", a dot between a letter or
-// digit and two letters ("claim.xyz", "t.me"; not "e.g." nor a sentence's dot,
-// which has a space after it), or an IP address ("1.2.3.4"), the dots written
-// as look-alikes (．。․﹒) read as dots, letters in any case. Basic on purpose:
-// what gets past it, the owner can Hide. And strict on purpose: a dot between
-// letters is what a domain looks like, so "St.Andrews" is refused with
-// "claim.xyz", and its author writes "St. Andrews".
-//
-// It reads s once, a byte at a time: every mark it looks for is ASCII, and
-// the only characters that lower-case to ASCII are İ and the Kelvin sign, so
-// a character past ASCII is decoded only to tell those, the look-alike dots
-// and the spaces that end a word apart from the rest.
+// linkish spots a web address in a community hole's name or note: "www.", a
+// dot between a letter or digit and two letters ("claim.xyz", "t.me"; not
+// "e.g."), or an IP address, look-alike dots (．。․﹒) read as dots, letters in
+// any case. Basic (the owner can Hide what gets past) and strict on purpose
+// ("St.Andrews" is refused). It reads s a byte at a time: every mark is
+// ASCII, so a non-ASCII character is decoded only to tell İ and the Kelvin
+// sign (which lower-case to ASCII), the look-alike dots and spaces apart.
 func linkish(s string) bool {
 	var c1, c2, c3 byte // the three characters before c, lower-cased
-	// the word so far, as strings.Fields splits: an IP address is only
-	// digits and three dots
+	// the word so far (as strings.Fields splits): an IP is digits, three dots
 	word, ip, dots := false, true, 0
 	for i := 0; i < len(s); {
 		c, size, space := s[i], 1, false
@@ -256,10 +233,8 @@ func isLower(c byte) bool { return c >= 'a' && c <= 'z' }
 func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 
 // decodeData checks a version's data as it arrives: hex, GG1 within the
-// format's limits, stored lengths bit-exact, and in the one form Encode
-// gives. After this the lengths are
-// trusted on every call (course.Decode does not check them; DecodeChecked,
-// here, does).
+// format's limits, stored lengths bit-exact (DecodeChecked: every later
+// Decode trusts them), and in the one form Encode gives.
 func decodeData(hexData string) (*course.Simple, string, string) {
 	if len(hexData) > 2*maxData {
 		panic("golf: the data is too long")
@@ -280,8 +255,7 @@ func decodeData(hexData string) (*course.Simple, string, string) {
 	if course.Encode(h) != data {
 		panic("golf: the data is not as course.Encode writes it")
 	}
-	// a hole whose heaviest shot a transaction could not replay is refused:
-	// the physics ends a stroke at MaxWork, so this holds a hole's walls
+	// refused if a transaction could not replay its heaviest shot
 	w := newWork(h, nil)
 	if w.bound > maxShotGas {
 		panic(errShotTooHeavy)
@@ -290,8 +264,8 @@ func decodeData(hexData string) (*course.Simple, string, string) {
 	return h, data, hex.EncodeToString(sum[:])
 }
 
-// nothingNew refuses a version whose data is its alias's current one's: it
-// would reset the hole's ranking for nothing.
+// nothingNew refuses data identical to the alias's current version: it would
+// reset the hole's ranking for nothing.
 func nothingNew(old *entry) string {
 	return "golf: this data is already " + old.id + ": nothing to publish"
 }
@@ -302,8 +276,7 @@ func dataEntry(alias string, n int, h *course.Simple, by address, sum, note stri
 	return e
 }
 
-// worlds is the course's worlds, in the order a player goes through them,
-// and what each is called on the page. A world not listed comes after them.
+// worlds is the course's worlds in play order, with their names on the page.
 var worlds = []struct{ id, name string }{
 	{"garden", "Garden Cup"},
 	{"island", "Island Cup"},
@@ -321,9 +294,8 @@ func worldRank(w string) int {
 	return len(worlds)
 }
 
-// slotKey is the key a slot is kept under: its world's rank, the world, and
-// the order in three digits, so that the slots tree is the course in course
-// order.
+// slotKey is a slot's key: its world's rank, the world, and the order in
+// three digits, so the slots tree is in course order.
 func slotKey(world string, order int) string {
 	return string(rune('0'+worldRank(world))) + world + "/" + pad(order, 3)
 }

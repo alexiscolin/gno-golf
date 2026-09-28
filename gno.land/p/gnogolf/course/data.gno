@@ -7,24 +7,10 @@ import (
 	"gno.land/p/gnogolf/physics"
 )
 
-// A hole as data: GG1, one compact binary string, little-endian, frozen with
-// this package. Encode writes a Simple as it stands after Fit; Decode reads
-// it back, bit for bit, and never calls Fit or any other builder.
-//
-//	"GG1"
-//	header : W,H u16 · Strokes u8 · Substeps u16 · World str · Order f64 · Title str
-//	         Tee f64×2 · Pin f64×2 · CupRadius f64 · Shelter f64
-//	field  : Friction, Bounce, Radius f64            (Tick is always 0)
-//	skins  : n u16, n × str                          (str = u8 len + bytes)
-//	walls  : n u16 · style runs [count u16, Bounce f64, Mark i32, Skin u16, Every/On/Phase i32]
-//	         then per wall: Ax Ay Bx By, then l, lp, lm (physics.Lengths)
-//	posts  : n u16 · per post: Cx Cy R Bounce f64, Mark i32, Skin u16
-//	zones  : n u16 · per zone: Kind u8, flags u8 (Round|Outside|Air|Capped), Min Max Vec f64×6,
-//	         Scale f64, Mark i32, Skin u16, Every/On/Phase i32, npoly u16, poly f64×2n
-//	pulses : n u8 · per pulse: Every/On/Phase i32, then walls (no lengths), posts, zones
-//
-// A pulse's walls carry no lengths: they are a stroke's extras, and Step
-// works theirs out itself.
+// Magic starts GG1, a hole as one little-endian binary string, frozen with
+// this package: magic, header, field, skin table (str = u8 len + bytes),
+// walls (style runs, then segments and, outside pulses, their Lengths),
+// posts, zones, pulses; each list a count first. Encode is the layout.
 const Magic = "GG1"
 
 // The frozen limits Decode holds a hole to, pulses included.
@@ -219,11 +205,10 @@ func (e *encoder) zones(zs []physics.Zone, skins map[string]int) {
 	}
 }
 
-// Decode reads a GG1 hole and prepares its walls from the stored lengths
-// (physics.PrepareWith), which it trusts: check them once with Exact, or
-// use DecodeChecked, before accepting data from anyone. Anything outside the
-// format, its limits or its value bounds is an error, and nothing is
-// returned with it.
+// Decode reads a GG1 hole; anything outside the format, its limits or its
+// value bounds is an error, with nothing returned. It prepares the walls from
+// the stored lengths (physics.PrepareWith) and trusts them: check them once
+// with Exact, or use DecodeChecked, before accepting data from anyone.
 func Decode(s string) (*Simple, error) {
 	d := &decoder{s: s}
 	if len(s) < len(Magic) || s[:len(Magic)] != Magic {
@@ -323,9 +308,8 @@ func Decode(s string) (*Simple, error) {
 	return h, nil
 }
 
-// DecodeChecked is Decode, then Exact: a hole from data anyone wrote, its
-// stored lengths checked. It costs a Prepare more than Decode; data once
-// checked (kept by the realm that checked it) can be read back with Decode.
+// DecodeChecked is Decode, then Exact: for data anyone wrote. It costs a
+// Prepare more; data once checked can be read back with Decode.
 func DecodeChecked(s string) (*Simple, error) {
 	h, err := Decode(s)
 	if err != nil {
@@ -337,13 +321,10 @@ func DecodeChecked(s string) (*Simple, error) {
 	return h, nil
 }
 
-// Exact reports whether a decoded hole's stored lengths are its walls' own:
-// whether its prep is, bit for bit, the one Prepare works out. Run it once on
-// data from anyone, before trusting it (Decode does not; DecodeChecked does).
-//
-// It is for a value fresh from Decode, in the caller's own hands: it copies
-// the field and prepares the copy, which can panic on a hole stored in another
-// realm (the copy keeps that realm's read-only mark).
+// Exact reports whether a decoded hole's stored lengths are its walls' own,
+// its prep bit for bit the one Prepare works out. Use it on a value fresh from
+// Decode: it prepares a copy of the field, which can panic on a hole stored in
+// another realm (the copy keeps that realm's read-only mark).
 func Exact(h *Simple) bool {
 	if h.Course == nil {
 		return false
@@ -363,9 +344,9 @@ func Exact(h *Simple) bool {
 	return true
 }
 
-// decoder reads GG1 with every read bounds-checked: past the end, it records
-// the error and reads zeros, so a truncated string fails cleanly. The counts
-// are checked against the limits before anything is allocated for them.
+// decoder reads GG1 with every read bounds-checked: past the end it records
+// the error and reads zeros. Counts are checked against the limits before
+// anything is allocated for them.
 type decoder struct {
 	s                               string
 	i                               int
@@ -451,9 +432,8 @@ func (d *decoder) point() physics.Vec2 {
 	return physics.Vec2{X: x, Y: y}
 }
 
-// corner reads a corner of a zone's box. Fit keeps a round or polygon zone's
-// box whole, so it may run past the board (hole7's pond does, by 1.5): a
-// corner may lie up to a board's largest side beyond it.
+// corner reads a corner of a zone's box, which may lie up to MaxBoard off the
+// board: Fit keeps a round or polygon zone's box whole.
 func (d *decoder) corner() physics.Vec2 {
 	x, y := d.f64(), d.f64()
 	if !(x >= -MaxBoard && x <= d.w+MaxBoard && y >= -MaxBoard && y <= d.h+MaxBoard) {
@@ -473,8 +453,8 @@ func (d *decoder) skin() string {
 
 func bounce(b float64) bool { return b >= 0 && b <= 1.5 }
 
-// timing is the bounds of Every/On/Phase (a pulse's too): untimed is
-// all zeros; timed, on at most every and phase below it.
+// timing is the bounds of Every/On/Phase: untimed is all zeros; timed, on at
+// most every and phase below it.
 func timing(every, on, phase int) bool {
 	if every == 0 {
 		return on == 0 && phase == 0
@@ -523,8 +503,7 @@ func (d *decoder) walls(lengths bool) ([]physics.Wall, []float64) {
 		}
 		i += count
 	}
-	// the segments, then the lengths, read in one pass: most of a hole's
-	// floats are here, so each is one call to le and a bounds check
+	// one bounds check, then le per float: most of a hole's floats are here
 	size := 32
 	if lengths {
 		size = 56
@@ -614,8 +593,7 @@ func (d *decoder) zones() []physics.Zone {
 			z.Vec = d.point() // a place on the board
 		default:
 			z.Vec = physics.Vec2{X: d.f64(), Y: d.f64()} // a push
-			// a hill's push is G·sin θ: no more than its steepest grade
-			// (squared: no root; a NaN fails the comparison)
+			// no steeper than MaxSin (squared: no root; a NaN fails it)
 			if max := physics.G * physics.MaxSin; !(z.Vec.X*z.Vec.X+z.Vec.Y*z.Vec.Y <= max*max) {
 				d.fail("a slope pushes at most G·MaxSin (0.95)")
 			}

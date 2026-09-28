@@ -5,36 +5,12 @@ import (
 	"strings"
 )
 
-// The model is a rigid ball on the board's plane, stepped at a fixed
-// timestep (the substep), with a height that only a renderer draws. Its laws
-// are the textbook ones a rigid-body engine (Box2D, cannon.js) uses:
-//
-//	gravity        G, along a hill: its Vec, which is G·sin θ downhill
-//	rolling        a constant deceleration Crr·G·cos θ against the velocity
-//	contacts       an impulse: restitution e along the normal, Coulomb
-//	               friction µ along the tangent, clamped to what stops the
-//	               contact point of a rolling ball (TangentMass)
-//	flight         ballistic under G off a crest the ball is too fast for
-//
-// Units: board units and substeps, so G is in board units per substep².
-
-// G is gravity, in board units per substep squared. It sets how steep a
-// hill's Vec is (sin θ = |Vec| / G), how long a ball flies off a crest and
-// how fast one may cross the cup and still drop.
+// G is gravity, in board units per substep squared: a hill's Vec is G·sin θ.
 const G = 1.0
 
-// The calibration of rolling resistance. Friction (the field's) and a
-// Surface's Scale were the two rules of a speed-dependent drag: each substep
-// a ball kept a share keep of its speed and lost a fixed Drag/Scale. Rolling
-// maps them onto a rolling-resistance coefficient Crr, fitted (least squares)
-// so that a full stroke stops where it did on every Friction and Scale the
-// course uses, within about 3%:
-//
-//	keep = min((Friction + keepBonus) · Scale, maxKeep)
-//	Crr  = ((1 − keep) · RollSpeed + RollDrag / Scale) / G
-//
-// A green of Friction 0.87 has Crr 0.224, sand (Scale 0.5) 1.13, brick
-// (0.92) 0.36, ice (1.18) 0.104.
+// The calibration of Rolling, fitted by least squares to the course's
+// strokes: keep = min((Friction+keepBonus)·Scale, maxKeep), then
+// Crr = ((1−keep)·RollSpeed + RollDrag/Scale) / G.
 const (
 	RollSpeed = 1.8
 	RollDrag  = 0.08
@@ -44,7 +20,7 @@ const (
 
 // Rolling is the rolling-resistance coefficient Crr of a green of the given
 // Friction under a Surface of the given Scale (1 is plain grass). A Scale of
-// 0 or less holds the ball where it is: an infinite Crr.
+// 0 or less is an infinite Crr: the ball stays where it is.
 func Rolling(friction, scale float64) float64 {
 	if !(scale > 0) {
 		return math.Inf(1)
@@ -56,66 +32,51 @@ func Rolling(friction, scale float64) float64 {
 	return ((1-keep)*RollSpeed + RollDrag/scale) / G
 }
 
-// The contact rules, as a rigid-body engine has them, for walls and posts.
+// The contact rules for walls and posts.
 const (
 	// WallFriction is the Coulomb µ between the ball and a wall or post:
 	// the tangential impulse is at most µ times the normal one.
 	WallFriction = 0.05
-	// TangentMass is the share of its speed along a surface a solid ball
-	// (moment of inertia 2/5·m·r²) loses when the friction grips it: the
-	// tangential impulse that stops its contact point from slipping is
-	// m·v·2/7, and no more is ever applied.
+	// TangentMass caps the tangential impulse, per unit mass and speed:
+	// 2/7 is what stops a solid ball's contact point from slipping.
 	TangentMass = 2.0 / 7
 	// RestSpeed is the speed into a surface, per substep, under which a
-	// contact is resting, not an impact: no restitution, no bounce counted
-	// (Box2D's velocity threshold). It is above what the steepest course
-	// hill (0.35) adds in a substep, so a ball pressed into a rail by a hill
-	// slides along it and does not jitter off it; a bounce it drops would
-	// have rolled the ball back a fifth of a unit.
+	// contact is resting: no restitution, no bounce counted. At least what
+	// the steepest hill adds in a substep, so a ball a hill presses into a
+	// rail slides along it instead of jittering.
 	RestSpeed = 0.35
 	// MaxBounce is the most restitution a passive piece plays: a Bounce
-	// above it is played at it. A mini-golf rail gives back 0.6 to 0.75 of
-	// the speed it is hit at; nothing passive adds energy.
+	// above it is played at it.
 	MaxBounce = 0.75
-	// MaxKick is the most restitution a bumper plays. A bumper is a piece
-	// whose Bounce is above 1 and whose skin says it is one (Kicks): an
-	// active one, like a pinball's, that kicks the ball back at Bounce
-	// times the speed it came in at (at most MaxKick, the most
-	// course.Decode accepts). Any other piece above 1 plays at MaxBounce.
-	// The ball stays under SpeedCap.
+	// MaxKick is the most restitution a bumper (a Bounce above 1 on a skin
+	// that Kicks) plays, and the most course.Decode accepts. The ball stays
+	// under SpeedCap.
 	MaxKick = 1.5
 )
 
-// The flight rules. A ball goes over a hill's crest (its uphill edge) and
-// leaves the ground when the ground curves away faster than gravity can
-// hold it: v² > G·R at the crest, with v its speed up the hill and R the
-// crest's radius. It flies a ballistic arc, and lands at the height it took
-// off from, with restitution and friction.
+// The flight rules: a ball takes off over a hill's crest (its uphill edge)
+// when v² > G·CrestRadius, v its speed up the hill, flies a ballistic arc and
+// lands at the height it took off from.
 const (
-	// CrestRadius is the radius of a hill's rounded lip, in board units (a
-	// kicker's lip is sharp: a quarter of the ball's width): a ball needs
-	// sqrt(G·CrestRadius), 0.71 per substep, to take off, so a ball that
-	// makes the top of a ramp at any real pace flies off it.
+	// CrestRadius is the radius of a hill's lip, in board units: a ball
+	// needs sqrt(G·CrestRadius), 0.71 per substep, to take off.
 	CrestRadius = 0.5
-	// MinRamp is the gentlest hill (|Vec|) that launches: a gentler one is
-	// a lawn's undulation, and a ball rolls over it.
+	// MinRamp is the gentlest hill (|Vec|) that launches.
 	MinRamp = 0.12
 	// GroundBounce is the restitution of the ground when a ball lands.
 	GroundBounce = 0.4
 	// LandFriction is the Coulomb µ between a landing ball and the ground.
 	LandFriction = 0.3
 	// HopSpeed is the vertical speed, per substep, under which a landing
-	// ball stays down: slower, the rebound is a roll, not a hop.
+	// ball stays down.
 	HopSpeed = 0.25
-	// MaxSin is the steepest grade a hill plays, sin θ (about 72°): its
-	// push is G·sin θ, so course.Decode holds a Slope's |Vec| to G·MaxSin,
-	// and newHill caps the grade there (tan θ ≤ 3.05, a flight that ends);
-	// no course hill is steeper than 20°.
+	// MaxSin is the steepest grade a hill plays, sin θ (about 72°), so tan θ
+	// and a flight stay bounded; course.Decode holds |Vec| to G·MaxSin.
 	MaxSin = 0.95
 )
 
 // MaxRollOn caps the substeps a ball may roll on past its stroke's own while
-// a slope keeps it moving, or while it is still in the air.
+// a slope keeps it moving or it is still in the air.
 const MaxRollOn = 120
 
 // pinCheck and pinMove: a ball rolling on that moves less than pinMove in
@@ -127,30 +88,11 @@ const (
 
 // MaxWork caps what one stroke may cost, whatever the field, in work units
 // of about a thousand gas each (Shot.Work): a stroke that reaches it ends
-// where the ball is. The units are counted as the stroke goes, from what
-// it does (the weights below, measured in the GnoVM), wherever it does it:
-// every zone a move, a rest check or a roll-on check looks at, every
-// polygon edge and ellipse it tests, every wall and post of every sweep and
-// every square root those tests take. No course shot comes near it (0.74
-// of it at the most); it holds a hostile hole's stroke (bumper walls across
-// the whole board, 160 walls stacked where the ball sits, a hill that keeps
-// the ball rolling on, zigzag polygons as ice or as hills, 40 timed bars,
-// rain or a storm over them) to about 1.07e9 gas. A Field's Cap lowers it
-// for one stroke (golf gives a commit's shot what is left of its budget).
+// where the ball is. A Field's Cap lowers it for one stroke.
 const MaxWork = 1000000
 
-// The work weights, in units: a substep, a move, a timed bar checked, a
-// wall or post a move's broad phase looks at, a wall and a post it tests
-// for a contact, a zone any check looks at, and one whose box holds the
-// ball, a polygon edge (each may straddle the ball: the worst case), an
-// ellipse, a push (a hill's or the wind's), a square root (a wall end's
-// distance or swept cap, a post's swept circle and its normal, a contact's,
-// the one that holds it to SpeedCap, a loop's mouth, capped wind), and a
-// wall a timed bar's push is checked against, per side. Measured on the
-// GnoVM's gas with probes that add one kind of piece at a time, and set so
-// that a unit costs at most 0.87K gas on any of them. A root costs about
-// 170K; a wall test, its roots aside, 39K to 130K (the most: onto a face,
-// both round caps hit), a post test 24K to 43K.
+// The work weights, in units, measured on the GnoVM with probes that add one
+// kind of piece at a time, so that a unit costs at most 0.87K gas.
 const (
 	substepWork  = 700
 	moveWork     = 15
@@ -168,14 +110,8 @@ const (
 )
 
 // MaxWorkStep is the most a stroke's Work passes its limit (MaxWork, or a
-// lower Cap) by. It is checked at each substep, after its timed bars'
-// pushes, before each move and each contact. On a Decode-limited field under
-// any weather (72 zones, 1024 polygon points, 160 walls, 32 posts) the most
-// that goes between two checks is one sweep, every root taken (167K), and
-// then the substep's end and the looks at the zones where the ball stopped
-// (45K): 212K; or a roll-on check (35K) and every bar's push (40 bars:
-// 129K), then the zones where the ball stopped (44K): 208K. Its limit plus
-// MaxWorkStep is what golf holds a shot to (shotBound).
+// lower Cap) by on a Decode-limited field: the most between two checks.
+// Golf holds a shot to its limit plus this (shotBound).
 const MaxWorkStep = 225000
 
 // limit is the work the stroke may cost: MaxWork, or the field's Cap under it.
@@ -186,40 +122,27 @@ func (f *Field) limit() int {
 	return MaxWork
 }
 
-// maxHits is the most contacts one move resolves: a move that hits spends
-// what is left of it from the contact, and a ball in a corner may meet the
-// other wall in the same move.
+// maxHits is the most contacts one move resolves (a corner meets two).
 const maxHits = 4
 
-// Shot is everything a stroke did: where the ball was at every substep, and how
-// many barriers it met on the way.
-//
-// The path exists so that nothing else has to recompute the flight. A renderer
-// replays these points; it never simulates. That keeps the chain the only place
-// the physics runs, which is the only way a client and a validator can agree on
-// where the ball landed.
-//
-// A Tunnel puts two consecutive points far apart on purpose — that
-// discontinuity is the ball being somewhere else, and a renderer should draw it
-// as such rather than interpolating across the board.
+// Shot is everything a stroke did: where the ball was at every substep, and
+// how many walls and posts it met. A renderer replays Path and never
+// simulates; two consecutive points far apart are a tunnel, not a line to
+// interpolate.
 type Shot struct {
 	Path    []Vec2
 	Bounces int
-	// Air marks the path points where the ball is off the ground, after
-	// taking off from the top of a slope. In the air it meets walls but no
-	// zone — it flies over water and sand — and it cannot drop into a cup.
-	// Same length as Path.
+	// Air marks the path points where the ball is off the ground (no zone
+	// acts, no cup takes it). Same length as Path.
 	Air []bool
 	// Cause says, per path point, what most acted on the ball in the substep
 	// that ended there: 'b' a bounce, 's' a hill, 'w' wind or a gust, 'i' a
-	// slippery surface (ice, rain), '-' nothing but friction. Same length as
-	// Path.
+	// slippery surface, '-' nothing but friction. Same length as Path.
 	Cause []byte
 	why   byte // this substep's cause so far
-	// Work is what the stroke cost, in units of MaxWork: see there.
+	// Work is what the stroke cost, in MaxWork's units.
 	Work int
-	// start is where the stroke was played from: a hazard sends the ball
-	// back there.
+	// start is where the stroke was played from, where a hazard sends it.
 	start Vec2
 }
 
@@ -240,9 +163,9 @@ func (s *Shot) mark(c byte) {
 const causes = "-iwsb"
 
 // The loop's mouth: a ball heading in within 45° (loopIn, cos 45°) enters,
-// one more than 25° off straight (loopStraight, cos 25°) rides up the side
-// and is set down loopDrop in front, loopFront outside the mouth; one too
-// slow to go round rolls back out at loopBack of its speed.
+// one more than 25° off straight (loopStraight, cos 25°) is set down loopDrop
+// in front, loopFront outside the mouth; one too slow rolls back out at
+// loopBack of its speed.
 const (
 	loopIn       = 0.7071
 	loopStraight = 0.9063
@@ -264,29 +187,15 @@ func (s Shot) Rest() Vec2 {
 // it, or a fast ball can step over it unseen.
 const MaxMove = 1.5
 
-// SpeedCap is the fastest a ball may go, in board units per substep: it is
-// held at the start of every substep and after every bounce (within a
-// substep, a slope can add up to its own Vec on top). A full stroke starts
-// well under it, and only a bumper adds energy; it bounds a substep to 6
-// moves on a hole that would run a ball down a slope on ice for ever, or
-// between two bumpers.
+// SpeedCap is the fastest a ball may go, in board units per substep, held at
+// the start of every substep and after every bounce: it bounds a substep to
+// 6 moves, even between two bumpers or down a slope on ice.
 const SpeedCap = 8
 
 // Step rolls a ball through the field until it comes to rest or runs out of
 // substeps (and past them while a slope keeps it rolling or it is still in
-// the air, see MaxRollOn).
-//
-// With a Radius the ball is round: it meets walls and posts with its edge.
-//
-// Each substep is a semi-implicit Euler step, walked in moves of at most
-// MaxMove: the zones under each move push the ball (a hill by its Vec, the
-// wind by its own), it moves, and a move that meets a wall or a post takes
-// the contact impulse there and spends what is left of it from the contact.
-// Rolling resistance takes its toll once the substep is walked.
-//
-// Cost is O(moves * (walls + posts + zones)), where a substep is
-// floor(speed / MaxMove) + 1 moves and is charged to the player on
-// every shot, so both numbers are a hole's budget, not a free parameter.
+// the air, see MaxRollOn). With a Radius, the ball meets walls and posts with
+// its edge. Cost is O(moves * (walls + posts + zones)), paid on every shot.
 func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	out := Shot{Path: make([]Vec2, 0, substeps+2), Air: make([]bool, 0, substeps+2), start: pos}
 	out.add(pos, false)
@@ -294,26 +203,17 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	vz := 0.0  // the vertical speed the ball took off (or bounced) with
 	hop := 0.0 // a landing's rebound, up again once the zones under it are met
 
-	// Each wall's two offset lines — one per side, pushed out by the ball's
-	// radius — are worked out once per hole (Prepare) or, for walls that come
-	// with the stroke, once per shot: never once per move. Everything a move
-	// asks of a wall is here, so the loop never copies the Wall itself.
+	// wall offsets once per shot (or per hole, Prepare), never per move
 	offs := f.offsets()
 	bars := f.timedBars()
 	slopes := f.groundSlopes()
 
-	// A ball does not stop on a slope steeper than its rolling resistance:
-	// when the stroke's substeps run out while it is still on one, or still
-	// in the air, it goes on (up to MaxRollOn more) until it is down and
-	// off it — a gnome left on a hill slides down, it does not wait there
-	// for the next stroke.
-	extra := 0
+	extra := 0 // substeps rolled on past the stroke's (MaxRollOn)
 	// the hill being climbed, and how far up it the climb began
 	var ramp *hill
 	rampFrom, from := 0.0, pos
-	// rolling on, a ball pinned against a wall by the slope only jitters in
-	// place: checked every pinCheck substeps, it stops once it has not got
-	// anywhere (a real roll down gathers speed, it always gets somewhere)
+	// rolling on, a ball a slope pins against a wall only jitters: it stops
+	// once it has not got anywhere in pinCheck substeps
 	base, anchor := substeps, pos
 	// the rolling deceleration the ball meets, per substep: where it starts,
 	// then the last substep's
@@ -330,17 +230,13 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			}
 			anchor = pos
 		}
-		if i == substeps-1 && f.rollsOn(extra, air, 0, slopes, pos, &out.Work) { // (hop 0: a pending one takes off in this substep, which the check at its end sees)
+		if i == substeps-1 && f.rollsOn(extra, air, 0, slopes, pos, &out.Work) { // hop 0: the check at the substep's end sees a pending one
 			substeps++
 			extra++
 		}
-		// A timed bar that comes back (a tram arriving, a plank swinging
-		// in) where the ball is pushes it out through its nearest side, as
-		// a piece appearing between strokes does (UnstickIn): a wall never
-		// stands on the ball, nor pushes it through another. On the first
-		// substep any bar standing counts.
-		// Every bar is pushed before the work is checked: a stroke that ends
-		// here does not end in a bar.
+		// A timed bar that comes back (or stands, on the first substep) on
+		// the ball pushes it out (UnstickIn). Every bar is pushed before the
+		// work is checked, so a stroke never ends inside one.
 		out.Work += barWork * len(bars)
 		for _, j := range bars {
 			w := &f.Walls[j]
@@ -356,20 +252,15 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			}
 			break
 		}
-		// A substep is walked in moves of at most MaxMove, so a fast ball
-		// meets every zone and wall it crosses instead of jumping over them.
-		// The path still gets one point per substep: it is what a renderer
-		// replays.
+		// moves of at most MaxMove, so a fast ball meets every zone and wall
+		// it crosses; the path still gets one point per substep
 		speed := vel.Len()
 		if speed > SpeedCap {
 			vel, speed = vel.Scale(SpeedCap/speed), SpeedCap
 		}
-		// Rolling resistance is a constant deceleration, applied as two
-		// half-kicks around the substep's moves (velocity Verlet): the ball
-		// covers v − a/2 in a substep that takes a off it, so it rolls
-		// v²/2a, as a ball under a constant deceleration does. The first
-		// half is the one it met at the end of the last substep. It never
-		// reverses the ball: one it would stop, it stops.
+		// Rolling resistance as two half-kicks around the moves (velocity
+		// Verlet, so a ball rolls v²/2a), the first at the last substep's
+		// deceleration. It never reverses the ball: it stops it.
 		if air <= 0 && hop <= 0 {
 			if dv := drag / 2; speed > dv {
 				vel, speed = vel.Scale((speed-dv)/speed), speed-dv
@@ -398,8 +289,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			// tunnel's mouth
 			var up *hill
 			if air <= 0 {
-				// the ground under this move: grass unless a zone says
-				// otherwise (a ball that left the sand mid-substep is on grass)
+				// grass unless a zone under this move says otherwise
 				surface := 1.0
 				var under *hill
 				if f.zonesAt(&pos, &vel, &surface, &under, slopes, n, tick, &out) {
@@ -409,8 +299,8 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 					out.mark('i')
 				}
 				if hop > 0 {
-					// the rebound of a landing, once the ground it came down
-					// on has had its say (water under it still catches it)
+					// a landing's rebound, once the ground had its say
+					// (water under it still catches it)
 					vz, air, hop = hop, 2*hop/G, 0
 				} else {
 					c := 1.0
@@ -424,9 +314,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 					up = nil // on the hill, but not climbing it
 				}
 				if up != ramp {
-					// a new climb: it counts from where the ball came onto
-					// the hill (the start of the move that brought it here,
-					// no further back than the hill's foot)
+					// a new climb counts from where the ball came onto the hill
 					ramp = up
 					if up != nil {
 						rampFrom = up.along(from)
@@ -435,9 +323,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			}
 			from = pos
 
-			// The move, from contact to contact: a move that hits spends
-			// what is left of it from where it hit, with the velocity the
-			// contact left it.
+			// contact to contact: a hit spends the rest of the move from there
 			hit, left := false, 1.0
 			for h := 0; h < maxHits && left > 0; h++ {
 				if out.Work > limit {
@@ -468,8 +354,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			}
 			if air > 0 {
 				if air -= dt; air <= 0 {
-					// down: the ground's impulse, restitution up and
-					// Coulomb friction along, as at a wall
+					// landing: restitution up, Coulomb friction along
 					air = 0
 					j := (1 + GroundBounce) * vz
 					if l := vel.Len(); l > 0 {
@@ -484,8 +369,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 					}
 				}
 			} else if up != nil && !hit && !f.climbs(slopes, pos, vel, tick, &out.Work) && up.overTheTop(from, pos, rampFrom, &out.Work) {
-				// over the crest, faster than its curve can hold: it takes
-				// off, and flies a ballistic arc, up at the hill's grade
+				// over the crest faster than its curve holds: take off
 				if vu := vel.Dot(up.u); vu > 0 && vu*vu > G*CrestRadius {
 					vz = vu * up.tan
 					air = 2 * vz / G
@@ -497,8 +381,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		if spent {
 			break
 		}
-		// and where the last substep left it: taken off over a crest during
-		// it, a landing still to bounce, or come onto a hill, it goes on too
+		// airborne, a landing to bounce, or onto a hill by now: go on too
 		if i == substeps-1 && f.rollsOn(extra, air, hop, slopes, pos, &out.Work) {
 			substeps++
 			extra++
@@ -509,8 +392,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			continue // no rolling resistance off the ground
 		}
 
-		// the second half-kick, at the deceleration of the moves on the
-		// ground (their share of the substep)
+		// the second half-kick, at the moves' mean deceleration on the ground
 		drag = roll * dt
 		l := vel.Len()
 		if dv := drag / 2; l > dv {
@@ -518,8 +400,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			continue
 		}
 		vel = Vec2{}
-		// on a hill steeper than its rolling resistance a ball does not stay
-		// put: it stops, then rolls back down (the hill pulls it next substep)
+		// on a hill steeper than its resistance, it rolls back next substep
 		if f.rolls(slopes, pos, tick+1, &out.Work) {
 			continue
 		}
@@ -528,18 +409,15 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 
 	// a ball at rest is on the ground, whatever was left of its flight
 	out.Air[len(out.Air)-1] = false
-	// A ball that came to rest in the water or in a tunnel's mouth is resolved
-	// now, not on the player's next stroke.
+	// a ball at rest in water or a tunnel's mouth is resolved now
 	var still Vec2
 	surface := 1.0
 	var under *hill
 	if f.zonesAt(&pos, &still, &surface, &under, slopes, 1, substeps+f.Tick, &out) {
 		return out
 	}
-	// A ball at rest under a timed hazard or tunnel (falling ice, a
-	// blowhole) waits there for the next stroke, and the hazard comes on
-	// within its period, whatever the tick: it meets it. Checking the one
-	// substep the stroke ended on let a lay-up under a serac survive.
+	// a ball at rest in a timed hazard or tunnel meets it whatever the tick:
+	// it would be there when it next comes on
 	for j := range f.Zones {
 		z := &f.Zones[j]
 		out.Work += zoneWork
@@ -556,13 +434,9 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 	return out
 }
 
-// contact is a contact impulse on a ball moving at vel into a surface of
-// unit normal n (pointing out of the surface, toward the ball) and the given
-// Bounce: the part of the velocity into the surface comes back times the
-// restitution e, and the part along it loses the Coulomb friction, at most
-// WallFriction times the normal impulse and never more than stops a rolling
-// ball's contact point (TangentMass). Slower into it than RestSpeed, it is a
-// resting contact: e is 0, and it is no impact.
+// contact applies the contact impulse to vel against a surface of unit
+// normal n (toward the ball): restitution along n, Coulomb friction along
+// the surface. It reports an impact (not a resting contact).
 func contact(vel, n Vec2, bounce float64) (Vec2, bool) {
 	vn := vel.Dot(n)
 	if !(vn < 0) {
@@ -597,9 +471,7 @@ func contact(vel, n Vec2, bounce float64) (Vec2, bool) {
 func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) (float64, Vec2, float64, bool) {
 	const skin = 1e-6
 	out.Work += broadWork * (len(offs) + len(f.Posts))
-	// the move's box: a wall or post whose own box it misses cannot touch
-	// it (the broad phase: a lane hole's ball is near a few of its walls,
-	// and each test costs more than these four compares)
+	// broad phase: skip a wall or post whose box the move's box misses
 	lo, hi := pos, next
 	if lo.X > hi.X {
 		lo.X, hi.X = hi.X, lo.X
@@ -622,9 +494,8 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 		if side < 0 {
 			seg, sn, facing = o.minus, o.mn, o.n.Scale(-1)
 		}
-		// Already closer than the radius (a corner, a wall that moved onto
-		// the ball): the offset line is behind it, so meet the wall now if
-		// the ball is moving into it.
+		// Already within the radius (a corner, a wall that moved onto the
+		// ball): the offset line is behind it, so meet the wall now.
 		if f.Radius > 0 {
 			d := side
 			if d < 0 {
@@ -640,15 +511,9 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 					}
 					continue
 				}
-				// past an end, the ball touches the wall's end point, not
-				// its face: push back along the line from that point. The
-				// face's normal there points across the next wall of a
-				// corner and set the ball jittering between the two. Not
-				// touching it yet, it may still meet it on the way: the end
-				// is a round cap, swept like a post (skipping it let a ball
-				// cut through a free wall end). That holds however far past
-				// the end the ball is: a ball coming along the wall's line
-				// meets nothing else.
+				// past an end, the ball meets the end point, not the face
+				// (whose normal points across a corner's next wall):
+				// touching it, push back from it; else sweep it as a cap
 				end := o.a
 				if u > o.length {
 					end = o.a.Add(along.Scale(o.length))
@@ -671,13 +536,8 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 			best, normal, hit = t, nn, true
 			restitution = o.bounce
 		}
-		// The offset lines are lengthened by the radius at each end: square
-		// caps, with no end face, that leave a gap in front of an acute
-		// corner's tip. The ends are round caps, swept like posts, from afar
-		// too: a ball coming head-on at a tip, or diagonally at a free end,
-		// meets the end point, not the solid behind it. A round cap lies
-		// inside its square one, so a ball that the offset line stops first
-		// is not touched.
+		// the offset lines' square ends leave a gap at an acute corner's
+		// tip: sweep both ends as round caps too (inside the square ones)
 		if f.Radius > 0 && o.length > 0 {
 			along := Vec2{o.n.Y, -o.n.X}
 			for _, end := range [2]Vec2{o.a, o.a.Add(along.Scale(o.length))} {
@@ -704,10 +564,9 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 	return best, normal, restitution, hit
 }
 
-// zonesAt applies the zones the ball is in, and reports whether a hazard
-// ended the shot. The ground under the ball is one hill at most: the first
-// ground Slope there (in field order) is the hill, its Vec pushes, and it is
-// left in *under; moving air (Zone.Air) pushes on top of it.
+// zonesAt applies the zones the ball is in, and reports whether one ended
+// the shot. The first ground Slope there is the hill (left in *under);
+// moving air pushes on top of it.
 func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, under **hill, slopes []hill, n, tick int, out *Shot) bool {
 	*under = nil
 	hk := 0 // the next hill of slopes, in field order
@@ -747,10 +606,8 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, under **hill, slopes [
 				v2 = vel.Dot(*vel)
 			}
 			*vel = vel.Add(z.Vec.Scale(1 / float64(n)))
-			// the weather's wind bends a rolling ball and brakes it, but never
-			// speeds it up: on ice it would beat the rolling resistance and
-			// keep a ball drifting. (Squared first: the roots are only taken
-			// when it did speed up.)
+			// capped wind never speeds the ball up (on ice it would keep a
+			// ball drifting); squared first, rooted only when it did
 			if l2 := vel.Dot(*vel); wind && l2 > v2 {
 				out.Work += 2 * rootWork // two roots
 				if v0, l := math.Sqrt(v2), math.Sqrt(l2); l > v0 {
@@ -768,9 +625,8 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, under **hill, slopes [
 			out.add(out.start, false) // back where the stroke was played from
 			return true
 		case Loop:
-			// decided at once, on the way in: the ball is put out of the
-			// mouth — round, back, or down in front of it — so it never has
-			// to remember being inside
+			// decided at once: the ball is put out of the mouth, so it never
+			// has to remember being inside
 			axis, sign := Vec2{1, 0}, 1.0
 			mid := z.Min.Add(z.Max).Scale(0.5)
 			if math.Abs(z.Vec.Y-mid.Y) > math.Abs(z.Vec.X-mid.X) {
@@ -785,8 +641,7 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, under **hill, slopes [
 			if vel.Dot(in) <= sp*loopIn {
 				continue // not heading into the mouth: it rolls across
 			}
-			// slanted in (more than 25° off straight), it rides up the side of
-			// the track and falls off it: put down in front of the mouth, still
+			// more than 25° off straight
 			slanted := vel.Dot(in) <= sp*loopStraight
 			front := z.Min.Dot(axis) - loopFront
 			if sign < 0 {
@@ -813,8 +668,7 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, under **hill, slopes [
 }
 
 // bounceOf is the Bounce a piece plays: its own, or the field's (def), and
-// above 1 only for a bumper (Kicks): a rail, a statue or a mole marked above
-// 1 plays as a passive piece, at MaxBounce.
+// above 1 only for a bumper (Kicks); any other plays MaxBounce.
 func bounceOf(b, def float64, skin string) float64 {
 	if b = orDefault(b, def); b > 1 && !Kicks(skin) {
 		return MaxBounce
@@ -823,8 +677,7 @@ func bounceOf(b, def float64, skin string) float64 {
 }
 
 // Kicks reports whether a piece of this skin may kick the ball back faster
-// than it came (a Bounce above 1): a bumper, a pinball's, a mushroom's
-// springy cap. Every other piece is passive, whatever its Bounce.
+// than it came (a Bounce above 1). Every other piece is passive.
 func Kicks(skin string) bool {
 	return strings.Contains(skin, "bumper") || strings.Contains(skin, "pinball") || strings.Contains(skin, "mushroom")
 }
@@ -836,11 +689,8 @@ func orDefault(v, def float64) float64 {
 	return v
 }
 
-// hill is a ground slope: its steepness |Vec| (G·sin θ), cos θ and tan θ of
-// its grade, and its crest: u is the unit uphill (against Vec); the crest is
-// the zone's edge u points at, on the axis u mostly runs along (every hill on
-// the holes is a rectangle square to the board, so that edge is the whole
-// top).
+// hill is a ground slope: its steepness g = |Vec| (G·sin θ), cos θ, tan θ,
+// u the unit uphill, and its crest, the zone's edge u mostly points at.
 type hill struct {
 	z        *Zone
 	g        float64
@@ -894,10 +744,9 @@ func (h *hill) along(p Vec2) float64 {
 // at its top: one that only clipped the hill near its crest has not ridden it.
 const JumpRun = 0.5
 
-// overTheTop reports whether the move a→b, from on the hill, left it through
-// its crest — not a side, not its foot — after a climb from rampFrom (a
-// height along it) of at least JumpRun of the hill. A hill no steeper than
-// MinRamp launches nothing.
+// overTheTop reports whether the move a→b left the hill through its crest
+// (not a side or its foot) after climbing at least JumpRun of it from
+// rampFrom. A hill no steeper than MinRamp launches nothing.
 func (h *hill) overTheTop(a, b Vec2, rampFrom float64, w *int) bool {
 	if h.g <= MinRamp || h.z.in(b, w) {
 		return false
@@ -918,14 +767,11 @@ func (h *hill) overTheTop(a, b Vec2, rampFrom float64, w *int) bool {
 	return h.depth-rampFrom >= JumpRun*h.depth
 }
 
-// groundSlopes is the field's hills, in field order: the only zones the
-// ground rules look at, found (and measured) once per shot. A timed one
-// counts only in the substeps it is there.
+// groundSlopes is the field's hills, in field order, measured once per shot.
 func (f *Field) groundSlopes() []hill {
 	var out []hill
 	for j := range f.Zones {
-		// air (Zone.Air) is no hill; a timed hill (a seesaw) is still a hill,
-		// while it is there
+		// air is no hill; a timed hill counts while it is there
 		if z := &f.Zones[j]; z.Kind == Slope && !z.Air {
 			out = append(out, newHill(z))
 		}
@@ -933,9 +779,8 @@ func (f *Field) groundSlopes() []hill {
 	return out
 }
 
-// ground is the hill under the ball at tick: the first there, in field
-// order, as zonesAt has it; nil off every hill. A tick below 0 asks for the
-// untimed hills only.
+// ground is the hill under the ball at tick, as zonesAt has it; nil off
+// every hill. A tick below 0 asks for the untimed hills only.
 func (f *Field) ground(slopes []hill, pos Vec2, tick int, w *int) *hill {
 	for j := range slopes {
 		s := &slopes[j]
@@ -956,10 +801,8 @@ func (f *Field) climbs(slopes []hill, pos, vel Vec2, tick int, w *int) bool {
 	return h != nil && vel.Dot(h.z.Vec) < 0
 }
 
-// resistance is the rolling deceleration of a ball at rest at pos at tick:
-// Crr·G·cos θ, with Crr the green's under the Surface there (the last listed)
-// and θ the grade of the hill there. A tick below 0 asks for the untimed
-// zones only.
+// resistance is the rolling deceleration Crr·G·cos θ at pos at tick. A tick
+// below 0 asks for the untimed zones only.
 func (f *Field) resistance(slopes []hill, pos Vec2, tick int, w *int) float64 {
 	t := tick
 	if t < 0 {
@@ -979,26 +822,22 @@ func (f *Field) resistance(slopes []hill, pos Vec2, tick int, w *int) float64 {
 	return Rolling(f.Friction, surface) * G * c
 }
 
-// rollsOn says whether a stroke on its last substep goes on for one more
-// (MaxRollOn at most, extra so far): still in the air, a landing still to
-// bounce (hop), or on a hill that rolls it.
+// rollsOn says whether a stroke on its last substep goes on for one more:
+// in the air, a landing to bounce (hop), or on a hill that rolls it.
 func (f *Field) rollsOn(extra int, air, hop float64, slopes []hill, pos Vec2, w *int) bool {
 	return extra < MaxRollOn && (air > 0 || hop > 0 || f.rolls(slopes, pos, -1, w))
 }
 
-// rolls reports whether a ball at rest at pos rolls away at tick: it is on
-// a hill that pulls harder than its rolling resistance holds, G·sin θ above
-// Crr·G·cos θ (tan θ above Crr). A tick below 0 asks for the untimed hills
-// only: rolling on past the stroke's substeps is for a ball left on a hill,
-// not on a rocking plank (it would rock there for all MaxRollOn substeps).
+// rolls reports whether a ball at rest at pos rolls away at tick (G·sin θ
+// above Crr·G·cos θ). A tick below 0 asks for the untimed hills only: a
+// rocking plank would roll a ball on for all MaxRollOn substeps.
 func (f *Field) rolls(slopes []hill, pos Vec2, tick int, w *int) bool {
 	h := f.ground(slopes, pos, tick, w)
 	return h != nil && h.g > f.resistance(slopes, pos, tick, w)
 }
 
-// in is contains, with what the test costs added to *w (the zone's own look,
-// zoneWork, is the caller's): a box that holds p, then a polygon's edges,
-// each of which may straddle p (the worst case), or an ellipse.
+// in is contains, adding what the test costs to *w (zoneWork is the
+// caller's); every polygon edge is charged as if it straddled p.
 func (z *Zone) in(p Vec2, w *int) bool {
 	if p.X < z.Min.X || p.X >= z.Max.X || p.Y < z.Min.Y || p.Y >= z.Max.Y {
 		return false

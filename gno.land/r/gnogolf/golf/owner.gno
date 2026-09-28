@@ -8,32 +8,24 @@ import (
 	"strings"
 )
 
-// The course's owner: whoever deployed golf, captured once at init. It is the
-// only party golf itself gives a power to (Publish, Hide, opening community
-// publishing, the play link, the successor, and handing the role on), and
-// every check of it is by the immediate caller (cur.Previous().Address()),
-// never by the transaction's signer, so a realm the owner calls cannot act in
-// their name.
-//
-// The role passes in two steps (Transfer, then Accept by the recipient), and
-// Renounce gives it up for good: the course is then frozen, with no owner
-// and nobody who can become one.
+// The course's owner, the deployer, set at init: golf's only role. Every
+// check is on the immediate caller (cur.Previous().Address()), never the
+// signer, so a realm the owner calls cannot act in their name. The role
+// passes by Transfer then Accept; Renounce freezes the course for good.
 var (
 	owner   address // "" once renounced
 	pending address // the address a Transfer offered the role to, "" if none
 )
 
-// self is golf's own pkgpath, and hub its gnoweb path: every link golf prints
-// and the range of its course holes follow from it, so the same code serves
-// under any namespace.
+// self is golf's own pkgpath, hub its gnoweb path: every link follows from
+// them, so the same code serves under any namespace.
 var (
 	self           = unsafe.CurrentRealm().PkgPath()
 	hub            = strings.TrimPrefix(self, "gno.land")
 	officialPrefix = self[:strings.LastIndex(self, "/")+1] // the namespace's realms, as "…/"
 )
 
-// playURL is the 3D client: every page links to it. The owner can move it
-// (SetPlayURL), since a site can be renamed or lost.
+// playURL is the 3D client every page links to (SetPlayURL moves it).
 var playURL = "https://gnogolf.xyz/"
 
 // successor is the realm that took this course over, "" until the owner
@@ -43,10 +35,9 @@ var successor string
 func init() { setUp(unsafe.OriginCaller(), runtime.ChainID()) }
 
 // setUp is init: the deployer owns the course, and community publishing
-// starts closed. A deploy always has a signer. `gno test` runs init with none
-// (chain "dev"): there the owner stays "", which holds no power, and the unit
-// tests set it themselves. Its filetests load golf that way too, with nobody
-// who could open publishing, so there, and only there, it starts open.
+// starts closed. Only `gno test` (chain "dev") runs it with no signer: the
+// owner stays "", which holds no power, and publishing starts open, since
+// nobody there could open it.
 func setUp(deployer address, chainID string) {
 	if deployer == "" && chainID != "dev" {
 		panic("golf: no owner: golf must be deployed by an account")
@@ -112,9 +103,8 @@ const (
 )
 
 // SetPlayURL moves the link every page gives to the 3D client. Only the
-// owner can. url is https://, at most 100 characters of letters, digits and
-// "-._~/:%", and takes no query or fragment of its own: a hole's link adds
-// "?cup=…&hole=…" to it.
+// owner can. url is https://, at most 100 of letters, digits and "-._~/:%",
+// with no query or fragment: a hole's link adds "?cup=…&hole=…" to it.
 func SetPlayURL(cur realm, url string) {
 	if !isOwner(cur.Previous().Address()) {
 		panic("golf: only the owner can move the play link")
@@ -140,14 +130,10 @@ func validURL(u string) bool {
 }
 
 // SetSuccessor names the realm that takes this course over, once and for
-// good: a pkgpath under gno.land/r/, not golf itself, whose segments are
-// names ("", "." and ".." are not). Only the owner can. It moves nothing and
-// blocks nothing: the pages say where the course went, and Holes gives it,
-// while every play and record here goes on as before.
-//
-// golf cannot tell cheaply whether the realm exists, and does not try: the
-// call is permanent, so check the path (deployed, and the right one) before
-// sending it.
+// good: a pkgpath under gno.land/r/, not golf itself, with no "", "." or ".."
+// segment. Only the owner can. It moves and blocks nothing: the pages and
+// Holes say where the course went, and play goes on here. golf does not check
+// the realm exists: check the path before sending.
 func SetSuccessor(cur realm, pkgpath string) {
 	if !isOwner(cur.Previous().Address()) {
 		panic("golf: only the owner can name a successor")
@@ -162,13 +148,11 @@ func SetSuccessor(cur realm, pkgpath string) {
 	chain.Emit(EventSuccessorSet, "successor", pkgpath)
 }
 
-// Hide takes a community hole ("<address>/<slug>", every version of it) off
-// the lists: the hub and Holes, so the 3D game's too. Its data, rounds and
-// page stay, and Community still has it; hide=false puts it back. A hidden
-// hole takes none of its author's perAuthor places, and a new version of it
-// stays hidden. Only the owner can: a name or note that is a scam or abuse
-// would otherwise sit on the course's front page for good. A hole already as
-// asked is left alone: nothing written, no event.
+// Hide takes a community hole ("<address>/<slug>", every version) off the
+// lists (the hub, Holes, the 3D game), for a scam or abuse in its name or
+// note; hide=false puts it back. Only the owner can. Its data, rounds and
+// page stay, Community still has it, and a new version stays hidden. A hole
+// already as asked is left alone, with no event.
 func Hide(cur realm, slot string, hide bool) {
 	if !isOwner(cur.Previous().Address()) {
 		panic("golf: only the owner can hide a hole")
@@ -183,8 +167,7 @@ func Hide(cur realm, slot string, hide bool) {
 	if hidden.Has(slot) == hide {
 		return
 	}
-	// off the lists is out of byAuthor, which is all listed walks: however
-	// many holes are hidden, the lists read none of them
+	// out of byAuthor, all the lists walk: they never read a hidden hole
 	e := find(v.(string))
 	a := e.by.String()
 	row := a + " " + recentKey(e.height, slot[len(a)+1:])
@@ -200,18 +183,16 @@ func Hide(cur realm, slot string, hide bool) {
 	chain.Emit(EventHoleHidden, "slot", slot, "hidden", strconv.FormatBool(hide))
 }
 
-// publishing is whether anyone can publish a community hole (PublishMine).
-// It starts closed (setUp): the first 3D client has no hole builder, and
-// publishing opens with the one that does, without a redeploy.
+// publishing is whether anyone can publish a community hole (PublishMine):
+// closed at deploy (setUp), opened later without a redeploy.
 var publishing bool
 
 // Publishing is whether PublishMine is open.
 func Publishing() bool { return publishing }
 
 // SetPublishing opens community publishing (PublishMine) or closes it again.
-// Only the owner can. Closing it stops new holes and new versions only:
-// every hole published stays playable, listed and on its board. Setting it
-// as it is writes nothing and emits nothing.
+// Only the owner can. Closing stops new holes and versions only: every hole
+// published stays playable and listed. Setting it as it is does nothing.
 func SetPublishing(cur realm, open bool) {
 	if !isOwner(cur.Previous().Address()) {
 		panic("golf: only the owner can open or close publishing")

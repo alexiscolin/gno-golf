@@ -1,5 +1,5 @@
-// Package course is the contract every hole realm implements. It is the only
-// thing golf and a hole have to agree on.
+// Package course is the contract every hole implements: the only thing golf
+// and a hole have to agree on.
 package course
 
 import (
@@ -9,21 +9,19 @@ import (
 	"gno.land/p/gnogolf/physics"
 )
 
-// BoardW and BoardH are the board a hole plays on unless it says otherwise,
-// in board units: also the character grid the text renderer draws.
+// BoardW and BoardH are the default board, in board units (also the text
+// renderer's character grid).
 const BoardW, BoardH = 32, 16
 
-// WearW and WearH are the wear grid, stretched over whatever board the hole
-// has, so a hole always stores 128 counters.
+// WearW and WearH are the wear grid, stretched over any board: 128 counters.
 const WearW, WearH = 16, 8
 
 // MaxBoard is the longest side a board may have: it bounds the text board
 // and the flood a client runs.
 const MaxBoard = 96
 
-// Sized is what a hole implements to play on a board other than 32x16 — a long
-// corridor, a narrow lane. It is optional, so every hole written before it
-// still plays on the default board.
+// Sized is what a hole implements to play on a board other than 32x16.
+// Optional.
 type Sized interface {
 	Board() (w, h int)
 }
@@ -34,9 +32,9 @@ type Parred interface {
 	Par() int
 }
 
-// ParOf is the hole's par. It calls the hole's method once and checks the
-// value it returns: a hole is anyone's code, and may answer differently each
-// time.
+// ParOf is the hole's par: 3 unless it says 1 to 19. It calls the method once
+// and checks that value: a hole is anyone's code, and may answer differently
+// each time.
 func ParOf(h Hole) int {
 	if p, ok := h.(Parred); ok {
 		if n := p.Par(); n > 0 && n < 20 {
@@ -46,7 +44,8 @@ func ParOf(h Hole) int {
 	return 3
 }
 
-// BoardOf is the board a hole plays on.
+// BoardOf is the board a hole plays on: the default unless it says 1 to
+// MaxBoard a side. Like ParOf, it calls the method once.
 func BoardOf(h Hole) (int, int) {
 	if s, ok := h.(Sized); ok {
 		w, hh := s.Board()
@@ -57,23 +56,18 @@ func BoardOf(h Hole) (int, int) {
 	return BoardW, BoardH
 }
 
-// Hole is one course.
-//
-// No method takes `cur realm`: an interface cannot carry a capability token, so
-// a hole never learns who is playing. Identity stays with golf, the only realm
-// the player calls.
+// Hole is one course. No method takes `cur realm`: an interface cannot carry a
+// capability token, so a hole never learns who is playing.
 type Hole interface {
 	Name() string
 	Start() physics.Vec2
 	Cup() physics.Vec2
 
-	// Field is the geometry, for whoever draws it: the text board and the 3D
-	// client. It is also what makes a hole inspectable before you play it.
+	// Field is the geometry, for renderers and for inspecting the hole.
 	Field() *physics.Field
 }
 
-// WearIndexOn maps a position on a w x h board to its wear cell, so every hole
-// marks the course the same way whatever its size.
+// WearIndexOn maps a position on a w x h board to its wear cell, clamped.
 func WearIndexOn(p physics.Vec2, w, h int) int {
 	x := int(p.X * WearW / float64(w))
 	y := int(p.Y * WearH / float64(h))
@@ -93,40 +87,31 @@ func WearIndexOn(p physics.Vec2, w, h int) int {
 }
 
 // Timed is what a hole implements when part of it changes from one stroke to
-// the next: a blade that turns, a gate that opens, a mole that pops up.
-//
-// The clock is the stroke number within the player's own round — 0 for the
-// first shot — never a count shared by all players. That keeps a hole a
-// function of the round: previewing shot N and committing it meet the same
-// course, whoever else is playing.
+// the next. The clock is the stroke number in the player's own round (0 is
+// the first shot), never shared between players: previewing shot N and
+// committing it meet the same course.
 type Timed interface {
-	// Varies says whether anything actually changes: a Simple hole has the
-	// methods whether or not it has pulses.
+	// Varies says whether anything actually changes.
 	Varies() bool
-	// Extras are the pieces present at a stroke, on top of Field(). A renderer
-	// reads them to draw the hole as it is for the shot being aimed.
+	// Extras are the pieces present at a stroke, on top of Field().
 	Extras(stroke int) ([]physics.Wall, []physics.Post)
 }
 
-// Pulse is a piece that comes and goes: present on the strokes where
-// (stroke+Phase) % Every < On, the same rule as a timed wall's within a
-// stroke. Every 2, On 1 is every other stroke; Every 3, On 1 is one stroke in
-// three.
+// Pulse is pieces that come and go: present on the strokes where
+// (stroke+Phase) % Every < On, a timed wall's rule applied per stroke.
 type Pulse struct {
 	Every, On, Phase int
 	Walls            []physics.Wall
 	Posts            []physics.Post
-	Zones            []physics.Zone // a puddle a sprinkler leaves, a bridge let down
+	Zones            []physics.Zone
 }
 
-// Weatherable is what a hole implements to be played in the weather: a
-// stroke of the round, with whole-board weather zones laid over the
-// course first (the hole's own sand, ice and slopes still count where they
-// are). The weather is the golf realm's to choose; a hole only says, through
-// MaxWind, how much wind its design can stand (0 is no limit of its own).
+// Weatherable is what a hole implements to be played in the weather golf
+// chooses: PreviewWith plays a stroke under the weather's zones, MaxWind is
+// the strongest wind the design can stand (0: no limit of its own).
 type Weatherable interface {
-	// tick is where the timed pieces were when the player let go: the
-	// field's clock starts there (physics.WithTick).
+	// tick is where the timed pieces were when the player let go
+	// (physics.WithTick).
 	PreviewWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool)
 	MaxWind() float64
 }
@@ -147,9 +132,8 @@ type chance struct {
 	kind    string
 }
 
-// climates is the weather of each world: the chance of each kind, out of 100.
-// A world not listed has the garden's. Read only through ForecastFor;
-// unexported so nothing can reach it to change.
+// climates is each world's chance of each kind, out of 100; a world not
+// listed has the garden's. Unexported so nothing can change it.
 var climates = map[string][]chance{
 	"garden":   {{55, Clear}, {20, Wind}, {15, Rain}, {10, Fog}},
 	"island":   {{50, Clear}, {25, Wind}, {15, Rain}, {10, Storm}},
@@ -164,8 +148,7 @@ const (
 	// WindMax is the strongest wind, per substep.
 	WindMax = 0.15
 	// RainScale is how much quicker the green is in the rain: a touch, not
-	// ice. On a 0.87 green the ball keeps 94% of its speed a substep instead
-	// of 92%; much more and the keep cap turns every board to pinball.
+	// ice (much more and every board turns to pinball).
 	RainScale = 1.025
 	// WetIce is how much quicker again the rain makes ice.
 	WetIce = 1.06
@@ -173,17 +156,15 @@ const (
 	SnowScale = 0.9
 )
 
-// Forecast is one hole's weather for one period: its kind, the wind (when it
-// blows) and the zones the chain plays it under. Whole-board zones lie under
+// Forecast is one hole's weather for one period. Whole-board zones lie under
 // the hole's own; the rest (puddles, wet ice) lie over it.
 type Forecast struct {
 	Period int64
 	Kind   string
 	Wind   physics.Vec2
 	Zones  []physics.Zone
-	// Work is what drawing it cost, in the physics' units of about a
-	// thousand gas (physics.MaxWork): the rain's puddle tries, counted as
-	// they go (see wet). golf counts it in a commit's budget.
+	// Work is what drawing it cost, in physics.MaxWork's units (about a
+	// thousand gas); golf counts it in a commit's budget.
 	Work int
 }
 
@@ -259,8 +240,7 @@ func weatherFor(kind string, h Hole, seed uint64, work *int) (physics.Vec2, []ph
 	case Rain:
 		return physics.Vec2{}, wet(h, r, []physics.Zone{all(physics.Surface, Rain, RainScale, physics.Vec2{})}, work)
 	case Storm:
-		// the storm's rain, and its wind in gusts: 40° one way for three
-		// substeps, then 40° the other
+		// rain, and the wind in two alternating gusts
 		*work += stormWork
 		v := blow()
 		a, s := math.Atan2(v.Y, v.X), v.Len()
@@ -299,10 +279,9 @@ const (
 	puddleGap    = 0.5
 )
 
-// The work of a forecast and its rain's puddle tries, in physics.MaxWork's
-// units (about a thousand gas), measured on the GnoVM's gas as the physics'
-// weights are: any forecast, a storm's gusts, a try, and in it each post, zone, polygon edge
-// and fixed wall dryLand tests, and each zone wet looks at for ice.
+// The work of a forecast, in physics.MaxWork's units, measured on GnoVM gas:
+// any forecast, a storm's gusts, a puddle try, and in it each post, zone,
+// polygon edge and fixed wall dryLand tests, and each zone wet checks for ice.
 const (
 	forecastWork = 3000 // drawing any forecast, before the rain's tries
 	stormWork    = 5000 // a storm's gusts, on top
@@ -349,16 +328,11 @@ func wet(h Hole, r *rng, zs []physics.Zone, work *int) []physics.Zone {
 	return append(zs, placed...)
 }
 
-// dryLand says whether a puddle of radius rad can lie at c: on the lane
-// (inside its outline, by the even-odd rule over the fixed walls), out of
-// every zone that is not plain ground, clear of walls, posts, tee and cup.
-// It is a pure conjunction, so the cheap tests go first and the walls last;
-// no test takes a square root (LenCmp, Crosses): on a lane hole every one of
-// the tries fails, and rain paid ~900M gas for them.
-//
-// A puddle keeps dryTee from the tee and the cup and dryGap from any piece.
-// The outline test casts a ray to a far point, off any board and at a slant
-// no wall of a grid lies along.
+// dryLand says whether a puddle of radius rad can lie at c: inside the lane's
+// outline (even-odd over the fixed walls, a ray to a far point at a slant no
+// grid wall lies along), off any zone but plain ground, dryGap from any piece
+// and dryTee from tee and cup. Cheap tests first, no square roots: on a lane
+// hole every try fails.
 func dryLand(h Hole, c physics.Vec2, rad float64, work *int) bool {
 	f := h.Field()
 	if c.Sub(h.Start()).LenCmp(rad+dryTee) < 0 || c.Sub(h.Cup()).LenCmp(rad+dryTee) < 0 {
@@ -404,10 +378,9 @@ const (
 	farX, farY = 1e4, 37
 )
 
-// WithWeather lays weather over a field: the sky's zones (wind, rain, fog,
-// storm, snow — the whole board) go under its own, so the sand stays sand in
-// the rain; what the rain leaves (puddles, wet ice) goes over them. It may
-// return f itself: do not mutate what it returns.
+// WithWeather lays weather over a field: the sky's whole-board zones go under
+// its own (the sand stays sand in the rain), puddles and wet ice over them.
+// It may return f itself: do not mutate what it returns.
 func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field {
 	if len(weather) == 0 {
 		return f
@@ -427,15 +400,13 @@ func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field {
 }
 
 // Zoned is what a timed hole implements when some of what comes and goes is
-// ground rather than a piece: the zones present at a stroke, on top of
-// Field()'s. Optional, beside Timed.
+// ground: the zones present at a stroke, on top of Field()'s. Optional.
 type Zoned interface {
 	ExtraZones(stroke int) []physics.Zone
 }
 
-// WithZones is the field plus some zones. The extra zones come first: a
-// puddle over the sand is the puddle. It may return f itself (no zones): do
-// not mutate what it returns.
+// WithZones is the field with zones put first (a puddle over the sand is the
+// puddle). It may return f itself: do not mutate what it returns.
 func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field {
 	if len(zones) == 0 {
 		return f
@@ -445,8 +416,7 @@ func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field {
 	return &g
 }
 
-// at is whether the pulse is there at a stroke: the rule of a timed wall's
-// Every/On/Phase, sign-safe.
+// at is whether the pulse is there at a stroke (a sign-safe mod).
 func (p Pulse) at(stroke int) bool {
 	if p.Every <= 0 {
 		return true
@@ -454,9 +424,8 @@ func (p Pulse) at(stroke int) bool {
 	return ((stroke+p.Phase)%p.Every+p.Every)%p.Every < p.On
 }
 
-// WithExtras is the field plus the pieces of one stroke: the hole's own is
-// never modified, so nothing persists between shots. It may return f itself
-// (no pieces): do not mutate what it returns.
+// WithExtras is the field plus one stroke's pieces, the hole's own left as
+// is. It may return f itself: do not mutate what it returns.
 func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *physics.Field {
 	if len(walls) == 0 && len(posts) == 0 {
 		return f
@@ -467,16 +436,9 @@ func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *p
 	return &g
 }
 
-// Simple is a hole that is only its geometry, which most holes are. It
-// implements the whole interface, so a course realm gets to be its field and
-// nothing else.
-//
-// A hole that wants to invent something the field
-// cannot express writes its own type instead. Pulses cover pieces that come
-// and go with the stroke — town10's bridge, island14's log, hole5's gate.
-//
-// Its fields and methods come in pairs (Strokes and Par, Title and Name,
-// Course and Field) only because a field and a method cannot share a name.
+// Simple is a hole that is only its geometry, and implements every interface
+// here. Fields and methods pair up (Strokes/Par, Title/Name, Course/Field)
+// because a field and a method cannot share a name.
 type Simple struct {
 	W, H      int // the board; 0 means the default 32x16
 	Title     string
@@ -486,12 +448,11 @@ type Simple struct {
 	Pulses    []Pulse // pieces that come and go with the stroke number
 	Substeps  int
 	CupRadius float64
-	// World is the world the hole belongs to ("" is "garden"); Order places it
-	// within that world, 1 first (0 leaves it to the number in its path).
+	// World is the hole's world ("" is "garden"); Order is its place there,
+	// 1 first (0: the number in its path).
 	World string
 	Order float64
-	// Shelter caps the wind this hole is played in (0: the world's own); a
-	// hole whose design a strong wind would break says so here.
+	// Shelter caps the wind the hole is played in (0: the world's own).
 	Shelter float64
 }
 
@@ -525,17 +486,14 @@ func (h *Simple) Extras(stroke int) ([]physics.Wall, []physics.Post) {
 	return ws, ps
 }
 
-// PreviewWith is a stroke of a round in some weather, the timed pieces
-// starting at tick: the stroke's pulses, then the weather, then the clock. Read-only.
-// A pulse piece that came back on the ball pushes it out, never across one
-// of the hole's own walls (physics.UnstickIn). A ball left where the next
-// stroke's pulse brings a hazard back (a canal opening) goes back to where
-// this stroke started, as under a timed hazard: the hazard would otherwise
-// send it back to where it stands, a lost stroke.
+// PreviewWith plays a stroke of a round in some weather, read-only, the timed
+// pieces starting at tick. A pulse piece that came back on the ball pushes it
+// out, never across the hole's own walls. A ball left where the next stroke
+// brings a hazard back returns to where this stroke started, as under a timed
+// hazard (else that hazard would cost a stroke for nothing).
 func (h *Simple) PreviewWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	ws, ps := h.Extras(stroke)
 	ball = physics.UnstickIn(ball, ws, ps, h.Course.Radius, h.Course.Walls)
-	// the stroke's own pieces first, then the weather under everything
 	f := WithZones(WithExtras(h.Course, ws, ps), h.ExtraZones(stroke))
 	f = physics.WithTick(WithWeather(f, weather), tick)
 	shot, holed := Sink(f.Step(ball, Launch(angle, power), h.Substeps), h.Pin, h.CupRadius, h.Course.Radius)
@@ -576,13 +534,9 @@ func (h *Simple) Board() (int, int) {
 	return BoardW, BoardH
 }
 
-// Kick turns a stroke's power (0 to 10) into the ball's speed per substep:
-// the speed is Kick·p^(3/4), so the ball's energy grows as p^(3/2), and so
-// does how far it rolls (v²/2a on a green of constant rolling resistance a).
-// A full stroke starts at 4.44 and rolls 44 on the usual green (Friction
-// 0.87, a = 0.224), a board's length; a pull of 3 rolls 7.2, one of 1 1.4.
-// Kick is the calibration that keeps every course hole's par: the solver
-// finds the same robust stroke count on all 74 as before the rework.
+// Kick turns a stroke's power (0 to 10) into the ball's speed per substep,
+// Kick·p^(3/4), so the roll (v²/2a) grows as p^(3/2). A full stroke rolls 44
+// on the usual green, a board's length. Calibrated to keep every hole's par.
 const Kick = 0.79
 
 // Launch is the ball's starting velocity for a stroke. Every hole should use
@@ -594,27 +548,14 @@ func Launch(angle, power float64) physics.Vec2 {
 	return physics.FromPolar(angle, Kick*math.Sqrt(power*math.Sqrt(power)))
 }
 
-// A ball drops into the cup by Holmes's criterion (B. W. Holmes, "Putting:
-// how a golf ball and hole interact", Am. J. Phys. 59, 1991): crossing the
-// cup off its centre by b, the ball's centre is over a chord of length
-// 2·sqrt(R² − b²); it falls freely from the near rim, and it drops when it
-// has fallen its own radius r by the time its leading edge meets the far
-// rim, a chord less r later. Falling r takes sqrt(2r/G), so the fastest
-// ball that drops is
-//
-//	Capture(R, r, b) = (2·sqrt(R² − b²) − r) · sqrt(G / 2r)
-//
-// 1.9 per substep over the middle of a 1.2 cup for the course's 0.5 ball,
-// and nothing past about 1.17 off it: a graze is not a hole.
-
-// minDrop is the least a ball falls to drop: a ball smaller than the
-// course's (Radius 0.5), a point ball included, drops as one of 0.5. A point
-// would drop into any cup at any speed.
+// minDrop is the least a ball falls to drop: a smaller ball drops as one of
+// 0.5, else a point ball would drop into any cup at any speed.
 const minDrop = 0.5
 
 // Capture is the fastest a ball of radius ball crossing a cup of radius cup,
 // off its centre by off, can go and still drop, in board units per substep;
-// 0 when it cannot drop at all.
+// 0 when it cannot drop at all. Holmes's criterion (Am. J. Phys. 59, 1991):
+// (2·sqrt(R² − b²) − r) · sqrt(G / 2r).
 func Capture(cup, ball, off float64) float64 {
 	c := cup*cup - off*off
 	if !(c > 0) {
@@ -635,10 +576,8 @@ func Capture(cup, ball, off float64) float64 {
 const jumpStep = 1.5
 
 // Sink decides whether a shot ends in the cup: it stops within radius of the
-// pin, or it rolls across the cup no faster than Capture allows a ball of
-// radius ball. When it drops the path is cut there and ends on the pin, so a
-// renderer shows the ball falling in rather than rolling on. Every stroke,
-// previewed or played, goes through it (PreviewWith).
+// pin, or crosses the cup no faster than Capture allows a ball of radius
+// ball. When it drops, the path is cut there and ends on the pin.
 func Sink(shot physics.Shot, pin physics.Vec2, radius, ball float64) (physics.Shot, bool) {
 	p := shot.Path
 	top := Capture(radius, ball, 0) // over the middle: the fastest drop
