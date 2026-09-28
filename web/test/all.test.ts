@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 test("the logic layer loads", async () => {
   for (const m of [
-    "../lib/adena.ts", "../lib/card.ts", "../lib/chain.ts", "../lib/clip.ts", "../lib/chase.ts", "../lib/feel.ts", "../lib/friends.ts",
+    "../lib/adena.ts", "../lib/card.ts", "../lib/chain.ts", "../lib/clip.ts", "../lib/chase.ts", "../lib/duel.ts", "../lib/feel.ts", "../lib/friends.ts",
     "../lib/network.ts", "../lib/prefs.ts", "../lib/terrain.ts",
     "../lib/engine/aim.ts", "../lib/engine/camera.ts", "../lib/engine/pace.ts", "../lib/engine/probes.ts", "../lib/engine/replay.ts",
   ]) assert.ok(await import(m), m);

@@ -27,7 +27,8 @@ import { makeCamera } from "./engine/camera";
 import { pace, slowFrames, frameMs, SLOW_KEY } from "./engine/pace";
 import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
-import type { Extras, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
+import { makeRival } from "./engine/rival";
+import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
 import type { WeatherZone } from "./scene/weather";
@@ -253,6 +254,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       view: g.view,
       gfx: gfxMode, // the graphics setting, and what it gives on this device
       tier,
+      // a duel's rival: their strokes replayed so far (null: no duel), and their ball in
+      rival: rival.state()?.strokes ?? null,
+      rivalIn: !!rival.state()?.holed,
     });
 
   // ------------------------------------------------------------- rendering
@@ -376,7 +380,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const gap = prevRaf ? now - prevRaf : 0;
     prevRaf = now;
     if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now), (budget = 0);
-    const busy = promo.on || g.flying || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
+    const busy = promo.on || g.flying || rival.busy() || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
     if (blurred && !busy) return (last = now), (budget = 0);
     // moving: the sway, water, weather and decor (all still under reduced
     // motion), or timed pieces (their clock runs under reduced motion too)
@@ -407,7 +411,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       return false;
     });
     if (g.course) g.course.userData.tick(now / 1000);
-    if (!g.flying && g.course) {
+    if (!g.flying && !rival.busy() && g.course) {
       // at rest and while aiming the pieces move slowly enough to read and to
       // time (3.5 substeps a second, 1.5 with reduced motion); the replay
       // follows the path's own steps. The chain only sees the tick at release.
@@ -450,6 +454,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const floor = BALL_R + ground(ball.position.x, ball.position.z);
     ball.userData.shade.position.y = floor - ball.position.y - BALL_R + 0.02;
     rp.offWalls(); // and clear of the walls he runs along
+    rival.frame();
     if (!g.flying) {
       // at rest on a deck that moves (a seesaw), he rides it
       if (g.course && g.course.userData.lifts && !g.done && !g.holed) ball.position.y = floor; // never a holed ball, it stays down in the cup
@@ -554,6 +559,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       if (!g.list.some((h) => h.id === id)) return load(s.next);
     }
 
+    if (id !== g.id) rival.race(null); // a duel is on one hole
     g.id = id;
     g.failed = null;
     // the cup follows the hole played (Back to another cup's hole, a link): a
@@ -794,6 +800,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     dragging = false;
     dropAim();
     ball.visible = true;
+    rival.reset(); // the ghost back on the tee too
     if (g.s) {
       g.ball = { x: g.s.start[0], y: g.s.start[1] };
       placeBall();
@@ -845,6 +852,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   window.addEventListener("pointermove", cam.hover);
   const rp = makeReplay(E);
   E.landing = rp.landing;
+  // a duel's ghost (ADR-004): another player's best, a stroke after each of the player's
+  const rival = makeRival(E, { showClock, restTimed, told: () => void publish() });
   const aimer = makeAimer(E);
   const { preview, dropAim, strokeFrom, ghosts, known } = aimer;
   // the pull let go of (or dropped): nothing aimed, the HUD told
@@ -930,6 +939,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!ev.isPrimary) return onCancel();
     if (ev.button > 0) return;
     if (g.flying || g.done) return;
+    rival.skip(); // a press that starts an aim ends the ghost's turn
     cam.finishGlide(); // the intro glide, if still on: finished now, quickly
     // a new press takes over whatever aim was held (a keyboard aim, a lost pull)
     dragging = true;
@@ -964,6 +974,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   canvas.setAttribute("aria-label", "Course. Arrow keys aim and set the power, Space shoots.");
   const onKey = (ev: KeyboardEvent) => {
     if (g.flying || g.done || !g.s) return;
+    rival.skip();
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) cam.finishGlide();
     const step = ev.shiftKey ? 1 : 4;
     if (!g.aiming && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
@@ -1128,6 +1139,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.ball = { x: last[0], y: last[1] };
     g.flying = false;
     void showExtras(); // a timed hole changes for the next stroke
+    void rival.turn(g.shots.length - 1, res.holed); // the duel's ghost answers
     // a jump or a bounce may have ended mid-air: put him on the ground
     if (!res.holed) ball.position.set(last[0], BALL_R + ground(last[0], last[1]), last[1]);
     g.facing = Math.PI / 2; // at rest he looks at the player
@@ -1350,8 +1362,12 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     clip(run: ClipRun, caption: Caption) {
       const stroke = won;
       if (!stroke || !g.s) return Promise.resolve(null);
-      const hide = () => [ball, aim, band, confetti && confetti.group, cam.marker];
+      const hide = () => [ball, rival.ball, aim, band, confetti && confetti.group, cam.marker];
       return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: `${caption.title} · ${caption.score}` }, run));
+    },
+    /** Races a ghost on this hole, from the tee (ADR-004); null drops the duel. */
+    race(ghost: Ghost | null) {
+      rival.race(ghost);
     },
     /** Dismiss a shot error and keep playing. */
     clearError() {
@@ -1428,6 +1444,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       cut++; // every animation still running stops at its next frame
       if (g.course) disposeCourse(g.course);
       for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group]) if (o) disposeCourse(o);
+      rival.dispose();
       renderer.dispose();
       pip.remove();
     },

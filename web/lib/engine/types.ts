@@ -185,6 +185,8 @@ export interface Snapshot {
   view: "overview" | "ball";
   gfx: GfxMode;
   tier: Tier;
+  rival: number | null;
+  rivalIn: boolean;
 }
 
 /** A hole a link names: its id, or a cup and a place in it. */

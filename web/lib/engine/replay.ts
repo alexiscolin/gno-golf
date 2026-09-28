@@ -483,7 +483,9 @@ export function makeReplay(E: Live) {
   }
 
   /** from: the step it starts at (the clip of a long putt opens mid-roll). */
-  function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "", from = 0) {
+  // speed: how many times faster than the player's own pace (a duel's ghost:
+  // its steps and its drop; a splash or a tube keeps its own time)
+  function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "", from = 0, speed = 1) {
     const cutAt = E.cut;
     const path = path0.slice();
     const round = g.round;
@@ -569,7 +571,7 @@ export function makeReplay(E: Live) {
         let knocked = false;
         // (the step into a tube is drawn longer than the chain's, to the mouth:
         // at the chain's own speed, at most four times as long)
-        const ms = drop ? 320 : showMs(run) * (mouth ? Math.min(4, from.distanceTo(to) / Math.max(run, 1e-3)) : 1);
+        const ms = (drop ? 320 : showMs(run) * (mouth ? Math.min(4, from.distanceTo(to) / Math.max(run, 1e-3)) : 1)) / speed;
         // a roll-back at a tube's mouth: the ball climbs part way into it and
         // slides back down before the path goes on (once per point)
         const back = !jump && i > 0 && rolledBack !== i && rollBackAt(path, i);

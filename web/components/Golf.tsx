@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
@@ -8,7 +8,9 @@ import { GNOMES, makePreview, cheer, motion } from "@/lib/scene";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
-import type { HoleRow, Mode } from "@/lib/types";
+import type { Ghost, HoleRow, Mode } from "@/lib/types";
+import { duelResult, duelShare, pickGhost, type Duel } from "@/lib/duel";
+import { DuelFine, DuelNote } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
 import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, shortOf, depositBytes, ADENA_URL, nameBytes, NAME_GAS, onWalletChange, type SendError } from "@/lib/adena";
@@ -674,29 +676,45 @@ export default function Golf() {
     return () => void (live = false);
   }, [holeId, chainName]);
 
-  // a dare in the link (by: the sharer): their best here, read on the chain, said on landing; they join the friends
+  // a dare in the link (by: the sharer): their best here, read on the chain
+  // with its round, raced as a ghost (ADR-004), said on landing; they join the friends
   const [dare] = useState(() => {
     const by = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("by") : null;
     return by && isAddress(by) ? by : "";
   });
   const dared = useRef(false);
   const [dareNote, setDareNote] = useState("");
+  // the rival a duel races: their bests here, in both modes, with their rounds
+  const [rival, setRival] = useState<{ hole: string; name: string; self: boolean; ghosts: Record<Mode, Ghost | null> } | null>(null);
   const me = account && account.address;
   useEffect(() => {
     const c = game.current && game.current.chain;
     if (!dare || !c || !holeId || !holeReady || dared.current) return;
     dared.current = true;
     if (dare !== me) addFriend(dare); // (a player opening their own link is not their own friend)
-    void Promise.all([c.bests(holeId, "assisted", [dare]), c.bests(holeId, "pro", [dare]), nameOnce(c, dare)])
+    void Promise.all([c.ghost(holeId, "assisted", dare), c.ghost(holeId, "pro", dare), nameOnce(c, dare)])
       .then(([a, p, n]) => {
-        const best = Math.min(...[...a.rows, ...p.rows].map((r) => r.strokes));
-        // said on the picker and again as the hole opens; a sharer with no round here still dares
-        const said = `${n || shortAddr(dare)} ${Number.isFinite(best) ? `holed it in ${best} ✓ on-chain. Beat it!` : "dares you on this hole."}`;
-        setDareNote(said);
-        setLinkNote(said);
+        const name = n || shortAddr(dare), best = Math.min(...[a, p].map((g) => (g ? g.strokes : Infinity)));
+        if (a || p) setRival({ hole: holeId, name, self: dare === me, ghosts: { assisted: a, pro: p } });
+        // said on the picker (a link opens there), and again as the hole opens; a sharer with no round here still dares
+        setDareNote(`${name} dares you on this hole.`); // (with a round here, the duel says it)
+        setLinkNote(Number.isFinite(best) ? `${name} holed it in ${best}. Your turn.` : `${name} dares you on this hole.`);
       })
       .catch(() => {});
   }, [dare, holeId, holeReady, me]);
+  // the duel on this hole: the rival's best in the round's aim mode, else their other one
+  const duelMode = (s && s.roundMode) || aim;
+  const duel: Duel | null = useMemo(() => {
+    const g = rival && rival.hole === holeId ? pickGhost(duelMode, rival.ghosts) : null;
+    return g && rival ? { ghost: g, name: rival.name, self: rival.self } : null;
+  }, [rival, holeId, duelMode]);
+  useEffect(() => game.current?.race(duel ? duel.ghost : null), [duel]);
+  // out of reach: the rival holed in fewer strokes than the player has played, said once a round
+  const duelLost = !!(duel && s && !s.holed && s.strokes >= duel.ghost.strokes);
+  useEffect(() => {
+    if (duelLost && duel) setLinkNote(`${duel.self ? "Your best" : duel.name} holed it in ${duel.ghost.strokes}. Finish for your score, or rematch.`);
+  }, [duelLost]); // eslint-disable-line react-hooks/exhaustive-deps -- once as it turns
+  const dropDuel = () => (setRival(null), setDareNote(""), setLinkNote("Solo now. Your strokes still count."));
 
   // an "add me as a friend" link: the address joins this browser's friends
   useEffect(() => {
@@ -982,6 +1000,9 @@ export default function Golf() {
   }, [curtainOpen]);
 
   const holed = s && s.holed;
+  // a duel's result, once the hole is won
+  const won = duel && s && s.holed ? { ...duelResult(s.strokes, duel, golfTerm(s.strokes, parHere(s))), duel } : null;
+  const rematch = !!won && won.result !== "win"; // a duel lost or tied pushes to the rematch
   const nextAfter = cupWon && s ? nextCup(cupWon.cup, s.worlds) : ""; // the cup after the one just complete
   // the hole the gnome picker leads to (a shared link's, or the cup's first), named over the gnomes
   const linked = s && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
@@ -1096,7 +1117,7 @@ export default function Golf() {
           onPick={enterCup}
         />
       )}
-      {screen === "pick" && <Picker world={(s && s.world) || "garden"} hole={linked} dare={dareNote} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
+      {screen === "pick" && <Picker world={(s && s.world) || "garden"} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} onDrop={dropDuel} /> : dareNote} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         onAbout={() => setAbout(true)}
         onBack={() => {
@@ -1123,10 +1144,11 @@ export default function Golf() {
                 </a>
               </div>
             </div>
-            <div className="card card--score">
-              <span className="eyebrow">Strokes</span>
-              <strong>{s.strokes}</strong>
-              <span className="card__par">par {parHere(s)}{last ? ` · last ${last}` : ""}</span>
+            {/* in a duel: both counts, the player's first, and the strokes to beat */}
+            <div className="card card--score" aria-label={duel ? `You ${s.strokes}, ${duel.name} ${s.rival ?? 0}${s.rivalIn ? ", in" : ""}; ${duel.ghost.strokes} to beat` : undefined}>
+              <span className="eyebrow">{duel ? "Race" : "Strokes"}</span>
+              <strong>{s.strokes}{duel && <> – {s.rival ?? 0}{s.rivalIn && "✓"}</>}</strong>
+              <span className="card__par">{duel ? (duelLost ? "they won" : `${duel.ghost.strokes} to beat`) : <>par {parHere(s)}{last ? ` · last ${last}` : ""}</>}</span>
               {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
             </div>
             <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
@@ -1269,7 +1291,7 @@ export default function Golf() {
             <span>Leaderboard</span>
           </Button>
           <footer className="hud hud--bottom">
-            <Button disabled={!s.strokes} onClick={() => game.current?.reset()}>Restart</Button>
+            <Button variant={duelLost ? "primary" : "secondary"} disabled={!s.strokes} onClick={() => game.current?.reset()}>{duelLost ? "Rematch" : "Restart"}</Button>
             <Button
               className="cam-btn"
               aria-label={`Camera: ${CAMS[s.cam] || "Classic"} — click to change`}
@@ -1292,7 +1314,8 @@ export default function Golf() {
         <div className="banner banner--win">
           <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label="Hole finished">
             <span className="eyebrow">In the hole! · {s.name}</span>
-            <h2>{golfTerm(s.strokes, parHere(s))}</h2>
+            <h2>{won ? won.title : golfTerm(s.strokes, parHere(s))}</h2>
+            {won && <p>{won.line}</p>}
             {/* the score, and beside it the ways to tell people about it */}
             <div className="win__head">
               <div className="win__score">
@@ -1306,15 +1329,16 @@ export default function Golf() {
                 )}
               </div>
             <Share
-              // with a round of the sharer's on the chain here, the link dares the friend to beat it
-              link={s ? holeLink(s, gnome, account && (onChain || saved) ? account.address : "") : ""}
-              label={savedPlace ? `Share your #${savedPlace.rank}` : "Share"}
-                snapshot={() => (game.current ? game.current.snapshot(caption(s)) : Promise.resolve(null))}
-                text={shareText({ s, card, cups, fresh, place: savedPlace })}
+              // with a round of the sharer's on the chain here, the link dares the friend to beat it;
+              // a duel dares them back once saved, and before, passes the rival's own dare on
+              link={s ? holeLink(s, gnome, won && !onChain ? won.duel.ghost.player : account && (onChain || saved) ? account.address : "") : ""}
+              label={won ? (onChain ? "Dare them back" : "Dare a friend") : savedPlace ? `Share your #${savedPlace.rank}` : "Share"}
+                snapshot={() => (game.current ? game.current.snapshot(caption(s, won)) : Promise.resolve(null))}
+                text={won ? duelShare(won.result, won.duel, s.name, s.strokes, onChain) : shareText({ s, card, cups, fresh, place: savedPlace })}
                 clip={clip}
               />
             </div>
-            {cfg && cfg.clips && <ShareClip make={(run) => (game.current ? game.current.clip(run, caption(s)) : Promise.resolve(null))} name={clipName(s.id || "")} onClip={setClip} />}
+            {cfg && cfg.clips && <ShareClip make={(run) => (game.current ? game.current.clip(run, caption(s, won)) : Promise.resolve(null))} name={clipName(s.id || "")} onClip={setClip} />}
 
 
             {/* where the round is: said by the save clock below while it can still go on-chain */}
@@ -1327,6 +1351,7 @@ export default function Golf() {
                     : "Saved in this browser only. A community hole is not ranked, but its rounds can be saved on-chain."}
               </p>
             )}
+            {won && <DuelFine duel={won.duel} mode={s.roundMode || aim} />}
             <Standings s={s} card={card} saved={onChainCard} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} compact onRules={() => setRules(true)} />
             <Unlocked fresh={fresh} onMeet={meet} />
             <NewBadges ids={freshBadges} onOpen={() => setBadgesOpen(true)} />
@@ -1364,13 +1389,13 @@ export default function Golf() {
             {!onChain && s.period != null && (
               <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} />
             )}
-            {/* one solid action at a time: saving while it can, else going on */}
+            {/* one solid action at a time: saving while it can, else going on (a duel lost or tied: the rematch) */}
             <div className="banner__row">
               {canSave ? (
-                <button className="linkish" onClick={() => game.current?.reset()}>Play again</button>
+                <button className="linkish" onClick={() => game.current?.reset()}>{won ? "Rematch" : "Play again"}</button>
               ) : (
-                <Button variant="secondary" onClick={() => game.current?.reset()}>
-                  Play again
+                <Button variant={rematch ? "primary" : "secondary"} onClick={() => game.current?.reset()}>
+                  {won ? "Rematch" : "Play again"}
                 </Button>
               )}
               {canSave && (
@@ -1388,17 +1413,18 @@ export default function Golf() {
                 </Button>
               )}
               {cupWon && cupWon.id === s.id ? (
-                <button className={"btn " + (canSave ? "btn--ghost" : "btn--main")} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
+                <button className={"btn " + (canSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
                   Cup complete! →
                 </button>
               ) : (
-                <button className={"btn " + (canSave ? "btn--ghost" : "btn--main")} onClick={() => goTo((nextHole(s, card) || s.holes[0]).id)}>
+                <button className={"btn " + (canSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => goTo((nextHole(s, card) || s.holes[0]).id)}>
                   Next hole →
                 </button>
               )}
             </div>
             {account && canSave && (
               <p className="real__fine">
+                {won && won.result !== "loss" && "Saved, your round becomes the ghost they race. "}
                 {costNow}. You confirm in Adena.
               </p>
             )}
@@ -1818,8 +1844,8 @@ interface PickerProps {
   world: string;
   /** the hole a shared link opened, named over the gnomes ("Hole 3 · Down the Tunnel") */
   hole?: string;
-  /** that link's dare, said under it ("nym-ace123 holed it in 2 ✓ on-chain. Beat it!") */
-  dare?: string;
+  /** that link's dare, said under it: the duel it arms, or who dares with no round here */
+  dare?: ReactNode;
   gnome: string;
   onChange: (id: string) => void;
   onPick: () => void;
@@ -1874,7 +1900,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
       <AboutButton onClick={onAbout} />
       <div className="pick">
         <span className="eyebrow">{hole ? <>{hole}<span className="pick__ask"> · pick your gnome</span></> : "Pick your gnome"}</span>
-        {dare && <p className="dare">{dare}</p>}
+        {dare && (typeof dare === "string" ? <p className="dare">{dare}</p> : dare)}
         <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
@@ -2023,9 +2049,11 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
   );
 }
 
-/** The hole on the shared picture's card and the clip's, as its link card has it (media/og): the hole and the score. */
-const caption = (s: Snapshot) => {
+/** The hole on the shared picture's card and the clip's, as its link card has it (media/og): the hole and the score;
+ *  a duel's, who was raced, both counts, and its result shouted. */
+const caption = (s: Snapshot, won: { title: string; duel: Duel } | null) => {
   const cup = s.place ? worldOf(s.world).name : "Community hole", par = parHere(s);
+  if (won) return { eyebrow: `vs ${won.duel.name}${par ? ` · par ${par}` : ""}`, title: s.name, score: `${s.strokes} – ${won.duel.ghost.strokes}`, term: won.title };
   return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: strokesWord(s.strokes), term: golfTerm(s.strokes, par).replace(/!?$/, "!") }; // the clip shouts it
 };
 
