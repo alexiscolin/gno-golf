@@ -60,6 +60,13 @@ export function capped30(gaps: readonly number[]) {
   return d[Math.floor(d.length * 0.1)] > 30 && mid >= 31 && mid <= 36;
 }
 
+/** A run of busy frames' gaps (ms) as analytics says it: the median frame
+ *  rate and the slowest tenth's, the frames over 50 ms (a hitch), how many. */
+export function frameStats(gaps: readonly number[]) {
+  const d = [...gaps].sort((a, b) => a - b), at = (q: number) => d[Math.min(d.length - 1, Math.floor(d.length * q))];
+  return { fps: Math.round(1000 / at(0.5)), fps_p10: Math.round(1000 / at(0.9)), long: d.filter((x) => x > 50).length, frames: d.length };
+}
+
 /** No input (pointer, key, touch, wheel) for this long, no shot on its way: the scene dozes. */
 export const AWAY_MS = 60_000;
 /**

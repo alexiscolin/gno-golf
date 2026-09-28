@@ -25,7 +25,8 @@ import {
 } from "./scene";
 import { BALL_R, plainSkins } from "./terrain";
 import { makeCamera } from "./engine/camera";
-import { pace, slowFrames, capped30, frameMs, SLOW_KEY } from "./engine/pace";
+import { pace, slowFrames, capped30, frameMs, frameStats, SLOW_KEY } from "./engine/pace";
+import { register, track, trackError } from "./analytics";
 import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
@@ -182,6 +183,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   };
   // an error the HUD shows, of a kind
   const fail = (err: unknown, kind: ErrorKind) => {
+    trackError(kind, err, { hole: g.id });
     g.error = errText(err);
     g.errorKind = kind;
     void publish();
@@ -292,6 +294,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     weather.thin(quality.low);
     dprCap = quality.low ? (coarse ? 0.8 : 1) : Infinity;
     resize();
+    register({ gfx: gfxMode, tier, weak_gpu: weak, slow: probe.slow });
     return was !== tier;
   }
   // only busy frames count (an idle scene may be drawn at 10 or 30 fps on purpose)
@@ -304,6 +307,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     probe.prev = now;
     if (now - probe.t0 < 2000 && probe.gaps.length < 90) return;
     probe.done = true;
+    if (probe.gaps.length > 10) track("perf", { tier: gfxMode, slow: slowFrames(probe.gaps) });
     if (probe.gaps.length > 10 && slowFrames(probe.gaps) && gfxMode === "auto") {
       probe.slow = true;
       // and for the next visits; frames held steady at 30 fps (a battery saver, or vsync on a GPU just
@@ -313,6 +317,19 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       setTier();
       void publish();
     }
+  }
+
+  // a round's frame rate, said as it ends (analytics): the gaps between busy frames drawn
+  let fpsGaps: number[] = [], fpsPrev = 0;
+  function fpsFrame(now: number, busy: boolean) {
+    if (busy && fpsPrev && fpsGaps.length < 3600) fpsGaps.push(now - fpsPrev);
+    fpsPrev = busy ? now : 0;
+  }
+  function sayFps() {
+    const mem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory; // (Chrome's only)
+    if (fpsGaps.length >= 30 && g.id) track("fps", { hole: g.id, tier, ...frameStats(fpsGaps), memory_mb: mem ? Math.round(mem.usedJSHeapSize / 1e7) * 10 : null });
+    fpsGaps = [];
+    fpsPrev = 0;
   }
 
   const sizeNow = new THREE.Vector2();
@@ -392,6 +409,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     budget = p.budget;
     if (!p.draw) return;
     probeFrame(now, busy);
+    fpsFrame(now, busy);
     // the clock of the timed pieces runs on real time, however far apart the
     // frames are (never stepped by a capped dt): at any frame rate a piece is
     // where the time says, never behind it
@@ -541,6 +559,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // chain nothing for it (the new hole's round starts once it is built)
     newRound(false);
     let s: Hole;
+    const t0 = performance.now();
     try {
       s = plainSkins(await stateOf(id));
     } catch (err) {
@@ -574,6 +593,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // ?world= dresses any hole in another world's look — for building one
     if (forceWorld) s = { ...s, world: forceWorld };
     // a cup's own look is fetched the first time one of its holes is played
+    const t1 = performance.now();
     try {
       await loadWorld(s.world);
     } catch {} // offline: the hole draws as the garden, still playable
@@ -632,6 +652,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (ticket !== loads || !alive) return;
     warming = 0;
     g.buildMs = [Math.round(built1 - built0), Math.round(performance.now() - built1)]; // ?camlog's buildMs(): [build, compile]
+    track("hole_loaded", { hole: id, world: s.world, state_ms: Math.round(t1 - t0), world_ms: Math.round(built0 - t1), build_ms: g.buildMs[0], compile_ms: g.buildMs[1] });
     g.rig = null; // a new hole starts from its overview, not from the last one
     cam.prepare();
     resize();
@@ -785,6 +806,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   /** A fresh round on the hole already built: back to the tee, nothing kept. */
   function newRound(ask = true) {
+    sayFps(); // the round before's
     // a new round starts behind the gnome, looking at the cup: no easing in from the last pose
     g.lastAim = null;
     cam.resetFollow();
@@ -1095,7 +1117,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     void publish();
 
     let res: Stroke;
-    const one = shotOf(angleDeg, power, tick);
+    const one = shotOf(angleDeg, power, tick), from = g.rest || g.s.start, asked = performance.now();
     try {
       // the aim preview already asked the chain this very stroke (same hole,
       // period, round so far and shot string): its answer is the shot, no
@@ -1110,6 +1132,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       return;
     }
     if (!g.shots.length) g.roundMode = mode; // this round is played, and recorded, in this mode
+    const flew = performance.now();
     g.lastAim = (angleDeg * Math.PI) / 180;
     g.shots = [...g.shots, one]; // a new list: what changed is seen by reference
     g.pts = [...g.pts, res.path.length];
@@ -1144,6 +1167,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     }
     restTimed();
     if (round !== g.round) return;
+    // (a hazard puts the ball back where the stroke was played from)
+    const back = Math.hypot(res.rest[0] - from[0], res.rest[1] - from[1]) < 0.01 && res.path.length > 2;
+    track("stroke", {
+      hole: id, n: g.shots.length, power: Math.round(power), angle: (Math.round(angleDeg / 45) * 45 + 360) % 360,
+      result: res.holed ? "holed" : back ? "hazard" : "rest", cause: [...new Set(res.cause.replace(/-/g, ""))].sort().join(""), bounces: res.bounces,
+      chain_ms: Math.round(flew - asked), fly_ms: Math.round(performance.now() - flew),
+    });
 
     const last = res.path[res.path.length - 1];
     g.ball = { x: last[0], y: last[1] };
@@ -1426,6 +1456,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       setView(home());
     },
     reset() {
+      if (g.id) track("restart", { hole: g.id, strokes: g.strokes, holed: !!g.done });
       newRound();
       setView(home());
     },

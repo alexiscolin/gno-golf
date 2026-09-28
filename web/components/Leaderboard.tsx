@@ -10,6 +10,7 @@ import { SHARE_TAGS, siteURL } from "@/lib/site";
 import { sound } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
+import { failure, track, trackError } from "@/lib/analytics";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
 import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, plural, AIMS, AIM_NAMES, useCopied, GNOME } from "@/components/common";
@@ -528,6 +529,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
           </span>
           {/* a place on a board is a saved best: the link dares (friends race the ghost) */}
           <Share
+            what="board"
             label="Dare a friend"
             text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place: race my ghost, free to play, no wallet needed.${SHARE_TAGS}`}
             link={kind === "hole" ? holeLink(s, "", me || "") : dareLink(me || "")}
@@ -653,8 +655,11 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
       }
       setDone(name);
       onNamed(name);
+      track("name_registered", { ok: true, via: "form" });
     } catch (x) {
-      if (!(x as SendError).cancelled) setErr(messageOf(x));
+      const cancelled = !!(x as SendError).cancelled;
+      track("name_registered", { ok: false, via: "form", reason: cancelled ? "cancelled" : failure(x) });
+      if (!cancelled) trackError("name", x), setErr(messageOf(x));
     } finally {
       setBusy(false);
     }
