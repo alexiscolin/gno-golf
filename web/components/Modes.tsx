@@ -5,7 +5,7 @@
 // of its own (Rival), then on which of the holes they have a best on (Ghosts),
 // in place of the cups. Panels of their own, a kart game's modes.
 import { useId, useState, type FormEvent } from "react";
-import { Emblem, WORLDS } from "@/components/Worlds";
+import { Emblem, EXTRAS, WORLDS } from "@/components/Worlds";
 import { useGnomeStage } from "@/components/Stage";
 import { gnomeById } from "@/lib/scene";
 import type { Act, Skin } from "@/lib/scene/gnome";
@@ -64,7 +64,7 @@ const Stage = ({ skin, act, playing }: { skin: Skin; act: Act; playing: boolean 
  * (i) says where to find one), or anyone on the course's board, a tap away.
  * Then their ghosts' holes (Ghosts).
  */
-export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; onPick: (addr: string) => void; onBack: () => void; onAbout: () => void }) {
+export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; onPick: (addr: string, bests?: ReadonlyMap<string, Readonly<Record<Mode, number>>>) => void; onBack: () => void; onAbout: () => void }) {
   const [typed, setTyped] = useState("");
   const [note, setNote] = useState("");
   const [why, setWhy] = useState(false);
@@ -76,9 +76,10 @@ export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snap
     if (!addr) return setNote(`No gno.land name “${v}” here. Check the spelling, or pick someone below.`);
     // a duel is played where their ghost is: someone with no saved round has none (a failed read lets them through)
     const ids = (s.allHoles || []).filter((h) => h.official).map((h) => h.id);
-    const has = !chain || !ids.length || (await chain.bestsOf(ids, addr).then((b) => b.size > 0, () => true));
-    if (!has) return setNote(`${v} has no saved round yet: no ghost to race. Pick someone below.`);
-    onPick(addr);
+    // (their bests go with them: not read twice)
+    const bests = chain && ids.length ? await chain.bestsOf(ids, addr).catch(() => undefined) : undefined;
+    if (bests && !bests.size) return setNote(`${v} has no saved round yet: no ghost to race. Pick someone below.`);
+    onPick(addr, bests);
   };
   return (
     <div className="screen worlds front modes tint--garden">
@@ -115,7 +116,7 @@ export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snap
 }
 
 // the cups, then the holes in none (ranked on the course all the same)
-const GROUPS = [...WORLDS, { id: "extras", name: "Extras" }];
+const GROUPS = [...WORLDS, EXTRAS];
 /**
  * A duel's holes, in place of the cups: each one the rival has a best on, by
  * cup, their best (the one raced: the aim mode's, else the other) beside the
@@ -156,7 +157,7 @@ export function Ghosts({ holes, name, bests, card, mode, onRace, onCups, onBack,
           const cup = holes.filter((h) => cupOf(h) === w.id), theirs = cup.filter((h) => bests.has(h.id));
           return theirs.length > 0 && (
             <section key={w.id} className="rival__way">
-              <h3 className="about__h ghosts__cup">{w.id !== "extras" && <Emblem id={w.id} />}{w.name}</h3>
+              <h3 className="about__h ghosts__cup">{w.id !== EXTRAS.id && <Emblem id={w.id} />}{w.name}</h3>
               <div className="lb">
                 <ol>
                   {theirs.map((h) => {

@@ -22,10 +22,10 @@ export default function Tip({ chain, me, chainId, price, onConnect, bare = false
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
-    void chain.owner().then((o) => live && setOwner(o), () => {});
+    void chain.owner().then((o) => live && setOwner(o), () => live && setOwner("")); // ("": not read, a node down or an owner renounced)
     return () => void (live = false);
   }, [chain]);
-  if (!owner || owner === me) return bare ? <p>{owner ? "You made the game: nothing to tip yourself." : "Reading the chain…"}</p> : null;
+  if (!owner || owner === me) return bare ? <p>{owner ? "You made the game: nothing to tip yourself." : owner === "" ? "No one to tip on this chain: its owner could not be read." : "Reading the chain…"}</p> : null;
   const unit = networkOf(chain.rpc) === "mainnet" ? "GNOT" : "test GNOT";
   // a phone with no Adena: it is a computer's browser extension (as saving a round)
   const away = !me && isTouch() && !hasAdena();

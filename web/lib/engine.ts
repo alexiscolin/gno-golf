@@ -1134,7 +1134,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.flying = false;
     // the duel's ghost answers among this stroke's pieces; then a timed hole
     // changes for the next stroke (at once without a duel)
-    void rival.turn(g.shots.length - 1, res.holed).finally(() => void showExtras());
+    const answered = rival.turn(g.shots.length - 1, res.holed);
+    void answered.finally(() => void showExtras());
     // a jump or a bounce may have ended mid-air: put him on the ground
     if (!res.holed) ball.position.set(last[0], BALL_R + ground(last[0], last[1]), last[1]);
     g.facing = Math.PI / 2; // at rest he looks at the player
@@ -1145,14 +1146,16 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       sound("pop");
       sound("win", g.strokes === 1 ? 1 : 0); // a hole-in-one gets the longer fanfare
       scene.add(burst.group);
-      // let the confetti fly before the banner covers the course
-      holedIn = setTimeout(() => {
-        if (round !== g.round) return;
-        g.holed = true;
-        buzz([30, 60, 45]);
-        sound("cup");
-        void publish();
-      }, 1600);
+      // let the confetti fly (and a duel's ghost play the stroke that ties) before the banner covers the course
+      void answered.then(() => {
+        if (round === g.round) holedIn = setTimeout(() => {
+          if (round !== g.round) return;
+          g.holed = true;
+          buzz([30, 60, 45]);
+          sound("cup");
+          void publish();
+        }, 1600);
+      });
     }
     void publish();
   }

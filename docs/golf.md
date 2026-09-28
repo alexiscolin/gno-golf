@@ -20,7 +20,8 @@ own records and board, but in no cup and out of the course ranking.
 ## Who can change what
 
 The realm has one role, its **owner**: the account that deployed it (captured
-once, when the realm is created). Every owner check is on the immediate caller
+once, when the realm is created). The web client sends its tips (Support) to
+this address, as `Owner()` reads it, so a new owner receives the next ones. Every owner check is on the immediate caller
 (`cur.Previous().Address()`), never on the transaction's signer, so a realm the
 owner happens to call can't act in the owner's name.
 

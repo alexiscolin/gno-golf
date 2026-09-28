@@ -309,6 +309,8 @@ test("badges: a duel's two, Ghost buster only for a fair win against a best at p
   assert.deepEqual(badgesFor(finish({ strokes: 2, duel: duel({ self: true }) }), []), [], "your own best is no rival");
   assert.deepEqual(badgesFor(finish({ strokes: 2, duel: duel({ mixed: true }) }), []), [], "a mixed race is no record");
   assert.deepEqual(badgesFor(finish({ strokes: 4, duel: duel({ result: "loss" }) }), []), ["sport"]);
+  assert.deepEqual(badgesFor(finish({ strokes: 4, duel: duel({ result: "loss", self: true }) }), []), [], "nor is losing to it");
+  assert.deepEqual(badgesFor(finish({ strokes: 4, duel: duel({ result: "loss", mixed: true }) }), []), [], "a mixed race earns nothing");
   assert.deepEqual(badgesFor(finish({ strokes: 2 }), []), [], "no duel, neither");
 });
 

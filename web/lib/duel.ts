@@ -35,7 +35,7 @@ export const ghostSpeed = (ms: number) => Math.max(2, ms / GHOST_MS);
 
 /** What the score card says is left, before the next stroke n of a race against a best of r:
  *  the last stroke that wins, the one that ties, else the target. */
-export const toBeat = (n: number, r: number) => (n === r ? "hole it to tie" : n === r - 1 ? "hole it to win" : `${r} to beat`);
+export const toBeat = (n: number, r: number) => (n > r ? "out of reach" : n === r ? "hole it to tie" : n === r - 1 ? "hole it to win" : `${r} to beat`);
 
 /** A number of strokes as said in a title: one is a word. */
 const inWords = (d: number) => (d === 1 ? "one" : String(d));

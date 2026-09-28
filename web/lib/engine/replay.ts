@@ -37,7 +37,7 @@ export const SHOW_SPEED = 26;
 // never a hard cap, under which a slower step could look quicker.
 const SHOW_FROM = 16, SHOW_EASE = 12;
 /** The time, in ms, one substep that runs d board units takes on screen. */
-export function showMs(d: number) {
+function showMs(d: number) {
   const v = (d / MS_PER_STEP) * 1000;
   const s = v <= SHOW_FROM ? v : SHOW_FROM + SHOW_EASE * Math.log(1 + (v - SHOW_FROM) / SHOW_EASE);
   return s > 0 ? Math.max(MS_PER_STEP, (d / s) * 1000) : MS_PER_STEP;

@@ -19,6 +19,7 @@
 // at the first duel: a game without one never makes it.
 //
 // E: the engine's live state (engine/types.ts Live).
+import * as THREE from "three";
 import { makeGhost, rivalSkin } from "../scene/gnome";
 import { disposeCourse, motion } from "../scene/materials";
 import { BALL_R } from "../terrain";
@@ -34,6 +35,7 @@ const CUT_MS = 5000; // a ghost's replay past this (a frozen tab) is cut: the en
 const GLIDE_MS = 450; // its walk onto its stroke's start (the tee: where the player stood), before it plays
 // each ghost's strokes as read, kept with the ghost (the same ghost comes back with a rematch, or a mode toggled back)
 const readsOf = new WeakMap<Ghost, (Promise<Stroke> | undefined)[]>();
+const look = new THREE.Vector3(); // the camera's direction, for beside()
 
 // gnome: the player's gnome's id (the rival wears another)
 export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome }: { showClock: (t: number) => void; restTimed: () => void; told: () => void; warm: () => void; gnome: () => string }) {
@@ -82,12 +84,14 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome }: 
   let fade = (_: number) => {}; // the ghost's see-through, once made
   const place = (b: Gnome, x: number, y: number) => b.position.set(x, BALL_R + E.ground(x, y), y);
   /** Where the ghost stands at (x, y): beside the player's gnome if it would stand on him,
-   *  across the line to the cup, like two karts on a grid (display only). */
+   *  side by side on screen, like two karts on a grid (display only): across the
+   *  view (classic and far look one fixed way), or across the line to the cup the
+   *  third-person camera looks down (on the tee it is still on the overview). */
   function beside(b: Gnome, x: number, y: number) {
-    const s = g.s, dx = x - g.ball.x, dy = y - g.ball.y;
-    if (!s || Math.hypot(dx, dy) > BALL_R * 2.5) return place(b, x, y);
-    const cx = s.cup[0] - x, cy = s.cup[1] - y, l = Math.hypot(cx, cy) || 1;
-    place(b, x - (cy / l) * BALL_R * 3.5, y + (cx / l) * BALL_R * 3.5);
+    const s = g.s;
+    if (!s || Math.hypot(x - g.ball.x, y - g.ball.y) > BALL_R * 2.5) return place(b, x, y);
+    const d = g.cam === "third" ? { x: s.cup[0] - x, z: s.cup[1] - y } : E.camera.getWorldDirection(look), l = Math.hypot(d.x, d.z) || 1;
+    place(b, x - (d.z / l) * BALL_R * 3.5, y + (d.x / l) * BALL_R * 3.5);
   }
 
   /** The ghost onto (x, y), gliding upright, not rolling; ends at once when cut (its turn skipped). */

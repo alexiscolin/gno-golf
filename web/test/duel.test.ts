@@ -75,3 +75,7 @@ test("a win that can't be saved still says it was won, with the rival's link", (
   assert.match(duelShare("win", duel(3), "The Mill", 2, false), /^⚔ Beat ace's 3 with 2 on The Mill\. Can you\?/);
   assert.match(duelShare("loss", duel(3), "The Mill", 4, false), /^⚔ Can you beat ace's 3 on The Mill\?/);
 });
+
+test("the strokes to beat: out of reach once past the ghost's count", () => {
+  assert.deepEqual([toBeat(3, 3), toBeat(2, 3), toBeat(1, 3), toBeat(4, 3)], ["hole it to tie", "hole it to win", "3 to beat", "out of reach"]);
+});

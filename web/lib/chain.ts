@@ -405,14 +405,14 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.standings),
     /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes }. */
     rank: (mode: string, player: string) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`, checks.rank),
-    /** Of these holes (at most 100), a player's bests on those they have one on, in either mode: their ghosts. One read. */
+    /** Of these holes (the first 100: one read's room, the course is 74), a player's bests on those they have one on, in either mode: their ghosts. One read. */
     bestsOf: async (holes: readonly string[], player: string): Promise<ReadonlyMap<string, { pro: number; assisted: number }>> => {
       const got = new Map<string, { pro: number; assisted: number }>();
       if (!isAddress(player)) return got;
       const ids = holes.slice(0, 100), who = `address(${s(player)})`;
       // a line "<id> <pro> <assisted>" a hole (the realm's strconv is not in reach here: n writes the digits)
       const out = await qstr(REALM, `func() (s string) { n := func(v int) (t string) { for { t = string(rune(48+v%10)) + t; v /= 10; if v == 0 { return } } }; for _, h := range []string{${ids.map(s).join(", ")}} { p, a := BestOf(h, "pro", ${who}), BestOf(h, "assisted", ${who}); if p+a > 0 { s += h + " " + n(p) + " " + n(a) + "\\n" } }; return }()`);
-      const best = (v: string) => (/^(0|[1-9]\d?)$/.test(v) && Number(v) <= 60 ? Number(v) : NaN); // (0: none in that mode)
+      const best = (v: string) => (/^(0|[1-9]\d?)$/.test(v) && Number(v) <= RULES.maxRoundStrokes ? Number(v) : NaN); // (0: none in that mode)
       for (const line of out.split("\n")) {
         const [id, pro, assisted, ...rest] = line.split(" "), b = { pro: best(pro), assisted: best(assisted) };
         if (ids.includes(id) && !rest.length && b.pro >= 0 && b.assisted >= 0 && b.pro + b.assisted > 0) got.set(id, b); // (only the holes asked)

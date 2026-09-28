@@ -549,8 +549,8 @@ html, body {
   inset: 0;
   z-index: var(--z-screen);
   display: grid;
-  place-items: center;
-  align-content: center;
+  place-items: safe center; /* safe: a screen taller than the window starts at its top, and scrolls */
+  align-content: safe center;
   padding: clamp(40px, 9vh, 110px) 28px 28px;
   background: var(--paper);
 }
@@ -891,6 +891,7 @@ html, body {
   color: var(--hat);
 }
 .banner--win h2[data-long] { font-size: clamp(26px, 7vw, 64px); } /* a duel's title with a name: it fits a phone */
+.banner--win h2[data-result="loss"] { color: var(--ink); } /* a duel lost: said in ink, not the hat's red */
 
 .banner--win .eyebrow {
   font-size: 14px;
@@ -2063,7 +2064,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .about__links b { font-size: 14px; }
 .about__links span { font-size: 12.5px; color: var(--ink-soft); }
 .about__credit { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(var(--ink-rgb), .15); font-size: 13px; color: var(--ink-soft); }
-.about__credit a, .boards__ranked a, .nameform a { color: var(--ink); } /* inline links in soft text: ink, one rule */
+.about__credit a, .boards__ranked a, .nameform a, a.mono { color: var(--ink); } /* inline links in soft text: ink, one rule */
 /* a sheet open: the screens' corner buttons (back, about) step aside, so the sheet's own close is the one tapped */
 body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hidden; }
 .drawer__panel .drawer__list { border-bottom: var(--rule); }
@@ -2206,10 +2207,12 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .card--compact.scorecard th { width: 40px; font-size: 8px; letter-spacing: .04em; }
   .card--compact.scorecard tr:first-child td > span { min-width: 0; padding: 0 3px; height: 18px; font-size: 10px; }
   .card--compact.scorecard tr:nth-child(3) td { font-size: 16px; }
-  .card--compact .stamp { right: -2px; top: -3px; } .card--compact .stamp svg { width: 16px; }
+  /* a score's medals, small and lifted onto the cell's top edge, clear of its digits */
+  .scorecard .stamp { right: -4px; top: -14px; } .scorecard .stamp svg { width: 14px; } .scorecard .stamp > span + span { margin-left: -7px; }
   /* a round waiting for its save: under the weather badge (92px + its 60), its words wrapping */
   .pending { gap: 8px; padding: 6px 6px 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); }
   body:has(.hud--top) .pending { top: 160px; }
+  body:has(.screen) .pending { top: 96px; } /* a front screen: under its corner buttons (Back, the mode, About) */
   .pending .btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
   .pending__say { min-width: 0; }
 }
@@ -2242,10 +2245,12 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .seg button, .boards__modes .seg button, .details summary, .unnamed summary, .world__reset, :not(p, span, small) > .linkish { min-height: 44px; }
   /* what stays small to the eye takes the tap round it: the clip's download,
      the share icons (8px apart), the aim's (i) (its line's, not the switch's above) */
-  .clip__save::before, .share__icon::before, .screen--pick .aimset__info::before { content: ""; position: absolute; inset: -7px; }
+  .clip__save::before, .share__icon::before, :is(.screen--pick, .rival) .aimset__info::before, .lb__race::before { content: ""; position: absolute; inset: -7px; }
   .share__icon::before { inset: -3px; }
-  .screen--pick .aimset__info { position: relative; }
+  .lb__race::before { inset: -6px -2px; } /* a row's Race, 32px tall */
+  :is(.screen--pick, .rival) .aimset__info { position: relative; }
   .screen--pick .aimset__info::before { inset: -6px -13px -20px; }
+  .rival .aimset__info::before { inset: -6px -14px -22px; } /* (clear of the field above) */
 }
 
 @media (max-width: 480px) {
@@ -2256,9 +2261,12 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
 }
 
 /* a duel's turn, called out: pressed on big, then gone */
-.turncall { position: fixed; top: 22%; left: 50%; z-index: var(--z-chip); margin: 0; translate: -50% 0; font-size: clamp(34px, 5vw, 60px); font-weight: 700; line-height: 1; white-space: nowrap; color: var(--paper); -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; pointer-events: none; animation: turn-call 1.5s var(--spring) both; }
+.turncall { position: fixed; top: 22%; left: 50%; z-index: var(--z-chip); margin: 0; translate: -50% 0; font-size: clamp(34px, 5vw, 60px); font-weight: 700; line-height: 1; width: max-content; max-width: calc(100vw - 32px); text-align: center; color: var(--paper); -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; pointer-events: none; animation: turn-call 1.5s var(--spring) both; }
 .turncall--them { color: var(--gold); }
 @keyframes turn-call { 0% { opacity: 0; transform: scale(2.2) rotate(-8deg); } 20%, 75% { opacity: 1; transform: rotate(-3deg); } 100% { opacity: 0; transform: translateY(-14px) rotate(-3deg); } }
+/* under a round waiting for its save; on a phone, under the toast too (both at 160px) */
+body:has(.pending) .turncall { top: 34%; }
+@media (max-width: 600px) { .turncall { top: 34%; } }
 
 @media (prefers-reduced-motion: reduce) {
   /* !important on purpose: the one switch over every rule's own motion */
@@ -2268,6 +2276,9 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .toast { animation: none !important; opacity: 1; }
   .cause { animation: none; opacity: 1; }
   .load__ball--in > * { animation: none; }
+  /* a duel's turn: still, then it fades (the switch would jump it to its end, gone) */
+  .turncall { animation: turn-fade 1.5s linear both !important; transform: rotate(-3deg); }
+  @keyframes turn-fade { 0%, 80% { opacity: 1 } 100% { opacity: 0 } }
 }
 
 /* the faucet and the address to paste there, on one line */

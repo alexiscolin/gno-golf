@@ -21,6 +21,10 @@ export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
 ];
 /** A cup by its id: the garden's when it is none of them. */
 export const worldOf = (id: string | null | undefined) => WORLDS.find((w) => w.id === id) || WORLDS[0];
+/** The holes in no cup: named so, with no emblem. */
+export const EXTRAS = { id: "extras", name: "Extras" } as const;
+/** A hole's cup, or the extras, as its world says (worldOf would name the extras the first cup). */
+export const groupOf = (id: string | null | undefined) => (id === EXTRAS.id ? EXTRAS : worldOf(id));
 
 // the scene is clipped to the round badge, and the ink ring drawn over it
 function Frame({ id, children }: { id: string; children?: ReactNode }) {

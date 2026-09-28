@@ -299,11 +299,12 @@ small team wins.
 
 ## Duels against a ghost: the next stages
 
-Designed in [ADR-004](adr/adr-004-duels.md); the realm side (a best keeps its
-round, `Ghost`) and the dare link's duel are built. Next: the ⚔ on a hole's
-board and in Friends with `beat you`, `Race your best`, the Ghost buster
-gnome, the clip with both balls, then `Duel(hole, rival)` on-chain with its
-board and streaks.
+Designed in [ADR-004](adr/adr-004-duels.md). Built: the realm side (a best
+keeps its round, `Ghost`), the dare link's duel, Race on the boards and in
+Friends (`Race your best` on one's own row), the game choice's Duel (the
+rival, then their ghosts, then the picker), and the Ghost buster and Good
+sport badges. Next: `beat you` in Friends, the clip with both balls, then
+`Duel(hole, rival)` on-chain with its board and streaks.
 
 ## v2 — wear becomes physical
 

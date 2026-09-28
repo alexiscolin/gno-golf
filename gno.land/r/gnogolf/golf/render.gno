@@ -223,7 +223,7 @@ func renderCup(world string) string {
 	slots.Iterate(k, k[:len(k)-1]+"0", func(_ string, v any) bool {
 		e := find(v.(string))
 		if n == 0 {
-			sb.WriteString("| # | hole | par | best | plays |\n|---|---|---|---|---|\n")
+			sb.WriteString("| # | hole | par | best | shots played |\n|---|---|---|---|---|\n")
 		}
 		n++
 		sb.WriteString("| " + strconv.Itoa(int(e.order)) + " | " + md(e.name, hub+":"+e.slot) + " | " + strconv.Itoa(e.par) + " | " +
@@ -409,7 +409,7 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	s += "</gno-form>\n\n"
 	s += "Took a gno.land name after saving rounds? " + md("Claim", hub+"$help&func=Claim") + " puts them on the boards now.\n\n"
 
-	s += ufmt.Sprintf("## Best rounds\n\nRounds played here: %d; finished: %d assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
+	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; finished: %d assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
 	if e.board(assisted).Size()+e.board(pro).Size() == 0 {
 		s += " No named player has finished it yet.\n\n"
 	} else {

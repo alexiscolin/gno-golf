@@ -202,8 +202,9 @@ test("stillsOnly: no matchMedia to ask (lib/device.ts) says no reduced motion; t
 });
 
 test("a badge is kept with the hole it was earned on, once; a hand edit reads as strings only", () => {
-  rememberBadges(["ace"], "garden/1/v1");
-  rememberBadges(["ace", "fog"], "garden/2/v1"); // (the ace stays where it was first earned)
+  assert.deepEqual(rememberBadges(["ace"], "garden/1/v1"), ["ace"]);
+  assert.deepEqual(rememberBadges(["ace", "fog"], "garden/2/v1"), ["fog"]); // (the ace stays where it was first earned)
+  assert.deepEqual(rememberBadges(["ace"], "garden/3/v1"), []);
   rememberBadges(["chain"], ""); // (no hole: kept, not placed)
   assert.deepEqual(badgesEarned(), ["ace", "fog", "chain"]);
   assert.deepEqual(badgesAt(), { ace: "garden/1/v1", fog: "garden/2/v1" });

@@ -26,9 +26,22 @@ replay of your shots, and anyone can replay it again.
   as a see-through ghost, stroke for stroke. The ghost is your real round,
   replayed by the chain in the weather you had, so it can't be faked, and
   racing it costs only free reads ([ADR-004](adr/adr-004-duels.md)).
+- Or pick a rival yourself: after the title, choose Duel, then whose ghost
+  (a friend's name or address, or anyone on the board), then one of their
+  ghosts, listed hole by hole with their best to beat. The ghost wears
+  another gnome than yours, and each turn is called out: yours, then theirs.
+  Race on a hole's board or in Friends does the same from the game.
+- Badges (an ace, all six weathers, a duel won…) are kept in your browser
+  and stamped on the cup card, on the hole each was earned on. New game
+  clears them with your scores; the gnomes you unlocked stay.
+- Support, the chip by the network banner, sends an optional 1, 5 or 10
+  GNOT tip: a plain bank send to the golf realm's `Owner()` as read on the
+  chain, confirmed in Adena. Playing stays free.
 
 There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain) and
-two extras. Some holes move, so timing is part of the shot. Every hole has
+two extras. A cup always starts from its first hole, with a fresh round. The
+menu's Mode goes back to Solo or Duel, All cups to the cups (a duel's ghosts
+in a duel), and Gnome to the gnome picker. Some holes move, so timing is part of the shot. Every hole has
 weather (wind, rain, fog, storm, snow), which changes every five minutes of
 chain time and is the same for everyone.
 

@@ -67,14 +67,15 @@ export const earned = () => kept("gnogolf.earned");
 export const remember = (id: string) => keep("gnogolf.earned", [id]);
 /** The badges earned in this browser (lib/card.ts BADGES), and new ones kept for good. */
 export const badgesEarned = () => kept("gnogolf.badges");
-// (at: the hole they were earned on, kept for the new ones only)
+// (at: the hole they were earned on, kept for the new ones only); returns the new ones
 export const rememberBadges = (ids: readonly string[], at: string) => {
-  const add = ids.filter((id) => !badgesEarned().includes(id));
-  keep("gnogolf.badges", add);
-  if (!at || !add.length) return;
+  const had = badgesEarned(), add = ids.filter((id) => !had.includes(id));
+  if (!add.length) return add;
   try {
-    localStorage.setItem(AT_KEY, JSON.stringify({ ...badgesAt(), ...Object.fromEntries(add.map((id) => [id, at])) }));
+    localStorage.setItem("gnogolf.badges", JSON.stringify([...had, ...add]));
+    if (at) localStorage.setItem(AT_KEY, JSON.stringify({ ...badgesAt(), ...Object.fromEntries(add.map((id) => [id, at])) }));
   } catch {}
+  return add;
 };
 const AT_KEY = "gnogolf.badges.at";
 /** Where each badge was earned: its hole's id (the cup card stamps it there); strings only, as kept() reads. */

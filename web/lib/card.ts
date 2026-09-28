@@ -236,7 +236,8 @@ export const BADGES: readonly Badge[] = [
   { id: "fog", name: "Fog walker", need: "Par or better in the fog", family: "weather", ok: (f) => f.kind === "fog" && f.strokes <= f.par },
   { id: "chain", name: "On the chain", need: "Save a round on-chain", family: "chain" },
   { id: "snail", name: "Never give up", need: "Finish a hole in 15 strokes or more", family: "fun", ok: (f) => f.strokes >= 15 },
-  { id: "sport", name: "Good sport", need: "Finish a duel you lost", family: "fun", ok: (f) => !!f.duel && f.duel.result === "loss" },
+  // (as Ghost buster: another player's ghost, the same aim mode; a mixed race earns nothing, ADR-004)
+  { id: "sport", name: "Good sport", need: "Finish a duel you lost to another player", family: "fun", ok: (f) => !!f.duel && f.duel.result === "loss" && !f.duel.self && !f.duel.mixed },
 ];
 /** The badges a finish earns that are not earned yet, rarest first. */
 export const badgesFor = (f: Finish, had: readonly string[]) => BADGES.filter((b) => b.ok && !had.includes(b.id) && b.ok(f)).map((b) => b.id);

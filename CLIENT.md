@@ -118,6 +118,7 @@ a client that finds one can offer to go there).
 | a player's place | `Rank(mode, player)` on the course, `HoleRank(hole, mode, player)` on a hole, not the whole `Players` list |
 | the boards | `Leaderboard(mode)` for a top ten, `CourseLeaderboard(mode, offset, limit)` and `HoleLeaderboard(hole, mode, offset, limit)` a page at a time, `Bests`, `Standings` |
 | check an old recorded round | `SimulateRoundIn(hole, shots, period)`, in its own weather however old |
+| list a player's ghosts (the holes they have a best on) | `BestOf(hole, mode, player)` over the holes, both modes (the web client asks them all in one `qeval`) |
 | race a player's best (a duel's ghost) | `Ghost(hole, mode, player)`, then its strokes: the first with `SimulateRoundIn`, each later one with `SimulateFrom` from the `"rest"` before, in its `"period"` |
 | rank rounds saved before a name | the write `Claim()`, best sent with the name's `Register` in one transaction |
 

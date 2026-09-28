@@ -371,16 +371,16 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
   return res.data ?? null;
 }
 
-/** One transaction of plain calls from the connected account: Adena simulates it and sets the final fee. */
-async function calls(address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string) {
+/** One transaction from the connected account: Adena simulates it and sets the final fee. */
+async function send(messages: (Call | Send)[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, memo = "gnogolf") {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
   await ensureNetwork(a, { chainId, rpc });
   const res = await a.DoContract({
-    messages: list.map(([pkg_path, func, args]) => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args } })),
+    messages,
     gasFee: feeFor(gasWanted, price),
     gasWanted,
-    memo: "gnogolf",
+    memo,
     ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
   });
   if (res.status !== "success") {
@@ -391,29 +391,18 @@ async function calls(address: string, list: readonly (readonly [string, string, 
   return res.data ?? null;
 }
 
+/** One transaction of plain calls from the connected account. */
+const calls = (address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string) =>
+  send(list.map(([pkg_path, func, args]): Call => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args } })), gasWanted, price, chainId, rpc, failed);
+
 // a bank send is a few hundred thousand gas: asked with room, Adena sets the final fee
 const TIP_GAS = 2_000_000;
+export const TIPS = [1, 5, 10] as const; // the GNOT a tip can be
 /** A tip: GNOT sent from the player's account to the game's maker (the realm's
  *  owner, read on the chain), confirmed in Adena like any send. No contract. */
-export const TIPS = [1, 5, 10] as const; // the GNOT a tip can be
 export async function sendTip({ from, to, gnot, price, chainId, rpc }: { from: string; to: string; gnot: number; price: number; chainId?: string | null; rpc: string }) {
   if (!isAddress(from) || !isAddress(to) || !TIPS.some((t) => t === gnot)) throw new Error("Nothing to send.");
-  const a = wallet();
-  if (!a) throw new Error("Adena is not installed in this browser.");
-  await ensureNetwork(a, { chainId, rpc });
-  const res = await a.DoContract({
-    messages: [{ type: "/bank.MsgSend", value: { from_address: from, to_address: to, amount: `${gnot * 1e6}ugnot` } }],
-    gasFee: feeFor(TIP_GAS, price),
-    gasWanted: TIP_GAS,
-    memo: "gnogolf tip",
-    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
-  });
-  if (res.status !== "success") {
-    const e: SendError = new Error(why(res, "The tip was not sent."));
-    e.cancelled = res.code === CANCELLED;
-    throw e;
-  }
-  return res.data ?? null;
+  return send([{ type: "/bank.MsgSend", value: { from_address: from, to_address: to, amount: `${gnot * 1e6}ugnot` } }], TIP_GAS, price, chainId, rpc, "The tip was not sent.", "gnogolf tip");
 }
 
 // golf's Claim reads the course's holes once (74 slots, two modes): measured
