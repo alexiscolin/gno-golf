@@ -50,9 +50,9 @@ export interface BoardProps {
 /** A board row's way into a duel: race that player's ghost here (yours: your best). */
 const RaceButton = ({ player, me, strokes, onRace }: { player: string; me?: string | null; strokes: number; onRace?: (p: string) => void }) =>
   onRace ? (
-    <button className="linkish lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
-      {player === me ? "Race your best" : "Race"}
-    </button>
+    <Button variant="primary" className="lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
+      {player === me ? "Race your best" : "Race ghost"}
+    </Button>
   ) : null;
 /** "Connect Adena", where a board asks for it: a link to the checklist, or the words alone. */
 const ConnectLink = ({ onConnect }: { onConnect?: () => void }) =>
@@ -164,9 +164,10 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
           {h.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>} <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} /></span>
+              <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
               <span className="lb__holes">{strokesWord(r.strokes)}</span>
               <strong>{vsPar(r.strokes - ((hole && hole.par) || parHere(s)))}</strong>
+              <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
             </li>
           ))}
         </ol>
@@ -419,7 +420,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace 
         <span className="lb__holes">
           {r.holes}/{head ? head.holes : "–"} holes
         </span>
-        <strong>{r.strokes}</strong>
+        <strong>{r.strokes}<small> stroke{r.strokes === 1 ? "" : "s"}</small></strong>
       </>
     );
   // your place, listed or further down: said once under the list, with the game's share
@@ -442,9 +443,10 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace 
               <span className="lb__rank">{r.at}</span>
               <span className="lb__who">
                 <Who chain={chain} addr={r.player} me={me} full link={link(r.player)} />
-                <FlagMark f={showAll && flags[r.player]} /> <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
+                <FlagMark f={showAll && flags[r.player]} />
               </span>
               {score(r)}
+              <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
             </li>
           ))}
           {next > 0 && (
@@ -687,14 +689,14 @@ function ClaimRounds({ chain, me, mode, onDone }: { chain: Chain; me: string; mo
 
 /** Your place on the hole's board once the round is saved: shown by the score, and in what is shared. */
 export function useSavedPlace(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean) {
-  const [p, setP] = useState<{ rank: number; of: number } | null>(null);
+  const [p, setP] = useState<{ rank: number; of: number; id: string } | null>(null); // (id: the hole it is on)
   const id = (s && s.official && s.id) || "";
   useEffect(() => {
     setP(null);
     if (!chain || !me || !id || !saved) return;
     let live = true;
     // the round was just read back: the board has it too
-    chain.holeRank(id, mode, me).then((r) => live && r.rank > 0 && setP(r)).catch(() => {});
+    chain.holeRank(id, mode, me).then((r) => live && r.rank > 0 && setP({ ...r, id })).catch(() => {});
     return () => void (live = false);
   }, [chain, me, id, mode, saved]);
   return p;

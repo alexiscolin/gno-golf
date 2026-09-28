@@ -194,9 +194,11 @@ interface WorldsProps {
   podium?: ReactNode;
   /** a duel chosen: whose ghost is raced, said under the title */
   racing?: ReactNode;
+  /** and on how many of each cup's holes their ghost waits */
+  ghosts?: Readonly<Record<string, number>>;
 }
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, community = [], onCommunity = () => {}, podium, racing }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, community = [], onCommunity = () => {}, podium, racing, ghosts }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -246,26 +248,28 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             const t = stats[w.id] || NOT_PLAYED;
             const vs = t.strokes - t.par, won = n > 0 && t.done >= n;
             const score = `${t.strokes} · ${vsPar(vs)}`;
+            const ghost = ghosts && n > 0 ? (ghosts[w.id] ? `their ghost on ${ghosts[w.id]}` : "no ghost yet") : "";
+            const open = n > 0 && !(ghosts && !ghosts[w.id]); // (a duel: a cup without their ghost is not)
             return (
               <li key={w.id}>
                 <button
                   className={`world world--${w.id} tint--${w.id}` + (w.id === current ? " world--on" : "")}
-                  disabled={!n}
+                  disabled={!open}
                   onClick={() => (sound("select"), onPick(w.id))}
                   // a mouse's hover (a tap goes straight in) or the keyboard's focus
-                  onPointerEnter={(e) => n && e.pointerType === "mouse" && setHot(w.id)}
+                  onPointerEnter={(e) => open && e.pointerType === "mouse" && setHot(w.id)}
                   onPointerLeave={() => setHot(null)}
-                  onFocus={() => n && setHot(w.id)}
+                  onFocus={() => open && setHot(w.id)}
                   onBlur={() => setHot(null)}
-                  aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
+                  aria-label={`${w.name}: ${n ? `${n} holes` + (ghost && `, ${ghost}`) + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
                 >
-                  <Diorama id={w.id} on={hot === w.id && n > 0} />
+                  <Diorama id={w.id} on={hot === w.id && open} />
                   {w.id === current && <span className="world__last" aria-hidden="true">Last played</span>}
                   {won && <Won clean={t.clean} score={score} />}
                   <span className="world__ribbon">{w.name}</span>
                   <span className="world__info">
                   <span className="world__tag">{w.tag}</span>
-                  <span className="world__count">{n ? `${n} holes` : "Coming soon"}</span>
+                  <span className="world__count">{n ? `${n} holes` : "Coming soon"}{ghost && <b className={ghosts && ghosts[w.id] ? "" : "world__none"}> · {ghost}</b>}</span>
                   {n > 0 && (
                     <span className="world__me">
                       <span className={`world__track load--${w.id}`}><Green p={t.done / n} world={w.id} holed={t.done === n} thick /></span>

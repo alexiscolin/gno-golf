@@ -192,8 +192,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // an expression evaluated in a realm, read-only: the VM's typed result as it printed it
   const vm = (realm: string, expr: string, ms?: number, signal?: AbortSignal | null) =>
     query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${realm}.${expr}`)}`, ms, signal);
-  // a string result — ("…" string) — unwrapped; an answer that is not one is the chain's to answer for
+  // a string result — ("…" string), an empty one ( string) — unwrapped; an answer that is not one is the chain's to answer for
   const unquote = (raw: string, expr: string) => {
+    if (raw.trim() === "( string)") return "";
     try {
       return String(JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)"))));
     } catch {
@@ -321,6 +322,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** gnoweb page of one player's round on a hole. */
     roundURL: (hole: string, player: string) =>
       isHoleId(hole) && isAddress(player) ? new URL(`${REALM_PATH}:${hole}/${player}`, web + "/").href : "#",
+    /** gnoweb page of an address (its /u/ profile), # for anything else. */
+    userURL: (addr: string) => (isAddress(addr) ? new URL(`/u/${addr}`, web + "/").href : "#"),
     /** gnoweb link to what a hole is made of: a realm hole's source, a data
      *  hole's data page. A player can read a hole before trusting it. */
     // links built from what the chain says, checked first: a hole id, an address
@@ -402,6 +405,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.standings),
     /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes }. */
     rank: (mode: string, player: string) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`, checks.rank),
+    /** Of these holes (at most 100), the ones a player has a best on in either mode: their ghosts. One read. */
+    ghostHoles: async (holes: readonly string[], player: string): Promise<ReadonlySet<string>> => {
+      if (!isAddress(player)) return new Set();
+      const ids = holes.slice(0, 100), p = `address(${s(player)})`;
+      const got = await qstr(REALM, `func() (s string) { for _, h := range []string{${ids.map(s).join(", ")}} { if BestOf(h, "pro", ${p}) + BestOf(h, "assisted", ${p}) > 0 { s += h + "\\n" } }; return }()`);
+      return new Set(got.split("\n").filter((h) => ids.includes(h))); // (only the holes asked)
+    },
     /** A gno.land name's address, or "" (r/sys/users). */
     resolveName: (name: string) =>
       isName(name)

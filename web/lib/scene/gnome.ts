@@ -143,8 +143,10 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
     dome.position.y = -0.3;
     hat.add(dome);
   } else {
-    const cone = inked(new THREE.ConeGeometry(0.5, skin.tall ? 1.6 : 1.15, 16), flat(skin.hat));
-    if (skin.tall) cone.position.y = 0.22;
+    // cut just under the brim: a foot any wider poked out of his brow, a red fleck over the eyes
+    const top = skin.tall ? 1.02 : 0.575, h = top + 0.3;
+    const cone = inked(new THREE.ConeGeometry(h * 0.5 / (skin.tall ? 1.6 : 1.15), h, 16), flat(skin.hat));
+    cone.position.y = top - h / 2;
     hat.add(cone);
   }
   if (skin.crown) {
@@ -340,43 +342,75 @@ export function makeGhost(o: number) {
   return { ball, fade };
 }
 
-/** A turntable for the gnome picker, and the game's choice (ghost: a duel's
- *  ghost hops beside him): its own small renderer, nothing else. */
-export function makePreview(canvas: HTMLCanvasElement, { ghost = false } = {}) {
+/** A little act a preview plays: "hop" (the picker: he hops, turning), "solo"
+ *  (he rolls on the spot, rights himself, blinks, hops) or "duel" (he and a
+ *  duel's ghost hop in turn, as a duel's strokes go). */
+export type Act = "hop" | "solo" | "duel";
+
+const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
+/** One gnome at time k (ms) of the solo act's 3.6 s: a roll of two turns,
+ *  up off the ground (his hat, upside down, clear of it and of the frame's
+ *  foot), a wobble as he rights himself, a blink, then a hop. */
+function soloAt(g: Gnome, k: number) {
+  const { body, eyes } = g.userData;
+  const roll = Math.min(k / 1300, 1), wob = k > 1300 && k < 1800 ? (1800 - k) / 500 : 0;
+  body.rotation.set(ease(roll) * Math.PI * 4, 0.35, Math.sin(k / 45) * 0.18 * wob);
+  const hop = roll < 1 ? Math.sin(roll * Math.PI) * 0.36 : k > 2900 && k < 3300 ? Math.sin(((k - 2900) / 400) * Math.PI) * 0.34 : 0;
+  body.position.y = hop;
+  for (const e of eyes || []) e.scale.y = k > 2300 && k < 2430 ? 0.12 : 1;
+  return hop;
+}
+
+/** A turntable for the gnome picker, and the game's choice's panels (act; a
+ *  duel's ghost hops beside him in "duel"): its own small renderer, nothing
+ *  else. Still, it holds the pose it stopped in and draws nothing more until
+ *  it plays again (a panel plays under the pointer only). */
+export function makePreview(canvas: HTMLCanvasElement, { act = "hop", still = false }: { act?: Act; still?: boolean } = {}) {
   const renderer = makeRenderer(canvas);
   const scene = makeScene();
   const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
   camera.position.set(0, 0.95, 4.2);
   camera.lookAt(0, 0.38, 0); // pompom at the top of a hop to the shadow, in frame
   let gnome: Gnome | null = null, alive = true;
-  // the ghost, a step to his right, hopping when he lands
-  const rival = ghost ? makeGhost(0.55).ball : null;
+  // the ghost, a step to his right
+  const rival = act === "duel" ? makeGhost(0.55).ball : null;
   if (rival) (rival.scale.setScalar(0.82), rival.position.set(0.46, 0, -0.25), scene.add(rival), camera.position.setZ(5.2)); // (the pair, a step back: room at both sides)
+  // the act's own clock: it runs only while playing (and never under reduced motion)
+  let t = 0, last = 0, playing = !still, drawn = false;
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    drawn = false;
   };
   const tick = (now: number) => {
     if (!alive) return;
     requestAnimationFrame(tick);
+    const dt = last ? Math.min(now - last, 50) : 0;
+    last = now;
+    if (playing && motion) t += dt;
+    else if (drawn) return;
     if (gnome) {
-      // the gnome hops; his shadow stays on the ground and shrinks as he rises
-      // (with reduced motion, he stands still, a little turned)
-      if (!motion) now = 900;
-      const hop = Math.abs(Math.sin(now / 380)) * 0.22;
       const { body, shade } = gnome.userData;
-      body.rotation.y = Math.sin(now / 1400) * 0.7;
-      body.position.y = hop;
+      let hop: number;
+      if (act === "solo") hop = soloAt(gnome, t % 3600);
+      else {
+        // he hops, turning; his shadow stays on the ground and shrinks as he rises
+        hop = Math.abs(Math.sin((t + 900) / 380)) * 0.22;
+        body.rotation.y = Math.sin((t + 900) / 1400) * 0.7;
+        body.position.y = hop;
+      }
       shade.scale.setScalar(1 - hop * 1.6);
       shade.material.opacity = 0.18 * (1 - hop * 1.4);
     }
+    // the ghost hops when he lands: their turns
     if (rival) {
-      rival.userData.body.position.y = Math.abs(Math.cos(now / 380)) * 0.22;
-      rival.userData.body.rotation.y = -Math.sin(now / 1400) * 0.7;
+      rival.userData.body.position.y = Math.abs(Math.cos((t + 900) / 380)) * 0.22;
+      rival.userData.body.rotation.y = -Math.sin((t + 900) / 1400) * 0.7;
     }
     renderer.render(scene, camera);
+    drawn = true;
   };
   size();
   requestAnimationFrame(tick);
@@ -391,6 +425,11 @@ export function makePreview(canvas: HTMLCanvasElement, { ghost = false } = {}) {
       gnome.userData.shade.position.y = -BALL_R + 0.02; // right under him, in frame
       if (rival) gnome.position.x = -0.42;
       scene.add(gnome);
+      drawn = false;
+    },
+    /** Plays the act, or holds it where it is. */
+    play(on: boolean) {
+      playing = on;
     },
     resize: size,
     destroy() {

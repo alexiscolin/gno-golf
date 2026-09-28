@@ -30,7 +30,7 @@
   --gold-grad: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%); /* the call to action's and a won cup's badge (--gold, the flat metal, everywhere else) */
   --glow: #ffe066; --glow-rgb: 255, 224, 102;
   /* type: a display heading, a card's name, a pill's label */
-  --fs-display: clamp(30px, 4.4vw, 54px);
+  --fs-display: clamp(36px, 5.4vw, 72px);
   --fs-name: clamp(15px, 1.4vw, 18px);
   --fs-pill: 15px;
   /* space: the vertical rhythm, small to large */
@@ -239,6 +239,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .world__info { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 8px 6px 6px; }
 /* the standing reads first, the green under it supports it */
 .worlds--v2 .world__count { font-size: 14px; }
+.world__count .world__none { color: var(--ink-soft); } /* a cup the rival has no ghost in */
 .worlds--v2 .world__score { font-size: 15px; }
 .worlds--v2 .world__track { padding: 2px 8% 0; }
 
@@ -276,13 +277,17 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   padding: 3px 10px; border-radius: var(--pill); background: var(--ink); color: var(--paper);
   font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
-.worlds--v2 .world:hover:not([disabled]),
-.worlds--v2 .world:focus-visible { z-index: 1; transform: translateY(-10px) scale(1.06); }
-.worlds--v2 .world:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 16px 0 var(--ink); }
+/* a front card under the pointer (a cup's, a game's): it leaps, leaning, in its glow; pressed, it sinks */
+.worlds--v2 .world:hover:not([disabled]), .worlds--v2 .world:focus-visible,
+.mode:hover:not([disabled]), .mode:focus-visible { z-index: 1; transform: translateY(-10px) scale(1.05) rotate(-1.5deg); }
+.worlds--v2 .world:hover:not([disabled]), .mode:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) .world__ribbon,
 .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
-.worlds--v2 .world:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
-.worlds--v2 .world[disabled] { background: linear-gradient(170deg, #e6ebe8, #aab6b0); }
+.worlds--v2 .world:active:not([disabled]), .mode:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
+.worlds--v2 .world[disabled] { background: #c9d2cd; }
+/* the cup's diorama in a round inked window, as a game's panel shows its gnome */
+.worlds--v2 .world__art { width: 80%; margin: 4px auto 0; aspect-ratio: 1 / 1; border-radius: 50%; }
+@media (max-height: 760px) { .worlds--v2 .world__art { width: 62%; } }
 .worlds--v2 .world[disabled] .world__art img { filter: grayscale(.85) opacity(.75); }
 .worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--shadow-btn); color: var(--ink); }
 .worlds--v2 .community { background: var(--paper); border: var(--edge); border-radius: 16px; padding: 10px 14px; } /* flat: a list to read */
@@ -306,9 +311,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode--solo { --c1: #3f9a72; --c2: #8fdcae; } /* the fairway */
 .mode--duel { --c1: var(--hat); --c2: #f6a79b; } /* the hat: the rival */
 .mode--build { --c1: var(--sunny); --c2: var(--lamp); } /* the sun */
-.mode:hover:not([disabled]), .mode:focus-visible { transform: translateY(-8px) scale(1.04) rotate(-1.2deg); }
 .mode:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold), var(--deep-card); }
-.mode--on { box-shadow: 0 0 0 4px var(--paper), 0 0 0 7px var(--ink), var(--deep-card); }
 .mode[disabled] { cursor: default; }
 .mode[disabled] > :not(.mode__soon) { opacity: .75; }
 /* the gnomes stand out over the panel's top edge */
@@ -329,10 +332,27 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   .mode__name { align-self: end; margin: 0 14px 0 4px; font-size: 32px; -webkit-text-stroke-width: 5px; }
   .mode__line { margin: 6px 14px 0 4px; font-size: 13px; }
 }
-/* a duel's "whom?": the dare's sticker, a field, the friends and the top players to tap */
-.whom { display: grid; justify-items: center; gap: 10px; width: min(100%, 520px); margin: clamp(16px, 3vh, 28px) auto 0; }
-.whom .friends__add { width: 100%; margin: 0; }
-.whom__picks { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 0; }
+/* the game chosen, big, beside Back: its panel's colour, inked (over the screens, under the sheets) */
+.modetag {
+  position: fixed; top: 34px; left: 96px; z-index: var(--z-screen); padding: 2px 16px 6px; border: var(--edge-bold); border-radius: var(--pill);
+  background: var(--c1); color: var(--paper); font-size: 30px; font-weight: 700; line-height: 1.2;
+  -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; box-shadow: 0 4px 0 var(--ink); transform: rotate(-3deg); pointer-events: none;
+}
+body:has(.sheet) .modetag { visibility: hidden; }
+/* in play: pinned small on the hole's card */
+.card--hole { position: relative; }
+.card--hole > .modetag { position: absolute; top: -12px; left: -8px; z-index: 1; padding: 0 10px 2px; font-size: 16px; -webkit-text-stroke-width: 3px; box-shadow: 0 2px 0 var(--ink); }
+@media (max-width: 600px) { .modetag { top: 30px; left: 88px; font-size: 22px; padding: 1px 12px 4px; -webkit-text-stroke-width: 4px; } }
+/* the rival raced, stuck under the cups' title, big */
+.front__head > .dare { margin: -8px 0 0; padding: 6px 18px; font-size: clamp(16px, 1.6vw, 20px); }
+/* a duel's rival: two ways, one under the other, each under its heading */
+.rival__way { width: min(100%, 640px); text-align: left; }
+.rival__way + .rival__way { margin-top: 18px; }
+.rival .friends__add { margin: 0; align-items: center; }
+.rival .drawer__note { position: relative; margin: 6px 0 0; } /* the (i)'s popover under its line */
+.rival .lb { margin-top: 10px; }
+/* the heading says what the board is; players with no name have no Race here */
+.rival .lb--full > h3, .rival .unnamed { display: none; }
 
 @media (max-height: 760px) { .world__art { aspect-ratio: 16 / 9; } }
 @media (max-height: 640px) { .world__art { aspect-ratio: 2 / 1; } .worlds--v2 .world__tag { display: none; } }

@@ -5,7 +5,8 @@
 // one plain send the player confirms in Adena. Playing stays free; a testnet's
 // GNOT is test GNOT, and said so.
 import { useEffect, useState } from "react";
-import { sendTip, TIPS } from "@/lib/adena";
+import { hasAdena, sendTip, TIPS } from "@/lib/adena";
+import { isTouch } from "@/lib/device";
 import { networkOf } from "@/lib/network";
 import { Button, Segmented } from "@/components/ui";
 import { shortAddr } from "@/components/common";
@@ -26,6 +27,8 @@ export default function Tip({ chain, me, chainId, price, onConnect, bare = false
   }, [chain]);
   if (!owner || owner === me) return bare ? <p>{owner ? "You made the game: nothing to tip yourself." : "Reading the chain…"}</p> : null;
   const unit = networkOf(chain.rpc) === "mainnet" ? "GNOT" : "test GNOT";
+  // a phone with no Adena: it is a computer's browser extension (as saving a round)
+  const away = !me && isTouch() && !hasAdena();
   const send = async () => {
     if (!me) return onConnect();
     setBusy(true);
@@ -42,11 +45,17 @@ export default function Tip({ chain, me, chainId, price, onConnect, bare = false
   return (
     <section>
       {!bare && <h3 className="about__h">Support the game</h3>}
-      <p>Playing stays free. A tip goes straight to its maker, the golf realm&apos;s owner on this chain: <b className="mono">{owner}</b>. You confirm it in Adena, where the same address shows.</p>
-      <Segmented label="Tip" value={gnot} full options={AMOUNTS.map((a) => [a, `${a} ${unit}`] as const)} onChange={setGnot} />
-      <Button variant="secondary" className="btn--wide" disabled={busy} onClick={() => void send()}>
-        {busy ? "Waiting for Adena…" : me ? `Send ${gnot} ${unit}` : "Connect Adena to tip"}
-      </Button>
+      <p>Playing stays free. A tip goes straight to its maker, the golf realm&apos;s owner on this chain: <a className="mono" href={chain.userURL(owner)} target="_blank" rel="noopener noreferrer">{owner} ↗</a>. You confirm it in Adena, where the same address shows.</p>
+      {away ? (
+        <p className="real__fine">Adena is a computer&apos;s browser extension: open the game there to tip.</p>
+      ) : (
+        <>
+          <Segmented label="Tip" value={gnot} full options={AMOUNTS.map((a) => [a, `${a} ${unit}`] as const)} onChange={setGnot} />
+          <Button variant="secondary" className="btn--wide" disabled={busy} onClick={() => void send()}>
+            {busy ? "Waiting for Adena…" : me ? `Send ${gnot} ${unit}` : "Connect Adena to tip"}
+          </Button>
+        </>
+      )}
       {said && <p className={"note " + (said.good ? "note--good" : "note--bad")}>{said.text}</p>}
     </section>
   );

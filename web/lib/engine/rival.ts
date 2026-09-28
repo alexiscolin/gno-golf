@@ -7,7 +7,8 @@
 // rest before, all in the ghost's own period): one read ahead, each kept once
 // it answers (a rematch, or the other mode and back, reads nothing again), a
 // failed one asked again at the next turn. Its turn never makes the player
-// wait: it plays at twice the speed (its steps in about 2 s), a press that
+// wait: it glides onto its stroke's start, then plays at twice the speed
+// (its steps in about 2 s), a press that
 // starts an aim cuts it (the ghost put at its rest), a replay that outlives
 // its time is cut as the player's is, and a
 // stroke read late, or once the player aims again, or under reduced motion,
@@ -23,13 +24,14 @@ import { disposeCourse, motion } from "../scene/materials";
 import { BALL_R } from "../terrain";
 import { ghostSpeed, shotsOf } from "../duel";
 import { makeReplay, outlived, stepsMs } from "./replay";
-import type { Ghost, Stroke } from "../types";
+import type { Ghost, Stroke, Vec2 } from "../types";
 import type { Gnome } from "../scene/data";
 import type { GameState, Live } from "./types";
 
 const SEEN = 0.7, AIMING = 0.45; // its opacity on its turn, and at rest while the player aims
 const WAIT_MS = 1500; // a stroke slower than this to read: the ghost jumps to its rest when it lands
 const CUT_MS = 5000; // a ghost's replay past this (a frozen tab) is cut: the engine's safety net, for the ghost
+const GLIDE_MS = 450; // its walk onto its stroke's start (the tee: where the player stood), before it plays
 // each ghost's strokes as read, kept with the ghost (the same ghost comes back with a rematch, or a mode toggled back)
 const readsOf = new WeakMap<Ghost, (Promise<Stroke> | undefined)[]>();
 
@@ -82,6 +84,20 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     place(b, x - (cy / l) * BALL_R * 3.5, y + (cx / l) * BALL_R * 3.5);
   }
 
+  /** The ghost onto (x, y), gliding upright, not rolling; ends at once when cut (its turn skipped). */
+  function glide(b: Gnome, [x, y]: Vec2, at: number) {
+    const x0 = b.position.x, y0 = b.position.z, t0 = performance.now();
+    return new Promise<void>((done) => {
+      const step = (now: number) => {
+        const k = Math.min((now - t0) / GLIDE_MS, 1), e = k * k * (3 - 2 * k);
+        place(b, x0 + (x - x0) * e, y0 + (y - y0) * e);
+        if (k < 1 && at === cut) requestAnimationFrame(step);
+        else done();
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
   /** The ghost's stroke n as the chain replays it, from the rest of stroke n - 1: read once, a failure forgotten. */
   function read(gh: Ghost, n: number): Promise<Stroke> {
     const kept = readsOf.get(gh) || [];
@@ -131,11 +147,14 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     const res = s;
     busy = true;
     fade(SEEN);
+    told(); // (its turn, said)
     cg.tick0 = Number(shotsOf(gh)[n].split(",")[2]) || 0;
     try {
-      if (await outlived(rp.replay(res.path, res.holed, res.air, res.cause, 0, ghostSpeed(stepsMs(res.path).reduce((a, x) => a + x, 0))), CUT_MS)) cut++;
+      await glide(b, res.path[0], at);
+      if (at === cut && (await outlived(rp.replay(res.path, res.holed, res.air, res.cause, 0, ghostSpeed(stepsMs(res.path).reduce((a, x) => a + x, 0))), CUT_MS))) cut++;
     } finally {
       busy = false;
+      told();
       restTimed(); // the pieces back on the player's clock
       if (round === g.round && gh === ghost) land(b, res, n);
     }
@@ -174,8 +193,8 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     /** The ghost's ball while it plays, for the camera to frame with the player's; null otherwise. */
     at: () => (busy && ball ? ball.position : null),
     /** What the HUD shows: the rival's strokes so far (null without a duel on this round:
-     *  none, or one armed mid-round, which starts with the next) and whether they holed. */
-    state: () => ({ rival: armed ? shown : null, rivalIn: armed && holed }),
+     *  none, or one armed mid-round, which starts with the next), whether they holed, and whether they are playing. */
+    state: () => ({ rival: armed ? shown : null, rivalIn: armed && holed, rivalTurn: busy }),
     /** The ghost's gnome, for the clip to hide (null: never made). */
     ball: () => ball,
     dispose() {

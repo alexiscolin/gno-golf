@@ -189,6 +189,7 @@ export interface Snapshot {
   tier: Tier;
   rival: number | null;
   rivalIn: boolean;
+  rivalTurn: boolean;
   done: boolean;
 }
 

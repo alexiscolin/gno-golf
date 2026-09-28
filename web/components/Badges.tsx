@@ -38,6 +38,25 @@ export function Medal({ b, on }: { b: Badge; on: boolean }) {
   );
 }
 
+/** A hole's badges on the cup card, their medals pressed askew on its score:
+ *  the ones earned on it (at), and the one its score alone earns (an ace, two
+ *  under, fifteen strokes or more) wherever that was first; fresh: the ones
+ *  just earned, pressed on as the card shows. */
+export function CardStamps({ at, strokes, par, seed, fresh }: { at: readonly string[]; strokes: number; par: number; seed: number; fresh: readonly string[] }) {
+  const own = strokes === 1 ? "ace" : strokes <= par - 2 ? "eagle" : strokes >= 15 ? "snail" : "";
+  const list = BADGES.filter((b) => at.includes(b.id) || b.id === own);
+  if (!list.length) return null;
+  return (
+    <span className="stamp" style={{ rotate: `${((seed * 37) % 30) - 15}deg` }}>
+      {list.map((b) => (
+        <span key={b.id} className={fresh.includes(b.id) ? "earned__fresh" : undefined}>
+          <Medal b={b} on />
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** The seal on a cup card's score that is on the chain too: the chain's glyph on its green. */
 export const ChainSeal = () => (
   <svg viewBox="0 0 24 24" className="seal" aria-label="Saved on-chain" role="img">

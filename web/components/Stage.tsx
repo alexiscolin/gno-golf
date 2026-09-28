@@ -2,12 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { makePreview } from "@/lib/scene";
-import type { Skin } from "@/lib/scene/gnome";
+import type { Act, Skin } from "@/lib/scene/gnome";
 
 /** A gnome turning on a stage of its own (the preview renderer): the ref of
  *  the box it is drawn in. The picker's tile, the cup's new-gnome card, the
- *  game's choice (ghost: a duel's ghost hops beside him). */
-export function useGnomeStage<T extends HTMLElement = HTMLDivElement>(skin: Skin, { ghost = false } = {}) {
+ *  game's choice's panels (act, and playing: a panel's act plays under the
+ *  pointer only, and holds its pose otherwise). */
+export function useGnomeStage<T extends HTMLElement = HTMLDivElement>(skin: Skin, { act = "hop", playing = true }: { act?: Act; playing?: boolean } = {}) {
   const box = useRef<T>(null);
   const preview = useRef<ReturnType<typeof makePreview> | null>(null);
   useEffect(() => {
@@ -19,7 +20,7 @@ export function useGnomeStage<T extends HTMLElement = HTMLDivElement>(skin: Skin
     el.className = "pick__canvas";
     box.current!.appendChild(el);
     let p: ReturnType<typeof makePreview>;
-    try { p = preview.current = makePreview(el, { ghost }); } catch { return () => el.remove(); } // no WebGL to spare: no stage, the screen stands
+    try { p = preview.current = makePreview(el, { act, still: !playing }); } catch { return () => el.remove(); } // no WebGL to spare: no stage, the screen stands
     const onResize = () => p.resize();
     window.addEventListener("resize", onResize);
     return () => {
@@ -27,9 +28,12 @@ export function useGnomeStage<T extends HTMLElement = HTMLDivElement>(skin: Skin
       p.destroy();
       el.remove();
     };
-  }, [ghost]);
+  }, [act]); // eslint-disable-line react-hooks/exhaustive-deps -- (playing: the effect below, not a new stage)
   useEffect(() => {
     preview.current && preview.current.show(skin);
   }, [skin]);
+  useEffect(() => {
+    preview.current && preview.current.play(playing);
+  }, [playing]);
   return box;
 }

@@ -223,6 +223,8 @@ test("roundURL links a named player's round on a hole, # for a bad hole id or ad
   const chain = makeChain();
   assert.equal(chain.roundURL("garden/1", ADDR1), new URL(`${REALM_PATH}:garden/1/${ADDR1}`, chain.web + "/").href);
   assert.equal(chain.roundURL("not a hole!", ADDR1), "#");
+  assert.equal(chain.userURL(ADDR1), new URL(`/u/${ADDR1}`, chain.web + "/").href);
+  assert.equal(chain.userURL("javascript:alert(1)"), "#");
   assert.equal(chain.roundURL("garden/1", "not-an-address"), "#");
 });
 
@@ -526,6 +528,14 @@ test("resolveName resolves a registered name to its address, '' for none", async
   assert.equal(await chain.resolveName("nobody"), "");
 });
 
+test("ghostHoles: one read, only the holes asked; none for a bad address, no network call", async () => {
+  const chain = makeChain();
+  setFetch(() => { throw new Error("should not be called"); });
+  assert.equal((await chain.ghostHoles(["garden/1/v1"], "not-an-address")).size, 0);
+  setFetch((url) => { assert.ok(decoded(url).expr.includes(`BestOf(h, "pro", address("${ADDR1}"))`)); return strReply("garden/1/v1\nnot/asked\n"); });
+  assert.deepEqual([...(await chain.ghostHoles(["garden/1/v1", "garden/2/v1"], ADDR1))], ["garden/1/v1"]);
+});
+
 test("nameOf short-circuits an invalid address, no network call; resolves a valid one", async () => {
   const chain = makeChain();
   setFetch(() => { throw new Error("should not be called"); });
@@ -663,6 +673,13 @@ test("unquote refuses a reply that isn't a quoted string", async () => {
   const chain = makeChain();
   setFetch(() => rawReply("(5 int64)")); // resolveName expects a string-typed print
   await assert.rejects(chain.resolveName("nesquimo"), (e) => errorKind(e) === "chain" && /is not a string/.test((e as Error).message));
+});
+
+test("an empty string, as the VM prints it — ( string) — reads as \"\"", async () => {
+  const chain = makeChain();
+  setFetch(() => rawReply("( string)"));
+  assert.equal(await chain.resolveName("nobody"), "");
+  assert.equal((await chain.ghostHoles(["garden/1/v1"], ADDR1)).size, 0);
 });
 
 test("qeval refuses a string reply whose contents aren't JSON", async () => {

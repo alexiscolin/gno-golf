@@ -126,6 +126,9 @@ test("hole numbers, the next hole, the next cup, golf's words", () => {
   assert.equal(holeNumber(holes, "someone/hole/v1"), "–");
   assert.equal(nextHole({ holes, id: "garden/1/v1" }, { "garden/2/v1": 3 })?.id, "garden/3/v1");
   assert.equal(nextHole({ holes, id: "garden/3/v1" }, { "garden/2/v1": 3 })?.id, "garden/1/v1");
+  // a duel's: only where their ghost is, a played one when none is left
+  assert.equal(nextHole({ holes, id: "garden/1/v1" }, {}, (h) => h.id !== "garden/2/v1")?.id, "garden/3/v1");
+  assert.equal(nextHole({ holes, id: "garden/1/v1" }, { "garden/2/v1": 3 }, (h) => h.id === "garden/2/v1")?.id, "garden/2/v1");
   assert.equal(nextCup("garden", { island: 0, town: 18 }), "town");
   assert.equal(nextCup("mountain", { garden: 18 }), "");
   assert.equal(golfTerm(1, 3), "Hole in one!");
