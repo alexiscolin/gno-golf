@@ -417,14 +417,15 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	}
 	for m := 0; m < modes; m++ {
 		rows := ""
-		n := 0
+		n, walked := 0, 0
 		e.board(m).Iterate("", "", func(k string, v any) bool {
+			walked++
 			p := v.(string)
 			if name := nameOf(p); name != "" { // a name deleted since is skipped
 				n++
 				rows += ufmt.Sprintf("| %d | [@%s](%s:%s/%s) | %d | %s |\n", n, name, hub, e.id, p, boardStrokes(k), race(e, p, "race"))
 			}
-			return n >= topSize
+			return n >= topSize || walked >= maxWalked
 		})
 		if rows != "" {
 			s += "### " + modeTitles[m] + "\n\n| # | player | score | ghost |\n|---|---|---|---|\n" + rows + "\n"

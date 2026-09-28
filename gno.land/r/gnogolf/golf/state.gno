@@ -658,18 +658,20 @@ func Leaderboard(mode string) string {
 // eachRanked walks a mode's top ten: the first named players of its ranking,
 // with their names. A name deleted since is skipped, not shown.
 func eachRanked(m int, fn func(r *row, name string)) {
-	n := 0
+	n, walked := 0, 0
 	ranks[m].Iterate("", "", func(_ string, v any) bool {
+		walked++ // (names deleted since are skipped: the walk still stops, maxWalked rows at most)
 		p := v.(string)
-		name := nameOf(p)
-		if name == "" {
-			return false
+		if name := nameOf(p); name != "" {
+			fn(totals[m].Get(p).(*row), name)
+			n++
 		}
-		fn(totals[m].Get(p).(*row), name)
-		n++
-		return n >= topSize
+		return n >= topSize || walked >= maxWalked
 	})
 }
+
+// maxWalked is how many rows a top ten walks at most, the deleted names it skips counted.
+const maxWalked = 4 * topSize
 
 // strokesRow and standingRow are the rows the reads list: a player and a
 // best, or a player and a standing.

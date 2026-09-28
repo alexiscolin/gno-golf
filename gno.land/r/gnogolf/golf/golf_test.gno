@@ -607,3 +607,24 @@ func TestARoundsPageSaysWhatComesNext(cur realm, t *testing.T) {
 	testing.SkipHeights(200)
 	uassert.True(t, strings.Contains(Render(id+"/"+walker.String()), "Its weather is over: Reset (below) before the next shot."))
 }
+
+// TestABestReadsAsItIsWritten pins the one way a best is kept: bestOf writes
+// it, bestStrokes and Ghost read it, and anything else is refused (a best
+// read by the drain on every finish must never be malformed).
+func TestABestReadsAsItIsWritten(cur realm, t *testing.T) {
+	r := &round{strokes: 3, period: 5912345, shots: "12.5000,6.2000,0;0.0000,1.0000,4;-359.9999,10.0000,1023"}
+	uassert.Equal(t, 3, bestStrokes(bestOf(r)))
+	uassert.Equal(t, 0, bestStrokes(nil), "no best is 0")
+	uassert.PanicsContains(t, cur, "a best not as bestOf writes it", func() { bestStrokes("3") })
+	uassert.PanicsContains(t, cur, "a best not as bestOf writes it", func() { bestStrokes("x 1 0,1,0") })
+}
+
+// TestNamesAreCheckedAsTheRegistrarWritesThem: the pages print names in links.
+func TestNamesAreCheckedAsTheRegistrarWritesThem(t *testing.T) {
+	for _, ok := range []string{"a", "nym-birdie007", "test_1"} {
+		uassert.True(t, nameish(ok), ok)
+	}
+	for _, bad := range []string{"", "1abc", "Abc", "a b", "a](x)", "a<b", strings.Repeat("a", 65)} {
+		uassert.False(t, nameish(bad), bad)
+	}
+}

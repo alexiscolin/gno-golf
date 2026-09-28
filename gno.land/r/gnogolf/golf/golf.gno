@@ -344,10 +344,26 @@ func named(player string) bool {
 
 // nameOf is a named player's name, "" for anyone else.
 func nameOf(player string) string {
-	if u := users.ResolveAddress(address(player)); !u.IsDeleted() {
+	if u := users.ResolveAddress(address(player)); !u.IsDeleted() && nameish(u.Name()) {
 		return u.Name()
 	}
 	return ""
+}
+
+// nameish is a name as r/sys/users registers them: a lowercase letter, then
+// lowercase letters, digits, "_" and "-", at most 64. It is checked again
+// here because the pages print names inside links: nothing another realm
+// writes, even one that changes, can break out of them.
+func nameish(n string) bool {
+	if n == "" || len(n) > 64 || n[0] < 'a' || n[0] > 'z' {
+		return false
+	}
+	for i := 0; i < len(n); i++ {
+		if c := n[i]; !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_' || c == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // find is the hole with this exact id, nil if none.
