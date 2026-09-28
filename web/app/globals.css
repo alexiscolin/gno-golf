@@ -758,6 +758,9 @@ html, body {
   line-height: 1.45;
 }
 
+/* under a button, clear of its ink drop */
+.btn + .note { margin-top: 14px; }
+
 .note a {
   color: inherit;
   font-weight: 600;
