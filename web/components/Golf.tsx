@@ -2267,18 +2267,17 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
  * away when there is one.
  */
 // onSupport: the tip, on every screen but the title: a button of its own beside the banner
-// (inside it, it read as supporting the chain), alone on mainnet (no banner)
+// (inside it, it read as supporting the chain); none on mainnet, where a tip can't go yet (Tip)
 function NetBanner({ rpc, onSupport }: { rpc: string; onSupport: () => void }) {
   const net = networkOf(rpc);
+  if (net === "mainnet") return null;
   return (
     <div className="netbanner">
-      {net !== "mainnet" && (
-        <p className={`netbanner__band netbanner--${net}`}>
-          <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
-          <span>{net === "local" ? "a node on this machine" : "practice scores, free test GNOT"}</span>
-          {net === "testnet" && OTHER_URL && <a className="btn btn--ghost btn--s netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
-        </p>
-      )}
+      <p className={`netbanner__band netbanner--${net}`}>
+        <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
+        <span>{net === "local" ? "a node on this machine" : "practice scores, free test GNOT"}</span>
+        {net === "testnet" && OTHER_URL && <a className="btn btn--ghost btn--s netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
+      </p>
       {/* the Leaderboard chip's twin, on the left (a phone keeps the heart) */}
       <Button variant="chip" className="netbanner__support" aria-label="Support the game" onClick={onSupport}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" /></svg>

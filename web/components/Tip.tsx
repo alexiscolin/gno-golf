@@ -3,7 +3,8 @@
 // A tip for the game's maker: GNOT sent from the player's Adena to the golf
 // realm's owner, as the chain has it (never an address the page carries), in
 // one plain send the player confirms in Adena. Playing stays free; a testnet's
-// GNOT is test GNOT, and said so.
+// GNOT is test GNOT, and said so. Not on mainnet while its ugnot is
+// transfer-locked (bank restricted_denoms): the chain refuses a plain send.
 import { useEffect, useState } from "react";
 import { hasAdena, resultOf, sendTip, TIPS, type SendError } from "@/lib/adena";
 import { isTouch } from "@/lib/device";
@@ -25,6 +26,8 @@ export default function Tip({ chain, me, chainId, price, onConnect, bare = false
     void chain.owner().then((o) => live && setOwner(o), () => live && setOwner("")); // ("": not read, a node down or an owner renounced)
     return () => void (live = false);
   }, [chain]);
+  if (networkOf(chain.rpc) === "mainnet")
+    return <section>{!bare && <h3 className="about__h">Support the game</h3>}<p>Tips open once GNOT can be sent on mainnet: until then the chain refuses a plain send.</p></section>;
   if (!owner || owner === me) return bare ? <p>{owner ? "You made the game: nothing to tip yourself." : owner === "" ? "No one to tip on this chain: its owner could not be read." : "Reading the chain…"}</p> : null;
   const unit = networkOf(chain.rpc) === "mainnet" ? "GNOT" : "test GNOT";
   // a phone with no Adena: it is a computer's browser extension (as saving a round)
