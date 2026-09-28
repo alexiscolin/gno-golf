@@ -960,6 +960,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (ev.button > 0) return;
     if (g.flying || g.done) return;
     if (rival.busy()) return; // the ghost's turn: a turn each, the next aim waits for it
+    rival.peek(false); // (their ball looked at: back to the player's)
     cam.finishGlide(); // the intro glide, if still on: finished now, quickly
     // a new press takes over whatever aim was held (a keyboard aim, a lost pull)
     dragging = true;
@@ -997,6 +998,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // an aim key waits for the ghost's turn, as a press does
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) {
       if (rival.busy()) return;
+      rival.peek(false);
       cam.finishGlide();
     }
     const step = ev.shiftKey ? 1 : 4;
@@ -1438,6 +1440,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       newRound();
       setView(home());
     },
+    /** In a duel: the camera on the ghost's ball, or back on the player's (their next aim does too). */
+    peekRival: (on: boolean) => rival.peek(on),
     shoot: fire,
     chain,
     destroy() {

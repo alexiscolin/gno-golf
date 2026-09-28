@@ -1429,7 +1429,8 @@ html, body {
   .card--hole .eyebrow { display: none; }
   .card--score { min-width: 0; }
   .card--score .eyebrow { font-size: 9px; letter-spacing: .06em; }
-  .card--score .eyebrow, .card--score strong, .card--score .card__par { white-space: nowrap; } /* a duel's "You – them", "2 – 1" and "3 to beat" on one line each */
+  .card--score .eyebrow, .card--score strong, .card--score .card__par { white-space: nowrap; } /* each on one line */
+  .card--duel { min-width: 0; padding: 6px 10px; gap: 1px; } .card--duel strong { font-size: 17px; } .card--duel .duel__row .eyebrow { max-width: 64px; }
   .card h1 { font-size: 15px; white-space: normal; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .aimbar small { white-space: nowrap; font-size: 11px; }
   .aimbar .power { width: 180px; }
@@ -1889,6 +1890,16 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .card--score strong { line-height: 1; }
 .card--score .card__par { line-height: 1.1; }
 .card--score .pro-chip { position: absolute; top: -9px; right: -8px; margin: 0; border: 2px solid var(--paper); }
+/* a duel's score: a row each, what is left under; a tap looks at their ball (lit while it does) */
+.card--duel { min-width: 136px; gap: 3px; padding: 8px 12px; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+.card--duel .duel__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.card--duel .duel__row .eyebrow { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card--duel strong { font-size: 20px; }
+.card--duel .card__par { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card--duel .card__par svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.card--duel:hover { border-color: var(--ink); }
+.card--peek { background: var(--gold); border-color: var(--ink); }
+.card--peek .eyebrow, .card--peek .card__par { color: var(--ink); }
 /* the same press on the remaining controls: the switches */
 .switch:active i { transform: scale(.96); }
 .seg button:active { background: #dcebe2; }

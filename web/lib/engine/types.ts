@@ -192,6 +192,8 @@ export interface Snapshot {
   rival: number | null;
   rivalIn: boolean;
   rivalTurn: boolean;
+  /** the player looking at the ghost's ball (the score card) */
+  rivalPeek: boolean;
   done: boolean;
 }
 

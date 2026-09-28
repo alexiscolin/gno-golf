@@ -31,7 +31,7 @@ import type { GameState, Live } from "./types";
 
 const SEEN = 0.7, AIMING = 0.45; // its opacity on its turn, and at rest while the player aims
 const WAIT_MS = 4000; // a stroke slower than this to read: the turn is the player's again, the ghost at its rest once read
-const BEAT_MS = 600, AFTER_MS = 500; // its turn said before it moves; at its rest before the player's turn
+const BEAT_MS = 600, AFTER_MS = 1000; // its turn said before it moves; at its rest, seen, before the player's turn
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const CUT_MS = 5000; // a ghost's replay past this (a frozen tab) is cut: the engine's safety net, for the ghost
 const GLIDE_MS = 450; // its walk onto its stroke's start (the tee: where the player stood), before it plays
@@ -46,7 +46,8 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome, ch
   let cut = 0, ghost: Ghost | null = null;
   // what the HUD reads: the rival's strokes replayed so far, and whether their ball is in
   // armed: this round races the ghost (a duel armed mid-round waits for the next)
-  let shown = 0, holed = false, busy = false, armed = false;
+  // peek: the player looking at the ghost's ball (the score card), until their next aim
+  let shown = 0, holed = false, busy = false, armed = false, peek = false;
   // the game as the replay reads it: the live one, the ghost's own fields over it
   const cg: GameState = Object.assign(Object.create(g) as GameState, { flying: false, inTube: false, cause: null, replaying: null, tick0: 0 });
   // (field by field, as the clip's: what moves is read through, never copied)
@@ -126,7 +127,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome, ch
   /** The ghost on the tee, nothing replayed: a new round. A duel armed mid-round waits for the next. */
   function reset() {
     cut++;
-    busy = holed = false;
+    busy = holed = peek = false;
     shown = 0;
     armed = !!ghost && !!g.s && !g.shots.length;
     if (ghost) made(ghost); // (the player may have taken its skin meanwhile)
@@ -206,11 +207,17 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome, ch
     /** A frame: the ghost clear of the walls it runs along. */
     frame: () => ball && ball.visible && rp.offWalls(),
     busy: () => busy,
-    /** The ghost's ball while it plays, for the camera to frame with the player's; null otherwise. */
-    at: () => (busy && ball ? ball.position : null),
+    /** The ghost's ball while it plays (and a moment at its rest), or while the player looks at it: the camera's; null otherwise. */
+    at: () => ((busy || peek) && ball ? ball.position : null),
+    /** The player looks at the ghost's ball, or back at theirs. */
+    peek(on: boolean) {
+      if ((on = on && armed && !!ball) === peek) return;
+      peek = on;
+      told();
+    },
     /** What the HUD shows: the rival's strokes so far (null without a duel on this round:
      *  none, or one armed mid-round, which starts with the next), whether they holed, and whether they are playing. */
-    state: () => ({ rival: armed ? shown : null, rivalIn: armed && holed, rivalTurn: busy }),
+    state: () => ({ rival: armed ? shown : null, rivalIn: armed && holed, rivalTurn: busy, rivalPeek: peek }),
     /** The ghost's gnome, for the clip to hide (null: never made). */
     ball: () => ball,
     dispose() {

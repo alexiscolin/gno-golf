@@ -1271,13 +1271,30 @@ export default function Golf() {
                 </a>
               </div>
             </div>
-            {/* in a duel: both counts, the player's first, and the strokes to beat */}
-            <div className="card card--score" aria-live={racing ? "polite" : undefined} aria-atomic={racing ? true : undefined}>
-              <span className="eyebrow">{racing ? (racing.self ? "You – best" : "You – them") : "Strokes"}</span>
-              <strong>{s.strokes}{racing && <> – {s.rival ?? 0}{s.rivalIn && "✓"}</>}</strong>
-              <span className="card__par">{racing ? (s.done && !s.flying ? { win: racing.self ? "you beat your best" : "you won", tie: "tie", loss: racing.self ? "your best won" : "they won" }[duelResult(s.strokes, racing, "").result] : theyWon ? (racing.self ? "your best won" : "they won") : toBeat(s.strokes + 1, racing.ghost.strokes)) : <>par {parHere(s)}{last ? ` · last ${last}` : ""}</>}</span>
-              {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
-            </div>
+            {/* in a duel: a row each (the player's first), what is left, and a tap to look at their ball (again: back to yours) */}
+            {racing ? (
+              <button className={"card card--score card--duel" + (s.rivalPeek ? " card--peek" : "")} aria-pressed={s.rivalPeek} onClick={() => game.current?.peekRival(!s.rivalPeek)}
+                title={s.rivalPeek ? "Back to your ball" : "See where their ball is"}>
+                <span className="duel__row" aria-live="polite" aria-atomic="true">
+                  <span className="eyebrow">You</span><strong>{s.strokes}</strong>
+                </span>
+                <span className="duel__row">
+                  <span className="eyebrow">{racing.self ? "Your best" : racing.name}</span><strong>{s.rival ?? 0}{s.rivalIn && "✓"}</strong>
+                </span>
+                <span className="card__par">
+                  {s.done && !s.flying ? { win: racing.self ? "you beat your best" : "you won", tie: "tie", loss: racing.self ? "your best won" : "they won" }[duelResult(s.strokes, racing, "").result] : theyWon ? (racing.self ? "your best won" : "they won") : toBeat(s.strokes + 1, racing.ghost.strokes)}
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6" /></svg>
+                </span>
+                {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
+              </button>
+            ) : (
+              <div className="card card--score">
+                <span className="eyebrow">Strokes</span>
+                <strong>{s.strokes}</strong>
+                <span className="card__par">par {parHere(s)}{last ? ` · last ${last}` : ""}</span>
+                {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
+              </div>
+            )}
             <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
             <div className="hud__right">
               <span className="adena__wrap">

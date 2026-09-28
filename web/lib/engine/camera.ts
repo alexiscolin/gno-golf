@@ -6,7 +6,6 @@
 import * as THREE from "three";
 import { behind, chaseState } from "../chase";
 import { focusRig, applyRig, ORBIT } from "../scene";
-import { RIG_FOV } from "../scene/camera";
 import { BALL_R, CELL, onAt, closest, segHit, rayCircle, angDiff } from "../terrain";
 import type { Post, Wall } from "../types";
 import type { Rig } from "../scene/camera";
@@ -29,7 +28,6 @@ type CamRow = (number | string)[];
 const N4: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const NO_WALLS: readonly Wall[] = [], NO_POSTS: readonly Post[] = [];
 const FOLLOW_CLOSER = 0.7; // the follow camera, nearer the gnome than the rig frames it
-const BOTH_MARGIN = 3; // board units round the gnome and a duel's ghost, framed together
 
 export function makeCamera(E: Live) {
   const { g, camera, scene, screen, ground } = E;
@@ -62,14 +60,13 @@ export function makeCamera(E: Live) {
       leant.tilt = (o.tilt || 0) + lean.y * k * ORBIT.tilt;
       return leant;
     }
-    // a duel's ghost playing: the gnome and the ghost both in the picture, the
-    // camera backed off as far as the gap between them asks, a margin round
-    // them, never past the whole hole's own framing (which holds both)
+    // a duel's ghost playing (and a moment at its rest after), or its ball
+    // looked at from the score card: the camera on it, close, as on the
+    // player's own ball in flight
     const ghost = E.rivalAt && E.rivalAt();
     if (ghost && !g.flying) {
-      const v = screen(), r = focusRig(E.ball.position, g.over!, v, null, focus), gap = E.ball.position.distanceTo(ghost);
-      r.target.lerp(ghost, 0.5);
-      r.dist = Math.min(g.over!.dist, Math.max(r.dist * FOLLOW_CLOSER, (gap / 2 + BOTH_MARGIN) / (Math.tan(((RIG_FOV / 2) * Math.PI) / 180) * Math.min(1, v.w / v.h))));
+      const r = focusRig(ghost, g.over!, screen(), null, focus);
+      r.dist *= FOLLOW_CLOSER;
       return r;
     }
     // in flight, follow the ball; at rest, keep the cup in the picture too
