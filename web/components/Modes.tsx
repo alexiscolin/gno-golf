@@ -221,7 +221,12 @@ function Pick({ kind, label, tint, first, row, reading, chain, me, gnome, holes,
   return (
     <button className={`mode rival__pick ${tint}`} disabled={!open} aria-label={open ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : line || "nobody yet"}`} {...on}
       onClick={() => open && row && onPick(row.player, show ? show.bests : undefined)}>
-      <span className="tag rival__tag">{!(kind === "self" && !(row && row.at)) && <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}{label}</span>
+      <span className="tag rival__tag">
+        {kind === "self"
+          ? <span className="podium__medal rival__you"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20v-8a6 6 0 0 1 12 0v8l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM10 11v1M14 11v1" /></svg></span>
+          : <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}
+        {label}
+      </span>
       {/* (yourself: your own gnome, connected or not) */}
       {row || kind === "self" ? <Stage className="rival__stage" skin={kind === "self" ? gnomeById(gnome) : rivalSkin(row!.player, gnome)} act="hop" playing={hot} /> : <span className="rival__stage" />}
       <span className="rival__show">

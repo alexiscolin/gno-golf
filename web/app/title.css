@@ -405,6 +405,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
   align-items: center; height: clamp(200px, 30vh, 260px); padding: 12px 18px 14px;
   background: var(--panel-dots), var(--c2);
 }
+.rival__you svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; } /* yourself: your ghost where the others have their place */
 .rival__tag { grid-area: tag; justify-self: start; position: relative; z-index: 2; padding-left: 4px; font-size: 13px; } /* (over a tall hat's tip) */
 .rival__dice { width: 24px; height: 24px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
 .rival__dice circle { fill: var(--ink); stroke: none; }
@@ -421,6 +422,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
 .rival__best { margin-top: -14px; position: relative; max-width: 100%; padding: 3px 10px; border: var(--edge); border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 12.5px; font-weight: 700; line-height: 1.2; text-align: center; transform: rotate(-3deg); }
 .rival__name { grid-area: name; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 4px 0; font-size: clamp(22px, 2.3vw, 30px); font-weight: 700; line-height: 1.1; }
 .rival__line { grid-area: line; padding: 0 4px; }
+.rival__pick:disabled .rival__line { grid-column: 1 / -1; white-space: nowrap; } /* (no Race: its line takes the width, one line) */
 /* Race: the call to action's gold (above), on its drop */
 .rival__go { padding: 6px 22px 7px; border-radius: var(--pill); font-size: 18px; font-weight: 700; box-shadow: 0 4px 0 var(--ink); }
 .rival__go::after { content: " ▸"; }
