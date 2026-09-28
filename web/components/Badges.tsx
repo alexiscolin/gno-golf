@@ -19,6 +19,8 @@ const GLYPH: Record<string, string> = {
   fog: "M4 8h16M6 12h12M4 16h16",
   chain: "M9.5 14.5l5-5M8 11 6 13a3 3 0 0 0 5 5l2-2M16 13l2-2a3 3 0 0 0-5-5l-2 2",
   snail: "M13 17a5 5 0 1 1 5-5c0 2-1.6 3.5-3.5 3.5a2.5 2.5 0 1 1 2.5-2.5M3 19h15l3-3",
+  ghost: "M6 20v-8a6 6 0 0 1 12 0v8l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM10 11v1M14 11v1",
+  sport: "M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z",
 };
 // the families, in the sheet's order, as they are said
 const FAMILIES: readonly [Badge["family"], string][] = [["skill", "Skill"], ["weather", "Weather"], ["chain", "On-chain"], ["fun", "Just for fun"]];

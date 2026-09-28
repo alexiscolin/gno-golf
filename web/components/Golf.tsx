@@ -679,10 +679,11 @@ export default function Golf() {
     return () => void (live = false);
   }, [holeId, chainName]);
 
-  // a dare in the link (by: the sharer): their best on each hole played, read
-  // on the chain with its round, raced as a ghost (ADR-004), said as the hole
-  // opens; they join the friends. Play solo drops it for the page.
-  const [dare] = useState(() => {
+  // a dare in the link (by: the sharer), or a player picked on a board: their
+  // best on each hole played, read on the chain with its round, raced as a
+  // ghost (ADR-004), said as the hole opens; they join the friends. Play solo
+  // drops it for the page.
+  const [dare, setDare] = useState(() => {
     const by = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("by") : null;
     return by && isAddress(by) ? by : "";
   });
@@ -746,6 +747,17 @@ export default function Golf() {
   useEffect(() => {
     setLinkNote((n) => (duelLost ? lostNote : n === lostNote ? null : n)); // (gone with the rematch)
   }, [duelLost]); // eslint-disable-line react-hooks/exhaustive-deps -- as it turns
+  // a board's Race: that player's ghost here, from the tee (a round under way starts again)
+  const raceWith = (player: string) => {
+    setBoard(false);
+    game.current?.reset();
+    if (player === dare && !solo) return; // (already the rival: a rematch)
+    readFor.current.clear();
+    setRival(null);
+    setSolo(false);
+    setDareHole("");
+    setDare(player);
+  };
   const dropDuel = () => {
     setSolo(true);
     setRival(null);
@@ -1124,7 +1136,8 @@ export default function Golf() {
     setFreshBadges([]);
     if (s && s.official && h) {
       seeWeather(s.kind);
-      award(badgesFor({ strokes, par: parOf(h), pro: s.roundMode === "pro", kind: s.kind, timed: s.timed, cups: after, weathers: weathersSeen() }, badgesEarned()));
+      const duel = racing && { result: duelResult(strokes, racing, "").result, theirs: racing.ghost.strokes, self: racing.self, mixed: racing.ghost.mode !== (s.roundMode || aim) };
+      award(badgesFor({ strokes, par: parOf(h), pro: s.roundMode === "pro", kind: s.kind, timed: s.timed, cups: after, weathers: weathersSeen(), duel }, badgesEarned()));
     }
   };
   // the chain's own badges: a round on it, and first place on a hole's board
@@ -1266,11 +1279,12 @@ export default function Golf() {
                       <span>vs par</span>
                     </div>
                   </div>
+                  {/* the cup's card wide on top, the rest under it (another cup: the cup above) */}
                   <div className="me__row">
-                    <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}>Cup overview</Button>
-                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("pick"); }}>Change gnome</Button>
-                    <Button variant="secondary" onClick={() => { setMenu(false); setBadgesOpen(true); }}>Badges</Button>
-                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("worlds"); }}>All cups</Button>
+                    <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.card}</svg>Cup overview</Button>
+                    <Button variant="secondary" aria-label="Change gnome" onClick={() => { setMenu(false); setScreen("pick"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.gnome}</svg>Gnome</Button>
+                    <Button variant="secondary" onClick={() => { setMenu(false); setBadgesOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.badge}</svg>Badges</Button>
+                    <Button variant="secondary" aria-label="Duel: race a player's ghost on this hole" onClick={() => { setMenu(false); setBoard(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.ghost}</svg>Duel</Button>
                     {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
@@ -1284,18 +1298,6 @@ export default function Golf() {
                   {([["sound", "Sound"], ["vibe", "Vibration"]] as const).map(([k, label]) => (
                     <Toggle key={k} label={label} checked={prefs[k]} onChange={() => toggle(k)} />
                   ))}
-                  <button
-                    className={"btn btn--ghost btn--wipe" + (wipe ? " btn--danger" : "")}
-                    onClick={() => {
-                      if (!wipe) return setWipe(true);
-                      setCard(clearCard());
-                      setWipe(false);
-                    }}
-                    onBlur={() => setWipe(false)}
-                  >
-                    {wipe ? "Sure? Tap again to clear" : "New game · clear my scores"}
-                  </button>
-                  <small className="drawer__note">Clears this browser's scorecard. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
                 </section>
                 <nav className="drawer__list">
                   {s.holes.map((h) => (
@@ -1316,6 +1318,21 @@ export default function Golf() {
                     </button>
                   ))}
                 </nav>
+                {/* last, out of the way: clearing the card */}
+                <div className="drawer__settings">
+                  <button
+                    className={"btn btn--ghost btn--wipe" + (wipe ? " btn--danger" : "")}
+                    onClick={() => {
+                      if (!wipe) return setWipe(true);
+                      setCard(clearCard());
+                      setWipe(false);
+                    }}
+                    onBlur={() => setWipe(false)}
+                  >
+                    {wipe ? "Sure? Tap again to clear" : "New game · clear my scores"}
+                  </button>
+                  <small className="drawer__note">Clears this browser's scorecard. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
+                </div>
               </Dialog>
             </div>
           )}
@@ -1524,7 +1541,7 @@ export default function Golf() {
       )}
 
       {board && s && (
-        <Boards mode={aim} s={s} inHole={screen === "play"} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
+        <Boards mode={aim} s={s} inHole={screen === "play"} onRace={screen === "play" ? raceWith : undefined} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
       )}
 
       {cardOpen && s && (
@@ -2138,6 +2155,14 @@ function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot
     `⛳ ${s.strokes} strokes on ${s.name}. Every bounce computed on-chain. Beat that, gnome.`,
   ]) + tag;
 }
+
+/** The menu's buttons' marks, drawn in the camera button's strokes. */
+const MENU_ICON = {
+  card: <path d="M4 5h16v14H4zM4 10h16M10 10v9" />,
+  gnome: <path d="M12 3 5.5 16h13ZM4 16h16M9 20h6" />,
+  badge: <path d="M12 9.5a5 5 0 1 1 0 10 5 5 0 0 1 0-10M8.5 3l3.5 6.5L15.5 3" />,
+  ghost: <path d="M6 20v-8a6 6 0 0 1 12 0v8l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM10 11v1M14 11v1" />,
+};
 
 /** The address of a cup, as the cup screen puts it in the bar: ?cup=<world>. */
 function cupLink(cup: string) {

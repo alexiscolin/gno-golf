@@ -302,6 +302,16 @@ test("badges: a perfect cup is every hole of a cup under par", () => {
   assert.ok(!badgesFor(finish({ cups: cupsOf({ "garden/1": 2 }) }), []).includes("perfect")); // not all played
 });
 
+test("badges: a duel's two, Ghost buster only for a fair win against a best at par or under", () => {
+  const duel = (d: Partial<NonNullable<Finish["duel"]>>) => ({ result: "win" as const, theirs: 3, self: false, mixed: false, ...d });
+  assert.deepEqual(badgesFor(finish({ strokes: 2, duel: duel({}) }), []), ["ghost"]);
+  assert.deepEqual(badgesFor(finish({ strokes: 3, duel: duel({ theirs: 4 }) }), []), [], "a ghost over par is no feat");
+  assert.deepEqual(badgesFor(finish({ strokes: 2, duel: duel({ self: true }) }), []), [], "your own best is no rival");
+  assert.deepEqual(badgesFor(finish({ strokes: 2, duel: duel({ mixed: true }) }), []), [], "a mixed race is no record");
+  assert.deepEqual(badgesFor(finish({ strokes: 4, duel: duel({ result: "loss" }) }), []), ["sport"]);
+  assert.deepEqual(badgesFor(finish({ strokes: 2 }), []), [], "no duel, neither");
+});
+
 test("badges: the chain's two come from a save, and ids sort rarest first", () => {
   assert.ok(!badgesFor(finish({ strokes: 1 }), []).some((id) => id === "chain" || id === "first"));
   assert.deepEqual(byRarity(["snail", "chain", "first", "ace"]), ["first", "ace", "chain", "snail"]);

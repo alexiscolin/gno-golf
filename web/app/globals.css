@@ -30,6 +30,7 @@
   --pill: 999px; /* a radius that rounds any height's ends */
   --rule: 2px dashed rgba(var(--ink-rgb), .25); /* a dashed rule between a sheet's parts */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font: Fredoka, ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
   /* what only shows (the HUD's hole, strokes and weather cards, the scorecard,
      a note on the lane): flat, a soft edge and no drop shadow; what can be
      pressed keeps --shadow-btn, so the two never look alike */
@@ -73,7 +74,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  font-family: Fredoka, ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  font-family: var(--font);
   color: var(--ink);
   background: var(--sky-day);
   overscroll-behavior: none;
@@ -1147,6 +1148,8 @@ html, body {
   background: var(--ink);
   color: var(--paper);
 }
+.lb li.me .linkish { color: inherit; } /* (Race your best, on the ink row) */
+.lb__race { font-family: var(--font); margin-left: 6px; } /* a button in the name's column, in the game's letters */
 
 .lb__rank {
   font-weight: 700;
@@ -1215,9 +1218,16 @@ html, body {
 }
 
 .me__row .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 10px 6px;
   font-size: 14px;
 }
+.me__row > .btn:first-child { grid-column: 1 / -1; } /* the cup's card, wide on top */
+.me__row > .btn:not(:first-child) { flex-direction: column; gap: 4px; } /* the others: the mark over the word */
+.me__row .btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .tile__best b {
   color: var(--ink);
@@ -2066,7 +2076,7 @@ html, body {
 .rules li { display: grid; grid-template-columns: 9em 1fr; gap: 12px; font-size: 14px; line-height: 1.45; color: var(--ink-soft); }
 .rules b { color: var(--ink); }
 /* the badges: a medal each, its family's colour; grey and dashed until earned */
-.bar.badges__bar { width: 100%; margin: 4px 0 6px; }
+.bar.badges__bar { width: 100%; margin: 14px 0 10px; }
 .badges { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .badges li { position: relative; display: grid; grid-template-columns: 46px 1fr; column-gap: 10px; align-items: center; padding: 8px 12px 8px 8px; border: var(--edge); border-radius: 14px; background: var(--white); }
 .badges li > svg { grid-row: span 2; width: 46px; height: 52px; }
