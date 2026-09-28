@@ -370,9 +370,9 @@ body:has(.sheet) .modetag { visibility: hidden; }
    then it does). The head in the corner buttons' row, room over it and under
    the frame (clear of the network banner's row, 34px + its 48, by as much
    again): the frame gives up its height, never that room. */
-.screen.front--fit { display: flex; flex-direction: column; align-items: center; padding: clamp(28px, 5vh, 48px) 28px 48px; }
+.screen.front--fit { display: flex; flex-direction: column; align-items: center; padding: clamp(28px, 5vh, 48px) clamp(28px, 4vw, 64px) 48px; } /* (clear of the frame at the sides too) */
 body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
-.worlds__in.rival { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 1.8vh, 18px); width: min(var(--front-w), calc(100vw - 48px)); }
+.worlds__in.rival { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 1.8vh, 18px); width: min(var(--front-w), 100%); } /* (the screen's room, its padding off: 100vw overflowed it, a sideways scroll) */
 .rival .front__head { margin: 0; }
 .front--fit .worlds__title { font-size: clamp(34px, min(4.2vw, 6.5vh), 56px); } /* (the picker's own, .screen--pick .pick__name) */
 @media (max-height: 720px) { .front--fit .front__head > .eyebrow { display: none; } }
