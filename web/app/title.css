@@ -328,7 +328,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode--build { --c1: var(--lamp); --c2: var(--sunny); } /* the sun */
 .mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
 .mode[disabled] { cursor: default; }
-.mode[disabled] > :not(.mode__soon, .mode__line) { opacity: .75; } /* (its line stays readable) */
+.mode[disabled] > :not(.mode__soon, .mode__line, .rival__tag) { opacity: .75; } /* (its line stays readable) */
 /* the gnomes stand out over the panel's top edge */
 .mode__stage { position: relative; display: block; min-height: 0; margin-top: -26%; }
 .mode__stage .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -405,7 +405,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
   align-items: center; height: clamp(200px, 30vh, 260px); padding: 12px 18px 14px;
   background: var(--panel-dots), var(--c2);
 }
-.rival__tag { grid-area: tag; justify-self: start; padding-left: 4px; font-size: 13px; }
+.rival__tag { grid-area: tag; justify-self: start; position: relative; z-index: 2; padding-left: 4px; font-size: 13px; } /* (over a tall hat's tip) */
 .rival__dice { width: 24px; height: 24px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
 .rival__dice circle { fill: var(--ink); stroke: none; }
 /* the gnome on his flat disc (the panel's light colour, inked), hopping out of it */

@@ -217,7 +217,7 @@ function Pick({ kind, label, tint, first, row, reading, chain, me, gnome, holes,
   const best = map && `${map.strokes === 1 ? "Ace" : golfTerm(map.strokes, map.par).replace(/!$/, "")} on ${map.name}`;
   // yourself: not connected, or no ghost of yours yet (a round to save first)
   const none = kind === "self" && (!me || (!!show && show.bests.size === 0)), open = !!row && !none;
-  const line = kind === "self" && !me ? "Connect Adena to race your own ghost" : none ? "Save a round: your ghost waits here" : row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
+  const line = kind === "self" && !me ? "Connect Adena to race it" : none ? "Save a round to race it" : row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
   return (
     <button className={`mode rival__pick ${tint}`} disabled={!open} aria-label={open ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : line || "nobody yet"}`} {...on}
       onClick={() => open && row && onPick(row.player, show ? show.bests : undefined)}>
