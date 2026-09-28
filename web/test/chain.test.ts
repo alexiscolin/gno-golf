@@ -745,7 +745,7 @@ test("a newer realm version warns once, then stays quiet", async () => {
   assert.match(String(seen[0][0]), /version 2/);
 });
 
-test("txResult: what a transaction's calls returned, by its hash in base64 or hex; null for none; a bad hash refused", async () => {
+test("txResult: what a transaction's calls returned, by its hash in base64 or hex; null for none; a failed one and a bad hash refused", async () => {
   const chain = makeChain();
   const hex = "ab".repeat(32), b64 = Buffer.from(hex, "hex").toString("base64");
   const data = Buffer.from('("holed in 3 strokes" string)\n\n').toString("base64");
@@ -755,6 +755,9 @@ test("txResult: what a transaction's calls returned, by its hash in base64 or he
   }
   setFetch(() => ({ error: { message: "tx not found" } }));
   assert.equal(await chain.txResult(hex), null);
+  // a transaction that failed on the chain: its log, refused (nothing of it was kept)
+  setFetch(() => ({ result: { tx_result: { ResponseBase: { Error: { "@type": "/std.InternalError" }, Log: "golf: this round's weather is over", Data: null } } } }));
+  await assert.rejects(chain.txResult(hex), (e: unknown) => errorKind(e) === "chain" && /weather is over/.test((e as Error).message));
   await assert.rejects(chain.txResult("nope"), /Not a transaction hash/);
   setFetch(() => ({ __status: 500 }));
   await assert.rejects(chain.txResult(hex), (e: unknown) => errorKind(e) === "down");

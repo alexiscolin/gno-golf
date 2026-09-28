@@ -15,7 +15,7 @@ import { SHARE_TAGS } from "@/lib/site";
 import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
-import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, holedIn, gasOf, roundGas, shortOf, depositBytes, nameBytes, NAME_GAS, PRICE, onWalletChange, type SendError } from "@/lib/adena";
+import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, readBack, replayDiffers, gasOf, roundGas, shortOf, depositBytes, nameBytes, NAME_GAS, PRICE, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, EXTRAS, Emblem, groupOf, worldOf } from "@/components/Worlds";
 import Weather from "@/components/Weather";
@@ -63,12 +63,17 @@ type Account = NonNullable<Awaited<ReturnType<typeof current>>>;
 // the last finished round not yet on the chain, kept for this tab: installing
 // Adena means reloading the page, and the round it was installed for must not go
 const PENDING = "gnogolf.pending";
-const roundOf = (r: SaveOf) => `${r.id}#${r.shots.join(";")}`; // a round's key: its hole and shots
+// a round's key: its hole, mode, weather and shots (the same shots in another mode or weather are another round)
+const roundOf = (r: SaveOf) => `${r.id}#${r.roundMode || "assisted"}#${r.period ?? ""}#${r.shots.join(";")}`;
 
-/** How a save goes: signing (part of of), refused (why; stale: its weather is over), or saved. */
+/** How a save goes: signing (part of of), checking (sent: the chain read back), refused (why; stale: its
+ *  weather is over), unsure (why; sent: Adena said it went, so a save again only reads it again, by its
+ *  hash if Adena gave one; else it may have gone: the player checks before saving again), or saved. */
 type Rec = null
   | { at: "signing"; part?: number; of?: number }
+  | { at: "checking" }
   | { at: "refused"; error: string; stale: boolean }
+  | { at: "unsure"; error: string; sent: boolean; hash?: string }
   | { at: "saved" };
 
 /** Config travels in the query string, so one build serves any chain. */
@@ -995,30 +1000,65 @@ export default function Golf() {
     // busy before anything is awaited: a second click must not start a second save
     if (lock.current) return;
     // a round that went through is not sent again: the chain would play it again, and charge for it
-    const sentAs = sentRounds.current.get(roundOf(r));
-    if (sentAs) return land(sentAs);
+    // (one the chain could not confirm yet is read again, not sent)
+    const key = roundOf(r), sentAs = sentRounds.current.get(key);
+    if (sentAs && !(sentAs.at === "unsure" && sentAs.sent)) return land(sentAs);
     lock.current = true;
-    land({ at: "signing" });
+    land(sentAs ? { at: "checking" } : { at: "signing" });
     // the save's funnel (analytics): the part being signed, of how many, and the gas asked
     const t0 = performance.now(), at = { part: 0, parts: 0, gas: 0 };
     const said = (stage: Events["save"]["stage"], reason?: string) => track("save", { stage, ...at, ms: Math.round(performance.now() - t0), reason });
+    const chain = game.current.chain, hole = r.id, mode = r.roundMode || "assisted";
+    // read every ms until ok has it (at most n reads, while on() holds): the last one read, null for none
+    const until = async <T,>(read: () => Promise<T>, ok: (got: T) => boolean, n: number, ms: number, on = () => true) => {
+      let got: T | null = null;
+      for (let k = 0; k < n && on(); k++) {
+        got = await read().catch(() => null);
+        if (got !== null && ok(got)) break;
+        await wait(ms);
+      }
+      return got;
+    };
+    const roundHere = () => chain.round(hole, account.address), bestHere = () => chain.ghost(hole, mode, account.address);
+    /**
+     * The last commit settled: what it did, as the chain says it (readBack),
+     * read again while the chain cannot say, and never saved without that.
+     * sent: Adena said it went; seen: its best was seen landing; adena:
+     * Adena's error, when it did not say.
+     */
+    const settle = async (hash: string | undefined, sent: boolean, seen = false, adena = "") => {
+      const read = () => readBack(chain, { hole, player: account.address, strokes: r.strokes, hash, sent });
+      let got = seen ? { holed: r.strokes, left: null } : await read();
+      for (let k = 0; got === undefined && (hash || sent) && k < 10; k++) land({ at: "checking" }), await wait(3000), (got = await read());
+      void within(chain.balance(account.address)).then(setFunds).catch(() => {});
+      if (got === undefined) {
+        said("failed", "unconfirmed");
+        const rec: Rec = sent
+          ? { at: "unsure", sent, hash, error: "Sent, but the chain could not confirm it yet. Check again in a moment: saving it again would pay twice." }
+          : { at: "unsure", sent, hash, error: `Adena did not confirm it (${adena.replace(/\.$/, "")}), but it may have gone through all the same: see your best on gno.land before saving again, or it is paid twice.` };
+        if (sent) sentRounds.current.set(key, rec);
+        return land(rec);
+      }
+      // the round went through, whatever the chain made of it: saving it again would only play it again
+      const rec: Rec = got.holed === r.strokes ? { at: "saved" } : { at: "refused", stale: false, error: replayDiffers(got.holed ?? got.left, got.holed != null) };
+      sentRounds.current.set(key, rec);
+      if (rec.at === "saved") {
+        said("ok");
+        land(rec);
+        award(["chain"], hole);
+        const row = ((s && s.allHoles) || []).find((h) => h.id === hole);
+        setOnChainCard(markOnChain(cardKey(row || { id: hole }), r.strokes));
+        if (roundKey.current.startsWith(hole + "#")) (setSaved(true), setGhostHere(true)); // (still on that hole: a kept round may be another's)
+        movedGhosts.current.add(hole);
+        setSaves((n) => n + 1);
+      } else said("failed", "replay"), land(rec);
+    };
     try {
+      if (sentAs && sentAs.at === "unsure") return await settle(sentAs.hash, true);
       // a round whose weather is over can no longer be saved: the chain would refuse it
       // (its clock read again first: the chain's time decides, not this browser's)
-      await game.current.chain.sync().catch(() => {});
-      if (r.period != null && game.current.chain.now() >= saveBy(r.period)) return said("failed", "late"), land({ at: "refused", error: "Too late to save: the weather changed. Play the hole again to save it.", stale: true });
-      const chain = game.current.chain, hole = r.id, mode = r.roundMode || "assisted";
-      // read every ms until ok has it (at most n reads, while on() holds): the last one read, null for none
-      const until = async <T,>(read: () => Promise<T>, ok: (got: T) => boolean, n: number, ms: number, on = () => true) => {
-        let got: T | null = null;
-        for (let k = 0; k < n && on(); k++) {
-          got = await read().catch(() => null);
-          if (got !== null && ok(got)) break;
-          await wait(ms);
-        }
-        return got;
-      };
-      const roundHere = () => chain.round(hole, account.address), bestHere = () => chain.ghost(hole, mode, account.address);
+      await chain.sync().catch(() => {});
+      if (r.period != null && chain.now() >= saveBy(r.period)) return said("failed", "late"), land({ at: "refused", error: "Too late to save: the weather changed. Play the hole again to save it.", stale: true });
       const id = chainId || (await within(chain.chainId()));
       // asked before Adena opens: how many transactions the round needs, or
       // why the chain would refuse it
@@ -1033,7 +1073,6 @@ export default function Golf() {
       const named = name ? { registrar: await within(chain.nameReg()), name } : null;
       at.parts = parts.length;
       said("sent");
-      let tx: { hash?: string } | null = null, seen = false; // the last commit's, and whether its best was seen landing
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k], last = k + 1 === parts.length;
         // the player has left this round (Play again, another hole): no more of it goes to Adena
@@ -1049,9 +1088,6 @@ export default function Golf() {
         const sent = recordRound({
           address: account.address, realm: chain.realm, hole, shots: r.shots.slice(from, to), reset: k === 0 && under,
           gas: gasOf(r, from, to), period: r.period, mode, price: gasPrice, chainId: id, rpc: chain.rpc, named: k === 0 ? named : null,
-        }).catch((err: SendError) => {
-          if (k > 0) err.message = `Part ${k} of ${parts.length} is on-chain, part ${k + 1} was not sent (${err.message}). Save again to send the whole round.`, (err.cancelled = false);
-          throw err;
         });
         // Adena answers only once its window is closed: the chain is watched
         // meanwhile, and a commit it holds counts as sent (Adena's answer, if
@@ -1059,46 +1095,30 @@ export default function Golf() {
         let open = before !== undefined;
         const landed = until<{ strokes: number } | null>(read, landedHere, 120, 1500, () => open).then(landedHere);
         void sent.catch(() => {}); // raced below; a late refusal after the chain has it is moot
-        const got = await Promise.race<{ hash?: string } | null | true>([sent, landed.then((ok): Promise<{ hash?: string } | null | true> | true => (ok ? true : sent))]).finally(() => (open = false));
-        if (last) (tx = got === true ? null : got), (seen = got === true);
-        // a commit seen on the chain before Adena answered: its window may
-        // still be open, and Adena refuses a second one meanwhile
-        if (k + 1 < parts.length) await Promise.race([sent.catch(() => {}), wait(10_000)]);
+        let got: { hash?: string } | null | true;
+        try {
+          got = await Promise.race<{ hash?: string } | null | true>([sent, landed.then((ok): Promise<{ hash?: string } | null | true> | true => (ok ? true : sent))]).finally(() => (open = false));
+        } catch (e) {
+          const err = e as SendError;
+          // the last commit, failed in Adena for no reason that says it never went (a replay
+          // that is not a best cannot be seen landing): the chain is asked by its hash
+          if (last && err.maybe) return await settle(err.hash, false, false, err.message);
+          if (k > 0) (err.message = `Part ${k} of ${parts.length} is on-chain, part ${k + 1} was not sent (${err.message}). Save again to send the whole round.`), (err.cancelled = false);
+          throw err;
+        }
         // the name is the player's once the first part is in: a retry of the rest must not take it again
         if (k === 0 && named) setNamedAs(named.name), nudge.named(), track("name_registered", { ok: true, via: "save" });
-        // the next part continues the round: it waits until the chain has this one
-        if (!last) await until(roundHere, (got) => !!got && got.strokes >= to, 10, 1000);
+        // signed is not recorded: what the last commit did, the chain says
+        if (last) return await settle(got === true ? undefined : (got && got.hash) || undefined, true, got === true);
+        // a commit seen on the chain before Adena answered: its window may
+        // still be open, and Adena refuses a second one meanwhile
+        await Promise.race([sent.catch(() => {}), wait(10_000)]);
+        // the next part continues the round: it waits until the chain has this one, and
+        // goes no further without it (the round holed sooner, or the chain slow to show it)
+        const going = await until(roundHere, (got) => !!got && got.strokes >= to, 10, 1000);
+        if (!going || going.strokes < to)
+          throw new Error(`Part ${k + 1} of ${parts.length} was sent, but the chain does not show the round going on from it: part ${k + 2} was not sent. Save again to send the whole round.`);
       }
-      void within(chain.balance(account.address)).then(setFunds).catch(() => {});
-      // signed is not recorded: what the last commit did, as its result says
-      // (a holed round is not kept), else as the chain shows it
-      const result = tx && tx.hash ? await chain.txResult(tx.hash).catch(() => null) : null;
-      let holed = holedIn(result), left = result ? Number((result.match(/after (\d+) strokes/) || [])[1]) || null : null;
-      if (result == null && !seen) {
-        // no result to read: a round still under way here is the replay ending otherwise; none, it was holed
-        const now = await roundHere().catch(() => null);
-        if (now && now.strokes >= r.strokes) left = now.strokes;
-        else holed = r.strokes;
-      }
-      // the round went through, whatever the chain made of it: saving it again would only play it again
-      const rec: Rec = seen || holed === r.strokes
-        ? { at: "saved" }
-        : {
-          at: "refused",
-          stale: false,
-          error: `The chain's replay ended differently (${holed != null ? `${holed} strokes, holed` : `${left ?? "?"} strokes, not holed`}): this hole moves between shots. Play it again to save.`,
-        };
-      sentRounds.current.set(roundOf(r), rec);
-      if (rec.at === "saved") {
-        said("ok");
-        land(rec);
-        award(["chain"], hole);
-        const row = ((s && s.allHoles) || []).find((h) => h.id === hole);
-        setOnChainCard(markOnChain(cardKey(row || { id: hole }), r.strokes));
-        if (roundKey.current.startsWith(hole + "#")) (setSaved(true), setGhostHere(true)); // (still on that hole: a kept round may be another's)
-        movedGhosts.current.add(hole);
-        setSaves((n) => n + 1);
-      } else said("failed", "replay"), land(rec);
     } catch (err) {
       const cancelled = !!(err as SendError).cancelled, reason = cancelled ? undefined : failure(err);
       said(cancelled ? "cancelled" : "failed", reason);
@@ -1636,14 +1656,10 @@ export default function Golf() {
                 </Button>
               )}
               {canSave && (
-                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={record?.at === "signing" || !nameReady} onClick={() => void recordIt()}>
+                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={busy(record) || !nameReady} onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
-                  {record?.at === "signing" ? (
-                    record.of === undefined ? "Waiting for Adena…" : `Adena: part ${record.part} of ${record.of}…`
-                  ) : (
-                    "Save on-chain"
-                  )}
-                  {nudge.at > 0 && record?.at !== "signing" && !(!account && isTouch() && !hasAdena()) && (
+                  {record?.at === "signing" && record.of !== undefined ? `Adena: part ${record.part} of ${record.of}…` : saveLabel(record)}
+                  {nudge.at > 0 && !busy(record) && !(!account && isTouch() && !hasAdena()) && (
                     // (a phone with no wallet can't take it: no promise there)
                     <span className="btn__rank">{!account ? `Could be #${nudge.at}` : askName && !saveName ? `#${nudge.at} with a name` : `Take #${nudge.at} on this hole!`}</span>
                   )}
@@ -1875,23 +1891,34 @@ export default function Golf() {
   );
 }
 
+// a save under way: its button waits
+const busy = (rec: Rec) => rec?.at === "signing" || rec?.at === "checking";
+// a save's button: what a click does now (a round sent but not confirmed yet is only read again)
+const saveLabel = (rec: Rec) =>
+  rec?.at === "signing" ? "Waiting for Adena…" : rec?.at === "checking" ? "Checking the chain…" : rec?.at === "unsure" && rec.sent ? "Check again" : "Save on-chain";
+
 // named: a name just taken with it, said in the same line
 function RecordState({ record, account, s, chain, named = "" }: { record: Rec; account: Account | null; s: Snapshot; chain: Chain | null; named?: string }) {
   if (!record) return null;
+  // the player's page on the hole: their best there (a holed round is not kept)
+  const best = chain && account && (
+    <a href={chain.roundURL(s.id || "", account.address)} target="_blank" rel="noopener noreferrer">
+      See your best on gno.land ↗
+    </a>
+  );
   switch (record.at) {
     case "signing":
       return record.of === undefined ? null : <p className="note">This round is saved in {record.of} transactions: one shot list is more than one transaction can replay here. Adena asks {record.of} times.</p>;
+    case "checking":
+      return <p className="note">Sent. Reading it back from the chain…</p>;
     case "refused":
       return record.stale ? null : <p className="note note--bad">{record.error}</p>;
+    case "unsure":
+      return <p className="note note--bad">{record.error} {best}</p>;
   }
   return (
     <p className="note note--good">
-      Saved on-chain{named ? <> as <b>{named}</b>: you&apos;re on the boards</> : ""}. Your link now dares friends to race it.{" "}
-      {chain && account && (
-        <a href={chain.roundURL(s.id || "", account.address)} target="_blank" rel="noopener noreferrer">
-          See your round on gno.land ↗
-        </a>
-      )}
+      Saved on-chain{named ? <> as <b>{named}</b>: you&apos;re on the boards</> : ""}. Your link now dares friends to race it. {best}
     </p>
   );
 }
@@ -1925,10 +1952,10 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
         <>
           <span className="pending__say">
             <span>Your <b>{strokesWord(r.strokes)}</b> on <b>{r.name}</b> {r.strokes > 1 ? "are" : "is"} waiting{left != null && <> · <b>{mmss(left)}</b> left</>}</span>
-            {rec?.at === "refused" && <small className="pending__err" role="alert">{rec.error}</small>}
+            {(rec?.at === "refused" || rec?.at === "unsure") && <small className="pending__err" role="alert">{rec.error}</small>}
           </span>
-          <Button variant="secondary" className="btn--save" disabled={rec?.at === "signing"} onClick={onSave}>
-            {rec?.at === "signing" ? "Waiting for Adena…" : "Save on-chain"}
+          <Button variant="secondary" className="btn--save" disabled={busy(rec)} onClick={onSave}>
+            {saveLabel(rec)}
           </Button>
         </>
       )}

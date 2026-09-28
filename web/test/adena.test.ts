@@ -22,13 +22,19 @@ import {
   registerName,
   claimRounds,
   gnokeyPlan,
+  gnokeyPaste,
   holedIn,
+  readBack,
   depositBytes,
   sendTip,
   shortOf,
   costOf,
 } from "../lib/adena.ts";
 import type { HoleState, SimulateRound, Vec2 } from "../lib/types.ts";
+import { execFileSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // a well-formed gno.land address (g1 + 38 [0-9a-z]): the one real check
 // connect()/current() run on Adena's answer
@@ -413,8 +419,8 @@ test("roundGas: a round in several commits pays each commit's call and fixed gas
 });
 
 // ------------------------------------------------------------------ chainSplit
-const simRes = (rest: Vec2, strokes: number, period: number): SimulateRound => ({
-  version: 1, path: [rest], air: "", cause: "", rest, holed: false, bounces: 0, strokes, period,
+const simRes = (rest: Vec2, strokes: number, period: number, holed = false): SimulateRound => ({
+  version: 1, path: [rest], air: "", cause: "", rest, holed, bounces: 0, strokes, period,
 });
 
 function fakeChain(script: {
@@ -444,7 +450,7 @@ test("chainSplit: a chain refusal ('commit the first N') retries smaller, then c
       if (i === 0) throw new Error("golf: commit the first 2 shots only");
       return simRes([1, 1], shots.length, 7);
     },
-    simulateCommit: (_i, shots) => simRes([2, 2], shots.length, 7),
+    simulateCommit: (_i, shots, from) => simRes([2, 2], from + shots.length, 7, true),
   });
   const parts = await chainSplit(chain, { id: "garden/7", shots: ["1,1", "2,2", "3,3"], pts: [10, 10, 10] }, 7);
   assert.deepEqual(parts, [[0, 2], [2, 3]]);
@@ -466,6 +472,19 @@ test("chainSplit: a refusal naming fewer than one shot cannot be honoured", asyn
     () => chainSplit(chain, { id: "beach/2", shots: ["1,1", "2,2", "3,3"], pts: [10, 10, 10] }, 1),
     /Even one shot of this round is more than one transaction can replay/,
   );
+});
+
+test("chainSplit: a round the chain holes before its last shot, or not at all, is refused before anything is sent", async () => {
+  const shots = ["1,1", "2,2", "3,3"], s = { id: "garden/7", shots, pts: [10, 10, 10] };
+  // part 1 of 2 holes on the chain: part 2 would start a new round from the tee
+  const cut = fakeChain({ simulateRound: (i) => { if (i === 0) throw new Error("golf: commit the first 2"); return simRes([5, 5], 2, 7, true); } });
+  await assert.rejects(chainSplit(cut, s, 7), /replay ended differently \(2 strokes, holed\)/);
+  assert.deepEqual(cut.calls.map((c) => c.name), ["simulateRound", "simulateRound"], "no SimulateCommit after a part that holes");
+  // one commit holed before its last shot, and one that never holes
+  await assert.rejects(chainSplit(fakeChain({ simulateRound: () => simRes([5, 5], 2, 7, true) }), s, 7), /\(2 strokes, holed\)/);
+  await assert.rejects(chainSplit(fakeChain({ simulateRound: () => simRes([5, 5], 3, 7) }), s, 7), /\(3 strokes, not holed\)/);
+  // holed on its last shot: one commit
+  assert.deepEqual(await chainSplit(fakeChain({ simulateRound: () => simRes([5, 5], 3, 7, true) }), s, 7), [[0, 3]]);
 });
 
 test("chainSplit: any other refusal is not retried", async () => {
@@ -575,8 +594,30 @@ test("recordRound: cancelled in Adena is flagged; a refused (chain) error is not
     assert.ok(e instanceof Error);
     assert.match(e.message, /golf: hole not found/);
     assert.equal((e as SendError).cancelled, false);
+    assert.equal((e as SendError).maybe, false, "the chain's refusal: nothing was kept");
     return true;
   });
+});
+
+test("recordRound: an Adena failure that does not say nothing went may have landed, with its hash when Adena gives one", async () => {
+  const cases: { res: Res; maybe: boolean; hash?: string }[] = [
+    { res: { status: "failure", code: 4001, type: "TRANSACTION_FAILED", message: "Adena could not execute the transaction", data: { hash: "aGFzaA==" } }, maybe: true, hash: "aGFzaA==" },
+    { res: { status: "failure", message: "timeout" }, maybe: true },
+    { res: { status: "failure", code: 4000 }, maybe: false },
+    { res: { status: "failure", code: 2000 }, maybe: false },
+    { res: { status: "failure", code: 1001 }, maybe: false },
+    { res: { status: "failure", code: 1000 }, maybe: false },
+    { res: { status: "failure", data: { log: "panic: golf: bad hole", hash: "aGFzaA==" } }, maybe: false, hash: "aGFzaA==" },
+  ];
+  for (const { res, maybe, hash } of cases) {
+    const { a } = fakeAdena({ DoContract: () => res });
+    setWindow({ adena: a });
+    await assert.rejects(() => recordRound(roundArgs()), (e: unknown) => {
+      assert.equal((e as SendError).maybe, maybe, JSON.stringify(res));
+      assert.equal((e as SendError).hash, hash, JSON.stringify(res));
+      return true;
+    });
+  }
 });
 
 // -------------------------------------------------------------------- why()
@@ -665,13 +706,16 @@ test("gnokeyPlan: an empty, period-less-pro, or badly-shaped round is nothing to
   assert.deepEqual(gnokeyPlan({ id: "bad id!", shots: ["1,1"], period: 1 }, { realm: REALM, rpc: RPC, chainId: CHAIN }), []);
 });
 
-test("gnokeyPlan: one commit is one plain call, PlayRoundAt with its shots quoted, no Reset (a holed round is not kept)", () => {
+test("gnokeyPlan: one commit is one plain call, PlayRoundAt with its shots quoted, after a Reset (a round left unfinished would go on otherwise)", () => {
   const plan = gnokeyPlan(
     { id: "garden/7", name: "My Round", shots: ["1,1", "2,2"], period: 5, roundMode: "assisted", pts: [10, 10], walls: 0, pieces: 0, official: true },
     { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC },
   );
   // gasOf: 30M PER_CALL + 2*22M shots = 74M, official: no DECODE_MAX
-  assert.deepEqual(plan, [`gnokey maketx call -pkgpath ${REALM} -func PlayRoundAt -args garden/7 -args '1,1;2,2' -args 5 -gas-fee 111000ugnot -gas-wanted 74000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`]);
+  assert.deepEqual(plan, [
+    `gnokey maketx call -pkgpath ${REALM} -func Reset -args garden/7 -gas-fee 45000ugnot -gas-wanted 30000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+    `gnokey maketx call -pkgpath ${REALM} -func PlayRoundAt -args garden/7 -args '1,1;2,2' -args 5 -gas-fee 111000ugnot -gas-wanted 74000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+  ]);
 });
 
 test("gnokeyPlan: several commits start with a Reset of their own, so a paste run again starts afresh", () => {
@@ -695,10 +739,10 @@ test("gnokeyPlan: an explicit `parts` overrides the natural commitsOf split", ()
 
 test("gnokeyPlan: mode=pro with a period plays PlayRoundPro; period=null and mode=assisted plays PlayRound with no extra arg", () => {
   const pro = gnokeyPlan({ id: "beach/2", shots: ["1,1"], period: 9, roundMode: "pro", pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC });
-  assert.match(pro[0], /-func PlayRoundPro -args beach\/2 -args '1,1' -args 9 -gas-fee/);
+  assert.match(pro[1], /-func PlayRoundPro -args beach\/2 -args '1,1' -args 9 -gas-fee/);
 
   const noPeriod = gnokeyPlan({ id: "beach/2", shots: ["1,1"], period: null, roundMode: "assisted", pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC });
-  assert.match(noPeriod[0], /-func PlayRound -args beach\/2 -args '1,1' -gas-fee/);
+  assert.match(noPeriod[1], /-func PlayRound -args beach\/2 -args '1,1' -gas-fee/);
 });
 
 test("gnokeyPlan: a community hole (official: false) asks DECODE_MAX more gas than the same round official", () => {
@@ -706,10 +750,10 @@ test("gnokeyPlan: a community hole (official: false) asks DECODE_MAX more gas th
   const off = gnokeyPlan({ ...s, official: true }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const comm = gnokeyPlan({ ...s, official: false }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const gasOfCmd = (c: string) => Number(/-gas-wanted (\d+)/.exec(c)![1]);
-  assert.equal(gasOfCmd(comm[0]) - gasOfCmd(off[0]), 115_000_000);
+  assert.equal(gasOfCmd(comm[1]) - gasOfCmd(off[1]), 115_000_000);
   // the realm's own figure said (Weather() "gas"): it holds the decoding already
   const said = gnokeyPlan({ ...s, official: false, fixed: 40_000_000 }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
-  assert.equal(gasOfCmd(said[0]) - gasOfCmd(off[0]), 40_000_000);
+  assert.equal(gasOfCmd(said[1]) - gasOfCmd(off[1]), 40_000_000);
 });
 
 test("gnokeyPlan: an invalid chain id or rpc falls back to a placeholder in the command", () => {
@@ -720,6 +764,66 @@ test("gnokeyPlan: an invalid chain id or rpc falls back to a placeholder in the 
 test("gnokeyPlan: nothing a shell would read otherwise goes in (a shot, the realm)", () => {
   assert.deepEqual(gnokeyPlan({ id: "garden/7", shots: ["1,1'; rm -rf ~"], period: 1, pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC }), []);
   assert.deepEqual(gnokeyPlan({ id: "garden/7", shots: ["1,1"], period: 1, pts: [10] }, { realm: "gno.land/r/x; ls", chainId: CHAIN, rpc: RPC }), []);
+});
+
+// gnokeyPaste run for real, in bash and zsh, with a fake gnokey (and sleep) on
+// the PATH: a first try per call refused for a stale sequence, as a node does
+// for a transaction signed before the one before landed, then taken
+function runPaste(shell: string, gnokey: string, calls = 2) {
+  const dir = mkdtempSync(join(tmpdir(), "paste-"));
+  try {
+    writeFileSync(join(dir, "gnokey"), `#!/bin/sh\necho "$*" >>"${dir}/log"\n${gnokey}\n`);
+    writeFileSync(join(dir, "sleep"), "#!/bin/sh\n");
+    chmodSync(join(dir, "gnokey"), 0o755), chmodSync(join(dir, "sleep"), 0o755);
+    const plan = gnokeyPlan({ id: "garden/7", shots: ["1,1"], period: 5, pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC }).slice(0, calls);
+    let status = 0;
+    try {
+      execFileSync(shell, ["-c", gnokeyPaste(plan, "'my key'")], { env: { PATH: `${dir}:/usr/bin:/bin` }, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) {
+      status = (e as { status: number }).status;
+    }
+    return { status, log: readFileSync(join(dir, "log"), "utf8").trim().split("\n") };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+for (const shell of ["bash", "zsh"].filter((sh) => existsSync(`/bin/${sh}`))) {
+  test(`gnokeyPaste (${shell}): a stale sequence is sent again a block later; any other failure stops the paste`, () => {
+    // each call refused once ("signature verification failed"), then taken
+    const stale = runPaste(shell, `n=$(grep -c . "$(dirname "$0")/log"); if [ $((n % 2)) = 1 ]; then echo "signature verification failed" >&2; exit 1; fi; echo "OK!"; echo "TX HASH: x"`);
+    assert.equal(stale.status, 0);
+    assert.equal(stale.log.length, 4);
+    assert.match(stale.log[0], /-func Reset .* my key$/);
+    assert.match(stale.log[3], /-func PlayRoundAt /);
+    // a chain refusal: not sent again, and nothing after it
+    const panic = runPaste(shell, `echo "panic: golf: no such hole" >&2; exit 1`);
+    assert.notEqual(panic.status, 0);
+    assert.equal(panic.log.length, 1);
+    // a sequence still stale after three tries: the paste stops
+    const stuck = runPaste(shell, `echo "signature verification failed" >&2; exit 1`);
+    assert.notEqual(stuck.status, 0);
+    assert.equal(stuck.log.length, 3);
+  });
+}
+
+test("readBack: a save's last commit as the chain says it, never saved without evidence", async () => {
+  const hash = "ab".repeat(32), base = { hole: "garden/7", player: ADDR, strokes: 3 };
+  const chainOf = (tx: () => Promise<string | null>, round: () => Promise<{ strokes: number } | null>) =>
+    ({ txResult: tx, round }) as unknown as Parameters<typeof readBack>[0];
+  const down = () => Promise.reject(Object.assign(new Error("RPC down"), { kind: "down" }));
+  // its result, by hash
+  assert.deepEqual(await readBack(chainOf(() => Promise.resolve('("holed in 3 strokes" string)'), down), { ...base, hash, sent: true }), { holed: 3, left: null });
+  assert.deepEqual(await readBack(chainOf(() => Promise.resolve('("2 shots replayed, ball at 1.0,2.0 after 5 strokes" string)'), down), { ...base, hash, sent: false }), { holed: null, left: 5 });
+  // failed on the chain: its log, thrown
+  await assert.rejects(readBack(chainOf(() => Promise.reject(Object.assign(new Error("golf: weather over"), { kind: "chain" })), down), { ...base, hash, sent: false }), /weather over/);
+  // the RPC down for both reads: the chain cannot say (not "saved")
+  assert.equal(await readBack(chainOf(down, down), { ...base, hash, sent: true }), undefined);
+  // sent (Adena said so), no result: the round the chain shows
+  assert.deepEqual(await readBack(chainOf(() => Promise.resolve(null), () => Promise.resolve(null)), { ...base, hash, sent: true }), { holed: 3, left: null });
+  assert.deepEqual(await readBack(chainOf(() => Promise.resolve(null), () => Promise.resolve({ strokes: 4 })), { ...base, sent: true }), { holed: null, left: 4 });
+  // not sent as far as Adena knows: no round there is no evidence
+  assert.equal(await readBack(chainOf(() => Promise.resolve(null), () => Promise.resolve(null)), { ...base, hash, sent: false }), undefined);
+  assert.equal(await readBack(chainOf(down, () => Promise.resolve(null)), { ...base, sent: false }), undefined);
 });
 
 test("holedIn: the strokes a save's result says, none when it did not hole", () => {

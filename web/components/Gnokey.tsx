@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { gnokeyPlan, chainSplit } from "@/lib/adena";
+import { gnokeyPlan, gnokeyPaste, chainSplit } from "@/lib/adena";
 import { Button } from "@/components/ui";
 import { messageOf, useCopied } from "@/components/common";
 import type { Chain } from "@/lib/chain";
@@ -9,10 +9,10 @@ import type { Snapshot } from "@/lib/engine";
 
 // "Use gnokey instead": the calls Adena would sign, as one paste for a
 // terminal (bash or zsh: macOS, Linux, WSL) that needs gnokey and nothing
-// else: one plain `gnokey maketx call` per commit (a round of several begins
-// with a Reset of its own, so a paste run again starts afresh), and the paste
-// stops at the first that fails. Collapsed by default; the key name is the
-// player's own, kept in this browser.
+// else: one plain `gnokey maketx call` per commit, after a Reset of its own
+// (gnokeyPlan), each sent again a block later if the node had not taken the
+// one before yet, and the paste stops at the first that fails (gnokeyPaste).
+// Collapsed by default; the key name is the player's own, kept in this browser.
 const KEY = "gnogolf.gnokey";
 // any name gnokey takes, quoted for the shell: all but a quote and control characters
 const keyOk = (k: string) => /^[^'\\\u0000-\u001f]{1,64}$/.test(k);
@@ -44,15 +44,8 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
   if (!plan.length) return null;
   const checking = !!mine && !mine.parts && !mine.bad;
   const name = key.trim(), ready = keyOk(name);
-  // what is shown is what is copied: a subshell that stops at the first failure
-  const who = `'${ready ? name : "YOUR_KEY_NAME"}'`;
-  const body = plan
-    .map((command, k) => [
-      ...(plan.length > 1 ? [`echo "Gnogolf: transaction ${k + 1} of ${plan.length}"`] : []),
-      command.replace("<your-key-name>", who),
-    ].join("\n"))
-    .join("\n\n");
-  const all = `(\nset -e\n${body}\n)`;
+  // what is shown is what is copied
+  const all = gnokeyPaste(plan, `'${ready ? name : "YOUR_KEY_NAME"}'`);
   const onKey = (v: string) => {
     setKey(v);
     try { localStorage.setItem(KEY, v.trim()); } catch {}
@@ -67,7 +60,7 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
             <input className="gnokey__key" value={key} onChange={(e) => onKey(e.target.value)} placeholder="my-key" aria-label="Your gnokey key name" aria-invalid={!!name && !ready} spellCheck={false} autoCapitalize="off" autoComplete="off" />
             {name && !ready && <small className="gnokey__bad">A key name here can't hold a quote ( ' ) or a backslash.</small>}
           </li>
-          <li>Copy it, paste it in a terminal (macOS, Linux or WSL) and type your key's password{plan.length > 1 ? ` (${plan.length} times: one per transaction)` : ""}. It works while this round's weather lasts: see the countdown above.</li>
+          <li>Copy it, paste it in a terminal (macOS, Linux or WSL) and type your key's password ({plan.length} times: one per transaction). It works while this round's weather lasts: see the countdown above.</li>
         </ol>
         <pre className="mono gnokey__code">{all}</pre>
         <div className="gnokey__row">
@@ -75,7 +68,7 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
           <span className="real__fine">
             {mine && mine.bad ? <span className="gnokey__bad">{mine.bad}</span>
               : checking ? "Asking the chain how it cuts this round…"
-              : ready ? <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b>{plan.length > 1 ? " for each" : ""}.</> : "Type your key name first."}
+              : ready ? <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b> for each.</> : "Type your key name first."}
           </span>
         </div>
       </div>

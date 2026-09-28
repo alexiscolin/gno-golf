@@ -490,7 +490,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      * What a transaction's calls returned, as the node printed them (a call's
      * result, `("holed in 3 strokes" string)`, one after the other), from its
      * hash as a wallet gives it (base64, or hex); null when the node has no
-     * such transaction. A holed round is not kept: this is how a save knows.
+     * such transaction, refused (errorKind "chain", its log) when it failed:
+     * nothing of it was kept. A holed round is not kept: this is how a save knows.
      */
     txResult: async (hash: string) => {
       let hex = "";
@@ -499,17 +500,19 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       } catch {}
       if (hex.length !== 64) throw refused("Not a transaction hash.");
       const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT);
+      let r;
       try {
         const res = await fetch(`${rpc}/tx?hash=0x${hex}`, { signal: c.signal });
         if (!res.ok) throw new Error(`RPC ${res.status}`);
-        const body = (await res.json()) as { error?: unknown; result?: { tx_result?: { ResponseBase?: { Data?: string } } } };
-        const r = body.result && body.result.tx_result && body.result.tx_result.ResponseBase;
-        return r ? utf8(r.Data || "") : null;
+        const body = (await res.json()) as { error?: unknown; result?: { tx_result?: { ResponseBase?: { Error?: unknown; Log?: string; Data?: string } } } };
+        r = body.result && body.result.tx_result && body.result.tx_result.ResponseBase;
       } catch (e) {
         throw down(e);
       } finally {
         clearTimeout(t);
       }
+      if (r && r.Error) throw refused(r.Log || "The transaction failed.", r.Log);
+      return r ? utf8(r.Data || "") : null;
     },
   };
 }

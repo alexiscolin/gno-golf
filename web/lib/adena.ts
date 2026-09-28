@@ -10,7 +10,7 @@
 // itself — the page sends decisions, never outcomes — so a recorded score is
 // one nobody can type in.
 
-import { RULES, isAddress, type Chain } from "./chain";
+import { RULES, isAddress, errorKind, type Chain } from "./chain";
 import { trackError } from "./analytics";
 import type { HoleState, Mode, Vec2, Zone } from "./types";
 
@@ -54,9 +54,15 @@ declare global {
     adena?: Adena;
   }
 }
-/** A transaction Adena did not send; cancelled when the player said no. */
+/** A transaction Adena did not send; cancelled when the player said no.
+ *  maybe: Adena failed without a reason that says nothing went (no refusal
+ *  in the chain's words, not locked, busy or unconnected: a timeout, say),
+ *  so it may have landed all the same; hash: the transaction's, when Adena
+ *  gives it, by which the chain can tell. */
 export interface SendError extends Error {
   cancelled?: boolean;
+  maybe?: boolean;
+  hash?: string;
 }
 /** What the work model counts for a round (the engine's snapshot has them):
  *  walls, pieces, the forecast's kind, each stroke's path length. */
@@ -86,17 +92,22 @@ function why(res: AdenaRes | null | undefined, fallback: string) {
   trackError("adena", said, { code: res && res.code, type: res && res.type, what: fallback });
   return said;
 }
+// Adena's codes for a transaction that never left it
+const UNSENT = [CANCELLED, LOCKED, BUSY, NOT_CONNECTED];
 function words(res: AdenaRes | null | undefined, fallback: string) {
   const code = res && res.code;
   if (code === CANCELLED) return "Cancelled in Adena — nothing was sent.";
   if (code === LOCKED) return "Adena is locked. Unlock it and try again.";
   if (code === BUSY) return "An Adena window is already open. Finish or close it first.";
   if (code === NOT_CONNECTED) return "Adena is not connected to this page yet.";
-  // a refused transaction: the chain's own words, where Adena passes them on
+  return refusal(res) || (res && res.message) || fallback;
+}
+/** A refused transaction: the chain's own words, where Adena passes them on ("" for none). */
+function refusal(res: AdenaRes | null | undefined) {
   const d = res && (res.data as { error?: { message?: string } | string; log?: string } | undefined);
   // (typeof null is "object": an error of null falls through to the log)
   const chain = d && ((d.error && typeof d.error === "object" && d.error.message) || d.log || d.error);
-  return (typeof chain === "string" && chain) || (res && res.message) || fallback;
+  return typeof chain === "string" ? chain : "";
 }
 
 // the same address written the same way: Adena compares RPCs as strings
@@ -298,6 +309,10 @@ export function gasOf(c: Work, from = 0, to = (c.pts || []).length) {
 /** The gas a round of n strokes should need in all: each of its commits pays its own call and fixed gas. */
 export const roundGas = (c: Work, n: number) => commitsOf(c, n).reduce((g, [from, to]) => g + gasOf(c, from, to), 0);
 
+/** Why a round the chain replays otherwise cannot be saved: where its replay ended (strokes, holed or not). */
+export const replayDiffers = (strokes: number | null, holed: boolean) =>
+  `The chain's replay ended differently (${strokes ?? "?"} strokes, ${holed ? "holed" : "not holed"}): this hole moves between shots. Play it again to save.`;
+
 /**
  * The commits a round is recorded in, each checked by the chain before Adena
  * opens. Each is cut by the realm's work model (commitsOf), then asked of the
@@ -305,9 +320,11 @@ export const roundGas = (c: Work, n: number) => commitsOf(c, n).reduce((g, [from
  * commit (its "rest" is where the next one starts) — so every commit is one
  * the chain has already accepted as a read. If the chain cuts sooner than the
  * model, its "commit the first N" wins and the rest is split again from
- * there. Any other refusal throws, in words: nothing goes to Adena then.
+ * there. Every commit must play all its shots, and only the last hole the
+ * round: one holed sooner is not kept, so the next would start a new round
+ * from the tee. Any other refusal throws, in words: nothing goes to Adena then.
  */
-async function splitRound(shots: readonly string[], check: (list: string[], from: number, ball: Vec2 | null | undefined) => Promise<{ rest?: Vec2 } | null | undefined>, c: Work = {}) {
+async function splitRound(shots: readonly string[], check: (list: string[], from: number, ball: Vec2 | null | undefined) => Promise<{ rest?: Vec2; holed?: boolean; strokes?: number } | null | undefined>, c: Work = {}) {
   const out: [number, number][] = [];
   for (let from = 0, ball: Vec2 | null | undefined = null; from < shots.length; ) {
     let to = commitsOf(c, shots.length, from)[0][1], r;
@@ -321,6 +338,8 @@ async function splitRound(shots: readonly string[], check: (list: string[], from
       to = from + n;
       r = await check(shots.slice(from, to), from, ball);
     }
+    // (strokes counts from the tee: a commit's shots end at stroke to, unless holed sooner)
+    if (!r || r.strokes !== to || !!r.holed !== (to === shots.length)) throw new Error(replayDiffers(r ? r.strokes ?? null : null, !!(r && r.holed)));
     out.push([from, to]);
     ball = r && r.rest;
     from = to;
@@ -404,6 +423,9 @@ async function send(messages: (Call | Send)[], gasWanted: number, price: number,
   if (res.status !== "success") {
     const e: SendError = new Error(why(res, failed));
     e.cancelled = res.code === CANCELLED;
+    e.maybe = !UNSENT.some((c) => c === res.code) && !refusal(res);
+    const hash = res.data && (res.data as { hash?: unknown }).hash;
+    if (typeof hash === "string" && hash) e.hash = hash;
     throw e;
   }
   return res.data ?? null;
@@ -474,12 +496,14 @@ interface SaveRound extends Work {
 /**
  * The same save for gnokey: one plain `gnokey maketx call` per commit, the
  * call Adena would send (PlayRoundAt, PlayRoundPro, or PlayRound with no
- * period), for the player to run with their own key (<your-key-name>). A
- * round of several commits starts with a Reset of its own: pasted again after
- * a part failed, it starts afresh from the tee rather than going on from
- * where the first part left the ball. One commit needs none: a holed round is
- * not kept. s: the engine's snapshot of a holed round (id, shots, period,
- * roundMode, and the work model's walls, pieces, kind, pts).
+ * period), for the player to run with their own key (<your-key-name>). It
+ * starts with a Reset of its own (nothing is sent with it; with no round of
+ * the player's under way it only pays its gas): a round they left unfinished
+ * (a paste whose second part failed, a shot from gnoweb) would otherwise go
+ * on from where it lies, or be refused in its own weather, and a paste run
+ * again starts afresh from the tee. The page cannot ask the chain first: it
+ * does not know the key's address. s: the engine's snapshot of a holed round
+ * (id, shots, period, roundMode, and the work model's walls, pieces, kind, pts).
  */
 export function gnokeyPlan(s: SaveRound, { realm, price = PRICE, chainId, rpc, parts: checked }: { realm: string; price?: number; chainId?: string | null; rpc: string; parts?: readonly (readonly [number, number])[] | null }) {
   const shots = s.shots || [], mode = s.roundMode || "assisted";
@@ -503,7 +527,34 @@ export function gnokeyPlan(s: SaveRound, { realm, price = PRICE, chainId, rpc, p
       : s.period == null ? call("PlayRound", [hole, list], gas)
         : call("PlayRoundAt", [hole, list, at], gas);
   });
-  return parts.length > 1 ? [call("Reset", [String(s.id)], PER_CALL), ...plays] : plays;
+  return [call("Reset", [String(s.id)], PER_CALL), ...plays];
+}
+
+/**
+ * gnokeyPlan's commands as one paste for bash or zsh, the key name (who)
+ * quoted in: a subshell that stops at the first that fails. Each goes through
+ * send, which prints gnokey's output as it comes (the password prompt too)
+ * and sends it again a block later, the password asked again, when the node
+ * refused it for the account's sequence before the one before had landed
+ * ("signature verification failed", as scripts/publishdata.sh does).
+ */
+export function gnokeyPaste(plan: readonly string[], who: string) {
+  const send = [
+    "send() {",
+    "  for try in 1 2 3; do",
+    '    out=$("$@" 2>&1 | tee /dev/stderr)',
+    "    if printf '%s\n' \"$out\" | grep -q '^OK!'; then return 0; fi",
+    "    printf '%s\n' \"$out\" | grep -q 'signature verification failed' || return 1",
+    '    echo "Gnogolf: the node had not taken the one before yet: sent again in a block (your password again)" >&2',
+    "    sleep 6",
+    "  done",
+    "  return 1",
+    "}",
+  ].join("\n");
+  const body = plan
+    .map((command, k) => `echo "Gnogolf: transaction ${k + 1} of ${plan.length}"\nsend ${command.replace("<your-key-name>", who)}`)
+    .join("\n\n");
+  return `(\nset -e\n${send}\n\n${body}\n)`;
 }
 
 /** The strokes a save's result says its round was holed in (PlayRound's
@@ -512,6 +563,29 @@ export const holedIn = (result: string | null | undefined) => {
   const m = String(result || "").match(/holed in (\d+) strokes/);
   return m ? Number(m[1]) : null;
 };
+
+/**
+ * What a save's last commit did, as the chain says it, for a round of
+ * strokes: { holed, left } (the strokes it was holed in, or left under way
+ * after), undefined while the chain cannot say (its RPC down, the transaction
+ * not found yet): never a save without that evidence. First its result, by
+ * its hash (a holed round is not kept); a transaction that failed on the
+ * chain throws its log (errorKind "chain"). Else, once Adena said it went
+ * (sent), the round the chain shows: one still under way is the replay ending
+ * otherwise, none is the round holed (not before: it may be one never sent).
+ */
+export async function readBack(chain: Pick<Chain, "txResult" | "round">, { hole, player, strokes, hash, sent }: { hole: string; player: string; strokes: number; hash?: string; sent: boolean }) {
+  if (hash) {
+    const result = await chain.txResult(hash).catch((e: unknown) => {
+      if (errorKind(e) === "chain") throw e;
+      return null;
+    });
+    if (result != null) return { holed: holedIn(result), left: Number((result.match(/after (\d+) strokes/) || [])[1]) || null };
+  }
+  if (!sent) return undefined;
+  const now = await chain.round(hole, player).catch(() => undefined);
+  return now === undefined ? undefined : now && now.strokes >= strokes ? { holed: null, left: now.strokes } : { holed: strokes, left: null };
+}
 
 // The storage a save writes, in bytes, measured on an onyx gnodev from the
 // final realm (a holed round is not kept: only its best and rows): a named
