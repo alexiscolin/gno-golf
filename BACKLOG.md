@@ -2,24 +2,56 @@
 
 ## Where this stands
 
-The V1 is built and runs end to end on a local chain: the physics and course
-packages, the `golf` realm, the full course (four cups of 18 holes and two
-extras, all stored as data), the 3D client in `web/`, and the boards: every
-hole and the whole course ranked on-chain, a page at a time, with your place,
-your name taken in the game, and the bot check scoring old records. What's
-left before pearl is a fresh deploy rehearsal on the current code (the last
-one predates the boards). This file is the longer view: what we measured
-along the way, and what comes after V1.
+The V1 is built and runs end to end on a local chain. On the chain: the
+`physics` and `course` packages and the `golf` realm, the only three deployed,
+and the whole course as data: four cups of 18 holes and two extras
+(`data/holes.txt`). The authoring code (`p/gnogolf/physics/build`,
+`p/gnogolf/course/author`) and the 74 hole realms stay in the repo as the
+source and are not deployed. What goes on chain is the repo byte for byte:
+`scripts/stage.sh` stages it and checks it, on every `scripts/check.sh` run. In
+`web/`, the 3D client, with the boards (every hole and the whole course, paged
+on-chain, your place, your gno.land name), badges, ghost duels (the champion,
+a player at your level, yourself, a friend's link, anyone on the board, with a
+callout before each turn), a Support tip and share clips.
+
+**The deploy target is onyx** (`onyx-1`, mainnet's code v1.5.0; pearl is
+retiring). What that changes for us, with a compatibility study running:
+
+- `addpkg` parks until the gpao approvals oracle approves it (the
+  code-submission policy, inert until then).
+- `maketx run` is restricted to one seeded member, so the gnokey save path and
+  `scripts/publishdata.sh` have to move to plain calls.
+- Namespaces are enforced from block 1: `gnogolf` has to be obtained.
+- Mainnet's filtered package set: every dependency has to be checked against
+  it.
+
+**Before deploy**, in progress, in order:
+
+1. The onyx compatibility fixes.
+2. The realm batch: a published hole's worst-case weather cost bounded at
+   publish, the forecast drawn once per page, finished rounds no longer stored
+   ("Reset first" goes; about −45% on a first finish).
+3. PostHog analytics: EU, cookieless-exempt, no banner; events and error
+   tracking (built and merged; `NEXT_PUBLIC_POSTHOG_KEY` turns it on at
+   deploy).
+4. A final full review of the final code: bugs, security, scalability,
+   playability.
+5. Docs: the pitch, the README, the site's texts, `CLIENT.md`,
+   `docs/golf.md`, `docs/design/deploy-v1.md`.
+6. Trailer v5, with the duels and no Adena.
+7. The OG images re-rendered (Mushroom Town).
+
+This file is the longer view: what we measured along the way, and what comes
+after V1.
 
 To pick it up again, follow "Running it locally" in the README: build gnodev
 and gnokey from the gno checkout, run `gnodev local -empty-blocks`, publish
 the course with `scripts/publishdata.sh`, then `npm run dev` in `web/`.
-`npm run selfcheck` and `npm run smoke` tell you whether the client and the
-realm still agree.
+`scripts/check.sh` runs everything that must pass (`--smoke` adds the
+end-to-end run against a local chain).
 
-After V1 comes the Builder: players draw a hole in the browser and publish it
-with `PublishMine`. The realm needs nothing new for it; the work is a GG1
-encoder on the client side (see ADR-002).
+After launch comes the Builder (see Next milestones): the realm side is ready,
+the in-game editor and its GG1 encoder are not (see ADR-002).
 
 ## The hole of the day — an idea, not for V1 (the whole course stays open from day one)
 
@@ -49,7 +81,7 @@ Tunnel"). It runs on its own: no owner, no cron, no server.
 - About one extra row (a few hundred bytes) per player and day, paid by the
   player's own deposit like the rest; reads are O(page).
 - **It has to live in golf.** A separate realm can't see golf's finishes (there
-  are no hooks), so this is a golf change: either in the V1 we deploy on pearl,
+  are no hooks), so this is a golf change: either in the V1 we deploy on onyx,
   or later in a golf v2 through `SetSuccessor`. Putting it in V1 avoids a
   migration.
 - **Bots know the hole in advance**, since the pick and the physics are public:
@@ -58,9 +90,10 @@ Tunnel"). It runs on its own: no owner, no cron, no server.
   tournament design of their own).
 
 One dependency has never been exercised: a real `create_session` from a web page
-with Adena. The whole no-popup, we-pay-the-gas story rests on it.
+with Adena. The whole no-popup, we-pay-the-gas story rests on it; V1 does
+without it (a player signs with Adena or gnokey).
 
-Everything parked while Milestone 0 (the mechanic, played in gnoweb) gets built.
+What follows was parked while Milestone 0 (the mechanic, played in gnoweb) was built.
 Findings marked *measured* come from a POC deployed on a local gnodev, not from
 reading.
 
@@ -219,24 +252,30 @@ with a canvas and changes nothing else.
 
 Three things did **not** survive contact with user-made courses:
 
-1. **The id scheme — done.** A hole's id is now the pkgpath of the realm that
-   registered it (`gno.land/r/alice/marsh`), so it is unique by construction
-   and cannot be squatted; `Register(cur, h)` takes no id. Rounds live in a
-   tree per hole, so `r/alice/marsh/2` cannot leak rounds into `r/alice/marsh`
-   (tested).
-2. **The hole number is not a property of a hole.** The client reads digits out
-   of `hole7` to label the chip and the signpost, which works only because we
-   named them. `alice/marsh` has no number, and should not need one.
-3. **There is no such thing as a course.** Today the registry is a flat list of
-   holes; "18" is just how many exist. A round of eighteen is an ordered
-   selection *of* holes, curated by somebody — a second concept, and the one
-   that makes a builder world navigable. It is also where a leaderboard would
-   finally make sense: not per hole, per course.
+1. **The id scheme — done.** Since ADR-002 a hole's id is a version: a
+   course slot's (`garden/7/v2`, published by the owner) or a player's own
+   (`<address>/<slug>/v1`, by `PublishMine`), so it is unique by construction
+   and cannot be squatted. Each version has its own rounds, board and wear.
+2. **The hole number is not a property of a hole — done.** A course hole sits
+   in a slot (`garden/7`): its cup and its place are the slot's, and a
+   community hole (`<address>/<slug>`) has none, and needs none. (The client
+   used to read digits out of `hole7`.)
+3. **There is no such thing as a course — done.** A cup is an ordered
+   selection of 18 slots, curated by the owner, and the course's current holes
+   are ranked together on their own board, beside each hole's. What a builder
+   world still lacks is the same for community holes (the creators' board).
 
-A fixed 32×16 board stays a deliberate constraint: it keeps holes comparable and
-the text renderer honest. Say so in the builder rather than letting people ask.
+The board is no longer a fixed 32×16: `author.Fit` sizes each hole's to its
+walls, within `course.MaxBoard`, and golf bounds the text renderer's work on
+it (`maxBoardWork`). Say what the limits are in the builder rather than
+letting people ask.
 
 ## Publishing a course — unblocked
+
+Since ADR-002 a hole is data: a player publishes one with `PublishMine`, a
+plain call, no `addpkg`, about half a GNOT of deposit a version, and golf
+plays data only (`Register` is gone). The numbers and the two tiers below are
+from the hole-as-realm days.
 
 ADR-001 said to prove the interface with hand-written holes before designing an
 editor. Four holes, four mechanics, zero lines changed in `golf`: proven.
@@ -302,9 +341,11 @@ small team wins.
 Designed in [ADR-004](adr/adr-004-duels.md). Built: the realm side (a best
 keeps its round, `Ghost`), the dare link's duel, Race on the boards and in
 Friends (`Race your best` on one's own row), the game choice's Duel (the
-rival, then their ghosts, then the picker), and the Ghost buster and Good
-sport badges. Next: `beat you` in Friends, the clip with both balls, then
-`Duel(hole, rival)` on-chain with its board and streaks.
+rival: the champion, a player at your level, yourself, a friend's link or
+anyone on the board; then their ghosts, then the picker), the turns with a
+callout before each stroke, and the Ghost buster and Good sport badges.
+Next: `beat you` in Friends, the clip with both balls, then `Duel(hole,
+rival)` on-chain with its board and streaks (a V2 idea, see Next milestones).
 
 ## v2 — wear becomes physical
 
@@ -335,31 +376,33 @@ matchmaking, which kills the solo casual game the visual reference is.
 
 Between previewing a shot and committing it, another player's commit can change
 the course, and the replay then differs from what the player watched. With wear
-cosmetic, v1 has exactly **one** hole where this is live: `hole4`, whose blade
-advances a notch per shot. Options there, cheapest first: commit per shot on
-that hole rather than per round; or have the client re-simulate just before
-committing — 44 ms — and warn if the result moved. Do not build pinning
+cosmetic, v1 had exactly **one** hole where this was live: `hole4`, whose blade
+advanced a notch per shot. It is gone: timed pieces now follow the round's own
+strokes and release tick (`TestTimedHoleFollowsTheRoundsStrokes`), so a
+preview is what the commit replays on every hole. Do not build pinning
 machinery for it. In v2 the problem becomes general and that is when it earns a
 real answer.
 
 ## Next milestones
 
-- **Done:** three more holes, each with a mechanic the others do not have
-  (bumpers, tunnel/sand/slope/water, a blade that turns one notch per shot).
-  That is ADR-001 Milestone 1: the course interface held, and `golf` was not
-  touched for any of them.
-- The visual client (ADR-001 Milestone 3). The obstacle types already carry a
-  `Skin` string that means nothing to the simulation and everything to a
-  renderer — that is the seam a themed dapp plugs into.
-- A second game on `p/gnogolf/physics` — the only honest test that the types are
-  general (Milestone 2).
+- **Launch on onyx**, after the list in "Where this stands".
+- **Marketing wave 1: the duels.** Race anyone's ghost, verified on-chain.
+- **Wave 2: the Builder.** The contract side is ready: `PublishMine`, its
+  checks, and the owner's switch (`SetPublishing`), closed at deploy. Still to
+  build: the in-game editor and its GG1 encoder (ADR-002).
+- **V2 ideas:** duel records on-chain (`Duel(hole, rival)` with its board and
+  streaks, ADR-004), a creators' board (community holes ranked by what makes
+  them worth replaying), the hole of the day (above).
+- **A second game on `p/gnogolf/physics`**: the only honest test that the
+  types are general (ADR-001 Milestone 2).
 
 ## Tests
 
-- `p/gnogolf/physics` — 8 tests: tunnelling, a short wall that is not an
-  infinite line, posts, tunnel, hazard, uphill, reflection, and the collinear
-  bar that a bare segment cannot catch.
-- `r/gnogolf/golf` — 8 tests, including the two invariants that matter:
+- `p/gnogolf/physics` 16 tests, `physics/build` 52, `course` 10,
+  `course/author` 4; each hole realm's fingerprint test (the hole survives
+  encoding bit for bit). `scripts/check.sh` runs them all.
+- `r/gnogolf/golf` — 98 tests and 8 filetests (gas and storage goldens),
+  including the two invariants that matter:
   **Preview must equal Play** (or players animate something that did not
   happen), and **PlayRound must equal the same shots one by one** (or the
   replay is a shortcut rather than the record).
