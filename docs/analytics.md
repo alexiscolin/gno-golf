@@ -29,6 +29,8 @@ either.
   string of the event (the URLs, `$referrer`, the first-touch `$initial_*`,
   exception messages and stacks).
 - The IP is discarded by the project setting.
+- No other third party sees a visit: the font (Fredoka) is served from the
+  game's own host (`web/public/fonts`), never a font CDN.
 - Never a wallet address, a player's name or a transaction hash in an event.
 
 Content-Security-Policy (`netlify.toml`): `connect-src` has

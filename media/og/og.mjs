@@ -25,6 +25,8 @@ const known = fs.existsSync(NAMES) ? JSON.parse(fs.readFileSync(NAMES, "utf8")) 
 const CUP_NAMES = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup" };
 const CUPS = Object.keys(CUP_NAMES);
 const cupName = (/** @type {string} */ w) => CUP_NAMES[w] || w[0].toUpperCase() + w.slice(1);
+// the game's own font, as the app serves it (its origin is the page's: the app's)
+const FONT = `@font-face { font-family: Fredoka; src: url(${APP}/fonts/fredoka.woff2) format("woff2"); font-weight: 300 700; font-display: block; }`;
 const esc = (/** @type {string} */ s) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 await chainUp();
@@ -66,8 +68,8 @@ async function shoot(/** @type {string} */ slot) {
 /** A card: the shot, the logo, and a label (eyebrow, title, chip). */
 async function card(/** @type {string} */ img, /** @type {string} */ eyebrow, /** @type {string} */ title, /** @type {string} */ chip, /** @type {string} */ file) {
   const html = `<!doctype html><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=block" rel="stylesheet">
 <style>
+  ${FONT}
   :root { --paper: #fdf6e9; --ink: #144134; --green: #226c57; --hat: #e0524b; --gold: #f2c14e; }
   * { box-sizing: border-box; margin: 0; }
   body { width: ${W}px; height: ${H}px; overflow: hidden; font-family: Fredoka, ui-rounded, system-ui, sans-serif; color: var(--ink);
@@ -118,8 +120,8 @@ if (CUPS.every((c) => firsts[c])) { // (npm run og -- garden/1 island/1 town/1 m
 // sparkles, and the one thing to do, big
 const STAR = (x, y, s, rot = 0) => `<svg class="star" style="left:${x}px;top:${y}px;width:${s}px;height:${s}px;transform:rotate(${rot}deg)" viewBox="-11 -11 22 22"><path d="M0-10Q1.8-1.8 10 0Q1.8 1.8 0 10Q-1.8 1.8-10 0Q-1.8-1.8 0-10Z" fill="#fffaf0" stroke="#144134" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 await render(`<!doctype html><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=block" rel="stylesheet">
 <style>
+  ${FONT}
   * { box-sizing: border-box; margin: 0; }
   body { width: ${W}px; height: ${H}px; overflow: hidden; position: relative; font-family: Fredoka, ui-rounded, system-ui, sans-serif;
     background: radial-gradient(circle at 50% 36%, #fff8e2 0 16%, #f8e6bb 52%, #ecd49c 100%); }

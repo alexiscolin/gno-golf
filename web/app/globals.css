@@ -3,6 +3,14 @@
      width   1600, 1280, 1100, 900, 860, 720 (min), 700, 600 (the phone), 520, 480, 400
      height  820 (a 13" laptop), 760, 720, 640
      shape   aspect-ratio 1/1 (wide vs upright), pointer: coarse, reduced motion */
+/* Fredoka (SIL OFL 1.1, public/fonts/OFL.txt), its Latin set, every weight
+   in one variable file, served from this host: no visitor goes to a font CDN */
+@font-face {
+  font-family: Fredoka;
+  src: url("/fonts/fredoka.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
 :root {
   --ink: #144134;
   --ink-soft: #4f7a6c;

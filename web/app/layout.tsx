@@ -44,12 +44,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
+        {/* the game's font, from this host (globals.css): asked at once, not once the CSS is read */}
+        <link rel="preload" href="/fonts/fredoka.woff2" as="font" type="font/woff2" crossOrigin="" />
       </head>
       <body>{children}</body>
     </html>
