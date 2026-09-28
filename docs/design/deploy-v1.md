@@ -233,13 +233,14 @@ There is no cross-call cache: it would be persisted, and qeval can't persist any
 
 ### 10.1 `scripts/stage.sh <ns> <out>`
 
-1. Copy the `.gno` and `gnomod.toml` files of physics, course and golf into `<out>/gno.land/{p,r}/<ns>/…`. Exclude:
-   - `*_test.gno` and `*_filetest.gno`;
-   - `course/fingerprint` and `zzinv`;
-   - the hole packages.
-2. Rewrite the import paths (`gno.land/[pr]/gnogolf/` → `<ns>`) with `sed`.
-3. Assert that no `gno.land/[pr]/gnogolf` string is left, that every gnomod has `gno = "0.9"`, and that there is no `[[replace]]`.
+The deployed source is the repo's, byte for byte: stage.sh transforms nothing but the namespace, and checks it.
+
+1. Copy every file of the physics, course and golf directories but their tests (`*_test.gno`, `*_filetest.gno`) into `<out>/gno.land/{p,r}/<ns>/…`, as it is. The subpackages (`physics/build`, `course/author`, `course/fingerprint`) and the hole realms are other directories, and never deployed: nothing deployed imports them.
+2. Rewrite the import paths (`gno.land/[pr]/gnogolf/` → `<ns>`) with `sed`: the one transformation. The production deploy targets the `gnogolf` namespace itself (to be registered on pearl), where it is the identity, so the on-chain source is then exactly the repo's; it only matters for a rehearsal nym such as `nym-golfer000`.
+3. Assert that each staged package holds the repo package's non-test files, no more and no fewer, and that each is the repo's file byte for byte once the namespace is read back; that no `gno.land/[pr]/gnogolf` string is left (under a nym); that every gnomod has `gno = "0.9"`; and that there is no `[[replace]]`.
 4. Run `gno lint` with the pearl toolchain and print the package sizes.
+
+`scripts/check.sh` stages into a temporary directory under `gnogolf` on every run, so a stage-time transformation or a skipped file fails the check before it can reach a deploy.
 
 The goldens stay tied to the canonical `gnogolf` tree, so staged tests would move only the id-dependent columns.
 
