@@ -851,7 +851,7 @@ const Face = ({ skin }: { skin: Skin }) => (
       <path d={GNOME.hat} fill={hex(skin.hat)} />
       <rect {...GNOME.brim} fill={hex(skin.hat)} />
       <circle cx="80" cy="124" r="6" fill="var(--ink)" /><circle cx="120" cy="124" r="6" fill="var(--ink)" />
-      <circle cx="100" cy="136" r="10" fill="#f2b8b0" strokeWidth="6" />
+      <circle cx="100" cy="136" r="10" fill="var(--nose)" strokeWidth="6" />
     </g>
   </Frame>
 );

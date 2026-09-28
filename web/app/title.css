@@ -41,10 +41,7 @@
   --gap-l: clamp(18px, 3vh, 30px);
   --gap-xl: clamp(24px, 4.5vh, 48px);
   --gap-grid: clamp(14px, 2vw, 28px); /* between a row's cards */
-  --front-w: 1040px; /* a front screen's rows of cards */
-  /* radii: a front panel (a cup's card, a game's, a pick, a cup's band), a card on it or beside it */
-  --r-panel: 26px; --r-card: 20px;
-  --t-pop: .28s; /* a card's springy pop (--spring, --t-press: :root) */
+  --front-w: 1040px; /* a front screen's rows of cards (their radii, --r-panel and --r-card, and their motion: :root) */
 }
 .tsky--island, .tint--island, .victory--island {
   --s0: #8fd8d0;
@@ -181,7 +178,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 @keyframes cta-pulse {
   50% { transform: scale(1.07); box-shadow: 0 7px 0 var(--ink), 0 0 0 14px rgba(var(--glow-rgb), 0); }
 }
-.screen--title .load { padding: 10px 18px 8px; background: var(--paper); border: var(--edge-bold); border-radius: 20px; } /* flat: it only shows */
+.screen--title .load { padding: 10px 18px 8px; background: var(--paper); border: var(--edge-bold); border-radius: var(--r-card); } /* flat: it only shows */
 .screen--title .title__facts { margin-top: 30px; gap: 12px; } /* clear of the button's drop */
 .screen--title .title__facts li { cursor: default; }
 
@@ -250,7 +247,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
    par or under, silver over it; a shine across it on hover */
 .world__won {
   position: absolute; z-index: 4; top: 14px; right: 14px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden;
-  padding: 3px 12px 3px 4px; border: 2.5px solid var(--ink); border-radius: var(--pill); box-shadow: 0 3px 0 var(--ink);
+  padding: 3px 12px 3px 4px; border: var(--edge-bold); border-radius: var(--pill); box-shadow: 0 3px 0 var(--ink);
   font-size: 15px; font-weight: 800; color: var(--ink); white-space: nowrap;
   transform: rotate(4deg);
 }
@@ -269,7 +266,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .won__shine { stroke: #fff6c9; stroke-width: 2.5; stroke-linecap: round; }
 .won__ribbon { fill: var(--hat); stroke: var(--ink); stroke-width: 2.2; stroke-linejoin: round; }
 .won__medal { fill: #dfe7eb; stroke: var(--ink); stroke-width: 2.5; }
-.won__star { fill: #fff; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
+.won__star { fill: var(--white); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
 
 /* the pick: the card under the pointer or the focus grows, its name-button
    tilts. Only the pointer's card glows; the focus has a ring of its own, and
@@ -308,7 +305,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   background:
     radial-gradient(circle at 50% 36%, var(--c1) 0 31%, var(--ink) 31% 32.2%, transparent 32.4%),
     var(--panel-dots), var(--c2);
-  box-shadow: var(--deep-card); transition: transform var(--t-pop) var(--spring);
+  box-shadow: var(--deep-card); transition: transform var(--t-pop) var(--spring), box-shadow .2s;
 }
 /* a game's colours, light and deep as a cup's tint's (.tint--*) */
 .mode--solo { --c1: var(--turf); --c2: var(--fairway); } /* the fairway */
@@ -325,7 +322,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 /* a panel's line: inked as its name, thinner, read on any panel */
 .mode__line, .rival__line { font-size: 14px; font-weight: 700; line-height: 1.3; --ink-w: 3px; --ink-drop: 2px; }
 .mode__line { margin: 10px 20px 0; }
-.mode__soon { position: absolute; top: 16px; right: 12px; margin: 0; transform: rotate(4deg); background: var(--hat); color: var(--paper); font-size: 17px; padding: 6px 16px; box-shadow: 0 4px 0 var(--ink); } /* (the hat's red on the builder's gold: it reads from across the room) */
+.mode__soon { position: absolute; top: 16px; right: 12px; margin: 0; transform: rotate(4deg); background: var(--hat); color: var(--paper); font-size: 17px; padding: 6px 16px; box-shadow: var(--shadow-btn); } /* (the hat's red on the builder's gold: it reads from across the room) */
 @media (max-width: 700px) {
   /* a phone: the panels stacked, wide, the gnomes on the left */
   .modes__list { grid-template-columns: 1fr; gap: 12px; }
@@ -341,7 +338,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .modetag {
   position: fixed; top: 34px; left: 96px; z-index: var(--z-screen); padding: 2px 16px 6px; border: var(--edge-bold); border-radius: var(--pill);
   background: var(--c2); font-size: 30px; font-weight: 700; line-height: 1.2; --ink-drop: 0;
-  box-shadow: 0 4px 0 var(--ink); transform: rotate(-3deg); pointer-events: none;
+  box-shadow: var(--shadow-btn); transform: rotate(-3deg); pointer-events: none;
 }
 body:has(.sheet) .modetag { visibility: hidden; }
 /* in play: pinned small on the hole's card */
@@ -471,7 +468,7 @@ li.me > .sticker { background: var(--ink); color: var(--paper); }
 /* a sticker or a hole card that is a button: it lifts under the pointer, sinks pressed, rings in focus */
 button.sticker, .ghost { cursor: pointer; transition: transform var(--t-pop) var(--spring), box-shadow .2s; }
 button.sticker:hover, .ghost:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 0 0 3px var(--glow), 0 8px 0 var(--ink); }
-button.sticker:active, .ghost:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+button.sticker:active, .ghost:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
 button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--shadow-btn); }
 /* a place nobody holds yet, a hole card still read: drawn blank, dashed */
 :is(.sticker, .ghost).podium__ghost { border-style: dashed; border-color: rgba(var(--ink-rgb), .25); background: transparent; box-shadow: none; pointer-events: none; }
@@ -621,7 +618,7 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 .screen--pick .pick__stage > * { position: relative; }
 /* the gnome's stage: the picker's tile, and a new gnome's on the cup's card */
 .screen--pick .pick__tile, .newgnome__stage {
-  border: var(--edge-bold); border-radius: 28px; overflow: hidden; box-shadow: var(--deep-card);
+  border: var(--edge-bold); border-radius: var(--r-panel); overflow: hidden; box-shadow: var(--deep-card);
   background: radial-gradient(circle, rgba(var(--ink-rgb), .07) 1.7px, transparent 2.1px) 0 0 / 14px 14px, var(--stage);
 }
 .screen--pick .pick__tile {
@@ -662,7 +659,7 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 .victory__in {
   position: relative; width: min(760px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto;
   display: grid; justify-items: center; gap: 10px; padding: 18px clamp(14px, 3vw, 30px) 22px; text-align: center;
-  background: var(--paper); border: var(--edge-bold); border-radius: 28px;
+  background: var(--paper); border: var(--edge-bold); border-radius: var(--r-panel);
   box-shadow: 0 0 0 8px var(--c1), 0 0 0 11px var(--ink), 0 16px 0 3px var(--ink), 0 26px 40px rgba(10, 20, 40, .35);
   animation: pop .45s var(--spring);
 }
@@ -673,7 +670,7 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 @keyframes cup-bounce { from { transform: translateY(-48px) scale(.5); opacity: 0; } }
 .victory__badge svg { display: block; width: 100%; }
 .victory__ribbon {
-  margin-top: -18px; position: relative; padding: 5px 18px; border-radius: 12px; border: var(--edge);
+  margin-top: -18px; position: relative; padding: 5px 18px; border-radius: 12px; border: var(--edge-bold);
   background: linear-gradient(170deg, var(--c1), var(--c2)); font-weight: 800; font-size: 17px; --ink-w: 3px; --ink-drop: 0;
 }
 .victory h2 {
@@ -695,7 +692,6 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 .newgnome .btn { white-space: nowrap; }
 .victory .note { margin: 0; }
 .victory .banner__row { margin-top: 6px; gap: 12px; flex-wrap: wrap; }
-.victory .btn { font-size: 17px; padding: 12px 24px; }
 @media (max-width: 600px) {
   .victory { padding: 10px; }
   .victory__in { max-height: calc(100dvh - 20px); border-radius: 22px; box-shadow: 0 0 0 5px var(--c1), 0 0 0 8px var(--ink), 0 10px 0 2px var(--ink); gap: 8px; }
