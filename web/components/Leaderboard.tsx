@@ -5,13 +5,13 @@ import type { Snapshot } from "@/lib/engine";
 import { isAddress, type Chain } from "@/lib/chain";
 import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
 import { vsPar } from "@/lib/card";
-import { SHARE_TAGS } from "@/lib/site";
+import { SHARE_TAGS, siteURL } from "@/lib/site";
 import { sound } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
-import { messageOf, shortAddr, holeLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied } from "@/components/common";
+import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied } from "@/components/common";
 
 // The leaderboards: the sheet (this hole, the course, friends), the top three
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -139,7 +139,8 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: Board
     setAdding("");
   };
   const drop = (addr: string) => setFriends(saveFriends(loadFriends().filter((f) => f.addr !== addr)));
-  const invite = me && `${window.location.origin}${window.location.pathname}?friend=${me}`;
+  // (a dare link: whoever opens it adds you as a friend and races your ghost where you have one)
+  const invite = me && siteURL(inHole ? holeLink(s, "", me) : dareLink(me));
   const rows = <R,>(b: { rows: readonly R[] } | null, pick: (a: R, b: R) => number) => (b ? [...b.rows].sort(pick) : null);
   const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
   return (
@@ -199,7 +200,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: Board
           className="linkish friends__invite"
           onClick={() => void copy(invite)}
         >
-          {copied ? "Link copied — send it to a friend" : "Copy an “add me as a friend” link"}
+          {copied ? "Copied: they race your ghost, and you join their friends" : "Copy my dare link"}
         </button>
       )}
       </section>
@@ -467,9 +468,11 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect }: Board
           <span>
             You are <b>#{myPlace.at}</b> of {myPlace.of} {kind === "hole" ? `on ${s.name}` : "on the course"}
           </span>
+          {/* a place on a board is a saved best: the link dares (friends race the ghost) */}
           <Share
-            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place.${SHARE_TAGS}`}
-            link={kind === "hole" ? holeLink(s, "") : ""}
+            label="Dare a friend"
+            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place: race my ghost, free to play, no wallet needed.${SHARE_TAGS}`}
+            link={kind === "hole" ? holeLink(s, "", me || "") : dareLink(me || "")}
           />
         </div>
       )}

@@ -38,6 +38,13 @@ export function holeLink(s: Snapshot, gnome: string, by = "") {
   return (slot ? `h/${slot[1]}-${slot[2]}/` : "") + (String(q) ? `?${q}` : "");
 }
 
+/** A dare to the whole course: friends race the player's ghost on every hole they have a best on. */
+export function dareLink(by: string) {
+  const q = chainQuery();
+  if (isAddress(by)) q.set("by", by);
+  return String(q) ? `?${q}` : "";
+}
+
 /** The par of the hole being played. */
 export const parHere = (s: Snapshot) => parOf(s.holes.find((h) => h.id === s.id) || (s.allHoles || []).find((h) => h.id === s.id));
 

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { costLine, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink } from "../components/common.ts";
+import { costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -132,4 +132,10 @@ test("hole numbers, the next hole, the next cup, golf's words", () => {
   assert.equal(golfTerm(2, 4), "Eagle!");
   assert.equal(golfTerm(3, 3), "Par");
   assert.equal(golfTerm(9, 3), "6 over par");
+});
+
+test("a dare to the whole course carries only the dare", () => {
+  const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  onPage("", () => assert.equal(dareLink(me), `?by=${me}`));
+  onPage("", () => assert.equal(dareLink("not an address"), ""));
 });

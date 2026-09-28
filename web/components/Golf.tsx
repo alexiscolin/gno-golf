@@ -808,6 +808,7 @@ export default function Golf() {
   const [slowSign, setSlowSign] = useState(false); // Adena open for more than 10 s
   const [bytePrice, setBytePrice] = useState(100); // ugnot per stored byte (vm params)
   const [saved, setSaved] = useState<boolean | null>(null); // whether this player already has a best on this hole, in this round's mode (null: unknown)
+  const [ghostHere, setGhostHere] = useState(false); // a best of theirs here in either mode: their link dares (a friend races either)
   // the player's saved holes on the course, per mode (Rank() "holes"; null: not read)
   const [onCourse, setOnCourse] = useState<{ assisted: number; pro: number } | null>(null);
   // the round on offer: the won one while it can be saved, else the one kept through a reload
@@ -817,12 +818,13 @@ export default function Golf() {
   const saveMode = toSave && toSave.roundMode === "pro" ? "pro" : "assisted";
   useEffect(() => {
     setSaved(null);
+    setGhostHere(false);
     setOnCourse(null);
     if (!account || !saveId || !game.current) return;
     let live = true;
     const c = game.current.chain;
-    void within(c.bests(saveId, saveMode, [account.address]))
-      .then((b) => live && setSaved(b.rows.length > 0))
+    void Promise.all([within(c.bests(saveId, "assisted", [account.address])), within(c.bests(saveId, "pro", [account.address]))])
+      .then(([a, p]) => live && (setSaved((saveMode === "pro" ? p : a).rows.length > 0), setGhostHere(a.rows.length + p.rows.length > 0)))
       .catch(() => {});
     void Promise.all([within(c.rank("assisted", account.address)), within(c.rank("pro", account.address))])
       .then(([a, p]) => live && setOnCourse({ assisted: a.holes, pro: p.holes }))
@@ -991,7 +993,7 @@ export default function Golf() {
         award(["chain"]);
         const row = ((s && s.allHoles) || []).find((h) => h.id === hole);
         setOnChainCard(markOnChain(cardKey(row || { id: hole }), r.strokes));
-        if (roundKey.current.startsWith(hole + "#")) setSaved(true); // (still on that hole: a kept round may be another's)
+        if (roundKey.current.startsWith(hole + "#")) (setSaved(true), setGhostHere(true)); // (still on that hole: a kept round may be another's)
       } else
         land({
           at: "refused",
@@ -1043,6 +1045,8 @@ export default function Golf() {
   const won = racing && s && s.holed ? { ...duelResult(s.strokes, racing, golfTerm(s.strokes, parHere(s))), duel: racing } : null;
   // a duel lost, or tied where it could have been won (not an ace), pushes to the rematch
   const rematch = !!won && (won.result === "loss" || (won.result === "tie" && won.duel.ghost.strokes > 1));
+  // a best of the player's on the chain here: their share is a dare (a friend races their ghost)
+  const daring = !!account && (onChain || ghostHere);
   const nextAfter = cupWon && s ? nextCup(cupWon.cup, s.worlds) : ""; // the cup after the one just complete
   // the hole the gnome picker leads to (a shared link's, or the cup's first), named over the gnomes
   const linked = s && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
@@ -1376,10 +1380,10 @@ export default function Golf() {
             <Share
               // with a round of the sharer's on the chain here, the link dares the friend to beat it;
               // a duel dares them back once saved, and before, passes the rival's own dare on
-              link={s ? holeLink(s, gnome, won && !onChain ? won.duel.ghost.player : account && (onChain || saved) ? account.address : "") : ""}
-              label={won ? (!onChain ? "Dare a friend" : won.duel.self ? "Share your ghost" : "Dare them back") : savedPlace ? `Share your #${savedPlace.rank}` : "Share"}
+              link={s ? holeLink(s, gnome, won && !onChain ? won.duel.ghost.player : daring ? account.address : "") : ""}
+              label={won ? (!onChain ? "Dare a friend" : won.duel.self ? "Share your ghost" : "Dare them back") : daring ? "Dare a friend" : savedPlace ? `Share your #${savedPlace.rank}` : "Share"}
                 snapshot={() => (game.current ? game.current.snapshot(caption(s, won)) : Promise.resolve(null))}
-                text={won ? duelShare(won.result, won.duel, s.name, s.strokes, onChain, won.duel.ghost.mode !== (s.roundMode || aim)) : shareText({ s, card, cups, fresh, place: savedPlace, ghost: !!(account && (onChain || saved)) })}
+                text={won ? duelShare(won.result, won.duel, s.name, s.strokes, onChain, won.duel.ghost.mode !== (s.roundMode || aim)) : shareText({ s, card, cups, fresh, place: savedPlace, ghost: daring })}
                 clip={clip}
               />
             </div>
@@ -1467,10 +1471,12 @@ export default function Golf() {
                 </button>
               )}
             </div>
-            {account && canSave && (
+            {canSave && (account || !(isTouch() && !hasAdena())) && (
               <p className="real__fine">
-                {won && won.result !== "loss" && "Saved, your best is the ghost they race. "}
-                {costNow}. You confirm in Adena.
+                {/* why save: a link that dares (a phone with no wallet can't: no promise there) */}
+                {won ? won.result !== "loss" && !won.duel.self && `Save it to dare ${won.duel.name} back with your own ghost. `
+                  : !daring && "Save it and your link becomes a dare: friends race your ghost, free, no wallet. "}
+                {account && costNow && `${costNow}. You confirm in Adena.`}
               </p>
             )}
             {!onChain && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
@@ -1666,7 +1672,7 @@ function RecordState({ record, account, s, chain, named = "" }: { record: Rec; a
   }
   return (
     <p className="note note--good">
-      Saved on-chain{named ? <> as <b>{named}</b>: you&apos;re on the boards</> : ""}.{" "}
+      Saved on-chain{named ? <> as <b>{named}</b>: you&apos;re on the boards</> : ""}. Your link now dares friends to race it.{" "}
       {chain && account && (
         <a href={chain.roundURL(s.id || "", account.address)} target="_blank" rel="noopener noreferrer">
           See your round on gno.land ↗
@@ -2112,12 +2118,14 @@ function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot
   const t = totals(card, s.holes), cup = worldOf(s.world).name;
   const d = t.strokes - t.par, vs = d === 0 ? "level par" : vsPar(d);
   const pick = (list: readonly string[]) => list[[...String(s.id || "")].reduce((a, c) => a + c.charCodeAt(0), s.strokes) % list.length];
-  const tag = (ghost ? " Race my ghost." : "") + SHARE_TAGS;
+  const tag = SHARE_TAGS;
   if (cups.slam) return "👑 Grand slam on Gnogolf: every cup at par or under. The Gnome King bows." + tag;
   if (t.all) return pick([
     `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on gno.land.`,
     `⛳ ${t.strokes} strokes round the whole ${cup} (${vs}). My gnome is tired, the chain is not.`,
   ]) + tag;
+  // the link dares: one ask, and no score (the friend races the best, maybe not this round)
+  if (ghost) return `⚔ Race my ghost on ${s.name}${place ? ` (#${place.rank} of ${place.of})` : ""}. Free to play, no wallet needed.` + tag;
   if (place) return `🏆 #${place.rank} of ${place.of} on ${s.name} in Gnogolf: ${strokesWord(s.strokes)}, saved on-chain. Come and take my place.` + tag;
   if (fresh.length) return `🍄 New gnome unlocked on Gnogolf: ${fresh.map((g) => g.name).join(" and ")}. Earned the hard way, one putt at a time.` + tag;
   if (s.strokes === 1) return pick([

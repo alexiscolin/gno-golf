@@ -2190,7 +2190,8 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .card--weather .weather__sky { width: 26px; height: 18px; }
   .card--weather .weather__say { display: none; }
   .card--weather .weather__until { display: none; }
-  .win__head { gap: 10px; } .win__head .share::before { display: none; } .share__label { display: none; }
+  .win__head { gap: 10px; } .win__head .share::before { display: none; } .share__label[data-plain] { display: none; }
+  .share:has(.share__label:not([data-plain])) { flex-wrap: wrap; justify-content: center; } .share__label:not([data-plain]) { flex-basis: 100%; text-align: center; } /* a dare says so, on its own row */
   .card--weather .weather__force { display: none; }
   .adena__off { display: none; } .adena__wrap .adena--on { padding-right: 0; } .drawer__off { display: block; grid-column: 1 / -1; }
   .cause { bottom: 104px; }
