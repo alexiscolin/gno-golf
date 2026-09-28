@@ -2,10 +2,10 @@
 
 // The first choice, before the cups: play alone, race a player's ghost
 // (ADR-004), or, to come, build a hole. A duel asks whom to race on a screen
-// of its own (Rival), then the cups: the rival's ghost is raced on every hole
-// they have a best on. Panels of their own, a kart game's modes.
+// of its own (Rival), then on which of the holes they have a best on (Ghosts),
+// in place of the cups. Panels of their own, a kart game's modes.
 import { useId, useState, type FormEvent } from "react";
-import { Emblem } from "@/components/Worlds";
+import { Emblem, WORLDS } from "@/components/Worlds";
 import { useGnomeStage } from "@/components/Stage";
 import { gnomeById } from "@/lib/scene";
 import type { Act, Skin } from "@/lib/scene/gnome";
@@ -13,9 +13,11 @@ import type { Snapshot } from "@/lib/engine";
 import { AboutButton, BackButton } from "@/components/About";
 import { Button } from "@/components/ui";
 import { FullBoard } from "@/components/Leaderboard";
+import { holeNumber } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
+import { cupOf, parOf, scoreOf, type Card } from "@/lib/card";
 import { sound } from "@/lib/feel";
-import type { Mode } from "@/lib/types";
+import type { HoleRow, Mode } from "@/lib/types";
 
 export default function Modes({ gnome, onSolo, onDuel, onBack, onAbout }: { gnome: string; onSolo: () => void; onDuel: () => void; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
@@ -60,7 +62,7 @@ const Stage = ({ skin, act, playing }: { skin: Skin; act: Act; playing: boolean 
 /**
  * A duel's rival, on a screen of their own: a name or an address typed (the
  * (i) says where to find one), or anyone on the course's board, a tap away.
- * Then the cups: their ghost is raced on every hole they have a best on.
+ * Then their ghosts' holes (Ghosts).
  */
 export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; onPick: (addr: string) => void; onBack: () => void; onAbout: () => void }) {
   const [typed, setTyped] = useState("");
@@ -74,7 +76,7 @@ export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snap
     if (!addr) return setNote(`No gno.land name “${v}” here. Check the spelling, or pick someone below.`);
     // a duel is played where their ghost is: someone with no saved round has none (a failed read lets them through)
     const ids = (s.allHoles || []).filter((h) => h.official).map((h) => h.id);
-    const has = !chain || !ids.length || (await chain.ghostHoles(ids, addr).then((h) => h.size > 0, () => true));
+    const has = !chain || !ids.length || (await chain.bestsOf(ids, addr).then((b) => b.size > 0, () => true));
     if (!has) return setNote(`${v} has no saved round yet: no ghost to race. Pick someone below.`);
     onPick(addr);
   };
@@ -112,6 +114,73 @@ export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snap
   );
 }
 
+// the cups, then the holes in none (ranked on the course all the same)
+const GROUPS = [...WORLDS, { id: "extras", name: "Extras" }];
+/**
+ * A duel's holes, in place of the cups: each one the rival has a best on, by
+ * cup, their best (the one raced: the aim mode's, else the other) beside the
+ * card's own, and a Race into it. A read that failed leaves the cups.
+ */
+export function Ghosts({ holes, name, bests, card, mode, onRace, onCups, onBack, onAbout }: {
+  holes: readonly HoleRow[];
+  name: string;
+  /** their bests by hole: undefined while read, null if the read failed */
+  bests: ReadonlyMap<string, Readonly<Record<Mode, number>>> | null | undefined;
+  card: Card;
+  mode: Mode;
+  onRace: (hole: string) => void;
+  onCups: () => void;
+  onBack: () => void;
+  onAbout: () => void;
+}) {
+  const other: Mode = mode === "pro" ? "assisted" : "pro";
+  return (
+    <div className="screen worlds front modes tint--garden">
+      <BackButton label="Back to the rivals" onClick={() => (sound("blip"), onBack())} />
+      <AboutButton onClick={onAbout} />
+      <div className="worlds__in rival">
+        <div className="front__head">
+          <span className="eyebrow">Choose your hole</span>
+          <h2 className="worlds__title">Their ghosts</h2>
+          <p className="dare">Racing {name}&apos;s ghost</p>
+        </div>
+        {bests === undefined && <p className="lb__empty">Reading their ghosts…</p>}
+        {(bests === null || (bests && !bests.size)) && (
+          <section className="rival__way">
+            <p className="note note--warn">{bests ? `${name} has no saved round on the course yet.` : "Their ghosts could not be read. Their best waits on each hole they saved a round on."}</p>
+            <Button variant="primary" onClick={() => (sound("select"), onCups())}>To the cups</Button>
+          </section>
+        )}
+        {bests && bests.size > 0 && <p className="drawer__note rival__way">Their best on each hole, to beat; yours from your card beside it.</p>}
+        {bests && GROUPS.map((w) => {
+          const cup = holes.filter((h) => cupOf(h) === w.id), theirs = cup.filter((h) => bests.has(h.id));
+          return theirs.length > 0 && (
+            <section key={w.id} className="rival__way">
+              <h3 className="about__h ghosts__cup">{w.id !== "extras" && <Emblem id={w.id} />}{w.name}</h3>
+              <div className="lb">
+                <ol>
+                  {theirs.map((h) => {
+                    const b = bests.get(h.id)!, m = b[mode] ? mode : other, mine = scoreOf(card, h);
+                    return (
+                      <li key={h.id}>
+                        <span className="lb__rank">{holeNumber(cup, h.id)}</span>
+                        <span className="lb__who">{h.name}{m === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
+                        <span className="lb__holes">par {parOf(h)}{mine ? ` · you ${mine}` : ""}</span>
+                        <strong>{b[m]}<small> stroke{b[m] === 1 ? "" : "s"}</small></strong>
+                        <Button variant="primary" className="lb__race" aria-label={`Race their ${b[m]} on ${h.name}`} onClick={() => (sound("select"), onRace(h.id))}>Race</Button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** The game chosen, said big in the top-left corner beside Back (the rival's
- *  screen, the cups, the picker), in its panel's colour. */
+ *  screen, their ghosts, the cups, the picker), in its panel's colour. */
 export const ModeTag = ({ kind }: { kind: "solo" | "duel" }) => <span className={`modetag mode--${kind}`}>{kind === "duel" ? "Duel" : "Solo"}</span>;

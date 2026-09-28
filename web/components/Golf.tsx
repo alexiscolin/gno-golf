@@ -23,7 +23,7 @@ import Gnokey from "@/components/Gnokey";
 import About, { AboutButton, BackButton, Rules } from "@/components/About";
 import { Badges, CardStamps, ChainSeal, EarnedBadges, NewBadges } from "@/components/Badges";
 import Tip from "@/components/Tip";
-import Modes, { ModeTag, Rival } from "@/components/Modes";
+import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain } from "@/lib/card";
@@ -51,7 +51,7 @@ declare global {
   }
 }
 
-const SCREENS = ["title", "modes", "rival", "worlds", "pick", "play"] as const;
+const SCREENS = ["title", "modes", "rival", "ghosts", "worlds", "pick", "play"] as const;
 type Screen = (typeof SCREENS)[number];
 const isScreen = (v: unknown): v is Screen => SCREENS.some((x) => x === v);
 type Gfx = "auto" | "high" | "low";
@@ -719,19 +719,26 @@ export default function Golf() {
       })
       .catch(() => {});
   }, [dare, solo, holeId, holeReady, me]);
-  // the course's holes the rival has a ghost on, read once a rival is picked: each cup says how many
-  const [rivalOn, setRivalOn] = useState<{ by: string; holes: ReadonlySet<string> } | null>(null);
+  // the rival's bests on the course's holes, read once a rival is picked: their ghosts' screen lists them
+  // (null: the read failed, and no earlier one of theirs is kept)
+  const [rivalOn, setRivalOn] = useState<{ by: string; bests: ReadonlyMap<string, Readonly<Record<Mode, number>>> | null } | null>(null);
   useEffect(() => {
     const c = game.current && game.current.chain, ids = allList.filter((h) => h.official).map((h) => h.id);
     if (!dare || solo || !c || !ids.length) return;
     let live = true;
-    void c.ghostHoles(ids, dare).then((holes) => live && setRivalOn({ by: dare, holes }), () => {});
+    void c.bestsOf(ids, dare).then(
+      (bests) => live && setRivalOn({ by: dare, bests }),
+      () => live && setRivalOn((r) => (r && r.by === dare ? r : { by: dare, bests: null })),
+    );
     return () => void (live = false);
   }, [dare, solo, allList, holeReady]);
-  // a duel is played only where their ghost is: the cups and holes without one are not offered
-  const duelOn = dare && !solo && rivalOn && rivalOn.by === dare ? rivalOn.holes : null;
+  const rivalBests = dare && !solo && rivalOn && rivalOn.by === dare ? rivalOn.bests : undefined;
+  // a duel is played only where their ghost is: the holes without one are not offered
+  const duelOn = rivalBests || null;
   const duelHole = duelOn ? (h: { id: string }) => duelOn.has(h.id) : undefined;
-  const ghostsIn = duelOn ? Object.fromEntries(WORLDS.map((w) => [w.id, allList.filter((h) => cupOf(h) === w.id && duelOn.has(h.id)).length])) : undefined;
+  // the cups' place in a duel: their ghosts' holes
+  const cupsScreen: Screen = dare && !solo ? "ghosts" : "worlds";
+  const rivalName = (rival && rival.name) || shortAddr(dare);
   // the duel on this hole: the rival's best in the round's aim mode, else their other one
   const duelMode = (s && s.roundMode) || aim;
   const duel: Duel | null = useMemo(() => {
@@ -913,6 +920,11 @@ export default function Golf() {
 
   // a gnome just unlocked, met on the picker's stage (the cup's card, if open, goes)
   const meet = (id: string) => (setCupWon(null), choose(id), setScreen("pick"));
+  // a hole picked (a community one, a ghost's): on to the gnome
+  const openHole = (id: string) => {
+    if (game.current) void game.current.load(id);
+    setScreen("pick");
+  };
   // into a cup: its hole set (the one being played if it is in that cup, else
   // its first), then the gnome, the last one played already picked
   const enterCup = (w: string) => {
@@ -1048,11 +1060,11 @@ export default function Golf() {
       // an open dialog hears Escape first and keeps it (useDialog); with none
       // open, a screen goes back to the one before it
       if (e.key !== "Escape") return;
-      setScreen((sc) => (sc === "pick" ? "worlds" : sc === "worlds" ? "title" : sc));
+      setScreen((sc) => (sc === "pick" ? cupsScreen : sc === "ghosts" ? "rival" : sc === "worlds" ? "title" : sc));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [cupsScreen]);
 
   unlockedRef.current = unlocked;
   // the new hole is on screen, built and its shaders ready: open the curtain
@@ -1100,6 +1112,7 @@ export default function Golf() {
       else q.set("hole", idHere);
       q.set("gnome", gnome);
     } else if (screen === "worlds" && world) q.set("cup", world);
+    else if (screen === "ghosts") q.set("by", dare); // (an address of its own: a step Back returns from)
     else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
     else if (screen === "play") return; // the hole is not known yet: wait for it
     // a dare stays in the address, with the hole, while it is raced: a reload, a copied link keep it
@@ -1189,7 +1202,11 @@ export default function Golf() {
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onBack={() => setScreen("modes")} onAbout={() => setAbout(true)}
-          onPick={(addr) => (sound("select"), raceWith(addr), setScreen("worlds"))} />
+          onPick={(addr) => (sound("select"), raceWith(addr), setScreen("ghosts"))} />
+      )}
+      {screen === "ghosts" && (
+        <Ghosts holes={allList} name={rivalName} bests={rivalBests} card={card} mode={aim} onRace={openHole}
+          onCups={() => setScreen("worlds")} onBack={() => setScreen("rival")} onAbout={() => setAbout(true)} />
       )}
 
       {screen === "worlds" && s && (
@@ -1203,14 +1220,10 @@ export default function Golf() {
           onAbout={() => setAbout(true)}
          
           community={s.community}
-          racing={dare && !solo && <p className="dare">Racing {(rival && rival.name) || shortAddr(dare)}&apos;s ghost</p>}
-          ghosts={ghostsIn}
+          racing={dare && !solo && <p className="dare">Racing {rivalName}&apos;s ghost</p>}
           podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} onOpen={() => setBoard(true)}
             extra={<button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>} />}
-          onCommunity={(id) => {
-            if (game.current) void game.current.load(id);
-            setScreen("pick");
-          }}
+          onCommunity={openHole}
           onPick={enterCup}
         />
       )}
@@ -1222,7 +1235,7 @@ export default function Golf() {
           sound("blip");
           // leaving on a locked gnome: back to the one really chosen
           if (!unlocked(gnome)) setGnome(chosenGnome());
-          setScreen("worlds");
+          setScreen(cupsScreen);
         }} />}
 
       {s && playing && (
@@ -1294,7 +1307,7 @@ export default function Golf() {
                     const cup = worldOf(s.world);
                     const [first, ...rest] = cup.name.split(" ");
                     return (
-                      <button className="drawer__cup" aria-label={`${cup.name} — change cup`} onClick={() => { sound("blip"); setMenu(false); setScreen("worlds"); }}>
+                      <button className="drawer__cup" aria-label={`${cup.name} — change cup`} onClick={() => { sound("blip"); setMenu(false); setScreen(cupsScreen); }}>
                         <Emblem id={cup.id} />
                         <h2>{first}<br />{rest.join(" ")}</h2>
                       </button>
@@ -1319,9 +1332,9 @@ export default function Golf() {
                   {/* the cup's card wide on top, the rest under it */}
                   <div className="me__row">
                     <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.card}</svg>Cup overview</Button>
+                    <Button variant="secondary" aria-label="Change mode: solo or duel" onClick={() => { setMenu(false); setScreen("modes"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.mode}</svg>Mode</Button>
+                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen(cupsScreen); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.cups}</svg>All cups</Button>
                     <Button variant="secondary" aria-label="Change gnome" onClick={() => { setMenu(false); setScreen("pick"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.gnome}</svg>Gnome</Button>
-                    <Button variant="secondary" aria-label="Duel: race a player's ghost" onClick={() => { setMenu(false); setScreen("rival"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.duel}</svg>Duel</Button>
-                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("worlds"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.cups}</svg>All cups</Button>
                   </div>
                 </section>
                 <section className="drawer__settings" aria-label="Settings">
@@ -1547,7 +1560,7 @@ export default function Golf() {
           saved={onChainCard}
           fresh={fresh}
           snapshot={() => (game.current ? game.current.snapshot({ eyebrow: "Cup", title: worldOf(cupWon.cup).name, score: "complete" }) : Promise.resolve(null))}
-          onBack={() => (setCupWon(null), setScreen("worlds"))}
+          onBack={() => (setCupWon(null), setScreen(cupsScreen))}
           onReplay={() => {
             setCupWon(null);
             const first = s.holes[0];
@@ -1617,7 +1630,7 @@ export default function Golf() {
       )}
       {rules && <Rules onClose={() => setRules(false)} onBadges={() => (setRules(false), setBadgesOpen(true))} />}
       {badgesOpen && <Badges fresh={freshBadges} onClose={() => setBadgesOpen(false)} />}
-      {(screen === "rival" || screen === "worlds" || screen === "pick") && <ModeTag kind={screen === "rival" || (dare && !solo) ? "duel" : "solo"} />}
+      {(screen === "rival" || screen === "ghosts" || screen === "worlds" || screen === "pick") && <ModeTag kind={screen === "rival" || (dare && !solo) ? "duel" : "solo"} />}
       {/* every screen but the title's (its film is the page) */}
       {cfg && screen !== "title" && <NetBanner rpc={cfg.rpc} onSupport={() => setSupport(true)} />}
 
@@ -2126,7 +2139,7 @@ function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot
 const MENU_ICON = {
   card: <path d="M4 5h16v14H4zM4 10h16M10 10v9" />,
   gnome: <path d="M12 3 5.5 16h13ZM4 16h16M9 20h6" />,
-  duel: <path d="M6 20v-8a6 6 0 0 1 12 0v8l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM10 11v1M14 11v1" />, // (the Ghost buster badge's ghost)
+  mode: <path d="M5 8h14l-3.5-3.5M19 16H5l3.5 3.5" />, // (one game to the other)
   cups: <path d="M8 21V4l10 4-10 4M5 21h8" />,
 };
 

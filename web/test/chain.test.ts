@@ -528,12 +528,16 @@ test("resolveName resolves a registered name to its address, '' for none", async
   assert.equal(await chain.resolveName("nobody"), "");
 });
 
-test("ghostHoles: one read, only the holes asked; none for a bad address, no network call", async () => {
+test("bestsOf: one read, each hole's bests; only the holes asked, strictly read; none for a bad address, no network call", async () => {
   const chain = makeChain();
   setFetch(() => { throw new Error("should not be called"); });
-  assert.equal((await chain.ghostHoles(["garden/1/v1"], "not-an-address")).size, 0);
-  setFetch((url) => { assert.ok(decoded(url).expr.includes(`BestOf(h, "pro", address("${ADDR1}"))`)); return strReply("garden/1/v1\nnot/asked\n"); });
-  assert.deepEqual([...(await chain.ghostHoles(["garden/1/v1", "garden/2/v1"], ADDR1))], ["garden/1/v1"]);
+  assert.equal((await chain.bestsOf(["garden/1/v1"], "not-an-address")).size, 0);
+  setFetch((url) => { assert.ok(decoded(url).expr.includes(`BestOf(h, "pro", address("${ADDR1}"))`)); return strReply("garden/1/v1 3 0\ngarden/2/v1 0 4\nnot/asked 2 2\n"); });
+  assert.deepEqual([...(await chain.bestsOf(["garden/1/v1", "garden/2/v1"], ADDR1))], [["garden/1/v1", { pro: 3, assisted: 0 }], ["garden/2/v1", { pro: 0, assisted: 4 }]]);
+  // a line not as written (no best, too many strokes, not a number, a field more) is dropped
+  const odd = ["garden/1/v1 0 0", "garden/2/v1 61 0", "garden/3/v1 x 2", "garden/4/v1 -1 2", "garden/5/v1 02 2", "garden/6/v1 2 2 2", "garden/7/v1 2"];
+  setFetch(() => strReply(odd.join("\n")));
+  assert.equal((await chain.bestsOf(odd.map((l) => l.split(" ")[0]), ADDR1)).size, 0);
 });
 
 test("nameOf short-circuits an invalid address, no network call; resolves a valid one", async () => {
@@ -679,7 +683,7 @@ test("an empty string, as the VM prints it — ( string) — reads as \"\"", asy
   const chain = makeChain();
   setFetch(() => rawReply("( string)"));
   assert.equal(await chain.resolveName("nobody"), "");
-  assert.equal((await chain.ghostHoles(["garden/1/v1"], ADDR1)).size, 0);
+  assert.equal((await chain.bestsOf(["garden/1/v1"], ADDR1)).size, 0);
 });
 
 test("qeval refuses a string reply whose contents aren't JSON", async () => {
