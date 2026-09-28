@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { buzz as shake, sound as say, type SoundName } from "../feel";
 import { causeAt } from "../scene/cause";
-import { at, makeSplash, disposeCourse } from "../scene";
+import { at, makePuff, makeSplash, disposeCourse } from "../scene";
 import { BALL_R, inZone, nearestOnPoly, boxOf, closest, segDist, onAt, segHit, rayCircle } from "../terrain";
 import type { MutVec2, Vec2, Wall, Zone } from "../types";
 import type { Cause } from "../scene/cause";
@@ -453,9 +453,10 @@ export function makeReplay(E: Live) {
           start = now;
           at = land;
           if (skin === "roof") {
-            // a fall, not a splash: a thud and a puff of dust in the street (makeSplash gives the puff there)
+            // a fall, not a splash: a thud and a puff of dust where it lands (off a bridge too, where
+            // makeSplash's own test finds no fall and would ring water)
             sound("thud");
-            rings = makeSplash(land.clone().setY(surf + 0.5), { open: false });
+            rings = makePuff(land.clone().setY(surf));
           } else if (skin === "serac") {
             sound("thud");
             for (let n = 0; n < 6; n++) E.causes.at(E.ball.position, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, { kind: "ice" });
