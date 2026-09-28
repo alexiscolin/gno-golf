@@ -265,6 +265,8 @@ For players on pearl:
 
 ## The command list for pearl
 
+> Superseded for onyx, which lets one seeded account `maketx run`: the holes are published with `scripts/publishdata.sh <key>`, one `gnokey maketx call` of `Publish` a hole, and checked with `scripts/publishdata.sh -verify` (docs/design/deploy-v1.md, section 10). The `maketx run` steps below are pearl's.
+
 The user runs these commands with their own key, in this order. The key is written `<your-key-name>` below, and its address `<your-address>`. Every transaction takes `-chainid pearl-1 -remote https://rpc.pearl.testnets.gno.land:443`, shortened to `$P` below. The read-only checks take only the remote, `$R`:
 
 ```sh

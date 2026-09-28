@@ -1,5 +1,7 @@
 # Deploy v1: Gnogolf on pearl (design, not implemented, 2026-09-25)
 
+> The target is now onyx (`onyx-1`, mainnet's code v1.5.0): the pipeline (section 10) is updated for it, the rest is the pearl-era design as it was.
+
 ## 0. Recommendation
 
 - **Holes become data.** Official holes are data records in `golf`, not 74 realm packages.
@@ -236,9 +238,9 @@ There is no cross-call cache: it would be persisted, and qeval can't persist any
 The deployed source is the repo's, byte for byte: stage.sh transforms nothing but the namespace, and checks it.
 
 1. Copy every file of the physics, course and golf directories but their tests (`*_test.gno`, `*_filetest.gno`) into `<out>/gno.land/{p,r}/<ns>/…`, as it is. The subpackages (`physics/build`, `course/author`, `course/fingerprint`) and the hole realms are other directories, and never deployed: nothing deployed imports them.
-2. Rewrite the import paths (`gno.land/[pr]/gnogolf/` → `<ns>`) with `sed`: the one transformation. The production deploy targets the `gnogolf` namespace itself (to be registered on pearl), where it is the identity, so the on-chain source is then exactly the repo's; it only matters for a rehearsal nym such as `nym-golfer000`.
+2. Rewrite the import paths (`gno.land/[pr]/gnogolf/` → `<ns>`) with `sed`: the one transformation. The production deploy targets the `gnogolf` namespace itself (to be obtained on onyx, where namespaces are enforced from block 1), where it is the identity, so the on-chain source is then exactly the repo's; it only matters for a rehearsal nym such as `nym-golfer000`.
 3. Assert that each staged package holds the repo package's non-test files, no more and no fewer, and that each is the repo's file byte for byte once the namespace is read back; that no `gno.land/[pr]/gnogolf` string is left (under a nym); that every gnomod has `gno = "0.9"`; and that there is no `[[replace]]`.
-4. Run `gno lint` with the pearl toolchain and print the package sizes.
+4. Run `gno lint` with the onyx toolchain (`GNO_TOOLCHAIN`, see the README) and print the package sizes.
 
 `scripts/check.sh` stages into a temporary directory under `gnogolf` on every run, so a stage-time transformation or a skipped file fails the check before it can reach a deploy.
 
@@ -252,20 +254,21 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
 
 | # | Step | Signer | Size and cost |
 |---|---|---|---|
-| 1 | `namereg/v1 Register("nym-golfer000")` | user, gnokey | ~5M gas |
+| 1 | `namereg/v0 Register("nym-golfer000")` (onyx and mainnet run v0; pearl ran v1) | user, gnokey | ~5M gas |
 | 2 | addpkg physics | user, gnokey | ~52 KB, 5.2 GNOT |
 | 3 | addpkg course | user, gnokey | ~3.7 GNOT |
 | 4 | addpkg golf (its init sets the owner) | user, gnokey | ~9.1 GNOT |
-| 5 | 74 × `Publish`, 7 a script (`scripts/publishdata.sh`) | the user's key, gnokey | measured in the rehearsal: ~98M gas and ~0.5 GNOT a hole (deploy-v1-rehearsal.md) |
-| 6 | Verify | gnomcp reads | 0 |
+| 5 | 74 × `Publish`, one plain `gnokey maketx call` a hole (`scripts/publishdata.sh <key>`: onyx lets one seeded account `maketx run`, so no script) | the user's key, gnokey | measured on the onyx toolchain: 46M to 174M gas a hole (8.1e9 in all, asked as 1.2 × (25M + 55K a byte of data)), 453,029 bytes in all (45.3 GNOT at 100 ugnot a byte) |
+| 6 | Verify: `scripts/publishdata.sh -verify`, one `vm/qeval` of `Current` and `Versions` over every slot | a read | 0 |
 
 - Every package is far below the 1 MB transaction limit.
 - **gnomcp can:**
   - simulate each addpkg under the agent's own address namespace;
-  - bench on a gnodev matched to pearl;
+  - bench on a gnodev matched to onyx;
   - publish through a user-approved session;
   - run the verification reads.
 - **gnomcp cannot:** addpkg under the user's name, and sessions can't addpkg either. Phase 0 checks that sessions work on pearl.
+- **No `MsgRun` on onyx:** `maketx run` (and its simulation) is restricted to one seeded account, so every write of the deploy and of the game is a plain `MsgCall`: `Publish` a hole a call, a save `PlayRoundAt` (or `PlayRoundPro`), a name `Register`.
 
 ### 10.4 Budget
 

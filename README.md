@@ -89,17 +89,18 @@ the hard way:
   so this is local only.
 
 **2. The holes.** The course is data (`data/holes.txt`), and only golf's owner
-can publish it. Under gnodev that's the deploy key, `test1`:
+can publish it. Under gnodev that's the deploy key, `test1`, which your
+gnokey needs once (`gnokey add test1 --recover`, with the mnemonic gnodev
+prints at start):
 
 ```sh
-scripts/publishdata.sh 7   # writes scripts/publish/publish-NN.gno, 7 holes each
-gnokey maketx run -gas-fee 100000000ugnot -gas-wanted 2000000000 \
-  -remote http://127.0.0.1:26657 -chainid dev -broadcast test1 scripts/publish/publish-01.gno
+scripts/publishdata.sh test1   # one gnokey call of Publish a hole, then a check of every slot
 ```
 
-Run them in order. A slot already up to date is skipped, so a failed script
-can just be run again. To save a round from the game, fund your Adena account
-from `test1` with `gnokey maketx send`.
+It asks the key's password once. A slot already up to date is skipped, so a
+failed run can just be run again; `scripts/publishdata.sh -verify` is the
+check alone. To save a round from the game, fund your Adena account from
+`test1` with `gnokey maketx send`.
 
 **3. The web client.**
 
