@@ -1,6 +1,7 @@
 package golf
 
 import (
+	"encoding/hex"
 	"math"
 	"strconv"
 	"strings"
@@ -209,16 +210,20 @@ func TestADataHoleIsNeverStored(cur realm, t *testing.T) {
 	uassert.Equal(t, 2, sumWear(e))
 }
 
-// The work of a hole at every limit of the format: a commit of twelve shots
-// is refused before it could run out of gas.
+// A hole at every limit of the format is refused: its dearest weather would
+// leave a commit no room. The heaviest of its kind golf takes has its first
+// shot's room in any weather, and a commit of twelve shots on it is refused
+// before it could run out of gas.
 func TestTheEstimatorRefusesAHoleAtTheLimits(cur realm, t *testing.T) {
-	h := limitsHole()
 	testing.SetRealm(testing.NewUserRealm(player))
-	id := PublishMine(cross(cur), "limits", hexOf(h), "every limit at once")
+	urequire.AbortsContains(t, cur, errTooStormy, func() { PublishMine(cross(cur), "limits", hexOf(limitsHole()), "every limit at once") })
+	h := heavyHole()
+	testing.SetRealm(testing.NewUserRealm(player))
+	id := PublishMine(cross(cur), "limits", hexOf(h), "as heavy as it gets")
 	w := newWork(mustHole(id).hole(), nil)
-	uassert.Equal(t, int64(course.MaxWalls), w.walls, "fixed and pulsed walls")
-	uassert.Equal(t, int64(course.MaxWalls+course.MaxPosts+course.MaxZones+course.MaxPolyTotal), w.pieces, "pieces and polygon edges")
-	uassert.True(t, w.bound <= maxShotGas && w.bound <= workBudget, "its heaviest shot fits one transaction")
+	uassert.Equal(t, int64(4+24+28), w.walls, "fixed and pulsed walls")
+	uassert.Equal(t, int64(4+24+28+course.MaxPosts+course.MaxZones+course.MaxPolyTotal), w.pieces, "pieces and polygon edges")
+	uassert.True(t, worstGas(h, len(course.Encode(h))) <= workBudget, "its first shot has its room in any weather")
 	shots := strings.TrimSuffix(strings.Repeat("30,10;", maxShots), ";")
 	uassert.PanicsContains(t, cur, "commit the first", func() { SimulateRound(id, shots) })
 	testing.SetRealm(testing.NewUserRealm(player))
@@ -262,10 +267,21 @@ func TestAPulsesSetUpIsCharged(cur realm, t *testing.T) {
 
 // limitsHole is at every limit GG1 allows at once: a 96×48 board, 160 walls
 // (28 of them in 16 pulses), 32 posts, 32 zones (8 of them 64-point
-// polygons, 512 points in all) and 60 substeps.
-func limitsHole() *course.Simple {
+// polygons, 512 points in all) and 60 substeps. Its dearest weather, every
+// puddle try testing all of that, would leave a commit no room for a shot:
+// golf refuses it.
+func limitsHole() *course.Simple { return atLimits(course.MaxWalls-28-4, physics.Surface, "sand") }
+
+// heavyHole is limitsHole as heavy as golf takes it: 24 of its 128 inner
+// walls, and slopes for its polygons (a puddle try tests a polygon's edges on
+// ground only), so its dearest weather leaves a commit's first shot its room.
+func heavyHole() *course.Simple { return atLimits(24, physics.Slope, "slope") }
+
+// atLimits is limitsHole with inner walls inside its box and its polygons
+// of kind poly.
+func atLimits(inner int, poly physics.ZoneKind, skin string) *course.Simple {
 	walls := build.Box(physics.V(0, 0), physics.V(96, 48))
-	for i := 0; len(walls) < course.MaxWalls-28; i++ {
+	for i := 0; i < inner; i++ {
 		x, y := 8+float64(i%16)*5, 6+float64(i/16)*5
 		walls = append(walls, physics.Wall{Seg: physics.Segment{A: physics.V(x, y), B: physics.V(x+1, y+0.5)}, Bounce: 0.6})
 	}
@@ -276,11 +292,15 @@ func limitsHole() *course.Simple {
 	var zones []physics.Zone
 	for i := 0; i < 8; i++ {
 		c := physics.V(12+float64(i)*10, 24)
-		var poly []physics.Vec2
+		var pts []physics.Vec2
 		for k := 0; k < course.MaxPoly; k++ {
-			poly = append(poly, c.Add(physics.FromPolar(float64(k)*2*math.Pi/course.MaxPoly, 2)))
+			pts = append(pts, c.Add(physics.FromPolar(float64(k)*2*math.Pi/course.MaxPoly, 2)))
 		}
-		zones = append(zones, physics.Zone{Kind: physics.Surface, Min: c.Sub(physics.V(2, 2)), Max: c.Add(physics.V(2, 2)), Scale: 0.9, Poly: poly, Skin: "sand"})
+		z := physics.Zone{Kind: poly, Min: c.Sub(physics.V(2, 2)), Max: c.Add(physics.V(2, 2)), Scale: 0.9, Poly: pts, Skin: skin}
+		if poly == physics.Slope {
+			z.Scale, z.Vec = 0, physics.V(0.01, 0)
+		}
+		zones = append(zones, z)
 	}
 	for i := 0; len(zones) < course.MaxZones; i++ {
 		c := physics.V(6+float64(i)*3.5, 44)
@@ -827,4 +847,18 @@ func TestOneAuthorCannotFloodTheList(cur realm, t *testing.T) {
 	uassert.True(t, at(late) < at(flooder.String()+"/f999/v1"), "newest first")
 	uassert.True(t, at(flooder.String()+"/f997/v1") < at(early[0]) && at(early[1]) >= 0, "and the older authors after the flood")
 	uassert.True(t, strings.Contains(Holes(), `"id":"`+early[0]+`"`) && strings.Contains(Render(""), ":"+strings.TrimSuffix(early[1], "/v1")+")"), "in Holes and on the hub")
+}
+
+// Every course hole fits one commit in its dearest weather: decoding, a
+// storm whose puddle tries all fail, and its heaviest shot (worstGas).
+func TestTheCourseFitsItsWorstWeather(t *testing.T) {
+	for _, d := range courseData {
+		raw, err := hex.DecodeString(d[3])
+		urequire.NoError(t, err)
+		h, err := course.Decode(string(raw))
+		urequire.NoError(t, err)
+		g := worstGas(h, len(raw))
+		t.Logf("worst %s forecast %d shot %d total %d", d[0], course.WorstForecastWork(h), newWork(h, nil).bound, g)
+		uassert.True(t, g <= workBudget, d[0]+" does not fit its worst weather")
+	}
 }

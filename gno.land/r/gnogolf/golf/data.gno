@@ -255,10 +255,14 @@ func decodeData(hexData string) (*course.Simple, string, string) {
 	if course.Encode(h) != data {
 		panic("golf: the data is not as course.Encode writes it")
 	}
-	// refused if a transaction could not replay its heaviest shot
-	w := newWork(h, nil)
-	if w.bound > maxShotGas {
+	// refused if a transaction could not replay its heaviest shot, or if in
+	// its dearest weather a commit's first shot would be capped below
+	// minShotWork: every commit decodes the hole and draws its forecast first
+	if newWork(h, nil).bound > maxShotGas {
 		panic(errShotTooHeavy)
+	}
+	if worstGas(h, len(data)) > workBudget {
+		panic(errTooStormy)
 	}
 	sum := sha256.Sum256(b)
 	return h, data, hex.EncodeToString(sum[:])

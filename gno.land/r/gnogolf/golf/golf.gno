@@ -42,6 +42,7 @@ const (
 	errShot         = "golf: a shot is an angle and a power between 0 and 10"
 	errStrokeLimit  = "golf: this round is over its stroke limit, Reset to play again"
 	errShotTooHeavy = "golf: one shot on this hole could cost more than a transaction can replay"
+	errTooStormy    = "golf: in its dearest weather, a commit on this hole would leave too little room for a shot"
 	errUnknownHole  = "golf: unknown hole: "
 )
 
@@ -734,12 +735,37 @@ const (
 // fixedGas is what a commit on e spends before its shots, in the forecast
 // fc: decoding the hole, and drawing the forecast.
 func fixedGas(e *entry, fc course.Forecast) int64 {
-	return decodeBase + decodePerByte*int64(len(holeData.Get(e.id).(string))) + int64(fc.Work)*workPerUnit
+	return decodeGas(len(holeData.Get(e.id).(string))) + int64(fc.Work)*workPerUnit
 }
+
+// decodeGas bounds decoding size bytes of a hole's data.
+func decodeGas(size int) int64 { return decodeBase + decodePerByte*int64(size) }
 
 // maxShotGas bounds a hole's heaviest shot (shotBound and its pulses'
 // set-up): a hole past it is refused at publish.
 const maxShotGas = 1300000000
+
+// minShotWork is the work, in the physics' units, a commit's first shot may
+// always do whatever the weather: four fifths of MaxWork. Past it a shot is
+// capped (work.next), so a hole whose dearest weather would leave less is
+// refused at publish (worstGas): a published hole never refuses a legitimate
+// full-power stroke in its worst weather, and an author whose board is too
+// heavy is told at publish, not by a hole that misbehaves in the rain. The
+// course's heaviest shot does 441,737 over the full grid of tee shots
+// (mountain/16, full power, in a storm), 0.74 of MaxWork in an adversarial
+// search (docs/golf.md); its tightest room in its dearest weather is 839,278
+// (mountain/7), 39,278 over the floor.
+const minShotWork = 4 * physics.MaxWork / 5
+
+// worstGas is what a commit on h (size bytes of data) spends up to a first
+// shot of minShotWork in its dearest weather: decoding, the forecast at its
+// most (course.WorstForecastWork), and the shot, its walls and its pulses'
+// set-up, as work.next caps it.
+func worstGas(h course.Hole, size int) int64 {
+	w := newWork(h, nil)
+	return decodeGas(size) + int64(course.WorstForecastWork(h))*workPerUnit +
+		workPerShot + w.walls*workPerWall + w.setup + (physics.MaxWorkStep+minShotWork)*workPerUnit
+}
 
 // newWork is a commit's work on a hole, before any shot: its walls and
 // pieces, a pulse's as if always there, and the weather's.

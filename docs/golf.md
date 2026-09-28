@@ -800,15 +800,30 @@ What a commit spends before its first shot is counted in too: decoding the
 hole (at most `6M + 4K ×` its data's bytes; 3.4K to 3.9K a byte measured)
 and drawing its forecast (`Forecast.Work` units, counted as it is drawn: the
 rain's puddle tries test every post, zone, polygon edge and wall, up to 0.14e9
-on the course and 1.1e9 on a hostile hole). `Weather` gives this part as
+on the course as drawn; at its dearest, every try failing after testing
+everything, `course.WorstForecastWork`: 0.04e9 to 0.30e9 on the course, and
+bounded at publish on any hole, below). `Weather` gives this part as
 `gas`, and every `Simulate*` answer its shot's `work`, so a client adds up a
 commit as the chain does.
 
 A hole's heaviest shot is bounded: `shotBound = 10M + 150K × walls + 1000 ×
 (MaxWork + MaxWorkStep)`, and its pulses' set-up, 1.24e9 to 1.26e9 for the
-course holes. A hole whose
-bound passes 1.3e9 is refused when it is published, and before the first
-shot of a commit the bound must fit the 1.4e9 budget. Before each later shot,
+course holes. A hole whose bound passes 1.3e9 (`maxShotGas`) is refused when
+it is published. So is a hole whose dearest weather would leave a commit's
+first shot less than `minShotWork` (four fifths of `MaxWork`): decoding, the
+forecast at its dearest and a shot's fixed part, its walls, its pulses'
+set-up and `MaxWorkStep + minShotWork` must fit the 1.4e9 budget
+(`worstGas`; `golf: in its dearest weather, a commit on this hole would
+leave too little room for a shot`). A published hole then never refuses a
+legitimate full-power stroke in its worst weather, and an author whose board
+is too heavy is told at publish, not by a hole that misbehaves in the rain.
+On the course that room is 839K (mountain/7, 39K over the floor) to 1,115K
+units (town/11); the heaviest course shot does 442K on the 42,624 grid shots
+of the 74 holes (mountain/16, full power, in a storm) and 0.74 of `MaxWork`
+in the adversarial search below. It also bounds a page: one forecast, at
+most `maxBoardWork` of board and one shot, far under a query's 3e9 (the
+worst pages golf takes cost 0.52e9, `z_worst_render_filetest`). Before the
+first shot of a commit the bound must fit the 1.4e9 budget. Before each later shot,
 a commit that would pass 1.4e9 with one more shot as heavy as its heaviest so
 far is refused:
 `golf: more shots than one transaction can replay on this hole: commit the

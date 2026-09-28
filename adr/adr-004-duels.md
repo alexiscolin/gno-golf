@@ -181,7 +181,8 @@ tree has already lost its shots, and no migration can bring them back.
 - **Cost of one read.** Each read decodes the hole and plays one shot. On the
   course holes that is 45 to 47M gas at most (docs/golf.md:805-808), well
   under the node's 3e9 query cap (docs/design/deploy-v1.md:34). A hostile
-  community hole is bounded by `maxShotGas`, 1.3e9, checked at publish
+  community hole is bounded by `maxShotGas`, 1.3e9, and its dearest weather
+  by `worstGas` (a first shot keeps `minShotWork`), both checked at publish
   (golf.gno:754).
 - **Order.** The reads are sequential, because each one needs the `rest` of
   the one before. The client asks for the rival's stroke N+1 as soon as

@@ -293,6 +293,34 @@ const (
 	iceWork      = 5
 )
 
+// WorstForecastWork bounds the Work of h's forecast in any period and world:
+// a storm's, whose puddle tries all fail, each after dryLand has tested every
+// piece (a try that fails sooner costs less, and one that places a puddle
+// ends them sooner). Golf refuses a hole whose worst forecast leaves a commit
+// no room for its heaviest shot.
+func WorstForecastWork(h Hole) int {
+	f := h.Field()
+	try := tryWork + dryPostWork*len(f.Posts)
+	for _, z := range f.Zones {
+		try += dryZoneTest(z)
+	}
+	for _, wl := range f.Walls {
+		if wl.Every <= 0 {
+			try += dryWallWork
+		}
+	}
+	return forecastWork + stormWork + iceWork*len(f.Zones) + puddleTries*try
+}
+
+// dryZoneTest is the work of dryLand's test of one zone: its polygon's edges
+// too for any zone but plain ground (Contains, at its dearest).
+func dryZoneTest(z physics.Zone) int {
+	if (z.Kind != physics.Surface && z.Kind != physics.Slope) || (z.Kind == physics.Surface && z.Skin != "") {
+		return dryZoneWork + dryEdgeWork*len(z.Poly)
+	}
+	return dryZoneWork
+}
+
 // wet adds what rain leaves on a hole: its ice quicker still, and two to four
 // puddles on the lane, clear of the kerb, the pieces, the tee and the cup.
 // What it costs goes in *work.
@@ -345,10 +373,7 @@ func dryLand(h Hole, c physics.Vec2, rad float64, work *int) bool {
 		}
 	}
 	for _, z := range f.Zones {
-		*work += dryZoneWork
-		if (z.Kind != physics.Surface && z.Kind != physics.Slope) || (z.Kind == physics.Surface && z.Skin != "") {
-			*work += dryEdgeWork * len(z.Poly) // Contains, at its dearest
-		}
+		*work += dryZoneTest(z)
 		if z.Kind != physics.Surface && z.Kind != physics.Slope && z.Contains(c) {
 			return false
 		}

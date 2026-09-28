@@ -55,7 +55,13 @@ import (
 //	         cap ("commit the first 11"): its 11 taps, then the
 //	         full shot alone                                      0.80e9
 //
-// All are under 1.6e9, and the 2e9 Adena simulates.
+// All are under 1.6e9, and the 2e9 Adena simulates. Since a hole's dearest
+// weather is bounded at publish (golf's worstGas: a commit's first shot has
+// minShotWork in any weather), all but a60, a31 and posts are refused at
+// publish, as the output says: each forecast tests their walls and polygon
+// edges on every puddle try. Their measures are kept as the record of what
+// the cap held before; the heaviest a published hole can do is now what a60,
+// a31 and posts do.
 
 type spec struct {
 	slug, world, walls string
@@ -226,7 +232,11 @@ func slugFor(cur realm, s spec, h *course.Simple) string {
 func main(cur realm) {
 	for _, s := range probes {
 		h := probe(s)
-		id := golf.PublishMine(cross(cur), slugFor(cur, s, h), hex.EncodeToString([]byte(course.Encode(h))), "")
+		var id string
+		if r := revive(func() { id = golf.PublishMine(cross(cur), slugFor(cur, s, h), hex.EncodeToString([]byte(course.Encode(h))), "") }); r != nil {
+			println(s.slug, r)
+			continue
+		}
 		angle, power := s.angle, s.power
 		if angle == 0 {
 			angle = 135
@@ -241,7 +251,11 @@ func main(cur realm) {
 		}
 	}
 	h := probe(spec{walls: "cage", zig: 8, rects: 23})
-	id := golf.PublishMine(cross(cur), slugFor(cur, spec{slug: "cage", kind: "dry"}, h), hex.EncodeToString([]byte(course.Encode(h))), "")
+	var id string
+	if r := revive(func() { id = golf.PublishMine(cross(cur), slugFor(cur, spec{slug: "cage", kind: "dry"}, h), hex.EncodeToString([]byte(course.Encode(h))), "") }); r != nil {
+		println("cage", r)
+		return
+	}
 	taps := strings.Repeat("0,0.01;", 11)
 	println(id, revive(func() { golf.PlayRoundAt(cross(cur), id, taps+"135,10", golf.Period()) }))
 	golf.Reset(cross(cur), id) // a test does not revert what the refused commit did; a transaction does
@@ -250,18 +264,16 @@ func main(cur realm) {
 }
 
 // Output:
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/a2/v1
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/a0/v1 golf: one shot on this hole could cost more than a transaction can replay
+// a2 golf: in its dearest weather, a commit on this hole would leave too little room for a shot
+// a0 golf: in its dearest weather, a commit on this hole would leave too little room for a shot
 // g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/a60/v1
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/a14/v1 golf: one shot on this hole could cost more than a transaction can replay
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/a23/v1
+// a14 golf: in its dearest weather, a commit on this hole would leave too little room for a shot
+// a23 golf: in its dearest weather, a commit on this hole would leave too little room for a shot
 // g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/a31/v1
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/a24/v1
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/endcap/v1
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/face/v1
+// a24 golf: in its dearest weather, a commit on this hole would leave too little room for a shot
+// endcap golf: in its dearest weather, a commit on this hole would leave too little room for a shot
+// face golf: in its dearest weather, a commit on this hole would leave too little room for a shot
 // g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/posts/v1
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/corner2/v1 golf: one shot on this hole could cost more than a transaction can replay
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/corner0/v1
-// g19ea2wqvcgqxwgg7lg270ut8cvcmy70fr5lup0m/cage2/v1 golf: more shots than one transaction can replay on this hole: commit the first 11, then the rest
-// 11 shots replayed, ball at 20.0,20.0 after 11 strokes
-// 1 shots replayed, ball at 26.2,25.8 after 12 strokes
+// corner golf: in its dearest weather, a commit on this hole would leave too little room for a shot
+// corner golf: in its dearest weather, a commit on this hole would leave too little room for a shot
+// cage golf: in its dearest weather, a commit on this hole would leave too little room for a shot

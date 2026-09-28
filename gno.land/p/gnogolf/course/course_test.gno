@@ -194,3 +194,31 @@ func TestParOfAsksTheHoleOnce(t *testing.T) {
 		t.Fatalf("ParOf gave %d after %d calls", p, f.calls)
 	}
 }
+
+// WorstForecastWork bounds every forecast's Work, and meets it on a hole
+// where every puddle try walks every piece: a cage of walls round the tee in
+// a corner, thin hazards along the far edge, the rest of the board off the
+// lane (each try fails at the lane test, the last).
+func TestWorstForecastWorkBoundsTheForecast(t *testing.T) {
+	cage := &Simple{W: 96, H: 96, World: "island", Tee: physics.V(5, 5), Pin: physics.V(93, 3), Substeps: 20, CupRadius: 1,
+		Course: &physics.Field{Walls: build.Box(physics.V(3, 3), physics.V(7, 7)), Friction: 0.9, Radius: 0.5,
+			Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(5, 6), R: 0.3}}},
+			Zones: []physics.Zone{{Kind: physics.Hazard, Min: physics.V(0, 95), Max: physics.V(96, 96),
+				Poly: []physics.Vec2{physics.V(0, 95.9), physics.V(96, 95.9), physics.V(96, 96)}}}}}
+	lane := &Simple{W: 40, H: 10, World: "island", Tee: physics.V(2, 5), Pin: physics.V(38, 5), Substeps: 20, CupRadius: 1,
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5}}
+	for _, h := range []*Simple{cage, lane} {
+		worst, most := WorstForecastWork(h), 0
+		for p := int64(0); p < 400; p++ {
+			if w := ForecastFor("x", h.World, h, p).Work; w > most {
+				most = w
+			}
+		}
+		if most > worst {
+			t.Fatalf("a forecast of %d work, past its bound %d", most, worst)
+		}
+		if h == cage && most != worst {
+			t.Fatalf("the cage's storms cost %d at most, not their bound %d", most, worst)
+		}
+	}
+}
