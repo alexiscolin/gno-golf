@@ -90,7 +90,7 @@ export function Green({ p, world = "garden", holed = false, thick = false }: { p
   return (
     <svg viewBox={`0 ${Math.min(0, pole - 6 * k)} 300 ${64 * k - Math.min(0, pole - 6 * k)}`} aria-hidden="true" className={`green green--${world}`}>
       <rect x="2" y={top} width="296" height={H} rx={H / 2} className="load__green" />
-      <rect x="2" y={top} width={Math.max(H, x + 10 * k)} height={H} rx={H / 2} className="load__mown" />
+      <rect x="2" y={top} width={holed ? 296 : Math.max(H, x + 10 * k)} height={H} rx={H / 2} className="load__mown" />
       <ellipse cx={cx} cy={mid} rx={11 * k} ry={5 * k} className="load__cup" />
       <path d={`M ${cx} ${mid} V ${pole}`} className="load__pole" />
       <g transform={`translate(${cx} ${pole}) scale(${k})`}>
