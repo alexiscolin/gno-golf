@@ -251,6 +251,24 @@ void test("an aim already answered, revisited, is served from cache with no seco
   assert.equal(chain.pending.length, 2); // served from the cache: no third request
 });
 
+void test("the same aim pulled again after dropAim() shows the kept answer, not the straight line", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { E, aimer, dots, chain } = makeRig();
+  E.dragging = true;
+  E.shot.power = 5;
+  aimer.preview();
+  const straight = dots.count;
+  t.mock.timers.tick(120);
+  chain.pending[0].resolve(mkStroke([[0, 0], [1, 0]])); // the ball stops short of the straight line
+  await settle();
+  const answered = dots.count;
+  assert.ok(answered < straight);
+  aimer.dropAim(); // Escape
+  aimer.preview(); // the very same aim again
+  assert.equal(dots.count, answered); // the chain's kept dots, at once
+  assert.equal(chain.pending.length, 1); // and no second request
+});
+
 void test("dropAim() cancels a chain request under way", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { E, aimer, aim, band, chain } = makeRig();

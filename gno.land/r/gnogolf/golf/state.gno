@@ -61,7 +61,8 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 		`,"period":` + strconv.FormatInt(p, 10) +
 		`,"weather":` + forecastJSON("", weatherOf(e, h, p)) +
 		`,"start":` + jvec(h.Start()) +
-		`,"cup":` + jvec(h.Cup()))
+		`,"cup":` + jvec(h.Cup()) +
+		`,"cupR":` + jnum(h.(*dataHole).CupRadius) + `,"ballR":` + jnum(f.Radius))
 	if rounds {
 		sb.WriteString(`,"plays":` + strconv.Itoa(e.plays))
 	}
@@ -638,17 +639,18 @@ func Extras(hole string, stroke int) string {
 }
 
 // Leaderboard is a mode's course-wide top ten ("assisted" or "pro"): each
-// named player's best finish on each current course hole, summed; most holes
-// first, then fewest strokes. It reads the first rows of a ranking kept in
-// order as rounds finish, so it costs nothing that grows with the players.
+// named player, with their name, and their best finish on each current course
+// hole, summed; most holes first, then fewest strokes, then the first there.
+// It reads the first rows of a ranking kept in order as rounds finish, so it
+// costs nothing that grows with the players.
 func Leaderboard(mode string) string {
 	m := modeOf(mode)
 	var sb strings.Builder
 	// out of the course's current holes: archived and anyone's do not count
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"holes":` + strconv.Itoa(slots.Size()) + `,"rows":[`)
 	n := 0
-	eachRanked(m, func(r *row, _ string) {
-		sb.WriteString(sep(n) + standingRow(r.player, r.holes, r.strokes))
+	eachRanked(m, func(r *row, name string) {
+		sb.WriteString(sep(n) + standingRow(r.player, name, r.holes, r.strokes))
 		n++
 	})
 	sb.WriteString("]}")
@@ -674,13 +676,21 @@ func eachRanked(m int, fn func(r *row, name string)) {
 const maxWalked = 4 * topSize
 
 // strokesRow and standingRow are the rows the reads list: a player and a
-// best, or a player and a standing.
-func strokesRow(p string, strokes int) string {
-	return `{"player":` + jstr(p) + `,"strokes":` + strconv.Itoa(strokes) + "}"
+// best, or a player and a standing. The boards read each name to skip a
+// deleted one, and give it (name); the other reads resolve none ("").
+func strokesRow(p, name string, strokes int) string {
+	return `{"player":` + jstr(p) + nameField(name) + `,"strokes":` + strconv.Itoa(strokes) + "}"
 }
 
-func standingRow(p string, holes, strokes int) string {
-	return `{"player":` + jstr(p) + `,"holes":` + strconv.Itoa(holes) + `,"strokes":` + strconv.Itoa(strokes) + "}"
+func standingRow(p, name string, holes, strokes int) string {
+	return `{"player":` + jstr(p) + nameField(name) + `,"holes":` + strconv.Itoa(holes) + `,"strokes":` + strconv.Itoa(strokes) + "}"
+}
+
+func nameField(name string) string {
+	if name == "" {
+		return ""
+	}
+	return `,"name":` + jstr(name)
 }
 
 // Rank is a player's place in a mode's course ranking: "rank" 1 is the top,
@@ -707,10 +717,11 @@ func Rank(mode string, player address) string {
 
 // CourseLeaderboard is a page of a mode's course ranking, paged like
 // HoleLeaderboard: from rank offset+1 (clamped to 0..players), at most limit
-// rows (clamped to 1..100). holes is the course's current holes, players how
-// many the ranking holds, next the offset of the next page (0 once there is
-// none). A name deleted since is skipped, so a page may hold fewer rows than
-// it covers. A page reads its own rows only, however long the ranking.
+// rows (clamped to 1..100), each with its name. holes is the course's
+// current holes, players how many the ranking holds, next the offset of the
+// next page (0 once there is none). A name deleted since is skipped, so a
+// page may hold fewer rows than it covers. A page reads its own rows only,
+// however long the ranking.
 func CourseLeaderboard(mode string, offset, limit int) string {
 	m := modeOf(mode)
 	limit = clampLimit(limit)
@@ -727,11 +738,12 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 	n := 0
 	ranks[m].IterateByOffset(offset, limit, func(_ string, v any) bool {
 		p := v.(string)
-		if !named(p) {
+		name := nameOf(p)
+		if name == "" {
 			return false // a name deleted since
 		}
 		r := totals[m].Get(p).(*row)
-		sb.WriteString(sep(n) + standingRow(p, r.holes, r.strokes))
+		sb.WriteString(sep(n) + standingRow(p, name, r.holes, r.strokes))
 		n++
 		return false
 	})
@@ -753,17 +765,10 @@ func Ghost(hole, mode string, player address) string {
 	if v == nil {
 		return "null"
 	}
-	// "<strokes> <period> <shots>", as bestOf writes it (bestStrokes refuses anything else)
-	strokes, f := bestStrokes(v), strings.SplitN(v.(string), " ", 3)
-	if len(f) < 3 {
-		panic(errBest + v.(string))
-	}
-	period, err := strconv.ParseInt(f[1], 10, 64)
-	if err != nil {
-		panic(errBest + v.(string))
-	}
+	strokes := bestStrokes(v)
+	_, period, shots := bestFields(v)
 	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(player.String()) +
-		`,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(f[2]) + "}"
+		`,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(shots) + "}"
 }
 
 // HoleRank is a player's place on a hole's board in a mode: "rank" 1 is the
@@ -773,9 +778,10 @@ func Ghost(hole, mode string, player address) string {
 func HoleRank(hole, mode string, player address) string {
 	e, m := readHole(hole), modeOf(mode)
 	p := player.String()
-	rank, strokes := 0, bestStrokes(e.bests(m).Get(p))
+	v := e.bests(m).Get(p)
+	rank, strokes := 0, bestStrokes(v)
 	if strokes > 0 {
-		if k := boardKey(strokes, p); e.board(m).Has(k) {
+		if k := boardKey(v, p); e.board(m).Has(k) {
 			rank = e.board(m).index(k) + 1
 		}
 	}
@@ -787,7 +793,8 @@ func HoleRank(hole, mode string, player address) string {
 const maxListed = 120
 
 // HoleLeaderboard is a page of one hole's board in a mode: each named
-// player's best finished round there, fewest strokes first, from rank
+// player, with their name, and their best finished round there, fewest
+// strokes first, then the first to make them, from rank
 // offset+1 (clamped to 0..players), at most limit rows (clamped to 1..100). players is how many
 // named players the board holds (what a client pages through), finished how
 // many players finished it, named or not. next is the offset of the next
@@ -812,10 +819,11 @@ func HoleLeaderboard(hole, mode string, offset, limit int) string {
 	n := 0
 	board.IterateByOffset(offset, limit, func(k string, v any) bool {
 		p := v.(string)
-		if !named(p) {
+		name := nameOf(p)
+		if name == "" {
 			return false // a name deleted since
 		}
-		sb.WriteString(sep(n) + strokesRow(p, boardStrokes(k)))
+		sb.WriteString(sep(n) + strokesRow(p, name, boardStrokes(k)))
 		n++
 		return false
 	})
@@ -871,7 +879,7 @@ func Bests(hole, mode, players string) string {
 	n := 0
 	for _, p := range friends(players) {
 		if v := e.bests(m).Get(p); v != nil {
-			sb.WriteString(sep(n) + strokesRow(p, bestStrokes(v)))
+			sb.WriteString(sep(n) + strokesRow(p, "", bestStrokes(v)))
 			n++
 		}
 	}
@@ -889,7 +897,7 @@ func Standings(mode, players string) string {
 	for _, p := range friends(players) {
 		if v := totals[m].Get(p); v != nil {
 			r := v.(*row)
-			sb.WriteString(sep(n) + standingRow(p, r.holes, r.strokes))
+			sb.WriteString(sep(n) + standingRow(p, "", r.holes, r.strokes))
 			n++
 		}
 	}
@@ -909,7 +917,7 @@ func Records(hole, mode, after string, limit int) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
 	next := page(e.bests(m).Iterate, after, limit, func(i int, p string, v any) {
-		sb.WriteString(sep(i) + strokesRow(p, bestStrokes(v)))
+		sb.WriteString(sep(i) + strokesRow(p, "", bestStrokes(v)))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()
@@ -924,7 +932,7 @@ func Players(mode, after string, limit int) string {
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
 	next := page(totals[m].Iterate, after, limit, func(i int, p string, v any) {
 		r := v.(*row)
-		sb.WriteString(sep(i) + standingRow(p, r.holes, r.strokes))
+		sb.WriteString(sep(i) + standingRow(p, "", r.holes, r.strokes))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()

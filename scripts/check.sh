@@ -24,7 +24,7 @@ fi
 
 cd "$root/web"
 echo "== typecheck" && npx tsc --noEmit
-echo "== lint" && ./node_modules/.bin/eslint . ../media/promo ../media/camera ../media/lib ../scripts
+echo "== lint" && npm run -s lint
 echo "== selfcheck" && npm run -s selfcheck
 echo "== unit tests" && npm test --silent
 if [ "${1:-}" = "--smoke" ]; then echo "== smoke" && npm run -s smoke; fi

@@ -111,11 +111,13 @@ func (e *entry) roundTree() view { return view{rounds, e.id + " "} }
 // finished round there, kept across replays, as bestOf writes it.
 func (e *entry) bests(m int) view { return view{bests, e.id + " " + modeNames[m] + " "} }
 
-// bestOf is how a best is kept: "<strokes> <period> <shots>", the round's
-// shots as played, so the best replays in its own weather (Ghost) for as long
-// as the realm stands. The mode is in the key.
+// bestOf is how a best is kept: "<strokes> <height> <period> <shots>": the
+// height it was made at, which ranks it before a later tie (boardKey), and
+// the round's shots as played, so the best replays in its own weather (Ghost)
+// for as long as the realm stands. The mode is in the key.
 func bestOf(r *round) string {
-	return strconv.Itoa(r.strokes) + " " + strconv.FormatInt(r.period, 10) + " " + r.shots
+	return strconv.Itoa(r.strokes) + " " + strconv.FormatInt(runtime.ChainHeight(), 10) + " " +
+		strconv.FormatInt(r.period, 10) + " " + r.shots
 }
 
 // errBest is a best not as bestOf writes it: never written, refused if read.
@@ -138,7 +140,23 @@ func bestStrokes(v any) int {
 	return n
 }
 
-// board is the version's board in mode m: boardKey(strokes, player) ->
+// bestFields is the rest of a kept best: the height it was made at, its
+// period and its shots.
+func bestFields(v any) (int64, int64, string) {
+	s := v.(string)
+	f := strings.SplitN(s, " ", 4)
+	if len(f) < 4 {
+		panic(errBest + s)
+	}
+	at, err := strconv.ParseInt(f[1], 10, 64)
+	period, err2 := strconv.ParseInt(f[2], 10, 64)
+	if err != nil || err2 != nil {
+		panic(errBest + s)
+	}
+	return at, period, f[3]
+}
+
+// board is the version's board in mode m: boardKey(best, player) ->
 // player, the named players' bests, fewest strokes first.
 func (e *entry) board(m int) view { return view{boards, e.id + " " + modeNames[m] + " "} }
 
@@ -328,6 +346,7 @@ var (
 type row struct {
 	player         string
 	holes, strokes int
+	height         int64 // of the finish that last improved it: the first there ranks first
 }
 
 const topSize = 10
@@ -429,15 +448,20 @@ func pad(n, width int) string {
 }
 
 // rankKey orders the course ranking: most holes first, then fewest strokes,
-// then the address.
+// then the first there, then the address.
 func rankKey(r *row) string {
-	return pad(9999-r.holes, 4) + "/" + pad(r.strokes, 7) + "/" + r.player
+	return pad(9999-r.holes, 4) + "/" + pad(r.strokes, 7) + "/" + pad(int(r.height), 12) + "/" + r.player
 }
 
-// boardKey orders a hole's board: fewest strokes first, then the address.
-// A board's rows read the strokes back from it (boardStrokes), not from the
+// boardKey orders a hole's board by each player's best v: fewest strokes
+// first, then the first to make them, then the address. A best's shots are
+// public (Ghost): whoever replays them ties it, and ranks after it. A
+// board's rows read the strokes back from it (boardStrokes), not from the
 // bests.
-func boardKey(strokes int, player string) string { return pad(strokes, 3) + "/" + player }
+func boardKey(v any, player string) string {
+	at, _, _ := bestFields(v)
+	return pad(bestStrokes(v), 3) + "/" + pad(int(at), 12) + "/" + player
+}
 
 // boardStrokes is the strokes of a board's key: always its three digits.
 func boardStrokes(k string) int {
@@ -445,18 +469,18 @@ func boardStrokes(k string) int {
 	return n
 }
 
-// setRow moves a player's standing and keeps the ranking in step. A
-// standing with no hole left ranks nowhere, and neither it nor its ranking
-// key is freed: the key moves to idle, apart from the ranking and 5 bytes
+// setRow moves a player's standing, as of height at, and keeps the ranking
+// in step. A standing with no hole left ranks nowhere, and neither it nor
+// its ranking key is freed: the key moves to idle, apart from the ranking and 5 bytes
 // longer, since its storage deposit is the player's, and freeing it would
 // refund whoever drained it. It moves back at the player's next hole.
-func setRow(m int, r *row, holes, strokes int) {
+func setRow(m int, r *row, holes, strokes int, at int64) {
 	k := rankKey(r)
 	_, had := ranks[m].Remove(k)
 	if _, ok := idle[m].Remove(k); ok {
 		had = true
 	}
-	r.holes, r.strokes = holes, strokes
+	r.holes, r.strokes, r.height = holes, strokes, at
 	switch {
 	case r.holes > 0 && named(r.player):
 		ranks[m].Set(rankKey(r), r.player)
@@ -479,9 +503,9 @@ func improve(m int, player string, was, best int) {
 		totals[m].Set(player, r)
 	}
 	if was == 0 {
-		setRow(m, r, r.holes+1, r.strokes+best)
+		setRow(m, r, r.holes+1, r.strokes+best, runtime.ChainHeight())
 	} else {
-		setRow(m, r, r.holes, r.strokes+best-was)
+		setRow(m, r, r.holes, r.strokes+best-was, runtime.ChainHeight())
 	}
 }
 
@@ -529,7 +553,7 @@ func drain(n int) {
 				}
 				if d.fresh[m] == nil || !d.fresh[m].Has(p) {
 					if r := totals[m].Get(p); r != nil {
-						setRow(m, r.(*row), r.(*row).holes-1, r.(*row).strokes-bestStrokes(v))
+						setRow(m, r.(*row), r.(*row).holes-1, r.(*row).strokes-bestStrokes(v), r.(*row).height)
 					}
 				}
 				n--
@@ -760,7 +784,8 @@ func shotList(shots string) []string {
 // dearer.
 type work struct {
 	walls, pieces int64 // on the board this commit: walls, and every piece and polygon edge
-	bound         int64 // shotBound
+	setup         int64 // what each shot spends outside its Shot.Work: a pulse's pieces, set up afresh
+	bound         int64 // shotBound, and the set-up
 	fixed         int64 // spent before the shots: decoding, forecast
 	spent, most   int64
 	played        int
@@ -778,6 +803,12 @@ const (
 	workPerPoint = 1200000
 	workPerPiece = 15000
 	workPerUnit  = 1000
+	// A pulse's walls and posts are set up afresh for each shot, outside its
+	// Shot.Work: a wall's offset lines (it has no stored lengths) and its
+	// unstick test, a post's unstick test. 806K a wall and 175K a post
+	// measured, workPerWall included.
+	workPerPulseWall = 700000
+	workPerPulsePost = 200000
 )
 
 // Decoding a hole's data costs at most decodeBase and decodePerByte a byte
@@ -794,7 +825,8 @@ func fixedGas(e *entry, fc course.Forecast) int64 {
 }
 
 // maxShotGas is the most one shot of a hole may be estimated at: a hole
-// whose shotBound passes it is refused when it is published.
+// whose bound (shotBound and its pulses' set-up) passes it is refused when it
+// is published.
 const maxShotGas = 1300000000
 
 // newWork is a commit's work on a hole, before any shot: its walls and
@@ -808,9 +840,10 @@ func newWork(h course.Hole, weather []physics.Zone) *work {
 	for _, p := range pulsesOf(h) {
 		w.walls += int64(len(p.Walls))
 		w.pieces += pieces(p.Walls, p.Posts, p.Zones)
+		w.setup += int64(len(p.Walls))*workPerPulseWall + int64(len(p.Posts))*workPerPulsePost
 	}
 	w.pieces += pieces(nil, nil, weather)
-	w.bound = shotBound(w.walls)
+	w.bound = shotBound(w.walls) + w.setup
 	return w
 }
 
@@ -852,6 +885,7 @@ func (w *work) next(h course.Hole) {
 		w.refuse()
 	}
 	c := (workBudget-w.fixed-w.spent-workPerShot-w.walls*workPerWall)/workPerUnit - physics.MaxWorkStep
+	c -= w.setup / workPerUnit
 	if c < 1 {
 		w.refuse()
 	}
@@ -880,6 +914,7 @@ func (w *work) add(s physics.Shot) {
 	if u := workPerShot + w.walls*workPerWall + int64(s.Work)*workPerUnit; u > c {
 		c = u // a shot that did more than its path shows
 	}
+	c += w.setup
 	w.spent += c
 	if c > w.most {
 		w.most = c
@@ -955,8 +990,10 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	angle, power = validShot(angle, power)
 
 	from := r.ball()
-	shot, holed := resolve(playAt(h, from, angle*math.Pi/180, power, r.strokes, tick, weather))
+	shot, holed := resolve(previewAt(h, from, angle*math.Pi/180, power, r.strokes, tick, weather))
 	shot = back(h, from, shot, holed)
+	w, hh := course.BoardOf(h)
+	e.mark(course.WearIndexOn(shot.Rest(), w, hh)) // where the round's ball is: back's, for a leak
 	// the decisions, as played: what anyone needs to replay the round
 	if r.shots != "" {
 		r.shots += ";"
@@ -975,26 +1012,15 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	}
 	r.done = true
 	m, p := r.mode, player.String()
-	isNamed := named(p) // a call to r/sys/users: once
-	// the hole's record is shown on the hub and its pages: a named player's,
-	// like the boards, or a throwaway address could hold it for good
-	if rec := e.rec(m); (rec.best == 0 || r.strokes < rec.best) && isNamed {
-		if m == pro {
-			e.proBest, e.proBestBy = r.strokes, player
-		} else {
-			e.best, e.bestBy = r.strokes, player
-		}
-	}
 	// a player's best stays theirs: replaying the hole never erases it, and a
 	// tie keeps the older round, shots and all
-	best, was := r.strokes, bestStrokes(e.bests(m).Get(p))
-	if was > 0 && was <= r.strokes {
-		best = was
-	} else {
+	best := e.bests(m).Get(p)
+	if was := bestStrokes(best); was == 0 || r.strokes < was {
 		if was > 0 {
-			e.board(m).Remove(boardKey(was, p))
+			e.board(m).Remove(boardKey(best, p))
 		}
-		e.bests(m).Set(p, bestOf(r))
+		best = bestOf(r)
+		e.bests(m).Set(p, best)
 		if counts(e, m, p, was) {
 			improve(m, p, was, r.strokes)
 		} else if was == 0 && e.official && e.next != "" && !e.out.done[m] && p >= e.out.from[m] {
@@ -1006,7 +1032,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 			e.out.fresh[m].Set(p, true)
 		}
 	}
-	if isNamed {
+	if named(p) {
 		seat(e, m, p, best)
 	}
 	if e.official {
@@ -1018,13 +1044,24 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 }
 
 // seat puts a named player where their best puts them: on the hole's board,
-// and in the course ranking if they stand in it. A finish does it whether or
-// not it improved, so a player who took a name after their best ranks at
-// their next finish.
-func seat(e *entry, m int, p string, best int) {
+// in the hole's record if it tops it, and in the course ranking if they
+// stand in it. A finish does it whether or not it improved, so a player who
+// took a name after their best ranks at their next finish.
+func seat(e *entry, m int, p string, best any) {
 	k := boardKey(best, p)
 	if !e.board(m).Has(k) {
 		e.board(m).Set(k, p)
+	}
+	// the record is shown on the hub and the hole's pages: a named player's,
+	// like the boards (a throwaway address could hold it for good), and the
+	// board's top, so a tie goes to the first to make it
+	if n, rec := bestStrokes(best), e.rec(m); rec.best == 0 || n < rec.best ||
+		n == rec.best && address(p) != rec.by && k < boardKey(e.bests(m).Get(rec.by.String()), rec.by.String()) {
+		if m == pro {
+			e.proBest, e.proBestBy = n, address(p)
+		} else {
+			e.best, e.bestBy = n, address(p)
+		}
 	}
 	if v := totals[m].Get(p); v != nil && v.(*row).holes > 0 {
 		if rk := rankKey(v.(*row)); !ranks[m].Has(rk) {
@@ -1050,7 +1087,7 @@ func Claim(cur realm) int {
 	slots.Iterate("", "", func(_ string, v any) bool {
 		e := find(v.(string))
 		for m := 0; m < modes; m++ {
-			if best := bestStrokes(e.bests(m).Get(p)); best > 0 {
+			if best := e.bests(m).Get(p); best != nil {
 				seat(e, m, p, best)
 				n++
 			}
@@ -1186,6 +1223,10 @@ func cleanText(n string, max int) string {
 			// neither: é stays; a script written with combining marks
 			// (Devanagari, Thai) loses them
 			continue
+		case !unicode.IsPrint(c) && c != ' ':
+			// what Go would print escaped (an unassigned astral rune: \U…), which a
+			// JSON reader of Holes() does not take: never in a name
+			continue
 		case strings.ContainsRune("|[]<>`*_#\\&~@", c):
 			continue
 		}
@@ -1211,12 +1252,8 @@ func cleanSkin(s string) string {
 	return string(b)
 }
 
-// previewAt and playAt resolve a stroke of a round: every hole is data
-// (dataHole), played with its stroke number, tick and weather.
+// previewAt resolves a stroke of a round: every hole is data (dataHole),
+// played with its stroke number, tick and weather. stroke marks the wear.
 func previewAt(h course.Hole, ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	return h.(course.Weatherable).PreviewWith(ball, angle, power, stroke, tick, weather)
-}
-
-func playAt(h course.Hole, ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
-	return h.(course.Weatherable).PlayWith(ball, angle, power, stroke, tick, weather)
 }

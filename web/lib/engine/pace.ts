@@ -27,6 +27,13 @@ export function slowFrames(gaps: readonly number[]) {
   return d.reduce((s, x) => s + x, 0) / d.length > 20;
 }
 
+/** Whether busy frames sit steadily on 33 ms: the browser holds them at 30 fps
+ *  (a battery saver), which says nothing of the GPU. */
+export function capped30(gaps: readonly number[]) {
+  const d = [...gaps].sort((a, b) => a - b), mid = d[d.length >> 1];
+  return d[Math.floor(d.length * 0.1)] > 30 && mid >= 31 && mid <= 36;
+}
+
 /** No input (pointer, key, touch, wheel) for this long, no shot on its way: the scene dozes. */
 export const AWAY_MS = 60_000;
 /**

@@ -1,6 +1,7 @@
 package golf
 
 import (
+	"chain/runtime"
 	"encoding/hex"
 	"math"
 	"strconv"
@@ -216,6 +217,7 @@ func TestNamesAreCleaned(cur realm, t *testing.T) {
 	uassert.Equal(t, "Garden Cup", cleanName("~~Garden~~ Cup"))
 	uassert.Equal(t, "g1abc x.y", cleanName("@g1abc x@.y"))
 	uassert.Equal(t, "ab", cleanText("a\u0085\u2028b", maxNote))
+	uassert.Equal(t, "a b", cleanText("a \U0002fffeb\U0010ffff", maxNote)) // (non-printable astral runes: strconv.Quote writes them \U…)
 	// format characters and nonspacing marks: Mongolian variation
 	// selectors, interlinear annotation, musical formatting, shorthand
 	// format controls, a stack of combining accents; a precomposed é stays
@@ -446,7 +448,9 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	}
 	testing.SetRealm(testing.NewUserRealm(stranger)) // unnamed: finished, not on the board
 	PlayRoundAt(cross(cur), id, holeShot, Period())
-	row := func(p address, n int) string { return ufmt.Sprintf(`{"player":"%s","strokes":%d}`, p.String(), n) }
+	row := func(p address, n int) string {
+		return ufmt.Sprintf(`{"player":"%s","name":"%s","strokes":%d}`, p.String(), nameOf(p.String()), n)
+	}
 	head := `{"version":1,"hole":"` + id + `","mode":"assisted","par":3,"players":3,"finished":4,`
 	uassert.Equal(t, head+`"offset":0,"rows":[`+row(a, 1)+","+row(b, 2)+","+row(c, 3)+`],"next":0}`, HoleLeaderboard(id, "assisted", 0, 10))
 	page := Render(id)
@@ -467,14 +471,15 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(Render(id+"/"+b.String()), "holed it in 2** (par 3, -1), assisted"), Render(id+"/"+b.String()))
 	uassert.True(t, strings.Contains(Render(id+"/"+c.String()), "(par 3, even)"), "par is even")
 
-	// c improves to 1: its old row goes, the new one sorts by address among the 1s
+	// c improves to 1, later: its old row goes, the new one ranks after a's, made first
+	testing.SkipHeights(1)
 	testing.SetRealm(testing.NewUserRealm(c))
 	Reset(cross(cur), id)
 	testing.SetRealm(testing.NewUserRealm(c))
 	PlayRoundAt(cross(cur), id, holeShot, Period())
 	lb := HoleLeaderboard(id, "assisted", 0, 10)
 	uassert.Equal(t, 1, strings.Count(lb, c.String()), lb)
-	uassert.True(t, strings.Index(lb, row(c, 1)) < strings.Index(lb, row(b, 2)), lb)
+	uassert.True(t, strings.Index(lb, row(a, 1)) < strings.Index(lb, row(c, 1)) && strings.Index(lb, row(c, 1)) < strings.Index(lb, row(b, 2)), lb)
 }
 
 // A pro round counts on the pro records only, and a round keeps its mode.
@@ -614,9 +619,12 @@ func TestARoundsPageSaysWhatComesNext(cur realm, t *testing.T) {
 func TestABestReadsAsItIsWritten(cur realm, t *testing.T) {
 	r := &round{strokes: 3, period: 5912345, shots: "12.5000,6.2000,0;0.0000,1.0000,4;-359.9999,10.0000,1023"}
 	uassert.Equal(t, 3, bestStrokes(bestOf(r)))
+	at, period, shots := bestFields(bestOf(r))
+	uassert.True(t, at == runtime.ChainHeight() && period == r.period && shots == r.shots, bestOf(r))
 	uassert.Equal(t, 0, bestStrokes(nil), "no best is 0")
 	uassert.PanicsContains(t, cur, "a best not as bestOf writes it", func() { bestStrokes("3") })
 	uassert.PanicsContains(t, cur, "a best not as bestOf writes it", func() { bestStrokes("x 1 0,1,0") })
+	uassert.PanicsContains(t, cur, "a best not as bestOf writes it", func() { bestFields("3 5912345 0,1,0") })
 }
 
 // TestNamesAreCheckedAsTheRegistrarWritesThem: the pages print names in links.

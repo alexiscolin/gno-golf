@@ -229,12 +229,13 @@ func TestNoZeroHoleRows(cur realm, t *testing.T) {
 	// the ranking key is kept aside, not freed (whoever drained would be
 	// refunded its deposit), and nothing ranked counts it
 	r := totals[assisted].Get(solo.String()).(*row)
-	uassert.True(t, idle[assisted].Has(rankKey(r)), "the key is kept aside")
+	kept := rankKey(r)
+	uassert.True(t, idle[assisted].Has(kept), "the key is kept aside")
 	uassert.Equal(t, of-1, ranks[assisted].Size())
 	uassert.True(t, strings.Contains(Rank("assisted", solo), `"rank":0,"of":`+strconv.Itoa(of-1)+`,"holes":0`), Rank("assisted", solo))
 	testing.SetRealm(testing.NewUserRealm(solo))
 	PlayRoundAt(cross(cur), again, "0,1", Period())
-	uassert.False(t, idle[assisted].Has(rankKey(&row{player: solo.String()})), "and back in the ranking at the next hole")
+	uassert.False(t, idle[assisted].Has(kept), "and back in the ranking at the next hole")
 	uassert.Equal(t, of, ranks[assisted].Size())
 	uassert.True(t, strings.Contains(Render(old), "> Archived: [Solo again](/r/gnogolf/golf:island/48/v2)"), "an archived hole says what took its place")
 }
@@ -457,4 +458,55 @@ func TestOnlyCourseFinishesDrain(cur realm, t *testing.T) {
 		holes, strokes := StandingOf("assisted", p)
 		uassert.True(t, holes == 0 && strokes == 0 && totals[assisted].Get(p.String()) != nil, "kept at 0: "+p.String())
 	}
+}
+
+// The hole's record is its board's top: a best made before a name takes it at
+// Claim, and a tie goes to the first to make it, on the record, the board, the
+// hole's page and the course ranking alike, whatever the addresses: a copy of
+// a best's public shots ranks after it.
+func TestTheFirstThereKeepsTheTop(cur realm, t *testing.T) {
+	id := courseHole(cur, 92)
+	early, late := testutils.TestAddress("tfearly"), testutils.TestAddress("tflate")
+	copier := testutils.TestAddress("tfcopy")
+	for i := 0; copier.String() > early.String(); i++ { // one that sorts first
+		urequire.True(t, i < 100, "no address sorts first")
+		copier = testutils.TestAddress(string(rune('a'+i%26)) + strconv.Itoa(i) + "tfcopy")
+	}
+	replayAs(cur, early, id, "0,1") // unnamed: no record, no board
+	testing.SkipHeights(1)
+	giveName(cur, late, "tflate")
+	replayAs(cur, late, id, "0,0.001;0,1")
+	uassert.True(t, mustHole(id).best == 2 && mustHole(id).bestBy == late)
+	giveName(cur, early, "tfearly")
+	testing.SetRealm(testing.NewUserRealm(early))
+	Claim(cross(cur))
+	uassert.True(t, mustHole(id).best == 1 && mustHole(id).bestBy == early, "claimed: the board's top holds the record")
+
+	testing.SkipHeights(1)
+	giveName(cur, copier, "tfcopy")
+	replayAs(cur, copier, id, "0,1")
+	uassert.True(t, mustHole(id).bestBy == early, "a tie leaves the record")
+	lb := HoleLeaderboard(id, "", 0, 10)
+	uassert.True(t, strings.Index(lb, early.String()) < strings.Index(lb, copier.String()), lb)
+	uassert.True(t, strings.Contains(HoleRank(id, "", copier), `"rank":2,`), HoleRank(id, "", copier))
+	page := Render(id)
+	uassert.True(t, strings.Contains(page, "| 1 | [@tfearly]") && strings.Contains(page, "| 2 | [@tfcopy]"), page)
+	uassert.True(t, ghostHoles(id, "assisted", copier), "the best still replays")
+	all := CourseLeaderboard("", 0, 100)
+	uassert.True(t, strings.Index(all, early.String()) < strings.Index(all, copier.String()), all)
+}
+
+// The wear is marked where the round's ball rests: one that leaves a hole
+// with no walls is back where it was played from, and so is its mark.
+func TestWearIsWhereTheBallRests(cur realm, t *testing.T) {
+	h := flatHole("Open")
+	h.Course.Walls = nil
+	id := mine(cur, "open", h)
+	p := testutils.TestAddress("wearer")
+	testing.SetRealm(testing.NewUserRealm(p))
+	PlayRoundAt(cross(cur), id, "180,10", Period())
+	r := roundIn(id, p)
+	uassert.True(t, r.bx == 2 && r.by == 8, "back on the tee")
+	uassert.Equal(t, 1, mustHole(id).hole().Wear()[course.WearIndexOn(physics.V(2, 8), 32, 16)])
+	uassert.Equal(t, 1, sumWear(mustHole(id)))
 }

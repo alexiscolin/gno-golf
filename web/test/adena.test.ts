@@ -15,6 +15,7 @@ import {
   onWalletChange,
   commitsOf,
   gasOf,
+  roundGas,
   chainSplit,
   recordRound,
   registerName,
@@ -329,6 +330,12 @@ test("commitsOf: a light round fits in one commit", () => {
   assert.deepEqual(commitsOf({ pts: [10, 10, 10], walls: 0, pieces: 0 }), [[0, 3]]);
 });
 
+test("commitsOf: the pulses' set-up counts on every shot, as the realm's newWork", () => {
+  const pts = Array(12).fill(10);
+  assert.equal(commitsOf({ pts }).length, 1);
+  assert.ok(commitsOf({ pts, setup: 120e6 }).length > 1);
+});
+
 test("commitsOf: no shots is no commits", () => {
   assert.deepEqual(commitsOf({}), []);
 });
@@ -365,6 +372,15 @@ test("gasOf: a shot is counted by its path or by its physics' work (Shot.Work), 
   const path = 10_000_000 + 100 * 1_200_000;
   assert.equal(gasOf({ pts: [100], works: [50_000] }, 0, 1), 30_000_000 + path); // the path's is larger
   assert.equal(gasOf({ pts: [100], works: [637_500] }, 0, 1), 30_000_000 + 10_000_000 + 637_500 * RULES.work.unit); // the work's
+});
+
+test("roundGas: a round in several commits pays each commit's call and fixed gas, past one commit's cap", () => {
+  const c = { fixed: 100_000_000 }; // pts unknown: each stroke the heaviest, so two per commit
+  assert.equal(roundGas(c, 1), gasOf(c, 0, 1));
+  assert.deepEqual(commitsOf(c, 5), [[0, 2], [2, 4], [4, 5]]);
+  assert.equal(roundGas(c, 5), gasOf(c, 0, 2) + gasOf(c, 2, 4) + gasOf(c, 4, 5));
+  assert.ok(roundGas(c, 5) > gasOf(c, 0, 5)); // one sum over the round counts the call once, and is capped
+  assert.equal(roundGas(c, 0), 0);
 });
 
 // ------------------------------------------------------------------ chainSplit

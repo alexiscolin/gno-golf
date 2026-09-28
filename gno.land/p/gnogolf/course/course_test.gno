@@ -111,6 +111,34 @@ func TestPulseZoneComesAndGoes(t *testing.T) {
 	}
 }
 
+// A ball left where the next stroke's pulse opens a hazard goes back to
+// where its stroke started, as under a timed hazard: the next stroke is
+// played, not lost to the water it stands in.
+func TestAHazardComingBackSendsTheBallBackNow(t *testing.T) {
+	h := &Simple{
+		Tee: physics.V(2, 5), Pin: physics.V(38, 5), Substeps: 40, CupRadius: 1,
+		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5},
+		Pulses: []Pulse{{Every: 2, On: 1, Phase: 1, Zones: []physics.Zone{
+			{Kind: physics.Hazard, Min: physics.V(4, 0), Max: physics.V(30, 10), Skin: "canal"},
+		}}},
+	}
+	// stroke 0: the canal is shut, and the ball stops over it
+	sh, _ := h.PreviewAt(h.Tee, 0, 3, 0)
+	if r := sh.Rest(); r != h.Tee {
+		t.Fatalf("a ball left where the canal opens next should be back on the tee, at %v", r)
+	}
+	// stroke 1: the canal is open under the tee's shot too; stroke 2 shut again
+	if sh, _ := h.PreviewAt(h.Tee, 0, 3, 1); sh.Rest() != h.Tee {
+		t.Fatalf("the open canal sends the ball back: at %v", sh.Rest())
+	}
+	if sh, _ := h.PreviewAt(h.Tee, 0, 3, 2); sh.Rest() != h.Tee || len(sh.Path) < 3 {
+		t.Fatalf("stroke 2 is as stroke 0: at %v", sh.Rest())
+	}
+	if sh, _ := h.PreviewAt(h.Tee, 0, 0.3, 0); sh.Rest().X > 4 {
+		t.Fatalf("a ball short of the canal stays: at %v", sh.Rest())
+	}
+}
+
 func TestWeatherIsLaidUnderTheCourse(t *testing.T) {
 	h := &Simple{
 		W: 40, H: 10, Tee: physics.V(2, 5), Pin: physics.V(38, 5), Substeps: 20, CupRadius: 1,

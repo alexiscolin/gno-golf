@@ -139,7 +139,7 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 	uassert.Equal(t, 2, BestOf(v1, "assisted", fan))
 	holes, strokes := StandingOf("assisted", fan)
 	uassert.True(t, holes >= 1 && strokes >= 2, "the course hole counts")
-	uassert.True(t, strings.Contains(Leaderboard("assisted"), fan.String()))
+	uassert.True(t, strings.Contains(Leaderboard("assisted"), fan.String()+`","name":"fan",`), "with the name")
 	uassert.Equal(t, 2, sumWear(mustHole(v1)), "two strokes, two marks on the version's wear")
 
 	h2 := cupHole("mountain", 62, "Second")
@@ -222,6 +222,39 @@ func TestTheEstimatorRefusesAHoleAtTheLimits(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(player))
 	urequire.AbortsContains(t, cur, "commit the first", func() { PlayRoundAt(cross(cur), id, shots, Period()) })
 	uassert.True(t, strings.Contains(HoleState(id), `"board":{"w":96,"h":48}`))
+	uassert.True(t, strings.Contains(HoleState(id), `"cupR":`+jnum(1)+`,"ballR":`+jnum(0.5)), "the cup and the ball as the hole has them")
+}
+
+// A pulse's walls and posts are set up afresh for each shot, at a cost no
+// Shot.Work counts: the estimate charges it, so a hole whose pulse holds the
+// format's walls and posts, whose heaviest shot a transaction could not
+// replay, is refused, and one it could is charged it on every shot.
+func TestAPulsesSetUpIsCharged(cur realm, t *testing.T) {
+	pulsed := func(bars int) *course.Simple {
+		h := cupHole("garden", 1, "Pulsed")
+		h.W, h.H, h.Pin = 96, 96, physics.V(90, 90)
+		h.Course.Walls = physics.Box(physics.V(0, 0), physics.V(96, 96))
+		p := course.Pulse{Every: 1, On: 1}
+		for i := 0; i < bars; i++ {
+			y := 10 + float64(i)*2
+			p.Walls = append(p.Walls, physics.Bar(physics.V(30, y), physics.V(80, y), 0.5, 0, "")...)
+		}
+		for i := 0; i < course.MaxPosts; i++ {
+			p.Posts = append(p.Posts, physics.Post{Circle: physics.Circle{C: physics.V(85, 3+float64(i)*2.8), R: 0.6}})
+		}
+		h.Pulses = []course.Pulse{p}
+		return h
+	}
+	testing.SetRealm(testing.NewUserRealm(player))
+	urequire.AbortsContains(t, cur, errShotTooHeavy, func() { PublishMine(cross(cur), "pulsed", hexOf(pulsed(39)), "") })
+	testing.SetRealm(testing.NewUserRealm(player))
+	id := PublishMine(cross(cur), "pulsed", hexOf(pulsed(16)), "")
+	w := newWork(mustHole(id).hole(), nil)
+	uassert.Equal(t, int64(64*workPerPulseWall+course.MaxPosts*workPerPulsePost), w.setup)
+	w.next(mustHole(id).hole())
+	tap, _ := previewAt(mustHole(id).hole(), physics.V(3, 3), 0, 0.05, 0, 0, nil)
+	w.add(tap)
+	uassert.True(t, w.spent >= workPerShot+68*workPerWall+w.setup, "every shot pays it")
 }
 
 // limitsHole is at every limit GG1 allows at once: a 96×48 board, 160 walls
@@ -514,7 +547,7 @@ func TestANameTakenLaterRanksAtTheNextFinish(cur realm, t *testing.T) {
 	Reset(cross(cur), id)
 	testing.SetRealm(testing.NewUserRealm(late))
 	PlayRoundAt(cross(cur), id, "0,0.001;0,1", Period()) // worse than the best
-	uassert.True(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), `{"player":"`+late.String()+`","strokes":1}`))
+	uassert.True(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), `{"player":"`+late.String()+`","name":"latename","strokes":1}`))
 	uassert.True(t, strings.Contains(Rank("", late), `"rank":`) && !strings.Contains(Rank("", late), `"rank":0,`), Rank("", late))
 }
 
@@ -531,7 +564,7 @@ func TestClaimRanksRoundsKeptWithoutAName(cur realm, t *testing.T) {
 	giveName(cur, late, "claimer")
 	testing.SetRealm(testing.NewUserRealm(late))
 	uassert.Equal(t, 1, Claim(cross(cur)))
-	uassert.True(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), `{"player":"`+late.String()+`","strokes":1}`))
+	uassert.True(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), `{"player":"`+late.String()+`","name":"claimer","strokes":1}`))
 	uassert.False(t, strings.Contains(Rank("", late), `"rank":0,`), Rank("", late))
 	// twice is harmless: the same seats
 	testing.SetRealm(testing.NewUserRealm(late))
@@ -561,9 +594,9 @@ func TestRankCountsThePlayersAhead(cur realm, t *testing.T) {
 	uassert.True(t, strings.HasPrefix(Rank("pro", stranger), `{"version":1,"mode":"pro","player":"`+stranger.String()+`","rank":0,`), Rank("pro", stranger))
 	// the whole ranking, a page at a time, in Rank's order
 	lb := CourseLeaderboard("pro", rank(a)-1, 1)
-	uassert.True(t, strings.Contains(lb, `"rows":[{"player":"`+a.String()+`","holes":2,`), lb)
+	uassert.True(t, strings.Contains(lb, `"rows":[{"player":"`+a.String()+`","name":"rka","holes":2,`), lb)
 	lb = CourseLeaderboard("pro", rank(b)-1, 1)
-	uassert.True(t, strings.Contains(lb, `"rows":[{"player":"`+b.String()+`","holes":1,`), lb)
+	uassert.True(t, strings.Contains(lb, `"rows":[{"player":"`+b.String()+`","name":"rkb","holes":1,`), lb)
 	uassert.True(t, strings.HasSuffix(CourseLeaderboard("pro", math.MaxInt, 100), `"rows":[],"next":0}`), "past the end: an empty last page")
 	uassert.True(t, strings.HasSuffix(CourseLeaderboard("pro", 0, 1), `],"next":1}`), "a page short of the end says where the next one starts")
 }

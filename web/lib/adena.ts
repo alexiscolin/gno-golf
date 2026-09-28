@@ -64,6 +64,8 @@ interface Work {
   works?: readonly number[];
   /** what the realm says a commit spends before its shots (Weather() "gas"; 0 or none: not said) */
   fixed?: number;
+  /** each shot's share of setting the hole's pulses up (newWork's setup: per pulse wall and post) */
+  setup?: number;
 }
 
 const wallet = () => (typeof window !== "undefined" ? window.adena : undefined);
@@ -206,7 +208,8 @@ export function onWalletChange(fn: (...x: unknown[]) => void) {
 
 // A commit's work, by the realm's own model (golf.gno, work: newWork, next,
 // add), computed here exactly: per shot 10M, plus 150K per wall, plus, per
-// point of its path, 1.2M and 15K per piece on the board. c: { walls, pieces,
+// point of its path, 1.2M and 15K per piece on the board, plus its pulses'
+// set-up (700K per pulse wall, 200K per pulse post: setup). c: { walls, pieces,
 // pts: [path length per stroke] }, as the engine's snapshot gives them: walls
 // are the hole's and its pulses', pieces every wall, post and zone of the
 // hole, its pulses and the forecast, each polygon edge one more.
@@ -220,7 +223,7 @@ const WORK = RULES.work;
 const baseOf = (c: Work) => WORK.shot + (c.walls || 0) * WORK.wall;
 const workOf = (c: Work, i: number) => {
   const base = baseOf(c);
-  return Math.max(base + ((c.pts || [])[i] ?? RULES.maxPath) * (WORK.point + (c.pieces || 0) * WORK.piece), base + ((c.works || [])[i] || 0) * WORK.unit);
+  return Math.max(base + ((c.pts || [])[i] ?? RULES.maxPath) * (WORK.point + (c.pieces || 0) * WORK.piece), base + ((c.works || [])[i] || 0) * WORK.unit) + (c.setup || 0);
 };
 
 /**
@@ -236,7 +239,7 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
   const base = baseOf(c);
   let from = start, spent = 0, most = 0;
   for (let i = start; i < n; i++) {
-    const cap = Math.min(RULES.maxWork, Math.trunc((WORK.budget - (c.fixed || 0) - spent - base) / WORK.unit) - RULES.maxWorkStep);
+    const cap = Math.min(RULES.maxWork, Math.trunc((WORK.budget - (c.fixed || 0) - spent - base) / WORK.unit) - RULES.maxWorkStep - Math.trunc((c.setup || 0) / WORK.unit));
     const over = cap < 1 || (cap < RULES.maxWork && ((c.works || [])[i] || 0) > cap);
     if (i > from && (i - from >= RULES.maxShots || spent + most > WORK.budget || over)) (parts.push([from, i]), (from = i), (spent = most = 0));
     const w = workOf(c, i);
@@ -267,6 +270,8 @@ export function gasOf(c: Work, from = 0, to = (c.pts || []).length) {
   for (let i = from; i < to; i++) g += workOf(c, i);
   return Math.min(Math.ceil(g), MAX_GAS);
 }
+/** The gas a round of n strokes should need in all: each of its commits pays its own call and fixed gas. */
+export const roundGas = (c: Work, n: number) => commitsOf(c, n).reduce((g, [from, to]) => g + gasOf(c, from, to), 0);
 
 /**
  * The commits a round is recorded in, each checked by the chain before Adena

@@ -14,7 +14,7 @@ import { SHARE_TAGS } from "@/lib/site";
 import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
-import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, shortOf, depositBytes, ADENA_URL, nameBytes, NAME_GAS, onWalletChange, type SendError } from "@/lib/adena";
+import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, roundGas, shortOf, depositBytes, ADENA_URL, nameBytes, NAME_GAS, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, EXTRAS, Emblem, groupOf, worldOf } from "@/components/Worlds";
 import Weather from "@/components/Weather";
@@ -374,6 +374,8 @@ export default function Golf() {
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   const goTo = (id: string) => {
     if (!s) return;
+    // the hole on screen: a new round on it, no curtain (its course stays built)
+    if (id === s.id) return void (game.current && game.current.reset());
     const i = s.holes.findIndex((h) => h.id === id);
     setCurtain({ n: holeNumber(s.holes, id), name: s.holes[i] ? s.holes[i].name : "", id });
     later(() => void (game.current && game.current.load(id)), 380);
@@ -643,8 +645,9 @@ export default function Golf() {
   }, [cfg, boot]);
 
   // The WebGL context can be taken away (a phone backgrounding the tab, the
-  // GPU reset): say so, rebuild the hole when it comes back, and offer a
-  // reload if it does not within 3 s.
+  // GPU reset): say so, and offer a reload if it does not come back within
+  // 3 s. When it does, three uploads the scene again by itself: the round
+  // in progress stays where it was.
   useEffect(() => {
     const el = canvas.current;
     if (!el) return;
@@ -654,13 +657,7 @@ export default function Golf() {
       setGl("lost");
       t = setTimeout(() => setGl((v) => (v === "lost" ? "gone" : v)), 3000);
     };
-    const back = () => {
-      clearTimeout(t);
-      setGl(null);
-      const g = game.current;
-      const id = g && g.current();
-      if (g && id) void g.load(id);
-    };
+    const back = () => (clearTimeout(t), setGl(null));
     el.addEventListener("webglcontextlost", lost);
     el.addEventListener("webglcontextrestored", back);
     return () => (clearTimeout(t), el.removeEventListener("webglcontextlost", lost), el.removeEventListener("webglcontextrestored", back));
@@ -880,13 +877,15 @@ export default function Golf() {
   const waiting = record?.at === "signing" && record.of === undefined; // Adena open, the round in one transaction
   // a name goes with the save of a player without one (on a hole that ranks):
   // typed, then asked of the chain; the save waits for a name it would take
-  const askName = !!(account && toSave && (winning ? nudge.noName : nudge.isNamed === false));
+  // (a kept round: its own hole's, not the one on screen; an archived or community one ranks nobody)
+  const keptRanks = !!pending && pending.official !== false && !allList.find((h) => h.id === pending.id)?.next;
+  const askName = !!(account && toSave && (winning ? nudge.noName : keptRanks && nudge.isNamed === false));
   const nameCheck = useNameCheck(askName && game.current ? game.current.chain : null, nameStem);
   const typed = { check: nameCheck, set: setNameStem };
   const saveName = askName && nameStem && nameCheck.ready ? nameCheck.name : null;
   const nameReady = !askName || nameCheck.ready;
-  // what saving it costs, the name included, and what the account lacks for it
-  const saveGas = toSave ? gasOf(toSave) + (saveName ? NAME_GAS : 0) : 0;
+  // what saving it costs (every commit of it), the name included, and what the account lacks for it
+  const saveGas = toSave ? roundGas(toSave, toSave.shots.length) + (saveName ? NAME_GAS : 0) : 0;
   // no finish yet anywhere on the course in this mode: a dearer first save;
   // a name's Claim seats every best of the player's, this one's included
   const firstOnCourse = !!onCourse && onCourse[saveMode] === 0;
@@ -946,7 +945,7 @@ export default function Golf() {
   // the waiting round's card has no name field: the checklist has it
   const savePending = () => {
     if (!pending) return;
-    if (stepMissing || nudge.isNamed === false) return setReal(true);
+    if (stepMissing || (keptRanks && nudge.isNamed === false)) return setReal(true);
     keptSave();
   };
   const keptSave = () => {
@@ -998,7 +997,8 @@ export default function Golf() {
         if (!alive()) return;
         if (parts.length > 1) land({ at: "signing", part: k + 1, of: parts.length });
         // the chain's round before this commit: a new one there is this commit landing
-        const before = JSON.stringify(await chain.round(hole, account.address).catch(() => null));
+        // (unread, the chain is not watched: an old round there would pass for it)
+        const before = await chain.round(hole, account.address).then(JSON.stringify, () => undefined);
         const sent = recordRound({
           address: account.address, realm: chain.realm, hole, shots: r.shots.slice(from, to), reset: k === 0,
           gas: gasOf(r, from, to), period: r.period, mode: r.roundMode || "assisted", price: gasPrice, chainId: id, rpc: chain.rpc, named: k === 0 ? named : null,
@@ -1009,7 +1009,7 @@ export default function Golf() {
         // Adena answers only once its window is closed: the chain is watched
         // meanwhile, and a commit it holds counts as sent (Adena's answer, if
         // it comes later, changes nothing)
-        let open = true;
+        let open = before !== undefined;
         const landed = (async () => {
           for (let w = 0; w < 120 && open; w++) {
             await new Promise((ok) => setTimeout(ok, 1500));
@@ -1020,6 +1020,9 @@ export default function Golf() {
         })();
         void sent.catch(() => {}); // raced below; a late refusal after the chain has it is moot
         await Promise.race([sent, landed.then((ok) => (ok ? null : sent))]).finally(() => (open = false));
+        // a commit seen on the chain before Adena answered: its window may
+        // still be open, and Adena refuses a second one meanwhile
+        if (k + 1 < parts.length) await Promise.race([sent.catch(() => {}), new Promise((ok) => setTimeout(ok, 10_000))]);
         // the name is the player's once the first part is in: a retry of the rest must not take it again
         if (k === 0 && named) setNamedAs(named.name), nudge.named();
         // the next part continues the round: it waits until the chain has this one
@@ -2342,9 +2345,10 @@ function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, o
     if (!chain || !me) return;
     let live = true; // no state set once the card is gone
     // the chain's own rank, among the named players it ranks
+    // (read again after a save: the one it lands may rank the player)
     chain.rank(mode, me).then((r) => live && setRank(r.rank > 0 ? { at: r.rank } : r.holes > 0 ? { unnamed: true } : null)).catch(() => {});
     return () => void (live = false);
-  }, [chain, me, mode]);
+  }, [chain, me, mode, saved]);
   const cup = groupOf(s.world);
   const t = totals(card, s.holes);
   const vs = t.strokes - t.par;

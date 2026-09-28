@@ -32,8 +32,8 @@ export const RULES = {
   maxPower: 10,
   /** weather.gno PeriodSeconds, in ms: one weather's length */
   periodMs: 300e3,
-  /** golf.gno's work model (workBudget, workPerShot, workPerWall, workPerPoint, workPerPiece, workPerUnit) */
-  work: { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3, unit: 1000 },
+  /** golf.gno's work model (workBudget, workPerShot, workPerWall, workPerPoint, workPerPiece, workPerUnit, workPerPulseWall, workPerPulsePost) */
+  work: { budget: 1.4e9, shot: 10e6, wall: 150e3, point: 1.2e6, piece: 15e3, unit: 1000, pulseWall: 700e3, pulsePost: 200e3 },
   /** physics MaxWork and MaxWorkStep: a stroke's work cap, and the most a stroke passes it by (golf's work.next caps a shot by what is left, less this) */
   maxWork: 1_000_000,
   maxWorkStep: 225_000,
@@ -70,6 +70,9 @@ const fx = (n: number) => {
   return /[.e]/.test(t) ? t : t + ".0";
 };
 const hexOf = (str: string) => [...new TextEncoder().encode(str)].map((b) => b.toString(16).padStart(2, "0")).join("");
+// the VM quotes its strings the Go way: a rune past U+FFFF it deems not
+// printable comes as \UXXXXXXXX, which JSON lacks (a \\ before a U is not one)
+const goJSON = (q: string) => q.replace(/\\(U[0-9a-fA-F]{8}|[\s\S])/g, (m, e: string) => (e.length > 1 ? String.fromCodePoint(parseInt(e.slice(1), 16)) : m));
 // the JSON shape this page reads (every realm object carries "version")
 const VERSION = 1;
 let warned = false;
@@ -196,7 +199,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   const unquote = (raw: string, expr: string) => {
     if (raw.trim() === "( string)") return "";
     try {
-      return String(JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)"))));
+      return String(JSON.parse(goJSON(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)")))));
     } catch {
       throw refused(`The chain's answer to ${expr.slice(0, expr.indexOf("("))} is not a string.`);
     }

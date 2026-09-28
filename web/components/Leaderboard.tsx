@@ -424,8 +424,9 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace 
       </>
     );
   // your place, listed or further down: said once under the list, with the game's share
-  const myRow = rows && me ? rows.find((r) => r.player === me) : undefined;
-  const myPlace = myRow && head ? { at: myRow.at, of: head.players } : mine ? { at: mine.rank, of: mine.of } : null;
+  // (the place in the list shown, flagged players left out of it and of the count)
+  const myRow = shown && me ? shown.rows.find((r) => r.player === me) : undefined;
+  const myPlace = myRow && head && shown ? { at: myRow.at, of: head.players - shown.hidden } : mine ? { at: mine.rank, of: mine.of } : null;
   const title = kind === "hole" ? s.name : "The course";
   const sub = !head ? "" : kind === "hole" ? `par ${par} · ${head.finished} finished${head.finished !== head.players ? `, ${head.players} ranked` : ""}` : `${head.players} ranked · most holes, then fewest strokes`;
   return (

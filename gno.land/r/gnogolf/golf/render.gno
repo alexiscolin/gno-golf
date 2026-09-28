@@ -463,10 +463,10 @@ func roundSummary(e *entry, p address, r *round) string {
 		vs = strconv.Itoa(d)
 	}
 	s := ufmt.Sprintf("> [!NOTE]\n> **%s holed it in %d** (par %d, %s), %s.\n>\n", who, r.strokes, e.par, vs, modeNames[r.mode])
-	b := e.board(r.mode)
-	best := bestStrokes(e.bests(r.mode).Get(p.String()))
-	switch k := boardKey(best, p.String()); {
-	case best > 0 && b.Has(k):
+	b, v := e.board(r.mode), e.bests(r.mode).Get(p.String()) // a finished round has its best
+	best := bestStrokes(v)
+	switch k := boardKey(v, p.String()); {
+	case b.Has(k):
 		s += ufmt.Sprintf("> Best here: %s, **#%d of %d** on the %s board. %s.\n>\n", count(best, "stroke"), b.index(k)+1, b.Size(), modeNames[r.mode], race(e, p.String(), "Race this ghost in 3D"))
 	case name == "":
 		s += "> Not on the board: only players with a gno.land name are ranked.\n>\n"

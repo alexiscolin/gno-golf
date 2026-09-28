@@ -290,6 +290,18 @@ test("holes(true) bypasses a valid cache", async () => {
   assert.equal(list.length, 2);
 });
 
+test("holes() reads a name the VM quoted the Go way (\\U…), a \\\\U left alone", async () => {
+  const chain = makeChain();
+  const reply = { ...HOLES_REPLY, holes: [{ id: "garden/1", name: "Hole \u{F0000} one" }, { id: "garden/2", name: "a\\U000f0000" }] };
+  // Go writes a rune past U+FFFF it deems not printable as \U…, where JSON.stringify leaves it raw
+  const raw = vmStr(JSON.stringify(reply)).replace("\u{F0000}", "\\U000f0000");
+  assert.ok(raw.includes("Hole \\U000f0000 one"));
+  setFetch(() => okReply(raw));
+  const list = await chain.holes();
+  assert.equal(list[0].name, "Hole \u{F0000} one");
+  assert.equal(list[1].name, "a\\U000f0000"); // a backslash of the name's own, then a U: not an escape
+});
+
 // ------------------------------------------------------------ reads validated by checks.*
 test("state reads one hole's geometry", async () => {
   const chain = makeChain();

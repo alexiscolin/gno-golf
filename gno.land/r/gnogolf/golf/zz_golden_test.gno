@@ -95,13 +95,16 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 // deb2fa81ccd4573d, sea d841bb88749cafa5, slope ee9475088019c6cd, storm
 // 384620ca83b7330d, timed 3d16130d4e52c06b, tunnel ff92e949423cf8b8). The
 // forecast and State columns did not move.
+// 2026-09-28, the cup's and the ball's radii in State ("cupR", "ballR"): the
+// State column moved on all six; with them taken out it hashes as it did.
+// The replay and forecast columns did not move.
 var golden = map[string][3]string{
-	"pulse":  {"2df4849397343b5c", "076ac3e7c0d705a9", "4e9da97515c48b33"},
-	"sea":    {"9cc043701ff301c4", "c3224daa821020f4", "807b1e8fc908df52"},
-	"slope":  {"0983305ba509f74d", "0757d6c38ca9a9ef", "0f53bd2e587932b7"},
-	"storm":  {"51af6518629e6a99", "217b2a005fc76324", "cd0874fd52e8179f"},
-	"timed":  {"d32d1dc343013582", "c3224daa821020f4", "e4dbc97ea48d1ede"},
-	"tunnel": {"325ffde22c9b1a13", "c3224daa821020f4", "335763617c2e9b50"},
+	"pulse":  {"2df4849397343b5c", "076ac3e7c0d705a9", "e765b6fb74e356ab"},
+	"sea":    {"9cc043701ff301c4", "c3224daa821020f4", "2c3a455623940aab"},
+	"slope":  {"0983305ba509f74d", "0757d6c38ca9a9ef", "1a01eb19367c9f5f"},
+	"storm":  {"51af6518629e6a99", "217b2a005fc76324", "4afb6a3bd46aae66"},
+	"timed":  {"d32d1dc343013582", "c3224daa821020f4", "51fd407a5bed495b"},
+	"tunnel": {"325ffde22c9b1a13", "c3224daa821020f4", "93c164aead9d376c"},
 }
 
 // goldAt keeps h as data under id, listed as its realm hole was: the world

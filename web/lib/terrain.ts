@@ -10,7 +10,7 @@
 //   - a height field: a Slope zone pushes the ball one way, so it is drawn as
 //     a ramp rising the other way. Height is cosmetic; the physics is flat.
 
-import type { HoleState, MutVec2, Timing, Vec2, Wall, Zone } from "./types";
+import type { HoleState, MutVec2, Post, Timing, Vec2, Wall, Zone } from "./types";
 
 /** A segment a→b on the board. */
 type Seg = readonly [Vec2, Vec2];
@@ -30,6 +30,13 @@ export const CUP_R = 1.2;
  *  The chain's own "air" flag when the zone carries one; else guessed from
  *  the skin (wind, a gust) or a clock, as the realm has no flag yet. */
 export const airy = (z: Zone) => z.kind === "slope" && (typeof z.air === "boolean" ? z.air : z.skin === "wind" || z.skin === "gust" || !!z.every);
+
+/** A hole's (or a stroke's) pieces with a skin every object has ("constructor",
+ *  "__proto__": an author's word) drawn plain: no table of skins finds its own methods. */
+export function plainSkins<T extends { walls: readonly Wall[]; posts: readonly Post[]; zones: readonly Zone[] }>(h: T): T {
+  const plain = <P extends { skin: string }>(xs: readonly P[]) => xs.map((x) => (x.skin in {} ? { ...x, skin: "" } : x));
+  return { ...h, walls: plain(h.walls), posts: plain(h.posts), zones: plain(h.zones) };
+}
 
 // ------------------------------------------------------ shared geometry
 // The small sums every part of the client needs, in one place.

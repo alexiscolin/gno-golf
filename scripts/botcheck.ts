@@ -31,7 +31,7 @@ const RPC = opt("rpc", DEFAULT_RPC);
 const TOP = +opt("top", 10);
 const DELAY = +opt("delay", 150); // ms between RPC calls: the node is on a laptop
 const MAX_SIMS = +opt("max-sims", 300); // perturbation replays, whole run
-const MAX_ROUNDS = +opt("max-rounds", 300); // Round() reads, whole run
+const MAX_ROUNDS = +opt("max-rounds", 300); // Ghost() reads, whole run
 const OUT = opt("out", here("../web/public/flags.json"));
 const JSON_OUT = opt("json", false);
 const SELFTEST = opt("selftest", false);
@@ -152,21 +152,26 @@ async function run() {
   }
   const players = [...candidates];
   const bests: Record<string, Record<string, number>> = Object.fromEntries(players.map((p) => [p, {}]));
+  const kept: Record<string, [string, string][]> = Object.fromEntries(players.map((p) => [p, []])); // each best's hole and mode
   for (const h of holes)
     for (const mode of ["assisted", "pro"])
       for (let i = 0; i < players.length; i += 50) // Bests takes 50 addresses at most
-        for (const r of (await rpc((c) => c.bests(h, mode, players.slice(i, i + 50)))).rows)
+        for (const r of (await rpc((c) => c.bests(h, mode, players.slice(i, i + 50)))).rows) {
           bests[r.player][h] = Math.min(bests[r.player][h] ?? Infinity, r.strokes);
+          kept[r.player].push([h, mode]);
+        }
 
   const out: Record<string, Awaited<ReturnType<typeof scorePlayer>>> = {};
   let rounds = 0;
   for (const p of players) {
     const recs: Rec[] = [];
-    for (const h of Object.keys(bests[p])) {
+    for (const [h, mode] of kept[p]) {
       if (rounds >= MAX_ROUNDS) break;
       rounds++;
-      const r = await rpc((c) => c.round(h, p)); // the round on record: the latest, maybe a replay
-      if (r && r.done && r.shots) recs.push({ hole: h, shots: r.shots.split(";"), strokes: r.strokes, period: r.period });
+      // the best on the board, its own shots and weather (Ghost): not the
+      // latest round, which a Reset or a stroke of a new one hides
+      const g = await rpc((c) => c.ghost(h, mode, p));
+      if (g) recs.push({ hole: g.hole, shots: g.shots.split(";"), strokes: g.strokes, period: g.period });
     }
     out[p] = await scorePlayer({ bests: bests[p], rounds: recs });
   }

@@ -81,6 +81,9 @@ check("realm calls", () => {
   const calls: [string, number, string][] = [];
   // reads: qeval(`Name(…)`) and vm(REALM, "Name(…)")
   for (const m of reads.matchAll(/(?:qeval\(`|vm\(REALM, ")([A-Z]\w*)\(/g)) calls.push([m[1], argsAt(reads, m.index + m[0].length), "chain.ts"]);
+  // and those inside an expression: qstr(REALM, `func() … BestOf(…) …`)
+  for (const q of reads.matchAll(/qstr\(REALM, `([^`]*)`/g)) for (const m of q[1].matchAll(/\b([A-Z]\w*)\(/g)) calls.push([m[1], argsAt(q[1], m.index + m[0].length), "chain.ts"]);
+  assert.ok(calls.some(([name]) => name === "BestOf"), "bestsOf's BestOf not found: the patterns drifted");
   // writes: call("Name", [..]) and [realm, "Name", [..]]
   for (const m of writes.matchAll(/(?:call\("|\[realm, ")([A-Z]\w*)", \[/g)) calls.push([m[1], argsAt(writes, m.index + m[0].length), "adena.ts"]);
   assert.ok(calls.length > 20, `only ${calls.length} calls found: the patterns drifted`);
@@ -104,6 +107,12 @@ check("golf.gno work model", () => {
   assert.equal(w.point, constOf(golf, "workPerPoint"), "workPerPoint");
   assert.equal(w.piece, constOf(golf, "workPerPiece"), "workPerPiece");
   assert.equal(w.unit, constOf(golf, "workPerUnit"), "workPerUnit");
+  assert.equal(w.pulseWall, constOf(golf, "workPerPulseWall"), "workPerPulseWall");
+  assert.equal(w.pulsePost, constOf(golf, "workPerPulsePost"), "workPerPulsePost");
+  // the pulses' set-up, as the engine's snapshot gives it (setup) and adena.ts adds it to each shot and takes it off the cap
+  assert.ok(has(golf, "w.setup += int64(len(p.Walls))*workPerPulseWall + int64(len(p.Posts))*workPerPulsePost"), "newWork(): the pulses' set-up changed");
+  assert.ok(has(golf, "c -= w.setup / workPerUnit"), "next(): the set-up off the cap changed");
+  assert.ok(has(golf, "c += w.setup"), "add(): the set-up per shot changed");
   const step = fs.readFileSync(new URL("../gno.land/p/gnogolf/physics/step.gno", import.meta.url), "utf8");
   assert.equal(RULES.maxWork, constOf(step, "MaxWork"), "physics MaxWork");
   assert.equal(RULES.maxWorkStep, constOf(step, "MaxWorkStep"), "physics MaxWorkStep");

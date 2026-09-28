@@ -411,7 +411,7 @@ Everything needed to draw the hole and aim: `State` without `plays`,
  "timed":false,
  "period":5920000,
  "weather":{"period":5920000,"kind":"wind","wind":[0.1,-0.04],"zones":[…]},
- "start":[5,6],"cup":[44,6],"plays":12,
+ "start":[5,6],"cup":[44,6],"cupR":1.2,"ballR":0.5,"plays":12,
  "walls":[{"a":[0,0],"b":[32,0],"skin":""},
           {"a":[…],"b":[…],"skin":"plank","every":8,"on":4,"phase":0}],
  "posts":[{"c":[12,6.3],"r":0.7,"skin":"stump"}],
@@ -430,6 +430,8 @@ Everything needed to draw the hole and aim: `State` without `plays`,
   and `v` (its number), and an archived one `next`.
 - `timed`: the hole changes from stroke to stroke. Read `Extras` for each
   stroke.
+- `cupR` and `ballR` are the cup's and the ball's radii: 1.2 and 0.5 on the
+  course, anything the format allows on a community hole.
 - `walls[].every/on/phase` only appear on timed walls, and
   `zones[].every/on/phase` only on timed zones. `zones[].poly` and `outside`
   only appear on polygon zones.
@@ -577,10 +579,14 @@ boards with a thousand accounts. Every finish is still kept, named or not. A
 player who takes a name later ranks at their next finish, or at once with
 [`Claim`](#claimcur-realm-int). `Bests`, `Standings`, `Records`, `Players` and
 `Ghost` read anyone. A hole's own record (`best`, shown on the hub and its pages) is a
-named player's too.
+named player's too: its board's top, set by a finish or a `Claim`.
+
+A tie goes to whoever got there first (in the same block, to the address): a best's shots
+are public (`Ghost`), and whoever replays them ties it and ranks after it.
 
 The course ranking adds up each player's best on each **current course hole**:
-most holes first, then fewest strokes. It's kept in order as rounds finish, so
+most holes first, then fewest strokes, then the first there (the finish that
+last improved the standing). It's kept in order as rounds finish, so
 reading it doesn't get slower as more people play.
 
 #### `Leaderboard(mode string) string`
@@ -588,11 +594,11 @@ reading it doesn't get slower as more people play.
 A mode's course-wide top ten.
 
 ```json
-{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","holes":18,"strokes":61}, …]}
+{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61}, …]}
 ```
 
-`holes` at the top is the number of slots in the course. A name deleted since
-is skipped.
+`holes` at the top is the number of slots in the course. Each row has its
+player's name; a name deleted since is skipped.
 
 #### `Rank(mode string, player address) string`
 
@@ -614,7 +620,7 @@ hole: from rank `offset+1`, at most `limit` rows (1..100).
 
 ```json
 {"version":1,"mode":"pro","holes":74,"players":213,"offset":0,
- "rows":[{"player":"g1…","holes":18,"strokes":61}, …],"next":20}
+ "rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61}, …],"next":20}
 ```
 
 `players` is how many the ranking holds, `next` the offset of the next page (0
@@ -632,13 +638,13 @@ A player's place on one hole's board.
 
 #### `HoleLeaderboard(hole, mode string, offset, limit int) string`
 
-A page of one hole's board: each named player's best there, fewest strokes
-first, from rank `offset+1` (clamped to 0..players), at most `limit` rows
+A page of one hole's board: each named player's best there, with their name,
+fewest strokes first, then the first to make them, from rank `offset+1` (clamped to 0..players), at most `limit` rows
 (clamped to 1..100).
 
 ```json
 {"version":1,"hole":"garden/3/v1","mode":"assisted","par":3,"players":57,"finished":80,
- "offset":0,"rows":[{"player":"g1…","strokes":2}, …],"next":10}
+ "offset":0,"rows":[{"player":"g1…","name":"birdie","strokes":2}, …],"next":10}
 ```
 
 `players` is how many named players the board holds, `finished` how many
@@ -754,7 +760,9 @@ gas (see physics.md, MaxWork); and it ends a stroke once that reaches
 `physics.MaxWork` (1e6), or the lower cap golf gives it. A commit's estimate
 of its work is, per shot, the larger of `10M + 150K × walls + points × (1.2M +
 15K × pieces)` (by its path) and `10M + 150K × walls + 1000 × Shot.Work` (by
-its work; walls: the hole's and its pulses'). The weights are measured so
+its work; walls: the hole's and its pulses'), plus `700K × pulse walls + 200K
+× pulse posts`: a pulse's pieces are set up afresh for each shot, outside its
+`Shot.Work` (806K a wall and 175K a post measured). The weights are measured so
 that a unit costs at most about 0.87K gas; a course shot runs at 0.6K to
 0.83K a unit.
 
@@ -767,7 +775,8 @@ on the course and 1.1e9 on a hostile hole). `Weather` gives this part as
 commit as the chain does.
 
 A hole's heaviest shot is bounded: `shotBound = 10M + 150K × walls + 1000 ×
-(MaxWork + MaxWorkStep)`, 1.24e9 to 1.26e9 for the course holes. A hole whose
+(MaxWork + MaxWorkStep)`, and its pulses' set-up, 1.24e9 to 1.26e9 for the
+course holes. A hole whose
 bound passes 1.3e9 is refused when it is published, and before the first
 shot of a commit the bound must fit the 1.4e9 budget. Before each later shot,
 a commit that would pass 1.4e9 with one more shot as heavy as its heaviest so

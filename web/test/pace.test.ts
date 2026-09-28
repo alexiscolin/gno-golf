@@ -2,7 +2,7 @@
 // detector, and frameMs()'s tier table (60/30/10/sleep).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AWAY_MS, frameMs, pace, slowFrames } from "../lib/engine/pace.ts";
+import { AWAY_MS, capped30, frameMs, pace, slowFrames } from "../lib/engine/pace.ts";
 
 void test("pace draws once a whole interval (less 1ms jitter) is owed, else carries the gap", () => {
   // a 10ms interval: an 8ms gap alone is not owed yet
@@ -55,6 +55,15 @@ void test("slowFrames drops the slowest 10% so one hitch does not read as a slow
 void test("slowFrames on a single sample keeps it (ceil(0.9) of 1 is 1: nothing to drop)", () => {
   assert.equal(slowFrames([100]), true);
   assert.equal(slowFrames([10]), false);
+});
+
+void test("capped30 tells a steady 30 fps cap (a battery saver) from a GPU slow on its own", () => {
+  const cap = Array.from({ length: 60 }, (_, i) => 33.3 + (i % 3) - 1); // 32.3 to 34.3 ms
+  assert.equal(slowFrames(cap), true); // slow, as the probe sees it
+  assert.equal(capped30(cap), true); // but held there by the browser: not remembered
+  assert.equal(capped30(Array.from({ length: 60 }, (_, i) => 22 + (i % 20))), false); // spread out: the GPU
+  assert.equal(capped30(Array.from({ length: 60 }, () => 50)), false); // well under 30 fps
+  assert.equal(capped30([...Array.from({ length: 50 }, () => 33), ...Array.from({ length: 10 }, () => 16.7)]), false); // some frames at 60: no cap
 });
 
 void test("frameMs: busy always wins, 60fps regardless of anything else", () => {

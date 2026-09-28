@@ -22,7 +22,7 @@ import (
 // course.Simple decoded here from that data is the realm's hole. This test
 // then plays that Simple directly against the published version, in the same
 // weather laid on both: calm, rain, wind and storm, from the tee, on stroke 0
-// at tick 0 and on stroke 1 at tick 5, previewed and played; and checks that
+// at tick 0 and on stroke 1 at tick 5; and checks that
 // both give a renderer the same pieces, and golf's listing the hole's own
 // name, par, world and order.
 func TestDataPlaysAsTheRealmHole(cur realm, t *testing.T) {
@@ -63,14 +63,8 @@ func TestDataPlaysAsTheRealmHole(cur realm, t *testing.T) {
 					if got := shotKey(previewAt(dh, me.Tee, angle, 6.5, stroke, 5*stroke, weather)); got != want {
 						t.Errorf("%s: the preview differs at %d°, stroke %d, weather %d", d[0], a, stroke, wi)
 					}
-					if got := shotKey(playAt(dh, me.Tee, angle, 6.5, stroke, 5*stroke, weather)); got != want {
-						t.Errorf("%s: the played shot differs at %d°, stroke %d, weather %d", d[0], a, stroke, wi)
-					}
 				}
 			}
-		}
-		if n := sumWear(de); n != 32 {
-			t.Errorf("%s: 32 shots played, %d marks on its wear", d[0], n)
 		}
 	}
 }

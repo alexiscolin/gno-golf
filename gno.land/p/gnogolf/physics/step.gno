@@ -497,6 +497,12 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		if spent {
 			break
 		}
+		// and where the last substep left it: taken off over a crest during
+		// it, a landing still to bounce, or come onto a hill, it goes on too
+		if i == substeps-1 && extra < MaxRollOn && (air > 0 || hop > 0 || f.rolls(slopes, pos, -1, &out.Work)) {
+			substeps++
+			extra++
+		}
 		out.Work += substepWork
 		if air > 0 || hop > 0 {
 			drag = 0

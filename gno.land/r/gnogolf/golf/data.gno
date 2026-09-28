@@ -12,7 +12,6 @@ import (
 	"unicode/utf8"
 
 	"gno.land/p/gnogolf/course"
-	"gno.land/p/gnogolf/physics"
 )
 
 // Holes as data. A version is a GG1 string (course.Encode), sent as hex,
@@ -27,20 +26,12 @@ import (
 // playable, its records kept, and, on the course, out of the ranking.
 
 // dataHole is a decoded data version for one call. It plays as its Simple,
-// and marks the wear on its entry: the Simple's own Marks would be lost with
-// it. golf plays every stroke with PlayWith (playAt), the one that marks it:
-// the Simple's own Play and PlayAt would not.
+// and reads its wear from its entry: the Simple's own Marks would be lost
+// with it. golf's stroke marks the wear where the round's ball rests, never
+// the Simple's own Play, PlayAt and PlayWith.
 type dataHole struct {
 	*course.Simple
 	e *entry
-}
-
-// PlayWith is Simple's PlayWith, the wear marked on the entry.
-func (d *dataHole) PlayWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
-	shot, holed := d.PreviewWith(ball, angle, power, stroke, tick, weather)
-	w, h := d.Board()
-	d.e.mark(course.WearIndexOn(shot.Rest(), w, h))
-	return shot, holed
 }
 
 // Wear is the entry's wear.

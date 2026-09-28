@@ -626,14 +626,28 @@ func (h *Simple) PlayAt(ball physics.Vec2, angle, power float64, stroke int) (ph
 // PreviewWith is a stroke of a round in some weather, the timed pieces
 // starting at tick: the stroke's pulses, then the weather, then the clock. Read-only.
 // A pulse piece that came back on the ball pushes it out, never across one
-// of the hole's own walls (physics.UnstickIn).
+// of the hole's own walls (physics.UnstickIn). A ball left where the next
+// stroke's pulse brings a hazard back (a canal opening) goes back to where
+// this stroke started, as under a timed hazard: the hazard would otherwise
+// send it back to where it stands, a lost stroke.
 func (h *Simple) PreviewWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	ws, ps := h.Extras(stroke)
 	ball = physics.UnstickIn(ball, ws, ps, h.Course.Radius, h.Course.Walls)
 	// the stroke's own pieces first, then the weather under everything
 	f := WithZones(WithExtras(h.Course, ws, ps), h.ExtraZones(stroke))
 	f = physics.WithTick(WithWeather(f, weather), tick)
-	return Sink(f.Step(ball, Launch(angle, power), h.Substeps), h.Pin, h.CupRadius, h.Course.Radius)
+	shot, holed := Sink(f.Step(ball, Launch(angle, power), h.Substeps), h.Pin, h.CupRadius, h.Course.Radius)
+	if !holed && len(shot.Path) > 0 {
+		for _, z := range h.ExtraZones(stroke + 1) {
+			if z.Kind == physics.Hazard && z.Contains(shot.Rest()) {
+				shot.Path = append(shot.Path, ball)
+				shot.Air = append(shot.Air, false)
+				shot.Cause = append(shot.Cause, '-')
+				break
+			}
+		}
+	}
+	return shot, holed
 }
 
 // PlayWith is PreviewWith, and it marks the wear where the ball stops.

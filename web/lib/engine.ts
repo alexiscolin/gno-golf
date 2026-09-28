@@ -22,9 +22,9 @@ import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
   courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene";
-import { BALL_R } from "./terrain";
+import { BALL_R, plainSkins } from "./terrain";
 import { makeCamera } from "./engine/camera";
-import { pace, slowFrames, frameMs, SLOW_KEY } from "./engine/pace";
+import { pace, slowFrames, capped30, frameMs, SLOW_KEY } from "./engine/pace";
 import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
@@ -216,7 +216,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       worlds: perList().worlds,
       id: g.id,
       name: g.s ? g.s.name : "",
-      // a realm hole's code, a data hole's data: what a player can read
+      // the hole's data: what a player can read
       source: g.s ? chain.sourceURL(g.id) : "#",
       official: !g.s || g.s.official !== false, // one of the course's holes (a community hole is not)
       community: g.community || NONE, // everyone else's holes, playable outside the cups
@@ -235,6 +235,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       pts: g.pts,
       works: g.works,
       fixed: (g.forecast && g.forecast.gas) || 0,
+      // and every shot's share of setting its pulses up (newWork's setup)
+      setup: pulse.walls * RULES.work.pulseWall + pulse.posts * RULES.work.pulsePost,
       shots: g.shots,
       flying: g.flying,
       aiming: g.aiming,
@@ -246,7 +248,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       mode, // the aim mode set now
       cam: g.cam,
       roundMode: g.roundMode || null, // the mode this round is played in, from its first stroke
-      period: g.period == null ? null : g.period, // the round's weather quarter hour: what a record is played in
+      period: g.period == null ? null : g.period, // the round's weather period (five minutes): what a record is played in
       cause: g.cause || null, // a word on why the ball speeds up or drifts, once a shot
       note: g.note || null, // a word on how the shot went
       errorKind: (g.error && g.errorKind) || null,
@@ -284,11 +286,12 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // A slow GPU (seen on some Safari and Firefox setups) gets a lighter canvas:
   // the first 2 s of busy drawing are timed, and frames drawn over 20 ms apart
   // on average (the cap aims at one every 16.7 ms, whatever the display) turn
-  // Auto to Low, once (and for the next visits).
+  // Auto to Low, once (and for the next visits; frames held at 30 fps by a
+  // battery saver only for this one).
   let dprCap = Infinity;
   function setTier() {
     const was = tier;
-    tier = gfxMode === "auto" ? (weakGpu || wasSlow() ? "low" : "high") : gfxMode;
+    tier = gfxMode === "auto" ? (weakGpu || probe.slow || wasSlow() ? "low" : "high") : gfxMode;
     quality.low = tier === "low"; // outlines: from the next hole built
     weather.thin(quality.low);
     dprCap = quality.low ? (coarse ? 0.8 : 1) : Infinity;
@@ -296,7 +299,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     return was !== tier;
   }
   // only busy frames count (an idle scene may be drawn at 10 or 30 fps on purpose)
-  const probe = { t0: 0, prev: 0, gaps: [] as number[], done: false };
+  const probe = { t0: 0, prev: 0, gaps: [] as number[], done: false, slow: false };
   function probeFrame(now: number, busy: boolean) {
     if (tier === "low" || probe.done) return;
     if (!busy) return void (probe.prev = 0);
@@ -306,7 +309,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (now - probe.t0 < 2000 && probe.gaps.length < 90) return;
     probe.done = true;
     if (probe.gaps.length > 10 && slowFrames(probe.gaps) && gfxMode === "auto") {
-      try { localStorage.setItem(SLOW_KEY, "low"); } catch {}
+      probe.slow = true;
+      // and for the next visits; frames held steady at 30 fps (a battery saver, or vsync on a GPU just
+      // too slow for 60) only for this one: probed again next visit
+      if (!capped30(probe.gaps)) try { localStorage.setItem(SLOW_KEY, "low"); } catch {}
       console.info("gnogolf: slow frames, graphics set to low");
       setTier();
       void publish();
@@ -342,8 +348,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
 
   // the intro's end: from the hole shown whole to the player's camera, one glide
-  // (Far is the whole hole already: nothing to glide to)
-  const intro = () => (setView(home()), g.view === "ball" && cam.glide());
+  // (Far is the whole hole already: nothing to glide to); a cut under reduced motion
+  const intro = () => (setView(home()), g.view === "ball" && (motion ? cam.glide() : cam.jump()));
   function setView(v: GameState["view"]) {
     clearTimeout(closeIn);
     g.view = v;
@@ -540,7 +546,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     newRound(false);
     let s: Hole;
     try {
-      s = await stateOf(id);
+      s = plainSkins(await stateOf(id));
     } catch (err) {
       // (the hole it failed on, for the banner's Try again: g.id is still the last one's)
       if (ticket === loads && alive) (g.failed = id), fail(err, "load");
@@ -558,6 +564,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       if (!g.list.some((h) => h.id === id)) return load(s.next);
     }
 
+    // a hole opened by its alias (a link to an unlisted one) is played by its
+    // version id: the chain saves no round by an alias
+    id = s.hole || id;
     if (id !== g.id) rival.race(null); // a duel is on one hole
     g.id = id;
     g.failed = null;
@@ -581,7 +590,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.course = null;
     extras = null;
     extrasFor = "";
-    pulse = { seen: new Set(), walls: 0, pieces: 0 };
+    pulse = { seen: new Set(), walls: 0, posts: 0, pieces: 0 };
     growing = [];
     aimer.forget(); // the hole is read anew: so are its previews
     // from here until its shaders are ready nothing is drawn (the curtain, or
@@ -608,7 +617,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     setLighting(scene, course.userData.time);
     // a hole's own weather, until a stroke's forecast says otherwise
     weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.dry || course.userData.terrain.onGreen);
-    // the round's weather: the chain's forecast for its quarter hour
+    // the round's weather: the chain's forecast for its five minutes
     g.period = s.period;
     g.forecast = s.weather || null;
     applyWeather();
@@ -664,18 +673,18 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   let extras: THREE.Object3D | null = null, extrasFor = "";
   // the pulses' pieces seen so far on this hole, each once: what the work
   // model counts for them (newWork: every pulse, as if always there)
-  let pulse = { seen: new Set<string>(), walls: 0, pieces: 0 };
+  let pulse = { seen: new Set<string>(), walls: 0, posts: 0, pieces: 0 };
   function sawPulse(ex: Extras) {
-    const add = (list: readonly (Wall | Post | Zone)[], wall = false) => {
+    const add = (list: readonly (Wall | Post | Zone)[], kind?: "walls" | "posts") => {
       for (const x of list) {
         const k = JSON.stringify(x);
         if (pulse.seen.has(k)) continue;
         pulse.seen.add(k);
         pulse.pieces += 1 + (("poly" in x && x.poly && x.poly.length) || 0);
-        if (wall) pulse.walls++;
+        if (kind) pulse[kind]++;
       }
     };
-    add(ex.walls, true), add(ex.posts), add(ex.zones);
+    add(ex.walls, "walls"), add(ex.posts, "posts"), add(ex.zones);
   }
   async function showExtras() {
     if (!g.s || !g.s.timed || !g.course) return;
@@ -684,9 +693,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     extrasFor = key;
     let ex: Extras;
     try {
-      ex = await chain.extras(g.id!, g.shots.length);
+      ex = plainSkins(await chain.extras(g.id!, g.shots.length));
     } catch {
-      if (extrasFor === key) extrasFor = ""; // let the next stroke ask again
+      // asked again in a moment: the stroke being aimed is played with its
+      // pieces (a shot on its way asks for the next one when it lands)
+      if (extrasFor === key) (extrasFor = ""), setTimeout(() => alive && !g.flying && void showExtras(), 2000);
       return;
     }
     if (extrasFor !== key || !alive || !g.course) return;
@@ -704,7 +715,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   }
   let growing: { o: THREE.Object3D; from: number; to: number; t: number; gone?: boolean }[] = [];
 
-  // The weather drawn is the round's (a forecast fixed for its quarter hour),
+  // The weather drawn is the round's (a forecast fixed for its five minutes),
   // with whatever the hole or the stroke carries itself.
   let strokeZones: readonly Zone[] = [], strokeWalls: readonly Wall[] = [];
   // the zones that act on the ball now: the hole's, the forecast's, the stroke's
@@ -1227,7 +1238,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!alive) return; // destroyed while the chain answered (a remount in dev)
     setList(list);
     if (!g.list.length) throw new Error("no hole is registered on this chain");
-    // a string is a realm id, as before
+    // a string is a hole's id or alias (or an old realm id)
     const asked = linked(typeof link === "string" ? { id: link } : link);
     // an older archived version, past what Holes() lists: the chain may
     // still have it, so it is asked for; one it has not lands on the cups
@@ -1391,7 +1402,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     setGfx(m: string) {
       gfxMode = gfxOf(m);
       if (m === "auto") try { localStorage.removeItem(SLOW_KEY); } catch {} // a fresh look at the device
-      Object.assign(probe, { t0: 0, prev: 0, gaps: [], done: false });
+      Object.assign(probe, { t0: 0, prev: 0, gaps: [], done: false, slow: false });
       if (setTier() && g.id && !g.flying && !g.shots.length) void load(g.id);
       void publish();
     },

@@ -8,7 +8,7 @@ import { shotOf, RULES } from "../chain";
 import { angDiff, onAt, segHit, rayCircle, BALL_R } from "../terrain";
 import { causeAt } from "../scene/cause";
 import { aimAlong } from "../scene";
-import type { Mode, MutVec2, Stroke, Vec2 } from "../types";
+import type { MutVec2, Stroke, Vec2 } from "../types";
 import type { Live } from "./types";
 
 const MAX_POWER = RULES.maxPower;
@@ -37,29 +37,16 @@ export function thirdAim(yaw0: number, dx: number, dy: number, prev?: number | n
   return prev + angDiff(want, prev) * (fine ? 0.33 : 0.6);
 }
 // How much the aim dots give away, by aim mode. Assisted: the chain's whole
-// path, as far as the pull is strong (2 + power × 1.6 units). Pro: no line at
-// all — the elastic and the gnome turning along it are the direction, like a
-// real putter — and the chain is not asked. ("first-contact" is kept for a
-// middle mode: up to the first thing the ball meets, maxLen units at most.)
-// Rounds of each mode are ranked apart on the chain.
-/** How far the dots show: to the end, to the first contact, or not at all; and how long at most. */
-interface Preview {
-  stopAt: "none" | "first-contact" | "hidden";
-  maxLen: number;
-}
-const PREVIEWS: Record<Mode, Preview> = {
-  assisted: { stopAt: "none", maxLen: Infinity },
-  pro: { stopAt: "hidden", maxLen: 0 },
-};
-// in pro, aimAlong is given the power that makes its reach maxLen (and the
-// dots' size), the same whatever the pull
-const proPower = (p: Preview) => Math.min(MAX_POWER, ((p.maxLen - 2) / 16) * MAX_POWER + 0.5);
+// path (the straight line before it answers as far as the pull is strong,
+// 2 + power × 1.6 units). Pro: no line at all — the elastic and the gnome
+// turning along it are the direction, like a real putter — and the chain is
+// not asked. Rounds of each mode are ranked apart on the chain.
 
-/** The first len units along path (of its first n points), the last one cut short. */
-function clipPath(path: readonly Vec2[], len: number, n = path.length) {
+/** The first len units along path, the last one cut short. */
+function clipPath(path: readonly Vec2[], len: number) {
   const out: Vec2[] = [path[0]];
   let left = len;
-  for (let i = 1; i < n && left > 0; i++) {
+  for (let i = 1; i < path.length && left > 0; i++) {
     const [ax, ay] = out[out.length - 1], [bx, by] = path[i], l = Math.hypot(bx - ax, by - ay);
     if (l <= left) (out.push(path[i]), (left -= l));
     else (out.push([ax + ((bx - ax) * left) / l, ay + ((by - ay) * left) / l]), (left = 0));
@@ -85,8 +72,7 @@ type Wanted = Pick<Question, "angle" | "deg" | "power" | "shots" | "id">;
 
 export function makeAimer(E: Live) {
   const { g, chain, aim, band, ground } = E;
-  const PREVIEW = () => PREVIEWS[g.roundMode || E.mode];
-  const dotPower = (p: number) => (PREVIEW().stopAt === "none" ? p : proPower(PREVIEW()));
+  const shows = () => (g.roundMode || E.mode) !== "pro";
   let shown: { angle: number } | null = null; // the aim the dots on screen were computed for (see interpolate)
   const straight: [MutVec2, MutVec2] = [[0, 0], [0, 0]]; // the provisional line (reused), until the chain answers
   // The chain's dots bend into place from where the straight ones were: each
@@ -133,6 +119,7 @@ export function makeAimer(E: Live) {
     ghosts(false);
     aim.visible = band.visible = false;
     shown = null;
+    sent = null; // the next pull draws the kept answer for the same aim
     aim.rotation.set(0, 0, 0);
     aim.position.set(0, 0, 0);
   };
@@ -192,7 +179,7 @@ export function makeAimer(E: Live) {
   function preview() {
     interpolate();
     if (!(E.shot.power > 0.3)) return; // too soft to shoot: nothing to ask
-    if (PREVIEW().stopAt === "hidden") return void (aim.visible = false); // pro: no line, no request
+    if (!shows()) return void (aim.visible = false); // pro: no line, no request
     // the chain's dots swung round the ball stand for the new aim only while
     // it is close to theirs: past that they would cross walls, and the
     // straight line (stopped at the first thing in the way) says it better
@@ -201,10 +188,10 @@ export function makeAimer(E: Live) {
     // along the aim, stopped at the first wall or post, replaced by the
     // chain's the moment it lands
     if (!shown && g.ball) {
-      const reach = Math.min(PREVIEW().maxLen, 2 + (E.shot.power / MAX_POWER) * 16), len = reach * firstHit(E.shot.angle, reach);
+      const reach = 2 + (E.shot.power / MAX_POWER) * 16, len = reach * firstHit(E.shot.angle, reach);
       straight[0][0] = g.ball.x, straight[0][1] = g.ball.y;
       straight[1][0] = g.ball.x + Math.cos(E.shot.angle) * len, straight[1][1] = g.ball.y + Math.sin(E.shot.angle) * len;
-      aimAlong(aim, straight, dotPower(E.shot.power), ground);
+      aimAlong(aim, straight, E.shot.power, ground);
       aim.visible = true;
     }
     if (!g.id) return;
@@ -260,7 +247,7 @@ export function makeAimer(E: Live) {
   function answer(q: Question, res: Stroke) {
     if (!(E.dragging && q.id === g.id && q.round === g.round && q.n === g.shots.length)) return;
     const was = snapDots();
-    aimAlong(aim, fogged(previewPath(res)), dotPower(q.power), ground, E.landing, dotTint(q));
+    aimAlong(aim, fogged(res.path), q.power, ground, E.landing, dotTint(q));
     morphFrom(was);
     shown = { angle: q.angle };
     aim.rotation.y = 0;
@@ -280,32 +267,6 @@ export function makeAimer(E: Live) {
     };
   };
 
-  // The chain's path cut where the preview stops (see PREVIEW): at the first
-  // contact, and at maxLen units along it whatever the power.
-  function previewPath(res: Stroke) {
-    const path = res.path, why = res.cause.length === path.length ? res.cause : "";
-    let stop = path.length;
-    const P = PREVIEW();
-    if (P.stopAt === "first-contact") {
-      for (let i = 1; i < path.length; i++) {
-        const c = why[i];
-        const hit = (c && c !== "-") || E.landing(path[i - 1], path[i], path[0]) != null;
-        // a sharp turn is a bounce, for a realm that does not say
-        let turn = false;
-        if (!why && i + 1 < path.length) {
-          const ax = path[i][0] - path[i - 1][0], ay = path[i][1] - path[i - 1][1], bx = path[i + 1][0] - path[i][0], by = path[i + 1][1] - path[i][1];
-          const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
-          turn = la > 1e-3 && lb > 1e-3 && (ax * bx + ay * by) / (la * lb) < Math.cos((25 * Math.PI) / 180);
-        }
-        if (hit || turn) {
-          stop = i + 1;
-          break;
-        }
-      }
-    }
-    return clipPath(path, P.maxLen, stop);
-  }
-
   // in fog the dots see only 7 units ahead: it hinders the aim without blinding it
   const fogged = (path: readonly Vec2[]) => (g.weather && g.weather.fog ? clipPath(path, 7) : path);
 
@@ -320,10 +281,10 @@ export function makeAimer(E: Live) {
     /** Whether the dots are moving (the frame is busy). */
     moving: () => !!morph,
     /** Whether this round's mode shows the dots at all (pro: no). */
-    shows: () => PREVIEW().stopAt !== "hidden",
+    shows,
     /** The preview answer for exactly this stroke (same hole, period, round so far and shot string), or undefined. */
     known: (id: string, shots: readonly string[], shot: string) => answers.get(keyOf({ id, shots, shot })),
     /** The hole is read anew: so are its previews. */
-    forget: () => answers.clear(),
+    forget: () => void (answers.clear(), (sent = null)),
   };
 }

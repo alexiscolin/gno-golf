@@ -414,6 +414,18 @@ func TestABallLeftOnASlopeRollsDown(t *testing.T) {
 	}
 }
 
+// A ball that takes off over a crest during the stroke's last substep flies
+// on, as one that took off before it does: it never stops in mid-air at the lip.
+func TestABallTakingOffOnTheLastSubstepFliesOn(t *testing.T) {
+	f := &Field{Walls: Box(V(0, 0), V(90, 20)),
+		Zones:    []Zone{{Kind: Slope, Min: V(10, 0), Max: V(12, 20), Vec: V(-0.3, 0)}},
+		Friction: 0.87, Radius: 0.5}
+	sh := f.Step(V(5.5, 10), V(4, 0), 2)
+	if !flew(sh) || sh.Rest().X < 20 {
+		t.Fatalf("a ball over the crest on the last substep stopped at %v, air %v", sh.Rest(), sh.Air)
+	}
+}
+
 // On flat grass, with nothing but friction, a ball only ever slows down.
 func TestFlatGrassNeverSpeedsUp(t *testing.T) {
 	f := &Field{Friction: 0.86, Radius: 0.5}

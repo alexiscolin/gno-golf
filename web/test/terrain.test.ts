@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   mod, there, onAt, smoothstep, angDiff, closest, boxOf, nearestOnPoly, segDist, wallDist,
-  segHit, rayCircle, inPoly, inset, inZone, inSea, sandIn, airy, terrain, CELL,
+  segHit, rayCircle, inPoly, inset, inZone, inSea, sandIn, airy, terrain, CELL, plainSkins,
 } from "../lib/terrain.ts";
 import type { HoleState, Vec2, Wall, Zone } from "../lib/types.ts";
 
@@ -301,4 +301,15 @@ void test("terrain: a bridge crosses a pond without the flood or the pond throwi
   assert.ok(under === null || typeof under.k === "number");
   const wet = t.pond(3, 1); // away from the bridge, plainly in the pond
   assert.ok(wet && wet.k > 0);
+});
+
+void test("plainSkins draws a skin every object has plain, and leaves the others as they are", () => {
+  const w: Wall = { a: [0, 0], b: [1, 0], skin: "constructor" }, k: Wall = { a: [0, 1], b: [1, 1], skin: "kerb" };
+  const h = { walls: [w, k], posts: [{ c: [2, 2] as Vec2, r: 0.5, skin: "__proto__" }], zones: [] as Zone[], name: "x" };
+  const out = plainSkins(h);
+  assert.deepEqual(out.walls.map((x) => x.skin), ["", "kerb"]);
+  assert.equal(out.posts[0].skin, "");
+  assert.equal(out.walls[1], k); // untouched pieces are the same objects
+  assert.equal(out.name, "x");
+  assert.equal(w.skin, "constructor"); // the answer read is not changed
 });
