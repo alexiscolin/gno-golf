@@ -286,8 +286,9 @@ func weatherNote(e *entry, h course.Hole) string {
 	case course.Snow:
 		what = "Snow: the green runs slow"
 	}
-	return ufmt.Sprintf("> [!NOTE] Weather now\n> %s — for %d min %02d s more. A round keeps the weather it started in, and can be played on until the next weather is over: after that it must be Reset.\n\n",
-		what, left/60, left%60)
+	// (ufmt has no width: the seconds padded by hand)
+	return ufmt.Sprintf("> [!NOTE] Weather now\n> %s — for %d min %s s more. A round keeps the weather it started in, and can be played on until the next weather is over: after that it must be Reset.\n\n",
+		what, left/60, pad(int(left%60), 2))
 }
 
 // noAdmin states what the reader can check in a minute: who can change what.

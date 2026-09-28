@@ -753,9 +753,12 @@ func Ghost(hole, mode string, player address) string {
 	}
 	// "<strokes> <period> <shots>", as bestOf writes it (bestStrokes refuses anything else)
 	strokes, f := bestStrokes(v), strings.SplitN(v.(string), " ", 3)
+	if len(f) < 3 {
+		panic(errBest + v.(string))
+	}
 	period, err := strconv.ParseInt(f[1], 10, 64)
-	if err != nil || len(f) < 3 {
-		panic("golf: a best not as bestOf writes it: " + v.(string))
+	if err != nil {
+		panic(errBest + v.(string))
 	}
 	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(player.String()) +
 		`,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(f[2]) + "}"

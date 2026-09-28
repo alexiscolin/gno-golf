@@ -353,9 +353,10 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 /* the tile and the aim card under it share one width (--pick-w): the same
    edges at every size */
 .screen--pick { --pick-w: min(380px, 60vw, 40vh); align-content: safe center; } /* taller than the window: from its top, never cut above it */
+.screen--pick:has(.dare) { --pick-w: min(380px, 60vw, 34vh); } /* a dare's lines above: the button still in view */
 @media (max-height: 820px) {
   .screen--pick { --pick-w: min(340px, 60vw, 36vh); }
-  .screen--pick:has(.dare) { --pick-w: min(340px, 60vw, 30vh); } /* a dare's line above: the button still in view */
+  .screen--pick:has(.dare) { --pick-w: min(340px, 60vw, 25vh); }
 }
 /* a phone: the stage fits a 360 one (144: the screen's padding and the two
    arrows), a tighter rhythm, and a named hole says its name only (the

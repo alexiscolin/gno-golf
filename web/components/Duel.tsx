@@ -10,7 +10,9 @@ const MODES: Record<Mode, string> = { assisted: "Assisted", pro: "Pro" };
 
 // sky: the weather the ghost was played in and today's, when both are known ("" is clear)
 export type Sky = { theirs: string; mine: string } | null;
-const differs = (sky: Sky): sky is { theirs: string; mine: string } => !!sky && sky.theirs !== sky.mine;
+// (fog plays as clear skies: only a weather that pushes or slows the ball is a difference)
+const plays = (kind: string) => (kind === "fog" ? "" : kind);
+const differs = (sky: Sky): sky is { theirs: string; mine: string } => !!sky && plays(sky.theirs) !== plays(sky.mine);
 
 /** The picker's dare, armed: who is raced and the strokes to beat (the link's
  *  sticker) and the way to play solo on one line; under it, only what changes
@@ -20,7 +22,7 @@ export function DuelNote({ duel, mode, sky, onDrop }: { duel: Duel; mode: Mode; 
   const notes = [
     ghost.strokes === 1 && `${self ? "You" : name} aced it. Match it to tie.`,
     ghost.mode !== mode && `You: ${MODES[mode]}. ${self ? "Your best" : "Them"}: ${MODES[ghost.mode]}. Still a race, not a record.`,
-    differs(sky) && `${self ? "You" : "They"} played in ${skyWord(sky.theirs)}.`,
+    differs(sky) && `${self ? "You" : "They"} played in ${skyWord(plays(sky.theirs))}.`,
   ].filter(Boolean);
   return (
     <>
@@ -37,8 +39,8 @@ export function DuelNote({ duel, mode, sky, onDrop }: { duel: Duel; mode: Mode; 
 export function DuelFine({ duel, mode, sky }: { duel: Duel; mode: Mode; sky: Sky }) {
   return (
     <p className="real__fine">
-      {differs(sky) && <>{duel.self ? "Your best had" : "They had"} {skyWord(sky.theirs)}. You had {skyWord(sky.mine)}. </>}
-      {duel.ghost.mode !== mode && <>Your {MODES[mode]} vs their {MODES[duel.ghost.mode]}. </>}
+      {differs(sky) && <>{duel.self ? "Your best had" : "They had"} {skyWord(plays(sky.theirs))}. You had {skyWord(plays(sky.mine))}. </>}
+      {duel.ghost.mode !== mode && <>Your {MODES[mode]} vs {duel.self ? "your best's" : "their"} {MODES[duel.ghost.mode]}. </>}
       Duel records on-chain · soon
     </p>
   );

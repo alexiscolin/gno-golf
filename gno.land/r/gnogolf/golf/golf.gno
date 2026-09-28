@@ -118,15 +118,22 @@ func bestOf(r *round) string {
 	return strconv.Itoa(r.strokes) + " " + strconv.FormatInt(r.period, 10) + " " + r.shots
 }
 
+// errBest is a best not as bestOf writes it: never written, refused if read.
+const errBest = "golf: a best not as bestOf writes it: "
+
 // bestStrokes is a kept best's strokes, 0 for none (a tree's nil).
 func bestStrokes(v any) int {
 	if v == nil {
 		return 0
 	}
 	s := v.(string)
-	n, err := strconv.Atoi(s[:strings.Index(s, " ")])
+	i := strings.Index(s, " ")
+	if i < 0 {
+		panic(errBest + s)
+	}
+	n, err := strconv.Atoi(s[:i])
 	if err != nil {
-		panic("golf: a best not as bestOf writes it: " + s)
+		panic(errBest + s)
 	}
 	return n
 }
@@ -326,8 +333,9 @@ type row struct {
 const topSize = 10
 
 // named reports whether a player has a gno.land name (r/sys/users). Only
-// named players enter the rankings: an address is free, a name is not, so a
-// script cannot fill the boards with a thousand accounts. Every finish is
+// named players enter the rankings: an address is free, a name takes a
+// registration (and a fee where the chain sets one), so a script cannot fill
+// the boards with a thousand accounts for nothing. Every finish is
 // still kept, named or not — a player who takes a name later ranks on their
 // next finish, and friends' boards (Bests, Standings) read anyone.
 func named(player string) bool {

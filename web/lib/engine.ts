@@ -200,8 +200,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     onChange(snap);
     return true;
   }
-  // a duel's rival: their strokes replayed so far (null: no duel), and their ball in
-  const duelOf = (r: { strokes: number; holed: boolean } | null) => ({ rival: r ? r.strokes : null, rivalIn: !!r && r.holed });
   const snapshot = (): Snapshot => ({
       holes: perList().holes,
       allHoles: g.list || NONE, // every cup's, for the cup totals and the grand slam
@@ -256,7 +254,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       view: g.view,
       gfx: gfxMode, // the graphics setting, and what it gives on this device
       tier,
-      ...duelOf(rival.state()),
+      ...rival.state(), // a duel's rival: their strokes replayed so far (null: no duel), and their ball in
       done: !!g.done, // no more shots (holed, even before the banner)
     });
 
@@ -801,7 +799,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     dragging = false;
     dropAim();
     ball.visible = true;
-    rival.reset(); // the ghost back on the tee too
     if (g.s) {
       g.ball = { x: g.s.start[0], y: g.s.start[1] };
       placeBall();
@@ -810,6 +807,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       if (ask) void showExtras();
       if (ask && stale()) void freshWeather();
     }
+    rival.reset(); // the ghost back on the tee too, beside the gnome now there
     void publish();
   }
 
@@ -1134,8 +1132,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const last = res.path[res.path.length - 1];
     g.ball = { x: last[0], y: last[1] };
     g.flying = false;
-    void showExtras(); // a timed hole changes for the next stroke
-    void rival.turn(g.shots.length - 1, res.holed); // the duel's ghost answers
+    // the duel's ghost answers among this stroke's pieces; then a timed hole
+    // changes for the next stroke (at once without a duel)
+    void rival.turn(g.shots.length - 1, res.holed).finally(() => void showExtras());
     // a jump or a bounce may have ended mid-air: put him on the ground
     if (!res.holed) ball.position.set(last[0], BALL_R + ground(last[0], last[1]), last[1]);
     g.facing = Math.PI / 2; // at rest he looks at the player

@@ -151,7 +151,7 @@ export function applyRig(camera: THREE.PerspectiveCamera, rig: Rig, view: Pick<V
 // The framing is solved through a camera of its own with that lens, never the
 // live one: that one may be mid third person (58° and more) when a hole loads
 // or the window is resized, and a rig solved through it came out twice too close.
-const RIG_FOV = 30;
+export const RIG_FOV = 30;
 const _lens = new THREE.PerspectiveCamera(RIG_FOV, 1, 3, 260);
 
 /**

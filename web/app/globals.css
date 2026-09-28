@@ -888,6 +888,7 @@ html, body {
   margin: 6px 0 14px;
   color: var(--hat);
 }
+.banner--win h2[data-long] { font-size: clamp(26px, 7vw, 64px); } /* a duel's title with a name: it fits a phone */
 
 .banner--win .eyebrow {
   font-size: 14px;
