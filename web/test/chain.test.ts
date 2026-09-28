@@ -500,6 +500,14 @@ test("holeLeaderboard pages one hole's board", async () => {
   assert.equal((await chain.holeLeaderboard("garden/1")).finished, 8);
 });
 
+test("a board's rows carry the realm's names, and a name that is not a string is refused", async () => {
+  const chain = makeChain();
+  setFetch(() => qevalReply({ ...HOLE_BOARD_REPLY, rows: [{ player: ADDR1, name: "ana", strokes: 3 }] }));
+  assert.equal((await chain.holeLeaderboard("garden/1")).rows[0].name, "ana");
+  setFetch(() => qevalReply({ ...COURSE_BOARD_REPLY, rows: [{ player: ADDR1, name: 7, strokes: 12, holes: 4 }] }));
+  await assert.rejects(chain.courseLeaderboard(), (e) => errorKind(e) === "chain");
+});
+
 test("records pages one hole's best-by-player list", async () => {
   const chain = makeChain();
   setFetch((url) => { assert.ok(decoded(url).expr.includes('Records("garden/1", "assisted", "", 100)')); return qevalReply(RECORDS_REPLY); });

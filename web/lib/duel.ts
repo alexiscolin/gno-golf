@@ -85,15 +85,20 @@ export function pickOne<R extends { player: string }>(rows: readonly R[], not: r
   return ok[Math.floor(r * ok.length)] || null;
 }
 
+/** A rival's best on a hole, the one raced: the aim mode's, else their other one (null: none). */
+export function bestOf(b: Readonly<Record<Mode, number>> | undefined, mode: Mode) {
+  const m: Mode = b && b[mode] ? mode : mode === "pro" ? "assisted" : "pro";
+  return b && b[m] ? { mode: m, strokes: b[m] } : null;
+}
+
 /** The holes a rival shows off, the finest first (n at most): an ace, else
- *  their best against its par (the aim mode's best, else their other one); the
- *  course's order breaks a tie. */
+ *  their best against its par (bestOf); the course's order breaks a tie. */
 export function showcases(bests: ReadonlyMap<string, Readonly<Record<Mode, number>>>, holes: readonly { id: string; par: number }[], mode: Mode, n = 3) {
   const worth = (t: { strokes: number; par: number }) => (t.strokes === 1 ? -Infinity : t.strokes - t.par);
   const all: { id: string; mode: Mode; strokes: number; par: number }[] = [];
   for (const h of holes) {
-    const b = bests.get(h.id), m: Mode = b && b[mode] ? mode : mode === "pro" ? "assisted" : "pro";
-    if (b && b[m]) all.push({ id: h.id, mode: m, strokes: b[m], par: h.par });
+    const b = bestOf(bests.get(h.id), mode);
+    if (b) all.push({ id: h.id, ...b, par: h.par });
   }
   return all.sort((a, b) => worth(a) - worth(b)).slice(0, n); // (a stable sort: the course's order within a worth)
 }
@@ -146,4 +151,17 @@ export function railRuns(walls: readonly { a: Vec2; b: Vec2 }[]) {
     runs.push(run);
   }
   return runs;
+}
+
+/** Calls run n at a time, the others waiting their turn in order: a screen's
+ *  maps read a few at once, never all of them together. */
+export function inTurn(n: number) {
+  let busy = 0;
+  const waiting: (() => void)[] = [];
+  return <T>(f: () => Promise<T>): Promise<T> => {
+    // (a finished call hands its place to the next one waiting)
+    const go = () => Promise.resolve().then(f).finally(() => { const next = waiting.shift(); if (next) next(); else busy--; });
+    if (busy < n) return (busy++, go());
+    return new Promise<void>((r) => waiting.push(r)).then(go);
+  };
 }

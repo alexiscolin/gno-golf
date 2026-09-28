@@ -206,6 +206,8 @@ export interface Community extends Versioned {
 
 export interface StrokesRow {
   player: string;
+  /** their gno.land name, as the boards give it (Leaderboard, CourseLeaderboard, HoleLeaderboard); none from the other reads or an older realm */
+  name?: string;
   strokes: number;
 }
 

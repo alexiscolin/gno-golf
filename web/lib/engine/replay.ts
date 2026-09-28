@@ -156,17 +156,22 @@ export function makeReplay(E: Live) {
   // Several zones may send the ball to the same point, so the zone is the one
   // the step came from: of those that land there, the nearest to where the
   // ball was.
+  // None, and still back to the start: the next stroke's hazard (town10's
+  // canal opening under the bridge, course.gno PreviewWith) takes the ball
+  // where it stopped. The client has none of that stroke's zones: one a unit
+  // round the ball stands for it, so it sinks where it stands.
   const jumpFrom = (p: Vec2, q: Vec2, start?: Vec2): Zone | null => {
     if (!g.s || Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-3) return null;
+    const at = (v: Vec2) => Math.abs(q[0] - v[0]) <= 1e-3 && Math.abs(q[1] - v[1]) <= 1e-3;
     let best: Zone | null = null, bd = Infinity;
     for (const z of g.s.zones) {
       // a loop with a tube (island7's castle tube) is ridden like a tunnel
-      const at = (v: Vec2) => Math.abs(q[0] - v[0]) <= 1e-3 && Math.abs(q[1] - v[1]) <= 1e-3;
       if ((z.kind !== "tunnel" && z.kind !== "hazard" && z.kind !== "loop") || !(at(z.vec) || (z.kind === "hazard" && start && at(start)))) continue;
       const dx = Math.max(z.min[0] - p[0], 0, p[0] - z.max[0]), dz = Math.max(z.min[1] - p[1], 0, p[1] - z.max[1]);
       const d = Math.hypot(dx, dz);
       if (d < bd) (bd = d), (best = z);
     }
+    if (!best && start && at(start)) return { kind: "hazard", min: [p[0] - 1, p[1] - 1], max: [p[0] + 1, p[1] + 1], vec: start, scale: 0, round: false, skin: "" };
     return best;
   };
   const tunnelled = (p: Vec2, q: Vec2) => { const z = jumpFrom(p, q); return z && (z.kind === "tunnel" || z.kind === "loop") ? z : null; };

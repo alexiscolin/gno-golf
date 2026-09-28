@@ -102,7 +102,7 @@ const isFlight = (v: Obj) => isPath(v.path) && v.path.length > 0 && isVec(v.rest
 const simFrom = (v: unknown): v is SimulateFrom => isObj(v) && isFlight(v) && typeof v.holed === "boolean" && nums(v, "bounces");
 // a board: its rows (each checked by row), its mode and the numbers it says
 const board = (v: unknown, row: (r: unknown) => boolean, ...keys: string[]): v is Obj => isObj(v) && isMode(v.mode) && Array.isArray(v.rows) && v.rows.every(row) && nums(v, ...keys);
-const strokesRow = (r: unknown) => isObj(r) && typeof r.player === "string" && nums(r, "strokes");
+const strokesRow = (r: unknown) => isObj(r) && typeof r.player === "string" && (r.name === undefined || typeof r.name === "string") && nums(r, "strokes");
 const standingRow = (r: unknown) => strokesRow(r) && nums(r as Obj, "holes");
 const checks = {
   holes: (v: unknown): v is HoleRow[] => Array.isArray(v) && v.every(holeRow),

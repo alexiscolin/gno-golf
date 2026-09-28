@@ -15,9 +15,10 @@ export const loadFriends = (): Friend[] => {
     return [];
   }
 };
-export const saveFriends = (f: Friend[]) => {
+export const saveFriends = (all: Friend[]) => {
+  const f = all.slice(-49); // (the latest kept: one added now is never the one dropped)
   try {
-    localStorage.setItem(FRIENDS, JSON.stringify(f.slice(-49))); // (the latest kept: one added now is never the one dropped)
+    localStorage.setItem(FRIENDS, JSON.stringify(f));
   } catch {}
   return f;
 };

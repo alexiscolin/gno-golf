@@ -51,11 +51,12 @@ test("loadFriends: a storage that throws is ignored", () => {
   }
 });
 
-test("saveFriends: keeps at most 49 entries and returns them", () => {
+test("saveFriends: keeps the latest 49 entries and returns what it stores", () => {
   const many = Array.from({ length: 60 }, (_, i) => ({ addr: addr(String.fromCharCode(97 + (i % 26))), name: String(i) }));
   const saved = saveFriends(many);
-  assert.equal(saved.length, 60, "returns what it was given");
-  assert.equal((JSON.parse(localStorage.getItem("gnogolf.friends")!) as unknown[]).length, 49, "but only stores 49");
+  assert.equal(saved.length, 49);
+  assert.equal(saved[0].name, "11", "the oldest dropped");
+  assert.deepEqual(JSON.parse(localStorage.getItem("gnogolf.friends")!), saved, "the list returned is the one stored");
 });
 
 test("saveFriends: swallows a storage that throws and still returns the list", () => {

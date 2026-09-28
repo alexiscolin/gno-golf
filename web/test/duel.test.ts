@@ -1,7 +1,7 @@
 // Ghost duels (ADR-004): the best raced, the ghost's pace, and the result in words.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, showcases, mapView, pathD, railRuns, type Duel } from "../lib/duel.ts";
+import { duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, bestOf, showcases, inTurn, mapView, pathD, railRuns, type Duel } from "../lib/duel.ts";
 import type { Ghost } from "../lib/types.ts";
 
 const ghost = (strokes: number, mode: Ghost["mode"] = "assisted"): Ghost => ({ version: 1, hole: "garden/1/v1", mode, player: "g1x", strokes, period: 7, shots: "0.0000,1.0000,0;12.5000,6.2000,3" });
@@ -136,4 +136,28 @@ test("a map's lines: rails joined end to end into runs, their corners rounded, a
   assert.equal(pathD([[0, 0], [10, 0]], id), "M0 0L10 0");
   assert.equal(pathD([[0, 0], [10, 0], [10, 10]], id), "M0 0L5 0Q10 0 10 5L10 10"); // the corner bent through the sides' middles
   assert.equal(pathD([[0, 0], [10, 0], [10, 10], [0, 0]], id), "M5 0Q10 0 10 5Q10 10 5 5Q0 0 5 0"); // a loop: no corner left
+});
+
+test("the best raced on a hole: the aim mode's, else the other, else none", () => {
+  assert.deepEqual(bestOf({ pro: 3, assisted: 2 }, "pro"), { mode: "pro", strokes: 3 });
+  assert.deepEqual(bestOf({ pro: 0, assisted: 2 }, "pro"), { mode: "assisted", strokes: 2 });
+  assert.equal(bestOf({ pro: 0, assisted: 0 }, "assisted"), null);
+  assert.equal(bestOf(undefined, "pro"), null);
+});
+
+test("calls in turn: n at once, the rest in order, a failed one handing its place on", async () => {
+  const turn = inTurn(2), log: string[] = [];
+  let at = 0, most = 0;
+  const call = (id: string, fail = false) => turn(async () => {
+    most = Math.max(most, ++at);
+    await new Promise((r) => setTimeout(r, 5));
+    at--, log.push(id);
+    if (fail) throw new Error(id);
+    return id;
+  });
+  const all = await Promise.allSettled([call("a", true), call("b"), call("c"), call("d")]);
+  assert.equal(most, 2);
+  assert.deepEqual(log, ["a", "b", "c", "d"]);
+  assert.deepEqual(all.map((r) => r.status), ["rejected", "fulfilled", "fulfilled", "fulfilled"]);
+  assert.equal(await turn(() => Promise.resolve("e")), "e"); // its places all given back
 });

@@ -19,9 +19,11 @@ import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, st
 
 // address → gno.land name, read once a page; "" is not kept, so a name taken since shows
 const names = new Map<string, Promise<string>>();
-/** A page's names in one read, kept for the Who of each row: one query a page, not one a row. */
-function primeNames(chain: Chain, addrs: readonly string[]) {
-  const todo = addrs.filter((a) => !names.has(a));
+/** A page's names kept for the Who of each row: the names its rows carry (a
+ *  board's), the others in one read, one query a page, not one a row. */
+function primeNames(chain: Chain, rows: readonly { player: string; name?: string }[]) {
+  for (const r of rows) if (r.name) names.set(r.player, Promise.resolve(r.name));
+  const todo = rows.filter((r) => !names.has(r.player)).map((r) => r.player);
   if (!todo.length) return;
   const all = chain.namesOf(todo).catch(() => [] as { player: string; name: string }[]);
   // a name found is kept; "" is not, like nameOnce's
@@ -283,7 +285,7 @@ function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"
     (kind === "hole" ? chain.records(id, mode, from) : chain.players(mode, from))
       .then(async (b) => {
         // names through the shared cache: one read a page, kept for the boards' rows
-        primeNames(chain, b.rows.map((r) => r.player));
+        primeNames(chain, b.rows);
         const named = await Promise.all(b.rows.map((r) => nameOnce(chain, r.player)));
         // no name today: a player named since their finish ranks from their next
         // one, and until then is on neither list (the realm keeps no such index)
@@ -350,7 +352,7 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
         const level = levelPick(near.rows, me, champ ? [champ.player] : []);
         const any = await page(Math.floor(Math.random() * top.players), 5).catch(() => top);
         const surprise = pickOne([...any.rows, ...top.rows], [me, champ && champ.player, level && level.player], Math.random());
-        primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r.player] : [])));
+        primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r] : [])));
         if (live) setPicks([champ, level, surprise]);
       })
       .catch(() => live && setPicks([null, null, null]));
@@ -388,7 +390,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   const add = (offset: number) =>
     read(offset).then(({ b, head: h }) => {
       if (!alive.current) return;
-      primeNames(chain!, b.rows.map((x) => x.player));
+      primeNames(chain!, b.rows);
       setHead(h);
       setRows((r) => {
         const had = offset ? r || [] : [];
@@ -782,7 +784,7 @@ export function Podium({ chain, me, mode = "pro", onOpen, extra }: { chain: Chai
       .then(([b, flags]) =>
         {
           const rows = screen_(b.rows, flags, false).rows.slice(0, 3);
-          primeNames(chain, rows.map((r) => r.player));
+          primeNames(chain, rows);
           if (live) setTop({ rows, holes: b.holes });
         },
       )

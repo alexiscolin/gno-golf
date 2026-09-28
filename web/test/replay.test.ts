@@ -118,6 +118,23 @@ void test("landing: a hazard matched by its vec, or by the stroke's own start", 
   assert.equal(api.landing([1, 1], [5, 5]), null); // no start given: the vec no longer matches
 });
 
+void test("landing: back to the start with no zone of the stroke's: the next stroke's hazard", () => {
+  const { E } = makeFixture();
+  const api = makeReplay(E);
+  // (town10: stopped on the bridge, the canal opens at the next stroke)
+  assert.equal(api.landing([9, 3], [1, 3], [1, 3]), "hazard");
+  assert.equal(api.landing([9, 3], [1, 3]), null); // no start given: a roll
+});
+
+void test("replay: sent back by the next stroke's hazard: a splash where it stopped, then the start", async () => {
+  const { E, ball, calls } = makeFixture();
+  const api = makeReplay(E);
+  await withFakeClock(() => api.replay([[1, 3], [5, 3], [9, 3], [1, 3]], false, "0000", "---"));
+  assert.equal(calls.moodShake, 1); // splashed, not rolled back across the board
+  assert.equal(ball.visible, true);
+  assert.deepEqual([ball.position.x, ball.position.z], [1, 3]);
+});
+
 void test("landing: of several zones landing at the same point, the nearest to p wins", () => {
   const { E, g } = makeFixture();
   const api = makeReplay(E);

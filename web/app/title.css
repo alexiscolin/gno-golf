@@ -69,6 +69,10 @@
 /* the screen's own children over the backdrop; :where() keeps it at no weight,
    so a child's own position (.screen__back, .resets) wins without a fight */
 :where(.front) > * { position: relative; z-index: 1; }
+/* a front's frame a passe-partout: over what scrolls (last, at its children's
+   level), the band out of it the backdrop's colour, so a long screen passes
+   under it; the corner buttons (2), the mode's tag and the network banner (after the screen) over it */
+.front::after { z-index: 1; box-shadow: 0 0 0 40px var(--s0); }
 @media (max-width: 600px) { .front::after, .victory::after, .screen--title::after { inset: 8px; border-width: 2.5px; } }
 /* the title's film and live scene stay as they are: the frame is its still's only */
 .screen--title:has(.title__film:not(.title__film--off))::after, .screen--title:has(.title__stage--on)::after { display: none; }
@@ -399,8 +403,8 @@ body:has(.sheet) .modetag { visibility: hidden; }
 .map__line { fill: none; stroke: var(--hat-ink); stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100 100; }
 .map__ball { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; offset-distance: 100%; offset-rotate: 0deg; }
 /* under the pointer or the focus, the ghost plays its round again, and again */
-.rival__pick:is(:hover, :focus-visible) .map__line { animation: map-ink 3.2s linear infinite; }
-.rival__pick:is(:hover, :focus-visible) .map__ball { animation: map-ball 3.2s linear infinite; }
+:is(.rival__pick, .ghost):is(:hover, :focus-visible) .map__line { animation: map-ink 3.2s linear infinite; }
+:is(.rival__pick, .ghost):is(:hover, :focus-visible) .map__ball { animation: map-ball 3.2s linear infinite; }
 @keyframes map-ink { from { stroke-dashoffset: 100; } 80%, to { stroke-dashoffset: 0; } }
 @keyframes map-ball { from { offset-distance: 0%; } 80%, to { offset-distance: 100%; } }
 /* anyone on the board: stickers, four a row, in the board's own scrolling frame (globals.css .lb--full ol) */
@@ -416,8 +420,8 @@ body:has(.sheet) .modetag { visibility: hidden; }
   transition: transform var(--t-pop) var(--spring), box-shadow .2s;
 }
 .lb li:nth-child(odd) > .sticker { rotate: -1deg; } .lb li:nth-child(even) > .sticker { rotate: 1deg; } /* stuck on by hand */
-.sticker:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 0 0 3px var(--glow), 0 8px 0 var(--ink); }
-.sticker:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.sticker:hover, .ghost:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 0 0 3px var(--glow), 0 8px 0 var(--ink); }
+.sticker:active, .ghost:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 .lb li.me > .sticker { background: var(--ink); color: var(--paper); }
 .sticker__face { grid-row: 1 / 3; width: 54px; height: 54px; }
 .sticker .lb__rank { position: absolute; top: -8px; left: -8px; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border: var(--edge); border-radius: var(--pill); background: var(--white); color: var(--ink); font-size: 13px; }
@@ -445,13 +449,43 @@ body:has(.sheet) .modetag { visibility: hidden; }
   .sticker__face { grid-row: auto; }
   .sticker__who { max-width: 100%; }
 }
-@media (prefers-reduced-motion: reduce) { .sticker:hover { transform: none; } }
-/* their ghosts: all the cups in one board's frame (globals.css .lb--full ol), a cup's emblem before its name; a row names a hole, not a player */
-.ghosts__list { width: min(100%, 640px); margin-top: 10px; }
-.ghosts__list > .rival__way { width: 100%; }
-.ghosts__cup { display: flex; align-items: center; gap: 10px; }
-.ghosts__cup svg { width: 36px; height: 36px; flex: none; }
-.ghosts__cup + .lb .lb__who { font-family: var(--font); font-size: 15px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .sticker:hover, .ghost:hover { transform: none; } }
+/* their ghosts: all the cups in one board's frame (globals.css .lb--full ol),
+   taller than a board's (it is the screen's all), each cup a band in its
+   colours as its card on the cups' screen, its emblem before its name; the holes cards on it */
+.ghosts__list { width: min(100%, 1040px); max-height: max(46vh, 100dvh - 440px); margin-top: 12px; padding-top: 8px; }
+.ghosts__cup { padding: 10px 14px 18px; border: var(--edge-bold); border-radius: 24px; text-align: left; background: radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px, var(--c2); box-shadow: var(--shadow-btn); }
+.ghosts__cup + .ghosts__cup { margin-top: 18px; }
+.ghosts__cup--extras { --c2: var(--stone); }
+.ghosts__name { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 24px; color: var(--paper); -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
+.ghosts__name svg { width: 44px; height: 44px; flex: none; filter: drop-shadow(0 3px 0 var(--ink)); }
+.ghosts__holes { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+/* a hole: a sticker's card (and its lift, above), its map on top, their best big, Race at its foot (the card is the button) */
+.ghost {
+  position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; width: 100%; height: 100%; padding: 12px 12px 14px;
+  border: var(--edge-bold); border-radius: 20px; background: var(--white); color: var(--ink); font: inherit; text-align: center; cursor: pointer; box-shadow: var(--shadow-btn);
+  transition: transform var(--t-pop) var(--spring), box-shadow .2s;
+}
+.ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--ink), var(--shadow-btn); }
+.ghost .lb__rank { position: absolute; top: 8px; left: 8px; display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; border: var(--edge); border-radius: var(--pill); background: var(--c1); color: var(--ink); font-size: 15px; font-weight: 800; }
+.ghost .rival__map { width: min(100%, 124px); margin-bottom: 6px; }
+.ghost__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 700; }
+.ghost__best { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.ghost__best strong { margin-right: 4px; font-size: 34px; line-height: 1; color: var(--ink); }
+.ghost__par { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px 8px; min-height: 24px; font-size: 13px; color: var(--ink-soft); }
+.ghost__you { font-weight: 700; color: var(--ink); }
+.ghost__you--won { padding: 1px 9px; border: var(--edge); border-radius: var(--pill); background: var(--green); color: var(--paper); transform: rotate(-3deg); } /* you beat them there already */
+.ghost .rival__go { grid-area: auto; justify-self: stretch; margin-top: 8px; text-align: center; }
+@media (max-width: 900px) { .ghosts__holes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .ghosts__cup { padding: 8px 10px 14px; border-radius: 20px; }
+  .ghosts__name { font-size: 20px; -webkit-text-stroke-width: 4px; }
+  .ghosts__name svg { width: 36px; height: 36px; }
+  .ghosts__holes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .ghost { padding: 10px 8px 12px; }
+  .ghost .rival__map { width: min(100%, 96px); }
+  .ghost .rival__go { padding: 4px 10px 5px; font-size: 16px; }
+}
 
 @media (max-height: 640px) { .worlds--v2 .world__tag { display: none; } }
 @media (max-width: 900px) { .worlds--v2 .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -701,7 +701,8 @@ export default function Golf() {
   const [dareHole, setDareHole] = useState(""); // the link's own hole, where the dare is said
   // the rival: their name, and their bests in both modes on each hole read so far
   const [rival, setRival] = useState<{ name: string; holes: Readonly<Record<string, Record<Mode, Ghost | null>>> } | null>(null);
-  const readFor = useRef(new Set<string>()); // the holes asked (once each)
+  const readFor = useRef(new Set<string>()); // the holes asked (once each, a failed read again)
+  const [reread, setReread] = useState(0); // a failed read asked again, a beat later
   // the player's rounds saved (how many), and their holes since the ghosts on them were read: a self-race's bests move with them
   const [saves, setSaves] = useState(0);
   const movedGhosts = useRef(new Set<string>());
@@ -717,8 +718,8 @@ export default function Golf() {
     movedGhosts.current.delete(holeId);
     readFor.current.add(holeId);
     if (first) (setDareHole(holeId), dare !== me && addFriend(dare)); // (a player opening their own link is not their own friend)
-    // (a ghost unread is no duel: the dare is still said)
-    void Promise.all([c.ghost(holeId, "assisted", dare).catch(() => null), c.ghost(holeId, "pro", dare).catch(() => null), nameOnce(c, dare)])
+    // (a read failed is no "no ghost here": the hole is asked again, until it answers)
+    void Promise.all([c.ghost(holeId, "assisted", dare), c.ghost(holeId, "pro", dare), nameOnce(c, dare)])
       .then(([a, p, n]) => {
         if (dareNow.current !== dare) return;
         const name = n || shortAddr(dare), has = !!(a || p), whose = dare === me ? "your own" : `${name}'s`;
@@ -729,8 +730,13 @@ export default function Golf() {
         if (has) setLinkNote(first ? `Race ${whose} ghost: your turn first.` : `${name} has a ghost here too: race it.`);
         else if (first) setLinkNote(`${name} dares you on this hole.`);
       })
-      .catch(() => {});
-  }, [dare, solo, holeId, holeReady, me, fresh0, saves]);
+      .catch(() => {
+        if (dareNow.current !== dare) return;
+        if (again) movedGhosts.current.add(holeId);
+        else readFor.current.delete(holeId);
+        setTimeout(() => setReread((n) => n + 1), 3000);
+      });
+  }, [dare, solo, holeId, holeReady, me, fresh0, saves, reread]);
   // the rival's bests on the course's holes, read once a rival is picked: their ghosts' screen lists them
   // (null: the read failed, and no earlier one of theirs is kept; at: the player's rounds saved then)
   const [rivalOn, setRivalOn] = useState<{ by: string; bests: ReadonlyMap<string, Readonly<Record<Mode, number>>> | null; at: number } | null>(null);
@@ -1231,7 +1237,7 @@ export default function Golf() {
           onPick={(addr, bests) => (sound("select"), bests && setRivalOn({ by: addr, bests, at: saves }), raceWith(addr), setScreen("ghosts"))} />
       )}
       {screen === "ghosts" && (
-        <Ghosts holes={allList} name={rivalName} bests={rivalBests} card={card} mode={aim} onRace={openHole}
+        <Ghosts holes={allList} name={rivalName} player={dare} chain={game.current && game.current.chain} bests={rivalBests} card={card} mode={aim} onRace={openHole}
           onCups={() => setScreen("worlds")} onBack={() => setScreen(BACK.ghosts)} onAbout={() => setAbout(true)} />
       )}
 

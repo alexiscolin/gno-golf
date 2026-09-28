@@ -410,7 +410,8 @@ export function makeCamera(E: Live) {
   function updateCamera(dt: number) {
     if (!g.s || !g.over) return;
     const s = g.s;
-    const mode = g.cam === "third" && g.view === "ball" ? "third" : "rig";
+    // (a duel's ghost playing, or its ball looked at: the rig, which follows it, the third person back after)
+    const mode = g.cam === "third" && g.view === "ball" && !(E.rivalAt && E.rivalAt()) ? "third" : "rig";
     const state = camState();
     if (mode !== lastMode && !glide.on) resetFollow();
     lastMode = mode;
