@@ -8,10 +8,12 @@ package mountain8
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 48, H: 16,
 	World:     "mountain",
 	Order:     8,
@@ -23,11 +25,11 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(7, 4, physics.V(5, 8), physics.V(24, 9), physics.V(43, 8))...),
-			physics.Timed(physics.Bar(physics.V(20, 4.8), physics.V(20, 13.2), 0.8, '#', "lift"), 12, 4, 0),
-			physics.Timed(physics.Bar(physics.V(24.5, 5), physics.V(24.5, 13.2), 0.8, '#', "lift"), 12, 4, 8),
-			physics.Timed(physics.Bar(physics.V(29, 4.8), physics.V(29, 13.2), 0.8, '#', "lift"), 12, 4, 4),
+		Walls: build.Walls(
+			build.Outline(build.Lane(7, 4, physics.V(5, 8), physics.V(24, 9), physics.V(43, 8))...),
+			build.Timed(build.Bar(physics.V(20, 4.8), physics.V(20, 13.2), 0.8, '#', "lift"), 12, 4, 0),
+			build.Timed(build.Bar(physics.V(24.5, 5), physics.V(24.5, 13.2), 0.8, '#', "lift"), 12, 4, 8),
+			build.Timed(build.Bar(physics.V(29, 4.8), physics.V(29, 13.2), 0.8, '#', "lift"), 12, 4, 4),
 		),
 		Zones: []physics.Zone{
 			// a drift across the run-out: a ball still running hot off the lift dies in it

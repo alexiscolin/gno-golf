@@ -6,10 +6,12 @@ import (
 	"math"
 
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 6,
 	W: 40, H: 31,
 	Title:     "Icehouse",
@@ -20,12 +22,12 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Path(
-				physics.Arc(physics.V(3.5, 3.5), 3.5, math.Pi/2, 3*math.Pi/2, 5),
-				physics.Arc(physics.V(32, 7), 7, -math.Pi/2, 0, 7),
-				physics.Arc(physics.V(35.5, 27), 3.5, 0, math.Pi, 5),
-				physics.Pts(physics.V(32, 7)),
+		Walls: build.Walls(
+			build.Outline(build.Path(
+				build.Arc(physics.V(3.5, 3.5), 3.5, math.Pi/2, 3*math.Pi/2, 5),
+				build.Arc(physics.V(32, 7), 7, -math.Pi/2, 0, 7),
+				build.Arc(physics.V(35.5, 27), 3.5, 0, math.Pi, 5),
+				build.Pts(physics.V(32, 7)),
 			)...),
 		),
 		Zones: []physics.Zone{

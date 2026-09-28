@@ -8,14 +8,16 @@ package hole12
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // the stream, either side of the bridge; a ball that falls in is fished out
 // on the tee's bank
 var back = physics.V(10, 7)
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 11,
 	W: 36, H: 28,
 	Title:     "The Moon Bridge",
@@ -26,8 +28,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.V(2, 2), physics.V(30, 2), physics.V(34, 8), physics.V(34, 26), physics.V(2, 26)),
+		Walls: build.Walls(
+			build.Outline(physics.V(2, 2), physics.V(30, 2), physics.V(34, 8), physics.V(34, 26), physics.V(2, 26)),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(32.6, 21.4), R: 0.7}, Bounce: 0.6, Skin: "lantern"},

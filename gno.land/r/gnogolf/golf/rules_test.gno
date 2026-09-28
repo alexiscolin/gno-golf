@@ -9,6 +9,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
 	"gno.land/p/nt/ufmt/v0"
@@ -124,7 +125,7 @@ func TestSimulateFromIsTheNextStroke(cur realm, t *testing.T) {
 	// the period is the weather's
 	wid := mine(cur, "windyfrom", &course.Simple{
 		W: 44, H: 16, World: "island", Title: "Windy", Tee: physics.V(2, 8), Pin: physics.V(40, 8), Substeps: 20, CupRadius: 1,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(44, 16)), Friction: 0.9, Radius: 0.5},
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(44, 16)), Friction: 0.9, Radius: 0.5},
 	})
 	calm, blown := int64(-1), int64(-1)
 	for p := Period(); p > Period()-400 && (calm < 0 || blown < 0); p-- {
@@ -288,7 +289,7 @@ func TestAStaleRoundMustBeReset(cur realm, t *testing.T) {
 func iceCage() *course.Simple {
 	var walls []physics.Wall
 	for len(walls) < course.MaxWalls {
-		for _, w := range physics.Box(physics.V(10, 10), physics.V(30, 30)) {
+		for _, w := range build.Box(physics.V(10, 10), physics.V(30, 30)) {
 			w.Bounce, w.Skin = 1.5, "bumper"
 			walls = append(walls, w)
 		}
@@ -358,9 +359,9 @@ func TestACommitNeverPassesItsBudget(cur realm, t *testing.T) {
 // polygons), the one shot has what is left, and one that reaches it is
 // refused before anything is kept.
 func TestALaunchNeverPassesItsBudget(cur realm, t *testing.T) {
-	walls := physics.Box(physics.V(3, 3), physics.V(7, 7))
+	walls := build.Box(physics.V(3, 3), physics.V(7, 7))
 	for len(walls) < course.MaxWalls {
-		walls = append(walls, physics.Box(physics.V(3, 3), physics.V(7, 7))...)
+		walls = append(walls, build.Box(physics.V(3, 3), physics.V(7, 7))...)
 	}
 	for i := range walls {
 		walls[i].Bounce, walls[i].Skin = 1.5, "bumper"
@@ -507,6 +508,6 @@ func TestWearIsWhereTheBallRests(cur realm, t *testing.T) {
 	PlayRoundAt(cross(cur), id, "180,10", Period())
 	r := roundIn(id, p)
 	uassert.True(t, r.bx == 2 && r.by == 8, "back on the tee")
-	uassert.Equal(t, 1, mustHole(id).hole().Wear()[course.WearIndexOn(physics.V(2, 8), 32, 16)])
+	uassert.Equal(t, 1, mustHole(id).wearGrid()[course.WearIndexOn(physics.V(2, 8), 32, 16)])
 	uassert.Equal(t, 1, sumWear(mustHole(id)))
 }

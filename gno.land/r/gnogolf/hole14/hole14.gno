@@ -5,10 +5,12 @@ package hole14
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 84, H: 16,
 	World:     "garden",
 	Order:     13,
@@ -20,9 +22,9 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Stadium(physics.V(29.4, 10.9), physics.V(34.6, 13.1), 3)...),
-			physics.Outline(physics.Lane(6.5, 2, physics.V(4, 8), physics.V(18, 4), physics.V(32, 12), physics.V(46, 4), physics.V(60, 12), physics.V(74, 5), physics.V(80, 8))...),
+		Walls: build.Walls(
+			build.Outline(build.Stadium(physics.V(29.4, 10.9), physics.V(34.6, 13.1), 3)...),
+			build.Outline(build.Lane(6.5, 2, physics.V(4, 8), physics.V(18, 4), physics.V(32, 12), physics.V(46, 4), physics.V(60, 12), physics.V(74, 5), physics.V(80, 8))...),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(46, 5.2), R: 0.8}, Bounce: 1.2, Skin: "bumper"},

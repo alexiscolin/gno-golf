@@ -6,10 +6,12 @@ package mountain16
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 58, H: 16,
 	World:     "mountain",
 	Order:     16,
@@ -23,12 +25,12 @@ var me = course.Fit(&course.Simple{
 	// an avalanche heap across the run above the landing on your first
 	// stroke (and every other one), its warning there on the strokes between
 	Pulses: []course.Pulse{
-		{Every: 2, On: 1, Phase: 0, Walls: physics.Walls(physics.Soft(physics.Bar(physics.V(19.6, 3.2), physics.V(20.4, 10.8), 1.4, '#', "avalanche"), 0.3))},
+		{Every: 2, On: 1, Phase: 0, Walls: build.Walls(build.Soft(build.Bar(physics.V(19.6, 3.2), physics.V(20.4, 10.8), 1.4, '#', "avalanche"), 0.3))},
 		{Every: 2, On: 1, Phase: 1, Zones: []physics.Zone{{Kind: physics.Slope, Min: physics.V(19, 3.6), Max: physics.V(21, 10.4), Skin: "avalanche-warn"}}},
 	},
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(6, 4, physics.V(5, 10), physics.V(25, 6), physics.V(45, 10), physics.V(52, 8))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(6, 4, physics.V(5, 10), physics.V(25, 6), physics.V(45, 10), physics.V(52, 8))...),
 		),
 		Zones: []physics.Zone{
 			{Kind: physics.Slope, Min: physics.V(8, 0), Max: physics.V(18.5, 16), Vec: physics.V(0.2, 0), Skin: "downhill"},

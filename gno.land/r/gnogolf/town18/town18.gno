@@ -6,7 +6,9 @@ package town18
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // the plaza's outline: an avenue from the west into a chamfered square
@@ -16,7 +18,7 @@ var plaza = []physics.Vec2{
 	physics.V(14, 44), physics.V(6, 36), physics.V(6, 28), physics.V(0, 28),
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 70, H: 44,
 	World:     "town",
 	Order:     18,
@@ -34,13 +36,13 @@ var me = course.Fit(&course.Simple{
 	},
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(plaza...),
+		Walls: build.Walls(
+			build.Outline(plaza...),
 			// the two trams cross the plaza's gate on one line, north and south,
 			// half a turn apart, each up 5 ticks in 24: the middle of the gate is
 			// always open, and a tram has time to cross the plaza between two
-			physics.Timed(physics.Bar(physics.V(20, 1.5), physics.V(20, 18.5), 2.4, '#', "tram"), 24, 5, 0),
-			physics.Timed(physics.Bar(physics.V(20, 25.5), physics.V(20, 42.5), 2.4, '#', "tram"), 24, 5, 12),
+			build.Timed(build.Bar(physics.V(20, 1.5), physics.V(20, 18.5), 2.4, '#', "tram"), 24, 5, 0),
+			build.Timed(build.Bar(physics.V(20, 25.5), physics.V(20, 42.5), 2.4, '#', "tram"), 24, 5, 12),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(38, 22), R: 4.2}, Bounce: 0.7, Skin: "bandstand"},

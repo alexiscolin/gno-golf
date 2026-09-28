@@ -8,6 +8,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
 	"gno.land/p/nt/ufmt/v0"
@@ -176,7 +177,7 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 
 func sumWear(e *entry) int {
 	n := 0
-	for _, c := range e.hole().Wear() {
+	for _, c := range e.wearGrid() {
 		n += c
 	}
 	return n
@@ -186,10 +187,10 @@ func sumWear(e *entry) int {
 // hole, and every read and write works from its data alone.
 func TestADataHoleIsNeverStored(cur realm, t *testing.T) {
 	h := cupHole("town", 63, "Stored")
-	h.Pulses = []course.Pulse{{Every: 2, On: 1, Walls: physics.Bar(physics.V(10, 4), physics.V(10, 12), 0.5, '=', "gate")}}
+	h.Pulses = []course.Pulse{{Every: 2, On: 1, Walls: build.Bar(physics.V(10, 4), physics.V(10, 12), 0.5, '=', "gate")}}
 	id := publish(cur, h)
 	e := mustHole(id)
-	_, isData := e.hole().(*dataHole)
+	_, isData := e.hole().(*course.Simple)
 	uassert.True(t, isData)
 	testing.SetRealm(testing.NewUserRealm(player))
 	Launch(cross(cur), id, 180, 1)
@@ -234,11 +235,11 @@ func TestAPulsesSetUpIsCharged(cur realm, t *testing.T) {
 	pulsed := func(bars int) *course.Simple {
 		h := cupHole("garden", 1, "Pulsed")
 		h.W, h.H, h.Pin = 96, 96, physics.V(90, 90)
-		h.Course.Walls = physics.Box(physics.V(0, 0), physics.V(96, 96))
+		h.Course.Walls = build.Box(physics.V(0, 0), physics.V(96, 96))
 		p := course.Pulse{Every: 1, On: 1}
 		for i := 0; i < bars; i++ {
 			y := 10 + float64(i)*2
-			p.Walls = append(p.Walls, physics.Bar(physics.V(30, y), physics.V(80, y), 0.5, 0, "")...)
+			p.Walls = append(p.Walls, build.Bar(physics.V(30, y), physics.V(80, y), 0.5, 0, "")...)
 		}
 		for i := 0; i < course.MaxPosts; i++ {
 			p.Posts = append(p.Posts, physics.Post{Circle: physics.Circle{C: physics.V(85, 3+float64(i)*2.8), R: 0.6}})
@@ -263,7 +264,7 @@ func TestAPulsesSetUpIsCharged(cur realm, t *testing.T) {
 // (28 of them in 16 pulses), 32 posts, 32 zones (8 of them 64-point
 // polygons, 512 points in all) and 60 substeps.
 func limitsHole() *course.Simple {
-	walls := physics.Box(physics.V(0, 0), physics.V(96, 48))
+	walls := build.Box(physics.V(0, 0), physics.V(96, 48))
 	for i := 0; len(walls) < course.MaxWalls-28; i++ {
 		x, y := 8+float64(i%16)*5, 6+float64(i/16)*5
 		walls = append(walls, physics.Wall{Seg: physics.Segment{A: physics.V(x, y), B: physics.V(x+1, y+0.5)}, Bounce: 0.6})
@@ -736,7 +737,7 @@ func TestArchivedVersionsLeaveRoomInTheList(cur realm, t *testing.T) {
 // to draw says so.
 func TestThePagesGnowebLinks(cur realm, t *testing.T) {
 	h := cupHole("pond", 5, "Hedged")
-	h.Course.Walls = append(h.Course.Walls, physics.Bar(physics.V(10, 2), physics.V(10, 6), 0.5, 0, "hedge")...)
+	h.Course.Walls = append(h.Course.Walls, build.Bar(physics.V(10, 2), physics.V(10, 6), 0.5, 0, "hedge")...)
 	author := testutils.TestAddress("pager")
 	testing.SetRealm(testing.NewUserRealm(author))
 	id := PublishMine(cross(cur), "hedged", hexOf(h), "")

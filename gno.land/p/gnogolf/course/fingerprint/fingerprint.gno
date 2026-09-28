@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
 )
 
@@ -204,7 +205,7 @@ type T interface {
 // the new one: after a change to the game that is meant, paste it in.
 //
 // It also proves the hole survives as data: Decode(Encode(h)) must be h field
-// by field (course.Diff, the prep included), encode back to the same bytes,
+// by field (author.Diff, the prep included), encode back to the same bytes,
 // play the same shots (Of, the same want) and have the same Full. Then it
 // logs the data, for scripts/holedata.sh: "data <slot> <sha8> <hex>".
 //
@@ -221,7 +222,7 @@ func Check(t T, h *course.Simple, want string) {
 	if err != nil {
 		t.Fatalf("the hole does not decode: %s", err.Error())
 	}
-	if diff := course.Diff(h, d); diff != "" {
+	if diff := author.Diff(h, d); diff != "" {
 		t.Fatalf("the decoded hole differs: %s", diff)
 	}
 	if !course.Exact(d) {

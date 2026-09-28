@@ -4,10 +4,12 @@ package hole3
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 3,
 	W: 48, H: 8,
 	Title:     "Down the Tunnel",
@@ -18,9 +20,9 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(20, 8), 6)...),
-			physics.Outline(physics.Stadium(physics.V(28, 0), physics.V(48, 8), 6)...),
+		Walls: build.Walls(
+			build.Outline(build.Stadium(physics.V(0, 0), physics.V(20, 8), 6)...),
+			build.Outline(build.Stadium(physics.V(28, 0), physics.V(48, 8), 6)...),
 		),
 		Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(6.5, -1), Max: physics.V(12.5, 4.2), Scale: 0.55, Mark: ',', Skin: "sand", Round: true},

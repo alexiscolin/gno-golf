@@ -5,10 +5,12 @@ package town14
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 44, H: 22,
 	World:     "town",
 	Order:     14,
@@ -20,9 +22,9 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(6, 2, physics.V(5, 5), physics.V(28, 5))...),
-			physics.Outline(physics.Lane(6, 3, physics.V(12, 16), physics.V(26, 17), physics.V(38, 16))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(6, 2, physics.V(5, 5), physics.V(28, 5))...),
+			build.Outline(build.Lane(6, 3, physics.V(12, 16), physics.V(26, 17), physics.V(38, 16))...),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(28.6, 5), R: 2.2}, Bounce: 0.6, Skin: "house"},

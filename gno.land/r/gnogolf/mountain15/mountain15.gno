@@ -8,7 +8,9 @@ package mountain15
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // serac is where one serac's ice comes down: there 4 substeps in 12. The
@@ -17,7 +19,7 @@ func serac(min, max physics.Vec2, phase int) physics.Zone {
 	return physics.Zone{Kind: physics.Hazard, Min: min, Max: max, Vec: physics.V(9, 17), Round: true, Mark: '*', Skin: "serac", Every: 12, On: 4, Phase: phase}
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 52, H: 24,
 	World:     "mountain",
 	Order:     15,
@@ -28,8 +30,8 @@ var me = course.Fit(&course.Simple{
 	Substeps:  28,
 	CupRadius: 1.2,
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(7, 4, physics.V(5, 18), physics.V(20, 16), physics.V(34, 9), physics.V(47, 6))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(7, 4, physics.V(5, 18), physics.V(20, 16), physics.V(34, 9), physics.V(47, 6))...),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(24, 18), R: 1.0}, Bounce: 0.5, Skin: "boulder"},

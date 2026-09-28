@@ -65,7 +65,12 @@ func TestPrepareWithIsPrepare(t *testing.T) {
 
 // A wrong number of lengths is not trusted: it prepares from scratch.
 func TestPrepareWithTheWrongCountIsPrepare(t *testing.T) {
-	f := &Field{Walls: Box(V(0, 0), V(10, 5)), Radius: 0.5}
+	f := &Field{Walls: []Wall{
+		{Seg: Segment{V(0, 0), V(10, 0)}},
+		{Seg: Segment{V(10, 0), V(10, 5)}},
+		{Seg: Segment{V(10, 5), V(0, 5)}},
+		{Seg: Segment{V(0, 5), V(0, 0)}},
+	}, Radius: 0.5}
 	Prepare(f)
 	want := Prepared(f)
 	f.prep = nil

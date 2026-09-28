@@ -8,11 +8,10 @@ import (
 	"gno.land/p/nt/ufmt/v0"
 )
 
-// The weather of the moment. It changes every five minutes of chain time,
-// differs from hole to hole, and is the same for everyone: course.ForecastFor
-// hashes (hole, period) into the world's climate. Nobody chooses it — a round
-// is played in the weather of the period it started in, and a recorded round
-// says which that was, so anyone can replay it.
+// The weather changes every five minutes of chain time, differs from hole to
+// hole and is the same for everyone (course.ForecastFor hashes hole and
+// period). A round is played in the weather of the period it started in, and
+// records it, so anyone can replay it.
 
 // PeriodSeconds is how long one weather lasts.
 const PeriodSeconds = 5 * 60
@@ -27,18 +26,17 @@ func weatherOf(e *entry, h course.Hole, period int64) course.Forecast {
 }
 
 // forecastJSON is a forecast as an object, head its first fields if any
-// (as `"version":1,`). A weather zone's air and capped are not printed: the
-// wind is always both, and no other weather zone is either.
+// (as `"version":1,`). Zones' air and capped are not printed: only the wind
+// has them, always.
 func forecastJSON(head string, f course.Forecast) string {
 	return "{" + head + `"period":` + strconv.FormatInt(f.Period, 10) + `,"kind":` + jstr(f.Kind) +
 		`,"wind":` + jvec(f.Wind) + `,"zones":` + zonesJSON(f.Zones, false) + "}"
 }
 
-// Weather is a hole's weather in a period, as the zones a client draws and
-// the chain plays under. Read-only. Its "gas" is what a commit on the hole
-// spends in that weather before its first shot (fixedGas: decoding the hole
-// and drawing its forecast), which the chain counts against the commit's
-// budget: a client adds it to its shots' estimate.
+// Weather is a hole's weather in a period, as JSON: the zones a client draws
+// and the chain plays under. Its "gas" is what a commit there spends before
+// its first shot (decoding and forecast), counted against the commit's
+// budget: a client adds it to its shots' estimate. A future period panics.
 func Weather(hole string, period int64) string {
 	notAhead(period)
 	e := readHole(hole)
@@ -46,10 +44,8 @@ func Weather(hole string, period int64) string {
 	return forecastJSON(versionJSON+`,"gas":`+strconv.FormatInt(fixedGas(e, fc), 10)+",", fc)
 }
 
-// notAhead refuses a period still to come: the hub does not serve the
-// weather ahead. It is no secret (course.ForecastFor is a pure function
-// anyone can run), so this only keeps the reads to the weather a round can
-// be played in.
+// notAhead refuses a period still to come. It is no secret (ForecastFor is
+// pure): this only keeps reads to the weather a round can be played in.
 func notAhead(period int64) {
 	if period > Period() {
 		panic("golf: that weather has not come yet")
@@ -64,10 +60,8 @@ func notOver(period int64) {
 	}
 }
 
-// playablePeriod checks the period a round is recorded under: the current
-// one, or the one just gone — a round that ran over the turn of the period is
-// recorded in the weather it was played in, and no older. stroke holds every
-// later stroke of a round to the same rule.
+// playablePeriod checks the period a round starts under: the current one, or
+// the one just gone, for a round that ran over the turn of the period.
 func playablePeriod(period int64) {
 	now := Period()
 	if period != now && period != now-1 {

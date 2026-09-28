@@ -4,10 +4,12 @@ package town3
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 40, H: 16,
 	World:     "town",
 	Order:     3,
@@ -21,8 +23,8 @@ var me = course.Fit(&course.Simple{
 	// the houses round the square keep the worst of the wind off it
 	Shelter: 0.08,
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Keyhole(0, 6, physics.V(31, 8), 7, 5)...),
+		Walls: build.Walls(
+			build.Outline(build.Keyhole(0, 6, physics.V(31, 8), 7, 5)...),
 		),
 		// two street lamps by the cup, one each side of the way round the fountain
 		Posts: []physics.Post{

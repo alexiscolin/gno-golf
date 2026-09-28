@@ -4,12 +4,14 @@ package island9
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var lane = physics.Lane(5, 4, physics.V(5, 7), physics.V(28, 6), physics.V(50, 8))
+var lane = build.Lane(5, 4, physics.V(5, 7), physics.V(28, 6), physics.V(50, 8))
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 56, H: 14,
 	World:     "island",
 	Order:     9,
@@ -22,9 +24,9 @@ var me = course.Fit(&course.Simple{
 	Shelter:   0.08, // no rails: the wind is capped so it cannot blow every line off
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Box(physics.V(0, 0), physics.V(56, 14)),
-			physics.Skinned(physics.Polyline(physics.Arc(physics.V(50, 8), 3.4, -1.3, 1.3, 5)...), "pier"),
+		Walls: build.Walls(
+			build.Box(physics.V(0, 0), physics.V(56, 14)),
+			build.Skinned(build.Polyline(build.Arc(physics.V(50, 8), 3.4, -1.3, 1.3, 5)...), "pier"),
 		),
 		Zones: []physics.Zone{
 			{Kind: physics.Hazard, Min: physics.V(16, 4.4), Max: physics.V(18, 6.9), Vec: physics.V(5, 7), Skin: "gap"},

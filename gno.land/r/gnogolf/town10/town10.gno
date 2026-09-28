@@ -7,10 +7,12 @@ package town10
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 50, H: 16,
 	World:     "town",
 	Order:     10,
@@ -32,7 +34,7 @@ var me = course.Fit(&course.Simple{
 	},
 
 	Course: &physics.Field{
-		Walls:    physics.Outline(physics.Lane(6, 4, physics.V(5, 6), physics.V(18, 6), physics.V(28, 10), physics.V(42, 10))...),
+		Walls:    build.Outline(build.Lane(6, 4, physics.V(5, 6), physics.V(18, 6), physics.V(28, 10), physics.V(42, 10))...),
 		Friction: 0.87,
 		Radius:   0.5,
 		Bounce:   0.85,

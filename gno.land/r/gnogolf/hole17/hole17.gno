@@ -4,10 +4,12 @@ package hole17
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 15,
 	W: 40, H: 20,
 	Title:     "The Nursery",
@@ -18,9 +20,9 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Path(
-				physics.Pts(physics.V(0, 6), physics.V(16, 6), physics.V(16, 0), physics.V(24, 0), physics.V(24, 6), physics.V(40, 6), physics.V(40, 14), physics.V(24, 14), physics.V(24, 20), physics.V(16, 20), physics.V(16, 14), physics.V(0, 14)),
+		Walls: build.Walls(
+			build.Outline(build.Path(
+				build.Pts(physics.V(0, 6), physics.V(16, 6), physics.V(16, 0), physics.V(24, 0), physics.V(24, 6), physics.V(40, 6), physics.V(40, 14), physics.V(24, 14), physics.V(24, 20), physics.V(16, 20), physics.V(16, 14), physics.V(0, 14)),
 			)...),
 		),
 		Posts: []physics.Post{

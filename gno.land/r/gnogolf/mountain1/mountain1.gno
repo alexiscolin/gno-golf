@@ -4,10 +4,12 @@ package mountain1
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 38, H: 13,
 	World:     "mountain",
 	Order:     1,
@@ -19,8 +21,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(6, 4, physics.V(5, 6), physics.V(20, 7), physics.V(34, 6))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(6, 4, physics.V(5, 6), physics.V(20, 7), physics.V(34, 6))...),
 		),
 		Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(9, 2), Max: physics.V(31, 11), Scale: 1.18, Round: true, Skin: "ice"},

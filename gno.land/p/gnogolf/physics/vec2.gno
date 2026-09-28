@@ -1,15 +1,11 @@
-// Package physics is the geometry and motion a rolling-ball game needs. It
-// knows nothing about golf: it answers where a ball goes, never what that
-// means.
+// Package physics is a 2D rolling-ball engine: it answers where a ball goes,
+// never what that means.
 //
-// Conventions: +X is right, +Y is down, 1.0 is one board unit, angles are in
-// radians. Determinism contract: float64 only, no map iteration, no clock, no
-// randomness — same inputs, same outputs, on every validator.
+// +X is right, +Y is down, 1.0 is one board unit, angles are in radians.
+// Deterministic: float64 only, no map iteration, no clock, no randomness.
 //
-// Inputs must be finite: a NaN or an infinity in a ball, a velocity or a
-// field gives no panic and no endless loop, but no meaningful answer either.
-// Callers check them (course.Decode refuses them in data; golf refuses a
-// non-finite shot and a non-finite rest).
+// Inputs must be finite: a NaN or an infinity gives no panic and no endless
+// loop, but no meaningful answer either. Callers check them.
 package physics
 
 import "math"
@@ -17,8 +13,7 @@ import "math"
 // Vec2 is a point or a displacement on the board, in board units.
 type Vec2 struct{ X, Y float64 }
 
-// V is the short form. A course is mostly coordinates, and they should read
-// like coordinates.
+// V is Vec2{x, y}, short so a course's coordinates read as coordinates.
 func V(x, y float64) Vec2 { return Vec2{X: x, Y: y} }
 
 // Add is a+b.
@@ -36,11 +31,9 @@ func (a Vec2) Dot(b Vec2) float64 { return a.X*b.X + a.Y*b.Y }
 // Len is the length of a.
 func (a Vec2) Len() float64 { return math.Sqrt(a.Dot(a)) }
 
-// LenCmp compares a.Len() with r: -1 shorter, 0 equal, 1 longer. It gives
-// exactly what comparing a.Len() would, but takes the (software, costly)
-// square root only when the two are within a hair of each other: outside
-// 1e-12 of r², a.Dot(a) decides, and the rounded root cannot say otherwise.
-// For lengths of a board's scale (r² neither underflows nor overflows).
+// LenCmp compares a.Len() with r: -1 shorter, 0 equal, 1 longer, exactly as
+// comparing a.Len() would. It takes the costly square root only within 1e-12
+// of r², where a.Dot(a) alone could round the other way. For board-scale r.
 func (a Vec2) LenCmp(r float64) int {
 	d2, r2 := a.Dot(a), r*r
 	switch {

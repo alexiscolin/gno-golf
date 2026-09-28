@@ -2,10 +2,9 @@ package physics
 
 import "math"
 
-// offset is what Step needs of a wall: its two offset lines (the lines a
-// ball's centre meets, one per side), their normals, the wall's own start,
-// normal and length, its bounce and timing, and the box a move must reach
-// for the wall to matter at all.
+// offset is what Step needs of a wall: its two offset lines (where the
+// ball's centre meets it), their normals, the wall's start, normal and
+// length, its bounce and timing, and its broad-phase box.
 type offset struct {
 	plus, minus      Segment
 	pn, mn           Vec2 // plus.Normal(), minus.Normal()
@@ -18,14 +17,13 @@ type offset struct {
 // unstickGap is how far clear of a piece UnstickIn sets a ball down.
 const unstickGap = 0.02
 
-// boxPad grows every broad-phase box: more than the half skin a ball may sit
-// inside a wall's radius (Step's near test), and far more than rounding.
+// boxPad grows every broad-phase box: more than the half skin of Step's near
+// test, and far more than rounding.
 const boxPad = 1e-6
 
 // lines works out a wall's offset lines for a ball of radius r: the segment
-// pushed r to each side and lengthened by r at each end, the lines the centre
-// of a round ball meets. It is exactly Normal's arithmetic and that push
-// (twice) — the same bits — with each square root taken once: 3 instead of 8.
+// pushed r to each side and lengthened by r at each end. Same bits as Normal
+// and that push, with 3 square roots instead of 8.
 func lines(s Segment, r float64, o *offset) {
 	d := s.B.Sub(s.A)
 	l := d.Len()
@@ -62,14 +60,13 @@ func lines(s Segment, r float64, o *offset) {
 	o.lo, o.hi = o.lo.Sub(Vec2{boxPad, boxPad}), o.hi.Add(Vec2{boxPad, boxPad})
 }
 
-// stride is the floats per wall in Field.prep: the wall's own ends (to know
-// the entry is still that wall's), then plus, minus, pn, mn, n, length, lo, hi.
+// stride is the floats per wall in Field.prep: the wall's ends (to know the
+// entry is still that wall's), then plus, minus, pn, mn, n, length, lo, hi.
 const stride = 23
 
-// Prepare works out the field's wall offsets once, for every shot to reuse:
-// a hole calls it (course.Fit does) after its walls are where they stay.
-// Walls that change afterwards are only a cost: Step checks each entry
-// against its wall and works out any that no longer match.
+// Prepare works out the field's wall offsets once, for every shot to reuse.
+// Call it once the walls are where they stay: Step works out again any wall
+// that no longer matches its entry.
 func Prepare(f *Field) {
 	p := make([]float64, 1, 1+stride*len(f.Walls))
 	p[0] = f.Radius
@@ -90,9 +87,8 @@ func appendPrep(p []float64, s Segment, o *offset) []float64 {
 		o.lo.X, o.lo.Y, o.hi.X, o.hi.Y)
 }
 
-// Lengths is the three square roots lines takes for a wall and a ball of
-// radius r: the wall's own length, then its plus and minus offset lines'.
-// A hole stored as data keeps them, so PrepareWith needs no square root.
+// Lengths is the three square roots Prepare takes for a wall and a ball of
+// radius r: the wall's length, then its plus and minus offset lines'.
 func Lengths(s Segment, r float64) (l, lp, lm float64) {
 	var o offset
 	lines(s, r, &o)
@@ -100,9 +96,9 @@ func Lengths(s Segment, r float64) (l, lp, lm float64) {
 }
 
 // PrepareWith is Prepare with each wall's Lengths given, three per wall in
-// wall order: the same prep, bit for bit, when they are the wall's own. It
-// does not check them — whoever stored them must have (Prepared(f) against
-// Prepare's, once). With the wrong count it is Prepare.
+// wall order: the same prep, bit for bit, when they are the walls' own. It
+// does not check them; whoever stored them must have. With the wrong count
+// it is Prepare.
 func PrepareWith(f *Field, lens []float64) {
 	if len(lens) != 3*len(f.Walls) {
 		Prepare(f)
@@ -119,18 +115,16 @@ func PrepareWith(f *Field, lens []float64) {
 	f.prep = p
 }
 
-// Prepared is a copy of the field's prep, for a test to compare bit for bit.
+// Prepared is a copy of the field's prep, to compare bit for bit.
 func Prepared(f *Field) []float64 {
 	out := make([]float64, len(f.prep))
 	copy(out, f.prep)
 	return out
 }
 
-// linesWith is lines with its three square roots given (Lengths): the same
-// operations on the same operands, in the same order, so the same bits —
-// written out by hand, without lines' closure, slice and method calls, since
-// a data hole runs it on every call. lines itself is left as it is, so a
-// hole that calls Prepare cannot move.
+// linesWith is lines with its square roots given (Lengths): the same
+// operations in the same order, so the same bits, written out by hand to
+// save lines' calls. Keep the two in step.
 func linesWith(s Segment, r float64, o *offset, l, lp, lm float64) {
 	dx, dy := s.B.X-s.A.X, s.B.Y-s.A.Y
 	o.a, o.length = s.A, l
@@ -180,8 +174,7 @@ func linesWith(s Segment, r float64, o *offset, l, lp, lm float64) {
 	o.lo, o.hi = Vec2{lo.X - boxPad, lo.Y - boxPad}, Vec2{hi.X + boxPad, hi.Y + boxPad}
 }
 
-// towardWith is lines' toward for the point (px, py): the offset line on
-// that point's side of the wall.
+// towardWith is lines' toward: the offset line on (px, py)'s side.
 func towardWith(s Segment, nx, ny, ex, ey, r, px, py float64) Segment {
 	mx, my := nx, ny
 	if (px-s.A.X)*mx+(py-s.A.Y)*my < 0 {
@@ -199,9 +192,8 @@ func normalWith(s Segment, l float64) Vec2 {
 	return Vec2{-(s.B.Y - s.A.Y) / l, (s.B.X - s.A.X) / l}
 }
 
-// offsets is every wall's offset for this shot: from Prepare where it still
-// matches the wall, worked out otherwise (a stroke's extra walls, a field
-// never prepared).
+// offsets is every wall's offset for this shot: from the prep where it still
+// matches the wall, worked out otherwise.
 func (f *Field) offsets() []offset {
 	offs := make([]offset, len(f.Walls))
 	p := f.prep
@@ -227,7 +219,7 @@ func (f *Field) offsets() []offset {
 }
 
 // timedBars is where each timed bar starts in f.Walls: four timed walls in a
-// row with one timing that close on themselves, as Timed(Bar(…)) makes them.
+// row, one timing, closing on themselves (build.Timed(build.Bar(…))).
 func (f *Field) timedBars() []int {
 	var out []int
 	ws := f.Walls
@@ -252,19 +244,11 @@ func (f *Field) timedBars() []int {
 	return out
 }
 
-// UnstickIn moves a ball out of a piece that appeared on top of it — a gate
-// shutting, a sail turning, a mole popping up where the ball rests, a tram
-// arriving on a rolling ball (Step, for timed bars). Walls come in bars of
-// four (physics.Bar): a ball inside one leaves through the nearest side it
-// can, straight out of it. A ball merely closer to a wall or a post than its
-// radius is pushed off it.
-//
-// No push carries the ball across one of the untimed walls of stays (the
-// hole's own walls, those that do not come and go): a ball inside a bar
-// leaves by the nearest side it can leave by without, and stays where it is
-// if there is none; any other push that would cross one is not made. A ball
-// left inside a post rolls out of it on the shot (Circle.hit: a post never
-// traps a ball).
+// UnstickIn moves a ball of radius r out of pieces that appeared on top of
+// it. walls are read in bars of four (build.Bar): a ball inside one leaves
+// through the nearest side it can; one closer than r to a bar or a post is
+// pushed off it. No push crosses an untimed wall of stays: out of a bar the
+// ball tries the next side, else it stays; any other such push is not made.
 func UnstickIn(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) Vec2 {
 	for i := 0; i+3 < len(walls); i += 4 {
 		q := walls[i : i+4]
@@ -276,7 +260,7 @@ func UnstickIn(ball Vec2, walls []Wall, posts []Post, r float64, stays []Wall) V
 			}
 		}
 		if inside {
-			// the sides nearest first, each pushing along its outward normal
+			// nearest side first, along its outward normal
 			var tried [4]bool
 			for range q {
 				k, best, bestD := -1, Vec2{}, math.Inf(1)

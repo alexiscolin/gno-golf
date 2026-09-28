@@ -2,8 +2,10 @@
 
 The contract between a hole and the `golf` realm. The `Hole` interface is the
 only thing the two have to agree on. The package also has `course.Simple` (a
-ready-made hole that's only geometry), `Fit`, the stroke-to-stroke timing, the
-cup rule, the weather, and GG1, the format a hole is stored in as data.
+ready-made hole that's only geometry), the stroke-to-stroke timing, the cup
+rule, the weather, and GG1, the format a hole is stored in as data. What only
+a hole's source and the tests need, `Fit` and `Diff`, is in
+[`course/author`](#authoring-courseauthor), which is never deployed.
 
 It builds on [physics](physics.md). Angles here are in **radians**, and power
 goes from 0 to 10.
@@ -26,26 +28,19 @@ type Hole interface {
 	Start() physics.Vec2
 	Cup() physics.Vec2
 	Field() *physics.Field
-	Preview(ball physics.Vec2, angle, power float64) (physics.Shot, bool)
-	Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool)
-	Wear() []int
 }
 ```
 
-- `Field` is the geometry, for renderers and for anyone who wants to inspect
-  the hole.
-- `Preview` resolves a shot and changes nothing. `Play` resolves it and marks
-  the course. Both return the whole `Shot` and whether the ball was holed.
-  Preview has to equal Play, or players see an animation of something that
-  didn't happen.
-- `Wear` is the `WearW*WearH` grid, row-major.
+`Field` is the geometry, for renderers and for anyone who wants to inspect
+the hole. A stroke is played through `Weatherable.PreviewWith`, which changes
+nothing: previewing a shot and recording it are the same call, so what a
+player watched is what the chain records.
 
 No method takes `cur realm`, so a hole never learns who's playing. Identity
 stays with `golf`.
 
-A course hole is published as data, and `golf` decodes it into a `Simple` for
-each call. A realm can also implement `Hole` itself and register it with
-`golf`, as a community hole ([golf.md](golf.md#registercur-realm-h-coursehole)).
+Every hole is published as data, and `golf` decodes it into a `Simple` for
+each call: no hole runs code of its own.
 
 ### Optional interfaces
 
@@ -55,19 +50,15 @@ each call. A realm can also implement `Hole` itself and register it with
 |---|---|---|
 | `Sized` | `Board() (w, h int)` | 32×16. Values outside `1..MaxBoard` also fall back. |
 | `Parred` | `Par() int` | par 3. Values outside `1..19` also fall back. |
-| `Ordered` | `Position() float64` | for a registered realm, the number at the end of its pkgpath (`hole7` → 7) |
-| `Worlded` | `WorldName() string` | `"garden"` |
-| `Timed` | `Varies() bool`, `Extras(stroke)`, `PreviewAt(...)`, `PlayAt(...)` | the hole is the same on every stroke |
+| `Timed` | `Varies() bool`, `Extras(stroke)` | the hole is the same on every stroke |
 | `Zoned` | `ExtraZones(stroke int) []physics.Zone` | no per-stroke zones |
-| `Weatherable` | `PreviewWith(...)`, `PlayWith(...)`, `MaxWind() float64` | played with no weather |
+| `Weatherable` | `PreviewWith(...)`, `MaxWind() float64` | played with no weather |
 
 Helpers that apply those fallbacks:
 
 ```go
 func BoardOf(h Hole) (int, int)
 func ParOf(h Hole) int
-func OrderOf(h Hole, fallback float64) float64 // Position() if > 0, else fallback
-func WorldOf(h Hole) string
 ```
 
 ### World and order
@@ -76,37 +67,29 @@ A hole's world is the cup it belongs to: `"garden"`, `"island"`, `"town"` or
 `"mountain"`. The web client dresses the whole scene from it. Its order is its
 place in that world, lowest first. A course hole's world and order are its
 slot (`garden/7` is world `garden`, order 7), and the order is a whole number
-from 1 to 999. `golf` reads both once, when a version is published or a realm
-registers, and lists the course world by world (`garden`, `island`, `town`,
+from 1 to 999. `golf` reads both from the data once, when a version is
+published, and lists the course world by world (`garden`, `island`, `town`,
 `mountain`, then any other world), then by order. Two holes, `extras/10` and
 `extras/16`, use the world `"extras"`, which the client doesn't count as a cup.
 
 ## Wear
 
 ```go
-func WearIndex(p physics.Vec2) int              // cell on the default board
 func WearIndexOn(p physics.Vec2, w, h int) int  // cell on a w×h board, clamped
-
-type Marks struct { /* [WearW*WearH]int */ }
-func (m *Marks) Mark(p physics.Vec2)
-func (m *Marks) MarkOn(p physics.Vec2, w, h int)
-func (m *Marks) Wear() []int // a copy
 ```
 
-`Marks` is meant to be embedded. Its methods are declared in `/p/`, but the
-array belongs to the realm that allocated the hole, so the writes go into
-that realm's storage. A data hole is decoded afresh for every call, so `golf`
-keeps its wear on the version's own entry instead, marked the same way. Wear
-doesn't affect play: it's there for renderers to show.
+A data hole is decoded afresh for every call and never stored, so it holds no
+wear: `golf` keeps each version's wear on its own entry, 128 counters marked
+with `WearIndexOn` where the round's ball comes to rest. Wear doesn't affect
+play: it's there for renderers to show.
 
 ## `Simple`
 
 A hole that's only its geometry. It implements `Hole`, `Sized`, `Parred`,
-`Ordered`, `Worlded`, `Timed`, `Zoned` and `Weatherable`.
+`Timed`, `Zoned` and `Weatherable`.
 
 ```go
 type Simple struct {
-	Marks
 	W, H      int            // the board; 0 means 32x16
 	Title     string         // Name()
 	Strokes   int            // par; 0 means 3
@@ -116,7 +99,7 @@ type Simple struct {
 	Substeps  int            // passed to Field.Step
 	CupRadius float64        // passed to Sink
 	World     string         // "" is "garden"
-	Order     float64        // place in the world, 1 first; 0 falls back to the pkgpath number
+	Order     float64        // place in the world, 1 first
 	Shelter   float64        // caps the wind (MaxWind); 0 means the world's own range
 }
 ```
@@ -132,19 +115,19 @@ What a stroke does in `PreviewWith(ball, angle, power, stroke, tick, weather)`:
 4. `Step(ball, Launch(angle, power), Substeps)`.
 5. `Sink(shot, Pin, CupRadius)`.
 
-`PlayWith` is `PreviewWith` followed by `MarkOn(shot.Rest(), W, H)`. The
-shorter methods are thin wrappers: `Preview` = `PreviewAt(..., 0)`, and
-`PreviewAt` = `PreviewWith(..., stroke, 0, nil)`. The same goes for `Play` and
-`PlayAt`.
-
 There's a full example in the [README](../README.md#writing-a-hole).
 
-### `Fit`
+## Authoring (`course/author`)
+
+`gno.land/p/gnogolf/course/author` holds what a hole's source is finished with
+and proved by. It depends only on `course` and `physics`, and nothing deployed
+imports it: it is never staged (see [deploy-v1.md](design/deploy-v1.md)).
 
 ```go
-func Fit(h *Simple, margin float64) *Simple
+func Fit(h *course.Simple, margin float64) *course.Simple
+func Diff(a, b *course.Simple) string
 
-var me = course.Fit(&course.Simple{…}, 1.5)
+var me = author.Fit(&course.Simple{…}, 1.5)
 ```
 
 `Fit` moves a hole so its walls sit `margin` inside the board, and sizes the
@@ -156,6 +139,8 @@ margin each side. A zone that covered the whole old board covers the new one,
 and a plain rectangle that runs past the new board is cut at its edge. Then it
 calls `physics.Prepare`. Every course hole is written this way. Call it once,
 where the hole is declared, and encode the hole after it.
+
+`Diff` proves a decoded hole is the hole it was encoded from: see GG1 below.
 
 ## Pieces that change per stroke
 
@@ -182,15 +167,12 @@ Pulses: []course.Pulse{{
 }},
 ```
 
-If you need something `Pulse` can't express, write a hole type of your own and
-implement `Timed`:
+`Simple` implements `Timed` from its pulses:
 
 ```go
 type Timed interface {
 	Varies() bool
 	Extras(stroke int) ([]physics.Wall, []physics.Post)
-	PreviewAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool)
-	PlayAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool)
 }
 ```
 
@@ -211,7 +193,7 @@ func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field
 
 Each may return `f` itself (nothing to add): do not mutate what they return.
 
-`physics.UnstickIn` treats `walls` as groups of four (`physics.Bar`). A ball
+`physics.UnstickIn` treats `walls` as groups of four (`build.Bar`). A ball
 inside a bar leaves through the nearest side it can leave by without crossing
 one of the hole's own walls, pushed straight out along that side's normal to
 just clear of it. A ball closer than the radius to a bar or a post is pushed
@@ -232,9 +214,10 @@ Every hole should use `Launch`, so the same pull means the same shot
 everywhere. The speed is `Kick·p^(3/4)`: under a constant rolling
 deceleration a ball rolls `v²/2a`, so the distance grows as `p^(3/2)`, the
 way it grew before the physics rework. A full stroke (power 10) starts at 4.44
-units per substep and rolls 44 on a green of Friction 0.87; a pull of 3 rolls
-7.2, one of 1 rolls 1.4. `Kick` is the calibration that keeps every course
-hole's par.
+units per substep and rolls 44, a board's length, on a green of Friction 0.87
+(rolling deceleration `a = 0.224`); a pull of 3 rolls 7.2, one of 1 rolls 1.4.
+`Kick` is the calibration that keeps every course hole's par: with it the
+solver finds the same robust stroke count on all 74 course holes.
 
 `Capture` is Holmes's capture criterion (B. W. Holmes, *Am. J. Phys.* 59,
 1991). A ball of radius `r` crossing a cup of radius `R` off its centre by
@@ -260,7 +243,8 @@ smaller than 0.5, a point ball included, drops as one of 0.5.
 - the ball comes to rest within `radius` of the pin.
 
 When the ball is holed, the path is cut there and ends on the pin, and `Air`
-and `Cause` are trimmed to match. Preview and Play both go through `Sink`.
+and `Cause` are trimmed to match. Every stroke, previewed or recorded, goes
+through `Sink`.
 
 ## Weather
 
@@ -316,8 +300,10 @@ What each kind puts on the board (whole-board zones cover `0..W, 0..H`):
 - **wind**: one Slope skinned `wind`, with `Air` and `Capped` set. `Vec` has a
   strength between `WindMin` and `WindMax`, capped at `MaxWind()` when that's
   greater than 0, and a direction taken from the seed.
-- **rain**: a Surface `rain` at `RainScale`. Also a copy of each of the hole's
-  Surface zones skinned `ice`, at `WetIce` times its scale. Also 2 to 4
+- **rain**: a Surface `rain` at `RainScale`: a touch, not ice. On a 0.87
+  green the ball keeps 94% of its speed a substep instead of 92%; much more
+  and the keep cap turns every board to pinball. Also a copy of each of the
+  hole's Surface zones skinned `ice`, at `WetIce` times its scale. Also 2 to 4
   `puddle`s: Round Surface zones at scale 0.6 with half-width 1.1 to 1.8
   (height 0.8 times that), placed only inside the lane's outline (even-odd
   over the untimed walls), off any skinned Surface zone and any Tunnel,
@@ -326,10 +312,13 @@ What each kind puts on the board (whole-board zones cover `0..W, 0..H`):
   makes up to 60 tries. Each try tests every post, zone (a polygon's every
   edge) and untimed wall until one refuses it, so a hostile hole's rain can
   cost more than its shot: 160 walls and 8 thin hazard polygons that no try
-  passes cost 1.1e9 gas. `Forecast.Work` counts it as it goes (any forecast
-  3000 units, a storm's gusts 5000 more, a try 35, and in it a post 22, a zone
-  20, a polygon edge 16, a wall 100, a zone looked at for ice 5: at most
-  0.86K gas a unit measured), and golf counts it in a commit's budget.
+  passes cost 1.1e9 gas. So the tests go cheapest first (tee and cup, posts,
+  zones, then walls) and none takes a square root (`LenCmp`, `Crosses`). The
+  outline test casts a ray to a far point `(1e4, 37)` away, off any board and
+  at a slant no wall of a grid lies along. `Forecast.Work` counts it as it
+  goes (any forecast 3000 units, a storm's gusts 5000 more, a try 35, and in
+  it a post 22, a zone 20, a polygon edge 16, a wall 100, a zone looked at
+  for ice 5: at most 0.86K gas a unit measured), and golf counts it in a commit's budget.
 - **storm**: a Surface `storm` at 1, the rain as above, and two gusting Slope
   zones `wind` (air, capped), each 0.7 rad (about 40°) on either side of the
   forecast wind, with `Every: 6, On: 3` and `Phase` 0 and 3.
@@ -356,7 +345,6 @@ const Magic = "GG1"
 func Encode(h *Simple) string
 func Decode(s string) (*Simple, error)
 func Exact(h *Simple) bool
-func Diff(a, b *Simple) string
 ```
 
 - **`Encode`** writes a `Simple` as it stands: call it on a hole after `Fit`,
@@ -370,11 +358,10 @@ func Diff(a, b *Simple) string
   own: whether its prep is, bit for bit, the one `physics.Prepare` works out.
   Decode doesn't check this, so run `Exact` once on data from anyone before
   trusting it. `golf` does, at every publish.
-- **`Diff`** is the first difference between two holes, field by field and
-  float by float (by their bits), the walls' prep included, or `""`. The wear
-  isn't compared. It's how a decoded hole is proved to be the hole it was
-  encoded from, and a test fails to build when a field is added to any of the
-  types without it.
+- **`author.Diff`** is the first difference between two holes, field by field
+  and float by float (by their bits), the walls' prep included, or `""`. It's
+  how a decoded hole is proved to be the hole it was encoded from, and a test
+  fails to build when a field is added to any of the types without it.
 
 `golf` also refuses data that isn't exactly what `Encode` writes for the hole
 it decodes to, so one hole has one string.
@@ -479,7 +466,7 @@ type T interface { // *testing.T is one
   compares it between a hole and the same hole encoded and decoded.
 - **`Check`** fails the test when `Of(h)` isn't `want`, and prints the new
   one. It also proves the hole survives as data: `Decode(Encode(h))` must equal
-  `h` field by field (`Diff`, the prep included), pass `Exact`, encode back to
+  `h` field by field (`author.Diff`, the prep included), pass `Exact`, encode back to
   the same bytes, have the same `Of` and the same `Full`. Then it logs the data
   as `data <slot> <sha8> <hex>`, which is how `data/holes.txt` is built.
 

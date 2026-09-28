@@ -8,10 +8,12 @@ package island15
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 48, H: 24,
 	World:     "island",
 	Order:     15,
@@ -23,9 +25,9 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
+		Walls: build.Walls(
 			// the cliff along the top is jagged: a bank off it never runs true
-			physics.Outline(physics.V(2, 4), physics.V(20, 2), physics.V(25, 3.6), physics.V(30, 2.3), physics.V(35, 4.4), physics.V(40, 3), physics.V(46, 4),
+			build.Outline(physics.V(2, 4), physics.V(20, 2), physics.V(25, 3.6), physics.V(30, 2.3), physics.V(35, 4.4), physics.V(40, 3), physics.V(46, 4),
 				physics.V(46, 20), physics.V(30, 21.5), physics.V(2, 20)),
 		),
 		Posts: []physics.Post{

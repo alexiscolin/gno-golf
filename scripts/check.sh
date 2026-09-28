@@ -1,11 +1,12 @@
 #!/bin/sh
 # check.sh [--smoke]: everything that must pass before a commit or a deploy.
 # The Gno packages' tests with the pearl toolchain (their gas and storage
-# goldens included) and the 74 holes' fingerprints, then the client: types,
-# lint, the realm sync check, the unit tests with their coverage floor, and
-# with --smoke the end-to-end run against a local chain and dev server (see
-# the README). Stops at the first
-# failure. This is also what a CI would run.
+# goldens included), the 74 holes' fingerprints, and the deployed packages
+# staged as addpkg takes them (stage.sh: the repo's files byte for byte,
+# linted); then the client: types, lint, the realm sync check, the unit tests
+# with their coverage floor, and with --smoke the end-to-end run against a
+# local chain and dev server (see the README). Stops at the first failure.
+# This is also what a CI would run.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 
@@ -18,6 +19,10 @@ if [ -x "$GNO" ]; then
 	(cd "$root" && GNOHOME=$store/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf)
 	echo "== the holes' fingerprints"
 	(cd "$root" && GNOHOME=$store/gnohome "$GNO" test -run TestFingerprint ./gno.land/r/gnogolf/...)
+	echo "== the staged packages: the repo's, byte for byte, and linted"
+	stage=$(mktemp -d)
+	trap 'rm -rf "$stage"' EXIT
+	GNO=$GNO "$root/scripts/stage.sh" gnogolf "$stage"
 else
 	echo "check.sh: no pearl gno at $GNO: the Gno tests are skipped" >&2
 fi

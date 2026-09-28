@@ -5,10 +5,12 @@ package hole5
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 5,
 	W: 43, H: 14,
 	Title:     "The Gate",
@@ -21,13 +23,13 @@ var me = course.Fit(&course.Simple{
 	// the gate: shut for your first stroke, open for the second, shut again…
 	Pulses: []course.Pulse{{
 		Every: 2, On: 1, Phase: 0,
-		Walls: physics.Bar(physics.V(18, 5.5), physics.V(18, 8.5), 0.8, '=', "gate door"),
+		Walls: build.Bar(physics.V(18, 5.5), physics.V(18, 8.5), 0.8, '=', "gate door"),
 	}},
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Keyhole(0, 8, physics.V(36, 7), 6.5, 5)...),
-			physics.Bar(physics.V(18, 3), physics.V(18, 5.5), 0.8, '|', "gate"),
-			physics.Bar(physics.V(18, 8.5), physics.V(18, 11), 0.8, '|', "gate"),
+		Walls: build.Walls(
+			build.Outline(build.Keyhole(0, 8, physics.V(36, 7), 6.5, 5)...),
+			build.Bar(physics.V(18, 3), physics.V(18, 5.5), 0.8, '|', "gate"),
+			build.Bar(physics.V(18, 8.5), physics.V(18, 11), 0.8, '|', "gate"),
 		),
 		Zones: []physics.Zone{
 			// a flowerbed on the straight line to the gate: through it slowly, or round it

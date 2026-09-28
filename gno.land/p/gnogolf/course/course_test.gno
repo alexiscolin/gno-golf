@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 func roll(speed float64) physics.Shot {
@@ -82,7 +83,7 @@ func TestBallInTheAirFliesOverTheCup(t *testing.T) {
 
 // A gate that shuts on a resting ball pushes it out instead of trapping it.
 func TestPieceAppearingOnTheBallPushesItOut(t *testing.T) {
-	bar := physics.Bar(physics.Vec2{X: 10, Y: 2}, physics.Vec2{X: 10, Y: 8}, 0.8, 0, "")
+	bar := build.Bar(physics.Vec2{X: 10, Y: 2}, physics.Vec2{X: 10, Y: 8}, 0.8, 0, "")
 	b := physics.UnstickIn(physics.Vec2{X: 10.1, Y: 5}, bar, nil, 0.5, nil)
 	if b.X > 9.1 && b.X < 10.9 {
 		t.Fatalf("still inside the bar at %v", b)
@@ -92,22 +93,15 @@ func TestPieceAppearingOnTheBallPushesItOut(t *testing.T) {
 func TestPulseZoneComesAndGoes(t *testing.T) {
 	h := &Simple{
 		Tee: physics.V(2, 5), Pin: physics.V(40, 5), Substeps: 20, CupRadius: 1,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5},
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5},
 		Pulses: []Pulse{{Every: 2, On: 1, Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(4, 0), Max: physics.V(12, 10), Scale: 0.4, Skin: "puddle"},
 		}}},
-		Order: 1.5,
 	}
-	wet, _ := h.PreviewAt(h.Tee, 0, 6, 0)
-	dry, _ := h.PreviewAt(h.Tee, 0, 6, 1)
+	wet, _ := h.PreviewWith(h.Tee, 0, 6, 0, 0, nil)
+	dry, _ := h.PreviewWith(h.Tee, 0, 6, 1, 0, nil)
 	if wet.Rest().X >= dry.Rest().X {
 		t.Fatalf("the puddle should slow the ball: wet %v, dry %v", wet.Rest(), dry.Rest())
-	}
-	if WorldOf(h) != "garden" {
-		t.Fatal("no world is the garden")
-	}
-	if OrderOf(h, 9) != 1.5 || OrderOf(&Simple{}, 9) != 9 {
-		t.Fatal("order is the hole's own, or the fallback")
 	}
 }
 
@@ -117,24 +111,24 @@ func TestPulseZoneComesAndGoes(t *testing.T) {
 func TestAHazardComingBackSendsTheBallBackNow(t *testing.T) {
 	h := &Simple{
 		Tee: physics.V(2, 5), Pin: physics.V(38, 5), Substeps: 40, CupRadius: 1,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5},
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5},
 		Pulses: []Pulse{{Every: 2, On: 1, Phase: 1, Zones: []physics.Zone{
 			{Kind: physics.Hazard, Min: physics.V(4, 0), Max: physics.V(30, 10), Skin: "canal"},
 		}}},
 	}
 	// stroke 0: the canal is shut, and the ball stops over it
-	sh, _ := h.PreviewAt(h.Tee, 0, 3, 0)
+	sh, _ := h.PreviewWith(h.Tee, 0, 3, 0, 0, nil)
 	if r := sh.Rest(); r != h.Tee {
 		t.Fatalf("a ball left where the canal opens next should be back on the tee, at %v", r)
 	}
 	// stroke 1: the canal is open under the tee's shot too; stroke 2 shut again
-	if sh, _ := h.PreviewAt(h.Tee, 0, 3, 1); sh.Rest() != h.Tee {
+	if sh, _ := h.PreviewWith(h.Tee, 0, 3, 1, 0, nil); sh.Rest() != h.Tee {
 		t.Fatalf("the open canal sends the ball back: at %v", sh.Rest())
 	}
-	if sh, _ := h.PreviewAt(h.Tee, 0, 3, 2); sh.Rest() != h.Tee || len(sh.Path) < 3 {
+	if sh, _ := h.PreviewWith(h.Tee, 0, 3, 2, 0, nil); sh.Rest() != h.Tee || len(sh.Path) < 3 {
 		t.Fatalf("stroke 2 is as stroke 0: at %v", sh.Rest())
 	}
-	if sh, _ := h.PreviewAt(h.Tee, 0, 0.3, 0); sh.Rest().X > 4 {
+	if sh, _ := h.PreviewWith(h.Tee, 0, 0.3, 0, 0, nil); sh.Rest().X > 4 {
 		t.Fatalf("a ball short of the canal stays: at %v", sh.Rest())
 	}
 }
@@ -142,7 +136,7 @@ func TestAHazardComingBackSendsTheBallBackNow(t *testing.T) {
 func TestWeatherIsLaidUnderTheCourse(t *testing.T) {
 	h := &Simple{
 		W: 40, H: 10, Tee: physics.V(2, 5), Pin: physics.V(38, 5), Substeps: 20, CupRadius: 1,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5},
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(40, 10)), Friction: 0.9, Radius: 0.5},
 	}
 	all := func(k physics.ZoneKind, skin string, scale float64, v physics.Vec2) []physics.Zone {
 		return []physics.Zone{{Kind: k, Min: physics.V(0, 0), Max: physics.V(40, 10), Scale: scale, Vec: v, Skin: skin}}
@@ -193,34 +187,10 @@ func (f *fickle) Par() int {
 	return 5
 }
 
-func (f *fickle) Position() float64 {
-	f.calls++
-	if f.calls > 1 {
-		return -1
-	}
-	return 4
-}
-
-func (f *fickle) WorldName() string {
-	f.calls++
-	if f.calls > 1 {
-		return ""
-	}
-	return "town"
-}
-
-// ParOf, OrderOf and WorldOf ask a hole once, and check what it said.
-func TestTheHelpersAskTheHoleOnce(t *testing.T) {
+// ParOf asks a hole once, and checks what it said.
+func TestParOfAsksTheHoleOnce(t *testing.T) {
 	f := &fickle{Simple: &Simple{}}
 	if p := ParOf(f); p != 5 || f.calls != 1 {
 		t.Fatalf("ParOf gave %d after %d calls", p, f.calls)
-	}
-	f.calls = 0
-	if o := OrderOf(f, 9); o != 4 || f.calls != 1 {
-		t.Fatalf("OrderOf gave %v after %d calls", o, f.calls)
-	}
-	f.calls = 0
-	if w := WorldOf(f); w != "town" || f.calls != 1 {
-		t.Fatalf("WorldOf gave %q after %d calls", w, f.calls)
 	}
 }

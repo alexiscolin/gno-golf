@@ -4,10 +4,12 @@ package town2
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 48, H: 20,
 	World:     "town",
 	Order:     2,
@@ -19,13 +21,13 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.V(-5.0, 18.0), physics.V(53.0, 18.0), physics.V(53.0, 2.0), physics.V(-5.0, 2.0)),
-			physics.Bar(physics.V(14, 2.6), physics.V(14, 7.2), 1.2, '#', "stall"),
-			physics.Bar(physics.V(14, 12.4), physics.V(14, 17.4), 1.2, '#', "stall"),
-			physics.Bar(physics.V(24, 7.4), physics.V(24, 12.6), 1.2, '#', "stall"),
-			physics.Bar(physics.V(34, 2.6), physics.V(34, 5.8), 1.2, '#', "stall"),
-			physics.Bar(physics.V(34, 10.6), physics.V(34, 17.4), 1.2, '#', "stall"),
+		Walls: build.Walls(
+			build.Outline(physics.V(-5.0, 18.0), physics.V(53.0, 18.0), physics.V(53.0, 2.0), physics.V(-5.0, 2.0)),
+			build.Bar(physics.V(14, 2.6), physics.V(14, 7.2), 1.2, '#', "stall"),
+			build.Bar(physics.V(14, 12.4), physics.V(14, 17.4), 1.2, '#', "stall"),
+			build.Bar(physics.V(24, 7.4), physics.V(24, 12.6), 1.2, '#', "stall"),
+			build.Bar(physics.V(34, 2.6), physics.V(34, 5.8), 1.2, '#', "stall"),
+			build.Bar(physics.V(34, 10.6), physics.V(34, 17.4), 1.2, '#', "stall"),
 		),
 		Friction: 0.87,
 		Radius:   0.5,

@@ -6,13 +6,15 @@ package mountain10
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // the cannon blows for 4 substeps in every 10
 const gustEvery, gustOn = 10, 4
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 46, H: 18,
 	World:     "mountain",
 	Order:     10,
@@ -24,7 +26,7 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Outline(physics.Lane(7, 4, physics.V(5, 9), physics.V(40, 9))...),
+		Walls: build.Outline(build.Lane(7, 4, physics.V(5, 9), physics.V(40, 9))...),
 		// a pine just off the tee, square in the line along the spine
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(7.9, 9.3), R: 0.6}, Bounce: 0.7, Skin: "pine"},

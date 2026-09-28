@@ -7,10 +7,12 @@ import (
 	"math"
 
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 32, H: 26,
 	World:     "island",
 	Order:     7,
@@ -22,8 +24,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Arc(physics.V(16, 13), 11, 0, 2*math.Pi, 20)[:20]...),
+		Walls: build.Walls(
+			build.Outline(build.Arc(physics.V(16, 13), 11, 0, 2*math.Pi, 20)[:20]...),
 			// the ramparts, castle to shore: there is no way round, only
 			// through the tube
 			[]physics.Wall{

@@ -8,7 +8,9 @@ package mountain13
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // skaters is one stroke's pair of skaters: the first of size ra (the
@@ -20,7 +22,7 @@ func skaters(phase int, a physics.Vec2, ra float64, b physics.Vec2) course.Pulse
 	}}
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 44, H: 22,
 	World:     "mountain",
 	Order:     13,
@@ -36,13 +38,13 @@ var me = course.Fit(&course.Simple{
 		skaters(1, physics.V(26, 15), 0.7, physics.V(30, 11)),  // strokes 3, 6...
 	},
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Stadium(physics.V(2, 2), physics.V(42, 20), 8)...),
+		Walls: build.Walls(
+			build.Outline(build.Stadium(physics.V(2, 2), physics.V(42, 20), 8)...),
 			// the goal net round the cup, open toward the rink, its back well
 			// clear of the flag
-			physics.Soft(physics.Bar(physics.V(39.2, 9), physics.V(39.2, 13), 0.4, '#', "net"), 0.3),
-			physics.Soft(physics.Bar(physics.V(35, 9), physics.V(39.2, 9), 0.4, '#', "net"), 0.3),
-			physics.Soft(physics.Bar(physics.V(35, 13), physics.V(39.2, 13), 0.4, '#', "net"), 0.3),
+			build.Soft(build.Bar(physics.V(39.2, 9), physics.V(39.2, 13), 0.4, '#', "net"), 0.3),
+			build.Soft(build.Bar(physics.V(35, 9), physics.V(39.2, 9), 0.4, '#', "net"), 0.3),
+			build.Soft(build.Bar(physics.V(35, 13), physics.V(39.2, 13), 0.4, '#', "net"), 0.3),
 		),
 		Zones: []physics.Zone{
 			{Kind: physics.Surface, Min: physics.V(2, 2), Max: physics.V(42, 20), Scale: 1.15, Mark: '-', Skin: "ice"},

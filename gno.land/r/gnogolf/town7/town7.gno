@@ -4,10 +4,12 @@ package town7
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 48, H: 16,
 	World:     "town",
 	Order:     7,
@@ -19,8 +21,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(8, 4, physics.V(5, 7), physics.V(24, 9), physics.V(43, 8))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(8, 4, physics.V(5, 7), physics.V(24, 9), physics.V(43, 8))...),
 		),
 		// street lamps on the far bank: one at the foot of the bridge, two in
 		// the lines off it to the cup

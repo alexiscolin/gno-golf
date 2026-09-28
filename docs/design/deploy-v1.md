@@ -43,13 +43,14 @@ r/<ns>/golf     registry; entries are realm holes (course.Hole) OR data versions
                 Publish (owner), PublishMine (anyone), Versions, HoleData, typed getters,
                 Drain, Transfer/Accept/Renounce
 repo only       hole sources (Fit literals + fingerprint tests), data/holes.txt generated
-                from them, scripts/stage.sh, scripts/holedata.sh
+                from them, scripts/stage.sh, scripts/holedata.sh; the authoring packages
+                p/<ns>/physics/build (wall builders) and p/<ns>/course/author (Fit, Diff)
 ```
 
 A call on a data hole goes through four steps:
 1. Load the version entry: one object holding the data string, about 0.15M gas.
 2. `course.Decode` rebuilds a `*course.Simple`, and `physics.PrepareWith` fills its `prep` from the stored lengths.
-3. The result is wrapped in `dataHole{Simple, e}`, which marks wear on the entry.
+3. The `*course.Simple` is the call's hole; golf marks the wear on the version's entry, never on it.
 4. The rest of the code (`previewAt`, `weatherOf`, `State`, `Render`) runs unchanged.
 
 The decoded value is never linked into realm state, so it costs no deposit.
@@ -232,13 +233,14 @@ There is no cross-call cache: it would be persisted, and qeval can't persist any
 
 ### 10.1 `scripts/stage.sh <ns> <out>`
 
-1. Copy the `.gno` and `gnomod.toml` files of physics, course and golf into `<out>/gno.land/{p,r}/<ns>/…`. Exclude:
-   - `*_test.gno` and `*_filetest.gno`;
-   - `course/fingerprint` and `zzinv`;
-   - the hole packages.
-2. Rewrite the import paths (`gno.land/[pr]/gnogolf/` → `<ns>`) with `sed`.
-3. Assert that no `gno.land/[pr]/gnogolf` string is left, that every gnomod has `gno = "0.9"`, and that there is no `[[replace]]`.
+The deployed source is the repo's, byte for byte: stage.sh transforms nothing but the namespace, and checks it.
+
+1. Copy every file of the physics, course and golf directories but their tests (`*_test.gno`, `*_filetest.gno`) into `<out>/gno.land/{p,r}/<ns>/…`, as it is. The subpackages (`physics/build`, `course/author`, `course/fingerprint`) and the hole realms are other directories, and never deployed: nothing deployed imports them.
+2. Rewrite the import paths (`gno.land/[pr]/gnogolf/` → `<ns>`) with `sed`: the one transformation. The production deploy targets the `gnogolf` namespace itself (to be registered on pearl), where it is the identity, so the on-chain source is then exactly the repo's; it only matters for a rehearsal nym such as `nym-golfer000`.
+3. Assert that each staged package holds the repo package's non-test files, no more and no fewer, and that each is the repo's file byte for byte once the namespace is read back; that no `gno.land/[pr]/gnogolf` string is left (under a nym); that every gnomod has `gno = "0.9"`; and that there is no `[[replace]]`.
 4. Run `gno lint` with the pearl toolchain and print the package sizes.
+
+`scripts/check.sh` stages into a temporary directory under `gnogolf` on every run, so a stage-time transformation or a skipped file fails the check before it can reach a deploy.
 
 The goldens stay tied to the canonical `gnogolf` tree, so staged tests would move only the id-dependent columns.
 
@@ -420,7 +422,7 @@ Where these differ from the sections above, these win.
 - **Y8:** writes take exact version ids only, and `Launch` returns the version id.
 - **GREEN notes:**
   - Check the stored lengths bit-exactly once, at publish.
-  - `dataHole` overrides Play, PlayAt, PlayWith and Wear.
+  - `dataHole` overrides Play, PlayAt, PlayWith and Wear. (Since gone: `Simple` no longer has Play, PlayAt, PlayWith or Wear, and golf marks the wear on the entry itself.)
   - Test the bptree indexes against avl.
   - Refuse a publish whose sha matches the current version.
   - Strip bidi and zero-width characters from text.

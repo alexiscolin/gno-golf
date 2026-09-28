@@ -4,10 +4,12 @@ package town17
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 44, H: 24,
 	World:     "town",
 	Order:     17,
@@ -19,12 +21,12 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Pulses: []course.Pulse{
-		{Every: 2, On: 1, Phase: 1, Walls: physics.Walls(physics.Bar(physics.V(13, 2.4), physics.V(13, 7.6), 0.8, '#', "awning"))},
+		{Every: 2, On: 1, Phase: 1, Walls: build.Walls(build.Bar(physics.V(13, 2.4), physics.V(13, 7.6), 0.8, '#', "awning"))},
 	},
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.V(2, 2), physics.V(42, 2), physics.V(42, 8), physics.V(25, 8), physics.V(25, 22), physics.V(19, 22), physics.V(19, 8), physics.V(2, 8)),
+		Walls: build.Walls(
+			build.Outline(physics.V(2, 2), physics.V(42, 2), physics.V(42, 8), physics.V(25, 8), physics.V(25, 22), physics.V(19, 22), physics.V(19, 8), physics.V(2, 8)),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(22, 12), R: 0.35}, Bounce: 0.9, Skin: "lamp"},

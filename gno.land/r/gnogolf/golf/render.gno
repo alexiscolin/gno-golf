@@ -12,8 +12,8 @@ import (
 	"gno.land/p/nt/ufmt/v0"
 )
 
-// wearRunes escalate with traffic: pristine grass, then a groove, at up to
-// wearLight, wearWorn and wearGroove balls come to rest in a cell, and past.
+// wearRunes draw a cell's wear: none, then up to wearLight, wearWorn and
+// wearGroove balls come to rest there, and past.
 const (
 	wearRunes  = " :;x%" // pristine grass blank: a shot's dots stand out on it
 	wearLight  = 2
@@ -31,8 +31,7 @@ const (
 	markTee  = '*'
 )
 
-// Render is the game as text: gnoweb draws the board and submits the shot. The
-// 3D client reads the same State and plays the same physics.
+// Render is the game as text: gnoweb draws the board and submits the shot.
 //
 // Paths: "" the hub; "<world>" a cup's holes; "<address>" the holes an
 // address published; "<hole>" a hole's page, "<hole>/<address>" the same
@@ -87,9 +86,8 @@ func lookup(id string) *entry {
 	return find(current(id))
 }
 
-// playLink is the 3D client on this very hole, as a short link a player can
-// share: a current course hole by its cup and its place in it (the client
-// maps them back), any other by its id, which no newer version can take.
+// playLink is the 3D client's link to this hole: a current course hole by cup
+// and order, any other by its id, which no newer version can take.
 func playLink(e *entry) string {
 	if !e.official || e.next != "" {
 		return playURL + "?hole=" + e.id
@@ -259,8 +257,7 @@ func renderAuthor(a address) string {
 }
 
 // bestCell is a hole's records, assisted then pro, for a table cell. names
-// keeps each holder as the page has said them: r/sys/users is read once a
-// player, not once a record.
+// caches holders: r/sys/users is read once a player, not once a record.
 func bestCell(e *entry, names map[string]string) string {
 	best := ""
 	for m := 0; m < modes; m++ {
@@ -283,8 +280,8 @@ func bestCell(e *entry, names map[string]string) string {
 	return best
 }
 
-// weatherNote is the hole's weather now, and how long it lasts: one forecast
-// per page, only on a hole's own page.
+// weatherNote is the hole's weather now and how long it lasts: one forecast,
+// only on a hole's own page.
 func weatherNote(e *entry, h course.Hole) string {
 	f := weatherOf(e, h, Period())
 	left := PeriodSeconds - time.Now().Unix()%PeriodSeconds
@@ -302,13 +299,12 @@ func weatherNote(e *entry, h course.Hole) string {
 	case course.Snow:
 		what = "Snow: the green runs slow"
 	}
-	// (ufmt has no width: the seconds padded by hand)
+	// ufmt has no width: the seconds padded by hand
 	return ufmt.Sprintf("> [!NOTE] Weather now\n> %s — for %d min %s s more. A round keeps the weather it started in, and can be played on until the next weather is over: after that it must be Reset.\n\n",
 		what, left/60, pad(int(left%60), 2))
 }
 
-// noAdmin states what the reader can check in a minute: who can change what.
-// It is deliberately also an admission.
+// noAdmin states who can change what, the owner's own powers included.
 func noAdmin() string {
 	holder := who(owner.String())
 	if owner == "" {
@@ -331,15 +327,13 @@ func noAdmin() string {
 		"and can only hand the role on (Transfer, then Accept) or give it up for good (Renounce).\n"
 }
 
-// source links a hole to what it is made of: its data page. A player can
-// read a hole before trusting it with a round — which is the whole
-// difference with a server, where you trust the operator's simulation.
+// source links a hole's data page: read it before trusting it with a round.
 func source(e *entry) string { return md("data", hub+":"+e.id+"/data") }
 
 func md(label, href string) string { return "[" + label + "](" + href + ")" }
 
-// flatRolls is what the page says a shot rolls on flat grass, from a tee
-// shot's Kick and the usual friction.
+// flatRolls is how far a shot rolls on flat grass (a tee shot's Kick, the
+// usual friction).
 const flatRolls = "On flat grass a power of 10 rolls about 40, a 5 about 15."
 
 func renderHole(e *entry, h course.Hole, focus address) string {
@@ -443,9 +437,8 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	return s + "\n_This hole is " + source(e) + " — read it before you trust it with a round._\n"
 }
 
-// roundSummary is a player's round on this hole, at the top of their page:
-// how it stands, and where their best puts them on the hole's board, or why
-// nowhere.
+// roundSummary is how a player's round stands, and where their best puts them
+// on the hole's board, or why nowhere.
 func roundSummary(e *entry, p address, r *round) string {
 	who := short(p.String())
 	name := nameOf(p.String())
@@ -519,7 +512,7 @@ func renderData(e *entry) string {
 func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 	bw, bh := course.BoardOf(h)
 	g := make([][]rune, bh)
-	wear := h.Wear()
+	wear := e.wearGrid()
 	for y := 0; y < bh; y++ {
 		row := make([]rune, bw)
 		for x := 0; x < bw; x++ {
@@ -527,8 +520,7 @@ func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 		}
 		g[y] = row
 	}
-	// the walls, traced once: drawn on the board, and what the flood fill
-	// below stops at
+	// the walls, traced once: drawn, and what the flood fill stops at
 	wall := make([][]rune, bh)
 	for y := range wall {
 		wall[y] = make([]rune, bw)
@@ -537,8 +529,7 @@ func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 		trace(wall, w.Seg, mark(w.Mark, markWall))
 	}
 
-	// the focused player's last flight first, on the grass: pieces drawn after
-	// it stay visible (a mole in a gap was hidden under the dots)
+	// the last flight first, so the pieces drawn over it stay visible
 	if mine != nil {
 		for _, p := range lastShot(e, h, mine).Path {
 			put(g, p, '·')
@@ -550,7 +541,7 @@ func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 		z := &f.Zones[i]
 		m := mark(z.Mark, '?')
 		if z.Kind == physics.Tunnel && tunnel < maxTunnels {
-			// a tunnel's mouth and its exit share a digit: you can see where it leads
+			// a tunnel's mouth and exit share a digit
 			tunnel++
 			m = rune('0' + tunnel)
 		}
@@ -592,11 +583,9 @@ func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 	return sb.String()
 }
 
-// drawZone marks the cells a zone holds: a cell is the zone's if its centre
-// is, so a round pond is drawn round, as the physics sees it
-// (physics.Zone.Contains). A polygon's row is drawn from where the row's
-// centre line crosses its edges; an ellipse's as the run of cells it holds,
-// found with the physics' own test at its ends, from its middle out.
+// drawZone marks the cells whose centre the zone holds, as the physics sees it
+// (physics.Zone.Contains): a polygon's row from where the centre line crosses
+// its edges, an ellipse's as the run the physics' test finds from its middle.
 func drawZone(g [][]rune, z *physics.Zone, m rune) {
 	bh := len(g)
 	if bh == 0 {
@@ -617,10 +606,8 @@ func drawZone(g [][]rune, z *physics.Zone, m rune) {
 		row, py := g[y], float64(y)+0.5
 		switch {
 		case poly:
-			// inPoly counts the crossings right of the centre, even-odd: a
-			// crossing is right of every cell before the first whose centre
-			// is at or past it, so a sweep from the right turns in and out
-			// at each one's cell. No sort: a row costs its edges and cells.
+			// even-odd, as inPoly: a sweep from the right flips at each
+			// crossing's cell. No sort: a row costs its edges and cells.
 			for x := x0; x <= x1; x++ {
 				flip[x] = false
 			}
@@ -684,9 +671,8 @@ func boxCells(lo, hi float64, n int) (int, int) {
 	return a, firstCell(a, b, func(x int) bool { return !(float64(x)+0.5 < hi) })
 }
 
-// cellAt is the first cell x in [lo, hi) whose centre is at or past c
-// (!(x+0.5 < c), as the physics compares), hi if none: ceil(c-0.5), as
-// arithmetic. lo is 0 or more.
+// cellAt is the first cell in [lo, hi), lo >= 0, whose centre is at or past c
+// (!(x+0.5 < c), as the physics compares), hi if none: ceil(c-0.5).
 func cellAt(c float64, lo, hi int) int {
 	if !(float64(lo)+0.5 < c) { // NaN too, as a search would find
 		return lo
@@ -736,18 +722,14 @@ func span(lo, hi float64, n int) (int, int) {
 	return a, b
 }
 
-// maxBoardWork bounds what drawing one board may cost, in thousands of gas
-// as boardWork estimates it: past it, the page says so instead of drawing,
-// and stays far under the 3e9 a query may use. The course's boards cost at
-// most a quarter of it; the worst the format allows, five times it.
+// maxBoardWork bounds a board's drawing, in thousands of gas (boardWork):
+// past it the page does not draw, far under the 3e9 a query may use.
 const maxBoardWork = 600000
 
-// boardWork estimates what board costs for this field, in thousands of gas,
-// from what it does (measured on 96×96 boards, the largest GG1 allows): 32 a
-// board cell (the wear, the flood fill, the blanking); for each row of a
-// zone's box, 5 a cell and 16 an edge of its polygon, as if every edge
-// crossed the row, as a zigzag's all do; 10 a step along a wall; 20 a cell of
-// a post's box.
+// boardWork estimates board's cost in thousands of gas, with measured weights:
+// a board cell; a cell and a polygon edge per row of a zone's box (every edge
+// counted as crossing, as a zigzag's do); a step along a wall; a cell of a
+// post's box.
 func boardWork(f *physics.Field, h course.Hole) int {
 	bw, bh := course.BoardOf(h)
 	n := 32 * bw * bh
@@ -769,10 +751,8 @@ func boardWork(f *physics.Field, h course.Hole) int {
 	return n
 }
 
-// legend names whatever this hole brought along, from the skins it declared;
-// walls is the skins of the walls drawn `#`, which the key names with the
-// wall. key names the board's fixed marks, only those it shows: the tee and
-// cup always, the rest when there is one to see.
+// key names the board's fixed marks it shows (tee and cup always), with the
+// skins of the walls drawn `#`.
 func key(b, walls string) string {
 	// what the board shows, read once: a big board is thousands of runes
 	var on [128]bool
@@ -817,6 +797,7 @@ func key(b, walls string) string {
 	return s
 }
 
+// legend names the pieces the hole gave a skin, and the skins of its `#` walls.
 func legend(f *physics.Field) (string, string) {
 	seen, s, walls := string(markWall), "", ""
 	add := func(m rune, def rune, skin string) {
@@ -891,8 +872,8 @@ func wearRune(wear []int, x, y int) rune {
 	}
 }
 
-// trace draws a wall as points every half unit: put(s.A + d*t), written
-// out, since a board has thousands of them.
+// trace draws a wall as points every half unit, put inlined: a board has
+// thousands.
 func trace(g [][]rune, s physics.Segment, c rune) {
 	bh := len(g)
 	if bh == 0 {
@@ -916,8 +897,8 @@ func trace(g [][]rune, s physics.Segment, c rune) {
 	}
 }
 
-// fill draws a post: the cells whose centre is within its radius, put at
-// (x, y). LenCmp is Len's comparison without its software square root.
+// fill draws a post: the cells whose centre is within its radius. LenCmp
+// skips Len's software square root.
 func fill(g [][]rune, c physics.Circle, r rune) {
 	bh := len(g)
 	if bh == 0 {
@@ -951,8 +932,7 @@ func put(g [][]rune, p physics.Vec2, c rune) {
 		return
 	}
 	bw := len(g[0])
-	// the far edge belongs to the last cell: a wall at x=bw is the right side
-	// of column bw-1, not off the board.
+	// the far edge belongs to the last cell, not off the board
 	if x == bw {
 		x = bw - 1
 	}
@@ -965,9 +945,8 @@ func put(g [][]rune, p physics.Vec2, c rune) {
 	g[y][x] = c
 }
 
-// eachRound walks the rounds of one hole in address order.
-// It stops after limit rounds: a hole's history grows with every address
-// that ever played it, and nothing that prints it may grow with it.
+// eachRound walks a hole's rounds in address order, at most limit: they grow
+// with every address that played, and no output may grow with them.
 func eachRound(e *entry, limit int, fn func(player string, r *round)) {
 	n := 0
 	e.roundTree().Iterate("", "", func(k string, v any) bool {
@@ -984,9 +963,8 @@ func short(addr string) string {
 	return addr[:8] + "…" + addr[len(addr)-4:]
 }
 
-// blankUnreachable clears the cells no ball can get to: flood-filled from the
-// tee, the cup and wherever a tunnel or a hazard puts the ball, stopped by
-// the walls. What stays is the shape the author drew, not a rectangle.
+// blankUnreachable clears the cells no ball can reach: a flood fill from the
+// tee, the cup and where tunnels and hazards put the ball, stopped by walls.
 func blankUnreachable(g, wall [][]rune, f *physics.Field, seeds ...physics.Vec2) {
 	bh := len(g)
 	if bh == 0 {
@@ -998,8 +976,7 @@ func blankUnreachable(g, wall [][]rune, f *physics.Field, seeds ...physics.Vec2)
 			seeds = append(seeds, z.Vec)
 		}
 	}
-	// a run of a row at a time, with no closure: a board has thousands of
-	// cells
+	// a row's run at a time, no closure: a board has thousands of cells
 	seen := make([][]bool, bh)
 	for y := range seen {
 		seen[y] = make([]bool, bw)
@@ -1053,8 +1030,7 @@ func blankUnreachable(g, wall [][]rune, f *physics.Field, seeds ...physics.Vec2)
 	}
 }
 
-// race is the 3D game on this hole against p's best, replayed as a ghost
-// (the game's dare link: by=).
+// race is the 3D game's dare link (by=): this hole against p's best's ghost.
 func race(e *entry, p, label string) string { return md(label, playLink(e)+"&by="+p) }
 
 // byName is a player by their gno.land name when they have one.

@@ -23,9 +23,8 @@ func (s Segment) Crosses(p0, p1 Vec2) bool {
 }
 
 // hitN reports where the motion p0->p1 crosses the segment: the travel
-// fraction in [0,1] and the given normal, turned to face the motion. Step
-// works the normal out once per shot for each wall instead of on every
-// crossing it tests.
+// fraction in [0,1] and the given normal (precomputed, to save a square
+// root per test), turned to face the motion.
 func (s Segment) hitN(p0, p1, normal Vec2) (float64, Vec2, bool) {
 	d := p1.Sub(p0)
 	e := s.B.Sub(s.A)
@@ -52,9 +51,8 @@ type Circle struct {
 	R float64
 }
 
-// hit is the swept point-vs-circle test, adding rootWork to *w for each
-// square root it takes. A ball that starts inside reports no hit, so a post
-// can never trap a ball that somehow got in.
+// hit is the swept point-vs-circle test, adding rootWork to *w per square
+// root. A ball that starts inside reports no hit: a post never traps a ball.
 func (c Circle) hit(p0, p1 Vec2, w *int) (float64, Vec2, bool) {
 	d := p1.Sub(p0)
 	a := d.Dot(d)

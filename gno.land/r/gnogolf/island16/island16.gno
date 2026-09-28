@@ -4,10 +4,12 @@ package island16
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 66, H: 22,
 	World:     "island",
 	Order:     16,
@@ -19,8 +21,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Keyhole(-22, 6, physics.V(34, 11), 9, 6)...),
+		Walls: build.Walls(
+			build.Outline(build.Keyhole(-22, 6, physics.V(34, 11), 9, 6)...),
 		),
 		Zones: []physics.Zone{
 			{Kind: physics.Slope, Min: physics.V(28, 5), Max: physics.V(32.6, 17), Vec: physics.V(-0.3, 0), Skin: "volcano"},

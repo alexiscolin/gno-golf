@@ -5,10 +5,12 @@ package hole1
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 1,
 	W: 50, H: 15,
 	Title:     "The Shelf",
@@ -19,10 +21,10 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(6, 4, physics.V(5, 6), physics.V(20, 10), physics.V(34, 4), physics.V(44, 6))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(6, 4, physics.V(5, 6), physics.V(20, 10), physics.V(34, 4), physics.V(44, 6))...),
 			// from the outer bank to just short of the middle
-			physics.Bar(physics.V(28.4, 10.2), physics.V(26.8, 6.5), 0.8, '=', "shelf"),
+			build.Bar(physics.V(28.4, 10.2), physics.V(26.8, 6.5), 0.8, '=', "shelf"),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(12, 6.3), R: 0.7}, Bounce: 0.6, Skin: "stump"},

@@ -1,8 +1,13 @@
-package course
+// Package author is what a hole's source is finished with and proved by:
+// Fit sizes the board to the walls, Diff compares a hole with its decoded
+// data. Nothing on chain needs it: golf plays a hole from its data
+// (course.Encode), and this package is for authoring holes and for tests.
+package author
 
 import (
 	"math"
 
+	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
 )
 
@@ -18,15 +23,15 @@ import (
 //
 // Call it once, where the hole is declared:
 //
-//	var me = course.Fit(&course.Simple{…}, 1.5)
-func Fit(h *Simple, margin float64) *Simple {
+//	var me = author.Fit(&course.Simple{…}, 1.5)
+func Fit(h *course.Simple, margin float64) *course.Simple {
 	f := h.Course
 	if f == nil {
 		return h
 	}
 	oldW, oldH := float64(h.W), float64(h.H)
 	if h.W <= 0 || h.H <= 0 {
-		oldW, oldH = BoardW, BoardH
+		oldW, oldH = course.BoardW, course.BoardH
 	}
 
 	// the extent to keep inside: every wall end and post, fixed or pulsed

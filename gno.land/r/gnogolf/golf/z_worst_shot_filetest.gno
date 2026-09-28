@@ -9,6 +9,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/r/gnogolf/golf"
 )
 
@@ -89,7 +90,7 @@ func bumpers(ws []physics.Wall) []physics.Wall {
 	return ws
 }
 
-func build(s spec) *course.Simple {
+func probe(s spec) *course.Simple {
 	var walls []physics.Wall
 	var posts []physics.Post
 	var zones []physics.Zone
@@ -102,17 +103,17 @@ func build(s spec) *course.Simple {
 		}
 		walls = bumpers(walls)
 	case "box", "bars":
-		walls = bumpers(physics.Box(physics.V(0, 0), physics.V(96, 96)))
+		walls = bumpers(build.Box(physics.V(0, 0), physics.V(96, 96)))
 		for i := 0; s.walls == "bars" && len(walls)+4 <= course.MaxWalls; i++ {
 			x, y := 2+float64(i%13)*7, 2+float64(i/13)*30
-			walls = append(walls, physics.Timed(physics.Bar(physics.V(x, y), physics.V(x+5, y+0.2), 0.3, '=', "tram"), 2, 1, i%2)...)
+			walls = append(walls, build.Timed(build.Bar(physics.V(x, y), physics.V(x+5, y+0.2), 0.3, '=', "tram"), 2, 1, i%2)...)
 		}
 	case "endcap", "face":
 		// every wall one short segment: a ball of radius 1 beside its end,
 		// or above its face, tests all of them on every move, square roots
 		// and all; a hill holds it there
 		radius = 1
-		walls = physics.Box(physics.V(34, 34), physics.V(46, 46))
+		walls = build.Box(physics.V(34, 34), physics.V(46, 46))
 		for len(walls) < course.MaxWalls {
 			walls = append(walls, physics.Wall{Seg: physics.Segment{A: physics.V(40, 40), B: physics.V(40.2, 40)}})
 		}
@@ -123,7 +124,7 @@ func build(s spec) *course.Simple {
 		zones = append(zones, physics.Zone{Kind: physics.Slope, Min: physics.V(0, 0), Max: physics.V(96, 96), Vec: v, Skin: "slope"})
 	case "posts":
 		radius = 1
-		walls = physics.Box(physics.V(34, 34), physics.V(46, 46))
+		walls = build.Box(physics.V(34, 34), physics.V(46, 46))
 		for i := 0; i < course.MaxPosts; i++ {
 			posts = append(posts, physics.Post{Circle: physics.Circle{C: physics.V(40, 40), R: 0.5}})
 		}
@@ -132,14 +133,14 @@ func build(s spec) *course.Simple {
 		// bumpers round a board of ice: a tap stays put, a full shot
 		// bounces on until its cap
 		for len(walls) < course.MaxWalls {
-			walls = append(walls, bumpers(physics.Box(physics.V(10, 10), physics.V(30, 30)))...)
+			walls = append(walls, bumpers(build.Box(physics.V(10, 10), physics.V(30, 30)))...)
 		}
 	case "corner":
 		// the forecast's worst: every wall and post in a corner cage (each
 		// puddle try away from it tests them all, and finds no lane), thin
 		// hazard polygons along the far edge (each try tests every edge)
 		for len(walls) < course.MaxWalls {
-			walls = append(walls, bumpers(physics.Box(physics.V(3, 3), physics.V(7, 7)))...)
+			walls = append(walls, bumpers(build.Box(physics.V(3, 3), physics.V(7, 7)))...)
 		}
 		for i := 0; i < course.MaxPosts; i++ {
 			posts = append(posts, physics.Post{Circle: physics.Circle{C: physics.V(3.5+float64(i%4), 3.5+float64(i/4%4)), R: 0.1}, Bounce: 1.5, Skin: "bumper"})
@@ -224,7 +225,7 @@ func slugFor(cur realm, s spec, h *course.Simple) string {
 
 func main(cur realm) {
 	for _, s := range probes {
-		h := build(s)
+		h := probe(s)
 		id := golf.PublishMine(cross(cur), slugFor(cur, s, h), hex.EncodeToString([]byte(course.Encode(h))), "")
 		angle, power := s.angle, s.power
 		if angle == 0 {
@@ -239,7 +240,7 @@ func main(cur realm) {
 			println(id)
 		}
 	}
-	h := build(spec{walls: "cage", zig: 8, rects: 23})
+	h := probe(spec{walls: "cage", zig: 8, rects: 23})
 	id := golf.PublishMine(cross(cur), slugFor(cur, spec{slug: "cage", kind: "dry"}, h), hex.EncodeToString([]byte(course.Encode(h))), "")
 	taps := strings.Repeat("0,0.01;", 11)
 	println(id, revive(func() { golf.PlayRoundAt(cross(cur), id, taps+"135,10", golf.Period()) }))
