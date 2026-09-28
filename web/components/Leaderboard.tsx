@@ -145,8 +145,10 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
     setNote(null);
     let addr = v, name = "";
     if (!isAddress(v)) {
-      addr = chain ? await chain.resolveName(v).catch(() => "") : "";
-      name = v;
+      // (a chain that did not answer is not a name it does not know)
+      const got = chain ? await chain.resolveName(v).catch(() => null) : "";
+      if (got === null) return setNote("The chain did not answer. Try again in a moment.");
+      (addr = got), (name = v);
       if (!addr) return setNote(`No gno.land name “${v}” on this chain.`);
     }
     if (addr === me) return setNote("That's you — you're always here.");
@@ -340,9 +342,10 @@ export type Placed = StrokesRow & { holes?: number; at: number };
  * each visit. null while read; a pick nobody fills, null.
  */
 // the three picks (the champion, your level, yourself: null while no one is connected),
-// and a surprise (the board's Surprise me)
+// and a surprise (the board's Surprise me); a board that could not be read: retry, to read it again
 export function useRivalPicks(chain: Chain | null, me: string | null | undefined, mode: Mode) {
-  const [picks, setPicks] = useState<{ rows: readonly (Placed | null)[]; surprise: Placed | null } | null>(null);
+  const [picks, setPicks] = useState<{ rows: readonly (Placed | null)[]; surprise: Placed | null; retry?: () => void } | null>(null);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!chain) return;
     let live = true;
@@ -362,9 +365,9 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
         primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r] : [])));
         if (live) setPicks({ rows: [champ, level, self], surprise });
       })
-      .catch(() => live && setPicks({ rows: [null, null, null], surprise: null }));
+      .catch(() => live && setPicks({ rows: [null, null, null], surprise: null, retry: () => (setPicks(null), setTick((n) => n + 1)) }));
     return () => void (live = false);
-  }, [chain, me, mode]);
+  }, [chain, me, mode, tick]);
   return picks;
 }
 
@@ -381,7 +384,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   const [rows, setRows] = useState<readonly Placed[] | null>(null);
   const [head, setHead] = useState<{ par: number; holes: number; players: number; finished?: number } | null>(null);
   const [next, setNext] = useState(0); // the next page's offset, 0 at the end
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState(false); // a page the chain did not give
   const [more, setMore] = useState(false);
   const [mine, setMine] = useState<{ rank: number; of: number; strokes: number; holes?: number } | null>(null);
   const flags = useFlags();
@@ -413,7 +416,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
     });
   useEffect(() => {
     if (!chain) return;
-    add(0).catch((e: unknown) => setErr(messageOf(e)));
+    add(0).catch(() => setErr(true));
     // the board is keyed by kind, mode and hole: one mount, one first page
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain]);
@@ -427,7 +430,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
     if (!next || more) return;
     setMore(true);
     add(next)
-      .catch((e: unknown) => setErr(messageOf(e)))
+      .catch(() => setErr(true))
       .finally(() => setMore(false));
   };
   // the next page loads as the end of the list comes into view
@@ -476,7 +479,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
       <h3>
         {title} <small>{sub}</small>
       </h3>
-      {err && <p className="note note--bad">{err}</p>}
+      {err && <p className="note note--bad">The chain did not answer. <button className="linkish" onClick={() => (setErr(false), rows ? loadMore() : void add(0).catch(() => setErr(true)))}>Try again</button></p>}
       {!rows && !err && <Ghosts />}
       {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No saved round yet: {me ? "save one and be the first." : <><ConnectLink onConnect={onConnect} /> and be the first.</>}</p></>)}
       {shown && shown.rows.length > 0 && (

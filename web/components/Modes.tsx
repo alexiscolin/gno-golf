@@ -77,7 +77,9 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
   const go = async (e: FormEvent) => {
     e.preventDefault();
     const v = typed.trim();
-    const addr = isAddress(v) ? v : chain ? await chain.resolveName(v).catch(() => "") : "";
+    // (a chain that did not answer is not a name it does not know)
+    const addr = isAddress(v) ? v : chain ? await chain.resolveName(v).catch(() => null) : "";
+    if (addr === null) return setNote("The chain did not answer. Try again in a moment.");
     if (!addr) return setNote(`No gno.land name “${v}” here. Check the spelling, or pick someone below.`);
     // a duel is played where their ghost is: someone with no saved round has none (a failed read lets them through)
     // (their bests go with them: not read twice)
@@ -97,9 +99,10 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
         </form>
         {note && <p className="note note--warn">{note}</p>}
       </section>
+      {picks && picks.retry && <p className="note note--bad">The chain did not answer. <button className="linkish" onClick={picks.retry}>Try again</button></p>}
       <ul className="rival__picks">
         {PICKS.map((p, i) => (
-          <li key={p.kind}><Pick {...p} first={i} row={picks && picks.rows[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} onConnect={p.kind === "self" ? onConnect : undefined} /></li>
+          <li key={p.kind}><Pick {...p} first={i} row={picks && picks.rows[i]} reading={!picks} failed={!!(picks && picks.retry)} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} onConnect={p.kind === "self" ? onConnect : undefined} /></li>
         ))}
       </ul>
       {/* the board as stickers; the whole of it, the leaderboard's sheet (its rows, a Race each) */}
@@ -188,7 +191,8 @@ function useShow(chain: Chain | null, player: string, holes: readonly Hole[], mo
 /** A quick pick, a game's panel as the game's choice's: the rival's gnome in
  *  3D (in the skin their ghost wears), their best hole played back on its map,
  *  both under the pointer or the focus only; their name, and Race. */
-function Pick({ kind, label, tint, first, row, reading, chain, me, gnome, holes, mode, onPick, onConnect }: (typeof PICKS)[number] & { first: number; row: Placed | null; reading: boolean; chain: Chain | null; me: string | null; gnome: string; holes: readonly Hole[]; mode: Mode; onPick: (addr: string, bests?: Bests, from?: RivalKind) => void; onConnect?: () => void }) {
+// failed: the board could not be read (not a board with nobody on it)
+function Pick({ kind, label, tint, first, row, reading, failed, chain, me, gnome, holes, mode, onPick, onConnect }: (typeof PICKS)[number] & { first: number; row: Placed | null; reading: boolean; failed: boolean; chain: Chain | null; me: string | null; gnome: string; holes: readonly Hole[]; mode: Mode; onPick: (addr: string, bests?: Bests, from?: RivalKind) => void; onConnect?: () => void }) {
   const [hot, on] = useHot();
   const player = row ? row.player : "";
   const who = useWho(chain, player, me), show = useShow(chain, player, holes, mode);
@@ -206,7 +210,7 @@ function Pick({ kind, label, tint, first, row, reading, chain, me, gnome, holes,
   const connect = kind === "self" && !me && onConnect; // (a tap connects: then it is yours)
   const line = kind === "self" && !me ? (onConnect ? "Beat your own best" : "Connect Adena to race it") : none ? "Save a round first" : row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
   return (
-    <button className={`mode rival__pick ${tint}`} disabled={!open && !connect} aria-label={connect ? `${label}: connect Adena to race your own ghost` : open ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : line || "nobody yet"}`} {...on}
+    <button className={`mode rival__pick ${tint}`} disabled={!open && !connect} aria-label={connect ? `${label}: connect Adena to race your own ghost` : open ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : failed ? "the board could not be read" : line || "nobody yet"}`} {...on}
       onClick={() => (connect ? (sound("select"), connect()) : open && row && onPick(row.player, show ? show.bests : undefined, kind))}>
       <span className="tag rival__tag">
         {kind === "self"
@@ -221,7 +225,7 @@ function Pick({ kind, label, tint, first, row, reading, chain, me, gnome, holes,
         {/* (its room kept when there is none: the circles the same size in every pick) */}
         <span className="rival__best" hidden={!best} aria-hidden={!best}>{best || "\u00a0"}</span>
       </span>
-      <span className="rival__name">{row ? who.label : kind === "self" ? "Your ghost" : reading ? "…" : "Nobody yet"}</span>
+      <span className="rival__name">{row ? who.label : kind === "self" ? "Your ghost" : reading ? "…" : failed ? "Not read" : "Nobody yet"}</span>
       <span className="rival__line">{line}</span>
       <span className="rival__go" hidden={!(open || connect)}>{connect ? "Connect" : "Race"}</span>
     </button>
