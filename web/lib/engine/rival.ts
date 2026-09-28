@@ -18,9 +18,8 @@
 // at the first duel: a game without one never makes it.
 //
 // E: the engine's live state (engine/types.ts Live).
-import { BackSide } from "three";
-import { makeBall } from "../scene";
-import { C, THIN_HULL, disposeCourse, motion, ownFade, setFade } from "../scene/materials";
+import { makeGhost } from "../scene/gnome";
+import { disposeCourse, motion } from "../scene/materials";
 import { BALL_R } from "../terrain";
 import { ghostSpeed, shotsOf } from "../duel";
 import { makeReplay, outlived, stepsMs } from "./replay";
@@ -28,8 +27,6 @@ import type { Ghost, Stroke } from "../types";
 import type { Gnome } from "../scene/data";
 import type { GameState, Live } from "./types";
 
-// the ghost's look: paper white, inked thin as a gnome is, see-through (and nobody's skin)
-const PAPER = { id: "ghost", name: "Ghost", line: "", hat: C.cream, body: C.cream, hair: C.cream, beard: "full" } as const;
 const SEEN = 0.7, AIMING = 0.45; // its opacity on its turn, and at rest while the player aims
 const WAIT_MS = 1500; // a stroke slower than this to read: the ghost jumps to its rest when it lands
 const CUT_MS = 5000; // a ghost's replay past this (a frozen tab) is cut: the engine's safety net, for the ghost
@@ -38,7 +35,7 @@ const readsOf = new WeakMap<Ghost, (Promise<Stroke> | undefined)[]>();
 
 export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showClock: (t: number) => void; restTimed: () => void; told: () => void; warm: () => void }) {
   const { g, scene } = E;
-  let ball: Gnome | null = null, mats: ReturnType<typeof ownFade> = [];
+  let ball: Gnome | null = null;
   let cut = 0, ghost: Ghost | null = null;
   // ends the wait for a stroke's read: the player's aim is not held for the ghost
   let hurry: (() => void) | null = null;
@@ -67,18 +64,14 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
   /** The ghost's gnome, made at the first duel, its see-through shaders compiled then. */
   function made() {
     if (ball) return ball;
-    ball = makeBall(PAPER);
-    mats = ownFade(ball, THIN_HULL);
-    ball.userData.shade.visible = false; // no shadow: a ghost
-    // its outline drawn after its body, against the body's depth: an ink rim, not an x-ray
-    ball.traverse((o) => { if ("material" in o && (o.material as { side?: number }).side === BackSide) o.renderOrder = 1; });
+    const ghostly = makeGhost(AIMING);
+    ball = ghostly.ball;
+    fade = ghostly.fade;
     scene.add(ball);
-    fade(AIMING);
     warm();
     return ball;
   }
-  // see-through, each part writing its depth: one drawn nearer first hides what is behind it
-  const fade = (o: number) => mats.forEach((m) => (setFade(m, o), (m.depthWrite = true)));
+  let fade = (_: number) => {}; // the ghost's see-through, once made
   const place = (b: Gnome, x: number, y: number) => b.position.set(x, BALL_R + E.ground(x, y), y);
   /** Where the ghost stands at (x, y): beside the player's gnome if it would stand on him,
    *  across the line to the cup, like two karts on a grid (display only). */

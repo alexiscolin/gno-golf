@@ -102,25 +102,6 @@ export function Emblem({ id }: { id: string }) {
         <rect x="50" y="58" width="8" height="9" rx="2" className="w__lamp" />
       </Frame>
     );
-  // the game's two ways to play: alone, and against a player's ghost
-  if (id === "solo" || id === "duel")
-    return (
-      <Frame id={id}>
-        <circle cx="60" cy="60" r="56" className="w__sky w__sky--garden" />
-        <path d="M 4 80 Q 60 66 116 80 L 116 116 L 4 116 Z" className="w__green" />
-        <path d="M 88 88 V 50" className="w__pole" />
-        <path d="M 88 50 L 102 55 L 88 60 Z" className="w__flag" />
-        {id === "duel" && (
-          // the rival: a see-through gnome, dashed, beside the player's
-          <g className="w__ghost">
-            <circle cx="62" cy="80" r="11" />
-            <path d="M 51 76 L 62 52 L 73 76 Z" />
-          </g>
-        )}
-        <circle cx={id === "duel" ? 36 : 48} cy="84" r="11" className="w__white" />
-        <path d={id === "duel" ? "M 25 80 L 36 56 L 47 80 Z" : "M 37 80 L 48 56 L 59 80 Z"} className="w__cap" />
-      </Frame>
-    );
   return (
     <Frame id="build">
       <circle cx="60" cy="60" r="56" className="w__sky w__sky--build" />

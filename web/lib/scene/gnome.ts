@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { BALL_R } from "../terrain";
-import { C, flat, inked, disposeCourse, texOf, motion } from "./materials";
+import { C, flat, inked, disposeCourse, texOf, motion, ownFade, setFade, THIN_HULL } from "./materials";
 import { makeRenderer, makeScene } from "./camera";
 import { bake } from "./bake";
 import { ud, type Gnome } from "./data";
@@ -325,14 +325,33 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   return root;
 }
 
-/** A turntable for the gnome picker: its own small renderer, nothing else. */
-export function makePreview(canvas: HTMLCanvasElement) {
+// a duel's ghost: paper white, inked thin as a gnome is (and nobody's skin)
+const GHOST: Skin = { id: "ghost", name: "Ghost", line: "", hat: C.cream, body: C.cream, hair: C.cream, beard: "full" };
+/** A see-through gnome (a duel's ghost, ADR-004): its own materials, no shadow;
+ *  fade(o) sets how see-through, each part hiding what is behind it. */
+export function makeGhost(o: number) {
+  const ball = makeBall(GHOST);
+  const mats = ownFade(ball, THIN_HULL);
+  ball.userData.shade.visible = false; // no shadow: a ghost
+  // its outline drawn after its body, against the body's depth: an ink rim, not an x-ray
+  ball.traverse((o) => { if ("material" in o && (o.material as THREE.Material).side === THREE.BackSide) o.renderOrder = 1; });
+  const fade = (x: number) => mats.forEach((m) => (setFade(m, x), (m.depthWrite = true)));
+  fade(o);
+  return { ball, fade };
+}
+
+/** A turntable for the gnome picker, and the game's choice (ghost: a duel's
+ *  ghost hops beside him): its own small renderer, nothing else. */
+export function makePreview(canvas: HTMLCanvasElement, { ghost = false } = {}) {
   const renderer = makeRenderer(canvas);
   const scene = makeScene();
   const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
   camera.position.set(0, 0.95, 4.2);
   camera.lookAt(0, 0.38, 0); // pompom at the top of a hop to the shadow, in frame
   let gnome: Gnome | null = null, alive = true;
+  // the ghost, a step to his right, hopping when he lands
+  const rival = ghost ? makeGhost(0.55).ball : null;
+  if (rival) (rival.scale.setScalar(0.82), rival.position.set(0.62, 0, -0.2), scene.add(rival));
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
@@ -353,6 +372,10 @@ export function makePreview(canvas: HTMLCanvasElement) {
       shade.scale.setScalar(1 - hop * 1.6);
       shade.material.opacity = 0.18 * (1 - hop * 1.4);
     }
+    if (rival) {
+      rival.userData.body.position.y = Math.abs(Math.cos(now / 380)) * 0.22;
+      rival.userData.body.rotation.y = -Math.sin(now / 1400) * 0.7;
+    }
     renderer.render(scene, camera);
   };
   size();
@@ -366,12 +389,13 @@ export function makePreview(canvas: HTMLCanvasElement) {
       gnome = makeBall(skin);
       gnome.scale.setScalar(0.82); // room above the hat for the hop
       gnome.userData.shade.position.y = -BALL_R + 0.02; // right under him, in frame
+      if (rival) gnome.position.x = -0.55;
       scene.add(gnome);
     },
     resize: size,
     destroy() {
       alive = false;
-      if (gnome) disposeCourse(gnome);
+      for (const g of [gnome, rival]) if (g) disposeCourse(g);
       renderer.dispose();
       renderer.forceContextLoss();
     },

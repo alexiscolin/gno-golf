@@ -2227,7 +2227,7 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   /* on a phone it joins the bottom row, left of the play buttons: a short word, no link (About has it) */
   .netbanner { height: 44px; padding: 0 8px; font-size: 11px; border-radius: 12px; }
   .netbanner b { font-size: 0; } .netbanner b::after { content: attr(data-short); font-size: 11px; }
-  .netbanner span, .netbanner__go { display: none; }
+  .netbanner span, .netbanner__go:not(.netbanner__support) { display: none; }
   .netbanner { left: 12px; } /* the top cards' gutter */
   .screen ~ .netbanner { left: 30px; bottom: max(30px, env(safe-area-inset-bottom)); } /* (a phone's corner buttons) */
   /* the play buttons start right of it, not under it */
@@ -2266,7 +2266,7 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
 /* where the centred play buttons reach the banner at the bottom left: its
    words go first, then (a phone on its side, a tablet) its mainnet link */
 @media (max-width: 1280px) { .netbanner span { display: none; } }
-@media (min-width: 601px) and (max-width: 900px) { .netbanner__go { display: none; } .netbanner { padding-right: 16px; } }
+@media (min-width: 601px) and (max-width: 900px) { .netbanner__go:not(.netbanner__support) { display: none; } }
 
 @media (max-width: 700px) {
   .podium__row { grid-template-columns: 1fr; gap: 4px; } .podium__row .podium__ghost { display: none; }

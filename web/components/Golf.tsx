@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
-import { GNOMES, makePreview, cheer, motion } from "@/lib/scene";
+import { GNOMES, cheer, motion } from "@/lib/scene";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
@@ -24,6 +24,7 @@ import About, { AboutButton, BackButton, Rules } from "@/components/About";
 import { Badges, ChainSeal, EarnedBadges, NewBadges } from "@/components/Badges";
 import Tip from "@/components/Tip";
 import Modes from "@/components/Modes";
+import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
@@ -1165,7 +1166,7 @@ export default function Golf() {
 
       {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => setScreen("modes")} onAbout={() => setAbout(true)} />}
       {screen === "modes" && (
-        <Modes chain={game.current && game.current.chain} me={account && account.address} mode={aim} onBack={() => setScreen("title")} onAbout={() => setAbout(true)}
+        <Modes chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen("title")} onAbout={() => setAbout(true)}
           onSolo={() => (setSolo(true), setRival(null), setScreen("worlds"))} onDuel={(addr) => (pickRival(addr), setScreen("worlds"))} />
       )}
       {screen === "worlds" && s && (
@@ -1599,6 +1600,7 @@ export default function Golf() {
       )}
       {real && (
         <RealPlay
+          elsewhere={ourNode === false}
           account={account}
           wallet={wallet}
           onConnect={() => void connectWallet()}
@@ -1784,7 +1786,9 @@ function GetGnot({ address, href, label = "" }: { address: string; href: string;
  * playing free. lack: the GNOT the account lacks for the round on offer
  * (null: unknown); waiting: that round, said while Adena is installed.
  */
-function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed, typed, nameOk }: {
+// elsewhere: Adena's network is another node (its balance there is not this one's)
+function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed, typed, nameOk, elsewhere = false }: {
+  elsewhere?: boolean;
   account: Account | null; wallet: { busy: boolean; error: string | null; note?: string }; onConnect: () => void; onClose: () => void; onSave: (() => void) | null;
   rpc: string | null; chainName: string; cost: string | null; funds: number | null; lack: number | null; named: boolean | null; waiting: string | null;
   chain: Chain | null; price: number; onNamed: (name: string) => void;
@@ -1864,7 +1868,9 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
                   {local ? null : <GetGnot address={account.address} href="" />}
                 </>
               )}
-              {account && funds != null && <> · You have {(funds / 1e6).toFixed(2)} GNOT.</>}
+              {account && (elsewhere
+                ? <> · Adena is on another network: in Adena, pick the one whose RPC is <b>{(rpc || "").replace(/^https?:\/\//, "")}</b>.</>
+                : funds != null && <> · You have {(funds / 1e6).toFixed(2)} GNOT here.</>)}
             </span>
           </li>
           <li className={step(3)}>
@@ -1948,34 +1954,6 @@ interface PickerProps {
   aim: Mode;
   onAim: (m: Mode) => void;
 }
-/** A gnome turning on a stage of its own (the preview renderer): the ref of
- *  the box it is drawn in. The picker's tile, the cup's new-gnome card. */
-function useGnomeStage(skin: Skin) {
-  const box = useRef<HTMLDivElement>(null);
-  const preview = useRef<ReturnType<typeof makePreview> | null>(null);
-  useEffect(() => {
-    // a canvas of its own each time: a WebGL context that was released cannot
-    // be taken again from the same element (React mounts twice in dev)
-    const el = document.createElement("canvas");
-    // its size only: the locked look is the wrapper's filter, and a copied
-    // "--locked" class stayed on this canvas for good (every gnome went dark)
-    el.className = "pick__canvas";
-    box.current!.appendChild(el);
-    let p: ReturnType<typeof makePreview>;
-    try { p = preview.current = makePreview(el); } catch { return () => el.remove(); } // no WebGL to spare: no stage, the screen stands
-    const onResize = () => p.resize();
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      p.destroy();
-      el.remove();
-    };
-  }, []);
-  useEffect(() => {
-    preview.current && preview.current.show(skin);
-  }, [skin]);
-  return box;
-}
 
 function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, onAbout, aim, onAim, hole = "", dare = "" }: PickerProps) {
   const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
@@ -2025,7 +2003,8 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
 // onSupport: the tip, on every screen: in the banner, or alone where there is none (mainnet)
 function NetBanner({ rpc, onSupport }: { rpc: string; onSupport: () => void }) {
   const net = networkOf(rpc);
-  const support = <button className="netbanner__go" onClick={onSupport}>♥ Support</button>;
+  // (on a phone, the heart alone: the banner's words go)
+  const support = <button className="netbanner__go netbanner__support" aria-label="Support the game" onClick={onSupport}>♥<span> Support</span></button>;
   // (the Leaderboard chip's twin, on the left)
   if (net === "mainnet")
     return (
