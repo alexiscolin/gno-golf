@@ -29,6 +29,11 @@ interface Call {
   type: "/vm.m_call";
   value: { caller: string; send: string; pkg_path: string; func: string; args: string[] };
 }
+/** A /bank.MsgSend message: coins from the player's account to another. */
+interface Send {
+  type: "/bank.MsgSend";
+  value: { from_address: string; to_address: string; amount: string };
+}
 /** The part of Adena's injected API this page calls (docs.adena.app). */
 export interface Adena {
   AddEstablish(name: string): Promise<AdenaRes>;
@@ -36,7 +41,7 @@ export interface Adena {
   GetNetwork?(): Promise<AdenaRes<Network>>;
   SwitchNetwork(chainId: string): Promise<AdenaRes>;
   AddNetwork(n: { chainId: string; chainName: string; rpcUrl: string }): Promise<AdenaRes>;
-  DoContract(tx: { messages: Call[]; gasFee: number; gasWanted: number; memo: string; networkInfo?: { chainId: string; rpcUrl: string } }): Promise<AdenaRes<{ hash: string; height: number }>>;
+  DoContract(tx: { messages: (Call | Send)[]; gasFee: number; gasWanted: number; memo: string; networkInfo?: { chainId: string; rpcUrl: string } }): Promise<AdenaRes<{ hash: string; height: number }>>;
   On?(event: "changedAccount" | "changedNetwork", fn: (...x: unknown[]) => void): void;
 }
 declare global {
@@ -380,6 +385,30 @@ async function calls(address: string, list: readonly (readonly [string, string, 
   });
   if (res.status !== "success") {
     const e: SendError = new Error(why(res, failed));
+    e.cancelled = res.code === CANCELLED;
+    throw e;
+  }
+  return res.data ?? null;
+}
+
+// a bank send is a few hundred thousand gas: asked with room, Adena sets the final fee
+const TIP_GAS = 2_000_000;
+/** A tip: GNOT sent from the player's account to the game's maker (the realm's
+ *  owner, read on the chain), confirmed in Adena like any send. No contract. */
+export async function sendTip({ from, to, gnot, price, chainId, rpc }: { from: string; to: string; gnot: number; price: number; chainId?: string | null; rpc: string }) {
+  if (!isAddress(from) || !isAddress(to) || !(gnot > 0) || !Number.isInteger(gnot * 1e6)) throw new Error("Nothing to send.");
+  const a = wallet();
+  if (!a) throw new Error("Adena is not installed in this browser.");
+  await ensureNetwork(a, { chainId, rpc });
+  const res = await a.DoContract({
+    messages: [{ type: "/bank.MsgSend", value: { from_address: from, to_address: to, amount: `${gnot * 1e6}ugnot` } }],
+    gasFee: feeFor(TIP_GAS, price),
+    gasWanted: TIP_GAS,
+    memo: "gnogolf tip",
+    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
+  });
+  if (res.status !== "success") {
+    const e: SendError = new Error(why(res, "The tip was not sent."));
     e.cancelled = res.code === CANCELLED;
     throw e;
   }

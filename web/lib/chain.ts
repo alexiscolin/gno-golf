@@ -383,6 +383,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       return n;
     },
     weather: (hole: string, period: number) => qeval(`Weather(${s(hole)}, ${period | 0})`, checks.weather),
+    /** The golf realm's owner (its maker), as the chain has it: where a tip goes. */
+    owner: async () => {
+      const raw = await vm(REALM, "Owner()");
+      const a = (raw.match(/^\("([^"]+)" \.uverse\.address\)$/) || [])[1];
+      if (!a || !isAddress(a)) throw refused("The chain's owner is not an address.");
+      return a;
+    },
     /** What a timed hole adds at one stroke of a round (0 = first shot). */
     extras: (hole: string, stroke: number) => qeval(`Extras(${s(hole)}, ${Math.max(0, stroke | 0)})`, checks.extras),
     /** The course-wide ranking of recorded rounds. */

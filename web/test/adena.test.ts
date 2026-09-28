@@ -21,6 +21,7 @@ import {
   claimRounds,
   gnokeyPlan,
   depositBytes,
+  sendTip,
   shortOf,
   costOf,
 } from "../lib/adena.ts";
@@ -723,4 +724,11 @@ test("commitsOf: a shot heavier than what is left of the budget (less its fixed 
   assert.deepEqual(commitsOf({ pts: heavy.map(() => 200), works: heavy, fixed: 150_000_000 }), [[0, 1], [1, 2], [2, 3], [3, 4]]);
   // without the works (a round kept from before they were said): the path's model alone
   assert.deepEqual(commitsOf({ pts: [60, 60] }), [[0, 2]]);
+});
+
+test("sendTip: sends nothing without two addresses and a whole ugnot amount", async () => {
+  const a = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  await assert.rejects(sendTip({ from: a, to: "nope", gnot: 5, price: 0.001, rpc: "http://127.0.0.1:26657" }), /Nothing to send/);
+  await assert.rejects(sendTip({ from: a, to: a, gnot: 0, price: 0.001, rpc: "http://127.0.0.1:26657" }), /Nothing to send/);
+  await assert.rejects(sendTip({ from: a, to: a, gnot: 1e-7, price: 0.001, rpc: "http://127.0.0.1:26657" }), /Nothing to send/);
 });

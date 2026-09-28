@@ -472,6 +472,14 @@ test("ghost reads a best with its round, null for none, and never asks for a bad
   assert.equal(asked.length, 5, "a bad address is never asked");
 });
 
+test("owner reads the realm's owner as an address, and refuses anything else", async () => {
+  const chain = makeChain();
+  setFetch(() => rawReply(`("${ADDR1}" .uverse.address)`));
+  assert.equal(await chain.owner(), ADDR1);
+  setFetch(() => rawReply(`("not an address" .uverse.address)`));
+  await assert.rejects(chain.owner());
+});
+
 test("holeLeaderboard pages one hole's board", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply(HOLE_BOARD_REPLY));
