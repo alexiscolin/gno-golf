@@ -787,6 +787,11 @@ function runPaste(shell: string, gnokey: string, calls = 2) {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+test("gnokeyPaste: the key name goes in as typed, a $ in it no replacement pattern", () => {
+  const plan = gnokeyPlan({ id: "garden/7", shots: ["1,1"], period: 5, pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC });
+  for (const key of ["'my$`key'", "'a$$b'", "'a$&b'"]) assert.ok(gnokeyPaste(plan, key).includes(key), key);
+});
+
 for (const shell of ["bash", "zsh"].filter((sh) => existsSync(`/bin/${sh}`))) {
   test(`gnokeyPaste (${shell}): a stale sequence is sent again a block later; any other failure stops the paste`, () => {
     // each call refused once ("signature verification failed"), then taken

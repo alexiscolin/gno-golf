@@ -758,6 +758,10 @@ test("txResult: what a transaction's calls returned, by its hash in base64 or he
   // a transaction that failed on the chain: its log, refused (nothing of it was kept)
   setFetch(() => ({ result: { tx_result: { ResponseBase: { Error: { "@type": "/std.InternalError" }, Log: "golf: this round's weather is over", Data: null } } } }));
   await assert.rejects(chain.txResult(hex), (e: unknown) => errorKind(e) === "chain" && /weather is over/.test((e as Error).message));
+  // onyx's whole VM dump: the player reads the realm's sentence, the log stays on the error
+  const dump = "msg:0,success:false,log:--= Error =--\nData: &errors.errorString{s:\"x\"}\nMsg Traces:\n    0  panic: golf: this round's weather is over\n--= /Error =--\n,events:[]";
+  setFetch(() => ({ result: { tx_result: { ResponseBase: { Error: { "@type": "/vm.VMError" }, Log: dump } } } }));
+  await assert.rejects(chain.txResult(hex), (e: unknown) => (e as Error).message === "golf: this round's weather is over" && (e as { log?: string }).log === dump);
   await assert.rejects(chain.txResult("nope"), /Not a transaction hash/);
   setFetch(() => ({ __status: 500 }));
   await assert.rejects(chain.txResult(hex), (e: unknown) => errorKind(e) === "down");

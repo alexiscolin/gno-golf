@@ -4,7 +4,7 @@ import { useState } from "react";
 import { gnokeyPlan, gnokeyPaste, chainSplit } from "@/lib/adena";
 import { Button } from "@/components/ui";
 import { messageOf, useCopied } from "@/components/common";
-import type { Chain } from "@/lib/chain";
+import { errorKind, type Chain } from "@/lib/chain";
 import type { Snapshot } from "@/lib/engine";
 
 // "Use gnokey instead": the calls Adena would sign, as one paste for a
@@ -30,13 +30,15 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
   // the commits as the chain itself cuts them, asked when the panel opens:
   // the same split an Adena save sends (keyed by the round it is for)
   const round = s ? `${s.id}#${s.shots.join(";")}#${s.period}` : "";
-  const [split, setSplit] = useState<{ round: string; parts: readonly (readonly [number, number])[] | null; bad?: string } | null>(null);
+  // (refused: the chain refused the round, and no paste is offered; a node that did not answer
+  // leaves the model's split, which the chain checks again as it plays it)
+  const [split, setSplit] = useState<{ round: string; parts: readonly (readonly [number, number])[] | null; bad?: string; refused?: boolean } | null>(null);
   const ask = () => {
     if (!s || !chain || !s.id || s.period == null || (split && split.round === round)) return;
     setSplit({ round, parts: null });
     chainSplit(chain, { ...s, id: s.id }, s.period)
       .then((parts) => setSplit((v) => (v && v.round === round ? { round, parts } : v)))
-      .catch((e: unknown) => setSplit((v) => (v && v.round === round ? { round, parts: null, bad: messageOf(e) } : v)));
+      .catch((e: unknown) => setSplit((v) => (v && v.round === round ? { round, parts: null, bad: messageOf(e), refused: errorKind(e) !== "down" } : v)));
   };
   if (!s || !chain) return null;
   const mine = split && split.round === round ? split : null;
@@ -62,9 +64,9 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
           </li>
           <li>Copy it, paste it in a terminal (macOS, Linux or WSL) and type your key's password ({plan.length} times: one per transaction). It works while this round's weather lasts: see the countdown above.</li>
         </ol>
-        <pre className="mono gnokey__code">{all}</pre>
+        {!(mine && mine.refused) && <pre className="mono gnokey__code">{all}</pre>}
         <div className="gnokey__row">
-          <Button variant="primary" className="gnokey__copy" disabled={!ready || checking} onClick={copy}>{copied ? "Copied" : checking ? "Checking…" : "Copy"}</Button>
+          <Button variant="primary" className="gnokey__copy" disabled={!ready || checking || !!(mine && mine.refused)} onClick={copy}>{copied ? "Copied" : checking ? "Checking…" : "Copy"}</Button>
           <span className="real__fine">
             {mine && mine.bad ? <span className="gnokey__bad">{mine.bad}</span>
               : checking ? "Asking the chain how it cuts this round…"

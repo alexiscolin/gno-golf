@@ -511,7 +511,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       } finally {
         clearTimeout(t);
       }
-      if (r && r.Error) throw refused(r.Log || "The transaction failed.", r.Log);
+      // (the realm's own sentence for the player; the VM's whole log kept on the error)
+      if (r && r.Error) throw refused(refusal(r.Log) || "The transaction failed.", r.Log);
       return r ? utf8(r.Data || "") : null;
     },
   };

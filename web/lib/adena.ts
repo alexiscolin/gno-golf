@@ -552,7 +552,7 @@ export function gnokeyPaste(plan: readonly string[], who: string) {
     "}",
   ].join("\n");
   const body = plan
-    .map((command, k) => `echo "Gnogolf: transaction ${k + 1} of ${plan.length}"\nsend ${command.replace("<your-key-name>", who)}`)
+    .map((command, k) => `echo "Gnogolf: transaction ${k + 1} of ${plan.length}"\nsend ${command.replace("<your-key-name>", () => who)}`)
     .join("\n\n");
   return `(\nset -e\n${send}\n\n${body}\n)`;
 }
@@ -563,6 +563,15 @@ export const holedIn = (result: string | null | undefined) => {
   const m = String(result || "").match(/holed in (\d+) strokes/);
   return m ? Number(m[1]) : null;
 };
+
+/** A transaction's result by its hash (its Data, "" for none), or null while
+ *  the chain cannot say (its RPC down, the transaction not found yet); one
+ *  that failed on the chain throws its log (errorKind "chain"). */
+export const resultOf = (chain: Pick<Chain, "txResult">, hash: string) =>
+  chain.txResult(hash).catch((e: unknown) => {
+    if (errorKind(e) === "chain") throw e;
+    return null;
+  });
 
 /**
  * What a save's last commit did, as the chain says it, for a round of
@@ -576,10 +585,7 @@ export const holedIn = (result: string | null | undefined) => {
  */
 export async function readBack(chain: Pick<Chain, "txResult" | "round">, { hole, player, strokes, hash, sent }: { hole: string; player: string; strokes: number; hash?: string; sent: boolean }) {
   if (hash) {
-    const result = await chain.txResult(hash).catch((e: unknown) => {
-      if (errorKind(e) === "chain") throw e;
-      return null;
-    });
+    const result = await resultOf(chain, hash);
     if (result != null) return { holed: holedIn(result), left: Number((result.match(/after (\d+) strokes/) || [])[1]) || null };
   }
   if (!sent) return undefined;
