@@ -182,7 +182,7 @@ function CauseNote({ hot }: { hot: Hot }) {
   const cause = useHot(hot, "cause");
   return cause ? <div key={cause.at} className="cause" aria-live="polite">{cause.label}</div> : null;
 }
-function LiveWeather({ hot, ...props }: { hot: Hot; w: Snapshot["weather"]; until: number | null }) {
+function LiveWeather({ hot, ...props }: { hot: Hot; w: Snapshot["weather"]; until: number | null; night: boolean }) {
   return <Weather {...props} flash={useHot(hot, "flash") || 0} />;
 }
 
@@ -1452,7 +1452,7 @@ export default function Golf() {
                 {assisted}
               </div>
             )}
-            <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
+            <LiveWeather hot={hot.current} w={wx ?? null} night={s.time === "night"} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
             <div className="hud__right">
               <span className="adena__wrap">
               <button

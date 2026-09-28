@@ -1621,6 +1621,7 @@ h3 small {
 .wv__brim { fill: var(--hat); stroke: var(--ink); stroke-width: 2; }
 .wv__calm { fill: var(--paper); stroke: var(--ink); stroke-width: 2.5; }
 .ws__sun { fill: var(--sunny); stroke: var(--ink); stroke-width: 2.5; }
+.ws__moon { fill: var(--lamp); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
 .ws__cloud { fill: var(--white); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
 .ws__cloud--dark { fill: var(--stone); }
 .ws__rain { stroke: #3d8fb0; stroke-width: 2.5; stroke-linecap: round; }

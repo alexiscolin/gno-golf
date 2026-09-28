@@ -5,12 +5,13 @@
 // the arrow and points where the wind blows (the board as seen: right is +x,
 // down the screen is +y) — a windsock for how hard, and what falls from the sky.
 // A storm's flashes are the scene's (flash counts them): the screen lights
-// up with the 3D lightning, not on a clock of its own.
+// up with the 3D lightning, not on a clock of its own. A clear night's sky is
+// the moon (night: the hole's time of day).
 import { useEffect, useState } from "react";
 import { InfoTip } from "@/components/ui";
 import type { WeatherNow } from "@/lib/scene/weather";
 
-export default function Weather({ w: given, flash = 0, until = null }: { w: WeatherNow | null; flash?: number; until?: number | null }) {
+export default function Weather({ w: given, flash = 0, until = null, night = false }: { w: WeatherNow | null; flash?: number; until?: number | null; night?: boolean }) {
   // how long this weather lasts: the chain's period ends at until (epoch ms);
   // said in minutes, which a drifting clock spoils less than a time of day
   const [now, setNow] = useState(() => Date.now());
@@ -27,11 +28,11 @@ export default function Weather({ w: given, flash = 0, until = null }: { w: Weat
   const force = !s ? 0 : s < 0.05 ? 1 : s < 0.09 ? 2 : s < 0.13 ? 3 : 4;
   const NAMES = ["Calm", "Breeze", "Wind", "Strong wind", "Gale"];
   const sky = w.storm ? "storm" : w.rain ? "rain" : w.snow ? "snow" : w.fog ? "fog" : "sun";
-  const said = [w.wind && `${NAMES[force].toLowerCase()}, force ${force} of 4`, w.rain && "rain, the green runs fast", w.fog && "fog", w.storm && "storm"]
+  const said = [w.wind && `${NAMES[force].toLowerCase()}, force ${force} of 4`, w.rain && "rain, the green runs fast", w.snow && "snow, the green runs slow", w.fog && "fog", w.storm && "storm"]
     .filter(Boolean)
     .join(" · ");
   // what it does to the ball, said on a tap
-  const note = [w.wind && `${NAMES[force]}, force ${force}/4: it pushes the ball on the chain; the aim dots include it.`, w.rain && "Rain: the green runs fast.", w.fog && "Fog: the far end is hard to see.", w.storm && "Storm: gusts come and go.", w.snow && "Snow."]
+  const note = [w.wind && `${NAMES[force]}, force ${force}/4: it pushes the ball on the chain; the aim dots include it.`, w.rain && "Rain: the green runs fast, and puddles slow the ball.", w.fog && "Fog: the far end is hard to see.", w.storm && "Storm: gusts come and go.", w.snow && "Snow: the green runs slow."]
     .filter(Boolean)
     .join(" ") || "A clear sky: nothing pushes the ball.";
   return (
@@ -57,7 +58,7 @@ export default function Weather({ w: given, flash = 0, until = null }: { w: Weat
         </svg>
         <div className="weather__side">
           <svg viewBox="0 0 40 28" className="weather__sky" aria-hidden="true">
-            {sky === "sun" && <circle cx="20" cy="14" r="8" className="ws__sun" />}
+            {sky === "sun" && (night ? <path d="M 24 7.07 A 8 8 0 1 0 24 20.93 A 7 7 0 0 1 24 7.07 Z" className="ws__moon" /> : <circle cx="20" cy="14" r="8" className="ws__sun" />)}
             {sky !== "sun" && <path d="M 8 20 Q 4 20 4 16 Q 4 11 10 11 Q 12 5 19 6 Q 25 5 27 11 Q 35 10 35 16 Q 35 20 30 20 Z" className={"ws__cloud" + (sky === "storm" ? " ws__cloud--dark" : "")} />}
             {sky === "rain" && <path d="M 12 23 l -2 4 M 20 23 l -2 4 M 28 23 l -2 4" className="ws__rain" />}
             {sky === "storm" && <path d="M 21 19 L 16 25 H 21 L 18 28" className="ws__bolt" />}
