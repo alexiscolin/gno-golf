@@ -1205,7 +1205,8 @@ export default function Golf() {
     // the cup complete now and not before, or again in fewer strokes than the card had
     const h = list.find((x) => x.id === id), cup = h && WORLDS.find((w) => w.id === cupOf(h))?.id;
     const b = cup && before[cup], a = cup && after[cup];
-    if (cup && b && a && a.all && (!b.all || a.strokes < b.strokes)) setCupWon({ cup, id, best: b.all });
+    // (not in a duel: a race on one hole, never a cup's end)
+    if (!(dare && !solo) && cup && b && a && a.all && (!b.all || a.strokes < b.strokes)) setCupWon({ cup, id, best: b.all });
     // a course hole's badges (a community hole's would be too easy to farm)
     setFreshBadges([]);
     if (s && s.official && h) {
