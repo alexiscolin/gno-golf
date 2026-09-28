@@ -65,8 +65,10 @@ export function buildHole(s: Hole, { defer = false } = {}): Course {
   if (pond) g.add(pond);
   g.add(roughScenery(s, t));
 
-  // wear: one counter per cell, painted as a soft trodden patch
-  const wear = wearLayer(s.wear, s.board.w, s.board.h, t.height);
+  // wear: one counter per cell, painted as a soft trodden patch, in the lane's
+  // own darker shade (packed snow, sand...; the garden's green without one)
+  const wg = world.green, lane = typeof wg === "function" ? wg(s) : wg;
+  const wear = wearLayer(s.wear, s.board.w, s.board.h, t.height, lane && lane !== "planks" ? new THREE.Color(lane[1]).multiplyScalar(0.55) : C.wear);
   g.add(wear.mesh);
 
   const ownSea = worldOf(s).SEA !== undefined;
@@ -1610,7 +1612,8 @@ function tee(start: Vec2, height: Height) {
   return m;
 }
 
-function wearLayer(wear: Wear, W: number, H: number, height: Height) {
+// lit as the ground it lies on: dark at night, not glowing
+function wearLayer(wear: Wear, W: number, H: number, height: Height, tint: THREE.ColorRepresentation = C.wear) {
   const canvas = document.createElement("canvas");
   canvas.width = wear.w;
   canvas.height = wear.h;
@@ -1635,7 +1638,7 @@ function wearLayer(wear: Wear, W: number, H: number, height: Height) {
   };
   const mesh = new THREE.Mesh(
     new THREE.BufferGeometry(),
-    new THREE.MeshBasicMaterial({ color: C.wear, map: texture, transparent: true, opacity: 0.55, depthWrite: false })
+    flat(tint, { map: texture, transparent: true, opacity: 0.55, depthWrite: false })
   );
   ud(mesh).live = true; // repainted and shown/hidden: never baked
 
