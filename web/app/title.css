@@ -350,7 +350,6 @@ body:has(.sheet) .modetag { visibility: hidden; }
 .rival .friends__add { margin: 0; align-items: center; }
 .rival .drawer__note { position: relative; margin: 6px 0 0; } /* the (i)'s popover under its line */
 .rival .lb { margin-top: 10px; }
-.rival .lb--full ol { max-height: none; overflow: visible; mask-image: none; padding: 2px 0 0; } /* the screen scrolls, not the board in it */
 /* the heading says what the board is; players with no name have no Race here */
 .rival .lb--full > h3, .rival .unnamed { display: none; }
 /* their ghosts: a cup's emblem before its name; a row names a hole, not a player */
