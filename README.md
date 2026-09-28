@@ -5,6 +5,13 @@
 A 3D mini-golf game on [gno.land](https://gno.land). The holes live on-chain,
 and so does the physics: the chain plays every shot.
 
+**Race anyone's ghost, verified on-chain.** Every best round on the boards is
+a ghost you can take turns against, stroke for stroke: the champion's, a
+player's at your level, a friend's, or your own. The chain kept it, so nobody
+can fake one, and there is no game server: the chain is the referee. Next:
+**build a hole, own it forever**, the contract side is ready and closed
+behind a switch, the in-game editor comes with the second wave.
+
 ## How it works
 
 You pull back like a slingshot and let go. The client sends that decision (an
@@ -15,7 +22,8 @@ replay of your shots, and anyone can replay it again.
 - Playing is free. A shot's preview is a read-only query, so you need no wallet
   to play the whole course.
 - Keeping a score takes one transaction per hole (two for a long round),
-  signed with [Adena](https://www.adena.app/). The first save on a hole costs
+  signed with [Adena](https://www.adena.app/) (or gnokey, from the game's
+  commands). The first save on a hole costs
   about 0.4 GNOT (most of it a storage deposit), a later one about 0.06.
 - The boards list players with a gno.land name, so a script can't flood them
   with throwaway addresses. You can take a name without leaving the game, in
