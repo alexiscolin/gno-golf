@@ -236,10 +236,12 @@ Holed in 3 on garden/3/v1! Your round: /r/gnogolf/golf:garden/3/v1/g1…
 ### `PlayRoundPro(cur realm, hole, shots string, period int64) string`
 
 Commit several shots in one transaction by replaying them. The client sends
-decisions, never outcomes. They **continue the caller's round from where it
-is**. They don't start from the tee, so to record what `SimulateRound` showed,
-send `Reset` and `PlayRoundAt` in the same transaction (the web client does
-this through Adena).
+decisions, never outcomes. They **continue the caller's round under way**
+from where it is, or start a new one from the tee if there is none. A holed
+round is not kept (its best is), so the next commit after a finish starts
+afresh with no `Reset`. To record what `SimulateRound` showed over a round
+left under way, send `Reset` and `PlayRoundAt` in the same transaction (the
+web client does this through Adena when the chain holds one).
 
 - `PlayRoundAt` plays in the weather of `period`, assisted. `PlayRoundPro` is
   `PlayRoundAt` in pro mode: the aim preview cut short, on the player's word.
@@ -254,14 +256,18 @@ this through Adena).
 - A round can be played on until the period after its own is over. After
   that, every stroke panics until the round is `Reset`.
 - It stops at the shot that holes the ball. Returns `"holed in N strokes"` or
-  `"K shots replayed, ball at X.X,Y.Y after N strokes"`.
-- A finished round (`done`) can't be played again until it's `Reset`.
+  `"K shots replayed, ball at X.X,Y.Y after N strokes"`: the transaction's
+  result is how a client knows its round was holed, since a holed round is
+  not kept (its best is, if it is one: `BestOf`, `Ghost`).
+- A round is stored from its first commit that does not hole it, and removed
+  when it is holed.
 
 ### `Reset(cur realm, hole string)`
 
-Drops the caller's round on that hole (and frees its storage). The next
-stroke starts a new one from the tee. Their bests are kept. Emits
-`RoundReset` (`hole`, `player`).
+Abandons the caller's round under way on that hole (and frees its storage).
+The next stroke starts a new one from the tee. Their bests are kept. A holed
+round is not kept, so it needs none. Emits `RoundReset` (`hole`, `player`)
+when there was a round to drop, nothing otherwise.
 
 ### `Claim(cur realm) int`
 
@@ -499,7 +505,7 @@ chooses it.
 
 ```json
 {"version":1,"player":"g1…","ball":[26,0.04],"rest":[26,0.0412345],
- "strokes":2,"done":false,"period":5920000,"mode":"assisted",
+ "strokes":2,"period":5920000,"mode":"assisted",
  "shots":"12.0000,6.5000,0;350.0000,3.0000,4",
  "path":[[3,13],…],"air":"000110…0","cause":"--bbw…-"}
 ```
@@ -514,8 +520,8 @@ a slippery surface, `-` nothing but friction.
 
 #### `Round(hole string, player address) string`
 
-One player's round with its last stroke's path, or `null` if they have none
-(or `Reset` it). It costs one stroke of gas, whatever the size of the hole's
+One player's round under way with its last stroke's path, or `null` if they
+have none: never started, holed (the best is kept: `Ghost`) or `Reset`. It costs one stroke of gas, whatever the size of the hole's
 history.
 
 #### `Simulate(hole string, ballX, ballY, angle, power float64) string`
@@ -742,7 +748,7 @@ version's id or an alias.
 | `<world>` | a cup: its holes by number (par, best by name, plays); a word that is no cup is "No such hole" |
 | `<address>` | the community holes that address published, as their current versions |
 | `<hole>` | the hole as a text board, its weather (a wind's heading in degrees), a `Launch` form, a `Reset` form, a link to `Claim`, and its best rounds per mode, each with a `race` link: the 3D game against that best's ghost (its dare link, `&by=`) |
-| `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked; a round whose weather is over says to `Reset` first, and a best links its ghost |
+| `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked: their round under way (one whose weather is over says to `Reset` first) and their best in each mode, each linking its ghost |
 | `<hole>/data` | a version's provenance, every version of its alias, and its data in hex |
 
 On gnoweb that's `/r/gnogolf/golf`, `/r/gnogolf/golf:garden`,
@@ -862,9 +868,12 @@ Measured on the course holes; treat them as orders of magnitude:
   entry and index keys): nothing for rounds or records until someone plays.
   A version's rounds, bests and board are rows of B+ trees every version
   shares (32 a leaf), seeded when golf is deployed: no version pays for trees
-  of its own, and a player's first finish pays for their own rows, about
-  3.2 KB (1.9 KB on a further hole), at 50 players. The first stroke of a round stores about
-  1.5 KB, a replay after `Reset` nothing. The decoded hole is never stored.
+  of its own, and a player's first finish pays for their own rows, not for
+  the round, which is not kept once holed: about 0.6 KB for an unnamed
+  player (2.2 KB when holed rounds were kept), plus the version's 512-byte
+  wear for its first finish. A round left under way stores about 1.6 KB
+  until it is holed or `Reset`; a replay that holes stores nothing. The
+  decoded hole is never stored.
   A best keeps its round for `Ghost`: about 30 bytes and 18 to 23 a stroke,
   written only when it improves (a shorter best frees the longer one).
 - **Reads** are free as queries, within the node's query gas limit.

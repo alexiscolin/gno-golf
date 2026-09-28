@@ -389,12 +389,9 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	}
 
 	s += "## Play\n\n"
-	if mine != nil && mine.done {
-		s += "_This round is holed: it is kept as it is. To play the hole again, Reset first (below), then shoot._\n\n"
-	}
 	// the one number a text player cannot read off the board: where the cup is
 	from, who := h.Start(), "the tee"
-	if mine != nil && !mine.done && mine.strokes > 0 {
+	if mine != nil {
 		from, who = mine.ball(), "the ball"
 	}
 	a, d := aim(from, h.Cup())
@@ -406,13 +403,13 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	s += "<gno-input name=\"power\" description=\"power: above 0, up to 10\" placeholder=\"e.g. 6\" required=\"true\" />\n"
 	s += "</gno-form>\n\n"
 	s += ufmt.Sprintf("_After your shot, see your ball at `%s:%s/<your address>`._\n\n", hub, e.id)
-	s += "Holed, or want a fresh start? Put your ball back on the tee:\n\n"
+	s += "A round under way you would rather start afresh? Put your ball back on the tee (a holed round needs nothing: the next shot starts a new one):\n\n"
 	s += "<gno-form exec=\"Reset\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
 	s += "</gno-form>\n\n"
 	s += "Took a gno.land name after saving rounds? " + md("Claim", hub+"$help&func=Claim") + " puts them on the boards now.\n\n"
 
-	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; finished: %d assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
+	s += ufmt.Sprintf("## Best rounds\n\n%d rounds under way here; finished: %d assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
 	if e.board(assisted).Size()+e.board(pro).Size() == 0 {
 		s += " No named player has finished it yet.\n\n"
 	} else {
@@ -437,45 +434,58 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	return s + "\n_This hole is " + source(e) + " — read it before you trust it with a round._\n"
 }
 
-// roundSummary is how a player's round stands, and where their best puts them
-// on the hole's board, or why nowhere.
+// roundSummary is how a player stands on the hole: their round under way, if
+// any, and their best in each mode, with where it puts them on the hole's
+// board, or why nowhere. A holed round is not kept: its best is.
 func roundSummary(e *entry, p address, r *round) string {
 	who := short(p.String())
 	name := nameOf(p.String())
 	if name != "" {
 		who = "@" + name
 	}
-	if r == nil {
-		return "> [!NOTE]\n> " + who + " has no round on this hole yet.\n\n"
-	}
-	// the shots are golf's own "%.4f,%.4f,%d": digits and punctuation only
-	shots := "Shots: `" + strings.ReplaceAll(r.shots, ";", "; ") + "`"
-	if !r.done {
+	s := ""
+	if r != nil {
 		over := ""
 		if r.period < Period()-1 {
 			over = " Its weather is over: Reset (below) before the next shot."
 		}
-		return ufmt.Sprintf("> [!NOTE]\n> %s's round: %s so far, not holed yet.%s\n>\n> %s\n\n", who, count(r.strokes, "stroke"), over, shots)
+		s = ufmt.Sprintf("> %s's round: %s so far, not holed yet.%s\n>\n> %s\n>\n", who, count(r.strokes, "stroke"), over, shotsOf(r.shots))
 	}
-	// ufmt has no %+d: the sign is written out
-	vs := "even"
-	if d := r.strokes - e.par; d > 0 {
-		vs = "+" + strconv.Itoa(d)
-	} else if d < 0 {
-		vs = strconv.Itoa(d)
+	for m := 0; m < modes; m++ {
+		v := e.bests(m).Get(p.String())
+		if v == nil {
+			continue
+		}
+		// ufmt has no %+d: the sign is written out
+		best, vs := bestStrokes(v), "even"
+		if d := best - e.par; d > 0 {
+			vs = "+" + strconv.Itoa(d)
+		} else if d < 0 {
+			vs = strconv.Itoa(d)
+		}
+		s += ufmt.Sprintf("> **%s's best here: %d** (par %d, %s), %s. ", who, best, e.par, vs, modeNames[m])
+		b := e.board(m)
+		switch k := boardKey(v, p.String()); {
+		case b.Has(k):
+			s += ufmt.Sprintf("**#%d of %d** on the %s board. %s.\n>\n", b.index(k)+1, b.Size(), modeNames[m], race(e, p.String(), "Race this ghost in 3D"))
+		case name == "":
+			s += "Not on the board: only players with a gno.land name are ranked.\n>\n"
+		default:
+			s += "Not on the board yet: the name came after this round. Claim (below, or the game's \"Rank them\") ranks it now.\n>\n"
+		}
+		_, _, shots := bestFields(v)
+		s += "> " + shotsOf(shots) + "\n>\n"
 	}
-	s := ufmt.Sprintf("> [!NOTE]\n> **%s holed it in %d** (par %d, %s), %s.\n>\n", who, r.strokes, e.par, vs, modeNames[r.mode])
-	b, v := e.board(r.mode), e.bests(r.mode).Get(p.String()) // a finished round has its best
-	best := bestStrokes(v)
-	switch k := boardKey(v, p.String()); {
-	case b.Has(k):
-		s += ufmt.Sprintf("> Best here: %s, **#%d of %d** on the %s board. %s.\n>\n", count(best, "stroke"), b.index(k)+1, b.Size(), modeNames[r.mode], race(e, p.String(), "Race this ghost in 3D"))
-	case name == "":
-		s += "> Not on the board: only players with a gno.land name are ranked.\n>\n"
-	default:
-		s += "> Not on the board yet: the name came after this round. Claim (below, or the game's \"Rank them\") ranks it now.\n>\n"
+	if s == "" {
+		return "> [!NOTE]\n> " + who + " has no round on this hole yet.\n\n"
 	}
-	return s + "> " + shots + "\n\n"
+	return "> [!NOTE]\n" + strings.TrimSuffix(s, ">\n") + "\n"
+}
+
+// shotsOf is a round's shots for a page: golf's own "%.4f,%.4f,%d", digits
+// and punctuation only.
+func shotsOf(shots string) string {
+	return "Shots: `" + strings.ReplaceAll(shots, ";", "; ") + "`"
 }
 
 // renderData is a data version's page: where it came from, its versions,
@@ -572,7 +582,7 @@ func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 	blankUnreachable(g, wall, f, h.Start(), h.Cup())
 
 	// only your own ball: everyone's at once would bury the board
-	if mine != nil && !mine.done {
+	if mine != nil {
 		put(g, mine.ball(), '@')
 	}
 

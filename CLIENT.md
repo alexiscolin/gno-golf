@@ -217,8 +217,8 @@ exact ball at stroke number `stroke`. It refuses what that commit would
 refuse, so a client can check every commit of a long round before it signs
 any. A heavy hole can't replay 12 full shots in one transaction: a list over
 its work budget is refused with `commit the first N, then the rest`. Record
-such a round in several transactions (the first with `Reset`), each
-continuing the round.
+such a round in several transactions (the first with `Reset` if a round is
+under way), each continuing the round.
 
 ### `Rank(mode, player) string` — a player's place
 
@@ -341,13 +341,18 @@ Every write is a `MsgCall` to the golf realm, signed by the wallet, and takes
 the exact version id.
 
 - `PlayRoundAt(cur, hole, shots, period)` records assisted shots, continuing
-  the caller's round. To record what `SimulateRoundAt` showed from the tee,
-  send `Reset(cur, hole)` and `PlayRoundAt` in the same transaction.
+  the caller's round under way, or starting one from the tee: a holed round
+  is not kept (its best is), so a new one needs nothing first. It answers
+  `"holed in N strokes"` when it holes, which the transaction's result
+  carries. To record what `SimulateRoundAt` showed from the tee over a round
+  left under way (`Round` is not `null`), send `Reset(cur, hole)` and
+  `PlayRoundAt` in the same transaction.
 - `PlayRoundPro(cur, hole, shots, period)` is the same for a round played
   without the aim preview. A round keeps the mode of its first stroke.
 - `Launch(cur, hole, angle, power)` is one shot, one transaction, always pro:
   it is how gnoweb plays.
-- `Reset(cur, hole)` puts the ball back on the tee.
+- `Reset(cur, hole)` abandons a round under way: the ball goes back to the
+  tee.
 
 A wallet session scoped to the golf realm's `vm/exec` stops the wallet
 prompting for every commit. `PublishMine` is how authors add holes of their

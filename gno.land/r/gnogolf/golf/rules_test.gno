@@ -261,7 +261,10 @@ func TestPagedReads(cur realm, t *testing.T) {
 	for _, p := range ps {
 		uassert.Equal(t, 1, strings.Count(one+two, `"player":"`+p), "each player once")
 	}
-	uassert.True(t, strings.Contains(Rounds(id, "", 100), `"shots":"0.0000,1.0000,0"`))
+	// the three are holed, so not kept: Rounds lists the rounds under way
+	testing.SetRealm(testing.NewUserRealm(player))
+	PlayRoundAt(cross(cur), id, "180,0.2", Period())
+	uassert.True(t, strings.Contains(Rounds(id, "", 100), `"rows":[{"version":1,"player":"`+player.String()+`","ball":`), Rounds(id, "", 100))
 	all := Players("assisted", "", 100)
 	for _, p := range ps {
 		uassert.True(t, strings.Contains(all, `"player":"`+p+`","holes":`), all)

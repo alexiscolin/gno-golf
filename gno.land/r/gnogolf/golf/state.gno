@@ -12,7 +12,7 @@ import (
 )
 
 // State is the hole as JSON for a client: geometry, skins (names the client
-// looks up), weather, wear and the rounds in flight, without their paths
+// looks up), weather, wear and the rounds under way, without their paths
 // (Round has one). hole is a version's id or an alias; "hole" in the answer
 // is always the version's id, the one to write with, with its "slot" and
 // "v", and an archived one's "next".
@@ -73,7 +73,7 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 		return sb.String()
 	}
 
-	// capped (roundsShown): every address that ever played keeps a round
+	// capped (roundsShown): every address that left a round under way keeps it
 	sb.WriteString(`]},"roundsTotal":` + strconv.Itoa(e.roundTree().Size()) + `,"rounds":[`)
 	i := 0
 	eachRound(e, roundsShown, func(player string, r *round) {
@@ -94,7 +94,7 @@ func roundJSON(e *entry, h course.Hole, player string, r *round, path bool) stri
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"player":` + jstr(player) +
 		`,"ball":` + jvec(r.ball()) + `,"rest":` + jexact(r.ball()) +
-		ufmt.Sprintf(`,"strokes":%d,"done":%t,"period":%d`, r.strokes, r.done, r.period) +
+		ufmt.Sprintf(`,"strokes":%d,"period":%d`, r.strokes, r.period) +
 		`,"mode":` + jstr(modeNames[r.mode]) +
 		`,"shots":` + jstr(r.shots))
 	if path {
@@ -143,8 +143,9 @@ func airOf(s physics.Shot) string {
 	return string(b)
 }
 
-// Round is one player's round on a hole with its last stroke's path, or null
-// if they have none (or Reset it). It costs one stroke of gas.
+// Round is one player's round under way on a hole with its last stroke's
+// path, or null if they have none: never started, holed (its best is kept:
+// Ghost) or Reset. It costs one stroke of gas.
 func Round(hole string, player address) string {
 	e := readHole(hole)
 	v := e.roundTree().Get(player.String())
@@ -860,8 +861,8 @@ func Players(mode, after string, limit int) string {
 	return sb.String()
 }
 
-// Rounds is a page of every round on a hole, as State lists them, paged like
-// Records.
+// Rounds is a page of every round under way on a hole, as State lists them,
+// paged like Records.
 func Rounds(hole, after string, limit int) string {
 	e := readHole(hole)
 	var sb strings.Builder

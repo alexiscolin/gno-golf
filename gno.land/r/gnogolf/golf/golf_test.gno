@@ -114,18 +114,51 @@ func TestRoundCountsStrokesAndFinishes(cur realm, t *testing.T) {
 
 	r := roundIn(count, player)
 	uassert.Equal(t, 2, r.strokes)
-	uassert.False(t, r.done)
 	uassert.True(t, strings.Contains(Round(count, player), `"path":[[`), "a shot must leave a path to animate: "+Round(count, player))
 
 	// straight at the cup from the tee, 18 units away
 	testing.SetRealm(testing.NewUserRealm(player))
 	Reset(cross(cur), count)
 	testing.SetRealm(testing.NewUserRealm(player))
-	Launch(cross(cur), count, 0, holeIt)
-
-	r = roundIn(count, player)
-	uassert.True(t, r.done, "a shot down the line should hole out")
+	uassert.True(t, strings.HasPrefix(Launch(cross(cur), count, 0, holeIt), "Holed in 1 "), "a shot down the line should hole out")
 	uassert.Equal(t, 1, bestStrokes(mustHole(count).bests(pro).Get(player.String())), "the player's best is kept")
+	uassert.Equal(t, "null", Round(count, player), "the holed round is not")
+}
+
+// A holed round is not kept: its best is. The next shot starts a new round
+// from the tee with no Reset; a replay that does not beat the best leaves it,
+// one that does takes its place; a round left under way is kept and resumed.
+func TestAHoledRoundIsNotKept(cur realm, t *testing.T) {
+	id := register(cur, "unkept")
+	e := mustHole(id)
+	testing.SetRealm(testing.NewUserRealm(player))
+	uassert.Equal(t, "holed in 2 strokes", PlayRoundAt(cross(cur), id, "0,1;"+holeShot, Period()))
+	uassert.Equal(t, "null", Round(id, player))
+	uassert.Equal(t, 0, e.roundTree().Size(), "nothing stored for the round")
+	before := e.bests(assisted).Get(player.String()).(string)
+
+	// replayed worse at once, no Reset: a new round, the best untouched
+	testing.SetRealm(testing.NewUserRealm(player))
+	uassert.Equal(t, "holed in 3 strokes", PlayRoundAt(cross(cur), id, "0,1;0,1;"+holeShot, Period()))
+	uassert.Equal(t, before, e.bests(assisted).Get(player.String()).(string), "a worse replay leaves the best")
+
+	// left under way over two commits: kept, resumed, then gone once holed
+	testing.SkipHeights(1)
+	testing.SetRealm(testing.NewUserRealm(player))
+	PlayRoundAt(cross(cur), id, "0,1", Period())
+	uassert.Equal(t, 1, roundIn(id, player).strokes, "a round under way is kept")
+	testing.SetRealm(testing.NewUserRealm(player))
+	urequire.AbortsContains(t, cur, "played in assisted mode", func() { Launch(cross(cur), id, 0, 1) }) // its mode is its first stroke's
+	testing.SetRealm(testing.NewUserRealm(player))
+	uassert.Equal(t, "holed in 2 strokes", PlayRoundAt(cross(cur), id, holeShot, Period()))
+	uassert.Equal(t, "null", Round(id, player))
+	uassert.Equal(t, 2, BestOf(id, "assisted", player), "a tie keeps the older best")
+
+	// better: it takes the best's place
+	testing.SetRealm(testing.NewUserRealm(player))
+	PlayRoundAt(cross(cur), id, holeShot, Period())
+	uassert.Equal(t, 1, BestOf(id, "assisted", player))
+	uassert.Equal(t, 0, e.roundTree().Size())
 }
 
 // TestPlayRoundEqualsTheSameShotsOneByOne is what makes committing a whole hole
@@ -250,8 +283,9 @@ func TestTimedHoleFollowsTheRoundsStrokes(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(player))
 	Reset(cross(cur), id)
 	testing.SetRealm(testing.NewUserRealm(player))
-	Launch(cross(cur), id, 0, 9)
-	uassert.True(t, roundIn(id, player).bx > 10, "the first stroke must find the gate open")
+	// holed (and so not kept) or past the gate
+	holed := strings.HasPrefix(Launch(cross(cur), id, 0, 9), "Holed")
+	uassert.True(t, holed || roundIn(id, player).bx > 10, "the first stroke must find the gate open")
 	uassert.Equal(t, `{"version":1,"walls":[],"posts":[],"zones":[]}`, Extras(id, 0))
 	uassert.True(t, strings.Contains(Extras(id, 1), `"a":[`), "stroke 1 has the gate")
 }
@@ -469,7 +503,7 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	uassert.Equal(t, place+stranger.String()+`","rank":0,"of":3,"strokes":1}`, HoleRank(id, "assisted", stranger))
 	uassert.Equal(t, place+player.String()+`","rank":0,"of":3,"strokes":0}`, HoleRank(id, "assisted", player)) // no finish here
 	// a round's page sums it up: over and under par written out (ufmt has no %+d)
-	uassert.True(t, strings.Contains(Render(id+"/"+b.String()), "holed it in 2** (par 3, -1), assisted"), Render(id+"/"+b.String()))
+	uassert.True(t, strings.Contains(Render(id+"/"+b.String()), "best here: 2** (par 3, -1), assisted. **#2 of 3** on the assisted board"), Render(id+"/"+b.String()))
 	uassert.True(t, strings.Contains(Render(id+"/"+c.String()), "(par 3, even)"), "par is even")
 
 	// c improves to 1, later: its old row goes, the new one ranks after a's, made first

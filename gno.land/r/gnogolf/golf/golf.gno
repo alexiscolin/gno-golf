@@ -88,7 +88,9 @@ func (e *entry) rec(m int) record {
 	return record{e.bestBy, e.best}
 }
 
-// roundTree is the version's rounds: player address -> *round.
+// roundTree is the version's rounds under way: player address -> *round. A
+// round is stored from its first commit that does not finish it, and removed
+// as it is holed (stroke) or Reset: a finish is kept as a best, not a round.
 func (e *entry) roundTree() view { return view{rounds, e.id + " "} }
 
 // bests is the version's results in mode m: player address -> their best
@@ -227,7 +229,6 @@ type round struct {
 	bx, by  float64 // the ball, exactly: flat, not a nested Vec2 object
 	fx, fy  float64 // where the last stroke started: its path is replayed from there
 	strokes int
-	done    bool
 	period  int64  // the weather it is played in: set by its first stroke
 	shots   string // the decisions so far, "angle,power,tick;…": the round, replayable
 	mode    int    // assisted or pro: set by its first stroke, like the weather
@@ -564,8 +565,9 @@ func Launch(cur realm, hole string, angle, power float64) string {
 	e := mustHole(hole)
 	h := e.hole()
 	player := cur.Previous().Address()
-	r := playable(e, h, player)
-	if r.strokes == 0 {
+	r := roundOf(e, h, player)
+	fresh := r.strokes == 0
+	if fresh {
 		r.period = Period() // a round starts in the weather of the moment, and keeps it
 		r.mode = pro
 	} else if r.mode != pro {
@@ -579,7 +581,10 @@ func Launch(cur realm, hole string, angle, power float64) string {
 	shot, holed := stroke(e, h, r, player, angle, power, 0, fc.Zones)
 	w.add(shot)
 	if holed {
-		return ufmt.Sprintf("Holed in %d on %s! Your round: %s:%s/%s", r.strokes, e.id, hub, e.id, player.String())
+		return ufmt.Sprintf("Holed in %d on %s! Your best there: %s:%s/%s", r.strokes, e.id, hub, e.id, player.String())
+	}
+	if fresh {
+		e.roundTree().Set(player.String(), r)
 	}
 	// what a gnoweb player needs for the next shot
 	a, d := aim(r.ball(), h.Cup())
@@ -631,8 +636,9 @@ func PlayRoundPro(cur realm, hole string, shots string, period int64) string {
 
 func playRound(e *entry, player address, shots string, period int64, mode int) string {
 	h := e.hole()
-	r := playable(e, h, player)
-	if r.strokes == 0 {
+	r := roundOf(e, h, player)
+	fresh := r.strokes == 0
+	if fresh {
 		playablePeriod(period)
 		r.period, r.mode = period, mode
 	} else if r.period != period {
@@ -654,6 +660,9 @@ func playRound(e *entry, player address, shots string, period int64, mode int) s
 		if holed {
 			return ufmt.Sprintf("holed in %d strokes", r.strokes)
 		}
+	}
+	if fresh { // under way: stored from its first commit
+		e.roundTree().Set(player.String(), r)
 	}
 	return ufmt.Sprintf("%d shots replayed, ball at %.1f,%.1f after %d strokes",
 		w.played, r.bx, r.by, r.strokes)
@@ -822,13 +831,16 @@ func (w *work) add(s physics.Shot) {
 	w.played++
 }
 
-// Reset drops the caller's round on hole (an exact id), freeing its storage:
-// the next stroke starts a new one from the tee. Their bests are kept.
+// Reset abandons the caller's round under way on hole (an exact id), freeing
+// its storage: the next stroke starts a new one from the tee. A finished round
+// is not kept (its best is), so a new one needs no Reset. With no round under
+// way it does nothing, and says nothing.
 func Reset(cur realm, hole string) {
 	e := mustHole(hole)
 	player := cur.Previous().Address().String()
-	e.roundTree().Remove(player)
-	chain.Emit(EventRoundReset, "hole", e.id, "player", player)
+	if _, ok := e.roundTree().Remove(player); ok {
+		chain.Emit(EventRoundReset, "hole", e.id, "player", player)
+	}
 }
 
 // validShot refuses what would poison a round and returns the shot as
@@ -907,7 +919,6 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 			"strokes", strconv.Itoa(r.strokes), "mode", modeNames[r.mode], "shot", played)
 		return shot, false
 	}
-	r.done = true
 	m, p := r.mode, player.String()
 	// a player's best stays theirs: replaying the hole never erases it, and a
 	// tie keeps the older round, shots and all
@@ -937,6 +948,9 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	}
 	chain.Emit(EventHoled, "hole", e.id, "player", p,
 		"strokes", strconv.Itoa(r.strokes), "mode", modeNames[m], "shots", r.shots)
+	// the round is its best now, or no better than it: not kept (a round of
+	// this commit's alone was never stored)
+	e.roundTree().Remove(p)
 	return shot, true
 }
 
@@ -1053,23 +1067,16 @@ func clampTick(t, shot string) int {
 	return n
 }
 
-func playable(e *entry, h course.Hole, player address) *round {
-	r := roundOf(e, h, player)
-	if r.done {
-		panic("golf: this hole is finished — Reset it to play again")
-	}
-	return r
-}
-
+// roundOf is the player's round under way on e, or a new one from the tee,
+// not stored: its commit stores it if it does not finish it.
 func roundOf(e *entry, h course.Hole, player address) *round {
 	if v := e.roundTree().Get(player.String()); v != nil {
 		return v.(*round)
 	}
 	s := h.Start()
-	r := &round{bx: s.X, by: s.Y}
-	e.roundTree().Set(player.String(), r)
-	return r
+	return &round{bx: s.X, by: s.Y}
 }
+
 
 // maxName and maxNote bound a hole's name and a version's note.
 const (

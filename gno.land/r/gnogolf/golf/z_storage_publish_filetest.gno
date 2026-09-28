@@ -17,9 +17,9 @@ import (
 // each index golf opens for it, the community's first; its author's row in
 // it, 403 of them, paid once per author; nothing for rounds or records until
 // someone plays); z_storage_play_filetest also plays two
-// strokes, which store 2,516 more: the round and its row in the shared
-// rounds index, its shots and the version's 512-byte wear. (With a rounds
-// tree per version, made at its first stroke, they stored 6,209.)
+// strokes, which store 2,478 more: the round under way and its row in the
+// shared rounds index, its shots and the version's 512-byte wear. (With a
+// rounds tree per version, made at its first stroke, they stored 6,209.)
 func main(cur realm) {
 	h := &course.Simple{W: 32, H: 16, World: "garden", Title: "Stored", Tee: physics.V(2, 8), Pin: physics.V(28, 8), Substeps: 14, CupRadius: 1.2,
 		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9, Radius: 0.5}}
