@@ -1,7 +1,13 @@
 // @ts-check
-// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups] [--cut=v4]
+// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups] [--cut=v5]
 //
-// --cut=v4: another cut of it, shots-v4.json, rendered to gnogolf-promo-v4.mp4.
+// --cut=v4: another cut of it, shots-v4.json, rendered to gnogolf-promo-v4.mp4 (and -720p).
+// --cut=v5, the current one: v4 with a ghost duel before an end card without Adena
+// (its rival's screen, the turns called, the ghost holing, the win). One command, with
+// the dev client on the local chain (web/.env.local; read only, nothing is sent):
+//   (cd web && npx next dev -p 3313) & APP=http://localhost:3313 node media/promo/render.mjs --cut=v5
+// -> media/promo/gnogolf-promo-v5.mp4 and -v5-720p.mp4. The duel races the seeded champion's
+// ghost (media/check/seed), its reads kept in paths.json ("reads") like the shots' paths.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
@@ -152,7 +158,17 @@ const SHOTS = ((a) => (CLEAN ? cleanOf(a) : a))(JSON.parse(fs.readFileSync(path.
 const ALL_GNOMES = ["classic", "sage", "ginger", "moustache", "gardener", "wizard", "viking", "golden", "pirate", "diver", "baker", "mayor", "king"];
 
 const LAST = Math.max(...SHOTS.map((s) => s.beats[1]));
-const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - LAST * BEAT).toFixed(3);
+// rewind: the music goes back that many beats as the shot starts (a phrase played again), so a
+// cut longer than another keeps the other's music under its shots (v5: v4's, then its duel on
+// the 32 beats before the end card again), and still ends on the last hit: [music s, length s] each
+const REWINDS = SHOTS.filter((s) => s.rewind && !s.t0).map((s) => [s.beats[0], s.rewind]);
+const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - (LAST - REWINDS.reduce((a, [, r]) => a + r, 0)) * BEAT).toFixed(3);
+const PARTS = [];
+for (let k = 0, b0 = 0, m = MUSIC_AT; k <= REWINDS.length; k++) {
+  const [b, r] = REWINDS[k] || [LAST, 0];
+  PARTS.push([+m.toFixed(3), +((b - b0) * BEAT).toFixed(3)]);
+  (m += (b - b0 - r) * BEAT), (b0 = b);
+}
 
 // ------------------------------------------------------------------ chrome
 
@@ -176,10 +192,15 @@ async function shoot(c, s, i, out) {
   const q = new URLSearchParams({ cup: s.cup, hole: s.hole, gnome: s.gnome || "classic" });
   if (s.weather) q.set("weather", s.weather);
   if (s.build) q.set("build", "");
-  await c.send("Page.navigate", { url: `${APP}/?play&promo&${q}` });
+  if (s.by) q.set("by", s.by); // a duel: that player's ghost raced (their best here)
+  if (s.screen) q.set("screen", s.screen); // a screen of the game's (its ui shown), not the course
+  const url = `${APP}/?${s.screen ? "" : "play&"}promo&${q}`;
+  // a duel's reads, kept from the first render (web/lib/promo.ts attach)
+  const reads = s.by && (await c.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__promoReads=${JSON.stringify(paths.reads || {})}` })).identifier;
+  await c.send("Page.navigate", { url });
   for (let k = 0; !(await c.js("!!(window.__promo && __promo.ready())").catch(() => false)); k++) {
     // now and then the page comes up without its query (the title screen): ask again
-    if (k % 40 === 39 && !(await c.js("location.search.includes('promo')").catch(() => true))) await c.send("Page.navigate", { url: `${APP}/?play&promo&${q}` });
+    if (k % 40 === 39 && !(await c.js("location.search.includes('promo')").catch(() => true))) await c.send("Page.navigate", { url });
     if (k === 240) await c.send("Page.reload"); // the dev server was busy recompiling: once more
     if (k > 480) throw new Error(`shot ${s.name}: the hole never loaded (${await c.js("location.href + ' ' + document.body.innerText.slice(0, 300)").catch((e) => e.message)})`);
     await sleep(250);
@@ -189,7 +210,7 @@ async function shoot(c, s, i, out) {
   // the chain's answers, fetched once and kept
   const key = (f) => `${s.cup}${s.hole}|${f.deg},${f.power}${f.tick != null ? "@" + f.tick : ""}`;
   const cache = {};
-  for (const f of s.fire || []) {
+  for (const f of (s.fire || []).slice(0, 1)) { // (a later stroke is played from the ball's rest: a duel's reads keep it)
     if (!paths[key(f)]) {
       paths[key(f)] = await c.js(`__promo.simulate([[${f.deg}, ${f.power}, ${f.tick ?? null}]])`);
       fs.writeFileSync(pathsFile, JSON.stringify(paths));
@@ -228,7 +249,8 @@ async function shoot(c, s, i, out) {
   const want = STILLS ? new Set(every ? Array.from({ length: Math.ceil(frames / every) }, (_, k) => k * every) : [0, Math.floor(frames / 2), frames - 1]) : null;
   for (let f = 0; f < frames; f++) {
     const st = await c.js("__promo.step(1)");
-    if ((s.dropAt != null || s.eventAt != null) && !s.sunk && (st.scale < (s.eventAt != null ? 0.97 : 0.75) || !st.visible || (s.eventAt != null && st.y < -0.6))) (s.sunk = true), console.log(`  ${s.name}: the ball sinks at ${(f / FPS).toFixed(3)} s (target ${s.dropAt ?? s.eventAt})`);
+    if (st.ghost && !s.ghostIn && (st.ghost.scale < 0.75 || !st.ghost.visible)) (s.ghostIn = true), console.log(`  ${s.name}: the ghost sinks at ${(f / FPS).toFixed(3)} s`);
+    if ((s.dropAt != null || s.eventAt != null || s.by) && !s.sunk && (st.scale < (s.eventAt != null ? 0.97 : 0.75) || !st.visible || (s.eventAt != null && st.y < -0.6))) (s.sunk = true), console.log(`  ${s.name}: the ball sinks at ${(f / FPS).toFixed(3)} s (target ${s.dropAt ?? s.eventAt ?? "-"})`);
     if (want && !want.has(f)) continue;
     const { data } = await c.send("Page.captureScreenshot", { format: STILLS ? "png" : "jpeg", quality: STILLS ? undefined : 94 });
     fs.writeFileSync(STILLS ? path.join(out, `${String(i).padStart(2, "0")}-${s.name}-${f}.png`) : path.join(out, `${String(s.f0 + f).padStart(5, "0")}.jpg`), Buffer.from(data, "base64"));
@@ -237,6 +259,11 @@ async function shoot(c, s, i, out) {
   if (!STILLS && !CLEAN) {
     const wav = await c.js(`__promo.audio(${s.pre || 0}, ${dur})`);
     if (wav) fs.writeFileSync(path.join(WORK, `sfx-${i}.wav`), Buffer.from(wav, "base64"));
+  }
+  if (reads) {
+    paths.reads = { ...paths.reads, ...(await c.js("window.__promoReads")) };
+    fs.writeFileSync(pathsFile, JSON.stringify(paths));
+    await c.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: reads });
   }
   console.log(`shot ${i} ${s.name}: ${frames} frames`);
 }
@@ -361,15 +388,19 @@ if (CLEAN) {
 // ------------------------------------------------------------------ encode
 
 const sfx = SHOTS.map((s, i) => [i, path.join(WORK, `sfx-${i}.wav`), s.f0 / FPS]).filter(([, f]) => fs.existsSync(f));
-const inputs = ["-framerate", String(FPS), "-i", path.join(out, "%05d.jpg"), "-ss", String(MUSIC_AT), "-t", String(LEN), "-i", MUSIC];
+// (each part of the music but the last runs on X s, cross-faded into the next: no click at the splice)
+const X = 0.03, N = PARTS.length;
+const inputs = ["-framerate", String(FPS), "-i", path.join(out, "%05d.jpg")];
+for (const [k, [at, len]] of PARTS.entries()) inputs.push("-ss", String(at), "-t", String(k < N - 1 ? len + X : LEN), "-i", MUSIC);
 for (const [, f] of sfx) inputs.push("-i", f);
-const delays = sfx.map(([, , at], k) => `[${k + 2}:a]adelay=${Math.round(at * 1000)}:all=1[s${k}]`).join(";");
+const delays = sfx.map(([, , at], k) => `[${k + N + 1}:a]adelay=${Math.round(at * 1000)}:all=1[s${k}]`).join(";");
 const filter = [
   delays,
+  ...PARTS.slice(1).map((_, k) => `[${k ? `m${k}` : "1:a"}][${k + 2}:a]acrossfade=d=${X}:c1=tri:c2=tri[m${k + 1}]`),
   `${sfx.map((_, k) => `[s${k}]`).join("")}amix=inputs=${sfx.length}:normalize=0,volume=2.8,asplit[fx][key]`,
   // the music gives way a little under the game's sounds (the putt, the cup, the confetti)
   // dip: [from, to] in a shot's seconds, the music held back (a breath before a hit)
-  `[1:a]volume=0.7,volume='${SHOTS.flatMap((s) => (s.dip && !s.t0 ? [[s.f0 / FPS + s.dip[0], s.f0 / FPS + s.dip[1]]] : [])).reduce((e, [a, b]) => `if(between(t,${a.toFixed(3)},${b.toFixed(3)}),0.12,${e})`, "1")}':eval=frame,afade=t=in:d=0.08,afade=t=out:st=${(LEN - 0.3).toFixed(2)}:d=0.3[mus]`,
+  `[${N > 1 ? `m${N - 1}` : "1:a"}]volume=0.7,volume='${SHOTS.flatMap((s) => (s.dip && !s.t0 ? [[s.f0 / FPS + s.dip[0], s.f0 / FPS + s.dip[1]]] : [])).reduce((e, [a, b]) => `if(between(t,${a.toFixed(3)},${b.toFixed(3)}),0.12,${e})`, "1")}':eval=frame,afade=t=in:d=0.08,afade=t=out:st=${(LEN - 0.3).toFixed(2)}:d=0.3[mus]`,
   `[mus][key]sidechaincompress=threshold=0.05:ratio=4:attack=5:release=250[duck]`,
   `[duck][fx]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]`,
 ].join(";");
