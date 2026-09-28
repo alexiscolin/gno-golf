@@ -12,7 +12,13 @@ either.
 - One anonymous first-party id: a cookie on this host only
   (`persistence: "cookie"`, no cross-subdomain cookie), 390 days at most. The
   cookie is renewed at each visit, so the id itself is dropped for a new one
-  once it is 13 months old (`since_day`, checked at load).
+  once it is 13 months old (`since_day`, checked at load), its `$device_id`
+  with it (`reset(true)`).
+- Visitors are told (the About sheet's credit line) and can object there in
+  one click, "Don't measure my visits": kept in this browser
+  (`localStorage` `gnogolf.noStats`), it stops what is sent at once
+  (`opt_out_capturing()`, the waiting events dropped), and posthog-js is not
+  loaded again on a later page.
 - Nobody is identified: no `identify()`, `person_profiles: "identified_only"`.
 - No session replay, no heatmaps. Autocapture is on with every element's text
   and attributes masked (the boards show names and addresses).

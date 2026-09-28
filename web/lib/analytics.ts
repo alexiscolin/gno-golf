@@ -5,7 +5,9 @@
 // posthog-js comes in a chunk of its own once the page is idle; what is said
 // before waits for it. Never who: no identify(), no replay, no heatmaps, the
 // clicks' text and attributes masked, and every event scrubbed of addresses
-// and share texts before it goes (clean). docs/analytics.md lists the events.
+// and share texts before it goes (clean). A visitor who objects (optOut, the
+// About sheet) is not measured again in this browser. docs/analytics.md lists
+// the events.
 import type { CaptureResult, PostHog } from "posthog-js";
 import { camlog } from "./testhooks";
 import { isTouch, reducedMotion } from "./device";
@@ -49,9 +51,29 @@ export interface Events {
 
 let ph: PostHog | null = null, started = false;
 const queue: ((p: PostHog) => void)[] = [];
+
+// the visitor's objection, kept in this browser (and for this page, storage blocked)
+const OFF = "gnogolf.noStats";
+let off = false;
+/** Whether the visitor objected to the measurement. */
+export const optedOut = () => {
+  try {
+    return off || localStorage.getItem(OFF) === "1";
+  } catch {
+    return off;
+  }
+};
+/** The visitor objects: nothing more goes, from this page or a later one, and nothing loads again. */
+export function optOut() {
+  off = true;
+  try { localStorage.setItem(OFF, "1"); } catch {}
+  queue.length = 0;
+  if (ph) ph.opt_out_capturing();
+}
+
 // (a page where it never loads, blocked: the first 200 wait, the rest go)
 function run(f: (p: PostHog) => void) {
-  if (!KEY) return;
+  if (!KEY || optedOut()) return;
   if (ph) f(ph);
   else if (queue.length < 200) queue.push(f);
 }
@@ -140,9 +162,9 @@ export const OPTIONS = {
 const sizeOf = (w: number) => (w < 600 ? "phone" : w < 1024 ? "tablet" : "desktop");
 
 /** Loads PostHog once the page is idle, then sends what was said meanwhile.
- *  Nothing without a key, nor under the test hooks. load: the import (the tests give theirs). */
+ *  Nothing without a key, under the test hooks, or for a visitor who objected. load: the import (the tests give theirs). */
 export function start(load: () => Promise<{ default: PostHog }> = () => import("posthog-js")) {
-  if (!KEY || started || camlog()) return;
+  if (!KEY || started || camlog() || optedOut()) return;
   started = true;
   const net = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection;
   register({ build: BUILD, touch: isTouch(), reduced_motion: reducedMotion(), dpr: devicePixelRatio, viewport: sizeOf(innerWidth), locale: navigator.language, online: navigator.onLine, net: net && net.effectiveType });
@@ -150,12 +172,13 @@ export function start(load: () => Promise<{ default: PostHog }> = () => import("
     const go = () =>
       void load()
         .then(({ default: p }) => {
+          if (optedOut()) return; // (objected while it loaded)
           p.init(KEY, {
             ...OPTIONS,
             loaded: (p) => {
-              // an id older than 13 months starts again (the cookie is renewed at each visit)
+              // an id older than 13 months starts again, its device id too (the cookie is renewed at each visit)
               const day = Math.floor(Date.now() / 864e5), since = Number(p.get_property("since_day"));
-              if (since && day - since > MAX_DAYS) p.reset();
+              if (since && day - since > MAX_DAYS) p.reset(true);
               p.register_once({ since_day: day });
             },
           });

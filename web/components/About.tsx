@@ -1,10 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
 import { REALM_PATH } from "@/lib/chain";
 import { sound } from "@/lib/feel";
+import { optedOut, optOut } from "@/lib/analytics";
 
 // About: how it works, what is in it, where to go next, and who made it.
 const GITHUB = "https://github.com/alexiscolin", REPO = `${GITHUB}/gno-golf`;
@@ -187,9 +188,15 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
         <span>
           Made by <a href={GITHUB} {...out}><b>alexiscolin</b></a> · <a href={REPO} {...out}>the code on GitHub ↗</a>
           {/* (lib/analytics.ts: only with its key) */}
-          {ANALYTICS && <><br />Audience measured anonymously (PostHog, EU): no cookie across sites, no recordings, no wallet addresses.</>}
+          {ANALYTICS && <><br />Audience measured anonymously (PostHog, EU): no cookie across sites, no recordings, no wallet addresses. <NoStats /></>}
         </span>
       </footer>
     </Sheet>
   );
+}
+
+// the visitor's objection to the measurement: one click, kept in this browser (lib/analytics.ts)
+function NoStats() {
+  const [off, setOff] = useState(optedOut);
+  return off ? <>Your visits are not measured in this browser.</> : <button className="linkish" onClick={() => (optOut(), setOff(true))}>Don&apos;t measure my visits</button>;
 }

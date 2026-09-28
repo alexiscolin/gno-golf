@@ -12,12 +12,20 @@ const load = () => import(`../lib/analytics.ts?v=${n++}`) as Promise<typeof Anal
 const ADDR = "g1" + "q".repeat(38);
 type Captured = { event: string; props: unknown };
 // a stand-in for posthog-js: what init was given, and what was captured and registered
-function fake() {
-  const got = { init: null as null | { key: string; options: Record<string, unknown> }, events: [] as Captured[], registered: {} as Record<string, unknown>, errors: [] as unknown[] };
+// (since: the day its id was first seen, as its cookie keeps it)
+function fake(since?: number) {
+  const got = { init: null as null | { key: string; options: Record<string, unknown> }, events: [] as Captured[], registered: {} as Record<string, unknown>, errors: [] as unknown[], resets: [] as unknown[], optedOut: false };
   const p = {
-    init: (key: string, options: Record<string, unknown>) => void (got.init = { key, options }),
-    capture: (event: string, props: unknown) => void got.events.push({ event, props }),
+    init: (key: string, options: Record<string, unknown>) => {
+      got.init = { key, options };
+      (options.loaded as ((p: unknown) => void) | undefined)?.(p);
+    },
+    capture: (event: string, props: unknown) => void (!got.optedOut && got.events.push({ event, props })),
     register: (props: Record<string, unknown>) => void Object.assign(got.registered, props),
+    register_once: (props: Record<string, unknown>) => void Object.assign(got.registered, props),
+    get_property: (k: string) => (k === "since_day" ? since : undefined),
+    reset: (device?: boolean) => void got.resets.push(device),
+    opt_out_capturing: () => void (got.optedOut = true),
     captureException: (e: unknown) => void got.errors.push(e),
   };
   let asked = 0;
@@ -97,6 +105,46 @@ test("with a key: loaded with replay and heatmaps off, the text masked, then wha
     assert.equal(f.got.errors.length, 3);
     assert.equal(a.start(f.loader), undefined); // (once a page)
   } finally {
+    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  }
+});
+
+test("an id past 13 months starts again, its device id too; a younger one stays", async () => {
+  process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test";
+  Object.assign(globalThis, { devicePixelRatio: 1, innerWidth: 1280 });
+  try {
+    const today = Math.floor(Date.now() / 864e5);
+    const old = fake(today - 391);
+    await (await load()).start(old.loader);
+    assert.deepEqual(old.got.resets, [true]);
+    const young = fake(today - 30);
+    await (await load()).start(young.loader);
+    assert.deepEqual(young.got.resets, []);
+  } finally {
+    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  }
+});
+
+test("a visitor who objects: nothing more goes, and on a later page nothing loads", async () => {
+  process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test";
+  Object.assign(globalThis, { devicePixelRatio: 1, innerWidth: 1280 });
+  try {
+    const a = await load(), f = fake();
+    await a.start(f.loader);
+    a.track("badge_earned", { id: "ace" });
+    assert.equal(a.optedOut(), false);
+    a.optOut();
+    assert.equal(f.got.optedOut, true);
+    a.track("badge_earned", { id: "eagle" });
+    assert.equal(f.got.events.length, 1);
+    // a later page: kept in this browser
+    const b = await load(), g = fake();
+    assert.equal(b.optedOut(), true);
+    b.track("share", { target: "x", what: "hole" });
+    assert.equal(b.start(g.loader), undefined);
+    assert.equal(g.asked(), 0);
+  } finally {
+    localStorage.removeItem("gnogolf.noStats");
     delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
   }
 });
