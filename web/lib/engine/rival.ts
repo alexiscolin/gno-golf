@@ -19,7 +19,7 @@
 // at the first duel: a game without one never makes it.
 //
 // E: the engine's live state (engine/types.ts Live).
-import { makeGhost } from "../scene/gnome";
+import { makeGhost, rivalSkin } from "../scene/gnome";
 import { disposeCourse, motion } from "../scene/materials";
 import { BALL_R } from "../terrain";
 import { ghostSpeed, shotsOf } from "../duel";
@@ -35,7 +35,8 @@ const GLIDE_MS = 450; // its walk onto its stroke's start (the tee: where the pl
 // each ghost's strokes as read, kept with the ghost (the same ghost comes back with a rematch, or a mode toggled back)
 const readsOf = new WeakMap<Ghost, (Promise<Stroke> | undefined)[]>();
 
-export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showClock: (t: number) => void; restTimed: () => void; told: () => void; warm: () => void }) {
+// gnome: the player's gnome's id (the rival wears another)
+export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome }: { showClock: (t: number) => void; restTimed: () => void; told: () => void; warm: () => void; gnome: () => string }) {
   const { g, scene } = E;
   let ball: Gnome | null = null;
   let cut = 0, ghost: Ghost | null = null;
@@ -63,12 +64,17 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
   };
   const rp = makeReplay(R);
 
-  /** The ghost's gnome, made at the first duel, its see-through shaders compiled then. */
-  function made() {
-    if (ball) return ball;
-    const ghostly = makeGhost(AIMING);
+  /** The ghost's gnome, made at the first duel (again for another rival, or the
+   *  player now in its skin), its see-through shaders compiled then. */
+  let skin = "";
+  function made(gh: Ghost) {
+    const want = rivalSkin(gh.player, gnome());
+    if (ball && skin === want.id) return ball;
+    if (ball) (scene.remove(ball), disposeCourse(ball));
+    const ghostly = makeGhost(AIMING, want);
     ball = ghostly.ball;
     fade = ghostly.fade;
+    skin = want.id;
     scene.add(ball);
     warm();
     return ball;
@@ -119,6 +125,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     busy = holed = false;
     shown = 0;
     armed = !!ghost && !!g.s && !g.shots.length;
+    if (ghost) made(ghost); // (the player may have taken its skin meanwhile)
     if (!ball) return;
     ball.visible = armed;
     if (!armed || !g.s) return;
@@ -178,7 +185,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     race(gh: Ghost | null) {
       if (gh === ghost) return; // (the same ghost again: the race goes on)
       ghost = gh;
-      if (gh) (made(), ahead(gh, 0));
+      if (gh) (made(gh), ahead(gh, 0));
       reset();
       told();
     },

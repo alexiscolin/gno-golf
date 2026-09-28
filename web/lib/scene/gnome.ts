@@ -329,10 +329,20 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
 
 // a duel's ghost: paper white, inked thin as a gnome is (and nobody's skin)
 const GHOST: Skin = { id: "ghost", name: "Ghost", line: "", hat: C.cream, body: C.cream, hair: C.cream, beard: "full" };
-/** A see-through gnome (a duel's ghost, ADR-004): its own materials, no shadow;
- *  fade(o) sets how see-through, each part hiding what is behind it. */
-export function makeGhost(o: number) {
-  const ball = makeBall(GHOST);
+/** A duel's rival's gnome: one of the others than the player's, the same for
+ *  the same rival (their address picks it), so two gnomes never look alike. */
+export function rivalSkin(player: string, mine: string) {
+  const others = GNOMES.filter((k) => k.id !== mine);
+  let h = 0;
+  for (const c of player) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return others[h % others.length];
+}
+
+/** A see-through gnome (a duel's ghost, ADR-004), in its skin (a plain cream
+ *  one by default): its own materials, no shadow; fade(o) sets how
+ *  see-through, each part hiding what is behind it. */
+export function makeGhost(o: number, skin: Skin = GHOST) {
+  const ball = makeBall(skin);
   const mats = ownFade(ball, THIN_HULL);
   ball.userData.shade.visible = false; // no shadow: a ghost
   // its outline drawn after its body, against the body's depth: an ink rim, not an x-ray

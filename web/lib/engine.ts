@@ -852,7 +852,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   const rp = makeReplay(E);
   E.landing = rp.landing;
   // a duel's ghost (ADR-004): another player's best, a stroke after each of the player's
-  const rival = makeRival(E, { showClock, restTimed, told: () => void publish(), warm: () => void warm() });
+  const rival = makeRival(E, { showClock, restTimed, told: () => void publish(), warm: () => void warm(), gnome: () => gnomeId });
   E.rivalAt = rival.at;
   const aimer = makeAimer(E);
   const { preview, dropAim, strokeFrom, ghosts, known } = aimer;
