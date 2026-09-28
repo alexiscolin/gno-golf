@@ -2284,8 +2284,8 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
 }
 
 /* a duel's turn, called out: pressed on big, then gone */
-.turncall { position: fixed; top: 22%; left: 50%; z-index: var(--z-chip); margin: 0; translate: -50% 0; font-size: clamp(34px, 5vw, 60px); font-weight: 700; line-height: 1; width: max-content; max-width: calc(100vw - 32px); text-align: center; --ink-w: 6px; --ink-drop: 0; pointer-events: none; animation: turn-call 1.5s var(--spring) both; }
-.turncall small { display: block; margin-top: 8px; font-size: .5em; -webkit-text-stroke-width: 4px; color: var(--gold); } /* a duel's: what the stroke is worth */
+.turncall { position: fixed; top: 22%; left: 50%; z-index: var(--z-chip); margin: 0; translate: -50% 0; font-size: clamp(48px, 10vw, 120px); font-weight: 700; line-height: 1; width: max-content; max-width: calc(100vw - 32px); text-align: center; --ink-w: 10px; --ink-drop: 0; pointer-events: none; animation: turn-call 1.5s var(--spring) both; }
+.turncall small { display: block; margin-top: 14px; font-size: .5em; -webkit-text-stroke-width: 6px; color: var(--gold); } /* a duel's: what the stroke is worth */
 .turncall--them { color: var(--gold); animation-name: turn-hold; } /* theirs held while they play: gone as the turn is the player's */
 @keyframes turn-hold { 0% { opacity: 0; transform: scale(2.2) rotate(-8deg); } 20%, 100% { opacity: 1; transform: rotate(-3deg); } }
 @keyframes turn-call { 0% { opacity: 0; transform: scale(2.2) rotate(-8deg); } 20%, 75% { opacity: 1; transform: rotate(-3deg); } 100% { opacity: 0; transform: translateY(-14px) rotate(-3deg); } }
