@@ -570,7 +570,7 @@ func replayAs(cur realm, p address, id, shots string) {
 func jfield(j, k string) string {
 	v := j[strings.Index(j, `"`+k+`":`)+len(k)+3:]
 	if v[0] == '"' {
-		return v[1:strings.Index(v[1:], `"`)+1]
+		return v[1 : strings.Index(v[1:], `"`)+1]
 	}
 	return v[:strings.IndexAny(v, ",}]")]
 }

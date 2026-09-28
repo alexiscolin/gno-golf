@@ -269,6 +269,7 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
   - run the verification reads.
 - **gnomcp cannot:** addpkg under the user's name, and sessions can't addpkg either. Phase 0 checks that sessions work on pearl.
 - **No `MsgRun` on onyx:** `maketx run` (and its simulation) is restricted to one seeded account, so every write of the deploy and of the game is a plain `MsgCall`: `Publish` a hole a call, a save `PlayRoundAt` (or `PlayRoundPro`), a name `Register`.
+- **On mainnet, freed storage is not refunded to the player.** A realm's freed storage deposit goes to the caller of the transaction that frees it only while ugnot moves freely (the testnets); where ugnot is transfer-locked (`bank:p:restricted_denoms` holds it, as on mainnet), the VM sends it to `StorageFeeCollector` instead (onyx's `gno.land/pkg/sdk/vm/keeper.go`, the refund's `receiver`). There a Reset, a round holed after a part left it under way, or a best improved in fewer bytes frees storage for the fee collector, not for the player who paid it: the deposit a save shows is spent, not escrowed.
 
 ### 10.4 Budget
 

@@ -13,10 +13,15 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 # The onyx toolchain (the README, "Running it locally"): GNO_TOOLCHAIN is the
 # folder of the gno, gnokey and gnodev built from a gno checkout at the tag
 # chain/onyx, each finding its GNOROOT (that checkout) by itself; GNO is the
-# gno binary alone.
+# gno binary alone. Without it the check fails: SKIP_GNO=1 checks the client
+# alone, and says so.
 toolchain=${GNO_TOOLCHAIN:-${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/onyx}
 GNO=${GNO:-$toolchain/gno}
-if [ -x "$GNO" ]; then
+skipped=""
+if [ "${SKIP_GNO:-}" = 1 ]; then
+	skipped=" (the Gno tests skipped: SKIP_GNO=1)"
+	echo "check.sh: SKIP_GNO=1: the Gno tests are skipped" >&2
+elif [ -x "$GNO" ]; then
 	echo "== gno test (onyx toolchain)"
 	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf)
 	echo "== the holes' fingerprints"
@@ -26,7 +31,8 @@ if [ -x "$GNO" ]; then
 	trap 'rm -rf "$stage"' EXIT
 	GNO=$GNO "$root/scripts/stage.sh" gnogolf "$stage"
 else
-	echo "check.sh: no onyx gno at $GNO: the Gno tests are skipped" >&2
+	echo "check.sh: no onyx gno at $GNO. Build the toolchain there (the README, \"Running it locally\"), or set GNO_TOOLCHAIN (or GNO) to one; SKIP_GNO=1 checks the client alone." >&2
+	exit 1
 fi
 
 cd "$root/web"
@@ -35,4 +41,4 @@ echo "== lint" && npm run -s lint
 echo "== selfcheck" && npm run -s selfcheck
 echo "== unit tests" && npm test --silent
 if [ "${1:-}" = "--smoke" ]; then echo "== smoke" && npm run -s smoke; fi
-echo "all checks passed"
+echo "all checks passed$skipped"

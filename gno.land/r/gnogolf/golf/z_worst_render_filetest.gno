@@ -26,9 +26,11 @@ import (
 // eight pages, about 2.34e9. A zigzag's page costs 0.52e9 drawn, with 2
 // polygons, and 0.03e9 with 4, too detailed to draw; a corner's 0.23e9, its
 // forecast drawn once. Every page stays far under the 3e9 a query may use: a
-// page decodes the hole, draws one forecast (bounded at publish, worstGas),
-// at most maxBoardWork of board and one shot. (Before a polygon's row cost
-// only its edges and cells, the reversed zigzag of 2 cost 3.7e9 to draw.)
+// page decodes the hole, draws one forecast (bounded at publish, worstGas;
+// two for a round begun in the period before, whose last shot the board
+// draws in its own), at most maxBoardWork of board and one shot. (Before a
+// polygon's row cost only its edges and cells, the reversed zigzag of 2 cost
+// 3.7e9 to draw.)
 
 // corner is the hole whose weather costs most among those golf takes: the
 // 12 bumper walls it takes (TestTheDearestWeatherIsBoundedAtPublish) in a
@@ -142,4 +144,4 @@ func main(cur realm) {
 // g1zkdqk2jtaqetqm4wfyxe8nyksymngnkp6msydn/island7/v1 true true
 
 // Gas:
-// 4010126784
+// 4010126786

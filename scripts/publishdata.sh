@@ -10,6 +10,8 @@
 #
 # publishdata.sh -verify: only the check, a read (vm/qeval, no key): the
 # current version of every slot has the sha data/holes.txt lists it with.
+# It fails (exit 1) when a slot is missing or holds other data, and so does
+# the check after publishing.
 #
 # REALM is the golf realm (default gno.land/r/gnogolf/golf), REMOTE the node
 # (default 127.0.0.1:26657), CHAINID its chain id (default dev), GNOKEY the
@@ -36,7 +38,9 @@ holes=$root/data/holes.txt
 verify() {
 	list=$(awk '{printf "%s{\"%s\", \"%s\"}", (NR > 1 ? ", " : ""), $1, $3}' "$holes")
 	expr='func() string { at := func(s, sub string) int { for i := 0; i+len(sub) <= len(s); i++ { if s[i:i+len(sub)] == sub { return i } }; return -1 }; bad := ""; for _, h := range [][2]string{'"$list"'} { id := Current(h[0]); v := Versions(h[0]); i := at(v, `"id":"`+id+`"`); if id != "" && i >= 0 { v = v[i:]; if j := at(v, "}"); j >= 0 && at(v[:j], `"sha":"`+h[1]) >= 0 { continue } }; bad += " " + h[0] }; if bad == "" { return "every slot holds its data" }; return "missing or other:" + bad }()'
-	"$gnokey" query vm/qeval -remote "$remote" -data "$realm.$expr"
+	out=$("$gnokey" query vm/qeval -remote "$remote" -data "$realm.$expr")
+	echo "$out"
+	case $out in *'"every slot holds its data"'*) ;; *) return 1 ;; esac
 }
 
 if [ "${1:-}" = -verify ]; then
@@ -49,11 +53,29 @@ key=${1:?usage: publishdata.sh <key> | -verify}
 price=$("$gnokey" query auth/gasprice -remote "$remote" | tr -d " \n" | sed -n 's/.*"gas":"*\([0-9]*\)"*,"price":"\([0-9]*\)ugnot".*/\2 \1/p')
 [ -n "$price" ] || { echo "publishdata.sh: no gas price at $remote" >&2; exit 1; }
 
+# the terminal's echo comes back however the script ends (an error, ^C)
+trap 'stty echo 2>/dev/null || true' EXIT
+trap 'exit 130' INT TERM
 printf 'Password for %s: ' "$key" >&2
 stty -echo 2>/dev/null || true
 read -r pass
 stty echo 2>/dev/null || true
 echo >&2
+
+# publish slot hex gas fee: one Publish call, its output in out. A call
+# signed before the one before it has landed reads the account's old
+# sequence ("signature verification failed"): sent again, a block later (the
+# web client's gnokey paste does the same: adena.ts gnokeyPaste).
+publish() {
+	for try in 1 2 3; do
+		out=$(printf '%s\n' "$pass" | "$gnokey" maketx call -pkgpath "$realm" -func Publish -args "$1" -args "$2" -args "" \
+			-gas-wanted "$3" -gas-fee "${4}ugnot" -max-deposit "${MAX_DEPOSIT:-10000000ugnot}" \
+			-broadcast -chainid "$chainid" -remote "$remote" -insecure-password-stdin "$key" 2>&1) && return 0
+		echo "$out" | grep -q "signature verification failed" || return 1
+		sleep 6
+	done
+	return 1
+}
 
 n=0
 while read -r slot _ _ hex; do
@@ -63,14 +85,7 @@ while read -r slot _ _ hex; do
 	gas=$(awk -v b=$((${#hex} / 2)) 'BEGIN {printf "%d", (25000000 + 55000 * b) * 1.2}')
 	fee=$(echo "$price" | awk -v g="$gas" '{printf "%d", g * $1 / $2 + 1}')
 	printf '%2d %-12s ' "$n" "$slot"
-	publish() {
-		echo "$pass" | "$gnokey" maketx call -pkgpath "$realm" -func Publish -args "$slot" -args "$hex" -args "" \
-			-gas-wanted "$gas" -gas-fee "${fee}ugnot" -max-deposit "${MAX_DEPOSIT:-10000000ugnot}" \
-			-broadcast -chainid "$chainid" -remote "$remote" -insecure-password-stdin "$key" 2>&1
-	}
-	# a call signed as the one before lands may read the account's old
-	# sequence: once more, a block later
-	out=$(publish) || { echo "$out" | grep -q "signature verification failed" && sleep 6 && out=$(publish); } || true
+	publish "$slot" "$hex" "$gas" "$fee" || true
 	if echo "$out" | grep -q "^OK!"; then
 		echo "$out" | awk '/GAS USED|STORAGE DELTA|TX HASH/ {printf "%s  ", $0} END {print ""}'
 	elif echo "$out" | grep -q "nothing to publish"; then

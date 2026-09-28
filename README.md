@@ -58,16 +58,17 @@ chain time and is the same for everyone.
 You need a `gnolang/gno` checkout next to this repo, Go, and Node.
 
 **1. The chain.** The game deploys on onyx (`onyx-1`, mainnet's code), so the
-tools are built from the checkout at the tag `chain/onyx`, into the folder
-the scripts look in (`GNO_TOOLCHAIN`, `~/.cache/gno-toolchains/onyx` unless
-set). Each finds its `GNOROOT`, the checkout, by itself:
+tools are built from the tag `chain/onyx` (a worktree of the checkout, which
+stays on its own branch), into the folder the scripts look in
+(`GNO_TOOLCHAIN`, `~/.cache/gno-toolchains/onyx` unless set). Each finds its
+`GNOROOT`, that worktree, by itself:
 
 ```sh
 t=${GNO_TOOLCHAIN:-~/.cache/gno-toolchains/onyx}
-git -C ../gno checkout chain/onyx
-(cd ../gno/gnovm && go build -o $t/gno ./cmd/gno)
-(cd ../gno/gno.land && go build -o $t/gnokey ./cmd/gnokey)
-(cd ../gno/contribs/gnodev && go build -o $t/gnodev .)
+git -C ../gno worktree add ../gno-onyx chain/onyx
+(cd ../gno-onyx/gnovm && go build -o $t/gno ./cmd/gno)
+(cd ../gno-onyx/gno.land && go build -o $t/gnokey ./cmd/gnokey)
+(cd ../gno-onyx/contribs/gnodev && go build -o $t/gnodev .)
 export PATH=$t:$PATH
 gnodev local -empty-blocks -empty-blocks-interval 5   # from this repo's root
 ```
@@ -121,7 +122,9 @@ hole-finished card ([ADR-003](adr/adr-003-sharing.md); `?clips` in a dev build).
 
 `scripts/check.sh` runs the Gno tests with that `gno` (or the one `GNO`
 names), which fetches the packages the tests import from gno.land (mainnet,
-the code onyx runs) into `$GNO_TOOLCHAIN/gnohome`, a cache of its own.
+the code onyx runs) into `$GNO_TOOLCHAIN/gnohome`, a cache of its own. With
+no `gno` there it fails; `SKIP_GNO=1 scripts/check.sh` checks the client
+alone, and says so.
 
 ## Writing a hole
 

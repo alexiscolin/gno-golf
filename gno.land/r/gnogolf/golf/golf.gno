@@ -611,7 +611,7 @@ func aim(from, cup physics.Vec2) (float64, float64) {
 func PlayRound(cur realm, hole string, shots string) string {
 	e, p := mustHole(hole), cur.Previous().Address()
 	period := Period()
-	if v := e.roundTree().Get(p.String()); v != nil && v.(*round).strokes > 0 {
+	if v := e.roundTree().Get(p.String()); v != nil { // (a round is kept from its first stroke on)
 		period = v.(*round).period // stroke() still refuses a stale one
 	}
 	return playRound(e, p, shots, period, assisted)
@@ -746,15 +746,17 @@ func decodeGas(size int) int64 { return decodeBase + decodePerByte*int64(size) }
 const maxShotGas = 1300000000
 
 // minShotWork is the work, in the physics' units, a commit's first shot may
-// always do whatever the weather: four fifths of MaxWork. Past it a shot is
-// capped (work.next), so a hole whose dearest weather would leave less is
-// refused at publish (worstGas): a published hole never refuses a legitimate
-// full-power stroke in its worst weather, and an author whose board is too
-// heavy is told at publish, not by a hole that misbehaves in the rain. The
-// course's heaviest shot does 441,737 over the full grid of tee shots
-// (mountain/16, full power, in a storm), 0.74 of MaxWork in an adversarial
-// search (docs/golf.md); its tightest room in its dearest weather is 839,278
-// (mountain/7), 39,278 over the floor.
+// always do whatever the weather: four fifths of MaxWork. A shot is capped at
+// what is left of the budget (work.next), so a hole whose dearest weather
+// would leave less is refused at publish (worstGas): on a published hole,
+// every shot of less than minShotWork plays out in any weather (as a commit's
+// first, if need be), and an author whose board is too heavy is told at
+// publish, not by a hole that misbehaves in the rain. A shot past it may be
+// cut short; none is known: the course's heaviest real shot does 441,737
+// over the full grid of tee shots (mountain/16, full power, in a storm), and
+// the heaviest found in an adversarial search 0.74 of MaxWork (docs/golf.md);
+// the course's tightest room in its dearest weather is 839,278 (mountain/7),
+// 39,278 over the floor.
 const minShotWork = 4 * physics.MaxWork / 5
 
 // worstGas is what a commit on h (size bytes of data) spends up to a first
@@ -1102,7 +1104,6 @@ func roundOf(e *entry, h course.Hole, player address) *round {
 	s := h.Start()
 	return &round{bx: s.X, by: s.Y}
 }
-
 
 // maxName and maxNote bound a hole's name and a version's note.
 const (

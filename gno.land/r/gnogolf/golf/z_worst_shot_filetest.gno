@@ -233,7 +233,9 @@ func main(cur realm) {
 	for _, s := range probes {
 		h := probe(s)
 		var id string
-		if r := revive(func() { id = golf.PublishMine(cross(cur), slugFor(cur, s, h), hex.EncodeToString([]byte(course.Encode(h))), "") }); r != nil {
+		if r := revive(func() {
+			id = golf.PublishMine(cross(cur), slugFor(cur, s, h), hex.EncodeToString([]byte(course.Encode(h))), "")
+		}); r != nil {
 			println(s.slug, r)
 			continue
 		}
@@ -252,7 +254,9 @@ func main(cur realm) {
 	}
 	h := probe(spec{walls: "cage", zig: 8, rects: 23})
 	var id string
-	if r := revive(func() { id = golf.PublishMine(cross(cur), slugFor(cur, spec{slug: "cage", kind: "dry"}, h), hex.EncodeToString([]byte(course.Encode(h))), "") }); r != nil {
+	if r := revive(func() {
+		id = golf.PublishMine(cross(cur), slugFor(cur, spec{slug: "cage", kind: "dry"}, h), hex.EncodeToString([]byte(course.Encode(h))), "")
+	}); r != nil {
 		println("cage", r)
 		return
 	}

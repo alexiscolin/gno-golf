@@ -814,14 +814,17 @@ first shot less than `minShotWork` (four fifths of `MaxWork`): decoding, the
 forecast at its dearest and a shot's fixed part, its walls, its pulses'
 set-up and `MaxWorkStep + minShotWork` must fit the 1.4e9 budget
 (`worstGas`; `golf: in its dearest weather, a commit on this hole would
-leave too little room for a shot`). A published hole then never refuses a
-legitimate full-power stroke in its worst weather, and an author whose board
-is too heavy is told at publish, not by a hole that misbehaves in the rain.
-On the course that room is 839K (mountain/7, 39K over the floor) to 1,115K
-units (town/11); the heaviest course shot does 442K on the 42,624 grid shots
-of the 74 holes (mountain/16, full power, in a storm) and 0.74 of `MaxWork`
-in the adversarial search below. It also bounds a page: one forecast, at
-most `maxBoardWork` of board and one shot, far under a query's 3e9 (the
+leave too little room for a shot`). On a published hole every shot of less
+than `minShotWork` then plays out in its worst weather (as a commit's first,
+if need be), and an author whose board is too heavy is told at publish, not
+by a hole that misbehaves in the rain. A shot past it may be cut short, and
+none is known: on the course that room is 839K (mountain/7, 39K over the
+floor) to 1,115K units (town/11); the heaviest course shot does 441,737 on
+the 42,624 grid shots of the 74 holes (mountain/16, full power, in a storm)
+and the heaviest found 0.74 of `MaxWork` in the adversarial search below.
+It also bounds a page: one forecast (two for a round begun in the period
+before, whose last shot the board draws in its own), at most
+`maxBoardWork` of board and one shot, far under a query's 3e9 (the
 worst pages golf takes cost 0.52e9, `z_worst_render_filetest`). Before the
 first shot of a commit the bound must fit the 1.4e9 budget. Before each later shot,
 a commit that would pass 1.4e9 with one more shot as heavy as its heaviest so
