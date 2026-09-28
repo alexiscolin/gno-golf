@@ -14,6 +14,8 @@ export interface Caption {
   title: string;
   score: string;
   term?: string;
+  /** the clip's closing ask, when not the hole and the score (a duel: the ghost to race) */
+  challenge?: string;
 }
 
 // the badge (app/icon.svg, the favicon; its PNG, apple-icon.png, where a

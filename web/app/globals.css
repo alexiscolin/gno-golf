@@ -1468,7 +1468,7 @@ html, body {
   .card--hole .eyebrow { display: none; }
   .card--score { min-width: 0; }
   .card--score .eyebrow { font-size: 9px; letter-spacing: .06em; }
-  .card--score strong, .card--score .card__par { white-space: nowrap; } /* a duel's "2 – 1" and "3 to beat" on one line each */
+  .card--score .eyebrow, .card--score strong, .card--score .card__par { white-space: nowrap; } /* a duel's "You – them", "2 – 1" and "3 to beat" on one line each */
   .card h1 { font-size: 15px; white-space: normal; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .aimbar small { white-space: nowrap; font-size: 11px; }
   .aimbar .power { width: 180px; }

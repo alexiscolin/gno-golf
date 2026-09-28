@@ -26,6 +26,12 @@ Everything below runs on-chain; the dapp reads it.
   read any list of up to 50 addresses, named or not. The dapp's Friends tab
   compares you with people you chose, and no bot can push you off. The sheet
   opens on this hole's board during a round, on the course's elsewhere.
+- **Duels race a best, not a board.** A share link carries the sharer's
+  address (`?by=`): the friend races their best on the hole as a ghost,
+  read with `Ghost(hole, mode, player)` (named or not, like `Bests`) and
+  replayed stroke by stroke. The result is the client's arithmetic in V1,
+  checkable against the two bests; nothing records it
+  ([ADR-004](../adr/adr-004-duels.md)).
 - **Suspected bots are hidden in the dapp only.** `scripts/botcheck.ts` (see [the bot check](#bot-check))
   writes `web/public/flags.json`. The general tabs hide players scoring at
   least 0.5 by default, with a "Show all" toggle. The Friends tab is never

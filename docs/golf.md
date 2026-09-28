@@ -856,7 +856,7 @@ score honest through it.
   shortcut, v1 records archived").
 - **The hub itself** is replaced by a new realm (a sibling path, such as
   `r/gnogolf/golf2`), which can read the v1's public state (`Holes`,
-  `Versions`, `HoleData`, `BestOf`, `StandingOf`, `Records`, `Players`) and
+  `Versions`, `HoleData`, `BestOf`, `Ghost`, `StandingOf`, `Records`, `Players`) and
   carry it over or show it as history. The v1's owner then calls
   `SetSuccessor` once: every v1 page says where the course went, and v1 goes
   on playing. See [deploy-v1.md §9](design/deploy-v1.md).

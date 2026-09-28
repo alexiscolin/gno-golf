@@ -451,10 +451,7 @@ func roundSummary(e *entry, p address, r *round) string {
 	}
 	s := ufmt.Sprintf("> [!NOTE]\n> **%s holed it in %d** (par %d, %s), %s.\n>\n", who, r.strokes, e.par, vs, modeNames[r.mode])
 	b := e.board(r.mode)
-	best := 0
-	if v := e.bests(r.mode).Get(p.String()); v != nil {
-		best = bestStrokes(v)
-	}
+	best := bestStrokes(e.bests(r.mode).Get(p.String()))
 	switch k := boardKey(best, p.String()); {
 	case best > 0 && b.Has(k):
 		s += ufmt.Sprintf("> Best here: %d strokes, **#%d of %d** on the %s board.\n>\n", best, b.index(k)+1, b.Size(), modeNames[r.mode])

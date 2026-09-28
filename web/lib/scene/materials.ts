@@ -96,7 +96,8 @@ export function hullOf(w = 0.055, color: number = C.ink) {
 }
 const hull = hullOf(0.055);
 // the gnome is seen up close in the picker: a scenery-weight line is too heavy
-const hullThin = hullOf(0.028);
+export const THIN_HULL = 0.028;
+const hullThin = hullOf(THIN_HULL);
 
 // ---------------------------------------------------------------- motion
 //

@@ -297,35 +297,13 @@ small team wins.
   touches physics.
 - Two points far apart in a path mean a tunnel. Do not interpolate across them.
 
-## v2 — duels against a ghost, decide one thing before mainnet
+## Duels against a ghost: the next stages
 
-A duel is a normal hole played against another player's record, shown as a
-see-through gnome (Mario Kart's time-trial ghost), turn by turn: the player
-shoots, then the rival's stroke of the same number replays, fast and
-skippable, and the HUD says "You 2 · nym-ace123 3". The chain is what makes it
-worth it: the rival's round is on-chain, so it can't be faked, and a
-replay is a free read.
-
-- **Ways in** (no mode screen, no extra step: a duel is about one hole, so
-  the hole is known):
-  - the "dare a friend" link after a save (`?by=`, already there);
-  - a ⚔ Race button on each row of a hole's board and of the Friends tab.
-
-  No field to type a name in: Friends already adds people by name.
-- **In play:** the picker says "Racing nym-ace123 · 3 strokes" where the
-  dare line is today; an × on the duel's badge drops back to solo play.
-- **At the end:** the win card is titled "You beat nym-ace123!" or
-  "nym-ace123 wins by 1", with Save on-chain, Rematch, and "Dare them back"
-  (the same link, the other way).
-- **On-chain, later:** `Duel(hole, rival)` records a result the chain checks
-  (both rounds replayed): wins, losses and streaks on a board of their own.
-
-**To settle before mainnet:** today the realm keeps the shots of a player's
-current round, and only the strokes of their best. For a ghost of the best,
-a best must keep its shots and period too. That is written in the same save
-transaction when a round beats the best (about 12 bytes a shot, the old
-shots freed); a worse round leaves the best, and its shots, alone. Adding the
-field after mainnet means migrating every best.
+Designed in [ADR-004](adr/adr-004-duels.md); the realm side (a best keeps its
+round, `Ghost`) and the dare link's duel are built. Next: the ⚔ on a hole's
+board and in Friends with `beat you`, `Race your best`, the Ghost buster
+gnome, the clip with both balls, then `Duel(hole, rival)` on-chain with its
+board and streaks.
 
 ## v2 — wear becomes physical
 

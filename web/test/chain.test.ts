@@ -464,8 +464,12 @@ test("ghost reads a best with its round, null for none, and never asks for a bad
   assert.equal(await chain.ghost("garden/1", "pro", ADDR1), null);
   reply = { ...GHOST, strokes: 0 };
   await assert.rejects(chain.ghost("garden/1", "pro", ADDR1), "a best of 0 strokes is no best");
+  reply = { ...GHOST, strokes: 1 };
+  await assert.rejects(chain.ghost("garden/1", "pro", ADDR1), "one shot a stroke");
+  reply = { ...GHOST, mode: "assisted" };
+  assert.equal(await chain.ghost("garden/1", "pro", ADDR1), null, "not the mode asked for: none");
   assert.equal(await chain.ghost("garden/1", "pro", 'g1") + x'), null);
-  assert.equal(asked.length, 3, "a bad address is never asked");
+  assert.equal(asked.length, 5, "a bad address is never asked");
 });
 
 test("holeLeaderboard pages one hole's board", async () => {

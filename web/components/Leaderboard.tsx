@@ -5,6 +5,7 @@ import type { Snapshot } from "@/lib/engine";
 import { isAddress, type Chain } from "@/lib/chain";
 import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
 import { vsPar } from "@/lib/card";
+import { SHARE_TAGS } from "@/lib/site";
 import { sound } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
@@ -467,7 +468,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect }: Board
             You are <b>#{myPlace.at}</b> of {myPlace.of} {kind === "hole" ? `on ${s.name}` : "on the course"}
           </span>
           <Share
-            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place. #gnoland @_gnoland`}
+            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place.${SHARE_TAGS}`}
             link={kind === "hole" ? holeLink(s, "") : ""}
           />
         </div>

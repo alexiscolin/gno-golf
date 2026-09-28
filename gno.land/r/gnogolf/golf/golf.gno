@@ -118,10 +118,16 @@ func bestOf(r *round) string {
 	return strconv.Itoa(r.strokes) + " " + strconv.FormatInt(r.period, 10) + " " + r.shots
 }
 
-// bestStrokes is a kept best's strokes.
+// bestStrokes is a kept best's strokes, 0 for none (a tree's nil).
 func bestStrokes(v any) int {
+	if v == nil {
+		return 0
+	}
 	s := v.(string)
-	n, _ := strconv.Atoi(s[:strings.Index(s, " ")])
+	n, err := strconv.Atoi(s[:strings.Index(s, " ")])
+	if err != nil {
+		panic("golf: a best not as bestOf writes it: " + s)
+	}
 	return n
 }
 
@@ -957,10 +963,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	}
 	// a player's best stays theirs: replaying the hole never erases it, and a
 	// tie keeps the older round, shots and all
-	best, was := r.strokes, 0
-	if v := e.bests(m).Get(p); v != nil {
-		was = bestStrokes(v)
-	}
+	best, was := r.strokes, bestStrokes(e.bests(m).Get(p))
 	if was > 0 && was <= r.strokes {
 		best = was
 	} else {
@@ -1023,8 +1026,8 @@ func Claim(cur realm) int {
 	slots.Iterate("", "", func(_ string, v any) bool {
 		e := find(v.(string))
 		for m := 0; m < modes; m++ {
-			if v := e.bests(m).Get(p); v != nil {
-				seat(e, m, p, bestStrokes(v))
+			if best := bestStrokes(e.bests(m).Get(p)); best > 0 {
+				seat(e, m, p, best)
 				n++
 			}
 		}

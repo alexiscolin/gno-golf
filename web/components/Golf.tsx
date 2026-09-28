@@ -10,6 +10,7 @@ import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
 import type { Ghost, HoleRow, Mode } from "@/lib/types";
 import { duelResult, duelShare, pickGhost, type Duel } from "@/lib/duel";
+import { SHARE_TAGS } from "@/lib/site";
 import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
@@ -211,7 +212,8 @@ function useNow(clock: () => number) {
 /** How long the round can still go on-chain ("within 4:12"), then, once its
  *  time is over, that it can't. */
 // by and clock (now, ms) on the chain's clock; ranked: a course hole (a community one ranks nobody)
-function SaveClock({ by, clock = Date.now, stale, ranked }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean }) {
+// again: what the button to play again says (Rematch in a duel)
+function SaveClock({ by, clock = Date.now, stale, ranked, again = "Play again" }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean; again?: string }) {
   const now = useNow(clock);
   const left = by - now;
   if (left > 0 && !stale)
@@ -222,7 +224,7 @@ function SaveClock({ by, clock = Date.now, stale, ranked }: { by: number; clock?
     );
   return (
     <p className="note note--warn">
-      This round's weather is over: it can no longer be saved on-chain. Play again in the new one.
+      This round's weather is over: it can no longer be saved on-chain. {again} in the new one.
     </p>
   );
 }
@@ -684,7 +686,7 @@ export default function Golf() {
     return by && isAddress(by) ? by : "";
   });
   const dared = useRef(false);
-  const [dareNote, setDareNote] = useState("");
+  const [dareNote, setDareNote] = useState(dare ? "Reading the dare…" : "");
   // the rival a duel races: their bests here, in both modes, with their rounds
   const [rival, setRival] = useState<{ hole: string; name: string; self: boolean; ghosts: Record<Mode, Ghost | null> } | null>(null);
   const me = account && account.address;
@@ -696,14 +698,15 @@ export default function Golf() {
     // (a ghost unread is no duel: the dare is still said)
     void Promise.all([c.ghost(holeId, "assisted", dare).catch(() => null), c.ghost(holeId, "pro", dare).catch(() => null), nameOnce(c, dare)])
       .then(([a, p, n]) => {
-        const name = n || shortAddr(dare), best = Math.min(...[a, p].map((g) => (g ? g.strokes : Infinity)));
-        if (a || p) setRival({ hole: holeId, name, self: dare === me, ghosts: { assisted: a, pro: p } });
+        // (a name as gno.land writes them, or the address: nothing a lying node could dress up)
+        const name = n && /^[a-z0-9._-]{1,64}$/i.test(n) ? n : shortAddr(dare), self = dare === me, g = pickGhost(aim, { assisted: a, pro: p });
+        if (g) setRival({ hole: holeId, name, self, ghosts: { assisted: a, pro: p } });
         // said on the picker (a link opens there), and again as the hole opens; a sharer with no round here still dares
         setDareNote(`${name} dares you on this hole.`); // (with a round here, the duel says it)
-        setLinkNote(Number.isFinite(best) ? `${name} holed it in ${best}. Your turn.` : `${name} dares you on this hole.`);
+        setLinkNote(!g ? `${name} dares you on this hole.` : self ? `Your best here: ${g.strokes}. Beat it.` : `${name} holed it in ${g.strokes}. Your turn.`);
       })
-      .catch(() => {});
-  }, [dare, holeId, holeReady, me]);
+      .catch(() => setDareNote(""));
+  }, [dare, holeId, holeReady, me, aim]);
   // the duel on this hole: the rival's best in the round's aim mode, else their other one
   const duelMode = (s && s.roundMode) || aim;
   const duel: Duel | null = useMemo(() => {
@@ -711,6 +714,8 @@ export default function Golf() {
     return g && rival ? { ghost: g, name: rival.name, self: rival.self } : null;
   }, [rival, holeId, duelMode]);
   useEffect(() => game.current?.race(duel ? duel.ghost : null), [duel]);
+  // the duel this round races (one armed mid-round starts with the next: the engine says when)
+  const racing = duel && s && s.rival != null ? duel : null;
   // the weather the ghost was played in (read once a duel is armed), said when it was not today's
   const [ghostSky, setGhostSky] = useState<{ ghost: Ghost; kind: string } | null>(null);
   useEffect(() => {
@@ -718,8 +723,8 @@ export default function Golf() {
     if (duel && c) void c.weather(duel.ghost.hole, duel.ghost.period).then((w) => setGhostSky({ ghost: duel.ghost, kind: w.kind || "" }), () => {});
   }, [duel]);
   const sky: Sky = duel && s && ghostSky && ghostSky.ghost === duel.ghost ? { theirs: ghostSky.kind, mine: s.kind } : null;
-  // out of reach: the rival's holing stroke shown and the player's ball at rest out of the cup, said once a round
-  const duelLost = !!(duel && s && s.rivalIn && !s.flying && !s.done && s.strokes >= duel.ghost.strokes);
+  // out of reach: the rival's holing stroke shown, and the player past it (or at it, the ball at rest out of the cup)
+  const duelLost = !!(racing && s && s.rivalIn && (s.strokes > racing.ghost.strokes || (s.strokes === racing.ghost.strokes && !s.flying && !s.done)));
   const lostNote = duel ? (duel.ghost.strokes === 1 ? "Missed the ace. Rematch?" : `${duel.self ? "Your best" : duel.name} holed it in ${duel.ghost.strokes}. Finish for your score, or rematch.`) : "";
   useEffect(() => {
     setLinkNote((n) => (duelLost ? lostNote : n === lostNote ? null : n)); // (gone with the rematch)
@@ -1011,7 +1016,7 @@ export default function Golf() {
 
   const holed = s && s.holed;
   // a duel's result, once the hole is won
-  const won = duel && s && s.holed ? { ...duelResult(s.strokes, duel, golfTerm(s.strokes, parHere(s))), duel } : null;
+  const won = racing && s && s.holed ? { ...duelResult(s.strokes, racing, golfTerm(s.strokes, parHere(s))), duel: racing } : null;
   const rematch = !!won && won.result !== "win"; // a duel lost or tied pushes to the rematch
   const nextAfter = cupWon && s ? nextCup(cupWon.cup, s.worlds) : ""; // the cup after the one just complete
   // the hole the gnome picker leads to (a shared link's, or the cup's first), named over the gnomes
@@ -1032,6 +1037,8 @@ export default function Golf() {
       q.set("gnome", gnome);
     } else if (screen === "worlds" && world) q.set("cup", world);
     else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
+    // a duel's dare stays in the address while it is raced here: a reload, a copied link keep it
+    if (rival && rival.hole === idHere && screen !== "worlds") q.set("by", dare);
     else if (screen === "play") return; // the hole is not known yet: wait for it
     // a hole's own page (/h/…) is left for the game's address once it moves on
     const base = window.location.pathname.startsWith("/h/") ? "/" : window.location.pathname;
@@ -1044,7 +1051,7 @@ export default function Golf() {
     if (url === here) return;
     if (moved) window.history.pushState({ screen }, "", url);
     else window.history.replaceState({ screen }, "", url);
-  }, [cfg, screen, place, world, gnome, idHere]);
+  }, [cfg, screen, place, world, gnome, idHere, rival, dare]);
   // Back and Forward: back to that screen, and that hole, without reloading the scene
   // (subscribed once: the latest goTo is read through its ref)
   useEffect(() => {
@@ -1155,10 +1162,10 @@ export default function Golf() {
               </div>
             </div>
             {/* in a duel: both counts, the player's first, and the strokes to beat */}
-            <div className="card card--score" role={duel ? "group" : undefined} aria-live={duel ? "polite" : undefined} aria-label={duel ? `You ${s.strokes}, ${duel.name} ${s.rival ?? 0}${s.rivalIn ? ", in" : ""}; ${duel.ghost.strokes} to beat` : undefined}>
-              <span className="eyebrow">{duel ? (duel.self ? "You – best" : "You – them") : "Strokes"}</span>
-              <strong>{s.strokes}{duel && <> – {s.rival ?? 0}{s.rivalIn && "✓"}</>}</strong>
-              <span className="card__par">{duel ? (duelLost ? "they won" : `${duel.ghost.strokes} to beat`) : <>par {parHere(s)}{last ? ` · last ${last}` : ""}</>}</span>
+            <div className="card card--score" role={racing ? "group" : undefined} aria-live={racing ? "polite" : undefined} aria-label={racing ? `You ${s.strokes}, ${racing.name} ${s.rival ?? 0}${s.rivalIn ? ", in" : ""}; ${racing.ghost.strokes} to beat` : undefined}>
+              <span className="eyebrow">{racing ? (racing.self ? "You – best" : "You – them") : "Strokes"}</span>
+              <strong>{s.strokes}{racing && <> – {s.rival ?? 0}{s.rivalIn && "✓"}</>}</strong>
+              <span className="card__par">{racing ? (duelLost ? "they won" : `${racing.ghost.strokes} to beat`) : <>par {parHere(s)}{last ? ` · last ${last}` : ""}</>}</span>
               {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
             </div>
             <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
@@ -1324,7 +1331,7 @@ export default function Golf() {
         <div className="banner banner--win">
           <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label="Hole finished">
             <span className="eyebrow">In the hole! · {s.name}</span>
-            <h2>{won ? won.title : golfTerm(s.strokes, parHere(s))}</h2>
+            <h2>{won ? won.title.replaceAll("-", "\u2011") /* a name's hyphens never break a line */ : golfTerm(s.strokes, parHere(s))}</h2>
             {won && <p>{won.line}</p>}
             {/* the score, and beside it the ways to tell people about it */}
             <div className="win__head">
@@ -1342,9 +1349,9 @@ export default function Golf() {
               // with a round of the sharer's on the chain here, the link dares the friend to beat it;
               // a duel dares them back once saved, and before, passes the rival's own dare on
               link={s ? holeLink(s, gnome, won && !onChain ? won.duel.ghost.player : account && (onChain || saved) ? account.address : "") : ""}
-              label={won ? (onChain ? "Dare them back" : "Dare a friend") : savedPlace ? `Share your #${savedPlace.rank}` : "Share"}
+              label={won ? (!onChain ? "Dare a friend" : won.duel.self ? "Share your ghost" : "Dare them back") : savedPlace ? `Share your #${savedPlace.rank}` : "Share"}
                 snapshot={() => (game.current ? game.current.snapshot(caption(s, won)) : Promise.resolve(null))}
-                text={won ? duelShare(won.result, won.duel, s.name, s.strokes, onChain) : shareText({ s, card, cups, fresh, place: savedPlace })}
+                text={won ? duelShare(won.result, won.duel, s.name, s.strokes, onChain, won.duel.ghost.mode !== (s.roundMode || aim)) : shareText({ s, card, cups, fresh, place: savedPlace })}
                 clip={clip}
               />
             </div>
@@ -1397,7 +1404,7 @@ export default function Golf() {
               return warn && <p className="note note--warn">{warn}</p>;
             })()}
             {!onChain && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} again={won ? "Rematch" : undefined} />
             )}
             {/* one solid action at a time: saving while it can, else going on (a duel lost or tied: the rematch) */}
             <div className="banner__row">
@@ -1434,7 +1441,7 @@ export default function Golf() {
             </div>
             {account && canSave && (
               <p className="real__fine">
-                {won && won.result !== "loss" && "Saved, your round becomes the ghost they race. "}
+                {won && won.result !== "loss" && "Saved, your best is the ghost they race. "}
                 {costNow}. You confirm in Adena.
               </p>
             )}
@@ -2063,7 +2070,7 @@ function Stamp({ kind, seed = 0, world = "garden" }: { kind: "ace" | "under" | "
  *  a duel's, who was raced, both counts, and its result shouted. */
 const caption = (s: Snapshot, won: { title: string; duel: Duel } | null) => {
   const cup = s.place ? worldOf(s.world).name : "Community hole", par = parHere(s);
-  if (won) return { eyebrow: `vs ${won.duel.name}${par ? ` · par ${par}` : ""}`, title: s.name, score: `${s.strokes} – ${won.duel.ghost.strokes}`, term: won.title };
+  if (won) return { eyebrow: `vs ${won.duel.name}${par ? ` · par ${par}` : ""}`, title: s.name, score: `${s.strokes} – ${won.duel.ghost.strokes}`, term: won.title, challenge: `Race the ghost · ${s.name}` };
   return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: strokesWord(s.strokes), term: golfTerm(s.strokes, par).replace(/!?$/, "!") }; // the clip shouts it
 };
 
@@ -2076,7 +2083,7 @@ function shareText({ s, card, cups, fresh, place }: { s: Snapshot; card: Card; c
   const t = totals(card, s.holes), cup = worldOf(s.world).name;
   const d = t.strokes - t.par, vs = d === 0 ? "level par" : vsPar(d);
   const pick = (list: readonly string[]) => list[[...String(s.id || "")].reduce((a, c) => a + c.charCodeAt(0), s.strokes) % list.length];
-  const tag = " #gnoland @_gnoland";
+  const tag = SHARE_TAGS;
   if (cups.slam) return "👑 Grand slam on Gnogolf: every cup at par or under. The Gnome King bows." + tag;
   if (t.all) return pick([
     `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on gno.land.`,
@@ -2143,7 +2150,7 @@ function Victory({ cup, best, holes, card, saved, fresh, snapshot, onBack, onRep
   const t = totals(card, holes), vs = t.strokes - t.par;
   const vsText = vs === 0 ? "level par" : vsPar(vs);
   const to = WORLDS.find((x) => x.id === next);
-  const text = `🏆 ${best ? `Beat my last ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on gno.land. #gnoland @_gnoland`;
+  const text = `🏆 ${best ? `Beat my last ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on gno.land.${SHARE_TAGS}`;
   return (
     <div className={`victory victory--${cup}`}>
       <Cheer />

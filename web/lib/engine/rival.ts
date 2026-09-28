@@ -4,9 +4,12 @@
 // Nothing about the player's round changes: the ghost is drawn only, the two
 // balls pass through each other, and its strokes are free reads (the first
 // with SimulateRoundIn from the tee, each later one with SimulateFrom from the
-// rest before, all in the ghost's own period), read ahead in the background.
-// Its turn never makes the player wait: it plays at twice the speed (at most
-// 2 s), a press that starts an aim cuts it (the ghost put at its rest), and a
+// rest before, all in the ghost's own period): one read ahead, each kept once
+// it answers (a rematch, or the other mode and back, reads nothing again), a
+// failed one asked again at the next turn. Its turn never makes the player
+// wait: it plays at twice the speed (its steps in about 2 s), a press that
+// starts an aim cuts it (the ghost put at its rest), a replay that outlives
+// its time is cut as the player's is, and a
 // stroke read late, or once the player aims again, or under reduced motion,
 // is not played at all: the ghost appears at its rest. It replays with the
 // game's own replay (engine/replay.ts), on a Live of its own like the shot
@@ -17,7 +20,7 @@
 // E: the engine's live state (engine/types.ts Live).
 import { BackSide } from "three";
 import { makeBall } from "../scene";
-import { C, disposeCourse, ownFade, setFade } from "../scene/materials";
+import { C, THIN_HULL, disposeCourse, ownFade, setFade } from "../scene/materials";
 import { reducedMotion } from "../device";
 import { BALL_R } from "../terrain";
 import { ghostSpeed, shotsOf } from "../duel";
@@ -26,16 +29,19 @@ import type { Ghost, Stroke } from "../types";
 import type { Gnome } from "../scene/data";
 import type { GameState, Live } from "./types";
 
-// the ghost's look: paper white, inked thin, see-through (and nobody's skin)
+// the ghost's look: paper white, inked thin as a gnome is, see-through (and nobody's skin)
 const PAPER = { id: "ghost", name: "Ghost", line: "", hat: C.cream, body: C.cream, hair: C.cream, beard: "full" } as const;
 const SEEN = 0.7, AIMING = 0.45; // its opacity on its turn, and at rest while the player aims
 const WAIT_MS = 1500; // a stroke slower than this to read: the ghost jumps to its rest when it lands
+const CUT_MS = 5000; // a ghost's replay past this (a frozen tab) is cut: the engine's safety net, for the ghost
+// each ghost's strokes as read, kept with the ghost (the same ghost comes back with a rematch, or a mode toggled back)
+const readsOf = new WeakMap<Ghost, (Promise<Stroke> | undefined)[]>();
 const reduced = reducedMotion();
 
 export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showClock: (t: number) => void; restTimed: () => void; told: () => void; warm: () => void }) {
   const { g, scene } = E;
   let ball: Gnome | null = null, mats: ReturnType<typeof ownFade> = [];
-  let cut = 0, ghost: Ghost | null = null, strokes: Promise<Stroke | null>[] = [];
+  let cut = 0, ghost: Ghost | null = null;
   // what the HUD reads: the rival's strokes replayed so far, and whether their ball is in
   let shown = 0, holed = false, busy = false;
   // the game as the replay reads it: the live one, the ghost's own fields over it
@@ -57,7 +63,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
   function made() {
     if (ball) return ball;
     ball = makeBall(PAPER);
-    mats = ownFade(ball, 0.028);
+    mats = ownFade(ball, THIN_HULL);
     ball.userData.shade.visible = false; // no shadow: a ghost
     // its outline drawn after its body, against the body's depth: an ink rim, not an x-ray
     ball.traverse((o) => { if ("material" in o && (o.material as { side?: number }).side === BackSide) o.renderOrder = 1; });
@@ -75,16 +81,23 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     const s = g.s, dx = x - g.ball.x, dy = y - g.ball.y;
     if (!s || Math.hypot(dx, dy) > BALL_R * 2.5) return place(b, x, y);
     const cx = s.cup[0] - x, cy = s.cup[1] - y, l = Math.hypot(cx, cy) || 1;
-    place(b, x - (cy / l) * BALL_R * 2.5, y + (cx / l) * BALL_R * 2.5);
+    place(b, x - (cy / l) * BALL_R * 3.5, y + (cx / l) * BALL_R * 3.5);
   }
 
-  /** Reads the ghost's strokes one after the other, each from the rest before, ahead of play. */
-  function readAll(gh: Ghost) {
-    let prev: Promise<Stroke | null> = Promise.resolve(null);
-    strokes = shotsOf(gh).map((shot, i) => (prev = prev.then((before) =>
-      i === 0 ? E.chain.replayRound(gh.hole, [shot], gh.period)
-        : before ? E.chain.simulateFrom(gh.hole, before.rest, shot, i, gh.period) : null).catch(() => null)));
+  /** The ghost's stroke n as the chain replays it, from the rest of stroke n - 1: read once, a failure forgotten. */
+  function read(gh: Ghost, n: number): Promise<Stroke> {
+    const kept = readsOf.get(gh) || [];
+    readsOf.set(gh, kept);
+    const shot = shotsOf(gh)[n];
+    return (kept[n] ||= (n === 0 ? E.chain.replayRound(gh.hole, [shot], gh.period)
+      : read(gh, n - 1).then((before) => E.chain.simulateFrom(gh.hole, before.rest, shot, n, gh.period))
+    ).catch((err: unknown) => {
+      kept[n] = undefined; // asked again next time
+      throw err;
+    }));
   }
+  /** The next stroke read while the player plays theirs (none past the ghost's last). */
+  const ahead = (gh: Ghost, n: number) => n < gh.strokes && void read(gh, n).catch(() => {});
 
   /** The ghost on the tee, nothing replayed: a new round. A duel armed mid-round waits for the next. */
   function reset() {
@@ -104,20 +117,26 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
    *  resolves when it rests, or is cut. */
   async function turn(n: number, done: boolean) {
     const gh = ghost, b = ball;
-    if (!gh || !b || !b.visible || n !== shown || n >= gh.strokes || holed || (done && n + 1 < gh.strokes)) return;
-    const round = g.round, at = cut;
-    const s = await Promise.race([strokes[n], new Promise<"late">((r) => setTimeout(() => r("late"), WAIT_MS))]);
+    // (a turn missed before, a read that failed: this one still lands, where its own stroke rests)
+    if (!gh || !b || !b.visible || n < shown || n >= gh.strokes || holed || (done && n + 1 < gh.strokes)) return;
+    const round = g.round, at = cut, stroke = read(gh, n);
+    const s = await Promise.race([stroke, new Promise<"late">((r) => setTimeout(() => r("late"), WAIT_MS))]);
     if (round !== g.round || at !== cut || gh !== ghost) return;
     // late, or the player aiming again (on a timed hole the pieces are theirs): straight to its rest
-    const res = s === "late" ? await strokes[n] : s;
-    if (!res || round !== g.round || gh !== ghost) return;
+    const res = s === "late" ? await stroke : s;
+    if (round !== g.round || gh !== ghost || n < shown) return;
     if (s === "late" || reduced || g.aiming || g.flying) return land(b, res, n);
     busy = true;
     fade(SEEN);
     cg.tick0 = Number(shotsOf(gh)[n].split(",")[2]) || 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await rp.replay(res.path, res.holed, res.air, res.cause, 0, ghostSpeed(stepsMs(res.path).reduce((a, x) => a + x, 0)));
+      await Promise.race([
+        rp.replay(res.path, res.holed, res.air, res.cause, 0, ghostSpeed(stepsMs(res.path).reduce((a, x) => a + x, 0))),
+        new Promise<void>((r) => (timer = setTimeout(() => (cut++, r()), CUT_MS))),
+      ]);
     } finally {
+      clearTimeout(timer);
       busy = false;
       restTimed(); // the pieces back on the player's clock
       if (round === g.round && gh === ghost) land(b, res, n);
@@ -127,6 +146,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
   /** The ghost at the rest of its stroke n, still (in the cup: gone). */
   function land(b: Gnome, res: Stroke, n: number) {
     shown = n + 1;
+    if (ghost && !res.holed) ahead(ghost, shown);
     holed = res.holed;
     b.visible = !holed;
     beside(b, res.rest[0], res.rest[1]);
@@ -139,8 +159,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     /** Races this ghost from the tee (null: the duel dropped). */
     race(gh: Ghost | null) {
       ghost = gh;
-      strokes = [];
-      if (gh) (made(), readAll(gh));
+      if (gh) (made(), ahead(gh, 0));
       reset();
       told();
     },
@@ -154,8 +173,9 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm }: { showC
     busy: () => busy,
     /** The ghost's ball while it plays, for the camera to frame with the player's; null otherwise. */
     at: () => (busy && ball ? ball.position : null),
-    /** What the HUD shows: the rival's strokes so far and whether they holed; null without a duel. */
-    state: () => (ghost ? { strokes: shown, holed } : null),
+    /** What the HUD shows: the rival's strokes so far and whether they holed; null without a
+     *  duel on this round (none, or one armed mid-round: it starts with the next). */
+    state: () => (ghost && ball && (ball.visible || shown) ? { strokes: shown, holed } : null),
     /** The ghost's gnome, for the clip to hide (null: never made). */
     ball: () => ball,
     dispose() {

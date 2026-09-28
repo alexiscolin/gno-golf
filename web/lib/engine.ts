@@ -976,8 +976,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   canvas.setAttribute("aria-label", "Course. Arrow keys aim and set the power, Space shoots.");
   const onKey = (ev: KeyboardEvent) => {
     if (g.flying || g.done || !g.s) return;
-    rival.skip();
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) cam.finishGlide();
+    // an aim key ends the ghost's turn, as a press does
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) (rival.skip(), cam.finishGlide());
     const step = ev.shiftKey ? 1 : 4;
     if (!g.aiming && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
       g.aiming = dragging = true;
@@ -1365,7 +1365,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       const stroke = won;
       if (!stroke || !g.s) return Promise.resolve(null);
       const hide = () => [ball, rival.ball(), aim, band, confetti && confetti.group, cam.marker];
-      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: `${caption.title} · ${caption.score}` }, run));
+      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: caption.challenge || `${caption.title} · ${caption.score}` }, run));
     },
     /** Races a ghost on this hole, from the tee (ADR-004); null drops the duel. */
     race(ghost: Ghost | null) {

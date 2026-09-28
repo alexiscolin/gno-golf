@@ -426,26 +426,7 @@ func Versions(alias string) string {
 // BestOf is a player's best finished round on a hole in a mode, 0 if none.
 func BestOf(hole, mode string, player address) int {
 	e, m := readHole(hole), modeOf(mode)
-	if v := e.bests(m).Get(player.String()); v != nil {
-		return bestStrokes(v)
-	}
-	return 0
-}
-
-// Ghost is a player's best finished round on a hole in a mode, with the
-// period it was played in and its shots, or null if none: what a duel races.
-// It replays stroke by stroke in its own weather, SimulateRoundIn for the
-// first stroke, then SimulateFrom from each rest. Named or not, like Bests.
-func Ghost(hole, mode string, player address) string {
-	e, m := readHole(hole), modeOf(mode)
-	v := e.bests(m).Get(player.String())
-	if v == nil {
-		return "null"
-	}
-	// "<strokes> <period> <shots>": the shots are golf's own digits and punctuation
-	f := strings.SplitN(v.(string), " ", 3)
-	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(player.String()) +
-		`,"strokes":` + f[0] + `,"period":` + f[1] + `,"shots":` + jstr(f[2]) + "}"
+	return bestStrokes(e.bests(m).Get(player.String()))
 }
 
 // StandingOf is a player's course-wide standing in a mode: how many current

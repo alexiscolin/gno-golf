@@ -52,3 +52,8 @@ test("racing your own best says so in the line and the share", () => {
   assert.match(duelShare("win", duel(3, true), "The Mill", 2, true), /^⚔ The Mill in 2, raced against my own ghost\./);
   assert.match(duelShare("win", duel(3, true), "The Mill", 2, false), /^⚔ Can you beat my 3 on The Mill\?/);
 });
+
+test("a mixed race is said in the share text", () => {
+  assert.match(duelShare("win", duel(3), "The Mill", 2, true, true), /\(mixed aim, not a record\) #gnoland/);
+  assert.doesNotMatch(duelShare("win", duel(3), "The Mill", 2, true), /mixed/);
+});

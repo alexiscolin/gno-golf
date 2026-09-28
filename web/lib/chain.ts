@@ -120,8 +120,10 @@ const checks = {
   courseLeaderboard: (v: unknown): v is CourseLeaderboard => board(v, standingRow, "holes", "players", "offset", "next"),
   holeRank: (v: unknown): v is HoleRank => isObj(v) && isMode(v.mode) && typeof v.hole === "string" && typeof v.player === "string" && nums(v, "rank", "of", "strokes"),
   rank: (v: unknown): v is Rank => isObj(v) && isMode(v.mode) && typeof v.player === "string" && nums(v, "rank", "of", "holes", "strokes"),
+  // a best of 1 to 60 strokes, one shot a stroke
   ghost: (v: unknown): v is Ghost | null =>
-    v === null || (isObj(v) && isMode(v.mode) && strs(v, "hole", "player", "shots") && Number.isInteger(v.strokes) && (v.strokes as number) > 0 && nums(v, "period")),
+    v === null || (isObj(v) && isMode(v.mode) && strs(v, "hole", "player", "shots") && nums(v, "period") && Number.isInteger(v.strokes) &&
+      (v.strokes as number) > 0 && (v.strokes as number) <= RULES.maxRoundStrokes && (v.shots as string).split(";").length === v.strokes),
   round: (v: unknown): v is Round | null =>
     v === null || (isObj(v) && isPath(v.path) && isVec(v.rest) && isVec(v.ball) && strs(v, "player", "shots", "air", "cause") && typeof v.done === "boolean" && isMode(v.mode) && Number.isInteger(v.strokes) && nums(v, "period")),
 };
@@ -434,7 +436,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     holeRank: (hole: string, mode: string, player: string) => qeval(`HoleRank(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.holeRank),
     /** A player's best on a hole in a mode with its period and shots, or null: the ghost a duel races, replayed with replayRound then simulateFrom. */
     ghost: (hole: string, mode: string, player: string) =>
-      isAddress(player) ? qeval(`Ghost(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.ghost) : Promise.resolve(null),
+      isAddress(player)
+        ? qeval(`Ghost(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.ghost).then((g) => (g && g.player === player && g.mode === m(mode) ? g : null)) // (the one asked for, or none)
+        : Promise.resolve(null),
     /** A page of a hole's board: { hole, mode, par, players (named), finished (everyone), offset, rows: [{ player, strokes }], next (the next page's offset, 0 at the end) }. */
     holeLeaderboard: (hole: string, offset = 0, limit = 10, mode = "assisted") =>
       qeval(`HoleLeaderboard(${s(hole)}, ${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.holeLeaderboard),

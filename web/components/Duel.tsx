@@ -1,8 +1,8 @@
 "use client";
 
-// A ghost duel on screen (ADR-004): the dare on the picker and the fine print
-// on the win card (the HUD's score card counts both rounds). The race itself is the engine's
-// (engine/rival.ts); the words are lib/duel.ts's.
+// A ghost duel's own pieces of the page (ADR-004): the dare on the picker and
+// the fine print on the win card. The race is the engine's (engine/rival.ts),
+// the words lib/duel.ts's; the score card and the win card are Golf.tsx's.
 import { skyWord, type Duel } from "@/lib/duel";
 import type { Mode } from "@/lib/types";
 
@@ -13,20 +13,22 @@ export type Sky = { theirs: string; mine: string } | null;
 const differs = (sky: Sky): sky is { theirs: string; mine: string } => !!sky && sky.theirs !== sky.mine;
 
 /** The picker's dare, armed: who is raced and the strokes to beat (the link's
- *  sticker), then one line (an ace, a mixed race, or why it can't be faked),
- *  their weather when it was not today's, and the way to play solo. */
+ *  sticker) and the way to play solo on one line; under it, only what changes
+ *  the race: an ace, a mixed aim, a weather that was not today's. */
 export function DuelNote({ duel, mode, sky, onDrop }: { duel: Duel; mode: Mode; sky: Sky; onDrop: () => void }) {
   const { ghost, name, self } = duel;
+  const notes = [
+    ghost.strokes === 1 && `${self ? "You" : name} aced it. Match it to tie.`,
+    ghost.mode !== mode && `You: ${MODES[mode]}. ${self ? "Your best" : "Them"}: ${MODES[ghost.mode]}. Still a race, not a record.`,
+    differs(sky) && `${self ? "You" : "They"} played in ${skyWord(sky.theirs)}.`,
+  ].filter(Boolean);
   return (
     <>
-      <p className="dare">{self ? "Racing your best" : `Racing ${name}`} · {ghost.strokes} to beat</p>
-      <p className="aimset__help">
-        {ghost.strokes === 1 ? `${self ? "You" : name} aced it. Match it to tie.`
-          : ghost.mode !== mode ? `You: ${MODES[mode]}. Them: ${MODES[ghost.mode]}. Still a race, not a record.`
-          : `${self ? "Your" : "Their"} round is on the chain, replayed, not typed in.`}{" "}
-        {differs(sky) && `${self ? "You" : "They"} played in ${skyWord(sky.theirs)}. `}
+      <p>
+        <span className="dare">{self ? "Racing your best" : `Racing ${name}`} · {ghost.strokes} to beat</span>{" "}
         <button className="linkish" onClick={onDrop}>Play solo</button>
       </p>
+      {notes.length > 0 && <p className="aimset__help">{notes.join(" ")}</p>}
     </>
   );
 }

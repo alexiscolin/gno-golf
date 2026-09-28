@@ -2,11 +2,10 @@
 
 ## Status
 
-Proposed, accepted for V1 in slices. The product decisions were taken with
-the user on 2026-09-27. One realm change has to land before mainnet: a best
-keeps its shots, its period and its mode. Everything else is client work and
-ships in slices after it: the dare link first, then the board and Friends
-entries. There is no on-chain duel record in V1.
+Accepted; stages 0 and 1 built (2026-09-28): the realm change and the duel
+from a dare link. The product decisions were taken with the user on
+2026-09-27. There is no on-chain duel record in V1. Where the build differs
+from the design below, [As built](#as-built) says so and wins.
 
 ## Summary
 
@@ -766,9 +765,51 @@ One is free and public today: the save's transaction memo, `"gnogolf"`
 count duel saves from the chain, and it says nothing a save does not already
 say.
 
-## What is to build
+## As built
 
-Nothing is built yet.
+**Stage 0, the realm** (as designed): a best is `"<strokes> <period> <shots>"`,
+written only when it improves; every read goes through `bestStrokes` (0 for
+none); `Ghost(hole, mode, player)` is in state.gno with the other JSON reads.
+Measured: about +50 bytes a first finish, +21 gas a finish over ints.
+
+**Stage 1, the duel from a dare link** (web/lib/engine/rival.ts,
+web/lib/duel.ts, web/components/Duel.tsx), where it differs from the design:
+
+- **Entry.** A hole link opens the picker directly (no title screen), and a
+  dare link always stops there, even for a player who has a gnome: it is the
+  one place that says who is raced and offers to play solo. The dare stays
+  in the address while it is raced (a reload keeps it).
+- **Picker.** The gold sticker `Racing {rival} · {n} to beat` with a
+  `Play solo` link on the same line; under it, only what changes the race:
+  an ace, a mixed aim, a weather that was not today's. The "can't be faked"
+  line is in the Rules sheet (`Duels`).
+- **HUD.** One score card, no badge: `You – them`, `2 – 1` (✓ once the
+  ghost is in), `3 to beat`, then `they won` once the ghost's holing stroke
+  has shown and the player is past it; Restart turns into a solid Rematch.
+  The card is a polite live region.
+- **The ghost's turn.** After `showExtras()`, not awaited: the player can aim
+  at once, and a press or an aim key cuts it (no Skip chip, no tag). Its
+  steps and drop play at twice the speed, fitted to about 2 s; a splash or a
+  tube keeps its own time. A replay past 5 s is cut (a frozen tab). The camera
+  frames both balls while it plays. It stands beside the player's gnome where
+  they would overlap. Its strokes are read one ahead and kept per ghost (a
+  rematch reads nothing again); a failed read is asked again at the next
+  turn, and a missed turn lands the next one where it rests. Read late,
+  while the player aims, or under reduced motion, it appears at its rest.
+- **Look.** Paper white at 0.7 on its turn and 0.45 at rest, each part
+  hiding what is behind it, its thin outline drawn behind the body. Built at
+  the first duel: a game without one makes nothing.
+- **Win card.** As designed, plus the ghost's weather when it differed. The
+  share is `Dare a friend` (the rival's link) until saved, then
+  `Dare them back`; a mixed race says so in the text. The shared picture and
+  the clip carry `vs {rival}` and both counts; the clip ends on
+  `Race the ghost`. Rematch does not read `Ghost` again.
+- **Not built yet:** the ⚔ on the boards and Friends, `Race your best` from a
+  board, the Ghost buster gnome, the stroke tag and the live-region lines, the
+  still dotted path under reduced motion, the memo `"gnogolf duel"`.
+  On a timed hole the ghost's stroke n is drawn among stroke n+1's pieces.
+
+## What was to build
 
 **The realm** (gno.land/r/gnogolf/golf):
 

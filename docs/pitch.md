@@ -30,11 +30,14 @@ read, and the same result on every node, forever. People come for mini-golf
 and leave having met Adena, gno.land names and gnoweb. And it's open source, a
 real example of a full app on Gno.
 
-## Coming soon
+## Ghost duels
 
-**Ghost duels.** A friend's best round shows up on the hole as a see-through
-gnome, and you take turns. It's their real round, replayed by the chain, so
-you race the real thing. Beat it, and your record becomes the ghost they chase.
+Send a friend your link and they race your best: your real round shows up
+as a see-through gnome, and you take turns, stroke for stroke. The chain
+replays it, so nobody can fake a ghost. Beat it, and your record becomes the
+ghost they chase.
+
+## Coming soon
 
 **The builder.** Draw your own hole, test it, publish it. It lands on-chain
 under your name, playable by everyone, with its own board, and the course grows

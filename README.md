@@ -22,6 +22,10 @@ replay of your shots, and anyone can replay it again.
   the same signature that ranks the rounds you saved before it. Rounds saved
   without a name are still kept, and shown apart under each board.
 - You can read a hole's code on gnoweb before you play it.
+- A saved round dares your friends: your share link has them race your best
+  as a see-through ghost, stroke for stroke. The ghost is your real round,
+  replayed by the chain in the weather you had, so it can't be faked, and
+  racing it costs only free reads ([ADR-004](adr/adr-004-duels.md)).
 
 There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain) and
 two extras. Some holes move, so timing is part of the shot. Every hole has
@@ -161,6 +165,6 @@ data/holes.txt               the course as data, one line per slot
 - [docs/physics.md](docs/physics.md): the physics, usable by other Gno games.
 - [docs/course.md](docs/course.md): the hole contract, timed pieces, weather.
 - [docs/golf.md](docs/golf.md): the realm's API, and how it's updated after the deploy.
-- [docs/leaderboards.md](docs/leaderboards.md): the boards, and the bot check.
+- [docs/leaderboards.md](docs/leaderboards.md): the boards, the ghost duels, and the bot check.
 - [CLIENT.md](CLIENT.md): how to write a client.
 - [adr/](adr/): the architecture decisions.

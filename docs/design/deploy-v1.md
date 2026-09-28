@@ -215,7 +215,7 @@ There is no cross-call cache: it would be persisted, and qeval can't persist any
 - **Typed reads for a future golf/v2:**
   - `HoleData(id)` returns the hex, and `Versions(alias)` each version's sha;
   - `Current(slot)`;
-  - `BestOf(hole, mode, player)`;
+  - `BestOf(hole, mode, player)`, and `Ghost(hole, mode, player)` for the round that set it (its shots and period: a v2 can carry a best over with its proof);
   - `StandingOf(mode, player)`;
   - the paged JSON reads (`Records`, `Players`, `Community`) to enumerate.
   - There is no `HoleOf`: it would hand any realm a value that writes golf's wear (audit Y4).

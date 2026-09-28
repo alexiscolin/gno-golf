@@ -741,6 +741,22 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 	return sb.String()
 }
 
+// Ghost is a player's best finished round on a hole in a mode, with the
+// period it was played in and its shots, or null if none: what a duel races.
+// It replays stroke by stroke in its own weather, SimulateRoundIn for the
+// first stroke, then SimulateFrom from each rest. Named or not, like Bests.
+func Ghost(hole, mode string, player address) string {
+	e, m := readHole(hole), modeOf(mode)
+	v := e.bests(m).Get(player.String())
+	if v == nil {
+		return "null"
+	}
+	// "<strokes> <period> <shots>": the shots are golf's own digits and punctuation
+	f := strings.SplitN(v.(string), " ", 3)
+	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(player.String()) +
+		`,"strokes":` + f[0] + `,"period":` + f[1] + `,"shots":` + jstr(f[2]) + "}"
+}
+
 // HoleRank is a player's place on a hole's board in a mode: "rank" 1 is the
 // top, out of "of" named players, with their best. It is 0 for a player the
 // board does not hold: unnamed, or no finish there. Like Rank, a name deleted
@@ -748,12 +764,9 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 func HoleRank(hole, mode string, player address) string {
 	e, m := readHole(hole), modeOf(mode)
 	p := player.String()
-	rank, strokes := 0, 0
-	if v := e.bests(m).Get(p); v != nil {
-		strokes = bestStrokes(v)
-		if k := boardKey(strokes, p); e.board(m).Has(k) {
-			rank = e.board(m).index(k) + 1
-		}
+	rank, strokes := 0, bestStrokes(e.bests(m).Get(p))
+	if k := boardKey(strokes, p); strokes > 0 && e.board(m).Has(k) {
+		rank = e.board(m).index(k) + 1
 	}
 	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(p) +
 		`,"rank":` + strconv.Itoa(rank) + `,"of":` + strconv.Itoa(e.board(m).Size()) + `,"strokes":` + strconv.Itoa(strokes) + "}"
