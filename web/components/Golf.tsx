@@ -1862,7 +1862,6 @@ export default function Golf() {
         />
       )}
 
-      {playing && s && s.note && !s.flying && <div className="toast" role="status">{s.note}</div>}
       {playing && linkNote && <Toast text={linkNote} onDone={() => setLinkNote(null)} />}
       {/* the turns, called out big before each stroke: a duel's (yours, then theirs), what the next is
           worth; solo, what it is for (the score card says them to a screen reader) */}

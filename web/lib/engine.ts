@@ -256,7 +256,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       roundMode: g.roundMode || null, // the mode this round is played in, from its first stroke
       period: g.period == null ? null : g.period, // the round's weather period (five minutes): what a record is played in
       cause: g.cause || null, // a word on why the ball speeds up or drifts, once a shot
-      note: g.note || null, // a word on how the shot went
       errorKind: (g.error && g.errorKind) || null,
       failed: g.error ? g.failed || null : null, // the hole a load failed on (Try again)
       view: g.view,
@@ -1126,7 +1125,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     sound("putt", 0.5 + power / 20);
     g.flying = true;
     g.error = null;
-    g.note = null;
     void publish();
 
     let res: Stroke;

@@ -69,7 +69,6 @@ export interface GameState {
   weather?: WeatherNow | null;
   flash?: number;
   cause?: CauseNote | null;
-  note?: string | null;
   /** the round's decisions, each stroke's path length and its physics' work (Shot.Work), the ball exactly as the chain left it */
   shots: string[];
   pts: number[];
@@ -185,7 +184,6 @@ export interface Snapshot {
   roundMode: Mode | null;
   period: number | null;
   cause: CauseNote | null;
-  note: string | null;
   errorKind: ErrorKind | null;
   failed: string | null;
   view: "overview" | "ball";
