@@ -2,7 +2,7 @@
 // detector, and frameMs()'s tier table (60/30/10/sleep).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AWAY_MS, capped30, frameMs, pace, slowFrames } from "../lib/engine/pace.ts";
+import { AWAY_MS, capped30, frameMs, frameStats, pace, slowFrames } from "../lib/engine/pace.ts";
 
 void test("pace draws once a whole interval (less 1ms jitter) is owed, else carries the gap", () => {
   // a 10ms interval: an 8ms gap alone is not owed yet
@@ -114,4 +114,9 @@ void test("pace holds 60, 30 and 10 fps on 60 to 165 Hz screens, the 30 in even 
     // no idle gap over two refreshes past the interval
     assert.ok(Math.max(...idle.gaps.slice(1)) <= 1000 / 30 + 1000 / hz + 1, `${hz} Hz idle: even gaps`);
   }
+});
+
+void test("frameStats: the median and slowest tenth's frame rate, the hitches over 50 ms", () => {
+  const gaps = [...Array<number>(18).fill(1000 / 60), 1000 / 30, 80];
+  assert.deepEqual(frameStats(gaps), { fps: 60, fps_p10: 30, long: 1, frames: 20 });
 });

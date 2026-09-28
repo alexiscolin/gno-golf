@@ -10,6 +10,7 @@
 // ("chain"), not left to fail somewhere in the scene.
 
 import { hostOf, isLoopback } from "./network";
+import { trackError } from "./analytics";
 import type {
   Bests, CourseLeaderboard, Extras, Ghost, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
   SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Weather,
@@ -196,9 +197,15 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   /** A raw ABCI query; returns the decoded data string. */
   const abci = (path: string) => query(`${rpc}/abci_query?path=%22${path}%22`);
 
-  // an expression evaluated in a realm, read-only: the VM's typed result as it printed it
-  const vm = (realm: string, expr: string, ms?: number, signal?: AbortSignal | null) =>
-    query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${realm}.${expr}`)}`, ms, signal);
+  // an expression evaluated in a realm, read-only: the VM's typed result as it
+  // printed it; a failure told analytics (the function, the node's host, how long)
+  const vm = (realm: string, expr: string, ms?: number, signal?: AbortSignal | null) => {
+    const t0 = performance.now();
+    return query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${realm}.${expr}`)}`, ms, signal).catch((e: unknown) => {
+      if (!(signal && signal.aborted)) trackError("rpc", e, { fn: fnOf(expr), host: hostOf(rpc), ms: Math.round(performance.now() - t0), kind: errorKind(e) });
+      throw e;
+    });
+  };
   // the function an expression calls, as a refusal names it
   const fnOf = (expr: string) => expr.slice(0, expr.indexOf("("));
   // a string result — ("…" string), an empty one ( string) — unwrapped; an answer that is not one is the chain's to answer for

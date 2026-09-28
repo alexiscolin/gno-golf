@@ -34,6 +34,7 @@ import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, s
 import { clipName } from "@/lib/clip";
 import { Boards, FullBoard, Podium, NameForm, nameOnce, useNameCheck, useRankNudge, useSavedPlace, type BoardProps, type NameCheck } from "@/components/Leaderboard";
 import { ADENA_URL, FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network";
+import { register, track, trackError, once, failure, type Events, type Play, type RivalKind } from "@/lib/analytics";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen } from "@/lib/prefs";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -425,6 +426,7 @@ export default function Golf() {
   // (hole: where they were earned, stamped there on the cup card)
   const award = (ids: readonly string[], hole: string | null | undefined) => {
     const got = rememberBadges(ids, hole || ""); // (the new ones only)
+    for (const id of got) track("badge_earned", { id });
     if (got.length) setFreshBadges((b) => byRarity([...b, ...got]));
   };
   // the hole that finished its cup (or beat the cup's best): the win card
@@ -682,6 +684,7 @@ export default function Golf() {
     return by && isAddress(by) ? by : "";
   });
   const [solo, setSolo] = useState(false);
+  const rivalFrom = useRef<RivalKind>("link"); // how the rival was found (analytics): a dare link's until one is picked
   const linkDare = useRef(dare); // a dare link's rival: Start goes to their ghosts, once (a rival picked later goes through Mode again)
   const [dareNote, setDareNote] = useState(dare ? "Reading the dare…" : "");
   const [dareHole, setDareHole] = useState(""); // the link's own hole, where the dare is said
@@ -716,7 +719,8 @@ export default function Golf() {
         if (has) setLinkNote(first ? `Race ${whose} ghost: your turn first.` : `${name} has a ghost here too: race it.`);
         else if (first) setLinkNote(`${name} dares you on this hole.`);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        trackError("ghost", err, { hole: holeId });
         if (dareNow.current !== dare) return;
         if (again) movedGhosts.current.add(holeId);
         else readFor.current.delete(holeId);
@@ -782,8 +786,9 @@ export default function Golf() {
     setLinkNote((n) => (duelLost ? lostNote : n === lostNote ? null : n)); // (gone with the rematch)
   }, [duelLost]); // eslint-disable-line react-hooks/exhaustive-deps -- as it turns
   // a rival picked (a board's Race, the game's choice): their ghost read afresh on each hole
-  const pickRival = (player: string) => {
+  const pickRival = (player: string, from: RivalKind) => {
     if (player === dare && !solo) return; // (already the rival)
+    rivalFrom.current = from;
     readFor.current.clear();
     movedGhosts.current.clear();
     setRival(null);
@@ -792,9 +797,9 @@ export default function Golf() {
     setDare(player);
   };
   // a Race (a board's, the rival screen's): from the tee, a round under way starts again
-  const raceWith = (player: string) => (setBoard(false), game.current?.reset(), pickRival(player));
+  const raceWith = (player: string, from: RivalKind = "board") => (setBoard(false), game.current?.reset(), pickRival(player, from));
   // a rival picked on the rival screen (or its board's sheet): their ghosts next, their bests kept when read there
-  const toGhosts = (player: string, bests?: ReadonlyMap<string, Readonly<Record<Mode, number>>>) => (sound("select"), bests && setRivalOn({ by: player, bests, at: saves }), raceWith(player), setScreen("ghosts"));
+  const toGhosts = (player: string, bests?: ReadonlyMap<string, Readonly<Record<Mode, number>>>, from?: RivalKind) => (sound("select"), bests && setRivalOn({ by: player, bests, at: saves }), raceWith(player, from), setScreen("ghosts"));
   const dropDuel = () => {
     setSolo(true);
     setRival(null);
@@ -822,6 +827,8 @@ export default function Golf() {
     const off = () => { try { return localStorage.getItem("gnogolf.adenaOff") === "1"; } catch { return false; } };
     const look = () => void (!off() && current().then((a) => a && setAccount(a)));
     look();
+    // once a session: whether this browser has Adena, and whether it knows the player
+    if (once("wallet")) void (off() ? Promise.resolve(null) : current()).then((a) => track("wallet", { adena: hasAdena(), connected: !!a }));
     // (and again back on the page: Adena connected from its own window says nothing)
     addEventListener("focus", look);
     const stop = onWalletChange(() => void (!off() && current().then(setAccount)));
@@ -987,11 +994,14 @@ export default function Golf() {
     if (lock.current) return;
     lock.current = true;
     land({ at: "signing" });
+    // the save's funnel (analytics): the part being signed, of how many, and the gas asked
+    const t0 = performance.now(), at = { part: 0, parts: 0, gas: 0 };
+    const said = (stage: Events["save"]["stage"], reason?: string) => track("save", { stage, ...at, ms: Math.round(performance.now() - t0), reason });
     try {
       // a round whose weather is over can no longer be saved: the chain would refuse it
       // (its clock read again first: the chain's time decides, not this browser's)
       await game.current.chain.sync().catch(() => {});
-      if (r.period != null && game.current.chain.now() >= saveBy(r.period)) return land({ at: "refused", error: "Too late to save: the weather changed. Play the hole again to save it.", stale: true });
+      if (r.period != null && game.current.chain.now() >= saveBy(r.period)) return said("failed", "late"), land({ at: "refused", error: "Too late to save: the weather changed. Play the hole again to save it.", stale: true });
       const chain = game.current.chain, hole = r.id;
       // the player's round here, read every ms until ok has it (at most n
       // reads, while on() holds): the last one read, null for none
@@ -1014,10 +1024,13 @@ export default function Golf() {
       const parts = await chainSplit(chain, r, period);
       // the name typed on the card goes in the first signature, before the round
       const named = name ? { registrar: await within(chain.nameReg()), name } : null;
+      at.parts = parts.length;
+      said("sent");
       for (let k = 0; k < parts.length; k++) {
         const [from, to] = parts[k];
         // the player has left this round (Play again, another hole): no more of it goes to Adena
         if (!alive()) return;
+        (at.part = k + 1), (at.gas = gasOf(r, from, to));
         if (parts.length > 1) land({ at: "signing", part: k + 1, of: parts.length });
         // the chain's round before this commit: a new one there is this commit landing
         // (unread, the chain is not watched: an old round there would pass for it)
@@ -1041,7 +1054,7 @@ export default function Golf() {
         // still be open, and Adena refuses a second one meanwhile
         if (k + 1 < parts.length) await Promise.race([sent.catch(() => {}), wait(10_000)]);
         // the name is the player's once the first part is in: a retry of the rest must not take it again
-        if (k === 0 && named) setNamedAs(named.name), nudge.named();
+        if (k === 0 && named) setNamedAs(named.name), nudge.named(), track("name_registered", { ok: true, via: "save" });
         // the next part continues the round: it waits until the chain has this one
         if (k + 1 < parts.length) await roundUntil((got) => got.strokes >= to, 10, 1000);
       }
@@ -1050,6 +1063,7 @@ export default function Golf() {
       // the block may land a moment after Adena answers: read back for up to 8 s
       const mine = await roundUntil((got) => got.done && got.strokes === r.strokes, 8, 1000);
       if (mine && mine.done && mine.strokes === r.strokes) {
+        said("ok");
         land({ at: "saved" });
         award(["chain"], hole);
         const row = ((s && s.allHoles) || []).find((h) => h.id === hole);
@@ -1058,6 +1072,7 @@ export default function Golf() {
         movedGhosts.current.add(hole);
         setSaves((n) => n + 1);
       } else
+        said("failed", mine ? "replay" : "missing"),
         land({
           at: "refused",
           stale: false,
@@ -1066,7 +1081,11 @@ export default function Golf() {
             : "The transaction went through, but the chain has no round for you on this hole.",
         });
     } catch (err) {
-      land((err as SendError).cancelled ? null : { at: "refused", error: messageOf(err), stale: /weather .* is over|is not the current weather/.test(String((err as SendError).message)) });
+      const cancelled = !!(err as SendError).cancelled, reason = cancelled ? undefined : failure(err);
+      said(cancelled ? "cancelled" : "failed", reason);
+      if (!cancelled) trackError("save", err, { ...at, reason });
+      if (name && at.part <= 1) track("name_registered", { ok: false, via: "save", reason: cancelled ? "cancelled" : reason });
+      land(cancelled ? null : { at: "refused", error: messageOf(err), stale: /weather .* is over|is not the current weather/.test(String((err as SendError).message)) });
     } finally {
       lock.current = false;
     }
@@ -1187,7 +1206,9 @@ export default function Golf() {
     const h = list.find((x) => x.id === id), cup = h && WORLDS.find((w) => w.id === cupOf(h))?.id;
     const b = cup && before[cup], a = cup && after[cup];
     // (not in a duel: a race on one hole, never a cup's end)
-    if (!(dare && !solo) && cup && b && a && a.all && (!b.all || a.strokes < b.strokes)) setCupWon({ cup, id, best: b.all });
+    if (!(dare && !solo) && cup && b && a && a.all && (!b.all || a.strokes < b.strokes)) setCupWon({ cup, id, best: b.all }), track("cup_complete", { cup, strokes: a.strokes, vs_par: a.strokes - a.par, best: b.all });
+    track("hole_finished", { ...playOf(id), strokes, par: parOf(h) });
+    if (racing) track("duel_result", { rival: rivalKind(), result: duelResult(strokes, racing, "").result, strokes, ghost: racing.ghost.strokes });
     // a course hole's badges (a community hole's would be too easy to farm)
     setFreshBadges([]);
     if (s && s.official && h) {
@@ -1196,6 +1217,50 @@ export default function Golf() {
       award(badgesFor({ strokes, par: parOf(h), pro: s.roundMode === "pro", kind: s.kind, timed: s.timed, cups: after, weathers: weathersSeen(), duel }, badgesEarned()), id);
     }
   };
+  // ----------------------------------------------------------- analytics
+  // (lib/analytics.ts, docs/analytics.md; nothing goes without its key)
+  // a round as analytics says it: the hole, its cup, solo or a duel, the aim
+  const rivalKind = (): RivalKind => (dare === me ? "self" : rivalFrom.current);
+  const playOf = (id: string): Play => ({ hole: id, cup: cupOf(allList.find((h) => h.id === id) || {}), mode: racing ? "duel" : "solo", aim: (s && s.roundMode) || aim });
+  // what is said with every event: the player's choices, the wallet, the chain, the hole played
+  const camNow = s && s.cam;
+  useEffect(() => {
+    register({ aim, cam: camNow, gnome, adena: hasAdena(), connected: !!account, wallet_on_node: ourNode, chain: chainName || null, network: cfg ? networkOf(cfg.rpc) : null, hole: playing ? holeId : null, cup: playing ? world : null });
+  }, [aim, camNow, gnome, account, ourNode, chainName, cfg, playing, holeId, world]);
+  // the screen in view, the ones the address bar does not follow (the sheets, the cards) included
+  const view = about ? "about" : board ? "boards" : badgesOpen ? "badges" : cardOpen ? "card" : real ? "wallet" : cupWon && cupWon.open ? "victory" : playing && holed ? "finished" : screen;
+  useEffect(() => track("screen", { name: view }), [view]);
+  // how long the page took: to the title's Start (the game made), to the first hole drawn
+  const shown = useRef({ title: 0, hole: 0 });
+  useEffect(() => {
+    const t = shown.current;
+    if (s && !t.title) t.title = performance.now();
+    if (holeReady && !t.hole) (t.hole = performance.now()), track("boot", { title_ms: Math.round(t.title), hole_ms: Math.round(t.hole) });
+  }, [tHas, holeReady]); // eslint-disable-line react-hooks/exhaustive-deps -- once each
+  // a round begun: the hole on screen, ready, no stroke yet (once, until a stroke is played)
+  const begun = useRef("");
+  useEffect(() => {
+    if (!s || !holeId) return;
+    if (!fresh0) return void (begun.current = "");
+    if (!playing || !holeReady || begun.current === holeId) return;
+    begun.current = holeId;
+    track("hole_started", { ...playOf(holeId), weather: s.kind || "clear", period: s.period });
+  }, [holeId, fresh0, playing, holeReady]); // eslint-disable-line react-hooks/exhaustive-deps -- as it turns
+  // a round under way (strokes, not holed) left for a new one or another hole: abandoned
+  const underway = useRef<Events["hole_abandoned"] | null>(null);
+  useEffect(() => {
+    const was = underway.current;
+    underway.current = s && s.id && s.strokes && !s.done ? { ...playOf(s.id), strokes: s.strokes } : null;
+    if (was && !(s && s.done) && (!underway.current || underway.current.hole !== was.hole)) track("hole_abandoned", was);
+  });
+  // a duel armed: who, and the best to beat
+  const racingGhost = racing && racing.ghost;
+  useEffect(() => {
+    if (racing) track("duel_started", { rival: rivalKind(), ghost: racing.ghost.strokes, mixed: racing.ghost.mode !== ((s && s.roundMode) || aim) });
+  }, [racingGhost]); // eslint-disable-line react-hooks/exhaustive-deps -- once a ghost
+  // the game could not start, or a hole would not load
+  useEffect(() => void (fatal && trackError("fatal", fatal.msg, { kind: fatal.kind })), [fatal]);
+
   // the chain's own badges: a round on it, and first place on a hole's board
   useEffect(() => {
     if (savedPlace && savedPlace.rank === 1) award(["first"], savedPlace.id);
@@ -2242,7 +2307,7 @@ function Victory({ cup, best, holes, card, saved, fresh, snapshot, onBack, onRep
         </p>
         <Scorecard holes={holes} card={card} saved={saved} current={null} compact onRules={onRules} />
         {fresh.length > 0 && <NewGnome skin={fresh[0]} also={fresh.slice(1)} where={to ? to.name : ""} onPlay={() => (sound("select"), onNext(fresh[0].id))} />}
-        <Share text={text} link={cupLink(cup)} snapshot={snapshot} />
+        <Share text={text} link={cupLink(cup)} snapshot={snapshot} what="cup" />
         {/* one solid action: the new gnome's (in its card), else the next cup, else back to the cups */}
         <div className="banner__row">
           <button className="linkish" onClick={() => (sound("blip"), onReplay())}>Replay the cup</button>

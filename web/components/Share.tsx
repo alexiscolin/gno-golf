@@ -7,6 +7,7 @@ import type { ClipRun } from "@/lib/engine/clip";
 import { siteURL } from "@/lib/site";
 import { pasted, shareLinks, useCopied } from "./common";
 import { isTouch, reducedMotion } from "@/lib/device";
+import { track, type Events } from "@/lib/analytics";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
 // with the score (X, Facebook, WhatsApp, Bluesky, copy link), each opening
@@ -32,12 +33,14 @@ interface ShareProps {
   link?: string;
   /** the row's word ("Share your #2" once a save ranks) */
   label?: string;
+  /** what is shared, as analytics says it (a clip, when the sheet sends one) */
+  what?: Events["share"]["what"];
 }
 // the system sheet only where it is the phone's own (on a desktop it is a
 // bare OS panel without the networks people mean)
 const onPhone = () => typeof navigator !== "undefined" && !!navigator.share && isTouch();
 
-export default function Share({ text, snapshot, link = "", clip = null, label = "Share" }: ShareProps) {
+export default function Share({ text, snapshot, link = "", clip = null, label = "Share", what = "hole" }: ShareProps) {
   const [copied, copyText] = useCopied();
   // this hole, this cup, this gnome, at the game's public address
   const url = siteURL(link);
@@ -58,16 +61,17 @@ export default function Share({ text, snapshot, link = "", clip = null, label = 
       }
       const data: ShareData = { title: "Gnogolf", text, url };
       if (file && can(file)) data.files = [file];
+      track("share", { target: "sheet", what: clip && file === clip.file ? "clip" : what });
       await navigator.share(data);
     } catch {} // cancelled, or refused: nothing to say
   };
-  const copy = () => (sound("blip"), copyText(pasted(text, url)));
+  const copy = () => (sound("blip"), track("share", { target: "copy", what }), copyText(pasted(text, url)));
   const links = shareLinks(text, url);
   return (
     <span className="share" role="group" aria-label="Share">
       <span className="share__label" data-plain={label === "Share" || undefined}>{label}</span>
       {links.map(([name, href]) => (
-        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name} onClick={() => sound("blip")}>
+        <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name} onClick={() => (sound("blip"), track("share", { target: name.toLowerCase(), what }))}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d={GLYPH[name]} /></svg>
         </a>
       ))}
@@ -157,7 +161,7 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
               </button>
             )}
             {/* on the video, top right (the brand's card has the bottom): a post with a video gets way more views */}
-            <a className="btn btn--ghost btn--s clip__save" href={clip.url} download={clip.file.name} title="Download the video: posts with a video get way more views" onClick={() => sound("blip")}>
+            <a className="btn btn--ghost btn--s clip__save" href={clip.url} download={clip.file.name} title="Download the video: posts with a video get way more views" onClick={() => (sound("blip"), track("share", { target: "download", what: "clip" }))}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
               Show off your shot
             </a>

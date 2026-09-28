@@ -110,6 +110,8 @@ The client takes its config from the URL, so one build works with any chain:
 `?rpc=`, `?web=`, `?hole=garden/7` or `?cup=garden&hole=7`.
 `NEXT_PUBLIC_CLIPS=1` at build time offers a clip of the holing shot in the
 hole-finished card ([ADR-003](adr/adr-003-sharing.md); `?clips` in a dev build).
+`NEXT_PUBLIC_POSTHOG_KEY` turns on anonymous audience measurement (PostHog EU,
+[docs/analytics.md](docs/analytics.md)); unset, as in local dev, nothing loads.
 
 For the Gno tests, point `GNOHOME` at a package cache holding the gno
 checkout's `examples/` copies of `avl`, `ufmt`, `uassert` and `urequire`: the

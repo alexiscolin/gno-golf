@@ -9,6 +9,7 @@
 // outcomes — so a recorded score is one nobody can type in.
 
 import { RULES, isAddress, type Chain } from "./chain";
+import { trackError } from "./analytics";
 import type { HoleState, Mode, Vec2, Zone } from "./types";
 
 /** An Adena answer: its status, and a code, a type or a message when it failed. */
@@ -77,8 +78,13 @@ export const hasAdena = () => !!wallet();
 // Adena's status codes worth telling apart (docs.adena.app, "errors")
 const CANCELLED = 4000, LOCKED = 2000, BUSY = 1001, NOT_CONNECTED = 1000;
 
-/** What went wrong, in words a player can act on. */
+/** What went wrong, in words a player can act on (and told analytics, with Adena's code). */
 function why(res: AdenaRes | null | undefined, fallback: string) {
+  const said = words(res, fallback);
+  trackError("adena", said, { code: res && res.code, type: res && res.type, what: fallback });
+  return said;
+}
+function words(res: AdenaRes | null | undefined, fallback: string) {
   const code = res && res.code;
   if (code === CANCELLED) return "Cancelled in Adena — nothing was sent.";
   if (code === LOCKED) return "Adena is locked. Unlock it and try again.";

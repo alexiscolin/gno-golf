@@ -1,9 +1,13 @@
 "use client";
 
-// Next's error boundary: a render error anywhere shows this, not a blank page.
+// Next's error boundary: a render error anywhere shows this, not a blank page
+// (and tells analytics: React keeps a caught error from the window's own handler).
+import { useEffect } from "react";
 import { Button } from "@/components/ui";
+import { trackError } from "@/lib/analytics";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => trackError("render", error, { digest: error.digest }), [error]);
   return (
     <div className="banner" role="alertdialog" aria-labelledby="crash-title">
       <div className="banner__in">
