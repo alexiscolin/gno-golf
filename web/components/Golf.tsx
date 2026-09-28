@@ -1599,7 +1599,7 @@ export default function Golf() {
               }}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" /></svg>
-              {CAMS[s.cam] || "Classic"} <span aria-hidden="true">▾</span>
+              <span className="cam-btn__name">{CAMS[s.cam] || "Classic"}</span> <span aria-hidden="true">▾</span>
             </Button>
           </footer>
         </>

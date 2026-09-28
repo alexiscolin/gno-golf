@@ -2229,6 +2229,7 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .pending { gap: 8px; padding: 6px 6px 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); }
   body:has(.hud--top) .pending { top: 160px; }
   body:has(.screen) .pending { top: 96px; } /* a front screen: under its corner buttons (Back, the mode, About) */
+  body:has(.pending) .screen .front__head { padding-top: 64px; } /* and its heading under the card */
   .pending .btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
   .pending__say { min-width: 0; }
 }
@@ -2266,9 +2267,12 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   /* on a phone the sticker sits under the label, not over the next button */
   .btn--save-rank { flex-wrap: wrap; justify-content: center; } .btn__rank { position: static; transform: none; box-shadow: none; flex-basis: 100%; text-align: center; margin-top: 4px; }
 }
+/* the narrowest phones: the camera button is its icon and ▾ (its label says the mode), so the
+   bottom row fits beside the network banner (140px) */
+@media (max-width: 400px) { .cam-btn { min-width: 0; } .cam-btn__name { display: none; } }
 
 /* a duel's turn, called out: pressed on big, then gone */
-.turncall { position: fixed; top: 22%; left: 50%; z-index: var(--z-chip); margin: 0; translate: -50% 0; font-size: clamp(48px, 10vw, 120px); font-weight: 700; line-height: 1; width: max-content; max-width: calc(100vw - 32px); text-align: center; --ink-w: 10px; --ink-drop: 0; pointer-events: none; animation: turn-call 1.5s var(--spring) both; }
+.turncall { position: fixed; top: 22%; left: 50%; z-index: var(--z-chip); margin: 0; translate: -50% 0; font-size: clamp(48px, 10vw, 120px); font-weight: 700; line-height: 1; width: max-content; max-width: calc(100vw - 32px); text-align: center; overflow-wrap: anywhere; --ink-w: 10px; --ink-drop: 0; pointer-events: none; animation: turn-call 1.5s var(--spring) both; }
 .turncall small { display: block; margin-top: 14px; font-size: .5em; -webkit-text-stroke-width: 6px; color: var(--gold); } /* a duel's: what the stroke is worth */
 .turncall--them { color: var(--gold); animation-name: turn-hold; } /* theirs held while they play: gone as the turn is the player's */
 @keyframes turn-hold { 0% { opacity: 0; transform: scale(2.2) rotate(-8deg); } 20%, 100% { opacity: 1; transform: rotate(-3deg); } }
