@@ -779,6 +779,11 @@ web/lib/duel.ts, web/components/Duel.tsx), where it differs from the design:
   dare link always stops there, even for a player who has a gnome: it is the
   one place that says who is raced and offers to play solo. The dare stays
   in the address, with the hole, while it is raced (a reload keeps it).
+- **Entries.** The game's choice after the title (Solo, Duel, Builder to
+  come) asks whose ghost to race (a name, an address, a friend, a top
+  player), then the cups; Race on a hole's board and in Friends (Race your
+  best on one's own row) arms that player's ghost from the tee; the gnoweb
+  page's bests each link the game's dare (`race`).
 - **The rival spans the course.** A dare is a rival, not one hole: their best
   is read on each hole the player opens (once each), and the duel re-arms
   wherever they have one (`{rival} has a ghost here too: race it.`). Play

@@ -647,7 +647,7 @@ func TestThePagesSayWhoHoldsPower(cur realm, t *testing.T) {
 	id := publish(cur, cupHole("town", 73, "Paged"))
 	hub := Render("")
 	uassert.True(t, strings.Contains(hub, "One party holds a real power: the course's owner, now [g1"), hub)
-	uassert.True(t, strings.Contains(Render("town"), "| [data](/r/gnogolf/golf:"+id+"/data) |"), "a course hole links its data")
+	uassert.True(t, strings.Contains(Render(id), "[data](/r/gnogolf/golf:"+id+"/data)"), "a course hole links its data")
 	page := Render("town/73")
 	uassert.True(t, strings.Contains(page, `value="`+id+`"`), "the page plays the version by id")
 	data := Render(id + "/data")
@@ -711,8 +711,8 @@ func TestThePagesGnowebLinks(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(page, "· Community hole by [g1"), "the author, not a cup")
 	uassert.True(t, strings.Contains(page, "`#` wall (hedge)") && !strings.Contains(page, "`#` hedge"), "the wall's skins go with the wall, once")
 	uassert.True(t, strings.Contains(Render(author.String()), "| [Hedged](/r/gnogolf/golf:"+author.String()+"/hedged) | 1 |"), "the author's page")
-	uassert.True(t, strings.Contains(Render(testutils.TestAddress("nobody").String()), "published no hole"))
-	uassert.True(t, strings.Contains(Render("nosuchcup"), "No course hole in this cup"))
+	uassert.True(t, strings.Contains(Render(testutils.TestAddress("nobody").String()), "published no community hole"))
+	uassert.True(t, strings.Contains(Render("nosuchcup"), "# No such hole"), "a word that is no cup is no page")
 	// a board past the budget is not drawn
 	big := flatHole("Big")
 	big.W, big.H = 96, 96

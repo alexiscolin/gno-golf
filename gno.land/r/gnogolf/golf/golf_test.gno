@@ -449,7 +449,9 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	row := func(p address, n int) string { return ufmt.Sprintf(`{"player":"%s","strokes":%d}`, p.String(), n) }
 	head := `{"version":1,"hole":"` + id + `","mode":"assisted","par":3,"players":3,"finished":4,`
 	uassert.Equal(t, head+`"offset":0,"rows":[`+row(a, 1)+","+row(b, 2)+","+row(c, 3)+`],"next":0}`, HoleLeaderboard(id, "assisted", 0, 10))
-	uassert.True(t, strings.Contains(Render(id), "| 1 | [@hba](/r/gnogolf/golf:"+id+"/"+a.String()+") | 1 |\n| 2 | [@hbb]"), "the page shows the best rounds, best first")
+	page := Render(id)
+	uassert.True(t, strings.Contains(page, "| 1 | [@hba](/r/gnogolf/golf:"+id+"/"+a.String()+") | 1 | [race](") && strings.Contains(page, " |\n| 2 | [@hbb]"), "the page shows the best rounds, best first, each a ghost to race")
+	uassert.True(t, strings.Contains(page, "&by="+a.String()+")"), "a race is the game's dare link on that player")
 	// a page at a time: next is where the following page starts
 	uassert.Equal(t, head+`"offset":1,"rows":[`+row(b, 2)+`],"next":2}`, HoleLeaderboard(id, "assisted", 1, 1))
 	// an offset past the board is the board's end, however large
@@ -592,4 +594,16 @@ func TestGhostOnATimedHole(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(Ghost(id, "assisted", racer), `"shots":"0.0000,0.0010,3;0.0000,0.0010,7;0.0000,7.5000,11"`), Ghost(id, "assisted", racer))
 	testing.SkipHeights(100)
 	uassert.True(t, ghostHoles(id, "assisted", racer), "the timed ghost holes in its own strokes")
+}
+
+// TestARoundsPageSaysWhatComesNext: a round under way says its strokes right
+// for one, and once its weather is over, that it must be Reset first.
+func TestARoundsPageSaysWhatComesNext(cur realm, t *testing.T) {
+	id := mine(cur, "roundpage", cupHole("garden", 1, "Page"))
+	walker := testutils.TestAddress("walker")
+	replayAs(cur, walker, id, "0,0.001")
+	page := Render(id + "/" + walker.String())
+	uassert.True(t, strings.Contains(page, "1 stroke so far") && !strings.Contains(page, "Its weather is over"), page)
+	testing.SkipHeights(200)
+	uassert.True(t, strings.Contains(Render(id+"/"+walker.String()), "Its weather is over: Reset (below) before the next shot."))
 }

@@ -721,11 +721,11 @@ version's id or an alias.
 
 | path | page |
 |---|---|
-| `""` | the hub: how to play, a card per cup (to its page), both leaderboards (by name), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
-| `<world>` | a cup: its holes by number (par, best, shots played, data link) |
-| `<address>` | the holes that address published, as their current versions |
-| `<hole>` | the hole as a text board, its weather, a `Launch` form, a `Reset` form, and its best rounds per mode |
-| `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked |
+| `""` | the hub: how to play, a card per cup (to its page), both leaderboards (by name, one under the other), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
+| `<world>` | a cup: its holes by number (par, best by name, plays); a word that is no cup is "No such hole" |
+| `<address>` | the community holes that address published, as their current versions |
+| `<hole>` | the hole as a text board, its weather (a wind's heading in degrees), a `Launch` form, a `Reset` form, a link to `Claim`, and its best rounds per mode, each with a `race` link: the 3D game against that best's ghost (its dare link, `&by=`) |
+| `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked; a round whose weather is over says to `Reset` first, and a best links its ghost |
 | `<hole>/data` | a version's provenance, every version of its alias, and its data in hex |
 
 On gnoweb that's `/r/gnogolf/golf`, `/r/gnogolf/golf:garden`,
