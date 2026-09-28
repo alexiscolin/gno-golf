@@ -2,23 +2,25 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { HoleRow } from "@/lib/types";
-import { vsPar, type Cup, type CupTotal, type cupTotals } from "@/lib/card";
+import { CUPS, CUP_NAMES, vsPar, type Cup, type CupTotal, type cupTotals } from "@/lib/card";
 import { sound } from "@/lib/feel";
 import { stillsOnly } from "@/lib/prefs";
 import { Green } from "@/components/Title";
 import { AboutButton, BackButton } from "@/components/About";
+import { strokesWord } from "@/components/common";
 import "@/app/title.css";
 
 // The world screen, between the game's choice (Modes.tsx) and the course: one
 // card per world, drawn like a cup to win. A world with
 // no holes on this chain yet is shown, but cannot be picked.
 
-export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
-  { id: "garden", name: "Garden Cup", tag: "Mushrooms, ponds and mountains" },
-  { id: "island", name: "Island Cup", tag: "Sand spits, palms and the sea" },
-  { id: "town", name: "Mushroom Town", tag: "Streets, lanterns and rooftops" },
-  { id: "mountain", name: "Mountain Cup", tag: "Snowy peaks, pines and a chalet" },
-];
+const TAGS: Record<Cup, string> = {
+  garden: "Mushrooms, ponds and mountains",
+  island: "Sand spits, palms and the sea",
+  town: "Streets, lanterns and rooftops",
+  mountain: "Snowy peaks, pines and a chalet",
+};
+export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = CUPS.map((id) => ({ id, name: CUP_NAMES[id], tag: TAGS[id] }));
 /** A cup by its id: the garden's when it is none of them. */
 export const worldOf = (id: string | null | undefined) => WORLDS.find((w) => w.id === id) || WORLDS[0];
 /** The holes in no cup: named so, with no emblem. */
@@ -279,7 +281,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                       <span className="world__score">
                         {t.done ? (
                           <>
-                            <b>{t.done}/{n}</b> · {t.strokes} stroke{t.strokes === 1 ? "" : "s"} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsPar(vs)}</b>
+                            <b>{t.done}/{n}</b> · {strokesWord(t.strokes)} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsPar(vs)}</b>
                             {t.clean && <span className="world__stamp" title="At par or under">★</span>}
                           </>
                         ) : "Not played yet"}

@@ -1,8 +1,33 @@
 // Frame pacing: which display refreshes are drawn, and when a device is too
-// slow for the High tier. Plain numbers, no three: scripts/selfcheck.ts runs it.
+// slow for the High tier, and the tier this browser plays in. Plain numbers,
+// no three: the title reads it before the game loads.
+import type { GfxMode } from "./types";
 
 /** Where Auto remembers a device found too slow for High ("low"): the title and the cup cards read it too. */
 export const SLOW_KEY = "gnogolf.gfx.slow";
+const GFX_KEY = "gnogolf.gfx";
+/** The graphics picked in this browser: auto (by the device), high or low. */
+export function savedGfx(): GfxMode {
+  try {
+    const v = localStorage.getItem(GFX_KEY);
+    return v === "high" || v === "low" ? v : "auto";
+  } catch {
+    return "auto";
+  }
+}
+export function saveGfx(m: GfxMode) {
+  try { localStorage.setItem(GFX_KEY, m); } catch {}
+}
+/** The Low graphics tier: picked, or Auto on a device whose frames were slow (the engine's own flag). */
+export function lowGfx() {
+  const gfx = savedGfx();
+  try {
+    return gfx === "low" || (gfx !== "high" && localStorage.getItem(SLOW_KEY) === "low");
+  } catch {
+    return false;
+  }
+}
+
 
 const out = { draw: false, budget: 0 };
 /**

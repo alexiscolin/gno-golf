@@ -15,10 +15,10 @@ export interface Duel {
   self: boolean;
 }
 
+const other = (mode: Mode): Mode => (mode === "pro" ? "assisted" : "pro");
 /** The best a duel races: the rival's in the player's aim mode if they have
  *  one, else their other one (the race then marked mixed). */
-export const pickGhost = (mode: Mode, ghosts: Readonly<Record<Mode, Ghost | null>>) =>
-  ghosts[mode] || ghosts[mode === "pro" ? "assisted" : "pro"];
+export const pickGhost = (mode: Mode, ghosts: Readonly<Record<Mode, Ghost | null>>) => ghosts[mode] || ghosts[other(mode)];
 
 const SKIES: Readonly<Record<string, string>> = { wind: "wind", fog: "fog", rain: "rain", storm: "a storm", snow: "snow" };
 /** A weather's kind (Weather() "kind"), as a duel says it; anything else is clear. */
@@ -86,7 +86,7 @@ export function pickOne<R extends { player: string }>(rows: readonly R[], not: r
 
 /** A rival's best on a hole, the one raced: the aim mode's, else their other one (null: none). */
 export function bestOf(b: Readonly<Record<Mode, number>> | undefined, mode: Mode) {
-  const m: Mode = b && b[mode] ? mode : mode === "pro" ? "assisted" : "pro";
+  const m = b && b[mode] ? mode : other(mode);
   return b && b[m] ? { mode: m, strokes: b[m] } : null;
 }
 

@@ -47,6 +47,9 @@ const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/golf$/.test(REALM_ENV) ? REALM_ENV : 
 export const REALM_PATH = REALM.replace(/^gno\.land/, "");
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
 
+/** A pause of ms: between two reads of the chain, a retry, a beat. */
+export const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export const DEFAULT_RPC = "http://127.0.0.1:26657";
 export const DEFAULT_WEB = "http://127.0.0.1:8888";
 
@@ -185,7 +188,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       return await once(url, ms, signal);
     } catch (e) {
       if (errorKind(e) !== "down" || (signal && signal.aborted)) throw e;
-      await new Promise((r) => setTimeout(r, 400));
+      await wait(400);
       return once(url, ms, signal);
     }
   }
@@ -196,13 +199,15 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // an expression evaluated in a realm, read-only: the VM's typed result as it printed it
   const vm = (realm: string, expr: string, ms?: number, signal?: AbortSignal | null) =>
     query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${realm}.${expr}`)}`, ms, signal);
+  // the function an expression calls, as a refusal names it
+  const fnOf = (expr: string) => expr.slice(0, expr.indexOf("("));
   // a string result — ("…" string), an empty one ( string) — unwrapped; an answer that is not one is the chain's to answer for
   const unquote = (raw: string, expr: string) => {
     if (raw.trim() === "( string)") return "";
     try {
       return String(JSON.parse(goJSON(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)")))));
     } catch {
-      throw refused(`The chain's answer to ${expr.slice(0, expr.indexOf("("))} is not a string.`);
+      throw refused(`The chain's answer to ${fnOf(expr)} is not a string.`);
     }
   };
 
@@ -217,7 +222,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     try {
       v = JSON.parse(json);
     } catch {
-      throw refused(`The chain's answer to ${expr.slice(0, expr.indexOf("("))} is not JSON.`);
+      throw refused(`The chain's answer to ${fnOf(expr)} is not JSON.`);
     }
     // every object the realm returns says its version: a newer realm may have
     // moved a field this page reads
@@ -225,7 +230,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       warned = true;
       console.warn(`gnogolf: the realm speaks version ${String(v.version)}, this page ${VERSION}`);
     }
-    if (!ok(v)) throw refused(bad || `The chain's answer to ${expr.slice(0, expr.indexOf("("))} is not one this page can read.`);
+    if (!ok(v)) throw refused(bad || `The chain's answer to ${fnOf(expr)} is not one this page can read.`);
     return v;
   }
   // a mode is sent exactly: the realm refuses any other word

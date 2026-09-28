@@ -1,4 +1,5 @@
 import { isLoopback } from "./network";
+import { CUPS as COURSE, CUP_NAMES, type Cup } from "./card";
 
 // The site's public address, for link cards, the canonical links and the
 // sitemap (all need absolute URLs). On Netlify it follows the site by itself:
@@ -28,6 +29,6 @@ export const DESCRIPTION =
 /** What every shared text ends with. */
 export const SHARE_TAGS = " #gnoland @_gnoland";
 
-/** The course's cups, in order, and how one is called. */
-export const CUPS = ["garden", "island", "town", "mountain"];
-export const cupName = (w: string) => w[0].toUpperCase() + w.slice(1) + (CUPS.includes(w) ? " Cup" : "");
+/** The course's cups, in order, and how one is called (the extras: by their world). */
+export const CUPS: readonly string[] = COURSE;
+export const cupName = (w: string) => CUP_NAMES[w as Cup] || w[0].toUpperCase() + w.slice(1);

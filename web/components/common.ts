@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Snapshot } from "@/lib/engine";
 import type { HoleRow, Mode } from "@/lib/types";
-import { CUPS, parOf, scoreOf, type Card, type Cup } from "@/lib/card";
+import { CUPS, parOf, scoreOf, vsPar, type Card, type Cup } from "@/lib/card";
 import { costOf } from "@/lib/adena";
 import { isAddress, isHoleId, RULES } from "@/lib/chain";
 
@@ -115,9 +115,16 @@ export function useCopied(ms = 1800) {
   return [copied, copy] as const;
 }
 
-const counted = (word: string) => (n: number) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/** "stroke" or "strokes", as n says (the word alone, where the number is set apart). */
+export const plural = (word: string, n: number) => word + (n === 1 ? "" : "s");
+const counted = (word: string) => (n: number) => `${n} ${plural(word, n)}`;
 /** "1 stroke", "3 strokes"; "1 hole", "6 holes"; "1 ghost", "4 ghosts". */
 export const strokesWord = counted("stroke"), holesWord = counted("hole"), ghostsWord = counted("ghost");
+/** A score against par in words: "level par", else vsPar's +3, −2. */
+export const vsParWords = (n: number) => (n === 0 ? "level par" : vsPar(n));
+/** The aim modes as the game names them; AIMS: Pro first, as the switches show them. */
+export const AIM_NAMES: Readonly<Record<Mode, string>> = { pro: "Pro", assisted: "Assisted" };
+export const AIMS = Object.entries(AIM_NAMES) as [Mode, string][];
 
 
 /** A finished round, as far as saving it goes: what the save and its gas read. */

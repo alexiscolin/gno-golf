@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { gnokeyPlan, chainSplit } from "@/lib/adena";
 import { Button } from "@/components/ui";
-import { useCopied } from "@/components/common";
+import { messageOf, useCopied } from "@/components/common";
 import type { Chain } from "@/lib/chain";
 import type { Snapshot } from "@/lib/engine";
 
@@ -37,7 +37,7 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
     setSplit({ round, parts: null });
     chainSplit(chain, { ...s, id: s.id }, s.period)
       .then((parts) => setSplit((v) => (v && v.round === round ? { round, parts } : v)))
-      .catch((e: unknown) => setSplit((v) => (v && v.round === round ? { round, parts: null, bad: e instanceof Error ? e.message : String(e) } : v)));
+      .catch((e: unknown) => setSplit((v) => (v && v.round === round ? { round, parts: null, bad: messageOf(e) } : v)));
   };
   if (!s || !chain) return null;
   const mine = split && split.round === round ? split : null;

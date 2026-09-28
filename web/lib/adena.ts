@@ -24,6 +24,8 @@ interface Network {
   rpcUrl?: string;
   rpc_url?: string;
 }
+// a network's RPC, under either of the names Adena gives it
+const rpcOf = (n: Network) => n.rpcUrl || n.rpc_url;
 /** A /vm.m_call message, as DoContract takes it. */
 interface Call {
   type: "/vm.m_call";
@@ -71,7 +73,6 @@ interface Work {
 const wallet = () => (typeof window !== "undefined" ? window.adena : undefined);
 
 export const hasAdena = () => !!wallet();
-export const ADENA_URL = "https://www.adena.app/";
 
 // Adena's status codes worth telling apart (docs.adena.app, "errors")
 const CANCELLED = 4000, LOCKED = 2000, BUSY = 1001, NOT_CONNECTED = 1000;
@@ -107,7 +108,7 @@ async function ensureNetwork(a: Adena, { chainId, rpc, name = `gno.land (${chain
   const active = async () => {
     try {
       const n = await a.GetNetwork?.();
-      return n && n.data ? { id: n.data.chainId, rpc: norm(n.data.rpcUrl || n.data.rpc_url) } : null;
+      return n && n.data ? { id: n.data.chainId, rpc: norm(rpcOf(n.data)) } : null;
     } catch {
       return null;
     }
@@ -131,7 +132,7 @@ async function ensureNetwork(a: Adena, { chainId, rpc, name = `gno.land (${chain
 }
 
 /** Connects, and moves Adena onto the chain this page plays on. */
-export async function connect({ chainId, rpc, name = `gno.land (${chainId})` }: { chainId?: string | null; rpc: string; name?: string }) {
+export async function connect({ chainId, rpc, name }: { chainId?: string | null; rpc: string; name?: string }) {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
 
@@ -168,7 +169,7 @@ export async function onOurNode(rpc: string | null | undefined) {
   if (!a || !a.GetNetwork || !rpc) return null;
   try {
     const n = await a.GetNetwork();
-    const url = n && n.data && (n.data.rpcUrl || n.data.rpc_url);
+    const url = n && n.data && rpcOf(n.data);
     return url ? port(url) === port(rpc) : null;
   } catch {
     return null;
@@ -267,6 +268,8 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
 // what is asked of the account: the gas at the price, with half again for a
 // price that rises between the reading and the block
 const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
+// the price asked when the chain's is not given: ugnot a gas
+const PRICE = 0.001;
 // Gas asked for one commit, calibrated on gno_call simulate=true
 // (docs/reviews/fix-sync-client.md): the work model already bounds the shots
 // (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; what the
@@ -338,16 +341,11 @@ const NO_REGISTRAR = "This chain has no name registrar: no name can be taken her
  * the round (Register), so it is ranked as it lands, and the rounds saved
  * before it after (Claim). Resolves with the tx (hash, height).
  */
-export async function recordRound({ address, realm, hole, shots, gas, period, reset = true, mode = "assisted", price = 0.001, chainId, rpc, named }: {
+export async function recordRound({ address, realm, hole, shots, gas, period, reset = true, mode = "assisted", price = PRICE, chainId, rpc, named }: {
   address: string; realm: string; hole: string; shots: readonly string[]; gas?: number; period?: number | null; reset?: boolean; mode?: Mode; price?: number; chainId?: string | null; rpc: string;
   named?: { registrar: string; name: string } | null;
 }) {
-  const a = wallet();
-  if (!a) throw new Error("Adena is not installed in this browser.");
   if (named && !named.registrar) throw new Error(NO_REGISTRAR);
-  await ensureNetwork(a, { chainId, rpc });
-  const gasWanted = Math.min((gas || MAX_GAS) + (named ? REGISTER_GAS + CLAIM_GAS : 0), MAX_GAS);
-  const gasFee = feeFor(gasWanted, price);
   // no balance gate here: Adena itself says when an account cannot pay, and
   // the page warns beforehand (shortOf) without keeping the wallet shut
   const call = (func: string, args: string[]): Call => ({
@@ -361,10 +359,10 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
   };
   // the period the chain checked (as a whole number) is the one signed
   if (period != null && !Number.isSafeInteger(period)) throw new Error("This round's weather period is not one the chain knows. Play it again.");
-  const res = await a.DoContract({
-    // in the weather the round was played in (its period): the chain takes
-    // the current one or the one before
-    messages: [
+  // in the weather the round was played in (its period): the chain takes
+  // the current one or the one before
+  return send(
+    [
       ...(named ? [{ type: "/vm.m_call", value: { caller: address, send: "", pkg_path: named.registrar, func: "Register", args: [named.name] } } as Call] : []),
       ...(reset ? [call("Reset", [hole])] : []),
       // a pro round goes on the pro board (the mode is the one it was played in)
@@ -375,22 +373,12 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
           : call("PlayRoundAt", [hole, shots.join(";"), String(period)]),
       ...(named ? [call("Claim", [])] : []),
     ],
-    // a starting point: Adena simulates the tx and sets the final fee itself
-    gasFee,
-    gasWanted,
-    memo: "gnogolf",
-    // this exact chain: id and RPC (Adena's own "dev" is another node)
-    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
-  });
-  if (res.status !== "success") {
-    const e: SendError = new Error(why(res, "The transaction was not sent."));
-    e.cancelled = res.code === CANCELLED;
-    throw e;
-  }
-  return res.data ?? null;
+    Math.min((gas || MAX_GAS) + (named ? NAME_GAS : 0), MAX_GAS),
+    price, chainId, rpc, "The transaction was not sent.",
+  );
 }
 
-/** One transaction from the connected account: Adena simulates it and sets the final fee. */
+/** One transaction from the connected account: Adena simulates it and sets the final fee (gasWanted, at price: a starting point). */
 async function send(messages: (Call | Send)[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, memo = "gnogolf") {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
@@ -400,6 +388,7 @@ async function send(messages: (Call | Send)[], gasWanted: number, price: number,
     gasFee: feeFor(gasWanted, price),
     gasWanted,
     memo,
+    // this exact chain: id and RPC (Adena's own "dev" is another node)
     ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
   });
   if (res.status !== "success") {
@@ -445,15 +434,15 @@ export const nameBytes = (holes: readonly number[]) => 3628 + holes.reduce((b, n
  * Register is free on pearl and mainnet (nothing is sent with it), and only
  * a direct call registers, which a message of this transaction is.
  */
-export const registerName = ({ address, registrar, realm, name, price = 0.001, chainId, rpc }: {
+export const registerName = ({ address, registrar, realm, name, price = PRICE, chainId, rpc }: {
   address: string; registrar: string; realm: string; name: string; price?: number; chainId?: string | null; rpc: string;
 }) =>
   registrar
-    ? calls(address, [[registrar, "Register", [name]], [realm, "Claim", []]], REGISTER_GAS + CLAIM_GAS, price, chainId, rpc, "The name was not registered.")
+    ? calls(address, [[registrar, "Register", [name]], [realm, "Claim", []]], NAME_GAS, price, chainId, rpc, "The name was not registered.")
     : Promise.reject(new Error(NO_REGISTRAR));
 
 /** Ranks the rounds a player saved before they had a name (golf's Claim). */
-export const claimRounds = ({ address, realm, price = 0.001, chainId, rpc }: { address: string; realm: string; price?: number; chainId?: string | null; rpc: string }) =>
+export const claimRounds = ({ address, realm, price = PRICE, chainId, rpc }: { address: string; realm: string; price?: number; chainId?: string | null; rpc: string }) =>
   calls(address, [[realm, "Claim", []]], CLAIM_GAS, price, chainId, rpc, "Your rounds were not ranked.");
 
 // The same save for gnokey, Adena's messages in one `maketx run` per commit:
@@ -482,7 +471,7 @@ interface SaveRound extends Work {
  * own key (<your-key-name>). s: the engine's snapshot of a holed round
  * (id, shots, period, roundMode, and the work model's walls, pieces, kind, pts).
  */
-export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc, parts: checked }: { realm: string; price?: number; chainId?: string | null; rpc: string; parts?: readonly (readonly [number, number])[] | null }) {
+export function gnokeyPlan(s: SaveRound, { realm, price = PRICE, chainId, rpc, parts: checked }: { realm: string; price?: number; chainId?: string | null; rpc: string; parts?: readonly (readonly [number, number])[] | null }) {
   const shots = s.shots || [], mode = s.roundMode || "assisted";
   if (!shots.length) return [];
   if (mode === "pro" && s.period == null) return []; // a pro round has its period, or it cannot be saved
@@ -539,4 +528,4 @@ export const shortOf = (gas: number, price: number, deposit: number, balance: nu
 /** What a round's gas costs, in GNOT, shown before anyone signs: the gas at
  *  today's price (the ask adds half again for a rising price; Adena charges
  *  what it simulates). */
-export const costOf = (gas: number, price = 0.001) => ((gas * price) / 1e6).toFixed(3);
+export const costOf = (gas: number, price = PRICE) => ((gas * price) / 1e6).toFixed(3);

@@ -25,6 +25,7 @@ import { disposeCourse, motion } from "../scene/materials";
 import { BALL_R } from "../terrain";
 import { ghostSpeed, shotsOf } from "../duel";
 import { makeReplay, outlived, stepsMs } from "./replay";
+import { wait } from "../chain";
 import type { Ghost, Stroke, Vec2 } from "../types";
 import type { Gnome } from "../scene/data";
 import type { GameState, Live } from "./types";
@@ -32,7 +33,6 @@ import type { GameState, Live } from "./types";
 const SEEN = 0.7, AIMING = 0.45; // its opacity on its turn, and at rest while the player aims
 const WAIT_MS = 4000; // a stroke slower than this to read: the turn is the player's again, the ghost at its rest once read
 const BEAT_MS = 600, AFTER_MS = 1000; // its turn said before it moves; at its rest, seen, before the player's turn
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const CUT_MS = 5000; // a ghost's replay past this (a frozen tab) is cut: the engine's safety net, for the ghost
 const GLIDE_MS = 450; // its walk onto its stroke's start (the tee: where the player stood), before it plays
 // each ghost's strokes as read, kept with the ghost (the same ghost comes back with a rematch, or a mode toggled back)

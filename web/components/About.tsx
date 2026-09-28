@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { NETWORK, OTHER_URL } from "@/lib/network";
+import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
 import { REALM_PATH } from "@/lib/chain";
 
@@ -101,9 +101,9 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
   const links: readonly [string, string, string][] = [
     ...(web ? [["The golf realm", `${web}${REALM_PATH}`, "its code and boards, on gnoweb"] as [string, string, string]] : []),
     ["gno.land", "https://gno.land", "the chain it runs on"],
-    ["Adena", "https://adena.app", "the wallet that saves your rounds"],
+    ["Adena", ADENA_URL, "the wallet that saves your rounds"],
     // the faucet feeds the testnet only; the other deployment, when there is one
-    ...(NETWORK === "testnet" ? [["Faucet", "https://faucet.gno.land", "free test GNOT for the testnet"] as [string, string, string]] : []),
+    ...(NETWORK === "testnet" ? [["Faucet", FAUCET, "free test GNOT for the testnet"] as [string, string, string]] : []),
     ...(OTHER_URL ? [NETWORK === "testnet" ? ["Play on mainnet", OTHER_URL, "the real chain: scores for keeps"] : ["Play on the testnet", OTHER_URL, "free test GNOT, same course"]] as [string, string, string][] : []),
   ];
   return (

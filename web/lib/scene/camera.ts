@@ -37,6 +37,16 @@ export function makeRenderer(canvas: HTMLCanvasElement) {
   r.setPixelRatio(Math.min(devicePixelRatio, maxDpr()));
   return r;
 }
+/** A weak or software GPU, by the name the renderer's context gives it. */
+export const weakGpu = (renderer: THREE.WebGLRenderer) => {
+  try {
+    const gl = renderer.getContext(), x = gl.getExtension("WEBGL_debug_renderer_info");
+    const name = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER)); // (a GL string, whatever the typings say)
+    return /swiftshader|llvmpipe|softpipe|software|mali-[4-7]\d\d|mali-g[57]\d\b|adreno \(tm\) [3-5]\d\d|powervr|intel.*hd graphics [2-5]\d\d/i.test(name);
+  } catch {
+    return false;
+  }
+};
 
 export function makeScene(): LitScene {
   const scene = new THREE.Scene() as LitScene;

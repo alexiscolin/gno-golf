@@ -153,6 +153,8 @@ export function totals(card: Card, holes: readonly CardHole[]) {
 // not a cup.
 export const CUPS = ["garden", "island", "town", "mountain"] as const;
 export type Cup = (typeof CUPS)[number];
+/** A cup's name, as the game calls it. */
+export const CUP_NAMES: Readonly<Record<Cup, string>> = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup" };
 
 /** A score against par as the game prints it: E, +3, −2 (a real minus sign). */
 export const vsPar = (n: number) => (n === 0 ? "E" : n > 0 ? `+${n}` : `−${-n}`);

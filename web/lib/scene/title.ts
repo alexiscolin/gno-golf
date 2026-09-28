@@ -13,7 +13,7 @@ import TITLE_HOLES from "./title-holes.json";
 import { loadWorld } from "./worlds";
 import { buildHole } from "./course";
 import { state } from "./state";
-import { makeRenderer, makeScene } from "./camera";
+import { makeRenderer, makeScene, weakGpu } from "./camera";
 import { makeBall, gnomeById } from "./gnome";
 import { makeConfetti } from "./fx";
 import { BALL_R, smoothstep } from "../terrain";
@@ -189,16 +189,6 @@ function frameCast(camera: THREE.PerspectiveCamera, c: ReturnType<typeof makeCas
 
 // ------------------------------------------------------------- the stage
 
-// the engine's own test (engine.ts weakGpu), kept apart: that file is the game loop's
-const weakGpu = (renderer: THREE.WebGLRenderer) => {
-  try {
-    const gl = renderer.getContext(), x = gl.getExtension("WEBGL_debug_renderer_info");
-    const name = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER)); // (a GL string, whatever the typings say)
-    return /swiftshader|llvmpipe|softpipe|software|mali-[4-7]\d\d|mali-g[57]\d\b|adreno \(tm\) [3-5]\d\d|powervr|intel.*hd graphics [2-5]\d\d/i.test(name);
-  } catch {
-    return false;
-  }
-};
 
 export async function holeOf(world: string, given?: Hole) {
   const s = given || HOLES[world] || HOLES.garden;

@@ -6,13 +6,12 @@ import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
 import { GNOME } from "@/components/common";
 import { AboutButton, ICON } from "@/components/About";
-import { SLOW_KEY } from "@/lib/engine/pace";
+import { lowGfx } from "@/lib/engine/pace";
 import { camlog } from "@/lib/testhooks";
 import { reducedMotion } from "@/lib/device";
-import type { makeTitle } from "@/lib/scene/title";
+import { CUPS } from "@/lib/card";
+import type { Title as TitleScene } from "@/lib/scene/title"; // the live title scene, once its module has loaded and made it
 
-/** The live title scene, once its module has loaded and made it. */
-type TitleScene = NonNullable<Awaited<ReturnType<typeof makeTitle>>>;
 type Film = ReturnType<typeof makeFilm>;
 declare global {
   interface Window {
@@ -169,7 +168,6 @@ const guessWorld = () => {
 // game's) by parking them for a moment instead of dropping them. Each visit's
 // splash is the next world. Reduced motion, the Low graphics tier and no WebGL
 // get a still instead; a data saver, a slow link or no autoplay skip the video.
-const SCENES = ["garden", "island", "town", "mountain"];
 interface Visit {
   world: string;
   canvas: HTMLCanvasElement | null;
@@ -187,21 +185,12 @@ const nextWorld = () => {
   let i = 0;
   try {
     const was = localStorage.getItem("gnogolf.title");
-    i = was == null ? 0 : (Number(was) + 1) % SCENES.length || 0;
+    i = was == null ? 0 : (Number(was) + 1) % CUPS.length || 0;
     localStorage.setItem("gnogolf.title", String(i));
   } catch {}
-  return SCENES[i];
+  return CUPS[i];
 };
-const wantsStill = () => {
-  if (reducedMotion()) return true;
-  try {
-    const gfx = localStorage.getItem("gnogolf.gfx");
-    // Low, or Auto on a device whose frames were slow (the engine's own flag)
-    return gfx === "low" || (gfx !== "high" && localStorage.getItem(SLOW_KEY) === "low");
-  } catch {
-    return false;
-  }
-};
+const wantsStill = () => reducedMotion() || lowGfx();
 const wantsVideo = () => {
   const c = navigator.connection;
   return !(c && (c.saveData || /2g/.test(c.effectiveType || "")));
@@ -328,16 +317,16 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" && /[?&]titlebake/.test(location.search)) void import("@/lib/scene/titlebake");
   }, []);
-  const start = () => (sound("start"), onStart?.());
+  const start = useCallback(() => (sound("start"), onStart?.()), [onStart]);
   // once ready, a click anywhere or Enter starts, like a console's title
   useEffect(() => {
     if (!ready) return;
     const key = (e: KeyboardEvent) => {
-      if ((e.key === "Enter" || e.key === " ") && (document.activeElement === document.body || !document.activeElement)) (e.preventDefault(), sound("start"), onStart?.());
+      if ((e.key === "Enter" || e.key === " ") && (document.activeElement === document.body || !document.activeElement)) (e.preventDefault(), start());
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
-  }, [ready, onStart]);
+  }, [ready, start]);
   const sw = scene && !scene.bare ? scene.world : null, playing = scene && scene.phase === "video";
   return (
     <div className={"screen screen--title" + (sw ? ` tsky--${sw}` : "") + (ready ? " screen--ready" : "")} onClick={ready ? start : undefined}>

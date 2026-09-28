@@ -13,7 +13,7 @@ import type { Snapshot } from "@/lib/engine";
 import { AboutButton, BackButton } from "@/components/About";
 import { Button, InfoTip } from "@/components/ui";
 import { FullBoard, Sticker, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
-import { ghostsWord, golfTerm, holeNumber, holesWord, strokesWord } from "@/components/common";
+import { ghostsWord, golfTerm, holeNumber, holesWord, plural, strokesWord } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
 import { cupOf, parOf, scoreOf, type Card } from "@/lib/card";
 import { bestOf, inTurn, mapFit, mapView, mapZone, pathD, railRuns, showcases, shotsOf, vsBest, type MapKind } from "@/lib/duel";
@@ -407,7 +407,7 @@ function HoleCard({ id, name, num, par, best, mine, chain, player, onRace }: { i
         <span className="rival__best">Par {par}</span>
       </span>
       <span className="ghost__label">Their best</span>
-      <span className="ghost__best"><strong>{n}</strong> stroke{n === 1 ? "" : "s"}{best.mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
+      <span className="ghost__best"><strong>{n}</strong> {plural("stroke", n)}{best.mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
       <span className={`ghost__you ghost__you--${you.kind}`}>
         {you.kind === "none" ? "Not played yet" : you.kind === "won" ? `✓ You beat them: ${mine}` : <>You <b>{mine}</b> · {you.kind === "over" ? <b className="bad">+{you.gap}</b> : "tied"}</>}
       </span>

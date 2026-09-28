@@ -16,11 +16,11 @@ import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
 import { loadWorld } from "./scene/worlds";
-import { makeChain, shotOf, pullShot, isHoleId, RULES } from "./chain";
+import { makeChain, shotOf, pullShot, isHoleId, RULES, wait } from "./chain";
 import { boardWork } from "./adena";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
-  makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
+  makeRenderer, weakGpu, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
   courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene";
 import { BALL_R, plainSkins } from "./terrain";
@@ -273,15 +273,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // device whose frames were slow (the probe below: remembered for next time).
   let gfxMode: GfxMode = gfxOf(gfx), tier: Tier = "high";
   const coarse = isTouch();
-  const weakGpu = (() => {
-    try {
-      const gl = renderer.getContext(), x = gl.getExtension("WEBGL_debug_renderer_info");
-      const name = String(gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER) as unknown);
-      return /swiftshader|llvmpipe|softpipe|software|mali-[4-7]\d\d|mali-g[57]\d\b|adreno \(tm\) [3-5]\d\d|powervr|intel.*hd graphics [2-5]\d\d/i.test(name);
-    } catch {
-      return false;
-    }
-  })();
+  const weak = weakGpu(renderer);
   const OLD_SLOW_KEY = "gnogolf.gfx.auto";
   // (a Low found by the probe before it knew the display's own rate: 75, 90
   // and 144 Hz screens were marked slow by the frame cap alone, and are probed again)
@@ -295,7 +287,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   let dprCap = Infinity;
   function setTier() {
     const was = tier;
-    tier = gfxMode === "auto" ? (weakGpu || probe.slow || wasSlow() ? "low" : "high") : gfxMode;
+    tier = gfxMode === "auto" ? (weak || probe.slow || wasSlow() ? "low" : "high") : gfxMode;
     quality.low = tier === "low"; // outlines: from the next hole built
     weather.thin(quality.low);
     dprCap = quality.low ? (coarse ? 0.8 : 1) : Infinity;
@@ -1326,7 +1318,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       // few degrees off and is corrected, the pull goes a little too far and
       // is eased back, and the pause before letting go is never the same
       // twice. Only the moment of release has to be exact.
-      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
       let n = 0;
       setSilent(true); // a demo is nobody's pull: no creak, no putt, no knock
       for (const item of list) {

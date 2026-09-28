@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Snapshot } from "@/lib/engine";
-import { isAddress, type Chain } from "@/lib/chain";
+import { isAddress, wait, type Chain } from "@/lib/chain";
 import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
 import { vsPar } from "@/lib/card";
 import { levelFrom, levelPick, pickOne } from "@/lib/duel";
@@ -12,7 +12,7 @@ import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
-import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied, GNOME } from "@/components/common";
+import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, plural, AIMS, AIM_NAMES, useCopied, GNOME } from "@/components/common";
 import { Frame } from "@/components/Worlds";
 import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Skin } from "@/lib/scene/gnome";
@@ -205,7 +205,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
         <ul className="friends__list">
           {friends.map((f) => (
             <li key={f.addr}>
-              <span>{f.name || `${f.addr.slice(0, 10)}…${f.addr.slice(-4)}`}</span>
+              <span>{f.name || shortAddr(f.addr, 10)}</span>
               <button className="linkish" onClick={() => drop(f.addr)} aria-label={`Remove ${f.name || f.addr}`}>remove</button>
             </li>
           ))}
@@ -248,7 +248,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
         <span className="eyebrow">Saved on-chain</span>
         <h2>Leaderboard</h2>
         <div className="boards__modes">
-          <Segmented className="seg--s" role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
+          <Segmented className="seg--s" role="tablist" label="Aim mode" value={mode} onChange={setMode} options={AIMS} />
           <p className="boards__word">{HONEST}</p>
         </div>
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={inHole ? [["hole", "This hole"], ["course", "The course"], ["friends", "Friends"]] : [["course", "The course"], ["friends", "Friends"]]} />
@@ -462,7 +462,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
         <span className="lb__holes">
           {r.holes}/{head ? head.holes : "–"} holes
         </span>
-        <strong>{r.strokes}<small> stroke{r.strokes === 1 ? "" : "s"}</small></strong>
+        <strong>{r.strokes}<small> {plural("stroke", r.strokes)}</small></strong>
       </>
     );
   // your place, listed or further down: said once under the list, with the game's share
@@ -649,7 +649,7 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
       for (let k = 0; k < 10; k++) {
         names.delete(account);
         if ((await nameOnce(chain, account)) === name) break;
-        await new Promise((r) => setTimeout(r, 1000));
+        await wait(1000);
       }
       setDone(name);
       onNamed(name);
@@ -796,7 +796,7 @@ export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra }: { chai
   return (
     <section className="podium" aria-label="Top players">
       <header className="podium__head">
-        <h3>Top players <small>{mode === "pro" ? "Pro" : "Assisted"} · on-chain</small></h3>
+        <h3>Top players <small>{AIM_NAMES[mode]} · on-chain</small></h3>
         <span className="podium__links">
           {extra}
           <button className="linkish podium__open" onClick={() => (sound("blip"), onOpen())}>See the leaderboard →</button>

@@ -2,7 +2,7 @@
 // the gnome, and the gnomes earned.
 import { GNOMES } from "./scene/gnome";
 import { reducedMotion } from "./device";
-import { SLOW_KEY } from "./engine/pace";
+import { lowGfx } from "./engine/pace";
 import type { CamMode } from "./engine/types";
 
 // the camera modes, in the order the button goes through them. A page always
@@ -22,10 +22,11 @@ export function saveCam(m: CamMode) {
   try { sessionStorage.setItem(CAM_KEY, m); } catch {}
 }
 
+const GNOME_KEY = "gnogolf.gnome";
 /** Whether this player ever picked a gnome (a first visit has not). */
 export function hadGnome() {
   try {
-    return !!localStorage.getItem("gnogolf.gnome");
+    return !!localStorage.getItem(GNOME_KEY);
   } catch {
     return false;
   }
@@ -34,13 +35,16 @@ export function hadGnome() {
 /** The gnome this player picked, if it is still theirs to play; the first one otherwise. */
 export function savedGnome() {
   try {
-    const id = localStorage.getItem("gnogolf.gnome");
+    const id = localStorage.getItem(GNOME_KEY);
     const gn = GNOMES.find((x) => x.id === id);
     if (!gn || (gn.unlock && !earned().includes(gn.id))) return GNOMES[0].id;
     return gn.id;
   } catch {
     return GNOMES[0].id;
   }
+}
+export function saveGnome(id: string) {
+  try { localStorage.setItem(GNOME_KEY, id); } catch {}
 }
 
 // A list of ids this browser keeps for good (the gnomes earned, the badges,
@@ -71,8 +75,8 @@ export const badgesEarned = () => kept("gnogolf.badges");
 export const rememberBadges = (ids: readonly string[], at: string) => {
   const had = badgesEarned(), add = ids.filter((id) => !had.includes(id));
   if (!add.length) return add;
+  keep("gnogolf.badges", add);
   try {
-    localStorage.setItem("gnogolf.badges", JSON.stringify([...had, ...add]));
     if (at) localStorage.setItem(AT_KEY, JSON.stringify({ ...badgesAt(), ...Object.fromEntries(add.map((id) => [id, at])) }));
   } catch {}
   return add;
@@ -98,15 +102,14 @@ export function forgetBadges() {
 }
 
 /** Stills and no clips on the cup cards: reduced motion, a data saver or a
- *  slow link, the Low graphics tier (or Auto on a device found slow). */
+ *  slow link, the Low graphics tier. */
 export function stillsOnly() {
   try {
     if (reducedMotion()) return true;
     const c = navigator.connection;
     if (c && (c.saveData || /2g/.test(c.effectiveType || ""))) return true;
-    const gfx = localStorage.getItem("gnogolf.gfx");
-    return gfx === "low" || (gfx !== "high" && localStorage.getItem(SLOW_KEY) === "low");
   } catch {
     return true;
   }
+  return lowGfx();
 }

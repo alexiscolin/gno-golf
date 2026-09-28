@@ -13,7 +13,6 @@ const WEB = new URL("../../web/", import.meta.url);
 const OUT = new URL("public/og/", WEB);
 const NAMES = new URL("app/h/holes.json", WEB);
 const W = 1200, H = 630, Q = 80;
-const CUPS = ["garden", "island", "town", "mountain"];
 const ALL = fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").split("\n").filter(Boolean).map((l) => l.split(" ")[0]);
 const named = process.argv.slice(2);
 const HOLES = named.length ? ALL.filter((s) => named.includes(s)) : ALL;
@@ -21,8 +20,11 @@ fs.mkdirSync(OUT, { recursive: true });
 
 /** @type {Record<string, { name: string, par: number }>} */
 const known = fs.existsSync(NAMES) ? JSON.parse(fs.readFileSync(NAMES, "utf8")) : {};
-const cap = (/** @type {string} */ w) => w[0].toUpperCase() + w.slice(1);
-const cupName = (/** @type {string} */ w) => (CUPS.includes(w) ? `${cap(w)} Cup` : cap(w));
+// a cup's name as the game calls it (web/lib/card.ts CUP_NAMES), the extras by their world
+/** @type {Record<string, string>} */
+const CUP_NAMES = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup" };
+const CUPS = Object.keys(CUP_NAMES);
+const cupName = (/** @type {string} */ w) => CUP_NAMES[w] || w[0].toUpperCase() + w.slice(1);
 const esc = (/** @type {string} */ s) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 await chainUp();

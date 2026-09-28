@@ -6,6 +6,8 @@ export const NETWORK: "testnet" | "mainnet" = process.env.NEXT_PUBLIC_NETWORK ==
 export const FAUCET = process.env.NEXT_PUBLIC_FAUCET || "https://faucet.gno.land";
 /** Where mainnet players get GNOT (NEXT_PUBLIC_GNOT_URL): the faucet hub's small drip by default. */
 export const GNOT_URL = process.env.NEXT_PUBLIC_GNOT_URL || FAUCET;
+/** Where to get Adena, the wallet. */
+export const ADENA_URL = "https://www.adena.app/";
 /** The other deployment's address ("" when there is none yet). */
 export const OTHER_URL = process.env.NEXT_PUBLIC_OTHER_URL || "";
 

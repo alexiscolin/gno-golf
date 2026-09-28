@@ -11,6 +11,7 @@ import { shotOf } from "./chain";
 import { worldOf } from "./scene/worlds";
 import { cupOf } from "./card";
 import { freshAudio, sound, type SoundName } from "./feel";
+import { camlog } from "./testhooks";
 import type { Chain } from "./chain";
 import type { HoleRow, SimulateRound } from "./types";
 import type { Course, Gnome, Hole } from "./scene/data";
@@ -77,11 +78,11 @@ interface Shot {
   burst?: number | null; burstOpacity?: number; hits?: readonly number[]; rays?: boolean;
 }
 
-// a capture tool: dev builds, or a page opened with ?camlog as well
+// a capture tool: dev builds, or a page opened with ?camlog where the test hooks answer (testhooks.ts)
 // read from the link the page was opened with: the page loads this module only
 // once it has asked for it, and by then its address bar may say another thing
 const opened = typeof window !== "undefined" ? new URL(performance.getEntriesByType("navigation")[0]?.name || window.location.href).search : "";
-const on = new URLSearchParams(opened).has("promo") && (process.env.NODE_ENV !== "production" || /[?&]camlog/.test(opened));
+const on = new URLSearchParams(opened).has("promo") && (process.env.NODE_ENV !== "production" || camlog(opened));
 const FPS = 30;
 
 let E: PromoEngine | null = null; // the engine's insides, given by attach()
