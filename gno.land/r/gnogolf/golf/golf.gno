@@ -108,8 +108,35 @@ func (e *entry) rec(m int) record {
 func (e *entry) roundTree() view { return view{rounds, e.id + " "} }
 
 // bests is the version's results in mode m: player address -> their best
-// finished round there, kept across replays.
+// finished round there, kept across replays, as bestOf writes it.
 func (e *entry) bests(m int) view { return view{bests, e.id + " " + modeNames[m] + " "} }
+
+// bestOf is how a best is kept: "<strokes> <period> <shots>", the round's
+// shots as played, so the best replays in its own weather (Ghost) for as long
+// as the realm stands. The mode is in the key.
+func bestOf(r *round) string {
+	return strconv.Itoa(r.strokes) + " " + strconv.FormatInt(r.period, 10) + " " + r.shots
+}
+
+// errBest is a best not as bestOf writes it: never written, refused if read.
+const errBest = "golf: a best not as bestOf writes it: "
+
+// bestStrokes is a kept best's strokes, 0 for none (a tree's nil).
+func bestStrokes(v any) int {
+	if v == nil {
+		return 0
+	}
+	s := v.(string)
+	i := strings.Index(s, " ")
+	if i < 0 {
+		panic(errBest + s)
+	}
+	n, err := strconv.Atoi(s[:i])
+	if err != nil {
+		panic(errBest + s)
+	}
+	return n
+}
 
 // board is the version's board in mode m: boardKey(strokes, player) ->
 // player, the named players' bests, fewest strokes first.
@@ -306,8 +333,9 @@ type row struct {
 const topSize = 10
 
 // named reports whether a player has a gno.land name (r/sys/users). Only
-// named players enter the rankings: an address is free, a name is not, so a
-// script cannot fill the boards with a thousand accounts. Every finish is
+// named players enter the rankings: an address is free, a name takes a
+// registration (and a fee where the chain sets one), so a script cannot fill
+// the boards with a thousand accounts for nothing. Every finish is
 // still kept, named or not — a player who takes a name later ranks on their
 // next finish, and friends' boards (Bests, Standings) read anyone.
 func named(player string) bool {
@@ -316,10 +344,26 @@ func named(player string) bool {
 
 // nameOf is a named player's name, "" for anyone else.
 func nameOf(player string) string {
-	if u := users.ResolveAddress(address(player)); !u.IsDeleted() {
+	if u := users.ResolveAddress(address(player)); !u.IsDeleted() && nameish(u.Name()) {
 		return u.Name()
 	}
 	return ""
+}
+
+// nameish is a name as r/sys/users registers them: a lowercase letter, then
+// lowercase letters, digits, "_" and "-", at most 64. It is checked again
+// here because the pages print names inside links: nothing another realm
+// writes, even one that changes, can break out of them.
+func nameish(n string) bool {
+	if n == "" || len(n) > 64 || n[0] < 'a' || n[0] > 'z' {
+		return false
+	}
+	for i := 0; i < len(n); i++ {
+		if c := n[i]; !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_' || c == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // find is the hole with this exact id, nil if none.
@@ -485,7 +529,7 @@ func drain(n int) {
 				}
 				if d.fresh[m] == nil || !d.fresh[m].Has(p) {
 					if r := totals[m].Get(p); r != nil {
-						setRow(m, r.(*row), r.(*row).holes-1, r.(*row).strokes-v.(int))
+						setRow(m, r.(*row), r.(*row).holes-1, r.(*row).strokes-bestStrokes(v))
 					}
 				}
 				n--
@@ -941,14 +985,16 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 			e.best, e.bestBy = r.strokes, player
 		}
 	}
-	// a player's best stays theirs: replaying the hole never erases it
-	if v := e.bests(m).Get(p); v == nil || r.strokes < v.(int) {
-		was := 0
-		if v != nil {
-			was = v.(int)
+	// a player's best stays theirs: replaying the hole never erases it, and a
+	// tie keeps the older round, shots and all
+	best, was := r.strokes, bestStrokes(e.bests(m).Get(p))
+	if was > 0 && was <= r.strokes {
+		best = was
+	} else {
+		if was > 0 {
 			e.board(m).Remove(boardKey(was, p))
 		}
-		e.bests(m).Set(p, r.strokes)
+		e.bests(m).Set(p, bestOf(r))
 		if counts(e, m, p, was) {
 			improve(m, p, was, r.strokes)
 		} else if was == 0 && e.official && e.next != "" && !e.out.done[m] && p >= e.out.from[m] {
@@ -961,7 +1007,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 		}
 	}
 	if isNamed {
-		seat(e, m, p)
+		seat(e, m, p, best)
 	}
 	if e.official {
 		drain(finishBatch) // only the course's finishes pay for the course's drain
@@ -975,8 +1021,8 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 // and in the course ranking if they stand in it. A finish does it whether or
 // not it improved, so a player who took a name after their best ranks at
 // their next finish.
-func seat(e *entry, m int, p string) {
-	k := boardKey(e.bests(m).Get(p).(int), p)
+func seat(e *entry, m int, p string, best int) {
+	k := boardKey(best, p)
 	if !e.board(m).Has(k) {
 		e.board(m).Set(k, p)
 	}
@@ -1004,8 +1050,8 @@ func Claim(cur realm) int {
 	slots.Iterate("", "", func(_ string, v any) bool {
 		e := find(v.(string))
 		for m := 0; m < modes; m++ {
-			if e.bests(m).Has(p) {
-				seat(e, m, p)
+			if best := bestStrokes(e.bests(m).Get(p)); best > 0 {
+				seat(e, m, p, best)
 				n++
 			}
 		}

@@ -38,6 +38,13 @@ export function holeLink(s: Snapshot, gnome: string, by = "") {
   return (slot ? `h/${slot[1]}-${slot[2]}/` : "") + (String(q) ? `?${q}` : "");
 }
 
+/** A dare to the whole course: friends race the player's ghost on every hole they have a best on. */
+export function dareLink(by: string) {
+  const q = chainQuery();
+  if (isAddress(by)) q.set("by", by);
+  return String(q) ? `?${q}` : "";
+}
+
 /** The par of the hole being played. */
 export const parHere = (s: Snapshot) => parOf(s.holes.find((h) => h.id === s.id) || (s.allHoles || []).find((h) => h.id === s.id));
 
@@ -183,7 +190,8 @@ export function golfTerm(strokes: number, par: number) {
 }
 
 /** The hole to play next: the first after this one not yet played, else the first not played at all. */
-export const nextHole = <H extends Pick<HoleRow, "id" | "slot">>(s: { holes: readonly H[]; id: string | null }, card: Card) => {
-  const at = s.holes.findIndex((h) => h.id === s.id);
-  return s.holes.find((h, i) => i > at && !scoreOf(card, h)) || s.holes.find((h) => !scoreOf(card, h));
+// only: the holes that may come next (a duel's: where their ghost is), played ones too when none is left unplayed, never this one
+export const nextHole = <H extends Pick<HoleRow, "id" | "slot">>(s: { holes: readonly H[]; id: string | null }, card: Card, only?: (h: H) => boolean) => {
+  const at = s.holes.findIndex((h) => h.id === s.id), open = (h: H) => (!only || only(h)) && !scoreOf(card, h);
+  return s.holes.find((h, i) => i > at && open(h)) || s.holes.find(open) || (only && (s.holes.find((h, i) => i > at && only(h)) || s.holes.find((h) => h.id !== s.id && only(h))));
 };

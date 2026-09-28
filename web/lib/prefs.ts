@@ -67,10 +67,35 @@ export const earned = () => kept("gnogolf.earned");
 export const remember = (id: string) => keep("gnogolf.earned", [id]);
 /** The badges earned in this browser (lib/card.ts BADGES), and new ones kept for good. */
 export const badgesEarned = () => kept("gnogolf.badges");
-export const rememberBadges = (ids: readonly string[]) => keep("gnogolf.badges", ids);
+// (at: the hole they were earned on, kept for the new ones only); returns the new ones
+export const rememberBadges = (ids: readonly string[], at: string) => {
+  const had = badgesEarned(), add = ids.filter((id) => !had.includes(id));
+  if (!add.length) return add;
+  try {
+    localStorage.setItem("gnogolf.badges", JSON.stringify([...had, ...add]));
+    if (at) localStorage.setItem(AT_KEY, JSON.stringify({ ...badgesAt(), ...Object.fromEntries(add.map((id) => [id, at])) }));
+  } catch {}
+  return add;
+};
+const AT_KEY = "gnogolf.badges.at";
+/** Where each badge was earned: its hole's id (the cup card stamps it there); strings only, as kept() reads. */
+export function badgesAt(): Record<string, string> {
+  try {
+    const e: unknown = JSON.parse(localStorage.getItem(AT_KEY) || "{}");
+    return e && typeof e === "object" && !Array.isArray(e) ? Object.fromEntries(Object.entries(e).filter((x): x is [string, string] => typeof x[1] === "string")) : {};
+  } catch {
+    return {};
+  }
+}
 /** The weathers a hole was finished in ("" the calm one), for All weathers. */
 export const weathersSeen = () => kept("gnogolf.weathers");
 export const seeWeather = (kind: string) => keep("gnogolf.weathers", [kind]);
+/** A new game: the badges go with the scorecard, where they were earned and the weathers counted toward one too (the gnomes stay). */
+export function forgetBadges() {
+  try {
+    for (const k of ["gnogolf.badges", AT_KEY, "gnogolf.weathers"]) localStorage.removeItem(k);
+  } catch {}
+}
 
 /** Stills and no clips on the cup cards: reduced motion, a data saver or a
  *  slow link, the Low graphics tier (or Auto on a device found slow). */

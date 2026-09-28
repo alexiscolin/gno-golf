@@ -29,7 +29,7 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
   },
   {
     title: "You keep it",
-    text: "Adena signs one transaction, the chain replays your shots and the round goes on the board. Nobody can type in a score.",
+    text: "Adena signs once, the chain replays your shots and the round goes on the board: no score typed in.",
     icon: ICON.keep,
   },
 ];
@@ -50,6 +50,7 @@ export const BackButton = ({ label, onClick }: { label: string; onClick: () => v
   </CornerButton>
 );
 /** The about screen's corner button (an inked ⓘ). */
+/** A screen's about button: an inked (i) in the top-right corner. */
 export const AboutButton = ({ onClick }: { onClick: () => void }) => (
   <CornerButton side="about" label="About Gnogolf" onClick={onClick}>
     <svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
@@ -73,6 +74,7 @@ const RULES: readonly (readonly [string, readonly (readonly [string, string])[]]
   ["On the boards", [
     ["Save on-chain", "To rank a round, save it with Adena before the next weather is over (the card counts down). The chain plays your shots again: nobody can type in a score."],
     ["Ranked", "Players with a gno.land name are ranked. A hole's board keeps each player's best; the course ranking counts holes first, then strokes."],
+    ["Duels", "Share a saved round and your link dares a friend: they race your best as a see-through ghost, stroke for stroke. It is your real round, replayed by the chain in the weather you had, so it can't be faked."],
   ]],
 ];
 
@@ -95,7 +97,8 @@ export function Rules({ onClose, onBadges }: { onClose: () => void; onBadges: ()
   );
 }
 
-export default function About({ onClose, onRules, web }: { onClose: () => void; onRules: () => void; web: string }) {
+// support: the tip, where the game offers one (components/Tip.tsx)
+export default function About({ onClose, onRules, web, support = null }: { onClose: () => void; onRules: () => void; web: string; support?: ReactNode }) {
   const links: readonly [string, string, string][] = [
     ...(web ? [["The golf realm", `${web}${REALM_PATH}`, "its code and boards, on gnoweb"] as [string, string, string]] : []),
     ["gno.land", "https://gno.land", "the chain it runs on"],
@@ -103,7 +106,6 @@ export default function About({ onClose, onRules, web }: { onClose: () => void; 
     // the faucet feeds the testnet only; the other deployment, when there is one
     ...(NETWORK === "testnet" ? [["Faucet", "https://faucet.gno.land", "free test GNOT for the testnet"] as [string, string, string]] : []),
     ...(OTHER_URL ? [NETWORK === "testnet" ? ["Play on mainnet", OTHER_URL, "the real chain: scores for keeps"] : ["Play on the testnet", OTHER_URL, "free test GNOT, same course"]] as [string, string, string][] : []),
-    ["Gno docs", "https://docs.gno.land", "write a realm of your own"],
   ];
   return (
     <Sheet className="about" label="About Gnogolf" onClose={onClose}>
@@ -134,6 +136,7 @@ export default function About({ onClose, onRules, web }: { onClose: () => void; 
           </li>
         ))}
       </ul>
+      {support}
 
       <footer className="about__credit">
         <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>

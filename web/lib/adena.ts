@@ -29,6 +29,11 @@ interface Call {
   type: "/vm.m_call";
   value: { caller: string; send: string; pkg_path: string; func: string; args: string[] };
 }
+/** A /bank.MsgSend message: coins from the player's account to another. */
+interface Send {
+  type: "/bank.MsgSend";
+  value: { from_address: string; to_address: string; amount: string };
+}
 /** The part of Adena's injected API this page calls (docs.adena.app). */
 export interface Adena {
   AddEstablish(name: string): Promise<AdenaRes>;
@@ -36,7 +41,7 @@ export interface Adena {
   GetNetwork?(): Promise<AdenaRes<Network>>;
   SwitchNetwork(chainId: string): Promise<AdenaRes>;
   AddNetwork(n: { chainId: string; chainName: string; rpcUrl: string }): Promise<AdenaRes>;
-  DoContract(tx: { messages: Call[]; gasFee: number; gasWanted: number; memo: string; networkInfo?: { chainId: string; rpcUrl: string } }): Promise<AdenaRes<{ hash: string; height: number }>>;
+  DoContract(tx: { messages: (Call | Send)[]; gasFee: number; gasWanted: number; memo: string; networkInfo?: { chainId: string; rpcUrl: string } }): Promise<AdenaRes<{ hash: string; height: number }>>;
   On?(event: "changedAccount" | "changedNetwork", fn: (...x: unknown[]) => void): void;
 }
 declare global {
@@ -366,16 +371,16 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
   return res.data ?? null;
 }
 
-/** One transaction of plain calls from the connected account: Adena simulates it and sets the final fee. */
-async function calls(address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string) {
+/** One transaction from the connected account: Adena simulates it and sets the final fee. */
+async function send(messages: (Call | Send)[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, memo = "gnogolf") {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
   await ensureNetwork(a, { chainId, rpc });
   const res = await a.DoContract({
-    messages: list.map(([pkg_path, func, args]) => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args } })),
+    messages,
     gasFee: feeFor(gasWanted, price),
     gasWanted,
-    memo: "gnogolf",
+    memo,
     ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
   });
   if (res.status !== "success") {
@@ -384,6 +389,20 @@ async function calls(address: string, list: readonly (readonly [string, string, 
     throw e;
   }
   return res.data ?? null;
+}
+
+/** One transaction of plain calls from the connected account. */
+const calls = (address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string) =>
+  send(list.map(([pkg_path, func, args]): Call => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args } })), gasWanted, price, chainId, rpc, failed);
+
+// a bank send is a few hundred thousand gas: asked with room, Adena sets the final fee
+const TIP_GAS = 2_000_000;
+export const TIPS = [1, 5, 10] as const; // the GNOT a tip can be
+/** A tip: GNOT sent from the player's account to the game's maker (the realm's
+ *  owner, read on the chain), confirmed in Adena like any send. No contract. */
+export async function sendTip({ from, to, gnot, price, chainId, rpc }: { from: string; to: string; gnot: number; price: number; chainId?: string | null; rpc: string }) {
+  if (!isAddress(from) || !isAddress(to) || !TIPS.some((t) => t === gnot)) throw new Error("Nothing to send.");
+  return send([{ type: "/bank.MsgSend", value: { from_address: from, to_address: to, amount: `${gnot * 1e6}ugnot` } }], TIP_GAS, price, chainId, rpc, "The tip was not sent.", "gnogolf tip");
 }
 
 // golf's Claim reads the course's holes once (74 slots, two modes): measured
@@ -488,9 +507,11 @@ export function gnokeyPlan(s: SaveRound, { realm, price = 0.001, chainId, rpc, p
 // course finish (the dearest case: round, best, board and ranking rows), wrote
 // 3,258 bytes; a replay of a hole already saved replaces what is there (~0).
 // A player's very first finish in a mode also writes their course standing
-// and ranking rows: 5,404 bytes in the pearl rehearsal. Asked with about a
-// tenth more; the chain charges what is really written.
-export const depositBytes = (first: boolean, firstOnCourse = false) => (!first ? 300 : firstOnCourse ? 6000 : 3600);
+// and ranking rows: 5,404 bytes in the pearl rehearsal. A first best also
+// keeps its shots, the ghost a duel races (Ghost): about 30 bytes and 23 a
+// stroke more; an improving best is shorter than the one it frees. Asked with
+// about a tenth more; the chain charges what is really written.
+export const depositBytes = (first: boolean, firstOnCourse = false, strokes = 0) => (!first ? 300 : (firstOnCourse ? 6000 : 3600) + 30 + 23 * strokes);
 
 /** How much GNOT an account lacks to save a round (gas and deposit), 0 if it has enough; null if unknown. */
 export const shortOf = (gas: number, price: number, deposit: number, balance: number | null | undefined) =>

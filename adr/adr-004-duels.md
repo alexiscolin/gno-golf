@@ -2,11 +2,11 @@
 
 ## Status
 
-Proposed, accepted for V1 in slices. The product decisions were taken with
-the user on 2026-09-27. One realm change has to land before mainnet: a best
-keeps its shots, its period and its mode. Everything else is client work and
-ships in slices after it: the dare link first, then the board and Friends
-entries. There is no on-chain duel record in V1.
+Accepted; stages 0 and 1 built (2026-09-28): the realm change, the duel
+from a dare link, and the ways into one from the game (the game choice's
+Duel, then the rival and their ghosts; Race on the boards and in Friends).
+The product decisions were taken with the user on 2026-09-27. There is no on-chain duel record in V1. Where the build differs
+from the design below, [As built](#as-built) says so and wins.
 
 ## Summary
 
@@ -766,9 +766,93 @@ One is free and public today: the save's transaction memo, `"gnogolf"`
 count duel saves from the chain, and it says nothing a save does not already
 say.
 
-## What is to build
+## As built
 
-Nothing is built yet.
+**Stage 0, the realm** (as designed): a best is `"<strokes> <period> <shots>"`,
+written only when it improves; every read goes through `bestStrokes` (0 for
+none); `Ghost(hole, mode, player)` is in state.gno with the other JSON reads.
+Measured: about +50 bytes a first finish, +21 gas a finish over ints.
+
+**Stage 1, the duel** (web/lib/engine/rival.ts, web/lib/duel.ts,
+web/components/Duel.tsx, web/components/Modes.tsx), where it differs from the
+design:
+
+- **Entry.** A hole link opens the picker directly (no title screen), and a
+  dare link always stops there, even for a player who has a gnome: it is the
+  one place that says who is raced and offers to play solo. The dare stays
+  in the address, with the hole, while it is raced (a reload keeps it).
+- **Entries.** The game's choice after the title (Solo, Duel, Builder to
+  come) leads a duel to the rival screen: a friend's name or address, or
+  anyone on the course board; someone with no saved round is refused there.
+  Then their ghosts: the holes they have a best on (one free read, `BestOf`
+  over the course's holes in both modes), grouped by cup with the extras,
+  their best to beat and the player's own from the card; Race opens that
+  hole's picker. A duel never shows the cups: its Back, Escape, All cups and
+  the cup card lead to their ghosts, and a hole with no ghost is not offered
+  (the menu's holes, Next hole). Race on a hole's board and in Friends (Race
+  your best on one's own row) arms that player's ghost from the tee; the
+  gnoweb page's bests each link the game's dare (`race`). The menu's Mode
+  goes back to the game choice.
+- **The rival spans the course.** A dare is a rival, not one hole: their best
+  is read on each hole the player opens (once each), and the duel re-arms
+  wherever they have one (`{rival} has a ghost here too: race it.`). Play
+  solo drops the rival for the page.
+- **Picker.** The gold sticker `Racing {rival} · {n} to beat` with a
+  `Play solo` link on the same line; under it, only what changes the race:
+  an ace, a mixed aim, a weather that was not today's. The "can't be faked"
+  line is in the Rules sheet (`Duels`).
+- **No ghost here.** A best only on another version is not told apart from
+  none: the picker says `{rival} dares you, with no ghost here yet: set the
+  score to beat.` and there is no duel. The end card does not read `BestOf`
+  again: the duel races the copy read when it was armed.
+- **HUD.** One score card, `Duel` pinned on the hole card beside it:
+  `You – them`, `2 – 1` (✓ once the ghost is in), then what is left: `3 to beat`, `hole it to win`, `hole it
+  to tie`; `they won` once the ghost's holing stroke has shown and the player
+  is past it, kept for the round, and Restart turns into a solid Rematch.
+  The card is a polite, atomic live region.
+- **The ghost's turn.** Called out big, `{rival}'s turn` then `Your turn!`
+  (hidden from a screen reader: the score card says it). It glides onto its
+  stroke's start, then plays among the pieces of the stroke it replays: the
+  next stroke's pieces grow once its turn is over (at once without a duel). It is
+  not awaited by the input: a press or an aim key cuts it (no Skip chip, no
+  tag), and a read still on its way hands the turn back at once. Its
+  steps and drop play at twice the speed, fitted to about 2 s; a splash or a
+  tube keeps its own time. A replay past 5 s is cut (a frozen tab). The camera
+  frames both balls while it plays, never wider than the hole's overview.
+  It stands beside the player's gnome where they would overlap, side by side
+  on screen. Its strokes are read one ahead and kept per ghost (a rematch
+  reads nothing again); a failed read is asked again at the next
+  turn, and a missed turn lands the next one where it rests. Read late,
+  while the player aims, or under reduced motion, it appears at its rest.
+- **Look.** Another gnome than the player's, the same one for the same
+  rival (their address picks it), see-through: 0.7 on its turn and 0.45 at
+  rest, each part hiding what is behind it, its thin outline drawn behind the
+  body. Built at the first duel (a game without one makes nothing), and again
+  when the player takes its skin. Paper white only on the Duel panel.
+- **Win card.** Said from the player's side, short and big: `You win!`,
+  `You lose`, `Tie!` (`Ace for ace!`); who and by how much in the line under
+  it (`You beat {rival} by one`, `{rival} wins by 2`); the shared picture and
+  the clip shout the same word. Plus the ghost's weather when it played
+  differently (fog plays as clear skies). The share is `Dare a friend` (the
+  rival's link) until saved, then `Dare them back`; a mixed race says so in
+  the text, and a win that can't be saved still says it was won. A tie
+  against an ace does not push the rematch (it can only tie again). The
+  sharer's own share (no duel) ends `Race my ghost.` once their round is on
+  the chain. The shared picture and
+  the clip carry `vs {rival}` and both counts; the clip ends on
+  `Race the ghost`. Rematch does not read `Ghost` again.
+- **Badges, not a gnome.** Ghost buster is a badge (lib/card.ts BADGES),
+  not the gnome of §8: a fair win (another player's best, the same aim
+  mode) against a best at par or under, earned at the finish, saved or not.
+  Good sport is its consolation, a lost duel finished, under the same rule.
+  Both are stamped on the cup card on the hole they were earned on.
+- **Not built yet:** the clip with both balls, the stroke tag and the
+  live-region lines, the still dotted path under reduced motion, the memo
+  `"gnogolf duel"`, `beat you` in Friends, and the on-chain `Duel`.
+  **Launch:** seed the team's ghosts at par (a birdie on par 4 and 5), not
+  aces: an ace ghost can only be tied.
+
+## What was to build
 
 **The realm** (gno.land/r/gnogolf/golf):
 

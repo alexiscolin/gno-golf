@@ -37,11 +37,22 @@ export const SHOW_SPEED = 26;
 // never a hard cap, under which a slower step could look quicker.
 const SHOW_FROM = 16, SHOW_EASE = 12;
 /** The time, in ms, one substep that runs d board units takes on screen. */
-export function showMs(d: number) {
+function showMs(d: number) {
   const v = (d / MS_PER_STEP) * 1000;
   const s = v <= SHOW_FROM ? v : SHOW_FROM + SHOW_EASE * Math.log(1 + (v - SHOW_FROM) / SHOW_EASE);
   return s > 0 ? Math.max(MS_PER_STEP, (d / s) * 1000) : MS_PER_STEP;
 }
+/** A replay's safety net: whether it outlived ms (a promise that never
+ *  settles, a frozen tab) or threw; the caller then cuts what is left of it. */
+export function outlived(play: Promise<unknown>, ms: number) {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    play.then(() => false, (err: unknown) => (console.warn("gnogolf: the replay threw", err), true)),
+    new Promise<boolean>((r) => (t = setTimeout(() => r(true), ms))),
+  ]).finally(() => clearTimeout(t));
+}
+/** Each step of a path's time on screen, in ms, at the player's pace. */
+export const stepsMs = (path: readonly Vec2[]) => path.slice(1).map((q, i) => showMs(Math.hypot(q[0] - path[i][0], q[1] - path[i][1])));
 /** A ray from p along unit u, and the point on it a run of d away from p by way of q: the ellipse of foci p, q. */
 function viaEllipse(p: Vec2, u: Vec2, q: Vec2, d: number): Vec2 | null {
   const rx = q[0] - p[0], ry = q[1] - p[1], r2 = rx * rx + ry * ry, ru = rx * u[0] + ry * u[1];
@@ -483,7 +494,9 @@ export function makeReplay(E: Live) {
   }
 
   /** from: the step it starts at (the clip of a long putt opens mid-roll). */
-  function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "", from = 0) {
+  // speed: how many times faster than the player's own pace (a duel's ghost:
+  // its steps and its drop; a splash or a tube keeps its own time)
+  function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "", from = 0, speed = 1) {
     const cutAt = E.cut;
     const path = path0.slice();
     const round = g.round;
@@ -569,7 +582,7 @@ export function makeReplay(E: Live) {
         let knocked = false;
         // (the step into a tube is drawn longer than the chain's, to the mouth:
         // at the chain's own speed, at most four times as long)
-        const ms = drop ? 320 : showMs(run) * (mouth ? Math.min(4, from.distanceTo(to) / Math.max(run, 1e-3)) : 1);
+        const ms = (drop ? 320 : showMs(run) * (mouth ? Math.min(4, from.distanceTo(to) / Math.max(run, 1e-3)) : 1)) / speed;
         // a roll-back at a tube's mouth: the ball climbs part way into it and
         // slides back down before the path goes on (once per point)
         const back = !jump && i > 0 && rolledBack !== i && rollBackAt(path, i);
@@ -659,7 +672,8 @@ export function makeReplay(E: Live) {
                 // D over the lip (or a higher landing), and a start at least
                 // as steep as the ramp. A shallow lip alone threw him flat, a
                 // few hundredths up, and a steep fall after it ate any hop.
-                const D = Math.max(0, a) + Math.min(0.35 + L * 0.16, 2.6);
+                // (the lip still climbs, so a smaller floor: the hop kept near the chain's own, landing where it lands)
+                const D = Math.max(0, a) + Math.min(0.1 + L * 0.06, 1.2);
                 const h = Math.max((s0 * L - a) / 4, (2 * D - a + 2 * Math.sqrt(D * (D - a))) / 4);
                 const y = top + a * v + h * 4 * v * (1 - v);
                 E.ball.position.y = BALL_R + Math.max(gh, y);

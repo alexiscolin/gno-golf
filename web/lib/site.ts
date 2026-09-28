@@ -25,6 +25,9 @@ export const TITLE = "Gnogolf — free 3D mini-golf in your browser, on-chain";
 export const DESCRIPTION =
   "A free 3D mini-golf in your browser: every hole lives on gno.land and every shot is computed by the chain. Pick a gnome and play, no wallet needed.";
 
+/** What every shared text ends with. */
+export const SHARE_TAGS = " #gnoland @_gnoland";
+
 /** The course's cups, in order, and how one is called. */
 export const CUPS = ["garden", "island", "town", "mountain"];
 export const cupName = (w: string) => w[0].toUpperCase() + w.slice(1) + (CUPS.includes(w) ? " Cup" : "");

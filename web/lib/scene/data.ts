@@ -145,9 +145,10 @@ export interface Course extends THREE.Group {
   userData: CourseData;
 }
 
-/** The gnome: his body (what turns and hops), his eyes (what blinks), his shadow, how far he reaches out from his centre (standing). */
+/** The gnome: his body (what turns and hops), his eyes (what blinks), his shadow, how far he reaches out from his centre (standing),
+ *  and the height of his middle, beard to hat (what a roll turns about). */
 export interface Gnome extends THREE.Group {
-  userData: { body: THREE.Object3D; eyes: THREE.Object3D[]; shade: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; reach: number };
+  userData: { body: THREE.Object3D; eyes: THREE.Object3D[]; shade: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; reach: number; mid: number };
 }
 
 /** The aim: its dots, one instance each. */

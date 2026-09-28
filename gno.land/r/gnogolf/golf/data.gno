@@ -426,10 +426,7 @@ func Versions(alias string) string {
 // BestOf is a player's best finished round on a hole in a mode, 0 if none.
 func BestOf(hole, mode string, player address) int {
 	e, m := readHole(hole), modeOf(mode)
-	if v := e.bests(m).Get(player.String()); v != nil {
-		return v.(int)
-	}
-	return 0
+	return bestStrokes(e.bests(m).Get(player.String()))
 }
 
 // StandingOf is a player's course-wide standing in a mode: how many current

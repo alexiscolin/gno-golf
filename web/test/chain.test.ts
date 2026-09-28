@@ -223,6 +223,8 @@ test("roundURL links a named player's round on a hole, # for a bad hole id or ad
   const chain = makeChain();
   assert.equal(chain.roundURL("garden/1", ADDR1), new URL(`${REALM_PATH}:garden/1/${ADDR1}`, chain.web + "/").href);
   assert.equal(chain.roundURL("not a hole!", ADDR1), "#");
+  assert.equal(chain.userURL(ADDR1), new URL(`/u/${ADDR1}`, chain.web + "/").href);
+  assert.equal(chain.userURL("javascript:alert(1)"), "#");
   assert.equal(chain.roundURL("garden/1", "not-an-address"), "#");
 });
 
@@ -452,6 +454,34 @@ test("holeRank reads one player's place on a hole", async () => {
   assert.equal((await chain.holeRank("garden/1", "assisted", ADDR1)).rank, 1);
 });
 
+test("ghost reads a best with its round, null for none, and never asks for a bad address", async () => {
+  const chain = makeChain();
+  const asked: string[] = [];
+  const GHOST = { version: 1, hole: "garden/1", mode: "pro", player: ADDR1, strokes: 2, period: 5912345, shots: "12.5000,6.2000,0;0.0000,1.0000,0" };
+  let reply: unknown = GHOST;
+  setFetch((url) => (asked.push(decoded(url).expr), qevalReply(reply)));
+  assert.deepEqual(await chain.ghost("garden/1", "pro", ADDR1), GHOST);
+  assert.match(asked[0], /Ghost\("garden\/1", "pro", address\("g1/);
+  reply = null;
+  assert.equal(await chain.ghost("garden/1", "pro", ADDR1), null);
+  reply = { ...GHOST, strokes: 0 };
+  await assert.rejects(chain.ghost("garden/1", "pro", ADDR1), "a best of 0 strokes is no best");
+  reply = { ...GHOST, strokes: 1 };
+  await assert.rejects(chain.ghost("garden/1", "pro", ADDR1), "one shot a stroke");
+  reply = { ...GHOST, mode: "assisted" };
+  assert.equal(await chain.ghost("garden/1", "pro", ADDR1), null, "not the mode asked for: none");
+  assert.equal(await chain.ghost("garden/1", "pro", 'g1") + x'), null);
+  assert.equal(asked.length, 5, "a bad address is never asked");
+});
+
+test("owner reads the realm's owner as an address, and refuses anything else", async () => {
+  const chain = makeChain();
+  setFetch(() => rawReply(`("${ADDR1}" .uverse.address)`));
+  assert.equal(await chain.owner(), ADDR1);
+  setFetch(() => rawReply(`("not an address" .uverse.address)`));
+  await assert.rejects(chain.owner());
+});
+
 test("holeLeaderboard pages one hole's board", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply(HOLE_BOARD_REPLY));
@@ -496,6 +526,18 @@ test("resolveName resolves a registered name to its address, '' for none", async
 
   setFetch(() => strReply(""));
   assert.equal(await chain.resolveName("nobody"), "");
+});
+
+test("bestsOf: one read, each hole's bests; only the holes asked, strictly read; none for a bad address, no network call", async () => {
+  const chain = makeChain();
+  setFetch(() => { throw new Error("should not be called"); });
+  assert.equal((await chain.bestsOf(["garden/1/v1"], "not-an-address")).size, 0);
+  setFetch((url) => { assert.ok(decoded(url).expr.includes(`BestOf(h, "pro", address("${ADDR1}"))`)); return strReply("garden/1/v1 3 0\ngarden/2/v1 0 4\nnot/asked 2 2\n"); });
+  assert.deepEqual([...(await chain.bestsOf(["garden/1/v1", "garden/2/v1"], ADDR1))], [["garden/1/v1", { pro: 3, assisted: 0 }], ["garden/2/v1", { pro: 0, assisted: 4 }]]);
+  // a line not as written (no best, too many strokes, not a number, a field more) is dropped
+  const odd = ["garden/1/v1 0 0", "garden/2/v1 61 0", "garden/3/v1 x 2", "garden/4/v1 -1 2", "garden/5/v1 02 2", "garden/6/v1 2 2 2", "garden/7/v1 2"];
+  setFetch(() => strReply(odd.join("\n")));
+  assert.equal((await chain.bestsOf(odd.map((l) => l.split(" ")[0]), ADDR1)).size, 0);
 });
 
 test("nameOf short-circuits an invalid address, no network call; resolves a valid one", async () => {
@@ -635,6 +677,13 @@ test("unquote refuses a reply that isn't a quoted string", async () => {
   const chain = makeChain();
   setFetch(() => rawReply("(5 int64)")); // resolveName expects a string-typed print
   await assert.rejects(chain.resolveName("nesquimo"), (e) => errorKind(e) === "chain" && /is not a string/.test((e as Error).message));
+});
+
+test("an empty string, as the VM prints it — ( string) — reads as \"\"", async () => {
+  const chain = makeChain();
+  setFetch(() => rawReply("( string)"));
+  assert.equal(await chain.resolveName("nobody"), "");
+  assert.equal((await chain.bestsOf(["garden/1/v1"], ADDR1)).size, 0);
 });
 
 test("qeval refuses a string reply whose contents aren't JSON", async () => {

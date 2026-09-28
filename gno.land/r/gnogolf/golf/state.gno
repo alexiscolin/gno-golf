@@ -658,18 +658,20 @@ func Leaderboard(mode string) string {
 // eachRanked walks a mode's top ten: the first named players of its ranking,
 // with their names. A name deleted since is skipped, not shown.
 func eachRanked(m int, fn func(r *row, name string)) {
-	n := 0
+	n, walked := 0, 0
 	ranks[m].Iterate("", "", func(_ string, v any) bool {
+		walked++ // (names deleted since are skipped: the walk still stops, maxWalked rows at most)
 		p := v.(string)
-		name := nameOf(p)
-		if name == "" {
-			return false
+		if name := nameOf(p); name != "" {
+			fn(totals[m].Get(p).(*row), name)
+			n++
 		}
-		fn(totals[m].Get(p).(*row), name)
-		n++
-		return n >= topSize
+		return n >= topSize || walked >= maxWalked
 	})
 }
+
+// maxWalked is how many rows a top ten walks at most, the deleted names it skips counted.
+const maxWalked = 4 * topSize
 
 // strokesRow and standingRow are the rows the reads list: a player and a
 // best, or a player and a standing.
@@ -741,6 +743,29 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 	return sb.String()
 }
 
+// Ghost is a player's best finished round on a hole in a mode, with the
+// period it was played in and its shots, or null if none: what a duel races.
+// It replays stroke by stroke in its own weather, SimulateRoundIn for the
+// first stroke, then SimulateFrom from each rest. Named or not, like Bests.
+func Ghost(hole, mode string, player address) string {
+	e, m := readHole(hole), modeOf(mode)
+	v := e.bests(m).Get(player.String())
+	if v == nil {
+		return "null"
+	}
+	// "<strokes> <period> <shots>", as bestOf writes it (bestStrokes refuses anything else)
+	strokes, f := bestStrokes(v), strings.SplitN(v.(string), " ", 3)
+	if len(f) < 3 {
+		panic(errBest + v.(string))
+	}
+	period, err := strconv.ParseInt(f[1], 10, 64)
+	if err != nil {
+		panic(errBest + v.(string))
+	}
+	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(player.String()) +
+		`,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(f[2]) + "}"
+}
+
 // HoleRank is a player's place on a hole's board in a mode: "rank" 1 is the
 // top, out of "of" named players, with their best. It is 0 for a player the
 // board does not hold: unnamed, or no finish there. Like Rank, a name deleted
@@ -748,9 +773,8 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 func HoleRank(hole, mode string, player address) string {
 	e, m := readHole(hole), modeOf(mode)
 	p := player.String()
-	rank, strokes := 0, 0
-	if v := e.bests(m).Get(p); v != nil {
-		strokes = v.(int)
+	rank, strokes := 0, bestStrokes(e.bests(m).Get(p))
+	if strokes > 0 {
 		if k := boardKey(strokes, p); e.board(m).Has(k) {
 			rank = e.board(m).index(k) + 1
 		}
@@ -847,7 +871,7 @@ func Bests(hole, mode, players string) string {
 	n := 0
 	for _, p := range friends(players) {
 		if v := e.bests(m).Get(p); v != nil {
-			sb.WriteString(sep(n) + strokesRow(p, v.(int)))
+			sb.WriteString(sep(n) + strokesRow(p, bestStrokes(v)))
 			n++
 		}
 	}
@@ -885,7 +909,7 @@ func Records(hole, mode, after string, limit int) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
 	next := page(e.bests(m).Iterate, after, limit, func(i int, p string, v any) {
-		sb.WriteString(sep(i) + strokesRow(p, v.(int)))
+		sb.WriteString(sep(i) + strokesRow(p, bestStrokes(v)))
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()

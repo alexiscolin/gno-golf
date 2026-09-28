@@ -205,6 +205,8 @@ export interface Finish {
   timed: boolean;
   cups: ReturnType<typeof cupTotals>;
   weathers: readonly string[];
+  /** a duel's finish: its result, the best raced, whether it was one's own or of the other aim mode */
+  duel?: { result: "win" | "loss" | "tie"; theirs: number; self: boolean; mixed: boolean } | null;
 }
 /** A badge: a moment to collect. family: its medal's colour; ok: earned by a
  *  finish (none: given by a save, the chain's two). */
@@ -223,6 +225,8 @@ export const BADGES: readonly Badge[] = [
   { id: "first", name: "Number one", need: "Take first place on a hole's board", family: "chain" },
   { id: "perfect", name: "Perfect cup", need: "A whole cup, every hole under par", family: "skill", ok: (f) => CUPS.some((c) => f.cups[c].all && f.cups[c].under === f.cups[c].done) },
   { id: "ace", name: "Hole in one", need: "Hole a ball in one stroke", family: "skill", ok: (f) => f.strokes === 1 },
+  // (another player's ghost at par or under, in the same aim mode: the cheap wins don't count)
+  { id: "ghost", name: "Ghost buster", need: "Beat another player's ghost at par or under", family: "skill", ok: (f) => !!f.duel && f.duel.result === "win" && !f.duel.self && !f.duel.mixed && f.duel.theirs <= f.par },
   { id: "weathers", name: "All weathers", need: "Finish a hole in all six weathers", family: "weather", ok: (f) => WEATHERS.every((k) => f.weathers.includes(k)) },
   { id: "eagle", name: "Eagle eye", need: "Two under par on a hole", family: "skill", ok: (f) => f.strokes <= f.par - 2 },
   { id: "pro", name: "Pro shot", need: "Under par with no aim line (Pro)", family: "skill", ok: (f) => f.pro && f.strokes < f.par },
@@ -232,6 +236,8 @@ export const BADGES: readonly Badge[] = [
   { id: "fog", name: "Fog walker", need: "Par or better in the fog", family: "weather", ok: (f) => f.kind === "fog" && f.strokes <= f.par },
   { id: "chain", name: "On the chain", need: "Save a round on-chain", family: "chain" },
   { id: "snail", name: "Never give up", need: "Finish a hole in 15 strokes or more", family: "fun", ok: (f) => f.strokes >= 15 },
+  // (as Ghost buster: another player's ghost, the same aim mode; a mixed race earns nothing, ADR-004)
+  { id: "sport", name: "Good sport", need: "Finish a duel you lost to another player", family: "fun", ok: (f) => !!f.duel && f.duel.result === "loss" && !f.duel.self && !f.duel.mixed },
 ];
 /** The badges a finish earns that are not earned yet, rarest first. */
 export const badgesFor = (f: Finish, had: readonly string[]) => BADGES.filter((b) => b.ok && !had.includes(b.id) && b.ok(f)).map((b) => b.id);

@@ -10,14 +10,14 @@ interface Friend {
 export const loadFriends = (): Friend[] => {
   try {
     const f: unknown = JSON.parse(localStorage.getItem(FRIENDS) || "[]");
-    return Array.isArray(f) ? f.filter((x: unknown): x is Friend => !!x && typeof x === "object" && "addr" in x && isAddress(x.addr)) : [];
+    return Array.isArray(f) ? f.filter((x: unknown): x is Friend => !!x && typeof x === "object" && "addr" in x && isAddress(x.addr) && (!("name" in x) || typeof x.name === "string")) : [];
   } catch {
     return [];
   }
 };
 export const saveFriends = (f: Friend[]) => {
   try {
-    localStorage.setItem(FRIENDS, JSON.stringify(f.slice(0, 49)));
+    localStorage.setItem(FRIENDS, JSON.stringify(f.slice(-49))); // (the latest kept: one added now is never the one dropped)
   } catch {}
   return f;
 };

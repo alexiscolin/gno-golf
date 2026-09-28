@@ -96,7 +96,8 @@ export function hullOf(w = 0.055, color: number = C.ink) {
 }
 const hull = hullOf(0.055);
 // the gnome is seen up close in the picker: a scenery-weight line is too heavy
-const hullThin = hullOf(0.028);
+export const THIN_HULL = 0.028;
+const hullThin = hullOf(THIN_HULL);
 
 // ---------------------------------------------------------------- motion
 //
@@ -500,15 +501,15 @@ export function setFade(mat: THREE.Material, o: number) {
   mat.depthWrite = !t;
 }
 /** An ink outline that can fade with its solid (the shared hull cannot). */
-const fadeHull = () => fadeable(pushHull(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), 0.055));
+const fadeHull = (w: number) => fadeable(pushHull(new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide }), w));
 /**
  * Gives a piece over the lane its own fadeable materials (clones of what it
  * draws with, one fadeable outline for all its hulls), so it can fade out of
  * the camera's way without fading the shared palette; marks it live. A
- * see-through material keeps its opacity as its base (setFade). Returns the
- * materials, for fadeLoop.
+ * see-through material keeps its opacity as its base (setFade); hull: the
+ * outline's width. Returns the materials, for fadeLoop.
  */
-export function ownFade(piece: THREE.Object3D) {
+export function ownFade(piece: THREE.Object3D, hull = 0.055) {
   const own = new Map<THREE.Material, THREE.Material>();
   let ink: THREE.MeshBasicMaterial | null = null;
   piece.traverse((o) => {
@@ -516,7 +517,7 @@ export function ownFade(piece: THREE.Object3D) {
     // a plain outline: one fadeable hull for all of them; a swaying one (its
     // own shader) is cloned like a solid, so it keeps swaying with it
     const was = o.material as THREE.Material;
-    if (was.side === THREE.BackSide && !String(md(was).hook).startsWith("sway")) return void (o.material = ink ||= fadeHull());
+    if (was.side === THREE.BackSide && !String(md(was).hook).startsWith("sway")) return void (o.material = ink ||= fadeHull(hull));
     if (!own.has(was)) {
       const m = fadeable(was.clone());
       // clone() drops the shader hook (sway, a hull's push): keep it

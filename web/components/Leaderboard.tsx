@@ -5,12 +5,13 @@ import type { Snapshot } from "@/lib/engine";
 import { isAddress, type Chain } from "@/lib/chain";
 import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
 import { vsPar } from "@/lib/card";
+import { SHARE_TAGS, siteURL } from "@/lib/site";
 import { sound } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
-import { messageOf, shortAddr, holeLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied } from "@/components/common";
+import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied } from "@/components/common";
 
 // The leaderboards: the sheet (this hole, the course, friends), the top three
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -43,7 +44,16 @@ export interface BoardProps {
   mode?: Mode;
   /** not connected: the way to (the Adena checklist) */
   onConnect?: () => void;
+  /** a duel against a player's best on this hole (their ghost), from the tee */
+  onRace?: (player: string) => void;
 }
+/** A board row's way into a duel: race that player's ghost here (yours: your best). */
+const RaceButton = ({ player, me, strokes, onRace }: { player: string; me?: string | null; strokes: number; onRace?: (p: string) => void }) =>
+  onRace ? (
+    <Button variant="primary" className="lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
+      {player === me ? "Race your best" : "Race ghost"}
+    </Button>
+  ) : null;
 /** "Connect Adena", where a board asks for it: a link to the checklist, or the words alone. */
 const ConnectLink = ({ onConnect }: { onConnect?: () => void }) =>
   onConnect ? <button className="linkish" onClick={onConnect}>Connect Adena</button> : <>Connect Adena</>;
@@ -101,7 +111,7 @@ const FlagMark = ({ f }: { f: Flag | false | undefined }) =>
  * You and your friends, on this hole and across the course, in the mode shown.
  * Read with Bests / Standings, which rank anyone, named or not.
  */
-function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: BoardProps & { inHole?: boolean }) {
+function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace }: BoardProps & { inHole?: boolean }) {
   const [friends, setFriends] = useState(loadFriends);
   // (a failed read shows as no rows)
   const [hole, setHole] = useState<(Partial<Bests> & { rows: readonly StrokesRow[] }) | null>(null);
@@ -138,7 +148,8 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: Board
     setAdding("");
   };
   const drop = (addr: string) => setFriends(saveFriends(loadFriends().filter((f) => f.addr !== addr)));
-  const invite = me && `${window.location.origin}${window.location.pathname}?friend=${me}`;
+  // (a dare link: whoever opens it adds you as a friend and races your ghost where you have one)
+  const invite = me && siteURL(inHole ? holeLink(s, "", me) : dareLink(me));
   const rows = <R,>(b: { rows: readonly R[] } | null, pick: (a: R, b: R) => number) => (b ? [...b.rows].sort(pick) : null);
   const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
   return (
@@ -156,6 +167,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: Board
               <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
               <span className="lb__holes">{strokesWord(r.strokes)}</span>
               <strong>{vsPar(r.strokes - ((hole && hole.par) || parHere(s)))}</strong>
+              <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
             </li>
           ))}
         </ol>
@@ -198,7 +210,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: Board
           className="linkish friends__invite"
           onClick={() => void copy(invite)}
         >
-          {copied ? "Link copied — send it to a friend" : "Copy an “add me as a friend” link"}
+          {copied ? "Copied: they race your ghost, and you join their friends" : "Copy my dare link"}
         </button>
       )}
       </section>
@@ -210,7 +222,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect }: Board
  * The leaderboards, in a sheet: this hole's best rounds, and the whole
  * course's. Read from the chain when the sheet opens, not before.
  */
-export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true, onConnect }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean }) {
+export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true, onConnect, onRace }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean }) {
   const [claimed, setClaimed] = useState(0); // rounds just ranked: the board is read again
   // "This hole" is the hole being played: opened from the cups, there is none
   const [tab, setTab] = useState<"friends" | "hole" | "course">(inHole ? "hole" : "course");
@@ -245,7 +257,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
             Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
           </p>
         )}
-        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} />}
+        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={inHole ? onRace : undefined} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={tab === "hole" ? onRace : undefined} />}
         <p className="real__fine">Only rounds saved on-chain appear here.</p>
     </Sheet>
   );
@@ -321,7 +333,7 @@ type Placed = StrokesRow & { holes?: number; at: number };
  * what proves it, and the connected player sees their own place, pinned under
  * the list when it is further down, with a way to share it.
  */
-export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect }: BoardProps & { kind: "hole" | "course" }) {
+export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace }: BoardProps & { kind: "hole" | "course" }) {
   const PAGE = 20;
   const id = s.id || "";
   const [rows, setRows] = useState<readonly Placed[] | null>(null);
@@ -408,7 +420,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect }: Board
         <span className="lb__holes">
           {r.holes}/{head ? head.holes : "–"} holes
         </span>
-        <strong>{r.strokes}</strong>
+        <strong>{r.strokes}<small> stroke{r.strokes === 1 ? "" : "s"}</small></strong>
       </>
     );
   // your place, listed or further down: said once under the list, with the game's share
@@ -434,6 +446,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect }: Board
                 <FlagMark f={showAll && flags[r.player]} />
               </span>
               {score(r)}
+              <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
             </li>
           ))}
           {next > 0 && (
@@ -466,9 +479,11 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect }: Board
           <span>
             You are <b>#{myPlace.at}</b> of {myPlace.of} {kind === "hole" ? `on ${s.name}` : "on the course"}
           </span>
+          {/* a place on a board is a saved best: the link dares (friends race the ghost) */}
           <Share
-            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place. #gnoland @_gnoland`}
-            link={kind === "hole" ? holeLink(s, "") : ""}
+            label="Dare a friend"
+            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place: race my ghost, free to play, no wallet needed.${SHARE_TAGS}`}
+            link={kind === "hole" ? holeLink(s, "", me || "") : dareLink(me || "")}
           />
         </div>
       )}
@@ -674,14 +689,14 @@ function ClaimRounds({ chain, me, mode, onDone }: { chain: Chain; me: string; mo
 
 /** Your place on the hole's board once the round is saved: shown by the score, and in what is shared. */
 export function useSavedPlace(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean) {
-  const [p, setP] = useState<{ rank: number; of: number } | null>(null);
+  const [p, setP] = useState<{ rank: number; of: number; id: string } | null>(null); // (id: the hole it is on)
   const id = (s && s.official && s.id) || "";
   useEffect(() => {
     setP(null);
     if (!chain || !me || !id || !saved) return;
     let live = true;
     // the round was just read back: the board has it too
-    chain.holeRank(id, mode, me).then((r) => live && r.rank > 0 && setP(r)).catch(() => {});
+    chain.holeRank(id, mode, me).then((r) => live && r.rank > 0 && setP({ ...r, id })).catch(() => {});
     return () => void (live = false);
   }, [chain, me, id, mode, saved]);
   return p;

@@ -20,7 +20,8 @@ own records and board, but in no cup and out of the course ranking.
 ## Who can change what
 
 The realm has one role, its **owner**: the account that deployed it (captured
-once, when the realm is created). Every owner check is on the immediate caller
+once, when the realm is created). The web client sends its tips (Support) to
+this address, as `Owner()` reads it, so a new owner receives the next ones. Every owner check is on the immediate caller
 (`cur.Previous().Address()`), never on the transaction's signer, so a realm the
 owner happens to call can't act in the owner's name.
 
@@ -574,8 +575,8 @@ Only players with a gno.land name (`r/sys/users`) enter the boards and the
 course ranking: an address is free, a name is not, so a script can't fill the
 boards with a thousand accounts. Every finish is still kept, named or not. A
 player who takes a name later ranks at their next finish, or at once with
-[`Claim`](#claimcur-realm-int). `Bests`, `Standings`, `Records` and `Players`
-read anyone. A hole's own record (`best`, shown on the hub and its pages) is a
+[`Claim`](#claimcur-realm-int). `Bests`, `Standings`, `Records`, `Players` and
+`Ghost` read anyone. A hole's own record (`best`, shown on the hub and its pages) is a
 named player's too.
 
 The course ranking adds up each player's best on each **current course hole**:
@@ -669,6 +670,18 @@ Each given player's course-wide standing, with the same list rules as
 The same as plain values: a player's best on a hole (0 if none), and their
 holes and strokes over the current course (0, 0 if none).
 
+#### `Ghost(hole, mode string, player address) string`
+
+A player's best on a hole in a mode with the round that made it, named or
+not, or `null`: what a duel races ([ADR-004](../adr/adr-004-duels.md)). A best
+keeps its period and shots from the save that set it; a worse round or a tie
+leaves them. It replays in its own weather however old: its first stroke with
+`SimulateRoundIn`, each later one with `SimulateFrom` from the `rest` before.
+
+```json
+{"version":1,"hole":"garden/3/v1","mode":"pro","player":"g1…","strokes":2,"period":5912345,"shots":"12.5000,6.2000,0;0.0000,1.0000,0"}
+```
+
 #### `Records(hole, mode, after string, limit int) string`
 
 A page of every player's best on a hole, named or not.
@@ -709,11 +722,11 @@ version's id or an alias.
 
 | path | page |
 |---|---|
-| `""` | the hub: how to play, a card per cup (to its page), both leaderboards (by name), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
-| `<world>` | a cup: its holes by number (par, best, shots played, data link) |
-| `<address>` | the holes that address published, as their current versions |
-| `<hole>` | the hole as a text board, its weather, a `Launch` form, a `Reset` form, and its best rounds per mode |
-| `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked |
+| `""` | the hub: how to play, a card per cup (to its page), both leaderboards (by name, one under the other), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
+| `<world>` | a cup: its holes by number (par, best by name, plays); a word that is no cup is "No such hole" |
+| `<address>` | the community holes that address published, as their current versions |
+| `<hole>` | the hole as a text board, its weather (a wind's heading in degrees), a `Launch` form, a `Reset` form, a link to `Claim`, and its best rounds per mode, each with a `race` link: the 3D game against that best's ghost (its dare link, `&by=`) |
+| `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked; a round whose weather is over says to `Reset` first, and a best links its ghost |
 | `<hole>/data` | a version's provenance, every version of its alias, and its data in hex |
 
 On gnoweb that's `/r/gnogolf/golf`, `/r/gnogolf/golf:garden`,
@@ -814,12 +827,13 @@ Measured on the course holes; treat them as orders of magnitude:
   data, its entry, and the first leaf of each index it opens). A later one
   stores the data (1–3 KB for the course holes) and about 3.2 KB more (its
   entry and index keys): nothing for rounds or records until someone plays.
-  A version's own trees (rounds, bests, board) are B+ trees with leaves of 16,
-  made at their first stroke or finish: the first finisher on a version pays
-  their first leaves (about 17 KB with the round and the standing, measured
-  in a filetest), a later player's first finish about 3.2 KB (1.9 KB on a
-  further hole), at 50 players. The first stroke of a round stores about
+  A version's rounds, bests and board are rows of B+ trees every version
+  shares (32 a leaf), seeded when golf is deployed: no version pays for trees
+  of its own, and a player's first finish pays for their own rows, about
+  3.2 KB (1.9 KB on a further hole), at 50 players. The first stroke of a round stores about
   1.5 KB, a replay after `Reset` nothing. The decoded hole is never stored.
+  A best keeps its round for `Ghost`: about 30 bytes and 18 to 23 a stroke,
+  written only when it improves (a shorter best frees the longer one).
 - **Reads** are free as queries, within the node's query gas limit.
 
 ## Updating after the deploy
@@ -843,7 +857,7 @@ score honest through it.
   shortcut, v1 records archived").
 - **The hub itself** is replaced by a new realm (a sibling path, such as
   `r/gnogolf/golf2`), which can read the v1's public state (`Holes`,
-  `Versions`, `HoleData`, `BestOf`, `StandingOf`, `Records`, `Players`) and
+  `Versions`, `HoleData`, `BestOf`, `Ghost`, `StandingOf`, `Records`, `Players`) and
   carry it over or show it as history. The v1's owner then calls
   `SetSuccessor` once: every v1 page says where the course went, and v1 goes
   on playing. See [deploy-v1.md §9](design/deploy-v1.md).

@@ -123,7 +123,7 @@ func TestRoundCountsStrokesAndFinishes(cur realm, t *testing.T) {
 
 	r = roundIn(count, player)
 	uassert.True(t, r.done, "a shot down the line should hole out")
-	uassert.Equal(t, 1, mustHole(count).bests(pro).Get(player.String()).(int), "the player's best is kept")
+	uassert.Equal(t, 1, bestStrokes(mustHole(count).bests(pro).Get(player.String())), "the player's best is kept")
 }
 
 // TestPlayRoundEqualsTheSameShotsOneByOne is what makes committing a whole hole
@@ -449,7 +449,9 @@ func TestHoleLeaderboardSortsBests(cur realm, t *testing.T) {
 	row := func(p address, n int) string { return ufmt.Sprintf(`{"player":"%s","strokes":%d}`, p.String(), n) }
 	head := `{"version":1,"hole":"` + id + `","mode":"assisted","par":3,"players":3,"finished":4,`
 	uassert.Equal(t, head+`"offset":0,"rows":[`+row(a, 1)+","+row(b, 2)+","+row(c, 3)+`],"next":0}`, HoleLeaderboard(id, "assisted", 0, 10))
-	uassert.True(t, strings.Contains(Render(id), "| 1 | [@hba](/r/gnogolf/golf:"+id+"/"+a.String()+") | 1 |\n| 2 | [@hbb]"), "the page shows the best rounds, best first")
+	page := Render(id)
+	uassert.True(t, strings.Contains(page, "| 1 | [@hba](/r/gnogolf/golf:"+id+"/"+a.String()+") | 1 | [race](") && strings.Contains(page, " |\n| 2 | [@hbb]"), "the page shows the best rounds, best first, each a ghost to race")
+	uassert.True(t, strings.Contains(page, "&by="+a.String()+")"), "a race is the game's dare link on that player")
 	// a page at a time: next is where the following page starts
 	uassert.Equal(t, head+`"offset":1,"rows":[`+row(b, 2)+`],"next":2}`, HoleLeaderboard(id, "assisted", 1, 1))
 	// an offset past the board is the board's end, however large
@@ -507,10 +509,122 @@ func TestOnlyNamedPlayersRank(cur realm, t *testing.T) {
 	id := courseHole(cur, 33)
 	testing.SetRealm(testing.NewUserRealm(stranger))
 	PlayRoundAt(cross(cur), id, "0,1", Period())
-	uassert.Equal(t, 1, mustHole(id).bests(assisted).Get(stranger.String()).(int), "the finish is kept")
+	uassert.Equal(t, 1, bestStrokes(mustHole(id).bests(assisted).Get(stranger.String())), "the finish is kept")
 	uassert.Equal(t, 0, mustHole(id).rec(assisted).best, "but holds no public record: records are named players' too")
 	uassert.False(t, strings.Contains(HoleLeaderboard(id, "assisted", 0, 100), stranger.String()), "not on the hole's board")
 	uassert.False(t, strings.Contains(Leaderboard("assisted"), stranger.String()), "not on the course's board")
 	uassert.True(t, strings.Contains(Bests(id, "assisted", " g1nobody, "+stranger.String()), `"player":"`+stranger.String()+`"`), "friends see it")
 	uassert.True(t, strings.Contains(Standings("assisted", stranger.String()), stranger.String()), "and its standing")
+}
+
+// replayAs plays a round afresh on a hole as p: Reset, then PlayRound.
+func replayAs(cur realm, p address, id, shots string) {
+	testing.SetRealm(testing.NewUserRealm(p))
+	Reset(cross(cur), id)
+	testing.SetRealm(testing.NewUserRealm(p))
+	PlayRound(cross(cur), id, shots)
+}
+
+// jfield is the raw value of a field of a flat JSON object: a number, or a
+// string's inside.
+func jfield(j, k string) string {
+	v := j[strings.Index(j, `"`+k+`":`)+len(k)+3:]
+	if v[0] == '"' {
+		return v[1:strings.Index(v[1:], `"`)+1]
+	}
+	return v[:strings.IndexAny(v, ",}]")]
+}
+
+// ghostHoles replays a player's Ghost as a duel does, from its own JSON: the
+// first stroke with SimulateRoundIn, each later one with SimulateFrom from the
+// rest before, all in the ghost's period. It reports whether the last stroke
+// holes, and only the last.
+func ghostHoles(id, mode string, p address) bool {
+	gj := Ghost(id, mode, p)
+	period, _ := strconv.ParseInt(jfield(gj, "period"), 10, 64)
+	shots := strings.Split(jfield(gj, "shots"), ";")
+	sim := SimulateRoundIn(id, shots[0], period)
+	for i := 1; i < len(shots); i++ {
+		if strings.Contains(sim, `"holed":true`) {
+			return false // holed early: not the round it was
+		}
+		rest := strings.Split(strings.SplitN(sim[strings.Index(sim, `"rest":[`)+8:], "]", 2)[0], ",")
+		x, _ := strconv.ParseFloat(rest[0], 64)
+		y, _ := strconv.ParseFloat(rest[1], 64)
+		sim = SimulateFrom(id, x, y, shots[i], i, period)
+	}
+	return strings.Contains(sim, `"holed":true`)
+}
+
+// TestGhostKeepsTheBestRound: a best keeps its period and shots, a worse round
+// or a tie leaves them, a better one replaces them, and the best replays
+// stroke by stroke from Ghost's own answer in its own period, long after, to
+// the same strokes: what a duel races.
+func TestGhostKeepsTheBestRound(cur realm, t *testing.T) {
+	id := mine(cur, "ghost", cupHole("garden", 1, "Ghost"))
+	racer := testutils.TestAddress("racer")
+	uassert.Equal(t, "null", Ghost(id, "assisted", racer), "no best, no ghost")
+	replayAs(cur, racer, id, "0,0.001;0,1")
+	period := Period()
+	two := ufmt.Sprintf(`"strokes":2,"period":%d,"shots":"0.0000,0.0010,0;0.0000,1.0000,0"}`, period)
+	urequire.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), Ghost(id, "assisted", racer))
+	uassert.Equal(t, "null", Ghost(id, "pro", racer), "a best is kept in its own mode")
+
+	replayAs(cur, racer, id, "0,0.001;0,0.001;0,1")
+	replayAs(cur, racer, id, "0,0.002;0,1")
+	uassert.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), "a worse round and a tie leave the ghost: "+Ghost(id, "assisted", racer))
+	uassert.Equal(t, 2, BestOf(id, "assisted", racer))
+
+	testing.SkipHeights(2000)
+	uassert.True(t, Period() > period+2, "the ghost's weather is over")
+	uassert.True(t, ghostHoles(id, "assisted", racer), "the ghost holes in its own strokes, long after")
+
+	replayAs(cur, racer, id, "0,1")
+	uassert.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), ufmt.Sprintf(`"strokes":1,"period":%d,"shots":"0.0000,1.0000,0"}`, Period())), "a better round is the ghost now")
+}
+
+// TestGhostOnATimedHole: each stroke of a ghost meets the pieces of its own
+// stroke number, at its own tick, so it replays to the round it was.
+func TestGhostOnATimedHole(cur realm, t *testing.T) {
+	id := mine(cur, "ghosttimed", timedHole())
+	racer := testutils.TestAddress("racer")
+	// stroke 1 meets the gate (a pulse every 2 strokes): a nudge there, then through
+	replayAs(cur, racer, id, "0,0.001,3;0,0.001,7;"+holeShot+",11")
+	urequire.Equal(t, 3, BestOf(id, "assisted", racer))
+	uassert.True(t, strings.Contains(Ghost(id, "assisted", racer), `"shots":"0.0000,0.0010,3;0.0000,0.0010,7;0.0000,7.5000,11"`), Ghost(id, "assisted", racer))
+	testing.SkipHeights(100)
+	uassert.True(t, ghostHoles(id, "assisted", racer), "the timed ghost holes in its own strokes")
+}
+
+// TestARoundsPageSaysWhatComesNext: a round under way says its strokes right
+// for one, and once its weather is over, that it must be Reset first.
+func TestARoundsPageSaysWhatComesNext(cur realm, t *testing.T) {
+	id := mine(cur, "roundpage", cupHole("garden", 1, "Page"))
+	walker := testutils.TestAddress("walker")
+	replayAs(cur, walker, id, "0,0.001")
+	page := Render(id + "/" + walker.String())
+	uassert.True(t, strings.Contains(page, "1 stroke so far") && !strings.Contains(page, "Its weather is over"), page)
+	testing.SkipHeights(200)
+	uassert.True(t, strings.Contains(Render(id+"/"+walker.String()), "Its weather is over: Reset (below) before the next shot."))
+}
+
+// TestABestReadsAsItIsWritten pins the one way a best is kept: bestOf writes
+// it, bestStrokes and Ghost read it, and anything else is refused (a best
+// read by the drain on every finish must never be malformed).
+func TestABestReadsAsItIsWritten(cur realm, t *testing.T) {
+	r := &round{strokes: 3, period: 5912345, shots: "12.5000,6.2000,0;0.0000,1.0000,4;-359.9999,10.0000,1023"}
+	uassert.Equal(t, 3, bestStrokes(bestOf(r)))
+	uassert.Equal(t, 0, bestStrokes(nil), "no best is 0")
+	uassert.PanicsContains(t, cur, "a best not as bestOf writes it", func() { bestStrokes("3") })
+	uassert.PanicsContains(t, cur, "a best not as bestOf writes it", func() { bestStrokes("x 1 0,1,0") })
+}
+
+// TestNamesAreCheckedAsTheRegistrarWritesThem: the pages print names in links.
+func TestNamesAreCheckedAsTheRegistrarWritesThem(t *testing.T) {
+	for _, ok := range []string{"a", "nym-birdie007", "test_1"} {
+		uassert.True(t, nameish(ok), ok)
+	}
+	for _, bad := range []string{"", "1abc", "Abc", "a b", "a](x)", "a<b", strings.Repeat("a", 65)} {
+		uassert.False(t, nameish(bad), bad)
+	}
 }

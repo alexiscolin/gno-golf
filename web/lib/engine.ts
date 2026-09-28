@@ -25,9 +25,10 @@ import {
 import { BALL_R } from "./terrain";
 import { makeCamera } from "./engine/camera";
 import { pace, slowFrames, frameMs, SLOW_KEY } from "./engine/pace";
-import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
+import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
-import type { Extras, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
+import { makeRival } from "./engine/rival";
+import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
 import type { WeatherZone } from "./scene/weather";
@@ -253,6 +254,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       view: g.view,
       gfx: gfxMode, // the graphics setting, and what it gives on this device
       tier,
+      ...rival.state(), // a duel's rival: their strokes replayed so far (null: no duel), and their ball in
+      done: !!g.done, // no more shots (holed, even before the banner)
     });
 
   // ------------------------------------------------------------- rendering
@@ -376,7 +379,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const gap = prevRaf ? now - prevRaf : 0;
     prevRaf = now;
     if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now), (budget = 0);
-    const busy = promo.on || g.flying || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
+    const busy = promo.on || g.flying || rival.busy() || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
     if (blurred && !busy) return (last = now), (budget = 0);
     // moving: the sway, water, weather and decor (all still under reduced
     // motion), or timed pieces (their clock runs under reduced motion too)
@@ -407,7 +410,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       return false;
     });
     if (g.course) g.course.userData.tick(now / 1000);
-    if (!g.flying && g.course) {
+    if (!g.flying && !rival.busy() && g.course) {
       // at rest and while aiming the pieces move slowly enough to read and to
       // time (3.5 substeps a second, 1.5 with reduced motion); the replay
       // follows the path's own steps. The chain only sees the tick at release.
@@ -450,6 +453,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const floor = BALL_R + ground(ball.position.x, ball.position.z);
     ball.userData.shade.position.y = floor - ball.position.y - BALL_R + 0.02;
     rp.offWalls(); // and clear of the walls he runs along
+    rival.frame();
     if (!g.flying) {
       // at rest on a deck that moves (a seesaw), he rides it
       if (g.course && g.course.userData.lifts && !g.done && !g.holed) ball.position.y = floor; // never a holed ball, it stays down in the cup
@@ -554,6 +558,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       if (!g.list.some((h) => h.id === id)) return load(s.next);
     }
 
+    if (id !== g.id) rival.race(null); // a duel is on one hole
     g.id = id;
     g.failed = null;
     // the cup follows the hole played (Back to another cup's hole, a link): a
@@ -802,6 +807,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       if (ask) void showExtras();
       if (ask && stale()) void freshWeather();
     }
+    rival.reset(); // the ghost back on the tee too, beside the gnome now there
     void publish();
   }
 
@@ -845,6 +851,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   window.addEventListener("pointermove", cam.hover);
   const rp = makeReplay(E);
   E.landing = rp.landing;
+  // a duel's ghost (ADR-004): another player's best, a stroke after each of the player's
+  const rival = makeRival(E, { showClock, restTimed, told: () => void publish(), warm: () => void warm(), gnome: () => gnomeId });
+  E.rivalAt = rival.at;
   const aimer = makeAimer(E);
   const { preview, dropAim, strokeFrom, ghosts, known } = aimer;
   // the pull let go of (or dropped): nothing aimed, the HUD told
@@ -930,6 +939,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!ev.isPrimary) return onCancel();
     if (ev.button > 0) return;
     if (g.flying || g.done) return;
+    rival.skip(); // a press that starts an aim ends the ghost's turn
     cam.finishGlide(); // the intro glide, if still on: finished now, quickly
     // a new press takes over whatever aim was held (a keyboard aim, a lost pull)
     dragging = true;
@@ -964,7 +974,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   canvas.setAttribute("aria-label", "Course. Arrow keys aim and set the power, Space shoots.");
   const onKey = (ev: KeyboardEvent) => {
     if (g.flying || g.done || !g.s) return;
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) cam.finishGlide();
+    // an aim key ends the ghost's turn, as a press does
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) (rival.skip(), cam.finishGlide());
     const step = ev.shiftKey ? 1 : 4;
     if (!g.aiming && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
       g.aiming = dragging = true;
@@ -1111,13 +1122,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     let expect = 0;
     for (let i = 0; i + 1 < res.path.length; i++) expect += Math.max(MS_PER_STEP, (Math.hypot(res.path[i + 1][0] - res.path[i][0], res.path[i + 1][1] - res.path[i][1]) / SHOW_SPEED) * 1000);
     const budget = 3500 + expect * 1.5;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = await Promise.race([
-      rp.replay(res.path, res.holed, res.air, res.cause).then(() => false, (err: unknown) => (console.warn("gnogolf: the replay threw", err), true)),
-      new Promise<boolean>((r) => (timer = setTimeout(() => r(true), budget))),
-    ]);
-    clearTimeout(timer);
-    if (late) {
+    if (await outlived(rp.replay(res.path, res.holed, res.air, res.cause), budget)) {
       cut++; // every animation of this replay stops
       console.warn(`gnogolf: replay cut after ${budget | 0} ms (path of ${res.path.length} steps)`);
     }
@@ -1127,7 +1132,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const last = res.path[res.path.length - 1];
     g.ball = { x: last[0], y: last[1] };
     g.flying = false;
-    void showExtras(); // a timed hole changes for the next stroke
+    // the duel's ghost answers among this stroke's pieces; then a timed hole
+    // changes for the next stroke (at once without a duel)
+    const answered = rival.turn(g.shots.length - 1, res.holed);
+    void answered.finally(() => void showExtras());
     // a jump or a bounce may have ended mid-air: put him on the ground
     if (!res.holed) ball.position.set(last[0], BALL_R + ground(last[0], last[1]), last[1]);
     g.facing = Math.PI / 2; // at rest he looks at the player
@@ -1138,14 +1146,16 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       sound("pop");
       sound("win", g.strokes === 1 ? 1 : 0); // a hole-in-one gets the longer fanfare
       scene.add(burst.group);
-      // let the confetti fly before the banner covers the course
-      holedIn = setTimeout(() => {
-        if (round !== g.round) return;
-        g.holed = true;
-        buzz([30, 60, 45]);
-        sound("cup");
-        void publish();
-      }, 1600);
+      // let the confetti fly (and a duel's ghost play the stroke that ties) before the banner covers the course
+      void answered.then(() => {
+        if (round === g.round) holedIn = setTimeout(() => {
+          if (round !== g.round) return;
+          g.holed = true;
+          buzz([30, 60, 45]);
+          sound("cup");
+          void publish();
+        }, 1600);
+      });
     }
     void publish();
   }
@@ -1176,7 +1186,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     };
     return n(a) - n(b) || a.id.localeCompare(b.id);
   };
-  const inWorld = () => g.list.filter((h) => cupOf(h) === g.world);
+  const inWorld = (w = g.world) => g.list.filter((h) => cupOf(h) === w);
 
   /**
    * The hole a link names: a realm id (?hole=gno.land/r/…, the old form), or a
@@ -1260,10 +1270,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** Play a world: its first hole, and its holes in the menu. */
     setWorld(w: string) {
       loadWorld(w).catch(() => {}); // fetched while the player picks a gnome
-      // (the cup asked for, and its hole on screen already: nothing to load)
-      if (!g.list || (w === g.world && inWorld().some((h) => h.id === g.id))) return;
+      if (!g.list) return;
+      // from its first hole, wherever the last round stopped (a cup entered is a new start)
+      const first = inWorld(w)[0];
       g.world = w;
-      const first = inWorld()[0];
+      if (first && first.id === g.id && !g.shots.length) return; // (on screen, not played yet)
       if (first) void load(first.id);
       else void publish();
     },
@@ -1276,7 +1287,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
      *  direct (a link to this hole): straight to the player's camera. */
     play(direct = false) {
       g.started = true;
-      if (!direct) return void (closeIn = setTimeout(intro, OVERVIEW_MS));
+      if (!direct) {
+        // from the overview whatever came before (a round restarted behind a screen: a duel picked, the same cup again)
+        if (g.view !== "overview") (setView("overview"), cam.jump());
+        return void (closeIn = setTimeout(intro, OVERVIEW_MS));
+      }
       cam.jump(); // in its framing at once, not glided in
       setView(home());
     },
@@ -1350,8 +1365,12 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     clip(run: ClipRun, caption: Caption) {
       const stroke = won;
       if (!stroke || !g.s) return Promise.resolve(null);
-      const hide = () => [ball, aim, band, confetti && confetti.group, cam.marker];
-      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: `${caption.title} · ${caption.score}` }, run));
+      const hide = () => [ball, rival.ball(), aim, band, confetti && confetti.group, cam.marker];
+      return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: caption.challenge || `${caption.title} · ${caption.score}` }, run));
+    },
+    /** Races a ghost on this hole, from the tee (ADR-004); null drops the duel. */
+    race(ghost: Ghost | null) {
+      rival.race(ghost);
     },
     /** Dismiss a shot error and keep playing. */
     clearError() {
@@ -1428,6 +1447,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       cut++; // every animation still running stops at its next frame
       if (g.course) disposeCourse(g.course);
       for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group]) if (o) disposeCourse(o);
+      rival.dispose();
       renderer.dispose();
       pip.remove();
     },

@@ -67,6 +67,11 @@ func Render(path string) string {
 			}
 		}
 	}
+	return noSuch(path)
+}
+
+// noSuch is the page for a path that is no hole, cup or address.
+func noSuch(path string) string {
 	what := "That page"
 	if c := cleanText(path, maxName); c != "" {
 		what = "`" + c + "`"
@@ -111,8 +116,8 @@ func renderHub() string {
 	sb.WriteString("# Gnogolf — mini-golf on-chain\n\n" + moved() +
 		"The course is data its owner published, anyone can add holes of their own, and the chain computes every shot: nobody can fake a score.\n\n" +
 		"> [!TIP] How to play\n" +
-		"> **In 3D:** " + md("open the game", playURL) + ". Aim with a free preview, then record your round in one transaction.\n" +
-		"> **Here, one shot at a time:** open a hole, fill its Launch form (an angle and a power) and sign it with your gno.land wallet (" + md("Adena", "https://adena.app") + "), then add `/<your address>` to the hole's URL to see your ball.\n" +
+		"> **In 3D:** " + md("open the game", playURL) + ". Aim with a free preview, then record your round in one transaction.\n>\n" +
+		"> **Here, one shot at a time:** open a hole, fill its Launch form (an angle and a power) and sign it with your gno.land wallet (" + md("Adena", "https://adena.app") + "), then add `/<your address>` to the hole's URL to see your ball.\n>\n" +
 		"> Only players with a gno.land name are ranked.\n\n")
 	var archived, others []*entry
 	type cup struct {
@@ -157,11 +162,8 @@ func renderHub() string {
 	}
 
 	sb.WriteString("## Leaderboard\n\nEach named player's best finish on each current hole of the course, added up: most holes first, then fewest strokes. " +
-		"Assisted and pro rounds (the aim preview cut short, on the player's word) are ranked apart.\n\n<gno-columns>\n")
+		"Assisted rounds (played with the 3D game's aim line) and pro rounds (without it, on the player's word; every round played on this page is pro) are ranked apart.\n\n")
 	for m := 0; m < modes; m++ {
-		if m > 0 {
-			sb.WriteString("<gno-columns-sep />\n")
-		}
 		sb.WriteString("### " + modeTitles[m] + "\n\n")
 		rows, i := "", 0
 		eachRanked(m, func(r *row, name string) {
@@ -169,12 +171,11 @@ func renderHub() string {
 			rows += "| " + strconv.Itoa(i) + " | " + md("@"+name, "/u/"+name) + " | " + strconv.Itoa(r.holes) + " | " + strconv.Itoa(r.strokes) + " |\n"
 		})
 		if rows == "" {
-			sb.WriteString("_Nobody has finished a hole of the course yet._\n")
+			sb.WriteString("_Nobody has finished a hole of the course yet._\n\n")
 			continue
 		}
-		sb.WriteString("| rank | player | holes | strokes |\n|---|---|---|---|\n" + rows)
+		sb.WriteString("| rank | player | holes | strokes |\n|---|---|---|---|\n" + rows + "\n")
 	}
-	sb.WriteString("</gno-columns>\n\n")
 
 	sb.WriteString("## Community holes\n\nAnyone can publish a hole of their own with PublishMine while the owner keeps publishing open. These are not part of the course: they have no cup and do not count in its ranking.\n\n")
 	switch {
@@ -222,15 +223,15 @@ func renderCup(world string) string {
 	slots.Iterate(k, k[:len(k)-1]+"0", func(_ string, v any) bool {
 		e := find(v.(string))
 		if n == 0 {
-			sb.WriteString("| # | hole | par | best | shots played | data |\n|---|---|---|---|---|---|\n")
+			sb.WriteString("| # | hole | par | best | shots played |\n|---|---|---|---|---|\n")
 		}
 		n++
 		sb.WriteString("| " + strconv.Itoa(int(e.order)) + " | " + md(e.name, hub+":"+e.slot) + " | " + strconv.Itoa(e.par) + " | " +
-			bestCell(e) + " | " + strconv.Itoa(e.plays) + " | " + source(e) + " |\n")
+			bestCell(e) + " | " + strconv.Itoa(e.plays) + " |\n")
 		return n >= maxListed
 	})
 	if n == 0 {
-		sb.WriteString("_No course hole in this cup._\n")
+		return noSuch(world)
 	}
 	return sb.String() + "\n" + md("Every cup", hub) + "\n"
 }
@@ -238,7 +239,7 @@ func renderCup(world string) string {
 // renderAuthor is the holes an address published, as their current versions.
 func renderAuthor(a address) string {
 	var sb strings.Builder
-	sb.WriteString("# Holes by " + who(a.String()) + "\n\n" + moved())
+	sb.WriteString("# Community holes by " + who(a.String()) + "\n\n" + moved())
 	n := 0
 	aliases.Iterate(a.String()+"/", a.String()+"0", func(_ string, v any) bool {
 		e := find(v.(string))
@@ -251,19 +252,24 @@ func renderAuthor(a address) string {
 		return n >= pageMax
 	})
 	if n == 0 {
-		sb.WriteString("_This address has published no hole._\n")
+		sb.WriteString("_This address has published no community hole._\n")
 	}
 	return sb.String() + "\n" + md("Every hole", hub) + "\n"
 }
 
 // bestCell is a hole's records, assisted then pro, for a table cell.
 func bestCell(e *entry) string {
-	best := "—"
-	if e.rec(assisted).best > 0 {
-		best = ufmt.Sprintf("%d strokes, %s", e.rec(assisted).best, who(e.rec(assisted).by.String()))
+	best := ""
+	for m := 0; m < modes; m++ {
+		if r := e.rec(m); r.best > 0 {
+			if best != "" {
+				best += " · "
+			}
+			best += ufmt.Sprintf("%s %d, %s", modeNames[m], r.best, byName(r.by.String()))
+		}
 	}
-	if e.rec(pro).best > 0 {
-		best += ufmt.Sprintf(" · pro %d, %s", e.rec(pro).best, who(e.rec(pro).by.String()))
+	if best == "" {
+		return "—"
 	}
 	return best
 }
@@ -276,18 +282,20 @@ func weatherNote(e *entry, h course.Hole) string {
 	what := "Clear"
 	switch f.Kind {
 	case course.Wind:
-		what = ufmt.Sprintf("Wind, %.2f a substep", f.Wind.Len())
+		a, _ := aim(physics.Vec2{}, f.Wind)
+		what = ufmt.Sprintf("Wind toward **%.0f°**: it pushes every roll that way", a)
 	case course.Rain:
 		what = "Rain: the green runs fast, and puddles slow the ball"
 	case course.Fog:
-		what = "Fog"
+		what = "Fog: it hides nothing here, and does not touch the ball"
 	case course.Storm:
 		what = "Storm: rain, puddles and wind"
 	case course.Snow:
 		what = "Snow: the green runs slow"
 	}
-	return ufmt.Sprintf("> [!NOTE] Weather now\n> %s — for %d min %02d s more. A round keeps the weather it started in, and can be played on until the next weather is over: after that it must be Reset.\n\n",
-		what, left/60, left%60)
+	// (ufmt has no width: the seconds padded by hand)
+	return ufmt.Sprintf("> [!NOTE] Weather now\n> %s — for %d min %s s more. A round keeps the weather it started in, and can be played on until the next weather is over: after that it must be Reset.\n\n",
+		what, left/60, pad(int(left%60), 2))
 }
 
 // noAdmin states what the reader can check in a minute: who can change what.
@@ -384,42 +392,43 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	// the one number a text player cannot read off the board: where the cup is
 	from, who := h.Start(), "the tee"
 	if mine != nil && !mine.done && mine.strokes > 0 {
-		from, who = mine.ball(), "your ball"
+		from, who = mine.ball(), "the ball"
 	}
 	a, d := aim(from, h.Cup())
 	s += ufmt.Sprintf("From %s the cup is **%.0f°** away, **%.1f** units in a straight line (0° = right, 90° = down). %s\n\n", who, a, d, flatRolls)
 	s += "_Rounds played here have no aim preview, so they go on the **Pro** board. A shot needs a gno.land wallet (Adena); the 3D game previews shots for free._\n\n"
 	s += "<gno-form exec=\"Launch\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
-	s += "<gno-input name=\"angle\" placeholder=\"angle in degrees (0 = right, 90 = down), decimals allowed\" required=\"true\" />\n"
-	s += "<gno-input name=\"power\" placeholder=\"power, above 0 and up to 10\" required=\"true\" />\n"
+	s += "<gno-input name=\"angle\" description=\"angle in degrees: 0 = right, 90 = down\" placeholder=\"e.g. 12.5\" required=\"true\" />\n"
+	s += "<gno-input name=\"power\" description=\"power: above 0, up to 10\" placeholder=\"e.g. 6\" required=\"true\" />\n"
 	s += "</gno-form>\n\n"
 	s += ufmt.Sprintf("_After your shot, see your ball at `%s:%s/<your address>`._\n\n", hub, e.id)
 	s += "Holed, or want a fresh start? Put your ball back on the tee:\n\n"
 	s += "<gno-form exec=\"Reset\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
 	s += "</gno-form>\n\n"
-	s += "Took a gno.land name after saving rounds? Put them on the boards now:\n\n<gno-form exec=\"Claim\">\n</gno-form>\n\n"
+	s += "Took a gno.land name after saving rounds? " + md("Claim", hub+"$help&func=Claim") + " puts them on the boards now.\n\n"
 
-	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; %d finished it assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
+	s += ufmt.Sprintf("## Best rounds\n\n%d players have a round here; finished: %d assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
 	if e.board(assisted).Size()+e.board(pro).Size() == 0 {
 		s += " No named player has finished it yet.\n\n"
 	} else {
-		s += " The named players' bests:\n\n"
+		s += " The named players' bests: each keeps its round, which the 3D game replays as a ghost to race.\n\n"
 	}
 	for m := 0; m < modes; m++ {
 		rows := ""
-		n := 0
+		n, walked := 0, 0
 		e.board(m).Iterate("", "", func(k string, v any) bool {
+			walked++
 			p := v.(string)
 			if name := nameOf(p); name != "" { // a name deleted since is skipped
 				n++
-				rows += ufmt.Sprintf("| %d | [@%s](%s:%s/%s) | %d |\n", n, name, hub, e.id, p, boardStrokes(k))
+				rows += ufmt.Sprintf("| %d | [@%s](%s:%s/%s) | %d | %s |\n", n, name, hub, e.id, p, boardStrokes(k), race(e, p, "race"))
 			}
-			return n >= topSize
+			return n >= topSize || walked >= maxWalked
 		})
 		if rows != "" {
-			s += "### " + modeTitles[m] + "\n\n| rank | player | strokes |\n|---|---|---|\n" + rows + "\n"
+			s += "### " + modeTitles[m] + "\n\n| # | player | score | ghost |\n|---|---|---|---|\n" + rows + "\n"
 		}
 	}
 	return s + "\n_This hole is " + source(e) + " — read it before you trust it with a round._\n"
@@ -440,7 +449,11 @@ func roundSummary(e *entry, p address, r *round) string {
 	// the shots are golf's own "%.4f,%.4f,%d": digits and punctuation only
 	shots := "Shots: `" + strings.ReplaceAll(r.shots, ";", "; ") + "`"
 	if !r.done {
-		return ufmt.Sprintf("> [!NOTE]\n> %s's round: %d strokes so far, not holed yet.\n>\n> %s\n\n", who, r.strokes, shots)
+		over := ""
+		if r.period < Period()-1 {
+			over = " Its weather is over: Reset (below) before the next shot."
+		}
+		return ufmt.Sprintf("> [!NOTE]\n> %s's round: %s so far, not holed yet.%s\n>\n> %s\n\n", who, count(r.strokes, "stroke"), over, shots)
 	}
 	// ufmt has no %+d: the sign is written out
 	vs := "even"
@@ -451,9 +464,10 @@ func roundSummary(e *entry, p address, r *round) string {
 	}
 	s := ufmt.Sprintf("> [!NOTE]\n> **%s holed it in %d** (par %d, %s), %s.\n>\n", who, r.strokes, e.par, vs, modeNames[r.mode])
 	b := e.board(r.mode)
-	switch v := e.bests(r.mode).Get(p.String()); {
-	case v != nil && b.Has(boardKey(v.(int), p.String())):
-		s += ufmt.Sprintf("> Best here: %d strokes, **#%d of %d** on the %s board.\n>\n", v.(int), b.index(boardKey(v.(int), p.String()))+1, b.Size(), modeNames[r.mode])
+	best := bestStrokes(e.bests(r.mode).Get(p.String()))
+	switch k := boardKey(best, p.String()); {
+	case best > 0 && b.Has(k):
+		s += ufmt.Sprintf("> Best here: %s, **#%d of %d** on the %s board. %s.\n>\n", count(best, "stroke"), b.index(k)+1, b.Size(), modeNames[r.mode], race(e, p.String(), "Race this ghost in 3D"))
 	case name == "":
 		s += "> Not on the board: only players with a gno.land name are ranked.\n>\n"
 	default:
@@ -763,7 +777,7 @@ func key(b, walls string) string {
 	}
 	s := "`*` tee · `U` cup"
 	for _, k := range []struct{ marks, what string }{
-		{"@", "your ball"}, {"·", "your last shot"}, {"#", "wall"},
+		{"@", "the ball"}, {"·", "its last shot"}, {"#", "wall"},
 		{":;x%", "wear (worn by past shots)"},
 	} {
 		shown := k.marks == "·" && shot
@@ -1028,4 +1042,24 @@ func blankUnreachable(g, wall [][]rune, f *physics.Field, seeds ...physics.Vec2)
 			}
 		}
 	}
+}
+
+// race is the 3D game on this hole against p's best, replayed as a ghost
+// (the game's dare link: by=).
+func race(e *entry, p, label string) string { return md(label, playLink(e)+"&by="+p) }
+
+// byName is a player by their gno.land name when they have one.
+func byName(addr string) string {
+	if n := nameOf(addr); n != "" {
+		return md("@"+n, "/u/"+n)
+	}
+	return who(addr)
+}
+
+// count is n things, said right for one.
+func count(n int, what string) string {
+	if n == 1 {
+		return "1 " + what
+	}
+	return strconv.Itoa(n) + " " + what + "s"
 }

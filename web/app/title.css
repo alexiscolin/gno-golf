@@ -25,12 +25,12 @@
   --c1: #7fe8a8; --c2: #1f9a6a;
   --stage: #d3e8c8; /* the picker's card behind the gnome: a flat, muted colour of the world */
   --art: linear-gradient(180deg, #7ec8ff, #ffd6a8);
-  --sky: linear-gradient(180deg, var(--s0), var(--s1));
+  --sky: var(--s0); /* flat, toon: the world's light colour under the dots */
   --dots: radial-gradient(circle, rgba(var(--ink-rgb), .09) 1.7px, transparent 2.1px) 0 0 / 14px 14px;
   --gold-grad: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%); /* the call to action's and a won cup's badge (--gold, the flat metal, everywhere else) */
   --glow: #ffe066; --glow-rgb: 255, 224, 102;
   /* type: a display heading, a card's name, a pill's label */
-  --fs-display: clamp(30px, 4.4vw, 54px);
+  --fs-display: clamp(36px, 5.4vw, 72px);
   --fs-name: clamp(15px, 1.4vw, 18px);
   --fs-pill: 15px;
   /* space: the vertical rhythm, small to large */
@@ -83,9 +83,9 @@
   display: inline-block; padding: 4px 14px; border-radius: var(--pill);
   font-size: var(--fs-pill); font-weight: 700; letter-spacing: .12em; color: var(--paper); background: var(--ink);
 }
-/* a paper panel: a card's standing (on its card's face, and its drop), the
-   title's facts, the builder's tab (flat: they only show) */
-.world__info, .screen--title .title__facts li, .builder { background: var(--paper); border: var(--edge); border-radius: 16px; }
+/* a paper panel: a card's standing (on its card's face, and its drop) and
+   the title's facts (flat: they only show) */
+.world__info, .screen--title .title__facts li { background: var(--paper); border: var(--edge); border-radius: 16px; }
 .world__info { border-width: 2.5px; box-shadow: var(--shadow-btn); }
 /* a round button: paper, inked, on its shadow (back, previous, next) */
 .front .round {
@@ -214,19 +214,14 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .front__head { position: relative; display: grid; justify-items: center; gap: 4px; margin-bottom: clamp(14px, 2.6vh, 30px); }
 .worlds--v2 .worlds__list { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); }
 
-/* a card: a glossy frame in its world's colours, the diorama up top, the
-   player's standing on a paper panel below */
+/* a card: a flat, toon frame in its world's colour under the dots (as the
+   game's choice's panels), the diorama up top, the player's standing on a
+   paper panel below */
 .worlds--v2 .world {
   position: relative; overflow: hidden; gap: 6px; padding: 8px 8px 12px; border-radius: 26px; border: var(--edge-bold);
-  background: linear-gradient(170deg, var(--c1), var(--c2));
+  background: radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px, var(--c2);
   box-shadow: var(--deep-card);
   transition: transform var(--t-pop) var(--spring), box-shadow .2s;
-}
-.worlds--v2 .world::before {
-  /* the gloss: a sheen across the frame */
-  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
-  background: linear-gradient(115deg, transparent 10%, rgba(255, 255, 255, .5) 32%, transparent 52%);
-  mix-blend-mode: soft-light;
 }
 .world__art {
   position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 19px; overflow: hidden;
@@ -281,40 +276,95 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   padding: 3px 10px; border-radius: var(--pill); background: var(--ink); color: var(--paper);
   font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
-.worlds--v2 .world:hover:not([disabled]),
-.worlds--v2 .world:focus-visible { z-index: 1; transform: translateY(-10px) scale(1.06); }
-.worlds--v2 .world:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 16px 0 var(--ink); }
+/* a front card under the pointer (a cup's, a game's): it leaps, leaning, in its glow; pressed, it sinks */
+.worlds--v2 .world:hover:not([disabled]), .worlds--v2 .world:focus-visible,
+.mode:hover:not([disabled]), .mode:focus-visible { z-index: 1; transform: translateY(-10px) scale(1.05) rotate(-1.5deg); }
+.worlds--v2 .world:hover:not([disabled]), .mode:hover:not([disabled]) { box-shadow: 0 0 0 4px var(--glow), 0 0 34px 8px rgba(var(--glow-rgb), .75), 0 16px 0 var(--ink); }
 .worlds--v2 .world:hover:not([disabled]) .world__ribbon,
 .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.18); }
-.worlds--v2 .world:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
-.worlds--v2 .world[disabled] { background: linear-gradient(170deg, #e6ebe8, #aab6b0); }
+.worlds--v2 .world:active:not([disabled]), .mode:active:not([disabled]) { transform: translateY(2px) scale(.98); box-shadow: 0 2px 0 var(--ink); }
+.worlds--v2 .world[disabled] { background: #c9d2cd; }
+/* the cup's diorama in a round inked window, as a game's panel shows its gnome */
+/* sized by the window's height too, so a laptop's cards end clear of the network banner */
+.worlds--v2 .world__art { width: min(80%, 20vh); margin: 4px auto 0; aspect-ratio: 1 / 1; border-radius: 50%; }
 .worlds--v2 .world[disabled] .world__art img { filter: grayscale(.85) opacity(.75); }
 .worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--shadow-btn); color: var(--ink); }
 .worlds--v2 .community { background: var(--paper); border: var(--edge); border-radius: 16px; padding: 10px 14px; } /* flat: a list to read */
 
-/* the builder: another game, to come; a small tab under the cups, plainly
-   not a button yet (dashed, flat, dimmed) */
-.builder {
-  display: inline-flex; align-items: center; gap: 10px; margin: clamp(18px, 3vh, 30px) auto 0; padding: 5px 8px 5px 5px;
-  border-radius: var(--pill); color: var(--ink); font-size: 14px; line-height: 1.2; cursor: default;
+/* the first choice: a kart game's mode panels, never the cups' cards: flat
+   toon colours, ours (the fairway, the hat, the sun), inked; a flat disc for
+   the gnomes, who hop in 3D out over the panel's top; the name inked big; the
+   one under the pointer leaps */
+.modes .worlds__in { width: min(1100px, calc(100vw - 48px)); }
+.modes__list { list-style: none; margin: 0 auto; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); width: min(100%, 1040px); padding-top: clamp(24px, 4vh, 48px); }
+.mode {
+  position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; width: 100%; aspect-ratio: 3 / 4; padding: 0 0 20px; overflow: visible;
+  border: var(--edge-bold); border-radius: 28px; color: var(--paper); font: inherit; text-align: left; cursor: pointer;
+  /* all flat: the disc (inked) and the panel's dots, on the panel's colour */
+  background:
+    radial-gradient(circle at 50% 36%, var(--c2) 0 31%, var(--ink) 31% 32.2%, transparent 32.4%),
+    radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px,
+    var(--c1);
+  box-shadow: var(--deep-card); transition: transform var(--t-pop) var(--spring);
 }
-.worlds--v2 .builder { border-style: dashed; opacity: .72; }
-.builder svg { width: 34px; height: 34px; flex: none; display: block; }
-.builder b { font-size: 16px; }
-.builder__tag { color: var(--ink-soft); }
-.builder__soon {
-  padding: 3px 10px; border-radius: var(--pill); background: var(--ink); color: var(--paper);
-  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+.mode--solo { --c1: #3f9a72; --c2: #8fdcae; } /* the fairway */
+.mode--duel { --c1: var(--hat); --c2: #f6a79b; } /* the hat: the rival */
+.mode--build { --c1: var(--sunny); --c2: var(--lamp); } /* the sun */
+.mode:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--ink), var(--deep-card); }
+.mode[disabled] { cursor: default; }
+.mode[disabled] > :not(.mode__soon, .mode__line) { opacity: .75; } /* (its line stays readable) */
+/* the gnomes stand out over the panel's top edge */
+.mode__stage { position: relative; display: block; min-height: 0; margin-top: -26%; }
+.mode__stage .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mode__stage svg { position: absolute; inset: 26% 0 0; margin: auto; width: 56%; height: auto; }
+.mode__name { margin: 0 20px; font-size: clamp(34px, 4.2vw, 56px); font-weight: 700; line-height: 1; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); transform: rotate(-3deg); transform-origin: left; }
+.mode__line { margin: 10px 20px 0; font-size: 14px; font-weight: 700; line-height: 1.3; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 2px 0 var(--ink); } /* inked as the name, thinner: read on any panel */
+.mode__soon { position: absolute; top: 16px; right: 12px; margin: 0; transform: rotate(4deg); }
+@media (max-width: 700px) {
+  /* a phone: the panels stacked, wide, the gnomes on the left */
+  .modes__list { grid-template-columns: 1fr; gap: 12px; }
+  .modes__list { padding-top: 12px; }
+  .mode { aspect-ratio: auto; min-height: 150px; grid-template-columns: 46% 1fr; grid-template-rows: 1fr auto; align-content: center; padding: 12px 0;
+    background: radial-gradient(circle at 23% 50%, var(--c2) 0 50px, var(--ink) 50px 52.5px, transparent 53px), radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px, var(--c1); }
+  .mode__stage { grid-row: 1 / 3; margin-top: -10px; }
+  .mode__stage svg { inset: 0; width: 78%; }
+  .mode__name { align-self: end; margin: 0 14px 0 4px; font-size: 32px; -webkit-text-stroke-width: 5px; }
+  .mode__line { margin: 6px 14px 0 4px; font-size: 13px; }
 }
+/* the game chosen, big, beside Back: its panel's colour, inked (over the screens, under the sheets) */
+.modetag {
+  position: fixed; top: 34px; left: 96px; z-index: var(--z-screen); padding: 2px 16px 6px; border: var(--edge-bold); border-radius: var(--pill);
+  background: var(--c1); color: var(--paper); font-size: 30px; font-weight: 700; line-height: 1.2;
+  -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; box-shadow: 0 4px 0 var(--ink); transform: rotate(-3deg); pointer-events: none;
+}
+body:has(.sheet) .modetag { visibility: hidden; }
+/* in play: pinned small on the hole's card */
+.card--hole { position: relative; }
+.card--hole > .modetag { position: absolute; top: -12px; left: -8px; z-index: 1; padding: 0 10px 2px; font-size: 16px; -webkit-text-stroke-width: 3px; box-shadow: 0 2px 0 var(--ink); }
+@media (max-width: 600px) { .modetag { top: 30px; left: 88px; font-size: 22px; padding: 1px 12px 4px; -webkit-text-stroke-width: 4px; } }
+/* the rival raced, stuck under the cups' title, big */
+.front__head > .dare { margin: -8px 0 0; padding: 6px 18px; font-size: clamp(16px, 1.6vw, 20px); }
+/* a duel's rival: two ways, one under the other, each under its heading */
+.rival__way { width: min(100%, 640px); text-align: left; }
+.rival__way + .rival__way { margin-top: 18px; }
+.rival .friends__add { margin: 0; align-items: center; }
+.rival .drawer__note { position: relative; margin: 6px 0 0; } /* the (i)'s popover under its line */
+.rival .lb { margin-top: 10px; }
+.rival .lb--full ol { max-height: none; overflow: visible; mask-image: none; padding: 2px 0 0; } /* the screen scrolls, not the board in it */
+/* the heading says what the board is; players with no name have no Race here */
+.rival .lb--full > h3, .rival .unnamed { display: none; }
+/* their ghosts: a cup's emblem before its name; a row names a hole, not a player */
+.ghosts__cup { display: flex; align-items: center; gap: 10px; }
+.ghosts__cup svg { width: 36px; height: 36px; flex: none; }
+.ghosts__cup + .lb .lb__who { font-family: var(--font); font-size: 15px; font-weight: 700; }
 
-@media (max-height: 760px) { .world__art { aspect-ratio: 16 / 9; } }
-@media (max-height: 640px) { .world__art { aspect-ratio: 2 / 1; } .worlds--v2 .world__tag { display: none; } }
+@media (max-height: 640px) { .worlds--v2 .world__tag { display: none; } }
 @media (max-width: 900px) { .worlds--v2 .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .worlds--v2 .worlds__list { gap: 12px; }
   .worlds--v2 .world { padding: 6px 6px 10px; border-radius: 20px; }
   .worlds--v2 .world__ribbon { font-size: 14px; padding: 4px 10px; white-space: normal; }
-  .worlds--v2 .world__tag, .builder__tag { display: none; }
+  .worlds--v2 .world__tag { display: none; }
   .worlds--v2 .world:hover:not([disabled]) .world__ribbon, .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.12); }
   .world__won { top: 10px; right: 10px; font-size: 13px; padding-right: 9px; }
   .world__won svg { width: 26px; height: 26px; }
@@ -353,7 +403,11 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 /* the tile and the aim card under it share one width (--pick-w): the same
    edges at every size */
 .screen--pick { --pick-w: min(380px, 60vw, 40vh); align-content: safe center; } /* taller than the window: from its top, never cut above it */
-@media (max-height: 820px) { .screen--pick { --pick-w: min(340px, 60vw, 36vh); } }
+.screen--pick:has(.dare) { --pick-w: min(380px, 60vw, 34vh); } /* a dare's lines above: the button still in view */
+@media (max-height: 820px) {
+  .screen--pick { --pick-w: min(340px, 60vw, 36vh); }
+  .screen--pick:has(.dare) { --pick-w: min(340px, 60vw, 25vh); }
+}
 /* a phone: the stage fits a 360 one (144: the screen's padding and the two
    arrows), a tighter rhythm, and a named hole says its name only (the
    button asks for the gnome), so it all fits above the network banner */

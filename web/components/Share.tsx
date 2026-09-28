@@ -65,7 +65,7 @@ export default function Share({ text, snapshot, link = "", clip = null, label = 
   const links = shareLinks(text, url);
   return (
     <span className="share" role="group" aria-label="Share">
-      <span className="share__label">{label}</span>
+      <span className="share__label" data-plain={label === "Share" || undefined}>{label}</span>
       {links.map(([name, href]) => (
         <a key={name} className={"share__icon share__icon--" + name.toLowerCase()} target="_blank" rel="noopener noreferrer" href={href} aria-label={`Share on ${name}`} title={name} onClick={() => sound("blip")}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d={GLYPH[name]} /></svg>

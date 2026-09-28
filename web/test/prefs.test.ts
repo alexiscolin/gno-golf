@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, stillsOnly } from "../lib/prefs.ts";
+import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, stillsOnly, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen } from "../lib/prefs.ts";
 import { GNOMES } from "../lib/scene/gnome.ts";
 
 beforeEach(() => {
@@ -199,4 +199,25 @@ test("stillsOnly: gnogolf.gfx=high overrides a measured-slow device", () => {
 test("stillsOnly: no matchMedia to ask (lib/device.ts) says no reduced motion; the rest decides", () => {
   // matchMedia left undefined by beforeEach
   assert.equal(stillsOnly(), false);
+});
+
+test("a badge is kept with the hole it was earned on, once; a hand edit reads as strings only", () => {
+  assert.deepEqual(rememberBadges(["ace"], "garden/1/v1"), ["ace"]);
+  assert.deepEqual(rememberBadges(["ace", "fog"], "garden/2/v1"), ["fog"]); // (the ace stays where it was first earned)
+  assert.deepEqual(rememberBadges(["ace"], "garden/3/v1"), []);
+  rememberBadges(["chain"], ""); // (no hole: kept, not placed)
+  assert.deepEqual(badgesEarned(), ["ace", "fog", "chain"]);
+  assert.deepEqual(badgesAt(), { ace: "garden/1/v1", fog: "garden/2/v1" });
+  localStorage.setItem("gnogolf.badges.at", JSON.stringify({ ace: 3, fog: "garden/2/v1" }));
+  assert.deepEqual(badgesAt(), { fog: "garden/2/v1" });
+  localStorage.setItem("gnogolf.badges.at", "[1]");
+  assert.deepEqual(badgesAt(), {});
+});
+
+test("a new game forgets the badges, their holes and the weathers counted, never the gnomes", () => {
+  remember("wizard");
+  rememberBadges(["ace"], "garden/1/v1");
+  seeWeather("fog");
+  forgetBadges();
+  assert.deepEqual([badgesEarned(), badgesAt(), weathersSeen(), earned()], [[], {}, [], ["wizard"]]);
 });

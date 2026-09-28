@@ -11,7 +11,7 @@
 
 import { hostOf, isLoopback } from "./network";
 import type {
-  Bests, CourseLeaderboard, Extras, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
+  Bests, CourseLeaderboard, Extras, Ghost, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
   SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Weather,
 } from "./types";
 
@@ -120,9 +120,15 @@ const checks = {
   courseLeaderboard: (v: unknown): v is CourseLeaderboard => board(v, standingRow, "holes", "players", "offset", "next"),
   holeRank: (v: unknown): v is HoleRank => isObj(v) && isMode(v.mode) && typeof v.hole === "string" && typeof v.player === "string" && nums(v, "rank", "of", "strokes"),
   rank: (v: unknown): v is Rank => isObj(v) && isMode(v.mode) && typeof v.player === "string" && nums(v, "rank", "of", "holes", "strokes"),
+  // a best of 1 to 60 strokes, one shot a stroke
+  ghost: (v: unknown): v is Ghost | null =>
+    v === null || (isObj(v) && isMode(v.mode) && strs(v, "hole", "player", "shots") && nums(v, "period") && Number.isInteger(v.strokes) &&
+      (v.strokes as number) > 0 && (v.strokes as number) <= RULES.maxRoundStrokes && (v.shots as string).split(";").length === v.strokes),
   round: (v: unknown): v is Round | null =>
     v === null || (isObj(v) && isPath(v.path) && isVec(v.rest) && isVec(v.ball) && strs(v, "player", "shots", "air", "cause") && typeof v.done === "boolean" && isMode(v.mode) && Number.isInteger(v.strokes) && nums(v, "period")),
 };
+// a gno.land name as r/sys/users writes them
+const isName = (n: string) => /^[a-z0-9._-]{1,64}$/i.test(n);
 // what a refused stroke says, as the engine always said it
 const NO_PATH = "The chain answered without a path for that shot.";
 
@@ -186,8 +192,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // an expression evaluated in a realm, read-only: the VM's typed result as it printed it
   const vm = (realm: string, expr: string, ms?: number, signal?: AbortSignal | null) =>
     query(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hexOf(`${realm}.${expr}`)}`, ms, signal);
-  // a string result — ("…" string) — unwrapped; an answer that is not one is the chain's to answer for
+  // a string result — ("…" string), an empty one ( string) — unwrapped; an answer that is not one is the chain's to answer for
   const unquote = (raw: string, expr: string) => {
+    if (raw.trim() === "( string)") return "";
     try {
       return String(JSON.parse(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(" string)"))));
     } catch {
@@ -315,6 +322,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** gnoweb page of one player's round on a hole. */
     roundURL: (hole: string, player: string) =>
       isHoleId(hole) && isAddress(player) ? new URL(`${REALM_PATH}:${hole}/${player}`, web + "/").href : "#",
+    /** gnoweb page of an address (its /u/ profile), # for anything else. */
+    userURL: (addr: string) => (isAddress(addr) ? new URL(`/u/${addr}`, web + "/").href : "#"),
     /** gnoweb link to what a hole is made of: a realm hole's source, a data
      *  hole's data page. A player can read a hole before trusting it. */
     // links built from what the chain says, checked first: a hole id, an address
@@ -377,6 +386,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       return n;
     },
     weather: (hole: string, period: number) => qeval(`Weather(${s(hole)}, ${period | 0})`, checks.weather),
+    /** The golf realm's owner (its maker), as the chain has it: where a tip goes. */
+    owner: async () => {
+      const raw = await vm(REALM, "Owner()");
+      const a = (raw.match(/^\("([^"]+)" \.uverse\.address\)$/) || [])[1];
+      if (!a || !isAddress(a)) throw refused("The chain's owner is not an address.");
+      return a;
+    },
     /** What a timed hole adds at one stroke of a round (0 = first shot). */
     extras: (hole: string, stroke: number) => qeval(`Extras(${s(hole)}, ${Math.max(0, stroke | 0)})`, checks.extras),
     /** The course-wide ranking of recorded rounds. */
@@ -389,15 +405,29 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.standings),
     /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes }. */
     rank: (mode: string, player: string) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`, checks.rank),
+    /** Of these holes (the first 100: one read's room, the course is 74), a player's bests on those they have one on, in either mode: their ghosts. One read. */
+    bestsOf: async (holes: readonly string[], player: string): Promise<ReadonlyMap<string, { pro: number; assisted: number }>> => {
+      const got = new Map<string, { pro: number; assisted: number }>();
+      if (!isAddress(player)) return got;
+      const ids = holes.slice(0, 100), who = `address(${s(player)})`;
+      // a line "<id> <pro> <assisted>" a hole (the realm's strconv is not in reach here: n writes the digits)
+      const out = await qstr(REALM, `func() (s string) { n := func(v int) (t string) { for { t = string(rune(48+v%10)) + t; v /= 10; if v == 0 { return } } }; for _, h := range []string{${ids.map(s).join(", ")}} { p, a := BestOf(h, "pro", ${who}), BestOf(h, "assisted", ${who}); if p+a > 0 { s += h + " " + n(p) + " " + n(a) + "\\n" } }; return }()`);
+      const best = (v: string) => (/^(0|[1-9]\d?)$/.test(v) && Number(v) <= RULES.maxRoundStrokes ? Number(v) : NaN); // (0: none in that mode)
+      for (const line of out.split("\n")) {
+        const [id, pro, assisted, ...rest] = line.split(" "), b = { pro: best(pro), assisted: best(assisted) };
+        if (ids.includes(id) && !rest.length && b.pro >= 0 && b.assisted >= 0 && b.pro + b.assisted > 0) got.set(id, b); // (only the holes asked)
+      }
+      return got;
+    },
     /** A gno.land name's address, or "" (r/sys/users). */
     resolveName: (name: string) =>
-      /^[a-z0-9._-]{1,64}$/i.test(name)
-        ? qstr("gno.land/r/sys/users", `func() string { d, _ := ResolveName(${s(name)}); if d == nil { return "" }; return d.Addr().String() }()`)
+      isName(name)
+        ? qstr("gno.land/r/sys/users", `func() string { d, _ := ResolveName(${s(name)}); if d == nil { return "" }; return d.Addr().String() }()`).then((a) => (isAddress(a) ? a : ""))
         : Promise.resolve(""),
     /** An address's gno.land name, or "". */
     nameOf: (addr: string) =>
       isAddress(addr)
-        ? qstr("gno.land/r/sys/users", `func() string { d := ResolveAddress(address(${s(addr)})); if d == nil { return "" }; return d.Name() }()`)
+        ? qstr("gno.land/r/sys/users", `func() string { d := ResolveAddress(address(${s(addr)})); if d == nil { return "" }; return d.Name() }()`).then((n) => (isName(n) ? n : "")) // (nothing a lying node could dress up)
         : Promise.resolve(""),
     /** A page of every player's best on a hole, named or not, by address: { rows: [{ player, strokes }], next ("" at the end) }. */
     records: (hole: string, mode: string, after = "", limit = 100) =>
@@ -430,6 +460,11 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       qeval(`CourseLeaderboard(${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.courseLeaderboard),
     /** A player's place on a hole's board: { rank (0: not on it), of, strokes }. */
     holeRank: (hole: string, mode: string, player: string) => qeval(`HoleRank(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.holeRank),
+    /** A player's best on a hole in a mode with its period and shots, or null: the ghost a duel races, replayed with replayRound then simulateFrom. */
+    ghost: (hole: string, mode: string, player: string) =>
+      isAddress(player)
+        ? qeval(`Ghost(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.ghost).then((g) => (g && g.player === player && g.mode === m(mode) && (g.hole === hole || g.hole.startsWith(hole + "/")) ? g : null)) // (the one asked for, or none)
+        : Promise.resolve(null),
     /** A page of a hole's board: { hole, mode, par, players (named), finished (everyone), offset, rows: [{ player, strokes }], next (the next page's offset, 0 at the end) }. */
     holeLeaderboard: (hole: string, offset = 0, limit = 10, mode = "assisted") =>
       qeval(`HoleLeaderboard(${s(hole)}, ${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.holeLeaderboard),

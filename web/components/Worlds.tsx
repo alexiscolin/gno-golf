@@ -9,8 +9,8 @@ import { Green } from "@/components/Title";
 import { AboutButton, BackButton } from "@/components/About";
 import "@/app/title.css";
 
-// The world screen, between the title and the course: one card per world,
-// drawn like a cup to win, and the builder to come under them. A world with
+// The world screen, between the game's choice (Modes.tsx) and the course: one
+// card per world, drawn like a cup to win. A world with
 // no holes on this chain yet is shown, but cannot be picked.
 
 export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
@@ -21,6 +21,10 @@ export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
 ];
 /** A cup by its id: the garden's when it is none of them. */
 export const worldOf = (id: string | null | undefined) => WORLDS.find((w) => w.id === id) || WORLDS[0];
+/** The holes in no cup: named so, with no emblem. */
+export const EXTRAS = { id: "extras", name: "Extras" } as const;
+/** A hole's cup, or the extras, as its world says (worldOf would name the extras the first cup). */
+export const groupOf = (id: string | null | undefined) => (id === EXTRAS.id ? EXTRAS : worldOf(id));
 
 // the scene is clipped to the round badge, and the ink ring drawn over it
 function Frame({ id, children }: { id: string; children?: ReactNode }) {
@@ -192,9 +196,11 @@ interface WorldsProps {
   onCommunity?: (id: string) => void;
   /** the course's top players, under the cups */
   podium?: ReactNode;
+  /** a duel chosen: whose ghost is raced, said under the title */
+  racing?: ReactNode;
 }
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, community = [], onCommunity = () => {}, podium }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, community = [], onCommunity = () => {}, podium, racing }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -209,7 +215,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   };
   return (
     <div className={`screen worlds worlds--v2 front tint--${hot || current || "garden"}`}>
-      <BackButton label="Back to the title" onClick={() => (sound("blip"), onBack())} />
+      <BackButton label="Back to the games" onClick={() => (sound("blip"), onBack())} />
       <AboutButton onClick={onAbout} />
       {played.length > 0 && (
         <div className="resets">
@@ -224,7 +230,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                 </button>
               ))}
               <button role="menuitem" className={"world__reset" + (wipe === "all" ? " world__reset--sure" : "")} onClick={() => clear("all", onResetAll)}>
-                {wipe === "all" ? "Sure? Tap again" : "Every cup"}
+                {wipe === "all" ? "Sure? Badges go too" : "Every cup"}
               </button>
             </div>
           )}
@@ -234,6 +240,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
         <div className="front__head">
           <span className="eyebrow">Choose your cup</span>
           <h2 className="worlds__title">Where do we play?</h2>
+          {racing}
         </div>
         {podium}
         <ul className="worlds__list">
@@ -243,20 +250,21 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             const t = stats[w.id] || NOT_PLAYED;
             const vs = t.strokes - t.par, won = n > 0 && t.done >= n;
             const score = `${t.strokes} · ${vsPar(vs)}`;
+            const open = n > 0;
             return (
               <li key={w.id}>
                 <button
                   className={`world world--${w.id} tint--${w.id}` + (w.id === current ? " world--on" : "")}
-                  disabled={!n}
+                  disabled={!open}
                   onClick={() => (sound("select"), onPick(w.id))}
                   // a mouse's hover (a tap goes straight in) or the keyboard's focus
-                  onPointerEnter={(e) => n && e.pointerType === "mouse" && setHot(w.id)}
+                  onPointerEnter={(e) => open && e.pointerType === "mouse" && setHot(w.id)}
                   onPointerLeave={() => setHot(null)}
-                  onFocus={() => n && setHot(w.id)}
+                  onFocus={() => open && setHot(w.id)}
                   onBlur={() => setHot(null)}
                   aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
                 >
-                  <Diorama id={w.id} on={hot === w.id && n > 0} />
+                  <Diorama id={w.id} on={hot === w.id && open} />
                   {w.id === current && <span className="world__last" aria-hidden="true">Last played</span>}
                   {won && <Won clean={t.clean} score={score} />}
                   <span className="world__ribbon">{w.name}</span>
@@ -282,13 +290,6 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             );
           })}
         </ul>
-        {/* another game to come: a tab of its own under the cups, kept small */}
-        <p className="builder">
-          <Emblem id="build" />
-          <b>Builder</b>
-          <span className="builder__tag">Draw your own hole, dare the others</span>
-          <span className="builder__soon">Coming soon</span>
-        </p>
         {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
         {community.length > 0 && (
           <section className="community" aria-label="Community holes">
