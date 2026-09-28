@@ -86,3 +86,30 @@ void test("frameMs: present and moving, fast movers get 60fps, slow decor 30fps"
   assert.equal(frameMs(false, true, true, 0, 0), 1000 / 60);
   assert.equal(frameMs(false, true, false, 0, 0), 1000 / 30);
 });
+
+void test("pace holds 60, 30 and 10 fps on 60 to 165 Hz screens, the 30 in even gaps", () => {
+  // four seconds of refreshes at hz, drawn at interval: the frames drawn a second, and the gaps between them
+  const run = (hz: number, interval: number) => {
+    let budget = 0, drawn = 0, since = 0;
+    const gaps: number[] = [];
+    for (let i = 0; i < hz * 4; i++) {
+      since += 1000 / hz;
+      const p = pace(budget, 1000 / hz, interval);
+      budget = p.budget;
+      if (!p.draw) continue;
+      drawn++;
+      gaps.push(since);
+      since = 0;
+    }
+    return { fps: drawn / 4, gaps };
+  };
+  for (const hz of [60, 75, 90, 120, 144, 165]) {
+    const busy = run(hz, 1000 / 60), idle = run(hz, 1000 / 30), doze = run(hz, 1000 / 10);
+    assert.ok(Math.abs(busy.fps - 60) <= 2, `${hz} Hz busy: ${busy.fps} fps`);
+    assert.ok(Math.abs(idle.fps - 30) <= 1.5, `${hz} Hz idle: ${idle.fps} fps`);
+    assert.ok(Math.abs(doze.fps - 10) <= 1, `${hz} Hz away: ${doze.fps} fps`);
+    assert.ok(!slowFrames(busy.gaps), `${hz} Hz on time: not slow`);
+    // no idle gap over two refreshes past the interval
+    assert.ok(Math.max(...idle.gaps.slice(1)) <= 1000 / 30 + 1000 / hz + 1, `${hz} Hz idle: even gaps`);
+  }
+});

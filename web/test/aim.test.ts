@@ -13,6 +13,14 @@ import type { Mode, Stroke, Vec2 } from "../lib/types.ts";
 
 // ------------------------------------------------------------ thirdAim
 
+void test("thirdAim aims opposite the pull: down ahead, up back, left right, right left", () => {
+  const deg = (a: number) => Math.round((((a * 180) / Math.PI) % 360 + 360) % 360);
+  assert.equal(deg(thirdAim(0, 0, 100)), 0);
+  assert.equal(deg(thirdAim(0, 0, -100)), 180);
+  assert.equal(deg(thirdAim(0, -100, 0)), 90);
+  assert.equal(deg(thirdAim(0, 100, 0)), 270);
+});
+
 void test("thirdAim holds the last angle inside the dead zone (too short a pull to read)", () => {
   assert.equal(thirdAim(0, 3, 4, 1.23), 1.23); // r = 5 < DEAD (18)
 });

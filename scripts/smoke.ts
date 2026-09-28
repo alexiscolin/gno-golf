@@ -10,20 +10,8 @@
 //   (from web/: npm run smoke; RPC and APP override the local defaults)
 
 import assert from "node:assert/strict";
-import { register } from "node:module";
-
-// the client's modules import each other without an extension: ".ts" is tried
-register(
-  "data:text/javascript," +
-    encodeURIComponent(
-      `export async function resolve(s, c, next) {
-        try { return await next(s, c); } catch (e) {
-          if (/^\\.\\.?\\//.test(s) && !/\\.[cm]?[jt]sx?$|\\.json$/.test(s)) return next(s + ".ts", c);
-          throw e;
-        }
-      }`,
-    ),
-);
+// the client's modules as the unit tests load them (".ts" tried, "@/" read)
+import "../web/test/setup.mjs";
 
 const { makeChain } = await import("../web/lib/chain.ts");
 /** media/lib/cdp.mjs, as this script uses it: one headless Chrome over the DevTools protocol */

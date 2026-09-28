@@ -346,6 +346,24 @@ test("boardWork: the realm's count when HoleState says it (every pulse), else th
   assert.deepEqual(boardWork({ ...s, work: { walls: 9, pieces: 20, setup: 5e6 } }, seen, rain), { walls: 9, pieces: 24, setup: 5e6 });
 });
 
+test("commitsOf: no commit the chain's own sums (golf.gno add, next) would refuse", () => {
+  const work = (c: { walls: number; pieces: number; pts: number[] }, i: number) => RULES.work.shot + c.walls * RULES.work.wall + c.pts[i] * (RULES.work.point + c.pieces * RULES.work.piece);
+  const refused = (c: { walls: number; pieces: number; pts: number[] }, [a, b]: [number, number]) => {
+    let spent = 0, most = 0;
+    for (let i = a; i < b; i++) {
+      if (i > a && spent + most > RULES.work.budget) return true;
+      const w = work(c, i);
+      spent += w;
+      most = Math.max(most, w);
+    }
+    return b - a > RULES.maxShots;
+  };
+  const heavy = { walls: 100, pieces: 100, pts: Array<number>(12).fill(190) }; // 5.4e8 a shot: two a commit
+  assert.deepEqual(commitsOf(heavy), [[0, 2], [2, 4], [4, 6], [6, 8], [8, 10], [10, 12]]);
+  const mixed = { walls: 100, pieces: 100, pts: [10, 10, 10, 512, 512, 512, 512] };
+  assert.ok(!commitsOf(mixed).some((part) => refused(mixed, part)));
+});
+
 test("commitsOf: no shots is no commits", () => {
   assert.deepEqual(commitsOf({}), []);
 });

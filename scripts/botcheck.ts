@@ -17,7 +17,11 @@
 import fs from "node:fs";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { makeChain, DEFAULT_RPC, type Chain } from "../web/lib/chain.ts";
+import type { Chain } from "../web/lib/chain.ts";
+// the client's modules as the unit tests load them (".ts" tried, "@/" read)
+import "../web/test/setup.mjs";
+
+const { makeChain, DEFAULT_RPC, RULES, shotOf } = await import("../web/lib/chain.ts");
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const argv = process.argv.slice(2);
@@ -71,7 +75,7 @@ const parseShot = (s: string): Shot => {
   const [a, p, t] = s.split(",").map(Number);
   return { a, p, t: t | 0 };
 };
-const fmt = ({ a, p, t }: Shot) => `${a.toFixed(4)},${p.toFixed(4)},${t}`;
+const fmt = ({ a, p, t }: Shot) => shotOf(a, p, t);
 const near = (x: number, step: number) => Math.abs(x / step - Math.round(x / step)) < 1e-6;
 
 // values: the dapp sends angle and power at 0.01 steps, so a human's shot lands
@@ -96,7 +100,7 @@ async function fragility(r: Rec) {
   let tried = 0, held = 0;
   for (const [da, dp, dt] of nudges) {
     const n = { a: last.a + da, p: +(last.p + dp).toFixed(4), t: last.t + dt };
-    if (n.p <= 0 || n.p > 10 || n.t < 0) continue;
+    if (n.p <= 0 || n.p > RULES.maxPower || n.t < 0) continue;
     if (sims >= MAX_SIMS) return null; // out of budget: unchecked, not innocent
     const res = await simulate(r.hole, [...prefix, fmt(n)], r.period);
     tried++;

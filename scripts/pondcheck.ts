@@ -11,28 +11,17 @@
 //   nice -n 20 node --experimental-strip-types scripts/pondcheck.ts [slot…]
 
 import fs from "node:fs";
-import { register } from "node:module";
+// the client's modules as the unit tests load them (".ts" tried, "@/" read)
+import "../web/test/setup.mjs";
 
-register(
-  "data:text/javascript," +
-    encodeURIComponent(
-      `export async function resolve(s, c, next) {
-        try { return await next(s, c); } catch (e) {
-          if (/^\\.\\.?\\//.test(s) && !/\\.[cm]?[jt]sx?$|\\.json$/.test(s)) return next(s + ".ts", c);
-          throw e;
-        }
-      }`,
-    ),
-);
-
-const { makeChain } = await import("../web/lib/chain.ts");
+const { makeChain, DEFAULT_RPC } = await import("../web/lib/chain.ts");
 const { terrain, POOLS, inZone, segDist } = await import("../web/lib/terrain.ts");
 const { groundMesh } = await import("../web/lib/scene/course.ts");
 const { worldOf, loadWorld } = await import("../web/lib/scene/worlds.ts");
 type Vec2 = readonly [number, number];
 
 const slots = process.argv.slice(2).length ? process.argv.slice(2) : fs.readFileSync(new URL("../data/holes.txt", import.meta.url), "utf8").split("\n").filter(Boolean).map((l) => l.split(" ")[0]);
-const chain = makeChain({ rpc: process.env.RPC || "http://127.0.0.1:26657" });
+const chain = makeChain({ rpc: process.env.RPC || DEFAULT_RPC });
 const STEP = 0.1;
 let bad = 0, waters = 0;
 for (const slot of slots) {
