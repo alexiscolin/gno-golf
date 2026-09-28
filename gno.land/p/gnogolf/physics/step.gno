@@ -330,7 +330,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 			}
 			anchor = pos
 		}
-		if i == substeps-1 && extra < MaxRollOn && (air > 0 || f.rolls(slopes, pos, -1, &out.Work)) {
+		if i == substeps-1 && f.rollsOn(extra, air, 0, slopes, pos, &out.Work) { // (hop 0: a pending one takes off in this substep, which the check at its end sees)
 			substeps++
 			extra++
 		}
@@ -499,7 +499,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		}
 		// and where the last substep left it: taken off over a crest during
 		// it, a landing still to bounce, or come onto a hill, it goes on too
-		if i == substeps-1 && extra < MaxRollOn && (air > 0 || hop > 0 || f.rolls(slopes, pos, -1, &out.Work)) {
+		if i == substeps-1 && f.rollsOn(extra, air, hop, slopes, pos, &out.Work) {
 			substeps++
 			extra++
 		}
@@ -977,6 +977,13 @@ func (f *Field) resistance(slopes []hill, pos Vec2, tick int, w *int) float64 {
 		c = h.cos
 	}
 	return Rolling(f.Friction, surface) * G * c
+}
+
+// rollsOn says whether a stroke on its last substep goes on for one more
+// (MaxRollOn at most, extra so far): still in the air, a landing still to
+// bounce (hop), or on a hill that rolls it.
+func (f *Field) rollsOn(extra int, air, hop float64, slopes []hill, pos Vec2, w *int) bool {
+	return extra < MaxRollOn && (air > 0 || hop > 0 || f.rolls(slopes, pos, -1, w))
 }
 
 // rolls reports whether a ball at rest at pos rolls away at tick: it is on

@@ -168,7 +168,7 @@ export interface Snapshot {
   works: readonly number[];
   /** what a commit on this hole, in this weather, spends before its shots (Weather() "gas"; 0: not said) */
   fixed: number;
-  /** each shot's share of setting the hole's pulses up (golf.gno newWork's setup), of those seen so far */
+  /** each shot's share of setting the hole's pulses up (golf.gno newWork's setup: HoleState's, else of those seen so far) */
   setup: number;
   shots: readonly string[];
   flying: boolean;

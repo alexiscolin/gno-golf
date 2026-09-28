@@ -636,3 +636,17 @@ func TestNamesAreCheckedAsTheRegistrarWritesThem(t *testing.T) {
 		uassert.False(t, nameish(bad), bad)
 	}
 }
+
+// A page reads each record holder's name once: bestCell takes it from the
+// page's names once there.
+func TestAPageReadsEachNameOnce(cur realm, t *testing.T) {
+	id, p := register(cur, "onename"), testutils.TestAddress("onename")
+	giveName(cur, p, "onename")
+	testing.SetRealm(testing.NewUserRealm(p))
+	PlayRoundAt(cross(cur), id, holeShot, Period())
+	names := map[string]string{}
+	uassert.Equal(t, "assisted 1, [@onename](/u/onename)", bestCell(mustHole(id), names))
+	uassert.Equal(t, "[@onename](/u/onename)", names[p.String()], "kept for the page")
+	names[p.String()] = "kept"
+	uassert.Equal(t, "assisted 1, kept", bestCell(mustHole(id), names), "not read again")
+}

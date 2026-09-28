@@ -185,10 +185,11 @@ func renderHub() string {
 	default:
 		sb.WriteString("_None yet: publishing opens with the game's hole builder._\n")
 	}
+	names := map[string]string{} // the record holders' names, read once each (bestCell)
 	if len(others) > 0 {
 		sb.WriteString("| hole | by | par | best | shots played |\n|---|---|---|---|---|\n")
 		for _, e := range others {
-			sb.WriteString("| " + md(e.name, hub+":"+e.slot) + " | " + md(short(e.by.String()), hub+":"+e.by.String()) + " | " + strconv.Itoa(e.par) + " | " + bestCell(e) + " | " +
+			sb.WriteString("| " + md(e.name, hub+":"+e.slot) + " | " + md(short(e.by.String()), hub+":"+e.by.String()) + " | " + strconv.Itoa(e.par) + " | " + bestCell(e, names) + " | " +
 				strconv.Itoa(e.plays) + " |\n")
 		}
 	}
@@ -196,7 +197,7 @@ func renderHub() string {
 		sb.WriteString("\n## Archived course holes\n\nA newer version took each one's place in its cup. They can still be played, and keep their records, but no longer count in the course-wide ranking. Every version of a slot is on its data page.\n\n" +
 			"| hole | version | par | best | shots played | now |\n|---|---|---|---|---|---|\n")
 		for _, e := range archived {
-			sb.WriteString("| " + md(e.name, hub+":"+e.id) + " | " + e.id + " | " + strconv.Itoa(e.par) + " | " + bestCell(e) + " | " +
+			sb.WriteString("| " + md(e.name, hub+":"+e.id) + " | " + e.id + " | " + strconv.Itoa(e.par) + " | " + bestCell(e, names) + " | " +
 				strconv.Itoa(e.plays) + " | " + md(e.next, hub+":"+e.next) + " |\n")
 		}
 	}
@@ -219,7 +220,7 @@ func renderCup(world string) string {
 	sb.WriteString("# " + cupName(world) + "\n\n" + moved())
 	k := slotKey(world, 0)
 	k = k[:len(k)-3] // the world's slots are the keys "<rank><world>/…"
-	n := 0
+	n, names := 0, map[string]string{}
 	slots.Iterate(k, k[:len(k)-1]+"0", func(_ string, v any) bool {
 		e := find(v.(string))
 		if n == 0 {
@@ -227,7 +228,7 @@ func renderCup(world string) string {
 		}
 		n++
 		sb.WriteString("| " + strconv.Itoa(int(e.order)) + " | " + md(e.name, hub+":"+e.slot) + " | " + strconv.Itoa(e.par) + " | " +
-			bestCell(e) + " | " + strconv.Itoa(e.plays) + " |\n")
+			bestCell(e, names) + " | " + strconv.Itoa(e.plays) + " |\n")
 		return n >= maxListed
 	})
 	if n == 0 {
@@ -240,7 +241,7 @@ func renderCup(world string) string {
 func renderAuthor(a address) string {
 	var sb strings.Builder
 	sb.WriteString("# Community holes by " + who(a.String()) + "\n\n" + moved())
-	n := 0
+	n, names := 0, map[string]string{}
 	aliases.Iterate(a.String()+"/", a.String()+"0", func(_ string, v any) bool {
 		e := find(v.(string))
 		if n == 0 {
@@ -248,7 +249,7 @@ func renderAuthor(a address) string {
 		}
 		n++
 		sb.WriteString("| " + md(e.name, hub+":"+e.slot) + " | " + strconv.Itoa(e.version) + " | " + strconv.Itoa(e.par) + " | " +
-			bestCell(e) + " | " + strconv.Itoa(e.plays) + " | " + source(e) + " |\n")
+			bestCell(e, names) + " | " + strconv.Itoa(e.plays) + " | " + source(e) + " |\n")
 		return n >= pageMax
 	})
 	if n == 0 {
@@ -257,15 +258,23 @@ func renderAuthor(a address) string {
 	return sb.String() + "\n" + md("Every hole", hub) + "\n"
 }
 
-// bestCell is a hole's records, assisted then pro, for a table cell.
-func bestCell(e *entry) string {
+// bestCell is a hole's records, assisted then pro, for a table cell. names
+// keeps each holder as the page has said them: r/sys/users is read once a
+// player, not once a record.
+func bestCell(e *entry, names map[string]string) string {
 	best := ""
 	for m := 0; m < modes; m++ {
 		if r := e.rec(m); r.best > 0 {
 			if best != "" {
 				best += " · "
 			}
-			best += ufmt.Sprintf("%s %d, %s", modeNames[m], r.best, byName(r.by.String()))
+			by := r.by.String()
+			name, ok := names[by]
+			if !ok {
+				name = byName(by)
+				names[by] = name
+			}
+			best += ufmt.Sprintf("%s %d, %s", modeNames[m], r.best, name)
 		}
 	}
 	if best == "" {

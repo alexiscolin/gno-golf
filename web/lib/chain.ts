@@ -109,7 +109,8 @@ const checks = {
   // Holes(): { version, play, successor, holes }
   holesReply: (v: unknown): v is Holes => isObj(v) && strs(v, "play", "successor") && Array.isArray(v.holes) && v.holes.every(holeRow),
   state: (v: unknown): v is HoleState =>
-    isObj(v) && typeof v.hole === "string" && isObj(v.board) && isVec(v.start) && isVec(v.cup) && arrays(v, "walls", "posts", "zones"),
+    isObj(v) && typeof v.hole === "string" && isObj(v.board) && isVec(v.start) && isVec(v.cup) && arrays(v, "walls", "posts", "zones") &&
+    (v.work === undefined || (isObj(v.work) && nums(v.work, "walls", "pieces", "setup"))),
   simFrom,
   simRound: (v: unknown): v is SimulateRound => isObj(v) && Number.isInteger(v.strokes) && nums(v, "period") && simFrom(v),
   weather: (v: unknown): v is Weather => isObj(v) && Array.isArray(v.zones),

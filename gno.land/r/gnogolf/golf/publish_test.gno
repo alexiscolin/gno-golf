@@ -10,6 +10,7 @@ import (
 	"gno.land/p/gnogolf/physics"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
+	"gno.land/p/nt/ufmt/v0"
 	"gno.land/p/nt/urequire/v0"
 )
 
@@ -251,6 +252,7 @@ func TestAPulsesSetUpIsCharged(cur realm, t *testing.T) {
 	id := PublishMine(cross(cur), "pulsed", hexOf(pulsed(16)), "")
 	w := newWork(mustHole(id).hole(), nil)
 	uassert.Equal(t, int64(64*workPerPulseWall+course.MaxPosts*workPerPulsePost), w.setup)
+	uassert.True(t, strings.Contains(HoleState(id), ufmt.Sprintf(`"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup)), "HoleState says it, pulse and all")
 	w.next(mustHole(id).hole())
 	tap, _ := previewAt(mustHole(id).hole(), physics.V(3, 3), 0, 0.05, 0, 0, nil)
 	w.add(tap)

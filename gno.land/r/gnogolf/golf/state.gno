@@ -63,6 +63,11 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 		`,"start":` + jvec(h.Start()) +
 		`,"cup":` + jvec(h.Cup()) +
 		`,"cupR":` + jnum(h.(*dataHole).CupRadius) + `,"ballR":` + jnum(f.Radius))
+	// what a commit counts on the board before the weather (newWork: every
+	// pulse as if always there, and each shot's share of setting them up):
+	// the client splits a round's save and sets its gas by it
+	w := newWork(h, nil)
+	sb.WriteString(ufmt.Sprintf(`,"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup))
 	if rounds {
 		sb.WriteString(`,"plays":` + strconv.Itoa(e.plays))
 	}

@@ -48,6 +48,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome, ch
   // armed: this round races the ghost (a duel armed mid-round waits for the next)
   // peek: the player looking at the ghost's ball (the score card), until their next aim
   let shown = 0, holed = false, busy = false, armed = false, peek = false;
+  let turns = 0; // the turns begun: only the last one gives the turn back (one left over from a Restart does not)
   // the game as the replay reads it: the live one, the ghost's own fields over it
   const cg: GameState = Object.assign(Object.create(g) as GameState, { flying: false, inTube: false, cause: null, replaying: null, tick0: 0 });
   // (field by field, as the clip's: what moves is read through, never copied)
@@ -152,6 +153,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome, ch
     const late = () => round === g.round && gh === ghost && armed && n >= shown;
     const mine = () => round === g.round && at === cut && gh === ghost;
     // its turn, said at once: the player's next aim waits for it
+    const own = ++turns;
     busy = true;
     told();
     try {
@@ -166,14 +168,14 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome, ch
           if (mine()) await glide(b, s.path[0], at);
           if (mine() && (await outlived(rp.replay(s.path, s.holed, s.air, s.cause, 0, ghostSpeed(stepsMs(s.path).reduce((a, x) => a + x, 0))), CUT_MS))) cut++;
         } finally {
-          restTimed(); // the pieces back on the player's clock
+          if (own === turns) restTimed(); // the pieces back on the player's clock (not under a later turn's)
         }
       }
       if (round !== g.round || gh !== ghost) return;
       land(b, s, n);
       if (motion) await wait(AFTER_MS);
     } finally {
-      busy = false;
+      if (own === turns) busy = false;
       told();
     }
   }

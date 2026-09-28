@@ -13,6 +13,7 @@ import {
   onOurNode,
   current,
   onWalletChange,
+  boardWork,
   commitsOf,
   gasOf,
   roundGas,
@@ -26,7 +27,7 @@ import {
   shortOf,
   costOf,
 } from "../lib/adena.ts";
-import type { SimulateRound, Vec2 } from "../lib/types.ts";
+import type { HoleState, SimulateRound, Vec2 } from "../lib/types.ts";
 
 // a well-formed gno.land address (g1 + 38 [0-9a-z]): the one real check
 // connect()/current() run on Adena's answer
@@ -334,6 +335,15 @@ test("commitsOf: the pulses' set-up counts on every shot, as the realm's newWork
   const pts = Array(12).fill(10);
   assert.equal(commitsOf({ pts }).length, 1);
   assert.ok(commitsOf({ pts, setup: 120e6 }).length > 1);
+});
+
+test("boardWork: the realm's count when HoleState says it (every pulse), else the pulses seen; the forecast's zones on top", () => {
+  const wall = { a: [0, 0], b: [1, 0] }, poly = { kind: "hazard", min: [0, 0], max: [1, 1], poly: [[0, 0], [1, 0], [1, 1]] };
+  const s = { walls: [wall, wall], posts: [{}], zones: [poly] } as unknown as HoleState;
+  const seen = { walls: 1, posts: 2, pieces: 3 }, rain = [poly] as unknown as HoleState["zones"];
+  assert.deepEqual(boardWork(null, seen), { walls: 0, pieces: 0, setup: 0 });
+  assert.deepEqual(boardWork(s, seen, rain), { walls: 3, pieces: 2 + 1 + 4 + 3 + 4, setup: RULES.work.pulseWall + 2 * RULES.work.pulsePost });
+  assert.deepEqual(boardWork({ ...s, work: { walls: 9, pieces: 20, setup: 5e6 } }, seen, rain), { walls: 9, pieces: 24, setup: 5e6 });
 });
 
 test("commitsOf: no shots is no commits", () => {

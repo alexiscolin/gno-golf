@@ -109,6 +109,9 @@ export interface HoleState extends Versioned {
   posts: readonly Post[];
   zones: readonly Zone[];
   wear: Wear;
+  /** what the realm's work model counts on the board before the weather (golf.gno newWork: every
+   *  pulse as if always there, and each shot's share of setting them up); none from a realm before it */
+  work?: { walls: number; pieces: number; setup: number };
 }
 
 /** One round as State and Rounds list it (no path). */

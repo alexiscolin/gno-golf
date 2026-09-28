@@ -113,6 +113,8 @@ check("golf.gno work model", () => {
   assert.ok(has(golf, "w.setup += int64(len(p.Walls))*workPerPulseWall + int64(len(p.Posts))*workPerPulsePost"), "newWork(): the pulses' set-up changed");
   assert.ok(has(golf, "c -= w.setup / workPerUnit"), "next(): the set-up off the cap changed");
   assert.ok(has(golf, "c += w.setup"), "add(): the set-up per shot changed");
+  // what HoleState says of it, which boardWork reads (the formula above its fallback)
+  assert.ok(has(realm("state.gno"), 'w := newWork(h, nil) sb.WriteString(ufmt.Sprintf(`,"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup))'), "HoleState's work changed");
   const step = fs.readFileSync(new URL("../gno.land/p/gnogolf/physics/step.gno", import.meta.url), "utf8");
   assert.equal(RULES.maxWork, constOf(step, "MaxWork"), "physics MaxWork");
   assert.equal(RULES.maxWorkStep, constOf(step, "MaxWorkStep"), "physics MaxWorkStep");

@@ -17,6 +17,7 @@ import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
 import { loadWorld } from "./scene/worlds";
 import { makeChain, shotOf, pullShot, isHoleId, RULES } from "./chain";
+import { boardWork } from "./adena";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
   makeRenderer, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
@@ -69,8 +70,6 @@ const gfxOf = (m: string): GfxMode => (m === "high" || m === "low" ? m : "auto")
 
 // the realm's limits: the strokes one round holds (a save of more than 12 goes in several commits), the power of a shot
 const { maxRoundStrokes, maxPower: MAX_POWER } = RULES;
-// zones as the work model counts them: one piece each, and one per polygon edge
-const piecesOf = (zs: readonly { poly?: readonly unknown[] }[]) => zs.reduce((n, z) => n + 1 + ((z.poly && z.poly.length) || 0), 0);
 // the part of the screen the HUD covers, in CSS pixels: the camera frames
 // what is left, so the course is centred in what the player can actually see
 const HUD = { top: 108, bottom: 136, side: 14 };
@@ -233,17 +232,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       // what the realm's work model (golf.gno newWork) counts, for the save's
       // split and its gas: the walls of the hole and of its pulses, every
       // piece on the board (the hole's, its pulses' as if always there, the
-      // forecast's zones; a polygon's every edge), the forecast's kind, each
-      // stroke's path length and work, and what the realm says a commit spends
-      // before its shots. A pulse is known from the strokes' extras.
-      walls: g.s ? g.s.walls.length + pulse.walls : 0,
-      pieces: g.s ? g.s.walls.length + g.s.posts.length + piecesOf(g.s.zones) + piecesOf((g.forecast && g.forecast.zones) || []) + pulse.pieces : 0,
+      // forecast's zones; a polygon's every edge) and every shot's share of
+      // setting its pulses up (boardWork), the forecast's kind, each stroke's
+      // path length and work, and what the realm says a commit spends before
+      // its shots
+      ...boardWork(g.s, pulse, (g.forecast && g.forecast.zones) || []),
       kind: (g.forecast && g.forecast.kind) || "",
       pts: g.pts,
       works: g.works,
       fixed: (g.forecast && g.forecast.gas) || 0,
-      // and every shot's share of setting its pulses up (newWork's setup)
-      setup: pulse.walls * RULES.work.pulseWall + pulse.posts * RULES.work.pulsePost,
       shots: g.shots,
       flying: g.flying,
       aiming: g.aiming,
@@ -679,7 +676,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // up out of the ground when they appear, and the old ones sink away.
   let extras: THREE.Object3D | null = null, extrasFor = "";
   // the pulses' pieces seen so far on this hole, each once: what the work
-  // model counts for them (newWork: every pulse, as if always there)
+  // model counts for them (newWork: every pulse, as if always there) when
+  // the realm does not say it (boardWork)
   let pulse = { seen: new Set<string>(), walls: 0, posts: 0, pieces: 0 };
   function sawPulse(ex: Extras) {
     const add = (list: readonly (Wall | Post | Zone)[], kind?: "walls" | "posts") => {

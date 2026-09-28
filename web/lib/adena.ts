@@ -9,7 +9,7 @@
 // outcomes — so a recorded score is one nobody can type in.
 
 import { RULES, isAddress, type Chain } from "./chain";
-import type { Mode, Vec2 } from "./types";
+import type { HoleState, Mode, Vec2, Zone } from "./types";
 
 /** An Adena answer: its status, and a code, a type or a message when it failed. */
 interface AdenaRes<T = unknown> {
@@ -219,6 +219,20 @@ export function onWalletChange(fn: (...x: unknown[]) => void) {
 // it said so has no work: the realm may then cut sooner, with "commit the
 // first N", and splitRound follows it.
 const WORK = RULES.work;
+// zones as the work model counts them: one piece each, and one per polygon edge
+const piecesOf = (zs: readonly { poly?: readonly unknown[] }[]) => zs.reduce((n, z) => n + 1 + ((z.poly && z.poly.length) || 0), 0);
+/** The board's walls, pieces and set-up as the work model counts them (s: the hole, none
+ *  before it loads): as HoleState says them, else (a realm before it said them) the hole's
+ *  own and its pulses' seen so far in the strokes' extras (seen); the forecast's zones on top. */
+export function boardWork(s: HoleState | null, seen: { walls: number; posts: number; pieces: number }, weather: readonly Zone[] = []) {
+  if (!s) return { walls: 0, pieces: 0, setup: 0 };
+  const w = s.work || {
+    walls: s.walls.length + seen.walls,
+    pieces: s.walls.length + s.posts.length + piecesOf(s.zones) + seen.pieces,
+    setup: seen.walls * WORK.pulseWall + seen.posts * WORK.pulsePost,
+  };
+  return { walls: w.walls, pieces: w.pieces + piecesOf(weather), setup: w.setup };
+}
 // what every shot of a commit costs before its own: the shot and the walls
 const baseOf = (c: Work) => WORK.shot + (c.walls || 0) * WORK.wall;
 const workOf = (c: Work, i: number) => {

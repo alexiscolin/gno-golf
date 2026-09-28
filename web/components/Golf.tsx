@@ -702,13 +702,19 @@ export default function Golf() {
   // the rival: their name, and their bests in both modes on each hole read so far
   const [rival, setRival] = useState<{ name: string; holes: Readonly<Record<string, Record<Mode, Ghost | null>>> } | null>(null);
   const readFor = useRef(new Set<string>()); // the holes asked (once each)
+  // the player's rounds saved (how many), and their holes since the ghosts on them were read: a self-race's bests move with them
+  const [saves, setSaves] = useState(0);
+  const movedGhosts = useRef(new Set<string>());
   const dareNow = useRef(""); // the rival raced now: a read for another one, or for a duel dropped, lands on nothing
   dareNow.current = dare && !solo ? dare : "";
   const me = account && account.address;
   useEffect(() => {
     const c = game.current && game.current.chain;
-    if (!dare || solo || !c || !holeId || !holeReady || readFor.current.has(holeId)) return;
-    const first = !readFor.current.size;
+    if (!dare || solo || !c || !holeId || !holeReady) return;
+    // (a self-race's hole again from the tee of the round after one saved there: its best moved)
+    const again = readFor.current.has(holeId), first = !readFor.current.size;
+    if (again && !(dare === me && fresh0 && movedGhosts.current.has(holeId))) return;
+    movedGhosts.current.delete(holeId);
     readFor.current.add(holeId);
     if (first) (setDareHole(holeId), dare !== me && addFriend(dare)); // (a player opening their own link is not their own friend)
     // (a ghost unread is no duel: the dare is still said)
@@ -717,29 +723,29 @@ export default function Golf() {
         if (dareNow.current !== dare) return;
         const name = n || shortAddr(dare), has = !!(a || p), whose = dare === me ? "your own" : `${name}'s`;
         setRival((r) => ({ name, holes: { ...(r ? r.holes : {}), [holeId]: { assisted: a, pro: p } } }));
+        if (again) return; // (their new best: said already)
         // the link's hole: said on the picker (a link opens there) and as the hole opens; a later hole: only when there is a ghost
         if (first) setDareNote(has ? "" : `${name} dares you, with no ghost here yet: set the score to beat.`);
         if (has) setLinkNote(first ? `Race ${whose} ghost: your turn first.` : `${name} has a ghost here too: race it.`);
         else if (first) setLinkNote(`${name} dares you on this hole.`);
       })
       .catch(() => {});
-  }, [dare, solo, holeId, holeReady, me]);
+  }, [dare, solo, holeId, holeReady, me, fresh0, saves]);
   // the rival's bests on the course's holes, read once a rival is picked: their ghosts' screen lists them
-  // (null: the read failed, and no earlier one of theirs is kept)
-  const [rivalOn, setRivalOn] = useState<{ by: string; bests: ReadonlyMap<string, Readonly<Record<Mode, number>>> | null } | null>(null);
-  const bestsGiven = useRef(""); // a rival picked with their bests just read (the rival screen's check): not read again at once
+  // (null: the read failed, and no earlier one of theirs is kept; at: the player's rounds saved then)
+  const [rivalOn, setRivalOn] = useState<{ by: string; bests: ReadonlyMap<string, Readonly<Record<Mode, number>>> | null; at: number } | null>(null);
   useEffect(() => {
     const c = game.current && game.current.chain, ids = allList.filter((h) => h.official).map((h) => h.id);
-    // (again on each hole opened, once it is ready: a self-race's bests move with each round saved)
-    if (!dare || solo || !c || !ids.length || !holeReady) return;
-    if (bestsGiven.current === dare) return void (bestsGiven.current = "");
+    // (once a rival, the rival screen's read kept; again after a round saved in a self-race, and a failed one at the next hole)
+    const known = rivalOn && rivalOn.by === dare && rivalOn.bests && (dare !== me || rivalOn.at === saves);
+    if (!dare || solo || !c || !ids.length || !holeReady || known) return;
     let live = true;
     void c.bestsOf(ids, dare).then(
-      (bests) => live && setRivalOn({ by: dare, bests }),
-      () => live && setRivalOn((r) => (r && r.by === dare ? r : { by: dare, bests: null })),
+      (bests) => live && setRivalOn({ by: dare, bests, at: saves }),
+      () => live && setRivalOn((r) => (r && r.by === dare ? r : { by: dare, bests: null, at: saves })),
     );
     return () => void (live = false);
-  }, [dare, solo, allList, holeReady]);
+  }, [dare, solo, allList, holeReady, me, saves, rivalOn]);
   const rivalBests = dare && !solo && rivalOn && rivalOn.by === dare ? rivalOn.bests : undefined;
   // a duel is played only where their ghost is: the holes without one are not offered
   const duelOn = rivalBests || null;
@@ -753,9 +759,10 @@ export default function Golf() {
     const ghosts = rival && holeId ? rival.holes[holeId] : null, g = ghosts ? pickGhost(duelMode, ghosts) : null;
     return g && rival ? { ghost: g, name: rival.name, self: dare === me } : null;
   }, [rival, holeId, duelMode, dare, me]);
-  // (keyed on the ghost, not the duel: an account connecting mid-round must not start it again)
+  // (keyed on the ghost, not the duel: an account connecting mid-round must not start it again;
+  // and on the hole built: a game made again, the start retried, gets the duel still on)
   const raced = duel ? duel.ghost : null;
-  useEffect(() => game.current?.race(raced), [raced]);
+  useEffect(() => game.current?.race(raced), [raced, holeReady]);
   // the duel this round races (one armed mid-round starts with the next: the engine says when)
   const racing = duel && s && s.rival != null ? duel : null;
   // the weather the ghost was played in (read once a duel is armed), said when it was not today's
@@ -786,6 +793,7 @@ export default function Golf() {
   const pickRival = (player: string) => {
     if (player === dare && !solo) return; // (already the rival)
     readFor.current.clear();
+    movedGhosts.current.clear();
     setRival(null);
     setSolo(false);
     setDareHole("");
@@ -1053,6 +1061,8 @@ export default function Golf() {
         const row = ((s && s.allHoles) || []).find((h) => h.id === hole);
         setOnChainCard(markOnChain(cardKey(row || { id: hole }), r.strokes));
         if (roundKey.current.startsWith(hole + "#")) (setSaved(true), setGhostHere(true)); // (still on that hole: a kept round may be another's)
+        movedGhosts.current.add(hole);
+        setSaves((n) => n + 1);
       } else
         land({
           at: "refused",
@@ -1218,7 +1228,7 @@ export default function Golf() {
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
-          onPick={(addr, bests) => (sound("select"), bests && ((bestsGiven.current = addr), setRivalOn({ by: addr, bests })), raceWith(addr), setScreen("ghosts"))} />
+          onPick={(addr, bests) => (sound("select"), bests && setRivalOn({ by: addr, bests, at: saves }), raceWith(addr), setScreen("ghosts"))} />
       )}
       {screen === "ghosts" && (
         <Ghosts holes={allList} name={rivalName} bests={rivalBests} card={card} mode={aim} onRace={openHole}
@@ -2307,7 +2317,7 @@ function Unlocked({ fresh, onMeet }: { fresh: readonly Skin[]; onMeet: (id: stri
 
 /** The card: hole, par and your score, ten holes to a row, with the totals. */
 // fresh: the badges the current hole just earned, stamped on its score
-function Scorecard({ holes, card, saved, current, compact = false, fresh = [], onRules }: { holes: readonly HoleRow[]; card: Card; saved: Card; current: string | null; compact?: boolean; fresh?: readonly string[]; onRules: () => void }) {
+function Scorecard({ holes, card, saved, current, compact = false, fresh = NONE, onRules }: { holes: readonly HoleRow[]; card: Card; saved: Card; current: string | null; compact?: boolean; fresh?: readonly string[]; onRules: () => void }) {
   // compact, with a hole being played (the win card): that hole and four either
   // side, one row, the whole card a tap away
   const at = holes.findIndex((h) => h.id === current), windowed = compact && at >= 0 && holes.length > 9;
@@ -2320,7 +2330,12 @@ function Scorecard({ holes, card, saved, current, compact = false, fresh = [], o
   for (let i = 0; i < shown.length; i += per) rows.push(shown.slice(i, i + per));
   const pad = (row: readonly HoleRow[]) => Array.from({ length: per - row.length }, (_, k) => <td key={"pad" + k} className="pad" />);
   const t = totals(card, holes);
-  const earnedAt = badgesAt();
+  // the badges earned on each hole, read once for the card (a badge comes with a score, a save or a fresh one)
+  const earnedOn = useMemo(() => {
+    const on: Record<string, string[]> = {};
+    for (const [b, h] of Object.entries(badgesAt())) (on[h] ||= []).push(b);
+    return on;
+  }, [card, saved, fresh]); // eslint-disable-line react-hooks/exhaustive-deps -- badgesAt() reads storage: read again as they change
   return (
     <div className={"card" + (compact ? " card--compact" : "") + " scorecard"}>
       {rows.map((row, r) => (
@@ -2337,7 +2352,7 @@ function Scorecard({ holes, card, saved, current, compact = false, fresh = [], o
                 return (
                   <td key={h.id} className={kind + (h.id === current ? " now" : "")}>
                     {sc || ""}
-                    {sc && <CardStamps at={Object.keys(earnedAt).filter((b) => earnedAt[b] === h.id)} strokes={sc} par={par} seed={r * per + row.indexOf(h)} fresh={h.id === current ? fresh : []} />}
+                    {sc && <CardStamps at={earnedOn[h.id] || NONE} strokes={sc} par={par} seed={r * per + row.indexOf(h)} fresh={h.id === current ? fresh : []} />}
                     {sc && saved[cardKey(h)] === sc && <ChainSeal />}
                   </td>
                 );
@@ -2362,7 +2377,7 @@ function Scorecard({ holes, card, saved, current, compact = false, fresh = [], o
 }
 
 // badges: the cup's card (not compact) shows the badges earned, those fresh pressed on
-function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, onRules, fresh = [], badges }: BoardProps & { card: Card; saved: Card; compact?: boolean; onRules: () => void; fresh?: readonly string[]; badges?: { onOpen: () => void } }) {
+function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, onRules, fresh = NONE, badges }: BoardProps & { card: Card; saved: Card; compact?: boolean; onRules: () => void; fresh?: readonly string[]; badges?: { onOpen: () => void } }) {
   const [rank, setRank] = useState<{ at?: number; unnamed?: boolean } | null>(null);
   useEffect(() => {
     if (!chain || !me) return;
