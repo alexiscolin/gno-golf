@@ -9,8 +9,10 @@
 > modules and knows nothing about React; the realm's JSON is typed in `lib/types.ts`
 > and parsed in `lib/chain.ts` alone; the interface is a thin component on
 > top. Swapping the framework means rewriting the HUD, never the game.
-> Config travels in the query string, so one build serves any chain:
-> `?rpc=` the node, `?web=` gnoweb for the source links,
+> Config travels in the query string: `?rpc=` the node and `?web=` gnoweb for
+> the source links (a dev or local build only, and to a loopback, `*.gno.land`
+> over https, or `NEXT_PUBLIC_ALLOWED_HOSTS` host: a production build served
+> from a public host ignores them and plays `NEXT_PUBLIC_RPC`),
 > `?hole=` which hole to open (any id form below), or `?cup=island&hole=3` a
 > course hole by its place in its cup, and `?shot=angle,power` to fire one on
 > load (that last one is how the screenshots and the smoke test are taken).

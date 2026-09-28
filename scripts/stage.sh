@@ -2,8 +2,9 @@
 # stage.sh <ns> <out>: the three deployed packages (physics, course, golf),
 # under the namespace <ns>, ready for addpkg.
 #
-#   scripts/stage.sh gnogolf /tmp/stage        the production namespace
-#   scripts/stage.sh nym-golfer000 /tmp/stage  a rehearsal nym
+#   scripts/stage.sh nym-golfer000 /tmp/stage  the production namespace (onyx)
+#   scripts/stage.sh gnogolf /tmp/stage        the canonical repo tree (the
+#                                              identity; what check.sh stages)
 #
 # Copies every file of each package's directory but its tests (*_test.gno,
 # *_filetest.gno) into <out>/gno.land/{p,r}/<ns>/…, as it is. The one change

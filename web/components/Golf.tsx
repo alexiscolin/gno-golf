@@ -90,7 +90,7 @@ type Rec = null
   | { at: "unsure"; error: string; sent: boolean; hash?: string; was?: number }
   | { at: "saved"; stays?: number };
 
-/** Config travels in the query string, so one build serves any chain. */
+/** Config travels in the query string (a public production build keeps its own node: safeEndpoint). */
 interface Config {
   rpc: string;
   web: string;

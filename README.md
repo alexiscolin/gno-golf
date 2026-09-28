@@ -113,8 +113,10 @@ npm run build   # static export to web/out/, host it anywhere
 npm run typecheck && npm run lint && npm run selfcheck   # selfcheck fails if the client's copy of the realm's rules drifts
 ```
 
-The client takes its config from the URL, so one build works with any chain:
-`?rpc=`, `?web=`, `?hole=garden/7` or `?cup=garden&hole=7`.
+The client takes its config from the URL: `?hole=garden/7` or
+`?cup=garden&hole=7`, and in a dev or local build `?rpc=` and `?web=` (a
+production build served from a public host ignores them and plays
+`NEXT_PUBLIC_RPC` and `NEXT_PUBLIC_WEB`).
 `NEXT_PUBLIC_CLIPS=1` at build time offers a clip of the holing shot in the
 hole-finished card ([ADR-003](adr/adr-003-sharing.md); `?clips` in a dev build).
 `NEXT_PUBLIC_POSTHOG_KEY` turns on anonymous audience measurement (PostHog EU,
