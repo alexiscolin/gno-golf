@@ -57,13 +57,18 @@ chain time and is the same for everyone.
 
 You need a `gnolang/gno` checkout next to this repo, Go, and Node.
 
-**1. The chain.** The `gnodev` and `gnokey` you may have installed are older
-than the checkout (they fail with `pubKeyAddress does not have a body`), so
-build them from source:
+**1. The chain.** The game deploys on onyx (`onyx-1`, mainnet's code), so the
+tools are built from the checkout at the tag `chain/onyx`, into the folder
+the scripts look in (`GNO_TOOLCHAIN`, `~/.cache/gno-toolchains/onyx` unless
+set). Each finds its `GNOROOT`, the checkout, by itself:
 
 ```sh
-(cd ../gno/contribs/gnodev && go build -o /usr/local/bin/gnodev .)
-(cd ../gno/gno.land && go build -o /usr/local/bin/gnokey ./cmd/gnokey)
+t=${GNO_TOOLCHAIN:-~/.cache/gno-toolchains/onyx}
+git -C ../gno checkout chain/onyx
+(cd ../gno/gnovm && go build -o $t/gno ./cmd/gno)
+(cd ../gno/gno.land && go build -o $t/gnokey ./cmd/gnokey)
+(cd ../gno/contribs/gnodev && go build -o $t/gnodev .)
+export PATH=$t:$PATH
 gnodev local -empty-blocks -empty-blocks-interval 5   # from this repo's root
 ```
 
@@ -80,7 +85,7 @@ the hard way:
   won't add a second `dev` network).
 - **Open `http://127.0.0.1:8888/r/sys/namereg/v0` once.** gnodev loads
   packages lazily, and registering a name straight after a restart fails
-  until the registrar has been loaded. Pearl and mainnet deploy it at genesis,
+  until the registrar has been loaded. Onyx and mainnet deploy it at genesis,
   so this is local only.
 
 **2. The holes.** The course is data (`data/holes.txt`), and only golf's owner
@@ -113,9 +118,9 @@ hole-finished card ([ADR-003](adr/adr-003-sharing.md); `?clips` in a dev build).
 `NEXT_PUBLIC_POSTHOG_KEY` turns on anonymous audience measurement (PostHog EU,
 [docs/analytics.md](docs/analytics.md)); unset, as in local dev, nothing loads.
 
-For the Gno tests, point `GNOHOME` at a package cache holding the gno
-checkout's `examples/` copies of `avl`, `ufmt`, `uassert` and `urequire`: the
-module cache's `p/nt/avl` differs from the chain's.
+`scripts/check.sh` runs the Gno tests with that `gno` (or the one `GNO`
+names), which fetches the packages the tests import from gno.land (mainnet,
+the code onyx runs) into `$GNO_TOOLCHAIN/gnohome`, a cache of its own.
 
 ## Writing a hole
 

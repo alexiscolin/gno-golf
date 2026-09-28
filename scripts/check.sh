@@ -1,6 +1,6 @@
 #!/bin/sh
 # check.sh [--smoke]: everything that must pass before a commit or a deploy.
-# The Gno packages' tests with the pearl toolchain (their gas and storage
+# The Gno packages' tests with the onyx toolchain (their gas and storage
 # goldens included), the 74 holes' fingerprints, and the deployed packages
 # staged as addpkg takes them (stage.sh: the repo's files byte for byte,
 # linted); then the client: types, lint, the realm sync check, the unit tests
@@ -10,21 +10,23 @@
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 
-store=${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/pearl
-GNO=${GNO:-$store/gno}
+# The onyx toolchain (the README, "Running it locally"): GNO_TOOLCHAIN is the
+# folder of the gno, gnokey and gnodev built from a gno checkout at the tag
+# chain/onyx, each finding its GNOROOT (that checkout) by itself; GNO is the
+# gno binary alone.
+toolchain=${GNO_TOOLCHAIN:-${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/onyx}
+GNO=${GNO:-$toolchain/gno}
 if [ -x "$GNO" ]; then
-	: "${GNOROOT:=$(go env GOMODCACHE)/github.com/gnolang/gno@$(go version -m "$GNO" | awk '$1 == "mod" {print $3}')}"
-	export GNOROOT
-	echo "== gno test (pearl toolchain)"
-	(cd "$root" && GNOHOME=$store/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf)
+	echo "== gno test (onyx toolchain)"
+	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf)
 	echo "== the holes' fingerprints"
-	(cd "$root" && GNOHOME=$store/gnohome "$GNO" test -run TestFingerprint ./gno.land/r/gnogolf/...)
+	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test -run TestFingerprint ./gno.land/r/gnogolf/...)
 	echo "== the staged packages: the repo's, byte for byte, and linted"
 	stage=$(mktemp -d)
 	trap 'rm -rf "$stage"' EXIT
 	GNO=$GNO "$root/scripts/stage.sh" gnogolf "$stage"
 else
-	echo "check.sh: no pearl gno at $GNO: the Gno tests are skipped" >&2
+	echo "check.sh: no onyx gno at $GNO: the Gno tests are skipped" >&2
 fi
 
 cd "$root/web"

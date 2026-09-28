@@ -11,16 +11,15 @@
 # data. Sorted by slot, so a change to a hole is a one-line diff to review.
 # Then scripts/paritydata.sh copies it into golf's parity test.
 #
-# GNO is the gno binary (default: the pearl toolchain store), GNOROOT its
-# source tree. The packages run one at a time, at low priority.
+# GNO is the gno binary (default: the onyx toolchain's, in GNO_TOOLCHAIN: see
+# check.sh). The packages run one at a time, at low priority.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-store=${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/pearl
-GNO=${GNO:-$store/gno}
-: "${GNOROOT:=$(go env GOMODCACHE)/github.com/gnolang/gno@$(go version -m "$GNO" | awk '$1 == "mod" {print $3}')}"
-: "${GNOHOME:=$store/gnohome}"
-export GNOROOT GNOHOME
+toolchain=${GNO_TOOLCHAIN:-${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/onyx}
+GNO=${GNO:-$toolchain/gno}
+: "${GNOHOME:=$toolchain/gnohome}"
+export GNOHOME
 
 cd "$root"
 mkdir -p data

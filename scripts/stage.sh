@@ -13,16 +13,16 @@
 # directories, and not deployed. Then it checks that each staged package is
 # the repo's, file for file and byte for byte once the namespace is read
 # back; that nothing of the old namespace is left; lints the result with the
-# pearl toolchain; and prints each package's size.
+# onyx toolchain; and prints each package's size.
 #
-# GNO is the gno binary to lint with (default: the pearl toolchain store,
-# see docs/design/deploy-v1.md), GNOROOT its source tree.
+# GNO is the gno binary to lint with (default: the onyx toolchain's, in
+# GNO_TOOLCHAIN: see check.sh).
 set -eu
 
 ns=${1:?usage: stage.sh <ns> <out>}
 out=${2:?usage: stage.sh <ns> <out>}
 if [ "$ns" != gnogolf ] && ! printf %s "$ns" | grep -Eqx 'nym-[a-z]{5,13}[0-9]{3}'; then
-	echo "stage.sh: $ns is neither gnogolf nor a pearl nym name (nym-<5 to 13 letters><3 digits>)" >&2
+	echo "stage.sh: $ns is neither gnogolf nor a nym name (nym-<5 to 13 letters><3 digits>)" >&2
 	exit 1
 fi
 
@@ -69,15 +69,13 @@ for m in $(find "$out/gno.land" -name gnomod.toml); do
 done
 [ $fail = 0 ] || exit 1
 
-store=${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/pearl
-GNO=${GNO:-$store/gno}
+toolchain=${GNO_TOOLCHAIN:-${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/onyx}
+GNO=${GNO:-$toolchain/gno}
 if [ -x "$GNO" ]; then
-	: "${GNOROOT:=$(go env GOMODCACHE)/github.com/gnolang/gno@$(go version -m "$GNO" | awk '$1 == "mod" {print $3}')}"
-	export GNOROOT
 	[ -f "$out/gnowork.toml" ] || : >"$out/gnowork.toml"
-	(cd "$out" && GNOHOME=$store/gnohome "$GNO" lint ./gno.land/...)
+	(cd "$out" && GNOHOME=$toolchain/gnohome "$GNO" lint ./gno.land/...)
 else
-	echo "stage.sh: no pearl gno at $GNO, not linted" >&2
+	echo "stage.sh: no onyx gno at $GNO, not linted" >&2
 fi
 
 for d in $(find "$out/gno.land" -name gnomod.toml -exec dirname {} \; | sort); do
