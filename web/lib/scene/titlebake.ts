@@ -64,7 +64,7 @@ const TILE_SKY: Record<string, [number, string][]> = {
  *  turn, closes in by adv and comes down by drop (fractions), eased at both
  *  ends so the clips cross-fade on a calm frame. still: the card's own view
  *  and moment, so the clip's first frame is its still. */
-export interface CupShot { a: number; r: number; h: number; turn: number; adv: number; drop: number; still?: boolean }
+interface CupShot { a: number; r: number; h: number; turn: number; adv: number; drop: number; still?: boolean }
 
 /**
  * A cup card's clip, a frame at a time: clip(world, hole, w, h, shot) ->

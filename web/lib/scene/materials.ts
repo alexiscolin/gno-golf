@@ -10,7 +10,7 @@ type Disposable = { dispose(): void };
 /** A shader hook, as onBeforeCompile gets it. */
 type Shader = Parameters<THREE.Material["onBeforeCompile"]>[0];
 /** A mesh, a line, points or a sprite: what has a geometry and a material. */
-export type Drawn = THREE.Mesh | THREE.Line | THREE.Points | THREE.Sprite;
+type Drawn = THREE.Mesh | THREE.Line | THREE.Points | THREE.Sprite;
 export const isDrawn = (o: THREE.Object3D): o is Drawn =>
   o instanceof THREE.Mesh || o instanceof THREE.Line || o instanceof THREE.Points || o instanceof THREE.Sprite;
 // the maps a material may own
@@ -372,7 +372,7 @@ export function waterMat() {
 
 /** One row of a bank's face: its height, how far out it leans, the colour
  *  of the band below it. */
-export type BankRow = readonly [y: number, out: number, color: number];
+type BankRow = readonly [y: number, out: number, color: number];
 const BANK_BANDS = [0xe6cb98, 0xbd9466, 0xd9bb88, 0xa98158] as const; // sand, earth, sand, earth
 /**
  * A natural bank of earth and sand, from its lip (top) down to foot, where

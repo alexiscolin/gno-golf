@@ -73,7 +73,7 @@ const CLIFF = 11; // how far in front of the plot the shelf ends: past the overv
 
 /** How high the snow lies above GRASS: flat round the board, rising into
  *  drifts further out and up the slope behind it. */
-function snowAt(W: number, H: number, x: number, z: number) {
+function snowAt(W: number, x: number, z: number) {
   const d = Math.max(0, -x - 2, x - W - 2, -z - 2);
   return smoothstep(d / 14) * (1.5 + 0.9 * Math.sin(x * 0.21 + z * 0.13) + 0.5 * Math.cos(x * 0.07 - z * 0.3)) + smoothstep(-z / 40) * 6;
 }
@@ -134,7 +134,7 @@ function snowField(s: Hole) {
     // camera looks over it) and flat again at the shelf's lip
     const front = 1 - 0.55 * smoothstep((z - H) / 4) - 0.45 * smoothstep((z - H - 8) / 5);
     const dune = 1.6 * (0.65 + 0.35 * n) * smoothstep((e - 0.7) / 3.2) * front;
-    let h = Math.max(lip, dune + snowAt(W, H, x, z));
+    let h = Math.max(lip, dune + snowAt(W, x, z));
     // down to GRASS at a cliff's or a crack's edge
     for (const q of open) {
       const dx = Math.max(q.min[0] - x, 0, x - q.max[0]), dz = Math.max(q.min[1] - z, 0, z - q.max[1]);
@@ -304,7 +304,7 @@ function peaks(rand: Rand, X0: number, X1: number, Z0: number, Z1: number, drop:
   // (three, lit to dark round the peak), and a snow cap on its upper part —
   // the same cone, scaled to that height and a hair larger, so its edge is a
   // clean ring following the ridges. Sometimes a lower shoulder beside it.
-  const W = box.max.x - ISLAND.x, H = box.max.z - ISLAND.front;
+  const W = box.max.x - ISLAND.x;
   const tones = [new THREE.Color(0x8b9db3), new THREE.Color(0x71839b), new THREE.Color(0x5c6c84)];
   const cone = (x: number, z: number, h: number, r: number, rot: number, k: number, y0: number) => {
     const rock = new THREE.ConeGeometry(r, h, 5, 1).toNonIndexed();
@@ -338,7 +338,7 @@ function peaks(rand: Rand, X0: number, X1: number, Z0: number, Z1: number, drop:
     sk.translate(x, y0 + r * 0.12, z);
     geos.push(sk);
   };
-  const massif = (x: number, z: number, h: number, k: number, y0 = GRASS + snowAt(W, H, x, z) - 0.5) => {
+  const massif = (x: number, z: number, h: number, k: number, y0 = GRASS + snowAt(W, x, z) - 0.5) => {
     const r = h * (0.62 + rand() * 0.12), rot = rand() * Math.PI;
     skirt(x, z, r, k, y0);
     cone(x, z, h, r, rot, k, y0);
@@ -376,7 +376,7 @@ function peaks(rand: Rand, X0: number, X1: number, Z0: number, Z1: number, drop:
     const top = new THREE.Color(0x6a8496).lerp(hazeC, k), foot = new THREE.Color(0x8ea6ba).lerp(hazeC, k);
     for (let i = 0; i < n; i++) {
       const [xa, ha] = pts[i], [xb, hb] = pts[i + 1];
-      const ya = y0 + snowAt(W, H, xa, z), yb = y0 + snowAt(W, H, xb, z);
+      const ya = y0 + snowAt(W, xa, z), yb = y0 + snowAt(W, xb, z);
       pos.push(xa, ya - 0.5, z, xb, yb - 0.5, z, xa, ya + ha, z, xb, yb - 0.5, z, xb, yb + hb, z, xa, ya + ha, z);
       for (const c of [foot, foot, top, foot, top, top]) col.push(c.r, c.g, c.b);
     }
@@ -745,7 +745,7 @@ function cableCar(W: number) {
  * A bobsleigh run down the slope behind, left of the chalet: an iced channel
  * with banked walls snaking down, and a bob racing down it now and then.
  */
-function bobsleigh(X0: number, X1: number, H: number, bank: Height, reserve: Reserve) {
+function bobsleigh(X0: number, X1: number, bank: Height, reserve: Reserve) {
   const g = new THREE.Group();
   const x0 = X0 + (X1 - X0) * 0.45;
   const ctrl = [[x0 - 4, -16], [x0 + 3, -13], [x0 - 2, -10.5], [x0 + 4, -8], [x0 + 1, -5.6]];
@@ -939,7 +939,7 @@ function snowFence(rand: Rand) {
 }
 
 /** Ski tracks and footprints across the front snow, where no one stands. */
-function tracks(rand: Rand, X0: number, X1: number, z0: number, z1: number, W: number, bank: Height, gaps: readonly (readonly [number, number])[] = []) {
+function tracks(X0: number, X1: number, z0: number, z1: number, W: number, bank: Height, gaps: readonly (readonly [number, number])[] = []) {
   const inGap = (x: number) => gaps.some(([a, b]) => x > a - 0.4 && x < b + 0.4);
   const g = new THREE.Group();
   const mat = new THREE.MeshBasicMaterial({ color: M.shadow, transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
@@ -1263,12 +1263,12 @@ function decor(s: Hole, bank: Height = () => 0) {
   grove(X1 + 5, H + 5, 4, 0.6);
   // snow fences half buried along the front, ski tracks and footprints
   for (let x = X0 + 4; x < X1 - 6; x += 11 + rand() * 6) place(snowFence(rand), x, front0 + 1 + rand() * 2, 1.8, (rand() - 0.5) * 0.4);
-  g.add(tracks(rand, X0, X1, front0, front1, W, bank, crevasses(s)));
+  g.add(tracks(X0, X1, front0, front1, W, bank, crevasses(s)));
   // a ski jump far off on the slope behind, left of centre
   place(skiJump(), X0 + (X1 - X0) * 0.36, -11, 2.5, 0);
 
   g.add(cableCar(W));
-  g.add(bobsleigh(X0, X1, H, bank, reserve));
+  g.add(bobsleigh(X0, X1, bank, reserve));
   // the ski lift (mountain8): a line of its own across the lane at each bar
   if ((s.walls || []).some((w) => w.skin === "lift")) g.add(liftLines(s, night, reserve));
   g.add(eagles(W, H));

@@ -27,7 +27,7 @@ const FAMILIES: readonly [Badge["family"], string][] = [["skill", "Skill"], ["we
 
 /** A badge's medal: a paper rim inked round its family's colour, on a red
  *  ribbon; a dashed grey one until it is earned. */
-export function Medal({ b, on }: { b: Badge; on: boolean }) {
+function Medal({ b, on }: { b: Badge; on: boolean }) {
   return (
     <svg viewBox="0 0 48 54" className={`medal medal--${b.family}` + (on ? "" : " medal--off")} aria-hidden="true">
       <path d="M15 34 11 52l6-3 4 4 3-16M33 34l4 18-6-3-4 4-3-16" className="medal__ribbon" />

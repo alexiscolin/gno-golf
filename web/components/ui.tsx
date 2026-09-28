@@ -8,20 +8,17 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAtt
 
 /**
  * A button. variant: "primary" (green), "secondary" (paper), "gold" (the
- * front's call to action: a duel's Race), "chip" (a HUD card that is a button). badge: a small label pinned to its top-right corner
- * ("Coming soon", PRO).
+ * front's call to action: a duel's Race), "chip" (a HUD card that is a button).
  */
 const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", gold: "btn--gold", chip: "btn--chip" };
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: keyof typeof VARIANTS;
-  badge?: ReactNode;
 }
-export function Button({ variant = "secondary", badge = null, className = "", children, ...props }: ButtonProps) {
+export function Button({ variant = "secondary", className = "", children, ...props }: ButtonProps) {
   const v = VARIANTS[variant] || "btn--ghost";
   return (
     <button className={`btn ${v} ${className}`.trim()} {...props}>
       {children}
-      {badge && <em className="badge">{badge}</em>}
     </button>
   );
 }
@@ -133,7 +130,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
  * Escape closes it (when it can be closed), and focus goes back to what
  * opened it once it is gone. Returns the ref for the dialog's element.
  */
-export function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => void) | null | undefined) {
+function useDialog<T extends HTMLElement = HTMLElement>(onClose: (() => void) | null | undefined) {
   const ref = useRef<T>(null);
   const close = useRef(onClose);
   close.current = onClose;

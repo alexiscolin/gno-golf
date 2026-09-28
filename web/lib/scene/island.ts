@@ -435,7 +435,7 @@ function palm(rand: Rand, h = 4.5 + rand() * 2.5) {
 }
 
 /** A gnome's beach hut: a thatched mushroom cap on a stout pale stem, a round door. */
-function paillote(rand: Rand, big = 1) {
+function paillote(big = 1) {
   const g = new THREE.Group();
   const r = 1.0 * big, hgt = 1.6 * big;
   const body = drawn(new THREE.CylinderGeometry(r * 0.88, r, hgt, 14), flat(C.cream));
@@ -1357,7 +1357,7 @@ function decor(s: Hole, bank: Height = () => 0): THREE.Group {
     const x = W * (0.25 + (0.5 * k) / Math.max(1, huts - 1)) + (rand() - 0.5) * 3, z = -5 - rand() * 2;
     const big = 0.8 + rand() * 0.35;
     if (dry(x, z, 2) && free(x, z, 2 * big)) {
-      put(paillote(rand, big), x, z, 2 * big, (rand() - 0.5) * 0.4).add(shelter(wrand, [[-0.5 * big, 1.35 * big + 0.1], [0.5 * big, 1.35 * big + 0.1]]));
+      put(paillote(big), x, z, 2 * big, (rand() - 0.5) * 0.4).add(shelter(wrand, [[-0.5 * big, 1.35 * big + 0.1], [0.5 * big, 1.35 * big + 0.1]]));
       perches.push(new THREE.Vector3(x, GRASS + bank(x, z) + (1.6 + 1.75 * 0.62 + 0.05) * big, z)); // the top of its straw cap
     }
   }

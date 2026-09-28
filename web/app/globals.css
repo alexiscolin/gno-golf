@@ -237,8 +237,6 @@ html, body {
 .card--score {
   text-align: center;
   min-width: 84px;
-  display: grid;
-  align-content: center;
 }
 
 /* a small caps label (a HUD card's, a hole card's "Their best") */
@@ -271,7 +269,6 @@ html, body {
 .card--score strong {
   font-size: 28px;
   font-weight: 700;
-  line-height: 1.1;
   display: block;
 }
 
@@ -323,7 +320,6 @@ html, body {
   right: 12px;
   bottom: 12px;
   width: min(360px, calc(100vw - 24px));
-  background: var(--paper);
   border: var(--edge);
   border-radius: 24px;
   box-shadow: -6px 6px 0 var(--ink);
@@ -1874,16 +1870,14 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 
 /* ---------------------------------------------------------- shared controls
    One look for every control (components/ui.tsx): a button sinks when pressed,
-   lifts a little under the pointer, rings when focused, greys when disabled;
-   a badge sits in its top-right corner. The segmented switch and the toggle
-   are the same family. */
+   lifts a little under the pointer, rings when focused, greys when disabled.
+   The segmented switch and the toggle are the same family. */
 .btn, .burger, .adena { position: relative; transition: transform var(--t-press), box-shadow var(--t-press), background .15s; }
 .btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
 .btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
 /* inside the button: .seg clips its overflow, so a ring outside shows as a stripe beside the next segment */
 .seg button:focus-visible { outline: var(--ring); outline-offset: -5px; box-shadow: inset 0 0 0 7px var(--ink); } /* the gold inked on both sides (ink 0-2, gold 2-5, ink 5-7) */
 .btn[disabled] { cursor: default; opacity: .7; box-shadow: 0 2px 0 var(--ink); transform: none; }
-.badge { position: absolute; top: -10px; right: -8px; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .03em; padding: 2px 7px; border-radius: var(--pill); background: var(--hat-ink); color: var(--paper); border: var(--edge); white-space: nowrap; pointer-events: none; }
 /* a HUD card that is a button (the leaderboard) */
 .btn--chip { background: var(--paper); color: var(--ink); display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 800; }
 .btn--chip svg { width: 22px; height: 22px; fill: #f5c542; stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
@@ -2233,7 +2227,6 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   /* the leaderboard chip: the icon alone, above the bottom row (Restart and Whole course) */
   .lbchip { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 118px); right: 14px; }
   .lbchip span { display: none; }
-  .lbchip .badge { top: -8px; right: -10px; font-size: 10px; padding: 1px 5px; }
   /* the leaderboard: the screen's full height */
   .boards { height: calc(100dvh - 40px); }
   /* a cup's standings: the emblem smaller, the sums on their own row */
@@ -2268,11 +2261,6 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
 @media (max-width: 700px), (max-height: 640px), (max-aspect-ratio: 1/1) {
   .screen.worlds { place-items: start center; align-content: start; padding: 0; }
   .worlds__in { padding: 96px 0 72px; }
-}
-/* wide and a 13" laptop's height, centred: in the middle of what the network
-   banner's row leaves (34px + its 48), as the title, the cards clear of it */
-@media (min-width: 701px) and (min-height: 641px) and (max-height: 820px) and (min-aspect-ratio: 1/1) {
-  body:has(.netbanner) .screen.worlds { padding-bottom: 90px; }
 }
 /* a tablet on its side: the fact pills wrap onto "Tap to start" */
 @media (max-width: 1100px) and (min-aspect-ratio: 1/1) { .screen--title .title__facts { display: none; } }

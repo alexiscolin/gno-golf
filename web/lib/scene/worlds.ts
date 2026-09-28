@@ -47,7 +47,7 @@ export interface Rough {
   plant?: (rand: () => number, s: Hole, x: number, z: number) => THREE.Object3D | null;
 }
 /** A world module (see the list above). */
-export interface World {
+interface World {
   base(s: Hole, box: THREE.Box3): THREE.Object3D;
   edging(s: Hole, box: THREE.Box3): THREE.Object3D;
   berms(s: Hole): { group: THREE.Object3D; height: Height };

@@ -60,7 +60,7 @@ const simulate = (hole: string, shots: string[], period: number) => (sims++, rpc
 // --- signals ------------------------------------------------------------------
 
 // Signal weights; they sum to 1, so the score is a weighted mean of 0-1 signals.
-export const WEIGHTS = { knife: 0.35, values: 0.3, optimal: 0.2, volume: 0.15 };
+const WEIGHTS = { knife: 0.35, values: 0.3, optimal: 0.2, volume: 0.15 };
 type Signal = keyof typeof WEIGHTS;
 /** A shot as numbers: angle (degrees), power, tick. */
 interface Shot { a: number; p: number; t: number }
@@ -107,7 +107,7 @@ async function fragility(r: Rec) {
 
 // Scores one player: bests = { slot: strokes } over the official holes,
 // rounds = the finished rounds on record [{ hole, shots: ["a,p,t"], strokes, period }].
-export async function scorePlayer({ bests, rounds }: { bests: Record<string, number>; rounds: Rec[] }) {
+async function scorePlayer({ bests, rounds }: { bests: Record<string, number>; rounds: Rec[] }) {
   const reasons: string[] = [];
   const s = {} as Record<Signal, number>;
 

@@ -626,7 +626,7 @@ export function mouthAt(skin: string, x: number, y: number, z: number, R: number
 
 // ------------------------------------------------------------- rooftops
 
-export const ROOF_Y = -2; // the houses' eaves round the lane: their ridges come up to just under it
+const ROOF_Y = -2; // the houses' eaves round the lane: their ridges come up to just under it
 export const STREET_Y = -4.6; // the streets down between the houses, where a ball off the roofs lands
 export const SLAB = 0.4; // the lane's roof slab, its edge down from the lane's top (course.ts draws it)
 const SET = 0.15; // the lane buildings' walls, set back under the slab's edge

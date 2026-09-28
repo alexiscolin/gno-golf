@@ -1252,19 +1252,19 @@ function patch(z: Zone, t: Terrain, map: THREE.Texture, tile: number, kerb: numb
   return g;
 }
 // the floor: bricks over the whole plaza
-function brickFloor(z: Zone, s: Hole, t: Terrain) {
+function brickFloor(z: Zone, t: Terrain) {
   const g = new THREE.Group(), pts = outlineOf(z);
   g.add(sheet(pts, z, t, flat(0xffffff, { map: brickTex() }), 4, 0.012));
   // (the tram rails are the tram lines' own: course.ts tramLine)
   return g;
 }
-const PLAZA_GROUND: Record<string, (z: Zone, s: Hole, t: Terrain) => THREE.Group> = {
+const PLAZA_GROUND: Record<string, (z: Zone, t: Terrain) => THREE.Group> = {
   brick: brickFloor,
-  herringbone: (z, s, t) => { const tex = herringTex(); tex.rotation = Math.PI / 4; return patch(z, t, tex, 8, T.curb); },
-  marble: (z, s, t) => patch(z, t, marbleTex(), 0, 0x8d9ca6),
+  herringbone: (z, t) => { const tex = herringTex(); tex.rotation = Math.PI / 4; return patch(z, t, tex, 8, T.curb); },
+  marble: (z, t) => patch(z, t, marbleTex(), 0, 0x8d9ca6),
   // a parterre: lawn and low flowers in a stone kerb, low enough to read as
   // ground a ball rolls through (slowly), not a wall of stems
-  flowerbed: (z, s, t) => {
+  flowerbed: (z, t) => {
     const g = patch(z, t, bedTex(), 3, T.curb), rand = seeded("bed" + z.min.join() + z.max.join());
     const { cx, cz, hx, hz } = boxOf(z);
     for (let i = 0; i < hx * hz * 2.2; i++) {
@@ -1678,7 +1678,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
   if (kind === "zone") {
     const zone = item as Zone; // (kind says which)
     const [x0, z0] = zone.min, [x1, z1] = zone.max, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
-    if (PLAZA_GROUND[skin]) return PLAZA_GROUND[skin](zone, s, t);
+    if (PLAZA_GROUND[skin]) return PLAZA_GROUND[skin](zone, t);
     if (skin === "plank bridge") return plankBridge(zone, t);
     if (skin === "funbox") return funboxEdge(zone, t);
     if (skin === "quarter pipe") return new THREE.Group(); // the ground rises itself: concrete, nothing on it

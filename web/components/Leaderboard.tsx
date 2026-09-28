@@ -65,9 +65,9 @@ const ConnectLink = ({ onConnect }: { onConnect?: () => void }) =>
   onConnect ? <button className="linkish" onClick={onConnect}>Connect Adena</button> : <>Connect Adena</>;
 
 /** An empty board's places, drawn blank: the table is there before its first row. */
-const Ghosts = ({ n = 3 }: { n?: number }) => (
+const Ghosts = () => (
   <ol className="lb__ghosts" aria-hidden="true">
-    {Array.from({ length: n }, (_, i) => (
+    {Array.from({ length: 3 }, (_, i) => (
       <li key={i}>
         <span className="lb__rank">{i + 1}</span>
         <i />
@@ -487,7 +487,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
                 <>
                   <Place at={r.at} plain />
                   <span className="lb__who">
-                    <Who chain={chain} addr={r.player} me={me} full link={link(r.player)} />
+                    <Who chain={chain} addr={r.player} me={me} link={link(r.player)} />
                     <FlagMark f={showAll && flags[r.player]} />
                   </span>
                   {score(r)}
@@ -602,16 +602,6 @@ function NameLink({ chain, children }: { chain: Chain | null; children: ReactNod
   );
 }
 
-/**
- * Takes a gno.land name without leaving the game: the registrar's rules
- * checked as it is typed out, then one transaction in Adena. The boards list
- * named players only, so this comes before the save that should rank.
- * onPick: the field alone, part of the save below it (the name goes in the
- * save's own signature): a name the chain would take is handed up, else
- * null, with ready: whether the save may go (a name checked, or none typed:
- * no name), never while a typed one is wrong or still being checked; suggest
- * fills it to start with.
- */
 /**
  * A name typed (what follows "nym-"), the chain asked about it once the typing
  * rests: taken, too close to one taken. why: "" free, a reason, null when the
@@ -762,9 +752,9 @@ export function useWho(chain: Chain | null, addr: string, me?: string | null) {
   return { label: addr === me ? "You" : name || shortAddr(addr), name };
 }
 /** A ranked player as the boards show them (useWho), their address under their name in full. */
-function Who({ chain, addr, me, full = false, link }: { chain: Chain | null; addr: string; me?: string | null; full?: boolean; link?: string }) {
+function Who({ chain, addr, me, link }: { chain: Chain | null; addr: string; me?: string | null; link?: string }) {
   const { label, name } = useWho(chain, addr, me);
-  const body = full && (name || addr === me) ? (
+  const body = name || addr === me ? (
     <span className="who">
       <span className="who__name">{label}</span>
       <small>{shortAddr(addr)}</small>

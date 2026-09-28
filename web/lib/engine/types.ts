@@ -21,7 +21,7 @@ export type Tier = "high" | "low";
 /** What went wrong: the hole's load, its drawing, a shot, the round's stroke limit. */
 export type ErrorKind = "load" | "draw" | "shot" | "limit";
 /** A word on why the ball speeds up or drifts, and when it was said. */
-export interface CauseNote {
+interface CauseNote {
   label: string;
   at: number;
 }

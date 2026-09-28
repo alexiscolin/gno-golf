@@ -49,7 +49,6 @@ export const BackButton = ({ label, onClick }: { label: string; onClick: () => v
     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
   </CornerButton>
 );
-/** The about screen's corner button (an inked ⓘ). */
 /** A screen's about button: an inked (i) in the top-right corner. */
 export const AboutButton = ({ onClick }: { onClick: () => void }) => (
   <CornerButton side="about" label="About Gnogolf" onClick={onClick}>

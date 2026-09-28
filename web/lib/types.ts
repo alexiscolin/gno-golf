@@ -128,13 +128,6 @@ interface RoundRow extends Versioned {
   shots: string;
 }
 
-/** State(): HoleState with the play count and the latest rounds. */
-export interface State extends HoleState {
-  plays: number;
-  roundsTotal: number;
-  rounds: readonly RoundRow[];
-}
-
 /** Round(): one player's round, its last stroke replayed; null when there is none. */
 export interface Round extends RoundRow {
   path: readonly Vec2[];
@@ -174,7 +167,7 @@ export interface Extras extends Versioned {
   zones: readonly Zone[];
 }
 
-/** One hole as Holes() and Community() list it. */
+/** One hole as Holes() lists it. */
 export interface HoleRow {
   id: string;
   name: string;
@@ -195,13 +188,6 @@ export interface Holes extends Versioned {
   play: string;
   successor: string;
   holes: readonly HoleRow[];
-}
-
-/** Community(): a page of every community hole, every version. */
-export interface Community extends Versioned {
-  rows: readonly HoleRow[];
-  /** the `after` of the next page, "" at the end */
-  next: string;
 }
 
 export interface StrokesRow {

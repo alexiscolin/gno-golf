@@ -7,23 +7,22 @@
 
 /* ------------------------------------------------------------ the system */
 
-/* the backdrop's two colours, registered so a new world's cross-fades in */
+/* the backdrop's colour, registered so a new world's cross-fades in */
 @property --s0 { syntax: "<color>"; inherits: true; initial-value: #fff3df; }
-@property --s1 { syntax: "<color>"; inherits: true; initial-value: #8fcba8; }
 
 /* the tokens, the garden's by default; a world's tint over them (.tint--<world>,
    and the title's and the cup won's own classes).
-   The backdrop's two stops (--s0 top, --s1 foot) are the scenes' own colours,
-   mirrored by hand: keep them in step with their sources.
-     garden   day sky #fff3df (scene/camera.ts makeScene) -> moss #8fcba8 (scene/materials.ts C)
-     island   shallow #5fd0cc softened to #8fd8d0 -> sandHi #f7e6ba (scene/island.ts P)
-     town     wall #f6ead3 -> roofFar #e2c9c4 (scene/town.ts T; globals.css --town-roof)
-     mountain haze #eef3f8 -> ice #bfe6f4 (scene/mountain.ts M)
+   The backdrop (--s0) is the scenes' own colour, mirrored by hand: keep it
+   in step with its source.
+     garden   day sky #fff3df (scene/camera.ts makeScene)
+     island   shallow #5fd0cc softened to #8fd8d0 (scene/island.ts P)
+     town     wall #f6ead3 (scene/town.ts T)
+     mountain haze #eef3f8 (scene/mountain.ts M)
    A map's ground and water are those scenes' too: moss and a pond, the
    island's sand and shallows, the town's cobbles and canal, snow and ice. */
 .screen--title, .front, .victory, .tint--garden {
-  /* the sky, top to horizon; a card's frame, light to deep; a diorama's sky */
-  --s0: #fff3df; --s1: #8fcba8;
+  /* the sky; a card's frame, light to deep; a diorama's sky */
+  --s0: #fff3df;
   --c1: #7fe8a8; --c2: #1f9a6a;
   --stage: #d3e8c8; /* the picker's card behind the gnome: a flat, muted colour of the world */
   --art: linear-gradient(180deg, #7ec8ff, #ffd6a8);
@@ -39,7 +38,6 @@
   --fs-pill: 15px;
   /* space: the vertical rhythm, small to large */
   --gap-s: 8px;
-  --gap-m: clamp(12px, 1.8vh, 18px);
   --gap-l: clamp(18px, 3vh, 30px);
   --gap-xl: clamp(24px, 4.5vh, 48px);
   --gap-grid: clamp(14px, 2vw, 28px); /* between a row's cards */
@@ -49,24 +47,24 @@
   --t-pop: .28s; /* a card's springy pop (--spring, --t-press: :root) */
 }
 .tsky--island, .tint--island, .victory--island {
-  --s0: #8fd8d0; --s1: #f7e6ba;
+  --s0: #8fd8d0;
   --c1: #7fe0f7; --c2: #1a86d0; --stage: #f1e2c2;
   --ground: var(--sand); --pond: #5fd0cc;
   --art: linear-gradient(180deg, #54b8f5, #b8ecff 70%, #ffe2a8);
 }
 .tsky--town, .tint--town, .victory--town {
-  --s0: #f6ead3; --s1: var(--town-roof);
+  --s0: #f6ead3;
   --c1: #ffa3c6; --c2: #cf3f7c; --stage: #eee0d6;
   --ground: #cdbb9f; --pond: #7fb2c4; /* cobbles, a canal */
   --art: linear-gradient(180deg, #6b4bc8, #ff8fb0 60%, #ffcf8a);
 }
 .tsky--mountain, .tint--mountain, .victory--mountain {
-  --s0: #eef3f8; --s1: #bfe6f4;
+  --s0: #eef3f8;
   --c1: #b8c9ff; --c2: #5569db; --stage: #e4edf3;
   --ground: var(--mountain-snow); --pond: #bfe6f4; /* snow, ice */
   --art: linear-gradient(180deg, #4d74e0, #bcd2ff 65%, #ffe0c0);
 }
-.front, .screen--title { transition: --s0 .45s, --s1 .45s; }
+.front, .screen--title { transition: --s0 .45s; }
 
 /* the backdrop: the world's fade under an even halftone (::before), and the
    game's first frame round the screen (::after) */

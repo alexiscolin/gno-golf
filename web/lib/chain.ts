@@ -269,9 +269,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   }, 60e3);
   const PARAMS_TTL = 10 * 60e3;
 
-  /** The name registrar this chain runs, "" if none: pearl has r/sys/namereg/v1, a local gno and mainnet v0. */
-  // the chain's name registrar ("" when it has none): a registrar the chain
-  // doesn't know is its answer; a node not answering is thrown, not kept
+  // whether the chain runs pkg: a package it doesn't know is its answer
+  // (false); a node not answering is thrown, not kept
   const has = async (pkg: string) => {
     try {
       await vm(pkg, "IsPaused()");
@@ -281,6 +280,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       throw e;
     }
   };
+  /** The name registrar this chain runs, "" if none: pearl has r/sys/namereg/v1, a local gno and mainnet v0. */
   const nameReg = memo(async () => {
     for (const v of ["gno.land/r/sys/namereg/v1", "gno.land/r/sys/namereg/v0"]) if (await has(v)) return v;
     return "";

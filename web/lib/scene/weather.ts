@@ -627,4 +627,3 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     },
   };
 }
-export type Weather = ReturnType<typeof makeWeather>;

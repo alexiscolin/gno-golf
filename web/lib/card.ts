@@ -218,7 +218,7 @@ export interface Badge {
   ok?: (f: Finish) => boolean;
 }
 /** The six weathers (the forecast's kinds; "" is the calm one). */
-export const WEATHERS = ["", "wind", "fog", "rain", "storm", "snow"] as const;
+const WEATHERS = ["", "wind", "fog", "rain", "storm", "snow"] as const;
 // Badges, front-only as the gnomes, earned once and kept (lib/prefs.ts). In the
 // order they are said when several come at once: the rarest first.
 export const BADGES: readonly Badge[] = [

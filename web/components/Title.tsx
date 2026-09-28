@@ -37,12 +37,12 @@ const CHORES: Record<string, readonly string[]> = {
 export const choresOf = (world: string) => CHORES[world] || CHORES.garden;
 
 /** The loader ball's hat, the curtain's hat: each cup wears its own. */
-export function Hat({ world, x = 0, y = 0, k = 1, className = "" }: { world: string; x?: number; y?: number; k?: number; className?: string }) {
-  const t = `translate(${x} ${y}) scale(${k})`;
+export function Hat({ world, y = 0 }: { world: string; y?: number }) {
+  const t = `translate(0 ${y})`;
   if (world === "island")
     // a straw hat: a wide brim and a low crown, with a band
     return (
-      <g transform={t} className={"hat hat--straw " + className}>
+      <g transform={t} className="hat hat--straw">
         <ellipse cx="0" cy="0" rx="9" ry="2.6" />
         <path d="M -4.5 0 Q -4.5 -6 0 -6.5 Q 4.5 -6 4.5 0 Z" />
         <path d="M -4.4 -1.6 H 4.4" className="hat__band" />
@@ -51,7 +51,7 @@ export function Hat({ world, x = 0, y = 0, k = 1, className = "" }: { world: str
   if (world === "mountain")
     // a woolly bobble hat
     return (
-      <g transform={t} className={"hat hat--wool " + className}>
+      <g transform={t} className="hat hat--wool">
         <path d="M -5.5 0 Q -5.5 -8 0 -8 Q 5.5 -8 5.5 0 Z" />
         <rect x="-6" y="-2" width="12" height="3" rx="1.5" className="hat__rib" />
         <circle cx="0" cy="-9" r="2.4" className="hat__bobble" />
@@ -60,13 +60,13 @@ export function Hat({ world, x = 0, y = 0, k = 1, className = "" }: { world: str
   if (world === "town")
     // a baker's toque: a puffed top on a band
     return (
-      <g transform={t} className={"hat hat--toque " + className}>
+      <g transform={t} className="hat hat--toque">
         <rect x="-4.5" y="-3" width="9" height="3.5" rx="1" />
         <path d="M -5 -3 Q -7.5 -7.5 -3.5 -8.5 Q -1.5 -11.5 1.5 -9.5 Q 5.5 -11 5.5 -7 Q 8 -5 5 -3 Z" />
       </g>
     );
   return (
-    <g transform={t} className={"hat hat--point " + className}>
+    <g transform={t} className="hat hat--point">
       <path d="M -5 0 L 0 -9 L 5 0 Z" />
     </g>
   );

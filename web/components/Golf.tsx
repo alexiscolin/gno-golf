@@ -205,7 +205,7 @@ const BANNER = {
 
 // how far this device's clock is behind the chain's (ms): a deadline on the
 // chain's clock, less this, is one on the device's
-const skewOf = (chain: Chain | null | undefined) => (chain && chain.now ? chain.now() - Date.now() : 0);
+const skewOf = (chain: Chain | null | undefined) => (chain ? chain.now() - Date.now() : 0);
 
 /** The time now on a clock (the chain's), read again every second. */
 function useNow(clock: () => number) {
@@ -305,7 +305,7 @@ export default function Golf() {
   useEffect(() => hush(!playing || away), [playing, away]);
   // the title, the cups and the picker hide the course entirely: nothing to draw
   useEffect(() => {
-    game.current && game.current.cover && game.current.cover(!playing);
+    game.current && game.current.cover(!playing);
   }, [playing, holeId]);
   // the gnome: a shared link's if this player has it, else their own; a link
   // never unlocks one, and is never saved as the player's choice
@@ -362,7 +362,7 @@ export default function Golf() {
     setAskAim(null);
     try { localStorage.setItem("gnogolf.aim", m); } catch {}
     setAimState(m);
-    game.current && game.current.setMode && game.current.setMode(m);
+    game.current && game.current.setMode(m);
   };
   const [chainName, setChainName] = useState("");
   // the curtain between holes: shut on the way out, open once the next is built
@@ -1129,7 +1129,6 @@ export default function Golf() {
   // a best of the player's on the chain here: their share is a dare (a friend races their ghost)
   const daring = !!account && (onChain || ghostHere);
   const nextAfter = cupWon && s ? nextCup(cupWon.cup, s.worlds) : ""; // the cup after the one just complete
-  // the hole the gnome picker leads to (a shared link's, or the cup's first), named over the gnomes
   // the hole a link opened, named over the gnomes (from the cups, the player knows where they go)
   const linked = s && s.linked && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
   // The address bar follows the screen: the title is the bare page, the cups
@@ -1183,8 +1182,8 @@ export default function Golf() {
       setScreen(sc);
       if (sc === "play" && game.current) {
         const cup = p.get("cup") || "", hv = p.get("hole") || "";
-        const h = game.current.find && game.current.find(isHoleId(hv) ? { id: hv } : { cup, n: Number(hv) });
-        if (h && h !== (game.current.current && game.current.current())) goToRef.current(h);
+        const h = game.current.find(isHoleId(hv) ? { id: hv } : { cup, n: Number(hv) });
+        if (h && h !== game.current.current()) goToRef.current(h);
       }
     };
     window.addEventListener("popstate", onPop);
@@ -1872,8 +1871,6 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
   );
 }
 
-/** GNOT for this account: where to get some (the faucet by default), and
- *  what to paste there (the address; on this machine, gnokey's command). */
 /** Where to get GNOT (href: its page, "" for none), and the address to paste there. */
 function GetGnot({ address, href, label = "" }: { address: string; href: string; label?: string }) {
   const [copied, copy] = useCopied();

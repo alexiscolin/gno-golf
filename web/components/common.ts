@@ -191,12 +191,12 @@ export function holeNumber(holes: readonly Pick<HoleRow, "id">[], id: string | n
 export const nextCup = (cup: string, counts: Readonly<Record<string, number>>) =>
   CUPS.slice(CUPS.indexOf(cup as Cup) + 1).find((c) => (counts[c] || 0) > 0) || "";
 
-/** A score in golf's own words, from the strokes against par. */
 /** What the next stroke n is worth on a par, called out big before it (solo): for an ace, eagle,
  *  birdie, par, bogey; past that, how far over par the round already is. */
 export const strokeFor = (n: number, par: number) =>
   n === 1 ? "For an ace!" : n <= par - 2 ? "For eagle!" : n === par - 1 ? "For birdie!" : n === par ? "For par!" : n === par + 1 ? "For bogey" : `${n - 1 - par} over par`;
 
+/** A score in golf's own words, from the strokes against par. */
 export function golfTerm(strokes: number, par: number) {
   if (strokes === 1) return "Hole in one!";
   const d = strokes - par;
