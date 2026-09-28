@@ -118,6 +118,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     disposeCourse(confetti.group);
     confetti = null;
   };
+  // the cup's confetti: the player's holing stroke, or a duel's ghost holing
+  const cheer = () => {
+    if (!g.s) return;
+    dropConfetti();
+    scene.add((confetti = makeConfetti(g.s.cup, ground(g.s.cup[0], g.s.cup[1]))).group);
+    sound("pop");
+  };
   // a burst kept hidden, so its shader compiles with the hole's (warm), not on the winning putt
   const confettiWarm = makeConfetti([0, 0]);
   confettiWarm.group.visible = false;
@@ -863,7 +870,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   const rp = makeReplay(E);
   E.landing = rp.landing;
   // a duel's ghost (ADR-004): another player's best, a stroke after each of the player's
-  const rival = makeRival(E, { showClock, restTimed, told: () => void publish(), warm: () => void warm(), gnome: () => gnomeId });
+  const rival = makeRival(E, { showClock, restTimed, told: () => void publish(), warm: () => void warm(), gnome: () => gnomeId, cheer });
   E.rivalAt = rival.at;
   const aimer = makeAimer(E);
   const { preview, dropAim, strokeFrom, ghosts, known } = aimer;
@@ -950,7 +957,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!ev.isPrimary) return onCancel();
     if (ev.button > 0) return;
     if (g.flying || g.done) return;
-    rival.skip(); // a press that starts an aim ends the ghost's turn
+    if (rival.busy()) return; // the ghost's turn: a turn each, the next aim waits for it
     cam.finishGlide(); // the intro glide, if still on: finished now, quickly
     // a new press takes over whatever aim was held (a keyboard aim, a lost pull)
     dragging = true;
@@ -985,8 +992,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   canvas.setAttribute("aria-label", "Course. Arrow keys aim and set the power, Space shoots.");
   const onKey = (ev: KeyboardEvent) => {
     if (g.flying || g.done || !g.s) return;
-    // an aim key ends the ghost's turn, as a press does
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) (rival.skip(), cam.finishGlide());
+    // an aim key waits for the ghost's turn, as a press does
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(ev.key)) {
+      if (rival.busy()) return;
+      cam.finishGlide();
+    }
     const step = ev.shiftKey ? 1 : 4;
     if (!g.aiming && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
       g.aiming = dragging = true;
@@ -1062,7 +1072,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   async function shoot(angleDeg: number, power: number, round: number | undefined) {
     if (!g.id || !g.s) return;
-    const id = g.id, s = g.s;
+    const id = g.id;
     if (g.shots.length >= maxRoundStrokes) {
       g.error = `${maxRoundStrokes} strokes is the most one round can hold.`;
       g.errorKind = "limit";
@@ -1152,11 +1162,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.facing = Math.PI / 2; // at rest he looks at the player
     rightUp();
     if (res.holed) {
-      dropConfetti();
-      const burst = (confetti = makeConfetti(s.cup, ground(s.cup[0], s.cup[1])));
-      sound("pop");
+      cheer();
       sound("win", g.strokes === 1 ? 1 : 0); // a hole-in-one gets the longer fanfare
-      scene.add(burst.group);
       // let the confetti fly (and a duel's ghost play the stroke that ties) before the banner covers the course
       void answered.then(() => {
         if (round === g.round) holedIn = setTimeout(() => {

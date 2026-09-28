@@ -20,9 +20,9 @@ test("shotsOf splits a ghost's round into its strokes", () => {
 });
 
 test("a ghost's stroke plays twice as fast, and never longer than 2 s", () => {
-  assert.equal(ghostSpeed(1000), 2);
-  assert.equal(ghostSpeed(4000), 2);
-  assert.equal(ghostSpeed(9000), 4.5);
+  assert.equal(ghostSpeed(1000), 1.25);
+  assert.equal(ghostSpeed(3000), 1.25);
+  assert.equal(ghostSpeed(9000), 3);
 });
 
 test("the result reads a win, a loss by one in words, a tie, an ace matched", () => {

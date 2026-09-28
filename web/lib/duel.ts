@@ -27,11 +27,12 @@ export const skyWord = (kind: string) => (Object.hasOwn(SKIES, kind) ? SKIES[kin
 /** A ghost's shots, one "angle,power,tick" each. */
 export const shotsOf = (g: Ghost) => g.shots.split(";");
 
-// a ghost's stroke plays at twice the speed, faster still to fit its steps in
-// about 2 s (a splash or a tube keeps its own time): never much longer than the wait it replaces
-const GHOST_MS = 2000;
-/** The speed a ghost's stroke plays at, for a stroke that takes ms at the player's pace. */
-export const ghostSpeed = (ms: number) => Math.max(2, ms / GHOST_MS);
+// a ghost's stroke plays a little faster than the player's, faster still to fit its steps in
+// about 3 s (a splash or a tube keeps its own time): its turn read, never a long wait
+const GHOST_MS = 3000;
+/** The speed a ghost's stroke plays at, for a stroke that takes ms at the player's pace:
+ *  a little faster, a long one kept to about 3 s. */
+export const ghostSpeed = (ms: number) => Math.max(1.25, ms / GHOST_MS);
 
 /** What the score card says is left, before the next stroke n of a race against a best of r:
  *  the last stroke that wins, the one that ties, else the target. */

@@ -6,13 +6,13 @@
 // with SimulateRoundIn from the tee, each later one with SimulateFrom from the
 // rest before, all in the ghost's own period): one read ahead, each kept once
 // it answers (a rematch, or the other mode and back, reads nothing again), a
-// failed one asked again at the next turn. Its turn never makes the player
-// wait: it glides onto its stroke's start, then plays at twice the speed
-// (its steps in about 2 s), a press that
-// starts an aim cuts it (the ghost put at its rest), a replay that outlives
-// its time is cut as the player's is, and a
-// stroke read late, or once the player aims again, or under reduced motion,
-// is not played at all: the ghost appears at its rest. It replays with the
+// failed one asked again at the next turn. A turn each: its turn is said at
+// once and the player's next aim waits for it; a beat, then it glides onto its
+// stroke's start and plays a little faster than the player's pace (about 3 s
+// at most), a beat at its rest, and the turn is the player's again. A replay
+// that outlives its time is cut as the player's is, and a stroke read late
+// (a slow node), or under reduced motion, is not played at all: the ghost
+// appears at its rest. Holed, it gets the cup's confetti. It replays with the
 // game's own replay (engine/replay.ts), on a Live of its own like the shot
 // clip's: its own ball and cut, silent, the scene's pieces set to its own tick
 // while it plays (the engine holds its clock meanwhile). The ghost is built
@@ -30,20 +30,20 @@ import type { Gnome } from "../scene/data";
 import type { GameState, Live } from "./types";
 
 const SEEN = 0.7, AIMING = 0.45; // its opacity on its turn, and at rest while the player aims
-const WAIT_MS = 1500; // a stroke slower than this to read: the ghost jumps to its rest when it lands
+const WAIT_MS = 4000; // a stroke slower than this to read: the turn is the player's again, the ghost at its rest once read
+const BEAT_MS = 600, AFTER_MS = 500; // its turn said before it moves; at its rest before the player's turn
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const CUT_MS = 5000; // a ghost's replay past this (a frozen tab) is cut: the engine's safety net, for the ghost
 const GLIDE_MS = 450; // its walk onto its stroke's start (the tee: where the player stood), before it plays
 // each ghost's strokes as read, kept with the ghost (the same ghost comes back with a rematch, or a mode toggled back)
 const readsOf = new WeakMap<Ghost, (Promise<Stroke> | undefined)[]>();
 const look = new THREE.Vector3(); // the camera's direction, for beside()
 
-// gnome: the player's gnome's id (the rival wears another)
-export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome }: { showClock: (t: number) => void; restTimed: () => void; told: () => void; warm: () => void; gnome: () => string }) {
+// gnome: the player's gnome's id (the rival wears another); cheer: the cup's confetti
+export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome, cheer }: { showClock: (t: number) => void; restTimed: () => void; told: () => void; warm: () => void; gnome: () => string; cheer: () => void }) {
   const { g, scene } = E;
   let ball: Gnome | null = null;
   let cut = 0, ghost: Ghost | null = null;
-  // ends the wait for a stroke's read: the player's aim is not held for the ghost
-  let hurry: (() => void) | null = null;
   // what the HUD reads: the rival's strokes replayed so far, and whether their ball is in
   // armed: this round races the ghost (a duel armed mid-round waits for the next)
   let shown = 0, holed = false, busy = false, armed = false;
@@ -142,32 +142,38 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome }: 
   /** The ghost's stroke n, played after the player's (done: the player holed
    *  it: only a stroke that ties is shown, seeing it drop too is the moment).
    *  Resolves once the turn is the player's again: the ghost at rest, cut, or
-   *  its read late or the player aiming (it then lands when its read does). */
+   *  its read late (it then lands when its read does). */
   async function turn(n: number, done: boolean) {
     const gh = ghost, b = ball;
     // (a turn missed before, a read that failed: this one still lands, where its own stroke rests)
     if (!gh || !b || !armed || n < shown || n >= gh.strokes || holed || (done && n + 1 < gh.strokes)) return;
     const round = g.round, at = cut, stroke = read(gh, n);
     const late = () => round === g.round && gh === ghost && armed && n >= shown;
-    const s = await Promise.race([stroke, new Promise<"late">((r) => ((hurry = () => r("late")), setTimeout(hurry, WAIT_MS)))]);
-    hurry = null;
-    if (round !== g.round || at !== cut || gh !== ghost) return;
-    // late, or the player aiming again (on a timed hole the pieces are theirs): at its rest once read
-    if (s === "late") return void stroke.then((res) => late() && land(b, res, n), () => {});
-    if (!motion || g.aiming || g.flying) return land(b, s, n);
-    const res = s;
+    const mine = () => round === g.round && at === cut && gh === ghost;
+    // its turn, said at once: the player's next aim waits for it
     busy = true;
-    fade(SEEN);
-    told(); // (its turn, said)
-    cg.tick0 = Number(shotsOf(gh)[n].split(",")[2]) || 0;
+    told();
     try {
-      await glide(b, res.path[0], at);
-      if (at === cut && (await outlived(rp.replay(res.path, res.holed, res.air, res.cause, 0, ghostSpeed(stepsMs(res.path).reduce((a, x) => a + x, 0))), CUT_MS))) cut++;
+      const s = await Promise.race([stroke, wait(WAIT_MS).then(() => "late" as const)]);
+      if (!mine()) return;
+      if (s === "late") return void stroke.then((res) => late() && land(b, res, n), () => {});
+      if (motion) {
+        fade(SEEN);
+        cg.tick0 = Number(shotsOf(gh)[n].split(",")[2]) || 0;
+        try {
+          await wait(BEAT_MS);
+          if (mine()) await glide(b, s.path[0], at);
+          if (mine() && (await outlived(rp.replay(s.path, s.holed, s.air, s.cause, 0, ghostSpeed(stepsMs(s.path).reduce((a, x) => a + x, 0))), CUT_MS))) cut++;
+        } finally {
+          restTimed(); // the pieces back on the player's clock
+        }
+      }
+      if (round !== g.round || gh !== ghost) return;
+      land(b, s, n);
+      if (motion) await wait(AFTER_MS);
     } finally {
       busy = false;
       told();
-      restTimed(); // the pieces back on the player's clock
-      if (round === g.round && gh === ghost) land(b, res, n);
     }
   }
 
@@ -175,6 +181,7 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome }: 
   function land(b: Gnome, res: Stroke, n: number) {
     shown = n + 1;
     if (ghost && !res.holed) ahead(ghost, shown);
+    if (res.holed && !holed) cheer();
     holed = res.holed;
     b.visible = !holed;
     beside(b, res.rest[0], res.rest[1]);
@@ -196,8 +203,6 @@ export function makeRival(E: Live, { showClock, restTimed, told, warm, gnome }: 
     reset,
     /** The ghost's turn after the player's stroke n; never throws. */
     turn: (n: number, done: boolean) => turn(n, done).catch((err: unknown) => console.warn("gnogolf: the ghost's turn failed", err)),
-    /** Cuts the ghost's turn: it jumps to where its stroke rests (or, still read, lands once it is). */
-    skip: () => (busy ? cut++ : hurry && hurry()),
     /** A frame: the ghost clear of the walls it runs along. */
     frame: () => ball && ball.visible && rp.offWalls(),
     busy: () => busy,
