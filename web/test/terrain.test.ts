@@ -257,6 +257,37 @@ void test("terrain: a slope zone ramps up toward its uphill side", () => {
   assert.equal(away, 0); // untouched ground, well clear of the cup's landing too
 });
 
+// the steepest step of the ground along z = 5, per 0.1, over x0..x1
+const steepest = (t: ReturnType<typeof terrain>, x0: number, x1: number) => {
+  let m = 0;
+  for (let x = x0; x < x1; x += 0.1) m = Math.max(m, Math.abs(t.ground(x + 0.1, 5) - t.ground(x, 5)));
+  return m;
+};
+
+void test("terrain: two hills back to back meet in one crest, no lip stacked on the other", () => {
+  // tops at x = 10 (a saddle: each pushes away from the crest)
+  const a = mkZone({ kind: "slope", min: [2, 1], max: [10, 9], vec: [-0.17, 0] }), b = mkZone({ kind: "slope", min: [10, 1], max: [18, 9], vec: [0.17, 0] });
+  const t = terrain(mkHole({ board: { w: 20, h: 10 }, zones: [a, b], start: [0.5, 5], cup: [19.5, 5] }));
+  const crest = t.ground(10, 5);
+  for (let x = 8; x <= 12; x += 0.05) assert.ok(t.ground(x, 5) <= crest + 1e-9, `no ridge over the crest at ${x}`);
+  assert.ok(Math.abs(t.ground(9.5, 5) - t.ground(10.5, 5)) < 1e-9); // the same climb either side
+  assert.ok(steepest(t, 8, 12) < 0.05);
+});
+
+void test("terrain: a hill whose top comes too near the cup holds up to it, no squeezed lip", () => {
+  // pushes -x: climbs to its top at x = 12, the cup 2 past it
+  const hill = mkZone({ kind: "slope", min: [4, 1], max: [12, 9], vec: [-0.25, 0] });
+  const t = terrain(mkHole({ board: { w: 20, h: 10 }, zones: [hill], start: [0.5, 5], cup: [14, 5] }));
+  const top = t.ground(12, 5);
+  assert.ok(top > 1);
+  assert.equal(t.ground(14, 5), top); // the cup up on the hilltop
+  assert.ok(steepest(t, 11, 16) < 0.05);
+  assert.ok(t.ground(11, 5) < top); // still climbing at its edge
+  // far from the cup, the same hill ends in its short lip
+  const far = terrain(mkHole({ board: { w: 20, h: 10 }, zones: [hill], start: [0.5, 5], cup: [19, 5] }));
+  assert.equal(far.ground(14, 5), 0);
+});
+
 void test("terrain: a mound draws one round dome over four slopes", () => {
   const mound = mkZone({ kind: "slope", min: [1, 1], max: [3, 3], vec: [0.5, 0.5], skin: "mound" });
   const t = terrain(mkHole({ zones: [mound], start: [8, 0.5], cup: [9.5, 7.5] }));

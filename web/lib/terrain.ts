@@ -218,7 +218,7 @@ interface Ramp {
   ux: number; uz: number; vx: number; vz: number;
   lo: number; span: number; rise: number; noLip: boolean;
   a0: number; a1: number;
-  plateau?: boolean; run?: boolean; bridge?: { gap: number; to: number };
+  plateau?: false | "tee" | "cup"; run?: boolean; bridge?: { gap: number; to: number }; // plateau: its top held toward the tee, or the cup
   in0?: boolean; in1?: boolean; // its side at a0 / a1 meets another hill: the shoulder tapers inside
 }
 /** A ramp per Slope zone: 0 on its downhill edge, rising against the push. */
@@ -303,16 +303,17 @@ const rise1 = (v: number, a: number, i0: number, i1: number, b: number) => (v < 
  * "downhill" hole begins high. Only when no other ramp lies between the tee
  * and this one — a row of hills keeps its valleys.
  */
-function plateaus(rs: Ramp[], tee: Vec2) {
-  for (const r of rs) {
-    const along = tee[0] * r.ux + tee[1] * r.uz - r.lo;
-    const between = rs.some((o) => {
+function plateaus(rs: Ramp[], tee: Vec2, cup: Vec2) {
+  // p past r's top, no other ramp between (within reach of its top, and of its sides)
+  const faces = (r: Ramp, p: Vec2, reach = Infinity, width = Infinity) => {
+    const along = p[0] * r.ux + p[1] * r.uz - r.lo, side = p[0] * r.vx + p[1] * r.vz;
+    return along > r.span && along - r.span < reach && side > r.a0 - width && side < r.a1 + width && !rs.some((o) => {
       if (o === r) return false;
       const a = (o.z.min[0] + o.z.max[0]) / 2 * r.ux + (o.z.min[1] + o.z.max[1]) / 2 * r.uz - r.lo;
       return a > r.span && a < along;
     });
-    r.plateau = along > r.span && !between;
-  }
+  };
+  for (const r of rs) r.plateau = faces(r, tee) && "tee";
   // a run of slopes the same way (a downhill in two pitches, a flight of
   // terraces): the lower one's top holds its height uphill of it, under the
   // flat between and the upper one, so the heights add up to one continuous
@@ -336,6 +337,10 @@ function plateaus(rs: Ramp[], tee: Vec2) {
       const gap = -(q.lo + q.span) - (r.lo + r.span);
       if (gap > 0 && gap <= 10) (r.bridge = { gap, to: q.rise }), (q.noLip = true);
     }
+  // a hill whose top comes too near the cup for its lip: the cup sits up on
+  // the hilltop, where the physics is flat, not at the foot of a lip its
+  // landing squeezed into a cliff
+  for (const r of rs) if (!(r.plateau || r.run || r.bridge || r.noLip) && faces(r, cup, BANK * 0.4 + CUP_R + 0.3, 0)) r.plateau = "cup";
   return rs;
 }
 
@@ -413,7 +418,7 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
       rough.push(cells);
     }
 
-  const rs = plateaus(ramps(s.zones), s.start);
+  const rs = plateaus(ramps(s.zones), s.start, s.cup);
   // a side that meets another hill (a volcano's cone, a bowl's corner) tapers
   // inside, into the seam; any other falls away outside the zone, over ground
   // the physics leaves flat. Inside, a slope is its push's own ramp: a taper
@@ -433,12 +438,17 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
       // how far outside its sides (the shoulder's own ground, see seam)
       const out = Math.max(r.a0 - side, side - r.a1);
       if (along < 0 || (out > 0 && (out >= SHOULDER || (side < r.a0 ? r.in0 : r.in1) || r.z.skin === "moon bridge" || !(x > 0 && z > 0 && x < W && z < H)))) continue;
+      const lip = !(r.bridge || r.plateau || r.run || r.noLip);
+      // its lip where another hill starts (two tops back to back): that hill's
+      // ground, not the lip stacked on it, a ridge the physics lacks
+      if (lip && along >= r.span && along - r.span < BANK * 0.4 && hills.some((q) => q !== r.z && inZone(q, x, z))) continue;
       let k: number;
       // a jump curls up to its lip; a hill that ends in a lip still climbs at it, as the physics' push does
-      // (a smoothstep went flat before the edge: he crossed a flat top, then flew, late); one onto a deck levels into it
+      // (a smoothstep went flat before the edge: he crossed a flat top, then flew, late), and so does one up to
+      // the cup on its top; one onto a deck levels into it
       if (along <= r.span) {
         const t = along / r.span;
-        k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? t * t : r.bridge || r.plateau || r.run || r.noLip ? smoothstep(t) : t * t * (2 - t);
+        k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? t * t : lip || r.plateau === "cup" ? t * t * (2 - t) : smoothstep(t);
       }
       else if (r.bridge && along - r.span < r.bridge.gap) k = 1 + (r.bridge.to / r.rise - 1) * smoothstep((along - r.span) / r.bridge.gap);
       else if (r.plateau || r.run) k = 1;

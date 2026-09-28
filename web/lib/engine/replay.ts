@@ -7,23 +7,101 @@ import * as THREE from "three";
 import { buzz as shake, sound as say, type SoundName } from "../feel";
 import { causeAt } from "../scene/cause";
 import { at, makeSplash, disposeCourse } from "../scene";
-import { BALL_R, inZone, nearestOnPoly, boxOf, closest, segDist } from "../terrain";
+import { BALL_R, inZone, nearestOnPoly, boxOf, closest, segDist, onAt, segHit, rayCircle } from "../terrain";
 import type { MutVec2, Vec2, Wall, Zone } from "../types";
 import type { Cause } from "../scene/cause";
 import type { Gnome, TubePath } from "../scene/data";
 import type { Live } from "./types";
 
-/** One flight of the ball, from the chain's air flags: its length, where each segment starts along it, the crest it leaves from. */
-interface Flight {
-  len: number;
-  starts: number[];
-  top: number | null;
-  s0?: number;
-  pt: (d: number) => MutVec2;
-  dir: MutVec2;
-  crest: number;
-  lx: number;
-  lz: number;
+/** One arc of a flight, in path time (a step is one substep): it leaves at
+ *  t0 from `from`, lands at t1 on `to`, its apex h over the line between;
+ *  y0 the height it leaves from, read as it leaves. */
+export interface Arc {
+  t0: number;
+  t1: number;
+  h: number;
+  from: Vec2;
+  to: Vec2;
+  y0?: number;
+  /** a hop after a landing: it leaves from the ground, not from the arc before */
+  hop?: boolean;
+}
+
+// the chain's flight rules (physics/step.gno), in board units and substeps (G is 1)
+const MAX_MOVE = 1.5, SPEED_CAP = 8, MIN_RAMP = 0.12, MAX_SIN = 0.95, GROUND_BOUNCE = 0.4, LAND_FRICTION = 0.3, TANGENT_MASS = 2 / 7, HOP_SPEED = 0.25;
+/** The moves a substep at speed v is walked in: a flight starts and ends at the end of one. */
+const movesOf = (v: number) => Math.floor(Math.min(v, SPEED_CAP) / MAX_MOVE) + 1;
+/** Where the path is at time t (a step is one unit of it). */
+function pointAt(path: readonly Vec2[], t: number): MutVec2 {
+  const j = Math.max(0, Math.min(Math.floor(t), path.length - 2)), k = Math.min(1, t - j);
+  return [path[j][0] + (path[j + 1][0] - path[j][0]) * k, path[j][1] + (path[j + 1][1] - path[j][1]) * k];
+}
+
+/** The chain's flights (its air flags, one per point): each step a flight
+ *  crosses, and its arcs. The chain takes off where a step crosses a hill's
+ *  crest (its uphill edge) climbing, up at the hill's grade, vz = (v·u)·tanθ,
+ *  and flies 2vz, on the grid of the substep's moves; it lands, and hops
+ *  again at 0.4 of vz while that is over HopSpeed. The flags alone cannot
+ *  say it: the chain lands mid-substep, and a hop goes up before a point on
+ *  the ground is recorded. ticks: each point's tick (a timed hill counts
+ *  while it is there). */
+export function flightsOf(path: readonly Vec2[], flags: string, zones: readonly Zone[], ticks: readonly number[]) {
+  const out = new Map<number, Arc[]>(); // step index -> the arcs over it
+  for (let i = 1; i < path.length; i++) {
+    if (flags[i] !== "1" || flags[i - 1] === "1") continue;
+    const s = i - 1, p = path[s], q = path[s + 1];
+    let e = i;
+    while (e < path.length - 1 && flags[e] === "1") e++;
+    // the hill it left: the first whose crest the step crosses (overTheTop)
+    let f = -1, vz = 0, sp = 0, along = 0;
+    for (const z of zones) {
+      const gz = Math.hypot(z.vec[0], z.vec[1]);
+      if (z.kind !== "slope" || z.air || gz <= MIN_RAMP || !onAt(z, ticks[s])) continue;
+      const ux = -z.vec[0] / gz, uz = -z.vec[1] / gz, ax = Math.abs(ux) >= Math.abs(uz) ? 0 : 1, o = 1 - ax;
+      const up = (ax ? uz : ux) >= 0 ? 1 : -1, crest = up > 0 ? z.max[ax] : z.min[ax];
+      if ((p[ax] - crest) * up >= 0 || (q[ax] - crest) * up < 0) continue;
+      const k = (crest - p[ax]) / (q[ax] - p[ax]), oc = p[o] + (q[o] - p[o]) * k;
+      if (oc < z.min[o] || oc >= z.max[o]) continue;
+      // its speed in the air: a whole step in the air is it, else the take-off's step
+      const w = flags[s + 2] === "1" ? s + 1 : s, dx = path[w + 1][0] - path[w][0], dz = path[w + 1][1] - path[w][1];
+      const sin = Math.min(gz, MAX_SIN), step = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      (f = k), (sp = Math.hypot(dx, dz)), (vz = (dx * ux + dz * uz) * (sin / Math.sqrt(1 - sin * sin)));
+      along = (sin * ((q[0] - p[0]) * ux + (q[1] - p[1]) * uz)) / step; // the hill's pull along the step (it slows the climb)
+      break;
+    }
+    const arcs: Arc[] = [];
+    if (f >= 0 && vz > 0) {
+      // up at the end of the move that crossed the crest (drawn from the crest itself)
+      // (the substep's speed as it started: its average, and what the hill took off it by the crest)
+      let n = movesOf(Math.hypot(q[0] - p[0], q[1] - p[1]) + along * f), sub = s, k = Math.floor(f * n) + 1, t0 = s + f;
+      do {
+        let air = 2 * vz;
+        do {
+          if (k >= n) (sub++), (k = 0), (n = movesOf(sp));
+          k++;
+          air -= 1 / n;
+        } while (air > 0);
+        const t1 = sub + k / n;
+        arcs.push({ t0, t1, h: (vz * vz) / 2, from: pointAt(path, t0), to: pointAt(path, t1), hop: arcs.length > 0 });
+        // down: friction along, restitution up
+        sp -= Math.min(LAND_FRICTION * (1 + GROUND_BOUNCE) * vz, TANGENT_MASS * sp);
+        vz *= GROUND_BOUNCE;
+        t0 = t1;
+      } while (vz > HOP_SPEED);
+    } else {
+      // no crest found (a hill the client does not have): one arc across the
+      // flags, as high as its time in the air flies (apex T²/8)
+      const t0 = s + 0.5, t1 = e - 0.5;
+      arcs.push({ t0, t1, h: ((t1 - t0) * (t1 - t0)) / 8, from: pointAt(path, t0), to: pointAt(path, t1) });
+    }
+    for (const a of arcs)
+      for (let j = Math.floor(a.t0); j < Math.ceil(a.t1) && j < path.length - 1; j++) {
+        const on = out.get(j);
+        if (on) on.push(a);
+        else out.set(j, [a]);
+      }
+  }
+  return out;
 }
 
 const NO_WALLS: readonly Wall[] = []; // (no hole loaded)
@@ -158,6 +236,18 @@ export function makeReplay(E: Live) {
     }
     p.y = air.y;
   }
+  // On the ground the chain has (no air flag), the ball keeps to the drawn
+  // ground; where that drops away steeper than 45° (a drawn ledge, a
+  // kicker's face) it falls to it under gravity (gv, the chain's own at the
+  // step's pace), it does not snap down. prev: where the last frame had it.
+  function fall(p: THREE.Vector3, prev: THREE.Vector3, now: number, gv: number) {
+    const dt = air.t ? Math.min((now - air.t) / 1000, 0.05) : 0, floor = BALL_R + ground(p.x, p.z);
+    air.t = now;
+    const y = air.y + (air.vy - gv * dt) * dt;
+    if (dt && y > floor && (air.up || air.y - floor > Math.hypot(p.x - prev.x, p.z - prev.z))) (air.up = true), (air.vy -= gv * dt), (air.y = y);
+    else (air.up = false), (air.vy = dt ? Math.min(0, (floor - air.y) / dt) : 0), (air.y = floor);
+    p.y = air.y;
+  }
 
   // whether a wind (the weather's) or a gust covers (x, y), by the zones' skins
   // a timed slope that is not wind: a seesaw's plank, a tilting board
@@ -230,7 +320,7 @@ export function makeReplay(E: Live) {
       }
     });
 
-  function through(z: Zone, from: THREE.Vector3, to: THREE.Vector3, round: number | undefined) {
+  function through(z: Zone, to: THREE.Vector3, round: number | undefined) {
     const cutAt = E.cut;
     const tube = g.course?.userData.tubes.get(z);
     sound("whoosh");
@@ -243,17 +333,15 @@ export function makeReplay(E: Live) {
       const start = performance.now(), T = tube ? Math.min(2400, Math.max(900, tube.getLength() * 75)) : 350;
       const tick = (now: number) => {
         if (round !== g.round || E.cut !== cutAt) return done();
-        const k = Math.min((now - start) / T, 1);
+        const k = Math.max(0, Math.min((now - start) / T, 1));
         if (tube) {
           tube.getPoint(k, E.ball.position); // written in place: no vector a frame
           E.ball.scale.setScalar(tube.userData && tube.userData.arc ? 1 : 0.7); // inside the pipe, a size smaller (thrown through the air: full size)
-        } else {
-          E.ball.position.lerpVectors(from, to, k);
-          E.ball.scale.setScalar(0.2 + 0.8 * k);
-        }
+        } else E.ball.visible = false; // no tube (a door, a cave): inside, unseen, until it comes out
         if (k < 1) return void requestAnimationFrame(tick);
         E.ball.position.copy(to);
         E.ball.scale.setScalar(1);
+        E.ball.visible = true; // out (a cut leaves it as its owner set it: a ghost dropped stays gone)
         done();
       };
       requestAnimationFrame(tick);
@@ -295,7 +383,7 @@ export function makeReplay(E: Live) {
       const start = performance.now();
       const tick = (now: number) => {
         if (round !== g.round || E.cut !== cutAt) return done();
-        const k = Math.min((now - start) / T, 1);
+        const k = Math.max(0, Math.min((now - start) / T, 1));
         const u = reach * (1 - (2 * k - 1) * (2 * k - 1)); // up, a pause at the top, down
         tube.getPointAt(Math.max(0, u), E.ball.position);
         E.ball.scale.setScalar(0.7 + 0.3 * (1 - Math.min(1, u * 20))); // into the pipe, a size smaller
@@ -335,7 +423,8 @@ export function makeReplay(E: Live) {
     // down to it, and splashes there. It never hovers at deck height.
     const surf = g.course && g.course.userData.surfaceAt ? g.course.userData.surfaceAt(at.x, at.z) : at.y - BALL_R;
     const drop = at.y - BALL_R - surf;
-    const fall = drop > 0.25 ? Math.sqrt((2 * drop) / GRAVITY) : 0; // seconds, under gravity
+    // seconds, under gravity; with no drop to speak of, still a glide to where it sinks
+    const fall = Math.max(Math.sqrt((2 * Math.max(drop, 0)) / GRAVITY), 0.2);
     const from = edge || at.clone();
     const land = at.clone().setY(surf + BALL_R * 0.4);
     return new Promise<void>((done) => {
@@ -348,7 +437,7 @@ export function makeReplay(E: Live) {
           return done();
         }
         // the fall first
-        const tf = (now - t0) / 1000;
+        const tf = Math.max(0, (now - t0) / 1000);
         if (tf < fall) {
           const k = tf / fall;
           E.ball.position.lerpVectors(from, land, k); // on outward at its speed
@@ -402,64 +491,39 @@ export function makeReplay(E: Live) {
     });
   }
 
-  /** Walk the path the chain returned. One segment, one slice of time. */
-  // The chain says where the ball is in the air ("air": one 0/1 per path
-  // point). Each run of 1s is one flight: from the ground point before it to
-  // the ground point after, drawn as the arc a ball thrown off that ramp flies.
-  function flightsOf(path: readonly Vec2[], flags: string) {
-    const at = new Map<number, { f: Flight; off: number; seg: number }>(); // segment index -> its flight, where it starts along it, where it ends
-    for (let i = 0; i < path.length; i++) {
-      if (flags[i] !== "1" || (i > 0 && flags[i - 1] === "1")) continue;
-      const s = Math.max(i - 1, 0);
-      let e = i;
-      while (e < path.length - 1 && flags[e] === "1") e++;
-      let len = 0;
-      const starts: number[] = [];
-      for (let j = s; j < e; j++) {
-        starts.push(len);
-        len += Math.hypot(path[j + 1][0] - path[j][0], path[j + 1][1] - path[j][1]);
+  /** How far from p along unit u the ball first meets a wall or a post
+   *  (its centre BALL_R off them), within far; null: none there. */
+  function hitAlong(p: Vec2, u: Vec2, far: number, tick: number) {
+    if (!g.s) return null;
+    const ex = p[0] + u[0] * far, ez = p[1] + u[1] * far;
+    let k = Infinity;
+    const take = (t: number) => void (t > 0 && t < k && (k = t));
+    for (const w of g.s.walls) {
+      if (!onAt(w, tick)) continue;
+      const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l = Math.hypot(dx, dz);
+      if (l > 1e-9) {
+        // the face on p's side, BALL_R out
+        let nx = (-dz / l) * BALL_R, nz = (dx / l) * BALL_R;
+        if ((p[0] - w.a[0]) * nx + (p[1] - w.a[1]) * nz < 0) (nx = -nx), (nz = -nz);
+        take(segHit(p[0], p[1], ex, ez, [w.a[0] + nx, w.a[1] + nz], [w.b[0] + nx, w.b[1] + nz]));
       }
-      // one flight, one arc. The flight's first point is still on the ramp:
-      // the ball rolls up it to the crest (the highest ground under the
-      // flight) and leaves the ground there; from the crest it flies one
-      // parabola down to where the chain lands it. Adding the arc on top of
-      // the ground (as before) put the ramp's own hump under the arc: two
-      // humps, a "double jump".
-      const pt = (d: number): MutVec2 => {
-        let j = s;
-        while (j < e - 1 && starts[j - s + 1] <= d) j++;
-        const a0 = starts[j - s], a1 = (starts[j - s + 1] as number | undefined) ?? len, k = a1 > a0 ? (d - a0) / (a1 - a0) : 0;
-        return [path[j][0] + (path[j + 1][0] - path[j][0]) * k, path[j][1] + (path[j + 1][1] - path[j][1]) * k];
-      };
-      // sampled finely: a kicker's lip is narrower than a 24th of a long flight,
-      // and a crest found past the real one leaves from a point already falling
-      let crest = 0, top = -Infinity;
-      const n = Math.max(24, Math.ceil(len / 0.05));
-      for (let q = 0; q <= n; q++) {
-        const d = (q / n) * len, [x, z] = pt(d), gh = ground(x, z);
-        if (gh > top + 1e-6) (top = gh), (crest = d);
-      }
-      const dl = Math.hypot(path[s + 1][0] - path[s][0], path[s + 1][1] - path[s][1]) || 1;
-      const f: Flight = {
-        len, starts,
-        top: null, // the height he leaves at: taken as he leaves
-        pt,
-        dir: [(path[s + 1][0] - path[s][0]) / dl, (path[s + 1][1] - path[s][1]) / dl],
-        crest, lx: path[e][0], lz: path[e][1],
-      };
-      for (let j = s; j < e; j++) at.set(j, { f, off: starts[j - s], seg: starts[j - s + 1] ?? len });
+      take(rayCircle(p[0], p[1], ex, ez, w.a, BALL_R));
+      take(rayCircle(p[0], p[1], ex, ez, w.b, BALL_R));
     }
-    return at;
+    for (const q of g.s.posts) take(rayCircle(p[0], p[1], ex, ez, q.c, q.r + BALL_R));
+    return k <= 1 ? k * far : null;
   }
 
   /** Where each bounce hit, a step's corner (null: none, or none to be found).
    *  The chain records one point a substep, so a substep that hits a rail
    *  ends past it: drawn as the chord, it cuts the corner and looks slow, and
    *  the step after looks fast. The corner is where the line in (from the
-   *  step before, or its own corner) meets the line out (the step after); a
-   *  head-on hit, the two lines near parallel, is placed on the line in at
-   *  the run the speeds either side give. */
-  function cornersOf(path: readonly Vec2[], why: string, flights: ReturnType<typeof flightsOf> | null) {
+   *  step before, or its own corner) meets a wall or a post (BALL_R off it,
+   *  as the chain keeps the ball); none there, where it meets the line out
+   *  (the step after); a head-on hit, the two lines near parallel, at the
+   *  run the speeds either side give. ticks: each point's tick (a timed wall
+   *  is met while it is there). */
+  function cornersOf(path: readonly Vec2[], why: string, flights: ReturnType<typeof flightsOf> | null, ticks: readonly number[]) {
     const out: (Vec2 | null)[] = [];
     const run = (j: number) => { const c = out[j], a = path[j], b = path[j + 1]; return c ? Math.hypot(c[0] - a[0], c[1] - a[1]) + Math.hypot(b[0] - c[0], b[1] - c[1]) : Math.hypot(b[0] - a[0], b[1] - a[1]); };
     const jumps = (j: number) => j >= 0 && j + 1 < path.length && !!jumpFrom(path[j], path[j + 1], path[0]);
@@ -478,14 +542,16 @@ export function makeReplay(E: Live) {
       const chord = (k: number) => (k + 1 < path.length ? Math.hypot(path[k + 1][0] - path[k][0], path[k + 1][1] - path[k][1]) : 0);
       const vin = run(i - 1), vout = chord(j);
       const rx = q[0] - p[0], ry = q[1] - p[1], len = Math.hypot(rx, ry);
-      let c: Vec2 | null = null;
-      if (j === i + 1 && vout > 1e-3) {
+      // a run between the speeds either side (a bumper's out faster), a little over
+      const fits = (a: number, b: number) => a >= 0 && b >= 0 && a + b >= 0.9 * Math.min(vin, vout) && a + b <= 1.1 * Math.max(vin, vout) + 0.05;
+      const hit = hitAlong(p, [ux, uy], 1.1 * Math.max(vin, len) + 0.05, ticks[i]);
+      let c: Vec2 | null = hit != null && fits(hit, Math.hypot(q[0] - p[0] - ux * hit, q[1] - p[1] - uy * hit)) ? [p[0] + ux * hit, p[1] + uy * hit] : null;
+      if (!c && j === i + 1 && vout > 1e-3) {
         const wx = (path[i + 2][0] - q[0]) / vout, wy = (path[i + 2][1] - q[1]) / vout;
         const x = ux * wy - uy * wx;
         if (Math.abs(x) > 0.25) {
           const a = (rx * wy - ry * wx) / x, b = (ux * ry - uy * rx) / x;
-          // a run between the speeds either side (a bumper's out faster), a little over
-          if (a >= 0 && b >= 0 && a + b >= 0.9 * Math.min(vin, vout) && a + b <= 1.1 * Math.max(vin, vout) + 0.05) c = [p[0] + ux * a, p[1] + uy * a];
+          if (fits(a, b)) c = [p[0] + ux * a, p[1] + uy * a];
         }
       }
       out[i] = c || viaEllipse(p, [ux, uy], q, Math.max(len, (vin + vout) / 2));
@@ -493,16 +559,22 @@ export function makeReplay(E: Live) {
     return out;
   }
 
-  /** from: the step it starts at (the clip of a long putt opens mid-roll). */
+  /** Walk the path the chain returned. One segment, one slice of time.
+   *  from: the step it starts at (the clip of a long putt opens mid-roll). */
   // speed: how many times faster than the player's own pace (a duel's ghost:
   // its steps and its drop; a splash or a tube keeps its own time)
   function replay(path0: readonly Vec2[], holed: boolean, flags: string, why = "", from = 0, speed = 1) {
     const cutAt = E.cut;
     const path = path0.slice();
     const round = g.round;
+    // each point's tick: the release's, plus a substep a step, but for a
+    // tunnel's jump (the chain records the way out as a point of its own,
+    // mid-substep)
+    const ticks = [g.tick0 || 0];
+    for (let j = 0; j + 1 < path.length; j++) ticks.push(ticks[j] + (tunnelled(path[j], path[j + 1]) ? 0 : 1));
     // without flags (an older realm) the heights are guessed from the ground
-    const flights = flags.length === path.length ? flightsOf(path, flags) : null;
-    const corners = cornersOf(path, why, flights);
+    const flights = flags.length === path.length && g.s ? flightsOf(path, flags, g.s.zones, ticks) : null;
+    const corners = cornersOf(path, why, flights, ticks);
     return new Promise<void>((settle) => {
       // a frame that throws ends the replay (the shot's finally puts things right)
       const done = () => settle();
@@ -532,10 +604,13 @@ export function makeReplay(E: Live) {
         const jump = tunnelled(path[i], path[i + 1]); // do not slide across the board
         // the step into a tube ends at its mouth, not at the chain's point in
         // the zone (beside or under the pipe): the ball rolls in, and the ride
-        // (through) starts where it is
+        // (through) starts where it is. With no tube (a door, a cave) it rolls
+        // on to the zone's middle, where the door is drawn: the chain's point
+        // is the last before it went in, short of it
         const into = !jump && path[i + 2] ? tunnelled(path[i + 1], path[i + 2]) : null;
         const mouth = into && g.course?.userData.tubes.get(into);
-        const from = lift(path[i]), to = mouth ? mouth.getPoint(0) : lift(path[i + 1]);
+        const door = into && !mouth ? boxOf(into) : null;
+        const from = lift(path[i]), to = mouth ? mouth.getPoint(0) : door ? lift([door.cx, door.cz]) : lift(path[i + 1]);
         // the last step of a holed shot is the ball dropping in: an easy glide
         // to the pin, then down — never a snap across the cup
         const drop = holed && i === path.length - 2;
@@ -580,9 +655,9 @@ export function makeReplay(E: Live) {
         const reach = corner ? Math.hypot(corner[0] - path[i][0], corner[1] - path[i][1]) : 0;
         const run = corner ? reach + Math.hypot(path[i + 1][0] - corner[0], path[i + 1][1] - corner[1]) : len;
         let knocked = false;
-        // (the step into a tube is drawn longer than the chain's, to the mouth:
+        // (the step into a tunnel is drawn longer than the chain's, to the mouth:
         // at the chain's own speed, at most four times as long)
-        const ms = (drop ? 320 : showMs(run) * (mouth ? Math.min(4, from.distanceTo(to) / Math.max(run, 1e-3)) : 1)) / speed;
+        const ms = (drop ? 320 : showMs(run) * (into ? Math.min(4, from.distanceTo(to) / Math.max(run, 1e-3)) : 1)) / speed;
         // a roll-back at a tube's mouth: the ball climbs part way into it and
         // slides back down before the path goes on (once per point)
         const back = !jump && i > 0 && rolledBack !== i && rollBackAt(path, i);
@@ -595,8 +670,8 @@ export function makeReplay(E: Live) {
         }
         if (jump) {
           // the timed pieces where the chain had them as the ball went in (a blowhole spouting)
-          E.showAt((g.tick0 || 0) + i);
-          return void through(jump, from, to, round).then(() => {
+          E.showAt(ticks[i]);
+          return void through(jump, to, round).then(() => {
             air.t = 0;
             i++;
             step();
@@ -611,7 +686,7 @@ export function makeReplay(E: Live) {
         // ice or wet, b bounce, - none); an older realm says nothing, and the
         // zones under the ball are read instead
         const said = typeof why === "string" && why.length === path.length ? why[i + 1] : null;
-        const guess = () => causeAt(zs, path[i][0], path[i][1], vx, vy, (g.tick0 || 0) + i);
+        const guess = () => causeAt(zs, path[i][0], path[i][1], vx, vy, ticks[i]);
         const guessVec = () => { const c = guess(); return c && "vec" in c ? c.vec : null; };
         // (a slope's and a tilt's own direction is the ball's: causes.at reads a vec for wind only)
         const along: Vec2 = [vx, vy];
@@ -629,10 +704,11 @@ export function makeReplay(E: Live) {
         const prev = from.clone();
         const tick = (now: number) => {
           if (round !== g.round || E.cut !== cutAt) return done();
-          const raw = jump ? 1 : Math.min((now - start) / ms, 1);
+          // (a frame stamped before the step began, on a slow device: at its start)
+          const raw = jump ? 1 : Math.max(0, Math.min((now - start) / ms, 1));
           // one path step is one substep: the sails are where the chain had them
           // the pieces where the chain had them: the release tick, plus the step
-          E.showAt((g.tick0 || 0) + i + raw);
+          E.showAt(ticks[i] + raw);
           const k = drop ? 1 - Math.pow(1 - raw, 2) : raw;
           if (via) {
             const d = k * run;
@@ -645,40 +721,20 @@ export function makeReplay(E: Live) {
             }
           } else E.ball.position.lerpVectors(from, to, k);
           if (!jump && !drop) {
-            const fl = flights && flights.get(i);
-            if (fl) {
-              const F = fl.f, d = fl.off + (fl.seg - fl.off) * k, gh = ground(E.ball.position.x, E.ball.position.z);
-              if (d <= F.crest) E.ball.position.y = BALL_R + gh; // still rolling up to the lip
-              else {
-                const L = Math.max(1e-6, F.len - F.crest), u = d - F.crest;
-                // One parabola from the lip to where the chain lands him: it
-                // leaves at least as steep as the ramp (its slope under the
-                // lip, read as he leaves: a timed deck, a seesaw's plank,
-                // moves), one hump, no second rise; never through the ground
-                // it flies over. The heights too
-                // are read as the flight goes (one taken before the shot put a
-                // dip, then a hop, at the lip)
-                if (F.top == null) {
-                  const [cx, cz] = F.pt(F.crest);
-                  // from the lip itself: the last frame on the ramp can be well
-                  // short of it (a long frame, a fast ball), and a throw from
-                  // there hid under the lip and rose a second time past it
-                  F.top = Math.max(ground(cx, cz), prev.y - BALL_R);
-                  F.s0 = Math.max(0, Math.min(2, (ground(cx, cz) - ground(cx - F.dir[0] * 0.4, cz - F.dir[1] * 0.4)) / 0.4));
-                }
-                const top = F.top, s0 = F.s0 ?? 0;
-                const land = ground(F.lx, F.lz), v = u / L, a = land - top;
-                // The arc over the lip-to-landing line: its top at least a hop
-                // D over the lip (or a higher landing), and a start at least
-                // as steep as the ramp. A shallow lip alone threw him flat, a
-                // few hundredths up, and a steep fall after it ate any hop.
-                // (the lip still climbs, so a smaller floor: the hop kept near the chain's own, landing where it lands)
-                const D = Math.max(0, a) + Math.min(0.1 + L * 0.06, 1.2);
-                const h = Math.max((s0 * L - a) / 4, (2 * D - a + 2 * Math.sqrt(D * (D - a))) / 4);
-                const y = top + a * v + h * 4 * v * (1 - v);
-                E.ball.position.y = BALL_R + Math.max(gh, y);
-              }
-            } else if (flights) E.ball.position.y = BALL_R + ground(E.ball.position.x, E.ball.position.z);
+            const t = i + k, arc = flights && flights.get(i)?.find((q) => t >= q.t0 && t <= q.t1);
+            if (arc) {
+              // The chain's arc: up to its apex, vz²/2 over where it left,
+              // then down to where it lands (the ground there may be lower,
+              // or higher), never through the ground it flies over. The
+              // heights are read as it flies (a timed deck, a seesaw's plank,
+              // moves); the one it leaves from as it leaves, from the lip
+              // itself (the last frame on the ramp can be well short of it)
+              arc.y0 ??= arc.hop ? ground(arc.from[0], arc.from[1]) : Math.max(ground(arc.from[0], arc.from[1]), prev.y - BALL_R);
+              const v = (t - arc.t0) / (arc.t1 - arc.t0), top = arc.y0 + arc.h, y1 = ground(arc.to[0], arc.to[1]);
+              const y = v < 0.5 ? top - arc.h * (1 - 2 * v) ** 2 : top + (y1 - top) * (2 * v - 1) ** 2;
+              E.ball.position.y = BALL_R + Math.max(ground(E.ball.position.x, E.ball.position.z), y);
+              (air.y = E.ball.position.y), (air.vy = 0), (air.up = false), (air.t = now);
+            } else if (flights) fall(E.ball.position, prev, now, 1e6 / (ms * ms));
             else fly(E.ball.position);
           }
           if (drop && raw > 0.6) {

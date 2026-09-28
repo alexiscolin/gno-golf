@@ -6,17 +6,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { makeReplay } from "../lib/engine/replay.ts";
+import { makeReplay, flightsOf, type Arc } from "../lib/engine/replay.ts";
 import { BALL_R } from "../lib/terrain.ts";
 import type { Live, GameState } from "../lib/engine/types.ts";
-import type { Post, Vec2, Zone } from "../lib/types.ts";
+import type { Post, Vec2, Wall, Zone } from "../lib/types.ts";
 import type { TubePath } from "../lib/scene/data.ts";
 
 function mkZone(over: Partial<Zone> & Pick<Zone, "kind" | "min" | "max">): Zone {
   return { vec: [0, 0], scale: 1, round: false, skin: "", ...over };
 }
-function mkHole(zones: Zone[] = [], posts: Post[] = []) {
-  return { board: { w: 20, h: 20 }, walls: [], zones, posts, start: [0, 0] as Vec2, cup: [10, 10] as Vec2 };
+function mkHole(zones: Zone[] = [], posts: Post[] = [], walls: Wall[] = []) {
+  return { board: { w: 20, h: 20 }, walls, zones, posts, start: [0, 0] as Vec2, cup: [10, 10] as Vec2 };
 }
 
 type RafGlobal = { window?: { requestAnimationFrame: (f: FrameRequestCallback) => number }; requestAnimationFrame?: (f: FrameRequestCallback) => number };
@@ -36,6 +36,26 @@ async function withFakeClock<T>(fn: () => Promise<T>): Promise<T> {
   let t = 0;
   performance.now = () => (t += 1e6);
   const raf = (cb: FrameRequestCallback) => (cb(performance.now()), 0);
+  g.window = { requestAnimationFrame: raf };
+  g.requestAnimationFrame = raf;
+  try {
+    return await fn();
+  } finally {
+    performance.now = realNow;
+    g.window = realWindow;
+    g.requestAnimationFrame = realRaf;
+  }
+}
+
+/** Runs fn() with performance.now() and each frame's stamp dt ms apart,
+ *  calling frame() after every frame: the replay as a real page draws it. */
+async function withSteppedClock<T>(dt: number, frame: () => void, fn: () => Promise<T>, stamp = (t: number) => t): Promise<T> {
+  const realNow = performance.now.bind(performance);
+  const g = globalThis as RafGlobal;
+  const realWindow = g.window, realRaf = g.requestAnimationFrame;
+  let t = 0;
+  performance.now = () => t;
+  const raf = (cb: FrameRequestCallback) => (queueMicrotask(() => ((t += dt), cb(stamp(t)), frame())), 0);
   g.window = { requestAnimationFrame: raf };
   g.requestAnimationFrame = raf;
   try {
@@ -153,14 +173,21 @@ void test("replay: a hazard step off a rectangular pond (no poly), and off a roo
   assert.equal(ball.visible, true);
 });
 
-void test("replay: a tunnel with no built tube still lerps straight through", async () => {
-  const { E, ball, calls } = makeFixture();
+void test("replay: a tunnel with no built tube: in at its middle, unseen inside, out at the exit", async () => {
+  const { E, ball } = makeFixture();
   const api = makeReplay(E);
-  const tunnel = mkZone({ kind: "tunnel", min: [1, 1], max: [3, 3], vec: [2, 2] });
+  const tunnel = mkZone({ kind: "tunnel", min: [1, -1], max: [3, 1], vec: [10, 10] });
   E.g.s = mkHole([tunnel]) as unknown as GameState["s"];
-  await withFakeClock(() => api.replay([[0, 0], [2, 2], [6, 6]], false, "000"));
-  assert.ok(Math.abs(ball.position.x - 6) < 1e-6);
-  assert.ok(calls.showAt.length > 0);
+  // the last point before it went in is short of the door; the exit is a point of its own, mid-substep
+  const ticks: number[] = [], frames: [number, boolean][] = [];
+  (E as { showAt: (t: number) => void }).showAt = (t) => void ticks.push(t);
+  await withSteppedClock(16, () => frames.push([ball.position.x, ball.visible]), () => api.replay([[-4, 0], [0, 0], [10, 10], [12, 10]], false, "0000"));
+  assert.ok(Math.abs(ball.position.x - 12) < 1e-6 && ball.visible);
+  const k = frames.findIndex(([, seen]) => !seen);
+  assert.ok(k > 0, "hidden inside");
+  assert.ok(Math.abs(frames[k - 1][0] - 2) < 1e-6, "the step before ends at the tunnel's middle");
+  // the exit is no substep: the step after it is still substep 1
+  assert.ok(Math.max(...ticks) <= 2 + 1e-9);
 });
 
 void test("replay: a loop zone's tube rolls the ball back when it reverses at the mouth", async () => {
@@ -196,13 +223,46 @@ void test("replay: an unmarked sharp turn (an older realm) still reads as a boun
   assert.ok(Math.abs(ball.position.z - -2) < 1e-6);
 });
 
-void test("replay: a flagged flight arcs from its crest to where it lands", async () => {
+void test("replay: a flagged flight with no hill found: one arc across its flags", async () => {
   const { E, ball } = makeFixture();
   const api = makeReplay(E);
   const path: Vec2[] = [[0, 0], [2, 0], [4, 0], [6, 0]];
   const flags = "0110"; // airborne across points 1..2
+  const [a] = flightsOf(path, flags, [], [0, 1, 2, 3]).get(1) as Arc[];
+  assert.deepEqual([a.t0, a.t1, a.h], [0.5, 2.5, 0.5]); // 2 substeps in the air: apex T²/8
   await withFakeClock(() => api.replay(path, false, flags));
   assert.ok(Math.abs(ball.position.x - 6) < 1e-6);
+});
+
+// garden/9's first hill and a stroke over its crest, as the chain's physics
+// played it: up at 1+2/3 (the end of the move that crossed x=25.5), vz 0.839,
+// down at 3+2/3 (33.31), a hop of 0.336, down again at 4+2/3 (36.74)
+const HILL = mkZone({ kind: "slope", min: [13.5, 1.5], max: [25.5, 9.5], vec: [-0.22, 0], skin: "slope" });
+const OVER: Vec2[] = [19.180425714767743, 23.358220032609708, 27.104387825905857, 30.82611117475756, 34.45254870461975, 37.863633602240455, 41.27945297563574].map((x) => [x, 5.5]);
+
+void test("flightsOf: the chain's take-off, landing and hop over a hill's crest", () => {
+  const m = flightsOf(OVER, "0011100", [HILL], [0, 1, 2, 3, 4, 5, 6]);
+  const [up, hop] = [...new Set([...m.values()].flat())];
+  assert.ok(Math.abs(up.t0 - (1 + 2.1418 / 3.7462)) < 1e-3, "drawn from the crest");
+  assert.ok(Math.abs(up.from[0] - 25.5) < 1e-6);
+  assert.ok(Math.abs(up.t1 - (3 + 2 / 3)) < 1e-9 && Math.abs(hop.t1 - (4 + 2 / 3)) < 1e-9);
+  assert.ok(Math.abs(up.h - 0.8393 ** 2 / 2) < 1e-3 && Math.abs(hop.h - 0.3357 ** 2 / 2) < 1e-3);
+  assert.ok(Math.abs(up.to[0] - 33.24) < 0.1);
+  assert.deepEqual([...m.keys()], [1, 2, 3, 4]);
+  // a timed hill that is not there, or one too gentle to launch: no crest, one arc across the flags
+  for (const z of [{ ...HILL, every: 4, on: 1, phase: 2 }, { ...HILL, vec: [-0.1, 0] as Vec2 }]) {
+    const [a] = flightsOf(OVER, "0011100", [z], [0, 1, 2, 3, 4, 5, 6]).get(1)!;
+    assert.equal(a.t0, 1.5);
+  }
+});
+
+void test("replay: a flight drawn as the chain's arc, its apex vz²/2 over the lip", async () => {
+  const { E, ball } = makeFixture();
+  const api = makeReplay(E);
+  E.g.s = mkHole([HILL]) as unknown as GameState["s"];
+  let top = 0;
+  await withSteppedClock(8, () => (top = Math.max(top, ball.position.y)), () => api.replay(OVER, false, "0011100"));
+  assert.ok(Math.abs(top - BALL_R - 0.8393 ** 2 / 2) < 0.01, `apex ${top - BALL_R}`);
 });
 
 void test("replay: rolling over sand, ice, a puddle or flowers doesn't throw", async () => {
@@ -281,4 +341,39 @@ void test("replay: no glow at all is a no-op, and an aborted round settles witho
     rg.requestAnimationFrame = realRaf;
   }
   assert.ok(ball.position.x < 8); // it never reached the end: cut short
+});
+
+void test("replay: a frame stamped before its step began (a slow device) is drawn at the step's start, not behind it", async () => {
+  const { E, ball } = makeFixture();
+  const api = makeReplay(E);
+  const xs: number[] = [];
+  // each frame's stamp 20 ms older than the clock the step started on
+  await withSteppedClock(16, () => xs.push(ball.position.x), () => api.replay([[0, 0], [2, 0], [4, 0]], false, "000"), (t) => t - 20);
+  assert.ok(xs.every((x, k) => x >= 0 && (k === 0 || x >= xs[k - 1] - 1e-9)), "never backwards");
+});
+
+void test("replay: off a drawn ledge the ball falls under gravity; down a slope it keeps to the ground", async () => {
+  const ledge = (x: number) => (x < 2 ? 2 : 0);
+  const { E, ball } = makeFixture(ledge);
+  const api = makeReplay(E);
+  const past: number[] = [];
+  await withSteppedClock(16, () => ball.position.x > 2 && past.push(ball.position.y), () => api.replay([[0, 0], [1, 0], [3, 0], [5, 0], [6, 0]], false, "00000"));
+  assert.ok(past[0] > BALL_R + 1.5, "no snap down the face");
+  assert.ok(Math.abs(past[past.length - 1] - BALL_R) < 1e-6, "down on the ground below");
+
+  const slope = (x: number) => (x < 2 ? 0 : -(x - 2) * 0.5);
+  const f = makeFixture(slope), r = makeReplay(f.E);
+  let off = 0;
+  await withSteppedClock(16, () => (off = Math.max(off, Math.abs(f.ball.position.y - BALL_R - slope(f.ball.position.x)))), () => r.replay([[0, 0], [2, 0], [4, 0], [6, 0]], false, "0000"));
+  assert.ok(off < 1e-6, `floated ${off}`);
+});
+
+void test("replay: a head-on bounce turns where the ball meets the wall, BALL_R off it", async () => {
+  const { E, ball } = makeFixture();
+  const api = makeReplay(E);
+  E.g.s = mkHole([], [], [{ a: [5, -5], b: [5, 5], skin: "" }]) as unknown as GameState["s"];
+  let far = -Infinity;
+  // in at 2 a substep, off the wall at x=5 (the centre at 4.5), back out at 2
+  await withSteppedClock(4, () => (far = Math.max(far, ball.position.x)), () => api.replay([[0, 0], [2, 0], [4, 0], [3, 0], [1, 0]], false, "00000", "---b-"));
+  assert.ok(Math.abs(far - (5 - BALL_R)) < 0.02, `turned at ${far}`);
 });

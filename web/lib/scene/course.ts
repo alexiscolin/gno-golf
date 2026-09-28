@@ -373,7 +373,9 @@ export function groundMesh(s: Hole, t: T) {
         // (an inlet only on the lane: its corners reaching past the kerb stay
         // drawn, the lane's edge closing its mouth, or the sea showed through
         // in a slot by the kerb's end post)
-        if (q && ((ownSea && q.skin === "sea" && (q.outside || !!t.green[t.idx(i, j)])) || q.skin === "roof" || GAPS.has(q.skin))) open_[t.idx(i, j)] = 1;
+        // (a gap in the lane, missing planks, 2: its edge is its own, the
+        // lane's rows beside it not pulled away onto the outline)
+        if (q && ((ownSea && q.skin === "sea" && (q.outside || !!t.green[t.idx(i, j)])) || q.skin === "roof" || GAPS.has(q.skin))) open_[t.idx(i, j)] = GAPS.has(q.skin) && q !== seaZone ? 2 : 1;
         // a blowhole's mouth is a real hole (its rim, drawn by island.ts,
         // covers the cells' stepped edge)
         if (q && q.skin === "blowhole") {

@@ -856,7 +856,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     landing: () => null, // the replay's, once made (below)
     tickNow: () => tickNow(),
     stop: () => cut++,
-    showAt: (t) => showClock((clock = t)),
+    // (the tick sent is the clock's floor: the replay starts up to a substep
+    // behind what was shown at release, which holds until it catches up)
+    showAt: (t) => showClock((clock = t < clock && t > clock - 1 ? clock : t)),
     get ball() { return ball; },
     get dragging() { return dragging; },
     get shot() { return shot; },
@@ -1145,6 +1147,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const budget = 3500 + expect * 1.5;
     if (await outlived(rp.replay(res.path, res.holed, res.air, res.cause), budget)) {
       cut++; // every animation of this replay stops
+      ball.visible = true; // (cut in a tunnel: shown again)
       console.warn(`gnogolf: replay cut after ${budget | 0} ms (path of ${res.path.length} steps)`);
     }
     restTimed();

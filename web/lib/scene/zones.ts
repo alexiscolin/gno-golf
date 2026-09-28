@@ -1138,13 +1138,18 @@ function drawTunnel(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
         mouth,
         new THREE.Vector3(cx, y + lift + 0.2, cz).addScaledVector(dirIn, -1.2),
         mouth.clone().lerp(out, 0.5).setY(top),
-        new THREE.Vector3(ox, oy + lift + 0.2, oz).addScaledVector(dirOut, -1.2),
+        // it comes down onto its exit from over a ball's head, the lane behind
+        // it clear (lying on it, it swallowed a ball the chain left there)
+        new THREE.Vector3(ox, Math.min(top, oy + lift + R + 1), oz).addScaledVector(dirOut, -2),
         out,
       ]);
   const tube = drawn(new THREE.TubeGeometry(path, 70, R, 12, false), flat(pair));
   g.add(tube);
   // a flared bell at each end, dark inside: the openings read at a glance
-  for (const [at, dir] of [[mouth, dirIn], [out, dirOut]]) {
+  // (over the top, the throat runs down the tube's own axis: coming down onto
+  // its exit, one square to the bell poked out under it; one that dives keeps
+  // it level, or the opening showed the grass)
+  for (const [at, dir, axis] of [[mouth, dirIn, path.getTangentAt(0).negate()], [out, dirOut, path.getTangentAt(1)]]) {
     // a real mouth: the flared bell seen from both sides, a thick lip,
     // a dark throat going into the tube, and the bottom set well back
     const ends = new THREE.Group();
@@ -1160,8 +1165,12 @@ function drawTunnel(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
     throat.position.z = -0.5;
     const back = new THREE.Mesh(new THREE.CircleGeometry(R, 20), new THREE.MeshBasicMaterial({ color: 0x0b1f19 }));
     back.position.z = -1.15;
-    ends.add(bell, lip, throat, back);
-    g.add(ends);
+    const deep = new THREE.Group();
+    deep.position.copy(at);
+    deep.lookAt(at.clone().add(underMill ? dir : axis));
+    ends.add(bell, lip);
+    deep.add(throat, back);
+    g.add(ends, deep);
   }
   // one badge, over the way in, clear of the tube's arch
   g.add(badge(pair, "down", mouth.x, mouth.y + R * 1.4 + 1.2, mouth.z));
