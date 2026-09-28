@@ -778,20 +778,27 @@ web/lib/duel.ts, web/components/Duel.tsx), where it differs from the design:
 - **Entry.** A hole link opens the picker directly (no title screen), and a
   dare link always stops there, even for a player who has a gnome: it is the
   one place that says who is raced and offers to play solo. The dare stays
-  in the address while it is raced (a reload keeps it).
+  in the address, with the hole, while it is raced (a reload keeps it).
+- **The rival spans the course.** A dare is a rival, not one hole: their best
+  is read on each hole the player opens (once each), and the duel re-arms
+  wherever they have one (`{rival} has a ghost here too: race it.`). Play
+  solo drops the rival for the page.
 - **Picker.** The gold sticker `Racing {rival} · {n} to beat` with a
   `Play solo` link on the same line; under it, only what changes the race:
   an ace, a mixed aim, a weather that was not today's. The "can't be faked"
   line is in the Rules sheet (`Duels`).
 - **HUD.** One score card, no badge: `You – them`, `2 – 1` (✓ once the
-  ghost is in), `3 to beat`, then `they won` once the ghost's holing stroke
-  has shown and the player is past it; Restart turns into a solid Rematch.
-  The card is a polite live region.
-- **The ghost's turn.** After `showExtras()`, not awaited: the player can aim
-  at once, and a press or an aim key cuts it (no Skip chip, no tag). Its
+  ghost is in), then what is left: `3 to beat`, `hole it to win`, `hole it
+  to tie`; `they won` once the ghost's holing stroke has shown and the player
+  is past it, kept for the round, and Restart turns into a solid Rematch.
+  The card is a polite, atomic live region.
+- **The ghost's turn.** Among the pieces of the stroke it replays: the next
+  stroke's pieces grow once its turn is over (at once without a duel). It is
+  not awaited by the input: a press or an aim key cuts it (no Skip chip, no
+  tag), and a read still on its way hands the turn back at once. Its
   steps and drop play at twice the speed, fitted to about 2 s; a splash or a
   tube keeps its own time. A replay past 5 s is cut (a frozen tab). The camera
-  frames both balls while it plays. It stands beside the player's gnome where
+  frames both balls while it plays, never wider than the hole's overview. It stands beside the player's gnome where
   they would overlap. Its strokes are read one ahead and kept per ghost (a
   rematch reads nothing again); a failed read is asked again at the next
   turn, and a missed turn lands the next one where it rests. Read late,
@@ -799,15 +806,20 @@ web/lib/duel.ts, web/components/Duel.tsx), where it differs from the design:
 - **Look.** Paper white at 0.7 on its turn and 0.45 at rest, each part
   hiding what is behind it, its thin outline drawn behind the body. Built at
   the first duel: a game without one makes nothing.
-- **Win card.** As designed, plus the ghost's weather when it differed. The
-  share is `Dare a friend` (the rival's link) until saved, then
-  `Dare them back`; a mixed race says so in the text. The shared picture and
+- **Win card.** As designed, plus the ghost's weather when it played
+  differently (fog plays as clear skies). The share is `Dare a friend` (the
+  rival's link) until saved, then `Dare them back`; a mixed race says so in
+  the text, and a win that can't be saved still says it was won. A tie
+  against an ace does not push the rematch (it can only tie again). The
+  sharer's own share (no duel) ends `Race my ghost.` once their round is on
+  the chain. The shared picture and
   the clip carry `vs {rival}` and both counts; the clip ends on
   `Race the ghost`. Rematch does not read `Ghost` again.
 - **Not built yet:** the ⚔ on the boards and Friends, `Race your best` from a
   board, the Ghost buster gnome, the stroke tag and the live-region lines, the
   still dotted path under reduced motion, the memo `"gnogolf duel"`.
-  On a timed hole the ghost's stroke n is drawn among stroke n+1's pieces.
+  **Launch:** seed the team's ghosts at par (a birdie on par 4 and 5), not
+  aces: an ace ghost can only be tied.
 
 ## What was to build
 
