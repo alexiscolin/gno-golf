@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink } from "../components/common.ts";
+import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -143,4 +143,10 @@ test("a dare to the whole course carries only the dare", () => {
   const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
   onPage("", () => assert.equal(dareLink(me), `?by=${me}`));
   onPage("", () => assert.equal(dareLink("not an address"), ""));
+});
+
+test("what the next stroke is for, called out before it: an ace, eagle, birdie, par, bogey, then how far over", () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map((n) => strokeFor(n, 4)), ["For an ace!", "For eagle!", "For birdie!", "For par!", "For bogey", "1 over par", "2 over par"]);
+  assert.equal(strokeFor(1, 2), "For an ace!");
+  assert.equal(strokeFor(2, 2), "For par!");
 });

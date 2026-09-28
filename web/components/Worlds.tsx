@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { HoleRow } from "@/lib/types";
 import { vsPar, type Cup, type CupTotal, type cupTotals } from "@/lib/card";
 import { sound } from "@/lib/feel";
@@ -26,16 +26,18 @@ export const EXTRAS = { id: "extras", name: "Extras" } as const;
 /** A hole's cup, or the extras, as its world says (worldOf would name the extras the first cup). */
 export const groupOf = (id: string | null | undefined) => (id === EXTRAS.id ? EXTRAS : worldOf(id));
 
-// the scene is clipped to the round badge, and the ink ring drawn over it
-function Frame({ id, children }: { id: string; children?: ReactNode }) {
+/** A round inked window, its scene clipped to it (an id of its own, so two
+ *  on a screen never share a clip): a cup's emblem, a hole's map, a gnome's face. */
+export function Frame({ className, children }: { className?: string; children?: ReactNode }) {
+  const clip = useId();
   return (
-    <svg viewBox="0 0 120 120" aria-hidden="true">
+    <svg viewBox="0 0 120 120" className={className} aria-hidden="true">
       <defs>
-        <clipPath id={`w-${id}`}>
+        <clipPath id={clip}>
           <circle cx="60" cy="60" r="56" />
         </clipPath>
       </defs>
-      <g clipPath={`url(#w-${id})`}>{children}</g>
+      <g clipPath={`url(#${clip})`}>{children}</g>
       <circle cx="60" cy="60" r="56" className="w__ring" />
     </svg>
   );
@@ -45,7 +47,7 @@ export function Emblem({ id }: { id: string }) {
   // each a little scene in the game's own inked, flat style
   if (id === "garden")
     return (
-      <Frame id={id}>
+      <Frame>
         <circle cx="60" cy="60" r="56" className="w__sky w__sky--garden" />
         <path d="M 4 78 Q 30 58 56 72 Q 84 54 116 72 L 116 116 L 4 116 Z" className="w__hill" />
         <path d="M 70 40 L 84 18 L 98 40 Z" className="w__peak" />
@@ -62,7 +64,7 @@ export function Emblem({ id }: { id: string }) {
     );
   if (id === "island")
     return (
-      <Frame id={id}>
+      <Frame>
         <circle cx="60" cy="60" r="56" className="w__sky w__sky--island" />
         <circle cx="88" cy="34" r="10" className="w__sun" />
         <path d="M 4 74 Q 20 70 36 74 T 68 74 T 100 74 T 116 74 L 116 116 L 4 116 Z" className="w__sea" />
@@ -76,7 +78,7 @@ export function Emblem({ id }: { id: string }) {
     );
   if (id === "mountain")
     return (
-      <Frame id={id}>
+      <Frame>
         <circle cx="60" cy="60" r="56" className="w__sky w__sky--mountain" />
         <path d="M 4 88 L 34 40 L 52 64 L 72 28 L 116 88 Z" className="w__peak" />
         <path d="M 27 51 L 34 40 L 41 51 L 37 49 L 34 53 Z M 64 41 L 72 28 L 80 41 L 76 38 L 72 44 L 68 38 Z" className="w__snow" />
@@ -91,7 +93,7 @@ export function Emblem({ id }: { id: string }) {
     );
   if (id === "town")
     return (
-      <Frame id={id}>
+      <Frame>
         <circle cx="60" cy="60" r="56" className="w__sky w__sky--town" />
         <path d="M 4 92 L 116 92 L 116 116 L 4 116 Z" className="w__street" />
         <path d="M 30 100 H 42 M 54 100 H 66 M 78 100 H 90" className="w__lane" />
@@ -107,7 +109,7 @@ export function Emblem({ id }: { id: string }) {
       </Frame>
     );
   return (
-    <Frame id="build">
+    <Frame>
       <circle cx="60" cy="60" r="56" className="w__sky w__sky--build" />
       <path d="M 20 40 H 100 M 20 60 H 100 M 20 80 H 100 M 40 20 V 100 M 60 20 V 100 M 80 20 V 100" className="w__grid" />
       <path d="M 30 88 Q 50 50 90 70" className="w__plan" />
@@ -265,7 +267,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                   aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
                 >
                   <Diorama id={w.id} on={hot === w.id && open} />
-                  {w.id === current && <span className="world__last" aria-hidden="true">Last played</span>}
+                  {w.id === current && <span className="tag world__last" aria-hidden="true">Last played</span>}
                   {won && <Won clean={t.clean} score={score} />}
                   <span className="world__ribbon">{w.name}</span>
                   <span className="world__info">

@@ -1,7 +1,7 @@
 // Ghost duels (ADR-004): the best raced, the ghost's pace, and the result in words.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, bestOf, showcases, inTurn, mapView, pathD, railRuns, type Duel } from "../lib/duel.ts";
+import { raceLeft, duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, bestOf, showcases, inTurn, mapView, mapFit, mapZone, vsBest, pathD, railRuns, type Duel } from "../lib/duel.ts";
 import type { Ghost } from "../lib/types.ts";
 
 const ghost = (strokes: number, mode: Ghost["mode"] = "assisted"): Ghost => ({ version: 1, hole: "garden/1/v1", mode, player: "g1x", strokes, period: 7, shots: "0.0000,1.0000,0;12.5000,6.2000,3" });
@@ -34,9 +34,9 @@ test("the result reads a win, a loss by one in words, a tie, an ace matched", ()
 });
 
 test("racing your own best reads as such", () => {
-  assert.equal(duelResult(2, duel(3, true), "Birdie").title, "You beat your best!");
-  assert.equal(duelResult(4, duel(3, true), "Bogey").title, "Your best still stands, by one");
-  assert.equal(duelResult(3, duel(3, true), "Par").title, "You tied your best");
+  assert.equal(duelResult(2, duel(3, true), "Birdie").title, "New best!");
+  assert.equal(duelResult(4, duel(3, true), "Bogey").title, "Your best stands");
+  assert.equal(duelResult(3, duel(3, true), "Par").title, "Tied your best");
 });
 
 test("the share text dares back once saved, and passes the rival's dare on before", () => {
@@ -47,7 +47,8 @@ test("the share text dares back once saved, and passes the rival's dare on befor
 });
 
 test("racing your own best says so in the line and the share", () => {
-  assert.equal(duelResult(2, duel(3, true), "Birdie").line, "2 to your 3 · Birdie");
+  assert.equal(duelResult(2, duel(3, true), "Birdie").line, "Better by one · 2 to your 3 · Birdie");
+  assert.equal(duelResult(5, duel(4, true), "Double bogey").line, "Short by one · 5 to your 4 · Double bogey");
   assert.equal(duelResult(1, duel(1, true), "Ace").title, "You matched your ace!");
   assert.match(duelShare("win", duel(3, true), "The Mill", 2, true), /^⚔ The Mill in 2, raced against my own ghost\./);
   assert.match(duelShare("win", duel(3, true), "The Mill", 2, false), /^⚔ Can you beat my 3 on The Mill\?/);
@@ -128,6 +129,26 @@ test("a hole's map: its middle in the window's, the tee to the left or the foot,
   assert.equal(pathD([[0, 0], [1, 0], [9, 0]], (p) => [p[0] * 2, p[1]]), "M0 0L1 0Q2 0 10 0L18 0");
 });
 
+test("a map frames the hole's shape too: its rails' ends, a rail-less lane's outline", () => {
+  const z = (outside: boolean) => ({ kind: "hazard" as const, min: [0, 0] as const, max: [9, 9] as const, vec: [0, 0] as const, scale: 1, round: false, skin: "sea", outside, poly: [[1, 1], [8, 1], [4, 8]] as const });
+  const fit = mapFit({ start: [2, 2], cup: [6, 2], walls: [{ a: [0, 0], b: [0, 9], skin: "" }], zones: [z(true), z(false)] }, [[3, 2]]);
+  assert.deepEqual(fit, [[2, 2], [6, 2], [3, 2], [0, 0], [0, 9], [1, 1], [8, 1], [4, 8]]); // (a zone inside the lane: not its shape)
+});
+
+test("a map's zones by what they do: water, a drop, sand, ice, a slope, what passes over or under; the rest left out", () => {
+  const k = (kind: "surface" | "slope" | "tunnel" | "hazard" | "loop", skin: string, air = false) => mapZone({ kind, skin, air });
+  assert.deepEqual([k("hazard", "water"), k("hazard", "sea"), k("hazard", "canal"), k("hazard", "crevasse"), k("hazard", "roof")], ["pond", "pond", "pond", "drop", "drop"]);
+  assert.deepEqual([k("surface", "sand"), k("surface", "wetsand"), k("surface", "ice"), k("surface", "plank bridge"), k("surface", "flowerbed")], ["sand", "sand", "ice", "over", null]);
+  assert.deepEqual([k("slope", "mound"), k("slope", "gust", true), k("tunnel", "tunnel"), k("loop", "castle tube")], ["slope", null, "over", "over"]);
+});
+
+test("your score against their best: none yet, over by the gap, level, beaten", () => {
+  assert.deepEqual(vsBest(undefined, 3), { kind: "none", gap: 0 });
+  assert.deepEqual(vsBest(5, 3), { kind: "over", gap: 2 });
+  assert.deepEqual(vsBest(3, 3), { kind: "tie", gap: 0 });
+  assert.deepEqual(vsBest(2, 3), { kind: "won", gap: 1 });
+});
+
 test("a map's lines: rails joined end to end into runs, their corners rounded, a loop closed", () => {
   const w = (a: [number, number], b: [number, number]) => ({ a, b });
   const runs = railRuns([w([0, 0], [1, 0]), w([5, 5], [6, 5]), w([1, 1], [1, 0]), w([0, 1], [0, 0])]);
@@ -160,4 +181,8 @@ test("calls in turn: n at once, the rest in order, a failed one handing its plac
   assert.deepEqual(log, ["a", "b", "c", "d"]);
   assert.deepEqual(all.map((r) => r.status), ["rejected", "fulfilled", "fulfilled", "fulfilled"]);
   assert.equal(await turn(() => Promise.resolve("e")), "e"); // its places all given back
+});
+
+test("a duel's next stroke called out: strokes left to win, the last one, the tie, out of reach", () => {
+  assert.deepEqual([1, 2, 3, 4, 5].map((n) => raceLeft(n, 4)), ["3 strokes left to win", "2 strokes left to win", "Last one to win!", "Hole it to tie", "Out of reach"]);
 });

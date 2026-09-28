@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import "@/app/title.css";
 import { sound } from "@/lib/feel";
 import { Button } from "@/components/ui";
+import { GNOME } from "@/components/common";
 import { AboutButton, ICON } from "@/components/About";
 import { SLOW_KEY } from "@/lib/engine/pace";
 import { camlog } from "@/lib/testhooks";
@@ -365,10 +366,10 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
                 extrusion and their fills are all <use>s of these */}
             <polygon id="badge" points={burst(18, 86, 104)} />
             <g id="gnome">
-              <rect id="gnome-face" x="40" y="100" width="120" height="44" rx="6" />
-              <path id="gnome-beard" d="M 40 116 Q 34 190 100 214 Q 166 190 160 116 Q 140 146 100 142 Q 60 146 40 116 Z" />
-              <path id="gnome-hat" d="M 28 95 Q 40 91 48.7 76 L 96.5 7 Q 100 -1.5 103.5 7 L 151.3 76 Q 160 91 172 95 Z" />
-              <rect id="gnome-brim" x="26" y="90" width="148" height="20" rx="10" />
+              <rect id="gnome-face" {...GNOME.face} />
+              <path id="gnome-beard" d={GNOME.beard} />
+              <path id="gnome-hat" d={GNOME.hat} />
+              <rect id="gnome-brim" {...GNOME.brim} />
             </g>
             {/* each shade is clipped to its own shape, so it follows that shape's rounded edges */}
             <clipPath id="clip-hat"><use href="#gnome-hat" /></clipPath>

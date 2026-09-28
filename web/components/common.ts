@@ -7,6 +7,15 @@ import { CUPS, parOf, scoreOf, type Card, type Cup } from "@/lib/card";
 import { costOf } from "@/lib/adena";
 import { isAddress, isHoleId, RULES } from "@/lib/chain";
 
+/** The gnome's head as the logo draws it (a 200 box; app/icon.svg keeps its
+ *  own copy): its face, beard, hat and brim. */
+export const GNOME = {
+  face: { x: 40, y: 100, width: 120, height: 44, rx: 6 },
+  beard: "M 40 116 Q 34 190 100 214 Q 166 190 160 116 Q 140 146 100 142 Q 60 146 40 116 Z",
+  hat: "M 28 95 Q 40 91 48.7 76 L 96.5 7 Q 100 -1.5 103.5 7 L 151.3 76 Q 160 91 172 95 Z",
+  brim: { x: 26, y: 90, width: 148, height: 20, rx: 10 },
+} as const;
+
 /** The error's own sentence, or the value said as it is. */
 export const messageOf = (e: unknown) => String((e && typeof e === "object" && "message" in e && e.message) || e);
 
@@ -183,6 +192,11 @@ export const nextCup = (cup: string, counts: Readonly<Record<string, number>>) =
   CUPS.slice(CUPS.indexOf(cup as Cup) + 1).find((c) => (counts[c] || 0) > 0) || "";
 
 /** A score in golf's own words, from the strokes against par. */
+/** What the next stroke n is worth on a par, called out big before it (solo): for an ace, eagle,
+ *  birdie, par, bogey; past that, how far over par the round already is. */
+export const strokeFor = (n: number, par: number) =>
+  n === 1 ? "For an ace!" : n <= par - 2 ? "For eagle!" : n === par - 1 ? "For birdie!" : n === par ? "For par!" : n === par + 1 ? "For bogey" : `${n - 1 - par} over par`;
+
 export function golfTerm(strokes: number, par: number) {
   if (strokes === 1) return "Hole in one!";
   const d = strokes - par;

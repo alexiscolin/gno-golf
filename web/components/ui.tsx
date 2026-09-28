@@ -7,11 +7,11 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
 
 /**
- * A button. variant: "primary" (green), "secondary" (paper), "chip" (a HUD
- * card that is a button). badge: a small label pinned to its top-right corner
+ * A button. variant: "primary" (green), "secondary" (paper), "gold" (the
+ * front's call to action: a duel's Race), "chip" (a HUD card that is a button). badge: a small label pinned to its top-right corner
  * ("Coming soon", PRO).
  */
-const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", chip: "btn--chip" };
+const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", gold: "btn--gold", chip: "btn--chip" };
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: keyof typeof VARIANTS;
   badge?: ReactNode;

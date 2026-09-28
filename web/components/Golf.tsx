@@ -9,7 +9,7 @@ import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind,
 import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
 import type { Ghost, HoleRow, Mode } from "@/lib/types";
-import { duelResult, duelShare, pickGhost, toBeat, type Duel } from "@/lib/duel";
+import { duelResult, duelShare, pickGhost, raceLeft, toBeat, type Duel } from "@/lib/duel";
 import { SHARE_TAGS } from "@/lib/site";
 import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
@@ -29,7 +29,7 @@ import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/componen
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
-import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, shortAddr, useCopied, saveBy, mmss, costLine, fundCmd, holeNumber, nextCup, golfTerm, nextHole, chainQuery, type SaveOf } from "@/components/common";
+import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, shortAddr, useCopied, saveBy, mmss, costLine, fundCmd, holeNumber, nextCup, golfTerm, nextHole, chainQuery, strokeFor, type SaveOf } from "@/components/common";
 import { clipName } from "@/lib/clip";
 import { Boards, FullBoard, Podium, NameForm, nameOnce, useNameCheck, useRankNudge, useSavedPlace, type BoardProps, type NameCheck } from "@/components/Leaderboard";
 import { FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network";
@@ -1251,8 +1251,8 @@ export default function Golf() {
           onBack={() => setScreen(BACK.worlds)}
           onAbout={() => setAbout(true)}
           community={s.community}
-          racing={dare && !solo && <p className="dare">Racing {rivalName}&apos;s ghost</p>}
-          podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} onOpen={() => setBoard(true)}
+          racing={dare && !solo && <p className="dare">Racing {rivalName}</p>}
+          podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onOpen={() => setBoard(true)}
             extra={<button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>} />}
           onCommunity={openHole}
           onPick={enterCup}
@@ -1478,7 +1478,7 @@ export default function Golf() {
         <div className="banner banner--win">
           <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label="Hole finished">
             <span className="eyebrow">In the hole! · {s.name}</span>
-            <h2 data-long={won && won.title.length > 16 ? "" : undefined} data-result={won ? won.result : undefined}>{won ? won.title.replaceAll("-", "\u2011") /* a name's hyphens never break a line */ : golfTerm(s.strokes, parHere(s))}</h2>
+            <h2 data-long={won && won.title.length > 16 ? "" : undefined}>{won ? won.title.replaceAll("-", "\u2011") /* a name's hyphens never break a line */ : golfTerm(s.strokes, parHere(s))}</h2>
             {/* the rival's name inked in the line, the one word to find */}
             {won && <p className="banner__duel">{won.line.split(won.duel.name).flatMap((part, i) => (i ? [<b key={i}>{won.duel.name}</b>, part] : [part]))}</p>}
             {/* the score, and beside it the ways to tell people about it */}
@@ -1719,10 +1719,11 @@ export default function Golf() {
 
       {playing && s && s.note && !s.flying && <div className="toast" role="status">{s.note}</div>}
       {playing && linkNote && <Toast text={linkNote} onDone={() => setLinkNote(null)} />}
-      {/* a duel's turns, called out big: yours, then theirs (the score card says them to a screen reader) */}
-      {playing && racing && s && !s.done && !theyWon && (s.view !== "overview" || s.cam === "far") && (s.rivalTurn || (s.strokes === s.rival && !s.flying)) && (
+      {/* the turns, called out big before each stroke: a duel's (yours, then theirs), what the next is
+          worth; solo, what it is for (the score card says them to a screen reader) */}
+      {playing && s && !s.done && !theyWon && (s.view !== "overview" || s.cam === "far") && (racing ? s.rivalTurn || (s.strokes === s.rival && !s.flying) : !s.flying && parHere(s) > 0) && (
         <p key={(s.rivalTurn ? "them" : "you") + s.strokes} className={"turncall" + (s.rivalTurn ? " turncall--them" : "")} aria-hidden="true">
-          {s.rivalTurn ? `${racing.self ? "Your best" : racing.name}'s turn` : "Your turn!"}
+          {s.rivalTurn && racing ? `${racing.self ? "Your best" : racing.name}'s turn` : racing ? <>Your turn!<small>{raceLeft(s.strokes + 1, racing.ghost.strokes)}</small></> : strokeFor(s.strokes + 1, parHere(s))}
         </p>
       )}
       {playing && !linkNote && !duel && farHint && s && s.ready && !s.flying && s.strokes > 0 && !s.done && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
@@ -1847,7 +1848,7 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
   return (
     <div className="pending">
       {done ? (
-        <span className="pending__say" role="status">Saved on-chain ✓ Your round on <b>{r.name}</b> is public.</span>
+        <span className="pending__say" role="status"><b>Saved on-chain ✓</b><span>Your round on <b>{r.name}</b> is public.</span></span>
       ) : (
         <>
           <span className="pending__say">
@@ -2134,7 +2135,7 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
   return (
     <div className={"aimset" + (compact ? " aimset--compact" : "")}>
       <span className="aimset__label">Aim</span>
-      <Segmented label="Aim" value={aim} full={!compact} options={[["pro", "Pro"], ["assisted", "Assisted"]]} onChange={(m) => (sound("blip"), onChange(m))} />
+      <Segmented className={compact ? "seg--s" : ""} label="Aim" value={aim} full={!compact} options={[["pro", "Pro"], ["assisted", "Assisted"]]} onChange={(m) => (sound("blip"), onChange(m))} />
       {/* both lines in one cell, the other one hidden: the box keeps the longer one's size, nothing moves on a switch */}
       <small className="aimset__help">
         <span className={aim === "pro" ? "" : "off"} aria-hidden={aim !== "pro"}>
@@ -2172,7 +2173,7 @@ function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot
   const tag = SHARE_TAGS;
   if (cups.slam) return "👑 Grand slam on Gnogolf: every cup at par or under. The Gnome King bows." + tag;
   if (t.all) return pick([
-    `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on gno.land.`,
+    `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on-chain.`,
     `⛳ ${t.strokes} strokes round the whole ${cup} (${vs}). My gnome is tired, the chain is not.`,
   ]) + tag;
   // the link dares: one ask, and no score (the friend races the best, maybe not this round)
@@ -2180,12 +2181,12 @@ function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot
   if (place) return `🏆 #${place.rank} of ${place.of} on ${s.name} in Gnogolf: ${strokesWord(s.strokes)}, saved on-chain. Come and take my place.` + tag;
   if (fresh.length) return `🍄 New gnome unlocked on Gnogolf: ${fresh.map((g) => g.name).join(" and ")}. Earned the hard way, one putt at a time.` + tag;
   if (s.strokes === 1) return pick([
-    `🕳️ Hole in one on ${s.name}! Every bounce computed by a realm on gno.land.`,
-    `⛳ Ace on ${s.name}. Somewhere on gno.land a realm just nodded.`,
+    `🕳️ Hole in one on ${s.name}! Every bounce computed by the chain.`,
+    `⛳ Ace on ${s.name}. Somewhere on the chain a realm just nodded.`,
   ]) + tag;
   return pick([
     `⛳ ${s.name} in ${s.strokes}. Mini-golf where the ball is rolled by a smart contract. Your turn?`,
-    `🧙 My gnome sank ${s.name} in ${s.strokes}. Physics by a realm on gno.land, excuses by me.`,
+    `🧙 My gnome sank ${s.name} in ${s.strokes}. Physics by a realm on-chain, excuses by me.`,
     `⛳ ${s.strokes} strokes on ${s.name}. Every bounce computed on-chain. Beat that, gnome.`,
   ]) + tag;
 }
@@ -2198,11 +2199,11 @@ const MENU_ICON = {
   cups: <path d="M8 21V4l10 4-10 4M5 21h8" />,
 };
 
-/** The address of a cup, as the cup screen puts it in the bar: ?cup=<world>. */
+/** A cup's own page (/h/<world>/), what its share links to. A share names no
+ *  bare gno.land: X would take that for the link and show gno.land's card. */
 function cupLink(cup: string) {
   const q = chainQuery();
-  q.set("cup", cup);
-  return `?${q}`;
+  return `h/${cup}/` + (String(q) ? `?${q}` : ""); // (its own page: its link card is the cup's, app/h)
 }
 
 /** The confetti over the victory screen: none with reduced motion. */
@@ -2246,7 +2247,7 @@ function Victory({ cup, best, holes, card, saved, fresh, snapshot, onBack, onRep
   const t = totals(card, holes), vs = t.strokes - t.par;
   const vsText = vs === 0 ? "level par" : vsPar(vs);
   const to = WORLDS.find((x) => x.id === next);
-  const text = `🏆 ${best ? `Beat my last ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on gno.land.${SHARE_TAGS}`;
+  const text = `🏆 ${best ? `Beat my last ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on-chain.${SHARE_TAGS}`;
   return (
     <div className={`victory victory--${cup}`}>
       <Cheer />

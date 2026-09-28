@@ -4,7 +4,7 @@
 // reads. The result is the client's arithmetic (V1 records no duel), from two
 // numbers the chain vouches for: the player's strokes and the rival's best.
 import { SHARE_TAGS } from "./site";
-import type { Ghost, Mode, Vec2 } from "./types";
+import type { Ghost, HoleState, Mode, Vec2, Zone } from "./types";
 
 /** A duel under way: the ghost raced and who it is, as said on screen. */
 export interface Duel {
@@ -36,6 +36,8 @@ export const ghostSpeed = (ms: number) => Math.max(1.25, ms / GHOST_MS);
 
 /** What the score card says is left, before the next stroke n of a race against a best of r:
  *  the last stroke that wins, the one that ties, else the target. */
+/** What a duel's next stroke n is worth against a best of r, called out big as the player's turn comes. */
+export const raceLeft = (n: number, r: number) => (n > r ? "Out of reach" : n === r ? "Hole it to tie" : n === r - 1 ? "Last one to win!" : `${r - n} strokes left to win`);
 export const toBeat = (n: number, r: number) => (n > r ? "out of reach" : n === r ? "hole it to tie" : n === r - 1 ? "hole it to win" : `${r} to beat`);
 
 /** A number of strokes as said in a title: one is a word. */
@@ -46,9 +48,9 @@ export function duelResult(mine: number, d: Duel, term: string) {
   const theirs = d.ghost.strokes, by = inWords(Math.abs(mine - theirs));
   // the title from the player's side, short and big; who and by how much in the line under it
   const line = (who: string) => `${who}${mine === theirs ? `${mine} ${mine === 1 ? "stroke" : "strokes"} each` : `${mine} to ${d.self ? "your" : "their"} ${theirs}`} · ${term}`;
-  if (mine === theirs) return { result: "tie" as const, title: d.self ? (mine === 1 ? "You matched your ace!" : "You tied your best") : mine === 1 ? "Ace for ace!" : "Tie!", line: line(d.self ? "" : `Tied with ${d.name} · `) };
-  if (mine < theirs) return { result: "win" as const, title: d.self ? "You beat your best!" : "You win!", line: line(d.self ? "" : `You beat ${d.name} by ${by} · `) };
-  return { result: "loss" as const, title: d.self ? `Your best still stands, by ${by}` : "You lose", line: line(d.self ? "" : `${d.name} wins by ${by} · `) };
+  if (mine === theirs) return { result: "tie" as const, title: d.self ? (mine === 1 ? "You matched your ace!" : "Tied your best") : mine === 1 ? "Ace for ace!" : "Tie!", line: line(d.self ? "" : `Tied with ${d.name} · `) };
+  if (mine < theirs) return { result: "win" as const, title: d.self ? "New best!" : "You win!", line: line(d.self ? `Better by ${by} · ` : `You beat ${d.name} by ${by} · `) };
+  return { result: "loss" as const, title: d.self ? "Your best stands" : "You lose", line: line(d.self ? `Short by ${by} · ` : `${d.name} wins by ${by} · `) };
 }
 
 /** The share text of a finished duel: once saved (a dare back), or the rival's
@@ -113,6 +115,33 @@ export function mapView(fit: readonly Vec2[], { start, cup }: { start: Vec2; cup
   const k = Math.min((1.84 * r) / Math.hypot(w + 6, h + 6), 8), s = (w >= h ? cup[0] < start[0] : cup[1] > start[1]) ? -k : k; // (3 units clear all round)
   const at = ([x, y]: Vec2): Vec2 => [+(60 + (x - x0 - w / 2) * s).toFixed(1), +(60 + (y - y0 - h / 2) * s).toFixed(1)];
   return { at, k };
+}
+
+/** What a hole's map frames: the tee, the cup and the ghost's path, and the
+ *  hole's own shape (its rails' ends, a rail-less lane's outline), so an L
+ *  or a loop reads as itself, not as the same pill as the next hole. */
+export function mapFit(hole: Pick<HoleState, "start" | "cup" | "walls" | "zones">, path: readonly Vec2[]): Vec2[] {
+  return [hole.start, hole.cup, ...path, ...hole.walls.flatMap((w) => [w.a, w.b]), ...hole.zones.flatMap((z) => (z.outside && z.poly) || [])];
+}
+
+export type MapKind = "pond" | "drop" | "sand" | "ice" | "slope" | "over";
+// the hazards the ball drops down (drawn dark), not into water
+const DROPS = new Set(["crevasse", "ditch", "gap", "cliff", "roof"]);
+/** How a zone shows on a hole's map, by what it does to the ball: water or a
+ *  drop to fall in, sand, ice, a slope, what passes over or under the lane
+ *  (a tunnel, a loop, a bridge); null: not drawn (a flowerbed, the air). */
+export function mapZone({ kind, skin, air }: Pick<Zone, "kind" | "skin" | "air">): MapKind | null {
+  if (kind === "hazard") return DROPS.has(skin) ? "drop" : "pond";
+  if (kind === "surface") return skin.includes("sand") ? "sand" : skin === "ice" ? "ice" : skin.includes("bridge") ? "over" : null;
+  if (kind === "slope") return air ? null : "slope";
+  return kind === "tunnel" || kind === "loop" ? "over" : null;
+}
+
+/** Your score on a hole against their best: none yet, over it (by gap),
+ *  level, or under it (won, by gap). */
+export function vsBest(mine: number | undefined, theirs: number) {
+  const gap = mine ? mine - theirs : 0;
+  return { kind: !mine ? "none" : gap > 0 ? "over" : gap < 0 ? "won" : "tie", gap: Math.abs(gap) } as const;
 }
 
 /** Points as one SVG line, its corners rounded (each bent through the middles

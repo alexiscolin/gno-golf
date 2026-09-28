@@ -12,7 +12,10 @@ import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
-import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied } from "@/components/common";
+import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, useCopied, GNOME } from "@/components/common";
+import { Frame } from "@/components/Worlds";
+import { gnomeById } from "@/lib/scene";
+import { rivalSkin, type Skin } from "@/lib/scene/gnome";
 
 // The leaderboards: the sheet (this hole, the course, friends), the top three
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -50,11 +53,11 @@ export interface BoardProps {
   /** a duel against a player's best on this hole (their ghost), from the tee */
   onRace?: (player: string) => void;
 }
-/** A board row's way into a duel: race that player's ghost here (yours: your best). */
+/** A board row's way into a duel, the duel's gold Race: that player's ghost here (yours: your best). */
 const RaceButton = ({ player, me, strokes, onRace }: { player: string; me?: string | null; strokes: number; onRace?: (p: string) => void }) =>
   onRace ? (
-    <Button variant="primary" className="lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
-      {player === me ? "Race your best" : "Race ghost"}
+    <Button variant="gold" className="lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
+      Race
     </Button>
   ) : null;
 /** "Connect Adena", where a board asks for it: a link to the checklist, or the words alone. */
@@ -245,7 +248,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
         <span className="eyebrow">Saved on-chain</span>
         <h2>Leaderboard</h2>
         <div className="boards__modes">
-          <Segmented role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
+          <Segmented className="seg--s" role="tablist" label="Aim mode" value={mode} onChange={setMode} options={[["pro", "Pro"], ["assisted", "Assisted"]]} />
           <p className="boards__word">{HONEST}</p>
         </div>
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={inHole ? [["hole", "This hole"], ["course", "The course"], ["friends", "Friends"]] : [["course", "The course"], ["friends", "Friends"]]} />
@@ -477,7 +480,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
             <li key={r.player} className={(r.player === me ? "me " : "") + (r.at <= 3 ? `medal medal--${r.at}` : "")}>
               {row ? row(r) : (
                 <>
-                  <span className="lb__rank">{r.at}</span>
+                  <Place at={r.at} plain />
                   <span className="lb__who">
                     <Who chain={chain} addr={r.player} me={me} full link={link(r.player)} />
                     <FlagMark f={showAll && flags[r.player]} />
@@ -773,8 +776,10 @@ function Who({ chain, addr, me, full = false, link }: { chain: Chain | null; add
   );
 }
 
-/** The course's top three on the cups screen, flagged players left out; nothing while the board is empty. */
-export function Podium({ chain, me, mode = "pro", onOpen, extra }: { chain: Chain | null; me?: string | null; mode?: Mode; onOpen: () => void; extra?: ReactNode }) {
+/** The course's top three on the cups screen, flagged players left out, as
+ *  the rival board's stickers (they only show: the board is a tap away);
+ *  the places nobody holds drawn blank. */
+export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra }: { chain: Chain | null; me?: string | null; mode?: Mode; gnome: string; onOpen: () => void; extra?: ReactNode }) {
   const [top, setTop] = useState<{ rows: readonly StandingRow[]; holes: number } | null>(null);
   useEffect(() => {
     setTop(null);
@@ -803,27 +808,56 @@ export function Podium({ chain, me, mode = "pro", onOpen, extra }: { chain: Chai
         </span>
       </header>
       <ol className="podium__row">
-        {/* always three places: the ones nobody holds yet drawn blank */}
-        {[0, 1, 2].map((i) => (top && top.rows[i]) || i).map((r, i) =>
-          typeof r === "number" ? (
-            <li key={r} className="podium__ghost" aria-hidden="true">
-              <span className={`podium__medal podium__medal--${i + 1}`}>{i + 1}</span>
-              <i />
+        {[0, 1, 2].map((i) => {
+          const r = top && top.rows[i];
+          return r ? (
+            <li key={r.player} className={r.player === me ? "me" : ""}>
+              <Sticker player={r.player} at={i + 1} sub={`${strokesWord(r.strokes)} · ${r.holes}/${top.holes} holes`} chain={chain} me={me} gnome={gnome} />
             </li>
           ) : (
-            <li key={r.player} className={r.player === me ? "me" : ""}>
-              <span className={`podium__medal podium__medal--${i + 1}`}>{i + 1}</span>
-              <span className="podium__who"><Who chain={chain} addr={r.player} me={me} full /></span>
-              <span className="podium__score">
-                <b>{r.strokes}</b> strokes · {r.holes}/{top!.holes}
-              </span>
+            <li key={i} aria-hidden="true">
+              <div className="sticker podium__ghost"><Frame className="sticker__face" /><Place at={i + 1} /><i /></div>
             </li>
-          ),
-        )}
+          );
+        })}
       </ol>
       {empty && <p className="podium__empty">Nobody yet: save a round on-chain to take the first place.</p>}
     </section>
   );
 }
 
+/** A place as a disc, in its metal for the first three; plain: a board row's
+ *  place past them, the number alone. */
+const Place = ({ at, plain = false }: { at: number; plain?: boolean }) =>
+  <span className={plain && at > 3 ? "lb__rank" : `podium__medal${at <= 3 ? ` podium__medal--${at}` : ""}`}>{at}</span>;
 
+/** A board's player as a sticker: their gnome flat (in their ghost's skin;
+ *  yours, your gnome), their place, name and a line under it (sub); a tap
+ *  races them (onClick), else it only shows. */
+export function Sticker({ player, at, sub, chain, me, gnome, onClick }: { player: string; at: number; sub: string; chain: Chain | null; me?: string | null; gnome: string; onClick?: () => void }) {
+  const { label } = useWho(chain, player, me), mine = player === me;
+  const body = (<>
+    <Face skin={mine ? gnomeById(gnome) : rivalSkin(player, gnome)} />
+    <Place at={at} />
+    <span className="sticker__who">{label}</span>
+    <span className="sticker__sub">{sub}</span>
+  </>);
+  return onClick
+    ? <button className="sticker" aria-label={`${mine ? "Race your best" : `Race ${label}'s ghost`}: #${at}, ${sub}`} onClick={onClick}>{body}</button>
+    : <div className="sticker">{body}</div>;
+}
+const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
+/** A gnome's face, flat and inked (the logo's), on a disc in his hat's colour, lighter. */
+const Face = ({ skin }: { skin: Skin }) => (
+  <Frame className="sticker__face">
+    <circle cx="60" cy="60" r="56" style={{ fill: `color-mix(in srgb, ${hex(skin.hat)} 45%, var(--paper))` }} />
+    <g transform="translate(10 7) scale(.5)" stroke="var(--ink)" strokeWidth="10" strokeLinejoin="round">
+      {skin.beard !== "none" && skin.beard !== "moustache" && <path d={GNOME.beard} fill={hex(skin.hair ?? 0xffffff)} />}
+      <rect {...GNOME.face} fill="var(--paper)" />
+      <path d={GNOME.hat} fill={hex(skin.hat)} />
+      <rect {...GNOME.brim} fill={hex(skin.hat)} />
+      <circle cx="80" cy="124" r="6" fill="var(--ink)" /><circle cx="120" cy="124" r="6" fill="var(--ink)" />
+      <circle cx="100" cy="136" r="10" fill="#f2b8b0" strokeWidth="6" />
+    </g>
+  </Frame>
+);
