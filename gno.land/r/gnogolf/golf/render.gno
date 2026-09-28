@@ -280,10 +280,9 @@ func bestCell(e *entry, names map[string]string) string {
 	return best
 }
 
-// weatherNote is the hole's weather now and how long it lasts: one forecast,
-// only on a hole's own page.
-func weatherNote(e *entry, h course.Hole) string {
-	f := weatherOf(e, h, Period())
+// weatherNote is the hole's weather now (f, the forecast of this period) and
+// how long it lasts, on a hole's own page.
+func weatherNote(f course.Forecast) string {
 	left := PeriodSeconds - time.Now().Unix()%PeriodSeconds
 	what := "Clear"
 	switch f.Kind {
@@ -371,7 +370,10 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	if focus != "" {
 		s += roundSummary(e, focus, mine)
 	}
-	s += weatherNote(e, h)
+	// the page's forecast, drawn once: its note, and the last shot of a round
+	// played in it
+	now := weatherOf(e, h, Period())
+	s += weatherNote(now)
 	if isTimed(h) {
 		if focus == "" {
 			s += "_This hole changes with every stroke. It is drawn for a first shot; add `/<your address>` to the URL to see it for your next one._\n\n"
@@ -382,7 +384,7 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	if boardWork(f, h) > maxBoardWork {
 		s += "_This hole is too detailed to draw here: " + md("play it in 3D", playLink(e)) + "._\n\n"
 	} else {
-		b := board(e, h, f, mine)
+		b := board(e, h, f, mine, now)
 		leg, walls := legend(f)
 		s += "```\n" + b + "```\n\n"
 		s += key(b, walls) + leg + "\n\n"
@@ -518,8 +520,8 @@ func renderData(e *entry) string {
 }
 
 // board rasterises the hole: wear, then zones, posts, walls, cup, and mine,
-// the focused player's round (nil for none).
-func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
+// the focused player's round (nil for none); now is this period's forecast.
+func board(e *entry, h course.Hole, f *physics.Field, mine *round, now course.Forecast) string {
 	bw, bh := course.BoardOf(h)
 	g := make([][]rune, bh)
 	wear := e.wearGrid()
@@ -541,7 +543,11 @@ func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 
 	// the last flight first, so the pieces drawn over it stay visible
 	if mine != nil {
-		for _, p := range lastShot(e, h, mine).Path {
+		fc := now
+		if mine.period != now.Period { // a round begun in the period before
+			fc = weatherOf(e, h, mine.period)
+		}
+		for _, p := range lastShot(h, mine, fc).Path {
 			put(g, p, '·')
 		}
 	}

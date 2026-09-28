@@ -98,7 +98,7 @@ func roundJSON(e *entry, h course.Hole, player string, r *round, path bool) stri
 		`,"mode":` + jstr(modeNames[r.mode]) +
 		`,"shots":` + jstr(r.shots))
 	if path {
-		shot := lastShot(e, h, r)
+		shot := lastShot(h, r, weatherOf(e, h, r.period))
 		sb.WriteString(`,"path":[` + pathJSON(shot.Path) + `],"air":` + jstr(airOf(shot)) + `,"cause":` + jstr(string(shot.Cause)))
 	}
 	sb.WriteString("}")
@@ -106,8 +106,9 @@ func roundJSON(e *entry, h course.Hole, player string, r *round, path bool) stri
 }
 
 // lastShot replays a round's last stroke, read-only, with its stroke number,
-// tick and weather: the same flight, less the wear. Empty before a first one.
-func lastShot(e *entry, h course.Hole, r *round) physics.Shot {
+// tick and weather (fc, its period's forecast): the same flight, less the
+// wear. Empty before a first one.
+func lastShot(h course.Hole, r *round, fc course.Forecast) physics.Shot {
 	if r.strokes == 0 || r.shots == "" {
 		return physics.Shot{}
 	}
@@ -117,7 +118,7 @@ func lastShot(e *entry, h course.Hole, r *round) physics.Shot {
 	}
 	angle, power, tick := parseShot(s)
 	from := physics.Vec2{X: r.fx, Y: r.fy}
-	shot, holed := previewAt(h, from, angle*math.Pi/180, power, r.strokes-1, tick, weatherOf(e, h, r.period).Zones)
+	shot, holed := previewAt(h, from, angle*math.Pi/180, power, r.strokes-1, tick, fc.Zones)
 	return back(h, from, shot, holed)
 }
 
