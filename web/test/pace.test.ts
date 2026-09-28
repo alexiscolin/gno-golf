@@ -80,6 +80,8 @@ void test("frameMs: nothing moving sleeps a second after the last change, else t
 void test("frameMs: moving but away (no input past AWAY_MS) settles to 10fps", () => {
   assert.equal(frameMs(false, true, false, AWAY_MS, 0), 1000 / 30); // boundary: not yet past AWAY_MS
   assert.equal(frameMs(false, true, false, AWAY_MS + 1, 0), 1000 / 10);
+  assert.equal(frameMs(false, true, true, AWAY_MS + 1, 0), 1000 / 10); // a fast mover dozes too
+  assert.equal(AWAY_MS, 60_000); // the doze: after a minute
 });
 
 void test("frameMs: present and moving, fast movers get 60fps, slow decor 30fps", () => {

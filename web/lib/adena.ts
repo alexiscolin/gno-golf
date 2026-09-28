@@ -269,7 +269,7 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
 // price that rises between the reading and the block
 const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
 // the price asked when the chain's is not given: ugnot a gas
-const PRICE = 0.001;
+export const PRICE = 0.001;
 // Gas asked for one commit, calibrated on gno_call simulate=true
 // (docs/reviews/fix-sync-client.md): the work model already bounds the shots
 // (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; what the

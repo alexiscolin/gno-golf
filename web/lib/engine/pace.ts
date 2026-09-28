@@ -18,13 +18,14 @@ export function savedGfx(): GfxMode {
 export function saveGfx(m: GfxMode) {
   try { localStorage.setItem(GFX_KEY, m); } catch {}
 }
-/** The Low graphics tier: picked, or Auto on a device whose frames were slow (the engine's own flag). */
-export function lowGfx() {
+/** The Low graphics tier: picked, or Auto on a device whose frames were slow
+ *  (the engine's own flag); `blocked` when storage cannot be read. */
+export function lowGfx(blocked = false) {
   const gfx = savedGfx();
   try {
     return gfx === "low" || (gfx !== "high" && localStorage.getItem(SLOW_KEY) === "low");
   } catch {
-    return false;
+    return blocked;
   }
 }
 

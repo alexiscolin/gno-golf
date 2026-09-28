@@ -111,5 +111,5 @@ export function stillsOnly() {
   } catch {
     return true;
   }
-  return lowGfx();
+  return lowGfx(true); // storage blocked: stills, as with the rest unknown
 }

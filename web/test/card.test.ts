@@ -1,8 +1,9 @@
+import { readFileSync } from "node:fs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   vsPar, parOf, cupOf, cardKey, scoreOf, legacyOf, oldToSlot, migrate, loadCard, recordScore, clearCard, clearCup, badgesFor, byRarity, loadOnChain, markOnChain,
-  totals, cupTotals, UNLOCKS, cupHasGnome,
+  totals, cupTotals, UNLOCKS, cupHasGnome, CUP_NAMES,
 } from "../lib/card.ts";
 import type { Finish } from "../lib/card.ts";
 
@@ -326,4 +327,11 @@ test("the card's scores saved on-chain: kept per cardKey, the latest save wins",
   assert.deepEqual(loadOnChain(), { "garden/3": 1 });
   localStorage.setItem("gnogolf.onchain", "[1,2]"); // not a map: none
   assert.deepEqual(loadOnChain(), {});
+});
+
+test("the link cards name the cups as the game does (media/og/og.mjs keeps its own copy: plain node reads no .ts)", () => {
+  const og = readFileSync(new URL("../../media/og/og.mjs", import.meta.url), "utf8");
+  const copy = og.match(/const CUP_NAMES = (\{[^}]*\});/);
+  assert.ok(copy, "og.mjs's CUP_NAMES");
+  assert.deepEqual(Object.fromEntries([...copy[1].matchAll(/(\w+): "([^"]*)"/g)].map((m) => [m[1], m[2]])), CUP_NAMES);
 });

@@ -154,6 +154,17 @@ test("remember: swallows a storage that throws", () => {
 
 // ---- stillsOnly ----
 
+test("stillsOnly: true when storage cannot be read (the Low tier unknown, stills are the safe side)", () => {
+  (globalThis as Record<string, unknown>).matchMedia = () => ({ matches: false });
+  const get = localStorage.getItem.bind(localStorage);
+  localStorage.getItem = () => { throw new Error("blocked"); };
+  try {
+    assert.equal(stillsOnly(), true);
+  } finally {
+    localStorage.getItem = get;
+  }
+});
+
 test("stillsOnly: true when the OS asks for reduced motion", () => {
   (globalThis as Record<string, unknown>).matchMedia = () => ({ matches: true });
   assert.equal(stillsOnly(), true);

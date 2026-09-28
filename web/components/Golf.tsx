@@ -15,7 +15,7 @@ import { SHARE_TAGS } from "@/lib/site";
 import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
-import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, roundGas, shortOf, depositBytes, nameBytes, NAME_GAS, onWalletChange, type SendError } from "@/lib/adena";
+import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, gasOf, roundGas, shortOf, depositBytes, nameBytes, NAME_GAS, PRICE, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
 import Worlds, { WORLDS, EXTRAS, Emblem, groupOf, worldOf } from "@/components/Worlds";
 import Weather from "@/components/Weather";
@@ -852,7 +852,7 @@ export default function Golf() {
   // transaction price the round the same way
   // read before the click, so the click opens Adena at once (a browser may
   // block a wallet window opened after long waits); each read gives up at 4 s
-  const [gasPrice, setGasPrice] = useState(0.001);
+  const [gasPrice, setGasPrice] = useState(PRICE);
   const [funds, setFunds] = useState<number | null>(null);
   const [chainId, setChainId] = useState<string | null>(null);
   const [ourNode, setOurNode] = useState<boolean | null>(null); // is Adena's active network this node?
@@ -2237,7 +2237,7 @@ function Victory({ cup, best, holes, card, saved, fresh, snapshot, onBack, onRep
         <p id="victory-sum" className="victory__sum">
           <strong>{t.strokes}</strong> strokes · par {t.par} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsText}</b>
           {t.all && vs <= 0 && <span className="victory__stamp" title="At par or under">★ At par or under</span>}
-          {t.aces > 0 && <span className="victory__stamp">{t.aces} hole{t.aces > 1 ? "s" : ""}-in-one</span>}
+          {t.aces > 0 && <span className="victory__stamp">{t.aces} {plural("hole", t.aces)}-in-one</span>}
         </p>
         <Scorecard holes={holes} card={card} saved={saved} current={null} compact onRules={onRules} />
         {fresh.length > 0 && <NewGnome skin={fresh[0]} also={fresh.slice(1)} where={to ? to.name : ""} onPlay={() => (sound("select"), onNext(fresh[0].id))} />}

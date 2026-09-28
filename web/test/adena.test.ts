@@ -704,6 +704,8 @@ test("gnokeyPlan: an explicit `parts` overrides the natural commitsOf split", ()
   assert.equal(plan.length, 2);
   assert.ok(plan[0].script.includes("strokes 1-1"));
   assert.ok(plan[1].script.includes("strokes 2-3"));
+  assert.ok(plan[0].script.includes("golf.Reset(cross(cur)"));
+  assert.ok(!plan[1].script.includes("golf.Reset(cross(cur)")); // only the first Resets
 });
 
 test("gnokeyPlan: mode=pro with a period plays PlayRoundPro; period=null and mode=assisted plays PlayRound with no extra arg", () => {

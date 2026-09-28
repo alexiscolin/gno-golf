@@ -597,7 +597,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     let course: Course | null = null;
     try {
       course = buildHole(decorOf(g.s), { defer: true });
-      await new Promise((r) => setTimeout(r, 0)); // the pieces, then (next task) their merge
+      await wait(0); // the pieces, then (next task) their merge
       if (ticket !== loads || !alive) return void disposeCourse(course);
       finishHole(course);
     } catch (err) {
