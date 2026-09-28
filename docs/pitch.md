@@ -4,7 +4,21 @@ You pull back, you let go, and a smart contract on gno.land decides where your
 ball stops. No server, no "trust us": every shot is computed on-chain, and
 anyone can replay it.
 
+**Race anyone's ghost, verified on-chain.** Pick a rival (the champion, a
+player at your level, a friend's link, or yourself) and take turns, stroke for
+stroke, against their real best round.
+
 **Play free at [gnogolf.xyz](https://gnogolf.xyz).** No wallet needed.
+
+## Ghost duels
+
+Every best round on the boards is a ghost you can race: the rival shows up as
+a see-through gnome in its own colors and plays its turn up close, and a call
+before each of your strokes says what it takes to win. The ghost is the round
+the chain kept, strokes, weather and all, so nobody can fake one, not even us:
+a multiplayer game with no game server, the chain as the referee. Send your
+link and a friend races your best; beat theirs, and your record becomes the
+ghost they chase.
 
 ## Why you'll keep playing
 
@@ -19,8 +33,8 @@ a friend to beat it.
 The game never sends "I scored 2". It sends your decisions (an angle, a power,
 the moment you let go), and the chain replays them. So a score on the boards
 can't be faked, and the holes themselves live on-chain too: you can read one
-before you play it. Playing is free. Keeping a score is one signature in
-Adena, for a small fee, with your gno.land name on the board.
+before you play it. Playing is free. Keeping a score is one signature (Adena or
+gnokey), for a small fee, with your gno.land name on the board.
 
 ## Why it matters for gno.land
 
@@ -30,17 +44,12 @@ read, and the same result on every node, forever. People come for mini-golf
 and leave having met Adena, gno.land names and gnoweb. And it's open source, a
 real example of a full app on Gno.
 
-## Ghost duels
+## Next: build a hole, own it forever
 
-Send a friend your link and they race your best: your real round shows up
-as a see-through gnome, and you take turns, stroke for stroke. The chain
-replays it, so nobody can fake a ghost. Beat it, and your record becomes the
-ghost they chase.
-
-## Coming soon
-
-**The builder.** Draw your own hole, test it, publish it. It lands on-chain
-under your name, playable by everyone, with its own board, and the course grows
-with the people who play it.
+Draw your own hole, test it, publish it. It lands on-chain under your name,
+readable by anyone, playable by everyone, with its own board and its own
+ghosts, and no studio can take it down. The contract side is already live and
+closed behind a switch; the in-game editor comes with the second wave, once
+the first players are in and the gas is watched on a real network.
 
 [Play](https://gnogolf.xyz) · [Code](https://github.com/alexiscolin/gno-golf) · [gno.land](https://gno.land) · [Adena](https://www.adena.app/)
