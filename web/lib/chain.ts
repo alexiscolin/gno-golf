@@ -41,9 +41,10 @@ export const RULES = {
 } as const;
 
 // the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-golfer000/golf on
-// onyx), else the local chain's
+// onyx, or a successor beside it, …/golf2), else the local chain's (a
+// production build refuses one missing or of another shape: next.config.mjs)
 const REALM_ENV = process.env.NEXT_PUBLIC_REALM || "";
-const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/golf$/.test(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
+const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/[a-z0-9_]+$/.test(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
 /** The hub's gnoweb path ("/r/…/golf"). */
 export const REALM_PATH = REALM.replace(/^gno\.land/, "");
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
