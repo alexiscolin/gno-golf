@@ -107,8 +107,8 @@ export function useCopied(ms = 1800) {
 }
 
 const counted = (word: string) => (n: number) => `${n} ${word}${n === 1 ? "" : "s"}`;
-/** "1 stroke", "3 strokes"; "1 hole", "6 holes". */
-export const strokesWord = counted("stroke"), holesWord = counted("hole");
+/** "1 stroke", "3 strokes"; "1 hole", "6 holes"; "1 ghost", "4 ghosts". */
+export const strokesWord = counted("stroke"), holesWord = counted("hole"), ghostsWord = counted("ghost");
 
 
 /** A finished round, as far as saving it goes: what the save and its gas read. */

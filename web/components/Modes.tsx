@@ -4,20 +4,22 @@
 // (ADR-004), or, to come, build a hole. A duel asks whom to race on a screen
 // of its own (Rival), then on which of the holes they have a best on (Ghosts),
 // in place of the cups. Panels of their own, a kart game's modes.
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { Emblem, EXTRAS, WORLDS } from "@/components/Worlds";
 import { useGnomeStage } from "@/components/Stage";
 import { gnomeById } from "@/lib/scene";
-import type { Act, Skin } from "@/lib/scene/gnome";
+import { rivalSkin, type Act, type Skin } from "@/lib/scene/gnome";
 import type { Snapshot } from "@/lib/engine";
 import { AboutButton, BackButton } from "@/components/About";
 import { Button } from "@/components/ui";
-import { FullBoard } from "@/components/Leaderboard";
-import { holeNumber } from "@/components/common";
+import { FullBoard, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
+import { ghostsWord, golfTerm, holeNumber, holesWord } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
 import { cupOf, parOf, scoreOf, type Card } from "@/lib/card";
+import { mapView, pathD, showcase, shotsOf } from "@/lib/duel";
+import { BALL_R, CUP_R } from "@/lib/terrain";
 import { sound } from "@/lib/feel";
-import type { HoleRow, Mode } from "@/lib/types";
+import type { HoleRow, HoleState, Mode, Stroke, Vec2 } from "@/lib/types";
 
 export default function Modes({ gnome, onSolo, onDuel, onBack, onAbout }: { gnome: string; onSolo: () => void; onDuel: () => void; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
@@ -57,27 +59,31 @@ function Panel({ kind, name, line, skin, soon = false, onClick }: { kind: "solo"
     </button>
   );
 }
-const Stage = ({ skin, act, playing }: { skin: Skin; act: Act; playing: boolean }) => <span ref={useGnomeStage<HTMLSpanElement>(skin, { act, playing })} className="mode__stage" />;
+const Stage = ({ skin, act, playing, className = "mode__stage" }: { skin: Skin; act: Act; playing: boolean; className?: string }) => <span ref={useGnomeStage<HTMLSpanElement>(skin, { act, playing })} className={className} />;
 
 /**
- * A duel's rival, on a screen of their own: a name or an address typed (the
- * (i) says where to find one), or anyone on the course's board, a tap away.
- * Then their ghosts' holes (Ghosts).
+ * A duel's rival, on a screen of their own: a friend's name or address typed
+ * (the (i) says where to find one), three picked for the player (the
+ * champion, one at their level, one at random: their gnome, and their best
+ * hole played back on its map), or anyone on the course's board, a sticker a
+ * tap away. Then their ghosts' holes (Ghosts).
  */
-export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; onPick: (addr: string, bests?: ReadonlyMap<string, Readonly<Record<Mode, number>>>) => void; onBack: () => void; onAbout: () => void }) {
+export function Rival({ s, chain, me, mode, gnome, onPick, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; gnome: string; onPick: (addr: string, bests?: Bests) => void; onBack: () => void; onAbout: () => void }) {
   const [typed, setTyped] = useState("");
   const [note, setNote] = useState("");
   const [why, setWhy] = useState(false);
   const popId = useId();
+  // the course's holes, where a ghost can be
+  const holes = useMemo(() => (s.allHoles || []).filter((h) => h.official).map((h) => ({ id: h.id, name: h.name, par: parOf(h) })), [s.allHoles]);
+  const picks = useRivalPicks(chain, me, mode);
   const go = async (e: FormEvent) => {
     e.preventDefault();
     const v = typed.trim();
     const addr = isAddress(v) ? v : chain ? await chain.resolveName(v).catch(() => "") : "";
     if (!addr) return setNote(`No gno.land name “${v}” here. Check the spelling, or pick someone below.`);
     // a duel is played where their ghost is: someone with no saved round has none (a failed read lets them through)
-    const ids = (s.allHoles || []).filter((h) => h.official).map((h) => h.id);
     // (their bests go with them: not read twice)
-    const bests = chain && ids.length ? await chain.bestsOf(ids, addr).catch(() => undefined) : undefined;
+    const bests = chain && holes.length ? await chain.bestsOf(holes.map((h) => h.id), addr).catch(() => undefined) : undefined;
     if (bests && !bests.size) return setNote(`${v} has no saved round yet: no ghost to race. Pick someone below.`);
     onPick(addr, bests);
   };
@@ -91,29 +97,176 @@ export function Rival({ s, chain, me, mode, onPick, onBack, onAbout }: { s: Snap
           <h2 className="worlds__title">Who do we race?</h2>
           <p className="dare">Their best round, as a ghost. Beat it!</p>
         </div>
-        {/* two ways: someone you know, typed; else anyone on the board */}
-        <section className="rival__way">
-          <h3 className="about__h">Race a friend</h3>
+        {/* someone you know, typed, first; then three picked for you; then anyone on the board */}
+        <section className="rival__friend">
+          <h3>
+            Race a friend
+            <button type="button" className="aimset__info" aria-expanded={why} aria-describedby={why ? popId : undefined} aria-label="How do I get it?" onClick={() => setWhy((v) => !v)} onBlur={() => setWhy(false)}>ⓘ</button>
+            {why && <span id={popId} className="aimset__pop" role="note">Their gno.land name or address. Ask them for it, or for their dare link: it opens the duel straight away, nothing to type.</span>}
+          </h3>
           <form className="friends__add" onSubmit={(e) => void go(e)}>
             <input value={typed} onChange={(e) => (setTyped(e.target.value), setNote(""))} placeholder="nym-ace123 or g1…" aria-label="Your friend's gno.land name or address" />
             <Button variant="primary" type="submit" disabled={!typed.trim()}>Race</Button>
           </form>
-          {note && <p className="note note--warn">{note}</p>}
-          <p className="drawer__note">
-            Their gno.land name or address.
-            <button type="button" className="aimset__info" aria-expanded={why} aria-describedby={why ? popId : undefined} aria-label="How do I get it?" onClick={() => setWhy((v) => !v)} onBlur={() => setWhy(false)}>ⓘ</button>
-            {why && <span id={popId} className="aimset__pop" role="note">Ask them for it, or for their dare link: it opens the duel straight away, nothing to type.</span>}
-          </p>
         </section>
-        <section className="rival__way">
-          <h3 className="about__h">Or race anyone on the board</h3>
-          <p className="drawer__note">Their ghost waits on each hole they saved a round on. Playing stays free.</p>
-          <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} onRace={onPick} />
+        {note && <p className="note note--warn rival__note">{note}</p>}
+        <ul className="rival__picks">
+          {PICKS.map((p, i) => (
+            <li key={p.kind}><Pick {...p} row={picks && picks[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} /></li>
+          ))}
+        </ul>
+        <section className="rival__way rival__board">
+          <h3 className="about__h">Or anyone on the board</h3>
+          <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} onRace={onPick}
+            row={(r) => <Sticker row={r} chain={chain} me={me} gnome={gnome} onPick={onPick} />} />
         </section>
       </div>
     </div>
   );
 }
+
+type Bests = ReadonlyMap<string, Readonly<Record<Mode, number>>>;
+type Hole = { id: string; name: string; par: number };
+const PICKS = [
+  { kind: "champ", label: "The champion" },
+  { kind: "level", label: "Your level" },
+  { kind: "any", label: "Surprise me" },
+] as const;
+
+/** A rival's bests, and their best hole shown off: its map and their ghost's
+ *  path on it (the strokes the duel replays, read the same way). */
+interface Show {
+  bests: Bests;
+  map: { hole: HoleState; path: Vec2[]; name: string; strokes: number; par: number } | null;
+}
+// read once a session a player (and mode); a read that failed is asked again next time
+const shows = new Map<string, Promise<Show>>();
+function showOf(chain: Chain, player: string, holes: readonly Hole[], mode: Mode) {
+  const key = `${player}|${mode}`;
+  let p = shows.get(key);
+  if (p) return p;
+  p = chain.bestsOf(holes.map((h) => h.id), player).then(async (bests) => {
+    const top = showcase(bests, holes, mode);
+    // (the tile works without its map: one that fails to read is left out)
+    const map = top && await chain.ghost(top.id, top.mode, player).then(async (g) => {
+      if (!g) return null;
+      const shots = shotsOf(g), hole = await chain.state(g.hole);
+      let at: Stroke = await chain.replayRound(g.hole, [shots[0]], g.period);
+      const path = [...at.path];
+      for (let n = 1; n < shots.length && !at.holed; n++) path.push(...(at = await chain.simulateFrom(g.hole, at.rest, shots[n], n, g.period)).path);
+      return { hole, path, name: holes.find((h) => h.id === top.id)!.name, strokes: g.strokes, par: top.par };
+    }).catch(() => null);
+    return { bests, map };
+  });
+  shows.set(key, p);
+  p.catch(() => shows.delete(key));
+  return p;
+}
+function useShow(chain: Chain | null, player: string, holes: readonly Hole[], mode: Mode) {
+  const [show, setShow] = useState<Show | null>(null);
+  useEffect(() => {
+    setShow(null);
+    if (!chain || !player || !holes.length) return;
+    let live = true;
+    showOf(chain, player, holes, mode).then((x) => live && setShow(x), () => {});
+    return () => void (live = false);
+  }, [chain, player, holes, mode]);
+  return show;
+}
+
+/** A quick pick, a game's panel as the game's choice's: the rival's gnome in
+ *  3D (in the skin their ghost wears), their best hole played back on its map,
+ *  both under the pointer or the focus only; their name, and Race. */
+function Pick({ kind, label, row, reading, chain, me, gnome, holes, mode, onPick }: { kind: (typeof PICKS)[number]["kind"]; label: string; row: Placed | null; reading: boolean; chain: Chain | null; me: string | null; gnome: string; holes: readonly Hole[]; mode: Mode; onPick: (addr: string, bests?: Bests) => void }) {
+  const [hot, setHot] = useState(false);
+  const player = row ? row.player : "";
+  const who = useWho(chain, player, me), show = useShow(chain, player, holes, mode), map = show && show.map;
+  const best = map && `${map.strokes === 1 ? "Ace" : golfTerm(map.strokes, map.par).replace(/!$/, "")} on ${map.name}`;
+  const line = row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
+  return (
+    <button className={`mode rival__pick rival__pick--${kind}`} disabled={!row} aria-label={row ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. Race their ghost` : `${label}: ${reading ? "reading the board" : "nobody yet"}`}
+      onPointerEnter={() => setHot(true)} onPointerLeave={() => setHot(false)} onFocus={() => setHot(true)} onBlur={() => setHot(false)}
+      onClick={() => row && onPick(row.player, show ? show.bests : undefined)}>
+      <span className="rival__tag">{kind === "any" ? <Dice /> : <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}{label}</span>
+      {row ? <Stage className="rival__stage" skin={rivalSkin(row.player, gnome)} act="hop" playing={hot} /> : <span className="rival__stage" />}
+      <span className="rival__show">
+        {map ? <HoleMap {...map} /> : <svg viewBox="0 0 120 120" className="rival__map" aria-hidden="true"><circle cx="60" cy="60" r="56" className="map__turf w__ring" /></svg>}
+        {best && <span className="rival__best">{best}</span>}
+      </span>
+      <span className="rival__name">{row ? who.label : reading ? "…" : "Nobody yet"}</span>
+      <span className="rival__line">{line}</span>
+      {row && <span className="rival__go">Race</span>}
+    </button>
+  );
+}
+
+/** A rival's best hole from above, in a round window as a cup's diorama: its
+ *  walls, posts, water and sand, the tee and the cup, and their ghost's path on
+ *  it in ink, drawn again, the ball rolling along it, under the pointer (CSS). */
+function HoleMap({ hole, path }: { hole: HoleState; path: readonly Vec2[] }) {
+  const clip = useId(), { at, k } = mapView([hole.start, hole.cup, ...path], hole), line = pathD(path, at);
+  const [cx, cy] = at(hole.cup), [tx, ty] = at(hole.start);
+  const walls = hole.walls.map((w) => `M${at(w.a).join(" ")}L${at(w.b).join(" ")}`).join("");
+  const zones = hole.zones.filter((z) => z.skin === "water" || z.skin === "sand");
+  return (
+    <svg viewBox="0 0 120 120" className="rival__map" aria-hidden="true">
+      <defs><clipPath id={clip}><circle cx="60" cy="60" r="56" /></clipPath></defs>
+      <g clipPath={`url(#${clip})`}>
+        <rect width="120" height="120" className="map__turf" />
+        {zones.map((z, i) => {
+          const [x0, y0] = at(z.min), [x1, y1] = at(z.max), box = { x: Math.min(x0, x1), y: Math.min(y0, y1), width: Math.abs(x1 - x0), height: Math.abs(y1 - y0) };
+          return <rect key={i} {...box} rx={z.round ? box.width / 2 : 2} ry={z.round ? box.height / 2 : 2} className={`map__${z.skin}`} />;
+        })}
+        {/* the rails: inked, paper on top */}
+        {["map__walls", "map__rails"].map((c) => <path key={c} d={walls} className={c} />)}
+        {hole.posts.map((p, i) => <circle key={i} cx={at(p.c)[0]} cy={at(p.c)[1]} r={Math.max(p.r * k, 1.5)} className="map__post" />)}
+        <circle cx={tx} cy={ty} r="2.6" className="map__tee" />
+        <circle cx={cx} cy={cy} r={Math.max(CUP_R * k, 2.5)} className="map__cup" />
+        <path d={line} pathLength={100} className="map__line" />
+        <circle r={Math.max(BALL_R * k, 2.4)} className="map__ball" style={{ offsetPath: `path("${line}")` }} />
+        <path d={`M${cx} ${cy}V${cy - 16}`} className="w__pole" />
+        <path d={`M${cx} ${cy - 16}l10 3.5l-10 3.5z`} className="w__flag" />
+      </g>
+      <circle cx="60" cy="60" r="56" className="w__ring" />
+    </svg>
+  );
+}
+
+/** A board's player as a sticker: their gnome flat (their ghost's skin), their
+ *  place, name and holes; a tap races them. */
+function Sticker({ row, chain, me, gnome, onPick }: { row: Placed; chain: Chain | null; me: string | null; gnome: string; onPick: (addr: string) => void }) {
+  const { label } = useWho(chain, row.player, me), mine = row.player === me;
+  return (
+    <button className="sticker" aria-label={`${mine ? "Race your best" : `Race ${label}'s ghost`}: #${row.at}, ${holesWord(row.holes || 0)}`} onClick={() => onPick(row.player)}>
+      <Face skin={mine ? gnomeById(gnome) : rivalSkin(row.player, gnome)} />
+      <span className="lb__rank">{row.at}</span>
+      <span className="sticker__who">{label}</span>
+      <span className="sticker__holes">{holesWord(row.holes || 0)}</span>
+    </button>
+  );
+}
+const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
+/** A gnome's face, flat and inked (the site's icon's), on a disc in his hat's colour, lighter. */
+const Face = ({ skin }: { skin: Skin }) => (
+  <svg viewBox="0 0 120 120" className="sticker__face" aria-hidden="true">
+    <circle cx="60" cy="60" r="56" style={{ fill: `color-mix(in srgb, ${hex(skin.hat)} 45%, var(--paper))` }} className="w__ring" />
+    <g transform="translate(10 7) scale(.5)" stroke="var(--ink)" strokeWidth="10" strokeLinejoin="round">
+      {skin.beard !== "none" && skin.beard !== "moustache" && <path d="M 40 116 Q 34 190 100 214 Q 166 190 160 116 Q 140 146 100 142 Q 60 146 40 116 Z" fill={hex(skin.hair ?? 0xffffff)} />}
+      <rect x="40" y="100" width="120" height="44" rx="6" fill="var(--paper)" />
+      <path d="M 28 95 Q 40 91 48.7 76 L 96.5 7 Q 100 -1.5 103.5 7 L 151.3 76 Q 160 91 172 95 Z" fill={hex(skin.hat)} />
+      <rect x="26" y="90" width="148" height="20" rx="10" fill={hex(skin.hat)} />
+      <circle cx="80" cy="124" r="6" fill="var(--ink)" /><circle cx="120" cy="124" r="6" fill="var(--ink)" />
+      <circle cx="100" cy="136" r="10" fill="#f2b8b0" strokeWidth="6" />
+    </g>
+  </svg>
+);
+/** A die, inked: the pick at random. */
+const Dice = () => (
+  <svg viewBox="0 0 24 24" className="rival__dice" aria-hidden="true">
+    <rect x="2" y="2" width="20" height="20" rx="5" />
+    {[[7.5, 7.5], [16.5, 7.5], [12, 12], [7.5, 16.5], [16.5, 16.5]].map(([x, y]) => <circle key={x * 99 + y} cx={x} cy={y} r="2" />)}
+  </svg>
+);
 
 // the cups, then the holes in none (ranked on the course all the same)
 const GROUPS = [...WORLDS, EXTRAS];
@@ -126,7 +279,7 @@ export function Ghosts({ holes, name, bests, card, mode, onRace, onCups, onBack,
   holes: readonly HoleRow[];
   name: string;
   /** their bests by hole: undefined while read, null if the read failed */
-  bests: ReadonlyMap<string, Readonly<Record<Mode, number>>> | null | undefined;
+  bests: Bests | null | undefined;
   card: Card;
   mode: Mode;
   onRace: (hole: string) => void;

@@ -5,6 +5,7 @@ import type { Snapshot } from "@/lib/engine";
 import { isAddress, type Chain } from "@/lib/chain";
 import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
 import { vsPar } from "@/lib/card";
+import { levelFrom, levelPick, pickOne } from "@/lib/duel";
 import { SHARE_TAGS, siteURL } from "@/lib/site";
 import { sound } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
@@ -325,7 +326,38 @@ function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"
 }
 
 /** A row of a full board: its place on the chain's board (the page's offset on), and the score. */
-type Placed = StrokesRow & { holes?: number; at: number };
+export type Placed = StrokesRow & { holes?: number; at: number };
+
+/**
+ * The rival screen's three quick picks, flagged players left out as on the
+ * boards: the course's #1, a player at the player's level (next to their
+ * place; the board's middle without one), and one at random, drawn again on
+ * each visit. null while read; a pick nobody fills, null.
+ */
+export function useRivalPicks(chain: Chain | null, me: string | null | undefined, mode: Mode) {
+  const [picks, setPicks] = useState<readonly (Placed | null)[] | null>(null);
+  useEffect(() => {
+    if (!chain) return;
+    let live = true;
+    // a page of the course's board, its places kept, the flagged out
+    const page = (at: number, n: number) =>
+      Promise.all([chain.courseLeaderboard(at, n, mode), flagsOf()]).then(([b, f]) => ({ players: b.players, rows: screen_(b.rows.map((r, i) => ({ ...r, at: at + i + 1 })), f, false).rows }));
+    void Promise.all([page(0, 10), me ? chain.rank(mode, me).catch(() => null) : null])
+      .then(async ([top, mine]) => {
+        const champ = top.rows[0] || null;
+        // (a page that fails: the first one's players stand in)
+        const near = await page(levelFrom(mine ? mine.rank : 0, top.players), 5).catch(() => top);
+        const level = levelPick(near.rows, me, champ ? [champ.player] : []);
+        const any = await page(Math.floor(Math.random() * top.players), 5).catch(() => top);
+        const surprise = pickOne([...any.rows, ...top.rows], [me, champ && champ.player, level && level.player], Math.random());
+        primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r.player] : [])));
+        if (live) setPicks([champ, level, surprise]);
+      })
+      .catch(() => live && setPicks([null, null, null]));
+    return () => void (live = false);
+  }, [chain, me, mode]);
+  return picks;
+}
 
 /**
  * A whole board, the hole's or the course's, read a page at a time as it is
@@ -333,7 +365,7 @@ type Placed = StrokesRow & { holes?: number; at: number };
  * what proves it, and the connected player sees their own place, pinned under
  * the list when it is further down, with a way to share it.
  */
-export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace }: BoardProps & { kind: "hole" | "course" }) {
+export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace, row }: BoardProps & { kind: "hole" | "course"; /** a row drawn otherwise (the rival's stickers) */ row?: (r: Placed) => ReactNode }) {
   const PAGE = 20;
   const id = s.id || "";
   const [rows, setRows] = useState<readonly Placed[] | null>(null);
@@ -441,13 +473,17 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace 
         <ol>
           {shown.rows.map((r) => (
             <li key={r.player} className={(r.player === me ? "me " : "") + (r.at <= 3 ? `medal medal--${r.at}` : "")}>
-              <span className="lb__rank">{r.at}</span>
-              <span className="lb__who">
-                <Who chain={chain} addr={r.player} me={me} full link={link(r.player)} />
-                <FlagMark f={showAll && flags[r.player]} />
-              </span>
-              {score(r)}
-              <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
+              {row ? row(r) : (
+                <>
+                  <span className="lb__rank">{r.at}</span>
+                  <span className="lb__who">
+                    <Who chain={chain} addr={r.player} me={me} full link={link(r.player)} />
+                    <FlagMark f={showAll && flags[r.player]} />
+                  </span>
+                  {score(r)}
+                  <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
+                </>
+              )}
             </li>
           ))}
           {next > 0 && (
@@ -703,16 +739,21 @@ export function useSavedPlace(s: Snapshot | null, chain: Chain | null, me: strin
   return p;
 }
 
-/** A ranked player as the boards show them: "You", their gno.land name, or a short address while it is read. */
-function Who({ chain, addr, me, full = false, link }: { chain: Chain | null; addr: string; me?: string | null; full?: boolean; link?: string }) {
+/** A player as the boards say them: "You", their gno.land name, or a short address while it is read; and the name alone. */
+export function useWho(chain: Chain | null, addr: string, me?: string | null) {
   const [name, setName] = useState("");
   useEffect(() => {
-    if (!chain || addr === me) return;
+    setName("");
+    if (!chain || !addr || addr === me) return;
     let live = true;
     void nameOnce(chain, addr).then((n) => live && setName(n));
     return () => void (live = false);
   }, [chain, addr, me]);
-  const label = addr === me ? "You" : name || shortAddr(addr);
+  return { label: addr === me ? "You" : name || shortAddr(addr), name };
+}
+/** A ranked player as the boards show them (useWho), their address under their name in full. */
+function Who({ chain, addr, me, full = false, link }: { chain: Chain | null; addr: string; me?: string | null; full?: boolean; link?: string }) {
+  const { label, name } = useWho(chain, addr, me);
   const body = full && (name || addr === me) ? (
     <span className="who">
       <span className="who__name">{label}</span>

@@ -4,7 +4,7 @@
 // reads. The result is the client's arithmetic (V1 records no duel), from two
 // numbers the chain vouches for: the player's strokes and the rival's best.
 import { SHARE_TAGS } from "./site";
-import type { Ghost, Mode } from "./types";
+import type { Ghost, Mode, Vec2 } from "./types";
 
 /** A duel under way: the ghost raced and who it is, as said on screen. */
 export interface Duel {
@@ -62,3 +62,54 @@ export function duelShare(r: ReturnType<typeof duelResult>["result"], d: Duel, h
   if (r === "loss") return `⚔ ${d.name} beat me by ${inWords(mine - theirs)} on ${hole}. Race my ghost while I rematch.` + tag;
   return `⚔ ${d.name} and I both holed ${hole} in ${mine}. Settle it.` + tag;
 }
+
+// The rival's screen: its three quick picks, and the hole each one shows off.
+
+/** The first of the board to read for a rival at the player's level: a page of
+ *  n around their place (rank, 1 first), or around the board's middle without one. */
+export const levelFrom = (rank: number, players: number, n = 5) => Math.max(0, (rank > 0 ? rank - 1 : Math.floor(players / 2)) - Math.floor(n / 2));
+
+/** A rival at the player's level, from such a page: the one just above them (the
+ *  one to beat), else just below, then further out; without them on it, the
+ *  page's middle first. Never the player, nor one already picked (not). */
+export function levelPick<R extends { player: string }>(rows: readonly R[], me: string | null | undefined, not: readonly string[] = []) {
+  const at = me ? rows.findIndex((r) => r.player === me) : -1, c = at >= 0 ? at : Math.floor(rows.length / 2);
+  for (let d = at >= 0 ? 1 : 0; d <= rows.length; d++)
+    for (const r of [rows[c - d], rows[c + d]]) if (r && r.player !== me && !not.includes(r.player)) return r;
+  return null;
+}
+
+/** One of these rows at random (r: 0..1), the player and those already picked left out. */
+export function pickOne<R extends { player: string }>(rows: readonly R[], not: readonly (string | null | undefined)[], r: number) {
+  const ok = [...new Map(rows.filter((x) => !not.includes(x.player)).map((x) => [x.player, x])).values()];
+  return ok[Math.floor(r * ok.length)] || null;
+}
+
+/** The hole a rival shows off: an ace first, else their best against its par
+ *  (the aim mode's best, else their other one); the course's order breaks a tie. */
+export function showcase(bests: ReadonlyMap<string, Readonly<Record<Mode, number>>>, holes: readonly { id: string; par: number }[], mode: Mode) {
+  let top: { id: string; mode: Mode; strokes: number; par: number } | null = null;
+  const worth = (t: { strokes: number; par: number }) => (t.strokes === 1 ? -Infinity : t.strokes - t.par);
+  for (const h of holes) {
+    const b = bests.get(h.id), m: Mode = b && b[mode] ? mode : mode === "pro" ? "assisted" : "pro";
+    const t = b && b[m] ? { id: h.id, mode: m, strokes: b[m], par: h.par } : null;
+    if (t && (!top || worth(t) < worth(top))) top = t;
+  }
+  return top;
+}
+
+/** A hole seen from above in a round window (0..120, centre 60, radius r),
+ *  framed on what happens (fit: the tee, the cup, the path; walls past the
+ *  ring are cut): its middle in the window's, as big as its corners allow (a
+ *  short one no more than 8 to a board unit), the tee on the left (a wide
+ *  one) or at the foot (a tall one), turned half round otherwise. */
+export function mapView(fit: readonly Vec2[], { start, cup }: { start: Vec2; cup: Vec2 }, r = 56) {
+  const xs = fit.map((p) => p[0]), ys = fit.map((p) => p[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0, h = Math.max(...ys) - y0;
+  const k = Math.min((1.84 * r) / Math.hypot(w + 6, h + 6), 8), s = (w >= h ? cup[0] < start[0] : cup[1] > start[1]) ? -k : k; // (3 units clear all round)
+  const at = ([x, y]: Vec2): Vec2 => [+(60 + (x - x0 - w / 2) * s).toFixed(1), +(60 + (y - y0 - h / 2) * s).toFixed(1)];
+  return { at, k };
+}
+
+/** A ball's path as one SVG line (unbroken: a dash drawing it along starts
+ *  again at each break; a tunnel is crossed straight). */
+export const pathD = (points: readonly Vec2[], at: (p: Vec2) => Vec2) => points.map((p, i) => (i ? "L" : "M") + at(p).join(" ")).join("");

@@ -1,7 +1,7 @@
 // Ghost duels (ADR-004): the best raced, the ghost's pace, and the result in words.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, type Duel } from "../lib/duel.ts";
+import { duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, showcase, mapView, pathD, type Duel } from "../lib/duel.ts";
 import type { Ghost } from "../lib/types.ts";
 
 const ghost = (strokes: number, mode: Ghost["mode"] = "assisted"): Ghost => ({ version: 1, hole: "garden/1/v1", mode, player: "g1x", strokes, period: 7, shots: "0.0000,1.0000,0;12.5000,6.2000,3" });
@@ -78,4 +78,51 @@ test("a win that can't be saved still says it was won, with the rival's link", (
 
 test("the strokes to beat: out of reach once past the ghost's count", () => {
   assert.deepEqual([toBeat(3, 3), toBeat(2, 3), toBeat(1, 3), toBeat(4, 3)], ["hole it to tie", "hole it to win", "3 to beat", "out of reach"]);
+});
+
+const row = (...ps: string[]) => ps.map((player) => ({ player }));
+
+test("a rival at your level is read from a page around your place, or the board's middle", () => {
+  assert.equal(levelFrom(7, 40), 4); // places 5..9
+  assert.equal(levelFrom(1, 40), 0);
+  assert.equal(levelFrom(0, 40), 18); // around the 20th
+  assert.equal(levelFrom(0, 3), 0);
+});
+
+test("your level: the one just above you, else below; never you nor a pick already made", () => {
+  assert.equal(levelPick(row("a", "b", "me", "d"), "me")?.player, "b");
+  assert.equal(levelPick(row("me", "b", "c"), "me")?.player, "b"); // the first: the one below
+  assert.equal(levelPick(row("champ", "me", "c"), "me", ["champ"])?.player, "c");
+  assert.equal(levelPick(row("a", "b", "c", "d", "e"), null)?.player, "c"); // no place: the middle
+  assert.equal(levelPick(row("a", "b", "c"), "zz", ["b"])?.player, "a");
+  assert.equal(levelPick(row("me"), "me"), null);
+});
+
+test("a surprise: one at random, you and the picks left out, each player once", () => {
+  assert.equal(pickOne(row("a", "b", "c", "b"), ["a"], 0)?.player, "b");
+  assert.equal(pickOne(row("a", "b", "c", "b"), ["a"], 0.99)?.player, "c");
+  assert.equal(pickOne(row("me"), ["me", null], 0.5), null);
+});
+
+test("the hole shown off: an ace first, else the best against par, in the aim mode's best else the other", () => {
+  const holes = [{ id: "h1", par: 3 }, { id: "h2", par: 4 }, { id: "h3", par: 2 }];
+  const b = (e: [string, number, number][]) => new Map(e.map(([id, pro, assisted]) => [id, { pro, assisted }]));
+  assert.deepEqual(showcase(b([["h1", 0, 2], ["h2", 0, 3]]), holes, "pro"), { id: "h1", mode: "assisted", strokes: 2, par: 3 }); // two birdies: the first
+  assert.deepEqual(showcase(b([["h2", 2, 0], ["h3", 0, 1]]), holes, "pro"), { id: "h3", mode: "assisted", strokes: 1, par: 2 }); // the ace over an eagle
+  assert.deepEqual(showcase(b([["h1", 4, 2]]), holes, "pro"), { id: "h1", mode: "pro", strokes: 4, par: 3 }); // the aim mode's, worse as it is
+  assert.equal(showcase(b([]), holes, "pro"), null);
+  assert.equal(showcase(b([["gone", 1, 1]]), holes, "pro"), null); // a hole no longer on the course
+});
+
+test("a hole's map: its middle in the window's, the tee to the left or the foot, the path one line", () => {
+  const wide = mapView([[5, 5], [35, 5], [20, 7]], { start: [5, 5], cup: [35, 5] });
+  assert.deepEqual(wide.at([20, 6]), [60, 60]); // the middle of what happens
+  assert.ok(wide.at([5, 5])[0] < 60 && wide.at([35, 5])[0] > 60);
+  assert.ok(Math.hypot(wide.at([5, 5])[0] - 60, wide.at([5, 5])[1] - 60) < 56); // inside the ring
+  const back = mapView([[5, 5], [35, 5]], { start: [35, 5], cup: [5, 5] });
+  assert.ok(back.at([35, 5])[0] < 60); // turned: the tee still on the left
+  const tall = mapView([[5, 5], [5, 35]], { start: [5, 5], cup: [5, 35] });
+  assert.ok(tall.at([5, 5])[1] > 60 && tall.at([5, 35])[1] < 60); // the tee at the foot
+  assert.equal(mapView([[0, 0], [1, 0]], { start: [0, 0], cup: [1, 0] }).k, 8); // a short one, not blown up
+  assert.equal(pathD([[0, 0], [1, 0], [9, 0]], (p) => [p[0] * 2, p[1]]), "M0 0L2 0L18 0");
 });

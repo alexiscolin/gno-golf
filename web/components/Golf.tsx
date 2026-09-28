@@ -1217,7 +1217,7 @@ export default function Golf() {
           onSolo={() => (setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")} />
       )}
       {screen === "rival" && s && (
-        <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
+        <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
           onPick={(addr, bests) => (sound("select"), bests && ((bestsGiven.current = addr), setRivalOn({ by: addr, bests })), raceWith(addr), setScreen("ghosts"))} />
       )}
       {screen === "ghosts" && (

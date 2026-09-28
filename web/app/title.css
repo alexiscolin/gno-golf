@@ -345,14 +345,105 @@ body:has(.sheet) .modetag { visibility: hidden; }
 @media (max-width: 600px) { .modetag { top: 30px; left: 88px; font-size: 22px; padding: 1px 12px 4px; -webkit-text-stroke-width: 4px; } }
 /* the rival raced, stuck under the cups' title, big */
 .front__head > .dare { margin: -8px 0 0; padding: 6px 18px; font-size: clamp(16px, 1.6vw, 20px); }
-/* a duel's rival: two ways, one under the other, each under its heading */
+/* a duel's rival (and their ghosts): a section a way in, under its heading */
 .rival__way { width: min(100%, 640px); text-align: left; }
 .rival__way + .rival__way { margin-top: 18px; }
-.rival .friends__add { margin: 0; align-items: center; }
-.rival .drawer__note { position: relative; margin: 6px 0 0; } /* the (i)'s popover under its line */
+.rival .drawer__note { margin: 6px 0 0; }
 .rival .lb { margin-top: 10px; }
 /* the heading says what the board is; players with no name have no Race here */
 .rival .lb--full > h3, .rival .unnamed { display: none; }
+/* a friend, first: one paper bar, its heading and (i), the field and Race */
+.rival__friend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; width: min(100%, 720px); padding: 10px 10px 10px 20px; background: var(--paper); border: var(--edge-bold); border-radius: 20px; }
+.rival__friend h3 { position: relative; margin: 0; font-size: 20px; white-space: nowrap; }
+.rival__friend .aimset__info { min-width: 44px; min-height: 44px; margin: -12px 0 -12px -4px; font-size: 18px; } /* a 44px tap, the line's height kept */
+.rival__friend .aimset__pop { left: 0; right: auto; font-weight: 400; }
+.rival__friend .friends__add { flex: 1 1 280px; margin: 0; align-items: center; }
+.rival__note { width: min(100%, 720px); margin: 10px 0 0; }
+/* three picked for you: the game's choice's panels, lying down, in their own
+   flat colours (the champion's gold, the fairway, the mountain's blue) */
+.rival__picks { list-style: none; margin: 0; padding: clamp(18px, 3vh, 30px) 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); width: min(100%, 1040px); }
+.rival__pick--champ { --c1: var(--sunny); --c2: var(--lamp); }
+.rival__pick--level { --c1: #3f9a72; --c2: #8fdcae; }
+.rival__pick--any { --c1: #5569db; --c2: #b8c9ff; }
+.mode.rival__pick {
+  aspect-ratio: auto; grid-template: auto minmax(0, 1fr) auto auto / 1fr 1fr; grid-template-areas: "tag tag" "stage show" "name name" "line go";
+  align-items: center; height: clamp(250px, 36vh, 300px); padding: 14px 18px 16px; border-radius: 26px;
+  background: radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px, var(--c1);
+}
+.rival__tag { grid-area: tag; justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 3px 14px 3px 4px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.rival__tag .podium__medal:not(.podium__medal--1, .podium__medal--2, .podium__medal--3) { background: var(--paper); }
+.rival__dice { width: 24px; height: 24px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
+.rival__dice circle { fill: var(--ink); stroke: none; }
+/* the gnome on his flat disc (the panel's light colour, inked), hopping out of it */
+.rival__stage { grid-area: stage; position: relative; align-self: stretch; container-type: size; }
+.rival__stage::before { content: ""; position: absolute; inset: 0; margin: auto; width: min(100cqw, 100cqh, 140px); aspect-ratio: 1; border-radius: 50%; background: var(--c2); border: var(--edge-bold); } /* (the stage's smaller side: round at any size) */
+.rival__stage .pick__canvas { position: absolute; inset: -22% -12% -4%; width: 124%; height: 126%; }
+/* their best, in a round window as a cup's diorama, its name on a ribbon over the window's foot */
+.rival__show { grid-area: show; display: grid; justify-items: center; align-self: stretch; align-content: center; min-height: 0; }
+.rival__map { width: min(100%, 17vh, 140px); aspect-ratio: 1; filter: drop-shadow(0 4px 0 var(--ink)); }
+.rival__best { margin-top: -14px; position: relative; max-width: 100%; padding: 3px 10px; border: var(--edge); border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 12.5px; font-weight: 700; line-height: 1.2; text-align: center; transform: rotate(-3deg); }
+.rival__name { grid-area: name; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 4px 0; font-size: clamp(22px, 2.3vw, 30px); font-weight: 700; line-height: 1.1; -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
+.rival__line { grid-area: line; padding: 0 4px; font-size: 14px; font-weight: 700; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 2px 0 var(--ink); }
+/* Race: the call to action's gold, on its drop (the panel is the button) */
+.rival__go { grid-area: go; justify-self: end; padding: 6px 22px 7px; border: var(--edge-bold); border-radius: var(--pill); background: var(--gold-grad); color: var(--ink); font-size: 18px; font-weight: 700; box-shadow: 0 4px 0 var(--ink); }
+.rival__go::after { content: " ▸"; }
+/* the map: turf, the walls inked, water and sand flat; the path in ink on a paper edge, the ball on it */
+.map__turf { fill: #8fdcae; }
+.map__water { fill: #5fb3c9; stroke: var(--ink); stroke-width: 1.5; }
+.map__sand { fill: #f0d9a0; stroke: var(--ink); stroke-width: 1.5; }
+.map__walls, .map__rails { fill: none; stroke: var(--ink); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.map__rails { stroke: var(--paper); stroke-width: 1.6; }
+.map__post { fill: var(--wood); stroke: var(--ink); stroke-width: 1.5; }
+.map__tee { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+.map__cup { fill: var(--ink); }
+.map__line { fill: none; stroke: var(--hat-ink); stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100 100; }
+.map__ball { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; offset-distance: 100%; offset-rotate: 0deg; }
+/* under the pointer or the focus, the ghost plays its round again, and again */
+.rival__pick:is(:hover, :focus-visible) .map__line { animation: map-ink 3.2s linear infinite; }
+.rival__pick:is(:hover, :focus-visible) .map__ball { animation: map-ball 3.2s linear infinite; }
+@keyframes map-ink { from { stroke-dashoffset: 100; } 80%, to { stroke-dashoffset: 0; } }
+@keyframes map-ball { from { offset-distance: 0%; } 80%, to { offset-distance: 100%; } }
+/* anyone on the board: stickers, four a row, in the board's own scrolling frame (globals.css .lb--full ol) */
+.rival__board { width: min(100%, 1040px); margin-top: clamp(22px, 3.5vh, 36px); }
+.rival__board .lb--full ol { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 10px 10px 26px 4px; }
+.rival__board .lb ol > li { display: block; padding: 0; border: 0; background: none; }
+.rival__board .lb li.lb__more { grid-column: 1 / -1; }
+.sticker {
+  position: relative; display: grid; grid-template: auto auto / auto minmax(0, 1fr); column-gap: 12px; align-items: center; width: 100%; min-height: 72px; padding: 8px 14px 8px 8px;
+  border: var(--edge-bold); border-radius: 18px; background: var(--white); color: var(--ink); font: inherit; text-align: left; cursor: pointer; box-shadow: var(--shadow-btn);
+  transition: transform var(--t-pop) var(--spring), box-shadow .2s;
+}
+.lb li:nth-child(odd) > .sticker { rotate: -1deg; } .lb li:nth-child(even) > .sticker { rotate: 1deg; } /* stuck on by hand */
+.sticker:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 0 0 3px var(--glow), 0 8px 0 var(--ink); }
+.sticker:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.lb li.me > .sticker { background: var(--ink); color: var(--paper); }
+.sticker__face { grid-row: 1 / 3; width: 54px; height: 54px; }
+.sticker .lb__rank { position: absolute; top: -8px; left: -8px; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border: var(--edge); border-radius: var(--pill); background: var(--white); color: var(--ink); font-size: 13px; }
+.lb li.medal--1 .sticker .lb__rank { background: var(--gold); } .lb li.medal--2 .sticker .lb__rank { background: var(--silver); } .lb li.medal--3 .sticker .lb__rank { background: var(--bronze); }
+.sticker__who { align-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+.sticker__holes { align-self: start; font-size: 12.5px; opacity: .75; }
+@media (max-width: 900px) {
+  /* three narrow panels: Race on a row of its own */
+  .mode.rival__pick { grid-template-rows: auto minmax(0, 1fr) auto auto auto; grid-template-areas: "tag tag" "stage show" "name name" "line line" "go go"; }
+  .rival__go { justify-self: stretch; margin-top: 8px; text-align: center; }
+  .rival__board .lb--full ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  /* a phone: the picks side by side in a row of their own, swiped, the next one peeking in */
+  .rival__picks { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 82%; gap: 12px; width: calc(100% + 24px); margin: 0 -12px; padding: 16px 12px 18px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 12px; }
+  .rival__picks > li { scroll-snap-align: start; }
+  .mode.rival__pick { height: 250px; padding: 12px 14px 14px; grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "tag tag" "stage show" "name name" "line go"; }
+  .rival__name { font-size: 22px; -webkit-text-stroke-width: 4px; }
+  .rival__line { font-size: 12.5px; }
+  .rival__go { justify-self: end; margin-top: 0; padding: 4px 16px 5px; font-size: 16px; }
+  .rival__best { font-size: 11.5px; }
+  .rival__friend { padding: 10px 12px; }
+  .rival__board .lb--full ol { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .sticker { grid-template: auto auto auto / minmax(0, 1fr); justify-items: center; padding: 10px 8px; text-align: center; }
+  .sticker__face { grid-row: auto; }
+  .sticker__who { max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .sticker:hover { transform: none; } }
 /* their ghosts: all the cups in one board's frame (globals.css .lb--full ol), a cup's emblem before its name; a row names a hole, not a player */
 .ghosts__list { width: min(100%, 640px); margin-top: 10px; }
 .ghosts__list > .rival__way { width: 100%; }
