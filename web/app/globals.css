@@ -892,6 +892,7 @@ html, body {
 }
 .banner--win h2[data-long] { font-size: clamp(26px, 7vw, 64px); } /* a duel's title with a name: it fits a phone */
 .banner--win h2[data-result="loss"] { color: var(--ink); } /* a duel lost: said in ink, not the hat's red */
+.banner__duel b { color: var(--ink); font-weight: 800; }
 
 .banner--win .eyebrow {
   font-size: 14px;

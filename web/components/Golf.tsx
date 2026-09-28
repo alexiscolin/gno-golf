@@ -1463,7 +1463,8 @@ export default function Golf() {
           <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label="Hole finished">
             <span className="eyebrow">In the hole! · {s.name}</span>
             <h2 data-long={won && won.title.length > 16 ? "" : undefined} data-result={won ? won.result : undefined}>{won ? won.title.replaceAll("-", "\u2011") /* a name's hyphens never break a line */ : golfTerm(s.strokes, parHere(s))}</h2>
-            {won && <p>{won.line}</p>}
+            {/* the rival's name inked in the line, the one word to find */}
+            {won && <p className="banner__duel">{won.line.split(won.duel.name).flatMap((part, i) => (i ? [<b key={i}>{won.duel.name}</b>, part] : [part]))}</p>}
             {/* the score, and beside it the ways to tell people about it */}
             <div className="win__head">
               <div className="win__score">
