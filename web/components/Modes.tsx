@@ -121,7 +121,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onBack, onAb
             <h3 className="rival__h">Or anyone on the board</h3>
             <button className="linkish rival__all" onClick={() => (sound("blip"), onBoard())}>See the whole leaderboard →</button>
           </div>
-          <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode}
+          <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} max={8}
             row={(r) => <Sticker player={r.player} at={r.at} sub={`${strokesWord(r.strokes)} · ${holesWord(r.holes || 0)}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
         </section>
       </div>

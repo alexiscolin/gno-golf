@@ -370,7 +370,8 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
  * what proves it, and the connected player sees their own place, pinned under
  * the list when it is further down, with a way to share it.
  */
-export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace, row }: BoardProps & { kind: "hole" | "course"; /** a row drawn otherwise (the rival's stickers) */ row?: (r: Placed) => ReactNode }) {
+// max: its first rows only, and nothing else (the rival's stickers: the whole board is a link away)
+export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace, row, max }: BoardProps & { kind: "hole" | "course"; /** a row drawn otherwise (the rival's stickers) */ row?: (r: Placed) => ReactNode; max?: number }) {
   const PAGE = 20;
   const id = s.id || "";
   const [rows, setRows] = useState<readonly Placed[] | null>(null);
@@ -476,7 +477,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
       {rows && rows.length === 0 && (<><Ghosts /><p className="lb__empty">No saved round yet: {me ? "save one and be the first." : <><ConnectLink onConnect={onConnect} /> and be the first.</>}</p></>)}
       {shown && shown.rows.length > 0 && (
         <ol>
-          {shown.rows.map((r) => (
+          {shown.rows.slice(0, max).map((r) => (
             <li key={r.player} className={(r.player === me ? "me " : "") + (r.at <= 3 ? `medal medal--${r.at}` : "")}>
               {row ? row(r) : (
                 <>
@@ -491,7 +492,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
               )}
             </li>
           ))}
-          {next > 0 && (
+          {next > 0 && !max && (
             <li className="lb__more" ref={end}>
               <Button className="boards__more" disabled={more} onClick={loadMore}>
                 {more ? "Reading…" : "Show more"}
@@ -500,14 +501,14 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
           )}
         </ol>
       )}
-      {shown && (shown.hidden > 0 || showAll) && (
+      {!max && shown && (shown.hidden > 0 || showAll) && (
         <button className="linkish" onClick={() => setShowAll((v) => !v)}>
           {showAll ? "Hide flagged players" : `Show all (${shown.hidden} hidden)`}
         </button>
       )}
-      <Unnamed kind={kind} chain={chain} id={id} mode={mode} me={me} count={head && kind === "hole" && head.finished != null ? head.finished - head.players : undefined} />
+      {!max && <Unnamed kind={kind} chain={chain} id={id} mode={mode} me={me} count={head && kind === "hole" && head.finished != null ? head.finished - head.players : undefined} />}
       {/* your place, when the list shown does not reach it yet */}
-      {mine && me && !listed && (
+      {!max && mine && me && !listed && (
         <ol className="lb__mine">
           <li className="me">
             <span className="lb__rank">{mine.rank}</span>
@@ -516,7 +517,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
           </li>
         </ol>
       )}
-      {myPlace && (
+      {!max && myPlace && (
         <div className="lb__myshare">
           <span>
             You are <b>#{myPlace.at}</b> of {myPlace.of} {kind === "hole" ? `on ${s.name}` : "on the course"}

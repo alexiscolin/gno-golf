@@ -370,9 +370,10 @@ body:has(.sheet) .modetag { visibility: hidden; }
    then it does). The head in the corner buttons' row, room over it and under
    the frame (clear of the network banner's row, 34px + its 48, by as much
    again): the frame gives up its height, never that room. */
-.screen.front--fit { display: flex; flex-direction: column; align-items: center; padding: clamp(28px, 5vh, 48px) clamp(28px, 4vw, 64px) 48px; } /* (clear of the frame at the sides too) */
+.screen.front--fit { display: flex; flex-direction: column; align-items: center; justify-content: safe center; padding: clamp(28px, 5vh, 48px) clamp(28px, 4vw, 64px) 48px; } /* (clear of the frame at the sides too; the block as tall as it needs, in the middle: its last frame gives up height, and scrolls, only when the window is short) */
 body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
-.worlds__in.rival { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 1.8vh, 18px); width: min(var(--front-w), 100%); } /* (the screen's room, its padding off: 100vw overflowed it, a sideways scroll) */
+@media (min-height: 880px) { body:has(.netbanner) .screen.front--fit { padding-top: 106px; } } /* (room to spare: the block in the page's middle, not just above the banner) */
+.worlds__in.rival { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 1.8vh, 18px); width: min(var(--front-w), 100%); } /* (the screen's room, its padding off: 100vw overflowed it, a sideways scroll) */
 .rival .front__head { margin: 0; }
 .front--fit .worlds__title { font-size: clamp(34px, min(4.2vw, 6.5vh), 56px); } /* (the picker's own, .screen--pick .pick__name) */
 @media (max-height: 720px) { .front--fit .front__head > .eyebrow { display: none; } }
@@ -454,7 +455,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
    whole board (the podium's link), then its frame (the board's own list,
    globals.css .lb--full ol): stickers, four a row, in equal columns, centred
    (the scrollbar's gutter kept on both sides; room for a sticker's place, over its corner) */
-.rival__board { flex: 1 1 auto; min-height: 160px; display: flex; flex-direction: column; width: 100%; margin-top: clamp(0px, 1.2vh, 12px); }
+.rival__board { flex: 0 1 auto; min-height: 160px; display: flex; flex-direction: column; width: 100%; margin-top: clamp(0px, 1.2vh, 12px); }
 .rival__boardhead { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; } /* (a phone: the link under the heading) */
 .rival__boardhead .rival__h { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rival__all { flex: none; white-space: nowrap; }
