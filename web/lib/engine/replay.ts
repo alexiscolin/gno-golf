@@ -42,6 +42,15 @@ export function showMs(d: number) {
   const s = v <= SHOW_FROM ? v : SHOW_FROM + SHOW_EASE * Math.log(1 + (v - SHOW_FROM) / SHOW_EASE);
   return s > 0 ? Math.max(MS_PER_STEP, (d / s) * 1000) : MS_PER_STEP;
 }
+/** A replay's safety net: whether it outlived ms (a promise that never
+ *  settles, a frozen tab) or threw; the caller then cuts what is left of it. */
+export function outlived(play: Promise<unknown>, ms: number) {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    play.then(() => false, (err: unknown) => (console.warn("gnogolf: the replay threw", err), true)),
+    new Promise<boolean>((r) => (t = setTimeout(() => r(true), ms))),
+  ]).finally(() => clearTimeout(t));
+}
 /** Each step of a path's time on screen, in ms, at the player's pace. */
 export const stepsMs = (path: readonly Vec2[]) => path.slice(1).map((q, i) => showMs(Math.hypot(q[0] - path[i][0], q[1] - path[i][1])));
 /** A ray from p along unit u, and the point on it a run of d away from p by way of q: the ellipse of foci p, q. */

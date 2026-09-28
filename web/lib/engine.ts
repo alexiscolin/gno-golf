@@ -25,7 +25,7 @@ import {
 import { BALL_R } from "./terrain";
 import { makeCamera } from "./engine/camera";
 import { pace, slowFrames, frameMs, SLOW_KEY } from "./engine/pace";
-import { makeReplay, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
+import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
@@ -1124,13 +1124,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     let expect = 0;
     for (let i = 0; i + 1 < res.path.length; i++) expect += Math.max(MS_PER_STEP, (Math.hypot(res.path[i + 1][0] - res.path[i][0], res.path[i + 1][1] - res.path[i][1]) / SHOW_SPEED) * 1000);
     const budget = 3500 + expect * 1.5;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = await Promise.race([
-      rp.replay(res.path, res.holed, res.air, res.cause).then(() => false, (err: unknown) => (console.warn("gnogolf: the replay threw", err), true)),
-      new Promise<boolean>((r) => (timer = setTimeout(() => r(true), budget))),
-    ]);
-    clearTimeout(timer);
-    if (late) {
+    if (await outlived(rp.replay(res.path, res.holed, res.air, res.cause), budget)) {
       cut++; // every animation of this replay stops
       console.warn(`gnogolf: replay cut after ${budget | 0} ms (path of ${res.path.length} steps)`);
     }

@@ -127,6 +127,8 @@ const checks = {
   round: (v: unknown): v is Round | null =>
     v === null || (isObj(v) && isPath(v.path) && isVec(v.rest) && isVec(v.ball) && strs(v, "player", "shots", "air", "cause") && typeof v.done === "boolean" && isMode(v.mode) && Number.isInteger(v.strokes) && nums(v, "period")),
 };
+// a gno.land name as r/sys/users writes them
+const isName = (n: string) => /^[a-z0-9._-]{1,64}$/i.test(n);
 // what a refused stroke says, as the engine always said it
 const NO_PATH = "The chain answered without a path for that shot.";
 
@@ -395,13 +397,13 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     rank: (mode: string, player: string) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`, checks.rank),
     /** A gno.land name's address, or "" (r/sys/users). */
     resolveName: (name: string) =>
-      /^[a-z0-9._-]{1,64}$/i.test(name)
+      isName(name)
         ? qstr("gno.land/r/sys/users", `func() string { d, _ := ResolveName(${s(name)}); if d == nil { return "" }; return d.Addr().String() }()`)
         : Promise.resolve(""),
     /** An address's gno.land name, or "". */
     nameOf: (addr: string) =>
       isAddress(addr)
-        ? qstr("gno.land/r/sys/users", `func() string { d := ResolveAddress(address(${s(addr)})); if d == nil { return "" }; return d.Name() }()`)
+        ? qstr("gno.land/r/sys/users", `func() string { d := ResolveAddress(address(${s(addr)})); if d == nil { return "" }; return d.Name() }()`).then((n) => (isName(n) ? n : "")) // (nothing a lying node could dress up)
         : Promise.resolve(""),
     /** A page of every player's best on a hole, named or not, by address: { rows: [{ player, strokes }], next ("" at the end) }. */
     records: (hole: string, mode: string, after = "", limit = 100) =>

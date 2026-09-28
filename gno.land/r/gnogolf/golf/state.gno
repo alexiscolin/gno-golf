@@ -751,10 +751,14 @@ func Ghost(hole, mode string, player address) string {
 	if v == nil {
 		return "null"
 	}
-	// "<strokes> <period> <shots>": the shots are golf's own digits and punctuation
-	f := strings.SplitN(v.(string), " ", 3)
+	// "<strokes> <period> <shots>", as bestOf writes it (bestStrokes refuses anything else)
+	strokes, f := bestStrokes(v), strings.SplitN(v.(string), " ", 3)
+	period, err := strconv.ParseInt(f[1], 10, 64)
+	if err != nil || len(f) < 3 {
+		panic("golf: a best not as bestOf writes it: " + v.(string))
+	}
 	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(player.String()) +
-		`,"strokes":` + f[0] + `,"period":` + f[1] + `,"shots":` + jstr(f[2]) + "}"
+		`,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(f[2]) + "}"
 }
 
 // HoleRank is a player's place on a hole's board in a mode: "rank" 1 is the
@@ -765,8 +769,10 @@ func HoleRank(hole, mode string, player address) string {
 	e, m := readHole(hole), modeOf(mode)
 	p := player.String()
 	rank, strokes := 0, bestStrokes(e.bests(m).Get(p))
-	if k := boardKey(strokes, p); strokes > 0 && e.board(m).Has(k) {
-		rank = e.board(m).index(k) + 1
+	if strokes > 0 {
+		if k := boardKey(strokes, p); e.board(m).Has(k) {
+			rank = e.board(m).index(k) + 1
+		}
 	}
 	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(p) +
 		`,"rank":` + strconv.Itoa(rank) + `,"of":` + strconv.Itoa(e.board(m).Size()) + `,"strokes":` + strconv.Itoa(strokes) + "}"

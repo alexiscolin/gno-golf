@@ -688,7 +688,7 @@ export default function Golf() {
   const dared = useRef(false);
   const [dareNote, setDareNote] = useState(dare ? "Reading the dare…" : "");
   // the rival a duel races: their bests here, in both modes, with their rounds
-  const [rival, setRival] = useState<{ hole: string; name: string; self: boolean; ghosts: Record<Mode, Ghost | null> } | null>(null);
+  const [rival, setRival] = useState<{ hole: string; name: string; ghosts: Record<Mode, Ghost | null> } | null>(null);
   const me = account && account.address;
   useEffect(() => {
     const c = game.current && game.current.chain;
@@ -698,21 +698,21 @@ export default function Golf() {
     // (a ghost unread is no duel: the dare is still said)
     void Promise.all([c.ghost(holeId, "assisted", dare).catch(() => null), c.ghost(holeId, "pro", dare).catch(() => null), nameOnce(c, dare)])
       .then(([a, p, n]) => {
-        // (a name as gno.land writes them, or the address: nothing a lying node could dress up)
-        const name = n && /^[a-z0-9._-]{1,64}$/i.test(n) ? n : shortAddr(dare), self = dare === me, g = pickGhost(aim, { assisted: a, pro: p });
-        if (g) setRival({ hole: holeId, name, self, ghosts: { assisted: a, pro: p } });
+        const name = n || shortAddr(dare);
+        if (a || p) setRival({ hole: holeId, name, ghosts: { assisted: a, pro: p } });
         // said on the picker (a link opens there), and again as the hole opens; a sharer with no round here still dares
-        setDareNote(`${name} dares you on this hole.`); // (with a round here, the duel says it)
-        setLinkNote(!g ? `${name} dares you on this hole.` : self ? `Your best here: ${g.strokes}. Beat it.` : `${name} holed it in ${g.strokes}. Your turn.`);
+        // (with a round here, the duel says who and how many: the HUD keeps the count)
+        setDareNote(`${name} dares you on this hole.`);
+        setLinkNote(a || p ? `Race ${dare === me ? "your own" : `${name}'s`} ghost: your turn first.` : `${name} dares you on this hole.`);
       })
       .catch(() => setDareNote(""));
-  }, [dare, holeId, holeReady, me, aim]);
+  }, [dare, holeId, holeReady, me]);
   // the duel on this hole: the rival's best in the round's aim mode, else their other one
   const duelMode = (s && s.roundMode) || aim;
   const duel: Duel | null = useMemo(() => {
     const g = rival && rival.hole === holeId ? pickGhost(duelMode, rival.ghosts) : null;
-    return g && rival ? { ghost: g, name: rival.name, self: rival.self } : null;
-  }, [rival, holeId, duelMode]);
+    return g && rival ? { ghost: g, name: rival.name, self: dare === me } : null;
+  }, [rival, holeId, duelMode, dare, me]);
   useEffect(() => game.current?.race(duel ? duel.ghost : null), [duel]);
   // the duel this round races (one armed mid-round starts with the next: the engine says when)
   const racing = duel && s && s.rival != null ? duel : null;
@@ -723,8 +723,10 @@ export default function Golf() {
     if (duel && c) void c.weather(duel.ghost.hole, duel.ghost.period).then((w) => setGhostSky({ ghost: duel.ghost, kind: w.kind || "" }), () => {});
   }, [duel]);
   const sky: Sky = duel && s && ghostSky && ghostSky.ghost === duel.ghost ? { theirs: ghostSky.kind, mine: s.kind } : null;
-  // out of reach: the rival's holing stroke shown, and the player past it (or at it, the ball at rest out of the cup)
-  const duelLost = !!(racing && s && s.rivalIn && (s.strokes > racing.ghost.strokes || (s.strokes === racing.ghost.strokes && !s.flying && !s.done)));
+  // out of reach: the rival's holing stroke shown, and the player past it (or at it, the ball at rest out of the cup);
+  // said, and the rematch pushed, while the round goes on
+  const theyWon = !!(racing && s && s.rivalIn && (s.strokes > racing.ghost.strokes || (s.strokes === racing.ghost.strokes && !s.flying && !s.done)));
+  const duelLost = theyWon && !!s && !s.done;
   const lostNote = duel ? (duel.ghost.strokes === 1 ? "Missed the ace. Rematch?" : `${duel.self ? "Your best" : duel.name} holed it in ${duel.ghost.strokes}. Finish for your score, or rematch.`) : "";
   useEffect(() => {
     setLinkNote((n) => (duelLost ? lostNote : n === lostNote ? null : n)); // (gone with the rematch)
@@ -1037,9 +1039,9 @@ export default function Golf() {
       q.set("gnome", gnome);
     } else if (screen === "worlds" && world) q.set("cup", world);
     else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
-    // a duel's dare stays in the address while it is raced here: a reload, a copied link keep it
-    if (rival && rival.hole === idHere && screen !== "worlds") q.set("by", dare);
     else if (screen === "play") return; // the hole is not known yet: wait for it
+    // a duel's dare stays in the address while it is raced here: a reload, a copied link keep it
+    if (rival && rival.hole === idHere && (screen === "play" || screen === "pick")) q.set("by", dare);
     // a hole's own page (/h/…) is left for the game's address once it moves on
     const base = window.location.pathname.startsWith("/h/") ? "/" : window.location.pathname;
     const url = base + (String(q) ? `?${q}` : "");
@@ -1165,7 +1167,7 @@ export default function Golf() {
             <div className="card card--score" role={racing ? "group" : undefined} aria-live={racing ? "polite" : undefined} aria-label={racing ? `You ${s.strokes}, ${racing.name} ${s.rival ?? 0}${s.rivalIn ? ", in" : ""}; ${racing.ghost.strokes} to beat` : undefined}>
               <span className="eyebrow">{racing ? (racing.self ? "You – best" : "You – them") : "Strokes"}</span>
               <strong>{s.strokes}{racing && <> – {s.rival ?? 0}{s.rivalIn && "✓"}</>}</strong>
-              <span className="card__par">{racing ? (duelLost ? "they won" : `${racing.ghost.strokes} to beat`) : <>par {parHere(s)}{last ? ` · last ${last}` : ""}</>}</span>
+              <span className="card__par">{racing ? (theyWon ? "they won" : `${racing.ghost.strokes} to beat`) : <>par {parHere(s)}{last ? ` · last ${last}` : ""}</>}</span>
               {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
             </div>
             <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
