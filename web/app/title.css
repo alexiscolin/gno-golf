@@ -406,6 +406,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
   background: var(--panel-dots), var(--c2);
 }
 .rival__you svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; } /* yourself: your ghost where the others have their place */
+.rival__pick [hidden] { display: revert; visibility: hidden; } /* (a pick's missing label or Race keeps its room: same circles in every pick) */
 .rival__tag { grid-area: tag; justify-self: start; position: relative; z-index: 2; padding-left: 4px; font-size: 13px; } /* (over a tall hat's tip) */
 .rival__dice { width: 24px; height: 24px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
 .rival__dice circle { fill: var(--ink); stroke: none; }

@@ -834,8 +834,12 @@ export default function Golf() {
   useEffect(() => {
     // unless the player disconnected this page: that holds until they connect again
     const off = () => { try { return localStorage.getItem("gnogolf.adenaOff") === "1"; } catch { return false; } };
-    if (!off()) void current().then((a) => a && setAccount(a));
-    return onWalletChange(() => void (!off() && current().then(setAccount)));
+    const look = () => void (!off() && current().then((a) => a && setAccount(a)));
+    look();
+    // (and again back on the page: Adena connected from its own window says nothing)
+    addEventListener("focus", look);
+    const stop = onWalletChange(() => void (!off() && current().then(setAccount)));
+    return () => (removeEventListener("focus", look), stop());
   }, []);
 
   // Adena has no revoke from a page: disconnecting forgets the account here,
@@ -1236,7 +1240,7 @@ export default function Golf() {
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
-          onPick={toGhosts} onBoard={() => setBoard(true)} />
+          onPick={toGhosts} onBoard={() => setBoard(true)} onConnect={account ? undefined : () => (hasAdena() ? void connectWallet() : setReal(true))} />
       )}
       {screen === "ghosts" && (
         <Ghosts holes={allList} name={rivalName} player={dare} chain={game.current && game.current.chain} bests={rivalBests} card={card} mode={aim} onRace={openHole}
