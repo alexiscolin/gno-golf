@@ -465,7 +465,10 @@ func boardKey(v any, player string) string {
 
 // boardStrokes is the strokes of a board's key: always its three digits.
 func boardStrokes(k string) int {
-	n, _ := strconv.Atoi(k[:3])
+	n, err := strconv.Atoi(k[:3])
+	if err != nil {
+		panic("golf: bad board key: " + k) // pad writes three digits: cannot happen
+	}
 	return n
 }
 
@@ -1153,7 +1156,10 @@ func clampTick(t, shot string) int {
 	if digits = strings.TrimLeft(digits, "0"); len(digits) > 4 {
 		return maxTick
 	}
-	n, _ := strconv.Atoi("0" + digits)
+	n, err := strconv.Atoi("0" + digits)
+	if err != nil {
+		panic("golf: bad tick: " + shot) // digits only, at most 4: cannot happen
+	}
 	if n > maxTick {
 		return maxTick
 	}

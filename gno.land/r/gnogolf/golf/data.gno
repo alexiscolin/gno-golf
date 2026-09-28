@@ -92,7 +92,10 @@ func Publish(cur realm, slot, hexData, note string) string {
 	if slot != own {
 		panic("golf: this data is " + own + ", not " + slot)
 	}
-	key, _ := slotKeyOf(slot)
+	key, ok := slotKeyOf(slot)
+	if !ok {
+		panic("golf: " + slot + " is not a course slot") // its data's own world/order: cannot happen
+	}
 	var old *entry
 	n := 1
 	if v := slots.Get(key); v != nil {
