@@ -9,8 +9,8 @@ import { Green } from "@/components/Title";
 import { AboutButton, BackButton } from "@/components/About";
 import "@/app/title.css";
 
-// The world screen, between the title and the course: one card per world,
-// drawn like a cup to win, and the builder to come under them. A world with
+// The world screen, between the game's choice (Modes.tsx) and the course: one
+// card per world, drawn like a cup to win. A world with
 // no holes on this chain yet is shown, but cannot be picked.
 
 export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = [
@@ -100,6 +100,25 @@ export function Emblem({ id }: { id: string }) {
         <rect x="80" y="78" width="8" height="14" rx="4" className="w__door" />
         <path d="M 54 92 V 64" className="w__pole" />
         <rect x="50" y="58" width="8" height="9" rx="2" className="w__lamp" />
+      </Frame>
+    );
+  // the game's two ways to play: alone, and against a player's ghost
+  if (id === "solo" || id === "duel")
+    return (
+      <Frame id={id}>
+        <circle cx="60" cy="60" r="56" className="w__sky w__sky--garden" />
+        <path d="M 4 80 Q 60 66 116 80 L 116 116 L 4 116 Z" className="w__green" />
+        <path d="M 88 88 V 50" className="w__pole" />
+        <path d="M 88 50 L 102 55 L 88 60 Z" className="w__flag" />
+        {id === "duel" && (
+          // the rival: a see-through gnome, dashed, beside the player's
+          <g className="w__ghost">
+            <circle cx="62" cy="80" r="11" />
+            <path d="M 51 76 L 62 52 L 73 76 Z" />
+          </g>
+        )}
+        <circle cx={id === "duel" ? 36 : 48} cy="84" r="11" className="w__white" />
+        <path d={id === "duel" ? "M 25 80 L 36 56 L 47 80 Z" : "M 37 80 L 48 56 L 59 80 Z"} className="w__cap" />
       </Frame>
     );
   return (
@@ -192,9 +211,11 @@ interface WorldsProps {
   onCommunity?: (id: string) => void;
   /** the course's top players, under the cups */
   podium?: ReactNode;
+  /** a duel chosen: whose ghost is raced, said under the title */
+  racing?: ReactNode;
 }
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, community = [], onCommunity = () => {}, podium }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, community = [], onCommunity = () => {}, podium, racing }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -209,7 +230,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   };
   return (
     <div className={`screen worlds worlds--v2 front tint--${hot || current || "garden"}`}>
-      <BackButton label="Back to the title" onClick={() => (sound("blip"), onBack())} />
+      <BackButton label="Back to the games" onClick={() => (sound("blip"), onBack())} />
       <AboutButton onClick={onAbout} />
       {played.length > 0 && (
         <div className="resets">
@@ -234,6 +255,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
         <div className="front__head">
           <span className="eyebrow">Choose your cup</span>
           <h2 className="worlds__title">Where do we play?</h2>
+          {racing}
         </div>
         {podium}
         <ul className="worlds__list">
@@ -282,13 +304,6 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             );
           })}
         </ul>
-        {/* another game to come: a tab of its own under the cups, kept small */}
-        <p className="builder">
-          <Emblem id="build" />
-          <b>Builder</b>
-          <span className="builder__tag">Draw your own hole, dare the others</span>
-          <span className="builder__soon">Coming soon</span>
-        </p>
         {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
         {community.length > 0 && (
           <section className="community" aria-label="Community holes">

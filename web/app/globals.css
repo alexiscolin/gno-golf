@@ -2096,6 +2096,12 @@ html, body {
 .medal--off .medal__ribbon, .medal--off .medal__face { fill: var(--disabled); }
 .medal--off .medal__rim { stroke-dasharray: 5 3.5; }
 .medal--off :is(.medal__ribbon, .medal__rim, .medal__face, .medal__glyph) { stroke: var(--ink-soft); }
+/* the cup's card: the badges earned in a row, a fresh one pressed on like the card's stamps */
+.earned { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 10px 0 0; }
+.earned svg { display: block; width: 30px; height: 34px; }
+.earned .linkish { margin-left: 6px; }
+.earned__fresh { animation: stamp-in .55s var(--spring) both; }
+@keyframes stamp-in { from { transform: scale(2.4) rotate(-14deg); opacity: 0; } }
 /* the win card's line: the medal by the words, no tick (the medal says it) */
 .newbadge { display: flex; align-items: center; gap: 10px; }
 .newbadge::before { content: none; }
@@ -2106,12 +2112,12 @@ html, body {
 .about__links a:hover { border-color: var(--ink); transform: translateY(-1px); }
 .about__links b { font-size: 14px; }
 .about__links span { font-size: 12.5px; color: var(--ink-soft); }
-.about__credit { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(var(--ink-rgb), .15); font-size: 13px; color: var(--ink-soft); }
+.about__credit { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(var(--ink-rgb), .15); font-size: 13px; color: var(--ink-soft); }
 .about__credit a, .boards__ranked a, .nameform a { color: var(--ink); } /* inline links in soft text: ink, one rule */
 /* a sheet open: the screens' corner buttons (back, about) step aside, so the sheet's own close is the one tapped */
 body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hidden; }
 .drawer__panel .drawer__list { border-bottom: var(--rule); }
-.drawer__panel .drawer__settings { border-bottom: 0; }
+.drawer__panel .drawer__settings:last-child { border-bottom: 0; } /* the settings ruled off from the holes; the last block (clearing the card) needs none */
 .scorecard__links { margin-left: auto; display: flex; gap: 14px; font-size: 13px; }
 /* the camera button keeps one width whatever its mode's name, so Restart never shifts */
 .cam-btn { min-width: 150px; justify-content: center; }
@@ -2139,6 +2145,8 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
    so no one takes a practice score for a real one, with the way to mainnet */
 .netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: var(--z-chip); display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: var(--edge); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; } /* the bottom buttons' height and edge, flat: it says, it is not pressed */
 .netbanner--testnet { background: var(--hat); color: var(--paper); }
+.netbanner--mainnet { padding: 0; border: 0; background: none; height: auto; } /* no banner on mainnet: only its Support chip */
+.netbanner--mainnet .btn--chip svg { fill: var(--hat); } /* a red heart where the Leaderboard has its gold cup */
 .screen ~ .netbanner { z-index: var(--z-screen); left: 34px; bottom: max(34px, env(safe-area-inset-bottom)); } /* over the title, cups and gnome screens too (under the sheets, 5), inside their frame, where their corner buttons are */
 .netbanner b { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .netbanner span { font-weight: 600; opacity: .9; }

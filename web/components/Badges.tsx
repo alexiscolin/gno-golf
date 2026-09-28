@@ -75,6 +75,24 @@ export function Badges({ onClose, fresh = [] }: { onClose: () => void; fresh?: r
   );
 }
 
+/** The badges earned, their medals in a row (the cup's card), the ones just
+ *  earned pressed on like a stamp, the whole sheet a tap away. */
+export function EarnedBadges({ fresh = [], onOpen }: { fresh?: readonly string[]; onOpen: () => void }) {
+  const had = badgesEarned();
+  const list = BADGES.filter((b) => had.includes(b.id));
+  if (!list.length) return null;
+  return (
+    <p className="earned">
+      {list.map((b) => (
+        <span key={b.id} className={fresh.includes(b.id) ? "earned__fresh" : undefined} title={b.name}>
+          <Medal b={b} on />
+        </span>
+      ))}
+      <button className="linkish" onClick={onOpen}>{had.length}/{BADGES.length} badges →</button>
+    </p>
+  );
+}
+
 /** The win card's line: the rarest badge just earned, its medal, how many
  *  more, a tap from the sheet. */
 export function NewBadges({ ids, onOpen }: { ids: readonly string[]; onOpen: () => void }) {

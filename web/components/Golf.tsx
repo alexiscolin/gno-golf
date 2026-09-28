@@ -21,8 +21,9 @@ import Weather from "@/components/Weather";
 import Share, { ShareClip, type Clip } from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
 import About, { AboutButton, BackButton, Rules } from "@/components/About";
-import { Badges, ChainSeal, NewBadges } from "@/components/Badges";
+import { Badges, ChainSeal, EarnedBadges, NewBadges } from "@/components/Badges";
 import Tip from "@/components/Tip";
+import Modes from "@/components/Modes";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
@@ -49,7 +50,7 @@ declare global {
   }
 }
 
-const SCREENS = ["title", "worlds", "pick", "play"] as const;
+const SCREENS = ["title", "modes", "worlds", "pick", "play"] as const;
 type Screen = (typeof SCREENS)[number];
 const isScreen = (v: unknown): v is Screen => SCREENS.some((x) => x === v);
 type Gfx = "auto" | "high" | "low";
@@ -323,6 +324,7 @@ export default function Golf() {
   const [menu, setMenu] = useState(false);
   const [board, setBoard] = useState(false); // the leaderboard sheet
   const [about, setAbout] = useState(false); // the about sheet
+  const [support, setSupport] = useState(false); // the tip's sheet (a heart beside About, and in the menu)
   const [rules, setRules] = useState(false); // the rules' sheet
   // the aim mode, kept in this browser: assisted (the whole path) or pro
   const [aim, setAimState] = useState<Mode>(() => {
@@ -749,16 +751,16 @@ export default function Golf() {
     setLinkNote((n) => (duelLost ? lostNote : n === lostNote ? null : n)); // (gone with the rematch)
   }, [duelLost]); // eslint-disable-line react-hooks/exhaustive-deps -- as it turns
   // a board's Race: that player's ghost here, from the tee (a round under way starts again)
-  const raceWith = (player: string) => {
-    setBoard(false);
-    game.current?.reset();
-    if (player === dare && !solo) return; // (already the rival: a rematch)
+  // a rival picked (a board's Race, the game's choice): their ghost read afresh on each hole
+  const pickRival = (player: string) => {
+    if (player === dare && !solo) return; // (already the rival)
     readFor.current.clear();
     setRival(null);
     setSolo(false);
     setDareHole("");
     setDare(player);
   };
+  const raceWith = (player: string) => (setBoard(false), game.current?.reset(), pickRival(player));
   const dropDuel = () => {
     setSolo(true);
     setRival(null);
@@ -1062,7 +1064,8 @@ export default function Golf() {
   const daring = !!account && (onChain || ghostHere);
   const nextAfter = cupWon && s ? nextCup(cupWon.cup, s.worlds) : ""; // the cup after the one just complete
   // the hole the gnome picker leads to (a shared link's, or the cup's first), named over the gnomes
-  const linked = s && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
+  // the hole a link opened, named over the gnomes (from the cups, the player knows where they go)
+  const linked = s && s.linked && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
   // The address bar follows the screen: the title is the bare page, the cups
   // ?cup=<world>, the picker adds &gnome=, a hole ?cup=&hole=&gnome=. A new
   // screen is a new history entry (Back returns to the one before); moving
@@ -1160,7 +1163,11 @@ export default function Golf() {
       {/* rain and storm darken and wet the whole scene a little */}
       {playing && wx && (wx.rain || wx.storm) && <div className={"wet" + (wx.storm ? " wet--storm" : "")} aria-hidden="true" />}
 
-      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => setScreen("worlds")} onAbout={() => setAbout(true)} />}
+      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => setScreen("modes")} onAbout={() => setAbout(true)} />}
+      {screen === "modes" && (
+        <Modes chain={game.current && game.current.chain} me={account && account.address} mode={aim} onBack={() => setScreen("title")} onAbout={() => setAbout(true)}
+          onSolo={() => (setSolo(true), setRival(null), setScreen("worlds"))} onDuel={(addr) => (pickRival(addr), setScreen("worlds"))} />
+      )}
       {screen === "worlds" && s && (
         <Worlds
           counts={s.worlds}
@@ -1168,9 +1175,11 @@ export default function Golf() {
           onResetAll={() => setCard(clearCard())}
           onReset={(w) => setCard(clearCup(allList.filter((h) => cupOf(h) === w).map(cardKey)))}
           current={s.world}
-          onBack={() => setScreen("title")}
+          onBack={() => setScreen("modes")}
           onAbout={() => setAbout(true)}
+         
           community={s.community}
+          racing={dare && !solo && <p className="dare">Racing {(rival && rival.name) || shortAddr(dare)}&apos;s ghost <button className="linkish" onClick={dropDuel}>Play solo</button></p>}
           podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} onOpen={() => setBoard(true)}
             extra={<button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>} />}
           onCommunity={(id) => {
@@ -1183,6 +1192,7 @@ export default function Golf() {
       {screen === "pick" && <Picker world={(s && s.world) || "garden"} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={chosenGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         onAbout={() => setAbout(true)}
+       
         onBack={() => {
           sound("blip");
           // leaving on a locked gnome: back to the one really chosen
@@ -1280,12 +1290,12 @@ export default function Golf() {
                       <span>vs par</span>
                     </div>
                   </div>
-                  {/* the cup's card wide on top, the rest under it (another cup: the cup above) */}
+                  {/* the cup's card wide on top, the rest under it */}
                   <div className="me__row">
                     <Button variant="primary" onClick={() => { setMenu(false); setCardOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.card}</svg>Cup overview</Button>
                     <Button variant="secondary" aria-label="Change gnome" onClick={() => { setMenu(false); setScreen("pick"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.gnome}</svg>Gnome</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setBadgesOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.badge}</svg>Badges</Button>
-                    <Button variant="secondary" aria-label="Duel: race a player's ghost on this hole" onClick={() => { setMenu(false); setBoard(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.ghost}</svg>Duel</Button>
+                    <Button variant="secondary" onClick={() => { setMenu(false); setScreen("worlds"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.cups}</svg>All cups</Button>
                     {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
@@ -1549,7 +1559,8 @@ export default function Golf() {
         <Sheet className="cardsheet" label="Scorecard" onClose={() => setCardOpen(false)}>
             <span className="eyebrow">Gnogolf · the cup and its card</span>
             <h2>The cup</h2>
-            <Standings s={s} card={card} saved={onChainCard} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onRules={() => setRules(true)} />
+            <Standings s={s} card={card} saved={onChainCard} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onRules={() => setRules(true)}
+              badges={{ fresh: freshBadges, onOpen: () => (setCardOpen(false), setBadgesOpen(true)) }} />
             <FullBoard key={aim} kind="course" s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
         </Sheet>
       )}
@@ -1571,9 +1582,16 @@ export default function Golf() {
         <About web={cfg ? cfg.web : ""} onClose={() => setAbout(false)} onRules={() => (setAbout(false), setRules(true))}
           support={game.current && <Tip chain={game.current.chain} me={account && account.address} chainId={chainId} price={gasPrice} onConnect={() => (setAbout(false), setReal(true))} />} />
       )}
+      {support && game.current && (
+        <Sheet className="about" label="Support the game" onClose={() => setSupport(false)}>
+          <span className="eyebrow">Support</span>
+          <h2>Keep the gnomes rolling</h2>
+          <Tip chain={game.current.chain} me={account && account.address} chainId={chainId} price={gasPrice} onConnect={() => (setSupport(false), setReal(true))} bare />
+        </Sheet>
+      )}
       {rules && <Rules onClose={() => setRules(false)} onBadges={() => (setRules(false), setBadgesOpen(true))} />}
       {badgesOpen && <Badges fresh={freshBadges} onClose={() => setBadgesOpen(false)} />}
-      {cfg && <NetBanner rpc={cfg.rpc} />}
+      {cfg && <NetBanner rpc={cfg.rpc} onSupport={() => setSupport(true)} />}
 
       {pending && !(holed && s && s.id === pending.id) && (
         <PendingSave r={pending} rec={pendingRec && pendingRec.round === roundOf(pending) ? pendingRec.rec : null} by={pending.period != null ? saveBy(pending.period) : null} clock={game.current ? game.current.chain.now : undefined}
@@ -2004,14 +2022,26 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
  * or the testnet, where scores are practice. The other deployment one click
  * away when there is one.
  */
-function NetBanner({ rpc }: { rpc: string }) {
+// onSupport: the tip, on every screen: in the banner, or alone where there is none (mainnet)
+function NetBanner({ rpc, onSupport }: { rpc: string; onSupport: () => void }) {
   const net = networkOf(rpc);
-  if (net === "mainnet") return null;
+  const support = <button className="netbanner__go" onClick={onSupport}>♥ Support</button>;
+  // (the Leaderboard chip's twin, on the left)
+  if (net === "mainnet")
+    return (
+      <p className="netbanner netbanner--mainnet">
+        <Button variant="chip" onClick={onSupport}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" /></svg>
+          <span>Support</span>
+        </Button>
+      </p>
+    );
   return (
     <p className={`netbanner netbanner--${net}`}>
       <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
       <span>{net === "local" ? "a node on this machine" : "practice scores, free test GNOT"}</span>
       {net === "testnet" && OTHER_URL && <a className="netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
+      {support}
     </p>
   );
 }
@@ -2165,7 +2195,7 @@ const MENU_ICON = {
   card: <path d="M4 5h16v14H4zM4 10h16M10 10v9" />,
   gnome: <path d="M12 3 5.5 16h13ZM4 16h16M9 20h6" />,
   badge: <path d="M12 9.5a5 5 0 1 1 0 10 5 5 0 0 1 0-10M8.5 3l3.5 6.5L15.5 3" />,
-  ghost: <path d="M6 20v-8a6 6 0 0 1 12 0v8l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM10 11v1M14 11v1" />,
+  cups: <path d="M8 21V4l10 4-10 4M5 21h8" />,
 };
 
 /** The address of a cup, as the cup screen puts it in the bar: ?cup=<world>. */
@@ -2345,7 +2375,8 @@ function Scorecard({ holes, card, saved, current, compact = false, world = "gard
   );
 }
 
-function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, onRules }: BoardProps & { card: Card; saved: Card; compact?: boolean; onRules: () => void }) {
+// badges: the cup's card (not compact) shows the badges earned, those fresh pressed on
+function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, onRules, badges }: BoardProps & { card: Card; saved: Card; compact?: boolean; onRules: () => void; badges?: { fresh: readonly string[]; onOpen: () => void } }) {
   const [rank, setRank] = useState<{ at?: number; unnamed?: boolean } | null>(null);
   useEffect(() => {
     if (!chain || !me) return;
@@ -2373,6 +2404,7 @@ function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, o
         </dl>
       </header>
       <Scorecard holes={s.holes} card={card} saved={saved} current={s.id} world={s.world} compact={compact} onRules={onRules} />
+      {badges && <EarnedBadges fresh={badges.fresh} onOpen={badges.onOpen} />}
       {(!compact || t.all) && <p className="cup__next">
         {t.all
           ? t.strokes <= t.par ? (cupHasGnome(s.world || "") ? "Cup finished at par or under — a gnome is waiting in the picker." : "Cup finished at par or under!") : "Cup finished. Now beat par."

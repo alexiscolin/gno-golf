@@ -83,9 +83,9 @@
   display: inline-block; padding: 4px 14px; border-radius: var(--pill);
   font-size: var(--fs-pill); font-weight: 700; letter-spacing: .12em; color: var(--paper); background: var(--ink);
 }
-/* a paper panel: a card's standing (on its card's face, and its drop), the
-   title's facts, the builder's tab (flat: they only show) */
-.world__info, .screen--title .title__facts li, .builder { background: var(--paper); border: var(--edge); border-radius: 16px; }
+/* a paper panel: a card's standing (on its card's face, and its drop) and
+   the title's facts (flat: they only show) */
+.world__info, .screen--title .title__facts li { background: var(--paper); border: var(--edge); border-radius: 16px; }
 .world__info { border-width: 2.5px; box-shadow: var(--shadow-btn); }
 /* a round button: paper, inked, on its shadow (back, previous, next) */
 .front .round {
@@ -292,20 +292,14 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--shadow-btn); color: var(--ink); }
 .worlds--v2 .community { background: var(--paper); border: var(--edge); border-radius: 16px; padding: 10px 14px; } /* flat: a list to read */
 
-/* the builder: another game, to come; a small tab under the cups, plainly
-   not a button yet (dashed, flat, dimmed) */
-.builder {
-  display: inline-flex; align-items: center; gap: 10px; margin: clamp(18px, 3vh, 30px) auto 0; padding: 5px 8px 5px 5px;
-  border-radius: var(--pill); color: var(--ink); font-size: 14px; line-height: 1.2; cursor: default;
-}
-.worlds--v2 .builder { border-style: dashed; opacity: .72; }
-.builder svg { width: 34px; height: 34px; flex: none; display: block; }
-.builder b { font-size: 16px; }
-.builder__tag { color: var(--ink-soft); }
-.builder__soon {
-  padding: 3px 10px; border-radius: var(--pill); background: var(--ink); color: var(--paper);
-  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
-}
+/* the first choice: the cups' cards, three of them, an emblem for a still */
+.modes .worlds__list { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 960px; margin: 0 auto; }
+.modes .world__art svg { position: absolute; inset: 8% 0; margin: auto; height: 84%; width: auto; display: block; }
+.w__ghost { fill: var(--paper); fill-opacity: .55; stroke: var(--ink); stroke-width: 2.5; stroke-dasharray: 5 4; stroke-linejoin: round; }
+/* a duel's "whom?": the dare's sticker, a field, the friends and the top players to tap */
+.whom { display: grid; justify-items: center; gap: 10px; width: min(100%, 520px); margin: clamp(16px, 3vh, 28px) auto 0; }
+.whom .friends__add { width: 100%; margin: 0; }
+.whom__picks { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 0; }
 
 @media (max-height: 760px) { .world__art { aspect-ratio: 16 / 9; } }
 @media (max-height: 640px) { .world__art { aspect-ratio: 2 / 1; } .worlds--v2 .world__tag { display: none; } }
@@ -314,7 +308,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   .worlds--v2 .worlds__list { gap: 12px; }
   .worlds--v2 .world { padding: 6px 6px 10px; border-radius: 20px; }
   .worlds--v2 .world__ribbon { font-size: 14px; padding: 4px 10px; white-space: normal; }
-  .worlds--v2 .world__tag, .builder__tag { display: none; }
+  .worlds--v2 .world__tag { display: none; }
   .worlds--v2 .world:hover:not([disabled]) .world__ribbon, .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.12); }
   .world__won { top: 10px; right: 10px; font-size: 13px; padding-right: 9px; }
   .world__won svg { width: 26px; height: 26px; }

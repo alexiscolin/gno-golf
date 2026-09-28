@@ -50,6 +50,7 @@ export const BackButton = ({ label, onClick }: { label: string; onClick: () => v
   </CornerButton>
 );
 /** The about screen's corner button (an inked ⓘ). */
+/** A screen's about button: an inked (i) in the top-right corner. */
 export const AboutButton = ({ onClick }: { onClick: () => void }) => (
   <CornerButton side="about" label="About Gnogolf" onClick={onClick}>
     <svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
@@ -105,7 +106,6 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
     // the faucet feeds the testnet only; the other deployment, when there is one
     ...(NETWORK === "testnet" ? [["Faucet", "https://faucet.gno.land", "free test GNOT for the testnet"] as [string, string, string]] : []),
     ...(OTHER_URL ? [NETWORK === "testnet" ? ["Play on mainnet", OTHER_URL, "the real chain: scores for keeps"] : ["Play on the testnet", OTHER_URL, "free test GNOT, same course"]] as [string, string, string][] : []),
-    ["Gno docs", "https://docs.gno.land", "write a realm of your own"],
   ];
   return (
     <Sheet className="about" label="About Gnogolf" onClose={onClose}>
