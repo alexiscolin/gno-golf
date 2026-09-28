@@ -1329,7 +1329,7 @@ function extras(ex: Extras, s: Hole, t: Terrain) {
   const bars: Slide[] = [];
   const av = (ex.walls || []).filter((w) => w.skin === "avalanche");
   for (let k = 0; k + 3 < av.length; k += 4) {
-    // physics.Bar: the long sides are walls 0 and 2; the centre line joins their midpoints' ends
+    // build.Bar: the long sides are walls 0 and 2; the centre line joins their midpoints' ends
     const ws = av.slice(k, k + 4), pts = ws.flatMap((w) => [w.a, w.b]);
     let best: Vec2[] = [pts[0], pts[1]], far = 0;
     for (const p of pts) for (const q of pts) { const d = Math.hypot(p[0] - q[0], p[1] - q[1]); if (d > far) (far = d), (best = [p, q]); }

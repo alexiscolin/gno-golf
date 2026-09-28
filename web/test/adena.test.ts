@@ -610,11 +610,11 @@ test("why(): an error of null falls back to the chain's log, not a TypeError", a
 test("registerName: Register then Claim in one transaction, gas = REGISTER_GAS + CLAIM_GAS", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v1", realm: REALM, name: "nym", rpc: RPC, chainId: CHAIN });
+  await registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v0", realm: REALM, name: "nym", rpc: RPC, chainId: CHAIN });
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
   assert.deepEqual(
     tx.messages.map((m) => [m.value.pkg_path, m.value.func, m.value.args]),
-    [["gno.land/r/sys/namereg/v1", "Register", ["nym"]], [REALM, "Claim", []]],
+    [["gno.land/r/sys/namereg/v0", "Register", ["nym"]], [REALM, "Claim", []]],
   );
   assert.equal(tx.gasWanted, 60_000_000 + 90_000_000);
 });
@@ -623,7 +623,7 @@ test("registerName: refused names the default failure", async () => {
   const { a } = fakeAdena({ DoContract: () => ({ status: "failure" }) });
   setWindow({ adena: a });
   await assert.rejects(
-    () => registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v1", realm: REALM, name: "nym", rpc: RPC, chainId: CHAIN }),
+    () => registerName({ address: ADDR, registrar: "gno.land/r/sys/namereg/v0", realm: REALM, name: "nym", rpc: RPC, chainId: CHAIN }),
     /The name was not registered\./,
   );
 });

@@ -1245,7 +1245,7 @@ function kerbRuns(W: readonly WallLike[], ch: Chain, zones: readonly Zone[], cut
  * ball goes in one move plus its radius, and nothing in the hole throws a ball
  * into the air over the hazard. The chain looks at the zones before every move
  * of at most MaxMove (physics/step.gno), so the ball is in the hazard first.
- * town15's frame box, 3 off its roofs, is one: kept by the chain (course.Fit
+ * town15's frame box, 3 off its roofs, is one: kept by the chain (author.Fit
  * sizes the board by it), not drawn.
  */
 const MAX_MOVE = 1.5; // physics.MaxMove
@@ -1273,7 +1273,7 @@ function unreached(walls: readonly Wall[], zones: readonly Zone[]) {
 }
 
 /**
- * Walls as the eye expects them. physics.Bar makes a free-standing barrier out
+ * Walls as the eye expects them. build.Bar makes a free-standing barrier out
  * of four segments; drawn one by one they look like two rails, so four closed
  * thin segments are drawn as one solid timber. A lone segment is a board edge:
  * its face is put on the line, on the side the ball plays on, so a gnome that

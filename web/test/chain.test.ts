@@ -599,23 +599,23 @@ test("namesOf truncates to 100 addresses", async () => {
   assert.equal((await chain.namesOf(many)).length, 100);
 });
 
-test("nameReg picks v1 when this chain runs it", async () => {
+test("nameReg picks v0 when this chain runs it (onyx, mainnet)", async () => {
   const chain = makeChain();
-  setFetch((url) => { assert.ok(decoded(url).expr.startsWith("gno.land/r/sys/namereg/v1.IsPaused()")); return rawReply("(false bool)"); });
-  assert.equal(await chain.nameReg(), "gno.land/r/sys/namereg/v1");
+  setFetch((url) => { assert.ok(decoded(url).expr.startsWith("gno.land/r/sys/namereg/v0.IsPaused()")); return rawReply("(false bool)"); });
+  assert.equal(await chain.nameReg(), "gno.land/r/sys/namereg/v0");
 });
 
-test("nameReg falls back to v0 when v1 isn't there, '' when neither is", async () => {
+test("nameReg falls back to v1 (pearl) when v0 isn't there, '' when neither is", async () => {
   const chain = makeChain();
-  setFetch((url) => (decoded(url).expr.startsWith("gno.land/r/sys/namereg/v1") ? refusedReply("panic: unknown realm") : rawReply("(false bool)")));
-  assert.equal(await chain.nameReg(), "gno.land/r/sys/namereg/v0");
+  setFetch((url) => (decoded(url).expr.startsWith("gno.land/r/sys/namereg/v0") ? refusedReply("panic: unknown realm") : rawReply("(false bool)")));
+  assert.equal(await chain.nameReg(), "gno.land/r/sys/namereg/v1");
 
   setFetch(() => refusedReply("panic: unknown realm"));
   assert.equal(await makeChain().nameReg(), "");
 });
 
 // one handler for every network call nameProblem makes, tunable per test
-function nameProblemFetch({ reg = "gno.land/r/sys/namereg/v1", validate = "", taken = false, canonical = false } = {}): Handler {
+function nameProblemFetch({ reg = "gno.land/r/sys/namereg/v0", validate = "", taken = false, canonical = false } = {}): Handler {
   return (url) => {
     const { expr } = decoded(url);
     if (expr.includes(".IsPaused()")) return expr.startsWith(reg) ? rawReply("(false bool)") : refusedReply("panic: unknown realm");

@@ -424,7 +424,7 @@ export async function sendTip({ from, to, gnot, price, chainId, rpc }: { from: s
 }
 
 // golf's Claim reads the course's holes once (74 slots, two modes): measured
-// well under this; Register was 25.4M on a pearl rehearsal
+// well under this (54.6M on an onyx gnodev); Register was 28M to 29.5M there
 const CLAIM_GAS = 90_000_000, REGISTER_GAS = 60_000_000;
 /** What a name taken with a save adds to its gas: Register and Claim's. */
 export const NAME_GAS = REGISTER_GAS + CLAIM_GAS;
@@ -441,7 +441,7 @@ export const nameBytes = (holes: readonly number[]) => 3628 + holes.reduce((b, n
 /**
  * Takes a gno.land name for the connected account, and ranks at once the
  * rounds it saved without one (golf's Claim): one transaction, two calls.
- * Register is free on pearl and mainnet (nothing is sent with it), and only
+ * Register is free on onyx and mainnet (nothing is sent with it), and only
  * a direct call registers, which a message of this transaction is.
  */
 export const registerName = ({ address, registrar, realm, name, price = PRICE, chainId, rpc }: {

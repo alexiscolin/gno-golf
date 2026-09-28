@@ -1755,7 +1755,7 @@ interface Rig { set(open: boolean, z: Zone): void }
 const rigs = new WeakMap<Hole, Rig>();
 
 function swingRig(s: Hole): THREE.Group {
-  // the canal's strip, as the chain lays it (course.Fit moved the source's
+  // the canal's strip, as the chain lays it (author.Fit moved the source's
   // x 20..24 by the tee's shift): corrected to the zone at the first stroke
   const CW = 4;
   const rig = new THREE.Group();

@@ -586,7 +586,7 @@ export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string
   return { at, noName: !!me && named === false && ranked, isNamed: named, named: () => setNamed(true) };
 }
 
-/** The chain's own name registrar on gnoweb (pearl: v1, a local gno and mainnet: v0), NEXT_PUBLIC_NAMEREG if set. */
+/** The chain's own name registrar on gnoweb (onyx, mainnet and a local gno: v0; pearl had v1), NEXT_PUBLIC_NAMEREG if set. */
 function NameLink({ chain, children }: { chain: Chain | null; children: ReactNode }) {
   const [reg, setReg] = useState(process.env.NEXT_PUBLIC_NAMEREG || "");
   useEffect(() => {

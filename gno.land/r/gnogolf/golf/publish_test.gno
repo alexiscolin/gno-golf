@@ -483,11 +483,11 @@ func TestADeployStartsClosed(cur realm, t *testing.T) {
 	setUp(deployer, "dev")
 	uassert.Equal(t, deployer, owner)
 	uassert.False(t, publishing)
-	setUp(deployer, "pearl")
+	setUp(deployer, "onyx-1")
 	uassert.False(t, publishing)
 	setUp("", "dev")
 	uassert.True(t, publishing)
-	uassert.PanicsWithMessage(t, cur, "golf: no owner: golf must be deployed by an account", func() { setUp("", "pearl") })
+	uassert.PanicsWithMessage(t, cur, "golf: no owner: golf must be deployed by an account", func() { setUp("", "onyx-1") })
 }
 
 // One address publishing fifty holes shows perAuthor of them in Holes, and

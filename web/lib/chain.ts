@@ -41,7 +41,7 @@ export const RULES = {
 } as const;
 
 // the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-golfer000/golf on
-// pearl), else the local chain's
+// onyx), else the local chain's
 const REALM_ENV = process.env.NEXT_PUBLIC_REALM || "";
 const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/golf$/.test(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
 /** The hub's gnoweb path ("/r/…/golf"). */
@@ -292,9 +292,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       throw e;
     }
   };
-  /** The name registrar this chain runs, "" if none: pearl has r/sys/namereg/v1, a local gno and mainnet v0. */
+  /** The name registrar this chain runs, "" if none: onyx, mainnet and a local gno have r/sys/namereg/v0 (pearl had v1). */
   const nameReg = memo(async () => {
-    for (const v of ["gno.land/r/sys/namereg/v1", "gno.land/r/sys/namereg/v0"]) if (await has(v)) return v;
+    for (const v of ["gno.land/r/sys/namereg/v0", "gno.land/r/sys/namereg/v1"]) if (await has(v)) return v;
     return "";
   }, 3600e3);
   return {
