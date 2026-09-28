@@ -139,6 +139,9 @@ try {
     await b.send("Page.navigate", { url: `${APP}/` });
     assert.ok(await until<boolean>(`!!document.querySelector('.btn--start')`, 100), "no title screen");
     await b.ev(`document.querySelector('.btn--start').click()`);
+    // Play opens the modes first: Solo leads to the cups
+    assert.ok(await until<boolean>(`!!document.querySelector('.mode--solo')`, 50), "no modes screen");
+    await b.ev(`document.querySelector('.mode--solo').click()`);
     assert.ok(await until<boolean>(`!!document.querySelector('.podium__open')`, 50), "no top players on the cups screen");
     await b.ev(`document.querySelector('.podium__open').click()`);
     const rows = await until<number>(`document.querySelectorAll('.lb--full ol:not(.lb__ghosts) > li:not(.lb__more)').length`, 40);
@@ -155,6 +158,9 @@ try {
     await b.send("Page.navigate", { url: `${APP}/` });
     assert.ok(await until<boolean>(`!!document.querySelector('.btn--start')`, 100), "no title screen");
     await b.ev(`document.querySelector('.btn--start').click()`);
+    // Play opens the modes first: Solo leads to the cups
+    assert.ok(await until<boolean>(`!!document.querySelector('.mode--solo')`, 50), "no modes screen");
+    await b.ev(`document.querySelector('.mode--solo').click()`);
     assert.ok(await until<boolean>(`document.querySelectorAll('.podium__row li:not(.podium__ghost)').length > 0`, 50), "no top players");
     const podium = await b.ev<string>(`document.querySelector('.podium__row').textContent`);
     const name = (await chain.namesOf([player]))[0].name;
