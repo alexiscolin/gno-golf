@@ -688,6 +688,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // A timed hole's moving pieces, for the stroke about to be played. They grow
   // up out of the ground when they appear, and the old ones sink away.
   let extras: THREE.Object3D | null = null, extrasFor = "";
+  // the next stroke's pieces, asked as the stroke lands (a duel's ghost plays
+  // meanwhile), shown once it has: by the stroke they are for
+  const extrasKey = () => `${g.id}#${g.round}#${g.shots.length}`;
+  let extrasAhead: { key: string; read: Promise<Extras> } | null = null;
+  const askExtras = () => {
+    const read = chain.extras(g.id!, g.shots.length);
+    read.catch(() => {}); // (said where it is awaited)
+    extrasAhead = { key: extrasKey(), read };
+  };
   // the pulses' pieces seen so far on this hole, each once: what the work
   // model counts for them (newWork: every pulse, as if always there) when
   // the realm does not say it (boardWork)
@@ -706,12 +715,14 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   }
   async function showExtras() {
     if (!g.s || !g.s.timed || !g.course) return;
-    const key = `${g.id}#${g.round}#${g.shots.length}`;
+    const key = extrasKey();
     if (key === extrasFor) return;
     extrasFor = key;
+    const read = extrasAhead && extrasAhead.key === key ? extrasAhead.read : chain.extras(g.id!, g.shots.length);
+    extrasAhead = null;
     let ex: Extras;
     try {
-      ex = plainSkins(await chain.extras(g.id!, g.shots.length));
+      ex = plainSkins(await read);
     } catch {
       // asked again in a moment: the stroke being aimed is played with its
       // pieces (a shot on its way asks for the next one when it lands)
@@ -796,9 +807,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     return L ? Math.floor(clock) % L : null; // no timed piece: nothing to send
   };
   const showClock = (t: number) => {
-    const mill = g.course && g.course.userData.mill, timed = g.course && g.course.userData.timed;
+    const mill = g.course && g.course.userData.mill;
     if (mill && mill.at) mill.at(t);
-    if (timed) for (const p of timed) p.at(t);
+    // the hole's timed pieces, and the stroke's (its extras)
+    for (const o of [g.course, extras]) for (const p of (o && ud(o).timed) || []) p.at(t);
     weather.clock(t); // a hole's gusts blow on the same clock
   };
   // timed pieces as they stand now (the clock runs on from where it is)
@@ -878,6 +890,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     get cut() { return cut; },
     get mode() { return mode; },
     get strokeZones() { return strokeZones; },
+    get extras() { return extras; },
   };
   const cam = makeCamera(E);
   window.addEventListener("pointermove", cam.hover);
@@ -1179,7 +1192,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.ball = { x: last[0], y: last[1] };
     g.flying = false;
     // the duel's ghost answers among this stroke's pieces; then a timed hole
-    // changes for the next stroke (at once without a duel)
+    // changes for the next stroke (at once without a duel), its pieces asked meanwhile
+    if (g.s && g.s.timed) askExtras();
     const answered = rival.turn(g.shots.length - 1, res.holed);
     void answered.finally(() => void showExtras());
     // a jump or a bounce may have ended mid-air: put him on the ground

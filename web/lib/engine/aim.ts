@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { shotOf, RULES } from "../chain";
 import { angDiff, onAt, segHit, rayCircle, BALL_R } from "../terrain";
 import { causeAt } from "../scene/cause";
+import { ud } from "../scene/data";
 import { aimAlong } from "../scene";
 import type { MutVec2, Stroke, Vec2 } from "../types";
 import type { Live } from "./types";
@@ -109,7 +110,10 @@ export function makeAimer(E: Live) {
   }
   // the aim put away: no dots, no elastic, nothing turned
   // the dashed outlines of timed pieces that are away, shown only while aiming
-  const ghosts = (on: boolean) => g.course && g.course.userData.ghosts && g.course.userData.ghosts(on);
+  // (the hole's, and the stroke's own: its extras')
+  const ghosts = (on: boolean) => {
+    for (const o of [g.course, E.extras]) if (o) ud(o).ghosts?.(on);
+  };
   const dropAim = () => {
     // a preview on its way is no longer wanted
     if (asked) asked.abort(), (asked = null), (asking = false);

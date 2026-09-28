@@ -81,6 +81,9 @@ interface ObjData {
   weather?: Dress | null;
   /** a live piece's per-frame function (a stroke's extras) */
   tick?: Tick;
+  /** a stroke's extras' own timed pieces, and their dashed outlines while aiming (buildExtras) */
+  timed?: Timed[];
+  ghosts?: ((aiming: boolean) => void) | null;
   // a prop's own, read by the decor that places it
   /** its radius */
   r?: number;

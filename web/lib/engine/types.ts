@@ -135,6 +135,8 @@ export interface Live {
   readonly cut: number;
   readonly mode: Mode;
   readonly strokeZones: readonly Zone[];
+  /** the stroke's own pieces on a timed hole (buildExtras), or null (the game's own: a replay's copy has none) */
+  readonly extras?: THREE.Object3D | null;
 }
 
 /** The snapshot's fast-moving fields (the power bar, a push's cause, the

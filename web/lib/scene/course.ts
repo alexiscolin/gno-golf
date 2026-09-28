@@ -12,7 +12,7 @@ import { worldOf, fromWorld, gapWater, DECK, GAP_Y } from "./worlds";
 import { WEATHER_SKINS } from "./weather";
 import { POSTS, BARS, roofs, SLAB } from "./pieces";
 import { zoneDetail, waterMask, pondWater } from "./zones";
-import { ud, withData, type Course, type CourseData, type CourseTerrain as T, type Height, type Hole, type Tick } from "./data";
+import { ud, withData, type Course, type CourseData, type CourseTerrain as T, type Height, type Hole, type Tick, type Timed } from "./data";
 import type { Extras, MutVec2, Post, Vec2, Wall, Wear, Zone } from "../types";
 
 /** A wall as the drawing takes it (a piece of one cut open: `cut`). */
@@ -1679,6 +1679,11 @@ export function buildExtras(course: Course, ex: Extras) {
   // what the pieces below animate (animate() pushes to state.live) runs with
   // the extras, and goes with them when the next stroke replaces them
   const ticks: Tick[] = (state.live = []);
+  // and its timed pieces (a tram, a gate on the clock) are its own too, not
+  // the course's: the next stroke's replace them, and the course's stay as built
+  const course0 = { timed: state.timed, ghosts: state.ghosts };
+  const timed: Timed[] = (state.timed = []);
+  state.ghosts = null;
   // a world may draw a stroke's pieces itself (an avalanche, a wave): it
   // returns { group, skins }, and what it drew is left out of the rest
   const own = worldOf(course.userData.state).extras?.(ex, course.userData.state, t);
@@ -1703,6 +1708,9 @@ export function buildExtras(course: Course, ex: Extras) {
   }
   state.live = [];
   ud(g).tick = (time: number) => { if (motion) for (const f of ticks) f(time); };
+  ud(g).timed = timed;
+  ud(g).ghosts = state.ghosts;
+  (state.timed = course0.timed), (state.ghosts = course0.ghosts);
   bake(g); // walls, posts, moles: merged; a mill's sails stay live
   return g;
 }
