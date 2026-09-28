@@ -427,7 +427,12 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
       const out = Math.max(r.a0 - side, side - r.a1);
       if (along < 0 || (out > 0 && (out >= SHOULDER || (side < r.a0 ? r.in0 : r.in1) || r.z.skin === "moon bridge" || !(x > 0 && z > 0 && x < W && z < H)))) continue;
       let k: number;
-      if (along <= r.span) k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? (along / r.span) ** 2 : smoothstep(along / r.span); // a jump curls up to its lip
+      // a jump curls up to its lip; a hill that ends in a lip still climbs at it, as the physics' push does
+      // (a smoothstep went flat before the edge: he crossed a flat top, then flew, late); one onto a deck levels into it
+      if (along <= r.span) {
+        const t = along / r.span;
+        k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? t * t : r.bridge || r.plateau || r.run || r.noLip ? smoothstep(t) : t * t * (2 - t);
+      }
       else if (r.bridge && along - r.span < r.bridge.gap) k = 1 + (r.bridge.to / r.rise - 1) * smoothstep((along - r.span) / r.bridge.gap);
       else if (r.plateau || r.run) k = 1;
       // a quarter-pipe's deck behind its coping: the kerb stands on it, not buried in the ramp

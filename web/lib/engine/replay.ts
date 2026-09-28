@@ -672,7 +672,8 @@ export function makeReplay(E: Live) {
                 // D over the lip (or a higher landing), and a start at least
                 // as steep as the ramp. A shallow lip alone threw him flat, a
                 // few hundredths up, and a steep fall after it ate any hop.
-                const D = Math.max(0, a) + Math.min(0.35 + L * 0.16, 2.6);
+                // (the lip still climbs, so a smaller floor: the hop kept near the chain's own, landing where it lands)
+                const D = Math.max(0, a) + Math.min(0.1 + L * 0.06, 1.2);
                 const h = Math.max((s0 * L - a) / 4, (2 * D - a + 2 * Math.sqrt(D * (D - a))) / 4);
                 const y = top + a * v + h * 4 * v * (1 - v);
                 E.ball.position.y = BALL_R + Math.max(gh, y);
