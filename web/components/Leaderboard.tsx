@@ -339,8 +339,8 @@ export type Placed = StrokesRow & { holes?: number; at: number };
  * place; the board's middle without one), and one at random, drawn again on
  * each visit. null while read; a pick nobody fills, null.
  */
-// the three picks (the champion, your level, yourself when you have a place, else a surprise),
-// and a surprise of its own (the board's Surprise me)
+// the three picks (the champion, your level, yourself: null while no one is connected),
+// and a surprise (the board's Surprise me)
 export function useRivalPicks(chain: Chain | null, me: string | null | undefined, mode: Mode) {
   const [picks, setPicks] = useState<{ rows: readonly (Placed | null)[]; surprise: Placed | null } | null>(null);
   useEffect(() => {
@@ -357,10 +357,10 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
         const level = levelPick(near.rows, me, champ ? [champ.player] : []);
         const any = await page(Math.floor(Math.random() * top.players), 5).catch(() => top);
         const surprise = pickOne([...any.rows, ...top.rows], [me, champ && champ.player, level && level.player], Math.random());
-        // (your row on the first page, else your rank read apart)
-        const self: Placed | null = !me ? null : top.rows.find((r) => r.player === me) || (mine && mine.rank > 0 ? { player: me, at: mine.rank, holes: mine.holes, strokes: mine.strokes } : null);
+        // (your row on the first page, else your rank read apart; unranked in this mode: at 0, your ghosts still read)
+        const self: Placed | null = !me ? null : top.rows.find((r) => r.player === me) || { player: me, at: mine && mine.rank > 0 ? mine.rank : 0, holes: mine ? mine.holes : 0, strokes: mine ? mine.strokes : 0 };
         primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r] : [])));
-        if (live) setPicks({ rows: [champ, level, self || surprise], surprise });
+        if (live) setPicks({ rows: [champ, level, self], surprise });
       })
       .catch(() => live && setPicks({ rows: [null, null, null], surprise: null }));
     return () => void (live = false);

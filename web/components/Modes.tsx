@@ -111,7 +111,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onBack, onAb
           {note && <p className="note note--warn">{note}</p>}
         </section>
         <ul className="rival__picks">
-          {[PICKS[0], PICKS[1], picks && picks.rows[2] && picks.rows[2].player === me ? PICKS[2] : PICKS[3]].map((p, i) => (
+          {PICKS.map((p, i) => (
             <li key={p.kind}><Pick {...p} first={i} row={picks && picks.rows[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} /></li>
           ))}
         </ul>
@@ -140,7 +140,6 @@ const PICKS = [
   { kind: "champ", label: "The champion", tint: "mode--build" },
   { kind: "level", label: "Your level", tint: "mode--solo" },
   { kind: "self", label: "Yourself", tint: "tint--mountain" },
-  { kind: "any", label: "Surprise me", tint: "tint--mountain" }, // (the third's, while you have no place)
 ] as const;
 
 /** A hole's map and a rival's best on it, their ghost's path (the strokes the
@@ -216,19 +215,22 @@ function Pick({ kind, label, tint, first, row, reading, chain, me, gnome, holes,
   }, [hot]);
   const map = show && show.maps.length ? show.maps[turn % show.maps.length] : null;
   const best = map && `${map.strokes === 1 ? "Ace" : golfTerm(map.strokes, map.par).replace(/!$/, "")} on ${map.name}`;
-  const line = row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
+  // yourself: not connected, or no ghost of yours yet (a round to save first)
+  const none = kind === "self" && (!me || (!!show && show.bests.size === 0)), open = !!row && !none;
+  const line = kind === "self" && !me ? "Connect Adena to race your own ghost" : none ? "Save a round: your ghost waits here" : row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
   return (
-    <button className={`mode rival__pick ${tint}`} disabled={!row} aria-label={row ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : "nobody yet"}`} {...on}
-      onClick={() => row && onPick(row.player, show ? show.bests : undefined)}>
-      <span className="tag rival__tag">{kind === "any" ? <Dice /> : <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}{label}</span>
-      {row ? <Stage className="rival__stage" skin={rivalSkin(row.player, gnome)} act="hop" playing={hot} /> : <span className="rival__stage" />}
+    <button className={`mode rival__pick ${tint}`} disabled={!open} aria-label={open ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : line || "nobody yet"}`} {...on}
+      onClick={() => open && row && onPick(row.player, show ? show.bests : undefined)}>
+      <span className="tag rival__tag">{!(kind === "self" && !(row && row.at)) && <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}{label}</span>
+      {/* (yourself: your own gnome, connected or not) */}
+      {row || kind === "self" ? <Stage className="rival__stage" skin={kind === "self" ? gnomeById(gnome) : rivalSkin(row!.player, gnome)} act="hop" playing={hot} /> : <span className="rival__stage" />}
       <span className="rival__show">
         {map ? <HoleMap key={map.name} {...map} /> : <NoMap />}
         {best && <span className="rival__best">{best}</span>}
       </span>
-      <span className="rival__name">{row ? who.label : reading ? "…" : "Nobody yet"}</span>
+      <span className="rival__name">{row ? who.label : kind === "self" ? "Your ghost" : reading ? "…" : "Nobody yet"}</span>
       <span className="rival__line">{line}</span>
-      {row && <span className="rival__go">Race</span>}
+      {open && <span className="rival__go">Race</span>}
     </button>
   );
 }
