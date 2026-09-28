@@ -225,14 +225,16 @@ clock moved forward. It returns the same pointer when `tick == 0`:
 
 ```go
 func WithTick(f *Field, tick int) *Field
-func Timed(ws []Wall, every, on, phase int) []Wall // sets the timing on every wall in ws
 ```
+
+A hole's source sets a timing on a group of walls with `build.Timed` (see
+[Building walls](#building-walls-physicsbuild)).
 
 Two planks across a rope bridge, out of step with each other (`island11`):
 
 ```go
-physics.Timed(physics.Bar(physics.V(18, 5.4), physics.V(18, 8.8), 0.5, '=', "plank"), 8, 4, 0),
-physics.Timed(physics.Bar(physics.V(32, 5.4), physics.V(32, 8.8), 0.5, '=', "plank"), 8, 4, 4),
+build.Timed(build.Bar(physics.V(18, 5.4), physics.V(18, 8.8), 0.5, '=', "plank"), 8, 4, 0),
+build.Timed(build.Bar(physics.V(32, 5.4), physics.V(32, 8.8), 0.5, '=', "plank"), 8, 4, 4),
 ```
 
 This is timing *within* one stroke. For pieces that change from one stroke to
@@ -263,7 +265,7 @@ nothing but friction.
 
 Each substep does this:
 
-0. A timed bar (four timed walls from `Timed(Bar(…))`) that comes back this
+0. A timed bar (four timed walls from `build.Timed(build.Bar(…))`) that comes back this
    substep, or stands on the first one, pushes a ball inside it (or closer
    than `Radius`) out through its nearest side, straight along that side's
    normal, as [`UnstickIn`](#unstickin) does for a stroke's pieces. A push that would carry
@@ -427,7 +429,7 @@ func PrepareWith(f *Field, lens []float64)    // Prepare with each wall's Length
 func Prepared(f *Field) []float64             // a copy of the prep, for tests
 ```
 
-- `Prepare` is called by `course.Fit`, once the walls are where they stay.
+- `Prepare` is called by `author.Fit`, once the walls are where they stay.
   Walls that change afterwards (a stroke's extras) are only a cost: `Step`
   checks each entry against its wall and works out any that no longer match.
 - `PrepareWith` takes three lengths per wall, in wall order, and gives the same
@@ -436,7 +438,14 @@ func Prepared(f *Field) []float64             // a copy of the prep, for tests
   `Prepared(f)` against `Prepare`'s. With the wrong count it is `Prepare`.
   `course.Decode` uses it, and `course.Exact` is that check.
 
-## Helpers
+## Building walls (`physics/build`)
+
+`gno.land/p/gnogolf/physics/build` is the toolkit a hole's source is written
+with. A hole's walls are plain `Wall` values, so nothing deployed needs it: it
+depends only on `physics`' exported API, and it is never staged (see
+[deploy-v1.md](design/deploy-v1.md)). Its tests are also where the physics'
+own behaviour is tested through built fields (`build/physics_test.gno`); what
+needs the physics' insides is tested in `physics` itself.
 
 Walls:
 
@@ -479,27 +488,27 @@ Examples from the deployed holes:
 
 ```go
 // hole1: a lane that bends and comes back, with a shelf across it
-physics.Walls(
-	physics.Outline(physics.Lane(6, 4, physics.V(5, 6), physics.V(20, 10), physics.V(34, 4), physics.V(44, 6))...),
-	physics.Bar(physics.V(28.4, 10.2), physics.V(26.8, 6.5), 0.8, '=', "shelf"),
+build.Walls(
+	build.Outline(build.Lane(6, 4, physics.V(5, 6), physics.V(20, 10), physics.V(34, 4), physics.V(44, 6))...),
+	build.Bar(physics.V(28.4, 10.2), physics.V(26.8, 6.5), 0.8, '=', "shelf"),
 )
 
 // hole2: a stadium lane with a gate in the middle
-physics.Walls(
-	physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(44, 9), 6)...),
-	physics.Bar(physics.V(26, 0), physics.V(26, 3), 0.8, '|', "gate"),
-	physics.Bar(physics.V(26, 6), physics.V(26, 9), 0.8, '|', "gate"),
+build.Walls(
+	build.Outline(build.Stadium(physics.V(0, 0), physics.V(44, 9), 6)...),
+	build.Bar(physics.V(26, 0), physics.V(26, 3), 0.8, '|', "gate"),
+	build.Bar(physics.V(26, 6), physics.V(26, 9), 0.8, '|', "gate"),
 )
 
 // island9: a curved pier edge
-physics.Skinned(physics.Polyline(physics.Arc(physics.V(50, 8), 3.4, -1.3, 1.3, 5)...), "pier")
+build.Skinned(build.Polyline(build.Arc(physics.V(50, 8), 3.4, -1.3, 1.3, 5)...), "pier")
 ```
 
 A whole field, and one stroke:
 
 ```go
 f := &physics.Field{
-	Walls:    physics.Box(physics.V(0, 0), physics.V(32, 16)),
+	Walls:    build.Box(physics.V(0, 0), physics.V(32, 16)),
 	Zones:    []physics.Zone{{Kind: physics.Surface, Min: physics.V(12, 0), Max: physics.V(16, 16), Scale: 0.55, Skin: "sand"}},
 	Friction: 0.86,
 	Bounce:   0.85,

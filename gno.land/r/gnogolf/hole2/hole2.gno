@@ -3,10 +3,12 @@ package hole2
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 2,
 	W: 44, H: 9,
 	Title:     "Bumper Alley",
@@ -23,10 +25,10 @@ var me = course.Fit(&course.Simple{
 		Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(26, 4.5), R: 0.9}, Bounce: 1.1, Skin: "mole"}},
 	}},
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(44, 9), 6)...),
-			physics.Bar(physics.V(26, 0), physics.V(26, 3), 0.8, '|', "gate"),
-			physics.Bar(physics.V(26, 6), physics.V(26, 9), 0.8, '|', "gate"),
+		Walls: build.Walls(
+			build.Outline(build.Stadium(physics.V(0, 0), physics.V(44, 9), 6)...),
+			build.Bar(physics.V(26, 0), physics.V(26, 3), 0.8, '|', "gate"),
+			build.Bar(physics.V(26, 6), physics.V(26, 9), 0.8, '|', "gate"),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(12, 2.8), R: 1.0}, Bounce: 1.2, Skin: "bumper"},

@@ -10,6 +10,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
 	"gno.land/p/nt/ufmt/v0"
@@ -22,7 +23,7 @@ import (
 func flatHole(title string) *course.Simple {
 	return &course.Simple{W: 32, H: 16, World: "garden", Title: title, Strokes: 3,
 		Tee: physics.V(2, 8), Pin: physics.V(20, 8), Substeps: 14, CupRadius: 1.5, Shelter: 0.01,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9}}
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9}}
 }
 
 var player = testutils.TestAddress("user")
@@ -46,7 +47,7 @@ func giveName(cur realm, addr address, name string) {
 func cupHole(world string, order int, title string) *course.Simple {
 	return &course.Simple{W: 32, H: 16, World: world, Order: float64(order), Title: title, Strokes: 3,
 		Tee: physics.V(2, 8), Pin: physics.V(3.3, 8), Substeps: 14, CupRadius: 1.2, Shelter: 0.01,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9, Radius: 0.5}}
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9, Radius: 0.5}}
 }
 
 // hexOf is a hole as Publish takes it.
@@ -229,7 +230,7 @@ func TestNamesAreCleaned(cur realm, t *testing.T) {
 // timedHole is a flat hole with a gate across it on odd strokes only.
 func timedHole() *course.Simple {
 	h := flatHole("Timed")
-	h.Pulses = []course.Pulse{{Every: 2, On: 1, Phase: 1, Walls: physics.Bar(physics.V(10, 0), physics.V(10, 16), 0.8, 0, "")}}
+	h.Pulses = []course.Pulse{{Every: 2, On: 1, Phase: 1, Walls: build.Bar(physics.V(10, 0), physics.V(10, 16), 0.8, 0, "")}}
 	return h
 }
 
@@ -340,7 +341,7 @@ func TestHolesAreListedWorldByWorld(cur realm, t *testing.T) {
 // a hole open to the wind
 var windy = &course.Simple{
 	W: 44, H: 16, World: "island", Title: "Windy", Tee: physics.V(2, 8), Pin: physics.V(40, 8), Substeps: 20, CupRadius: 1,
-	Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(44, 16)), Friction: 0.9, Radius: 0.5},
+	Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(44, 16)), Friction: 0.9, Radius: 0.5},
 }
 
 // The weather is a function of (hole, period): the same for everyone, it
@@ -376,7 +377,7 @@ func TestWeatherOfTheMoment(cur realm, t *testing.T) {
 var swing = &course.Simple{
 	W: 32, H: 16, World: "garden", Title: "Swing", Tee: physics.V(2, 3), Pin: physics.V(26, 3), Substeps: 20, CupRadius: 1,
 	Course: &physics.Field{
-		Walls:    physics.Walls(physics.Box(physics.V(0, 0), physics.V(30, 6)), physics.Timed(physics.Bar(physics.V(10, 0), physics.V(10, 6), 0.5, '=', "gate"), 8, 4, 0)),
+		Walls:    build.Walls(build.Box(physics.V(0, 0), physics.V(30, 6)), build.Timed(build.Bar(physics.V(10, 0), physics.V(10, 6), 0.5, '=', "gate"), 8, 4, 0)),
 		Friction: 0.95,
 		Radius:   0.5,
 	},

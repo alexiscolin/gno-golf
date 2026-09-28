@@ -4,7 +4,9 @@ package hole18
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // the lane's centreline, tee to cup
@@ -12,7 +14,7 @@ var line = []physics.Vec2{
 	physics.V(5, 5), physics.V(18, 13), physics.V(32, 5), physics.V(46, 13), physics.V(58, 7),
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 16,
 	W: 64, H: 18,
 	Title:     "The Long Green",
@@ -23,7 +25,7 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Outline(physics.Lane(5, 3, line...)...),
+		Walls: build.Outline(build.Lane(5, 3, line...)...),
 		Posts: []physics.Post{
 			// a rock on the inside of the third bend: round it, or bank off it
 			{Circle: physics.Circle{C: physics.V(44.5, 11.5), R: 0.9}, Bounce: 0.7, Skin: "rock"},

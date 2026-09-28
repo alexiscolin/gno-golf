@@ -7,7 +7,9 @@ package island8
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // pool is a tide pool: the polygon, drawn and played as it is, and where a
@@ -31,7 +33,7 @@ func pool(back physics.Vec2, pts ...physics.Vec2) physics.Zone {
 	return physics.Zone{Kind: physics.Hazard, Min: lo, Max: hi, Vec: back, Mark: '~', Skin: "tidepool", Poly: pts}
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 28, H: 40,
 	World:     "island",
 	Order:     8,
@@ -43,8 +45,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.V(4, 38), physics.V(16, 38), physics.V(24, 32), physics.V(26, 20), physics.V(20, 14),
+		Walls: build.Walls(
+			build.Outline(physics.V(4, 38), physics.V(16, 38), physics.V(24, 32), physics.V(26, 20), physics.V(20, 14),
 				physics.V(24, 4), physics.V(12, 2), physics.V(4, 8), physics.V(8, 20), physics.V(3, 28)),
 		),
 		Zones: []physics.Zone{

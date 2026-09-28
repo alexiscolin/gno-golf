@@ -43,13 +43,14 @@ r/<ns>/golf     registry; entries are realm holes (course.Hole) OR data versions
                 Publish (owner), PublishMine (anyone), Versions, HoleData, typed getters,
                 Drain, Transfer/Accept/Renounce
 repo only       hole sources (Fit literals + fingerprint tests), data/holes.txt generated
-                from them, scripts/stage.sh, scripts/holedata.sh
+                from them, scripts/stage.sh, scripts/holedata.sh; the authoring packages
+                p/<ns>/physics/build (wall builders) and p/<ns>/course/author (Fit, Diff)
 ```
 
 A call on a data hole goes through four steps:
 1. Load the version entry: one object holding the data string, about 0.15M gas.
 2. `course.Decode` rebuilds a `*course.Simple`, and `physics.PrepareWith` fills its `prep` from the stored lengths.
-3. The result is wrapped in `dataHole{Simple, e}`, which marks wear on the entry.
+3. The `*course.Simple` is the call's hole; golf marks the wear on the version's entry, never on it.
 4. The rest of the code (`previewAt`, `weatherOf`, `State`, `Render`) runs unchanged.
 
 The decoded value is never linked into realm state, so it costs no deposit.
@@ -420,7 +421,7 @@ Where these differ from the sections above, these win.
 - **Y8:** writes take exact version ids only, and `Launch` returns the version id.
 - **GREEN notes:**
   - Check the stored lengths bit-exactly once, at publish.
-  - `dataHole` overrides Play, PlayAt, PlayWith and Wear.
+  - `dataHole` overrides Play, PlayAt, PlayWith and Wear. (Since gone: `Simple` no longer has Play, PlayAt, PlayWith or Wear, and golf marks the wear on the entry itself.)
   - Test the bptree indexes against avl.
   - Refuse a publish whose sha matches the current version.
   - Strip bidi and zero-width characters from text.

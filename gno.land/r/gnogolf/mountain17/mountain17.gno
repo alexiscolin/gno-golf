@@ -5,10 +5,12 @@ package mountain17
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 54, H: 22,
 	World:     "mountain",
 	Order:     17,
@@ -20,8 +22,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(12, 4, physics.V(5, 11), physics.V(27, 11), physics.V(49, 11))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(12, 4, physics.V(5, 11), physics.V(27, 11), physics.V(49, 11))...),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(43.5, 7.6), R: 0.6}, Bounce: 0.7, Skin: "pine"},

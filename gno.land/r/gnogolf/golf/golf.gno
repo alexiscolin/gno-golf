@@ -232,7 +232,7 @@ func (e *entry) hole() course.Hole {
 	if err != nil {
 		panic("golf: the data of " + e.id + " does not decode: " + err.Error()) // checked at publish: cannot happen
 	}
-	return &dataHole{Simple: s, e: e}
+	return s
 }
 
 // draining is how far an archived hole's players are out of the standings:
@@ -872,8 +872,6 @@ func pulsesOf(h course.Hole) []course.Pulse {
 	switch s := h.(type) {
 	case *course.Simple:
 		return s.Pulses
-	case *dataHole:
-		return s.Pulses
 	}
 	return nil
 }
@@ -1258,7 +1256,7 @@ func cleanSkin(s string) string {
 	return string(b)
 }
 
-// previewAt resolves a stroke of a round: every hole is data (dataHole),
+// previewAt resolves a stroke of a round: every hole is data (a *course.Simple),
 // played with its stroke number, tick and weather. stroke marks the wear.
 func previewAt(h course.Hole, ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	return h.(course.Weatherable).PreviewWith(ball, angle, power, stroke, tick, weather)

@@ -8,7 +8,9 @@ package hole4
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // the doors, top to bottom: where their mouths are on the mill's face
@@ -31,10 +33,10 @@ const turn = 24
 func sail(i, on, at int) []physics.Wall {
 	y := doors[i]
 	q := turn / 4
-	return physics.Timed(physics.Bar(physics.V(24.2, y-1.4), physics.V(24.2, y+1.4), 0.5, 'S', "sail"), q, on, (q-at)%q)
+	return build.Timed(build.Bar(physics.V(24.2, y-1.4), physics.V(24.2, y+1.4), 0.5, 'S', "sail"), q, on, (q-at)%q)
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 4,
 	W: 48, H: 12,
 	Title:     "The Mill",
@@ -45,10 +47,10 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(48, 12), 6)...),
+		Walls: build.Walls(
+			build.Outline(build.Stadium(physics.V(0, 0), physics.V(48, 12), 6)...),
 			// the mill itself, wall to wall: nothing rolls round it
-			physics.Box(physics.V(27, 0), physics.V(33, 12)),
+			build.Box(physics.V(27, 0), physics.V(33, 12)),
 			// its sails, over each door while they pass it
 			sail(1, 3, turn/4-1), sail(0, 1, 2), sail(2, 1, 4),
 		),

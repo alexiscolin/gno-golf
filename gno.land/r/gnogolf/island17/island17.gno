@@ -6,10 +6,12 @@ import (
 	"math"
 
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 20, H: 18,
 	World:     "island",
 	Order:     17,
@@ -21,8 +23,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Arc(physics.V(11.5, 9), 7, 0, 2*math.Pi, 14)[:14]...),
+		Walls: build.Walls(
+			build.Outline(build.Arc(physics.V(11.5, 9), 7, 0, 2*math.Pi, 14)[:14]...),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(17, 11.8), R: 0.45}, Bounce: 0.7, Skin: "coral"},

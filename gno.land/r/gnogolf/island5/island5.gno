@@ -8,10 +8,12 @@ package island5
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 44, H: 22,
 	World:     "island",
 	Order:     5,
@@ -24,12 +26,12 @@ var me = course.Fit(&course.Simple{
 	Shelter:   0.08, // no rail on the sea side: a gale would blow a ball into it
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
+		Walls: build.Walls(
 			// the dunes behind and the rocks at each end; the sea side is open
-			physics.Polyline(physics.V(3, 18), physics.V(3, 3), physics.V(41, 3), physics.V(41, 15)),
+			build.Polyline(physics.V(3, 18), physics.V(3, 3), physics.V(41, 3), physics.V(41, 15)),
 			// a driftwood log washed up against the dunes, across the high
 			// line: soft, it soaks the pace up
-			physics.Soft(physics.Bar(physics.V(19, 3.5), physics.V(23, 8.4), 0.8, '#', "driftwood"), 0.4),
+			build.Soft(build.Bar(physics.V(19, 3.5), physics.V(23, 8.4), 0.8, '#', "driftwood"), 0.4),
 		),
 		Zones: []physics.Zone{
 			// the sea: everything past the wavy waterline

@@ -126,9 +126,9 @@ var me = &course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Box(physics.V(0, 0), physics.V(40, 12)),
-			physics.Bar(physics.V(20, 0), physics.V(20, 7), 0.8, '=', "hedge"),
+		Walls: build.Walls(
+			build.Box(physics.V(0, 0), physics.V(40, 12)),
+			build.Bar(physics.V(20, 0), physics.V(20, 7), 0.8, '=', "hedge"),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(28, 4), R: 1.0}, Bounce: 1.2, Skin: "bumper"},
@@ -147,6 +147,9 @@ var hexData = hex.EncodeToString([]byte(course.Encode(me)))
 
 Its id is `<your address>/<slug>/v1`, and only you can add versions to it. A
 `Skin` is only a hint: a client that doesn't know `"hedge"` draws a plain wall.
+`build` is `gno.land/p/gnogolf/physics/build`, the wall builders; the course's
+holes also finish with `author.Fit` (`gno.land/p/gnogolf/course/author`). Both
+are for writing holes only: nothing on chain needs them.
 The course's own holes, in `gno.land/r/gnogolf/`, are the best examples.
 
 ## Who can change what

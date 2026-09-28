@@ -1,17 +1,19 @@
-package course
+package author
 
 import (
 	"testing"
 
+	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 func TestFitPutsTheWallsInsideTheBoard(t *testing.T) {
-	h := Fit(&Simple{
+	h := Fit(&course.Simple{
 		W: 20, H: 8,
 		Tee: physics.V(2, 4), Pin: physics.V(18, 4),
 		Course: &physics.Field{
-			Walls: physics.Outline(physics.Stadium(physics.V(-1, -0.5), physics.V(21, 8), 4)...),
+			Walls: build.Outline(build.Stadium(physics.V(-1, -0.5), physics.V(21, 8), 4)...),
 			Zones: []physics.Zone{
 				{Kind: physics.Hazard, Min: physics.V(0, 0), Max: physics.V(20, 8), Vec: physics.V(2, 4), Skin: "sea"},
 				{Kind: physics.Slope, Min: physics.V(5, 0), Max: physics.V(9, 8), Vec: physics.V(0.2, 0)},

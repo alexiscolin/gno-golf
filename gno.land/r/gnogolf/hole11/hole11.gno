@@ -7,7 +7,9 @@ package hole11
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // a row of the patch: a slanted strip of soil from the fence (x 2) to the
@@ -19,7 +21,7 @@ func row(y0, w float64) physics.Zone {
 	}
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 10,
 	W: 40, H: 30,
 	Title:     "The Vegetable Patch",
@@ -30,10 +32,10 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.V(2, 2), physics.V(38, 2), physics.V(38, 28), physics.V(12, 28), physics.V(2, 18)),
+		Walls: build.Walls(
+			build.Outline(physics.V(2, 2), physics.V(38, 2), physics.V(38, 28), physics.V(12, 28), physics.V(2, 18)),
 			// the wheelbarrow at the head of the top path: it soaks up a shot along it
-			physics.Soft(physics.Bar(physics.V(35.4, 3.6), physics.V(36.9, 5.4), 1.2, '#', "wheelbarrow"), 0.4),
+			build.Soft(build.Bar(physics.V(35.4, 3.6), physics.V(36.9, 5.4), 1.2, '#', "wheelbarrow"), 0.4),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(27.5, 23.3), R: 0.7}, Bounce: 0.6, Skin: "scarecrow"},

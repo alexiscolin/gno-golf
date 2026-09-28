@@ -10,10 +10,12 @@ import (
 	"math"
 
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 50, H: 28,
 	World:     "town",
 	Order:     6,
@@ -24,17 +26,17 @@ var me = course.Fit(&course.Simple{
 	Substeps:  28,
 	CupRadius: 1.2,
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Path(
-				physics.Arc(physics.V(6, 6), 4, math.Pi, 1.5*math.Pi, 3),
-				physics.Arc(physics.V(42, 6), 4, 1.5*math.Pi, 2*math.Pi, 3),
-				physics.Arc(physics.V(42, 20), 4, 0, 0.5*math.Pi, 3),
-				physics.Arc(physics.V(6, 20), 4, 0.5*math.Pi, math.Pi, 3),
+		Walls: build.Walls(
+			build.Outline(build.Path(
+				build.Arc(physics.V(6, 6), 4, math.Pi, 1.5*math.Pi, 3),
+				build.Arc(physics.V(42, 6), 4, 1.5*math.Pi, 2*math.Pi, 3),
+				build.Arc(physics.V(42, 20), 4, 0, 0.5*math.Pi, 3),
+				build.Arc(physics.V(6, 20), 4, 0.5*math.Pi, math.Pi, 3),
 			)...),
 			// the ledge down the middle, open at the bowl end
-			physics.Bar(physics.V(2, 13), physics.V(32, 13), 0.8, '#', "ledge"),
+			build.Bar(physics.V(2, 13), physics.V(32, 13), 0.8, '#', "ledge"),
 			// the grind rail along the top alley
-			physics.Bar(physics.V(16, 9.5), physics.V(28, 9.5), 0.4, '=', "rail"),
+			build.Bar(physics.V(16, 9.5), physics.V(28, 9.5), 0.4, '=', "rail"),
 		),
 		Zones: []physics.Zone{
 			// the quarter-pipes: they push back to the flat, harder than the drag

@@ -9,6 +9,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/urequire/v0"
 )
@@ -21,7 +22,7 @@ func v(x, y float64) physics.Vec2 { return physics.Vec2{X: x, Y: y} }
 
 func lane(zones []physics.Zone, walls ...[]physics.Wall) *physics.Field {
 	return &physics.Field{
-		Walls:    physics.Walls(append([][]physics.Wall{physics.Box(v(0, 0), v(40, 10))}, walls...)...),
+		Walls:    build.Walls(append([][]physics.Wall{build.Box(v(0, 0), v(40, 10))}, walls...)...),
 		Zones:    zones,
 		Friction: 0.86,
 		Radius:   0.5,
@@ -34,17 +35,17 @@ func goldHoles() map[string]*course.Simple {
 	sea := []physics.Vec2{v(1, 3), v(39, 3), v(39, 7), v(1, 7)}
 	return map[string]*course.Simple{
 		"timed": {W: 40, H: 10, Title: "Timed", Tee: v(3, 5), Pin: v(37, 5), Substeps: 22, CupRadius: 1.2,
-			Course: lane(nil, physics.Timed(physics.Bar(v(20, 0.5), v(20, 9.5), 0.5, 'T', "tram"), 12, 5, 0))},
+			Course: lane(nil, build.Timed(build.Bar(v(20, 0.5), v(20, 9.5), 0.5, 'T', "tram"), 12, 5, 0))},
 		"slope": {W: 40, H: 10, Title: "Slope", Tee: v(3, 5), Pin: v(37, 5), Substeps: 24, CupRadius: 1.2,
 			Course: lane([]physics.Zone{{Kind: physics.Slope, Min: v(12, 0), Max: v(24, 10), Vec: v(-0.25, 0), Skin: "slope"}})},
 		"sea": {W: 40, H: 10, Title: "Sea", Tee: v(3, 5), Pin: v(37, 5), Substeps: 22, CupRadius: 1.2, World: "island",
 			Course: lane([]physics.Zone{{Kind: physics.Hazard, Min: v(0, 0), Max: v(40, 10), Vec: v(3, 5), Skin: "sea", Poly: sea, Outside: true}})},
 		"tunnel": {W: 40, H: 10, Title: "Tunnel", Tee: v(3, 5), Pin: v(37, 5), Substeps: 22, CupRadius: 1.2,
 			Course: lane([]physics.Zone{{Kind: physics.Tunnel, Min: v(14, 3), Max: v(17, 7), Vec: v(30, 5), Skin: "tunnel", Round: true}},
-				physics.Bar(v(22, 0), v(22, 10), 0.6, '#', "hedge"))},
+				build.Bar(v(22, 0), v(22, 10), 0.6, '#', "hedge"))},
 		"pulse": {W: 40, H: 10, Title: "Pulse", Tee: v(3, 5), Pin: v(37, 5), Substeps: 22, CupRadius: 1.2,
-			Pulses: []course.Pulse{{Every: 2, On: 1, Walls: physics.Bar(v(20, 3), v(20, 7), 0.5, '=', "gate door")}},
-			Course: lane(nil, physics.Bar(v(20, 0), v(20, 3), 0.5, '|', "gate"), physics.Bar(v(20, 7), v(20, 10), 0.5, '|', "gate"))},
+			Pulses: []course.Pulse{{Every: 2, On: 1, Walls: build.Bar(v(20, 3), v(20, 7), 0.5, '=', "gate door")}},
+			Course: lane(nil, build.Bar(v(20, 0), v(20, 3), 0.5, '|', "gate"), build.Bar(v(20, 7), v(20, 10), 0.5, '|', "gate"))},
 		"storm": {W: 40, H: 10, Title: "Storm", Tee: v(3, 5), Pin: v(37, 5), Substeps: 22, CupRadius: 1.2, World: "island",
 			Course: lane(nil)},
 	}
@@ -118,7 +119,7 @@ func goldAt(id string, h *course.Simple) {
 	if h.World == "" {
 		h.World = "garden"
 	}
-	community.Set(id, newEntry(id, cleanName(h.Title), course.ParOf(h), h.World, course.OrderOf(h, 1<<20)))
+	community.Set(id, newEntry(id, cleanName(h.Title), course.ParOf(h), h.World, 1<<20))
 	holeData.Set(id, course.Encode(h))
 }
 

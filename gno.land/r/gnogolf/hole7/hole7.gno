@@ -6,10 +6,12 @@ import (
 	"math"
 
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 7,
 	W: 44, H: 20,
 	Title:     "The Pond",
@@ -20,13 +22,13 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Path(
-				physics.Pts(physics.V(0, 0), physics.V(34, 0)),
-				physics.Arc(physics.V(34, 10), 10, -math.Pi/2, math.Pi/2, 8),
-				physics.Pts(physics.V(0, 20), physics.V(0, 12), physics.V(34, 12)),
-				physics.Arc(physics.V(34, 10), 2, math.Pi/2, -math.Pi/2, 4),
-				physics.Pts(physics.V(0, 8)),
+		Walls: build.Walls(
+			build.Outline(build.Path(
+				build.Pts(physics.V(0, 0), physics.V(34, 0)),
+				build.Arc(physics.V(34, 10), 10, -math.Pi/2, math.Pi/2, 8),
+				build.Pts(physics.V(0, 20), physics.V(0, 12), physics.V(34, 12)),
+				build.Arc(physics.V(34, 10), 2, math.Pi/2, -math.Pi/2, 4),
+				build.Pts(physics.V(0, 8)),
 			)...),
 		),
 		Zones: []physics.Zone{

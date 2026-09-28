@@ -185,7 +185,12 @@ func TestABumperKicksWithinBounds(t *testing.T) {
 		t.Fatalf("a bumper past MaxKick sent back %v, want %v", -out.X, 2*MaxKick)
 	}
 	f := &Field{
-		Walls:    Box(V(0, 0), V(40, 20)),
+		Walls: []Wall{
+			{Seg: Segment{V(0, 0), V(40, 0)}},
+			{Seg: Segment{V(40, 0), V(40, 20)}},
+			{Seg: Segment{V(40, 20), V(0, 20)}},
+			{Seg: Segment{V(0, 20), V(0, 0)}},
+		},
 		Posts:    []Post{{Circle: Circle{C: V(20, 10), R: 1.2}, Bounce: 1.3, Skin: "bumper"}},
 		Friction: 0.87, Bounce: 0.85, Radius: 0.5,
 	}
@@ -264,7 +269,12 @@ func TestAHazardSendsTheBallBackToTheStroke(t *testing.T) {
 	lane := []Vec2{V(2, 8), V(38, 8), V(38, 12), V(2, 12)}
 	sea := Zone{Kind: Hazard, Min: V(0, 0), Max: V(40, 20), Vec: far, Poly: lane, Outside: true}
 	ice := Zone{Kind: Hazard, Min: V(28, 0), Max: V(40, 20), Vec: far, Every: 50, On: 1, Phase: 49}
-	walls := Box(V(0, 0), V(40, 20))
+	walls := []Wall{
+		{Seg: Segment{V(0, 0), V(40, 0)}},
+		{Seg: Segment{V(40, 0), V(40, 20)}},
+		{Seg: Segment{V(40, 20), V(0, 20)}},
+		{Seg: Segment{V(0, 20), V(0, 0)}},
+	}
 	for i := 0; i < 36; i++ {
 		start := V(20, 10).Add(FromPolar(float64(i)*math.Pi/18, 8))
 		f := &Field{Walls: walls, Zones: []Zone{pond}, Friction: 0.87, Bounce: 0.85, Radius: 0.5}
@@ -318,73 +328,6 @@ func TestAMoveGoesOnFromItsContact(t *testing.T) {
 	want := 9.5 - (v-1)*MaxBounce
 	if got := s.Path[1].X; math.Abs(got-want) > 1e-5 {
 		t.Fatalf("the ball ended the substep at %v, want %v", got, want)
-	}
-}
-
-// steep is a hill that rises toward +X up to its crest at x=20, of the given
-// steepness, in a lane with no walls near it.
-func steep(g float64, zones ...Zone) *Field {
-	return &Field{
-		Zones:    append([]Zone{{Kind: Slope, Min: V(10, -20), Max: V(20, 20), Vec: V(-g, 0)}}, zones...),
-		Friction: 0.87, Radius: 0.5,
-	}
-}
-
-// Off the crest, a ball flies the ballistic range: taking off at v up the
-// hill at a grade θ, it rises at v·tan θ and comes down 2·v·tan θ / G later,
-// 2·v²·tan θ / G on. Water across where it lands catches it; water it flies
-// over does not.
-func TestTheFlightIsBallistic(t *testing.T) {
-	for _, g := range []float64{0.3, 0.4, 0.5} {
-		const v0 = 4.6
-		s := steep(g).Step(V(9, 0), V(v0, 0), 60)
-		k := -1
-		for i, a := range s.Air {
-			if a {
-				k = i
-				break
-			}
-		}
-		if k < 0 || !s.Air[k+1] {
-			t.Fatalf("hill %v: no flight of two substeps: %v", g, s.Air)
-		}
-		v := s.Path[k+1].Sub(s.Path[k]).X // in the air: its speed, unchanged
-		sin := g / G
-		tan := sin / math.Sqrt(1-sin*sin)
-		land := 20 + 2*v*v*tan/G
-		pond := func(x0, x1 float64) bool {
-			w := steep(g, Zone{Kind: Hazard, Min: V(x0, -20), Max: V(x1, 20), Vec: V(0, 30)})
-			return w.Step(V(9, 0), V(v0, 0), 60).Rest() == V(9, 0) // back where it was played from
-		}
-		if !pond(land-v/2-MaxMove, land+v/2+MaxMove) {
-			t.Errorf("hill %v: water across the landing (%v) did not catch it", g, land)
-		}
-		if pond(20.5, land-v/2-MaxMove) {
-			t.Errorf("hill %v: water short of the landing (%v) caught it in the air", g, land)
-		}
-	}
-}
-
-// Too slow for the crest's curve (v² at most G·CrestRadius up the hill), a
-// ball rolls over the top instead of flying.
-func TestASlowBallRollsOverTheCrest(t *testing.T) {
-	s := steep(0.3).Step(V(9, 0), V(3.4, 0), 60)
-	if s.Rest().X <= 20 {
-		t.Fatalf("it should make the top, stopped at %v", s.Rest())
-	}
-	if flew(s) {
-		t.Fatalf("a ball too slow for the crest flew: %v", s.Air)
-	}
-}
-
-// A ball still in the air when its substeps run out keeps flying, and lands.
-func TestAFlightOutlivesTheStroke(t *testing.T) {
-	s := steep(0.5).Step(V(9, 0), V(4.6, 0), 4)
-	if !flew(s) || s.Air[len(s.Air)-1] {
-		t.Fatalf("air flags %v", s.Air)
-	}
-	if s.Rest().X < 24 {
-		t.Fatalf("the flight was cut short, at %v", s.Rest())
 	}
 }
 

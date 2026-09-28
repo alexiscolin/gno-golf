@@ -3,10 +3,12 @@ package hole8
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 8,
 	W: 40, H: 11,
 	Title:     "Pinball",
@@ -17,10 +19,10 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(40, 11), 6)...),
+		Walls: build.Walls(
+			build.Outline(build.Stadium(physics.V(0, 0), physics.V(40, 11), 6)...),
 			// a pile of logs off the low bank: it soaks up a ball, bumpers do not
-			physics.Soft(physics.Bar(physics.V(32, 0.6), physics.V(32, 3.4), 0.9, '=', "logs"), 0.5),
+			build.Soft(build.Bar(physics.V(32, 0.6), physics.V(32, 3.4), 0.9, '=', "logs"), 0.5),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(11, 3.2), R: 1.0}, Bounce: 1.25, Skin: "bumper"},

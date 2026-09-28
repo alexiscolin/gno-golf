@@ -9,10 +9,12 @@ package mountain11
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 30, H: 40,
 	World:     "mountain",
 	Order:     11,
@@ -23,8 +25,8 @@ var me = course.Fit(&course.Simple{
 	Substeps:  30,
 	CupRadius: 1.2,
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(4.4, 2, physics.V(6, 4), physics.V(11, 9), physics.V(6, 14), physics.V(6, 23), physics.V(9, 29), physics.V(19, 28), physics.V(19.5, 11))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(4.4, 2, physics.V(6, 4), physics.V(11, 9), physics.V(6, 14), physics.V(6, 23), physics.V(9, 29), physics.V(19, 28), physics.V(19.5, 11))...),
 		),
 		Zones: []physics.Zone{
 			// the drop: a straight run down the chute, steeper than the drag, so a

@@ -67,7 +67,7 @@ func lines(s Segment, r float64, o *offset) {
 const stride = 23
 
 // Prepare works out the field's wall offsets once, for every shot to reuse:
-// a hole calls it (course.Fit does) after its walls are where they stay.
+// a hole calls it (author.Fit does) after its walls are where they stay.
 // Walls that change afterwards are only a cost: Step checks each entry
 // against its wall and works out any that no longer match.
 func Prepare(f *Field) {
@@ -227,7 +227,7 @@ func (f *Field) offsets() []offset {
 }
 
 // timedBars is where each timed bar starts in f.Walls: four timed walls in a
-// row with one timing that close on themselves, as Timed(Bar(…)) makes them.
+// row with one timing that close on themselves, as build.Timed(build.Bar(…)) makes them.
 func (f *Field) timedBars() []int {
 	var out []int
 	ws := f.Walls
@@ -255,7 +255,7 @@ func (f *Field) timedBars() []int {
 // UnstickIn moves a ball out of a piece that appeared on top of it — a gate
 // shutting, a sail turning, a mole popping up where the ball rests, a tram
 // arriving on a rolling ball (Step, for timed bars). Walls come in bars of
-// four (physics.Bar): a ball inside one leaves through the nearest side it
+// four (build.Bar): a ball inside one leaves through the nearest side it
 // can, straight out of it. A ball merely closer to a wall or a post than its
 // radius is pushed off it.
 //

@@ -62,7 +62,7 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 		`,"weather":` + forecastJSON("", weatherOf(e, h, p)) +
 		`,"start":` + jvec(h.Start()) +
 		`,"cup":` + jvec(h.Cup()) +
-		`,"cupR":` + jnum(h.(*dataHole).CupRadius) + `,"ballR":` + jnum(f.Radius))
+		`,"cupR":` + jnum(h.(*course.Simple).CupRadius) + `,"ballR":` + jnum(f.Radius))
 	// what a commit counts on the board before the weather (newWork: every
 	// pulse as if always there, and each shot's share of setting them up):
 	// the client splits a round's save and sets its gas by it
@@ -74,7 +74,7 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 	sb.WriteString(`,"walls":` + wallsJSON(f.Walls) + `,"posts":` + postsJSON(f.Posts))
 	sb.WriteString(`,"zones":` + zonesJSON(f.Zones, true))
 	sb.WriteString(`,"wear":{"w":` + strconv.Itoa(course.WearW) + `,"h":` + strconv.Itoa(course.WearH) + `,"cells":[`)
-	for i, c := range h.Wear() {
+	for i, c := range e.wearGrid() {
 		sb.WriteString(sep(i))
 		sb.WriteString(strconv.Itoa(c))
 	}

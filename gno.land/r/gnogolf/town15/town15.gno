@@ -8,7 +8,9 @@ package town15
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // roofs is the walkable outline: roof A (the tee), plank 1, roof B (tall),
@@ -23,7 +25,7 @@ func roofs() []physics.Vec2 {
 	}
 }
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 61, H: 26,
 	World:     "town",
 	Order:     15,
@@ -39,8 +41,8 @@ var me = course.Fit(&course.Simple{
 		{Every: 2, On: 1, Phase: 0, Posts: []physics.Post{{Circle: physics.Circle{C: physics.V(33.5, 18.75), R: 0.6}, Bounce: 0.7, Skin: "cat"}}},
 	},
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Box(physics.V(0, 0), physics.V(61, 26)),
+		Walls: build.Walls(
+			build.Box(physics.V(0, 0), physics.V(61, 26)),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(26, 7.5), R: 0.8}, Bounce: 0.7, Skin: "chimney"},

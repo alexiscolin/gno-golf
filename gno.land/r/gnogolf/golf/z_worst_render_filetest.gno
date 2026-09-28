@@ -8,6 +8,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/r/gnogolf/golf"
 )
 
@@ -70,7 +71,7 @@ func zigzag(n int, reversed bool) *course.Simple {
 	}
 	return &course.Simple{W: 96, H: 96, World: "garden", Title: "Zigzag", Strokes: 5,
 		Tee: physics.V(3, 3), Pin: physics.V(93, 93), Substeps: 14, CupRadius: 1,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(96, 96)), Zones: zones, Friction: 0.86, Bounce: 0.85, Radius: 0.5}}
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(96, 96)), Zones: zones, Friction: 0.86, Bounce: 0.85, Radius: 0.5}}
 }
 
 // the zigzag holes, as their slugs
@@ -107,4 +108,4 @@ func main(cur realm) {
 // zig-asc-8 false true
 
 // Gas:
-// 3946845223
+// 3946745296

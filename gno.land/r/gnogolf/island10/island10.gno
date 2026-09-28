@@ -6,12 +6,14 @@ package island10
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var lane = physics.Lane(6, 4, physics.V(5, 5), physics.V(20, 5), physics.V(30, 10), physics.V(44, 10))
+var lane = build.Lane(6, 4, physics.V(5, 5), physics.V(20, 5), physics.V(30, 10), physics.V(44, 10))
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 50, H: 16,
 	World:     "island",
 	Order:     10,
@@ -23,7 +25,7 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Outline(lane...),
+		Walls: build.Outline(lane...),
 		// a crab sunning itself in the middle of the walk, where it turns
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(24, 7), R: 0.6}, Bounce: 0.8, Skin: "crab"},

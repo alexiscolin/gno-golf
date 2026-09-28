@@ -519,7 +519,7 @@ func renderData(e *entry) string {
 func board(e *entry, h course.Hole, f *physics.Field, mine *round) string {
 	bw, bh := course.BoardOf(h)
 	g := make([][]rune, bh)
-	wear := h.Wear()
+	wear := e.wearGrid()
 	for y := 0; y < bh; y++ {
 		row := make([]rune, bw)
 		for x := 0; x < bw; x++ {

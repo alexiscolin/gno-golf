@@ -7,6 +7,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/r/gnogolf/golf"
 )
@@ -21,7 +22,7 @@ import (
 func main(cur realm) {
 	h := &course.Simple{W: 32, H: 16, World: "garden", Title: "Finished", Strokes: 3,
 		Tee: physics.V(2, 8), Pin: physics.V(4, 8), Substeps: 14, CupRadius: 1.2, Shelter: 0.01,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9, Radius: 0.5}}
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9, Radius: 0.5}}
 	id := golf.PublishMine(cross(cur), "finished", hex.EncodeToString([]byte(course.Encode(h))), "")
 	for _, name := range []string{"first", "second"} {
 		testing.SetRealm(testing.NewUserRealm(testutils.TestAddress(name)))

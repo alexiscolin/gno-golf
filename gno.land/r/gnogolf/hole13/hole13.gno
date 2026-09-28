@@ -5,10 +5,12 @@ package hole13
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 46, H: 16,
 	World:     "garden",
 	Order:     12,
@@ -20,9 +22,9 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Stadium(physics.V(0, 0), physics.V(46, 16), 8)...),
-			physics.Outline(physics.Stadium(physics.V(13, 4), physics.V(33, 9), 4)...),
+		Walls: build.Walls(
+			build.Outline(build.Stadium(physics.V(0, 0), physics.V(46, 16), 8)...),
+			build.Outline(build.Stadium(physics.V(13, 4), physics.V(33, 9), 4)...),
 		),
 		// a stump where the two ways meet, in the line off the narrow one
 		Posts: []physics.Post{

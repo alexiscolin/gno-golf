@@ -34,44 +34,9 @@ type Parred interface {
 	Par() int
 }
 
-// Ordered is what a hole implements to choose its place in the course: holes
-// are listed by it, lowest first, so a hole 1.5 slots between 1 and 2.
-// Optional; a hole that does not say is placed by the number in its path.
-type Ordered interface {
-	Position() float64
-}
-
-// OrderOf is the hole's place in the course, or fallback when it has none.
-//
-// OrderOf, WorldOf and ParOf call the hole's method once and check the value
-// they return: a hole is anyone's code, and may answer differently each time.
-func OrderOf(h Hole, fallback float64) float64 {
-	if o, ok := h.(Ordered); ok {
-		if n := o.Position(); n > 0 {
-			return n
-		}
-	}
-	return fallback
-}
-
-// Worlded is what a hole implements to say which world of the course it
-// belongs to — "garden", "island", "town": a client dresses the whole scene
-// (sea, sky, decor) from it. Optional; a hole that does not say is "garden".
-type Worlded interface {
-	WorldName() string
-}
-
-// WorldOf is the hole's world.
-func WorldOf(h Hole) string {
-	if w, ok := h.(Worlded); ok {
-		if n := w.WorldName(); n != "" {
-			return n
-		}
-	}
-	return "garden"
-}
-
-// ParOf is the hole's par.
+// ParOf is the hole's par. It calls the hole's method once and checks the
+// value it returns: a hole is anyone's code, and may answer differently each
+// time.
 func ParOf(h Hole) int {
 	if p, ok := h.(Parred); ok {
 		if n := p.Par(); n > 0 && n < 20 {
@@ -105,24 +70,7 @@ type Hole interface {
 	// Field is the geometry, for whoever draws it: the text board and the 3D
 	// client. It is also what makes a hole inspectable before you play it.
 	Field() *physics.Field
-
-	// Preview resolves a shot and changes nothing. It exists so a client can
-	// ask the chain what a shot would do — over a read-only query, free and
-	// without waiting for a block — instead of reimplementing the physics and
-	// drifting away from it.
-	Preview(ball physics.Vec2, angle, power float64) (physics.Shot, bool)
-
-	// Play resolves one shot and marks the course. It returns the whole flight,
-	// so a renderer can replay it instead of recomputing it, and whether the
-	// ball was holed. Everything a hole invents lives here.
-	Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool)
-
-	// Wear is the WearW*WearH grid, row-major.
-	Wear() []int
 }
-
-// WearIndex maps a position on the default board to its wear cell.
-func WearIndex(p physics.Vec2) int { return WearIndexOn(p, BoardW, BoardH) }
 
 // WearIndexOn maps a position on a w x h board to its wear cell, so every hole
 // marks the course the same way whatever its size.
@@ -144,36 +92,13 @@ func WearIndexOn(p physics.Vec2, w, h int) int {
 	return y*WearW + x
 }
 
-// Marks is the wear grid a hole embeds. The methods are declared here but the
-// array belongs to the hole realm that allocated it, so the writes land in that
-// realm's own storage.
-type Marks struct {
-	cells [WearW * WearH]int
-}
-
-// Mark records that a ball came to rest at p, on the default board.
-func (m *Marks) Mark(p physics.Vec2) { m.cells[WearIndex(p)]++ }
-
-// MarkOn is Mark for a hole with its own board size.
-func (m *Marks) MarkOn(p physics.Vec2, w, h int) { m.cells[WearIndexOn(p, w, h)]++ }
-
-// Wear is the rest counters, one per cell of the WearW by WearH grid.
-func (m *Marks) Wear() []int {
-	out := make([]int, len(m.cells))
-	for i, v := range m.cells {
-		out[i] = v
-	}
-	return out
-}
-
 // Timed is what a hole implements when part of it changes from one stroke to
 // the next: a blade that turns, a gate that opens, a mole that pops up.
 //
 // The clock is the stroke number within the player's own round — 0 for the
 // first shot — never a count shared by all players. That keeps a hole a
 // function of the round: previewing shot N and committing it meet the same
-// course, whoever else is playing. golf asks for PreviewAt/PlayAt whenever a
-// hole has them; Preview and Play are then the first stroke.
+// course, whoever else is playing.
 type Timed interface {
 	// Varies says whether anything actually changes: a Simple hole has the
 	// methods whether or not it has pulses.
@@ -181,8 +106,6 @@ type Timed interface {
 	// Extras are the pieces present at a stroke, on top of Field(). A renderer
 	// reads them to draw the hole as it is for the shot being aimed.
 	Extras(stroke int) ([]physics.Wall, []physics.Post)
-	PreviewAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool)
-	PlayAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool)
 }
 
 // Pulse is a piece that comes and goes: present on the strokes where
@@ -196,8 +119,8 @@ type Pulse struct {
 	Zones            []physics.Zone // a puddle a sprinkler leaves, a bridge let down
 }
 
-// Weatherable is what a hole implements to be played in the weather: the
-// same stroke as PreviewAt/PlayAt, with whole-board weather zones laid over the
+// Weatherable is what a hole implements to be played in the weather: a
+// stroke of the round, with whole-board weather zones laid over the
 // course first (the hole's own sand, ice and slopes still count where they
 // are). The weather is the golf realm's to choose; a hole only says, through
 // MaxWind, how much wind its design can stand (0 is no limit of its own).
@@ -205,7 +128,6 @@ type Weatherable interface {
 	// tick is where the timed pieces were when the player let go: the
 	// field's clock starts there (physics.WithTick).
 	PreviewWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool)
-	PlayWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool)
 	MaxWind() float64
 }
 
@@ -549,17 +471,13 @@ func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *p
 // implements the whole interface, so a course realm gets to be its field and
 // nothing else.
 //
-// The methods are declared here, in /p/, but the value is allocated by the hole
-// realm that declares it — so the wear writes land in that realm's own storage,
-// under its own authority. A hole that wants to invent something the field
+// A hole that wants to invent something the field
 // cannot express writes its own type instead. Pulses cover pieces that come
 // and go with the stroke — town10's bridge, island14's log, hole5's gate.
 //
 // Its fields and methods come in pairs (Strokes and Par, Title and Name,
-// Order and Position, World and WorldName, Course and Field) only because a
-// field and a method cannot share a name.
+// Course and Field) only because a field and a method cannot share a name.
 type Simple struct {
-	Marks
 	W, H      int // the board; 0 means the default 32x16
 	Title     string
 	Strokes   int // par: the strokes a good round takes (0 means 3)
@@ -579,12 +497,6 @@ type Simple struct {
 
 // MaxWind is the strongest wind the hole is played in (0: the world's own).
 func (h *Simple) MaxWind() float64 { return h.Shelter }
-
-// Position is the hole's place in its world.
-func (h *Simple) Position() float64 { return h.Order }
-
-// WorldName is the world the hole belongs to.
-func (h *Simple) WorldName() string { return h.World }
 
 // ExtraZones is the zones the hole's pulses lay down at a stroke.
 func (h *Simple) ExtraZones(stroke int) []physics.Zone {
@@ -611,16 +523,6 @@ func (h *Simple) Extras(stroke int) ([]physics.Wall, []physics.Post) {
 		}
 	}
 	return ws, ps
-}
-
-// PreviewAt is a stroke of a round in calm weather at tick 0, read-only.
-func (h *Simple) PreviewAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool) {
-	return h.PreviewWith(ball, angle, power, stroke, 0, nil)
-}
-
-// PlayAt is PreviewAt, and it marks the wear where the ball stops.
-func (h *Simple) PlayAt(ball physics.Vec2, angle, power float64, stroke int) (physics.Shot, bool) {
-	return h.PlayWith(ball, angle, power, stroke, 0, nil)
 }
 
 // PreviewWith is a stroke of a round in some weather, the timed pieces
@@ -650,14 +552,6 @@ func (h *Simple) PreviewWith(ball physics.Vec2, angle, power float64, stroke, ti
 	return shot, holed
 }
 
-// PlayWith is PreviewWith, and it marks the wear where the ball stops.
-func (h *Simple) PlayWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
-	shot, holed := h.PreviewWith(ball, angle, power, stroke, tick, weather)
-	w, hh := h.Board()
-	h.MarkOn(shot.Rest(), w, hh)
-	return shot, holed
-}
-
 // Name is the hole's title.
 func (h *Simple) Name() string { return h.Title }
 
@@ -680,16 +574,6 @@ func (h *Simple) Board() (int, int) {
 		return h.W, h.H
 	}
 	return BoardW, BoardH
-}
-
-// Preview is the first stroke of a round, read-only.
-func (h *Simple) Preview(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	return h.PreviewAt(ball, angle, power, 0)
-}
-
-// Play is the first stroke of a round, marking the wear.
-func (h *Simple) Play(ball physics.Vec2, angle, power float64) (physics.Shot, bool) {
-	return h.PlayAt(ball, angle, power, 0)
 }
 
 // Kick turns a stroke's power (0 to 10) into the ball's speed per substep:
@@ -753,8 +637,8 @@ const jumpStep = 1.5
 // Sink decides whether a shot ends in the cup: it stops within radius of the
 // pin, or it rolls across the cup no faster than Capture allows a ball of
 // radius ball. When it drops the path is cut there and ends on the pin, so a
-// renderer shows the ball falling in rather than rolling on. Both Preview
-// and Play go through it, so the preview still equals the commit.
+// renderer shows the ball falling in rather than rolling on. Every stroke,
+// previewed or played, goes through it (PreviewWith).
 func Sink(shot physics.Shot, pin physics.Vec2, radius, ball float64) (physics.Shot, bool) {
 	p := shot.Path
 	top := Capture(radius, ball, 0) // over the middle: the fastest drop

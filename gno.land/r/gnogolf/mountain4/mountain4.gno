@@ -4,10 +4,12 @@ package mountain4
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 48, H: 16,
 	World:     "mountain",
 	Order:     4,
@@ -19,8 +21,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(physics.Lane(8, 4, physics.V(5, 8), physics.V(24, 7.5), physics.V(43, 8))...),
+		Walls: build.Walls(
+			build.Outline(build.Lane(8, 4, physics.V(5, 8), physics.V(24, 7.5), physics.V(43, 8))...),
 		),
 		// a pine at the foot of the first drift, and one in the path between
 		Posts: []physics.Post{

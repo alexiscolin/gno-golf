@@ -8,6 +8,7 @@ import (
 
 	"gno.land/p/gnogolf/course"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 	"gno.land/p/nt/testutils/v0"
 	"gno.land/r/gnogolf/golf"
 )
@@ -22,7 +23,7 @@ import (
 func publishAll(cur realm) {
 	data := hex.EncodeToString([]byte(course.Encode(&course.Simple{W: 32, H: 16, World: "garden", Title: "Listed", Strokes: 3,
 		Tee: physics.V(2, 8), Pin: physics.V(20, 8), Substeps: 14, CupRadius: 1.5,
-		Course: &physics.Field{Walls: physics.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9}})))
+		Course: &physics.Field{Walls: build.Box(physics.V(0, 0), physics.V(32, 16)), Friction: 0.8, Bounce: 0.9}})))
 	for i := 0; i < 130; i++ {
 		for j := 0; j < 3; j++ {
 			testing.SetRealm(testing.NewUserRealm(testutils.TestAddress("author" + strconv.Itoa(i))))
@@ -40,4 +41,4 @@ func main(cur realm) {
 // g1v96hg6r0wgcnyw2lta047h6lta047h6lur7p3c/h2/v1
 
 // Gas:
-// 7027385892
+// 7026640340

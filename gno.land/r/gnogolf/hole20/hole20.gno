@@ -10,7 +10,9 @@ package hole20
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
 // the seesaw's clock: it rocks one way for half its period, then the other
@@ -22,7 +24,7 @@ const (
 // a ball that falls in the pond is fished out on the tee's bank
 var bank = physics.V(11, 13)
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	World: "garden", Order: 18,
 	W: 50, H: 26,
 	Title:     "The Seesaw",
@@ -33,12 +35,12 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Box(physics.V(2, 2), physics.V(48, 24)),
+		Walls: build.Walls(
+			build.Box(physics.V(2, 2), physics.V(48, 24)),
 			// the hedge that sends the lawn round: along the pond's far bank,
 			// then out across the lawn, leaving a gap at the far wall
-			physics.Bar(physics.V(29.6, 2), physics.V(29.6, 10), 0.6, '#', "hedge"),
-			physics.Bar(physics.V(29.6, 10), physics.V(45, 10), 0.6, '#', "hedge"),
+			build.Bar(physics.V(29.6, 2), physics.V(29.6, 10), 0.6, '#', "hedge"),
+			build.Bar(physics.V(29.6, 10), physics.V(45, 10), 0.6, '#', "hedge"),
 		),
 		Posts: []physics.Post{
 			// sunflowers along the top lawn: two in the way, two either side

@@ -3,10 +3,12 @@ package hole16
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	// moved out of the garden's eighteen: kept, listed under extras
 	World: "extras", Order: 16,
 	W: 44, H: 10,
@@ -18,7 +20,7 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Outline(physics.V(0, 0), physics.V(24, 2), physics.V(44, 2), physics.V(44, 8), physics.V(24, 8), physics.V(0, 10)),
+		Walls: build.Outline(physics.V(0, 0), physics.V(24, 2), physics.V(44, 2), physics.V(44, 8), physics.V(24, 8), physics.V(0, 10)),
 		Posts: []physics.Post{
 			// an old stump on the flat, to one side of the way to the cup
 			{Circle: physics.Circle{C: physics.V(29, 6.3), R: 0.7}, Bounce: 0.6, Skin: "stump"},

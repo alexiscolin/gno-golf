@@ -25,19 +25,11 @@ import (
 // of the course, or "<address>/<slug>"), and the old one is archived: still
 // playable, its records kept, and, on the course, out of the ranking.
 
-// dataHole is a decoded data version for one call. It plays as its Simple,
-// and reads its wear from its entry: the Simple's own Marks would be lost
-// with it. golf's stroke marks the wear where the round's ball rests, never
-// the Simple's own Play, PlayAt and PlayWith.
-type dataHole struct {
-	*course.Simple
-	e *entry
-}
-
-// Wear is the entry's wear.
-func (d *dataHole) Wear() []int {
+// wearGrid is the entry's wear: a count per cell of the WearW by WearH
+// grid, row-major. golf's stroke marks it where the round's ball rests.
+func (e *entry) wearGrid() []int {
 	out := make([]int, wearCells)
-	if b := d.e.wear; b != nil {
+	if b := e.wear; b != nil {
 		for i := range out {
 			out[i] = int(uint32(b[4*i]) | uint32(b[4*i+1])<<8 | uint32(b[4*i+2])<<16 | uint32(b[4*i+3])<<24)
 		}

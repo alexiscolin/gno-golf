@@ -253,7 +253,7 @@ is `"assisted"` or `"pro"`, and each has its own records and ranking.
   course. `Extras(hole, stroke)` returns the extra walls, posts and zones for
   stroke N (0 = the first shot); draw them over the hole's field and refresh
   after every shot.
-- **Holes need not be rectangles.** `physics.Outline` walls a polygon, and
+- **Holes need not be rectangles.** `build.Outline` walls a polygon, and
   whatever the walls fence off is ground the ball never reaches. The web
   client flood-fills from the tee to find the green and draws the rest as
   garden.

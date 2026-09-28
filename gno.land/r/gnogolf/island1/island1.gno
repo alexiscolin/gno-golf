@@ -3,12 +3,14 @@ package island1
 
 import (
 	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
 	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
 )
 
-var lane = physics.Lane(6, 4, physics.V(5, 6), physics.V(19, 9), physics.V(33, 7))
+var lane = build.Lane(6, 4, physics.V(5, 6), physics.V(19, 9), physics.V(33, 7))
 
-var me = course.Fit(&course.Simple{
+var me = author.Fit(&course.Simple{
 	W: 38, H: 15,
 	World:     "island",
 	Order:     1,
@@ -20,8 +22,8 @@ var me = course.Fit(&course.Simple{
 	CupRadius: 1.2,
 
 	Course: &physics.Field{
-		Walls: physics.Walls(
-			physics.Outline(lane...),
+		Walls: build.Walls(
+			build.Outline(lane...),
 		),
 		Posts: []physics.Post{
 			{Circle: physics.Circle{C: physics.V(19, 7.2), R: 0.6}, Bounce: 0.8, Skin: "palm"},
