@@ -111,15 +111,18 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onBack, onAb
           {note && <p className="note note--warn">{note}</p>}
         </section>
         <ul className="rival__picks">
-          {PICKS.map((p, i) => (
-            <li key={p.kind}><Pick {...p} first={i} row={picks && picks[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} /></li>
+          {[PICKS[0], PICKS[1], picks && picks.rows[2] && picks.rows[2].player === me ? PICKS[2] : PICKS[3]].map((p, i) => (
+            <li key={p.kind}><Pick {...p} first={i} row={picks && picks.rows[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} /></li>
           ))}
         </ul>
         {/* the board as stickers; the whole of it, the leaderboard's sheet (its rows, a Race each) */}
         <section className="rival__board">
           <div className="rival__boardhead">
             <h3 className="rival__h">Or anyone on the board</h3>
-            <button className="linkish rival__all" onClick={() => (sound("blip"), onBoard())}>See the whole leaderboard →</button>
+            <span className="rival__links">
+              {picks && picks.surprise && <button className="linkish rival__all" onClick={() => (sound("select"), onPick(picks.surprise!.player))}><Dice /> Surprise me</button>}
+              <button className="linkish rival__all" onClick={() => (sound("blip"), onBoard())}>See the whole leaderboard →</button>
+            </span>
           </div>
           <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} max={8}
             row={(r) => <Sticker player={r.player} at={r.at} sub={`${strokesWord(r.strokes)} · ${holesWord(r.holes || 0)}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
@@ -136,7 +139,8 @@ const MAP_MS = 3200; // a map's drawing of the path, as its CSS animation (title
 const PICKS = [
   { kind: "champ", label: "The champion", tint: "mode--build" },
   { kind: "level", label: "Your level", tint: "mode--solo" },
-  { kind: "any", label: "Surprise me", tint: "tint--mountain" },
+  { kind: "self", label: "Yourself", tint: "tint--mountain" },
+  { kind: "any", label: "Surprise me", tint: "tint--mountain" }, // (the third's, while you have no place)
 ] as const;
 
 /** A hole's map and a rival's best on it, their ghost's path (the strokes the
@@ -214,7 +218,7 @@ function Pick({ kind, label, tint, first, row, reading, chain, me, gnome, holes,
   const best = map && `${map.strokes === 1 ? "Ace" : golfTerm(map.strokes, map.par).replace(/!$/, "")} on ${map.name}`;
   const line = row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
   return (
-    <button className={`mode rival__pick ${tint}`} disabled={!row} aria-label={row ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. Race their ghost` : `${label}: ${reading ? "reading the board" : "nobody yet"}`} {...on}
+    <button className={`mode rival__pick ${tint}`} disabled={!row} aria-label={row ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : "nobody yet"}`} {...on}
       onClick={() => row && onPick(row.player, show ? show.bests : undefined)}>
       <span className="tag rival__tag">{kind === "any" ? <Dice /> : <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}{label}</span>
       {row ? <Stage className="rival__stage" skin={rivalSkin(row.player, gnome)} act="hop" playing={hot} /> : <span className="rival__stage" />}

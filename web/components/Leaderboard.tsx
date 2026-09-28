@@ -339,8 +339,10 @@ export type Placed = StrokesRow & { holes?: number; at: number };
  * place; the board's middle without one), and one at random, drawn again on
  * each visit. null while read; a pick nobody fills, null.
  */
+// the three picks (the champion, your level, yourself when you have a place, else a surprise),
+// and a surprise of its own (the board's Surprise me)
 export function useRivalPicks(chain: Chain | null, me: string | null | undefined, mode: Mode) {
-  const [picks, setPicks] = useState<readonly (Placed | null)[] | null>(null);
+  const [picks, setPicks] = useState<{ rows: readonly (Placed | null)[]; surprise: Placed | null } | null>(null);
   useEffect(() => {
     if (!chain) return;
     let live = true;
@@ -355,10 +357,11 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
         const level = levelPick(near.rows, me, champ ? [champ.player] : []);
         const any = await page(Math.floor(Math.random() * top.players), 5).catch(() => top);
         const surprise = pickOne([...any.rows, ...top.rows], [me, champ && champ.player, level && level.player], Math.random());
+        const self: Placed | null = me && mine && mine.rank > 0 ? { player: me, at: mine.rank, holes: mine.holes, strokes: mine.strokes } : null;
         primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r] : [])));
-        if (live) setPicks([champ, level, surprise]);
+        if (live) setPicks({ rows: [champ, level, self || surprise], surprise });
       })
-      .catch(() => live && setPicks([null, null, null]));
+      .catch(() => live && setPicks({ rows: [null, null, null], surprise: null }));
     return () => void (live = false);
   }, [chain, me, mode]);
   return picks;

@@ -373,7 +373,7 @@ body:has(.sheet) .modetag { visibility: hidden; }
 .screen.front--fit { display: flex; flex-direction: column; align-items: center; justify-content: safe center; padding: clamp(28px, 5vh, 48px) clamp(28px, 4vw, 64px) 48px; } /* (clear of the frame at the sides too; the block as tall as it needs, in the middle: its last frame gives up height, and scrolls, only when the window is short) */
 body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
 @media (min-height: 880px) { body:has(.netbanner) .screen.front--fit { padding-top: 106px; } } /* (room to spare: the block in the page's middle, not just above the banner) */
-.worlds__in.rival { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 1.8vh, 18px); width: min(var(--front-w), 100%); } /* (the screen's room, its padding off: 100vw overflowed it, a sideways scroll) */
+.worlds__in.rival { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 3.4vh, 40px); width: min(var(--front-w), 100%); } /* (the parts apart, less so on a short window) */ /* (the screen's room, its padding off: 100vw overflowed it, a sideways scroll) */
 .rival .front__head { margin: 0; }
 .front--fit .worlds__title { font-size: clamp(34px, min(4.2vw, 6.5vh), 56px); } /* (the picker's own, .screen--pick .pick__name) */
 @media (max-height: 720px) { .front--fit .front__head > .eyebrow { display: none; } }
@@ -459,6 +459,8 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
 .rival__boardhead { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; } /* (a phone: the link under the heading) */
 .rival__boardhead .rival__h { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rival__all { flex: none; white-space: nowrap; }
+.rival__links { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; }
+.rival__all .rival__dice { width: 15px; height: 15px; vertical-align: -2px; }
 .rival__board .lb--full ol { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 14px 12px 22px; scrollbar-gutter: stable both-edges; }
 .rival__board .lb ol > li { display: block; padding: 0; border: 0; background: none; }
 .rival__board .lb li.lb__more { grid-column: 1 / -1; }
