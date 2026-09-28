@@ -690,8 +690,9 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 }
 
 // Ghost is a player's best round on a hole in a mode, named or not, with its
-// period and shots, or null: what a duel races. It replays in its own weather
-// (SimulateRoundIn for the first stroke, then SimulateFrom from each rest).
+// height (the first to a score ranks first), period and shots, or null: what a
+// duel races. It replays in its own weather (SimulateRoundIn for the first
+// stroke, then SimulateFrom from each rest).
 func Ghost(hole, mode string, player address) string {
 	e, m := readHole(hole), modeOf(mode)
 	v := e.bests(m).Get(player.String())
@@ -699,9 +700,9 @@ func Ghost(hole, mode string, player address) string {
 		return "null"
 	}
 	strokes := bestStrokes(v)
-	_, period, shots := bestFields(v)
+	at, period, shots := bestFields(v)
 	return "{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(player.String()) +
-		`,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(shots) + "}"
+		`,"height":` + strconv.FormatInt(at, 10) + `,"strokes":` + strconv.Itoa(strokes) + `,"period":` + strconv.FormatInt(period, 10) + `,"shots":` + jstr(shots) + "}"
 }
 
 // HoleRank is a player's place on a hole's board in a mode, with their best,
@@ -833,7 +834,9 @@ func Standings(mode, players string) string {
 	return sb.String()
 }
 
-// Records is a page of every player's best on a hole in a mode, named or not.
+// Records is a page of every player's best on a hole in a mode, named or not,
+// with the height that ranks it before a later tie: all a successor needs to
+// carry the boards over in their order.
 // The paged reads (Records, Players, Rounds, Community) walk everything by
 // key: after is the last key of the page before ("" for the first), limit is
 // clamped to 1..100, next is the after of the next page ("" at the end).
@@ -842,21 +845,24 @@ func Records(hole, mode, after string, limit int) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
 	next := page(e.bests(m).Iterate, after, limit, func(i int, p string, v any) {
-		sb.WriteString(sep(i) + strokesRow(p, "", bestStrokes(v)))
+		at, _, _ := bestFields(v)
+		sb.WriteString(sep(i) + `{"player":` + jstr(p) + `,"strokes":` + strconv.Itoa(bestStrokes(v)) + `,"height":` + strconv.FormatInt(at, 10) + "}")
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()
 }
 
-// Players is a page of every course standing in a mode, named or not, paged
-// like Records.
+// Players is a page of every course standing in a mode, named or not, with
+// the height of the finish that last improved it (the ranking's tie-break),
+// paged like Records.
 func Players(mode, after string, limit int) string {
 	m := modeOf(mode)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
 	next := page(totals[m].Iterate, after, limit, func(i int, p string, v any) {
 		r := v.(*row)
-		sb.WriteString(sep(i) + standingRow(p, "", r.holes, r.strokes))
+		sb.WriteString(sep(i) + `{"player":` + jstr(p) + `,"holes":` + strconv.Itoa(r.holes) + `,"strokes":` + strconv.Itoa(r.strokes) +
+			`,"height":` + strconv.FormatInt(r.height, 10) + "}")
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()

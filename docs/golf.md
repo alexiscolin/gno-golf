@@ -283,7 +283,8 @@ its gas is the same for everyone (about 60M). Its storage grows with what it
 seats: 504 bytes a best, and 580 once for each mode it ranks the player in, so
 `580 + 504 × n` a mode with `n` bests (none for none). `Rank(mode, player)`'s
 `holes` gives a client `n` beforehand; it can be more than Claim seats while
-an archived hole is draining, never less.
+an archived hole is draining, never less. A best on a community or archived
+hole is not Claim's: a finish there once named puts it on that hole's board.
 
 ### `Drain(cur realm, n int) int`
 
@@ -699,17 +700,20 @@ not, or `null`: what a duel races ([ADR-004](../adr/adr-004-duels.md)). A best
 keeps its period and shots from the save that set it; a worse round or a tie
 leaves them. It replays in its own weather however old: its first stroke with
 `SimulateRoundIn`, each later one with `SimulateFrom` from the `rest` before.
+`height` is the block of the save that set it, which ranks it before a later
+tie.
 
 ```json
-{"version":1,"hole":"garden/3/v1","mode":"pro","player":"g1…","strokes":2,"period":5912345,"shots":"12.5000,6.2000,0;0.0000,1.0000,0"}
+{"version":1,"hole":"garden/3/v1","mode":"pro","player":"g1…","height":81234,"strokes":2,"period":5912345,"shots":"12.5000,6.2000,0;0.0000,1.0000,0"}
 ```
 
 #### `Records(hole, mode, after string, limit int) string`
 
-A page of every player's best on a hole, named or not.
+A page of every player's best on a hole, named or not, with the `height`
+that ranks it before a later tie: a board can be rebuilt in its order.
 
 ```json
-{"version":1,"hole":"garden/3/v1","mode":"assisted","rows":[{"player":"g1…","strokes":3}, …],"next":"g1…"}
+{"version":1,"hole":"garden/3/v1","mode":"assisted","rows":[{"player":"g1…","strokes":3,"height":81234}, …],"next":"g1…"}
 ```
 
 `Records`, `Players`, `Rounds` and `Community` walk everything by key, so
@@ -720,10 +724,11 @@ page (`""` once there is none).
 
 #### `Players(mode, after string, limit int) string`
 
-A page of every course standing in a mode, named or not.
+A page of every course standing in a mode, named or not, with the `height`
+of the finish that last improved it (the ranking's tie-break).
 
 ```json
-{"version":1,"mode":"assisted","rows":[{"player":"g1…","holes":12,"strokes":40}, …],"next":""}
+{"version":1,"mode":"assisted","rows":[{"player":"g1…","holes":12,"strokes":40,"height":81234}, …],"next":""}
 ```
 
 ### The owner
@@ -746,8 +751,8 @@ version's id or an alias.
 |---|---|
 | `""` | the hub: how to play, a card per cup (to its page), both leaderboards (by name, one under the other), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
 | `<world>` | a cup: its holes by number (par, best by name, plays); a word that is no cup is "No such hole" |
-| `<address>` | the community holes that address published, as their current versions |
-| `<hole>` | the hole as a text board, its weather (a wind's heading in degrees), a `Launch` form, a `Reset` form, a link to `Claim`, and its best rounds per mode, each with a `race` link: the 3D game against that best's ghost (its dare link, `&by=`) |
+| `<address>` | the community holes that address published, as their current versions (a hidden one left out) |
+| `<hole>` | the hole as a text board, its weather (a wind's heading in degrees), a `Launch` form, a `Reset` form, a link to `Claim` (on the course's current holes, the only ones it seats), and its best rounds per mode, each with a `race` link: the 3D game against that best's ghost (its dare link, `&by=`) |
 | `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked: their round under way (one whose weather is over says to `Reset` first) and their best in each mode, each linking its ghost |
 | `<hole>/data` | a version's provenance, every version of its alias, and its data in hex |
 

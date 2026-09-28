@@ -376,6 +376,7 @@ func TestCommunityTextAndHide(cur realm, t *testing.T) {
 	Hide(cross(cur), slot, true)
 	uassert.False(t, strings.Contains(Holes(), `"id":"`+id+`"`), "off the 3D game's list")
 	uassert.False(t, strings.Contains(Render(""), "Rude words"), "and the hub's")
+	uassert.False(t, strings.Contains(Render(eve.String()), "Rude words"), "and its author's page")
 	uassert.True(t, strings.Contains(Community("", 100), `"id":"`+id+`"`), "still in Community")
 	testing.SetRealm(testing.NewUserRealm(eve))
 	PlayRoundAt(cross(cur), id, "0,1", Period()) // still playable
@@ -585,6 +586,7 @@ func TestClaimRanksRoundsKeptWithoutAName(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "take a gno.land name first", func() { Claim(cross(cur)) })
 	uassert.False(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), late.String()))
 	giveName(cur, late, "claimer")
+	uassert.True(t, strings.Contains(Render(id+"/"+late.String()), "Claim (below"), "a current course hole says Claim")
 	testing.SetRealm(testing.NewUserRealm(late))
 	uassert.Equal(t, 1, Claim(cross(cur)))
 	uassert.True(t, strings.Contains(HoleLeaderboard(id, "", 0, 10), `{"player":"`+late.String()+`","name":"claimer","strokes":1}`))
@@ -593,6 +595,14 @@ func TestClaimRanksRoundsKeptWithoutAName(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(late))
 	uassert.Equal(t, 1, Claim(cross(cur)))
 	uassert.Equal(t, 1, strings.Count(HoleLeaderboard(id, "", 0, 100), late.String()))
+	// a community hole is not Claim's: its page says to finish it again
+	other := testutils.TestAddress("claimer2")
+	c := mine(cur, "claimed", cupHole("pond", 1, "Unclaimed"))
+	testing.SetRealm(testing.NewUserRealm(other))
+	PlayRoundAt(cross(cur), c, "0,1", Period())
+	giveName(cur, other, "claimer2")
+	page := Render(c + "/" + other.String())
+	uassert.True(t, strings.Contains(page, "Finish it again") && !strings.Contains(page, "Claim"), page)
 }
 
 // Rank is a player's place in the course ranking.

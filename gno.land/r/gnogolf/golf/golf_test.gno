@@ -605,7 +605,8 @@ func TestGhostKeepsTheBestRound(cur realm, t *testing.T) {
 	racer := testutils.TestAddress("racer")
 	uassert.Equal(t, "null", Ghost(id, "assisted", racer), "no best, no ghost")
 	replayAs(cur, racer, id, "0,0.001;0,1")
-	period := Period()
+	period, at := Period(), strconv.FormatInt(runtime.ChainHeight(), 10)
+	uassert.Equal(t, at, jfield(Ghost(id, "assisted", racer), "height"), "the height that ranks it before a later tie")
 	two := ufmt.Sprintf(`"strokes":2,"period":%d,"shots":"0.0000,0.0010,0;0.0000,1.0000,0"}`, period)
 	urequire.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), Ghost(id, "assisted", racer))
 	uassert.Equal(t, "null", Ghost(id, "pro", racer), "a best is kept in its own mode")
@@ -613,6 +614,7 @@ func TestGhostKeepsTheBestRound(cur realm, t *testing.T) {
 	replayAs(cur, racer, id, "0,0.001;0,0.001;0,1")
 	replayAs(cur, racer, id, "0,0.002;0,1")
 	uassert.True(t, strings.HasSuffix(Ghost(id, "assisted", racer), two), "a worse round and a tie leave the ghost: "+Ghost(id, "assisted", racer))
+	uassert.Equal(t, at, jfield(Ghost(id, "assisted", racer), "height"), "and its height")
 	uassert.Equal(t, 2, BestOf(id, "assisted", racer))
 
 	testing.SkipHeights(2000)

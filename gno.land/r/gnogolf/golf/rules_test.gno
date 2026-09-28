@@ -256,6 +256,7 @@ func TestPagedReads(cur realm, t *testing.T) {
 	one := Records(id, "assisted", "", 2)
 	uassert.True(t, strings.HasPrefix(one, `{"version":1,"hole":"`+id+`","mode":"assisted","rows":[`), one)
 	uassert.Equal(t, 2, strings.Count(one, `"player"`))
+	uassert.Equal(t, 2, strings.Count(one, `,"height":`), "each best with its tie-break")
 	next := one[strings.Index(one, `"next":"`)+8 : len(one)-2]
 	two := Records(id, "assisted", next, 2)
 	uassert.Equal(t, 1, strings.Count(two, `"player"`))
@@ -271,6 +272,7 @@ func TestPagedReads(cur realm, t *testing.T) {
 	for _, p := range ps {
 		uassert.True(t, strings.Contains(all, `"player":"`+p+`","holes":`), all)
 	}
+	uassert.Equal(t, strings.Count(all, `"player"`), strings.Count(all, `,"height":`), "each standing with its tie-break")
 }
 
 // A round in progress is held to its weather on every stroke: once that

@@ -240,7 +240,10 @@ func renderAuthor(a address) string {
 	var sb strings.Builder
 	sb.WriteString("# Community holes by " + who(a.String()) + "\n\n" + moved())
 	n, names := 0, map[string]string{}
-	aliases.Iterate(a.String()+"/", a.String()+"0", func(_ string, v any) bool {
+	aliases.Iterate(a.String()+"/", a.String()+"0", func(k string, v any) bool {
+		if hidden.Has(k) {
+			return false // off the lists, as Hide says: this page is one
+		}
 		e := find(v.(string))
 		if n == 0 {
 			sb.WriteString("| hole | versions | par | best | shots played | data |\n|---|---|---|---|---|---|\n")
@@ -409,7 +412,9 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	s += "<gno-form exec=\"Reset\">\n"
 	s += ufmt.Sprintf("<gno-input name=\"hole\" value=\"%s\" readonly=\"true\" description=\"this hole\" required=\"true\" />\n", e.id)
 	s += "</gno-form>\n\n"
-	s += "Took a gno.land name after saving rounds? " + md("Claim", hub+"$help&func=Claim") + " puts them on the boards now.\n\n"
+	if e.official && e.next == "" {
+		s += "Took a gno.land name after saving rounds? " + md("Claim", hub+"$help&func=Claim") + " puts them on the boards now.\n\n"
+	}
 
 	s += ufmt.Sprintf("## Best rounds\n\n%d rounds under way here; finished: %d assisted, %d pro.", e.roundTree().Size(), e.bests(assisted).Size(), e.bests(pro).Size())
 	if e.board(assisted).Size()+e.board(pro).Size() == 0 {
@@ -472,8 +477,10 @@ func roundSummary(e *entry, p address, r *round) string {
 			s += ufmt.Sprintf("**#%d of %d** on the %s board. %s.\n>\n", b.index(k)+1, b.Size(), modeNames[m], race(e, p.String(), "Race this ghost in 3D"))
 		case name == "":
 			s += "Not on the board: only players with a gno.land name are ranked.\n>\n"
-		default:
+		case e.official && e.next == "":
 			s += "Not on the board yet: the name came after this round. Claim (below, or the game's \"Rank them\") ranks it now.\n>\n"
+		default: // Claim seats the course's current holes only
+			s += "Not on the board yet: the name came after this round. Finish it again: a named player's every finish puts their best on the board.\n>\n"
 		}
 		_, _, shots := bestFields(v)
 		s += "> " + shotsOf(shots) + "\n>\n"
