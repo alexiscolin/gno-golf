@@ -172,8 +172,8 @@ async function run() {
     for (const [h, mode] of kept[p]) {
       if (rounds >= MAX_ROUNDS) break;
       rounds++;
-      // the best on the board, its own shots and weather (Ghost): not the
-      // latest round, which a Reset or a stroke of a new one hides
+      // the best on the board, its own shots and weather (Ghost): a holed
+      // round is not kept, only its best
       const g = await rpc((c) => c.ghost(h, mode, p));
       if (g) recs.push({ hole: g.hole, shots: g.shots.split(";"), strokes: g.strokes, period: g.period });
     }

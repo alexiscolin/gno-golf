@@ -133,7 +133,7 @@ const checks = {
     v === null || (isObj(v) && isMode(v.mode) && strs(v, "hole", "player", "shots") && nums(v, "period") && Number.isInteger(v.strokes) &&
       (v.strokes as number) > 0 && (v.strokes as number) <= RULES.maxRoundStrokes && (v.shots as string).split(";").length === v.strokes),
   round: (v: unknown): v is Round | null =>
-    v === null || (isObj(v) && isPath(v.path) && isVec(v.rest) && isVec(v.ball) && strs(v, "player", "shots", "air", "cause") && typeof v.done === "boolean" && isMode(v.mode) && Number.isInteger(v.strokes) && nums(v, "period")),
+    v === null || (isObj(v) && isPath(v.path) && isVec(v.rest) && isVec(v.ball) && strs(v, "player", "shots", "air", "cause") && isMode(v.mode) && Number.isInteger(v.strokes) && nums(v, "period")),
 };
 // a gno.land name as r/sys/users writes them
 const isName = (n: string) => /^[a-z0-9._-]{1,64}$/i.test(n);
@@ -484,8 +484,33 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** A page of a hole's board: { hole, mode, par, players (named), finished (everyone), offset, rows: [{ player, strokes }], next (the next page's offset, 0 at the end) }. */
     holeLeaderboard: (hole: string, offset = 0, limit = 10, mode = "assisted") =>
       qeval(`HoleLeaderboard(${s(hole)}, ${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.holeLeaderboard),
-    /** One player's round on a hole ({ shots, strokes, done, period, rest, path… }), or null: none, or Reset since. */
+    /** One player's round under way on a hole ({ shots, strokes, period, rest, path… }), or null: none, holed (not kept: its best is) or Reset. */
     round: (hole: string, player: string) => qeval(`Round(${s(hole)}, address(${s(player)}))`, checks.round),
+    /**
+     * What a transaction's calls returned, as the node printed them (a call's
+     * result, `("holed in 3 strokes" string)`, one after the other), from its
+     * hash as a wallet gives it (base64, or hex); null when the node has no
+     * such transaction. A holed round is not kept: this is how a save knows.
+     */
+    txResult: async (hash: string) => {
+      let hex = "";
+      try {
+        hex = /^(0x)?[0-9a-f]{64}$/i.test(hash) ? hash.replace(/^0x/i, "") : [...atob(hash)].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+      } catch {}
+      if (hex.length !== 64) throw refused("Not a transaction hash.");
+      const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT);
+      try {
+        const res = await fetch(`${rpc}/tx?hash=0x${hex}`, { signal: c.signal });
+        if (!res.ok) throw new Error(`RPC ${res.status}`);
+        const body = (await res.json()) as { error?: unknown; result?: { tx_result?: { ResponseBase?: { Data?: string } } } };
+        const r = body.result && body.result.tx_result && body.result.tx_result.ResponseBase;
+        return r ? utf8(r.Data || "") : null;
+      } catch (e) {
+        throw down(e);
+      } finally {
+        clearTimeout(t);
+      }
+    },
   };
 }
 export type Chain = ReturnType<typeof makeChain>;

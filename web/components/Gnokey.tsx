@@ -7,13 +7,12 @@ import { messageOf, useCopied } from "@/components/common";
 import type { Chain } from "@/lib/chain";
 import type { Snapshot } from "@/lib/engine";
 
-// "Use gnokey instead": the transaction Adena would sign, as one paste for a
+// "Use gnokey instead": the calls Adena would sign, as one paste for a
 // terminal (bash or zsh: macOS, Linux, WSL) that needs gnokey and nothing
-// else. Each commit is a tiny script written with a heredoc into a fresh
-// temporary folder (any working directory will do, nothing is left in it),
-// then one `maketx run` (Reset then the shots in the first), so each stays one
-// atomic transaction as with Adena; the paste stops at the first that fails.
-// Collapsed by default; the key name is the player's own, kept in this browser.
+// else: one plain `gnokey maketx call` per commit (a round of several begins
+// with a Reset of its own, so a paste run again starts afresh), and the paste
+// stops at the first that fails. Collapsed by default; the key name is the
+// player's own, kept in this browser.
 const KEY = "gnogolf.gnokey";
 // any name gnokey takes, quoted for the shell: all but a quote and control characters
 const keyOk = (k: string) => /^[^'\\\u0000-\u001f]{1,64}$/.test(k);
@@ -48,13 +47,12 @@ export default function Gnokey({ s, chain, price, chainId }: { s: Snapshot | nul
   // what is shown is what is copied: a subshell that stops at the first failure
   const who = `'${ready ? name : "YOUR_KEY_NAME"}'`;
   const body = plan
-    .map((p, k) => [
+    .map((command, k) => [
       ...(plan.length > 1 ? [`echo "Gnogolf: transaction ${k + 1} of ${plan.length}"`] : []),
-      `cat >| "$d/${p.file}" <<'EOF'\n${p.script}EOF`,
-      p.command.replace(`<your-key-name> ${p.file}`, `${who} "$d/${p.file}"`),
+      command.replace("<your-key-name>", who),
     ].join("\n"))
     .join("\n\n");
-  const all = `(\nset -e\nd=$(mktemp -d)\n${body}\nrm -rf "$d"\n)`;
+  const all = `(\nset -e\n${body}\n)`;
   const onKey = (v: string) => {
     setKey(v);
     try { localStorage.setItem(KEY, v.trim()); } catch {}

@@ -121,7 +121,6 @@ interface RoundRow extends Versioned {
   ball: Vec2;
   rest: Vec2;
   strokes: number;
-  done: boolean;
   period: number;
   mode: Mode;
   /** "angle,power[,tick]" joined by ";" */

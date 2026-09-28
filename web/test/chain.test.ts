@@ -81,7 +81,7 @@ const COURSE_BOARD_REPLY = { mode: "assisted", holes: 4, players: 20, offset: 0,
 const HOLE_RANK_REPLY = { mode: "assisted", hole: "garden/1", player: ADDR1, rank: 1, of: 9, strokes: 3 };
 const RANK_REPLY = { mode: "assisted", player: ADDR1, rank: 2, of: 20, holes: 4, strokes: 12 };
 const ROUND_REPLY = {
-  version: 1, player: ADDR1, shots: "0.0000,1.0000", air: "n", cause: "x", done: true, mode: "assisted", strokes: 2, period: 7,
+  version: 1, player: ADDR1, shots: "0.0000,1.0000", air: "n", cause: "x", mode: "assisted", strokes: 2, period: 7,
   path: [[0, 0]], rest: [0, 0], ball: [0, 0],
 };
 
@@ -520,13 +520,13 @@ test("players pages the whole course's standings", async () => {
   assert.equal((await chain.players("assisted")).rows[0].holes, 1);
 });
 
-test("round reads a player's round, is null when there is none, refuses a malformed one", async () => {
+test("round reads a player's round under way, is null when there is none, refuses a malformed one", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply(ROUND_REPLY));
-  assert.equal((await chain.round("garden/1", ADDR1)).done, true);
+  assert.equal((await chain.round("garden/1", ADDR1))!.strokes, 2);
 
   setFetch(() => qevalReply(null));
-  assert.equal(await chain.round("garden/1", ADDR1), null); // none, or Reset since
+  assert.equal(await chain.round("garden/1", ADDR1), null); // none, holed (not kept) or Reset
 
   setFetch(() => qevalReply({ ...ROUND_REPLY, mode: undefined }));
   await assert.rejects(chain.round("garden/1", ADDR1), (e) => errorKind(e) === "chain");
@@ -743,4 +743,19 @@ test("a newer realm version warns once, then stays quiet", async () => {
   }
   assert.equal(seen.length, 1);
   assert.match(String(seen[0][0]), /version 2/);
+});
+
+test("txResult: what a transaction's calls returned, by its hash in base64 or hex; null for none; a bad hash refused", async () => {
+  const chain = makeChain();
+  const hex = "ab".repeat(32), b64 = Buffer.from(hex, "hex").toString("base64");
+  const data = Buffer.from('("holed in 3 strokes" string)\n\n').toString("base64");
+  for (const hash of [b64, hex, "0x" + hex]) {
+    setFetch((url) => { assert.ok(url.endsWith(`/tx?hash=0x${hex}`), url); return { result: { tx_result: { ResponseBase: { Data: data } } } }; });
+    assert.equal(await chain.txResult(hash), '("holed in 3 strokes" string)\n\n');
+  }
+  setFetch(() => ({ error: { message: "tx not found" } }));
+  assert.equal(await chain.txResult(hex), null);
+  await assert.rejects(chain.txResult("nope"), /Not a transaction hash/);
+  setFetch(() => ({ __status: 500 }));
+  await assert.rejects(chain.txResult(hex), (e: unknown) => errorKind(e) === "down");
 });

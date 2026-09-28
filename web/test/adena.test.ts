@@ -22,6 +22,7 @@ import {
   registerName,
   claimRounds,
   gnokeyPlan,
+  holedIn,
   depositBytes,
   sendTip,
   shortOf,
@@ -482,16 +483,16 @@ test("recordRound: not installed", async () => {
   await assert.rejects(() => recordRound(roundArgs()), /not installed/);
 });
 
-test("recordRound: Reset + PlayRound for a fresh, period-less, assisted round", async () => {
+test("recordRound: PlayRound alone for a fresh, period-less, assisted round (a holed round is not kept: nothing to Reset)", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
   await recordRound(roundArgs({ shots: ["1,1", "2,2"] }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string; args: string[] } }[]; gasFee: number; gasWanted: number; networkInfo?: unknown };
   assert.deepEqual(
     tx.messages.map((m) => m.value.func),
-    ["Reset", "PlayRound"],
+    ["PlayRound"],
   );
-  assert.deepEqual(tx.messages[1].value.args, ["garden/7", "1,1;2,2"]);
+  assert.deepEqual(tx.messages[0].value.args, ["garden/7", "1,1;2,2"]);
   assert.deepEqual(tx.networkInfo, { chainId: CHAIN, rpcUrl: RPC }); // the network the tx is signed for
   assert.equal(tx.gasWanted, 1_900_000_000); // no gas given: MAX_GAS
   assert.equal(tx.gasFee, Math.ceil(1_900_000_000 * 0.001 * 1.5));
@@ -500,19 +501,19 @@ test("recordRound: Reset + PlayRound for a fresh, period-less, assisted round", 
 test("recordRound: a name taken in the same signature, Register first and Claim last, their gas added", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ shots: ["1,1"], gas: 100_000_000, named: { registrar: "gno.land/r/sys/namereg/v1", name: "nym-golfer482" } }));
+  await recordRound(roundArgs({ shots: ["1,1"], gas: 100_000_000, named: { registrar: "gno.land/r/sys/namereg/v0", name: "nym-golfer482" } }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
-  assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func]), [["gno.land/r/sys/namereg/v1", "Register"], [REALM, "Reset"], [REALM, "PlayRound"], [REALM, "Claim"]]);
+  assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func]), [["gno.land/r/sys/namereg/v0", "Register"], [REALM, "PlayRound"], [REALM, "Claim"]]);
   assert.deepEqual(tx.messages[0].value.args, ["nym-golfer482"]);
   assert.equal(tx.gasWanted, 100_000_000 + 60_000_000 + 90_000_000);
 });
 
-test("recordRound: reset=false continues a round with PlayRound alone", async () => {
+test("recordRound: reset abandons a round left under way, Reset then PlayRound in one transaction", async () => {
   const { a, calls } = fakeAdena();
   setWindow({ adena: a });
-  await recordRound(roundArgs({ reset: false }));
-  const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string } }[] };
-  assert.deepEqual(tx.messages.map((m) => m.value.func), ["PlayRound"]);
+  await recordRound(roundArgs({ reset: true }));
+  const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string; args: string[] } }[] };
+  assert.deepEqual(tx.messages.map((m) => [m.value.func, m.value.args]), [["Reset", ["garden/7"]], ["PlayRound", ["garden/7", "1,1"]]]);
 });
 
 test("recordRound: a period sends PlayRoundAt", async () => {
@@ -520,7 +521,7 @@ test("recordRound: a period sends PlayRoundAt", async () => {
   setWindow({ adena: a });
   await recordRound(roundArgs({ period: 5 }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string; args: string[] } }[] };
-  assert.deepEqual(tx.messages[1].value, { caller: ADDR, send: "", pkg_path: REALM, func: "PlayRoundAt", args: ["garden/7", "1,1", "5"] });
+  assert.deepEqual(tx.messages[0].value, { caller: ADDR, send: "", pkg_path: REALM, func: "PlayRoundAt", args: ["garden/7", "1,1", "5"] });
 });
 
 test("recordRound: mode=pro sends PlayRoundPro, and networkInfo is pinned when chainId+rpc are given", async () => {
@@ -528,8 +529,8 @@ test("recordRound: mode=pro sends PlayRoundPro, and networkInfo is pinned when c
   setWindow({ adena: a });
   await recordRound(roundArgs({ mode: "pro", period: 3 }));
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { func: string; args: string[] } }[]; networkInfo?: { chainId: string; rpcUrl: string } };
-  assert.deepEqual(tx.messages[1].value.args, ["garden/7", "1,1", "3"]);
-  assert.equal(tx.messages[1].value.func, "PlayRoundPro");
+  assert.deepEqual(tx.messages[0].value.args, ["garden/7", "1,1", "3"]);
+  assert.equal(tx.messages[0].value.func, "PlayRoundPro");
   assert.deepEqual(tx.networkInfo, { chainId: CHAIN, rpcUrl: RPC });
 });
 
@@ -664,36 +665,24 @@ test("gnokeyPlan: an empty, period-less-pro, or badly-shaped round is nothing to
   assert.deepEqual(gnokeyPlan({ id: "bad id!", shots: ["1,1"], period: 1 }, { realm: REALM, rpc: RPC, chainId: CHAIN }), []);
 });
 
-test("gnokeyPlan: one commit — Reset + PlayRoundAt, the gas/fee command, and no 'part' numbering", () => {
+test("gnokeyPlan: one commit is one plain call, PlayRoundAt with its shots quoted, no Reset (a holed round is not kept)", () => {
   const plan = gnokeyPlan(
     { id: "garden/7", name: "My Round", shots: ["1,1", "2,2"], period: 5, roundMode: "assisted", pts: [10, 10], walls: 0, pieces: 0, official: true },
     { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC },
   );
-  assert.equal(plan.length, 1);
-  const [{ file, script, command }] = plan;
-  assert.equal(file, "gnogolf-save.gno");
-  assert.ok(script.includes(`import "${REALM}"`));
-  assert.ok(script.includes('golf.Reset(cross(cur), "garden/7")'));
-  assert.ok(script.includes('println(golf.PlayRoundAt(cross(cur), "garden/7", "1,1;2,2", 5))'));
-  assert.ok(!script.includes("part "));
-  // gasOf(30M PER_CALL + 2*22M shots) + RUN_EXTRA(20M) = 94M, official: no DECODE_MAX
-  assert.equal(command, `gnokey maketx run -gas-fee 141000ugnot -gas-wanted 94000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name> gnogolf-save.gno`);
+  // gasOf: 30M PER_CALL + 2*22M shots = 74M, official: no DECODE_MAX
+  assert.deepEqual(plan, [`gnokey maketx call -pkgpath ${REALM} -func PlayRoundAt -args garden/7 -args '1,1;2,2' -args 5 -gas-fee 111000ugnot -gas-wanted 74000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`]);
 });
 
-test("gnokeyPlan: several commits are numbered, only the first Resets, and only the last omits a trailing arg", () => {
+test("gnokeyPlan: several commits start with a Reset of their own, so a paste run again starts afresh", () => {
   const plan = gnokeyPlan(
     { id: "garden/7", shots: ["1,1", "2,2", "3,3"], period: 5, roundMode: "assisted" }, // pts omitted: heaviest possible, forces a 2-way split
     { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC },
   );
-  assert.equal(plan.length, 2);
-  assert.equal(plan[0].file, "gnogolf-save-1.gno");
-  assert.equal(plan[1].file, "gnogolf-save-2.gno");
-  assert.ok(plan[0].script.includes("part 1 of 2"));
-  assert.ok(plan[0].script.includes("golf.Reset(cross(cur)"));
-  assert.ok(plan[1].script.includes("part 2 of 2"));
-  assert.ok(!plan[1].script.includes("golf.Reset(cross(cur)"));
-  assert.match(plan[0].command, /-gas-wanted 1298800000 /);
-  assert.match(plan[1].command, /-gas-wanted 674400000 /);
+  assert.equal(plan.length, 3);
+  assert.match(plan[0], /-func Reset -args garden\/7 -gas-fee 45000ugnot -gas-wanted 30000000 /);
+  assert.match(plan[1], /-func PlayRoundAt -args garden\/7 -args '1,1;2,2' -args 5 .*-gas-wanted 1278800000 /);
+  assert.match(plan[2], /-func PlayRoundAt -args garden\/7 -args '3,3' -args 5 .*-gas-wanted 654400000 /);
 });
 
 test("gnokeyPlan: an explicit `parts` overrides the natural commitsOf split", () => {
@@ -701,19 +690,15 @@ test("gnokeyPlan: an explicit `parts` overrides the natural commitsOf split", ()
     { id: "garden/7", shots: ["1,1", "2,2", "3,3"], period: 5, pts: [10, 10, 10] }, // would naturally be one commit
     { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC, parts: [[0, 1], [1, 3]] },
   );
-  assert.equal(plan.length, 2);
-  assert.ok(plan[0].script.includes("strokes 1-1"));
-  assert.ok(plan[1].script.includes("strokes 2-3"));
-  assert.ok(plan[0].script.includes("golf.Reset(cross(cur)"));
-  assert.ok(!plan[1].script.includes("golf.Reset(cross(cur)")); // only the first Resets
+  assert.deepEqual(plan.map((c) => (c.match(/-func (\w+)(?: -args (\S+))*/) || [])[0]), ["-func Reset -args garden/7", "-func PlayRoundAt -args garden/7 -args '1,1' -args 5", "-func PlayRoundAt -args garden/7 -args '2,2;3,3' -args 5"]);
 });
 
 test("gnokeyPlan: mode=pro with a period plays PlayRoundPro; period=null and mode=assisted plays PlayRound with no extra arg", () => {
   const pro = gnokeyPlan({ id: "beach/2", shots: ["1,1"], period: 9, roundMode: "pro", pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC });
-  assert.ok(pro[0].script.includes('golf.PlayRoundPro(cross(cur), "beach/2", "1,1", 9)'));
+  assert.match(pro[0], /-func PlayRoundPro -args beach\/2 -args '1,1' -args 9 -gas-fee/);
 
   const noPeriod = gnokeyPlan({ id: "beach/2", shots: ["1,1"], period: null, roundMode: "assisted", pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC });
-  assert.ok(noPeriod[0].script.includes('golf.PlayRound(cross(cur), "beach/2", "1,1")'));
+  assert.match(noPeriod[0], /-func PlayRound -args beach\/2 -args '1,1' -gas-fee/);
 });
 
 test("gnokeyPlan: a community hole (official: false) asks DECODE_MAX more gas than the same round official", () => {
@@ -721,30 +706,35 @@ test("gnokeyPlan: a community hole (official: false) asks DECODE_MAX more gas th
   const off = gnokeyPlan({ ...s, official: true }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const comm = gnokeyPlan({ ...s, official: false }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
   const gasOfCmd = (c: string) => Number(/-gas-wanted (\d+)/.exec(c)![1]);
-  assert.equal(gasOfCmd(comm[0].command) - gasOfCmd(off[0].command), 115_000_000);
+  assert.equal(gasOfCmd(comm[0]) - gasOfCmd(off[0]), 115_000_000);
   // the realm's own figure said (Weather() "gas"): it holds the decoding already
   const said = gnokeyPlan({ ...s, official: false, fixed: 40_000_000 }, { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC });
-  assert.equal(gasOfCmd(said[0].command) - gasOfCmd(off[0].command), 40_000_000);
+  assert.equal(gasOfCmd(said[0]) - gasOfCmd(off[0]), 40_000_000);
 });
 
 test("gnokeyPlan: an invalid chain id or rpc falls back to a placeholder in the command", () => {
   const plan = gnokeyPlan({ id: "garden/7", shots: ["1,1"], period: 1, pts: [10] }, { realm: REALM, chainId: "bad id!", rpc: "not-a-url" });
-  assert.match(plan[0].command, /-chainid <chain-id> -remote <rpc-url>/);
+  assert.match(plan[0], /-chainid <chain-id> -remote <rpc-url>/);
 });
 
-test("gnokeyPlan: the title strips non-ASCII and is cut to 60 characters", () => {
-  const name = "café \u{1F3CC} " + "x".repeat(60);
-  const plan = gnokeyPlan({ id: "garden/7", name, shots: ["1,1"], period: 1, pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC });
-  const title = name.replace(/[^\x20-\x7e]/g, "").slice(0, 60); // mirrors lib/adena.ts:414
-  assert.ok(plan[0].script.startsWith(`// Gnogolf: ${title},`));
+test("gnokeyPlan: nothing a shell would read otherwise goes in (a shot, the realm)", () => {
+  assert.deepEqual(gnokeyPlan({ id: "garden/7", shots: ["1,1'; rm -rf ~"], period: 1, pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC }), []);
+  assert.deepEqual(gnokeyPlan({ id: "garden/7", shots: ["1,1"], period: 1, pts: [10] }, { realm: "gno.land/r/x; ls", chainId: CHAIN, rpc: RPC }), []);
+});
+
+test("holedIn: the strokes a save's result says, none when it did not hole", () => {
+  assert.equal(holedIn('("holed in 3 strokes" string)\n\n'), 3);
+  assert.equal(holedIn('("" string)\n\n("holed in 12 strokes" string)\n\n(1 int)\n\n'), 12); // a name and a Claim around it
+  assert.equal(holedIn('("2 shots replayed, ball at 3.0,4.0 after 2 strokes" string)'), null);
+  assert.equal(holedIn(null), null);
 });
 
 // ------------------------------------------------------- depositBytes/shortOf/costOf
 test("depositBytes: later saves are cheap; a first finish is dearer still on the whole course", () => {
   assert.equal(depositBytes(false), 300);
-  assert.equal(depositBytes(true), 3630);
-  assert.equal(depositBytes(true, true), 6030);
-  assert.equal(depositBytes(true, false, 12), 3630 + 276, "a first best keeps its shots");
+  assert.equal(depositBytes(true), 1780);
+  assert.equal(depositBytes(true, true), 3230);
+  assert.equal(depositBytes(true, false, 12), 1780 + 276, "a first best keeps its shots");
   assert.equal(depositBytes(false, false, 12), 300, "an improving best frees more than it writes");
 });
 

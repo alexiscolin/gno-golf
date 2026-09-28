@@ -1,12 +1,14 @@
 // Adena, the gno.land browser wallet. The page asks it two things only: who is
 // playing, and to sign one round.
 //
-// A round is recorded as one transaction with two calls: Reset puts the
-// player's ball back on the tee, PlayRound replays the shot list from there.
-// A round too heavy for one transaction goes in two (or more): the first
-// Resets and plays the first strokes, the next continue it (splitRound).
-// The chain re-runs every shot itself — the page sends decisions, never
-// outcomes — so a recorded score is one nobody can type in.
+// A round is recorded as one call, PlayRound, which replays the shot list
+// from the tee: a holed round is not kept on the chain (its best is), so a new
+// one starts there. A round too heavy for one transaction goes in two (or
+// more): the first plays the first strokes, the next continue it
+// (splitRound). Only a round of the player's left under way on the chain
+// needs a Reset first, in the same transaction. The chain re-runs every shot
+// itself — the page sends decisions, never outcomes — so a recorded score is
+// one nobody can type in.
 
 import { RULES, isAddress, type Chain } from "./chain";
 import { trackError } from "./analytics";
@@ -278,9 +280,9 @@ const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price
 export const PRICE = 0.001;
 // Gas asked for one commit, calibrated on gno_call simulate=true
 // (docs/reviews/fix-sync-client.md): the work model already bounds the shots
-// (1.2x-1.6x their measured gas); the Reset and the call cost ~30M; what the
-// commit spends before its shots (decoding the hole, drawing the forecast) is
-// the realm's own figure (Weather() "gas"). A round without it: the forecast's
+// (1.2x-1.6x their measured gas); the call costs ~30M (a Reset with it too);
+// what the commit spends before its shots (decoding the hole, drawing the
+// forecast) is the realm's own figure (Weather() "gas"). A round without it: the forecast's
 // most, rain and a storm on the heaviest course holes (town/14, island/14:
 // 193M and 204M), the rest ~7M.
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
@@ -341,13 +343,15 @@ export function chainSplit(chain: Pick<Chain, "simulateRound" | "simulateCommit"
 const NO_REGISTRAR = "This chain has no name registrar: no name can be taken here.";
 
 /**
- * Signs one commit of this round: Reset + PlayRound… for the first (reset),
- * PlayRound… alone for the next ones, which continue the round where the
- * chain has it. named: a gno.land name taken in the same signature, before
- * the round (Register), so it is ranked as it lands, and the rounds saved
- * before it after (Claim). Resolves with the tx (hash, height).
+ * Signs one commit of this round: PlayRound… from the tee for the first, or
+ * where the chain has the round for the next ones. reset: a Reset first, in
+ * the same transaction, for a first commit over a round of the player's left
+ * under way (a holed one is not kept, and needs none). named: a gno.land name
+ * taken in the same signature, before the round (Register), so it is ranked
+ * as it lands, and the rounds saved before it after (Claim). Resolves with
+ * the tx (hash, height).
  */
-export async function recordRound({ address, realm, hole, shots, gas, period, reset = true, mode = "assisted", price = PRICE, chainId, rpc, named }: {
+export async function recordRound({ address, realm, hole, shots, gas, period, reset = false, mode = "assisted", price = PRICE, chainId, rpc, named }: {
   address: string; realm: string; hole: string; shots: readonly string[]; gas?: number; period?: number | null; reset?: boolean; mode?: Mode; price?: number; chainId?: string | null; rpc: string;
   named?: { registrar: string; name: string } | null;
 }) {
@@ -451,11 +455,6 @@ export const registerName = ({ address, registrar, realm, name, price = PRICE, c
 export const claimRounds = ({ address, realm, price = PRICE, chainId, rpc }: { address: string; realm: string; price?: number; chainId?: string | null; rpc: string }) =>
   calls(address, [[realm, "Claim", []]], CLAIM_GAS, price, chainId, rpc, "Your rounds were not ranked.");
 
-// The same save for gnokey, Adena's messages in one `maketx run` per commit:
-// a tiny script that Resets (first commit only) and plays the shots, so the
-// transaction is as atomic as Adena's. RUN_EXTRA: what a script's own
-// package costs over a call (an empty run is ~19M).
-const RUN_EXTRA = 20e6;
 // Decoding a hole's data is in each commit's gas too, in the realm's figure
 // (fixed). Without it, a community hole may be as large as the format allows
 // (golf.gno decodeBase + decodePerByte a byte: 115M for the largest one
@@ -473,59 +472,57 @@ interface SaveRound extends Work {
   roundMode?: Mode | null;
 }
 /**
- * [{ file, script, command }] per commit, for the player to run with their
- * own key (<your-key-name>). s: the engine's snapshot of a holed round
- * (id, shots, period, roundMode, and the work model's walls, pieces, kind, pts).
+ * The same save for gnokey: one plain `gnokey maketx call` per commit, the
+ * call Adena would send (PlayRoundAt, PlayRoundPro, or PlayRound with no
+ * period), for the player to run with their own key (<your-key-name>). A
+ * round of several commits starts with a Reset of its own: pasted again after
+ * a part failed, it starts afresh from the tee rather than going on from
+ * where the first part left the ball. One commit needs none: a holed round is
+ * not kept. s: the engine's snapshot of a holed round (id, shots, period,
+ * roundMode, and the work model's walls, pieces, kind, pts).
  */
 export function gnokeyPlan(s: SaveRound, { realm, price = PRICE, chainId, rpc, parts: checked }: { realm: string; price?: number; chainId?: string | null; rpc: string; parts?: readonly (readonly [number, number])[] | null }) {
   const shots = s.shots || [], mode = s.roundMode || "assisted";
   if (!shots.length) return [];
   if (mode === "pro" && s.period == null) return []; // a pro round has its period, or it cannot be saved
   // the player pastes this into a shell: nothing the chain or the page's link
-  // says goes in unchecked
+  // says goes in unchecked (a shot is digits, a sign, dots and commas)
   if (s.period != null && !Number.isSafeInteger(s.period)) return [];
-  if (!/^[\w./-]{1,128}$/.test(String(s.id))) return [];
-  const title = String(s.name || s.id).replace(/[^\x20-\x7e]/g, "").slice(0, 60);
+  if (!/^[\w./-]{1,128}$/.test(String(s.id)) || !/^gno\.land\/r\/[\w/.-]+$/.test(realm) || !shots.every((x) => /^[\d.,-]+$/.test(x))) return [];
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
   const remote = /^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "<rpc-url>";
-  const q = JSON.stringify; // a Go string literal, for these ASCII ids and shots
+  const call = (func: string, args: readonly string[], gas: number) =>
+    `gnokey maketx call -pkgpath ${realm} -func ${func}${args.map((a) => ` -args ${a}`).join("")} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chain} -remote ${remote} <your-key-name>`;
   // the chain's own cut when it was asked (chainSplit); the work model's otherwise
   const parts = checked && checked.length ? checked : commitsOf(s, shots.length);
-  return parts.map(([from, to], k) => {
-    const list = q(shots.slice(from, to).join(";")), hole = q(s.id);
-    const play =
-      mode === "pro" ? `golf.PlayRoundPro(cross(cur), ${hole}, ${list}, ${s.period})`
-        : s.period == null ? `golf.PlayRound(cross(cur), ${hole}, ${list})`
-          : `golf.PlayRoundAt(cross(cur), ${hole}, ${list}, ${s.period})`;
-    const file = parts.length > 1 ? `gnogolf-save-${k + 1}.gno` : "gnogolf-save.gno";
-    const script = [
-      `// Gnogolf: ${title}, ${parts.length > 1 ? `part ${k + 1} of ${parts.length}, ` : ""}strokes ${from + 1}-${to} (${mode})`,
-      "package main",
-      "",
-      `import "${realm}"`,
-      "",
-      "func main(cur realm) {",
-      ...(k === 0 ? [`\tgolf.Reset(cross(cur), ${hole})`] : []),
-      `\tprintln(${play})`,
-      "}",
-      "",
-    ].join("\n");
-    const gas = Math.min(gasOf(s, from, to) + RUN_EXTRA + (s.official === false && !s.fixed ? DECODE_MAX : 0), MAX_GAS);
-    const command = `gnokey maketx run -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chain} -remote ${remote} <your-key-name> ${file}`;
-    return { file, script, command };
+  const plays = parts.map(([from, to]) => {
+    // the shots are quoted: ";" ends a shell command
+    const hole = String(s.id), list = `'${shots.slice(from, to).join(";")}'`, at = String(s.period);
+    const gas = Math.min(gasOf(s, from, to) + (s.official === false && !s.fixed ? DECODE_MAX : 0), MAX_GAS);
+    return mode === "pro" ? call("PlayRoundPro", [hole, list, at], gas)
+      : s.period == null ? call("PlayRound", [hole, list], gas)
+        : call("PlayRoundAt", [hole, list, at], gas);
   });
+  return parts.length > 1 ? [call("Reset", [String(s.id)], PER_CALL), ...plays] : plays;
 }
 
-// The storage a save writes, in bytes, measured on a local chain from the
-// final realm: a player's first finish on a hole, which is also their first
-// course finish (the dearest case: round, best, board and ranking rows), wrote
-// 3,258 bytes; a replay of a hole already saved replaces what is there (~0).
-// A player's very first finish in a mode also writes their course standing
-// and ranking rows: 5,404 bytes in the pearl rehearsal. A first best also
-// keeps its shots, the ghost a duel races (Ghost): about 30 bytes and 23 a
-// stroke more; an improving best is shorter than the one it frees. Asked with
-// about a tenth more; the chain charges what is really written.
-export const depositBytes = (first: boolean, firstOnCourse = false, strokes = 0) => (!first ? 300 : (firstOnCourse ? 6000 : 3600) + 30 + 23 * strokes);
+/** The strokes a save's result says its round was holed in (PlayRound's
+ *  "holed in N strokes", in a transaction's result), null if it says none. */
+export const holedIn = (result: string | null | undefined) => {
+  const m = String(result || "").match(/holed in (\d+) strokes/);
+  return m ? Number(m[1]) : null;
+};
+
+// The storage a save writes, in bytes, measured on an onyx gnodev from the
+// final realm (a holed round is not kept: only its best and rows): a named
+// player's first finish on a hole wrote 1,040 bytes, and 512 more for the
+// hole's wear if it is the hole's first play; their first finish in a mode,
+// which also writes their course standing and ranking rows, 2,891 to 2,927;
+// a replay writes nothing, or a few bytes for an improving best. A first
+// best also keeps its shots, the ghost a duel races (Ghost): about 30 bytes
+// and 23 a stroke more. Asked with about a tenth more; the chain charges what
+// is really written.
+export const depositBytes = (first: boolean, firstOnCourse = false, strokes = 0) => (!first ? 300 : (firstOnCourse ? 3200 : 1750) + 30 + 23 * strokes);
 
 /** How much GNOT an account lacks to save a round (gas and deposit), 0 if it has enough; null if unknown. */
 export const shortOf = (gas: number, price: number, deposit: number, balance: number | null | undefined) =>
