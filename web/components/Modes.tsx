@@ -153,7 +153,8 @@ export function Ghosts({ holes, name, bests, card, mode, onRace, onCups, onBack,
           </section>
         )}
         {bests && bests.size > 0 && <p className="drawer__note rival__way">Their best on each hole, to beat; yours from your card beside it.</p>}
-        {bests && GROUPS.map((w) => {
+        {/* in a frame of its own, as a board: it scrolls under its fade, the screen stays put */}
+        {bests && bests.size > 0 && <div className="ghosts__list">{GROUPS.map((w) => {
           const cup = holes.filter((h) => cupOf(h) === w.id), theirs = cup.filter((h) => bests.has(h.id));
           return theirs.length > 0 && (
             <section key={w.id} className="rival__way">
@@ -176,7 +177,7 @@ export function Ghosts({ holes, name, bests, card, mode, onRace, onCups, onBack,
               </div>
             </section>
           );
-        })}
+        })}</div>}
       </div>
     </div>
   );

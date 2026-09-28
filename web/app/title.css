@@ -353,7 +353,9 @@ body:has(.sheet) .modetag { visibility: hidden; }
 .rival .lb { margin-top: 10px; }
 /* the heading says what the board is; players with no name have no Race here */
 .rival .lb--full > h3, .rival .unnamed { display: none; }
-/* their ghosts: a cup's emblem before its name; a row names a hole, not a player */
+/* their ghosts: all the cups in one board's frame (globals.css .lb--full ol), a cup's emblem before its name; a row names a hole, not a player */
+.ghosts__list { width: min(100%, 640px); margin-top: 10px; }
+.ghosts__list > .rival__way { width: 100%; }
 .ghosts__cup { display: flex; align-items: center; gap: 10px; }
 .ghosts__cup svg { width: 36px; height: 36px; flex: none; }
 .ghosts__cup + .lb .lb__who { font-family: var(--font); font-size: 15px; font-weight: 700; }

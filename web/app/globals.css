@@ -1958,7 +1958,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 @media (max-width: 480px) { .lb--full li, .lb__mine li { grid-template-columns: 30px minmax(0, 1fr) auto 40px; } }
 /* a full board scrolls in its list only: a toon scrollbar in its own gutter,
    and the rows fade out at the bottom edge instead of being cut */
-.lb--full ol { max-height: 46vh; overflow-y: auto; scrollbar-width: auto; scrollbar-gutter: stable; padding: 2px 8px 22px 0; mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
+.lb--full ol, .ghosts__list { max-height: 46vh; overflow-y: auto; scrollbar-width: auto; scrollbar-gutter: stable; padding: 2px 8px 22px 0; mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
 .lb--full ol::-webkit-scrollbar { display: block; width: 12px; }
 .lb--full ol::-webkit-scrollbar-track { background: rgba(var(--ink-rgb), .08); border-radius: var(--pill); margin: 4px 0 20px; }
 .lb--full ol::-webkit-scrollbar-thumb { background: var(--green); border: var(--edge); border-radius: var(--pill); }
