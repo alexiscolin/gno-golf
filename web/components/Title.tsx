@@ -230,12 +230,12 @@ function makeFilm(v: Visit) {
     v.notify();
   };
   el.addEventListener("ended", end);
-  el.addEventListener("playing", () => clearTimeout(waited));
+  // it fades in once it really plays: the sky's colour until then, never a still or a poster that jumps
+  el.addEventListener("playing", () => (clearTimeout(waited), el.classList.add("title__video--on")));
   // it stops for data half way: a few seconds' grace, then the splash
   el.addEventListener("waiting", () => (clearTimeout(waited), (waited = setTimeout(end, 4000))));
   const load = () => {
     if (visit !== v || v.phase !== "video") return;
-    el.poster = "title/bg-poster.webp";
     for (const [src, type] of FILM) {
       const so = document.createElement("source");
       so.src = src;
@@ -342,7 +342,7 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
     <div className={"screen screen--title" + (sw ? ` tsky--${sw}` : "") + (ready ? " screen--ready" : "")} onClick={ready ? start : undefined}>
       <div className="title__sky" aria-hidden="true" />
       {sw && (
-        <picture className={"title__still" + (scene?.live && !playing ? " title__still--off" : "")} aria-hidden="true">
+        <picture className={"title__still" + (scene && (scene.live || playing) ? " title__still--off" : "")} aria-hidden="true">
           <source media="(orientation: portrait)" srcSet={`title/${sw}-p.webp`} />
           <img src={`title/${sw}.webp`} alt="" />
         </picture>

@@ -5,7 +5,7 @@
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
-// small for the web (AV1 and VP9 webm, H.264 mp4, a poster).
+// small for the web (AV1 and VP9 webm, H.264 mp4; no poster: the page fades the film in over the sky's colour).
 //
 // One headless Chrome (its own profile, killed by PID at the end) opens the
 // running dev client (http://localhost:3300) in promo mode (web/lib/promo.js)
@@ -353,10 +353,7 @@ if (CLEAN) {
   for (const pass of [1, 2])
     ff(...src, "-vf", vf("960:540"), "-an", "-c:v", "libx264", "-preset", "veryslow", "-tune", "animation", "-b:v", `${KBPS}k`, "-maxrate", `${Math.round(KBPS * 1.5)}k`, "-bufsize", `${KBPS * 3}k`, "-profile:v", "high", "-movflags", "+faststart", "-g", "240",
       "-pass", String(pass), "-passlogfile", path.join(WORK, "x264"), ...(pass === 1 ? ["-f", "null", "/dev/null"] : [path.join(DEST, "bg.mp4")]));
-  // the poster: the first frame, what shows while the video loads
-  ff("-i", path.join(out, "00000.jpg"), "-vf", "scale=1280:720:flags=lanczos", path.join(WORK, "poster.png"));
-  execFileSync("cwebp", ["-quiet", "-q", "70", path.join(WORK, "poster.png"), "-o", path.join(DEST, "bg-poster.webp")]);
-  for (const f of ["bg.av1.webm", "bg.vp9.webm", "bg.mp4", "bg-poster.webp"]) console.log(f, Math.round(fs.statSync(path.join(DEST, f)).size / 1024), "KB");
+  for (const f of ["bg.av1.webm", "bg.vp9.webm", "bg.mp4"]) console.log(f, Math.round(fs.statSync(path.join(DEST, f)).size / 1024), "KB");
   console.log("clean cut:", LEN.toFixed(2), "s");
   process.exit(0);
 }

@@ -124,7 +124,8 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 /* the film: full bleed, then cross-fading into the splash under it */
 .title__film { position: absolute; inset: 0; transition: opacity 1.4s ease-in-out; }
 .title__film--off { opacity: 0; pointer-events: none; }
-.title__video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.title__video { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 1.2s ease-out; }
+.title__video--on { opacity: 1; } /* (once it plays: over the sky's colour, not a jump) */
 /* a light scrim: the logo and the button read over any shot; less of it on the calm splash */
 .title__scrim {
   position: absolute; inset: 0; pointer-events: none; opacity: .5; transition: opacity 1.4s;
