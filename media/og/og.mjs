@@ -114,7 +114,6 @@ if (CUPS.every((c) => firsts[c])) { // (npm run og -- garden/1 island/1 town/1 m
 }
 // the home page: the trailer's end card, the badge over golden rays and
 // sparkles, and the one thing to do, big
-const ADENA = "data:image/svg+xml;base64," + fs.readFileSync(new URL("public/adena.svg", WEB)).toString("base64");
 const STAR = (x, y, s, rot = 0) => `<svg class="star" style="left:${x}px;top:${y}px;width:${s}px;height:${s}px;transform:rotate(${rot}deg)" viewBox="-11 -11 22 22"><path d="M0-10Q1.8-1.8 10 0Q1.8 1.8 0 10Q-1.8 1.8-10 0Q-1.8-1.8 0-10Z" fill="#fffaf0" stroke="#144134" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 await render(`<!doctype html><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=block" rel="stylesheet">
@@ -134,14 +133,13 @@ await render(`<!doctype html><meta charset="utf-8">
     border: 5px solid #144134; border-radius: 20px; padding: 6px 42px 10px; box-shadow: 0 8px 0 #144134; }
   .sub { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 25px; color: #fdf6e9; background: #226c57;
     border: 4px solid #144134; border-radius: 999px; padding: 5px 24px 7px; box-shadow: 0 5px 0 #144134; }
-  .sub img { width: 30px; height: 30px; border-radius: 7px; }
   .star { position: absolute; }
 </style>
 <div class="rays"></div><div class="dots"></div><div class="frame"></div>
 ${STAR(360, 70, 44, -8)}${STAR(820, 96, 36, 12)}${STAR(330, 262, 64, 6)}${STAR(846, 250, 30, -14)}
 <div class="hero"><img class="logo" src="${LOGO}">
 <div class="cta">PLAY ON GNO.LAND</div>
-<div class="sub">Free to play · Your records on-chain with <img src="${ADENA}" alt=""> Adena</div></div>`, "default.jpg");
+<div class="sub">Free to play · Your records on-chain</div></div>`, "default.jpg");
 if (b.errors.length) console.log("page errors:", b.errors.slice(0, 5));
 b.kill();
 process.exit(0);
