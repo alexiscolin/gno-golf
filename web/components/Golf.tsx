@@ -78,6 +78,7 @@ interface Config {
   cup: string;
   place: number;
   gnome: string;
+  screen: "" | "modes" | "rival";
   shot: string;
   play: boolean;
   demo: string;
@@ -106,6 +107,8 @@ function useConfig() {
       cup: /^[a-z]{2,16}$/.test(p.get("cup") || "") ? p.get("cup") || "" : "",
       place: /^\d{1,3}$/.test(p.get("hole") || "") ? Number(p.get("hole")) : 0,
       gnome: /^[a-z]{2,16}$/.test(p.get("gnome") || "") ? p.get("gnome") || "" : "",
+      // ?screen=modes, ?screen=rival: the game's choice, a duel's rival (a reload stays there)
+      screen: p.get("screen") === "rival" ? "rival" : p.get("screen") === "modes" ? "modes" : "",
       shot: p.get("shot") || "",
       // ?play skips the title screen — for screenshots and smoke tests
       play: p.has("play") || p.has("shot"),
@@ -595,6 +598,7 @@ export default function Golf() {
         .then(() => {
           if (cancelled) return;
           if (cfg.play) play();
+          else if (cfg.screen && !dare) setScreen(cfg.screen);
           else if (cfg.hole || cfg.cup) {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first); a link to nothing lands on the cups, quietly
@@ -1121,6 +1125,7 @@ export default function Golf() {
       else q.set("hole", idHere);
       q.set("gnome", gnome);
     } else if (screen === "worlds" && world) q.set("cup", world);
+    else if (screen === "modes" || screen === "rival") q.set("screen", screen);
     // (an address of its own: a step Back returns from; a dare link's title keeps it, Start goes there)
     else if (screen === "ghosts" || (screen === "title" && dare && !solo)) q.set("by", dare);
     else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
@@ -1135,7 +1140,7 @@ export default function Golf() {
     const url = base + (String(q) ? `?${q}` : "");
     const here = window.location.pathname + window.location.search;
     // a link to a hole keeps its address while the title shows (the game on its way to it)
-    if (screen === "title" && lastScreen.current === null && (cfg.hole || cfg.cup)) return;
+    if (screen === "title" && lastScreen.current === null && (cfg.hole || cfg.cup || cfg.screen)) return;
     const moved = lastScreen.current !== null && lastScreen.current !== screen;
     lastScreen.current = screen;
     // (a dare link's title and its ghosts share an address: the ghosts still get their step Back)
@@ -1150,7 +1155,7 @@ export default function Golf() {
       const p = new URLSearchParams(window.location.search);
       const st: unknown = e.state; // a history entry's state: this page's own, or anyone's
       const was = st && typeof st === "object" && "screen" in st && isScreen(st.screen) ? st.screen : null;
-      const sc: Screen = was || (p.get("hole") ? "play" : p.get("cup") ? "worlds" : "title");
+      const sc: Screen = was || (p.get("hole") ? "play" : p.get("cup") ? "worlds" : p.get("screen") === "rival" ? "rival" : p.get("screen") === "modes" ? "modes" : "title");
       lastScreen.current = sc; // arriving here is not a new step
       setMenu(false);
       setScreen(sc);

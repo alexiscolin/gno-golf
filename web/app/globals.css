@@ -1553,7 +1553,7 @@ html, body {
 .world[disabled] .world__count { color: var(--ink-soft); }
 /* one back button for every screen: round, big, top left */
 /* a screen's corner buttons, back and about: in the screen, they scroll with it */
-.screen__back, .screen__about { position: absolute; top: 34px; z-index: 2; background: var(--paper); }
+.screen__back, .screen__about { position: fixed; top: 34px; z-index: 2; background: var(--paper); } /* fixed: they stay in their corners while a long screen scrolls, as the mode's tag does */
 .screen__back { left: 34px; } .screen__about { right: 34px; }
 .round--back { display: grid; place-items: center; padding: 0; width: 52px; height: 52px; border-width: 3px; }
 .round--x { display: grid; place-items: center; padding: 0; width: 48px; height: 48px; --round: var(--ink); } /* a sheet's close: ink, not the go-ahead green */
