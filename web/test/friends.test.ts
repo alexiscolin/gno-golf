@@ -95,3 +95,16 @@ test("addFriend: appends, keeping earlier friends", () => {
     { addr: B, name: "Bo" },
   ]);
 });
+
+test("loadFriends: a friend whose name is not text is dropped, not drawn", () => {
+  localStorage.setItem("gnogolf.friends", JSON.stringify([{ addr: A, name: { x: 1 } }, { addr: B, name: "Bo" }]));
+  assert.deepEqual(loadFriends(), [{ addr: B, name: "Bo" }]);
+});
+
+test("saveFriends: a full list keeps the latest (one added now is kept)", () => {
+  const many = Array.from({ length: 60 }, (_, i) => ({ addr: A, name: String(i) }));
+  saveFriends(many);
+  const kept = JSON.parse(localStorage.getItem("gnogolf.friends") || "[]") as { name: string }[];
+  assert.equal(kept.length, 49);
+  assert.equal(kept[48].name, "59");
+});

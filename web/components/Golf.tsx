@@ -1297,7 +1297,6 @@ export default function Golf() {
                     <Button variant="secondary" aria-label="Change gnome" onClick={() => { setMenu(false); setScreen("pick"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.gnome}</svg>Gnome</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setBadgesOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.badge}</svg>Badges</Button>
                     <Button variant="secondary" onClick={() => { setMenu(false); setScreen("worlds"); }}><svg viewBox="0 0 24 24" aria-hidden="true">{MENU_ICON.cups}</svg>All cups</Button>
-                    {account && <Button variant="secondary" className="drawer__off" onClick={() => { setMenu(false); disconnectWallet(); }}>Disconnect Adena</Button>}
                   </div>
                 </section>
                 <section className="drawer__settings" aria-label="Settings">
@@ -1604,6 +1603,7 @@ export default function Golf() {
           account={account}
           wallet={wallet}
           onConnect={() => void connectWallet()}
+          onDisconnect={() => (setReal(false), disconnectWallet())}
           onClose={() => setReal(false)}
           // from a won hole (or one kept through a reload), connecting leads straight to its save
           onSave={s && s.holed && canSave ? () => (setReal(false), void recordIt()) : pending ? () => (setReal(false), keptSave()) : null}
@@ -1787,8 +1787,10 @@ function GetGnot({ address, href, label = "" }: { address: string; href: string;
  * (null: unknown); waiting: that round, said while Adena is installed.
  */
 // elsewhere: Adena's network is another node (its balance there is not this one's)
-function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed, typed, nameOk, elsewhere = false }: {
+// onDisconnect: this page forgets the account (Adena keeps it), any screen
+function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed, typed, nameOk, elsewhere = false, onDisconnect }: {
   elsewhere?: boolean;
+  onDisconnect?: () => void;
   account: Account | null; wallet: { busy: boolean; error: string | null; note?: string }; onConnect: () => void; onClose: () => void; onSave: (() => void) | null;
   rpc: string | null; chainName: string; cost: string | null; funds: number | null; lack: number | null; named: boolean | null; waiting: string | null;
   chain: Chain | null; price: number; onNamed: (name: string) => void;
@@ -1926,6 +1928,7 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
         )}
         <p className="real__fine">
           {account && <>Connected as <span className="mono">{shortAddr(account.address, 4, 3)}</span> · </>}Network: <span className="mono">{chainName}</span>
+          {account && onDisconnect && <> · <button className="linkish" onClick={onDisconnect}>Disconnect</button></>}
         </p>
     </Sheet>
   );
@@ -2004,7 +2007,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
 function NetBanner({ rpc, onSupport }: { rpc: string; onSupport: () => void }) {
   const net = networkOf(rpc);
   // (on a phone, the heart alone: the banner's words go)
-  const support = <button className="netbanner__go netbanner__support" aria-label="Support the game" onClick={onSupport}>♥<span> Support</span></button>;
+  const support = <button className="netbanner__go netbanner__support" aria-label="Support the game" onClick={onSupport}>♥<span className="netbanner__word">Support</span></button>;
   // (the Leaderboard chip's twin, on the left)
   if (net === "mainnet")
     return (

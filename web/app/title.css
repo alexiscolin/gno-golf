@@ -25,7 +25,7 @@
   --c1: #7fe8a8; --c2: #1f9a6a;
   --stage: #d3e8c8; /* the picker's card behind the gnome: a flat, muted colour of the world */
   --art: linear-gradient(180deg, #7ec8ff, #ffd6a8);
-  --sky: linear-gradient(180deg, var(--s0), var(--s1));
+  --sky: var(--s0); /* flat, toon: the world's light colour under the dots */
   --dots: radial-gradient(circle, rgba(var(--ink-rgb), .09) 1.7px, transparent 2.1px) 0 0 / 14px 14px;
   --gold-grad: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%); /* the call to action's and a won cup's badge (--gold, the flat metal, everywhere else) */
   --glow: #ffe066; --glow-rgb: 255, 224, 102;
@@ -214,19 +214,14 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .front__head { position: relative; display: grid; justify-items: center; gap: 4px; margin-bottom: clamp(14px, 2.6vh, 30px); }
 .worlds--v2 .worlds__list { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); }
 
-/* a card: a glossy frame in its world's colours, the diorama up top, the
-   player's standing on a paper panel below */
+/* a card: a flat, toon frame in its world's colour under the dots (as the
+   game's choice's panels), the diorama up top, the player's standing on a
+   paper panel below */
 .worlds--v2 .world {
   position: relative; overflow: hidden; gap: 6px; padding: 8px 8px 12px; border-radius: 26px; border: var(--edge-bold);
-  background: linear-gradient(170deg, var(--c1), var(--c2));
+  background: radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px, var(--c2);
   box-shadow: var(--deep-card);
   transition: transform var(--t-pop) var(--spring), box-shadow .2s;
-}
-.worlds--v2 .world::before {
-  /* the gloss: a sheen across the frame */
-  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
-  background: linear-gradient(115deg, transparent 10%, rgba(255, 255, 255, .5) 32%, transparent 52%);
-  mix-blend-mode: soft-light;
 }
 .world__art {
   position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 19px; overflow: hidden;
@@ -292,32 +287,45 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--shadow-btn); color: var(--ink); }
 .worlds--v2 .community { background: var(--paper); border: var(--edge); border-radius: 16px; padding: 10px 14px; } /* flat: a list to read */
 
-/* the first choice: a kart game's mode panels, never the cups' cards: the
-   colour edge to edge on a sunburst, the gnomes hopping in 3D, the name inked
-   big; the one under the pointer leaps */
+/* the first choice: a kart game's mode panels, never the cups' cards: flat
+   toon colours, ours (the fairway, the hat, the sun), inked; a flat disc for
+   the gnomes, who hop in 3D out over the panel's top; the name inked big; the
+   one under the pointer leaps */
 .modes .worlds__in { width: min(1100px, calc(100vw - 48px)); }
-.modes__list { list-style: none; margin: 0 auto; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); width: min(100%, 1040px); }
+.modes__list { list-style: none; margin: 0 auto; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); width: min(100%, 1040px); padding-top: clamp(24px, 4vh, 48px); }
 .mode {
-  position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; width: 100%; aspect-ratio: 3 / 4; padding: 0 0 20px; overflow: hidden;
+  position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; width: 100%; aspect-ratio: 3 / 4; padding: 0 0 20px; overflow: visible;
   border: var(--edge-bold); border-radius: 28px; color: var(--paper); font: inherit; text-align: left; cursor: pointer;
-  background: repeating-conic-gradient(from 0deg at 50% 40%, rgba(255, 255, 255, .13) 0 9deg, transparent 9deg 18deg), linear-gradient(170deg, var(--c1), var(--c2));
+  /* all flat: the disc (inked) and the panel's dots, on the panel's colour */
+  background:
+    radial-gradient(circle at 50% 36%, var(--c2) 0 31%, var(--ink) 31% 32.2%, transparent 32.4%),
+    radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px,
+    var(--c1);
   box-shadow: var(--deep-card); transition: transform var(--t-pop) var(--spring);
 }
+.mode--solo { --c1: #3f9a72; --c2: #8fdcae; } /* the fairway */
+.mode--duel { --c1: var(--hat); --c2: #f6a79b; } /* the hat: the rival */
+.mode--build { --c1: var(--sunny); --c2: var(--lamp); } /* the sun */
 .mode:hover:not([disabled]), .mode:focus-visible { transform: translateY(-8px) scale(1.04) rotate(-1.2deg); }
 .mode:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gold), var(--deep-card); }
 .mode--on { box-shadow: 0 0 0 4px var(--paper), 0 0 0 7px var(--ink), var(--deep-card); }
-.mode[disabled] { cursor: default; filter: saturate(.3) brightness(.95); }
-.mode__stage { position: relative; display: block; min-height: 0; }
+.mode[disabled] { cursor: default; }
+.mode[disabled] > :not(.mode__soon) { opacity: .75; }
+/* the gnomes stand out over the panel's top edge */
+.mode__stage { position: relative; display: block; min-height: 0; margin-top: -26%; }
 .mode__stage .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.mode__stage svg { position: absolute; inset: 0; margin: auto; width: 62%; height: auto; opacity: .85; }
+.mode__stage svg { position: absolute; inset: 26% 0 0; margin: auto; width: 56%; height: auto; }
 .mode__name { margin: 0 20px; font-size: clamp(34px, 4.2vw, 56px); font-weight: 700; line-height: 1; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); transform: rotate(-3deg); transform-origin: left; }
-.mode__line { margin: 10px 20px 0; font-size: 14px; font-weight: 700; line-height: 1.3; text-shadow: 0 1px 0 rgba(var(--ink-rgb), .5); }
+.mode__line { margin: 10px 20px 0; font-size: 14px; font-weight: 700; line-height: 1.3; text-shadow: 0 1px 0 var(--ink); }
 .mode__soon { position: absolute; top: 16px; right: 12px; margin: 0; transform: rotate(4deg); }
 @media (max-width: 700px) {
   /* a phone: the panels stacked, wide, the gnomes on the left */
   .modes__list { grid-template-columns: 1fr; gap: 12px; }
-  .mode { aspect-ratio: auto; min-height: 150px; grid-template-columns: 46% 1fr; grid-template-rows: 1fr auto; align-content: center; padding: 12px 0; }
-  .mode__stage { grid-row: 1 / 3; }
+  .modes__list { padding-top: 12px; }
+  .mode { aspect-ratio: auto; min-height: 150px; grid-template-columns: 46% 1fr; grid-template-rows: 1fr auto; align-content: center; padding: 12px 0;
+    background: radial-gradient(circle at 23% 50%, var(--c2) 0 50px, var(--ink) 50px 52.5px, transparent 53px), radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px, var(--c1); }
+  .mode__stage { grid-row: 1 / 3; margin-top: -10px; }
+  .mode__stage svg { inset: 0; width: 78%; }
   .mode__name { align-self: end; margin: 0 14px 0 4px; font-size: 32px; -webkit-text-stroke-width: 5px; }
   .mode__line { margin: 6px 14px 0 4px; font-size: 13px; }
 }

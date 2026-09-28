@@ -351,7 +351,7 @@ export function makePreview(canvas: HTMLCanvasElement, { ghost = false } = {}) {
   let gnome: Gnome | null = null, alive = true;
   // the ghost, a step to his right, hopping when he lands
   const rival = ghost ? makeGhost(0.55).ball : null;
-  if (rival) (rival.scale.setScalar(0.82), rival.position.set(0.62, 0, -0.2), scene.add(rival));
+  if (rival) (rival.scale.setScalar(0.82), rival.position.set(0.46, 0, -0.25), scene.add(rival), camera.position.setZ(5.2)); // (the pair, a step back: room at both sides)
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
@@ -389,7 +389,7 @@ export function makePreview(canvas: HTMLCanvasElement, { ghost = false } = {}) {
       gnome = makeBall(skin);
       gnome.scale.setScalar(0.82); // room above the hat for the hop
       gnome.userData.shade.position.y = -BALL_R + 0.02; // right under him, in frame
-      if (rival) gnome.position.x = -0.55;
+      if (rival) gnome.position.x = -0.42;
       scene.add(gnome);
     },
     resize: size,

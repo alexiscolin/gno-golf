@@ -731,4 +731,5 @@ test("sendTip: sends nothing without two addresses and a whole ugnot amount", as
   await assert.rejects(sendTip({ from: a, to: "nope", gnot: 5, price: 0.001, rpc: "http://127.0.0.1:26657" }), /Nothing to send/);
   await assert.rejects(sendTip({ from: a, to: a, gnot: 0, price: 0.001, rpc: "http://127.0.0.1:26657" }), /Nothing to send/);
   await assert.rejects(sendTip({ from: a, to: a, gnot: 1e-7, price: 0.001, rpc: "http://127.0.0.1:26657" }), /Nothing to send/);
+  await assert.rejects(sendTip({ from: a, to: a, gnot: 100, price: 0.001, rpc: "http://127.0.0.1:26657" }), /Nothing to send/, "only the tips offered");
 });

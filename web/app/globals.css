@@ -1826,7 +1826,6 @@ html, body {
 .adena__wrap .adena--on { padding-right: 52px; }
 .adena__off { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; border: var(--edge); background: var(--paper); color: var(--ink); display: grid; place-items: center; padding: 0; cursor: pointer; z-index: 2; }
 .adena__off:hover { background: var(--hat); color: var(--paper); }
-.drawer__off { display: none; }
 
 /* a word on why the ball speeds up or drifts: once a shot, gone in a moment */
 /* a small caption at the bottom, above the buttons: the trails behind the ball say the rest */
@@ -2153,6 +2152,7 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .netbanner:not(:has(.netbanner__go)) { padding-right: 16px; }
 .netbanner__go { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border: var(--edge); border-radius: 12px; background: var(--paper); color: var(--ink); font-weight: 800; text-decoration: none; white-space: nowrap; }
 .netbanner__go:hover { background: var(--gold); }
+.netbanner__support { gap: 6px; } /* the heart, then the word (a flex box drops a leading space) */
 
 /* ------------------------------------------------------------ the shot clip
    (ADR-003, NEXT_PUBLIC_CLIPS; components/Share.tsx ShareClip): the holing
@@ -2211,7 +2211,7 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .win__head { gap: 10px; } .win__head .share::before { display: none; } .share__label[data-plain] { display: none; }
   .share:has(.share__label:not([data-plain])) { flex-wrap: wrap; justify-content: center; } .share__label:not([data-plain]) { flex-basis: 100%; text-align: center; } /* a dare says so, on its own row */
   .card--weather .weather__force { display: none; }
-  .adena__off { display: none; } .adena__wrap .adena--on { padding-right: 0; } .drawer__off { display: block; grid-column: 1 / -1; }
+  .adena__off { display: none; } .adena__wrap .adena--on { padding-right: 0; }
   .cause { bottom: 104px; }
   .card--score { padding-top: 14px; } .card--score .pro-chip { top: -11px; right: -6px; font-size: 9px; }
   .screen__about { top: 30px; right: 30px; }
@@ -2265,7 +2265,7 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
 
 /* where the centred play buttons reach the banner at the bottom left: its
    words go first, then (a phone on its side, a tablet) its mainnet link */
-@media (max-width: 1280px) { .netbanner span { display: none; } }
+@media (max-width: 1280px) { .netbanner span:not(.netbanner__word) { display: none; } } /* (Support keeps its word; a phone keeps the heart) */
 @media (min-width: 601px) and (max-width: 900px) { .netbanner__go:not(.netbanner__support) { display: none; } }
 
 @media (max-width: 700px) {

@@ -395,8 +395,9 @@ async function calls(address: string, list: readonly (readonly [string, string, 
 const TIP_GAS = 2_000_000;
 /** A tip: GNOT sent from the player's account to the game's maker (the realm's
  *  owner, read on the chain), confirmed in Adena like any send. No contract. */
+export const TIPS = [1, 5, 10] as const; // the GNOT a tip can be
 export async function sendTip({ from, to, gnot, price, chainId, rpc }: { from: string; to: string; gnot: number; price: number; chainId?: string | null; rpc: string }) {
-  if (!isAddress(from) || !isAddress(to) || !(gnot > 0) || !Number.isInteger(gnot * 1e6)) throw new Error("Nothing to send.");
+  if (!isAddress(from) || !isAddress(to) || !TIPS.some((t) => t === gnot)) throw new Error("Nothing to send.");
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
   await ensureNetwork(a, { chainId, rpc });

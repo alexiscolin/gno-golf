@@ -33,9 +33,9 @@ export default function Modes({ chain, me, mode, gnome, onSolo, onDuel, onBack, 
           <h2 className="worlds__title">How do we play?</h2>
         </div>
         <ul className="modes__list">
-          <li><Panel tint="garden" name="Solo" line="Four cups, your best on the boards" skin={skin} onClick={onSolo} /></li>
-          <li><Panel tint="island" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} ghost on={asking} onClick={() => setAsking(true)} /></li>
-          <li><Panel tint="town" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>
+          <li><Panel kind="solo" name="Solo" line="Four cups, your best on the boards" skin={skin} onClick={onSolo} /></li>
+          <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} ghost on={asking} onClick={() => setAsking(true)} /></li>
+          <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>
         </ul>
         {asking && <Whom chain={chain} me={me} mode={mode} onPick={onDuel} />}
       </div>
@@ -46,9 +46,9 @@ export default function Modes({ chain, me, mode, gnome, onSolo, onDuel, onBack, 
 /** A game's panel, as a kart game's modes are: its colour edge to edge, the
  *  gnome hopping on it in 3D (a duel's ghost beside him), its name inked big.
  *  One to come is drawn, dimmed, with its sticker (and no 3D of its own). */
-function Panel({ tint, name, line, skin, ghost = false, soon = false, on = false, onClick }: { tint: string; name: string; line: string; skin: Skin; ghost?: boolean; soon?: boolean; on?: boolean; onClick?: () => void }) {
+function Panel({ kind, name, line, skin, ghost = false, soon = false, on = false, onClick }: { kind: string; name: string; line: string; skin: Skin; ghost?: boolean; soon?: boolean; on?: boolean; onClick?: () => void }) {
   return (
-    <button className={`mode tint--${tint}` + (on ? " mode--on" : "")} disabled={soon} aria-expanded={ghost ? on : undefined}
+    <button className={`mode mode--${kind}` + (on ? " mode--on" : "")} disabled={soon} aria-expanded={ghost ? on : undefined}
       aria-label={`${name}: ${line}${soon ? ". Coming soon" : ""}`} onClick={() => (sound("select"), onClick && onClick())}>
       {soon ? <span className="mode__stage"><Emblem id="build" /></span> : <Stage skin={skin} ghost={ghost} />}
       <span className="mode__name">{name}</span>

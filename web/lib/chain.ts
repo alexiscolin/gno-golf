@@ -405,7 +405,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** A gno.land name's address, or "" (r/sys/users). */
     resolveName: (name: string) =>
       isName(name)
-        ? qstr("gno.land/r/sys/users", `func() string { d, _ := ResolveName(${s(name)}); if d == nil { return "" }; return d.Addr().String() }()`)
+        ? qstr("gno.land/r/sys/users", `func() string { d, _ := ResolveName(${s(name)}); if d == nil { return "" }; return d.Addr().String() }()`).then((a) => (isAddress(a) ? a : ""))
         : Promise.resolve(""),
     /** An address's gno.land name, or "". */
     nameOf: (addr: string) =>
@@ -446,7 +446,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** A player's best on a hole in a mode with its period and shots, or null: the ghost a duel races, replayed with replayRound then simulateFrom. */
     ghost: (hole: string, mode: string, player: string) =>
       isAddress(player)
-        ? qeval(`Ghost(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.ghost).then((g) => (g && g.player === player && g.mode === m(mode) ? g : null)) // (the one asked for, or none)
+        ? qeval(`Ghost(${s(hole)}, ${s(m(mode))}, address(${s(player)}))`, checks.ghost).then((g) => (g && g.player === player && g.mode === m(mode) && (g.hole === hole || g.hole.startsWith(hole + "/")) ? g : null)) // (the one asked for, or none)
         : Promise.resolve(null),
     /** A page of a hole's board: { hole, mode, par, players (named), finished (everyone), offset, rows: [{ player, strokes }], next (the next page's offset, 0 at the end) }. */
     holeLeaderboard: (hole: string, offset = 0, limit = 10, mode = "assisted") =>
