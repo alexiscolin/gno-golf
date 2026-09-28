@@ -32,6 +32,7 @@ interface PromoEngine {
   chain: Chain;
   fire: (deg: number, power: number) => Promise<void>;
   ball: () => Gnome;
+  ghost?: () => Gnome | null; // a duel's ghost (engine/rival.ts), once made
   every?: () => number;
   setClock: (t: number) => void;
 }
@@ -50,6 +51,7 @@ interface Cam {
   // keys
   from?: Key; to?: Key; look?: Key; lookFrom?: Key; lookTo?: Key;
   near?: number; fov0?: number; fov?: number; roll?: number;
+  ghost?: boolean; // on a duel's ghost, not the player's gnome
 }
 interface Title {
   html: string;
@@ -76,13 +78,14 @@ interface Shot {
   spin?: number; clockAt?: number | null;
   flash?: number; punch?: number; card?: number | null; blur?: number; dim?: number; whip?: number;
   burst?: number | null; burstOpacity?: number; hits?: readonly number[]; rays?: boolean;
+  ui?: string; // the page's own pieces left in view (a duel's callout, its score card, a screen): a selector list
 }
 
 // a capture tool: dev builds, or a page opened with ?camlog where the test hooks answer (testhooks.ts)
 // read from the link the page was opened with: the page loads this module only
 // once it has asked for it, and by then its address bar may say another thing
 const opened = typeof window !== "undefined" ? new URL(performance.getEntriesByType("navigation")[0]?.name || window.location.href).search : "";
-const on = new URLSearchParams(opened).has("promo") && (process.env.NODE_ENV !== "production" || camlog(opened));
+const q = new URLSearchParams(opened), on = q.has("promo") && (process.env.NODE_ENV !== "production" || camlog(opened));
 const FPS = 30;
 
 let E: PromoEngine | null = null; // the engine's insides, given by attach()
@@ -98,6 +101,20 @@ export const promo = {
     if (new URLSearchParams(opened).has("build")) {
       const state = e.chain.state;
       e.chain.state = async (hole) => ({ ...(await state(hole)), unbaked: true });
+    }
+    // ?promo&by=: a duel's reads (the ghost, its strokes, the rival's name, the player's later
+    // strokes) answered from those render.mjs kept (window.__promoReads), and a new one kept
+    // there: a re-render replays the same duel (a stroke's period left out of its key)
+    if (q.has("by")) {
+      const w = window as Window & { __promoReads?: Record<string, unknown> }, kept = (w.__promoReads ||= {});
+      const c = e.chain as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+      for (const [k, n] of [["ghost", 3], ["nameOf", 1], ["replayRound", 3], ["simulateFrom", 4]] as const) {
+        const f = c[k];
+        c[k] = (...a) => {
+          const key = k + JSON.stringify(a.slice(0, n));
+          return key in kept ? Promise.resolve(kept[key]) : f(...a).then((r) => (kept[key] = r));
+        };
+      }
     }
   },
   /** Called by the engine's frame, after its own rig: the shot's camera wins. */
@@ -164,8 +181,8 @@ function install() {
 
   const css = document.createElement("style");
   css.textContent = `
-    #stage ~ *:not(.wet):not(#promo), nextjs-portal { display: none !important; }
     #stage { transform-origin: 50% 50%; }
+    .hud--top { zoom: 1.7; } /* a duel's score card, when shown: read at a trailer's size */
     #promo { position: fixed; inset: 0; z-index: 9999; pointer-events: none; overflow: hidden;
       font-family: Fredoka, ui-rounded, system-ui, sans-serif; }
     #promo .flash { position: absolute; inset: 0; background: #fffdf6; opacity: 0; }
@@ -200,6 +217,13 @@ function install() {
       color: #144134; background: #fdf6e9; border: 5px solid #144134; border-radius: 999px; padding: 6px 28px; margin-top: 26px; }
   `;
   document.head.appendChild(css);
+  // the page's own pieces hidden, but those a shot shows (ui), the others in their row (the HUD's) kept in place, unseen
+  const hide = document.createElement("style");
+  const show = (ui = "") => (hide.textContent = `#stage ~ *:not(.wet, #promo${ui && `, ${ui}, :has(${ui})`}), nextjs-portal { display: none !important; }`
+    + (ui && ` #stage ~ :has(${ui}) :not(:is(${ui}), :is(${ui}) *, :has(${ui})) { visibility: hidden !important; }`));
+  show();
+  document.head.appendChild(hide);
+  const born = new WeakMap<Animation, number>(); // a CSS animation's start on the promo clock
 
   const layer = document.createElement("div");
   layer.id = "promo";
@@ -253,7 +277,8 @@ function install() {
   }
   const api = {
     /** The hole is built and drawn. */
-    ready: () => !!(E && E.g.id && E.g.s && E.g.course && E.g.started),
+    // (a screen shot, ?screen=: the course never starts behind it; a duel: its ghost on the tee)
+    ready: () => !!(E && E.g.id && E.g.s && E.g.course && (q.has("screen") || (E.g.started && (!q.has("by") || !!(E.ghost && E.ghost()?.visible))))),
     info: () => {
       const e = E!, s = e.g.s!;
       return {
@@ -282,6 +307,8 @@ function install() {
         return Promise.resolve(r);
       };
       e.g.view = "ball";
+      show(c.ui);
+      if (c.ui) dispatchEvent(new Event("resize")); // (a piece measured while hidden, a gnome's stage, takes its size)
       pieces = c.build ? piecesOf() : null;
       titles = (c.titles || []).map((t) => {
         const el = document.createElement("div");
@@ -333,11 +360,21 @@ function install() {
         // clockAt: the timed pieces held at one tick (a tram that would sink out of a still shot)
         if (cfg_.clockAt != null && !e.g.flying) e.setClock(cfg_.clockAt);
         tick(r);
+        // the pieces shown play their CSS animations (a callout's pop) on the promo clock too
+        // (a scroll-driven one is left alone)
+        if (cfg_.ui) for (const a of document.getAnimations()) {
+          if (a.timeline !== document.timeline) continue;
+          if (!born.has(a)) born.set(a, vt);
+          a.pause();
+          a.currentTime = vt - born.get(a)!;
+        }
         draw();
         // the game's promise chains (a replay's next step) run before the next frame
         await new Promise((r) => nSet(r, 0));
       }
-      return { t: tt, flying: e.g.flying, holed: e.g.done, scale: e.ball().scale.x, visible: e.ball().visible, y: e.ball().position.y };
+      const gb = e.ghost && e.ghost();
+      return { t: tt, flying: e.g.flying, holed: e.g.done, scale: e.ball().scale.x, visible: e.ball().visible, y: e.ball().position.y,
+        ghost: gb && { scale: gb.scale.x, visible: gb.visible } };
     },
     /** The sounds of the shot, from its time 0, as a 16-bit WAV in base64. */
     async audio(from = 0, dur = 3) {
@@ -439,8 +476,8 @@ let camInit = false;
 const shot = chaseState(); // the follow framing, shared with the game's third-person view
 
 function aim(camera: THREE.PerspectiveCamera, c: Cam) {
-  const { g, ball } = E!, s = g.s!, b = s.board, h = (x: number, z: number) => (g.course ? g.course.userData.height(x, z) : 0);
-  const B = ball().position, t = Math.max(tt, 0), T = c.dur || 2;
+  const { g } = E!, s = g.s!, b = s.board, h = (x: number, z: number) => (g.course ? g.course.userData.height(x, z) : 0);
+  const who = (c.ghost && E!.ghost && E!.ghost()) || E!.ball(), B = who.position, t = Math.max(tt, 0), T = c.dur || 2;
   // [u, y, v, dz]: board fractions across and along, height and an extra depth in units
   const u = (p: Key) => tmp.set(p[0] * b.w, p[1], p[2] * b.h + (p[3] || 0));
   const k = Math.min(Math.max(tt / T, 0), 1), sk = smoothstep(k);
@@ -456,7 +493,7 @@ function aim(camera: THREE.PerspectiveCamera, c: Cam) {
     if (!camInit) pos.copy(want.pos);
     else pos.lerp(want.pos, 1 - Math.exp(-(c.lag || 5) / FPS));
     look.copy(want.look);
-  } else if (c.mode === "track" && c.hold && camInit && (ball().scale.x < 0.97 || !ball().visible || B.y < -0.3)) {
+  } else if (c.mode === "track" && c.hold && camInit && (who.scale.x < 0.97 || !who.visible || B.y < -0.3)) {
     // hold: the ball goes into water or a crevasse, the camera stays where it was and watches it go
   } else if (c.mode === "track") {
     // alongside the ball at a fixed offset, lagging a little

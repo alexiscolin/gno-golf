@@ -1296,7 +1296,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     requestAnimationFrame(frame);
   }
 
-  promo.attach({ g, chain, fire, ball: () => ball, every: () => everyOf(), setClock: (t: number) => (clock = t) }); // ?promo only
+  promo.attach({ g, chain, fire, ball: () => ball, ghost: () => rival.ball(), every: () => everyOf(), setClock: (t: number) => (clock = t) }); // ?promo only
   const api = {
     start,
     load,
