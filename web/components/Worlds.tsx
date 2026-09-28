@@ -6,7 +6,8 @@ import { CUPS, CUP_NAMES, vsPar, type Cup, type CupTotal, type cupTotals } from 
 import { sound } from "@/lib/feel";
 import { stillsOnly } from "@/lib/prefs";
 import { Green } from "@/components/Title";
-import { AboutButton, BackButton } from "@/components/About";
+import { FrontScreen } from "@/components/About";
+import { Button, VsPar } from "@/components/ui";
 import { strokesWord } from "@/components/common";
 import "@/app/title.css";
 
@@ -217,102 +218,94 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
     setWipe(null);
     setResets(false);
   };
-  return (
-    <div className={`screen worlds worlds--v2 front tint--${hot || current || "garden"}`}>
-      <BackButton label="Back to the games" onClick={() => (sound("blip"), onBack())} />
-      <AboutButton onClick={onAbout} />
-      {played.length > 0 && (
-        <div className="resets">
-          <button className="round round--pill" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>
-            Reset scores ▾
-          </button>
-          {resets && (
-            <div className="resets__menu" role="menu">
-              {played.map((w) => (
-                <button key={w.id} role="menuitem" className={"world__reset" + (wipe === w.id ? " world__reset--sure" : "")} onClick={() => clear(w.id, () => onReset(w.id))}>
-                  {wipe === w.id ? "Sure? Tap again" : w.name}
-                </button>
-              ))}
-              <button role="menuitem" className={"world__reset" + (wipe === "all" ? " world__reset--sure" : "")} onClick={() => clear("all", onResetAll)}>
-                {wipe === "all" ? "Sure? Badges go too" : "Every cup"}
-              </button>
-            </div>
-          )}
+  // the reset menu, in the corner row beside About
+  const resetMenu = played.length > 0 && (
+    <div className="resets">
+      <button className="round round--pill" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>
+        Reset scores ▾
+      </button>
+      {resets && (
+        <div className="resets__menu" role="menu">
+          {played.map((w) => (
+            <Button key={w.id} role="menuitem" className={"btn--s" + (wipe === w.id ? " btn--danger" : "")} onClick={() => clear(w.id, () => onReset(w.id))}>
+              {wipe === w.id ? "Sure? Tap again" : w.name}
+            </Button>
+          ))}
+          <Button role="menuitem" className={"btn--s" + (wipe === "all" ? " btn--danger" : "")} onClick={() => clear("all", onResetAll)}>
+            {wipe === "all" ? "Sure? Badges go too" : "Every cup"}
+          </Button>
         </div>
       )}
-      <div className="worlds__in">
-        <div className="front__head">
-          <span className="eyebrow">Choose your cup</span>
-          <h2 className="worlds__title">Where do we play?</h2>
-          {racing}
-        </div>
-        {podium}
-        <ul className="worlds__list">
-          {WORLDS.map((w) => {
-            const n = counts[w.id] || 0;
-            // where the player stands in it: holes done, and strokes against par
-            const t = stats[w.id] || NOT_PLAYED;
-            const vs = t.strokes - t.par, won = n > 0 && t.done >= n;
-            const score = `${t.strokes} · ${vsPar(vs)}`;
-            const open = n > 0;
-            return (
-              <li key={w.id}>
-                <button
-                  className={`world world--${w.id} tint--${w.id}` + (w.id === current ? " world--on" : "")}
-                  disabled={!open}
-                  onClick={() => (sound("select"), onPick(w.id))}
-                  // a mouse's hover (a tap goes straight in) or the keyboard's focus
-                  onPointerEnter={(e) => open && e.pointerType === "mouse" && setHot(w.id)}
-                  onPointerLeave={() => setHot(null)}
-                  onFocus={() => open && setHot(w.id)}
-                  onBlur={() => setHot(null)}
-                  aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
-                >
-                  <Diorama id={w.id} on={hot === w.id && open} />
-                  {w.id === current && <span className="tag world__last" aria-hidden="true">Last played</span>}
-                  {won && <Won clean={t.clean} score={score} />}
-                  <span className="world__ribbon">{w.name}</span>
-                  <span className="world__info">
-                  <span className="world__tag">{w.tag}</span>
-                  <span className="world__count">{n ? `${n} holes` : "Coming soon"}</span>
-                  {n > 0 && (
-                    <span className="world__me">
-                      <span className={`world__track load--${w.id}`}><Green p={t.done / n} world={w.id} holed={t.done === n} thick /></span>
-                      <span className="world__score">
-                        {t.done ? (
-                          <>
-                            <b>{t.done}/{n}</b> · {strokesWord(t.strokes)} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsPar(vs)}</b>
-                            {t.clean && <span className="world__stamp" title="At par or under">★</span>}
-                          </>
-                        ) : "Not played yet"}
-                      </span>
-                    </span>
-                  )}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
-        {community.length > 0 && (
-          <section className="community" aria-label="Community holes">
-            <h3>Community holes <small>not ranked</small></h3>
-            <ul>
-              {community.slice(0, shown).map((h) => (
-                <li key={h.id}>
-                  <button className="linkish" onClick={() => (sound("select"), onCommunity(h.id))}>{h.name}</button>
-                </li>
-              ))}
-            </ul>
-            {community.length > shown && (
-              <button className="linkish" onClick={() => setShown((n) => n + PAGE)}>
-                Show more ({community.length - shown} left)
-              </button>
-            )}
-          </section>
-        )}
-      </div>
     </div>
+  );
+  return (
+    <FrontScreen className="worlds--v2" tint={hot || current || "garden"} back="Back to the games" onBack={onBack} onAbout={onAbout} eyebrow="Choose your cup" title="Where do we play?" dare={racing} corner={resetMenu}>
+      {podium}
+      <ul className="worlds__list">
+        {WORLDS.map((w) => {
+          const n = counts[w.id] || 0;
+          // where the player stands in it: holes done, and strokes against par
+          const t = stats[w.id] || NOT_PLAYED;
+          const vs = t.strokes - t.par, won = n > 0 && t.done >= n;
+          const score = `${t.strokes} · ${vsPar(vs)}`;
+          const open = n > 0;
+          return (
+            <li key={w.id}>
+              <button
+                className={`world world--${w.id} tint--${w.id}` + (w.id === current ? " world--on" : "")}
+                disabled={!open}
+                onClick={() => (sound("select"), onPick(w.id))}
+                // a mouse's hover (a tap goes straight in) or the keyboard's focus
+                onPointerEnter={(e) => open && e.pointerType === "mouse" && setHot(w.id)}
+                onPointerLeave={() => setHot(null)}
+                onFocus={() => open && setHot(w.id)}
+                onBlur={() => setHot(null)}
+                aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
+              >
+                <Diorama id={w.id} on={hot === w.id && open} />
+                {w.id === current && <span className="tag world__last" aria-hidden="true">Last played</span>}
+                {won && <Won clean={t.clean} score={score} />}
+                <span className="world__ribbon">{w.name}</span>
+                <span className="world__info">
+                <span className="world__tag">{w.tag}</span>
+                <span className="world__count">{n ? `${n} holes` : "Coming soon"}</span>
+                {n > 0 && (
+                  <span className="world__me">
+                    <span className={`world__track load--${w.id}`}><Green p={t.done / n} world={w.id} holed={t.done === n} thick /></span>
+                    <span className="world__score">
+                      {t.done ? (
+                        <>
+                          <b>{t.done}/{n}</b> · {strokesWord(t.strokes)} · <VsPar vs={vs} />
+                          {t.clean && <span className="world__stamp" title="At par or under">★</span>}
+                        </>
+                      ) : "Not played yet"}
+                    </span>
+                  </span>
+                )}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
+      {community.length > 0 && (
+        <section className="community" aria-label="Community holes">
+          <h3>Community holes <small>not ranked</small></h3>
+          <ul>
+            {community.slice(0, shown).map((h) => (
+              <li key={h.id}>
+                <button className="linkish" onClick={() => (sound("select"), onCommunity(h.id))}>{h.name}</button>
+              </li>
+            ))}
+          </ul>
+          {community.length > shown && (
+            <button className="linkish" onClick={() => setShown((n) => n + PAGE)}>
+              Show more ({community.length - shown} left)
+            </button>
+          )}
+        </section>
+      )}
+    </FrontScreen>
   );
 }

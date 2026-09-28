@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
 import { REALM_PATH } from "@/lib/chain";
+import { sound } from "@/lib/feel";
 
 // About: how it works, what is in it, where to go next, and who made it.
 const GITHUB = "https://github.com/alexiscolin", REPO = `${GITHUB}/gno-golf`;
@@ -38,11 +39,15 @@ const FACTS = ["4 cups · 72 holes · 2 extras", "Weather that changes every 5 m
 /** The round corner button every screen has: back at the top left, about at the top right. */
 function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button className={`round round--small round--back screen__${side}`} aria-label={label} title={label} onClick={(e) => (e.stopPropagation(), onClick())}>
+    <button className={`round round--icon screen__${side}`} aria-label={label} title={label} onClick={(e) => (e.stopPropagation(), onClick())}>
       {children}
     </button>
   );
 }
+/** The inked (i) of About: the corner button's, the menu's. */
+export const InfoIcon = () => (
+  <svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+);
 /** A screen's back button: an inked arrow in the top-left corner. */
 export const BackButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
   <CornerButton side="back" label={label} onClick={onClick}>
@@ -52,9 +57,48 @@ export const BackButton = ({ label, onClick }: { label: string; onClick: () => v
 /** A screen's about button: an inked (i) in the top-right corner. */
 export const AboutButton = ({ onClick }: { onClick: () => void }) => (
   <CornerButton side="about" label="About Gnogolf" onClick={onClick}>
-    <svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+    <InfoIcon />
   </CornerButton>
 );
+
+/**
+ * A front screen as the games, the rival, their ghosts and the cups have it:
+ * its colours (tint), Back and About in its corners (and what else the
+ * corner row holds: corner), its head (the pill, the title, the rival raced
+ * under them: dare), then its own parts.
+ */
+interface FrontScreenProps {
+  /** the screen's own classes, beside "screen worlds front" */
+  className: string;
+  tint?: string;
+  /** the inner column's own class, beside "worlds__in" */
+  inner?: string;
+  back: string;
+  onBack: () => void;
+  onAbout: () => void;
+  eyebrow: string;
+  title: string;
+  dare?: ReactNode;
+  corner?: ReactNode;
+  children?: ReactNode;
+}
+export function FrontScreen({ className, tint = "garden", inner = "", back, onBack, onAbout, eyebrow, title, dare, corner, children }: FrontScreenProps) {
+  return (
+    <div className={`screen worlds front ${className} tint--${tint}`}>
+      <BackButton label={back} onClick={() => (sound("blip"), onBack())} />
+      <AboutButton onClick={onAbout} />
+      {corner}
+      <div className={`worlds__in ${inner}`.trim()}>
+        <div className="front__head">
+          <span className="eyebrow">{eyebrow}</span>
+          <h2 className="worlds__title">{title}</h2>
+          {dare}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // the rules as the chain plays them (golf.gno, docs/golf.md) and the card keeps them (lib/card.ts)
 const RULES: readonly (readonly [string, readonly (readonly [string, string])[]])[] = [
@@ -131,7 +175,7 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
       <ul className="about__links">
         {links.map(([name, href, what]) => (
           <li key={name}>
-            <a href={href} {...out}><b>{name} ↗</b><span>{what}</span></a>
+            <a className="btn btn--ghost" href={href} {...out}><b>{name} ↗</b><span>{what}</span></a>
           </li>
         ))}
       </ul>

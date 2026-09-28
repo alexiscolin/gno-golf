@@ -93,27 +93,19 @@
   display: inline-block; padding: 4px 14px; border-radius: var(--pill);
   font-size: var(--fs-pill); font-weight: 700; letter-spacing: .12em; color: var(--paper); background: var(--ink);
 }
-/* a paper panel: a card's standing (on its card's face, and its drop) and
-   the title's facts (flat: they only show) */
-.world__info, .screen--title .title__facts li { background: var(--paper); border: var(--edge); border-radius: 16px; }
-.world__info { border-width: 2.5px; box-shadow: var(--shadow-btn); }
-/* a round button: paper, inked, on its shadow (back, previous, next) */
-.front .round {
-  background: var(--paper); color: var(--ink); border: var(--edge-bold); box-shadow: var(--shadow-btn);
-  transition: transform var(--t-press), box-shadow var(--t-press);
-}
-.front .round:hover { background: var(--paper); transform: translateY(-2px); box-shadow: 0 6px 0 var(--ink); }
-.front .round:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
-/* the call to action: gold, inked, on its shadow (the title's start, the picker's
-   pick, a duel's Race: the picks', the hole cards', a friend's, a board row's);
-   this file loads after globals.css, so .btn--start is over .btn--cta and .btn--main */
-.btn--gold, .rival__go, .btn--start, .front .btn--play:not([disabled]) {
+/* a front's paper panel: a card's standing (on its card's face, and its
+   drop), the title's facts, the aim's card, the community holes, a new
+   gnome's (flat: they only show) */
+.world__info, .screen--title .title__facts li, .front .aimset--compact, .worlds--v2 .community, .newgnome { background: var(--paper); border: var(--edge); border-radius: var(--r-card); }
+.world__info { box-shadow: var(--shadow-btn); }
+/* the call to action: gold, inked, on its shadow (Button's "gold": the title's
+   start and the picker's pick, globals.css .btn--cta; a duel's Race: the
+   picks', the hole cards', a friend's, a board row's) */
+.btn--gold, .rival__go {
   background: var(--gold-grad); color: var(--ink); border: var(--edge-bold);
 }
-.btn--gold[disabled] { opacity: .5; }
-.front .btn--play { font-size: clamp(18px, 2vw, 22px); font-weight: 700; padding: 12px 34px; border-radius: 20px; box-shadow: 0 6px 0 var(--ink); animation: pop .35s var(--spring); }
-.front .btn--play:hover:not([disabled]) { transform: translateY(-2px); box-shadow: 0 8px 0 var(--ink); }
-.front .btn--play:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
+/* the picker's pick, a size under the title's start */
+.front .btn--play { font-size: clamp(18px, 2vw, 22px); padding: 12px 34px; }
 
 /* ------------------------------------------------------------ the title */
 
@@ -185,7 +177,6 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   box-shadow: 0 7px 0 var(--ink), 0 0 0 0 rgba(var(--glow-rgb), .7);
   animation: pop .35s var(--spring), cta-pulse 1.6s .4s ease-in-out infinite;
 }
-.btn--start svg { stroke: var(--ink); }
 .btn--start:hover { animation-play-state: paused; }
 @keyframes cta-pulse {
   50% { transform: scale(1.07); box-shadow: 0 7px 0 var(--ink), 0 0 0 14px rgba(var(--glow-rgb), 0); }
@@ -302,8 +293,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 /* sized by the window's height too, so a laptop's cards end clear of the network banner */
 .worlds--v2 .world__art { width: min(80%, 20vh); margin: 4px auto 0; aspect-ratio: 1 / 1; border-radius: 50%; }
 .worlds--v2 .world[disabled] .world__art img { filter: grayscale(.85) opacity(.75); }
-.worlds--v2 .resets .world__reset:not(.world__reset--sure) { box-shadow: var(--shadow-btn); color: var(--ink); }
-.worlds--v2 .community { background: var(--paper); border: var(--edge); border-radius: 16px; padding: 10px 14px; } /* flat: a list to read */
+.worlds--v2 .community { padding: 10px 14px; } /* flat: a list to read */
 
 /* the first choice: a kart game's mode panels, never the cups' cards: flat
    toon colours, ours (the fairway, the hat, the sun), inked; a flat disc for
@@ -324,7 +314,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode--solo { --c1: var(--turf); --c2: var(--fairway); } /* the fairway */
 .mode--duel { --c1: #f6a79b; --c2: var(--hat); } /* the hat: the rival */
 .mode--build { --c1: var(--lamp); --c2: var(--sunny); } /* the sun */
-.mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
+.worlds--v2 .world:focus-visible, .mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
 .mode[disabled] { cursor: default; }
 .mode[disabled] > :not(.mode__soon, .mode__line, .rival__tag) { opacity: .75; } /* (its line stays readable) */
 /* the gnomes stand out over the panel's top edge */
@@ -422,9 +412,11 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
 .rival__name { grid-area: name; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 4px 0; font-size: clamp(22px, 2.3vw, 30px); font-weight: 700; line-height: 1.1; }
 .rival__line { grid-area: line; padding: 0 4px; }
 .rival__pick:disabled .rival__line { grid-column: 1 / -1; white-space: nowrap; } /* (no Race: its line takes the width, one line) */
-/* Race: the call to action's gold (above), on its drop */
-.rival__go { padding: 6px 22px 7px; border-radius: var(--pill); font-size: 18px; font-weight: 700; box-shadow: 0 4px 0 var(--ink); }
+/* Race: the call to action's gold (above), a pill on its drop */
+.rival__go { padding: 6px 22px 7px; border-radius: var(--pill); font-size: 18px; font-weight: 700; box-shadow: var(--shadow-btn); }
 .rival__go::after { content: " ▸"; }
+/* a board row's, small (globals.css .lb li) */
+.lb__race { display: inline-flex; align-items: center; min-height: 32px; padding: 2px 14px; font-size: 13px; white-space: nowrap; }
 .rival__pick .rival__go { grid-area: go; justify-self: end; }
 /* the map, in its cup's colours (its tint): the ground round the rails, the
    lane's felt in them, what the ball meets flat on it; the rails inked; the
@@ -554,7 +546,6 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 .ghost__best strong { margin-right: 4px; font-size: 34px; line-height: 1; color: var(--ink); }
 .ghost__you { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; font-size: 14px; color: var(--ink); }
 .ghost__you--none { color: var(--ink-soft); }
-.ghost__you .bad { color: var(--hat-ink); } /* over their best: the boards' red */
 .ghost__you--won { padding: 1px 10px; border: var(--edge); border-radius: var(--pill); background: var(--green); color: var(--paper); font-weight: 700; transform: rotate(-3deg); } /* you beat them there already */
 .ghost .rival__go { justify-self: stretch; min-height: 40px; margin-top: 8px; text-align: center; }
 .ghost.podium__ghost i { width: 70%; margin-top: 8px; }
@@ -601,7 +592,6 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 .front .aimset--compact {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px;
   width: min(400px, 100%); margin: 0 0 var(--gap-xl); padding: 8px 16px 10px;
-  background: var(--paper); border: var(--edge); border-radius: 18px;
 }
 .screen--pick .aimset--compact .aimset__label { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
 .screen--pick .aimset--compact .aimset__help { flex-basis: 100%; font-size: 13.5px; font-weight: 400; line-height: 1.35; text-align: center; color: var(--ink); }
@@ -691,16 +681,14 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 }
 .victory__sum { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 10px; margin: 0; font-size: 18px; font-weight: 700; color: var(--ink-soft); }
 .victory__sum strong { font-size: clamp(36px, 6vw, 52px); line-height: 1; color: var(--ink); }
-.victory__sum .good { color: var(--green); }
-.victory__sum .bad { color: var(--hat-ink); }
 .victory__stamp {
   align-self: center; padding: 3px 10px; border: 2px solid var(--hat-ink); border-radius: var(--pill); color: var(--hat-ink);
   font-size: 13px; font-weight: 800; transform: rotate(-4deg);
 }
 .victory .scorecard { width: 100%; margin: 0; min-height: auto; } /* its full height: the card scrolls, nothing slides under the next block */
 /* a gnome just unlocked: its stage and its words, the one solid action under them */
-.newgnome { display: flex; align-items: center; gap: 18px; width: 100%; padding: 12px 16px; border: var(--edge); border-radius: 22px; background: var(--paper); text-align: left; } /* flat: its button is the thing to press */
-.victory .newgnome__stage { flex: 0 0 auto; width: 120px; height: 134px; border-radius: 22px; }
+.newgnome { display: flex; align-items: center; gap: 18px; width: 100%; padding: 12px 16px; text-align: left; } /* flat: its button is the thing to press */
+.victory .newgnome__stage { flex: 0 0 auto; width: 120px; height: 134px; border-radius: var(--r-card); }
 .newgnome__say { display: grid; justify-items: start; gap: 4px; }
 .newgnome__say small { color: var(--ink-soft); font-size: 13px; }
 .newgnome__name { font-size: 28px; line-height: 1.1; --ink-w: 6px; --ink-drop: 4px; } /* the picker's name, a size down */

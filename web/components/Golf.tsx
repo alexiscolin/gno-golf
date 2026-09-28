@@ -21,12 +21,12 @@ import Worlds, { WORLDS, EXTRAS, Emblem, groupOf, worldOf } from "@/components/W
 import Weather from "@/components/Weather";
 import Share, { ShareClip, type Clip } from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
-import About, { AboutButton, BackButton, Rules } from "@/components/About";
+import About, { AboutButton, BackButton, InfoIcon, Rules } from "@/components/About";
 import { Badges, CardStamps, ChainSeal, EarnedBadges, NewBadges } from "@/components/Badges";
 import Tip from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
-import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip } from "@/components/ui";
+import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
@@ -437,6 +437,8 @@ export default function Golf() {
   // this hole's score on the card (the round before), said by the strokes while playing it
   const hereRow = s && allList.find((h) => h.id === s.id);
   const last = s && !s.holed && hereRow ? scoreOf(card, hereRow) : undefined;
+  // an assisted round, said on the strokes card's corner (solo or duel)
+  const assisted = s && (s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>;
   // once earned, a gnome stays earned: a hole registered later must not take
   // it back, and the hole list not being loaded yet must not either
   const had = earned(); // read once a render, not once a gnome
@@ -1287,14 +1289,14 @@ export default function Golf() {
                   {s.done && !s.flying ? { win: racing.self ? "You beat your best" : "You won", tie: "Tie", loss: racing.self ? "Your best won" : "They won" }[duelResult(s.strokes, racing, "").result] : theyWon ? (racing.self ? "Your best won" : "They won") : raceLeft(s.strokes + 1, racing.ghost.strokes)}
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6" /></svg>
                 </span>
-                {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
+                {assisted}
               </button>
             ) : (
               <div className="card card--score">
                 <span className="eyebrow">Strokes</span>
                 <strong>{s.strokes}</strong>
                 <span className="card__par">par {parHere(s)}{last ? ` · last ${last}` : ""}</span>
-                {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
+                {assisted}
               </div>
             )}
             <LiveWeather hot={hot.current} w={wx ?? null} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
@@ -1348,8 +1350,8 @@ export default function Golf() {
                     );
                   })()}
                   <div className="drawer__tools">
-                    <button className="round round--small round--x" aria-label="About Gnogolf" title="About" onClick={() => { setMenu(false); setAbout(true); }}>
-                      <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M10 9 V14 M10 6 V6.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" /></svg>
+                    <button className="round round--icon round--small" aria-label="About Gnogolf" title="About" onClick={() => { setMenu(false); setAbout(true); }}>
+                      <InfoIcon />
                     </button>
                     <SheetClose onClose={() => setMenu(false)} inline />
                   </div>
@@ -1404,8 +1406,8 @@ export default function Golf() {
                 </nav>
                 {/* last, out of the way: clearing the card */}
                 <div className="drawer__settings">
-                  <button
-                    className={"btn btn--ghost btn--wipe" + (wipe ? " btn--danger" : "")}
+                  <Button
+                    className={"btn--wipe" + (wipe ? " btn--danger" : "")}
                     onClick={() => {
                       if (!wipe) return setWipe(true);
                       newGame();
@@ -1414,8 +1416,8 @@ export default function Golf() {
                     onBlur={() => setWipe(false)}
                   >
                     {wipe ? "Sure? Scores and badges go" : "New game · clear my scores"}
-                  </button>
-                  <small className="drawer__note">Clears this browser&apos;s scorecard and its badges. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
+                  </Button>
+                  <small className="real__fine">Clears this browser&apos;s scorecard and its badges. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
                 </div>
               </Dialog>
             </div>
@@ -1429,7 +1431,7 @@ export default function Golf() {
           )}
           {s.aiming && (
             <div className="aimbar" aria-live="polite">
-              <div className="power">
+              <div className="bar">
                 <AimBar hot={hot.current} />
               </div>
               <small>Let go to shoot · slide back to cancel</small>
@@ -2077,7 +2079,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
         </div>
         <AimSetting aim={aim} onChange={onAim} compact />
         {/* a locked gnome on show: the button still plays, as the gnome really chosen */}
-        <Button variant="primary" className="btn--play" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>
+        <Button variant="gold" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>
           {unlocked(skin.id) ? "Choose this gnome" : `Play as ${gnomeById(chosen).name}`}
         </Button>
       </div>
@@ -2100,7 +2102,7 @@ function NetBanner({ rpc, onSupport }: { rpc: string; onSupport: () => void }) {
         <p className={`netbanner__band netbanner--${net}`}>
           <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
           <span>{net === "local" ? "a node on this machine" : "practice scores, free test GNOT"}</span>
-          {net === "testnet" && OTHER_URL && <a className="netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
+          {net === "testnet" && OTHER_URL && <a className="btn btn--ghost btn--s netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
         </p>
       )}
       {/* the Leaderboard chip's twin, on the left (a phone keeps the heart) */}
@@ -2119,7 +2121,7 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
       <span className="aimset__label">Aim</span>
       <Segmented className={compact ? "seg--s" : ""} label="Aim" value={aim} full={!compact} options={AIMS} onChange={(m) => (sound("blip"), onChange(m))} />
       {/* both lines in one cell, the other one hidden: the box keeps the longer one's size, nothing moves on a switch */}
-      <small className="aimset__help">
+      <small className="aimset__help real__fine">
         <span className={aim === "pro" ? "" : "off"} aria-hidden={aim !== "pro"}>
           {compact ? "No aim line: you read the course yourself. Ranked on its own board." : "No aim line · ranked apart"}
           <InfoTip label="Why ranked apart?" note={HONEST} tabIndex={aim === "pro" ? 0 : -1} />
@@ -2224,9 +2226,8 @@ interface VictoryProps {
 function Victory({ cup, best, holes, card, saved, fresh, snapshot, onBack, onReplay, next, onNext, onRules }: VictoryProps) {
   const w = worldOf(cup);
   const t = totals(card, holes), vs = t.strokes - t.par;
-  const vsText = vsParWords(vs);
   const to = WORLDS.find((x) => x.id === next);
-  const text = `🏆 ${best ? `Beat my last ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsText}. Every putt computed on-chain.${SHARE_TAGS}`;
+  const text = `🏆 ${best ? `Beat my last ${w.name}` : `${w.name} complete`} on Gnogolf: ${t.strokes} strokes over ${holes.length} holes, ${vsParWords(vs)}. Every putt computed on-chain.${SHARE_TAGS}`;
   return (
     <div className={`victory victory--${cup}`}>
       <Cheer />
@@ -2235,7 +2236,7 @@ function Victory({ cup, best, holes, card, saved, fresh, snapshot, onBack, onRep
         <span className="victory__ribbon">{w.name}</span>
         <h2 id="victory-title">{best ? "Better than last time!" : "Cup complete!"}</h2>
         <p id="victory-sum" className="victory__sum">
-          <strong>{t.strokes}</strong> strokes · par {t.par} · <b className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{vsText}</b>
+          <strong>{t.strokes}</strong> strokes · par {t.par} · <VsPar vs={vs} words />
           {t.all && vs <= 0 && <span className="victory__stamp" title="At par or under">★ At par or under</span>}
           {t.aces > 0 && <span className="victory__stamp">{t.aces} {plural("hole", t.aces)}-in-one</span>}
         </p>
@@ -2387,7 +2388,7 @@ function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, o
         </div>
         <dl className="cup__sum">
           <div><dt>Holes</dt><dd>{t.done}/{s.holes.length}</dd></div>
-          <div><dt>Vs par</dt><dd className={vs < 0 ? "good" : vs > 0 ? "bad" : ""}>{t.done ? vsPar(vs) : "–"}</dd></div>
+          <div><dt>Vs par</dt><dd>{t.done ? <VsPar vs={vs} /> : "–"}</dd></div>
           <div><dt>On-chain</dt><dd title={rank && rank.unnamed ? "Only players with a gno.land name are ranked" : undefined}>{!rank || !rank.at ? "–" : `#${rank.at}`}</dd></div>
         </dl>
       </header>

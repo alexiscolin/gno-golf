@@ -426,7 +426,7 @@ export default function Title({ onStart, onAbout, loading = false, world: given 
           mini-golf on-chain
         </p>
         {ready ? (
-          <Button variant="primary" className="btn--play btn--cta btn--pop btn--start" aria-label="Play" onClick={(e) => (e.stopPropagation(), start())}>
+          <Button variant="gold" className="btn--play btn--cta btn--pop btn--start" aria-label="Play" onClick={(e) => (e.stopPropagation(), start())}>
             <span className="hint--mouse">Click to start</span>
             <span className="hint--touch">Tap to start</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12 H18 M13 6 L19 12 L13 18" /></svg>

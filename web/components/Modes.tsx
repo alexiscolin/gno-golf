@@ -10,7 +10,7 @@ import { useGnomeStage } from "@/components/Stage";
 import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Act, type Skin } from "@/lib/scene/gnome";
 import type { Snapshot } from "@/lib/engine";
-import { AboutButton, BackButton } from "@/components/About";
+import { FrontScreen } from "@/components/About";
 import { Button, InfoTip } from "@/components/ui";
 import { FullBoard, Sticker, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
 import { ghostsWord, golfTerm, holeNumber, holesWord, plural, strokesWord } from "@/components/common";
@@ -25,21 +25,13 @@ import type { HoleRow, HoleState, Mode, Stroke, Vec2, Zone } from "@/lib/types";
 export default function Modes({ gnome, onSolo, onDuel, onBack, onAbout }: { gnome: string; onSolo: () => void; onDuel: () => void; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
   return (
-    <div className="screen worlds front modes tint--garden">
-      <BackButton label="Back to the title" onClick={() => (sound("blip"), onBack())} />
-      <AboutButton onClick={onAbout} />
-      <div className="worlds__in">
-        <div className="front__head">
-          <span className="eyebrow">Choose your game</span>
-          <h2 className="worlds__title">How do we play?</h2>
-        </div>
-        <ul className="modes__list">
-          <li><Panel kind="solo" name="Solo" line="Four cups, your best on the boards" skin={skin} onClick={onSolo} /></li>
-          <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
-          <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>
-        </ul>
-      </div>
-    </div>
+    <FrontScreen className="modes" back="Back to the title" onBack={onBack} onAbout={onAbout} eyebrow="Choose your game" title="How do we play?">
+      <ul className="modes__list">
+        <li><Panel kind="solo" name="Solo" line="Four cups, your best on the boards" skin={skin} onClick={onSolo} /></li>
+        <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
+        <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>
+      </ul>
+    </FrontScreen>
   );
 }
 
@@ -93,43 +85,35 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
     onPick(addr, bests);
   };
   return (
-    <div className="screen worlds front front--fit modes tint--garden">
-      <BackButton label="Back to the games" onClick={() => (sound("blip"), onBack())} />
-      <AboutButton onClick={onAbout} />
-      <div className="worlds__in rival">
-        <div className="front__head">
-          <span className="eyebrow">Choose your rival</span>
-          <h2 className="worlds__title">Who do we race?</h2>
+    <FrontScreen className="front--fit modes" inner="rival" back="Back to the games" onBack={onBack} onAbout={onAbout} eyebrow="Choose your rival" title="Who do we race?">
+      {/* someone you know, typed, first; then three picked for you; then anyone on the board, in the one frame that scrolls */}
+      <section className="rival__friend">
+        <h3 className="rival__h">Race a friend</h3>
+        <InfoTip label="How do I get it?" note="Their gno.land name or address. Ask them for it, or for their dare link: it opens the duel straight away, nothing to type." />
+        <form className="friends__add" onSubmit={(e) => void go(e)}>
+          <input value={typed} onChange={(e) => (setTyped(e.target.value), setNote(""))} placeholder="A friend: nym-… or g1…" aria-label="Your friend's gno.land name or address" />
+          <Button variant="gold" className="rival__go" type="submit" disabled={!typed.trim()}>Race</Button>
+        </form>
+        {note && <p className="note note--warn">{note}</p>}
+      </section>
+      <ul className="rival__picks">
+        {PICKS.map((p, i) => (
+          <li key={p.kind}><Pick {...p} first={i} row={picks && picks.rows[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} onConnect={p.kind === "self" ? onConnect : undefined} /></li>
+        ))}
+      </ul>
+      {/* the board as stickers; the whole of it, the leaderboard's sheet (its rows, a Race each) */}
+      <section className="rival__board">
+        <div className="rival__boardhead">
+          <h3 className="rival__h">Or anyone on the board</h3>
+          <span className="rival__links">
+            {picks && picks.surprise && <button className="linkish rival__all" onClick={() => (sound("select"), onPick(picks.surprise!.player))}><Dice /> Surprise me</button>}
+            <button className="linkish rival__all" onClick={() => (sound("blip"), onBoard())}>See the whole leaderboard →</button>
+          </span>
         </div>
-        {/* someone you know, typed, first; then three picked for you; then anyone on the board, in the one frame that scrolls */}
-        <section className="rival__friend">
-          <h3 className="rival__h">Race a friend</h3>
-          <InfoTip label="How do I get it?" note="Their gno.land name or address. Ask them for it, or for their dare link: it opens the duel straight away, nothing to type." />
-          <form className="friends__add" onSubmit={(e) => void go(e)}>
-            <input value={typed} onChange={(e) => (setTyped(e.target.value), setNote(""))} placeholder="A friend: nym-… or g1…" aria-label="Your friend's gno.land name or address" />
-            <Button variant="gold" className="rival__go" type="submit" disabled={!typed.trim()}>Race</Button>
-          </form>
-          {note && <p className="note note--warn">{note}</p>}
-        </section>
-        <ul className="rival__picks">
-          {PICKS.map((p, i) => (
-            <li key={p.kind}><Pick {...p} first={i} row={picks && picks.rows[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} onConnect={p.kind === "self" ? onConnect : undefined} /></li>
-          ))}
-        </ul>
-        {/* the board as stickers; the whole of it, the leaderboard's sheet (its rows, a Race each) */}
-        <section className="rival__board">
-          <div className="rival__boardhead">
-            <h3 className="rival__h">Or anyone on the board</h3>
-            <span className="rival__links">
-              {picks && picks.surprise && <button className="linkish rival__all" onClick={() => (sound("select"), onPick(picks.surprise!.player))}><Dice /> Surprise me</button>}
-              <button className="linkish rival__all" onClick={() => (sound("blip"), onBoard())}>See the whole leaderboard →</button>
-            </span>
-          </div>
-          <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} max={8}
-            row={(r) => <Sticker player={r.player} at={r.at} sub={`${strokesWord(r.strokes)} · ${holesWord(r.holes || 0)}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
-        </section>
-      </div>
-    </div>
+        <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} max={8}
+          row={(r) => <Sticker player={r.player} at={r.at} sub={`${strokesWord(r.strokes)} · ${holesWord(r.holes || 0)}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
+      </section>
+    </FrontScreen>
   );
 }
 
@@ -333,46 +317,37 @@ export function Ghosts({ holes, name, player, chain, bests, card, mode, onRace, 
   onAbout: () => void;
 }) {
   return (
-    <div className="screen worlds front front--fit modes tint--garden">
-      <BackButton label="Back to the rivals" onClick={() => (sound("blip"), onBack())} />
-      <AboutButton onClick={onAbout} />
-      <div className="worlds__in rival">
-        <div className="front__head">
-          <span className="eyebrow">Choose your hole</span>
-          <h2 className="worlds__title">Their ghosts</h2>
-          <p className="dare">Racing {name}</p>
-        </div>
-        {/* while read: a band of blank cards, in the frame's place */}
-        {bests === undefined && (
-          <div className="ghosts__list">
-            <section className="ghosts__cup">
-              <h3 className="ghosts__name">Reading their ghosts…</h3>
-              <ul className="ghosts__holes" aria-hidden="true">{[0, 1, 2, 3].map((i) => <li key={i}><span className="ghost podium__ghost"><NoMap /><i /><i /></span></li>)}</ul>
-            </section>
-          </div>
-        )}
-        {(bests === null || (bests && !bests.size)) && (
-          <section className="ghosts__none">
-            <p className="note note--warn">{bests ? `${name} has no saved round on the course yet.` : "Their ghosts could not be read. Their best waits on each hole they saved a round on."}</p>
-            <Button variant="primary" onClick={() => (sound("select"), onCups())}>To the cups</Button>
+    <FrontScreen className="front--fit modes" inner="rival" back="Back to the rivals" onBack={onBack} onAbout={onAbout} eyebrow="Choose your hole" title="Their ghosts" dare={<p className="dare">Racing {name}</p>}>
+      {/* while read: a band of blank cards, in the frame's place */}
+      {bests === undefined && (
+        <div className="ghosts__list">
+          <section className="ghosts__cup">
+            <h3 className="ghosts__name">Reading their ghosts…</h3>
+            <ul className="ghosts__holes" aria-hidden="true">{[0, 1, 2, 3].map((i) => <li key={i}><span className="ghost podium__ghost"><NoMap /><i /><i /></span></li>)}</ul>
           </section>
-        )}
-        {/* in a frame of its own, as a board: it scrolls under its fades, each cup's name held at its top, the screen stays put */}
-        {bests && bests.size > 0 && <div className="ghosts__list">{GROUPS.map((w) => {
-          const cup = holes.filter((h) => cupOf(h) === w.id), theirs = cup.filter((h) => bests.has(h.id));
-          return theirs.length > 0 && (
-            <section key={w.id} className={`ghosts__cup ${w.id === EXTRAS.id ? "ghosts__cup--extras" : `tint--${w.id}`}`}>
-              <h3 className="ghosts__name">{w.id !== EXTRAS.id && <Emblem id={w.id} />}{w.name}</h3>
-              <ul className="ghosts__holes">
-                {theirs.map((h) => (
-                  <li key={h.id}><HoleCard id={h.id} name={h.name} num={holeNumber(cup, h.id)} par={parOf(h)} best={bestOf(bests.get(h.id), mode)!} mine={scoreOf(card, h)} chain={chain} player={player} onRace={onRace} /></li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}</div>}
-      </div>
-    </div>
+        </div>
+      )}
+      {(bests === null || (bests && !bests.size)) && (
+        <section className="ghosts__none">
+          <p className="note note--warn">{bests ? `${name} has no saved round on the course yet.` : "Their ghosts could not be read. Their best waits on each hole they saved a round on."}</p>
+          <Button variant="primary" onClick={() => (sound("select"), onCups())}>To the cups</Button>
+        </section>
+      )}
+      {/* in a frame of its own, as a board: it scrolls under its fades, each cup's name held at its top, the screen stays put */}
+      {bests && bests.size > 0 && <div className="ghosts__list">{GROUPS.map((w) => {
+        const cup = holes.filter((h) => cupOf(h) === w.id), theirs = cup.filter((h) => bests.has(h.id));
+        return theirs.length > 0 && (
+          <section key={w.id} className={`ghosts__cup ${w.id === EXTRAS.id ? "ghosts__cup--extras" : `tint--${w.id}`}`}>
+            <h3 className="ghosts__name">{w.id !== EXTRAS.id && <Emblem id={w.id} />}{w.name}</h3>
+            <ul className="ghosts__holes">
+              {theirs.map((h) => (
+                <li key={h.id}><HoleCard id={h.id} name={h.name} num={holeNumber(cup, h.id)} par={parOf(h)} best={bestOf(bests.get(h.id), mode)!} mine={scoreOf(card, h)} chain={chain} player={player} onRace={onRace} /></li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}</div>}
+    </FrontScreen>
   );
 }
 

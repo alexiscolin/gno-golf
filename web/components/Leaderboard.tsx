@@ -4,13 +4,12 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import type { Snapshot } from "@/lib/engine";
 import { isAddress, wait, type Chain } from "@/lib/chain";
 import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
-import { vsPar } from "@/lib/card";
 import { levelFrom, levelPick, pickOne } from "@/lib/duel";
 import { SHARE_TAGS, siteURL } from "@/lib/site";
 import { sound } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
 import { registerName, claimRounds, type SendError } from "@/lib/adena";
-import { Button, Segmented, Sheet } from "@/components/ui";
+import { Button, Segmented, Sheet, VsPar } from "@/components/ui";
 import Share from "@/components/Share";
 import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, plural, AIMS, AIM_NAMES, useCopied, GNOME } from "@/components/common";
 import { Frame } from "@/components/Worlds";
@@ -56,7 +55,7 @@ export interface BoardProps {
 /** A board row's way into a duel, the duel's gold Race: that player's ghost here (yours: your best). */
 const RaceButton = ({ player, me, strokes, onRace }: { player: string; me?: string | null; strokes: number; onRace?: (p: string) => void }) =>
   onRace ? (
-    <Button variant="gold" className="lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
+    <Button variant="gold" className="rival__go lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
       Race
     </Button>
   ) : null;
@@ -172,7 +171,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
               <span className="lb__rank">{i + 1}</span>
               <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
               <span className="lb__holes">{strokesWord(r.strokes)}</span>
-              <strong>{vsPar(r.strokes - ((hole && hole.par) || parHere(s)))}</strong>
+              <strong><VsPar vs={r.strokes - ((hole && hole.par) || parHere(s))} /></strong>
               <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
             </li>
           ))}
@@ -455,7 +454,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
         <span className="lb__holes">
           {r.strokes === 1 ? <em className="ace-chip">ACE</em> : `${r.strokes} strokes`}
         </span>
-        <strong className={r.strokes < par ? "good" : r.strokes > par ? "bad" : ""}>{vsPar(r.strokes - par)}</strong>
+        <strong><VsPar vs={r.strokes - par} /></strong>
       </>
     ) : (
       <>
@@ -816,7 +815,7 @@ export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra }: { chai
           );
         })}
       </ol>
-      {empty && <p className="podium__empty">Nobody yet: save a round on-chain to take the first place.</p>}
+      {empty && <p className="real__fine podium__empty">Nobody yet: save a round on-chain to take the first place.</p>}
     </section>
   );
 }

@@ -152,12 +152,12 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
           <>
             <video ref={video} src={clip.url} muted playsInline loop autoPlay={!still} controls={still && playing} onPlay={() => setPlaying(true)} aria-label="A clip of the holing shot, looping" />
             {still && !playing && (
-              <button className="clip__play" aria-label="Play the clip" onClick={() => void video.current?.play()}>
+              <button className="round round--icon clip__play" aria-label="Play the clip" onClick={() => void video.current?.play()}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
               </button>
             )}
             {/* on the video, top right (the brand's card has the bottom): a post with a video gets way more views */}
-            <a className="clip__save" href={clip.url} download={clip.file.name} title="Download the video: posts with a video get way more views" onClick={() => sound("blip")}>
+            <a className="btn btn--ghost btn--s clip__save" href={clip.url} download={clip.file.name} title="Download the video: posts with a video get way more views" onClick={() => sound("blip")}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
               Show off your shot
             </a>

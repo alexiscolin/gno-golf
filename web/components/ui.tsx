@@ -5,6 +5,8 @@
 // Their look is in globals.css under "shared controls".
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
+import { vsPar } from "@/lib/card";
+import { vsParWords } from "@/components/common";
 
 /**
  * A button. variant: "primary" (green), "secondary" (paper), "gold" (the
@@ -101,13 +103,18 @@ export function InfoTip({ label, note, className = "aimset__info", tabIndex, chi
   );
 }
 
+/** A score against par ("−2", "E", "+1"; words: "level par" for E), green under it, red over it. */
+export const VsPar = ({ vs, words = false }: { vs: number; words?: boolean }) => (
+  <b className={vs < 0 ? "good" : vs > 0 ? "bad" : undefined}>{(words ? vsParWords : vsPar)(vs)}</b>
+);
+
 /** The X in a sheet's corner, the same everywhere. */
 const CloseX = () => (
   <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4 16 16M16 4 4 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" /></svg>
 );
 export function SheetClose({ onClose, inline = false }: { onClose: () => void; inline?: boolean }) {
   return (
-    <button className={"round round--small round--x" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose}>
+    <button className={"round round--icon round--small" + (inline ? "" : " sheet__close")} aria-label="Close" onClick={onClose}>
       <CloseX />
     </button>
   );

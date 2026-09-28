@@ -29,7 +29,7 @@ export function DuelNote({ duel, mode, sky, onDrop }: { duel: Duel; mode: Mode; 
         <span className="dare">{self ? "Racing your best" : `Racing ${name}`} · {ghost.strokes} to beat</span>{" "}
         <button className="linkish" onClick={onDrop}>Play solo</button>
       </p>
-      {notes.length > 0 && <p className="aimset__help">{notes.join(" ")}</p>}
+      {notes.length > 0 && <p className="real__fine">{notes.join(" ")}</p>}
     </>
   );
 }
