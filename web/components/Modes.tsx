@@ -11,13 +11,14 @@ import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Act, type Skin } from "@/lib/scene/gnome";
 import type { Snapshot } from "@/lib/engine";
 import { AboutButton, BackButton } from "@/components/About";
-import { Button } from "@/components/ui";
+import { Button, Segmented } from "@/components/ui";
 import { FullBoard, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
 import { ghostsWord, golfTerm, holeNumber, holesWord } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
 import { cupOf, parOf, scoreOf, type Card } from "@/lib/card";
-import { mapView, pathD, showcase, shotsOf } from "@/lib/duel";
+import { mapView, pathD, railRuns, showcases, shotsOf } from "@/lib/duel";
 import { BALL_R, CUP_R } from "@/lib/terrain";
+import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2 } from "@/lib/types";
 
@@ -70,6 +71,7 @@ const Stage = ({ skin, act, playing, className = "mode__stage" }: { skin: Skin; 
  */
 export function Rival({ s, chain, me, mode, gnome, onPick, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; gnome: string; onPick: (addr: string, bests?: Bests) => void; onBack: () => void; onAbout: () => void }) {
   const [typed, setTyped] = useState("");
+  const [asList, setAsList] = useState(false); // the board as the full board, not stickers
   const [note, setNote] = useState("");
   const [why, setWhy] = useState(false);
   const popId = useId();
@@ -115,10 +117,14 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBack, onAbout }: { 
             <li key={p.kind}><Pick {...p} row={picks && picks[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} /></li>
           ))}
         </ul>
-        <section className="rival__way rival__board">
-          <h3 className="about__h">Or anyone on the board</h3>
+        {/* the board as stickers, or as the full board with its rows (the leaderboards' own) */}
+        <section className={"rival__way rival__board" + (asList ? "" : " rival__board--cards")}>
+          <div className="rival__boardhead">
+            <h3 className="about__h">Or anyone on the board</h3>
+            <Segmented label="Show the board as" value={asList ? "list" : "cards"} options={[["cards", "Cards"], ["list", "List"]]} onChange={(v) => (sound("blip"), setAsList(v === "list"))} />
+          </div>
           <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} onRace={onPick}
-            row={(r) => <Sticker row={r} chain={chain} me={me} gnome={gnome} onPick={onPick} />} />
+            row={asList ? undefined : (r) => <Sticker row={r} chain={chain} me={me} gnome={gnome} onPick={onPick} />} />
         </section>
       </div>
     </div>
@@ -127,17 +133,20 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBack, onAbout }: { 
 
 type Bests = ReadonlyMap<string, Readonly<Record<Mode, number>>>;
 type Hole = { id: string; name: string; par: number };
+const MAP_MS = 3200; // a map's drawing of the path, as its CSS animation (title.css map-ink): the next hole then
 const PICKS = [
   { kind: "champ", label: "The champion" },
   { kind: "level", label: "Your level" },
   { kind: "any", label: "Surprise me" },
 ] as const;
 
-/** A rival's bests, and their best hole shown off: its map and their ghost's
- *  path on it (the strokes the duel replays, read the same way). */
+/** A rival's bests, and their finest holes shown off (three at most): each
+ *  one's map and their ghost's path on it (the strokes the duel replays, read
+ *  the same way). */
+type Shown = { hole: HoleState; path: Vec2[]; name: string; strokes: number; par: number };
 interface Show {
   bests: Bests;
-  map: { hole: HoleState; path: Vec2[]; name: string; strokes: number; par: number } | null;
+  maps: Shown[];
 }
 // read once a session a player (and mode); a read that failed is asked again next time
 const shows = new Map<string, Promise<Show>>();
@@ -146,17 +155,16 @@ function showOf(chain: Chain, player: string, holes: readonly Hole[], mode: Mode
   let p = shows.get(key);
   if (p) return p;
   p = chain.bestsOf(holes.map((h) => h.id), player).then(async (bests) => {
-    const top = showcase(bests, holes, mode);
-    // (the tile works without its map: one that fails to read is left out)
-    const map = top && await chain.ghost(top.id, top.mode, player).then(async (g) => {
+    // (the tile works without its maps: one that fails to read is left out)
+    const maps = await Promise.all(showcases(bests, holes, mode).map((top) => chain.ghost(top.id, top.mode, player).then(async (g): Promise<Shown | null> => {
       if (!g) return null;
       const shots = shotsOf(g), hole = await chain.state(g.hole);
       let at: Stroke = await chain.replayRound(g.hole, [shots[0]], g.period);
       const path = [...at.path];
       for (let n = 1; n < shots.length && !at.holed; n++) path.push(...(at = await chain.simulateFrom(g.hole, at.rest, shots[n], n, g.period)).path);
       return { hole, path, name: holes.find((h) => h.id === top.id)!.name, strokes: g.strokes, par: top.par };
-    }).catch(() => null);
-    return { bests, map };
+    }).catch(() => null)));
+    return { bests, maps: maps.filter((m): m is Shown => !!m) };
   });
   shows.set(key, p);
   p.catch(() => shows.delete(key));
@@ -180,7 +188,15 @@ function useShow(chain: Chain | null, player: string, holes: readonly Hole[], mo
 function Pick({ kind, label, row, reading, chain, me, gnome, holes, mode, onPick }: { kind: (typeof PICKS)[number]["kind"]; label: string; row: Placed | null; reading: boolean; chain: Chain | null; me: string | null; gnome: string; holes: readonly Hole[]; mode: Mode; onPick: (addr: string, bests?: Bests) => void }) {
   const [hot, setHot] = useState(false);
   const player = row ? row.player : "";
-  const who = useWho(chain, player, me), show = useShow(chain, player, holes, mode), map = show && show.map;
+  const who = useWho(chain, player, me), show = useShow(chain, player, holes, mode);
+  // their holes in turn under the pointer, one a drawing of the path (a random one first)
+  const [turn, setTurn] = useState(() => Math.floor(Math.random() * 3));
+  useEffect(() => {
+    if (!hot || !motion) return;
+    const t = setInterval(() => setTurn((n) => n + 1), MAP_MS);
+    return () => clearInterval(t);
+  }, [hot]);
+  const map = show && show.maps.length ? show.maps[turn % show.maps.length] : null;
   const best = map && `${map.strokes === 1 ? "Ace" : golfTerm(map.strokes, map.par).replace(/!$/, "")} on ${map.name}`;
   const line = row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
   return (
@@ -190,7 +206,7 @@ function Pick({ kind, label, row, reading, chain, me, gnome, holes, mode, onPick
       <span className="rival__tag">{kind === "any" ? <Dice /> : <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}{label}</span>
       {row ? <Stage className="rival__stage" skin={rivalSkin(row.player, gnome)} act="hop" playing={hot} /> : <span className="rival__stage" />}
       <span className="rival__show">
-        {map ? <HoleMap {...map} /> : <svg viewBox="0 0 120 120" className="rival__map" aria-hidden="true"><circle cx="60" cy="60" r="56" className="map__turf w__ring" /></svg>}
+        {map ? <HoleMap key={map.name} {...map} /> : <svg viewBox="0 0 120 120" className="rival__map" aria-hidden="true"><circle cx="60" cy="60" r="56" className="map__turf w__ring" /></svg>}
         {best && <span className="rival__best">{best}</span>}
       </span>
       <span className="rival__name">{row ? who.label : reading ? "…" : "Nobody yet"}</span>
@@ -206,7 +222,7 @@ function Pick({ kind, label, row, reading, chain, me, gnome, holes, mode, onPick
 function HoleMap({ hole, path }: { hole: HoleState; path: readonly Vec2[] }) {
   const clip = useId(), { at, k } = mapView([hole.start, hole.cup, ...path], hole), line = pathD(path, at);
   const [cx, cy] = at(hole.cup), [tx, ty] = at(hole.start);
-  const walls = hole.walls.map((w) => `M${at(w.a).join(" ")}L${at(w.b).join(" ")}`).join("");
+  const walls = railRuns(hole.walls).map((run) => pathD(run, at)).join("");
   const zones = hole.zones.filter((z) => z.skin === "water" || z.skin === "sand");
   return (
     <svg viewBox="0 0 120 120" className="rival__map" aria-hidden="true">

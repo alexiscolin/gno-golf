@@ -85,17 +85,17 @@ export function pickOne<R extends { player: string }>(rows: readonly R[], not: r
   return ok[Math.floor(r * ok.length)] || null;
 }
 
-/** The hole a rival shows off: an ace first, else their best against its par
- *  (the aim mode's best, else their other one); the course's order breaks a tie. */
-export function showcase(bests: ReadonlyMap<string, Readonly<Record<Mode, number>>>, holes: readonly { id: string; par: number }[], mode: Mode) {
-  let top: { id: string; mode: Mode; strokes: number; par: number } | null = null;
+/** The holes a rival shows off, the finest first (n at most): an ace, else
+ *  their best against its par (the aim mode's best, else their other one); the
+ *  course's order breaks a tie. */
+export function showcases(bests: ReadonlyMap<string, Readonly<Record<Mode, number>>>, holes: readonly { id: string; par: number }[], mode: Mode, n = 3) {
   const worth = (t: { strokes: number; par: number }) => (t.strokes === 1 ? -Infinity : t.strokes - t.par);
+  const all: { id: string; mode: Mode; strokes: number; par: number }[] = [];
   for (const h of holes) {
     const b = bests.get(h.id), m: Mode = b && b[mode] ? mode : mode === "pro" ? "assisted" : "pro";
-    const t = b && b[m] ? { id: h.id, mode: m, strokes: b[m], par: h.par } : null;
-    if (t && (!top || worth(t) < worth(top))) top = t;
+    if (b && b[m]) all.push({ id: h.id, mode: m, strokes: b[m], par: h.par });
   }
-  return top;
+  return all.sort((a, b) => worth(a) - worth(b)).slice(0, n); // (a stable sort: the course's order within a worth)
 }
 
 /** A hole seen from above in a round window (0..120, centre 60, radius r),
@@ -110,6 +110,40 @@ export function mapView(fit: readonly Vec2[], { start, cup }: { start: Vec2; cup
   return { at, k };
 }
 
-/** A ball's path as one SVG line (unbroken: a dash drawing it along starts
- *  again at each break; a tunnel is crossed straight). */
-export const pathD = (points: readonly Vec2[], at: (p: Vec2) => Vec2) => points.map((p, i) => (i ? "L" : "M") + at(p).join(" ")).join("");
+/** Points as one SVG line, its corners rounded (each bent through the middles
+ *  of its two sides), a loop closed round: a ball's path (unbroken: a dash
+ *  drawing it along starts again at each break; a tunnel is crossed straight),
+ *  a run of rails. */
+export function pathD(points: readonly Vec2[], at: (p: Vec2) => Vec2) {
+  const p = points.map(at), n = p.length, xy = (q: Vec2) => q.join(" ");
+  const mid = (a: Vec2, b: Vec2): Vec2 => [+((a[0] + b[0]) / 2).toFixed(1), +((a[1] + b[1]) / 2).toFixed(1)];
+  if (n < 3) return p.map((q, i) => (i ? "L" : "M") + xy(q)).join("");
+  if (xy(p[0]) === xy(p[n - 1])) {
+    let d = `M${xy(mid(p[0], p[1]))}`;
+    for (let i = 1; i < n; i++) d += `Q${xy(p[i % (n - 1)])} ${xy(mid(p[i % (n - 1)], p[(i + 1) % (n - 1)]))}`;
+    return d;
+  }
+  let d = `M${xy(p[0])}L${xy(mid(p[0], p[1]))}`;
+  for (let i = 1; i < n - 1; i++) d += `Q${xy(p[i])} ${xy(mid(p[i], p[i + 1]))}`;
+  return d + `L${xy(p[n - 1])}`;
+}
+
+/** A hole's rails as runs: walls that meet end to end joined into one line
+ *  each (so a run's corners round, see pathD), in the walls' order. */
+export function railRuns(walls: readonly { a: Vec2; b: Vec2 }[]) {
+  const same = (u: Vec2, v: Vec2) => Math.abs(u[0] - v[0]) < 1e-6 && Math.abs(u[1] - v[1]) < 1e-6;
+  const left = walls.slice(), runs: Vec2[][] = [];
+  while (left.length) {
+    const w = left.shift()!, run: Vec2[] = [w.a, w.b];
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (let i = 0; i < left.length; i++) {
+        const { a, b } = left[i], end = run[run.length - 1], start = run[0];
+        const add = same(a, end) ? () => run.push(b) : same(b, end) ? () => run.push(a) : same(b, start) ? () => run.unshift(a) : same(a, start) ? () => run.unshift(b) : null;
+        if (add) (add(), left.splice(i, 1), (grew = true), i--);
+      }
+    }
+    runs.push(run);
+  }
+  return runs;
+}

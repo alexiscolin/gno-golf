@@ -1,7 +1,7 @@
 // Ghost duels (ADR-004): the best raced, the ghost's pace, and the result in words.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, showcase, mapView, pathD, type Duel } from "../lib/duel.ts";
+import { duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, showcases, mapView, pathD, railRuns, type Duel } from "../lib/duel.ts";
 import type { Ghost } from "../lib/types.ts";
 
 const ghost = (strokes: number, mode: Ghost["mode"] = "assisted"): Ghost => ({ version: 1, hole: "garden/1/v1", mode, player: "g1x", strokes, period: 7, shots: "0.0000,1.0000,0;12.5000,6.2000,3" });
@@ -107,11 +107,12 @@ test("a surprise: one at random, you and the picks left out, each player once", 
 test("the hole shown off: an ace first, else the best against par, in the aim mode's best else the other", () => {
   const holes = [{ id: "h1", par: 3 }, { id: "h2", par: 4 }, { id: "h3", par: 2 }];
   const b = (e: [string, number, number][]) => new Map(e.map(([id, pro, assisted]) => [id, { pro, assisted }]));
-  assert.deepEqual(showcase(b([["h1", 0, 2], ["h2", 0, 3]]), holes, "pro"), { id: "h1", mode: "assisted", strokes: 2, par: 3 }); // two birdies: the first
-  assert.deepEqual(showcase(b([["h2", 2, 0], ["h3", 0, 1]]), holes, "pro"), { id: "h3", mode: "assisted", strokes: 1, par: 2 }); // the ace over an eagle
-  assert.deepEqual(showcase(b([["h1", 4, 2]]), holes, "pro"), { id: "h1", mode: "pro", strokes: 4, par: 3 }); // the aim mode's, worse as it is
-  assert.equal(showcase(b([]), holes, "pro"), null);
-  assert.equal(showcase(b([["gone", 1, 1]]), holes, "pro"), null); // a hole no longer on the course
+  assert.deepEqual(showcases(b([["h1", 0, 2], ["h2", 0, 3]]), holes, "pro")[0], { id: "h1", mode: "assisted", strokes: 2, par: 3 }); // two birdies: the first
+  assert.deepEqual(showcases(b([["h2", 2, 0], ["h3", 0, 1]]), holes, "pro").map((t) => t.id), ["h3", "h2"]); // the ace, then the eagle
+  assert.deepEqual(showcases(b([["h1", 4, 2]]), holes, "pro"), [{ id: "h1", mode: "pro", strokes: 4, par: 3 }]); // the aim mode's, worse as it is
+  assert.deepEqual(showcases(b([]), holes, "pro"), []);
+  assert.deepEqual(showcases(b([["gone", 1, 1]]), holes, "pro"), []); // a hole no longer on the course
+  assert.equal(showcases(b([["h1", 2, 2], ["h2", 3, 3], ["h3", 1, 1]]), holes, "pro", 2).length, 2); // n at most
 });
 
 test("a hole's map: its middle in the window's, the tee to the left or the foot, the path one line", () => {
@@ -124,5 +125,15 @@ test("a hole's map: its middle in the window's, the tee to the left or the foot,
   const tall = mapView([[5, 5], [5, 35]], { start: [5, 5], cup: [5, 35] });
   assert.ok(tall.at([5, 5])[1] > 60 && tall.at([5, 35])[1] < 60); // the tee at the foot
   assert.equal(mapView([[0, 0], [1, 0]], { start: [0, 0], cup: [1, 0] }).k, 8); // a short one, not blown up
-  assert.equal(pathD([[0, 0], [1, 0], [9, 0]], (p) => [p[0] * 2, p[1]]), "M0 0L2 0L18 0");
+  assert.equal(pathD([[0, 0], [1, 0], [9, 0]], (p) => [p[0] * 2, p[1]]), "M0 0L1 0Q2 0 10 0L18 0");
+});
+
+test("a map's lines: rails joined end to end into runs, their corners rounded, a loop closed", () => {
+  const w = (a: [number, number], b: [number, number]) => ({ a, b });
+  const runs = railRuns([w([0, 0], [1, 0]), w([5, 5], [6, 5]), w([1, 1], [1, 0]), w([0, 1], [0, 0])]);
+  assert.deepEqual(runs, [[[0, 1], [0, 0], [1, 0], [1, 1]], [[5, 5], [6, 5]]]); // (a wall the other way round, joined all the same)
+  const id = (p: [number, number]) => p;
+  assert.equal(pathD([[0, 0], [10, 0]], id), "M0 0L10 0");
+  assert.equal(pathD([[0, 0], [10, 0], [10, 10]], id), "M0 0L5 0Q10 0 10 5L10 10"); // the corner bent through the sides' middles
+  assert.equal(pathD([[0, 0], [10, 0], [10, 10], [0, 0]], id), "M5 0Q10 0 10 5Q10 10 5 5Q0 0 5 0"); // a loop: no corner left
 });
