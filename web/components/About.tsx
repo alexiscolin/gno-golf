@@ -32,7 +32,7 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
   },
   {
     title: "You keep it",
-    text: "Adena signs once, the chain replays your shots and the round goes on the board: no score typed in.",
+    text: "Adena signs (once for most rounds, a few times for a long one), the chain replays your shots and the round goes on the board: no score typed in.",
     icon: ICON.keep,
   },
 ];

@@ -554,3 +554,16 @@ func TestWearIsWhereTheBallRests(cur realm, t *testing.T) {
 	uassert.Equal(t, 1, mustHole(id).wearGrid()[course.WearIndexOn(physics.V(2, 8), 32, 16)])
 	uassert.Equal(t, 1, sumWear(mustHole(id)))
 }
+
+// A text board's key says which way a slope takes the ball (moving air
+// pushes it), each way of a mark once.
+func TestLegendSlopeWay(t *testing.T) {
+	f := &physics.Field{Zones: []physics.Zone{
+		{Kind: physics.Slope, Vec: physics.V(0, 0.1), Mark: '^', Skin: "hill"},
+		{Kind: physics.Slope, Vec: physics.V(0, 0.2), Mark: '^', Skin: "hill"},
+		{Kind: physics.Slope, Vec: physics.V(-0.1, 0), Mark: '^', Skin: "hill"},
+		{Kind: physics.Slope, Vec: physics.V(0.1, 0), Mark: '~', Skin: "draft", Air: true},
+	}}
+	s, _ := legend(f)
+	urequire.Equal(t, " · `^` hill (slope), falls toward 90° · `^` hill (slope), falls toward 180° · `~` draft (slope), pushes toward 0°", s)
+}

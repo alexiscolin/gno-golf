@@ -114,7 +114,7 @@ func renderHub() string {
 	sb.WriteString("# Gnogolf — mini-golf on-chain\n\n" + moved() +
 		"The course is data its owner published, anyone can add holes of their own, and the chain computes every shot: nobody can fake a score.\n\n" +
 		"> [!TIP] How to play\n" +
-		"> **In 3D:** " + md("open the game", playURL) + ". Aim with a free preview, then record your round in one transaction.\n>\n" +
+		"> **In 3D:** " + md("open the game", playURL) + ". Aim with a free preview, then record your round in a transaction (a long one in a few).\n>\n" +
 		"> **Here, one shot at a time:** open a hole, fill its Launch form (an angle and a power) and sign it with your gno.land wallet (" + md("Adena", "https://adena.app") + "), then add `/<your address>` to the hole's URL to see your ball.\n>\n" +
 		"> Only players with a gno.land name are ranked.\n\n")
 	var archived, others []*entry
@@ -820,9 +820,10 @@ func key(b, walls string) string {
 	return s
 }
 
-// legend names the pieces the hole gave a skin, and the skins of its `#` walls.
+// legend names the pieces the hole gave a skin (a slope with the way it
+// falls), and the skins of its `#` walls.
 func legend(f *physics.Field) (string, string) {
-	seen, s, walls := string(markWall), "", ""
+	s, walls := "", ""
 	add := func(m rune, def rune, skin string) {
 		if skin == "" {
 			return
@@ -838,11 +839,12 @@ func legend(f *physics.Field) (string, string) {
 			}
 			return
 		}
-		if strings.ContainsRune(seen, r) {
+		// once each: a mark with two meanings (two slopes' ways) says both
+		item := ufmt.Sprintf(" · `%s` %s", string(r), skin)
+		if strings.Contains(s+" · ", item+" · ") {
 			return
 		}
-		seen += string(r)
-		s += ufmt.Sprintf(" · `%s` %s", string(r), skin)
+		s += item
 	}
 	for _, z := range f.Zones {
 		if z.Kind == physics.Tunnel {
@@ -853,6 +855,15 @@ func legend(f *physics.Field) (string, string) {
 			name = z.Kind.String()
 		} else {
 			name += " (" + z.Kind.String() + ")"
+		}
+		// a slope says which way it takes the ball, in the shot's degrees (the wind's, the cup's)
+		if z.Kind == physics.Slope && (z.Vec.X != 0 || z.Vec.Y != 0) {
+			a, _ := aim(physics.Vec2{}, z.Vec)
+			if z.Air {
+				name += ufmt.Sprintf(", pushes toward %.0f°", a)
+			} else {
+				name += ufmt.Sprintf(", falls toward %.0f°", a)
+			}
 		}
 		add(z.Mark, '?', name)
 	}
