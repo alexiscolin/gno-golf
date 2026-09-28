@@ -33,7 +33,7 @@ import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, s
 import { clipName } from "@/lib/clip";
 import { Boards, FullBoard, Podium, NameForm, nameOnce, useNameCheck, useRankNudge, useSavedPlace, type BoardProps, type NameCheck } from "@/components/Leaderboard";
 import { FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network";
-import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, badgesAt, badgesEarned, rememberBadges, seeWeather, weathersSeen } from "@/lib/prefs";
+import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen } from "@/lib/prefs";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
 // dev build, or on a page opened with ?camlog where the hooks answer
@@ -384,6 +384,8 @@ export default function Golf() {
   const [prefs, setPrefs] = useState(() => feel());
   const toggle = (k: keyof Feel) => { setFeel(k, !prefs[k]); setPrefs(feel()); };
   const [wipe, setWipe] = useState(false); // "clear my scores" asks twice
+  // a new game: the card and its badges gone (the gnomes earned stay)
+  const newGame = () => (setCard(clearCard()), forgetBadges(), setFreshBadges([]));
 
   // The tab says what the gnome is up to: a glance at it tells how the shot
   // went, and a tab left behind calls you back.
@@ -1194,7 +1196,7 @@ export default function Golf() {
         <Worlds
           counts={s.worlds}
           stats={cups}
-          onResetAll={() => setCard(clearCard())}
+          onResetAll={newGame}
           onReset={(w) => setCard(clearCup(allList.filter((h) => cupOf(h) === w).map(cardKey)))}
           current={s.world}
           onBack={() => setScreen("modes")}
@@ -1359,14 +1361,14 @@ export default function Golf() {
                     className={"btn btn--ghost btn--wipe" + (wipe ? " btn--danger" : "")}
                     onClick={() => {
                       if (!wipe) return setWipe(true);
-                      setCard(clearCard());
+                      newGame();
                       setWipe(false);
                     }}
                     onBlur={() => setWipe(false)}
                   >
-                    {wipe ? "Sure? Tap again to clear" : "New game · clear my scores"}
+                    {wipe ? "Sure? Scores and badges go" : "New game · clear my scores"}
                   </button>
-                  <small className="drawer__note">Clears this browser's scorecard. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
+                  <small className="drawer__note">Clears this browser&apos;s scorecard and its badges. Gnomes you earned stay yours, and rounds saved on-chain stay on the leaderboard.</small>
                 </div>
               </Dialog>
             </div>

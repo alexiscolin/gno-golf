@@ -228,7 +228,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                 </button>
               ))}
               <button role="menuitem" className={"world__reset" + (wipe === "all" ? " world__reset--sure" : "")} onClick={() => clear("all", onResetAll)}>
-                {wipe === "all" ? "Sure? Tap again" : "Every cup"}
+                {wipe === "all" ? "Sure? Badges go too" : "Every cup"}
               </button>
             </div>
           )}

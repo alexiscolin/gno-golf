@@ -1283,7 +1283,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
      *  direct (a link to this hole): straight to the player's camera. */
     play(direct = false) {
       g.started = true;
-      if (!direct) return void (closeIn = setTimeout(intro, OVERVIEW_MS));
+      if (!direct) {
+        // from the overview whatever came before (a round restarted behind a screen: a duel picked, the same cup again)
+        if (g.view !== "overview") (setView("overview"), cam.jump());
+        return void (closeIn = setTimeout(intro, OVERVIEW_MS));
+      }
       cam.jump(); // in its framing at once, not glided in
       setView(home());
     },

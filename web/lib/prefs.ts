@@ -89,6 +89,12 @@ export function badgesAt(): Record<string, string> {
 /** The weathers a hole was finished in ("" the calm one), for All weathers. */
 export const weathersSeen = () => kept("gnogolf.weathers");
 export const seeWeather = (kind: string) => keep("gnogolf.weathers", [kind]);
+/** A new game: the badges go with the scorecard, where they were earned and the weathers counted toward one too (the gnomes stay). */
+export function forgetBadges() {
+  try {
+    for (const k of ["gnogolf.badges", AT_KEY, "gnogolf.weathers"]) localStorage.removeItem(k);
+  } catch {}
+}
 
 /** Stills and no clips on the cup cards: reduced motion, a data saver or a
  *  slow link, the Low graphics tier (or Auto on a device found slow). */

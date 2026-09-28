@@ -323,7 +323,7 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
 
   const root = new THREE.Group() as Gnome;
   root.add(g, shade);
-  root.userData = { body: g, eyes, shade, reach };
+  root.userData = { body: g, eyes, shade, reach, mid: (box.min.y + box.max.y) / 2 };
   return root;
 }
 
@@ -348,15 +348,16 @@ export function makeGhost(o: number) {
 export type Act = "hop" | "solo" | "duel";
 
 const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
-/** One gnome at time k (ms) of the solo act's 3.6 s: a roll of two turns,
- *  up off the ground (his hat, upside down, clear of it and of the frame's
- *  foot), a wobble as he rights himself, a blink, then a hop. */
+/** One gnome at time k (ms) of the solo act's 3.6 s: a roll of two turns
+ *  about his middle (a tall hat stays in frame, never under the ground), a
+ *  wobble as he rights himself, a blink, then a hop. */
 function soloAt(g: Gnome, k: number) {
-  const { body, eyes } = g.userData;
-  const roll = Math.min(k / 1300, 1), wob = k > 1300 && k < 1800 ? (1800 - k) / 500 : 0;
-  body.rotation.set(ease(roll) * Math.PI * 4, 0.35, Math.sin(k / 45) * 0.18 * wob);
-  const hop = roll < 1 ? Math.sin(roll * Math.PI) * 0.36 : k > 2900 && k < 3300 ? Math.sin(((k - 2900) / 400) * Math.PI) * 0.34 : 0;
-  body.position.y = hop;
+  const { body, eyes, mid } = g.userData;
+  const roll = Math.min(k / 1300, 1), wob = k > 1300 && k < 1800 ? (1800 - k) / 500 : 0, a = ease(roll) * Math.PI * 4;
+  body.rotation.set(a, 0.35, Math.sin(k / 45) * 0.18 * wob);
+  const hop = k > 2900 && k < 3300 ? Math.sin(((k - 2900) / 400) * Math.PI) * 0.34 : 0;
+  // (turned about his middle: his body's centre goes round it)
+  body.position.set(0, mid * (1 - Math.cos(a)) + hop, -mid * Math.sin(a));
   for (const e of eyes || []) e.scale.y = k > 2300 && k < 2430 ? 0.12 : 1;
   return hop;
 }
