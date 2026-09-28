@@ -357,7 +357,8 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
         const level = levelPick(near.rows, me, champ ? [champ.player] : []);
         const any = await page(Math.floor(Math.random() * top.players), 5).catch(() => top);
         const surprise = pickOne([...any.rows, ...top.rows], [me, champ && champ.player, level && level.player], Math.random());
-        const self: Placed | null = me && mine && mine.rank > 0 ? { player: me, at: mine.rank, holes: mine.holes, strokes: mine.strokes } : null;
+        // (your row on the first page, else your rank read apart)
+        const self: Placed | null = !me ? null : top.rows.find((r) => r.player === me) || (mine && mine.rank > 0 ? { player: me, at: mine.rank, holes: mine.holes, strokes: mine.strokes } : null);
         primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r] : [])));
         if (live) setPicks({ rows: [champ, level, self || surprise], surprise });
       })
