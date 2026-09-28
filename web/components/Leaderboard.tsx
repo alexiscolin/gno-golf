@@ -50,7 +50,7 @@ export interface BoardProps {
   mode?: Mode;
   /** not connected: the way to (the Adena checklist) */
   onConnect?: () => void;
-  /** a duel against a player's best on this hole (their ghost), from the tee */
+  /** a duel against a player's best on this hole (their ghost), from the tee; off a hole (the rival screen's sheet), that player picked */
   onRace?: (player: string) => void;
 }
 /** A board row's way into a duel, the duel's gold Race: that player's ghost here (yours: your best). */
@@ -263,7 +263,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
             Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
           </p>
         )}
-        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={inHole ? onRace : undefined} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={tab === "hole" ? onRace : undefined} />}
+        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={inHole ? onRace : undefined} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={tab === "hole" || !inHole ? onRace : undefined} />}
         <p className="real__fine">Only rounds saved on-chain appear here.</p>
     </Sheet>
   );

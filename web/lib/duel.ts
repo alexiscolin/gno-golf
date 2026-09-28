@@ -34,11 +34,8 @@ const GHOST_MS = 3000;
  *  a little faster, a long one kept to about 3 s. */
 export const ghostSpeed = (ms: number) => Math.max(1.25, ms / GHOST_MS);
 
-/** What the score card says is left, before the next stroke n of a race against a best of r:
- *  the last stroke that wins, the one that ties, else the target. */
-/** What a duel's next stroke n is worth against a best of r, called out big as the player's turn comes. */
+/** What a duel's next stroke n is worth against a best of r, called out big as the player's turn comes, and on the score card. */
 export const raceLeft = (n: number, r: number) => (n > r ? "Out of reach" : n === r ? "Hole it to tie" : n === r - 1 ? "Last one to win!" : `${r - n} strokes left to win`);
-export const toBeat = (n: number, r: number) => (n > r ? "out of reach" : n === r ? "hole it to tie" : n === r - 1 ? "hole it to win" : `${r} to beat`);
 
 /** A number of strokes as said in a title: one is a word. */
 const inWords = (d: number) => (d === 1 ? "one" : String(d));

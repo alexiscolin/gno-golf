@@ -11,7 +11,7 @@ import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Act, type Skin } from "@/lib/scene/gnome";
 import type { Snapshot } from "@/lib/engine";
 import { AboutButton, BackButton } from "@/components/About";
-import { Button, Segmented } from "@/components/ui";
+import { Button, InfoTip } from "@/components/ui";
 import { FullBoard, Sticker, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
 import { ghostsWord, golfTerm, holeNumber, holesWord, strokesWord } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
@@ -71,14 +71,12 @@ const Stage = ({ skin, act, playing, className = "mode__stage" }: { skin: Skin; 
  * (the (i) says where to find one), three picked for the player (the
  * champion, one at their level, one at random: their gnome, and their best
  * hole played back on its map), or anyone on the course's board, a sticker a
- * tap away. Then their ghosts' holes (Ghosts).
+ * tap away (the whole board, the leaderboard's sheet: onBoard). Then their
+ * ghosts' holes (Ghosts).
  */
-export function Rival({ s, chain, me, mode, gnome, onPick, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; gnome: string; onPick: (addr: string, bests?: Bests) => void; onBack: () => void; onAbout: () => void }) {
+export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onBack, onAbout }: { s: Snapshot; chain: Chain | null; me: string | null; mode: Mode; gnome: string; onPick: (addr: string, bests?: Bests) => void; onBoard: () => void; onBack: () => void; onAbout: () => void }) {
   const [typed, setTyped] = useState("");
-  const [asList, setAsList] = useState(false); // the board as the full board, not stickers
   const [note, setNote] = useState("");
-  const [why, setWhy] = useState(false);
-  const popId = useId();
   // the course's holes, where a ghost can be
   const holes = useMemo(() => (s.allHoles || []).filter((h) => h.official).map((h) => ({ id: h.id, name: h.name, par: parOf(h) })), [s.allHoles]);
   const picks = useRivalPicks(chain, me, mode);
@@ -105,10 +103,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBack, onAbout }: { 
         {/* someone you know, typed, first; then three picked for you; then anyone on the board, in the one frame that scrolls */}
         <section className="rival__friend">
           <h3 className="rival__h">Race a friend</h3>
-          <span className="rival__info">
-            <button type="button" className="aimset__info" aria-expanded={why} aria-describedby={why ? popId : undefined} aria-label="How do I get it?" onClick={() => setWhy((v) => !v)} onBlur={() => setWhy(false)}>ⓘ</button>
-            {why && <span id={popId} className="aimset__pop" role="note">Their gno.land name or address. Ask them for it, or for their dare link: it opens the duel straight away, nothing to type.</span>}
-          </span>
+          <InfoTip label="How do I get it?" note="Their gno.land name or address. Ask them for it, or for their dare link: it opens the duel straight away, nothing to type." />
           <form className="friends__add" onSubmit={(e) => void go(e)}>
             <input value={typed} onChange={(e) => (setTyped(e.target.value), setNote(""))} placeholder="A friend: nym-… or g1…" aria-label="Your friend's gno.land name or address" />
             <Button variant="gold" className="rival__go" type="submit" disabled={!typed.trim()}>Race</Button>
@@ -120,14 +115,14 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBack, onAbout }: { 
             <li key={p.kind}><Pick {...p} first={i} row={picks && picks[i]} reading={!picks} chain={chain} me={me} gnome={gnome} holes={holes} mode={mode} onPick={onPick} /></li>
           ))}
         </ul>
-        {/* the board as stickers, or as the full board with its rows (the leaderboards' own) */}
-        <section className={"rival__board" + (asList ? "" : " rival__board--cards")}>
+        {/* the board as stickers; the whole of it, the leaderboard's sheet (its rows, a Race each) */}
+        <section className="rival__board">
           <div className="rival__boardhead">
             <h3 className="rival__h">Or anyone on the board</h3>
-            <Segmented className="seg--s" label="Show the board as" value={asList ? "list" : "cards"} options={[["cards", "Cards"], ["list", "List"]]} onChange={(v) => (sound("blip"), setAsList(v === "list"))} />
+            <button className="linkish rival__all" onClick={() => (sound("blip"), onBoard())}>See the whole leaderboard →</button>
           </div>
-          <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} onRace={onPick}
-            row={asList ? undefined : (r) => <Sticker player={r.player} at={r.at} sub={`${strokesWord(r.strokes)} · ${holesWord(r.holes || 0)}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
+          <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode}
+            row={(r) => <Sticker player={r.player} at={r.at} sub={`${strokesWord(r.strokes)} · ${holesWord(r.holes || 0)}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
         </section>
       </div>
     </div>

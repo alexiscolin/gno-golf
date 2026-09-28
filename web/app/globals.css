@@ -522,6 +522,7 @@ html, body {
   justify-content: center;
   margin-top: 18px;
 }
+.crash__retry { margin-top: 8px; } /* (the crash's second way, a word under its Reload) */
 
 .mono {
   font-family: var(--mono);
@@ -1441,7 +1442,6 @@ html, body {
   .card--score { min-width: 0; }
   .card--score .eyebrow { font-size: 9px; letter-spacing: .06em; }
   .card--score .eyebrow, .card--score strong, .card--score .card__par { white-space: nowrap; } /* each on one line */
-  .card--duel { min-width: 0; padding: 6px 10px; gap: 1px; } .card--duel strong { font-size: 17px; } .card--duel .duel__row .eyebrow { max-width: 64px; }
   .card h1 { font-size: 15px; white-space: normal; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .aimbar small { white-space: nowrap; font-size: 11px; }
   .aimbar .power { width: 180px; }
@@ -1718,7 +1718,6 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 
 /* the forecast as a HUD card, next to the strokes */
 .card--weather { display: flex; align-items: center; gap: 8px; padding: 8px 12px; position: relative; font: inherit; color: inherit; cursor: pointer; }
-.weather__pop { left: 0; } /* (the aim's note, under the badge) */
 /* rain darkens and wets the scene; a storm more */
 .wet { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30,45,60,.28), rgba(20,40,50,.12)); transition: opacity .8s; }
 .wet--storm { background: linear-gradient(180deg, rgba(18,26,48,.34), rgba(18,28,40,.12)); }
@@ -1843,8 +1842,9 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 
 /* one short line under the switch; the honesty note behind an (i) */
 .aimset__info { margin-left: 6px; cursor: pointer; font: inherit; font-style: normal; color: inherit; background: none; border: 0; padding: 0 2px; }
-.aimset__help > span:has(.aimset__pop) { position: relative; }
-.aimset__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 3; width: max-content; max-width: 240px; padding: 8px 10px; border-radius: 10px; border: var(--edge); background: var(--paper); color: var(--ink); font-size: 12.5px; line-height: 1.4; text-align: left; }
+/* an (i)'s note (ui.tsx InfoTip): under its button, centred on it, inside the window */
+.tip { position: relative; }
+.aimset__pop { position: absolute; left: 50%; translate: -50% 0; top: calc(100% + 6px); z-index: 3; width: max-content; max-width: min(240px, calc(100vw - 32px)); padding: 8px 10px; border-radius: 10px; border: var(--edge); background: var(--paper); color: var(--ink); font-size: 12.5px; line-height: 1.4; text-align: left; }
 .boards__word { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
 /* the picker's button, the same size whether it says Choose or Locked */
 .screen .btn--play { min-width: 210px; min-height: 48px; }
@@ -1896,7 +1896,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .seg button:hover:not(.on) { background: var(--mint); }
 .seg button:active { transform: translateY(1px); }
 .seg button.on { background: var(--green); color: var(--paper); }
-/* a small one, beside what it switches (the board's aim, the picker's, the rival's Cards / List) */
+/* a small one, beside what it switches (the board's aim, the picker's) */
 .seg--s { box-shadow: 0 2px 0 var(--ink); border-radius: 12px; }
 .seg--s button { min-height: 32px; padding: 4px 14px; font-size: 13px; }
 .boards .seg { margin: 6px 0 10px; }
@@ -1906,11 +1906,20 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .card--score strong { line-height: 1; }
 .card--score .card__par { line-height: 1.1; }
 .card--score .pro-chip { position: absolute; top: -9px; right: -8px; margin: 0; border: 2px solid var(--paper); }
-/* a duel's score: a row each, what is left under; a tap looks at their ball (lit while it does) */
-.card--duel { min-width: 136px; gap: 3px; padding: 8px 12px; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+/* a duel's score: a row each (theirs of the total to beat, small), what is left under; a tap looks at their ball (lit while it does) */
+.card--duel { height: auto; min-width: 150px; gap: 4px; padding: 12px 14px; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
 .card--duel .duel__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .card--duel .duel__row .eyebrow { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card--duel strong { font-size: 20px; }
+.card--duel strong small { font-size: 12px; color: var(--ink-soft); }
+.card--duel .card__par { margin-top: 2px; }
+/* a phone: its own width, never cut (the hole's card gives way), the rival's name and the line shorter
+   (after the card's own rules, so they hold) */
+@media (max-width: 600px) {
+  .card--duel { flex: none; min-width: 0; padding: 10px; gap: 3px; } .card--duel strong { font-size: 17px; } .card--duel .duel__row .eyebrow { max-width: 64px; }
+  .card--duel .card__par { gap: 4px; font-size: 10px; } .card--duel .card__par svg { width: 14px; height: 14px; }
+  body:has(.card--duel) .timed { top: 106px; } /* (the hole's note under it: the card is the row's tallest) */
+}
 .card--duel .card__par { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .card--duel .card__par svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .card--duel:hover { border-color: var(--ink); }
@@ -2184,7 +2193,7 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   .card--weather { position: fixed; top: 92px; right: 12px; width: 60px; height: 60px; padding: 0; justify-content: center; border-radius: 50%; }
   body:has(.card--weather) .timed { right: 84px; }
   .card--weather .weather__vane { width: 46px; height: 46px; }
-  .weather__pop { left: auto; right: 0; } /* (a phone's badge is at the right edge) */
+  .card--weather + .aimset__pop { position: fixed; top: 160px; left: auto; right: 12px; translate: none; } /* (under the badge, at the right edge) */
   .card--weather .weather__side { position: absolute; right: -8px; bottom: -8px; background: var(--paper); border: var(--edge); border-radius: 12px; padding: 1px 3px; }
   .card--weather .weather__sky { width: 26px; height: 18px; }
   .card--weather .weather__say { display: none; }

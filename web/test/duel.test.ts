@@ -1,7 +1,7 @@
 // Ghost duels (ADR-004): the best raced, the ghost's pace, and the result in words.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { raceLeft, duelResult, duelShare, skyWord, toBeat, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, bestOf, showcases, inTurn, mapView, mapFit, mapZone, vsBest, pathD, railRuns, type Duel } from "../lib/duel.ts";
+import { raceLeft, duelResult, duelShare, skyWord, ghostSpeed, pickGhost, shotsOf, levelFrom, levelPick, pickOne, bestOf, showcases, inTurn, mapView, mapFit, mapZone, vsBest, pathD, railRuns, type Duel } from "../lib/duel.ts";
 import type { Ghost } from "../lib/types.ts";
 
 const ghost = (strokes: number, mode: Ghost["mode"] = "assisted"): Ghost => ({ version: 1, hole: "garden/1/v1", mode, player: "g1x", strokes, period: 7, shots: "0.0000,1.0000,0;12.5000,6.2000,3" });
@@ -65,20 +65,9 @@ test("a weather is said in words, and nothing a node could slip in", () => {
   assert.equal(skyWord("constructor"), "clear skies");
 });
 
-test("the score card says what is left: the target, the stroke that wins, the one that ties", () => {
-  assert.equal(toBeat(1, 4), "4 to beat");
-  assert.equal(toBeat(3, 4), "hole it to win");
-  assert.equal(toBeat(4, 4), "hole it to tie");
-  assert.equal(toBeat(1, 1), "hole it to tie", "an ace: tie it at best");
-});
-
 test("a win that can't be saved still says it was won, with the rival's link", () => {
   assert.match(duelShare("win", duel(3), "The Mill", 2, false), /^⚔ Beat ace's 3 with 2 on The Mill\. Can you\?/);
   assert.match(duelShare("loss", duel(3), "The Mill", 4, false), /^⚔ Can you beat ace's 3 on The Mill\?/);
-});
-
-test("the strokes to beat: out of reach once past the ghost's count", () => {
-  assert.deepEqual([toBeat(3, 3), toBeat(2, 3), toBeat(1, 3), toBeat(4, 3)], ["hole it to tie", "hole it to win", "3 to beat", "out of reach"]);
 });
 
 const row = (...ps: string[]) => ps.map((player) => ({ player }));
@@ -185,4 +174,5 @@ test("calls in turn: n at once, the rest in order, a failed one handing its plac
 
 test("a duel's next stroke called out: strokes left to win, the last one, the tie, out of reach", () => {
   assert.deepEqual([1, 2, 3, 4, 5].map((n) => raceLeft(n, 4)), ["3 strokes left to win", "2 strokes left to win", "Last one to win!", "Hole it to tie", "Out of reach"]);
+  assert.equal(raceLeft(1, 1), "Hole it to tie", "an ace: tie it at best");
 });

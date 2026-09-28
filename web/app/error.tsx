@@ -1,6 +1,8 @@
 "use client";
 
 // Next's error boundary: a render error anywhere shows this, not a blank page.
+import { Button } from "@/components/ui";
+
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="banner" role="alertdialog" aria-labelledby="crash-title">
@@ -11,10 +13,11 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           <summary>Technical details</summary>
           <div className="details__box"><p className="mono">{(error && error.message) || String(error)}</p></div>
         </details>
+        {/* one way out; the other (the page kept, drawn again) a small word under it */}
         <div className="banner__row">
-          <button className="btn btn--ghost" onClick={() => reset()}>Try again</button>
-          <button className="btn btn--main" onClick={() => window.location.reload()}>Reload</button>
+          <Button variant="primary" onClick={() => window.location.reload()}>Reload</Button>
         </div>
+        <button className="linkish crash__retry" onClick={() => reset()}>or try again without reloading</button>
       </div>
     </div>
   );

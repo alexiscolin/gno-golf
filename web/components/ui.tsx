@@ -4,7 +4,7 @@
 // game is one of these, so they all hover, press, focus and disable alike.
 // Their look is in globals.css under "shared controls".
 
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
 
 /**
  * A button. variant: "primary" (green), "secondary" (paper), "gold" (the
@@ -64,6 +64,43 @@ export function Toggle({ label, checked, onChange }: { label: ReactNode; checked
       <input type="checkbox" role="switch" checked={checked} onChange={onChange} />
       <i aria-hidden="true" />
     </label>
+  );
+}
+
+/**
+ * A note a tap away (a tooltip never shows on touch): a button, the (i) or
+ * what it is given (the weather's card), opens it under itself, said to a
+ * screen reader too; it stays inside the window, and closes on a tap
+ * elsewhere, Escape or the focus leaving.
+ */
+export function InfoTip({ label, note, className = "aimset__info", tabIndex, children = "ⓘ" }: { label: string; note: ReactNode; className?: string; tabIndex?: number; children?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const box = useRef<HTMLSpanElement>(null), pop = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = pop.current;
+    if (!el) return;
+    // moved back inside the window by what it spills over (16px in: the screens' frame)
+    el.style.marginLeft = "";
+    const r = el.getBoundingClientRect();
+    el.style.marginLeft = `${Math.min(0, innerWidth - 16 - r.right) || Math.max(0, 16 - r.left)}px`;
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => box.current && !box.current.contains(e.target as Node) && setOpen(false);
+    // (before a dialog's own Escape: the note closes, not the menu it is in)
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), setOpen(false));
+    document.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc, true);
+    return () => (document.removeEventListener("pointerdown", away), window.removeEventListener("keydown", esc, true));
+  }, [open]);
+  return (
+    <span ref={box} className="tip">
+      <button type="button" className={className} tabIndex={tabIndex} aria-label={label} aria-expanded={open} aria-describedby={open ? id : undefined} onClick={() => setOpen((v) => !v)} onBlur={() => setOpen(false)}>
+        {children}
+      </button>
+      {open && <span ref={pop} id={id} className="aimset__pop" role="note">{note}</span>}
+    </span>
   );
 }
 

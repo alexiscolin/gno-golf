@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
@@ -9,7 +9,7 @@ import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind,
 import { HOT, type CamMode, type ErrorKind } from "@/lib/engine/types";
 import type { Skin } from "@/lib/scene/gnome";
 import type { Ghost, HoleRow, Mode } from "@/lib/types";
-import { duelResult, duelShare, pickGhost, raceLeft, toBeat, type Duel } from "@/lib/duel";
+import { duelResult, duelShare, pickGhost, raceLeft, type Duel } from "@/lib/duel";
 import { SHARE_TAGS } from "@/lib/site";
 import { DuelFine, DuelNote, type Sky } from "@/components/Duel";
 import type { Card, Cup } from "@/lib/card";
@@ -25,7 +25,7 @@ import { Badges, CardStamps, ChainSeal, EarnedBadges, NewBadges } from "@/compon
 import Tip from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
-import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog } from "@/components/ui";
+import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip } from "@/components/ui";
 import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
@@ -807,6 +807,8 @@ export default function Golf() {
   };
   // a Race (a board's, the rival screen's): from the tee, a round under way starts again
   const raceWith = (player: string) => (setBoard(false), game.current?.reset(), pickRival(player));
+  // a rival picked on the rival screen (or its board's sheet): their ghosts next, their bests kept when read there
+  const toGhosts = (player: string, bests?: ReadonlyMap<string, Readonly<Record<Mode, number>>>) => (sound("select"), bests && setRivalOn({ by: player, bests, at: saves }), raceWith(player), setScreen("ghosts"));
   const dropDuel = () => {
     setSolo(true);
     setRival(null);
@@ -1234,7 +1236,7 @@ export default function Golf() {
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
-          onPick={(addr, bests) => (sound("select"), bests && setRivalOn({ by: addr, bests, at: saves }), raceWith(addr), setScreen("ghosts"))} />
+          onPick={toGhosts} onBoard={() => setBoard(true)} />
       )}
       {screen === "ghosts" && (
         <Ghosts holes={allList} name={rivalName} player={dare} chain={game.current && game.current.chain} bests={rivalBests} card={card} mode={aim} onRace={openHole}
@@ -1287,7 +1289,7 @@ export default function Golf() {
                 </a>
               </div>
             </div>
-            {/* in a duel: a row each (the player's first), what is left, and a tap to look at their ball (again: back to yours) */}
+            {/* in a duel: a row each (the player's first; theirs played so far, of the total to beat), what is left, and a tap to look at their ball (again: back to yours) */}
             {racing ? (
               <button className={"card card--score card--duel" + (s.rivalPeek ? " card--peek" : "")} aria-pressed={s.rivalPeek} onClick={() => game.current?.peekRival(!s.rivalPeek)}
                 title={s.rivalPeek ? "Back to your ball" : "See where their ball is"}>
@@ -1295,10 +1297,10 @@ export default function Golf() {
                   <span className="eyebrow">You</span><strong>{s.strokes}</strong>
                 </span>
                 <span className="duel__row">
-                  <span className="eyebrow">{racing.self ? "Your best" : racing.name}</span><strong>{s.rival ?? 0}{s.rivalIn && "✓"}</strong>
+                  <span className="eyebrow">{racing.self ? "Your best" : racing.name}</span><strong>{s.rival ?? 0}<small> / {racing.ghost.strokes}</small></strong>
                 </span>
                 <span className="card__par">
-                  {s.done && !s.flying ? { win: racing.self ? "you beat your best" : "you won", tie: "tie", loss: racing.self ? "your best won" : "they won" }[duelResult(s.strokes, racing, "").result] : theyWon ? (racing.self ? "your best won" : "they won") : toBeat(s.strokes + 1, racing.ghost.strokes)}
+                  {s.done && !s.flying ? { win: racing.self ? "You beat your best" : "You won", tie: "Tie", loss: racing.self ? "Your best won" : "They won" }[duelResult(s.strokes, racing, "").result] : theyWon ? (racing.self ? "Your best won" : "They won") : raceLeft(s.strokes + 1, racing.ghost.strokes)}
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12ZM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6" /></svg>
                 </span>
                 {(s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>}
@@ -1644,7 +1646,7 @@ export default function Golf() {
       )}
 
       {board && s && (
-        <Boards mode={aim} s={s} inHole={screen === "play"} onRace={screen === "play" ? raceWith : undefined} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
+        <Boards mode={aim} s={s} inHole={screen === "play"} onRace={screen === "play" ? raceWith : screen === "rival" ? toGhosts : undefined} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
       )}
 
       {cardOpen && s && (
@@ -2130,8 +2132,6 @@ function NetBanner({ rpc, onSupport }: { rpc: string; onSupport: () => void }) {
 
 /** Assisted or Pro aim, with what it means — and what the chain can't check. */
 function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (m: Mode) => void; compact?: boolean }) {
-  const [why, setWhy] = useState(false); // the (i)'s note, a tap away (a tooltip never shows on touch)
-  const popId = useId(); // (the note is what the (i) says, to a screen reader too)
   return (
     <div className={"aimset" + (compact ? " aimset--compact" : "")}>
       <span className="aimset__label">Aim</span>
@@ -2140,10 +2140,7 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
       <small className="aimset__help">
         <span className={aim === "pro" ? "" : "off"} aria-hidden={aim !== "pro"}>
           {compact ? "No aim line: you read the course yourself. Ranked on its own board." : "No aim line · ranked apart"}
-          <button type="button" className="aimset__info" tabIndex={aim === "pro" ? 0 : -1} aria-expanded={why} aria-describedby={why ? popId : undefined} aria-label="Why ranked apart?" onClick={() => setWhy((v) => !v)} onBlur={() => setWhy(false)}>
-            ⓘ
-          </button>
-          {why && <span id={popId} className="aimset__pop" role="note">{HONEST}</span>}
+          <InfoTip label="Why ranked apart?" note={HONEST} tabIndex={aim === "pro" ? 0 : -1} />
         </span>
         <span className={aim === "pro" ? "off" : ""} aria-hidden={aim === "pro"}>{compact ? "The chain previews your shot: see the whole aim line before you swing." : "Full aim line"}</span>
       </small>
