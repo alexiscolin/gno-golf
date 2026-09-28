@@ -79,14 +79,14 @@ const loadSent = () => {
 };
 
 /** How a save goes: signing (part of of), checking (sent: the chain read back), refused (why; stale: its
- *  weather is over), unsure (why; sent: Adena said it went, so a save again only reads it again, by its
+ *  weather is over; final: the chain played it, otherwise than here: sent, it is not offered again), unsure (why; sent: Adena said it went, so a save again only reads it again, by its
  *  hash if Adena gave one; else it may have gone: the player checks before saving again; was: the
  *  player's best there as the last commit went, 0 for none), or saved (stays: the older best the chain
  *  kept, this round not beating it: a tie keeps the older round). */
 type Rec = null
   | { at: "signing"; part?: number; of?: number }
   | { at: "checking" }
-  | { at: "refused"; error: string; stale: boolean }
+  | { at: "refused"; error: string; stale: boolean; final?: true }
   | { at: "unsure"; error: string; sent: boolean; hash?: string; was?: number }
   | { at: "saved"; stays?: number };
 
@@ -245,13 +245,14 @@ function useNow(clock: () => number) {
  *  time is over, that it can't. */
 // by and clock (now, ms) on the chain's clock; ranked: a course hole (a community one ranks nobody)
 // again: what the button to play again says (Rematch in a duel)
-function SaveClock({ by, clock = Date.now, stale, ranked, again = "Play again" }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean; again?: string }) {
+// moot: no better than the player's best there (the chain keeps that one)
+function SaveClock({ by, clock = Date.now, stale, ranked, moot, again = "Play again" }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean; moot?: boolean; again?: string }) {
   const now = useNow(clock);
   const left = by - now;
   if (left > 0 && !stale)
     return (
       <p className={"saveclock" + (left < 60000 ? " saveclock--soon" : "")}>
-        Only in this browser. Save within <b>{mmss(left)}</b> {ranked ? "to be ranked" : "to keep it on your address"}.
+        Only in this browser. Save within <b>{mmss(left)}</b> {moot ? "to play it on-chain (your best here stays)" : ranked ? "to be ranked" : "to keep it on your address"}.
       </p>
     );
   return (
@@ -480,7 +481,7 @@ export default function Golf() {
   const [account, setAccount] = useState<Account | null>(null);
   const [wallet, setWallet] = useState<{ busy: boolean; error: string | null; note?: string }>({ busy: false, error: null });
   const [record, setRecord] = useState<Rec>(null);
-  const played = record?.at === "saved"; // this round went through: nothing more of it to send
+  const played = record?.at === "saved" || (record?.at === "refused" && !!record.final); // this round went through: nothing more of it to send
   const onChain = record?.at === "saved" && !record.stays; // and it is the player's best on the chain: public, their ghost
   const stale = record?.at === "refused" && record.stale; // its weather is over: no save any more
   // the save window runs out on the clock, not at the next click: the button goes with it
@@ -948,10 +949,13 @@ export default function Golf() {
   const bests = onCourse ? { ...onCourse, [saveMode]: onCourse[saveMode] + (saved === true ? 0 : 1) } : { assisted: 0, pro: 0, [saveMode]: 1 };
   const saveDeposit = depositOf(saved, bytePrice, firstOnCourse, toSave ? toSave.strokes : 0) + (saveName ? nameBytes([bests.assisted, bests.pro]) * bytePrice : 0);
   const mainnet = networkOf((cfg && cfg.rpc) || "") === "mainnet"; // its GNOT is the real one
-  // (and a round no better than the player's best there, said before it is paid for: the chain keeps the best)
-  const costNow = toSave
-    ? costLine(saveGas, gasPrice, saved, saveDeposit, !mainnet) + (best && toSave.strokes >= best ? `. Your best here is ${strokesWord(best)}: this round would not change it` : "")
-    : null;
+  // a round no better than the player's best there, said before it is paid for: the chain keeps the best
+  const moot = !!(best && toSave && toSave.strokes >= best);
+  const costNow = toSave ? costLine(saveGas, gasPrice, saved, saveDeposit, !mainnet) + (moot ? `. Your best here is ${strokesWord(best || 0)}: this round would not change it` : "") : null;
+  // a phone with no wallet can't save here (the sheet sends the hole to a computer): nothing promised there
+  const phoneOnly = !account && isTouch() && !hasAdena();
+  // saving is the win card's main action while it would get somewhere: else going on is
+  const pushSave = canSave && !phoneOnly && !moot;
   const lackNow = toSave && account && funds != null ? shortOf(saveGas, gasPrice, saveDeposit, funds) : null;
   useEffect(() => {
     if (!waiting) return setSlowSign(false);
@@ -1016,21 +1020,22 @@ export default function Golf() {
     void saveRound(r, (rec) => setPendingRec({ round, rec }), () => !!pendingNow.current && roundOf(pendingNow.current) === round, savingKept, saveName);
   };
 
-  // the round the win card offers to save
-  async function recordIt() {
-    if (stepMissing) return setReal(true);
+  // the round the win card offers to save (send: false, only asked of the chain: a gnokey save)
+  async function recordIt(send = true) {
+    if (send && stepMissing) return setReal(true);
     if (!s || !game.current || !s.id) return;
     const r = { ...s, id: s.id }, round = roundOf(r);
-    await saveRound(r, (rec) => roundKey.current === round && setRecord(rec), () => roundKey.current === round, savingWin, saveName);
+    await saveRound(r, (rec) => roundKey.current === round && setRecord(rec), () => roundKey.current === round, savingWin, saveName, send);
   }
 
   /**
    * Puts a finished round on the chain: in as many commits as the chain cuts
    * it into, each signed in Adena, then read back. land says how it goes;
    * alive: the player is still on it (a later commit is not sent otherwise);
-   * lock: that card's save under way; name: taken in the first signature.
+   * lock: that card's save under way; name: taken in the first signature;
+   * send: false, nothing is sent: only whether the chain holds it already.
    */
-  async function saveRound(r: SaveOf, land: (rec: Rec) => void, alive: () => boolean, lock: { current: boolean }, name: string | null) {
+  async function saveRound(r: SaveOf, land: (rec: Rec) => void, alive: () => boolean, lock: { current: boolean }, name: string | null, send = true) {
     if (!account || !game.current) return;
     // busy before anything is awaited: a second click must not start a second save
     if (lock.current) return;
@@ -1039,7 +1044,7 @@ export default function Golf() {
     const key = sentKey(account.address, r), sentAs = sentRounds.get(key);
     if (sentAs && !(sentAs.at === "unsure" && sentAs.sent)) return land(sentAs);
     lock.current = true;
-    land(sentAs ? { at: "checking" } : { at: "signing" });
+    land(sentAs || !send ? { at: "checking" } : { at: "signing" });
     // the save's funnel (analytics): the part being signed, of how many, and the gas asked
     const t0 = performance.now(), at = { part: 0, parts: 0, gas: 0 };
     const said = (stage: Events["save"]["stage"], reason?: string) => track("save", { stage, ...at, ms: Math.round(performance.now() - t0), reason });
@@ -1076,7 +1081,7 @@ export default function Golf() {
       // the round went through, whatever the chain made of it: saving it again would only play it again
       // (a round no better than the best there leaves it: the chain keeps a best until a round beats it)
       const stays = was && was <= r.strokes ? was : undefined;
-      const rec: Rec = got.holed === r.strokes ? { at: "saved", stays } : { at: "refused", stale: false, error: replayDiffers(got.holed ?? got.left, got.holed != null) };
+      const rec: Rec = got.holed === r.strokes ? { at: "saved", stays } : { at: "refused", stale: false, final: true, error: replayDiffers(got.holed ?? got.left, got.holed != null) };
       markSent(key, rec);
       if (rec.at === "saved") {
         said("ok");
@@ -1096,6 +1101,11 @@ export default function Golf() {
       // (its clock read again first: the chain's time decides, not this browser's)
       await chain.sync().catch(() => {});
       if (r.period != null && chain.now() >= saveBy(r.period)) return said("failed", "late"), land({ at: "refused", error: "Too late to save: the weather changed. Play the hole again to save it.", stale: true });
+      // a round the chain holds already as the player's best here went another way (the gnokey
+      // paste): it is saved, not sent again (one that did not beat the best leaves no trace to see)
+      const had = await within(bestHere()).catch(() => null);
+      if (had && had.period === r.period && had.shots === r.shots.join(";")) return await settle(undefined, true, true);
+      if (!send) return land({ at: "unsure", sent: false, error: "The chain does not show this round as your best here: a gnokey save shows once it printed OK! for each transaction, from the account connected here, if it beats your best." });
       const id = chainId || (await within(chain.chainId()));
       // asked before Adena opens: how many transactions the round needs, or
       // why the chain would refuse it
@@ -1657,8 +1667,11 @@ export default function Golf() {
               const chain = game.current && game.current.chain;
               const host = ((chain && chain.rpc) || "").replace(/^https?:\/\//, "");
               const need = (canSave && lackNow) || 0;
+              // (Adena on this node already, a slow fee is only slow: no network to pick)
               const warn =
-                account && (ourNode === false || slowSign) ? (
+                account && ourNode === true && slowSign ? (
+                  "Adena is still working out the fee: confirm or reject it in its window."
+                ) : account && (ourNode === false || slowSign) ? (
                   <>
                     {ourNode === false ? "Adena is on another network." : "Adena is still working out the fee."} In Adena, pick the one whose RPC is <b>{host}</b>
                     {chainId ? <> (chain id <b>{chainId}</b>)</> : null}.
@@ -1682,34 +1695,33 @@ export default function Golf() {
                 );
               return warn && <p className="note note--warn">{warn}</p>;
             })()}
-            {!played && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} again={won ? "Rematch" : undefined} />
+            {!played && !phoneOnly && s.period != null && (
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} moot={moot} again={won ? "Rematch" : undefined} />
             )}
-            {/* one solid action at a time: saving while it can, else going on (a duel lost or tied: the rematch) */}
+            {/* one solid action at a time: saving while it gets somewhere, else going on (a duel lost or tied: the rematch) */}
             <div className="banner__row">
-              {canSave && !rematch ? (
+              {pushSave && !rematch ? (
                 <button className="linkish" onClick={() => game.current?.reset()}>{won ? "Rematch" : "Play again"}</button>
               ) : (
-                <Button variant={rematch && !canSave ? "primary" : "secondary"} onClick={() => game.current?.reset()}>
+                <Button variant={rematch && !pushSave ? "primary" : "secondary"} onClick={() => game.current?.reset()}>
                   {won ? "Rematch" : "Play again"}
                 </Button>
               )}
-              {canSave && (
-                <Button variant="secondary" className={"btn--save" + (nudge.at ? " btn--save-rank" : "")} disabled={busy(record) || !nameReady} onClick={() => void recordIt()}>
+              {canSave && !phoneOnly && (
+                <Button variant="secondary" className={(pushSave ? "btn--save" : "") + (nudge.at ? " btn--save-rank" : "")} disabled={busy(record) || !nameReady} onClick={() => void recordIt()}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record?.at === "signing" && record.of !== undefined ? `Adena: part ${record.part} of ${record.of}…` : saveLabel(record)}
-                  {nudge.at > 0 && !busy(record) && !(!account && isTouch() && !hasAdena()) && (
-                    // (a phone with no wallet can't take it: no promise there)
+                  {nudge.at > 0 && !busy(record) && (
                     <span className="btn__rank">{!account ? `Could be #${nudge.at}` : askName && !saveName ? `#${nudge.at} with a name` : `Take #${nudge.at} on this hole!`}</span>
                   )}
                 </Button>
               )}
               {cupWon && cupWon.id === s.id ? (
-                <button className={"btn " + (canSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
+                <button className={"btn " + (pushSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
                   Cup complete! →
                 </button>
               ) : (
-                <button className={"btn " + (canSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => {
+                <button className={"btn " + (pushSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => {
                   // (a duel with no other ghost in this cup: back to their ghosts)
                   const n = nextHole(s, card, duelHole);
                   n ? goTo(n.id) : duelHole ? setScreen(cupsScreen) : goTo(s.holes[0].id);
@@ -1718,15 +1730,21 @@ export default function Golf() {
                 </button>
               )}
             </div>
-            {canSave && (account || !(isTouch() && !hasAdena())) && (
+            {canSave && phoneOnly && (
               <p className="real__fine">
-                {/* why save: a link that dares (a phone with no wallet can't: no promise there) */}
+                This round stays on this phone: saving takes Adena, a computer&apos;s wallet. <button className="linkish" onClick={() => setReal(true)}>Play it on your computer</button>
+              </p>
+            )}
+            {canSave && !phoneOnly && (
+              <p className="real__fine">
+                {/* why save: a link that dares */}
                 {won ? won.result !== "loss" && !won.duel.self && `Save it to dare ${won.duel.name} back with your own ghost. `
                   : !daring && "Save it and your link becomes a dare: friends race your ghost, free, no wallet. "}
                 {account && costNow && `${costNow}. You confirm in Adena.`}
               </p>
             )}
-            {!played && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} />}
+            {/* a gnokey save said done: the chain asked for it (connected), else it is not kept for a save here any more */}
+            {!played && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} onSent={() => (account ? void recordIt(false) : keepPending(null))} />}
           </Dialog>
         </div>
       )}
@@ -1997,9 +2015,11 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
             <span>Your <b>{strokesWord(r.strokes)}</b> on <b>{r.name}</b> {r.strokes > 1 ? "are" : "is"} waiting{left != null && <> · <b>{mmss(left)}</b> left</>}</span>
             {(rec?.at === "refused" || rec?.at === "unsure") && <small className="pending__err" role="alert">{rec.error}</small>}
           </span>
-          <Button variant="secondary" className="btn--save" disabled={busy(rec)} onClick={onSave}>
-            {saveLabel(rec)}
-          </Button>
+          {!(rec?.at === "refused" && rec.final) && (
+            <Button variant="secondary" className="btn--save" disabled={busy(rec)} onClick={onSave}>
+              {saveLabel(rec)}
+            </Button>
+          )}
         </>
       )}
       <SheetClose inline onClose={onForget} />
@@ -2050,7 +2070,8 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
   const installed = hasAdena();
   const phone = !installed && isTouch();
   const net = networkOf(rpc || ""), local = net === "local", main = net === "mainnet";
-  const funded = funds != null && (lack != null ? lack === 0 : funds > 0);
+  // (a balance not read is no step missing, as on the win card: the chain or Adena says a shortfall)
+  const funded = !!account && (funds == null || (lack != null ? lack === 0 : funds > 0));
   // one step at a time: each ticked on its own (a name and no GNOT left is
   // step 3 to do again), and only the first not done shows what to do
   const done = [installed, !!account, funded, !!named, savedAny && !onSave]; // (a round waiting: its save is the step at hand)
