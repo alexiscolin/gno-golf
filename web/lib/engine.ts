@@ -1183,7 +1183,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     };
     return n(a) - n(b) || a.id.localeCompare(b.id);
   };
-  const inWorld = () => g.list.filter((h) => cupOf(h) === g.world);
+  const inWorld = (w = g.world) => g.list.filter((h) => cupOf(h) === w);
 
   /**
    * The hole a link names: a realm id (?hole=gno.land/r/…, the old form), or a
@@ -1267,10 +1267,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     /** Play a world: its first hole, and its holes in the menu. */
     setWorld(w: string) {
       loadWorld(w).catch(() => {}); // fetched while the player picks a gnome
-      // (the cup asked for, and its hole on screen already: nothing to load)
-      if (!g.list || (w === g.world && inWorld().some((h) => h.id === g.id))) return;
+      if (!g.list) return;
+      // from its first hole, wherever the last round stopped (a cup entered is a new start)
+      const first = inWorld(w)[0];
       g.world = w;
-      const first = inWorld()[0];
+      if (first && first.id === g.id && !g.shots.length) return; // (on screen, not played yet)
       if (first) void load(first.id);
       else void publish();
     },

@@ -925,8 +925,7 @@ export default function Golf() {
     if (game.current) void game.current.load(id);
     setScreen("pick");
   };
-  // into a cup: its hole set (the one being played if it is in that cup, else
-  // its first), then the gnome, the last one played already picked
+  // into a cup: from its first hole (engine setWorld), then the gnome, the last one played already picked
   const enterCup = (w: string) => {
     // a duel: the cup's first hole with their ghost (the one on screen when it has one)
     const first = duelHole && !(holeId && duelHole({ id: holeId }) && s && s.world === w) && allList.find((h) => cupOf(h) === w && duelHole(h));
