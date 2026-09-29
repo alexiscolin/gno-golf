@@ -74,6 +74,8 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
   // the course's holes, where a ghost can be
   const holes = useMemo(() => (s.allHoles || []).filter((h) => h.official).map((h) => ({ id: h.id, name: h.name, par: parOf(h) })), [s.allHoles]);
   const picks = useRivalPicks(chain, me, mode);
+  // a board read with no one on it (no champion): no "anyone on the board" to show
+  const nobody = !!picks && !picks.retry && !picks.rows[0];
   const go = async (e: FormEvent) => {
     e.preventDefault();
     const v = typed.trim();
@@ -106,7 +108,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
         ))}
       </ul>
       {/* the board as stickers; the whole of it, the leaderboard's sheet (its rows, a Race each) */}
-      <section className="rival__board">
+      {!nobody && <section className="rival__board">
         <div className="rival__boardhead">
           <h3 className="rival__h">Or anyone on the board</h3>
           <span className="rival__links">
@@ -116,7 +118,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
         </div>
         <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} max={8}
           row={(r) => <Sticker player={r.player} at={r.at} sub={`${holesWord(r.holes || 0)} · ${vsPar(standingVs(r))}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
-      </section>
+      </section>}
     </FrontScreen>
   );
 }

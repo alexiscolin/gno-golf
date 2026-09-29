@@ -2171,6 +2171,8 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 /* on the play screen, in the top row between its cards (its height, centred on them); under them when the row is full */
 body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-height: 76px; }
 @media (max-width: 1600px) { body:has(.hud--top) .pending { top: 104px; min-height: 0; } }
+/* on a front screen, centred on its corner buttons' line (Back, About: 34px + 52/2) */
+body:has(.screen) .pending { top: 60px; transform: translate(-50%, -50%); }
 /* ------------------------------------------------ by breakpoint
    The media rules no later rule fights, gathered here: wide to narrow, the
    motion switch last. The ones a later rule overrides stay where they are. */
@@ -2249,7 +2251,7 @@ body:has(.hud--top) .pending { top: max(14px, env(safe-area-inset-top)); min-hei
   /* a round waiting for its save: under the weather badge (92px + its 60), its words wrapping */
   .pending { gap: 8px; padding: 6px 6px 6px 12px; font-size: 13px; max-width: calc(100vw - 24px); }
   body:has(.hud--top) .pending { top: 160px; }
-  body:has(.screen) .pending { top: 96px; } /* a front screen: under its corner buttons (Back, the mode, About) */
+  body:has(.screen) .pending { top: 96px; transform: translateX(-50%); } /* a front screen: under its corner buttons (Back, the mode, About) */
   body:has(.pending) .screen .front__head { padding-top: 64px; } /* and its heading under the card */
   .pending .btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
   .pending__say { min-width: 0; }
