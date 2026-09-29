@@ -236,6 +236,15 @@ test("roundURL links a named player's round on a hole, # for a bad hole id or ad
   assert.equal(chain.roundURL("garden/1", "not-an-address"), "#");
 });
 
+test("helpURL: a realm function's gnoweb form ($help&func=), # for anything else", () => {
+  const chain = makeChain();
+  assert.equal(chain.helpURL("gno.land/r/sys/namereg/v0", "Register"), new URL("/r/sys/namereg/v0$help&func=Register", chain.web + "/").href);
+  assert.equal(chain.helpURL("gno.land/r/gnogolf/golf", "Claim"), new URL("/r/gnogolf/golf$help&func=Claim", chain.web + "/").href);
+  assert.equal(chain.helpURL("", "Register"), "#"); // (no registrar)
+  assert.equal(chain.helpURL("javascript:alert(1)", "Claim"), "#");
+  assert.equal(chain.helpURL("gno.land/r/gnogolf/golf", "Claim&x=1"), "#");
+});
+
 test("sourceURL: a package hole's gnoweb source, a data hole's data page, # otherwise", () => {
   const chain = makeChain();
   assert.equal(chain.sourceURL("gno.land/r/gnogolf/golf"), new URL("/r/gnogolf/golf$source", chain.web + "/").href);

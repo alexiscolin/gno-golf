@@ -1757,6 +1757,13 @@ export default function Golf() {
             )}
             {/* a gnokey save said done: the chain asked for it, from the account connected (none: the round stays, checked once one is) */}
             {!played && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} onSent={account ? () => void recordIt(false) : undefined} />}
+            {/* no account to know the player by: their name with gnokey too (its Claim ranks the rounds saved before it) */}
+            {!account && !phoneOnly && s.official && game.current && (
+              <details className="details gnokey">
+                <summary>Rank it: take your gno.land name with gnokey</summary>
+                <NameForm chain={game.current.chain} account={null} chainId={chainId || chainName || null} price={gasPrice} lead="Your name on the board" onNamed={() => {}} />
+              </details>
+            )}
           </Dialog>
         </div>
       )}

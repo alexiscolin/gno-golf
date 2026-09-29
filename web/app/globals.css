@@ -884,7 +884,7 @@ html, body {
   background: var(--paper);
 }
 
-.real__steps li > .nameform { grid-column: 2; margin: 8px 0 0; } /* under its step's words */
+.real__steps li > .nameform, .real__steps li > .gnokey { grid-column: 2; margin: 8px 0 0; } /* under its step's words */
 
 /* the step to do now stands out; the ones after it wait */
 .real__steps li.now::before { background: var(--gold); }
@@ -2030,6 +2030,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .gnokey__row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
 .gnokey__row .real__fine { text-align: left; }
 .btn.gnokey__copy { min-width: 110px; }
+.gnokey__web.real__fine { margin: 12px 0 0; text-align: left; } /* the same call on gnoweb, under the paste */
 
 /* about: how it works, what is in it, where to go next, who made it */
 /* the about button: the back button's twin, top right, over every front screen */
@@ -2087,7 +2088,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .about__links b { font-size: 14px; }
 .about__links span { font-size: 12.5px; font-weight: 400; color: var(--ink-soft); }
 .about__credit { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: var(--rule); font-size: 13px; color: var(--ink-soft); }
-.about__credit a, .boards__ranked a, .nameform a, a.mono { color: var(--ink); } /* inline links in soft text: ink, one rule */
+.about__credit a, .boards__ranked a, .nameform a, .gnokey__web a, a.mono { color: var(--ink); } /* inline links in soft text: ink, one rule */
 /* a sheet open: the screens' corner buttons (back, about) step aside, so the sheet's own close is the one tapped */
 body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hidden; }
 .drawer__panel .drawer__list { border-bottom: var(--rule); }

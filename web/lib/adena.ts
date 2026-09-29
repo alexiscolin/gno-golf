@@ -10,7 +10,7 @@
 // itself — the page sends decisions, never outcomes — so a recorded score is
 // one nobody can type in.
 
-import { RULES, isAddress, errorKind, type Chain } from "./chain";
+import { RULES, isAddress, nameShape, errorKind, type Chain } from "./chain";
 import { trackError } from "./analytics";
 import type { HoleState, Mode, Vec2, Zone } from "./types";
 
@@ -493,6 +493,21 @@ interface SaveRound extends Work {
   period?: number | null;
   roundMode?: Mode | null;
 }
+// A gnokey paste's parts. Nothing the chain or the page's link says goes in
+// unchecked: a package path is one of a realm's characters, the chain's id and
+// RPC are theirs or a placeholder, and an argument is checked (or quoted) by
+// the plan it is in.
+const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+/** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
+function gnokeyOn(chainId: string | null | undefined, rpc: string) {
+  const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
+  const remote = /^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "<rpc-url>";
+  return `-broadcast -chainid ${chain} -remote ${remote} <your-key-name>`;
+}
+/** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's. */
+const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string) =>
+  `gnokey maketx call -pkgpath ${pkg} -func ${func}${args.map((a) => ` -args ${a}`).join("")} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} ${on}`;
+
 /**
  * The same save for gnokey: one plain `gnokey maketx call` per commit, the
  * call Adena would send (PlayRoundAt, PlayRoundPro, or PlayRound with no
@@ -512,11 +527,9 @@ export function gnokeyPlan(s: SaveRound, { realm, price = PRICE, chainId, rpc, p
   // the player pastes this into a shell: nothing the chain or the page's link
   // says goes in unchecked (a shot is digits, a sign, dots and commas)
   if (s.period != null && !Number.isSafeInteger(s.period)) return [];
-  if (!/^[\w./-]{1,128}$/.test(String(s.id)) || !/^gno\.land\/r\/[\w/.-]+$/.test(realm) || !shots.every((x) => /^[\d.,-]+$/.test(x))) return [];
-  const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
-  const remote = /^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "<rpc-url>";
-  const call = (func: string, args: readonly string[], gas: number) =>
-    `gnokey maketx call -pkgpath ${realm} -func ${func}${args.map((a) => ` -args ${a}`).join("")} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -broadcast -chainid ${chain} -remote ${remote} <your-key-name>`;
+  if (!/^[\w./-]{1,128}$/.test(String(s.id)) || !PKG_PATH.test(realm) || !shots.every((x) => /^[\d.,-]+$/.test(x))) return [];
+  const on = gnokeyOn(chainId, rpc);
+  const call = (func: string, args: readonly string[], gas: number) => gnokeyCall(realm, func, args, gas, price, on);
   // the chain's own cut when it was asked (chainSplit); the work model's otherwise
   const parts = checked && checked.length ? checked : commitsOf(s, shots.length);
   const plays = parts.map(([from, to]) => {
@@ -556,6 +569,29 @@ export function gnokeyPaste(plan: readonly string[], who: string) {
     .join("\n\n");
   return `(\nset -e\n${send}\n\n${body}\n)`;
 }
+
+/** Where a gnokey paste goes: this chain (its id and RPC), at its gas price. */
+interface GnokeyAt { price?: number; chainId?: string | null; rpc: string }
+/**
+ * A name taken with gnokey, as registerName does with Adena: Register, then
+ * golf's Claim, which ranks the rounds saved before it. Two transactions
+ * (gnokey sends one call each), each at its own gas; Register must be a direct
+ * call, which a `maketx call` is. name: whole ("nym-…"), as the name form
+ * checked it; [] for none of the registrar's shape, or no registrar.
+ */
+export function gnokeyName({ registrar, realm, name, price = PRICE, chainId, rpc }: GnokeyAt & { registrar: string; realm: string; name: string }) {
+  if (!PKG_PATH.test(registrar) || !PKG_PATH.test(realm) || !nameShape(name)) return [];
+  const on = gnokeyOn(chainId, rpc);
+  return [gnokeyCall(registrar, "Register", [`'${name}'`], REGISTER_GAS, price, on), gnokeyCall(realm, "Claim", [], CLAIM_GAS, price, on)];
+}
+/** The rounds saved before a name ranked with gnokey, as claimRounds does with Adena (golf's Claim). */
+export const gnokeyClaim = ({ realm, price = PRICE, chainId, rpc }: GnokeyAt & { realm: string }) =>
+  PKG_PATH.test(realm) ? [gnokeyCall(realm, "Claim", [], CLAIM_GAS, price, gnokeyOn(chainId, rpc))] : [];
+/** A tip with gnokey, as sendTip does with Adena: one plain send of gnot (one of TIPS) to the realm's owner (to, read on the chain). */
+export const gnokeyTip = ({ to, gnot, price = PRICE, chainId, rpc }: GnokeyAt & { to: string; gnot: number }) =>
+  isAddress(to) && TIPS.some((t) => t === gnot)
+    ? [`gnokey maketx send -send ${gnot * 1e6}ugnot -to ${to} -gas-fee ${feeFor(TIP_GAS, price)}ugnot -gas-wanted ${TIP_GAS} ${gnokeyOn(chainId, rpc)}`]
+    : [];
 
 /** The strokes a save's result says its round was holed in (PlayRound's
  *  "holed in N strokes", in a transaction's result), null if it says none. */

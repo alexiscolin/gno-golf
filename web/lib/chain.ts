@@ -138,6 +138,8 @@ const checks = {
 };
 // a gno.land name as r/sys/users writes them
 const isName = (n: string) => /^[a-z0-9._-]{1,64}$/i.test(n);
+/** What a name a registrar takes is made of (its own rules come after, ValidateNymFormat): what nameProblem asks first, and a gnokey paste takes. */
+export const nameShape = (n: string) => /^[a-z0-9_-]{1,64}$/.test(n);
 // what a refused stroke says, as the engine always said it
 const NO_PATH = "The chain answered without a path for that shot.";
 
@@ -341,6 +343,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       isHoleId(hole) && isAddress(player) ? new URL(`${REALM_PATH}:${hole}/${player}`, web + "/").href : "#",
     /** gnoweb page of an address (its /u/ profile), # for anything else. */
     userURL: (addr: string) => (isAddress(addr) ? new URL(`/u/${addr}`, web + "/").href : "#"),
+    /** gnoweb form of a realm's function (its $help page, at func): the call made in a browser, without Adena; # for anything else. */
+    helpURL: (pkg: string, func: string) =>
+      /^gno\.land\/r\/[\w/.-]+$/.test(pkg) && /^[A-Z]\w*$/.test(func) ? new URL(`${pkg.replace(/^gno\.land/, "")}$help&func=${func}`, web + "/").href : "#",
     /** gnoweb link to what a hole is made of: a realm hole's source, a data
      *  hole's data page. A player can read a hole before trusting it. */
     // links built from what the chain says, checked first: a hole id, an address
@@ -456,7 +461,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     nameProblem: async (name: string) => {
       const reg = await nameReg();
       if (!reg) return "This chain has no name registrar.";
-      if (!/^[a-z0-9_-]{1,64}$/.test(name)) return "Lowercase letters, digits and dashes only.";
+      if (!nameShape(name)) return "Lowercase letters, digits and dashes only.";
       const bad = await qstr(reg, `func() string { if e := ValidateNymFormat(${s(name)}); e != nil { return e.Error() }; return "" }()`);
       if (bad) return bad.replace(/^namereg: /, "");
       if ((await vm("gno.land/r/sys/users", `IsNameTaken(${s(name)})`)).startsWith("(true")) return "That name is taken.";

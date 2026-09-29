@@ -2,14 +2,16 @@
 
 // A tip for the game's maker: GNOT sent from the player's Adena to the golf
 // realm's owner, as the chain has it (never an address the page carries), in
-// one plain send the player confirms in Adena. Playing stays free; a testnet's
+// one plain send the player confirms in Adena, or signs with gnokey (a paste:
+// the only way without Adena, a quiet other one with it). Playing stays free; a testnet's
 // GNOT is test GNOT, and said so. Not on mainnet while its ugnot is
 // transfer-locked (bank restricted_denoms): the chain refuses a plain send.
 import { useEffect, useState } from "react";
-import { hasAdena, resultOf, sendTip, TIPS, type SendError } from "@/lib/adena";
+import { hasAdena, resultOf, sendTip, gnokeyTip, TIPS, type SendError } from "@/lib/adena";
 import { isTouch } from "@/lib/device";
 import { networkOf } from "@/lib/network";
 import { Button, Segmented } from "@/components/ui";
+import { GnokeyTx } from "@/components/Gnokey";
 import { messageOf, shortAddr } from "@/components/common";
 import { wait, type Chain } from "@/lib/chain";
 
@@ -31,7 +33,7 @@ export default function Tip({ chain, me, chainId, price, onConnect, bare = false
   if (!owner || owner === me) return bare ? <p>{owner ? "You made the game: nothing to tip yourself." : owner === "" ? "No one to tip on this chain: its owner could not be read." : "Reading the chain…"}</p> : null;
   const unit = "test GNOT"; // (mainnet's tips are not open: said above)
   // a phone with no Adena: it is a computer's browser extension (as saving a round)
-  const away = !me && isTouch() && !hasAdena();
+  const adena = hasAdena(), away = !me && isTouch() && !adena;
   const thanks = `Thank you! ${gnot} ${unit} sent to ${shortAddr(owner)}.`;
   const send = async () => {
     if (!me) return onConnect();
@@ -62,15 +64,20 @@ export default function Tip({ chain, me, chainId, price, onConnect, bare = false
   return (
     <section>
       {!bare && <h3 className="about__h">Support the game</h3>}
-      <p>Playing stays free. A tip goes straight to its maker, the golf realm&apos;s owner on this chain: <a className="mono" href={chain.userURL(owner)} target="_blank" rel="noopener noreferrer">{owner} ↗</a>. You confirm it in Adena, where the same address shows.</p>
+      <p>Playing stays free. A tip goes straight to its maker, the golf realm&apos;s owner on this chain: <a className="mono" href={chain.userURL(owner)} target="_blank" rel="noopener noreferrer">{owner} ↗</a>. You confirm it in Adena or gnokey, where the same address shows.</p>
       {away ? (
         <p className="real__fine">Adena is a computer&apos;s browser extension: open the game there to tip.</p>
       ) : (
         <>
           <Segmented label="Tip" value={gnot} full options={AMOUNTS.map((a) => [a, `${a} ${unit}`] as const)} onChange={setGnot} />
-          <Button variant="secondary" className="btn--wide" disabled={busy} onClick={() => void send()}>
-            {busy ? "Waiting for Adena…" : me ? `Send ${gnot} ${unit}` : "Connect Adena to tip"}
-          </Button>
+          {adena && (
+            <Button variant="secondary" className="btn--wide" disabled={busy} onClick={() => void send()}>
+              {busy ? "Waiting for Adena…" : me ? `Send ${gnot} ${unit}` : "Connect Adena to tip"}
+            </Button>
+          )}
+          <GnokeyTx chain={chain} open={!adena} summary={adena ? "Tip with gnokey instead" : `Send ${gnot} ${unit} with gnokey`}
+            plan={(at) => gnokeyTip({ to: owner, gnot: Number(gnot), rpc: chain.rpc, ...at })} why="Nothing to send."
+            web={<>A send has no form on gno.land: any wallet can send to <a href={chain.userURL(owner)} target="_blank" rel="noopener noreferrer">the owner&apos;s address ↗</a>.</>} />
         </>
       )}
       {said && <p className={"note " + (said.good ? "note--good" : "note--bad")}>{said.text}</p>}

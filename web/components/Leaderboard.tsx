@@ -8,7 +8,8 @@ import { levelFrom, levelPick, pickOne } from "@/lib/duel";
 import { SHARE_TAGS, siteURL } from "@/lib/site";
 import { sound } from "@/lib/feel";
 import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
-import { registerName, claimRounds, type SendError } from "@/lib/adena";
+import { registerName, claimRounds, gnokeyName, gnokeyClaim, type SendError } from "@/lib/adena";
+import { GnokeyTx } from "@/components/Gnokey";
 import { failure, track, trackError } from "@/lib/analytics";
 import { Button, Segmented, Sheet, VsPar } from "@/components/ui";
 import Share from "@/components/Share";
@@ -260,6 +261,8 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
           </p>
         )}
         {tab !== "friends" && me && myName && chain && <ClaimRounds chain={chain} me={me} mode={mode} onDone={() => setClaimed((n) => n + 1)} />}
+        {/* no account to read: a name taken after rounds saved (with gnokey, on gno.land) ranks them so */}
+        {tab !== "friends" && !me && chain && <ClaimGnokey chain={chain} summary="Named after saving? Rank your rounds with gnokey" />}
         {tab === "hole" && newer && (
           <p className="note note--warn">
             Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
@@ -628,11 +631,12 @@ export function useNameCheck(chain: Chain | null, stem: string) {
 export type NameCheck = ReturnType<typeof useNameCheck>;
 
 /**
- * Taking a gno.land name. On its own: typed, then "Get this name" signs it.
- * With a save (typed): the name typed and checked by the card's owner, taken
- * in the save's own signature; no button here.
+ * Taking a gno.land name. On its own: typed, then "Get this name" signs it,
+ * or gnokey does (a paste, under the form; the only way with no account
+ * connected: account null). With a save (typed): the name typed and checked
+ * by the card's owner, taken in the save's own signature; no button here.
  */
-export function NameForm({ chain, account, chainId, price, lead, onNamed, typed }: { chain: Chain; account: string; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; typed?: { check: NameCheck; set: (stem: string) => void } }) {
+export function NameForm({ chain, account, chainId, price, lead, onNamed, typed }: { chain: Chain; account: string | null; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; typed?: { check: NameCheck; set: (stem: string) => void } }) {
   const [own, setOwn] = useState("");
   const mine = useNameCheck(typed ? null : chain, own);
   const { stem, name, hint, why, retry } = typed ? typed.check : mine;
@@ -640,9 +644,27 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
   const [err, setErr] = useState<string | null>(null); // Adena's refusal
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState("");
+  // the registrar gnokey calls, as registerName's (read once there is a paste to make)
+  const [reg, setReg] = useState("");
+  useEffect(() => {
+    if (typed) return;
+    let live = true;
+    void chain.nameReg().then((r) => live && setReg(r), () => {});
+    return () => void (live = false);
+  }, [chain, typed]);
+  // a name taken with gnokey, said done: the account connected asked (gnokey's key may be another)
+  const sent = async () => {
+    if (!account) return;
+    names.delete(account);
+    const n = await nameOnce(chain, account);
+    if (!n) return setErr("No name on your Adena account yet: gnokey's key may be another one.");
+    setDone(n);
+    onNamed(n);
+    track("name_registered", { ok: true, via: "gnokey" });
+  };
   const take = async (e: FormEvent) => {
     e.preventDefault();
-    if (hint || !stem) return;
+    if (!account || hint || !stem) return;
     setErr(null);
     setBusy(true);
     try {
@@ -669,8 +691,8 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
   if (done) return <p className="note note--good">You are <b>{done}</b> now: save your round to take your place.</p>;
   const problem = err || why;
   const bad = !!stem && !!(hint || problem || why === null); // a name typed that the chain would not take, or could not check
-  return (
-    <form className="nameform" onSubmit={(e) => void (typed ? e.preventDefault() : take(e))}>
+  return (<>
+    <form className="nameform" onSubmit={(e) => void (typed || !account ? e.preventDefault() : take(e))}>
       <b className="nameform__title">{lead}</b>
       <span className="nameform__why">{typed ? "Only named players are ranked. Yours is taken with this save." : "Only named players are ranked. Take yours once."}</span>
       <span className="nameform__row">
@@ -678,7 +700,7 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
           <span aria-hidden="true">nym-</span>
           <input value={stem} onChange={(e) => (setErr(null), setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim()))} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
         </label>
-        {!typed && <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint || !stem}>{busy ? "Adena…" : "Get this name"}</Button>}
+        {!typed && account && <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint || !stem}>{busy ? "Adena…" : "Get this name"}</Button>}
       </span>
       <small className={bad ? "nameform__err" : !stem || hint || why === undefined ? "" : "nameform__ok"} aria-live="polite">
         {typed && !stem
@@ -695,7 +717,16 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
         {bad && typed ? " · Fix it, or clear it to save without a name." : ""} · <NameLink chain={chain}>names on gno.land ↗</NameLink>
       </small>
     </form>
-  );
+    {/* (outside the form: its Copy and its key's field submit nothing) */}
+    {!typed && (
+      <GnokeyTx chain={chain} open={!account} summary={account ? "Take it with gnokey instead" : "Take it with gnokey"}
+        // only a name the form found free goes in (its checks, then the registrar's shape again)
+        plan={(at) => (reg && stem && !hint && why === "" ? gnokeyName({ registrar: reg, realm: chain.realm, name, rpc: chain.rpc, ...at }) : [])}
+        why={reg ? "Type a name the chain takes first." : "This chain has no name registrar."}
+        onSent={account ? () => void sent() : undefined}
+        web={<>Or use their forms on gno.land: {reg && <><a href={chain.helpURL(reg, "Register")} target="_blank" rel="noopener noreferrer">Register ↗</a>, then </>}<a href={chain.helpURL(chain.realm, "Claim")} target="_blank" rel="noopener noreferrer">Claim ↗</a> (it ranks the rounds you saved before).</>} />
+    )}
+  </>);
 }
 
 /**
@@ -705,11 +736,12 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
 function ClaimRounds({ chain, me, mode, onDone }: { chain: Chain; me: string; mode: Mode; onDone: () => void }) {
   const [holes, setHoles] = useState(0); // saved holes the course ranking does not hold
   const [state, setState] = useState(""); // "", "busy", "done", or what went wrong
+  const [asked, setAsked] = useState(0); // a gnokey Claim said done: read again
   useEffect(() => {
     let live = true;
     chain.rank(mode, me).then((r) => live && setHoles(r.rank === 0 ? r.holes : 0)).catch(() => {});
     return () => void (live = false);
-  }, [chain, me, mode]); // read once: after "Rank them" the board itself is read again
+  }, [chain, me, mode, asked]); // read once: after "Rank them" the board itself is read again
   if (state === "done") return <p className="note note--good">Your rounds are on the boards.</p>;
   if (!holes) return null;
   const go = async () => {
@@ -723,13 +755,21 @@ function ClaimRounds({ chain, me, mode, onDone }: { chain: Chain; me: string; mo
     }
   };
   return (
-    <p className="note note--warn">
+    <div className="note note--warn">
       {holes} saved hole{holes === 1 ? " is" : "s are"} not ranked yet: the name came after them.{" "}
       <Button variant="secondary" disabled={state === "busy"} onClick={() => void go()}>{state === "busy" ? "Adena…" : "Rank them"}</Button>
       {state && state !== "busy" && <small className="nameform__err"> {state}</small>}
-    </p>
+      <ClaimGnokey chain={chain} summary="Rank them with gnokey instead" onSent={() => (setAsked((n) => n + 1), onDone())} />
+    </div>
   );
 }
+
+/** golf's Claim as a gnokey paste, or on its gnoweb form: the rounds saved before a name, ranked. */
+const ClaimGnokey = ({ chain, summary, onSent }: { chain: Chain; summary: string; onSent?: () => void }) => (
+  <GnokeyTx chain={chain} summary={summary} onSent={onSent}
+    plan={(at) => gnokeyClaim({ realm: chain.realm, rpc: chain.rpc, ...at })} why="This game's realm is not one gnokey can call."
+    web={<a href={chain.helpURL(chain.realm, "Claim")} target="_blank" rel="noopener noreferrer">Or use its form on gno.land ↗</a>} />
+);
 
 /** Your place on the hole's board once the round is saved: shown by the score, and in what is shared. */
 export function useSavedPlace(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean) {

@@ -40,7 +40,7 @@ export interface Events {
   fps: { hole: string; tier: string; fps: number; fps_p10: number; long: number; frames: number; memory_mb: number | null };
   perf: { tier: string; slow: boolean };
   save: { stage: "sent" | "ok" | "cancelled" | "failed"; parts?: number; part?: number; gas?: number; ms?: number; reason?: string };
-  name_registered: { ok: boolean; via: "save" | "form"; reason?: string };
+  name_registered: { ok: boolean; via: "save" | "form" | "gnokey"; reason?: string };
   badge_earned: { id: string };
   cup_complete: { cup: string; strokes: number; vs_par: number; best: boolean };
   duel_started: { rival: RivalKind; ghost: number; mixed: boolean };

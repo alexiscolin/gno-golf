@@ -23,6 +23,9 @@ import {
   claimRounds,
   gnokeyPlan,
   gnokeyPaste,
+  gnokeyName,
+  gnokeyClaim,
+  gnokeyTip,
   holedIn,
   readBack,
   depositBytes,
@@ -808,6 +811,73 @@ for (const shell of ["bash", "zsh"].filter((sh) => existsSync(`/bin/${sh}`))) {
     const stuck = runPaste(shell, `echo "signature verification failed" >&2; exit 1`);
     assert.notEqual(stuck.status, 0);
     assert.equal(stuck.log.length, 3);
+  });
+}
+
+// ------------------------------------------------ gnokeyName, gnokeyClaim, gnokeyTip
+const REG = "gno.land/r/sys/namereg/v0", OWNER = "g1" + "b".repeat(38);
+test("gnokeyName: Register (the name quoted) then Claim, two calls at their own gas, to this chain", () => {
+  assert.deepEqual(gnokeyName({ registrar: REG, realm: REALM, name: "nym-golfer123", price: 0.001, chainId: CHAIN, rpc: RPC }), [
+    `gnokey maketx call -pkgpath ${REG} -func Register -args 'nym-golfer123' -gas-fee 90000ugnot -gas-wanted 60000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 135000ugnot -gas-wanted 90000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+  ]);
+});
+
+test("gnokeyName: no registrar, or a name not of the registrar's shape, is nothing to run (nothing a shell would read)", () => {
+  const at = { realm: REALM, chainId: CHAIN, rpc: RPC };
+  assert.deepEqual(gnokeyName({ ...at, registrar: "", name: "nym-golfer123" }), []);
+  assert.deepEqual(gnokeyName({ ...at, registrar: "gno.land/r/x; ls", name: "nym-golfer123" }), []);
+  assert.deepEqual(gnokeyName({ ...at, realm: "gno.land/r/x $(id)", registrar: REG, name: "nym-golfer123" }), []);
+  for (const name of ["", "nym-a'; rm -rf ~; '", "nym-$(id)", "nym-a b", "Nym-golfer123", "nym-`id`", "nym-a\nb", "x".repeat(65)])
+    assert.deepEqual(gnokeyName({ ...at, registrar: REG, name }), [], name);
+});
+
+test("gnokeyClaim: Claim alone at CLAIM_GAS; a bad realm is nothing; a bad chain id or rpc a placeholder", () => {
+  assert.deepEqual(gnokeyClaim({ realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC + "/" }), [
+    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 135000ugnot -gas-wanted 90000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+  ]);
+  assert.deepEqual(gnokeyClaim({ realm: "gno.land/r/x;ls", chainId: CHAIN, rpc: RPC }), []);
+  assert.match(gnokeyClaim({ realm: REALM, chainId: "a;b", rpc: "$(id)" })[0], /-chainid <chain-id> -remote <rpc-url> <your-key-name>$/);
+});
+
+test("gnokeyTip: one plain send of a TIPS amount in ugnot to the owner; any other amount or address is nothing", () => {
+  assert.deepEqual(gnokeyTip({ to: OWNER, gnot: 5, price: 0.001, chainId: CHAIN, rpc: RPC }), [
+    `gnokey maketx send -send 5000000ugnot -to ${OWNER} -gas-fee 3000ugnot -gas-wanted 2000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+  ]);
+  for (const gnot of [0, 2, -5, 1.5, NaN, 1e9]) assert.deepEqual(gnokeyTip({ to: OWNER, gnot, chainId: CHAIN, rpc: RPC }), [], String(gnot));
+  for (const to of ["", "g1short", `${OWNER}; ls`, `$(id)${OWNER}`, "g1" + "B".repeat(38)]) assert.deepEqual(gnokeyTip({ to, gnot: 1, chainId: CHAIN, rpc: RPC }), [], to);
+});
+
+test("gnokeyName, gnokeyClaim, gnokeyTip in a paste: the retry helper, and every command through it", () => {
+  const plans = [
+    gnokeyName({ registrar: REG, realm: REALM, name: "nym-golfer123", chainId: CHAIN, rpc: RPC }),
+    gnokeyClaim({ realm: REALM, chainId: CHAIN, rpc: RPC }),
+    gnokeyTip({ to: OWNER, gnot: 1, chainId: CHAIN, rpc: RPC }),
+  ];
+  for (const plan of plans) {
+    const paste = gnokeyPaste(plan, "'my key'");
+    assert.match(paste, /^\(\nset -e\nsend\(\) \{\n[\s\S]*signature verification failed[\s\S]*\n\)$/);
+    assert.equal(paste.split("\nsend gnokey maketx ").length - 1, plan.length);
+    assert.ok(!paste.includes("<your-key-name>") && paste.includes(" 'my key'\n"));
+  }
+});
+
+for (const shell of ["bash", "zsh"].filter((sh) => existsSync(`/bin/${sh}`))) {
+  test(`gnokeyName's paste (${shell}): gnokey gets the name as one argument, the key as typed, Register before Claim`, () => {
+    const dir = mkdtempSync(join(tmpdir(), "paste-"));
+    try {
+      // each argument on its own line: what the shell really passed
+      writeFileSync(join(dir, "gnokey"), `#!/bin/sh\nfor a in "$@"; do echo "[$a]"; done >>"${dir}/log"\necho "OK!"\n`);
+      chmodSync(join(dir, "gnokey"), 0o755);
+      const plan = gnokeyName({ registrar: REG, realm: REALM, name: "nym-golfer123", chainId: CHAIN, rpc: RPC });
+      execFileSync(shell, ["-c", gnokeyPaste(plan, "'my $key'")], { env: { PATH: `${dir}:/usr/bin:/bin` }, stdio: ["ignore", "pipe", "pipe"] });
+      const log = readFileSync(join(dir, "log"), "utf8");
+      assert.match(log, /\[-func\]\n\[Register\]\n\[-args\]\n\[nym-golfer123\]\n/);
+      assert.ok(log.indexOf("[Register]") < log.indexOf("[Claim]"));
+      assert.equal(log.split("[my $key]").length - 1, 2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 }
 
