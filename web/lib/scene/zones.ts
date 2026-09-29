@@ -1051,15 +1051,17 @@ function castleSlide(z: Zone, s: Hole, t: T, g: THREE.Group, castle: Post, [cx, 
     const r = rs + wide * smoothstep(((aJ - a) / turn - 0.5) / 0.25);
     plan.push(new THREE.Vector2(kx + Math.cos(a) * r, kz + Math.sin(a) * r));
   }
-  const run = plan.length, nz = kz + rs + wide;
-  for (let x = kx; x < x2 && plan.length < MAX; x += 0.1) plan.push(new THREE.Vector2(x, nz + (oz - nz) * smoothstep((x - kx) / (x2 - kx))));
+  // (the eased run's span kept above zero: an exit a unit east of the castle
+  // leaves none, and 0/0 there would put a NaN in the path)
+  const run = plan.length, nz = kz + rs + wide, span = Math.max(1e-3, x2 - kx);
+  for (let x = kx; x < x2 && plan.length < MAX; x += 0.1) plan.push(new THREE.Vector2(x, nz + (oz - nz) * smoothstep((x - kx) / span)));
   for (let x = x2; x < ox && plan.length < MAX; x += 0.1) plan.push(new THREE.Vector2(x, oz));
   plan.push(new THREE.Vector2(ox, oz));
   // and in height: level round the bend, up clear of the lane round the
   // circle (higher halfway), down again on the run to the exit
   const pts = plan.map((q, i) => {
     if (i < ring) return new THREE.Vector3(q.x, y0 + sit, q.y);
-    if (i >= run) return new THREE.Vector3(q.x, y1 + clear + (sit - clear) * smoothstep((q.x - kx) / (x2 - kx)), q.y);
+    if (i >= run) return new THREE.Vector3(q.x, y1 + clear + (sit - clear) * smoothstep((q.x - kx) / span), q.y);
     const v = (i - ring) / (run - ring);
     return new THREE.Vector3(q.x, y0 + sit + (clear - sit) * smoothstep(((i - ring) * 0.1) / 4) + (y1 - y0) * v + (top - clear) * Math.sin(Math.PI * v) ** 2, q.y);
   });

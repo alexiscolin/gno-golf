@@ -736,6 +736,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     void publish();
     const old = extras;
     extras = buildExtras(g.course, ex);
+    // an aim begun while the pieces loaded: theirs show their outlines too
+    if (g.aiming) ud(extras).ghosts?.(true);
     extras.scale.y = 0.01;
     g.course.add(extras);
     growing.push({ o: extras, from: 0.01, to: 1, t: 0 });
