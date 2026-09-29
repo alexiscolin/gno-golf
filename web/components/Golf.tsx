@@ -837,12 +837,6 @@ export default function Golf() {
   const raceWith = (player: string, from: RivalKind = "board") => (setBoard(false), game.current?.reset(), pickRival(player, from));
   // a rival picked on the rival screen (or its board's sheet): their ghosts next, their bests kept when read there
   const toGhosts = (player: string, bests?: ReadonlyMap<string, Readonly<Record<Mode, number>>>, from?: RivalKind) => (sound("select"), bests && setRivalOn({ by: player, bests, at: saves }), raceWith(player, from), setScreen("ghosts"));
-  // a Race on the course's board, from a hole: here at once when they have a ghost on it, else their ghosts to pick one
-  const raceFromCourse = (player: string) => {
-    const c = game.current?.chain, id = screen === "play" && s && s.id;
-    if (!c || !id) return toGhosts(player);
-    void c.ghost(id, aim, player).then((g) => (g ? raceWith(player) : toGhosts(player)), () => toGhosts(player));
-  };
   const dropDuel = () => {
     setSolo(true);
     setRival(null);
@@ -1815,7 +1809,7 @@ export default function Golf() {
       )}
 
       {board && s && (
-        <Boards mode={aim} s={s} inHole={screen === "play"} onRace={screen === "play" ? raceWith : screen === "rival" ? toGhosts : undefined} onRaceAll={screen === "play" ? raceFromCourse : undefined} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
+        <Boards mode={aim} s={s} inHole={screen === "play"} onRace={screen === "play" ? raceWith : undefined} onGhosts={screen === "play" || screen === "rival" ? toGhosts : undefined} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
       )}
 
       {cardOpen && s && (
@@ -1824,7 +1818,7 @@ export default function Golf() {
             <h2>The cup</h2>
             <Standings s={s} card={card} saved={onChainCard} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onRules={() => setRules(true)}
               fresh={freshBadges} badges={{ onOpen: () => (setCardOpen(false), setBadgesOpen(true)) }} />
-            <FullBoard key={aim} kind="course" s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onRace={(p) => (setCardOpen(false), raceFromCourse(p))} />
+            <FullBoard key={aim} kind="course" s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onRace={screen === "play" ? (p) => (setCardOpen(false), raceWith(p)) : undefined} onGhosts={(p) => (setCardOpen(false), toGhosts(p))} />
         </Sheet>
       )}
 

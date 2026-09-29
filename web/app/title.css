@@ -413,7 +413,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
 .rival__go { padding: 6px 22px 7px; border-radius: var(--pill); font-size: 18px; font-weight: 700; box-shadow: var(--shadow-btn); }
 .rival__go::after { content: " ▸"; }
 /* a board row's, small (globals.css .lb li) */
-.lb__race { display: inline-flex; align-items: center; min-height: 32px; padding: 2px 14px; font-size: 13px; white-space: nowrap; }
+.lb__race { display: inline-flex; align-items: center; justify-content: center; min-width: 8.5em; min-height: 32px; padding: 2px 14px; font-size: 13px; white-space: nowrap; } /* one width, "Race here" or "Their holes": the rows' columns kept in line */
 .rival__pick .rival__go { grid-area: go; justify-self: end; }
 /* the map, in its cup's colours (its tint): the ground round the rails, the
    lane's felt in them, what the ball meets flat on it; the rails inked; the

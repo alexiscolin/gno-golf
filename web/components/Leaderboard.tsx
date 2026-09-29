@@ -51,16 +51,21 @@ export interface BoardProps {
   mode?: Mode;
   /** not connected: the way to (the Adena checklist) */
   onConnect?: () => void;
-  /** a duel against a player's best on this hole (their ghost), from the tee; off a hole (the rival screen's sheet), that player picked */
+  /** "Race here": a duel against a player's best on the hole played (their ghost), from the tee; only in a hole */
   onRace?: (player: string) => void;
 }
-/** A board row's way into a duel, the duel's gold Race: that player's ghost here (yours: your best). */
-const RaceButton = ({ player, me, strokes, onRace }: { player: string; me?: string | null; strokes: number; onRace?: (p: string) => void }) =>
-  onRace ? (
-    <Button variant="gold" className="rival__go lb__race" aria-label={player === me ? `Race your best, ${strokes}` : `Race their ghost, ${strokes}`} onClick={() => onRace(player)}>
-      Race
+/** A board row's way into a duel, the duel's small gold Race, saying what it does before the click:
+ *  "Race here", their ghost on the hole played at once, or "Their holes", their ghosts to pick one. */
+const RaceButton = ({ player, name, me, here, onClick }: { player: string; name: string; me?: string | null; here: boolean; onClick?: (p: string) => void }) => {
+  if (!onClick) return null;
+  const self = player === me, whose = self ? "your" : `${name}'s`;
+  const says = here ? `Race ${whose} ghost on this hole` : `See ${whose} ghosts and pick a hole`;
+  return (
+    <Button variant="gold" className="rival__go lb__race" title={says} aria-label={says} onClick={() => onClick(player)}>
+      {here ? "Race here" : self ? "Your holes" : "Their holes"}
     </Button>
-  ) : null;
+  );
+};
 /** "Connect Adena", where a board asks for it: a link to the checklist, or the words alone. */
 const ConnectLink = ({ onConnect }: { onConnect?: () => void }) =>
   onConnect ? <button className="linkish" onClick={onConnect}>Connect Adena</button> : <>Connect Adena</>;
@@ -176,7 +181,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
               <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
               <span className="lb__holes">{strokesWord(r.strokes)}</span>
               <strong><VsPar vs={r.strokes - ((hole && hole.par) || parHere(s))} /></strong>
-              <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
+              <RaceButton player={r.player} name={label(r.player)} me={me} here onClick={onRace} />
             </li>
           ))}
         </ol>
@@ -231,8 +236,8 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
  * The leaderboards, in a sheet: this hole's best rounds, and the whole
  * course's. Read from the chain when the sheet opens, not before.
  */
-// onRaceAll: from a hole, the course's board races anyone too (their ghosts, then a hole of theirs)
-export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true, onConnect, onRace, onRaceAll }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean; onRaceAll?: (player: string) => void }) {
+// onGhosts: "Their holes", a player's ghosts to pick a hole: the course's rows without a best on the hole played (all of them off a hole)
+export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true, onConnect, onRace, onGhosts }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean; onGhosts?: (player: string) => void }) {
   const [claimed, setClaimed] = useState(0); // rounds just ranked: the board is read again
   // "This hole" is the hole being played: opened from the cups, there is none
   const [tab, setTab] = useState<"friends" | "hole" | "course">(inHole ? "hole" : "course");
@@ -256,6 +261,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
           <p className="boards__word">{HONEST}</p>
         </div>
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={inHole ? [["hole", "This hole"], ["course", "The course"], ["friends", "Friends"]] : [["course", "The course"], ["friends", "Friends"]]} />
+        {tab === "course" && inHole && onRace && <p className="real__fine boards__legend">Race here: this hole · Their holes: pick one.</p>}
         {tab !== "friends" && (
           <p className="boards__ranked">
             Ranked: players with a gno.land name{!(me && myName) && ", taken when you save"}
@@ -267,7 +273,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
             Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
           </p>
         )}
-        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={inHole ? onRace : undefined} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={tab === "hole" || !inHole ? onRace : onRaceAll} />}
+        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={onRace} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={onRace} onGhosts={onGhosts} />}
         <p className="real__fine">
           Only rounds saved on-chain appear here.
           {tab !== "friends" && chain && <> · <a href={chain.boardURL(tab === "hole" ? s.id : null, mode)} target="_blank" rel="noopener noreferrer">This board on gno.land ↗</a></>}
@@ -383,7 +389,8 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
  * the list when it is further down, with a way to share it.
  */
 // max: its first rows only, and nothing else (the rival's stickers: the whole board is a link away)
-export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace, row, max }: BoardProps & { kind: "hole" | "course"; /** a row drawn otherwise (the rival's stickers) */ row?: (r: Placed) => ReactNode; max?: number }) {
+// onRace: a hole's rows, and the course's with a best on the hole played; onGhosts: the course's others (all of them off a hole)
+export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace, onGhosts, row, max }: BoardProps & { kind: "hole" | "course"; onGhosts?: (player: string) => void; /** a row drawn otherwise (the rival's stickers) */ row?: (r: Placed) => ReactNode; max?: number }) {
   const PAGE = 20;
   const id = s.id || "";
   const [rows, setRows] = useState<readonly Placed[] | null>(null);
@@ -394,6 +401,11 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   const [mine, setMine] = useState<{ rank: number; of: number; strokes: number; holes?: number } | null>(null);
   const flags = useFlags();
   const [showAll, setShowAll] = useState(false);
+  // the course's rows with a best on the hole played, read with their page (one read a page, not one a row):
+  // their Race is there, the others' (all of them if the read failed) their ghosts. A hole's rows all race there.
+  const [here, setHere] = useState<ReadonlySet<string>>(() => new Set());
+  const hereOn = kind === "course" && !!onRace && !!id;
+  const racesHere = (p: string) => kind === "hole" || here.has(p);
   // Offsets are the chain's, not the rows shown: a name deleted since is
   // skipped in its page, which then holds fewer rows while more still follow.
   const read = (offset: number) =>
@@ -404,8 +416,10 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   // set on each mount too: React's dev double mount runs the cleanup once in between
   useEffect(() => ((alive.current = true), () => void (alive.current = false)), []);
   const add = (offset: number) =>
-    read(offset).then(({ b, head: h }) => {
+    read(offset).then(async ({ b, head: h }) => {
+      const got = hereOn ? await chain!.bests(id, mode, b.rows.map((r) => r.player)).then((x) => x.rows.map((r) => r.player), () => []) : [];
       if (!alive.current) return;
+      if (got.length) setHere((was) => new Set([...was, ...got]));
       primeNames(chain!, b.rows);
       setHead(h);
       setRows((r) => {
@@ -499,7 +513,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
                     <FlagMark f={showAll && flags[r.player]} />
                   </span>
                   {score(r)}
-                  <RaceButton player={r.player} me={me} strokes={r.strokes} onRace={onRace} />
+                  <RaceButton player={r.player} name={r.name || shortAddr(r.player)} me={me} here={racesHere(r.player)} onClick={racesHere(r.player) ? onRace : onGhosts} />
                 </>
               )}
             </li>
