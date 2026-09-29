@@ -211,7 +211,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 
 /* ------------------------------------------------------------ the cups */
 
-.worlds--v2 .worlds__in { width: min(1680px, 100%); }
+.worlds--v2 .worlds__in { width: min(1680px, 94vw); }
 .front__head { position: relative; display: grid; justify-items: center; gap: 4px; margin-bottom: clamp(14px, 2.6vh, 30px); }
 .worlds--v2 .worlds__list { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap-grid); }
 
