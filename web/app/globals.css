@@ -1700,6 +1700,12 @@ h3 small {
 .w__snowfield { fill: var(--mountain-snow); stroke: var(--ink); stroke-width: 2.5; }
 .w__chalet { fill: #b07a4a; stroke: var(--ink); stroke-width: 2.5; }
 .w__roof { fill: #8a3b33; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+/* the Crystal Mines (to come): its emblem */
+.w__sky--mines { fill: #b9a8f0; }
+.w__cave { fill: #6c5a9c; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.w__shaft { fill: #1d1538; }
+.w__crystal { fill: #7fe0f7; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.w__crystal--violet { fill: #c7a6ff; }
 .hat--wool path { fill: #3f7fbf; }
 .hat--wool .hat__rib { fill: var(--mountain-snow); }
 .hat--wool .hat__bobble { fill: var(--hat); }
