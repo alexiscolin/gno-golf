@@ -1670,7 +1670,7 @@ export default function Golf() {
                     : "Saved in this browser only. A community hole is not ranked, but its rounds can be saved on-chain."}
               </p>
             )}
-            {won && <DuelFine duel={won.duel} mode={s.roundMode || aim} sky={sky} />}
+            {won && <DuelFine duel={won.duel} mode={s.roundMode || aim} sky={sky} round={game.current ? game.current.chain.roundURL(won.duel.ghost.hole, won.duel.ghost.player) : undefined} />}
             <Standings s={s} card={card} saved={onChainCard} chain={game.current && game.current.chain} me={account && account.address} mode={s.roundMode || aim} compact fresh={freshBadges} onRules={() => setRules(true)} />
             <Unlocked fresh={fresh} onMeet={meet} />
             <NewBadges ids={freshBadges} onOpen={() => setBadgesOpen(true)} />

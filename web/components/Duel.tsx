@@ -34,13 +34,14 @@ export function DuelNote({ duel, mode, sky, onDrop }: { duel: Duel; mode: Mode; 
   );
 }
 
-/** The win card's duel fine print: a different weather and a mixed race said, and what V1 does not record. */
-export function DuelFine({ duel, mode, sky }: { duel: Duel; mode: Mode; sky: Sky }) {
+/** The win card's duel fine print: a different weather and a mixed race said, what V1 does not record, and the rival's round on gnoweb (round). */
+export function DuelFine({ duel, mode, sky, round }: { duel: Duel; mode: Mode; sky: Sky; round?: string }) {
   return (
     <p className="real__fine">
       {differs(sky) && <>{duel.self ? "Your best had" : "They had"} {skyWord(plays(sky.theirs))}. You had {skyWord(plays(sky.mine))}. </>}
       {duel.ghost.mode !== mode && <>Your {AIM_NAMES[mode]} vs {duel.self ? "your best's" : "their"} {AIM_NAMES[duel.ghost.mode]}. </>}
       Duel records on-chain · soon
+      {round && round !== "#" && !duel.self && <> · <a href={round} target="_blank" rel="noopener noreferrer">Their round on gno.land ↗</a></>}
     </p>
   );
 }

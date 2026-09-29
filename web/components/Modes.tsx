@@ -322,7 +322,7 @@ export function Ghosts({ holes, name, player, chain, bests, card, mode, onRace, 
   onAbout: () => void;
 }) {
   return (
-    <FrontScreen className="front--fit modes" inner="rival" back="Back to the rivals" onBack={onBack} onAbout={onAbout} eyebrow="Choose your hole" title="Their ghosts" dare={<p className="dare">Racing {name}</p>}>
+    <FrontScreen className="front--fit modes" inner="rival" back="Back to the rivals" onBack={onBack} onAbout={onAbout} eyebrow="Choose your hole" title="Their ghosts" dare={<><p className="dare">Racing {name}</p>{chain && isAddress(player) && <a className="real__fine" href={chain.userURL(player)} target="_blank" rel="noopener noreferrer">Player page on gno.land ↗</a>}</>}>
       {/* while read: a band of blank cards, in the frame's place */}
       {bests === undefined && (
         <div className="ghosts__list">

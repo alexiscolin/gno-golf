@@ -267,7 +267,10 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
           </p>
         )}
         {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={inHole ? onRace : undefined} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={tab === "hole" || !inHole ? onRace : undefined} />}
-        <p className="real__fine">Only rounds saved on-chain appear here.</p>
+        <p className="real__fine">
+          Only rounds saved on-chain appear here.
+          {tab !== "friends" && chain && <> · <a href={chain.boardURL(tab === "hole" ? s.id : null, mode)} target="_blank" rel="noopener noreferrer">This board on gno.land ↗</a></>}
+        </p>
     </Sheet>
   );
 }
@@ -452,7 +455,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   const shown = screened && { ...screened, rows: screened.rows.map((r, i) => ({ ...r, at: i + 1 })) };
   const listed = !!rows && !!me && rows.some((r) => r.player === me);
   const par = head ? head.par || parHere(s) : parHere(s);
-  const link = (p: string) => (kind === "hole" ? chain?.roundURL(id, p) : undefined);
+  const link = (p: string) => (kind === "hole" ? chain?.roundURL(id, p) : chain?.userURL(p));
   const score = (r: { strokes: number; holes?: number }) =>
     kind === "hole" ? (
       <>
@@ -491,7 +494,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
                 <>
                   <Place at={r.at} plain />
                   <span className="lb__who">
-                    <Who chain={chain} addr={r.player} me={me} link={link(r.player)} />
+                    <Who chain={chain} addr={r.player} me={me} link={link(r.player)} title={kind === "hole" ? undefined : "Player page on gno.land"} />
                     <FlagMark f={showAll && flags[r.player]} />
                   </span>
                   {score(r)}
@@ -797,7 +800,7 @@ export function useWho(chain: Chain | null, addr: string, me?: string | null) {
   return { label: addr === me ? "You" : name || shortAddr(addr), name };
 }
 /** A ranked player as the boards show them (useWho), their address under their name in full. */
-function Who({ chain, addr, me, link }: { chain: Chain | null; addr: string; me?: string | null; link?: string }) {
+function Who({ chain, addr, me, link, title = "See this round on gno.land" }: { chain: Chain | null; addr: string; me?: string | null; link?: string; title?: string }) {
   const { label, name } = useWho(chain, addr, me);
   const body = name || addr === me ? (
     <span className="who">
@@ -808,7 +811,7 @@ function Who({ chain, addr, me, link }: { chain: Chain | null; addr: string; me?
     label
   );
   return link && link !== "#" ? (
-    <a href={link} target="_blank" rel="noopener noreferrer" title="See this round on gno.land">
+    <a href={link} target="_blank" rel="noopener noreferrer" title={title}>
       {body}
     </a>
   ) : (
