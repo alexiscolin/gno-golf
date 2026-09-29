@@ -23,6 +23,7 @@ import {
   claimRounds,
   gnokeyPlan,
   gnokeyPaste,
+  gnokeyLate,
   gnokeyName,
   gnokeyClaim,
   gnokeyTip,
@@ -772,7 +773,7 @@ test("gnokeyPlan: nothing a shell would read otherwise goes in (a shot, the real
 // gnokeyPaste run for real, in bash and zsh, with a fake gnokey (and sleep) on
 // the PATH: a first try per call refused for a stale sequence, as a node does
 // for a transaction signed before the one before landed, then taken
-function runPaste(shell: string, gnokey: string, calls = 2) {
+function runPaste(shell: string, gnokey: string, calls = 2, first = "") {
   const dir = mkdtempSync(join(tmpdir(), "paste-"));
   try {
     writeFileSync(join(dir, "gnokey"), `#!/bin/sh\necho "$*" >>"${dir}/log"\n${gnokey}\n`);
@@ -781,7 +782,7 @@ function runPaste(shell: string, gnokey: string, calls = 2) {
     const plan = gnokeyPlan({ id: "garden/7", shots: ["1,1"], period: 5, pts: [10] }, { realm: REALM, chainId: CHAIN, rpc: RPC }).slice(0, calls);
     let status = 0;
     try {
-      execFileSync(shell, ["-c", gnokeyPaste(plan, "'my key'")], { env: { PATH: `${dir}:/usr/bin:/bin` }, stdio: ["ignore", "pipe", "pipe"] });
+      execFileSync(shell, ["-c", gnokeyPaste(plan, "'my key'", first)], { env: { PATH: `${dir}:/usr/bin:/bin` }, stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
       status = (e as { status: number }).status;
     }
@@ -812,7 +813,30 @@ for (const shell of ["bash", "zsh"].filter((sh) => existsSync(`/bin/${sh}`))) {
     assert.notEqual(stuck.status, 0);
     assert.equal(stuck.log.length, 3);
   });
+
+  test(`gnokeyLate (${shell}): a round whose weather is over stops the paste before anything is sent, its Reset neither`, () => {
+    // the round is in period 5: the chain takes it in 5 and 6
+    const late = gnokeyLate(5, { realm: REALM, rpc: RPC });
+    const at = (now: string) => `if [ "$1" = query ]; then ${now}; exit 0; fi; echo "OK!"`;
+    const over = runPaste(shell, at(`echo "height: 0"; echo "data: (7 int64)"`), 2, late);
+    assert.notEqual(over.status, 0);
+    assert.deepEqual(over.log, [`query vm/qeval -data ${REALM}.Period() -remote ${RPC}`]);
+    const ok = runPaste(shell, at(`echo "height: 0"; echo "data: (6 int64)"`), 2, late);
+    assert.equal(ok.status, 0);
+    assert.equal(ok.log.length, 3);
+    // a chain that does not answer: the paste goes on, the chain judges it
+    const down = runPaste(shell, `if [ "$1" = query ]; then exit 1; fi; echo "OK!"`, 2, late);
+    assert.equal(down.status, 0);
+    assert.equal(down.log.length, 3);
+  });
 }
+
+test("gnokeyLate: nothing to ask for a round with no period, or an RPC or realm a shell would read otherwise", () => {
+  assert.equal(gnokeyLate(null, { realm: REALM, rpc: RPC }), "");
+  assert.equal(gnokeyLate(1.5, { realm: REALM, rpc: RPC }), "");
+  assert.equal(gnokeyLate(5, { realm: REALM, rpc: "$(id)" }), "");
+  assert.equal(gnokeyLate(5, { realm: "gno.land/r/x; ls", rpc: RPC }), "");
+});
 
 // ------------------------------------------------ gnokeyName, gnokeyClaim, gnokeyTip
 const REG = "gno.land/r/sys/namereg/v0", OWNER = "g1" + "b".repeat(38);

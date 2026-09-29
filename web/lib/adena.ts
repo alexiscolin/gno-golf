@@ -498,11 +498,12 @@ interface SaveRound extends Work {
 // RPC are theirs or a placeholder, and an argument is checked (or quoted) by
 // the plan it is in.
 const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+// an RPC as a command may carry it, "" for anything else
+const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "");
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
 function gnokeyOn(chainId: string | null | undefined, rpc: string) {
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
-  const remote = /^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "<rpc-url>";
-  return `-broadcast -chainid ${chain} -remote ${remote} <your-key-name>`;
+  return `-broadcast -chainid ${chain} -remote ${remoteOf(rpc) || "<rpc-url>"} <your-key-name>`;
 }
 /** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's. */
 const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string) =>
@@ -544,14 +545,31 @@ export function gnokeyPlan(s: SaveRound, { realm, price = PRICE, chainId, rpc, p
 }
 
 /**
+ * What a save's paste runs first: the chain's weather asked (Period(), a
+ * query: no key, no fee), and a round whose weather is over (the chain takes
+ * a round in its period or the next) stops there, nothing sent, its Reset
+ * neither. A chain that does not answer lets it go on: the chain judges it
+ * again. "" for a round with no period, or an RPC or realm not shown.
+ */
+export function gnokeyLate(period: number | null | undefined, { realm, rpc }: { realm: string; rpc: string }) {
+  const remote = remoteOf(rpc);
+  if (period == null || !Number.isSafeInteger(period) || !remote || !PKG_PATH.test(realm)) return "";
+  return [
+    `now=$(gnokey query vm/qeval -data '${realm}.Period()' -remote ${remote} 2>/dev/null | sed -n 's/^data: (\\([0-9]*\\) int64)$/\\1/p')`,
+    `if [ -n "$now" ] && [ "$now" -gt ${period + 1} ]; then echo "Gnogolf: too late, this round's weather is over: nothing was sent. Play the hole again to save it." >&2; exit 1; fi`,
+  ].join("\n");
+}
+
+/**
  * gnokeyPlan's commands as one paste for bash or zsh, the key name (who)
  * quoted in: a subshell that stops at the first that fails. Each goes through
  * send, which prints gnokey's output as it comes (the password prompt too)
  * and sends it again a block later, the password asked again, when the node
  * refused it for the account's sequence before the one before had landed
  * ("signature verification failed", as scripts/publishdata.sh does).
+ * first: run before them (gnokeyLate's check).
  */
-export function gnokeyPaste(plan: readonly string[], who: string) {
+export function gnokeyPaste(plan: readonly string[], who: string, first = "") {
   const send = [
     "send() {",
     "  for try in 1 2 3; do",
@@ -567,7 +585,7 @@ export function gnokeyPaste(plan: readonly string[], who: string) {
   const body = plan
     .map((command, k) => `echo "Gnogolf: transaction ${k + 1} of ${plan.length}"\nsend ${command.replace("<your-key-name>", () => who)}`)
     .join("\n\n");
-  return `(\nset -e\n${send}\n\n${body}\n)`;
+  return `(\nset -e\n${send}\n\n${first ? `${first}\n\n` : ""}${body}\n)`;
 }
 
 /** Where a gnokey paste goes: this chain (its id and RPC), at its gas price. */

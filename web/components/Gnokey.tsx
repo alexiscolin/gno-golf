@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { gnokeyPlan, gnokeyPaste, chainSplit, PRICE } from "@/lib/adena";
+import { gnokeyPlan, gnokeyPaste, gnokeyLate, chainSplit, PRICE } from "@/lib/adena";
 import { Button } from "@/components/ui";
 import { messageOf, useCopied } from "@/components/common";
 import { errorKind, type Chain } from "@/lib/chain";
@@ -9,7 +9,8 @@ import type { Snapshot } from "@/lib/engine";
 
 // "Use gnokey instead": the calls Adena would sign, as one paste for a
 // terminal (bash or zsh: macOS, Linux, WSL) that needs gnokey and nothing
-// else: one plain `gnokey maketx call` per commit, after a Reset of its own
+// else: the weather asked first (gnokeyLate: too late, nothing goes), then one
+// plain `gnokey maketx call` per commit, after a Reset of its own
 // (gnokeyPlan), each sent again a block later if the node had not taken the
 // one before yet, and the paste stops at the first that fails (gnokeyPaste).
 // Collapsed by default; the key name is the player's own, kept in this browser.
@@ -99,7 +100,7 @@ export default function Gnokey({ s, chain, price, chainId, onSent }: { s: Snapsh
   const checking = !!mine && !mine.parts && !mine.bad;
   return (
     <Panel summary="Save with gnokey instead" onOpen={ask} txs={plan.length} when=" It works while this round's weather lasts: see the countdown above."
-      paste={(who) => gnokeyPaste(plan, who)} hide={!!(mine && mine.refused)} hold={checking ? "Checking…" : undefined} onCopy={() => setOut(round)}
+      paste={(who) => gnokeyPaste(plan, who, gnokeyLate(s.period, chain))} hide={!!(mine && mine.refused)} hold={checking ? "Checking…" : undefined} onCopy={() => setOut(round)}
       note={mine && mine.bad ? <span className="gnokey__bad">{mine.bad}</span> : checking ? "Asking the chain how it cuts this round…" : undefined}
       done={() => <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b> for each.{out === round && (onSent ? <> <button className="linkish" onClick={onSent} aria-label="It did: check the chain for this round">It did</button></> : " Connect Adena to check it on the chain.")}</>} />
   );
