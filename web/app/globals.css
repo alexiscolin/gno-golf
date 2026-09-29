@@ -2022,6 +2022,8 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .gnokey summary { padding: 4px 2px; border-radius: 6px; font-size: 14px; font-weight: 600; color: var(--ink); }
 .details__box.gnokey__box { max-height: none; overflow: visible; padding: 14px 16px 12px; text-align: left; }
 .gnokey__steps { margin: 0 0 14px; padding-left: 20px; font-size: 14px; line-height: 1.45; color: var(--ink); display: grid; gap: 12px; }
+/* the board's own folds (the unnamed, gnokey's Claim) read alike: quiet, at its foot */
+.boards .gnokey { margin: 6px 0 0; } .boards .gnokey summary { padding: 10px 2px; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
 .gnokey__steps li { overflow-wrap: anywhere; }
 .gnokey__steps code { font-size: 12px; background: rgba(var(--ink-rgb), .08); padding: 1px 6px; border-radius: 6px; }
 .gnokey__key { display: block; margin-top: 8px; width: 100%; max-width: 240px; }

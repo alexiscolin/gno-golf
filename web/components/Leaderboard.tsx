@@ -261,8 +261,6 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
           </p>
         )}
         {tab !== "friends" && me && myName && chain && <ClaimRounds chain={chain} me={me} mode={mode} onDone={() => setClaimed((n) => n + 1)} />}
-        {/* no account to read: a name taken after rounds saved (with gnokey, on gno.land) ranks them so */}
-        {tab !== "friends" && !me && chain && <ClaimGnokey chain={chain} summary="Named after saving? Rank your rounds with gnokey" />}
         {tab === "hole" && newer && (
           <p className="note note--warn">
             Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
