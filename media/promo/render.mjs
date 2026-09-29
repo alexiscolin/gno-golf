@@ -29,6 +29,11 @@
 // and a tagline already landed on frame 0 (web/lib/promo.ts), then a bar of beat pulses and
 // sparkles, the logo zooming out on a whoosh into the fast shots; its frame 0 also kept as
 // gnogolf-promo-<cut>-cover.jpg (1920x1080), for a platform that takes a thumbnail of its own.
+// --cut=v11 (and v11-teaser): v10's cover calmer. Its titles breathe (a title's "soft": a pulse's
+// scale, eased in and out over two beats) instead of kicking on every beat: the logo once from
+// frame 0 and once on beat 2, the taglines on beat 2 only, its sway in depth 4 degrees (tilt3d);
+// the music swells in over the first shot's "fadeIn" seconds (equal power; v11: a bar, whole on the next
+// downbeat, before the whoosh out), not at full level on frame 0.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
@@ -432,7 +437,7 @@ const filter = [
   `${sfx.map((_, k) => `[s${k}]`).join("")}amix=inputs=${sfx.length}:normalize=0,volume=2.8,asplit[fx][key]`,
   // the music gives way a little under the game's sounds (the putt, the cup, the confetti)
   // dip: [from, to] in a shot's seconds, the music held back (a breath before a hit)
-  `[${N > 1 ? `m${N - 1}` : "1:a"}]volume=0.7,volume='${SHOTS.flatMap((s) => (s.dip && !s.t0 ? [[s.f0 / FPS + s.dip[0], s.f0 / FPS + s.dip[1]]] : [])).reduce((e, [a, b]) => `if(between(t,${a.toFixed(3)},${b.toFixed(3)}),0.12,${e})`, "1")}':eval=frame,afade=t=in:d=0.08,afade=t=out:st=${(LEN - 0.3).toFixed(2)}:d=0.3[mus]`,
+  `[${N > 1 ? `m${N - 1}` : "1:a"}]volume=0.7,volume='${SHOTS.flatMap((s) => (s.dip && !s.t0 ? [[s.f0 / FPS + s.dip[0], s.f0 / FPS + s.dip[1]]] : [])).reduce((e, [a, b]) => `if(between(t,${a.toFixed(3)},${b.toFixed(3)}),0.12,${e})`, "1")}':eval=frame,afade=t=in:d=${SHOTS[0].fadeIn || 0.08}:curve=qsin,afade=t=out:st=${(LEN - 0.3).toFixed(2)}:d=0.3[mus]`,
   `[mus][key]sidechaincompress=threshold=0.05:ratio=4:attack=5:release=250[duck]`,
   `[duck][fx]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]`,
 ].join(";");
