@@ -121,7 +121,13 @@ export function scrub(v: string) {
       for (const k of [...u.searchParams.keys()]) if (!KEEP.has(k)) u.searchParams.delete(k);
       v = u.href;
     } catch {}
-  return v.replace(G1, "g1…").replace(/nym-[a-z0-9._-]+/gi, "nym-…").replace(/address\(.*/gs, "address(…)");
+  return v
+    .replace(G1, "g1…")
+    .replace(/nym-[a-z0-9._-]+/gi, "nym-…")
+    .replace(/address\(.*/gs, "address(…)")
+    // a net for what never should pass here (the page holds no key): a private key's hex, a recovery phrase
+    .replace(/\b(?:0x)?[0-9a-f]{64,}\b/gi, "hex…")
+    .replace(/\b(?:[a-z]{3,8}\s+){11,}[a-z]{3,8}\b/g, "words…");
 }
 const deep = (v: unknown): unknown =>
   typeof v === "string" ? scrub(v) : Array.isArray(v) ? v.map(deep) : v && typeof v === "object" && !(v instanceof Date) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, deep(x)])) : v;

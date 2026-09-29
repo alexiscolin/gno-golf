@@ -55,6 +55,17 @@ test("scrub: a URL keeps where in the game, never by=, friend= nor a share's tex
   assert.equal(scrub("/h/garden-3/"), "/h/garden-3/");
 });
 
+test("scrub: a key's hex or a recovery phrase never leaves, should one ever reach an error", async () => {
+  const { scrub } = await load();
+  const hex = "a".repeat(32) + "0123456789abcdef".repeat(2);
+  assert.equal(scrub(`bad key ${hex}`), "bad key hex…");
+  assert.equal(scrub(`key 0x${hex}`), "key hex…");
+  const phrase = "abandon ability able about above absent absorb abstract absurd abuse access accident";
+  assert.equal(scrub(`restore: ${phrase}: 12 words`), "restore: words…: 12 words");
+  // what the game sends stays: a sentence of the realm, a tx hash's 64 hex aside
+  assert.equal(scrub("golf: the weather of that round is over, play the hole again"), "golf: the weather of that round is over, play the hole again");
+});
+
 test("clean: every string of an event, nested ones and the person's first ones", async () => {
   const { clean } = await load();
   const e = clean({
