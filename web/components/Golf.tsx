@@ -1902,8 +1902,9 @@ export default function Golf() {
       {/* the turns, called out big before each stroke: a duel's (yours, then theirs), what the next is
           worth; solo, what it is for (the score card says them to a screen reader) */}
       {playing && s && !s.done && !theyWon && (s.view !== "overview" || s.cam === "far") && (racing ? s.rivalTurn || (s.strokes === s.rival && !s.flying) : !s.flying && parHere(s) > 0) && (
-        <p key={(s.rivalTurn ? "them" : "you") + s.strokes} className={"turncall" + (s.rivalTurn ? " turncall--them" : "")} aria-hidden="true">
-          {s.rivalTurn && racing ? `${racing.self ? "Your best" : racing.name}'s turn` : racing ? <>Your turn!<small>{raceLeft(s.strokes + 1, racing.ghost.strokes)}</small></> : strokeFor(s.strokes + 1, parHere(s))}
+        <p key={(s.rivalTurn ? "them" : "you") + s.strokes} className={"turncall" + (s.rivalTurn ? " turncall--them" : "")} aria-hidden="true" data-long={s.rivalTurn && racing && racing.name.length > 10 ? "" : undefined}>
+          {/* a name's hyphens never break a line: it goes whole to the next, broken only when longer than one */}
+          {s.rivalTurn && racing ? `${racing.self ? "Your best" : racing.name.replaceAll("-", "\u2011")}'s turn` : racing ? <>Your turn!<small>{raceLeft(s.strokes + 1, racing.ghost.strokes)}</small></> : strokeFor(s.strokes + 1, parHere(s))}
         </p>
       )}
       {playing && !linkNote && !duel && farHint && s && s.ready && !s.flying && s.strokes > 0 && !s.done && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
