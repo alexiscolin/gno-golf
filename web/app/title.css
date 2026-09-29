@@ -211,7 +211,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 
 /* ------------------------------------------------------------ the cups */
 
-.worlds--v2 .worlds__in { width: min(1320px, 94vw); }
+.worlds--v2 .worlds__in { width: min(1680px, 100%); }
 .front__head { position: relative; display: grid; justify-items: center; gap: 4px; margin-bottom: clamp(14px, 2.6vh, 30px); }
 .worlds--v2 .worlds__list { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gap-grid); }
 
@@ -237,7 +237,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   margin-top: -22px; position: relative; z-index: 3; box-shadow: 0 3px 0 var(--ink); font-size: var(--fs-name);
   transition: transform var(--t-pop) var(--spring);
 }
-.world__info { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 8px 6px 6px; }
+.world__info { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 14px 8px 8px; }
 /* the standing reads first, the green under it supports it */
 .worlds--v2 .world__count { font-size: 14px; }
 .worlds--v2 .world__score { font-size: 15px; }
