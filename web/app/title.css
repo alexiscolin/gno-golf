@@ -295,10 +295,12 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
    come (.mode[disabled]), not greyed as an empty cup; its crystals the window
    (scene/crystal.ts, baked on this cave: titlebake.ts) */
 .tint--mines { --c2: #4f3b8f; --art: linear-gradient(180deg, #34266e, #7a64c4 65%, #f0a07a); }
-.worlds--v2 .world--mines[disabled] { background: var(--panel-dots), var(--c2); grid-template-rows: auto auto 1fr; } /* (its panel down to the card's foot, as the others') */
-.worlds--v2 .world--mines[disabled] .world__art { opacity: .75; }
-.worlds--v2 .world--mines[disabled] .world__art img { filter: none; }
-.worlds--v2 .world--mines[disabled] .world__ribbon { background: var(--green); } /* (its name read, not greyed) */
+/* to come, plainly: its colours faded toward stone (as a game to come, .mode[disabled]), the sticker alone bright */
+.worlds--v2 .world--mines[disabled] { background: var(--panel-dots), color-mix(in srgb, var(--c2) 35%, var(--stone)); grid-template-rows: auto auto 1fr; } /* (its panel down to the card's foot, as the others') */
+.worlds--v2 .world--mines[disabled] .world__art { opacity: .7; }
+.worlds--v2 .world--mines[disabled] .world__art img { filter: saturate(.3); }
+.worlds--v2 .world--mines[disabled] .world__ribbon { background: color-mix(in srgb, var(--green) 45%, var(--stone)); } /* (its name read, faded) */
+.worlds--v2 .world--mines[disabled] .world__info { opacity: .8; }
 .world--mines .world__info { align-content: start; } /* (its lines level with the others') */
 
 /* the first choice: a kart game's mode panels, never the cups' cards: flat
@@ -322,7 +324,13 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode--build { --c1: var(--lamp); --c2: var(--sunny); } /* the sun */
 .worlds--v2 .world:focus-visible, .mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
 .mode[disabled] { cursor: default; }
-.mode[disabled] > :not(.mode__soon, .mode__line, .rival__tag) { opacity: .75; } /* (its line stays readable) */
+.mode[disabled] > :not(.mode__soon, .mode__line, .rival__tag) { opacity: .7; filter: saturate(.35); } /* (its line stays readable) */
+/* a game to come, plainly: its colours faded toward stone, the "Coming soon" sticker alone bright */
+.mode[disabled] {
+  background:
+    radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--c1) 35%, var(--stone)) 0 31%, var(--ink) 31% 32.2%, transparent 32.4%),
+    var(--panel-dots), color-mix(in srgb, var(--c2) 35%, var(--stone));
+}
 /* the gnomes stand out over the panel's top edge */
 .mode__stage { position: relative; display: block; min-height: 0; margin-top: -26%; }
 .mode__stage .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
