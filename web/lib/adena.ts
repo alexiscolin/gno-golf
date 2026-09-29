@@ -454,11 +454,12 @@ export const NAME_GAS = REGISTER_GAS + CLAIM_GAS;
  * The bytes a name taken with a save stores: Register's (5,216 measured with
  * a Claim of 2 bests, docs/design/deploy-v1-rehearsal.md, less that Claim's
  * 1,588), and Claim's, which seats the player's unranked bests of each mode:
- * 580 and 504 a best (golf filetests: 0, 1,084, 1,588, 2,596, 4,612 bytes for
- * 0, 1, 2, 4, 8). holes: the player's bests per mode (Rank() "holes"), this
- * save's counted in.
+ * 620 and 504 a best (golf filetests: 0, 1,084, 1,588, 2,596, 4,612 bytes for
+ * 0, 1, 2, 4, 8, measured before the standing kept its par: +38 bytes, and its
+ * ranking key a digit longer, rounded up). holes: the player's bests per mode
+ * (Rank() "holes"), this save's counted in.
  */
-export const nameBytes = (holes: readonly number[]) => 3628 + holes.reduce((b, n) => b + (n > 0 ? 580 + 504 * n : 0), 0);
+export const nameBytes = (holes: readonly number[]) => 3628 + holes.reduce((b, n) => b + (n > 0 ? 620 + 504 * n : 0), 0);
 
 /**
  * Takes a gno.land name for the connected account, and ranks at once the
