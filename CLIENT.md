@@ -14,7 +14,7 @@
 > over https, or `NEXT_PUBLIC_ALLOWED_HOSTS` host: a production build served
 > from a public host ignores them and plays `NEXT_PUBLIC_RPC`),
 > `?hole=` which hole to open (any id form below), or `?cup=island&hole=3` a
-> course hole by its place in its cup, and `?shot=angle,power` to fire one on
+> course hole by its place in its cup, `?screen=cups` the cups screen, and `?shot=angle,power` to fire one on
 > load (that last one is how the screenshots and the smoke test are taken).
 > The golf realm's path is set at build time (`NEXT_PUBLIC_REALM`).
 >
@@ -116,7 +116,7 @@ a client that finds one can offer to go there).
 | preview the first stroke | `SimulateRoundAt(hole, shots, period)`, from the tee exactly |
 | preview any later stroke | `SimulateFrom(hole, x, y, shot, stroke, period)` from the last `"rest"` |
 | check a commit before signing | `SimulateCommit(hole, x, y, stroke, shots, period)` |
-| read back a recorded round | `Round(hole, player)` |
+| read back a round under way | `Round(hole, player)` (`null` once holed: a holed round is not kept, its best is, read with `Ghost`) |
 | a player's place | `Rank(mode, player)` on the course, `HoleRank(hole, mode, player)` on a hole, not the whole `Players` list |
 | the boards | `Leaderboard(mode)` for a top ten, `CourseLeaderboard(mode, offset, limit)` and `HoleLeaderboard(hole, mode, offset, limit)` a page at a time, `Bests`, `Standings` |
 | check an old recorded round | `SimulateRoundIn(hole, shots, period)`, in its own weather however old |
@@ -124,7 +124,7 @@ a client that finds one can offer to go there).
 | race a player's best (a duel's ghost) | `Ghost(hole, mode, player)`, then its strokes: the first with `SimulateRoundIn`, each later one with `SimulateFrom` from the `"rest"` before, in its `"period"` |
 | rank rounds saved before a name | the write `Claim()`, best sent with the name's `Register` in one transaction |
 
-`State(hole)` is `HoleState` plus the play count and up to 24 rounds; a client
+`State(hole)` is `HoleState` plus the play count and up to 24 rounds under way; a client
 that only draws the hole doesn't need them.
 
 ### `HoleState(hole string) string` — everything to draw
@@ -291,6 +291,8 @@ of a slot has weather of its own.
 | town | 50 | 15 | 20 | 15 | | |
 | mountain | 40 | 20 | | 15 | | 25 |
 
+A world not listed (the Crystal Mines' `mines`, `extras`) has the garden's.
+
 - **wind**: one Slope zone over the board, `vec` = the push, 0.08–0.15 per
   substep (never over the hole's `Shelter`), its direction from the hash.
 - **rain**: a Surface ×1.025 over the board (a touch quicker green), the hole's
@@ -341,8 +343,10 @@ played, in `"shots":"a,p,t;…"`.
 
 ## The writes
 
-Every write is a `MsgCall` to the golf realm, signed by the wallet, and takes
-the exact version id.
+Every write is a `MsgCall` to the golf realm, signed by the wallet (Adena, or
+a `gnokey maketx call` the player pastes), and takes the exact version id.
+There is no `MsgRun`: onyx and mainnet restrict `maketx run` to one seeded
+account.
 
 - `PlayRoundAt(cur, hole, shots, period)` records assisted shots, continuing
   the caller's round under way, or starting one from the tee: a holed round
@@ -358,8 +362,9 @@ the exact version id.
 - `Reset(cur, hole)` abandons a round under way: the ball goes back to the
   tee.
 
-A wallet session scoped to the golf realm's `vm/exec` stops the wallet
-prompting for every commit. `PublishMine` is how authors add holes of their
+A wallet session scoped to the golf realm's `vm/exec` would stop the wallet
+prompting for every commit (planned for V1.1: BACKLOG, "Auto-save with a
+chain session"). `PublishMine` is how authors add holes of their
 own, and `Publish` is the owner's; neither is a player's concern.
 
 ## Skin vocabulary

@@ -17,8 +17,10 @@ either.
 - Visitors are told (the About sheet's credit line) and can object there in
   one click, "Don't measure my visits": kept in this browser
   (`localStorage` `gnogolf.noStats`), it stops what is sent at once
-  (`opt_out_capturing()`, the waiting events dropped), and posthog-js is not
-  loaded again on a later page.
+  (`opt_out_capturing()`, the waiting events dropped), takes PostHog's id
+  and cookies away (`reset(true)`; its `ph_…` and opt-out cookies deleted, an
+  earlier page's too, and `opt_out_persistence_by_default` so none is written
+  again), and posthog-js is not loaded again on a later page.
 - Nobody is identified: no `identify()`, `person_profiles: "identified_only"`.
 - No session replay, no heatmaps. Autocapture is on with every element's text
   and attributes masked (the boards show names and addresses).
@@ -75,7 +77,7 @@ web vitals (`$web_vitals`) are PostHog's own.
 | `duel_started` | `hole`, `cup`, `rival`, `ghost` (their strokes), `mixed` (another aim mode) | a ghost armed | `Golf.tsx` |
 | `duel_result` | `rival`, `result` (win/loss/tie), `strokes`, `ghost` | a duel's hole holed | `Golf.tsx holedRef` |
 | `save` | `stage` (sent/ok/cancelled/failed), `parts`, `part`, `gas` (the part's estimate), `ms`, `reason` (late, replay, unconfirmed, missing, down, chain, gas, funds, locked, busy, network, other) | Adena about to open (sent), then its end | `Golf.tsx saveRound()` |
-| `name_registered` | `ok`, `via` (save/form), `reason` | a name taken with a save, or from the name form | `Golf.tsx`, `Leaderboard.tsx` |
+| `name_registered` | `ok`, `via` (save/form/gnokey), `reason` | a name taken with a save, from the name form, or with the gnokey paste | `Golf.tsx`, `Leaderboard.tsx` |
 | `share` | `target` (x, facebook, whatsapp, bluesky, copy, sheet, download), `what` (hole/cup/board/clip) | a share button | `Share.tsx` |
 | `wallet` | `adena`, `connected` | once a session | `Golf.tsx` |
 | `perf` | `tier` (the setting), `slow` | the first 2 s of busy frames timed | `engine.ts probeFrame()` |

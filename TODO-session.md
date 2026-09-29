@@ -72,14 +72,14 @@ HUD, sound, engine replay).
 - [x] ui: weather sounds: rain bed, gusts, snow whoosh, thunder after flashes — behind the Sound switch, silent in a hidden tab.
 - [x] ui: menu cup header: name big on two lines, the header opens the cup screen.
 - [x] ui: standings: a played hole shows its strokes big, number small, and the cup's stamp (shell, lantern, gnome, snowflake).
-- [x] ui: weather per round and period: State `period`/`weather` drawn, SimulateRoundAt for every shot, Reset + PlayRoundAt to record, refreshed between rounds only, "until 12:30" on the card (and "Clear" when clear). (Reset first is going with the realm batch: a finished round is no longer stored, see BACKLOG.)
+- [x] ui: weather per round and period: State `period`/`weather` drawn, SimulateRoundAt for every shot, Reset + PlayRoundAt to record, refreshed between rounds only, "until 12:30" on the card (and "Clear" when clear). (Reset first is gone since `1a47321`: a finished round is no longer stored, so a new round needs no Reset.)
 - [x] garden: trees and bunting leaning with the wind (scene files). — done: foliage, pines and bunting sway with `windNow()` (materials.ts, garden, island).
 - [x] ui: loop replay: slanted entry (>25°) rides up and falls off the side with a thud ("Off the loop — aim straight in"); a too-soft climb goes as high as v² says; rolls out as fast as it went in.
 - [x] ui: aim dots cut at 7 units in fog.
 - [x] ui: share: one small "Share" control under the score — the phone's share sheet (snapshot + text), on a desktop a popover of four round icons (X, Facebook, Bluesky, copy link). `?won=N` screenshot hook.
 - [x] ui: "Save on-chain" opens Adena at once: price, balance and chain id read when the card opens (4 s timeouts), no balance gate (a warning under the button instead).
 - [ ] ui: share also from a finished cup / grand slam / gnome unlocked outside the win card (the message already follows the moment on the win card). (still open: partly: a finished cup shares from its own victory screen; that text names neither a grand slam nor a new gnome)
-- [ ] user: fund the Adena account on the local chain to save a round (needs the address; not done without it). (unverified: a user step; moot once the game is on onyx)
+- [ ] user: fund the Adena account on the local chain to save a round (needs the address; not done without it). (unverified: a user step; moot once the game is on onyx (the deploy is planned for 09-30: docs/design/deploy-v1.md))
 - [x] ui: black-line lead: resize() only calls setSize when the size or the pixel ratio really changed (it cleared the buffer on every hole load). No backdrop-filter anywhere.
 - [x] ui: weather card says "for N min" (period×300 s + 300 s vs the local clock; the chain clock checked in step), rain puddles drawn at the chain's puddle zones.
 - [x] ui: player-timed pieces: a clock at one substep per 72 ms drives mill, tram, clock hands, planks, gusts; the release tick (clock mod lcm of every) goes with each shot ("a,p,t") to SimulateRoundAt and PlayRoundAt; the preview re-asks at the current tick (every 250 ms while aiming).
@@ -228,7 +228,7 @@ HUD, sound, engine replay).
 - [x] gnoweb: optimise the golf Render with the latest gnoweb features. — done: Render uses alerts, gno-columns and gno-form (the Claim form and others).
 
 ## At the very end
-- [ ] Big pass (running): security audit of the realms (auditor), 3D perf (garden), engine bugs, web perf, Adena, UI design (ui), docs (docs). (still open: the passes ran (b729671, 17ca533, the 09-27 polish); the final review on the final code is still to come, see BACKLOG)
+- [ ] Big pass (running): security audit of the realms (auditor), 3D perf (garden), engine bugs, web perf, Adena, UI design (ui), docs (docs). (still open: the passes ran (b729671, 17ca533, the 09-27 polish); the final review on the final code is running on 09-29, before the onyx deploy, see BACKLOG)
 - [x] README, docs/physics.md, docs/course.md, docs/golf.md.
 - [x] chain: missing doc comments in physics and course. — done: a short doc on every exported name (7e719d1).
 - [ ] A game and physics engine that's complete and shareable (p/gnogolf/physics and course usable by other games). (still open: the packages stand alone and are documented (docs/physics.md, docs/course.md); the proof is a second game, see BACKLOG)

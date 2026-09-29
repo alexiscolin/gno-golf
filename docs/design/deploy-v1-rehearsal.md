@@ -265,7 +265,7 @@ For players on pearl:
 
 ## The command list for pearl
 
-> Superseded for onyx, which lets one seeded account `maketx run`: the holes are published with `scripts/publishdata.sh <key>`, one `gnokey maketx call` of `Publish` a hole, and checked with `scripts/publishdata.sh -verify` (docs/design/deploy-v1.md, section 10). The `maketx run` steps below are pearl's.
+> History (pearl). The onyx runbook is `deploy-v1.md`, [Onyx deploy, step by step](deploy-v1.md#onyx-deploy-step-by-step). Superseded for onyx, which lets one seeded account `maketx run`: the holes are published with `scripts/publishdata.sh <key>`, one `gnokey maketx call` of `Publish` a hole, and checked with `scripts/publishdata.sh -verify` (docs/design/deploy-v1.md, section 10). The `maketx run` steps below are pearl's.
 
 The user runs these commands with their own key, in this order. The key is written `<your-key-name>` below, and its address `<your-address>`. Every transaction takes `-chainid pearl-1 -remote https://rpc.pearl.testnets.gno.land:443`, shortened to `$P` below. The read-only checks take only the remote, `$R`:
 
@@ -378,6 +378,8 @@ The same list as gnomcp calls (what the rehearsal ran):
 gnomcp cannot run step 5 on pearl as it stands, for two reasons. It pins `-max-deposit` to 10 GNOT on addpkg, and golf needs 22.37 GNOT (problem 5). It also deploys as its agent key, not as the user.
 
 ## Netlify environment
+
+> History (pearl). Onyx's values are in `deploy-v1.md`, [Onyx deploy, step by step](deploy-v1.md#onyx-deploy-step-by-step), step 7.
 
 These are the values for the site (see `netlify.toml`; `web/.env.example` carries the same set):
 

@@ -2,44 +2,82 @@
 
 ## Where this stands
 
-The V1 is built and runs end to end on a local chain. On the chain: the
-`physics` and `course` packages and the `golf` realm, the only three deployed,
-and the whole course as data: four cups of 18 holes and two extras
-(`data/holes.txt`). The authoring code (`p/gnogolf/physics/build`,
-`p/gnogolf/course/author`) and the 74 hole realms stay in the repo as the
-source and are not deployed. What goes on chain is the repo byte for byte:
-`scripts/stage.sh` stages it and checks it, on every `scripts/check.sh` run. In
-`web/`, the 3D client, with the boards (every hole and the whole course, paged
-on-chain, your place, your gno.land name), badges, ghost duels (the champion,
-a player at your level, yourself, a friend's link, anyone on the board, with a
-callout before each turn), a Support tip and share clips.
+*2026-09-29, the day before the onyx deploy.*
 
-**The deploy target is onyx** (`onyx-1`, mainnet's code v1.5.0; pearl is
-retiring). What that changes for us, with a compatibility study running:
+The V1 is built, and it runs end to end on a local chain built with the onyx
+toolchain.
+- **On the chain:** the `physics` and `course` packages and the `golf` realm,
+  the only three deployed. The whole course goes on chain as data: four cups
+  of 18 holes and two extras (`data/holes.txt`). golf already names a fifth
+  world, the Crystal Mines, whose holes come after the launch.
+- **In the repo only:** the authoring code (`p/gnogolf/physics/build`,
+  `p/gnogolf/course/author`) and the 74 hole realms are the source, and are
+  not deployed. What goes on chain is the repo byte for byte:
+  `scripts/stage.sh` stages it and checks it, on every `scripts/check.sh` run.
+- **In `web/`,** the 3D client:
+  - the boards: every hole and the whole course, paged on-chain, your place,
+    your gno.land name. The course ranks by most holes, then the best score
+    against par;
+  - badges, and a Support tip;
+  - ghost duels: the champion, a player at your level, yourself, a friend's
+    link, or anyone on the board ("Race here" on the hole you're on, "Their
+    holes" to pick one), with a callout before each turn;
+  - share clips;
+  - saving, the name, Claim and the tip with Adena or a gnokey paste;
+  - anonymous analytics with a one-click opt-out;
+  - the Crystal Mines card, as coming soon.
 
-- `addpkg` parks until the gpao approvals oracle approves it (the
-  code-submission policy, inert until then).
-- `maketx run` is restricted to one seeded member, so the gnokey save path and
-  `scripts/publishdata.sh` have to move to plain calls.
-- Namespaces are enforced from block 1: `gnogolf` has to be obtained.
-- Mainnet's filtered package set: every dependency has to be checked against
-  it.
+**The deploy target is onyx** (`onyx-1`, mainnet's code v1.5.0), tomorrow, as
+the key `GnoAlex` under `nym-golfer000`. The runbook is
+`docs/design/deploy-v1.md`, "Onyx deploy, step by step": about 90 GNOT in all,
+and the key holds 100.
 
-**Before deploy**, in progress, in order:
+**Done since the last update:**
 
-1. The onyx compatibility fixes.
-2. The realm batch: a published hole's worst-case weather cost bounded at
-   publish, the forecast drawn once per page, finished rounds no longer stored
-   ("Reset first" goes; about −45% on a first finish).
-3. PostHog analytics: EU, cookieless-exempt, no banner; events and error
-   tracking (built and merged; `NEXT_PUBLIC_POSTHOG_KEY` turns it on at
-   deploy).
-4. A final full review of the final code: bugs, security, scalability,
-   playability.
-5. Docs: the pitch, the README, the site's texts, `CLIENT.md`,
-   `docs/golf.md`, `docs/design/deploy-v1.md`.
-6. Trailer v5, with the duels and no Adena.
-7. The OG images re-rendered (Mushroom Town).
+1. The onyx compatibility fixes:
+   - the onyx toolchain everywhere (`80635bf`);
+   - no `MsgRun`: `publishdata.sh` sends one `Publish` call a hole, and the
+     gnokey save pastes plain calls (`33d39a2`, `67b7135`);
+   - `namereg/v0` (`337f349`);
+   - every dependency is live on onyx (checked 09-29).
+   - Onyx parks each addpkg until the gpao oracle approves it: the runbook
+     polls `vm/qpkgmeta_json` between packages.
+2. The realm batch:
+   - a hole's worst-case weather cost is bounded at publish (`32faa21`);
+   - a hole page draws its forecast once (`a165a8b`);
+   - finished rounds are no longer stored, so "Reset first" is gone. A first
+     course finish is now about 0.29 GNOT and each further hole about 0.10
+     (`1a47321`).
+3. The course ranking counts holes, then the score against par, so the Crystal
+   Mines' pars weigh the same as any other cup's (`d0272d6`, `da76f54`).
+4. PostHog analytics (EU, no banner) and its opt-out, which also takes the
+   cookies away (`427aca0`, `a29162e`).
+5. The gnokey paths:
+   - the save wherever a round waits, confirmed on the chain by the key's
+     address (`8b54f0e`);
+   - its weather checked first (`0e13d52`);
+   - the name, Claim and the tip (`5634e7a`).
+6. On mainnet, no Support chip while ugnot is transfer-locked (`bae4a21`).
+7. The cups screen has its own address (`?screen=cups`), and so does a cup's
+   picker. The Crystal Mines card shows as coming soon.
+8. Trailer v11 and its teaser (`52ab3cb`).
+9. The docs brought up to date: this file, the README, `CLIENT.md`,
+   `docs/golf.md`, `docs/leaderboards.md`, `docs/analytics.md`, the pitch, and
+   the onyx runbook.
+
+**Still to do:**
+
+1. The final full review of the final code (bugs, security, scalability,
+   playability). It is running now, and its fixes land before the deploy.
+2. The OG images re-rendered (Mushroom Town): being re-rendered on 09-29.
+3. **The deploy on onyx, tomorrow:** the runbook's steps 0 to 7, then a real
+   save from the site.
+
+**Right after the launch:**
+
+- **The Crystal Mines** are being built on the branch `mines` (ADR-005). The
+  client ships first, then the owner publishes the 18 holes.
+- **V1.1: auto-save through a chain session.** See "Next milestones".
 
 This file is the longer view: what we measured along the way, and what comes
 after V1.

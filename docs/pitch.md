@@ -22,7 +22,8 @@ ghost they chase.
 
 ## Why you'll keep playing
 
-Four cups of 18 holes, windmills, trams, a volcano, pieces you have to time.
+Four cups of 18 holes, windmills, trams, a volcano, pieces you have to time,
+and a fifth on the way: the Crystal Mines, an expert cup.
 The weather changes every five minutes, the same for everyone, so the hole you
 know by heart plays differently in a storm. There are gnomes to unlock, badges
 to collect, and a clip of your best shot ready to post, with a link that dares
@@ -34,7 +35,8 @@ The game never sends "I scored 2". It sends your decisions (an angle, a power,
 the moment you let go), and the chain replays them. So a score on the boards
 can't be faked, and the holes themselves live on-chain too: you can read one
 before you play it. Playing is free. Keeping a score is one signature (Adena or
-gnokey), for a small fee, with your gno.land name on the board.
+gnokey), for a small fee (test GNOT from the faucet on the onyx testnet), with
+your gno.land name on the board.
 
 ## Why it matters for gno.land
 

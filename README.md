@@ -21,10 +21,14 @@ replay of your shots, and anyone can replay it again.
 
 - Playing is free. A shot's preview is a read-only query, so you need no wallet
   to play the whole course.
-- Keeping a score takes one transaction per hole (two for a long round),
-  signed with [Adena](https://www.adena.app/) (or gnokey, from the game's
-  commands). The first save on a hole costs
-  about 0.4 GNOT (most of it a storage deposit), a later one about 0.06.
+- Keeping a score takes one transaction per hole (more for a long round),
+  signed with [Adena](https://www.adena.app/), or with gnokey: the game gives
+  the command to paste in a terminal, and confirms the save on the chain by
+  the key's address (typed once, kept in the browser). The name, a Claim and a tip can go the same way. A
+  finished round isn't kept on chain, only your best, so a save costs a
+  storage deposit only the first time you finish a hole: about 0.29 GNOT for
+  your first hole on the course, about 0.10 for each hole after, nothing for
+  a replay, plus about 0.05 GNOT of fees a transaction.
 - The boards list players with a gno.land name, so a script can't flood them
   with throwaway addresses. You can take a name without leaving the game, in
   the same signature that ranks the rounds you saved before it. Rounds saved
@@ -42,16 +46,23 @@ replay of your shots, and anyone can replay it again.
   (a friend's name or address, or anyone on the board), then one of their
   ghosts, listed hole by hole with their best to beat. The ghost wears
   another gnome than yours, and each turn is called out: yours, then theirs.
-  Race on a hole's board or in Friends does the same from the game.
+  On a board or in Friends, "Race here" starts at once on the hole you're on
+  (their ghost there), and "Their holes" lists their ghosts to pick one.
 - Badges (an ace, all six weathers, a duel won…) are kept in your browser
   and stamped on the cup card, on the hole each was earned on. New game
   clears them with your scores; the gnomes you unlocked stay.
 - Support, the chip by the network banner, sends an optional 1, 5 or 10
   GNOT tip: a plain bank send to the golf realm's `Owner()` as read on the
-  chain, confirmed in Adena. Playing stays free.
+  chain, confirmed in Adena or gnokey. Playing stays free. On mainnet, while
+  GNOT can't be sent, there is no Support chip.
+- Visits are measured anonymously (PostHog EU, no banner); the About sheet
+  says so and turns it off in one click
+  ([docs/analytics.md](docs/analytics.md)). The font is served by the site
+  itself.
 
 There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain) and
-two extras. A cup always starts from its first hole, with a fresh round. The
+two extras; a fifth, the Crystal Mines, an expert cup, is on the cups screen as
+coming soon ([ADR-005](adr/adr-005-crystal-mines.md)). A cup always starts from its first hole, with a fresh round. The
 menu's Mode goes back to Solo or Duel, All cups to the cups (a duel's ghosts
 in a duel), and Gnome to the gnome picker. Some holes move, so timing is part of the shot. Every hole has
 weather (wind, rain, fog, storm, snow), which changes every five minutes of
@@ -118,7 +129,7 @@ npm run typecheck && npm run lint && npm run selfcheck   # selfcheck fails if th
 ```
 
 The client takes its config from the URL: `?hole=garden/7` or
-`?cup=garden&hole=7`, and in a dev or local build `?rpc=` and `?web=` (a
+`?cup=garden&hole=7`, `?screen=cups` for the cups screen, and in a dev or local build `?rpc=` and `?web=` (a
 production build served from a public host ignores them and plays
 `NEXT_PUBLIC_RPC` and `NEXT_PUBLIC_WEB`).
 `NEXT_PUBLIC_CLIPS=1` at build time offers a clip of the holing shot in the
@@ -135,7 +146,8 @@ alone, and says so.
 ## Writing a hole
 
 A hole is geometry: a `course.Simple`, encoded as data and published with
-`golf.PublishMine(slug, hexData, note)`. It becomes a community hole: playable,
+`golf.PublishMine(slug, hexData, note)`, once the owner opens publishing
+(`SetPublishing`; closed at launch, until the Builder). It becomes a community hole: playable,
 and recorded on its own board, but in no cup and not in the rankings. No hole runs code of its own:
 golf decodes the data and plays it with its own physics.
 
@@ -182,8 +194,10 @@ The course's own holes, in `gno.land/r/gnogolf/`, are the best examples.
 The golf realm has one role, its owner (the account that deployed it). The
 owner publishes the course's holes and their new versions. A new version
 archives the old one: still playable, its records kept, but out of the
-course-wide ranking. The owner can also set the game's link, name a successor
-realm once, and hand the role on or give it up for good.
+course-wide ranking. The owner can also open or close community publishing
+(closed at launch), hide a community hole from the lists (for abuse; it stays
+playable), set the game's link, name a successor realm once, and hand the role
+on or give it up for good.
 
 The owner can't edit or delete a hole, a round or a score, can't touch
 anyone's community hole, the weather or the physics, and can't pause or
@@ -208,4 +222,6 @@ data/holes.txt               the course as data, one line per slot
 - [docs/golf.md](docs/golf.md): the realm's API, and how it's updated after the deploy.
 - [docs/leaderboards.md](docs/leaderboards.md): the boards, the ghost duels, and the bot check.
 - [CLIENT.md](CLIENT.md): how to write a client.
+- [docs/analytics.md](docs/analytics.md): the anonymous audience measurement.
+- [docs/design/deploy-v1.md](docs/design/deploy-v1.md#onyx-deploy-step-by-step): the onyx deploy, step by step.
 - [adr/](adr/): the architecture decisions.

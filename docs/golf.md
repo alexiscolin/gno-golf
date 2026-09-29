@@ -242,7 +242,9 @@ from where it is, or start a new one from the tee if there is none. A holed
 round is not kept (its best is), so the next commit after a finish starts
 afresh with no `Reset`. To record what `SimulateRound` showed over a round
 left under way, send `Reset` and `PlayRoundAt` in the same transaction (the
-web client does this through Adena when the chain holds one).
+web client does this through Adena when the chain holds one; its gnokey paste,
+plain `maketx call`s, one message each, always starts with a `Reset` call of
+its own).
 
 - `PlayRoundAt` plays in the weather of `period`, assisted. `PlayRoundPro` is
   `PlayRoundAt` in pro mode: the aim preview cut short, on the player's word.
@@ -281,8 +283,9 @@ caller has no name yet. Calling it twice changes nothing. The game sends it in
 the same transaction as the name's `Register`, and offers a "Rank them" button
 to anyone who took their name elsewhere. It reads the course's holes only, so
 its gas is the same for everyone (about 60M). Its storage grows with what it
-seats: 504 bytes a best, and 580 once for each mode it ranks the player in, so
-`580 + 504 × n` a mode with `n` bests (none for none). `Rank(mode, player)`'s
+seats: 504 bytes a best, and about 620 once for each mode it ranks the player
+in (580 measured before the standing kept its par and a longer key), so about
+`620 + 504 × n` a mode with `n` bests (none for none). `Rank(mode, player)`'s
 `holes` gives a client `n` beforehand; it can be more than Claim seats while
 an archived hole is draining, never less. A best on a community or archived
 hole is not Claim's: a finish there once named puts it on that hole's board.

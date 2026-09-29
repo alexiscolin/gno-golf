@@ -37,8 +37,10 @@ Everything below runs on-chain; the dapp reads it.
   opens on this hole's board during a round, on the course's elsewhere.
 - **Duels race a best, not a board.** A share link carries the sharer's
   address (`?by=`); in the game, Duel asks for a rival (a name, an address,
-  anyone on the board) and lists the holes they have a best on (`BestOf`),
-  and Race on a board's rows does the same. The player races that best as
+  anyone on the board) and lists the holes they have a best on (`BestOf`).
+  A board's rows race too: "Race here" plays their ghost at once on the hole
+  being played (on its board, or the course's for a player with a best on
+  it), "Their holes" lists their ghosts to pick one. The player races that best as
   a ghost, read with `Ghost(hole, mode, player)` (named or not, like
   `Bests`) and replayed stroke by stroke. The result is the client's arithmetic in V1,
   checkable against the two bests; nothing records it
@@ -62,8 +64,8 @@ nice -n 20 node --experimental-strip-types scripts/botcheck.ts --selftest
 ```
 
 It takes the top rows of every official hole's boards and the course boards,
-in both modes, reads each candidate's bests (`Bests`) and recorded rounds
-(`Round`), and prints a markdown (or `--json`) report. It also writes
+in both modes, reads each candidate's bests (`Bests`) and the round that set
+each (`Ghost`: a holed round is not kept, its best is), and prints a markdown (or `--json`) report. It also writes
 `web/public/flags.json`: `{ updated, flags: { <address>: { score, reasons } } }`.
 The score, 0 to 1, is a weighted mean of four signals:
 
@@ -85,7 +87,6 @@ scores higher.
 0.01, pick robust shots rather than knife-edge ones (our own solver prefers
 those), and play a few strokes over the optimum. Such a bot scores like a
 strong human. A strong human who plays a lot will score on optimality and
-volume, up to 0.35 from those two alone. The recorded round is the latest one
-on a hole, which may be a replay rather than the ranked best. Only the holing
+volume, up to 0.35 from those two alone. Only the holing
 shot is nudged, because setup shots are fragile for everyone. Flags feed a
 "show all" toggle, not a ban.
