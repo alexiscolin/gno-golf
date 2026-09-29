@@ -2028,7 +2028,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .details__box.gnokey__box { max-height: none; overflow: visible; padding: 14px 16px 12px; text-align: left; }
 .gnokey__steps { margin: 0 0 14px; padding-left: 20px; font-size: 14px; line-height: 1.45; color: var(--ink); display: grid; gap: 12px; }
 .gnokey__steps li { overflow-wrap: anywhere; }
-.gnokey__steps code { font-size: 12px; background: rgba(var(--ink-rgb), .08); padding: 1px 6px; border-radius: 6px; }
+.gnokey__steps code, .gnokey__addr code { font-size: 12px; background: rgba(var(--ink-rgb), .08); padding: 1px 6px; border-radius: 6px; }
 .gnokey__key { display: block; margin-top: 8px; width: 100%; max-width: 240px; }
 .gnokey__bad { display: block; margin-top: 6px; font-size: 13px; color: var(--hat-ink); }
 .gnokey__code { white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font-size: 11.5px; line-height: 1.5; margin: 0; padding: 12px 14px; max-height: 320px; overflow: auto; border-radius: 12px; background: #1f2b27; color: #e8f1ec; }
@@ -2036,6 +2036,9 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .gnokey__row .real__fine { text-align: left; }
 .btn.gnokey__copy { min-width: 110px; }
 .gnokey__web.real__fine { margin: 12px 0 0; text-align: left; } /* the same call on gnoweb, under the paste */
+/* no account connected: the key's address, for "It did" to ask the chain */
+.gnokey__addr { display: block; margin-top: 14px; font-size: 14px; line-height: 1.45; color: var(--ink); text-align: left; overflow-wrap: anywhere; }
+.gnokey__addr .gnokey__key { max-width: 100%; font-family: var(--mono); font-size: 13px; }
 
 /* about: how it works, what is in it, where to go next, who made it */
 /* the about button: the back button's twin, top right, over every front screen */

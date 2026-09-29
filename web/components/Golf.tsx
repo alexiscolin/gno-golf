@@ -1030,36 +1030,42 @@ export default function Golf() {
     if (stepMissing || (keptRanks && nudge.isNamed === false)) return setReal(true);
     keptSave();
   };
-  const keptSave = () => {
+  // (send: false, who: a gnokey save, only asked of the chain for that address)
+  const keptSave = (send = true, who = "") => {
     const r = pending;
     if (!r) return;
     const round = roundOf(r);
     // (its state is its own round's; forgotten or replaced, no later part goes)
-    void saveRound(r, (rec) => setPendingRec({ round, rec }), () => !!pendingNow.current && roundOf(pendingNow.current) === round, savingKept, saveName);
+    void saveRound(r, (rec) => setPendingRec({ round, rec }), () => !!pendingNow.current && roundOf(pendingNow.current) === round, savingKept, saveName, send, who);
   };
 
-  // the round the win card offers to save (send: false, only asked of the chain: a gnokey save)
-  async function recordIt(send = true) {
+  // the round the win card offers to save (send: false, only asked of the chain for who: a gnokey save)
+  async function recordIt(send = true, who = "") {
     if (send && stepMissing) return setReal(true);
     if (!s || !game.current || !s.id) return;
     const r = { ...s, id: s.id }, round = roundOf(r);
-    await saveRound(r, (rec) => roundKey.current === round && setRecord(rec), () => roundKey.current === round, savingWin, saveName, send);
+    await saveRound(r, (rec) => roundKey.current === round && setRecord(rec), () => roundKey.current === round, savingWin, saveName, send, who);
   }
+  // a gnokey save said done, for the round on offer (the won one, else the kept one)
+  const gnokeySaved = (who: string) => (winning ? void recordIt(false, who) : keptSave(false, who));
 
   /**
    * Puts a finished round on the chain: in as many commits as the chain cuts
    * it into, each signed in Adena, then read back. land says how it goes;
    * alive: the player is still on it (a later commit is not sent otherwise);
    * lock: that card's save under way; name: taken in the first signature;
-   * send: false, nothing is sent: only whether the chain holds it already.
+   * send: false, nothing is sent: only whether the chain holds it already,
+   * as the best of who (a gnokey key's address), the account's by default.
    */
-  async function saveRound(r: SaveOf, land: (rec: Rec) => void, alive: () => boolean, lock: { current: boolean }, name: string | null, send = true) {
-    if (!account || !game.current) return;
+  async function saveRound(r: SaveOf, land: (rec: Rec) => void, alive: () => boolean, lock: { current: boolean }, name: string | null, send = true, who = "") {
+    // the player the chain is asked about: the account connected, which alone sends
+    const player = (!send && who) || (account && account.address);
+    if (!player || (send && !account) || !game.current) return;
     // busy before anything is awaited: a second click must not start a second save
     if (lock.current) return;
     // a round that went through is not sent again: the chain would play it again, and charge for it
     // (one the chain could not confirm yet is read again, not sent)
-    const key = sentKey(game.current.chain, account.address, r), sentAs = sentRounds.get(key);
+    const key = sentKey(game.current.chain, player, r), sentAs = sentRounds.get(key);
     if (sentAs && !(sentAs.at === "unsure" && sentAs.sent)) return land(sentAs);
     lock.current = true;
     land(sentAs || !send ? { at: "checking" } : { at: "signing" });
@@ -1077,7 +1083,7 @@ export default function Golf() {
       }
       return got;
     };
-    const roundHere = () => chain.round(hole, account.address), bestHere = () => chain.ghost(hole, mode, account.address);
+    const roundHere = () => chain.round(hole, player), bestHere = () => chain.ghost(hole, mode, player);
     /**
      * The last commit settled: what it did, as the chain says it (readBack),
      * read again while the chain cannot say, and never saved without that.
@@ -1088,10 +1094,10 @@ export default function Golf() {
       // sent, the round is the chain's, answered or not: a reload meanwhile reads it again
       const unsure: Rec = { at: "unsure", sent: true, hash, was, error: "Sent, but the chain could not confirm it yet. Check again in a moment: saving it again would pay twice." };
       if (sent) markSent(key, unsure);
-      const read = () => readBack(chain, { hole, player: account.address, strokes: r.strokes, hash, sent });
+      const read = () => readBack(chain, { hole, player, strokes: r.strokes, hash, sent });
       let got = seen ? { holed: r.strokes, left: null } : await read();
       for (let k = 0; got === undefined && (hash || sent) && k < 10; k++) land({ at: "checking" }), await wait(3000), (got = await read());
-      void within(chain.balance(account.address)).then(setFunds).catch(() => {});
+      if (account) void within(chain.balance(account.address)).then(setFunds).catch(() => {});
       if (got === undefined) {
         said("failed", "unconfirmed");
         return land(sent ? unsure : { at: "unsure", sent, hash, error: `Adena did not confirm it (${adena.replace(/\.$/, "")}), but it may have gone through all the same: see your best on gno.land before saving again, or it is paid twice.` });
@@ -1124,7 +1130,7 @@ export default function Golf() {
       // (its clock read again first: the chain's time decides, not this browser's)
       await chain.sync().catch(() => {});
       if (r.period != null && chain.now() >= saveBy(r.period)) return said("failed", "late"), land({ at: "refused", error: "Too late to save: the weather changed. Play the hole again to save it.", stale: true });
-      if (!send) return land({ at: "unsure", sent: false, error: "The chain does not show this round as your best here: a gnokey save shows once it printed OK! for each transaction, from the account connected here, if it beats your best." });
+      if (!send) return land({ at: "unsure", sent: false, error: `The chain does not show this round as your best here: a gnokey save shows once it printed OK! for each transaction, from ${account && player === account.address ? "the account connected here" : "the key whose address you gave"}, if it beats your best.` });
       const id = chainId || (await within(chain.chainId()));
       // asked before Adena opens: how many transactions the round needs, or
       // why the chain would refuse it
@@ -1154,7 +1160,7 @@ export default function Golf() {
         const was = last && prior !== undefined ? (prior ? prior.strokes : 0) : undefined;
         const landedHere = (got: { strokes: number } | null) => !!got && (last ? got.strokes === r.strokes : got.strokes >= to) && JSON.stringify(got) !== before;
         const sent = recordRound({
-          address: account.address, realm: chain.realm, hole, shots: r.shots.slice(from, to), reset: k === 0 && under,
+          address: player, realm: chain.realm, hole, shots: r.shots.slice(from, to), reset: k === 0 && under,
           gas: gasOf(r, from, to), period: r.period, mode, price: gasPrice, chainId: id, rpc: chain.rpc, named: k === 0 ? named : null,
         });
         // Adena answers only once its window is closed: the chain is watched
@@ -1751,7 +1757,7 @@ export default function Golf() {
             </div>
             {canSave && phoneOnly && (
               <p className="real__fine">
-                This round stays on this phone: saving takes Adena, a computer&apos;s wallet. <button className="linkish" onClick={() => setReal(true)}>Play it on your computer</button>
+                This round stays on this phone: saving takes a computer (Adena, or gnokey in a terminal). <button className="linkish" onClick={() => setReal(true)}>Play it on your computer</button>
               </p>
             )}
             {canSave && !phoneOnly && (
@@ -1762,8 +1768,8 @@ export default function Golf() {
                 {account && costNow && `${costNow}. You confirm in Adena.`}
               </p>
             )}
-            {/* a gnokey save said done: the chain asked for it, from the account connected (none: the round stays, checked once one is) */}
-            {!played && !closed && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} onSent={account ? () => void recordIt(false) : undefined} />}
+            {/* a gnokey save said done: the chain asked for it, for the account connected or the key's address (a phone: none, the handoff above) */}
+            {!played && !closed && !phoneOnly && <Gnokey s={s} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} me={account && account.address} onSent={gnokeySaved} />}
             {/* no account to know the player by: their name with gnokey too (its Claim ranks the rounds saved before it) */}
             {!account && !phoneOnly && s.official && game.current && (
               <details className="details gnokey">
@@ -1885,6 +1891,8 @@ export default function Golf() {
           price={gasPrice}
           onNamed={(n) => (setNamedAs(n), nudge.named())}
           waiting={pending ? `your ${strokesWord(pending.strokes)} on ${pending.name || "this hole"}` : s && s.holed && canSave ? "this round" : null}
+          // the round on offer, with gnokey too: said done, the sheet goes for its card to say how it went
+          gnokey={toSave && !played && <Gnokey s={toSave} chain={game.current && game.current.chain} price={gasPrice} chainId={chainId || chainName} me={account && account.address} onSent={(who) => (setReal(false), gnokeySaved(who))} />}
         />
       )}
 
@@ -2074,8 +2082,10 @@ function GetGnot({ address, href, label = "" }: { address: string; href: string;
  */
 // elsewhere: Adena's network is another node (its balance there is not this one's)
 // onDisconnect: this page forgets the account (Adena keeps it), any screen
-function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed, typed, nameOk, elsewhere = false, onDisconnect }: {
+// gnokey: the round on offer saved with gnokey instead (not on a phone: the hole goes to a computer)
+function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName, cost, funds, lack, named, waiting, chain, price, onNamed, typed, nameOk, elsewhere = false, onDisconnect, gnokey }: {
   elsewhere?: boolean;
+  gnokey?: ReactNode;
   onDisconnect?: () => void;
   account: Account | null; wallet: { busy: boolean; error: string | null; note?: string }; onConnect: () => void; onClose: () => void; onSave: (() => void) | null;
   rpc: string | null; chainName: string; cost: string | null; funds: number | null; lack: number | null; named: boolean | null; waiting: string | null;
@@ -2213,6 +2223,7 @@ function RealPlay({ account, wallet, onConnect, onClose, onSave, rpc, chainName,
             {wallet.busy ? "Waiting for Adena…" : "Connect Adena"}
           </Button>
         )}
+        {!phone && gnokey}
         <p className="real__fine">
           {account && <>Connected as <span className="mono">{shortAddr(account.address, 4, 3)}</span> · </>}Network: <span className="mono">{chainName}</span>
           {account && onDisconnect && <> · <button className="linkish" onClick={onDisconnect}>Disconnect</button></>}
