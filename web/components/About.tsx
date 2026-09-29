@@ -173,8 +173,9 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
 
       <ul className="about__facts" aria-label="In the game">
         {FACTS.map((f) => <li key={f}>{f}</li>)}
+        {/* the rules, where the facts end: a link, not a tag */}
+        <li className="about__more"><button className="linkish" onClick={onRules}>The rules of the game →</button></li>
       </ul>
-      <p className="about__rules"><button className="linkish" onClick={onRules}>The rules of the game →</button></p>
 
       <h3 className="about__h">Go further</h3>
       <ul className="about__links">
