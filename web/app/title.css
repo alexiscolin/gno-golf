@@ -576,7 +576,13 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 }
 
 @media (max-height: 640px) { .worlds--v2 .world__tag { display: none; } }
-@media (max-width: 900px) { .worlds--v2 .worlds__list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* two cards a row, each over two quarter tracks: an odd last card (the Crystal
+   Mines) sits centred at a card's width, whatever the gap */
+@media (max-width: 900px) {
+  .worlds--v2 .worlds__list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .worlds--v2 .worlds__list > li { grid-column: span 2; }
+  .worlds--v2 .worlds__list > li:last-child:nth-child(odd) { grid-column: 2 / span 2; }
+}
 @media (max-width: 600px) {
   .worlds--v2 .worlds__list { gap: 12px; }
   .worlds--v2 .world { padding: 6px 6px 10px; border-radius: var(--r-card); }

@@ -740,7 +740,7 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed,
               : why === null
                 ? <>✗ The chain did not answer. <button type="button" className="linkish" onClick={retry}>Try again</button></>
                 : why === undefined
-                  ? `Checking ${name}…`
+                  ? stem ? `Checking ${name}…` : "Type the name you want."
                   : `✓ ${name}`}
         {bad && typed ? " · Fix it, or clear it to save without a name." : ""} · <NameLink chain={chain}>names on gno.land ↗</NameLink>
       </small>

@@ -208,7 +208,8 @@ function Pick({ kind, label, tint, first, row, reading, failed, chain, me, gnome
   // yourself: not connected, or no ghost of yours yet (a round to save first)
   const none = kind === "self" && (!me || (!!show && show.bests.size === 0)), open = !!row && !none;
   const connect = kind === "self" && !me && onConnect; // (a tap connects: then it is yours)
-  const line = kind === "self" && !me ? (onConnect ? "Beat your own best" : "Connect Adena to race it") : none ? "Save a round first" : row ? [holesWord(row.holes || 0), !!row.holes && vsPar(standingVs(row)), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
+  // (each part whole: the narrow line breaks only at a " · ", never inside "18 ghosts")
+  const line = kind === "self" && !me ? (onConnect ? "Beat your own best" : "Connect Adena to race it") : none ? "Save a round first" : row ? [holesWord(row.holes || 0), !!row.holes && vsPar(standingVs(row)), show && ghostsWord(show.bests.size)].filter(Boolean).map((p) => String(p).replace(/ /g, "\u00a0")).join(" · ") : "";
   return (
     <button className={`mode rival__pick ${tint}`} disabled={!open && !connect} aria-label={connect ? `${label}: connect Adena to race your own ghost` : open ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : failed ? "the board could not be read" : line || "nobody yet"}`} {...on}
       onClick={() => (connect ? (sound("select"), connect()) : open && row && onPick(row.player, show ? show.bests : undefined, kind))}>
