@@ -7,7 +7,7 @@ import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
 import { levelFrom, levelPick, pickOne } from "@/lib/duel";
 import { SHARE_TAGS, siteURL } from "@/lib/site";
 import { sound } from "@/lib/feel";
-import { loadFriends, saveFriends, addFriend } from "@/lib/friends";
+import { loadFriends, saveFriends, addFriend, nameFriends } from "@/lib/friends";
 import { registerName, claimRounds, gnokeyName, gnokeyClaim, type SendError } from "@/lib/adena";
 import { GnokeyTx } from "@/components/Gnokey";
 import { failure, track, trackError } from "@/lib/analytics";
@@ -128,6 +128,17 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
   const [copied, copy] = useCopied();
   const who = [me, ...friends.map((f) => f.addr)].filter((x): x is string => !!x);
   const key = who.join(",");
+  // friends kept by their address alone (a friend link, a dare, an address typed): their names, read in one query
+  const bare = friends.filter((f) => !f.name).map((f) => f.addr), bareKey = bare.join(",");
+  useEffect(() => {
+    if (!chain || !bare.length) return;
+    let live = true;
+    primeNames(chain, bare.map((player) => ({ player })));
+    void Promise.all(bare.map((a) => nameOnce(chain, a))).then((ns) => live && setFriends(nameFriends(Object.fromEntries(bare.map((a, i) => [a, ns[i]])))));
+    return () => void (live = false);
+    // bare is keyed by its join
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain, bareKey]);
   useEffect(() => {
     if (!chain || !who.length) return;
     let live = true;

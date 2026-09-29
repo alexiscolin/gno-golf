@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { loadFriends, saveFriends, addFriend } from "../lib/friends.ts";
+import { loadFriends, saveFriends, addFriend, nameFriends } from "../lib/friends.ts";
 
 // valid addresses per lib/chain.ts: /^g1[0-9a-z]{38}$/
 const addr = (c: string) => "g1" + c.repeat(38);
@@ -108,4 +108,11 @@ test("saveFriends: a full list keeps the latest (one added now is kept)", () => 
   const kept = JSON.parse(localStorage.getItem("gnogolf.friends") || "[]") as { name: string }[];
   assert.equal(kept.length, 49);
   assert.equal(kept[48].name, "59");
+});
+
+test("nameFriends: a friend kept by address alone takes the name found; a named one, or one with none found, stays", () => {
+  const C = addr("c");
+  saveFriends([{ addr: A, name: "" }, { addr: B, name: "Bea" }, { addr: C, name: "" }]);
+  assert.deepEqual(nameFriends({ [A]: "nym-ana", [B]: "nym-other", [C]: "" }), [{ addr: A, name: "nym-ana" }, { addr: B, name: "Bea" }, { addr: C, name: "" }]);
+  assert.deepEqual(loadFriends()[0], { addr: A, name: "nym-ana" }); // kept
 });
