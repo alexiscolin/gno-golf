@@ -63,12 +63,20 @@ export const optedOut = () => {
     return off;
   }
 };
-/** The visitor objects: nothing more goes, from this page or a later one, and nothing loads again. */
+/** The visitor objects: nothing more goes, from this page or a later one, and nothing loads again;
+ *  what PostHog kept in this browser goes (its id, and its cookies: an earlier page's too). */
 export function optOut() {
   off = true;
   try { localStorage.setItem(OFF, "1"); } catch {}
   queue.length = 0;
-  if (ph) ph.opt_out_capturing();
+  if (ph) (ph.opt_out_capturing(), ph.reset(true));
+  // (this host's only, no domain: cross_subdomain_cookie is off; its opt-out one too, OFF says it)
+  try {
+    for (const c of document.cookie.split(";")) {
+      const name = c.split("=")[0].trim();
+      if (/^(ph_|__ph_opt_in_out_)/.test(name)) document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
+    }
+  } catch {}
 }
 
 // (a page where it never loads, blocked: the first 200 wait, the rest go)
@@ -144,6 +152,7 @@ export const OPTIONS = {
   person_profiles: "identified_only", // and nobody is identified: anonymous events only
   // first-party, this host only, 13 months at most
   persistence: "cookie",
+  opt_out_persistence_by_default: true, // an objection takes the cookie away, and none is written again
   cross_subdomain_cookie: false,
   cookie_expiration: MAX_DAYS,
   capture_pageview: "history_change", // the address bar follows the screens
