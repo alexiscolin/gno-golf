@@ -1638,7 +1638,7 @@ function wearLayer(wear: Wear, W: number, H: number, height: Height, tint: THREE
   };
   const mesh = new THREE.Mesh(
     new THREE.BufferGeometry(),
-    flat(tint, { map: texture, transparent: true, opacity: 0.55, depthWrite: false })
+    flat(tint, { map: texture, transparent: true, opacity: 0.3, depthWrite: false })
   );
   ud(mesh).live = true; // repainted and shown/hidden: never baked
 
