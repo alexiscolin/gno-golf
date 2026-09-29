@@ -623,11 +623,13 @@ and in the same block the lower address does.
 A standing keeps its holes, its strokes and its `par` (those holes' pars,
 added up): `strokes - par` is its score against par ("E" in the game,
 "even" on gnoweb, at 0). Its ranking
-key is `9999 - holes` in four digits, the score plus 1,000,000 in seven
-(a hole's score is -18 to +59: 1 to 60 strokes, par 1 to 19; the course holds
-at most 9,999 slots, so the sum never leaves them), the height and the
-address. A hole's own board still ranks by strokes: its par is the same for
-everyone on it. `ranking_test.gno` holds every read of the standings to a
+key is `99999 - holes` in five digits, the score plus 1,000,000 in seven
+(a hole's score is -18 to +59: 1 to 60 strokes, par 1 to 19; the seven
+digits hold 55,555 holes), the height and the address. The course holds at
+most 9,999 slots, but the holes get a digit more: while a republished hole
+drains, a standing can count its old version's best and its new one's both,
+so for a moment more holes than the course has slots. A hole's own board
+still ranks by strokes: its par is the same for everyone on it. `ranking_test.gno` holds every read of the standings to a
 reference model of this rule over random runs (finishes better, worse and
 level in both modes at 1 to 60 strokes on par 1 to 19, late names and
 `Claim`, community finishes, holes archived at another par), and the key to

@@ -411,7 +411,8 @@ func TestTheRankingIsTheModel(cur realm, t *testing.T) {
 
 // The ranking's key sorts as the rule at its extremes: every hole of a full
 // course (maxCourse) at 60 strokes on par 1 (the most over par a standing
-// can be), or holed in one on par 19 (the most under), and rows drawn at
+// can be), or holed in one on par 19 (the most under), a standing past the
+// slots while republished holes drain (maxCourse+1, +2), and rows drawn at
 // random in between; its numbers keep their widths.
 func TestTheRankingKeySortsAsTheRule(t *testing.T) {
 	rows := []*row{
@@ -425,12 +426,15 @@ func TestTheRankingKeySortsAsTheRule(t *testing.T) {
 		{player: "g1f", holes: 1, strokes: 2, par: 2, height: 4},
 		{player: "g1g", holes: 1, strokes: 5, par: 5, height: 4}, // level with g1f: the address
 		{player: "g1h", holes: 0, strokes: 0, par: 0, height: 9},
+		{player: "g1k", holes: maxCourse + 1, strokes: 60 * (maxCourse + 1), par: maxCourse + 1, height: 9},
+		{player: "g1l", holes: maxCourse + 2, strokes: 60 * (maxCourse + 2), par: maxCourse + 2, height: 9},
+		{player: "g1m", holes: maxCourse + 2, strokes: maxCourse + 2, par: 19 * (maxCourse + 2), height: 9},
 	}
 	g := &rng{42}
 	for i := 0; i < 300; i++ {
-		h := g.n(maxCourse + 1)
+		h := g.n(maxCourse + 3)
 		if i%2 == 0 { // as many holes as others: the score decides
-			h = []int{1, 2, 74, 92, maxCourse}[g.n(5)]
+			h = []int{1, 2, 74, 92, maxCourse, maxCourse + 1, maxCourse + 2}[g.n(7)]
 		}
 		par := h + g.n(18*h+1) // 1 to 19 a hole
 		rows = append(rows, &row{player: "g1r" + strconv.Itoa(i), holes: h, strokes: h + g.n(59*h+1), par: par, height: int64(g.n(1000))})
@@ -460,7 +464,8 @@ func TestTheRankingKeySortsAsTheRule(t *testing.T) {
 }
 
 // The course holds at most maxCourse slots: the ranking's key has room for
-// no more.
+// them and for the archived versions a standing still counts while they
+// drain.
 func TestTheCourseIsBounded(cur realm, t *testing.T) {
 	var fill []string
 	for i := slots.Size(); i < maxCourse; i++ {

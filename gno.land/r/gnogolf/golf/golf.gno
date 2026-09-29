@@ -415,15 +415,18 @@ func pad(n, width int) string {
 // rankKey orders the course ranking: most holes first, then the best score
 // against par (a hole at par counts the same whatever its par), then the
 // first there, then the address. The score is signed: vsParBias puts it in
-// seven digits, as holes (at most maxCourse) fit four.
+// seven digits. The holes take five: a standing can count more than the
+// course's slots while a republished hole drains (its old best still counts,
+// its new one adds a hole), so they get room well past maxCourse.
 func rankKey(r *row) string {
-	return pad(9999-r.holes, 4) + "/" + pad(vsParBias+r.strokes-r.par, 7) + "/" + pad(int(r.height), 12) + "/" + r.player
+	return pad(99999-r.holes, 5) + "/" + pad(vsParBias+r.strokes-r.par, 7) + "/" + pad(int(r.height), 12) + "/" + r.player
 }
 
-// maxCourse bounds the course's slots (Publish), and so a standing's holes;
+// maxCourse bounds the course's slots (Publish); a standing's holes are at
+// most those plus the archived versions drain has not taken it out of yet.
 // vsParBias is more than a standing can be under or over par: a hole is -18
-// to +59 (1 to 60 strokes, par 1 to 19), so a standing at most 9999 * 59 =
-// 589,941 over, 179,982 under.
+// to +59 (1 to 60 strokes, par 1 to 19), so a full course at most 9999 * 59 =
+// 589,941 over, 179,982 under, and the seven digits hold 55,555 holes.
 const (
 	maxCourse = 9999
 	vsParBias = 1000000
