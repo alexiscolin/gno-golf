@@ -249,10 +249,12 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
           const vs = t.strokes - t.par, won = n > 0 && t.done >= n;
           const score = `${t.strokes} · ${vsPar(vs)}`;
           const open = n > 0;
+          // the cup last played: one the player has a score in (a new player's default cup is none)
+          const last = w.id === current && t.done > 0;
           return (
             <li key={w.id}>
               <button
-                className={`world world--${w.id} tint--${w.id}` + (w.id === current ? " world--on" : "")}
+                className={`world world--${w.id} tint--${w.id}` + (last ? " world--on" : "")}
                 disabled={!open}
                 onClick={() => (sound("select"), onPick(w.id))}
                 // a mouse's hover (a tap goes straight in) or the keyboard's focus
@@ -263,7 +265,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                 aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
               >
                 <Diorama id={w.id} on={hot === w.id && open} />
-                {w.id === current && <span className="tag world__last" aria-hidden="true">Last played</span>}
+                {last && <span className="tag world__last" aria-hidden="true">Last played</span>}
                 {won && <Won clean={t.clean} score={score} />}
                 <span className="world__ribbon">{w.name}</span>
                 <span className="world__info">
