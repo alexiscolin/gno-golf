@@ -75,6 +75,11 @@ await step("Leaderboard, CourseLeaderboard (paged), Rank", async () => {
   const top = await chain.leaderboard("pro");
   const page = await chain.courseLeaderboard(0, 5, "pro");
   assert.ok(page.rows.length <= 5);
+  // in the ranking's order: most holes, then the best score against par
+  for (const [i, r] of page.rows.entries()) {
+    const up = page.rows[i - 1];
+    if (up) assert.ok(up.holes > r.holes || (up.holes === r.holes && up.strokes - up.par <= r.strokes - r.par), `row ${i + 1} ranks before row ${i}`);
+  }
   if (page.players > 5) assert.equal((await chain.courseLeaderboard(page.next, 5, "pro")).offset, page.next);
   player = (top.rows[0] || page.rows[0] || { player: "" }).player;
   if (player) assert.ok((await chain.rank("pro", player)).rank >= 1, "the top player ranks");
@@ -143,10 +148,20 @@ try {
     assert.ok(await until<boolean>(`!!document.querySelector('.mode--solo')`, 50), "no modes screen");
     await b.ev(`document.querySelector('.mode--solo').click()`);
     assert.ok(await until<boolean>(`!!document.querySelector('.podium__open')`, 50), "no top players on the cups screen");
+    // a course standing reads as its holes and its score against par
+    const vs = /(E|[+−]\d+)$/;
+    if (await until<boolean>(`!!document.querySelector('.podium .sticker__sub')`, 20)) {
+      const sub = await b.ev<string>(`document.querySelector('.podium .sticker__sub').textContent`);
+      assert.ok(/holes · /.test(sub) && vs.test(sub), `a podium sticker says ${sub}`);
+    }
     await b.ev(`document.querySelector('.podium__open').click()`);
     const rows = await until<number>(`document.querySelectorAll('.lb--full ol:not(.lb__ghosts) > li:not(.lb__more)').length`, 40);
     assert.ok(rows > 0, "no board rows");
-    return `${rows} rows`;
+    const caption = await b.ev<string>(`document.querySelector('.lb--full h3 small').textContent`);
+    assert.ok(caption.includes("most holes, then best score against par"), `the course board's caption: ${caption}`);
+    const score = await b.ev<string>(`document.querySelector('.lb--full ol > li strong').textContent`);
+    assert.ok(vs.test(score), `a course row's score: ${score}`);
+    return `${rows} rows, the first at ${score}`;
   });
   await step("a player the bot check flags is hidden from the boards", async () => {
     assert.ok(player, "no ranked player to flag");

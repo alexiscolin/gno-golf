@@ -122,6 +122,13 @@ const counted = (word: string) => (n: number) => `${n} ${plural(word, n)}`;
 export const strokesWord = counted("stroke"), holesWord = counted("hole"), ghostsWord = counted("ghost");
 /** A score against par in words: "level par", else vsPar's +3, −2. */
 export const vsParWords = (n: number) => (n === 0 ? "level par" : vsPar(n));
+/** A row's score against par: a course standing's strokes less its holes' pars; a hole's row (no par) its strokes. */
+export const standingVs = (r: { strokes: number; par?: number }) => r.strokes - (r.par || 0);
+/** The course ranking's rule, as its boards caption it. */
+export const RANKED_BY = "most holes, then best score against par";
+/** The course ranking's order (golf.gno rankKey): most holes, then the best score against par; a hole's rows, fewest strokes. */
+export const byStanding = (a: { holes?: number; strokes: number; par?: number }, z: { holes?: number; strokes: number; par?: number }) =>
+  (z.holes || 0) - (a.holes || 0) || standingVs(a) - standingVs(z);
 /** The aim modes as the game names them; AIMS: Pro first, as the switches show them. */
 export const AIM_NAMES: Readonly<Record<Mode, string>> = { pro: "Pro", assisted: "Assisted" };
 export const AIMS = Object.entries(AIM_NAMES) as [Mode, string][];

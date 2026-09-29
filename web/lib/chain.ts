@@ -108,7 +108,7 @@ const simFrom = (v: unknown): v is SimulateFrom => isObj(v) && isFlight(v) && ty
 // a board: its rows (each checked by row), its mode and the numbers it says
 const board = (v: unknown, row: (r: unknown) => boolean, ...keys: string[]): v is Obj => isObj(v) && isMode(v.mode) && Array.isArray(v.rows) && v.rows.every(row) && nums(v, ...keys);
 const strokesRow = (r: unknown) => isObj(r) && typeof r.player === "string" && (r.name === undefined || typeof r.name === "string") && nums(r, "strokes");
-const standingRow = (r: unknown) => strokesRow(r) && nums(r as Obj, "holes");
+const standingRow = (r: unknown) => strokesRow(r) && nums(r as Obj, "holes", "par");
 const checks = {
   holes: (v: unknown): v is HoleRow[] => Array.isArray(v) && v.every(holeRow),
   // Holes(): { version, play, successor, holes }
@@ -128,7 +128,7 @@ const checks = {
   players: (v: unknown): v is { rows: StandingRow[]; next: string } => isObj(v) && Array.isArray(v.rows) && v.rows.every(standingRow) && typeof v.next === "string",
   courseLeaderboard: (v: unknown): v is CourseLeaderboard => board(v, standingRow, "holes", "players", "offset", "next"),
   holeRank: (v: unknown): v is HoleRank => isObj(v) && isMode(v.mode) && typeof v.hole === "string" && typeof v.player === "string" && nums(v, "rank", "of", "strokes"),
-  rank: (v: unknown): v is Rank => isObj(v) && isMode(v.mode) && typeof v.player === "string" && nums(v, "rank", "of", "holes", "strokes"),
+  rank: (v: unknown): v is Rank => isObj(v) && isMode(v.mode) && typeof v.player === "string" && nums(v, "rank", "of", "holes", "strokes", "par"),
   // a best of 1 to 60 strokes, one shot a stroke
   ghost: (v: unknown): v is Ghost | null =>
     v === null || (isObj(v) && isMode(v.mode) && strs(v, "hole", "player", "shots") && nums(v, "period") && Number.isInteger(v.strokes) &&
@@ -425,10 +425,10 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** The best rounds of these players (at most 50) on a hole: { hole, mode, par, rows: [{ player, strokes }] }. */
     bests: (hole: string, mode: string, players: readonly string[]) =>
       qeval(`Bests(${s(hole)}, ${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.bests),
-    /** These players across the course: { mode, holes, rows: [{ player, holes, strokes }] }. */
+    /** These players across the course: { mode, holes, rows: [{ player, holes, strokes, par }] }. */
     standings: (mode: string, players: readonly string[]) =>
       qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.standings),
-    /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes }. */
+    /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes, par }. */
     rank: (mode: string, player: string) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`, checks.rank),
     /** Of these holes (the first 100: one read's room, the course is 74), a player's bests on those they have one on, in either mode: their ghosts. One read. */
     bestsOf: async (holes: readonly string[], player: string): Promise<ReadonlyMap<string, { pro: number; assisted: number }>> => {
@@ -457,7 +457,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** A page of every player's best on a hole, named or not, by address: { rows: [{ player, strokes }], next ("" at the end) }. */
     records: (hole: string, mode: string, after = "", limit = 100) =>
       qeval(`Records(${s(hole)}, ${s(m(mode))}, ${s(after)}, ${limit | 0})`, checks.records),
-    /** A page of every course standing, named or not, by address: { rows: [{ player, holes, strokes }], next ("" at the end) }. */
+    /** A page of every course standing, named or not, by address: { rows: [{ player, holes, strokes, par, height }], next ("" at the end) }. */
     players: (mode: string, after = "", limit = 100) => qeval(`Players(${s(m(mode))}, ${s(after)}, ${limit | 0})`, checks.players),
     nameReg,
     /** Why a name cannot be taken here ("" if it can): the registrar's own format rules, then whether it is taken. */
@@ -480,7 +480,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       const names = out.split(",");
       return ok.map((a, i) => ({ player: a, name: names[i] || "" }));
     },
-    /** A page of the course ranking: { mode, holes, players, offset, rows: [{ player, holes, strokes }], next (0 at the end) }. */
+    /** A page of the course ranking (most holes, then the best score against par): { mode, holes, players, offset, rows: [{ player, holes, strokes, par }], next (0 at the end) }. */
     courseLeaderboard: (offset = 0, limit = 10, mode = "assisted") =>
       qeval(`CourseLeaderboard(${s(m(mode))}, ${offset | 0}, ${limit | 0})`, checks.courseLeaderboard),
     /** A player's place on a hole's board: { rank (0: not on it), of, strokes }. */

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink } from "../components/common.ts";
+import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink, byStanding, standingVs } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -149,4 +149,14 @@ test("what the next stroke is for, called out before it: an ace, eagle, birdie, 
   assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map((n) => strokeFor(n, 4)), ["For an ace!", "For eagle!", "For birdie!", "For par!", "For bogey", "1 over par", "2 over par"]);
   assert.equal(strokeFor(1, 2), "For an ace!");
   assert.equal(strokeFor(2, 2), "For par!");
+});
+
+test("byStanding orders the course as the realm does: most holes, then the best score against par", () => {
+  const par5 = { player: "a", holes: 1, strokes: 5, par: 5 }, par2 = { player: "b", holes: 1, strokes: 2, par: 2 };
+  assert.equal(standingVs(par5), 0);
+  assert.equal(byStanding(par5, par2), 0, "a hole at par counts the same whatever its par");
+  const two = { player: "c", holes: 2, strokes: 14, par: 6 }, under = { player: "d", holes: 1, strokes: 1, par: 3 };
+  assert.deepEqual([under, par5, two].sort(byStanding).map((r) => r.player), ["c", "d", "a"], "more holes first, then under par first");
+  // a hole's rows (no holes, no par): fewest strokes
+  assert.deepEqual([{ player: "x", strokes: 4 }, { player: "y", strokes: 2 }].sort(byStanding).map((r) => r.player), ["y", "x"]);
 });

@@ -13,9 +13,9 @@ import type { Snapshot } from "@/lib/engine";
 import { FrontScreen } from "@/components/About";
 import { Button, InfoTip } from "@/components/ui";
 import { FullBoard, Sticker, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
-import { ghostsWord, golfTerm, holeNumber, holesWord, plural, strokesWord } from "@/components/common";
+import { ghostsWord, golfTerm, holeNumber, holesWord, plural, standingVs } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
-import { cupOf, parOf, scoreOf, type Card } from "@/lib/card";
+import { cupOf, parOf, scoreOf, vsPar, type Card } from "@/lib/card";
 import { bestOf, inTurn, mapFit, mapView, mapZone, pathD, railRuns, showcases, shotsOf, vsBest, type MapKind } from "@/lib/duel";
 import { BALL_R, CUP_R } from "@/lib/terrain";
 import type { RivalKind } from "@/lib/analytics";
@@ -115,7 +115,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
           </span>
         </div>
         <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} max={8}
-          row={(r) => <Sticker player={r.player} at={r.at} sub={`${strokesWord(r.strokes)} · ${holesWord(r.holes || 0)}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
+          row={(r) => <Sticker player={r.player} at={r.at} sub={`${holesWord(r.holes || 0)} · ${vsPar(standingVs(r))}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
       </section>
     </FrontScreen>
   );
@@ -208,7 +208,7 @@ function Pick({ kind, label, tint, first, row, reading, failed, chain, me, gnome
   // yourself: not connected, or no ghost of yours yet (a round to save first)
   const none = kind === "self" && (!me || (!!show && show.bests.size === 0)), open = !!row && !none;
   const connect = kind === "self" && !me && onConnect; // (a tap connects: then it is yours)
-  const line = kind === "self" && !me ? (onConnect ? "Beat your own best" : "Connect Adena to race it") : none ? "Save a round first" : row ? [holesWord(row.holes || 0), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
+  const line = kind === "self" && !me ? (onConnect ? "Beat your own best" : "Connect Adena to race it") : none ? "Save a round first" : row ? [holesWord(row.holes || 0), !!row.holes && vsPar(standingVs(row)), show && ghostsWord(show.bests.size)].filter(Boolean).join(" · ") : "";
   return (
     <button className={`mode rival__pick ${tint}`} disabled={!open && !connect} aria-label={connect ? `${label}: connect Adena to race your own ghost` : open ? `${label}: ${who.label}, ${line}${best ? `, ${best}` : ""}. ${kind === "self" ? "Race your best" : "Race their ghost"}` : `${label}: ${reading ? "reading the board" : failed ? "the board could not be read" : line || "nobody yet"}`} {...on}
       onClick={() => (connect ? (sound("select"), connect()) : open && row && onPick(row.player, show ? show.bests : undefined, kind))}>

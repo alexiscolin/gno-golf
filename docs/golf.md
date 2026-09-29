@@ -137,7 +137,8 @@ and returns the new version's id (`"garden/7/v2"`).
   it decodes to. So the same hole can't come back under another sha.
 - The slot must be the data's own world and order (`"garden/7"` for world
   `garden`, order 7), so a mis-edited file can't replace the wrong hole. The
-  order must be a whole number from 1 to 999.
+  order must be a whole number from 1 to 999, and the course holds at most
+  9,999 slots (what the ranking's key has room for).
 - Data identical to the current version's is refused: it would reset the
   hole's ranking for nothing.
 - The name, par, world and order are frozen with the version. `note` is
@@ -330,7 +331,8 @@ player who finished the hole: the `Publish` that replaces it takes the first
 150, every finish on a course hole takes 4 more (a community hole's finish
 takes none), and anyone can take up to 400 with `Drain`. Until the last one is
 out, a player not yet reached still counts the old version, and a better
-finish there still moves their standing. A first finish on a version after it
+finish there still moves their standing. Taking a player out takes their best
+there and the version's own par off their standing. A first finish on a version after it
 was archived never counts. A standing the drain empties is kept at 0 holes,
 out of the ranking; the owner's playbook is to `Drain(400)` after a
 republish until it returns 0.
@@ -602,16 +604,41 @@ A tie goes to whoever got there first (in the same block, to the address): a bes
 are public (`Ghost`), and whoever replays them ties it and ranks after it.
 
 The course ranking adds up each player's best on each **current course hole**:
-most holes first, then fewest strokes, then the first there (the finish that
-last improved the standing). It's kept in order as rounds finish, so
-reading it doesn't get slower as more people play.
+most holes first, then the best **score against par** (each hole's strokes
+less its par, added up), then the first there, then the address. One board
+with the difficulty built in: a hole at par counts
+the same on a par 2 as on a par 5, and a Crystal Mines hole counts like any
+other, weighted by its par. It's kept in order as rounds finish, so reading it
+doesn't get slower as more people play.
+
+**The first there**, exactly: level on holes and score, the player whose
+standing last moved earlier ranks first. A standing moves at a finish that
+adds a hole or lowers its score (its height, the block, is kept: `Players`'
+`height`); a worse or equal round does not move it, and neither does an
+archived hole taken out of it (the drain), which is no finish of theirs. So
+of two players level at -3 over 12 holes, the one who reached their -3 (or
+their twelfth hole) in an earlier block ranks first, whatever their strokes,
+and in the same block the lower address does.
+
+A standing keeps its holes, its strokes and its `par` (those holes' pars,
+added up): `strokes - par` is its score against par ("E" in the game,
+"even" on gnoweb, at 0). Its ranking
+key is `9999 - holes` in four digits, the score plus 1,000,000 in seven
+(a hole's score is -18 to +59: 1 to 60 strokes, par 1 to 19; the course holds
+at most 9,999 slots, so the sum never leaves them), the height and the
+address. A hole's own board still ranks by strokes: its par is the same for
+everyone on it. `ranking_test.gno` holds every read of the standings to a
+reference model of this rule over random runs (finishes better, worse and
+level in both modes at 1 to 60 strokes on par 1 to 19, late names and
+`Claim`, community finishes, holes archived at another par), and the key to
+the rule at its extremes.
 
 #### `Leaderboard(mode string) string`
 
 A mode's course-wide top ten.
 
 ```json
-{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61}, …]}
+{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …]}
 ```
 
 `holes` at the top is the number of slots in the course. Each row has its
@@ -622,12 +649,12 @@ player's name; a name deleted since is skipped.
 A player's place in a mode's course ranking.
 
 ```json
-{"version":1,"mode":"pro","player":"g1…","rank":7,"of":213,"holes":18,"strokes":64}
+{"version":1,"mode":"pro","player":"g1…","rank":7,"of":213,"holes":18,"strokes":64,"par":57}
 ```
 
 `rank` 1 is the top, out of `of` ranked players. It's 0 for a player the
-ranking doesn't hold (unnamed, or no current course hole finished); `holes`
-and `strokes` are still their standing. A ranked name deleted since keeps its
+ranking doesn't hold (unnamed, or no current course hole finished); `holes`,
+`strokes` and `par` are still their standing. A ranked name deleted since keeps its
 place until its next change, so a rank can be that many too low.
 
 #### `CourseLeaderboard(mode string, offset, limit int) string`
@@ -637,7 +664,7 @@ hole: from rank `offset+1`, at most `limit` rows (1..100).
 
 ```json
 {"version":1,"mode":"pro","holes":74,"players":213,"offset":0,
- "rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61}, …],"next":20}
+ "rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …],"next":20}
 ```
 
 `players` is how many the ranking holds, `next` the offset of the next page (0
@@ -685,13 +712,14 @@ Each given player's course-wide standing, with the same list rules as
 `Bests`.
 
 ```json
-{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","holes":12,"strokes":40}, …]}
+{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","holes":12,"strokes":40,"par":38}, …]}
 ```
 
-#### `BestOf(hole, mode string, player address) int` and `StandingOf(mode string, player address) (int, int)`
+#### `BestOf(hole, mode string, player address) int` and `StandingOf(mode string, player address) (holes, strokes, par int)`
 
 The same as plain values: a player's best on a hole (0 if none), and their
-holes and strokes over the current course (0, 0 if none).
+holes, strokes and those holes' pars over the current course (0, 0, 0 if
+none).
 
 #### `Ghost(hole, mode string, player address) string`
 
@@ -724,11 +752,12 @@ page (`""` once there is none).
 
 #### `Players(mode, after string, limit int) string`
 
-A page of every course standing in a mode, named or not, with the `height`
-of the finish that last improved it (the ranking's tie-break).
+A page of every course standing in a mode, named or not: its holes, strokes
+and par (all its ranking key reads) and the `height` of the finish that last
+improved it (the tie-break).
 
 ```json
-{"version":1,"mode":"assisted","rows":[{"player":"g1…","holes":12,"strokes":40,"height":81234}, …],"next":""}
+{"version":1,"mode":"assisted","rows":[{"player":"g1…","holes":12,"strokes":40,"par":38,"height":81234}, …],"next":""}
 ```
 
 ### The owner

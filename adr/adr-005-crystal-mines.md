@@ -9,6 +9,11 @@ published with `Publish`, and needs no redeploy. The backlog chose it
 for holes that are hard for several reasons at once, visually worth a trailer,
 unique against the other four cups, and on a real curve up to a boss hole.
 
+Amended 2026-09-29, before the deploy froze golf: golf's `worlds` names the
+mines ("Crystal Mines", fifth, after the mountain), and the course ranking
+counts holes, then the score against par (see Consequences), so the mines
+count in the general ranking weighted by their par.
+
 ## Summary
 
 - **A fifth world, `mines`: 18 holes, par 86.** The four cups are par 52 to
@@ -91,9 +96,10 @@ publishes into a slot (`mines/7`). The slot's world is the hole's world, and a
 new world needs nothing on chain:
 
 - `isWorld` accepts 1 to 16 letters `a-z`.
-- `worldRank` puts an unknown world after the mountain.
-- The hub gives it a card, titled `cupName("mines")`, which is `"Mines"`.
-- The course ranking counts it: it adds up every current course hole.
+- `worldRank` puts it fifth, after the mountain: golf's `worlds` names it.
+- The hub gives it a card, titled `cupName("mines")`, which is `"Crystal Mines"`.
+- The course ranking counts it: it adds up every current course hole, each
+  against its par.
 
 **What is frozen with the deployed packages:**
 
@@ -112,9 +118,8 @@ new world needs nothing on chain:
   goes, and pushes a ball out of it without giving it any speed. A zone moves
   the ball only as a tunnel (keeping its velocity), as a hill, as air, or
   back to where the stroke was played from (a hazard).
-- **Golf's page table.** `worlds` in `golf/data.gno` names four cups. The
-  mines' card on gnoweb reads "Mines", not "Crystal Mines". That is
-  acceptable, and the client names it in full.
+- **Golf's page table.** `worlds` in `golf/data.gno` names five cups, the
+  mines last, as "Crystal Mines" (added before the deploy).
 
 **What golf checks when a hole is published.** From `golf.gno`, and restated
 here because they shape every hole:
@@ -180,7 +185,7 @@ night.
 ### 1. A fifth world, published as data
 
 - **World `mines`, slots `mines/1` to `mines/18`.** The client calls it "The
-  Crystal Mines" and gnoweb calls it "Mines".
+  Crystal Mines" and gnoweb "Crystal Mines".
 - **Every hole is written like the others.** It is a hole realm under
   `gno.land/r/gnogolf/mines<N>`, which is source only and never deployed:
   - `author.Fit` with a margin of 1.5
@@ -1215,8 +1220,16 @@ Estimates are for one developer with Claude, on the pace of the four cups.
     open question below).
 - **The mines' par (86) is a third more than a classic cup's.** Its average
   per hole is 4.8, against 2.9 to 3.1.
-- **The hub card on gnoweb says "Mines"**, and the hub lists the mines after
-  the mountain (and after `extras`, which sorts before `mines`).
+  - **The general ranking weighs them by their par.** After its holes, a
+    standing ranks by its score against par: each best's strokes less its
+    hole's par, added up. A mines hole at par counts 0, as a garden hole at
+    par does, so the mines' pars don't sink a total of strokes, and a stroke
+    over par costs the same anywhere. (Decided 2026-09-29, with the owner,
+    before golf was frozen: ranked by strokes, 18 holes at par 86 would have
+    weighed a third more than any other cup.)
+- **The hub card on gnoweb says "Crystal Mines"**, and the hub lists the mines
+  after the mountain (golf's `worlds` puts them fifth, before any world it
+  does not name, `extras` included).
 - **The weather is gentler than the mountain's**, since a mines hole never gets
   snow or a storm. The difficulty the owner asked for comes from the holes'
   own vents, clocks and void, not from the sky. It is always visible, and so

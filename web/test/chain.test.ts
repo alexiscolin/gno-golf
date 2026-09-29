@@ -72,14 +72,14 @@ const SIM_FROM_REPLY = { version: 1, path: [[0, 0], [1, 1]], rest: [1, 1], air: 
 const SIM_ROUND_REPLY = { version: 1, strokes: 3, period: 7, path: [[0, 0], [2, 2]], rest: [2, 2], air: "n", cause: "x", holed: false, bounces: 0 };
 const WEATHER_REPLY = { version: 1, zones: [] };
 const EXTRAS_REPLY = { version: 1, walls: [], posts: [], zones: [] };
-const BOARD_REPLY = { mode: "assisted", holes: 4, rows: [{ player: ADDR1, strokes: 12, holes: 4 }] };
+const BOARD_REPLY = { mode: "assisted", holes: 4, rows: [{ player: ADDR1, strokes: 12, holes: 4, par: 11 }] };
 const BESTS_REPLY = { hole: "garden/1", mode: "assisted", par: 3, rows: [{ player: ADDR1, strokes: 3 }] };
 const HOLE_BOARD_REPLY = { hole: "garden/1", mode: "assisted", par: 3, players: 9, finished: 8, offset: 0, next: 0, rows: [{ player: ADDR1, strokes: 3 }] };
 const RECORDS_REPLY = { rows: [{ player: ADDR1, strokes: 3 }], next: "" };
-const PLAYERS_REPLY = { rows: [{ player: ADDR1, strokes: 3, holes: 1 }], next: "" };
-const COURSE_BOARD_REPLY = { mode: "assisted", holes: 4, players: 20, offset: 0, next: 0, rows: [{ player: ADDR1, strokes: 12, holes: 4 }] };
+const PLAYERS_REPLY = { rows: [{ player: ADDR1, strokes: 3, holes: 1, par: 3, height: 7 }], next: "" };
+const COURSE_BOARD_REPLY = { mode: "assisted", holes: 4, players: 20, offset: 0, next: 0, rows: [{ player: ADDR1, strokes: 12, holes: 4, par: 11 }] };
 const HOLE_RANK_REPLY = { mode: "assisted", hole: "garden/1", player: ADDR1, rank: 1, of: 9, strokes: 3 };
-const RANK_REPLY = { mode: "assisted", player: ADDR1, rank: 2, of: 20, holes: 4, strokes: 12 };
+const RANK_REPLY = { mode: "assisted", player: ADDR1, rank: 2, of: 20, holes: 4, strokes: 12, par: 11 };
 const ROUND_REPLY = {
   version: 1, player: ADDR1, shots: "0.0000,1.0000", air: "n", cause: "x", mode: "assisted", strokes: 2, period: 7,
   path: [[0, 0]], rest: [0, 0], ball: [0, 0],
@@ -521,8 +521,16 @@ test("a board's rows carry the realm's names, and a name that is not a string is
   const chain = makeChain();
   setFetch(() => qevalReply({ ...HOLE_BOARD_REPLY, rows: [{ player: ADDR1, name: "ana", strokes: 3 }] }));
   assert.equal((await chain.holeLeaderboard("garden/1")).rows[0].name, "ana");
-  setFetch(() => qevalReply({ ...COURSE_BOARD_REPLY, rows: [{ player: ADDR1, name: 7, strokes: 12, holes: 4 }] }));
+  setFetch(() => qevalReply({ ...COURSE_BOARD_REPLY, rows: [{ player: ADDR1, name: 7, strokes: 12, holes: 4, par: 11 }] }));
   await assert.rejects(chain.courseLeaderboard(), (e) => errorKind(e) === "chain");
+});
+
+test("a course standing says its par (its score against par ranks it): one without is refused", async () => {
+  const chain = makeChain();
+  setFetch(() => qevalReply({ ...COURSE_BOARD_REPLY, rows: [{ player: ADDR1, strokes: 12, holes: 4 }] }));
+  await assert.rejects(chain.courseLeaderboard(), (e) => errorKind(e) === "chain");
+  setFetch(() => qevalReply({ mode: "assisted", player: ADDR1, rank: 2, of: 20, holes: 4, strokes: 12 }));
+  await assert.rejects(chain.rank("assisted", ADDR1), (e) => errorKind(e) === "chain");
 });
 
 test("records pages one hole's best-by-player list", async () => {

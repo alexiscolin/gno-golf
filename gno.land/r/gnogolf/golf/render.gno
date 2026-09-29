@@ -159,20 +159,20 @@ func renderHub() string {
 		sb.WriteString("</gno-columns>\n\n")
 	}
 
-	sb.WriteString("## Leaderboard\n\nEach named player's best finish on each current hole of the course, added up: most holes first, then fewest strokes. " +
+	sb.WriteString("## Leaderboard\n\nEach named player's best finish on each current hole of the course, added up: most holes first, then the best score against par (each hole's strokes less its par, added up: a hole at par counts the same whatever its par). " +
 		"Assisted rounds (played with the 3D game's aim line) and pro rounds (without it, on the player's word; every round played on this page is pro) are ranked apart.\n\n")
 	for m := 0; m < modes; m++ {
 		sb.WriteString("### " + modeTitles[m] + "\n\n")
 		rows, i := "", 0
 		eachRanked(m, func(r *row, name string) {
 			i++
-			rows += "| " + strconv.Itoa(i) + " | " + md("@"+name, "/u/"+name) + " | " + strconv.Itoa(r.holes) + " | " + strconv.Itoa(r.strokes) + " |\n"
+			rows += "| " + strconv.Itoa(i) + " | " + md("@"+name, "/u/"+name) + " | " + strconv.Itoa(r.holes) + " | " + vsPar(r.strokes-r.par) + " |\n"
 		})
 		if rows == "" {
 			sb.WriteString("_Nobody has finished a hole of the course yet._\n\n")
 			continue
 		}
-		sb.WriteString("| rank | player | holes | strokes |\n|---|---|---|---|\n" + rows + "\n")
+		sb.WriteString("| rank | player | holes | vs par |\n|---|---|---|---|\n" + rows + "\n")
 	}
 
 	sb.WriteString("## Community holes\n\nAnyone can publish a hole of their own with PublishMine while the owner keeps publishing open. These are not part of the course: they have no cup and do not count in its ranking.\n\n")
@@ -334,6 +334,17 @@ func source(e *entry) string { return md("data", hub+":"+e.id+"/data") }
 
 func md(label, href string) string { return "[" + label + "](" + href + ")" }
 
+// vsPar is a score against par: "even", "+3", "-2" (ufmt has no %+d).
+func vsPar(d int) string {
+	switch {
+	case d > 0:
+		return "+" + strconv.Itoa(d)
+	case d < 0:
+		return strconv.Itoa(d)
+	}
+	return "even"
+}
+
 // flatRolls is how far a shot rolls on flat grass (a tee shot's Kick, the
 // usual friction).
 const flatRolls = "On flat grass a power of 10 rolls about 40, a 5 about 15."
@@ -463,14 +474,8 @@ func roundSummary(e *entry, p address, r *round) string {
 		if v == nil {
 			continue
 		}
-		// ufmt has no %+d: the sign is written out
-		best, vs := bestStrokes(v), "even"
-		if d := best - e.par; d > 0 {
-			vs = "+" + strconv.Itoa(d)
-		} else if d < 0 {
-			vs = strconv.Itoa(d)
-		}
-		s += ufmt.Sprintf("> **%s's best here: %d** (par %d, %s), %s. ", who, best, e.par, vs, modeNames[m])
+		best := bestStrokes(v)
+		s += ufmt.Sprintf("> **%s's best here: %d** (par %d, %s), %s. ", who, best, e.par, vsPar(best-e.par), modeNames[m])
 		b := e.board(m)
 		switch k := boardKey(v, p.String()); {
 		case b.Has(k):

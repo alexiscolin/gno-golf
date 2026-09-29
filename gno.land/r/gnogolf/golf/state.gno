@@ -581,8 +581,9 @@ func Extras(hole string, stroke int) string {
 }
 
 // Leaderboard is a mode's course-wide top ten ("assisted" or "pro"): named
-// players' bests on the current course holes, summed; most holes, then
-// fewest strokes, then the first there. Its cost does not grow with players.
+// players' bests on the current course holes, summed; most holes, then the
+// best score against par (strokes - par), then the first there. Its cost does
+// not grow with players.
 func Leaderboard(mode string) string {
 	m := modeOf(mode)
 	var sb strings.Builder
@@ -590,7 +591,7 @@ func Leaderboard(mode string) string {
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"holes":` + strconv.Itoa(slots.Size()) + `,"rows":[`)
 	n := 0
 	eachRanked(m, func(r *row, name string) {
-		sb.WriteString(sep(n) + standingRow(r.player, name, r.holes, r.strokes))
+		sb.WriteString(sep(n) + standingRow(r.player, name, r))
 		n++
 	})
 	sb.WriteString("]}")
@@ -616,13 +617,19 @@ func eachRanked(m int, fn func(r *row, name string)) {
 const maxWalked = 4 * topSize
 
 // strokesRow and standingRow are a player's best or standing row; name is ""
-// on the reads that resolve no names.
+// on the reads that resolve no names. A standing's par is its holes' pars
+// summed: strokes - par is its score against par.
 func strokesRow(p, name string, strokes int) string {
 	return `{"player":` + jstr(p) + nameField(name) + `,"strokes":` + strconv.Itoa(strokes) + "}"
 }
 
-func standingRow(p, name string, holes, strokes int) string {
-	return `{"player":` + jstr(p) + nameField(name) + `,"holes":` + strconv.Itoa(holes) + `,"strokes":` + strconv.Itoa(strokes) + "}"
+func standingRow(p, name string, r *row) string {
+	return `{"player":` + jstr(p) + nameField(name) + standingFields(r) + "}"
+}
+
+// standingFields is a standing's numbers: holes, strokes and par.
+func standingFields(r *row) string {
+	return `,"holes":` + strconv.Itoa(r.holes) + `,"strokes":` + strconv.Itoa(r.strokes) + `,"par":` + strconv.Itoa(r.par)
 }
 
 func nameField(name string) string {
@@ -639,18 +646,15 @@ func nameField(name string) string {
 func Rank(mode string, player address) string {
 	m := modeOf(mode)
 	p := player.String()
-	rank, holes, strokes := 0, 0, 0
+	rank, r := 0, &row{}
 	if v := totals[m].Get(p); v != nil {
-		r := v.(*row)
-		holes, strokes = r.holes, r.strokes
-		key := rankKey(r)
-		if ranks[m].Has(key) {
+		r = v.(*row)
+		if key := rankKey(r); ranks[m].Has(key) {
 			rank = ranks[m].index(key) + 1
 		}
 	}
 	return "{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"player":` + jstr(p) +
-		`,"rank":` + strconv.Itoa(rank) + `,"of":` + strconv.Itoa(ranks[m].Size()) +
-		`,"holes":` + strconv.Itoa(holes) + `,"strokes":` + strconv.Itoa(strokes) + "}"
+		`,"rank":` + strconv.Itoa(rank) + `,"of":` + strconv.Itoa(ranks[m].Size()) + standingFields(r) + "}"
 }
 
 // CourseLeaderboard is a page of a mode's course ranking, paged like
@@ -676,8 +680,7 @@ func CourseLeaderboard(mode string, offset, limit int) string {
 		if name == "" {
 			return false // a name deleted since
 		}
-		r := totals[m].Get(p).(*row)
-		sb.WriteString(sep(n) + standingRow(p, name, r.holes, r.strokes))
+		sb.WriteString(sep(n) + standingRow(p, name, totals[m].Get(p).(*row)))
 		n++
 		return false
 	})
@@ -817,7 +820,8 @@ func Bests(hole, mode, players string) string {
 }
 
 // Standings is each given player's course-wide standing in a mode: how many
-// of the course's current holes they finished, and in how many strokes.
+// of the course's current holes they finished, in how many strokes, and
+// those holes' pars summed.
 func Standings(mode, players string) string {
 	m := modeOf(mode)
 	var sb strings.Builder
@@ -825,8 +829,7 @@ func Standings(mode, players string) string {
 	n := 0
 	for _, p := range friends(players) {
 		if v := totals[m].Get(p); v != nil {
-			r := v.(*row)
-			sb.WriteString(sep(n) + standingRow(p, "", r.holes, r.strokes))
+			sb.WriteString(sep(n) + standingRow(p, "", v.(*row)))
 			n++
 		}
 	}
@@ -852,17 +855,16 @@ func Records(hole, mode, after string, limit int) string {
 	return sb.String()
 }
 
-// Players is a page of every course standing in a mode, named or not, with
-// the height of the finish that last improved it (the ranking's tie-break),
-// paged like Records.
+// Players is a page of every course standing in a mode, named or not: its
+// holes, strokes and par (all the ranking's key reads) and the height of the
+// finish that last improved it (the tie-break), paged like Records.
 func Players(mode, after string, limit int) string {
 	m := modeOf(mode)
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"mode":` + jstr(modeNames[m]) + `,"rows":[`)
 	next := page(totals[m].Iterate, after, limit, func(i int, p string, v any) {
 		r := v.(*row)
-		sb.WriteString(sep(i) + `{"player":` + jstr(p) + `,"holes":` + strconv.Itoa(r.holes) + `,"strokes":` + strconv.Itoa(r.strokes) +
-			`,"height":` + strconv.FormatInt(r.height, 10) + "}")
+		sb.WriteString(sep(i) + `{"player":` + jstr(p) + standingFields(r) + `,"height":` + strconv.FormatInt(r.height, 10) + "}")
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()
