@@ -390,6 +390,18 @@ real answer.
 - **Wave 2: the Builder.** The contract side is ready: `PublishMine`, its
   checks, and the owner's switch (`SetPublishing`), closed at deploy. Still to
   build: the in-game editor and its GG1 encoder (ADR-002).
+- **Auto-save with a chain session (V1.1, right after launch).** Onyx (v1.5.0)
+  has sessions in tm2's auth (`MsgCreateSession`: `AllowPaths`, `SpendLimit`
+  per `SpendPeriod`, `ExpiresAt`; `MsgRevokeSession`, `MsgRevokeAllSessions`;
+  gno-onyx `tm2/pkg/sdk/auth/msgs.go`). The game makes a key in the browser,
+  the player signs one session for it in Adena, allowed only calls to the golf
+  realm, with a spend cap (e.g. 2 GNOT a day) and an expiry (24 h or 7 days),
+  revocable; every save after is signed by that key, no Adena window: a whole
+  cup saved as it is played. A switch in the game ("Auto-save my rounds").
+  No realm change. To check first: Adena can sign `MsgCreateSession` (else
+  gnokey once, or wait for it); the client signs txs itself (tm2 JS signing);
+  the storage deposit counts against the spend cap; the key stays scoped to
+  this origin (and what a leaked key could still do: only golf calls, capped).
 - **A fifth cup, for experts** (a "Champion's Cup"): 18 long, hard holes for
   the players who finished the four at par, unlocked by them (a gnome of its
   own, a badge). Holes are data: they publish with `Publish` and need no
