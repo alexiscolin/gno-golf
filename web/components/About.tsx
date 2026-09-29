@@ -33,7 +33,7 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
   },
   {
     title: "You keep it",
-    text: "Adena signs (once for most rounds, a few times for a long one), or gnokey in a terminal; the chain replays your shots and the round goes on the board: no score typed in.",
+    text: "Adena or gnokey signs; the chain replays your shots and puts the round on the board. No score typed in.",
     icon: ICON.keep,
   },
 ];
