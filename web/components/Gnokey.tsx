@@ -1,30 +1,34 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { gnokeyPlan, gnokeyPaste, chainSplit, PRICE } from "@/lib/adena";
+import { gnokeyPlan, gnokeyPaste, gnokeyLate, chainSplit, PRICE } from "@/lib/adena";
 import { Button } from "@/components/ui";
 import { messageOf, useCopied } from "@/components/common";
-import { errorKind, type Chain } from "@/lib/chain";
-import type { Snapshot } from "@/lib/engine";
+import { errorKind, isAddress, type Chain } from "@/lib/chain";
 
 // "Use gnokey instead": the calls Adena would sign, as one paste for a
 // terminal (bash or zsh: macOS, Linux, WSL) that needs gnokey and nothing
-// else: one plain `gnokey maketx call` per commit, after a Reset of its own
+// else: the weather asked first (gnokeyLate: too late, nothing goes), then one
+// plain `gnokey maketx call` per commit, after a Reset of its own
 // (gnokeyPlan), each sent again a block later if the node had not taken the
 // one before yet, and the paste stops at the first that fails (gnokeyPaste).
 // Collapsed by default; the key name is the player's own, kept in this browser.
-// Once copied, the player says when it went (onSent): the game asks the chain;
-// with no account connected to ask for (no onSent), the round stays, to check once one is.
+// Once copied, the player says when it went (onSent): the game asks the chain
+// for the account connected (me), else for the key's address, typed once
+// (optional, kept in this browser like the name); with neither, the round stays.
 // The name, a Claim and a tip go the same way (GnokeyTx), in the same panel (Panel).
-const KEY = "gnogolf.gnokey";
+const KEY = "gnogolf.gnokey", ADDR = "gnogolf.gnokey.addr";
 // any name gnokey takes, quoted for the shell: all but a quote and control characters
 const keyOk = (k: string) => /^[^'\\\u0000-\u001f]{1,64}$/.test(k);
-const savedKey = () => {
+const saved = (k: string) => () => {
   try {
-    return localStorage.getItem(KEY) || "";
+    return localStorage.getItem(k) || "";
   } catch {
     return "";
   }
+};
+const keep = (k: string, v: string) => {
+  try { localStorage.setItem(k, v.trim()); } catch {}
 };
 
 /**
@@ -41,14 +45,11 @@ function Panel({ summary, open, onOpen, txs, when = "", paste, note, done, hold,
 }) {
   const [copied, copyText] = useCopied(1600);
   const [out, setOut] = useState(false); // copied once: the line may say what next
-  const [key, setKey] = useState(savedKey);
+  const [key, setKey] = useState(saved(KEY));
   const name = key.trim(), ready = keyOk(name);
   // what is shown is what is copied
   const all = paste(`'${ready ? name : "YOUR_KEY_NAME"}'`);
-  const onKey = (v: string) => {
-    setKey(v);
-    try { localStorage.setItem(KEY, v.trim()); } catch {}
-  };
+  const onKey = (v: string) => (setKey(v), keep(KEY, v));
   const copy = () => (setOut(true), onCopy && onCopy(), void copyText(all));
   const box = (
       <div className="details__box gnokey__box">
@@ -77,11 +78,20 @@ function Panel({ summary, open, onOpen, txs, when = "", paste, note, done, hold,
   );
 }
 
-export default function Gnokey({ s, chain, price, chainId, onSent }: { s: Snapshot | null; chain: Chain | null; price: number; chainId: string | null; onSent?: () => void }) {
+/**
+ * A round's save with gnokey (s: the round; a won one, or one kept through a
+ * reload). me: the account connected; onSent: "It did", with the address to
+ * ask the chain for (me's, else the key's typed here).
+ */
+export default function Gnokey({ s, chain, price, chainId, me, onSent }: {
+  s: Parameters<typeof gnokeyPlan>[0] | null; chain: Chain | null; price: number; chainId: string | null; me?: string | null; onSent: (player: string) => void;
+}) {
   const [out, setOut] = useState(""); // the round last copied
+  const [addr, setAddr] = useState(saved(ADDR)); // the key's address, with no account connected
+  const typed = addr.trim(), who = me || (isAddress(typed) ? typed : "");
   // the commits as the chain itself cuts them, asked when the panel opens:
   // the same split an Adena save sends (keyed by the round it is for)
-  const round = s ? `${s.id}#${s.shots.join(";")}#${s.period}` : "";
+  const round = s ? `${s.id}#${(s.shots || []).join(";")}#${s.period}` : "";
   // (refused: the chain refused the round, and no paste is offered; a node that did not answer
   // leaves the model's split, which the chain checks again as it plays it)
   const [split, setSplit] = useState<{ round: string; parts: readonly (readonly [number, number])[] | null; bad?: string; refused?: boolean } | null>(null);
@@ -98,10 +108,19 @@ export default function Gnokey({ s, chain, price, chainId, onSent }: { s: Snapsh
   if (!plan.length) return null;
   const checking = !!mine && !mine.parts && !mine.bad;
   return (
-    <Panel summary="Save with gnokey instead" onOpen={ask} txs={plan.length} when=" It works while this round's weather lasts: see the countdown above."
-      paste={(who) => gnokeyPaste(plan, who)} hide={!!(mine && mine.refused)} hold={checking ? "Checking…" : undefined} onCopy={() => setOut(round)}
+    <Panel summary="Save with gnokey instead" onOpen={ask} txs={plan.length} when=" It works while this round's weather lasts: see its countdown."
+      paste={(key) => gnokeyPaste(plan, key, gnokeyLate(s.period, chain))} hide={!!(mine && mine.refused)} hold={checking ? "Checking…" : undefined} onCopy={() => setOut(round)}
       note={mine && mine.bad ? <span className="gnokey__bad">{mine.bad}</span> : checking ? "Asking the chain how it cuts this round…" : undefined}
-      done={() => <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b> for each.{out === round && (onSent ? <> <button className="linkish" onClick={onSent} aria-label="It did: check the chain for this round">It did</button></> : " Connect Adena to check it on the chain.")}</>} />
+      done={() => <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b> for each.{out === round && (who ? <> <button className="linkish" onClick={() => onSent(who)} aria-label="It did: check the chain for this round">It did</button></> : " Give your key's address below to check it here.")}</>}>
+      {/* no account to ask the chain for: the key's own address, optional */}
+      {!me && (
+        <label className="gnokey__addr">
+          Your key&apos;s address (g1…, <code>gnokey list</code> shows it), to check the save here. Optional.
+          <input className="gnokey__key" value={addr} onChange={(e) => (setAddr(e.target.value), keep(ADDR, e.target.value))} placeholder="g1…" aria-invalid={!!typed && !who} spellCheck={false} autoCapitalize="off" autoComplete="off" />
+          {typed && !who && <small className="gnokey__bad">That is not a gno.land address: g1 and 38 more letters and digits.</small>}
+        </label>
+      )}
+    </Panel>
   );
 }
 

@@ -1275,11 +1275,12 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.community = COMMUNITY ? list.filter((h) => !h.next && h.official === false) : [];
   }
 
-  async function start(link: string | Link | null) {
+  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", null for a link to nothing). */
+  async function start(link: string | Link | null): Promise<"hole" | "cup" | null> {
     let list = await chain.holes();
     // a link to a hole the tab's kept list does not have yet: the chain's own
     if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);
-    if (!alive) return; // destroyed while the chain answered (a remount in dev)
+    if (!alive) return null; // destroyed while the chain answered (a remount in dev)
     setList(list);
     if (!g.list.length) throw new Error("no hole is registered on this chain");
     // a string is a hole's id or alias (or an old realm id)
@@ -1288,11 +1289,11 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // still have it, so it is asked for; one it has not lands on the cups
     if (!asked && typeof link === "string" && link) {
       await load(link);
-      if (!alive) return;
+      if (!alive) return null;
       if (g.s) {
         g.linked = true;
         requestAnimationFrame(frame);
-        return;
+        return "hole";
       }
       g.error = null;
       g.failed = null;
@@ -1306,6 +1307,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     await load(first.id);
     if (!g.s) throw new Error(g.error || "the first hole could not be loaded");
     requestAnimationFrame(frame);
+    // (a cup and a place in it that is not there: a link to nothing)
+    return asked ? "hole" : cupLink && typeof link === "object" && link && "n" in link && !link.n ? "cup" : null;
   }
 
   promo.attach({ g, chain, fire, ball: () => ball, ghost: () => rival.ball(), every: () => everyOf(), setClock: (t: number) => (clock = t) }); // ?promo only
@@ -1320,8 +1323,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     },
     /** The hole being played. */
     current: () => g.id,
-    /** Whether the page's link named a hole that exists here. */
-    linked: () => !!g.linked,
     /** Play a world: its first hole, and its holes in the menu. */
     setWorld(w: string) {
       loadWorld(w).catch(() => {}); // fetched while the player picks a gnome

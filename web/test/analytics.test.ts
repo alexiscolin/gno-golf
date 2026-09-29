@@ -140,12 +140,23 @@ test("a visitor who objects: nothing more goes, and on a later page nothing load
   process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test";
   Object.assign(globalThis, { devicePixelRatio: 1, innerWidth: 1280 });
   try {
+    // this browser's cookies: PostHog's (its id, its opt-out) and another's
+    const jar = new Map([["ph_phc_test_posthog", "{id}"], ["__ph_opt_in_out_phc_test", "0"], ["theme", "dark"]]);
+    Object.assign(globalThis, {
+      document: {
+        get cookie() { return [...jar].map(([k, v]) => `${k}=${v}`).join("; "); },
+        set cookie(c: string) { const [kv] = c.split(";"), [k, v] = kv.split("="); if (/max-age=0/i.test(c)) jar.delete(k.trim()); else jar.set(k.trim(), v); },
+      },
+    });
     const a = await load(), f = fake();
     await a.start(f.loader);
     a.track("badge_earned", { id: "ace" });
     assert.equal(a.optedOut(), false);
+    assert.equal(f.got.init!.options.opt_out_persistence_by_default, true);
     a.optOut();
     assert.equal(f.got.optedOut, true);
+    assert.deepEqual(f.got.resets, [true]); // its id forgotten, its device id too
+    assert.deepEqual([...jar.keys()], ["theme"]); // its cookies gone, no one else's
     a.track("badge_earned", { id: "eagle" });
     assert.equal(f.got.events.length, 1);
     // a later page: kept in this browser
@@ -155,6 +166,7 @@ test("a visitor who objects: nothing more goes, and on a later page nothing load
     assert.equal(b.start(g.loader), undefined);
     assert.equal(g.asked(), 0);
   } finally {
+    delete (globalThis as { document?: unknown }).document;
     localStorage.removeItem("gnogolf.noStats");
     delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
   }
