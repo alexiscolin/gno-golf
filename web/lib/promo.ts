@@ -61,6 +61,7 @@ interface Title {
   y?: number;
   sparkle?: number;
   sfx?: SoundName;
+  sfxOut?: SoundName; // a sound as it goes (to)
   bounce?: number;
   pulse?: readonly number[];
   tilt3d?: boolean;
@@ -79,6 +80,7 @@ interface Shot {
   flash?: number; punch?: number; card?: number | null; blur?: number; dim?: number; whip?: number;
   burst?: number | null; burstOpacity?: number; hits?: readonly number[]; rays?: boolean;
   ui?: string; // the page's own pieces left in view (a duel's callout, its score card, a screen): a selector list
+  cover?: boolean; // the video's first frame, its poster: its titles (those from 0), burst, rays and drift already landed, no flash
 }
 
 // a capture tool: dev builds, or a page opened with ?camlog where the test hooks answer (testhooks.ts)
@@ -253,7 +255,7 @@ function install() {
       const x = ((r(3) * 2400 + tt * (near ? 420 : 160) * (r(4) > 0.5 ? 1 : -1)) % 2400 + 2400) % 2400 - 240;
       const y = r(5) * 1080 + Math.sin(tt * 2 + i) * 40 + tt * (near ? 120 : 50);
       Object.assign(el.style, { width: size + "px", height: size * 0.6 + "px", background: DRIFT_COLORS[i % 6],
-        filter: `blur(${near ? 7 : 1.5}px)`, opacity: String(Math.min(1, Math.max(0, tt / 0.3)) * (near ? 0.85 : 0.9)),
+        filter: `blur(${near ? 7 : 1.5}px)`, opacity: String((cfg?.cover ? 1 : Math.min(1, Math.max(0, tt / 0.3))) * (near ? 0.85 : 0.9)),
         transform: `translate(${x}px, ${y % 1180 - 50}px) rotate(${tt * (90 + r(6) * 200) + i * 40}deg)` });
     }
   }
@@ -315,6 +317,11 @@ function install() {
     setup(c: Shot) {
       cfg = c;
       const e = E!;
+      if (c.cover) {
+        c.titles = (c.titles || []).map((t) => (t.at > 0 ? t : { ...t, at: -1 }));
+        if (c.burst != null) c.burst = -1;
+        c.flash = 0;
+      }
       tt = (c.t0 || 0) - (c.pre || 0); // t0: a later slice of a shot cut into several page loads
       // the chain's answers were fetched ahead: a replay never waits on the network
       const paths = c.paths || {};
@@ -352,7 +359,7 @@ function install() {
       for (let i = 0; i < (c.drift || 0); i++) {
         const d = document.createElement("div");
         d.className = "drift";
-        layer.insertBefore(d, layer.querySelector(".flash"));
+        layer.insertBefore(d, layer.querySelector(c.cover ? ".t" : ".flash")); // (a cover's behind its titles: none over a word of the thumbnail)
         drifts.push({ el: d, i });
       }
       draw();
@@ -450,7 +457,7 @@ function install() {
     if (shk) st.style.transform += ` translate(${sx * 0.6}px, ${sy * 0.6}px)`;
     layer.querySelector<HTMLElement>(".flash")!.style.opacity = String(Math.max(hit, cfg.flash ? Math.max(0, 1 - Math.max(tt, 0) / 0.22) * cfg.flash : 0));
     const ry = layer.querySelector<HTMLElement>(".rays")!;
-    ry.style.opacity = String(cfg.rays ? Math.min(1, Math.max(0, (tt - 0.1) / 0.4)) * 0.8 : 0);
+    ry.style.opacity = String(cfg.rays ? (cfg.cover ? 1 : Math.min(1, Math.max(0, (tt - 0.1) / 0.4))) * 0.8 : 0);
     ry.style.transform = `rotate(${-tt * 5}deg) translate(${Math.sin(tt) * 20}px, 0)`;
     // parallax: the plate drifts less than the course behind, the logo not at all
     if (cfg.burst != null) bu.style.transform += ` translate(${Math.sin(tt * 0.9) * 30}px, ${Math.cos(tt * 0.7) * 16}px)`;
@@ -460,6 +467,7 @@ function install() {
       const k = (tt - t.at) / 0.28, out = t.to != null ? (tt - t.to) / 0.18 : 0;
       if (k < 0 || out >= 1) { t.el.style.opacity = "0"; continue; }
       if (!heard.has(t)) heard.add(t), sound(t.sfx || "whoosh");
+      if (out > 0 && t.sfxOut && !heard.has(t.el)) heard.add(t.el), sound(t.sfxOut);
       const kk = Math.min(k, 1);
       let s = t.kind === "slam" ? 2.6 - 1.6 * ease(kk) : 0.2 + 0.8 * back(kk, t.bounce || 1.7);
       // a slam shakes as it lands; a title then creeps toward the camera
@@ -474,7 +482,7 @@ function install() {
       t.el.style.opacity = String(Math.min(1, kk * 3) * o);
       t.el.style.transform = `translate(calc(-50% + ${shake}px), calc(-50% + ${(t.y || 0)}px))${tilt3d} rotate(${t.tilt ?? -4}deg) scale(${s * (1 + sq)}, ${s * (1 - sq)})`;
       t.el.querySelectorAll<HTMLElement>(".spk").forEach((sp, i) => {
-        const u = (tt - t.at - 0.3 - i * 0.13) / 0.5;
+        const u = (tt - Math.max(t.at, 0) - 0.3 - i * 0.13) / 0.5; // (a cover's, landed before frame 0, pop after it)
         const on = u > 0 && u < 1;
         sp.style.transform = on ? `scale(${Math.sin(Math.PI * u) * (i % 2 ? 0.8 : 1.2)}) rotate(${u * 120}deg)` : "scale(0)";
       });

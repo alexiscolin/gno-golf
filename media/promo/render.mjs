@@ -24,6 +24,11 @@
 // two on the tee, the player's stroke (the ghost waiting there), the ghost's (the player at rest),
 // a cut, the ghost holing on a beat (the player waiting in front), a cut, the player's last putt
 // dropping on the drop; a duel's shot stops the render should a frame show both moving.
+// --cut=v10 (and v10-teaser): v9 opening on its poster. A shot with "cover": true (the first, at
+// beat 0) is the video's first frame, the thumbnail X and most players show: the logo on its burst
+// and a tagline already landed on frame 0 (web/lib/promo.ts), then a bar of beat pulses and
+// sparkles, the logo zooming out on a whoosh into the fast shots; its frame 0 also kept as
+// gnogolf-promo-<cut>-cover.jpg (1920x1080), for a platform that takes a thumbnail of its own.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
@@ -170,6 +175,8 @@ const SHOTS = ((a) => (CLEAN ? cleanOf(a) : a))(JSON.parse(fs.readFileSync(path.
     return { ...base, name: `${s.name}-${gnome}`, gnome, f0: a, f1: b, t0: (a - f0) / FPS, flash: k ? 0 : s.flash, punch: k ? 0 : s.punch };
   });
 });
+// the cover is frame 0, on the music's first beat: nothing shifts the sound
+if (SHOTS.some((s, i) => s.cover && (i || s.f0))) throw new Error("a cover is the first shot, at beat 0");
 // every gnome may be shown, the ones still to unlock too (this is the capture's own browser profile)
 const ALL_GNOMES = ["classic", "sage", "ginger", "moustache", "gardener", "wizard", "viking", "golden", "pirate", "diver", "baker", "mayor", "king"];
 
@@ -275,7 +282,7 @@ async function shoot(c, s, i, out) {
     if (st.ghost && !s.ghostIn && (st.ghost.scale < 0.75 || !st.ghost.visible)) (s.ghostIn = true), console.log(`  ${s.name}: the ghost sinks at ${(f / FPS).toFixed(3)} s`);
     if ((s.dropAt != null || s.eventAt != null || s.by) && !s.sunk && (st.scale < (s.eventAt != null ? 0.97 : 0.75) || !st.visible || (s.eventAt != null && st.y < -0.6))) (s.sunk = true), console.log(`  ${s.name}: the ball sinks at ${(f / FPS).toFixed(3)} s (target ${s.dropAt ?? s.eventAt ?? "-"})`);
     if (want && !want.has(f)) continue;
-    const { data } = await c.send("Page.captureScreenshot", { format: STILLS ? "png" : "jpeg", quality: STILLS ? undefined : 94 });
+    const { data } = await c.send("Page.captureScreenshot", { format: STILLS ? "png" : "jpeg", quality: STILLS ? undefined : s.cover && !f ? 100 : 94 });
     fs.writeFileSync(STILLS ? path.join(out, `${String(i).padStart(2, "0")}-${s.name}-${f}.png`) : path.join(out, `${String(s.f0 + f).padStart(5, "0")}.jpg`), Buffer.from(data, "base64"));
     if (f % 15 === 0) await sleep(40); // a modest pace: the laptop stays cool
   }
@@ -430,6 +437,7 @@ const filter = [
   `[duck][fx]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]`,
 ].join(";");
 const MP4 = path.join(HERE, `gnogolf-promo${SUFFIX}.mp4`);
+if (SHOTS[0].cover) fs.copyFileSync(path.join(out, "00000.jpg"), path.join(HERE, `gnogolf-promo${SUFFIX}-cover.jpg`));
 execFileSync("nice", ["-n", "20", FFMPEG, "-y", "-v", "error", ...inputs, "-filter_complex", filter, "-map", "0:v", "-map", "[a]",
   "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p", "-r", String(FPS), "-movflags", "+faststart",
   "-c:a", "aac", "-b:a", "192k", "-t", String(LEN), MP4], { stdio: "inherit" });
