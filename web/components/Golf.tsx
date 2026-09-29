@@ -603,16 +603,17 @@ export default function Golf() {
       if (logs) window.__g = game_;
 
       game_.start(cfg.hole || (cfg.cup ? { cup: cfg.cup, n: cfg.place } : null))
-        .then(() => {
+        .then((to) => {
           if (cancelled) return;
           if (cfg.play) play();
           else if (cfg.screen && !dare) setScreen(cfg.screen);
           else if (cfg.hole || cfg.cup) {
             // a shared link: straight to that hole (a first-time player picks a
-            // gnome first); a link to nothing lands on the cups, quietly
-            if (!game_.linked()) setScreen("worlds");
+            // gnome first), a cup's from its first, on the picker; a link to
+            // nothing lands on the cups, quietly
+            if (!to) setScreen("worlds");
             // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo)
-            else if ((cfg.gnome || hadGnome()) && !dare) play(true);
+            else if (to === "hole" && (cfg.gnome || hadGnome()) && !dare) play(true);
             else setScreen("pick");
           }
           // ?won=N shows the win card for N strokes — dev screenshots only
@@ -1263,7 +1264,8 @@ export default function Golf() {
     else if (screen === "modes" || screen === "rival") q.set("screen", screen);
     // (an address of its own: a step Back returns from; a dare link's title keeps it, Start goes there)
     else if (screen === "ghosts" || (screen === "title" && dare && !solo)) q.set("by", dare);
-    else if (screen === "pick" && world) (q.set("cup", world), q.set("gnome", gnome));
+    // (the picker of a hole past the cup's first: that hole, a reload or a copied link lands there)
+    else if (screen === "pick" && world) (q.set("cup", world), place && place > 1 && q.set("hole", String(place)), q.set("gnome", gnome));
     else if (screen === "play") return; // the hole is not known yet: wait for it
     // a dare stays in the address, with the hole, while it is raced: a reload, a copied link keep it
     if (dare && !solo && idHere && (screen === "play" || screen === "pick")) {
