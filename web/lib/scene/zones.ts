@@ -1039,15 +1039,21 @@ function castleSlide(z: Zone, s: Hole, t: T, g: THREE.Group, castle: Post, [cx, 
   const rho = ((kx - x0) ** 2 + (cz - kz) ** 2 - rs * rs) / (2 * (rs - (cz - kz)));
   const F = new THREE.Vector2(x0, cz + rho), aJ = Math.atan2(F.y - kz, F.x - kx), aN = Math.PI / 2 - Math.PI * 2;
   const plan: THREE.Vector2[] = [];
-  for (let p = -Math.PI / 2, pJ = Math.atan2(kz - F.y, kx - F.x); p < pJ; p += 0.1 / rho) plan.push(new THREE.Vector2(F.x + rho * Math.cos(p), F.y + rho * Math.sin(p)));
+  // a board this bend cannot fit (the mouth north of the circle, or in it: a
+  // radius not positive) goes straight onto the circle; every walk capped,
+  // whatever a community hole's pieces say
+  const MAX = 4000;
+  if (rho > 0 && Number.isFinite(rho))
+    for (let p = -Math.PI / 2, pJ = Math.atan2(kz - F.y, kx - F.x); p < pJ && plan.length < MAX; p += 0.1 / rho) plan.push(new THREE.Vector2(F.x + rho * Math.cos(p), F.y + rho * Math.sin(p)));
+  else plan.push(new THREE.Vector2(x0, cz));
   const ring = plan.length, turn = aJ - aN;
-  for (let a = aJ; a > aN; a -= 0.1 / rs) {
+  for (let a = aJ; a > aN && plan.length < MAX; a -= 0.1 / rs) {
     const r = rs + wide * smoothstep(((aJ - a) / turn - 0.5) / 0.25);
     plan.push(new THREE.Vector2(kx + Math.cos(a) * r, kz + Math.sin(a) * r));
   }
   const run = plan.length, nz = kz + rs + wide;
-  for (let x = kx; x < x2; x += 0.1) plan.push(new THREE.Vector2(x, nz + (oz - nz) * smoothstep((x - kx) / (x2 - kx))));
-  for (let x = x2; x < ox; x += 0.1) plan.push(new THREE.Vector2(x, oz));
+  for (let x = kx; x < x2 && plan.length < MAX; x += 0.1) plan.push(new THREE.Vector2(x, nz + (oz - nz) * smoothstep((x - kx) / (x2 - kx))));
+  for (let x = x2; x < ox && plan.length < MAX; x += 0.1) plan.push(new THREE.Vector2(x, oz));
   plan.push(new THREE.Vector2(ox, oz));
   // and in height: level round the bend, up clear of the lane round the
   // circle (higher halfway), down again on the run to the exit

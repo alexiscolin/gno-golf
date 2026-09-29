@@ -254,7 +254,7 @@ function SaveClock({ by, clock = Date.now, stale, ranked, moot, dare, again = "P
   if (left > 0 && !stale)
     return (
       <p className={"saveclock" + (left < 60000 ? " saveclock--soon" : "")}>
-        {dare && !moot ? "" : "Only in this browser. "}Save within <b>{mmss(left)}</b> {moot ? "to play it on-chain (your best here stays)" : dare ? `to rank it and dare ${dare} back` : ranked ? "to be ranked" : "to keep it on your address"}.
+        {dare && !moot ? "" : "Only in this browser. "}Save within <b>{mmss(left)}</b> {moot ? "to play it on-chain (your best here stays)" : dare ? `to ${ranked ? "rank it and " : ""}dare ${dare} back` : ranked ? "to be ranked" : "to keep it on your address"}.
       </p>
     );
   return (
@@ -1762,7 +1762,7 @@ export default function Golf() {
             {!account && !phoneOnly && s.official && game.current && (
               <details className="details gnokey">
                 <summary>Rank it: take your gno.land name with gnokey</summary>
-                <NameForm chain={game.current.chain} account={null} chainId={chainId || chainName || null} price={gasPrice} lead="Your name on the board" onNamed={() => {}} />
+                <NameForm chain={game.current.chain} account={null} chainId={chainId || chainName || null} price={gasPrice} lead="Your name on the board" onNamed={() => {}} folded />
               </details>
             )}
           </Dialog>

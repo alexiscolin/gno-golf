@@ -637,7 +637,8 @@ export type NameCheck = ReturnType<typeof useNameCheck>;
  * connected: account null). With a save (typed): the name typed and checked
  * by the card's owner, taken in the save's own signature; no button here.
  */
-export function NameForm({ chain, account, chainId, price, lead, onNamed, typed }: { chain: Chain; account: string | null; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; typed?: { check: NameCheck; set: (stem: string) => void } }) {
+// folded: already inside a fold of the caller's, its gnokey panel shown without its own
+export function NameForm({ chain, account, chainId, price, lead, onNamed, typed, folded }: { chain: Chain; account: string | null; chainId: string | null; price: number; lead: string; onNamed: (name: string) => void; typed?: { check: NameCheck; set: (stem: string) => void }; folded?: boolean }) {
   const [own, setOwn] = useState("");
   const mine = useNameCheck(typed ? null : chain, own);
   const { stem, name, hint, why, retry } = typed ? typed.check : mine;
@@ -720,7 +721,7 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed 
     </form>
     {/* (outside the form: its Copy and its key's field submit nothing) */}
     {!typed && (
-      <GnokeyTx chain={chain} open={!account} summary={account ? "Take it with gnokey instead" : "Take it with gnokey"}
+      <GnokeyTx chain={chain} open={!account} summary={folded ? null : account ? "Take it with gnokey instead" : "Take it with gnokey"}
         // only a name the form found free goes in (its checks, then the registrar's shape again)
         plan={(at) => (reg && stem && !hint && why === "" ? gnokeyName({ registrar: reg, realm: chain.realm, name, rpc: chain.rpc, ...at }) : [])}
         why={reg ? "Type a name the chain takes first." : "This chain has no name registrar."}

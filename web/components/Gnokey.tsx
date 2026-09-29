@@ -36,7 +36,7 @@ const savedKey = () => {
  * hide: nothing to copy. children: another way, under it.
  */
 function Panel({ summary, open, onOpen, txs, when = "", paste, note, done, hold, hide = false, onCopy, children }: {
-  summary: string; open?: boolean; onOpen?: () => void; txs: number; when?: string; paste: (who: string) => string;
+  summary: string | null; open?: boolean; onOpen?: () => void; txs: number; when?: string; paste: (who: string) => string;
   note?: ReactNode; done: (copied: boolean) => ReactNode; hold?: string; hide?: boolean; onCopy?: () => void; children?: ReactNode;
 }) {
   const [copied, copyText] = useCopied(1600);
@@ -50,9 +50,7 @@ function Panel({ summary, open, onOpen, txs, when = "", paste, note, done, hold,
     try { localStorage.setItem(KEY, v.trim()); } catch {}
   };
   const copy = () => (setOut(true), onCopy && onCopy(), void copyText(all));
-  return (
-    <details className="details gnokey" open={open} onToggle={(e) => e.currentTarget.open && onOpen && onOpen()}>
-      <summary>{summary}</summary>
+  const box = (
       <div className="details__box gnokey__box">
         <ol className="gnokey__steps">
           <li>Your gnokey key&apos;s name (<code>gnokey list</code> shows them). It pays the fee, shown before you send.
@@ -68,6 +66,13 @@ function Panel({ summary, open, onOpen, txs, when = "", paste, note, done, hold,
         </div>
         {children}
       </div>
+  );
+  // no summary: shown as is, inside a fold of the caller's (one fold, not two)
+  if (summary === null) return <div className="details gnokey">{box}</div>;
+  return (
+    <details className="details gnokey" open={open} onToggle={(e) => e.currentTarget.open && onOpen && onOpen()}>
+      <summary>{summary}</summary>
+      {box}
     </details>
   );
 }
@@ -109,7 +114,7 @@ export default function Gnokey({ s, chain, price, chainId, onSent }: { s: Snapsh
  */
 export function GnokeyTx({ chain, plan, why, summary, open, web, onSent }: {
   chain: Chain; plan: (at: { chainId: string | null; price: number }) => readonly string[]; why: string;
-  summary: string; open?: boolean; web: ReactNode; onSent?: () => void;
+  summary: string | null; open?: boolean; web: ReactNode; onSent?: () => void;
 }) {
   const [at, setAt] = useState<{ chainId: string | null; price: number }>({ chainId: null, price: PRICE });
   useEffect(() => {
