@@ -390,6 +390,17 @@ real answer.
 - **Wave 2: the Builder.** The contract side is ready: `PublishMine`, its
   checks, and the owner's switch (`SetPublishing`), closed at deploy. Still to
   build: the in-game editor and its GG1 encoder (ADR-002).
+- **A fifth cup, for experts** (a "Champion's Cup"): 18 long, hard holes for
+  the players who finished the four at par, unlocked by them (a gnome of its
+  own, a badge). Holes are data: they publish with `Publish` and need no
+  redeploy; the work is the design (long lanes, chained hazards, timed pieces,
+  worst weathers) and their solving (`scripts/hole-bests.json`, every hole
+  finishable at par, see `docs/design/phase5-pars.md`). Two limits to design
+  under: a stroke's cost stays under `maxShotGas`, and a published hole must
+  leave its first stroke `minShotWork` in its worst weather (so the longest
+  lanes cost the rain's forecast). The client needs its world: a new scene,
+  or a night/volcano variant of an existing one to ship sooner. A good
+  "what's next" after the launch, between the duels wave and the Builder.
 - **V2 ideas:** duel records on-chain (`Duel(hole, rival)` with its board and
   streaks, ADR-004), a creators' board (community holes ranked by what makes
   them worth replaying), the hole of the day (above).
