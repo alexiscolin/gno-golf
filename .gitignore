@@ -19,3 +19,4 @@ gnohome/
 
 # agents' isolated worktrees (Claude Code)
 .claude/worktrees/
+media/promo/*-cover.jpg
