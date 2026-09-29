@@ -1809,7 +1809,7 @@ export default function Golf() {
       )}
 
       {board && s && (
-        <Boards mode={aim} s={s} inHole={screen === "play"} onRace={screen === "play" ? raceWith : screen === "rival" ? toGhosts : undefined} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
+        <Boards mode={aim} s={s} inHole={screen === "play"} onRace={screen === "play" ? raceWith : screen === "rival" ? toGhosts : undefined} onRaceAll={screen === "play" ? (p) => toGhosts(p) : undefined} chain={game.current && game.current.chain} me={account && account.address} onClose={() => setBoard(false)} goTo={(id) => (setBoard(false), goTo(id))} onConnect={account ? undefined : () => (setBoard(false), setReal(true))} />
       )}
 
       {cardOpen && s && (
@@ -1818,7 +1818,7 @@ export default function Golf() {
             <h2>The cup</h2>
             <Standings s={s} card={card} saved={onChainCard} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onRules={() => setRules(true)}
               fresh={freshBadges} badges={{ onOpen: () => (setCardOpen(false), setBadgesOpen(true)) }} />
-            <FullBoard key={aim} kind="course" s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} />
+            <FullBoard key={aim} kind="course" s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} onRace={(p) => (setCardOpen(false), toGhosts(p))} />
         </Sheet>
       )}
 

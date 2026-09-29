@@ -231,7 +231,8 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
  * The leaderboards, in a sheet: this hole's best rounds, and the whole
  * course's. Read from the chain when the sheet opens, not before.
  */
-export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true, onConnect, onRace }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean }) {
+// onRaceAll: from a hole, the course's board races anyone too (their ghosts, then a hole of theirs)
+export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole = true, onConnect, onRace, onRaceAll }: BoardProps & { onClose: () => void; goTo: (id: string) => void; inHole?: boolean; onRaceAll?: (player: string) => void }) {
   const [claimed, setClaimed] = useState(0); // rounds just ranked: the board is read again
   // "This hole" is the hole being played: opened from the cups, there is none
   const [tab, setTab] = useState<"friends" | "hole" | "course">(inHole ? "hole" : "course");
@@ -266,7 +267,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
             Archived version — <button className="linkish" onClick={() => goTo(newer)}>play the current one</button>
           </p>
         )}
-        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={inHole ? onRace : undefined} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={tab === "hole" || !inHole ? onRace : undefined} />}
+        {tab === "friends" ? <Friends s={s} chain={chain} me={me} mode={mode} inHole={inHole} onConnect={onConnect} onRace={inHole ? onRace : undefined} /> : <FullBoard key={`${tab}|${mode}|${s.id}|${claimed}`} kind={tab} s={s} chain={chain} me={me} mode={mode} onConnect={onConnect} onRace={tab === "hole" || !inHole ? onRace : onRaceAll} />}
         <p className="real__fine">
           Only rounds saved on-chain appear here.
           {tab !== "friends" && chain && <> · <a href={chain.boardURL(tab === "hole" ? s.id : null, mode)} target="_blank" rel="noopener noreferrer">This board on gno.land ↗</a></>}
