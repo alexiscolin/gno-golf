@@ -8,6 +8,7 @@ import { makeRenderer, makeScene } from "./camera";
 import { smoothstep } from "../terrain";
 import { TICKS_PER_S } from "../engine/types";
 import { disposeCourse, setTime } from "./materials";
+import { crystals } from "./crystal";
 import type { Hole } from "./data";
 
 /**
@@ -31,17 +32,25 @@ export async function titleStill(kind: string, world: string, w: number, h: numb
     renderer.setSize(w, h, false);
     const scene = makeScene();
     golden(scene, world);
-    const { s, course } = await holeOf(world);
-    scene.add(course);
-    setTime(3);
-    course.userData.tick(3);
-    if (course.userData.mill && course.userData.mill.at) course.userData.mill.at(6);
-    for (const p of course.userData.timed || []) p.at(6);
     const camera = new THREE.PerspectiveCamera(34, w / h, 0.5, 600);
-    const c = CUP[world] || CUP.garden;
-    orbit(camera, s.board, c.a, c, false, c.y ?? -1.5);
+    if (world === "mines") {
+      // the cup to come, no hole yet: its crystal cluster alone in the window
+      scene.add(crystals());
+      camera.position.set(6.1, 4.6, 7.7);
+      camera.lookAt(0, 1.55, 0);
+    } else {
+      const { s, course } = await holeOf(world);
+      scene.add(course);
+      setTime(3);
+      course.userData.tick(3);
+      if (course.userData.mill && course.userData.mill.at) course.userData.mill.at(6);
+      for (const p of course.userData.timed || []) p.at(6);
+      const c = CUP[world] || CUP.garden;
+      orbit(camera, s.board, c.a, c, false, c.y ?? -1.5);
+    }
     renderer.render(scene, camera);
-    const url = canvas.toDataURL("image/png");
+    // the mines' on its cave: the crystals' additive halo needs a sky under it to read
+    const url = world === "mines" ? onSky(canvas, world, "image/png") : canvas.toDataURL("image/png");
     disposeCourse(scene);
     renderer.dispose();
     renderer.forceContextLoss();
@@ -57,7 +66,21 @@ const TILE_SKY: Record<string, [number, string][]> = {
   island: [[0, "#54b8f5"], [0.7, "#b8ecff"], [1, "#ffe2a8"]],
   town: [[0, "#6b4bc8"], [0.6, "#ff8fb0"], [1, "#ffcf8a"]],
   mountain: [[0, "#4d74e0"], [0.65, "#bcd2ff"], [1, "#ffe0c0"]],
+  mines: [[0, "#34266e"], [0.65, "#7a64c4"], [1, "#f0a07a"]],
 };
+
+/** The WebGL canvas drawn on a card's sky, as a data URL. */
+function onSky(canvas: HTMLCanvasElement, world: string, type: string, q?: number) {
+  const out = document.createElement("canvas");
+  out.width = canvas.width;
+  out.height = canvas.height;
+  const x = out.getContext("2d")!, sky = x.createLinearGradient(0, 0, 0, out.height);
+  for (const [at, c] of TILE_SKY[world] || TILE_SKY.garden) sky.addColorStop(at, c);
+  x.fillStyle = sky;
+  x.fillRect(0, 0, out.width, out.height);
+  x.drawImage(canvas, 0, 0);
+  return out.toDataURL(type, q);
+}
 
 /** One hole of a cup card's hover clip: the orbit starts at a (radians round
  *  the board), r and h (times the ring's own), and in its length turns by
@@ -83,11 +106,6 @@ export async function cupClip(world: string, hole: Hole | null, w: number, h: nu
   const { s, course } = await holeOf(world, hole || undefined);
   scene.add(course);
   const camera = new THREE.PerspectiveCamera(34, w / h, 0.5, 600);
-  const out = document.createElement("canvas");
-  out.width = w;
-  out.height = h;
-  const x = out.getContext("2d")!, sky = x.createLinearGradient(0, 0, 0, h);
-  for (const [at, c] of TILE_SKY[world] || TILE_SKY.garden) sky.addColorStop(at, c);
   const c0: CupShot & { y?: number } = shot.still ? { ...shot, ...(CUP[world] || CUP.garden) } : shot;
   return {
     frame(k: number, t: number) {
@@ -99,10 +117,7 @@ export async function cupClip(world: string, hole: Hole | null, w: number, h: nu
       const e = smoothstep(k);
       orbit(camera, s.board, c0.a + shot.turn * e, { r: c0.r * (1 - shot.adv * e), h: c0.h * (1 - shot.drop * e) }, false, c0.y ?? -1.5);
       renderer.render(scene, camera);
-      x.fillStyle = sky;
-      x.fillRect(0, 0, w, h);
-      x.drawImage(canvas, 0, 0);
-      return out.toDataURL("image/jpeg", 0.95);
+      return onSky(canvas, world, "image/jpeg", 0.95);
     },
     destroy() {
       disposeCourse(scene);

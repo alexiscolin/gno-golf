@@ -111,24 +111,6 @@ export function Emblem({ id }: { id: string }) {
         <rect x="50" y="58" width="8" height="9" rx="2" className="w__lamp" />
       </Frame>
     );
-  if (id === "mines")
-    return (
-      <Frame>
-        <circle cx="60" cy="60" r="56" className="w__sky w__sky--mines" />
-        <path d="M 4 84 V 46 Q 60 4 116 46 V 84 Z" className="w__cave" />
-        <path d="M 48 76 V 44 H 72 V 76 Z" className="w__shaft" />
-        <path d="M 46 76 V 42 M 74 76 V 42 M 42 42 H 78" className="w__trunk" />
-        <rect x="56" y="45" width="8" height="9" rx="2" className="w__lamp" />
-        <path d="M 4 74 Q 60 68 116 74 L 116 116 L 4 116 Z" className="w__street" />
-        <path d="M 54 74 L 38 116 M 66 74 L 82 116" className="w__pole" />
-        <path d="M 14 78 V 60 L 20 50 L 26 60 V 78 Z M 90 80 V 64 L 96 54 L 102 64 V 80 Z M 56 84 V 74 L 62 66 L 68 74 V 84 Z" className="w__crystal" />
-        <path d="M 26 80 V 68 L 31 60 L 36 68 V 80 Z M 100 82 V 72 L 105 66 L 110 72 V 82 Z M 46 84 V 76 L 51 70 L 56 76 V 84 Z" className="w__crystal w__crystal--violet" />
-        <path d="M 20 50 L 26 60 L 20 64 Z M 96 54 L 102 64 L 96 68 Z" className="w__snow" />
-        <path d="M 42 82 H 78 L 74 96 H 46 Z" className="w__head" />
-        <circle cx="52" cy="97" r="4" className="w__door" />
-        <circle cx="68" cy="97" r="4" className="w__door" />
-      </Frame>
-    );
   return (
     <Frame>
       <circle cx="60" cy="60" r="56" className="w__sky w__sky--build" />
@@ -311,7 +293,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             unlock, badge or page counts it. The mines branch replaces it with a real cup. */}
         <li>
           <button className="world world--mines tint--mines" disabled aria-label="Crystal Mines: expert cup, coming soon">
-            <span className="world__art"><Emblem id="mines" /></span>
+            <span className="world__art"><img src="title/cup-mines.webp" alt="" width="480" height="360" loading="eager" /></span>
             <span className="dare mode__soon">Coming soon</span>
             <span className="world__ribbon">Crystal Mines</span>
             <span className="world__info">
