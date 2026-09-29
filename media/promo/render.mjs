@@ -19,6 +19,11 @@
 // ghost (media/check/seed), its reads kept in paths.json ("reads") like the shots' paths.
 // --cut=v8-teaser: v8 before the launch, its end card announcing it ("COMING VERY SOON", on
 // gno.land) and the Builder's "NEXT:" (its "COMING SOON:" would say it twice in a row).
+// --cut=v9 (and v9-teaser): v8's duel a turn each, as the game plays it: never the two rolling
+// at once (v8 had the player's last putt set off while the ghost's last stroke still rolled). The
+// two on the tee, the player's stroke (the ghost waiting there), the ghost's (the player at rest),
+// a cut, the ghost holing on a beat (the player waiting in front), a cut, the player's last putt
+// dropping on the drop; a duel's shot stops the render should a frame show both moving.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
@@ -259,8 +264,14 @@ async function shoot(c, s, i, out) {
   if (pre) await c.js(`__promo.step(${pre})`);
   const every = Number(process.env.EVERY) || 0; // stills every N frames, instead of first/middle/last
   const want = STILLS ? new Set(every ? Array.from({ length: Math.ceil(frames / every) }, (_, k) => k * every) : [0, Math.floor(frames / 2), frames - 1]) : null;
+  // a duel is played a turn each: no frame shows the two gnomes rolling at once (checked, the render stops if one does)
+  const moved = (a, b) => a.visible && Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) > 0.002;
+  let prev = null;
   for (let f = 0; f < frames; f++) {
     const st = await c.js("__promo.step(1)");
+    if (s.by && prev && st.ghost && prev.ghost && moved(st, prev) && moved(st.ghost, prev.ghost)) throw new Error(`shot ${s.name}: both gnomes move at frame ${f} (${(f / FPS).toFixed(3)} s)`);
+    if (process.env.MOVES && s.by && prev && st.ghost) console.log(`  ${s.name} ${f}: player ${moved(st, prev) ? "moves" : "-"}, ghost ${prev.ghost && moved(st.ghost, prev.ghost) ? "moves" : "-"}`);
+    prev = st;
     if (st.ghost && !s.ghostIn && (st.ghost.scale < 0.75 || !st.ghost.visible)) (s.ghostIn = true), console.log(`  ${s.name}: the ghost sinks at ${(f / FPS).toFixed(3)} s`);
     if ((s.dropAt != null || s.eventAt != null || s.by) && !s.sunk && (st.scale < (s.eventAt != null ? 0.97 : 0.75) || !st.visible || (s.eventAt != null && st.y < -0.6))) (s.sunk = true), console.log(`  ${s.name}: the ball sinks at ${(f / FPS).toFixed(3)} s (target ${s.dropAt ?? s.eventAt ?? "-"})`);
     if (want && !want.has(f)) continue;
