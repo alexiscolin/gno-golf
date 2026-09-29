@@ -13,7 +13,8 @@ import type { Snapshot } from "@/lib/engine";
 // (gnokeyPlan), each sent again a block later if the node had not taken the
 // one before yet, and the paste stops at the first that fails (gnokeyPaste).
 // Collapsed by default; the key name is the player's own, kept in this browser.
-// Once copied, the player says when it went (onSent): the game asks the chain.
+// Once copied, the player says when it went (onSent): the game asks the chain;
+// with no account connected to ask for (no onSent), the round stays, to check once one is.
 const KEY = "gnogolf.gnokey";
 // any name gnokey takes, quoted for the shell: all but a quote and control characters
 const keyOk = (k: string) => /^[^'\\\u0000-\u001f]{1,64}$/.test(k);
@@ -25,7 +26,7 @@ const savedKey = () => {
   }
 };
 
-export default function Gnokey({ s, chain, price, chainId, onSent }: { s: Snapshot | null; chain: Chain | null; price: number; chainId: string | null; onSent: () => void }) {
+export default function Gnokey({ s, chain, price, chainId, onSent }: { s: Snapshot | null; chain: Chain | null; price: number; chainId: string | null; onSent?: () => void }) {
   const [copied, copyText] = useCopied(1600);
   const [out, setOut] = useState(""); // the round last copied
   const [key, setKey] = useState(savedKey);
@@ -72,7 +73,7 @@ export default function Gnokey({ s, chain, price, chainId, onSent }: { s: Snapsh
           <span className="real__fine">
             {mine && mine.bad ? <span className="gnokey__bad">{mine.bad}</span>
               : checking ? "Asking the chain how it cuts this round…"
-              : ready ? <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b> for each.{out === round && <> <button className="linkish" onClick={onSent}>It did</button></>}</> : "Type your key name first."}
+              : ready ? <>Saved when it prints <b>OK!</b> and a <b>TX HASH</b> for each.{out === round && (onSent ? <> <button className="linkish" onClick={onSent} aria-label="It did: check the chain for this round">It did</button></> : " Connect Adena to check it on the chain.")}</> : "Type your key name first."}
           </span>
         </div>
       </div>

@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, RULES, REALM_PATH, DEFAULT_RPC,
+  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, DEFAULT_RPC,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -137,6 +137,14 @@ test("shotOf writes angle,power to four decimals, and an optional tick", () => {
   assert.equal(shotOf(45, 5), "45.0000,5.0000");
   assert.equal(shotOf(45, 5, 3), "45.0000,5.0000,3");
   assert.equal(shotOf(45, 5, null), "45.0000,5.0000"); // no tick when null
+});
+
+test("roundShots writes a round the realm's way: the page's shots with or without a tick equal the chain's", () => {
+  const chain = "45.0000,5.0000,0;12.5000,3.2500,7";
+  assert.equal(roundShots([shotOf(45, 5), shotOf(12.5, 3.25, 7)]), chain); // no tick: the realm's 0
+  assert.equal(roundShots(chain), chain);
+  assert.equal(roundShots(["45,5", "12.5,3.25,7"]), chain);
+  assert.notEqual(roundShots([shotOf(45, 5, 1)]), roundShots("45.0000,5.0000,0"));
 });
 
 test("RULES mirrors golf.gno's own constants (a regression guard for scripts/selfcheck.ts's drift check)", () => {

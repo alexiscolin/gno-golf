@@ -578,3 +578,13 @@ export function pullShot(px: number, vw: number, vh: number, angleRad: number, m
 /** One shot as the realm parses it. The same string goes to SimulateRound and
  *  to PlayRound, so the preview and the record decide the same shot. */
 export const shotOf = (angleDeg: number, power: number, tick?: number | null) => `${f(angleDeg)},${f(power)}` + (tick == null ? "" : `,${tick | 0}`);
+/** A round's shots as the realm stores them ("%.4f,%.4f,%d": a shot sent with no tick is kept
+ *  at tick 0), from a list of shotOf's or the chain's ";"-joined string: compared, the page's
+ *  round and the chain's both go through it. */
+export const roundShots = (shots: string | readonly string[]) =>
+  (typeof shots === "string" ? shots.split(";") : shots)
+    .map((x) => {
+      const [a, p, t] = x.split(",");
+      return shotOf(Number(a), Number(p), Number(t) || 0);
+    })
+    .join(";");

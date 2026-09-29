@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
 import { REALM_PATH } from "@/lib/chain";
@@ -196,7 +197,10 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
 }
 
 // the visitor's objection to the measurement: one click, kept in this browser (lib/analytics.ts)
+// (the button goes as it is clicked: the keyboard's focus goes on to what it says, not to the page)
 function NoStats() {
   const [off, setOff] = useState(optedOut);
-  return off ? <>Your visits are not measured in this browser.</> : <button className="linkish" onClick={() => (optOut(), setOff(true))}>Don&apos;t measure my visits</button>;
+  const said = useRef<HTMLSpanElement>(null);
+  const stop = () => (optOut(), flushSync(() => setOff(true)), said.current?.focus());
+  return off ? <span ref={said} tabIndex={-1} role="status">Your visits are not measured in this browser.</span> : <button className="linkish" onClick={stop}>Don&apos;t measure my visits</button>;
 }

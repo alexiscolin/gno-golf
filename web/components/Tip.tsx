@@ -29,7 +29,7 @@ export default function Tip({ chain, me, chainId, price, onConnect, bare = false
   if (networkOf(chain.rpc) === "mainnet")
     return <section>{!bare && <h3 className="about__h">Support the game</h3>}<p>Tips open once GNOT can be sent on mainnet: until then the chain refuses a plain send.</p></section>;
   if (!owner || owner === me) return bare ? <p>{owner ? "You made the game: nothing to tip yourself." : owner === "" ? "No one to tip on this chain: its owner could not be read." : "Reading the chain…"}</p> : null;
-  const unit = networkOf(chain.rpc) === "mainnet" ? "GNOT" : "test GNOT";
+  const unit = "test GNOT"; // (mainnet's tips are not open: said above)
   // a phone with no Adena: it is a computer's browser extension (as saving a round)
   const away = !me && isTouch() && !hasAdena();
   const thanks = `Thank you! ${gnot} ${unit} sent to ${shortAddr(owner)}.`;
