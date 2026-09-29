@@ -1419,7 +1419,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     clip(run: ClipRun, caption: Caption) {
       const stroke = won;
       if (!stroke || !g.s) return Promise.resolve(null);
-      const hide = () => [ball, rival.ball(), aim, band, confetti && confetti.group, cam.marker];
+      const hide = () => [ball, rival.ball(), aim, band, confetti && confetti.group];
       return Promise.all([import("./engine/clip"), loadBadge()]).then(([m]) => m.recordClip({ E, stroke, gnome: gnomeId, showClock, hide, card: (x, w, h) => drawCard(x, w, h, caption, 0.6), term: caption.term, challenge: caption.challenge || `${caption.title} · ${caption.score}` }, run));
     },
     /** Races a ghost on this hole, from the tee (ADR-004); null drops the duel. */

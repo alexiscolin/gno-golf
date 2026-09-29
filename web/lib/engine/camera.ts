@@ -30,7 +30,7 @@ const NO_WALLS: readonly Wall[] = [], NO_POSTS: readonly Post[] = [];
 const FOLLOW_CLOSER = 0.7; // the follow camera, nearer the gnome than the rig frames it
 
 export function makeCamera(E: Live) {
-  const { g, camera, scene, screen, ground } = E;
+  const { g, camera, screen, ground } = E;
   let settled = false; // the springs at rest: a still scene may be drawn less often
   const cupAt = new THREE.Vector3();
   // the camera's goal, filled in place every frame instead of made anew
@@ -122,14 +122,6 @@ export function makeCamera(E: Live) {
   let sightOk = true, sightTick = 0, clearTick = 0;
   const lensWho: Record<number, number> = {};
   const rawPos = new THREE.Vector3(), push = new THREE.Vector3();
-  // where the ball is when the course hides it on purpose (a tube, a tunnel): a ring over everything
-  const marker = new THREE.Mesh(
-    new THREE.RingGeometry(0.55, 0.75, 28),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false })
-  );
-  marker.renderOrder = 30;
-  marker.visible = false;
-  scene.add(marker);
 
   // Where the course goes next from a point: a distance field over the green
   // cells, from the cup (made once per hole), walked downhill a few cells —
@@ -495,7 +487,7 @@ export function makeCamera(E: Live) {
     camera.updateMatrixWorld();
     // the ball on screen and in sight: in the middle 70 %, nothing between it
     // and the camera (board-space test, no ray); out of frame → catch up fast;
-    // hidden by a wall → rise a little; hidden on purpose (a tube) → a ring
+    // hidden by a wall → rise a little
     const B = E.ball.position;
     ndcB.copy(B).project(camera);
     const inFrame = ndcB.z < 1 && Math.abs(ndcB.x) < 0.7 && Math.abs(ndcB.y) < 0.7;
@@ -508,17 +500,13 @@ export function makeCamera(E: Live) {
     // out of frame or behind a wall: the springs catch up fast until it is back in sight
     urgent = mode === "third" && gl < 0 && (!inFrame || blocked);
     rise = blocked ? Math.min(3, rise + dt * 12) : Math.max(0, rise - dt * 6);
-    // down a cliff, into water, in a tube: hidden on purpose, and marked
-    const under = g.inTube || B.y < ground(B.x, B.z) - 0.3;
-    marker.visible = !seen && (under || (mode === "third" && rise >= 3));
-    if (marker.visible) (marker.position.copy(B), marker.quaternion.copy(camera.quaternion));
     settled = !glide.on && sp.vp.lengthSq() < 1e-4 && sp.vl.lengthSq() < 1e-4 && Math.abs(sp.vf) < 1e-3;
     if (E.log) {
-      // [yaw°, distance, widening, seen, in a tube, pitch°, flat distance, gnome height (share of screen), ball ndc y, cup ndc x, state, near-wall, in frame, snapped, ball ndc x, ms, squeezed, glide share (-1: none), camera azimuth°]
+      // [yaw°, distance, widening, seen, hidden on purpose (in a tube, under the ground), pitch°, flat distance, gnome height (share of screen), ball ndc y, cup ndc x, state, near-wall, in frame, snapped, ball ndc x, ms, squeezed, glide share (-1: none), camera azimuth°]
       const fl = Math.hypot(camera.position.x - B.x, camera.position.z - B.z);
       const top = ndcTop.copy(B).setY(B.y + 1.1).project(camera).y, bot = ndcBot.copy(B).setY(B.y - BALL_R).project(camera).y;
       const cupX = ndcTop.set(s.cup[0], B.y, s.cup[1]).project(camera).x;
-      camLog.push([+((yaw * 180) / Math.PI).toFixed(1), +camera.position.distanceTo(B).toFixed(1), +wide.toFixed(2), seen ? 1 : 0, under ? 1 : 0,
+      camLog.push([+((yaw * 180) / Math.PI).toFixed(1), +camera.position.distanceTo(B).toFixed(1), +wide.toFixed(2), seen ? 1 : 0, g.inTube || B.y < ground(B.x, B.z) - 0.3 ? 1 : 0,
         +((Math.atan2(camera.position.y - B.y, fl) * 180) / Math.PI).toFixed(1), +fl.toFixed(1), +((top - bot) / 2).toFixed(3), +ndcB.y.toFixed(2), +cupX.toFixed(2), state, wallHug(camera.position) ? 1 : 0, inFrame ? 1 : 0, snapped ? 1 : 0, +ndcB.x.toFixed(2), Math.round(performance.now()), +squeezed.toFixed(2), +gl.toFixed(3), +((Math.atan2(B.z - camera.position.z, B.x - camera.position.x) * 180) / Math.PI).toFixed(2)]);
     }
   }
@@ -800,7 +788,7 @@ export function makeCamera(E: Live) {
     yaw: () => yaw,
     settled: () => settled,
     // for the ?camlog probes
-    occluded, marker, camLog, lensWho,
+    occluded, camLog, lensWho,
     /** The lane's axis at (x, z), as the rest heading reads it. */
     laneAt: (x: number, z: number) => laneHeading(x, z),
     inner: () => ({ swing: +swing.toFixed(2), pen, rise: +rise.toFixed(2), wide: +wide.toFixed(2), yaw: +yaw.toFixed(2) }),

@@ -7,11 +7,15 @@
 // --cut=v6: the duel as gameplay only, before the Builder's "coming soon": one race against the
 // champion's ghost (another skin, see-through) filmed in slices, the two on the tee, a stroke each
 // cut on the beat, both rolling in, the ghost holing then the player, again slowed; no game UI.
-// --cut=v7, the current one: v6's duel on 20 beats, without the slowed replay, the player holing
-// on the music's drop; the Builder's card on 14 beats, each title held 2 s or more. One command,
-// with the dev client on the local chain (web/.env.local; read only, nothing is sent):
-//   (cd web && npx next dev -p 3316) & APP=http://localhost:3316 node media/promo/render.mjs --cut=v7
-// -> media/promo/gnogolf-promo-v7.mp4 and -v7-720p.mp4. The duel races the seeded champion's
+// --cut=v7: v6's duel on 20 beats, without the slowed replay, the player holing on the music's
+// drop; the Builder's card on 14 beats, each title held 2 s or more.
+// --cut=v8, the current one: v7, the hole-in-one's slow motion eased in and held at 0.6 (it
+// stood still on the lip at 0.35), and the music's rewind moved off the duel's first cut (mid-bar,
+// a bar after it the chords 0.86 alike) to the duel-finish cut, a downbeat: the song's own last
+// bar, break and drop then play into the player's holing (the bar after it 0.94 alike, per-beat
+// chroma). One command, with the dev client on the local chain (web/.env.local; read only, nothing is sent):
+//   (cd web && npx next dev -p 3316) & APP=http://localhost:3316 node media/promo/render.mjs --cut=v8
+// -> media/promo/gnogolf-promo-v8.mp4 and -v8-720p.mp4. The duel races the seeded champion's
 // ghost (media/check/seed), its reads kept in paths.json ("reads") like the shots' paths.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
@@ -165,7 +169,8 @@ const ALL_GNOMES = ["classic", "sage", "ginger", "moustache", "gardener", "wizar
 const LAST = Math.max(...SHOTS.map((s) => s.beats[1]));
 // rewind: the music goes back that many beats as the shot starts (a phrase played again), so a
 // cut longer than another keeps the other's music under its shots (v7: v4's, its duel on the
-// 24 beats before the Builder's again), and still ends on the last hit: [music s, length s] each
+// 24 beats before the Builder's again; v8: from the duel's last cut, a downbeat), and still ends
+// on the last hit: [music s, length s] each
 const REWINDS = SHOTS.filter((s) => s.rewind && !s.t0).map((s) => [s.beats[0], s.rewind]);
 const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - (LAST - REWINDS.reduce((a, [, r]) => a + r, 0)) * BEAT).toFixed(3);
 const PARTS = [];
@@ -232,9 +237,9 @@ async function shoot(c, s, i, out) {
     let T = 0;
     for (let k = 0; k < upto; k++) T += s.dropAt != null && k === pts.length - 2 ? 0.32 : Math.max(0.072, Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1]) / 26);
     if (s.eventAt != null) s.dropAt = s.eventAt;
-    // in the game's time: a slow-motion ramp before the drop stretches the shot's seconds
-    const G = (t) => (s.ramp ? Math.min(t, s.ramp[0]) + Math.max(0, Math.min(t, s.ramp[1]) - s.ramp[0]) * s.ramp[2] + Math.max(0, t - s.ramp[1]) : t);
-    s.fire[0].at = G(s.dropAt) - T - (s.dropLag ?? 0.013 * upto); // dropLag: what the frame-stepped replay adds, measured (see the "sinks at" log)
+    // in the game's time: a slow-motion ramp before the drop stretches the shot's seconds (the page's own pace, web/lib/promo.ts)
+    const G = s.ramp ? await c.js(`__promo.gameTime(${JSON.stringify(s.ramp)}, ${s.dropAt})`) : s.dropAt;
+    s.fire[0].at = G - T - (s.dropLag ?? 0.013 * upto); // dropLag: what the frame-stepped replay adds, measured (see the "sinks at" log)
   }
   const frames = s.f1 - s.f0, dur = frames / FPS;
   const cfg = { ...s, paths: cache };
@@ -393,15 +398,17 @@ if (CLEAN) {
 // ------------------------------------------------------------------ encode
 
 const sfx = SHOTS.map((s, i) => [i, path.join(WORK, `sfx-${i}.wav`), s.f0 / FPS]).filter(([, f]) => fs.existsSync(f));
-// (each part of the music but the last runs on X s, cross-faded into the next: no click at the splice)
-const X = 0.03, N = PARTS.length;
+// (each part of the music but the first comes in X s early, cross-faded at equal power over the
+// last quarter of the beat before its splice: the splice's downbeat is the new part's own, whole
+// (a whole beat's doubled both bars and swelled the level 2 dB; a linear one dipped it 3 to 4 dB))
+const X = BEAT / 4, N = PARTS.length;
 const inputs = ["-framerate", String(FPS), "-i", path.join(out, "%05d.jpg")];
-for (const [k, [at, len]] of PARTS.entries()) inputs.push("-ss", String(at), "-t", String(k < N - 1 ? len + X : LEN), "-i", MUSIC);
+for (const [k, [at, len]] of PARTS.entries()) inputs.push("-ss", String(k ? at - X : at), "-t", String(k === N - 1 ? LEN : k ? len + X : len), "-i", MUSIC);
 for (const [, f] of sfx) inputs.push("-i", f);
 const delays = sfx.map(([, , at], k) => `[${k + N + 1}:a]adelay=${Math.round(at * 1000)}:all=1[s${k}]`).join(";");
 const filter = [
   delays,
-  ...PARTS.slice(1).map((_, k) => `[${k ? `m${k}` : "1:a"}][${k + 2}:a]acrossfade=d=${X}:c1=tri:c2=tri[m${k + 1}]`),
+  ...PARTS.slice(1).map((_, k) => `[${k ? `m${k}` : "1:a"}][${k + 2}:a]acrossfade=d=${X}:c1=qsin:c2=qsin[m${k + 1}]`),
   `${sfx.map((_, k) => `[s${k}]`).join("")}amix=inputs=${sfx.length}:normalize=0,volume=2.8,asplit[fx][key]`,
   // the music gives way a little under the game's sounds (the putt, the cup, the confetti)
   // dip: [from, to] in a shot's seconds, the music held back (a breath before a hit)

@@ -74,7 +74,7 @@ interface Shot {
   paths?: Record<string, SimulateRound>;
   build?: Record<"ground" | "walls" | "drop" | "flag", number>;
   t0?: number; pre?: number; drift?: number;
-  ramp?: readonly [number, number, number];
+  ramp?: Ramp;
   spin?: number; clockAt?: number | null;
   flash?: number; punch?: number; card?: number | null; blur?: number; dim?: number; whip?: number;
   burst?: number | null; burstOpacity?: number; hits?: readonly number[]; rays?: boolean;
@@ -87,6 +87,17 @@ interface Shot {
 const opened = typeof window !== "undefined" ? new URL(performance.getEntriesByType("navigation")[0]?.name || window.location.href).search : "";
 const q = new URLSearchParams(opened), on = q.has("promo") && (process.env.NODE_ENV !== "production" || camlog(opened));
 const FPS = 30;
+
+// ramp: [from, to, rate, ease?] in shot seconds, the game run at that rate in
+// between; with ease (seconds), eased into it from from and out of it from to
+// (a slow motion that slows to a pace still read as motion, not a stop)
+type Ramp = readonly [number, number, number, number?];
+const pace = (ramp: Ramp | undefined, t: number) => {
+  if (!ramp) return 1;
+  const [a, b, rate, ease = 0] = ramp;
+  const k = ease ? Math.min(smoothstep((t - a) / ease), 1 - smoothstep((t - b) / ease)) : +(t >= a && t < b);
+  return 1 + (rate - 1) * k;
+};
 
 let E: PromoEngine | null = null; // the engine's insides, given by attach()
 let cfg: Shot | null = null; // the shot being captured
@@ -288,6 +299,13 @@ function install() {
         holes: (e.g.list || []).map((h) => ({ id: h.id, world: cupOf(h), order: h.order, name: h.name })),
       };
     },
+    /** The game's seconds at a shot's second t (from 0), frame by frame as step() runs them, under that ramp. */
+    gameTime(ramp: Ramp | undefined, t: number) {
+      const n = Math.floor(t * FPS);
+      let g = pace(ramp, n / FPS) * (t - n / FPS); // (the frame t falls in, the part of it before t)
+      for (let k = 0; k < n; k++) g += pace(ramp, k / FPS) / FPS;
+      return g;
+    },
     /** The chain's answer for a round of shots on this hole, straight from the RPC. */
     simulate: (shots: [number, number, number?][]) => E!.chain.simulateRound(E!.g.id!, shots.map(([d, p, tick]) => shotOf(d, p, tick ?? null)), E!.g.period),
     /**
@@ -345,8 +363,7 @@ function install() {
     async step(n = 1) {
       const cfg_ = cfg!, e = E!;
       for (let i = 0; i < n; i++) {
-        // ramp: [from, to, rate] in shot seconds, the game slowed in between
-        const r = cfg_.ramp && tt >= cfg_.ramp[0] && tt < cfg_.ramp[1] ? cfg_.ramp[2] : 1;
+        const r = pace(cfg_.ramp, tt);
         tt += 1 / FPS;
         gt += r / FPS; // the game's own time: fire times are in it
         for (const f of cfg_.fire || []) if (!f.done && gt >= f.at) {

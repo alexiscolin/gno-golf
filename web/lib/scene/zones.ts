@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BALL_R, CELL, inZone, inset, mod, segDist, boxOf, POOLS, DISH, sandIn } from "../terrain";
+import { BALL_R, CELL, inZone, inset, mod, segDist, boxOf, POOLS, DISH, sandIn, smoothstep } from "../terrain";
 import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf, waterTone, waterMat } from "./materials";
 import { animate, state } from "./state";
 import { stone, warp, badge, windmill } from "./props";
@@ -1023,57 +1023,81 @@ function sandDetail(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand, inSand
  */
 function castleSlide(z: Zone, s: Hole, t: T, g: THREE.Group, castle: Post, [cx, cz]: Vec2, [ox, oz]: Vec2) {
   const [kx, kz] = castle.c, R0 = castle.r;
-  const ang = (x: number, zz: number) => Math.atan2(zz - kz, x - kx);
-  // round the castle the way that leaves it heading +x (east, to the cup):
-  // clockwise on the board, the angle going down
-  const a0 = ang(cx, cz);
-  let a1 = ang(ox, oz);
-  while (a1 > a0 - Math.PI * 2.2) a1 -= Math.PI * 2; // about a turn and a quarter
-  const r0 = Math.hypot(cx - kx, cz - kz), r1 = Math.hypot(ox - kx, oz - kz), rs = R0 + 0.55; // hugs the wall
   const y0 = t.height(cx, cz), y1 = t.height(ox, oz), top = 5.6, clear = 2.1; // clear of a rolling ball and the ramparts
-  // in straight from the tee side: the mouth opens at -x, square to the zone,
-  // and the tube runs +x a little before it turns round the castle
-  const lead = Math.max(0.3, Math.min(0.8, r0 - R0 - 0.6));
-  const sit = BALL_R; // the mouth's centre: a rolling ball's, so it rolls straight in (its ring sunk in the sand)
-  // the first and last stretches are straight and level, so each end is a
-  // clean cut square to the axis (the lip sits on it)
-  const pts = [new THREE.Vector3(cx - 0.05, y0 + sit, cz), new THREE.Vector3(cx + lead * 0.5, y0 + sit, cz), new THREE.Vector3(cx + lead, y0 + sit + 0.05, cz)];
-  const N = 90;
-  for (let k = 3; k < N; k++) {
-    const u = k / N, a = a0 + (a1 - a0) * u;
-    const edge = Math.min(1, Math.min(u, 1 - u) / 0.1);
-    const r = u < 0.5 ? r0 + (rs - r0) * edge : r1 + (rs - r1) * edge;
-    const up = Math.min(1, Math.min(u, 1 - u) / 0.07);
-    const yy = (u < 0.5 ? y0 : y1) + sit + up * (clear - sit) + Math.sin(Math.PI * u) * (top - clear);
-    pts.push(new THREE.Vector3(kx + Math.cos(a) * r, yy, kz + Math.sin(a) * r));
+  const sit = BALL_R; // the mouths' centre: a rolling ball's, so it rolls straight in
+  // In plan, every bend wider than the tube (a tighter one folded it on
+  // itself: its sand showed inside the mouths, its ink cracked). In straight
+  // from the tee side, the mouth opening at -x square to the zone, and at
+  // once a bend onto a circle hugging the castle's wall; clockwise on the
+  // board round it (the angle going down) a turn and a quarter, the last
+  // quarter widened out past the first so the two never meet, to the north
+  // where it heads +x (east, to the cup); then eased down and across onto
+  // the exit's line, and out straight: each end a clean cut square to the
+  // axis, level (the lip sits on it).
+  const rs = R0 + 0.55, wide = 1.5, x0 = cx - 0.05, x2 = ox - 1; // hugs the wall; how much wider the last quarter runs
+  // the bend: tangent to the way in at the mouth and to the circle, outside it
+  const rho = ((kx - x0) ** 2 + (cz - kz) ** 2 - rs * rs) / (2 * (rs - (cz - kz)));
+  const F = new THREE.Vector2(x0, cz + rho), aJ = Math.atan2(F.y - kz, F.x - kx), aN = Math.PI / 2 - Math.PI * 2;
+  const plan: THREE.Vector2[] = [];
+  for (let p = -Math.PI / 2, pJ = Math.atan2(kz - F.y, kx - F.x); p < pJ; p += 0.1 / rho) plan.push(new THREE.Vector2(F.x + rho * Math.cos(p), F.y + rho * Math.sin(p)));
+  const ring = plan.length, turn = aJ - aN;
+  for (let a = aJ; a > aN; a -= 0.1 / rs) {
+    const r = rs + wide * smoothstep(((aJ - a) / turn - 0.5) / 0.25);
+    plan.push(new THREE.Vector2(kx + Math.cos(a) * r, kz + Math.sin(a) * r));
   }
-  // and out, straightened: the last stretch runs east onto the exit
-  pts.push(new THREE.Vector3(ox - 1.4, y1 + sit + 0.05, oz), new THREE.Vector3(ox - 0.7, y1 + sit, oz), new THREE.Vector3(ox, y1 + sit, oz));
+  const run = plan.length, nz = kz + rs + wide;
+  for (let x = kx; x < x2; x += 0.1) plan.push(new THREE.Vector2(x, nz + (oz - nz) * smoothstep((x - kx) / (x2 - kx))));
+  for (let x = x2; x < ox; x += 0.1) plan.push(new THREE.Vector2(x, oz));
+  plan.push(new THREE.Vector2(ox, oz));
+  // and in height: level round the bend, up clear of the lane round the
+  // circle (higher halfway), down again on the run to the exit
+  const pts = plan.map((q, i) => {
+    if (i < ring) return new THREE.Vector3(q.x, y0 + sit, q.y);
+    if (i >= run) return new THREE.Vector3(q.x, y1 + clear + (sit - clear) * smoothstep((q.x - kx) / (x2 - kx)), q.y);
+    const v = (i - ring) / (run - ring);
+    return new THREE.Vector3(q.x, y0 + sit + (clear - sit) * smoothstep(((i - ring) * 0.1) / 4) + (y1 - y0) * v + (top - clear) * Math.sin(Math.PI * v) ** 2, q.y);
+  });
   const path = new THREE.CatmullRomCurve3(pts);
-  const tubeR = 0.6; // the zone is 1.6 across: the mouth fills it
-  const SAND = 0xe0bd7e, WET = 0xc9a66a;
+  const tubeR = 0.6, inR = tubeR * 0.96; // the zone is 1.6 across: the mouth fills it
+  const SAND = 0xe0bd7e;
   // the tube: sand outside, a dark wall inside (seen only into the ends, so
   // the throat is closed and dark all the way in), an ink hull just outside
   const TS = 200, RS = 16;
+  const dark = new THREE.MeshBasicMaterial({ color: C.burrow, side: THREE.BackSide });
   g.add(new THREE.Mesh(new THREE.TubeGeometry(path, TS, tubeR, RS, false), flat(SAND)));
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(path, TS, tubeR * 0.96, RS, false), new THREE.MeshBasicMaterial({ color: C.burrow, side: THREE.BackSide })));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(path, TS, inR, RS, false), dark));
   g.add(new THREE.Mesh(new THREE.TubeGeometry(path, TS, tubeR + 0.05, RS, false), hullOf(0)));
-  const rim = new THREE.CatmullRomCurve3(pts.map((p) => p.clone().setY(p.y + tubeR * 0.86)));
-  g.add(new THREE.Mesh(new THREE.TubeGeometry(rim, TS, 0.07, 6, false), flat(0xb98f55)));
-  // each end: a flared lip exactly on the cut, concentric with the tube, a
-  // wet band just behind it; all square to the tube's own axis there
+  // each end: a bell flaring out of the cut, sand outside and dark inside,
+  // and a round lip on its rim, all square to the tube's axis there. Its
+  // axis is a rolling ball's height, so the ground runs into the mouth: the
+  // lip meets it steeply (a narrow one grazed it in slivers), and the ground
+  // under the throat is painted the throat's dark (the lawn showed in it)
+  const BELL = 0.45, RB = tubeR + 0.26, LIP = 0.1, len = path.getLength();
   for (const u of [0, 1]) {
     const p = path.getPointAt(u), d = path.getTangentAt(u).normalize();
     const out = u === 0 ? d.clone().negate() : d.clone(); // the way the opening faces
     const end = new THREE.Group();
     end.position.copy(p);
     end.lookAt(p.clone().add(out)); // the group's +z is the opening's outward axis
-    const lip = drawn(new THREE.TorusGeometry(tubeR + 0.06, 0.15, 12, 32), flat(SAND));
-    lip.position.z = -0.02;
-    const band = new THREE.Mesh(new THREE.TorusGeometry(tubeR + 0.01, 0.05, 6, 32), flat(WET));
-    band.position.z = -0.32;
-    end.add(lip, band); // (the dark inner wall closes the throat all the way)
-    g.add(end);
+    const cone = (r1: number, r0: number) => new THREE.CylinderGeometry(r1, r0, BELL, RS * 2, 1, true).rotateX(Math.PI / 2).translate(0, 0, BELL / 2);
+    const lip = drawn(new THREE.TorusGeometry(RB + 0.03, LIP, 12, RS * 3), flat(SAND));
+    lip.position.z = BELL;
+    end.add(drawn(cone(RB, tubeR), flat(SAND)), new THREE.Mesh(cone(RB - 0.04, inR), dark), lip);
+    // the dark floor: the throat's width where the ground cuts it (a hair
+    // more, into the wall: no seam of lawn along it), from the lip in until
+    // the tube's own floor has risen out of the ground
+    const side: THREE.Vector3[] = [];
+    for (let w = BELL; w > -3; w -= 0.05) {
+      const k = u === 0 ? Math.min(1, -w / len) : Math.max(0, 1 + w / len); // (in the tube: that far along it)
+      const c = w >= 0 ? p.clone().addScaledVector(out, w) : path.getPointAt(k), tan = w >= 0 ? out : path.getTangentAt(k);
+      const r = w >= 0 ? inR + ((RB - 0.04 - inR) * w) / BELL : inR, y = t.height(c.x, c.z) + 0.01, h = c.y - y;
+      if (h >= r) break;
+      const lat = new THREE.Vector3(-tan.z, 0, tan.x).normalize().multiplyScalar(Math.sqrt(r * r - h * h) + 0.015);
+      side.push(new THREE.Vector3(c.x, y, c.z).add(lat), new THREE.Vector3(c.x, y, c.z).sub(lat));
+    }
+    const floor = new THREE.BufferGeometry().setFromPoints(side);
+    floor.setIndex(Array.from({ length: side.length / 2 - 1 }, (_, k) => [2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 1, 2 * k + 3, 2 * k + 2]).flat());
+    g.add(end, new THREE.Mesh(floor, new THREE.MeshBasicMaterial({ color: C.burrow, side: THREE.DoubleSide })));
   }
   state.tubes.set(z, path);
   return g;
