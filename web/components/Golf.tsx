@@ -99,7 +99,7 @@ interface Config {
   cup: string;
   place: number;
   gnome: string;
-  screen: "" | "modes" | "rival" | "worlds";
+  screen: "" | "modes" | "rival" | "worlds" | "pick";
   shot: string;
   play: boolean;
   demo: string;
@@ -128,8 +128,9 @@ function useConfig() {
       cup: /^[a-z]{2,16}$/.test(p.get("cup") || "") ? p.get("cup") || "" : "",
       place: /^\d{1,3}$/.test(p.get("hole") || "") ? Number(p.get("hole")) : 0,
       gnome: /^[a-z]{2,16}$/.test(p.get("gnome") || "") ? p.get("gnome") || "" : "",
-      // ?screen=modes, ?screen=rival, ?screen=cups: the game's choice, a duel's rival, the cups (a reload stays there)
-      screen: p.get("screen") === "rival" ? "rival" : p.get("screen") === "modes" ? "modes" : p.get("screen") === "cups" ? "worlds" : "",
+      // ?screen=modes, ?screen=rival, ?screen=cups: the game's choice, a duel's rival, the cups (a reload stays there);
+      // ?screen=pick: a cup hole's picker, not its play
+      screen: p.get("screen") === "rival" ? "rival" : p.get("screen") === "modes" ? "modes" : p.get("screen") === "cups" ? "worlds" : p.get("screen") === "pick" ? "pick" : "",
       shot: p.get("shot") || "",
       // ?play skips the title screen — for screenshots and smoke tests
       play: p.has("play") || p.has("shot"),
@@ -606,14 +607,15 @@ export default function Golf() {
         .then((to) => {
           if (cancelled) return;
           if (cfg.play) play();
-          else if (cfg.screen && !dare) setScreen(cfg.screen);
+          else if (cfg.screen && cfg.screen !== "pick" && !dare) setScreen(cfg.screen);
           else if (cfg.hole || cfg.cup) {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first), a cup's from its first, on the picker; a link to
             // nothing lands on the cups, quietly
             if (!to) setScreen("worlds");
-            // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo)
-            else if (to === "hole" && (cfg.gnome || hadGnome()) && !dare) play(true);
+            // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo;
+            // so does the picker's own address)
+            else if (to === "hole" && (cfg.gnome || hadGnome()) && !dare && cfg.screen !== "pick") play(true);
             else setScreen("pick");
           }
           // ?won=N shows the win card for N strokes — dev screenshots only
@@ -1241,9 +1243,10 @@ export default function Golf() {
   // the hole a link opened, named over the gnomes (from the cups, the player knows where they go)
   const linked = s && s.linked && s.id && s.name ? `${s.place ? `Hole ${holeNumber(s.holes, s.id)} · ` : ""}${s.name}` : "";
   // The address bar follows the screen: the title is the bare page, the cups
-  // ?cup=<world>, the picker adds &gnome=, a hole ?cup=&hole=&gnome=. A new
-  // screen is a new history entry (Back returns to the one before); moving
-  // within a hole — next hole, another gnome — only rewrites the current one.
+  // ?cup=<world>, the picker adds &gnome= (past the cup's first hole, &hole=
+  // and &screen=pick), a hole ?cup=&hole=&gnome=. A new screen is a new
+  // history entry (Back returns to the one before); moving within a hole —
+  // next hole, another gnome — only rewrites the current one.
   const place = s && s.place, world = s && s.world, idHere = s && s.id;
   const lastScreen = useRef<Screen | null>(null);
   useEffect(() => {
@@ -1258,8 +1261,8 @@ export default function Golf() {
     else if (screen === "modes" || screen === "rival") q.set("screen", screen);
     // (an address of its own: a step Back returns from; a dare link's title keeps it, Start goes there)
     else if (screen === "ghosts" || (screen === "title" && dare && !solo)) q.set("by", dare);
-    // (the picker of a hole past the cup's first: that hole, a reload or a copied link lands there)
-    else if (screen === "pick" && world) (q.set("cup", world), place && place > 1 && q.set("hole", String(place)), q.set("gnome", gnome));
+    // (the picker of a hole past the cup's first: that hole, marked the picker's, so a reload or a copied link lands on it, not in play)
+    else if (screen === "pick" && world) (q.set("cup", world), place && place > 1 && (q.set("hole", String(place)), q.set("screen", "pick")), q.set("gnome", gnome));
     else if (screen === "play") return; // the hole is not known yet: wait for it
     // a dare stays in the address, with the hole, while it is raced: a reload, a copied link keep it
     if (dare && !solo && idHere && (screen === "play" || screen === "pick")) {
