@@ -17,6 +17,8 @@
 //   (cd web && npx next dev -p 3316) & APP=http://localhost:3316 node media/promo/render.mjs --cut=v8
 // -> media/promo/gnogolf-promo-v8.mp4 and -v8-720p.mp4. The duel races the seeded champion's
 // ghost (media/check/seed), its reads kept in paths.json ("reads") like the shots' paths.
+// --cut=v8-teaser: v8 before the launch, its end card announcing it ("COMING VERY SOON", on
+// gno.land) and the Builder's "NEXT:" (its "COMING SOON:" would say it twice in a row).
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
 // short cut of the calmer shots, no titles, flashes, shakes or sound, encoded
