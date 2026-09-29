@@ -339,6 +339,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** gnoweb page of one player's round on a hole. */
     roundURL: (hole: string, player: string) =>
       isHoleId(hole) && isAddress(player) ? new URL(`${REALM_PATH}:${hole}/${player}`, web + "/").href : "#",
+    /** gnoweb board: a hole's best rounds, or the course's (the hub's), at the mode's table. */
+    boardURL: (hole: string | null, mode: Mode) =>
+      new URL(`${REALM_PATH}${isHoleId(hole) ? `:${hole}` : ""}#${mode === "assisted" ? "assisted" : "pro"}`, web + "/").href,
     /** gnoweb page of an address (its /u/ profile), # for anything else. */
     userURL: (addr: string) => (isAddress(addr) ? new URL(`/u/${addr}`, web + "/").href : "#"),
     /** gnoweb link to what a hole is made of: a realm hole's source, a data

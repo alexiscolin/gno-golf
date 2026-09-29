@@ -37,6 +37,8 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
     icon: ICON.keep,
   },
 ];
+// what gnoweb shows of the game, to check it plays as it says: the code, the physics, the holes' format, the game as text
+const VERIFY = [["The realm's code", `${REALM_PATH}$source`], ["The physics", "/p/gnogolf/physics$source"], ["The hole data", "/p/gnogolf/course$source"], ["The game as text", REALM_PATH]] as const;
 const FACTS = ["4 cups · 72 holes · 2 extras", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
 
 /** The round corner button every screen has: back at the top left, about at the top right. */
@@ -182,6 +184,12 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
           </li>
         ))}
       </ul>
+      {web && (<>
+        <h3 className="about__h">Verify it yourself</h3>
+        <p className="real__fine about__verify">
+          {VERIFY.map(([name, path], i) => <span key={name}>{i > 0 && " · "}<a href={`${web}${path}`} {...out}>{name} ↗</a></span>)}
+        </p>
+      </>)}
       {support}
 
       <footer className="about__credit">
