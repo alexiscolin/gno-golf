@@ -28,8 +28,8 @@ The costs come from the pearl rehearsal (runs 5 and 6, `deploy-v1-rehearsal.md`,
 | 3. physics | ~4.5 GNOT | 0.16 |
 | 3. course | ~4.8 GNOT | 0.13 |
 | 3. golf (its init and shared indexes) | ~22.7 GNOT | 0.35 |
-| 4. 74 holes | 45.3 GNOT (453,029 bytes, onyx gnodev) | ~11.5 (74 calls at `publishdata.sh`'s gas, 11.5e9 asked in all) |
-| **Total** | **~77.6 GNOT** | **~12.2 GNOT** |
+| 4. 74 holes | 45.3 GNOT (453,029 bytes, onyx gnodev) | ~8.9 (74 calls, each asking its simulation's gas and a tenth more: 8.9e9 asked in all, 8.1e9 used, onyx gnodev) |
+| **Total** | **~77.6 GNOT** | **~9.6 GNOT** |
 
 That makes **about 90 GNOT**. `GnoAlex` held 100 GNOT on onyx on 2026-09-29, which leaves about 10 for a rerun. The deposits are locked for good, since published data is never freed.
 
@@ -137,7 +137,7 @@ until gnokey query vm/qpkgmeta_json -data gno.land/r/nym-golfer000/golf -remote 
 
 ### 4. Publish the 74 holes
 
-The script sends one plain `gnokey maketx call` of `Publish(slot, hex, "")` a hole, in the order of `data/holes.txt`. It asks the password once. Each call's gas is sized from its hole's data at the node's gas price, and its deposit is capped at `MAX_DEPOSIT`, 10 GNOT by default. A slot that already holds its data is skipped, so after a failure you just run it again. It ends by checking every slot.
+The script sends one plain `gnokey maketx call` of `Publish(slot, hex, "")` a hole, in the order of `data/holes.txt`. It asks the password once. Each call is simulated first and then asks the gas the simulation used and a tenth more, at the node's gas price, and its deposit is capped at `MAX_DEPOSIT`, 10 GNOT by default. A slot that already holds its data is skipped, so after a failure you just run it again. It ends by checking every slot.
 
 ```sh
 REALM=gno.land/r/nym-golfer000/golf REMOTE=$RPC CHAINID=onyx-1 scripts/publishdata.sh GnoAlex
@@ -506,7 +506,7 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
 
 ### 10.4 Budget
 
-> History: the design's estimate. Measured since: about 77.6 GNOT of deposit and 12.2 of fees ([Costs](#costs-estimates)).
+> History: the design's estimate. Measured since: about 77.6 GNOT of deposit and 9.6 of fees ([Costs](#costs-estimates)).
 
 | Item | GNOT |
 |---|---|

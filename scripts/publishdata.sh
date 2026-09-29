@@ -2,9 +2,10 @@
 # publishdata.sh <key>: publishes every course hole of data/holes.txt into its
 # slot, as the course's owner (<key>, a gnokey key name): one plain
 # `gnokey maketx call` of golf's Publish(slot, hex, "") a hole, in order,
-# each simulated before it is sent (gnokey's default). A slot whose current
-# version already holds the data is refused by the simulation ("nothing to
-# publish") and skipped, so the script can be run again after a failure.
+# each simulated first (-simulate only) and then sent asking the gas the
+# simulation used. A slot whose current version already holds the data is
+# refused by the simulation ("nothing to publish") and skipped, so the
+# script can be run again after a failure.
 # Then it checks every slot (below). The key's password is asked once and
 # handed to each call on its stdin.
 #
@@ -16,7 +17,7 @@
 # REALM is the golf realm (default gno.land/r/gnogolf/golf), REMOTE the node
 # (default 127.0.0.1:26657), CHAINID its chain id (default dev), GNOKEY the
 # gnokey (default the onyx toolchain's, in GNO_TOOLCHAIN: see check.sh). A
-# call asks gas for its hole's data (below, measured on the course) at the
+# call asks the gas its simulation used and a tenth more (below) at the
 # node's gas price (auth/gasprice), and its storage deposit is capped at
 # MAX_DEPOSIT (default 10000000ugnot; a hole stores 4 to 35 KB).
 #
@@ -62,15 +63,17 @@ read -r pass
 stty echo 2>/dev/null || true
 echo >&2
 
-# publish slot hex gas fee: one Publish call, its output in out. A call
-# signed before the one before it has landed reads the account's old
+# publish slot hex gas simulate: one Publish call (-simulate only, or test:
+# simulated and sent), paying gas at the node's price, its output in out. A
+# call signed before the one before it has landed reads the account's old
 # sequence ("signature verification failed"): sent again, a block later (the
 # web client's gnokey paste does the same: adena.ts gnokeyPaste).
 publish() {
+	fee=$(echo "$price" | awk -v g="$3" '{printf "%d", g * $1 / $2 + 1}')
 	for try in 1 2 3; do
 		out=$(printf '%s\n' "$pass" | "$gnokey" maketx call -pkgpath "$realm" -func Publish -args "$1" -args "$2" -args "" \
-			-gas-wanted "$3" -gas-fee "${4}ugnot" -max-deposit "${MAX_DEPOSIT:-10000000ugnot}" \
-			-broadcast -chainid "$chainid" -remote "$remote" -insecure-password-stdin "$key" 2>&1) && return 0
+			-gas-wanted "$3" -gas-fee "${fee}ugnot" -max-deposit "${MAX_DEPOSIT:-10000000ugnot}" \
+			-broadcast -simulate "$4" -chainid "$chainid" -remote "$remote" -insecure-password-stdin "$key" 2>&1) && return 0
 		echo "$out" | grep -q "signature verification failed" || return 1
 		sleep 6
 	done
@@ -80,14 +83,19 @@ publish() {
 n=0
 while read -r slot _ _ hex; do
 	n=$((n + 1))
-	# what Publish of b bytes costs, with a fifth more: every course hole's
-	# first version took under 25M and 55K a byte (onyx toolchain, gnodev)
+	# the simulation's gas, what Publish of b bytes costs with a fifth more:
+	# every hole's first version took under 25M and 55K a byte (onyx
+	# toolchain, gnodev). The call then asks what the simulation used and a
+	# tenth more, rounded up: the same run, but the state can differ by a few
+	# bytes by the time it lands.
 	gas=$(awk -v b=$((${#hex} / 2)) 'BEGIN {printf "%d", (25000000 + 55000 * b) * 1.2}')
-	fee=$(echo "$price" | awk -v g="$gas" '{printf "%d", g * $1 / $2 + 1}')
 	printf '%2d %-12s ' "$n" "$slot"
-	publish "$slot" "$hex" "$gas" "$fee" || true
+	if publish "$slot" "$hex" "$gas" only; then
+		gas=$(echo "$out" | awk '/GAS USED/ {printf "%d", ($3 * 11 + 9) / 10}')
+		publish "$slot" "$hex" "$gas" test || true
+	fi
 	if echo "$out" | grep -q "^OK!"; then
-		echo "$out" | awk '/GAS USED|STORAGE DELTA|TX HASH/ {printf "%s  ", $0} END {print ""}'
+		echo "$out" | awk '/GAS WANTED|GAS USED|STORAGE DELTA|TX HASH/ {printf "%s  ", $0} END {print ""}'
 	elif echo "$out" | grep -q "nothing to publish"; then
 		echo "already current"
 	else
