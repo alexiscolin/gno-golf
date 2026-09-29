@@ -221,8 +221,8 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   // the reset menu, in the corner row beside About
   const resetMenu = played.length > 0 && (
     <div className="resets">
-      <button className="round round--pill" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>
-        Reset scores ▾
+      <button className="round round--pill" aria-label="Reset scores" aria-expanded={resets} onClick={() => (sound("blip"), setResets((o) => !o), setWipe(null))}>
+        Reset<span className="resets__what"> scores</span> ▾
       </button>
       {resets && (
         <div className="resets__menu" role="menu">
