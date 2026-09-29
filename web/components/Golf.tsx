@@ -247,13 +247,14 @@ function useNow(clock: () => number) {
 // by and clock (now, ms) on the chain's clock; ranked: a course hole (a community one ranks nobody)
 // again: what the button to play again says (Rematch in a duel)
 // moot: no better than the player's best there (the chain keeps that one)
-function SaveClock({ by, clock = Date.now, stale, ranked, moot, again = "Play again" }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean; moot?: boolean; again?: string }) {
+// dare: a duel won's rival, dared back by the saved round (one line, not two)
+function SaveClock({ by, clock = Date.now, stale, ranked, moot, dare, again = "Play again" }: { by: number; clock?: () => number; stale?: boolean; ranked: boolean; moot?: boolean; dare?: string; again?: string }) {
   const now = useNow(clock);
   const left = by - now;
   if (left > 0 && !stale)
     return (
       <p className={"saveclock" + (left < 60000 ? " saveclock--soon" : "")}>
-        Only in this browser. Save within <b>{mmss(left)}</b> {moot ? "to play it on-chain (your best here stays)" : ranked ? "to be ranked" : "to keep it on your address"}.
+        {dare && !moot ? "" : "Only in this browser. "}Save within <b>{mmss(left)}</b> {moot ? "to play it on-chain (your best here stays)" : dare ? `to rank it and dare ${dare} back` : ranked ? "to be ranked" : "to keep it on your address"}.
       </p>
     );
   return (
@@ -1708,7 +1709,7 @@ export default function Golf() {
               return warn && <p className="note note--warn">{warn}</p>;
             })()}
             {!played && !phoneOnly && s.period != null && (
-              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} moot={moot} again={won ? "Rematch" : undefined} />
+              <SaveClock by={saveBy(s.period)} clock={game.current ? game.current.chain.now : undefined} stale={closed} ranked={!!s.official} moot={moot} dare={won && won.result !== "loss" && !won.duel.self ? won.duel.name : undefined} again={won ? "Rematch" : undefined} />
             )}
             {/* one solid action at a time: saving while it gets somewhere, else going on (a duel lost or tied: the rematch) */}
             <div className="banner__row">
@@ -1750,8 +1751,8 @@ export default function Golf() {
             {canSave && !phoneOnly && (
               <p className="real__fine">
                 {/* why save: a link that dares */}
-                {won ? won.result !== "loss" && !won.duel.self && `Save it to dare ${won.duel.name} back with your own ghost. `
-                  : !daring && "Save it and your link becomes a dare: friends race your ghost, free, no wallet. "}
+                {/* a duel's dare is the clock's own line */}
+                {!won && !daring && "Save it and your link becomes a dare: friends race your ghost, free, no wallet. "}
                 {account && costNow && `${costNow}. You confirm in Adena.`}
               </p>
             )}
