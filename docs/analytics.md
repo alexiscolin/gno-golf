@@ -72,7 +72,7 @@ web vitals (`$web_vitals`) are PostHog's own.
 | `restart` | `hole`, `strokes`, `holed` | Play again, Rematch, a race from the tee | `engine.ts reset()` |
 | `cup_complete` | `cup`, `strokes`, `vs_par`, `best` (it beat the cup's best) | a cup finished, or bettered | `Golf.tsx holedRef` |
 | `badge_earned` | `id` | a new badge | `Golf.tsx award()` |
-| `duel_started` | `rival`, `ghost` (their strokes), `mixed` (another aim mode) | a ghost armed | `Golf.tsx` |
+| `duel_started` | `hole`, `cup`, `rival`, `ghost` (their strokes), `mixed` (another aim mode) | a ghost armed | `Golf.tsx` |
 | `duel_result` | `rival`, `result` (win/loss/tie), `strokes`, `ghost` | a duel's hole holed | `Golf.tsx holedRef` |
 | `save` | `stage` (sent/ok/cancelled/failed), `parts`, `part`, `gas` (the part's estimate), `ms`, `reason` (late, replay, unconfirmed, missing, down, chain, gas, funds, locked, busy, network, other) | Adena about to open (sent), then its end | `Golf.tsx saveRound()` |
 | `name_registered` | `ok`, `via` (save/form), `reason` | a name taken with a save, or from the name form | `Golf.tsx`, `Leaderboard.tsx` |

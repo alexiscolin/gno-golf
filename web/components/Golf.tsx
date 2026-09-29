@@ -1371,7 +1371,7 @@ export default function Golf() {
   // a duel armed: who, and the best to beat
   const racingGhost = racing && racing.ghost;
   useEffect(() => {
-    if (racing) track("duel_started", { rival: rivalKind(), ghost: racing.ghost.strokes, mixed: racing.ghost.mode !== ((s && s.roundMode) || aim) });
+    if (racing && holeId) track("duel_started", { hole: holeId, cup: playOf(holeId).cup, rival: rivalKind(), ghost: racing.ghost.strokes, mixed: racing.ghost.mode !== ((s && s.roundMode) || aim) });
   }, [racingGhost]); // eslint-disable-line react-hooks/exhaustive-deps -- once a ghost
   // the game could not start, or a hole would not load
   useEffect(() => void (fatal && trackError("fatal", fatal.msg, { kind: fatal.kind })), [fatal]);

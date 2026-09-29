@@ -43,7 +43,7 @@ export interface Events {
   name_registered: { ok: boolean; via: "save" | "form" | "gnokey"; reason?: string };
   badge_earned: { id: string };
   cup_complete: { cup: string; strokes: number; vs_par: number; best: boolean };
-  duel_started: { rival: RivalKind; ghost: number; mixed: boolean };
+  duel_started: Pick<Play, "hole" | "cup"> & { rival: RivalKind; ghost: number; mixed: boolean };
   duel_result: { rival: RivalKind; result: "win" | "loss" | "tie"; strokes: number; ghost: number };
   share: { target: string; what: "hole" | "cup" | "board" | "clip" };
   wallet: { adena: boolean; connected: boolean };
