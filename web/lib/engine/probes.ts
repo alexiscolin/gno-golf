@@ -79,7 +79,7 @@ export function probes(E: Live, { cam, rp, placeBall, fakeWeather }: Inner) {
           // (lines are picked up a whole unit wide: bunting wires, not a wall in the face)
           const hit = rc.intersectObjects(scene.children, true).find((h) => {
             const o = h.object;
-            if (!o.visible || o instanceof THREE.Sprite || o instanceof THREE.Points || o instanceof THREE.Line || o === cam.marker) return false;
+            if (!o.visible || o instanceof THREE.Sprite || o instanceof THREE.Points || o instanceof THREE.Line) return false;
             const m = isDrawn(o) && !Array.isArray(o.material) ? o.material : null;
             return !(m && m.transparent && m.opacity < 0.5);
           });

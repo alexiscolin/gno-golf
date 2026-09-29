@@ -17,7 +17,6 @@ function makeCam() {
     occluded: () => false,
     inner: { some: "state" },
     lensWho: {} as Record<number, number>,
-    marker: new THREE.Object3D(),
     yaw: () => 0.5,
     gliding: () => false,
     laneAt: (x: number, z: number) => ({ x, z }),

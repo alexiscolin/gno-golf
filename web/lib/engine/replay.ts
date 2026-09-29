@@ -329,7 +329,7 @@ export function makeReplay(E: Live) {
     const cutAt = E.cut;
     const tube = g.course?.userData.tubes.get(z);
     sound("whoosh");
-    // in the tube, the ball is hidden on purpose (the camera shows where it is)
+    // in the tube, the ball is hidden on purpose
     g.inTube = true;
     return new Promise<void>((settle) => {
       const done = () => ((g.inTube = false), settle());
