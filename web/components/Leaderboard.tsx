@@ -596,8 +596,8 @@ export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string
         const b = { ...board, rows: screen_(board.rows, flags, false).rows };
         const mine = me ? b.rows.find((r) => r.player === me) : undefined;
         if (mine && mine.strokes <= strokes) return; // no better than the player's own best
-        // the board orders equal strokes by address; not connected, a tie counts as ahead
-        const ahead = b.rows.filter((r) => r.player !== me && (r.strokes < strokes || (r.strokes === strokes && (!me || r.player < me)))).length;
+        // equal strokes go by who got there first: a save lands last, so every tie is ahead
+        const ahead = b.rows.filter((r) => r.player !== me && r.strokes <= strokes).length;
         // sorted rows: a row not ahead, or the end of the board, makes the place exact
         // (a page can hold fewer rows than asked while more follow)
         if (ahead < b.rows.length || b.next === 0) setAt(ahead + 1);
