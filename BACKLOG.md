@@ -401,6 +401,11 @@ real answer.
   lanes cost the rain's forecast). The client needs its world: a new scene,
   or a night/volcano variant of an existing one to ship sooner. A good
   "what's next" after the launch, between the duels wave and the Builder.
+  **Chosen: the Crystal Mines** (the gnomes' own mines), at the other cups'
+  level of finish, with wow moments: glowing crystal galleries, mine carts on
+  rails to time, rope bridges over the void, lava lakes and a lava fall, a
+  collapsing gallery, a lift down a shaft, lanterns and gnome miners at work;
+  a miner gnome (helmet, headlamp) and a badge for finishing it at par.
 - **V2 ideas:** duel records on-chain (`Duel(hole, rival)` with its board and
   streaks, ADR-004), a creators' board (community holes ranked by what makes
   them worth replaying), the hole of the day (above).
