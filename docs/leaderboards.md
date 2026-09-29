@@ -22,6 +22,15 @@ Everything below runs on-chain; the dapp reads it.
   rank from the player's next finish once named. The dapp lists them folded
   under each board ("Also finished, no name"), greyed and without a place,
   from `Records` and `Players`.
+- **The course ranks by holes, then against par.** A player's standing adds
+  up their best on each current course hole: most holes first, then the best
+  score against par (each best's strokes less its hole's par, added up), then
+  whoever got there first: the one whose standing last moved (a finish that
+  added a hole or lowered the score) in an earlier block, then the lower
+  address ([the exact rule](golf.md#records-and-rankings)). A hole at par counts the same whatever its par, so
+  one board takes every hole's difficulty in, the Crystal Mines' included. The
+  course boards show that score (`E`, `−3`, `+5`) and the holes; a hole's own
+  board ranks by strokes, its par being the same for everyone on it.
 - **Friends first.** `Bests(hole, mode, players)` and `Standings(mode, players)`
   read any list of up to 50 addresses, named or not. The dapp's Friends tab
   compares you with people you chose, and no bot can push you off. The sheet

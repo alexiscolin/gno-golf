@@ -310,11 +310,13 @@ var (
 	archiving []string
 )
 
-// row is one player's standing across the course.
+// row is one player's standing across the course: their best on each hole
+// counted, summed, and those holes' pars, summed. Its score against par,
+// strokes - par, is what ranks it after its holes.
 type row struct {
-	player         string
-	holes, strokes int
-	height         int64 // of the finish that last improved it: the first there ranks first
+	player              string
+	holes, strokes, par int
+	height              int64 // of the finish that last improved it: the first there ranks first
 }
 
 const topSize = 10
@@ -410,11 +412,22 @@ func pad(n, width int) string {
 	return s
 }
 
-// rankKey orders the course ranking: most holes first, then fewest strokes,
-// then the first there, then the address.
+// rankKey orders the course ranking: most holes first, then the best score
+// against par (a hole at par counts the same whatever its par), then the
+// first there, then the address. The score is signed: vsParBias puts it in
+// seven digits, as holes (at most maxCourse) fit four.
 func rankKey(r *row) string {
-	return pad(9999-r.holes, 4) + "/" + pad(r.strokes, 7) + "/" + pad(int(r.height), 12) + "/" + r.player
+	return pad(9999-r.holes, 4) + "/" + pad(vsParBias+r.strokes-r.par, 7) + "/" + pad(int(r.height), 12) + "/" + r.player
 }
+
+// maxCourse bounds the course's slots (Publish), and so a standing's holes;
+// vsParBias is more than a standing can be under or over par: a hole is -18
+// to +59 (1 to 60 strokes, par 1 to 19), so a standing at most 9999 * 59 =
+// 589,941 over, 179,982 under.
+const (
+	maxCourse = 9999
+	vsParBias = 1000000
+)
 
 // boardKey orders a hole's board by each player's best v: fewest strokes,
 // then the first to make them (a best's shots are public: whoever replays
@@ -437,13 +450,13 @@ func boardStrokes(k string) int {
 // in step. A standing with no hole left is not freed, nor its key, which
 // moves to idle: its deposit is the player's, and freeing it would refund
 // whoever drained it. It moves back at the player's next hole.
-func setRow(m int, r *row, holes, strokes int, at int64) {
+func setRow(m int, r *row, holes, strokes, par int, at int64) {
 	k := rankKey(r)
 	_, had := ranks[m].Remove(k)
 	if _, ok := idle[m].Remove(k); ok {
 		had = true
 	}
-	r.holes, r.strokes, r.height = holes, strokes, at
+	r.holes, r.strokes, r.par, r.height = holes, strokes, par, at
 	switch {
 	case r.holes > 0 && named(r.player):
 		ranks[m].Set(rankKey(r), r.player)
@@ -452,11 +465,11 @@ func setRow(m int, r *row, holes, strokes int, at int64) {
 	}
 }
 
-// improve moves a player's standing by a new best on an official hole (was:
-// their old best there, 0 if none): only those count, or anyone's own hole
-// would be a way to the top. The standing is kept, not recomputed, so a
-// finish costs the same however many play.
-func improve(m int, player string, was, best int) {
+// improve moves a player's standing by a new best on an official hole of par
+// par (was: their old best there, 0 if none): only those count, or anyone's
+// own hole would be a way to the top. The standing is kept, not recomputed,
+// so a finish costs the same however many play.
+func improve(m int, player string, par, was, best int) {
 	r := &row{player: player}
 	if v := totals[m].Get(player); v != nil {
 		r = v.(*row)
@@ -464,9 +477,9 @@ func improve(m int, player string, was, best int) {
 		totals[m].Set(player, r)
 	}
 	if was == 0 {
-		setRow(m, r, r.holes+1, r.strokes+best, runtime.ChainHeight())
+		setRow(m, r, r.holes+1, r.strokes+best, r.par+par, runtime.ChainHeight())
 	} else {
-		setRow(m, r, r.holes, r.strokes+best-was, runtime.ChainHeight())
+		setRow(m, r, r.holes, r.strokes+best-was, r.par, runtime.ChainHeight())
 	}
 }
 
@@ -505,8 +518,9 @@ func drain(n int) {
 					return true
 				}
 				if d.fresh[m] == nil || !d.fresh[m].Has(p) {
-					if r := totals[m].Get(p); r != nil {
-						setRow(m, r.(*row), r.(*row).holes-1, r.(*row).strokes-bestStrokes(v), r.(*row).height)
+					if t := totals[m].Get(p); t != nil {
+						r := t.(*row)
+						setRow(m, r, r.holes-1, r.strokes-bestStrokes(v), r.par-e.par, r.height)
 					}
 				}
 				n--
@@ -958,7 +972,7 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 		best = bestOf(r)
 		e.bests(m).Set(p, best)
 		if counts(e, m, p, was) {
-			improve(m, p, was, r.strokes)
+			improve(m, p, e.par, was, r.strokes)
 		} else if was == 0 && e.official && e.next != "" && !e.out.done[m] && p >= e.out.from[m] {
 			// the drain has yet to reach this first finish: it was never
 			// counted, so it must not be taken out

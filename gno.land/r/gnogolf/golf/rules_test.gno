@@ -206,7 +206,7 @@ func TestRetireDrainsInBatches(cur realm, t *testing.T) {
 	PlayRoundAt(cross(cur), old, "0,1", Period()) // 1 stroke: drains the rest as a finish
 	for _, p := range ps {
 		r := totals[assisted].Get(p.String()).(*row)
-		uassert.True(t, r.holes == 0 && r.strokes == 0, "no hole left, a standing of 0: "+p.String())
+		uassert.True(t, r.holes == 0 && r.strokes == 0 && r.par == 0, "no hole left, a standing of 0: "+p.String())
 		uassert.False(t, ranks[assisted].Has(rankKey(r)), "and no rank")
 	}
 	uassert.True(t, e.out.done[assisted] && e.out.done[pro])
@@ -223,7 +223,7 @@ func TestNoZeroHoleRows(cur realm, t *testing.T) {
 	old := publish(cur, cupHole("island", 48, "Solo"))
 	testing.SetRealm(testing.NewUserRealm(solo))
 	PlayRoundAt(cross(cur), old, "0,1", Period())
-	uassert.True(t, strings.Contains(Leaderboard("assisted"), solo.String()))
+	uassert.True(t, rankOf("assisted", solo) > 0, "ranked")
 	of := ranks[assisted].Size()
 	again := publish(cur, cupHole("island", 48, "Solo again")) // the same island slot
 	lb := Leaderboard("assisted")
@@ -499,8 +499,8 @@ func TestOnlyCourseFinishesDrain(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(stranger))
 	uassert.Equal(t, 0, Drain(cross(cur), drainMax))
 	for _, p := range ps {
-		holes, strokes := StandingOf("assisted", p)
-		uassert.True(t, holes == 0 && strokes == 0 && totals[assisted].Get(p.String()) != nil, "kept at 0: "+p.String())
+		holes, strokes, par := StandingOf("assisted", p)
+		uassert.True(t, holes == 0 && strokes == 0 && par == 0 && totals[assisted].Get(p.String()) != nil, "kept at 0: "+p.String())
 	}
 }
 
@@ -566,4 +566,124 @@ func TestLegendSlopeWay(t *testing.T) {
 	}}
 	s, _ := legend(f)
 	urequire.Equal(t, " · `^` hill (slope), falls toward 90° · `^` hill (slope), falls toward 180° · `~` draft (slope), pushes toward 0°", s)
+}
+
+// parHole is a Crystal Mines hole of par par: cupHole's box, holed by "0,1"
+// from the tee, a stroke more for each "0,0.001" before it.
+func parHole(cur realm, order, par int) string {
+	h := cupHole("mines", order, "Par "+strconv.Itoa(par))
+	h.Strokes = par
+	return publish(cur, h)
+}
+
+// strokesOf is shots that hole a parHole in n strokes.
+func strokesOf(n int) string { return strings.Repeat("0,0.001;", n-1) + "0,1" }
+
+// rankOf is a player's place in a mode's course ranking, 0 if none.
+func rankOf(mode string, p address) int {
+	n, _ := strconv.Atoi(jfield(Rank(mode, p), "rank"))
+	return n
+}
+
+// The course ranks by holes, then by the score against par: a hole at par
+// counts the same on a par 5 as on a par 2, so two players level there rank
+// by who got there first, whatever their strokes and addresses.
+func TestAHoleAtParCountsTheSameWhateverItsPar(cur realm, t *testing.T) {
+	five, two := parHole(cur, 1, 5), parHole(cur, 2, 2)
+	first, then := testutils.TestAddress("vpfirst"), testutils.TestAddress("vpthen")
+	for i := 0; then.String() > first.String(); i++ { // the later sorts first
+		urequire.True(t, i < 100, "no address sorts first")
+		then = testutils.TestAddress(string(rune('a'+i%26)) + strconv.Itoa(i) + "vpthen")
+	}
+	giveName(cur, first, "vpfirst")
+	giveName(cur, then, "vpthen")
+	replayAs(cur, first, five, strokesOf(5))
+	testing.SkipHeights(1)
+	replayAs(cur, then, two, strokesOf(2))
+	uassert.True(t, strings.HasSuffix(Rank("assisted", first), `,"holes":1,"strokes":5,"par":5}`), Rank("assisted", first))
+	uassert.True(t, strings.HasSuffix(Rank("assisted", then), `,"holes":1,"strokes":2,"par":2}`), Rank("assisted", then))
+	a, b := rankOf("assisted", first), rankOf("assisted", then)
+	uassert.True(t, a > 0 && a < b, "level at par: the first there first, "+Rank("assisted", first)+Rank("assisted", then))
+	all := CourseLeaderboard("assisted", 0, 100)
+	uassert.True(t, strings.Contains(all, `{"player":"`+first.String()+`","name":"vpfirst","holes":1,"strokes":5,"par":5}`), all)
+}
+
+// More holes beat a better score against par; among as many holes, the
+// better score ranks first, and an improvement moves the strokes, not the par.
+func TestMoreHolesBeatABetterScore(cur realm, t *testing.T) {
+	x, y := parHole(cur, 3, 3), parHole(cur, 4, 3)
+	many, good := testutils.TestAddress("vpmany"), testutils.TestAddress("vpgood")
+	giveName(cur, many, "vpmany")
+	giveName(cur, good, "vpgood")
+	replayAs(cur, good, x, strokesOf(1)) // one hole, -2
+	// two holes, +2 each: +4
+	for _, id := range []string{x, y} {
+		replayAs(cur, many, id, strokesOf(5))
+	}
+	uassert.True(t, rankOf("pro", many) == 0, "an assisted standing only")
+	uassert.True(t, rankOf("assisted", many) < rankOf("assisted", good), "two holes at +4 before one at -2")
+	replayAs(cur, many, x, strokesOf(2)) // -1 on x: +1 in all
+	holes, strokes, par := StandingOf("assisted", many)
+	uassert.True(t, holes == 2 && strokes == 7 && par == 6, "an improvement moves the strokes only")
+	// the best score among as many holes ranks first
+	other := testutils.TestAddress("vpother")
+	giveName(cur, other, "vpother")
+	replayAs(cur, other, x, strokesOf(3))
+	replayAs(cur, other, y, strokesOf(3)) // level par in two
+	uassert.True(t, rankOf("assisted", other) < rankOf("assisted", many), "even before +1")
+}
+
+// An archived hole leaves a standing with its own par: its strokes and par
+// come out, and what is left ranks by the holes still current.
+func TestTheDrainTakesAnArchivedHolesParOut(cur realm, t *testing.T) {
+	five, two := parHole(cur, 5, 5), parHole(cur, 6, 2)
+	p := testutils.TestAddress("vpdrain")
+	giveName(cur, p, "vpdrain")
+	replayAs(cur, p, five, strokesOf(4)) // -1
+	replayAs(cur, p, two, strokesOf(3))  // +1
+	holes, strokes, par := StandingOf("assisted", p)
+	uassert.True(t, holes == 2 && strokes == 7 && par == 7, "level par in two")
+	was := rankKey(totals[assisted].Get(p.String()).(*row))
+	h := cupHole("mines", 5, "Par 5 again")
+	h.Strokes = 5
+	publish(cur, h) // archives five
+	drain(drainMax) // and any archived before it
+	holes, strokes, par = StandingOf("assisted", p)
+	uassert.True(t, holes == 1 && strokes == 3 && par == 2, "+1 on the par 2 alone")
+	r := totals[assisted].Get(p.String()).(*row)
+	uassert.True(t, ranks[assisted].Has(rankKey(r)) && !ranks[assisted].Has(was), "ranked by what is left, once")
+}
+
+// A tie on holes and score goes to whoever got there first: the standing
+// that last moved earlier, a worse or level replay moving nothing; in the
+// same block, the lower address.
+func TestATieGoesToWhoGotThereFirst(cur realm, t *testing.T) {
+	x, y := parHole(cur, 7, 3), parHole(cur, 8, 3)
+	a, b := testutils.TestAddress("tiea"), testutils.TestAddress("tieb")
+	giveName(cur, a, "tiea")
+	giveName(cur, b, "tieb")
+	replayAs(cur, a, x, strokesOf(3))
+	testing.SkipHeights(1)
+	replayAs(cur, b, x, strokesOf(3))
+	uassert.True(t, rankOf("assisted", a) < rankOf("assisted", b), "level at E on one hole: the first there")
+	testing.SkipHeights(1)
+	replayAs(cur, a, x, strokesOf(4)) // worse
+	replayAs(cur, a, x, strokesOf(3)) // level with their own best
+	uassert.True(t, rankOf("assisted", a) < rankOf("assisted", b), "a replay that improves nothing moves nothing")
+	testing.SkipHeights(1)
+	replayAs(cur, b, y, strokesOf(3))
+	testing.SkipHeights(1)
+	replayAs(cur, a, y, strokesOf(3))
+	uassert.True(t, rankOf("assisted", b) < rankOf("assisted", a), "b reached two holes at E first")
+	// in one block, the address
+	c, d := testutils.TestAddress("tiec"), testutils.TestAddress("tied")
+	if d.String() < c.String() {
+		c, d = d, c
+	}
+	giveName(cur, c, "tiec")
+	giveName(cur, d, "tied")
+	testing.SkipHeights(1)
+	replayAs(cur, d, x, strokesOf(3))
+	replayAs(cur, c, x, strokesOf(3))
+	uassert.True(t, rankOf("assisted", c) < rankOf("assisted", d), "the same block: the lower address")
 }

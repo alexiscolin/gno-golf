@@ -29,6 +29,10 @@ replay of your shots, and anyone can replay it again.
   with throwaway addresses. You can take a name without leaving the game, in
   the same signature that ranks the rounds you saved before it. Rounds saved
   without a name are still kept, and shown apart under each board.
+- A hole's board ranks by strokes. The course ranking counts the holes you
+  finished, then your score against par over them (your best on each, less
+  its par, added up), then who got there first: a hole at par counts the same
+  whatever its par.
 - You can read a hole's code on gnoweb before you play it.
 - A saved round dares your friends: your share link has them race your best
   as a see-through ghost, stroke for stroke. The ghost is your real round,

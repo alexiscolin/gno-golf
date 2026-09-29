@@ -225,9 +225,11 @@ under way), each continuing the round.
 ### `Rank(mode, player) string` — a player's place
 
 ```json
-{"version":1,"mode":"assisted","player":"g1…","rank":7,"of":213,"holes":18,"strokes":64}
+{"version":1,"mode":"assisted","player":"g1…","rank":7,"of":213,"holes":18,"strokes":64,"par":57}
 ```
 
+The course ranks by `holes`, then by the score against par, `strokes - par`
+(`par` is the pars of those holes, added up), then by who got there first.
 `rank` is 0 for a player the ranking doesn't hold: unnamed (only players with
 a gno.land name are ranked), or with no current course hole finished. `mode`
 is `"assisted"` or `"pro"`, and each has its own records and ranking.

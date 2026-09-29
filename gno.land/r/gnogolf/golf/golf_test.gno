@@ -298,6 +298,9 @@ func TestLeaderboardRanksFinishedRounds(cur realm, t *testing.T) {
 	lb := Leaderboard("pro")
 	uassert.True(t, strings.Contains(lb, `"player":"`+player.String()+`"`), lb)
 	uassert.True(t, strings.HasPrefix(lb, `{"version":1,"mode":"pro","holes":`), lb)
+	uassert.True(t, strings.Contains(lb, `"name":"golfer","holes":1,"strokes":1,"par":3}`), lb)
+	hub := Render("")
+	uassert.True(t, strings.Contains(hub, "| rank | player | holes | vs par |") && strings.Contains(hub, " | [@golfer](/u/golfer) | 1 | -2 |"), hub)
 }
 
 // A finish on anyone's hole keeps no standing and ranks nobody: no 0-hole

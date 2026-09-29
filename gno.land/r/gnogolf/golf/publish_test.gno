@@ -140,7 +140,7 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(fan))
 	PlayRoundAt(cross(cur), v1, "0,0.001;0,1", Period())
 	uassert.Equal(t, 2, BestOf(v1, "assisted", fan))
-	holes, strokes := StandingOf("assisted", fan)
+	holes, strokes, _ := StandingOf("assisted", fan)
 	uassert.True(t, holes >= 1 && strokes >= 2, "the course hole counts")
 	uassert.True(t, strings.Contains(Leaderboard("assisted"), fan.String()+`","name":"fan",`), "with the name")
 	uassert.Equal(t, 2, sumWear(mustHole(v1)), "two strokes, two marks on the version's wear")
@@ -151,7 +151,7 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 	uassert.Equal(t, v2, mustHole(v1).next)
 	uassert.Equal(t, v2, Current("mountain/62"))
 	was := holes
-	holes, _ = StandingOf("assisted", fan)
+	holes, _, _ = StandingOf("assisted", fan)
 	uassert.Equal(t, was-1, holes, "the old version's best leaves the standing")
 	uassert.Equal(t, 2, BestOf(v1, "assisted", fan), "and stays its record")
 	uassert.Equal(t, 0, BestOf("mountain/62", "assisted", fan), "the new version starts afresh")
@@ -171,7 +171,7 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(fan))
 	PlayRoundAt(cross(cur), v1, "0,1", Period())
 	uassert.Equal(t, 1, BestOf(v1, "assisted", fan))
-	holes, _ = StandingOf("assisted", fan)
+	holes, _, _ = StandingOf("assisted", fan)
 	uassert.Equal(t, was-1, holes)
 	uassert.Equal(t, 3, sumWear(mustHole(v1)))
 }
@@ -543,17 +543,17 @@ func TestAFirstFinishOnAnArchivedHoleNeverCounts(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(late))
 	PlayRoundAt(cross(cur), old, "0,0.001;0,1", Period())
 	uassert.Equal(t, 2, BestOf(old, "assisted", late), "the record is kept")
-	holes, _ := StandingOf("assisted", late)
+	holes, _, _ := StandingOf("assisted", late)
 	uassert.Equal(t, 0, holes, "no hole counted on an archived hole")
 	testing.SetRealm(testing.NewUserRealm(late))
 	Reset(cross(cur), old)
 	testing.SetRealm(testing.NewUserRealm(late))
 	PlayRoundAt(cross(cur), old, "0,1", Period())
 	drain(retireBatch)
-	holes, _ = StandingOf("assisted", late)
+	holes, _, _ = StandingOf("assisted", late)
 	uassert.Equal(t, 0, holes, "nor after an improvement and the drain")
 	for _, p := range early {
-		holes, _ := StandingOf("assisted", p)
+		holes, _, _ := StandingOf("assisted", p)
 		uassert.Equal(t, 0, holes, "the early finishers were drained")
 	}
 }
