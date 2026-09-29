@@ -692,6 +692,19 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 .newgnome .btn { white-space: nowrap; }
 .victory .note { margin: 0; }
 .victory .banner__row { margin-top: 6px; gap: 12px; flex-wrap: wrap; }
+/* a new gnome's card takes the room: the share and the way back on one line under it,
+   and on a laptop's height (800) the cup, its title and the gaps a size down: no scroll */
+@media (min-width: 720px) {
+  .victory__in:has(.newgnome) { grid-template-columns: 1fr auto auto 1fr; column-gap: 24px; }
+  .victory__in:has(.newgnome) > * { grid-column: 1 / -1; }
+  .victory__in:has(.newgnome) > .share { grid-column: 2; }
+  .victory__in:has(.newgnome) > .banner__row { grid-column: 3; margin-top: 0; }
+}
+@media (min-width: 601px) and (max-height: 820px) {
+  .victory__in { gap: 6px; padding-top: 14px; padding-bottom: 16px; }
+  .victory__badge { width: clamp(56px, 8vh, 108px); }
+  .victory h2 { font-size: clamp(34px, 6vh, 58px); }
+}
 @media (max-width: 600px) {
   .victory { padding: 10px; }
   .victory__in { max-height: calc(100dvh - 20px); border-radius: 22px; box-shadow: 0 0 0 5px var(--c1), 0 0 0 8px var(--ink), 0 10px 0 2px var(--ink); gap: 8px; }
