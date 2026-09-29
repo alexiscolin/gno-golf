@@ -286,6 +286,7 @@ var worlds = []struct{ id, name string }{
 	{"island", "Island Cup"},
 	{"town", "Mushroom Town"},
 	{"mountain", "Mountain Cup"},
+	{"mines", "Crystal Mines"},
 }
 
 // worldRank is a world's place among worlds; any other comes after.
