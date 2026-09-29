@@ -2087,7 +2087,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .about__links b { font-size: 14px; }
 .about__links span { font-size: 12.5px; font-weight: 400; color: var(--ink-soft); }
 .about__credit { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: var(--rule); font-size: 13px; color: var(--ink-soft); }
-.about__credit a, .boards__ranked a, .nameform a, a.mono, .real__fine a, a.real__fine { color: var(--ink); } /* inline links in soft text: ink, one rule */
+.about__credit a, .boards__ranked a, .nameform a, a.mono, .real__fine a, a.real__fine { color: inherit; } /* inline links in soft text: its colour, the underline says link */
 .real__fine a, a.real__fine { white-space: nowrap; } /* a small link wraps whole */
 .sheet .about__verify { margin: 0 0 18px; text-align: left; }
 @media (pointer: coarse) { .real__fine a, a.real__fine { padding-block: 5px; margin-block: -5px; } } /* a finger's 24px round a small link, the line kept */
