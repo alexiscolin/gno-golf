@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { makeCamera } from "../lib/engine/camera.ts";
+import { timeOf } from "../lib/scene/camera.ts";
 import { angDiff, terrain } from "../lib/terrain.ts";
 import type { Live } from "../lib/engine/types.ts";
 import type { HoleState, Post, Vec2, Wall } from "../lib/types.ts";
@@ -336,4 +337,8 @@ void test("a post right where the camera would sit is avoided", () => {
   const cam = settle(mkCam(hole));
   const d = Math.hypot(cam.camera.position.x - 5, cam.camera.position.z - 5);
   assert.ok(d >= 1 - 0.05, `the camera (d=${d.toFixed(2)}) should be pushed clear of the post's radius`);
+});
+
+test("a hole's time of day is its number in its cup's, not its version's", () => {
+  assert.deepEqual(["garden/2/v1", "garden/3/v1", "garden/4/v1", "garden/4/v2", "garden/4", "hole16"].map(timeOf), ["dusk", "day", "night", "night", "night", "night"]);
 });
