@@ -389,9 +389,10 @@ function install() {
         // the game's promise chains (a replay's next step) run before the next frame
         await new Promise((r) => nSet(r, 0));
       }
-      const gb = e.ghost && e.ghost();
-      return { t: tt, flying: e.g.flying, holed: e.g.done, scale: e.ball().scale.x, visible: e.ball().visible, y: e.ball().position.y,
-        ghost: gb && { scale: gb.scale.x, visible: gb.visible } };
+      const gb = e.ghost && e.ghost(), b = e.ball();
+      // (x, z: where each gnome is, for render.mjs to see which of the two moved)
+      return { t: tt, flying: e.g.flying, holed: e.g.done, scale: b.scale.x, visible: b.visible, x: b.position.x, y: b.position.y, z: b.position.z,
+        ghost: gb && { scale: gb.scale.x, visible: gb.visible, x: gb.position.x, y: gb.position.y, z: gb.position.z } };
     },
     /** The sounds of the shot, from its time 0, as a 16-bit WAV in base64. */
     async audio(from = 0, dur = 3) {
