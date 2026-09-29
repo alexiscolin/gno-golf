@@ -64,7 +64,8 @@ interface Title {
   sfxOut?: SoundName; // a sound as it goes (to)
   bounce?: number;
   pulse?: readonly number[];
-  tilt3d?: boolean;
+  soft?: number; // its pulses a breath of that much scale, eased in and out, not a kick (v11's cover)
+  tilt3d?: boolean | number; // a slow sway in depth, that many degrees (true: 9)
   tilt?: number;
 }
 /** One shot of the trailer: its camera, what fires when, its titles and effects. */
@@ -477,8 +478,13 @@ function install() {
       if (out > 0) s *= 1 + out * 0.4;
       // squash and stretch as it lands, and a bump on each accent (pulse)
       const sq = k > 0.7 && k < 1.6 ? Math.sin((k - 0.7) * 7) * 0.07 * (1.6 - k) : 0;
-      for (const p of t.pulse || []) if (tt >= p && tt < p + 0.25) s *= 1 + 0.09 * (1 - (tt - p) / 0.25);
-      const tilt3d = t.tilt3d ? ` perspective(1400px) rotateY(${Math.sin(tt * 1.3) * 9}deg) rotateX(${Math.cos(tt * 1.1) * 5}deg)` : "";
+      for (const p of t.pulse || []) {
+        const d = tt - p; // (a soft one two beats long, 0 on its own: a cover's pulse at 0 leaves frame 0 as designed)
+        if (t.soft) s *= d >= 0 && d < 0.686 ? 1 + t.soft * Math.sin(Math.PI * (d / 0.686) ** 0.6) ** 2 : 1;
+        else if (d >= 0 && d < 0.25) s *= 1 + 0.09 * (1 - d / 0.25);
+      }
+      const tw = t.tilt3d === true ? 9 : t.tilt3d || 0;
+      const tilt3d = tw ? ` perspective(1400px) rotateY(${Math.sin(tt * 1.3) * tw}deg) rotateX(${(Math.cos(tt * 1.1) * tw * 5) / 9}deg)` : "";
       t.el.style.opacity = String(Math.min(1, kk * 3) * o);
       t.el.style.transform = `translate(calc(-50% + ${shake}px), calc(-50% + ${(t.y || 0)}px))${tilt3d} rotate(${t.tilt ?? -4}deg) scale(${s * (1 + sq)}, ${s * (1 - sq)})`;
       t.el.querySelectorAll<HTMLElement>(".spk").forEach((sp, i) => {
