@@ -121,7 +121,7 @@ const RULES: readonly (readonly [string, readonly (readonly [string, string])[]]
   ]],
   ["On the boards", [
     ["Save on-chain", "To rank a round, save it on-chain (with Adena, or gnokey in a terminal) before the next weather is over (the card counts down). The chain plays your shots again: nobody can type in a score."],
-    ["Ranked", "Players with a gno.land name are ranked: take yours with Adena, or gnokey in a terminal. A hole's board keeps each player's best; the course ranking counts holes first, then strokes."],
+    ["Ranked", "Players with a gno.land name are ranked: take yours with Adena, or gnokey in a terminal. A hole's board keeps each player's best; the course ranking counts holes first, then the score against par (a hole at par counts the same whatever its par)."],
     ["Duels", "Share a saved round and your link dares a friend: they race your best as a see-through ghost, stroke for stroke. It is your real round, replayed by the chain in the weather you had, so it can't be faked."],
   ]],
 ];

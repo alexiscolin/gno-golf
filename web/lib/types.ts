@@ -196,8 +196,10 @@ export interface StrokesRow {
   strokes: number;
 }
 
+/** A course standing: its best on each hole counted, summed, and those holes' pars (strokes − par: its score against par, which ranks it after its holes). */
 export interface StandingRow extends StrokesRow {
   holes: number;
+  par: number;
 }
 
 /** Leaderboard(): a mode's course-wide top ten. */
@@ -231,6 +233,7 @@ export interface Rank extends Versioned {
   of: number;
   holes: number;
   strokes: number;
+  par: number;
 }
 
 /** CourseLeaderboard(): a page of a mode's course ranking. */

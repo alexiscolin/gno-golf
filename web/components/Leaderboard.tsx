@@ -13,7 +13,8 @@ import { GnokeyTx } from "@/components/Gnokey";
 import { failure, track, trackError } from "@/lib/analytics";
 import { Button, Segmented, Sheet, VsPar } from "@/components/ui";
 import Share from "@/components/Share";
-import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, plural, AIMS, AIM_NAMES, useCopied, GNOME } from "@/components/common";
+import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, strokesWord, holesWord, AIMS, AIM_NAMES, useCopied, GNOME, byStanding, standingVs, RANKED_BY } from "@/components/common";
+import { vsPar } from "@/lib/card";
 import { Frame } from "@/components/Worlds";
 import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Skin } from "@/lib/scene/gnome";
@@ -176,7 +177,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
   // (a dare link: whoever opens it adds you as a friend and races your ghost where you have one)
   const invite = me && siteURL(inHole ? holeLink(s, "", me) : dareLink(me));
   const rows = <R,>(b: { rows: readonly R[] } | null, pick: (a: R, b: R) => number) => (b ? [...b.rows].sort(pick) : null);
-  const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, (a, b) => b.holes - a.holes || a.strokes - b.strokes);
+  const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, byStanding);
   return (
     <div className="lb friends">
       {!me && <p className="lb__empty"><ConnectLink onConnect={onConnect} /> to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
@@ -197,7 +198,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
           ))}
         </ol>
       )}
-      <h3>The course <small>{course ? `${course.holes} holes` : ""}</small></h3>
+      <h3>The course <small>{course ? `${course.holes} holes · ${RANKED_BY}` : RANKED_BY}</small></h3>
       {!c && <p className="lb__empty">Reading the chain…</p>}
       {c && c.length === 0 && <p className="lb__empty">No saved rounds yet: be the first.</p>}
       {c && c.length > 0 && (
@@ -207,7 +208,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
               <span className="lb__rank">{i + 1}</span>
               <span className="lb__who">{label(r.player)}</span>
               <span className="lb__holes">{holesWord(r.holes)}</span>
-              <strong>{r.strokes}</strong>
+              <strong><VsPar vs={standingVs(r)} /></strong>
             </li>
           ))}
         </ol>
@@ -301,7 +302,7 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
  */
 function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"; chain: Chain | null; id: string; mode: Mode; me?: string | null; count?: number }) {
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<readonly (StrokesRow & { holes?: number })[] | null>(null);
+  const [rows, setRows] = useState<readonly (StrokesRow & { holes?: number; par?: number })[] | null>(null);
   const [after, setAfter] = useState(""); // the next page's cursor, "" at the end
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
@@ -317,8 +318,7 @@ function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"
         // no name today: a player named since their finish ranks from their next
         // one, and until then is on neither list (the realm keeps no such index)
         const page = b.rows.filter((_, i) => !named[i]);
-        const order = (a: StrokesRow & { holes?: number }, z: StrokesRow & { holes?: number }) => (z.holes || 0) - (a.holes || 0) || a.strokes - z.strokes;
-        setRows((r) => [...(from ? r || [] : []), ...page].sort(order));
+        setRows((r) => [...(from ? r || [] : []), ...page].sort(byStanding));
         setAfter(b.next);
       })
       .catch(() => setErr(true))
@@ -340,7 +340,7 @@ function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"
               ) : (
                 <span>{r.player === me ? "You" : shortAddr(r.player)}</span>
               )}
-              <span>{kind === "hole" ? strokesWord(r.strokes) : `${holesWord(r.holes || 0)} · ${strokesWord(r.strokes)}`}</span>
+              <span>{kind === "hole" ? strokesWord(r.strokes) : `${holesWord(r.holes || 0)} · ${vsPar(standingVs(r))}`}</span>
             </li>
           ))}
         </ul>
@@ -354,8 +354,8 @@ function Unnamed({ kind, chain, id, mode, me, count }: { kind: "hole" | "course"
   );
 }
 
-/** A row of a full board: its place on the chain's board (the page's offset on), and the score. */
-export type Placed = StrokesRow & { holes?: number; at: number };
+/** A row of a full board: its place on the chain's board (the page's offset on), and the score (a course row's: its holes, strokes and par). */
+export type Placed = StrokesRow & { holes?: number; par?: number; at: number };
 
 /**
  * The rival screen's three quick picks, flagged players left out as on the
@@ -383,7 +383,7 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
         const any = await page(Math.floor(Math.random() * top.players), 5).catch(() => top);
         const surprise = pickOne([...any.rows, ...top.rows], [me, champ && champ.player, level && level.player], Math.random());
         // (your row on the first page, else your rank read apart; unranked in this mode: at 0, your ghosts still read)
-        const self: Placed | null = !me ? null : top.rows.find((r) => r.player === me) || { player: me, at: mine && mine.rank > 0 ? mine.rank : 0, holes: mine ? mine.holes : 0, strokes: mine ? mine.strokes : 0 };
+        const self: Placed | null = !me ? null : top.rows.find((r) => r.player === me) || { player: me, at: mine && mine.rank > 0 ? mine.rank : 0, holes: mine ? mine.holes : 0, strokes: mine ? mine.strokes : 0, par: mine ? mine.par : 0 };
         primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r] : [])));
         if (live) setPicks({ rows: [champ, level, self], surprise });
       })
@@ -409,7 +409,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   const [next, setNext] = useState(0); // the next page's offset, 0 at the end
   const [err, setErr] = useState(false); // a page the chain did not give
   const [more, setMore] = useState(false);
-  const [mine, setMine] = useState<{ rank: number; of: number; strokes: number; holes?: number } | null>(null);
+  const [mine, setMine] = useState<{ rank: number; of: number; strokes: number; holes?: number; par?: number } | null>(null);
   const flags = useFlags();
   const [showAll, setShowAll] = useState(false);
   // the course's rows with a best on the hole played, read with their page (one read a page, not one a row):
@@ -482,7 +482,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   const listed = !!rows && !!me && rows.some((r) => r.player === me);
   const par = head ? head.par || parHere(s) : parHere(s);
   const link = (p: string) => (kind === "hole" ? chain?.roundURL(id, p) : chain?.userURL(p));
-  const score = (r: { strokes: number; holes?: number }) =>
+  const score = (r: { strokes: number; holes?: number; par?: number }) =>
     kind === "hole" ? (
       <>
         <span className="lb__holes">
@@ -495,7 +495,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
         <span className="lb__holes">
           {r.holes}/{head ? head.holes : "–"} holes
         </span>
-        <strong>{r.strokes}<small> {plural("stroke", r.strokes)}</small></strong>
+        <strong><VsPar vs={standingVs(r)} /></strong>
       </>
     );
   // your place, listed or further down: said once under the list, with the game's share
@@ -503,7 +503,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   const myRow = shown && me ? shown.rows.find((r) => r.player === me) : undefined;
   const myPlace = myRow && head && shown ? { at: myRow.at, of: head.players - shown.hidden } : mine ? { at: mine.rank, of: mine.of } : null;
   const title = kind === "hole" ? s.name : "The course";
-  const sub = !head ? "" : kind === "hole" ? `par ${par} · ${head.finished} finished${head.finished !== head.players ? `, ${head.players} ranked` : ""}` : `${head.players} ranked · most holes, then fewest strokes`;
+  const sub = !head ? "" : kind === "hole" ? `par ${par} · ${head.finished} finished${head.finished !== head.players ? `, ${head.players} ranked` : ""}` : `${head.players} ranked · ${RANKED_BY}`;
   return (
     <div className="lb lb--full">
       <h3>
@@ -882,7 +882,7 @@ export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra }: { chai
           const r = top && top.rows[i];
           return r ? (
             <li key={r.player} className={r.player === me ? "me" : ""}>
-              <Sticker player={r.player} at={i + 1} sub={`${strokesWord(r.strokes)} · ${r.holes}/${top.holes} holes`} chain={chain} me={me} gnome={gnome} />
+              <Sticker player={r.player} at={i + 1} sub={`${r.holes}/${top.holes} holes · ${vsPar(standingVs(r))}`} chain={chain} me={me} gnome={gnome} />
             </li>
           ) : (
             <li key={i} aria-hidden="true">

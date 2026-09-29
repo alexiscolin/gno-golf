@@ -651,7 +651,8 @@ export async function readBack(chain: Pick<Chain, "txResult" | "round">, { hole,
 // final realm (a holed round is not kept: only its best and rows): a named
 // player's first finish on a hole wrote 1,040 bytes, and 512 more for the
 // hole's wear if it is the hole's first play; their first finish in a mode,
-// which also writes their course standing and ranking rows, 2,891 to 2,927;
+// which also writes their course standing (its par too) and ranking rows,
+// 2,929 to 2,965 (38 more than with no par: an onyx gnodev, before and after);
 // a replay writes nothing, or a few bytes for an improving best. A first
 // best also keeps its shots, the ghost a duel races (Ghost): about 30 bytes
 // and 23 a stroke more. Asked with about a tenth more; the chain charges what

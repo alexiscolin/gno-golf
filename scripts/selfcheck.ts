@@ -119,6 +119,14 @@ check("golf's own figures the gas model reads", () => {
   assert.ok(has(state, '`,"work":` + strconv.Itoa(shot.Work)'), "a shot's JSON no longer says its work");
   assert.ok(has(weather, '`,"gas":`+strconv.FormatInt(fixedGas(e, fc), 10)'), "Weather() no longer says the commit's fixed gas");
 });
+check("the course ranking's order", () => {
+  // most holes, then the score against par (strokes - par): what Standings,
+  // Players and a standing row give, and components/common.ts byStanding sorts by
+  assert.ok(has(golf, 'return pad(9999-r.holes, 4) + "/" + pad(vsParBias+r.strokes-r.par, 7) + "/" + pad(int(r.height), 12) + "/" + r.player'), "rankKey: the course ranking's order changed");
+  assert.ok(has(realm("state.gno"), '`,"holes":` + strconv.Itoa(r.holes) + `,"strokes":` + strconv.Itoa(r.strokes) + `,"par":` + strconv.Itoa(r.par)'), "standingFields: a standing's numbers changed");
+  const common = fs.readFileSync(new URL("../web/components/common.ts", import.meta.url), "utf8");
+  assert.ok(has(common, "(z.holes || 0) - (a.holes || 0) || standingVs(a) - standingVs(z)") && has(common, "r.strokes - (r.par || 0)"), "byStanding no longer sorts as rankKey");
+});
 check("weather.gno period", () => {
   assert.equal(RULES.periodMs, constOf(weather, "PeriodSeconds") * 1000, "PeriodSeconds");
   // a round saves in its period or the next one (Golf.tsx saveBy: period + 2)
