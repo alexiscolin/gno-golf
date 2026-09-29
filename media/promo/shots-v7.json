@@ -1,0 +1,1141 @@
+[
+ {
+  "cup": "town",
+  "hole": 13,
+  "gnome": "ginger",
+  "pre": 4,
+  "dropAt": 0.686,
+  "fire": [
+   {
+    "deg": -53.5,
+    "power": 9
+   }
+  ],
+  "cam": {
+   "mode": "orbit",
+   "center": "cup",
+   "r": 5,
+   "h": 2.6,
+   "a0": 150,
+   "speed": 30,
+   "fov": 44
+  },
+  "hits": [
+   0.686
+  ],
+  "dropLag": 0.024,
+  "name": "cold",
+  "beats": [
+   0,
+   4
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "garden",
+  "hole": 13,
+  "gnome": "classic",
+  "flash": 1,
+  "blur": 16,
+  "dim": 0.45,
+  "burst": 0.02,
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.5,
+    0,
+    0.5
+   ],
+   "r": 34,
+   "h": 18,
+   "a0": 70,
+   "speed": 6,
+   "fov": 40
+  },
+  "titles": [
+   {
+    "logo": 820,
+    "at": 0,
+    "bounce": 3.2,
+    "tilt": -3,
+    "y": -70,
+    "sparkle": 6,
+    "tilt3d": true,
+    "sfx": "whoosh"
+   },
+   {
+    "pill": "MINI-GOLF. BUT WILD.",
+    "size": 62,
+    "at": 1.371,
+    "bounce": 2.6,
+    "tilt": -2,
+    "y": 400
+   }
+  ],
+  "drift": 16,
+  "rays": true,
+  "hits": [
+   0.28
+  ],
+  "name": "logo",
+  "beats": [
+   4,
+   12
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "island",
+  "hole": 4,
+  "gnome": "diver",
+  "weather": "rain",
+  "flash": 0.7,
+  "cam": {
+   "mode": "keys",
+   "from": [
+    0,
+    16,
+    1,
+    12
+   ],
+   "to": [
+    0.85,
+    10,
+    1,
+    7
+   ],
+   "lookFrom": [
+    0.25,
+    0,
+    0.5
+   ],
+   "lookTo": [
+    0.85,
+    0,
+    0.5
+   ],
+   "fov": 42
+  },
+  "titles": [
+   {
+    "big": "<b>RAIN.</b>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3
+   }
+  ],
+  "name": "rain",
+  "beats": [
+   12,
+   15
+  ]
+ },
+ {
+  "cup": "mountain",
+  "hole": 1,
+  "gnome": "sage",
+  "weather": "snow",
+  "punch": 0.12,
+  "cam": {
+   "mode": "keys",
+   "from": [
+    0.2,
+    3,
+    0.5,
+    10
+   ],
+   "to": [
+    0.35,
+    17,
+    0.5,
+    20
+   ],
+   "lookFrom": [
+    0.45,
+    0,
+    0.5
+   ],
+   "lookTo": [
+    0.55,
+    0,
+    0.5
+   ],
+   "fov": 44
+  },
+  "titles": [
+   {
+    "big": "SNOW.",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": 3
+   }
+  ],
+  "name": "snow",
+  "beats": [
+   15,
+   18
+  ]
+ },
+ {
+  "cup": "town",
+  "hole": 4,
+  "gnome": "mayor",
+  "weather": "storm",
+  "flash": 0,
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.5,
+    0,
+    0.5
+   ],
+   "r": 24,
+   "h": 11,
+   "a0": 80,
+   "speed": 14,
+   "fov": 42
+  },
+  "titles": [
+   {
+    "big": "<i>STORMS.</i>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3
+   }
+  ],
+  "whip": 1,
+  "name": "storms",
+  "beats": [
+   18,
+   21
+  ]
+ },
+ {
+  "cup": "garden",
+  "hole": 1,
+  "gnome": "sage",
+  "weather": "fog",
+  "flash": 0.7,
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.5,
+    0,
+    0.5
+   ],
+   "r0": 40,
+   "r": 30,
+   "h0": 20,
+   "h": 13,
+   "a0": 70,
+   "speed": 14,
+   "fov": 42
+  },
+  "titles": [
+   {
+    "big": "THE WEATHER CHANGES<br><b>EVERY 5 MINUTES</b>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3,
+    "size": 128
+   }
+  ],
+  "name": "weather",
+  "beats": [
+   21,
+   25
+  ]
+ },
+ {
+  "cup": "island",
+  "hole": 7,
+  "gnome": "pirate",
+  "pre": 2.5,
+  "eventAt": 0.95,
+  "fire": [
+   {
+    "deg": 0,
+    "power": 5,
+    "eventT": 0.211
+   }
+  ],
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.54,
+    0,
+    0.49
+   ],
+   "r0": 16,
+   "r": 20,
+   "h0": 5,
+   "h": 10,
+   "a0": 195,
+   "speed": -8,
+   "fov": 44,
+   "lookUp": 2
+  },
+  "punch": 0.12,
+  "titles": [
+   {
+    "big": "SAND<i>CASTLES.</i>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3
+   }
+  ],
+  "name": "sandcastles",
+  "beats": [
+   25,
+   29
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "garden",
+  "hole": 4,
+  "gnome": "ginger",
+  "whip": 0,
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.5,
+    2,
+    0.45
+   ],
+   "r0": 26,
+   "r": 15,
+   "h0": 10,
+   "h": 6,
+   "a0": 60,
+   "speed": 10,
+   "fov": 42,
+   "lookUp": 2
+  },
+  "punch": 0.12,
+  "titles": [
+   {
+    "big": "WIND<b>MILLS.</b>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": 3
+   }
+  ],
+  "name": "windmills",
+  "beats": [
+   29,
+   32
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 2,
+  "gnome": "baker",
+  "whip": -1,
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.5,
+    0,
+    0.5
+   ],
+   "r": 30,
+   "h": 13,
+   "a0": 110,
+   "speed": -22,
+   "fov": 40
+  },
+  "titles": [
+   {
+    "big": "MUSHROOM <b>TOWNS.</b>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3,
+    "size": 150
+   }
+  ],
+  "name": "mushroomtowns",
+  "beats": [
+   32,
+   35
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 18,
+  "gnome": "mayor",
+  "punch": 0.12,
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.55,
+    0,
+    0.5
+   ],
+   "r0": 24,
+   "r": 12,
+   "h0": 9,
+   "h": 4.5,
+   "a0": 80,
+   "speed": 8,
+   "fov": 42,
+   "lookUp": 2
+  },
+  "titles": [
+   {
+    "big": "BAND<i>STANDS.</i>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": 3,
+    "size": 170
+   }
+  ],
+  "name": "bandstands",
+  "beats": [
+   35,
+   38
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "mountain",
+  "hole": 6,
+  "gnome": "viking",
+  "weather": "snow",
+  "punch": 0.12,
+  "pre": 1.1,
+  "fire": [
+   {
+    "deg": 0,
+    "power": 9.5,
+    "at": -1.05
+   }
+  ],
+  "cam": {
+   "mode": "follow",
+   "deg": 0,
+   "back": 5,
+   "up": 1.4,
+   "ahead": 4,
+   "fov": 46
+  },
+  "name": "frozen",
+  "beats": [
+   38,
+   40
+  ]
+ },
+ {
+  "cup": "island",
+  "hole": 1,
+  "flash": 0.85,
+  "swap": [
+   "classic",
+   "pirate",
+   "sage",
+   "wizard",
+   "moustache",
+   "viking",
+   "gardener",
+   "ginger",
+   "diver",
+   "baker",
+   "mayor",
+   "king"
+  ],
+  "cam": {
+   "mode": "orbit",
+   "center": "ball",
+   "r": 5,
+   "h": 1.9,
+   "lookUp": 0.7,
+   "a0": 55,
+   "speed": 22,
+   "fov": 40
+  },
+  "titles": [
+   {
+    "big": "PICK YOUR <b>GNOME.</b>",
+    "size": 150,
+    "at": 0.02,
+    "to": 0.84,
+    "bounce": 2.6,
+    "tilt": -3,
+    "y": 250
+   },
+   {
+    "big": "UNLOCK <i>THEM ALL.</i>",
+    "size": 150,
+    "at": 1.03,
+    "bounce": 2.6,
+    "tilt": 3,
+    "y": 250
+   }
+  ],
+  "weather": "wind",
+  "name": "roster",
+  "beats": [
+   40,
+   46
+  ]
+ },
+ {
+  "cup": "garden",
+  "hole": 6,
+  "gnome": "classic",
+  "pre": 0.8,
+  "fire": [
+   {
+    "deg": 15,
+    "power": 10,
+    "at": -0.75
+   }
+  ],
+  "punch": 0.12,
+  "cam": {
+   "mode": "follow",
+   "deg": 15,
+   "back": 5.5,
+   "up": 2.3,
+   "ahead": 4,
+   "fov": 46
+  },
+  "weather": "rain",
+  "name": "icehouse",
+  "beats": [
+   46,
+   48
+  ]
+ },
+ {
+  "cup": "town",
+  "hole": 9,
+  "gnome": "diver",
+  "flash": 0.85,
+  "cam": {
+   "mode": "orbit",
+   "center": "cup",
+   "r": 7,
+   "h": 3,
+   "a0": -90,
+   "speed": 88,
+   "fov": 44
+  },
+  "titles": [
+   {
+    "big": "YOUR <b>RECORDS.</b>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3,
+    "to": 0.84,
+    "size": 150
+   },
+   {
+    "big": "ON-CHAIN. <i>FOREVER.</i>",
+    "at": 1.03,
+    "bounce": 2.6,
+    "tilt": 3,
+    "size": 150
+   }
+  ],
+  "name": "records",
+  "beats": [
+   48,
+   54
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 6,
+  "gnome": "wizard",
+  "weather": "clear",
+  "pre": 2.5,
+  "fire": [
+   {
+    "deg": 0,
+    "power": 10,
+    "at": -1.45
+   }
+  ],
+  "cam": {
+   "mode": "orbit",
+   "center": "ball",
+   "r": 4.5,
+   "h": 1.2,
+   "a0": 150,
+   "speed": -110,
+   "fov": 52,
+   "lookUp": 0.5
+  },
+  "whip": 1,
+  "name": "skatepark",
+  "beats": [
+   54,
+   57
+  ],
+  "ramp": [
+   0,
+   1.03,
+   1.6
+  ]
+ },
+ {
+  "cup": "town",
+  "hole": 7,
+  "gnome": "gardener",
+  "pre": 2.5,
+  "eventAt": 0.343,
+  "fire": [
+   {
+    "deg": -23,
+    "power": 9,
+    "eventT": 0.847
+   }
+  ],
+  "cam": {
+   "mode": "track",
+   "off": [
+    -2,
+    2.5,
+    4.5
+   ],
+   "fov": 46,
+   "lag": 4,
+   "hold": true
+  },
+  "punch": 0.12,
+  "name": "canal",
+  "beats": [
+   57,
+   59
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "island",
+  "hole": 9,
+  "gnome": "diver",
+  "pre": 2.5,
+  "eventAt": 0.343,
+  "fire": [
+   {
+    "deg": 0,
+    "power": 9,
+    "eventT": 0.955
+   }
+  ],
+  "cam": {
+   "mode": "track",
+   "off": [
+    3,
+    3.5,
+    6
+   ],
+   "fov": 44,
+   "lag": 4,
+   "hold": true
+  },
+  "whip": -1,
+  "name": "pier",
+  "beats": [
+   59,
+   61
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "garden",
+  "hole": 2,
+  "gnome": "moustache",
+  "pre": 2.5,
+  "eventAt": 0.3,
+  "fire": [
+   {
+    "deg": -15,
+    "power": 7,
+    "eventT": 0.26
+   }
+  ],
+  "cam": {
+   "mode": "orbit",
+   "center": "ball",
+   "r": 5,
+   "h": 2,
+   "a0": 60,
+   "speed": 60,
+   "fov": 46,
+   "lookUp": 0.4
+  },
+  "punch": 0.12,
+  "name": "bumpers",
+  "beats": [
+   61,
+   63
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 8,
+  "gnome": "mayor",
+  "pre": 2.5,
+  "eventAt": 0.343,
+  "fire": [
+   {
+    "deg": 6,
+    "power": 9,
+    "tick": 0,
+    "eventT": 0.56
+   }
+  ],
+  "cam": {
+   "mode": "track",
+   "off": [
+    -2,
+    4,
+    7
+   ],
+   "fov": 46,
+   "lag": 4
+  },
+  "whip": 1,
+  "name": "clockhand",
+  "beats": [
+   63,
+   65
+  ],
+  "weather": "wind"
+ },
+ {
+  "cup": "mountain",
+  "hole": 12,
+  "gnome": "sage",
+  "pre": 2.5,
+  "eventAt": 0.3,
+  "fire": [
+   {
+    "deg": -9,
+    "power": 8,
+    "event": 6
+   }
+  ],
+  "cam": {
+   "mode": "follow",
+   "deg": -9,
+   "back": 5.5,
+   "up": 2,
+   "ahead": 4,
+   "fov": 46
+  },
+  "punch": 0.12,
+  "name": "rebound",
+  "beats": [
+   65,
+   67
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "island",
+  "hole": 13,
+  "gnome": "mayor",
+  "whip": 1,
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.5,
+    0,
+    0.5
+   ],
+   "r0": 38,
+   "r": 24,
+   "h0": 20,
+   "h": 12,
+   "a0": 40,
+   "speed": 14,
+   "fov": 40,
+   "lookUp": 2
+  },
+  "name": "lagoon",
+  "beats": [
+   67,
+   68
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 5,
+  "gnome": "golden",
+  "flash": 0,
+  "pre": 0.2,
+  "fire": [
+   {
+    "deg": 3,
+    "power": 10,
+    "at": -0.15
+   }
+  ],
+  "cam": {
+   "mode": "track",
+   "off": [
+    -5,
+    3,
+    6
+   ],
+   "fov": 44
+  },
+  "whip": -1,
+  "name": "ace-roll",
+  "beats": [
+   68,
+   70
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 5,
+  "gnome": "golden",
+  "punch": 0.1,
+  "pre": 4,
+  "dropAt": 0.686,
+  "fire": [
+   {
+    "deg": 3,
+    "power": 10
+   }
+  ],
+  "cam": {
+   "mode": "orbit",
+   "center": "cup",
+   "r": 5.5,
+   "h": 3,
+   "a0": -20,
+   "speed": 16,
+   "fov": 44
+  },
+  "titles": [
+   {
+    "big": "HOLE <b>IN ONE!</b>",
+    "at": 0.69,
+    "to": 1.85,
+    "kind": "slam",
+    "tilt": -4,
+    "y": -150,
+    "sfx": "pop"
+   },
+   {
+    "big": "BEAT THE <b>WORLD.</b>",
+    "at": 2.057,
+    "bounce": 2.6,
+    "tilt": 3,
+    "y": -150
+   }
+  ],
+  "hits": [
+   0.686
+  ],
+  "dip": [
+   0.514,
+   0.686
+  ],
+  "ramp": [
+   0.2,
+   0.62,
+   0.35
+  ],
+  "dropLag": 0.121,
+  "name": "ace-cup",
+  "beats": [
+   70,
+   82
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 2,
+  "gnome": "wizard",
+  "by": "g10pv5j3f5ly9u2a0a899z4h54s33zucq6mp58ht",
+  "weather": "clear",
+  "name": "duel-grid",
+  "beats": [
+   82,
+   88
+  ],
+  "rewind": 24,
+  "flash": 0.85,
+  "punch": 0.12,
+  "cam": {
+   "mode": "orbit",
+   "center": "ball",
+   "r": 6.5,
+   "h": 2.4,
+   "lookUp": 0.6,
+   "a0": 60,
+   "speed": 14,
+   "fov": 44
+  },
+  "titles": [
+   {
+    "big": "MULTIPLAYER <b>DUELS.</b>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3,
+    "size": 150,
+    "y": -280
+   }
+  ]
+ },
+ {
+  "cup": "town",
+  "hole": 2,
+  "gnome": "wizard",
+  "by": "g10pv5j3f5ly9u2a0a899z4h54s33zucq6mp58ht",
+  "weather": "clear",
+  "name": "duel-p1",
+  "beats": [
+   88,
+   90
+  ],
+  "pre": 0.45,
+  "fire": [
+   {
+    "deg": 349.5,
+    "power": 10,
+    "at": 0.05
+   }
+  ],
+  "whip": 1,
+  "cam": {
+   "mode": "keys",
+   "from": [
+    0.31,
+    7,
+    0.9
+   ],
+   "to": [
+    0.34,
+    6,
+    0.86
+   ],
+   "look": [
+    0.32,
+    0.3,
+    0.36
+   ],
+   "fov": 50
+  }
+ },
+ {
+  "cup": "town",
+  "hole": 2,
+  "gnome": "wizard",
+  "by": "g10pv5j3f5ly9u2a0a899z4h54s33zucq6mp58ht",
+  "weather": "clear",
+  "name": "duel-g1",
+  "beats": [
+   90,
+   92
+  ],
+  "pre": 3.35,
+  "fire": [
+   {
+    "deg": 349.5,
+    "power": 10,
+    "at": -2.85
+   }
+  ],
+  "whip": -1,
+  "cam": {
+   "mode": "track",
+   "ghost": true,
+   "off": [
+    -3,
+    1.8,
+    3
+   ],
+   "fov": 50,
+   "lag": 5
+  }
+ },
+ {
+  "cup": "town",
+  "hole": 2,
+  "gnome": "wizard",
+  "by": "g10pv5j3f5ly9u2a0a899z4h54s33zucq6mp58ht",
+  "weather": "clear",
+  "name": "duel-finish",
+  "beats": [
+   92,
+   102
+  ],
+  "pre": 9.572,
+  "fire": [
+   {
+    "deg": 349.5,
+    "power": 10,
+    "at": -9.072
+   },
+   {
+    "deg": 16.25,
+    "power": 2,
+    "at": -4.572
+   },
+   {
+    "deg": 16.25,
+    "power": 2,
+    "at": -1.372
+   },
+   {
+    "deg": 16.25,
+    "power": 4,
+    "at": 0.504
+   }
+  ],
+  "punch": 0.1,
+  "cam": {
+   "mode": "orbit",
+   "center": "cup",
+   "r": 6,
+   "h": 2.2,
+   "a0": 24,
+   "speed": 6,
+   "fov": 36
+  },
+  "titles": [
+   {
+    "big": "RACE ANYONE'S <b>GHOST.</b>",
+    "at": 1.371,
+    "kind": "slam",
+    "tilt": -4,
+    "y": -150,
+    "sfx": "pop",
+    "size": 150
+   }
+  ],
+  "hits": [
+   1.371
+  ],
+  "dip": [
+   1.2,
+   1.371
+  ]
+ },
+ {
+  "cup": "garden",
+  "hole": 8,
+  "gnome": "king",
+  "flash": 0.85,
+  "build": {
+   "ground": 0,
+   "walls": 0.686,
+   "drop": 1.371,
+   "flag": 2.743
+  },
+  "cam": {
+   "mode": "orbit",
+   "center": [
+    0.5,
+    0,
+    0.5
+   ],
+   "r": 30,
+   "h": 17,
+   "a0": 75,
+   "speed": 10,
+   "fov": 40
+  },
+  "titles": [
+   {
+    "big": "COMING SOON:<br><b>BUILD YOUR OWN.</b>",
+    "at": 0.02,
+    "bounce": 2.6,
+    "tilt": -3,
+    "size": 120,
+    "to": 2.553,
+    "y": -320
+   },
+   {
+    "big": "DARE YOUR <i>FRIENDS.</i>",
+    "at": 2.743,
+    "bounce": 2.6,
+    "tilt": 3,
+    "size": 130,
+    "y": -320
+   }
+  ],
+  "hits": [
+   2.743
+  ],
+  "name": "build",
+  "beats": [
+   102,
+   116
+  ],
+  "weather": "clear"
+ },
+ {
+  "cup": "town",
+  "hole": 5,
+  "gnome": "classic",
+  "card": -1,
+  "flash": 1,
+  "burst": 0.02,
+  "burstOpacity": 0.35,
+  "url": "",
+  "urlAt": 2.743,
+  "urlY": 440,
+  "cam": {
+   "mode": "orbit",
+   "center": "cup",
+   "r": 12,
+   "h": 6,
+   "a0": 0,
+   "speed": 10
+  },
+  "titles": [
+   {
+    "logo": 600,
+    "at": 0,
+    "bounce": 3.2,
+    "tilt": -3,
+    "y": -190,
+    "sparkle": 4,
+    "tilt3d": true
+   },
+   {
+    "cta": "PLAY ON GNO.LAND",
+    "at": 1.371,
+    "bounce": 2.6,
+    "tilt": 0,
+    "y": 215,
+    "size": 84,
+    "pulse": [
+     4.114
+    ]
+   },
+   {
+    "raw": "<div class='sub' style='text-transform:none;letter-spacing:.01em;font-size:44px;display:flex;align-items:center;gap:14px'>Free to try · Your records on-chain</div>",
+    "at": 2.057,
+    "bounce": 2.6,
+    "tilt": 0,
+    "y": 345
+   }
+  ],
+  "rays": true,
+  "hits": [
+   0.28
+  ],
+  "name": "end",
+  "beats": [
+   116,
+   136.5
+  ],
+  "weather": "clear"
+ }
+]

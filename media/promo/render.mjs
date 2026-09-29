@@ -1,16 +1,17 @@
 // @ts-check
-// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups] [--cut=v6]
+// Renders the Gnogolf trailer: node media/promo/render.mjs [--stills] [--only=name] [--clean] [--cups] [--cut=v7]
 //
 // --cut=v4: another cut of it, shots-v4.json, rendered to gnogolf-promo-v4.mp4 (and -720p).
 // --cut=v5: v4 with a ghost duel before an end card without Adena (its rival's screen, the
 // turns called, the ghost holing, the win, the game's own pieces shown: a shot's ui).
-// --cut=v6, the current one: the duel as gameplay only, before the Builder's "coming soon":
-// one race against the champion's ghost (another skin, see-through) filmed in slices, the two
-// on the tee, a stroke each cut on the beat, both rolling in, the ghost holing then the player,
-// again slowed; the trailer's own titles, no game UI. One command, with the dev client on the
-// local chain (web/.env.local; read only, nothing is sent):
-//   (cd web && npx next dev -p 3316) & APP=http://localhost:3316 node media/promo/render.mjs --cut=v6
-// -> media/promo/gnogolf-promo-v6.mp4 and -v6-720p.mp4. The duel races the seeded champion's
+// --cut=v6: the duel as gameplay only, before the Builder's "coming soon": one race against the
+// champion's ghost (another skin, see-through) filmed in slices, the two on the tee, a stroke each
+// cut on the beat, both rolling in, the ghost holing then the player, again slowed; no game UI.
+// --cut=v7, the current one: v6's duel on 20 beats, without the slowed replay, the player holing
+// on the music's drop; the Builder's card on 14 beats, each title held 2 s or more. One command,
+// with the dev client on the local chain (web/.env.local; read only, nothing is sent):
+//   (cd web && npx next dev -p 3316) & APP=http://localhost:3316 node media/promo/render.mjs --cut=v7
+// -> media/promo/gnogolf-promo-v7.mp4 and -v7-720p.mp4. The duel races the seeded champion's
 // ghost (media/check/seed), its reads kept in paths.json ("reads") like the shots' paths.
 //
 // --clean: the title screen's background instead (web/public/title/bg.*): a
@@ -163,8 +164,8 @@ const ALL_GNOMES = ["classic", "sage", "ginger", "moustache", "gardener", "wizar
 
 const LAST = Math.max(...SHOTS.map((s) => s.beats[1]));
 // rewind: the music goes back that many beats as the shot starts (a phrase played again), so a
-// cut longer than another keeps the other's music under its shots (v6: v4's, its duel on the
-// 32 beats before the Builder's again), and still ends on the last hit: [music s, length s] each
+// cut longer than another keeps the other's music under its shots (v7: v4's, its duel on the
+// 24 beats before the Builder's again), and still ends on the last hit: [music s, length s] each
 const REWINDS = SHOTS.filter((s) => s.rewind && !s.t0).map((s) => [s.beats[0], s.rewind]);
 const LEN = F(LAST) / FPS, MUSIC_AT = +(MUSIC_END - (LAST - REWINDS.reduce((a, [, r]) => a + r, 0)) * BEAT).toFixed(3);
 const PARTS = [];
