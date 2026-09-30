@@ -43,13 +43,12 @@ func TestDataPlaysAsTheRealmHole(cur realm, t *testing.T) {
 			t.Fatalf("%s: published as %s", d[0], vid)
 		}
 		de := mustHole(vid)
-		var rh course.Hole = me
 		dh := de.hole()
 
-		if name := cleanName(me.Title); name != de.name || course.ParOf(me) != de.par || me.World != de.world || me.Order != de.order {
-			t.Errorf("%s: the listing differs: %q %d %s %v, data %q %d %s %v", d[0], name, course.ParOf(me), me.World, me.Order, de.name, de.par, de.world, de.order)
+		if name := cleanName(me.Title); name != de.name || me.Par() != de.par || me.World != de.world || me.Order != de.order {
+			t.Errorf("%s: the listing differs: %q %d %s %v, data %q %d %s %v", d[0], name, me.Par(), me.World, me.Order, de.name, de.par, de.world, de.order)
 		}
-		if a, b := pieceJSON(rh), pieceJSON(dh); a != b {
+		if a, b := pieceJSON(me), pieceJSON(dh); a != b {
 			t.Errorf("%s: the pieces a client draws differ", d[0])
 		}
 		_, rain := course.WeatherFor(course.Rain, me, 7)
@@ -59,8 +58,8 @@ func TestDataPlaysAsTheRealmHole(cur realm, t *testing.T) {
 			for a := 0; a < 360; a += 90 {
 				angle := float64(a+wi*20) * math.Pi / 180
 				for stroke := 0; stroke < 2; stroke++ {
-					want := shotKey(previewAt(rh, me.Tee, angle, 6.5, stroke, 5*stroke, weather))
-					if got := shotKey(previewAt(dh, me.Tee, angle, 6.5, stroke, 5*stroke, weather)); got != want {
+					want := shotKey(me.PreviewWith(me.Tee, angle, 6.5, stroke, 5*stroke, weather))
+					if got := shotKey(dh.PreviewWith(me.Tee, angle, 6.5, stroke, 5*stroke, weather)); got != want {
 						t.Errorf("%s: the preview differs at %d°, stroke %d, weather %d", d[0], a, stroke, wi)
 					}
 				}
@@ -71,15 +70,13 @@ func TestDataPlaysAsTheRealmHole(cur realm, t *testing.T) {
 
 // pieceJSON is what a client draws a hole from: its board, tee, cup, pieces
 // and the extras of its first strokes.
-func pieceJSON(h course.Hole) string {
+func pieceJSON(h *course.Simple) string {
 	f := h.Field()
-	s := boardJSON(h) + jvec(h.Start()) + jvec(h.Cup()) + strconv.FormatBool(isTimed(h)) +
+	s := boardJSON(h) + jvec(h.Start()) + jvec(h.Cup()) + strconv.FormatBool(h.Varies()) +
 		wallsJSON(f.Walls) + postsJSON(f.Posts) + zonesJSON(f.Zones, true)
-	if tm, ok := h.(course.Timed); ok {
-		for stroke := 0; stroke < 4; stroke++ {
-			ws, ps := tm.Extras(stroke)
-			s += wallsJSON(ws) + postsJSON(ps) + zonesJSON(extraZones(h, stroke), true)
-		}
+	for stroke := 0; stroke < 4; stroke++ {
+		ws, ps := h.Extras(stroke)
+		s += wallsJSON(ws) + postsJSON(ps) + zonesJSON(h.ExtraZones(stroke), true)
 	}
 	return s
 }

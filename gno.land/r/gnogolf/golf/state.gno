@@ -38,12 +38,12 @@ func HoleState(hole string) string {
 	sb.WriteString(boardJSON(h) +
 		`,"par":` + strconv.Itoa(e.par) +
 		`,"world":` + jstr(e.world) + `,"order":` + jnum(e.order) +
-		`,"timed":` + strconv.FormatBool(isTimed(h)) +
+		`,"timed":` + strconv.FormatBool(h.Varies()) +
 		`,"period":` + strconv.FormatInt(p, 10) +
 		`,"weather":` + forecastJSON("", weatherOf(e, h, p)) +
 		`,"start":` + jvec(h.Start()) +
 		`,"cup":` + jvec(h.Cup()) +
-		`,"cupR":` + jnum(h.(*course.Simple).CupRadius) + `,"ballR":` + jnum(f.Radius))
+		`,"cupR":` + jnum(h.CupRadius) + `,"ballR":` + jnum(f.Radius))
 	// the hole's work before the weather (newWork): the client splits a save
 	// and sets its gas by it
 	w := newWork(h, nil)
@@ -61,7 +61,7 @@ func HoleState(hole string) string {
 
 // roundJSON is one player's round: ball rounded, rest exact (for SimulateFrom)
 // and the last stroke replayed: rounds store shots, not paths.
-func roundJSON(e *entry, h course.Hole, player string, r *round) string {
+func roundJSON(e *entry, h *course.Simple, player string, r *round) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"player":` + jstr(player) +
 		`,"ball":` + jvec(r.ball()) + `,"rest":` + jexact(r.ball()) +
@@ -77,7 +77,7 @@ func roundJSON(e *entry, h course.Hole, player string, r *round) string {
 // lastShot replays a round's last stroke, read-only, with its stroke number,
 // tick and weather (fc, its period's forecast): the same flight, less the
 // wear. Empty before a first one.
-func lastShot(h course.Hole, r *round, fc course.Forecast) physics.Shot {
+func lastShot(h *course.Simple, r *round, fc course.Forecast) physics.Shot {
 	if r.strokes == 0 || r.shots == "" {
 		return physics.Shot{}
 	}
@@ -87,7 +87,7 @@ func lastShot(h course.Hole, r *round, fc course.Forecast) physics.Shot {
 	}
 	angle, power, tick := parseShot(s)
 	from := physics.Vec2{X: r.fx, Y: r.fy}
-	shot, holed := previewAt(h, from, angle*math.Pi/180, power, r.strokes-1, tick, fc.Zones)
+	shot, holed := h.PreviewWith(from, angle*math.Pi/180, power, r.strokes-1, tick, fc.Zones)
 	return back(h, from, shot, holed)
 }
 
@@ -343,7 +343,7 @@ func SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, pe
 	h := e.hole()
 	ball := onBoard(h, ballX, ballY)
 	angle, power = validShot(angle, power)
-	sh, holed := resolve(previewAt(h, ball, angle*math.Pi/180, power, stroke, tick, weatherOf(e, h, period).Zones))
+	sh, holed := resolve(h.PreviewWith(ball, angle*math.Pi/180, power, stroke, tick, weatherOf(e, h, period).Zones))
 	sh = back(h, ball, sh, holed)
 	return "{" + versionJSON + `,"holed":` + strconv.FormatBool(holed) + `,"bounces":` + strconv.Itoa(sh.Bounces) + shotJSON(sh) + "}"
 }
@@ -355,8 +355,8 @@ func validStroke(stroke int) {
 }
 
 // onBoard refuses a ball off the board (or NaN): no round leaves one there.
-func onBoard(h course.Hole, x, y float64) physics.Vec2 {
-	w, hh := course.BoardOf(h)
+func onBoard(h *course.Simple, x, y float64) physics.Vec2 {
+	w, hh := h.W, h.H
 	if !(x >= 0 && x <= float64(w) && y >= 0 && y <= float64(hh)) {
 		panic("golf: the ball must be on the board")
 	}
@@ -430,7 +430,7 @@ func simulateRound(hole string, from *physics.Vec2, strokes int, shots string, p
 		w.next(h)
 		angle, power, tick := parseShot(s)
 		angle, power = validShot(angle, power)
-		last, holed = resolve(previewAt(h, ball, angle*math.Pi/180, power, strokes, tick, weather))
+		last, holed = resolve(h.PreviewWith(ball, angle*math.Pi/180, power, strokes, tick, weather))
 		last = back(h, ball, last, holed)
 		w.add(last)
 		ball = last.Rest()
@@ -444,8 +444,8 @@ func simulateRound(hole string, from *physics.Vec2, strokes int, shots string, p
 		shotJSON(last) + "}"
 }
 
-func boardJSON(h course.Hole) string {
-	w, hh := course.BoardOf(h)
+func boardJSON(h *course.Simple) string {
+	w, hh := h.W, h.H
 	return `,"board":{"w":` + strconv.Itoa(w) + `,"h":` + strconv.Itoa(hh) + "}"
 }
 
@@ -514,29 +514,15 @@ func polyJSON(z *physics.Zone) string {
 	return `,"poly":[` + pathJSON(z.Poly) + `],"outside":` + strconv.FormatBool(z.Outside)
 }
 
-// extraZones is what a timed hole lays down at a stroke, if it lays anything.
-func extraZones(h course.Hole, stroke int) []physics.Zone {
-	if z, ok := h.(course.Zoned); ok {
-		return z.ExtraZones(stroke)
-	}
-	return nil
-}
-
-func isTimed(h course.Hole) bool {
-	t, ok := h.(course.Timed)
-	return ok && t.Varies()
-}
-
 // Extras is what a timed hole adds at one stroke of a round (0 is the first),
 // to draw over HoleState's field. Empty for other holes.
 func Extras(hole string, stroke int) string {
 	h := readHole(hole).hole()
-	t, ok := h.(course.Timed)
-	if !ok || stroke < 0 {
+	if stroke < 0 {
 		return "{" + versionJSON + `,"walls":[],"posts":[],"zones":[]}`
 	}
-	ws, ps := t.Extras(stroke)
-	return "{" + versionJSON + `,"walls":` + wallsJSON(ws) + `,"posts":` + postsJSON(ps) + `,"zones":` + zonesJSON(extraZones(h, stroke), true) + "}"
+	ws, ps := h.Extras(stroke)
+	return "{" + versionJSON + `,"walls":` + wallsJSON(ws) + `,"posts":` + postsJSON(ps) + `,"zones":` + zonesJSON(h.ExtraZones(stroke), true) + "}"
 }
 
 // Leaderboard is a mode's course-wide top ten ("assisted" or "pro"): named

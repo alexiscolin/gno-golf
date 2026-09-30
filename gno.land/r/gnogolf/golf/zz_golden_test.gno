@@ -59,7 +59,7 @@ func sum(s string) string {
 }
 
 // the period of a kind of weather for a hole: the first at or before now
-func periodOf(id, world string, h course.Hole, kind string) int64 {
+func periodOf(id, world string, h *course.Simple, kind string) int64 {
 	for p := Period(); p > Period()-2000; p-- {
 		if course.ForecastFor(id, world, h, p).Kind == kind {
 			return p
@@ -125,7 +125,7 @@ func goldAt(id string, h *course.Simple) {
 	if h.World == "" {
 		h.World = "garden"
 	}
-	community.Set(id, newEntry(id, cleanName(h.Title), course.ParOf(h), h.World, 1<<20))
+	community.Set(id, newEntry(id, cleanName(h.Title), h.Par(), h.World, 1<<20))
 	holeData.Set(id, course.Encode(h))
 }
 

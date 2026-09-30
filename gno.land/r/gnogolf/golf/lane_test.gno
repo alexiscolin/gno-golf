@@ -32,7 +32,7 @@ func courseHoleData(t *testing.T, realm string) *course.Simple {
 // inLane is whether p is on the board and inside the hole's outline: an odd
 // number of its untimed walls between p and far away.
 func inLane(h *course.Simple, p physics.Vec2) bool {
-	w, hh := h.Board()
+	w, hh := h.W, h.H
 	if !(p.X >= 0 && p.X <= float64(w) && p.Y >= 0 && p.Y <= float64(hh)) {
 		return false
 	}
@@ -195,7 +195,7 @@ func TestNoDryGroundOffTheBoard(t *testing.T) {
 	for _, d := range courseData {
 		h := courseHoleData(t, d[1])
 		f := h.Course
-		w, hh := h.Board()
+		w, hh := h.W, h.H
 		x0, y0 := -3.0, -3.0
 		nx, ny := int((float64(w)+6)/c)+1, int((float64(hh)+6)/c)+1
 		at := func(k int) physics.Vec2 { return physics.V(x0+float64(k%nx)*c, y0+float64(k/nx)*c) }

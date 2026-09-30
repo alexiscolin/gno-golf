@@ -132,7 +132,7 @@ no Windmill or Tunnel type. Every mini-golf obstacle is built from these three:
 | water, pit, the void | a Hazard zone |
 | loop-the-loop | a Loop zone: round it only when fast enough |
 | upper floor | a Tunnel to another part of the board, drawn apart |
-| moving obstacle | timed walls and zones within a stroke; from one stroke to the next, `course.Timed` (`course.Pulse` for the simple cases) |
+| moving obstacle | timed walls and zones within a stroke; from one stroke to the next, `course.Pulse` |
 
 ```go
 type Field struct {
@@ -257,7 +257,7 @@ build.Timed(build.Bar(physics.V(32, 5.4), physics.V(32, 8.8), 0.5, '=', "plank")
 ```
 
 This is timing *within* one stroke. For pieces that change from one stroke to
-the next, see `course.Pulse` and `course.Timed`.
+the next, see `course.Pulse`.
 
 ## Step and Shot
 

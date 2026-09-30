@@ -3,7 +3,7 @@
 The game realm. It holds the holes, every player's round on each hole, the
 records and the rankings. It routes shots to holes. It knows nothing about any
 particular course: `golf` only understands a hole through
-[`course.Hole`](course.md).
+[`course.Simple`](course.md), decoded from its data.
 
 Every hole is **data**: a GG1 string ([course.md](course.md#holes-as-data-gg1))
 that `golf` stores and decodes afresh for every call, and plays with the
@@ -470,7 +470,7 @@ What a timed hole adds at stroke N of a round (0 = first shot):
 {"version":1,"walls":[…],"posts":[…],"zones":[…]}
 ```
 
-All three lists are empty for a hole that isn't `course.Timed`, and for
+All three lists are empty for a hole with no pulses, and for
 `stroke < 0`.
 
 #### `Weather(hole string, period int64) string`

@@ -173,25 +173,12 @@ func TestWeatherIsLaidUnderTheCourse(t *testing.T) {
 	}
 }
 
-// fickle answers once as a hole should, then otherwise.
-type fickle struct {
-	*Simple
-	calls int
-}
-
-func (f *fickle) Par() int {
-	f.calls++
-	if f.calls > 1 {
-		return -7
-	}
-	return 5
-}
-
-// ParOf asks a hole once, and checks what it said.
-func TestParOfAsksTheHoleOnce(t *testing.T) {
-	f := &fickle{Simple: &Simple{}}
-	if p := ParOf(f); p != 5 || f.calls != 1 {
-		t.Fatalf("ParOf gave %d after %d calls", p, f.calls)
+// Par is the hole's own from 1 to 19, and 3 otherwise.
+func TestParIsThreeUnlessSaid(t *testing.T) {
+	for strokes, want := range map[int]int{0: 3, 1: 1, 5: 5, 19: 19, 20: 3, -7: 3} {
+		if p := (&Simple{Strokes: strokes}).Par(); p != want {
+			t.Fatalf("Strokes %d: par %d, want %d", strokes, p, want)
+		}
 	}
 }
 

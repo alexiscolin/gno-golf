@@ -209,7 +209,7 @@ func newEntry(id, name string, par int, world string, order float64) *entry {
 
 // hole is the entry's hole, decoded from its data for this call only: a
 // public call decodes it once and passes it down, and it is never stored.
-func (e *entry) hole() course.Hole {
+func (e *entry) hole() *course.Simple {
 	s, err := course.Decode(holeData.Get(e.id).(string))
 	if err != nil {
 		panic("golf: the data of " + e.id + " does not decode: " + err.Error()) // checked at publish: cannot happen
@@ -780,7 +780,7 @@ const minShotWork = 4 * physics.MaxWork / 5
 // shot of minShotWork in its dearest weather: decoding, the forecast at its
 // most (course.WorstForecastWork), and the shot, its walls and its pulses'
 // set-up, as work.next caps it.
-func worstGas(h course.Hole, size int) int64 {
+func worstGas(h *course.Simple, size int) int64 {
 	w := newWork(h, nil)
 	return decodeGas(size) + int64(course.WorstForecastWork(h))*workPerUnit +
 		workPerShot + w.walls*workPerWall + w.setup + (physics.MaxWorkStep+minShotWork)*workPerUnit
@@ -788,13 +788,13 @@ func worstGas(h course.Hole, size int) int64 {
 
 // newWork is a commit's work on a hole, before any shot: its walls and
 // pieces, a pulse's as if always there, and the weather's.
-func newWork(h course.Hole, weather []physics.Zone) *work {
+func newWork(h *course.Simple, weather []physics.Zone) *work {
 	w := &work{}
 	if f := h.Field(); f != nil {
 		w.walls = int64(len(f.Walls))
 		w.pieces = pieces(f.Walls, f.Posts, f.Zones)
 	}
-	for _, p := range pulsesOf(h) {
+	for _, p := range h.Pulses {
 		w.walls += int64(len(p.Walls))
 		w.pieces += pieces(p.Walls, p.Posts, p.Zones)
 		w.setup += int64(len(p.Walls))*workPerPulseWall + int64(len(p.Posts))*workPerPulsePost
@@ -820,18 +820,9 @@ func pieces(ws []physics.Wall, ps []physics.Post, zs []physics.Zone) int64 {
 	return int64(n)
 }
 
-// pulsesOf is a hole's pulses: the pieces it adds at some strokes.
-func pulsesOf(h course.Hole) []course.Pulse {
-	switch s := h.(type) {
-	case *course.Simple:
-		return s.Pulses
-	}
-	return nil
-}
-
 // next refuses the next shot if it could overrun the budget, and caps its
 // work at what is left of it.
-func (w *work) next(h course.Hole) {
+func (w *work) next(h *course.Simple) {
 	if w.played == 0 && w.bound > workBudget {
 		w.refuse()
 	}
@@ -921,9 +912,9 @@ func resolve(shot physics.Shot, holed bool) (physics.Shot, bool) {
 // back brings a ball that came to rest off the board (a leak in a hole's
 // walls) back to from, where the shot started; the stroke counts, with no
 // penalty. Every stroke golf plays or replays goes through it.
-func back(h course.Hole, from physics.Vec2, shot physics.Shot, holed bool) physics.Shot {
+func back(h *course.Simple, from physics.Vec2, shot physics.Shot, holed bool) physics.Shot {
 	rest := shot.Rest()
-	w, hh := course.BoardOf(h)
+	w, hh := h.W, h.H
 	if holed || len(shot.Path) == 0 || (rest.X >= 0 && rest.X <= float64(w) && rest.Y >= 0 && rest.Y <= float64(hh)) {
 		return shot
 	}
@@ -935,7 +926,7 @@ func back(h course.Hole, from physics.Vec2, shot physics.Shot, holed bool) physi
 }
 
 // stroke resolves one shot into the round and reports whether it was holed.
-func stroke(e *entry, h course.Hole, r *round, player address, angle, power float64, tick int, weather []physics.Zone) (physics.Shot, bool) {
+func stroke(e *entry, h *course.Simple, r *round, player address, angle, power float64, tick int, weather []physics.Zone) (physics.Shot, bool) {
 	if r.strokes >= maxRoundStrokes {
 		panic(errStrokeLimit)
 	}
@@ -944,9 +935,9 @@ func stroke(e *entry, h course.Hole, r *round, player address, angle, power floa
 	angle, power = validShot(angle, power)
 
 	from := r.ball()
-	shot, holed := resolve(previewAt(h, from, angle*math.Pi/180, power, r.strokes, tick, weather))
+	shot, holed := resolve(h.PreviewWith(from, angle*math.Pi/180, power, r.strokes, tick, weather))
 	shot = back(h, from, shot, holed)
-	w, hh := course.BoardOf(h)
+	w, hh := h.W, h.H
 	e.mark(course.WearIndexOn(shot.Rest(), w, hh)) // where the round's ball is: back's, for a leak
 	// the decisions, as played: what anyone needs to replay the round
 	if r.shots != "" {
@@ -1114,7 +1105,7 @@ func clampTick(t, shot string) int {
 
 // roundOf is the player's round under way on e, or a new one from the tee,
 // not stored: its commit stores it if it does not finish it.
-func roundOf(e *entry, h course.Hole, player address) *round {
+func roundOf(e *entry, h *course.Simple, player address) *round {
 	if v := e.roundTree().Get(player.String()); v != nil {
 		return v.(*round)
 	}
@@ -1187,10 +1178,4 @@ func cleanSkin(s string) string {
 		}
 	}
 	return string(b)
-}
-
-// previewAt resolves a stroke of a round, with its stroke number, tick and
-// weather.
-func previewAt(h course.Hole, ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool) {
-	return h.(course.Weatherable).PreviewWith(ball, angle, power, stroke, tick, weather)
 }

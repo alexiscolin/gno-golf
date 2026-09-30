@@ -1,5 +1,5 @@
-// Package course is the contract every hole implements: the only thing golf
-// and a hole have to agree on.
+// Package course is what golf and a hole agree on: a hole as data (Simple,
+// GG1), its weather, and how a stroke is launched and drops.
 package course
 
 import (
@@ -20,53 +20,6 @@ const WearW, WearH = 16, 8
 // and the flood a client runs.
 const MaxBoard = 96
 
-// Sized is what a hole implements to play on a board other than 32x16.
-// Optional.
-type Sized interface {
-	Board() (w, h int)
-}
-
-// Parred is what a hole implements to say how many strokes a good round
-// takes. Optional; a hole that does not say is a par 3.
-type Parred interface {
-	Par() int
-}
-
-// ParOf is the hole's par: 3 unless it says 1 to 19. It calls the method once
-// and checks that value: a hole is anyone's code, and may answer differently
-// each time.
-func ParOf(h Hole) int {
-	if p, ok := h.(Parred); ok {
-		if n := p.Par(); n > 0 && n < 20 {
-			return n
-		}
-	}
-	return 3
-}
-
-// BoardOf is the board a hole plays on: the default unless it says 1 to
-// MaxBoard a side. Like ParOf, it calls the method once.
-func BoardOf(h Hole) (int, int) {
-	if s, ok := h.(Sized); ok {
-		w, hh := s.Board()
-		if w > 0 && hh > 0 && w <= MaxBoard && hh <= MaxBoard {
-			return w, hh
-		}
-	}
-	return BoardW, BoardH
-}
-
-// Hole is one course. No method takes `cur realm`: an interface cannot carry a
-// capability token, so a hole never learns who is playing.
-type Hole interface {
-	Name() string
-	Start() physics.Vec2
-	Cup() physics.Vec2
-
-	// Field is the geometry, for renderers and for inspecting the hole.
-	Field() *physics.Field
-}
-
 // WearIndexOn maps a position on a w x h board to its wear cell, clamped.
 func WearIndexOn(p physics.Vec2, w, h int) int {
 	x := int(p.X * WearW / float64(w))
@@ -86,34 +39,16 @@ func WearIndexOn(p physics.Vec2, w, h int) int {
 	return y*WearW + x
 }
 
-// Timed is what a hole implements when part of it changes from one stroke to
-// the next. The clock is the stroke number in the player's own round (0 is
-// the first shot), never shared between players: previewing shot N and
-// committing it meet the same course.
-type Timed interface {
-	// Varies says whether anything actually changes.
-	Varies() bool
-	// Extras are the pieces present at a stroke, on top of Field().
-	Extras(stroke int) ([]physics.Wall, []physics.Post)
-}
-
 // Pulse is pieces that come and go: present on the strokes where
-// (stroke+Phase) % Every < On, a timed wall's rule applied per stroke.
+// (stroke+Phase) % Every < On, a timed wall's rule applied per stroke. The
+// clock is the stroke number in the player's own round (0 is the first
+// shot), never shared between players: previewing shot N and committing it
+// meet the same course.
 type Pulse struct {
 	Every, On, Phase int
 	Walls            []physics.Wall
 	Posts            []physics.Post
 	Zones            []physics.Zone
-}
-
-// Weatherable is what a hole implements to be played in the weather golf
-// chooses: PreviewWith plays a stroke under the weather's zones, MaxWind is
-// the strongest wind the design can stand (0: no limit of its own).
-type Weatherable interface {
-	// tick is where the timed pieces were when the player let go
-	// (physics.WithTick).
-	PreviewWith(ball physics.Vec2, angle, power float64, stroke, tick int, weather []physics.Zone) (physics.Shot, bool)
-	MaxWind() float64
 }
 
 // The weather kinds. Each but Clear is also the skin of its whole-board zones.
@@ -180,7 +115,7 @@ func hash(s string) uint64 {
 
 // ForecastFor is the weather of hole id (in world) for a period: a hash of
 // the two looked up in the world's climate. Nobody picks it.
-func ForecastFor(id, world string, h Hole, period int64) Forecast {
+func ForecastFor(id, world string, h *Simple, period int64) Forecast {
 	seed := hash(id + "#" + strconv.FormatInt(period, 10))
 	table, ok := climates[world]
 	if !ok {
@@ -211,15 +146,14 @@ func (r *rng) unit() float64 { return float64(r.next()%1000000) / 1000000 }
 
 // WeatherFor is the wind and zones of one kind of weather on a hole, drawn
 // from seed: the wind's side and strength, where the rain leaves its puddles.
-func WeatherFor(kind string, h Hole, seed uint64) (physics.Vec2, []physics.Zone) {
+func WeatherFor(kind string, h *Simple, seed uint64) (physics.Vec2, []physics.Zone) {
 	var work int
 	return weatherFor(kind, h, seed, &work)
 }
 
 // weatherFor is WeatherFor, adding what it cost to *work (see wet).
-func weatherFor(kind string, h Hole, seed uint64, work *int) (physics.Vec2, []physics.Zone) {
-	w, hh := BoardOf(h)
-	W, H := float64(w), float64(hh)
+func weatherFor(kind string, h *Simple, seed uint64, work *int) (physics.Vec2, []physics.Zone) {
+	W, H := float64(h.W), float64(h.H)
 	all := func(k physics.ZoneKind, skin string, scale float64, vec physics.Vec2) physics.Zone {
 		// the wind is air, and never speeds the ball up
 		air := k == physics.Slope
@@ -228,8 +162,8 @@ func weatherFor(kind string, h Hole, seed uint64, work *int) (physics.Vec2, []ph
 	r := &rng{s: seed}
 	blow := func() physics.Vec2 {
 		s := WindMin + r.unit()*(WindMax-WindMin)
-		if x, ok := h.(Weatherable); ok && x.MaxWind() > 0 && s > x.MaxWind() {
-			s = x.MaxWind()
+		if h.Shelter > 0 && s > h.Shelter {
+			s = h.Shelter
 		}
 		return physics.FromPolar(r.unit()*2*math.Pi, s)
 	}
@@ -298,7 +232,7 @@ const (
 // piece (a try that fails sooner costs less, and one that places a puddle
 // ends them sooner). Golf refuses a hole whose worst forecast leaves a commit
 // no room for its heaviest shot.
-func WorstForecastWork(h Hole) int {
+func WorstForecastWork(h *Simple) int {
 	f := h.Field()
 	try := tryWork + dryPostWork*len(f.Posts)
 	for _, z := range f.Zones {
@@ -324,7 +258,7 @@ func dryZoneTest(z physics.Zone) int {
 // wet adds what rain leaves on a hole: its ice quicker still, and two to four
 // puddles on the lane, clear of the kerb, the pieces, the tee and the cup.
 // What it costs goes in *work.
-func wet(h Hole, r *rng, zs []physics.Zone, work *int) []physics.Zone {
+func wet(h *Simple, r *rng, zs []physics.Zone, work *int) []physics.Zone {
 	f := h.Field()
 	*work += iceWork * len(f.Zones)
 	for _, z := range f.Zones {
@@ -333,10 +267,9 @@ func wet(h Hole, r *rng, zs []physics.Zone, work *int) []physics.Zone {
 			zs = append(zs, z)
 		}
 	}
-	w, hh := BoardOf(h)
 	want, placed := minPuddles+int(r.next()%morePuddles), []physics.Zone{}
 	for try := 0; try < puddleTries && len(placed) < want; try++ {
-		c := physics.V(r.unit()*float64(w), r.unit()*float64(hh))
+		c := physics.V(r.unit()*float64(h.W), r.unit()*float64(h.H))
 		rad := puddleR + r.unit()*puddleGrow
 		*work += tryWork
 		if !dryLand(h, c, rad, work) {
@@ -361,7 +294,7 @@ func wet(h Hole, r *rng, zs []physics.Zone, work *int) []physics.Zone {
 // grid wall lies along), off any zone but plain ground, dryGap from any piece
 // and dryTee from tee and cup. Cheap tests first, no square roots: on a lane
 // hole every try fails.
-func dryLand(h Hole, c physics.Vec2, rad float64, work *int) bool {
+func dryLand(h *Simple, c physics.Vec2, rad float64, work *int) bool {
 	f := h.Field()
 	if c.Sub(h.Start()).LenCmp(rad+dryTee) < 0 || c.Sub(h.Cup()).LenCmp(rad+dryTee) < 0 {
 		return false
@@ -424,12 +357,6 @@ func WithWeather(f *physics.Field, weather []physics.Zone) *physics.Field {
 	return &g
 }
 
-// Zoned is what a timed hole implements when some of what comes and goes is
-// ground: the zones present at a stroke, on top of Field()'s. Optional.
-type Zoned interface {
-	ExtraZones(stroke int) []physics.Zone
-}
-
 // WithZones is the field with zones put first (a puddle over the sand is the
 // puddle). It may return f itself: do not mutate what it returns.
 func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field {
@@ -461,11 +388,11 @@ func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *p
 	return &g
 }
 
-// Simple is a hole that is only its geometry, and implements every interface
-// here. Fields and methods pair up (Strokes/Par, Title/Name, Course/Field)
-// because a field and a method cannot share a name.
+// Simple is a hole: its geometry, what Decode gives golf. Fields and methods
+// pair up (Strokes/Par, Tee/Start, Pin/Cup, Course/Field) because a field and
+// a method cannot share a name.
 type Simple struct {
-	W, H      int // the board; 0 means the default 32x16
+	W, H      int // the board, 1 to MaxBoard a side (Decode holds data to it, author.Fit sets it)
 	Title     string
 	Strokes   int // par: the strokes a good round takes (0 means 3)
 	Tee, Pin  physics.Vec2
@@ -480,9 +407,6 @@ type Simple struct {
 	// Shelter caps the wind the hole is played in (0: the world's own).
 	Shelter float64
 }
-
-// MaxWind is the strongest wind the hole is played in (0: the world's own).
-func (h *Simple) MaxWind() float64 { return h.Shelter }
 
 // ExtraZones is the zones the hole's pulses lay down at a stroke.
 func (h *Simple) ExtraZones(stroke int) []physics.Zone {
@@ -535,11 +459,13 @@ func (h *Simple) PreviewWith(ball physics.Vec2, angle, power float64, stroke, ti
 	return shot, holed
 }
 
-// Name is the hole's title.
-func (h *Simple) Name() string { return h.Title }
-
-// Par is the strokes a good round takes.
-func (h *Simple) Par() int { return h.Strokes }
+// Par is the strokes a good round takes: Strokes, 3 unless it says 1 to 19.
+func (h *Simple) Par() int {
+	if h.Strokes > 0 && h.Strokes < 20 {
+		return h.Strokes
+	}
+	return 3
+}
 
 // Start is the tee.
 func (h *Simple) Start() physics.Vec2 { return h.Tee }
@@ -549,15 +475,6 @@ func (h *Simple) Cup() physics.Vec2 { return h.Pin }
 
 // Field is the course as the physics sees it.
 func (h *Simple) Field() *physics.Field { return h.Course }
-
-// Board is the hole's board size: W by H, or the default when either is 0
-// or past MaxBoard, as BoardOf has it.
-func (h *Simple) Board() (int, int) {
-	if h.W > 0 && h.H > 0 && h.W <= MaxBoard && h.H <= MaxBoard {
-		return h.W, h.H
-	}
-	return BoardW, BoardH
-}
 
 // Kick turns a stroke's power (0 to 10) into the ball's speed per substep,
 // Kick·p^(3/4), so the roll (v²/2a) grows as p^(3/2). A full stroke rolls 44

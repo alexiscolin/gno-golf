@@ -21,7 +21,7 @@ func Period() int64 { return time.Now().Unix() / PeriodSeconds }
 
 // weatherOf is the hole's weather in a period: seeded by its id, so each
 // version of a slot has weather of its own.
-func weatherOf(e *entry, h course.Hole, period int64) course.Forecast {
+func weatherOf(e *entry, h *course.Simple, period int64) course.Forecast {
 	return course.ForecastFor(e.id, e.world, h, period)
 }
 

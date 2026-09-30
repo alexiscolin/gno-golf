@@ -1,9 +1,8 @@
 # `gno.land/p/gnogolf/course`
 
-The contract between a hole and the `golf` realm. The `Hole` interface is the
-only thing the two have to agree on. The package also has `course.Simple` (a
-ready-made hole that's only geometry), the stroke-to-stroke timing, the cup
-rule, the weather, and GG1, the format a hole is stored in as data. What only
+What a hole and the `golf` realm agree on: `course.Simple` (a hole, which is
+only its geometry), the stroke-to-stroke timing, the cup rule, the weather,
+and GG1, the format a hole is stored in as data. What only
 a hole's source and the tests need, `Fit` and `Diff`, is in
 [`course/author`](#authoring-courseauthor), which is never deployed.
 
@@ -20,46 +19,15 @@ const (
 )
 ```
 
-## `Hole`
-
-```go
-type Hole interface {
-	Name() string
-	Start() physics.Vec2
-	Cup() physics.Vec2
-	Field() *physics.Field
-}
-```
-
-`Field` is the geometry, for renderers and for anyone who wants to inspect
-the hole. A stroke is played through `Weatherable.PreviewWith`, which changes
-nothing: previewing a shot and recording it are the same call, so what a
-player watched is what the chain records.
-
-No method takes `cur realm`, so a hole never learns who's playing. Identity
-stays with `golf`.
+## A hole
 
 Every hole is published as data, and `golf` decodes it into a `Simple` for
-each call: no hole runs code of its own.
+each call: no hole runs code of its own, and no method takes `cur realm`, so a
+hole never learns who's playing. Identity stays with `golf`.
 
-### Optional interfaces
-
-`golf` checks for these with type assertions:
-
-| Interface | Method(s) | If missing |
-|---|---|---|
-| `Sized` | `Board() (w, h int)` | 32×16. Values outside `1..MaxBoard` also fall back. |
-| `Parred` | `Par() int` | par 3. Values outside `1..19` also fall back. |
-| `Timed` | `Varies() bool`, `Extras(stroke)` | the hole is the same on every stroke |
-| `Zoned` | `ExtraZones(stroke int) []physics.Zone` | no per-stroke zones |
-| `Weatherable` | `PreviewWith(...)`, `MaxWind() float64` | played with no weather |
-
-Helpers that apply those fallbacks:
-
-```go
-func BoardOf(h Hole) (int, int)
-func ParOf(h Hole) int
-```
+A stroke is played through `Simple.PreviewWith`, which changes nothing:
+previewing a shot and recording it are the same call, so what a player
+watched is what the chain records.
 
 ### World and order
 
@@ -84,14 +52,13 @@ play: it's there for renderers to show.
 
 ## `Simple`
 
-A hole that's only its geometry. It implements `Hole`, `Sized`, `Parred`,
-`Timed`, `Zoned` and `Weatherable`.
+A hole that's only its geometry.
 
 ```go
 type Simple struct {
-	W, H      int            // the board; 0 means 32x16
-	Title     string         // Name()
-	Strokes   int            // par; 0 means 3
+	W, H      int            // the board, 1 to MaxBoard a side (Decode holds data to it, author.Fit sets it)
+	Title     string
+	Strokes   int            // Par(): 3 unless 1 to 19
 	Tee, Pin  physics.Vec2   // Start(), Cup()
 	Course    *physics.Field // Field(); required
 	Pulses    []Pulse        // pieces that come and go with the stroke number
@@ -99,7 +66,7 @@ type Simple struct {
 	CupRadius float64        // passed to Sink
 	World     string         // "" is "garden"
 	Order     float64        // place in the world, 1 first
-	Shelter   float64        // caps the wind (MaxWind); 0 means the world's own range
+	Shelter   float64        // caps the wind; 0 means the world's own range
 }
 ```
 
@@ -166,18 +133,17 @@ Pulses: []course.Pulse{{
 }},
 ```
 
-`Simple` implements `Timed` from its pulses:
+`Simple` reads its pulses with:
 
 ```go
-type Timed interface {
-	Varies() bool
-	Extras(stroke int) ([]physics.Wall, []physics.Post)
-}
+func (h *Simple) Varies() bool
+func (h *Simple) Extras(stroke int) ([]physics.Wall, []physics.Post)
+func (h *Simple) ExtraZones(stroke int) []physics.Zone
 ```
 
-`Varies` says whether anything actually changes (`Simple` returns
-`len(Pulses) > 0`). `Extras` is what a renderer draws on top of `Field()` for
-the stroke being aimed. Keep `Timed` (per stroke) separate from
+`Varies` says whether anything actually changes (`len(Pulses) > 0`).
+`Extras` and `ExtraZones` are what a renderer draws on top of `Field()` for
+the stroke being aimed. Keep the pulses (per stroke) separate from
 `physics.Wall.Every` (per substep, inside one stroke): hole4's sails, for one,
 are timed walls, not a pulse.
 
@@ -248,7 +214,7 @@ through `Sink`.
 ## Weather
 
 The weather is the `golf` realm's to choose. A hole only says how much wind
-it can take (`Weatherable.MaxWind`, which is `Simple.Shelter`).
+it can take (`Simple.Shelter`).
 
 ```go
 const (
@@ -276,8 +242,8 @@ type Forecast struct {
 	Work   int // what drawing it cost, in physics.MaxWork's units
 }
 
-func ForecastFor(id, world string, h Hole, period int64) Forecast
-func WeatherFor(kind string, h Hole, seed uint64) (physics.Vec2, []physics.Zone)
+func ForecastFor(id, world string, h *Simple, period int64) Forecast
+func WeatherFor(kind string, h *Simple, seed uint64) (physics.Vec2, []physics.Zone)
 ```
 
 `ForecastFor` computes `seed` as the 64-bit FNV-1a hash of
@@ -297,7 +263,7 @@ are unexported, so nothing can change them.
 What each kind puts on the board (whole-board zones cover `0..W, 0..H`):
 
 - **wind**: one Slope skinned `wind`, with `Air` and `Capped` set. `Vec` has a
-  strength between `WindMin` and `WindMax`, capped at `MaxWind()` when that's
+  strength between `WindMin` and `WindMax`, capped at `Shelter` when that's
   greater than 0, and a direction taken from the seed.
 - **rain**: a Surface `rain` at `RainScale`: a touch, not ice. On a 0.87
   green the ball keeps 94% of its speed a substep instead of 92%; much more

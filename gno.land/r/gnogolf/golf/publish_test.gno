@@ -191,8 +191,6 @@ func TestADataHoleIsNeverStored(cur realm, t *testing.T) {
 	h.Pulses = []course.Pulse{{Every: 2, On: 1, Walls: build.Bar(physics.V(10, 4), physics.V(10, 12), 0.5, '=', "gate")}}
 	id := publish(cur, h)
 	e := mustHole(id)
-	_, isData := e.hole().(*course.Simple)
-	uassert.True(t, isData)
 	testing.SetRealm(testing.NewUserRealm(player))
 	Launch(cross(cur), id, 180, 1)
 	testing.SetRealm(testing.NewUserRealm(player))
@@ -260,7 +258,7 @@ func TestAPulsesSetUpIsCharged(cur realm, t *testing.T) {
 	uassert.Equal(t, int64(64*workPerPulseWall+course.MaxPosts*workPerPulsePost), w.setup)
 	uassert.True(t, strings.Contains(HoleState(id), ufmt.Sprintf(`"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup)), "HoleState says it, pulse and all")
 	w.next(mustHole(id).hole())
-	tap, _ := previewAt(mustHole(id).hole(), physics.V(3, 3), 0, 0.05, 0, 0, nil)
+	tap, _ := mustHole(id).hole().PreviewWith(physics.V(3, 3), 0, 0.05, 0, 0, nil)
 	w.add(tap)
 	uassert.True(t, w.spent >= workPerShot+68*workPerWall+w.setup, "every shot pays it")
 }

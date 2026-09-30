@@ -351,7 +351,7 @@ func vsPar(d int) string {
 // usual friction).
 const flatRolls = "On flat grass a power of 10 rolls about 40, a 5 about 15."
 
-func renderHole(e *entry, h course.Hole, focus address) string {
+func renderHole(e *entry, h *course.Simple, focus address) string {
 	f := h.Field()
 	var mine *round // the focused player's round, looked up once
 	if v := e.roundTree().Get(focus.String()); v != nil {
@@ -362,10 +362,8 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 		stroke = mine.strokes
 	}
 	// a timed hole is drawn as it stands for the focused player's next stroke
-	if t, ok := h.(course.Timed); ok {
-		ws, ps := t.Extras(stroke)
-		f = course.WithZones(course.WithExtras(f, ws, ps), extraZones(h, stroke))
-	}
+	ws, ps := h.Extras(stroke)
+	f = course.WithZones(course.WithExtras(f, ws, ps), h.ExtraZones(stroke))
 	// a community hole's world is its author's word: only the course has cups
 	where := md(cupName(e.world), hub+":"+e.world)
 	if !e.official {
@@ -390,7 +388,7 @@ func renderHole(e *entry, h course.Hole, focus address) string {
 	// played in it
 	now := weatherOf(e, h, Period())
 	s += weatherNote(now)
-	if isTimed(h) {
+	if h.Varies() {
 		if focus == "" {
 			s += "_This hole changes with every stroke. It is drawn for a first shot; add `/<your address>` to the URL to see it for your next one._\n\n"
 		} else {
@@ -535,8 +533,8 @@ func renderData(e *entry) string {
 
 // board rasterises the hole: wear, then zones, posts, walls, cup, and mine,
 // the focused player's round (nil for none); now is this period's forecast.
-func board(e *entry, h course.Hole, f *physics.Field, mine *round, now course.Forecast) string {
-	bw, bh := course.BoardOf(h)
+func board(e *entry, h *course.Simple, f *physics.Field, mine *round, now course.Forecast) string {
+	bw, bh := h.W, h.H
 	g := make([][]rune, bh)
 	wear := e.wearGrid()
 	for y := 0; y < bh; y++ {
@@ -760,8 +758,8 @@ const maxBoardWork = 600000
 // a board cell; a cell and a polygon edge per row of a zone's box (every edge
 // counted as crossing, as a zigzag's do); a step along a wall; a cell of a
 // post's box.
-func boardWork(f *physics.Field, h course.Hole) int {
-	bw, bh := course.BoardOf(h)
+func boardWork(f *physics.Field, h *course.Simple) int {
+	bw, bh := h.W, h.H
 	n := 32 * bw * bh
 	for i := range f.Zones {
 		z := &f.Zones[i]

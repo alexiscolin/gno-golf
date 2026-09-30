@@ -278,7 +278,7 @@ func nothingNew(old *entry) string {
 }
 
 func dataEntry(alias string, n int, h *course.Simple, by address, sum, note string) *entry {
-	e := newEntry(alias+"/v"+strconv.Itoa(n), cleanName(h.Title), course.ParOf(h), h.World, h.Order)
+	e := newEntry(alias+"/v"+strconv.Itoa(n), cleanName(h.Title), h.Par(), h.World, h.Order)
 	e.slot, e.version, e.by, e.height, e.sha, e.note = alias, n, by, runtime.ChainHeight(), sum, cleanText(note, maxNote)
 	return e
 }
