@@ -451,6 +451,11 @@ real answer.
   stay a cache on top. Unsaved (local-only) play still lives in the browser,
   and the game says so where it matters ("save your rounds to keep your
   progress everywhere"). No realm change: the reads exist.
+- **Phone aim UX** (third person): the one-gesture aim (fine aim near the
+  press, spinning past a threshold, power by the vertical pull) works on
+  touch as it is; to design properly for small screens, e.g. two on-screen
+  rotate arrows to hold, a comfortable fine-aim zone, and a check with real
+  thumbs.
 - **Open the Crystal Mines after one cup finished** (with the item above, so
   it follows the player): the four classic cups stay open from the start; the
   Mines' card shows "Finish a cup to open" and a progress bar, its clip still
