@@ -16,7 +16,7 @@ import "@/app/title.css";
 // no holes on this chain yet is shown, but cannot be picked.
 
 const TAGS: Record<Cup, string> = {
-  garden: "Mushrooms, ponds and mountains",
+  garden: "Mushrooms, ponds and hedges",
   island: "Sand spits, palms and the sea",
   town: "Streets, lanterns and rooftops",
   mountain: "Snowy peaks, pines and a chalet",
@@ -270,7 +270,6 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                 <span className="world__ribbon">{w.name}</span>
                 <span className="world__info">
                 <span className="world__tag">{w.tag}</span>
-                <span className="world__count">{n ? `${n} holes` : "Coming soon"}</span>
                 {n > 0 && (
                   <span className="world__me">
                     <span className={`world__track load--${w.id}`}><Green p={t.done / n} world={w.id} holed={t.done === n} thick /></span>
@@ -298,7 +297,6 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
             <span className="world__ribbon">Crystal Mines</span>
             <span className="world__info">
               <span className="world__tag">Crystals, carts and lava</span>
-              <span className="world__count">Expert cup</span>
             </span>
           </button>
         </li>

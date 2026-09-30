@@ -239,7 +239,6 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 }
 .world__info { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 14px 8px 8px; }
 /* the standing reads first, the green under it supports it */
-.worlds--v2 .world__count { font-size: 14px; }
 .worlds--v2 .world__score { font-size: 15px; }
 .worlds--v2 .world__track { padding: 2px 8% 0; }
 
@@ -591,7 +590,6 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .worlds--v2 .world:hover:not([disabled]) .world__ribbon, .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.12); }
   .world__won { top: 10px; right: 10px; font-size: 13px; padding-right: 9px; }
   .world__won svg { width: 26px; height: 26px; }
-  .worlds--v2 .world__count { font-size: 13px; }
   .worlds--v2 .world__score { font-size: 13px; }
   .world--mines .mode__soon { top: 8px; right: 6px; font-size: 13px; padding: 4px 10px; }
   .front .worlds__title, .front .pick__name { --ink-w: 6px; }
