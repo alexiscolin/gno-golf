@@ -139,13 +139,21 @@ type Mapped = { hole: HoleState; path: Vec2[]; strokes: number };
 // read once a session a rival's hole (and mode), a few at a time (a screen of
 // cards is dozens of calls); a read that failed is asked again next time
 const maps = new Map<string, Promise<Mapped | null>>(), mapTurn = inTurn(3);
+// a hole's state, read once a session for every ghost on it (two picks often
+// show the same hole): its map is its lanes, which its version id fixes
+const states = new Map<string, Promise<HoleState>>();
+function stateOf(chain: Chain, id: string) {
+  let p = states.get(id);
+  if (!p) states.set(id, (p = chain.state(id))), p.catch(() => states.delete(id));
+  return p;
+}
 function mapOf(chain: Chain, player: string, id: string, mode: Mode, strokes: number) {
   const key = `${player}|${id}|${mode}|${strokes}`; // (a new best: its own path)
   let p = maps.get(key);
   if (p) return p;
   p = mapTurn(() => chain.ghost(id, mode, player).then(async (g) => {
     if (!g) return null;
-    const shots = shotsOf(g), hole = await chain.state(g.hole);
+    const shots = shotsOf(g), hole = await stateOf(chain, g.hole);
     let at: Stroke = await chain.replayRound(g.hole, [shots[0]], g.period);
     const path = [...at.path];
     for (let n = 1; n < shots.length && !at.holed; n++) path.push(...(at = await chain.simulateFrom(g.hole, at.rest, shots[n], n, g.period)).path);
