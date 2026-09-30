@@ -441,6 +441,16 @@ real answer.
   gnokey once, or wait for it); the client signs txs itself (tm2 JS signing);
   the storage deposit counts against the spend cap; the key stays scoped to
   this origin (and what a leaked key could still do: only golf calls, capped).
+- **Progress that follows the player (right after launch).** Today the cup
+  card, the badges, the gnomes and any unlock live in this browser's
+  localStorage: a new device, another browser or cleared site data starts the
+  player from nothing, though their saved rounds are all on the chain. When a
+  wallet is connected, rebuild what the chain can prove from it: the holes
+  saved (`Bests`/`Records` for the address), so a cup finished on-chain counts
+  as finished, its unlocks and badges follow; the card's latest local rounds
+  stay a cache on top. Unsaved (local-only) play still lives in the browser,
+  and the game says so where it matters ("save your rounds to keep your
+  progress everywhere"). No realm change: the reads exist.
 - **A fifth cup, for experts** (a "Champion's Cup"): 18 long, hard holes for
   the players who finished the four at par, unlocked by them (a gnome of its
   own, a badge). Holes are data: they publish with `Publish` and need no
