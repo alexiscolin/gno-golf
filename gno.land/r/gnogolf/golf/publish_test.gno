@@ -715,6 +715,7 @@ func TestThePagesSayWhoHoldsPower(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(page, `value="`+id+`"`), "the page plays the version by id")
 	data := Render(id + "/data")
 	uassert.True(t, strings.Contains(data, "version 1 of [town/73](/r/gnogolf/golf:town/73)"), data)
+	uassert.True(t, strings.Contains(data, "[course](/p/gnogolf/course$source)") && strings.Contains(data, "[physics](/p/gnogolf/physics$source)"), "the packages golf imports")
 	uassert.True(t, strings.Contains(data, hexOf(cupHole("town", 73, "Paged"))), "the data, as published")
 	uassert.True(t, strings.Contains(Render("town/73/data"), "**"+id+"**"), "by alias too")
 	uassert.True(t, strings.Contains(Render("no/such"), "# No such hole"))

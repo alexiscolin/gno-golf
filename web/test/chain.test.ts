@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, DEFAULT_RPC,
+  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, isRealmPath, DEFAULT_RPC,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -155,6 +155,17 @@ test("RULES mirrors golf.gno's own constants (a regression guard for scripts/sel
 
 test("REALM_PATH is the hub's gnoweb path (NEXT_PUBLIC_REALM is unset here, so the default realm)", () => {
   assert.equal(REALM_PATH, "/r/gnogolf/golf");
+});
+
+test("isRealmPath: a realm under a namespace, or under a game's sub-path, and nothing else", () => {
+  for (const ok of ["gno.land/r/gnogolf/golf", "gno.land/r/nym-alexiscolin000/gnogolf/golf"]) assert.equal(isRealmPath(ok), true, ok);
+  for (const bad of ["", "gno.land/r/gnogolf", "gno.land/p/nym-alexiscolin000/gnogolf/golf", "gno.land/r/a/b/c/d", "gno.land/r/a/golf/", "gno.land/r/a/Golf",
+    "evil.land/r/a/golf", "gno.land/r/a/golf$source", "gno.land/r/a/../golf"]) assert.equal(isRealmPath(bad), false, bad);
+});
+
+test("pkgsPath: the packages beside the realm, in the repo tree and as stage.sh deploys them", () => {
+  assert.equal(pkgsPath(REALM_PATH), "/p/gnogolf/");
+  assert.equal(pkgsPath("/r/nym-alexiscolin000/gnogolf/golf"), "/p/nym-alexiscolin000/gnogolf/");
 });
 
 // ------------------------------------------------------------ makeChain: params, clock, links

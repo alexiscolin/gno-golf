@@ -1,20 +1,26 @@
 #!/bin/sh
-# stage.sh <ns> <out>: the three deployed packages (physics, course, golf),
-# under the namespace <ns>, ready for addpkg.
+# stage.sh <ns> <out>: the three deployed packages, under the gno.land name
+# <ns> and the game's own sub-path, gnogolf (an address has one name, so each
+# game under it takes a sub-path), ready for addpkg:
 #
-#   scripts/stage.sh nym-golfer000 /tmp/stage  the production namespace (onyx)
-#   scripts/stage.sh gnogolf /tmp/stage        the canonical repo tree (the
-#                                              identity; what check.sh stages)
+#   p/gnogolf/physics  ->  p/<ns>/gnogolf/physics
+#   p/gnogolf/course   ->  p/<ns>/gnogolf/course
+#   r/gnogolf/golf     ->  r/<ns>/gnogolf/golf
+#
+#   scripts/stage.sh nym-alexiscolin000 /tmp/stage   the onyx deploy (deploy-v1.md)
+#
+# The realm keeps its last element, golf: the chain takes a package only when
+# its name is its path's last element (gnovm's ValidatePkgNameMatchesPath).
 #
 # Copies every file of each package's directory but its tests (*_test.gno,
-# *_filetest.gno) into <out>/gno.land/{p,r}/<ns>/…, as it is. The one change
-# is the namespace in the import paths (gno.land/[pr]/gnogolf/ to <ns>),
-# which is none at all for gnogolf. The subpackages (physics/build,
+# *_filetest.gno) into <out>/gno.land/…, as it is. The one change is that
+# prefix, [pr]/gnogolf/ to [pr]/<ns>/gnogolf/, wherever a path is named (the
+# imports, gnomod.toml's module). The subpackages (physics/build,
 # course/author, course/fingerprint) and the hole realms are other
 # directories, and not deployed. Then it checks that each staged package is
-# the repo's, file for file and byte for byte once the namespace is read
-# back; that nothing of the old namespace is left; lints the result with the
-# onyx toolchain; and prints each package's size.
+# the repo's, file for file and byte for byte once the prefix is read back;
+# that no repo path is left; that each gnomod.toml names its own path; lints
+# the result with the onyx toolchain; and prints each package's size.
 #
 # GNO is the gno binary to lint with (default: the onyx toolchain's, in
 # GNO_TOOLCHAIN: see check.sh).
@@ -22,31 +28,32 @@ set -eu
 
 ns=${1:?usage: stage.sh <ns> <out>}
 out=${2:?usage: stage.sh <ns> <out>}
-if [ "$ns" != gnogolf ] && ! printf %s "$ns" | grep -Eqx 'nym-[a-z]{5,13}[0-9]{3}'; then
-	echo "stage.sh: $ns is neither gnogolf nor a nym name (nym-<5 to 13 letters><3 digits>)" >&2
+if ! printf %s "$ns" | grep -Eqx 'nym-[a-z]{5,13}[0-9]{3}'; then
+	echo "stage.sh: $ns is not a nym name (nym-<5 to 13 letters><3 digits>)" >&2
 	exit 1
 fi
+to() { sed "s#gno\.land/\([pr]\)/gnogolf/#gno.land/\1/$ns/gnogolf/#g"; }
+back() { sed "s#gno\.land/\([pr]\)/$ns/gnogolf/#gno.land/\1/gnogolf/#g"; }
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-src=$root/gno.land
-pkgs="p/gnogolf/physics p/gnogolf/course r/gnogolf/golf"
+pkgs="gno.land/p/gnogolf/physics gno.land/p/gnogolf/course gno.land/r/gnogolf/golf"
 rm -rf "$out/gno.land"
 for pkg in $pkgs; do
-	dst=$out/gno.land/$(echo "$pkg" | sed "s#/gnogolf/#/$ns/#")
+	dst=$out/$(echo "$pkg" | to)
 	mkdir -p "$dst"
-	for f in "$src/$pkg"/*; do
+	for f in "$root/$pkg"/*; do
 		[ -f "$f" ] || continue
 		case $f in *_test.gno | *_filetest.gno) continue ;; esac
-		sed "s#gno\.land/\([pr]\)/gnogolf/#gno.land/\1/$ns/#g" "$f" >"$dst/$(basename "$f")"
+		to <"$f" >"$dst/$(basename "$f")"
 	done
 done
 
 fail=0
 # the staged packages are the repo's: the same files, and each the same bytes
-# once its namespace is read back
+# once the prefix is read back
 for pkg in $pkgs; do
-	dst=$out/gno.land/$(echo "$pkg" | sed "s#/gnogolf/#/$ns/#")
-	want=$(cd "$src/$pkg" && for f in *; do [ -f "$f" ] && echo "$f"; done | grep -Ev '_(file)?test\.gno$' | LC_ALL=C sort)
+	dst=$out/$(echo "$pkg" | to)
+	want=$(cd "$root/$pkg" && for f in *; do [ -f "$f" ] && echo "$f"; done | grep -Ev '_(file)?test\.gno$' | LC_ALL=C sort)
 	got=$(ls -A "$dst" | LC_ALL=C sort)
 	if [ "$want" != "$got" ]; then
 		echo "stage.sh: $pkg staged other files than the repo's:" >&2
@@ -54,17 +61,19 @@ for pkg in $pkgs; do
 		fail=1
 	fi
 	for f in $want; do
-		if ! sed "s#gno\.land/\([pr]\)/$ns/#gno.land/\1/gnogolf/#g" "$dst/$f" | cmp -s - "$src/$pkg/$f"; then
+		if ! back <"$dst/$f" | cmp -s - "$root/$pkg/$f"; then
 			echo "stage.sh: $pkg/$f is not the repo's" >&2
 			fail=1
 		fi
 	done
 done
-if [ "$ns" != gnogolf ] && grep -rn 'gno\.land/[pr]/gnogolf' "$out/gno.land"; then
-	echo "stage.sh: the old namespace is still named above" >&2
+if grep -rn 'gno\.land/[pr]/gnogolf' "$out/gno.land"; then
+	echo "stage.sh: a repo path is still named above" >&2
 	fail=1
 fi
 for m in $(find "$out/gno.land" -name gnomod.toml); do
+	d=$(dirname "$m")
+	grep -qx "module = \"${d#"$out"/}\"" "$m" || { echo "stage.sh: $m does not name its own path" >&2; fail=1; }
 	grep -q '^gno = "0.9"$' "$m" || { echo "stage.sh: $m is not gno 0.9" >&2; fail=1; }
 	if grep -q 'replace' "$m"; then echo "stage.sh: $m has a replace" >&2; fail=1; fi
 done

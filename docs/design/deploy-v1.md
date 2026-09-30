@@ -11,8 +11,9 @@ Everything is signed by the owner's key **`GnoAlex`** (`g1mpkp5lm8lwpm0pym438883
 | Chain | `onyx-1` |
 | RPC | `https://rpc.onyx.testnets.gno.land:443` |
 | gnoweb | `https://onyx.testnets.gno.land` |
-| Namespace | `nym-golfer000`: valid, free and not canonically taken (read on onyx 2026-09-29) |
-| Realm | `gno.land/r/nym-golfer000/golf` |
+| Namespace | `nym-alexiscolin000`: valid and free (`ValidateNymFormat` nil, `ResolveName` nil, read on onyx 2026-09-30). It is `$NS` in every command below |
+| Packages | the game at its own sub-path, `gnogolf`, leaving room for other games under the name: `gno.land/p/nym-alexiscolin000/gnogolf/physics`, `gno.land/p/nym-alexiscolin000/gnogolf/course` |
+| Realm | `gno.land/r/nym-alexiscolin000/gnogolf/golf` (it keeps its last element `golf`: onyx refuses a package whose name is not its path's last element) |
 | Prices (read on onyx 2026-09-29) | gas `1ugnot/1000gas`, storage `100ugnot` a byte, default deposit cap 100 GNOT |
 | Code submission | `inert`: an addpkg parks until the approver (`g1yaee4f2qt8yyzse54wq7r897ndupnvxcyl6adz`, the chain's `pkg_approvers`, run by the gpao oracle) enables it; no submission charge; the CLA is not enforced |
 
@@ -20,16 +21,16 @@ The commands are written for zsh or bash. Every transaction gets `-chainid onyx-
 
 ### Costs (estimates)
 
-The costs come from the pearl rehearsal (runs 5 and 6, `deploy-v1-rehearsal.md`, at the same 100 ugnot a byte) and from the onyx gnodev measurements in the commits since (`33d39a2`, `1a47321`, `web/lib/adena.ts`). The deploy itself has not been rehearsed on onyx.
+The name's cost comes from the pearl rehearsal (`deploy-v1-rehearsal.md`, at the same 100 ugnot a byte). Steps 3 and 4 were dry-run on a fresh onyx gnodev on 2026-09-30, at these very paths (the staged packages, then `publishdata.sh`); gnodev does not ask for the name, nor for an approval.
 
 | Step | Deposit | Fees (at the flags below) |
 |---|---|---|
 | 1. Name | ~0.33 GNOT | 0.05 |
-| 3. physics | ~4.5 GNOT | 0.16 |
-| 3. course | ~4.8 GNOT | 0.13 |
-| 3. golf (its init and shared indexes) | ~22.7 GNOT | 0.35 |
-| 4. 72 holes | 43.0 GNOT (430,305 bytes, onyx gnodev) | ~8.8 (72 calls, each asking its simulation's gas and a tenth more: 8.8e9 asked in all, 8.0e9 used, onyx gnodev) |
-| **Total** | **~75.3 GNOT** | **~9.5 GNOT** |
+| 3. physics | 3.2 GNOT (32,241 bytes; 65M gas) | 0.16 |
+| 3. course | 4.3 GNOT (42,954 bytes; 55M gas) | 0.13 |
+| 3. golf (its init and shared indexes) | 23.2 GNOT (231,751 bytes; 204M gas) | 0.35 |
+| 4. 72 holes | 43.4 GNOT (434,409 bytes) | ~8.8 (72 calls, each asking its simulation's gas and a tenth more: 8.7e9 asked in all, 7.9e9 used) |
+| **Total** | **~74.5 GNOT** | **~9.5 GNOT** |
 
 That makes **about 85 GNOT**. `GnoAlex` held 100 GNOT on onyx on 2026-09-29, which leaves about 15 for a rerun. The deposits are locked for good, since published data is never freed.
 
@@ -47,6 +48,8 @@ A save also pays **about 0.05 GNOT** in fees: 49M to 60M gas at the floor, measu
   ```sh
   export PATH=~/.cache/gno-toolchains/onyx:$PATH
   RPC=https://rpc.onyx.testnets.gno.land:443
+  NS=nym-alexiscolin000               # the namespace (the table above); every command builds on it
+  REALM=gno.land/r/$NS/gnogolf/golf   # the golf realm
   gnokey list | grep GnoAlex          # the key is there: g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq
   ```
 
@@ -65,7 +68,7 @@ A save also pays **about 0.05 GNOT** in fees: 49M to 60M gas at the floor, measu
 Registration is free on onyx (`r/sys/namereg/v0`, price 0 ugnot, so send nothing). Only a direct call from the key can register.
 
 ```sh
-gnokey maketx call -pkgpath gno.land/r/sys/namereg/v0 -func Register -args nym-golfer000 \
+gnokey maketx call -pkgpath gno.land/r/sys/namereg/v0 -func Register -args $NS \
   -gas-wanted 40000000 -gas-fee 48000ugnot -max-deposit 1000000ugnot \
   -broadcast -chainid onyx-1 -remote $RPC GnoAlex
 ```
@@ -74,30 +77,30 @@ Check that this returns `(true bool)`:
 
 ```sh
 gnokey query vm/qeval -remote $RPC \
-  -data 'gno.land/r/sys/names.IsAuthorizedAddressForNamespace(address("g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq"), "nym-golfer000")'
+  -data "gno.land/r/sys/names.IsAuthorizedAddressForNamespace(address(\"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq\"), \"$NS\")"
 ```
 
-You can also open https://onyx.testnets.gno.land/u/nym-golfer000. An address has one name, so `GnoAlex` will show as `nym-golfer000` on the boards if it plays.
+You can also open https://onyx.testnets.gno.land/u/nym-alexiscolin000. An address has one name, so `GnoAlex` will show as `nym-alexiscolin000` on the boards if it plays. The name holds every path under it, so the game takes its own sub-path, `gnogolf`, and another game can take another.
 
 ### 2. Stage the packages
 
 ```sh
-scripts/stage.sh nym-golfer000 /tmp/stage
+scripts/stage.sh $NS /tmp/stage
 ```
 
-This copies physics, course and golf, without their tests, into `/tmp/stage/gno.land/{p,r}/nym-golfer000/…`. The only change it makes is the namespace in the import paths. It then checks that:
-- each staged package has exactly the repo's files, and each file matches the repo's byte for byte once the namespace is read back;
+This copies physics, course and golf, without their tests, into `/tmp/stage/gno.land/p/$NS/gnogolf/{physics,course}` and `/tmp/stage/gno.land/r/$NS/gnogolf/golf`. The only change it makes is that prefix, `gno.land/[pr]/gnogolf/` to `gno.land/[pr]/$NS/gnogolf/`, in the import paths and the `gnomod.toml` module lines. It then checks that:
+- each staged package has exactly the repo's files, and each file matches the repo's byte for byte once the prefix is read back;
 - no `gno.land/[pr]/gnogolf` is left;
-- every `gnomod.toml` says `gno = "0.9"` and has no `replace`.
+- every `gnomod.toml` names its own staged path, says `gno = "0.9"` and has no `replace`.
 
-It lints the result with the onyx `gno` and prints the sizes. On 2026-09-29 these were course 37,488 B, physics 44,645 B and golf 134,215 B. Any error stops here.
+It lints the result with the onyx `gno` and prints the sizes. On 2026-09-30 these were course 34,955 B, physics 44,722 B and golf 130,516 B. Any error stops here.
 
 ### 3. Submit the packages, in order, and wait for each approval
 
 Submit physics first, then course, then golf. Each one imports the one before, and the oracle leaves a package pending while one of its imports is still parked. So **do not submit the next package until the previous one is `live`**.
 
 ```sh
-gnokey maketx addpkg -pkgpath gno.land/p/nym-golfer000/physics -pkgdir /tmp/stage/gno.land/p/nym-golfer000/physics \
+gnokey maketx addpkg -pkgpath gno.land/p/$NS/gnogolf/physics -pkgdir /tmp/stage/gno.land/p/$NS/gnogolf/physics \
   -gas-wanted 130000000 -gas-fee 156000ugnot -max-deposit 6000000ugnot \
   -broadcast -chainid onyx-1 -remote $RPC GnoAlex
 ```
@@ -105,27 +108,27 @@ gnokey maketx addpkg -pkgpath gno.land/p/nym-golfer000/physics -pkgdir /tmp/stag
 Poll until it is live:
 
 ```sh
-until gnokey query vm/qpkgmeta_json -data gno.land/p/nym-golfer000/physics -remote $RPC | grep -q '"status":"live"'; do sleep 10; done; echo live
+until gnokey query vm/qpkgmeta_json -data gno.land/p/$NS/gnogolf/physics -remote $RPC | grep -q '"status":"live"'; do sleep 10; done; echo live
 ```
 
-`vm/qpkgmeta_json` answers `{"status":"inert","pending":true,"reason":"waiting for a package approver to enable it",…}` while the package waits, and `{"status":"live",…}` once it is enabled. `"absent"` means the submission never landed. `vm/qinertpaths` with `-data gno.land/p/nym-golfer000` lists what is still parked.
+`vm/qpkgmeta_json` answers `{"status":"inert","pending":true,"reason":"waiting for a package approver to enable it",…}` while the package waits, and `{"status":"live",…}` once it is enabled. `"absent"` means the submission never landed. `vm/qinertpaths` with `-data gno.land/p/$NS/gnogolf` (or `gno.land/r/$NS/gnogolf`) lists what is still parked.
 
 Then course:
 
 ```sh
-gnokey maketx addpkg -pkgpath gno.land/p/nym-golfer000/course -pkgdir /tmp/stage/gno.land/p/nym-golfer000/course \
+gnokey maketx addpkg -pkgpath gno.land/p/$NS/gnogolf/course -pkgdir /tmp/stage/gno.land/p/$NS/gnogolf/course \
   -gas-wanted 110000000 -gas-fee 132000ugnot -max-deposit 7000000ugnot \
   -broadcast -chainid onyx-1 -remote $RPC GnoAlex
-until gnokey query vm/qpkgmeta_json -data gno.land/p/nym-golfer000/course -remote $RPC | grep -q '"status":"live"'; do sleep 10; done; echo live
+until gnokey query vm/qpkgmeta_json -data gno.land/p/$NS/gnogolf/course -remote $RPC | grep -q '"status":"live"'; do sleep 10; done; echo live
 ```
 
 Then golf. Its init makes `GnoAlex` the owner, with community publishing closed:
 
 ```sh
-gnokey maketx addpkg -pkgpath gno.land/r/nym-golfer000/golf -pkgdir /tmp/stage/gno.land/r/nym-golfer000/golf \
+gnokey maketx addpkg -pkgpath $REALM -pkgdir /tmp/stage/$REALM \
   -gas-wanted 290000000 -gas-fee 348000ugnot -max-deposit 30000000ugnot \
   -broadcast -chainid onyx-1 -remote $RPC GnoAlex
-until gnokey query vm/qpkgmeta_json -data gno.land/r/nym-golfer000/golf -remote $RPC | grep -q '"status":"live"'; do sleep 10; done; echo live
+until gnokey query vm/qpkgmeta_json -data $REALM -remote $RPC | grep -q '"status":"live"'; do sleep 10; done; echo live
 ```
 
 - **The deposit is charged at approval,** from `GnoAlex`, up to the `-max-deposit` recorded at submission. An approval that finds the key short fails, and gpao retries it only a few times. So keep at least ~23 GNOT on the key until golf is live.
@@ -133,20 +136,20 @@ until gnokey query vm/qpkgmeta_json -data gno.land/r/nym-golfer000/golf -remote 
   1. Read its `reason`.
   2. If the package was submitted before its import was live, or the oracle missed it, run the same addpkg again. The same creator may replace its own parked package, the oracle sees the new submission, and it costs one more fee, no deposit.
   3. If it is still stuck, ask the onyx operators (aeddi) to look at the gpao oracle. Its status API says whether the package is `rejected`, `pending`, `gave_up` or `blocked` (the oracle's spend cap).
-- Check the pages: https://onyx.testnets.gno.land/p/nym-golfer000/physics$source, …/course$source, and https://onyx.testnets.gno.land/r/nym-golfer000/golf (the hub, empty until step 4).
+- Check the pages: https://onyx.testnets.gno.land/p/nym-alexiscolin000/gnogolf/physics$source, …/gnogolf/course$source, and https://onyx.testnets.gno.land/r/nym-alexiscolin000/gnogolf/golf (the hub, empty until step 4).
 
 ### 4. Publish the 72 holes
 
 The script sends one plain `gnokey maketx call` of `Publish(slot, hex, "")` a hole, in the order of `data/holes.txt`. It asks the password once. Each call is simulated first and then asks the gas the simulation used and a tenth more, at the node's gas price, and its deposit is capped at `MAX_DEPOSIT`, 10 GNOT by default. A slot that already holds its data is skipped, so after a failure you just run it again. It ends by checking every slot.
 
 ```sh
-REALM=gno.land/r/nym-golfer000/golf REMOTE=$RPC CHAINID=onyx-1 scripts/publishdata.sh GnoAlex
+REALM=$REALM REMOTE=$RPC CHAINID=onyx-1 scripts/publishdata.sh GnoAlex
 ```
 
 It prints the gas, storage and hash of each hole as it goes, and ends with `"every slot holds its data"`. You can run the check alone at any time: it is one read, with no key.
 
 ```sh
-REALM=gno.land/r/nym-golfer000/golf REMOTE=$RPC scripts/publishdata.sh -verify
+REALM=$REALM REMOTE=$RPC scripts/publishdata.sh -verify
 ```
 
 ### 5. Owner settings
@@ -159,7 +162,7 @@ Check the owner and the settings:
 
 ```sh
 for f in 'Owner()' 'Pending()' 'Publishing()' 'Successor()'; do
-  gnokey query vm/qeval -data "gno.land/r/nym-golfer000/golf.$f" -remote $RPC
+  gnokey query vm/qeval -data "$REALM.$f" -remote $RPC
 done
 ```
 
@@ -168,7 +171,7 @@ They should return `GnoAlex`'s address, `""`, `false` and `""`.
 **Only if the game is served somewhere other than https://gnogolf.xyz/,** for example the Netlify URL until the domain points at it, move the link every gnoweb page gives. It must be https, at most 100 characters, with no query. End it with `/`, since a hole's link appends `?cup=…&hole=…`. It measured 11.8M gas and no deposit.
 
 ```sh
-gnokey maketx call -pkgpath gno.land/r/nym-golfer000/golf -func SetPlayURL -args https://<the-site>/ \
+gnokey maketx call -pkgpath $REALM -func SetPlayURL -args https://<the-site>/ \
   -gas-wanted 20000000 -gas-fee 24000ugnot -max-deposit 1000000ugnot \
   -broadcast -chainid onyx-1 -remote $RPC GnoAlex
 ```
@@ -178,9 +181,9 @@ golf has no other setting. `Hide`, `SetSuccessor`, `Transfer`/`Accept` and `Reno
 ### 6. Smoke test on onyx (reads only)
 
 ```sh
-gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.Holes()' -remote $RPC | head -c 600; echo
-gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.HoleState("garden/1")' -remote $RPC | head -c 600; echo
-gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.SimulateRound("garden/1", "0,5")' -remote $RPC | head -c 300; echo
+gnokey query vm/qeval -data "$REALM.Holes()" -remote $RPC | head -c 600; echo
+gnokey query vm/qeval -data "$REALM.HoleState(\"garden/1\")" -remote $RPC | head -c 600; echo
+gnokey query vm/qeval -data "$REALM.SimulateRound(\"garden/1\", \"0,5\")" -remote $RPC | head -c 300; echo
 ```
 
 Check each answer:
@@ -188,7 +191,7 @@ Check each answer:
 - `HoleState` answers `garden/1/v1`'s geometry and weather;
 - `SimulateRound` answers a path.
 
-Then open https://onyx.testnets.gno.land/r/nym-golfer000/golf: the hub lists the cups, a hole's page renders, and its "open the game" link goes to the play link. After step 7, save one round from the site with a player's account (Adena on onyx, or the gnokey paste) and see it on the hole's board.
+Then open https://onyx.testnets.gno.land/r/nym-alexiscolin000/gnogolf/golf: the hub lists the cups, a hole's page renders, and its "open the game" link goes to the play link. After step 7, save one round from the site with a player's account (Adena on onyx, or the gnokey paste) and see it on the hole's board.
 
 ### 7. Netlify
 
@@ -196,7 +199,7 @@ The site is a static export (`netlify.toml`: base `web`, `npm ci && npm run buil
 
 | Variable | Value |
 |---|---|
-| `NEXT_PUBLIC_REALM` | `gno.land/r/nym-golfer000/golf` |
+| `NEXT_PUBLIC_REALM` | `gno.land/r/nym-alexiscolin000/gnogolf/golf` |
 | `NEXT_PUBLIC_RPC` | `https://rpc.onyx.testnets.gno.land:443` |
 | `NEXT_PUBLIC_WEB` | `https://onyx.testnets.gno.land` |
 | `NEXT_PUBLIC_NETWORK` | `testnet` |
@@ -215,11 +218,11 @@ The site is a static export (`netlify.toml`: base `web`, `npm ci && npm run buil
 ### 8. After the launch
 
 - **Handing the role on (optional).**
-  1. `GnoAlex` offers it: `gnokey maketx call -pkgpath gno.land/r/nym-golfer000/golf -func Transfer -args <new-address> -gas-wanted 20000000 -gas-fee 24000ugnot -max-deposit 1000000ugnot -broadcast -chainid onyx-1 -remote $RPC GnoAlex`.
+  1. `GnoAlex` offers it: `gnokey maketx call -pkgpath $REALM -func Transfer -args <new-address> -gas-wanted 20000000 -gas-fee 24000ugnot -max-deposit 1000000ugnot -broadcast -chainid onyx-1 -remote $RPC GnoAlex`.
   2. The new key takes it with `-func Accept` (no args), signed by that key.
   3. Check `Pending()` and `Owner()`.
 
-  `Transfer` to the owner's own address cancels an offer. Tips follow the role, because the game sends them to `Owner()`. The namespace `nym-golfer000` stays with `GnoAlex`.
+  `Transfer` to the owner's own address cancels an offer. Tips follow the role, because the game sends them to `Owner()`. The namespace `nym-alexiscolin000` stays with `GnoAlex`.
 - **The Crystal Mines** (branch `mines`, in progress; ADR-005). The cup ships as data, with no redeploy: golf already names the world. The order matters:
   1. Deploy the client that knows `mines` first. Before it, a mines hole would be dressed as the garden and named "Garden Cup".
   2. Then add its 18 lines to `data/holes.txt` and run step 4's same command. The course's 72 slots are skipped as already current.
@@ -468,12 +471,12 @@ There is no cross-call cache: it would be persisted, and qeval can't persist any
 
 The deployed source is the repo's, byte for byte: stage.sh transforms nothing but the namespace, and checks it.
 
-1. Copy every file of the physics, course and golf directories but their tests (`*_test.gno`, `*_filetest.gno`) into `<out>/gno.land/{p,r}/<ns>/…`, as it is. The subpackages (`physics/build`, `course/author`, `course/fingerprint`) and the hole realms are other directories, and never deployed: nothing deployed imports them.
-2. Rewrite the import paths (`gno.land/[pr]/gnogolf/` → `<ns>`) with `sed`: the one transformation. The production deploy targets the `gnogolf` namespace itself (to be obtained on onyx, where namespaces are enforced from block 1), where it is the identity, so the on-chain source is then exactly the repo's; it only matters for a rehearsal nym such as `nym-golfer000`.
-3. Assert that each staged package holds the repo package's non-test files, no more and no fewer, and that each is the repo's file byte for byte once the namespace is read back; that no `gno.land/[pr]/gnogolf` string is left (under a nym); that every gnomod has `gno = "0.9"`; and that there is no `[[replace]]`.
+1. Copy every file of the physics, course and golf directories but their tests (`*_test.gno`, `*_filetest.gno`) into `<out>/gno.land/{p,r}/<ns>/gnogolf/…`, as it is: the game at its own sub-path under the name (`p/<ns>/gnogolf/physics`, `p/<ns>/gnogolf/course`, `r/<ns>/gnogolf/golf`). The subpackages (`physics/build`, `course/author`, `course/fingerprint`) and the hole realms are other directories, and never deployed: nothing deployed imports them.
+2. Rewrite the paths (`gno.land/[pr]/gnogolf/` → `gno.land/[pr]/<ns>/gnogolf/`) with `sed`: the one transformation. Each package keeps its last element, which onyx requires to be its package name.
+3. Assert that each staged package holds the repo package's non-test files, no more and no fewer, and that each is the repo's file byte for byte once the prefix is read back; that no `gno.land/[pr]/gnogolf` string is left; that every gnomod names its own staged path and has `gno = "0.9"`; and that there is no `[[replace]]`.
 4. Run `gno lint` with the onyx toolchain (`GNO_TOOLCHAIN`, see the README) and print the package sizes.
 
-`scripts/check.sh` stages into a temporary directory under `gnogolf` on every run, so a stage-time transformation or a skipped file fails the check before it can reach a deploy.
+`scripts/check.sh` stages into a temporary directory under a stand-in name on every run, so a stage-time transformation or a skipped file fails the check before it can reach a deploy.
 
 The goldens stay tied to the canonical `gnogolf` tree, so staged tests would move only the id-dependent columns.
 
@@ -491,7 +494,7 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
 | 2 | addpkg physics | user, gnokey | ~52 KB, 5.2 GNOT |
 | 3 | addpkg course | user, gnokey | ~3.7 GNOT |
 | 4 | addpkg golf (its init sets the owner) | user, gnokey | ~9.1 GNOT |
-| 5 | 72 × `Publish`, one plain `gnokey maketx call` a hole (`scripts/publishdata.sh <key>`: onyx lets one seeded account `maketx run`, so no script) | the user's key, gnokey | measured on the onyx toolchain: 46M to 174M gas a hole (8.0e9 in all, asked as 1.2 × (25M + 55K a byte of data)), 430,305 bytes in all (43.0 GNOT at 100 ugnot a byte) |
+| 5 | 72 × `Publish`, one plain `gnokey maketx call` a hole (`scripts/publishdata.sh <key>`: onyx lets one seeded account `maketx run`, so no script) | the user's key, gnokey | measured on the onyx toolchain: 46M to 174M gas a hole (8.0e9 in all, asked as 1.2 × (25M + 55K a byte of data)), 434,409 bytes in all (43.4 GNOT at 100 ugnot a byte) |
 | 6 | Verify: `scripts/publishdata.sh -verify`, one `vm/qeval` of `Current` and `Versions` over every slot | a read | 0 |
 
 - Every package is far below the 1 MB transaction limit.
@@ -506,7 +509,7 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
 
 ### 10.4 Budget
 
-> History: the design's estimate. Measured since: about 75.3 GNOT of deposit and 9.5 of fees ([Costs](#costs-estimates)).
+> History: the design's estimate. Measured since: about 74.5 GNOT of deposit and 9.5 of fees ([Costs](#costs-estimates)).
 
 | Item | GNOT |
 |---|---|
@@ -613,7 +616,7 @@ That is about 7 faucet-days for one address, or a request to the faucet operator
 
 ## 17. Open decisions
 
-1. The name: `nym-golfer000` (decided).
+1. The name: `nym-golfer000` (decided for pearl). Onyx: `nym-alexiscolin000`, the game at its sub-path `gnogolf` (the runbook).
 2. The IC-B physics fixes: **yes, all of them** (decided). Fix the physics as far as possible before it is frozen.
 3. `Transfer` and `Renounce`: **included** (decided).
 4. `playURL`: owner-settable (`SetPlayURL`), starting at `https://gnogolf.xyz/` (decided). Realm holes (`Register`, `Expect`) removed: every hole is data (decided, final fixes).

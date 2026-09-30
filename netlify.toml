@@ -2,9 +2,10 @@
 # Set these in the site's environment before deploying:
 #   NEXT_PUBLIC_SITE_URL  the public address, e.g. https://gnogolf.xyz
 #                         (link previews, share links)
-#   NEXT_PUBLIC_REALM     the golf realm, e.g. gno.land/r/nym-golfer000/golf on
-#                         onyx (a production deploy fails without it, or
-#                         without RPC, WEB and NETWORK: next.config.mjs)
+#   NEXT_PUBLIC_REALM     the golf realm, e.g.
+#                         gno.land/r/nym-alexiscolin000/gnogolf/golf on onyx
+#                         (a production deploy fails without it, or without
+#                         RPC, WEB and NETWORK: next.config.mjs)
 #   NEXT_PUBLIC_RPC       the gno.land RPC the game plays on (a testnet node),
 #                         e.g. https://rpc.onyx.testnets.gno.land:443 (onyx-1)
 #   NEXT_PUBLIC_WEB       its gnoweb, for "read its code" links,

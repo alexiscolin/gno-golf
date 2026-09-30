@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
-import { REALM_PATH } from "@/lib/chain";
+import { REALM_PATH, pkgsPath } from "@/lib/chain";
 import { sound } from "@/lib/feel";
 import { optedOut, optOut } from "@/lib/analytics";
 
@@ -38,7 +38,7 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
   },
 ];
 // what gnoweb shows of the game, to check it plays as it says: the code, the physics, the holes' format, the game as text
-const VERIFY = [["The realm's code", `${REALM_PATH}$source`], ["The physics", "/p/gnogolf/physics$source"], ["The hole data", "/p/gnogolf/course$source"], ["The game as text", REALM_PATH]] as const;
+const VERIFY = [["The realm's code", `${REALM_PATH}$source`], ["The physics", `${pkgsPath(REALM_PATH)}physics$source`], ["The hole data", `${pkgsPath(REALM_PATH)}course$source`], ["The game as text", REALM_PATH]] as const;
 const FACTS = ["4 cups · 72 holes", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
 
 /** The round corner button every screen has: back at the top left, about at the top right. */

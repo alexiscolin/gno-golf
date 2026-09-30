@@ -40,13 +40,20 @@ export const RULES = {
   maxWorkStep: 225_000,
 } as const;
 
-// the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-golfer000/golf on
-// onyx, or a successor beside it, …/golf2), else the local chain's (a
+/** A realm path NEXT_PUBLIC_REALM may name: gno.land/r/<namespace>/<realm>, or
+ *  a game's sub-path, gno.land/r/<namespace>/<game>/<realm> (next.config.mjs
+ *  holds the same rule). */
+export const isRealmPath = (s: string) => /^gno\.land\/r\/[a-z0-9_-]+(\/[a-z0-9_]+){1,2}$/.test(s);
+// the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-alexiscolin000/gnogolf/golf
+// on onyx, or a successor beside it, …/golf2), else the local chain's (a
 // production build refuses one missing or of another shape: next.config.mjs)
 const REALM_ENV = process.env.NEXT_PUBLIC_REALM || "";
-const REALM = /^gno\.land\/r\/[a-z0-9_-]+\/[a-z0-9_]+$/.test(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
+const REALM = isRealmPath(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
 /** The hub's gnoweb path ("/r/…/golf"). */
 export const REALM_PATH = REALM.replace(/^gno\.land/, "");
+/** The gnoweb path ("/p/…/") of the packages a realm at `realm` imports, beside
+ *  it: p/gnogolf/… in the repo tree, p/<ns>/gnogolf/… as stage.sh deploys them. */
+export const pkgsPath = (realm: string) => realm.replace(/^\/r\//, "/p/").replace(/[^/]+$/, "");
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
 
 /** A pause of ms: between two reads of the chain, a retry, a beat. */

@@ -16,7 +16,8 @@
 > `?hole=` which hole to open (any id form below), or `?cup=island&hole=3` a
 > course hole by its place in its cup, `?screen=cups` the cups screen, and `?shot=angle,power` to fire one on
 > load (that last one is how the screenshots and the smoke test are taken).
-> The golf realm's path is set at build time (`NEXT_PUBLIC_REALM`).
+> The golf realm's path is set at build time (`NEXT_PUBLIC_REALM`): `gno.land/r/<ns>/gnogolf/golf`
+> on a chain (`<ns>` is in docs/design/deploy-v1.md), `gno.land/r/gnogolf/golf` on a local gnodev.
 >
 > Style: cel shading — `MeshToonMaterial` over a three-band ramp — plus
 > `EdgesGeometry` contours. Flat volumes, dark outlines, no gradients, which is

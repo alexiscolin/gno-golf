@@ -215,6 +215,11 @@ web/                         Next.js + three.js client (static export)
 data/holes.txt               the course as data, one line per slot
 ```
 
+On a chain, the three deployed packages sit under their owner's name and
+the game's sub-path: `p/<ns>/gnogolf/physics`, `p/<ns>/gnogolf/course` and
+`r/<ns>/gnogolf/golf`. `scripts/stage.sh <ns>` stages them so, and the onyx
+runbook names `<ns>`.
+
 ## Docs
 
 - [docs/physics.md](docs/physics.md): the physics, usable by other Gno games.

@@ -2,10 +2,11 @@
 # check.sh [--smoke]: everything that must pass before a commit or a deploy.
 # The Gno packages' tests with the onyx toolchain (their gas and storage
 # goldens included), the course holes' fingerprints, and the deployed packages
-# staged as addpkg takes them (stage.sh: the repo's files byte for byte,
-# linted); then the client: types, lint, the realm sync check, the unit tests
-# with their coverage floor, and with --smoke the end-to-end run against a
-# local chain and dev server (see the README). Stops at the first failure.
+# staged as addpkg takes them (stage.sh: at the deploy's paths, the repo's
+# files byte for byte, linted); then the client: types, lint, the realm sync
+# check, the unit tests with their coverage floor, and with --smoke the
+# end-to-end run against a local chain and dev server (see the README). Stops
+# at the first failure.
 # This is also what a CI would run.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -29,7 +30,7 @@ elif [ -x "$GNO" ]; then
 	echo "== the staged packages: the repo's, byte for byte, and linted"
 	stage=$(mktemp -d)
 	trap 'rm -rf "$stage"' EXIT
-	GNO=$GNO "$root/scripts/stage.sh" gnogolf "$stage"
+	GNO=$GNO "$root/scripts/stage.sh" nym-stagecheck000 "$stage" # any name will do; the deploy's is in deploy-v1.md
 else
 	echo "check.sh: no onyx gno at $GNO. Build the toolchain there (the README, \"Running it locally\"), or set GNO_TOOLCHAIN (or GNO) to one; SKIP_GNO=1 checks the client alone." >&2
 	exit 1

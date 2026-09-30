@@ -22,7 +22,7 @@
 # MAX_DEPOSIT (default 10000000ugnot; a hole stores 4 to 35 KB).
 #
 #   scripts/publishdata.sh test1                                  a local gnodev
-#   REALM=gno.land/r/nym-golfer000/golf REMOTE=https://rpc.onyx.testnets.gno.land:443 \
+#   REALM=gno.land/r/nym-alexiscolin000/gnogolf/golf REMOTE=https://rpc.onyx.testnets.gno.land:443 \
 #     CHAINID=onyx-1 scripts/publishdata.sh <your-key-name>
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)

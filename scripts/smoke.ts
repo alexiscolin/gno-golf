@@ -8,6 +8,11 @@
 //
 //   nice -n 20 node --experimental-strip-types scripts/smoke.ts
 //   (from web/: npm run smoke; RPC and APP override the local defaults)
+//
+// The realm is the client's, NEXT_PUBLIC_REALM (unset, the repo tree's
+// gno.land/r/gnogolf/golf). Against a staged deploy (scripts/stage.sh), set it
+// here and in the dev server at APP alike:
+//   NEXT_PUBLIC_REALM=gno.land/r/<ns>/gnogolf/golf RPC=http://127.0.0.1:<port> APP=http://localhost:<port> npm run smoke
 
 import assert from "node:assert/strict";
 // the client's modules as the unit tests load them (".ts" tried, "@/" read)

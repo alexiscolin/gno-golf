@@ -6,7 +6,7 @@
 //
 // The paths and addresses can be set from the environment: CHROME (the
 // binary), APP (the running client), RPC (the local chain), REALM (the golf
-// realm on it).
+// realm on it; else NEXT_PUBLIC_REALM, the client's).
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -15,7 +15,7 @@ import path from "node:path";
 export const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 export const APP = process.env.APP || "http://localhost:3300";
 export const RPC = process.env.RPC || "http://127.0.0.1:26657";
-export const REALM = process.env.REALM || "gno.land/r/gnogolf/golf";
+export const REALM = process.env.REALM || process.env.NEXT_PUBLIC_REALM || "gno.land/r/gnogolf/golf";
 export const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 
 // The course's holes are data in slots now ("garden/17"): a hole the scripts

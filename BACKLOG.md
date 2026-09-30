@@ -28,7 +28,8 @@ toolchain.
   - the Crystal Mines card, as coming soon.
 
 **The deploy target is onyx** (`onyx-1`, mainnet's code v1.5.0), tomorrow, as
-the key `GnoAlex` under `nym-golfer000`. The runbook is
+the key `GnoAlex` under `nym-alexiscolin000`, the game at its sub-path
+`gnogolf` (`r/nym-alexiscolin000/gnogolf/golf`). The runbook is
 `docs/design/deploy-v1.md`, "Onyx deploy, step by step": about 85 GNOT in all,
 and the key holds 100.
 
