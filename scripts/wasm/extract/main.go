@@ -1,0 +1,247 @@
+// extract <dir> <out.go> <shimmed,…> <root> [<root>…]: the part of a Gno
+// package a Go build runs, taken out of its .gno files as they are. The
+// declarations the roots reach (functions, types with all their methods,
+// whole const and var blocks, and a root "T.m", one method), in source
+// order, comments kept; the shimmed names are left for a hand-written file
+// to declare. Nothing is rewritten: a declaration is printed as the file
+// has it. It prints the files it took something from, one a line.
+//
+// scripts/wasm.sh runs it on the golf realm: see there.
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"go/ast"
+	"go/format"
+	"go/parser"
+	"go/printer"
+	"go/token"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+type decl struct {
+	file *ast.File
+	name string // the file's base name
+	node ast.Decl
+	pos  token.Pos
+}
+
+func main() {
+	if len(os.Args) < 5 {
+		fmt.Fprintln(os.Stderr, "usage: extract <dir> <out.go> <shimmed,…> <root> [<root>…]")
+		os.Exit(2)
+	}
+	dir, out, roots := os.Args[1], os.Args[2], os.Args[4:]
+	shimmed := map[string]bool{}
+	for _, s := range strings.Split(os.Args[3], ",") {
+		shimmed[s] = true
+	}
+	fset := token.NewFileSet()
+	names, _ := filepath.Glob(filepath.Join(dir, "*.gno"))
+	sort.Strings(names)
+	byName := map[string][]*decl{}     // a top-level name: its declaration (a func, a type, a const or var block)
+	methods := map[string][]*decl{}    // a type: its methods
+	method := map[string]*decl{}       // "T.m": one method
+	top := map[any]bool{}              // every top-level spec and func: what a resolved identifier may point at
+	var pkg string
+	for _, n := range names {
+		if strings.HasSuffix(n, "_test.gno") || strings.HasSuffix(n, "_filetest.gno") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, n, nil, parser.ParseComments)
+		if err != nil {
+			fail("%v", err)
+		}
+		pkg = f.Name.Name
+		for _, d := range f.Decls {
+			dd := &decl{file: f, name: filepath.Base(n), node: d, pos: d.Pos()}
+			switch d := d.(type) {
+			case *ast.FuncDecl:
+				top[d] = true
+				if d.Recv != nil {
+					t := recvType(d.Recv.List[0].Type)
+					methods[t] = append(methods[t], dd)
+					method[t+"."+d.Name.Name] = dd
+					continue
+				}
+				byName[d.Name.Name] = append(byName[d.Name.Name], dd)
+			case *ast.GenDecl:
+				for _, s := range d.Specs {
+					top[s] = true
+					switch s := s.(type) {
+					case *ast.TypeSpec:
+						byName[s.Name.Name] = append(byName[s.Name.Name], dd)
+					case *ast.ValueSpec:
+						for _, id := range s.Names {
+							byName[id.Name] = append(byName[id.Name], dd)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// the closure: every declaration a kept one names, less the shimmed
+	kept := map[*decl]bool{}
+	var queue []*decl
+	keep := func(d *decl) {
+		if !kept[d] {
+			kept[d] = true
+			queue = append(queue, d)
+		}
+	}
+	for _, r := range roots {
+		if d := method[r]; d != nil {
+			keep(d)
+			continue
+		}
+		if len(byName[r]) == 0 {
+			fail("no declaration of %s", r)
+		}
+		for _, d := range byName[r] {
+			keep(d)
+		}
+	}
+	for len(queue) > 0 {
+		d := queue[0]
+		queue = queue[1:]
+		if g, ok := d.node.(*ast.GenDecl); ok && g.Tok == token.TYPE {
+			for _, s := range g.Specs {
+				for _, m := range methods[s.(*ast.TypeSpec).Name.Name] {
+					keep(m)
+				}
+			}
+		}
+		refs(d.node, func(id *ast.Ident) {
+			if shimmed[id.Name] || len(byName[id.Name]) == 0 || id.Obj != nil && !top[id.Obj.Decl] {
+				return // not a top-level name, or a local that shadows one
+			}
+			for _, d := range byName[id.Name] {
+				keep(d)
+			}
+		})
+	}
+
+	// the imports the kept declarations use, as their files name them
+	imports := map[string]string{} // path -> name ("" for the path's own)
+	used := map[string]bool{}
+	var ds []*decl
+	for d := range kept {
+		ds = append(ds, d)
+		local := map[string]*ast.ImportSpec{}
+		for _, im := range d.file.Imports {
+			p, _ := strconv.Unquote(im.Path.Value)
+			n := p[strings.LastIndex(p, "/")+1:]
+			if im.Name != nil {
+				n = im.Name.Name
+			} else if strings.HasPrefix(n, "v") && strings.Contains(p, "/") { // gno.land/p/nt/ufmt/v0: its package is ufmt
+				s := strings.TrimSuffix(p, "/"+n)
+				n = s[strings.LastIndex(s, "/")+1:]
+			}
+			local[n] = im
+		}
+		ast.Inspect(d.node, func(n ast.Node) bool {
+			if s, ok := n.(*ast.SelectorExpr); ok {
+				if x, ok := s.X.(*ast.Ident); ok && x.Obj == nil {
+					if im := local[x.Name]; im != nil {
+						p, _ := strconv.Unquote(im.Path.Value)
+						imports[p] = ""
+						if im.Name != nil {
+							imports[p] = im.Name.Name
+						}
+					}
+				}
+			}
+			return true
+		})
+		used[d.name] = true
+	}
+	sort.Slice(ds, func(i, j int) bool {
+		if ds[i].name != ds[j].name {
+			return ds[i].name < ds[j].name
+		}
+		return ds[i].pos < ds[j].pos
+	})
+
+	var b bytes.Buffer
+	var files []string
+	for f := range used {
+		files = append(files, f)
+	}
+	sort.Strings(files)
+	fmt.Fprintf(&b, "// Code generated by scripts/wasm.sh from %s (%s). DO NOT EDIT.\n\npackage %s\n\nimport (\n", dir, strings.Join(files, ", "), pkg)
+	var paths []string
+	for p := range imports {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	for _, p := range paths {
+		fmt.Fprintf(&b, "\t%s %q\n", imports[p], p)
+	}
+	b.WriteString(")\n")
+	for _, d := range ds {
+		b.WriteString("\n// " + d.name + "\n")
+		if err := printer.Fprint(&b, fset, &printer.CommentedNode{Node: d.node, Comments: d.file.Comments}); err != nil {
+			fail("%v", err)
+		}
+		b.WriteString("\n")
+	}
+	src, err := format.Source(b.Bytes())
+	if err != nil {
+		fail("%v", err)
+	}
+	if err := os.WriteFile(out, src, 0o644); err != nil {
+		fail("%v", err)
+	}
+	for _, f := range files {
+		fmt.Println(f)
+	}
+}
+
+// refs calls fn with every identifier in n that may name a top-level
+// declaration: not a selector's name (a field, a method, an import's) nor a
+// composite literal's key (a field).
+func refs(n ast.Node, fn func(*ast.Ident)) {
+	ast.Inspect(n, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.SelectorExpr:
+			refs(n.X, fn)
+			return false
+		case *ast.CompositeLit:
+			if n.Type != nil {
+				refs(n.Type, fn)
+			}
+			for _, e := range n.Elts {
+				if kv, ok := e.(*ast.KeyValueExpr); ok {
+					if _, ok := kv.Key.(*ast.Ident); !ok {
+						refs(kv.Key, fn)
+					}
+					refs(kv.Value, fn)
+				} else {
+					refs(e, fn)
+				}
+			}
+			return false
+		case *ast.Ident:
+			fn(n)
+		}
+		return true
+	})
+}
+
+func recvType(e ast.Expr) string {
+	if s, ok := e.(*ast.StarExpr); ok {
+		e = s.X
+	}
+	return e.(*ast.Ident).Name
+}
+
+func fail(f string, a ...any) {
+	fmt.Fprintf(os.Stderr, "extract: "+f+"\n", a...)
+	os.Exit(1)
+}

@@ -3,7 +3,9 @@
 # The Gno packages' tests with the onyx toolchain (their gas and storage
 # goldens included), the course holes' fingerprints, and the deployed packages
 # staged as addpkg takes them (stage.sh: at the deploy's paths, the repo's
-# files byte for byte, linted); then the client: types, lint, the realm sync
+# files byte for byte, linted), and the aim preview's wasm (wasm.sh --check:
+# the build of these sources, bit for bit, and the realm's answers on the
+# whole course, byte for byte; TinyGo needed); then the client: types, lint, the realm sync
 # check, the unit tests with their coverage floor, and with --smoke the
 # end-to-end run against a local chain and dev server (see the README). Stops
 # at the first failure.
@@ -31,6 +33,8 @@ elif [ -x "$GNO" ]; then
 	stage=$(mktemp -d)
 	trap 'rm -rf "$stage"' EXIT
 	GNO=$GNO "$root/scripts/stage.sh" nym-stagecheck000 "$stage" # any name will do; the deploy's is in deploy-v1.md
+	echo "== the aim preview's wasm: the build of these sources, answering as the realm, byte for byte"
+	GNO=$GNO "$root/scripts/wasm.sh" --check
 else
 	echo "check.sh: no onyx gno at $GNO. Build the toolchain there (the README, \"Running it locally\"), or set GNO_TOOLCHAIN (or GNO) to one; SKIP_GNO=1 checks the client alone." >&2
 	exit 1

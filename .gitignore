@@ -17,6 +17,12 @@ media/promo/stills-check/
 gnohome/
 *.swp
 
+# scripts/wasm.sh: the Go sources it makes of the .gno files (golf.wasm is kept)
+scripts/wasm/p/
+scripts/wasm/gnovm/
+scripts/wasm/sources.go
+scripts/wasm/r/gnogolf/golf/golf.go
+
 # agents' isolated worktrees (Claude Code)
 .claude/worktrees/
 media/promo/*-cover.jpg
