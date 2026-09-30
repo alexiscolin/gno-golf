@@ -537,7 +537,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // Loads are ticketed: only the latest one may land, and the round changes
   // before the wait, so any shot still in the air is already somebody else's.
   let loads = 0, warming = 0; // warming: the load whose hole is being built and compiled
-  // the next hole's State, read while the win card shows: "Next hole" then
+  // the next hole's HoleState, read while the win card shows: "Next hole" then
   // asks nothing. Kept PREFETCH_MS at most (its weather and wear move on).
   const PREFETCH_MS = 60e3;
   let ahead: { id: string; at: number; p: Promise<Hole> } | null = null;
@@ -568,7 +568,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     }
     if (ticket !== loads || !alive) return;
     // a hole the kept list has as current that the chain has replaced since
-    // (its State names the version that took its place): the list read anew,
+    // (its HoleState names the version that took its place): the list read anew,
     // and its current version played
     if (s.next && g.list.some((h) => h.id === id)) {
       try {

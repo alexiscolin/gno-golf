@@ -114,7 +114,7 @@ export interface HoleState extends Versioned {
   work?: { walls: number; pieces: number; setup: number };
 }
 
-/** One round as State and Rounds list it (no path). */
+/** A round, as Round gives it without its path. */
 interface RoundRow extends Versioned {
   player: string;
   /** where it lies (3 decimals), and the same ball exactly */
