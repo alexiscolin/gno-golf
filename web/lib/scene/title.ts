@@ -29,12 +29,13 @@ const HOLES = TITLE_HOLES as unknown as Record<string, Hole>;
 const FRAME_MS = 1000 / 30;
 
 // The cup cards' dioramas: a fixed three-quarter view on the landmark (y: the
-// height looked at, the garden's higher for its tall mill, seen from its door side)
+// height looked at, the garden's higher for its tall mill, seen from its door
+// side, the mountain's for its ski lift at the back of the lane)
 export const CUP: Record<string, { a: number; r: number; h: number; y?: number }> = {
   garden: { a: 2.3, r: 0.95, h: 0.85, y: 3 },
   island: { a: 1.0, r: 0.8, h: 1.1 },
   town: { a: 1.35, r: 0.85, h: 1.1 },
-  mountain: { a: 1.25, r: 0.8, h: 1.2 },
+  mountain: { a: 1.2, r: 0.76, h: 0.88, y: 4 },
 };
 
 /** Golden hour: a warm low sun, a pink sky light, violet shadows (the

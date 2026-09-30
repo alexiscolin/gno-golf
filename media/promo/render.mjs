@@ -330,8 +330,8 @@ async function renderCups() {
       for (let i = 0; i < 120 && !(await b.ev("!!window.__cupClip")); i++) await sleep(500);
       for (const w of worlds)
         for (const [k, shot] of plan[w].entries()) {
-          // the hole as the chain has it (the first, the card's landmark, as the title has it)
-          const hole = shot.still ? null : await holeState(shot.hole);
+          // the hole as the chain has it (the first, the card's landmark, as its still has it)
+          const hole = await holeState(shot.hole);
           const out = STILLS ? path.join(HERE, "stills-check") : dir(w, k), n = D * CFPS;
           if (!STILLS) fs.rmSync(out, { recursive: true, force: true });
           fs.mkdirSync(out, { recursive: true });

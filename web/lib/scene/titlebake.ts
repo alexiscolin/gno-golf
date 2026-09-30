@@ -14,9 +14,10 @@ import type { Hole } from "./data";
 /**
  * A still of the title or of a cup card's diorama, as a PNG data URL on a
  * clear background (the page paints the sky): what the Low tier, no WebGL
- * and reduced motion show. Dev only: media/camera/titlebake.mjs calls it.
+ * and reduced motion show. hole: a cup card's own (cups.json's first, the
+ * chain's), else the title's. Dev only: media/camera/titlebake.mjs calls it.
  */
-export async function titleStill(kind: string, world: string, w: number, h: number) {
+export async function titleStill(kind: string, world: string, w: number, h: number, hole?: Hole | null) {
   const canvas = document.createElement("canvas");
   canvas.style.cssText = `position:fixed;left:0;top:0;width:${w}px;height:${h}px`;
   document.body.appendChild(canvas);
@@ -39,7 +40,7 @@ export async function titleStill(kind: string, world: string, w: number, h: numb
       camera.position.set(6.1, 4.6, 7.7);
       camera.lookAt(0, 1.55, 0);
     } else {
-      const { s, course } = await holeOf(world);
+      const { s, course } = await holeOf(world, hole || undefined);
       scene.add(course);
       setTime(3);
       course.userData.tick(3);
