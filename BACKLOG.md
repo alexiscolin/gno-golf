@@ -451,6 +451,11 @@ real answer.
   stay a cache on top. Unsaved (local-only) play still lives in the browser,
   and the game says so where it matters ("save your rounds to keep your
   progress everywhere"). No realm change: the reads exist.
+- **Open the Crystal Mines after one cup finished** (with the item above, so
+  it follows the player): the four classic cups stay open from the start; the
+  Mines' card shows "Finish a cup to open" and a progress bar, its clip still
+  playing as a teaser; deep links (duels, shares) still play a mines hole. At
+  launch every cup is open.
 - **A fifth cup, for experts** (a "Champion's Cup"): 18 long, hard holes for
   the players who finished the four at par, unlocked by them (a gnome of its
   own, a badge). Holes are data: they publish with `Publish` and need no
