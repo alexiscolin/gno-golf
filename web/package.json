@@ -11,6 +11,7 @@
     "selfcheck": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/selfcheck.ts",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --import ./test/setup.mjs --test --experimental-test-coverage --test-coverage-include='lib/**/*.ts' --test-coverage-exclude='lib/scene/**' --test-coverage-exclude='lib/scene.ts' --test-coverage-exclude='lib/engine.ts' --test-coverage-exclude='lib/promo.ts' --test-coverage-exclude='lib/types.ts' --test-coverage-exclude='lib/engine/types.ts' --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=70 test/*.test.ts",
     "check": "sh ../scripts/check.sh",
+    "wasm": "sh ../scripts/wasm.sh",
     "smoke": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/smoke.ts",
     "og": "node ../media/og/og.mjs"
   },

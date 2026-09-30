@@ -143,14 +143,11 @@ the code onyx runs) into `$GNO_TOOLCHAIN/gnohome`, a cache of its own. With
 no `gno` there it fails; `SKIP_GNO=1 scripts/check.sh` checks the client
 alone, and says so.
 
-The assisted aim's previews run the realm's physics in the page:
-`web/lib/sim/golf.wasm`, built from the `.gno` files by `scripts/wasm.sh`
-with TinyGo 0.42.0 (`brew install tinygo-org/tools/tinygo`). The built file is
-kept in the repo, so a deploy (Netlify) needs no Go; the bundler serves it
-under a hashed name. After changing `gno.land/p/gnogolf/…` or the golf realm's
-simulation, run `scripts/wasm.sh` and commit `golf.wasm`: `check.sh` rebuilds
-it (the same bytes, or it fails) and plays the whole course through it and
-through the realm (`scripts/wasmparity.ts`: every answer byte for byte).
+The assisted aim's preview runs the realm's physics in the page
+(`web/lib/sim/golf.wasm`, committed, so a deploy needs no Go). After changing
+the physics, the course or the golf realm's simulation, rebuild it with
+`npm run wasm` (TinyGo 0.42.0: `brew install tinygo-org/tools/tinygo`) and
+commit it; `check.sh` fails until you do.
 
 ## Writing a hole
 
