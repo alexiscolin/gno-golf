@@ -20,7 +20,7 @@ fs.mkdirSync(OUT, { recursive: true });
 
 /** @type {Record<string, { name: string, par: number }>} */
 const known = fs.existsSync(NAMES) ? JSON.parse(fs.readFileSync(NAMES, "utf8")) : {};
-// a cup's name as the game calls it (web/lib/card.ts CUP_NAMES), the extras by their world
+// a cup's name as the game calls it (web/lib/card.ts CUP_NAMES)
 /** @type {Record<string, string>} */
 const CUP_NAMES = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup" };
 const CUPS = Object.keys(CUP_NAMES);

@@ -127,7 +127,7 @@ func renderHub() string {
 	for _, e := range listed() {
 		switch {
 		case e.official && e.next == "":
-			// one card per cup: nothing here calls a hole
+			// one column per cup: nothing here calls a hole
 			if len(cups) == 0 || cups[len(cups)-1].world != e.world {
 				cups = append(cups, &cup{world: e.world})
 			}
@@ -146,17 +146,19 @@ func renderHub() string {
 	if len(cups) == 0 {
 		sb.WriteString("_No course hole yet._\n\n")
 	} else {
-		sb.WriteString("<gno-columns>\n")
-		for i, c := range cups {
-			if i > 0 {
-				sb.WriteString("<gno-columns-sep />\n")
-			}
-			sb.WriteString("### " + md(cupName(c.world), hub+":"+c.world) + "\n\n" + strconv.Itoa(c.holes) + " holes · par " + strconv.Itoa(c.par) + "\n")
+		// a column a cup, so they all fit one row (gnoweb's columns wrap past four)
+		head, rule, sizes, tops := "| ", "|---", "| holes · par", "| most played"
+		for _, c := range cups {
+			top := "—"
 			if c.top != nil {
-				sb.WriteString("\nmost played: " + c.top.name + "\n")
+				top = c.top.name
 			}
+			head += " | " + md(cupName(c.world), hub+":"+c.world)
+			rule += "|---"
+			sizes += " | " + strconv.Itoa(c.holes) + " · " + strconv.Itoa(c.par)
+			tops += " | " + top
 		}
-		sb.WriteString("</gno-columns>\n\n")
+		sb.WriteString(head + " |\n" + rule + "|\n" + sizes + " |\n" + tops + " |\n\n")
 	}
 
 	sb.WriteString("## Leaderboard\n\nEach named player's best finish on each current hole of the course, added up: most holes first, then the best score against par (each hole's strokes less its par, added up: a hole at par counts the same whatever its par). " +

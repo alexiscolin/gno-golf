@@ -8,10 +8,10 @@ The V1 is built, and it runs end to end on a local chain built with the onyx
 toolchain.
 - **On the chain:** the `physics` and `course` packages and the `golf` realm,
   the only three deployed. The whole course goes on chain as data: four cups
-  of 18 holes and two extras (`data/holes.txt`). golf already names a fifth
+  of 18 holes (`data/holes.txt`). golf already names a fifth
   world, the Crystal Mines, whose holes come after the launch.
 - **In the repo only:** the authoring code (`p/gnogolf/physics/build`,
-  `p/gnogolf/course/author`) and the 74 hole realms are the source, and are
+  `p/gnogolf/course/author`) and the 72 hole realms are the source, and are
   not deployed. What goes on chain is the repo byte for byte:
   `scripts/stage.sh` stages it and checks it, on every `scripts/check.sh` run.
 - **In `web/`,** the 3D client:
@@ -29,7 +29,7 @@ toolchain.
 
 **The deploy target is onyx** (`onyx-1`, mainnet's code v1.5.0), tomorrow, as
 the key `GnoAlex` under `nym-golfer000`. The runbook is
-`docs/design/deploy-v1.md`, "Onyx deploy, step by step": about 90 GNOT in all,
+`docs/design/deploy-v1.md`, "Onyx deploy, step by step": about 85 GNOT in all,
 and the key holds 100.
 
 **Done since the last update:**

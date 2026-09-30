@@ -1,7 +1,7 @@
 #!/bin/sh
 # check.sh [--smoke]: everything that must pass before a commit or a deploy.
 # The Gno packages' tests with the onyx toolchain (their gas and storage
-# goldens included), the 74 holes' fingerprints, and the deployed packages
+# goldens included), the course holes' fingerprints, and the deployed packages
 # staged as addpkg takes them (stage.sh: the repo's files byte for byte,
 # linted); then the client: types, lint, the realm sync check, the unit tests
 # with their coverage floor, and with --smoke the end-to-end run against a

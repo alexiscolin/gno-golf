@@ -1210,7 +1210,7 @@ Estimates are for one developer with Claude, on the pace of the four cups.
 
 ## Consequences
 
-- **The course ranking grows from 74 to 92 holes.** The course ranking adds up
+- **The course ranking grows from 72 to 90 holes.** The course ranking adds up
   every current course hole, and golf's page table can't set a cup apart
   without a redeploy.
   - A player who never goes down the mines drops behind one who does, since
@@ -1229,7 +1229,7 @@ Estimates are for one developer with Claude, on the pace of the four cups.
     weighed a third more than any other cup.)
 - **The hub card on gnoweb says "Crystal Mines"**, and the hub lists the mines
   after the mountain (golf's `worlds` puts them fifth, before any world it
-  does not name, `extras` included).
+  does not name).
 - **The weather is gentler than the mountain's**, since a mines hole never gets
   snow or a storm. The difficulty the owner asked for comes from the holes'
   own vents, clocks and void, not from the sky. It is always visible, and so
@@ -1308,5 +1308,3 @@ Estimates are for one developer with Claude, on the pace of the four cups.
   says show it, since it is the carrot.
 - Two gnomes per cup, like garden, island and town (a Prospector for
   finishing, the Miner at par)? Or one, as above?
-- Should `extras` sort after the mines on the hub? That needs golf's page
-  table, so it waits for a golf v2 with the rest.

@@ -368,7 +368,35 @@ func TestHolesAreListedWorldByWorld(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(list, `"id":"`+id+`","name":"Flat","official":false`), "Holes says it is not the course's")
 	hub := Render("")
 	uassert.True(t, strings.Contains(hub, "## Community holes"), "anyone's holes have their own section")
-	uassert.True(t, strings.Contains(hub, "### [Island Cup](/r/gnogolf/golf:island)"), "the course has a card per cup, to its page")
+	// the cups: a table, a column each under its name (to its page), so all fit one row
+	cups := func() [][]string {
+		hub := Render("")
+		rows := strings.Split(hub[strings.Index(hub, "\n|  | ")+1:strings.Index(hub, "\n\n## Leaderboard")], "\n")
+		urequire.Equal(t, 4, len(rows), hub)
+		var cells [][]string
+		for _, r := range rows {
+			c := strings.Split(r, "|")
+			for i := range c {
+				c[i] = strings.TrimSpace(c[i])
+			}
+			uassert.Equal(t, strings.Count(rows[0], "|")+1, len(c), r) // no cell adds a column
+			cells = append(cells, c)
+		}
+		return cells
+	}
+	c := cups()
+	i := 0
+	for i < len(c[0]) && c[0][i] != "[Island Cup](/r/gnogolf/golf:island)" {
+		i++
+	}
+	urequire.True(t, i < len(c[0]), "the course has a column per cup, to its page")
+	uassert.Equal(t, "holes · par", c[2][1])
+	uassert.Equal(t, "1 · 3", c[2][i])
+	uassert.Equal(t, "most played", c[3][1])
+	uassert.Equal(t, "—", c[3][i], "none before a shot")
+	testing.SetRealm(testing.NewUserRealm(player))
+	Launch(cross(cur), island, 0, 1)
+	uassert.Equal(t, "Isle", cups()[3][i], "then the most played")
 	uassert.True(t, strings.Index(hub, "Island Cup") < strings.Index(hub, "## Community holes"), "the course first")
 	uassert.True(t, strings.Contains(Render("island"), "| 41 | [Isle](/r/gnogolf/golf:island/41) |"), "a cup's page lists its holes by their number")
 	uassert.True(t, strings.Contains(Render(id), "Community hole by [g1"), "a community hole has no cup, whatever its world")

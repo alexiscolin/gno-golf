@@ -60,8 +60,8 @@ replay of your shots, and anyone can replay it again.
   ([docs/analytics.md](docs/analytics.md)). The font is served by the site
   itself.
 
-There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain) and
-two extras; a fifth, the Crystal Mines, an expert cup, is on the cups screen as
+There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain); a
+fifth, the Crystal Mines, an expert cup, is on the cups screen as
 coming soon ([ADR-005](adr/adr-005-crystal-mines.md)). A cup always starts from its first hole, with a fresh round. The
 menu's Mode goes back to Solo or Duel, All cups to the cups (a duel's ghosts
 in a duel), and Gnome to the gnome picker. Some holes move, so timing is part of the shot. Every hole has

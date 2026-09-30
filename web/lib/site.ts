@@ -29,6 +29,6 @@ export const DESCRIPTION =
 /** What every shared text ends with. */
 export const SHARE_TAGS = " #gnoland @_gnoland";
 
-/** The course's cups, in order, and how one is called (the extras: by their world). */
+/** The course's cups, in order, and how one is called. */
 export const CUPS: readonly string[] = COURSE;
 export const cupName = (w: string) => CUP_NAMES[w as Cup] || w[0].toUpperCase() + w.slice(1);

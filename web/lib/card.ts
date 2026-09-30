@@ -26,11 +26,11 @@ export const cupOf = (h: Partial<Pick<HoleRow, "world">>) => h.world || "garden"
 
 // The course was once 74 realms, one a hole; it is now data in slots
 // ("garden/17"), each version its own id ("garden/17/v2"). From
-// data/holes.txt: the garden's and the extras' old realm under each slot;
+// data/holes.txt: the garden's old realm under each slot;
 // every other cup's slot "<world>/<n>" was the realm "<world><n>".
 const OLD_GARDEN: Record<string, string> = {
-  "extras/10": "hole10", "extras/16": "hole16", "garden/1": "hole1", "garden/2": "hole2", "garden/3": "hole3", "garden/4": "hole4",
-  "garden/5": "hole5", "garden/6": "hole6", "garden/7": "hole7", "garden/8": "hole8", "garden/9": "hole9", "garden/10": "hole11",
+  "garden/1": "hole1", "garden/2": "hole2", "garden/3": "hole3", "garden/4": "hole4", "garden/5": "hole5",
+  "garden/6": "hole6", "garden/7": "hole7", "garden/8": "hole8", "garden/9": "hole9", "garden/10": "hole11",
   "garden/11": "hole12", "garden/12": "hole13", "garden/13": "hole14", "garden/14": "hole15", "garden/15": "hole17",
   "garden/16": "hole18", "garden/17": "hole19", "garden/18": "hole20",
 };
@@ -149,8 +149,7 @@ export function totals(card: Card, holes: readonly CardHole[]) {
   return { done, strokes, par, aces, under, all: holes.length > 0 && done === holes.length };
 }
 
-// The cups a player can win, in order. A hole's cup is its world; "extras" is
-// not a cup.
+// The cups a player can win, in order. A hole's cup is its world.
 export const CUPS = ["garden", "island", "town", "mountain"] as const;
 export type Cup = (typeof CUPS)[number];
 /** A cup's name, as the game calls it. */

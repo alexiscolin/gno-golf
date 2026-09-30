@@ -17,7 +17,7 @@ import type { Card, Cup } from "@/lib/card";
 import type { Feel } from "@/lib/feel";
 import { hasAdena, connect, current, onOurNode, recordRound, chainSplit, readBack, replayDiffers, gasOf, roundGas, shortOf, depositBytes, nameBytes, NAME_GAS, PRICE, onWalletChange, type SendError } from "@/lib/adena";
 import Title, { Hat, choresOf } from "@/components/Title";
-import Worlds, { WORLDS, EXTRAS, Emblem, groupOf, worldOf } from "@/components/Worlds";
+import Worlds, { WORLDS, Emblem, worldOf } from "@/components/Worlds";
 import Weather from "@/components/Weather";
 import Share, { ShareClip, type Clip } from "@/components/Share";
 import Gnokey from "@/components/Gnokey";
@@ -1517,11 +1517,11 @@ export default function Golf() {
                   {/* the cup being played, and the way to another */}
                   {(() => {
                     // the cup being played; tapping it goes to the cups (their ghosts in a duel)
-                    const cup = groupOf(s.world);
+                    const cup = worldOf(s.world);
                     const [first, ...rest] = cup.name.split(" ");
                     return (
                       <button className="drawer__cup" aria-label={`${cup.name} — change cup`} onClick={() => { sound("blip"); setMenu(false); setScreen(cupsScreen); }}>
-                        {cup.id !== EXTRAS.id && <Emblem id={cup.id} />}
+                        <Emblem id={cup.id} />
                         <h2>{first}<br />{rest.join(" ")}</h2>
                       </button>
                     );
@@ -2346,7 +2346,7 @@ function AimSetting({ aim, onChange, compact = false }: { aim: Mode; onChange: (
 /** The hole on the shared picture's card and the clip's, as its link card has it (media/og): the hole and the score;
  *  a duel's, who was raced, both counts, and its result shouted. */
 const caption = (s: Snapshot, won: { title: string; duel: Duel } | null) => {
-  const cup = s.place ? groupOf(s.world).name : "Community hole", par = parHere(s);
+  const cup = s.place ? worldOf(s.world).name : "Community hole", par = parHere(s);
   if (won) return { eyebrow: `vs ${won.duel.name}${par ? ` · par ${par}` : ""}`, title: s.name, score: `${s.strokes} – ${won.duel.ghost.strokes}`, term: won.title, challenge: `Race the ghost · ${s.name}` };
   return { eyebrow: [cup, s.place && `hole ${s.place}`, par && `par ${par}`].filter(Boolean).join(" · "), title: s.name, score: strokesWord(s.strokes), term: golfTerm(s.strokes, par).replace(/!?$/, "!") }; // the clip shouts it
 };
@@ -2358,7 +2358,7 @@ const caption = (s: Snapshot, won: { title: string; duel: Duel } | null) => {
  */
 // ghost: the link dares (a round of the sharer's on the chain): the text says so
 function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot; card: Card; cups: ReturnType<typeof cupTotals>; fresh: readonly Skin[]; place?: { rank: number; of: number } | null; ghost?: boolean }) {
-  const t = totals(card, s.holes), cup = groupOf(s.world).name;
+  const t = totals(card, s.holes), cup = worldOf(s.world).name;
   const vs = vsParWords(t.strokes - t.par);
   const pick = (list: readonly string[]) => list[[...String(s.id || "")].reduce((a, c) => a + c.charCodeAt(0), s.strokes) % list.length];
   const tag = SHARE_TAGS;
@@ -2584,14 +2584,14 @@ function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, o
     chain.rank(mode, me).then((r) => live && setRank(r.rank > 0 ? { at: r.rank } : r.holes > 0 ? { unnamed: true } : null)).catch(() => {});
     return () => void (live = false);
   }, [chain, me, mode, saved]);
-  const cup = groupOf(s.world);
+  const cup = worldOf(s.world);
   const t = totals(card, s.holes);
   const vs = t.strokes - t.par;
   const next = nextHole(s, card);
   return (
     <section className="cup" aria-label={`${cup.name} standings`}>
       <header className="cup__head">
-        {cup.id !== EXTRAS.id && <Emblem id={cup.id} />}
+        <Emblem id={cup.id} />
         <div>
           <span className="eyebrow">Your cup</span>
           <h3>{cup.name}</h3>

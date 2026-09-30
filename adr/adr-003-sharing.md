@@ -23,7 +23,7 @@ Sharing is how the game spreads, and today it undersells it:
 
 ## Decision
 
-- **A page per hole, built statically.** `/h/<world>-<n>/` (74 pages, from the
+- **A page per hole, built statically.** `/h/<world>-<n>/` (72 pages, from the
   course's slots at build time, `generateStaticParams`), plus one per cup
   (`/h/garden/`) and the home page. Each has its own title, description
   ("Can you hole it in one? Every shot is computed by the chain.") and its own
@@ -57,7 +57,7 @@ Sharing is how the game spreads, and today it undersells it:
 
 ## What is built
 
-- **The pages.** `web/app/h/[slot]/page.tsx` builds 78 of them: the 74 holes
+- **The pages.** `web/app/h/[slot]/page.tsx` builds 76 of them: the 72 holes
   (`/h/garden-3/`) and the four cups (`/h/garden/`), from `data/holes.txt`,
   with no chain at build time. `trailingSlash` in `next.config.mjs` makes each
   one a folder (`out/h/garden-3/index.html`), so any static host serves it.

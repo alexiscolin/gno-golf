@@ -786,7 +786,7 @@ design:
   come) leads a duel to the rival screen: a friend's name or address, or
   anyone on the course board; someone with no saved round is refused there.
   Then their ghosts: the holes they have a best on (one free read, `BestOf`
-  over the course's holes in both modes), grouped by cup with the extras,
+  over the course's holes in both modes), grouped by cup,
   their best to beat and the player's own from the card; Race opens that
   hole's picker. A duel never shows the cups: its Back, Escape, All cups and
   the cup card lead to their ghosts, and a hole with no ghost is not offered

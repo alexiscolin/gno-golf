@@ -5,7 +5,7 @@
 // of its own (Rival), then on which of the holes they have a best on (Ghosts),
 // in place of the cups. Panels of their own, a kart game's modes.
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { Emblem, EXTRAS, Frame, WORLDS } from "@/components/Worlds";
+import { Emblem, Frame, WORLDS } from "@/components/Worlds";
 import { useGnomeStage } from "@/components/Stage";
 import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Act, type Skin } from "@/lib/scene/gnome";
@@ -301,8 +301,6 @@ const Dice = () => (
   </svg>
 );
 
-// the cups, then the holes in none (ranked on the course all the same)
-const GROUPS = [...WORLDS, EXTRAS];
 /**
  * A duel's holes, in place of the cups: each one the rival has a best on, a
  * card in its cup's band, their best (the one raced: the aim mode's, else the
@@ -342,11 +340,11 @@ export function Ghosts({ holes, name, player, chain, bests, card, mode, onRace, 
         </section>
       )}
       {/* in a frame of its own, as a board: it scrolls under its fades, each cup's name held at its top, the screen stays put */}
-      {bests && bests.size > 0 && <div className="ghosts__list">{GROUPS.map((w) => {
+      {bests && bests.size > 0 && <div className="ghosts__list">{WORLDS.map((w) => {
         const cup = holes.filter((h) => cupOf(h) === w.id), theirs = cup.filter((h) => bests.has(h.id));
         return theirs.length > 0 && (
-          <section key={w.id} className={`ghosts__cup ${w.id === EXTRAS.id ? "ghosts__cup--extras" : `tint--${w.id}`}`}>
-            <h3 className="ghosts__name">{w.id !== EXTRAS.id && <Emblem id={w.id} />}{w.name}</h3>
+          <section key={w.id} className={`ghosts__cup tint--${w.id}`}>
+            <h3 className="ghosts__name"><Emblem id={w.id} />{w.name}</h3>
             <ul className="ghosts__holes">
               {theirs.map((h) => (
                 <li key={h.id}><HoleCard id={h.id} name={h.name} num={holeNumber(cup, h.id)} par={parOf(h)} best={bestOf(bests.get(h.id), mode)!} mine={scoreOf(card, h)} chain={chain} player={player} onRace={onRace} /></li>

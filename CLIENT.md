@@ -291,7 +291,7 @@ of a slot has weather of its own.
 | town | 50 | 15 | 20 | 15 | | |
 | mountain | 40 | 20 | | 15 | | 25 |
 
-A world not listed (the Crystal Mines' `mines`, `extras`) has the garden's.
+A world not listed (the Crystal Mines' `mines`) has the garden's.
 
 - **wind**: one Slope zone over the board, `vec` = the push, 0.08–0.15 per
   substep (never over the hole's `Shelter`), its direction from the hash.

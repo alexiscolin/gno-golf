@@ -24,10 +24,6 @@ const TAGS: Record<Cup, string> = {
 export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = CUPS.map((id) => ({ id, name: CUP_NAMES[id], tag: TAGS[id] }));
 /** A cup by its id: the garden's when it is none of them. */
 export const worldOf = (id: string | null | undefined) => WORLDS.find((w) => w.id === id) || WORLDS[0];
-/** The holes in no cup: named so, with no emblem. */
-export const EXTRAS = { id: "extras", name: "Extras" } as const;
-/** A hole's cup, or the extras, as its world says (worldOf would name the extras the first cup). */
-export const groupOf = (id: string | null | undefined) => (id === EXTRAS.id ? EXTRAS : worldOf(id));
 
 /** A round inked window, its scene clipped to it (an id of its own, so two
  *  on a screen never share a clip): a cup's emblem, a hole's map, a gnome's face. */

@@ -69,8 +69,7 @@ place in that world, lowest first. A course hole's world and order are its
 slot (`garden/7` is world `garden`, order 7), and the order is a whole number
 from 1 to 999. `golf` reads both from the data once, when a version is
 published, and lists the course world by world (`garden`, `island`, `town`,
-`mountain`, then any other world), then by order. Two holes, `extras/10` and
-`extras/16`, use the world `"extras"`, which the client doesn't count as a cup.
+`mountain`, then any other world), then by order.
 
 ## Wear
 
@@ -217,7 +216,7 @@ way it grew before the physics rework. A full stroke (power 10) starts at 4.44
 units per substep and rolls 44, a board's length, on a green of Friction 0.87
 (rolling deceleration `a = 0.224`); a pull of 3 rolls 7.2, one of 1 rolls 1.4.
 `Kick` is the calibration that keeps every course hole's par: with it the
-solver finds the same robust stroke count on all 74 course holes.
+solver finds the same robust stroke count on all 72 course holes.
 
 `Capture` is Holmes's capture criterion (B. W. Holmes, *Am. J. Phys.* 59,
 1991). A ball of radius `r` crossing a cup of radius `R` off its centre by

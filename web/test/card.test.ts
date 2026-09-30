@@ -59,7 +59,7 @@ test("legacyOf: a course slot's old realm id, from a plain world/n", () => {
 
 test("legacyOf: empty for a slot with no old realm, or a malformed slot", () => {
   assert.equal(legacyOf("island/19"), ""); // out of the old 1-18 range
-  assert.equal(legacyOf("extras/1"), ""); // extras had none but 10 and 16
+  assert.equal(legacyOf("garden/19"), ""); // the garden had 18
   assert.equal(legacyOf("not-a-slot"), "");
   assert.equal(legacyOf(null), "");
   assert.equal(legacyOf(undefined), "");
@@ -206,18 +206,18 @@ const allHoles = [
   { id: "g2", slot: "garden/2", par: 3, world: "garden" },
   { id: "i1", slot: "island/1", par: 3, world: "island" },
   { id: "i2", slot: "island/2", par: 3, world: "island" },
-  { id: "x1", slot: "extras/1", par: 3, world: "extras" }, // not a cup
+  { id: "p1", slot: "pond/1", par: 3, world: "pond" }, // not a cup
 ];
 
-test("cupTotals: buckets holes by cup, extras counts in none", () => {
-  const card = { "garden/1": 3, "garden/2": 3, "island/1": 3, "island/2": 4, "extras/1": 1 };
+test("cupTotals: buckets holes by cup, a hole in no cup counts in none", () => {
+  const card = { "garden/1": 3, "garden/2": 3, "island/1": 3, "island/2": 4, "pond/1": 1 };
   const t = cupTotals(card, allHoles);
   assert.equal(t.garden.done, 2);
   assert.equal(t.garden.clean, true); // at par
   assert.equal(t.island.clean, false); // one over
   assert.equal(t.town.open, false);
   assert.equal(t.mountain.open, false);
-  assert.equal(t.aces, 0); // the extras ace does not count toward any cup
+  assert.equal(t.aces, 0); // the pond's ace does not count toward any cup
 });
 
 test("cupTotals: slam is true only once every cup the chain has is clean", () => {
@@ -270,8 +270,8 @@ test("UNLOCKS.golden: five holes-in-one, anywhere", () => {
   const card = { "garden/1": 1, "garden/2": 1, "island/1": 1, "island/2": 1 };
   const almost = cupTotals(card, allHoles);
   assert.equal(UNLOCKS.golden.ok(almost), false); // only 4 aces
-  const t = cupTotals({ ...card, "extras/1": 1 }, allHoles);
-  // extras/1 is not part of any cup, so it never counts toward aces either
+  const t = cupTotals({ ...card, "pond/1": 1 }, allHoles);
+  // pond/1 is not part of any cup, so it never counts toward aces either
   assert.equal(UNLOCKS.golden.ok(t), false);
 });
 
@@ -280,7 +280,7 @@ test("cupHasGnome: true for cups with an unlock, false for the Mountain Cup", ()
   assert.equal(cupHasGnome("island"), true);
   assert.equal(cupHasGnome("town"), true);
   assert.equal(cupHasGnome("mountain"), false);
-  assert.equal(cupHasGnome("extras"), false);
+  assert.equal(cupHasGnome("pond"), false);
 });
 
 // ---- badges ----

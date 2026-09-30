@@ -1,6 +1,4 @@
-{"extras/10":{"par":2,"best":1,"robust":1,"period":5967998,"plan":["14,8.5"]},
-"extras/16":{"par":2,"best":1,"robust":1,"period":5967998,"plan":["22,7.5"]},
-"garden/1":{"par":3,"best":2,"robust":2,"period":5967997,"plan":["21,8","290.5,7.75"]},
+{"garden/1":{"par":3,"best":2,"robust":2,"period":5967997,"plan":["21,8","290.5,7.75"]},
 "garden/2":{"par":3,"best":1,"robust":2,"period":5967998,"plan":["0,7.5","40,5"]},
 "garden/3":{"par":2,"best":1,"robust":1,"period":5967998,"plan":["0,9.25"]},
 "garden/4":{"par":2,"best":1,"robust":1,"period":5967997,"plan":["0,8,2"]},

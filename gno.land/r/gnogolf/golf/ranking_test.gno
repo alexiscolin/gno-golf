@@ -434,7 +434,7 @@ func TestTheRankingKeySortsAsTheRule(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		h := g.n(maxCourse + 3)
 		if i%2 == 0 { // as many holes as others: the score decides
-			h = []int{1, 2, 74, 92, maxCourse, maxCourse + 1, maxCourse + 2}[g.n(7)]
+			h = []int{1, 2, 72, 90, maxCourse, maxCourse + 1, maxCourse + 2}[g.n(7)]
 		}
 		par := h + g.n(18*h+1) // 1 to 19 a hole
 		rows = append(rows, &row{player: "g1r" + strconv.Itoa(i), holes: h, strokes: h + g.n(59*h+1), par: par, height: int64(g.n(1000))})

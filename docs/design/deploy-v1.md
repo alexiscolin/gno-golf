@@ -28,10 +28,10 @@ The costs come from the pearl rehearsal (runs 5 and 6, `deploy-v1-rehearsal.md`,
 | 3. physics | ~4.5 GNOT | 0.16 |
 | 3. course | ~4.8 GNOT | 0.13 |
 | 3. golf (its init and shared indexes) | ~22.7 GNOT | 0.35 |
-| 4. 74 holes | 45.3 GNOT (453,029 bytes, onyx gnodev) | ~8.9 (74 calls, each asking its simulation's gas and a tenth more: 8.9e9 asked in all, 8.1e9 used, onyx gnodev) |
-| **Total** | **~77.6 GNOT** | **~9.6 GNOT** |
+| 4. 72 holes | 43.0 GNOT (430,305 bytes, onyx gnodev) | ~8.8 (72 calls, each asking its simulation's gas and a tenth more: 8.8e9 asked in all, 8.0e9 used, onyx gnodev) |
+| **Total** | **~75.3 GNOT** | **~9.5 GNOT** |
 
-That makes **about 90 GNOT**. `GnoAlex` held 100 GNOT on onyx on 2026-09-29, which leaves about 10 for a rerun. The deposits are locked for good, since published data is never freed.
+That makes **about 85 GNOT**. `GnoAlex` held 100 GNOT on onyx on 2026-09-29, which leaves about 15 for a rerun. The deposits are locked for good, since published data is never freed.
 
 For players, these are the storage figures measured on an onyx gnodev since finished rounds stopped being kept:
 - a named player's first finish on the course (in a mode) stores about 2.9 KB, **~0.29 GNOT**;
@@ -51,7 +51,7 @@ A save also pays **about 0.05 GNOT** in fees: 49M to 60M gas at the floor, measu
   ```
 
   A new machine needs the key restored once: `gnokey add GnoAlex --recover`, with its recovery phrase.
-- **Funds: about 90 GNOT.** Check the balance:
+- **Funds: about 85 GNOT.** Check the balance:
 
   ```sh
   gnokey query bank/balances/g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq -remote $RPC   # "100000000ugnot" on 09-29
@@ -135,7 +135,7 @@ until gnokey query vm/qpkgmeta_json -data gno.land/r/nym-golfer000/golf -remote 
   3. If it is still stuck, ask the onyx operators (aeddi) to look at the gpao oracle. Its status API says whether the package is `rejected`, `pending`, `gave_up` or `blocked` (the oracle's spend cap).
 - Check the pages: https://onyx.testnets.gno.land/p/nym-golfer000/physics$source, …/course$source, and https://onyx.testnets.gno.land/r/nym-golfer000/golf (the hub, empty until step 4).
 
-### 4. Publish the 74 holes
+### 4. Publish the 72 holes
 
 The script sends one plain `gnokey maketx call` of `Publish(slot, hex, "")` a hole, in the order of `data/holes.txt`. It asks the password once. Each call is simulated first and then asks the gas the simulation used and a tenth more, at the node's gas price, and its deposit is capped at `MAX_DEPOSIT`, 10 GNOT by default. A slot that already holds its data is skipped, so after a failure you just run it again. It ends by checking every slot.
 
@@ -184,7 +184,7 @@ gnokey query vm/qeval -data 'gno.land/r/nym-golfer000/golf.SimulateRound("garden
 ```
 
 Check each answer:
-- `Holes()` answers `{"version":1,"play":"https://gnogolf.xyz/",…}` and lists the 74 holes;
+- `Holes()` answers `{"version":1,"play":"https://gnogolf.xyz/",…}` and lists the 72 holes;
 - `HoleState` answers `garden/1/v1`'s geometry and weather;
 - `SimulateRound` answers a path.
 
@@ -222,10 +222,10 @@ The site is a static export (`netlify.toml`: base `web`, `npm ci && npm run buil
   `Transfer` to the owner's own address cancels an offer. Tips follow the role, because the game sends them to `Owner()`. The namespace `nym-golfer000` stays with `GnoAlex`.
 - **The Crystal Mines** (branch `mines`, in progress; ADR-005). The cup ships as data, with no redeploy: golf already names the world. The order matters:
   1. Deploy the client that knows `mines` first. Before it, a mines hole would be dressed as the garden and named "Garden Cup".
-  2. Then add its 18 lines to `data/holes.txt` and run step 4's same command. The course's 74 slots are skipped as already current.
+  2. Then add its 18 lines to `data/holes.txt` and run step 4's same command. The course's 72 slots are skipped as already current.
   3. Run `-verify`.
 
-  The course ranking then counts 92 holes. At the course's average of about 0.6 GNOT a hole, the 18 holes' deposit would be about 11 GNOT, but measure them on a local chain first.
+  The course ranking then counts 90 holes. At the course's average of about 0.6 GNOT a hole, the 18 holes' deposit would be about 11 GNOT, but measure them on a local chain first.
 - **Mainnet notes.**
   - The namespace: a non-nym name such as `gnogolf` is not self-registered on mainnet. You register a nym, and GovDAO renames it (`r/sys/namereg/v0` `ProposeNewName`).
   - While ugnot is transfer-locked there (`bank:p:restricted_denoms`, empty on onyx), the client shows no Support chip and the About sheet says tips open once GNOT can be sent.
@@ -491,7 +491,7 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
 | 2 | addpkg physics | user, gnokey | ~52 KB, 5.2 GNOT |
 | 3 | addpkg course | user, gnokey | ~3.7 GNOT |
 | 4 | addpkg golf (its init sets the owner) | user, gnokey | ~9.1 GNOT |
-| 5 | 74 × `Publish`, one plain `gnokey maketx call` a hole (`scripts/publishdata.sh <key>`: onyx lets one seeded account `maketx run`, so no script) | the user's key, gnokey | measured on the onyx toolchain: 46M to 174M gas a hole (8.1e9 in all, asked as 1.2 × (25M + 55K a byte of data)), 453,029 bytes in all (45.3 GNOT at 100 ugnot a byte) |
+| 5 | 72 × `Publish`, one plain `gnokey maketx call` a hole (`scripts/publishdata.sh <key>`: onyx lets one seeded account `maketx run`, so no script) | the user's key, gnokey | measured on the onyx toolchain: 46M to 174M gas a hole (8.0e9 in all, asked as 1.2 × (25M + 55K a byte of data)), 430,305 bytes in all (43.0 GNOT at 100 ugnot a byte) |
 | 6 | Verify: `scripts/publishdata.sh -verify`, one `vm/qeval` of `Current` and `Versions` over every slot | a read | 0 |
 
 - Every package is far below the 1 MB transaction limit.
@@ -506,7 +506,7 @@ It runs the fingerprint tests with `-v`. `fingerprint.Check` logs `data <slot> <
 
 ### 10.4 Budget
 
-> History: the design's estimate. Measured since: about 77.6 GNOT of deposit and 9.6 of fees ([Costs](#costs-estimates)).
+> History: the design's estimate. Measured since: about 75.3 GNOT of deposit and 9.5 of fees ([Costs](#costs-estimates)).
 
 | Item | GNOT |
 |---|---|

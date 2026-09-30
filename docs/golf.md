@@ -643,7 +643,7 @@ the rule at its extremes.
 A mode's course-wide top ten.
 
 ```json
-{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …]}
+{"version":1,"mode":"assisted","holes":72,"rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …]}
 ```
 
 `holes` at the top is the number of slots in the course. Each row has its
@@ -668,7 +668,7 @@ The whole course ranking, a page at a time, the way `HoleLeaderboard` pages a
 hole: from rank `offset+1`, at most `limit` rows (1..100).
 
 ```json
-{"version":1,"mode":"pro","holes":74,"players":213,"offset":0,
+{"version":1,"mode":"pro","holes":72,"players":213,"offset":0,
  "rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …],"next":20}
 ```
 
@@ -717,7 +717,7 @@ Each given player's course-wide standing, with the same list rules as
 `Bests`.
 
 ```json
-{"version":1,"mode":"assisted","holes":74,"rows":[{"player":"g1…","holes":12,"strokes":40,"par":38}, …]}
+{"version":1,"mode":"assisted","holes":72,"rows":[{"player":"g1…","holes":12,"strokes":40,"par":38}, …]}
 ```
 
 #### `BestOf(hole, mode string, player address) int` and `StandingOf(mode string, player address) (holes, strokes, par int)`
@@ -783,7 +783,7 @@ version's id or an alias.
 
 | path | page |
 |---|---|
-| `""` | the hub: how to play, a card per cup (to its page), both leaderboards (by name, one under the other), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
+| `""` | the hub: how to play, the cups in a table, a column each (its name to its page, its holes and par, its most played hole), both leaderboards (by name, one under the other), the community holes (with their authors), at most 20 archived course holes, and who can change what (folded) |
 | `<world>` | a cup: its holes by number (par, best by name, plays); a word that is no cup is "No such hole" |
 | `<address>` | the community holes that address published, as their current versions (a hidden one left out) |
 | `<hole>` | the hole as a text board, its weather (a wind's heading in degrees), a `Launch` form, a `Reset` form, a link to `Claim` (on the course's current holes, the only ones it seats), and its best rounds per mode, each with a `race` link: the 3D game against that best's ghost (its dare link, `&by=`) |

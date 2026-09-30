@@ -52,7 +52,7 @@ let hole = "", player = "", period = 0;
 await step("Holes: the course is published", async () => {
   const list = await chain.holes(true);
   const official = list.filter((h) => h.official && !h.next);
-  assert.ok(official.length >= 74, `${official.length} course holes`);
+  assert.ok(official.length >= 72, `${official.length} course holes`);
   hole = (official.find((h) => h.id.startsWith("garden/3/")) || official[0]).id;
   return `${official.length} holes`;
 });

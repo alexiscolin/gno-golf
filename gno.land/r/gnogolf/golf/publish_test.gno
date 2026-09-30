@@ -793,9 +793,9 @@ func TestThePagesGnowebLinks(cur realm, t *testing.T) {
 
 // Community rows are the newest first: sixteen addresses that sort low
 // (bech32 "g1qqq…", cheap to grind for) publishing three holes each, on a
-// course of 74, cannot keep a later author's hole off the list or the hub.
+// course of 72, cannot keep a later author's hole off the list or the hub.
 func TestNewestCommunityHolesAreListed(cur realm, t *testing.T) {
-	for i := slots.Size(); i < 74; i++ {
+	for i := slots.Size(); i < 72; i++ {
 		publish(cur, cupHole("filler", i+1, "Filler"))
 	}
 	data := hexOf(cupHole("pond", 1, "Low"))

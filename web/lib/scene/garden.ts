@@ -65,7 +65,7 @@ function edging(s: Hole, box: THREE.Box3) {
 
 // A few holes have a dream of their own; the rest take one of the three
 // everyday backdrops by a hash of their id.
-const THEME: Record<string, string> = { hole5: "giants", hole10: "giants", hole17: "giants", hole8: "clouds", hole14: "clouds", hole19: "clouds" };
+const THEME: Record<string, string> = { hole5: "giants", hole17: "giants", hole8: "clouds", hole14: "clouds", hole19: "clouds" };
 const themeOf = (id: string) => {
   const named = THEME[String(id).split("/").pop()!];
   if (named) return named;
