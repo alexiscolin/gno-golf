@@ -13,7 +13,7 @@
 //
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
-import { makeRenderer, makeBall, gnomeById, makeConfetti, disposeCourse, overviewRig, farRig, courseBox, laneBox } from "../scene";
+import { makeRenderer, makeBall, gnomeById, makeConfetti, disposeCourse, releaseShared, overviewRig, farRig, courseBox, laneBox } from "../scene";
 import { makeCauses } from "../scene/cause";
 import { BALL_R } from "../terrain";
 import { CLIP, clipWindow, skyStops } from "../clip";
@@ -166,6 +166,7 @@ export function recordClip({ E, stroke, gnome, showClock, hide, card, term, chal
         causes.dispose();
         disposeCourse(own); // (the shared materials are kept: disposeCourse knows them)
         renderer.dispose();
+        releaseShared();
         renderer.forceContextLoss(); // its copy of the course's buffers freed now, not at the next collection
       };
       if (!rec || rec.state === "inactive") return free(), resolve(null);

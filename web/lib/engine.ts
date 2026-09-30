@@ -21,7 +21,7 @@ import { boardWork } from "./adena";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
   makeRenderer, weakGpu, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
-  courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, setTime, buildExtras, setLighting, quality, motion,
+  courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, releaseShared, setTime, buildExtras, setLighting, quality, motion,
 } from "./scene";
 import { BALL_R, plainSkins } from "./terrain";
 import { makeCamera } from "./engine/camera";
@@ -1509,6 +1509,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group]) if (o) disposeCourse(o);
       rival.dispose();
       renderer.dispose();
+      releaseShared();
       pip.remove();
     },
   };

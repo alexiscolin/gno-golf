@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { BALL_R } from "../terrain";
-import { C, flat, drawn, clipTo, share, disposeCourse } from "./materials";
+import { C, flat, drawn, clipTo, share, disposeCourse, releaseShared } from "./materials";
 import { makeRenderer, makeScene } from "./camera";
 import { state } from "./state";
 import type { Aim, Height, WaterMask } from "./data";
@@ -269,6 +269,7 @@ export function cheer(canvas: HTMLCanvasElement) {
     alive = false;
     for (const b of bursts) disposeCourse(b.group);
     renderer.dispose();
+    releaseShared();
     renderer.forceContextLoss();
   };
   const tick = (now: number) => {

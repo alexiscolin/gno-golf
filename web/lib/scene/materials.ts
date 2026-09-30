@@ -459,6 +459,20 @@ export function disposeCourse(root: THREE.Object3D) {
 }
 
 /**
+ * Lets the renderers that drew the shared things go, once one of them is
+ * disposed. three hangs a 'dispose' listener on every material, texture and
+ * geometry a renderer draws, and the listener holds that renderer: on a shared
+ * thing, never disposed, it kept every renderer that ever drew one (the
+ * title's, each gnome picker's turntable) for the rest of the visit. The live
+ * renderers' listeners go too: they only ever act on a dispose, which a
+ * shared thing never gets.
+ */
+export function releaseShared() {
+  // ponytail: three's own list (EventDispatcher._listeners, three 0.169): a three upgrade checks it is still there
+  for (const x of SHARED) (Reflect.get(x as object, "_listeners") as { dispose?: unknown[] } | undefined)?.dispose?.splice(0);
+}
+
+/**
  * Clips a material to a board mask (a texture with one texel per terrain
  * cell, board units w x h): fragments over a cell the mask leaves out are
  * dropped. Ripples and splash rings use it with the water mask, so no ring

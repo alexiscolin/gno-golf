@@ -8,7 +8,7 @@
 // The pieces live under scene/; this file is the public face engine.ts and
 // the picker import.
 
-export { motion, setTime, at, disposeCourse, quality } from "./scene/materials";
+export { motion, setTime, at, disposeCourse, releaseShared, quality } from "./scene/materials";
 export { maxDpr, makeRenderer, weakGpu, makeScene, setLighting, courseBox, laneBox, applyRig, overviewRig, farRig, ORBIT, focusRig } from "./scene/camera";
 export { buildHole, finishHole, buildExtras } from "./scene/course";
 export { GNOMES, gnomeById, makeBall, makePreview } from "./scene/gnome";

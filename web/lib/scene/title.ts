@@ -18,7 +18,7 @@ import { makeBall, gnomeById } from "./gnome";
 import { makeConfetti } from "./fx";
 import { BALL_R, smoothstep } from "../terrain";
 import { TICKS_PER_S } from "../engine/types";
-import { C, flat, inked, texOf, disposeCourse, setTime } from "./materials";
+import { C, flat, inked, texOf, disposeCourse, releaseShared, setTime } from "./materials";
 import { ud, type Course, type Gnome, type Hole, type LitScene } from "./data";
 import type { Board } from "../types";
 
@@ -292,6 +292,7 @@ export async function makeTitle(canvas: HTMLCanvasElement, { world = "garden", h
       removeEventListener("resize", resize);
       disposeCourse(scene);
       renderer.dispose();
+      releaseShared();
       renderer.forceContextLoss();
     },
   };

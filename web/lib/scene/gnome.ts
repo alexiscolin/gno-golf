@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { BALL_R } from "../terrain";
-import { C, flat, inked, disposeCourse, texOf, motion, ownFade, setFade, THIN_HULL } from "./materials";
+import { C, flat, inked, disposeCourse, releaseShared, texOf, motion, ownFade, setFade, THIN_HULL } from "./materials";
 import { makeRenderer, makeScene } from "./camera";
 import { bake } from "./bake";
 import { ud, type Gnome } from "./data";
@@ -447,6 +447,7 @@ export function makePreview(canvas: HTMLCanvasElement, { act = "hop", still = fa
       alive = false;
       for (const g of [gnome, rival]) if (g) disposeCourse(g);
       renderer.dispose();
+      releaseShared();
       renderer.forceContextLoss();
     },
   };
