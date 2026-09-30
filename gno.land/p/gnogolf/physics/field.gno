@@ -13,9 +13,10 @@ type Wall struct {
 	Every, On, Phase int
 }
 
-// there is the timing rule walls and zones share (sign-safe mod, so a
-// negative phase works); every <= 0 is always there.
-func there(i, every, on, phase int) bool {
+// There is the timing rule walls, zones and course pulses share (sign-safe
+// mod, so a negative phase works): on at i when (i+phase) mod every is below
+// on; every <= 0 is always there.
+func There(i, every, on, phase int) bool {
 	return every <= 0 || ((i+phase)%every+every)%every < on
 }
 

@@ -234,7 +234,8 @@ substep `i` when
 ```
 
 (a sign-safe mod, so a negative phase works too). Walls and zones with
-`Every <= 0` are always there.
+`Every <= 0` are always there. `There(i, every, on, phase)` is that rule, which
+`course.Pulse` applies per stroke.
 
 `Field.Tick` is where the clock stands when the stroke starts, i.e. where the
 moving pieces were when the player let go. The page shows them moving all the

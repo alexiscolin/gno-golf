@@ -240,7 +240,7 @@ func (f *Field) Step(pos, vel Vec2, substeps int) Shot {
 		out.Work += barWork * len(bars)
 		for _, j := range bars {
 			w := &f.Walls[j]
-			if there(tick, w.Every, w.On, w.Phase) && (i == 0 || !there(tick-1, w.Every, w.On, w.Phase)) {
+			if There(tick, w.Every, w.On, w.Phase) && (i == 0 || !There(tick-1, w.Every, w.On, w.Phase)) {
 				pos = UnstickIn(pos, f.Walls[j:j+4], nil, f.Radius, f.Walls)
 				out.Work += 4 * unstickWork * len(f.Walls)
 			}
@@ -485,7 +485,7 @@ func (f *Field) sweep(offs []offset, pos, next, move Vec2, tick int, out *Shot) 
 		if o.hi.X < lo.X || o.lo.X > hi.X || o.hi.Y < lo.Y || o.lo.Y > hi.Y {
 			continue
 		}
-		if !there(tick, o.every, o.on, o.phase) {
+		if !There(tick, o.every, o.on, o.phase) {
 			continue // a timed wall that is not there this substep
 		}
 		out.Work += wallTestWork
@@ -581,7 +581,7 @@ func (f *Field) zonesAt(pos, vel *Vec2, surface *float64, under **hill, slopes [
 			hk++
 		}
 		out.Work += zoneWork
-		if !there(tick, z.Every, z.On, z.Phase) || !z.in(*pos, &out.Work) {
+		if !There(tick, z.Every, z.On, z.Phase) || !z.in(*pos, &out.Work) {
 			continue
 		}
 		switch z.Kind {
@@ -785,7 +785,7 @@ func (f *Field) ground(slopes []hill, pos Vec2, tick int, w *int) *hill {
 	for j := range slopes {
 		s := &slopes[j]
 		*w += zoneWork
-		if (tick < 0 && s.z.Every > 0) || (tick >= 0 && !there(tick, s.z.Every, s.z.On, s.z.Phase)) {
+		if (tick < 0 && s.z.Every > 0) || (tick >= 0 && !There(tick, s.z.Every, s.z.On, s.z.Phase)) {
 			continue
 		}
 		if s.z.in(pos, w) {
@@ -811,7 +811,7 @@ func (f *Field) resistance(slopes []hill, pos Vec2, tick int, w *int) float64 {
 	surface := 1.0
 	for j := range f.Zones {
 		*w += zoneWork
-		if z := &f.Zones[j]; z.Kind == Surface && (tick >= 0 || z.Every <= 0) && there(t, z.Every, z.On, z.Phase) && z.in(pos, w) {
+		if z := &f.Zones[j]; z.Kind == Surface && (tick >= 0 || z.Every <= 0) && There(t, z.Every, z.On, z.Phase) && z.in(pos, w) {
 			surface = z.Scale
 		}
 	}

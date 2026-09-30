@@ -48,7 +48,7 @@ func Render(path string) string {
 		return renderHole(e, e.hole(), "")
 	}
 	// the segments of a hole's path, which gnoweb links one by one
-	if isWorld(path) {
+	if course.IsWorld(path) {
 		return renderCup(path)
 	}
 	if address(path).IsValid() {
@@ -516,11 +516,7 @@ func renderData(e *entry) string {
 	}
 	s += "## Versions\n\n| version | height | by | sha256 | note |\n|---|---|---|---|---|\n"
 	now := find(current(e.slot))
-	from := 1
-	if now.version > pageMax {
-		from = now.version - pageMax + 1
-	}
-	for n := from; n <= now.version; n++ {
+	for n := firstVersion(now); n <= now.version; n++ {
 		v := find(e.slot + "/v" + strconv.Itoa(n))
 		s += "| " + md(v.id, hub+":"+v.id+"/data") + " | " + strconv.FormatInt(v.height, 10) + " | " + who(v.by.String()) + " | `" + v.sha[:16] + "…` | " + v.note + " |\n"
 	}

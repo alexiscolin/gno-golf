@@ -40,10 +40,10 @@ func WearIndexOn(p physics.Vec2, w, h int) int {
 }
 
 // Pulse is pieces that come and go: present on the strokes where
-// (stroke+Phase) % Every < On, a timed wall's rule applied per stroke. The
-// clock is the stroke number in the player's own round (0 is the first
-// shot), never shared between players: previewing shot N and committing it
-// meet the same course.
+// (stroke+Phase) % Every < On, a timed wall's rule (physics.There) applied per
+// stroke. The clock is the stroke number in the player's own round (0 is the
+// first shot), never shared between players: previewing shot N and
+// committing it meet the same course.
 type Pulse struct {
 	Every, On, Phase int
 	Walls            []physics.Wall
@@ -368,14 +368,6 @@ func WithZones(f *physics.Field, zones []physics.Zone) *physics.Field {
 	return &g
 }
 
-// at is whether the pulse is there at a stroke (a sign-safe mod).
-func (p Pulse) at(stroke int) bool {
-	if p.Every <= 0 {
-		return true
-	}
-	return ((stroke+p.Phase)%p.Every+p.Every)%p.Every < p.On
-}
-
 // WithExtras is the field plus one stroke's pieces, the hole's own left as
 // is. It may return f itself: do not mutate what it returns.
 func WithExtras(f *physics.Field, walls []physics.Wall, posts []physics.Post) *physics.Field {
@@ -412,7 +404,7 @@ type Simple struct {
 func (h *Simple) ExtraZones(stroke int) []physics.Zone {
 	var zs []physics.Zone
 	for _, p := range h.Pulses {
-		if p.at(stroke) {
+		if physics.There(stroke, p.Every, p.On, p.Phase) {
 			zs = append(zs, p.Zones...)
 		}
 	}
@@ -427,7 +419,7 @@ func (h *Simple) Extras(stroke int) ([]physics.Wall, []physics.Post) {
 	var ws []physics.Wall
 	var ps []physics.Post
 	for _, p := range h.Pulses {
-		if p.at(stroke) {
+		if physics.There(stroke, p.Every, p.On, p.Phase) {
 			ws = append(ws, p.Walls...)
 			ps = append(ps, p.Posts...)
 		}

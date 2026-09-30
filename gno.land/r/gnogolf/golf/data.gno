@@ -311,7 +311,7 @@ func slotKey(world string, order int) string {
 // slotKeyOf reads a slot, "world/order" (as "garden/7"), into its key.
 func slotKeyOf(slot string) (string, bool) {
 	i := strings.Index(slot, "/")
-	if i < 0 || !isWorld(slot[:i]) {
+	if i < 0 || !course.IsWorld(slot[:i]) {
 		return "", false
 	}
 	n, err := strconv.Atoi(slot[i+1:])
@@ -319,20 +319,6 @@ func slotKeyOf(slot string) (string, bool) {
 		return "", false
 	}
 	return slotKey(slot[:i], n), true
-}
-
-// isWorld is whether w can name a world: 1 to 16 of a-z, as course.Decode
-// holds data to.
-func isWorld(w string) bool {
-	if len(w) < 1 || len(w) > course.MaxWorld {
-		return false
-	}
-	for i := 0; i < len(w); i++ {
-		if w[i] < 'a' || w[i] > 'z' {
-			return false
-		}
-	}
-	return true
 }
 
 func validSlug(s string) bool {
@@ -371,22 +357,25 @@ func Versions(alias string) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"slot":` + jstr(slot) + `,"versions":[`)
 	if now != nil {
-		from := 1
-		if now.version > pageMax {
-			from = now.version - pageMax + 1
-		}
+		from := firstVersion(now)
 		for n := from; n <= now.version; n++ {
 			e := find(now.slot + "/v" + strconv.Itoa(n))
-			if n > from {
-				sb.WriteString(",")
-			}
-			sb.WriteString(`{"id":` + jstr(e.id) + `,"v":` + strconv.Itoa(e.version) +
+			sb.WriteString(sep(n-from) + `{"id":` + jstr(e.id) + `,"v":` + strconv.Itoa(e.version) +
 				`,"height":` + strconv.FormatInt(e.height, 10) + `,"by":` + jstr(e.by.String()) +
 				`,"sha":` + jstr(e.sha) + `,"note":` + jstr(e.note) + `,"next":` + jstr(e.next) + "}")
 		}
 	}
 	sb.WriteString("]}")
 	return sb.String()
+}
+
+// firstVersion is the oldest of now's versions a list shows: the newest
+// pageMax are (now is its alias's current version).
+func firstVersion(now *entry) int {
+	if now.version > pageMax {
+		return now.version - pageMax + 1
+	}
+	return 1
 }
 
 // BestOf is a player's best finished round on a hole in a mode, 0 if none.

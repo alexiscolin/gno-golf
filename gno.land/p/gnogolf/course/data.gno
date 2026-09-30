@@ -234,7 +234,7 @@ func Decode(s string) (*Simple, error) {
 	if h.Substeps < 1 || h.Substeps > MaxSubsteps {
 		return nil, errors.New("course: substeps are 1 to 60")
 	}
-	if !worldName(h.World) {
+	if !IsWorld(h.World) {
 		return nil, errors.New("course: a world is 1 to 16 letters a-z")
 	}
 	if !(h.Order >= 0 && h.Order <= MaxOrder) {
@@ -462,7 +462,9 @@ func timing(every, on, phase int) bool {
 	return every > 0 && every <= MaxTiming && on >= 0 && on <= every && phase >= 0 && phase < every
 }
 
-func worldName(w string) bool {
+// IsWorld is whether w can name a world: 1 to MaxWorld letters a-z, as Decode
+// holds data to.
+func IsWorld(w string) bool {
 	if len(w) < 1 || len(w) > MaxWorld {
 		return false
 	}
@@ -538,6 +540,7 @@ func (d *decoder) walls(lengths bool) ([]physics.Wall, []float64) {
 }
 
 // le is the little-endian float at s[i:i+8]; the caller checked the length.
+// f64 has it inline: a call more per float is gas on every decode.
 func le(s string, i int) float64 {
 	return math.Float64frombits(uint64(s[i]) | uint64(s[i+1])<<8 | uint64(s[i+2])<<16 | uint64(s[i+3])<<24 |
 		uint64(s[i+4])<<32 | uint64(s[i+5])<<40 | uint64(s[i+6])<<48 | uint64(s[i+7])<<56)

@@ -342,7 +342,7 @@ func TestATimedSegmentIsNeverCrossed(t *testing.T) {
 				s := f.Step(V(x, 0), V(v, 0), 10)
 				for i := 1; i < len(s.Path); i++ {
 					a, b := s.Path[i-1], s.Path[i]
-					if (a.X-10)*(b.X-10) < 0 && there(i-1, 6, 3, phase) && there(i, 6, 3, phase) {
+					if (a.X-10)*(b.X-10) < 0 && There(i-1, 6, 3, phase) && There(i, 6, 3, phase) {
 						t.Fatalf("phase %d, from %v at %v: crossed the standing wall, %v to %v", phase, x, v, a, b)
 					}
 				}
