@@ -7,7 +7,7 @@
 //   npm run og [-- garden/3 town/18]   (the dev server on APP, the local chain on RPC)
 // Make them again when a hole changes: the cards show its layout.
 import fs from "node:fs";
-import { launch, chainUp, sleep, APP } from "../lib/cdp.mjs";
+import { launch, chainUp, sleep, APP, RPC } from "../lib/cdp.mjs";
 
 const WEB = new URL("../../web/", import.meta.url);
 const OUT = new URL("public/og/", WEB);
@@ -22,8 +22,11 @@ fs.mkdirSync(OUT, { recursive: true });
 const known = fs.existsSync(NAMES) ? JSON.parse(fs.readFileSync(NAMES, "utf8")) : {};
 // a cup's name as the game calls it (web/lib/card.ts CUP_NAMES)
 /** @type {Record<string, string>} */
-const CUP_NAMES = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup" };
+const CUP_NAMES = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup", mines: "Crystal Mines" };
 const CUPS = Object.keys(CUP_NAMES);
+// a cup's own colour on its cards' eyebrow, when not the garden's green (the mines' amethyst: web/app/title.css .tint--mines)
+/** @type {Record<string, string>} */
+const TINT = { mines: "#4f3b8f" };
 const cupName = (/** @type {string} */ w) => CUP_NAMES[w] || w[0].toUpperCase() + w.slice(1);
 // the game's own font, as the app serves it (its origin is the page's: the app's)
 const FONT = `@font-face { font-family: Fredoka; src: url(${APP}/fonts/fredoka.woff2) format("woff2"); font-weight: 300 700; font-display: block; }`;
@@ -51,9 +54,37 @@ const LOGO_W = (w) => `width: ${Math.round((w * (r.width + 2 * M.x)) / r.width)}
 const LOGO_H = (h) => `height: ${Math.round((h * (r.height + M.top + M.bottom)) / r.height)}px; margin: ${-Math.round((h * M.top) / r.height)}px 0 ${-Math.round((h * M.bottom) / r.height)}px;`;
 await send("Emulation.setDefaultBackgroundColorOverride", {});
 
+// The mines' boards are twice the four cups' (80 to 95 long): their Far view
+// would show a board of crumbs. Each is shot instead as near as the four
+// cups' cards stand to theirs (their Far camera, measured: about 62 units
+// off, 39° up, from the south, a 30° lens) on its point of interest, the lane
+// round it readable.
+/** @type {Record<string, [number, number]>} */
+const POI = {
+  "mines/1": [61, 7], // the headframe, the cage over the shaft
+  "mines/2": [37, 18], // the singing crystals' chicane
+  "mines/3": [45, 12], // the yard, its carts and the turntable
+  "mines/4": [11, 17], // the giant pickaxe
+  "mines/5": [26, 22], // the Geode's rings
+  "mines/6": [39, 5], // the stamp battery over the belt
+  "mines/7": [46, 28], // the lava tide round the causeway
+  "mines/8": [49, 14], // the lift and its cage doors
+  "mines/9": [30, 11], // the drill's cutterhead
+  "mines/10": [46, 21], // the geysers
+  "mines/11": [32, 14], // the corkscrew's loops
+  "mines/12": [35, 16], // the vents and the steam pump's pistons
+  "mines/13": [22, 16], // the lava falls
+  "mines/14": [74, 19], // the cart ride
+  "mines/15": [48, 12], // the stalactites and the frozen fall
+  "mines/16": [37, 14], // the strongroom's gauntlet of doors
+  "mines/17": [19, 20], // the cable car over the great shaft
+  "mines/18": [46, 37], // the Heart
+};
+const NEAR = { d: 62, el: (39 * Math.PI) / 180 };
+
 /** The hole in the Far view, by day, the HUD hidden: its image, name, par. */
 async function shoot(/** @type {string} */ slot) {
-  await send("Page.navigate", { url: `${APP}/?play&camlog&og&weather=clear&hole=${slot}` });
+  await send("Page.navigate", { url: `${APP}/?play&camlog&og&weather=clear&rpc=${encodeURIComponent(RPC)}&hole=${slot}` }); // (the chain the holes are read from: RPC)
   for (let i = 0; i < 150; i++) { await sleep(300); if (await ev(`!!(window.__g&&window.__g.farOrbit()&&document.querySelector('.cam-btn'))`)) break; }
   if (!(await ev(`!!(window.__g&&window.__g.farOrbit())`))) throw new Error(`${slot} did not load ${b.errors.slice(-2)}`);
   for (let i = 0; i < 30; i++) { await sleep(200); if (await ev(`window.__g.boardFrame().view === "ball" && !window.__g.cam?.gliding?.()`)) break; }
@@ -61,12 +92,17 @@ async function shoot(/** @type {string} */ slot) {
   const par = Number(/\d+/.exec(await js(`document.querySelector(".card__par").textContent`))?.[0]) || 3; // "par 3 · last 4": the first number
   await js(`(() => { const s = document.createElement("style"); s.textContent = "#stage ~ *, nextjs-portal { display: none !important; }"; document.head.append(s); })()`);
   await ev(`window.__g.setCam("far")`);
+  const poi = POI[slot];
+  if (poi) {
+    const [x, z] = poi, y = await js(`window.__g.groundAt(${x}, ${z})`);
+    await js(`window.__g.pose([${x}, ${y + NEAR.d * Math.sin(NEAR.el)}, ${z + NEAR.d * Math.cos(NEAR.el)}], [${x}, ${y}, ${z}], 30)`);
+  }
   await sleep(2400);
   return { img: await png(), name, par };
 }
 
 /** A card: the shot, the logo, and a label (eyebrow, title, chip). */
-async function card(/** @type {string} */ img, /** @type {string} */ eyebrow, /** @type {string} */ title, /** @type {string} */ chip, /** @type {string} */ file) {
+async function card(/** @type {string} */ img, /** @type {string} */ eyebrow, /** @type {string} */ title, /** @type {string} */ chip, /** @type {string} */ file, tint = "") {
   const html = `<!doctype html><meta charset="utf-8">
 <style>
   ${FONT}
@@ -78,7 +114,7 @@ async function card(/** @type {string} */ img, /** @type {string} */ eyebrow, /*
   .logo { position: absolute; right: 34px; top: 26px; z-index: 1; ${LOGO_W(206)} } /* the corner opposite the label */
   .label { position: absolute; left: 36px; bottom: 34px; max-width: 900px; z-index: 1; padding: 18px 28px 20px; background: var(--paper);
     border: 4px solid var(--ink); border-radius: 22px; box-shadow: 0 7px 0 var(--ink), 0 18px 30px rgba(20,65,52,.35); transform: rotate(-1.2deg); }
-  .eyebrow { font-weight: 600; font-size: 24px; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
+  .eyebrow { font-weight: 600; font-size: 24px; letter-spacing: .12em; text-transform: uppercase; color: ${tint || "var(--green)"}; }
   h1 { font-weight: 700; font-size: 64px; line-height: 1.02; margin: 4px 0 12px; }
   .row { display: flex; align-items: center; gap: 14px; font-weight: 500; font-size: 24px; }
   .chip { padding: 3px 16px 5px; background: var(--gold); border: 3px solid var(--ink); border-radius: 999px; font-weight: 700; }
@@ -110,12 +146,11 @@ for (const slot of HOLES) {
   const s = await shoot(slot);
   known[slot] = { name: s.name, par: s.par };
   if (n === "1" && CUPS.includes(world)) firsts[world] = s.img;
-  await card(s.img, `${cupName(world)} · hole ${n}`, s.name, `par ${s.par}`, `${world}-${n}.jpg`);
+  await card(s.img, `${cupName(world)} · hole ${n}`, s.name, `par ${s.par}`, `${world}-${n}.jpg`, TINT[world]);
 }
 fs.writeFileSync(NAMES, JSON.stringify(Object.fromEntries(ALL.filter((s) => known[s]).map((s) => [s, known[s]])), null, 1) + "\n"); // in the course's order
-if (CUPS.every((c) => firsts[c])) { // (npm run og -- garden/1 island/1 town/1 mountain/1: just these)
-  for (const c of CUPS) await card(firsts[c], `${ALL.filter((s) => s.startsWith(c + "/")).length} holes`, cupName(c), "", `${c}.jpg`);
-}
+// each cup whose first hole was shot (npm run og -- garden/1 mines/1: just these cups' cards)
+for (const c of CUPS) if (firsts[c]) await card(firsts[c], `${ALL.filter((s) => s.startsWith(c + "/")).length} holes` + (c === "mines" ? " · expert" : ""), cupName(c), "", `${c}.jpg`, TINT[c]);
 // the home page: the trailer's end card, the badge over golden rays and
 // sparkles, and the one thing to do, big
 const STAR = (x, y, s, rot = 0) => `<svg class="star" style="left:${x}px;top:${y}px;width:${s}px;height:${s}px;transform:rotate(${rot}deg)" viewBox="-11 -11 22 22"><path d="M0-10Q1.8-1.8 10 0Q1.8 1.8 0 10Q-1.8 1.8-10 0Q-1.8-1.8 0-10Z" fill="#fffaf0" stroke="#144134" stroke-width="1.8" stroke-linejoin="round"/></svg>`;

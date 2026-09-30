@@ -250,8 +250,41 @@ function mergeByCopy(pieces: readonly Piece[]) {
   return merged;
 }
 
+// A moving piece made of many meshes costs a draw call per mesh, every frame
+// (the hole's bake only merges what stands still): bakeLocal merges an
+// object's meshes that share a material into one, in the object's own space:
+// a chair of eight parts becomes two or three draws.
 /** A moving piece's meshes merged in its own frame (one draw per material): it moves as one. */
 export const bakeLocal = <T extends THREE.Object3D>(o: T) => bake(o, { local: true });
+
+/**
+ * Many copies of one moving thing (chairs on a lift, skiers): the template is
+ * compacted, then drawn as one InstancedMesh per material for all n copies —
+ * a handful of draws for the whole lot. set(i, position, rotation) places a copy.
+ */
+export function instances(template: THREE.Object3D, n: number) {
+  bakeLocal(template);
+  const g = new THREE.Group();
+  ud(g).live = true;
+  const meshes = template.children.filter((o): o is THREE.Mesh => o instanceof THREE.Mesh).map((o) => {
+    const m = new THREE.InstancedMesh(o.geometry, o.material, n);
+    m.frustumCulled = false; // copies spread far from the template's bounds
+    g.add(m);
+    return m;
+  });
+  const mat = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
+  return {
+    group: g,
+    set(i: number, pos: THREE.Vector3, euler: THREE.Euler, scale = one) {
+      q.setFromEuler(euler);
+      mat.compose(pos, q, scale);
+      for (const m of meshes) m.setMatrixAt(i, mat);
+    },
+    /** A copy's colour, multiplying its material's (a chair going into a dark shed). */
+    tint(i: number, c: THREE.Color) { for (const m of meshes) m.setColorAt(i, c); },
+    done() { for (const m of meshes) (m.instanceMatrix.needsUpdate = true), m.instanceColor && (m.instanceColor.needsUpdate = true); },
+  };
+}
 
 /** Tags a decor part with the looks it shows in (see weatherLooks); returns it. */
 export const look = <T extends THREE.Object3D>(o: T, ...looks: string[]) => ((ud(o).look = looks), o);

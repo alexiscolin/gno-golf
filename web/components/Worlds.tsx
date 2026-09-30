@@ -8,7 +8,7 @@ import { stillsOnly } from "@/lib/prefs";
 import { Green } from "@/components/Title";
 import { FrontScreen } from "@/components/About";
 import { Button, VsPar } from "@/components/ui";
-import { strokesWord } from "@/components/common";
+import { plural } from "@/components/common";
 import "@/app/title.css";
 
 // The world screen, between the game's choice (Modes.tsx) and the course: one
@@ -20,6 +20,7 @@ const TAGS: Record<Cup, string> = {
   island: "Sand spits, palms and the sea",
   town: "Streets, lanterns and rooftops",
   mountain: "Snowy peaks, pines and a chalet",
+  mines: "Crystals, carts and lava",
 };
 export const WORLDS: readonly { id: Cup; name: string; tag: string }[] = CUPS.map((id) => ({ id, name: CUP_NAMES[id], tag: TAGS[id] }));
 /** A cup by its id: the garden's when it is none of them. */
@@ -107,6 +108,28 @@ export function Emblem({ id }: { id: string }) {
         <rect x="50" y="58" width="8" height="9" rx="2" className="w__lamp" />
       </Frame>
     );
+  if (id === "mines")
+    // the vault's night, a faceted crystal, a pick and a miner's lamp crossed over it
+    return (
+      <Frame>
+        <circle cx="60" cy="60" r="56" className="w__sky w__sky--mines" />
+        <circle cx="26" cy="30" r="2" className="w__glint" />
+        <circle cx="92" cy="24" r="1.6" className="w__glint w__glint--violet" />
+        <circle cx="100" cy="52" r="1.4" className="w__glint" />
+        <path d="M 4 92 Q 30 82 60 88 Q 90 82 116 92 L 116 116 L 4 116 Z" className="w__cave" />
+        <path d="M 42 58 L 52 40 H 68 L 78 58 L 60 94 Z" className="w__crystal" />
+        <path d="M 42 58 H 78 M 52 40 L 56 58 L 60 94 M 68 40 L 64 58 L 60 94" className="w__facet" />
+        <path d="M 22 96 L 26 84 L 31 96 Z M 88 98 L 93 82 L 99 98 Z" className="w__crystal w__crystal--violet" />
+        <path d="M 30 34 L 88 88" className="w__trunk" />
+        <path d="M 16 38 Q 30 18 50 22 Q 34 26 30 34 Q 26 30 16 38 Z" className="w__pick" />
+        <path d="M 88 40 L 34 88" className="w__trunk" />
+        <circle cx="90" cy="30" r="14" className="w__halo" />
+        <path d="M 84 20 Q 90 9 96 20" className="w__handle" />
+        <rect x="84" y="23" width="12" height="13" rx="3" className="w__lamp" />
+        <rect x="82" y="19" width="16" height="5" rx="2" className="w__head" />
+        <rect x="82" y="35" width="16" height="5" rx="2" className="w__head" />
+      </Frame>
+    );
   return (
     <Frame>
       <circle cx="60" cy="60" r="56" className="w__sky w__sky--build" />
@@ -140,7 +163,9 @@ function Diorama({ id, on }: { id: Cup; on: boolean }) {
   const v = useRef<HTMLVideoElement>(null);
   const [armed, setArmed] = useState(false); // the clip is in the page, once asked for
   const [playing, setPlaying] = useState(false);
-  if (on && !armed && !stillsOnly()) setArmed(true);
+  // no still baked for it yet (a new cup): its emblem is the window, and no clip
+  const [baked, setBaked] = useState(true);
+  if (on && !armed && baked && !stillsOnly()) setArmed(true);
   useEffect(() => {
     const el = v.current;
     if (!el) return;
@@ -148,9 +173,9 @@ function Diorama({ id, on }: { id: Cup; on: boolean }) {
     else (el.pause(), (el.currentTime = 0));
   }, [on, armed]);
   return (
-    <span className="world__art">
-      <img src={`title/cup-${id}.webp`} alt="" width="480" height="360" loading="eager" />
-      {armed && (
+    <span className={"world__art" + (baked ? "" : " world__art--emblem")}>
+      {baked ? <img src={`title/cup-${id}.webp`} alt="" width="480" height="360" loading="eager" onError={() => setBaked(false)} /> : <Emblem id={id} />}
+      {armed && baked && (
         <video ref={v} className={"world__clip" + (on && playing ? " world__clip--on" : "")} muted loop playsInline preload="none" disablePictureInPicture aria-hidden="true" onPlaying={() => setPlaying(true)}>
           {CLIP.map(([ext, type]) => <source key={ext} src={`title/cup-${id}.${ext}`} type={type} />)}
         </video>
@@ -208,6 +233,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
   const PAGE = 24;
   const [shown, setShown] = useState(PAGE); // community holes listed, a page more on each "Show more"
   const played = WORLDS.filter((w) => stats[w.id] && stats[w.id].done);
+  const loading = !Object.keys(counts).length; // (the chain's list not in yet: every cup at 0)
   const clear = (what: string, run: () => void) => {
     if (wipe !== what) return (sound("blip"), setWipe(what));
     run();
@@ -258,44 +284,32 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                 onPointerLeave={() => setHot(null)}
                 onFocus={() => open && setHot(w.id)}
                 onBlur={() => setHot(null)}
-                aria-label={`${w.name}: ${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : "coming soon"}`}
+                aria-label={`${w.name}: ${w.id === "mines" ? "the expert cup, " : ""}${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : loading ? "loading" : "coming soon"}`}
               >
                 <Diorama id={w.id} on={hot === w.id && open} />
                 {last && <span className="tag world__last" aria-hidden="true">Last played</span>}
+                {w.id === "mines" && !won && open && <span className="tag world__expert" aria-hidden="true">Expert</span>}
                 {won && <Won clean={t.clean} score={score} />}
                 <span className="world__ribbon">{w.name}</span>
                 <span className="world__info">
                 <span className="world__tag">{w.tag}</span>
-                {n > 0 && (
-                  <span className="world__me">
-                    <span className={`world__track load--${w.id}`}><Green p={t.done / n} world={w.id} holed={t.done === n} thick /></span>
-                    <span className="world__score">
-                      {t.done ? (
-                        <>
-                          <b>{t.done}/{n}</b> · {strokesWord(t.strokes)} · <VsPar vs={vs} />
-                          {t.clean && <span className="world__stamp" title="At par or under">★</span>}
-                        </>
-                      ) : "Not played yet"}
-                    </span>
+                {/* (a cup with no holes on this chain: the same rows, the green empty, why it cannot be picked said) */}
+                <span className="world__me">
+                  <span className={`world__track load--${w.id}`}><Green p={n ? t.done / n : 0} world={w.id} holed={n > 0 && t.done === n} thick /></span>
+                  <span className="world__score">
+                    {!n ? (loading ? "Loading…" : "Coming soon") : t.done ? (
+                      <>
+                        <b>{t.done}/{n}</b> · <span>{t.strokes}<span className="world__unit"> {plural("stroke", t.strokes)}</span></span> · <VsPar vs={vs} />
+                        {t.clean && <span className="world__stamp" title="At par or under">★</span>}
+                      </>
+                    ) : "Not played yet"}
                   </span>
-                )}
+                </span>
                 </span>
               </button>
             </li>
           );
         })}
-        {/* the expert cup to come, drawn only: not in CUPS (lib/card.ts), so no total,
-            unlock, badge or page counts it. The mines branch replaces it with a real cup. */}
-        <li>
-          <button className="world world--mines tint--mines" disabled aria-label="Crystal Mines: expert cup, coming soon">
-            <span className="world__art"><img src="title/cup-mines.webp" alt="" width="480" height="360" loading="eager" /></span>
-            <span className="dare mode__soon">Coming soon</span>
-            <span className="world__ribbon">Crystal Mines</span>
-            <span className="world__info">
-              <span className="world__tag">Crystals, carts and lava</span>
-            </span>
-          </button>
-        </li>
       </ul>
       {/* anyone can register a hole: those outside the course are playable here, in no cup and on no ranking */}
       {community.length > 0 && (

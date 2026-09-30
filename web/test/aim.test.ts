@@ -1,4 +1,4 @@
-// The aim preview: thirdAim's pull-to-angle mapping, and makeAimer's
+// The aim preview: steerAim's third-person aim (the fine zone, the spin, the power), and makeAimer's
 // debounced chain previews, answer cache, abort-on-drop and give-up timer.
 // The chain is a hand-rolled fake (only simulateFrom/simulateRound, the two
 // methods aim.ts calls); aimAlong/aim itself run for real against a plain
@@ -6,45 +6,49 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { makeAimer, thirdAim } from "../lib/engine/aim.ts";
-import { angDiff } from "../lib/terrain.ts";
+import { makeAimer, steerAim } from "../lib/engine/aim.ts";
+import { sight } from "../lib/scene/data.ts";
 import type { Live } from "../lib/engine/types.ts";
 import type { Mode, Stroke, Vec2 } from "../lib/types.ts";
 
-// ------------------------------------------------------------ thirdAim
+// ------------------------------------------------------------ steerAim
 
-void test("thirdAim aims opposite the pull: down ahead, up back, left right, right left", () => {
-  const deg = (a: number) => Math.round((((a * 180) / Math.PI) % 360 + 360) % 360);
-  assert.equal(deg(thirdAim(0, 0, 100)), 0);
-  assert.equal(deg(thirdAim(0, 0, -100)), 180);
-  assert.equal(deg(thirdAim(0, -100, 0)), 90);
-  assert.equal(deg(thirdAim(0, 100, 0)), 270);
+// a desktop screen: the zone is 0.28 of its width (403 px), 50° at its edge
+const VW = 1440, VH = 900, ZONE = 0.28 * VW, DEG = Math.PI / 180;
+
+void test("steerAim: inside the zone the offset is the aim, a slingshot's way round (the hand right turns it left)", () => {
+  for (const f of [0, 0.25, 0.5, 1]) {
+    const a = steerAim(1, f * ZONE, 50, 1 / 60, VW, VH);
+    assert.ok(Math.abs(a.dir - (1 - 50 * f * DEG)) < 1e-9, `at ${f} of the zone`);
+    assert.equal(a.yaw, 1, "no spin inside it");
+    assert.equal(a.spin, 0);
+  }
+  assert.ok(steerAim(0, -0.5 * ZONE, 50, 1, VW, VH).dir > 0, "the hand left turns it right");
 });
 
-void test("thirdAim holds the last angle inside the dead zone (too short a pull to read)", () => {
-  assert.equal(thirdAim(0, 3, 4, 1.23), 1.23); // r = 5 < DEAD (18)
+void test("steerAim: past the zone the aim turns on that way, faster the further, without end", () => {
+  const rate = (px: number) => -steerAim(0, ZONE + px, 50, 1, VW, VH).yaw / DEG; // (a second of it)
+  assert.ok(rate(0.03 * VW) > 0 && rate(0.03 * VW) < rate(0.1 * VW) && rate(0.1 * VW) < rate(0.3 * VW));
+  assert.ok(Math.abs(rate(0.3 * VW) - 150) < 1e-9, "at most 150°/s");
+  let yaw = 0;
+  for (let i = 0; i < 600; i++) yaw = steerAim(yaw, ZONE + 0.3 * VW, 50, 1 / 60, VW, VH).yaw;
+  assert.ok(Math.abs(yaw / DEG + 1500) < 1e-6, "10 s held: 1500°, no clamp");
+  assert.equal(steerAim(0, ZONE + 10, 50, 1, VW, VH).spin, 1, "the side held");
 });
 
-void test("thirdAim starts fresh, straight opposite the pull, with no previous angle", () => {
-  const want = 0 + Math.atan2(-0, -20);
-  assert.ok(Math.abs(thirdAim(0, 0, -20, null) - want) < 1e-9);
+void test("steerAim: back inside the zone the spin stops, the fine aim going on from the new heading without a jump", () => {
+  const out = steerAim(-2, ZONE + 1e-6, 50, 1 / 60, VW, VH), back = steerAim(out.yaw, ZONE - 1e-6, 50, 1 / 60, VW, VH);
+  assert.ok(Math.abs(back.dir - out.dir) < 1e-6);
+  assert.equal(back.yaw, out.yaw);
 });
 
-void test("thirdAim ignores a move mostly along the pull itself (a power change, not a direction one)", () => {
-  const prev = 0.7;
-  // dx,dy well past the dead zone; mx,my point the same way as the pull, so
-  // "along" swamps "across" and the direction holds
-  const a = thirdAim(0, 0, -30, prev, false, 0, -10);
-  assert.equal(a, prev);
-});
-
-void test("thirdAim blends toward the pull's direction, a third as far in fine mode as coarse", () => {
-  const prev = 0, dx = 30, dy = 0, mx = 0, my = 30; // mostly across the pull: direction moves
-  const want = 0 + Math.atan2(-dx, dy);
-  const coarse = thirdAim(0, dx, dy, prev, false, mx, my);
-  const fine = thirdAim(0, dx, dy, prev, true, mx, my);
-  assert.ok(Math.abs(coarse - (prev + angDiff(want, prev) * 0.6)) < 1e-9);
-  assert.ok(Math.abs(fine - (prev + angDiff(want, prev) * 0.33)) < 1e-9);
+void test("steerAim: down is the power, as a pull's; a 45° pull to full power does not spin; at the press's height, no shot", () => {
+  const full = Math.max(120, Math.min(VW, VH) * 0.24);
+  const a = steerAim(0, full, full, 1, VW, VH);
+  assert.equal(a.spin, 0);
+  assert.equal(a.shot?.power, 10);
+  assert.equal(steerAim(0, 100, 5, 1, VW, VH).shot, null, "within 6 px of its height: cancelled");
+  assert.ok((steerAim(0, 0, full / 2, 1, VW, VH).shot?.power ?? 0) > 4);
 });
 
 // ------------------------------------------------------------ makeAimer fixtures
@@ -94,7 +98,7 @@ function makeRig() {
     round: 1,
     course: null as { userData: { ghosts?: (on: boolean) => void } } | null,
     weather: null as { fog?: boolean } | null,
-    s: null as { walls: { a: Vec2; b: Vec2; skin: string }[]; posts: { c: Vec2; r: number; skin: string }[] } | null,
+    s: null as { walls: { a: Vec2; b: Vec2; skin: string }[]; posts: { c: Vec2; r: number; skin: string }[]; hole?: string; slot?: string } | null,
   };
   const band = { visible: false };
   const E = {
@@ -343,6 +347,35 @@ void test("in fog the chain's dots are clipped to 7 units, even mid-segment", as
   assert.ok(dots.count > 0);
   // aimAlong lays dots every ~0.7 units along a path capped at 7: nowhere near 20's worth
   assert.ok(dots.count < 20);
+});
+
+void test("sight: fog cuts the dots at 7; a dark gallery at the headlamp's 7, and 4 in fog", () => {
+  assert.equal(sight(false, false), 0);
+  assert.equal(sight(true, false), 7);
+  assert.equal(sight(false, true), 7);
+  assert.equal(sight(true, true), 4);
+});
+
+void test("the mines' dark galleries (holes 2 and 15) cut the dots in any weather; other holes only in fog", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const dotsOn = async (hole: string, fog: boolean) => {
+    const { E, g, aimer, dots, chain } = makeRig();
+    g.s = { walls: [], posts: [], hole: hole + "/v1", slot: hole };
+    g.weather = fog ? { fog: true } : null;
+    E.dragging = true;
+    E.shot.power = 9;
+    aimer.preview();
+    t.mock.timers.tick(120);
+    chain.pending[0].resolve(mkStroke([[0, 0], [20, 0]]));
+    await settle();
+    return dots.count;
+  };
+  const open = await dotsOn("mines/3", false), dark = await dotsOn("mines/2", false), fogged = await dotsOn("mines/3", true);
+  assert.ok(open >= 20, "a mines hole in the light: the whole path");
+  assert.ok(dark < 20 && dark === fogged, "a dark gallery: as far as fog, 7 units");
+  assert.equal(await dotsOn("mines/15", false), dark);
+  assert.ok((await dotsOn("mines/15", true)) < dark, "a dark gallery in fog: 4 units");
+  assert.equal(await dotsOn("garden/2", false), open, "another cup's hole 2: not dark");
 });
 
 void test("ghosts(on) toggles the course's timed-piece outlines only once a course is built", () => {

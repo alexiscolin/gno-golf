@@ -528,7 +528,7 @@ test("recordRound: a name taken in the same signature, Register first and Claim 
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
   assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func]), [["gno.land/r/sys/namereg/v0", "Register"], [REALM, "PlayRound"], [REALM, "Claim"]]);
   assert.deepEqual(tx.messages[0].value.args, ["nym-golfer482"]);
-  assert.equal(tx.gasWanted, 100_000_000 + 60_000_000 + 90_000_000);
+  assert.equal(tx.gasWanted, 100_000_000 + 60_000_000 + 150_000_000);
 });
 
 test("recordRound: reset abandons a round left under way, Reset then PlayRound in one transaction", async () => {
@@ -661,7 +661,7 @@ test("registerName: Register then Claim in one transaction, gas = REGISTER_GAS +
     tx.messages.map((m) => [m.value.pkg_path, m.value.func, m.value.args]),
     [["gno.land/r/sys/namereg/v0", "Register", ["nym"]], [REALM, "Claim", []]],
   );
-  assert.equal(tx.gasWanted, 60_000_000 + 90_000_000);
+  assert.equal(tx.gasWanted, 60_000_000 + 150_000_000);
 });
 
 test("registerName: refused names the default failure", async () => {
@@ -679,7 +679,7 @@ test("claimRounds: Claim alone, gas = CLAIM_GAS, and runs ensureNetwork like any
   await claimRounds({ address: ADDR, realm: REALM, rpc: RPC, chainId: CHAIN });
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
   assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func, m.value.args]), [[REALM, "Claim", []]]);
-  assert.equal(tx.gasWanted, 90_000_000);
+  assert.equal(tx.gasWanted, 150_000_000);
   assert.ok(calls.some((c) => c.name === "GetNetwork"));
 });
 
@@ -843,7 +843,7 @@ const REG = "gno.land/r/sys/namereg/v0", OWNER = "g1" + "b".repeat(38);
 test("gnokeyName: Register (the name quoted) then Claim, two calls at their own gas, to this chain", () => {
   assert.deepEqual(gnokeyName({ registrar: REG, realm: REALM, name: "nym-golfer123", price: 0.001, chainId: CHAIN, rpc: RPC }), [
     `gnokey maketx call -pkgpath ${REG} -func Register -args 'nym-golfer123' -gas-fee 90000ugnot -gas-wanted 60000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
-    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 135000ugnot -gas-wanted 90000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 225000ugnot -gas-wanted 150000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
   ]);
 });
 
@@ -858,7 +858,7 @@ test("gnokeyName: no registrar, or a name not of the registrar's shape, is nothi
 
 test("gnokeyClaim: Claim alone at CLAIM_GAS; a bad realm is nothing; a bad chain id or rpc a placeholder", () => {
   assert.deepEqual(gnokeyClaim({ realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC + "/" }), [
-    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 135000ugnot -gas-wanted 90000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 225000ugnot -gas-wanted 150000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
   ]);
   assert.deepEqual(gnokeyClaim({ realm: "gno.land/r/x;ls", chainId: CHAIN, rpc: RPC }), []);
   assert.match(gnokeyClaim({ realm: REALM, chainId: "a;b", rpc: "$(id)" })[0], /-chainid <chain-id> -remote <rpc-url> <your-key-name>$/);

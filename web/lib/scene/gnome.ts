@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { BALL_R } from "../terrain";
-import { C, flat, inked, disposeCourse, releaseShared, texOf, motion, ownFade, setFade, THIN_HULL } from "./materials";
+import { C, flat, inked, disposeCourse, releaseShared, texOf, motion, ownFade, setFade, THIN_HULL, lanternGlow, share } from "./materials";
 import { makeRenderer, makeScene } from "./camera";
 import { bake } from "./bake";
 import { ud, type Gnome } from "./data";
@@ -22,6 +22,10 @@ export interface Skin {
   glasses?: boolean; pompom?: boolean; flower?: boolean; cheeks?: boolean; stars?: boolean; tall?: boolean;
   horns?: boolean; helmet?: boolean; patch?: boolean; parrot?: boolean; mask?: boolean; flour?: boolean;
   sash?: boolean; monocle?: boolean; crown?: boolean; cape?: boolean;
+  /** a lit headlamp on the hat's front (the Miner's, in every world) */
+  lamp?: boolean;
+  /** the brim's colour, when not the hat's (a helmet's: dark wood) */
+  brim?: number;
 }
 
 /** The ball is a gnome. Which one is the player's choice — cosmetic only: the
@@ -52,9 +56,59 @@ export const GNOMES: readonly Skin[] = [
     hat: 0xffffff, shape: "toque", beard: "moustache", hair: 0x6b4a2f, body: 0xffffff, flour: true },
   { id: "mayor", unlock: "mayor", name: "The Mayor", line: "Mushroom Town at par or under. The sash says so.",
     hat: 0x1f2328, shape: "tophat", beard: "full", hair: 0xd9d4c8, sash: true, monocle: true },
-  { id: "king", unlock: "king", name: "The Gnome King", line: "The grand slam: every cup at par or under. Bow.",
+  { id: "king", unlock: "king", name: "The Gnome King", line: "The grand slam: the four cups at par or under. Bow.",
     hat: C.cap, crown: true, beard: "long", hair: 0xffffff, body: 0xf2c14e, cape: true },
+  { id: "miner", unlock: "miner", name: "The Miner", line: "Down the Crystal Mines and back up. The lamp stays lit.",
+    hat: 0xf2c14e, brim: 0xf2c14e, helmet: true, lamp: true, beard: "bushy", hair: 0x9a8b7a },
 ];
+
+// the headlamp: an iron housing on the hat's front, its lens lit (unlit
+// white-gold) and a small glow (a sprite, as the town's lanterns): real 3D,
+// inked like the rest of him
+const LENS = share(new THREE.MeshBasicMaterial({ color: 0xfff3b0 }));
+function lampOn(body: THREE.Object3D, at: THREE.Vector3) {
+  const lamp = new THREE.Group();
+  const housing = inked(new THREE.CylinderGeometry(0.11, 0.13, 0.12, 14).rotateX(Math.PI / 2), flat(0x4b4f5c));
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.085, 16), LENS);
+  lens.position.z = 0.062;
+  const glow = new THREE.Sprite(lanternGlow());
+  glow.position.z = 0.12;
+  glow.scale.setScalar(0.9);
+  lamp.add(housing, lens, glow);
+  lamp.position.copy(at);
+  lamp.rotation.x = -0.2; // as the hat leans back
+  body.add(lamp);
+  return glow;
+}
+
+const FOUND = new WeakMap<THREE.Object3D, THREE.Object3D>();
+/** The player's gnome in a scene (the engine's ball; a duel's ghost is not
+ *  him): a world that lights his way finds him here (the mines' headlamp). */
+export function gnomeIn(scene: THREE.Object3D): Gnome | undefined {
+  // (found once and kept while he is still in it: the lamps ask every frame, and a search walks the whole course)
+  let o: THREE.Object3D | null = FOUND.get(scene) ?? null;
+  const gn = o;
+  while (o && o !== scene) o = o.parent;
+  if (gn && o && gn.name === "gnome") return gn as Gnome;
+  const found = scene.getObjectByName("gnome") as Gnome | undefined;
+  if (found) FOUND.set(scene, found);
+  return found;
+}
+
+/**
+ * A gnome's headlamp, lit: the Miner's own (in every world), or a clip-on one
+ * any gnome wears while a world asks for it (the mines: on while he is
+ * there, off when he leaves; the Miner's own never goes out). Returns the
+ * lamp's glow, at its lens: its world position is where the light comes
+ * from (a world's cone decal on the ground hangs from it, the gnome its
+ * root); null once off.
+ */
+export function headlamp(gnome: Gnome, on = true): THREE.Object3D | null {
+  const d = gnome.userData;
+  if (on && !d.lamp) (d.lamp = lampOn(d.body, d.lampAt)), (d.clip = true);
+  if (d.lamp && d.clip) d.lamp.parent!.visible = on;
+  return d.lamp && d.lamp.parent!.visible ? d.lamp : null;
+}
 
 /** Horizontal stripes on the body (the pirate's shirt). */
 function stripedBody([a, b]: readonly [number, number]) {
@@ -195,7 +249,7 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
     }
   }
   // the brim sits where the cone leaves the head, above the eyes
-  const brim = inked(new THREE.TorusGeometry(skin.helmet ? 0.5 : skin.shape === "tophat" ? 0.5 : 0.37, 0.075, 8, 22), flat(skin.helmet ? C.woodDark : skin.hat));
+  const brim = inked(new THREE.TorusGeometry(skin.helmet ? 0.5 : skin.shape === "tophat" ? 0.5 : 0.37, 0.075, 8, 22), flat(skin.brim ?? (skin.helmet ? C.woodDark : skin.hat)));
   if (skin.shape === "tricorn" || skin.shape === "toque") brim.visible = false;
   brim.rotation.x = Math.PI / 2;
   brim.position.y = -0.2;
@@ -219,6 +273,12 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   hat.position.set(0, 0.62, -0.08);
   hat.rotation.x = -0.2;
   g.add(hat);
+  // where a headlamp clips on: the hat's front, just over the brim (on the
+  // helmet's dome, a hat's band, the cone where it is that wide; over a
+  // diver's mask, in front of a crown), in the body's own space
+  const [ly, lz] = skin.helmet ? [-0.05, 0.45] : skin.shape === "tophat" ? [0, 0.4] : skin.shape ? [0.05, 0.47] : skin.mask ? [0.12, 0.27] : [-0.1, skin.crown ? 0.5 : skin.tall ? 0.37 : 0.32];
+  hat.updateMatrix();
+  const lampAt = new THREE.Vector3(0, ly, lz).applyMatrix4(hat.matrix);
 
   const eyes: THREE.Object3D[] = [];
   for (const side of [-1, 1]) {
@@ -322,8 +382,10 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   const reach = Math.max(-box.min.x, box.max.x, -box.min.z, box.max.z);
 
   const root = new THREE.Group() as Gnome;
+  root.name = "gnome"; // (gnomeIn; a ghost is renamed)
   root.add(g, shade);
-  root.userData = { body: g, eyes, shade, reach, mid: (box.min.y + box.max.y) / 2 };
+  root.userData = { body: g, eyes, shade, reach, mid: (box.min.y + box.max.y) / 2, lampAt };
+  if (skin.lamp) root.userData.lamp = lampOn(g, lampAt); // (after the bake: his glow stays a sprite of its own)
   return root;
 }
 
@@ -343,8 +405,10 @@ export function rivalSkin(player: string, mine: string) {
  *  see-through, each part hiding what is behind it. */
 export function makeGhost(o: number, skin: Skin = GHOST) {
   const ball = makeBall(skin);
+  ball.name = "ghost";
   const mats = ownFade(ball, THIN_HULL);
   ball.userData.shade.visible = false; // no shadow: a ghost
+  if (ball.userData.lamp) ball.userData.lamp.visible = false; // nor a glow: a Miner's lamp is his lens alone
   // its outline drawn after its body, against the body's depth: an ink rim, not an x-ray
   ball.traverse((o) => { if ("material" in o && (o.material as THREE.Material).side === THREE.BackSide) o.renderOrder = 1; });
   const fade = (x: number) => mats.forEach((m) => (setFade(m, x), (m.depthWrite = true)));

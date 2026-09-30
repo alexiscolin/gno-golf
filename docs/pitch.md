@@ -22,8 +22,8 @@ ghost they chase.
 
 ## Why you'll keep playing
 
-Four cups of 18 holes, windmills, trams, a volcano, pieces you have to time,
-and a fifth on the way: the Crystal Mines, an expert cup.
+Five cups of 18 holes, windmills, trams, a volcano, pieces you have to time,
+the fifth the Crystal Mines, an expert cup.
 The weather changes every five minutes, the same for everyone, so the hole you
 know by heart plays differently in a storm. There are gnomes to unlock, badges
 to collect, and a clip of your best shot ready to post, with a link that dares

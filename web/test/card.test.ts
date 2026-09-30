@@ -3,7 +3,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   vsPar, parOf, cupOf, cardKey, scoreOf, legacyOf, oldToSlot, migrate, loadCard, recordScore, clearCard, clearCup, badgesFor, byRarity, loadOnChain, markOnChain,
-  totals, cupTotals, UNLOCKS, cupHasGnome, CUP_NAMES,
+  totals, cupTotals, UNLOCKS, cupFinishLine, CUP_NAMES, CUPS, CLASSIC, guessCup,
 } from "../lib/card.ts";
 import type { Finish } from "../lib/card.ts";
 
@@ -238,7 +238,7 @@ test("cupTotals: aces sum across every cup", () => {
   assert.equal(cupTotals(card, allHoles).aces, 3);
 });
 
-// ---- UNLOCKS / cupHasGnome ----
+// ---- UNLOCKS / cupFinishLine ----
 
 test("UNLOCKS: each ok() reads the matching field off cupTotals", () => {
   const card = { "garden/1": 3, "garden/2": 3, "island/1": 3, "island/2": 3 };
@@ -275,12 +275,67 @@ test("UNLOCKS.golden: five holes-in-one, anywhere", () => {
   assert.equal(UNLOCKS.golden.ok(t), false);
 });
 
-test("cupHasGnome: true for cups with an unlock, false for the Mountain Cup", () => {
-  assert.equal(cupHasGnome("garden"), true);
-  assert.equal(cupHasGnome("island"), true);
-  assert.equal(cupHasGnome("town"), true);
-  assert.equal(cupHasGnome("mountain"), false);
-  assert.equal(cupHasGnome("pond"), false);
+test("cupFinishLine: what a finished cup earned, at par or over (the Mines: the Miner for finishing, the Mother Lode for par)", () => {
+  const gnome = "Cup finished at par or under — a gnome is waiting in the picker.";
+  for (const c of ["garden", "island", "town"]) {
+    assert.equal(cupFinishLine(c, true), gnome, c);
+    assert.equal(cupFinishLine(c, false), "Cup finished. Now beat par.", c);
+  }
+  assert.equal(cupFinishLine("mountain", true), "Cup finished at par or under!");
+  assert.equal(cupFinishLine("mountain", false), "Cup finished. Now beat par.");
+  assert.equal(cupFinishLine("mines", true), "Cup finished at par or under — the Mother Lode badge is yours.", "par: the badge, not a gnome");
+  assert.equal(cupFinishLine("mines", false), "Cup finished — a gnome is waiting in the picker. Now beat par.", "finishing: the Miner");
+  assert.equal(cupFinishLine("pond", true), "Cup finished at par or under!");
+});
+
+// ---- the Crystal Mines (ADR-005 §7) ----
+
+// the four classic cups of two holes each, all at par, and the mines' two
+const fiveCups = [...allHoles.filter((h) => h.world !== "extras"),
+  { id: "t1", slot: "town/1", par: 3, world: "town" }, { id: "t2", slot: "town/2", par: 3, world: "town" },
+  { id: "m1", slot: "mountain/1", par: 3, world: "mountain" }, { id: "m2", slot: "mountain/2", par: 3, world: "mountain" },
+  { id: "c1", slot: "mines/1", par: 6, world: "mines" }, { id: "c2", slot: "mines/2", par: 6, world: "mines" }];
+const fourAtPar = { "garden/1": 3, "garden/2": 3, "island/1": 3, "island/2": 3, "town/1": 3, "town/2": 3, "mountain/1": 3, "mountain/2": 3 };
+
+test("the cups: the mines after the four, named Crystal Mines; the classic four apart", () => {
+  assert.deepEqual([...CUPS], ["garden", "island", "town", "mountain", "mines"]);
+  assert.deepEqual([...CLASSIC], ["garden", "island", "town", "mountain"]);
+  assert.equal(CUP_NAMES.mines, "Crystal Mines");
+});
+
+test("cupTotals: the mines are a cup of their own, left out of the slam", () => {
+  const t = cupTotals({ ...fourAtPar, "mines/1": 9 }, fiveCups);
+  assert.equal(t.mines.done, 1);
+  assert.equal(t.mines.clean, false);
+  assert.equal(t.slam, true, "the mines unfinished and over par: still the slam");
+  assert.equal(UNLOCKS.king.ok(t), true);
+  assert.equal(cupTotals({ ...fourAtPar, "mountain/2": 4, "mines/1": 6, "mines/2": 6 }, fiveCups).slam, false, "the mines at par make up for no classic cup");
+  assert.equal(cupTotals({ "mines/1": 1, "mines/2": 1 }, fiveCups).aces, 2, "their aces count toward the Golden Gnome");
+});
+
+test("UNLOCKS.miner: finishing the Crystal Mines, at any score", () => {
+  assert.equal(UNLOCKS.miner.cup, "mines");
+  assert.equal(UNLOCKS.miner.ok(cupTotals({ "mines/1": 6 }, fiveCups)), false);
+  assert.equal(UNLOCKS.miner.ok(cupTotals({ "mines/1": 20, "mines/2": 20 }, fiveCups)), true);
+});
+
+test("the Mother Lode badge: the Crystal Mines at par or under", () => {
+  const mines = (card: Record<string, number>) => finish({ cups: cupTotals(card, fiveCups) });
+  assert.ok(badgesFor(mines({ "mines/1": 6, "mines/2": 6 }), []).includes("lode"));
+  assert.ok(badgesFor(mines({ "mines/1": 5, "mines/2": 7 }), []).includes("lode"), "par over the cup, not every hole");
+  assert.ok(!badgesFor(mines({ "mines/1": 6, "mines/2": 7 }), []).includes("lode"));
+  assert.ok(!badgesFor(mines({ "mines/1": 6 }), []).includes("lode"), "not all played");
+  assert.ok(!badgesFor(mines({ "mines/1": 6, "mines/2": 6 }), ["lode"]).includes("lode"));
+});
+
+test("guessCup: the cup a link names, the garden when none", () => {
+  assert.equal(guessCup("mines/3"), "mines");
+  assert.equal(guessCup("/h/mines-3/"), "mines");
+  assert.equal(guessCup("gno.land/r/gnogolf/island7"), "island");
+  assert.equal(guessCup("town/4/v2"), "town");
+  assert.equal(guessCup("/h/mountain/"), "mountain");
+  assert.equal(guessCup("extras/10"), "garden");
+  assert.equal(guessCup(""), "garden");
 });
 
 // ---- badges ----

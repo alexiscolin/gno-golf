@@ -438,6 +438,32 @@ test("extras clamps a negative stroke to 0 before asking", async () => {
   await chain.extras("garden/1", -1);
 });
 
+test("extras: read once per hole version and stroke (the look-ahead and the next stroke ask the same), a failure asked again", async () => {
+  const chain = makeChain();
+  const asked: string[] = [];
+  let down = false;
+  setFetch((url) => {
+    asked.push(decoded(url).expr.replace(/^.*Extras/, "Extras"));
+    if (down) throw new Error("node down");
+    return qevalReply(EXTRAS_REPLY);
+  });
+  // a timed hole's load (strokes 0..3), then three strokes each with its two ahead (as engine.ts showExtras asks)
+  await Promise.all([0, 1, 2, 3].map((k) => chain.extras("mines/8/v3", k)));
+  for (const stroke of [0, 1, 2]) await Promise.all([stroke, stroke + 1, stroke + 2].map((k) => chain.extras("mines/8/v3", k)));
+  assert.deepEqual(asked, [0, 1, 2, 3, 4].map((k) => `Extras("mines/8/v3", ${k})`), "each stroke once: 5 reads, not 13");
+  // another version of the hole is another hole
+  await chain.extras("mines/8/v4", 0);
+  assert.equal(asked.length, 6);
+  // a failed read is not kept: the next ask goes to the node again
+  down = true;
+  await assert.rejects(chain.extras("mines/8/v3", 9));
+  const tried = asked.length;
+  down = false;
+  await chain.extras("mines/8/v3", 9);
+  await chain.extras("mines/8/v3", 9);
+  assert.equal(asked.length, tried + 1, "asked again once, then kept");
+});
+
 // ------------------------------------------------------------ boards, and the mode guard
 test("leaderboard defaults to assisted mode, and normalizes anything that isn't 'pro'", async () => {
   const chain = makeChain();

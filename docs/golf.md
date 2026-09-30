@@ -626,7 +626,7 @@ the rule at its extremes.
 A mode's course-wide top ten.
 
 ```json
-{"version":1,"mode":"assisted","holes":72,"rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …]}
+{"version":1,"mode":"assisted","holes":90,"rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …]}
 ```
 
 `holes` at the top is the number of slots in the course. Each row has its
@@ -651,7 +651,7 @@ The whole course ranking, a page at a time, the way `HoleLeaderboard` pages a
 hole: from rank `offset+1`, at most `limit` rows (1..100).
 
 ```json
-{"version":1,"mode":"pro","holes":72,"players":213,"offset":0,
+{"version":1,"mode":"pro","holes":90,"players":213,"offset":0,
  "rows":[{"player":"g1…","name":"birdie","holes":18,"strokes":61,"par":57}, …],"next":20}
 ```
 
@@ -700,7 +700,7 @@ Each given player's course-wide standing, with the same list rules as
 `Bests`.
 
 ```json
-{"version":1,"mode":"assisted","holes":72,"rows":[{"player":"g1…","holes":12,"strokes":40,"par":38}, …]}
+{"version":1,"mode":"assisted","holes":90,"rows":[{"player":"g1…","holes":12,"strokes":40,"par":38}, …]}
 ```
 
 #### `BestOf(hole, mode string, player address) int`

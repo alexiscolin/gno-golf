@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Snapshot } from "../lib/engine.ts";
-import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink, byStanding, standingVs } from "../components/common.ts";
+import { sight } from "../lib/scene/data.ts";
+import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink, byStanding, standingVs, courseCount, countWord, minesHint, readMs } from "../components/common.ts";
 
 const snap = (s: Partial<Snapshot>) => s as Snapshot;
 const onPage = (search: string, f: () => void) => {
@@ -133,6 +134,8 @@ test("hole numbers, the next hole, the next cup, golf's words", () => {
   assert.equal(nextHole({ holes, id: "garden/2/v1" }, { "garden/2/v1": 3 }, (h) => h.id === "garden/2/v1"), undefined);
   assert.equal(nextCup("garden", { island: 0, town: 18 }), "town");
   assert.equal(nextCup("mountain", { garden: 18 }), "");
+  assert.equal(nextCup("mountain", { garden: 18, mines: 18 }), "mines");
+  assert.equal(nextCup("mines", { garden: 18, mines: 18 }), "");
   assert.equal(golfTerm(1, 3), "Hole in one!");
   assert.equal(golfTerm(2, 4), "Eagle!");
   assert.equal(golfTerm(3, 3), "Par");
@@ -159,4 +162,31 @@ test("byStanding orders the course as the realm does: most holes, then the best 
   assert.deepEqual([under, par5, two].sort(byStanding).map((r) => r.player), ["c", "d", "a"], "more holes first, then under par first");
   // a hole's rows (no holes, no par): fewest strokes
   assert.deepEqual([{ player: "x", strokes: 4 }, { player: "y", strokes: 2 }].sort(byStanding).map((r) => r.player), ["y", "x"]);
+});
+
+test("the course in numbers, from the chain: the mines count once published, not before", () => {
+  const four = { garden: 18, island: 18, town: 18, mountain: 18 };
+  assert.deepEqual(courseCount(four), { cups: 4, holes: 72 });
+  assert.deepEqual(courseCount({ ...four, mines: 18 }), { cups: 5, holes: 90 });
+  assert.deepEqual(courseCount({}), { cups: 0, holes: 0 });
+  assert.deepEqual(courseCount({ ...four, extras: 6, community: 3 }), { cups: 4, holes: 72 }, "holes in no cup count in neither");
+  assert.equal(countWord(4), "Four");
+  assert.equal(countWord(5), "Five");
+  assert.equal(countWord(12), "12");
+});
+
+test("minesHint: a mines hole's signature by its slot or id, none off the mines", () => {
+  assert.equal(minesHint("mines/7"), "The lava rises with your strokes: low, mid, high.");
+  assert.equal(minesHint("mines/7/v2"), minesHint("mines/7"));
+  for (let n = 1; n <= 18; n++) assert.ok(minesHint(`mines/${n}`).length > 10, `mines/${n}`);
+  assert.equal(minesHint("mines/19"), "");
+  assert.equal(minesHint("garden/7"), "");
+  assert.equal(minesHint(null), "");
+  assert.equal(minesHint("xmines/7"), "", "a mines slot only from its start (minesOrder's)");
+  assert.ok(minesHint("mines/2").includes(`${sight(false, true)} units`), "the dark gallery's reach: the aim dots' own");
+});
+
+test("readMs: a line stays up long enough to read, longer as it grows", () => {
+  assert.equal(readMs("Short."), 6000);
+  assert.ok(readMs("x".repeat(95)) > readMs("x".repeat(60)));
 });

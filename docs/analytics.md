@@ -54,7 +54,7 @@ posthog-js is imported once the page is idle, in a chunk of its own (about
 | `aim` (pro/assisted), `cam`, `gnome` | the player's choices | `Golf.tsx` |
 | `adena`, `connected`, `wallet_on_node` | Adena installed, an account connected, Adena on this page's node | `Golf.tsx` |
 | `chain` (chain id), `network` (local/testnet/mainnet) | where the game plays | `Golf.tsx` |
-| `hole`, `cup` | the hole and cup played (null off the course) | `Golf.tsx` |
+| `hole`, `cup` | the hole and cup played (null off the course); a cup is its world: garden, island, town, mountain, mines (the Crystal Mines) | `Golf.tsx` |
 
 ## The game's events
 

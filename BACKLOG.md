@@ -2,16 +2,15 @@
 
 ## Where this stands
 
-*2026-09-29, the day before the onyx deploy.*
+*2026-09-30, the eve of the onyx deploy.*
 
 The V1 is built, and it runs end to end on a local chain built with the onyx
 toolchain.
 - **On the chain:** the `physics` and `course` packages and the `golf` realm,
-  the only three deployed. The whole course goes on chain as data: four cups
-  of 18 holes (`data/holes.txt`). golf already names a fifth
-  world, the Crystal Mines, whose holes come after the launch.
+  the only three deployed. The whole course goes on chain as data: five cups
+  of 18 holes, the Crystal Mines' among them (90 lines, `data/holes.txt`).
 - **In the repo only:** the authoring code (`p/gnogolf/physics/build`,
-  `p/gnogolf/course/author`) and the 72 hole realms are the source, and are
+  `p/gnogolf/course/author`) and the hole realms (72, and the mines' 18) are the source, and are
   not deployed. What goes on chain is the repo byte for byte:
   `scripts/stage.sh` stages it and checks it, on every `scripts/check.sh` run.
 - **In `web/`,** the 3D client:
@@ -25,13 +24,20 @@ toolchain.
   - share clips;
   - saving, the name, Claim and the tip with Adena or a gnokey paste;
   - anonymous analytics with a one-click opt-out;
-  - the Crystal Mines card, as coming soon.
+  - the Crystal Mines (ADR-005, "As built"), open at the launch like the other
+    four cups: 18 long holes (`mines1` to `mines18`, par 158, three to five
+    minutes each, pars calibrated by hand in every weather), the world scene,
+    its rides and machines, the Miner and the Mother Lode badge;
+  - the aim preview worked out in the page: the realm's own code in
+    WebAssembly (`scripts/wasm.sh`), 0 answers different from the chain's.
 
 **The deploy target is onyx** (`onyx-1`, mainnet's code v1.5.0), tomorrow, as
 the key `GnoAlex` under `nym-alexiscolin000`, the game at its sub-path
 `gnogolf` (`r/nym-alexiscolin000/gnogolf/golf`). The runbook is
-`docs/design/deploy-v1.md`, "Onyx deploy, step by step": about 85 GNOT in all,
-and the key holds 100.
+`docs/design/deploy-v1.md`, "Onyx deploy, step by step": about 106 GNOT in all
+(92.5 of deposits, 13.8 of fees), and the key holds 699.6. Rehearsed on the
+final code on a fresh onyx gnodev on 09-30: every flag with room to spare
+(`media/check/mines/fresh-publish-90-final.log`).
 
 **Done since the last update:**
 
@@ -60,24 +66,27 @@ and the key holds 100.
    - the name, Claim and the tip (`5634e7a`).
 6. On mainnet, no Support chip while ugnot is transfer-locked (`bae4a21`).
 7. The cups screen has its own address (`?screen=cups`), and so does a cup's
-   picker. The Crystal Mines card shows as coming soon.
+   picker.
 8. Trailer v11 and its teaser (`52ab3cb`).
 9. The docs brought up to date: this file, the README, `CLIENT.md`,
    `docs/golf.md`, `docs/leaderboards.md`, `docs/analytics.md`, the pitch, and
    the onyx runbook.
 
+10. The final fan-out review of main and the Crystal Mines (nine dimensions,
+    each finding checked by a second agent): 56 confirmed, none a security
+    issue; 54 fixed at the source, #6 all but mines/8 (see
+    Next milestones), #53 moot. `media/check/mines/owner/REVIEW.md`.
+11. The Crystal Mines merged, their 90 holes rehearsed on an onyx gnodev.
+
 **Still to do:**
 
-1. The final full review of the final code (bugs, security, scalability,
-   playability). It is running now, and its fixes land before the deploy.
-2. The OG images re-rendered (Mushroom Town): being re-rendered on 09-29.
-3. **The deploy on onyx, tomorrow:** the runbook's steps 0 to 7, then a real
-   save from the site.
+1. **The deploy on onyx:** the runbook's steps 0 to 7, then a real save from
+   the site.
 
 **Right after the launch:**
 
-- **The Crystal Mines** are being built on the branch `mines` (ADR-005). The
-  client ships first, then the owner publishes the 18 holes.
+- **Pressure plates** for a later physics (a piece that reacts to where a
+  ball rests), left out of the Crystal Mines.
 - **V1.1: auto-save through a chain session.** See "Next milestones".
 
 This file is the longer view: what we measured along the way, and what comes
@@ -456,27 +465,20 @@ real answer.
   touch as it is; to design properly for small screens, e.g. two on-screen
   rotate arrows to hold, a comfortable fine-aim zone, and a check with real
   thumbs.
+- **mines/8's stroke hitch** (review #6, what is left): the stroke's pieces
+  are rebuilt whole each stroke, the lift's frame (gantries, sheaves, rope)
+  with them, about 60 ms on a 4x-slowed CPU (16 fps at the worst frame; the
+  other pulse holes are at 37 to 50 since the signs' plan is kept). Two
+  steps: build the pieces once per stroke, not again when the look-ahead
+  reads come in (about half of it); then keep the lift's frame across
+  strokes, only the cages and ropes moving, after checking the bake does not
+  dispose of the geometries it merges. Proof: mines/8's strokes shot before
+  and after, and the fps probe (media/check/mines/perf/r6.md).
 - **Open the Crystal Mines after one cup finished** (with the item above, so
   it follows the player): the four classic cups stay open from the start; the
   Mines' card shows "Finish a cup to open" and a progress bar, its clip still
   playing as a teaser; deep links (duels, shares) still play a mines hole. At
   launch every cup is open.
-- **A fifth cup, for experts** (a "Champion's Cup"): 18 long, hard holes for
-  the players who finished the four at par, unlocked by them (a gnome of its
-  own, a badge). Holes are data: they publish with `Publish` and need no
-  redeploy; the work is the design (long lanes, chained hazards, timed pieces,
-  worst weathers) and their solving (`scripts/hole-bests.json`, every hole
-  finishable at par, see `docs/design/phase5-pars.md`). Two limits to design
-  under: a stroke's cost stays under `maxShotGas`, and a published hole must
-  leave its first stroke `minShotWork` in its worst weather (so the longest
-  lanes cost the rain's forecast). The client needs its world: a new scene,
-  or a night/volcano variant of an existing one to ship sooner. A good
-  "what's next" after the launch, between the duels wave and the Builder.
-  **Chosen: the Crystal Mines** (the gnomes' own mines), at the other cups'
-  level of finish, with wow moments: glowing crystal galleries, mine carts on
-  rails to time, rope bridges over the void, lava lakes and a lava fall, a
-  collapsing gallery, a lift down a shaft, lanterns and gnome miners at work;
-  a miner gnome (helmet, headlamp) and a badge for finishing it at par.
 - **V2 ideas:** duel records on-chain (`Duel(hole, rival)` with its board and
   streaks, ADR-004), a creators' board (community holes ranked by what makes
   them worth replaying), the hole of the day (above).

@@ -5,7 +5,8 @@
 import { siteHost } from "./site";
 
 const INK = "#144134", INK_SOFT = "#4f7a6c", GREEN = "#226c57", PAPER = "#fdf6e9", HAT = "#e0524b";
-const FONT = "Fredoka, ui-rounded, system-ui, sans-serif";
+/** The site's font stack, for text drawn on a canvas (the cards, the clip, the mines' signs). */
+export const FONT = "Fredoka, ui-rounded, system-ui, sans-serif";
 
 /** What the card says of the hole, as its link card does: its cup, number and
  *  par over its name, and the score; term, the clip's word for it (Birdie!). */

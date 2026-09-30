@@ -15,20 +15,20 @@ import { isTouch, reducedMotion } from "./device";
 import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
-import { loadWorld } from "./scene/worlds";
+import { loadWorld, worldOf } from "./scene/worlds";
 import { makeChain, shotOf, pullShot, isHoleId, RULES, wait } from "./chain";
 import { boardWork } from "./adena";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
   makeRenderer, weakGpu, makeScene, maxDpr, buildHole, finishHole, makeBall, makeAim, at,
-  courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, releaseShared, setTime, buildExtras, setLighting, quality, motion,
+  courseBox, laneBox, overviewRig, farRig, makeBand, bandTo, gnomeById, makeConfetti, disposeCourse, releaseShared, setTime, buildExtras, setLighting, quality, motion, headlamp,
 } from "./scene";
 import { BALL_R, plainSkins } from "./terrain";
 import { makeCamera } from "./engine/camera";
 import { pace, slowFrames, capped30, frameMs, frameStats, SLOW_KEY } from "./engine/pace";
 import { register, track, trackError } from "./analytics";
 import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
-import { makeAimer, thirdAim } from "./engine/aim";
+import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole } from "./sim";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
@@ -248,6 +248,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       flying: g.flying,
       aiming: g.aiming,
       power: g.power,
+      spin: g.spin || 0, // third person's aim turning on past its zone: -1 left, 1 right (the cue)
       holed: g.holed,
       error: g.error,
       weather: g.weather || null, // { wind: [x, y] | null, rain, fog, storm } for the HUD
@@ -415,6 +416,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // where the time says, never behind it
     const elapsed = Math.min((now - last) / 1000, 0.5), dt = Math.min(elapsed, 0.1);
     last = now;
+    steer(dt);
     cam.update(dt);
     promo.camera(camera); // ?promo: the trailer's camera, off otherwise
     setTime(now / 1000);
@@ -598,6 +600,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       await loadWorld(s.world);
     } catch {} // offline: the hole draws as the garden, still playable
     if (ticket !== loads || !alive) return;
+    // a world that cuts the lane under a stroke's own hazards (a shaft opening
+    // at a landing) knows them before the hole is built: its first strokes' extras
+    if (s.timed && worldOf(s).ahead && worldOf(s).open) {
+      const seen = new Map<string, Zone>();
+      for (const ex of await Promise.all([0, 1, 2, 3].map((k) => chain.extras(id, k).then(plainSkins, () => null))))
+        for (const q of (ex && ex.zones) || []) if (q.kind === "hazard") seen.set(JSON.stringify(q), q);
+      if (ticket !== loads || !alive) return;
+      if (seen.size) s = { ...s, pulseZones: [...seen.values()] };
+    }
     g.s = s;
     if (g.course) {
       scene.remove(g.course);
@@ -619,6 +630,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       course = buildHole(decorOf(g.s), { defer: true });
       await wait(0); // the pieces, then (next task) their merge
       if (ticket !== loads || !alive) return void disposeCourse(course);
+      cam.collect(worldOf(g.s).camSolids ? course : null); // (the pieces' boxes, before they are merged)
       finishHole(course);
     } catch (err) {
       // our bug, not the chain's: say so, and leave the game usable
@@ -631,6 +643,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.course = course;
     scene.add(course);
     setLighting(scene, course.userData.time);
+    headlamp(ball, s.world === "mines"); // any gnome clips a lamp on in the mines (the Miner's is always lit)
     // a hole's own weather, until a stroke's forecast says otherwise
     weather.board(s.board.w, s.board.h, cupOf(s), course.userData.terrain.dry || course.userData.terrain.onGreen);
     // the round's weather: the chain's forecast for its five minutes
@@ -697,6 +710,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const read = chain.extras(g.id!, g.shots.length);
     read.catch(() => {}); // (said where it is awaited)
     extrasAhead = { key: extrasKey(), read };
+    // and the strokes a world shows ahead (worlds.ts ahead), read now: they are ready when the pieces are drawn
+    for (let k = 1; k <= ((g.s && worldOf(g.s).ahead) || 0); k++) chain.extras(g.id!, g.shots.length + k).catch(() => {});
   };
   // the pulses' pieces seen so far on this hole, each once: what the work
   // model counts for them (newWork: every pulse, as if always there) when
@@ -721,9 +736,21 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     extrasFor = key;
     const read = extrasAhead && extrasAhead.key === key ? extrasAhead.read : chain.extras(g.id!, g.shots.length);
     extrasAhead = null;
+    // a world that shows what comes (worlds.ts ahead): the next strokes' too,
+    // each a nice-to-have (none, if it fails), never waited on: those read
+    // already (the last stroke's look-ahead, askExtras, the hole's load) come
+    // with this stroke's pieces; any still on its way, the pieces are drawn
+    // again with it once it is in
+    const n = worldOf(g.s).ahead || 0, stroke = g.shots.length;
+    const next = Promise.all(Array.from({ length: n }, (_, k) => chain.extras(g.id!, stroke + 1 + k).then(plainSkins, () => null)));
     let ex: Extras;
     try {
       ex = plainSkins(await read);
+      if (n) {
+        const ahead = await Promise.race([next, new Promise<null>((r) => setTimeout(() => r(null), 0))]);
+        if (ahead) ex = { ...ex, ahead };
+        else void next.then(() => extrasFor === key && alive && ((extrasFor = ""), void showExtras()), () => {}); // (then with it)
+      }
     } catch {
       // asked again in a moment: the stroke being aimed is played with its
       // pieces (a shot on its way asks for the next one when it lands)
@@ -733,13 +760,20 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (extrasFor !== key || !alive || !g.course) return;
     sawPulse(ex);
     // this stroke's weather: the hole's, and whatever the stroke brings
-    strokeWalls = ex.walls;
+    (strokeWalls = ex.walls), (strokeEx = ex);
     applyWeather(ex.zones);
     void publish();
     const old = extras;
     extras = buildExtras(g.course, ex);
     // an aim begun while the pieces loaded: theirs show their outlines too
     if (g.aiming) ud(extras).ghosts?.(true);
+    // (a world's own that moves on from the last stroke's itself: at once)
+    if (ud(extras).steady) {
+      g.course.add(extras);
+      growing = growing.filter((a) => a.o !== old);
+      if (old) (g.course.remove(old), disposeCourse(old));
+      return;
+    }
     extras.scale.y = 0.01;
     g.course.add(extras);
     growing.push({ o: extras, from: 0.01, to: 1, t: 0 });
@@ -749,7 +783,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   // The weather drawn is the round's (a forecast fixed for its five minutes),
   // with whatever the hole or the stroke carries itself.
-  let strokeZones: readonly Zone[] = [], strokeWalls: readonly Wall[] = [];
+  let strokeZones: readonly Zone[] = [], strokeWalls: readonly Wall[] = [], strokeEx: Extras | null = null;
   // the zones that act on the ball now: the hole's, the forecast's, the stroke's
   const zonesNow = (): Zone[] => [...(g.s ? g.s.zones : []), ...((g.forecast && g.forecast.zones) || []), ...strokeZones];
   function applyWeather(zones?: readonly Zone[]) {
@@ -768,7 +802,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   }
   // Between rounds the period may have turned: a round not started yet takes
   // the new weather. Asked only once the loaded period is over on the chain's
-  // clock (State has just given the current one: no Period() behind it).
+  // clock (HoleState has just given the current one: no Period() behind it).
   const stale = () => g.period != null && chain.now() >= (g.period + 1) * RULES.periodMs;
   let freshening: Promise<void> | null = null;
   function freshWeather() {
@@ -830,6 +864,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     rp.clearGlow();
     restTimed();
     g.round = (g.round || 0) + 1;
+    g.ride = null; // (no ride's or fall's camera carried into a new round, whatever ended the last)
     dropConfetti();
     clearTimeout(holedIn);
     g.flying = g.done = g.holed = g.aiming = false;
@@ -849,6 +884,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       placeBall();
       strokeZones = [];
       strokeWalls = [];
+      strokeEx = null;
       if (ask) void showExtras();
       if (ask && stale()) void freshWeather();
     }
@@ -879,6 +915,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   // what the camera, the aim and the replay read of the game, as it changes
   const E: Live = {
     g, camera, scene, chain, aim, band, causes, mood, publish, screen, ground, lift, log: logCam,
+    info: () => renderer.info,
     zones: zonesNow,
     landing: () => null, // the replay's, once made (below)
     tickNow: () => tickNow(),
@@ -893,6 +930,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     get cut() { return cut; },
     get mode() { return mode; },
     get strokeZones() { return strokeZones; },
+    get strokeExtras() { return strokeEx; },
     get extras() { return extras; },
   };
   const cam = makeCamera(E);
@@ -905,7 +943,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   const aimer = makeAimer(E);
   const { preview, dropAim, strokeFrom, ghosts, known } = aimer;
   // the pull let go of (or dropped): nothing aimed, the HUD told
-  const endPull = () => ((dragging = g.aiming = false), dropAim(), void publish());
+  const endPull = () => ((dragging = g.aiming = false), (g.spin = 0), dropAim(), void publish());
 
   // the canvas is a fixed full-window backdrop: its rect changes with the
   // window only, so it is read once per resize, not twice a pointer move (a
@@ -927,6 +965,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
 
   function onMove(ev: PointerEvent) {
     if (!dragging || g.flying || !press) return;
+    // behind the gnome: where the pointer is, steer() reads it every frame
+    if (g.cam === "third" && press.yaw != null) return void ((press.lx = ev.clientX), (press.ly = ev.clientY), steer(0));
     // the power is the pointer's distance from where the pull began, on the
     // screen, whatever the camera does meanwhile
     const px = Math.hypot(ev.clientX - press.x, ev.clientY - press.y);
@@ -945,19 +985,29 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     }
     // both ends through the camera as it is now: an easing camera moves the
     // board under a still hand, and must not turn the shot
-    let dir: number;
-    if (g.cam === "third" && press.yaw != null) {
-      // behind the gnome: the shot opposite the pull, read in the camera frame
-      // of the pull's start (every direction reachable, the view never feeding back)
-      dir = thirdAim(press.yaw, ev.clientX - press.x, ev.clientY - press.y, press.dir, ev.shiftKey, ev.clientX - (press.lx ?? press.x), ev.clientY - (press.ly ?? press.y));
-      press.dir = dir;
-      (press.lx = ev.clientX), (press.ly = ev.clientY);
-    } else {
-      const from = boardPoint(press), to = boardPoint(ev);
-      if (!from || !to) return;
-      dir = Math.atan2(from.y - to.y, from.x - to.x);
+    const from = boardPoint(press), to = boardPoint(ev);
+    if (!from || !to) return;
+    const dir = Math.atan2(from.y - to.y, from.x - to.x);
+    aimAt(pullShot(px, window.innerWidth, window.innerHeight, dir, MAX_POWER));
+  }
+  // Behind the gnome (third person) the pull aims two ways at once (aim.ts
+  // steerAim): every frame (dt), and at each pointer move (0).
+  function steer(dt: number) {
+    if (!dragging || g.flying || !press || press.yaw == null || g.cam !== "third") return;
+    const down = Math.max(0, (press.ly ?? press.y) - press.y);
+    const a = steerAim(press.yaw, (press.lx ?? press.x) - press.x, down, dt, window.innerWidth, window.innerHeight);
+    (press.yaw = a.yaw), (press.dir = a.dir);
+    if (a.spin !== (g.spin || 0)) (g.spin = a.spin), void publish();
+    if (!a.shot) {
+      // (at the start's height: no power, the aim still turning)
+      (shot.angle = a.dir), (g.facing = shot.angle);
+      if (shot.power > 0) (shot.power = 0), (g.power = 0), (band.visible = aim.visible = false), (lastBar = 0), void publish();
+      return;
     }
-    const { deg, power } = pullShot(px, window.innerWidth, window.innerHeight, dir, MAX_POWER);
+    aimAt(a.shot);
+  }
+  // the shot as the pull has it now: the aim, the elastic, the preview, the power bar
+  function aimAt({ deg, power }: { deg: number; power: number }) {
     shot.angle = (deg * Math.PI) / 180;
     shot.deg = deg;
     shot.power = power;
@@ -997,7 +1047,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     shot = { angle: 0, power: 0 };
     press = { clientX: ev.clientX, clientY: ev.clientY, x: ev.clientX, y: ev.clientY };
     // third person: the heading the pull is measured from, frozen for the pull
-    if (g.cam === "third" && g.view === "ball") Object.assign(press, { yaw: cam.yaw(), dir: null });
+    if (g.cam === "third" && g.view === "ball") (Object.assign(press, { yaw: cam.yaw(), dir: cam.yaw() }), (shot.angle = cam.yaw()));
     // no dots until the chain has answered for this pull
     if (aim.userData.dots) aim.userData.dots.count = 0;
     else for (const d of aim.children) d.visible = false;
@@ -1033,7 +1083,8 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!g.aiming && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) {
       g.aiming = dragging = true;
       ghosts(true);
-      shot = { angle: Math.atan2(g.s.cup[1] - g.ball.y, g.s.cup[0] - g.ball.x), power: 3 };
+      // (behind the gnome: from where the view looks, not through the walls at the cup)
+      shot = { angle: g.cam === "third" && g.view === "ball" ? cam.yaw() : Math.atan2(g.s.cup[1] - g.ball.y, g.s.cup[0] - g.ball.x), power: 3 };
     }
     if (ev.key === "ArrowLeft") shot.angle -= (step * Math.PI) / 180;
     else if (ev.key === "ArrowRight") shot.angle += (step * Math.PI) / 180;
@@ -1061,6 +1112,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     void publish();
   };
   canvas.addEventListener("keydown", onKey);
+  // behind the gnome: the wheel, a trackpad's two-finger swipe, turns the view (there is no zoom; ctrl+wheel and a pinch are the page's zoom, left to it)
+  const onWheel = (ev: WheelEvent) => {
+    if (ev.ctrlKey || g.cam !== "third" || g.view !== "ball" || !g.s || g.flying || g.done || dragging) return;
+    ev.preventDefault();
+    const px = (Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY) * (ev.deltaMode ? 16 : 1);
+    cam.finishGlide();
+    cam.turn(-Math.max(-0.5, Math.min(0.5, (px * 0.3 * Math.PI) / 180))); // (the pull's sense: a swipe right turns the view left)
+  };
+  canvas.addEventListener("wheel", onWheel, { passive: false });
 
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointermove", onMove);
@@ -1442,6 +1502,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       scene.remove(ball);
       disposeCourse(ball);
       ball = makeBall(gnomeById((gnomeId = id)));
+      if (g.s) headlamp(ball, g.s.world === "mines");
       scene.add(ball);
       if (g.s) placeBall();
     },
@@ -1500,6 +1561,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
       canvas.removeEventListener("keydown", onKey);
+      canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("pointercancel", onCancel);
       canvas.removeEventListener("lostpointercapture", onCancel);
       clearTimeout(holedIn);
@@ -1517,6 +1579,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   };
   // the test hooks, only for a page that asks for them
   // (always there in the type: undefined unless the page asked for them)
-  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()), aimDrawn: aimer.drawn }) : {};
+  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()), stroke: (ex) => ((strokeWalls = ex.walls), (strokeEx = ex), applyWeather(ex.zones)), aimDrawn: aimer.drawn }) : {};
   return Object.assign(api, hooked);
 }

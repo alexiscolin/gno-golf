@@ -16,8 +16,39 @@
 //   kerb    { color, post }                  its rails
 //   edgeInk false to hide the green's edge line
 //   SEA     the world's sea level: "sea" zones are left open over it
+//   time(s) -> string   its own time of day (camera.ts TIMES), not timeOf's
+//   baked(course)       after the hole's merge: its own pass over the merged meshes
+//   lifted(s) -> Terrain?  the hole's terrain with parts of its lane raised
+//                          (cosmetic: the ball is drawn on it), or none
+//   laneLook(m, s)      its own texture on the lane's material (a shader hook added to m)
 //   piece(kind, item, t, s) -> Object3D?     its own drawing of a lane piece
 //   extras(ex, s, t) -> { group, skins: Set }?  its own drawing of a stroke's pieces
+//   walls   true: piece() is asked for a lone skinned wall too (item.walls: that one)
+//   wearStep n: the lane's wear overlay laid n rows a unit (2 without it)
+//   ahead   n: a stroke's extras come with the next n strokes' (ex.ahead), for
+//           the look-ahead; its extras' group may say steady (ud): swapped at
+//           once, not grown, the world animating the change itself
+//   ring(s, x, z, k) -> boolean   a bounce at (x, z) (k: how hard, 0 silent):
+//           true when the world answers it itself (a singing crystal)
+//   open(z) -> number?   a zone the lane is cut open over (a shaft, a sump): the
+//           ground left out there, its sides in rock down to the level a
+//           falling ball meets (returned); the world draws what is inside
+//   fallIn(s, skin, at, loud) -> { group, step(t) }?  the ball falling into a
+//           hazard of that skin at `at`: its own effect (and sound), not the splash
+//   fallCam  true: the camera follows every fall-in over the lip a moment (its hazards walled and deep: the
+//           player's own would not see it go in), not only a drop's
+//   pit(s, x, z) -> { y, end, as }?  what a ball falling off the lane at (x, z) lands in as drawn there (a pit's
+//           lake, lava or floor): its height, its ending, the hazard skin whose look it takes; undefined: the dark
+//   track(line, s, t) -> Object3D?           its own rails and tunnels for a line of
+//                                   timed bars that drive along it (course.ts's trams)
+//   route   true: third person's rest heading follows the route to the cup along
+//           the lane (walls, posts and hazards in the way, tunnels and loops
+//           as steps; the stroke's pieces too), not the green's distance field
+//   camSolids true: the chase camera keeps clear of the pieces as drawn (their
+//           boxes, taken before the merge) and sees the gnome past them
+//   camFloor(s) -> Height   the relief round the board, which the camera stays over
+//   wallHeight(skin) -> number?   a tall collider's height as drawn (a machine
+//           over the kerb), for the camera to see over; the kerb's without
 //
 // s is the hole state (board, walls, zones, cup, start, hole id, world). The
 // board itself (green, rough, walls, zones, cup) is common to all.
@@ -25,7 +56,7 @@ import type * as THREE from "three";
 import * as garden from "./garden";
 import { GRASS } from "./common";
 import type { Terrain } from "../terrain";
-import type { Extras, Post, Wall, Zone } from "../types";
+import type { Extras, Post, Timing, Wall, Zone } from "../types";
 import type { Hole, Height, Fade, Dress } from "./data";
 
 /** What a world's decor is: an Object3D, a canopy fade and a weather dress on it. */
@@ -38,6 +69,23 @@ export interface Bar {
   length: number;
   thick: number;
   ang: number;
+  /** a timed bar's own clock (its walls come without it) */
+  timing?: Timing;
+}
+/** A line of timed bars driving along it (course.ts tramLines), as a world lays
+ *  its track: its skin, its axis u (the way they drive) and offset across,
+ *  the lane's extent along it (e0..e1), the bars' thickness and the tunnels
+ *  at its ends (at: the mouth along u, dir: which way the tunnel runs, its
+ *  depth and width). A point s along it, off across it: [ux·s − uz·(perp +
+ *  off), uz·s + ux·(perp + off)]. */
+export interface Track {
+  skin: string;
+  u: readonly [number, number];
+  perp: number;
+  e0: number;
+  e1: number;
+  th: number;
+  portals: readonly { at: number; dir: number; depth: number; width: number }[];
 }
 /** The rough's look: its colours, how high it mounds, what it plants. */
 export interface Rough {
@@ -57,16 +105,41 @@ interface World {
   kerb?: { color: number; post: number };
   edgeInk?: boolean;
   SEA?: number;
+  time?: (s: Hole) => string;
+  baked?: (course: THREE.Object3D) => void;
+  lifted?: (s: Hole) => Terrain | null;
+  laneLook?: (m: THREE.Material, s: Hole) => void;
   piece?(kind: "post", item: Post, t: Terrain, s: Hole): THREE.Object3D | null | undefined | void;
   piece?(kind: "wall", item: Bar, t: Terrain, s: Hole): THREE.Object3D | null | undefined | void;
   piece?(kind: "zone", item: Zone, t: Terrain, s: Hole): THREE.Object3D | null | undefined | void;
   extras?(ex: Extras, s: Hole, t: Terrain): { group: THREE.Object3D; skins: Set<string> } | null | undefined;
+  walls?: boolean;
+  ahead?: number;
+  ghostLine?: boolean;
+  pieceFade?: boolean;
+  wearStep?: number;
+  route?: boolean;
+  camSolids?: boolean;
+  camFloor?: (s: Hole) => Height;
+  wallHeight?: (skin: string) => number | undefined;
+  open?(z: Zone): number | null | undefined;
+  ring?(s: Hole, x: number, z: number, k: number): boolean;
+  fallIn?(s: Hole, skin: string, at: THREE.Vector3, loud: boolean): FallIn | null | undefined;
+  fallCam?: boolean;
+  pit?(s: Hole, x: number, z: number): { y: number; end: "water" | "lava" | "floor"; as: string } | undefined;
+  track?(line: Track, s: Hole, t: Terrain): THREE.Object3D | null | undefined;
+}
+/** A fall into a hazard as a world draws it: its group, stepped by the seconds since it landed. */
+export interface FallIn {
+  group: THREE.Object3D;
+  step(t: number): void;
 }
 
 const LOADERS: Record<string, () => Promise<World>> = {
   island: () => import("./island"),
   town: () => import("./town"),
   mountain: () => import("./mountain"),
+  mines: () => import("./mines"),
 };
 const WORLDS: Record<string, World> = { garden };
 const pending: Record<string, Promise<World>> = {};

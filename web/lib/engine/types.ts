@@ -3,7 +3,7 @@
 // engine.ts and engine/*.ts import it without importing each other.
 import type * as THREE from "three";
 import type { Chain } from "../chain";
-import type { Forecast, HoleRow, Mode, Vec2, Zone, ZoneKind } from "../types";
+import type { Extras, Forecast, HoleRow, Mode, Vec2, Zone, ZoneKind } from "../types";
 import type { Aim, Course, Gnome, Height, Hole, LitScene } from "../scene/data";
 import type { Rig, View } from "../scene/camera";
 import type { WeatherNow } from "../scene/weather";
@@ -45,6 +45,8 @@ export interface GameState {
   facing: number;
   power: number;
   aiming: boolean;
+  /** third person's aim turning on past its zone (engine.ts steer): -1 left, 1 right, 0 not */
+  spin?: number;
   holed: boolean;
   /** no more shots this round (holed, even before the banner) */
   done?: boolean;
@@ -78,6 +80,8 @@ export interface GameState {
   lastAim?: number | null;
   tick0?: number;
   inTube?: boolean;
+  /** the camera's pose during a ride (a set piece carrying the ball), or none */
+  ride?: { pos: THREE.Vector3; look: THREE.Vector3; fov?: number; cut?: boolean } | null;
   /** ?camlog's ballLift: which step of which flags */
   replaying?: { flags: string; at: number };
   /** ?camlog's buildMs(): [build, compile] */
@@ -104,6 +108,8 @@ export interface Live {
   readonly g: GameState;
   readonly camera: THREE.PerspectiveCamera;
   readonly scene: LitScene;
+  /** what the renderer holds (its info): the perf probe's */
+  readonly info?: () => THREE.WebGLInfo;
   readonly chain: Chain;
   readonly aim: Aim;
   readonly band: Band;
@@ -134,6 +140,8 @@ export interface Live {
   readonly cut: number;
   readonly mode: Mode;
   readonly strokeZones: readonly Zone[];
+  /** the stroke's own pieces on a timed hole (and the next strokes', a world's ahead), as the chain gave them */
+  readonly strokeExtras?: Extras | null;
   /** the stroke's own pieces on a timed hole (buildExtras), or null (the game's own: a replay's copy has none) */
   readonly extras?: THREE.Object3D | null;
 }
@@ -175,6 +183,8 @@ export interface Snapshot {
   flying: boolean;
   aiming: boolean;
   power: number;
+  /** the aim turning on (third person): -1 left, 1 right, 0 not */
+  spin: number;
   holed: boolean;
   error: string | null;
   weather: WeatherNow | null;

@@ -22,6 +22,9 @@ function makeCam() {
     laneAt: (x: number, z: number) => ({ x, z }),
     resetFollow: () => {},
     jump: () => {},
+    forced: null as boolean | null,
+    forceRoute(on: boolean | null) { this.forced = on; },
+    routeAt: (x: number, z: number) => (x < 0 ? null : x + z),
   };
 }
 
@@ -47,6 +50,7 @@ function makeRig() {
   const rp = { replay: (...args: unknown[]) => (replayCalls.push(args), Promise.resolve()) };
   const fakeWeatherCalls: unknown[] = [];
   const placeBallCalls: unknown[] = [];
+  const strokeCalls: unknown[] = [];
 
   const g: Record<string, unknown> = {
     strokes: 0,
@@ -90,9 +94,10 @@ function makeRig() {
     rp,
     placeBall: (...a: unknown[]) => placeBallCalls.push(a),
     fakeWeather: (w: string) => fakeWeatherCalls.push(w),
+    stroke: (ex: unknown) => strokeCalls.push(ex),
   };
 
-  return { E, g, camera, scene, course, cam, rp, replayCalls, fakeWeatherCalls, placeBallCalls, p: probes(E, inner as never) };
+  return { E, g, camera, scene, course, cam, rp, replayCalls, fakeWeatherCalls, placeBallCalls, strokeCalls, p: probes(E, inner as never) };
 }
 
 void test("fakeWin marks the hole done, and keeps it off the player's card (nobody played it)", () => {
@@ -325,4 +330,88 @@ void test("boardFrame is null without a loaded hole", () => {
   const { p, g } = makeRig();
   g.s = null;
   assert.equal(p.boardFrame(), null);
+});
+
+void test("pose holds the camera at a close-up as a ride would, and lets it go", () => {
+  const { p, g } = makeRig();
+  p.pose([1, 2, 3], [4, 5, 6], 30);
+  const ride = g.ride as { pos: THREE.Vector3; look: THREE.Vector3; fov?: number };
+  assert.deepEqual([ride.pos.toArray(), ride.look.toArray(), ride.fov], [[1, 2, 3], [4, 5, 6], 30]);
+  p.pose();
+  assert.equal(g.ride, null);
+});
+
+void test("tubes lists the course's tubes: skin, kind, length, ridden, the hole's own", () => {
+  const { p, g, course } = makeRig();
+  assert.deepEqual(p.tubes(), []);
+  const own = { kind: "tunnel", skin: "cart ride", min: [0, 0], max: [1, 1], vec: [5, 5] };
+  const lift = { kind: "tunnel", skin: "lift", min: [0, 0], max: [1, 1], vec: [5, 5] };
+  const ride = Object.assign(new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(3, 4, 0)), { userData: { ride: { ms: 900 } } });
+  const plain = new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 2.04));
+  (g.s as { zones: unknown[] }).zones = [own];
+  course.userData.tubes = new Map<unknown, unknown>([[own, ride], [lift, plain]]);
+  assert.deepEqual(p.tubes(), [["cart ride", "tunnel", 5, true, true], ["lift", "tunnel", 2, false, false]]);
+});
+
+void test("showAt, ballAt and gpu read the engine: the clock held, the ball as drawn, what the GPU holds", () => {
+  const { p, E, g } = makeRig();
+  const shown: number[] = [];
+  Object.assign(E, { showAt: (t: number) => shown.push(t), info: () => ({ memory: { geometries: 12, textures: 3 }, programs: [1, 2], render: { frame: 9 } }) });
+  p.showAt(6);
+  assert.deepEqual(shown, [6]);
+  g.inTube = true;
+  assert.deepEqual(p.ballAt(), { p: [2, 0.5, 3], visible: true, tube: true, scale: 1, seen: true });
+  assert.deepEqual(p.gpu(), { geometries: 12, textures: 3, programs: 2 });
+  Object.assign(E, { info: () => ({ memory: { geometries: 1, textures: 0 } }) });
+  assert.equal(p.gpu().programs, 0);
+});
+
+void test("the audit's hooks run on the engine's course (audit.ts)", () => {
+  const { p, E } = makeRig();
+  Object.assign(E, { zones: () => [], info: () => ({ render: { frame: 3 } }) });
+  const a = p.surfaceAudit(2)!;
+  assert.deepEqual([a.board, a.step, a.rows.length], [[20, 12], 2, 60]);
+  assert.ok(Array.isArray(p.whatAt(0, 0)));
+  assert.deepEqual(p.glows(), { glows: [], blind: [] });
+  assert.deepEqual(p.movers(), { frame: 3, rows: [] });
+});
+
+void test("sightHits names what stands between the camera and the gnome, by its nearest named group; nothing when clear", () => {
+  const { p, scene } = makeRig();
+  const wall = new THREE.Group();
+  wall.name = "crag";
+  wall.add(new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2), new THREE.MeshBasicMaterial()));
+  wall.position.set(2, 1, 0);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2), new THREE.MeshBasicMaterial({ transparent: true }));
+  glass.position.set(2, 1, 6);
+  scene.add(wall, glass);
+  scene.updateMatrixWorld(true);
+  assert.deepEqual(p.sightHits([2, 0.6, -5]), ["crag", "crag", "crag", "crag", "crag"]);
+  assert.deepEqual(p.sightHits([2, 0.6, 9]), ["", "", "", "", ""], "a see-through pane is no obstacle");
+  wall.visible = false;
+  assert.deepEqual(p.sightHits([2, 0.6, -5]), ["", "", "", "", ""], "nor a hidden one");
+});
+
+void test("routeForce, routeAt and strokeState pass through to the camera's route and the engine's stroke", () => {
+  const { p, cam, strokeCalls } = makeRig();
+  p.routeForce(true);
+  assert.equal(cam.forced, true);
+  p.routeForce(null);
+  assert.equal(cam.forced, null);
+  assert.equal(p.routeAt(2, 3), 5);
+  assert.equal(p.routeAt(-1, 0), null);
+  const ex = { walls: [], zones: [] };
+  p.strokeState(ex as never);
+  assert.deepEqual(strokeCalls, [ex]);
+});
+
+void test("the audit's rides and pieces checks run on the engine's course (audit.ts)", () => {
+  const { p, E } = makeRig();
+  Object.assign(E, { zones: () => [] });
+  assert.deepEqual(p.clearance(), { seen: 0, under: [] });
+  assert.equal(p.rideClearance(), null, "no tubes on this course");
+  assert.deepEqual(p.draws("none")!.mine, []);
+  assert.ok(Array.isArray(p.renderQuality()));
+  assert.deepEqual(p.moverClip(), []);
+  assert.deepEqual(p.trackOverHazard(), []);
 });

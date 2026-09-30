@@ -109,6 +109,8 @@ export const motion = !reducedMotion();
 const clock = { value: 0 };
 /** Advances the garden's clock; the engine calls it once a frame. */
 export const setTime = (t: number) => { if (motion) clock.value = t; };
+/** The scene's clock as a shader uniform (seconds; still for a player who asked for less motion). */
+export const uTime = clock;
 // The wind of the hole's weather (the chain's push per substep, [x, y]): the
 // foliage leans with it and sways harder the stronger it is. 0 is calm.
 const wind = { value: new THREE.Vector2(0, 0) };
@@ -521,17 +523,17 @@ const fadeHull = (w: number) => fadeable(pushHull(new THREE.MeshBasicMaterial({ 
  * draws with, one fadeable outline for all its hulls), so it can fade out of
  * the camera's way without fading the shared palette; marks it live. A
  * see-through material keeps its opacity as its base (setFade); hull: the
- * outline's width. Returns the materials, for fadeLoop.
+ * outline's width. Returns the materials, for fadeLoop. set: pieces that
+ * fade as one share their materials (a set carried from call to call).
  */
-export function ownFade(piece: THREE.Object3D, hull = 0.055) {
-  const own = new Map<THREE.Material, THREE.Material>();
-  let ink: THREE.MeshBasicMaterial | null = null;
+export function ownFade(piece: THREE.Object3D, hull = 0.055, set: { own: Map<THREE.Material, THREE.Material>; ink: THREE.MeshBasicMaterial | null } = { own: new Map(), ink: null }) {
+  const own = set.own;
   piece.traverse((o) => {
     if (!(o instanceof THREE.Mesh || o instanceof THREE.Line) || Array.isArray(o.material)) return;
     // a plain outline: one fadeable hull for all of them; a swaying one (its
     // own shader) is cloned like a solid, so it keeps swaying with it
     const was = o.material as THREE.Material;
-    if (was.side === THREE.BackSide && !String(md(was).hook).startsWith("sway")) return void (o.material = ink ||= fadeHull(hull));
+    if (was.side === THREE.BackSide && !String(md(was).hook).startsWith("sway")) return void (o.material = set.ink ||= fadeHull(hull));
     if (!own.has(was)) {
       const m = fadeable(was.clone());
       // clone() drops the shader hook (sway, a hull's push): keep it
@@ -546,7 +548,7 @@ export function ownFade(piece: THREE.Object3D, hull = 0.055) {
     o.material = own.get(was)!;
   });
   ud(piece).live = true;
-  return ink ? [...own.values(), ink] : [...own.values()];
+  return set.ink ? [...own.values(), set.ink] : [...own.values()];
 }
 /** One thing a canopy fade watches: where it is (read from obj if it moves), its radius, its materials. */
 export interface FadeItem {

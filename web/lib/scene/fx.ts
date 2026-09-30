@@ -83,10 +83,10 @@ export function makeSplash(at: THREE.Vector3, { open = false } = {}) {
 /** Off the roofs: a puff of dust where the ball lands, down in the street or
  *  on a roof, and a few chips of tile knocked flying that bounce and settle.
  *  Two instanced draws; the same { group, step(t) } as a splash. */
-export function makePuff(at: THREE.Vector3) {
+export function makePuff(at: THREE.Vector3, [tone, chip]: readonly [number, number] = [0xe6dccb, 0xb8573f]) {
   const group = new THREE.Group();
-  const dust = new THREE.MeshBasicMaterial({ color: 0xe6dccb, transparent: true, depthWrite: false });
-  const puffs = new THREE.InstancedMesh(PUFF_GEO, dust, 8), chips = new THREE.InstancedMesh(CHIP_GEO, flat(0xb8573f), 6);
+  const dust = new THREE.MeshBasicMaterial({ color: tone, transparent: true, depthWrite: false });
+  const puffs = new THREE.InstancedMesh(PUFF_GEO, dust, 8), chips = new THREE.InstancedMesh(CHIP_GEO, flat(chip), 6);
   for (const m of [puffs, chips]) (m.frustumCulled = false), m.instanceMatrix.setUsage(THREE.DynamicDrawUsage), group.add(m);
   const o = new THREE.Object3D();
   const out = Array.from({ length: 8 }, (_, i) => (i / 8) * Math.PI * 2 + Math.random() * 0.5);

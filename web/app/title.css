@@ -61,6 +61,14 @@
   --ground: var(--mountain-snow); --pond: #bfe6f4; /* snow, ice */
   --art: linear-gradient(180deg, #4d74e0, #bcd2ff 65%, #ffe0c0);
 }
+/* the mines: a pale amethyst over the dots (the vault itself, #15122b to
+   #2a2350, is the game's sky and the diorama's); basalt, a black sump */
+.tsky--mines, .tint--mines, .victory--mines {
+  --s0: #ece6f7;
+  --c1: #c7a6ff; --c2: #4f3b8f; --stage: #e3dcef;
+  --ground: #5a4e78; --pond: #2d3550;
+  --art: linear-gradient(180deg, #34266e, #7a64c4 65%, #f0a07a); /* the baked still's cave: a deep violet to a lava glow */
+}
 .front, .screen--title { transition: --s0 .45s; }
 
 /* the backdrop: the world's fade under an even halftone (::before), and the
@@ -239,7 +247,15 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 }
 .world__info { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 14px 8px 8px; }
 /* the standing reads first, the green under it supports it */
-.worlds--v2 .world__score { font-size: 15px; }
+/* the standing on one line in every state: on a narrow card the strokes
+   without their word, as the won badge says them */
+.worlds--v2 .world__info { container-type: inline-size; }
+.worlds--v2 .world__score { font-size: 15px; flex-wrap: nowrap; white-space: nowrap; }
+/* (the taglines on one line where the longest fits, 202 px of the panel's
+   width inside its padding: narrower, two lines kept for each, so the rows stay level) */
+@container (max-width: 201px) { .world__tag { min-height: 2.6em; } }
+@container (max-width: 200px) { .world__unit { display: none; } .worlds--v2 .world__score { font-size: 13px; } }
+.worlds--v2 .world__score .world__stamp { margin-block: -4px; } /* (the par star's ring overhangs the line, never grows it) */
 .worlds--v2 .world__track { padding: 2px 8% 0; }
 
 /* a won cup: its badge on the diorama's corner, over the clip too; gold at
@@ -276,7 +292,12 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border-radius: var(--pill); background: var(--ink); color: var(--paper);
   font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
-.world__last { position: absolute; top: 14px; left: 14px; z-index: 3; pointer-events: none; padding-inline: 10px; font-size: 11px; }
+.world__last, .world__expert { position: absolute; top: 14px; left: 14px; z-index: 3; pointer-events: none; padding-inline: 10px; font-size: 11px; }
+.world:has(.world__won) .world__last { top: 68px; } /* (under a won cup's badge, never into it) */
+/* the expert cup's, top right in the hat's red, where a won cup's badge
+   takes its place; under Last played when both show (a narrow card has no room for two) */
+.world__expert { left: auto; right: 14px; background: var(--hat); }
+.world__last ~ .world__expert { top: 40px; }
 /* a front card under the pointer (a cup's, a game's): it leaps, leaning, in its glow; pressed, it sinks */
 .worlds--v2 .world:hover:not([disabled]), .worlds--v2 .world:focus-visible,
 .mode:hover:not([disabled]), .mode:focus-visible { z-index: 1; transform: translateY(-10px) scale(1.05) rotate(-1.5deg); }
@@ -290,17 +311,9 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .worlds--v2 .world__art { width: min(80%, 20vh); margin: 4px auto 0; aspect-ratio: 1 / 1; border-radius: 50%; }
 .worlds--v2 .world[disabled] .world__art img { filter: grayscale(.85) opacity(.75); }
 .worlds--v2 .community { padding: 10px 14px; } /* flat: a list to read */
-/* the cup to come (the mines): in its own cave colour, dimmed as a game to
-   come (.mode[disabled]), not greyed as an empty cup; its crystals the window
-   (scene/crystal.ts, baked on this cave: titlebake.ts) */
-.tint--mines { --c2: #4f3b8f; --art: linear-gradient(180deg, #34266e, #7a64c4 65%, #f0a07a); }
-/* to come, plainly: its colours faded toward stone (as a game to come, .mode[disabled]), the sticker alone bright */
-.worlds--v2 .world--mines[disabled] { background: var(--panel-dots), color-mix(in srgb, var(--c2) 35%, var(--stone)); grid-template-rows: auto auto 1fr; } /* (its panel down to the card's foot, as the others') */
-.worlds--v2 .world--mines[disabled] .world__art { opacity: .7; }
-.worlds--v2 .world--mines[disabled] .world__art img { filter: saturate(.3); }
-.worlds--v2 .world--mines[disabled] .world__ribbon { background: color-mix(in srgb, var(--green) 45%, var(--stone)); } /* (its name read, faded) */
-.worlds--v2 .world--mines[disabled] .world__info { opacity: .8; }
-.world--mines .world__info { align-content: start; } /* (its lines level with the others') */
+/* a cup with no still baked yet: its emblem is the window */
+.worlds--v2 .world__art--emblem { border: 0; background: none; }
+.world__art--emblem > svg { display: block; width: 100%; height: 100%; }
 
 /* the first choice: a kart game's mode panels, never the cups' cards: flat
    toon colours, ours (the fairway, the hat, the sun), inked; a flat disc for
@@ -588,9 +601,9 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .worlds--v2 .world__tag { display: none; }
   .worlds--v2 .world:hover:not([disabled]) .world__ribbon, .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.12); }
   .world__won { top: 10px; right: 10px; font-size: 13px; padding-right: 9px; }
+  .world:has(.world__won) .world__last { top: 56px; } /* (the badge a size down) */
   .world__won svg { width: 26px; height: 26px; }
   .worlds--v2 .world__score { font-size: 13px; }
-  .world--mines .mode__soon { top: 8px; right: 6px; font-size: 13px; padding: 4px 10px; }
   .front .worlds__title, .front .pick__name { --ink-w: 6px; }
 }
 /* (the motion itself: the global switch, globals.css; the card still, not grown) */

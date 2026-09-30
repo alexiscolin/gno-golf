@@ -381,7 +381,7 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
     type: "/vm.m_call",
     value: { caller: address, send: "", pkg_path: realm, func, args },
   });
-  // a pro round always has its period (State gives one): never a 0 the chain refuses
+  // a pro round always has its period (HoleState gives one): never a 0 the chain refuses
   const periodArg = (p: number | null | undefined) => {
     if (p == null) throw new Error("This round has no weather period, so it cannot be saved. Play it again.");
     return String(p);
@@ -445,9 +445,11 @@ export async function sendTip({ from, to, gnot, price, chainId, rpc }: { from: s
   return send([{ type: "/bank.MsgSend", value: { from_address: from, to_address: to, amount: `${gnot * 1e6}ugnot` } }], TIP_GAS, price, chainId, rpc, "The tip was not sent.", "gnogolf tip");
 }
 
-// golf's Claim reads the course's holes once (74 slots, two modes): measured
-// well under this (54.6M on an onyx gnodev); Register was 28M to 29.5M there
-const CLAIM_GAS = 90_000_000, REGISTER_GAS = 60_000_000;
+// golf's Claim reads the course's holes once (90 slots, two modes) and seats
+// each best the player kept unnamed: 57.6M with 1 best and 62.1M with 6 on an
+// onyx gnodev (about 56.7M and 0.9M a best), so 150M seats about 100 bests;
+// Register was 28M to 29.5M there
+const CLAIM_GAS = 150_000_000, REGISTER_GAS = 60_000_000;
 /** What a name taken with a save adds to its gas: Register and Claim's. */
 export const NAME_GAS = REGISTER_GAS + CLAIM_GAS;
 /**

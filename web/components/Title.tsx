@@ -9,7 +9,7 @@ import { AboutButton, ICON } from "@/components/About";
 import { lowGfx } from "@/lib/engine/pace";
 import { camlog } from "@/lib/testhooks";
 import { reducedMotion } from "@/lib/device";
-import { CUPS } from "@/lib/card";
+import { CLASSIC, guessCup } from "@/lib/card";
 import type { Title as TitleScene } from "@/lib/scene/title"; // the live title scene, once its module has loaded and made it
 
 type Film = ReturnType<typeof makeFilm>;
@@ -32,6 +32,7 @@ const CHORES: Record<string, readonly string[]> = {
   island: ["Raking the sand…", "Chasing crabs…", "Waxing the palm trees…", "Counting the waves…", "Asking the chain nicely…", "Building sandcastles…", "Shooing the seagulls…"],
   mountain: ["Waxing the skis…", "Shovelling the snow…", "Knitting bobble hats…", "Asking the chain nicely…", "Warming the chalet…", "Counting the pines…"],
   town: ["Lighting the lamps…", "Baking bread…", "Sweeping the cobbles…", "Winding the clock tower…", "Asking the chain nicely…", "Painting the rooftops…", "Ringing the tram bell…"],
+  mines: ["Lighting the lanterns…", "Polishing the crystals…", "Greasing the cart wheels…", "Asking the chain nicely…", "Waking the canary…", "Propping the galleries…", "Cooling the lava…"],
 };
 export const choresOf = (world: string) => CHORES[world] || CHORES.garden;
 
@@ -54,6 +55,16 @@ export function Hat({ world, y = 0 }: { world: string; y?: number }) {
         <path d="M -5.5 0 Q -5.5 -8 0 -8 Q 5.5 -8 5.5 0 Z" />
         <rect x="-6" y="-2" width="12" height="3" rx="1.5" className="hat__rib" />
         <circle cx="0" cy="-9" r="2.4" className="hat__bobble" />
+      </g>
+    );
+  if (world === "mines")
+    // a miner's hard hat, its lamp lit
+    return (
+      <g transform={t} className="hat hat--miner">
+        <circle cx="0" cy="-4.5" r="5" className="hat__glow" />
+        <path d="M -5.5 0 Q -5.5 -8 0 -8 Q 5.5 -8 5.5 0 Z" />
+        <rect x="-7.5" y="-1.4" width="15" height="2.6" rx="1.3" />
+        <circle cx="0" cy="-4.5" r="2.1" className="hat__lamp" />
       </g>
     );
   if (world === "town")
@@ -99,6 +110,8 @@ export function Green({ p, world = "garden", holed = false, thick = false }: { p
           <rect x="-6" y="-4" width="12" height="12" rx="3" className="load__lamp" />
         ) : world === "mountain" ? (
           <path d="M 0 -6 L -8 8 H 8 Z M 0 -12 L -6 0 H 6 Z" className="load__pine" />
+        ) : world === "mines" ? (
+          <path d="M -4 8 V -2 L 0 -10 L 4 -2 V 8 Z M 4 8 V 2 L 8 -3 L 11 2 V 8 Z" className="load__crystal" />
         ) : (
           <path d="M 0 0 L 20 6 L 0 12 Z" className="load__flag" />
         )}
@@ -157,8 +170,7 @@ const burst = (n: number, r0: number, r1: number, cx = 100, cy = 100) =>
 // hydrates it) is the garden's, the client's own render the link's.
 const guessWorld = () => {
   const p = new URLSearchParams(window.location.search);
-  const h = p.get("world") || p.get("cup") || p.get("hole") || "";
-  return /island/.test(h) ? "island" : /town/.test(h) ? "town" : /mountain/.test(h) ? "mountain" : "garden";
+  return guessCup(p.get("world") || p.get("cup") || p.get("hole") || window.location.pathname);
 };
 
 // The title's backdrop, one per visit: the promo's textless cut
@@ -185,10 +197,10 @@ const nextWorld = () => {
   let i = 0;
   try {
     const was = localStorage.getItem("gnogolf.title");
-    i = was == null ? 0 : (Number(was) + 1) % CUPS.length || 0;
+    i = was == null ? 0 : (Number(was) + 1) % CLASSIC.length || 0;
     localStorage.setItem("gnogolf.title", String(i));
   } catch {}
-  return CUPS[i];
+  return CLASSIC[i]; // (the title's scenes and stills are the four's: lib/scene/title.ts)
 };
 const wantsStill = () => reducedMotion() || lowGfx();
 const wantsVideo = () => {

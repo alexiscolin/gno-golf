@@ -4,13 +4,15 @@
 import * as THREE from "three";
 import { onAt, closest } from "../terrain";
 import { isDrawn } from "../scene/materials";
+import { worldOf } from "../scene/worlds";
 import { laneBox } from "../scene/camera";
-import { ud } from "../scene/data";
-import type { Vec2 } from "../types";
+import { ud, md, type TubePath } from "../scene/data";
+import type { Extras, Vec2, Zone } from "../types";
 import { simChecks, simMs, simReady } from "../sim";
 import type { Live } from "./types";
 import type { makeCamera } from "./camera";
 import type { makeReplay } from "./replay";
+import { clearance, draws, glows, lamps, moverClip, movers, renderQuality, rideClearance, surfaceAudit, trackOverHazard, whatAt } from "./audit";
 
 /** What the probes reach beyond E: the camera and the replay, and a few of the engine's own. */
 interface Inner {
@@ -18,13 +20,14 @@ interface Inner {
   rp: ReturnType<typeof makeReplay>;
   placeBall: () => void;
   fakeWeather: (w: string) => void;
+  stroke: (ex: Extras) => void;
   aimDrawn: () => { n: number; at: number; angle: number; power: number };
 }
 
 const ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3();
 
 /** E: the engine's live state; cam: its camera controller. */
-export function probes(E: Live, { cam, rp, placeBall, fakeWeather, aimDrawn }: Inner) {
+export function probes(E: Live, { cam, rp, placeBall, fakeWeather, stroke, aimDrawn }: Inner) {
   const { g, camera, scene, ground, band, publish } = E;
   return {
     /** For screenshots only (?won): the win card as if the hole was just holed. */
@@ -95,12 +98,43 @@ export function probes(E: Live, { cam, rp, placeBall, fakeWeather, aimDrawn }: I
         }
       return near / 25;
     },
+    /** ?camlog only: what stands between the camera and the gnome: five rays to points on him, each
+     *  the first opaque drawn thing it meets before him (by its nearest named group), or "" if clear. */
+    sightHits: (from?: number[]) => {
+      const B = E.ball.position, P = from ? new THREE.Vector3().fromArray(from) : camera.position, rc = new THREE.Raycaster(), out: string[] = [];
+      rc.camera = camera; // (sprites need it)
+      const own = new Set<THREE.Object3D>();
+      E.ball.traverse((o) => void own.add(o));
+      for (const [dx, dy, dz] of [[0, 0.7, 0], [0, 0.3, 0], [0.35, 0.4, 0], [-0.35, 0.4, 0], [0, 1.1, 0]]) {
+        const T = new THREE.Vector3(B.x + dx, B.y + dy, B.z + dz), d = T.clone().sub(P), L = d.length();
+        rc.set(P, d.normalize());
+        rc.far = L - 0.3;
+        const hit = rc.intersectObjects(scene.children, true).find((h) => {
+          const o = h.object, m = isDrawn(o) && !Array.isArray(o.material) ? o.material : null;
+          if (!o.visible || own.has(o) || o instanceof THREE.Sprite || o instanceof THREE.Points || o instanceof THREE.Line || !m) return false;
+          for (let q: THREE.Object3D | null = o; q; q = q.parent) if (!q.visible) return false;
+          return !m.transparent && m.blending !== THREE.AdditiveBlending && !md(m).hull;
+        });
+        let k = "";
+        for (let q: THREE.Object3D | null = hit ? hit.object : null; q && !k; q = q.parent) k = q.name || String(ud(q).kind || "");
+        out.push(hit ? k || "?" : "");
+      }
+      return out;
+    },
     /** ?camlog only: the radius of what the lens probe hit, counted. */
     lensWho: () => cam.lensWho,
     /** ?camlog only: the third-person heading now, in radians (what a pull starting now is measured from). */
     camYaw: () => cam.yaw(),
     gliding: () => cam.gliding(),
     laneAt: (x: number, z: number) => cam.laneAt(x, z),
+    /** ?camlog only: the route (worlds.ts route) forced on or off for any world, or the world's own again (null). */
+    routeForce: (on: boolean | null) => cam.forceRoute(on),
+    /** ?camlog only: the route's distance to the cup from (x, z), or null. */
+    routeAt: (x: number, z: number) => cam.routeAt(x, z),
+    /** ?camlog only: a world's camSolids: the boxes' count, those near the ball, the ground under (x, z) as the camera has it. */
+    solidsInfo: (x: number, z: number, r?: number) => cam.solidsInfo(x, z, r),
+    /** ?camlog only: a stroke's own pieces (a chain Extras, its ahead too) as the camera and the weather read them, not drawn. */
+    strokeState: (ex: Extras) => stroke(ex),
     /** Where the camera stands against the board: over the green, how far from the nearest rail, how high over the ground. */
     camBoard: () => {
       if (!g.course || !g.s) return null;
@@ -177,6 +211,44 @@ export function probes(E: Live, { cam, rp, placeBall, fakeWeather, aimDrawn }: I
     clock: () => E.clock,
     /** ?camlog only: the last hole's [build, shader compile] time, ms. */
     buildMs: () => g.buildMs,
+    /** ?camlog only: the camera held at a pose (a close-up), as a ride holds it; none: back to the mode's. */
+    pose: (pos?: number[], look?: number[], fov?: number) => void (g.ride = pos && look ? { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look), fov } : null),
+    /** ?camlog only: the course's tubes: [skin, kind, length, ridden, one of the hole's own zones]. */
+    tubes: () => [...((g.course && g.course.userData.tubes) || new Map<Zone, TubePath>())].map(([z, c]) => [z.skin, z.kind, +c.getLength().toFixed(1), !!(c.userData && c.userData.ride), !!g.s && g.s.zones.includes(z)]),
+    /** ?camlog only: the timed pieces shown at tick t (the clock held there until it runs on). */
+    // (and the live pieces' own animation run once at that clock: a held clock, frozen time, still shows them where it has them)
+    showAt: (t: number) => {
+      E.showAt(t);
+      const now = performance.now() / 1000;
+      // (a course without its live pieces' tick, as a test's, has nothing to run)
+      if (g.course) for (const o of [g.course, ...g.course.children]) ud(o).tick?.(now);
+    },
+    /** ?camlog only: the ball as drawn: where, whether seen, riding a tube, its scale. */
+    /** What a ball falling off the lane at (x, z) lands in, as the world draws it there (worlds.ts pit). */
+    pit: (x: number, z: number) => (g.s ? worldOf(g.s).pit?.(g.s, x, z) ?? null : null),
+    /** The gnome's pose: its body's up and its roll axis (its local x) in the world, the whole ball's own rotation, the last fall's ending. */
+    gnome: () => {
+      const body = E.ball.userData.body, q = body.getWorldQuaternion(new THREE.Quaternion());
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), ax = new THREE.Vector3(1, 0, 0).applyQuaternion(q), f = rp.fell();
+      return { up: up.toArray().map((v) => +v.toFixed(3)), axis: ax.toArray().map((v) => +v.toFixed(3)), rot: [E.ball.rotation.x, E.ball.rotation.y, E.ball.rotation.z].map((v) => +v.toFixed(3)), fell: f && { skin: f.skin, end: f.end, ago: Math.round(performance.now() - f.at) } };
+    },
+    ballAt: () => ({ p: E.ball.position.toArray().map((v) => +v.toFixed(3)), visible: E.ball.visible, tube: !!g.inTube, scale: +E.ball.scale.x.toFixed(2), seen: !cam.occluded(camera.position, headAt.copy(E.ball.position).setY(E.ball.position.y + 0.7)) }),
+    /** ?camlog only: the render against the physics over a grid (audit.ts). */
+    surfaceAudit: (step?: number) => surfaceAudit(E, step),
+    /** ?camlog only: what a ray straight down at (x, z) meets in the course (audit.ts). */
+    whatAt: (x: number, z: number) => whatAt(E, x, z),
+    // the glows against the solids (media/rides/glow.mjs), the movers frame by frame (movers.mjs), the rails' clearance (clear.mjs)
+    glows: () => glows(E),
+    lamps: (lantern: number) => lamps(E, lantern),
+    movers: () => movers(E),
+    clearance: () => clearance(E),
+    rideClearance: () => rideClearance(E),
+    draws: (who?: string) => draws(E, who),
+    renderQuality: () => renderQuality(E),
+    moverClip: (sweep?: boolean) => moverClip(E, 0.06, sweep),
+    trackOverHazard: () => trackOverHazard(E),
+    /** ?camlog only: what the GPU holds: geometries, textures, shader programs. */
+    gpu: () => { const i = E.info!(); return { geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs ? i.programs.length : 0 }; },
     /** ?camlog only: where the camera is now. */
     camPose: () => camera.position.toArray(),
     /** The Far rig: the orbit share it has room for, its pitch blend, its distance. */

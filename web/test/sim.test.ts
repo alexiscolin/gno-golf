@@ -80,20 +80,17 @@ function rig() {
   return { E, dots, calls, aimer: makeAimer(E) };
 }
 
-void test("the aim draws the page's own answer at once, and asks the chain only once the hand rests", async (t) => {
+void test("the aim draws the page's own answer at once, and asks the chain only once the hand rests", async () => {
   const { E, dots, calls, aimer } = rig();
   aimer.preview();
   await settle();
   const own = await simStroke(ID, [], "21.0000,7.0000", null, PERIOD);
   assert.ok(own && dots.count > 2); // the page's path, not the straight line's two
   assert.equal(calls.length, 0); // not asked while the hand moves
-  t.mock.timers.enable({ apis: ["setTimeout"] });
-  aimer.preview(); // the hand rests on the same aim
-  t.mock.timers.tick(120);
+  aimer.preview(); // the hand rests on the same aim (the frames go on: the timer armed once)
+  await new Promise((r) => setTimeout(r, 130));
   assert.equal(calls.length, 1); // now the chain, for the release and to check
   calls[0].resolve(own);
-  await Promise.resolve();
-  t.mock.timers.reset();
   await settle();
   assert.equal(simReady(ID), true); // the same answer: still on
   E.dragging = false;

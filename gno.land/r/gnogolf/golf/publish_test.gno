@@ -349,6 +349,7 @@ func TestPublishMine(cur realm, t *testing.T) {
 // A community hole's name or note carries no web address, and what gets past
 // that the owner can take off the lists: never off the chain.
 func TestCommunityTextAndHide(cur realm, t *testing.T) {
+	defer asideCourse()()
 	eve := testutils.TestAddress("eve")
 	for _, bad := range []string{"claim at bonus.xyz", "see www.bonus", "t.me/golf", "GNOGOLF.APP", "at 10.0.0.1 now", "bonus．xyz", "win。app"} {
 		testing.SetRealm(testing.NewUserRealm(eve))
@@ -741,15 +742,19 @@ func TestTextIsCleanedAtPublish(cur realm, t *testing.T) {
 // However often the course is republished, the list keeps room for
 // everyone else's holes, and shows a few archived versions only.
 func TestArchivedVersionsLeaveRoomInTheList(cur realm, t *testing.T) {
+	defer asideCourse()()
 	for i := 0; i < maxArchived+5; i++ {
 		publish(cur, cupHole("garden", 85, "Again "+strconv.Itoa(i)))
 	}
 	for i := 0; i < minCommunity; i++ {
 		register(cur, "room"+strconv.Itoa(i))
 	}
+	// the archived rows after the course's own (a slot may point at an old
+	// version: another test's), and the community's
 	archived, others := 0, 0
-	for _, e := range listed() {
+	for i, e := range listed() {
 		switch {
+		case i < slots.Size():
 		case e.official && e.next != "":
 			archived++
 		case !e.official:
@@ -791,7 +796,8 @@ func TestThePagesGnowebLinks(cur realm, t *testing.T) {
 
 // Community rows are the newest first: sixteen addresses that sort low
 // (bech32 "g1qqq…", cheap to grind for) publishing three holes each, on a
-// course of 72, cannot keep a later author's hole off the list or the hub.
+// full course (the parity test's 90 in a full run; 72 filler slots when this
+// test runs alone), cannot keep a later author's hole off the list or the hub.
 func TestNewestCommunityHolesAreListed(cur realm, t *testing.T) {
 	for i := slots.Size(); i < 72; i++ {
 		publish(cur, cupHole("filler", i+1, "Filler"))
@@ -819,6 +825,7 @@ func TestNewestCommunityHolesAreListed(cur realm, t *testing.T) {
 // the list once scanned (maxScanned): as many newer holes of one author
 // took every older one off the list and the hub.
 func TestOneAuthorCannotFloodTheList(cur realm, t *testing.T) {
+	defer asideCourse()()
 	data := hexOf(cupHole("pond", 1, "Flood"))
 	testing.SkipHeights(1)
 	var early []string
@@ -868,5 +875,25 @@ func TestTheCourseFitsItsWorstWeather(t *testing.T) {
 		g := worstGas(h, len(raw))
 		t.Logf("worst %s forecast %d shot %d total %d", d[0], course.WorstForecastWork(h), newWork(h, nil).bound, g)
 		uassert.True(t, g <= workBudget, d[0]+" does not fit its worst weather")
+	}
+}
+
+// asideCourse takes the course's own slots (published by the parity test:
+// 90 with the Crystal Mines) out of the list while a test models the list's
+// room on a small course of its own, and puts them back after it.
+func asideCourse() func() {
+	var keys, ids []string
+	for _, d := range courseData {
+		if k, ok := slotKeyOf(d[0]); ok {
+			if v := slots.Get(k); v != nil {
+				keys, ids = append(keys, k), append(ids, v.(string))
+				slots.Remove(k)
+			}
+		}
+	}
+	return func() {
+		for i, k := range keys {
+			slots.Set(k, ids[i])
+		}
 	}
 }

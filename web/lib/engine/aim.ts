@@ -1,5 +1,6 @@
 // The aim preview: while the player pulls, the dots follow the path of the
-// shot, bending into place; in fog they see 7 units ahead. The path is the
+// shot, bending into place; in fog they see 7 units ahead (in the mines' dark
+// galleries, 7 in any weather and 4 in fog). The path is the
 // chain's own answer: worked out here, in the page, by the realm's code built
 // for it (lib/sim: every pull, at once), or asked of the chain (debounced,
 // cached, cancelled when no longer wanted) until that is there, or wherever it
@@ -8,9 +9,10 @@
 //
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
-import { shotOf, RULES } from "../chain";
+import { shotOf, pullShot, pullFull, RULES } from "../chain";
 import { angDiff, onAt, segHit, rayCircle, BALL_R } from "../terrain";
 import { causeAt } from "../scene/cause";
+import { darkGallery, sight } from "../scene/data";
 import { ud } from "../scene/data";
 import { aimAlong } from "../scene";
 import { same, simHole, simReady, simStroke } from "../sim";
@@ -19,28 +21,25 @@ import type { Live } from "./types";
 
 const MAX_POWER = RULES.maxPower;
 
-// Third person's aim: the shot flies opposite the pull, like the classic
-// slingshot, so every direction is reachable — pull straight down to shoot
-// ahead, up to shoot back at the camera, sideways to shoot across. The pull
-// (dx right, dy down, on the screen) is read in the camera frame frozen when
-// the pull began (yaw0: where the view looked), so the camera trailing the aim
-// never feeds back into it. Screen up is yaw0, screen right is yaw0 + 90°.
-// Near the start (DEAD px) the direction holds; fine (Shift) moves the aim a
-// third as far towards where the drag points; otherwise a light smoothing.
-// A move mostly along the pull (mx, my: the pointer's last step), in or out,
-// sets the power and leaves the direction: at a short pull a hand's slight
-// sideways drift would otherwise swing the aim more than the power changes.
-const DEAD = 18, RADIAL = 1.5;
-export function thirdAim(yaw0: number, dx: number, dy: number, prev?: number | null, fine = false, mx = 0, my = 0) {
-  const r = Math.hypot(dx, dy);
-  if (r < DEAD && prev != null) return prev;
-  if (prev != null && r > 0) {
-    const along = (mx * dx + my * dy) / r, across = (mx * dy - my * dx) / r;
-    if (Math.abs(along) > RADIAL * Math.abs(across)) return prev;
-  }
-  const want = yaw0 + Math.atan2(-dx, dy);
-  if (prev == null) return want;
-  return prev + angDiff(want, prev) * (fine ? 0.33 : 0.6);
+// Third person's aim (engine.ts steer, every frame of a pull), two ways at
+// once, a slingshot's way round (the hand right turns the aim left). Within
+// the zone of the press (a share of the width, and wider than a full pull on
+// a narrow screen), left or right, the offset dx is the aim itself (FINE at
+// the zone's edge: a pull to full power, even 45° down, never spins); pushed
+// past it the aim goes on turning that way as long as it is held, the rate
+// coming in gently with the distance past (SPIN_RAMP of the width, up to
+// SPIN_MAX: all the way round, straight back), and back inside it stops, the
+// fine aim going on from the new heading without a jump. Down from the press
+// is the power, as a pull's; back within CANCEL of its height none (shot
+// null: letting go there shoots nothing). yaw: the heading the fine aim is
+// read from, turned on by dt seconds of spin; returns the new one, the aim
+// (dir), which way it spins (-1, 0, 1), and the shot as a pull rounds it.
+const FINE = (50 * Math.PI) / 180, SPIN_MAX = (150 * Math.PI) / 180, SPIN_RAMP = 0.2, CANCEL = 6;
+export function steerAim(yaw: number, dx: number, down: number, dt: number, vw: number, vh: number) {
+  const zone = Math.max(0.28 * vw, 1.15 * pullFull(vw, vh)), past = Math.abs(dx) - zone;
+  const k = past <= 0 ? 0 : Math.min(1, past / (SPIN_RAMP * vw)), rate = k * k * (3 - 2 * k) * SPIN_MAX;
+  const y = yaw - Math.sign(dx) * rate * dt, dir = y - FINE * Math.max(-1, Math.min(1, dx / zone));
+  return { yaw: y, dir, spin: rate > 0 ? Math.sign(dx) : 0, shot: down < CANCEL ? null : pullShot(down, vw, vh, dir, MAX_POWER) };
 }
 // How much the aim dots give away, by aim mode. Assisted: the chain's whole
 // path (the straight line before it answers as far as the pull is strong,
@@ -59,6 +58,7 @@ function clipPath(path: readonly Vec2[], len: number) {
   }
   return out;
 }
+
 
 /** One preview asked of the chain: the aim, the round so far, the tick, and the shot string sent. */
 interface Question {
@@ -124,7 +124,7 @@ export function makeAimer(E: Live) {
     if (asked) asked.abort(), (asked = null), (asking = false);
     (mineWant = null), (mineShown = "");
     clearTimeout(later);
-    since = 0;
+    (since = 0), (armed = "");
     morph = null;
     ghosts(false);
     aim.visible = band.visible = false;
@@ -147,7 +147,7 @@ export function makeAimer(E: Live) {
   // rounded for the chain), for this hole. A request the pull no longer
   // wants (let go, cancelled, a new round) is cancelled.
   const PREVIEW_MS = 120, PREVIEW_MAX = 360, KEPT = 256;
-  let sent: Question | null = null, later: ReturnType<typeof setTimeout> | undefined, since = 0, asked: AbortController | null = null;
+  let sent: Question | null = null, armed = "", later: ReturnType<typeof setTimeout> | undefined, since = 0, asked: AbortController | null = null;
   const answers = new Map<string, Stroke>(), mine = new Map<string, Stroke>(); // the chain's answers, the page's own
   const keep = (m: Map<string, Stroke>, k: string, res: Stroke) => {
     m.delete(k);
@@ -247,9 +247,12 @@ export function makeAimer(E: Live) {
       local(q);
       // the chain, once the hand rests on a new aim (not for the timed
       // pieces moving on under a still hand): its answer kept for the
-      // release, and checked against this one
+      // release, and checked against this one. The timer is armed once per
+      // aim (armed): third person previews every frame, and re-arming it
+      // each time would never let it fire
       const moved = !sent || sent.id !== q.id || sent.n !== q.n || sent.angle !== q.angle || sent.power !== q.power;
-      if (moved && !answers.has(q.key) && !asking) (clearTimeout(later), (later = setTimeout(ask, PREVIEW_MS)));
+      const at = `${q.id}|${q.n}|${q.angle}|${q.power}`;
+      if (moved && at !== armed && !answers.has(q.key) && !asking) (armed = at), clearTimeout(later), (later = setTimeout(ask, PREVIEW_MS));
       return;
     }
     void simHole(chain, q.id); // the page's own previews, for the next pulls
@@ -273,6 +276,7 @@ export function makeAimer(E: Live) {
     return { ...w, rest: g.rest, n: w.shots.length, round: g.round, tick, shot, key: keyOf({ id: w.id, shots: w.shots, shot }) };
   }
   function ask() {
+    armed = "";
     if (!E.dragging || !wanted || asking) return;
     since = 0;
     const q = (sent = question(wanted));
@@ -320,7 +324,10 @@ export function makeAimer(E: Live) {
   };
 
   // in fog the dots see only 7 units ahead: it hinders the aim without blinding it
-  const fogged = (path: readonly Vec2[]) => (g.weather && g.weather.fog ? clipPath(path, 7) : path);
+  const fogged = (path: readonly Vec2[]) => {
+    const reach = sight(!!(g.weather && g.weather.fog), !!g.s && darkGallery({ hole: g.s.slot || g.s.hole }));
+    return reach ? clipPath(path, reach) : path;
+  };
 
   return {
     preview,

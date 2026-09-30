@@ -6,11 +6,12 @@
 import * as THREE from "three";
 import { buzz as shake, sound as say, type SoundName } from "../feel";
 import { causeAt } from "../scene/cause";
-import { at, makePuff, makeSplash, disposeCourse } from "../scene";
+import { worldOf } from "../scene/worlds";
+import { at, makePuff, makeSplash, disposeCourse, motion } from "../scene";
 import { BALL_R, inZone, nearestOnPoly, boxOf, closest, segDist, onAt, segHit, rayCircle } from "../terrain";
 import type { MutVec2, Vec2, Wall, Zone } from "../types";
 import type { Cause } from "../scene/cause";
-import type { Gnome, TubePath } from "../scene/data";
+import type { Gnome, Ride, TubePath } from "../scene/data";
 import type { Live } from "./types";
 
 /** One arc of a flight, in path time (a step is one substep): it leaves at
@@ -164,11 +165,16 @@ export function makeReplay(E: Live) {
     if (!g.s || Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-3) return null;
     const at = (v: Vec2) => Math.abs(q[0] - v[0]) <= 1e-3 && Math.abs(q[1] - v[1]) <= 1e-3;
     let best: Zone | null = null, bd = Infinity;
-    for (const z of g.s.zones) {
+    // (and the stroke's own tunnels: a lift at this stroke's landing, hole 8)
+    const own = g.s.zones, more = E.zones().filter((z) => z.kind === "tunnel" && !own.includes(z));
+    for (const z of more.length ? own.concat(more) : own) {
       // a loop with a tube (island7's castle tube) is ridden like a tunnel
       if ((z.kind !== "tunnel" && z.kind !== "hazard" && z.kind !== "loop") || !(at(z.vec) || (z.kind === "hazard" && start && at(start)))) continue;
       const dx = Math.max(z.min[0] - p[0], 0, p[0] - z.max[0]), dz = Math.max(z.min[1] - p[1], 0, p[1] - z.max[1]);
-      const d = Math.hypot(dx, dz);
+      // (the dark round a lane, whose box is the board's: as far as its edge, not 0)
+      const e = z.outside && z.poly && !inZone(z, p[0], p[1]) ? nearestOnPoly(p[0], p[1], z.poly) : null;
+      // (a hazard the ball is in is the one it fell into: before any nearer box, a pond beside a void whose box is the board's)
+      const d = z.kind === "hazard" && inZone(z, p[0], p[1]) ? -1 : e ? Math.hypot(e[0] - p[0], e[1] - p[1]) : Math.hypot(dx, dz);
       if (d < bd) (bd = d), (best = z);
     }
     if (!best && start && at(start)) return { kind: "hazard", min: [p[0] - 1, p[1] - 1], max: [p[0] + 1, p[1] + 1], vec: start, scale: 0, round: false, skin: "" };
@@ -181,17 +187,43 @@ export function makeReplay(E: Live) {
     return z ? z.kind : null;
   };
 
-  // The ball really rolls: turned about the axis across its motion by distance
-  // over radius. It is cosmetic — the chain moves a point — and when it stops
-  // the gnome rights himself and looks at the player again.
-  const axis = new THREE.Vector3(), spin = new THREE.Quaternion();
+  // A fall's ending by what the ball goes into, in every world, one path: water swallows it at the surface, a drop
+  // (a void, a shaft, a gap, a crevasse, a cliff) has it fall on out of sight, lava takes it in slowly, a roof, a
+  // serac or a bin stops it with a thud. A world may draw its own (worlds.ts fallIn), else the shared splash or dust.
+  const DROPS = new Set(["void", "shaft", "crumble", "gap", "crevasse", "cliff"]), LAVAS = new Set(["lava", "lava tide", "lava fall"]), THUDS = new Set(["roof", "serac", "ore bin"]);
+  let fell: { skin: string; end: string; at: number } | null = null;
+  const endingOf = (skin: string) => (DROPS.has(skin) ? "drop" : LAVAS.has(skin) ? "lava" : THUDS.has(skin) ? "thud" : "water");
+  // (a drop's dust and bits: sand and rock off an island's gap, snow and ice off the mountain's)
+  const DUST: Record<string, readonly [number, number]> = { gap: [0xe6dccb, 0x8a7a66], crevasse: [0xf4f8ff, 0xbfe3f2], cliff: [0xf4f8ff, 0xbfe3f2] };
+
+  // The ball really rolls: forward, head over heels about the level axis across
+  // its way, by distance over radius, its hat and face turning with it, never
+  // on its side. Its heading turns to a new way (a bounce, a ride's exit) as it
+  // goes, smoothly; only the roll pitches it. Cosmetic — the chain moves a
+  // point — and when it stops the gnome rights himself and looks at the player
+  // again. Every move of the drawn ball goes through here (the lane, a ride, a fall).
+  const rolled = { yaw: 0, pitch: 0, q: new THREE.Quaternion(), mine: false }, fwd = new THREE.Vector3(), rollE = new THREE.Euler(0, 0, 0, "YXZ");
   function roll(a: THREE.Vector3, b: THREE.Vector3) {
     const dx = b.x - a.x, dz = b.z - a.z;
     const d = Math.hypot(dx, dz);
     if (d < 1e-6) return;
-    axis.set(dz / d, 0, -dx / d);
-    spin.setFromAxisAngle(axis, d / BALL_R);
-    E.ball.userData.body.quaternion.premultiply(spin);
+    const q = E.ball.userData.body.quaternion;
+    // (set by another since: righted, aimed, a new stroke: from its heading, standing)
+    if (!rolled.mine || !q.equals(rolled.q)) (fwd.set(0, 0, 1).applyQuaternion(q)), (rolled.yaw = Math.atan2(fwd.x, fwd.z)), (rolled.pitch = 0);
+    const want = Math.atan2(dx, dz), off = Math.atan2(Math.sin(want - rolled.yaw), Math.cos(want - rolled.yaw));
+    rolled.yaw += Math.sign(off) * Math.min(Math.abs(off), d * 5); // (a half turn over 0.63 of its way: never long across it)
+    rolled.pitch += (d / BALL_R) * Math.cos(want - rolled.yaw);
+    q.setFromEuler(rollE.set(rolled.pitch, rolled.yaw, 0));
+    rolled.q.copy(q);
+    rolled.mine = true;
+  }
+  /** Standing again where it is put back (a hazard's reset): its heading kept, no roll, the whole gnome upright. */
+  function upright() {
+    const q = E.ball.userData.body.quaternion;
+    fwd.set(0, 0, 1).applyQuaternion(q);
+    q.setFromEuler(rollE.set(0, rolled.mine ? rolled.yaw : Math.atan2(fwd.x, fwd.z), 0));
+    E.ball.rotation.set(0, 0, 0);
+    rolled.mine = false;
   }
   // Off a ramp the ball takes off. On the ground it follows the ground; when
   // the ground falls away faster than the ball is moving down, it is in the
@@ -314,12 +346,19 @@ export function makeReplay(E: Live) {
   // A frame of a tunnel, a climb back or a splash that throws ends that move:
   // warned, the ball put right (E.stop), and the move settled, so the replay
   // awaiting it goes on instead of waiting for good.
-  const framesOf = (done: () => void) => (f: FrameRequestCallback) =>
+  const framesOf = (done: () => void, undo?: () => void) => (f: FrameRequestCallback) =>
     window.requestAnimationFrame((now) => {
       try {
         f(now);
       } catch (err) {
         console.warn("gnogolf: the replay threw", err);
+        // (a ride's or a fall's camera let go, its set piece told it is over: never pinned there for good)
+        g.ride = null;
+        try {
+          undo?.();
+        } catch {
+          // (its own set piece threw again: let it be)
+        }
         E.stop();
         done();
       }
@@ -333,17 +372,21 @@ export function makeReplay(E: Live) {
     g.inTube = true;
     return new Promise<void>((settle) => {
       const done = () => ((g.inTube = false), settle());
-      const requestAnimationFrame = framesOf(done);
+      const ride = tube && tube.userData && tube.userData.ride;
+      const requestAnimationFrame = framesOf(done, () => ride && ride.at?.(-1, E.ball));
       // a longer tube (a spiral slide) takes longer, at the same pace as a straight one
-      const start = performance.now(), T = tube ? Math.min(2400, Math.max(900, tube.getLength() * 75)) : 350;
+      // (a ride takes its own time, and moves its set piece and the camera: rideStep)
+      const start = performance.now(), T = ride ? (motion ? ride.ms : Math.min(ride.ms, 700)) : tube ? Math.min(2400, Math.max(900, tube.getLength() * 75)) : 350;
       const tick = (now: number) => {
-        if (round !== g.round || E.cut !== cutAt) return done();
+        if (round !== g.round || E.cut !== cutAt) return (ride && rideStep(ride, -1)), done();
         const k = Math.max(0, Math.min((now - start) / T, 1));
-        if (tube) {
+        if (ride) rideStep(ride, k, tube);
+        else if (tube) {
           tube.getPoint(k, E.ball.position); // written in place: no vector a frame
           E.ball.scale.setScalar(tube.userData && tube.userData.arc ? 1 : 0.7); // inside the pipe, a size smaller (thrown through the air: full size)
         } else E.ball.visible = false; // no tube (a door, a cave): inside, unseen, until it comes out
         if (k < 1) return void requestAnimationFrame(tick);
+        if (ride) rideStep(ride, -1);
         E.ball.position.copy(to);
         E.ball.scale.setScalar(1);
         E.ball.visible = true; // out (a cut leaves it as its owner set it: a ghost dropped stays gone)
@@ -351,6 +394,22 @@ export function makeReplay(E: Live) {
       };
       requestAnimationFrame(tick);
     });
+  }
+
+  /** A frame of a ride at k (0..1 of its time; -1: over): the ball along its
+   *  curve, the set piece with it, the camera where the ride puts it. */
+  const rideCam = { pos: new THREE.Vector3(), look: new THREE.Vector3(), cut: false }, rideWas = new THREE.Vector3();
+  function rideStep(ride: Ride, k: number, tube?: TubePath) {
+    if (k < 0) return void ((g.ride = null), ride.at && ride.at(-1, E.ball));
+    rideWas.copy(E.ball.position);
+    tube!.getPoint(ride.ease ? ride.ease(k) : k, E.ball.position);
+    if (k > 0) roll(rideWas, E.ball.position); // (rolling its way along the ride, as on the lane)
+    E.ball.scale.setScalar(ride.size ?? 1);
+    if (ride.at) ride.at(k, E.ball);
+    // (for a player who asked for less motion: a short ride, the camera left as it is)
+    const c = motion && ride.cam ? ride.cam(k, rideCam.pos, rideCam.look) : false;
+    rideCam.cut = c === "cut";
+    g.ride = c ? rideCam : null;
   }
 
   /**
@@ -372,8 +431,9 @@ export function makeReplay(E: Live) {
       if (Math.hypot(dx, dy) > 0.7) continue;
       const t0 = tube.getTangentAt(0);
       if (ix * t0.x + iy * t0.z <= 0) continue; // it was not going in
-      const speed = Math.hypot(ix, iy), frac = Math.min(0.97, speed / (z.scale || 2));
-      return { tube, reach: frac * 0.5, speed };
+      // (a ridden loop says how far up it a ball climbs: never over the top, never round)
+      const speed = Math.hypot(ix, iy), frac = Math.min(0.97, speed / (z.scale || 2)), climb = tube.userData && tube.userData.ride && tube.userData.ride.climb;
+      return { tube, reach: frac * (climb ?? 0.5), speed };
     }
     return null;
   }
@@ -420,47 +480,94 @@ export function makeReplay(E: Live) {
     return from.clone().set(p[0] + (dx / l) * 0.6, from.y, p[1] + (dz / l) * 0.6);
   }
 
-  function splashDown(at: THREE.Vector3, back: THREE.Vector3, round: number | undefined, edge: THREE.Vector3 | null = null, skin = "") {
+  function splashDown(at: THREE.Vector3, back: THREE.Vector3, round: number | undefined, edge: THREE.Vector3 | null = null, skin = "", vel: THREE.Vector3 | null = null, zone: Zone | null = null) {
     const cutAt = E.cut;
+    let end = endingOf(skin), look = skin;
     buzz(25);
+    // into a drop or lava it goes on over the lip along its way (a slow one tips over, 0.6 on), where it went in,
+    // never well inside it as into water, nor stopped on the edge
+    const sp = vel ? Math.hypot(vel.x, vel.z) : 0, fallDir = new THREE.Vector3(1, 0, 0);
+    if ((end === "drop" || end === "lava") && edge && vel) {
+      const dir = sp > 1e-3 ? vel.clone().setY(0).normalize() : at.clone().sub(edge).setY(0).normalize();
+      fallDir.copy(dir);
+      const on = edge.clone().addScaledVector(dir, Math.max(0.6, Math.min(sp * 0.5, 4)));
+      if (!zone || inZone(zone, on.x, on.z)) at = on.setY(at.y);
+      else {
+        // (going along the edge, slow: over it where the hazard is nearest, the side nearest its heading first)
+        let best: THREE.Vector3 | null = null;
+        for (let r = 0.6; r <= 2 && !best; r += 0.35)
+          for (let k = 0; k < 16 && !best; k++) {
+            const a = Math.atan2(dir.z, dir.x) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 8), q = edge.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
+            if (inZone(zone, q.x, q.z)) best = q;
+          }
+        if (best) (at = best.setY(at.y)), fallDir.copy(best).sub(edge).setY(0).normalize();
+      }
+    }
     // Off a raised edge (a pier, a boardwalk, a crevasse's lip): the water is
     // below. The ball carries on outward in a short falling arc from the edge
-    // down to it, and splashes there. It never hovers at deck height.
-    const surf = g.course && g.course.userData.surfaceAt ? g.course.userData.surfaceAt(at.x, at.z) : at.y - BALL_R;
+    // down to it, rolling on as it goes. It never hovers at deck height.
+    // (a drop onto what the world draws down there: a pit's lake, its lava, its floor: worlds.ts pit; else the dark)
+    const pit = end === "drop" && g.s ? worldOf(g.s).pit?.(g.s, at.x, at.z) : undefined;
+    if (pit) (end = pit.end === "floor" ? "thud" : pit.end), (look = pit.as);
+    const lies = skin === "roof" || pit?.end === "floor"; // (it lies where it fell: a street, a pit's floor)
+    const surf = pit ? pit.y : g.course && g.course.userData.surfaceAt ? g.course.userData.surfaceAt(at.x, at.z) : at.y - BALL_R;
     const drop = at.y - BALL_R - surf;
     // seconds, under gravity; with no drop to speak of, still a glide to where it sinks
     const fall = Math.max(Math.sqrt((2 * Math.max(drop, 0)) / GRAVITY), 0.2);
     const from = edge || at.clone();
     const land = at.clone().setY(surf + BALL_R * 0.4);
+    // (a drop's camera over the lip, following it down a moment: the rides' pose, camera.ts g.ride)
+    // (and every fall-in in a world whose hazards are walled and deep, where the player's camera would not see it: worlds.ts fallCam)
+    const follow = (end === "drop" || !!(g.s && worldOf(g.s).fallCam)) && motion && !!edge, was = new THREE.Vector3();
+    // (seconds: going under, gone, coming back; a drop falls on a while out of sight, lava takes it in slowly)
+    const under = end === "drop" || end === "lava" ? 1 : 0.7, gone = under + 0.4, over = gone + 0.3;
+    const watch = () => {
+      if (!follow) return;
+      rideCam.pos.copy(from).addScaledVector(fallDir, 1.2).setY(from.y + 5.5);
+      rideCam.look.copy(E.ball.position);
+      rideCam.cut = false;
+      g.ride = rideCam;
+    };
     return new Promise<void>((done) => {
-      const requestAnimationFrame = framesOf(done);
+      // (a frame that throws: its ending taken away, the gnome on his feet)
+      const requestAnimationFrame = framesOf(done, () => (rings && (scene.remove(rings.group), disposeCourse(rings.group)), upright()));
       const t0 = performance.now();
       let rings: { group: THREE.Object3D; step(t: number): void } | null = null, start = 0;
       const tick = (now: number) => {
         if (round !== g.round || E.cut !== cutAt) {
           if (rings) (scene.remove(rings.group), disposeCourse(rings.group));
+          if (follow) g.ride = null;
+          upright();
           return done();
         }
         // the fall first
         const tf = Math.max(0, (now - t0) / 1000);
         if (tf < fall) {
           const k = tf / fall;
+          was.copy(E.ball.position);
           E.ball.position.lerpVectors(from, land, k); // on outward at its speed
           E.ball.position.y = from.y + (land.y - from.y) * k * k; // and down, faster and faster
+          roll(was, E.ball.position); // (rolling on as on the lane, at its own speed)
+          watch();
           return void requestAnimationFrame(tick);
         }
         if (!rings) {
           start = now;
           at = land;
-          if (skin === "roof") {
+          fell = { skin, end, at: now };
+          const own = g.s && worldOf(g.s).fallIn?.(g.s, look, land.clone().setY(surf), !E.quiet);
+          if (own) rings = own;
+          else if (skin === "roof") {
             // a fall, not a splash: a thud and a puff of dust where it lands (off a bridge too, where
             // makeSplash's own test finds no fall and would ring water)
             sound("thud");
             rings = makePuff(land.clone().setY(surf));
-          } else if (skin === "serac") {
-            sound("thud");
-            for (let n = 0; n < 6; n++) E.causes.at(E.ball.position, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, { kind: "ice" });
-            rings = { group: new THREE.Group(), step() {} };
+          } else if (skin === "serac" || end === "drop") {
+            // a serac: a thud and chips of ice; a drop (a gap, a crevasse, a cliff): a breath of dust off the
+            // lip as it goes on down out of sight, chips of ice off the mountain's
+            sound(end === "drop" ? "drop" : "thud");
+            if (skin !== "gap") for (let n = 0; n < 6; n++) E.causes.at(E.ball.position, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, { kind: "ice" });
+            rings = end === "drop" ? makePuff(land.clone().setY(surf), DUST[skin]) : { group: new THREE.Group(), step() {} };
           } else {
             sound("splash");
             rings = makeSplash(land.clone().setY(surf + 0.5), { open: drop > 0.25 });
@@ -471,23 +578,38 @@ export function makeReplay(E: Live) {
         if (round !== g.round || E.cut !== cutAt) {
           scene.remove(rings.group);
           disposeCourse(rings.group);
+          if (follow) g.ride = null;
+          upright();
           return done();
         }
         rings.step(t);
-        if (t < 0.7) {
-          // (in the street it lies where it fell, whole: it only sinks in water)
-          const k = skin === "roof" ? 0 : t / 0.7;
-          E.ball.position.set(at.x, at.y - k * 1.1, at.z);
-          E.ball.scale.setScalar(1 - k * 0.6);
-        } else if (t < 1.1) {
+        if (t < under) {
+          const k = t / under;
+          if (end === "drop") {
+            // on down out of sight, faster and faster, still going its way a little, smaller and smaller
+            was.copy(E.ball.position);
+            const on = Math.min(sp, 2) * 0.4 * t; // (a drift its way, not on into the far wall)
+            E.ball.position.set(at.x + fallDir.x * on, at.y - 0.8 * k - 7.2 * k * k, at.z + fallDir.z * on);
+            roll(was, E.ball.position);
+            E.ball.scale.setScalar(1 - k * k * 0.85);
+          } else {
+            // into water it sinks where it went in, lava takes it slower; in the street it lies where it fell, whole
+            const deep = lies ? 0 : end === "lava" ? 1.2 : 1.1;
+            E.ball.position.set(at.x, at.y - k * deep, at.z);
+            E.ball.scale.setScalar(1 - k * (lies ? 0 : 0.6));
+          }
+          if (follow && g.ride) rideCam.look.copy(E.ball.position);
+        } else if (t < gone) {
           E.ball.visible = false;
+          if (follow) g.ride = null; // (the camera back to its own once the ball is gone: the reset follows)
         } else {
           E.ball.visible = true;
-          const k = Math.min((t - 1.1) / 0.3, 1);
+          const k = Math.min((t - gone) / 0.3, 1);
           E.ball.position.copy(back);
+          upright(); // (back on its feet where it is put back, whatever it went through)
           E.ball.scale.setScalar(0.3 + 0.7 * k);
         }
-        if (t < 1.4) return void requestAnimationFrame(tick);
+        if (t < over) return void requestAnimationFrame(tick);
         scene.remove(rings.group);
         disposeCourse(rings.group);
         E.ball.scale.setScalar(1);
@@ -626,7 +748,9 @@ export function makeReplay(E: Live) {
           // off a rooftop: it drops into the street just past the edge it left
           // from, not well inside the hazard as into water
           const at = hz && hz.skin === "roof" ? offEdge(hz, path[Math.max(0, i - 1)], path[i], from) : sinkPoint(path[i], path[i + 1], from, path[0]);
-          return void splashDown(at, to, round, E.ball.position.clone(), hz ? hz.skin : "").then(() => {
+          // (its speed over the last step, for a world whose ball falls on over the lip: worlds.ts fallIn)
+          const pv = path[Math.max(0, i - 1)], vel = new THREE.Vector3(path[i][0] - pv[0], 0, path[i][1] - pv[1]).divideScalar(MS_PER_STEP / 1000);
+          return void splashDown(at, to, round, E.ball.position.clone(), hz ? hz.skin : "", vel, hz).then(() => {
             E.mood.shake(performance.now());
             air.t = 0;
             i++;
@@ -651,8 +775,9 @@ export function makeReplay(E: Live) {
           const marked = typeof why === "string" && why.length === path.length;
           if (marked ? why[i] === "b" : cos < 0.6) {
             const post = s.posts.some((p) => Math.hypot(p.c[0] - path[i][0], p.c[1] - path[i][1]) < p.r + 1.2);
-            // louder the faster it hits, never silent
-            sound(post ? "boing" : "knock", Math.max(0.2, Math.min(1, Math.max(l0, len) / 2)));
+            // louder the faster it hits, never silent (a world may sound it itself: a singing crystal)
+            const k = Math.max(0.2, Math.min(1, Math.max(l0, len) / 2));
+            if (!worldOf(s).ring?.(s, path[i][0], path[i][1], E.quiet ? 0 : k)) sound(post ? "boing" : "knock", k);
           }
         }
         // a bounce's step runs through where it hit: in, then out, at the one speed of its run
@@ -723,7 +848,8 @@ export function makeReplay(E: Live) {
             if (d >= reach && !knocked && corner) {
               knocked = true;
               const post = s.posts.some((p) => Math.hypot(p.c[0] - corner[0], p.c[1] - corner[1]) < p.r + 1.2);
-              sound(post ? "boing" : "knock", Math.max(0.2, Math.min(1, run / 2)));
+              const k = Math.max(0.2, Math.min(1, run / 2));
+              if (!worldOf(s).ring?.(s, corner[0], corner[1], E.quiet ? 0 : k)) sound(post ? "boing" : "knock", k);
             }
           } else E.ball.position.lerpVectors(from, to, k);
           if (!jump && !drop) {
@@ -750,7 +876,7 @@ export function makeReplay(E: Live) {
           }
           if (push && (push.kind === "slope" || push.kind === "tilt")) glowSlope(path[i][0], path[i][1]);
           if (push) {
-            const label = E.causes.at(E.ball.position, vx * perSec, vy * perSec, push);
+            const label = E.causes.at(E.ball.position, vx * perSec, vy * perSec, push, g.s ? g.s.world : "");
             if (label) (g.cause = { label, at: performance.now() }), void E.publish();
           }
           if (!jump) roll(prev, E.ball.position);
@@ -800,6 +926,8 @@ export function makeReplay(E: Live) {
 
   return {
     replay,
+    /** ?camlog: the last fall's ending, as it began (its hazard's skin, the ending's kind, when). */
+    fell: () => fell,
     /** The gnome drawn clear of the walls, for this frame (the engine's and the clip's). */
     offWalls,
     /** The kind of jump a step makes, for the aim dots: "tunnel", "hazard", "loop" or null. */

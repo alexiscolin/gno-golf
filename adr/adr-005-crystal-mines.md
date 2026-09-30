@@ -2,9 +2,12 @@
 
 ## Status
 
-Proposed, 2026-09-29. This is a design on paper only: no game code, no hole
-realm and no chain write goes with it. The cup ships after the launch as data,
-published with `Publish`, and needs no redeploy. The backlog chose it
+Accepted and built, 2026-09-30. The cup ships at the launch: its 18 holes are
+published as data with the 72 in the deploy's step 4 (90 holes at once), and
+the client from the branch `mines` draws them. **"As built"**, at the end, says
+what shipped where it differs from the design below. It was proposed on
+2026-09-29 as a design for after the launch, as data published with `Publish`
+and no redeploy. The backlog chose it
 ("A fifth cup, for experts", **Chosen: the Crystal Mines**). The owner asked
 for holes that are hard for several reasons at once, visually worth a trailer,
 unique against the other four cups, and on a real curve up to a boss hole.
@@ -13,6 +16,11 @@ Amended 2026-09-29, before the deploy froze golf: golf's `worlds` names the
 mines ("Crystal Mines", fifth, after the mountain), and the course ranking
 counts holes, then the score against par (see Consequences), so the mines
 count in the general ranking weighted by their par.
+
+Built 2026-09-29 on the branch `mines`: the owner's rules while it was built
+changed the holes' scale and pars (long fairways, human-calibrated pars, three
+to five minutes a hole). **"As built"**, at the end, says what shipped where it
+differs from the design below.
 
 ## Summary
 
@@ -95,7 +103,7 @@ twice, one at a time. An expert cup is what keeps them.
 publishes into a slot (`mines/7`). The slot's world is the hole's world, and a
 new world needs nothing on chain:
 
-- `isWorld` accepts 1 to 16 letters `a-z`.
+- `course.IsWorld` accepts 1 to 16 letters `a-z`.
 - `worldRank` puts it fifth, after the mountain: golf's `worlds` names it.
 - The hub gives it a card, titled `cupName("mines")`, which is `"Crystal Mines"`.
 - The course ranking counts it: it adds up every current course hole, each
@@ -110,9 +118,13 @@ new world needs nothing on chain:
   - Timings with `Every` up to 4096.
   - At most 32 KB of data.
 - **The climates.** `course.climates` is unexported. A world that isn't listed
-  gets the garden's: clear 55, wind 20, rain 15, fog 10. So the mines can
-  never get a storm or snow. A mines climate would mean a new `course` and a
-  new `golf`: a redeploy, and a new weather for every version id (ADR-002,
+  gets the garden's: clear 55, wind 20, rain 15, fog 10. So the mines never
+  get a storm or snow. Course and golf were still undeployed when the mines
+  were built, so a `"mines"` row could have been added; keeping the garden's
+  is a choice: the owner's underground weather is still air, a draught,
+  dripping and lights out (no storm, no snow), the 18 pars were calibrated
+  over it, and a row now would re-pin the 18 frozen holes' data. After the
+  deploy a mines climate means a new `course` and a new `golf` (ADR-002,
   Consequences).
 - **The physics.** Pieces don't move and carry nothing. A timed bar comes and
   goes, and pushes a ball out of it without giving it any speed. A zone moves
@@ -239,7 +251,7 @@ across the hole's own walls.
 
 ### 3. Weather underground
 
-The mines get the garden's climate, since the table is frozen. In the client
+The mines get the garden's climate (a choice: see The climates, above). In the client
 each kind of weather is re-dressed for a cave, and each hole is built so that
 the weather changes the right shot:
 
@@ -1308,3 +1320,97 @@ Estimates are for one developer with Claude, on the pace of the four cups.
   says show it, since it is the carrot.
 - Two gnomes per cup, like garden, island and town (a Prospector for
   finishing, the Miner at par)? Or one, as above?
+## As built
+
+The cup was built as designed where this section says nothing. What changed,
+and why:
+
+**Pars from what a human can do, not the machine.** The solver proves a hole
+finishable; the par is what a good player can execute. A stroke counts as
+playable when its neighbours also work: angle ±1° and ±0.5°, power ±0.2, tick
+±1 on a timed hole; each must hole where the stroke holes, else not be sent
+back and stop no more than 3 units farther from the cup (the board's distance
+round the walls). **Par is the worst weather's human-robust stroke count plus
+one**, over calm (= fog), ten rain periods of `mines/N/v1` and wind at the
+hole's cap from eight directions. Every one of the 18 × 19 weather plans is
+kept in the hole's report and replays; the calm plan goes in
+`scripts/hole-bests.json`, the machine's fragile best as `raw`.
+
+**Three to five minutes a hole.** The owner's rule: a good player takes 3 to 5
+minutes. Modelled per stroke as 12 s of aim (20 for a precision shot), the wait
+for the timing window of the pieces it threads (half their cycle at 3.5 ticks a
+second), the flight as the game replays it (0.6 to 1.7 s measured) and 3 s of
+camera; 2.5 s a ride. The 18 come out at 3.1 to 4.1 minutes at par. So the pars
+are higher than §8's: **158 in all** (§8: 86), 8 to 10 a hole. A round keeps
+its weather and must be saved within 4:45 to 9:45 of its first stroke (the
+period it starts in, and the next), which a par round fits.
+
+**Long fairways, organic, full of obstacles.** The owner asked for classic long
+lanes (up to the 96 of `MaxBoard` on the long axis, narrow on the other), their
+edges organic like the other cups' (the lane is the void's outline, split into
+two or three Outside zones tiling the board where one 64-point polygon would
+facet), with hard obstacles of every kind along them, several per stretch, and
+a silhouette no other hole shares. Only 5 The Geode and 17 The Great Shaft are
+wide caverns. Hazard zones are round or smooth polygons, never square corners.
+
+| # | Hole | Shape | Hero / signature | Par | Board | Minutes |
+|---|---|---|---|---|---|---|
+| 1 | The Pithead | split upper and lower lanes | the headframe's cage over the open shaft; the man-way | 9 | 76×34 | 3.4 |
+| 2 | Glowworm Gallery | a serpentine of six round bends (dark) | a chicane of singing crystals | 9 | 67×35 | 3.5 |
+| 3 | The Rail Yard | a yard from a roundhouse | the turntable, three carts on three beats | 8 | 84×28 | 3.2 |
+| 4 | The Chasm | a zigzag of rope bridges | the giant pickaxe's pendulum, swaying bridges | 9 | 87×28 | 3.4 |
+| 5 | The Geode | wide: three rings | kicking and dull agate facets on crystal ice | 9 | 51×51 | 3.5 |
+| 6 | The Stamp Mill | two floors joined by the hopper | the stamp battery over the belt, the water wheel | 10 | 92×31 | 3.5 |
+| 7 | The Lava Tide | a horseshoe round the lake | the tide on a period of three | 8 | 76×42 | 3.1 |
+| 8 | The Cage | a drift down in three legs | the lift at another landing each stroke | 8 | 92×35 | 3.2 |
+| 9 | The Collapsing Gallery | a fork round a rock island | the drill head, one-way rockfalls, dynamite, crumbling slabs | 10 | 94×26 | 3.5 |
+| 10 | The Geysers | a staircase of terraces | three geysers on three clocks, steam pistons | 8 | 95×33 | 3.7 |
+| 11 | The Corkscrew | a hook | the chute's two loops behind timed points, the jump | 8 | 83×74 | 3.1 |
+| 12 | The Steam Vents | a crescent ledge | jets, the steam pump's pistons, the iron vein | 10 | 83×27 | 4.1 |
+| 13 | The Lava Fall | a long lava gallery | two falls on coprime periods, the basalt bridge | 8 | 93×29 | 3.1 |
+| 14 | The Mine Cart Run | a lane doubling back under itself | the cart ride, the rolling boulder | 9 | 95×38 | 3.7 |
+| 15 | The Stalactite Hall | a lasso round a frozen lake (dark) | stalactites, bats per stroke, the frozen fall | 8 | 65×36 | 3.3 |
+| 16 | The Strongroom | a lollipop | a gauntlet of doors, tripwires, the round vault | 9 | 62×43 | 3.6 |
+| 17 | The Great Shaft | wide: a ring round the shaft | a trap each quarter, the cable car | 9 | 94×71 | 3.5 |
+| 18 | The Mother Lode | the eye: the Heart on an island | cart or collapse, the tide, the Heart | 9 | 83×69 | 3.5 |
+
+**Gas, measured.** Every hole keeps 843,914 to 952,747 units of room in its
+dearest weather (all over the 840K asked, 44K to 153K over the floor), and a
+shot bound of 1.238e9 to 1.259e9. The heaviest shot found (a random search over
+starts, angle, power, tick and weather, and on 18 from every real rest of the
+par route) is 0.496 of `MaxWork`, on 18 in the Heart; 5 and 6 reach about 0.4.
+
+**One-way pulses are `Every: 64`, not 4096.** A round holds at most 60
+strokes, so 64 closes a gallery for good just the same, and `fingerprint.Full`
+plays every stroke of the longest cycle: 4096 would make a fingerprint test
+take hours.
+
+**New pieces, same engine.** The owner's traps were built from existing pieces:
+a pendulum pickaxe (timed bars in sequence), a rolling boulder (timed bars
+inside a pulse of 2), dynamite (a pulse present until stroke k), crumbling
+slabs (a hazard pulse from stroke k), the iron vein (untimed air), a turntable
+(pulse walls by stroke), a water wheel and a drill head (rotating timed bars),
+steam pistons, singing crystals (bumpers), a frozen lake (ice), ore piles, a
+lift down one level on odd strokes (a pulse tunnel), a timed loop (11). One
+idea needs a redeploy and is left for a later physics: **pressure plates** that
+react to where a ball rests.
+
+**The weather underground** (client only, the chain's kinds unchanged): still
+air (clear), a draught (wind), dripping (rain) and **lights out** (fog: the
+lanterns die, only the headlamp, crystals, lava, the rim and the cup's lamp
+light the way; the aim dots stop at 7). The dark galleries (2, 15) play lights
+out in any weather, their dots at 7 and 4 in fog. The lava holes keep a heat
+ambience of their own ("hot").
+
+**The list's room.** golf lists at most 120 rows (`maxListed`, frozen at the
+deploy), the course's slots first: with the mines the course is 90, leaving the
+20 community rows and 10 archived. Raising it now would grow `Holes()` and the
+hub's reads for every player, for room no cup needs yet; a seventh cup would
+need a successor golf (deploy-v1.md, section 9).
+
+**No unlock: the cup is open at launch.** The owner opened it from the start,
+a cup like the other four: no boarded card, no padlock, no door kept in the
+browser, no cutscene. Its card is the others' size, an Expert tag on its
+window; "a few minutes a hole" is said on its curtain, its page and in About.
+The slam and the King stay the four classic cups. The Miner gnome is for
+finishing the cup, the Mother Lode badge for par.

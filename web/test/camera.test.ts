@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { makeCamera } from "../lib/engine/camera.ts";
-import { timeOf } from "../lib/scene/camera.ts";
+import { timeOf, overviewRig, courseBox } from "../lib/scene/camera.ts";
 import { angDiff, terrain } from "../lib/terrain.ts";
 import type { Live } from "../lib/engine/types.ts";
 import type { HoleState, Post, Vec2, Wall } from "../lib/types.ts";
@@ -341,4 +341,109 @@ void test("a post right where the camera would sit is avoided", () => {
 
 test("a hole's time of day is its number in its cup's, not its version's", () => {
   assert.deepEqual(["garden/2/v1", "garden/3/v1", "garden/4/v1", "garden/4/v2", "garden/4", "hole16"].map(timeOf), ["dusk", "day", "night", "night", "night", "night"]);
+});
+
+// ------------------------------------------------ the mines' boards and rides
+
+void test("the camera on the ball: a board bigger than the four cups' is followed from as near as their biggest", () => {
+  const view = { w: 1280, h: 720, top: 80, bottom: 80, side: 40 };
+  const cap = overviewRig(courseBox({ w: 90, h: 47 }), view).dist;
+  const off = (board: { w: number; h: number }, dist: number) => {
+    const hole = mkHole({ board, start: [10, 10], cup: [80, 10] });
+    const cam = settle(mkCam(hole, { g: { cam: "classic", over: { target: new THREE.Vector3(10, 0, 10), dist, ox: 0, oy: 0 } } }));
+    return cam.camera.position.distanceTo(cam.ball.position);
+  };
+  // a board within the four's: stands off as its overview says, whatever that is
+  assert.ok(off({ w: 90, h: 47 }, cap * 2) > off({ w: 90, h: 47 }, cap) * 1.8);
+  // the mines' boss, 96 by 80: no farther than the biggest of the four
+  assert.ok(Math.abs(off({ w: 96, h: 80 }, cap * 2) - off({ w: 90, h: 47 }, cap)) < 1e-6);
+  assert.ok(Math.abs(off({ w: 60, h: 72 }, cap * 2) - off({ w: 60, h: 47 }, cap * 2)) > 1, "too wide alone: capped too");
+  // an overview already nearer than that: kept
+  assert.ok(Math.abs(off({ w: 96, h: 80 }, cap / 2) - off({ w: 90, h: 47 }, cap / 2)) < 1e-6);
+});
+
+void test("a ride puts the camera where it says, in any mode: a cut at once, else sprung there", () => {
+  for (const mode of ["third", "classic"]) {
+    const cam = settle(mkCam(mkHole(), { g: { cam: mode } }));
+    const pos = new THREE.Vector3(4, 3, 8), look = new THREE.Vector3(6, 0, 5);
+    cam.g.ride = { pos, look, cut: true };
+    cam.api.update(1 / 60);
+    assert.ok(cam.camera.position.distanceTo(pos) < 1e-6, `${mode}: a cut`);
+    pos.set(9, 2, 5);
+    cam.g.ride = { pos, look, fov: 50 };
+    cam.api.update(1 / 60);
+    assert.ok(cam.camera.position.distanceTo(pos) > 0.1, `${mode}: no cut, no jump`);
+    settle(cam, 120);
+    assert.ok(cam.camera.position.distanceTo(pos) < 0.05, `${mode}: sprung there`);
+    assert.ok(Math.abs(cam.camera.fov - 50) < 0.5, `${mode}: the ride's lens`);
+    cam.g.ride = null;
+    settle(cam);
+    assert.ok(cam.camera.position.distanceTo(pos) > 0.5, `${mode}: back to the mode's own pose`);
+  }
+});
+
+void test("the route (a world's, or forced): the third person looks along the lane round a wall, not across it to the cup", () => {
+  // a U: out along the south leg, round the divider's end, back along the north leg to the cup
+  const hole = mkHole({ board: { w: 20, h: 10 }, walls: [mkWall([0, 5], [15, 5])], start: [2, 2.5], cup: [2, 7.5] });
+  const heading = (route: boolean | null) => {
+    const cam = mkCam(hole, { g: { cam: "third", course: { userData: { terrain: terrain(hole) } } } });
+    cam.api.forceRoute(route);
+    cam.api.prepare();
+    settle(cam, 300);
+    return cam.api.yaw();
+  };
+  const along = heading(true), across = heading(false);
+  assert.ok(Math.abs(angDiff(along, 0)) < 0.5, `the route: east along the leg (${along.toFixed(2)})`);
+  assert.ok(Math.abs(angDiff(across, 0)) > 0.5, `without it: toward the cup (${across.toFixed(2)})`);
+  // past the divider's end the route turns north, then west to the cup
+  const round = mkCam({ ...hole, start: [17.5, 5] }, { g: { cam: "third", course: { userData: { terrain: terrain({ ...hole, start: [17.5, 5] }) } } } });
+  round.api.forceRoute(true);
+  settle(round, 300);
+  assert.ok(Math.abs(angDiff(round.api.yaw(), Math.PI)) < 0.9, `round the end: back west (${round.api.yaw().toFixed(2)})`);
+});
+
+void test("the route takes a tunnel when it is the shorter way, and finds its way from a ball against a wall", () => {
+  const walls = [mkWall([0, 5], [15, 5])];
+  const look = (start: Vec2, zones: HoleState["zones"] = []) => {
+    const hole = mkHole({ board: { w: 20, h: 10 }, walls, zones, start, cup: [2, 7.5] });
+    const cam = mkCam(hole, { g: { cam: "third", course: { userData: { terrain: terrain(hole) } } } });
+    cam.api.forceRoute(true);
+    settle(cam, 300);
+    return cam.api.yaw();
+  };
+  // from x 8 on the south leg: round the divider's end, east; with a tunnel at x 5 up to the north leg, west to it
+  assert.ok(Math.abs(angDiff(look([8, 2.5]), 0)) < 0.6);
+  const tunnel = { kind: "tunnel", min: [4.5, 1] as Vec2, max: [5.5, 4] as Vec2, vec: [4, 7.5] as Vec2, scale: 1, round: false, skin: "adit" } as HoleState["zones"][number];
+  assert.ok(Math.abs(angDiff(look([8, 2.5], [tunnel]), Math.PI)) < 0.6, "west, to the tunnel");
+  // a ball against the divider (its cell within a ball of the wall): the nearest cell the route has, and on
+  assert.ok(Number.isFinite(look([10, 4.8])));
+});
+
+void test("third person, a world's solids: a moving piece is boxed again only once it has moved", () => {
+  const cam = mkCam(mkHole({ board: { w: 40, h: 10 } }));
+  const course = new THREE.Group(), live = new THREE.Group();
+  course.userData.height = () => 0;
+  live.userData.live = true; // (a machine: boxed every few frames, as it stands then)
+  const geo = new THREE.BoxGeometry(6, 2, 1), rock = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+  rock.position.set(5, 1, 5);
+  live.add(rock), course.add(live);
+  cam.api.collect(course);
+  cam.g.course = course;
+  let reads = 0;
+  const pos = geo.getAttribute("position") as THREE.BufferAttribute, getX = pos.getX.bind(pos);
+  pos.getX = (i: number) => (reads++, getX(i)); // (a big piece: boxed vertex by vertex)
+  const xs = () => cam.api.solidsInfo(5, 5, 20).boxes!.map((b) => b[0]);
+  settle(cam, 30);
+  assert.ok(reads > 0, "boxed the first time");
+  const first = reads, at = xs();
+  settle(cam, 30);
+  assert.equal(reads, first, "standing still: not boxed again");
+  assert.deepEqual(xs(), at);
+  rock.position.x += 2;
+  rock.updateMatrixWorld();
+  settle(cam, 30);
+  assert.ok(reads > first, "moved: boxed again");
+  assert.ok(xs().every((x, i) => Math.abs(x - at[i] - 2) < 1e-6), "and its boxes moved with it");
+  cam.api.collect(null);
+  assert.equal(cam.api.solidsInfo(5, 5).solids, 0, "a world without solids: none kept");
 });

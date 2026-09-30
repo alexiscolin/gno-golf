@@ -162,6 +162,29 @@ const SOUNDS = {
   select: (a) => (tone(a, { type: "triangle", f0: 660, f1: 520, dur: 0.07, gain: 0.12 }), noise(a, { dur: 0.03, f0: 2600, q: 3, gain: 0.08 })),
   blip: (a) => tone(a, { type: "sine", f0: 880, f1: 990, dur: 0.05, gain: 0.08 }),
   start: (a) => [523, 784, 1047].forEach((f, i) => tone(a, { type: "triangle", f0: f, at: i * 0.07, dur: i === 2 ? 0.35 : 0.1, gain: 0.1 })),
+  // the mines: a singing crystal struck (n: its note on a pentatonic scale,
+  // a bell's partials ringing out), into lava (a hiss and a crackle of
+  // sparks), into the void (a fall whistling away, then a far knock and its
+  // echo), a steam burst, a gallery's roof coming down, a charge blown
+  chime: (a, n = 0) => {
+    const f = 523.25 * 2 ** ([0, 2, 4, 7, 9, 12, 14, 16][Math.abs(Math.round(n)) % 8] / 12);
+    tone(a, { f0: f, dur: 1.4, gain: 0.09 });
+    tone(a, { f0: f * 2.76, dur: 0.6, gain: 0.03 });
+    tone(a, { type: "triangle", f0: f * 5.4, dur: 0.18, gain: 0.02 });
+  },
+  hiss: (a) => {
+    noise(a, { dur: 0.9, f0: 5200, f1: 2600, q: 0.7, gain: 0.16 });
+    for (let i = 0; i < 7; i++) noise(a, { at: 0.05 + Math.random() * 0.5, dur: 0.02, f0: 3000 + Math.random() * 3000, q: 4, gain: 0.12 });
+    tone(a, { f0: 120, f1: 60, dur: 0.3, gain: 0.12 });
+  },
+  drop: (a) => {
+    tone(a, { f0: 900, f1: 180, dur: 0.7, gain: 0.05 });
+    for (const [at, gain] of [[0.75, 0.16], [1.05, 0.06], [1.35, 0.025]] as const) tone(a, { type: "triangle", f0: 110, f1: 60, at, dur: 0.2, gain });
+    noise(a, { at: 0.75, dur: 0.5, f0: 700, f1: 300, q: 0.8, gain: 0.05 });
+  },
+  steam: (a, k = 1) => noise(a, { dur: 0.6, f0: 3200, f1: 1800, q: 0.5, gain: 0.14 * k }),
+  rumble: (a, k = 1) => (noise(a, { dur: 1.4, f0: 180, f1: 70, q: 0.7, gain: 0.3 * k }), tone(a, { f0: 70, f1: 38, dur: 1.2, gain: 0.2 * k })),
+  blast: (a) => (noise(a, { dur: 0.08, f0: 2400, q: 0.5, gain: 0.4 }), noise(a, { at: 0.03, dur: 1.2, f0: 300, f1: 90, q: 0.6, gain: 0.35 }), tone(a, { f0: 90, f1: 30, dur: 0.8, gain: 0.3 })),
   // into the cup: the plop of the ball dropping (the fanfare comes with the confetti)
   cup: (a) => (tone(a, { f0: 520, f1: 180, dur: 0.12, gain: 0.22 }), tone(a, { type: "triangle", f0: 140, f1: 90, at: 0.08, dur: 0.1, gain: 0.1 })),
 } satisfies Record<string, (a: AudioContext, k?: number) => void>;

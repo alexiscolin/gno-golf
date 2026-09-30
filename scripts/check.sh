@@ -27,8 +27,8 @@ if [ "${SKIP_GNO:-}" = 1 ]; then
 elif [ -x "$GNO" ]; then
 	echo "== gno test (onyx toolchain)"
 	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf)
-	echo "== the holes' fingerprints"
-	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test -run TestFingerprint ./gno.land/r/gnogolf/...)
+	echo "== the holes' fingerprints, and data/holes.txt (what publishdata.sh publishes) their data"
+	GNO=$GNO GNOHOME=$toolchain/gnohome "$root/scripts/holedata.sh" --check
 	echo "== the staged packages: the repo's, byte for byte, and linted"
 	stage=$(mktemp -d)
 	trap 'rm -rf "$stage"' EXIT

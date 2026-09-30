@@ -394,3 +394,142 @@ void test("replay: a head-on bounce turns where the ball meets the wall, BALL_R 
   await withSteppedClock(4, () => (far = Math.max(far, ball.position.x)), () => api.replay([[0, 0], [2, 0], [4, 0], [3, 0], [1, 0]], false, "00000", "---b-"));
   assert.ok(Math.abs(far - (5 - BALL_R)) < 0.02, `turned at ${far}`);
 });
+
+// ------------------------------------------------------ the mines' hooks
+
+void test("landing: the stroke's own tunnels count too (a lift at this stroke's landing)", () => {
+  const { E, g } = makeFixture();
+  const api = makeReplay(E);
+  g.s = mkHole() as unknown as GameState["s"];
+  const lift = mkZone({ kind: "tunnel", min: [4, 4], max: [6, 6], vec: [15, 5], skin: "lift" });
+  assert.equal(api.landing([3, 5], [15, 5]), null, "not the hole's: nothing lands there");
+  (E as { zones: () => Zone[] }).zones = () => [...g.s!.zones, lift];
+  assert.equal(api.landing([3, 5], [15, 5]), "tunnel");
+});
+
+void test("replay: a ride carries the ball along its curve with its set piece, the camera where the ride puts it", async () => {
+  const { E, ball, g } = makeFixture();
+  const api = makeReplay(E);
+  const tunnel = mkZone({ kind: "tunnel", min: [1, -1], max: [3, 1], vec: [10, 10], skin: "cart ride" });
+  const curve = new THREE.LineCurve3(new THREE.Vector3(2, 0, 0), new THREE.Vector3(10, 0, 10)) as unknown as TubePath & { userData: unknown };
+  const at: number[] = [], seen: { k: number; x: number; size: number; ride: boolean; cut: boolean }[] = [];
+  let k = 0;
+  curve.userData = {
+    ride: {
+      ms: 1000,
+      ease: (u: number) => u * u,
+      size: 1.4,
+      at: (u: number) => void at.push((k = u)),
+      cam: (u: number, pos: THREE.Vector3, look: THREE.Vector3) => (pos.set(0, 5, u), look.set(1, 0, u), u > 0.8 ? "cut" : true),
+    },
+  };
+  g.s = mkHole([tunnel]) as unknown as GameState["s"];
+  g.course = { userData: { tubes: new Map([[tunnel, curve]]) } } as unknown as GameState["course"];
+  await withSteppedClock(100, () => at.length > 0 && at[at.length - 1] >= 0 && seen.push({ k, x: ball.position.x, size: ball.scale.x, ride: !!g.ride, cut: !!g.ride?.cut }), () => api.replay([[-4, 0], [0, 0], [10, 10], [12, 10]], false, "0000"));
+  const mid = seen.find((f) => f.k >= 0.5 && f.k < 0.6)!;
+  assert.ok(Math.abs(mid.x - (2 + 8 * mid.k * mid.k)) < 1e-6, "along its curve, eased");
+  assert.ok(seen.every((f) => f.size === 1.4), "at the ride's size");
+  assert.ok(seen.some((f) => f.ride && !f.cut) && seen.some((f) => f.cut), "the ride's camera, a cut when it says so");
+  assert.equal(at[at.length - 1], -1, "its set piece told it is over");
+  assert.equal(g.ride, null, "the camera back to its mode");
+  assert.ok(Math.abs(ball.position.x - 12) < 1e-6 && ball.scale.x === 1 && ball.visible, "out at the exit, full size");
+});
+
+void test("replay: a ride cut short (a new round) lets its set piece and the camera go", async () => {
+  const { E, g } = makeFixture();
+  const api = makeReplay(E);
+  const tunnel = mkZone({ kind: "tunnel", min: [1, -1], max: [3, 1], vec: [10, 10], skin: "cage" });
+  const curve = new THREE.LineCurve3(new THREE.Vector3(2, 0, 0), new THREE.Vector3(2, -8, 0)) as unknown as TubePath & { userData: unknown };
+  const at: number[] = [];
+  curve.userData = { ride: { ms: 2000, at: (u: number) => void at.push(u), cam: (_u: number, pos: THREE.Vector3) => (pos.set(0, 3, 0), true) } };
+  g.s = mkHole([tunnel]) as unknown as GameState["s"];
+  g.course = { userData: { tubes: new Map([[tunnel, curve]]) } } as unknown as GameState["course"];
+  await withSteppedClock(100, () => at.length === 3 && (g.round = 2), () => api.replay([[-4, 0], [0, 0], [10, 10], [12, 10]], false, "0000"));
+  assert.equal(at[at.length - 1], -1);
+  assert.ok(at.length < 10, "never ridden to its end");
+  assert.equal(g.ride, null);
+  assert.equal(g.inTube, false);
+});
+
+void test("Review #25: a ride's frame that throws lets the camera go and tells its set piece it is over", async () => {
+  const { E, g } = makeFixture();
+  const api = makeReplay(E);
+  const tunnel = mkZone({ kind: "tunnel", min: [1, -1], max: [3, 1], vec: [10, 10], skin: "cart ride" });
+  const curve = new THREE.LineCurve3(new THREE.Vector3(2, 0, 0), new THREE.Vector3(10, 0, 10)) as unknown as TubePath & { userData: unknown };
+  const at: number[] = [];
+  let pinned = false;
+  curve.userData = {
+    ride: {
+      ms: 1000,
+      at: (u: number) => {
+        at.push(u);
+        if (u > 0.3) throw new Error("a set piece's frame throws");
+      },
+      cam: (_u: number, pos: THREE.Vector3, look: THREE.Vector3) => (pos.set(0, 5, 0), look.set(1, 0, 0), true),
+    },
+  };
+  g.s = mkHole([tunnel]) as unknown as GameState["s"];
+  g.course = { userData: { tubes: new Map([[tunnel, curve]]) } } as unknown as GameState["course"];
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await withSteppedClock(100, () => void (pinned ||= !!g.ride), () => api.replay([[-4, 0], [0, 0], [10, 10], [12, 10]], false, "0000"));
+  } finally {
+    console.warn = warn;
+  }
+  assert.ok(pinned, "the ride had the camera");
+  assert.equal(g.ride, null, "let go after the throw");
+  assert.equal(at[at.length - 1], -1, "its set piece told it is over");
+});
+
+/** What a fall puts in the scene (the geometries' types): into a hazard of
+ *  skin in a hole of world, or off the lane at p (sent back to the start at
+ *  [10, 5]) where zones lie. */
+async function fallInto(world: string, skin: string, quiet = false, zones?: Zone[], p: Vec2 = [3, 3]) {
+  const { E, ball } = makeFixture();
+  (E as { quiet?: boolean }).quiet = quiet;
+  const api = makeReplay(E);
+  const pool = mkZone({ kind: "hazard", min: [1, 1], max: [5, 5], vec: [3, 3], round: true, skin });
+  E.g.s = { ...mkHole(zones || [pool]), world } as unknown as GameState["s"];
+  const kinds = new Set<string>();
+  const add = E.scene.add.bind(E.scene);
+  E.scene.add = (...o: THREE.Object3D[]) => (o.forEach((x) => x.traverse((m) => (m as THREE.Mesh).geometry && kinds.add((m as THREE.Mesh).geometry.type))), add(...o));
+  await withFakeClock(() => api.replay(zones ? [[10, 5], p, [10, 5]] : [[0, 0], p, p], false, "000"));
+  assert.ok(ball.visible && ball.scale.x === 1, "back and whole");
+  return kinds;
+}
+
+void test("replay: a world's own fall-in (the mines: sparks into lava, pebbles into the void), never the water's rings", async () => {
+  const { loadWorld } = await import("../lib/scene/worlds.ts");
+  await loadWorld("mines");
+  const pond = await fallInto("garden", "lava");
+  assert.ok(pond.has("RingGeometry"), "a garden hole: the splash's rings");
+  const lava = await fallInto("mines", "lava");
+  assert.ok(lava.has("OctahedronGeometry") && !lava.has("RingGeometry"), `lava: ${[...lava].join()}`);
+  const dark = await fallInto("mines", "void", true);
+  assert.ok(dark.has("DodecahedronGeometry") && !dark.has("RingGeometry"), `the void: ${[...dark].join()}`);
+  // a skin the world leaves alone: the shared splash
+  assert.ok((await fallInto("mines", "")).has("RingGeometry"));
+});
+
+void test("replay: the void round a lane is as far as its edge, not 0 under its board-wide box", async () => {
+  // a lane from x 2 to 18 edged by the void (the whole board its box), a lava pool on it; both send the ball back to the start
+  const dark = mkZone({ kind: "hazard", min: [0, 0], max: [20, 20], poly: [[2, 2], [18, 2], [18, 18], [2, 18]], outside: true, skin: "void" });
+  const lava = mkZone({ kind: "hazard", min: [9, 9], max: [11, 11], round: true, skin: "lava" });
+  const mid = await fallInto("mines", "", true, [dark, lava], [10, 8.5]);
+  assert.ok(mid.has("OctahedronGeometry") && !mid.has("DodecahedronGeometry"), `mid-lane, by the pool: the lava (${[...mid].join()})`);
+  const edge = await fallInto("mines", "", true, [dark, lava], [17.8, 5]);
+  assert.ok(edge.has("DodecahedronGeometry") && !edge.has("OctahedronGeometry"), `by the edge: the void (${[...edge].join()})`);
+});
+
+void test("replay: the hazard the ball fell into is the one it is in, before another whose box it is in too", async () => {
+  await (await import("../lib/scene/worlds.ts")).loadWorld("mines");
+  // a round sump whose box covers the corner, listed first; the lava pool round the ball in that corner
+  const sump = mkZone({ kind: "hazard", min: [0, 0], max: [10, 10], round: true, skin: "sump" });
+  const lava = mkZone({ kind: "hazard", min: [0, 0], max: [2, 2], round: true, skin: "lava" });
+  const kinds = await fallInto("mines", "", true, [sump, lava], [1, 1]);
+  assert.ok(kinds.has("OctahedronGeometry"), `into the lava it is in (${[...kinds].join()})`);
+  // out of the lava (in the sump's round, its box's corner outside the pool): the sump
+  const other = await fallInto("mines", "", true, [lava, sump], [5, 5]);
+  assert.ok(!other.has("OctahedronGeometry"), `into the sump (${[...other].join()})`);
+});

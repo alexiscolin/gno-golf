@@ -12,7 +12,7 @@ import { animate, state } from "./state";
 import { inZone, mod, there, segDist, wallDist, smoothstep, boxOf, closest, terrain } from "../terrain";
 import { timeOf } from "./camera";
 import { gnomelet, bunting, stone, smoke } from "./props";
-import { bakeLocal, look, weatherLooks } from "./bake";
+import { bakeLocal, look, weatherLooks, instances } from "./bake";
 import { seeded, ISLAND, GRASS, placer, onGround, tangentInto, type Rand } from "./common";
 import { ud, type Hole, type Height } from "./data";
 import { GAP_Y, type Bar } from "./worlds";
@@ -35,40 +35,6 @@ const DRIFT_OPAQUE = share(new THREE.MeshLambertMaterial({ vertexColors: true, e
 // scene's warm light turns it beige
 const SNOW_2SIDE = new THREE.MeshLambertMaterial({ color: 0xf6f9fc, emissive: 0xc4d2e2, emissiveIntensity: 0.55, side: THREE.DoubleSide });
 const SNOW = share(new THREE.MeshLambertMaterial({ color: 0xf6f9fc, emissive: 0xc4d2e2, emissiveIntensity: 0.55 }));
-// A moving piece made of many meshes costs a draw call per mesh, every frame
-// (the hole's bake only merges what stands still): bakeLocal merges an
-// object's meshes that share a material into one, in the object's own space:
-// a chair of eight parts becomes two or three draws.
-
-/**
- * Many copies of one moving thing (chairs on a lift, skiers): the template is
- * compacted, then drawn as one InstancedMesh per material for all n copies —
- * a handful of draws for the whole lot. set(i, position, rotation) places a copy.
- */
-function instances(template: THREE.Object3D, n: number) {
-  bakeLocal(template);
-  const g = new THREE.Group();
-  ud(g).live = true;
-  const meshes = template.children.filter((o): o is THREE.Mesh => o instanceof THREE.Mesh).map((o) => {
-    const m = new THREE.InstancedMesh(o.geometry, o.material, n);
-    m.frustumCulled = false; // copies spread far from the template's bounds
-    g.add(m);
-    return m;
-  });
-  const mat = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
-  return {
-    group: g,
-    set(i: number, pos: THREE.Vector3, euler: THREE.Euler, scale = one) {
-      q.setFromEuler(euler);
-      mat.compose(pos, q, scale);
-      for (const m of meshes) m.setMatrixAt(i, mat);
-    },
-    /** A copy's colour, multiplying its material's (a chair going into a dark shed). */
-    tint(i: number, c: THREE.Color) { for (const m of meshes) m.setColorAt(i, c); },
-    done() { for (const m of meshes) (m.instanceMatrix.needsUpdate = true), m.instanceColor && (m.instanceColor.needsUpdate = true); },
-  };
-}
-
 const CLIFF = 11; // how far in front of the plot the shelf ends: past the overview's bottom edge
 
 /** How high the snow lies above GRASS: flat round the board, rising into

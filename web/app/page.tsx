@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Game from "@/app/game";
 import Intro, { gnoweb } from "@/app/intro";
-import { CUPS, cupName, DESCRIPTION as description, SITE, TITLE as title } from "@/lib/site";
+import { cupName, DESCRIPTION as description, SITE, TITLE as title } from "@/lib/site";
+import { COURSE_CUPS } from "@/app/h/slots";
 
 // here, not in the layout: a page without its own (the 404) must not claim the home's
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -29,7 +30,7 @@ export default function Page() {
   };
   return (
     <>
-      <Intro title={title} text={description} web={gnoweb()} links={CUPS.map((c) => ({ href: `/h/${c}/`, label: cupName(c) }))} ld={ld} />
+      <Intro title={title} text={description} web={gnoweb()} links={COURSE_CUPS.map((c) => ({ href: `/h/${c}/`, label: cupName(c) }))} ld={ld} />
       <Game />
     </>
   );

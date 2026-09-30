@@ -21,6 +21,11 @@ const LOOK: Record<Cause["kind"], { color: number; life: number; streak: boolean
   tilt: { color: 0xfff1b8, life: 0.4, streak: true, label: "Tilting" }, // a timed slope: a seesaw, a tilting board
 };
 
+// a world's own words for a cause, as its weather card and signs say them (the mines' wind is a draught)
+const WORDS: Record<string, Partial<Record<Cause["kind"], string>>> = { mines: { wind: "Draught" } };
+// the surfaces a ball runs faster on, named as slippery as ice (the strongroom's gold coins, signed so)
+const SLICK = new Set(["ice", "gold"]);
+
 /** What pushes a ball at (x, y), moving (vx, vy), under these zones and this clock tick. */
 export function causeAt(zones: Iterable<CauseZone>, x: number, y: number, vx: number, vy: number, tick = 0): Cause | null {
   let wind: Vec2 | null = null, slope: Vec2 | { tilt: true; vec: Vec2 } | null = null, wet = false, ice = false;
@@ -38,7 +43,7 @@ export function causeAt(zones: Iterable<CauseZone>, x: number, y: number, vx: nu
       else if (z.vec[0] * vx + z.vec[1] * vy > 0) slope = z.vec;
     }
     if (z.kind === "surface" && (z.skin === "rain" || z.skin === "puddle" || z.skin === "wetsand")) wet = true;
-    if (z.kind === "surface" && z.skin === "ice") ice = true;
+    if (z.kind === "surface" && SLICK.has(z.skin)) ice = true;
   }
   return wind ? { kind: "wind", vec: wind } : ice ? { kind: "ice" } : wet ? { kind: "wet" } : slope ? ("tilt" in slope ? { kind: "tilt", vec: slope.vec } : { kind: "slope", vec: slope }) : null;
 }
@@ -70,9 +75,9 @@ export function makeCauses(scene: THREE.Scene) {
      * this cause. Spawns a few particles; returns the label to show the first
      * time a cause appears in the shot, else null.
      */
-    at(p: THREE.Vector3, vx: number, vz: number, cause: Cause | null) {
+    at(p: THREE.Vector3, vx: number, vz: number, cause: Cause | null, world = "") {
       if (!cause) return null;
-      const L = LOOK[cause.kind], sp = Math.hypot(vx, vz) || 1;
+      const L = LOOK[cause.kind], sp = Math.hypot(vx, vz) || 1, label = (WORDS[world] && WORDS[world][cause.kind]) || L.label;
       for (let k = 0; k < 2; k++) {
         const q = parts[next];
         next = (next + 1) % N;
@@ -109,9 +114,9 @@ export function makeCauses(scene: THREE.Scene) {
           q.y = cause.kind === "ice" ? p.y - 0.42 : q.y;
         }
       }
-      if (seen.has(L.label)) return null;
-      seen.add(L.label);
-      return L.label;
+      if (seen.has(label)) return null;
+      seen.add(label);
+      return label;
     },
     tick(t: number) {
       const dt = last === null ? 0 : Math.min(0.05, t - last);

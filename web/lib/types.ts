@@ -105,6 +105,8 @@ export interface HoleState extends Versioned {
   weather: Forecast | null;
   start: Vec2;
   cup: Vec2;
+  /** the radius the chain holes a ball in (the course's 1.2; the Crystal Mines' 1.1 and 1.0) */
+  cupR?: number;
   walls: readonly Wall[];
   posts: readonly Post[];
   zones: readonly Zone[];
@@ -164,6 +166,8 @@ export interface Extras extends Versioned {
   walls: readonly Wall[];
   posts: readonly Post[];
   zones: readonly Zone[];
+  /** the client's own: the next strokes' extras, for a world that looks ahead (worlds.ts ahead) */
+  ahead?: readonly (Extras | null)[];
 }
 
 /** One hole as Holes() lists it. */

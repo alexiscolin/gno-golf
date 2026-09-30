@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, stillsOnly, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen } from "../lib/prefs.ts";
+import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, stillsOnly, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "../lib/prefs.ts";
 import { GNOMES } from "../lib/scene/gnome.ts";
 
 beforeEach(() => {
@@ -231,4 +231,34 @@ test("a new game forgets the badges, their holes and the weathers counted, never
   seeWeather("fog");
   forgetBadges();
   assert.deepEqual([badgesEarned(), badgesAt(), weathersSeen(), earned()], [[], {}, [], ["wizard"]]);
+});
+
+
+test("the mines' first-visit lines: each hole's said once", () => {
+  assert.deepEqual(minesHinted(), []);
+  minesHintSaid("mines/7");
+  minesHintSaid("mines/7");
+  minesHintSaid("mines/2");
+  assert.deepEqual(minesHinted(), ["mines/7", "mines/2"]);
+});
+
+test("the Miner: an earned gnome, a helmet with a lamp", () => {
+  const miner = GNOMES.find((g) => g.id === "miner");
+  assert.ok(miner && miner.unlock === "miner" && miner.helmet && miner.lamp);
+  localStorage.setItem("gnogolf.gnome", "miner");
+  assert.equal(savedGnome(), GNOMES[0].id, "not his to play before he is earned");
+  remember("miner");
+  assert.equal(savedGnome(), "miner");
+});
+
+test("the mines' first-visit hints: each hole's said once, kept for good (a new game leaves them)", () => {
+  assert.deepEqual(minesHinted(), []);
+  minesHintSaid("mines/7");
+  minesHintSaid("mines/3");
+  minesHintSaid("mines/7");
+  assert.deepEqual(minesHinted(), ["mines/7", "mines/3"]);
+  forgetBadges();
+  assert.deepEqual(minesHinted(), ["mines/7", "mines/3"]);
+  localStorage.setItem("gnogolf.hint.mines", "{broken");
+  assert.deepEqual(minesHinted(), [], "a spoilt entry reads as none said");
 });

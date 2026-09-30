@@ -7,6 +7,8 @@ import { Sheet } from "@/components/ui";
 import { REALM_PATH, pkgsPath } from "@/lib/chain";
 import { sound } from "@/lib/feel";
 import { optedOut, optOut } from "@/lib/analytics";
+import { courseCount, holesWord, plural } from "@/components/common";
+import { sight } from "@/lib/scene/data";
 
 // About: how it works, what is in it, where to go next, and who made it.
 const GITHUB = "https://github.com/alexiscolin", REPO = `${GITHUB}/gno-golf`;
@@ -39,7 +41,12 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
 ];
 // what gnoweb shows of the game, to check it plays as it says: the code, the physics, the holes' format, the game as text
 const VERIFY = [["The realm's code", `${REALM_PATH}$source`], ["The physics", `${pkgsPath(REALM_PATH)}physics$source`], ["The hole data", `${pkgsPath(REALM_PATH)}course$source`], ["The game as text", REALM_PATH]] as const;
-const FACTS = ["4 cups · 72 holes", "Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
+const FACTS = ["Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
+/** The course's fact, from the chain's holes per cup ("5 cups · 90 holes"); none before it has answered. */
+function courseFact(counts: Readonly<Record<string, number>>) {
+  const { cups, holes } = courseCount(counts);
+  return cups ? [`${cups} ${plural("cup", cups)} · ${holesWord(holes)}`] : [];
+}
 
 /** The round corner button every screen has: back at the top left, about at the top right. */
 function CornerButton({ side, label, onClick, children }: { side: "back" | "about"; label: string; onClick: () => void; children: ReactNode }) {
@@ -109,15 +116,16 @@ export function FrontScreen({ className, tint = "garden", inner = "", back, onBa
 const RULES: readonly (readonly [string, readonly (readonly [string, string])[]])[] = [
   ["On the course", [
     ["Strokes", "Pull back and let go: every shot is a stroke. Hole out in as few as you can; par is the number to beat."],
-    ["Water and falls", "In the water, the sea, off a roof or off the board, the ball goes back where you shot from. The stroke counts, nothing more."],
+    ["Water and falls", "In the water or the sea, in lava, a shaft or the void (the Crystal Mines), off a roof or off the board, the ball goes back where you shot from. The stroke counts, nothing more."],
     ["Moving pieces", "On a timed hole the pieces run on a clock: the moment you let go decides where they are."],
     ["Weather", "It changes every 5 minutes, the same for everyone: calm, wind, fog, rain, storm or snow, and the ball runs with it."],
+    ["Underground", `The Crystal Mines never get a storm or snow, and name the rest as a mine does: still air (calm), a draught (the wind: it pushes the ball), dripping (the rain: the green and the crystal ice run a little faster, and puddles slow the ball), lights out (the fog: the aim dots stop ${sight(true, false)} units ahead). Two galleries are always dark: your lamp lights the dots ${sight(false, true)} units ahead, ${sight(true, true)} with the lights out.`],
     ["Aim", "Assisted shows the whole aim line, Pro shows none. Each is ranked on its own boards."],
     ["Limit", "A round stops at 60 strokes: start the hole again."],
   ]],
   ["Your card", [
     ["Your score", "The cup card keeps your latest score on each hole, in this browser: play a hole again and the new score replaces it. Your best stays on the boards once saved."],
-    ["Cups and gnomes", "A cup is complete once its 18 holes are on your card. Finishing a cup, playing one at par or under and five holes-in-one unlock gnomes."],
+    ["Cups and gnomes", "A cup is complete once its 18 holes are on your card. Finishing a cup, playing one at par or under and five holes-in-one unlock gnomes. The Crystal Mines are the expert cup: a few minutes a hole."],
   ]],
   ["On the boards", [
     ["Save on-chain", "To rank a round, save it on-chain (with Adena, or gnokey in a terminal) before the next weather is over (the card counts down). The chain plays your shots again: nobody can type in a score."],
@@ -146,7 +154,7 @@ export function Rules({ onClose, onBadges }: { onClose: () => void; onBadges: ()
 }
 
 // support: the tip, where the game offers one (components/Tip.tsx)
-export default function About({ onClose, onRules, web, support = null }: { onClose: () => void; onRules: () => void; web: string; support?: ReactNode }) {
+export default function About({ onClose, onRules, web, support = null, counts = {} }: { onClose: () => void; onRules: () => void; web: string; support?: ReactNode; counts?: Readonly<Record<string, number>> }) {
   const links: readonly [string, string, string][] = [
     ...(web ? [["The golf realm", `${web}${REALM_PATH}`, "its code and boards, on gnoweb"] as [string, string, string]] : []),
     ["gno.land", "https://gno.land", "the chain it runs on"],
@@ -172,7 +180,7 @@ export default function About({ onClose, onRules, web, support = null }: { onClo
       </ol>
 
       <ul className="about__facts" aria-label="In the game">
-        {FACTS.map((f) => <li key={f}>{f}</li>)}
+        {[...courseFact(counts), ...FACTS].map((f) => <li key={f}>{f}</li>)}
         {/* the rules, where the facts end: a link, not a tag */}
         <li className="about__more"><button className="linkish" onClick={onRules}>The rules of the game →</button></li>
       </ul>

@@ -91,6 +91,9 @@ export function badgesAt(): Record<string, string> {
     return {};
   }
 }
+/** The mines' holes whose signature was said on a first visit (their slots, "mines/7"). */
+export const minesHinted = () => kept("gnogolf.hint.mines");
+export const minesHintSaid = (slot: string) => keep("gnogolf.hint.mines", [slot]);
 /** The weathers a hole was finished in ("" the calm one), for All weathers. */
 export const weathersSeen = () => kept("gnogolf.weathers");
 export const seeWeather = (kind: string) => keep("gnogolf.weathers", [kind]);

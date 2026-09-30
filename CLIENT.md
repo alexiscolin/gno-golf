@@ -32,11 +32,13 @@ what a client needs of it.
 
 ## Four rules
 
-1. **Never simulate.** The chain returns the ball's whole path; the client
-   replays it. Reimplementing the physics in JS means matching float64 GnoVM
-   semantics exactly, and the ball will eventually land somewhere on screen that
-   the chain disagrees with. This is the one rule that, if broken, breaks
-   everything else quietly.
+1. **Never simulate the shot played.** The chain returns the ball's whole
+   path; the client replays it. Aim previews may run the realm's own code
+   built to wasm (`web/lib/sim`: byte for byte, its sources checked against the
+   chain's, every answer checked against the chain's), never a
+   reimplementation: matching float64 GnoVM semantics by hand, the ball would
+   eventually land somewhere on screen that the chain disagrees with. This is
+   the one rule that, if broken, breaks everything else quietly.
 2. **Skin is a hint, geometry is the contract.** Draw any hole from its shapes
    alone and treat an unknown skin as the plain form — an unrecognised wall is a
    wall, a post is a post, a zone is a tinted area. An author ships
@@ -131,7 +133,7 @@ a client that finds one can offer to go there).
 {"version":1,"hole":"garden/3/v1","name":"Down the Tunnel","official":true,"slot":"garden/3","v":1,
  "board":{"w":32,"h":16},"par":3,"world":"garden","order":3.000,"timed":false,
  "period":N,"weather":{"period":N,"kind":"","wind":[0,0],"zones":[]},
- "start":[3,13],"cup":[28,8],
+ "start":[3,13],"cup":[28,8],"cupR":1.2,"ballR":0.5,
  "walls":[{"a":[0,0],"b":[32,0],"skin":""}, …],
  "posts":[{"c":[9,4],"r":1.4,"skin":"bumper"}],
  "zones":[{"kind":"tunnel","min":[2,2],"max":[5,5],"vec":[26,3],"scale":0,"round":false,"skin":"tunnel"},
@@ -145,6 +147,8 @@ a client that finds one can offer to go there).
 (Illustrative values.) `official` says the hole is one of the course's (cups,
 numbers, rankings); anyone else's hole is a community hole. `slot` and `v` are
 a data version's alias and number, and `next` appears once it's archived.
+`cupR` is the radius a ball holes in: 1.2 on the four cups, 1.1 and 1.0 on the
+Crystal Mines' later holes. Draw the cup that size.
 
 `zones[].vec` means a different thing per kind: an acceleration for `slope`, a
 destination for `tunnel`, nothing for `hazard` (a hazard sends the ball back
@@ -295,7 +299,10 @@ of a slot has weather of its own.
 | town | 50 | 15 | 20 | 15 | | |
 | mountain | 40 | 20 | | 15 | | 25 |
 
-A world not listed (the Crystal Mines' `mines`) has the garden's.
+A world the table does not list (the Crystal Mines' `mines`) has the garden's:
+the mines get clear, wind, rain and fog, never a storm or snow. The game names them as a
+mine does (still air, a draught, dripping, lights out); the chain's kinds and
+what they do to the ball are the same.
 
 - **wind**: one Slope zone over the board, `vec` = the push, 0.08–0.15 per
   substep (never over the hole's `Shelter`), its direction from the hash.

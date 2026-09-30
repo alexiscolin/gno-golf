@@ -6,6 +6,8 @@
 import * as THREE from "three";
 import { mod } from "../terrain";
 import { motion } from "./materials";
+import { setLighting } from "./camera";
+import type { LitScene } from "./data";
 import type { Forecast, MutVec2, Zone } from "../types";
 
 /** The weather drawn now, for the HUD and the decor: null for none. */
@@ -62,6 +64,22 @@ const BITS_OF: Record<string, readonly number[]> = {
   island: [0xf0d9a0, 0xe8cc88, 0xfff4d6],
   town: [0xe25248, 0xf5b83d, 0x5b6fb5, 0xffffff],
   mountain: [0xffffff, 0xeef6fb, 0xdde9f2], // snowflakes
+  mines: [0x8a7a6a, 0x6a5e70, 0xb09a7a, 0x4e4658], // grit and dust in the draught
+};
+
+// Under ground (the mines) the weather is the cave's: the draught (wind) a
+// dusty stream of grit and pale streaks, the rain water dripping from the
+// vault (fewer drops, slower, each a drop), the puddles black water, and the
+// fog "Lights out": no banks of mist, the lanterns out (the world's) and the
+// light gone to the dark gallery's (camera.ts TIMES), the dark closing in
+// (the scene's fog in the vault's colour, near). A cave is never clear of
+// its own dark far off: a soft far fog always. Every other world as before.
+const CAVE = {
+  rain: 0.3, // of the drops
+  drop: [9, 5] as const, // fall speed: from, and up to this much more
+  len: 0.35, // a drop's streak, of the rain's
+  gust: 0.32, // the draught's streaks: dust, faint (white ones read as paper in the dark)
+  fogClear: [2.2, 5.5] as const, fogDark: [0.95, 2.3] as const, // the fog's near and far, times the camera's distance
 };
 
 // a soft round blob, for fog banks
@@ -156,6 +174,8 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
   group.visible = false;
   scene.add(group);
   let W = 40, H = 10, now: WeatherNow | null = null, area = { x: -8, z: -8, w: 56, d: 26 };
+  // the mines (board's world): the cave's weather; its own time of day, as the hole's lighting set it
+  let cave = false, caveTime = "cave", steam: MutVec2[] = [];
 
   // rain: short streaks, recycled from the top as they reach the ground
   const rainGeo = new THREE.BufferGeometry();
@@ -165,11 +185,14 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
   rain.frustumCulled = false;
   group.add(rain);
   const drops = Array.from({ length: RAIN }, () => ({ x: 0, y: 0, z: 0, v: 0 }));
+  // in the cave the water drips from the vault at its own spots (drip), not everywhere
+  let drip: MutVec2[] = [];
   const seed = (d: (typeof drops)[number], top: boolean) => {
-    d.x = area.x + Math.random() * area.w;
-    d.z = area.z + Math.random() * area.d;
+    const at = cave && drip.length ? drip[Math.floor(Math.random() * drip.length)] : null;
+    d.x = at ? at[0] + (Math.random() - 0.5) * 0.12 : area.x + Math.random() * area.w;
+    d.z = at ? at[1] + (Math.random() - 0.5) * 0.12 : area.z + Math.random() * area.d;
     d.y = top ? 9 + Math.random() * 3 : Math.random() * 12;
-    d.v = 16 + Math.random() * 6;
+    d.v = cave ? CAVE.drop[0] + Math.random() * CAVE.drop[1] : 16 + Math.random() * 6;
   };
   drops.forEach((d) => seed(d, false));
 
@@ -211,6 +234,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       b.z = H / 2 - (wz / l) * (area.d / 2) + (Math.random() - 0.5) * area.d * 0.6;
     }
     b.m.material.color.setHex(palette[Math.floor(Math.random() * palette.length)]);
+    b.m.scale.setScalar(cave ? 0.45 : 1); // (grit in the cave, not leaves)
     b.m.position.set(b.x, b.y, b.z);
   };
   // gusts over the course only (round it, one ran across the lens in the Far view)
@@ -235,6 +259,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     return { m, t: Math.random() };
   });
   const puddleMat = new THREE.MeshBasicMaterial({ color: 0x5f8fa8, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+  const PUDDLE = { sky: 0x5f8fa8, cave: 0x243a52 }, WET = { sky: 0x5c8a74, cave: 0x6e5a44 };
   // one mesh for all of them, rebuilt when the weather is set (not per frame)
   const puddleMesh = new THREE.Mesh(new THREE.BufferGeometry(), puddleMat);
   puddleMesh.frustumCulled = false;
@@ -274,7 +299,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
   const clouds = Array.from({ length: CLOUDS }, (_, k) => ({ m: proxy(), a: ((k + Math.random() * 0.5) / CLOUDS) * Math.PI * 2, e: 0.02 + Math.random() * 0.05, s: 0.5 + Math.random() * 0.25 }));
 
   // one frame's pieces into their batches
-  const col = new THREE.Color(), wetGreen = new THREE.Color(0x5c8a74);
+  const col = new THREE.Color(), wetGreen = new THREE.Color(WET.sky);
   const tv = new THREE.Vector3();
   // colours per batch, made once (flush runs every frame)
   const bitColor = (m: Proxy) => m.material.color;
@@ -338,7 +363,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       for (let v = 0; v < V; v++) {
         tv.fromArray(tr.local, v * 3).applyMatrix4(m.matrix).toArray(trailPos, (o + v) * 3);
         const step = v >> 1;
-        trailCol[(o + v) * 4 + 3] = step >= i0 && step <= i1 && a > 0 ? a * (cam ? nearFade(tv.distanceTo(cam.position)) : 1) : 0;
+        trailCol[(o + v) * 4 + 3] = step >= i0 && step <= i1 && a > 0 ? a * (cave ? CAVE.gust : 1) * (cam ? nearFade(tv.distanceTo(cam.position)) : 1) : 0;
       }
     });
     trailGeo.attributes.position.needsUpdate = true;
@@ -391,8 +416,12 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     fogK = fogOn ? Math.min(1, fogK + dt / FOG_IN) : Math.max(0, fogK - dt / FOG_IN);
     fogD = !fogD || fogWant >= fogD ? fogWant : fogD + (fogWant - fogD) * Math.min(1, dt * 4);
     const e = fogK * fogK * (3 - 2 * fogK), push = (1 - e) * fogD * 4;
-    if (e <= 0 || !fogD) (fog.near = OFF), (fog.far = OFF * 10);
-    else (fog.near = fogD * 0.75 + push), (fog.far = fogD * 1.9 + push);
+    // (a cave: its soft far dark always, near in the dark)
+    const [fn, ff] = !cave ? [0.75, 1.9] : fogOn ? CAVE.fogDark : CAVE.fogClear;
+    if (cave && fogD && e <= 0) (fog.near = fogD * CAVE.fogClear[0]), (fog.far = fogD * CAVE.fogClear[1]);
+    else if (e <= 0 || !fogD) (fog.near = OFF), (fog.far = OFF * 10);
+    else if (cave) (fog.near = fogD * (CAVE.fogClear[0] + (fn - CAVE.fogClear[0]) * e)), (fog.far = fogD * (CAVE.fogClear[1] + (ff - CAVE.fogClear[1]) * e));
+    else (fog.near = fogD * fn + push), (fog.far = fogD * ff + push);
     bankMat.opacity = 0.55 * e;
     bankMat.color.copy(fog.color).multiply(BANK_TINT); // the banks as pale as the fog, day or night (setLighting sets its colour)
     cloudMat.color.copy(fog.color).lerp(WHITE, 0.3); // the clouds too: slate by day, rosy at dusk, dark at night
@@ -413,10 +442,26 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     /** The board it hangs over: rain falls there and a little around. */
     board(w: number, h: number, world = "garden", onGreen: (x: number, z: number) => boolean = () => true) {
       green = onGreen;
+      cave = world === "mines";
+
+      // the draught's streaks dusty in the cave, white elsewhere (the alpha is per frame)
+      for (let i = 0; i < trailCol.length; i += 4) trailCol.set(cave ? [0.62, 0.55, 0.5] : [1, 1, 1], i);
+      trailGeo.attributes.color.needsUpdate = true;
+      // (the hole's own light, as the engine has just set it: back to it when the lights come on)
+      caveTime = (scene as LitScene).userData.time || "cave";
+      puddleMat.color.setHex(cave ? PUDDLE.cave : PUDDLE.sky);
+      wetGreen.setHex(cave ? WET.cave : WET.sky);
       W = w;
       H = h;
       palette = BITS_OF[world] || BITS_OF.garden;
       area = { x: -6, z: -6, w: w + 12, d: h + 12 };
+      // the cave's drips: spots over the board and round it, a third over the lane
+      drip = [];
+      const room = { on: 14, off: 28 };
+      for (let k = 0; k < 600 && room.on + room.off > 0; k++) {
+        const x = area.x + Math.random() * area.w, z = area.z + Math.random() * area.d, side = onGreen(x, z) ? "on" : "off";
+        if (room[side] > 0) (room[side]--, drip.push([x, z]));
+      }
       drops.forEach((d) => seed(d, false));
       placeWeather();
       wet = 0;
@@ -428,7 +473,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
     set(zones: readonly WeatherZone[] | null, fc: Pick<Forecast, "wind"> | null = null): WeatherNow | null {
       lastZones = zones || [];
       lastFc = fc;
-      rainN = share(RAIN);
+      rainN = Math.round(share(RAIN) * (cave ? CAVE.rain : 1));
       rainGeo.setDrawRange(0, rainN * 2);
       // a storm's wind blows in timed gusts (skinned "wind"): streaked like a hole's own
       gusts = (zones || []).filter((q) => (q.skin === "gust" || q.skin === "wind") && (q.every ?? 0) > 0);
@@ -448,20 +493,26 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       group.visible = !!now;
       rain.visible = !!now && (now.rain || now.storm || now.snow);
       // snow: the same particles, slow and short, drifting
-      rain.material.color.setHex(now && now.snow ? 0xffffff : 0xeaf6ff);
-      drops.forEach((d) => (d.v = now && now.snow ? 1.2 + Math.random() : 16 + Math.random() * 6));
+      rain.material.color.setHex(now && now.snow ? 0xffffff : cave ? 0xbfe4ff : 0xeaf6ff);
+      drops.forEach((d) => (d.v = now && now.snow ? 1.2 + Math.random() : cave ? CAVE.drop[0] + Math.random() * CAVE.drop[1] : 16 + Math.random() * 6));
       const raining = !!now && (now.rain || now.storm);
       // the rain's puddles are where the chain has them (they slow the ball
       // there), cut at the lane's edge: none spills over its side or the water
       const pz = raining ? (zones || []).filter((q): q is Zone => q.skin === "puddle" && !!q.min && !!q.max) : [];
       puddleMesh.geometry.dispose();
       puddleMesh.geometry = puddleGeo(pz, green);
+      // in the cave, a puddle beside the lava steams: the banks, small, rising off it
+      const lava = cave ? (zones || []).filter((q): q is Zone => q.skin.startsWith("lava") && !!q.min && !!q.max) : [];
+      steam = pz.filter((q) => lava.some((l) => Math.max(l.min[0] - q.max[0], q.min[0] - l.max[0], l.min[1] - q.max[1], q.min[1] - l.max[1]) < 3))
+        .map((q) => [(q.min[0] + q.max[0]) / 2, (q.min[1] + q.max[1]) / 2] as MutVec2);
       splashes.forEach((sp, k) => (sp.m.visible = raining && k < share(SPLASH)));
 
-      banks.forEach((b, k) => (b.m.visible = !!now && now.fog && k < share(BANKS)));
+      banks.forEach((b, k) => (b.m.visible = (!!now && now.fog && !cave && k < share(BANKS)) || (k < steam.length * 4 && k < share(BANKS))));
       clouds.forEach((c, k) => (c.m.visible = !!now && now.storm && k < share(CLOUDS)));
       if (!raining) wet = 0;
       setFog(!!now && now.fog);
+      // Lights out: the dark gallery's light (the world puts its lanterns out, userData.weather)
+      if (cave) setLighting(scene as LitScene, now && now.fog ? "gallery" : caveTime);
       const s = now && now.wind ? Math.hypot(now.wind[0], now.wind[1]) : 0;
       // a breeze shows a few gusts, a gale a dozen
       const n = s ? share(Math.max(3, Math.min(TRAILS, Math.round(3 + (s / 0.08) * 9)))) : 0;
@@ -471,7 +522,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
       bitMesh.visible = n > 0;
       ringMesh.visible = raining;
       puddleMesh.visible = raining;
-      bankMesh.visible = !!now && now.fog;
+      bankMesh.visible = (!!now && now.fog && !cave) || steam.length > 0;
       cloudMesh.visible = !!now && now.storm;
       flush();
       return now;
@@ -538,7 +589,7 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
           if (d.y < 0) seed(d, true);
           if (now.snow) d.x += Math.sin(t + i) * 0.3 * dt;
           const ex = c ? d.x - c.x : 25, ey = c ? d.y - c.y : 0, ez = c ? d.z - c.z : 0, r = Math.sqrt(ex * ex + ey * ey + ez * ez);
-          const l = r < NEAR_RAIN ? 0 : Math.min(2.5, r * RAIN_LEN) * (now.snow ? 0.15 : 1), k = l / 0.8;
+          const l = r < NEAR_RAIN ? 0 : Math.min(2.5, r * RAIN_LEN) * (now.snow ? 0.15 : cave ? CAVE.len : 1), k = l / 0.8;
           const o = i * 6;
           rainPos[o] = d.x, rainPos[o + 1] = d.y, rainPos[o + 2] = d.z;
           rainPos[o + 3] = d.x - sx * 0.05 * k, rainPos[o + 4] = d.y + l, rainPos[o + 5] = d.z - sz * 0.05 * k;
@@ -553,7 +604,10 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
           if (sp.t >= 1) {
             sp.t = 0;
             let x = 0, z = 0;
-            for (let k = 0; k < 6 && !onLane(x, z); k++) (x = Math.random() * W), (z = Math.random() * H);
+            // (in the cave where a drip lands on the lane)
+            const lands = cave ? drip.filter(([a, b]) => onLane(a, b)) : [];
+            if (lands.length) [x, z] = lands[Math.floor(Math.random() * lands.length)];
+            else for (let k = 0; k < 6 && !onLane(x, z); k++) (x = Math.random() * W), (z = Math.random() * H);
             sp.m.position.set(x, 0.04, z);
           }
           sp.m.scale.setScalar(1 + sp.t * 3);
@@ -568,6 +622,16 @@ export function makeWeather(scene: THREE.Scene, { onFlash = () => {}, camera = n
           if (b.x > area.x + area.w + 6) b.x = area.x - 6;
           b.m.position.set(b.x, b.y + (motion ? Math.sin(t * 0.3 + b.s) * 0.2 : 0), b.z);
         }
+      if (steam.length) {
+        banks.forEach((b, k) => {
+          if (!b.m.visible) return;
+          const [x, z] = steam[Math.floor(k / 4)], u = ((t * 0.35 + k * 0.25) % 1);
+          b.m.scale.set(0.6 + u * 1.6, (0.6 + u * 1.6) * 0.7, 1);
+          b.m.position.set(x + Math.sin(k * 2.3 + t * 0.5) * 0.4, 0.3 + u * 2.2, z + Math.cos(k * 1.7) * 0.4);
+        });
+        bankMat.opacity = 0.45 * wet;
+        bankMat.color.setHex(0xdde8f0);
+      }
       if (now.storm) for (const c of clouds) c.a += dt * 0.01; // the sky drifts round (dt is 0 with reduced motion: still)
       if (now.storm && motion) {
         // now and then a flash: the scene lit white, and the page told

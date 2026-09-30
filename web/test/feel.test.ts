@@ -7,6 +7,8 @@ import type { Feel } from "../lib/feel.ts";
 // time. These are the minimal fakes needed to exercise that logic — not to
 // check what the fakes "sound" like.
 const calls = { osc: 0, gain: 0, filter: 0, bufSrc: 0 };
+const oscs: { frequency: Param }[] = []; // every oscillator made, in order (a tone's pitch)
+let contexts = 0, closed = 0;
 class Param {
   value = 0;
   setValueAtTime(v: number) { this.value = v; return this; }
@@ -19,13 +21,15 @@ class FakeAudioContext {
   currentTime = 0;
   state: "suspended" | "running" = "suspended";
   destination = {};
-  createOscillator() { calls.osc++; return { type: "sine", frequency: new Param(), ...linkable() }; }
+  constructor() { contexts++; }
+  createOscillator() { calls.osc++; const o = { type: "sine", frequency: new Param(), ...linkable() }; oscs.push(o); return o; }
   createGain() { calls.gain++; return { gain: new Param(), ...linkable() }; }
   createBiquadFilter() { calls.filter++; return { type: "", Q: new Param(), frequency: new Param(), ...linkable() }; }
   createBuffer(_ch: number, len: number) { return { getChannelData: () => new Float32Array(len) }; }
   createBufferSource() { calls.bufSrc++; return { buffer: null, loop: false, ...linkable() }; }
   resume() { this.state = "running"; return Promise.resolve(); }
   suspend() { this.state = "suspended"; return Promise.resolve(); }
+  close() { closed++; return Promise.resolve(); }
 }
 
 const winHandlers: Record<string, () => void> = {};
@@ -44,7 +48,7 @@ const fakeDoc = { hidden: false, addEventListener: (t: string, fn: () => void) =
 // Imported once: feel.ts keeps its prefs/ctx as module-level singleton state,
 // so every test below runs in sequence against the same instance (node:test
 // runs top-level tests in one file sequentially).
-const { feel, setFeel, buzz, sound, ambience, hush, setSilent } = await import("../lib/feel.ts");
+const { feel, setFeel, buzz, sound, ambience, hush, setSilent, freshAudio } = await import("../lib/feel.ts");
 
 test("feel: defaults to sound and vibration on, and returns a fresh copy", () => {
   const f = feel();
@@ -172,4 +176,41 @@ test("window blur/focus mirror hidden/visible for the ambient bed", () => {
   assert.doesNotThrow(() => winHandlers.blur());
   assert.doesNotThrow(() => winHandlers.keydown());
   assert.doesNotThrow(() => winHandlers.focus());
+});
+
+test("the mines' sounds: a crystal's chime, lava's hiss, the void's drop, steam, a rumble, a blast", () => {
+  winHandlers.pointerdown();
+  // [name, oscillators, noise sources] each makes
+  const made: [Parameters<typeof sound>[0], number, number][] = [["chime", 3, 0], ["hiss", 1, 8], ["drop", 4, 1], ["steam", 0, 1], ["rumble", 1, 1], ["blast", 1, 2]];
+  for (const [name, osc, src] of made) {
+    const before = { ...calls };
+    sound(name, 1);
+    assert.deepEqual([calls.osc - before.osc, calls.bufSrc - before.bufSrc], [osc, src], name);
+  }
+});
+
+test("chime: a singing crystal's note on a pentatonic scale, its bell partials over it, wrapping round the scale", () => {
+  winHandlers.pointerdown();
+  const ring = (n?: number) => {
+    const from = oscs.length;
+    sound("chime", n);
+    return oscs.slice(from).map((o) => +o.frequency.value.toFixed(2));
+  };
+  const c5 = ring();
+  assert.equal(c5[0], 523.25, "no note: the scale's first");
+  assert.deepEqual(c5.slice(1), [+(523.25 * 2.76).toFixed(2), +(523.25 * 5.4).toFixed(2)]);
+  assert.equal(ring(3)[0], +(523.25 * 2 ** (7 / 12)).toFixed(2), "the fourth note: a fifth up");
+  assert.deepEqual(ring(11), ring(3), "past the eighth note, round again");
+  assert.deepEqual(ring(-3), ring(3), "a negative note: its size");
+  assert.ok(ring(7)[0] > ring(6)[0], "up the scale");
+});
+
+test("freshAudio: the next sound makes a context of its own, the old one closed", () => {
+  winHandlers.pointerdown();
+  sound("blip");
+  const [made, shut] = [contexts, closed];
+  freshAudio();
+  assert.equal(closed, shut + 1);
+  sound("blip");
+  assert.equal(contexts, made + 1);
 });

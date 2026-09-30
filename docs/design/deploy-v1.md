@@ -21,7 +21,7 @@ The commands are written for zsh or bash. Every transaction gets `-chainid onyx-
 
 ### Costs (estimates)
 
-The name's cost comes from the pearl rehearsal (`deploy-v1-rehearsal.md`, at the same 100 ugnot a byte). Steps 3 and 4 were dry-run on a fresh onyx gnodev on 2026-09-30, at these very paths (the staged packages, then `publishdata.sh`); gnodev does not ask for the name, nor for an approval.
+The name's cost comes from the pearl rehearsal (`deploy-v1-rehearsal.md`, at the same 100 ugnot a byte). Steps 3 and 4 were dry-run on a fresh onyx gnodev on 2026-09-30, at these very paths (the staged packages, then `publishdata.sh`); gnodev does not ask for the name, nor for an approval. They were run again on the final code (`b252fdc`, `media/check/mines/fresh-publish-90-final.log`) with the flags below: the same bytes at every step, the same gas to within 0.1%.
 
 | Step | Deposit | Fees (at the flags below) |
 |---|---|---|
@@ -29,10 +29,10 @@ The name's cost comes from the pearl rehearsal (`deploy-v1-rehearsal.md`, at the
 | 3. physics | 3.2 GNOT (32,241 bytes; 65M gas) | 0.16 |
 | 3. course | 4.3 GNOT (42,954 bytes; 55M gas) | 0.13 |
 | 3. golf (its init and shared indexes) | 23.2 GNOT (231,751 bytes; 204M gas) | 0.35 |
-| 4. 72 holes | 43.4 GNOT (434,409 bytes) | ~8.8 (72 calls, each asking its simulation's gas and a tenth more: 8.7e9 asked in all, 7.9e9 used) |
-| **Total** | **~74.5 GNOT** | **~9.5 GNOT** |
+| 4. 90 holes (the 72 and the Crystal Mines' 18) | 61.4 GNOT (613,787 bytes, of which the mines 165,680: onyx gnodev under `nym-alexiscolin000`, `media/check/mines/fresh-publish-90-nym.log`) | ~13.1 (90 calls, each asking its simulation's gas and a tenth more: 13.10e9 asked, 11.91e9 used, the mines 3.95e9 of it) |
+| **Total** | **~92.5 GNOT** | **~13.8 GNOT** |
 
-That makes **about 85 GNOT**. `GnoAlex` held 100 GNOT on onyx on 2026-09-29, which leaves about 15 for a rerun. The deposits are locked for good, since published data is never freed.
+That makes **about 106 GNOT**. `GnoAlex` held 699.6 GNOT on onyx on 2026-09-30: the funds are ample, reruns included. The deposits are locked for good, since published data is never freed.
 
 For players, these are the storage figures measured on an onyx gnodev since finished rounds stopped being kept:
 - a named player's first finish on the course (in a mode) stores about 2.9 KB, **~0.29 GNOT**;
@@ -54,7 +54,7 @@ A save also pays **about 0.05 GNOT** in fees: 49M to 60M gas at the floor, measu
   ```
 
   A new machine needs the key restored once: `gnokey add GnoAlex --recover`, with its recovery phrase.
-- **Funds: about 85 GNOT.** Check the balance:
+- **Funds: about 106 GNOT**; the key holds 699.6 (2026-09-30), ample. Check the balance:
 
   ```sh
   gnokey query bank/balances/g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq -remote $RPC   # "100000000ugnot" on 09-29
@@ -63,7 +63,9 @@ A save also pays **about 0.05 GNOT** in fees: 49M to 60M gas at the floor, measu
   If it runs short, the faucet (https://faucet.gno.land) gives 10 GNOT an address every 24 h. For more, ask aeddi or the faucet team. The key must stay funded until the end of step 4, because each package's deposit is taken when it is approved, not when it is submitted.
 - **The code.** The commit being deployed passes `scripts/check.sh`. Note its hash (`git rev-parse HEAD`): physics, course and golf are frozen once they are on chain.
 
-### 1. Register the namespace
+### 1. Register the namespace (done on 2026-09-30)
+
+`nym-alexiscolin000` is registered: `r/sys/users` resolves it to `GnoAlex`. Kept below for the record.
 
 Registration is free on onyx (`r/sys/namereg/v0`, price 0 ugnot, so send nothing). Only a direct call from the key can register.
 
@@ -93,7 +95,7 @@ This copies physics, course and golf, without their tests, into `/tmp/stage/gno.
 - no `gno.land/[pr]/gnogolf` is left;
 - every `gnomod.toml` names its own staged path, says `gno = "0.9"` and has no `replace`.
 
-It lints the result with the onyx `gno` and prints the sizes. On 2026-09-30 these were course 34,955 B, physics 44,722 B and golf 130,516 B. Any error stops here.
+It lints the result with the onyx `gno` and prints the sizes. On 2026-09-30 these were course 35,059 B, physics 44,722 B and golf 130,516 B. Any error stops here.
 
 ### 3. Submit the packages, in order, and wait for each approval
 
@@ -138,7 +140,7 @@ until gnokey query vm/qpkgmeta_json -data $REALM -remote $RPC | grep -q '"status
   3. If it is still stuck, ask the onyx operators (aeddi) to look at the gpao oracle. Its status API says whether the package is `rejected`, `pending`, `gave_up` or `blocked` (the oracle's spend cap).
 - Check the pages: https://onyx.testnets.gno.land/p/nym-alexiscolin000/gnogolf/physics$source, …/gnogolf/course$source, and https://onyx.testnets.gno.land/r/nym-alexiscolin000/gnogolf/golf (the hub, empty until step 4).
 
-### 4. Publish the 72 holes
+### 4. Publish the 90 holes
 
 The script sends one plain `gnokey maketx call` of `Publish(slot, hex, "")` a hole, in the order of `data/holes.txt`. It asks the password once. Each call is simulated first and then asks the gas the simulation used and a tenth more, at the node's gas price, and its deposit is capped at `MAX_DEPOSIT`, 10 GNOT by default. A slot that already holds its data is skipped, so after a failure you just run it again. It ends by checking every slot.
 
@@ -187,7 +189,7 @@ gnokey query vm/qeval -data "$REALM.SimulateRound(\"garden/1\", \"0,5\")" -remot
 ```
 
 Check each answer:
-- `Holes()` answers `{"version":1,"play":"https://gnogolf.xyz/",…}` and lists the 72 holes;
+- `Holes()` answers `{"version":1,"play":"https://gnogolf.xyz/",…}` and lists the 90 holes;
 - `HoleState` answers `garden/1/v1`'s geometry and weather;
 - `SimulateRound` answers a path.
 
@@ -223,12 +225,7 @@ The site is a static export (`netlify.toml`: base `web`, `npm ci && npm run buil
   3. Check `Pending()` and `Owner()`.
 
   `Transfer` to the owner's own address cancels an offer. Tips follow the role, because the game sends them to `Owner()`. The namespace `nym-alexiscolin000` stays with `GnoAlex`.
-- **The Crystal Mines** (branch `mines`, in progress; ADR-005). The cup ships as data, with no redeploy: golf already names the world. The order matters:
-  1. Deploy the client that knows `mines` first. Before it, a mines hole would be dressed as the garden and named "Garden Cup".
-  2. Then add its 18 lines to `data/holes.txt` and run step 4's same command. The course's 72 slots are skipped as already current.
-  3. Run `-verify`.
-
-  The course ranking then counts 90 holes. At the course's average of about 0.6 GNOT a hole, the 18 holes' deposit would be about 11 GNOT, but measure them on a local chain first.
+- **The Crystal Mines** (ADR-005) ship as data with the launch: their 18 lines are in `data/holes.txt` and step 4 publishes them with the rest (the course ranking counts 90 holes). The client that draws them deploys once it is ready; until then the live client lists no mines cup, and a mines hole reached by a link is dressed as the garden.
 - **Mainnet notes.**
   - The namespace: a non-nym name such as `gnogolf` is not self-registered on mainnet. You register a nym, and GovDAO renames it (`r/sys/namereg/v0` `ProposeNewName`).
   - While ugnot is transfer-locked there (`bank:p:restricted_denoms`, empty on onyx), the client shows no Support chip and the About sheet says tips open once GNOT can be sent.
@@ -275,7 +272,7 @@ The site is a static export (`netlify.toml`: base `web`, `npm ci && npm run buil
 ```
 p/<ns>/physics  unchanged engine + PrepareWith/Lengths (same arithmetic, no sqrt)
 p/<ns>/course   unchanged + data.gno: Encode(*Simple) string, Decode(string) (*Simple, error)
-r/<ns>/golf     registry; entries are realm holes (course.Hole) OR data versions.
+r/<ns>/golf     registry; entries are data versions (a *course.Simple decoded from GG1 data).
                 Publish (owner), PublishMine (anyone), Versions, HoleData, typed getters,
                 Drain, Transfer/Accept/Renounce
 repo only       hole sources (Fit literals + fingerprint tests), data/holes.txt generated
@@ -287,7 +284,7 @@ A call on a data hole goes through four steps:
 1. Load the version entry: one object holding the data string, about 0.15M gas.
 2. `course.Decode` rebuilds a `*course.Simple`, and `physics.PrepareWith` fills its `prep` from the stored lengths.
 3. The `*course.Simple` is the call's hole; golf marks the wear on the version's entry, never on it.
-4. The rest of the code (`previewAt`, `weatherOf`, `State`, `Render`) runs unchanged.
+4. The rest of the code (`Simple.PreviewWith`, `weatherOf`, `HoleState`, `Render`) runs unchanged.
 
 The decoded value is never linked into realm state, so it costs no deposit.
 
@@ -378,7 +375,7 @@ Weather is not hole data: golf computes it at play time.
 | PrepareWith | ~0.15M | stored |
 | **Total** | **~1.5–2M** | **~7–14M** |
 
-There is no cross-call cache: it would be persisted, and qeval can't persist anyway. The hole is decoded once per public call: `h := e.hole()` is passed down to weather, work, State and Render.
+There is no cross-call cache: it would be persisted, and qeval can't persist anyway. The hole is decoded once per public call: `h := e.hole()` is passed down to weather, work, HoleState and Render.
 
 ## 4. Slots and versions
 
@@ -453,16 +450,17 @@ There is no cross-call cache: it would be persisted, and qeval can't persist any
   - `HoleData(id)` returns the hex, and `Versions(alias)` each version's sha;
   - `Current(slot)`;
   - `BestOf(hole, mode, player)`, and `Ghost(hole, mode, player)` for the round that set it (its shots and period: a v2 can carry a best over with its proof);
-  - `StandingOf(mode, player)`;
+  - a player's standing: `Rank(mode, player)`, and `Standings`/`Players` (JSON) for the rest;
   - the paged JSON reads (`Records`, `Players`, `Community`) to enumerate.
   - There is no `HoleOf`: it would hand any realm a value that writes golf's wear (audit Y4).
 - **golf/v2** re-publishes v1's data and shows v1's records as history, or carries bests over lazily (`v2.Import(player)` reading `v1.BestOf`), only where the physics and course are the same.
 - **Deploy v2 as a sibling** (`r/<ns>/golf2`): golf derives `officialPrefix` and the `/p/<ns>/` links from its own path up to the last `/`, so `r/<ns>/golf/v2` would take `r/<ns>/golf/` for its namespace.
 - **Trap: the weather is seeded by the version id** (`ForecastFor(e.id, …)`). A version re-published in v2 gets a new id, so new weather: a v1 best was played in other weather than the v2 round it would be compared with. A v2 that counts imported bests as the same hole must seed its weather from the v1 id (keep a `legacyID` per version).
-- **Trap: no hole comes over by itself.** Holes don't register from realms any more (every hole is data, and the 74 hole realms don't call golf), so nothing re-registers into a v2: it re-publishes every official version from `HoleData`, checked against `Versions`' sha, and community authors re-publish theirs with v2's `PublishMine`.
+- **Trap: no hole comes over by itself.** Holes don't register from realms any more (every hole is data, and the hole realms don't call golf), so nothing re-registers into a v2: it re-publishes every official version from `HoleData`, checked against `Versions`' sha, and community authors re-publish theirs with v2's `PublishMine`.
 - **Pointing players at v2:** v1's owner calls `SetSuccessor(v2)` once. Every v1 page then shows a "moved to" banner and `Holes` gives `"successor"`; v1 goes on playing and blocks nothing.
-- **physics/v2** needs course/v2 and golf/v2, because `course.Hole` uses physics v1 types. The `GG1` magic leaves room for a `GG2`.
+- **physics/v2** needs course/v2 and golf/v2, because `course.Simple` (and its GG1 data) uses physics v1 types. The `GG1` magic leaves room for a `GG2`.
 - **Frozen at deploy:** physics, course and the `GG1` format with its limits, the golf code and constants, the namespace.
+- **The list's ceiling:** `maxListed = 120` rows, the course's current slots first. At 90 course holes that leaves 10 archived and the 20 community rows (`minCommunity`); a sixth 18-hole cup (108) squeezes the community to 12, a seventh (126) would cut course holes from `Holes()` and the hub. A cup beyond the sixth needs a successor golf (above).
 - **Updatable:** official hole versions, community holes, the owner, the play link (`SetPlayURL`), the successor (once), the client.
 
 ## 10. Deploy pipeline

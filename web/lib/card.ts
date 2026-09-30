@@ -149,11 +149,18 @@ export function totals(card: Card, holes: readonly CardHole[]) {
   return { done, strokes, par, aces, under, all: holes.length > 0 && done === holes.length };
 }
 
-// The cups a player can win, in order. A hole's cup is its world.
-export const CUPS = ["garden", "island", "town", "mountain"] as const;
+// The cups a player can win, in order. A hole's cup is its world. The
+// Crystal Mines, the expert cup, come after the four (ADR-005).
+export const CUPS = ["garden", "island", "town", "mountain", "mines"] as const;
 export type Cup = (typeof CUPS)[number];
+/** The four classic cups: the grand slam's and the King's (not the mines). */
+export const CLASSIC = ["garden", "island", "town", "mountain"] as const satisfies readonly Cup[];
 /** A cup's name, as the game calls it. */
-export const CUP_NAMES: Readonly<Record<Cup, string>> = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup" };
+export const CUP_NAMES: Readonly<Record<Cup, string>> = { garden: "Garden Cup", island: "Island Cup", town: "Mushroom Town", mountain: "Mountain Cup", mines: "Crystal Mines" };
+/** How the expert cup says what it asks (its curtain, its page, the About sheet). */
+export const HARD = "a few minutes a hole";
+/** The cup a link names ("?hole=town/3", "/h/mines-3/", an old realm's "island7"), the garden when it names none. */
+export const guessCup = (link: string): Cup => CUPS.find((c) => link.includes(c)) || "garden";
 
 /** A score against par as the game prints it: E, +3, −2 (a real minus sign). */
 export const vsPar = (n: number) => (n === 0 ? "E" : n > 0 ? `+${n}` : `−${-n}`);
@@ -166,9 +173,10 @@ export function cupTotals(card: Card, allHoles: readonly CardHole[]) {
     const t = totals(card, allHoles.filter((h) => cupOf(h) === c));
     return { ...t, clean: t.all && t.strokes <= t.par, open: t.done > 0 || t.all };
   };
-  const out: Record<Cup, CupTotal> = { garden: cup("garden"), island: cup("island"), town: cup("town"), mountain: cup("mountain") };
-  // the grand slam: every cup the chain has, finished at par or under
-  const cups = CUPS.filter((c) => allHoles.some((h) => cupOf(h) === c));
+  const out = Object.fromEntries(CUPS.map((c) => [c, cup(c)])) as Record<Cup, CupTotal>;
+  // the grand slam: every classic cup the chain has, finished at par or under
+  // (never the mines: the King would move behind the expert cup, ADR-005 §7)
+  const cups = CLASSIC.filter((c) => allHoles.some((h) => cupOf(h) === c));
   return { ...out, slam: cups.length > 1 && cups.every((c) => out[c].clean), aces: CUPS.reduce((n, c) => n + out[c].aces, 0) };
 }
 
@@ -176,6 +184,8 @@ export function cupTotals(card: Card, allHoles: readonly CardHole[]) {
  *  across cups), what it takes, and whether cupTotals() has it. */
 interface Unlock {
   cup?: Cup;
+  /** earned by the cup at par or under (not by finishing it) */
+  par?: true;
   need: string;
   ok: (t: ReturnType<typeof cupTotals>) => boolean;
 }
@@ -183,17 +193,24 @@ interface Unlock {
 // ok() is given cupTotals().
 export const UNLOCKS = {
   wizard: { cup: "garden", need: "Finish the Garden Cup", ok: (t) => t.garden.all },
-  viking: { cup: "garden", need: "Garden Cup at par or under", ok: (t) => t.garden.clean },
+  viking: { cup: "garden", par: true, need: "Garden Cup at par or under", ok: (t) => t.garden.clean },
   golden: { need: "Five holes-in-one", ok: (t) => t.aces >= 5 },
   pirate: { cup: "island", need: "Finish the Island Cup", ok: (t) => t.island.all },
-  diver: { cup: "island", need: "Island Cup at par or under", ok: (t) => t.island.clean },
+  diver: { cup: "island", par: true, need: "Island Cup at par or under", ok: (t) => t.island.clean },
   baker: { cup: "town", need: "Finish Mushroom Town", ok: (t) => t.town.all },
-  mayor: { cup: "town", need: "Mushroom Town at par or under", ok: (t) => t.town.clean },
-  king: { need: "Every cup at par or under", ok: (t) => t.slam },
+  mayor: { cup: "town", par: true, need: "Mushroom Town at par or under", ok: (t) => t.town.clean },
+  king: { need: "The four cups at par or under", ok: (t) => t.slam },
+  miner: { cup: "mines", need: "Finish the Crystal Mines", ok: (t) => t.mines.all },
 } satisfies Record<string, Unlock>;
 export type UnlockId = keyof typeof UNLOCKS;
-/** Whether finishing this cup at par or under earns a gnome (the Mountain Cup earns none). */
-export const cupHasGnome = (cup: string) => Object.values<Unlock>(UNLOCKS).some((u) => u.cup === cup);
+/** What a cup just finished says it earned: at par or under, its par gnome
+ *  (the Mountain Cup has none), or its par badge (the Crystal Mines' Mother
+ *  Lode); over par, a gnome for finishing when that is the cup's only one (the Miner). */
+export function cupFinishLine(cup: string, atPar: boolean) {
+  const gnomes = Object.values<Unlock>(UNLOCKS).filter((u) => u.cup === cup), badge = BADGES.find((b) => b.cup === cup);
+  if (atPar) return gnomes.some((u) => u.par) ? "Cup finished at par or under — a gnome is waiting in the picker." : badge ? `Cup finished at par or under — the ${badge.name} badge is yours.` : "Cup finished at par or under!";
+  return gnomes.length && !gnomes.some((u) => u.par) ? "Cup finished — a gnome is waiting in the picker. Now beat par." : "Cup finished. Now beat par.";
+}
 
 /** A course hole finished, as the badges read it: its strokes and par, Pro
  *  aim or not, its weather (the forecast's kind, "" calm), moving pieces or
@@ -216,6 +233,8 @@ export interface Badge {
   name: string;
   need: string;
   family: "skill" | "weather" | "chain" | "fun";
+  /** a cup's own (earned by that cup at par or under: said when the cup is finished) */
+  cup?: Cup;
   ok?: (f: Finish) => boolean;
 }
 /** The six weathers (the forecast's kinds; "" is the calm one). */
@@ -225,6 +244,8 @@ const WEATHERS = ["", "wind", "fog", "rain", "storm", "snow"] as const;
 export const BADGES: readonly Badge[] = [
   { id: "first", name: "Number one", need: "Take first place on a hole's board", family: "chain" },
   { id: "perfect", name: "Perfect cup", need: "A whole cup, every hole under par", family: "skill", ok: (f) => CUPS.some((c) => f.cups[c].all && f.cups[c].under === f.cups[c].done) },
+  // (the expert cup's: its gnome goes with finishing it, this with par, ADR-005 §7)
+  { id: "lode", name: "Mother Lode", need: "The Crystal Mines at par or under", family: "skill", cup: "mines", ok: (f) => f.cups.mines.clean },
   { id: "ace", name: "Hole in one", need: "Hole a ball in one stroke", family: "skill", ok: (f) => f.strokes === 1 },
   // (another player's ghost at par or under, in the same aim mode: the cheap wins don't count)
   { id: "ghost", name: "Ghost buster", need: "Beat another player's ghost at par or under", family: "skill", ok: (f) => !!f.duel && f.duel.result === "win" && !f.duel.self && !f.duel.mixed && f.duel.theirs <= f.par },

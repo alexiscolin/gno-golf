@@ -13,22 +13,23 @@ import type { Snapshot } from "@/lib/engine";
 import { FrontScreen } from "@/components/About";
 import { Button, InfoTip } from "@/components/ui";
 import { FullBoard, Sticker, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
-import { ghostsWord, golfTerm, holeNumber, holesWord, plural, standingVs } from "@/components/common";
+import { countWord, courseCount, ghostsWord, golfTerm, holeNumber, holesWord, plural, standingVs } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
-import { cupOf, parOf, scoreOf, vsPar, type Card } from "@/lib/card";
+import { CLASSIC, cupOf, parOf, scoreOf, vsPar, type Card } from "@/lib/card";
 import { bestOf, inTurn, mapFit, mapView, mapZone, pathD, railRuns, showcases, shotsOf, vsBest, type MapKind } from "@/lib/duel";
-import { BALL_R, CUP_R } from "@/lib/terrain";
+import { BALL_R, cupRadius, inSea } from "@/lib/terrain";
 import type { RivalKind } from "@/lib/analytics";
 import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2, Zone } from "@/lib/types";
 
-export default function Modes({ gnome, onSolo, onDuel, onBack, onAbout }: { gnome: string; onSolo: () => void; onDuel: () => void; onBack: () => void; onAbout: () => void }) {
+export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
+  const cups = courseCount(counts).cups || CLASSIC.length; // (the chain's, once it has answered)
   return (
     <FrontScreen className="modes" back="Back to the title" onBack={onBack} onAbout={onAbout} eyebrow="Choose your game" title="How do we play?">
       <ul className="modes__list">
-        <li><Panel kind="solo" name="Solo" line="Four cups, your best on the boards" skin={skin} onClick={onSolo} /></li>
+        <li><Panel kind="solo" name="Solo" line={`${countWord(cups)} cups, your best on the boards`} skin={skin} onClick={onSolo} /></li>
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
         <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>
       </ul>
@@ -252,7 +253,8 @@ function Pick({ kind, label, tint, first, row, reading, failed, chain, me, gnome
 function HoleMap({ hole, path }: { hole: HoleState; path: readonly Vec2[] }) {
   const lane = useId(), { at, k } = mapView(mapFit(hole, path), hole), line = pathD(path, at);
   const [cx, cy] = at(hole.cup), [tx, ty] = at(hole.start);
-  const rails = (moving: boolean) => railRuns(hole.walls.filter((w) => !!w.every === moving));
+  // (the mines' board frame, out in the void, is the chain's and not drawn: course.ts inSea)
+  const rails = (moving: boolean) => railRuns(hole.walls.filter((w) => !!w.every === moving && !(hole.world === "mines" && inSea(w, hole.zones))));
   const [still, gates] = [rails(false), rails(true)].map((runs) => runs.map((run) => pathD(run, at)).join(""));
   // the lane: the rails' closed runs (one inside another, a hole in it) and a rail-less lane's outline
   const closed = (run: readonly Vec2[]) => run.length > 3 && at(run[0]).join() === at(run[run.length - 1]).join();
@@ -275,7 +277,7 @@ function HoleMap({ hole, path }: { hole: HoleState; path: readonly Vec2[] }) {
       <path d={gates} className="map__rails map__rails--moving" />
       {hole.posts.map((p, i) => <circle key={i} cx={at(p.c)[0]} cy={at(p.c)[1]} r={Math.max(p.r * k, 1.5)} className="map__post" />)}
       <circle cx={tx} cy={ty} r="2.6" className="map__tee" />
-      <circle cx={cx} cy={cy} r={Math.max(CUP_R * k, 2.5)} className="map__cup" />
+      <circle cx={cx} cy={cy} r={Math.max(cupRadius(hole) * k, 2.5)} className="map__cup" />
       <path d={line} pathLength={100} className="map__line" />
       <circle r={Math.max(BALL_R * k, 2.4)} className="map__ball" style={{ offsetPath: `path("${line}")` }} />
       <path d={`M${cx} ${cy}V${cy - 16}`} className="w__pole" />

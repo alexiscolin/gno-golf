@@ -60,13 +60,17 @@ replay of your shots, and anyone can replay it again.
   ([docs/analytics.md](docs/analytics.md)). The font is served by the site
   itself.
 
-There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain); a
-fifth, the Crystal Mines, an expert cup, is on the cups screen as
-coming soon ([ADR-005](adr/adr-005-crystal-mines.md)). A cup always starts from its first hole, with a fresh round. The
+There are four cups of 18 holes (Garden, Island, Mushroom Town, Mountain),
+then the Crystal Mines, the expert cup: 18 long holes of three to
+five minutes each (par 158), their pars set by what a good player can do in the
+worst weather ([ADR-005](adr/adr-005-crystal-mines.md), "As built"). It is
+open from the start like the four, and its holes count in the course ranking
+like any other, once published. A cup always starts from its first hole, with a fresh round. The
 menu's Mode goes back to Solo or Duel, All cups to the cups (a duel's ghosts
 in a duel), and Gnome to the gnome picker. Some holes move, so timing is part of the shot. Every hole has
-weather (wind, rain, fog, storm, snow), which changes every five minutes of
-chain time and is the same for everyone.
+weather (wind, rain, fog, storm, snow; the Crystal Mines have theirs underground,
+still air, a draught, dripping and lights out, never a storm or snow), which
+changes every five minutes of chain time and is the same for everyone.
 
 ## Running it locally
 

@@ -3,7 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { C, ink, flat, sway, grows, swayLine, drawn, rbox, texOf, lanternGlow, glowTex, tuftGeo, share, motion, onTop } from "./materials";
 import { animate, state } from "./state";
 import { bakeLocal } from "./bake";
-import { GRASS, type Rand } from "./common";
+import { GRASS, shown, type Rand } from "./common";
 import { ud, type Height, type Tick } from "./data";
 import type { MutVec2, Post } from "../types";
 
@@ -440,7 +440,6 @@ export function smokeBatch(marks: readonly THREE.Object3D[]): { mesh: THREE.Inst
   mesh.frustumCulled = false; // its puffs move: bounds measured once would be stale
   ud(mesh).live = true;
   const local = new THREE.Matrix4(), world = new THREE.Matrix4(), hide = new THREE.Matrix4().makeScale(0, 0, 0);
-  const shown = (o: THREE.Object3D | null) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
   const tick = (t: number) => {
     if (!mesh.parent) return;
     marks.forEach((g, c) => {

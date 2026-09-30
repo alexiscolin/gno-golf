@@ -13,7 +13,7 @@ import TITLE_HOLES from "./title-holes.json";
 import { loadWorld } from "./worlds";
 import { buildHole } from "./course";
 import { state } from "./state";
-import { makeRenderer, makeScene, weakGpu } from "./camera";
+import { makeRenderer, makeScene, weakGpu, setLighting } from "./camera";
 import { makeBall, gnomeById } from "./gnome";
 import { makeConfetti } from "./fx";
 import { BALL_R, smoothstep } from "../terrain";
@@ -31,16 +31,22 @@ const FRAME_MS = 1000 / 30;
 // The cup cards' dioramas: a fixed three-quarter view on the landmark (y: the
 // height looked at, the garden's higher for its tall mill, seen from its door
 // side, the mountain's for its ski lift at the back of the lane)
-export const CUP: Record<string, { a: number; r: number; h: number; y?: number }> = {
+// (at: a point of interest on a big board, the mines', circled d units off and
+// el degrees up, as near as the four cups' rings stand to theirs: cupCam)
+export interface CupFrame { a: number; r?: number; h?: number; y?: number; at?: readonly [number, number]; d?: number; el?: number }
+export const CUP: Record<string, CupFrame> = {
   garden: { a: 2.3, r: 0.95, h: 0.85, y: 3 },
   island: { a: 1.0, r: 0.8, h: 1.1 },
   town: { a: 1.35, r: 0.85, h: 1.1 },
   mountain: { a: 1.2, r: 0.76, h: 0.88, y: 4 },
+  mines: { a: 2.2, at: [46, 37] }, // (the Heart: its crystals over the lava moat)
 };
 
 /** Golden hour: a warm low sun, a pink sky light, violet shadows (the
- *  snow in a brighter alpenglow: under the garden's it greys). */
+ *  snow in a brighter alpenglow: under the garden's it greys). Under
+ *  ground (the mines) no sun: the cave's own light, as the game plays it. */
 export function golden(scene: LitScene, world: string) {
+  if (world === "mines") return setLighting(scene, "cave");
   const { sky, sun } = scene.userData.lights, snow = world === "mountain";
   sky.color.set(snow ? 0xffeadc : 0xffd6b0);
   sky.groundColor.set(snow ? 0x9aa4ee : 0x7d78c8);
@@ -48,6 +54,16 @@ export function golden(scene: LitScene, world: string) {
   sun.color.set(0xffa865);
   sun.intensity = snow ? 0.85 : 1.05;
   sun.position.set(-26, 18, 22);
+}
+
+/** A cup card's camera at angle a, k: its ring's share (r) and height's (h)
+ *  as the move closes in: round the board (orbit), or round the frame's point
+ *  of interest, looking at the ground there (height: the course's). */
+export function cupCam(camera: THREE.PerspectiveCamera, b: Board, c: CupFrame, a: number, k: { r: number; h: number }, height: (x: number, z: number) => number) {
+  if (!c.at) return orbit(camera, b, a, { r: (c.r ?? 1) * k.r, h: (c.h ?? 1) * k.h }, false, c.y ?? -1.5);
+  const [x, z] = c.at, y = c.y ?? height(x, z), d = c.d ?? 50, el = ((c.el ?? 30) * Math.PI) / 180, flat = d * Math.cos(el) * k.r;
+  camera.position.set(x + Math.cos(a) * flat, y + d * Math.sin(el) * k.h, z + Math.sin(a) * flat);
+  camera.lookAt(x, y, z);
 }
 
 /** A ring round the board: the cup card's camera at angle a. */

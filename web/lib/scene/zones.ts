@@ -1281,4 +1281,4 @@ function seesaw(z: Zone, s: Hole, t: T, g: THREE.Group) {
   return g;
 }
 
-export { zoneDetail };
+export { zoneDetail, organic, rings, tone, type Blob };

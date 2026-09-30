@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  mod, there, onAt, smoothstep, angDiff, closest, boxOf, nearestOnPoly, segDist, wallDist,
-  segHit, rayCircle, inPoly, inset, inZone, inSea, sandIn, airy, terrain, CELL, plainSkins,
+  mod, there, onAt, untilOn, smoothstep, angDiff, closest, boxOf, nearestOnPoly, segDist, wallDist,
+  segHit, rayCircle, inPoly, inset, inZone, inSea, sandIn, airy, terrain, CELL, plainSkins, cupRadius, CUP_R,
 } from "../lib/terrain.ts";
 import type { HoleState, Vec2, Wall, Zone } from "../lib/types.ts";
 
@@ -41,6 +41,12 @@ void test("there: untimed (every 0) is always on; timed follows on/every/phase",
   // a phase shift moves the window
   assert.equal(there(2, 4, 2, 2), true);
   assert.equal(there(0, 4, 2, 2), false);
+});
+
+void test("untilOn: the ticks to go before a timed piece is on, 0 while it is or untimed (Review #9)", () => {
+  assert.equal(untilOn({}, 7), 0);
+  assert.deepEqual([0, 1, 2, 3, 4].map((t) => untilOn({ every: 4, on: 2 }, t)), [0, 0, 2, 1, 0]);
+  assert.deepEqual([0, 1, 2, 3].map((t) => untilOn({ every: 4, on: 2, phase: 2 }, t)), [2, 1, 0, 0]);
 });
 
 void test("onAt reads a Timing object the same way", () => {
@@ -286,6 +292,17 @@ void test("terrain: a hill whose top comes too near the cup holds up to it, no s
   // far from the cup, the same hill ends in its short lip
   const far = terrain(mkHole({ board: { w: 20, h: 10 }, zones: [hill], start: [0.5, 5], cup: [19, 5] }));
   assert.equal(far.ground(14, 5), 0);
+});
+
+void test("terrain: the cup at the hole's own radius (the chain's cupR): a smaller cup needs less room from a hill", () => {
+  assert.equal(cupRadius({}), CUP_R);
+  assert.equal(CUP_R, 1.2);
+  assert.equal(cupRadius({ cupR: 1.0 }), 1.0);
+  const hill = mkZone({ kind: "slope", min: [4, 1], max: [12, 9], vec: [-0.25, 0] });
+  const at = (cupR?: number) => terrain({ ...mkHole({ board: { w: 20, h: 10 }, zones: [hill], start: [0.5, 5], cup: [14.4, 5] }), ...(cupR ? { cupR } : {}) });
+  assert.ok(at().ground(14.4, 5) > 1, "a 1.2 cup 2.4 past the hill: up on its top");
+  assert.equal(at(1.2).ground(14.4, 5), at().ground(14.4, 5), "1.2 said is 1.2");
+  assert.equal(at(1.0).ground(14.4, 5), 0, "a 1.0 cup there: room for the hill's lip, the cup at its foot");
 });
 
 void test("terrain: a mound draws one round dome over four slopes", () => {

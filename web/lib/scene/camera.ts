@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { isTouch } from "../device";
 import { ISLAND } from "./common";
+import { quality } from "./materials";
 import type { LitScene } from "./data";
 import type { Board, HoleState } from "../types";
 
@@ -63,10 +64,17 @@ export function makeScene(): LitScene {
 // A hole is played at one moment of the day, and keeps it: day, evening or
 // night. The light changes here, and the fog's colour (a pale mist by day, a
 // rosy haze at dusk, a blue murk at night); the sky behind the canvas is the page's.
-const TIMES: Record<string, { sky: readonly [number, number, number]; sun: readonly [number, number, readonly [number, number, number]]; fog: number }> = {
+// Under ground (the Crystal Mines, ADR-005 §6) the light is the scene's own:
+// "cave" a blue-slate hemisphere and a soft warm key from above, as if from
+// the lantern strings; "gallery" the dark (holes 2 and 15, and "Lights out"),
+// where only the crystals, the lava and the headlamp light the way. Their
+// fog is the vault's dark. low: the Low tier's ambient, a step up.
+const TIMES: Record<string, { sky: readonly [number, number, number]; sun: readonly [number, number, readonly [number, number, number]]; fog: number; low?: number }> = {
   day:   { sky: [0xfff3df, 0x9fc4b3, 1.3], sun: [0xfff6e2, 0.7, [24, 40, 6]], fog: 0xdfe6e2 },
   dusk:  { sky: [0xffd2b0, 0x6f7fa8, 1.05], sun: [0xff9d62, 0.95, [-20, 14, 10]], fog: 0xd9b3a4 },
   night: { sky: [0x8ea2dc, 0x1f3342, 0.62], sun: [0xc4d4ff, 0.38, [10, 30, -10]], fog: 0x3e5372 },
+  cave:    { sky: [0xb9c6f2, 0x2c3456, 1.3], sun: [0xffd9a8, 0.55, [6, 40, 14]], fog: 0x15122b, low: 1.2 },
+  gallery: { sky: [0x7f8fd0, 0x1a1636, 0.42], sun: [0xffcf9a, 0.16, [6, 40, 14]], fog: 0x0b0918, low: 1.35 },
 };
 
 /** Day for most holes, evening or night for some — stable per hole. */
@@ -84,11 +92,12 @@ export function setLighting(scene: LitScene, time: string) {
   const t = TIMES[time] || TIMES.day, { sky, sun } = scene.userData.lights;
   sky.color.set(t.sky[0]);
   sky.groundColor.set(t.sky[1]);
-  sky.intensity = t.sky[2];
+  sky.intensity = t.sky[2] * (t.low && quality.low ? t.low : 1);
   sun.color.set(t.sun[0]);
   sun.intensity = t.sun[1];
   sun.position.set(...t.sun[2]);
   if (scene.fog) scene.fog.color.set(t.fog);
+  scene.userData.time = time;
 }
 
 /** What the overview frames: the course, with a little of the garden around

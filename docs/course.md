@@ -133,6 +133,13 @@ Pulses: []course.Pulse{{
 }},
 ```
 
+A pulse can also change **once for good** (the Crystal Mines' collapsing
+galleries and dynamite): a round holds at most 60 strokes, so a cycle of 64 is
+never completed. Absent on strokes 0 to k−1 and present from stroke k on is
+`Every: 64, On: 64 − k, Phase: 64 − k`; present until stroke k and gone from
+then on is `Every: 64, On: k, Phase: 0`. Keep it at 64, not 4096:
+`fingerprint.Full` plays every stroke of the longest cycle.
+
 `Simple` reads its pulses with:
 
 ```go

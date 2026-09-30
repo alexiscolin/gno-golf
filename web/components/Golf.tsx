@@ -27,15 +27,16 @@ import Tip from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
-import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupHasGnome, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain } from "@/lib/card";
+import { loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
-import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, plural, vsParWords, AIMS, AIM_NAMES, shortAddr, useCopied, saveBy, mmss, costLine, fundCmd, holeNumber, nextCup, golfTerm, nextHole, chainQuery, strokeFor, type SaveOf } from "@/components/common";
+import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, plural, vsParWords, AIMS, AIM_NAMES, shortAddr, useCopied, saveBy, mmss, costLine, fundCmd, holeNumber, nextCup, golfTerm, nextHole, chainQuery, strokeFor, minesHint, readMs, type SaveOf } from "@/components/common";
 import { clipName } from "@/lib/clip";
 import { Boards, FullBoard, Podium, NameForm, nameOnce, useNameCheck, useRankNudge, useSavedPlace, type BoardProps, type NameCheck } from "@/components/Leaderboard";
 import { ADENA_URL, FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network";
 import { register, track, trackError, once, failure, type Events, type Play, type RivalKind } from "@/lib/analytics";
-import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen } from "@/lib/prefs";
+import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "@/lib/prefs";
+import { darkGallery, minesOrder } from "@/lib/scene/data";
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
 // dev build, or on a page opened with ?camlog where the hooks answer
@@ -192,7 +193,7 @@ function CauseNote({ hot }: { hot: Hot }) {
   const cause = useHot(hot, "cause");
   return cause ? <div key={cause.at} className="cause" aria-live="polite">{cause.label}</div> : null;
 }
-function LiveWeather({ hot, ...props }: { hot: Hot; w: Snapshot["weather"]; until: number | null; night: boolean }) {
+function LiveWeather({ hot, ...props }: { hot: Hot; w: Snapshot["weather"]; until: number | null; night: boolean; world?: string; dark?: boolean }) {
   return <Weather {...props} flash={useHot(hot, "flash") || 0} />;
 }
 
@@ -289,14 +290,14 @@ function Retry({ onRetry }: { onRetry: () => void }) {
 }
 
 /** A word over the course for a moment. Taken away by a timer, not by its animation: with reduced motion there is none. */
-function Toast({ text, onDone }: { text: string; onDone: () => void }) {
+function Toast({ text, onDone, ms = 3200 }: { text: string; onDone: () => void; ms?: number }) {
   const done = useRef(onDone);
   done.current = onDone;
   useEffect(() => {
-    const t = setTimeout(() => done.current(), 3200);
+    const t = setTimeout(() => done.current(), ms);
     return () => clearTimeout(t);
-  }, []);
-  return <div className="toast" role="status">{text}</div>;
+  }, [ms]);
+  return <div className="toast" role="status" style={ms !== 3200 ? { animationDuration: `${ms}ms` } : undefined}>{text}</div>;
 }
 
 // The storage deposit of a save, in ugnot: a first save on a hole writes the
@@ -352,6 +353,9 @@ export default function Golf() {
       return false;
     }
   });
+  // a mines hole's first visit: its signature, said once (the slots already told)
+  const [hinted, setHinted] = useState(minesHinted);
+  const [camNote, setCamNote] = useState<string | null>(null); // the view just picked, said for a moment
   const [gnome, setGnome] = useState(() => {
     const gn = linkedGnome();
     return gn && gn.open ? gn.id : savedGnome(); // a locked one: lockedNote says so
@@ -470,6 +474,8 @@ export default function Golf() {
   // this hole's score on the card (the round before), said by the strokes while playing it
   const hereRow = s && allList.find((h) => h.id === s.id);
   const last = s && !s.holed && hereRow ? scoreOf(card, hereRow) : undefined;
+  // a mines hole: its slot, and its signature for a first visit
+  const minesN = minesOrder({ hole: (s && s.id) || "" }), hintSlot = minesN ? `mines/${minesN}` : "", hint = minesHint(hintSlot);
   // an assisted round, said on the strokes card's corner (solo or duel)
   const assisted = s && (s.roundMode || s.mode) === "assisted" && <span className="pro-chip" title="Assisted: the full aim line, ranked apart">ASSISTED</span>;
   // once earned, a gnome stays earned: a hole registered later must not take
@@ -1241,6 +1247,8 @@ export default function Golf() {
   }, [curtainOpen]);
 
   const holed = s && s.holed;
+  // behind the gnome the pull is a joystick (engine.ts steer): the hints say how
+  const third = !!s && s.cam === "third";
   // a duel's result, once the hole is won
   const won = racing && s && s.holed ? { ...duelResult(s.strokes, racing, golfTerm(s.strokes, parHere(s))), duel: racing } : null;
   // a duel lost, or tied where it could have been won (not an ace), pushes to the rematch
@@ -1402,7 +1410,7 @@ export default function Golf() {
 
       {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => (setScreen(dare && !solo && dare === linkDare.current ? "ghosts" : "modes"), (linkDare.current = ""))} onAbout={() => setAbout(true)} />}
       {screen === "modes" && (
-        <Modes gnome={gnome} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
+        <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
           onSolo={() => (setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")} />
       )}
       {screen === "rival" && s && (
@@ -1484,7 +1492,7 @@ export default function Golf() {
                 {assisted}
               </div>
             )}
-            <LiveWeather hot={hot.current} w={wx ?? null} night={s.time === "night"} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
+            <LiveWeather hot={hot.current} w={wx ?? null} night={s.time === "night"} world={s.look} dark={darkGallery({ hole: s.id || "" })} until={s.period != null ? (s.period + 1) * RULES.periodMs - skewOf(game.current && game.current.chain) : null} />
             <div className="hud__right">
               <span className="adena__wrap">
               <button
@@ -1610,8 +1618,8 @@ export default function Golf() {
 
           {!s.aiming && !s.flying && !holed && s.strokes === 0 && (
             <div className="hint">
-              <span className="hint--mouse">Click anywhere and pull back, like a slingshot, or use the arrow keys and Space</span>
-              <span className="hint--touch">Touch anywhere and pull back, like a slingshot</span>
+              <span className="hint--mouse">{third ? "Press anywhere: drag down for power, push far left or right to turn, or use the arrow keys and Space · scroll to look around" : "Click anywhere and pull back, like a slingshot, or use the arrow keys and Space"}</span>
+              <span className="hint--touch">{third ? "Touch anywhere: drag down for power, push far left or right to turn" : "Touch anywhere and pull back, like a slingshot"}</span>
             </div>
           )}
           {s.aiming && (
@@ -1619,7 +1627,17 @@ export default function Golf() {
               <div className="bar">
                 <AimBar hot={hot.current} />
               </div>
-              <small>Let go to shoot · slide back to cancel</small>
+              <small>{third ? "Drag down for power · push far left or right to turn · back to the start to cancel" : "Let go to shoot · slide back to cancel"}</small>
+            </div>
+          )}
+          {/* behind the gnome, the aim turning on past its zone: a curved arrow on the side held */}
+          {s.aiming && !!s.spin && (
+            <div className={"spin spin--" + (s.spin > 0 ? "right" : "left")} aria-hidden="true">
+              <svg viewBox="0 0 64 64">
+                <path className="spin__rim" d="M12 34A20 20 0 1 1 44 50" />
+                <path className="spin__band" d="M12 34A20 20 0 1 1 44 50" />
+                <path className="spin__head" d="M37 56 50 54 42 43Z" />
+              </svg>
             </div>
           )}
 
@@ -1631,17 +1649,21 @@ export default function Golf() {
             <Button variant={theyWon ? "primary" : "secondary"} disabled={!s.strokes} onClick={() => game.current?.reset()}>{theyWon ? "Rematch" : "Restart"}</Button>
             <Button
               className="cam-btn"
-              aria-label={`Camera: ${CAMS[s.cam] || "Classic"} — click to change`}
-              title={`Camera: ${CAMS[s.cam] || "Classic"} — click to change`}
+              aria-label={`View: ${CAMS[s.cam] || "Classic"} — click for the next view`}
+              title={`View: ${CAMS[s.cam] || "Classic"} — click for the next view`}
               onClick={() => {
                 const next = CAM_ORDER[(CAM_ORDER.indexOf(s.cam || "classic") + 1) % CAM_ORDER.length];
                 saveCam(next);
                 sound("blip");
                 game.current?.setCam(next);
+                setCamNote(`${CAMS[next]} view`);
               }}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" /></svg>
-              <span className="cam-btn__name">{CAMS[s.cam] || "Classic"}</span> <span aria-hidden="true">▾</span>
+              {/* an eye, the view */}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></svg>
+              <span className="cam-btn__name">{CAMS[s.cam] || "Classic"}</span>
+              {/* which of the three views, the current one filled: a click goes to the next */}
+              <span className="cam-btn__dots" aria-hidden="true">{CAM_ORDER.map((c) => <i key={c} data-on={c === (s.cam || "classic") ? "" : undefined} />)}</span>
             </Button>
           </footer>
         </>
@@ -1850,12 +1872,13 @@ export default function Golf() {
             <span className="eyebrow">Hole {curtain.n}</span>
             <h2>{curtain.name}</h2>
             <p className="curtain__chore">{((c) => c[Number(curtain.n) % c.length])(choresOf((s && s.world) || "garden"))}</p>
+            {s && s.world === "mines" && <p className="curtain__chore">The expert cup: {HARD}</p>}
           </div>
         </div>
       )}
 
       {about && (
-        <About web={cfg ? cfg.web : ""} onClose={() => setAbout(false)} onRules={() => (setAbout(false), setRules(true))}
+        <About web={cfg ? cfg.web : ""} counts={s ? s.worlds : undefined} onClose={() => setAbout(false)} onRules={() => (setAbout(false), setRules(true))}
           support={game.current && <Tip chain={game.current.chain} me={account && account.address} chainId={chainId} price={gasPrice} onConnect={() => (setAbout(false), setReal(true))} />} />
       )}
       {support && game.current && (
@@ -1912,7 +1935,11 @@ export default function Golf() {
           {s.rivalTurn && racing ? `${racing.self ? "Your best" : racing.name.replaceAll("-", "\u2011")}'s turn` : racing ? <>Your turn!<small>{raceLeft(s.strokes + 1, racing.ghost.strokes)}</small></> : strokeFor(s.strokes + 1, parHere(s))}
         </p>
       )}
-      {playing && !linkNote && !duel && farHint && s && s.ready && !s.flying && s.strokes > 0 && !s.done && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
+      {playing && !linkNote && camNote && <Toast key={camNote} text={camNote} ms={1600} onDone={() => setCamNote(null)} />}
+      {playing && !linkNote && !camNote && !duel && farHint && s && s.ready && !s.flying && s.strokes > 0 && !s.done && s.cam !== "far" && <Toast text="Tip: the camera button's Far view shows the whole hole." onDone={() => { try { localStorage.setItem("gnogolf.hint.far", "1"); } catch {} setFarHint(false); }} />}
+      {playing && !linkNote && !camNote && !curtain && hint && !hinted.includes(hintSlot) && s && s.ready && !s.flying && s.strokes === 0 && !s.done && (
+        <Toast key={hintSlot} text={hint} ms={readMs(hint)} onDone={() => (minesHintSaid(hintSlot), setHinted((h) => [...h, hintSlot]))} />
+      )}
       {playing && s && s.flying && <CauseNote hot={hot.current} />}
 
       {gl && !fatal && (
@@ -1980,7 +2007,7 @@ export default function Golf() {
           {/* the world is not known yet: guess it from the hole asked for */}
           <svg viewBox="-12 -16 24 26" className="boot__gnome" aria-hidden="true">
             <circle cx="0" cy="2" r="7" className="load__white" />
-            <Hat world={(cfg && (cfg.world || (/island/.test(cfg.hole) ? "island" : /town/.test(cfg.hole) ? "town" : /mountain/.test(cfg.hole) ? "mountain" : ""))) || "garden"} y={-3} />
+            <Hat world={(cfg && (cfg.world || guessCup(cfg.hole || ""))) || "garden"} y={-3} />
           </svg>
           <p>Reaching the chain…</p>
         </div>
@@ -2370,7 +2397,7 @@ function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot
   const vs = vsParWords(t.strokes - t.par);
   const pick = (list: readonly string[]) => list[[...String(s.id || "")].reduce((a, c) => a + c.charCodeAt(0), s.strokes) % list.length];
   const tag = SHARE_TAGS;
-  if (cups.slam) return "👑 Grand slam on Gnogolf: every cup at par or under. The Gnome King bows." + tag;
+  if (cups.slam) return "👑 Grand slam on Gnogolf: the four cups at par or under. The Gnome King bows." + tag;
   if (t.all) return pick([
     `🏆 ${cup} done on Gnogolf, ${vs}. Every putt computed on-chain.`,
     `⛳ ${t.strokes} strokes round the whole ${cup} (${vs}). My gnome is tired, the chain is not.`,
@@ -2614,7 +2641,7 @@ function Standings({ s, card, saved, chain, me, mode = "pro", compact = false, o
       {badges && <EarnedBadges fresh={fresh} onOpen={badges.onOpen} />}
       {(!compact || t.all) && <p className="cup__next">
         {t.all
-          ? t.strokes <= t.par ? (cupHasGnome(s.world || "") ? "Cup finished at par or under — a gnome is waiting in the picker." : "Cup finished at par or under!") : "Cup finished. Now beat par."
+          ? cupFinishLine(s.world || "", t.strokes <= t.par)
           : next && <>Next up: <b>{next.name}</b></>}
       </p>}
     </section>

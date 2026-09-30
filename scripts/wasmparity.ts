@@ -8,9 +8,9 @@
 // call's answer's sha256; then the wasm answers the same calls, through the
 // page's own host (web/lib/sim/host.ts). Any difference fails.
 //
-// The holes: the course's 72 (data/holes.txt, their plans in
+// The holes: the course's (data/holes.txt, their plans in
 // scripts/hole-bests.json), and the mines' 18 from the mines worktree
-// (MINES, default: gnogolf-mines beside the repo), when it is there.
+// (MINES, default: gnogolf-mines beside the repo) when the course lacks them.
 //
 //   cd web && node --experimental-strip-types ../scripts/wasmparity.ts
 //   (scripts/wasm.sh --check runs it; check.sh runs that)
@@ -37,8 +37,9 @@ function holes(dir: string, only?: RegExp): Hole[] {
 const all = holes(root);
 const main = path.dirname(execFileSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" }).trim());
 const mines = process.env.MINES || path.join(main, "../gnogolf-mines");
-if (fs.existsSync(path.join(mines, "data/holes.txt"))) all.push(...holes(mines, /^mines\//));
-else console.log(`wasmparity: no mines worktree at ${mines}: the course's holes only`);
+const ownMines = all.some((h) => h.slot.startsWith("mines/")); // (the course has them already: each slot once)
+if (!ownMines && fs.existsSync(path.join(mines, "data/holes.txt"))) all.push(...holes(mines, /^mines\//));
+else if (!ownMines) console.log(`wasmparity: no mines worktree at ${mines}: the course's holes only`);
 if (process.env.ONLY) all.splice(0, all.length, ...all.filter((h) => new RegExp(process.env.ONLY!).test(h.slot))); // ONLY=mines/1: those holes alone
 const hexOf = new Map(all.map((h) => [h.slot, h.hex]));
 

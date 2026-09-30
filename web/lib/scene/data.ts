@@ -10,7 +10,18 @@ import type { WeatherNow } from "./weather";
  *  (engine.ts decorOf), and unbaked for the trailer's hole that builds itself. */
 export interface Hole extends HoleState {
   unbaked?: boolean;
+  /** the hazards a stroke's pulses lay (fetched ahead for a world that cuts the lane under them: worlds.ts ahead, open) */
+  pulseZones?: readonly Zone[];
 }
+
+/** A mines hole's place in its cup (1..18), 0 off the mines (a hole dressed as the mines with ?world=). */
+export const minesOrder = (s: Pick<Hole, "hole">) => Number(/^mines\/(\d+)/.exec(s.hole || "")?.[1]) || 0;
+/** The mines' dark galleries (ADR-005 §6): lit only by the headlamp, the glowworms and the crystals, in any weather. */
+export const darkGallery = (s: Pick<Hole, "hole">) => [2, 15].includes(minesOrder(s));
+/** How far the aim dots see (0: all the way): 7 units in fog; in a dark gallery
+ *  of the mines, the headlamp's 7 in any weather and 4 in fog. (The HUD and
+ *  the rules say these numbers from here.) */
+export const sight = (fog: boolean, dark: boolean) => (dark ? (fog ? 4 : 7) : fog ? 7 : 0);
 
 /** The ground height at a board point (x, z): cosmetic, the physics is flat. */
 export type Height = (x: number, z: number) => number;
@@ -37,8 +48,24 @@ export interface Mill {
 export interface SlopeGlow {
   glow: (k: number) => void;
 }
-/** The curve a tunnel's tube follows; an arc is a throw through the air (a blowhole). */
-export type TubePath = THREE.Curve<THREE.Vector3> & { userData?: { arc?: boolean } };
+/** The curve a tunnel's tube follows; an arc is a throw through the air (a blowhole); a ride, a set piece that carries the ball along it. */
+export type TubePath = THREE.Curve<THREE.Vector3> & { userData?: { arc?: boolean; ride?: Ride } };
+/**
+ * A tunnel ridden in a set piece (the mines' cage, cart, geyser...): the ball
+ * taken along its curve for ms, at the curve's point ease(k) (k: 0..1 of the
+ * time); each frame at(k, ball) moves the piece with it (and may move, hide
+ * or turn the ball), and at(-1) when it is over; cam(k, pos, look) the camera's pose then ("cut": put there at once),
+ * or false to leave it to the mode. The ball is drawn at size (1 by default).
+ */
+export interface Ride {
+  ms: number;
+  ease?: (k: number) => number;
+  at?: (k: number, ball: THREE.Object3D) => void;
+  cam?: (k: number, pos: THREE.Vector3, look: THREE.Vector3) => boolean | "cut";
+  size?: number;
+  /** a loop's: how far up its curve (a share of it) a ball too slow for it climbs at most before it rolls back out (0.5 by default) */
+  climb?: number;
+}
 /** The water mask: one texel per terrain cell (green where there is water). */
 export interface WaterMask {
   tex: THREE.DataTexture;
@@ -84,6 +111,11 @@ interface ObjData {
   /** a stroke's extras' own timed pieces, and their dashed outlines while aiming (buildExtras) */
   timed?: Timed[];
   ghosts?: ((aiming: boolean) => void) | null;
+  /** a world's timed bar that moves itself (course.ts timedPieces): clock(tick, e) with the clock's
+   *  tick and how far in it is (0 away, 1 in place), in place of the pivot's rise and sink */
+  clock?: (tick: number, e: number) => void;
+  /** a stroke's extras the world animates from the last stroke's itself: swapped at once, not grown */
+  steady?: boolean;
   // a prop's own, read by the decor that places it
   /** its radius */
   r?: number;
@@ -151,7 +183,11 @@ export interface Course extends THREE.Group {
 /** The gnome: his body (what turns and hops), his eyes (what blinks), his shadow, how far he reaches out from his centre (standing),
  *  and the height of his middle, beard to hat (what a roll turns about). */
 export interface Gnome extends THREE.Group {
-  userData: { body: THREE.Object3D; eyes: THREE.Object3D[]; shade: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; reach: number; mid: number };
+  userData: {
+    body: THREE.Object3D; eyes: THREE.Object3D[]; shade: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; reach: number; mid: number;
+    /** where a headlamp clips on (the body's space), its glow once lit, and whether it is a clip-on (gnome.ts headlamp) */
+    lampAt: THREE.Vector3; lamp?: THREE.Object3D; clip?: boolean;
+  };
 }
 
 /** The aim: its dots, one instance each. */
@@ -161,5 +197,5 @@ export interface Aim extends THREE.Group {
 
 /** A scene with its two lights (makeScene). */
 export interface LitScene extends THREE.Scene {
-  userData: { lights: { sky: THREE.HemisphereLight; sun: THREE.DirectionalLight } };
+  userData: { lights: { sky: THREE.HemisphereLight; sun: THREE.DirectionalLight }; time?: string };
 }

@@ -453,7 +453,7 @@ html, body {
 
 .hint {
   transition: opacity .3s;
-  white-space: nowrap;
+  width: max-content; max-width: calc(100vw - 32px); text-align: center; /* (wrapped inside the screen when it does not fit) */
 }
 
 .btn {
@@ -992,6 +992,24 @@ html, body {
   justify-items: center;
   gap: 6px;
 }
+
+/* third person's aim turning on past its zone (engine.ts steer): a curved
+   arrow on the side held, in the toon's ink and the sun's yellow */
+.spin {
+  position: fixed;
+  top: 50%;
+  width: 88px;
+  height: 88px;
+  margin-top: -44px;
+  pointer-events: none;
+}
+.spin--right { right: 16px; transform: scaleX(-1); } /* the arrow turns the aim's way: against the hand */
+.spin--left { left: 16px; }
+.spin svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 3px 0 var(--ink)); }
+.spin__rim, .spin__band { fill: none; stroke-linecap: round; }
+.spin__rim { stroke: var(--ink); stroke-width: 12; }
+.spin__band { stroke: var(--sunny); stroke-width: 6.5; }
+.spin__head { fill: var(--sunny); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
 
 .aimbar .bar {
   width: 220px;
@@ -1606,7 +1624,9 @@ h3 small {
 .toast {
   position: fixed; left: 50%; top: 108px; transform: translateX(-50%); z-index: var(--z-menu);
   padding: 10px 18px; border-radius: 14px; border: var(--edge); background: var(--paper);
-  font-weight: 800; color: var(--ink); white-space: nowrap;
+  font-weight: 800; color: var(--ink);
+  /* one line when it fits, wrapped inside the screen when not (a mines hole's hint on a tablet) */
+  width: max-content; max-width: calc(100vw - 32px); text-align: center;
   animation: toast 3.2s ease forwards; pointer-events: none;
 }
 @keyframes toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 8%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
@@ -1699,6 +1719,26 @@ h3 small {
 .w__snowfield { fill: var(--mountain-snow); stroke: var(--ink); stroke-width: 2.5; }
 .w__chalet { fill: #b07a4a; stroke: var(--ink); stroke-width: 2.5; }
 .w__roof { fill: #8a3b33; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+/* the Crystal Mines: emblem, loader, hat, curtain, sky (the vault's colours: scene/mines-kit.ts MINES) */
+.w__sky--mines { fill: #2a2350; }
+.w__glint { fill: #5ff3ff; } .w__glint--violet { fill: #c7a6ff; }
+.w__cave { fill: #6c5a9c; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.w__crystal { fill: #7fe0f7; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.w__crystal--violet { fill: #c7a6ff; }
+.w__facet { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; opacity: .55; }
+.w__pick { fill: var(--silver); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.w__halo { fill: var(--lamp); opacity: .35; }
+.hat--miner path, .hat--miner rect { fill: var(--gold); }
+.hat--miner .hat__lamp { fill: var(--lamp); stroke-width: 1.2; }
+.hat--miner .hat__glow { fill: var(--lamp); stroke: none; opacity: .5; }
+.load--mines .load__green { fill: #ded6f2; }
+.load--mines .load__mown { fill: #6c5a9c; }
+.load__crystal { fill: #7fe0f7; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.curtain--mines { background: linear-gradient(180deg, #d9cff2, #f1ecf9); }
+/* underground at any hour: the vault's own dark (the scene draws the vault
+   below the camera; above it the page shows through), no sun, cloud or stars */
+.sky.sky--w-mines { background: #15122b; }
+.sky--w-mines .cloud, .sky--w-mines .sun, .sky--w-mines .stars { display: none; }
 .hat--wool path { fill: #3f7fbf; }
 .hat--wool .hat__rib { fill: var(--mountain-snow); }
 .hat--wool .hat__bobble { fill: var(--hat); }
@@ -2108,6 +2148,9 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .scorecard__links { margin-left: auto; display: flex; gap: 14px; font-size: 13px; }
 /* the camera button keeps one width whatever its mode's name, so Restart never shifts */
 .cam-btn { min-width: 150px; justify-content: center; }
+.cam-btn__dots { display: inline-flex; gap: 3px; margin-left: 10px; position: relative; top: 2px; }
+.cam-btn__dots i { width: 5px; height: 5px; border-radius: 50%; border: 1.5px solid currentColor; }
+.cam-btn__dots i[data-on] { background: currentColor; }
 /* the cup off the picture: a pip at the edge of the screen pointing to it (engine.ts cupPip) */
 .cuppip { position: fixed; left: 0; top: 0; z-index: var(--z-mark); width: 56px; height: 56px; pointer-events: none; opacity: 0; transition: opacity .35s; }
 .cuppip--on { opacity: 1; }

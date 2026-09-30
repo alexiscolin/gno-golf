@@ -143,6 +143,78 @@
   "name": "Banked Bend",
   "par": 3
  },
+ "mines/1": {
+  "name": "The Pithead",
+  "par": 9
+ },
+ "mines/2": {
+  "name": "Glowworm Gallery",
+  "par": 9
+ },
+ "mines/3": {
+  "name": "The Rail Yard",
+  "par": 8
+ },
+ "mines/4": {
+  "name": "The Chasm",
+  "par": 9
+ },
+ "mines/5": {
+  "name": "The Geode",
+  "par": 9
+ },
+ "mines/6": {
+  "name": "The Stamp Mill",
+  "par": 10
+ },
+ "mines/7": {
+  "name": "The Lava Tide",
+  "par": 8
+ },
+ "mines/8": {
+  "name": "The Cage",
+  "par": 8
+ },
+ "mines/9": {
+  "name": "The Collapsing Gallery",
+  "par": 10
+ },
+ "mines/10": {
+  "name": "The Geysers",
+  "par": 8
+ },
+ "mines/11": {
+  "name": "The Corkscrew",
+  "par": 8
+ },
+ "mines/12": {
+  "name": "The Steam Vents",
+  "par": 10
+ },
+ "mines/13": {
+  "name": "The Lava Fall",
+  "par": 8
+ },
+ "mines/14": {
+  "name": "The Mine Cart Run",
+  "par": 9
+ },
+ "mines/15": {
+  "name": "The Stalactite Hall",
+  "par": 8
+ },
+ "mines/16": {
+  "name": "The Strongroom",
+  "par": 9
+ },
+ "mines/17": {
+  "name": "The Great Shaft",
+  "par": 9
+ },
+ "mines/18": {
+  "name": "The Mother Lode",
+  "par": 9
+ },
  "mountain/1": {
   "name": "Ski School",
   "par": 2

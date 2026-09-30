@@ -9,8 +9,9 @@ import (
 	"gno.land/p/gnogolf/physics"
 )
 
-// BoardW and BoardH are the default board, in board units (also the text
-// renderer's character grid).
+// BoardW and BoardH are the board author.Fit gives a hole declared without W
+// and H, in board units (nothing deployed reads them: Decode holds W and H to
+// 1..MaxBoard).
 const BoardW, BoardH = 32, 16
 
 // WearW and WearH are the wear grid, stretched over any board: 128 counters.
@@ -392,8 +393,8 @@ type Simple struct {
 	Pulses    []Pulse // pieces that come and go with the stroke number
 	Substeps  int
 	CupRadius float64
-	// World is the hole's world ("" is "garden"); Order is its place there,
-	// 1 first (0: the number in its path).
+	// World is the hole's world (1 to MaxWorld letters a-z, as Decode holds
+	// it); Order is its place there, 0 to MaxOrder (a course hole 1 or more).
 	World string
 	Order float64
 	// Shelter caps the wind the hole is played in (0: the world's own).

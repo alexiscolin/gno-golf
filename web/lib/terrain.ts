@@ -23,8 +23,10 @@ export const CELL = 0.5;
 // big because the chain keeps its centre this far from any wall.
 export const BALL_R = 0.5;
 
-// The cup is drawn at the radius the chain holes a ball in.
+// The cup is drawn at the radius the chain holes a ball in: the course's
+// 1.2, or a hole's own (HoleState cupR: the Crystal Mines' 1.1 and 1.0).
 export const CUP_R = 1.2;
+export const cupRadius = (s: { cupR?: number }) => s.cupR || CUP_R;
 
 /** A slope that is air, not ground: it pushes the ball but raises no ramp.
  *  The chain's own "air" flag when the zone carries one; else guessed from
@@ -49,6 +51,8 @@ export const mod = (a: number, n: number) => ((a % n) + n) % n;
 export const there = (i: number, every = 0, on = 0, phase = 0) => !(every > 0) || mod(i + (phase | 0), every) < on;
 /** Whether timed zone or wall q is on at tick. */
 export const onAt = (q: Timing, tick: number) => there(tick, q.every, q.on, q.phase);
+/** The ticks to go from tick before timed q is on (0 while it is, or untimed): a piece's warning, on the chain's own test. */
+export const untilOn = (q: Timing, tick: number) => (onAt(q, tick) ? 0 : (q.every ?? 0) - mod(tick + ((q.phase ?? 0) | 0), q.every ?? 0));
 
 /** 0 below 0, 1 above 1, and an S between. */
 export const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
@@ -224,7 +228,8 @@ interface Ramp {
 /** A ramp per Slope zone: 0 on its downhill edge, rising against the push. */
 function ramps(zones: readonly Zone[]): Ramp[] {
   return zones
-    .filter((z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && z.skin !== "volcano" && (z.vec[0] || z.vec[1]))
+    // (the mines' conveyor is a belt: flat, the push is the belt's)
+    .filter((z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && z.skin !== "volcano" && z.skin !== "conveyor" && (z.vec[0] || z.vec[1]))
     .map((z) => {
       const l = Math.hypot(z.vec[0], z.vec[1]);
       const ux = -z.vec[0] / l, uz = -z.vec[1] / l; // uphill
@@ -235,7 +240,8 @@ function ramps(zones: readonly Zone[]): Ramp[] {
       // a kicker is a ski jump, not a bump: steep and tall, cut off at its lip
       // a moon bridge is a high arch, whatever its push
       // a skate park's quarter-pipe curls up to its coping, a funbox is a low block
-      const rise = z.skin === "kicker" || z.skin === "ramp" ? 2.2 : z.skin === "moon bridge" ? 1.5 : z.skin === "quarter pipe" ? 1.3 : z.skin === "funbox" ? 0.8 : Math.min(MAX_RISE, 0.35 * l * len * 1.6);
+      // (a bank round the great shaft is a lean of the ledge, not a hill: low)
+      const rise = z.skin === "kicker" || z.skin === "ramp" ? 2.2 : z.skin === "moon bridge" ? 1.5 : z.skin === "quarter pipe" ? 1.3 : z.skin === "funbox" ? 0.8 : Math.min(z.skin === "ledge bank" ? 0.45 : MAX_RISE, 0.35 * l * len * 1.6);
       // across the slope, for the shoulders
       const vx = -uz, vz = ux;
       const across = [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]].map((p) => p[0] * vx + p[1] * vz);
@@ -303,7 +309,7 @@ const rise1 = (v: number, a: number, i0: number, i1: number, b: number) => (v < 
  * "downhill" hole begins high. Only when no other ramp lies between the tee
  * and this one — a row of hills keeps its valleys.
  */
-function plateaus(rs: Ramp[], tee: Vec2, cup: Vec2) {
+function plateaus(rs: Ramp[], tee: Vec2, cup: Vec2, cupR: number) {
   // p past r's top, no other ramp between (within reach of its top, and of its sides)
   const faces = (r: Ramp, p: Vec2, reach = Infinity, width = Infinity) => {
     const along = p[0] * r.ux + p[1] * r.uz - r.lo, side = p[0] * r.vx + p[1] * r.vz;
@@ -313,7 +319,9 @@ function plateaus(rs: Ramp[], tee: Vec2, cup: Vec2) {
       return a > r.span && a < along;
     });
   };
-  for (const r of rs) r.plateau = faces(r, tee) && "tee";
+  // (not a mines incline: a man-way between two galleries of a winding hole,
+  // whose tee is somewhere else along the lane, not up at its top)
+  for (const r of rs) r.plateau = r.z.skin !== "incline" && faces(r, tee) && "tee";
   // a run of slopes the same way (a downhill in two pitches, a flight of
   // terraces): the lower one's top holds its height uphill of it, under the
   // flat between and the upper one, so the heights add up to one continuous
@@ -340,11 +348,11 @@ function plateaus(rs: Ramp[], tee: Vec2, cup: Vec2) {
   // a hill whose top comes too near the cup for its lip: the cup sits up on
   // the hilltop, where the physics is flat, not at the foot of a lip its
   // landing squeezed into a cliff
-  for (const r of rs) if (!(r.plateau || r.run || r.bridge || r.noLip) && faces(r, cup, BANK * 0.4 + CUP_R + 0.3, 0)) r.plateau = "cup";
+  for (const r of rs) if (!(r.plateau || r.run || r.bridge || r.noLip) && faces(r, cup, BANK * 0.4 + cupR + 0.3, 0)) r.plateau = "cup";
   return rs;
 }
 
-export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start" | "cup">) {
+export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start" | "cup" | "cupR">) {
   const W = s.board.w, H = s.board.h;
   const nx = Math.round(W / CELL), nz = Math.round(H / CELL);
   const idx = (i: number, j: number) => j * nx + i;
@@ -418,7 +426,7 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
       rough.push(cells);
     }
 
-  const rs = plateaus(ramps(s.zones), s.start, s.cup);
+  const rs = plateaus(ramps(s.zones), s.start, s.cup, cupRadius(s));
   // a side that meets another hill (a volcano's cone, a bowl's corner) tapers
   // inside, into the seam; any other falls away outside the zone, over ground
   // the physics leaves flat. Inside, a slope is its push's own ramp: a taper
@@ -487,6 +495,7 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
   const onSlope = s.zones.some((q) => q.kind === "slope" && !airy(q) && s.cup[0] >= q.min[0] && s.cup[0] < q.max[0] && s.cup[1] >= q.min[1] && s.cup[1] < q.max[1]);
   // a landing stops short of a slope near it: reaching onto one, it dug a
   // dip in the hill that a ball rolling back sped up climbing out of
+  const CUP_R = cupRadius(s); // (this hole's)
   const landR = Math.min(CUP_R + 1.6, ...hills.map((q) => Math.hypot(Math.max(q.min[0] - s.cup[0], 0, s.cup[0] - q.max[0]), Math.max(q.min[1] - s.cup[1], 0, s.cup[1] - q.max[1]))));
   const flatR = Math.min(CUP_R + 0.3, landR);
   const level = (x: number, z: number) => {

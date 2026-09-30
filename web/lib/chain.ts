@@ -258,6 +258,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // Params that do not move within a session (the chain id, the gas and
   // storage prices) are read once per ttl, not once a hole: the answer is kept,
   // a failure is not.
+  // Extras(hole, stroke), per hole version and stroke (chain.extras)
+  const extrasRead = new Map<string, Promise<Extras>>();
   const memo = <T>(fn: () => Promise<T>, ttl: number) => {
     let at = 0, p: Promise<T> | null = null;
     return (): Promise<T> => {
@@ -382,7 +384,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       } catch {}
       return list;
     },
-    /** One hole's geometry, skins, weather and wear (HoleState: State without the rounds, which the page never reads). */
+    /** One hole's geometry, skins, weather and wear (HoleState: everything to draw the hole and aim). */
     state: (hole: string) => qeval(`HoleState(${s(hole)})`, checks.state),
     /**
      * One stroke, read-only, from an exact ball: what PlayRoundAt would play
@@ -435,8 +437,19 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       if (!a || !isAddress(a)) throw refused("The chain's owner is not an address.");
       return a;
     },
-    /** What a timed hole adds at one stroke of a round (0 = first shot). */
-    extras: (hole: string, stroke: number) => qeval(`Extras(${s(hole)}, ${Math.max(0, stroke | 0)})`, checks.extras),
+    /** What a timed hole adds at one stroke of a round (0 = first shot): read
+     *  once per hole version and stroke (Extras is a pure function of the two:
+     *  the look-ahead and the next stroke ask the same), a failure not kept. */
+    extras: (hole: string, stroke: number) => {
+      const n = Math.max(0, stroke | 0), k = `${hole}#${n}`;
+      let p = extrasRead.get(k);
+      if (!p) {
+        if (extrasRead.size >= 512) extrasRead.clear(); // (a long session: from scratch, never unbounded)
+        p = qeval(`Extras(${s(hole)}, ${n})`, checks.extras).catch((e: unknown) => (extrasRead.delete(k), Promise.reject(e instanceof Error ? e : new Error(String(e)))));
+        extrasRead.set(k, p);
+      }
+      return p;
+    },
     /** The course-wide ranking of recorded rounds. */
     leaderboard: (mode = "assisted") => qeval(`Leaderboard(${s(m(mode))})`, checks.leaderboard),
     /** The best rounds of these players (at most 50) on a hole: { hole, mode, par, rows: [{ player, strokes }] }. */
@@ -447,7 +460,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       qeval(`Standings(${s(m(mode))}, ${s(players.slice(0, 50).join(","))})`, checks.standings),
     /** A player's place in a mode's course ranking: { rank (0: not ranked), of, holes, strokes, par }. */
     rank: (mode: string, player: string) => qeval(`Rank(${s(m(mode))}, address(${s(player)}))`, checks.rank),
-    /** Of these holes (the first 100: one read's room, the course is 74), a player's bests on those they have one on, in either mode: their ghosts. One read. */
+    /** Of these holes (the first 100: one read's room, the course is 90), a player's bests on those they have one on, in either mode: their ghosts. One read. */
     bestsOf: async (holes: readonly string[], player: string): Promise<ReadonlyMap<string, { pro: number; assisted: number }>> => {
       const got = new Map<string, { pro: number; assisted: number }>();
       if (!isAddress(player)) return got;
@@ -584,6 +597,8 @@ export const isHoleId = (s: unknown) => PKG.test(String(s)) || DATA.test(String(
 export const isAddress = (s: unknown) => typeof s === "string" && ADDR.test(s);
 
 const PULL_SHARE = 0.24; // a pull this share of the viewport's short side is full power
+/** How far a pull goes to full power on a vw × vh screen (px). */
+export const pullFull = (vw: number, vh: number) => Math.max(120, Math.min(vw, vh) * PULL_SHARE);
 /**
  * The pull, as a shot: the same pull always gives the same numbers. Its length
  * is measured in CSS pixels against the viewport's short side, so neither the
@@ -592,7 +607,7 @@ const PULL_SHARE = 0.24; // a pull this share of the viewport's short side is fu
  * sent: the preview and the shot use exactly these.
  */
 export function pullShot(px: number, vw: number, vh: number, angleRad: number, maxPower: number = RULES.maxPower) {
-  const full = Math.max(120, Math.min(vw, vh) * PULL_SHARE);
+  const full = pullFull(vw, vh);
   const power = Math.round(Math.min(px / full, 1) * maxPower * 100) / 100;
   let deg = (angleRad * 180) / Math.PI;
   // in [0, 360): 359.996 rounds to 0, as the chain records it, not to 360
