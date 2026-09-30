@@ -1,10 +1,12 @@
 // Talking to the realm.
 //
 // Two reads, both free: no wallet, no transaction, no block to wait for. The
-// chain resolves every shot — nothing here computes anything about a ball.
+// chain resolves every shot — nothing here computes anything about a ball
+// (the aim's previews run the realm's own code in the page: lib/sim.ts).
 // See CLIENT.md for the contract.
 //
-// This is the one place the realm's JSON is parsed: each read is checked
+// This is the one place the chain's JSON is parsed (lib/sim.ts parses the
+// wasm's, the same JSON): each read is checked
 // against the shape lib/types.ts gives it (the fields the page cannot do
 // without), and a reply that is not that shape is refused here, as the realm's
 // ("chain"), not left to fail somewhere in the scene.
@@ -409,6 +411,14 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      */
     simulateCommit: (hole: string, ball: Vec2, stroke: number, shots: readonly string[], period: number, ms?: number, signal?: AbortSignal | null) =>
       qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
+    /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim). */
+    holeData: async (hole: string) => {
+      const hex = await qstr(REALM, `HoleData(${s(hole)})`);
+      if (!/^([0-9a-f]{2})+$/.test(hex)) throw refused("The chain's hole data is not hex.");
+      return hex;
+    },
+    /** A deployed package's file, as the node keeps it (vm/qfile). */
+    file: (path: string) => query(`${rpc}/abci_query?path=%22vm/qfile%22&data=0x${hexOf(path)}`),
     /** The weather's five minutes on the chain (block time / 300), and its forecast for a hole. */
     // an int64, not a string: its own unwrapping
     period: async () => {

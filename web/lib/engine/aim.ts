@@ -1,6 +1,10 @@
-// The aim preview: while the player pulls, the chain is asked what the shot
-// would do (debounced, cached, cancelled when no longer wanted) and the dots
-// follow its path, bending into place; in fog they see 7 units ahead.
+// The aim preview: while the player pulls, the dots follow the path of the
+// shot, bending into place; in fog they see 7 units ahead. The path is the
+// chain's own answer: worked out here, in the page, by the realm's code built
+// for it (lib/sim: every pull, at once), or asked of the chain (debounced,
+// cached, cancelled when no longer wanted) until that is there, or wherever it
+// is not. The chain is still asked once the hand rests, and for the shot let
+// go: every answer it gives is checked against the page's own.
 //
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
@@ -9,6 +13,7 @@ import { angDiff, onAt, segHit, rayCircle, BALL_R } from "../terrain";
 import { causeAt } from "../scene/cause";
 import { ud } from "../scene/data";
 import { aimAlong } from "../scene";
+import { same, simHole, simReady, simStroke } from "../sim";
 import type { MutVec2, Stroke, Vec2 } from "../types";
 import type { Live } from "./types";
 
@@ -117,6 +122,7 @@ export function makeAimer(E: Live) {
   const dropAim = () => {
     // a preview on its way is no longer wanted
     if (asked) asked.abort(), (asked = null), (asking = false);
+    (mineWant = null), (mineShown = "");
     clearTimeout(later);
     since = 0;
     morph = null;
@@ -142,20 +148,52 @@ export function makeAimer(E: Live) {
   // wants (let go, cancelled, a new round) is cancelled.
   const PREVIEW_MS = 120, PREVIEW_MAX = 360, KEPT = 256;
   let sent: Question | null = null, later: ReturnType<typeof setTimeout> | undefined, since = 0, asked: AbortController | null = null;
-  const answers = new Map<string, Stroke>();
+  const answers = new Map<string, Stroke>(), mine = new Map<string, Stroke>(); // the chain's answers, the page's own
+  const keep = (m: Map<string, Stroke>, k: string, res: Stroke) => {
+    m.delete(k);
+    m.set(k, res);
+    if (m.size > KEPT) m.delete(m.keys().next().value!);
+  };
   const keyOf = (q: Pick<Question, "id" | "shots" | "shot">) => `${q.id}|${g.period}|${q.shots.join(";")}|${q.shot}`;
   // One stroke asked of the chain: the first from the tee (SimulateRound of
   // that one shot: the tee exactly), every other one from the exact ball the
   // last answer left (SimulateFrom): one shot of work, whatever the round's
   // length. It is what PlayRoundAt will replay for the same list.
+  // Every answer is checked against the page's own for the same call, when
+  // it has one: a difference turns the page's previews off (lib/sim).
   function strokeFrom(id: string, shots: readonly string[], one: string, rest: Vec2 | null, ms?: number, signal?: AbortSignal): Promise<Stroke> {
-    return shots.length && rest && g.period != null
-      ? chain.simulateFrom(id, rest, one, shots.length, g.period, ms, signal)
-      : chain.simulateRound(id, [...shots, one], g.period, ms, signal);
+    const period = g.period, key = keyOf({ id, shots, shot: one });
+    return (shots.length && rest && period != null
+      ? chain.simulateFrom(id, rest, one, shots.length, period, ms, signal)
+      : chain.simulateRound(id, [...shots, one], period, ms, signal)
+    ).then((res) => {
+      if (period != null && simReady(id))
+        void Promise.resolve(mine.get(key) || simStroke(id, shots, one, rest, period)).then((own) => own && same(res, own, { hole: id, period, shot: one, n: shots.length }));
+      return res;
+    });
   }
-  // While the chain works out the new aim, the dots it gave for the last one
-  // swing round the ball to where the pull points now, so they never lag the
-  // hand; the chain's answer replaces them the moment it lands.
+  // The page's own answer for the aim: at most one worked out at a time, the
+  // latest pull next; drawn the moment it is there.
+  let mineAsking = false, mineWant: Question | null = null, mineShown = "";
+  function local(q: Question) {
+    mineWant = q;
+    if (mineAsking || q.key === mineShown) return;
+    mineAsking = true;
+    void simStroke(q.id, q.shots, q.shot, q.rest, g.period!)
+      .then((res) => {
+        if (!res) return;
+        keep(mine, q.key, res);
+        mineShown = q.key;
+        answer(q, res);
+      })
+      .finally(() => {
+        mineAsking = false;
+        if (E.dragging && mineWant && mineWant.key !== q.key) local(mineWant);
+      });
+  }
+  // While the new aim is worked out, the dots given for the last one swing
+  // round the ball to where the pull points now, so they never lag the hand;
+  // the new answer replaces them the moment it lands.
   function interpolate() {
     if (!shown || !aim.visible) return;
     const d = E.shot.angle - shown.angle, bx = g.ball.x, bz = g.ball.y;
@@ -205,6 +243,16 @@ export function makeAimer(E: Live) {
     // exact aim it is asked once, so that the release finds its answer kept
     // (fire: no second round trip)
     const q = question(wanted);
+    if (simReady(q.id) && g.period != null) {
+      local(q);
+      // the chain, once the hand rests on a new aim (not for the timed
+      // pieces moving on under a still hand): its answer kept for the
+      // release, and checked against this one
+      const moved = !sent || sent.id !== q.id || sent.n !== q.n || sent.angle !== q.angle || sent.power !== q.power;
+      if (moved && !answers.has(q.key) && !asking) (clearTimeout(later), (later = setTimeout(ask, PREVIEW_MS)));
+      return;
+    }
+    void simHole(chain, q.id); // the page's own previews, for the next pulls
     if (sent && sent.id === wanted.id && sent.n === wanted.shots.length && sent.tick === E.tickNow() &&
         Math.abs(sent.angle - wanted.angle) < 0.005 && Math.abs(sent.power - wanted.power) < 0.05) {
       if (sent.key !== q.key && !answers.has(q.key) && !asking) (clearTimeout(later), (later = setTimeout(ask, PREVIEW_MS)));
@@ -229,17 +277,15 @@ export function makeAimer(E: Live) {
     since = 0;
     const q = (sent = question(wanted));
     const kept = answers.get(q.key);
-    if (kept) return answer(q, kept);
+    if (kept) return void (simReady(q.id) || answer(q, kept));
     asking = true;
     const ac = (asked = new AbortController());
     // a chain slow to answer does not hold the aim: after 1.5 s the request is
     // let go, and the next one (the latest aim) goes out
     strokeFrom(q.id, q.shots, q.shot, q.rest, 1500, ac.signal)
       .then((res) => {
-        answers.delete(q.key);
-        answers.set(q.key, res);
-        if (answers.size > KEPT) answers.delete(answers.keys().next().value!);
-        answer(q, res);
+        keep(answers, q.key, res);
+        if (!simReady(q.id)) answer(q, res); // (the page's own are drawn already)
       })
       .catch(() => {})
       .finally(() => {
@@ -257,7 +303,9 @@ export function makeAimer(E: Live) {
     aim.rotation.y = 0;
     aim.position.set(0, 0, 0);
     interpolate();
+    Object.assign(drawn, { n: drawn.n + 1, at: performance.now(), angle: q.angle, power: q.power });
   }
+  const drawn = { n: 0, at: 0, angle: 0, power: 0 }; // the last answer drawn: its number, when, its aim (the perf rigs: probes aimDrawn)
 
   // The dots take the colour of what bends them: wind blue, a downhill slope
   // gold, ice or a wet green cyan — the same causes the replay shows.
@@ -284,11 +332,13 @@ export function makeAimer(E: Live) {
     step: stepMorph,
     /** Whether the dots are moving (the frame is busy). */
     moving: () => !!morph,
+    /** The answers drawn so far, and when the last one was (performance.now()). */
+    drawn: () => ({ ...drawn }),
     /** Whether this round's mode shows the dots at all (pro: no). */
     shows,
     /** The preview answer for exactly this stroke (same hole, period, round so far and shot string), or undefined. */
     known: (id: string, shots: readonly string[], shot: string) => answers.get(keyOf({ id, shots, shot })),
     /** The hole is read anew: so are its previews. */
-    forget: () => void (answers.clear(), (sent = null)),
+    forget: () => void (answers.clear(), mine.clear(), (sent = null), (mineShown = "")),
   };
 }

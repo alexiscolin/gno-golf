@@ -82,6 +82,7 @@ web vitals (`$web_vitals`) are PostHog's own.
 | `wallet` | `adena`, `connected` | once a session | `Golf.tsx` |
 | `perf` | `tier` (the setting), `slow` | the first 2 s of busy frames timed | `engine.ts probeFrame()` |
 | `fps` | `hole`, `tier`, `fps` (median), `fps_p10` (slowest tenth), `long` (frames over 50 ms), `frames`, `memory_mb` (Chrome) | a round's end (a new round or hole) | `engine.ts newRound()` |
+| `sim_off` | `why`: `sources` (golf.wasm is not built from the realm's files), `load`, or `mismatch` (a chain answer the page's own differs from: `hole`, `period`, `shot`, `n`, the stroke's number) | the page's own aim previews turned off for the visit | `lib/sim` |
 
 `rival` is how the rival was found: `champ`, `level`, `self` (the rival
 screen's picks), `friend` (a name typed), `surprise`, `board` (a board's
@@ -100,6 +101,7 @@ PostHog itself. The failures the game handles are sent too, with `where`
 | `save` | `part`, `parts`, `gas`, `reason` | a save that failed (not cancelled) |
 | `name` | | the name form's registration failing |
 | `ghost` | `hole` | a duel's ghost that would not load |
+| `sim` | | the page's own aim previews that would not start (`lib/sim`) |
 | `load`, `draw`, `shot` | `hole` | the engine's banner errors (`fail()`) |
 | `fatal` | `kind` (webgl, down…) | the game that could not start |
 | `render` | `digest` | the error page (`app/error.tsx`, `app/global-error.tsx`) |

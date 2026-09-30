@@ -30,6 +30,7 @@ import { register, track, trackError } from "./analytics";
 import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, thirdAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
+import { simHole } from "./sim";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
@@ -652,6 +653,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     warming = 0;
     g.buildMs = [Math.round(built1 - built0), Math.round(performance.now() - built1)]; // ?camlog's buildMs(): [build, compile]
     track("hole_loaded", { hole: id, world: s.world, state_ms: Math.round(t1 - t0), world_ms: Math.round(built0 - t1), build_ms: g.buildMs[0], compile_ms: g.buildMs[1] });
+    if (aimer.shows()) void simHole(chain, id); // the page's own aim previews (lib/sim), readied while the hole is looked over
     g.rig = null; // a new hole starts from its overview, not from the last one
     cam.prepare();
     resize();
@@ -1515,6 +1517,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   };
   // the test hooks, only for a page that asks for them
   // (always there in the type: undefined unless the page asked for them)
-  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()) }) : {};
+  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()), aimDrawn: aimer.drawn }) : {};
   return Object.assign(api, hooked);
 }

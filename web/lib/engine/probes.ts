@@ -7,6 +7,7 @@ import { isDrawn } from "../scene/materials";
 import { laneBox } from "../scene/camera";
 import { ud } from "../scene/data";
 import type { Vec2 } from "../types";
+import { simChecks, simMs, simReady } from "../sim";
 import type { Live } from "./types";
 import type { makeCamera } from "./camera";
 import type { makeReplay } from "./replay";
@@ -17,12 +18,13 @@ interface Inner {
   rp: ReturnType<typeof makeReplay>;
   placeBall: () => void;
   fakeWeather: (w: string) => void;
+  aimDrawn: () => { n: number; at: number; angle: number; power: number };
 }
 
 const ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3();
 
 /** E: the engine's live state; cam: its camera controller. */
-export function probes(E: Live, { cam, rp, placeBall, fakeWeather }: Inner) {
+export function probes(E: Live, { cam, rp, placeBall, fakeWeather, aimDrawn }: Inner) {
   const { g, camera, scene, ground, band, publish } = E;
   return {
     /** For screenshots only (?won): the win card as if the hole was just holed. */
@@ -123,6 +125,11 @@ export function probes(E: Live, { cam, rp, placeBall, fakeWeather }: Inner) {
     /** The ball over the ground, and the step of the replay (with the chain's air flags) it is on. */
     ballLift: () => ({ lift: +(E.ball.position.y - E.ground(E.ball.position.x, E.ball.position.z)).toFixed(3), y: +E.ball.position.y.toFixed(3), flying: !!g.flying, at: g.replaying ? g.replaying.at : -1, flags: g.replaying ? g.replaying.flags : null }),
     /** ?camlog only: the pull as it stands. */
+    /** ?camlog only: the aim previews drawn so far and when the last was, and the page's own simulations' times (lib/sim), ms. */
+    aimDrawn,
+    aimShot: () => ({ angle: E.shot.angle, power: E.shot.power }),
+    simMs: () => simMs.slice(),
+    simChecks: () => ({ ...simChecks, on: simReady(g.id) }),
     pullState: () => ({ power: +E.shot.power.toFixed(2), deg: E.shot.deg, aiming: !!g.aiming, band: band.visible, flying: !!g.flying, strokes: g.strokes }),
     /** ?camlog only: the scene's objects: all, empty groups, drawables, matrices recomposed each frame. */
     census: () => {

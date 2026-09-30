@@ -47,6 +47,7 @@ export interface Events {
   duel_result: { rival: RivalKind; result: "win" | "loss" | "tie"; strokes: number; ghost: number };
   share: { target: string; what: "hole" | "cup" | "board" | "clip" };
   wallet: { adena: boolean; connected: boolean };
+  sim_off: { why: "sources" | "load" | "mismatch"; hole?: string; period?: number; shot?: string; n?: number };
 }
 
 let ph: PostHog | null = null, started = false;

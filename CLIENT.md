@@ -206,8 +206,15 @@ whole round's. `ballX, ballY` is the `"rest"` of the previous answer (`Round`,
 `"angle,power,tick"`; `stroke` is the stroke number (0 = the first). The
 rounded `ball` and path points are for drawing only: after a bounce or two a
 rounding error is a different ball. The web client asks the first stroke with
-`SimulateRound*` (the tee exactly) and every later one, aim previews
-included, with `SimulateFrom`.
+`SimulateRound*` (the tee exactly) and every later one with `SimulateFrom`.
+Its assisted aim previews are these two reads worked out in the page itself:
+`web/lib/sim/golf.wasm`, the realm's own code built from its `.gno` files
+(`scripts/wasm.sh`), which answers byte for byte as the realm does
+(`scripts/wasmparity.ts` plays the whole course through both). It is used only
+once the realm's deployed files are the ones it was built from, and every
+answer the chain gives the aim (the hand at rest, the shot let go) is checked
+against it: one difference, and the previews are the chain's again for the
+visit. The shot played is always the chain's answer.
 
 ### `SimulateCommit(hole, ballX, ballY, stroke, shots, period) string` — check a commit
 
