@@ -168,7 +168,7 @@ export function makeAimer(E: Live) {
       : chain.simulateRound(id, [...shots, one], period, ms, signal)
     ).then((res) => {
       if (period != null && simReady(id))
-        void Promise.resolve(mine.get(key) || simStroke(id, shots, one, rest, period)).then((own) => own && same(res, own, { hole: id, period, shot: one, n: shots.length }));
+        void Promise.resolve(mine.get(key) || simStroke(id, shots, one, rest, period)).then((own) => simReady(id) && same(res, own, { hole: id, period, shot: one, n: shots.length }));
       return res;
     });
   }

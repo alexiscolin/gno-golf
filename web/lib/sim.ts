@@ -70,6 +70,7 @@ export function startSim(chain: SimChain): Promise<boolean> {
     if (r.ms != null) simMs.push(r.ms) > 200 && simMs.shift();
     if (w) r.err != null ? w[1](new Error(r.err)) : w[0](r.out ?? "");
   };
+  worker.onerror = () => simOff("load"); // its script would not load: the chain's previews
   on = sourcesMatch(chain).then(
     (ok) => (ok || simOff("sources"), ok),
     (e: unknown) => (trackError("sim", e), simOff("load"), false),
@@ -99,22 +100,24 @@ export const simReady = (id: string | null) => !off && !!id && ready.has(id);
  * One stroke as the chain would answer it (engine/aim.ts strokeFrom, the same
  * call): from the exact ball after shots, SimulateFrom; from the tee, or with
  * no ball, SimulateRoundAt of the whole list. null when the local preview is
- * not there, or when the chain would refuse the shot (it says why).
+ * not there, or when the chain would refuse the shot (it says why). A worker
+ * that fails turns it off: the chain's previews, not none.
  */
 export async function simStroke(id: string, shots: readonly string[], one: string, rest: Vec2 | null, period: number): Promise<Stroke | null> {
   if (!simReady(id)) return null;
   const out = await (shots.length && rest
     ? post({ op: "from", id, x: rest[0], y: rest[1], shot: one, stroke: shots.length, period })
-    : post({ op: "round", id, shots: [...shots, one].join(";"), period })).catch(() => "");
+    : post({ op: "round", id, shots: [...shots, one].join(";"), period })).catch((e: unknown) => (off || (trackError("sim", e), simOff("load")), ""));
   return out.startsWith("{") ? (JSON.parse(out) as Stroke) : null;
 }
 
 /**
- * The chain's answer to a stroke against the local one for the same call:
- * two answers of the same JSON are equal field for field, and a difference
- * turns the local preview off (the hole, the weather and the shot told).
+ * The chain's answer to a stroke against the local one for the same call
+ * (null: the local one refused it): two answers of the same JSON are equal
+ * field for field, and a difference turns the local preview off (the hole,
+ * the weather and the shot told).
  */
-export function same(chainRes: Stroke, local: Stroke, what: { hole: string; period: number; shot: string; n: number }) {
+export function same(chainRes: Stroke, local: Stroke | null, what: { hole: string; period: number; shot: string; n: number }) {
   simChecks.n++;
   if (JSON.stringify(chainRes) === JSON.stringify(local)) return true;
   simChecks.differ++;
