@@ -176,9 +176,17 @@ const sameCold = <T extends object>(a: T, b: T) => {
   for (const k in b) if (!HOT_KEYS.has(k) && a[k] !== b[k]) return false;
   return true;
 };
+// the pull's power, drawn straight onto the bar as it changes: a React render
+// a pointer move was the whole of the aim's work in the page
+const barWidth = (hot: Hot) => `${Math.round((hot.get().power || 0) * 100)}%`;
 function AimBar({ hot }: { hot: Hot }) {
-  const power = useHot(hot, "power") || 0;
-  return <span style={{ width: `${Math.round(power * 100)}%` }} />;
+  const bar = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const draw = () => void (bar.current && (bar.current.style.width = barWidth(hot)));
+    draw();
+    return hot.sub(draw);
+  }, [hot]);
+  return <span ref={bar} style={{ width: barWidth(hot) }} />;
 }
 function CauseNote({ hot }: { hot: Hot }) {
   const cause = useHot(hot, "cause");
