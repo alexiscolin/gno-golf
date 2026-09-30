@@ -144,7 +144,7 @@ export interface Flight {
   work?: number;
 }
 
-/** SimulateFrom() (and Simulate()): one stroke. */
+/** SimulateFrom(): one stroke. */
 export interface SimulateFrom extends Versioned, Flight {
   holed: boolean;
   bounces: number;

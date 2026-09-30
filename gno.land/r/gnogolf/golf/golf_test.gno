@@ -98,7 +98,7 @@ func simAt(id, shots string, period int64) string { return simulateRound(id, nil
 // same place, or players animate something that did not happen.
 func TestPreviewMatchesPlay(cur realm, t *testing.T) {
 	id := register(cur, "mirror1")
-	preview := Simulate(id, 2, 8, 17, 5)
+	preview := SimulateFrom(id, 2, 8, "17,5", 0, Period())
 	testing.SetRealm(testing.NewUserRealm(player))
 	Launch(cross(cur), id, 17, 5)
 	uassert.True(t, strings.HasSuffix(preview, `"rest":`+jexact(roundIn(id, player).ball())+"}"), preview)
@@ -364,7 +364,7 @@ func TestHolesAreListedWorldByWorld(cur realm, t *testing.T) {
 	gi, ii, ci := strings.Index(list, `"id":"`+garden+`"`), strings.Index(list, `"id":"`+island+`"`), strings.Index(list, `"id":"`+id+`"`)
 	uassert.True(t, gi >= 0 && ii > gi && ci > ii, "the garden, then the island, then anyone's: "+list)
 	uassert.True(t, strings.Contains(list, `"world":"island","order":41.000,"next":"","slot":"island/41"}`), "the island hole says where it is")
-	uassert.True(t, strings.Contains(State(id), `"world":"island"`), "State says the world too")
+	uassert.True(t, strings.Contains(HoleState(id), `"world":"island"`), "State says the world too")
 	uassert.True(t, strings.Contains(list, `"id":"`+id+`","name":"Flat","official":false`), "Holes says it is not the course's")
 	hub := Render("")
 	uassert.True(t, strings.Contains(hub, "## Community holes"), "anyone's holes have their own section")
@@ -435,7 +435,7 @@ func TestWeatherOfTheMoment(cur realm, t *testing.T) {
 	PlayRoundAt(cross(cur), id, "0,4", Period())
 	uassert.True(t, strings.Contains(Round(id, player), ufmt.Sprintf(`"period":%d`, Period())), "the round says its weather")
 	uassert.AbortsContains(t, cur, "is being played in the weather", func() { PlayRoundAt(cross(cur), id, "0,2", Period()-1) })
-	uassert.True(t, strings.Contains(State(id), `"weather":{"period":`), "State gives the weather of the moment")
+	uassert.True(t, strings.Contains(HoleState(id), `"weather":{"period":`), "State gives the weather of the moment")
 }
 
 // a gate that swings across the lane within each stroke
@@ -604,6 +604,16 @@ func jfield(j, k string) string {
 		return v[1 : strings.Index(v[1:], `"`)+1]
 	}
 	return v[:strings.IndexAny(v, ",}]")]
+}
+
+// standingOf is a player's course-wide standing in a mode as Rank gives it:
+// holes, strokes and par; 0, 0, 0 if none.
+func standingOf(mode string, p address) (holes, strokes, par int) {
+	rk := Rank(mode, p)
+	holes, _ = strconv.Atoi(jfield(rk, "holes"))
+	strokes, _ = strconv.Atoi(jfield(rk, "strokes"))
+	par, _ = strconv.Atoi(jfield(rk, "par"))
+	return holes, strokes, par
 }
 
 // ghostHoles replays a player's Ghost as a duel does, from its own JSON: the

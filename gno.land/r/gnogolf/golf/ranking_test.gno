@@ -156,12 +156,10 @@ func (r *ref) check(t *testing.T, step string) {
 			h, s, par := r.standing(m, p)
 			return `"holes":` + strconv.Itoa(h) + `,"strokes":` + strconv.Itoa(s) + `,"par":` + strconv.Itoa(par)
 		}
-		// StandingOf, Standings, Rank, Players: every player's numbers
+		// Standings, Rank, Players: every player's numbers
 		rows := ""
 		for _, p := range r.players {
-			h, s, par := r.standing(m, p)
-			gh, gs, gp := StandingOf(mode, address(p))
-			urequire.True(t, gh == h && gs == s && gp == par, step+": StandingOf "+mode+" "+p+": "+fields(p))
+			h, _, _ := r.standing(m, p)
 			if r.seen[m][p] {
 				if rows != "" {
 					rows += ","

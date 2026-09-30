@@ -122,12 +122,12 @@ func TestWritesTakeExactIds(cur realm, t *testing.T) {
 		testing.SetRealm(testing.NewUserRealm(player))
 		urequire.AbortsContains(t, cur, "garden/61 is an alias: play its version by id, "+id, write)
 	}
-	uassert.True(t, strings.Contains(State("garden/61"), `"hole":"`+id+`"`), "a read by alias answers with the id")
-	uassert.True(t, strings.Contains(State("garden/61"), `"slot":"garden/61","v":1,`))
+	uassert.True(t, strings.Contains(HoleState("garden/61"), `"hole":"`+id+`"`), "a read by alias answers with the id")
+	uassert.True(t, strings.Contains(HoleState("garden/61"), `"slot":"garden/61","v":1,`))
 	uassert.Equal(t, SimulateRound(id, "0,1"), SimulateRound("garden/61", "0,1"))
 	testing.SetRealm(testing.NewUserRealm(player))
 	uassert.True(t, strings.Contains(Launch(cross(cur), id, 0, 0.001), "on "+id+":"), "Launch says the version")
-	uassert.PanicsContains(t, cur, "unknown hole", func() { State("garden/62") })
+	uassert.PanicsContains(t, cur, "unknown hole", func() { HoleState("garden/62") })
 }
 
 // A course hole's life: published, played and worn; a new version archives
@@ -140,7 +140,7 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(fan))
 	PlayRoundAt(cross(cur), v1, "0,0.001;0,1", Period())
 	uassert.Equal(t, 2, BestOf(v1, "assisted", fan))
-	holes, strokes, _ := StandingOf("assisted", fan)
+	holes, strokes, _ := standingOf("assisted", fan)
 	uassert.True(t, holes >= 1 && strokes >= 2, "the course hole counts")
 	uassert.True(t, strings.Contains(Leaderboard("assisted"), fan.String()+`","name":"fan",`), "with the name")
 	uassert.Equal(t, 2, sumWear(mustHole(v1)), "two strokes, two marks on the version's wear")
@@ -151,13 +151,13 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 	uassert.Equal(t, v2, mustHole(v1).next)
 	uassert.Equal(t, v2, Current("mountain/62"))
 	was := holes
-	holes, _, _ = StandingOf("assisted", fan)
+	holes, _, _ = standingOf("assisted", fan)
 	uassert.Equal(t, was-1, holes, "the old version's best leaves the standing")
 	uassert.Equal(t, 2, BestOf(v1, "assisted", fan), "and stays its record")
 	uassert.Equal(t, 0, BestOf("mountain/62", "assisted", fan), "the new version starts afresh")
 	uassert.Equal(t, 0, sumWear(mustHole(v2)), "and its wear too")
-	uassert.True(t, strings.Contains(State("mountain/62"), `"hole":"`+v2+`"`))
-	uassert.True(t, strings.Contains(State(v1), `"next":"`+v2+`"`), "an archived version says what took its place")
+	uassert.True(t, strings.Contains(HoleState("mountain/62"), `"hole":"`+v2+`"`))
+	uassert.True(t, strings.Contains(HoleState(v1), `"next":"`+v2+`"`), "an archived version says what took its place")
 
 	vs := Versions("mountain/62")
 	uassert.True(t, strings.HasPrefix(vs, `{"version":1,"slot":"mountain/62","versions":[{"id":"mountain/62/v1","v":1,`), vs)
@@ -171,7 +171,7 @@ func TestPublishPlayWearRepublish(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(fan))
 	PlayRoundAt(cross(cur), v1, "0,1", Period())
 	uassert.Equal(t, 1, BestOf(v1, "assisted", fan))
-	holes, _, _ = StandingOf("assisted", fan)
+	holes, _, _ = standingOf("assisted", fan)
 	uassert.Equal(t, was-1, holes)
 	uassert.Equal(t, 3, sumWear(mustHole(v1)))
 }
@@ -199,9 +199,9 @@ func TestADataHoleIsNeverStored(cur realm, t *testing.T) {
 	PlayRoundPro(cross(cur), id, "0,2", Period()) // Launch made it a pro round
 	r := roundIn(id, player)
 	for _, read := range []string{
-		State(id), HoleState(id), Render(id), Render(id + "/" + player.String()), Render(id + "/data"),
+		HoleState(id), Render(id), Render(id + "/" + player.String()), Render(id + "/data"),
 		Extras(id, 1), Round(id, player), SimulateFrom(id, r.bx, r.by, "0,1", r.strokes, Period()),
-		SimulateCommit(id, r.bx, r.by, r.strokes, "0,1;0,1", Period()), Rounds(id, "", 10), Weather(id, Period()),
+		SimulateCommit(id, r.bx, r.by, r.strokes, "0,1;0,1", Period()), Weather(id, Period()),
 	} {
 		uassert.True(t, len(read) > 0)
 	}
@@ -543,17 +543,17 @@ func TestAFirstFinishOnAnArchivedHoleNeverCounts(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(late))
 	PlayRoundAt(cross(cur), old, "0,0.001;0,1", Period())
 	uassert.Equal(t, 2, BestOf(old, "assisted", late), "the record is kept")
-	holes, _, _ := StandingOf("assisted", late)
+	holes, _, _ := standingOf("assisted", late)
 	uassert.Equal(t, 0, holes, "no hole counted on an archived hole")
 	testing.SetRealm(testing.NewUserRealm(late))
 	Reset(cross(cur), old)
 	testing.SetRealm(testing.NewUserRealm(late))
 	PlayRoundAt(cross(cur), old, "0,1", Period())
 	drain(retireBatch)
-	holes, _, _ = StandingOf("assisted", late)
+	holes, _, _ = standingOf("assisted", late)
 	uassert.Equal(t, 0, holes, "nor after an improvement and the drain")
 	for _, p := range early {
-		holes, _, _ := StandingOf("assisted", p)
+		holes, _, _ := standingOf("assisted", p)
 		uassert.Equal(t, 0, holes, "the early finishers were drained")
 	}
 }
@@ -684,9 +684,8 @@ func TestHoleStateHasNoRounds(cur realm, t *testing.T) {
 	id := publish(cur, h)
 	testing.SetRealm(testing.NewUserRealm(player))
 	Launch(cross(cur), id, 180, 1)
-	st, hs := State(id), HoleState(id)
-	uassert.True(t, strings.Contains(st, `"rounds":[{`) && !strings.Contains(hs, `"rounds"`) && !strings.Contains(hs, `"plays"`), hs)
-	uassert.Equal(t, st[:strings.Index(st, `,"plays"`)], hs[:strings.Index(hs, `,"walls"`)])
+	hs := HoleState(id)
+	uassert.True(t, !strings.Contains(hs, `"rounds"`) && !strings.Contains(hs, `"plays"`), hs)
 	uassert.True(t, strings.HasSuffix(hs, "]}}"), hs)
 	uassert.True(t, strings.Contains(hs, `"scale":0.000,"round":false,"air":true,"capped":true,"skin":"fan"}`), "a hole's air says so: "+hs)
 }

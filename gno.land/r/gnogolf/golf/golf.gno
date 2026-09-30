@@ -7,7 +7,7 @@
 // recorded but outside the course and its ranking.
 //
 // Reads take a version's id or its alias ("garden/7", "<address>/<slug>"),
-// its current version. Writes take the exact id only, as State or Holes gave
+// its current version. Writes take the exact id only, as HoleState or Holes gave
 // it: a round cannot be replayed on a version it was not played on.
 //
 // Who can change what (in full on the hub page): the owner holds one power,
@@ -1048,7 +1048,7 @@ func Claim(cur realm) int {
 	return n
 }
 
-// maxRoundStrokes bounds a round's history (State shows it); maxPath the path
+// maxRoundStrokes bounds a round's history (Round shows it); maxPath the path
 // a hole may return for a stroke (an honest one: a few hundred points).
 const (
 	maxRoundStrokes = 60

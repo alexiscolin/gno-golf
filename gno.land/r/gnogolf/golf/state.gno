@@ -11,27 +11,17 @@ import (
 	"gno.land/p/nt/ufmt/v0"
 )
 
-// State is the hole as JSON for a client: geometry, skins (names the client
-// looks up), weather, wear and the rounds under way, without their paths
-// (Round has one). hole is a version's id or an alias; "hole" in the answer
-// is always the version's id, the one to write with, with its "slot" and
-// "v", and an archived one's "next".
+// HoleState is the hole as JSON for a client: geometry, skins (names the
+// client looks up), weather and wear, all it needs to draw the hole and aim.
+// hole is a version's id or an alias; "hole" in the answer is always the
+// version's id, the one to write with, with its "slot" and "v", and an
+// archived one's "next".
 //
 // A shot's path (Round, Simulate*) is the flight the chain computed: replay
 // it, never re-simulate. Points far apart are a tunnel: do not interpolate.
-func State(hole string) string {
-	e := readHole(hole)
-	return stateJSON(e, e.hole(), true)
-}
-
-// HoleState is State without the rounds and the play count: the hole, its
-// weather and its wear, all a client needs to draw it and aim.
 func HoleState(hole string) string {
 	e := readHole(hole)
-	return stateJSON(e, e.hole(), false)
-}
-
-func stateJSON(e *entry, h course.Hole, rounds bool) string {
+	h := e.hole()
 	f := h.Field()
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON +
@@ -58,9 +48,6 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 	// and sets its gas by it
 	w := newWork(h, nil)
 	sb.WriteString(ufmt.Sprintf(`,"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup))
-	if rounds {
-		sb.WriteString(`,"plays":` + strconv.Itoa(e.plays))
-	}
 	sb.WriteString(`,"walls":` + wallsJSON(f.Walls) + `,"posts":` + postsJSON(f.Posts))
 	sb.WriteString(`,"zones":` + zonesJSON(f.Zones, true))
 	sb.WriteString(`,"wear":{"w":` + strconv.Itoa(course.WearW) + `,"h":` + strconv.Itoa(course.WearH) + `,"cells":[`)
@@ -68,39 +55,21 @@ func stateJSON(e *entry, h course.Hole, rounds bool) string {
 		sb.WriteString(sep(i))
 		sb.WriteString(strconv.Itoa(c))
 	}
-	if !rounds {
-		sb.WriteString("]}}")
-		return sb.String()
-	}
-
-	// capped (roundsShown): every address that left a round under way keeps it
-	sb.WriteString(`]},"roundsTotal":` + strconv.Itoa(e.roundTree().Size()) + `,"rounds":[`)
-	i := 0
-	eachRound(e, roundsShown, func(player string, r *round) {
-		sb.WriteString(sep(i))
-		sb.WriteString(roundJSON(e, h, player, r, false))
-		i++
-	})
-	sb.WriteString("]}")
+	sb.WriteString("]}}")
 	return sb.String()
 }
 
-// roundsShown is how many rounds State and the page list at most.
-const roundsShown = 24
-
 // roundJSON is one player's round: ball rounded, rest exact (for SimulateFrom)
-// and, with path, the last stroke replayed: rounds store shots, not paths.
-func roundJSON(e *entry, h course.Hole, player string, r *round, path bool) string {
+// and the last stroke replayed: rounds store shots, not paths.
+func roundJSON(e *entry, h course.Hole, player string, r *round) string {
 	var sb strings.Builder
 	sb.WriteString("{" + versionJSON + `,"player":` + jstr(player) +
 		`,"ball":` + jvec(r.ball()) + `,"rest":` + jexact(r.ball()) +
 		ufmt.Sprintf(`,"strokes":%d,"period":%d`, r.strokes, r.period) +
 		`,"mode":` + jstr(modeNames[r.mode]) +
 		`,"shots":` + jstr(r.shots))
-	if path {
-		shot := lastShot(h, r, weatherOf(e, h, r.period))
-		sb.WriteString(`,"path":[` + pathJSON(shot.Path) + `],"air":` + jstr(airOf(shot)) + `,"cause":` + jstr(string(shot.Cause)))
-	}
+	shot := lastShot(h, r, weatherOf(e, h, r.period))
+	sb.WriteString(`,"path":[` + pathJSON(shot.Path) + `],"air":` + jstr(airOf(shot)) + `,"cause":` + jstr(string(shot.Cause)))
 	sb.WriteString("}")
 	return sb.String()
 }
@@ -153,7 +122,7 @@ func Round(hole string, player address) string {
 	if v == nil {
 		return "null"
 	}
-	return roundJSON(e, e.hole(), player.String(), v.(*round), true)
+	return roundJSON(e, e.hole(), player.String(), v.(*round))
 }
 
 func sep(i int) string {
@@ -360,22 +329,23 @@ const (
 	minCommunity = 20
 )
 
-// Simulate previews a first stroke (stroke 0, tick 0) from a ball in the
-// current weather, changing nothing. As a vm/qeval query it needs no
-// transaction or wallet: a client animates a shot the instant it is released.
-func Simulate(hole string, ballX, ballY, angle, power float64) string {
-	return simulateFrom(hole, ballX, ballY, angle, power, 0, 0, Period())
-}
-
 // SimulateFrom previews one shot, read-only: from an exact ball (a "rest"
 // answered before), shot "angle,power,tick", its stroke number (0 is the
 // first; timed and pulse holes change with it) and any period not ahead.
-// It is what PlayRoundAt would play, for one shot's gas. JSON as Simulate.
+// It is what PlayRoundAt would play, for one shot's gas. As a vm/qeval query
+// it needs no transaction or wallet: a client animates a shot the instant it
+// is released.
 func SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, period int64) string {
 	notAhead(period)
 	validStroke(stroke)
 	angle, power, tick := parseShot(shot)
-	return simulateFrom(hole, ballX, ballY, angle, power, stroke, tick, period)
+	e := readHole(hole)
+	h := e.hole()
+	ball := onBoard(h, ballX, ballY)
+	angle, power = validShot(angle, power)
+	sh, holed := resolve(previewAt(h, ball, angle*math.Pi/180, power, stroke, tick, weatherOf(e, h, period).Zones))
+	sh = back(h, ball, sh, holed)
+	return "{" + versionJSON + `,"holed":` + strconv.FormatBool(holed) + `,"bounces":` + strconv.Itoa(sh.Bounces) + shotJSON(sh) + "}"
 }
 
 func validStroke(stroke int) {
@@ -391,17 +361,6 @@ func onBoard(h course.Hole, x, y float64) physics.Vec2 {
 		panic("golf: the ball must be on the board")
 	}
 	return physics.Vec2{X: x, Y: y}
-}
-
-// simulateFrom is Simulate and SimulateFrom: one shot on a hole, read-only.
-func simulateFrom(hole string, ballX, ballY, angle, power float64, stroke, tick int, period int64) string {
-	e := readHole(hole)
-	h := e.hole()
-	ball := onBoard(h, ballX, ballY)
-	angle, power = validShot(angle, power)
-	shot, holed := resolve(previewAt(h, ball, angle*math.Pi/180, power, stroke, tick, weatherOf(e, h, period).Zones))
-	shot = back(h, ball, shot, holed)
-	return "{" + versionJSON + `,"holed":` + strconv.FormatBool(holed) + `,"bounces":` + strconv.Itoa(shot.Bounces) + shotJSON(shot) + "}"
 }
 
 // shotJSON is a shot's path, air, cause, work (Shot.Work, which a client adds
@@ -569,7 +528,7 @@ func isTimed(h course.Hole) bool {
 }
 
 // Extras is what a timed hole adds at one stroke of a round (0 is the first),
-// to draw over State's field. Empty for other holes.
+// to draw over HoleState's field. Empty for other holes.
 func Extras(hole string, stroke int) string {
 	h := readHole(hole).hole()
 	t, ok := h.(course.Timed)
@@ -840,7 +799,7 @@ func Standings(mode, players string) string {
 // Records is a page of every player's best on a hole in a mode, named or not,
 // with the height that ranks it before a later tie: all a successor needs to
 // carry the boards over in their order.
-// The paged reads (Records, Players, Rounds, Community) walk everything by
+// The paged reads (Records, Players, Community) walk everything by
 // key: after is the last key of the page before ("" for the first), limit is
 // clamped to 1..100, next is the after of the next page ("" at the end).
 func Records(hole, mode, after string, limit int) string {
@@ -865,19 +824,6 @@ func Players(mode, after string, limit int) string {
 	next := page(totals[m].Iterate, after, limit, func(i int, p string, v any) {
 		r := v.(*row)
 		sb.WriteString(sep(i) + `{"player":` + jstr(p) + standingFields(r) + `,"height":` + strconv.FormatInt(r.height, 10) + "}")
-	})
-	sb.WriteString(`],"next":` + jstr(next) + "}")
-	return sb.String()
-}
-
-// Rounds is a page of every round under way on a hole, as State lists them,
-// paged like Records.
-func Rounds(hole, after string, limit int) string {
-	e := readHole(hole)
-	var sb strings.Builder
-	sb.WriteString("{" + versionJSON + `,"hole":` + jstr(e.id) + `,"rows":[`)
-	next := page(e.roundTree().Iterate, after, limit, func(i int, p string, v any) {
-		sb.WriteString(sep(i) + roundJSON(e, nil, p, v.(*round), false)) // no path: no hole needed
 	})
 	sb.WriteString(`],"next":` + jstr(next) + "}")
 	return sb.String()

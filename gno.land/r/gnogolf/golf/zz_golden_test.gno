@@ -69,7 +69,8 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 }
 
 // golden: fixture -> sha256 prefix of its SimulateRoundAt (weather period
-// chosen per fixture), its Forecast, and its State.
+// chosen per fixture), its Forecast, and its HoleState (State until
+// 2026-09-30).
 //
 // Deploy v1: the fixtures were realm holes under golf's namespace, which
 // are no longer the course's (the course is data): State says
@@ -103,13 +104,18 @@ func periodOf(id, world string, h course.Hole, kind string) int64 {
 // and pulse set-up, what the client's save split reads): the State column
 // moved on all six, nothing else in it did. The replay and forecast columns
 // did not move (nor with the physics' roll-on rule in one helper, rollsOn).
+// 2026-09-30, State removed (only its tests read it; the client reads
+// HoleState, which is State without "plays" and the rounds): the third
+// column hashes HoleState instead, and moved on all six for that alone. The
+// new hashes are the ones the code before the removal gave for HoleState.
+// The replay and forecast columns did not move.
 var golden = map[string][3]string{
-	"pulse":  {"2df4849397343b5c", "076ac3e7c0d705a9", "b8b2e652ca8d8339"},
-	"sea":    {"9cc043701ff301c4", "c3224daa821020f4", "68044871798d94fd"},
-	"slope":  {"0983305ba509f74d", "0757d6c38ca9a9ef", "38217921e1ad7864"},
-	"storm":  {"51af6518629e6a99", "217b2a005fc76324", "53bedbefe2d430ee"},
-	"timed":  {"d32d1dc343013582", "c3224daa821020f4", "fe3a7a607057fb55"},
-	"tunnel": {"325ffde22c9b1a13", "c3224daa821020f4", "1be326463b6c4bfc"},
+	"pulse":  {"2df4849397343b5c", "076ac3e7c0d705a9", "e80fe259799b6bb7"},
+	"sea":    {"9cc043701ff301c4", "c3224daa821020f4", "e73fad3555ef963b"},
+	"slope":  {"0983305ba509f74d", "0757d6c38ca9a9ef", "cdf79e14c4936c42"},
+	"storm":  {"51af6518629e6a99", "217b2a005fc76324", "70fda29e98eedd34"},
+	"timed":  {"d32d1dc343013582", "c3224daa821020f4", "82144ad536460597"},
+	"tunnel": {"325ffde22c9b1a13", "c3224daa821020f4", "8746d7b3047b3df4"},
 }
 
 // goldAt keeps h as data under id, listed as its realm hole was: the world
@@ -143,7 +149,7 @@ func TestGoldenReplays(cur realm, t *testing.T) {
 		got := [3]string{
 			sum(simAt(id, goldShots, p)),
 			sum(forecastJSON("", weatherOf(mustHole(id), h, p))),
-			sum(strings.Replace(State(id), `"official":false`, `"official":true`, 1)),
+			sum(strings.Replace(HoleState(id), `"official":false`, `"official":true`, 1)),
 		}
 		want, ok := golden[name]
 		if !ok {

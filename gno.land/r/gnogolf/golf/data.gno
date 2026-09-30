@@ -394,15 +394,3 @@ func BestOf(hole, mode string, player address) int {
 	e, m := readHole(hole), modeOf(mode)
 	return bestStrokes(e.bests(m).Get(player.String()))
 }
-
-// StandingOf is a player's course-wide standing in a mode: how many current
-// course holes they finished, in how many strokes, and those holes' pars
-// summed (strokes - par is their score against par, which ranks them after
-// their holes); 0, 0, 0 if none.
-func StandingOf(mode string, player address) (holes, strokes, par int) {
-	if v := totals[modeOf(mode)].Get(player.String()); v != nil {
-		r := v.(*row)
-		return r.holes, r.strokes, r.par
-	}
-	return 0, 0, 0
-}

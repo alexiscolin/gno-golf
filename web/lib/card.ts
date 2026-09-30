@@ -8,7 +8,7 @@ type CardHole = Pick<HoleRow, "id"> & Partial<Pick<HoleRow, "slot" | "par" | "wo
 /** The scorecard: a best per cardKey. */
 export type Card = Record<string, number>;
 
-// Par is the hole's own, from the chain (Holes()/State() "par"); a hole that
+// Par is the hole's own, from the chain (Holes()/HoleState() "par"); a hole that
 // does not say (or is not known yet) is a par 3.
 export const parOf = (h: Partial<Pick<HoleRow, "par">> | null | undefined) => (h && h.par) || 3;
 

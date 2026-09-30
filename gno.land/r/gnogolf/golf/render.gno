@@ -986,17 +986,6 @@ func put(g [][]rune, p physics.Vec2, c rune) {
 	g[y][x] = c
 }
 
-// eachRound walks a hole's rounds in address order, at most limit: they grow
-// with every address that played, and no output may grow with them.
-func eachRound(e *entry, limit int, fn func(player string, r *round)) {
-	n := 0
-	e.roundTree().Iterate("", "", func(k string, v any) bool {
-		fn(k, v.(*round))
-		n++
-		return n >= limit
-	})
-}
-
 func short(addr string) string {
 	if len(addr) <= 12 {
 		return addr

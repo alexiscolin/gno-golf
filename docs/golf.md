@@ -76,7 +76,7 @@ animating a path, the rules a client must follow), see
 | community alias | `g1…/my-hole` | alias for its current version |
 
 **Reads take an id or an alias. Writes take the exact id only**, the one
-`State` or `Holes` gave: a round can't be replayed on a version it wasn't
+`HoleState` or `Holes` gave: a round can't be replayed on a version it wasn't
 played on. A write given an alias panics with
 `golf: garden/7 is an alias: play its version by id, garden/7/v2`, and an
 unknown hole with `golf: unknown hole: <id>`. Every JSON answer names the
@@ -348,7 +348,7 @@ pays 8 to 16M more while a drain is under way.
 ## Reads
 
 These are all free as `vm/qeval` queries and return JSON strings (except
-`Current`, `HoleData`, `BestOf`, `StandingOf`, `Owner`, `Pending`,
+`Current`, `HoleData`, `BestOf`, `Owner`, `Pending`,
 `Publishing` and `Period`, which return plain values).
 
 ### Holes and versions
@@ -416,10 +416,7 @@ version's): what a successor realm or an auditor reads back.
 
 #### `HoleState(hole string) string`
 
-Everything needed to draw the hole and aim: `State` without `plays`,
-`roundsTotal` and `rounds`. Prefer it to `State` when the rounds aren't needed.
-
-#### `State(hole string) string`
+Everything needed to draw the hole and aim: its geometry, weather and wear.
 
 ```json
 {"version":1,"hole":"garden/3/v1","name":"Down the Tunnel","official":true,
@@ -428,7 +425,8 @@ Everything needed to draw the hole and aim: `State` without `plays`,
  "timed":false,
  "period":5920000,
  "weather":{"period":5920000,"kind":"wind","wind":[0.1,-0.04],"zones":[…]},
- "start":[5,6],"cup":[44,6],"cupR":1.2,"ballR":0.5,"plays":12,
+ "start":[5,6],"cup":[44,6],"cupR":1.2,"ballR":0.5,
+ "work":{"walls":48,"pieces":61,"setup":0},
  "walls":[{"a":[0,0],"b":[32,0],"skin":""},
           {"a":[…],"b":[…],"skin":"plank","every":8,"on":4,"phase":0}],
  "posts":[{"c":[12,6.3],"r":0.7,"skin":"stump"}],
@@ -436,9 +434,7 @@ Everything needed to draw the hole and aim: `State` without `plays`,
           {"kind":"slope","min":[…],"max":[…],"vec":[0.2,0],"scale":0,"round":false,"air":true,"skin":"cannon"},
           {"kind":"hazard","min":[0,0],"max":[50,18],"vec":[5,6],"scale":0,"round":false,
            "poly":[[…],…],"outside":true,"skin":"sea"}],
- "wear":{"w":16,"h":8,"cells":[0,0,1,…]},
- "roundsTotal":40,
- "rounds":[<round>, …]}
+ "wear":{"w":16,"h":8,"cells":[0,0,1,…]}}
 ```
 
 (The values are illustrative, not from one real hole.)
@@ -449,7 +445,7 @@ Everything needed to draw the hole and aim: `State` without `plays`,
   stroke.
 - `cupR` and `ballR` are the cup's and the ball's radii: 1.2 and 0.5 on the
   course, anything the format allows on a community hole.
-- `work` (`{"walls":…,"pieces":…,"setup":…}`, `HoleState` too) is what a
+- `work` (`{"walls":…,"pieces":…,"setup":…}`) is what a
   commit counts on the hole before the weather: its walls and pieces, every
   pulse's as if always there, and each shot's share of setting the pulses up.
   The web client splits a round's save into commits and sets their gas by it
@@ -464,9 +460,7 @@ Everything needed to draw the hole and aim: `State` without `plays`,
   `vec` and `scale` mean for each kind, see [physics.md](physics.md#zone).
 - `weather` is the forecast for the current period. See `Weather`. Its zones
   never carry `air` or `capped`: the wind is always both.
-- `rounds` shows at most 24 rounds, in address order, without their paths.
-  `roundsTotal` is the real count. Use `Round` for one player's round, or
-  `Rounds` to page through them all.
+- A player's round under way is `Round`'s.
 
 #### `Extras(hole string, stroke int) string`
 
@@ -507,7 +501,11 @@ chooses it.
 
 ### Rounds and previews
 
-#### `<round>` (in `State`, `Round` and `Rounds`)
+#### `Round(hole string, player address) string`
+
+One player's round under way with its last stroke's path, or `null` if they
+have none: never started, holed (the best is kept: `Ghost`) or `Reset`. It costs one stroke of gas, whatever the size of the hole's
+history.
 
 ```json
 {"version":1,"player":"g1…","ball":[26,0.04],"rest":[26,0.0412345],
@@ -518,22 +516,18 @@ chooses it.
 
 `ball` is where it lies, rounded; `rest` is the same ball exactly, which
 `SimulateFrom` and `SimulateCommit` take. `shots` is the round as played,
-which is enough to replay it. `path`, `air` and `cause` are only in `Round`:
-the last stroke, replayed from where it started. `air` has one `0`/`1` per
+which is enough to replay it. `path`, `air` and `cause` are the last stroke,
+replayed from where it started. `air` has one `0`/`1` per
 path point (the ball is off the ground), and `cause` one letter per point for
 what most acted on the ball: `b` a bounce, `s` a hill, `w` wind or a gust, `i`
 a slippery surface, `-` nothing but friction.
 
-#### `Round(hole string, player address) string`
+#### `SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, period int64) string`
 
-One player's round under way with its last stroke's path, or `null` if they
-have none: never started, holed (the best is kept: `Ghost`) or `Reset`. It costs one stroke of gas, whatever the size of the hole's
-history.
-
-#### `Simulate(hole string, ballX, ballY, angle, power float64) string`
-
-What one shot from `(ballX, ballY)` would do, in the current weather, as
-**stroke 0 with tick 0**. The ball must be on the board. Changes nothing.
+One shot from an exact ball, with every input given: `shot` is
+`"angle,power,tick"`, `stroke` the stroke number it would be (0 to 59; timed
+and pulse holes change with it), `period` the weather (not one still to come).
+The ball must be on the board. Changes nothing.
 
 ```json
 {"version":1,"holed":false,"bounces":1,"path":[[3,8],[9,8],…,[4.301,8]],
@@ -541,15 +535,9 @@ What one shot from `(ballX, ballY)` would do, in the current weather, as
 ```
 
 `work` is the shot's `Shot.Work` (see [The work budget](#the-work-budget)).
-
-#### `SimulateFrom(hole string, ballX, ballY float64, shot string, stroke int, period int64) string`
-
-One shot from an exact ball, with every input given: `shot` is
-`"angle,power,tick"`, `stroke` the stroke number it would be (0 to 59; timed
-and pulse holes change with it), `period` the weather (not one still to come).
 It's exactly what `PlayRoundAt` would play for that stroke, for one shot's
 gas. Unlike the other previews it takes an old period too, to replay a stroke
-of an old round. Its JSON is `Simulate`'s.
+of an old round.
 
 #### `SimulateRound(hole, shots string) string`
 
@@ -587,11 +575,6 @@ round's count after the commit.
 Use `SimulateCommit` or `SimulateFrom` after the first stroke, from the `rest`
 the previous answer gave. Positions in paths are rounded to three decimals, and
 after a bounce or two a rounding error is a different ball.
-
-#### `Rounds(hole, after string, limit int) string`
-
-A page of every round on a hole, as `State` lists them (no path). Paged like
-`Records`.
 
 ### Records and rankings
 
@@ -720,11 +703,11 @@ Each given player's course-wide standing, with the same list rules as
 {"version":1,"mode":"assisted","holes":72,"rows":[{"player":"g1…","holes":12,"strokes":40,"par":38}, …]}
 ```
 
-#### `BestOf(hole, mode string, player address) int` and `StandingOf(mode string, player address) (holes, strokes, par int)`
+#### `BestOf(hole, mode string, player address) int`
 
-The same as plain values: a player's best on a hole (0 if none), and their
-holes, strokes and those holes' pars over the current course (0, 0, 0 if
-none).
+The same as a plain value: a player's best on a hole (0 if none). Their
+holes, strokes and pars over the current course are `Rank`'s, `Standings`'
+and `Players'`.
 
 #### `Ghost(hole, mode string, player address) string`
 
@@ -749,7 +732,7 @@ that ranks it before a later tie: a board can be rebuilt in its order.
 {"version":1,"hole":"garden/3/v1","mode":"assisted","rows":[{"player":"g1…","strokes":3,"height":81234}, …],"next":"g1…"}
 ```
 
-`Records`, `Players`, `Rounds` and `Community` walk everything by key, so
+`Records`, `Players` and `Community` walk everything by key, so
 anyone (an indexer, a successor realm carrying the records over) can read all
 of it a page at a time: `after` is the last key of the page before (`""` for
 the first), `limit` is clamped to 1..100, and `next` is the `after` of the next
@@ -956,7 +939,7 @@ score honest through it.
   shortcut, v1 records archived").
 - **The hub itself** is replaced by a new realm (a sibling path, such as
   `r/gnogolf/golf2`), which can read the v1's public state (`Holes`,
-  `Versions`, `HoleData`, `BestOf`, `Ghost`, `StandingOf`, `Records`, `Players`) and
+  `Versions`, `HoleData`, `BestOf`, `Ghost`, `Records`, `Players`) and
   carry it over or show it as history. The v1's owner then calls
   `SetSuccessor` once: every v1 page says where the course went, and v1 goes
   on playing. See [deploy-v1.md §9](design/deploy-v1.md).

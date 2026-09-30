@@ -195,7 +195,7 @@ Two numbers, both taken on the running node:
 
 | | |
 |---|---|
-| a shot **previewed** (`golf.Simulate`, read-only `vm/qeval`) | **44 ms**, 0 gas, no wallet, no account |
+| a shot **previewed** (`golf.SimulateFrom`, read-only `vm/qeval`) | **44 ms**, 0 gas, no wallet, no account |
 | a shot **committed** (`golf.Launch`, a transaction) | **~3.2 s** (pearl block time), ~0.025 GNOT |
 
 So a shot does not have to be a transaction. The chain resolves it either way —
@@ -225,7 +225,7 @@ That gives three things at once, and none of them needed a new protocol feature:
   **56% less gas**, because the ~7.3M fixed cost of a call is paid once instead
   of five times: 22.9M per shot alone against 10.0M inside a commit.
 
-**`Simulate` does two jobs at once, and that is the point.** It is the animation
+**The `Simulate*` reads do two jobs at once, and that is the point.** It is the animation
 source for a paying player and it is the entire game for a visitor with no
 wallet — same function, same physics, same 44 ms. One read-only entry point
 removes the need for a demo build, a trial mode, a JS physics port and a
@@ -338,7 +338,7 @@ builds. The gap between it and this repo is art and production, not engineering.
 
 Three consequences:
 
-- **The contract is renderer-agnostic.** `State()` and `Simulate()` are HTTP and
+- **The contract is renderer-agnostic.** `HoleState()` and `SimulateFrom()` are HTTP and
   JSON. Unity WebGL consumes them exactly as a three.js page would, so the
   choice belongs to whoever does the art.
 - **If it ends up in Unity, one rule is not negotiable: no Rigidbody.** The ball
@@ -362,12 +362,12 @@ small team wins.
 ## The client contract — settled, do not drift from it
 
 - **The chain computes the flight, the client replays it.** `Play` returns the
-  whole path, `golf.State(hole)` hands it out as JSON. A client that
+  whole path, `golf.Round` and the `Simulate*` reads hand it out as JSON. A client that
   re-simulated the physics in JS would have to match float64 GnoVM semantics
   exactly, and the ball would occasionally land somewhere on screen that the
   chain disagrees with. Nothing re-simulates.
-- **`golf.State(hole)` over `vm/qeval` is the API the 3D site consumes**:
-  geometry, `Skin` names, wear grid, every round in flight with its last path.
+- **`golf.HoleState(hole)` over `vm/qeval` is the API the 3D site consumes**:
+  geometry, `Skin` names, wear grid; `Round` gives a round in flight with its last path.
   The realm's markdown view is a second client, not the interface.
 - **`Skin` is the seam.** It means nothing to the simulation; the renderer owns
   the lookup from `"turning blade"` to a mesh. Adding a themed prop never
@@ -394,7 +394,7 @@ moves while staying readable.
 
 Deferring costs nothing, which is why it is a good deferral: **the counters are
 already accumulating**. Every committed shot marks its cell today, the grid is
-in `State()`, a renderer can already draw it. v2 only has to make `Field.Step`
+in `HoleState()`, a renderer can already draw it. v2 only has to make `Field.Step`
 read it. No migration, no data lost in the meantime — v1 players are already
 writing v2's terrain.
 

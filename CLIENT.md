@@ -66,7 +66,7 @@ version keeps its own rounds, records and board.
 | community | `g1…/my-hole/v1`, alias `g1…/my-hole` | someone's own data hole, the same two ways |
 
 Reads take any of these. **Writes take the exact version id**, the `"hole"`
-that `HoleState` or `State` returned (or the `"id"` in `Holes()`): a write
+that `HoleState` returned (or the `"id"` in `Holes()`): a write
 given `garden/7` panics, so shots aimed at one version can never be replayed
 on another. A version with a non-empty `"next"` is archived: still playable,
 its records kept, but out of the course ranking.
@@ -90,7 +90,7 @@ The expression syntax is `<pkgpath>.<call>` — a dot, not a newline. The reply
 carries a base64 Gno-typed result that has to be unwrapped twice:
 
 ```js
-const call = `gno.land/r/gnogolf/golf.Simulate("garden/2", 3, 8, 0, 6)`
+const call = `gno.land/r/gnogolf/golf.SimulateRound("garden/2", "0,6")`
 const hex  = [...new TextEncoder().encode(call)]
                .map(b => b.toString(16).padStart(2, "0")).join("")
 const res  = await fetch(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hex}`)
@@ -123,9 +123,6 @@ a client that finds one can offer to go there).
 | list a player's ghosts (the holes they have a best on) | `BestOf(hole, mode, player)` over the holes, both modes (the web client asks them all in one `qeval`) |
 | race a player's best (a duel's ghost) | `Ghost(hole, mode, player)`, then its strokes: the first with `SimulateRoundIn`, each later one with `SimulateFrom` from the `"rest"` before, in its `"period"` |
 | rank rounds saved before a name | the write `Claim()`, best sent with the name's `Register` in one transaction |
-
-`State(hole)` is `HoleState` plus the play count and up to 24 rounds under way; a client
-that only draws the hole doesn't need them.
 
 ### `HoleState(hole string) string` — everything to draw
 
@@ -175,10 +172,9 @@ rest there. It is the only thing that changes on its own, and it is the theme's
 to interpret: a worn track in grass, a glowing trace, cracks, polish. Map the
 number to intensity and stay out of the way.
 
-### `Simulate(hole, ballX, ballY, angle, power) string` — what a shot would do
+### A shot, as every `Simulate*` read answers it
 
-Angle in degrees, 0 = +X, 90 = +Y. Power above 0, up to 10. It plays a first
-stroke (stroke 0, tick 0) in the current weather.
+Angle in degrees, 0 = +X, 90 = +Y. Power above 0, up to 10.
 
 ```json
 {"version":1,"holed":false,"bounces":1,

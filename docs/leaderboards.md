@@ -11,7 +11,7 @@ Everything below runs on-chain; the dapp reads it.
     (one shot at a time from gnoweb) is pro.
   - A round keeps the mode of its first stroke.
   - The mode is the player's word: the chain cannot see a screen, and
-    `Simulate` is open to all.
+    `SimulateFrom` is open to all.
 - **Only named players are ranked.** `Leaderboard(mode)` (the course-wide top ten),
   `CourseLeaderboard(mode, offset, limit)` (the whole course ranking) and
   `HoleLeaderboard(hole, mode, offset, limit)` (a hole's board) list only

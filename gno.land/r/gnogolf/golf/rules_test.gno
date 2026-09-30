@@ -54,18 +54,16 @@ func TestJnumIsPercentThreeF(t *testing.T) {
 	uassert.Equal(t, "0", jnum(math.Inf(-1)))
 }
 
-// State lists rounds without paths; Round replays the last stroke's
-// path; a round stores its shots, not its path; Reset frees the round.
+// A round stores its shots, not its path; Round replays the last stroke's
+// path; Reset frees the round.
 func TestRoundsStoreShotsNotPaths(cur realm, t *testing.T) {
 	id := register(cur, "nopaths")
 	testing.SetRealm(testing.NewUserRealm(player))
 	PlayRoundAt(cross(cur), id, "10,2;-20,3", Period())
-	st := State(id)
-	uassert.False(t, strings.Contains(st[strings.Index(st, `"rounds"`):], `"path"`), "no path in State's rounds")
-	uassert.True(t, strings.Contains(st, `"shots":"10.0000,2.0000,0;-20.0000,3.0000,0"`), st)
+	got := Round(id, player)
+	uassert.True(t, strings.Contains(got, `"shots":"10.0000,2.0000,0;-20.0000,3.0000,0"`), got)
 	// the path Round gives is the last stroke's, from where it started
 	want := SimulateFrom(id, roundIn(id, player).fx, roundIn(id, player).fy, "-20,3", 1, Period())
-	got := Round(id, player)
 	uassert.Equal(t, want[strings.Index(want, `"path"`):strings.Index(want, `,"work"`)], got[strings.Index(got, `"path"`):len(got)-1])
 
 	testing.SetRealm(testing.NewUserRealm(player))
@@ -155,7 +153,7 @@ func TestWhatPassesIsWhatReplays(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "a shot is", func() { PlayRound(cross(cur), id, "0,0.00004") })
 	testing.SetRealm(testing.NewUserRealm(player))
 	urequire.AbortsContains(t, cur, "a shot is", func() { Launch(cross(cur), id, 0, 0.00004) })
-	uassert.PanicsContains(t, cur, "a shot is", func() { Simulate(id, 2, 8, 0, 0.00004) })
+	uassert.PanicsContains(t, cur, "a shot is", func() { SimulateFrom(id, 2, 8, "0,0.00004", 0, Period()) })
 
 	testing.SetRealm(testing.NewUserRealm(player))
 	PlayRound(cross(cur), id, "-359.99996,3")
@@ -243,7 +241,8 @@ func TestNoZeroHoleRows(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(Render(old), "> Archived: [Solo again](/r/gnogolf/golf:island/48/v2)"), "an archived hole says what took its place")
 }
 
-// Every best, standing and round can be read out a page at a time.
+// Every best and standing can be read out a page at a time; a round under
+// way, by its player.
 func TestPagedReads(cur realm, t *testing.T) {
 	id := courseHole(cur, 51)
 	var ps []string
@@ -264,10 +263,11 @@ func TestPagedReads(cur realm, t *testing.T) {
 	for _, p := range ps {
 		uassert.Equal(t, 1, strings.Count(one+two, `"player":"`+p), "each player once")
 	}
-	// the three are holed, so not kept: Rounds lists the rounds under way
+	// the three are holed, so not kept: a round under way is
 	testing.SetRealm(testing.NewUserRealm(player))
 	PlayRoundAt(cross(cur), id, "180,0.2", Period())
-	uassert.True(t, strings.Contains(Rounds(id, "", 100), `"rows":[{"version":1,"player":"`+player.String()+`","ball":`), Rounds(id, "", 100))
+	uassert.True(t, strings.HasPrefix(Round(id, player), `{"version":1,"player":"`+player.String()+`","ball":`), Round(id, player))
+	uassert.Equal(t, "null", Round(id, address(ps[0])))
 	all := Players("assisted", "", 100)
 	for _, p := range ps {
 		uassert.True(t, strings.Contains(all, `"player":"`+p+`","holes":`), all)
@@ -499,7 +499,7 @@ func TestOnlyCourseFinishesDrain(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(stranger))
 	uassert.Equal(t, 0, Drain(cross(cur), drainMax))
 	for _, p := range ps {
-		holes, strokes, par := StandingOf("assisted", p)
+		holes, strokes, par := standingOf("assisted", p)
 		uassert.True(t, holes == 0 && strokes == 0 && par == 0 && totals[assisted].Get(p.String()) != nil, "kept at 0: "+p.String())
 	}
 }
@@ -623,7 +623,7 @@ func TestMoreHolesBeatABetterScore(cur realm, t *testing.T) {
 	uassert.True(t, rankOf("pro", many) == 0, "an assisted standing only")
 	uassert.True(t, rankOf("assisted", many) < rankOf("assisted", good), "two holes at +4 before one at -2")
 	replayAs(cur, many, x, strokesOf(2)) // -1 on x: +1 in all
-	holes, strokes, par := StandingOf("assisted", many)
+	holes, strokes, par := standingOf("assisted", many)
 	uassert.True(t, holes == 2 && strokes == 7 && par == 6, "an improvement moves the strokes only")
 	// the best score among as many holes ranks first
 	other := testutils.TestAddress("vpother")
@@ -641,14 +641,14 @@ func TestTheDrainTakesAnArchivedHolesParOut(cur realm, t *testing.T) {
 	giveName(cur, p, "vpdrain")
 	replayAs(cur, p, five, strokesOf(4)) // -1
 	replayAs(cur, p, two, strokesOf(3))  // +1
-	holes, strokes, par := StandingOf("assisted", p)
+	holes, strokes, par := standingOf("assisted", p)
 	uassert.True(t, holes == 2 && strokes == 7 && par == 7, "level par in two")
 	was := rankKey(totals[assisted].Get(p.String()).(*row))
 	h := cupHole("mines", 5, "Par 5 again")
 	h.Strokes = 5
 	publish(cur, h) // archives five
 	drain(drainMax) // and any archived before it
-	holes, strokes, par = StandingOf("assisted", p)
+	holes, strokes, par = standingOf("assisted", p)
 	uassert.True(t, holes == 1 && strokes == 3 && par == 2, "+1 on the par 2 alone")
 	r := totals[assisted].Get(p.String()).(*row)
 	uassert.True(t, ranks[assisted].Has(rankKey(r)) && !ranks[assisted].Has(was), "ranked by what is left, once")
