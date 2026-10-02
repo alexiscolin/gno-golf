@@ -1,0 +1,446 @@
+package physics
+
+import (
+	"math"
+	"testing"
+)
+
+// The laws of the model, one test each: rolling, hills, contacts, flight.
+
+// flat is an open green of the course's usual Friction.
+func flat() *Field { return &Field{Friction: 0.87, Radius: 0.5} }
+
+// A ball on the flat stops after v²/2a, in v/a substeps, a the green's
+// rolling deceleration Crr·G: the half-kicks make it exact whenever v is a
+// whole number of a, and never off by more than a/8.
+func TestRollingStopsAtVSquaredOverTwoA(t *testing.T) {
+	a := Rolling(0.87, 1) * G
+	if math.Abs(a-0.224) > 1e-12 {
+		t.Fatalf("the usual green's deceleration is %v, want 0.224", a)
+	}
+	for _, v := range []float64{0.5, 1, 2.3, 3, 4.6, 6} {
+		s := flat().Step(V(0, 0), V(v, 0), 200)
+		want := v * v / (2 * a)
+		if d := s.Rest().X; math.Abs(d-want) > a/8+1e-9 {
+			t.Errorf("speed %v: rolled %v, v²/2a is %v", v, d, want)
+		}
+		if n := len(s.Path) - 1; math.Abs(float64(n)-v/a) > 1 {
+			t.Errorf("speed %v: rolled %d substeps, v/a is %v", v, n, v/a)
+		}
+	}
+	// exact at a whole number of a
+	s := flat().Step(V(0, 0), V(20*a, 0), 200)
+	if want := 200 * a; math.Abs(s.Rest().X-want) > 1e-9 {
+		t.Fatalf("20a rolled %v, want %v", s.Rest().X, want)
+	}
+}
+
+// Sand holds harder than grass, ice less, and a surface of scale 0 holds the
+// ball where it is.
+func TestSurfacesAreRollingResistance(t *testing.T) {
+	sand, grass, ice := Rolling(0.87, 0.5), Rolling(0.87, 1), Rolling(0.87, 1.18)
+	if !(sand > grass && grass > ice && ice > 0) {
+		t.Fatalf("Crr sand %v, grass %v, ice %v", sand, grass, ice)
+	}
+	if !math.IsInf(Rolling(0.87, 0), 1) {
+		t.Fatal("a scale of 0 is an infinite Crr")
+	}
+	f := &Field{Zones: []Zone{{Kind: Surface, Min: V(-10, -10), Max: V(10, 10), Scale: 0}}, Friction: 0.87}
+	if s := f.Step(V(0, 0), V(3, 0), 10); s.Rest() != V(0, 0) {
+		t.Fatalf("a ball on a scale-0 surface moved to %v", s.Rest())
+	}
+}
+
+// uphill is a wide field that is all one hill, rising toward +X.
+func uphill(g, scale float64) *Field {
+	return &Field{
+		Zones: []Zone{
+			{Kind: Surface, Min: V(-200, -200), Max: V(200, 200), Scale: scale},
+			{Kind: Slope, Min: V(-200, -200), Max: V(200, 200), Vec: V(-g, 0)},
+		},
+		Friction: 0.87, Radius: 0.5,
+	}
+}
+
+// A ball rolling up a hill slows down on every substep it climbs, head on or
+// at a slant, on grass or ice: gravity and rolling resistance both take from
+// it, and nothing gives.
+func TestUphillAlwaysSlows(t *testing.T) {
+	for _, scale := range []float64{1, 1.18} {
+		for _, g := range []float64{0.12, 0.2, 0.3, 0.35} {
+			f := uphill(g, scale)
+			for _, deg := range []float64{0, 30, 60, 80, 85, 89} {
+				for _, v := range []float64{0.4, 1.5, 3, 4.6} {
+					s := f.Step(V(0, 0), FromPolar(deg*math.Pi/180, v), 60)
+					for i := 2; i < len(s.Path); i++ {
+						d0, d1 := s.Path[i-1].Sub(s.Path[i-2]), s.Path[i].Sub(s.Path[i-1])
+						if d0.X <= 0 || d1.X <= 0 {
+							break // over the top of its climb
+						}
+						if d1.Len() > d0.Len()+1e-12 {
+							t.Fatalf("scale %v, hill %v, %v° off uphill at %v: substep %d went %v after %v", scale, g, deg, v, i, d1.Len(), d0.Len())
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// A ball at rest on a hill rolls down it when the hill pulls harder than its
+// rolling resistance holds (tan θ above Crr), and does not move at all when
+// it does not: no creeping.
+func TestAHillSteeperThanItsFrictionRollsTheBallBack(t *testing.T) {
+	a := Rolling(0.87, 1) * G // 0.224
+	for _, c := range []struct {
+		g     float64
+		rolls bool
+	}{{0.2, false}, {0.21, false}, {0.23, true}, {0.3, true}} {
+		s := uphill(c.g, 1).Step(V(0, 0), Vec2{}, 20)
+		moved := s.Rest().X < 0
+		if moved != c.rolls {
+			t.Errorf("hill %v (friction %v): rest at %v", c.g, a, s.Rest())
+		}
+		if !c.rolls && s.Rest() != V(0, 0) {
+			t.Errorf("hill %v: a ball it cannot move crept to %v", c.g, s.Rest())
+		}
+		// one rolling up it stops, then comes back down, or stays
+		up := uphill(c.g, 1).Step(V(0, 0), V(2, 0), 40)
+		if back := up.Rest().X < s.Path[0].X+1; back != c.rolls {
+			top := 0.0
+			for _, p := range up.Path {
+				top = math.Max(top, p.X)
+			}
+			if c.rolls {
+				t.Errorf("hill %v: a ball that climbed to %v stopped up there, at %v", c.g, top, up.Rest())
+			} else if up.Rest().X < top-1e-9 {
+				t.Errorf("hill %v: a ball that climbed to %v slid back to %v", c.g, top, up.Rest())
+			}
+		}
+	}
+}
+
+// Two hills over the same ground are one hill: the first listed. The ball
+// is pushed by its Vec only, not by the two added up.
+func TestOverlappingHillsAreTheFirst(t *testing.T) {
+	one := uphill(0.3, 1)
+	two := uphill(0.3, 1)
+	two.Zones = append(two.Zones, Zone{Kind: Slope, Min: V(-200, -200), Max: V(200, 200), Vec: V(-0.3, 0)})
+	a, b := one.Step(V(0, 0), V(3, 0), 40), two.Step(V(0, 0), V(3, 0), 40)
+	if len(a.Path) != len(b.Path) || a.Rest() != b.Rest() {
+		t.Fatalf("a second hill under the first changed the shot: %v, %v", a.Rest(), b.Rest())
+	}
+}
+
+// The contact impulse: the speed into the surface comes back times the
+// restitution (an energy ratio of e²), the speed along it loses µ times the
+// normal impulse.
+func TestRestitutionAndCoulomb(t *testing.T) {
+	n := V(-1, 0) // a wall at the ball's right, facing it
+	for _, e := range []float64{0, 0.5, 0.7} {
+		for _, deg := range []float64{0, 20, 45, 70} {
+			in := FromPolar(deg*math.Pi/180, 3)
+			out, impact := contact(in, n, e)
+			vn, vt := in.X, in.Y
+			if !impact {
+				t.Fatalf("e %v, %v°: a 3-per-substep hit is an impact", e, deg)
+			}
+			if got := -out.X / vn; math.Abs(got-e) > 1e-12 {
+				t.Errorf("e %v, %v°: the normal speed came back times %v", e, deg, got)
+			}
+			if ratio := (out.X * out.X) / (vn * vn); math.Abs(ratio-e*e) > 1e-12 {
+				t.Errorf("e %v, %v°: normal energy ratio %v, want %v", e, deg, ratio, e*e)
+			}
+			// Coulomb: the tangential impulse is µ(1+e)|vn|, clamped at 2/7 vt
+			want := math.Min(WallFriction*(1+e)*vn, TangentMass*math.Abs(vt))
+			if got := math.Abs(vt) - math.Abs(out.Y); math.Abs(got-want) > 1e-12 {
+				t.Errorf("e %v, %v°: the speed along lost %v, want %v", e, deg, got, want)
+			}
+			if out.Y*vt < 0 {
+				t.Errorf("e %v, %v°: friction reversed the ball along the wall", e, deg)
+			}
+		}
+	}
+	// passive pieces are held to MaxBounce; a resting contact does not bounce
+	if out, _ := contact(V(2, 0), n, 1); math.Abs(out.X+2*MaxBounce) > 1e-12 {
+		t.Fatalf("a Bounce of 1 played %v, want MaxBounce", -out.X/2)
+	}
+	if out, impact := contact(V(RestSpeed/2, 0.5), n, 0.85); impact || out.X != 0 {
+		t.Fatalf("a resting contact bounced: %v, impact %v", out, impact)
+	}
+	if out, _ := contact(V(-1, 0), n, 0.85); out != V(-1, 0) {
+		t.Fatalf("a ball moving away was touched: %v", out)
+	}
+}
+
+// A bumper (Bounce above 1) kicks the ball back faster than it came, at most
+// MaxKick times, and never past SpeedCap; two facing bumpers cannot pump a
+// ball without end.
+func TestABumperKicksWithinBounds(t *testing.T) {
+	n := V(-1, 0)
+	if out, _ := contact(V(2, 0), n, 1.25); math.Abs(out.X+2.5) > 1e-12 {
+		t.Fatalf("a 1.25 bumper sent back %v, want 2.5", -out.X)
+	}
+	if out, _ := contact(V(2, 0), n, 3); math.Abs(out.X+2*MaxKick) > 1e-12 {
+		t.Fatalf("a bumper past MaxKick sent back %v, want %v", -out.X, 2*MaxKick)
+	}
+	f := &Field{
+		Walls: []Wall{
+			{Seg: Segment{V(0, 0), V(40, 0)}},
+			{Seg: Segment{V(40, 0), V(40, 20)}},
+			{Seg: Segment{V(40, 20), V(0, 20)}},
+			{Seg: Segment{V(0, 20), V(0, 0)}},
+		},
+		Posts:    []Post{{Circle: Circle{C: V(20, 10), R: 1.2}, Bounce: 1.3, Skin: "bumper"}},
+		Friction: 0.87, Bounce: 0.85, Radius: 0.5,
+	}
+	s := f.Step(V(14, 10), V(3, 0), 40)
+	kicked := false
+	for i := 1; i < len(s.Path); i++ {
+		d := s.Path[i].Sub(s.Path[i-1]).Len()
+		if d > 3+1e-9 {
+			kicked = true
+		}
+		if d > SpeedCap+1e-9 {
+			t.Fatalf("substep %d went %v, past SpeedCap", i, d)
+		}
+	}
+	if !kicked {
+		t.Fatal("the bumper did not kick the ball back faster")
+	}
+}
+
+// No passive contact gives the ball speed: a rail, a statue or a mole marked
+// above 1 plays at MaxBounce, and the impulse, its Coulomb friction and the
+// rest of the move from the contact never add to |v|. Over random contacts,
+// and over random shots into a wall and a post, where each substep with no
+// bounce in it goes no further than the last one before it.
+func TestNoPassiveContactGainsSpeed(t *testing.T) {
+	seed := uint64(7)
+	rnd := func() float64 {
+		seed = seed*6364136223846793005 + 1442695040888963407
+		return float64(seed>>11) / (1 << 53)
+	}
+	skins := []string{"", "rail", "gnome statue", "mole", "hedge"}
+	for i := 0; i < 3000; i++ {
+		v := FromPolar(rnd()*2*math.Pi, 8*rnd())
+		n := FromPolar(rnd()*2*math.Pi, 1)
+		e := bounceOf(1.5*rnd(), 0.85, skins[i%len(skins)])
+		if out, _ := contact(v, n, e); out.Len() > v.Len()*(1+1e-12) {
+			t.Fatalf("a contact at e %v turned %v into %v", e, v, out)
+		}
+	}
+	if !Kicks("bumper") || Kicks("gnome statue") || bounceOf(1.25, 0.85, "gnome statue") != MaxBounce || bounceOf(0, 1.3, "") != MaxBounce {
+		t.Fatal("only a bumper kicks")
+	}
+	for i := 0; i < 200; i++ {
+		f := &Field{
+			Walls:    []Wall{{Seg: Segment{V(20, -50), V(20, 50)}, Bounce: 1.5 * rnd(), Skin: skins[i%len(skins)]}},
+			Posts:    []Post{{Circle: Circle{C: V(4, 12), R: 1}, Bounce: 1.5 * rnd(), Skin: skins[(i+1)%len(skins)]}},
+			Friction: 0.87, Bounce: 1.5 * rnd(), Radius: 0.5,
+		}
+		// at the wall within 60° of square, or at the post, fast enough
+		// that every contact is an impact (a 'b' substep)
+		v := FromPolar((rnd()-0.5)*2*math.Pi/3, 1+5*rnd())
+		if i%2 == 1 {
+			v = V(-4, 12).Sub(V(4, 6)).Scale(1 + 0.3*rnd()).Add(V(rnd()-0.5, rnd()-0.5)).Scale(0.4)
+		}
+		s := f.Step(V(4, 6), v, 60)
+		last := math.Inf(1)
+		for k := 1; k < len(s.Path); k++ {
+			if s.Cause[k] == 'b' || (k+1 < len(s.Path) && s.Cause[k+1] == 'b') {
+				continue // the substep of a contact, and the one before it (its end may be the contact's start)
+			}
+			d := s.Path[k].Sub(s.Path[k-1]).Len()
+			if d > last+1e-9 {
+				t.Fatalf("shot %d: substep %d went %v, after %v", i, k, d, last)
+			}
+			last = d
+		}
+	}
+}
+
+// Every hazard sends the ball back where the stroke was played from, not
+// to its Vec: a pond rolled into, the sea off a rail-less lane, and a timed
+// hazard (falling ice) that comes on over a ball at rest.
+func TestAHazardSendsTheBallBackToTheStroke(t *testing.T) {
+	far := V(1, 1) // a hazard's Vec, which no rule reads
+	pond := Zone{Kind: Hazard, Min: V(16, 6), Max: V(24, 14), Vec: far, Round: true}
+	lane := []Vec2{V(2, 8), V(38, 8), V(38, 12), V(2, 12)}
+	sea := Zone{Kind: Hazard, Min: V(0, 0), Max: V(40, 20), Vec: far, Poly: lane, Outside: true}
+	ice := Zone{Kind: Hazard, Min: V(28, 0), Max: V(40, 20), Vec: far, Every: 50, On: 1, Phase: 49}
+	walls := []Wall{
+		{Seg: Segment{V(0, 0), V(40, 0)}},
+		{Seg: Segment{V(40, 0), V(40, 20)}},
+		{Seg: Segment{V(40, 20), V(0, 20)}},
+		{Seg: Segment{V(0, 20), V(0, 0)}},
+	}
+	for i := 0; i < 36; i++ {
+		start := V(20, 10).Add(FromPolar(float64(i)*math.Pi/18, 8))
+		f := &Field{Walls: walls, Zones: []Zone{pond}, Friction: 0.87, Bounce: 0.85, Radius: 0.5}
+		if s := f.Step(start, V(20, 10).Sub(start).Scale(3/8.0), 40); s.Rest() != start || len(s.Path) < 3 {
+			t.Fatalf("from %v into the pond: rest %v, want the start", start, s.Rest())
+		}
+		start = V(5+float64(i%9)*3.5, 10)
+		f = &Field{Walls: walls, Zones: []Zone{sea}, Friction: 0.87, Bounce: 0.85, Radius: 0.5}
+		if s := f.Step(start, FromPolar(math.Pi/2+float64(i%2)*math.Pi, 2), 40); s.Rest() != start {
+			t.Fatalf("from %v off the lane: rest %v, want the start", start, s.Rest())
+		}
+	}
+	// it stops under the ice, which then comes down on it
+	f := &Field{Walls: walls, Zones: []Zone{ice}, Friction: 0.87, Bounce: 0.85, Radius: 0.5}
+	start := V(20, 10)
+	if s := f.Step(start, V(3.5, 0), 40); s.Rest() != start {
+		t.Fatalf("a ball at rest under the ice ended at %v, want the start", s.Rest())
+	}
+}
+
+// A ball pressed into a rail by a hill slides along it: a resting contact,
+// with no bounce counted and no jitter off it.
+func TestAHillPressesTheBallAlongARail(t *testing.T) {
+	f := &Field{
+		Walls:    []Wall{{Seg: Segment{V(-100, 5), V(100, 5)}}},
+		Zones:    []Zone{{Kind: Slope, Min: V(-100, -10), Max: V(100, 10), Vec: V(0.2, 0.3)}},
+		Friction: 0.87, Bounce: 0.85, Radius: 0.5,
+	}
+	s := f.Step(V(0, 4.5-1e-6), V(1, 0), 30)
+	if s.Bounces != 0 {
+		t.Fatalf("a ball pressed on the rail counted %d bounces", s.Bounces)
+	}
+	for i, p := range s.Path {
+		if p.Y > 4.5+1e-6 || (i > 0 && p.Y < 4.5-0.01) {
+			t.Fatalf("the ball left the rail, at %v", p)
+		}
+	}
+	if s.Rest().X <= 1 {
+		t.Fatalf("it did not slide on down the rail, stopped at %v", s.Rest())
+	}
+}
+
+// A move that hits spends the rest of itself from the contact: a ball fired
+// at a wall ends the substep as far back from it as it would have gone past.
+func TestAMoveGoesOnFromItsContact(t *testing.T) {
+	f := &Field{Walls: []Wall{{Seg: Segment{V(10, -50), V(10, 50)}}}, Friction: 0.87, Bounce: 1, Radius: 0.5}
+	s := f.Step(V(8.5, 0), V(1.4, 0), 1)
+	// 0.112 of rolling resistance first, then 1 to the wall (at 9.5), then
+	// the 0.285 left, back at MaxBounce of the speed
+	v := 1.4 - Rolling(0.87, 1)*G/2
+	want := 9.5 - (v-1)*MaxBounce
+	if got := s.Path[1].X; math.Abs(got-want) > 1e-5 {
+		t.Fatalf("the ball ended the substep at %v, want %v", got, want)
+	}
+}
+
+// A timed wall of a single segment that comes up across a moving ball is
+// never crossed: the ball, already within its radius, is stopped by it.
+func TestATimedSegmentIsNeverCrossed(t *testing.T) {
+	for phase := 0; phase < 6; phase++ {
+		w := Wall{Seg: Segment{V(10, -5), V(10, 5)}, Every: 6, On: 3, Phase: phase}
+		f := &Field{Walls: []Wall{w}, Friction: 0.87, Bounce: 0.85, Radius: 0.5}
+		for _, x := range []float64{9.6, 9.8, 10, 10.2} {
+			for _, v := range []float64{-2, -0.5, 0.5, 2} {
+				s := f.Step(V(x, 0), V(v, 0), 10)
+				for i := 1; i < len(s.Path); i++ {
+					a, b := s.Path[i-1], s.Path[i]
+					if (a.X-10)*(b.X-10) < 0 && There(i-1, 6, 3, phase) && There(i, 6, 3, phase) {
+						t.Fatalf("phase %d, from %v at %v: crossed the standing wall, %v to %v", phase, x, v, a, b)
+					}
+				}
+			}
+		}
+	}
+}
+
+// A stroke costs at most MaxWork (and one step past it): a hostile field of
+// bumper walls across the whole board, the steepest hill and polygons under
+// every move, which rolled on for ever, ends there, and says so in its Work.
+// A course stroke is far from it.
+func TestAStrokeCostsAtMostMaxWork(t *testing.T) {
+	var ws []Wall
+	for i := 0; i < 160; i++ {
+		x := float64(i) * 96 / 160
+		ws = append(ws, Wall{Seg: Segment{A: V(x, 0), B: V(96-x, 96)}, Bounce: 1.5, Skin: "bumper"})
+	}
+	zs := []Zone{{Kind: Slope, Min: V(0, 0), Max: V(96, 96), Vec: V(0.67, 0.67)}}
+	for i := 0; i < 31; i++ {
+		z := Zone{Kind: Surface, Min: V(0, 0), Max: V(96, 96), Scale: 8}
+		if i < 8 {
+			for k := 0; k < 64; k++ {
+				z.Poly = append(z.Poly, V(48, 48).Add(FromPolar(float64(k)*2*math.Pi/64, 40+float64(i))))
+			}
+		}
+		zs = append(zs, z)
+	}
+	f := &Field{Walls: ws, Zones: zs, Friction: 0.99, Bounce: 1.5, Radius: 0.5}
+	Prepare(f)
+	s := f.Step(V(20, 20), V(-3, 3), 60)
+	if s.Work <= MaxWork || s.Work > MaxWork+MaxWorkStep {
+		t.Fatalf("the hostile stroke cost %d, want just past %d", s.Work, MaxWork)
+	}
+	// a Cap under MaxWork ends it there, on the same path so far
+	for _, c := range []int{1, 50000, MaxWork / 3} {
+		f.Cap = c
+		k := f.Step(V(20, 20), V(-3, 3), 60)
+		if k.Work <= c || k.Work > c+MaxWorkStep || len(k.Path) > len(s.Path) {
+			t.Fatalf("capped at %d, the stroke cost %d in %d points", c, k.Work, len(k.Path))
+		}
+		for i := 0; i < len(k.Path)-1; i++ {
+			if k.Path[i] != s.Path[i] {
+				t.Fatalf("capped at %d, point %d moved", c, i)
+			}
+		}
+	}
+	f.Cap = 2 * MaxWork // above MaxWork, MaxWork holds
+	if k := f.Step(V(20, 20), V(-3, 3), 60); k.Work != s.Work || len(k.Path) != len(s.Path) {
+		t.Fatalf("a Cap above MaxWork changed the stroke: %d, want %d", k.Work, s.Work)
+	}
+	if n := len(s.Path); n > 60+MaxRollOn+2 {
+		t.Fatalf("%d path points", n)
+	}
+	if c := flat().Step(V(0, 0), V(4.44, 0), 30); c.Work > MaxWork/50 {
+		t.Fatalf("a full stroke on the flat cost %d", c.Work)
+	}
+}
+
+// Every square root a sweep takes is counted: a ball of radius 1 beside the
+// end of 160 short walls tests each end cap, the distance to it and the
+// swept circle (two roots), and above their faces both caps are hit (two
+// each). Those roots are most of what a test costs.
+func TestASweepCountsItsSquareRoots(t *testing.T) {
+	f := &Field{Radius: 1}
+	for i := 0; i < 160; i++ {
+		f.Walls = append(f.Walls, Wall{Seg: Segment{V(0, 0), V(0.2, 0)}})
+	}
+	Prepare(f)
+	offs := f.offsets()
+	for _, c := range []struct {
+		from, to Vec2
+		roots    int
+	}{
+		{V(1, 0.8), V(1.1, 0.8), 2},   // past the end, the cap swept
+		{V(0.5, 0.8), V(0.6, 0.8), 1}, // past the end, touching the cap
+		{V(0.1, 1.6), V(0.1, 0.8), 4}, // onto the face, both caps met
+		{V(0.1, 0.5), V(0.1, 0.4), 0}, // on the face already
+	} {
+		var s Shot
+		f.sweep(offs, c.from, c.to, c.to.Sub(c.from), 0, &s)
+		if want := 160 * (broadWork + wallTestWork + c.roots*rootWork); s.Work != want {
+			t.Errorf("%v→%v: work %d, want %d (%d roots a wall)", c.from, c.to, s.Work, want, c.roots)
+		}
+	}
+	p := &Field{Radius: 1, Posts: []Post{{Circle: Circle{C: V(0, 0), R: 0.5}}}}
+	for _, c := range []struct {
+		from, to Vec2
+		roots    int
+	}{
+		{V(1.6, 0), V(1.2, 0), 2},      // hit
+		{V(1.5, 0.1), V(1.55, 0.1), 1}, // its line through the post, going away
+		{V(1.55, 1.4), V(1.5, 1.45), 0},
+	} {
+		var s Shot
+		p.sweep(nil, c.from, c.to, c.to.Sub(c.from), 0, &s)
+		if want := broadWork + postTestWork + c.roots*rootWork; s.Work != want {
+			t.Errorf("post %v→%v: work %d, want %d", c.from, c.to, s.Work, want)
+		}
+	}
+}

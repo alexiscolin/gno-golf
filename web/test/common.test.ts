@@ -1,0 +1,208 @@
+// holeLink: the address every share and copied link is built from. A cup's
+// hole by its own page (its link card), anything else by its id.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import type { Snapshot } from "../lib/engine.ts";
+import { sight } from "../lib/scene/data.ts";
+import { strokeFor, costLine, dareLink, fundCmd, golfTerm, holeNumber, holesWord, mmss, nameHint, nameRefusal, nextCup, nextHole, pasted, pendingOf, saveBy, shareLinks, strokesWord, suggestName, holeLink, byStanding, standingVs, courseCount, countWord, minesHint, readMs } from "../components/common.ts";
+
+const snap = (s: Partial<Snapshot>) => s as Snapshot;
+const onPage = (search: string, f: () => void) => {
+  const had = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = { location: { search } };
+  try {
+    f();
+  } finally {
+    (globalThis as { window?: unknown }).window = had;
+  }
+};
+
+test("a cup's hole links to its own page, whatever its version", () => {
+  assert.equal(holeLink(snap({ id: "garden/3/v1", place: 3, world: "garden" }), ""), "h/garden-3/");
+  assert.equal(holeLink(snap({ id: "mountain/18/v4", place: 18, world: "mountain" }), ""), "h/mountain-18/");
+});
+
+test("the gnome rides along as a query", () => {
+  assert.equal(holeLink(snap({ id: "island/9/v1", place: 9, world: "island" }), "wizard"), "h/island-9/?gnome=wizard");
+});
+
+test("a sharer with a round on the chain dares the friend: their address rides along", () => {
+  const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  assert.equal(holeLink(snap({ id: "island/9/v1", place: 9, world: "island" }), "wizard", me), `h/island-9/?gnome=wizard&by=${me}`);
+  assert.equal(holeLink(snap({ id: "island/9/v1", place: 9, world: "island" }), "", "not-an-address"), "h/island-9/");
+  assert.equal(holeLink(snap({ id: "island/9/v1", place: 9, world: "island" }), "", me, "duel"), `h/island-9/?by=${me}&src=duel`, "where it was shared from, last");
+});
+
+test("a hole in no cup (community, archived) links by its id", () => {
+  const community = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5/my-hole/v1";
+  assert.equal(holeLink(snap({ id: community, place: 0 }), ""), `?hole=${encodeURIComponent(community)}`);
+  // archived: no place in a cup any more, even with a slot-shaped id
+  assert.equal(holeLink(snap({ id: "garden/3/v1" }), ""), "?hole=garden%2F3%2Fv1");
+});
+
+test("a page pointed at another chain keeps pointing there", () => {
+  onPage("?rpc=https%3A%2F%2Frpc.example&web=https%3A%2F%2Fweb.example&other=1", () => {
+    const l = holeLink(snap({ id: "town/5/v1", place: 5, world: "town" }), "");
+    assert.ok(l.startsWith("h/town-5/?"), l);
+    const q = new URLSearchParams(l.split("?")[1]);
+    assert.equal(q.get("rpc"), "https://rpc.example");
+    assert.equal(q.get("web"), "https://web.example");
+    assert.equal(q.get("other"), null, "only rpc and web are kept");
+  });
+});
+
+test("X puts the link after the text, the others put it first, for its card", () => {
+  const text = "Ace on Down the Tunnel. Somewhere on gno.land a realm just nodded.", url = "https://gnogolf.xyz/h/garden-3/";
+  const l = Object.fromEntries(shareLinks(text, url));
+  const x = new URL(l.X).searchParams;
+  assert.equal(x.get("text"), text);
+  assert.equal(x.get("url"), url);
+  for (const k of ["WhatsApp", "Bluesky"]) assert.ok(new URL(l[k]).searchParams.get("text")!.startsWith(url + "\n"), k);
+  assert.equal(new URL(l.Facebook).searchParams.get("u"), url);
+  assert.ok(pasted(text, url).startsWith(url));
+});
+
+test("a name to start from: the gnome's letters and 3 digits, as the registrar wants", () => {
+  assert.equal(suggestName("classic", 0), "classic100");
+  assert.equal(suggestName("Big-Viking", 0.999), "bigviking999");
+  assert.equal(suggestName("bob", 0.5), "golfer550"); // too short
+  assert.equal(suggestName("gnomey", 0), "golfer100"); // the registrar refuses gno…
+  assert.match(suggestName("the ultimate champion"), /^[a-z]{5,13}\d{3}$/);
+});
+
+test("a round kept for the tab is taken back only in the shape a save sends", () => {
+  const ok = { id: "garden/3/v1", name: "Down the Tunnel", shots: ["0.0000,9.2500", "-25.0000,9.5000,5"], strokes: 2, period: 5968, roundMode: "pro", official: true, walls: 12, pieces: 30, kind: "", pts: [10, 12], works: [900, 1200], fixed: 15_728_000 };
+  assert.deepEqual(pendingOf(JSON.parse(JSON.stringify(ok))), ok);
+  assert.equal(pendingOf(null), null);
+  assert.equal(pendingOf({ ...ok, id: "../../evil" }), null);
+  assert.equal(pendingOf({ ...ok, shots: ["0,9;Reset"] }), null); // no shot list smuggled in one shot
+  assert.equal(pendingOf({ ...ok, shots: [] }), null);
+  assert.equal(pendingOf({ ...ok, shots: Array(61).fill("0,1") }), null);
+  assert.equal(pendingOf({ ...ok, period: 5.9 }), null);
+  assert.equal(pendingOf({ ...ok, strokes: "2" }), null);
+  assert.equal(pendingOf({ ...ok, roundMode: "god" }), null);
+  assert.equal(pendingOf({ ...ok, pts: [1, "x"] }), null);
+  assert.equal(pendingOf({ ...ok, name: "x".repeat(200) })!.name!.length, 60);
+});
+
+test("strokes are said in the singular for one", () => {
+  assert.equal(strokesWord(1), "1 stroke");
+  assert.equal(strokesWord(3), "3 strokes");
+});
+
+test("a name refused is said in a word: the rule it breaks first, else the chain's answer", () => {
+  assert.equal(nameRefusal("", "That name is taken."), null);
+  assert.equal(nameRefusal("Golfer123"), "chars");
+  assert.equal(nameRefusal("gnomey123"), "reserved");
+  assert.equal(nameRefusal("bob123"), "length");
+  assert.equal(nameRefusal("golfer12", "That name is taken."), "digits"); // (a shape refused is never asked of the chain)
+  assert.equal(nameRefusal("golfer123"), null); // unread
+  assert.equal(nameRefusal("golfer123", ""), null);
+  assert.equal(nameRefusal("golfer123", "That name is taken."), "taken");
+  assert.equal(nameRefusal("golfer123", "Too close to a name already taken."), "lookalike");
+  assert.equal(nameRefusal("golfer123", "This chain has no name registrar."), "no_registrar");
+  assert.equal(nameRefusal("golfer123", "invalid nym format"), "invalid");
+});
+
+test("a name is checked as the registrar has it: 5 to 13 letters, 3 digits, no reserved start", () => {
+  assert.equal(nameHint("golfer123"), "");
+  assert.equal(nameHint(""), "5 to 13 letters, then 3 digits");
+  assert.equal(nameHint("Golfer123"), "lowercase letters, then digits");
+  assert.match(nameHint("gnomey123"), /cannot start/);
+  assert.match(nameHint("atoneme123"), /cannot start/);
+  assert.equal(nameHint("bob123"), "5 to 13 letters");
+  assert.equal(nameHint("golfer12"), "and 3 digits to end");
+  assert.equal(holesWord(1), "1 hole");
+  assert.equal(holesWord(6), "6 holes");
+});
+
+test("a save's deadline: the end of the period after its own, less the margin, said as a clock", () => {
+  assert.equal(saveBy(10), 12 * 300e3 - 15e3);
+  assert.equal(mmss(0), "0:00");
+  assert.equal(mmss(61001), "1:02"); // rounded up: never 0:00 while a second is left
+  assert.equal(mmss(-5), "0:00");
+});
+
+test("a cost line: the total, a first save's deposit counted in", () => {
+  assert.equal(costLine(200e6, 0.001, true, 360000), "About 0.20 GNOT");
+  assert.equal(costLine(200e6, 0.001, false, 360000, true), "About 0.56 test GNOT (first save on this hole)");
+});
+
+test("the funding command: only a checked address, chain id and host go in the shell", () => {
+  const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  assert.equal(fundCmd(me, "dev", "http://127.0.0.1:26657"), `gnokey maketx send -send 50000000ugnot -to ${me} -gas-fee 1000000ugnot -gas-wanted 2000000 -chainid dev -remote 127.0.0.1:26657 -broadcast test1`);
+  assert.equal(fundCmd("g1; rm -rf ~", "dev", "http://127.0.0.1:26657"), "");
+  assert.equal(fundCmd(me, "dev; ls", "http://127.0.0.1:26657"), "");
+  assert.equal(fundCmd(me, "dev", "not a url"), "");
+});
+
+test("hole numbers, the next hole, the next cup, golf's words", () => {
+  const holes = [{ id: "garden/1/v1" }, { id: "garden/2/v1" }, { id: "garden/3/v1" }];
+  assert.equal(holeNumber(holes, "garden/2/v1"), "2");
+  assert.equal(holeNumber(holes, "someone/hole/v1"), "–");
+  assert.equal(nextHole({ holes, id: "garden/1/v1" }, { "garden/2/v1": 3 })?.id, "garden/3/v1");
+  assert.equal(nextHole({ holes, id: "garden/3/v1" }, { "garden/2/v1": 3 })?.id, "garden/1/v1");
+  // a duel's: only where their ghost is, a played one when none is left
+  assert.equal(nextHole({ holes, id: "garden/1/v1" }, {}, (h) => h.id !== "garden/2/v1")?.id, "garden/3/v1");
+  assert.equal(nextHole({ holes, id: "garden/1/v1" }, { "garden/2/v1": 3 }, (h) => h.id === "garden/2/v1")?.id, "garden/2/v1");
+  // their only ghost, the hole just played: none next (not the same one again)
+  assert.equal(nextHole({ holes, id: "garden/2/v1" }, { "garden/2/v1": 3 }, (h) => h.id === "garden/2/v1"), undefined);
+  assert.equal(nextCup("garden", { island: 0, town: 18 }), "town");
+  assert.equal(nextCup("mountain", { garden: 18 }), "");
+  assert.equal(nextCup("mountain", { garden: 18, mines: 18 }), "mines");
+  assert.equal(nextCup("mines", { garden: 18, mines: 18 }), "");
+  assert.equal(golfTerm(1, 3), "Hole in one!");
+  assert.equal(golfTerm(2, 4), "Eagle!");
+  assert.equal(golfTerm(3, 3), "Par");
+  assert.equal(golfTerm(9, 3), "6 over par");
+});
+
+test("a dare to the whole course carries only the dare", () => {
+  const me = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  onPage("", () => assert.equal(dareLink(me), `?by=${me}`));
+  onPage("", () => assert.equal(dareLink(me, "board"), `?by=${me}&src=board`));
+  onPage("", () => assert.equal(dareLink("not an address"), ""));
+});
+
+test("what the next stroke is for, called out before it: an ace, eagle, birdie, par, bogey, then how far over", () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map((n) => strokeFor(n, 4)), ["For an ace!", "For eagle!", "For birdie!", "For par!", "For bogey", "1 over par", "2 over par"]);
+  assert.equal(strokeFor(1, 2), "For an ace!");
+  assert.equal(strokeFor(2, 2), "For par!");
+});
+
+test("byStanding orders the course as the realm does: most holes, then the best score against par", () => {
+  const par5 = { player: "a", holes: 1, strokes: 5, par: 5 }, par2 = { player: "b", holes: 1, strokes: 2, par: 2 };
+  assert.equal(standingVs(par5), 0);
+  assert.equal(byStanding(par5, par2), 0, "a hole at par counts the same whatever its par");
+  const two = { player: "c", holes: 2, strokes: 14, par: 6 }, under = { player: "d", holes: 1, strokes: 1, par: 3 };
+  assert.deepEqual([under, par5, two].sort(byStanding).map((r) => r.player), ["c", "d", "a"], "more holes first, then under par first");
+  // a hole's rows (no holes, no par): fewest strokes
+  assert.deepEqual([{ player: "x", strokes: 4 }, { player: "y", strokes: 2 }].sort(byStanding).map((r) => r.player), ["y", "x"]);
+});
+
+test("the course in numbers, from the chain: the mines count once published, not before", () => {
+  const four = { garden: 18, island: 18, town: 18, mountain: 18 };
+  assert.deepEqual(courseCount(four), { cups: 4, holes: 72 });
+  assert.deepEqual(courseCount({ ...four, mines: 18 }), { cups: 5, holes: 90 });
+  assert.deepEqual(courseCount({}), { cups: 0, holes: 0 });
+  assert.deepEqual(courseCount({ ...four, extras: 6, community: 3 }), { cups: 4, holes: 72 }, "holes in no cup count in neither");
+  assert.equal(countWord(4), "Four");
+  assert.equal(countWord(5), "Five");
+  assert.equal(countWord(12), "12");
+});
+
+test("minesHint: a mines hole's signature by its slot or id, none off the mines", () => {
+  assert.equal(minesHint("mines/7"), "The lava rises with your strokes: low, mid, high.");
+  assert.equal(minesHint("mines/7/v2"), minesHint("mines/7"));
+  for (let n = 1; n <= 18; n++) assert.ok(minesHint(`mines/${n}`).length > 10, `mines/${n}`);
+  assert.equal(minesHint("mines/19"), "");
+  assert.equal(minesHint("garden/7"), "");
+  assert.equal(minesHint(null), "");
+  assert.equal(minesHint("xmines/7"), "", "a mines slot only from its start (minesOrder's)");
+  assert.ok(minesHint("mines/2").includes(`${sight(false, true)} units`), "the dark gallery's reach: the aim dots' own");
+});
+
+test("readMs: a line stays up long enough to read, longer as it grows", () => {
+  assert.equal(readMs("Short."), 6000);
+  assert.ok(readMs("x".repeat(95)) > readMs("x".repeat(60)));
+});

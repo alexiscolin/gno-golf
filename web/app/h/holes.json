@@ -1,0 +1,362 @@
+{
+ "garden/1": {
+  "name": "The Shelf",
+  "par": 3
+ },
+ "garden/2": {
+  "name": "Bumper Alley",
+  "par": 3
+ },
+ "garden/3": {
+  "name": "Down the Tunnel",
+  "par": 2
+ },
+ "garden/4": {
+  "name": "The Mill",
+  "par": 2
+ },
+ "garden/5": {
+  "name": "The Gate",
+  "par": 3
+ },
+ "garden/6": {
+  "name": "Icehouse",
+  "par": 3
+ },
+ "garden/7": {
+  "name": "The Pond",
+  "par": 4
+ },
+ "garden/8": {
+  "name": "Pinball",
+  "par": 3
+ },
+ "garden/9": {
+  "name": "The Climb",
+  "par": 3
+ },
+ "garden/10": {
+  "name": "The Vegetable Patch",
+  "par": 3
+ },
+ "garden/11": {
+  "name": "The Moon Bridge",
+  "par": 4
+ },
+ "garden/12": {
+  "name": "Round the Bed",
+  "par": 3
+ },
+ "garden/13": {
+  "name": "The Long Meander",
+  "par": 4
+ },
+ "garden/14": {
+  "name": "The Moat",
+  "par": 2
+ },
+ "garden/15": {
+  "name": "The Nursery",
+  "par": 3
+ },
+ "garden/16": {
+  "name": "The Long Green",
+  "par": 3
+ },
+ "garden/17": {
+  "name": "The Maze",
+  "par": 5
+ },
+ "garden/18": {
+  "name": "The Seesaw",
+  "par": 3
+ },
+ "island/1": {
+  "name": "Sandy Start",
+  "par": 2
+ },
+ "island/2": {
+  "name": "Snail Shell",
+  "par": 4
+ },
+ "island/3": {
+  "name": "Crab Beach",
+  "par": 2
+ },
+ "island/4": {
+  "name": "Beached Boat",
+  "par": 3
+ },
+ "island/5": {
+  "name": "Tide Line",
+  "par": 3
+ },
+ "island/6": {
+  "name": "Sand Spit",
+  "par": 4
+ },
+ "island/7": {
+  "name": "The Sandcastle",
+  "par": 3
+ },
+ "island/8": {
+  "name": "Rock Pools",
+  "par": 3
+ },
+ "island/9": {
+  "name": "The Pier",
+  "par": 4
+ },
+ "island/10": {
+  "name": "Broken Boardwalk",
+  "par": 3
+ },
+ "island/11": {
+  "name": "Rope Bridge",
+  "par": 2
+ },
+ "island/12": {
+  "name": "Outcrops",
+  "par": 3
+ },
+ "island/13": {
+  "name": "Lagoon Ring",
+  "par": 3
+ },
+ "island/14": {
+  "name": "Treasure Isle",
+  "par": 3
+ },
+ "island/15": {
+  "name": "The Blowhole",
+  "par": 3
+ },
+ "island/16": {
+  "name": "The Volcano",
+  "par": 3
+ },
+ "island/17": {
+  "name": "Coral Atoll",
+  "par": 2
+ },
+ "island/18": {
+  "name": "Banked Bend",
+  "par": 3
+ },
+ "mines/1": {
+  "name": "The Pithead",
+  "par": 9
+ },
+ "mines/2": {
+  "name": "Glowworm Gallery",
+  "par": 9
+ },
+ "mines/3": {
+  "name": "The Rail Yard",
+  "par": 8
+ },
+ "mines/4": {
+  "name": "The Chasm",
+  "par": 9
+ },
+ "mines/5": {
+  "name": "The Geode",
+  "par": 9
+ },
+ "mines/6": {
+  "name": "The Stamp Mill",
+  "par": 10
+ },
+ "mines/7": {
+  "name": "The Lava Tide",
+  "par": 8
+ },
+ "mines/8": {
+  "name": "The Cage",
+  "par": 8
+ },
+ "mines/9": {
+  "name": "The Collapsing Gallery",
+  "par": 10
+ },
+ "mines/10": {
+  "name": "The Geysers",
+  "par": 8
+ },
+ "mines/11": {
+  "name": "The Corkscrew",
+  "par": 8
+ },
+ "mines/12": {
+  "name": "The Steam Vents",
+  "par": 10
+ },
+ "mines/13": {
+  "name": "The Lava Fall",
+  "par": 8
+ },
+ "mines/14": {
+  "name": "The Mine Cart Run",
+  "par": 9
+ },
+ "mines/15": {
+  "name": "The Stalactite Hall",
+  "par": 8
+ },
+ "mines/16": {
+  "name": "The Strongroom",
+  "par": 9
+ },
+ "mines/17": {
+  "name": "The Great Shaft",
+  "par": 9
+ },
+ "mines/18": {
+  "name": "The Mother Lode",
+  "par": 9
+ },
+ "mountain/1": {
+  "name": "Ski School",
+  "par": 2
+ },
+ "mountain/2": {
+  "name": "Pine Slalom",
+  "par": 2
+ },
+ "mountain/3": {
+  "name": "Switchbacks",
+  "par": 4
+ },
+ "mountain/4": {
+  "name": "Snowdrifts",
+  "par": 3
+ },
+ "mountain/5": {
+  "name": "Crevasse Jump",
+  "par": 2
+ },
+ "mountain/6": {
+  "name": "Frozen Lake",
+  "par": 3
+ },
+ "mountain/7": {
+  "name": "Ice Cave",
+  "par": 2
+ },
+ "mountain/8": {
+  "name": "Ski Lift",
+  "par": 3
+ },
+ "mountain/9": {
+  "name": "Avalanche",
+  "par": 4
+ },
+ "mountain/10": {
+  "name": "Snow Cannon Ridge",
+  "par": 3
+ },
+ "mountain/11": {
+  "name": "The Bobsleigh",
+  "par": 3
+ },
+ "mountain/12": {
+  "name": "The Col",
+  "par": 3
+ },
+ "mountain/13": {
+  "name": "Ice Rink",
+  "par": 3
+ },
+ "mountain/14": {
+  "name": "Terraces",
+  "par": 2
+ },
+ "mountain/15": {
+  "name": "Serac Fall",
+  "par": 3
+ },
+ "mountain/16": {
+  "name": "Downhill Run",
+  "par": 3
+ },
+ "mountain/17": {
+  "name": "Glacier Split",
+  "par": 3
+ },
+ "mountain/18": {
+  "name": "The Summit",
+  "par": 4
+ },
+ "town/1": {
+  "name": "The Boulevard",
+  "par": 2
+ },
+ "town/2": {
+  "name": "Market Square",
+  "par": 3
+ },
+ "town/3": {
+  "name": "Fountain Square",
+  "par": 3
+ },
+ "town/4": {
+  "name": "Tram Crossing",
+  "par": 3
+ },
+ "town/5": {
+  "name": "Mushroom House",
+  "par": 2
+ },
+ "town/6": {
+  "name": "Skate Park",
+  "par": 3
+ },
+ "town/7": {
+  "name": "Canal Bridge",
+  "par": 3
+ },
+ "town/8": {
+  "name": "Clock Tower",
+  "par": 2
+ },
+ "town/9": {
+  "name": "Back Alleys",
+  "par": 4
+ },
+ "town/10": {
+  "name": "Swing Bridge",
+  "par": 3
+ },
+ "town/11": {
+  "name": "Gnome Courtyard",
+  "par": 2
+ },
+ "town/12": {
+  "name": "The Crescent",
+  "par": 3
+ },
+ "town/13": {
+  "name": "Roundabout",
+  "par": 2
+ },
+ "town/14": {
+  "name": "Side Door",
+  "par": 3
+ },
+ "town/15": {
+  "name": "Rooftops",
+  "par": 4
+ },
+ "town/16": {
+  "name": "Square Garden",
+  "par": 3
+ },
+ "town/17": {
+  "name": "T-Junction",
+  "par": 3
+ },
+ "town/18": {
+  "name": "Grand Plaza",
+  "par": 4
+ }
+}

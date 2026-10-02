@@ -1,0 +1,38 @@
+// Package island1 is a gentle bend along the beach, one palm leaning over it.
+package island1
+
+import (
+	"gno.land/p/gnogolf/course"
+	"gno.land/p/gnogolf/course/author"
+	"gno.land/p/gnogolf/physics"
+	"gno.land/p/gnogolf/physics/build"
+)
+
+var lane = build.Lane(6, 4, physics.V(5, 6), physics.V(19, 9), physics.V(33, 7))
+
+var me = author.Fit(&course.Simple{
+	W: 38, H: 15,
+	World:     "island",
+	Order:     1,
+	Title:     "Sandy Start",
+	Strokes:   2, // par
+	Tee:       physics.V(5, 6),
+	Pin:       physics.V(33, 7),
+	Substeps:  22,
+	CupRadius: 1.2,
+
+	Course: &physics.Field{
+		Walls: build.Walls(
+			build.Outline(lane...),
+		),
+		Posts: []physics.Post{
+			{Circle: physics.Circle{C: physics.V(19, 7.2), R: 0.6}, Bounce: 0.8, Skin: "palm"},
+		},
+		Zones: []physics.Zone{
+			{Kind: physics.Surface, Min: physics.V(24, 6), Max: physics.V(29, 10.5), Scale: 0.6, Round: true, Skin: "wetsand"},
+		},
+		Friction: 0.87,
+		Radius:   0.5,
+		Bounce:   0.85,
+	},
+}, 1.5)

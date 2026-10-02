@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64 64" width="256" height="256">
+  <defs>
+    <g id="gnome">
+      <rect id="face" x="40" y="100" width="120" height="44" rx="6"/>
+      <path id="beard" d="M 40 116 Q 34 190 100 214 Q 166 190 160 116 Q 140 146 100 142 Q 60 146 40 116 Z"/>
+      <path id="hat" d="M 28 95 Q 40 91 48.7 76 L 96.5 7 Q 100 -1.5 103.5 7 L 151.3 76 Q 160 91 172 95 Z"/>
+      <rect id="brim" x="26" y="90" width="148" height="20" rx="10"/>
+    </g>
+    <clipPath id="clip-hat"><use href="#hat" xlink:href="#hat"/></clipPath>
+    <clipPath id="clip-brim"><use href="#brim" xlink:href="#brim"/></clipPath>
+    <clipPath id="clip-face"><use href="#face" xlink:href="#face"/></clipPath>
+    <clipPath id="clip-beard"><use href="#beard" xlink:href="#beard"/></clipPath>
+  </defs>
+  <polygon points="32.0,6.0 37.4,1.5 40.9,7.6 47.5,5.2 48.7,12.1 55.7,12.1 54.5,19.0 61.1,21.4 57.6,27.5 63.0,32.0 57.6,36.5 61.1,42.6 54.5,45.0 55.7,51.9 48.7,51.9 47.5,58.8 40.9,56.4 37.4,62.5 32.0,58.0 26.6,62.5 23.1,56.4 16.5,58.8 15.3,51.9 8.3,51.9 9.5,45.0 2.9,42.6 6.4,36.5 1.0,32.0 6.4,27.5 2.9,21.4 9.5,19.0 8.3,12.1 15.3,12.1 16.5,5.2 23.1,7.6 26.6,1.5" fill="#f5b83d"/>
+  <circle cx="32" cy="32" r="23" fill="#ffd66b"/>
+  <g transform="translate(6 4) scale(0.26)">
+    <use href="#gnome" xlink:href="#gnome" y="10" fill="#144134" stroke="#144134" stroke-width="16" stroke-linejoin="round"/>
+    <use href="#gnome" xlink:href="#gnome" fill="#144134" stroke="#144134" stroke-width="16" stroke-linejoin="round"/>
+    <use href="#face" xlink:href="#face" fill="#fdf6e9"/>
+    <path d="M 20 90 H 180 V 119 C 150 119 120 117 100 116 C 70 115 45 113 20 113 Z" clip-path="url(#clip-face)" fill="#f2e2cc"/>
+    <use href="#beard" xlink:href="#beard" fill="#fff"/>
+    <path d="M 20 100 H 180 V 230 H 100 Q 136 192 129 162 Q 124 150 106 151 C 82 153 60 150 40 136 L 20 128 Z" clip-path="url(#clip-beard)" fill="#e8eeec"/>
+    <use href="#hat" xlink:href="#hat" fill="#e0524b"/>
+    <path d="M 100 -8 C 118.4 35.5 125.3 68.1 127 100 L 127 120 L 200 120 L 200 -8 Z" clip-path="url(#clip-hat)" fill="#c9443d"/>
+    <path d="M 101 -5 L 200 -5 L 200 120 L 172 120 L 163 90 Q 149.2 88 146 80 C 135.2 53.3 120.8 28.7 103 6 Z" clip-path="url(#clip-hat)" fill="#b83a33"/>
+    <use href="#brim" xlink:href="#brim" fill="#c9443d"/>
+    <path d="M 126 85 L 126 90 A 16 10 0 0 0 126 110 L 126 115 L 200 115 L 200 85 Z" clip-path="url(#clip-brim)" fill="#b83a33"/>
+    <path d="M 86 30 L 64 62" stroke="#fdf6e9" stroke-width="10" stroke-linecap="round" opacity=".85"/>
+    <circle cx="80" cy="120" r="9" fill="#144134"/>
+    <circle cx="120" cy="120" r="9" fill="#144134"/>
+    <circle cx="100" cy="134" r="11" fill="#f2b8b0"/>
+  </g>
+</svg>

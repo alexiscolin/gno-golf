@@ -1,0 +1,31 @@
+.DS_Store
+node_modules/
+.next/
+out/
+# working screenshots stay local; the promo's and og's scripts are kept
+media/*
+!media/tsconfig.json
+!media/promo/
+!media/lib/
+!media/og/
+# promo renders and the music file are rebuilt by media/promo/render.mjs
+media/promo/*.mp4
+media/promo/music/
+media/promo/stills-v4/
+media/promo/stills-check/
+# gnohome/ (a local package cache and gnokey keybase: private keys) and editor swap files: never in the repo
+gnohome/
+*.swp
+
+# scripts/wasm.sh: the Go sources it makes of the .gno files (golf.wasm is kept)
+scripts/wasm/p/
+scripts/wasm/gnovm/
+scripts/wasm/sources.go
+scripts/wasm/r/gnogolf/golf/golf.go
+
+# local tool settings
+.netlify/
+media/promo/*-cover.jpg
+
+# internal notes, decisions by hand and the bot check cron: their own repo (gno-golf-private)
+private/

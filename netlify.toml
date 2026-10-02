@@ -1,0 +1,96 @@
+# Netlify: a static export (next.config.mjs has output: "export"), no server.
+# Set these in the site's environment before deploying:
+#   NEXT_PUBLIC_SITE_URL  the public address, e.g. https://gnogolf.xyz
+#                         (link previews, share links)
+#   NEXT_PUBLIC_REALM     the golf realm, e.g.
+#                         gno.land/r/nym-alexiscolin000/gnogolf/golf on onyx
+#                         (a production deploy fails without it, or without
+#                         RPC, WEB and NETWORK: next.config.mjs)
+#   NEXT_PUBLIC_RPC       the gno.land RPC the game plays on (a testnet node),
+#                         e.g. https://rpc.onyx.testnets.gno.land:443 (onyx-1)
+#   NEXT_PUBLIC_WEB       its gnoweb, for "read its code" links,
+#                         e.g. https://onyx.testnets.gno.land
+#   NEXT_PUBLIC_NETWORK   testnet or mainnet: the faucet link, the title's tag
+#   NEXT_PUBLIC_OTHER_URL the other deployment, linked from the About sheet
+#   NEXT_PUBLIC_NAMEREG   optional: the name registrar (found on the chain otherwise)
+#   NEXT_PUBLIC_COMMUNITY optional: 1 lists the community's holes with the cups
+#                         (off until the builder is out)
+#   NEXT_PUBLIC_CLIPS     optional: 1 offers a clip of the holing shot (ADR-003)
+#   NEXT_PUBLIC_POSTHOG_KEY optional: the PostHog project's public key (phc_…),
+#                         anonymous audience measurement (docs/analytics.md);
+#                         unset, nothing loads or is sent
+#   NEXT_PUBLIC_POSTHOG_SURVEY optional: the PostHog API survey the testnet's
+#                         feedback sheet answers (its questions in the sheet's order);
+#                         unset, the answers go as a feedback event
+[build]
+  base = "web"
+  command = "npm ci && npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# The game's own address for a cup's hole (?cup=garden&hole=4) served as that
+# hole's page (app/h: its title, description and link card), the address and
+# its query kept: a copied link previews the hole, not the site. A cup alone
+# (?cup=garden), its cup's page. A hole past a cup's holes has no page: 404.
+[[redirects]]
+  from = "/"
+  to = "/h/:cup-:hole/"
+  status = 200
+  force = true
+  query = { cup = ":cup", hole = ":hole" }
+
+[[redirects]]
+  from = "/"
+  to = "/h/:cup/"
+  status = 200
+  force = true
+  query = { cup = ":cup" }
+
+# PostHog EU behind the site's own path (lib/analytics.ts api_host), its
+# extensions under /e/static: a blocker sees no third party
+[[redirects]]
+  from = "/e/static/*"
+  to = "https://eu-assets.i.posthog.com/static/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/e/*"
+  to = "https://eu.i.posthog.com/:splat"
+  status = 200
+  force = true
+
+# the bot check's list (docs/leaderboards.md), replaced every 12 hours in its
+# own repo: the boards read it here, no deploy needed (web/public/flags.json,
+# empty, is what a local run reads)
+[[redirects]]
+  from = "/flags.json"
+  to = "https://raw.githubusercontent.com/alexiscolin/gnogolf-flags/main/flags.json"
+  status = 200
+  force = true
+
+# long cache for the hashed build files, none for the page itself
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    X-Frame-Options = "DENY"
+    Strict-Transport-Security = "max-age=31536000"
+    # The page talks to gno.land's nodes (a public build ignores ?rpc=; a node
+    # elsewhere, set in NEXT_PUBLIC_RPC, goes in connect-src too); PostHog
+    # is reached through /e, the site itself. Next's static export inlines
+    # its bootstrap scripts, hence 'unsafe-inline'; the rest is shut: no
+    # plugins, no framing, no <base> or form elsewhere.
+    # 'wasm-unsafe-eval' compiles golf.wasm, the aim preview's physics
+    # (web/lib/sim), in its worker: WebAssembly only, not eval.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.gno.land; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"

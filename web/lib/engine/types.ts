@@ -1,0 +1,211 @@
+// The engine's shapes: the game's state (g), the live state its parts read
+// (E), and what the interface is told (Snapshot). It imports types only, so
+// engine.ts and engine/*.ts import it without importing each other.
+import type * as THREE from "three";
+import type { Chain } from "../chain";
+import type { Extras, Forecast, HoleRow, Mode, Vec2, Zone, ZoneKind } from "../types";
+import type { Aim, Course, Gnome, Height, Hole, LitScene } from "../scene/data";
+import type { Rig, View } from "../scene/camera";
+import type { WeatherNow } from "../scene/weather";
+import type { Band } from "../scene/fx";
+import type { Causes } from "../scene/cause";
+
+/** The timed pieces' clock at rest and while aiming, in substeps a second (the title's splash runs on it too). */
+export const TICKS_PER_S = 3.5;
+
+/** The camera modes: the rig on the gnome, the whole hole, or behind him. */
+export type CamMode = "classic" | "far" | "third";
+/** The graphics setting, and the tier it gives on this device. */
+export type GfxMode = "auto" | "high" | "low";
+export type Tier = "high" | "low";
+/** What went wrong: the hole's load, its drawing, a shot, the round's stroke limit. */
+export type ErrorKind = "load" | "draw" | "shot" | "limit";
+/** A word on why the ball speeds up or drifts, and when it was said. */
+interface CauseNote {
+  label: string;
+  at: number;
+}
+
+/** The game's state: the hole, the round, the camera. */
+export interface GameState {
+  list: HoleRow[];
+  /** every hole the chain lists, archived ones too */
+  all?: HoleRow[];
+  /** everyone else's holes, playable outside the cups */
+  community?: HoleRow[];
+  world?: string;
+  /** the page's link named a hole that exists */
+  linked?: boolean;
+  id: string | null;
+  s: Hole | null;
+  course: Course | null;
+  ball: { x: number; y: number };
+  strokes: number;
+  flying: boolean;
+  facing: number;
+  power: number;
+  aiming: boolean;
+  /** third person's aim turning on past its zone (engine.ts steer): -1 left, 1 right, 0 not */
+  spin?: number;
+  holed: boolean;
+  /** no more shots this round (holed, even before the banner) */
+  done?: boolean;
+  error: string | null;
+  errorKind?: ErrorKind;
+  /** the hole the last load failed on (the banner's Try again loads it) */
+  failed?: string | null;
+  view: "overview" | "ball";
+  cam: CamMode;
+  rig: Rig | null;
+  over: Rig | null;
+  far?: Rig & { orbit: number; tilt: number };
+  started: boolean;
+  /** an opaque screen is over the course */
+  covered?: boolean;
+  round?: number;
+  roundMode?: Mode | null;
+  /** the round's weather period, and the chain's forecast for it */
+  period?: number | null;
+  forecast?: Forecast | null;
+  /** the weather drawn now */
+  weather?: WeatherNow | null;
+  flash?: number;
+  cause?: CauseNote | null;
+  /** the round's decisions, each stroke's path length and its physics' work (Shot.Work), the ball exactly as the chain left it */
+  shots: string[];
+  pts: number[];
+  works: number[];
+  rest: Vec2 | null;
+  /** the last shot's heading (radians), and the clock tick it was let go at */
+  lastAim?: number | null;
+  tick0?: number;
+  inTube?: boolean;
+  /** the camera's pose during a ride (a set piece carrying the ball), or none */
+  ride?: { pos: THREE.Vector3; look: THREE.Vector3; fov?: number; cut?: boolean } | null;
+  /** ?camlog's ballLift: which step of which flags */
+  replaying?: { flags: string; at: number };
+  /** ?camlog's buildMs(): [build, compile] */
+  buildMs?: [number, number];
+}
+
+/** The pull as it stands: its heading (radians), its power, and the heading rounded as sent. */
+export interface Shot {
+  angle: number;
+  power: number;
+  deg?: number;
+}
+
+/** The gnome's small moods: a hop of joy, a head shake. */
+export interface Mood {
+  joy(now: number): void;
+  shake(now: number): void;
+  hop(now: number): number;
+  tick(now: number): void;
+}
+
+/** What the camera, the aim and the replay read of the game, as it changes. */
+export interface Live {
+  readonly g: GameState;
+  readonly camera: THREE.PerspectiveCamera;
+  readonly scene: LitScene;
+  /** what the renderer holds (its info): the perf probe's */
+  readonly info?: () => THREE.WebGLInfo;
+  readonly chain: Chain;
+  readonly aim: Aim;
+  readonly band: Band;
+  readonly causes: Causes;
+  readonly mood: Mood;
+  readonly publish: () => boolean;
+  readonly screen: () => View;
+  readonly ground: Height;
+  readonly lift: (p: Vec2) => THREE.Vector3;
+  readonly log: boolean;
+  /** no sound, no buzz (a replay nobody watches live: the shot clip's) */
+  readonly quiet?: boolean;
+  readonly tickNow: () => number | null;
+  /** cut every animation */
+  readonly stop: () => number;
+  /** the timed pieces' clock set to t */
+  readonly showAt: (t: number) => void;
+  /** the zones that act on the ball now: the hole's, the forecast's, the stroke's */
+  readonly zones: () => Zone[];
+  /** the kind of jump a step makes (the replay's) */
+  landing: (p: Vec2, q: Vec2, start?: Vec2) => ZoneKind | null;
+  /** a duel's ghost while it plays (engine/rival.ts): the camera frames it with the gnome */
+  rivalAt?: () => THREE.Vector3 | null;
+  readonly ball: Gnome;
+  readonly dragging: boolean;
+  readonly shot: Shot;
+  readonly clock: number;
+  readonly cut: number;
+  readonly mode: Mode;
+  readonly strokeZones: readonly Zone[];
+  /** the stroke's own pieces on a timed hole (and the next strokes', a world's ahead), as the chain gave them */
+  readonly strokeExtras?: Extras | null;
+  /** the stroke's own pieces on a timed hole (buildExtras), or null (the game's own: a replay's copy has none) */
+  readonly extras?: THREE.Object3D | null;
+}
+
+/** The snapshot's fast-moving fields (the power bar, a push's cause, the
+ *  storm's flashes): told at most 10 times a second in a replay, and read by
+ *  the page from a store of their own. */
+export const HOT = ["power", "cause", "flash"] as const satisfies readonly (keyof Snapshot)[];
+
+/** What the interface is told, each time it changes. */
+export interface Snapshot {
+  holes: readonly HoleRow[];
+  allHoles: readonly HoleRow[];
+  world: string | undefined;
+  linked: boolean;
+  ready: boolean;
+  place: number;
+  archived: boolean;
+  look: string;
+  worlds: Readonly<Record<string, number>>;
+  id: string | null;
+  name: string;
+  source: string;
+  official: boolean;
+  community: readonly HoleRow[];
+  strokes: number;
+  timed: boolean;
+  time: string;
+  walls: number;
+  pieces: number;
+  kind: string;
+  pts: readonly number[];
+  works: readonly number[];
+  /** what a commit on this hole, in this weather, spends before its shots (Weather() "gas"; 0: not said) */
+  fixed: number;
+  /** each shot's share of setting the hole's pulses up (golf.gno newWork's setup: HoleState's, else of those seen so far) */
+  setup: number;
+  shots: readonly string[];
+  flying: boolean;
+  aiming: boolean;
+  power: number;
+  /** the aim turning on (third person): -1 left, 1 right, 0 not */
+  spin: number;
+  holed: boolean;
+  error: string | null;
+  weather: WeatherNow | null;
+  flash: number;
+  mode: Mode;
+  cam: CamMode;
+  roundMode: Mode | null;
+  period: number | null;
+  cause: CauseNote | null;
+  errorKind: ErrorKind | null;
+  failed: string | null;
+  view: "overview" | "ball";
+  gfx: GfxMode;
+  tier: Tier;
+  rival: number | null;
+  rivalIn: boolean;
+  rivalTurn: boolean;
+  /** the player looking at the ghost's ball (the score card) */
+  rivalPeek: boolean;
+  done: boolean;
+}
+
+/** A hole a link names: its id, or a cup and a place in it. */
+export type Link = { id: string } | { cup: string; n?: number };

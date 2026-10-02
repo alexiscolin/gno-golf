@@ -1,0 +1,118 @@
+// What this browser remembers of the player: the camera picked this session,
+// the gnome, and the gnomes earned.
+import { GNOMES } from "./scene/gnome";
+import { reducedMotion } from "./device";
+import { lowGfx } from "./engine/pace";
+import type { CamMode } from "./engine/types";
+
+// the camera modes, in the order the button goes through them. A page always
+// opens in Classic; a mode picked since is kept for this tab's session only.
+export const CAM_ORDER: readonly CamMode[] = ["classic", "third", "far"];
+const CAM_KEY = "gnogolf.cam.session";
+export function savedCam(): CamMode {
+  try {
+    localStorage.removeItem("gnogolf.cam"); // the old, lasting choice: forgotten
+    const c = sessionStorage.getItem(CAM_KEY);
+    return CAM_ORDER.find((m) => m === c) ?? "classic";
+  } catch {
+    return "classic";
+  }
+}
+export function saveCam(m: CamMode) {
+  try { sessionStorage.setItem(CAM_KEY, m); } catch {}
+}
+
+const GNOME_KEY = "gnogolf.gnome";
+/** Whether this player ever picked a gnome (a first visit has not). */
+export function hadGnome() {
+  try {
+    return !!localStorage.getItem(GNOME_KEY);
+  } catch {
+    return false;
+  }
+}
+
+/** The gnome this player picked, if it is still theirs to play; the first one otherwise. */
+export function savedGnome() {
+  try {
+    const id = localStorage.getItem(GNOME_KEY);
+    const gn = GNOMES.find((x) => x.id === id);
+    if (!gn || (gn.unlock && !earned().includes(gn.id))) return GNOMES[0].id;
+    return gn.id;
+  } catch {
+    return GNOMES[0].id;
+  }
+}
+export function saveGnome(id: string) {
+  try { localStorage.setItem(GNOME_KEY, id); } catch {}
+}
+
+// A list of ids this browser keeps for good (the gnomes earned, the badges,
+// the weathers holed out in): read back as strings only, a hand edit or an
+// older format must not blank the page.
+function kept(key: string): string[] {
+  try {
+    const e: unknown = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(e) ? e.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+function keep(key: string, ids: readonly string[]) {
+  try {
+    const e = kept(key), add = ids.filter((id) => !e.includes(id));
+    if (add.length) localStorage.setItem(key, JSON.stringify([...e, ...add]));
+  } catch {}
+}
+
+/** The gnomes earned in this browser. */
+export const earned = () => kept("gnogolf.earned");
+/** A gnome earned, kept for good. */
+export const remember = (id: string) => keep("gnogolf.earned", [id]);
+/** The badges earned in this browser (lib/card.ts BADGES), and new ones kept for good. */
+export const badgesEarned = () => kept("gnogolf.badges");
+// (at: the hole they were earned on, kept for the new ones only); returns the new ones
+export const rememberBadges = (ids: readonly string[], at: string) => {
+  const had = badgesEarned(), add = ids.filter((id) => !had.includes(id));
+  if (!add.length) return add;
+  keep("gnogolf.badges", add);
+  try {
+    if (at) localStorage.setItem(AT_KEY, JSON.stringify({ ...badgesAt(), ...Object.fromEntries(add.map((id) => [id, at])) }));
+  } catch {}
+  return add;
+};
+const AT_KEY = "gnogolf.badges.at";
+/** Where each badge was earned: its hole's id (the cup card stamps it there); strings only, as kept() reads. */
+export function badgesAt(): Record<string, string> {
+  try {
+    const e: unknown = JSON.parse(localStorage.getItem(AT_KEY) || "{}");
+    return e && typeof e === "object" && !Array.isArray(e) ? Object.fromEntries(Object.entries(e).filter((x): x is [string, string] => typeof x[1] === "string")) : {};
+  } catch {
+    return {};
+  }
+}
+/** The mines' holes whose signature was said on a first visit (their slots, "mines/7"). */
+export const minesHinted = () => kept("gnogolf.hint.mines");
+export const minesHintSaid = (slot: string) => keep("gnogolf.hint.mines", [slot]);
+/** The weathers a hole was finished in ("" the calm one), for All weathers. */
+export const weathersSeen = () => kept("gnogolf.weathers");
+export const seeWeather = (kind: string) => keep("gnogolf.weathers", [kind]);
+/** A new game: the badges go with the scorecard, where they were earned and the weathers counted toward one too (the gnomes stay). */
+export function forgetBadges() {
+  try {
+    for (const k of ["gnogolf.badges", AT_KEY, "gnogolf.weathers"]) localStorage.removeItem(k);
+  } catch {}
+}
+
+/** Stills and no clips on the cup cards: reduced motion, a data saver or a
+ *  slow link, the Low graphics tier. */
+export function stillsOnly() {
+  try {
+    if (reducedMotion()) return true;
+    const c = navigator.connection;
+    if (c && (c.saveData || /2g/.test(c.effectiveType || ""))) return true;
+  } catch {
+    return true;
+  }
+  return lowGfx(true); // storage blocked: stills, as with the rest unknown
+}

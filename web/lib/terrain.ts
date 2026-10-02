@@ -1,0 +1,621 @@
+// What the client works out from a hole's geometry — for drawing, never for
+// play. The chain decides where the ball goes; this only decides what the
+// ground under it looks like.
+//
+// Two things come out of it:
+//   - the shape of the green: the part of the board a ball can actually reach,
+//     flood-filled from the tee. Whatever the walls fence off is not green, it
+//     is rough ground, and it gets drawn as such — so a hole built from walls
+//     looks like the shape its author drew, not like a rectangle.
+//   - a height field: a Slope zone pushes the ball one way, so it is drawn as
+//     a ramp rising the other way. Height is cosmetic; the physics is flat.
+
+import type { HoleState, MutVec2, Post, Timing, Vec2, Wall, Zone } from "./types";
+
+/** A segment a→b on the board. */
+type Seg = readonly [Vec2, Vec2];
+/** A zone's shape, as inZone reads it. */
+type Shape = Pick<Zone, "min" | "max" | "round" | "poly" | "outside">;
+
+export const CELL = 0.5;
+
+// Must match the Field.Radius every hole deploys with: the gnome is drawn this
+// big because the chain keeps its centre this far from any wall.
+export const BALL_R = 0.5;
+
+// The cup is drawn at the radius the chain holes a ball in: the course's
+// 1.2, or a hole's own (HoleState cupR: the Crystal Mines' 1.1 and 1.0).
+export const CUP_R = 1.2;
+export const cupRadius = (s: { cupR?: number }) => s.cupR || CUP_R;
+
+/** A slope that is air, not ground: it pushes the ball but raises no ramp.
+ *  The chain's own "air" flag when the zone carries one; else guessed from
+ *  the skin (wind, a gust) or a clock, as the realm has no flag yet. */
+export const airy = (z: Zone) => z.kind === "slope" && (typeof z.air === "boolean" ? z.air : z.skin === "wind" || z.skin === "gust" || !!z.every);
+
+/** A hole's (or a stroke's) pieces with a skin every object has ("constructor",
+ *  "__proto__": an author's word) drawn plain: no table of skins finds its own methods. */
+export function plainSkins<T extends { walls: readonly Wall[]; posts: readonly Post[]; zones: readonly Zone[] }>(h: T): T {
+  const plain = <P extends { skin: string }>(xs: readonly P[]) => xs.map((x) => (x.skin in {} ? { ...x, skin: "" } : x));
+  return { ...h, walls: plain(h.walls), posts: plain(h.posts), zones: plain(h.zones) };
+}
+
+// ------------------------------------------------------ shared geometry
+// The small sums every part of the client needs, in one place.
+
+/** a mod n, never negative (JavaScript's % keeps the sign of a). */
+export const mod = (a: number, n: number) => ((a % n) + n) % n;
+
+/** Whether a timed piece is there at substep i: the chain's own test
+ *  (field.gno there()). Untimed (every 0 or none): always. */
+export const there = (i: number, every = 0, on = 0, phase = 0) => !(every > 0) || mod(i + (phase | 0), every) < on;
+/** Whether timed zone or wall q is on at tick. */
+export const onAt = (q: Timing, tick: number) => there(tick, q.every, q.on, q.phase);
+/** The ticks to go from tick before timed q is on (0 while it is, or untimed): a piece's warning, on the chain's own test. */
+export const untilOn = (q: Timing, tick: number) => (onAt(q, tick) ? 0 : (q.every ?? 0) - mod(tick + ((q.phase ?? 0) | 0), q.every ?? 0));
+
+/** 0 below 0, 1 above 1, and an S between. */
+export const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+/** The signed turn from angle b to angle a, in (-π, π]. */
+export const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+// One result object reused by every call (no allocation in the
+// camera's per-frame wall tests); read it before the next call
+const nearest = { x: 0, z: 0, u: 0, d: 0 };
+/** The point of segment a→b nearest (x, z): { x, z, u (the fraction along
+ *  it), d (the distance) }. The same object every call. */
+export function closest(x: number, z: number, a: Vec2, b: Vec2) {
+  const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz;
+  const u = l2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2)) : 0;
+  nearest.x = a[0] + u * dx;
+  nearest.z = a[1] + u * dz;
+  nearest.u = u;
+  nearest.d = Math.hypot(x - a[0] - u * dx, z - a[1] - u * dz);
+  return nearest;
+}
+/** A zone's box: its centre (cx, cz), its half-sizes (hx, hz) and its sizes (w, h). */
+export const boxOf = (q: Pick<Zone, "min" | "max">) => {
+  const w = q.max[0] - q.min[0], h = q.max[1] - q.min[1];
+  return { cx: (q.min[0] + q.max[0]) / 2, cz: (q.min[1] + q.max[1]) / 2, hx: w / 2, hz: h / 2, w, h };
+};
+/** The point of a polygon's outline nearest (x, z), as a new pair. */
+export function nearestOnPoly(x: number, z: number, poly: readonly Vec2[]): MutVec2 {
+  let best: MutVec2 = [x, z], bd = Infinity;
+  for (let k = 0; k < poly.length; k++) {
+    const q = closest(x, z, poly[k], poly[(k + 1) % poly.length]);
+    if (q.d < bd) (bd = q.d), (best = [q.x, q.z]);
+  }
+  return best;
+}
+/** The distance from (x, z) to segment a→b. */
+export const segDist = (x: number, z: number, a: Vec2, b: Vec2) => closest(x, z, a, b).d;
+/** The distance from (x, z) to the nearest of these walls ({ a, b }), Infinity for none. */
+export function wallDist(x: number, z: number, walls: Iterable<Pick<Wall, "a" | "b">>) {
+  let d = Infinity;
+  for (const w of walls) d = Math.min(d, segDist(x, z, w.a, w.b));
+  return d;
+}
+
+/** Where the segment o→c crosses a→b, as a fraction of o→c, or -1. */
+export function segHit(ox: number, oz: number, cx: number, cz: number, a: Vec2, b: Vec2) {
+  const rx = cx - ox, rz = cz - oz, sx = b[0] - a[0], sz = b[1] - a[1];
+  const den = rx * sz - rz * sx;
+  if (Math.abs(den) < 1e-9) return -1;
+  const t = ((a[0] - ox) * sz - (a[1] - oz) * sx) / den, u = ((a[0] - ox) * rz - (a[1] - oz) * rx) / den;
+  return t > 0 && t < 1 && u >= 0 && u <= 1 ? t : -1;
+}
+/** Where the segment o→c first enters the circle (c, r), as a fraction of o→c, or -1. */
+export function rayCircle(ox: number, oz: number, cx: number, cz: number, c: Vec2, r: number) {
+  const dx = cx - ox, dz = cz - oz, fx = ox - c[0], fz = oz - c[1];
+  const A = dx * dx + dz * dz, B = 2 * (fx * dx + fz * dz), C = fx * fx + fz * fz - r * r, disc = B * B - 4 * A * C;
+  return A > 0 && disc >= 0 ? (-B - Math.sqrt(disc)) / (2 * A) : -1;
+}
+
+/** Even-odd point in polygon ([[x, y], ...]). */
+export function inPoly(x: number, y: number, poly: readonly Vec2[]) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** The edges of a zone's outline, as segments [a, b] (none for a Round one). */
+const edgesOf = (q: Shape): Seg[] => {
+  const poly = q.poly;
+  if (poly && poly.length > 2) return poly.map((p, i): Seg => [poly[(i + poly.length - 1) % poly.length], p]);
+  if (q.round) return [];
+  const [x0, y0] = q.min, [x1, y1] = q.max;
+  return [[[x0, y0], [x1, y0]], [[x1, y0], [x1, y1]], [[x1, y1], [x0, y1]], [[x0, y1], [x0, y0]]];
+};
+
+/** How far (x, y) is inside zone q: its distance to the zone's edge, 0
+ *  outside. edges: the ones to measure from (all of them by default). */
+export function inset(q: Shape, x: number, y: number, edges: readonly Seg[] = edgesOf(q)) {
+  if (!inZone(q, x, y)) return 0;
+  let d = Infinity;
+  for (const [a, b] of edges) d = Math.min(d, segDist(x, y, a, b));
+  if (q.round) {
+    const hx = (q.max[0] - q.min[0]) / 2, hy = (q.max[1] - q.min[1]) / 2;
+    d = Math.min(d, (1 - Math.hypot((x - q.min[0] - hx) / hx, (y - q.min[1] - hy) / hy)) * Math.min(hx, hy));
+  }
+  return Math.max(0, d);
+}
+
+// garden water, sunk into the ground: from the zone's own edge (where the
+// chain drowns the ball) a bank falls to the water, and on to the bed. Heights
+// under the lane's lowest point round the pond; bank: how wide it is
+export const POOL = { water: -0.42, bed: -0.8, bank: 0.6 };
+// the water sunk that way, by skin, and how wide its bank is: a pond's of
+// earth, a rock pool's, a lagoon's of sand, a canal's quay wall (steep)
+export const POOLS: Record<string, { bank: number }> = { water: { bank: 0.6 }, tidepool: { bank: 0.5 }, lagoon: { bank: 0.8 }, canal: { bank: 0.22 } };
+// how round a pond's shore is at a corner (the soft minimum's scale)
+const SHORE = 0.35;
+// the relief of a surface, by skin: how far its middle sinks (a bunker's
+// dish; less than 0 heaps it up, a bed of soil), over how far in from its
+// drawn outline (sandIn), and the soft lip just inside that outline
+// (ripple: how high the wind's ripple marks stand, and a slow swell under them)
+export const DISH: Record<string, { depth: number; run: number; lip: number; ripple?: number }> = {
+  sand: { depth: 0.3, run: 1.4, lip: 0.07 },
+  wetsand: { depth: 0.15, run: 1.2, lip: 0.05, ripple: 0.016 },
+  flowerbed: { depth: -0.08, run: 0.5, lip: 0 },
+  soil: { depth: -0.06, run: 0.5, lip: 0 },
+};
+
+/**
+ * How far (x, y) is inside the outline a sand is drawn to (or a bed of
+ * soil): its zone's edges, and the walls that cross it, blended by a soft
+ * minimum so every corner rounds off inward, less an uneven margin of 0.08
+ * to 0.26 — a natural shape, never past the chain's zone. Under 0 outside it
+ * (-1 outside the zone). The dish (terrain) and the patch (zones.ts
+ * sandPatch) both follow it, so the ball rides what is drawn.
+ */
+export function sandIn(q: Shape, walls: readonly Pick<Wall, "a" | "b">[], x: number, y: number) {
+  if (!inZone(q, x, y)) return -1;
+  let sum = 0;
+  for (const [a, b] of edgesOf(q)) sum += Math.exp(-segDist(x, y, a, b) / SHORE);
+  for (const w of walls) sum += Math.exp(-segDist(x, y, w.a, w.b) / SHORE);
+  const d = Math.min(q.round ? inset(q, x, y) : Infinity, sum ? -SHORE * Math.log(sum) : Infinity);
+  const n = 0.75 * Math.sin(x * 1.3 + y * 0.6) * Math.cos(y * 1.1 - x * 0.4) + 0.25 * Math.sin(x * 2.9 - y * 2.3 + 1.1);
+  return d - (0.17 + 0.09 * n);
+}
+
+/**
+ * Whether (x, y) is in a zone, as the chain tests it: its rectangle; a Round
+ * zone is the ellipse in it; a zone with `poly` is that polygon (within the
+ * rectangle), and with `outside` everything in the rectangle but the polygon.
+ */
+export function inZone(q: Shape, x: number, y: number) {
+  if (x < q.min[0] || x >= q.max[0] || y < q.min[1] || y >= q.max[1]) return false;
+  if (q.poly && q.poly.length > 2) return inPoly(x, y, q.poly) !== !!q.outside;
+  if (q.round) {
+    const ex = (x - (q.min[0] + q.max[0]) / 2) / ((q.max[0] - q.min[0]) / 2), ey = (y - (q.min[1] + q.max[1]) / 2) / ((q.max[1] - q.min[1]) / 2);
+    return ex * ex + ey * ey <= 1;
+  }
+  return true;
+}
+
+/** Whether a plain wall stands wholly out in an Outside hazard (the sea
+ *  round a lane with no rails): the board's frame there, not a rail —
+ *  not drawn at all (course.ts wallPieces), with no posts nor piles. */
+export function inSea(w: Pick<Wall, "a" | "b" | "skin" | "every">, zones: readonly Zone[]) {
+  if (w.skin || w.every) return false;
+  const sea = zones.filter((q) => q.kind === "hazard" && q.outside && q.poly && !q.every);
+  const n = Math.max(1, Math.ceil(Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) / 0.25));
+  for (let k = 0; k <= n; k++) {
+    const x = w.a[0] + ((w.b[0] - w.a[0]) * k) / n, z = w.a[1] + ((w.b[1] - w.a[1]) * k) / n;
+    if (!sea.some((q) => inZone(q, x, z))) return false;
+  }
+  return sea.length > 0;
+}
+
+const N4: readonly Vec2[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const MAX_RISE = 1.6;
+const BANK = 2.5; // how far a ramp's top edge takes to fall back to the green
+const SHOULDER = 1.2; // its sides taper over this much, so it reads as a hill
+
+
+/** A Slope zone drawn as a ramp: its uphill (ux, uz) and across (vx, vz) axes, where it starts along them and how high it rises. */
+interface Ramp {
+  z: Zone;
+  ux: number; uz: number; vx: number; vz: number;
+  lo: number; span: number; rise: number; noLip: boolean;
+  a0: number; a1: number;
+  plateau?: false | "tee" | "cup"; run?: boolean; bridge?: { gap: number; to: number }; // plateau: its top held toward the tee, or the cup
+  in0?: boolean; in1?: boolean; // its side at a0 / a1 meets another hill: the shoulder tapers inside
+}
+/** A ramp per Slope zone: 0 on its downhill edge, rising against the push. */
+function ramps(zones: readonly Zone[]): Ramp[] {
+  return zones
+    // (the mines' conveyor is a belt: flat, the push is the belt's)
+    .filter((z) => z.kind === "slope" && !airy(z) && z.skin !== "mound" && z.skin !== "volcano" && z.skin !== "conveyor" && (z.vec[0] || z.vec[1]))
+    .map((z) => {
+      const l = Math.hypot(z.vec[0], z.vec[1]);
+      const ux = -z.vec[0] / l, uz = -z.vec[1] / l; // uphill
+      const proj = [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]].map((p) => p[0] * ux + p[1] * uz);
+      const lo = Math.min(...proj), hi = Math.max(...proj);
+      // as high as the slope is strong over its length: what looks steep is steep
+      const len = hi - lo;
+      // a kicker is a ski jump, not a bump: steep and tall, cut off at its lip
+      // a moon bridge is a high arch, whatever its push
+      // a skate park's quarter-pipe curls up to its coping, a funbox is a low block
+      // (a bank round the great shaft is a lean of the ledge, not a hill: low)
+      const rise = z.skin === "kicker" || z.skin === "ramp" ? 2.2 : z.skin === "moon bridge" ? 1.5 : z.skin === "quarter pipe" ? 1.3 : z.skin === "funbox" ? 0.8 : Math.min(z.skin === "ledge bank" ? 0.45 : MAX_RISE, 0.35 * l * len * 1.6);
+      // across the slope, for the shoulders
+      const vx = -uz, vz = ux;
+      const across = [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]].map((p) => p[0] * vx + p[1] * vz);
+      return { z, ux, uz, vx, vz, lo, span: hi - lo || 1, rise, noLip: z.skin === "kicker" || z.skin === "ramp" || z.skin === "moon bridge" || z.skin === "quarter pipe", a0: Math.min(...across), a1: Math.max(...across) };
+    });
+}
+
+/** Slope zones that touch, as one box each (x0..x1 by y0..y1), with their zones. */
+function clusters(zs: readonly Zone[]) {
+  const groups: { x0: number; x1: number; y0: number; y1: number; zs: Zone[] }[] = [];
+  const touch = (a: (typeof groups)[number], b: (typeof groups)[number]) => a.x0 <= b.x1 + 0.1 && a.x1 >= b.x0 - 0.1 && a.y0 <= b.y1 + 0.1 && a.y1 >= b.y0 - 0.1;
+  for (const z of zs) groups.push({ x0: z.min[0], x1: z.max[0], y0: z.min[1], y1: z.max[1], zs: [z] });
+  // merge until none touch (a zone added late can join two groups)
+  for (let merged = true; merged; ) {
+    merged = false;
+    for (let i = 0; i < groups.length && !merged; i++)
+      for (let j = i + 1; j < groups.length && !merged; j++)
+        if (touch(groups[i], groups[j])) {
+          const a = groups[i], b = groups.splice(j, 1)[0];
+          Object.assign(a, { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1), zs: a.zs.concat(b.zs) });
+          merged = true;
+        }
+  }
+  return groups;
+}
+
+/**
+ * A mound: the chain makes one of four slopes pushing out from a centre (skin
+ * "mound"). Drawn as one round dome over them, as high as its push is strong,
+ * not as four ramps: that read as a flat square with lines on it.
+ */
+function mounds(zones: readonly Zone[]) {
+  const ms = zones.filter((z) => z.kind === "slope" && z.skin === "mound");
+  return clusters(ms).map((g) => {
+    const push = Math.max(...g.zs.map((z) => Math.hypot(...z.vec)));
+    return { x: (g.x0 + g.x1) / 2, z: (g.y0 + g.y1) / 2, rx: (g.x1 - g.x0) / 2 + 0.6, rz: (g.y1 - g.y0) / 2 + 0.6, h: Math.min(1.1, 0.35 + push * 2) };
+  });
+}
+
+/**
+ * A volcano: slopes pushing out, down its four sides, round a flat top (the
+ * cup's). Drawn as one cone, the product of a rise across x and one across z:
+ * each side climbs toward the top along its own push, and nowhere does the
+ * ground rise against a push. (Four ramps drew a ridge over the top.)
+ */
+function cones(zones: readonly Zone[]) {
+  const vs = zones.filter((z) => z.kind === "slope" && z.skin === "volcano" && (z.vec[0] || z.vec[1]));
+  return clusters(vs).map((g) => {
+    // the top: where the sides' uphill edges stop
+    // (a side with no slope pushing that way would climb to the box's edge, a cliff)
+    let ix0 = g.x0, ix1 = g.x1, iy0 = g.y0, iy1 = g.y1;
+    for (const z of g.zs) {
+      const [vx, vy] = z.vec;
+      if (Math.abs(vx) >= Math.abs(vy)) vx < 0 ? (ix0 = Math.max(ix0, z.max[0])) : (ix1 = Math.min(ix1, z.min[0]));
+      else vy < 0 ? (iy0 = Math.max(iy0, z.max[1])) : (iy1 = Math.min(iy1, z.min[1]));
+    }
+    return { ...g, ix0, ix1, iy0, iy1, h: MAX_RISE };
+  });
+}
+const rise1 = (v: number, a: number, i0: number, i1: number, b: number) => (v < i0 ? smoothstep((v - a) / (i0 - a || 1)) : v > i1 ? smoothstep((b - v) / (b - i1 || 1)) : 1);
+
+/**
+ * A ramp whose top edge faces the tee is a hill the player starts on: the
+ * ground stays up at the top (a plateau) instead of banking back down, so a
+ * "downhill" hole begins high. Only when no other ramp lies between the tee
+ * and this one — a row of hills keeps its valleys.
+ */
+function plateaus(rs: Ramp[], tee: Vec2, cup: Vec2, cupR: number) {
+  // p past r's top, no other ramp between (within reach of its top, and of its sides)
+  const faces = (r: Ramp, p: Vec2, reach = Infinity, width = Infinity) => {
+    const along = p[0] * r.ux + p[1] * r.uz - r.lo, side = p[0] * r.vx + p[1] * r.vz;
+    return along > r.span && along - r.span < reach && side > r.a0 - width && side < r.a1 + width && !rs.some((o) => {
+      if (o === r) return false;
+      const a = (o.z.min[0] + o.z.max[0]) / 2 * r.ux + (o.z.min[1] + o.z.max[1]) / 2 * r.uz - r.lo;
+      return a > r.span && a < along;
+    });
+  };
+  // (not a mines incline: a man-way between two galleries of a winding hole,
+  // whose tee is somewhere else along the lane, not up at its top)
+  for (const r of rs) r.plateau = r.z.skin !== "incline" && faces(r, tee) && "tee";
+  // a run of slopes the same way (a downhill in two pitches, a flight of
+  // terraces): the lower one's top holds its height uphill of it, under the
+  // flat between and the upper one, so the heights add up to one continuous
+  // descent instead of each pitch dropping back to the green and the next
+  // starting high again
+  for (const r of rs)
+    r.run = rs.some((q) => {
+      if (q === r || r.ux * q.ux + r.uz * q.uz < 0.99) return false;
+      if (Math.min(r.a1, q.a1) - Math.max(r.a0, q.a0) < 1) return false; // side by side, not in line
+      const gap = q.lo - (r.lo + r.span); // from r's top to q's foot, along the climb
+      return gap >= -0.01 && gap <= 10;
+    });
+  // two ramps whose tops face each other, a short flat between them, are one
+  // hill: the ground stays up across the gap (easing from one top's height to
+  // the other's) instead of dropping to the green and rising again like two
+  // boxes. The physics there is flat, and so is a hilltop.
+  for (const r of rs)
+    for (const q of rs) {
+      if (q === r || r.bridge || q.bridge || r.ux * q.ux + r.uz * q.uz > -0.99) continue;
+      if (Math.min(r.a1, -q.a0) - Math.max(r.a0, -q.a1) < 1) continue; // side by side, not facing
+      const gap = -(q.lo + q.span) - (r.lo + r.span);
+      if (gap > 0 && gap <= 10) (r.bridge = { gap, to: q.rise }), (q.noLip = true);
+    }
+  // a hill whose top comes too near the cup for its lip: the cup sits up on
+  // the hilltop, where the physics is flat, not at the foot of a lip its
+  // landing squeezed into a cliff
+  for (const r of rs) if (!(r.plateau || r.run || r.bridge || r.noLip) && faces(r, cup, BANK * 0.4 + cupR + 0.3, 0)) r.plateau = "cup";
+  return rs;
+}
+
+export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start" | "cup" | "cupR">) {
+  const W = s.board.w, H = s.board.h;
+  const nx = Math.round(W / CELL), nz = Math.round(H / CELL);
+  const idx = (i: number, j: number) => j * nx + i;
+  const centre = (i: number, j: number): MutVec2 => [(i + 0.5) * CELL, (j + 0.5) * CELL];
+  const inGrid = (i: number, j: number) => i >= 0 && j >= 0 && i < nx && j < nz;
+  // a 4-neighbour flood from the cells on the stack: enter(k) says whether
+  // cell k is taken in (and marks it), visit(i, j) sees each cell as it is reached
+  const flood = (stack: MutVec2[], enter: (k: number) => boolean | number, visit?: (i: number, j: number) => void) => {
+    while (stack.length) {
+      const [i, j] = stack.pop()!;
+      if (visit) visit(i, j);
+      for (const [di, dj] of N4) {
+        const a = i + di, b = j + dj;
+        if (inGrid(a, b) && enter(idx(a, b))) stack.push([a, b]);
+      }
+    }
+  };
+
+  // cells a wall runs through
+  const blocked = new Uint8Array(nx * nz);
+  for (const w of s.walls) {
+    if (w.every) continue; // a wall that comes and goes fences nothing off
+    const x0 = Math.max(0, Math.floor(Math.min(w.a[0], w.b[0]) / CELL) - 1);
+    const x1 = Math.min(nx - 1, Math.ceil(Math.max(w.a[0], w.b[0]) / CELL) + 1);
+    const z0 = Math.max(0, Math.floor(Math.min(w.a[1], w.b[1]) / CELL) - 1);
+    const z1 = Math.min(nz - 1, Math.ceil(Math.max(w.a[1], w.b[1]) / CELL) + 1);
+    for (let j = z0; j <= z1; j++)
+      for (let i = x0; i <= x1; i++) {
+        const [px, pz] = centre(i, j);
+        if (segDist(px, pz, w.a, w.b) < CELL * 0.52) blocked[idx(i, j)] = 1;
+      }
+  }
+
+  // flood from everywhere a ball can be put: the tee, and wherever a tunnel or
+  // a hazard sends it
+  const reach = new Uint8Array(nx * nz);
+  const stack: MutVec2[] = [];
+  const seed = (p: Vec2) => {
+    const i = Math.floor(p[0] / CELL), j = Math.floor(p[1] / CELL);
+    if (inGrid(i, j) && !blocked[idx(i, j)] && !reach[idx(i, j)]) {
+      reach[idx(i, j)] = 1;
+      stack.push([i, j]);
+    }
+  };
+  seed(s.start);
+  seed(s.cup);
+  for (const z of s.zones) if (z.kind === "tunnel" || z.kind === "hazard") seed(z.vec);
+  flood(stack, (k) => !blocked[k] && !reach[k] && (reach[k] = 1));
+
+  // green: what the ball reaches, plus the wall cells along its edge (a wall
+  // stands on the green, not on a gap next to it)
+  const green = new Uint8Array(nx * nz);
+  for (let j = 0; j < nz; j++)
+    for (let i = 0; i < nx; i++) {
+      const k = idx(i, j);
+      if (reach[k]) green[k] = 1;
+      else if (blocked[k])
+        for (const [di, dj] of N4) if (inGrid(i + di, j + dj) && reach[idx(i + di, j + dj)]) green[k] = 1;
+    }
+
+  // rough: connected pieces of everything else, for the scenery to fill
+  const rough: MutVec2[][] = [];
+  const seen = new Uint8Array(nx * nz);
+  for (let j = 0; j < nz; j++)
+    for (let i = 0; i < nx; i++) {
+      const k = idx(i, j);
+      if (green[k] || seen[k]) continue;
+      const cells: MutVec2[] = [];
+      seen[k] = 1;
+      flood([[i, j]], (kk) => !green[kk] && !seen[kk] && (seen[kk] = 1), (a, b) => cells.push([a, b]));
+      rough.push(cells);
+    }
+
+  const rs = plateaus(ramps(s.zones), s.start, s.cup, cupRadius(s));
+  // a side that meets another hill (a volcano's cone, a bowl's corner) tapers
+  // inside, into the seam; any other falls away outside the zone, over ground
+  // the physics leaves flat. Inside, a slope is its push's own ramp: a taper
+  // there drew a side hill the ball does not feel, and it sped up climbing it
+  const hills = s.zones.filter((q) => q.kind === "slope" && !airy(q));
+  const seam = (r: Ramp, side: number) => [0.25, 0.5, 0.75].some((f) => {
+    const a = r.lo + f * r.span;
+    return hills.some((q) => q !== r.z && inZone(q, a * r.ux + side * r.vx, a * r.uz + side * r.vz));
+  });
+  for (const r of rs) (r.in0 = seam(r, r.a0 - 0.25)), (r.in1 = seam(r, r.a1 + 0.25));
+  const domes = mounds(s.zones), volcanoes = cones(s.zones);
+  // flat: without a moon bridge's arch (the ground under it)
+  const raw = (x: number, z: number, flat = false) => {
+    let h = 0, arch = 0;
+    for (const r of rs) {
+      const along = x * r.ux + z * r.uz - r.lo, side = x * r.vx + z * r.vz;
+      // how far outside its sides (the shoulder's own ground, see seam)
+      const out = Math.max(r.a0 - side, side - r.a1);
+      if (along < 0 || (out > 0 && (out >= SHOULDER || (side < r.a0 ? r.in0 : r.in1) || r.z.skin === "moon bridge" || !(x > 0 && z > 0 && x < W && z < H)))) continue;
+      const lip = !(r.bridge || r.plateau || r.run || r.noLip);
+      // its lip where another hill starts (two tops back to back): that hill's
+      // ground, not the lip stacked on it, a ridge the physics lacks
+      if (lip && along >= r.span && along - r.span < BANK * 0.4 && hills.some((q) => q !== r.z && inZone(q, x, z))) continue;
+      let k: number;
+      // a jump curls up to its lip; a hill that ends in a lip still climbs at it, as the physics' push does
+      // (a smoothstep went flat before the edge: he crossed a flat top, then flew, late), and so does one up to
+      // the cup on its top; one onto a deck levels into it
+      if (along <= r.span) {
+        const t = along / r.span;
+        k = r.z.skin === "kicker" || r.z.skin === "ramp" || r.z.skin === "quarter pipe" ? t * t : lip || r.plateau === "cup" ? t * t * (2 - t) : smoothstep(t);
+      }
+      else if (r.bridge && along - r.span < r.bridge.gap) k = 1 + (r.bridge.to / r.rise - 1) * smoothstep((along - r.span) / r.bridge.gap);
+      else if (r.plateau || r.run) k = 1;
+      // a quarter-pipe's deck behind its coping: the kerb stands on it, not buried in the ramp
+      else if (r.z.skin === "quarter pipe" && along - r.span < 1.2) k = 1;
+      else if (r.noLip) continue; // the top of the hill the tee stands on
+      else if (along - r.span < BANK * 0.4 && x > 0 && z > 0 && x < W && z < H) k = 1 - smoothstep((along - r.span) / (BANK * 0.4)); // a short lip, not a slope the physics lacks
+      else continue;
+      // shoulders, so it reads as a hill: falling away outside its sides, or
+      // into a seam with the next hill (a bridge's deck is full width, over the water)
+      if (out > 0) k *= 1 - smoothstep(out / SHOULDER);
+      else {
+        const edge = Math.min(r.in0 ? side - r.a0 : SHOULDER, r.in1 ? r.a1 - side : SHOULDER);
+        if (edge < SHOULDER) k *= smoothstep(edge / SHOULDER);
+      }
+      // a moon bridge's two halves meet at its crown: the higher, not the sum
+      if (r.z.skin === "moon bridge") {
+        if (!flat) arch = Math.max(arch, k * r.rise);
+        continue;
+      }
+      h += k * r.rise;
+    }
+    h += arch;
+    for (const d of domes) {
+      const q = Math.hypot((x - d.x) / d.rx, (z - d.z) / d.rz);
+      if (q < 1) h += d.h * (1 - q * q) * (1 - q * q); // a soft dome, flat at its foot
+    }
+    for (const v of volcanoes)
+      if (x > v.x0 && x < v.x1 && z > v.y0 && z < v.y1) h += v.h * rise1(x, v.x0, v.ix0, v.ix1, v.x1) * rise1(z, v.y0, v.iy0, v.iy1, v.y1);
+    return h;
+  };
+  // the cup sits on a flat landing, never on the slope itself
+  const cupH = raw(s.cup[0], s.cup[1]);
+  // a cup inside a slope zone sits on the slope: flattening it would show a
+  // landing the ball does not have
+  const onSlope = s.zones.some((q) => q.kind === "slope" && !airy(q) && s.cup[0] >= q.min[0] && s.cup[0] < q.max[0] && s.cup[1] >= q.min[1] && s.cup[1] < q.max[1]);
+  // a landing stops short of a slope near it: reaching onto one, it dug a
+  // dip in the hill that a ball rolling back sped up climbing out of
+  const CUP_R = cupRadius(s); // (this hole's)
+  const landR = Math.min(CUP_R + 1.6, ...hills.map((q) => Math.hypot(Math.max(q.min[0] - s.cup[0], 0, s.cup[0] - q.max[0]), Math.max(q.min[1] - s.cup[1], 0, s.cup[1] - q.max[1]))));
+  const flatR = Math.min(CUP_R + 0.3, landR);
+  const level = (x: number, z: number) => {
+    // on a slope the landing is just the cup itself: the rings lie flat, the
+    // slope comes back right after
+    if (onSlope) {
+      const d = Math.hypot(x - s.cup[0], z - s.cup[1]);
+      return d <= CUP_R + 0.15 ? cupH : d < CUP_R + 0.9 ? cupH + (raw(x, z) - cupH) * smoothstep((d - CUP_R - 0.15) / 0.75) : raw(x, z);
+    }
+    const d = Math.hypot(x - s.cup[0], z - s.cup[1]);
+    if (d <= flatR) return cupH;
+    if (d < landR) {
+      const k = smoothstep((d - flatR) / (landR - flatR));
+      return cupH * (1 - k) + raw(x, z) * k;
+    }
+    return raw(x, z);
+  };
+
+  // a bunker is a dish (DISH): sunk in its middle, with a low lip just inside
+  // its edge — the zone's, or a wall's where one crosses it, so no kerb dips
+  // into it; a bed of soil is heaped up. The ball rides it (height), as it is
+  // drawn.
+  const dishes = s.zones.filter((q) => q.kind === "surface" && DISH[q.skin]).map((q) => ({
+    q, ...DISH[q.skin], walls: s.walls.filter((w) => Math.min(w.a[0], w.b[0]) < q.max[0] + 1 && Math.max(w.a[0], w.b[0]) > q.min[0] - 1 && Math.min(w.a[1], w.b[1]) < q.max[1] + 1 && Math.max(w.a[1], w.b[1]) > q.min[1] - 1),
+  }));
+  const dish = (x: number, z: number) => {
+    let h = 0;
+    for (const { q, walls, depth, run, lip, ripple } of dishes) {
+      if (!inZone(q, x, z)) continue;
+      // a lip just inside the drawn outline, then the floor sinking away
+      // (a slow smoothstep: the lane's coarser mesh under the patch keeps
+      // within its lift)
+      const d = sandIn(q, walls, x, z);
+      if (d > -0.3) h += lip * Math.exp(-(((d - 0.14) / 0.14) ** 2)) - depth * smoothstep((d - 0.16) / run);
+      // the wind's ripple marks, bent, over a slow swell; none at the rim
+      if (ripple && d > 0) h += smoothstep(d / 0.4) * ripple * (Math.sin(x * 7.3 + z * 4.1 + 1.2 * Math.sin(z * 1.1 + x * 0.3)) + 1.6 * Math.sin(x * 0.7 + z * 0.4) * Math.cos(z * 0.5 - x * 0.2));
+    }
+    return h;
+  };
+  const height = dishes.length ? (x: number, z: number) => level(x, z) + dish(x, z) : level;
+
+  // the ground mesh's own heights: height(), but sunk under garden water
+  // (the ball rides height(): it drops in where the chain drowns it)
+  const bridges = s.zones.filter((q) => q.kind === "slope" && q.skin === "moon bridge");
+  const inRect = (q: Zone, x: number, z: number) => x >= q.min[0] && x <= q.max[0] && z >= q.min[1] && z <= q.max[1];
+  // the ponds and streams, each flat at its own level
+  // what crosses the water (a bridge's deck, a causeway, the seesaw): the
+  // water runs on under it, its banks from the one side's to the other's.
+  // c: the axis the water crosses along
+  const spans = s.zones.filter((q) => (q.kind === "slope" && (q.skin === "moon bridge" || q.skin === "seesaw")) || q.skin === "bridge").map((q) => ({
+    q, c: (q.skin === "moon bridge" ? (Math.abs(q.vec[0]) > Math.abs(q.vec[1]) ? 1 : 0) : q.max[0] - q.min[0] >= q.max[1] - q.min[1] ? 1 : 0),
+  }));
+  // (a pond's edge along one of those is no bank: the water goes on under it)
+  const along = ([a, b]: Seg, { q, c }: (typeof spans)[number]) => [a, b].every((p) => Math.abs(p[c] - q.min[c]) < 0.05 || Math.abs(p[c] - q.max[c]) < 0.05) && Math.abs(a[c] - b[c]) < 0.05
+    && Math.max(a[1 - c], b[1 - c]) > q.min[1 - c] - 0.05 && Math.min(a[1 - c], b[1 - c]) < q.max[1 - c] + 0.05;
+  const pools = s.zones.filter((q) => q.kind === "hazard" && POOLS[q.skin]).map((q) => {
+    const edges = edgesOf(q).filter((e) => !spans.some((sp) => along(e, sp)));
+    let lo = Infinity;
+    for (let u = 0; u <= 1; u += 0.25) for (let v = 0; v <= 1; v += 0.25) lo = Math.min(lo, raw(q.min[0] + u * (q.max[0] - q.min[0]), q.min[1] + v * (q.max[1] - q.min[1])));
+    // and the walls that stand in it (a kerb across a zone that reaches past
+    // the lane): the bank comes up to meet them, or the ground sank away under
+    // the kerb and the water showed through beneath it. Not a crossing's own
+    // rails: the water goes on under those.
+    const walls = s.walls.filter((w) => !w.every && Math.min(w.a[0], w.b[0]) < q.max[0] + 1 && Math.max(w.a[0], w.b[0]) > q.min[0] - 1 && Math.min(w.a[1], w.b[1]) < q.max[1] + 1 && Math.max(w.a[1], w.b[1]) > q.min[1] - 1
+      && !spans.some((sp) => [w.a, w.b].every(([x, z]) => x > sp.q.min[0] - 0.4 && x < sp.q.max[0] + 0.4 && z > sp.q.min[1] - 0.4 && z < sp.q.max[1] + 0.4)));
+    return { q, edges, walls, bank: POOLS[q.skin].bank, level: lo + POOL.water, bed: lo + POOL.bed };
+  });
+  // how far in from a pond's shore: its edges' distances blended (a soft
+  // minimum), so the shore rounds its corners inside the zone, and wobbled,
+  // so it is not ruled. Never past the zone's edge: the chain drowns the ball
+  // there, and the bank starts there.
+  const shoreIn = (p: (typeof pools)[number], x: number, z: number) => {
+    if (!inZone(p.q, x, z)) return 0;
+    let sum = 0;
+    if (!p.q.round) for (const [a, b] of p.edges) sum += Math.exp(-segDist(x, z, a, b) / SHORE);
+    for (const w of p.walls) sum += Math.exp(-segDist(x, z, w.a, w.b) / SHORE);
+    const d = Math.min(p.q.round ? inset(p.q, x, z) : Infinity, sum ? -SHORE * Math.log(sum) : Infinity);
+    return Math.max(0, d - 0.07 * (1 + Math.sin(x * 1.7 + z * 0.8) * Math.cos(z * 1.3 - x * 0.6)));
+  };
+  const poolAt = (x: number, z: number) => {
+    let best: { k: number; d: number; level: number; bed: number; skin: string } | null = null;
+    for (const p of pools) {
+      const d = shoreIn(p, x, z);
+      if (d > 0 && (!best || d > best.d)) best = { k: Math.min(1, d / p.bank), d, level: p.level, bed: p.bed, skin: p.q.skin };
+    }
+    if (best) best.k = smoothstep(best.k);
+    return best;
+  };
+  const water = (x: number, z: number) => {
+    const sp = pools.length ? spans.find((p) => inRect(p.q, x, z)) : null;
+    if (!sp) return pools.length ? poolAt(x, z) : null;
+    const { q, c } = sp, lo = q.min[c] - 0.05, hi = q.max[c] + 0.05, f = ((c ? z : x) - lo) / (hi - lo);
+    const a = poolAt(c ? x : lo, c ? lo : z), b = poolAt(c ? x : hi, c ? hi : z);
+    const k = (a ? a.k : 0) * (1 - f) + (b ? b.k : 0) * f, d = (a ? a.d : 0) * (1 - f) + (b ? b.d : 0) * f, p = a || b;
+    return p && k > 0 ? { k, d, level: p.level, bed: p.bed, skin: p.skin } : null;
+  };
+  // (under a moon bridge the ground is the banks and the stream: its arch is
+  // drawn apart, and the ball rides that)
+  // (and a hair under a sand's patch, which is drawn on height() itself: the
+  // lane's coarser mesh, cut across its dish and lip, kept from showing through)
+  const sands = dishes.filter((d) => d.depth > 0);
+  const underSand = (x: number, z: number) => {
+    let k = 0;
+    for (const { q, walls } of sands) if (inZone(q, x, z)) k = Math.max(k, smoothstep(sandIn(q, walls, x, z) / 0.25));
+    return 0.12 * k;
+  };
+  const ground = (x: number, z: number) => {
+    const base = bridges.some((q) => inRect(q, x, z)) ? raw(x, z, true) : height(x, z) - (sands.length ? underSand(x, z) : 0), w = water(x, z);
+    return w ? base + (w.bed - base) * w.k : base;
+  };
+
+  const zoneAt = (x: number, z: number) => s.zones.find((q) => inZone(q, x, z)) || null;
+
+  /** Whether the ball can be at (x, z): the board cell there is green. */
+  const onGreen = (x: number, z: number) => {
+    const i = Math.floor(x / CELL), j = Math.floor(z / CELL);
+    return inGrid(i, j) && !!green[idx(i, j)];
+  };
+  return { nx, nz, idx, inGrid, green, rough, height, ground, pond: water, zoneAt, centre, onGreen, domes };
+}
+
+
+export type Terrain = ReturnType<typeof terrain>;
