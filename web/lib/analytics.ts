@@ -26,7 +26,7 @@ const MAX_DAYS = 390;
 type Value = string | number | boolean | null | undefined;
 type Props = Record<string, Value>;
 /** How a duel's rival was found: a pick of the rival screen's, a dare link, a board. */
-export type RivalKind = "champ" | "level" | "self" | "friend" | "surprise" | "board" | "link";
+export type RivalKind = "today" | "level" | "self" | "friend" | "surprise" | "board" | "link";
 /** Where the wallet sheet was opened from. */
 export type WalletFrom = "hud" | "card" | "pending" | "phone" | "rival" | "board" | "about" | "support";
 /** The wallet sheet's steps, in its order; done: none left. */

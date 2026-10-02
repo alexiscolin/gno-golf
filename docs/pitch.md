@@ -4,8 +4,8 @@ You pull back, you let go, and a smart contract on gno.land decides where your
 ball stops. No server, no "trust us": every shot is computed on-chain, and
 anyone can replay it.
 
-**Race anyone's ghost, verified on-chain.** Pick a rival (the champion, a
-player at your level, a friend's link, or yourself) and take turns, stroke for
+**Race anyone's ghost, verified on-chain.** Pick a rival (one picked for the day,
+a player at your level, a friend's link, or yourself) and take turns, stroke for
 stroke, against their real best round.
 
 **Play free at [gnogolf.xyz](https://gnogolf.xyz).** No wallet needed.

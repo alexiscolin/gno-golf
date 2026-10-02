@@ -62,8 +62,8 @@ const Stage = ({ skin, act, playing, className = "mode__stage" }: { skin: Skin; 
 
 /**
  * A duel's rival, on a screen of their own: a friend's name or address typed
- * (the (i) says where to find one), three picked for the player (the
- * champion, one at their level, one at random: their gnome, and their best
+ * (the (i) says where to find one), three picked for the player (today's
+ * rival, one at their level, yourself: their gnome, and their best
  * hole played back on its map), or anyone on the course's board, a sticker a
  * tap away (the whole board, the leaderboard's sheet: onBoard). Then their
  * ghosts' holes (Ghosts).
@@ -111,7 +111,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
       {/* (a board with nobody keeps its blank stickers and says so: nothing moves once it is read) */}
       <section className="rival__board">
         <div className="rival__boardhead">
-          <h3 className="rival__h">Or anyone on the board</h3>
+          <h3 className="rival__h">Or anyone who played</h3>
           <span className="rival__links">
             {/* (there, not pressable, while the board is read or has nobody: the links beside it do not move) */}
             {(!picks || !picks.rows[0] || picks.surprise) && <button className="linkish rival__all rival__surprise" disabled={!picks?.surprise} onClick={() => picks?.surprise && (sound("select"), onPick(picks.surprise.player, undefined, "surprise"))}><Dice /> Surprise me</button>}
@@ -119,7 +119,7 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
           </span>
         </div>
         <FullBoard kind="course" s={s} chain={chain} me={me} mode={mode} max={8} onConnect={onConnect}
-          row={(r) => <Sticker player={r.player} at={r.at} sub={`${holesWord(r.holes || 0)} · ${vsPar(standingVs(r))}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
+          row={(r) => <Sticker player={r.player} sub={`${holesWord(r.holes || 0)} · ${vsPar(standingVs(r))}`} chain={chain} me={me} gnome={gnome} onClick={() => onPick(r.player)} />} />
       </section>
     </FrontScreen>
   );
@@ -128,9 +128,9 @@ export function Rival({ s, chain, me, mode, gnome, onPick, onBoard, onConnect, o
 type Bests = ReadonlyMap<string, Readonly<Record<Mode, number>>>;
 type Hole = { id: string; name: string; par: number };
 const MAP_MS = 3200; // a map's drawing of the path, as its CSS animation (title.css map-ink): the next hole then
-// each in a colour of the game's own: the champion the sun's, your level the fairway's, a surprise the mountain's
+// each in a colour of the game's own: today's rival the sun's, your level the fairway's, yourself the mountain's
 const PICKS = [
-  { kind: "champ", label: "The champion", tint: "mode--build" },
+  { kind: "today", label: "Today's rival", tint: "mode--build" },
   { kind: "level", label: "Your level", tint: "mode--solo" },
   { kind: "self", label: "Yourself", tint: "tint--mountain" },
 ] as const;
@@ -228,7 +228,7 @@ function Pick({ kind, label, tint, first, row, reading, failed, chain, me, gnome
       <span className="tag rival__tag">
         {kind === "self"
           ? <span className="podium__medal rival__you"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20v-8a6 6 0 0 1 12 0v8l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM10 11v1M14 11v1" /></svg></span>
-          : <span className={`podium__medal${row && row.at <= 3 ? ` podium__medal--${row.at}` : ""}`}>{row ? row.at : "?"}</span>}
+          : null /* (no place said: a rival to race, not a rank) */}
         {label}
       </span>
       {/* (yourself: your own gnome, connected or not) */}

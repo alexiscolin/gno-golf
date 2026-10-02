@@ -417,7 +417,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
 .rival__friend .rival__go { min-height: 44px; }
 .rival__friend .note { flex-basis: 100%; margin: 0 14px 4px 0; }
 /* three picked for you: the game's choice's panels, lying down, in their own
-   colours (the champion's the sun's, your level the fairway's, a surprise the mountain's) */
+   colours (today's rival the sun's, your level the fairway's, yourself the mountain's) */
 .rival__picks { flex: none; list-style: none; margin: 0; padding: 4px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-grid); width: 100%; }
 .mode.rival__pick {
   aspect-ratio: auto; grid-template: auto minmax(0, 1fr) auto auto / 1fr 1fr; grid-template-areas: "tag tag" "stage show" "name name" "line go";

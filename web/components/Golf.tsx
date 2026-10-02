@@ -2499,8 +2499,8 @@ function shareText({ s, card, cups, fresh, place, ghost = false }: { s: Snapshot
     `⛳ ${t.strokes} strokes round the whole ${cup} (${vs}). My gnome is tired, the chain is not.`,
   ]) + tag;
   // the link dares: one ask, and no score (the friend races the best, maybe not this round)
-  if (ghost) return `⚔ Race my ghost on ${s.name}${place ? ` (#${place.rank} of ${place.of})` : ""}. Free to play, no wallet needed.` + tag;
-  if (place) return `🏆 #${place.rank} of ${place.of} on ${s.name} in Gnogolf: ${strokesWord(s.strokes)}, saved on-chain. Come and take my place.` + tag;
+  if (ghost) return `⚔ Race my ghost on ${s.name} and beat it. Free to play, no wallet needed.` + tag;
+  if (place) return `⛳ ${strokesWord(s.strokes)} on ${s.name} in Gnogolf, saved on-chain. Race my ghost and beat it.` + tag;
   if (fresh.length) return `🍄 New gnome unlocked on Gnogolf: ${fresh.map((g) => g.name).join(" and ")}. Earned the hard way, one putt at a time.` + tag;
   if (s.strokes === 1) return pick([
     `🕳️ Hole in one on ${s.name}! Every bounce computed by the chain.`,

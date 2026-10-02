@@ -357,11 +357,12 @@ export type Placed = StrokesRow & { holes?: number; par?: number; at: number };
 
 /**
  * The rival screen's three quick picks, flagged players left out as on the
- * boards: the course's #1, a player at the player's level (next to their
- * place; the board's middle without one), and one at random, drawn again on
- * each visit. null while read; a pick nobody fills, null.
+ * boards: today's rival (featured.ts: never the first three, drawn by the day),
+ * a player at the player's level (next to their place; the board's middle
+ * without one), and one at random, drawn again on each visit. null while read;
+ * a pick nobody fills, null.
  */
-// the three picks (the champion, your level, yourself: null while no one is connected),
+// the three picks (today's rival, your level, yourself: null while no one is connected),
 // and a surprise (the board's Surprise me); a board that could not be read: retry, to read it again
 export function useRivalPicks(chain: Chain | null, me: string | null | undefined, mode: Mode) {
   const [picks, setPicks] = useState<{ rows: readonly (Placed | null)[]; surprise: Placed | null; retry?: () => void } | null>(null);
@@ -371,19 +372,19 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
     let live = true;
     // a page of the course's board, its places kept, the flagged out
     const page = (at: number, n: number) =>
-      Promise.all([chain.courseLeaderboard(at, n, mode), flagsOf(chain)]).then(([b, f]) => ({ players: b.players, rows: screen(b.rows.map((r, i) => ({ ...r, at: at + i + 1 })), f.flags, false).rows }));
-    void Promise.all([page(0, 10), me ? chain.rank(mode, me).catch(() => null) : null])
+      Promise.all([chain.courseLeaderboard(at, n, mode), flagsOf(chain)]).then(([b, f]) => ({ players: b.players, holes: b.holes, rows: screen(b.rows.map((r, i) => ({ ...r, at: at + i + 1 })), f.flags, false).rows.map((r, i) => ({ ...r, at: i + 1 })) }));
+    void Promise.all([page(0, 30), me ? chain.rank(mode, me).catch(() => null) : null])
       .then(async ([top, mine]) => {
-        const champ = top.rows[0] || null;
         // (a page that fails: the first one's players stand in)
         const near = await page(levelFrom(mine ? mine.rank : 0, top.players), 5).catch(() => top);
-        const level = levelPick(near.rows, me, champ ? [champ.player] : []);
+        const level = levelPick(near.rows, me);
+        const today = coursePicks(top.rows.filter((r) => !level || r.player !== level.player), top.holes, me, null, null, undefined, 1)[0]?.row || null;
         const any = await page(Math.floor(Math.random() * top.players), 5).catch(() => top);
-        const surprise = pickOne([...any.rows, ...top.rows], [me, champ && champ.player, level && level.player], Math.random());
+        const surprise = pickOne([...any.rows, ...top.rows], [me, today && today.player, level && level.player], Math.random());
         // (your row on the first page, else your rank read apart; unranked in this mode: at 0, your ghosts still read)
         const self: Placed | null = !me ? null : top.rows.find((r) => r.player === me) || { player: me, at: mine && mine.rank > 0 ? mine.rank : 0, holes: mine ? mine.holes : 0, strokes: mine ? mine.strokes : 0, par: mine ? mine.par : 0 };
-        primeNames(chain, [champ, level, surprise].flatMap((r) => (r ? [r] : [])));
-        if (live) setPicks({ rows: [champ, level, self], surprise });
+        primeNames(chain, [today, level, surprise].flatMap((r) => (r ? [r] : [])));
+        if (live) setPicks({ rows: [today, level, self], surprise });
       })
       .catch(() => live && setPicks({ rows: [null, null, null], surprise: null, retry: () => (setPicks(null), setTick((n) => n + 1)) }));
     return () => void (live = false);
@@ -549,6 +550,8 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   // (the place in the list shown, flagged players left out of it and of the count)
   const myRow = shown && me ? shown.rows.find((r) => r.player === me) : undefined;
   const myPlace = myRow && head && shown ? { at: myRow.at, of: head.players - shown.hidden } : mine ? { at: mine.rank, of: mine.of } : null;
+  // your score as a dare says it: a hole's strokes, the course's holes and score against par
+  const myBest = myRow || mine, myScore = !myBest ? "" : kind === "hole" ? strokesWord(myBest.strokes) : `${holesWord(myBest.holes || 0)} at ${vsPar(standingVs(myBest))}`;
   // the rows to come, blank: drawn as the rows will be (the rival's stickers, as many as it shows)
   const ghosts = row ? <ol aria-hidden="true">{Array.from({ length: max || 3 }, (_, i) => <li key={i}><StickerGhost at={i + 1} /></li>)}</ol> : <Ghosts />;
   const title = kind === "hole" ? s.name : "The course";
@@ -661,7 +664,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
             label="Dare a friend"
             kind="dare"
             saved
-            text={`🏆 #${myPlace.at} of ${myPlace.of} ${kind === "hole" ? `on ${s.name}` : "on the whole course"} in Gnogolf (${mode}), saved on-chain. Come and take my place: race my ghost, free to play, no wallet needed.${SHARE_TAGS}`}
+            text={`⚔ Beat my ${myScore} ${kind === "hole" ? `on ${s.name}` : "across the course"} in Gnogolf (${mode}), saved on-chain: race my ghost, free to play, no wallet needed.${SHARE_TAGS}`}
             link={kind === "hole" ? holeLink(s, "", me || "", "board") : dareLink(me || "", "board")}
           />
         </div>
@@ -1041,7 +1044,7 @@ export function Sticker({ player, at = 0, tag, sub, chain, me, gnome, onClick, s
   const { label } = useWho(chain, player, me), mine = player === me;
   const body = (<>
     <Face skin={mine ? gnomeById(gnome) : rivalSkin(player, gnome)} />
-    {tag ? <span className="sticker__tag">{tag}</span> : <Place at={at} />}
+    {tag ? <span className="sticker__tag">{tag}</span> : at > 0 && <Place at={at} />}
     <span className="sticker__who">{label}</span>
     <span className="sticker__sub">{sub}</span>
     {tag && onClick && !say && <span className="sticker__go" aria-hidden="true">{go} ▸</span>}

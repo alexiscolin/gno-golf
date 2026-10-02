@@ -35,7 +35,7 @@ test("a link opened is named by what it opens: its class, else its address's sha
   assert.equal(kind(`${WEB}:garden/3#pro`), "board");
   assert.equal(kind(`${WEB}$help&func=Claim`), "form");
   assert.equal(kind("https://example.com/"), "other");
-  assert.deepEqual(actionOf(at(".rival__pick:not([disabled])", ["mode", "rival__pick"], "", "champ")), { action: "rival_picked", kind: "champ" }, "a rival pick is no mode pick");
+  assert.deepEqual(actionOf(at(".rival__pick:not([disabled])", ["mode", "rival__pick"], "", "today")), { action: "rival_picked", kind: "today" }, "a rival pick is no mode pick");
 });
 
 test("a click on nothing named, or not on an element: no action", () => {
@@ -80,8 +80,8 @@ test("the real shapes: the rival screen's leaderboard link is no surprise, its p
   assert.equal(actionOf(el(node("button", "linkish rival__all rival__surprise", links)))?.action, "rival_surprise");
   assert.equal(actionOf(el(node("button", "linkish rival__all rival__surprise", links, { disabled: "" }))), null, "a disabled surprise is no pick");
   const pick = node("button", "mode rival__pick tint--a", node("ul", "rival__picks"));
-  pick.dataset.kind = "champ";
-  assert.deepEqual(actionOf(el(node("span", "rival__go", pick))), { action: "rival_picked", kind: "champ" }, "its Race label is the pick");
+  pick.dataset.kind = "today";
+  assert.deepEqual(actionOf(el(node("span", "rival__go", pick))), { action: "rival_picked", kind: "today" }, "its Race label is the pick");
   const card = node("button", "mode mode--duel", node("ul", "modes__list"));
   assert.deepEqual(actionOf(el(node("span", "mode__name", card))), { action: "mode_picked", mode: "duel" });
 });
