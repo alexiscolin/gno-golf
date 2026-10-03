@@ -29,7 +29,7 @@ import Tip, { readOwner } from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
-import { fromChain, restoredFor, markRestored, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
+import { fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
 import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, plural, vsParWords, AIMS, AIM_NAMES, shortAddr, useCopied, saveBy, mmss, costLine, fundCmd, holeNumber, nextCup, golfTerm, nextHole, chainQuery, strokeFor, minesHint, readMs, type SaveOf } from "@/components/common";
@@ -503,31 +503,32 @@ export default function Golf() {
   // playing for real: who is connected, and where the current round's record is
   const [real, setReal] = useState<WalletFrom | false>(false); // the explainer is open, and from where
   const [account, setAccount] = useState<Account | null>(null);
-  // the connected wallet's bests, on a new device or cleared data: the holes this browser has no
-  // score for filled from the chain, once an address a browser; the cups, gnomes and badges follow,
-  // said wherever the player is (never over another note). Adena's address only: a gnokey one is
-  // typed, anyone's
+  // the connected wallet's records, read at each visit: on a new device or cleared data the holes this
+  // browser has no score for filled from the chain, then only what was saved since (played elsewhere:
+  // a New game or a reset is not filled back); the cups, gnomes and badges follow, said wherever the
+  // player is (never over another note). Adena's address only: a gnokey one is typed, anyone's
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
-  const connected = useRef(""), tried = useRef(""); // (the account now: a read for another is dropped; the one read by itself this visit)
+  const connected = useRef(""), tried = useRef(""); // (the account now: a read for another is dropped; the one synced this visit)
   const [restoreBusy, setRestoreBusy] = useState(false); // (either read: the buttons wait for it)
-  // asked (the menu, the cups' Scores): again after a New game or a reset, said even when nothing comes
+  // asked (the menu, the cups' Scores): every record again, after a New game or a reset, said even when nothing comes
   const restore = async (who: string, asked = false) => {
     const c = game.current && game.current.chain;
     if (!c || !allList.length) return void (asked && setRestoreNote("The course is still loading. Try again in a moment."));
-    const versions = (await c.holes()).filter((h) => h.official !== false), bests = new Map<string, { pro: number; assisted: number }>();
-    for (let i = 0; i < versions.length; i += 100) for (const [id, b] of await c.bestsOf(versions.slice(i, i + 100).map((h) => h.id), who)) bests.set(id, b);
+    const rows = await c.progressOf(who);
     if (connected.current !== who) return; // (another account since, or none)
-    markRestored(who);
-    const before = cupTotals(loadCard(), allList), locked = lockedNote(), r = fromChain(versions, bests, allList);
-    if (!r.filled.length) return void (asked && setRestoreNote("Nothing to bring back: your card has every hole you saved."));
-    setCard(r.card);
-    setOnChainCard(r.onChain);
-    for (const f of r.filled) rememberBadges(f.badges, f.id); // (kept quietly: not new, nor counted as earned)
-    rememberBadges(r.cupBadges, "");
+    const was = syncedTo(who), before = cupTotals(loadCard(), allList), locked = lockedNote(), r = fromChain(rows, allList, asked ? 0 : was);
+    markSynced(who, asked || was === Number.MAX_SAFE_INTEGER ? r.height : Math.max(r.height, was)); // (a read of everything sets it afresh)
+    if (r.filled.length) (setCard(r.card), setOnChainCard(r.onChain));
+    r.kinds.forEach(seeWeather);
+    const all = [...r.badges, ...badgesFor({ strokes: 0, par: 0, pro: false, kind: "", timed: false, cups: cupTotals({}, []), weathers: weathersSeen() }, []).map((id) => ({ id, at: "" }))]; // (All weathers)
+    const back = all.flatMap((b) => rememberBadges([b.id], b.at)); // (kept quietly: shown as new in the badges, not said one by one)
     const after = cupTotals(r.card, allList), had = earned(), gnomes = GNOMES.filter((g) => g.unlock && !had.includes(g.id) && !UNLOCKS[g.unlock].ok(before) && UNLOCKS[g.unlock].ok(after));
     if (locked && gnomes.some((g) => g.id === linkedGnome()?.id)) setLinkNote((n) => (n === locked ? null : n)); // (the shared link's gnome, unlocked now)
+    if (back.length) setFreshBadges((b) => byRarity([...b, ...back]));
+    if (!r.filled.length && !back.length && !gnomes.length) return void (asked && setRestoreNote("Nothing to bring back: your card has every hole you saved."));
     track("progress_restored", { holes: r.filled.length, asked });
-    setRestoreNote(`${r.filled.length} ${plural("hole", r.filled.length)} back on your card from the chain${gnomes.length ? `, and ${gnomes.map((g) => g.name).join(" and ")} with them` : ""}.`);
+    const what = [r.filled.length && `${r.filled.length} ${plural("hole", r.filled.length)}`, back.length && `${back.length} ${plural("badge", back.length)}`, ...gnomes.map((g) => `the ${g.name} gnome`)].filter(Boolean);
+    setRestoreNote(`Back from the chain: ${what.join(", ").replace(/, ([^,]*)$/, " and $1")}.`);
   };
   const restoreAsked = account
     ? () => {
@@ -537,10 +538,10 @@ export default function Golf() {
     : undefined;
   useEffect(() => {
     const who = (connected.current = account ? account.address : "");
-    if (!who || !allList.length || tried.current === who || restoredFor(who)) return;
+    if (!who || !allList.length || tried.current === who) return;
     tried.current = who;
     setRestoreBusy(true);
-    void restore(who).catch(() => tried.current === who && (tried.current = "")).finally(() => setRestoreBusy(false));
+    void restore(who).catch((e) => errorKind(e) === "down" && tried.current === who && (tried.current = "")).finally(() => setRestoreBusy(false)); // (tried again on a later list only if the node did not answer)
   }, [account, allList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [wallet, setWallet] = useState<{ busy: boolean; error: string | null; note?: string }>({ busy: false, error: null });

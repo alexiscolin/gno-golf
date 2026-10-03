@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  vsPar, parOf, cupOf, cardKey, scoreOf, legacyOf, oldToSlot, migrate, loadCard, recordScore, clearCard, clearCup, badgesFor, byRarity, loadOnChain, markOnChain, fromChain, restoredFor, markRestored,
+  vsPar, parOf, cupOf, cardKey, scoreOf, legacyOf, oldToSlot, migrate, loadCard, recordScore, clearCard, clearCup, badgesFor, byRarity, loadOnChain, markOnChain, fromChain, syncedTo, markSynced,
   totals, cupTotals, UNLOCKS, cupFinishLine, CUP_NAMES, CUPS, CLASSIC, guessCup,
 } from "../lib/card.ts";
-import type { Finish } from "../lib/card.ts";
+import type { Finish, SkyKind } from "../lib/card.ts";
+import type { ChainBest } from "../lib/chain.ts";
+import { skyOf } from "../lib/sky.ts";
 
 beforeEach(() => {
   localStorage.clear();
@@ -391,32 +393,68 @@ test("the link cards name the cups as the game does (media/og/og.mjs keeps its o
   assert.deepEqual(Object.fromEntries([...copy[1].matchAll(/(\w+): "([^"]*)"/g)].map((m) => [m[1], m[2]])), CUP_NAMES);
 });
 
-test("fromChain: a wallet's bests fill the holes this card has none for, marked on-chain; the latest round stays", () => {
+// a record as chain.progressOf reads it (garden, par 3, assisted, saved at block 10, weather period 1, not the hole's record)
+const best = (id: string, strokes: number, o: Partial<ChainBest> = {}): ChainBest =>
+  ({ id, slot: id.replace(/\/v\d+$/, ""), world: "garden", par: 3, mode: "assisted", strokes, height: 10, period: 1, top: false, ...o });
+
+test("fromChain: a wallet's records fill the holes this card has none for, and beat a worse score not saved here; marked on-chain", () => {
   recordScore("garden/1", 4);
+  recordScore("garden/4", 5);
+  markOnChain("garden/4", 3);
   markOnChain("island/1", 3);
-  const holes = [{ id: "g1/v2", slot: "garden/1", par: 3 }, { id: "g2", slot: "garden/2", par: 4 }, { id: "g3", slot: "garden/3", par: 3 }, { id: "g4", slot: "garden/4", par: 3 }, { id: "x5" }];
-  const r = fromChain(holes, new Map([["g1/v2", { pro: 0, assisted: 2 }], ["g2", { pro: 2, assisted: 3 }], ["g3", { pro: 0, assisted: 1 }], ["x5", { pro: 4, assisted: 0 }], ["nope", { pro: 1, assisted: 1 }]]));
-  assert.deepEqual(r.card, { "garden/1": 4, "garden/2": 2, "garden/3": 1, x5: 4 }, "garden/1 keeps its latest round; the best of both modes elsewhere; a hole with no slot by its id; one not on the course ignored");
+  const r = fromChain([best("garden/1/v2", 2), best("garden/2/v1", 3), best("garden/2/v1", 2, { mode: "pro", par: 4 }), best("garden/3/v1", 1), best("garden/4/v1", 3)], []);
+  assert.deepEqual(r.card, { "garden/1": 2, "garden/2": 2, "garden/3": 1, "garden/4": 5 }, "garden/1's 4 beaten by a 2 played elsewhere; garden/4's 3 was saved here: the latest round stays");
   assert.deepEqual(loadCard(), r.card);
-  assert.deepEqual(loadOnChain(), { "island/1": 3, "garden/2": 2, "garden/3": 1, x5: 4 }, "the marks already there kept");
-  assert.deepEqual(r.filled, [{ key: "garden/2", id: "g2", badges: ["eagle", "pro"] }, { key: "garden/3", id: "g3", badges: ["ace", "eagle"] }, { key: "x5", id: "x5", badges: [] }], "a Pro best over par (x5, par 3 by default) proves nothing");
-  assert.deepEqual(r.cupBadges, ["chain"]);
+  assert.deepEqual(loadOnChain(), { "garden/4": 3, "island/1": 3, "garden/1": 2, "garden/2": 2, "garden/3": 1 }, "the marks already there kept");
+  assert.deepEqual(r.filled, ["garden/1", "garden/2", "garden/3"]);
+  assert.deepEqual(r.badges.map((b) => b.id), ["eagle", "pro", "ace", "eagle", "chain"], "what the records prove (garden/2 in Pro, par 4, in 2: eagle and pro)");
+  assert.equal(r.height, 10);
 });
 
-test("fromChain: every version of a slot, the lowest kept; nothing on the chain changes nothing; once an address a browser", () => {
-  const v = [{ id: "g1/v1", slot: "garden/1", par: 3 }, { id: "g1/v2", slot: "garden/1", par: 3 }];
-  assert.deepEqual(fromChain(v, new Map()).filled, []);
+test("fromChain: every version of a slot, the lowest kept; nothing on the chain changes nothing", () => {
+  assert.deepEqual(fromChain([], []), { card: {}, onChain: {}, filled: [], badges: [], kinds: [], height: 0 });
   assert.equal(localStorage.getItem("gnogolf.onchain"), null, "nothing written");
-  assert.deepEqual(fromChain(v, new Map([["g1/v1", { pro: 0, assisted: 2 }], ["g1/v2", { pro: 0, assisted: 3 }]])).filled, [{ key: "garden/1", id: "g1/v1", badges: [] }]);
+  assert.deepEqual(fromChain([best("garden/1/v1", 2), best("garden/1/v2", 3)], []).filled, ["garden/1"]);
   assert.equal(loadCard()["garden/1"], 2);
+});
+
+test("fromChain: the badges a record proves, as a finish earns them, its weather's among them; a whole cup's", () => {
+  const at = (id: string, world: string, kind: string) => [...Array(500).keys()].find((p) => skyOf(id, world, p) === kind)!;
+  const r = fromChain([
+    best("island/1/v1", 15, { world: "island", period: at("island/1/v1", "island", "storm") }),
+    best("garden/4/v1", 3, { top: true }),
+    best("garden/5/v1", 4, { period: at("garden/5/v1", "garden", "fog") }),
+    best("garden/6/v1", 3, { period: at("garden/6/v1", "garden", "fog") }),
+    best("mountain/1/v1", 5, { world: "mountain", period: at("mountain/1/v1", "mountain", "snow") }),
+  ], []);
+  assert.deepEqual(r.badges.map((b) => b.id), ["storm", "snail", "first", "fog", "snow", "chain"], "the fog over par proves nothing, at par it does");
+  assert.deepEqual(r.badges.find((b) => b.id === "snail"), { id: "snail", at: "island/1/v1" }, "each where it was earned");
+  assert.ok(["storm", "fog", "snow"].every((k) => r.kinds.includes(k as SkyKind)));
+  const cup = [best("mines/1/v1", 2, { world: "mines", par: 4 }), best("mines/2/v1", 3, { world: "mines", par: 4 })];
+  assert.deepEqual(fromChain(cup, cup).badges.slice(-3).map((b) => b.id), ["chain", "perfect", "lode"], "a whole cup under par, filled from the chain");
+});
+
+test("fromChain since a sync: only what was saved after, never this browser's own save, so a New game or a reset is not filled back; what was played elsewhere comes in", () => {
+  const rows = [best("garden/1/v1", 3, { height: 5 }), best("garden/2/v1", 2, { height: 20 }), best("garden/3/v1", 1, { height: 30 })];
+  recordScore("garden/2", 4);
+  markOnChain("garden/3", 1); // saved here after the sync, then a New game:
   clearCard();
-  const pars = [{ id: "a/v1", slot: "garden/9", par: 4 }, { id: "a/v2", slot: "garden/9", par: 3 }];
-  assert.deepEqual(fromChain(pars, new Map([["a/v1", { pro: 0, assisted: 2 }], ["a/v2", { pro: 0, assisted: 3 }]])).filled[0].badges, ["eagle"], "judged on the par of the version kept (4), not the last read");
-  assert.equal(restoredFor("g1abc"), false);
-  markRestored("g1abc");
-  markRestored("g1abc");
-  assert.equal(restoredFor("g1abc"), true);
-  assert.equal(localStorage.getItem("gnogolf.restored"), JSON.stringify(["g1abc"]));
+  recordScore("garden/2", 4);
+  const r = fromChain(rows, [], 10);
+  assert.deepEqual(r.filled, ["garden/2"], "garden/1 (before the sync) and garden/3 (this browser's own save) stay cleared, with no badge of theirs; garden/2 beaten elsewhere");
+  assert.deepEqual(r.card, { "garden/2": 2 });
+  assert.deepEqual(r.badges.map((b) => b.id), ["chain"]);
+  assert.equal(r.height, 30, "the next sync's start: the newest record read, whatever came in");
+  assert.deepEqual(fromChain(rows, [], 30).filled, [], "nothing newer: nothing");
+  assert.deepEqual(fromChain(rows, [], 0).filled, ["garden/1", "garden/3"], "asked (since 0): every record again");
+});
+
+test("syncedTo / markSynced: an address's height, 0 for one never synced; one restored before the height was kept counts as all taken in", () => {
+  assert.equal(syncedTo("g1abc"), 0);
+  markSynced("g1abc", 42);
+  assert.equal(syncedTo("g1abc"), 42);
+  localStorage.setItem("gnogolf.restored", JSON.stringify(["g1old"]));
+  assert.equal(syncedTo("g1old"), Number.MAX_SAFE_INTEGER);
   clearCard();
-  assert.equal(restoredFor("g1abc"), true, "a New game does not forget it: the chain does not fill back what was cleared");
+  assert.equal(syncedTo("g1abc"), 42, "a New game does not forget it: the chain does not fill back what was cleared");
 });

@@ -2,6 +2,8 @@
 // browser: the player's own run of free play. The chain keeps the best, on
 // the leaderboard.
 import type { HoleRow } from "./types";
+import type { ChainBest } from "./chain";
+import { skyOf } from "./sky";
 
 /** A hole as the card reads it: a row of Holes(), or as much of one as is known. */
 type CardHole = Pick<HoleRow, "id"> & Partial<Pick<HoleRow, "slot" | "par" | "world">>;
@@ -89,42 +91,60 @@ const keepOnChain = (all: Card) => {
   return all;
 };
 
-/** A player's bests on the chain (chain.bestsOf: per hole id, 0 where none), every version of a
- *  slot's (the lowest kept), on the holes this card has no score for, a new device's or a cleared
- *  one's: kept, and marked on-chain; a hole the card has keeps its latest round. Returns both cards
- *  and the holes that came in, with the badges their bests prove (an ace, two under par, under
- *  par in Pro); `all` the course's current holes, for the cups' (a cup's at par, every hole under). */
-export function fromChain(versions: readonly CardHole[], bests: ReadonlyMap<string, { pro: number; assisted: number }>, all: readonly CardHole[] = versions) {
-  const card = loadCard(), onChain = loadOnChain(), got = new Map<string, { id: string; v: number; pro: number; par: number }>();
-  for (const h of versions) {
-    const b = bests.get(h.id), key = cardKey(h);
-    if (!b || !key || card[key]) continue;
-    const v = Math.min(b.pro || Infinity, b.assisted || Infinity), was = got.get(key);
-    if (!Number.isFinite(v)) continue;
-    const keep = was && was.v <= v;
-    got.set(key, { id: keep ? was.id : h.id, v: keep ? was.v : v, pro: Math.min(b.pro || Infinity, was ? was.pro : Infinity), par: keep ? was.par : parOf(h) });
+/** A player's records on the chain (chain.progressOf), every version of a slot's, those saved after
+ *  `since` (a block height; 0: all) and not this browser's own since (a New game or a cup's reset is not
+ *  filled back): each fills its hole on this card when the card has no score for it (a new device,
+ *  cleared data), or when it beats the card's and this browser did not save it (played elsewhere); kept,
+ *  marked on-chain. With them, the badges they prove (badgesFor, as a finish earns them: a record's
+ *  weather from its period; the hole's record, "first") and the weathers they were finished in; `all`
+ *  the course's current holes, for the cups'. height: the newest record's, the next sync's `since`. */
+export function fromChain(rows: readonly ChainBest[], all: readonly CardHole[], since = 0) {
+  const card = loadCard(), onChain = loadOnChain(), best = new Map<string, ChainBest>(), badges: { id: string; at: string }[] = [], kinds = new Set<SkyKind>(), none = cupTotals({}, []);
+  let height = 0;
+  for (const r of rows) {
+    height = Math.max(height, r.height);
+    const key = cardKey(r);
+    if (r.height <= since || (since > 0 && onChain[key] === r.strokes)) continue;
+    const kind = skyOf(r.id, r.world, r.period);
+    kinds.add(kind);
+    for (const id of [...badgesFor({ strokes: r.strokes, par: r.par, pro: r.mode === "pro", kind, timed: false, cups: none, weathers: [] }, []), ...(r.top ? ["first"] : [])]) badges.push({ id, at: r.id });
+    if (!best.has(key) || r.strokes < best.get(key)!.strokes) best.set(key, r);
   }
-  const filled = [...got].map(([key, { id, v, pro, par }]) => ((card[key] = onChain[key] = v), { key, id, badges: [v === 1 && "ace", v <= par - 2 && "eagle", pro < par && "pro"].filter((x): x is string => !!x) }));
-  if (!filled.length) return { card, onChain, filled, cupBadges: [] as string[] };
-  const cups = cupTotals(card, all);
-  const cupBadges = ["chain", cups.mines.clean && "lode", CUPS.some((c) => cups[c].all && cups[c].under === cups[c].done) && "perfect"].filter((x): x is string => !!x);
-  return { card: save(card), onChain: keepOnChain(onChain), filled, cupBadges };
+  const filled = [...best].filter(([key, r]) => !card[key] || (r.strokes < card[key] && onChain[key] !== r.strokes)).map(([key, r]) => ((card[key] = onChain[key] = r.strokes), key));
+  if (best.size) badges.push({ id: "chain", at: "" });
+  if (filled.length) {
+    for (const id of badgesFor({ strokes: 0, par: 0, pro: false, kind: "", timed: false, cups: cupTotals(card, all), weathers: [] }, [])) badges.push({ id, at: "" });
+    save(card);
+    keepOnChain(onChain);
+  }
+  return { card, onChain, filled, badges, kinds: [...kinds], height };
 }
 
-// the addresses whose bests this browser took in (fromChain): once, so a New game or a cup's reset
-// is not filled back from the chain on the next visit (cleared site data or a new device: again)
-const RESTORED_KEY = "gnogolf.restored";
-const restored = (): string[] => {
+// how far this browser has taken in each address's records (fromChain's height): the next sync takes
+// only newer ones, so a New game or a cup's reset is not filled back, while what was played elsewhere
+// since comes in. (An address restored before the height was kept counts as all taken in.)
+const SYNC_KEY = "gnogolf.synced";
+const synced = (): Record<string, number> => {
   try {
-    const v: unknown = JSON.parse(localStorage.getItem(RESTORED_KEY) || "[]");
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    const v: unknown = JSON.parse(localStorage.getItem(SYNC_KEY) || "{}");
+    return v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter((x): x is [string, number] => Number.isSafeInteger(x[1]))) : {};
   } catch {
-    return [];
+    return {};
   }
 };
-export const restoredFor = (addr: string) => restored().includes(addr);
-export function markRestored(addr: string) {
-  try { localStorage.setItem(RESTORED_KEY, JSON.stringify([...restored().filter((x) => x !== addr), addr])); } catch {}
+/** The block height up to which this browser has an address's records (0: none yet). */
+export function syncedTo(addr: string) {
+  const at = synced()[addr];
+  if (at !== undefined) return at;
+  try {
+    const old: unknown = JSON.parse(localStorage.getItem("gnogolf.restored") || "[]");
+    return Array.isArray(old) && old.includes(addr) ? Number.MAX_SAFE_INTEGER : 0;
+  } catch {
+    return 0;
+  }
+}
+export function markSynced(addr: string, height: number) {
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ ...synced(), [addr]: height })); } catch {}
 }
 
 /** The card as version 1 kept it (by realm id) rewritten by slot, the lower

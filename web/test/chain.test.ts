@@ -626,6 +626,32 @@ test("bestsOf: one read, each hole's bests; only the holes asked, strictly read;
   assert.equal((await chain.bestsOf(odd.map((l) => l.split(" ")[0]), ADDR1)).size, 0);
 });
 
+test("progressOf: one read of the whole course, a row a record, every field strictly read; none for a bad address, no network call", async () => {
+  const chain = makeChain();
+  setFetch(() => { throw new Error("should not be called"); });
+  assert.deepEqual(await chain.progressOf("not-an-address"), []);
+  // two pages: the first ends with where the next starts, the second with none
+  const asked: string[] = [];
+  setFetch((url) => {
+    const { expr } = decoded(url);
+    asked.push(expr);
+    assert.ok(expr.includes(`"${ADDR1}"`) && expr.includes("!copiesOf(id, m).Has(p)"), "the player, and never a copy");
+    return strReply(asked.length === 1 ? "garden/1/v2 garden/1 garden 3 pro 2 65431 5969251 1\nnext garden/1/v2\n" : "island/3/v1 island/3 island 2 assisted 4 7 8 0\n");
+  });
+  assert.deepEqual(await chain.progressOf(ADDR1), [
+    { id: "garden/1/v2", slot: "garden/1", world: "garden", par: 3, mode: "pro", strokes: 2, height: 65431, period: 5969251, top: true },
+    { id: "island/3/v1", slot: "island/3", world: "island", par: 2, mode: "assisted", strokes: 4, height: 7, period: 8, top: false },
+  ]);
+  assert.equal(asked.length, 2);
+  assert.ok(asked[1].includes('courseHoles.Iterate("garden/1/v2"'), "the next page from where the first stopped");
+  // a row not as written (a mode, strokes past the rules, a slot, a world, a flag, a field less or more) is dropped
+  const odd = ["garden/1/v1 garden/1 garden 3 fast 2 1 1 0", "garden/1/v1 garden/1 garden 3 pro 61 1 1 0", "garden/1/v1 Garden/1 garden 3 pro 2 1 1 0",
+    "garden/1/v1 garden/1 gar-den 3 pro 2 1 1 0", "garden/1/v1 garden/1 garden 3 pro 2 1 1 2", "garden/1/v1 garden/1 garden 3 pro 2 1 1", "garden/1/v1 garden/1 garden 3 pro 2 1 1 0 x", "garden/1/v1 garden/1 garden 0 pro 2 1 1 0",
+    "bad id garden/1 garden 3 pro 2 1 1 0", "garden/1/v1 garden/1 garden 3 pro 2 -1 1 0", "garden/1/v1 garden/1 garden 3 pro 2 1 x 0", "next not-an-id"];
+  setFetch(() => strReply(odd.join("\n")));
+  assert.deepEqual(await chain.progressOf(ADDR1), []);
+});
+
 test("recordsOf: one read, each record as the realm keeps it; only the players asked, every field strictly read", async () => {
   const chain = makeChain();
   setFetch(() => { throw new Error("should not be called"); });

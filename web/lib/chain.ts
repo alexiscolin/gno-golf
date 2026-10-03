@@ -478,6 +478,25 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       }
       return got;
     },
+    /** A player's records on the course, every version of a slot's (archived ones too), a row a best, never a
+     *  copy (kept, never ranked): what their progress is rebuilt from on another device (card.ts fromChain).
+     *  A read a page of 300 versions (each decoded only where the player has a best: at most ~0.8e9 query gas). */
+    progressOf: async (player: string): Promise<ChainBest[]> => {
+      const rows: ChainBest[] = [];
+      for (let after = "", page = 0; isAddress(player) && page < 40; page++) {
+        const out = await qstr(REALM, `func() (s string) { p, n, last := ${s(player)}, 0, ""; courseHoles.Iterate(${s(after)}, "", func(id, v string) bool { if id == ${s(after)} { return false }; if n++; n > 300 { s += "next " + last + "\\n"; return true }; last = id; var e *entry; for m := 0; m < modes; m++ { if b, ok := bestsOf(id, m).Get(p); ok && !copiesOf(id, m).Has(p) { if e == nil { e = decodeEntry(v) }; at, period, _ := bestFields(b); top := "0"; if e.rec(m).by.String() == p { top = "1" }; s += id + " " + e.slot + " " + e.world + " " + itoa(e.par) + " " + modeNames[m] + " " + itoa(bestStrokes(b)) + " " + i64(at) + " " + i64(period) + " " + top + "\\n" } }; return false }); return }()`);
+        after = "";
+        for (const line of out.split("\n")) {
+          if (line.startsWith("next ")) after = line.slice(5);
+          const [id, slot, world, par, mode, strokes, height, period, top, ...rest] = line.split(" "), n = (v: string, max: number) => (/^\d{1,15}$/.test(v) && Number(v) <= max ? Number(v) : NaN);
+          const r = { id, slot, world, par: n(par, 99), mode: mode as Mode, strokes: n(strokes, RULES.maxRoundStrokes), height: n(height, Number.MAX_SAFE_INTEGER), period: n(period, Number.MAX_SAFE_INTEGER), top: top === "1" };
+          // (a row as the realm writes it, or none: its strings go into keys and badges)
+          if (!rest.length && isHoleId(id) && /^[a-z]+\/\d{1,4}$/.test(slot) && /^[a-z]{1,16}$/.test(world) && isMode(mode) && r.par > 0 && r.strokes > 0 && r.height >= 0 && r.period >= 0 && (top === "0" || r.top)) rows.push(r);
+        }
+        if (!isHoleId(after)) break; // (the last page)
+      }
+      return rows;
+    },
     /** These players' records on a hole in a mode (the first 50), as the realm keeps them: strokes, the block
      *  it was saved at, its weather's period, its shots ("a,p,t;…"). One read: a board's page, the bot check's hole. */
     recordsOf: async (hole: string, mode: string, players: readonly string[]): Promise<ReadonlyMap<string, Kept>> => {
@@ -616,6 +635,9 @@ const DATA = /^([a-z]{1,16}\/[1-9]\d{0,2}|g1[0-9a-z]{38}\/[a-z0-9-]{1,32})(\/v[1
 export const isHoleId = (s: unknown) => PKG.test(String(s)) || DATA.test(String(s));
 /** A best as the realm keeps it (recordsOf). */
 export interface Kept { strokes: number; height: number; period: number; shots: string }
+/** One of a player's records (progressOf): the hole's version, slot, world and par; the mode, strokes,
+ *  the block it was saved at and its weather's period; whether it holds the hole's record in that mode. */
+export interface ChainBest { id: string; slot: string; world: string; par: number; mode: Mode; strokes: number; height: number; period: number; top: boolean }
 // a kept best's shots: "angle,power,tick" (%.4f, %.4f, %d) joined by ";", 1 to 60
 const SHOTS = /^-?\d{1,3}\.\d{4},\d{1,2}\.\d{4},-?\d{1,4}(;-?\d{1,3}\.\d{4},\d{1,2}\.\d{4},-?\d{1,4}){0,59}$/;
 /** recordsOf's lines, "<player> <strokes> <height> <period> <shots>", each field as the realm writes it
