@@ -298,10 +298,14 @@ export const PRICE = 0.001;
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
 const MAX_GAS = 1_900_000_000;
 const PER_CALL = 30e6;
+// a round's last commit, the one that holes it, also keeps its finish in
+// store (its best, the board, the standing, the drain's share): some 30M to
+// 40M golf's work model leaves out (golf.gno storeGas)
+const FINISH = 40e6;
 const FORECAST: Record<string, number> = { rain: 200e6, storm: 210e6 };
 /** The gas one commit of these strokes should need. c: { walls, pieces, kind (the forecast's), pts, works, fixed }. */
 export function gasOf(c: Work, from = 0, to = (c.pts || []).length) {
-  let g = PER_CALL + (c.fixed || FORECAST[c.kind || ""] || 0);
+  let g = PER_CALL + (c.fixed || FORECAST[c.kind || ""] || 0) + (c.pts?.length && to > from && to >= c.pts.length ? FINISH : 0);
   for (let i = from; i < to; i++) g += workOf(c, i);
   return Math.min(Math.ceil(g), MAX_GAS);
 }
@@ -444,11 +448,12 @@ export async function sendTip({ from, to, gnot, price, chainId, rpc }: { from: s
   return send([{ type: "/bank.MsgSend", value: { from_address: from, to_address: to, amount: `${gnot * 1e6}ugnot` } }], TIP_GAS, price, chainId, rpc, "The tip was not sent.", "gnogolf tip");
 }
 
-// golf's Claim reads the course's holes once (90 slots, two modes) and seats
-// each best the player kept unnamed: 57.6M with 1 best and 62.1M with 6 on an
-// onyx gnodev (about 56.7M and 0.9M a best), so 150M seats about 100 bests;
-// Register was 28M to 29.5M there
-const CLAIM_GAS = 150_000_000, REGISTER_GAS = 60_000_000;
+// golf's Claim reads the course's slots once (90, two modes: a read of store
+// each) and seats each best the player kept unnamed: 70.2M with 3 bests on an
+// onyx gnodev, and about 4M a best more (golf/v2 filetests: the seat written
+// through store), so a whole course unnamed in both modes, 180 bests, takes
+// about 780M: 850M covers any player; Register was 28M to 29.5M there
+const CLAIM_GAS = 850_000_000, REGISTER_GAS = 60_000_000;
 /** What a name taken with a save adds to its gas: Register and Claim's. */
 export const NAME_GAS = REGISTER_GAS + CLAIM_GAS;
 /**

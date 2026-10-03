@@ -273,7 +273,8 @@ export function makeAimer(E: Live) {
   // the preview for the aim as it is now
   function question(w: Wanted): Question {
     const tick = E.tickNow();
-    const shot = shotOf(w.deg != null ? w.deg : (w.angle * 180) / Math.PI, w.power, tick);
+    // in the chain's steps of 0.01, as a pull is (a demo's settling aim is not): a finer one it refuses
+    const shot = shotOf(w.deg != null ? w.deg : pullShot(0, 1, 1, w.angle).deg, Math.round(w.power * 100) / 100, tick);
     return { ...w, rest: g.rest, n: w.shots.length, round: g.round, tick, shot, key: keyOf({ id: w.id, shots: w.shots, shot }) };
   }
   function ask() {

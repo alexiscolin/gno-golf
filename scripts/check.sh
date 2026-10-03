@@ -26,13 +26,14 @@ if [ "${SKIP_GNO:-}" = 1 ]; then
 	echo "check.sh: SKIP_GNO=1: the Gno tests are skipped" >&2
 elif [ -x "$GNO" ]; then
 	echo "== gno test (onyx toolchain)"
-	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf)
+	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf/... ./gno.land/r/gnogolf/store)
 	echo "== the holes' fingerprints, and data/holes.txt (what publishdata.sh publishes) their data"
 	GNO=$GNO GNOHOME=$toolchain/gnohome "$root/scripts/holedata.sh" --check
 	echo "== the staged packages: the repo's, byte for byte, and linted"
 	stage=$(mktemp -d)
 	trap 'rm -rf "$stage"' EXIT
-	GNO=$GNO "$root/scripts/stage.sh" nym-stagecheck000 "$stage" # any name will do; the deploy's is in deploy-v1.md
+	GNO=$GNO "$root/scripts/stage.sh" nym-stagecheck000 "$stage" # any name will do
+	MAINNET=1 GNO=$GNO "$root/scripts/stage.sh" nym-stagecheck000 "$stage" # without v1, nor the import of its records
 	echo "== the aim preview's wasm: the build of these sources, answering as the realm, byte for byte"
 	GNO=$GNO "$root/scripts/wasm.sh" --check
 else

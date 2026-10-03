@@ -28,7 +28,8 @@ function check(name: string, f: () => void) {
 }
 
 // ---------------------------------------------------------------- the realm
-const realm = (f: string) => fs.readFileSync(new URL(`../gno.land/r/gnogolf/golf/${f}`, import.meta.url), "utf8");
+const realmDir = new URL("../gno.land/r/gnogolf/golf/v2/", import.meta.url); // the rules the site plays
+const realm = (f: string) => fs.readFileSync(new URL(f, realmDir), "utf8");
 const golf = realm("golf.gno"), weather = realm("weather.gno");
 /** The number a Go constant is set to (a literal, or a product of literals). */
 const constOf = (src: string, name: string) => {
@@ -41,7 +42,7 @@ const has = (src: string, code: string) => src.replace(/\s+/g, "").includes(code
 // every golf function the client calls exists, with as many arguments: the
 // reads chain.ts evaluates and the transactions adena.ts sends
 check("realm calls", () => {
-  const src = ["golf.gno", "state.gno", "data.gno", "owner.gno", "weather.gno", "render.gno"].map(realm).join("\n");
+  const src = fs.readdirSync(realmDir).filter((f) => f.endsWith(".gno") && !/_(file)?test\.gno$/.test(f)).map(realm).join("\n");
   const arity = new Map<string, number>();
   // (and its unexported ones: an expression may read the realm's own state through them)
   for (const m of src.matchAll(/^func ([A-Za-z]\w*)\(([^)]*)\)/gm)) {
@@ -91,9 +92,9 @@ check("realm calls", () => {
 check("the realm's formats the client reads", () => {
   assert.ok(has(golf, `return strconv.Itoa(r.strokes) + " " + strconv.FormatInt(runtime.ChainHeight(), 10) + " " + strconv.FormatInt(r.period, 10) + " " + r.shots`), "bestOf: recordsOf parses <strokes> <height> <period> <shots>");
   assert.ok(has(golf, `played := ufmt.Sprintf("%.4f,%.4f,%d", angle, power, tick)`), "a shot as kept: SHOTS and botproof read %.4f,%.4f,%d");
-  assert.ok(has(golf, "func bestFields(v any) (int64, int64, string) {"), "bestFields: height, period, shots");
-  for (const m of ["func (e *entry) bests(m int) view {", "func (e *entry) board(m int) view {", "func (e *entry) hole() *course.Simple {", "func (v view) Get(k string) any", "func (v view) IterateByOffset(offset, count int, cb func(key string, x any) bool) bool {"])
-    assert.ok(has(golf, m), `a method the reads call: ${m}`);
+  assert.ok(has(golf, "func bestFields(s string) (int64, int64, string) {"), "bestFields: height, period, shots");
+  for (const m of ["func (e *entry) bests(m int) view {", "func (e *entry) board(m int) view {", "func (e *entry) hole() *course.Simple {", "func (v view) Get(k string) (string, bool) {", "func (v view) IterateByOffset(offset, count int, cb func(key, x string) bool) bool {"])
+    assert.ok(has(golf + realm("kv.gno"), m), `a method the reads call: ${m}`);
   const course = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/course.gno", import.meta.url), "utf8");
   const kinds: Record<string, string> = Object.fromEntries([...course.matchAll(/^\t(Clear|Wind|Rain|Fog|Storm|Snow)\s*=\s*"(\w*)"/gm)].map((m) => [m[1], m[2]]));
   assert.deepEqual(Object.values(kinds).sort(), [...SKIES].sort(), "the six kinds: card.ts SKIES");

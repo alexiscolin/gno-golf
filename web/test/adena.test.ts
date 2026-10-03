@@ -400,17 +400,17 @@ test("commitsOf: the work budget cuts sooner than maxShots for heavy (unknown-le
 test("gasOf: PER_CALL alone for an empty range; the forecast and the shots add on top, capped at MAX_GAS", () => {
   assert.equal(gasOf({}), 30_000_000);
   // without the realm's own figure, the forecast's most (adena.ts FORECAST: rain 200M, a storm 210M)
-  assert.equal(gasOf({ kind: "rain", pts: [100] }, 0, 1), 30_000_000 + 200_000_000 + 10_000_000 + 100 * 1_200_000);
-  assert.equal(gasOf({ kind: "storm", pts: [100] }, 0, 1), 30_000_000 + 210_000_000 + 10_000_000 + 100 * 1_200_000);
+  assert.equal(gasOf({ kind: "rain", pts: [100] }, 0, 1), 30_000_000 + 200_000_000 + 10_000_000 + 100 * 1_200_000 + 40_000_000); // (the last commit: its finish too)
+  assert.equal(gasOf({ kind: "storm", pts: [100] }, 0, 1), 30_000_000 + 210_000_000 + 10_000_000 + 100 * 1_200_000 + 40_000_000);
   // with it (Weather() "gas"), that figure, whatever the kind
-  assert.equal(gasOf({ kind: "storm", fixed: 15_728_000, pts: [100] }, 0, 1), 30_000_000 + 15_728_000 + 10_000_000 + 100 * 1_200_000);
+  assert.equal(gasOf({ kind: "storm", fixed: 15_728_000, pts: [100] }, 0, 1), 30_000_000 + 15_728_000 + 10_000_000 + 100 * 1_200_000 + 40_000_000);
   assert.equal(gasOf({ walls: 1000, pieces: 1000, pts: [2000] }, 0, 1), 1_900_000_000);
 });
 
 test("gasOf: a shot is counted by its path or by its physics' work (Shot.Work), the larger, as the realm does", () => {
   const path = 10_000_000 + 100 * 1_200_000;
-  assert.equal(gasOf({ pts: [100], works: [50_000] }, 0, 1), 30_000_000 + path); // the path's is larger
-  assert.equal(gasOf({ pts: [100], works: [637_500] }, 0, 1), 30_000_000 + 10_000_000 + 637_500 * RULES.work.unit); // the work's
+  assert.equal(gasOf({ pts: [100], works: [50_000] }, 0, 1), 30_000_000 + path + 40_000_000); // the path's is larger (and the finish)
+  assert.equal(gasOf({ pts: [100], works: [637_500] }, 0, 1), 30_000_000 + 10_000_000 + 637_500 * RULES.work.unit + 40_000_000); // the work's
 });
 
 test("roundGas: a round in several commits pays each commit's call and fixed gas, past one commit's cap", () => {
@@ -528,7 +528,7 @@ test("recordRound: a name taken in the same signature, Register first and Claim 
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
   assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func]), [["gno.land/r/sys/namereg/v0", "Register"], [REALM, "PlayRound"], [REALM, "Claim"]]);
   assert.deepEqual(tx.messages[0].value.args, ["nym-golfer482"]);
-  assert.equal(tx.gasWanted, 100_000_000 + 60_000_000 + 150_000_000);
+  assert.equal(tx.gasWanted, 100_000_000 + 60_000_000 + 850_000_000);
 });
 
 test("recordRound: reset abandons a round left under way, Reset then PlayRound in one transaction", async () => {
@@ -661,7 +661,7 @@ test("registerName: Register then Claim in one transaction, gas = REGISTER_GAS +
     tx.messages.map((m) => [m.value.pkg_path, m.value.func, m.value.args]),
     [["gno.land/r/sys/namereg/v0", "Register", ["nym"]], [REALM, "Claim", []]],
   );
-  assert.equal(tx.gasWanted, 60_000_000 + 150_000_000);
+  assert.equal(tx.gasWanted, 60_000_000 + 850_000_000);
 });
 
 test("registerName: refused names the default failure", async () => {
@@ -679,7 +679,7 @@ test("claimRounds: Claim alone, gas = CLAIM_GAS, and runs ensureNetwork like any
   await claimRounds({ address: ADDR, realm: REALM, rpc: RPC, chainId: CHAIN });
   const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[] } }[]; gasWanted: number };
   assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func, m.value.args]), [[REALM, "Claim", []]]);
-  assert.equal(tx.gasWanted, 150_000_000);
+  assert.equal(tx.gasWanted, 850_000_000);
   assert.ok(calls.some((c) => c.name === "GetNetwork"));
 });
 
@@ -715,10 +715,10 @@ test("gnokeyPlan: one commit is one plain call, PlayRoundAt with its shots quote
     { id: "garden/7", name: "My Round", shots: ["1,1", "2,2"], period: 5, roundMode: "assisted", pts: [10, 10], walls: 0, pieces: 0, official: true },
     { realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC },
   );
-  // gasOf: 30M PER_CALL + 2*22M shots = 74M, official: no DECODE_MAX
+  // gasOf: 30M PER_CALL + 2*22M shots + 40M its finish = 114M, official: no DECODE_MAX
   assert.deepEqual(plan, [
     `gnokey maketx call -pkgpath ${REALM} -func Reset -args garden/7 -gas-fee 45000ugnot -gas-wanted 30000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
-    `gnokey maketx call -pkgpath ${REALM} -func PlayRoundAt -args garden/7 -args '1,1;2,2' -args 5 -gas-fee 111000ugnot -gas-wanted 74000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+    `gnokey maketx call -pkgpath ${REALM} -func PlayRoundAt -args garden/7 -args '1,1;2,2' -args 5 -gas-fee 171000ugnot -gas-wanted 114000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
   ]);
 });
 
@@ -843,7 +843,7 @@ const REG = "gno.land/r/sys/namereg/v0", OWNER = "g1" + "b".repeat(38);
 test("gnokeyName: Register (the name quoted) then Claim, two calls at their own gas, to this chain", () => {
   assert.deepEqual(gnokeyName({ registrar: REG, realm: REALM, name: "nym-golfer123", price: 0.001, chainId: CHAIN, rpc: RPC }), [
     `gnokey maketx call -pkgpath ${REG} -func Register -args 'nym-golfer123' -gas-fee 90000ugnot -gas-wanted 60000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
-    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 225000ugnot -gas-wanted 150000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 1275000ugnot -gas-wanted 850000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
   ]);
 });
 
@@ -858,7 +858,7 @@ test("gnokeyName: no registrar, or a name not of the registrar's shape, is nothi
 
 test("gnokeyClaim: Claim alone at CLAIM_GAS; a bad realm is nothing; a bad chain id or rpc a placeholder", () => {
   assert.deepEqual(gnokeyClaim({ realm: REALM, price: 0.001, chainId: CHAIN, rpc: RPC + "/" }), [
-    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 225000ugnot -gas-wanted 150000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
+    `gnokey maketx call -pkgpath ${REALM} -func Claim -gas-fee 1275000ugnot -gas-wanted 850000000 -broadcast -chainid ${CHAIN} -remote ${RPC} <your-key-name>`,
   ]);
   assert.deepEqual(gnokeyClaim({ realm: "gno.land/r/x;ls", chainId: CHAIN, rpc: RPC }), []);
   assert.match(gnokeyClaim({ realm: REALM, chainId: "a;b", rpc: "$(id)" })[0], /-chainid <chain-id> -remote <rpc-url> <your-key-name>$/);

@@ -46,10 +46,12 @@ async function sourcesMatch(chain: SimChain) {
     if (localStorage.getItem(key) === "ok") return true;
   } catch {}
   // stage.sh's prefix: the repo's gno.land/[pr]/gnogolf/ is the realm's
-  // gno.land/[pr]/<ns>/gnogolf/ (none on a local chain), and golf is the realm
-  const at = chain.realm.replace(/^gno\.land\/r\//, "").replace(/[^/]+$/, "");
+  // gno.land/[pr]/<ns>/gnogolf/ (none on a local chain), and golf/v2 (the
+  // rules golf.wasm was built from: scripts/wasm.sh) is the realm
+  const at = chain.realm.replace(/^gno\.land\/r\//, "").replace(/\/v[0-9]+$/, "").replace(/[^/]+$/, "");
+  const rules = /^gno\.land\/r\/gnogolf\/golf(\/v[0-9]+)?\//;
   const deployed = (p: string) =>
-    p.startsWith("gno.land/r/gnogolf/golf/") ? chain.realm + p.slice("gno.land/r/gnogolf/golf".length) : p.replace(/^gno\.land\/p\/gnogolf\//, `gno.land/p/${at}`);
+    rules.test(p) ? chain.realm + "/" + p.replace(rules, "") : p.replace(/^gno\.land\/p\/gnogolf\//, `gno.land/p/${at}`);
   const back = (s: string) => s.replaceAll(`gno.land/p/${at}`, "gno.land/p/gnogolf/").replaceAll(`gno.land/r/${at}`, "gno.land/r/gnogolf/");
   const same = await Promise.all(Object.entries(src).map(async ([p, sum]) => (await digest(back(await chain.file(deployed(p))))) === sum));
   if (!same.every(Boolean)) return false;

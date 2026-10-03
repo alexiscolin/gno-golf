@@ -11,12 +11,10 @@ type entry struct{ id, world string }
 
 type store map[string]string
 
-// Get is the realm tree's: nil for a hole never loaded.
-func (s store) Get(k string) any {
-	if v, ok := s[k]; ok {
-		return v
-	}
-	return nil
+// Get is the realm's view's: false for a hole never loaded.
+func (s store) Get(k string) (string, bool) {
+	v, ok := s[k]
+	return v, ok
 }
 
 var (

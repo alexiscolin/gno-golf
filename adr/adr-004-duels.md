@@ -180,7 +180,7 @@ tree has already lost its shots, and no migration can bring them back.
   One read per stroke also matches the turn-by-turn play: one read a turn.
 - **Cost of one read.** Each read decodes the hole and plays one shot. On the
   course holes that is 45 to 47M gas at most (docs/golf.md:805-808), well
-  under the node's 3e9 query cap (docs/design/deploy-v1.md:34). A hostile
+  under the node's 3e9 query cap. A hostile
   community hole is bounded by `maxShotGas`, 1.3e9, and its dearest weather
   by `worstGas` (a first shot keeps `minShotWork`), both checked at publish
   (golf.gno:754).

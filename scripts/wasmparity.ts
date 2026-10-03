@@ -2,7 +2,8 @@
 // The wasm parity test: web/lib/sim/golf.wasm (scripts/wasm.sh) must answer
 // every call exactly as the realm does, byte for byte. The realm's side runs
 // in the GnoVM (gno test, the onyx toolchain), in scratch copies of the
-// packages, one per core: scripts/wasm/parity_test.gno publishes every hole
+// packages, one per core: scripts/wasm/parity_test.gno, in golf/v2 (the rules
+// the wasm is built from: scripts/wasm.sh), publishes every hole
 // and plays it (its par plans stroke by stroke in 19 weathers, and random
 // shots anywhere, at any stroke and tick, some refused), printing each
 // call's answer's sha256; then the wasm answers the same calls, through the
@@ -63,15 +64,15 @@ const lines = (
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), `wasmparity${i}-`));
     try {
       fs.cpSync(path.join(root, "gno.land/p/gnogolf"), path.join(dir, "gno.land/p/gnogolf"), { recursive: true });
-      const golf = path.join(dir, "gno.land/r/gnogolf/golf");
-      fs.cpSync(path.join(root, "gno.land/r/gnogolf/golf"), golf, { recursive: true });
+      for (const r of ["golf", "store"]) fs.cpSync(path.join(root, "gno.land/r/gnogolf", r), path.join(dir, "gno.land/r/gnogolf", r), { recursive: true });
+      const golf = path.join(dir, "gno.land/r/gnogolf/golf/v2");
       fs.copyFileSync(path.join(root, "gnowork.toml"), path.join(dir, "gnowork.toml"));
       fs.cpSync(path.join(toolchain, "gnohome"), path.join(dir, "gnohome"), { recursive: true }); // its own: gno locks its package cache
       fs.copyFileSync(path.join(root, "scripts/wasm/parity_test.gno"), path.join(golf, "wasm_parity_test.gno"));
       fs.writeFileSync(path.join(golf, "wasm_parity_data_test.gno"),
         `package golf\n\n// slot, data, plans ("a,p;a,p|…")\nvar wasmHoles = [][3]string{\n${s.holes.map((h) => `\t{${JSON.stringify(h.slot)}, ${JSON.stringify(h.hex)}, ${JSON.stringify(h.plans.join("|"))}},\n`).join("")}}\n`);
       const out = await new Promise<string>((ok, no) => {
-        const p = spawn(GNO, ["test", "-v", "-run", "TestWasmParity", "./gno.land/r/gnogolf/golf"], { cwd: dir, env: { ...process.env, GNOHOME: path.join(dir, "gnohome") } });
+        const p = spawn(GNO, ["test", "-v", "-run", "TestWasmParity", "./gno.land/r/gnogolf/golf/v2"], { cwd: dir, env: { ...process.env, GNOHOME: path.join(dir, "gnohome") } });
         let o = "", e = "";
         p.stdout.on("data", (d: Buffer) => (o += d.toString()));
         p.stderr.on("data", (d: Buffer) => (e += d.toString()));

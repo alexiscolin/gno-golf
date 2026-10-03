@@ -321,7 +321,7 @@ the weather changes the right shot:
 
 ### 5. Pars, and finishable at par in every weather
 
-- **The procedure extends the one in [phase5-pars.md](../docs/design/phase5-pars.md).**
+- **The procedure extends the course's own pars procedure.**
   - The native solver runs each hole in calm, with a budget of 60 to 120 s,
     since the boards are long.
   - The robust plan is then replayed in the weathers a mines hole can get:
@@ -1406,7 +1406,7 @@ ambience of their own ("hot").
 deploy), the course's slots first: with the mines the course is 90, leaving the
 20 community rows and 10 archived. Raising it now would grow `Holes()` and the
 hub's reads for every player, for room no cup needs yet; a seventh cup would
-need a successor golf (deploy-v1.md, section 9).
+need a successor golf.
 
 **No unlock: the cup is open at launch.** The owner opened it from the start,
 a cup like the other four: no boarded card, no padlock, no door kept in the

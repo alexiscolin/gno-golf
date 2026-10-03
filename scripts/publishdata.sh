@@ -14,7 +14,7 @@
 # It fails (exit 1) when a slot is missing or holds other data, and so does
 # the check after publishing.
 #
-# REALM is the golf realm (default gno.land/r/gnogolf/golf), REMOTE the node
+# REALM is the golf realm (default gno.land/r/gnogolf/golf/v2), REMOTE the node
 # (default 127.0.0.1:26657), CHAINID its chain id (default dev), GNOKEY the
 # gnokey (default the onyx toolchain's, in GNO_TOOLCHAIN: see check.sh). A
 # call asks the gas its simulation used and a tenth more (below) at the
@@ -22,11 +22,11 @@
 # MAX_DEPOSIT (default 10000000ugnot; a hole stores 4 to 35 KB).
 #
 #   scripts/publishdata.sh test1                                  a local gnodev
-#   REALM=gno.land/r/nym-alexiscolin000/gnogolf/golf REMOTE=https://rpc.onyx.testnets.gno.land:443 \
+#   REALM=gno.land/r/nym-alexiscolin000/gnogolf/golf/v2 REMOTE=https://rpc.onyx.testnets.gno.land:443 \
 #     CHAINID=onyx-1 scripts/publishdata.sh <your-key-name>
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
-realm=${REALM:-gno.land/r/gnogolf/golf}
+realm=${REALM:-gno.land/r/gnogolf/golf/v2}
 remote=${REMOTE:-127.0.0.1:26657}
 chainid=${CHAINID:-dev}
 toolchain=${GNO_TOOLCHAIN:-${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/onyx}

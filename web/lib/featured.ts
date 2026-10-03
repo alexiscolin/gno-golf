@@ -12,8 +12,8 @@ export interface Pick<R> { row: R; tag: Tag; sky?: SkyKind }
 
 /** The day, a number: the picks hold for it, and change with it. */
 export const today = (now = Date.now()) => Math.floor(now / 864e5);
-// a player's draw for a day: the same all day, another the next
-const draw = (player: string, day: number) => {
+// a player's draw for a day: the same all day, another the next (the gnoweb hub's, featured.gno, draws the same)
+export const draw = (player: string, day: number) => {
   let h = 2166136261 ^ day;
   for (let i = 0; i < player.length; i++) h = Math.imul(h ^ player.charCodeAt(i), 16777619);
   return h >>> 0;

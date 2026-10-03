@@ -19,7 +19,7 @@ import type {
 } from "./types";
 
 /**
- * The realm's rules the client plays by, copied from gno.land/r/gnogolf/golf
+ * The realm's rules the client plays by, copied from gno.land/r/gnogolf/golf/v2
  * (golf.gno, weather.gno): scripts/selfcheck.ts reads them there and fails on
  * any drift. A split or a gas figure that disagrees with the realm sends a
  * commit the chain refuses.
@@ -43,19 +43,23 @@ export const RULES = {
 } as const;
 
 /** A realm path NEXT_PUBLIC_REALM may name: gno.land/r/<namespace>/<realm>, or
- *  a game's sub-path, gno.land/r/<namespace>/<game>/<realm> (next.config.mjs
- *  holds the same rule). */
-export const isRealmPath = (s: string) => /^gno\.land\/r\/[a-z0-9_-]+(\/[a-z0-9_]+){1,2}$/.test(s);
-// the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-alexiscolin000/gnogolf/golf
-// on onyx, or a successor beside it, …/golf2), else the local chain's (a
-// production build refuses one missing or of another shape: next.config.mjs)
+ *  a game's sub-path, gno.land/r/<namespace>/<game>/<realm>, either with a
+ *  version (…/golf/v2) (next.config.mjs holds the same rule). */
+export const isRealmPath = (s: string) => /^gno\.land\/r\/[a-z0-9_-]+(\/[a-z0-9_]+){1,2}(\/v[0-9]+)?$/.test(s);
+// the hub: the build's (NEXT_PUBLIC_REALM, as gno.land/r/nym-alexiscolin000/gnogolf/golf/v2
+// on onyx), else the local chain's (a production build refuses one missing or
+// of another shape: next.config.mjs)
 const REALM_ENV = process.env.NEXT_PUBLIC_REALM || "";
-const REALM = isRealmPath(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf";
+const REALM = isRealmPath(REALM_ENV) ? REALM_ENV : "gno.land/r/gnogolf/golf/v2";
 /** The hub's gnoweb path ("/r/…/golf"). */
 export const REALM_PATH = REALM.replace(/^gno\.land/, "");
+/** The game's own gnoweb path ("/r/…/gnogolf/") of a realm at `realm` (its version aside). */
+const gamePath = (realm: string) => realm.replace(/\/v[0-9]+$/, "").replace(/[^/]+$/, "");
 /** The gnoweb path ("/p/…/") of the packages a realm at `realm` imports, beside
  *  it: p/gnogolf/… in the repo tree, p/<ns>/gnogolf/… as stage.sh deploys them. */
-export const pkgsPath = (realm: string) => realm.replace(/^\/r\//, "/p/").replace(/[^/]+$/, "");
+export const pkgsPath = (realm: string) => gamePath(realm).replace(/^\/r\//, "/p/");
+/** The gnoweb path of the realm that keeps the records, beside the rules: …/gnogolf/store. */
+export const storePath = (realm: string) => gamePath(realm) + "store";
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
 
 /** A pause of ms: between two reads of the chain, a retry, a beat. */
@@ -479,7 +483,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     recordsOf: async (hole: string, mode: string, players: readonly string[]): Promise<ReadonlyMap<string, Kept>> => {
       const got = new Map<string, Kept>(), ps = players.filter(isAddress).slice(0, 50);
       if (!ps.length) return got;
-      const out = await qstr(REALM, `func() (s string) { e, m := readHole(${s(hole)}), modeOf(${s(m(mode))}); for _, p := range []string{${ps.map(s).join(", ")}} { if v := e.bests(m).Get(p); v != nil { s += p + " " + v.(string) + "\\n" } }; return }()`);
+      const out = await qstr(REALM, `func() (s string) { e, m := readHole(${s(hole)}), modeOf(${s(m(mode))}); for _, p := range []string{${ps.map(s).join(", ")}} { if v, ok := e.bests(m).Get(p); ok { s += p + " " + v + "\\n" } }; return }()`);
       for (const [p, k] of keptLines(out)) if (ps.includes(p)) got.set(p, k); // (only the players asked)
       return got;
     },
@@ -487,7 +491,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      *  read of up to 300 (the bot check's; a name deleted since stays). next: the next page's offset, 0 at the end. */
     boardRecords: async (hole: string, mode: string, offset = 0, limit = 300) => {
       const n = Math.max(1, Math.min(300, limit | 0)), at = Math.max(0, offset | 0);
-      const out = await qstr(REALM, `func() (s string) { e, m := readHole(${s(hole)}), modeOf(${s(m(mode))}); e.board(m).IterateByOffset(${at}, ${n}, func(_ string, v any) bool { p := v.(string); if r := e.bests(m).Get(p); r != nil { s += p + " " + r.(string) + "\\n" } else { s += p + "\\n" }; return false }); return }()`);
+      const out = await qstr(REALM, `func() (s string) { e, m := readHole(${s(hole)}), modeOf(${s(m(mode))}); e.board(m).IterateByOffset(${at}, ${n}, func(_, p string) bool { if r, ok := e.bests(m).Get(p); ok { s += p + " " + r + "\\n" } else { s += p + "\\n" }; return false }); return }()`);
       const lines = out.split("\n").filter(Boolean);
       return { rows: keptLines(out), next: lines.length === n ? at + n : 0 };
     },

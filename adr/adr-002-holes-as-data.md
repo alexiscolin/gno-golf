@@ -76,7 +76,7 @@ value. That has three costs on a live chain:
   realm: a golf/v2 that re-publishes a version gets a new id, so new weather,
   and a best carried over from v1 was played in other weather. A v2 that
   wants imported bests to count as the same hole must seed its weather from
-  the v1 id (see deploy-v1.md §9).
+  the v1 id.
 - **No hole realm can follow a v2**: none registers anywhere. A successor
   re-publishes the data (`HoleData` gives it back, `Versions` its sha), and
   community authors re-publish theirs.

@@ -49,7 +49,9 @@ got=$(wc -l <"$tmp" | tr -d ' ')
 if [ -n "$check" ]; then
 	cmp -s "$tmp" data/holes.txt || { diff "$tmp" data/holes.txt | cut -c1-120 >&2; echo "holedata.sh --check: data/holes.txt is not the hole realms' data: run scripts/holedata.sh" >&2; exit 1; }
 	OUT=$par "$root/scripts/paritydata.sh" >/dev/null
-	cmp -s "$par" gno.land/r/gnogolf/golf/parity_data_test.gno || { echo "holedata.sh --check: golf's parity_data_test.gno is not data/holes.txt: run scripts/paritydata.sh" >&2; exit 1; }
+	for g in golf golf/v2; do
+		cmp -s "$par" gno.land/r/gnogolf/$g/parity_data_test.gno || { echo "holedata.sh --check: $g's parity_data_test.gno is not data/holes.txt: run scripts/paritydata.sh" >&2; exit 1; }
+	done
 	echo "data/holes.txt: the $got hole realms' data, and golf's parity data with it"
 	exit 0
 fi

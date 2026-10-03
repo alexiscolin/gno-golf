@@ -31,7 +31,7 @@ class FakeWorker {
 (globalThis as { Worker?: unknown }).Worker = FakeWorker;
 
 const hex = fs.readFileSync(new URL("data/holes.txt", repo), "utf8").split("\n")[0].split(" ")[3];
-const chain = (file = (p: string) => fs.readFileSync(new URL(p, repo), "utf8")) => ({ realm: "gno.land/r/gnogolf/golf", file: (p: string) => Promise.resolve(file(p)), holeData: () => Promise.resolve(hex) });
+const chain = (file = (p: string) => fs.readFileSync(new URL(p, repo), "utf8")) => ({ realm: "gno.land/r/gnogolf/golf/v2", file: (p: string) => Promise.resolve(file(p)), holeData: () => Promise.resolve(hex) });
 const ID = "garden/1/v1", PERIOD = 5967997;
 let copies = 0;
 const fresh = () => import(`../lib/sim.ts?${++copies}`) as Promise<typeof Sim>;

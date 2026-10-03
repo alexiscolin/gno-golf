@@ -8,7 +8,7 @@
 if (process.env.CONTEXT === "production") {
   const e = process.env, https = (v) => /^https:\/\/[^/\s]+/.test(v || "");
   const bad = [
-    !/^gno\.land\/r\/[a-z0-9_-]+(\/[a-z0-9_]+){1,2}$/.test(e.NEXT_PUBLIC_REALM || "") && "NEXT_PUBLIC_REALM (gno.land/r/<namespace>/[<game>/]<realm>)",
+    !/^gno\.land\/r\/[a-z0-9_-]+(\/[a-z0-9_]+){1,2}(\/v[0-9]+)?$/.test(e.NEXT_PUBLIC_REALM || "") && "NEXT_PUBLIC_REALM (gno.land/r/<namespace>/[<game>/]<realm>[/v<n>])",
     !https(e.NEXT_PUBLIC_RPC) && "NEXT_PUBLIC_RPC (https://…)",
     !https(e.NEXT_PUBLIC_WEB) && "NEXT_PUBLIC_WEB (https://…)",
     !["testnet", "mainnet"].includes(e.NEXT_PUBLIC_NETWORK || "") && "NEXT_PUBLIC_NETWORK (testnet or mainnet)",

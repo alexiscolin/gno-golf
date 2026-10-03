@@ -1,4 +1,4 @@
-# `gno.land/r/gnogolf/golf`
+# `gno.land/r/gnogolf/golf/v2`
 
 The game realm. It holds the holes, every player's round on each hole, the
 records and the rankings. It routes shots to holes. It knows nothing about any
@@ -57,7 +57,10 @@ aren't holes of this realm at all, but their URLs look like the course's.
 
 The owner can't edit or delete a version, a round, a record, a best, a board
 or a standing, can't touch a community hole, the weather, the physics or the
-code, and can't pause or upgrade the realm. Everyone else can play, reset
+code. The records are kept in `store`, apart from these rules: store's own
+owner may propose new rules (they take over three days after their code is
+on chain) and pause every save for a bug (see [Updating after the
+deploy](#updating-after-the-deploy)). Everyone else can play, reset
 their own round, publish holes of their own while publishing is open, and
 settle the ranking sooner (`Drain`). The hub page says the same, with the current owner's name
 (see [Render](#renderpath-string-string)).
@@ -226,8 +229,8 @@ fixes the round's weather period to `Period()`. It answers with the version's
 id and, for gnoweb, where the cup is:
 
 ```
-Stroke 2 on garden/3/v1: the ball stopped 7.4 from the cup, which is at 12° from it. Your round: /r/gnogolf/golf:garden/3/v1/g1…
-Holed in 3 on garden/3/v1! Your round: /r/gnogolf/golf:garden/3/v1/g1…
+Stroke 2 on garden/3/v1: the ball stopped 7.4 from the cup, which is at 12° from it. Your round: /r/gnogolf/golf/v2:garden/3/v1/g1…
+Holed in 3 on garden/3/v1! Your round: /r/gnogolf/golf/v2:garden/3/v1/g1…
 ```
 
 ### `PlayRound(cur realm, hole, shots string) string`
@@ -773,9 +776,9 @@ version's id or an alias.
 | `<hole>/<address>` | the same, drawn for that player's next stroke (on timed holes) and with their ball marked: their round under way (one whose weather is over says to `Reset` first) and their best in each mode, each linking its ghost |
 | `<hole>/data` | a version's provenance, every version of its alias, and its data in hex |
 
-On gnoweb that's `/r/gnogolf/golf`, `/r/gnogolf/golf:garden`,
-`/r/gnogolf/golf:g1…`, `/r/gnogolf/golf:garden/3`,
-`/r/gnogolf/golf:garden/3/v1/g1…` and `/r/gnogolf/golf:garden/3/v1/data`:
+On gnoweb that's `/r/gnogolf/golf/v2`, `/r/gnogolf/golf/v2:garden`,
+`/r/gnogolf/golf/v2:g1…`, `/r/gnogolf/golf/v2:garden/3`,
+`/r/gnogolf/golf/v2:garden/3/v1/g1…` and `/r/gnogolf/golf/v2:garden/3/v1/data`:
 every segment of gnoweb's breadcrumb leads somewhere. A query string
 (`?ref=…`) is ignored. A course hole's page names its cup; a community hole's
 page names its author, never a cup, whatever world its data says. A board
@@ -902,16 +905,14 @@ Measured on the course holes; treat them as orders of magnitude:
 - **Publishing** is where the checks land: on the two heaviest holes, decoding
   the hex argument measured 32–45M and the length check (`course.Exact`)
   21–36M, once per version.
-- **Storage**: the first publish into a fresh realm stores about 17 KB (the
-  data, its entry, and the first leaf of each index it opens). A later one
-  stores the data (1–3 KB for the course holes) and about 3.2 KB more (its
-  entry and index keys): nothing for rounds or records until someone plays.
-  A version's rounds, bests and board are rows of B+ trees every version
-  shares (32 a leaf), seeded when golf is deployed: no version pays for trees
-  of its own, and a player's first finish pays for their own rows, not for
-  the round, which is not kept once holed: about 0.6 KB for an unnamed
-  player (2.2 KB when holed rounds were kept), plus the version's 512-byte
-  wear for its first finish. A round left under way stores about 1.6 KB
+- **Storage**, all of it in store: a publish stores the data (1–3 KB for the
+  course holes) and its entry and index rows (a 2 KB hole: about 3.1 KB in
+  all), nothing for rounds or records until someone plays. A version's
+  rounds, bests and board are rows of B+ trees every version shares (32 a
+  leaf), seeded when store is deployed: no version pays for trees of its own,
+  and a player's first finish pays for their own rows, not for the round,
+  which is not kept once holed: under 1 KB for an unnamed player, with the
+  wear its ball leaves (a row a cell played). A round left under way stores about 1.6 KB
   until it is holed or `Reset`; a replay that holes stores nothing. The
   decoded hole is never stored.
   A best keeps its round for `Ghost`: about 30 bytes and 18 to 23 a stroke,
@@ -937,12 +938,33 @@ score honest through it.
 - **Say what changed.** The version's note (on its data page, and in
   `Versions`), and the dapp's changelog, name the fix ("Hole 7 v2: closed a
   shortcut, v1 records archived").
-- **The hub itself** is replaced by a new realm (a sibling path, such as
-  `r/gnogolf/golf2`), which can read the v1's public state (`Holes`,
-  `Versions`, `HoleData`, `BestOf`, `Ghost`, `Records`, `Players`) and
-  carry it over or show it as history. The v1's owner then calls
-  `SetSuccessor` once: every v1 page says where the course went, and v1 goes
-  on playing. See [deploy-v1.md §9](design/deploy-v1.md).
+- **The rules change, the records stay (from v2).** The data (every record,
+  best, board, standing, round in play and hole) lives in its own realm,
+  `r/<ns>/gnogolf/store`, apart from the rules (`r/<ns>/gnogolf/golf/v2`, then
+  v3…). store takes writes from one realm only, the rules it names, checked on
+  every write; anyone reads it. New rules take over **three days after** their
+  code is on chain, on their own: the owner proposes their path (`Propose`),
+  and once deployed they say so (their own crossing call of store's `Ready`,
+  which only they can make), so anyone reads the code that will run for three
+  days before it does; the owner can cancel them before, **stop every save at
+  once** (Pause, for a bug: the reads go on), start the same rules again at
+  once (Resume: nothing new runs), and give the role up for good (Renounce,
+  never while paused: the rules can then never change). store's page says which rules are in force and
+  what is proposed. Nothing is reset at a switch: the next rules read the data
+  on from where it is.
+- **v1's records come over to v2 (onyx),** read on chain from v1 itself (its
+  `HoleData`, `Versions`, `Ghost`, `Records`) in the transaction that writes
+  them, so nobody can change one: `ImportHole` (the owner: a course hole keeps
+  its v1 id, so its weather and its records fit it), then `ImportRecord`
+  (the owner too: v1 plays on with no near-copy rule, so a round played there
+  later is not one to rank here; it copies what v1 holds, once, onto the hole
+  with v1's data). `scripts/importv1.sh` runs it after finishing v1's drain,
+  some forty records a transaction, and checks every board against v1's. A
+  record with a
+  shot finer than 0.01, which the game never sends, stays on v1: its ghost
+  would not replay under v2's rules. v1's owner then calls `SetSuccessor`
+  once: every v1 page says where the course went, and v1 goes on playing.
+  Mainnet has no v1: its stage leaves `import_v1.gno` out.
 - **The dapp** (the web client) is not on-chain and can be updated at any time.
   It lists the current holes (`"next"` is empty in `Holes()`) and links the
   archived ones.

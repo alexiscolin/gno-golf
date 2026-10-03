@@ -3,7 +3,7 @@
 #   NEXT_PUBLIC_SITE_URL  the public address, e.g. https://gnogolf.xyz
 #                         (link previews, share links)
 #   NEXT_PUBLIC_REALM     the golf realm, e.g.
-#                         gno.land/r/nym-alexiscolin000/gnogolf/golf on onyx
+#                         gno.land/r/nym-alexiscolin000/gnogolf/golf/v2 on onyx
 #                         (a production deploy fails without it, or without
 #                         RPC, WEB and NETWORK: next.config.mjs)
 #   NEXT_PUBLIC_RPC       the gno.land RPC the game plays on (a testnet node),

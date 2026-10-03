@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { holePicks, coursePicks, tagWord, today, saveLine } from "../lib/featured.ts";
+import { holePicks, coursePicks, tagWord, today, saveLine, draw } from "../lib/featured.ts";
 import type { SkyKind } from "../lib/card.ts";
 
 // a board's rows in order, their places from 1
@@ -71,4 +71,9 @@ test("saveLine: the players passed first, then the best in its weather, a new be
   assert.equal(saveLine({ pass: [], best: true, sky: "storm" }, 3), "Storm master here · #3");
   assert.equal(saveLine({ pass: [], best: true, sky: "" }, 7), "Your new best · #7");
   assert.equal(saveLine({ pass: [], best: false, sky: "" }, 12), "Your first record · #12");
+});
+
+test("draw: the numbers the gnoweb hub's draw gives too (featured.gno, hub_test.gno)", () => {
+  const a = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", b = "g1" + "q".repeat(38);
+  assert.deepEqual([draw(a, 20363), draw(b, 20363), draw(a, 1)], [1277278921, 4003602704, 3880469319]);
 });

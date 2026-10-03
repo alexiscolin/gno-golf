@@ -147,11 +147,11 @@ func (r *lcg) next() uint64 {
 
 func (r *lcg) unit() float64 { return float64(r.next()%1000001) / 1000000 }
 
-// shot is a shot as a client sends it ("angle,power" or with a tick), now
-// and then one the realm refuses or clamps.
+// shot is a shot as a client sends it ("angle,power" in steps of 0.01, or
+// with a tick), now and then one the realm refuses or clamps.
 func (r *lcg) shot() string {
-	a := strconv.FormatFloat(r.unit()*720-360, 'f', 4, 64)
-	pw := strconv.FormatFloat(0.0001+r.unit()*9.9999, 'f', 4, 64)
+	a := strconv.FormatFloat(r.unit()*720-360, 'f', 2, 64)
+	pw := strconv.FormatFloat(0.01+r.unit()*9.99, 'f', 2, 64)
 	switch r.next() % 40 {
 	case 0:
 		pw = "10.5" // too strong
@@ -161,6 +161,8 @@ func (r *lcg) shot() string {
 		return a + "," + pw + ",-3"
 	case 3:
 		return a + "," + pw + ",99999"
+	case 4:
+		return a + "5," + pw // finer than the game's steps
 	}
 	if r.next()%3 == 0 {
 		return a + "," + pw

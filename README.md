@@ -215,25 +215,31 @@ playable), set the game's link, name a successor realm once, and hand the role
 on or give it up for good.
 
 The owner can't edit or delete a hole, a round or a score, can't touch
-anyone's community hole, the weather or the physics, and can't pause or
-upgrade the realm. The details are in
-[docs/golf.md](docs/golf.md#who-can-change-what).
+anyone's community hole, the weather or the physics. The records live in a
+realm of their own, `store`, apart from the rules: its owner can propose new
+rules, which take over three days after their code is on chain (anyone can
+read it first), and can stop every save at once for a bug (the reads go on)
+and start the same rules again, never write a record.
+The details are in [docs/golf.md](docs/golf.md#who-can-change-what).
 
 ## Repo layout
 
 ```
 gno.land/p/gnogolf/physics   2D rolling-ball engine
 gno.land/p/gnogolf/course    the hole contract and the weather
-gno.land/r/gnogolf/golf      the game realm: holes, rounds, previews, boards, gnoweb page
+gno.land/r/gnogolf/store     the records: every hole, round, best, board and standing
+gno.land/r/gnogolf/golf/v2   the rules: rounds, previews, boards, gnoweb page (the only writer of store)
+gno.land/r/gnogolf/golf      v1, the rules before: on onyx, its records copied into v2
 gno.land/r/gnogolf/<hole>    each course hole's source
 web/                         Next.js + three.js client (static export)
 data/holes.txt               the course as data, one line per slot
 ```
 
-On a chain, the three deployed packages sit under their owner's name and
-the game's sub-path: `p/<ns>/gnogolf/physics`, `p/<ns>/gnogolf/course` and
-`r/<ns>/gnogolf/golf`. `scripts/stage.sh <ns>` stages them so, and the onyx
-runbook names `<ns>`.
+On a chain, the deployed packages sit under their owner's name and the game's
+sub-path: `p/<ns>/gnogolf/physics`, `p/<ns>/gnogolf/course`,
+`r/<ns>/gnogolf/store` and `r/<ns>/gnogolf/golf/v2` (and v1 on onyx).
+`scripts/stage.sh <ns>` stages them so (`MAINNET=1`: without v1 and the import
+of its records), and `scripts/importv1.sh` copies onyx's v1 records into v2.
 
 ## Docs
 
@@ -244,5 +250,4 @@ runbook names `<ns>`.
 - [docs/leaderboards.md](docs/leaderboards.md): the boards, the ghost duels, and the bot check.
 - [CLIENT.md](CLIENT.md): how to write a client.
 - [docs/analytics.md](docs/analytics.md): the anonymous audience measurement.
-- [docs/design/deploy-v1.md](docs/design/deploy-v1.md#onyx-deploy-step-by-step): the onyx deploy, step by step.
 - [adr/](adr/): the architecture decisions.

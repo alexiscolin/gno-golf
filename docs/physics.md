@@ -473,8 +473,8 @@ func Prepared(f *Field) []float64             // a copy of the prep, for tests
 
 `gno.land/p/gnogolf/physics/build` is the toolkit a hole's source is written
 with. A hole's walls are plain `Wall` values, so nothing deployed needs it: it
-depends only on `physics`' exported API, and it is never staged (see
-[deploy-v1.md](design/deploy-v1.md)). Its tests are also where the physics'
+depends only on `physics`' exported API, and it is never staged
+(scripts/stage.sh leaves it out). Its tests are also where the physics'
 own behaviour is tested through built fields (`build/physics_test.gno`); what
 needs the physics' insides is tested in `physics` itself.
 

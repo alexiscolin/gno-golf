@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
-import { REALM_PATH, pkgsPath } from "@/lib/chain";
+import { REALM_PATH, pkgsPath, storePath } from "@/lib/chain";
 import { sound } from "@/lib/feel";
 import { optedOut, optOut } from "@/lib/analytics";
 import { courseCount, holesWord, plural } from "@/components/common";
@@ -39,8 +39,8 @@ const STEPS: readonly { title: string; text: string; icon: ReactNode }[] = [
     icon: ICON.keep,
   },
 ];
-// what gnoweb shows of the game, to check it plays as it says: the code, the physics, the holes' format, the game as text
-const VERIFY = [["The realm's code", `${REALM_PATH}$source`], ["The physics", `${pkgsPath(REALM_PATH)}physics$source`], ["The hole data", `${pkgsPath(REALM_PATH)}course$source`], ["The game as text", REALM_PATH]] as const;
+// what gnoweb shows of the game, to check it plays as it says: the code, where the records are kept (and who may change the rules), the physics, the holes' format, the game as text
+const VERIFY = [["The realm's code", `${REALM_PATH}$source`], ["Where the records are kept", storePath(REALM_PATH)], ["The physics", `${pkgsPath(REALM_PATH)}physics$source`], ["The hole data", `${pkgsPath(REALM_PATH)}course$source`], ["The game as text", REALM_PATH]] as const;
 const FACTS = ["Weather that changes every 5 minutes", "Gnomes to unlock", "Assisted and Pro, ranked apart", "Open source"];
 /** The course's fact, from the chain's holes per cup ("5 cups · 90 holes"); none before it has answered. */
 function courseFact(counts: Readonly<Record<string, number>>) {

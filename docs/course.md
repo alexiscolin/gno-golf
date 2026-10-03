@@ -87,7 +87,7 @@ There's a full example in the [README](../README.md#writing-a-hole).
 
 `gno.land/p/gnogolf/course/author` holds what a hole's source is finished with
 and proved by. It depends only on `course` and `physics`, and nothing deployed
-imports it: it is never staged (see [deploy-v1.md](design/deploy-v1.md)).
+imports it: it is never staged (scripts/stage.sh leaves it out).
 
 ```go
 func Fit(h *course.Simple, margin float64) *course.Simple

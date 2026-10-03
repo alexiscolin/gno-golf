@@ -11,8 +11,9 @@
 #     copied (.gno to .go);
 #   - p/nt/ufmt/v0: the onyx toolchain's, copied the same way (golf's
 #     refusals print with it);
-#   - r/gnogolf/golf: the declarations SimulateFrom and simulateRound reach,
-#     extracted whole from the realm's files (scripts/wasm/extract), with the
+#   - r/gnogolf/golf/v2 (realm, below): the declarations SimulateFrom and
+#     simulateRound reach, extracted whole from the realm's files
+#     (scripts/wasm/extract), into the module's r/gnogolf/golf, with the
 #     realm's storage (a hole's data by its id, readHole) and its clock
 #     (Period) given by scripts/wasm/r/gnogolf/golf/local.go, the one
 #     hand-written file of the package, which adds Load and Round;
@@ -50,6 +51,7 @@
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 here=$root/scripts/wasm
+realm=gno.land/r/gnogolf/golf/v2 # the rules the site plays
 toolchain=${GNO_TOOLCHAIN:-${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/onyx}
 GNO=${GNO:-$toolchain/gno}
 TINYGO=${TINYGO:-tinygo}
@@ -76,7 +78,7 @@ copy "$gnoroot/examples/gno.land/p/nt/ufmt/v0" "$here/p/nt/ufmt/v0"
 copy "$gnoroot/gnovm/stdlibs/math" "$here/gnovm/math"
 rm "$here/gnovm/math/native.go" # native.gno: the natives' declarations, bodiless
 cp "$gnoroot/gnovm/stdlibs/math/native.go" "$here/gnovm/math/native.go"
-golf=$(cd "$here" && go run ./extract "$root/gno.land/r/gnogolf/golf" r/gnogolf/golf/golf.go \
+golf=$(cd "$here" && go run ./extract "$root/$realm" r/gnogolf/golf/golf.go \
 	entry,readHole,holeData,Period SimulateFrom simulateRound entry.hole)
 gnomath <"$here/r/gnogolf/golf/golf.go" >"$here/r/gnogolf/golf/golf.go.tmp"
 mv "$here/r/gnogolf/golf/golf.go.tmp" "$here/r/gnogolf/golf/golf.go"
@@ -95,7 +97,7 @@ fi
 	printf '%s' 'const sources = `{'
 	sep=""
 	for f in $(cd "$root" && ls gno.land/p/gnogolf/physics/*.gno gno.land/p/gnogolf/course/*.gno | grep -Ev '_(file)?test\.gno$') \
-		$(for g in $golf; do echo "gno.land/r/gnogolf/golf/$g"; done); do
+		$(for g in $golf; do echo "$realm/$g"; done); do
 		printf '%s"%s":"%s"' "$sep" "$f" "$(shasum -a 256 "$root/$f" | cut -d' ' -f1)"
 		sep=","
 	done

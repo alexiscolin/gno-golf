@@ -16,8 +16,8 @@
 > `?hole=` which hole to open (any id form below), or `?cup=island&hole=3` a
 > course hole by its place in its cup, `?screen=cups` the cups screen, and `?shot=angle,power` to fire one on
 > load (that last one is how the screenshots and the smoke test are taken).
-> The golf realm's path is set at build time (`NEXT_PUBLIC_REALM`): `gno.land/r/<ns>/gnogolf/golf`
-> on a chain (`<ns>` is in docs/design/deploy-v1.md), `gno.land/r/gnogolf/golf` on a local gnodev.
+> The golf realm's path is set at build time (`NEXT_PUBLIC_REALM`): `gno.land/r/<ns>/gnogolf/golf/v2`
+> on a chain (`<ns>`: the deploy's namespace, `nym-alexiscolin000` on onyx), `gno.land/r/gnogolf/golf/v2` on a local gnodev.
 >
 > Style: cel shading — `MeshToonMaterial` over a three-band ramp — plus
 > `EdgesGeometry` contours. Flat volumes, dark outlines, no gradients, which is
@@ -96,7 +96,7 @@ The expression syntax is `<pkgpath>.<call>` — a dot, not a newline. The reply
 carries a base64 Gno-typed result that has to be unwrapped twice:
 
 ```js
-const call = `gno.land/r/gnogolf/golf.SimulateRound("garden/2", "0,6")`
+const call = `gno.land/r/gnogolf/golf/v2.SimulateRound("garden/2", "0,6")`
 const hex  = [...new TextEncoder().encode(call)]
                .map(b => b.toString(16).padStart(2, "0")).join("")
 const res  = await fetch(`${rpc}/abci_query?path=%22vm/qeval%22&data=0x${hex}`)

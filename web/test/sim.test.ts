@@ -34,7 +34,7 @@ const NS = "nym-tester000";
 const asked: string[] = [];
 const hex = fs.readFileSync(new URL("data/holes.txt", repo), "utf8").split("\n")[0].split(" ")[3];
 const chain = {
-  realm: `gno.land/r/${NS}/gnogolf/golf`,
+  realm: `gno.land/r/${NS}/gnogolf/golf/v2`,
   // the deployed file: the repo's, its paths under the name
   file: (p: string) => {
     asked.push(p);
@@ -49,7 +49,7 @@ const settle = () => new Promise((r) => setTimeout(r, 5));
 void test("the wasm starts once its sources are the realm's deployed files, read back through the name's prefix", async () => {
   assert.equal(simReady(ID), false);
   assert.equal(await startSim(chain), true);
-  assert.ok(asked.includes(`gno.land/p/${NS}/gnogolf/physics/step.gno`) && asked.includes(`gno.land/r/${NS}/gnogolf/golf/golf.gno`));
+  assert.ok(asked.includes(`gno.land/p/${NS}/gnogolf/physics/step.gno`) && asked.includes(`gno.land/r/${NS}/gnogolf/golf/v2/golf.gno`));
   assert.equal(await simHole(chain, ID), true);
   assert.equal(simReady(ID), true);
 });

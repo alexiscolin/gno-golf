@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, isRealmPath, DEFAULT_RPC,
+  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -155,18 +155,21 @@ test("RULES mirrors golf.gno's own constants (a regression guard for scripts/sel
 });
 
 test("REALM_PATH is the hub's gnoweb path (NEXT_PUBLIC_REALM is unset here, so the default realm)", () => {
-  assert.equal(REALM_PATH, "/r/gnogolf/golf");
+  assert.equal(REALM_PATH, "/r/gnogolf/golf/v2");
 });
 
 test("isRealmPath: a realm under a namespace, or under a game's sub-path, and nothing else", () => {
-  for (const ok of ["gno.land/r/gnogolf/golf", "gno.land/r/nym-alexiscolin000/gnogolf/golf"]) assert.equal(isRealmPath(ok), true, ok);
-  for (const bad of ["", "gno.land/r/gnogolf", "gno.land/p/nym-alexiscolin000/gnogolf/golf", "gno.land/r/a/b/c/d", "gno.land/r/a/golf/", "gno.land/r/a/Golf",
+  for (const ok of ["gno.land/r/gnogolf/golf", "gno.land/r/nym-alexiscolin000/gnogolf/golf", "gno.land/r/gnogolf/golf/v2", "gno.land/r/nym-alexiscolin000/gnogolf/golf/v2"]) assert.equal(isRealmPath(ok), true, ok);
+  for (const bad of ["", "gno.land/r/gnogolf", "gno.land/p/nym-alexiscolin000/gnogolf/golf", "gno.land/r/a/b/c/d", "gno.land/r/a/b/c/v2/v3", "gno.land/r/a/golf/v2/", "gno.land/r/a/golf/", "gno.land/r/a/Golf",
     "evil.land/r/a/golf", "gno.land/r/a/golf$source", "gno.land/r/a/../golf"]) assert.equal(isRealmPath(bad), false, bad);
 });
 
 test("pkgsPath: the packages beside the realm, in the repo tree and as stage.sh deploys them", () => {
   assert.equal(pkgsPath(REALM_PATH), "/p/gnogolf/");
   assert.equal(pkgsPath("/r/nym-alexiscolin000/gnogolf/golf"), "/p/nym-alexiscolin000/gnogolf/");
+  assert.equal(pkgsPath("/r/nym-alexiscolin000/gnogolf/golf/v2"), "/p/nym-alexiscolin000/gnogolf/");
+  assert.equal(storePath("/r/nym-alexiscolin000/gnogolf/golf/v2"), "/r/nym-alexiscolin000/gnogolf/store");
+  assert.equal(storePath(REALM_PATH), "/r/gnogolf/store");
 });
 
 // ------------------------------------------------------------ makeChain: params, clock, links
@@ -413,7 +416,7 @@ test("simulateCommit previews the next commit from an exact ball", async () => {
 
 test("period reads the chain's int64 clock tick, and rejects a reply that isn't one", async () => {
   const chain = makeChain();
-  setFetch((url) => { assert.equal(decoded(url).expr, "gno.land/r/gnogolf/golf.Period()"); return rawReply("(42 int64)"); });
+  setFetch((url) => { assert.equal(decoded(url).expr, "gno.land/r/gnogolf/golf/v2.Period()"); return rawReply("(42 int64)"); });
   assert.equal(await chain.period(), 42);
 
   setFetch(() => rawReply("(oops)"));
