@@ -29,7 +29,7 @@ import Tip, { readOwner } from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
-import { fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
+import { CUPS, fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
 import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, plural, vsParWords, AIMS, AIM_NAMES, shortAddr, useCopied, saveBy, mmss, costLine, fundCmd, holeNumber, nextCup, golfTerm, nextHole, chainQuery, strokeFor, minesHint, readMs, type SaveOf } from "@/components/common";
@@ -478,6 +478,9 @@ export default function Golf() {
   const tot = useMemo(() => totals(card, holesList), [card, holesList]);
   const allList = (s && s.allHoles) || NONE;
   const cups = useMemo(() => cupTotals(card, allList), [card, allList]);
+  // each cup's holes not played yet, in order: the next one is said on its card; the cup played
+  // last's first few carry the records to beat on the cups screen (three of them, on those with one)
+  const toPlay = useMemo(() => Object.fromEntries(CUPS.map((c) => [c, allList.filter((h) => cupOf(h) === c && !scoreOf(card, h))])) as Record<Cup, HoleRow[]>, [card, allList]);
   // this hole's score on the card (the round before), said by the strokes while playing it
   const hereRow = s && allList.find((h) => h.id === s.id);
   const last = s && !s.holed && hereRow ? scoreOf(card, hereRow) : undefined;
@@ -1083,10 +1086,11 @@ export default function Golf() {
     if (game.current) void game.current.load(id);
     setScreen("pick");
   };
-  // into a cup: from its first hole (engine setWorld), then the gnome, the last one played already picked
+  // into a cup: from its next hole to play (its card says which), a cup not begun or won from its
+  // first (engine setWorld); then the gnome, the last one played already picked
   const enterCup = (w: string) => {
     // a duel: the cup's first hole with their ghost
-    const first = duelHole && allList.find((h) => cupOf(h) === w && duelHole(h));
+    const first = duelHole ? allList.find((h) => cupOf(h) === w && duelHole(h)) : cups[guessCup(w)].done > 0 ? toPlay[guessCup(w)][0] : undefined;
     if (game.current) void (first ? game.current.load(first.id) : game.current.setWorld(w));
     setScreen("pick");
   };
@@ -1515,7 +1519,9 @@ export default function Golf() {
           onAbout={() => setAbout(true)}
           community={s.community}
           racing={dare && !solo && <p className="dare">Racing {rivalName}</p>}
+          next={(c) => toPlay[c][0]?.name}
           podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onOpen={() => setBoard(true)}
+            holes={toPlay[guessCup(s.world || "")].slice(0, 6)} onRace={(p, id) => (raceWith(p), openHole(id))}
             extra={<button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>} />}
           onCommunity={openHole}
           onPick={enterCup}
@@ -1767,6 +1773,12 @@ export default function Golf() {
             <h2 data-long={won && won.title.length > 16 ? "" : undefined}>{won ? won.title.replaceAll("-", "\u2011") /* a name's hyphens never break a line */ : golfTerm(s.strokes, parHere(s))}</h2>
             {/* the rival's name inked in the line, the one word to find */}
             {won && <p className="banner__duel">{won.line.split(won.duel.name).flatMap((part, i) => (i ? [<b key={i}>{won.duel.name}</b>, part] : [part]))}</p>}
+            {/* not a duel: the record this round takes the place of on the hole's board, else the next one up to race */}
+            {!won && !onChain && rankAt > 0 && (nudge.beat ? (
+              <p className="banner__duel">You beat <b>{nudge.beat.name}</b>&apos;s {nudge.beat.strokes}.</p>
+            ) : nudge.next && (
+              <p className="banner__duel"><b>{nudge.next.name}</b> did it in {nudge.next.strokes} · <button className="linkish" aria-label={`Race ${nudge.next.name}'s ghost`} onClick={() => (sound("select"), raceWith(nudge.next!.player))}>Race ▸</button></p>
+            ))}
             {/* the score, and beside it the ways to tell people about it */}
             <div className="win__head">
               <div className="win__score">
@@ -1858,7 +1870,7 @@ export default function Golf() {
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record?.at === "signing" && record.of !== undefined ? `Adena: part ${record.part} of ${record.of}…` : saveLabel(record)}
                   {rankAt > 0 && !busy(record) && (
-                    <span className="btn__rank">{!account ? `Could be #${rankAt}` : askName && !saveName ? `#${rankAt} with a name` : saveLine(nudge, rankAt)}</span>
+                    <span className="btn__rank">{!account ? `Could be #${rankAt}` : askName && !saveName ? `#${rankAt} with a name` : !won && nudge.beat ? `#${rankAt}` /* (who: said on the card) */ : saveLine(nudge, rankAt)}</span>
                   )}
                 </Button>
               )}

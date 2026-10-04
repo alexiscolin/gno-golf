@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Snapshot } from "@/lib/engine";
 import { isAddress, wait, type Chain } from "@/lib/chain";
-import type { Bests, Mode, StandingRow, StrokesRow } from "@/lib/types";
+import type { Bests, HoleRow, Mode, StandingRow, StrokesRow } from "@/lib/types";
 import { levelFrom, levelPick, pickOne, skyWord } from "@/lib/duel";
 import { ISSUES, SHARE_TAGS, siteURL } from "@/lib/site";
 import { readFlags, stale, hidden, whyHidden, screen, type Flag, type Flags } from "@/lib/flags";
@@ -14,7 +14,7 @@ import { loadFriends, saveFriends, addFriend, nameFriends } from "@/lib/friends"
 import { registerName, claimRounds, gnokeyName, gnokeyClaim, type SendError } from "@/lib/adena";
 import { GnokeyTx } from "@/components/Gnokey";
 import { failure, track, trackError } from "@/lib/analytics";
-import { Button, Segmented, Sheet, VsPar } from "@/components/ui";
+import { Button, InfoTip, Segmented, Sheet, VsPar } from "@/components/ui";
 import Share from "@/components/Share";
 import { messageOf, shortAddr, holeLink, dareLink, parHere, HONEST, nameHint, nameRefusal, strokesWord, holesWord, AIMS, AIM_NAMES, useCopied, GNOME, byStanding, standingVs, RANKED_BY } from "@/components/common";
 import { vsPar, type SkyKind } from "@/lib/card";
@@ -61,14 +61,15 @@ export interface BoardProps {
   /** the player's gnome: a ghost put forward wears another (rivalSkin) */
   gnome?: string;
 }
-/** A board row's way into a duel, the duel's small gold Race, saying what it does before the click:
- *  "Race here", their ghost on the hole played at once, or "Their holes", their ghosts to pick one. */
-const RaceButton = ({ player, name, me, here, onClick }: { player: string; name: string; me?: string | null; here: boolean; onClick?: (p: string) => void }) => {
+/** A board row's way into a duel, the duel's small Race, saying what it does before the click:
+ *  "Race here", their ghost on the hole played at once, or "Their holes", their ghosts to pick one;
+ *  gold on the records worth racing (the few just above you), plain on the rest. */
+const RaceButton = ({ player, name, me, here, onClick, gold = true }: { player: string; name: string; me?: string | null; here: boolean; onClick?: (p: string) => void; gold?: boolean }) => {
   if (!onClick) return null;
   const self = player === me, whose = self ? "your" : `${name}'s`;
   const says = here ? `Race ${whose} ghost on this hole` : `See ${whose} ghosts and pick a hole`;
   return (
-    <Button variant="gold" className="rival__go lb__race" title={says} aria-label={says} onClick={() => onClick(player)}>
+    <Button variant={gold && !self ? "gold" : "secondary"} className="rival__go lb__race" title={says} aria-label={says} onClick={() => onClick(player)}>
       {here ? "Race here" : self ? "Your holes" : "Their holes"}
     </Button>
   );
@@ -95,6 +96,8 @@ const Ghosts = () => (
 // the site's own root (a hole's page is /h/<slot>/). Missing or broken: nobody is hidden,
 // and it is read again next time; stale: said once, to whoever watches.
 let flagsOnce: Promise<ReturnType<typeof readFlags>> | null = null;
+/** A board's rows as it shows them: flagged players left out, the rest placed from 1. */
+const placed = <R extends { player: string }>(rows: readonly R[], flags: Flags) => screen(rows, flags, false).rows.map((r, i) => ({ ...r, at: i + 1 }));
 const flagsOf = (chain: Chain) =>
   (flagsOnce ||= Promise.all([fetch("/flags.json", { cache: "no-cache" }).then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))), chain.chainId()])
     .then(([text, id]) => {
@@ -174,6 +177,8 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
   const invite = me && siteURL(inHole ? holeLink(s, "", me, "board") : dareLink(me, "board"));
   const rows = <R,>(b: { rows: readonly R[] } | null, pick: (a: R, b: R) => number) => (b ? [...b.rows].sort(pick) : null);
   const h = rows(hole, (a, b) => a.strokes - b.strokes), c = rows(course, byStanding);
+  // a friend listed before you is ahead of you: said, and theirs the gold Race
+  const ahead = <R extends { player: string }>(list: readonly R[], i: number) => i < list.findIndex((r) => r.player === me);
   return (
     <div className="lb friends">
       {!me && <p className="lb__empty"><ConnectLink onConnect={onConnect} /> to see where you stand with your friends{friends.length ? "" : ", or add one below"}.</p>}
@@ -187,9 +192,9 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
               <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
-              <span className="lb__holes">{strokesWord(r.strokes)}</span>
+              <span className="lb__holes">{strokesWord(r.strokes)}{ahead(h, i) && " · ahead of you"}</span>
               <strong><VsPar vs={r.strokes - ((hole && hole.par) || parHere(s))} /></strong>
-              <RaceButton player={r.player} name={label(r.player)} me={me} here onClick={onRace} />
+              <RaceButton player={r.player} name={label(r.player)} me={me} here onClick={onRace} gold={ahead(h, i)} />
             </li>
           ))}
         </ol>
@@ -203,7 +208,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
               <span className="lb__who">{label(r.player)}</span>
-              <span className="lb__holes">{holesWord(r.holes)}</span>
+              <span className="lb__holes">{holesWord(r.holes)}{ahead(c, i) && " · ahead of you"}</span>
               <strong><VsPar vs={standingVs(r)} /></strong>
             </li>
           ))}
@@ -268,15 +273,10 @@ export function Boards({ s, chain, me, onClose, goTo, mode: mine = "pro", inHole
         <h2>Beat a record</h2>
         <div className="boards__modes">
           <Segmented className="seg--s" role="tablist" label="Aim mode" value={mode} onChange={setMode} options={AIMS} />
-          <p className="boards__word">{HONEST}</p>
+          <InfoTip label="About these boards" note={<>{HONEST} Ranked: players with a gno.land name{!(me && myName) && ", taken when you save"}.</>} />
         </div>
         <Segmented className="boards__tabs" full role="tablist" label="Board" value={tab} onChange={setTab} options={[...(friendsFirst ? [["friends", "Friends"] as const] : []), ...(inHole ? [["hole", "This hole"] as const] : []), ["course", "The course"] as const, ...(friendsFirst ? [] : [["friends", "Friends"] as const])]} />
         {tab === "course" && inHole && onRace && <p className="real__fine boards__legend">Race here: this hole · Their holes: pick one.</p>}
-        {tab !== "friends" && (
-          <p className="boards__ranked">
-            Ranked: players with a gno.land name{!(me && myName) && ", taken when you save"}
-          </p>
-        )}
         {tab !== "friends" && me && myName && chain && <ClaimRounds chain={chain} me={me} mode={mode} onDone={() => setClaimed((n) => n + 1)} />}
         {tab === "hole" && newer && (
           <p className="note note--warn">
@@ -372,7 +372,7 @@ export function useRivalPicks(chain: Chain | null, me: string | null | undefined
     let live = true;
     // a page of the course's board, its places kept, the flagged out
     const page = (at: number, n: number) =>
-      Promise.all([chain.courseLeaderboard(at, n, mode), flagsOf(chain)]).then(([b, f]) => ({ players: b.players, holes: b.holes, rows: screen(b.rows.map((r, i) => ({ ...r, at: at + i + 1 })), f.flags, false).rows.map((r, i) => ({ ...r, at: i + 1 })) }));
+      Promise.all([chain.courseLeaderboard(at, n, mode), flagsOf(chain)]).then(([b, f]) => ({ players: b.players, holes: b.holes, rows: placed(b.rows.map((r, i) => ({ ...r, at: at + i + 1 })), f.flags) }));
     void Promise.all([page(0, 30), me ? chain.rank(mode, me).catch(() => null) : null])
       .then(async ([top, mine]) => {
         // (a page that fails: the first one's players stand in)
@@ -544,7 +544,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
       <FlagMark f={showAll && flags[r.player]} />
     </span>
     {score(r)}
-    <RaceButton player={r.player} name={r.name || shortAddr(r.player)} me={me} here={racesHere(r.player)} onClick={racesHere(r.player) ? onRace : onGhosts} />
+    <RaceButton player={r.player} name={r.name || shortAddr(r.player)} me={me} here={racesHere(r.player)} onClick={racesHere(r.player) ? onRace : onGhosts} gold={myPlace ? r.at < myPlace.at && r.at >= myPlace.at - 3 : r.at <= 3} />
   </>);
   // your place, listed or further down: said once under the list, with the game's share
   // (the place in the list shown, flagged players left out of it and of the count)
@@ -569,7 +569,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
   // the records put forward: from the first page (they hold as more is read), flagged ones always out,
   // once your place and the page's weather are read (cards drawn blank till then: nothing moves);
   // none on a board of a few rows (they would be its rows again)
-  const base = rows ? screen(rows.slice(0, PAGE), flags, false).rows.map((r, i) => ({ ...r, at: i + 1 })) : [];
+  const base = rows ? placed(rows.slice(0, PAGE), flags) : [];
   const featured = own && !!head && (base.length > TOP || next > 0);
   const picks: Pick<Placed>[] = !featured || !mineRead || !infoRead ? [] : kind === "hole"
     ? holePicks(base, info, me, mine ? mine.strokes : null)
@@ -681,7 +681,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
  */
 export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string | null | undefined, mode: Mode, saved: boolean, stale: boolean) {
   const [at, setAt] = useState(0);
-  const [gain, setGain] = useState<{ pass: readonly string[]; best: boolean; sky: SkyKind }>(NO_GAIN);
+  const [gain, setGain] = useState<Gain>(NO_GAIN);
   const [named, setNamed] = useState<boolean | null>(null);
   const id = (s && s.id) || "", strokes = s ? s.strokes : 0;
   // an archived version, or a community hole, ranks nobody
@@ -705,7 +705,7 @@ export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string
         const best = rank && rank.rank > 0 ? rank.strokes : null;
         if (best != null && best <= strokes) return; // no better than the player's own best
         // equal strokes go by who got there first: a save lands last, so every tie is ahead
-        const ahead = b.rows.filter((r) => r.player !== me && r.strokes <= strokes).length;
+        const others = b.rows.filter((r) => r.player !== me), before = others.filter((r) => r.strokes <= strokes), ahead = before.length;
         // sorted rows: a row not ahead, or the end of the board, makes the place exact
         // (a page can hold fewer rows than asked while more follow)
         if (!(ahead < b.rows.length || b.next === 0)) return;
@@ -715,11 +715,14 @@ export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string
         const was = board.rows.findIndex((r) => r.player === me);
         const aheadOfBest = best == null ? [] : was >= 0 ? board.rows.slice(0, was) : board.rows;
         const pass = b.rows.filter((r) => aheadOfBest.includes(r) && r.strokes > strokes).map((r) => r.name || shortAddr(r.player));
-        setGain({ pass, best: best != null, sky: "" });
+        // the finish card's line: the record this round takes the place of (one your best was not ahead
+        // of already), else the next one up that it does not tie (a ghost still to beat)
+        const who = (r: StrokesRow | undefined) => r && { player: r.player, name: r.name || shortAddr(r.player), strokes: r.strokes };
+        const beaten = others[ahead] && (best == null || others[ahead].strokes < best) ? others[ahead] : undefined;
+        setGain({ pass, best: best != null, sky: "", beat: who(beaten), next: who(before.filter((r) => r.strokes < strokes).at(-1)) });
         // in a hard sky, the best in it here: no record ahead played in the same sky (one read; said only if read)
-        const before = b.rows.filter((r) => r.player !== me && r.strokes <= strokes).map((r) => r.player);
         if (HARD_SKIES.includes(sky))
-          void (before.length ? chain.recordsOf(id, mode, before) : Promise.resolve(new Map<string, { period: number }>()))
+          void (before.length ? chain.recordsOf(id, mode, before.map((r) => r.player)) : Promise.resolve(new Map<string, { period: number }>()))
             .then((kept) => live && ![...kept.values()].some((r) => skyOf(id, world, r.period) === sky) && setGain((g) => ({ ...g, sky })), () => {});
       })
       .catch(() => {});
@@ -738,7 +741,11 @@ export function useRankNudge(s: Snapshot | null, chain: Chain | null, me: string
   // a player with no name is not listed yet: the place is what a name would give
   return { at, ...gain, noName: !!me && named === false && ranked, isNamed: named, named: () => setNamed(true) };
 }
-const NO_GAIN = { pass: [] as readonly string[], best: false, sky: "" as SkyKind };
+/** What a finish would win on its hole's board: the players it passes (ahead of your best, behind this round),
+ *  your best before or none, the hard sky it is the best in; the record whose place it takes, the next one up. */
+interface Gain { pass: readonly string[]; best: boolean; sky: SkyKind; beat?: Rival; next?: Rival }
+type Rival = { player: string; name: string; strokes: number };
+const NO_GAIN: Gain = { pass: [], best: false, sky: "" };
 
 /** The chain's own name registrar on gnoweb (onyx, mainnet and a local gno: v0; pearl had v1), NEXT_PUBLIC_NAMEREG if set. */
 function NameLink({ chain, children }: { chain: Chain | null; children: ReactNode }) {
@@ -975,29 +982,46 @@ function Who({ chain, addr, me, link, title = "See this round on gno.land" }: { 
   );
 }
 
-/** The cups screen's records to beat today (featured.ts: not the top three, a few
- *  worth beating, each for a reason), flagged players left out as on the boards,
- *  as the rival board's stickers (a tap opens the board); the cards nobody fills
- *  drawn blank. Read from the course board's first page (yours among it, or not). */
-export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra }: { chain: Chain | null; me?: string | null; mode?: Mode; gnome: string; onOpen: () => void; extra?: ReactNode }) {
-  const [top, setTop] = useState<{ picks: Pick<StandingRow & { at: number }>[]; holes: number; flagged: boolean } | null>(null);
+/** The cups screen's records to beat today (featured.ts: a few worth beating, each for a reason),
+ *  flagged players left out as on the boards, as the rival board's stickers; the cards nobody fills
+ *  drawn blank. With holes (the next ones to play), a record on each of the first three that has one
+ *  (holePicks, as its board picks them, none you beat already), a tap racing it there (onRace); none:
+ *  the course's (coursePicks, never its top three), a tap opening the board. A read again keeps the
+ *  cards there until it lands: the cups below never move. */
+export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra, holes = [], onRace }: { chain: Chain | null; me?: string | null; mode?: Mode; gnome: string; onOpen: () => void; extra?: ReactNode; holes?: readonly HoleRow[]; onRace?: (player: string, hole: string) => void }) {
+  const [top, setTop] = useState<{ cards: { player: string; name?: string; tag: string; sub: string; hole?: string }[]; flagged: boolean } | null>(null);
+  const next = holes.map((h) => h.id).join(" ");
   useEffect(() => {
-    setTop(null);
     if (!chain) return;
     let live = true;
-    Promise.all([chain.courseLeaderboard(0, 50, mode), flagsOf(chain)])
-      .then(([b, { flags }]) => {
-        const rows = screen(b.rows, flags, false).rows.map((r, i) => ({ ...r, at: i + 1 }));
+    const course = () =>
+      Promise.all([chain.courseLeaderboard(0, 50, mode), flagsOf(chain)]).then(([b, { flags }]) => {
+        const rows = placed(b.rows, flags);
         const i = me ? rows.findIndex((r) => r.player === me) : -1;
         const picks = coursePicks(rows, b.holes, me, i >= 0 ? rows[i] : null, i > 0 ? rows[i - 1] : null);
-        primeNames(chain, picks.map((p) => p.row));
-        if (live) setTop({ picks, holes: b.holes, flagged: b.rows.length > 0 && !rows.length });
+        return { cards: picks.map((p) => ({ player: p.row.player, name: p.row.name, tag: tagWord(p), sub: `${p.row.holes}/${b.holes} holes · ${vsPar(standingVs(p.row))}` })), flagged: b.rows.length > 0 && !rows.length };
+      });
+    const onHoles = () =>
+      // (a board that does not answer: no record there; the course's picks if none answers)
+      Promise.all([flagsOf(chain), ...holes.map((h) => chain.holeLeaderboard(h.id, 0, 20, mode).catch(() => ({ rows: [] })))]).then(([{ flags }, ...boards]) => ({
+        cards: holes.flatMap((h, k) => {
+          const all = placed(boards[k].rows, flags), mine = all.find((r) => r.player === me), rows = all.filter((r) => !mine || r.strokes < mine.strokes || r === mine);
+          const p = holePicks(rows, new Map(), me, mine ? mine.strokes : null, undefined, 1)[0];
+          return p ? [{ player: p.row.player, name: p.row.name, tag: tagWord(p), sub: `${h.name} · ${strokesWord(p.row.strokes)}`, hole: h.id }] : [];
+        }),
+        flagged: false,
+      }));
+    (holes.length ? onHoles() : course())
+      .then((t) => (t.cards.length || !holes.length ? t : course()))
+      .then((t) => {
+        primeNames(chain, t.cards);
+        if (live) setTop(t);
       })
       .catch(() => {});
     return () => void (live = false);
-  }, [chain, mode, me]);
+  }, [chain, mode, me, next]); // eslint-disable-line react-hooks/exhaustive-deps -- (holes: by their ids)
   if (!chain) return null;
-  const empty = !!top && !top.picks.length;
+  const empty = !!top && !top.cards.length;
   return (
     <section className="podium" aria-label="Records to beat today">
       <header className="podium__head">
@@ -1009,10 +1033,11 @@ export function Podium({ chain, me, mode = "pro", gnome, onOpen, extra }: { chai
       </header>
       <ol className="podium__row">
         {[0, 1, 2].map((i) => {
-          const p = top && top.picks[i];
-          return p ? (
-            <li key={p.row.player}>
-              <Sticker player={p.row.player} tag={tagWord(p)} sub={`${p.row.holes}/${top.holes} holes · ${vsPar(standingVs(p.row))}`} chain={chain} me={me} gnome={gnome} say="See them on the board" onClick={() => (sound("blip"), onOpen())} />
+          const c = top && top.cards[i];
+          return c ? (
+            <li key={`${c.player}|${c.hole || ""}`}>
+              <Sticker player={c.player} tag={c.tag} sub={c.sub} chain={chain} me={me} gnome={gnome} say={c.hole && onRace ? undefined : "See them on the board"}
+                onClick={() => (sound(c.hole && onRace ? "select" : "blip"), c.hole && onRace ? onRace(c.player, c.hole) : onOpen())} />
             </li>
           ) : (
             <li key={i} aria-hidden="true">

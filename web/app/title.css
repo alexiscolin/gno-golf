@@ -498,7 +498,7 @@ li.me > .sticker { background: var(--ink); color: var(--paper); }
 .sticker__face { grid-row: 1 / 3; width: 54px; height: 54px; }
 .sticker .podium__medal { --m: 26px; position: absolute; top: -8px; left: -8px; }
 .sticker__who { align-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-name); font-weight: 700; }
-.sticker__sub { align-self: start; font-size: 12.5px; opacity: .75; }
+.sticker__sub { align-self: start; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; opacity: .75; } /* (one line, as its name: a card never grows) */
 /* a sticker or a hole card that is a button: it lifts under the pointer, sinks pressed, rings in focus */
 button.sticker, .ghost { cursor: pointer; transition: transform var(--t-pop) var(--spring), box-shadow .2s; }
 button.sticker:hover, .ghost:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 0 0 3px var(--glow), 0 8px 0 var(--ink); }
@@ -509,7 +509,8 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
 .podium__ghost .podium__medal, .podium__ghost .rival__map { opacity: .45; }
 .podium__ghost i { width: 60%; }
 /* the cups' records to beat: the stickers, smaller */
-.podium .sticker { min-height: 58px; padding: 6px 12px 6px 6px; }
+.podium .sticker { padding: 6px 12px 6px 6px; }
+.podium :is(.sticker, .podium__ghost) { min-height: 84px; } /* (a card with its Race line: one height filled or blank, the cups below never move) */
 .podium .sticker__face { width: 44px; height: 44px; }
 @media (max-width: 900px) {
   /* three narrow panels: Race on a row of its own */
@@ -529,9 +530,10 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .rival__board .lb--full ol { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .sticker { grid-template: auto auto auto / minmax(0, 1fr); justify-items: center; padding: 10px 8px; text-align: center; }
   .sticker__face { grid-row: auto; }
-  .sticker__who { max-width: 100%; }
+  .sticker__who, .sticker__sub { max-width: 100%; }
   .podium__row { gap: 8px; padding-left: 8px; } /* (the first medal clear of the page's frame) */
   .podium .sticker { padding: 8px 4px 6px; }
+  .podium :is(.sticker, .podium__ghost) { min-height: 114px; }
   .podium .sticker__sub { font-size: 11px; }
 }
 @media (max-width: 600px) {
@@ -591,7 +593,7 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .ghost .rival__go { padding: 4px 10px 5px; font-size: 16px; }
 }
 
-@media (max-height: 640px) { .worlds--v2 .world__tag { display: none; } }
+@media (max-height: 640px) { .worlds--v2 .world__tag:not(.world__next) { display: none; } }
 /* two cards a row, each over two quarter tracks: an odd last card (the Crystal
    Mines) sits centred at a card's width, whatever the gap */
 @media (max-width: 900px) {
@@ -603,7 +605,8 @@ button.sticker:focus-visible, .ghost:focus-visible { outline: none; box-shadow: 
   .worlds--v2 .worlds__list { gap: 12px; }
   .worlds--v2 .world { padding: 6px 6px 10px; border-radius: var(--r-card); }
   .worlds--v2 .world__ribbon { font-size: 14px; padding: 4px 10px; white-space: normal; }
-  .worlds--v2 .world__tag { display: none; }
+  .worlds--v2 .world__tag:not(.world__next) { display: none; } /* (a cup begun keeps where it goes on) */
+  .worlds--v2 .world__next { font-size: 12.5px; }
   .worlds--v2 .world:hover:not([disabled]) .world__ribbon, .worlds--v2 .world:focus-visible .world__ribbon { transform: rotate(-6deg) scale(1.12); }
   .world__won { top: 10px; right: 10px; font-size: 13px; padding-right: 9px; }
   .world:has(.world__won) .world__last { top: 56px; } /* (the badge a size down) */

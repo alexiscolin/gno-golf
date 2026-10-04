@@ -220,13 +220,15 @@ interface WorldsProps {
   onCommunity?: (id: string) => void;
   /** the course's records to beat, under the cups */
   podium?: ReactNode;
+  /** a cup's next hole to play, said on its card once begun */
+  next?: (cup: Cup) => string | undefined;
   /** a duel chosen: whose ghost is raced, said under the title */
   racing?: ReactNode;
 }
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
 let shownOnce = false;
 
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, podium, racing }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, podium, racing, next = () => undefined }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -300,7 +302,7 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                 onPointerLeave={() => setHot(null)}
                 onFocus={() => open && setHot(w.id)}
                 onBlur={() => setHot(null)}
-                aria-label={`${w.name}: ${w.id === "mines" ? "the expert cup, " : ""}${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par` : "") : loading ? "loading" : "coming soon"}`}
+                aria-label={`${w.name}: ${w.id === "mines" ? "the expert cup, " : ""}${n ? `${n} holes` + (won ? `, cup won${t.clean ? " at par or under" : ""}: ${t.strokes} strokes, ${vs > 0 ? "+" : ""}${vs} against par` : t.done ? `, ${t.done} played, ${vs > 0 ? "+" : ""}${vs} against par${next(w.id) ? `, next: ${next(w.id)}` : ""}` : "") : loading ? "loading" : "coming soon"}`}
               >
                 <Diorama id={w.id} on={hot === w.id && open} />
                 {last && <span className="tag world__last" aria-hidden="true">Last played</span>}
@@ -308,7 +310,8 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
                 {won && <Won clean={t.clean} score={score} />}
                 <span className="world__ribbon">{w.name}</span>
                 <span className="world__info">
-                <span className="world__tag">{w.tag}</span>
+                {/* (begun: where a tap goes on instead of what it is, kept on a phone) */}
+                {t.done > 0 && !won && next(w.id) ? <span className="world__tag world__next">Next: {next(w.id)}</span> : <span className="world__tag">{w.tag}</span>}
                 {/* (a cup with no holes on this chain: the same rows, the green empty, why it cannot be picked said) */}
                 <span className="world__me">
                   <span className={`world__track load--${w.id}`}><Green p={n ? t.done / n : 0} world={w.id} holed={n > 0 && t.done === n} thick /></span>

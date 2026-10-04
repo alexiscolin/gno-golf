@@ -157,10 +157,11 @@ try {
     const vs = /(E|[+−]\d+)$/;
     if (await until<boolean>(`!!document.querySelector('.podium .sticker__sub')`, 20)) {
       const sub = await b.ev<string>(`document.querySelector('.podium .sticker__sub').textContent`);
-      assert.ok(/holes · /.test(sub) && vs.test(sub), `a podium sticker says ${sub}`);
-      // each card says why it is there (featured.ts), not a place
+      // a record on one of the cup's next holes (the hole, then its strokes), else a course standing
+      assert.ok(/ · \d+ strokes?$/.test(sub) || (/holes · /.test(sub) && vs.test(sub)), `a podium sticker says ${sub}`);
+      // each card says why it is there (featured.ts tagWord), not a place
       const tag = await b.ev<string>(`(document.querySelector('.podium .sticker__tag') || {}).textContent || ""`);
-      assert.ok(/^(Within reach|One place up|Fast start|Best average|Today's pick|Also today)$/.test(tag), `a podium card's tag: ${tag}`);
+      assert.ok(/^(Within reach|One place up|First target|Hole in one|(Storm|Snow|Rain|Wind) master|Latest|Fast start|Best average|Today's pick|Also today)$/.test(tag), `a podium card's tag: ${tag}`);
     }
     await b.ev(`document.querySelector('.podium__open').click()`);
     const rows = await until<number>(`document.querySelectorAll('.lb--full > ol:not(.lb__ghosts) > li:not(.lb__more)').length`, 40);
