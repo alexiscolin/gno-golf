@@ -160,6 +160,16 @@ it leaves them and refuses to move an earned one.
 | a first buy (2.45M while a sold count in the series rewrote its rows) | 2.34M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
+| `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
+
+Every figure above is `gno test`'s, and a chain charges more. `gno test`
+runs on a store with no gas meter: it never charges what a call pays to load
+each object it reads from the chain's store (per object 59,000 to read, then
+17 a byte, and amino's decoding a byte; `tm2/pkg/store/types/gas.go`
+`DefaultGasConfig`). For `TokenURI(199)` that is 7.1M more, the
+catalogue's 60 KB string and the ledger's nodes among it; a read of the
+catalogue (a buy, a proof's cups) pays its share too. The client's gas for
+a call is the chain's figure with a margin, never a filetest's.
 
 The King's proof is under the 300M the client will ask for `MintEarned` and
 of the order of golf's `Claim` (70.2M); a `GnomesOf` page of 100 is about

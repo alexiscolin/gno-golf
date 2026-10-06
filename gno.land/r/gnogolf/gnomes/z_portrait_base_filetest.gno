@@ -11,11 +11,19 @@ import (
 	gnomes "gno.land/r/gnogolf/gnomes"
 )
 
-// What a portrait costs to draw: z_portrait_base buys gnome 1, whose look is
-// the heaviest picture of the Genesis (Figurehead Fen's, 6.0 KB of SVG);
+// What a portrait costs to read: z_portrait_base buys gnome 199, Figurehead
+// Fen, the heaviest picture of the Genesis (an Epic: its look and its tier's
+// two rings, 8,170 bytes of data URI; of every Genesis gnome's, measured,
+// the largest), at its real row: its tier, its name, its traits;
 // z_portrait_read buys it and reads its TokenURI. The difference of their
-// gas is the read: 0.076e9 (75.8 million), drawing it 0.048e9 of that; a
-// Common of 3.7 KB draws for a third less.
+// gas is the read as `gno test` counts it: 76.0M (75.8M on a Common row).
+//
+// A chain counts more: 83.08M for the same TokenURI on a local chain built
+// from this toolchain. `gno test` runs on a store with no gas meter, so it
+// never charges what a fresh call pays to load each object it reads from
+// the chain's store (per object 59,000 to read, then 17 a byte, and amino's
+// decoding a byte), the catalogue's 60 KB string and the ledger's nodes
+// among them. Budget a TokenURI call from the chain's figure, not this one.
 func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
@@ -23,17 +31,18 @@ func main(cur realm) {
 	gnomes.SetMintOpen(cross(cur), true)
 
 	buyer := testutils.TestAddress("buyer")
-	price := chain.Coins{{"ugnot", 30_000_000}}
+	price := chain.Coins{{"ugnot", 333_000_000}}
 	testing.SetOriginCaller(buyer)
 	testing.SetOriginSend(price)
 	testing.IssueCoins(chain.PackageAddress("gno.land/r/gnogolf/gnomes"), price)
 	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/gnomes"))
 	testing.SetRealm(testing.NewUserRealm(buyer))
-	tid := gnomes.Buy(cross(cur), "1")
+	tid := gnomes.Buy(cross(cur), "199")
 	println(tid)
 }
 
-// genesis is z_storage_genesis's, gnome 1 in Figurehead Fen's look.
+// genesis is z_storage_genesis's, gnome 199 at its real row (an Epic of
+// wave 2, Figurehead Fen, its traits as data/gnomes.json has them).
 func genesis() string {
 	var b strings.Builder
 	id := 1
@@ -51,11 +60,11 @@ func genesis() string {
 		}{{"common", 72}, {"rare", rares}, {"epic", epics}, {"legendary", 1}} {
 			for i := 0; i < t.n; i++ {
 				s := strconv.Itoa(id)
-				traits := "01" + strings.Repeat("0", 56-len(s)) + s
-				if id == 1 {
-					traits = "0101030002040932ff06345100ff000000000100ff02330c0302330cff"
+				name, traits := "Pip Seedwell "+s, "01"+strings.Repeat("0", 56-len(s))+s
+				if id == 199 {
+					name, traits = "Figurehead Fen", "0101030002040932ff06345100ff000000000100ff02330c0302330cff"
 				}
-				b.WriteString(s + "|" + t.name + "|Pip Seedwell " + s + "|" + traits + "\n")
+				b.WriteString(s + "|" + t.name + "|" + name + "|" + traits + "\n")
 				id++
 			}
 		}
@@ -64,7 +73,7 @@ func genesis() string {
 }
 
 // Output:
-// 1
+// 199
 
 // Gas:
-// 1406927467
+// 1406400960
