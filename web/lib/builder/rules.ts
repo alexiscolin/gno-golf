@@ -17,13 +17,14 @@ export interface Field {
   bounce: number;
   ballR: number;
   cupR: number;
+  shelter: number;
 }
-const field = (substeps: number, friction: number): Field => ({ substeps, friction, bounce: 0.85, ballR: 0.5, cupR: 1.2 });
+const field = (substeps: number, friction: number, shelter = 0): Field => ({ substeps, friction, bounce: 0.85, ballR: 0.5, cupR: 1.2, shelter });
 /** The worlds' fields: the values most of each world's course holes have (data/holes.txt). */
 export const FIELD: Record<string, Field> = {
   garden: field(22, 0.86),
   island: field(26, 0.87),
   town: field(26, 0.87),
   mountain: field(28, 0.87),
-  mines: field(34, 0.87),
+  mines: field(34, 0.87, 0.03),
 };

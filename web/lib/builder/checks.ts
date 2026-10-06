@@ -7,7 +7,8 @@
 // loses what lies off the board, where neither tee nor cup is).
 import { inZone, segDist } from "../terrain";
 import type { Vec2 } from "../types";
-import { LIMITS, type GHole, type GPost, type GWall, type GZone } from "./gg1";
+import { LIMITS } from "./gg1";
+import type { HoleIn as GHole, PostIn as GPost, WallIn as GWall, ZoneIn as GZone } from "./types";
 import type { Cost } from "./wasm";
 
 /** Where a piece is in the hole: its list, its place in it, and its pulse (-1: none). */

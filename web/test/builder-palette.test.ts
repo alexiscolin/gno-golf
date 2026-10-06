@@ -8,7 +8,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { added, drawn, loadWorld, worldOf } from "./scene-harness.ts";
-import { draftHex, type GHole } from "../lib/builder/gg1.ts";
+import { writeHole as draftHex } from "../lib/builder/gg1.ts";
+import type { HoleIn as GHole } from "../lib/builder/types.ts";
 import { BINDINGS, HAND_ONLY, WORLD_NAMES, paletteOf, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD, MAX_BOUNCE, WEATHER, kicks } from "../lib/builder/rules.ts";
 import { place, type Params } from "../lib/builder/place.ts";
@@ -23,7 +24,7 @@ for (const w of WORLD_NAMES) {
 const every = () => [...palettes.entries()].flatMap(([w, es]) => es.map((e) => [w, e] as const));
 
 // a lane of 30 by 20 in a world, the piece in its middle, tee and cup at its ends
-const AT = [15, 10] as const;
+const AT: [number, number] = [15, 10];
 const lane = (world: string, pieces: Partial<Pick<GHole, "walls" | "posts" | "zones">> = {}, w = 30, h = 20): GHole => {
   const f = FIELD[world];
   const box: GHole["walls"] = [[0, 0, w, 0], [w, 0, w, h], [w, h, 0, h], [0, h, 0, 0]].map(([a, b, c, d]) => ({ a: [a, b], b: [c, d] }));
@@ -63,14 +64,14 @@ void test("each world's field is the one most of its course holes have", () => {
     const world = b.subarray(i + 1, (i += 1 + b[i])).toString();
     i += 8, (i += 1 + b[i]), (i += 32);
     const f = (k: number) => b.readDoubleLE(i + 8 * k);
-    const s = seen.get(world) ?? { substeps: [], friction: [], bounce: [], ballR: [], cupR: [] };
-    s.substeps.push(b.readUInt16LE(8)), s.cupR.push(f(0)), s.friction.push(f(2)), s.bounce.push(f(3)), s.ballR.push(f(4));
+    const s = seen.get(world) ?? { substeps: [], friction: [], bounce: [], ballR: [], cupR: [], shelter: [] };
+    s.substeps.push(b.readUInt16LE(8)), s.cupR.push(f(0)), s.friction.push(f(2)), s.bounce.push(f(3)), s.ballR.push(f(4)), s.shelter.push(f(1));
     seen.set(world, s);
   }
   // each value the one most of the world's holes have (their substeps vary hole by hole)
   const most = (xs: number[]) => xs.reduce((best, x) => (xs.filter((y) => y === x).length > xs.filter((y) => y === best).length ? x : best));
   for (const [w, s] of seen) {
-    assert.deepEqual(FIELD[w], { substeps: most(s.substeps), friction: most(s.friction), bounce: most(s.bounce), ballR: most(s.ballR), cupR: most(s.cupR) }, w);
+    assert.deepEqual(FIELD[w], { substeps: most(s.substeps), friction: most(s.friction), bounce: most(s.bounce), ballR: most(s.ballR), cupR: most(s.cupR), shelter: most(s.shelter) }, w);
   }
 });
 

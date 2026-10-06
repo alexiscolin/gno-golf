@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { makeBuilderHost } from "../lib/builder/wasm.ts";
 import { makeHost } from "../lib/sim/host.ts";
-import { draftHex } from "../lib/builder/gg1.ts";
+import { writeHole } from "../lib/builder/gg1.ts";
 import type { GHole } from "../lib/builder/types.ts";
 
 const repo = new URL("../../", import.meta.url);
@@ -107,7 +107,7 @@ void test("decode is lossless: every course hole, written back by gg1 and fitted
   for (const [slot, , , h] of lines) {
     const g: GHole = host.decode(h);
     assert.ok(g.w >= 1 && g.w <= 96 && g.walls.length + g.pulses.reduce((n, p) => n + p.walls.length, 0) <= 160, slot);
-    const back = host.fit(draftHex(g), "", 1.5);
+    const back = host.fit(writeHole(g), "", 1.5);
     assert.ok(back.ok, slot);
     if (slot !== "mines/17") assert.equal(back.hex, h, slot);
   }

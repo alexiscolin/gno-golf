@@ -5,7 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { checkHole, counts, inLane, work, PULSE_EVERY, WORK_WARN } from "../lib/builder/checks.ts";
-import { LIMITS, type GHole, type GWall } from "../lib/builder/gg1.ts";
+import { LIMITS } from "../lib/builder/gg1.ts";
+import type { HoleIn as GHole, WallIn as GWall } from "../lib/builder/types.ts";
 import { makeBuilderHost } from "../lib/builder/wasm.ts";
 
 const box = (x0: number, y0: number, x1: number, y1: number): GWall[] =>

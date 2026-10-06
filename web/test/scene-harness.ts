@@ -4,7 +4,7 @@
 // textures, stood in for here by one that draws nothing. What a test reads
 // back is the geometry: each mesh's vertex count and colour.
 import type * as THREE from "three";
-import type { GHole } from "../lib/builder/gg1.ts";
+import type { HoleIn as GHole } from "../lib/builder/types.ts";
 import type { Hole } from "../lib/scene/data.ts";
 
 // a 2D context that draws nothing: every call a no-op, every read zeros

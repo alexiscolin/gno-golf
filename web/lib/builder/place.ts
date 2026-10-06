@@ -1,8 +1,8 @@
 // A palette entry placed on the board: the GG1 pieces it is (gg1.ts), as
 // the course's own builders make them (physics/build: a bar is Bar's four
 // walls round its axis). Pure: the editor and the tests place alike.
-import type { Vec2 } from "../types";
-import type { GPost, GWall, GZone } from "./gg1";
+import type { V as Vec2 } from "./types";
+import type { PostIn as GPost, WallIn as GWall, ZoneIn as GZone } from "./types";
 import type { Clock, PaletteEntry, Shape } from "./palette";
 
 /** What one placed piece is in GG1. */
@@ -24,7 +24,7 @@ export interface Params {
   /** a tunnel's or a loop's way out, on the board */
   to?: Vec2;
   /** a polygon's points, for shape "poly" or "outside" */
-  poly?: readonly Vec2[];
+  poly?: Vec2[];
 }
 /** A substep clock: on for on of every substeps, from phase (a timed wall or zone). */
 export interface Timing {

@@ -47,6 +47,23 @@ export interface GPulse extends Timing {
   posts: GPost[];
   zones: GZone[];
 }
+/** A piece as a writer or a check takes it: its place, the rest optional (0, "", false, [] when left out). */
+export type WallIn = Pick<GWall, "a" | "b"> & Partial<GWall>;
+export type PostIn = Pick<GPost, "c" | "r"> & Partial<GPost>;
+export type ZoneIn = Pick<GZone, "kind" | "min" | "max"> & Partial<GZone>;
+export interface PulseIn extends Timing {
+  walls: readonly WallIn[];
+  posts: readonly PostIn[];
+  zones: readonly ZoneIn[];
+}
+/** A hole as a writer or a check takes it (gg1.ts writeHole, checks.ts): GHole with its pieces' details optional. */
+export type HoleIn = Omit<GHole, "walls" | "posts" | "zones" | "pulses"> & {
+  walls: readonly WallIn[];
+  posts: readonly PostIn[];
+  zones: readonly ZoneIn[];
+  pulses: readonly PulseIn[];
+};
+
 export interface GHole {
   w: number;
   h: number;
