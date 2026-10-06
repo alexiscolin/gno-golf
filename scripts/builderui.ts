@@ -117,6 +117,10 @@ for (const [w, h] of SIZES) {
   await c.js(`[...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))).focus()`);
   await sleep(600);
   const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
+  assert.equal(await c.js(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`), 0, "a piece selected: no number to type until Details is opened");
+  await c.js(`document.querySelector(".insp__details").open = true`);
+  await sleep(200);
+  assert.ok(await c.js<number>(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`) > 0, "Details opened: its sliders");
   await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).focus()`);
   await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).click()`);
   await sleep(800);
@@ -128,7 +132,10 @@ for (const [w, h] of SIZES) {
   const post = await c.js<[number, number]>(`(() => { const g = [...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const bin = await centre("[data-bin]");
   await mouse("mousePressed", ...post);
-  for (let k = 1; k <= 6; k++) (await mouse("mouseMoved", post[0] + ((bin[0] - post[0]) * k) / 6, post[1] + ((bin[1] - post[1]) * k) / 6), await sleep(50));
+  for (let k = 1; k <= 6; k++) {
+    await mouse("mouseMoved", post[0] + ((bin[0] - post[0]) * k) / 6, post[1] + ((bin[1] - post[1]) * k) / 6);
+    await sleep(50);
+  }
   await mouse("mouseReleased", ...bin);
   await sleep(1200);
   assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 2, "a post dropped on the bin is removed");

@@ -228,3 +228,8 @@
 .pub__gnokey pre { max-height: 160px; overflow: auto; overscroll-behavior: contain; padding: var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 12px; white-space: pre-wrap; word-break: break-all; }
 .pub__row { display: flex; gap: var(--sp-2); }
 .pub__row .btn { margin: 0; }
+
+/* the selected piece: its name and its three actions; its numbers behind Details */
+.insp__hint, .insp__at { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.insp__details { display: grid; gap: var(--sp-2); }
+.insp__details summary { cursor: pointer; width: max-content; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }

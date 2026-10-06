@@ -50,7 +50,7 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  if (!piece) return <p className="nothing">Select a piece to change it, or drag one in from the left.</p>;
+  if (!piece) return <p className="nothing">Click a piece to change it. Drag its handles to size and turn it.</p>;
   const e = entryIn(piece.entry, quick.palette);
   if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
   const p = piece, ent: PaletteEntry = e;
@@ -82,7 +82,17 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
   const unit = c.k === "substep" ? "substeps" : "strokes";
   return (
     <div className="insp">
-      <div className="insp__head">{ent.label}<small>{+at[0].toFixed(2)}, {+at[1].toFixed(2)}</small></div>
+      <div className="insp__head">{ent.label}</div>
+      <div className="insp__acts">
+        <button type="button" className="btn btn--ghost" onClick={onTurn}>Turn<kbd>R</kbd></button>
+        <button type="button" className="btn btn--ghost" onClick={onCopy}>Copy<kbd>{MOD}D</kbd></button>
+        <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
+      </div>
+      <p className="insp__hint">Drag it to move it, its handles to size and turn it.</p>
+      {/* the numbers, for whoever asks for them (the GUI spec's B1: none to type unless Details is opened) */}
+      <details className="insp__details">
+      <summary>Details</summary>
+      <p className="insp__at">At {+at[0].toFixed(2)}, {+at[1].toFixed(2)}</p>
       {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v))} onDone={done} />)}
       {p.geometry.t === "bar" && ent.thick && <Row label="Thick" value={p.geometry.thick} range={ent.thick} onChange={(v) => tryPiece({ ...p, geometry: { ...(p.geometry as Extract<Piece["geometry"], { t: "bar" }>), thick: v } })} onDone={done} />}
       {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : `${ent.bounce.min} to ${ent.bounce.max} (0: the field's)`} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}
@@ -109,11 +119,7 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
           </div>
         </>
       )}
-      <div className="insp__acts">
-        <button type="button" className="btn btn--ghost" onClick={onTurn}>Turn<kbd>R</kbd></button>
-        <button type="button" className="btn btn--ghost" onClick={onCopy}>Copy<kbd>{MOD}D</kbd></button>
-        <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
-      </div>
+      </details>
     </div>
   );
 }
