@@ -33,7 +33,8 @@ void test("fromPublished: a hole the Builder published opens as a draft (its slu
   assert.equal(d.slug, "");
   const mine = await fromPublished(hex, host, `${A}/mole-run/v3`, A);
   assert.equal(typeof mine !== "string" && mine.slug, "mole-run", "your own hole: its next version");
-  assert.match(String(await fromPublished(holes.get("garden/6")!, host, "garden/6/v1", A)), /off the grid/, "a course hole written by hand: not on the Builder's grid");
+  const byHand = await fromPublished(holes.get("garden/6")!, host, "garden/6/v1", A);
+  assert.match(typeof byHand === "string" ? byHand : "", /off the grid/, "a course hole written by hand: not on the Builder's grid");
 });
 
 void test("fromPublished: a hole with pieces the Builder does not make is refused, naming them", async () => {
