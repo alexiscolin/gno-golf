@@ -2446,3 +2446,6 @@ body:has(.pending) .turncall { top: 34%; }
 }
 @media (max-width: 340px) { .worlds--v2 .modetag { display: none; } } /* (the cups' Scores pill takes its room) */
 @media (max-height: 640px) { .boards > .lb--full > ol { flex-shrink: 0; } } /* (a short screen: the sheet scrolls, not a box in it) */
+
+/* /build when the Builder is not out on this build (app/build/gate.tsx) */
+.builder-off { display: grid; place-items: center; align-content: center; gap: 8px; min-height: 100dvh; padding: 16px; text-align: center; }
