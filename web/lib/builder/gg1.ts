@@ -11,6 +11,7 @@ export interface GWall {
   a: Vec2;
   b: Vec2;
   bounce?: number;
+  mark?: number;
   skin?: string;
   every?: number;
   on?: number;
@@ -21,6 +22,7 @@ export interface GPost {
   c: Vec2;
   r: number;
   bounce?: number;
+  mark?: number;
   skin?: string;
 }
 /** A zone (physics.Zone): its box, or the ellipse in it (round), or a polygon (or all but one: outside). */
@@ -31,6 +33,7 @@ export interface GZone {
   /** a slope's push; a tunnel's or a loop's way out */
   vec?: Vec2;
   scale?: number;
+  mark?: number;
   skin?: string;
   round?: boolean;
   poly?: readonly Vec2[];
@@ -111,7 +114,7 @@ export function draftHex(h: GHole): string {
     for (const w of ws) { // a style run each: decodable, if not Encode's runs
       u16(1);
       num(w.bounce ?? 0);
-      i32(0);
+      i32(w.mark ?? 0);
       u16(skin(w.skin));
       i32(w.every ?? 0), i32(w.on ?? 0), i32(w.phase ?? 0);
     }
@@ -122,7 +125,7 @@ export function draftHex(h: GHole): string {
   };
   const posts = (ps: readonly GPost[]) => {
     u16(ps.length);
-    for (const p of ps) vec(p.c), num(p.r), num(p.bounce ?? 0), i32(0), u16(skin(p.skin));
+    for (const p of ps) vec(p.c), num(p.r), num(p.bounce ?? 0), i32(p.mark ?? 0), u16(skin(p.skin));
   };
   const zones = (zs: readonly GZone[]) => {
     u16(zs.length);
@@ -131,7 +134,7 @@ export function draftHex(h: GHole): string {
       u8((z.round ? ROUND : 0) | (z.outside ? OUTSIDE : 0) | (z.air ? AIR : 0) | (z.capped ? CAPPED : 0));
       vec(z.min), vec(z.max), vec(z.vec ?? [0, 0]);
       num(z.scale ?? 0);
-      i32(0);
+      i32(z.mark ?? 0);
       u16(skin(z.skin));
       i32(z.every ?? 0), i32(z.on ?? 0), i32(z.phase ?? 0);
       u16(z.poly?.length ?? 0);

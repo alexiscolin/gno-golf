@@ -33,6 +33,16 @@ const lane = (world: string, pieces: Partial<Pick<GHole, "walls" | "posts" | "zo
     walls: [...box, ...(pieces.walls ?? [])], posts: pieces.posts ?? [], zones: pieces.zones ?? [], pulses: [],
   };
 };
+// the lane moved into the builder's frame: its corner (0, 0) to the margin, a whole grid step
+const framed = (g: GHole): GHole => {
+  const m = (v: readonly [number, number]): [number, number] => [v[0] + 1.5, v[1] + 1.5];
+  return {
+    ...g, tee: m(g.tee), pin: m(g.pin),
+    walls: g.walls.map((w) => ({ ...w, a: m(w.a), b: m(w.b) })),
+    posts: g.posts.map((p) => ({ ...p, c: m(p.c) })),
+    zones: g.zones.map((z) => ({ ...z, min: m(z.min), max: m(z.max), ...(z.vec && z.kind !== "slope" && { vec: m(z.vec) }), ...(z.poly && { poly: z.poly.map(m) }) })),
+  };
+};
 const withPiece = (world: string, e: PaletteEntry, p: Params = {}) => lane(world, place(e, AT, { to: [24, 4], ...p }));
 
 void test("every world has a palette, every kind of piece in it", () => {
@@ -99,7 +109,7 @@ void test("every entry's piece, at the ends of its ranges, passes PublishMine's 
     for (const end of ["min", "def", "max"] as const) {
       const p: Params = { size: e.size[end], thick: e.thick?.[end], bounce: e.bounce?.[end], scale: e.scale?.[end], grade: e.grade?.[end], to: [80, 20] };
       // a lane as big as the draft's board (96 less Fit's margins), the piece in its middle; a rail from its edge
-      const f = host.fit(draftHex(lane(w, place(e, e.kind === "rail" ? [0, 60] : [46.5, 46.5], p), 93, 93)), 1.5);
+      const f = host.fit(draftHex({ ...framed(lane(w, place(e, e.kind === "rail" ? [0, 60] : [46.5, 46.5], p), 93, 93)), w: 96, h: 96 }), "", 1.5);
       assert.ok(f.ok, `${w} ${e.id} ${end}: ${f.ok ? "" : f.why}`);
       const c = host.check("palette", f.hex);
       assert.ok(c.ok, `${w} ${e.id} ${end}: ${c.ok ? "" : c.why}`);

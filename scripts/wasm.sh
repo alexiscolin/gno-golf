@@ -13,8 +13,9 @@
 #
 # The Go sources are the .gno files, as they are, in a Go module named
 # gno.land (scripts/wasm/go.mod), so their import paths stay what they are:
-#   - p/gnogolf/physics, p/gnogolf/course and p/gnogolf/course/author:
-#     every file but the tests, copied (.gno to .go);
+#   - p/gnogolf/physics and p/gnogolf/course (and, for builder.wasm, the
+#     authoring kits course/author and physics/build): every file but the
+#     tests, copied (.gno to .go);
 #   - p/nt/ufmt/v0: the onyx toolchain's, copied the same way (golf's
 #     refusals print with it);
 #   - r/gnogolf/golf/v2 (realm, below): the declarations SimulateFrom and
@@ -85,6 +86,7 @@ copy() { # copy <from dir> <to dir>: the package's files but its tests
 copy "$root/gno.land/p/gnogolf/physics" "$here/p/gnogolf/physics"
 copy "$root/gno.land/p/gnogolf/course" "$here/p/gnogolf/course"
 copy "$root/gno.land/p/gnogolf/course/author" "$here/p/gnogolf/course/author"
+copy "$root/gno.land/p/gnogolf/physics/build" "$here/p/gnogolf/physics/build"
 copy "$gnoroot/examples/gno.land/p/nt/ufmt/v0" "$here/p/nt/ufmt/v0"
 copy "$gnoroot/gnovm/stdlibs/math" "$here/gnovm/math"
 rm "$here/gnovm/math/native.go" # native.gno: the natives' declarations, bodiless

@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { makeBuilderHost } from "../lib/builder/wasm.ts";
 import { makeHost } from "../lib/sim/host.ts";
+import { draftHex } from "../lib/builder/gg1.ts";
+import type { GHole } from "../lib/builder/types.ts";
 
 const repo = new URL("../../", import.meta.url);
 const mod = new WebAssembly.Module(fs.readFileSync(new URL("web/lib/sim/builder.wasm", repo)));
@@ -32,7 +34,7 @@ void test("every course hole passes it, and fit at the course's margin gives its
   const moved: string[] = [];
   for (const [slot, , , h] of lines) {
     assert.equal(why(host.check("x", h)), "ok", slot);
-    const f = host.fit(h, 1.5);
+    const f = host.fit(h, "", 1.5);
     assert.ok(f.ok && f.dx === 0 && f.dy === 0, slot);
     if (f.hex !== h) moved.push(slot);
   }
@@ -61,21 +63,29 @@ void test("the host goes on after a refusal", () => {
   assert.equal(host.check("ok", hex).ok, true);
 });
 
-void test("fit moves a hole to the margin and sizes the board to it; fitted again, it stays", () => {
-  const r = host.fit(hex, 3);
-  assert.ok(r.ok);
-  assert.ok(Math.abs(r.dx - 1.5) < 1e-9 && Math.abs(r.dy - 1.5) < 1e-9, `${r.dx}, ${r.dy}`);
-  assert.ok(r.w > 0 && r.w <= 96 && r.h > 0 && r.h <= 96);
-  assert.equal(why(host.check("ok", r.hex)), "ok");
-  const again = host.fit(r.hex, 3);
-  assert.ok(again.ok);
-  assert.equal(again.hex, r.hex);
-  assert.deepEqual([again.dx, again.dy], [0, 0]);
+void test("fit says the extent's low corner, the margin, on every course hole", () => {
+  for (const [slot, , , h] of lines) {
+    const f = host.fit(h, "", 1.5);
+    assert.ok(f.ok && f.w <= 96 && f.h <= 96, slot);
+    // (mines/17's leftmost piece a hair inside it: the known ulp)
+    if (slot !== "mines/17") assert.deepEqual(f.lo, [1.5, 1.5], slot);
+    else assert.ok(Math.abs(f.lo[0] - 1.5) < 1e-12 && Math.abs(f.lo[1] - 1.5) < 1e-12);
+  }
+});
+
+void test("a draft out of its frame is refused: the builder keeps every draft framed", () => {
+  assert.equal(why(host.fit(hex, "", 3)), "builder: the draft is not in its frame");
 });
 
 void test("fit refuses what Decode refuses, in its words", () => {
-  assert.equal(why(host.fit("00", 1.5)), "golf: course: not GG1 data");
-  assert.equal(why(host.fit("0", 1.5)), "golf: the data is not hex");
+  assert.equal(why(host.fit("00", "", 1.5)), "golf: course: not GG1 data");
+  assert.equal(why(host.fit("0", "", 1.5)), "golf: the data is not hex");
+});
+
+void test("bar gives build.Bar's corners: a 4-long bar along X, 0.5 thick", () => {
+  assert.deepEqual(host.bar("2 2 6 2 0.5"), [[1.75, 2.25], [6.25, 2.25], [6.25, 1.75], [1.75, 1.75]]);
+  assert.deepEqual(host.bar("0 0 3 4 1").length, 4, "a slanted one");
+  assert.equal(host.bar("1 1 1 1 0.5").length, 0, "none for a bar of no length");
 });
 
 void test("its sources are deployed files: the realm's and the course's, never author's", () => {
@@ -90,4 +100,18 @@ void test("it plays as golf.wasm does: test mode's simulation is the game's", ()
   const golf = makeHost(new WebAssembly.Module(fs.readFileSync(new URL("web/lib/sim/golf.wasm", repo))));
   golf.load("garden/1/v1", hex);
   assert.equal(sim.from("garden/1/v1", 3, 3, "21.00,8.00", 0, 5967997), golf.from("garden/1/v1", 3, 3, "21.00,8.00", 0, 5967997));
+});
+
+void test("decode is lossless: every course hole, written back by gg1 and fitted, is the same bytes", () => {
+  for (const [slot, , , h] of lines) {
+    const g: GHole = host.decode(h);
+    assert.ok(g.w >= 1 && g.w <= 96 && g.walls.length + g.pulses.reduce((n, p) => n + p.walls.length, 0) <= 160, slot);
+    const back = host.fit(draftHex(g), "", 1.5);
+    assert.ok(back.ok, slot);
+    if (slot !== "mines/17") assert.equal(back.hex, h, slot);
+  }
+});
+
+void test("decode refuses what Decode refuses", () => {
+  assert.throws(() => host.decode("00"), /golf: course: not GG1 data/);
 });

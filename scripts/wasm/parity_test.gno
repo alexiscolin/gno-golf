@@ -200,16 +200,30 @@ func TestBuilderParity(cur realm, t *testing.T) {
 		for _, c := range cases {
 			wpCheck(cur, c[0], d[0], mutate(d[1], c[1]), c[1], c[2])
 		}
-		for _, m := range []float64{1.5, 3} {
-			h, err := course.Decode(unhex(d[1]))
-			if err != nil {
-				panic(err)
+		h, err := course.Decode(unhex(d[1]))
+		if err != nil {
+			panic(err)
+		}
+		tee := h.Tee
+		author.Fit(h, 1.5) // the course's margin: every course hole is in its frame
+		println("WP\tT\t" + d[0] + "\t1.5\t" + strconv.FormatFloat(h.Tee.X-tee.X, 'g', -1, 64) + "\t" + strconv.FormatFloat(h.Tee.Y-tee.Y, 'g', -1, 64) +
+			"\t" + strconv.Itoa(h.W) + "\t" + strconv.Itoa(h.H) + "\t" + wpSum(hex.EncodeToString([]byte(course.Encode(h)))))
+		// bars as the builder places them (on the grid, at the lattice's angles), build.Bar's corners
+		for k := 0; k < wasmBars; k++ {
+			a := physics.V(float64(r.next()%384)/4, float64(r.next()%384)/4)
+			dirs := [][2]float64{{1, 0}, {0, 1}, {1, 1}, {1, -1}, {1, 2}, {2, 1}, {1, 3}, {3, 1}, {2, -1}, {1, -3}}
+			dir, n := dirs[r.next()%uint64(len(dirs))], float64(1+r.next()%32)/4
+			b := physics.V(a.X+dir[0]*n, a.Y+dir[1]*n)
+			t := float64(1+r.next()%6) / 4
+			line := wpNum(a.X) + " " + wpNum(a.Y) + " " + wpNum(b.X) + " " + wpNum(b.Y) + " " + wpNum(t)
+			corners := ""
+			for i, w := range build.Bar(a, b, t, 0, "") {
+				if i > 0 {
+					corners += ","
+				}
+				corners += "[" + wpNum(w.Seg.A.X) + "," + wpNum(w.Seg.A.Y) + "]"
 			}
-			tee := h.Tee
-			author.Fit(h, m)
-			println("WP\tT\t" + d[0] + "\t" + strconv.FormatFloat(m, 'g', -1, 64) +
-				"\t" + strconv.FormatFloat(h.Tee.X-tee.X, 'g', -1, 64) + "\t" + strconv.FormatFloat(h.Tee.Y-tee.Y, 'g', -1, 64) +
-				"\t" + strconv.Itoa(h.W) + "\t" + strconv.Itoa(h.H) + "\t" + wpSum(hex.EncodeToString([]byte(course.Encode(h)))))
+			println("WP\tB\t" + line + "\t[" + corners + "]")
 		}
 	}
 	// holes past a limit by one, or at the work limits (their data printed
@@ -283,8 +297,14 @@ func wpLimits() []*course.Simple {
 	return hs
 }
 
-// wasmMutations is how many of a hole's bytes each check changes, one each.
-const wasmMutations = 8
+// wasmMutations is how many of a hole's bytes each check changes, one each;
+// wasmBars how many bars each hole's run places.
+const (
+	wasmMutations = 8
+	wasmBars      = 8
+)
+
+func wpNum(x float64) string { return strconv.FormatFloat(x, 'g', -1, 64) }
 
 // wpCheck prints PublishMine's answer on (slug, data, note) as the page
 // reads builder.wasm's: the refusal, or "ok" and the hole's cost (wpCost).

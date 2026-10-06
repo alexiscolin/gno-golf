@@ -111,7 +111,7 @@ const builder = makeBuilderHost(new WebAssembly.Module(fs.readFileSync(path.join
 for (const [p, want] of Object.entries(builder.sources())) {
   if (sha(fs.readFileSync(path.join(root, p), "utf8")) !== want) fail(`sources: builder.wasm was built from another ${p}: run scripts/wasm.sh`);
 }
-const count = { holes: 0, from: 0, round: 0, plan: 0, refused: 0, checks: 0, checksRefused: 0, fits: 0 };
+const count = { holes: 0, from: 0, round: 0, plan: 0, refused: 0, checks: 0, checksRefused: 0, fits: 0, bars: 0 };
 const refusals = new Set<string>(); // PublishMine's sentences the checks met
 const t1 = performance.now();
 for (const l of lines) {
@@ -130,10 +130,16 @@ for (const l of lines) {
   }
   if (f[1] === "T") { // author.Fit then Encode: builder.wasm's fit
     const [, , slot, margin, dx, dy, w, h, want] = f;
-    const r = builder.fit(hexOf.get(slot)!, Number(margin));
+    const r = builder.fit(hexOf.get(slot)!, "", Number(margin));
     const got = r.ok ? `${r.dx} ${r.dy} ${r.w} ${r.h} ${sha(r.hex)}` : r.why;
     count.fits++;
     if (got !== `${Number(dx)} ${Number(dy)} ${w} ${h} ${want}`) fail(`fit ${slot} ${margin}\n  realm: ${dx} ${dy} ${w} ${h} ${want}\n  wasm:  ${got}`);
+    continue;
+  }
+  if (f[1] === "B") { // build.Bar's corners: builder.wasm's bar
+    const got = JSON.stringify(builder.bar(f[2]));
+    count.bars++;
+    if (got !== f[3]) fail(`bar ${f[2]}\n  realm: ${f[3]}\n  wasm:  ${got}`);
     continue;
   }
   if (f[1] === "H") {
@@ -152,15 +158,15 @@ for (const l of lines) {
 const calls = count.from + count.round;
 console.log(`wasmparity: ${count.holes} holes, ${calls} calls (${count.from} SimulateFrom, ${count.round} SimulateRound; ${count.plan} of the plans in 19 weathers, ` +
   `${calls - count.plan} random; ${count.refused} refused), ` +
-  `${count.checks} PublishMine checks (${count.checksRefused} refused, in ${refusals.size} sentences), ${count.fits} fits; ` +
+  `${count.checks} PublishMine checks (${count.checksRefused} refused, in ${refusals.size} sentences), ${count.fits} fits, ${count.bars} bars; ` +
   `${failed} different — gno ${(gnoMs / 1000).toFixed(0)} s on ${n} cores, wasm ${((performance.now() - t1) / 1000).toFixed(1)} s`);
 if (count.holes !== all.length || calls === 0) {
   failed++;
   console.error(`wasmparity: ${count.holes} of ${all.length} holes played`);
 }
 if (process.env.VERBOSE) console.log([...refusals].sort().join("\n"));
-if (count.fits !== 2 * all.length || count.checks === count.checksRefused) {
+if (count.fits !== all.length || count.bars === 0 || count.checks === count.checksRefused) {
   failed++;
-  console.error(`wasmparity: ${count.fits} fits of ${2 * all.length}; ${count.checks - count.checksRefused} of ${count.checks} checks passed`);
+  console.error(`wasmparity: ${count.fits} fits of ${all.length}, ${count.bars} bars; ${count.checks - count.checksRefused} of ${count.checks} checks passed`);
 }
 process.exit(failed ? 1 : 0);

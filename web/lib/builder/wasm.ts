@@ -4,10 +4,13 @@
 // draft publishable. A refusal is the realm's sentence, word for word
 // (scripts/wasmparity.ts holds them to PublishMine's). No DOM.
 import { makeCaller, type Base } from "../sim/wasi";
+import type { GHole } from "./types";
 
 interface Exports extends Base {
   check(n: number, m: number): void;
-  fit(margin: number): void;
+  fit(n: number, margin: number): void;
+  bar(): void;
+  decode(): void;
   sources(): void;
 }
 
@@ -35,8 +38,11 @@ export interface Cost {
 /** The realm's answer: publishable, with its cost, or refused, with the realm's sentence. */
 export type Checked = { ok: true; cost: Cost } | { ok: false; why: string };
 
-/** A draft fitted: its data (hex), the shift author.Fit applied, the board it sized. */
-export type Fitted = { ok: true; hex: string; dx: number; dy: number; w: number; h: number } | { ok: false; why: string };
+/** A draft fitted: its data (hex), the shift author.Fit applied (always none: a draft is framed), the board it sized, the extent's low corner. */
+export type Fitted = { ok: true; hex: string; dx: number; dy: number; w: number; h: number; lo: [number, number] } | { ok: false; why: string };
+
+/** The margin round a hole's pieces, as every course hole has it (author.Fit's). */
+export const MARGIN = 1.5;
 
 const refusal = (out: string) => (out.startsWith("panic: ") ? out.slice(7) : null);
 
@@ -52,14 +58,29 @@ export function makeBuilderHost(mod: WebAssembly.Module) {
       const why = refusal(out);
       return why != null ? { ok: false, why } : { ok: true, cost: JSON.parse(out) as Cost };
     },
-    /** A draft (GG1 in hex, its wall lengths not read) moved and sized by author.Fit, written by Encode. */
-    fit(hex: string, margin: number): Fitted {
-      const out = call((e) => {
-        put(e, hex);
-        e.fit(margin);
-      });
+    /**
+     * A draft (GG1 in hex, its wall lengths not read; bars, gg1.ts's lines,
+     * made build.Bar's walls) sized by author.Fit and written by Encode: the
+     * hole that will be published. Refused out of its frame.
+     */
+    fit(hex: string, bars = "", margin = MARGIN): Fitted {
+      const out = call((e) => e.fit(put(e, hex, bars)[0], margin));
       const why = refusal(out);
-      return why != null ? { ok: false, why } : { ok: true, ...(JSON.parse(out) as { hex: string; dx: number; dy: number; w: number; h: number }) };
+      return why != null ? { ok: false, why } : { ok: true, ...(JSON.parse(out) as Omit<Fitted & { ok: true }, "ok">) };
+    },
+    /** A hole's data as course.Simple has it, every float exact (types.ts GHole); Decode's refusal thrown. */
+    decode(hex: string): GHole {
+      const out = call((e) => (put(e, hex), e.decode()));
+      const why = refusal(out);
+      if (why != null) throw new Error(why);
+      return JSON.parse(out) as GHole;
+    },
+    /** build.Bar's four corners for a bar from a to b, thick wide ([] for one of no length). */
+    bar(line: string): [number, number][] {
+      const out = call((e) => (put(e, line), e.bar()));
+      const why = refusal(out);
+      if (why != null) throw new Error(why);
+      return JSON.parse(out) as [number, number][];
     },
     /** {path: sha256} of the deployed .gno files it was built from. */
     sources: () => JSON.parse(call((e) => e.sources())) as Record<string, string>,
