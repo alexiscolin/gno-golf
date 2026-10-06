@@ -136,7 +136,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
       setWhy(e instanceof Error ? e.message : String(e));
     }
   };
-  const command = gnokeyPublish({ realm: chain.realm, slug: draft.slug, hex, note, gas, price: prices.gas, deposit, chainId, rpc });
+  const command = gnokeyPublish({ realm: chain.realm, slug: draft.slug, hex, note, gas, price: prices.gas, deposit, chainId, rpc, author });
   // the 3D: the final data as a player's client reads it (no weather in it: any id will do until the chain says which)
   const state: Hole | null = useMemo(() => {
     if (!hex) return null;
@@ -203,6 +203,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
             <summary>Publish with gnokey instead</summary>
             {command && !off ? (
               <>
+                <p className="pub__small">Run it where gnokey holds the key of {author}: the hole was proved under that address.</p>
                 <pre>{command}</pre>
                 <div className="pub__row">
                   <Button onClick={() => void copy(command)}>{copied ? "Copied" : "Copy the command"}</Button>

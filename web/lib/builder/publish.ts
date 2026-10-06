@@ -5,6 +5,7 @@
 // warm-up's), the bill shown before any signature, and the command for
 // gnokey, whose every argument reaches the realm as the page shows it.
 import { feeFor, gnokeyOn, MAX_GAS, PER_CALL, PKG_PATH } from "../adena";
+import { isAddress } from "../chain";
 import type { Versions } from "../types";
 import { holeId, holeRow } from "./testmode";
 import { makeLocalChain } from "./localchain";
@@ -122,14 +123,16 @@ export const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 /**
  * The publish as one `gnokey maketx call` (PublishMine of slug, data, note),
- * its gas and fee as the bill's, its deposit capped at it; for the author to
- * run with their own key (<your-key-name>). "" for a slug, data, realm, gas
- * or deposit not of their shape: nothing unchecked reaches a shell (the
- * note, any text, is quoted).
+ * its gas and fee as the bill's, its deposit capped at it, signed by the
+ * author's key named by its address (gnokey takes a name or an address): a
+ * keybase without it refuses, so the hole never lands under another address,
+ * whose weather was never proved. "" for a slug, data, realm, gas, deposit or
+ * author not of their shape: nothing unchecked reaches a shell (the note, any
+ * text, is quoted).
  */
-export function gnokeyPublish({ realm, slug, hex, note, gas, price, deposit: max, chainId, rpc }: {
-  realm: string; slug: string; hex: string; note: string; gas: number; price: number; deposit: number; chainId: string | null | undefined; rpc: string;
+export function gnokeyPublish({ realm, slug, hex, note, gas, price, deposit: max, chainId, rpc, author }: {
+  realm: string; slug: string; hex: string; note: string; gas: number; price: number; deposit: number; chainId: string | null | undefined; rpc: string; author: string;
 }) {
-  if (!PKG_PATH.test(realm) || !/^[a-z0-9-]{1,32}$/.test(slug) || !/^(?:[0-9a-f]{2})+$/.test(hex) || !Number.isSafeInteger(gas) || gas <= 0 || !Number.isSafeInteger(max) || max < 0) return "";
-  return `gnokey maketx call -pkgpath ${realm} -func PublishMine -args ${slug} -args ${hex} -args ${shq(note)} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -max-deposit ${max}ugnot ${gnokeyOn(chainId, rpc)}`;
+  if (!isAddress(author) || !PKG_PATH.test(realm) || !/^[a-z0-9-]{1,32}$/.test(slug) || !/^(?:[0-9a-f]{2})+$/.test(hex) || !Number.isSafeInteger(gas) || gas <= 0 || !Number.isSafeInteger(max) || max < 0) return "";
+  return `gnokey maketx call -pkgpath ${realm} -func PublishMine -args ${slug} -args ${hex} -args ${shq(note)} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -max-deposit ${max}ugnot ${gnokeyOn(chainId, rpc, author)}`;
 }

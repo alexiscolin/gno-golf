@@ -525,9 +525,9 @@ export const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
 // an RPC as a command may carry it, "" for anything else
 const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "");
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
-export function gnokeyOn(chainId: string | null | undefined, rpc: string) {
+export function gnokeyOn(chainId: string | null | undefined, rpc: string, key = "<your-key-name>") {
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
-  return `-broadcast -chainid ${chain} -remote ${remoteOf(rpc) || "<rpc-url>"} <your-key-name>`;
+  return `-broadcast -chainid ${chain} -remote ${remoteOf(rpc) || "<rpc-url>"} ${key}`;
 }
 /** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's. */
 const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string) =>

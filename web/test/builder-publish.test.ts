@@ -68,10 +68,11 @@ void test("the note comes out of the gnokey command unchanged", () => {
   const note = "Let's go; $(x) `y` \\ \"z\"";
   const out = execFileSync("sh", ["-c", `printf %s ${shq(note)}`], { encoding: "utf8" });
   assert.equal(out, note);
-  const cmd = gnokeyPublish({ realm: "gno.land/r/x/golf", slug: "a-b", hex: "00ff", note: "Let's go; $(x)", gas: 1e8, price: 0.001, deposit: 600000, chainId: "dev", rpc: "http://127.0.0.1:26657" });
+  const by = "g1" + "c".repeat(38);
+  const cmd = gnokeyPublish({ realm: "gno.land/r/x/golf", slug: "a-b", hex: "00ff", note: "Let's go; $(x)", gas: 1e8, price: 0.001, deposit: 600000, chainId: "dev", rpc: "http://127.0.0.1:26657", author: by });
   assert.match(cmd, /-func PublishMine -args a-b -args 00ff -args 'Let'\\''s go; \$\(x\)'/);
   assert.match(cmd, /-max-deposit 600000ugnot/, "the deposit capped at the bill's");
-  assert.match(cmd, /-chainid dev -remote http:\/\/127\.0\.0\.1:26657 <your-key-name>$/);
+  assert.ok(cmd.endsWith(`-chainid dev -remote http://127.0.0.1:26657 ${by}`), "signed by the proved author's key, named by its address: a keybase without it refuses (the weather was proved under that address)");
 });
 
 const A = "g1" + "a".repeat(38);
@@ -137,9 +138,9 @@ void test("the final data: the name as the chain keeps it written in; the proofs
 });
 
 void test("gnokeyPublish: nothing for a slug, data or realm not of their shape (nothing unchecked reaches a shell)", () => {
-  const ok = { realm: "gno.land/r/x/golf", slug: "a-b", hex: "00ff", note: "", gas: 1e8, price: 0.001, deposit: 1, chainId: "dev", rpc: "http://127.0.0.1:26657" };
+  const ok = { realm: "gno.land/r/x/golf", slug: "a-b", hex: "00ff", note: "", gas: 1e8, price: 0.001, deposit: 1, chainId: "dev", rpc: "http://127.0.0.1:26657", author: "g1" + "c".repeat(38) };
   assert.notEqual(gnokeyPublish(ok), "");
-  for (const bad of [{ slug: "a b" }, { slug: "$(x)" }, { hex: "0g" }, { hex: "0" }, { realm: "gno.land/r/x;rm" }, { deposit: -1 }, { gas: 1.5 }]) {
+  for (const bad of [{ slug: "a b" }, { slug: "$(x)" }, { hex: "0g" }, { hex: "0" }, { realm: "gno.land/r/x;rm" }, { deposit: -1 }, { gas: 1.5 }, { author: "" }, { author: "mykey" }, { author: "g1x; rm -rf ~" }]) {
     assert.equal(gnokeyPublish({ ...ok, ...bad }), "", JSON.stringify(bad));
   }
 });
