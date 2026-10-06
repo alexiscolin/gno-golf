@@ -5,8 +5,9 @@
 // Chrome), killed by PID. Node 22+ (the built-in WebSocket).
 //
 // The paths and addresses can be set from the environment: CHROME (the
-// binary), APP (the running client), RPC (the local chain), REALM (the golf
-// realm on it; else NEXT_PUBLIC_REALM, the client's).
+// binary), CHROME_ARGS (more flags, each starting --; a value may hold spaces), APP (the running
+// client), RPC (the local chain), REALM (the golf realm on it; else
+// NEXT_PUBLIC_REALM, the client's).
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -55,7 +56,7 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
   dir ||= fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-cdp-"));
   fs.mkdirSync(dir, { recursive: true });
   try { fs.unlinkSync(path.join(dir, "DevToolsActivePort")); } catch {}
-  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, "about:blank"], { stdio: "ignore", detached: true });
+  const p = spawn("nice", ["-n", "20", CHROME, "--headless=new", `--user-data-dir=${dir}`, "--remote-debugging-port=0", "--use-angle=metal", "--no-first-run", "--mute-audio", ...args, ...(process.env.CHROME_ARGS || "").split(/ +(?=--)/).filter(Boolean), "about:blank"], { stdio: "ignore", detached: true });
   const pid = /** @type {number} */ (p.pid);
   live.add(pid);
   const kill = () => { stop(pid); live.delete(pid); };

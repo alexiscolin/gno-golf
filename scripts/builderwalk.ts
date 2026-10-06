@@ -13,6 +13,12 @@
 // reached (B6).
 //
 //   APP=http://localhost:3471 node --experimental-strip-types scripts/builderwalk.ts
+//
+// With SEED (a seed.env of scripts/e2e-gnomes.sh SEED=1 or try-local.sh)
+// and KEY (one of its keys, p1 by default), the hole is proved under that
+// key's address and published for real once the walk is timed: Publish in
+// Adena, the stand-in Adena signing with the key (media/gnomes/wallet.mjs),
+// until the page and the chain say it is there.
 
 interface Browser {
   send: (method: string, params?: object) => Promise<unknown>;
@@ -27,16 +33,23 @@ const cdp = (await import("../media/lib/cdp.mjs")) as {
   APP: string;
 };
 const { launch, sleep, APP } = cdp;
+interface Wallet { pump: () => Promise<void> }
+const SEED = process.env.SEED || "", KEY = process.env.KEY || "p1";
+const stand = SEED
+  ? ((await import("../media/gnomes/wallet.mjs")) as { seedEnv: (f: string) => Record<string, string>; fakeAdena: (b: Browser, env: Record<string, string>, key: string) => Promise<Wallet> })
+  : null;
+const env = stand ? stand.seedEnv(SEED) : null;
 const LIMIT_MS = 5 * 60_000;
 /** B6's budget for the starter path: Got it, Test it, Publish, and the address the hole is proved under. */
 const BUDGET = { clicks: 4, typed: 1 };
-const AUTHOR = "g1" + "q".repeat(38);
+const AUTHOR = env ? env[KEY] : "g1" + "q".repeat(38);
 
 const t0 = Date.now();
 const said = (s: string) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)} s  ${s}`);
 const count = { clicks: 0, drags: 0, typed: 0, shots: 0 };
 const c = await launch({ width: 1280, height: 800 });
 await c.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+const wallet = stand && env ? await stand.fakeAdena(c, env, KEY) : null;
 const until = async (expr: string, what: string, ms = 60_000) => {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(250)) if (await c.ev<boolean>(expr)) return;
   throw new Error(`waited ${ms / 1000} s for ${what}`);
@@ -146,12 +159,22 @@ try {
   if (short.b > short.h) throw new Error(`1366x650: the hole's card is cut off the Publish form (${short.b} > ${short.h})`);
   await c.js(`[...document.querySelectorAll(".step button")].find((b) => /Test/.test(b.textContent)).click()`);
   await until(`!!document.querySelector(".tmode")`, "the Test step from Publish: test mode", 10_000);
+  if (wallet) {
+    // published for real: back to Publish, Publish in Adena, signed by the stand-in, until the page says it landed
+    await c.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    await click(button(/^Publish →$/), "Publish → (again)");
+    await until(`!!${button(/^Publish in Adena/)}`, "the chain's checks: Publish in Adena", 180_000);
+    await click(button(/^Publish in Adena/), "Publish in Adena");
+    for (const end = Date.now() + 120_000; Date.now() < end && !(await c.ev<boolean>(`!!document.querySelector(".pub--done")`)); await sleep(500)) await wallet.pump();
+    if (!(await c.ev<boolean>(`!!document.querySelector(".pub--done")`))) throw new Error(`not published: ${await c.ev<string>(`document.querySelector(".pub")?.textContent.replace(/\\s+/g, " ").slice(-300) || ""`)}`);
+    said(`published, signed by ${KEY}: ${await c.ev<string>(`document.querySelector(".pub--done").textContent.replace(/\\s+/g, " ").slice(0, 160)`)}`);
+  }
   console.log("builderwalk: ok");
   c.kill();
   process.exit(0);
 } catch (e) {
   console.error(`builderwalk: ${e instanceof Error ? e.message : String(e)}`, JSON.stringify(count), JSON.stringify(c.errors).slice(0, 800));
-  console.error("state", JSON.stringify(await c.ev(`({ chips: [...document.querySelectorAll(".tmode__chip")].map((x) => x.className + " " + x.textContent), card: document.querySelector(".tmode__card")?.textContent, notes: [...document.querySelectorAll(".tmode__notes p")].map((x) => x.textContent), step: document.querySelector("[aria-current=step]")?.textContent })`)));
+  console.error("state", JSON.stringify(await c.ev(`({ pub: document.querySelector(".pub")?.textContent.replace(/\\s+/g, " ").slice(-400), chips: [...document.querySelectorAll(".tmode__chip")].map((x) => x.className + " " + x.textContent), card: document.querySelector(".tmode__card")?.textContent, notes: [...document.querySelectorAll(".tmode__notes p")].map((x) => x.textContent), step: document.querySelector("[aria-current=step]")?.textContent })`)));
   c.kill();
   process.exit(1);
 }

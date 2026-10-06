@@ -44,11 +44,18 @@
 # their balance alone), in a few minutes. The chain
 # is left running (KEEP=1) and $WORK/seed.env written: its addresses, the
 # realms, the keybase and password, each key's address, what was seeded.
-# Stop it with kill $DEV_PID (seed.env).
+# Stop it with kill $DEV_PID (seed.env). The throwaway keys' mnemonics are
+# in $WORK/mnemonics.env (this chain's alone). scripts/try-local.sh seeds
+# more for a person to try it all (its env below).
 #
-# Env: NS (nym-gnometest000), RPC_ADDR, WEB_ADDR, WORK (a new temp dir),
-# OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the end, SEED=1,
-# GNO_TOOLCHAIN as in check.sh.
+# Env: NS (nym-gnometest000), RPC_ADDR, WEB_ADDR (where this script reaches
+# the node and gnoweb), RPC_LISTEN, WEB_LISTEN (where gnodev listens: those
+# by default; 0.0.0.0:<port> for another machine), CHAINID (dev), WORK (a
+# new temp dir), OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the
+# end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WAVE2=0 adds
+# no wave 2, SEED_WORLDS publishes every course hole of those worlds too
+# ("garden island": garden/3 alone by default), SEED_PUBLISHING=1 opens
+# community publishing, SEED_TREASURY=1 moves the treasury to the treas key.
 set -u
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -59,10 +66,12 @@ GNOMCP=${GNOMCP:-$HOME/.local/src/gno-mcp/bin/gnomcp}
 NS=${NS:-nym-gnometest000}
 RPC_ADDR=${RPC_ADDR:-127.0.0.1:26757}
 WEB_ADDR=${WEB_ADDR:-127.0.0.1:8898}
+RPC_LISTEN=${RPC_LISTEN:-$RPC_ADDR}
+WEB_LISTEN=${WEB_LISTEN:-$WEB_ADDR}
 WORK=${WORK:-$(mktemp -d)}
 OUT=${OUT:-$WORK/e2e.md}
 MCP=${MCP:-0}
-CHAINID=dev
+CHAINID=${CHAINID:-dev}
 PASS=pass # the throwaway keys' password
 GN=gno.land/r/$NS/gnogolf/gnomes
 GOLF=gno.land/r/$NS/gnogolf/golf/v2
@@ -181,7 +190,10 @@ EOF
 
 KH=$WORK/keys
 addr() { "$GNOKEY" list -home "$KH" | grep " $1 (" | sed 's/.*addr: \([^ ]*\).*/\1/'; }
-addkey() { printf '%s\n%s\n%s\n' "$2" "$PASS" "$PASS" | "$GNOKEY" add -home "$KH" -recover -insecure-password-stdin "$1" >/dev/null 2>&1; }
+addkey() { # (each mnemonic kept in WORK too: throwaway keys of this chain alone)
+	printf '%s\n%s\n%s\n' "$2" "$PASS" "$PASS" | "$GNOKEY" add -home "$KH" -recover -insecure-password-stdin "$1" >/dev/null 2>&1
+	(umask 077 && printf "MNEMONIC_%s='%s'\n" "$1" "$2" >>"$WORK/mnemonics.env")
+}
 
 # chain time: the last block's, unix seconds; a block's by height
 chaintime() { curl -s "http://$RPC_ADDR/status" | jq -r .result.sync_info.latest_block_time | py epoch; }
@@ -355,7 +367,7 @@ for a in $P0 $P1 $B1 $B2 $TREAS; do pre+=(-add-account "$a=5000000000ugnot"); do
 deps=gno.land/p/nt/bptree/v0,gno.land/p/nt/grc721/v0,gno.land/p/nt/grc721/royalty/v0,gno.land/p/nt/ufmt/v0,gno.land/r/sys/users
 mkdir -p "$WORK/devroot"
 (cd "$WORK/devroot" && exec "$GNODEV" local -no-watch -empty-blocks -empty-blocks-interval 1 \
-	-node-rpc-listener "$RPC_ADDR" -web-listener "$WEB_ADDR" -paths "$deps" "${pre[@]}") >"$WORK/gnodev.log" 2>&1 &
+	-chain-id "$CHAINID" -node-rpc-listener "$RPC_LISTEN" -web-listener "$WEB_LISTEN" -paths "$deps" "${pre[@]}") >"$WORK/gnodev.log" 2>&1 &
 DEV=$!
 if [ "${SEED:-}" = 1 ]; then # (kept running once seeded, killed when the seed fails)
 	trap '[ $? = 0 ] || kill $DEV 2>/dev/null' EXIT
@@ -416,13 +428,28 @@ if [ "${SEED:-}" = 1 ]; then
 	NOW=$(chaintime)
 	ok "seed: wave 1 ($W1F-$W1L) open, 1 h player window" "added" test1 "$GN" AddWave "$W1F" "$W1L" "$((NOW - 60))" 1; must
 	W1UNTIL=$((NOW - 60 + 3600)) W2AT=$((NOW + 2 * 86400)) CLOSE=$((NOW + 30 * 86400))
-	ok "seed: wave 2 ($W2F-$W2L) in 2 days" "added" test1 "$GN" AddWave "$W2F" "$W2L" "$W2AT" "$WIN2"; must
+	if [ "${SEED_WAVE2:-1}" = 1 ]; then
+		ok "seed: wave 2 ($W2F-$W2L) in 2 days" "added" test1 "$GN" AddWave "$W2F" "$W2L" "$W2AT" "$WIN2"; must
+	else W2AT=""; fi
 	ok "seed: close in 30 days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
 	C2=$((C1 + 1)) C3=$((C1 + 2))
 	SEND=$(($(price "$C1") + $(price "$C2")))ugnot ok "seed: p1 buys Commons $C1, $C2" "sold" p1 "$GN" Buy "$C1,$C2"; must
 	SEND=$(price "$R1")ugnot ok "seed: p1 buys Rare $R1" "sold" p1 "$GN" Buy "$R1"; must
 	ok "seed: p1 wears $C1" "worn" p1 "$GN" Equip "$C1"; must
 	SEND=$(price "$C3")ugnot ok "seed: b1 buys Common $C3" "sold" b1 "$GN" Buy "$C3"; must
+	for w in ${SEED_WORLDS:-}; do # every course hole of the world (garden/3's data is there already: skipped)
+		while read -r slot hex; do
+			GASW=2000000000 ok "seed: publish $slot" "published" test1 "$GOLF" Publish "$slot" "$hex" e2e; must
+		done < <(awk -v w="$w" 'index($1, w "/") == 1 && $1 != "garden/3" {print $1, $4}' "$root/data/holes.txt")
+	done
+	if [ "${SEED_PUBLISHING:-}" = 1 ]; then
+		ok "seed: community publishing open" "open" test1 "$GOLF" SetPublishing true; must
+	fi
+	if [ "${SEED_TREASURY:-}" = 1 ]; then
+		ok "seed: the treasury offered to treas" "offered" test1 "$GN" SetTreasury "$TREAS"; must
+		ok "seed: treas accepts it" "accepted" treas "$GN" AcceptTreasury; must
+		is "seed: Treasury()" "gnomes.Treasury()" "$TREAS" "$(qg 'Treasury()')"; must
+	fi
 	ENV=$WORK/seed.env
 	{
 		echo "# gnomes seed chain ($(date -u +%FT%TZ)): scripts/e2e-gnomes.sh SEED=1. Stop it: kill \$DEV_PID"

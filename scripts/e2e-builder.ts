@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import type { Draft, Piece, V } from "../web/lib/builder/draft.ts";
-import type { HoleRow, Versions } from "../web/lib/types.ts";
+import type { HoleRow } from "../web/lib/types.ts";
 
 const env = (k: string) => process.env[k] ?? (() => { throw new Error(`e2e-builder: ${k} is not set`); })();
 const RPC = env("RPC"), REALM = env("NEXT_PUBLIC_REALM"), GNOKEY = env("GNOKEY"), KEYHOME = env("KEYHOME"), PASS = env("PASS"), OUT = env("OUT");
@@ -35,7 +35,7 @@ const { STARTERS } = await import("../web/lib/builder/starters.ts");
 const { canonicalHex, proofKey, provedAs, replay, shaOf, suggestPar } = await import("../web/lib/builder/proof.ts");
 const { plan, holeId, holeRow } = await import("../web/lib/builder/testmode.ts");
 const { makeLocalChain } = await import("../web/lib/builder/localchain.ts");
-const { bill, finalHex, gasFor, gnokeyPublish, proofsHold, publishBytes, publishSteps } = await import("../web/lib/builder/publish.ts");
+const { bill, finalHex, gasFor, gnokeyPublish, holeHolds, publishBytes, publishSteps } = await import("../web/lib/builder/publish.ts");
 const { fromPublished } = await import("../web/lib/builder/importing.ts");
 const { listHoles } = await import("../web/lib/builder/holes.ts");
 const { makeChain, shotOf } = await import("../web/lib/chain.ts");
@@ -54,8 +54,11 @@ function row(step: string, call: string, expected: unknown, got: unknown, ok: bo
   const r = ok === "note" ? "NOTE" : ok ? "PASS" : "FAIL";
   if (ok === "note") nnote++;
   else if (ok) npass++;
-  else (nfail++, (fails += ` ${n}`));
-  fs.appendFileSync(OUT, `| ${n} | ${cell(step)} | \`${cell(call)}\` | ${cell(expected)} | ${cell(got)} | ${r} | ${gas} |\n`);
+  else {
+    nfail++;
+    fails += ` ${n}`;
+  }
+  fs.appendFileSync(OUT, `| ${n} | ${cell(step)} | \`${cell(call)}\` | ${cell(expected)} | ${cell(got)} | ${r} | ${cell(gas)} |\n`);
   console.error(`${r} ${n} ${step}: ${cell(got)}`);
 }
 const is = (step: string, call: string, expected: unknown, got: unknown, gas?: unknown) => row(step, call, expected, got, String(expected) === String(got), gas);
@@ -65,12 +68,14 @@ interface Sent { ok: boolean; out: string; gas: number; delta: number; fee: numb
 const num = (out: string, label: string) => Number((out.match(new RegExp(`^${label}:\\s*(-?\\d+)`, "m")) ?? [])[1] ?? NaN);
 /**
  * A command as the page prints it, run as the author would: gnokey, signed
- * by key. The one change is where the key is (this run's keybase) and the
- * password on stdin, put where the page says <your-key-name>.
+ * by key, which the page names by its address (a publish) or leaves as
+ * <your-key-name> (a round's plan). The one change is where the key is (this
+ * run's keybase) and the password on stdin.
  */
 function run(command: string, key: string): Sent {
-  if (!command.startsWith("gnokey maketx ") || !command.endsWith(" <your-key-name>")) throw new Error(`not a page's gnokey command: ${command.slice(0, 80)}`);
-  const sh = GNOKEY + command.slice("gnokey".length, -" <your-key-name>".length) + ` -home ${KEYHOME} -insecure-password-stdin ${key}`;
+  const signer = [` ${KEYS[key]}`, " <your-key-name>"].find((x) => command.endsWith(x));
+  if (!command.startsWith("gnokey maketx ") || !signer) throw new Error(`not a page's gnokey command for ${key}: ${command.slice(0, 80)}`);
+  const sh = GNOKEY + command.slice("gnokey".length, -signer.length) + ` -home ${KEYHOME} -insecure-password-stdin ${KEYS[key]}`;
   let out = "";
   for (let i = 0; i < 3; i++) {
     try {
@@ -86,7 +91,7 @@ function run(command: string, key: string): Sent {
   const ev = (out.match(/^EVENTS:\s*(\[.*\])$/m) ?? [])[1];
   return {
     ok, out, gas: num(out, "GAS USED"), delta: num(out, "STORAGE DELTA"), fee: num(out, "STORAGE FEE"),
-    why: (out.match(/^Data: (.*)$/m) ?? [])[1] ?? "", events: ev ? JSON.parse(ev) : [],
+    why: (out.match(/^Data: (.*)$/m) ?? [])[1] ?? "", events: ev ? (JSON.parse(ev) as Sent["events"]) : [],
   };
 }
 const event = (s: Sent, type: string) => Object.fromEntries((s.events.find((e) => e.type === type)?.attrs ?? []).map((a) => [a.key, a.value]));
@@ -135,18 +140,19 @@ function holing(id: string, d: Draft, period: number): string[] | null {
 }
 
 // --------------------------------------------- the Publish step's readings
-/** What Publish.tsx reads before it opens, read the same way. */
+/** What Publish.tsx reads before it opens, read the same way (the takedown list is the site's: none here). */
 async function readings(alias: string) {
-  const [publishing, rules, versions, holes, gas, byte, chainId] = await Promise.all([
+  const [publishing, rules, writer, versions, holes, gas, byte, chainId] = await Promise.all([
     chain.publishing().catch(() => null),
     Promise.all([chain.successor(), sameSources(chain, host.sources(), "builder")]).then(([s, same]) => same && s === "", () => null),
+    chain.writer().catch(() => null),
     chain.versions(alias).catch(() => null),
     chain.holes(true).catch(() => [] as HoleRow[]),
     chain.gasPrice(),
     chain.storagePrice(),
     chain.chainId(),
   ]);
-  return { publishing, rules, versions: versions as Versions | null, firstCommunity: !holes.some((h) => h.official === false), gas, byte, chainId };
+  return { publishing, rules, writer, taken: false, versions, firstCommunity: !holes.some((h) => h.official === false), gas, byte, chainId };
 }
 
 // ------------------------------------------------------- one hole, published
@@ -176,7 +182,7 @@ async function publish(label: string, d0: Draft, signer: string): Promise<{ id: 
     const shots = holing(id, d0, period);
     const p = shots && (await replay(makeLocalChain(host, holeRow(id, d0), hex0, period), { key: key0!, id, kind, period, shots }));
     const ok = !!p && typeof p !== "string";
-    row(`${label}: test mode, ${kind || "clear"}`, `holing round at period ${period}, replayed as a save is cut`, "holed", ok ? `holed in ${shots!.length}: ${shots!.join(" ")}` : (p ?? "no round found"), ok);
+    row(`${label}: test mode, ${kind || "clear"}`, `holing round at period ${period}, replayed as a save is cut`, "holed", ok ? `holed in ${shots.length}: ${shots.join(" ")}` : (p ?? "no round found"), ok);
     if (ok) proofs.push(p);
   }
   const d: Draft = { ...d0, proofs, par: Math.max(d0.par, suggestPar(proofs)) };
@@ -188,16 +194,16 @@ async function publish(label: string, d0: Draft, signer: string): Promise<{ id: 
   const checked = host.check(d.slug, hex, note);
   const key = await proofKey(d, host);
   const proved = key ? provedAs(d.proofs, d.world, key, author, d.slug) : null;
-  const proofsOk = !!(hex && key && proved) && (await proofsHold({ ...d, title: name }, host, hex, key!, proved!));
+  const hole = hex && key && proved ? await holeHolds({ ...d, title: name }, hex, key, proved, { host, palette: await loadPalette(d.world), census }) : "The rounds that proved it no longer play out the same on its final data: test it again.";
   const sha = await shaOf(hex);
-  const step = publishSteps({ publishing: r0.publishing, rules: r0.rules, versions: r0.versions, proofs: proofsOk, name: checked.ok ? "" : checked.why }, { author, slug: d.slug, proved: proved ?? "", sha });
+  const step = publishSteps({ publishing: r0.publishing, rules: r0.rules, writer: r0.writer, taken: r0.taken, versions: r0.versions, hole, name: checked.ok ? "" : checked.why }, { author, slug: d.slug, proved: proved ?? "", sha, realm: chain.realm });
   is(`${label}: the Publish step`, "publishSteps(readings)", "ready", step.at + (step.why ? `: ${step.why}` : ""));
   if (step.at !== "ready" || !checked.ok) return null;
   const v = Number(id.slice(id.lastIndexOf("/v") + 2)) || 1;
-  const sizes = { bytes: checked.cost.bytes, name, note, v, newAuthor: true, firstCommunity: r0.firstCommunity };
+  const sizes = { bytes: checked.cost.bytes, name, note, v, newAuthor: true };
   const b = bill({ ...sizes, gasPrice: r0.gas, bytePrice: r0.byte });
   const gas = gasFor(sizes), deposit = Math.round(b.deposit * 1e6);
-  const command = gnokeyPublish({ realm: chain.realm, slug: d.slug, hex, note, gas, price: r0.gas, deposit, chainId: r0.chainId, rpc: RPC });
+  const command = gnokeyPublish({ realm: chain.realm, slug: d.slug, hex, note, gas, price: r0.gas, deposit, chainId: r0.chainId, rpc: RPC, author });
   row(`${label}: the command it prints`, command.replace(hex, `<${hex.length / 2} bytes>`), "a gnokey call", command ? "printed" : "none", !!command);
 
   // published
@@ -219,18 +225,20 @@ async function publish(label: string, d0: Draft, signer: string): Promise<{ id: 
   measures.push({ hole: label, id, bytes: sizes.bytes, runes: [...name].length + [...note].length, v, newAuthor, firstCommunity: r0.firstCommunity, stored: sent.delta, predicted, depositCap: deposit, depositPaid: sent.fee, gasAsked: gas, gasUsed: sent.gas, fee: feeFor(gas, r0.gas) });
   row(`${label}: the deposit within the bill`, "STORAGE FEE ≤ the bill's deposit (-max-deposit)", `≤ ${deposit}`, sent.fee, sent.fee <= deposit);
   row(`${label}: the gas within the ask`, "GAS USED ≤ gasFor", `≤ ${gas}`, sent.gas, sent.gas <= gas);
-  // more stored than publishBytes says would make a deposit cap too low (a refused publish): a failure; less, a bill
-  // that overstates, noted (the table after the steps has every figure)
+  // the deposit is publishBytes a tenth more (publish.ts deposit): more stored than that would make the cap too low
+  // (a refused publish), a failure; within it but over publishBytes, or a bill that overstates by a tenth, noted
+  // (the table after the steps has every figure)
   const off = sent.delta - predicted;
-  row(`${label}: stored vs publishBytes`, `STORAGE DELTA vs publishBytes (newAuthor ${newAuthor}, first ${r0.firstCommunity})`, `≤ ${predicted}`,
-    `${sent.delta} (${off >= 0 ? "+" : ""}${off}, ${(off / predicted * 100).toFixed(0)}%)`, off > 0 ? false : Math.abs(off) <= 0.1 * predicted || "note");
+  row(`${label}: stored vs publishBytes`, `STORAGE DELTA vs publishBytes (newAuthor ${newAuthor}, first ${r0.firstCommunity})`, `≤ ${Math.floor(predicted * 1.1)} (publishBytes ${predicted}, a tenth more)`,
+    `${sent.delta} (${off >= 0 ? "+" : ""}${off}, ${(off / predicted * 100).toFixed(0)}%)`, off > 0.1 * predicted ? false : (off <= 0 && -off <= 0.1 * predicted) || "note");
 
   // the game reads it
   const listed = (await chain.holes(true)).find((h) => h.id === id);
   is(`${label}: listed`, "Holes(): its row, official", "false", String(listed?.official));
   is(`${label}: HoleData`, "HoleData(id) = the published bytes", "same", (await chain.holeData(id)) === hex ? "same" : "differs");
   const p = await chain.period(), s = await chain.state(id);
-  host.load(id, hex), host.setperiod(p);
+  host.load(id, hex);
+  host.setperiod(p);
   is(`${label}: HoleState`, "HoleState(id) = builder.wasm's state of it", "same", JSON.stringify(s) === JSON.stringify(JSON.parse(host.state(id))) ? "same" : "differs");
   for (const pr of d.proofs) {
     const r = await chain.replayRound(id, pr.shots, pr.period);
@@ -253,7 +261,9 @@ async function play(label: string, id: string, d: Draft) {
   let rest: V | null = null;
   for (let k = 0; k < shots.length; k++) {
     const a = rest ? await chain.simulateFrom(id, rest, shots[k], k, period) : await chain.simulateRound(id, [shots[k]], period);
-    pts.push(a.path.length), works.push(a.work || 0), (rest = a.rest as V);
+    pts.push(a.path.length);
+    works.push(a.work || 0);
+    rest = a.rest as V;
   }
   const save = { id, official: false, shots, period, roundMode: "assisted" as const, ...boardWork(st, { walls: 0, posts: 0, pieces: 0 }, fc.zones), kind: fc.kind, pts, works, fixed: fc.gas || 0 };
   const parts = await chainSplit(chain, save, period);
@@ -262,7 +272,10 @@ async function play(label: string, id: string, d: Draft) {
   for (const c of cmds) {
     const r = run(c, "pl");
     gas += r.gas || 0;
-    if (!r.ok) (ok = false), (why = r.why || r.out.slice(-200));
+    if (!r.ok) {
+      ok = false;
+      why = r.why || r.out.slice(-200);
+    }
     if (!ok) break;
   }
   row(`${label}: the player saves it (gnokeyPlan, ${cmds.length - 1} commit${cmds.length > 2 ? "s" : ""})`, "pl: Reset, then PlayRoundAt as printed", "went through", ok ? "went through" : `refused: ${why}`, ok, gas);
@@ -297,7 +310,8 @@ for (const world of Object.keys(FIELD)) {
         if (++refusedInRow >= 5) break outer;
         continue;
       }
-      (d = next), (refusedInRow = 0);
+      d = next;
+      refusedInRow = 0;
     }
   }
   const c = host.check("heavy", canonicalHex(d, host)!, "");
@@ -330,7 +344,7 @@ if (v1) {
   const palette = await loadPalette("garden"), post = postOf(palette, "garden");
   const same = await readings(`${KEYS.a1}/plain-lane`);
   const sha1 = await shaOf(v1.hex);
-  const again = publishSteps({ publishing: same.publishing, rules: same.rules, versions: same.versions, proofs: true, name: "" }, { author: KEYS.a1, slug: "plain-lane", proved: holeId(KEYS.a1, "plain-lane", same.versions), sha: sha1 });
+  const again = publishSteps({ publishing: same.publishing, rules: same.rules, writer: same.writer, taken: same.taken, versions: same.versions, hole: "", name: "" }, { author: KEYS.a1, slug: "plain-lane", proved: holeId(KEYS.a1, "plain-lane", same.versions), sha: sha1, realm: chain.realm });
   is("second version: the same data again", "publishSteps, v1's data", "same", again.at);
   const d2: Draft = { ...plain, pieces: [...plain.pieces, placePiece(post, "p1", [15, 3])], proofs: v1.draft.proofs };
   const k2 = await proofKey(d2, host);
@@ -365,7 +379,7 @@ if (v1) {
     const hex = f.ok ? f.hex : raw;
     const c = host.check(d.slug, hex, "");
     const gas = gasFor({ bytes: hex.length / 2, name: d.title, note: "" });
-    const cmd = gnokeyPublish({ realm: chain.realm, slug: d.slug, hex, note: "", gas, price: r.gas, deposit: 100_000_000, chainId: r.chainId, rpc: RPC });
+    const cmd = gnokeyPublish({ realm: chain.realm, slug: d.slug, hex, note: "", gas, price: r.gas, deposit: 100_000_000, chainId: r.chainId, rpc: RPC, author: KEYS.a2 });
     const sent = run(cmd, "a2");
     row(`hostile, ${label}: the chain takes it`, "a2: PublishMine, around the Builder", "went through", sent.ok ? "went through" : `refused: ${sent.why}`, sent.ok, sent.gas);
     if (!sent.ok) continue;

@@ -12,7 +12,7 @@
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 
-/** seed.env as an object. @param {string} file */
+/** seed.env as an object; PAGE_RPC (env) is the same node as the page names it (scripts/try-local.sh: this machine's Tailscale address), RPC by default. @param {string} file */
 export function seedEnv(file) {
   /** @type {Record<string, string>} */
   const env = {};
@@ -21,6 +21,7 @@ export function seedEnv(file) {
     if (m) env[m[1]] = m[2];
   }
   if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(env.RPC || "")) throw new Error(`seed.env's RPC is not this machine's: ${env.RPC}`);
+  env.PAGE_RPC = process.env.PAGE_RPC || env.RPC; // (the network the stand-in says it is on; it signs on RPC)
   return env;
 }
 
@@ -46,7 +47,7 @@ export async function fakeAdena(b, env, key) {
     const ok = (data) => Promise.resolve({ status: "success", data });
     window.adena = {
       AddEstablish: () => ok(), GetAccount: () => ok({ address: ${JSON.stringify(address)}, chainId: ${JSON.stringify(env.CHAINID)} }),
-      GetNetwork: () => ok({ chainId: ${JSON.stringify(env.CHAINID)}, rpcUrl: ${JSON.stringify(env.RPC)} }),
+      GetNetwork: () => ok({ chainId: ${JSON.stringify(env.CHAINID)}, rpcUrl: ${JSON.stringify(env.PAGE_RPC)} }),
       SwitchNetwork: () => ok(), AddNetwork: () => ok(),
       DoContract: (tx) => new Promise((r) => { const id = ++n; wait[id] = r; q.push({ id, tx }); }),
       On: () => {},
