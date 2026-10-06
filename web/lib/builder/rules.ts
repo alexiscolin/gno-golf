@@ -11,6 +11,10 @@ export const MAX_BOUNCE = 0.75;
 export const MIN_RAMP = 0.12;
 /** physics.MaxMove: a zone a fast ball cannot step over is at least this deep along its way. */
 export const MAX_MOVE = 1.5;
+/** course.Decode: a hole's par (Strokes) is at most this. */
+export const MAX_PAR = 19;
+/** golf's minShotWork: the work a commit's first shot may do in its dearest weather, four fifths of physics.MaxWork. */
+export const MIN_SHOT_WORK = 800_000;
 /** The weather's skins (course.WithWeather, and the puddles it lays): never a piece's. */
 export const WEATHER = ["wind", "rain", "fog", "storm", "snow", "puddle"] as const;
 

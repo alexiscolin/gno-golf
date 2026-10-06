@@ -122,7 +122,8 @@ const simFrom = (v: unknown): v is SimulateFrom => isObj(v) && isFlight(v) && ty
 const board = (v: unknown, row: (r: unknown) => boolean, ...keys: string[]): v is Obj => isObj(v) && isMode(v.mode) && Array.isArray(v.rows) && v.rows.every(row) && nums(v, ...keys);
 const strokesRow = (r: unknown) => isObj(r) && typeof r.player === "string" && (r.name === undefined || typeof r.name === "string") && nums(r, "strokes");
 const standingRow = (r: unknown) => strokesRow(r) && nums(r as Obj, "holes", "par");
-const checks = {
+/** Each answer's shape, checked (the builder's test mode reads its local chain's answers through the same). */
+export const checks = {
   holes: (v: unknown): v is HoleRow[] => Array.isArray(v) && v.every(holeRow),
   // Holes(): { version, play, successor, holes }
   holesReply: (v: unknown): v is Holes => isObj(v) && strs(v, "play", "successor") && Array.isArray(v.holes) && v.holes.every(holeRow),

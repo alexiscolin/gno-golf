@@ -68,6 +68,15 @@ void test("anything else is refused, with why", () => {
   assert.equal(why(nan), "Piece p2 has a setting that is not a number.");
 });
 
+void test("a draft's proofs read back whole; one not shaped as the Builder makes them refuses the file", () => {
+  const proof = { key: "ab".repeat(32), id: "g1x/mole-run/v1", kind: "wind", period: 5967997, shots: ["0.0000,7.0000"], commits: [[0, 1]] as [number, number][], strokes: 1, maxWork: 11888 };
+  const d = { ...base(), proofs: [proof] };
+  assert.deepEqual(parseDraft(exportDraft(d)), d);
+  for (const bad of [{ ...proof, commits: [[0]] }, { ...proof, shots: [7] }, { ...proof, period: 1.5 }, { ...proof, maxWork: "x" }, "proof"]) {
+    assert.equal(why({ ...base(), proofs: [bad] }), "The draft's proofs are not rounds the Builder made.", JSON.stringify(bad));
+  }
+});
+
 void test("history: 200 steps deep; undo, redo, and a new step drops what was undone", () => {
   const h = history(base());
   for (let i = 0; i < 201; i++) h.push({ ...h.now(), par: (i % 19) + 1 });

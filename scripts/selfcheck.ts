@@ -15,7 +15,7 @@ import "../web/test/setup.mjs";
 const { RULES } = await import("../web/lib/chain.ts");
 const { SKIES } = await import("../web/lib/card.ts");
 const { CLIMATES } = await import("../web/lib/sky.ts");
-const { KICKS, MAX_BOUNCE, MAX_MOVE, MIN_RAMP, WEATHER } = await import("../web/lib/builder/rules.ts");
+const { KICKS, MAX_BOUNCE, MAX_MOVE, MAX_PAR, MIN_RAMP, MIN_SHOT_WORK, WEATHER } = await import("../web/lib/builder/rules.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -173,6 +173,10 @@ check("the physics the builder's palette is bound by", () => {
   assert.equal(MIN_RAMP, constOf(step, "MinRamp"), "MinRamp");
   assert.equal(MAX_MOVE, constOf(step, "MaxMove"), "MaxMove");
   for (const w of WEATHER) assert.ok(course.includes(`"${w}"`), `course: no weather skin "${w}"`);
+  const data = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/data.gno", import.meta.url), "utf8");
+  assert.ok(has(data, `if h.Strokes > ${MAX_PAR} {`), "course.Decode: the most par changed");
+  const golf = fs.readFileSync(new URL("../gno.land/r/gnogolf/golf/golf.gno", import.meta.url), "utf8");
+  assert.ok(has(golf, "const minShotWork = 4 * physics.MaxWork / 5") && MIN_SHOT_WORK === (4 * RULES.maxWork) / 5, "golf's minShotWork changed");
 });
 
 if (failed) {

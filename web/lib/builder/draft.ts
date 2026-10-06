@@ -4,7 +4,7 @@
 // that will be published. A draft read from a file or from the browser is
 // untrusted: parseDraft takes it only whole, on the grid and within its
 // limits. Its history (undo, redo) and its keeping in the browser are here.
-import { FIELD } from "./rules";
+import { FIELD, MAX_PAR } from "./rules";
 
 export type V = [number, number];
 /** Where a piece is: a rail's ends, a bar's axis and thickness, a post's circle, a zone's box, ellipse or polygon. */
@@ -40,13 +40,19 @@ export interface Pulse {
   on: number;
   phase: number;
 }
-/** A round that holed the exact hole in one weather, replayed by the chain's code (proof.ts). */
+/**
+ * A round that holed the exact hole in one weather, replayed by the chain's
+ * code (proof.ts): key, the hole's (proofKey); kind, the weather's ("" clear);
+ * commits, [from, to) as a save cuts it; maxWork, its heaviest shot's work.
+ * A file's proofs are kept as given: publishing replays each again.
+ */
 export interface Proof {
   key: string;
   id: string;
   kind: string;
   period: number;
   shots: string[];
+  commits: [number, number][];
   strokes: number;
   maxWork: number;
 }
@@ -70,7 +76,7 @@ export interface Draft {
 export const MAX_PIECES = 200;
 /** Where the browser keeps the drafts. */
 export const DRAFTS_KEY = "gnogolf.builder.drafts";
-const MAX_TITLE = 40, MAX_NOTE = 140, MAX_PAR = 19, MAX_PULSES = 16;
+const MAX_TITLE = 40, MAX_NOTE = 140, MAX_PULSES = 16;
 
 /** A grid value: a multiple of a quarter (Fit shifts the hole by one exactly). */
 export const onGrid = (x: number) => Number.isFinite(x) && x * 4 === Math.round(x * 4);
@@ -112,6 +118,11 @@ function clockOf(c: unknown, pulses: number): "clock" | "pulse" | null {
   return "clock";
 }
 
+const isProof = (x: unknown) =>
+  isObj(x) && typeof x.key === "string" && typeof x.id === "string" && typeof x.kind === "string" && Number.isSafeInteger(x.period) &&
+  Array.isArray(x.shots) && x.shots.every((s) => typeof s === "string") && Array.isArray(x.commits) && x.commits.every((c) => Array.isArray(c) && c.length === 2 && c.every(Number.isInteger)) &&
+  Number.isInteger(x.strokes) && isNum(x.maxWork);
+
 /** A draft from a file or the browser, whole; or why it is refused, in a sentence. */
 export function parseDraft(text: string): Draft | string {
   let d: unknown;
@@ -151,7 +162,7 @@ export function parseDraft(text: string): Draft | string {
     if (c === "pulse") return `Piece ${p.id} comes and goes with a pulse the draft does not have.`;
     if (c === "clock") return `Piece ${p.id} has a timing that is not whole numbers.`;
   }
-  if (!Array.isArray(d.proofs)) return "The file is not a draft.";
+  if (!Array.isArray(d.proofs) || !d.proofs.every(isProof)) return "The draft's proofs are not rounds the Builder made.";
   return d as unknown as Draft;
 }
 
