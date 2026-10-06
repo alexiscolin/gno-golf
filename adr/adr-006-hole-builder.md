@@ -68,7 +68,9 @@ the realm byte for byte by `scripts/wasmparity.ts`). Every player loads it.
   something, and something other than what an unknown skin falls back to
   (the plain form) unless it is the plain form on purpose; and its piece,
   at the low end, default and high end of its ranges, must pass `Fit` and
-  `Check`. 384 entries across the five worlds. A world-only skin offered
+  `Check`. 273 entries across the Builder's four worlds (garden 61, island
+  62, town 72, mountain 78; 384 across five before the Crystal Mines left
+  the Builder). A world-only skin offered
   elsewhere, or a slope skin that only reshapes the ground, fails it
   (measured on purpose).
 - **The rules the palette is bound by are the chain's** (`rules.ts`):

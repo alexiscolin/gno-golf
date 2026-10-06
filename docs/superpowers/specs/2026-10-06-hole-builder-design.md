@@ -288,9 +288,10 @@ the checks, the text filters, `physics/build` and the `decode` writer: about
    Friction, Bounce, Shelter and Substeps, the ball's radius (0.5) and the
    cup's (1.2) are not editable in v1: they are pinned per world in
    `palette.ts` from the world's course holes, so a community hole plays like
-   the cup it borrows. Shelter matters most: mines holes use 0.03 to 0.06
-   (17 of 18), so mines is pinned at 0.03; without it a mines hole would take
-   the garden climate's full wind. Substeps (20 to 34 in the course, chosen
+   the cup it borrows (the four of Decision 8b: `rules.ts` `FIELD`). Shelter
+   mattered most for the mines (0.03 to 0.06 in 17 of 18 holes, which would
+   otherwise take the garden climate's full wind), no longer a Builder
+   world. Substeps (20 to 34 in the course, chosen
    per hole) are pinned at the world's most common value; that a stroke
    reaches the cup is guaranteed by the proof, not by the constant.
 8. **No Builder on a phone** (amended 2026-10-06, the owner's decision). On a
@@ -698,10 +699,11 @@ coordinates are the published ones.
 
 ### Starter templates
 
-Three per world, each a Draft made only of palette entries: a straight par 2,
-a dogleg par 3, and one that shows the world's signature piece (garden: a
-seesaw slope; island: a tunnel under the sea; town: a timed stall bar;
-mountain: a slope to a crevasse; mines: a lava hazard to carry). No proofs
+Three per world of the Builder's four (Decision 8b: no Crystal Mines), each a
+Draft made only of palette entries: a straight par 2, a dogleg par 3, and one
+that shows the world's signature piece (garden: a seesaw slope; island: a
+tunnel under the sea; town: a timed stall bar; mountain: a slope to a
+crevasse). No proofs
 are committed with them: a proof depends on the hole's id, which holds the
 author's address and the version, so a template's proof never matches an
 author's. The author proves a template on first test like any draft. CI
@@ -940,7 +942,7 @@ part of the kerb".
 | Hostile holes | the adversarial holes of "Security and abuse" build in every world, no error | `scripts/smoke.ts`, a new step |
 | Editor checks | E1 to E15, each with a hole that passes and one that fails; E1 with a polygon point and a tunnel destination past the extent, and a rectangle clipped to empty; E5 with a 1.4 strip of water and a thin polygon | `web/test/builder-checks.test.ts` |
 | Golden broken holes | a set of deliberately broken holes, one or more per rule (E1 to E15, L2 refusals), each refused by exactly the rule expected with its sentence; the course holes of the Builder's worlds it passes keep passing, those it refuses a report (Decision 8c); `canPlace` refuses every broken piece the set places and clamps a drag to the nearest valid place | `web/test/builder-golden.test.ts` |
-| Proofs | proofs replay holed by commits; a round of more than 12 strokes on a mines hole replays in several commits and holds; a moved piece drops them; a proof over `minShotWork` does not count; template proofs under the fixed test id replay | `web/test/builder-proof.test.ts` |
+| Proofs | proofs replay holed by commits; a round of more than 12 strokes replays in several commits and holds; a moved piece drops them; a proof over `minShotWork` does not count; template proofs under the fixed test id replay | `web/test/builder-proof.test.ts` |
 | Local clock | on `localchain`, `period()`, `now()`, `state`'s period and `weather` agree; the engine does not refresh the weather during a test round | `web/test/builder-proof.test.ts` |
 | gnokey quoting | the note `Let's go; $(x)` comes out of the command, run through `sh -c 'printf %s …'`, unchanged | `web/test/builder-publish.test.ts` |
 | Size | `builder.wasm` under 300 KB raw, 130 KB gzipped; `golf.wasm` unchanged, its `sources.go` unchanged | `scripts/wasm.sh --check` |
