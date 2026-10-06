@@ -6,7 +6,9 @@
 // piece), and Turn · Copy · Delete with their keys. A setting that would
 // break the hole does not take: the slider stays at the last value that
 // holds, and the reason is said once (settings.ts; edit.ts canPlace).
+import { useRef, useState } from "react";
 import { Segmented } from "@/components/ui";
+import { settle } from "@/lib/builder/session";
 import { canPlace, newErrors, errorsOf, whereOf } from "@/lib/builder/edit";
 import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/lib/builder/palette";
 import { DIRS, sizesOf, TIMING, withClock, withDir, withNumber, withSize, withTiming } from "@/lib/builder/settings";
@@ -18,10 +20,14 @@ const SIZE_NAMES = { r: "Size", length: "Length", width: "Width", depth: "Depth"
 const ARROWS = ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"];
 
 function Row({ label, value, range, shown, note, onChange, onDone }: { label: string; value: number; range: Range; shown?: string; note?: string; onChange: (v: number) => void; onDone: () => void }) {
+  // let go (its pointer up, a key up, its blur): checked once a change, not three times, nor for a tab onto it
+  const latest = useRef(onDone);
+  latest.current = onDone;
+  const [release] = useState(() => settle(() => latest.current()));
   return (
     <label className="range">
       <span>{label}</span>
-      <input type="range" min={range.min} max={range.max} step={range.step} value={value} onChange={(e) => onChange(Number(e.target.value))} onPointerUp={onDone} onKeyUp={onDone} onBlur={onDone} />
+      <input type="range" min={range.min} max={range.max} step={range.step} value={value} onChange={(e) => (release.changed(), onChange(Number(e.target.value)))} onPointerUp={release.done} onKeyUp={release.done} onBlur={release.done} />
       <output>{shown ?? +value.toFixed(2)}</output>
       <small>{note ?? `${range.min} to ${range.max}`}</small>
     </label>

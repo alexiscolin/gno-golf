@@ -8,7 +8,7 @@ import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
 import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, pieceLabel, placeNear, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, setHandle, turnPiece } from "../lib/builder/handles.ts";
-import { makeSession } from "../lib/builder/session.ts";
+import { makeSession, settle } from "../lib/builder/session.ts";
 import { K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { validate } from "../lib/builder/pipeline.ts";
@@ -174,6 +174,19 @@ void test("the board's view: a wheel zooms about the pointer, a pinch about the 
   const moved = pinch(v, [[100, 100], [300, 100]], [[140, 130], [340, 130]]);
   assert.equal(moved.k, 20);
   assert.deepEqual(under(moved, [240, 130]), under(v, [200, 100]), "both fingers moved: the board follows");
+});
+
+void test("settle: a slider let go is checked once a change (a release, a key up and a blur after one change: one check; a tab onto it: none)", () => {
+  let checks = 0;
+  const s = settle(() => checks++);
+  s.done();
+  assert.equal(checks, 0, "nothing changed: no check");
+  s.changed();
+  s.changed();
+  s.done();
+  s.done();
+  s.done();
+  assert.equal(checks, 1);
 });
 
 void test("a session: an edit beside a drag (the name, the slug) is made on the draft as kept, never on the drag's unchecked preview", () => {

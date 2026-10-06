@@ -108,7 +108,9 @@ void test("a check stays quick on a hole of many bars (the board checks on a dra
   const bars = [];
   for (let y = 8; y < 44; y += 9) for (let x = 12; x < 60; x += 12) bars.push({ ...placePiece(plank, `b${bars.length}`, [x, y]), geometry: { t: "bar" as const, a: [x, y] as [number, number], b: [x + 4, y] as [number, number], thick: 0.5 } });
   const d = { ...lane("garden", bars, 70, 50), slug: "many" }, o = { host, palette: garden };
-  validate(d, o); // (warm)
-  const ms = Math.min(...[0, 1, 2].map(() => { const t0 = performance.now(); validate(d, o); return performance.now() - t0; }));
-  assert.ok(ms < 40, `${bars.length} bars: ${ms.toFixed(0)} ms`);
+  // against the same lane bare, timed alike (best of five, the machine's load the same for both)
+  const bare = { ...lane("garden", [], 70, 50), slug: "many" };
+  const best = (x: typeof d) => (validate(x, o), Math.min(...[0, 1, 2, 3, 4].map(() => { const t0 = performance.now(); validate(x, o); return performance.now() - t0; })));
+  const ratio = best(d) / best(bare);
+  assert.ok(ratio < 6, `${bars.length} bars: ${ratio.toFixed(1)} times the bare lane's check (it was some 20 before)`);
 });

@@ -40,3 +40,16 @@ export function makeSession(first: Draft) {
   };
 }
 export type Session = ReturnType<typeof makeSession>;
+
+/** A gesture with many ends (a slider: its pointer up, its key up, its blur): run once each time something changed, never for nothing. */
+export function settle(run: () => void) {
+  let pending = false;
+  return {
+    changed: () => void (pending = true),
+    done: () => {
+      if (!pending) return;
+      pending = false;
+      run();
+    },
+  };
+}
