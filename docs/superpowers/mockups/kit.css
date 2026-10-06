@@ -1,0 +1,277 @@
+/* The mockups' kit: the game's own tokens and controls, mirrored from
+   web/app/globals.css and web/app/title.css (the same names, the same
+   values), then the few new pieces the gnomes and the Builder add, each
+   marked NEW. A mockup is static HTML: what is mirrored here is the
+   reference, the game's CSS stays the source. Keep the two in step. */
+
+@font-face {
+  font-family: Fredoka;
+  src: url("../../../web/public/fonts/fredoka.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: block;
+}
+
+/* ------------------------------------------------------------ the tokens (globals.css :root) */
+:root {
+  --ink: #144134; --ink-soft: #4f7a6c; --green: #226c57; --green-light: #60ab96;
+  --hat: #e0524b; --hat-ink: #b83a33; --chain: #2f5ae8; --paper: #fdf6e9; --white: #fff; --disabled: #dfe5e2;
+  --ink-rgb: 20, 65, 52; --paper-rgb: 253, 246, 233; --green-rgb: 34, 108, 87;
+  --shadow: 0 5px 0 var(--ink), 0 12px 24px rgba(var(--ink-rgb), .18);
+  --shadow-btn: 0 4px 0 var(--ink);
+  --deep-card: 0 7px 0 var(--ink), 0 18px 28px rgba(20, 10, 60, .3);
+  --press: 3px; --lift: 1px;
+  --ring-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--ink);
+  --gold: #f2c14e; --silver: #d9dee3; --bronze: #e3a877;
+  --gold-grad: linear-gradient(180deg, #ffe066 0%, #ffc53d 55%, #f59f1f 100%);
+  --dim: rgba(var(--ink-rgb), .45);
+  --spring: cubic-bezier(.3, 1.6, .5, 1); --t-press: .08s; --t-pop: .28s;
+  --edge: 2px solid var(--ink); --edge-bold: 3px solid var(--ink);
+  --pill: 999px; --r-panel: 26px; --r-card: 20px;
+  --rule: 2px dashed rgba(var(--ink-rgb), .25);
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font: Fredoka, ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --info-edge: 2px solid rgba(var(--ink-rgb), .22); --info-bg: rgba(var(--paper-rgb), .94);
+  --sunny: #f5b83d; --lamp: #ffe39a; --mint: #eaf4ee; --stone: #9aa9a2; --nose: #f2b8b0;
+  --turf: #8fdcae; --fairway: #3f9a72; --water: #5fb3c9; --sand: #f0d9a0;
+  /* NEW: the gnomes' tiers, one colour and one shape each (the shape reads in
+     grey too): Common stone and a disc, Rare sea blue and a diamond, Epic
+     amethyst and a gem, Legendary gold and a crown. Never --chain's blue:
+     that one is the signature's alone. */
+  --tier-common: #e8dfcc; --tier-common-deep: #a08f72;
+  --tier-rare: #7cc8f0; --tier-rare-deep: #1c7fb8;
+  --tier-epic: #c6a4f5; --tier-epic-deep: #6b3fc4;
+  --tier-legendary: #ffd75e; --tier-legendary-deep: #c98a12;
+  color-scheme: light;
+}
+
+/* ------------------------------------------------------------ a world's tint (title.css) */
+.front, .tint--garden { --s0: #fff3df; --c1: #7fe8a8; --c2: #1f9a6a; --stage: #d3e8c8; --art: linear-gradient(180deg, #7ec8ff, #ffd6a8); }
+.tint--island { --s0: #8fd8d0; --c1: #7fe0f7; --c2: #1a86d0; --stage: #f1e2c2; --art: linear-gradient(180deg, #54b8f5, #b8ecff 70%, #ffe2a8); }
+.tint--town { --s0: #f6ead3; --c1: #ffa3c6; --c2: #cf3f7c; --stage: #eee0d6; --art: linear-gradient(180deg, #6b4bc8, #ff8fb0 60%, #ffcf8a); }
+.tint--mountain { --s0: #eef3f8; --c1: #b8c9ff; --c2: #5569db; --stage: #e4edf3; --art: linear-gradient(180deg, #4d74e0, #bcd2ff 65%, #ffe0c0); }
+.tint--mines { --s0: #ece6f7; --c1: #c7a6ff; --c2: #4f3b8f; --stage: #e3dcef; --art: linear-gradient(180deg, #34266e, #7a64c4 65%, #f0a07a); }
+/* NEW: the shop's own tint, the paper's: no world wins in a mixed grid */
+.tint--shop { --s0: #fff6e4; --c1: #ffe39a; --c2: #e9a93a; --stage: #f6ead2; }
+/* NEW: a Legendary's auction: a deep gold night, the one dark front */
+.tint--legend { --s0: #2b2550; --c1: #ffd75e; --c2: #c98a12; --stage: #3a3270; }
+
+* { box-sizing: border-box; scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--ink); background: var(--paper); }
+body { -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+img { display: block; }
+
+/* ------------------------------------------------------------ the front screen (title.css) */
+.front {
+  position: relative; min-height: 100vh; padding: clamp(40px, 8vh, 90px) 40px 110px; background: var(--s0);
+  --dots: radial-gradient(circle, rgba(var(--ink-rgb), .09) 1.7px, transparent 2.1px) 0 0 / 14px 14px;
+  --panel-dots: radial-gradient(rgba(var(--ink-rgb), .14) 1.6px, transparent 2px) 0 0 / 16px 16px;
+  --glow: #ffe066; --glow-rgb: 255, 224, 102;
+  --fs-display: clamp(36px, 5.4vw, 72px); --fs-name: clamp(15px, 1.4vw, 18px); --fs-pill: 15px;
+  --gap-grid: clamp(14px, 2vw, 28px);
+}
+.front::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: var(--dots), var(--s0); }
+.front::after { content: ""; position: fixed; inset: 16px; pointer-events: none; border: 3px solid var(--green); border-radius: 10px; z-index: 1; box-shadow: 0 0 0 40px var(--s0); }
+.front > * { position: relative; z-index: 1; }
+.tint--legend.front::after { border-color: var(--c1); }
+@media (max-width: 600px) { .front { padding: 96px 16px 96px; } .front::after { inset: 8px; border-width: 2.5px; } }
+
+.front__head { display: grid; justify-items: center; gap: 4px; margin: 0 auto clamp(14px, 2.6vh, 30px); text-align: center; }
+.eyebrow { display: block; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+.front .eyebrow--pill { display: inline-block; padding: 4px 14px; border-radius: var(--pill); font-size: var(--fs-pill); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--paper); background: var(--ink); }
+.inked { color: var(--paper); -webkit-text-stroke: var(--ink-w, 5px) var(--ink); paint-order: stroke fill; text-shadow: 0 var(--ink-drop, 3px) 0 var(--ink); }
+.display { margin: 2px 0 0; font-size: var(--fs-display); line-height: 1.05; font-weight: 700; --ink-w: 7px; --ink-drop: 5px; }
+.display--m { font-size: clamp(30px, 3.6vw, 52px); --ink-w: 6px; --ink-drop: 4px; }
+
+/* the corner buttons: Back and About, and a pill beside them */
+.corner { position: fixed; top: 34px; z-index: 3; display: flex; gap: 12px; align-items: center; }
+.corner--l { left: 34px; } .corner--r { right: 34px; }
+@media (max-width: 600px) { .round--big { width: 52px; height: 52px; } .wide-only { display: none !important; } }
+@media (min-width: 601px) { .phone-only { display: none !important; } }
+@media (max-width: 600px) { .corner { top: 22px; } .corner--l { left: 22px; } .corner--r { right: 22px; } }
+
+/* ------------------------------------------------------------ controls (globals.css "shared controls", ui.tsx) */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: var(--edge); cursor: pointer; font-weight: 600; font-size: 15px; padding: 12px 22px; min-height: 44px;
+  border-radius: 16px; box-shadow: var(--shadow-btn); text-decoration: none; color: var(--ink); background: var(--paper);
+  transition: transform var(--t-press), box-shadow var(--t-press);
+}
+.btn:hover:not([disabled]) { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
+.btn[disabled] { cursor: default; opacity: .5; box-shadow: 0 2px 0 var(--ink); }
+.btn--main { background: var(--green); color: var(--paper); }
+.btn--ghost { background: var(--paper); color: var(--ink); }
+.btn--gold { background: var(--gold-grad); color: var(--ink); border: var(--edge-bold); }
+.btn--chain { background: var(--chain); color: var(--white); } /* globals.css .btn--save: what signs */
+.btn--cta { font-weight: 700; border-radius: 24px; box-shadow: 0 7px 0 var(--ink); font-size: clamp(18px, 2vw, 22px); padding: 12px 34px; }
+.btn--s { min-height: 32px; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 800; }
+.btn--wide { display: flex; width: 100%; margin-top: 16px; }
+.btn--chip { height: 48px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 800; }
+.btn svg { width: 20px; height: 20px; flex: none; }
+.btn__rank { position: absolute; top: -12px; right: -10px; padding: 1px 9px; border: var(--edge); border-radius: var(--pill); background: var(--gold); color: var(--ink); font-size: 12px; font-weight: 800; transform: rotate(4deg); }
+
+.round {
+  position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
+  border: var(--edge-bold); background: var(--paper); color: var(--ink); cursor: pointer; flex: 0 0 auto;
+  box-shadow: var(--shadow-btn); padding: 0;
+}
+.round svg { width: 22px; height: 22px; }
+.round--big { width: 64px; height: 64px; }
+.round--small { width: 40px; height: 40px; border-width: 2px; }
+
+.seg { display: inline-flex; border: var(--edge); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-btn); background: var(--paper); }
+.seg button { flex: 1; border: 0; background: transparent; font-weight: 800; font-size: 15px; padding: 10px 16px; min-height: 48px; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+.seg button + button { border-left: 2px solid var(--ink); }
+.seg button.on { background: var(--green); color: var(--paper); }
+.seg--s { border-radius: 12px; } .seg--s button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.tag--hat { background: var(--hat); }
+.tag--gold { background: var(--gold); color: var(--ink); border: var(--edge); }
+.dare { display: inline-block; padding: 4px 14px; border: var(--edge); border-radius: var(--pill); background: var(--gold); font-size: 14px; font-weight: 800; transform: rotate(-2deg); box-shadow: var(--shadow-btn); }
+
+.linkish { border: 0; background: none; padding: 2px 0; font-size: 13px; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; cursor: pointer; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.fine { font-size: 12px; color: var(--ink-soft); line-height: 1.45; margin: 8px 0 0; }
+.src { font-size: 12px; color: var(--ink-soft); text-decoration: none; border-bottom: 1px dashed currentColor; }
+
+.field { height: 48px; padding: 0 14px; border: var(--edge); border-radius: 12px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); width: 100%; }
+.field:focus { outline: none; box-shadow: var(--ring-shadow); }
+.field--bad { border-color: var(--hat-ink); }
+label.lbl { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.count { justify-self: end; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+
+.note { margin: 8px 0 0; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; }
+.note--good { background: var(--paper); border: 2px solid var(--green); }
+.note--good::before { content: "✓ "; color: var(--green); font-weight: 800; }
+.note--bad { background: var(--paper); border: 2px solid var(--hat-ink); color: var(--hat-ink); }
+.note--warn { background: #fff3d6; border: 2px solid #e0a44a; }
+.note b { font-weight: 700; }
+
+/* ------------------------------------------------------------ the sheet (ui.tsx Sheet) */
+.sheet { position: fixed; inset: 0; display: grid; place-items: center; background: var(--dim); padding: 20px; z-index: 5; }
+.sheet__in {
+  position: relative; background: var(--paper); border: var(--edge); border-radius: var(--r-panel); padding: 26px;
+  width: 100%; max-width: 440px; box-shadow: var(--shadow); text-align: left; max-height: calc(100vh - 40px); overflow: auto;
+}
+.sheet__close { position: absolute; top: 14px; right: 14px; }
+.sheet h2 { margin: 2px 0 8px; font-size: 30px; line-height: 1.1; }
+.sheet p { margin: 0 0 12px; color: var(--ink-soft); line-height: 1.5; font-size: 14px; }
+.sheet .lead { font-size: 15px; color: var(--ink); }
+
+/* the play-for-real steps (Golf.tsx RealPlay): numbered, the current gold, done green */
+.steps { list-style: none; margin: 14px 0; padding: 0; display: grid; gap: 10px; }
+.steps li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; font-size: 14px; font-weight: 600; }
+.steps li > i { width: 30px; height: 30px; border-radius: 50%; border: var(--edge); display: grid; place-items: center; font-style: normal; font-weight: 800; font-size: 14px; background: var(--white); }
+.steps li.done > i { background: var(--green); color: var(--paper); }
+.steps li.now > i { background: var(--gold); }
+.steps li.later { opacity: .55; }
+.steps small { display: block; font-weight: 500; color: var(--ink-soft); font-size: 12px; }
+
+/* the gnokey fallback (Gnokey.tsx) */
+.details { border: var(--edge); border-radius: 14px; background: var(--white); margin-top: 14px; }
+.details > summary { cursor: pointer; padding: 10px 14px; font-size: 14px; font-weight: 700; list-style: none; }
+.details > summary::before { content: "▸ "; }
+.details[open] > summary::before { content: "▾ "; }
+.details__box { padding: 0 14px 14px; }
+.code { display: block; white-space: pre-wrap; word-break: break-all; background: var(--ink); color: var(--paper); border-radius: 10px; padding: 10px 12px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; }
+
+/* the share row (Share.tsx) */
+.share { display: inline-flex; align-items: center; gap: 6px; padding: 5px 6px 5px 14px; border-radius: var(--pill); background: rgba(var(--ink-rgb), .07); }
+.share__label { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); margin-right: 4px; }
+.share__icon { width: 38px; height: 38px; border-radius: 50%; border: var(--edge); display: grid; place-items: center; color: var(--white); box-shadow: 0 2px 0 var(--ink); }
+.share__icon svg { width: 18px; height: 18px; fill: currentColor; }
+.share__icon--x { background: #111; } .share__icon--bsky { background: #1185fe; } .share__icon--wa { background: #25d366; }
+.share__icon--copy, .share__icon--more { background: var(--paper); color: var(--ink); }
+
+/* a board's sticker (title.css .sticker), and its face */
+.sticker { position: relative; display: grid; grid-template: auto auto / auto minmax(0, 1fr); column-gap: 12px; align-items: center; min-height: 64px; padding: 6px 14px 6px 6px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
+.sticker__face { grid-row: 1 / 3; width: 50px; height: 50px; }
+.sticker__who { align-self: end; font-size: var(--fs-name, 16px); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sticker__sub { align-self: start; font-size: 12.5px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sticker.me { background: var(--ink); color: var(--paper); }
+
+/* the netbanner (Golf.tsx NetBanner), bottom left */
+.netbanner { position: fixed; left: 34px; bottom: 34px; z-index: 3; display: flex; gap: 12px; }
+.netbanner__band { display: inline-flex; align-items: center; gap: 12px; margin: 0; padding: 6px 6px 6px 16px; border: var(--edge); border-radius: 16px; background: var(--gold); box-shadow: var(--shadow-btn); font-size: 14px; font-weight: 700; color: var(--green); }
+.netbanner__band b { color: var(--ink); letter-spacing: .1em; }
+@media (max-width: 600px) { .netbanner { left: 22px; bottom: 22px; } }
+
+/* the HUD's info cards (globals.css .card): what only shows, flat */
+.card { background: var(--info-bg); border: var(--info-edge); border-radius: 18px; padding: 10px 16px; height: 76px; display: flex; flex-direction: column; justify-content: center; }
+.card h1 { margin: 1px 0 2px; font-size: 19px; line-height: 1.15; white-space: nowrap; }
+.card strong { font-size: 28px; font-weight: 700; line-height: 1; }
+
+/* ------------------------------------------------------------ NEW: tiers */
+/* a tier's chip: its shape and its name, on its colour */
+.tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border: var(--edge); border-radius: var(--pill); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+.tier svg { width: 14px; height: 14px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.tier--common { background: var(--tier-common); }
+.tier--rare { background: var(--tier-rare); }
+.tier--epic { background: var(--tier-epic); }
+.tier--legendary { background: var(--gold-grad); }
+
+/* a gnome's tile: the gnome on its stage, framed in its tier: a plain inked
+   frame (Common), a second rim (Rare), a faceted rim (Epic), a gold rim and
+   a slow shine (Legendary). Its stage is the world's flat --stage. */
+.gtile { position: relative; display: grid; aspect-ratio: 1; border-radius: 18px; border: var(--edge-bold); background: var(--panel-dots, none), var(--stage, #f6ead2); overflow: hidden; }
+.gtile img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 60%; }
+/* the tier's rim, over the gnome (an inset shadow would sit under his render) */
+.gtile::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none; }
+.gtile--rare::before { box-shadow: inset 0 0 0 5px var(--tier-rare), inset 0 0 0 7px var(--ink); }
+.gtile--epic::before { box-shadow: inset 0 0 0 6px var(--tier-epic), inset 0 0 0 8px var(--ink), inset 0 0 0 11px rgba(255, 255, 255, .55); }
+.gtile--epic { background: conic-gradient(from 45deg at 50% 45%, transparent 0 12%, rgba(107, 63, 196, .12) 12% 13%, transparent 13% 37%, rgba(107, 63, 196, .12) 37% 38%, transparent 38% 62%, rgba(107, 63, 196, .12) 62% 63%, transparent 63% 87%, rgba(107, 63, 196, .12) 87% 88%, transparent 88%), radial-gradient(circle at 50% 40%, rgba(255, 255, 255, .6), transparent 60%), var(--stage, #f6ead2); }
+.gtile--legendary::before { box-shadow: inset 0 0 0 7px var(--tier-legendary), inset 0 0 0 9px var(--ink); }
+.gtile--legendary { background: repeating-conic-gradient(from 0deg at 50% 42%, #ffe69a 0 7.5deg, #ffd25a 7.5deg 15deg); }
+/* a Legendary's slow shine across him (a won cup's, title.css) */
+.gtile--legendary::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .45) 50%, transparent 70%); transform: translateX(-120%); animation: won-shine 3.2s ease-in-out infinite; }
+@keyframes won-shine { 60%, 100% { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+/* the wallet chip (globals.css .adena), top right */
+.adena { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px 0 10px; border: var(--edge); border-radius: 16px; background: var(--paper); box-shadow: var(--shadow-btn); cursor: pointer; }
+.adena__logo { width: 30px; height: 30px; border-radius: 8px; background: var(--chain); display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 17px; }
+.adena__text { display: grid; line-height: 1.1; text-align: left; }
+.adena__text small { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
+.adena__text b { font-size: 15px; }
+.adena--on { background: var(--green); color: var(--paper); }
+@media (max-width: 700px) { .adena__text { display: none; } .adena { padding: 0 10px; } }
+
+/* ------------------------------------------------------------ NEW: the gnomes' cards */
+/* a gnome in a grid: its tile, its name and number, its tier and its price
+   or its standing. A button: it lifts as a board's sticker does. */
+.gcard { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; min-width: 0; color: inherit; text-decoration: none; gap: 8px; padding: 8px 8px 10px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); text-align: left; cursor: pointer; transition: transform var(--t-pop) var(--spring), box-shadow .2s; }
+.gcard:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 0 0 3px var(--glow, #ffe066), 0 8px 0 var(--ink); z-index: 2; }
+.gcard__name { margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcard__name small { font-weight: 600; color: var(--ink-soft); font-size: 12px; margin-left: 4px; }
+.gcard__foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 2px; min-height: 26px; }
+.gcard__price { font-size: 15px; font-weight: 800; white-space: nowrap; }
+.gcard__price small { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+.gcard__who { font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* taken: the tile stays in colour (it is someone's gnome, not a gap), the price gives way to its player */
+.gcard--taken { background: #f4efe4; box-shadow: 0 2px 0 var(--ink); }
+.gcard__stamp { position: absolute; top: 14px; left: 14px; z-index: 2; transform: rotate(-6deg); }
+/* yours: the board's own row, inked */
+.gcard--mine { background: var(--ink); color: var(--paper); }
+.gcard--mine .gcard__name small, .gcard--mine .gcard__who { color: rgba(var(--paper-rgb), .75); }
+/* not on sale yet: a later wave, browsable, flat */
+.gcard--later { background: transparent; border-style: dashed; box-shadow: none; }
+.gcard--later .gtile img { filter: saturate(.5) opacity(.85); }
+.gcard--equipped::after { content: "On the ball"; position: absolute; top: -10px; right: -8px; padding: 1px 10px; border: var(--edge); border-radius: var(--pill); background: var(--gold); color: var(--ink); font-size: 12px; font-weight: 800; transform: rotate(4deg); }
+
+/* a wave's progress: the loader's putting green (Title.tsx Green), mown as far as the gnomes found players */
+.track { position: relative; height: 22px; border-radius: var(--pill); background: #cfe6d4; border: var(--edge); overflow: hidden; }
+.track > i { position: absolute; inset: 0 auto 0 0; background: var(--turf); border-right: var(--edge); border-radius: var(--pill); }
+.track--gold { background: #f3e2b4; } .track--gold > i { background: var(--gold); }
+
+/* a front's paper panel (title.css .world__info): flat, it only shows */
+.panel { background: var(--paper); border: var(--edge); border-radius: var(--r-card); padding: 14px 16px; }
+.panel--deep { border: var(--edge-bold); border-radius: var(--r-panel); box-shadow: var(--deep-card); }
+.rule { border: 0; border-top: var(--rule); margin: 14px 0; }
+
+/* the trust strip: one line of facts under a buy button, each a link or a plain word */
+.trust { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.trust li { display: inline-flex; align-items: center; gap: 6px; }
+.trust li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green-light); border: 1.5px solid var(--ink); flex: none; }
+.trust a { color: var(--green); }

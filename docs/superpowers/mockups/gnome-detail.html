@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A gnome · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- states: ?state=open (default) | mine | taken | later | locked (the players' window, no record) | cap (this wallet's share of the window used) | nowallet -->
+<style>
+  .gd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(20px, 3vw, 44px); width: min(1120px, 100%); margin: 0 auto; align-items: start; }
+  .gd__stage { position: sticky; top: 20px; display: grid; gap: 14px; justify-items: center; }
+  .gd__tile { width: 100%; max-width: 500px; border-radius: var(--r-panel); box-shadow: var(--deep-card); cursor: grab; }
+  .gd__tile img { animation: turn 7s ease-in-out infinite; }
+  @keyframes turn { 25% { transform: rotateY(25deg); } 75% { transform: rotateY(-25deg); } }
+  .gd__hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 4px 12px; border-radius: var(--pill); background: rgba(var(--paper-rgb), .9); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .gd__views { display: flex; gap: 10px; align-items: center; }
+
+  .gd__info { display: grid; gap: 16px; }
+  .gd__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+  .gd__name { margin: 0; font-size: clamp(38px, 4.4vw, 62px); line-height: 1; transform: rotate(-1.5deg); transform-origin: left; --ink-w: 7px; --ink-drop: 5px; }
+  .gd__line { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.35; }
+  .traits { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 0; }
+  .traits div { padding: 8px 12px; border: var(--info-edge); border-radius: 14px; background: var(--info-bg); }
+  .traits dt { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+  .traits dd { margin: 2px 0 0; font-size: 15px; font-weight: 700; }
+  .traits small { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+
+  .buy { display: grid; gap: 10px; }
+  .buy__price { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .buy__price b { font-size: 40px; line-height: 1; }
+  .buy__price span { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+  .buy__row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .buy .btn--cta { flex: 1; min-width: 240px; }
+  .who { display: flex; align-items: center; gap: 12px; }
+  .who svg { width: 44px; height: 44px; flex: none; }
+  .who p { margin: 0; font-size: 14px; line-height: 1.4; }
+
+  @media (max-width: 860px) {
+    .gd { grid-template-columns: 1fr; }
+    .gd__stage { position: static; }
+  }
+  @media (max-width: 600px) {
+    .gd__name { font-size: 40px; --ink-w: 6px; }
+    .gd__line { font-size: 16px; }
+    .buy__price b { font-size: 32px; }
+    /* the price and its button stay at hand: pinned to the foot, over the netbanner */
+    .buy--pin { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 4; padding: 12px 14px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--paper); box-shadow: var(--shadow); }
+    .buy--pin .buy__price b { font-size: 24px; }
+    .buy--pin .buy__row { flex-wrap: nowrap; }
+    .buy--pin .btn--cta { min-width: 0; font-size: 17px; padding: 10px 16px; }
+    .buy--pin .trust, .buy--pin .fine, .buy--pin .buy__note { display: none; }
+    .netbanner { display: none; }
+    .front:has(.buy--pin) { padding-bottom: 200px; }
+  }
+</style>
+</head>
+<body>
+<main class="front tint--garden" id="app"></main>
+<script src="kit.js"></script>
+<script>
+  const { ICON, TIER_ICON, tierChip, gnome, state, corners, netbanner, shareRow } = Kit;
+  const s = state("open");
+  const g = gnome(94);
+  g.art = "img/g02.png";
+  const face = `<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#f6a79b" stroke="#144134" stroke-width="5"/><path d="M26 56 Q50 92 74 56 Q62 66 50 64 Q38 66 26 56Z" fill="#fff" stroke="#144134" stroke-width="4"/><path d="M22 48 L50 12 L78 48Z" fill="#e0524b" stroke="#144134" stroke-width="5" stroke-linejoin="round"/><circle cx="40" cy="58" r="3.5" fill="#144134"/><circle cx="60" cy="58" r="3.5" fill="#144134"/></svg>`;
+
+  const owner = s === "mine"
+    ? `<div class="who">${face}<p><b>Yours</b> since 4 Oct. He rolls for you on every hole, and your ghost wears him.</p></div>`
+    : s === "taken"
+    ? `<div class="who">${face}<p>Plays with <b>nym-gnorman</b> since 4 Oct · best on the Garden: 31 strokes.<br><a class="linkish" href="#">Race nym-gnorman's ghost →</a></p></div>`
+    : `<div class="who">${face}<p>Nobody plays him yet.</p></div>`;
+
+  const price = `<div class="buy__price"><b>${g.price} GNOT</b><span>+ about 0.3 GNOT storage deposit, once</span></div>`;
+  const trust = `<ul class="trust"><li>You get exactly this gnome: no random draw</li><li>Cosmetic only</li><li>Paid straight to the game's account</li><li><a href="#">The contract on gnoweb ↗</a></li></ul>`;
+  const buy = {
+    open: `<section class="panel buy buy--pin">${price}
+      <div class="buy__row"><button class="btn btn--chain btn--cta">Buy ${g.name.split(" of ")[0]} · ${g.price} GNOT</button><button class="round" aria-label="Keep on my list" title="Keep on my list">♡</button></div>${trust}</section>`,
+    nowallet: `<section class="panel buy buy--pin">${price}
+      <div class="buy__row"><button class="btn btn--chain btn--cta">Buy ${g.name.split(" of ")[0]} · ${g.price} GNOT</button></div>
+      <p class="fine buy__note">Buying takes Adena, the gno.land wallet, or a gnokey command: the next step shows both. Playing with him needs nothing more.</p>${trust}</section>`,
+    locked: `<section class="panel buy buy--pin">${price}
+      <div class="buy__row"><button class="btn btn--chain btn--cta" disabled>Players first until Thu 18:00 UTC</button></div>
+      <p class="note note--warn buy__note">This wave goes first to wallets with a score on the boards. <b>Save one round on-chain</b> and he's yours to buy now, or wait for Thursday. <a href="#">Play a hole →</a></p></section>`,
+    cap: `<section class="panel buy buy--pin">${price}
+      <div class="buy__row"><button class="btn btn--chain btn--cta" disabled>3 of 3 Commons this wave</button></div>
+      <p class="note note--warn buy__note">Until Thursday, each player takes up to 3 Commons, 2 Rares and 1 Epic of this wave: yours are Basil, Pip and Clover. Open to everyone after Thu 18:00 UTC.</p></section>`,
+    mine: `<section class="panel buy">
+      <div class="buy__row"><button class="btn btn--gold btn--cta">Play with him</button><button class="btn btn--ghost">Your ghost wears him ✓</button></div>
+      <p class="fine">Rivals see him on your ghost and next to your name on the boards. ${shareRow("Show him off")}</p></section>`,
+    taken: `<section class="panel buy"><p style="margin:0;font-weight:600">He found his player. The Garden has 43 more on sale.</p>
+      <div class="buy__row"><a class="btn btn--main" href="gnomes-gallery.html">See the Garden's gnomes</a></div></section>`,
+    later: `<section class="panel buy"><div class="buy__price"><b>${g.price} GNOT</b><span>when Wave 2 · Island opens</span></div>
+      <div class="buy__row"><button class="btn btn--ghost btn--cta">♡ Keep him on my list</button></div>
+      <p class="fine">The list stays in this browser: when the Island opens, he shows first.</p></section>`,
+  }[s];
+
+  document.getElementById("app").innerHTML = `
+    ${corners("Back to the gnomes")}
+    <div class="gd">
+      <div class="gd__stage">
+        <div style="position:relative;width:100%;max-width:500px">
+          <span class="gtile gtile--${g.tier} gd__tile tint--${g.world}" role="img" aria-label="${g.name}, turning: drag to turn him, or use the arrow keys"><img src="${g.art}" alt=""></span>
+          <span class="gd__hint wide-only">Drag to turn him</span>
+        </div>
+        <div class="gd__views">
+          <button class="round" aria-label="Previous gnome, #93">${ICON.back}</button>
+          <div class="seg seg--s" role="radiogroup" aria-label="See him"><button class="on" role="radio" aria-checked="true">Turning</button><button role="radio" aria-checked="false">On the green</button><button role="radio" aria-checked="false">As a ghost</button></div>
+          <button class="round" aria-label="Next gnome, #95">${ICON.next}</button>
+        </div>
+      </div>
+      <div class="gd__info">
+        <div class="gd__meta">${tierChip(g.tier)}<span>#${g.id}</span><span>·</span><span>Wave ${s === "later" ? "2 · Island" : "1 · Garden"}</span></div>
+        <h1 class="gd__name inked">${g.name}</h1>
+        <p class="gd__line">A bobble that will not sit still, a ginger beard, and a trail of petals behind every putt.</p>
+        <dl class="traits">
+          <div><dt>Hat</dt><dd>Bobble, moss green</dd><small>31 in the Garden</small></div>
+          <div><dt>Beard</dt><dd>Bushy, ginger</dd><small>18 in the Garden</small></div>
+          <div><dt>Extra</dt><dd>Rosy cheeks</dd><small>12 in the Garden</small></div>
+          <div><dt>Trail</dt><dd>Petals</dd><small>Rares and up</small></div>
+        </dl>
+        ${owner}
+        ${buy}
+        ${s === "open" || s === "nowallet" ? `<p class="fine wide-only">For adults. A game cosmetic, not an investment: every gnome rolls the same, and nothing promises he can be sold on. ${shareRow("Share him")}</p>` : ""}
+      </div>
+    </div>
+    ${netbanner()}`;
+</script>
+</body>
+</html>

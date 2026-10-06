@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Legendary's auction · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- states: ?state=live (default: someone else leads) | outbid | leading | extended (a late bid, under 10 min) | ended (waiting for its hand-over) | won | nobid | upcoming -->
+<style>
+  .front { color: var(--paper); }
+  .au { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(20px, 3vw, 48px); width: min(1140px, 100%); margin: 0 auto; align-items: start; }
+  .au__stage { display: grid; gap: 14px; justify-items: center; position: sticky; top: 20px; }
+  .au__stage .gtile { width: 100%; max-width: 500px; border-radius: var(--r-panel); box-shadow: 0 0 0 6px var(--c1), 0 0 0 9px var(--ink), 0 14px 0 6px var(--ink), 0 0 80px 20px rgba(255, 215, 94, .35); }
+  .au__lore { margin: 0; max-width: 460px; font-size: 14px; line-height: 1.5; color: rgba(var(--paper-rgb), .85); text-align: center; }
+  .au__info { display: grid; gap: 14px; }
+  .au__meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; font-weight: 700; color: rgba(var(--paper-rgb), .8); }
+  .au__name { margin: 0; font-size: clamp(40px, 4.6vw, 66px); line-height: 1; transform: rotate(-1.5deg); transform-origin: left; color: var(--tier-legendary); --ink-w: 7px; --ink-drop: 5px; }
+  .au__line { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; }
+
+  .bid { color: var(--ink); display: grid; gap: 12px; }
+  .bid__top { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: end; }
+  .bid__top b { font-size: 46px; line-height: 1; }
+  .bid__top small { font-size: 15px; font-weight: 700; }
+  .clock { display: grid; justify-items: end; text-align: right; }
+  .clock strong { font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .clock span { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+  .clock--soon strong { color: var(--hat-ink); }
+  .bid__form { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+  .bid__field { position: relative; }
+  .bid__field .field { height: 56px; font-size: 22px; font-weight: 700; padding-right: 70px; }
+  .bid__field > span { position: absolute; right: 14px; bottom: 17px; font-size: 14px; font-weight: 800; color: var(--ink-soft); }
+  .bid__form .btn--cta { height: 56px; }
+  .hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .hist li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 8px 12px; border: var(--edge); border-radius: 12px; background: var(--white); color: var(--ink); font-size: 14px; }
+  .hist li.me { background: var(--ink); color: var(--paper); }
+  .hist li.top { border-width: 3px; }
+  .hist time { font-size: 12px; opacity: .7; }
+  .hist b { font-size: 15px; }
+  .au h3 { margin: 0; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: rgba(var(--paper-rgb), .8); }
+  .bid h3 { color: var(--ink-soft); }
+  .netbanner__band { color: var(--green); }
+  @media (max-width: 860px) {
+    .au { grid-template-columns: 1fr; }
+    .au__stage { position: static; }
+    .au__stage .gtile { max-width: 240px; }
+    .au__lore { display: none; }
+    .bid__top b { font-size: 36px; }
+    .bid__form { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main class="front tint--legend" id="app"></main>
+<script src="kit.js"></script>
+<script>
+  const { ICON, TIER_ICON, state, corners, netbanner, shareRow } = Kit;
+  const s = state("live");
+  const leader = s === "leading" || s === "won" ? "nym-twee" : s === "extended" || s === "ended" ? "nym-zxxma042" : "nym-moustache943";
+  const best = { live: "1,240", outbid: "1,302", leading: "1,302", extended: "1,368", ended: "1,368", won: "1,368", nobid: "", upcoming: "" }[s];
+  const min = { live: "1,302", outbid: "1,368", leading: "1,368", extended: "1,437" }[s];
+  const hist = [
+    s === "extended" || s === "ended" || s === "won" ? ["nym-zxxma042", "1,368", "17:52 UTC", s === "won" ? "me" : ""] : null,
+    s !== "live" && s !== "nobid" && s !== "upcoming" ? ["nym-twee", "1,302", "Fri 21:04", "me"] : null,
+    ["nym-moustache943", "1,240", "Fri 12:30", ""],
+    ["nym-pebble77", "1,100", "Thu 19:12", ""],
+    ["nym-itsok123", "777", "Thu 18:05", ""],
+  ].filter(Boolean);
+  if (s === "won") hist[0] = ["nym-twee", "1,368", "17:52 UTC", "me"], hist.splice(1, 1);
+
+  const clock = s === "extended"
+    ? `<div class="clock clock--soon" role="timer" aria-live="off"><strong>8 min 41 s</strong><span>A late bid: the end moved to 18:10 UTC</span></div>`
+    : s === "ended" || s === "won" ? `<div class="clock"><strong>Ended</strong><span>Sat 11 Oct, 18:10 UTC</span></div>`
+    : s === "upcoming" ? `<div class="clock"><strong>Fri 10 Oct</strong><span>Opens 18:00 UTC, for 48 hours</span></div>`
+    : `<div class="clock" role="timer" aria-live="off"><strong>21 h 14 min</strong><span>Ends Sat 11 Oct, 18:00 UTC</span></div>`;
+
+  const topRow = s === "nobid" ? `<div class="bid__top"><div><h3>No bid reached the reserve</h3><b>777 <small>GNOT reserve</small></b></div><div class="clock"><strong>Ended</strong><span>Sat 11 Oct, 18:00 UTC</span></div></div>`
+    : s === "upcoming" ? `<div class="bid__top"><div><h3>Opening bid</h3><b>777 <small>GNOT</small></b></div>${clock}</div>`
+    : `<div class="bid__top"><div><h3>${s === "won" ? "Your winning bid" : s === "leading" ? "You lead with" : "Top bid"}</h3><b>${best} <small>GNOT</small></b>${s === "leading" || s === "won" ? "" : `<div style="font-size:14px;font-weight:600">by <b style="font-size:14px">${leader}</b></div>`}</div>${clock}</div>`;
+
+  const form = (label = "Bid") => `<div class="bid__form"><label class="lbl bid__field">Your bid<input class="field" inputmode="numeric" value="${min}" aria-describedby="min"><span>GNOT</span></label>
+      <button class="btn btn--chain btn--cta">${label} ${min} GNOT</button></div>
+      <p class="fine" id="min" style="margin:0">At least <b>${min} GNOT</b>: the top bid and 5%, or 5 GNOT if that is more. While you lead, your GNOT waits in the contract; outbid, it comes straight back to you, in the same transaction as the bid that beat yours.</p>`;
+
+  const action = {
+    live: form(),
+    outbid: `<p class="note note--warn"><b>nym-moustache943 bid 1,302.</b> Your 1,240 GNOT is already back in your Adena. ${"Still 19 h 02 min to go."}</p>${form("Bid again ·")}`,
+    leading: `<p class="note note--good">You lead. If someone bids more, your 1,302 GNOT comes straight back to you, and this page says so.</p>
+      <p class="fine" style="margin:0">Keep the page open, or come back: nothing to do until it ends.</p>`,
+    extended: `<p class="note note--warn">A bid in the last 10 minutes moves the end 10 minutes on: nobody wins by a second.</p>${form()}`,
+    ended: `<p class="note note--good"><b>nym-zxxma042 won him</b> with 1,368 GNOT.</p>
+      <button class="btn btn--main btn--wide">Hand him over</button>
+      <p class="fine" style="margin:0">One signature from anyone ends the auction: the gnome goes to its winner and the GNOT to the game's account. The winner's page does it for them.</p>`,
+    won: `<p class="note note--good"><b>He's yours.</b> The Windmill King plays with nym-twee, and his name goes up next to yours on every board.</p>
+      <button class="btn btn--gold btn--cta btn--wide">Play with him</button>${shareRow("Show him off")}`,
+    nobid: `<p class="note note--warn">Nobody bid the 777 GNOT reserve. He comes back in the last wave, at the same reserve.</p><a class="btn btn--ghost btn--wide" href="gnomes-gallery.html">Back to the gnomes</a>`,
+    upcoming: `<button class="btn btn--ghost btn--wide">♡ Remind me in this browser</button><p class="fine" style="margin:0">48 hours, one bid at a time, and the end moves 10 minutes on with any late bid.</p>`,
+  }[s];
+
+  document.getElementById("app").innerHTML = `
+    ${corners("Back to the gnomes", `<button class="adena adena--on" aria-label="Adena, connected as nym-twee"><span class="adena__logo">A</span><span class="adena__text"><small>Adena · connected</small><b>nym-twee</b></span></button>`)}
+    <div class="au">
+      <div class="au__stage">
+        <span class="gtile gtile--legendary" role="img" aria-label="The Windmill King, turning"><img src="img/g12.png" alt=""></span>
+        <div class="seg seg--s" role="radiogroup" aria-label="See him"><button class="on" role="radio" aria-checked="true">Turning</button><button role="radio" aria-checked="false">His holing</button><button role="radio" aria-checked="false">As a ghost</button></div>
+        <p class="au__lore">He built the Garden's first windmill to keep the moles awake, and has worn its sails as a crown ever since. When he drops in the cup, the sails turn once for him.</p>
+      </div>
+      <div class="au__info">
+        <div class="au__meta"><span class="tier tier--legendary">${TIER_ICON.legendary}Legendary · one of one</span><span>#715</span><span>·</span><span>Wave 1 · Garden</span></div>
+        <h1 class="au__name inked">The Windmill King</h1>
+        <p class="au__line">Sails for a crown, a beard to his knees, his own holing: the windmill turns as he drops.</p>
+        <section class="panel panel--deep bid" aria-label="The auction">${topRow}<hr class="rule" style="margin:2px 0">${action}
+          <ul class="trust" style="margin-top:4px"><li>One Legendary at a time, 48 hours</li><li>The reserve, 777 GNOT, never goes down</li><li><a href="#">The contract on gnoweb ↗</a></li></ul>
+        </section>
+        ${hist.length && s !== "upcoming" && s !== "nobid" ? `<h3>The bids</h3><ol class="hist" aria-label="The bids, the latest first">${hist.map(([who, amt, when, me], i) => `<li class="${me} ${i === 0 ? "top" : ""}"><span><b>${who === "nym-twee" ? "You" : who}</b></span><b>${amt} GNOT</b><time>${when}</time></li>`).join("")}</ol>` : ""}
+        <p class="fine" style="color:rgba(253,246,233,.75)">For adults. A game cosmetic: he rolls exactly as every gnome does. Nothing promises he can be sold on.</p>
+      </div>
+    </div>
+    ${netbanner()}`;
+</script>
+</body>
+</html>

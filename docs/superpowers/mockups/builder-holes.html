@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holes by players · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- The Builder's front: the player's holes, and the community's. Its cards are
+     the duel's ghost cards (Modes.tsx), a hole's map up top.
+     states: ?state=mine (default) | community | empty -->
+<style>
+  .holes { width: min(1120px, 100%); margin: 0 auto; display: grid; gap: 18px; }
+  .holes__bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+  .hcard { position: relative; display: grid; align-content: start; gap: 8px; padding: 8px 8px 12px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); }
+  .hcard--draft { background: transparent; border-style: dashed; box-shadow: none; }
+  .hcard:nth-child(4n+2) .map { transform: scaleX(-1); } .hcard:nth-child(4n+3) .map { transform: scaleY(-1); } .hcard:nth-child(4n) .map { transform: rotate(180deg); }
+  .hcard__map { position: relative; height: 140px; border: var(--edge); border-radius: 14px; overflow: hidden; background: #5c9a78; }
+  .hcard__map .tag { position: absolute; left: 8px; top: 8px; }
+  .hcard h3 { margin: 0 6px; font-size: 19px; line-height: 1.1; }
+  .hcard__sub { margin: 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .hcard__note { margin: 0 6px; font-size: 13.5px; line-height: 1.35; }
+  .hcard__row { display: flex; gap: 8px; align-items: center; margin: 2px 6px 0; flex-wrap: wrap; }
+  .holed { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 4px; border-radius: var(--pill); background: var(--mint); border: 1.5px solid var(--green); font-size: 12px; font-weight: 700; }
+  .holed i { width: 18px; height: 18px; border-radius: 50%; background: var(--green); color: var(--paper); font-style: normal; display: grid; place-items: center; font-size: 11px; }
+  .holed--not { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); color: var(--ink-soft); }
+  .stat { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+  .blank { display: grid; justify-items: center; gap: 12px; padding: 40px 20px; text-align: center; }
+  .blank p { margin: 0; max-width: 440px; line-height: 1.45; color: var(--ink-soft); }
+  .fine-note { text-align: center; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } .holes__bar .btn--cta { display: none; } }
+</style>
+</head>
+<body>
+<main class="front tint--garden" id="app"></main>
+<script src="kit.js"></script>
+<script src="builder.js"></script>
+<script>
+  const { ICON, state, corners, netbanner } = Kit;
+  const { holeSVG } = Builder;
+  const s = state("mine");
+  const world = { garden: ["Garden", "#1f9a6a"], island: ["Island", "#1a86d0"], town: ["Mushroom Town", "#cf3f7c"], mountain: ["Mountain", "#5569db"], mines: ["Crystal Mines", "#4f3b8f"] };
+  const map = (w) => `<div class="hcard__map">${holeSVG({ small: true })}<span class="tag" style="background:${world[w][1]}">${world[w][0]}</span></div>`;
+  const holed = (yes) => yes ? `<span class="holed"><i>✓</i>Holed by its author</span>` : `<span class="holed holed--not">Not yet holed by its author</span>`;
+
+  const mine = [
+    `<article class="hcard">${map("garden")}<h3>Mole Run</h3><p class="hcard__sub">v2 · par 5 · published 4 Oct</p>
+      <div class="hcard__row">${holed(true)}<span class="stat">23 players · your best 4</span></div>
+      <div class="hcard__row"><button class="btn btn--gold btn--s">${ICON.play} Play</button><button class="btn btn--ghost btn--s">Edit for v3</button><button class="btn btn--ghost btn--s">Dare a friend</button></div></article>`,
+    `<article class="hcard">${map("island")}<h3>Crab Walk</h3><p class="hcard__sub">v1 · par 3 · published 2 Oct</p>
+      <div class="hcard__row">${holed(false)}<span class="stat">4 players</span></div>
+      <p class="hcard__note" style="color:var(--hat-ink);font-size:12.5px">Save a round of your own on it: then it shows first in the list, and your link dares.</p>
+      <div class="hcard__row"><button class="btn btn--gold btn--s">${ICON.play} Play it for real</button><button class="btn btn--ghost btn--s">Edit for v2</button></div></article>`,
+    `<article class="hcard hcard--draft">${map("town")}<h3>Tram Stop</h3><p class="hcard__sub">Draft · in this browser · 2 of 3 weathers holed</p>
+      <div class="hcard__row"><button class="btn btn--main btn--s">Open in the Builder</button><button class="btn btn--ghost btn--s">Export</button></div></article>`,
+  ];
+  const community = [
+    ["Mole Run", "nym-twee", "garden", 5, true, "Mind the gate, and the moles.", "23 players"],
+    ["The Long Ice", "nym-pebble77", "mountain", 4, true, "Slow is fast. Fast is the crevasse.", "61 players"],
+    ["Lava Lane", "nym-zxxma042", "mines", 6, true, "The loop wants all of your pull.", "18 players"],
+    ["Bakery Bend", "nym-itsok123", "town", 3, true, "", "9 players"],
+    ["Crab Walk", "nym-twee", "island", 3, false, "", "4 players"],
+    ["Hedge Maze", "nym-gnorman", "garden", 7, false, "Left, left, then right.", "2 players"],
+  ].map(([n, by, w, par, h, note, stat]) => `<article class="hcard">${map(w)}<h3>${n}</h3><p class="hcard__sub">by ${by} · par ${par}</p>${note ? `<p class="hcard__note">${note}</p>` : ""}
+      <div class="hcard__row">${holed(h)}<span class="stat">${stat}</span></div>
+      <div class="hcard__row">${h ? `<button class="btn btn--gold btn--s">Race ${by === "nym-twee" ? "your own" : "the author"}</button>` : ""}<button class="btn btn--ghost btn--s">${ICON.play} Play</button></div></article>`);
+
+  const body = s === "empty"
+    ? `<div class="blank"><h2 style="margin:0">No hole of yours yet</h2><p>Draw one on the Builder's board with the Garden's pieces, hole it in every weather, and publish it: it costs about a GNOT, the chain's price for keeping it.</p><button class="btn btn--gold btn--cta">Draw a hole</button><a class="linkish" href="?state=community">Play the community's first →</a></div>`
+    : `<div class="grid">${s === "community" ? community.join("") : mine.join("")}</div>`;
+
+  document.getElementById("app").innerHTML = `
+    ${corners("Back to the game")}
+    <div class="holes">
+      <header class="front__head"><span class="eyebrow--pill">The Builder</span><h1 class="display inked">${s === "community" ? "Holes by players" : "Your holes"}</h1>${s === "community" ? `<span class="dare">Drawn by players, holed by their authors</span>` : ""}</header>
+      <div class="holes__bar">
+        <div class="seg" role="tablist" aria-label="Whose holes"><button role="tab" aria-selected="${s !== "community"}" class="${s !== "community" ? "on" : ""}">Yours</button><button role="tab" aria-selected="${s === "community"}" class="${s === "community" ? "on" : ""}">The community's</button></div>
+        ${s === "community" ? `<div class="seg seg--s" aria-label="Order"><button class="on">Holed first</button><button>Newest</button><button>Most played</button></div>` : `<button class="btn btn--gold btn--cta">+ Draw a new hole</button>`}
+      </div>
+      ${body}
+      ${s === "community" ? `<p class="fine fine-note">At most 3 holes by one player are listed. "Holed by its author" is the chain's word: the author saved a round on it. Something wrong with a hole? <a class="linkish" href="#">Tell us</a></p>` : ""}
+    </div>
+    ${netbanner()}`;
+</script>
+</body>
+</html>
