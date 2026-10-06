@@ -21,7 +21,9 @@ gnohome/
 scripts/wasm/p/
 scripts/wasm/gnovm/
 scripts/wasm/sources.go
+scripts/wasm/sources_builder.go
 scripts/wasm/r/gnogolf/golf/golf.go
+scripts/wasm/r/gnogolf/golf/golf_builder.go
 
 # local tool settings
 .netlify/

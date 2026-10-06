@@ -7,14 +7,17 @@
 // and plays it (its par plans stroke by stroke in 19 weathers, and random
 // shots anywhere, at any stroke and tick, some refused), printing each
 // call's answer's sha256; then the wasm answers the same calls, through the
-// page's own host (web/lib/sim/host.ts). Any difference fails.
+// page's own host (web/lib/sim/host.ts). The builder's builder.wasm the same
+// way (web/lib/builder/wasm.ts): PublishMine itself on each hole's data,
+// changed and not, and on holes at the work limits, its refusals word for
+// word; author.Fit and Encode byte for byte. Any difference fails.
 //
 // The holes: the course's (data/holes.txt, their plans in
 // the solver's bests, private/botcheck/hole-bests.json, kept out of the public repo:
 // without them, random shots only), and the mines' 18 from the mines worktree
 // (MINES, default: gnogolf-mines beside the repo) when the course lacks them.
 //
-//   cd web && node --experimental-strip-types ../scripts/wasmparity.ts
+//   cd web && node --experimental-strip-types --import ./test/setup.mjs ../scripts/wasmparity.ts
 //   (scripts/wasm.sh --check runs it; check.sh runs that)
 
 import { execFileSync, spawn } from "node:child_process";
@@ -23,11 +26,22 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { makeHost } from "../web/lib/sim/host.ts";
+import { makeBuilderHost } from "../web/lib/builder/wasm.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const toolchain = process.env.GNO_TOOLCHAIN || path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"), "gno-toolchains/onyx");
 const GNO = process.env.GNO || path.join(toolchain, "gno");
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+/** A hole's data (hex) as a check case changes it: parity_test.gno's mutate. */
+function mutate(x: string, m: string) {
+  const [k, a, b] = m.split(":");
+  if (k === "upper") return x.toUpperCase();
+  if (k === "odd") return x + "0";
+  if (k === "extra") return x + "00";
+  if (k === "cut") return x.slice(0, 2 * Number(a));
+  if (k === "set") return x.slice(0, 2 * Number(a)) + b + x.slice(2 * Number(a) + 2);
+  return x;
+}
 
 interface Hole { slot: string; hex: string; plans: string[] }
 function holes(dir: string, only?: RegExp): Hole[] {
@@ -72,7 +86,7 @@ const lines = (
       fs.writeFileSync(path.join(golf, "wasm_parity_data_test.gno"),
         `package golf\n\n// slot, data, plans ("a,p;a,p|…")\nvar wasmHoles = [][3]string{\n${s.holes.map((h) => `\t{${JSON.stringify(h.slot)}, ${JSON.stringify(h.hex)}, ${JSON.stringify(h.plans.join("|"))}},\n`).join("")}}\n`);
       const out = await new Promise<string>((ok, no) => {
-        const p = spawn(GNO, ["test", "-v", "-run", "TestWasmParity", "./gno.land/r/gnogolf/golf/v2"], { cwd: dir, env: { ...process.env, GNOHOME: path.join(dir, "gnohome") } });
+        const p = spawn(GNO, ["test", "-v", "-run", "TestWasmParity|TestBuilderParity","./gno.land/r/gnogolf/golf/v2"], { cwd: dir, env: { ...process.env, GNOHOME: path.join(dir, "gnohome") } });
         let o = "", e = "";
         p.stdout.on("data", (d: Buffer) => (o += d.toString()));
         p.stderr.on("data", (d: Buffer) => (e += d.toString()));
@@ -93,10 +107,35 @@ const fail = (what: string) => (failed++ < 20 && console.error(`MISMATCH ${what}
 for (const [p, want] of Object.entries(host.sources())) {
   if (sha(fs.readFileSync(path.join(root, p), "utf8")) !== want) fail(`sources: golf.wasm was built from another ${p}: run scripts/wasm.sh`);
 }
-const count = { holes: 0, from: 0, round: 0, plan: 0, refused: 0 };
+const builder = makeBuilderHost(new WebAssembly.Module(fs.readFileSync(path.join(root, "web/lib/sim/builder.wasm"))));
+for (const [p, want] of Object.entries(builder.sources())) {
+  if (sha(fs.readFileSync(path.join(root, p), "utf8")) !== want) fail(`sources: builder.wasm was built from another ${p}: run scripts/wasm.sh`);
+}
+const count = { holes: 0, from: 0, round: 0, plan: 0, refused: 0, checks: 0, checksRefused: 0, fits: 0 };
+const refusals = new Set<string>(); // PublishMine's sentences the checks met
 const t1 = performance.now();
 for (const l of lines) {
   const f = l.split("\t");
+  if (f[1] === "C") { // PublishMine on (slug, data, note): builder.wasm's check
+    const [, , slug, hole, mutation, note] = f, want = f.slice(6).join("\t");
+    const r = builder.check(slug, mutate(hole.startsWith("=") ? hole.slice(1) : hexOf.get(hole)!, mutation), note);
+    const got = r.ok ? ["ok", r.cost.name, r.cost.note, r.cost.bytes, r.cost.bound, r.cost.worst, r.cost.room].join("\t") : `panic: ${r.why}`;
+    count.checks++;
+    if (!r.ok) {
+      count.checksRefused++;
+      refusals.add(r.why.replace(/ \S+\/v\d+:/, " <id>:"));
+    }
+    if (got !== want) fail(`check ${slug} ${hole.slice(0, 40)} ${mutation} ${JSON.stringify(note)}\n  realm: ${want}\n  wasm:  ${got}`);
+    continue;
+  }
+  if (f[1] === "T") { // author.Fit then Encode: builder.wasm's fit
+    const [, , slot, margin, dx, dy, w, h, want] = f;
+    const r = builder.fit(hexOf.get(slot)!, Number(margin));
+    const got = r.ok ? `${r.dx} ${r.dy} ${r.w} ${r.h} ${sha(r.hex)}` : r.why;
+    count.fits++;
+    if (got !== `${Number(dx)} ${Number(dy)} ${w} ${h} ${want}`) fail(`fit ${slot} ${margin}\n  realm: ${dx} ${dy} ${w} ${h} ${want}\n  wasm:  ${got}`);
+    continue;
+  }
   if (f[1] === "H") {
     host.load(f[3], hexOf.get(f[2])!);
     count.holes++;
@@ -113,9 +152,15 @@ for (const l of lines) {
 const calls = count.from + count.round;
 console.log(`wasmparity: ${count.holes} holes, ${calls} calls (${count.from} SimulateFrom, ${count.round} SimulateRound; ${count.plan} of the plans in 19 weathers, ` +
   `${calls - count.plan} random; ${count.refused} refused), ` +
+  `${count.checks} PublishMine checks (${count.checksRefused} refused, in ${refusals.size} sentences), ${count.fits} fits; ` +
   `${failed} different — gno ${(gnoMs / 1000).toFixed(0)} s on ${n} cores, wasm ${((performance.now() - t1) / 1000).toFixed(1)} s`);
 if (count.holes !== all.length || calls === 0) {
   failed++;
   console.error(`wasmparity: ${count.holes} of ${all.length} holes played`);
+}
+if (process.env.VERBOSE) console.log([...refusals].sort().join("\n"));
+if (count.fits !== 2 * all.length || count.checks === count.checksRefused) {
+  failed++;
+  console.error(`wasmparity: ${count.fits} fits of ${2 * all.length}; ${count.checks - count.checksRefused} of ${count.checks} checks passed`);
 }
 process.exit(failed ? 1 : 0);
