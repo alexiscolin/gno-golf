@@ -171,7 +171,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
         action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
-        onTitle={(t) => set({ ...draft, title: t })} onSlug={(s) => set({ ...draft, slug: s })} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} />
+        onTitle={(t) => (session.edit((k) => frame({ ...k, title: t })), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} />
       {palette && quick && full ? (
         <>
           <Palette world={draft.world} palette={palette} armed={armed} off={offAtLimit(draft, palette)} onArm={setArmed} />

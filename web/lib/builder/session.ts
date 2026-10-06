@@ -29,6 +29,10 @@ export function makeSession(first: Draft) {
       live = null;
       if (d !== h.now()) h.push(d);
     },
+    /** An edit beside the board (the name, the slug): made on the draft as kept, any drag's preview dropped. */
+    edit(f: (kept: Draft) => Draft) {
+      this.set(f(h.now()));
+    },
     undo: () => ((live = null), h.undo()),
     redo: () => ((live = null), h.redo()),
     canUndo: () => h.canUndo(),

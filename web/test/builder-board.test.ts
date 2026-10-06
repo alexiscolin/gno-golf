@@ -9,6 +9,7 @@ import { build } from "./scene-harness.ts";
 import { clampEnd, clampHandle, copyPiece, dropEnd, dropHandle, dropMove, nextId, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, setHandle, turnPiece } from "../lib/builder/handles.ts";
 import { makeSession } from "../lib/builder/session.ts";
+import { K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { validate } from "../lib/builder/pipeline.ts";
 import type { Draft, Piece } from "../lib/builder/draft.ts";
@@ -112,6 +113,29 @@ void test("toWorld: a draft moved to another world only if it holds there, judge
   const tight = town.map((e) => (e.id === "*/post/rock" ? { ...e, size: { ...e.size, max: 1 } } : e));
   const no = toWorld(d, "town", tight, ctx);
   assert.ok("why" in no && /radius is 2/.test(no.why), JSON.stringify(no));
+});
+
+void test("the board's view: a wheel zooms about the pointer, a pinch about the fingers' midpoint (and pans with it)", () => {
+  const v = { x: 10, y: 5, k: 20 }, under = (w: typeof v, p: [number, number]) => [w.x + p[0] / w.k, w.y + p[1] / w.k];
+  const z = zoomAt(v, [300, 200], 40);
+  assert.deepEqual(under(z, [300, 200]), under(v, [300, 200]), "the point under the pointer stays");
+  assert.equal(zoomAt(v, [0, 0], 1000).k, K_MAX);
+  const spread = pinch(v, [[100, 100], [300, 100]], [[50, 100], [350, 100]]);
+  assert.equal(spread.k, 30, "fingers half as far apart again: half as close again");
+  assert.deepEqual(under(spread, [200, 100]), under(v, [200, 100]), "the board under the midpoint stays under it, not the corner");
+  const moved = pinch(v, [[100, 100], [300, 100]], [[140, 130], [340, 130]]);
+  assert.equal(moved.k, 20);
+  assert.deepEqual(under(moved, [240, 130]), under(v, [200, 100]), "both fingers moved: the board follows");
+});
+
+void test("a session: an edit beside a drag (the name, the slug) is made on the draft as kept, never on the drag's unchecked preview", () => {
+  const d = lane("garden", []), s = makeSession(d);
+  const dragged = { ...d, pieces: [...d.pieces, rail("x", [3, 0], [3, 20])] }; // across the tee: a drag cut short by a second finger
+  s.preview(dragged);
+  s.edit((k) => ({ ...k, title: "Named" }));
+  assert.equal(s.kept().title, "Named");
+  assert.deepEqual(s.kept().pieces, d.pieces, "the preview dropped, not kept");
+  assert.equal(s.now(), s.kept());
 });
 
 void test("a session: a drag previews as it goes and is one step of history once let go", () => {

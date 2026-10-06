@@ -13,6 +13,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { canPlace, dropEnd, dropHandle, dropMove, errorsOf, movePiece, newErrors, nextId, placePiece, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
+import { K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
 import { BOARD, frame } from "@/lib/builder/gg1";
 import { handlesOf, setHandle, type HandleKey } from "@/lib/builder/handles";
 import { entry as entryIn, type PaletteEntry } from "@/lib/builder/palette";
@@ -52,7 +53,6 @@ type Drag =
   | { t: "handle"; id: string; key: HandleKey; start: Draft }
   | { t: "end"; which: "tee" | "pin"; start: Draft };
 
-const K_MIN = 3, K_MAX = 90;
 const fmt = (v: V) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`;
 
 /** The extent the view frames at first: the tee, the cup and every piece, with a margin. */
@@ -100,11 +100,7 @@ export default function Board(props: BoardProps) {
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = el.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
-      setView((v) => {
-        if (!v) return v;
-        const k = Math.max(K_MIN, Math.min(K_MAX, v.k * Math.exp(-e.deltaY * 0.0015)));
-        return { k, x: v.x + px / v.k - px / k, y: v.y + py / v.k - py / k };
-      });
+      setView((v) => v && zoomAt(v, [px, py], v.k * Math.exp(-e.deltaY * 0.0015)));
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
@@ -127,7 +123,11 @@ export default function Board(props: BoardProps) {
   function onDown(e: RPointerEvent<SVGSVGElement>) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
-    if (pointers.current.size > 1) return void (drag.current = null); // a pinch
+    if (pointers.current.size > 1) {
+      // a pinch: a drag under way is dropped, its unchecked preview with it (never kept by the next edit)
+      if (drag.current && drag.current.t !== "pan") (props.onCancel(), setLive(null));
+      return void (drag.current = null);
+    }
     const at = unit(e), target = (e.target as Element).closest<HTMLElement>("[data-piece],[data-handle],[data-end]");
     if (armed) return; // dropped on release
     if (target?.dataset.handle && selected) return void (drag.current = { t: "handle", id: selected, key: target.dataset.handle as HandleKey, start: draft });
@@ -143,12 +143,13 @@ export default function Board(props: BoardProps) {
 
   function onMove(e: RPointerEvent<SVGSVGElement>) {
     if (pointers.current.size === 2 && pointers.current.has(e.pointerId)) {
-      // a pinch: the change in the distance between the two fingers zooms
-      const spread = () => { const [a, b] = [...pointers.current.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
-      const before = spread();
+      // a pinch: the fingers' spread zooms, about their midpoint, which the board follows
+      const r = box.current!.getBoundingClientRect();
+      const fingers = () => { const [a, b] = [...pointers.current.values()]; return [[a[0] - r.left, a[1] - r.top], [b[0] - r.left, b[1] - r.top]] as const; };
+      const from = fingers();
       pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
-      const now = spread();
-      if (before > 0) setView((v) => v && { ...v, k: Math.max(K_MIN, Math.min(K_MAX, (v.k * now) / before)) });
+      const to = fingers();
+      setView((v) => v && pinch(v, from, to));
       return;
     }
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
