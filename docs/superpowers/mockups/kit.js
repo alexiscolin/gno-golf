@@ -18,6 +18,7 @@ const ICON = {
   x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.2-8.3L1.8 3h6.4l4.4 5.8zM16.7 19.2h1.7L7.3 4.7H5.5z"/></svg>',
   bsky: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.8 3.9C8.4 5.8 11.1 9.7 12 11.7c.9-2 3.6-5.9 6.2-7.8 1.9-1.4 4.9-2.5 4.9 1 0 .7-.4 5.8-.6 6.6-.8 2.9-3.7 3.6-6.3 3.2 4.5.8 5.7 3.3 3.2 5.9-4.7 4.8-6.8-1.2-7.3-2.8l-.1-.3-.1.3c-.5 1.6-2.6 7.6-7.3 2.8-2.5-2.6-1.3-5.1 3.2-5.9-2.6.4-5.5-.3-6.3-3.2C1.3 10.7.9 5.6.9 4.9c0-3.5 3-2.4 4.9-1z"/></svg>',
   copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 19h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   more: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   heart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" fill="#e0524b" stroke="#144134" stroke-width="1.8"/></svg>',
   feedback: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
@@ -84,5 +85,15 @@ const shareRow = (label = "Share") => `
   <a class="share__icon share__icon--copy" aria-label="Copy the link">${ICON.copy}</a>
   <a class="share__icon share__icon--more" aria-label="More ways to share">${ICON.more}</a></span>`;
 
-window.Kit = { ICON, TIER_ICON, TIER_NAME, tierChip, art, WORLDS, gnome, state, corners, netbanner, shareRow };
+// The genesis sale's end (CollectionJSON closesAt; the owner can only bring it
+// earlier): said as a date, the same words everywhere, never as a countdown.
+const CLOSES = "Sun 14 Dec, 18:00 UTC";
+const CAL = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+/** The closing line, a flat note: it only says. */
+const closes = () => `<p class="closes">${CAL}<span>Sale closes for good on <b>${CLOSES}</b>. Unsold gnomes are never made.</span></p>`;
+/** The trust strip, under a buy button only (once a screen): the sale's end is one of its facts. */
+const trust = () => `<ul class="trust"><li>This exact gnome: no random draw</li><li>Cosmetic only</li>
+  <li>Sale closes for good on ${CLOSES}. Unsold gnomes are never made.</li><li><a href="#">The contract ↗</a></li></ul>`;
+
+window.Kit = { ICON, TIER_ICON, TIER_NAME, tierChip, art, WORLDS, gnome, state, corners, netbanner, shareRow, CLOSES, closes, trust };
 })();

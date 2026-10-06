@@ -2,73 +2,57 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Testing a hole · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
 <link rel="stylesheet" href="builder.css">
-<!-- The game itself, on the Builder's local chain (builder.wasm), the HUD as in
-     play; the proof's panel on the right. states: ?state=playing (default: the
-     rain still to hole) | proved (every weather holed: publish) | missed (a proof
-     replayed and refused: the shot cost too much in its dearest weather) -->
+<!-- Test mode: the game itself on the Builder's local chain, its HUD as in play, the proof on the right.
+     states: ?state=playing (default: the rain still to hole) | proved (every weather holed: publish) | missed (a round that does not count) -->
 <style>
-  body { background: #2f6b53 url(img/play-garden3.jpg) center / cover no-repeat; height: 100vh; overflow: hidden; }
-  /* a dark wet veil: the rain's weather, as the game draws it (lib/scene/weather.ts) */
-  .rain { position: fixed; inset: 0; background: linear-gradient(rgba(40, 60, 80, .28), rgba(40, 60, 80, .18)), repeating-linear-gradient(105deg, transparent 0 22px, rgba(255, 255, 255, .22) 22px 23px, transparent 23px 46px); pointer-events: none; }
-  .hud { position: fixed; top: 14px; left: 14px; display: flex; gap: 12px; }
-  .card--hole { position: relative; min-width: 260px; }
-  .card--hole .eyebrow { font-size: 10.5px; padding-left: 42px; }
+  body { margin: 0; height: 100vh; overflow: hidden; overscroll-behavior: none; background: #2f6b53 url(img/play-garden3.jpg) 30% center / cover no-repeat; }
+  .hud { position: fixed; top: var(--sp-3); left: var(--sp-3); display: flex; gap: var(--sp-3); }
+  .card { min-width: 84px; text-align: center; }
+  .card--hole { position: relative; min-width: 220px; text-align: left; }
+  .card--hole .eyebrow { padding-left: 46px; }
   .modetag { position: absolute; top: -12px; left: -8px; padding: 0 10px 2px; border: var(--edge-bold); border-radius: var(--pill); background: var(--sunny); font-size: 16px; font-weight: 700; transform: rotate(-3deg); box-shadow: 0 2px 0 var(--ink); --ink-w: 3px; --ink-drop: 0; }
-  .card--score { min-width: 84px; text-align: center; }
-  .card--weather { flex-direction: row; align-items: center; gap: 10px; }
-  .card--weather svg { width: 36px; height: 36px; }
-  .timed { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); padding: 4px 12px; border-radius: var(--pill); background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 600; }
-  .hint { position: fixed; left: calc(50% - 180px); bottom: 34px; transform: translateX(-50%); padding: 4px 12px; border-radius: var(--pill); background: rgba(var(--paper-rgb), .9); font-size: 13px; font-weight: 600; white-space: nowrap; }
-  .foot { position: fixed; left: 14px; bottom: 14px; display: flex; gap: 10px; }
-
-  .proof { position: fixed; top: 14px; right: 14px; bottom: 14px; width: 360px; display: grid; align-content: start; gap: 12px; padding: 18px; border: var(--edge); border-radius: 24px; background: var(--paper); box-shadow: -6px 6px 0 var(--ink); overflow: auto; }
-  .proof h2 { margin: 0; font-size: 26px; line-height: 1.1; }
-  .proof p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--ink-soft); }
-  .par { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: var(--edge); border-radius: 14px; background: var(--white); }
+  .proof { position: fixed; top: var(--sp-3); right: var(--sp-3); bottom: var(--sp-3); width: 340px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; border: var(--edge); border-radius: 24px; background: var(--paper); box-shadow: -6px 6px 0 var(--ink); overflow: hidden; }
+  /* the head and the action pinned, the middle scrolls in itself */
+  .proof > header, .proof > footer { padding: var(--sp-4) var(--sp-5); }
+  .proof > header { border-bottom: var(--rule); }
+  .proof > footer { display: grid; gap: var(--sp-2); border-top: var(--rule); }
+  .proof > footer .btn { margin: 0; min-height: 52px; }
+  .proof__body { overflow: auto; overscroll-behavior: contain; padding: var(--sp-4) var(--sp-5); display: grid; align-content: start; gap: var(--sp-4); }
+  .proof h2 { margin: var(--sp-1) 0 0; font-size: 24px; line-height: 1.15; }
+  .par { display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-3); align-items: center; padding: var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); }
   .par b { font-size: 30px; line-height: 1; }
-  .par .seg button { min-height: 34px; padding: 2px 12px; }
+  .par .seg button { min-height: 36px; width: 40px; }
 </style>
 </head>
 <body>
-<div class="rain" aria-hidden="true"></div>
 <div id="app"></div>
 <script src="kit.js"></script>
-<script src="builder.js"></script>
 <script>
+  // the Builder needs 900 px: narrower, its play-only screen
+  if (matchMedia("(max-width: 899px), (pointer: coarse)").matches) location.replace("builder-phone.html");
   const { ICON, state } = Kit;
   const s = state("playing");
   const proved = s === "proved";
-  const wx = { clear: "☀", wind: "≋", rain: "☂" };
-  const rows = [
-    ["clear", "Clear", "done", "3 strokes · replayed by the chain's code ✓"],
-    ["wind", "Wind", "done", "4 strokes · replayed ✓"],
-    ["rain", "Rain", proved ? "done" : s === "missed" ? "missed" : "now", proved ? "4 strokes · replayed ✓" : s === "missed" ? "Holed in 5, but one shot could run out of room in the rain" : "Playing now: the rain lays puddles before the gate"],
-  ];
-
+  const rows = [["☀", "Clear", "3 strokes", true], ["≋", "Wind", "4 strokes", true], ["☂", "Rain", proved ? "4 strokes" : s === "missed" ? "Doesn't count" : "Playing now", proved]];
   document.getElementById("app").innerHTML = `
     <header class="hud">
-      <div class="card card--hole"><span class="modetag inked">Test</span><span class="eyebrow">Your hole · Garden</span><h1>Mole Run</h1><a class="src">Back to the editor ↩</a></div>
-      <div class="card card--score"><span class="eyebrow">Strokes</span><strong>${proved ? 4 : 2}</strong><small style="font-size:11px;font-weight:700">par ?</small></div>
-      <div class="card card--weather"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M10 22a7 7 0 1 1 3-13 8 8 0 0 1 14 5 5 5 0 0 1-1 10H10z" fill="#fdf6e9" stroke="#144134" stroke-width="2"/><path d="M13 27l-2 4m8-4-2 4m8-4-2 4" stroke="#5fb3c9" stroke-width="2.2" stroke-linecap="round"/></svg><span><span class="eyebrow">Rain</span><b style="font-size:13px">the hole's real rain</b></span></div>
+      <div class="card card--hole"><span class="modetag inked">Test</span><span class="eyebrow">Your hole</span><h1>Mole Run</h1></div>
+      <div class="card"><span class="eyebrow">Strokes</span><strong>${proved ? 4 : 2}</strong></div>
+      <div class="card"><span class="eyebrow">Weather</span><strong style="font-size:20px">Rain</strong></div>
     </header>
-    <p class="timed">↻ This hole changes with every stroke: watch the gate before you shoot</p>
-    <p class="hint">Click anywhere and pull back, like a slingshot</p>
-    <div class="foot"><button class="btn btn--ghost btn--s" style="min-height:44px">Restart</button><button class="btn btn--ghost btn--s" style="min-height:44px">${ICON.eye} Far</button></div>
-
     <aside class="proof" aria-label="The proof">
-      <span class="eyebrow">Test · nothing is sent, nothing costs</span>
-      <h2>${proved ? "Holed in every weather" : "Hole it in every weather that moves the ball"}</h2>
-      <p>${proved ? "Each round was played again by the chain's own code, stroke for stroke: it can be done, in all of them. Publish is open." : "The Garden's climate has three that change how the ball rolls. Each is the weather your hole will really have, from its address. Fog only hides the far end: no round needed."}</p>
-      <ul class="proofs">${rows.map(([k, name, st, sub]) => `<li class="${st === "done" ? "done" : ""}"><span class="wx" aria-hidden="true">${wx[k]}</span><span>${name}<small>${sub}</small></span>${st === "done" ? '<span style="color:var(--green);font-size:20px">✓</span>' : st === "missed" ? '<button class="btn btn--ghost btn--s">Again</button>' : '<span class="tag tag--gold">Now</span>'}</li>`).join("")}</ul>
-      ${s === "missed" ? `<p class="note note--warn">That round does not count: in a storm the chain could cut that shot short. Try a softer line, or edit the hole: <b>fewer fixed rails</b> leave a shot more room.</p>` : ""}
-      <div class="par"><span><span class="eyebrow">Par</span><b>${proved ? 5 : "–"}</b></span>${proved ? `<span class="fine" style="margin:0;max-width:150px">The most strokes it took, plus one. Higher if you like; never lower.</span><div class="seg seg--s"><button>−</button><button>+</button></div>` : `<span class="fine" style="margin:0">Set once every weather is holed.</span>`}</div>
-      ${proved ? `<button class="btn btn--chain btn--wide btn--cta" style="font-size:18px">Publish…</button>` : ""}
-      <button class="btn btn--ghost btn--wide" style="margin-top:${proved ? 0 : 6}px">Back to the editor</button>
-      <p class="fine">Move a piece, and the proofs go: the hole is not the one you holed any more. Renaming it, or its par, keeps them.</p>
+      <header><span class="eyebrow">Test · free, nothing is sent</span><h2>${proved ? "Holed in every weather" : "Hole it in each weather"}</h2></header>
+      <div class="proof__body">
+        <ul class="proofs">${rows.map(([g, n, sub, done]) => `<li class="${done ? "done" : ""}"><span class="wx" aria-hidden="true">${g}</span><span>${n}<br><small style="font-weight:600;color:var(--ink-soft)">${sub}</small></span>${done ? '<span style="color:var(--green);font-size:20px">✓</span>' : s === "missed" ? '<button class="btn btn--ghost btn--s">Again</button>' : '<span class="tag tag--gold">Now</span>'}</li>`).join("")}</ul>
+        ${s === "missed" ? `<p class="note note--warn" style="margin:0">One shot could run out of room in the rain. Try a softer line.</p>` : ""}
+        ${proved ? `<div class="par"><span class="eyebrow">Par</span><b>5</b><div class="seg seg--s" aria-label="Par"><button aria-label="Lower" disabled>−</button><button aria-label="Higher">+</button></div></div>` : ""}
+        <details class="more"><summary>Why each weather?</summary><p>Wind, rain and the rest change how the ball rolls. The weather here is your hole's real one. Moving a piece drops these rounds.</p></details>
+      </div>
+      <footer>${proved ? `<button class="btn btn--chain">Publish…</button>` : ""}<button class="btn btn--ghost">Back to the editor</button></footer>
     </aside>`;
 </script>
 </body>

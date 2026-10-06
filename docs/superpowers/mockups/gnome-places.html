@@ -12,7 +12,7 @@
   .places { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; max-width: 1390px; margin: 0 auto; }
   .place { display: grid; gap: 8px; align-content: start; }
   .place h2 { margin: 0; font-size: 17px; }
-  .place p { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-soft); max-width: 640px; }
+  .place p { margin: 0; font-size: 15px; line-height: 1.4; color: var(--ink-soft); max-width: 640px; }
   .crop { position: relative; height: 330px; overflow: hidden; border: var(--edge-bold); border-radius: 14px; background: var(--s0, #fff3df); }
   .crop.front { min-height: 0; padding: 22px; }
   /* (a crop of a front screen: its backdrop and frame inside the crop, not the window) */
@@ -82,7 +82,7 @@
         </div>
         <div class="cups-peek"><i style="background:#1f9a6a"></i><i style="background:#1a86d0"></i><i style="background:#cf3f7c"></i><i style="background:#5569db"></i><i style="background:#4f3b8f"></i></div>
       </div>
-      <p>A plain link, as the two beside it, and no badge counting what is for sale. A player's face on a sticker is the gnome their ghost wears; a Legendary's player carries its name in a gold pill on every board. While a wave is open, the link reads <b>Gnomes · Wave 1 →</b>; that is all the noise the cups make.</p>
+      <p>A plain link beside the other two. Nothing counts down, nothing is for sale here.</p>
     </section>
 
     <section class="place"><h2>2 · A duel: the rival's ghost wears their gnome</h2>
@@ -92,7 +92,7 @@
         <button class="ghost-tag">${face("img/g03.png")}nym-moustache943 · Thistle of the Garden</button>
         <div class="hud-duel"><div>${face("img/g08.png")}You<b>2</b></div><div>${face("img/g03.png")}nym-moustache943<b>3</b></div></div>
       </div>
-      <p>The ghost is the rival's own gnome, see-through, meshes only (no trail, no holing). Its tag shows while the ghost rolls and on a tap; tapping the name opens that gnome's page in a sheet over the hole, never mid-shot. A rival whose gnome matches the player's own falls back to the game's rival look, so the two never read alike.</p>
+      <p>The ghost wears its player's gnome. A tap on its tag opens that gnome, between shots.</p>
     </section>
 
     <section class="place"><h2>3 · A hole finished: the share card tries on another gnome</h2>
@@ -102,7 +102,7 @@
           <div class="tryon">${face("img/g08.png")}<span>The card shows <b>The Pirate</b>.<br><button class="linkish">Try another gnome on it</button></span></div>
         </div>
       </div>
-      <p>Only after a personal best, and only on the share card: the player's gnome is on it; "Try another gnome on it" previews the card with any gnome, theirs, earned or in the gallery, with a link to that gnome's page. Never after a bad shot, never a pop-up, never "your rival has a gnome you don't".</p>
+      <p>Only after a personal best, only on the share card. Never after a bad shot.</p>
     </section>
 
     <section class="place"><h2>4 · The boards: a player's face is their gnome</h2>
@@ -115,7 +115,7 @@
           <li><span class="medal" style="background:var(--paper)">8</span>${face("img/g00.png")}<span><b>nym-pebble77</b></span><b>39</b><button class="btn btn--gold">Race</button></li>
         </ol>
       </div>
-      <p>The face stays the board's flat face until the gnome's thumbnail is loaded (one read per page of rows, cached for the visit). A gnome that changed hands drops off its old player's row at once: the chain says who wears what.</p>
+      <p>A face on the boards is the player's gnome; a Legendary adds his name in gold. A tap on a row opens their gnomes, read-only.</p>
     </section>`;
 </script>
 </body>

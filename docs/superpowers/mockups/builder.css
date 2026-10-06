@@ -1,87 +1,72 @@
-/* NEW: the Builder's workbench, over kit.css. The front's paper and ink, at a
-   tool's density: smaller type, flat info panels (they only show), pressable
-   things on their drop as everywhere. Desktop only (900 px and up). */
+/* NEW: the Builder's workbench, over kit.css. The front's paper and ink at a
+   tool's density: flat info panels, pressable things on their drop. 900 px
+   and up only. The window never scrolls: the palette and the inspector
+   scroll in themselves (no chaining), the board pans and zooms. */
 
-.bench { position: fixed; inset: 0; display: grid; grid-template: 64px minmax(0, 1fr) / 236px minmax(0, 1fr) 352px; gap: 12px; padding: 12px; background: var(--dots, none), var(--s0); }
-.bench { --dots: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px; }
+.bench { position: fixed; inset: 0; display: grid; grid-template: 64px minmax(0, 1fr) / 224px minmax(0, 1fr) 320px; gap: var(--sp-3); padding: var(--sp-3) max(var(--sp-3), env(safe-area-inset-right)) var(--sp-3) max(var(--sp-3), env(safe-area-inset-left)); overflow: hidden; background: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px, var(--s0); }
 
-/* the bar: back, the hole's name, its world, history, then the two ways out (test, publish) */
-.bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 6px; }
-.bar .round { width: 48px; height: 48px; }
-.bar__name { display: grid; line-height: 1.1; }
-.bar__name input { border: 0; border-bottom: 2px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; font-size: 22px; font-weight: 700; color: var(--ink); width: 260px; padding: 0 0 2px; }
-.bar__name small { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+/* the bar: back, the name, the world, history, the one action */
+.bar { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.bar .round, .bar .btn { height: 48px; min-height: 48px; margin: 0; }
+.bar .round { width: 48px; }
+.bar .round--small { width: 40px; height: 40px; min-height: 40px; }
+.bar .btn--s { height: 40px; min-height: 40px; }
+.bar__name { min-width: 0; width: 280px; border: 0; border-bottom: 2px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; font-size: 22px; font-weight: 700; color: var(--ink); padding: 0 0 2px; text-overflow: ellipsis; }
 .bar__sp { flex: 1; }
-.bar .seg button { min-height: 40px; padding: 4px 12px; font-size: 13px; }
 
-/* a column: a paper panel, its parts apart by a dashed rule */
-.col { min-height: 0; overflow: auto; display: grid; align-content: start; gap: 10px; padding: 12px; border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
-.col h3 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); display: flex; justify-content: space-between; align-items: center; }
-.col hr { border: 0; border-top: var(--rule); margin: 4px 0; width: 100%; }
+/* a column: a paper panel that scrolls in itself, never the page */
+.col { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-3); padding: var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
+.col hr { border: 0; border-top: var(--rule); margin: 0; width: 100%; }
 
-/* the palette: this world's pieces, by kind, each one drawn as the board draws it */
-.kinds { display: flex; flex-wrap: wrap; gap: 4px; }
-.kinds button { padding: 3px 9px; border: 1.5px solid var(--ink); border-radius: var(--pill); background: var(--white); font-size: 12px; font-weight: 700; cursor: pointer; }
-.kinds button.on { background: var(--ink); color: var(--paper); }
-.pieces { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.piece { display: grid; justify-items: center; gap: 2px; padding: 6px 4px 5px; border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font-size: 12px; font-weight: 700; cursor: grab; }
+/* the palette: the world's pieces, each drawn as the board draws it */
+.pieces { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.piece { display: grid; justify-items: center; gap: var(--sp-1); padding: var(--sp-2) var(--sp-1); border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font-size: 13px; font-weight: 700; cursor: grab; }
 .piece svg { width: 40px; height: 30px; }
-.piece small { font-size: 10px; font-weight: 600; color: var(--ink-soft); }
 .piece--on { background: var(--mint); box-shadow: 0 0 0 2px var(--gold), 0 2px 0 3px var(--ink); }
-.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 
-/* the board: the hole from above, on its grid, at the editor's scale */
-.board { position: relative; min-height: 0; border: var(--edge-bold); border-radius: var(--r-card); background: #5c9a78; overflow: hidden; }
+/* the board: the hole from above; it takes the wheel, the pinch and the drag */
+.board { position: relative; min-height: 0; border: var(--edge-bold); border-radius: var(--r-card); background: #5c9a78; overflow: hidden; touch-action: none; overscroll-behavior: contain; }
 .board svg.map { position: absolute; inset: 0; width: 100%; height: 100%; }
-.board__foot { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.board__foot { position: absolute; left: var(--sp-3); right: var(--sp-3); bottom: var(--sp-3); display: flex; gap: var(--sp-2); align-items: center; pointer-events: none; }
 .board__foot > * { pointer-events: auto; }
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--pill); background: rgba(var(--paper-rgb), .92); border: var(--info-edge); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.board__zoom { margin-left: auto; display: flex; gap: 6px; }
-.board__zoom .round { width: 34px; height: 34px; border-width: 2px; font-size: 18px; font-weight: 800; }
-/* a piece's size or angle while dragged, by its handle */
-.measure { position: absolute; padding: 2px 8px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; height: 34px; padding: 0 var(--sp-3); border-radius: var(--pill); background: rgba(var(--paper-rgb), .94); border: var(--info-edge); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.board__zoom { margin-left: auto; display: flex; gap: var(--sp-2); }
+.board__zoom .round { width: 34px; height: 34px; border-width: 2px; font-size: 17px; font-weight: 800; }
+.measure { position: absolute; padding: 2px var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; white-space: nowrap; }
 
 /* the 3D pane: the game's own drawing of the canonical hole */
-.preview { position: relative; height: 200px; flex: none; border: var(--edge); border-radius: 14px; overflow: hidden; background: #3f9a72 center / cover; }
-.preview .pill { position: absolute; left: 8px; top: 8px; }
+.preview { height: 180px; flex: none; border: var(--edge); border-radius: 14px; background: #3f9a72 center / cover; }
 
-/* the inspector: the selected piece's parameters, inside its palette entry's ranges */
-.insp { display: grid; gap: 10px; }
-.insp__head { display: flex; align-items: center; gap: 10px; }
-.insp__head b { font-size: 17px; }
-.insp__head small { display: block; font-size: 12px; color: var(--ink-soft); font-weight: 600; }
-.range { display: grid; grid-template-columns: 74px 1fr 52px; gap: 8px; align-items: center; font-size: 12.5px; font-weight: 700; }
-.range input[type="range"] { width: 100%; accent-color: var(--green); }
-.range output { justify-self: end; font-family: var(--mono); font-size: 12px; padding: 2px 6px; border: 1.5px solid rgba(var(--ink-rgb), .3); border-radius: 6px; background: var(--white); }
-.range small { grid-column: 2 / -1; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-top: -6px; }
-/* a timed piece's cycle: one cell a substep (or a stroke), on where it is there */
-.cycle { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 18px; }
+/* the piece: its parameters, label, slider, value: three columns, one baseline */
+.insp { display: grid; gap: var(--sp-3); }
+.insp__head { display: flex; align-items: center; gap: var(--sp-2); font-size: 17px; }
+.range { display: grid; grid-template-columns: 60px minmax(0, 1fr) 56px; gap: var(--sp-2); align-items: center; font-size: 13px; font-weight: 700; }
+.range input[type="range"] { width: 100%; margin: 0; accent-color: var(--green); }
+.range output { justify-self: stretch; text-align: right; font-size: 13px; padding: 2px 6px; border: 1.5px solid rgba(var(--ink-rgb), .3); border-radius: 6px; background: var(--white); }
+.cycle { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 16px; margin-left: 68px; }
 .cycle i { border-radius: 3px; background: rgba(var(--ink-rgb), .12); }
 .cycle i.on { background: var(--hat); }
-.cycle i.now { outline: 2px solid var(--ink); }
 
-/* the checks: the counts against GG1's limits, then what is wrong, worst first */
-.gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
-.gauge { display: grid; gap: 3px; font-size: 11.5px; font-weight: 700; }
-.gauge span { display: flex; justify-content: space-between; }
-.gauge span em { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+/* the limits: behind a tap, a gauge each */
+.gauges { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2) var(--sp-3); }
+.gauge { display: grid; gap: 3px; font-size: 12px; font-weight: 700; color: var(--ink); }
+.gauge span { display: flex; justify-content: space-between; gap: var(--sp-1); }
+.gauge span em { font-style: normal; color: var(--ink-soft); }
 .gauge i { display: block; height: 7px; border-radius: var(--pill); background: rgba(var(--ink-rgb), .12); overflow: hidden; }
-.gauge i b { display: block; height: 100%; background: var(--green-light); border-right: 1.5px solid var(--ink); }
-.gauge--warn i b { background: var(--sunny); } .gauge--full i b { background: var(--hat); }
-.issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.issue { display: grid; grid-template-columns: 20px 1fr; gap: 8px; padding: 7px 10px; border-radius: 12px; font-size: 13px; line-height: 1.35; cursor: pointer; }
-.issue::before { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; border: 1.5px solid var(--ink); }
-.issue--error { background: var(--paper); border: 2px solid var(--hat-ink); color: var(--hat-ink); }
+.gauge i b { display: block; height: 100%; background: var(--green-light); }
+
+/* checks: what is wrong, one line each; a click selects the piece */
+.issues { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.issue { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: var(--sp-2); align-items: start; margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: 12px; font-size: 14px; line-height: 1.35; }
+.issue::before { width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; border: 1.5px solid var(--ink); }
+.issue--error { background: var(--paper); border: 2px solid var(--hat-ink); color: var(--hat-ink); cursor: pointer; }
 .issue--error::before { content: "!"; background: var(--hat); color: var(--paper); }
-.issue--warn { background: #fff3d6; border: 2px solid #e0a44a; }
-.issue--warn::before { content: "?"; background: var(--sunny); }
 .issue--ok { background: var(--paper); border: 2px solid var(--green); }
 .issue--ok::before { content: "✓"; background: var(--green); color: var(--paper); }
-.issue code { display: block; margin-top: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); }
 
-/* the proof: every weather of the world's climate that moves the ball, holed */
-.proofs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.proofs li { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; padding: 6px 10px 6px 6px; border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; font-weight: 700; }
-.proofs li small { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
+/* the proof: every weather of the climate that moves the ball */
+.proofs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.proofs li { display: grid; grid-template-columns: 36px minmax(0, 1fr) 64px; gap: var(--sp-3); align-items: center; min-height: 52px; padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-2); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 15px; font-weight: 700; }
+.proofs li > :last-child { justify-self: end; }
 .proofs li.done { background: var(--mint); }
-.proofs .wx { width: 34px; height: 34px; border-radius: 50%; border: var(--edge); display: grid; place-items: center; background: var(--paper); font-size: 16px; }
+.proofs .wx { width: 36px; height: 36px; border-radius: 50%; border: var(--edge); display: grid; place-items: center; background: var(--paper); font-size: 16px; }

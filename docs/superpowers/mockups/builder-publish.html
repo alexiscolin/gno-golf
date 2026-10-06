@@ -2,44 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Publishing a hole · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
 <link rel="stylesheet" href="builder.css">
-<!-- The publish wizard, a sheet over the editor. states: ?state=name (default) | refused (the name looks like a link) | checks | cost | pending | done | closed (publishing not open) | newer (a newer version was published from elsewhere) -->
+<!-- Publishing, a sheet over the editor: name it, see the cost, sign. The chain's checks run on their own
+     and show only when one fails. states: ?state=name (default) | refused (the name looks like a link)
+     | cost | newer (a newer version published elsewhere) | closed (publishing not open) | pending | done -->
 <style>
   body { overflow: hidden; height: 100vh; }
   .behind { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
-  .sheet__in { max-width: 520px; }
-  .wiz { display: flex; gap: 6px; margin: 8px 0 14px; padding: 0; list-style: none; }
-  .wiz li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; border: 1.5px solid rgba(var(--ink-rgb), .3); border-radius: var(--pill); font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
-  .wiz li i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px; border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); }
-  .wiz li.done i { background: var(--green); color: var(--paper); }
-  .wiz li.now { border-color: var(--ink); color: var(--ink); background: var(--white); }
-  .wiz li.now i { background: var(--gold); }
-  .form { display: grid; gap: 12px; }
-  .form .lbl > span:first-child { display: flex; justify-content: space-between; }
-  .stored { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-  .stored b { color: var(--ink); }
-  textarea.field { height: 72px; padding-top: 10px; resize: none; }
-  .locked { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 12px; border: var(--info-edge); border-radius: 12px; background: var(--info-bg); font-size: 13px; }
-  .card-pre { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: center; padding: 8px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); }
-  .card-pre .mini { position: relative; height: 60px; border-radius: 10px; overflow: hidden; background: #5c9a78; border: var(--edge); }
-  .card-pre b { font-size: 16px; display: block; }
-  .card-pre small { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
-  .checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .bill { margin: 4px 0 6px; padding: 12px 14px; border: var(--edge); border-radius: 16px; background: var(--white); display: grid; gap: 6px; font-size: 14px; }
-  .bill div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-  .bill span small { display: block; font-size: 12px; color: var(--ink-soft); font-weight: 500; }
-  .bill .bill__total { padding-top: 8px; border-top: var(--rule); font-size: 17px; }
-  .bill .bill__total b { font-size: 20px; }
-  .row { display: flex; gap: 10px; margin-top: 14px; }
-  .row .btn { flex: 1; }
-  .shot { position: relative; height: 170px; border: var(--edge-bold); border-radius: 16px; overflow: hidden; background: url(img/play-garden3.jpg) center / cover; }
-  .shot__card { position: absolute; left: 10px; bottom: 10px; padding: 6px 12px; border: var(--edge); border-radius: 12px; background: var(--paper); }
-  .shot__card b { display: block; font-size: 18px; }
-  .shot__card small { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
-  .hop { animation: hop .7s ease-in-out infinite alternate; }
+  .sheet__in { max-width: 460px; display: grid; gap: var(--sp-4); }
+  .sheet__in > :not(.sheet__foot) { margin: 0; }
+  .steps2 { display: flex; gap: var(--sp-2); font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+  .steps2 b { color: var(--ink); }
+  .lbl span { display: flex; justify-content: space-between; }
+  textarea.field { height: 76px; padding-top: 10px; resize: none; }
+  .bill { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 15px; align-items: baseline; }
+  .bill b { text-align: right; }
+  .bill .bill__total { padding-top: var(--sp-2); border-top: var(--rule); font-size: 17px; }
+  .bill b.bill__total { font-size: 20px; }
+  .shot { position: relative; aspect-ratio: 1200 / 630; border: var(--edge); border-radius: 14px; overflow: hidden; }
+  .shot iframe { position: absolute; left: 0; top: 0; width: 1200px; height: 630px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+  .row2 .btn { min-height: 52px; margin: 0; }
+  .center { text-align: center; justify-items: center; }
+  .hop { width: 180px; height: 110px; position: relative; border: var(--edge-bold); border-radius: 14px; overflow: hidden; background: #5c9a78; animation: hop .7s ease-in-out infinite alternate; }
   @keyframes hop { to { transform: translateY(-12px); } }
 </style>
 </head>
@@ -49,69 +37,41 @@
 <script src="kit.js"></script>
 <script src="builder.js"></script>
 <script>
-  const { ICON, state, shareRow } = Kit;
+  if (matchMedia("(max-width: 899px), (pointer: coarse)").matches) location.replace("builder-phone.html");
+  const { ICON, state } = Kit;
   const { holeSVG } = Builder;
   const s = state("name");
-  const at = { name: 1, refused: 1, checks: 2, newer: 2, cost: 3, pending: 4, done: 5, closed: 2 }[s];
-  const wiz = `<ol class="wiz" aria-label="Publishing, step ${Math.min(at, 4)} of 4">${["Name", "Checks", "Cost", "Sign"].map((n, i) => `<li class="${i + 1 < at ? "done" : i + 1 === at ? "now" : ""}"><i>${i + 1 < at ? "✓" : i + 1}</i>${n}</li>`).join("")}</ol>`;
+  const step = (n) => `<p class="steps2" aria-label="Step ${n} of 2"><span>${n === 1 ? "<b>1 · Name</b>" : "1 · Name ✓"}</span><span>·</span><span>${n === 2 ? "<b>2 · Publish</b>" : "2 · Publish"}</span></p>`;
   const close = `<button class="round round--small sheet__close" aria-label="Close: the draft stays">${ICON.close}</button>`;
-  const gnokey = `<details class="details"><summary>Publish with gnokey instead</summary><div class="details__box"><p>The hole's data is long: copy the whole command, it is one line.</p>
-    <code class="code">gnokey maketx call -pkgpath "gno.land/r/gnogolf/golf/v2" -func "PublishMine" -args "mole-run" -args "4747310001…(5,240 bytes)…" -args "Mind the gate, and the moles." -gas-fee 1500000ugnot -gas-wanted 205000000 -send "" -broadcast -chainid gnoland-1 -remote https://rpc.gno.land:443 <b>my-key</b></code>
-    <button class="btn btn--main btn--s" style="margin-top:10px">Copy</button> <span class="fine">Published when it prints <b>OK!</b>: this page sees the hole within a few seconds.</span></div></details>`;
+  const foot = (b) => `<div class="sheet__foot">${b}</div>`;
+  const name = (bad) => `${step(1)}<h2>Name it</h2>
+    <label class="lbl"><span>Name <span class="count">${bad ? "10" : "8"} / 40</span></span><input class="field${bad ? " field--bad" : ""}" value="${bad ? "St.Andrews" : "Mole Run"}"></label>
+    ${bad ? `<p class="note note--bad">Looks like a web address. Try "St. Andrews".</p>` : ""}
+    <label class="lbl"><span>A line for players <span class="count">29 / 140</span></span><textarea class="field">Mind the gate, and the moles.</textarea></label>
+    ${foot(`<button class="btn btn--main btn--wide"${bad ? " disabled" : ""}>Next</button>`)}`;
+  const gnokey = `<details class="more"><summary>Publish with gnokey instead</summary><div><code class="code">gnokey maketx call -pkgpath "gno.land/r/gnogolf/golf/v2" -func "PublishMine" -args "mole-run" -args "4747310001…" -args "Mind the gate, and the moles." -gas-fee 1500000ugnot -gas-wanted 205000000 -broadcast -chainid gnoland-1 -remote https://rpc.gno.land:443 my-key</code>
+    <button class="btn btn--main btn--s" style="margin-top:8px">Copy</button></div></details>`;
 
   const body = {
-    name: `<span class="eyebrow">Publish a hole</span><h2>Name it</h2>${wiz}
-      <div class="form">
-        <label class="lbl"><span>Name <span class="count">8 / 40</span></span><input class="field" value="Mole Run"><span class="stored">Stored as <b>Mole Run</b> ✓</span></label>
-        <label class="lbl"><span>A line for players <span class="count">29 / 140</span></span><textarea class="field">Mind the gate, and the moles.</textarea></label>
-        <div class="locked"><span>Its address <b class="mono">nym-twee/mole-run/v1</b></span><span class="fine" style="margin:0">Fixed at the test: the weather comes from it</span></div>
-        <span class="eyebrow">In the community's list</span>
-        <div class="card-pre"><span class="mini">${holeSVG({ small: true })}</span><span><b>Mole Run</b><small>by nym-twee · par 5 · Garden</small><br><small style="color:var(--ink)">Mind the gate, and the moles.</small></span></div>
-      </div>
-      <div class="row"><button class="btn btn--ghost">Back to the editor</button><button class="btn btn--main">Next: the checks</button></div>`,
-    refused: `<span class="eyebrow">Publish a hole</span><h2>Name it</h2>${wiz}
-      <div class="form">
-        <label class="lbl"><span>Name <span class="count">11 / 40</span></span><input class="field field--bad" value="St.Andrews"><span class="note note--bad" style="margin:0;font-size:13px">The name looks like a web address: write "St. Andrews", not "St.Andrews".<code class="mono" style="display:block;opacity:.75">golf: a community hole's name and note carry no web address</code></span></label>
-        <label class="lbl"><span>A line for players <span class="count">29 / 140</span></span><textarea class="field">Mind the gate, and the moles.</textarea></label>
-      </div>
-      <div class="row"><button class="btn btn--ghost">Back to the editor</button><button class="btn btn--main" disabled>Next: the checks</button></div>`,
-    checks: `<span class="eyebrow">Publish a hole · Mole Run</span><h2>One last look</h2>${wiz}
-      <ul class="checklist">
-        <li class="issue issue--ok">The chain's own checks pass on the very bytes to publish.</li>
-        <li class="issue issue--ok">Clear, wind and rain: each round replayed holed, in 3, 4 and 4.</li>
-        <li class="issue issue--ok">Publishing is open on gno.land.</li>
-        <li class="issue issue--ok">A new hole: it will be <b>v1</b>.</li>
-      </ul>
-      <div class="row"><button class="btn btn--ghost">Back</button><button class="btn btn--main">Next: what it costs</button></div>`,
-    newer: `<span class="eyebrow">Publish a hole · Mole Run</span><h2>One last look</h2>${wiz}
-      <p class="note note--warn">A <b>v2</b> of Mole Run was published from elsewhere since your test. This one would be <b>v3</b>, and its weather changes with its address: play the three rounds again (free).</p>
-      <div class="row"><button class="btn btn--ghost">Back</button><button class="btn btn--gold">${ICON.play} Test again</button></div>`,
-    closed: `<span class="eyebrow">Publish a hole · Mole Run</span><h2>Not open yet</h2>${wiz}
-      <p class="note note--warn">Publishing community holes is not open yet on gno.land. <b>Your draft is kept</b> in this browser, proofs and all.</p>
-      <p>Export it as a file to keep it safe elsewhere, or to open it on another computer.</p>
-      <div class="row"><button class="btn btn--ghost">Export the draft</button><button class="btn btn--main">Back to the editor</button></div>`,
-    cost: `<span class="eyebrow">Publish a hole · Mole Run</span><h2>What it costs</h2>${wiz}
-      <div class="bill" aria-label="The bill">
-        <div><span>Storage deposit <small>For the hole's 5,240 bytes and its rows in the lists, kept by the chain</small></span><b>≈ 0.89 GNOT</b></div>
-        <div><span>Network fee <small>Adena works it out when you sign</small></span><b>≈ 0.31 GNOT</b></div>
-        <div class="bill__total"><span>At most</span><b>1.20 GNOT</b></div>
-        <p class="fine" style="margin:0">About $0.08 at today's rate (approximate). Your Adena: 41.20 GNOT.</p>
-      </div>
-      <p style="font-size:12.5px">Nothing goes to the game: the deposit is the chain's price for keeping the hole, the fee its price for checking it. A new version later costs about as much again.</p>
-      <button class="btn btn--chain btn--wide btn--cta" style="font-size:18px">Publish in Adena · 1.20 GNOT</button>
-      ${gnokey}`,
-    pending: `<div style="text-align:center"><span class="eyebrow">Publishing Mole Run</span>${wiz.replace('class="wiz"', 'class="wiz" style="justify-content:center"')}
-      <div class="hop" style="width:200px;height:120px;margin:18px auto;position:relative;border:var(--edge-bold);border-radius:14px;overflow:hidden;background:#5c9a78">${holeSVG({ small: true })}</div>
-      <h2 style="font-size:26px">Reading it back from the chain…</h2><p>Signed and sent. The chain is checking every piece of it, as the Builder did: a few seconds.</p></div>`,
-    done: `<span class="eyebrow">nym-twee/mole-run/v1 · Garden · par 5</span><h2>Mole Run is on gno.land!</h2>
-      <div class="shot"><div class="shot__card"><small>BUILT ON GNO.LAND · by nym-twee</small><b>Mole Run</b><small>par 5</small></div></div>
-      <p style="margin-top:12px" class="lead">Now play it for real and save your round: your best becomes the dare, and the list marks it <b>holed by its author</b>.</p>
-      <button class="btn btn--gold btn--wide btn--cta">${ICON.play} Play it for real</button>
-      <div style="margin-top:14px;display:flex;justify-content:center">${shareRow("Share the hole")}</div>
-      <p class="fine" style="text-align:center">After your saved round, the link dares friends to race your ghost on it. · <a class="linkish" href="#">See it on gnoweb ↗</a></p>`,
+    name: name(false),
+    refused: name(true),
+    cost: `${step(2)}<h2>Publish Mole Run</h2>
+      <div class="bill" aria-label="The bill"><span>Storage deposit</span><b>≈ 0.89 GNOT</b><span>Network fee</span><b>≈ 0.31 GNOT</b><span class="bill__total">At most</span><b class="bill__total">1.20 GNOT</b></div>
+      <p class="fine">The chain's price for keeping and checking the hole. Nothing goes to the game.</p>${gnokey}
+      ${foot(`<button class="btn btn--chain btn--wide">Publish in Adena · 1.20 GNOT</button>`)}`,
+    newer: `${step(2)}<h2>Publish Mole Run</h2><p class="note note--warn">A v2 was published elsewhere. This one would be v3, with new weather: test it again (free).</p>
+      ${foot(`<button class="btn btn--gold btn--wide">${ICON.play} Test again</button>`)}`,
+    closed: `<h2>Not open yet</h2><p class="lead">Publishing isn't open on gno.land yet. Your draft is kept.</p>
+      ${foot(`<button class="btn btn--main btn--wide">Back to the editor</button>`)}`,
+    pending: `<div class="center" style="display:grid;gap:var(--sp-4)"><div class="hop">${holeSVG({ small: true })}</div><h2 style="font-size:24px">Sign in Adena…</h2></div>`,
+    done: `<h2>Mole Run is on gno.land!</h2>
+      <div class="shot"><iframe src="share-card.html?state=hole" title="The hole's share card" tabindex="-1" aria-hidden="true"></iframe></div>
+      <p class="lead">Play it for real: your best becomes the ghost your friends race.</p>
+      ${foot(`<div class="row2"><button class="btn btn--gold">${ICON.play} Play it for real</button><a class="btn btn--ghost" href="share.html?state=published">${ICON.more} Share the hole</a></div>`)}`,
   }[s];
-
   document.getElementById("app").innerHTML = `<div class="sheet__in" role="dialog" aria-modal="true" aria-label="Publish Mole Run">${s === "pending" ? "" : close}${body}</div>`;
+  const fit = () => document.querySelectorAll(".shot iframe").forEach((f) => (f.style.transform = `scale(${f.parentElement.clientWidth / 1200})`));
+  fit(); addEventListener("resize", fit);
 </script>
 </body>
 </html>

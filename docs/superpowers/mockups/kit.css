@@ -41,7 +41,19 @@
   --tier-rare: #7cc8f0; --tier-rare-deep: #1c7fb8;
   --tier-epic: #c6a4f5; --tier-epic-deep: #6b3fc4;
   --tier-legendary: #ffd75e; --tier-legendary-deep: #c98a12;
+  /* NEW: one spacing scale for every screen (a gap, a padding, a margin is one of these) */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+  /* NEW, readability: the soft ink one step darker than the game's #4f7a6c
+     (4.48:1 on the paper, under AA): #44705f is 5.0:1 on the paper, 5.3:1 on
+     white. The game's token should follow. */
+  --ink-soft: #44705f;
   color-scheme: light;
+}
+/* numbers line up: prices, counts, clocks, gauges */
+body { font-variant-numeric: tabular-nums; }
+/* a phone: body text at 15 px at least (labels in caps, chips and tags excepted) */
+@media (max-width: 600px) {
+  .fine, .note, .sheet p, .more, .more > *, .trust, .closes, .lead { font-size: 15px !important; }
 }
 
 /* ------------------------------------------------------------ a world's tint (title.css) */
@@ -126,7 +138,7 @@ img { display: block; }
 .seg button.on { background: var(--green); color: var(--paper); }
 .seg--s { border-radius: 12px; } .seg--s button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
 
-.tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.tag { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 12px; border-radius: 14px; background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .tag--hat { background: var(--hat); }
 .tag--gold { background: var(--gold); color: var(--ink); border: var(--edge); }
 .dare { display: inline-block; padding: 4px 14px; border: var(--edge); border-radius: var(--pill); background: var(--gold); font-size: 14px; font-weight: 800; transform: rotate(-2deg); box-shadow: var(--shadow-btn); }
@@ -150,12 +162,26 @@ label.lbl { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
 .note b { font-weight: 700; }
 
 /* ------------------------------------------------------------ the sheet (ui.tsx Sheet) */
-.sheet { position: fixed; inset: 0; display: grid; place-items: center; background: var(--dim); padding: 20px; z-index: 5; }
+/* NEW, scroll: a sheet scrolls inside itself, never the page behind it (no
+   chaining, no rubber band showing the canvas); its head and its action stay
+   pinned while the middle scrolls; the page under it is locked. */
+.sheet { position: fixed; inset: 0; display: grid; place-items: center; background: var(--dim); padding: 20px; z-index: 5; overscroll-behavior: contain; }
+html:has(.sheet), html:has(.sheet) body { overflow: hidden; }
 .sheet__in {
   position: relative; background: var(--paper); border: var(--edge); border-radius: var(--r-panel); padding: 26px;
-  width: 100%; max-width: 440px; box-shadow: var(--shadow); text-align: left; max-height: calc(100vh - 40px); overflow: auto;
+  width: 100%; max-width: 440px; box-shadow: var(--shadow); text-align: left; max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain;
+  overflow-wrap: anywhere;
 }
-.sheet__close { position: absolute; top: 14px; right: 14px; }
+.sheet__close { position: absolute; top: 14px; right: 14px; z-index: 2; }
+/* the pinned action: the sheet's last row, on the paper, over what scrolls under it */
+.sheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-3) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-2); }
+.sheet__foot .btn { margin: 0; }
+/* a phone: the sheet comes up from the foot, the full width, clear of the home bar */
+@media (max-width: 600px) {
+  .sheet { padding: 0; place-items: end stretch; }
+  .sheet__in { max-width: none; border-radius: var(--r-panel) var(--r-panel) 0 0; border-bottom: 0; max-height: 92dvh; padding: 22px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .sheet__foot { bottom: calc(-16px - env(safe-area-inset-bottom)); margin: 0 -16px calc(-16px - env(safe-area-inset-bottom)) !important; padding: var(--sp-3) 16px calc(16px + env(safe-area-inset-bottom)); }
+}
 .sheet h2 { margin: 2px 0 8px; font-size: 30px; line-height: 1.1; }
 .sheet p { margin: 0 0 12px; color: var(--ink-soft); line-height: 1.5; font-size: 14px; }
 .sheet .lead { font-size: 15px; color: var(--ink); }
@@ -194,9 +220,12 @@ label.lbl { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
 
 /* the netbanner (Golf.tsx NetBanner), bottom left */
 .netbanner { position: fixed; left: 34px; bottom: 34px; z-index: 3; display: flex; gap: 12px; }
-.netbanner__band { display: inline-flex; align-items: center; gap: 12px; margin: 0; padding: 6px 6px 6px 16px; border: var(--edge); border-radius: 16px; background: var(--gold); box-shadow: var(--shadow-btn); font-size: 14px; font-weight: 700; color: var(--green); }
+.netbanner__band { display: inline-flex; align-items: center; gap: 12px; margin: 0; padding: 6px 6px 6px 16px; border: var(--edge); border-radius: 16px; background: var(--gold); box-shadow: var(--shadow-btn); font-size: 14px; font-weight: 700; color: var(--ink); }
 .netbanner__band b { color: var(--ink); letter-spacing: .1em; }
-@media (max-width: 600px) { .netbanner { left: 22px; bottom: 22px; } }
+/* under 900 px the banner is the page's last row, not over it: it never covers an action */
+@media (max-width: 900px) { .netbanner { position: static; margin-top: var(--sp-6); } }
+/* on a front screen that scrolls, the same at every width: the page's last row, under the content */
+.front > .netbanner { position: static; margin-top: var(--sp-6); }
 
 /* the HUD's info cards (globals.css .card): what only shows, flat */
 .card { background: var(--info-bg); border: var(--info-edge); border-radius: 18px; padding: 10px 16px; height: 76px; display: flex; flex-direction: column; justify-content: center; }
@@ -245,10 +274,11 @@ label.lbl { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
 .gcard:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 0 0 3px var(--glow, #ffe066), 0 8px 0 var(--ink); z-index: 2; }
 .gcard__name { margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gcard__name small { font-weight: 600; color: var(--ink-soft); font-size: 12px; margin-left: 4px; }
-.gcard__foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 2px; min-height: 26px; }
+.gcard__foot { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 4px 6px; margin: 0 2px; min-height: 28px; min-width: 0; }
+@media (max-width: 600px) { .gcard__foot { flex-wrap: wrap; } }
 .gcard__price { font-size: 15px; font-weight: 800; white-space: nowrap; }
 .gcard__price small { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
-.gcard__who { font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcard__who { min-width: 0; max-width: 100%; font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* taken: the tile stays in colour (it is someone's gnome, not a gap), the price gives way to its player */
 .gcard--taken { background: #f4efe4; box-shadow: 0 2px 0 var(--ink); }
 .gcard__stamp { position: absolute; top: 14px; left: 14px; z-index: 2; transform: rotate(-6deg); }
@@ -275,3 +305,27 @@ label.lbl { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
 .trust li { display: inline-flex; align-items: center; gap: 6px; }
 .trust li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green-light); border: 1.5px solid var(--ink); flex: none; }
 .trust a { color: var(--green); }
+
+/* NEW: what is secondary waits behind a tap: a dashed link that opens in place
+   (a native <details>: keyboard and screen readers for free) */
+.more { margin: 0; font-size: 13px; }
+.more > summary { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; cursor: pointer; list-style: none; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::after { content: "▾"; text-decoration: none; }
+.more[open] > summary::after { content: "▴"; }
+.more > :not(summary) { margin-top: 6px; color: var(--ink-soft); line-height: 1.45; }
+
+/* the sale's end: a flat info note (the HUD cards' edge, no drop), the ink's
+   soft green: a date to know, never a warning, never red, never counting down */
+.closes { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 5px 14px 5px 10px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--ink-soft); text-align: left; }
+.closes svg { width: 18px; height: 18px; flex: none; color: var(--green); }
+.closes b { color: var(--ink); font-weight: 700; white-space: nowrap; }
+@media (max-width: 600px) { .closes { border-radius: 14px; font-size: 12.5px; } }
+
+/* a gnome never made: the sale closed before he found a player. His outline, dashed, nothing to press */
+.gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; cursor: default; }
+.gcard--never:hover { transform: none; box-shadow: none; }
+.gcard--never .gtile { border-style: dashed; border-color: rgba(var(--ink-rgb), .35); background: rgba(var(--ink-rgb), .04); }
+.gcard--never .gtile::before { box-shadow: none; }
+.gcard--never .gtile img { filter: grayscale(1) brightness(1.15) opacity(.28); }
+.gcard--never .gcard__name { color: var(--ink-soft); }

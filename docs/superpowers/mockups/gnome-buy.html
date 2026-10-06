@@ -5,36 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buying a gnome · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
-<!-- states: ?state=confirm (default) | connect | nowallet | elsewhere (a phone, no Adena) | network | short | pending | reading | success | taken | cancelled | unsure -->
+<!-- Buying: a sheet over the gnome's page. The bill, one line of consent, one button.
+     states: ?state=confirm (default) | connect | nowallet | elsewhere (a phone, no Adena) | network | short
+     | pending | reading | success | taken | cancelled | unsure -->
 <style>
   body { overflow: hidden; height: 100vh; }
   .behind { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
-  .sheet__in { max-width: 470px; }
-  .buyhead { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: center; margin: 4px 40px 6px 0; }
-  .buyhead .gtile { border-radius: 14px; }
-  .buyhead h2 { margin: 0; font-size: 26px; }
-  .buyhead p { margin: 2px 0 0; display: flex; gap: 8px; align-items: center; }
-
-  /* the bill: every line the wallet will take, then the total, before any signature */
-  .bill { margin: 14px 0 6px; padding: 12px 14px; border: var(--edge); border-radius: 16px; background: var(--white); display: grid; gap: 6px; font-size: 14px; }
-  .bill div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-  .bill span small { display: block; font-size: 12px; color: var(--ink-soft); font-weight: 500; }
-  .bill b { white-space: nowrap; }
-  .bill .bill__total { padding-top: 8px; margin-top: 2px; border-top: var(--rule); font-size: 17px; }
-  .bill .bill__total b { font-size: 20px; }
-  .consent { font-size: 12.5px !important; color: var(--ink) !important; background: rgba(var(--ink-rgb), .05); border-radius: 12px; padding: 8px 12px; margin: 10px 0 0 !important; }
-
-  .celebrate { text-align: center; }
-  .celebrate .gtile { width: 220px; margin: 6px auto 4px; border-radius: var(--r-panel); box-shadow: var(--deep-card); animation: pop .5s var(--spring); }
-  .celebrate h2 { font-size: 40px; margin: 10px 0 6px; --ink-w: 6px; --ink-drop: 4px; }
-  @keyframes pop { from { transform: scale(.6); opacity: 0; } }
-  .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
-  .confetti i { position: absolute; top: -10px; width: 9px; height: 14px; border: 1.5px solid var(--ink); border-radius: 2px; animation: fall 2.4s ease-in infinite; }
-  @keyframes fall { to { transform: translateY(560px) rotate(540deg); } }
+  .sheet__in { max-width: 440px; display: grid; gap: var(--sp-4); }
+  .sheet__in > :not(.sheet__foot) { margin: 0 !important; }
+  .head { display: grid; grid-template-columns: 56px 1fr; gap: var(--sp-3); align-items: center; padding-right: 48px; }
+  .head .gtile { border-radius: 12px; }
+  .head h2 { font-size: 26px; }
+  /* the bill: label left, amount right, one baseline; the total under a rule */
+  .bill { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 15px; align-items: baseline; }
+  .bill b { text-align: right; }
+  .bill .bill__total { padding-top: var(--sp-2); border-top: var(--rule); font-size: 17px; }
+  .bill b.bill__total { font-size: 20px; }
+  .bill small { grid-column: 1 / -1; text-align: right; font-size: 13px; color: var(--ink-soft); margin-top: calc(-1 * var(--sp-1)); }
+  .consent { font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+  .sheet__in .btn--wide { margin: 0; min-height: 52px; font-size: 17px; font-weight: 700; }
+  .center { text-align: center; justify-items: center; }
+  .center .gtile { width: 168px; border-radius: var(--r-panel); box-shadow: var(--deep-card); }
+  .center h2 { font-size: 34px; --ink-w: 6px; --ink-drop: 4px; }
   .hop { animation: hop .7s ease-in-out infinite alternate; }
-  @keyframes hop { to { transform: translateY(-14px); } }
-  .alike { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 4px; }
-  .alike .gcard { padding: 6px; } .alike .gcard__name { font-size: 13px; }
+  @keyframes hop { to { transform: translateY(-12px); } }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } }
+  .pop { animation: pop .5s var(--spring); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); width: 100%; }
+  .row2 .btn { margin: 0; min-height: 52px; }
+  @media (max-width: 600px) { .consent { font-size: 15px; } }
 </style>
 </head>
 <body>
@@ -42,72 +41,40 @@
 <div class="sheet" id="app"></div>
 <script src="kit.js"></script>
 <script>
-  const { ICON, TIER_ICON, tierChip, gnome, state, shareRow } = Kit;
+  const { ICON, state } = Kit;
   const s = state("confirm");
-  const head = (eyebrow) => `<span class="eyebrow">${eyebrow}</span>
-    <div class="buyhead"><span class="gtile gtile--epic tint--garden"><img src="img/g02.png" alt=""></span>
-    <div><h2>Tansy of the Garden</h2><p>${tierChip("epic")}<span class="mono">#94</span></p></div></div>`;
-  const steps = (now) => `<ol class="steps">
-    <li class="${now > 1 ? "done" : "now"}"><i>${now > 1 ? "✓" : 1}</i><span>Connect Adena<small>The gno.land wallet, in this browser</small></span></li>
-    <li class="${now > 2 ? "done" : now === 2 ? "now" : "later"}"><i>${now > 2 ? "✓" : 2}</i><span>Check the bill, then sign<small>Nothing leaves your wallet before that</small></span></li></ol>`;
-  const gnokey = (open = false) => `<details class="details"${open ? " open" : ""}><summary>Buy with gnokey instead</summary><div class="details__box">
-    <p>Paste this in a terminal with your key's name. It sends exactly 333 GNOT, nothing more.</p>
-    <code class="code">gnokey maketx call -pkgpath "gno.land/r/gnogolf/gnomes" -func "Mint" -args "94" -send "333000000ugnot" -gas-fee 1000000ugnot -gas-wanted 30000000 -broadcast -chainid gnoland-1 -remote https://rpc.gno.land:443 <b>my-key</b></code>
-    <button class="btn btn--main btn--s" style="margin-top:10px">Copy</button> <span class="fine">Bought when it prints <b>OK!</b>: this page sees him within a few seconds.</span></div></details>`;
-  const bill = `<div class="bill" aria-label="The bill">
-      <div><span>Tansy of the Garden <small>Epic, the price of every Epic this wave</small></span><b>333 GNOT</b></div>
-      <div><span>Storage deposit <small>The chain keeps it for his record, once</small></span><b>≈ 0.31 GNOT</b></div>
-      <div><span>Network fee <small>Adena works it out when you sign</small></span><b>≈ 0.02 GNOT</b></div>
-      <div class="bill__total"><span>At most</span><b>333.33 GNOT</b></div>
-      <p class="fine" style="margin:0">About $23 at today's rate (approximate). Your Adena: 1,204.50 GNOT.</p></div>`;
-  const trust = `<ul class="trust"><li>No random draw: this exact gnome</li><li>Paid straight to the game's account, nothing held</li><li><a href="#">The contract on gnoweb ↗</a></li></ul>`;
-  const consent = `<p class="consent">Pressing Buy asks Adena to send 333 GNOT now. Tansy is yours the moment the chain says so, so there is no 14-day change of mind. For adults. A cosmetic: he rolls exactly as every gnome does.</p>`;
+  const tile = (cls = "") => `<span class="gtile gtile--epic tint--garden ${cls}"><img src="img/g02.png" alt=""></span>`;
+  const head = `<div class="head">${tile()}<h2>Buy Tansy</h2></div>`;
+  const bill = (balance = false) => `<div class="bill" aria-label="The bill">
+      <span>Tansy of the Garden</span><b>333 GNOT</b>
+      <span>Storage deposit</span><b>≈ 0.31 GNOT</b>
+      <span>Network fee</span><b>≈ 0.02 GNOT</b>
+      <span class="bill__total">At most</span><b class="bill__total">333.33 GNOT</b>
+      <small>${balance ? "In your Adena: 120 GNOT" : "≈ $23 at today's rate"}</small></div>`;
+  const consent = `<p class="consent">Buy sends the GNOT now, straight to the game's account, and he's yours at once: no 14-day return. For adults.</p>`;
+  const buy = `<div class="sheet__foot"><button class="btn btn--chain btn--wide">Buy in Adena · 333.33 GNOT</button></div>`;
+  const foot = (b) => `<div class="sheet__foot">${b}</div>`;
+  const gnokey = (open = false) => `<details class="more"${open ? " open" : ""}><summary>Buy with gnokey instead</summary>
+    <div><code class="code">gnokey maketx call -pkgpath "gno.land/r/gnogolf/gnomes" -func "Mint" -args "94" -send "333000000ugnot" -gas-fee 1000000ugnot -gas-wanted 30000000 -broadcast -chainid gnoland-1 -remote https://rpc.gno.land:443 my-key</code>
+    <button class="btn btn--main btn--s" style="margin-top:8px">Copy</button></div></details>`;
   const close = `<button class="round round--small sheet__close" aria-label="Close">${ICON.close}</button>`;
+  const wait = (t) => `<div class="center" style="display:grid;gap:var(--sp-4)">${tile("hop")}<h2 style="font-size:24px">${t}</h2></div>`;
 
   const body = {
-    connect: `${head("Buy a gnome")}${steps(1)}
-      <button class="btn btn--main btn--wide">Connect Adena</button>${gnokey()}
-      <p class="fine">Network: <span class="mono">gnoland-1</span></p>`,
-    nowallet: `${head("Buy a gnome")}<p class="lead">Buying takes a gno.land wallet. Adena is the browser one; gnokey, the terminal one.</p>${steps(1)}
-      <a class="btn btn--main btn--wide" href="#">Install Adena ↗</a>
-      <p class="fine">Installed it? <button class="linkish">Reload this page</button>: Tansy waits for you in this tab.</p>${gnokey(true)}`,
-    elsewhere: `${head("Buy a gnome")}<p class="lead">Adena lives in a computer's browser. Pick him here, buy him there: the link keeps him.</p>
-      <button class="btn btn--main btn--wide">Send the link to my computer</button>
-      <p class="fine">Opens the share sheet: mail it, or AirDrop it. In Adena's own app? Its browser buys here as on a computer.</p>`,
-    network: `${head("Buy a gnome")}${steps(2)}
-      <p class="note note--warn">Adena is on another network. In Adena, pick the one whose RPC is <b class="mono">rpc.gno.land</b>, then come back: nothing was sent.</p>
-      <button class="btn btn--main btn--wide">I switched: check again</button>`,
-    confirm: `${head("Buy a gnome · step 2 of 2")}${bill}${consent}
-      <button class="btn btn--chain btn--wide btn--cta" style="font-size:18px">Buy in Adena · 333.33 GNOT</button>${trust}${gnokey()}
-      <p class="fine">Connected as <span class="mono">g1jg8m…sqf5</span> · Network: <span class="mono">gnoland-1</span> · <button class="linkish">Disconnect</button></p>`,
-    short: `${head("Buy a gnome · step 2 of 2")}${bill.replace("Your Adena: 1,204.50 GNOT.", "")}
-      <p class="note note--warn">Your Adena has <b>120 GNOT</b>: <b>213.33 more</b> to go.</p>
-      <a class="btn btn--main btn--wide" href="#">Get GNOT ↗</a>
-      <p class="fine">Back with enough? The bill updates by itself.</p>`,
-    pending: `<div class="celebrate"><span class="eyebrow">Buying Tansy of the Garden</span>
-      <span class="gtile gtile--epic tint--garden hop" style="width:160px;margin:18px auto"><img src="img/g02.png" alt=""></span>
-      <h2 style="font-size:26px">Waiting for Adena…</h2><p>Check the window Adena opened: it shows 333 GNOT to the gnomes' contract. Sign there.</p></div>`,
-    reading: `<div class="celebrate"><span class="eyebrow">Buying Tansy of the Garden</span>
-      <span class="gtile gtile--epic tint--garden hop" style="width:160px;margin:18px auto"><img src="img/g02.png" alt=""></span>
-      <h2 style="font-size:26px">Reading it back from the chain…</h2><p>Signed and sent. A few seconds: the chain is writing his new player down.</p></div>`,
-    success: `<div class="confetti" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="left:${(i * 47) % 100}%;top:${(i * 29) % 95}%;background:${["#e0524b", "#f2c14e", "#7fe8a8", "#7cc8f0", "#c6a4f5"][i % 5]};animation-delay:${(i % 7) * 0.3}s"></i>`).join("")}</div>
-      <div class="celebrate"><span class="eyebrow">Tansy of the Garden · #94 · Epic</span>
-      <span class="gtile gtile--epic tint--garden"><img src="img/g02.png" alt=""></span>
-      <h2 class="inked">Tansy's yours!</h2>
-      <p class="lead">He's on your ball from your next putt. For rivals to see him on your ghost and the boards, wear him there: one small signature.</p>
-      <button class="btn btn--gold btn--cta btn--wide">Play with him</button>
-      <button class="btn btn--ghost btn--wide" style="margin-top:10px">Wear him on the boards too</button><p class="fine"><a class="linkish" href="#">See the transaction ↗</a></p>
-      <div style="margin-top:12px">${shareRow("Show him off")}</div></div>`,
-    taken: `${head("Buy a gnome")}<p class="note note--bad">Someone took Tansy a moment before you. <b>Nothing was sent</b>: your GNOT stays with you.</p>
-      <p style="margin-top:12px">Still on sale, and a lot like him:</p>
-      <div class="alike">${[95, 97, 99].map((id, i) => { const g = gnome(id); return `<button class="gcard"><span class="gtile gtile--${g.tier} tint--garden"><img src="img/g0${[6, 2, 9][i]}.png" alt=""></span><span class="gcard__name">${g.name.split(" of ")[0]}<small>#${id}</small></span></button>`; }).join("")}</div>
-      <a class="btn btn--ghost btn--wide" href="gnomes-gallery.html">Back to the Garden's gnomes</a>`,
-    cancelled: `${head("Buy a gnome · step 2 of 2")}<p class="note note--bad">Cancelled in Adena: nothing was sent.</p>${bill}
-      <button class="btn btn--chain btn--wide btn--cta" style="font-size:18px">Buy in Adena · 333.33 GNOT</button>`,
-    unsure: `${head("Buy a gnome")}<p class="note note--warn">Sent, but the chain could not confirm it yet. <b>Check again in a moment</b>: buying again would pay twice.</p>
-      <button class="btn btn--main btn--wide">Check again</button><p class="fine"><a class="linkish" href="#">See the transaction ↗</a></p>`,
+    confirm: `${head}${bill()}${consent}${gnokey()}${buy}`,
+    connect: `${head}<p class="lead">Connect Adena, the gno.land wallet, to buy.</p>${gnokey()}${foot(`<button class="btn btn--main btn--wide">Connect Adena</button>`)}`,
+    nowallet: `${head}<p class="lead">Buying takes a gno.land wallet.</p>${gnokey(true)}${foot(`<a class="btn btn--main btn--wide" href="#">Install Adena ↗</a>`)}`,
+    elsewhere: `${head}<p class="lead">Adena lives on a computer. The link keeps Tansy for you there.</p>${foot(`<button class="btn btn--main btn--wide">Send the link to my computer</button>`)}`,
+    network: `${head}<p class="note note--warn">Adena is on another network. Pick <b>gnoland-1</b> in Adena: nothing was sent.</p>${foot(`<button class="btn btn--main btn--wide">Check again</button>`)}`,
+    short: `${head}${bill(true)}<p class="note note--warn"><b>213.33 GNOT</b> to go.</p>${foot(`<a class="btn btn--main btn--wide" href="#">Get GNOT ↗</a>`)}`,
+    pending: wait("Sign in Adena…"),
+    reading: wait("Reading it back from the chain…"),
+    success: `<div class="center" style="display:grid;gap:var(--sp-4)">${tile("pop")}<h2 class="inked">Tansy's yours!</h2>
+      <div class="row2"><button class="btn btn--gold">Play with him</button><a class="btn btn--ghost" href="share.html?state=bought">${ICON.more} Show your gnome</a></div></div>`,
+    taken: `${head}<p class="note note--bad">Someone took Tansy a moment before you. <b>Nothing was sent.</b></p>${foot(`<a class="btn btn--main btn--wide" href="gnomes-gallery.html">Pick another</a>`)}`,
+    cancelled: `${head}<p class="note note--bad">Cancelled in Adena: nothing was sent.</p>${bill()}${buy}`,
+    unsure: `${head}<p class="note note--warn">Sent, but not confirmed yet. <b>Don't buy again</b>: it would pay twice.</p>${foot(`<button class="btn btn--main btn--wide">Check again</button>`)}`,
   }[s];
-
   document.getElementById("app").innerHTML = `<div class="sheet__in" role="dialog" aria-modal="true" aria-label="Buy Tansy of the Garden">${s === "pending" || s === "reading" ? "" : close}${body}</div>`;
 </script>
 </body>
