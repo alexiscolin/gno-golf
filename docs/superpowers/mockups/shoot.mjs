@@ -42,11 +42,11 @@ const PAGES = /** @type {{ page: string, title: string, shots: Shot[], audit?: b
   { page: "gnome-places", title: "A5 · Where the gnomes show in play", shots: [["", DESK]] },
   { page: "share-card", title: "A6 · Share cards", shots: [["", CARD], ["square", SQUARE], ["reveal", CARD], ["team", CARD], ["hole", CARD]], audit: false },
   { page: "region", title: "A7 · Not in your region (/g/* where the shop is not offered)", shots: [["", DESK], ["", PHONE]] },
-  { page: "builder-editor", title: "B2 · The editor", widths: DESKTOP, shots: [["", DESK], ["", MID], ["", LAPTOP], ["empty", DESK], ["place", DESK], ["invalid", DESK], ["issues", DESK], ["issues", LAPTOP], ["timed", DESK], ["proved", DESK], ["world", DESK]] },
-  { page: "builder-test", title: "B3 · Test", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["proved", DESK], ["missed", DESK]] },
-  { page: "builder-publish", title: "B4 · Publish", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["refused", DESK], ["newer", DESK], ["closed", DESK], ["pending", DESK], ["done", DESK]] },
-  { page: "builder-phone", title: "B6 · The Builder on a phone", shots: [["", PHONE], ["community", PHONE]] },
-  { page: "builder-holes", title: "B5 · Your holes, the community's", shots: [["", DESK], ["", PHONE], ["community", DESK], ["community", PHONE], ["empty", DESK]] },
+  { page: "builder-editor", title: "B3 · The editor (B1 simple to pick up, B2 the header)", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["select", DESK], ["details", DESK], ["place", DESK], ["invalid", DESK], ["issues", DESK], ["issues", LAPTOP], ["near", DESK], ["proved", DESK], ["world", DESK]] },
+  { page: "builder-test", title: "B4 · Test", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["proved", DESK], ["missed", DESK]] },
+  { page: "builder-publish", title: "B5 · Publish", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["refused", DESK], ["newer", DESK], ["closed", DESK], ["pending", DESK], ["done", DESK]] },
+  { page: "builder-phone", title: "B8 · The Builder on a phone", shots: [["", PHONE], ["community", PHONE]] },
+  { page: "builder-holes", title: "B7 · Your holes, the community's", shots: [["", DESK], ["", PHONE], ["community", DESK], ["community", PHONE], ["empty", DESK]] },
 ]);
 const nameOf = (/** @type {string} */ page, /** @type {string} */ state, /** @type {Size} */ size) => `${page}${state ? `-${state}` : ""}${size.tag ? `-${size.tag}` : ""}.webp`;
 const urlOf = (/** @type {number} */ port, /** @type {string} */ page, /** @type {string} */ state) => `http://127.0.0.1:${port}/docs/superpowers/mockups/${page}.html${state ? `?state=${state}` : ""}`;

@@ -6,99 +6,77 @@
 <title>The Builder · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
 <link rel="stylesheet" href="builder.css">
-<!-- The editor (step 1 of 3). The palette left by kind, the board centre, the 3D and the selected piece right,
-     the checks docked under the board. The window never scrolls; the board takes the wheel and the pinch.
-     states: ?state=select (default: a bumper selected) | empty (a new hole: start from a template)
-     | place (a piece dragged: its ghost snapped, green) | invalid (red: it cannot go there, and why)
-     | issues (errors: the list open, one-click fixes; a limit near) | timed (the gate selected: its cycle)
-     | proved (holed in every weather: Publish is the action) | world (the world menu open: the four classic worlds)
+<!-- The editor for a first-time player: it opens on a working starter hole, three short hints, the common
+     pieces first, direct manipulation (drag, handles, the bin, Delete), numbers only under Details, the next
+     step one big button with its reason in plain words, undo always in sight.
+     states: ?state=firstrun (default: the starter, three hints) | select (a bumper selected) | details (its numbers open)
+     | place (a piece dragged: its ghost, green) | invalid (red: it cannot go there, and why) | issues (one thing to fix)
+     | near (a limit near) | proved (holed in every weather: Publish) | world (the world menu)
      A phone, a touch screen or under 900 px: builder-phone.html, the editor never loads. -->
-<style>
-  .start { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--sp-5); }
-  .start__in { width: min(560px, 100%); display: grid; gap: var(--sp-4); padding: var(--sp-5); border: var(--edge-bold); border-radius: var(--r-panel); background: var(--paper); box-shadow: var(--shadow); text-align: center; }
-  .start__in h2 { margin: 0; font-size: 26px; }
-  .tpls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
-  .tpl { display: grid; gap: var(--sp-2); padding: var(--sp-2); border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: var(--shadow-btn); font-size: 14px; font-weight: 700; cursor: pointer; }
-  .tpl span { position: relative; height: 74px; border-radius: 10px; overflow: hidden; background: #5c9a78; border: 1.5px solid var(--ink); }
-  .tpl:nth-child(2) .map { transform: scaleX(-1); } .tpl:nth-child(3) .map { transform: rotate(180deg); }
-</style>
 </head>
 <body>
 <div id="app"></div>
 <script src="kit.js"></script>
 <script src="builder.js"></script>
 <script>
-  // a phone, a touch screen, under 900 px: no editor (nor builder.wasm), the one phone screen
   if (matchMedia("(max-width: 899px), (pointer: coarse)").matches) location.replace("builder-phone.html");
   const { ICON, state } = Kit;
   const { holeSVG, PIECE, header } = Builder;
-  const s = state("select");
-  const empty = s === "empty", issues = s === "issues", proved = s === "proved";
-  const sel = s === "timed" ? "gate" : s === "select" || s === "proved" || s === "world" || issues ? "bumper" : "";
-  const dragging = s === "place" ? "bumper" : s === "invalid" ? "sunflower" : "";
+  const s = state("firstrun");
+  const issues = s === "issues", proved = s === "proved";
+  const sel = s === "select" || s === "details" || s === "world" ? "bumper" : "";
+  const dragging = s === "place" ? "bumper" : s === "invalid" ? "sand" : "";
+  const BIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-  // the palette, by kind, the world's own pieces (the hole-builder spec's palette entries)
-  const KINDS = [["Start", [["tee", "Tee"], ["cup", "Cup"]]], ["Walls", [["rail", "Rail"], ["hedge", "Hedge"], ["logs", "Logs"]]], ["Posts", [["bumper", "Mushroom"], ["sunflower", "Sunflower"], ["stump", "Stump"], ["molehill", "Molehill"]]],
-    ["Ground", [["sand", "Sand"], ["water", "Pond"], ["ice", "Ice"], ["flowerbed", "Flowerbed"]]], ["Moving", [["gate", "Gate"], ["seesaw", "Seesaw"], ["slope", "Slope"]]], ["Jumps", [["tunnel", "Tunnel"]]]];
-  const palette = `<div class="palette__world tint--garden">Garden pieces</div>` + KINDS.map(([kind, list]) => `<h3>${kind}</h3><div class="pieces">${list.map(([k, n]) => `<button class="piece${k === (dragging || sel) ? " piece--on" : ""}" title="${n}: drag it onto the board">${PIECE[k]}${n}</button>`).join("")}</div>`).join("");
+  // the palette: five common pieces, big, named plainly; the world's others under More; the bin last
+  const COMMON = [["rail", "Wall"], ["bumper", "Bumper"], ["sand", "Sand"], ["water", "Water"], ["slope", "Slope"]];
+  const MORE = [["hedge", "Hedge"], ["logs", "Logs"], ["sunflower", "Sunflower"], ["stump", "Stump"], ["molehill", "Molehill"], ["ice", "Ice"], ["flowerbed", "Flowerbed"], ["gate", "Gate"], ["seesaw", "Seesaw"], ["tunnel", "Tunnel"]];
+  const tile = ([k, n]) => `<button class="piece${k === (dragging || sel) ? " piece--on" : ""}" title="${n}: drag it onto the board">${PIECE[k]}${n}</button>`;
+  const palette = `<div class="palette__world tint--garden">Garden pieces</div>
+    <div class="pieces pieces--big">${COMMON.map(tile).join("")}</div>
+    <details class="more"><summary>More pieces</summary><div class="pieces" style="margin-top:var(--sp-2)">${MORE.map(tile).join("")}</div></details>
+    <div class="bin" aria-label="The bin: drop a piece here to remove it (or press Delete)">${BIN}Drop here to remove</div>`;
 
-  const inspector = !sel ? `<p class="nothing">Select a piece to change it, or drag one in from the left.</p>`
-    : sel === "bumper" ? `
-      <div class="insp__head">${PIECE.bumper.replace("<svg", '<svg width="36" height="27"')}Mushroom<small>33, 18</small></div>
-      <label class="range">Size<input type="range" min="0.6" max="1.6" step="0.1" value="1.2"><output>1.2</output><small>0.6 to 1.6</small></label>
-      <label class="range">Bounce<input type="range" min="0.5" max="1.4" step="0.05" value="1.25"><output>1.25</output><small>Above 1 it kicks</small></label>
-      <div class="range"><span>Timing</span><div class="seg seg--s" style="grid-column:2/-1"><button class="on">Always</button><button>Comes and goes</button></div></div>
-      <div class="insp__acts"><button class="btn btn--ghost">Turn<kbd>R</kbd></button><button class="btn btn--ghost">Copy<kbd>⌘D</kbd></button><button class="btn btn--ghost">Delete<kbd>⌫</kbd></button></div>`
-    : `
-      <div class="insp__head">${PIECE.gate.replace("<svg", '<svg width="36" height="27"')}Gate<small>25.5, 4</small></div>
-      <label class="range">Length<input type="range" min="2" max="12" step="0.5" value="10"><output>10</output></label>
-      <div class="range"><span>Timing</span><div class="seg seg--s" style="grid-column:2/-1"><button>Always</button><button class="on">In a stroke</button><button>Strokes</button></div></div>
-      <label class="range">Shut<input type="range" min="1" max="7" value="3"><output>3 / 8</output></label>
-      <label class="range">From<input type="range" min="0" max="7" value="2"><output>step 2</output></label>
-      <div class="cycle" aria-label="Shut on steps 2, 3 and 4 of 8">${Array.from({ length: 8 }, (_, i) => `<i class="${i >= 2 && i < 5 ? "on" : ""}"></i>`).join("")}</div>
-      <div class="insp__acts"><button class="btn btn--ghost">Turn<kbd>R</kbd></button><button class="btn btn--ghost">Copy<kbd>⌘D</kbd></button><button class="btn btn--ghost">Delete<kbd>⌫</kbd></button></div>`;
+  // the right: the hole in 3D, then the selected piece, its numbers only under Details
+  const piece = !sel ? `<p class="nothing">Click a piece to change it. Drag its handles to size and turn it.</p>`
+    : `<div class="sel"><div class="insp__head">${PIECE.bumper.replace("<svg", '<svg width="36" height="27"')}Bumper</div>
+        <div class="insp__acts"><button class="btn btn--ghost">Turn<kbd>R</kbd></button><button class="btn btn--ghost">Copy<kbd>⌘D</kbd></button><button class="btn btn--ghost">Delete<kbd>⌫</kbd></button></div>
+        <details class="more"${s === "details" ? " open" : ""}><summary>Details</summary><div class="insp" style="margin-top:var(--sp-2)">
+          <label class="range">Size<input type="range" min="0.6" max="1.6" step="0.1" value="1.2"><output>1.2</output></label>
+          <label class="range">Bounce<input type="range" min="0.5" max="1.4" step="0.05" value="1.25"><output>1.25</output><small>Above 1 it kicks the ball faster</small></label>
+          <div class="range"><span>Timing</span><div class="seg seg--s" style="grid-column:2/-1"><button class="on">Always</button><button>Comes and goes</button></div></div></div></details></div>`;
 
-  // the limits: small gauges, amber from 80%, red at the limit
-  const gauge = ([n, v, max, opt, shown]) => { const p = v / max, cls = p >= 1 ? "gauge--full" : p >= .8 ? "gauge--warn" : ""; return `<div class="gauge ${cls}${opt ? " gauge--opt" : ""}" title="${n}: ${shown || `${v} of ${max}`}"><span>${n}<em>${shown || `${v}/${max}`}</em></span><i><b style="width:${Math.max(3, Math.round(Math.min(1, p) * 100))}%"></b></i></div>`; };
-  // the gas room: what a shot has left in the dearest weather; the bar is what is used, amber from 80%
-  const limits = [["Walls", empty ? 0 : 23, 160], ["Posts", issues ? 27 : empty ? 0 : 5, 32], ["Zones", empty ? 0 : 6, 32], ["Points", empty ? 0 : 38, 512, true], ["Size", empty ? 0 : 2.4, 32, true, `${empty ? 0 : 2.4} KB`], ["Gas room", empty ? 0 : 36, 100, false, `${empty ? 100 : 64}% left`]].map(gauge).join("");
-  const verdict = empty ? `<span class="verdict verdict--bad">Place a tee and a cup</span>`
-    : issues ? `<span class="verdict verdict--bad">2 to fix</span>`
-    : proved ? `<span class="verdict verdict--ok">Holed in every weather</span>` : `<span class="verdict verdict--ok">Ready to test</span>`;
-  const list = issues ? `<ul class="issues" aria-label="What to fix, errors first">
-      <li class="issue issue--error"><span><b>Cup</b> touches the hedge.</span><button class="btn btn--ghost btn--s">Move the cup</button></li>
-      <li class="issue issue--error"><span><b>Tunnel</b>: its landing is in the pond.</span><button class="btn btn--ghost btn--s">Select it</button></li>
-      <li class="issue issue--warn"><span><b>Posts</b>: 27 of 32. Five more at most.</span><span></span></li></ul>` : "";
+  // the checks, one line in the player's words (the rule's code only in a tooltip, for us)
+  const say = {
+    issues: `<p class="say" title="E3: the cup's disc touches an untimed wall"><span class="verdict verdict--bad">The cup is inside a wall: move the cup or the wall.</span><button class="btn btn--ghost btn--s">Show me</button></p>`,
+    near: `<p class="say"><span class="verdict verdict--ok">Ready to test</span><span class="gauge gauge--warn" style="flex:1;max-width:280px"><span>Bumpers and posts<em>27 of 32 · room for 5 more</em></span><i><b style="width:84%"></b></i></span></p>`,
+    proved: `<p class="say"><span class="verdict verdict--ok">Holed in every weather: press Publish.</span></p>`,
+  }[s] || `<p class="say"><span class="verdict verdict--ok">Ready to test: press Test it.</span></p>`;
 
-  const board = empty
-    ? `${holeSVG({ empty: true })}<div class="start"><div class="start__in"><span class="eyebrow">A new hole · Garden</span><h2>Start from a template</h2>
-        <div class="tpls">${["Straight · par 2", "Dogleg · par 3", "The seesaw · par 3"].map((t) => `<button class="tpl"><span>${holeSVG({ small: true })}</span>${t}</button>`).join("")}</div>
-        <button class="linkish" style="justify-self:center">or a blank board: drag a tee and a cup in</button></div></div>`
-    : holeSVG({ select: sel === "bumper" ? 1 : -1, issue: issues,
-        place: s === "place" ? { x: 24, y: 9.5, label: "Mushroom · 24, 9.5" } : s === "invalid" ? { x: 36.5, y: 22, ok: false, label: "Too close to the cup" } : null });
+  const tips = s === "firstrun" ? `
+    <p class="tip3 tip3--left" style="left:232px;top:150px"><i>1</i>Drag a piece onto the board</p>
+    <p class="tip3 tip3--up" style="right:16px;top:84px"><i>2</i>Press Test it to play your hole</p>
+    <p class="tip3 tip3--up" style="left:calc(50% - 60px);top:84px"><i>3</i>Then Publish, once holed in every weather<button class="btn btn--ghost btn--s" style="grid-column:1/-1;justify-self:end;margin-top:4px">Got it</button></p>` : "";
+
+  const board = holeSVG({ select: sel ? 1 : -1, issue: issues,
+    place: s === "place" ? { x: 24, y: 9.5, label: "Bumper" } : s === "invalid" ? { x: 36.5, y: 22, ok: false, label: "Not on the cup" } : null });
 
   document.getElementById("app").innerHTML = `<main class="bench tint--garden">
-    ${header({ mode: "edit", proved, errors: issues || empty ? 2 : 0, worldOpen: s === "world" })}
+    ${header({ mode: "edit", proved, errors: issues ? 1 : 0, name: "Garden Dogleg", alias: "nym-twee/garden-dogleg", worldOpen: s === "world" })}
     <aside class="col" aria-label="The Garden's pieces">${palette}</aside>
     <div class="centre">
-      <section class="board${s === "invalid" ? " board--no" : ""}" aria-label="The board: wheel or pinch to zoom, drag empty space to pan" style="${s === "invalid" ? "cursor:not-allowed" : ""}">
+      <section class="board" aria-label="The board: drag pieces in and around; wheel or pinch to zoom" style="${s === "invalid" ? "cursor:not-allowed" : ""}">
         ${board}
-        ${sel === "bumper" && !issues ? `<span class="measure" style="left:69%;top:51%">r 1.2</span>` : ""}
-        <div class="board__foot"><span class="pill keys" aria-label="Keyboard shortcuts"><span><kbd>⌘Z</kbd>Undo</span><span class="wide-key"><kbd>⇧⌘Z</kbd>Redo</span><span><kbd>R</kbd>Turn</span><span class="wide-key"><kbd>⌘D</kbd>Copy</span><span><kbd>⌫</kbd>Delete</span></span>
-          <span class="board__zoom"><span class="pill">Snap 0.5</span><button class="round" aria-label="Zoom out">−</button><button class="round" aria-label="Zoom in">+</button></span></div>
+        <div class="board__foot"><span class="pill keys" aria-label="Keyboard shortcuts"><span><kbd>⌘Z</kbd>Undo</span><span><kbd>R</kbd>Turn</span><span><kbd>⌫</kbd>Delete</span></span>
+          <span class="board__zoom"><button class="round" aria-label="Zoom out">−</button><button class="round" aria-label="Zoom in">+</button></span></div>
       </section>
-      <section class="checks" aria-label="Checks">
-        ${list}
-        <div class="checks__row">${verdict}<div class="gauges" aria-label="The chain's limits">${limits}</div></div>
-      </section>
+      <section class="checks" aria-label="Checks" aria-live="polite">${say}</section>
     </div>
     <aside class="col" aria-label="The hole in 3D and the selected piece">
-      ${empty ? `<p class="nothing preview" style="display:grid;place-items:center">The hole in 3D shows here, as players will see it.</p>`
-        : `<div class="preview" style="background-image:url(img/play-garden3.jpg)" role="img" aria-label="The hole in 3D, as players will see it, in sync with the board"><span class="pill">3D · in sync</span></div>`}
-      <hr>
-      <div class="insp">${inspector}</div>
+      <div class="preview" style="background-image:url(img/play-garden3.jpg)" role="img" aria-label="The hole in 3D, as players will see it"><span class="pill">3D</span></div>
+      <hr>${piece}
     </aside>
-  </main>`;
+  </main>${tips}`;
 </script>
 </body>
 </html>

@@ -22,9 +22,12 @@ The mockups are in `docs/superpowers/mockups/` ("Mockups", at the end).
 ### Decisions taken by the owner
 
 - **Every tier is a fixed price, Legendaries included; there are no
-  auctions.** Defaults: Common 30, Rare 99, Epic 333, Legendary 777 GNOT,
-  owner-settable between waves, never discounted once on sale. The first
-  buyer of a gnome has him. All are bought the same way (`Buy(ids)`).
+  auctions.** Defaults, golf numbers: Common 36 (par of nine holes), Rare
+  72 (par of a course), Epic 336 (the dimples on a golf ball), Legendary
+  1,296 GNOT (18 holes × par 72); 59,424 GNOT if all 720 sell. Owner-settable
+  between waves, never lower on what is on sale. The first buyer of a gnome
+  has him. All are bought the same way (`Buy(ids)`). The gallery says the
+  golf meaning once, in "How the gnomes work".
 - **Waves** open by id range, one world each: wave 1 the Garden (ids 1 to
   104: Commons 1-72, Rares 73-93, Epics 94-103, the Legendary The Miller
   104), wave 2 the Island (105 to 208), and on. A wave's first window is
@@ -146,7 +149,7 @@ closed, loading, empty, error; phone.
 A front screen (the cups' look): the pill "The gnomes", "Who's on the ball?",
 the closing line; one row "now": the wave ("Wave 1 · Garden · 58 of 104 found
 a player · 41 players", its green) and the wave's Legendary ("The Miller ·
-Legendary · 777 GNOT · one of one, one per wallet", "See him"); the filters
+Legendary · 1,296 GNOT · one of one, one per wallet", "See him"); the filters
 (`Segmented` "On sale · Mine · All 720", tier chips, "More filters" behind a
 tap, a search; one "Filters" button on a phone); the grid, paged; the legal
 links and "How the gnomes work" behind a tap.
@@ -167,9 +170,9 @@ links and "How the gnomes work" behind a tap.
 `gnome-sheet.html`, the game's `Sheet` over the gallery, all its states.
 
 **Him**: the turntable tile (drag or arrow keys), tier chip, `#id · Wave ·
-World`, the name inked, one line, the price ("333 GNOT + ≈ 0.46 GNOT deposit
+World`, the name inked, one line, the price ("336 GNOT + ≈ 0.46 GNOT deposit
 and fee"), the trust strip, "His traits" behind a tap; pinned, the blue "Buy
-Tansy · 333 GNOT". A Legendary is the same with his note: "One of one. At
+Tansy · 336 GNOT". A Legendary is the same with his note: "One of one. At
 most one Legendary per wallet; the first to buy him has him." States change
 the button or add one note: locked (players' window), cap, mine ("Play with
 him"), taken ("Race nym-gnorman's ghost"), later ("♡ Keep him on my list"),
@@ -190,13 +193,13 @@ Sale. I understand a gnome is a cosmetic item, not an investment, and that
 it may lose all resale value."; B, "I want my gnome delivered now, before
 the 14-day withdrawal period ends, and I understand that I therefore **lose
 my right of withdrawal** once it is delivered."; gnokey behind a tap; pinned,
-the blue **"Order with obligation to pay (333.46 GNOT): sign in wallet"**,
+the blue **"Order with obligation to pay (336.46 GNOT): sign in wallet"**,
 off until both boxes are ticked, and under it "Your wallet will open and ask
 you to sign. Signing is your order. It cannot be undone."
 
 **The gnokey line**, from the realm's `Buy(ids)` and `lib/adena.ts`
 (`gnokeyCall`'s shape, with `-send` added): `gnokey maketx call -pkgpath
-gno.land/r/<ns>/gnogolf/gnomes -func Buy -args 94 -send 333000000ugnot
+gno.land/r/<ns>/gnogolf/gnomes -func Buy -args 94 -send 336000000ugnot
 -gas-fee <feeFor(gas)>ugnot -gas-wanted <gas> -broadcast -chainid <chain>
 -remote <rpc> <your-key-name>`. The gas is the measured buy's
 (`z_storage_buy_filetest.gno`) with the margin the save uses; the fee is
@@ -279,7 +282,7 @@ close, like every unsold gnome, he is never made.
 ### B0. Where it runs
 
 On a computer (900 px and up, a fine pointer): the editor. On a phone, a
-touch screen or under 900 px: B6, and nothing of the editor is loaded.
+touch screen or under 900 px: B8, and nothing of the editor is loaded.
 `app/build/page.tsx` decides before importing anything
 (`matchMedia("(max-width: 899px), (pointer: coarse)")`); the editor's
 components and `builder.wasm` are `next/dynamic` imports reached only on
@@ -288,130 +291,110 @@ page with a phone's media and asserts that no request names
 `builder.wasm` or the editor's chunks; the smoke run checks the same at
 390 px.
 
-### B1. One header, three steps
+### B1. Simple to pick up
 
-Every computer screen of the Builder has the same header: Back (the draft is
-saved), the hole's name in place with its address under it, in Edit the
-world's menu ("Garden ▾"), the three steps in the middle, and on the right
-the history (in Edit) and the one primary action of the mode.
+The Builder is for a first-time player, not an expert. Its rules, on every
+screen (every safety rule of the hole-builder spec stays: the palette lock,
+the chain's checks in the wasm, the proofs):
 
-**The worlds**: the Builder offers the four classic worlds only, Garden,
-Island, Mushroom Town and Mountain, each with its colour in the menu (state
-`world`). The Crystal Mines are not a Builder world: their set pieces and
-lighting are built by hand, so they have no palette, no starters, no menu
-entry (the game still plays the mines course as before). Opening a mines
-hole in the editor, from a link or "Edit" in Your holes, is refused before
-anything loads, in one sentence on the holes list: "The Crystal Mines are
-built by hand: this hole can't be opened in the Builder."
+- **It opens on a working hole.** A new player lands on a starter of a
+  classic world (the Garden's dogleg, par 3), already holed in every weather,
+  with **three short hints, dismissible at once** ("Got it"), never a
+  tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press Test
+  it to play your hole" (at the big button), ③ "Then Publish, once holed in
+  every weather" (at the steps). They show on the first visit only.
+- **The next step is always one big button**, top right: "Test it" (gold),
+  then "Publish →" (blue). When it waits, the reason sits beside it in a few
+  words ("1 thing to fix ↓") and, in full, in the player's words under the
+  board.
+- **Direct manipulation only**: drag from the palette to place; drag to
+  move; handles to size and turn; Delete, or drop on the bin, to remove.
+  **No number to type** unless the player opens "Details".
+- **Errors in the player's words**, each naming the piece and the fix,
+  with "Show me" (it selects and frames the piece): "The cup is inside a
+  wall: move the cup or the wall." The rule's code (E3) only in a tooltip,
+  for us.
+- **Sensible defaults everywhere**: the starter; the name suggested from the
+  world and the starter ("Garden Dogleg"); the address derived from the name
+  at the first test; the par suggested from the proofs; the line for players
+  optional.
+- **Undo and redo always in sight**, beside the big button; the keys on the
+  board's foot (Undo, Turn, Delete).
 
-| Step | Shows | Unlocked when | Primary action |
-|---|---|---|---|
-| 1 · Edit | current (ink, the gold number) | always | gold "Test it"; off, with its reason ("Fix 2 first"), while an error stands |
-| 2 · Test | open, current, done (✓) or locked (🔒, "Fix the errors first") | no error | none while playing ("Back to edit"); blue "Publish →" once every weather is holed |
-| 3 · Publish | locked ("Hole it in every weather first") until proved | every proof in hand for the current geometry | the form's own "Publish in Adena" |
+### B2. One header, three steps
 
-A step that is done or open is a link back to it; a locked one says why on
-hover and to a screen reader. Moving a piece drops the proofs: Test and
-Publish lock again, said once in the checks ("Moved: test it again").
+Back (the draft is saved), the hole's name (editable, suggested), its
+address under it, in Edit the world's menu ("Garden ▾": the four classic
+worlds, and "Start again from a starter"), the steps Edit → Test → Publish
+(done ✓, current, or 🔒 with its reason on hover), undo and redo, the big
+button. The Crystal Mines are not a Builder world; a mines hole is refused
+before anything loads ("The Crystal Mines are built by hand: this hole can't
+be opened in the Builder.").
 
-Widths: 1024, 1280 and 1440 px are checked; under 1180 px the steps keep
-their numbers and only the current one its word, and the less needed
-gauges and keys fold away. Never under 900 px (B6).
+### B3. The editor
 
-### B2. The editor
+`builder-editor.html`: firstrun, select, details, place, invalid, issues,
+near, proved, world; at 1440, 1280 and 1024.
 
-`builder-editor.html`: select, empty, place, invalid, issues, timed, proved,
-world;
-at 1440, 1280 and 1024.
+- **The palette** (left): the world's name; **five common pieces, big, named
+  plainly**: Wall, Bumper, Sand, Water, Slope; the world's other pieces
+  under "More pieces"; the bin ("Drop here to remove").
+- **The board** (centre): the hole from above on its snapping grid; a piece
+  dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
+  with the reason ("Not on the cup") and no drop; moving clamps to the last
+  valid place; a handle stops at its range. The wheel and the pinch zoom it,
+  never the page.
+- **The right**: the hole in 3D, in sync; the selected piece only: its name,
+  Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
+  sliders: size, bounce, timing). Nothing selected: "Click a piece to change
+  it. Drag its handles to size and turn it."
+- **The checks** (one line under the board): "Ready to test: press Test it."
+  or the one thing to fix, in words, with "Show me"; a limit appears only
+  when near ("Bumpers and posts: 27 of 32 · room for 5 more"), amber; the
+  full gauges are the hole-builder spec's, behind the limit's tap.
 
-The window never scrolls. Three columns under the header:
+### B4. Test
 
-- **The palette** (left, 208 px; 224 from 1400 px): the world's name on an
-  ink strip edged in its colour, then its pieces by kind: Start (tee, cup),
-  Walls, Posts, Ground, Moving, Jumps. Each a tile with the board's own
-  drawing and its name (what it does in its tooltip). It scrolls in itself.
-  Only what the palette has can be placed (the hole-builder spec's palette
-  lock).
-- **The board** (centre): the hole from above on its snapping grid, the
-  units along two edges. The wheel and the pinch zoom it, a drag on empty
-  space pans it, never the page. Its foot: the keys always in sight as
-  keycaps (Undo, Redo, Turn, Copy, Delete; Ctrl on Windows and Linux, ⌘ on a
-  Mac), "Snap 0.5" and zoom.
-- **The right** (300 px; 340 from 1400): the 3D preview, rebuilt from the
-  canonical hole as the board changes ("3D · in sync"), then the inspector
-  of the selected piece only: its name and place, label · slider · value
-  rows on one grid with each range written under it ("0.6 to 1.6"), timing,
-  a timed piece's cycle strip, and Turn · Copy · Delete with their keys.
-  Nothing selected: "Select a piece to change it, or drag one in from the
-  left."
-- **The checks**, docked under the board: one row with the verdict ("Ready
-  to test", "2 to fix", "Holed in every weather") and the limits as small
-  gauges (walls /160, posts /32, zones /32, points /512, size /32 KB, gas
-  room), green, amber from 80%, red at the limit; above it, when anything
-  is wrong, the list (errors first, then warnings), each line naming its
-  piece in bold, a click selecting it, and a one-click fix where one is
-  obvious ("Move the cup", "Make it 1.5 deep", "Delete it"); the list
-  scrolls in itself.
+`builder-test.html`: playing, proved, missed. The game takes the window
+under the header; the weathers to beat as chips that tick when holed (☀
+Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –", then the suggested par;
+a round that does not count says why in one line. The big button: "Back to
+edit", then "Publish →". The next weather starts by itself.
 
-**Placing**: a piece dragged from the palette is a ghost under the cursor,
-snapped to the grid, with guide lines to its row and column and a label: in
-green its name and place ("Mushroom · 24, 9.5"); in red the one-line reason
-("Too close to the cup", "Off the lane", "The cup must stay clear") and a
-not-allowed cursor: letting go there drops nothing. Moving clamps to the
-last valid place; a handle stops at the range's end (a radius at 1.6, a
-loop's depth at 1.5) and the measure label says the limit.
+### B5. Publish
 
-**Empty**: a new hole opens on the empty grid with one card: "A new hole ·
-Garden / Start from a template", the world's three templates as cards with
-their maps (straight par 2, dogleg par 3, the world's signature piece), and
-"or a blank board: drag a tee and a cup in". The verdict says "Place a tee
-and a cup"; Test is locked.
+`builder-publish.html`: form, refused, newer, closed, pending, done. The
+hole as players will see it; the form: the name, suggested ("Suggested from
+the world and the starter: change it if you like."), the address ("From the
+name, at the first test"), a line for players (optional), the cost before
+signing (storage deposit, network fee, "At most 1.20 GNOT", "Nothing goes to
+the game"), gnokey behind a tap, the pinned blue "Publish in Adena · 1.20
+GNOT". Done: the hole's card, "Play it for real: your best becomes the ghost
+your friends race.", gold "Play it for real", the game's Share row "Share the
+dare".
 
-### B3. Test
+### B6. Measured: five minutes, few clicks
 
-`builder-test.html`: playing, proved, missed; at 1440 and 1024.
+A scripted headless walkthrough (`scripts/builderwalk.ts`, on the repo's
+headless Chrome, `media/lib/cdp.mjs`) plays a new player against a local
+chain: open `/build`; "Got it"; drag a Bumper onto the starter, off the
+ball's line; "Test it"; hole each weather with the starter's committed shots
+(the starter's proofs are its shot lists; the bumper is placed off their
+path); "Publish →"; stop on the form with the suggested name, ready to sign.
+It reports the wall time and the count of clicks and drags, and fails over
+**5 minutes**, or over the budget below. CI runs it.
 
-The game takes everything under the header: the play area is the window's.
-Over it, top left the strokes card, top centre one strip: the weathers to
-beat as chips (☀ Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –" until all
-are holed, then the suggested par ("Par 5"). A chip ticks when its round is
-holed and replayed by the chain's code; a round that does not count turns
-its chip red and says why once, under the strip ("That rain round doesn't
-count: one shot could run out of room. Play it again, a softer line."). The
-game's own hint at the foot. The header's action: "Back to edit", then
-"Publish →" once proved.
+| Step | Clicks | Drags |
+|---|---|---|
+| Open `/build` (the starter, the hints) | 0 | 0 |
+| "Got it" | 1 | 0 |
+| A Bumper onto the board | 0 | 1 |
+| "Test it" | 1 | 0 |
+| Clear, wind, rain holed (about 2 shots each; the next weather starts by itself) | 0 | 6 |
+| "Publish →", the form ready (name suggested) | 1 | 0 |
+| **Starter path to a proved, publish-ready hole** | **3** | **7** |
 
-### B4. Publish
-
-`builder-publish.html`: form, refused, newer, closed, pending, done; at 1440
-and 1024.
-
-Two columns under the header: the hole as players will see it (the 3D, its
-card in the community list); the form, a panel that scrolls in itself with
-its action pinned at its foot:
-
-- **Name** (40) with its counter; **Address** `nym-twee/mole-run/v1`, shown
-  and fixed ("Fixed at the test": the weather comes from it; the slug is
-  chosen in Edit, before the first test); **A line for players** (140).
-- **The cost before any signature**: storage deposit, network fee, "At most
-  1.20 GNOT", "The chain's price for keeping and checking the hole. Nothing
-  goes to the game."
-- "Publish with gnokey instead" behind a tap.
-- Pinned: the blue "Publish in Adena · 1.20 GNOT".
-
-Only what changes: a refused name turns its field red with one line ("Looks
-like a web address. Try "St. Andrews"."), the button off; a newer version
-elsewhere ("This one would be v3, with new weather: test it again.") makes
-the action gold "Test again (free)"; closed: "Publishing isn't open on
-gno.land yet. Your draft is kept." and "Back to edit"; signing: "Check the
-window Adena opened, and sign there."
-
-**Done**: "Mole Run is on gno.land!", the hole's share card, "Play it for
-real: your best becomes the ghost your friends race.", gold "Play it for
-real" and "Share the dare" (A6; the dare carries the author's ghost once
-their best is saved).
-
-### B5. Your holes, the community's
+### B7. Your holes, the community's
 
 `builder-holes.html`: mine, community, empty; phone.
 
@@ -422,7 +405,7 @@ par 5 · 23 players", "by nym-pebble77 · Mountain · par 4"), one button
 chain says so, "Open" for a draft) and "Edit" as a link on the player's own.
 Empty: "No hole of yours yet" · Draw a hole.
 
-### B6. On a phone
+### B8. On a phone
 
 `builder-phone.html`: both, community.
 
@@ -559,8 +542,8 @@ exiting non-zero on any finding; it uses the repo's headless Chrome
 | A5 where it shows | `gnome-places.html` | the game's screens, one addition each |
 | A6 share cards | `share-card.html` | gnome, square, spotlight, team, hole |
 | A7 not in your region | `region.html` | one · phone |
-| B2 the editor (B1 its header) | `builder-editor.html` | select, empty, place, invalid, issues, timed, proved, world · 1280, 1024 |
-| B3 test | `builder-test.html` | playing, proved, missed · 1024 |
-| B4 publish | `builder-publish.html` | form, refused, newer, closed, pending, done · 1024 |
-| B5 the holes | `builder-holes.html` | mine, community, empty · phone |
-| B6 the Builder on a phone | `builder-phone.html` | both, community |
+| B3 the editor (B1, B2) | `builder-editor.html` | firstrun, select, details, place, invalid, issues, near, proved, world · 1280, 1024 |
+| B4 test | `builder-test.html` | playing, proved, missed · 1024 |
+| B5 publish | `builder-publish.html` | form, refused, newer, closed, pending, done · 1024 |
+| B7 the holes | `builder-holes.html` | mine, community, empty · phone |
+| B8 the Builder on a phone | `builder-phone.html` | both, community |

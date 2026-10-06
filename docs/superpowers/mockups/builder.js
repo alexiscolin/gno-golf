@@ -84,13 +84,15 @@
   // the Builder's worlds: the four classic ones (the Crystal Mines are built by hand, never in the Builder)
   const WORLDS = [["garden", "Garden", "#1f9a6a"], ["island", "Island", "#1a86d0"], ["town", "Mushroom Town", "#cf3f7c"], ["mountain", "Mountain", "#5569db"]];
 
-  function header({ mode = "edit", proved = false, errors = 0, name = "Mole Run", alias = "nym-twee/mole-run", worldOpen = false }) {
+  function header({ mode = "edit", proved = false, errors = 0, name = "Garden Dogleg", alias = "nym-twee/garden-dogleg", worldOpen = false }) {
     const I = Kit.ICON;
     const test = mode === "test" ? "now" : proved ? "done" : errors ? "locked" : "open";
     const pub = mode === "publish" ? "now" : proved ? "open" : "locked";
     const step = (n, label, st, why = "") => `<li class="step step--${st}"${why ? ` title="${why}"` : ""} aria-current="${st === "now" ? "step" : "false"}"><i>${st === "done" ? "✓" : st === "locked" ? "🔒" : n}</i><span>${label}</span></li>`;
-    const action = mode === "edit" ? (proved ? `<button class="btn btn--chain">Publish →</button>` : `<button class="btn btn--gold"${errors ? ` disabled title="Fix ${errors} first"` : ""}>${I.play} Test it</button>`)
-      : mode === "test" ? (proved ? `<button class="btn btn--chain">Publish →</button>` : `<button class="btn btn--ghost">Back to edit</button>`) : `<button class="btn btn--ghost">Back to edit</button>`;
+    // the next step, one big button; when it waits, why, in a few words (the sentence is under the board)
+    const why = errors ? `<span class="why">${errors === 1 ? "1 thing to fix" : `${errors} things to fix`} ↓</span>` : "";
+    const action = mode === "edit" ? (proved ? `<button class="btn btn--chain btn--next">Publish →</button>` : `${why}<button class="btn btn--gold btn--next"${errors ? " disabled" : ""}>${I.play} Test it</button>`)
+      : mode === "test" ? (proved ? `<button class="btn btn--chain btn--next">Publish →</button>` : `<button class="btn btn--ghost">Back to edit</button>`) : `<button class="btn btn--ghost">Back to edit</button>`;
     return `<header class="bar">
       <button class="round" aria-label="Back to the game: the draft is saved">${I.back}</button>
       <label class="bar__hole"><input value="${name}" aria-label="The hole's name"${mode === "edit" ? "" : " readonly"}><small>${alias}${mode === "edit" ? "" : " · Garden"}</small></label>

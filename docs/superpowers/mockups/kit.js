@@ -63,7 +63,7 @@ function gnome(id, owners = {}) {
   const traits = { Hat: HATS[id % HATS.length], Beard: BEARDS[(id * 7) % BEARDS.length], Extra: EXTRAS[(id * 3) % EXTRAS.length] };
   if (tier !== "common") traits.Trail = ["petals", "bubbles", "sparks", "snowflakes"][id % 4];
   if (tier === "epic") traits.Holing = ["a fountain of petals", "a ring of crystal", "a burst of confetti"][id % 3];
-  const price = { common: 30, rare: 99, epic: 333, legendary: 777 }[tier];
+  const price = { common: 36, rare: 72, epic: 336, legendary: 1296 }[tier];
   return { id, world: w.id, worldName: w.name, tier, name, line: `${cap(traits.Hat)}, ${traits.Beard} and ${traits.Extra}.`, traits, price, owner: owners[id] || "", art: tier === "legendary" ? "img/g12.png" : art(id * 5 + (tier === "epic" ? 3 : 0)) };
 }
 const cap = (s) => s[0].toUpperCase() + s.slice(1);

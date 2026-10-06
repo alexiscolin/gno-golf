@@ -55,7 +55,7 @@
   const { holeSVG, header } = Builder;
   const s = state("form");
   const bad = s === "refused";
-  const gnokey = `<details class="more"><summary>Publish with gnokey instead</summary><div><code class="code">gnokey maketx call -pkgpath gno.land/r/nym-alexiscolin000/gnogolf/golf/v2 -func "PublishMine" -args "mole-run" -args "4747310001…" -args "Mind the gate, and the moles." -gas-fee 1500000ugnot -gas-wanted 205000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 &lt;your-key-name&gt;</code>
+  const gnokey = `<details class="more"><summary>Publish with gnokey instead</summary><div><code class="code">gnokey maketx call -pkgpath gno.land/r/nym-alexiscolin000/gnogolf/golf/v2 -func "PublishMine" -args "garden-dogleg" -args "4747310001…" -args "Mind the gate, and the moles." -gas-fee 1500000ugnot -gas-wanted 205000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 &lt;your-key-name&gt;</code>
     <button class="btn btn--main btn--s" style="margin-top:8px">Copy</button></div></details>`;
   const action = {
     form: `<button class="btn btn--chain">Publish in Adena · 1.20 GNOT</button>`,
@@ -73,13 +73,13 @@
 
   const form = `<section class="pub">
       <div class="pub__see"><div class="shot" role="img" aria-label="The hole in 3D"></div>
-        <div class="listcard"><span class="mini">${holeSVG({ small: true })}</span><span><b>${bad ? "St.Andrews" : "Mole Run"}</b><small>by nym-twee · Garden · par 5</small></span></div></div>
+        <div class="listcard"><span class="mini">${holeSVG({ small: true })}</span><span><b>${bad ? "St.Andrews" : "Garden Dogleg"}</b><small>by nym-twee · Garden · par 5</small></span></div></div>
       <div class="form">
         <div class="form__body">
           <h2>Publish your hole</h2>
-          <label class="lbl"><span>Name <span class="count">${bad ? 10 : 8} / 40</span></span><input class="field${bad ? " field--bad" : ""}" value="${bad ? "St.Andrews" : "Mole Run"}"></label>
-          <div class="slug"><span>Address <b class="mono">nym-twee/mole-run/v1</b></span><span class="fine" style="margin:0">Fixed at the test</span></div>
-          <label class="lbl"><span>A line for players <span class="count">29 / 140</span></span><textarea class="field">Mind the gate, and the moles.</textarea></label>
+          <label class="lbl"><span>Name <span class="count">${bad ? 10 : 13} / 40</span></span><input class="field${bad ? " field--bad" : ""}" value="${bad ? "St.Andrews" : "Garden Dogleg"}" aria-describedby="suggested"><span class="fine" id="suggested" style="margin:0">${bad ? "" : "Suggested from the world and the starter: change it if you like."}</span></label>
+          <div class="slug"><span>Address <b class="mono">nym-twee/garden-dogleg/v1</b></span><span class="fine" style="margin:0">From the name, at the first test</span></div>
+          <label class="lbl"><span>A line for players (optional) <span class="count">29 / 140</span></span><textarea class="field">Mind the gate, and the moles.</textarea></label>
           <div class="bill" aria-label="The cost, before any signature"><span>Storage deposit</span><b>≈ 0.89 GNOT</b><span>Network fee</span><b>≈ 0.31 GNOT</b><span class="bill__total">At most</span><b class="bill__total">1.20 GNOT</b></div>
           <p class="fine">The chain's price for keeping and checking the hole. Nothing goes to the game.</p>
           ${note}
@@ -88,7 +88,7 @@
         <div class="form__foot">${action}</div>
       </div>
     </section>`;
-  const done = `<section class="done"><div class="done__in"><span class="eyebrow">nym-twee/mole-run/v1 · Garden · par 5</span><h2 class="inked">Mole Run is on gno.land!</h2>
+  const done = `<section class="done"><div class="done__in"><span class="eyebrow">nym-twee/garden-dogleg/v1 · Garden · par 5</span><h2 class="inked">Garden Dogleg is on gno.land!</h2>
       <div class="shot"><iframe src="share-card.html?state=hole" title="The hole's share card" tabindex="-1" aria-hidden="true"></iframe></div>
       <p class="lead" style="margin:0">Play it for real: your best becomes the ghost your friends race.</p>
       <button class="btn btn--gold btn--cta" style="justify-self:center;margin:0">${ICON.play} Play it for real</button><div style="display:flex;justify-content:center">${shareRow("Share the dare")}</div></div></section>`;

@@ -59,18 +59,20 @@
   const { ICON, TIER_ICON, tierChip, state, trust, legal, shareRow, CLOSES } = Kit;
   const s = state("open");
   const leg = s === "legendary";
-  const G = leg ? { name: "The Miller", short: "The Miller", id: 104, tier: "legendary", price: 777, img: "img/g12.png", line: "Sails for a crown, a beard to his knees: the windmill turns once as he drops." }
-    : { name: "Tansy of the Garden", short: "Tansy", id: 94, tier: "epic", price: 333, img: "img/g02.png", line: "A bobble that will not sit still, and a trail of petals behind every putt." };
+  const G = leg ? { name: "The Miller", short: "The Miller", id: 104, tier: "legendary", price: 1296, img: "img/g12.png", line: "Sails for a crown, a beard to his knees: the windmill turns once as he drops." }
+    : { name: "Tansy of the Garden", short: "Tansy", id: 94, tier: "epic", price: 336, img: "img/g02.png", line: "A bobble that will not sit still, and a trail of petals behind every putt." };
   const tile = (cls = "") => `<span class="gtile gtile--${G.tier} tint--garden ${cls}"><img src="${G.img}" alt=""></span>`;
   const foot = (b, small = "") => `<div class="sheet__foot">${b}${small ? `<p class="fine">${small}</p>` : ""}</div>`;
   const close = `<button class="round round--small sheet__close" aria-label="Close">${ICON.close}</button>`;
-  const total = (G.price + 0.46).toFixed(2);
+  // amounts as people read them: 1,296 GNOT
+  const gn = (n) => n.toLocaleString("en", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  const total = gn(G.price + 0.46);
 
   // him: the turntable, who he is, his price, one action
   const him = (action, note = "", withTrust = true) => `${tile("stage").replace('class="gtile', 'role="img" aria-label="' + G.name + ', turning: drag, or the arrow keys" class="gtile')}
     <div class="meta">${tierChip(G.tier)}<span>#${G.id} · Wave 1 · Garden</span></div>
     <h2 class="gname inked">${G.name}</h2><p class="gline">${G.line}</p>
-    ${note}${withTrust ? `<div class="price"><b>${G.price} GNOT</b><span>+ ≈ 0.46 GNOT deposit and fee</span></div>` : ""}
+    ${note}${withTrust ? `<div class="price"><b>${gn(G.price)} GNOT</b><span>+ ≈ 0.46 GNOT deposit and fee</span></div>` : ""}
     ${withTrust ? trust() : ""}
     <details class="more traits"><summary>His traits</summary><p><span>Hat</span><b>${leg ? "Windmill sails" : "Bobble, moss green"}</b><span>Beard</span><b>${leg ? "Long, white" : "Bushy, ginger"}</b><span>Extra</span><b>${leg ? "Flour on the brim" : "Rosy cheeks"}</b><span>Trail</span><b>${leg ? "Turning sails" : "Petals"}</b></p></details>
     ${foot(action)}`;
@@ -78,9 +80,9 @@
   // the order, term by term (legal pack §1.1), the seller from the site's build settings
   const review = (balance = false) => `<dl class="review" aria-label="Your order">
       <dt>Item</dt><dd>${G.name} (#${G.id}, ${G.tier === "legendary" ? "Legendary, 1 of 1" : "Epic"}), 1 item</dd>
-      <dt>Price</dt><dd>${G.price} GNOT</dd>
+      <dt>Price</dt><dd>${gn(G.price)} GNOT</dd>
       <dt>Other costs</dt><dd>Storage deposit about 0.31 GNOT (held by the chain, returned if you burn the gnome) + network fee about 0.15 GNOT. Neither is paid to us.</dd>
-      <dt>Total</dt><dd><span class="total">about ${total} GNOT</span><small>${balance ? "In your Adena: 120 GNOT" : "≈ $23, approximate, rate of 18:02 UTC from [source]"}</small></dd>
+      <dt>Total</dt><dd><span class="total">about ${total} GNOT</span><small>${balance ? "In your Adena: 120 GNOT" : "≈ $24, approximate, rate of 18:02 UTC from [source]"}</small></dd>
       <dt>Payment</dt><dd>Paid now, in GNOT, from your own wallet, in the transaction you sign.</dd>
       <dt>Delivery</dt><dd>Delivered at once to g1jg8m…sqf5, in the same transaction.</dd>
       <dt>Sale period</dt><dd>The genesis sale closes on ${CLOSES} (Mon 14 Dec, 03:00 JST).</dd>
@@ -96,7 +98,7 @@
   const order = (on) => foot(`<button class="btn btn--chain btn--wide"${on ? "" : ' disabled title="Tick both boxes first"'}>Order with obligation to pay (${total} GNOT): sign in wallet</button>`, "Your wallet will open and ask you to sign. Signing is your order. It cannot be undone.");
   const head = (t) => `<div class="head">${tile()}<h2>${t}</h2></div>`;
   const wait = (t) => `<div class="center">${tile("hop")}<h2 style="font-size:24px">${t}</h2></div>`;
-  const buy = `<button class="btn btn--chain btn--wide">Buy ${G.short} · ${G.price} GNOT</button>`;
+  const buy = `<button class="btn btn--chain btn--wide">Buy ${G.short} · ${gn(G.price)} GNOT</button>`;
 
   const body = {
     open: him(buy),
@@ -113,14 +115,14 @@
     nowallet: `${head("Buy " + G.short)}<p class="lead" style="text-align:center">Buying takes a gno.land wallet.</p>${gnokey(true)}${foot(`<a class="btn btn--main btn--wide" href="#">Install Adena ↗</a>`)}`,
     elsewhere: `${head("Buy " + G.short)}<p class="lead" style="text-align:center">Adena lives on a computer. The link keeps ${G.short} for you there.</p>${foot(`<button class="btn btn--main btn--wide">Send the link to my computer</button>`)}`,
     network: `${head("Buy " + G.short)}<p class="note note--warn">Adena is on another network. Pick <b>onyx-1</b> in Adena: nothing was sent.</p>${foot(`<button class="btn btn--main btn--wide">Check again</button>`)}`,
-    short: `${head("Review your order")}${review(true)}<p class="note note--warn"><b>213.46 GNOT</b> to go.</p>${foot(`<a class="btn btn--main btn--wide" href="#">Get GNOT ↗</a>`)}`,
+    short: `${head("Review your order")}${review(true)}<p class="note note--warn"><b>216.46 GNOT</b> to go.</p>${foot(`<a class="btn btn--main btn--wide" href="#">Get GNOT ↗</a>`)}`,
     pending: wait("Sign in Adena…"),
     reading: wait("Reading it back from the chain…"),
     success: `<div class="center">${tile()}<h2 class="inked">${G.short}'s yours!</h2>${shareRow("Show your gnome")}<p class="fine" style="margin:0"><a class="linkish" href="?state=receipt">Your receipt: print or save it</a></p></div>${foot(`<button class="btn btn--gold btn--wide">Play with him</button>`)}`,
     receipt: `${head("Your receipt")}<div class="receipt"><h3>Receipt: Gnogolf gnome purchase</h3>
       <p>Seller: [operator name], [address], [e-mail]</p><p>Date and time: Tue 6 Oct 2026, 18:04 UTC (Wed 7 Oct, 03:04 JST)</p>
       <p>Item: ${G.name}, #${G.id}. Contract <span class="mono">gno.land/r/nym-alexiscolin000/gnogolf/gnomes</span></p>
-      <p>Price paid: ${G.price} GNOT (+ network fee 0.15 GNOT, storage deposit 0.31 GNOT held by the chain)</p>
+      <p>Price paid: ${gn(G.price)} GNOT (+ network fee 0.15 GNOT, storage deposit 0.31 GNOT held by the chain)</p>
       <p>Delivered to: <span class="mono">g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5</span></p>
       <p>Transaction: <span class="mono">3F9A…C21B</span> (permanent record on onyx-1: <a href="#">explorer ↗</a>)</p>
       <p>Terms accepted: Terms of Sale version [1.0, date]</p>
