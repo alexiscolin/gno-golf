@@ -7,6 +7,10 @@ export const KICKS = ["bumper", "pinball", "mushroom"] as const;
 export const kicks = (skin: string) => KICKS.some((k) => skin.includes(k));
 /** physics.MaxBounce: the most a passive piece plays, whatever its Bounce. */
 export const MAX_BOUNCE = 0.75;
+/** physics.MinRamp: the gentlest hill (|Vec|) that launches a ball off its crest. */
+export const MIN_RAMP = 0.12;
+/** physics.MaxMove: a zone a fast ball cannot step over is at least this deep along its way. */
+export const MAX_MOVE = 1.5;
 /** The weather's skins (course.WithWeather, and the puddles it lays): never a piece's. */
 export const WEATHER = ["wind", "rain", "fog", "storm", "snow", "puddle"] as const;
 

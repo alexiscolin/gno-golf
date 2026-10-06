@@ -15,7 +15,7 @@ import "../web/test/setup.mjs";
 const { RULES } = await import("../web/lib/chain.ts");
 const { SKIES } = await import("../web/lib/card.ts");
 const { CLIMATES } = await import("../web/lib/sky.ts");
-const { KICKS, MAX_BOUNCE, WEATHER } = await import("../web/lib/builder/rules.ts");
+const { KICKS, MAX_BOUNCE, MAX_MOVE, MIN_RAMP, WEATHER } = await import("../web/lib/builder/rules.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -170,6 +170,8 @@ check("the physics the builder's palette is bound by", () => {
   const course = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/course.gno", import.meta.url), "utf8");
   assert.ok(has(step, `return ${KICKS.map((k) => `strings.Contains(skin, "${k}")`).join(" || ")}`), "physics.Kicks: the skins that kick changed");
   assert.equal(MAX_BOUNCE, constOf(step, "MaxBounce"), "MaxBounce");
+  assert.equal(MIN_RAMP, constOf(step, "MinRamp"), "MinRamp");
+  assert.equal(MAX_MOVE, constOf(step, "MaxMove"), "MaxMove");
   for (const w of WEATHER) assert.ok(course.includes(`"${w}"`), `course: no weather skin "${w}"`);
 });
 

@@ -45,6 +45,8 @@ export interface Binding {
   clocks: readonly Clock[];
   /** drawn as the plain form on purpose: the plain entries, and the garden's bumper (its mushroom) */
   plain?: boolean;
+  /** what it may lie on or in (E13): kinds ("wall" for a rail or a bar, "post", a zone's kind) the scene draws it well with */
+  overlaps?: readonly string[];
 }
 /** Which of the scene's drawings draws it. */
 export type Draw = "POSTS" | "BARS" | "MOUTHS" | "course" | "zones" | "world";
@@ -73,12 +75,13 @@ const KIND: Record<Kind, Binding> = {
   rail: { size: r(0.5, 93, 0.25, 6), bounce: PASSIVE, clocks: ["fixed"] }, // (93: the board's 96 less Fit's margins)
   bar: { size: r(0.5, 40, 0.25, 3), thick: r(0.25, 1.6, 0.05, 0.5), bounce: PASSIVE, clocks: ["fixed", "substep", "stroke"] },
   post: { size: r(0.3, 4.5, 0.05, 0.8), bounce: PASSIVE, clocks: ["fixed", "stroke"] },
-  surface: { shapes: ["rect", "round", "poly"], size: r(1, 80, 0.25, 6), scale: r(0.3, 1, 0.01, 0.5), clocks: ["fixed"] },
-  slope: { shapes: ["rect", "round", "poly"], size: r(1, 80, 0.25, 8), grade: r(0.05, 0.35, 0.01, 0.2), clocks: ["fixed"] },
+  surface: { shapes: ["rect", "round", "poly"], size: r(1, 80, 0.25, 6), scale: r(0.3, 1, 0.01, 0.5), clocks: ["fixed"], overlaps: ["slope", "hazard"] },
+  // (a slope is the ground's relief: what lies on it is drawn on it)
+  slope: { shapes: ["rect", "round", "poly"], size: r(1, 80, 0.25, 8), grade: r(0.05, 0.35, 0.01, 0.2), clocks: ["fixed"], overlaps: ["surface", "hazard", "tunnel"] },
   air: { shapes: ["rect", "round"], size: r(2, 40, 0.25, 6), grade: r(0.05, 0.35, 0.01, 0.25), clocks: ["substep", "fixed"] },
   // a mouth at least 1.5 across: thinner, a fast ball steps over it (E5)
-  tunnel: { shapes: ["round", "rect"], size: r(1.5, 8, 0.25, 3), clocks: ["fixed"] },
-  hazard: { shapes: ["rect", "round", "poly"], size: r(1.5, 80, 0.25, 6), clocks: ["fixed", "stroke"] },
+  tunnel: { shapes: ["round", "rect"], size: r(1.5, 8, 0.25, 3), clocks: ["fixed"], overlaps: ["slope"] },
+  hazard: { shapes: ["rect", "round", "poly"], size: r(1.5, 80, 0.25, 6), clocks: ["fixed", "stroke"], overlaps: ["slope", "surface"] },
   loop: { shapes: ["rect"], size: r(1.5, 6, 0.1, 2), scale: r(1, 3.5, 0.1, 2), clocks: ["fixed"] },
 };
 
@@ -86,6 +89,8 @@ const KICK = { bounce: r(0, 1.5, 0.05, 1.2) };
 const ICE = { scale: r(1.01, 1.3, 0.01, 1.18) };
 const MOVES = { clocks: ["substep"] } as const satisfies Partial<Binding>; // a machine: drawn only while it runs
 const BIG = { size: r(1, 4.5, 0.05, 2.2) };
+// rock among rock: a cluster of them, or one set into a rock wall, reads as one outcrop (the mines', the mountain's)
+const ROCKY = { overlaps: ["wall", "post"] };
 
 /**
  * Bindings by kind, then skin: the kind's binding with these changes. A
@@ -101,11 +106,12 @@ export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
     boulder: MOVES, "cage door": MOVES, "crystal gate": MOVES, tripwire: MOVES, stalactite: MOVES,
   },
   post: {
-    "": {}, bumper: { ...KICK, plain: true }, scarecrow: {}, sunflower: {}, lantern: {}, sandcastle: BIG, palm: {}, coral: {}, buoy: {}, crab: {},
-    lamp: {}, clock: {}, roundabout: BIG, chimney: {}, outcrop: {}, driftwood: {}, house: BIG, "gnome statue": {}, rock: {}, stump: {},
+    "": {}, bumper: { ...KICK, plain: true }, scarecrow: {}, sunflower: {}, lantern: {}, sandcastle: { ...BIG, overlaps: ["wall"] }, palm: {}, coral: {}, buoy: {}, crab: {},
+    // (a clock's hands turn over it)
+    lamp: {}, clock: { overlaps: ["wall"] }, roundabout: BIG, chimney: {}, outcrop: {}, driftwood: {}, house: BIG, "gnome statue": {}, rock: {}, stump: {},
     cat: {}, bandstand: BIG, obelisk: {}, pigeon: {}, stall: {},
-    pine: {}, boulder: {}, snowman: {}, chalet: BIG, skater: {},
-    stalagmite: {}, prop: {}, buffer: {}, "crystal bumper": KICK, "jewel bumper": KICK, "frozen fall": {}, bat: {},
+    pine: {}, boulder: ROCKY, snowman: {}, chalet: BIG, skater: {},
+    stalagmite: ROCKY, prop: ROCKY, buffer: {}, "crystal bumper": { ...KICK, ...ROCKY }, "jewel bumper": KICK, "frozen fall": {}, bat: {},
   },
   surface: {
     "": {}, sand: {}, wetsand: {}, flowerbed: {}, soil: {}, bridge: { scale: r(1, 1, 0.01, 1) }, ice: ICE, molehill: { scale: r(1, 1, 0.01, 1) },

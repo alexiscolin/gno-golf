@@ -1,152 +1,226 @@
 // The builder's own checks of a hole: what the chain does not check and a
-// player would meet (the design's L1, "The validation pipeline"). The chain
-// takes a cup inside a wall; these do not. Each issue names its rule (E2…),
-// its piece and the place, and is an error (no test mode, no publish) or a
-// warning. Pure, on the hole's GG1 pieces: Fit only moves a hole, so the
-// draft's own coordinates do (a rectangle Fit cuts at the board's edge only
-// loses what lies off the board, where neither tee nor cup is).
+// player would meet (the design's L1). The chain takes a cup inside a wall;
+// these do not. Each issue names its rule (E2…), its piece and the place,
+// and is an error (no test mode, no publish) or a warning (a gauge nearing
+// its limit). checkHole reads a hole as fit gives it (decode's pieces, in
+// GG1's order); the draft's checks (draft-checks.ts) add what only the draft
+// knows. Rules and thresholds: docs/superpowers/specs/2026-10-06-hole-builder-design.md.
 import { inZone, segDist } from "../terrain";
-import type { Vec2 } from "../types";
+import type { PieceRef } from "../scene/census";
 import { LIMITS } from "./gg1";
-import type { HoleIn as GHole, PostIn as GPost, WallIn as GWall, ZoneIn as GZone } from "./types";
+import { CELL, laneOf, moves, reach } from "./lane";
+import type { HoleIn, PostIn, V, WallIn, ZoneIn } from "./types";
 import type { Cost } from "./wasm";
 
-/** Where a piece is in the hole: its list, its place in it, and its pulse (-1: none). */
-export interface PieceRef {
-  list: "walls" | "posts" | "zones";
-  index: number;
-  pulse: number;
-}
+export type Rule = "L0" | "E1" | "E1b" | "E2" | "E3" | "E4" | "E5" | "E6" | "E7" | "E8" | "E9" | "E10" | "E11" | "E12" | "E13" | "E14" | "E15" | "L2";
 export interface Issue {
-  rule: "E2" | "E3" | "E7" | "E8" | "E11";
+  rule: Rule;
   severity: "error" | "warning";
   text: string;
-  piece?: PieceRef;
-  at?: Vec2;
+  /** the hole's piece it is about (census.ts PieceRef); the draft's checks add its piece's id */
+  ref?: PieceRef;
+  piece?: string;
+  at?: V;
+  /** the pieces it is about, beyond ref (E13's other, E14's walls) */
+  also?: PieceRef[];
 }
 
-/** How close a ball may rest to a wall at the tee: its radius and this (the design's E2). */
+/** How close a ball may rest to a wall at the tee: its radius and this (E2). */
 export const TEE_GAP = 0.05;
-/** A pulse's cycle, in strokes: a round has at most 60 (the design's E7). */
-export const PULSE_EVERY = { min: 2, max: 60 };
+/** A round's strokes at most: a pulse must come and go within them (E7). */
+export const ROUND_STROKES = 60;
 /** The share of a work limit past which the gauge warns (E11). */
-export const WORK_WARN = 0.9;
+export const WORK_WARN = 0.8;
+/** A mouth a ball must not step over: a hazard or a tunnel at least this across (E5). */
+export const MOUTH = 1.5;
+/** A passage the ball must use: its width, beyond the ball's diameter (E14). */
+export const PASSAGE = 0.25;
+/** How far a piece keeps from a rail: nearer, the kerb swallows it (E15). */
+export const KERB_GAP = 0.5;
 
+/** A hole's piece, its place and pulse. */
 type Each<T> = { item: T; ref: PieceRef };
-function all<T>(h: GHole, list: PieceRef["list"]): Each<T>[] {
-  const out: Each<T>[] = (h[list] as readonly T[]).map((item, index) => ({ item, ref: { list, index, pulse: -1 } }));
-  h.pulses.forEach((p, k) => (p[list] as readonly T[]).forEach((item, index) => out.push({ item, ref: { list, index, pulse: k } })));
+function each<T>(h: HoleIn, set: PieceRef["set"]): Each<T>[] {
+  const key = set === "wall" ? "walls" : set === "post" ? "posts" : "zones";
+  const out: Each<T>[] = (h[key] as readonly T[]).map((item, i) => ({ item, ref: { set, i } }));
+  h.pulses.forEach((p, k) => (p[key] as readonly T[]).forEach((item, i) => out.push({ item, ref: { set, i, pulse: k } })));
   return out;
 }
-const shape = (z: GZone) => ({ min: z.min, max: z.max, round: !!z.round, poly: z.poly, outside: z.outside });
-/** A zone a ball cannot rest in: it moves it on (a tunnel, a loop) or sends it back (a hazard). */
-const notGround = (z: GZone) => z.kind === "hazard" || z.kind === "tunnel" || z.kind === "loop";
-const named = (r: PieceRef, skin = "") => `the ${skin || "plain"} ${r.list === "walls" ? "wall" : r.list === "posts" ? "post" : "zone"}${r.pulse >= 0 ? ` (pulse ${r.pulse + 1})` : ""}`;
-const pt = (p: Vec2) => `(${+p[0].toFixed(2)}, ${+p[1].toFixed(2)})`;
+const pieceOf = (h: HoleIn, r: PieceRef) => {
+  const list = r.pulse === undefined ? h : h.pulses[r.pulse];
+  return (r.set === "wall" ? list.walls : r.set === "post" ? list.posts : list.zones)[r.i];
+};
+const shapeOf = (z: ZoneIn) => ({ min: z.min, max: z.max, round: !!z.round, poly: z.poly, outside: z.outside });
+const pt = (p: V) => `(${+p[0].toFixed(2)}, ${+p[1].toFixed(2)})`;
+const centreOf = (z: ZoneIn): V => [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2];
 
-/** The lane's grid: a ball's centre tested every quarter unit, the builder's snap. */
-export const LANE_CELL = 0.25;
+/** A piece's name in a sentence: "the hedge wall", "the plain post", "the water hazard". */
+export type Namer = (r: PieceRef) => string;
+export const nameIn = (h: HoleIn): Namer => (r) => {
+  const p = pieceOf(h, r), kind = r.set === "zone" ? (p as ZoneIn).kind : r.set;
+  return `the ${p.skin || "plain"} ${kind}${r.pulse !== undefined ? ` (pulse ${r.pulse + 1})` : ""}`;
+};
 
-/**
- * The lane: where a ball cannot leave the board, closed in by the untimed
- * walls (a timed one, or a pulse's, is not always there). A cell is shut
- * when a ball's centre there would be within its radius of a wall, so a gap
- * narrower than the ball closes the lane and a rail inside it does not cut
- * it (an even-odd count of the walls across a ray, course's dryLand, would);
- * everything reached from the grid's edge round the walls is outside. It
- * answers for a point: in the lane, or on a wall (the walls' own checks name
- * it there).
- */
-export function inLane(h: GHole): (p: Vec2) => boolean {
-  const walls = h.walls.filter((w) => !w.every), r = h.ballR, pad = r + 2 * LANE_CELL;
-  if (!walls.length) return () => false;
-  const xs = walls.flatMap((w) => [w.a[0], w.b[0]]), ys = walls.flatMap((w) => [w.a[1], w.b[1]]);
-  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
-  const nx = Math.ceil((Math.max(...xs) + pad - x0) / LANE_CELL), ny = Math.ceil((Math.max(...ys) + pad - y0) / LANE_CELL);
-  const shut = new Uint8Array(nx * ny), out = new Uint8Array(nx * ny);
-  const cx = (i: number) => x0 + (i + 0.5) * LANE_CELL, cy = (j: number) => y0 + (j + 0.5) * LANE_CELL;
-  for (const w of walls) {
-    const i0 = Math.max(0, Math.floor((Math.min(w.a[0], w.b[0]) - r - x0) / LANE_CELL)), i1 = Math.min(nx - 1, Math.ceil((Math.max(w.a[0], w.b[0]) + r - x0) / LANE_CELL));
-    const j0 = Math.max(0, Math.floor((Math.min(w.a[1], w.b[1]) - r - y0) / LANE_CELL)), j1 = Math.min(ny - 1, Math.ceil((Math.max(w.a[1], w.b[1]) + r - y0) / LANE_CELL));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (segDist(cx(i), cy(j), w.a, w.b) < r) shut[j * nx + i] = 1;
-  }
-  // the outside: every open cell reached from the grid's edge
-  const queue: number[] = [];
-  const reach = (i: number, j: number) => {
-    const k = j * nx + i;
-    if (i >= 0 && j >= 0 && i < nx && j < ny && !shut[k] && !out[k]) (out[k] = 1), queue.push(k);
-  };
-  for (let i = 0; i < nx; i++) reach(i, 0), reach(i, ny - 1);
-  for (let j = 0; j < ny; j++) reach(0, j), reach(nx - 1, j);
-  while (queue.length) {
-    const k = queue.pop()!, i = k % nx, j = (k - i) / nx;
-    reach(i + 1, j), reach(i - 1, j), reach(i, j + 1), reach(i, j - 1);
-  }
-  return (p) => {
-    const i = Math.floor((p[0] - x0) / LANE_CELL), j = Math.floor((p[1] - y0) / LANE_CELL);
-    if (i < 0 || j < 0 || i >= nx || j >= ny) return false;
-    return shut[j * nx + i] === 1 || !out[j * nx + i];
-  };
-}
+const err = (rule: Rule, text: string, ref?: PieceRef, at?: V, also?: PieceRef[]): Issue => ({ rule, severity: "error", text, ...(ref && { ref }), ...(at && { at }), ...(also && { also }) });
 
 /** What blocks a disc of radius rad at p, any clock: a wall within rad, a post over it, a zone it must stay out of. */
-function blocked(h: GHole, p: Vec2, rad: number, zoneHit: (z: GZone) => boolean): PieceRef[] {
+function blocked(h: HoleIn, p: V, rad: number, zoneHit: (z: ZoneIn) => boolean, judged: Judged = () => true): PieceRef[] {
   const out: PieceRef[] = [];
-  for (const { item, ref } of all<GWall>(h, "walls")) if (segDist(p[0], p[1], item.a, item.b) < rad) out.push(ref);
-  for (const { item, ref } of all<GPost>(h, "posts")) if (Math.hypot(p[0] - item.c[0], p[1] - item.c[1]) < item.r + rad) out.push(ref);
-  for (const { item, ref } of all<GZone>(h, "zones")) if (notGround(item) && zoneHit(item)) out.push(ref);
-  return out;
+  for (const { item, ref } of each<WallIn>(h, "wall")) if (segDist(p[0], p[1], item.a, item.b) < rad) out.push(ref);
+  for (const { item, ref } of each<PostIn>(h, "post")) if (Math.hypot(p[0] - item.c[0], p[1] - item.c[1]) < item.r + rad) out.push(ref);
+  for (const { item, ref } of each<ZoneIn>(h, "zone")) if (moves(item) && zoneHit(item)) out.push(ref);
+  return out.filter(judged);
 }
-const skinOf = (h: GHole, r: PieceRef) => ((r.pulse < 0 ? h : h.pulses[r.pulse])[r.list][r.index] as { skin?: string }).skin;
+
+/** E1: a zone Fit cut to nothing at the board's edge (it lay off the board). */
+function board(h: HoleIn, name: Namer): Issue[] {
+  return each<ZoneIn>(h, "zone").filter(({ item }) => !(item.max[0] > item.min[0] && item.max[1] > item.min[1])).map(({ ref }) => err("E1", `${cap(name(ref))} lies off the board once the hole is fitted`, ref));
+}
 
 /** E2: the tee in the lane, the ball's radius and TEE_GAP from every wall, off every post and every zone that moves or sends a ball back. */
-function tee(h: GHole, lane: (p: Vec2) => boolean): Issue[] {
+function tee(h: HoleIn, lane: (p: V) => boolean, name: Namer, judged: Judged): Issue[] {
   const out: Issue[] = [];
-  if (!lane(h.tee)) out.push({ rule: "E2", severity: "error", text: `The tee at ${pt(h.tee)} is outside the lane`, at: h.tee });
-  for (const ref of blocked(h, h.tee, h.ballR + TEE_GAP, (z) => inZone(shape(z), h.tee[0], h.tee[1]))) {
-    out.push({ rule: "E2", severity: "error", text: `The tee touches ${named(ref, skinOf(h, ref))} at ${pt(h.tee)}`, piece: ref, at: h.tee });
+  if (!lane(h.tee)) out.push(err("E2", `The tee at ${pt(h.tee)} is outside the lane`, undefined, h.tee));
+  for (const ref of blocked(h, h.tee, h.ballR + TEE_GAP, (z) => inZone(shapeOf(z), h.tee[0], h.tee[1]), judged)) out.push(err("E2", `The tee touches ${name(ref)} at ${pt(h.tee)}`, ref, h.tee));
+  return out;
+}
+
+/** E3: the cup's disc (where a ball is holed: the cup's radius round the pin) in the lane, touching no wall, post or zone of any clock. */
+function cup(h: HoleIn, lane: (p: V) => boolean, name: Namer, judged: Judged): Issue[] {
+  const out: Issue[] = [], rad = h.cupR, [x, y] = h.pin;
+  const rim: V[] = [h.pin, ...Array.from({ length: 24 }, (_, k): V => [x + rad * Math.cos((k * Math.PI) / 12), y + rad * Math.sin((k * Math.PI) / 12)])];
+  if (!rim.every(lane)) out.push(err("E3", `The cup at ${pt(h.pin)} is not wholly in the lane`, undefined, h.pin));
+  for (const ref of blocked(h, h.pin, rad, (z) => rim.some((p) => inZone(shapeOf(z), p[0], p[1])), judged)) out.push(err("E3", `The cup touches ${name(ref)} at ${pt(h.pin)}`, ref, h.pin));
+  return out;
+}
+
+/**
+ * E4: the cup reached from the tee at the ball's clearance (the most open the
+ * hole ever is: its timed and pulsed pieces left out; tunnels jump, hazards
+ * stop). E14: and at the ball's diameter and PASSAGE, so no way to the cup is
+ * one a ball only just threads; the pieces at the narrowest place named.
+ */
+function way(h: HoleIn, name: Namer): Issue[] {
+  // the grid's flood is generous (a cell shut only if no ball could be anywhere in it): it must never
+  // refuse a hole a ball can play; the gaps are then measured exactly
+  const loose = h.ballR - CELL * Math.SQRT1_2;
+  if (!reach(h, loose).reached) return [err("E4", "The cup cannot be reached from the tee", undefined, h.pin)];
+  // the gaps between two fixed solids (walls, posts: a pulse's and a timed one are not always there)
+  const of: Solid[] = [], refs: PieceRef[] = [];
+  for (const { item, ref } of each<WallIn>(h, "wall")) if (!item.every && ref.pulse === undefined) of.push({ kind: "wall", a: item.a, b: item.b }), refs.push(ref);
+  for (const { item, ref } of each<PostIn>(h, "post")) if (ref.pulse === undefined) of.push({ kind: "post", c: item.c, r: item.r }), refs.push(ref);
+  const ball = 2 * h.ballR, wide = ball + PASSAGE, out: Issue[] = [];
+  for (let i = 0; i < of.length; i++) {
+    for (let j = i + 1; j < of.length; j++) {
+      const [gap, mid] = gapOf(of[i], of[j]);
+      if (!(gap > 1e-9 && gap < wide)) continue;
+      // one the way needs: closed there, the cup is lost
+      if (reach({ ...h, posts: [...h.posts, { c: mid, r: Math.max(gap / 2, CELL) }] }, loose).reached) continue;
+      const between = `the gap at ${pt(mid)} between ${name(refs[i])} and ${name(refs[j])} is ${+gap.toFixed(2)} wide`;
+      out.push(gap < ball
+        ? err("E4", `The cup cannot be reached from the tee: ${between}, narrower than the ball (${ball})`, refs[i], mid, [refs[j]])
+        : err("E14", `${cap(between)}, and the way to the cup goes through it: at least ${wide}, or a ball only just fits`, refs[i], mid, [refs[j]]));
+    }
   }
   return out;
 }
 
-/** E3: the cup's disc (the cup and a ball's radius) in the lane, touching no wall, post or zone of any clock. */
-function cup(h: GHole, lane: (p: Vec2) => boolean): Issue[] {
-  const out: Issue[] = [], rad = h.cupR + h.ballR, [x, y] = h.pin;
-  // the disc's rim, every 15°, and its centre: in the lane, and in no zone
-  const rim: Vec2[] = [h.pin, ...Array.from({ length: 24 }, (_, k): Vec2 => [x + rad * Math.cos((k * Math.PI) / 12), y + rad * Math.sin((k * Math.PI) / 12)])];
-  if (!rim.every(lane)) out.push({ rule: "E3", severity: "error", text: `The cup at ${pt(h.pin)} is not wholly in the lane`, at: h.pin });
-  for (const ref of blocked(h, h.pin, rad, (z) => rim.some((p) => inZone(shape(z), p[0], p[1])))) {
-    out.push({ rule: "E3", severity: "error", text: `The cup touches ${named(ref, skinOf(h, ref))} at ${pt(h.pin)}`, piece: ref, at: h.pin });
+/** The gap between two solids (a wall a segment, a post a circle) and the middle of its narrowest place. */
+type Solid = { kind: "wall"; a: V; b: V } | { kind: "post"; c: V; r: number };
+function gapOf(a: Solid, b: Solid): [number, V] {
+  const seg = (p: V, s: { a: V; b: V }): [number, V] => {
+    const dx = s.b[0] - s.a[0], dy = s.b[1] - s.a[1], l2 = dx * dx + dy * dy;
+    const u = l2 ? Math.max(0, Math.min(1, ((p[0] - s.a[0]) * dx + (p[1] - s.a[1]) * dy) / l2)) : 0;
+    const q: V = [s.a[0] + u * dx, s.a[1] + u * dy];
+    return [Math.hypot(p[0] - q[0], p[1] - q[1]), q];
+  };
+  const mid = (p: V, q: V): V => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+  if (a.kind === "post" && b.kind === "post") {
+    const d = Math.hypot(a.c[0] - b.c[0], a.c[1] - b.c[1]), u: V = [(b.c[0] - a.c[0]) / d, (b.c[1] - a.c[1]) / d];
+    return [d - a.r - b.r, mid([a.c[0] + u[0] * a.r, a.c[1] + u[1] * a.r], [b.c[0] - u[0] * b.r, b.c[1] - u[1] * b.r])];
+  }
+  if (a.kind === "post" || b.kind === "post") {
+    const p = (a.kind === "post" ? a : b) as { c: V; r: number }, w = (a.kind === "wall" ? a : b) as { a: V; b: V };
+    const [d, q] = seg(p.c, w), u: V = d ? [(q[0] - p.c[0]) / d, (q[1] - p.c[1]) / d] : [0, 0];
+    return [d - p.r, mid([p.c[0] + u[0] * p.r, p.c[1] + u[1] * p.r], q)];
+  }
+  // two walls: the nearest of each one's ends to the other (walls that cross have no gap)
+  if (crosses(a.a, a.b, b.a, b.b)) return [0, a.a];
+  let best: [number, V] = [Infinity, a.a];
+  for (const [p, s] of [[a.a, b], [a.b, b], [b.a, a], [b.b, a]] as const) {
+    const [d, q] = seg(p, s);
+    if (d < best[0]) best = [d, mid(p, q)];
+  }
+  return best;
+}
+
+/** The widest circle inside a polygon, by its diameter: a grid's points inside, each one's distance to the edges. */
+function inscribed(poly: readonly V[]): number {
+  const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]), step = 0.05;
+  let best = 0;
+  for (let x = Math.min(...xs); x <= Math.max(...xs); x += step) {
+    for (let y = Math.min(...ys); y <= Math.max(...ys); y += step) {
+      if (!inZone({ min: [Math.min(...xs), Math.min(...ys)], max: [Math.max(...xs) + 1e-9, Math.max(...ys) + 1e-9], round: false, poly }, x, y)) continue;
+      let d = Infinity;
+      for (let k = 0; k < poly.length; k++) d = Math.min(d, segDist(x, y, poly[k], poly[(k + 1) % poly.length]));
+      best = Math.max(best, d);
+    }
+  }
+  return 2 * best;
+}
+
+/** E5: every hazard's and tunnel's mouth at least MOUTH across (a polygon by the widest circle in it); thinner, a fast ball steps over it. */
+function mouths(h: HoleIn, name: Namer): Issue[] {
+  const out: Issue[] = [];
+  for (const { item: z, ref } of each<ZoneIn>(h, "zone")) {
+    if (z.kind !== "hazard" && z.kind !== "tunnel") continue;
+    if (z.outside) continue; // (all the box but a polygon: the sea round a lane, as wide as the board)
+    const w = z.poly?.length ? inscribed(z.poly) : Math.min(z.max[0] - z.min[0], z.max[1] - z.min[1]);
+    if (w < MOUTH - 1e-9) out.push(err("E5", `${cap(name(ref))} is ${+w.toFixed(2)} across: at least ${MOUTH}, or a fast ball steps over it`, ref, z.min));
   }
   return out;
 }
 
-/** E7: a timed piece is on for part of its cycle, never all or none of it; a pulse's cycle fits a round. */
-function clocks(h: GHole): Issue[] {
+/** E6: a tunnel's way out in the lane, clear of walls and posts by the ball's radius, in no zone that moves the ball. */
+function exits(h: HoleIn, lane: (p: V) => boolean, name: Namer): Issue[] {
   const out: Issue[] = [];
-  const timed = (list: "walls" | "zones") => {
-    for (const { item, ref } of all<GWall | GZone>(h, list)) {
-      if (item.every && !(item.on! >= 1 && item.on! <= item.every - 1)) {
-        out.push({ rule: "E7", severity: "error", text: `${named(ref, item.skin)} is on for ${item.on ?? 0} of ${item.every} substeps: 1 to ${item.every - 1}`, piece: ref });
+  for (const { item: z, ref } of each<ZoneIn>(h, "zone")) {
+    if (z.kind !== "tunnel" || !z.vec) continue;
+    const v = z.vec;
+    const why = !lane(v) ? "outside the lane"
+      : blocked(h, v, h.ballR, () => false).length ? "on a wall or a post"
+      : h.zones.some((q) => moves(q) && inZone(shapeOf(q), v[0], v[1])) ? "in a zone that moves the ball on" : "";
+    if (why) out.push(err("E6", `${cap(name(ref))} comes out at ${pt(v)}, ${why}`, ref, v));
+  }
+  return out;
+}
+
+/** E7: a timed piece is on for part of its cycle, never all or none of it; a pulse both comes and goes within a round's strokes. */
+function clocks(h: HoleIn, name: Namer): Issue[] {
+  const out: Issue[] = [];
+  for (const set of ["wall", "zone"] as const) {
+    for (const { item, ref } of each<WallIn | ZoneIn>(h, set)) {
+      if (item.every && !((item.on ?? 0) >= 1 && (item.on ?? 0) <= item.every - 1)) {
+        out.push(err("E7", `${cap(name(ref))} is on for ${item.on ?? 0} of ${item.every} substeps: 1 to ${item.every - 1}`, ref));
       }
     }
-  };
-  timed("walls"), timed("zones");
+  }
   h.pulses.forEach((p, k) => {
-    if (p.every < PULSE_EVERY.min || p.every > PULSE_EVERY.max || p.on < 1 || p.on > p.every - 1) {
-      out.push({ rule: "E7", severity: "error", text: `Pulse ${k + 1} is on for ${p.on} of every ${p.every} strokes: every ${PULSE_EVERY.min} to ${PULSE_EVERY.max}, on for 1 to every−1` });
+    const on = Array.from({ length: ROUND_STROKES }, (_, s) => (((s + p.phase) % p.every) + p.every) % p.every < p.on);
+    if (p.every < 2 || !on.includes(true) || !on.includes(false)) {
+      out.push(err("E7", `Pulse ${k + 1} (on for ${p.on} of every ${p.every} strokes) never ${on.includes(true) ? "goes" : "comes"} in a round's ${ROUND_STROKES} strokes`));
     }
   });
   return out;
 }
 
-/** What the hole counts against GG1's limits (pulses included), each with its limit. */
-export function counts(h: GHole) {
-  const zs = all<GZone>(h, "zones").map((z) => z.item), skins = new Set<string>();
-  for (const l of ["walls", "posts", "zones"] as const) for (const { item } of all<{ skin?: string }>(h, l)) skins.add(item.skin ?? "");
+/** What the hole counts against GG1's limits (pulses included), each with its limit: the gauges. */
+export function counts(h: HoleIn) {
+  const zs = each<ZoneIn>(h, "zone").map((z) => z.item), skins = new Set<string>();
+  for (const s of ["wall", "post", "zone"] as const) for (const { item } of each<{ skin?: string }>(h, s)) skins.add(item.skin ?? "");
   return {
-    walls: [all(h, "walls").length, LIMITS.walls],
-    posts: [all(h, "posts").length, LIMITS.posts],
+    walls: [each(h, "wall").length, LIMITS.walls],
+    posts: [each(h, "post").length, LIMITS.posts],
     zones: [zs.length, LIMITS.zones],
     points: [zs.reduce((n, z) => n + (z.poly?.length ?? 0), 0), LIMITS.polyTotal],
     pulses: [h.pulses.length, LIMITS.pulses],
@@ -155,22 +229,92 @@ export function counts(h: GHole) {
 }
 
 /** E8: the counts within GG1's limits, and each polygon within its own. */
-function limits(h: GHole): Issue[] {
+function limits(h: HoleIn, name: Namer): Issue[] {
   const out: Issue[] = [];
-  for (const [what, [n, max]] of Object.entries(counts(h))) {
-    if (n > max) out.push({ rule: "E8", severity: "error", text: `Too many ${what}: ${n} of ${max}` });
-  }
-  for (const { item, ref } of all<GZone>(h, "zones")) {
-    if (item.poly && item.poly.length > LIMITS.poly) out.push({ rule: "E8", severity: "error", text: `${named(ref, item.skin)} has ${item.poly.length} points: at most ${LIMITS.poly}`, piece: ref });
+  for (const [what, [n, max]] of Object.entries(counts(h))) if (n > max) out.push(err("E8", `Too many ${what}: ${n} of ${max}`));
+  for (const { item, ref } of each<ZoneIn>(h, "zone")) {
+    if (item.poly && item.poly.length > LIMITS.poly) out.push(err("E8", `${cap(name(ref))} has ${item.poly.length} points: at most ${LIMITS.poly}`, ref));
   }
   return out;
 }
 
-/** The editor's checks of a hole (E2, E3, E7, E8), errors first. */
-export function checkHole(h: GHole): Issue[] {
-  const lane = inLane(h);
-  const out = [...tee(h, lane), ...cup(h, lane), ...clocks(h), ...limits(h)];
-  return out.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
+/** Whether a ball from the tee gets within rad of a point (lane.ts reach). */
+export type Reaches = (p: V, rad?: number) => boolean;
+/** E10: a post or a zone (the draft's checks add bars) no ball from the tee gets near: outside the lane. */
+function inReach(h: HoleIn, reaches: Reaches, name: Namer): Issue[] {
+  const out: Issue[] = [], near = h.ballR + CELL;
+  for (const { item, ref } of each<PostIn>(h, "post")) if (!reaches(item.c, item.r + near)) out.push(err("E10", `${cap(name(ref))} at ${pt(item.c)} is outside the lane: no ball reaches it`, ref, item.c));
+  for (const { item, ref } of each<ZoneIn>(h, "zone")) {
+    if (item.outside) continue;
+    const c = centreOf(item), half = Math.max(item.max[0] - item.min[0], item.max[1] - item.min[1]) / 2;
+    if (!reaches(c, half + near)) out.push(err("E10", `${cap(name(ref))} at ${pt(c)} is outside the lane: no ball reaches it`, ref, c));
+  }
+  return out;
+}
+
+/** Whether segments a→b and c→d cross at a point inside both (meeting at an end is not crossing). */
+function crosses(a: V, b: V, c: V, d: V) {
+  const o = (p: V, q: V, r: V) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const d1 = o(c, d, a), d2 = o(c, d, b), d3 = o(a, b, c), d4 = o(a, b, d), e = 1e-9;
+  return ((d1 > e && d2 < -e) || (d1 < -e && d2 > e)) && ((d3 > e && d4 < -e) || (d3 < -e && d4 > e));
+}
+/** Whether two zones' boxes overlap with an area (touching edges do not). */
+const overlap = (a: ZoneIn, b: ZoneIn) => Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]) > 1e-9 && Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]) > 1e-9;
+/** A piece's palette entry as the checks read it (its overlaps), or none: a piece the builder did not place (an imported hole's composition) is not judged. */
+export type EntryOf = (r: PieceRef) => { overlaps?: readonly string[] } | undefined;
+type Judged = (r: PieceRef) => boolean;
+/** A piece's kind as overlaps names it: "wall", "post", or a zone's kind. */
+const kindOf = (h: HoleIn, r: PieceRef) => (r.set === "zone" ? (pieceOf(h, r) as ZoneIn).kind : r.set);
+
+/**
+ * E13: no two solid pieces in one another where the scene draws them badly:
+ * posts overlapping, a post on a wall, two walls crossing, a post in a zone
+ * that moves the ball, two zones of different kinds overlapping; unless the
+ * palette lets that pair meet (allow).
+ */
+function overlaps(h: HoleIn, name: Namer, entryOf: EntryOf): Issue[] {
+  const out: Issue[] = [], posts = each<PostIn>(h, "post"), walls = each<WallIn>(h, "wall"), zones = each<ZoneIn>(h, "zone");
+  const may = (a: PieceRef, b: PieceRef) => !!entryOf(a)?.overlaps?.includes(kindOf(h, b));
+  const say = (a: PieceRef, b: PieceRef, what: string, at: V) => {
+    if (!entryOf(a) || !entryOf(b) || may(a, b) || may(b, a)) return;
+    out.push(err("E13", `${cap(name(a))} ${what} ${name(b)} at ${pt(at)}`, a, at, [b]));
+  };
+  posts.forEach(({ item: p, ref }, k) => {
+    for (const { item: q, ref: r } of posts.slice(k + 1)) if (Math.hypot(p.c[0] - q.c[0], p.c[1] - q.c[1]) < p.r + q.r - 1e-9) say(ref, r, "overlaps", p.c);
+    for (const { item: w, ref: r } of walls) if (segDist(p.c[0], p.c[1], w.a, w.b) < p.r - 1e-9) say(ref, r, "stands on", p.c);
+    for (const { item: z, ref: r } of zones) if (moves(z) && inZone(shapeOf(z), p.c[0], p.c[1])) say(ref, r, "stands in", p.c);
+  });
+  zones.forEach(({ item: z, ref }, k) => {
+    for (const { item: y, ref: r } of zones.slice(k + 1)) if (z.kind !== y.kind && !z.outside && !y.outside && overlap(z, y)) say(ref, r, "lies over", z.min);
+  });
+  return out;
+}
+
+/** E15: no post (the draft's checks add bars) in the world's own scenery round the lane: inside the sea, the void, the rooftops (a zone of all its box but the lane). */
+function scenery(h: HoleIn, name: Namer): Issue[] {
+  const out: Issue[] = [], round = h.zones.filter((z) => z.outside && moves(z));
+  for (const { item: p, ref } of each<PostIn>(h, "post")) {
+    const z = round.find((q) => inZone(shapeOf(q), p.c[0], p.c[1]));
+    if (z) out.push(err("E15", `${cap(name(ref))} at ${pt(p.c)} stands in the ${z.skin || "hazard"} round the lane: the world draws over it`, ref, p.c));
+  }
+  return out;
+}
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * The hole's checks (E1 to E8, E10, E13 to E15), errors first. name says a
+ * piece; entryOf is the palette's view of each (by default every piece judged,
+ * none allowed to meet another): a piece with no entry is not the builder's
+ * to judge.
+ */
+export function checkHole(h: HoleIn, { name = nameIn(h), entryOf = () => ({}) }: { name?: Namer; entryOf?: EntryOf } = {}): Issue[] {
+  const lane = laneOf(h), judged: Judged = (r) => !!entryOf(r);
+  const ends = [...tee(h, lane, name, judged), ...cup(h, lane, name, judged)].filter((i) => !i.ref || judged(i.ref));
+  // (the way follows from its ends: with the tee or the cup refused, E4 would only say so again)
+  const out = [...board(h, name), ...ends, ...(ends.length ? [] : way(h, name)), ...mouths(h, name), ...exits(h, lane, name),
+    ...clocks(h, name), ...limits(h, name), ...(ends.length ? [] : inReach(h, reach(h, h.ballR - CELL * Math.SQRT1_2).reaches, name)), ...overlaps(h, name, entryOf), ...scenery(h, name)];
+  return out.filter((i) => !i.ref || judged(i.ref)).sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
 }
 
 /** A work gauge: what the hole uses of one of the realm's limits (0 to 1, past 1 refused). */
@@ -185,10 +329,10 @@ export interface Gauge {
  * dearest weather (refused past budget), and E11, a warning as either nears
  * its limit (each fixed wall costs every storm's puddle tries).
  */
-export function work(c: Cost): { shot: Gauge; storm: Gauge; issues: Issue[] } {
+export function work(c: Cost, warnAt = WORK_WARN): { shot: Gauge; storm: Gauge; issues: Issue[] } {
   const g = (used: number, of: number): Gauge => ({ used, of, share: used / of });
   const shot = g(c.bound, c.maxShot), storm = g(c.worst, c.budget), issues: Issue[] = [];
-  if (shot.share > WORK_WARN) issues.push({ rule: "E11", severity: "warning", text: `Its heaviest shot is ${Math.round(shot.share * 100)}% of what a transaction can replay` });
-  if (storm.share > WORK_WARN) issues.push({ rule: "E11", severity: "warning", text: `In its dearest weather, a first shot has ${c.room.toLocaleString("en")} units of room, at least ${c.minShot.toLocaleString("en")}` });
+  if (shot.share > warnAt) issues.push({ rule: "E11", severity: "warning", text: `Its heaviest shot is ${Math.round(shot.share * 100)}% of what a transaction can replay` });
+  if (storm.share > warnAt) issues.push({ rule: "E11", severity: "warning", text: `In its dearest weather, a first shot has ${c.room.toLocaleString("en")} units of room, at least ${c.minShot.toLocaleString("en")}` });
   return { shot, storm, issues };
 }

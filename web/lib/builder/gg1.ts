@@ -125,6 +125,17 @@ const sub = (a: V, d: V): V => [a[0] + d[0], a[1] + d[1]];
  * became (fit keeps their order), as the render census names them.
  */
 export function writeDraft(d: Draft, field: WriteField): { hex: string; bars: string; refs: Map<string, PieceRef[]> } {
+  const { hole, bars, refs } = draftHole(d, field);
+  return { hex: writeHole(hole), bars, refs };
+}
+
+/**
+ * The draft as GG1's pieces, and which pieces each draft piece became. A bar
+ * is four placeholders and fit's line for it, or, with corners, four walls
+ * round its corners near enough to judge without the wasm (a drag's every
+ * step; never stored: only fit's bytes are published).
+ */
+export function draftHole(d: Draft, field: WriteField, corners = false): { hole: HoleIn; bars: string; refs: Map<string, PieceRef[]> } {
   const lists = [{ walls: [] as WallIn[], posts: [] as PostIn[], zones: [] as ZoneIn[] }, ...d.pulses.map(() => ({ walls: [] as WallIn[], posts: [] as PostIn[], zones: [] as ZoneIn[] }))];
   const bars: string[] = [], refs = new Map<string, PieceRef[]>();
   for (const p of d.pieces as readonly DraftPiece[]) {
@@ -143,18 +154,26 @@ export function writeDraft(d: Draft, field: WriteField): { hex: string; bars: st
       if (g.t === "rail") to.walls.push({ a: g.a, b: g.b, bounce, skin, ...timing });
       else if (g.t === "bar") {
         bars.push(`${g.a[0]} ${g.a[1]} ${g.b[0]} ${g.b[1]} ${g.thick} ${to.walls.length} ${pulse}`);
-        for (let k = 0; k < 4; k++) to.walls.push({ a: g.a, b: g.b, bounce, skin, ...timing });
+        const c = barCorners(g.a, g.b, g.thick);
+        for (let k = 0; k < 4; k++) to.walls.push({ ...(corners ? { a: c[k], b: c[(k + 1) % 4] } : { a: g.a, b: g.b }), bounce, skin, ...timing });
       } else if (g.t === "post") to.posts.push({ c: g.c, r: g.r, bounce, skin });
       else to.zones.push(zoneOf(kind, skin, g, p, d.tee, timing));
     }
   }
   const [field0, ...pulses] = lists;
-  const hex = writeHole({
+  const hole: HoleIn = {
     w: BOARD, h: BOARD, title: d.title, par: d.par, tee: d.tee, pin: d.pin, world: d.world, order: field.order ?? 0,
     substeps: field.substeps, cupR: field.cupR, shelter: field.shelter, friction: field.friction, bounce: field.bounce, ballR: field.ballR,
     ...field0, pulses: d.pulses.map((q, i) => ({ ...q, ...pulses[i] })),
-  });
-  return { hex, bars: bars.join("\n"), refs };
+  };
+  return { hole, bars: bars.join("\n"), refs };
+}
+
+/** A bar's four corners, near enough for a check (fit stores build.Bar's own): its axis a→b, thick wide, its caps out by half that. */
+export function barCorners(a: V, b: V, thick: number): V[] {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, h = thick / 2;
+  const n: V = [(-dy / l) * h, (dx / l) * h], e: V = [(dx / l) * h, (dy / l) * h];
+  return [[a[0] - e[0] + n[0], a[1] - e[1] + n[1]], [b[0] + e[0] + n[0], b[1] + e[1] + n[1]], [b[0] + e[0] - n[0], b[1] + e[1] - n[1]], [a[0] - e[0] - n[0], a[1] - e[1] - n[1]]];
 }
 
 function zoneOf(kind: string, skin: string, g: Exclude<Geometry, { t: "rail" | "bar" | "post" }>, p: Piece, tee: V, timing: object): ZoneIn {
