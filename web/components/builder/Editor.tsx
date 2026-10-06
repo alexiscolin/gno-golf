@@ -31,7 +31,6 @@ import Preview from "./Preview";
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
 /** The id the 3D's hole is loaded under in the builder's wasm. */
-const PREVIEW_ID = "preview/v1";
 const WORLDS = Object.keys(FIELD);
 
 export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish }: {
@@ -82,14 +81,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   useEffect(() => {
     if (!full) return;
     const t = setTimeout(() => {
-      const v = validate(kept, full);
-      let state: Hole | null = null;
-      if (v.hex) {
-        host.load(PREVIEW_ID, v.hex);
-        host.setperiod(1);
-        try { state = JSON.parse(host.state(PREVIEW_ID)) as Hole; } catch { state = null; }
-      }
-      setChecked({ of: kept, v, state });
+      const v = validate(kept, full); // (its state, read for the census, is what the preview draws)
+      setChecked({ of: kept, v, state: v.state ?? null });
       void proofKey(kept, host).then((k) => setKey({ of: kept, key: k }));
     }, CHECK_MS);
     return () => clearTimeout(t);

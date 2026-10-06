@@ -10,12 +10,13 @@ import { commonShift, gauges, groupsOf, offAtLimit, testGate, verdict } from "..
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
-import { validate } from "../lib/builder/pipeline.ts";
+import { DRAFT_ID, validate } from "../lib/builder/pipeline.ts";
 import type { Issue } from "../lib/builder/checks.ts";
 
 const garden = await loadPalette("garden");
 const entry = (id: string) => garden.find((e) => e.id === id)!;
 const err = (rule: Issue["rule"]): Issue => ({ rule, severity: "error", text: "x" });
+const stateAt1 = (hex: string) => (host.load(DRAFT_ID, hex), host.setperiod(1), JSON.parse(host.state(DRAFT_ID)) as unknown);
 
 void test("verdict: what to fix first, then ready to test, then proved", () => {
   assert.deepEqual(verdict({ pieces: 0, errors: 0, proved: false }), { ok: false, text: "Place pieces between the tee and the cup" });
@@ -69,6 +70,15 @@ void test("groupsOf: the palette by kind, in the editor's order, each group's en
   assert.deepEqual(g.map((x) => x.name), ["Walls", "Posts", "Ground", "Hazards", "Hills", "Jumps"].filter((n) => g.some((x) => x.name === n)));
   assert.ok(g.every((x) => x.entries.length > 0));
   assert.equal(g.reduce((n, x) => n + x.entries.length, 0), garden.length, "every entry once");
+});
+
+void test("a full check hands back the hole as players get it (the census's HoleState): the 3D preview draws it, no second load", async () => {
+  const { census } = await import("../lib/builder/drawn.ts");
+  const d = lane("garden", [placePiece(entry("*/post/rock"), "x", [12, 4])]);
+  const v = validate(d, { host, palette: garden, census });
+  assert.ok(v.state, "the state the census read");
+  assert.deepEqual(v.state, stateAt1(v.hex!), "the realm's HoleState of those bytes, at the period the preview shows");
+  assert.equal(validate(d, { host, palette: garden }).state, undefined, "a quick check reads none");
 });
 
 void test("testGate: Test opens only on a check of the draft as kept now (an older check's verdict never opens it)", () => {

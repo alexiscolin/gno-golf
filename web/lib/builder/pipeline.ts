@@ -38,6 +38,8 @@ export interface Validated {
   hole?: GHole;
   cost?: Cost;
   refs: Map<string, PieceRef[]>;
+  /** the hole as players get it (the realm's HoleState of the bytes, at period 1): read for the census, drawn by the preview */
+  state?: Hole;
 }
 
 /** The realm's maxData: a version's data at most. */
@@ -204,10 +206,12 @@ export function validate(draft: Draft, o: ValidateOptions): Validated {
     const k = `${i.rule} ${piece} ${i.text}`;
     if (!seen.has(k)) seen.add(k), issues.push({ ...i, ...(piece && { piece }) });
   }
+  let state: Hole | undefined;
   if (o.census) {
     host.load(DRAFT_ID, f.hex);
     host.setperiod(1);
-    issues.push(...drawnAs(d, refs, palette, o.census(JSON.parse(host.state(DRAFT_ID)) as Hole)));
+    state = JSON.parse(host.state(DRAFT_ID)) as Hole;
+    issues.push(...drawnAs(d, refs, palette, o.census(state)));
   }
   const bytes = f.hex.length / 2;
   if (bytes > (o.maxBytes ?? MAX_BYTES)) issues.push(err("E9", `The hole is ${bytes} bytes of data: at most ${o.maxBytes ?? MAX_BYTES}`));
@@ -218,7 +222,7 @@ export function validate(draft: Draft, o: ValidateOptions): Validated {
     issues.push(...w.issues);
   }
   issues.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
-  return { issues, hex: f.hex, hole: h, ...(c.ok && { cost: c.cost }), refs };
+  return { issues, hex: f.hex, hole: h, ...(c.ok && { cost: c.cost }), refs, ...(state && { state }) };
 }
 
 /** Whether an issue is about a draft piece: named for it, or for another piece it meets (also). */
@@ -229,4 +233,5 @@ export function about(i: Issue, id: string, refs: Map<string, PieceRef[]>): bool
 }
 
 /** The id a draft is shown under in the builder's own wasm (its test mode has its real one). */
-const DRAFT_ID = "draft/v1";
+/** The id a full check loads the draft under (its census, its state). */
+export const DRAFT_ID = "draft/v1";
