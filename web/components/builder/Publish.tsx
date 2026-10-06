@@ -24,6 +24,7 @@ import { loadPalette } from "@/lib/builder/palette";
 import { proofKey, provedAs, shaOf } from "@/lib/builder/proof";
 import { holeId, holeRow } from "@/lib/builder/testmode";
 import { ISSUES } from "@/lib/site";
+import { loadTakedown, takenDown } from "@/lib/takedown";
 import { sameSources } from "@/lib/sim/sources";
 import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost, Cost } from "@/lib/builder/wasm";
@@ -50,7 +51,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const { rpc, web } = useMemo(() => endpoints(window.location.search), []);
   const chain = useMemo(() => makeChain({ rpc, web }), [rpc, web]);
   const alias = `${author}/${draft.slug}`;
-  const [readings, setReadings] = useState<Readings>({ publishing: undefined, rules: undefined, writer: undefined, versions: undefined, hole: undefined, name: "" });
+  const [readings, setReadings] = useState<Readings>({ publishing: undefined, rules: undefined, writer: undefined, taken: undefined, versions: undefined, hole: undefined, name: "" });
   const [prices, setPrices] = useState({ gas: PRICE, byte: 100 });
   const [chainId, setChainId] = useState<string | null>(null);
   const [key, setKey] = useState<string | null>(null);
@@ -74,13 +75,14 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   // the chain's state (read again on "Try again": a read that fails is said, never waited on); the proofs on the final data, and its sha, as it changes
   const [tries, setTries] = useState(0);
   useEffect(() => {
-    setReadings((r) => ({ ...r, publishing: undefined, rules: undefined, writer: undefined, versions: undefined }));
+    setReadings((r) => ({ ...r, publishing: undefined, rules: undefined, writer: undefined, taken: undefined, versions: undefined }));
     void Promise.all([
       chain.publishing().catch(() => null),
       Promise.all([chain.successor(), sameSources(chain, host.sources(), "builder")]).then(([s, same]) => same && s === "", () => null),
       chain.writer().catch(() => null),
+      loadTakedown(chain).then((t) => takenDown(t, alias), () => null),
       chain.versions(alias).catch(() => null),
-    ]).then(([publishing, rules, writer, versions]) => live.current && setReadings((r) => ({ ...r, publishing, rules, writer, versions })));
+    ]).then(([publishing, rules, writer, taken, versions]) => live.current && setReadings((r) => ({ ...r, publishing, rules, writer, taken, versions })));
     void chain.gasPrice().then((gas) => live.current && setPrices((p) => ({ ...p, gas })), () => {});
     void chain.storagePrice().then((byte) => live.current && setPrices((p) => ({ ...p, byte })), () => {});
     void chain.chainId().then((c) => live.current && setChainId(c), () => {});

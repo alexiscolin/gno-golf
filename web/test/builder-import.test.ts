@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { host, lane } from "./builder-fixture.ts";
+import { hexOf, host, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import { draftFile, fromFile, fromPublished } from "../lib/builder/importing.ts";
 import { exportDraft } from "../lib/builder/draft.ts";
@@ -35,6 +35,14 @@ void test("fromPublished: a hole the Builder published opens as a draft (its slu
   assert.equal(typeof mine !== "string" && mine.slug, "mole-run", "your own hole: its next version");
   const byHand = await fromPublished(holes.get("garden/6")!, host, "garden/6/v1", A);
   assert.match(typeof byHand === "string" ? byHand : "", /off the grid/, "a course hole written by hand: not on the Builder's grid");
+});
+
+void test("fromPublished: a hole the site took down never opens in the Builder (nor comes back as a new version), its data not even read", async () => {
+  const hex = hexOf(lane("garden", []));
+  const taken = new Set([`${B}/rude`]);
+  for (const id of [`${B}/rude/v1`, `${B}/rude/v3`, `${B}/rude`]) assert.equal(await fromPublished(hex, host, id, A, taken), "This hole was taken down: it cannot be opened in the Builder.", id);
+  assert.equal(await fromPublished("zz", host, `${B}/rude/v1`, A, taken), "This hole was taken down: it cannot be opened in the Builder.", "said before the data is decoded");
+  assert.equal(typeof (await fromPublished(hex, host, `${B}/other/v1`, A, taken)), "object");
 });
 
 void test("fromPublished: a hole with pieces the Builder does not make is refused, naming them", async () => {

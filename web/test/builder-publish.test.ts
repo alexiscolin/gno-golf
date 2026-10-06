@@ -80,7 +80,7 @@ void test("the note comes out of the gnokey command unchanged", () => {
 
 const A = "g1" + "a".repeat(38);
 const ver = (v: number, sha = "old") => ({ id: `${A}/lane/v${v}`, v, height: 1, by: A, sha, note: "", next: "" });
-const ready = { publishing: true, rules: true, versions: { version: 1, slot: `${A}/lane`, versions: [ver(1)] }, writer: "gno.land/r/gnogolf/golf/v2", hole: "", name: "" };
+const ready = { publishing: true, rules: true, versions: { version: 1, slot: `${A}/lane`, versions: [ver(1)] }, writer: "gno.land/r/gnogolf/golf/v2", taken: false, hole: "", name: "" };
 const at = { author: A, slug: "lane", proved: `${A}/lane/v2`, sha: "new", realm: "gno.land/r/gnogolf/golf/v2" };
 
 void test("publishSteps: open once every check holds; else the first that does not, in words", () => {
@@ -96,6 +96,9 @@ void test("publishSteps: open once every check holds; else the first that does n
   assert.deepEqual(publishSteps({ ...ready, writer: "gno.land/r/gnogolf/golf/v3" }, at), { at: "rules", why: "New rules play this course now. Your draft is kept: reload the page once the site has caught up." });
   assert.equal(publishSteps({ ...ready, writer: null }, at).at, "unread");
   assert.equal(publishSteps({ ...ready, writer: undefined }, at).at, "reading");
+  // a hole the site took down: never published again (its next version would be down too, its fee spent for nothing)
+  assert.deepEqual(publishSteps({ ...ready, taken: true }, at), { at: "taken", why: "This hole was taken down: it cannot be published again." });
+  assert.equal(publishSteps({ ...ready, taken: undefined }, at).at, "reading");
   const newer = publishSteps({ ...ready, versions: { ...ready.versions, versions: [ver(1), ver(2)] } }, at);
   assert.deepEqual(newer, { at: "newer", why: "This one would be v3, with new weather: test it again." }, "a version published elsewhere since: its proofs are another id's");
   assert.deepEqual(publishSteps(ready, { ...at, sha: "old" }), { at: "same", why: "This is exactly the version already published." });

@@ -12,6 +12,7 @@ import { BackButton } from "@/components/About";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import { exportDraft, loadDrafts, saveDrafts, type Draft } from "@/lib/builder/draft";
 import { draftFile, fromFile, fromPublished } from "@/lib/builder/importing";
+import { loadTakedown } from "@/lib/takedown";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
 import { endpoints, knownAuthor } from "@/lib/builder/holes";
@@ -59,8 +60,10 @@ function Drafts({ host, author, drafts, onOpen, onAdd, onDelete }: {
     if (!isHoleId(id)) return setWhy("A hole's address is like g1…/its-name, or g1…/its-name/v2.");
     setBusy(true);
     const { rpc, web } = endpoints(window.location.search);
-    void makeChain({ rpc, web }).holeData(id)
-      .then((hex) => fromPublished(hex, host, id, author), () => "The chain has no hole there, or could not be read.")
+    const chain = makeChain({ rpc, web });
+    // the site's takedown list too: a hole taken down never opens (the list unread, nothing does)
+    void Promise.all([chain.holeData(id), loadTakedown(chain)])
+      .then(([hex, taken]) => fromPublished(hex, host, id, author, taken), () => "The chain has no hole there, or could not be read.")
       .then(take)
       .finally(() => setBusy(false));
   };

@@ -13,6 +13,7 @@ import { validate, type ValidateOptions } from "./pipeline";
 import { FIELD, notABuilderWorld } from "./rules";
 import { parseDraft, type Draft } from "./draft";
 import type { BuilderHost } from "./wasm";
+import { takenDown } from "../takedown";
 
 /** A draft from a file's text, or why not. */
 export async function fromFile(text: string): Promise<Draft | string> {
@@ -52,7 +53,9 @@ export async function asDraft(hex: string, host: BuilderHost, census?: ValidateO
  * when the hole is me's (the slug its alias's), a new hole otherwise; or why
  * not (asDraft: the Builder opens only what it can vouch for).
  */
-export async function fromPublished(hex: string, host: BuilderHost, id: string, me: string | null): Promise<Draft | string> {
+export async function fromPublished(hex: string, host: BuilderHost, id: string, me: string | null, taken: ReadonlySet<string> = new Set()): Promise<Draft | string> {
+  // a hole the site took down (takedown.ts): never opened, nor published again as its next version
+  if (takenDown(taken, id)) return "This hole was taken down: it cannot be opened in the Builder.";
   const r = await asDraft(hex, host);
   if (typeof r === "string") return r;
   const [author, slug] = id.split("/");
