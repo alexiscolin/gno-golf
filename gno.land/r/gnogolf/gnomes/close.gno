@@ -10,10 +10,9 @@ import (
 // genesis is published, and may bring it forward, never push it back: a
 // buyer can count on the date announced, and on no gnome of the genesis
 // being sold after it. From that block on, its unsold gnomes are closed for
-// good: Buy, AddWave and StartAuction refuse them, and the genesis's final
-// supply is what was sold (Collection's "sold"). An auction under way at
-// the close runs to its end and settles. A later series is not closed by
-// it, and earned gnomes never are. 0 is no date set.
+// good: Buy and AddWave refuse them, and the genesis's final supply is what
+// was sold (Collection's "sold"). A later series is not closed by it, and
+// earned gnomes never are. 0 is no date set.
 var closeAt int64
 
 // CloseAt is the genesis sale's closing date (unix seconds, block time), 0
@@ -45,11 +44,9 @@ func SetCloseAt(cur realm, at int64) {
 // block on.
 func genesisClosed() bool { return closeAt != 0 && now() >= closeAt }
 
-// isClosed reports whether gnome id was left unsold by a closed sale. A
-// Legendary in its auction, under way or ended and not settled, is not: it
-// may still sell.
+// isClosed reports whether gnome id was left unsold by a closed sale.
 func isClosed(id int64) bool {
-	return genesisClosed() && seriesAt(id) == 0 && !isSold(id) && (auc == nil || auc.id != id)
+	return genesisClosed() && seriesAt(id) == 0 && !isSold(id)
 }
 
 // assertNotClosed panics when id's sale has closed.

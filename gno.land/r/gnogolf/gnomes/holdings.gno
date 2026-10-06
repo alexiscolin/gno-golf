@@ -25,6 +25,8 @@ const errBound = "gnomes: an earned gnome is bound to its player: it cannot be t
 
 func (holdings) ExtensionKind() string { return "gnomes" }
 
+// (a mint's byBest row is written by mintTo and MintEarned, which hold the
+// gnome already: looking its row up again here would cost a parse a mint)
 func (holdings) OnMint(to address, tid grc721.TokenID) {
 	held.Set(heldKey(to, parseID(string(tid))), "")
 }
@@ -36,6 +38,10 @@ func (holdings) OnTransfer(from, to address, tid grc721.TokenID) {
 	}
 	held.Remove(heldKey(from, id))
 	held.Set(heldKey(to, id), "")
+	if g, ok := tokenAt(id); ok {
+		byBest.Remove(bestKey(from, g))
+		byBest.Set(bestKey(to, g), "")
+	}
 	unequip(from, string(tid))
 }
 
@@ -49,8 +55,7 @@ func heldKey(holder address, id int64) string {
 
 // heldPage is up to n of holder's ids from offset, in id order, and whether
 // more follow. It walks the holder's own rows only, from their first: a
-// holder has their caps, the auctions they won, their earned gnomes and
-// what they were sent.
+// holder has their caps, their earned gnomes and what they were sent.
 func heldPage(holder address, offset int64, n int) ([]int64, bool) {
 	var ids []int64
 	more, i := false, int64(0)

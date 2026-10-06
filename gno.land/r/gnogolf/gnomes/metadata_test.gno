@@ -65,6 +65,14 @@ func TestAnEarnedTokensMetadataNamesItsKind(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(md, `"name":"The Viking"`), md)
 	uassert.True(t, strings.Contains(md, `{"trait_type":"Kind","value":"viking"}`), md)
 	uassert.True(t, strings.Contains(md, `"description":"The Viking, earned in play: Garden Cup at par or under. Bound to its player, cosmetic only."`), md)
+	uassert.False(t, strings.Contains(md, "external_url"), "no site set")
+
+	// an earned gnome's page is its kind's (the site builds one per kind, not
+	// per earned id, which has no bound)
+	testing.SetRealm(asUser(deployer, nil))
+	SetSiteURL(cross(cur), "https://golf.example.org/")
+	md, _ = TokenMetadata(id)
+	uassert.True(t, strings.Contains(md, `"external_url":"https://golf.example.org/g/viking/"`), md)
 	uri, err := TokenURI(id)
 	urequire.NoError(t, err)
 	uassert.True(t, strings.HasPrefix(uri, svgDataPrefix))

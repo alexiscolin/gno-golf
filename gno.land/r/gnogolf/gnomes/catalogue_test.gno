@@ -54,7 +54,7 @@ func TestALaterDropContinuesTheIDs(cur realm, t *testing.T) {
 	g := mustGnome(721)
 	uassert.Equal(t, "winter-2027", g.series)
 	uassert.Equal(t, 0, g.tier, "the drop's first row is common")
-	uassert.Equal(t, auctionTier, mustGnome(726).tier, "its last is legendary")
+	uassert.Equal(t, legendaryTier, mustGnome(726).tier, "its last is legendary")
 
 	testing.SetRealm(asUser(alice, ugnot(tiers[0].price)))
 	urequire.AbortsContains(t, cur, "not on sale", func() { Buy(cross(cur), "721") })
