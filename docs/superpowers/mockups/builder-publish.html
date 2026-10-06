@@ -6,70 +6,94 @@
 <title>Publishing a hole · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
 <link rel="stylesheet" href="builder.css">
-<!-- Publishing, a sheet over the editor: name it, see the cost, sign. The chain's checks run on their own
-     and show only when one fails. states: ?state=name (default) | refused (the name looks like a link)
-     | cost | newer (a newer version published elsewhere) | closed (publishing not open) | pending | done -->
+<!-- Publish (step 3 of 3): the hole as players will see it on the left; on the right its name, its
+     line, the cost before any signature, and one action: Publish in Adena (or gnokey). The chain's checks
+     run on their own and show only when one fails.
+     states: ?state=form (default) | refused (the name looks like a link) | newer (a version published elsewhere)
+     | closed (publishing not open) | pending | done (published: play it for real, share the dare) -->
 <style>
-  body { overflow: hidden; height: 100vh; }
-  .behind { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
-  .sheet__in { max-width: 460px; display: grid; gap: var(--sp-4); }
-  .sheet__in > :not(.sheet__foot) { margin: 0; }
-  .steps2 { display: flex; gap: var(--sp-2); font-size: 13px; font-weight: 700; color: var(--ink-soft); }
-  .steps2 b { color: var(--ink); }
-  .lbl span { display: flex; justify-content: space-between; }
-  textarea.field { height: 76px; padding-top: 10px; resize: none; }
+  .pub { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); gap: var(--sp-5); }
+  .pub__see { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--sp-3); }
+  .pub__see .shot { position: relative; min-height: 0; border: var(--edge-bold); border-radius: var(--r-card); overflow: hidden; background: url(img/play-garden3.jpg) center / cover; }
+  .pub__see .shot iframe { position: absolute; left: 0; top: 0; width: 1200px; height: 630px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .listcard { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--sp-3); align-items: center; padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-2); border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); }
+  .listcard .mini { position: relative; height: 52px; border-radius: 10px; overflow: hidden; background: #5c9a78; border: var(--edge); }
+  .listcard b { display: block; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listcard small { display: block; font-size: 14px; color: var(--ink-soft); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* the form: a panel that scrolls inside itself, its action pinned at its foot */
+  .form { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; border: var(--edge); border-radius: var(--r-card); background: var(--paper); overflow: hidden; }
+  .form__body { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-4); padding: var(--sp-5); }
+  .form__body > * { margin: 0; }
+  .form__foot { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-5) var(--sp-4); border-top: var(--rule); }
+  .form__foot .btn { margin: 0; min-height: 52px; font-size: 17px; font-weight: 700; }
+  .form h2 { margin: 0; font-size: 24px; }
+  .lbl > span:first-child { display: flex; justify-content: space-between; }
+  textarea.field { height: 72px; padding-top: 10px; resize: none; }
+  .slug { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: var(--info-edge); border-radius: 12px; background: var(--info-bg); font-size: 14px; }
+  .slug b { font-weight: 700; }
   .bill { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 15px; align-items: baseline; }
   .bill b { text-align: right; }
   .bill .bill__total { padding-top: var(--sp-2); border-top: var(--rule); font-size: 17px; }
   .bill b.bill__total { font-size: 20px; }
-  .shot { position: relative; aspect-ratio: 1200 / 630; border: var(--edge); border-radius: 14px; overflow: hidden; }
-  .shot iframe { position: absolute; left: 0; top: 0; width: 1200px; height: 630px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .done { grid-column: 1 / -1; min-height: 0; overflow: auto; display: grid; place-items: center; }
+  .done__in { width: min(640px, 100%); display: grid; gap: var(--sp-4); text-align: center; }
+  .done__in h2 { margin: 0; font-size: 40px; --ink-w: 6px; --ink-drop: 4px; }
+  .done__in .shot { position: relative; aspect-ratio: 1200 / 630; border: var(--edge-bold); border-radius: var(--r-card); overflow: hidden; }
+  .done__in .shot iframe { position: absolute; left: 0; top: 0; width: 1200px; height: 630px; border: 0; transform-origin: 0 0; pointer-events: none; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
-  .row2 .btn { min-height: 52px; margin: 0; }
-  .center { text-align: center; justify-items: center; }
-  .hop { width: 180px; height: 110px; position: relative; border: var(--edge-bold); border-radius: 14px; overflow: hidden; background: #5c9a78; animation: hop .7s ease-in-out infinite alternate; }
-  @keyframes hop { to { transform: translateY(-12px); } }
+  .row2 .btn { margin: 0; min-height: 52px; }
 </style>
 </head>
 <body>
-<iframe class="behind" src="builder-editor.html?state=proved" title="The editor, behind the sheet" aria-hidden="true" tabindex="-1"></iframe>
-<div class="sheet" id="app"></div>
+<div id="app"></div>
 <script src="kit.js"></script>
 <script src="builder.js"></script>
 <script>
   if (matchMedia("(max-width: 899px), (pointer: coarse)").matches) location.replace("builder-phone.html");
   const { ICON, state } = Kit;
-  const { holeSVG } = Builder;
-  const s = state("name");
-  const step = (n) => `<p class="steps2" aria-label="Step ${n} of 2"><span>${n === 1 ? "<b>1 · Name</b>" : "1 · Name ✓"}</span><span>·</span><span>${n === 2 ? "<b>2 · Publish</b>" : "2 · Publish"}</span></p>`;
-  const close = `<button class="round round--small sheet__close" aria-label="Close: the draft stays">${ICON.close}</button>`;
-  const foot = (b) => `<div class="sheet__foot">${b}</div>`;
-  const name = (bad) => `${step(1)}<h2>Name it</h2>
-    <label class="lbl"><span>Name <span class="count">${bad ? "10" : "8"} / 40</span></span><input class="field${bad ? " field--bad" : ""}" value="${bad ? "St.Andrews" : "Mole Run"}"></label>
-    ${bad ? `<p class="note note--bad">Looks like a web address. Try "St. Andrews".</p>` : ""}
-    <label class="lbl"><span>A line for players <span class="count">29 / 140</span></span><textarea class="field">Mind the gate, and the moles.</textarea></label>
-    ${foot(`<button class="btn btn--main btn--wide"${bad ? " disabled" : ""}>Next</button>`)}`;
+  const { holeSVG, header } = Builder;
+  const s = state("form");
+  const bad = s === "refused";
   const gnokey = `<details class="more"><summary>Publish with gnokey instead</summary><div><code class="code">gnokey maketx call -pkgpath "gno.land/r/gnogolf/golf/v2" -func "PublishMine" -args "mole-run" -args "4747310001…" -args "Mind the gate, and the moles." -gas-fee 1500000ugnot -gas-wanted 205000000 -broadcast -chainid gnoland-1 -remote https://rpc.gno.land:443 my-key</code>
     <button class="btn btn--main btn--s" style="margin-top:8px">Copy</button></div></details>`;
-
-  const body = {
-    name: name(false),
-    refused: name(true),
-    cost: `${step(2)}<h2>Publish Mole Run</h2>
-      <div class="bill" aria-label="The bill"><span>Storage deposit</span><b>≈ 0.89 GNOT</b><span>Network fee</span><b>≈ 0.31 GNOT</b><span class="bill__total">At most</span><b class="bill__total">1.20 GNOT</b></div>
-      <p class="fine">The chain's price for keeping and checking the hole. Nothing goes to the game.</p>${gnokey}
-      ${foot(`<button class="btn btn--chain btn--wide">Publish in Adena · 1.20 GNOT</button>`)}`,
-    newer: `${step(2)}<h2>Publish Mole Run</h2><p class="note note--warn">A v2 was published elsewhere. This one would be v3, with new weather: test it again (free).</p>
-      ${foot(`<button class="btn btn--gold btn--wide">${ICON.play} Test again</button>`)}`,
-    closed: `<h2>Not open yet</h2><p class="lead">Publishing isn't open on gno.land yet. Your draft is kept.</p>
-      ${foot(`<button class="btn btn--main btn--wide">Back to the editor</button>`)}`,
-    pending: `<div class="center" style="display:grid;gap:var(--sp-4)"><div class="hop">${holeSVG({ small: true })}</div><h2 style="font-size:24px">Sign in Adena…</h2></div>`,
-    done: `<h2>Mole Run is on gno.land!</h2>
-      <div class="shot"><iframe src="share-card.html?state=hole" title="The hole's share card" tabindex="-1" aria-hidden="true"></iframe></div>
-      <p class="lead">Play it for real: your best becomes the ghost your friends race.</p>
-      ${foot(`<div class="row2"><button class="btn btn--gold">${ICON.play} Play it for real</button><a class="btn btn--ghost" href="share.html?state=published">${ICON.more} Share the hole</a></div>`)}`,
+  const action = {
+    form: `<button class="btn btn--chain">Publish in Adena · 1.20 GNOT</button>`,
+    refused: `<button class="btn btn--chain" disabled>Publish in Adena · 1.20 GNOT</button>`,
+    newer: `<button class="btn btn--gold">${ICON.play} Test again (free)</button>`,
+    closed: `<button class="btn btn--ghost">Back to edit</button>`,
+    pending: `<button class="btn btn--chain" disabled>Sign in Adena…</button>`,
   }[s];
-  document.getElementById("app").innerHTML = `<div class="sheet__in" role="dialog" aria-modal="true" aria-label="Publish Mole Run">${s === "pending" ? "" : close}${body}</div>`;
+  const note = {
+    refused: `<p class="note note--bad">Looks like a web address. Try "St. Andrews".</p>`,
+    newer: `<p class="note note--warn">A v2 was published elsewhere. This one would be v3, with new weather: test it again.</p>`,
+    closed: `<p class="note note--warn">Publishing isn't open on gno.land yet. Your draft is kept.</p>`,
+    pending: `<p class="note note--good">Check the window Adena opened, and sign there.</p>`,
+  }[s] || "";
+
+  const form = `<section class="pub">
+      <div class="pub__see"><div class="shot" role="img" aria-label="The hole in 3D"></div>
+        <div class="listcard"><span class="mini">${holeSVG({ small: true })}</span><span><b>${bad ? "St.Andrews" : "Mole Run"}</b><small>by nym-twee · Garden · par 5</small></span></div></div>
+      <div class="form">
+        <div class="form__body">
+          <h2>Publish your hole</h2>
+          <label class="lbl"><span>Name <span class="count">${bad ? 10 : 8} / 40</span></span><input class="field${bad ? " field--bad" : ""}" value="${bad ? "St.Andrews" : "Mole Run"}"></label>
+          <div class="slug"><span>Address <b class="mono">nym-twee/mole-run/v1</b></span><span class="fine" style="margin:0">Fixed at the test</span></div>
+          <label class="lbl"><span>A line for players <span class="count">29 / 140</span></span><textarea class="field">Mind the gate, and the moles.</textarea></label>
+          <div class="bill" aria-label="The cost, before any signature"><span>Storage deposit</span><b>≈ 0.89 GNOT</b><span>Network fee</span><b>≈ 0.31 GNOT</b><span class="bill__total">At most</span><b class="bill__total">1.20 GNOT</b></div>
+          <p class="fine">The chain's price for keeping and checking the hole. Nothing goes to the game.</p>
+          ${note}
+          ${gnokey}
+        </div>
+        <div class="form__foot">${action}</div>
+      </div>
+    </section>`;
+  const done = `<section class="done"><div class="done__in"><span class="eyebrow">nym-twee/mole-run/v1 · Garden · par 5</span><h2 class="inked">Mole Run is on gno.land!</h2>
+      <div class="shot"><iframe src="share-card.html?state=hole" title="The hole's share card" tabindex="-1" aria-hidden="true"></iframe></div>
+      <p class="lead" style="margin:0">Play it for real: your best becomes the ghost your friends race.</p>
+      <div class="row2"><button class="btn btn--gold">${ICON.play} Play it for real</button><a class="btn btn--ghost" href="share.html?state=published">${ICON.more} Share the dare</a></div></div></section>`;
+
+  document.getElementById("app").innerHTML = `<main class="bench bench--wide tint--garden">${header({ mode: "publish", proved: true })}${s === "done" ? done : form}</main>`;
+  if (s !== "done") document.querySelector(".shot").style.backgroundImage = "url(img/play-garden3.jpg)";
   const fit = () => document.querySelectorAll(".shot iframe").forEach((f) => (f.style.transform = `scale(${f.parentElement.clientWidth / 1200})`));
   fit(); addEventListener("resize", fit);
 </script>

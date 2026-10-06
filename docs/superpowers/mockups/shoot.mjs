@@ -24,12 +24,17 @@ const DESK = /** @type {Size} */ ({ width: 1440, height: 900, scale: 1, mobile: 
 const PHONE = /** @type {Size} */ ({ width: 390, height: 844, scale: 2, mobile: true, tag: "phone" });
 const CARD = /** @type {Size} */ ({ width: 1200, height: 630, scale: 1, mobile: false });
 const SQUARE = /** @type {Size} */ ({ width: 1080, height: 1080, scale: 1, mobile: false });
+/** a 13" laptop and a small one: the Builder's own sizes */
+const MID = /** @type {Size} */ ({ width: 1280, height: 800, scale: 1, mobile: false, tag: "1280" });
+const LAPTOP = /** @type {Size} */ ({ width: 1024, height: 700, scale: 1, mobile: false, tag: "1024" });
 /** the widths every state is audited at */
 const AUDIT = [320, 390, 768, 1280];
+/** the Builder's computer screens: never under 900 px (a phone gets builder-phone.html) */
+const DESKTOP = [1024, 1280, 1440];
 /** @typedef {[string, Size]} Shot a state ("" the page's default) and a size */
 
 /** the pages, in the spec's order (docs/superpowers/specs/2026-10-06-gui-design.md); audit: false for a picture, not a screen */
-const PAGES = /** @type {{ page: string, title: string, shots: Shot[], audit?: boolean }[]} */ ([
+const PAGES = /** @type {{ page: string, title: string, shots: Shot[], audit?: boolean, widths?: number[] }[]} */ ([
   { page: "gnomes-gallery", title: "A1 · The gallery", shots: [["", DESK], ["", PHONE], ["teaser", DESK], ["players", DESK], ["soldout", DESK], ["closed", DESK], ["closed", PHONE], ["loading", DESK], ["empty", DESK], ["error", DESK]] },
   { page: "gnome-detail", title: "A2 · A gnome's page", shots: [["", DESK], ["", PHONE], ["nowallet", DESK], ["locked", DESK], ["cap", DESK], ["mine", DESK], ["taken", DESK], ["later", PHONE], ["nevermade", DESK]] },
   { page: "gnome-buy", title: "A3 · Buying", shots: [["", DESK], ["", PHONE], ["connect", DESK], ["nowallet", DESK], ["elsewhere", PHONE], ["network", DESK], ["short", DESK], ["pending", DESK], ["reading", DESK], ["success", DESK], ["success", PHONE], ["taken", DESK], ["cancelled", DESK], ["unsure", DESK]] },
@@ -39,11 +44,11 @@ const PAGES = /** @type {{ page: string, title: string, shots: Shot[], audit?: b
   { page: "gnome-places", title: "A7 · Where the gnomes show in play", shots: [["", DESK]], audit: false },
   { page: "share", title: "A8 · Share moments", shots: [["", DESK], ["", PHONE], ["equipped", DESK], ["bidding", DESK], ["won", PHONE], ["team", DESK], ["published", DESK], ["clip", DESK]] },
   { page: "share-card", title: "A8 · Share cards", shots: [["", CARD], ["square", SQUARE], ["auction", CARD], ["reveal", CARD], ["team", CARD], ["hole", CARD]], audit: false },
-  { page: "builder-editor", title: "B1 · The editor", shots: [["", DESK], ["timed", DESK], ["issues", DESK], ["proved", DESK]] },
-  { page: "builder-test", title: "B2 · Test mode", shots: [["", DESK], ["proved", DESK], ["missed", DESK]] },
-  { page: "builder-publish", title: "B3 · Publishing", shots: [["", DESK], ["refused", DESK], ["cost", DESK], ["newer", DESK], ["closed", DESK], ["pending", DESK], ["done", DESK]] },
-  { page: "builder-phone", title: "B5 · The Builder on a phone", shots: [["", PHONE], ["community", PHONE]] },
-  { page: "builder-holes", title: "B4 · Your holes, the community's", shots: [["", DESK], ["", PHONE], ["community", DESK], ["community", PHONE], ["empty", DESK]] },
+  { page: "builder-editor", title: "B2 · The editor", widths: DESKTOP, shots: [["", DESK], ["", MID], ["", LAPTOP], ["empty", DESK], ["place", DESK], ["invalid", DESK], ["issues", DESK], ["issues", LAPTOP], ["timed", DESK], ["proved", DESK]] },
+  { page: "builder-test", title: "B3 · Test", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["proved", DESK], ["missed", DESK]] },
+  { page: "builder-publish", title: "B4 · Publish", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["refused", DESK], ["newer", DESK], ["closed", DESK], ["pending", DESK], ["done", DESK]] },
+  { page: "builder-phone", title: "B6 · The Builder on a phone", shots: [["", PHONE], ["community", PHONE]] },
+  { page: "builder-holes", title: "B5 · Your holes, the community's", shots: [["", DESK], ["", PHONE], ["community", DESK], ["community", PHONE], ["empty", DESK]] },
 ]);
 const nameOf = (/** @type {string} */ page, /** @type {string} */ state, /** @type {Size} */ size) => `${page}${state ? `-${state}` : ""}${size.tag ? `-${size.tag}` : ""}.webp`;
 const urlOf = (/** @type {number} */ port, /** @type {string} */ page, /** @type {string} */ state) => `http://127.0.0.1:${port}/docs/superpowers/mockups/${page}.html${state ? `?state=${state}` : ""}`;
@@ -116,7 +121,7 @@ const CHECK = `(() => {
 const only = process.argv[2];
 fs.mkdirSync(OUT, { recursive: true });
 let found = 0;
-for (const { page, shots, audit = true } of PAGES) {
+for (const { page, shots, audit = true, widths = AUDIT } of PAGES) {
   if (only && page !== only) continue;
   for (const [state, size] of shots) {
     await open(urlOf(port, page, state), size);
@@ -126,7 +131,7 @@ for (const { page, shots, audit = true } of PAGES) {
   }
   if (!audit || process.env.AUDIT === "0") continue;
   for (const state of [...new Set(shots.map(([st]) => st))]) {
-    for (const width of AUDIT) {
+    for (const width of widths) {
       await open(urlOf(port, page, state), { width, height: width < 600 ? 800 : 900, scale: 1, mobile: width < 600 });
       const issues = /** @type {string[]} */ ((await b.ev(CHECK)) || []);
       for (const i of issues) console.error(`  ✗ ${page}${state ? `?state=${state}` : ""} @${width}: ${i}`);

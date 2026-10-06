@@ -17,7 +17,8 @@
   const pts = (p) => p.map(([x, y]) => `${x},${y}`).join(" ");
 
   /** The hole as an SVG: w×h units shown, select: a bumper's index, issue: the cup's error, small: a card's map (no grid, no labels). */
-  function holeSVG({ w = 48, h = 31, select = -1, issue = false, small = false, ghost = false } = {}) {
+  function holeSVG({ w = 48, h = 31, select = -1, issue = false, small = false, empty = false, place = null } = {}) {
+    if (empty) return `<svg class="map" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><defs><pattern id="cell" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M1 0H0V1" fill="none" stroke="rgba(20,65,52,.13)" stroke-width=".04"/></pattern><pattern id="cell4" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M4 0H0V4" fill="none" stroke="rgba(20,65,52,.28)" stroke-width=".06"/></pattern></defs><rect width="${w}" height="${h}" fill="url(#cell)"/><rect width="${w}" height="${h}" fill="url(#cell4)"/></svg>`;
     const grid = small ? "" : `<defs><pattern id="cell" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M1 0H0V1" fill="none" stroke="rgba(20,65,52,.13)" stroke-width=".04"/></pattern>
       <pattern id="cell4" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M4 0H0V4" fill="none" stroke="rgba(20,65,52,.28)" stroke-width=".06"/></pattern>
       <pattern id="hatch" width=".6" height=".6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V.6" stroke="#144134" stroke-width=".18"/></pattern></defs>
@@ -33,7 +34,7 @@
       <polygon points="${pts(LANE)}" fill="none" stroke="#144134" stroke-width="${small ? .35 : .12}" stroke-linejoin="round" transform=""/>
       <ellipse cx="${s.sand.cx}" cy="${s.sand.cy}" rx="${s.sand.rx}" ry="${s.sand.ry}" fill="#f0d9a0" stroke="#144134" stroke-width="${sw}"/>
       <polygon points="${pts(s.water)}" fill="#5fb3c9" stroke="#144134" stroke-width="${sw}" stroke-linejoin="round"/>
-      <g opacity="${ghost ? .5 : 1}"><rect x="${s.slope.x}" y="${s.slope.y}" width="${s.slope.w}" height="${s.slope.h}" fill="rgba(63,154,114,.35)" stroke="#144134" stroke-width="${sw * .7}" stroke-dasharray="${small ? "" : ".4 .25"}"/>
+      <g><rect x="${s.slope.x}" y="${s.slope.y}" width="${s.slope.w}" height="${s.slope.h}" fill="rgba(63,154,114,.35)" stroke="#144134" stroke-width="${sw * .7}" stroke-dasharray="${small ? "" : ".4 .25"}"/>
       ${small ? "" : [0, 1, 2].map((k) => `<path d="M${s.slope.x + 1.4} ${s.slope.y + 1.6 + k * 2}h3.8m-1.1-.9 1.1.9-1.1.9" fill="none" stroke="#144134" stroke-width=".18" stroke-linecap="round" stroke-linejoin="round"/>`).join("")}</g>
       <rect x="${s.hedge.x}" y="${s.hedge.y}" width="${s.hedge.w}" height="${s.hedge.h}" rx=".4" fill="#2f6b53" stroke="#144134" stroke-width="${sw}"/>
       <rect x="${s.gate.x}" y="${s.gate.y}" width="${s.gate.w}" height="${s.gate.h}" fill="${small ? "#8a5a35" : "url(#hatch)"}" stroke="#144134" stroke-width="${sw}"/>
@@ -44,6 +45,7 @@
       <g><circle cx="${s.tee[0]}" cy="${s.tee[1]}" r="1" fill="#fff" stroke="#144134" stroke-width="${sw}"/>${small ? "" : `<text x="${s.tee[0]}" y="${s.tee[1] + .32}" font-size=".9" font-weight="800" text-anchor="middle" fill="#144134">T</text>`}</g>
       <g><circle cx="${s.cup[0]}" cy="${s.cup[1]}" r="1.2" fill="#1d1712" stroke="#144134" stroke-width="${sw}"/><path d="M${s.cup[0]} ${s.cup[1]}V${s.cup[1] - 3.2}" stroke="#144134" stroke-width="${small ? .35 : .14}"/><path d="M${s.cup[0]} ${s.cup[1] - 3.2}l2 .7-2 .7z" fill="#e0524b" stroke="#144134" stroke-width="${small ? .2 : .08}"/>
       ${issue ? `<circle cx="${s.cup[0]}" cy="${s.cup[1]}" r="2.3" fill="none" stroke="#e0524b" stroke-width=".25"/><circle cx="${s.cup[0] + 2}" cy="${s.cup[1] - 1.8}" r=".7" fill="#e0524b" stroke="#144134" stroke-width=".1"/><text x="${s.cup[0] + 2}" y="${s.cup[1] - 1.55}" font-size=".9" font-weight="800" text-anchor="middle" fill="#fdf6e9">!</text>` : ""}</g>
+      ${place ? ghostOf(place) : ""}
       ${ticks}
     </svg>`;
   }
@@ -69,5 +71,31 @@
     cup: '<svg viewBox="0 0 40 30"><circle cx="16" cy="20" r="6" fill="#1d1712" stroke="#144134" stroke-width="2"/><path d="M16 20V4l10 3.5L16 11" fill="#e0524b" stroke="#144134" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   };
 
-  window.Builder = { holeSVG, PIECE };
+  /** The piece under the cursor before it drops: snapped to the grid, green where it can go, red with its reason where it cannot. */
+  function ghostOf({ x, y, r = 1.2, ok = true, label }) {
+    const c = ok ? "#226c57" : "#b83a33", tw = label.length * .46 + 1.2;
+    return `<g class="ghostpiece"><path d="M${x} 0V31M0 ${y}H48" stroke="${c}" stroke-width=".07" stroke-dasharray=".3 .3"/>
+      <circle cx="${x}" cy="${y}" r="${r}" fill="${ok ? "rgba(143,220,174,.55)" : "rgba(224,82,75,.35)"}" stroke="${c}" stroke-width=".2" stroke-dasharray=".45 .25"/>
+      ${ok ? "" : `<path d="M${x - .6} ${y - .6}l1.2 1.2m0-1.2-1.2 1.2" stroke="${c}" stroke-width=".22" stroke-linecap="round"/>`}
+      <rect x="${x + r + .5}" y="${y - .75}" width="${tw}" height="1.5" rx=".75" fill="${c}"/><text x="${x + r + 1.1}" y="${y + .28}" font-size=".8" font-weight="700" fill="#fdf6e9" font-family="Fredoka">${label}</text></g>`;
+  }
+
+  /** The Builder's header, on every computer screen: the hole, the three steps, the one action. */
+  function header({ mode = "edit", proved = false, errors = 0, name = "Mole Run", alias = "nym-twee/mole-run" }) {
+    const I = Kit.ICON;
+    const test = mode === "test" ? "now" : proved ? "done" : errors ? "locked" : "open";
+    const pub = mode === "publish" ? "now" : proved ? "open" : "locked";
+    const step = (n, label, st, why = "") => `<li class="step step--${st}"${why ? ` title="${why}"` : ""} aria-current="${st === "now" ? "step" : "false"}"><i>${st === "done" ? "✓" : st === "locked" ? "🔒" : n}</i><span>${label}</span></li>`;
+    const action = mode === "edit" ? (proved ? `<button class="btn btn--chain">Publish →</button>` : `<button class="btn btn--gold"${errors ? ` disabled title="Fix ${errors} first"` : ""}>${I.play} Test it</button>`)
+      : mode === "test" ? (proved ? `<button class="btn btn--chain">Publish →</button>` : `<button class="btn btn--ghost">Back to edit</button>`) : `<button class="btn btn--ghost">Back to edit</button>`;
+    return `<header class="bar">
+      <button class="round" aria-label="Back to the game: the draft is saved">${I.back}</button>
+      <label class="bar__hole"><input value="${name}" aria-label="The hole's name"${mode === "edit" ? "" : " readonly"}><small>${alias} · Garden</small></label>
+      <span></span>
+      <ol class="stepper" aria-label="Edit, test, publish">${step(1, "Edit", mode === "edit" ? "now" : "done")}${step(2, "Test", test, errors ? "Fix the errors first" : "")}${step(3, "Publish", pub, proved ? "" : "Hole it in every weather first")}</ol>
+      <div class="bar__end">${mode === "edit" ? `<button class="round" aria-label="Undo" title="Undo · Ctrl Z">${I.undo}</button><button class="round" aria-label="Redo" title="Redo · Ctrl Shift Z" disabled>${I.redo}</button>` : ""}${action}</div>
+    </header>`;
+  }
+
+  window.Builder = { holeSVG, PIECE, header };
 })();

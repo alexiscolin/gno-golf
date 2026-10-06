@@ -423,7 +423,7 @@ the bundle.
 ### B0. Where it runs
 
 On a computer (900 px and up, a fine pointer): the editor. On a phone, a
-touch screen or under 900 px: B5, and nothing of the editor is loaded.
+touch screen or under 900 px: B6, and nothing of the editor is loaded.
 `app/build/page.tsx` decides before importing anything
 (`matchMedia("(max-width: 899px), (pointer: coarse)")`); the editor's
 components and `builder.wasm` are `next/dynamic` imports reached only on
@@ -432,65 +432,120 @@ page with a phone's media and asserts that no request names
 `builder.wasm` or the editor's chunks; the smoke run checks the same at
 390 px.
 
-### B1. The editor
+### B1. One header, three steps
 
-`builder-editor.html`: select, timed, issues, proved.
+Every computer screen of the Builder has the same header: Back (the draft is
+saved), the hole's name in place with its address and world under it, the
+three steps in the middle, and on the right the history (in Edit) and the
+one primary action of the mode.
 
-A full-window workbench that never scrolls: the bar, the palette (left,
-scrolls in itself), the board (centre: wheel and pinch zoom it, a drag on
-empty space pans it, never the page), the right column (scrolls in itself).
+| Step | Shows | Unlocked when | Primary action |
+|---|---|---|---|
+| 1 · Edit | current (ink, the gold number) | always | gold "Test it"; off, with its reason ("Fix 2 first"), while an error stands |
+| 2 · Test | open, current, done (✓) or locked (🔒, "Fix the errors first") | no error | none while playing ("Back to edit"); blue "Publish →" once every weather is holed |
+| 3 · Publish | locked ("Hole it in every weather first") until proved | every proof in hand for the current geometry | the form's own "Publish in Adena" |
 
-- **The bar**: Back (the draft is saved), the name in place, the world
-  ("Garden ▾"), Undo and Redo, and one primary action: gold "Test it"
-  (off with its reason while an error stands); once proved, blue
-  "Publish…" with "Test again" beside it.
-- **The palette**: Tee and Cup, then the world's pieces as tiles (the
-  board's own drawing and a name; what a piece does is its tooltip),
-  "Start from a template" behind a tap.
-- **The board**: the hole from above on its grid; handles to move, size
-  and turn; a dark label by a handle while dragging ("r 1.2"); "Snap 0.5 ·
-  15°" and zoom at its foot, the keys behind "?".
-- **The right column**: the 3D preview; the selected piece (its name, then
-  label · slider · value rows on one grid: Size, Bounce, Timing, and for a
-  timed piece Shut and From with its cycle strip); one check line ("Ready to
-  test." / the errors, each selecting its piece); "The chain's limits · all
-  fine" behind a tap (the gauges).
+A step that is done or open is a link back to it; a locked one says why on
+hover and to a screen reader. Moving a piece drops the proofs: Test and
+Publish lock again, said once in the checks ("Moved: test it again").
 
-Gestures, keys, drafts and world changes are the hole-builder spec's.
+Widths: 1024, 1280 and 1440 px are checked; under 1180 px the steps keep
+their numbers and only the current one its word, and the less needed
+gauges and keys fold away. Never under 900 px (B6).
 
-### B2. Test mode
+### B2. The editor
 
-`builder-test.html`: playing, proved, missed.
+`builder-editor.html`: select, empty, place, invalid, issues, timed, proved;
+at 1440, 1280 and 1024.
 
-The game itself, its HUD reduced to the hole card (with its "Test" tag),
-the strokes and the weather. The proof panel on the right: pinned head
-("Test · free, nothing is sent" / "Hole it in each weather"), the weathers
-as rows (glyph, name, strokes, ✓ or "Now"), "Why each weather?" behind a
-tap, the par once proved (− +, never under the suggestion), and the pinned
-foot: blue "Publish…" once proved, "Back to the editor".
+The window never scrolls. Three columns under the header:
 
-### B3. Publishing
+- **The palette** (left, 208 px; 224 from 1400 px): the world's name on an
+  ink strip edged in its colour, then its pieces by kind: Start (tee, cup),
+  Walls, Posts, Ground, Moving, Jumps. Each a tile with the board's own
+  drawing and its name (what it does in its tooltip). It scrolls in itself.
+  Only what the palette has can be placed (the hole-builder spec's palette
+  lock).
+- **The board** (centre): the hole from above on its snapping grid, the
+  units along two edges. The wheel and the pinch zoom it, a drag on empty
+  space pans it, never the page. Its foot: the keys always in sight as
+  keycaps (Undo, Redo, Turn, Copy, Delete; Ctrl on Windows and Linux, ⌘ on a
+  Mac), "Snap 0.5" and zoom.
+- **The right** (300 px; 340 from 1400): the 3D preview, rebuilt from the
+  canonical hole as the board changes ("3D · in sync"), then the inspector
+  of the selected piece only: its name and place, label · slider · value
+  rows on one grid with each range written under it ("0.6 to 1.6"), timing,
+  a timed piece's cycle strip, and Turn · Copy · Delete with their keys.
+  Nothing selected: "Select a piece to change it, or drag one in from the
+  left."
+- **The checks**, docked under the board: one row with the verdict ("Ready
+  to test", "2 to fix", "Holed in every weather") and the limits as small
+  gauges (walls /160, posts /32, zones /32, points /512, size /32 KB, gas
+  room), green, amber from 80%, red at the limit; above it, when anything
+  is wrong, the list (errors first, then warnings), each line naming its
+  piece in bold, a click selecting it, and a one-click fix where one is
+  obvious ("Move the cup", "Make it 1.5 deep", "Delete it"); the list
+  scrolls in itself.
 
-`builder-publish.html`: name, refused, cost, newer, closed, pending, done.
+**Placing**: a piece dragged from the palette is a ghost under the cursor,
+snapped to the grid, with guide lines to its row and column and a label: in
+green its name and place ("Mushroom · 24, 9.5"); in red the one-line reason
+("Too close to the cup", "Off the lane", "The cup must stay clear") and a
+not-allowed cursor: letting go there drops nothing. Moving clamps to the
+last valid place; a handle stops at the range's end (a radius at 1.6, a
+loop's depth at 1.5) and the measure label says the limit.
 
-Two steps in a sheet over the editor, the chain's checks running on their
-own and shown only when one fails:
+**Empty**: a new hole opens on the empty grid with one card: "A new hole ·
+Garden / Start from a template", the world's three templates as cards with
+their maps (straight par 2, dogleg par 3, the world's signature piece), and
+"or a blank board: drag a tee and a cup in". The verdict says "Place a tee
+and a cup"; Test is locked.
 
-1. **Name**: the name and the line for players, counters, "Next" pinned.
-   A refused name: the field red, "Looks like a web address. Try "St.
-   Andrews"."
-2. **Publish**: the bill (deposit, fee, "At most 1.20 GNOT"), "The chain's
-   price for keeping and checking the hole. Nothing goes to the game.",
-   gnokey behind a tap, the pinned blue "Publish in Adena · 1.20 GNOT".
+### B3. Test
 
-**Newer** (a version published elsewhere): "This one would be v3, with new
-weather: test it again (free)." · Test again. **Closed**: "Publishing isn't
-open on gno.land yet. Your draft is kept." **Done**: "Mole Run is on
-gno.land!", its share card, "Play it for real: your best becomes the ghost
-your friends race.", gold "Play it for real" and "Share the hole" (A8: the
-dare once the author has a best).
+`builder-test.html`: playing, proved, missed; at 1440 and 1024.
 
-### B4. Your holes, the community's
+The game takes everything under the header: the play area is the window's.
+Over it, top left the strokes card, top centre one strip: the weathers to
+beat as chips (☀ Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –" until all
+are holed, then the suggested par ("Par 5"). A chip ticks when its round is
+holed and replayed by the chain's code; a round that does not count turns
+its chip red and says why once, under the strip ("That rain round doesn't
+count: one shot could run out of room. Play it again, a softer line."). The
+game's own hint at the foot. The header's action: "Back to edit", then
+"Publish →" once proved.
+
+### B4. Publish
+
+`builder-publish.html`: form, refused, newer, closed, pending, done; at 1440
+and 1024.
+
+Two columns under the header: the hole as players will see it (the 3D, its
+card in the community list); the form, a panel that scrolls in itself with
+its action pinned at its foot:
+
+- **Name** (40) with its counter; **Address** `nym-twee/mole-run/v1`, shown
+  and fixed ("Fixed at the test": the weather comes from it; the slug is
+  chosen in Edit, before the first test); **A line for players** (140).
+- **The cost before any signature**: storage deposit, network fee, "At most
+  1.20 GNOT", "The chain's price for keeping and checking the hole. Nothing
+  goes to the game."
+- "Publish with gnokey instead" behind a tap.
+- Pinned: the blue "Publish in Adena · 1.20 GNOT".
+
+Only what changes: a refused name turns its field red with one line ("Looks
+like a web address. Try "St. Andrews"."), the button off; a newer version
+elsewhere ("This one would be v3, with new weather: test it again.") makes
+the action gold "Test again (free)"; closed: "Publishing isn't open on
+gno.land yet. Your draft is kept." and "Back to edit"; signing: "Check the
+window Adena opened, and sign there."
+
+**Done**: "Mole Run is on gno.land!", the hole's share card, "Play it for
+real: your best becomes the ghost your friends race.", gold "Play it for
+real" and "Share the dare" (A8; the dare carries the author's ghost once
+their best is saved).
+
+### B5. Your holes, the community's
 
 `builder-holes.html`: mine, community, empty; phone.
 
@@ -501,7 +556,7 @@ par 5 · 23 players", "by nym-pebble77 · Mountain · par 4"), one button
 chain says so, "Open" for a draft) and "Edit" as a link on the player's own.
 Empty: "No hole of yours yet" · Draw a hole.
 
-### B5. On a phone
+### B6. On a phone
 
 `builder-phone.html`: both, community.
 
@@ -549,7 +604,7 @@ per-world trait counts, trait labels.
 
 ### From the Builder's wasm and the golf realm
 
-As the hole-builder spec lists them, and for B4/B5 a bounded
+As the hole-builder spec lists them, and for B5/B6 a bounded
 `CommunityJSON(from, count, order)` (`{id, alias, author, name, par, world,
 players, holedByAuthor}`) and `MineJSON(addr)`.
 
@@ -561,7 +616,7 @@ players, holedByAuthor}`) and `MineJSON(addr)`.
 | `web/components/ShareMoment.tsx` (new) | the share sheet and the in-page cards (team, hole, moments) | `Share`, the `snapshot` path |
 | `web/components/Golf.tsx` | the picker's shelf, the wear pill, the ghost's tag, the finish card's try-on | |
 | `web/components/Worlds.tsx`, `Leaderboard.tsx`, `Modes.tsx`, `About.tsx` | the cups' link; faces, the Legendary pill, a row's "their gnomes"; the Builder panel; "How the gnomes work" | |
-| `web/components/builder/*` | the editor, test, publish (hole-builder spec), `Holes.tsx`, `PhoneBuilder.tsx` | |
+| `web/components/builder/*` | the hole-builder spec's files, plus `Header.tsx` (the three steps and the mode's action), `Checks.tsx` (the docked verdict, gauges and issues with their fixes), the board's placement ghost, `Holes.tsx`, `PhoneBuilder.tsx` | `Segmented`, `Sheet`, the engine and HUD for the test |
 | `web/app/globals.css`, `title.css` | tiers, `.gcard`, `.closes`, `.trust`, `.bill`, `.more`, `.sheet__foot`, the spacing scale, `--ink-soft`, `.tint--shop`, `.tint--legend` | |
 | `web/app/g/…`, `web/app/build/page.tsx` | static pages; the phone/computer split | `app/h/[slot]/page.tsx` |
 
@@ -587,7 +642,7 @@ marks each new piece NEW: the reference, not code to copy.
 Gallery: two columns, filters in a bottom sheet. A gnome's page and the
 auction: one column. Sheets rise from the foot, their action pinned. The
 picker's shelf and My gnomes: two columns or a sideways shelf. The Builder:
-B5 only.
+B6 only.
 
 ## Evolvability
 
@@ -615,18 +670,19 @@ that use it; refusals map in one table per feature.
   history and rules (now taps), the trust strip, two of the three trust
   facts.
 - The picker: the `#id` and the long ghost sentence.
-- The editor: the kind filters, the one-word role under each piece, the
-  draft subtitle, the world as five buttons (now one menu), Duplicate and
-  Rotate buttons (the keys and handles do it), the size pill, the keys pill
-  (now "?"), the always-visible gauges and storm warning (now a tap), the
-  disabled Publish with its sticker (Publish appears when it can be used).
+- The editor: the kind filters (the palette is grouped by kind instead),
+  the one-word role under each piece (now its tooltip), the draft subtitle,
+  the world as five buttons (now one menu), the size and keys pills (now
+  keycaps on the board), the gauges' panel and storm warning (now small
+  gauges docked under the board), the disabled Publish with its sticker (the
+  header's three steps now say what is locked, and why).
 - Test mode: the explanatory paragraph, the moving-hole note, the camera
-  button, the proofs' note (now "Why each weather?").
+  button, the proof panel (now chips over the play area).
 - Publishing: the separate checks step (checks run on their own), the
-  locked address row, the list preview, the cost paragraph.
+  wizard's sheet (Publish is now a step of the header), the cost paragraph.
 - The holes: the community's order switch, its footer, the per-card notes,
   "Dare a friend" on each card.
-- The touch editor mockup: replaced by B5.
+- The touch editor mockup: replaced by B6.
 
 ## Open questions
 
@@ -660,8 +716,8 @@ headless Chrome (`media/lib/cdp.mjs`), no new dependency.
 | A7 where it shows | `gnome-places.html` | one |
 | A8 share moments | `share.html` | bought, equipped, bidding, won, team, published, clip · phone |
 | A8 share cards | `share-card.html` | gnome, square, auction, reveal, team, hole |
-| B1 the editor | `builder-editor.html` | select, timed, issues, proved |
-| B2 test mode | `builder-test.html` | playing, proved, missed |
-| B3 publishing | `builder-publish.html` | name, refused, cost, newer, closed, pending, done |
-| B4 the holes | `builder-holes.html` | mine, community, empty · phone |
-| B5 the Builder on a phone | `builder-phone.html` | both, community |
+| B2 the editor (B1 its header) | `builder-editor.html` | select, empty, place, invalid, issues, timed, proved · 1280, 1024 |
+| B3 test | `builder-test.html` | playing, proved, missed · 1024 |
+| B4 publish | `builder-publish.html` | form, refused, newer, closed, pending, done · 1024 |
+| B5 the holes | `builder-holes.html` | mine, community, empty · phone |
+| B6 the Builder on a phone | `builder-phone.html` | both, community |
