@@ -1,0 +1,215 @@
+# ADR-007: The gnomes realm, its catalogue as data, sold in waves
+
+## Status
+
+Accepted for the feasibility step, 2026-10-06. Implements the on-chain part
+of the gnomes' design (`docs/superpowers/specs/2026-10-06-nft-gnomes-design.md`)
+as `gno.land/r/gnogolf/gnomes`, with the user's decisions: 720 gnomes, the
+research brief's waves, player window, prices and auction
+(`docs/superpowers/research/2026-10-06-nft-best-practices.md`), and a hard
+closing date for the genesis sale. golf/v2 and store do not change. Nothing
+is deployed. Two points stay open for the user: a treasury apart from the
+owner and `Renounce`, and a portrait drawn from the traits.
+
+## Context
+
+The ball is a gnome. Players choose the exact gnome they buy (no random
+draw), pay a fixed price in GNOT, and equip it. GNOT moves on gnoland-1
+(`params/bank:p:restricted_denoms` is `[]`; gnofly's treasury holds what
+its 162 mints paid).
+
+Before the client is built on it, four things had to be proven:
+
+- that `p/nt/grc721` (with `royalty`) is on onyx-1 and gnoland-1 and works
+  from a realm under `gno test` (it is, on both: `vm/qfile` lists
+  `grc721/v0`, `royalty/v0`, `metadata/v0`, `enumerable/v0`, `bptree/v0`);
+- that a sale can be paid exactly and forwarded in the same call, the realm
+  holding nothing;
+- that the nine earned gnomes can be proven from store's rows alone, at a
+  gas a transaction can pay;
+- what each write costs in deposit, since every byte of state is paid at
+  100 ugnot.
+
+And the collection must grow without new code: seasonal drops after the
+genesis, waves of a world at a time, prices moved between waves.
+
+## Decision
+
+**The catalogue is data, published as series.** The owner publishes a series
+with `AddSeries(name, rows)`, one gnome a line, `id|tier|name|traits`, ids
+following on from the last series. The first is the genesis and must match
+the config's supply per tier (504, 144, 65, 7: 720, ten times a par-72
+course), which `scripts/selfcheck.ts` holds to `data/gnomes/series.json`
+(with the prices, caps and auction rules: every count is written once). A
+later drop is one more call of any size, never new code. A series is
+checked whole and never changed. It is kept as one string read in place by
+bisection (as gnofly's table), not as structs. The traits are the designer's
+encoding, version first, opaque to the realm: the client reads them, the
+realm keeps and returns them. A token's id is its row's id, and its row is
+its record: no copy is made per token. Which ids were ever sold is a bitmap
+(a bit an id), so a burned gnome is never sold again.
+
+**The sale comes in waves.** `AddWave(first, last, start, playerHours)` puts
+a range of ids on sale from a start, at the prices of the day. Its first
+hours sell only to wallets with a record in store (a standing in either mode
+in `totals`, which v1's records were copied into), at most 3 commons, 2
+rares and 1 epic each per wave; then anyone, under the lifetime caps (10, 5,
+2). A wave is never changed nor withdrawn: its ids stay on sale at its
+prices, and `SetPrice` moves only the waves published after it. Prices
+start at 30, 99 and 333 GNOT; nothing is ever discounted by the realm.
+
+**The genesis sale closes on a date.** `SetCloseAt(at)`, owner only, once the
+genesis is published: a date in the future, which can later be brought
+forward, never pushed back, by this owner or the next. From its block on, the
+genesis's unsold gnomes are closed for good: `Buy`, `AddWave` and
+`StartAuction` refuse them ("the genesis sale closed on <date>"), and its
+final supply is readable on chain (`Collection`: the series' `sold` and
+`closed`; `Gnome`: `closed`; `Sold` stays the sold bitmap). An auction under
+way at the close runs to its end and settles; a Legendary it leaves unsold
+is closed with the rest. A later series is not closed by it, and earned
+gnomes never are. **Recommended date**: about 30 days after wave 7 opens,
+with a last auction of each unsold Legendary before it, announced at launch
+with the waves.
+
+**Buy is a direct, exact, forwarded payment.** `Buy(ids)` takes 1 to 5 ids
+and exactly their sum in one ugnot coin, checked against `OriginSend`, which
+is trusted only on a direct user call (`cur.Previous().IsUserCall()`): a
+realm or run script in between could keep coins it attached. The state is
+written first, then the sum goes to the owner with an `OriginSend` banker,
+which can spend this call's envelope and nothing else.
+
+**A Legendary is auctioned, one at a time.** The owner starts it with
+`StartAuction(id, hours)`, its reserve the tier's price (777 GNOT). The first
+bid meets the reserve; each next beats the last by the larger of 5% and 5
+GNOT; a bid in the last 10 minutes moves the end to 10 minutes after it.
+The realm holds the top bid alone: the bid it beats is refunded in the same
+call (`RealmSend`, after the state is written). Once the end is past anyone
+settles: the gnome to the winner, the bid to the owner; with no bid it stays
+unsold. `CancelAuction` only before the first bid. `Sweep` sends the owner
+any stray coins, never the escrow. `Auction()` is the one under way, else
+the last one settled.
+
+**Earned gnomes are proven from store, free, and bound.** `MintEarned(kind)`
+mints the caller's earned gnome once store proves the feat (the nine of
+`UNLOCKS`: a cup finished, at par, five aces, the four cups at par), reading
+store with golf/v2's key layout (slots, bests, copies, holes) and never
+calling golf/v2. A best that is a copy (a record sent again) does not count;
+only a slot's current version does. The proof refuses while store's writer
+is not the golf/v2 it was built against, and on any row not in the format
+it knows: a later format can refuse a mint, never prove a false one. Free:
+nothing may be sent; once per player and kind; ids from 1,000,001, above any
+catalogue's (64 series of 1,000). An earned gnome cannot be transferred or
+approved (the ledger extension vetoes it); it can be burned, and its kind
+minted again under a new id. `Proof(kind, player)` says, free, what a mint
+would find. Its traits are the designer's codec's for the kind, byte for
+byte (selfcheck.ts).
+
+**Burn is the holder's.** `Burn(id)` clears what the ledger's hook cannot
+(the locker's row, the equipped gnome, an earned gnome's rows) before the
+ledger's burn; the deposit returns to the holder.
+
+**The owner is the treasury,** captured at deploy and handed on with
+`Transfer` then `Accept`, as golf's; the royalty (5%, advisory) follows.
+Every check is on the immediate caller. `SetMintOpen` stops every sale and
+bid at once (not `MintEarned`, which sells nothing). There is no `Renounce`
+and no treasury apart from the owner yet: open, for the user.
+
+**State in bptrees, no enumerable.** Measured with storage goldens: an avl
+row costs about 2 KB of deposit, `grc721/enumerable` added 5 to 9 KB to a
+buy. The realm keeps its own rows (caps, equips, a holder's gnomes, earned
+kinds) in bptrees seeded at deploy, as store does, and indexes holdings
+with a small ledger extension, which also drops a gnome its holder wore when
+it leaves them and refuses to move an earned one.
+
+| what | bytes | deposit | golden |
+|---|---|---|---|
+| the realm's code, staged (no catalogue) | 67,015 | 6.7 GNOT, the deployer | `stage.sh` |
+| the genesis published as the catalogue lays it out, with a wave | 64,269 | 6.4 GNOT, the owner | `z_storage_genesis` |
+| a first buy (was 10,465 with enumerable and a traits copy) | 3,861 | 0.39 GNOT, the buyer | `z_storage_buy` |
+| an earned gnome | 3,554 | 0.36 GNOT, the player | `z_storage_earned` |
+
+| what | gas | measured by |
+|---|---|---|
+| the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
+| a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
+
+The King's proof is under the 300M the client will ask for `MintEarned` and
+of the order of golf's `Claim` (70.2M); a `GnomesOf` page of 100 is about
+210M, far under a query's 3e9.
+
+**Reads for the screens**, JSON starting with `"version":1`, one query each:
+`Collection`, `Gnome` (`{"version":1,"id":""}` for none), `Sold` (a bit per
+id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
+enough to draw a collection with no call per token; `total`, `next`),
+`Equipped`, `EquippedMany` (the first 50 players of a list), `Auction`,
+`Proof`; the GRC721 surface (`TokenOfOwnerByIndex` from the locker's index,
+no `TokenByIndex`); `TokenMetadata` (name, description, image,
+`external_url`, attributes Tier, Series and an earned gnome's Kind);
+`Render` for gnoweb (the collection, a gnome, an earned kind, a player).
+`TokenURI` is an SVG drawn on read, its name escaped; a portrait drawn from
+the traits is the user's call.
+
+## Threats, and the test for each
+
+| function | threat | answer | test |
+|---|---|---|---|
+| Buy, Bid, MintEarned | a realm or run script relays the call and keeps the coins it attached | direct user call only | `TestBuyMustBeADirectUserCall`, `TestABidMustBeADirectUserCall`, `TestAProvenKindIsMintedFreeOnce` |
+| Buy | underpay, overpay, another denom, two coins | exact single coin | `TestBuyRefusesAnyOtherPayment`, `TestBuyTakesUpToFiveAtTheirSum` |
+| Buy | malformed list: repeats, blanks, signs, leading zeros, huge numbers | strict parse, 1 to 5 | `TestBuyReadsItsIDsStrictly` |
+| Buy | the same gnome twice; a burned gnome sold again | sold once, for good | `TestAGnomeSellsOnce`, `TestABurnIsTheHoldersAndForGood` |
+| Buy | a Legendary bought at a fixed price | auction only | `TestTheAuctionTierIsNotBought` |
+| Buy | before a wave, outside every wave | refused | `TestAWaveOpensItsIDsAtItsStart` |
+| Buy | a non-player in the player window, a player over its cap | store record, per-wave cap | `TestThePlayerWindowIsForPlayers`, `TestARecordInEitherModeCounts` |
+| Buy | a wallet over its cap, in one call or several | lifetime cap per tier, batch checked whole | `TestAWalletBuysUpToItsLifetimeCap` |
+| SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
+| SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
+| Buy, AddWave, StartAuction | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
+| Bid, Settle | an auction under way cut short by the close; its unsold Legendary sold later | runs to its end; then closed | `TestARunningAuctionFinishesAfterTheClose`, `TestALegendaryUnsoldAtTheCloseIsClosed` |
+| SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
+| Bid | a bid under the reserve or the raise; outbidding oneself | refused | `TestBidsBeatTheReserveThenTheLastByTheMinimumRaise`, `TestTheMinimumRaiseIsFiveGNOTOnSmallBids` |
+| Bid | the outbid bidder's coins kept | refunded in the same call; the realm keeps the top bid alone | `TestBidsBeatTheReserveThenTheLastByTheMinimumRaise` |
+| Bid | sniping at the bell | soft close | `TestALateBidExtendsTheEnd` |
+| Settle | early, twice, a sold Legendary auctioned again | state machine | `TestSettleGivesTheWinnerTheGnomeAndTheOwnerTheBid`, `TestAnAuctionWithNoBidLeavesTheGnomeUnsold` |
+| CancelAuction | a bidder's auction cancelled | before the first bid only | `TestCancelOnlyBeforeTheFirstBid` |
+| Sweep | the escrow swept | kept | `TestSweepKeepsTheEscrow` |
+| MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |
+| MintEarned | rows of new rules, or a format the proof does not know | refused, never a false proof | `TestNewRulesRefuseTheMint`, `TestARowNotAsGolfWritesItRefuses` |
+| MintEarned | paid; twice for a kind | free only; once per player and kind | `TestAProvenKindIsMintedFreeOnce` |
+| TransferFrom, Approve | an earned gnome sold or moved, by its player or an operator | vetoed by the ledger extension; approval refused | `TestAnEarnedGnomeIsBoundToItsPlayer`, `TestAnOperatorCannotMoveAnEarnedGnome` |
+| Burn | another's gnome burned, by anyone or an operator | the holder only | `TestABurnIsTheHoldersAndForGood` |
+| owner calls | anyone else; a realm the owner calls; no owner | immediate caller only | `TestAnEmptyOwnerHoldsNoPower`, `TestARealmTheOwnerCallsIsNotTheOwner`, `TestTheOwnerHandsOverInTwoSteps` |
+| init | a deploy with no signer | refused off `dev` | `TestTheDeployerOwns` |
+| TransferFrom, Approve | a realm moves its caller's gnomes | the ledger's caller teller | `TestARealmCannotMoveItsCallersGnomes`, `TestTransfersGoThroughTheLedgersChecks` |
+| Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |
+| AddSeries | a malformed row; a gap; growth without bound | checked whole; 64 series of 1,000 rows | `TestASeriesIsRefusedWhole`, `TestASeriesIsBounded` |
+| AddWave | overlaps; too many | checked; 64 waves | `TestAWaveIsCheckedWhole`, `TestTheWavesAreBounded` |
+| reads | a query made unbounded | bounded pages and lists | `TestEquippedManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
+| TokenURI, TokenMetadata | markup or JSON in a name | escaped | `TestANameCannotInjectMarkup`, `TestMetadataEscapesTheName` |
+
+Reentrancy: the only calls out are to the banker, which runs no code, and
+store's reads, which write nothing; each send comes after the state is
+written. Overflow: a Buy's sum is at most 5 times the highest price
+SetPrice takes; a raise is computed on a bid no larger than the ugnot in
+existence. Not tested, and not built: `Renounce` (open); the close is a
+date in block time, so it holds whatever becomes of the owner.
+
+## Consequences
+
+- A new drop is two owner calls, `AddSeries` and `AddWave`; a new price,
+  one. No redeploy. A later series's closing date is a decision of its own
+  (the genesis's date does not close it).
+- The client draws a gnome from its traits; an unknown version or trait
+  falls back to a plain gnome (the client's side, not this realm's).
+- Store's layout is now read by a second realm: `totals` for the player
+  window, `slots`, `bests`, `copies` and `holes` for the proof. Rules that
+  change them must keep the same answers, or the proof refuses until gnomes
+  is updated.
+- `scripts/stage.sh` stages `r/gnogolf/gnomes` beside store; the proof's
+  golf/v2 path is rewritten with the other paths.
+- `external_url` is golf's play address (`https://gnogolf.xyz/`), a
+  constant: stage.sh changes nothing but the paths.
+- The bidder's refund is pushed, not pulled: fine while bidders are user
+  accounts, which `Bid` requires.
+- In `gno test`, a recovered call's writes are not reverted (golf's
+  `z_worst_shot` notes the same): the earned veto is tested as an abort, and
+  on chain the abort reverts the whole call.

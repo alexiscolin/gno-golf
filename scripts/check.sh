@@ -26,7 +26,7 @@ if [ "${SKIP_GNO:-}" = 1 ]; then
 	echo "check.sh: SKIP_GNO=1: the Gno tests are skipped" >&2
 elif [ -x "$GNO" ]; then
 	echo "== gno test (onyx toolchain)"
-	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf/... ./gno.land/r/gnogolf/store)
+	(cd "$root" && GNOHOME=$toolchain/gnohome "$GNO" test ./gno.land/p/gnogolf/... ./gno.land/r/gnogolf/golf/... ./gno.land/r/gnogolf/store ./gno.land/r/gnogolf/gnomes)
 	echo "== the holes' fingerprints, and data/holes.txt (what publishdata.sh publishes) their data"
 	GNO=$GNO GNOHOME=$toolchain/gnohome "$root/scripts/holedata.sh" --check
 	echo "== the staged packages: the repo's, byte for byte, and linted"

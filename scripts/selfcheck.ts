@@ -13,7 +13,8 @@ import fs from "node:fs";
 import "../web/test/setup.mjs";
 
 const { RULES } = await import("../web/lib/chain.ts");
-const { SKIES } = await import("../web/lib/card.ts");
+const { SKIES, UNLOCKS } = await import("../web/lib/card.ts");
+const { GNOMES } = await import("../web/lib/scene/gnome.ts");
 const { CLIMATES } = await import("../web/lib/sky.ts");
 
 let failed = 0;
@@ -160,6 +161,80 @@ check("weather.gno period", () => {
   assert.equal(RULES.periodMs, constOf(weather, "PeriodSeconds") * 1000, "PeriodSeconds");
   // a round saves in its period or the next one (Golf.tsx saveBy: period + 2)
   assert.ok(has(weather, "if period != now && period != now-1 {"), "playablePeriod: the periods a round saves in changed");
+});
+
+// ---------------------------------------------------------------- the gnomes realm
+// Every count is written once (ADR-007): the catalogue's data
+// (data/gnomes/series.json) and the realm's config.gno say the same supply,
+// prices, caps and auction rules; the earned gnomes are UNLOCKS' and GNOMES'.
+const gnomesDir = new URL("../gno.land/r/gnogolf/gnomes/", import.meta.url);
+const gnomes = (f: string) => fs.readFileSync(new URL(f, gnomesDir), "utf8");
+/** A Go array literal of numbers, `name = [len(tiers)]int64{1, 2, 3}`, as numbers. */
+const arrayOf = (src: string, name: string) => {
+  const m = new RegExp(`\\b${name}\\s*=\\s*\\[[^\\]]*\\]int64\\{([^}]*)\\}`).exec(src);
+  assert.ok(m, `${name} not found`);
+  return m[1].split(",").map((x) => Number(x.trim().replace(/_/g, "")));
+};
+/** A Go []string literal, `name = []string{"a", "b"}`, possibly over lines. */
+const stringsOf = (src: string, name: string) => {
+  const m = new RegExp(`\\b${name}\\s*=\\s*\\[\\]string\\{([^}]*)\\}`).exec(src);
+  assert.ok(m, `${name} not found`);
+  return [...m[1].matchAll(/"([^"]*)"/g)].map((x) => x[1]);
+};
+/** What these checks read of data/gnomes/series.json. */
+type Sale = Record<"common" | "rare" | "epic", number>;
+interface SeriesFile {
+  earned: { first: number };
+  series: {
+    id: string;
+    supply: Record<string, number>;
+    sale: {
+      prices: Sale; lifetimeCaps: Sale; playerWindowCaps: Sale; playerWindowHours: number;
+      auction: { reserve: number; hours: number; extendMinutes: number; minIncrementPercent: number; minIncrementGnot: number };
+    };
+  }[];
+}
+const seriesFile = new URL("../data/gnomes/series.json", import.meta.url);
+check("gnomes config.gno: data/gnomes/series.json", () => {
+  if (!fs.existsSync(seriesFile)) return console.log("     (skipped: no data/gnomes/series.json in this checkout yet)");
+  const config = gnomes("config.gno"), earned = gnomes("earned.gno");
+  const series = JSON.parse(fs.readFileSync(seriesFile, "utf8")) as SeriesFile;
+  const genesis = series.series.find((s) => s.id === "genesis");
+  assert.ok(genesis, "no genesis in series.json");
+  const TIERS = ["common", "rare", "epic", "legendary"];
+  const realmTiers = [...config.matchAll(/^\t\{"(\w+)", ([\d_]+)\},/gm)].map((m) => [m[1], Number(m[2].replace(/_/g, ""))] as const);
+  assert.deepEqual(realmTiers.map(([n]) => n), TIERS, "tiers");
+  assert.deepEqual(arrayOf(config, "genesisSupply"), TIERS.map((t) => genesis.supply[t]), "genesisSupply: supply");
+  const sale = genesis.sale, G = 1_000_000;
+  const SOLD = ["common", "rare", "epic"] as const;
+  assert.deepEqual(realmTiers.slice(0, 3).map(([, p]) => p), SOLD.map((t) => sale.prices[t] * G), "prices");
+  assert.equal(realmTiers[3][1], sale.auction.reserve * G, "the Legendary reserve");
+  assert.deepEqual(arrayOf(config, "lifetimeCap").slice(0, 3), SOLD.map((t) => sale.lifetimeCaps[t]), "lifetimeCap");
+  assert.deepEqual(arrayOf(config, "playerCap").slice(0, 3), SOLD.map((t) => sale.playerWindowCaps[t]), "playerCap");
+  assert.equal(constOf(config, "softClose"), sale.auction.extendMinutes * 60, "softClose");
+  assert.equal(constOf(config, "minRaiseBps"), sale.auction.minIncrementPercent * 100, "minRaiseBps");
+  assert.equal(constOf(config, "minRaise"), sale.auction.minIncrementGnot * G, "minRaise");
+  assert.ok(sale.playerWindowHours <= constOf(config, "maxHours") && sale.auction.hours <= constOf(config, "maxHours"), "maxHours");
+  assert.equal(series.earned.first, constOf(earned, "firstEarned"), "earned.first: firstEarned");
+});
+// the designer's codec, once it is in this checkout
+const codecFile = new URL("../web/lib/gnomes/codec.ts", import.meta.url);
+/** What these checks use of the codec. */
+interface Codec { encode(t: object): string; PLAIN: object }
+const codec = fs.existsSync(codecFile) ? ((await import("../web/lib/gnomes/codec.ts")) as Codec) : null;
+check("gnomes earned.gno: UNLOCKS and GNOMES", () => {
+  const earned = gnomes("earned.gno");
+  const kinds = Object.keys(UNLOCKS);
+  assert.deepEqual(stringsOf(earned, "earnedKinds"), kinds, "earnedKinds: UNLOCKS' order");
+  assert.deepEqual(stringsOf(earned, "earnedNeeds"), kinds.map((k) => (UNLOCKS as Record<string, { need: string }>)[k].need), "earnedNeeds: UNLOCKS' need");
+  assert.deepEqual(stringsOf(earned, "earnedNames"), kinds.map((k) => GNOMES.find((g) => g.unlock === k)?.name), "earnedNames: GNOMES' names");
+  if (!codec) return console.log("     (skipped the traits: no web/lib/gnomes/codec.ts in this checkout yet)");
+  const m = /return "(010000)" \+ [^+]+\+ [^+]+\+ "([0-9a-f]+)"/.exec(earned);
+  assert.ok(m, "earnedTraits not found");
+  kinds.forEach((_, i) => {
+    const k = (i + 1).toString(16).padStart(2, "0");
+    assert.equal(m[1] + k + m[2], codec.encode({ ...codec.PLAIN, accessories: [], tier: "earned", kind: i + 1 }), `earnedTraits(${i + 1}): codec.ts`);
+  });
 });
 
 if (failed) {
