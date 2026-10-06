@@ -32,6 +32,11 @@ func TestTokenMetadataIsTheRowsAsAWalletReadsIt(cur realm, t *testing.T) {
 	SetSiteURL(cross(cur), "https://golf.example.org/")
 	md, _ = TokenMetadata("1")
 	uassert.True(t, strings.Contains(md, `"image":"`+uri+`","external_url":"https://golf.example.org/g/1/","attributes"`), md)
+
+	// an earned gnome's page is its kind's (the site builds /g/<kind>/: its ids are not known at build)
+	k := mintEarnedFor(alice, 1)
+	md, _ = TokenMetadata(itoa(k))
+	uassert.True(t, strings.Contains(md, `"external_url":"https://golf.example.org/g/`+earnedKinds[0]+`/"`), md)
 }
 
 // The site's address is the owner's to move, under golf's play link rule

@@ -134,7 +134,7 @@ and bid at once (not `MintEarned`, which sells nothing). Whether the role
 may be renounced is not decided: there is no `Renounce`.
 
 **The site link is the owner's.** `SetSiteURL` sets the game's site, which
-a token's `external_url` names (`<site>g/<id>/`); none is set at deploy,
+a token's `external_url` names (`<site>g/<id>/`, an earned one's `<site>g/<kind>/`: the site's static pages); none is set at deploy,
 and until one is, the metadata has no `external_url`. The image is the
 on-chain SVG, so nothing a wallet shows depends on the domain. The link
 follows golf/v2's `SetPlayURL` rule (https://, at most 100 of a-z, A-Z, 0-9

@@ -30,7 +30,11 @@ func TokenMetadata(tid string) (string, error) {
 	}
 	link := ""
 	if siteURL != "" {
-		link = `,"external_url":"` + siteURL + "g/" + tid + `/"`
+		page := tid // a catalogue gnome's page is its id's; an earned one's, its kind's (the site's /g/<kind>/)
+		if g.tier == earnedTier {
+			page = earnedKinds[g.kind-1]
+		}
+		link = `,"external_url":"` + siteURL + "g/" + page + `/"`
 	}
 	return `{"name":` + jsonString(g.name) + `,"description":` + jsonString(describe(g)) + `,"image":"` + image + `"` +
 		link + `,"attributes":[` + attrs + `]}`, nil
