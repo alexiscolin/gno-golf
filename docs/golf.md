@@ -917,17 +917,20 @@ Measured on the course holes; treat them as orders of magnitude:
   decoded hole is never stored.
   A best keeps its round for `Ghost`: about 30 bytes and 18 to 23 a stroke,
   written only when it improves (a shorter best frees the longer one).
-- **A community publish** (`PublishMine`), measured by the
-  `z_builder_publish_*` filetests (each publishes a warm-up hole first, so the
-  indexes a first publish opens are paid there): a plain lane of 364 bytes of
-  data stores 4,297 bytes and spends 15.5M gas; an author new to golf adds
-  385 bytes (their row in the community's index); a later version stores 933
-  bytes less; golf's heaviest hole (15,292 bytes of data) stores 19,242 and
-  spends 435M; a name and a note at their longest, in four-byte runes, add
-  892 bytes and 51M (each rune cleaned and checked for links). So a publish
-  stores its data, its name and note and about 3.9 KB more; the Builder asks
-  for that at the chain's byte price, a tenth more, and the gas fitted on
-  these with a quarter more (`web/lib/builder/publish.ts`).
+- **A community publish** (`PublishMine` under golf/v2, its records in
+  store), measured by golf/v2's `z_builder_publish_*` filetests (each
+  publishes a warm-up hole first; store made the indexes' first leaves when it
+  was deployed, so the chain's very first publish stores only 139 bytes more
+  than another): a plain lane of 364 bytes of data stores 2,557 bytes and
+  spends 16.9M gas; an author new to golf adds 454 bytes (their row in the
+  authors' index); a later version stores 960 bytes less; the heaviest hole
+  v2 takes from the Builder's worlds (5,346 bytes of data: more and v2's work
+  check refuses it) stores 7,550 and spends 128M; a name and a note at their
+  longest, in four-byte runes, add 884 bytes and 52M (each rune cleaned and
+  checked for links). So a publish stores its data, its name and note and
+  about 2.2 KB more; the Builder asks for that at the chain's byte price, a
+  tenth more, and the gas fitted on these with a quarter more
+  (`web/lib/builder/publish.ts`).
 - **Reads** are free as queries, within the node's query gas limit.
 
 ## Updating after the deploy

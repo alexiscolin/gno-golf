@@ -149,8 +149,11 @@ and plan, Tasks 7.7 to 10.6):
   replayed as its save would be cut; publishing opens only with every proof
   of the hole as it is, under the id it will have.
 - **Publish figures from filetests.** The deposit and the gas come from the
-  `z_builder_publish_*` filetests (Storage and Gas less a warm-up publish's),
-  not from a transaction: none was sent while building this.
+  `z_builder_publish_*` filetests in golf/v2, the rules the Builder publishes
+  under (Storage in golf/v2 and store, and Gas, less a warm-up publish's), not
+  from a transaction: none was sent while building this. (They were fitted on
+  golf v1 at first, whose first publisher also paid the indexes' first
+  leaves: the first v2 publish was billed some 2 GNOT too much.)
 - **No Builder on a phone.** Under 900 px or on a coarse pointer, `/build`
   loads neither the editor nor `builder.wasm` (an import-graph test holds it).
 

@@ -15,32 +15,34 @@ import type { Draft } from "./draft";
 import type { BuilderHost } from "./wasm";
 
 /**
- * What a publish stores besides its data, name and note (bytes): its entry
- * and its rows in golf's indexes (a plain lane: 4,297 stored for 364 of data
- * and a 4-byte name); an author new to golf adds their row in the
- * community's index; a later version, its alias already indexed, less;
- * the chain's first community hole, the first leaf of each index golf opens
- * for the community (the warm-up filetest: 22,680 in all).
+ * What a publish stores besides its data, name and note (bytes), in store
+ * under golf/v2's rules (the z_builder_publish filetests in golf/v2): its
+ * entry and its rows in the indexes (a plain lane: 2,557 stored for 364 of
+ * data and a 4-byte name); an author new to golf adds their row in the
+ * authors' index; a later version, its alias already indexed, less. Store
+ * made the indexes' first leaves at its deploy: the chain's first community
+ * hole pays no more (the warm-up's 139 bytes over, within the deposit's tenth).
  */
-export const STORED = { overhead: 3929, newAuthor: 385, version: -933, firstCommunity: 17998 } as const;
+export const STORED = { overhead: 2189, newAuthor: 454, version: -960 } as const;
 
 const utf8 = (s: string) => new TextEncoder().encode(s).length;
 
 /** What a publish stores: the data's bytes (course.Encode's), the name and note as the chain keeps them, its entry and index rows. */
-export function publishBytes({ bytes, name, note, v, newAuthor, firstCommunity = false }: { bytes: number; name: string; note: string; v: number; newAuthor: boolean; firstCommunity?: boolean }) {
-  return bytes + utf8(name) + utf8(note) + STORED.overhead + (newAuthor ? STORED.newAuthor : 0) + (v > 1 ? STORED.version : 0) + (firstCommunity ? STORED.firstCommunity : 0);
+export function publishBytes({ bytes, name, note, v, newAuthor }: { bytes: number; name: string; note: string; v: number; newAuthor: boolean }) {
+  return bytes + utf8(name) + utf8(note) + STORED.overhead + (newAuthor ? STORED.newAuthor : 0) + (v > 1 ? STORED.version : 0);
 }
 
 /** The storage deposit (ugnot) at price ugnot a byte (the chain's: vm params), a tenth more: the chain takes what is really written. */
 export const deposit = (o: Parameters<typeof publishBytes>[0] & { price: number }) => Math.ceil(publishBytes(o) * o.price * 1.1);
 
 /**
- * PublishMine's work, fitted on the filetests: a base, each byte of data
- * (decoding, the checks, the work estimates walk what it holds: golf's
- * heaviest hole, 15,292 bytes, 435M), each rune of name and note (cleaned
- * and checked for links: 180 four-byte runes, 47M).
+ * PublishMine's work under golf/v2, fitted on its filetests: a base (a new
+ * author's or a version's rows on top: kept above both), each byte of data
+ * (decoding, the checks, the work estimates walk what it holds: the heaviest
+ * hole v2 takes from the Builder's worlds, 5,346 bytes, 128M), each rune of
+ * name and note (cleaned and checked for links: 180 four-byte runes, 49M).
  */
-const GAS = { base: 5.23e6, perByte: 28_113, perRune: 261_800 } as const;
+const GAS = { base: 8.0e6, perByte: 22_185, perRune: 273_400 } as const;
 /** The gas a publish asks for: the call's own, and PublishMine's work a quarter more, never past what a transaction may ask. */
 export function gasFor({ bytes, name, note }: { bytes: number; name: string; note: string }) {
   const runes = [...name].length + [...note].length;

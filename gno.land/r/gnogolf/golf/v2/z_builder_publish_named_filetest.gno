@@ -1,17 +1,19 @@
-// PKGPATH: gno.land/r/test/builderpublishnamed
-package builderpublishnamed
+// PKGPATH: gno.land/r/test/builderpublishv2named
+package builderpublishv2named
 
 import (
 	"strings"
 
-	"gno.land/r/gnogolf/golf"
+	golf "gno.land/r/gnogolf/golf/v2"
 )
 
 // The Builder's publish numbers (web/lib/builder/publish.ts: the storage
-// deposit and the gas a PublishMine asks for). Each z_builder_publish_*
-// filetest publishes the same warm-up hole first, paying there for the
-// indexes golf opens at a first publish; its Storage and Gas less
-// z_builder_publish_warm_filetest's are its own publish's:
+// deposit and the gas a PublishMine asks for), on the rules it publishes
+// under (golf/v2, its records in store). Each z_builder_publish_* filetest
+// publishes the same warm-up hole first (store made the community's and the
+// authors' first index leaves when it was deployed: a first publish pays no
+// more than another); its Storage and Gas less z_builder_publish_warm_filetest's
+// are its own publish's:
 // the plain lane with the longest name and note, each rune four bytes (40 and
 // 140 of U+10400).
 // The data are course.Encode's own, written out: a transaction is handed
@@ -29,12 +31,13 @@ func main(cur realm) {
 }
 
 // Output:
-// g19ke5nmahs8thcqe7wt7f9qsk9c6sfkjpj5kghj/warm/v1
-// g19ke5nmahs8thcqe7wt7f9qsk9c6sfkjpj5kghj/named/v1
+// g1xcnzgvne2unkedwzmcp4slz59s9guwznywa7ml/warm/v1
+// g1xcnzgvne2unkedwzmcp4slz59s9guwznywa7ml/named/v1
 
 // Storage:
-// gno.land/r/gnogolf/golf: 27869
-// gno.land/r/test/builderpublishnamed: 0
+// gno.land/r/gnogolf/golf/v2: 24
+// gno.land/r/gnogolf/store: 6567
+// gno.land/r/test/builderpublishv2named: 0
 
 // Gas:
-// 84133168
+// 87308424

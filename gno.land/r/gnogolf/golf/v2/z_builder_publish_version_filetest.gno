@@ -1,15 +1,17 @@
-// PKGPATH: gno.land/r/test/builderpublishversion
-package builderpublishversion
+// PKGPATH: gno.land/r/test/builderpublishv2version
+package builderpublishv2version
 
 import (
-	"gno.land/r/gnogolf/golf"
+	golf "gno.land/r/gnogolf/golf/v2"
 )
 
 // The Builder's publish numbers (web/lib/builder/publish.ts: the storage
-// deposit and the gas a PublishMine asks for). Each z_builder_publish_*
-// filetest publishes the same warm-up hole first, paying there for the
-// indexes golf opens at a first publish; its Storage and Gas less
-// z_builder_publish_warm_filetest's are its own publish's:
+// deposit and the gas a PublishMine asks for), on the rules it publishes
+// under (golf/v2, its records in store). Each z_builder_publish_* filetest
+// publishes the same warm-up hole first (store made the community's and the
+// authors' first index leaves when it was deployed: a first publish pays no
+// more than another); its Storage and Gas less z_builder_publish_warm_filetest's
+// are its own publish's:
 // a second version of the warm-up, its tee moved to (2, 7).
 // The data are course.Encode's own, written out: a transaction is handed
 // the hex, so the Gas is PublishMine's work alone. The warm-up is
@@ -26,12 +28,13 @@ func main(cur realm) {
 }
 
 // Output:
-// g1lvskqmcvejjc2prg29zcwch6jndnknuzlazulr/warm/v1
-// g1lvskqmcvejjc2prg29zcwch6jndnknuzlazulr/warm/v2
+// g19l05aanwu0mx63m3p8n4wpguvguqxtkuvxla64/warm/v1
+// g19l05aanwu0mx63m3p8n4wpguvguqxtkuvxla64/warm/v2
 
 // Storage:
-// gno.land/r/gnogolf/golf: 26044
-// gno.land/r/test/builderpublishversion: 0
+// gno.land/r/gnogolf/golf/v2: 24
+// gno.land/r/gnogolf/store: 4723
+// gno.land/r/test/builderpublishv2version: 0
 
 // Gas:
-// 32759268
+// 38132363

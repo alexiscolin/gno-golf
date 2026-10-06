@@ -9,11 +9,13 @@ import fs from "node:fs";
 import { bill, deposit, finalHex, gasFor, gnokeyPublish, holeHolds, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
 import { shaOf } from "../lib/builder/proof.ts";
 
-const GOLF = new URL("../../gno.land/r/gnogolf/golf/", import.meta.url);
-/** A filetest's golden numbers: the golf realm's storage and the gas. */
+// the rules the Builder publishes under (golf/v2, chain.ts's REALM), its records in store
+const GOLF = new URL("../../gno.land/r/gnogolf/golf/v2/", import.meta.url);
+/** A filetest's golden numbers: what golf/v2 and store stored, and the gas. */
 const golden = (name: string) => {
   const s = fs.readFileSync(new URL(`z_builder_publish_${name}_filetest.gno`, GOLF), "utf8");
-  return { stored: Number(/gno\.land\/r\/gnogolf\/golf: (\d+)/.exec(s)![1]), gas: Number(/\/\/ Gas:\n\/\/ (\d+)/.exec(s)![1]) };
+  const at = (realm: string) => Number(new RegExp(`// ${realm.replaceAll("/", "\\/")}: (-?\\d+)`).exec(s)![1]);
+  return { stored: at("gno.land/r/gnogolf/golf/v2") + at("gno.land/r/gnogolf/store"), gas: Number(/\/\/ Gas:\n\/\/ (\d+)/.exec(s)![1]) };
 };
 const warm = golden("warm");
 const own = (name: string) => ({ stored: golden(name).stored - warm.stored, gas: golden(name).gas - warm.gas });
@@ -22,7 +24,7 @@ const FOUR = "\u{10400}";
 const CASES = {
   more: { bytes: 364, name: "More", note: "", v: 1, newAuthor: false },
   author: { bytes: 364, name: "Lane", note: "", v: 1, newAuthor: true },
-  heavy: { bytes: 15292, name: "At the limits", note: "", v: 1, newAuthor: false },
+  heavy: { bytes: 5346, name: "Fixture", note: "", v: 1, newAuthor: false },
   named: { bytes: 520, name: FOUR.repeat(40), note: FOUR.repeat(140), v: 1, newAuthor: false },
   version: { bytes: 364, name: "Warm", note: "", v: 2, newAuthor: false },
 };
@@ -32,13 +34,14 @@ void test("publishBytes: what each measured publish stored, within a few bytes (
     const want = own(name).stored, got = publishBytes(c);
     assert.ok(Math.abs(got - want) <= 24, `${name}: ${got} for ${want}`);
   }
-  assert.ok(STORED.overhead > 3000 && STORED.overhead < 5000);
+  assert.ok(STORED.overhead > 1500 && STORED.overhead < 3000, "v2: an entry and its index rows, no first leaves");
 });
 
-void test("publishBytes: the chain's first community hole also opens the community's indexes (the warm-up filetest: a first publish)", () => {
-  const first = publishBytes({ bytes: 364, name: "Warm", note: "", v: 1, newAuthor: true, firstCommunity: true });
-  assert.ok(Math.abs(first - warm.stored) <= 24, `${first} for ${warm.stored}`);
-  assert.ok(deposit({ bytes: 364, name: "Warm", note: "", v: 1, newAuthor: true, firstCommunity: true, price: 100 }) >= warm.stored * 100);
+void test("publishBytes: the chain's first community hole costs what any first publish does (store made the indexes' first leaves at its deploy)", () => {
+  const first = { bytes: 364, name: "Warm", note: "", v: 1, newAuthor: true };
+  assert.ok(Math.abs(publishBytes(first) - warm.stored) < 160, `${publishBytes(first)} for ${warm.stored}`);
+  assert.ok(deposit({ ...first, price: 100 }) >= warm.stored * 100, "the very first publish, on an empty store: still within the deposit's tenth");
+  assert.ok(!("firstCommunity" in STORED), "no surcharge for being first: v1's, which its first publisher paid");
 });
 
 void test("deposit: the bytes at the chain's price, a tenth more: never less than what is stored", () => {
