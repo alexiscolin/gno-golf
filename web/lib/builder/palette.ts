@@ -12,7 +12,7 @@ import { DRAWN as COURSE_DRAWN } from "../scene/course";
 import { DRAWN as ZONES_DRAWN } from "../scene/zones";
 import { WORLD_NAMES, loadWorld, worldOf, type Kind, type Skins } from "../scene/worlds";
 import { own } from "../own";
-import { MAX_BOUNCE } from "./rules";
+import { FIELD, MAX_BOUNCE, notABuilderWorld } from "./rules";
 
 export type { Kind };
 export { WORLD_NAMES };
@@ -87,9 +87,8 @@ const KIND: Record<Kind, Binding> = {
 
 const KICK = { bounce: r(0, 1.5, 0.05, 1.2) };
 const ICE = { scale: r(1.01, 1.3, 0.01, 1.18) };
-const MOVES = { clocks: ["substep"] } as const satisfies Partial<Binding>; // a machine: drawn only while it runs
 const BIG = { size: r(1, 4.5, 0.05, 2.2) };
-// rock among rock: a cluster of them, or one set into a rock wall, reads as one outcrop (the mines', the mountain's)
+// rock among rock: a cluster of them, or one set into a rock wall, reads as one outcrop (the mountain's)
 const ROCKY = { overlaps: ["wall", "post"] };
 
 /**
@@ -97,13 +96,10 @@ const ROCKY = { overlaps: ["wall", "post"] };
  * drawing with no binding is not in the palette (and must be in HAND_ONLY).
  */
 export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
-  rail: { "": {}, rampart: {}, rockface: {}, crystal: {}, "crystal bumper": KICK, grate: {}, rope: {}, railguard: {} },
+  rail: { "": {}, rampart: {} },
   bar: {
     "": {}, driftwood: {}, plank: {}, "clock hand": { clocks: ["substep", "fixed"] }, stall: {}, awning: {}, wheelbarrow: {},
     logs: {}, hay: {}, gate: {}, "gate door": {}, hedge: {}, "rowing boat": {}, rail: {}, ledge: {}, net: {},
-    rockface: {}, crystal: {}, "crystal bumper": KICK, grate: {}, rope: {}, railguard: {},
-    stamp: MOVES, paddle: MOVES, pickaxe: MOVES, drill: MOVES, piston: MOVES, "swing door": MOVES, "safe door": MOVES,
-    boulder: MOVES, "cage door": MOVES, "crystal gate": MOVES, tripwire: MOVES, stalactite: MOVES,
   },
   post: {
     "": {}, bumper: { ...KICK, plain: true }, scarecrow: {}, sunflower: {}, lantern: {}, sandcastle: { ...BIG, overlaps: ["wall"] }, palm: {}, coral: {}, buoy: {}, crab: {},
@@ -111,24 +107,21 @@ export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
     lamp: {}, clock: { overlaps: ["wall"] }, roundabout: BIG, chimney: {}, outcrop: {}, driftwood: {}, house: BIG, "gnome statue": {}, rock: {}, stump: {},
     cat: {}, bandstand: BIG, obelisk: {}, pigeon: {}, stall: {},
     pine: {}, boulder: ROCKY, snowman: {}, chalet: BIG, skater: {},
-    stalagmite: ROCKY, prop: ROCKY, buffer: {}, "crystal bumper": { ...KICK, ...ROCKY }, "jewel bumper": KICK, "frozen fall": {}, bat: {},
   },
   surface: {
     "": {}, sand: {}, wetsand: {}, flowerbed: {}, soil: {}, bridge: { scale: r(1, 1, 0.01, 1) }, ice: ICE, molehill: { scale: r(1, 1, 0.01, 1) },
     brick: { scale: r(0.8, 1, 0.01, 0.92) }, herringbone: { scale: r(0.8, 1, 0.01, 0.88) }, marble: { scale: r(1, 1.2, 0.01, 1.05) },
     "plank bridge": { scale: r(1, 1, 0.01, 1) }, snowdrift: {},
-    rubble: {}, ore: {}, ballast: {}, "drip pool": {}, gold: ICE, causeway: { scale: r(1, 1, 0.01, 1) },
   },
   slope: {
     "": {}, dune: {}, stairs: {}, "quarter pipe": {}, funbox: {}, "moon bridge": {},
     kicker: {}, terrace: {}, downhill: {}, slope: {}, "saddle crest": {}, bank: {},
-    incline: {}, "ledge bank": {}, conveyor: {},
   },
   air: {},
   tunnel: { "": {}, cave: {}, well: {}, door: {}, shipwreck: {}, warp: {}, "ice cave": {} },
   hazard: {
     "": {}, water: {}, wave: {}, lagoon: {}, tidepool: {}, fountain: {}, canal: {},
-    cliff: {}, serac: {}, crevasse: {}, lava: {}, shaft: {}, sump: {}, "hot spring": {}, "ore bin": {},
+    cliff: {}, serac: {}, crevasse: {},
   },
   loop: {},
 };
@@ -137,15 +130,12 @@ export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
  * Drawings by skin that cannot be placed one by one, with why: each comes
  * back as an assembly, with its own binding and render test. (The worlds
  * declare only what they draw from the piece alone: their compositions, a
- * mines ride or a mill's sails, are in no list.)
+ * mill's sails, are in no list.) Only the Builder's worlds' drawings are
+ * here (the Crystal Mines' are the game's alone).
  */
 export const HAND_ONLY: Record<string, string> = {
   "bar/tram": "a tram line is a run of timed bars, with rails and tunnels at the board's edge (course.ts tramLines)",
-  "bar/cart": "a mines cart runs on its ride's track (mines-rides.ts)",
   "air/gust": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
-  "air/vent": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
-  "air/booster": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
-  "air/magnet": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
 };
 
 /** The shared drawings (any world), by kind: the scene's tables and declarations. */
@@ -205,6 +195,7 @@ export function paletteOf(world: string, own: Skins = {}): PaletteEntry[] {
 
 /** A world's palette, its module loaded first (its skins are declared beside its drawings). */
 export async function loadPalette(world: string): Promise<readonly PaletteEntry[]> {
+  if (!Object.hasOwn(FIELD, world)) throw new Error(notABuilderWorld(world));
   await loadWorld(world);
   return paletteOf(world, worldOf({ world }).skins);
 }

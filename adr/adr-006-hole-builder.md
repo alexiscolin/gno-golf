@@ -131,11 +131,16 @@ and plan, Tasks 7.7 to 10.6):
   where the way to the cup goes, bars clear of the kerb; and `buildHole`
   reports what drew each piece, so a piece the scene would draw as another
   is refused.
-- **The builder is stricter than the course.** Four course holes would be
-  refused as drafts (mines/10, mines/7, mines/14, town/14: thin hot springs, a
-  door 1.2 deep, scenery out of reach, buffers in the void), named in the
-  golden test; 38 of the 90 open in the Builder, the rest having pieces only a
-  hand-written hole has.
+- **The builder is stricter than the course, on purpose** (the owner's
+  decision: safety first, no rule relaxed). The course holes were validated
+  by hand and by play; those the Builder refuses (town/14: a door 1.2 deep)
+  are a report in the golden test, and never open in the editor, which opens
+  only what its own rules pass.
+- **The classic worlds only** (the owner's decision). The Builder offers the
+  Garden, the Island, Mushroom Town and the Mountain; the Crystal Mines are
+  too complex for it and stay the game's: no picker entry, palette, starter
+  or field, and a mines hole or file is refused to open with a plain
+  sentence.
 - **Work gauges measure what a hole adds.** A shot's bound and a storm's cost
   both start from a floor every hole pays (MaxWork per shot); the gauges and
   E11 measure the rest against what is left, or a plain lane would sit at 95%.

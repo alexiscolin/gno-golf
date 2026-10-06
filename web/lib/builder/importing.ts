@@ -3,10 +3,14 @@
 // or a published hole read back as a draft for its next version (gg1.ts
 // readHole on builder.wasm's decode: each piece matched to the palette, each
 // bar recovered from build.Bar's corners), refused naming the pieces the
-// Builder does not make. And a draft's file name.
+// Builder does not make, or whose world is not one of the Builder's, or
+// that the Builder's own rules refuse (it opens only what it can vouch for).
+// And a draft's file name.
 import { matchIn, unknownEntry } from "./edit";
 import { readHole } from "./gg1";
 import { loadPalette } from "./palette";
+import { validate } from "./pipeline";
+import { FIELD, notABuilderWorld } from "./rules";
 import { parseDraft, type Draft } from "./draft";
 import type { BuilderHost } from "./wasm";
 
@@ -32,11 +36,15 @@ export async function fromPublished(hex: string, host: BuilderHost, id: string, 
   } catch {
     return "This hole's data could not be read.";
   }
-  const r = readHole(g, matchIn(await loadPalette(g.world)), (line) => host.bar(line));
+  if (!Object.hasOwn(FIELD, g.world)) return notABuilderWorld(g.world);
+  const palette = await loadPalette(g.world), r = readHole(g, matchIn(palette), (line) => host.bar(line));
   if ("refused" in r) {
     const more = r.refused.length - NAMED;
     return `This hole has pieces the Builder doesn't make: ${r.refused.slice(0, NAMED).join(", ")}${more > 0 ? `, and ${more} more` : ""}.`;
   }
+  // a hole the Builder's own rules refuse never opens in it: it cannot vouch for what it would publish
+  const why = validate(r, { host, palette }).issues.find((i) => i.severity === "error");
+  if (why) return `This hole breaks the Builder's rules: ${why.text}. It stays playable in the game.`;
   const [author, slug] = id.split("/");
   return { ...r, slug: me && author === me && /^[a-z0-9-]{1,32}$/.test(slug) ? slug : "" };
 }

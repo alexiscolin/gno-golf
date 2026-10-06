@@ -105,8 +105,8 @@ void test("history: 200 steps deep; undo, redo, and a new step drops what was un
 
 void test("persistence: saved and loaded as written; a store that throws, or another version's, gives none", () => {
   localStorage.clear();
-  saveDrafts([base(), emptyDraft("mines")]);
-  assert.deepEqual(loadDrafts(), [base(), emptyDraft("mines")]);
+  saveDrafts([base(), emptyDraft("island")]);
+  assert.deepEqual(loadDrafts(), [base(), emptyDraft("island")]);
   localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 9, drafts: [base()] }));
   assert.deepEqual(loadDrafts(), []);
   localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: [base(), { nope: 1 }] }));

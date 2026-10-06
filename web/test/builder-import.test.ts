@@ -33,10 +33,25 @@ void test("fromPublished: a course hole of palette pieces opens as a draft (its 
 });
 
 void test("fromPublished: a hole with pieces the Builder does not make is refused, naming them", async () => {
-  const r = await fromPublished(holes.get("mines/3")!, host, "mines/3/v1", A);
+  const r = await fromPublished(holes.get("island/4")!, host, "island/4/v1", A);
   assert.equal(typeof r, "string");
-  assert.match(typeof r === "string" ? r : "", /^This hole has pieces the Builder doesn't make: the rail cart at \(26\.7, 4\.2\)/);
+  assert.match(typeof r === "string" ? r : "", /^This hole has pieces the Builder doesn't make: the rail rowing boat at \(30\.24, 7\.19\)/);
   assert.equal(await fromPublished("zz", host, "x/v1", A), "This hole's data could not be read.");
+});
+
+void test("fromPublished: a hole the Builder's rules refuse never opens in the editor (the course holes it is stricter on)", async () => {
+  for (const slot of ["town/14"]) {
+    const r = await fromPublished(holes.get(slot)!, host, `${slot}/v1`, A);
+    assert.equal(typeof r, "string", `${slot} opened`);
+  }
+  const door = await fromPublished(holes.get("town/14")!, host, "town/14/v1", A);
+  assert.match(typeof door === "string" ? door : "", /^This hole breaks the Builder's rules: /);
+});
+
+void test("fromPublished, fromFile: a Crystal Mines hole never opens in the Builder (not one of its worlds), said plainly", async () => {
+  const want = "The Builder makes holes in the Garden, the Island, Mushroom Town and the Mountain: this one is in the Crystal Mines, and stays playable in the game.";
+  for (const slot of ["mines/1", "mines/3", "mines/12"]) assert.equal(await fromPublished(holes.get(slot)!, host, `${slot}/v1`, A), want, slot);
+  assert.equal(await fromFile(JSON.stringify({ ...lane("garden", []), world: "mines" })), want);
 });
 
 void test("draftFile: a file name from the slug, else the name, else a plain one; never a path", () => {

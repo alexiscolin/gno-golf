@@ -39,12 +39,11 @@ void test("Local clock: the strokes and the extras answer as the chain's, parsed
   await assert.rejects(c.simulateRound(ID, ["x"], PERIOD), /golf:/, "a refusal is the realm's sentence");
 });
 
-void test("required: each weather that moves the ball, in the world's climate (fog out; the mines take the garden's)", () => {
+void test("required: each weather that moves the ball, in the world's climate (fog out)", () => {
   assert.deepEqual(required("garden"), ["", "wind", "rain"]);
   assert.deepEqual(required("island"), ["", "wind", "rain", "storm"]);
   assert.deepEqual(required("town"), ["", "rain", "wind"]);
   assert.deepEqual(required("mountain"), ["", "snow", "wind"]);
-  assert.deepEqual(required("mines"), required("garden"));
 });
 
 void test("proofKey: renaming the hole or changing its par keeps it; moving a piece or the world drops it", async () => {

@@ -15,12 +15,16 @@ import { placePiece } from "../lib/builder/edit.ts";
 import { writeDraft } from "../lib/builder/gg1.ts";
 import { host, lane, stateOf } from "./builder-fixture.ts";
 
+// the Builder's worlds (FIELD's keys): the classic four; the Crystal Mines are the game's alone
+const BUILDER_WORLDS = Object.keys(FIELD);
 const palettes = new Map<string, readonly PaletteEntry[]>();
-for (const w of WORLD_NAMES) palettes.set(w, await loadPalette(w));
+for (const w of BUILDER_WORLDS) palettes.set(w, await loadPalette(w));
 const every = () => [...palettes.entries()].flatMap(([w, es]) => es.map((e) => [w, e] as const));
 
-void test("the builder's worlds are the scene's; each has a palette with every kind it may offer", () => {
-  assert.deepEqual(Object.keys(FIELD).sort(), [...WORLD_NAMES].sort());
+void test("the builder's worlds are the scene's classic four (no Crystal Mines); each has a palette with every kind it may offer", async () => {
+  assert.deepEqual([...BUILDER_WORLDS].sort(), ["garden", "island", "mountain", "town"]);
+  assert.ok(BUILDER_WORLDS.every((w) => WORLD_NAMES.includes(w)));
+  await assert.rejects(loadPalette("mines"), /The Builder makes holes in the Garden, the Island, Mushroom Town and the Mountain: this one is in the Crystal Mines/);
   for (const [w, es] of palettes) {
     const kinds = new Set(es.map((e) => e.kind));
     for (const k of ["rail", "bar", "post", "surface", "slope", "tunnel", "hazard"] as const) assert.ok(kinds.has(k), `${w}: no ${k}`);
@@ -49,12 +53,16 @@ void test("each world's field is the one most of its course holes have", () => {
   // each value the one most of the world's holes have (their substeps vary hole by hole)
   const most = (xs: number[]) => xs.reduce((best, x) => (xs.filter((y) => y === x).length > xs.filter((y) => y === best).length ? x : best));
   for (const [w, s] of seen) {
+    if (!Object.hasOwn(FIELD, w)) continue; // (a world the Builder leaves to the game)
     assert.deepEqual(FIELD[w], { substeps: most(s.substeps), friction: most(s.friction), bounce: most(s.bounce), ballR: most(s.ballR), cupR: most(s.cupR), shelter: most(s.shelter) }, w);
   }
 });
 
-void test("every drawing the scene declares is bound or hand-only, and nothing is both; tram and cart are hand-only", async () => {
-  const declared = [sharedSkins(), ...(await Promise.all(WORLD_NAMES.map(async (w) => (await loadWorld(w), worldOf({ world: w }).skins ?? {}))))];
+void test("every drawing the scene declares for the Builder's worlds is bound or hand-only, nothing is both, and no binding is for a drawing none of them has", async () => {
+  const declared = [sharedSkins(), ...(await Promise.all(BUILDER_WORLDS.map(async (w) => (await loadWorld(w), worldOf({ world: w }).skins ?? {}))))];
+  const used = new Set(declared.flatMap((skins) => Object.entries(skins).flatMap(([kind, list]) => list.map((s) => `${kind}/${s}`))));
+  for (const [kind, skins] of Object.entries(BINDINGS)) for (const s of Object.keys(skins)) assert.ok(used.has(`${kind}/${s}`), `${kind}/${s}: bound, but no Builder world draws it`);
+  for (const k of Object.keys(HAND_ONLY)) assert.ok(used.has(k), `${k}: hand-only, but no Builder world draws it`);
   for (const skins of declared) {
     for (const [kind, list] of Object.entries(skins)) {
       for (const s of list) {
@@ -63,7 +71,7 @@ void test("every drawing the scene declares is bound or hand-only, and nothing i
       }
     }
   }
-  assert.ok(Object.hasOwn(HAND_ONLY, "bar/tram") && Object.hasOwn(HAND_ONLY, "bar/cart"));
+  assert.ok(Object.hasOwn(HAND_ONLY, "bar/tram"));
 });
 
 void test("every binding is inside GG1's bounds and the plan's: a bounce above 1 exactly where the skin kicks; mouths 1.5 across; ice a surface; no weather", () => {
@@ -119,7 +127,8 @@ void test("the palette covers the course: every course piece whose skin has an e
   const out: string[] = [];
   const course = fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n").map((l) => l.split(" "));
   for (const [slot, , , hex] of course) {
-    const g = host.decode(hex), es = palettes.get(g.world)!;
+    const g = host.decode(hex), es = palettes.get(g.world);
+    if (!es) continue; // (a world the Builder leaves to the game)
     const find = (kind: string, skin: string) => es.find((e) => e.kind === kind && e.skin === skin);
     const inRange = (what: string, v: number, r?: { min: number; max: number }) => r && !(v >= r.min - 1e-9 && v <= r.max + 1e-9) && out.push(`${slot} ${what} ${v} not in ${r.min}..${r.max}`);
     // a passive piece plays MaxBounce at most whatever it says: that is the bounce it has

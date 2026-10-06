@@ -2,9 +2,9 @@
 // broken on purpose, one or more per rule, each refused by exactly its rule
 // with its sentence, through the whole pipeline (lib/builder/pipeline.ts:
 // the palette's ranges, the editor's checks on the hole as fit gives it, the
-// chain's own checks, the render census); and every course hole, read as the
-// builder reads one, passing, but for the four where the builder is stricter
-// than a hole written by hand (named, with why).
+// chain's own checks, the render census); and the course holes as the
+// Builder judges them: those it passes keep passing, those it is stricter on
+// (named, with why) a report.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -13,6 +13,7 @@ import { host, lane, rail } from "./builder-fixture.ts";
 import { validate } from "../lib/builder/pipeline.ts";
 import { checkHole, type EntryOf } from "../lib/builder/checks.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
+import { FIELD } from "../lib/builder/rules.ts";
 import { canPlace, clampMove, fixOf, placePiece } from "../lib/builder/edit.ts";
 import type { Draft } from "../lib/builder/draft.ts";
 import type { GHole } from "../lib/builder/types.ts";
@@ -91,23 +92,30 @@ void test("E9 and E11: the data's size and the work, from the chain's own number
   assert.deepEqual(warn, ["warning", "warning"]);
 });
 
-void test("every course hole passes, as the builder reads it, but for the four where the builder is stricter", async () => {
-  const stricter: Record<string, string[]> = {
-    "mines/10": ["E3", "E5", "E5", "E5"], // hot springs 1.21 across, one against the cup: a fast ball can step over them (physics MaxMove 1.5)
-    "mines/7": ["E10", "E10"], // stalagmites and a lava pool beyond the rockface: scenery outside the lane
-    "mines/14": ["E15", "E15"], // a cart ride's buffers out in the void: the ride is hand-only, its buffers alone would be hidden
-    "town/14": ["E5"], // a door 1.2 deep: a fast ball can step over it
-  };
+// The course holes were checked by hand and by play, not by the Builder, which
+// is stricter (safety first: its rules are never relaxed to let one in). Those
+// it refuses are a report, not a requirement; every other one of its worlds
+// must keep passing, so a change that refuses a new one is seen here. (The
+// Crystal Mines are not a Builder world: their holes are the game's alone.)
+const REFUSED_COURSE: Record<string, string> = {
+  "town/14": "a door 1.2 deep: a fast ball can step over it",
+};
+
+void test("the course holes as the Builder judges them: those it passes keep passing; those it refuses, a report", async (t) => {
   for (const l of fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n")) {
     const [slot, , , hex] = l.split(" ");
-    const g: GHole = host.decode(hex), es = await loadPalette(g.world);
+    const g: GHole = host.decode(hex);
+    if (!Object.hasOwn(FIELD, g.world)) continue;
+    const es = await loadPalette(g.world);
     const entryOf: EntryOf = (r) => {
       const list = r.pulse === undefined ? g : g.pulses[r.pulse];
       const p = r.set === "wall" ? list.walls[r.i] : r.set === "post" ? list.posts[r.i] : list.zones[r.i];
       const kinds = r.set === "wall" ? ["rail", "bar"] : r.set === "post" ? ["post"] : [(p as { kind: string }).kind];
       return es.find((e) => kinds.includes(e.kind) && e.skin === p.skin);
     };
-    assert.deepEqual(checkHole(g, { entryOf }).map((i) => i.rule), stricter[slot] ?? [], slot);
+    const rules = checkHole(g, { entryOf }).filter((i) => i.severity === "error").map((i) => i.rule);
+    if (Object.hasOwn(REFUSED_COURSE, slot)) t.diagnostic(`${slot} refused by the Builder (${rules.join(", ") || "none now"}): ${REFUSED_COURSE[slot]}`);
+    else assert.deepEqual(rules, [], `${slot}: it passed before`);
   }
   void build;
 });

@@ -205,7 +205,8 @@ are for writing holes only: nothing on chain needs them.
 The course's own holes, in `gno.land/r/gnogolf/`, are the best examples.
 
 **Or draw it in the Builder**, at `/build` on a computer (behind
-`NEXT_PUBLIC_BUILDER=1` until it is out): a palette of each world's pieces, a
+`NEXT_PUBLIC_BUILDER=1` until it is out), in the Garden, the Island, Mushroom
+Town or the Mountain (the Crystal Mines stay the game's): a palette of each world's pieces, a
 board where nothing the chain would refuse can be placed (a piece that would
 break the hole is red with the reason and does not drop; a drag stops at the
 last place it may go), the hole in 3D as players will see it, and the chain's

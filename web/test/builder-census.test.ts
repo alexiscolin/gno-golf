@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadWorld } from "./scene-harness.ts";
 import { lane, stateOf } from "./builder-fixture.ts";
-import { WORLD_NAMES, loadPalette } from "../lib/builder/palette.ts";
+import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { writeDraft } from "../lib/builder/gg1.ts";
 import { FIELD } from "../lib/builder/rules.ts";
@@ -27,7 +27,7 @@ function census(d: Draft, s: Hole = stateOf(d)): Map<string, Drawn[]> {
 const piece = (entry: string, geometry: Piece["geometry"], over: Partial<Piece> = {}): Piece => ({ id: "x", entry, geometry, params: {}, clock: { k: "fixed" }, ...over });
 
 void test("every palette entry, placed alone, is drawn by its own path", async () => {
-  for (const w of WORLD_NAMES) {
+  for (const w of Object.keys(FIELD)) { // (the Builder's worlds)
     await loadWorld(w);
     for (const e of await loadPalette(w)) {
       const d = lane(w, [placePiece(e, "x", [14, 9], { to: [24, 4] })]);

@@ -300,6 +300,19 @@ the checks, the text filters, `physics/build` and the `decode` writer: about
    (playing stays on a phone), and gives a link to copy to open it on a
    computer. No touch editing. A test holds that this path never fetches
    `builder.wasm`.
+8b. **The classic worlds only** (amended 2026-10-06, the owner's decision):
+   the Builder offers the Garden, the Island, Mushroom Town and the
+   Mountain. The Crystal Mines (their rides, their dark galleries, their
+   void) are too much for it: no picker, palette, starter or field for them,
+   and a mines hole, a file or a published one, is refused to open with a
+   plain sentence; the game plays the mines course as before. (Their field
+   in Decision 7 is kept only as history.)
+8c. **Stricter than the course** (amended 2026-10-06, the owner's
+   decision): the course holes were validated by hand and by play; the
+   Builder's rules are never relaxed to let one in. Those it refuses
+   (town/14, a door 1.2 deep) are a report in the golden test, not a
+   requirement, and never open in the editor: it opens only what it can
+   vouch for.
 9. **No server.** Drafts live in the browser (and in a file the author can
    export); proofs are re-checked in the browser at publish; sharing is a
    link and an image made in the page (ADR-003). The one file the site
@@ -470,8 +483,8 @@ the whole hole shows.
 and `canPlace` (the same rules, one piece against the rest) for the ghost
 and the clamps. The golden set of broken holes (`web/test/builder-golden.test.ts`)
 holds them: each deliberately broken hole is refused by the right rule with
-its sentence, and every course hole of `data/holes.txt` made of palette
-pieces passes.
+its sentence; the course holes of the Builder's worlds it passes keep
+passing, and those it is stricter on are a report (Decision 8c).
 
 ### The render census
 
@@ -712,7 +725,6 @@ changes how the ball moves: every kind but fog, which only hides the far end
 | island | clear, wind, rain, storm |
 | town | clear, rain, wind |
 | mountain | clear, snow, wind |
-| mines (not in `climates`: the garden's on chain) | clear, wind, rain |
 
 One period is one sample: wind direction and strength (`WindMin` to
 `WindMax`) and the puddles change every period (`course.ForecastFor`,
@@ -927,7 +939,7 @@ part of the kerb".
 | Render census | a "palette sheet" hole per world, every entry once, and the same sheet with every entry next to a rail run, inside an outside-polygon sea, and in a timed run: the census reports each palette piece drawn by its entry's path where the hole allows it, and E12 flags exactly the pieces the context hides or merges | `scripts/smoke.ts`, a new step |
 | Hostile holes | the adversarial holes of "Security and abuse" build in every world, no error | `scripts/smoke.ts`, a new step |
 | Editor checks | E1 to E15, each with a hole that passes and one that fails; E1 with a polygon point and a tunnel destination past the extent, and a rectangle clipped to empty; E5 with a 1.4 strip of water and a thin polygon | `web/test/builder-checks.test.ts` |
-| Golden broken holes | a set of deliberately broken holes, one or more per rule (E1 to E15, L2 refusals), each refused by exactly the rule expected with its sentence; every course hole of `data/holes.txt` passes E1 to E11 and E13 to E15; `canPlace` refuses every broken piece the set places and clamps a drag to the nearest valid place | `web/test/builder-golden.test.ts` |
+| Golden broken holes | a set of deliberately broken holes, one or more per rule (E1 to E15, L2 refusals), each refused by exactly the rule expected with its sentence; the course holes of the Builder's worlds it passes keep passing, those it refuses a report (Decision 8c); `canPlace` refuses every broken piece the set places and clamps a drag to the nearest valid place | `web/test/builder-golden.test.ts` |
 | Proofs | proofs replay holed by commits; a round of more than 12 strokes on a mines hole replays in several commits and holds; a moved piece drops them; a proof over `minShotWork` does not count; template proofs under the fixed test id replay | `web/test/builder-proof.test.ts` |
 | Local clock | on `localchain`, `period()`, `now()`, `state`'s period and `weather` agree; the engine does not refresh the weather during a test round | `web/test/builder-proof.test.ts` |
 | gnokey quoting | the note `Let's go; $(x)` comes out of the command, run through `sh -c 'printf %s …'`, unchanged | `web/test/builder-publish.test.ts` |
