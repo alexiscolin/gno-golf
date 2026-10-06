@@ -193,6 +193,12 @@ export interface Holes extends Versioned {
   holes: readonly HoleRow[];
 }
 
+/** Versions(alias): a community hole's versions, oldest shown first ("" slot and none for an alias with none). */
+export interface Versions extends Versioned {
+  slot: string;
+  versions: readonly { id: string; v: number; height: number; by: string; sha: string; note: string; next: string }[];
+}
+
 export interface StrokesRow {
   player: string;
   /** their gno.land name, as the boards give it (Leaderboard, CourseLeaderboard, HoleLeaderboard); none from the other reads or an older realm */

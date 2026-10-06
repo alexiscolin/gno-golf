@@ -24,11 +24,17 @@ const toBytes = (hex: string) => Uint8Array.from(hex.match(/../g) ?? [], (b) => 
 
 /** The key the draft's proofs hold for: sha-256 of its canonical data written with no name and par 0; null if fit refuses it. */
 export async function proofKey(d: Draft, host: BuilderHost): Promise<string | null> {
-  const { hex, bars } = writeDraft(frame({ ...d, title: "", par: 0 }), FIELD[d.world]);
-  const f = host.fit(hex, bars);
-  if (!f.ok) return null;
-  const sum = new Uint8Array(await crypto.subtle.digest("SHA-256", toBytes(f.hex)));
+  const hex = canonicalHex({ ...d, title: "", par: 0 }, host);
+  if (hex == null) return null;
+  const sum = new Uint8Array(await crypto.subtle.digest("SHA-256", toBytes(hex)));
   return Array.from(sum, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** The draft's canonical bytes (framed, written, fit): what is played in test mode and published; null if fit refuses it. */
+export function canonicalHex(d: Draft, host: BuilderHost): string | null {
+  const { hex, bars } = writeDraft(frame(d), FIELD[d.world]);
+  const f = host.fit(hex, bars);
+  return f.ok ? f.hex : null;
 }
 
 /** How far back the wasm's find looks (local_builder.go findBack). */
@@ -98,6 +104,12 @@ export async function replay(chain: LocalChain, r: Played): Promise<Proof | stri
 export function unproven(proofs: readonly Proof[], world: string, key: string, id: string): string[] {
   const held = new Set(proofs.filter((p) => p.key === key && p.id === id && p.maxWork <= MIN_SHOT_WORK).map((p) => p.kind));
   return required(world).filter((k) => !held.has(k));
+}
+
+/** The id under which the hole as it is now (key) is proved in every weather, among the author's ids for this slug; null if under none. */
+export function provedAs(proofs: readonly Proof[], world: string, key: string, author: string, slug: string): string | null {
+  const ids = new Set(proofs.filter((p) => p.key === key && p.id.startsWith(`${author}/${slug}/v`)).map((p) => p.id));
+  return [...ids].find((id) => unproven(proofs, world, key, id).length === 0) ?? null;
 }
 
 /** The par the proofs suggest: the most strokes one took, plus one, at most MAX_PAR; 0 with none. */

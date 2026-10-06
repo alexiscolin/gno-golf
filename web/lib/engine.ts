@@ -16,7 +16,7 @@ import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
 import { loadWorld, worldOf } from "./scene/worlds";
-import { makeChain, shotOf, pullShot, isHoleId, RULES, wait, errorKind } from "./chain";
+import { makeChain, shotOf, pullShot, isHoleId, RULES, wait, errorKind, type Chain } from "./chain";
 import { boardWork } from "./adena";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
@@ -50,6 +50,8 @@ export type Game = ReturnType<typeof createGame>;
 export interface GameOptions {
   rpc?: string;
   web?: string;
+  /** the chain played on: the network's (rpc, web) unless given (the Builder's test mode gives its local one, lib/builder/testmode.ts) */
+  chain?: Chain;
   gnome?: string;
   world?: string;
   weather?: string;
@@ -63,7 +65,8 @@ export interface GameOptions {
   /** ?camlog: the camera logs every frame (for the probes' camLog) */
   log?: boolean;
   onChange?: (snap: Snapshot) => void;
-  onHoled?: (r: { id: string; strokes: number }) => void;
+  /** the ball dropped: the hole, the strokes, and the round's shots (the last among them: a snapshot says it only after) */
+  onHoled?: (r: { id: string; strokes: number; shots: readonly string[] }) => void;
 }
 
 /** A thrown value's message, for the HUD. */
@@ -84,8 +87,8 @@ const NO_TAKEN: ReadonlySet<string> = new Set(); // how long a new hole is shown
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
 
-export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
-  const chain = makeChain({ rpc, web });
+export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
+  const chain = given ?? makeChain({ rpc, web });
 
   const renderer = makeRenderer(canvas);
   const scene = makeScene();
@@ -1247,7 +1250,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       const holed = () => {
         // the stroke count as the round has it (SimulateFrom sends none: res.strokes was undefined,
         // and the card saved nothing)
-        onHoled({ id, strokes: g.strokes });
+        onHoled({ id, strokes: g.strokes, shots: g.shots });
         // the hole "Next hole" goes to (the win card's: the next in this cup)
         const cup = perList().holes, i = cup.findIndex((h) => h.id === id);
         if (cup.length) prefetch(cup[(i + 1) % cup.length].id);

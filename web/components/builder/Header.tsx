@@ -25,7 +25,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   step: Step;
   steps: Record<Step, StepState>;
   /** the mode's one action: its words, its look, off with why */
-  action: { text: string; kind: "gold" | "chain"; off?: string; onClick: () => void } | null;
+  action: { text: string; kind: "gold" | "chain" | "ghost"; off?: string; onClick: () => void } | null;
   history: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } | null;
   onTitle: (v: string) => void;
   onSlug: (v: string) => void;
@@ -71,7 +71,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
           </>
         )}
         {action && (
-          <button type="button" className={`btn ${action.kind === "chain" ? "btn--save" : "btn--gold"}`} disabled={!!action.off} title={action.off || undefined} onClick={action.onClick}>
+          <button type="button" className={`btn ${action.kind === "chain" ? "btn--save" : action.kind === "ghost" ? "btn--ghost" : "btn--gold"}`} disabled={!!action.off} title={action.off || undefined} onClick={action.onClick}>
             {action.off || action.text}
           </button>
         )}

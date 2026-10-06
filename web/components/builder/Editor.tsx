@@ -14,6 +14,7 @@ import { frame } from "@/lib/builder/gg1";
 import { turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
+import { proofKey, provedAs } from "@/lib/builder/proof";
 import { FIELD } from "@/lib/builder/rules";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
@@ -33,7 +34,7 @@ const CHECK_MS = 150;
 const PREVIEW_ID = "preview/v1";
 const WORLDS = Object.keys(FIELD);
 
-export default function Editor({ host, first, author, onSave, onBack, onTest }: {
+export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish }: {
   host: BuilderHost;
   first: Draft;
   author: string | null;
@@ -42,6 +43,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest }: 
   onBack: () => void;
   /** Test it: the draft with no error */
   onTest: (d: Draft) => void;
+  /** Publish: the draft proved in every weather as it is */
+  onPublish: (d: Draft) => void;
 }) {
   const session = useMemo(() => makeSession(first), [first]);
   const [, bump] = useState(0);
@@ -52,6 +55,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest }: 
   const [said, setSaid] = useState("");
   const [checked, setChecked] = useState<{ of: Draft; v: Validated; state: Hole | null } | null>(null);
   const [fine, setFine] = useState(false);
+  const [key, setKey] = useState<{ of: Draft; key: string | null } | null>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
@@ -85,6 +89,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest }: 
         try { state = JSON.parse(host.state(PREVIEW_ID)) as Hole; } catch { state = null; }
       }
       setChecked({ of: kept, v, state });
+      void proofKey(kept, host).then((k) => setKey({ of: kept, key: k }));
     }, CHECK_MS);
     return () => clearTimeout(t);
   }, [kept, full, host]);
@@ -152,22 +157,24 @@ export default function Editor({ host, first, author, onSave, onBack, onTest }: 
   const v = checked?.v, fresh = checked?.of === kept;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
   const bad = new Set(errors.map((i) => i.piece).filter((x): x is string => !!x));
-  const testOff = !v ? "Checking…" : errors.length ? `Fix ${errors.length} first` : !draft.pieces.length ? "Place a piece first" : "";
+  const testOff = !v ? "Checking…" : errors.length ? `Fix ${errors.length} first` : !draft.pieces.length ? "Place a piece first" : !draft.slug ? "Give it a short name first" : "";
   const step: Step = "edit";
+  // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
+  const proved = !testOff && key?.of === kept && !!key.key && !!author && !!provedAs(kept.proofs, kept.world, key.key, author, kept.slug);
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
-        steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: false }, publish: { locked: "Hole it in every weather first", done: false } }}
-        action={{ text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(session.now()) }}
+        steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
+        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
-        onTitle={(t) => set({ ...draft, title: t })} onSlug={(s) => set({ ...draft, slug: s })} onWorld={world} onStep={(s) => s === "test" && !testOff && onTest(session.now())} onBack={onBack} />
+        onTitle={(t) => set({ ...draft, title: t })} onSlug={(s) => set({ ...draft, slug: s })} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} />
       {palette && quick && full ? (
         <>
           <Palette world={draft.world} palette={palette} armed={armed} off={offAtLimit(draft, palette)} onArm={setArmed} />
           <div className="centre">
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onDisarm={() => setArmed(null)} onSay={say} said={said} />
-            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved: false })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
+            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
               issues={v?.issues ?? []} busy={!fresh} onSelect={setSelected} onFix={fix} />
           </div>
           <aside className="col" aria-label="The hole in 3D and the selected piece">

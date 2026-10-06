@@ -344,6 +344,20 @@ test("state reads one hole's geometry", async () => {
   assert.equal((await chain.state("garden/1")).hole, "garden/1");
 });
 
+test("versions reads an alias's versions; a reply not shaped so is refused", async () => {
+  const chain = makeChain(), alias = `${ADDR1}/mole-run`;
+  const v = { id: `${alias}/v1`, v: 1, height: 9, by: ADDR1, sha: "ab", note: "", next: "" };
+  setFetch((url) => {
+    assert.ok(decoded(url).expr.includes(`Versions("${alias}")`));
+    return qevalReply({ version: 1, slot: alias, versions: [v] });
+  });
+  assert.deepEqual((await chain.versions(alias)).versions.map((x) => x.v), [1]);
+  setFetch(() => qevalReply({ version: 1, slot: "", versions: [] }));
+  assert.deepEqual((await chain.versions(alias)).versions, [], "none yet");
+  setFetch(() => qevalReply({ version: 1, slot: alias, versions: [{ ...v, v: "1" }] }));
+  await assert.rejects(chain.versions(alias), (e) => errorKind(e) === "chain");
+});
+
 test("state refuses a reply missing a required field", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply({ ...STATE_REPLY, cup: undefined }));

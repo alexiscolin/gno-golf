@@ -15,7 +15,7 @@ import { hostOf, isLoopback } from "./network";
 import { trackError } from "./analytics";
 import type {
   Bests, CourseLeaderboard, Extras, Ghost, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
-  SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Weather,
+  SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Versions, Weather,
 } from "./types";
 
 /**
@@ -133,6 +133,8 @@ export const checks = {
   simFrom,
   simRound: (v: unknown): v is SimulateRound => isObj(v) && Number.isInteger(v.strokes) && nums(v, "period") && simFrom(v),
   weather: (v: unknown): v is Weather => isObj(v) && Array.isArray(v.zones),
+  versions: (v: unknown): v is Versions => isObj(v) && typeof v.slot === "string" && Array.isArray(v.versions) &&
+    v.versions.every((x) => isObj(x) && strs(x, "id", "by", "sha", "note", "next") && nums(x, "v", "height")),
   extras: (v: unknown): v is Extras => isObj(v) && arrays(v, "walls", "posts", "zones"),
   leaderboard: (v: unknown): v is Leaderboard => board(v, standingRow, "holes"),
   bests: (v: unknown): v is Bests => board(v, strokesRow, "par") && typeof v.hole === "string",
@@ -418,6 +420,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      */
     simulateCommit: (hole: string, ball: Vec2, stroke: number, shots: readonly string[], period: number, ms?: number, signal?: AbortSignal | null) =>
       qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
+    /** A community hole's versions (an alias, "<address>/<slug>"): what the next one's id will be, and each one's sha. */
+    versions: (alias: string) => qeval(`Versions(${s(alias)})`, checks.versions),
     /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim). */
     holeData: async (hole: string) => {
       const hex = await qstr(REALM, `HoleData(${s(hole)})`);

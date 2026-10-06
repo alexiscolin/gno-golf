@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, ID, PERIOD, hexOf, lane, rail } from "./builder-fixture.ts";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
-import { parAllowed, periodFor, proofKey, replay, required, suggestPar, unproven, type Proof } from "../lib/builder/proof.ts";
+import { parAllowed, periodFor, proofKey, provedAs, replay, required, suggestPar, unproven, type Proof } from "../lib/builder/proof.ts";
 import { MIN_SHOT_WORK } from "../lib/builder/rules.ts";
 import { RULES, shotOf } from "../lib/chain.ts";
 import type { HoleRow, SimulateFrom, Vec2 } from "../lib/types.ts";
@@ -123,6 +123,17 @@ void test("L3: publishing waits for a proof in each required weather, for this h
   assert.deepEqual(unproven([p(""), p("wind", { id: "other/v1" }), p("rain")], "garden", "k", ID), ["wind"], "another id: another weather");
   assert.deepEqual(unproven([p(""), p("wind", { maxWork: MIN_SHOT_WORK + 1 }), p("rain")], "garden", "k", ID), ["wind"]);
   assert.deepEqual(unproven([], "island", "k", ID), ["", "wind", "rain", "storm"]);
+});
+
+void test("provedAs: the hole as it is now proved in every weather under one of the author's ids for its slug", () => {
+  const A = "g1" + "a".repeat(38), id = `${A}/lane/v2`;
+  const p = (kind: string, over: Partial<Proof> = {}): Proof => ({ key: "k", id, kind, period: 1, shots: ["0,1"], commits: [[0, 1]], strokes: 1, maxWork: 1, ...over });
+  const all = [p(""), p("wind"), p("rain")];
+  assert.equal(provedAs(all, "garden", "k", A, "lane"), id);
+  assert.equal(provedAs(all, "garden", "other", A, "lane"), null, "a piece moved since");
+  assert.equal(provedAs(all, "garden", "k", A, "renamed"), null, "another slug: another id, another weather");
+  assert.equal(provedAs(all.slice(1), "garden", "k", A, "lane"), null);
+  assert.equal(provedAs([...all, p("", { id: `${A}/lane/v1` })], "garden", "k", A, "lane"), id, "an older version's proof aside");
 });
 
 void test("par: the most strokes a proof took plus one, at most 19; a par below that refused", () => {

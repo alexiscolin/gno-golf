@@ -128,3 +128,27 @@
 .bholes__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); width: 100%; text-align: left; }
 .bholes__acts { display: flex; align-items: center; gap: var(--sp-3); }
 .bholes__acts .btn { margin: 0; }
+
+/* ------------------------------------------------------------ test mode (B3): the game under the header, the weathers over it */
+.tbench { --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; position: fixed; inset: 0; overflow: hidden; font-family: var(--font); color: var(--ink); }
+.tbench > .bhead { position: absolute; left: var(--sp-3); right: var(--sp-3); top: var(--sp-3); z-index: 2; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: rgba(var(--paper-rgb), .96); }
+.tmode { position: absolute; inset: 0; }
+.tmode__strip { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); max-width: calc(100% - 2 * var(--sp-3)); padding: var(--sp-2); border: var(--edge); border-radius: var(--pill); background: rgba(var(--paper-rgb), .96); }
+.tmode__chip, .tmode__par { display: inline-flex; align-items: center; gap: var(--sp-1); height: 32px; padding: 0 var(--sp-3); border-radius: var(--pill); border: 2px solid rgba(var(--ink-rgb), .25); font-size: 14px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tmode__chip--now { border-color: var(--ink); background: var(--gold); }
+.tmode__chip--done { border-color: var(--green); background: var(--mint); color: var(--green); }
+.tmode__chip--bad { border-color: var(--hat-ink); color: var(--hat-ink); background: var(--white); }
+.tmode__par { border-style: dashed; }
+.tmode__card { position: absolute; top: 96px; left: var(--sp-3); z-index: 1; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: rgba(var(--paper-rgb), .96); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tmode__notes { position: absolute; top: 148px; left: 50%; transform: translateX(-50%); z-index: 1; display: grid; justify-items: center; gap: var(--sp-2); width: min(640px, calc(100% - 2 * var(--sp-3))); pointer-events: none; }
+.tmode__why, .tmode__note, .tmode__done { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-size: 15px; font-weight: 700; text-align: center; }
+.tmode__note { border-color: rgba(var(--ink-rgb), .3); color: var(--ink); background: rgba(var(--paper-rgb), .96); font-weight: 600; }
+.tmode__done { border-color: var(--green); color: var(--green); }
+.tmode__again { position: absolute; right: var(--sp-3); bottom: var(--sp-3); z-index: 1; margin: 0; }
+.tmode--ask { display: grid; place-items: center; padding: 120px var(--sp-4) var(--sp-4); overflow: auto; overscroll-behavior: contain; background: var(--paper); }
+.tmode__ask { width: min(480px, 100%); display: grid; gap: var(--sp-3); text-align: center; }
+.tmode__ask h2 { margin: 0; font-size: 26px; }
+.tmode__ask p { margin: 0; font-size: 15px; line-height: 1.4; }
+.tmode__ask .btn { margin: 0; }
+.tmode__addr { display: grid; gap: var(--sp-1); text-align: left; font-size: 13px; font-weight: 700; }
+.tmode__addr input { min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; font-family: var(--mono); }
