@@ -6,6 +6,7 @@
 // then at least the most strokes a proof took, plus one.
 import { boardWork, chainSplit } from "../adena";
 import { CLIMATES } from "../sky";
+import { bytesOf, sha256 } from "../sha";
 import { FIELD, MAX_PAR, MIN_SHOT_WORK } from "./rules";
 import { frame, writeDraft } from "./gg1";
 import type { Draft, Proof } from "./draft";
@@ -20,7 +21,6 @@ export function required(world: string): string[] {
   return (Object.hasOwn(CLIMATES, world) ? CLIMATES[world] : CLIMATES.garden).map(([, k]) => k as string).filter((k) => k !== "fog");
 }
 
-const toBytes = (hex: string) => Uint8Array.from(hex.match(/../g) ?? [], (b) => parseInt(b, 16));
 
 /** The key the draft's proofs hold for: sha-256 of its canonical data written with no name and par 0; null if fit refuses it. */
 export async function proofKey(d: Draft, host: BuilderHost): Promise<string | null> {
@@ -30,10 +30,7 @@ export async function proofKey(d: Draft, host: BuilderHost): Promise<string | nu
 }
 
 /** The sha-256 of data given in hex, as the realm keeps it (Versions "sha"). */
-export async function shaOf(hex: string): Promise<string> {
-  const sum = new Uint8Array(await crypto.subtle.digest("SHA-256", toBytes(hex)));
-  return Array.from(sum, (b) => b.toString(16).padStart(2, "0")).join("");
-}
+export const shaOf = (hex: string): Promise<string> => sha256(bytesOf(hex));
 
 /** The draft's canonical bytes (framed, written, fit): what is played in test mode and published; null if fit refuses it. */
 export function canonicalHex(d: Draft, host: BuilderHost): string | null {

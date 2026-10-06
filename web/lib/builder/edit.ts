@@ -146,14 +146,25 @@ export function movePiece(p: Piece, to: V): Piece {
 /** v on a grid of step (half a unit, the board's default; a quarter at the finest). */
 export const snap = (v: V, step = 0.5): V => [Math.round(v[0] / step) * step + 0, Math.round(v[1] / step) * step + 0];
 
+/**
+ * v on the quarter grid as the hole has it: measured from origin (the tee:
+ * the grid's own, since framing shifts a whole hole, by a post's rim at
+ * times; the cup when the tee itself moves).
+ */
+const onQuarter = (v: V, origin: V): V => {
+  const s = snap([v[0] - origin[0], v[1] - origin[1]], QUARTER);
+  return [s[0] + origin[0], s[1] + origin[1]];
+};
+
 /** The last point from `from` toward `to` (a grid step at a time) that ok takes: `to` itself if it does; `from` if not even the first step does. */
-function walk(from: V, to: V, ok: (v: V) => boolean): V {
-  to = snap(to, QUARTER);
+function walk(from: V, to: V, ok: (v: V) => boolean, origin: V = [0, 0]): V {
+  const on = (v: V) => onQuarter(v, origin);
+  to = on(to);
   if (ok(to)) return to;
   const n = Math.ceil(Math.max(Math.abs(to[0] - from[0]), Math.abs(to[1] - from[1])) / CELL);
   let last = from;
   for (let k = 1; k < n; k++) {
-    const v = snap([from[0] + ((to[0] - from[0]) * k) / n, from[1] + ((to[1] - from[1]) * k) / n], QUARTER);
+    const v = on([from[0] + ((to[0] - from[0]) * k) / n, from[1] + ((to[1] - from[1]) * k) / n]);
     if (!ok(v)) break;
     last = v;
   }
@@ -172,7 +183,7 @@ export function clampMove(d: Draft, id: string, to: V, o: ValidateOptions): V {
   const p = d.pieces.find((q) => q.id === id);
   if (!p) return to;
   const rest = without(d, id), before = errorsOf(rest, o);
-  return walk(whereOf(p.geometry), to, (v) => canPlace(rest, movePiece(p, v), o, before).length === 0);
+  return walk(whereOf(p.geometry), to, (v) => canPlace(rest, movePiece(p, v), o, before).length === 0, d.tee);
 }
 
 /** A drag of one of a piece's handles toward `to`: the piece within its entry's ranges (handles.ts), stopped at the last place the hole holds; the draft framed. */
@@ -187,7 +198,7 @@ export function clampHandle(d: Draft, id: string, key: HandleKey, to: V, o: Vali
 /** A drag of the tee or the cup toward `to`: stopped at the last place where the hole has no error it did not have. */
 export function clampEnd(d: Draft, which: "tee" | "pin", to: V, o: ValidateOptions): V {
   const had = errorsOf(d, o);
-  return walk(d[which], to, (v) => newErrors(had, { ...d, [which]: v }, o).length === 0);
+  return walk(d[which], to, (v) => newErrors(had, { ...d, [which]: v }, o).length === 0, which === "tee" ? d.pin : d.tee);
 }
 
 /** A release's outcome: the draft as it is kept (framed), or why nothing changes. */
@@ -238,7 +249,7 @@ function nearest(rest: Draft, p: Piece, o: ValidateOptions): Piece | null {
   const before = errorsOf(rest, o), from = whereOf(p.geometry), seen = new Set<string>();
   for (let r = CELL; r <= FIX_REACH + 1e-9; r += CELL) {
     for (let k = 0; k < FIX_DIRECTIONS; k++) {
-      const a = (2 * Math.PI * k) / FIX_DIRECTIONS, v = snap([from[0] + r * Math.cos(a), from[1] + r * Math.sin(a)], QUARTER), key = v.join(" ");
+      const a = (2 * Math.PI * k) / FIX_DIRECTIONS, v = onQuarter([from[0] + r * Math.cos(a), from[1] + r * Math.sin(a)], rest.tee), key = v.join(" ");
       if (seen.has(key) || (v[0] === from[0] && v[1] === from[1])) continue;
       seen.add(key);
       const moved = movePiece(p, v);

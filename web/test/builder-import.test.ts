@@ -9,9 +9,11 @@ import { host, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import { draftFile, fromFile, fromPublished } from "../lib/builder/importing.ts";
 import { exportDraft } from "../lib/builder/draft.ts";
+import { canonicalHex } from "../lib/builder/proof.ts";
+import { STARTERS } from "../lib/builder/starters.ts";
 
 const holes = new Map(fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n").map((l) => l.split(" ")).map(([slot, , , hex]) => [slot, hex]));
-const A = "g1" + "a".repeat(38);
+const A = "g1" + "a".repeat(38), B = "g1" + "b".repeat(38);
 
 void test("fromFile: a draft whole and of its world's pieces; else why", async () => {
   const d = lane("garden", []);
@@ -21,15 +23,17 @@ void test("fromFile: a draft whole and of its world's pieces; else why", async (
   assert.equal(await fromFile(exportDraft(foreign)), "Piece r1 is no piece of the Garden's.");
 });
 
-void test("fromPublished: a course hole of palette pieces opens as a draft (its slug yours only if the hole is yours)", async () => {
-  const d = await fromPublished(holes.get("garden/6")!, host, "garden/6/v1", A);
+void test("fromPublished: a hole the Builder published opens as a draft (its slug yours only if the hole is yours); an off-grid course hole does not", async () => {
+  const hex = canonicalHex({ ...STARTERS.garden.straight, title: "Mole Run" }, host)!;
+  const d = await fromPublished(hex, host, `${B}/lane/v1`, A);
   assert.equal(typeof d, "object", JSON.stringify(d));
   if (typeof d === "string") return;
   assert.equal(d.world, "garden");
-  assert.ok(d.pieces.length > 0 && d.title.length > 0);
+  assert.ok(d.pieces.length > 0 && d.title === "Mole Run");
   assert.equal(d.slug, "");
-  const mine = await fromPublished(holes.get("garden/6")!, host, `${A}/mole-run/v3`, A);
+  const mine = await fromPublished(hex, host, `${A}/mole-run/v3`, A);
   assert.equal(typeof mine !== "string" && mine.slug, "mole-run", "your own hole: its next version");
+  assert.match(String(await fromPublished(holes.get("garden/6")!, host, "garden/6/v1", A)), /off the grid/, "a course hole written by hand: not on the Builder's grid");
 });
 
 void test("fromPublished: a hole with pieces the Builder does not make is refused, naming them", async () => {

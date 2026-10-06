@@ -9,7 +9,7 @@
 import { matchIn, unknownEntry } from "./edit";
 import { readHole } from "./gg1";
 import { loadPalette } from "./palette";
-import { validate } from "./pipeline";
+import { validate, type ValidateOptions } from "./pipeline";
 import { FIELD, notABuilderWorld } from "./rules";
 import { parseDraft, type Draft } from "./draft";
 import type { BuilderHost } from "./wasm";
@@ -25,11 +25,11 @@ export async function fromFile(text: string): Promise<Draft | string> {
 const NAMED = 4;
 
 /**
- * A published hole (its data in hex, its id) as a draft: its next version
- * when the hole is me's (the slug its alias's), a new hole otherwise; or why
- * not, naming the pieces the Builder does not make.
+ * A published hole's data read as the Builder reads it: its world one of the
+ * Builder's, its pieces its palette's, every rule passed (with the census if
+ * given), and the bytes the Builder would write for it; or why not.
  */
-export async function fromPublished(hex: string, host: BuilderHost, id: string, me: string | null): Promise<Draft | string> {
+export async function asDraft(hex: string, host: BuilderHost, census?: ValidateOptions["census"]): Promise<{ draft: Draft; hex: string } | string> {
   let g;
   try {
     g = host.decode(hex);
@@ -42,11 +42,21 @@ export async function fromPublished(hex: string, host: BuilderHost, id: string, 
     const more = r.refused.length - NAMED;
     return `This hole has pieces the Builder doesn't make: ${r.refused.slice(0, NAMED).join(", ")}${more > 0 ? `, and ${more} more` : ""}.`;
   }
-  // a hole the Builder's own rules refuse never opens in it: it cannot vouch for what it would publish
-  const why = validate(r, { host, palette }).issues.find((i) => i.severity === "error");
+  const v = validate(r, { host, palette, ...(census && { census }) }), why = v.issues.find((i) => i.severity === "error");
   if (why) return `This hole breaks the Builder's rules: ${why.text}. It stays playable in the game.`;
+  return { draft: r, hex: v.hex! };
+}
+
+/**
+ * A published hole (its data in hex, its id) as a draft: its next version
+ * when the hole is me's (the slug its alias's), a new hole otherwise; or why
+ * not (asDraft: the Builder opens only what it can vouch for).
+ */
+export async function fromPublished(hex: string, host: BuilderHost, id: string, me: string | null): Promise<Draft | string> {
+  const r = await asDraft(hex, host);
+  if (typeof r === "string") return r;
   const [author, slug] = id.split("/");
-  return { ...r, slug: me && author === me && /^[a-z0-9-]{1,32}$/.test(slug) ? slug : "" };
+  return { ...r.draft, slug: me && author === me && /^[a-z0-9-]{1,32}$/.test(slug) ? slug : "" };
 }
 
 /** A draft's file name: its slug, else its name made safe, else "hole". */

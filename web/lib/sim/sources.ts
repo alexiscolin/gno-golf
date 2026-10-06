@@ -4,9 +4,7 @@
 // (a package on the chain never changes). golf.wasm's previews (lib/sim.ts)
 // and builder.wasm's checks before a publish (the Builder) both ask it.
 import type { Chain } from "../chain";
-
-const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
-const digest = async (s: string) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
+import { sha256 as digest } from "../sha";
 
 /** Whether src (path → sha-256) is what the realm runs; tag: the build's own key in this browser ("sim", "builder"). */
 export async function sameSources(chain: Pick<Chain, "file" | "realm">, src: Record<string, string>, tag: string): Promise<boolean> {

@@ -32,6 +32,7 @@ import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
 import { readTakedown, takenDown } from "./takedown";
+import { authorOf } from "./builder/holes";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
@@ -1399,8 +1400,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       .then(([text, id]) => readTakedown(text, id))
       .catch(() => ((takenOnce = null), NO_TAKEN)));
 
-  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", "taken" for a hole the site took down, null for a link to nothing). */
-  async function start(link: string | Link | null): Promise<"hole" | "cup" | "taken" | null> {
+  // A community hole plays only once the Builder's own rules pass it (lib/community.ts, judged once a
+  // browser and loaded only then): anyone can publish one with gnokey, past the Builder.
+  const passes = (id: string) => import("./community").then((m) => m.verdictOf(chain, id)).then((v) => v.ok, () => false);
+  const unchecked = () => start(null).then((to) => (to === null ? "unchecked" : to));
+
+  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", "taken" for a hole the site took down, "unchecked" for a community hole the Builder's rules do not pass, null for a link to nothing). */
+  async function start(link: string | Link | null): Promise<"hole" | "cup" | "taken" | "unchecked" | null> {
     g.taken = await takedown();
     // a link to a hole the site took down opens the cups, and says so
     if (typeof link === "string" && takenDown(g.taken, link)) return start(null).then((to) => (to === null ? "taken" : to));
@@ -1415,6 +1421,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     // an older archived version, past what Holes() lists: the chain may
     // still have it, so it is asked for; one it has not lands on the cups
     if (!asked && typeof link === "string" && link) {
+      if (authorOf(link) && !(await passes(link))) return unchecked();
       await load(link);
       if (!alive) return null;
       if (g.s) {
@@ -1425,6 +1432,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       g.error = null;
       g.failed = null;
     }
+    if (asked && asked.official === false && !(await passes(asked.id))) return unchecked();
     g.linked = !!asked;
     // ?cup=island alone: that cup, on its first hole
     const cupWant = typeof link === "object" && link && "cup" in link ? link.cup : undefined;

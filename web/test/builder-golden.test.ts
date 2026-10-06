@@ -62,8 +62,8 @@ const cases: [string, () => Draft, string[]][] = [
     ["E13 x: The rock post stands on the plain rail at (13.5, 2.3)"]],
   ["E13: two bars crossing", () => lane("garden", [put("x", "*/bar/plank", [10, 9], { size: 4 }), { ...put("y", "*/bar/plank", [12, 7], { size: 4 }), geometry: { t: "bar", a: [12, 7], b: [12, 11], thick: 0.5 } }]),
     ["E13 x: The plank bar crosses the plank bar at (13.5, 10.5)"]],
-  ["E14: the only way to the cup a ball only just fits", () => lane("garden", [rail("a", [15, 0], [15, 9.4]), rail("b", [15, 10.5], [15, 20])]),
-    ["E14 a: The gap at (16.5, 11.45) between the plain rail and the plain rail is 1.1 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits"]],
+  ["E14: the only way to the cup a ball only just fits", () => lane("garden", [rail("a", [15, 0], [15, 9.5]), rail("b", [15.5, 10.5], [15.5, 20])]),
+    ["E14 a: The gap at (16.75, 11.5) between the plain rail and the plain rail is 1.12 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits"]],
   ["E15: a bar against a rail, swallowed by the kerb", () => lane("garden", [{ ...put("x", "*/bar/plank", [10, 0.5]), geometry: { t: "bar", a: [10, 0.5], b: [14, 0.5], thick: 0.5 } }]),
     ["E15 x: The plank bar is 0.25 from the plain rail: at least 0.5, or the kerb swallows it"]],
   ["L2: a name the chain refuses", () => ({ ...lane("garden", []), title: "see t.me/x" }),
@@ -83,6 +83,12 @@ void test("L0: a piece's geometry is its entry's kind and shape, a polygon withi
   const ring = Array.from({ length: 70 }, (_, k): [number, number] => [+(15 + 3 * Math.cos((k * 2 * Math.PI) / 70)).toFixed(2), +(10 + 3 * Math.sin((k * 2 * Math.PI) / 70)).toFixed(2)].map((x) => Math.round(x * 4) / 4) as [number, number]);
   const pond = put("x", "*/hazard/water", [12, 7]);
   assert.deepEqual(said(lane("garden", [{ ...pond, geometry: { t: "poly", pts: ring } }])), ["L0 x: The water hazard's outline has 70 points: at most 64"]);
+});
+
+void test("L0: every point on the quarter grid, as the board places them (a hole read back, a hand-edited file)", () => {
+  const off = { ...rail("x", [10, 4], [14, 4]), geometry: { t: "rail" as const, a: [10.1, 4] as [number, number], b: [14, 4] as [number, number] } };
+  assert.deepEqual(said(lane("garden", [off])), ["L0 x: The plain rail is off the grid: every point on a quarter"]);
+  assert.deepEqual(said({ ...lane("garden", []), pin: [28.6, 11.5] }), ["L0 -: The cup is off the grid: every point on a quarter"]);
 });
 
 void test("E9 and E11: the data's size and the work, from the chain's own numbers", () => {

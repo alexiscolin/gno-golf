@@ -5,6 +5,7 @@ import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/en
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion } from "@/lib/scene";
+import { NOT_BUILDER } from "@/lib/community";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
@@ -684,9 +685,10 @@ export default function Golf() {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first), a cup's from its first, on the picker; a link to
             // nothing lands on the cups, quietly
-            if (!to || to === "taken") {
+            if (!to || to === "taken" || to === "unchecked") {
               setScreen("worlds");
               if (to === "taken") setRestoreNote("This hole was taken down."); // (nothing of it shown: no name, no note, no author)
+              if (to === "unchecked") setRestoreNote(NOT_BUILDER); // (a community hole the Builder's rules do not pass: nothing of it shown either)
             }
             // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo;
             // so does the picker's own address)

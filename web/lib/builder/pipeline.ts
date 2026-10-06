@@ -59,11 +59,16 @@ const SHAPES = { rail: "a rail", bar: "a bar", post: "a post", rect: "a box", ro
 /** L0: each piece's entry is its world's, within its ranges and clocks. */
 function ranges(d: Draft, palette: readonly PaletteEntry[]): Issue[] {
   const out: Issue[] = [];
+  const q = (x: number) => Math.abs(x * 4 - Math.round(x * 4)) < 1e-6, grid = (v: V) => q(v[0] - d.tee[0]) && q(v[1] - d.tee[1]);
   const range = (p: Piece, what: string, v: number, r?: Range) => r && !(v >= r.min - 1e-9 && v <= r.max + 1e-9) && out.push(err("L0", `${cap(pieceName(p))}'s ${what} is ${+v.toFixed(2)}: ${r.min} to ${r.max}`, p));
   for (const p of d.pieces) {
     const e = entryIn(p.entry, palette);
     if (!e) { out.push(err("L0", `${cap(pieceName(p))} is no piece of this world's`, p)); continue; }
     const g = p.geometry;
+    // every point on the quarter grid, as the board places them, measured from the tee (framing shifts the
+    // whole hole, by a post's rim at times); a radius and a thickness are on their entry's steps
+    const at = g.t === "rail" || g.t === "bar" ? [g.a, g.b] : g.t === "post" ? [g.c] : g.t === "poly" ? g.pts : [g.min, g.max];
+    if (![...at, ...(p.params.to ? [p.params.to] : [])].every(grid)) { out.push(err("L0", `${cap(pieceName(p))} is off the grid: every point on a quarter`, p)); continue; }
     // its kind's geometry, in a shape its entry takes; a polygon within GG1's points
     const shapes: readonly string[] = e.kind === "rail" || e.kind === "bar" || e.kind === "post" ? [e.kind] : (e.shapes ?? ["rect"]);
     if (!shapes.includes(g.t)) { out.push(err("L0", `${cap(pieceName(p))} cannot be drawn as ${SHAPES[g.t]}`, p)); continue; }
@@ -77,6 +82,7 @@ function ranges(d: Draft, palette: readonly PaletteEntry[]): Issue[] {
     if (p.params.grade !== undefined) range(p, "grade", p.params.grade, e.grade);
     if (!e.clocks.includes(p.clock.k)) out.push(err("L0", `${cap(pieceName(p))} cannot be ${p.clock.k === "fixed" ? "fixed" : p.clock.k === "substep" ? "timed within a stroke" : "in a pulse"}`, p));
   }
+  if (!grid(d.pin)) out.push(err("L0", "The cup is off the grid: every point on a quarter"));
   return out;
 }
 
