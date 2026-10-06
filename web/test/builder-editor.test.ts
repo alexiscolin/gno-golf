@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { commonShift, gauges, groupsOf, nearLimits, offAtLimit, testGate, verdict } from "../lib/builder/editor.ts";
+import { commonShift, gauges, groupsOf, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
@@ -88,6 +88,14 @@ void test("nearLimits: a limit said only when near it (amber from 80%), in words
   assert.deepEqual(nearLimits([g("Size", 28000, 32768, "warn", "27.3 KB")]), ["Size: 27.3 KB of 32 KB"]);
   assert.deepEqual(nearLimits([g("Room", 90, 100, "warn", "10%")]), ["Room for a shot in its stormiest weather: 10% left"]);
   assert.deepEqual(nearLimits([g("Walls", 4, 160, "ok")]), [], "far from every limit: nothing said");
+});
+
+void test("shortWhy: the reason beside the big button, in a few words (the full one in the checks line under the board)", () => {
+  assert.equal(shortWhy("Fix 1 first"), "1 thing to fix ↓");
+  assert.equal(shortWhy("Fix 3 first"), "3 things to fix ↓");
+  assert.equal(shortWhy("Checking…"), "Checking…");
+  assert.equal(shortWhy("Give it a short name first"), "Name it first ↓");
+  assert.equal(shortWhy(""), "");
 });
 
 void test("testGate: Test opens only on a check of the draft as kept now (an older check's verdict never opens it)", () => {

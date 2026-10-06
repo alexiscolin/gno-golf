@@ -29,6 +29,14 @@ export function testGate(kept: Draft, checked: { of: Draft; v: Validated } | nul
   return errors ? `Fix ${errors} first` : !kept.pieces.length ? "Place a piece first" : !kept.slug ? "Give it a short name first" : "";
 }
 
+/** testGate's reason in a few words, beside the big button (the full one in the checks line, ↓). */
+export function shortWhy(off: string): string {
+  const fix = /^Fix (\d+) first$/.exec(off);
+  if (fix) return `${fix[1]} ${fix[1] === "1" ? "thing" : "things"} to fix ↓`;
+  if (off === "Give it a short name first") return "Name it first ↓";
+  return off;
+}
+
 export interface Gauge {
   name: string;
   used: number;

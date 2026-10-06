@@ -7,6 +7,7 @@
 import { MOD } from "./Inspector";
 import { shortAddr } from "@/components/common";
 import { worldName } from "@/lib/builder/rules";
+import { shortWhy } from "@/lib/builder/editor";
 
 export type Step = "edit" | "test" | "publish";
 
@@ -67,6 +68,8 @@ export default function Header({ title, slug, author, world, worlds, step, steps
         })}
       </ol>
       <div className="bhead__end">
+        {/* why the big button waits, in a few words (its slot kept: nothing moves); in full under the board */}
+        {action && <span className="bhead__why" aria-hidden="true">{shortWhy(action.off ?? "")}</span>}
         {history && (
           <>
             <button type="button" className="round" aria-label={`Undo (${MOD}Z)`} title={`Undo (${MOD}Z)`} disabled={!history.canUndo} onClick={history.undo}>↶</button>
