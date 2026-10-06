@@ -16,6 +16,7 @@ const { RULES } = await import("../web/lib/chain.ts");
 const { SKIES, UNLOCKS } = await import("../web/lib/card.ts");
 const { GNOMES } = await import("../web/lib/scene/gnome.ts");
 const { CLIMATES } = await import("../web/lib/sky.ts");
+const { KICKS, MAX_BOUNCE, MAX_MOVE, MAX_PAR, MIN_RAMP, MIN_SHOT_WORK, WEATHER } = await import("../web/lib/builder/rules.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -125,6 +126,9 @@ check("golf.gno work model", () => {
   // the pulses' set-up, as the engine's snapshot gives it (setup) and adena.ts adds it to each shot and takes it off the cap
   assert.ok(has(golf, "w.setup += int64(len(p.Walls))*workPerPulseWall + int64(len(p.Posts))*workPerPulsePost"), "newWork(): the pulses' set-up changed");
   assert.ok(has(golf, "c -= w.setup / workPerUnit"), "next(): the set-up off the cap changed");
+  // the builder's work gauges (web/lib/builder/checks.ts SHOT_FLOOR, STORM_FLOOR) are these sums less the hole's part
+  assert.ok(has(golf, "return workPerShot + walls*workPerWall + (physics.MaxWork+physics.MaxWorkStep)*workPerUnit"), "shotBound() changed");
+  assert.ok(has(golf, "workPerShot + w.walls*workPerWall + w.setup + (physics.MaxWorkStep+minShotWork)*workPerUnit"), "worstGas() changed");
   assert.ok(has(golf, "c += w.setup"), "add(): the set-up per shot changed");
   // what HoleState says of it, which boardWork reads (the formula above its fallback)
   assert.ok(has(realm("state.gno"), 'w := newWork(h, nil) sb.WriteString(ufmt.Sprintf(`,"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup))'), "HoleState's work changed");
@@ -228,6 +232,21 @@ check("gnomes earned.gno: UNLOCKS and GNOMES", () => {
     const k = (i + 1).toString(16).padStart(2, "0");
     assert.equal(m[1] + k + m[2], codec.encode({ ...codec.PLAIN, accessories: [], tier: "earned", kind: i + 1 }), `earnedTraits(${i + 1}): codec.ts`);
   });
+});
+// the hole builder's palette (web/lib/builder/rules.ts): the skins that are
+// physics, and the bounce a passive piece plays at most, as step.gno has them
+check("the physics the builder's palette is bound by", () => {
+  const step = fs.readFileSync(new URL("../gno.land/p/gnogolf/physics/step.gno", import.meta.url), "utf8");
+  const course = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/course.gno", import.meta.url), "utf8");
+  assert.ok(has(step, `return ${KICKS.map((k) => `strings.Contains(skin, "${k}")`).join(" || ")}`), "physics.Kicks: the skins that kick changed");
+  assert.equal(MAX_BOUNCE, constOf(step, "MaxBounce"), "MaxBounce");
+  assert.equal(MIN_RAMP, constOf(step, "MinRamp"), "MinRamp");
+  assert.equal(MAX_MOVE, constOf(step, "MaxMove"), "MaxMove");
+  for (const w of WEATHER) assert.ok(course.includes(`"${w}"`), `course: no weather skin "${w}"`);
+  const data = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/data.gno", import.meta.url), "utf8");
+  assert.ok(has(data, `if h.Strokes > ${MAX_PAR} {`), "course.Decode: the most par changed");
+  const golf = fs.readFileSync(new URL("../gno.land/r/gnogolf/golf/golf.gno", import.meta.url), "utf8");
+  assert.ok(has(golf, "const minShotWork = 4 * physics.MaxWork / 5") && MIN_SHOT_WORK === (4 * RULES.maxWork) / 5, "golf's minShotWork changed");
 });
 
 if (failed) {

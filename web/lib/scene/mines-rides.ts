@@ -19,6 +19,7 @@ import type { Terrain } from "../terrain";
 import type { Post, Zone } from "../types";
 import { md, ud, type Hole, type Ride, type TubePath } from "./data";
 import type { Bar, Track } from "./worlds";
+import { own } from "../own";
 
 // ------------------------------------------------------------ the kit
 //
@@ -2031,7 +2032,7 @@ const ZONES: Record<string, (z: Zone, t: Terrain, s: Hole) => THREE.Object3D> = 
 export function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terrain, s: Hole): THREE.Object3D | null | undefined {
   wood = seeded("wood" + JSON.stringify(item));
   const o = kind === "wall" && item.skin === "cart" ? cartOn(item as Bar, t)
-    : kind === "zone" && ZONES[item.skin] && ((item as Zone).kind === "tunnel" || (item as Zone).kind === "loop") ? ZONES[item.skin](item as Zone, t, s)
+    : kind === "zone" && own(ZONES, item.skin) && ((item as Zone).kind === "tunnel" || (item as Zone).kind === "loop") ? own(ZONES, item.skin)!(item as Zone, t, s)
     : undefined;
   return named(o);
 }

@@ -7,6 +7,7 @@ import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
 import { skinOfTraits } from "@/lib/gnomes/skin";
+import { NOT_BUILDER } from "@/lib/community";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
@@ -265,6 +266,7 @@ const BANNER = {
   load: ["That hole did not load", "The chain did not send this hole. Try again, or pick another one from the menu."],
   draw: ["That hole could not be drawn", "Something broke on our side while building it. Pick another hole from the menu — your scores are safe."],
   limit: ["That is the most strokes a round holds", "Restart the hole to play it again."],
+  unchecked: ["That hole can't be played here", `${NOT_BUILDER} Pick another one from the menu.`],
   shot: ["That shot did not go through", "The chain could not play that shot. Nothing was lost; you can shoot again."],
 } as const satisfies Record<FatalKind | ErrorKind, readonly [string, string]>;
 
@@ -716,7 +718,11 @@ export default function Golf() {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first), a cup's from its first, on the picker; a link to
             // nothing lands on the cups, quietly
-            if (!to) setScreen("worlds");
+            if (!to || to === "taken" || to === "unchecked") {
+              setScreen("worlds");
+              if (to === "taken") setRestoreNote("This hole was taken down."); // (nothing of it shown: no name, no note, no author)
+              if (to === "unchecked") setRestoreNote(NOT_BUILDER); // (a community hole the Builder's rules do not pass: nothing of it shown either)
+            }
             // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo;
             // so does the picker's own address)
             else if (to === "hole" && (cfg.gnome || hadGnome()) && !dare && cfg.screen !== "pick") play(true);
@@ -1592,6 +1598,7 @@ export default function Golf() {
           onBack={() => setScreen(BACK.worlds)}
           onAbout={() => setAbout(true)}
           community={s.community}
+          chain={game.current && game.current.chain}
           racing={dare && !solo && <p className="dare">Racing {rivalName}</p>}
           next={(c) => toPlay[c][0]?.name}
           podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onOpen={() => setBoard(true)}

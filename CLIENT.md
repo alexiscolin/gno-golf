@@ -47,7 +47,10 @@ what a client needs of it.
    wall, a post is a post, a zone is a tinted area. An author ships
    `"giant skull"` today, an artist adds the mesh next month, nothing breaks in
    between. What a zone *does* is in its fields (`kind`, `air`, `capped`),
-   never in its skin.
+   never in its skin. And look a skin up as a key of your own tables only
+   (`Object.hasOwn`, the web client's `own()`): a skin is any string an
+   author wrote, and `table["constructor"]` would answer with
+   `Object.prototype`'s.
 3. **Two points far apart in a path mean a tunnel.** The ball is somewhere else.
    Do not interpolate across the gap; cut, or play a pipe animation.
    **`"air"` says where the ball is off the ground**: a string with one `0`/`1`

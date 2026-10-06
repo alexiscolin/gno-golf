@@ -11,6 +11,7 @@
 //     a ramp rising the other way. Height is cosmetic; the physics is flat.
 
 import type { HoleState, MutVec2, Post, Timing, Vec2, Wall, Zone } from "./types";
+import { own } from "./own";
 
 /** A segment a→b on the board. */
 type Seg = readonly [Vec2, Vec2];
@@ -74,6 +75,9 @@ export function closest(x: number, z: number, a: Vec2, b: Vec2) {
   return nearest;
 }
 /** A zone's box: its centre (cx, cz), its half-sizes (hx, hz) and its sizes (w, h). */
+/** A zone with no area: its box inverted or flat on either axis (a NaN too). GG1 holds a zone's corners to the board, not
+ *  to each other: a hole published from a terminal may have one, and the scene draws nothing of it. */
+export const emptyZone = (z: Pick<Zone, "min" | "max">) => !(z.max[0] > z.min[0] && z.max[1] > z.min[1]);
 export const boxOf = (q: Pick<Zone, "min" | "max">) => {
   const w = q.max[0] - q.min[0], h = q.max[1] - q.min[1];
   return { cx: (q.min[0] + q.max[0]) / 2, cz: (q.min[1] + q.max[1]) / 2, hx: w / 2, hz: h / 2, w, h };
@@ -518,8 +522,8 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
   // its edge — the zone's, or a wall's where one crosses it, so no kerb dips
   // into it; a bed of soil is heaped up. The ball rides it (height), as it is
   // drawn.
-  const dishes = s.zones.filter((q) => q.kind === "surface" && DISH[q.skin]).map((q) => ({
-    q, ...DISH[q.skin], walls: s.walls.filter((w) => Math.min(w.a[0], w.b[0]) < q.max[0] + 1 && Math.max(w.a[0], w.b[0]) > q.min[0] - 1 && Math.min(w.a[1], w.b[1]) < q.max[1] + 1 && Math.max(w.a[1], w.b[1]) > q.min[1] - 1),
+  const dishes = s.zones.filter((q) => q.kind === "surface" && own(DISH, q.skin)).map((q) => ({
+    q, ...own(DISH, q.skin)!, walls: s.walls.filter((w) => Math.min(w.a[0], w.b[0]) < q.max[0] + 1 && Math.max(w.a[0], w.b[0]) > q.min[0] - 1 && Math.min(w.a[1], w.b[1]) < q.max[1] + 1 && Math.max(w.a[1], w.b[1]) > q.min[1] - 1),
   }));
   const dish = (x: number, z: number) => {
     let h = 0;
@@ -551,7 +555,7 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
   // (a pond's edge along one of those is no bank: the water goes on under it)
   const along = ([a, b]: Seg, { q, c }: (typeof spans)[number]) => [a, b].every((p) => Math.abs(p[c] - q.min[c]) < 0.05 || Math.abs(p[c] - q.max[c]) < 0.05) && Math.abs(a[c] - b[c]) < 0.05
     && Math.max(a[1 - c], b[1 - c]) > q.min[1 - c] - 0.05 && Math.min(a[1 - c], b[1 - c]) < q.max[1 - c] + 0.05;
-  const pools = s.zones.filter((q) => q.kind === "hazard" && POOLS[q.skin]).map((q) => {
+  const pools = s.zones.filter((q) => q.kind === "hazard" && own(POOLS, q.skin)).map((q) => {
     const edges = edgesOf(q).filter((e) => !spans.some((sp) => along(e, sp)));
     let lo = Infinity;
     for (let u = 0; u <= 1; u += 0.25) for (let v = 0; v <= 1; v += 0.25) lo = Math.min(lo, raw(q.min[0] + u * (q.max[0] - q.min[0]), q.min[1] + v * (q.max[1] - q.min[1])));
@@ -561,7 +565,7 @@ export function terrain(s: Pick<HoleState, "board" | "walls" | "zones" | "start"
     // rails: the water goes on under those.
     const walls = s.walls.filter((w) => !w.every && Math.min(w.a[0], w.b[0]) < q.max[0] + 1 && Math.max(w.a[0], w.b[0]) > q.min[0] - 1 && Math.min(w.a[1], w.b[1]) < q.max[1] + 1 && Math.max(w.a[1], w.b[1]) > q.min[1] - 1
       && !spans.some((sp) => [w.a, w.b].every(([x, z]) => x > sp.q.min[0] - 0.4 && x < sp.q.max[0] + 0.4 && z > sp.q.min[1] - 0.4 && z < sp.q.max[1] + 0.4)));
-    return { q, edges, walls, bank: POOLS[q.skin].bank, level: lo + POOL.water, bed: lo + POOL.bed };
+    return { q, edges, walls, bank: own(POOLS, q.skin)!.bank, level: lo + POOL.water, bed: lo + POOL.bed };
   });
   // how far in from a pond's shore: its edges' distances blended (a soft
   // minimum), so the shore rounds its corners inside the zone, and wobbled,

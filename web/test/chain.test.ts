@@ -344,6 +344,20 @@ test("state reads one hole's geometry", async () => {
   assert.equal((await chain.state("garden/1")).hole, "garden/1");
 });
 
+test("versions reads an alias's versions; a reply not shaped so is refused", async () => {
+  const chain = makeChain(), alias = `${ADDR1}/mole-run`;
+  const v = { id: `${alias}/v1`, v: 1, height: 9, by: ADDR1, sha: "ab", note: "", next: "" };
+  setFetch((url) => {
+    assert.ok(decoded(url).expr.includes(`Versions("${alias}")`));
+    return qevalReply({ version: 1, slot: alias, versions: [v] });
+  });
+  assert.deepEqual((await chain.versions(alias)).versions.map((x) => x.v), [1]);
+  setFetch(() => qevalReply({ version: 1, slot: "", versions: [] }));
+  assert.deepEqual((await chain.versions(alias)).versions, [], "none yet");
+  setFetch(() => qevalReply({ version: 1, slot: alias, versions: [{ ...v, v: "1" }] }));
+  await assert.rejects(chain.versions(alias), (e) => errorKind(e) === "chain");
+});
+
 test("state refuses a reply missing a required field", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply({ ...STATE_REPLY, cup: undefined }));
@@ -550,6 +564,24 @@ test("owner reads the realm's owner as an address, and refuses anything else", a
   assert.equal(await chain.owner(), ADDR1);
   setFetch(() => rawReply(`("not an address" .uverse.address)`));
   await assert.rejects(chain.owner());
+});
+
+test("publishing and successor read the realm's state for a publish; anything else is refused", async () => {
+  const chain = makeChain();
+  setFetch((url) => (decoded(url).expr.includes("Publishing()") ? rawReply("(true bool)") : strReply("")));
+  assert.equal(await chain.publishing(), true);
+  assert.equal(await chain.successor(), "", "none set");
+  setFetch(() => rawReply("(false bool)"));
+  assert.equal(await chain.publishing(), false);
+  setFetch(() => rawReply("(maybe bool)"));
+  await assert.rejects(chain.publishing());
+  setFetch(() => strReply("gno.land/r/x/golf/v3"));
+  assert.equal(await chain.successor(), "gno.land/r/x/golf/v3");
+  setFetch((url) => (assert.ok(decoded(url).expr.includes(`Current("${ADDR1}/lane")`)), strReply(`${ADDR1}/lane/v2`)));
+  assert.equal(await chain.current(`${ADDR1}/lane`), `${ADDR1}/lane/v2`);
+  // the records' realm beside the rules: who writes there now ("" paused), as render.gno's moved() reads it
+  setFetch((url) => (assert.match(decoded(url).expr, /gno\.land\/r\/gnogolf\/store\.Writer\(\)/), strReply(chain.realm)));
+  assert.equal(await chain.writer(), chain.realm);
 });
 
 test("holeLeaderboard pages one hole's board", async () => {

@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { GRASS } from "./common";
 import { ud, md, type Height, type WaterMask } from "./data";
 import type { Vec2 } from "../types";
+import { own } from "../own";
 
 /** Something the GPU holds: a material, a texture or a geometry. */
 type Disposable = { dispose(): void };
@@ -328,7 +329,7 @@ const shallowC = new THREE.Color(), deepC = new THREE.Color(), foamC = new THREE
 /** The colour of water `skin` at a point d in from its shore, over `depth`
  *  of water (0 where it laps the bank: foam), into c. */
 export function waterTone(c: THREE.Color, skin: string, d: number, depth: number) {
-  const [a, b] = WATERS[skin] || WATERS.water;
+  const [a, b] = own(WATERS, skin) || WATERS.water;
   return c.copy(shallowC.set(a)).lerp(deepC.set(b), smoothstep01((d - 0.3) / 2.2)).lerp(foamC, 0.6 * (1 - smoothstep01(depth / 0.1)));
 }
 const smoothstep01 = (x: number) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };

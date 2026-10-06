@@ -23,6 +23,7 @@ import { INK, INK_THIN, chamfer, paint, log, boulder, vnoise, TIMBER, TIMBER_DAR
 import { FONT } from "../brand";
 import type { Hole, Height } from "./data";
 import type { Extras, Vec2, Wall, Zone } from "../types";
+import { own } from "../own";
 
 // ------------------------------------------------------------ the signs
 
@@ -522,6 +523,7 @@ function words(x: X, text: string, x0: number, y0: number, w: number, h: number)
 
 /** A face: its enamel (or its paint on a plank), chipped and rusting at its edge, the pictogram and the words. */
 function face(x: X, name: string, ox: number, oy: number) {
+  // eslint-disable-next-line no-restricted-syntax -- a sign's name from SIGN_OF, never the chain's
   const spec = SIGNS[name], c = PAINTS[spec.look], rand = seeded("sign-" + name);
   x.save();
   x.translate(ox, oy);
@@ -637,6 +639,7 @@ const tinted = (g: THREE.BufferGeometry, color: number, k = 1) => paint(g, (_x, 
 
 /** The plate: iron rusting at its edges and riveted (enamel), or a plank with its nails (paint); its faces both sides. */
 function plate(name: string) {
+  // eslint-disable-next-line no-restricted-syntax -- a sign's name from SIGN_OF, never the chain's
   const g = new THREE.Group(), go = SIGNS[name].look === "go", d = go ? 0.16 : 0.09;
   const body = chamfer(PW, PH, d, go ? 0.05 : 0.035);
   const base = new THREE.Color(go ? TIMBER : IRON), rust = new THREE.Color(go ? TIMBER_DARK : RUST);
@@ -865,7 +868,7 @@ interface Lists { walls: readonly Wall[]; posts: readonly { c: Vec2; skin: strin
 /** The pieces of a hole (or of its strokes) that have a sign, each with a few points of it. */
 function marks({ walls, posts, zones }: Lists, pits: readonly Zone[]): Mark[] {
   const out: Mark[] = [];
-  const name = (skin: string, timed: boolean) => (TIMED_ONLY.has(skin) && !timed ? null : SIGN_OF[skin] || null);
+  const name = (skin: string, timed: boolean) => (TIMED_ONLY.has(skin) && !timed ? null : own(SIGN_OF, skin) || null);
   for (const w of walls) {
     const n = name(w.skin, !!w.every);
     if (n) out.push({ name: n, pts: [[(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2], [w.a[0], w.a[1]], [w.b[0], w.b[1]]] });

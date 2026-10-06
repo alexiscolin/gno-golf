@@ -1,3 +1,5 @@
+//go:build !builder
+
 package golf
 
 // The realm's storage as a local preview has it, the one hand-written part

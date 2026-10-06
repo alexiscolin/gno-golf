@@ -105,3 +105,16 @@ to 0.01, pick robust shots, play a few strokes over the optimum and space its
 saves. Such a bot scores like a strong human: it is caught by a copy, or by
 knife edges in Pro, not by being good. Flags feed a "Show all" toggle, not a
 ban; the chain and gnoweb keep every record.
+
+## Takedown list
+
+A community hole is anyone's data: the chain takes any that passes its checks
+(`PublishMine`), and its owner can take one off the lists with `Hide`. For what
+must not be shown at all, on any chain, the site serves `/takedown.json`:
+`{ chain, holes: ["<address>/<slug>", …] }`, aliases, so every version of
+each. The game reads it once a visit, only if `chain` is the one it plays on
+(or empty): it lists none of them, and a link to one opens the cups with "This
+hole was taken down", nothing of its name, note or author shown. The site's
+owner edits it by hand in `web/public/takedown.json`; it takes effect with the
+next deploy. The chain keeps the hole: this is the site's choice, not a
+deletion.

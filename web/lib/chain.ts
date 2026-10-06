@@ -15,7 +15,7 @@ import { hostOf, isLoopback } from "./network";
 import { trackError } from "./analytics";
 import type {
   Bests, CourseLeaderboard, Extras, Ghost, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
-  SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Weather,
+  SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Versions, Weather,
 } from "./types";
 
 /**
@@ -124,7 +124,8 @@ const simFrom = (v: unknown): v is SimulateFrom => isObj(v) && isFlight(v) && ty
 const board = (v: unknown, row: (r: unknown) => boolean, ...keys: string[]): v is Obj => isObj(v) && isMode(v.mode) && Array.isArray(v.rows) && v.rows.every(row) && nums(v, ...keys);
 const strokesRow = (r: unknown) => isObj(r) && typeof r.player === "string" && (r.name === undefined || typeof r.name === "string") && nums(r, "strokes");
 const standingRow = (r: unknown) => strokesRow(r) && nums(r as Obj, "holes", "par");
-const checks = {
+/** Each answer's shape, checked (the builder's test mode reads its local chain's answers through the same). */
+export const checks = {
   holes: (v: unknown): v is HoleRow[] => Array.isArray(v) && v.every(holeRow),
   // Holes(): { version, play, successor, holes }
   holesReply: (v: unknown): v is Holes => isObj(v) && strs(v, "play", "successor") && Array.isArray(v.holes) && v.holes.every(holeRow),
@@ -134,6 +135,8 @@ const checks = {
   simFrom,
   simRound: (v: unknown): v is SimulateRound => isObj(v) && Number.isInteger(v.strokes) && nums(v, "period") && simFrom(v),
   weather: (v: unknown): v is Weather => isObj(v) && Array.isArray(v.zones),
+  versions: (v: unknown): v is Versions => isObj(v) && typeof v.slot === "string" && Array.isArray(v.versions) &&
+    v.versions.every((x) => isObj(x) && strs(x, "id", "by", "sha", "note", "next") && nums(x, "v", "height")),
   extras: (v: unknown): v is Extras => isObj(v) && arrays(v, "walls", "posts", "zones"),
   leaderboard: (v: unknown): v is Leaderboard => board(v, standingRow, "holes"),
   bests: (v: unknown): v is Bests => board(v, strokesRow, "par") && typeof v.hole === "string",
@@ -425,6 +428,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      */
     simulateCommit: (hole: string, ball: Vec2, stroke: number, shots: readonly string[], period: number, ms?: number, signal?: AbortSignal | null) =>
       qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
+    /** A community hole's versions (an alias, "<address>/<slug>"): what the next one's id will be, and each one's sha. */
+    versions: (alias: string) => qeval(`Versions(${s(alias)})`, checks.versions),
     /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim). */
     holeData: async (hole: string) => {
       const hex = await qstr(REALM, `HoleData(${s(hole)})`);
@@ -449,6 +454,18 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       if (!a || !isAddress(a)) throw refused("The chain's owner is not an address.");
       return a;
     },
+    /** Whether the realm takes community holes now (Publishing()): the Builder's publish step reads it first. */
+    publishing: async () => {
+      const m = (await vm(REALM, "Publishing()")).match(/^\((true|false) bool\)/);
+      if (!m) throw refused("The chain did not say whether publishing is open.");
+      return m[1] === "true";
+    },
+    /** An alias's current version's id (Current), "" for none: a publish has landed once it names the new id. */
+    current: (alias: string) => qstr(REALM, `Current(${s(alias)})`),
+    /** The realm that took this course over (Successor()), "" for none: nothing is published to a course that moved. */
+    successor: () => qstr(REALM, "Successor()"),
+    /** Who writes in the records' realm now (store's Writer(): "" paused, another realm once new rules took over): a save or a publish here lands only while it is this realm. */
+    writer: () => qstr(storePath(REALM), "Writer()"),
     /** What a timed hole adds at one stroke of a round (0 = first shot): read
      *  once per hole version and stroke (Extras is a pure function of the two:
      *  the look-ahead and the next stroke ask the same), a failure not kept. */

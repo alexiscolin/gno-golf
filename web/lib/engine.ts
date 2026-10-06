@@ -16,7 +16,7 @@ import { buzz, sound, ambience, setSilent } from "./feel";
 import { makeWeather } from "./scene/weather";
 import { makeCauses } from "./scene/cause";
 import { loadWorld, worldOf } from "./scene/worlds";
-import { makeChain, shotOf, pullShot, isHoleId, RULES, wait, errorKind } from "./chain";
+import { makeChain, shotOf, pullShot, isHoleId, RULES, wait, errorKind, type Chain } from "./chain";
 import { boardWork } from "./adena";
 import { cupOf, legacyOf, oldToSlot } from "./card";
 import {
@@ -31,6 +31,9 @@ import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
+import { loadTakedown, takenDown } from "./takedown";
+import { communityOf, NOT_BUILDER, playable } from "./community";
+import { authorOf } from "./builder/holes";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
@@ -50,6 +53,8 @@ export type Game = ReturnType<typeof createGame>;
 export interface GameOptions {
   rpc?: string;
   web?: string;
+  /** the chain played on: the network's (rpc, web) unless given (the Builder's test mode gives its local one, lib/builder/testmode.ts) */
+  chain?: Chain;
   gnome?: string;
   world?: string;
   weather?: string;
@@ -63,7 +68,8 @@ export interface GameOptions {
   /** ?camlog: the camera logs every frame (for the probes' camLog) */
   log?: boolean;
   onChange?: (snap: Snapshot) => void;
-  onHoled?: (r: { id: string; strokes: number }) => void;
+  /** the ball dropped: the hole, the strokes, and the round's shots (the last among them: a snapshot says it only after) */
+  onHoled?: (r: { id: string; strokes: number; shots: readonly string[] }) => void;
 }
 
 /** A thrown value's message, for the HUD. */
@@ -79,12 +85,13 @@ const HUD = { top: 108, bottom: 136, side: 14 };
 // the community's holes listed with the cups (off until the builder is out)
 const COMMUNITY = process.env.NEXT_PUBLIC_COMMUNITY === "1";
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
+const NO_TAKEN: ReadonlySet<string> = new Set(); // the takedown list when none could be read
 
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
 
-export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
-  const chain = makeChain({ rpc, web });
+export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
+  const chain = given ?? makeChain({ rpc, web });
 
   const renderer = makeRenderer(canvas);
   const scene = makeScene();
@@ -585,6 +592,14 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // any shot in the air belongs to the old hole: end its round, but ask the
     // chain nothing for it (the new hole's round starts once it is built)
     newRound(false);
+    // a community hole plays only once the Builder's own rules pass it (lib/community.ts, judged once a
+    // browser, the Builder's code loaded only then): anyone can publish one with gnokey, past the Builder.
+    // Every way into a hole comes here (a link, the cups' list, Next); nothing of a refused one is built
+    if (!(await playable(chain, id))) {
+      if (ticket === loads && alive) fail(new Error(NOT_BUILDER), "unchecked");
+      return;
+    }
+    if (ticket !== loads || !alive) return;
     let s: Hole;
     const t0 = performance.now();
     try {
@@ -1271,7 +1286,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       const holed = () => {
         // the stroke count as the round has it (SimulateFrom sends none: res.strokes was undefined,
         // and the card saved nothing)
-        onHoled({ id, strokes: g.strokes });
+        onHoled({ id, strokes: g.strokes, shots: g.shots });
         // the hole "Next hole" goes to (the win card's: the next in this cup)
         const cup = perList().holes, i = cup.findIndex((h) => h.id === id);
         if (cup.length) prefetch(cup[(i + 1) % cup.length].id);
@@ -1409,12 +1424,33 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // listed apart and ranked nowhere
     g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
     // not listed until the builder is out (NEXT_PUBLIC_COMMUNITY=1 lists
-    // them): the chain takes anyone's hole, the game shows the course's
-    g.community = COMMUNITY ? list.filter((h) => !h.next && h.official === false) : [];
+    // them): the chain takes anyone's hole, the game shows the course's,
+    // and none until the takedown list is known
+    g.community = COMMUNITY ? communityOf(list, g.taken ?? null) : [];
   }
 
-  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", null for a link to nothing). */
-  async function start(link: string | Link | null): Promise<"hole" | "cup" | null> {
+  /** The takedown list, read once a visit (none if it cannot be read: the next start tries again). */
+  let takenOnce: Promise<ReadonlySet<string>> | null = null;
+  const takedown = () =>
+    (takenOnce ||= loadTakedown(chain).catch(() => ((takenOnce = null), NO_TAKEN)));
+
+  // a link to a community hole the Builder's rules do not pass lands on the cups, and says so (load refuses it too)
+  const unchecked = () => start(null).then((to) => (to === null ? "unchecked" : to));
+
+  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", "taken" for a hole the site took down, "unchecked" for a community hole the Builder's rules do not pass, null for a link to nothing). */
+  async function start(link: string | Link | null): Promise<"hole" | "cup" | "taken" | "unchecked" | null> {
+    // the takedown list (the site's file, the node's chain id) read beside the hole list, never before it:
+    // the community's list fills once it is known, and only a link to a community hole waits for it
+    const taking = takedown().then((t) => {
+      if (alive && g.taken !== t) {
+        g.taken = t;
+        if (g.all) setList(g.all);
+        void publish();
+      }
+      return t;
+    });
+    // a link to a hole the site took down opens the cups, and says so (a course hole is never on the list)
+    if (typeof link === "string" && authorOf(link) && takenDown(await taking, link)) return start(null).then((to) => (to === null ? "taken" : to));
     let list = await chain.holes();
     // a link to a hole the tab's kept list does not have yet: the chain's own
     if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);
@@ -1426,6 +1462,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     // an older archived version, past what Holes() lists: the chain may
     // still have it, so it is asked for; one it has not lands on the cups
     if (!asked && typeof link === "string" && link) {
+      if (!(await playable(chain, link))) return unchecked();
       await load(link);
       if (!alive) return null;
       if (g.s) {
@@ -1436,6 +1473,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       g.error = null;
       g.failed = null;
     }
+    if (asked && !(await playable(chain, asked.id))) return unchecked();
     g.linked = !!asked;
     // ?cup=island alone: that cup, on its first hole
     const cupWant = typeof link === "object" && link && "cup" in link ? link.cup : undefined;

@@ -13,6 +13,7 @@ import type { MutVec2, Vec2, Wall, Zone } from "../types";
 import type { Cause } from "../scene/cause";
 import type { Gnome, Ride, TubePath } from "../scene/data";
 import type { Live } from "./types";
+import { own as ownKey } from "../own";
 
 /** One arc of a flight, in path time (a step is one substep): it leaves at
  *  t0 from `from`, lands at t1 on `to`, its apex h over the line between;
@@ -567,7 +568,7 @@ export function makeReplay(E: Live) {
             // lip as it goes on down out of sight, chips of ice off the mountain's
             sound(end === "drop" ? "drop" : "thud");
             if (skin !== "gap") for (let n = 0; n < 6; n++) E.causes.at(E.ball.position, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, { kind: "ice" });
-            rings = end === "drop" ? makePuff(land.clone().setY(surf), DUST[skin]) : { group: new THREE.Group(), step() {} };
+            rings = end === "drop" ? makePuff(land.clone().setY(surf), ownKey(DUST, skin)) : { group: new THREE.Group(), step() {} };
           } else {
             sound("splash");
             rings = makeSplash(land.clone().setY(surf + 0.5), { open: drop > 0.25 });
@@ -762,7 +763,7 @@ export function makeReplay(E: Live) {
         if (len > 0.08) {
           const [x, y] = path[i];
           const on = s.zones.find((z) => z.kind === "surface" && inZone(z, x, y));
-          const kind = on && SURFACE_SOUNDS[on.skin];
+          const kind = on && ownKey(SURFACE_SOUNDS, on.skin);
           if (kind && !(flights && flights.get(i))) sound(kind, Math.min(1, 0.25 + len / 2.2));
         }
         // a bounce: a knock off timber, a boing off a mushroom. The chain marks

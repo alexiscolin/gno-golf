@@ -19,7 +19,7 @@ export type CamMode = "classic" | "far" | "third";
 export type GfxMode = "auto" | "high" | "low";
 export type Tier = "high" | "low";
 /** What went wrong: the hole's load, its drawing, a shot, the round's stroke limit. */
-export type ErrorKind = "load" | "draw" | "shot" | "limit";
+export type ErrorKind = "load" | "draw" | "shot" | "limit" | "unchecked";
 /** A word on why the ball speeds up or drifts, and when it was said. */
 interface CauseNote {
   label: string;
@@ -33,6 +33,8 @@ export interface GameState {
   all?: HoleRow[];
   /** everyone else's holes, playable outside the cups */
   community?: HoleRow[];
+  /** the community holes the site took down (/takedown.json): neither listed nor opened by a link */
+  taken?: ReadonlySet<string>;
   world?: string;
   /** the page's link named a hole that exists */
   linked?: boolean;

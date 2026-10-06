@@ -15,9 +15,10 @@ import { gnomelet, bunting, stone, smoke } from "./props";
 import { bakeLocal, look, weatherLooks, instances } from "./bake";
 import { seeded, ISLAND, GRASS, placer, onGround, tangentInto, type Rand } from "./common";
 import { ud, type Hole, type Height } from "./data";
-import { GAP_Y, type Bar } from "./worlds";
+import { GAP_Y, type Bar, type Skins } from "./worlds";
 import type { Terrain } from "../terrain";
 import type { Extras, MutVec2, Post, Vec2, Wall, Zone } from "../types";
+import { own } from "../own";
 
 /** Places reserved round the board (common.ts placer). */
 type Reserve = (x: number, z: number, r: number) => void;
@@ -2327,6 +2328,17 @@ function serac(z: Zone, t: Terrain, s: Hole) {
   return g;
 }
 
+/** The skins piece() draws from the piece alone (the builder's palette, worlds.ts Skins); a lift is its cable's (decor). */
+const skins: Skins = {
+  post: ["pine", "boulder", "snowman", "chalet", "skater"],
+  bar: ["net"],
+  surface: ["ice", "snowdrift"],
+  slope: ["kicker", "terrace", "downhill", "slope", "saddle crest", "bank"],
+  air: ["gust"],
+  hazard: ["cliff", "serac", "crevasse"],
+  tunnel: ["ice cave", "door"],
+};
+
 function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terrain, s: Hole) {
   const skin = item.skin || "";
   const rand = seeded("mpiece" + s.hole + JSON.stringify("c" in item ? item.c : "min" in item ? item.min : []));
@@ -2335,7 +2347,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
     const post = item as Post; // (kind says which)
     const [x, z] = post.c, r = post.r;
     const makers: Record<string, () => THREE.Group> = { pine: () => pinePost(r, rand), boulder: () => boulder(r, rand), snowman: () => snowmanPost(r), chalet: () => chaletPost(r, night), skater: () => skaterPost(r, rand, r > 0.8) };
-    const make = makers[skin];
+    const make = own(makers, skin);
     return make ? onGround(make(), x, z, t) : undefined;
   }
   if (kind === "wall") {
@@ -2560,4 +2572,4 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
   return undefined;
 }
 
-export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece, liftPlan, liftChairs };
+export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece, skins, liftPlan, liftChairs };

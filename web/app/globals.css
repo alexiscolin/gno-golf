@@ -2446,3 +2446,10 @@ body:has(.pending) .turncall { top: 34%; }
 }
 @media (max-width: 340px) { .worlds--v2 .modetag { display: none; } } /* (the cups' Scores pill takes its room) */
 @media (max-height: 640px) { .boards > .lb--full > ol { flex-shrink: 0; } } /* (a short screen: the sheet scrolls, not a box in it) */
+
+/* /build when the Builder is not out on this build (app/build/gate.tsx) */
+.builder-off { display: grid; place-items: center; align-content: center; gap: 8px; min-height: 100dvh; padding: 16px; text-align: center; }
+
+/* a community hole's mark: whether its author has holed it (Worlds), its line held while the chain answers */
+.community__mark { display: block; min-height: 1.3em; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.community__judging { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }

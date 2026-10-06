@@ -8,7 +8,10 @@ import { stillsOnly } from "@/lib/prefs";
 import { CLIP, Green, canHover, cupStill, stillsReady, warmClips } from "@/components/Title";
 import { FrontScreen } from "@/components/About";
 import { Button, VsPar } from "@/components/ui";
-import { plural } from "@/components/common";
+import { authorFirst, authorMark, plural } from "@/components/common";
+import { authorOf } from "@/lib/builder/holes";
+import type { Chain } from "@/lib/chain";
+import { NOT_BUILDER, pageOf, verdictOf, type Verdict } from "@/lib/community";
 import "@/app/title.css";
 
 // The world screen, between the game's choice (Modes.tsx) and the course: one
@@ -218,6 +221,8 @@ interface WorldsProps {
   restoring?: boolean;
   community?: readonly HoleRow[];
   onCommunity?: (id: string) => void;
+  /** the chain: each community hole judged by the Builder's rules before it is listed, and whether its author has holed it */
+  chain?: Pick<Chain, "bests" | "holeData"> | null;
   /** the course's records to beat, under the cups */
   podium?: ReactNode;
   /** a cup's next hole to play, said on its card once begun */
@@ -228,7 +233,7 @@ interface WorldsProps {
 const NOT_PLAYED: Pick<CupTotal, "done" | "strokes" | "par" | "clean"> = { done: 0, strokes: 0, par: 0, clean: false };
 let shownOnce = false;
 
-export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, podium, racing, next = () => undefined }: WorldsProps) {
+export default function Worlds({ counts = {}, stats, current, onPick, onBack, onAbout, onReset, onResetAll, onRestore, restoring = false, community = [], onCommunity = () => {}, chain = null, podium, racing, next = () => undefined }: WorldsProps) {
   const [wipe, setWipe] = useState<string | null>(null); // what was asked to be cleared, before the second tap
   const [resets, setResets] = useState(false); // the little reset menu at the top
   const [hot, setHot] = useState<string | null>(null); // the cup under the pointer or the focus: the backdrop takes its colours
@@ -242,7 +247,41 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
     return () => void (live = false);
   }, [ready]);
   const PAGE = 24;
-  const [shown, setShown] = useState(PAGE); // community holes listed, a page more on each "Show more"
+  const [shown, setShown] = useState(PAGE); // community holes judged for the list, a page more on each "Show more"
+  // each community hole of the page judged by the Builder's own rules (lib/community.ts: anyone can publish
+  // past the Builder with gnokey), one after the other, once a version a browser: only those it passes are listed
+  const [verdicts, setVerdicts] = useState<ReadonlyMap<string, Verdict>>(new Map());
+  useEffect(() => {
+    if (!chain) return;
+    let live = true;
+    void (async () => {
+      for (const h of community.slice(0, shown)) {
+        if (!live) return;
+        if (verdicts.has(h.id)) continue;
+        // (the rules not loaded: not shown this visit, nothing kept)
+        const v = await verdictOf(chain, h.id).catch((): Verdict => ({ ok: false, why: NOT_BUILDER }));
+        if (live) setVerdicts((m) => new Map(m).set(h.id, v));
+      }
+    })();
+    return () => void (live = false);
+  }, [chain, community, shown]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts: judged once each, not again as they fill)
+  const page = pageOf(community, shown, verdicts);
+  // whether each hole listed has been holed by its author (its best on the chain), read once a hole;
+  // the list put in that order once the page's answers are in (one move, not one per answer)
+  const [holed, setHoled] = useState<ReadonlyMap<string, boolean>>(new Map());
+  useEffect(() => {
+    if (!chain || page.judging) return;
+    let live = true;
+    for (const h of page.rows) {
+      const a = authorOf(h.id);
+      if (!a || holed.has(h.id)) continue;
+      const best = (mode: string) => chain.bests(h.id, mode, [a]).then((b) => b.rows.length > 0);
+      void best("assisted").then((yes) => yes || best("pro")).then((yes) => live && setHoled((m) => new Map(m).set(h.id, yes)), () => {});
+    }
+    return () => void (live = false);
+  }, [chain, page.judging, page.rows.length]); // eslint-disable-line react-hooks/exhaustive-deps -- (holed: read once each, not again as it fills)
+  const settled = !page.judging && page.rows.every((h) => holed.has(h.id) || !authorOf(h.id));
+  const listed = settled ? authorFirst(page.rows, holed) : page.rows;
   const played = WORLDS.filter((w) => stats[w.id] && stats[w.id].done);
   const loading = !Object.keys(counts).length; // (the chain's list not in yet: every cup at 0)
   const clear = (what: string, run: () => void) => {
@@ -335,15 +374,18 @@ export default function Worlds({ counts = {}, stats, current, onPick, onBack, on
         <section className="community" aria-label="Community holes">
           <h3>Community holes <small>not ranked</small></h3>
           <ul>
-            {community.slice(0, shown).map((h) => (
+            {listed.map((h) => (
               <li key={h.id}>
                 <button className="linkish" onClick={() => (sound("select"), onCommunity(h.id))}>{h.name}</button>
+                <small className="community__mark">{authorMark(holed.get(h.id))}</small>
               </li>
             ))}
           </ul>
-          {community.length > shown && (
+          {page.judging ? (
+            <p className="community__judging" aria-live="polite">Checking the holes against the Builder rules…</p>
+          ) : page.more > 0 && (
             <button className="linkish" onClick={() => setShown((n) => n + PAGE)}>
-              Show more ({community.length - shown} left)
+              Show more
             </button>
           )}
         </section>

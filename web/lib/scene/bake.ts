@@ -192,11 +192,13 @@ function mergeInPlace(pieces: readonly Piece[]) {
   for (const { geo, at, color } of pieces) {
     const n = geo.attributes.position.count, e = at.elements;
     for (const name in arrays) {
+      // eslint-disable-next-line no-restricted-syntax -- a geometry's own attribute name
       const dst = arrays[name];
       if (name === "color" && color) {
         for (let i = 0, o = v0 * 3; i < n; i++, o += 3) (dst[o] = color.r), (dst[o + 1] = color.g), (dst[o + 2] = color.b);
         continue;
       }
+      // eslint-disable-next-line no-restricted-syntax -- a geometry's own attribute name
       const a = geo.attributes[name] as THREE.BufferAttribute, src = a.array, size = a.itemSize;
       if (name === "position") {
         for (let i = 0, o = v0 * 3; i < n; i++, o += 3) {

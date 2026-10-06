@@ -18,6 +18,7 @@ import { track, trackError } from "./analytics";
 import type { Chain } from "./chain";
 import type { Stroke, Vec2 } from "./types";
 import type { Ask, Reply } from "./sim/worker";
+import { sameSources } from "./sim/sources";
 
 type SimChain = Pick<Chain, "file" | "realm" | "holeData">;
 
@@ -35,31 +36,8 @@ function post(m: Ask): Promise<string> {
   });
 }
 
-const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
-const digest = async (s: string) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
-
 /** Whether the files golf.wasm was built from are the ones the realm runs. */
-async function sourcesMatch(chain: SimChain) {
-  const src = JSON.parse(await post({ op: "sources" })) as Record<string, string>;
-  const key = `gnogolf.sim|${chain.realm}|${await digest(JSON.stringify(src))}`;
-  try {
-    if (localStorage.getItem(key) === "ok") return true;
-  } catch {}
-  // stage.sh's prefix: the repo's gno.land/[pr]/gnogolf/ is the realm's
-  // gno.land/[pr]/<ns>/gnogolf/ (none on a local chain), and golf/v2 (the
-  // rules golf.wasm was built from: scripts/wasm.sh) is the realm
-  const at = chain.realm.replace(/^gno\.land\/r\//, "").replace(/\/v[0-9]+$/, "").replace(/[^/]+$/, "");
-  const rules = /^gno\.land\/r\/gnogolf\/golf(\/v[0-9]+)?\//;
-  const deployed = (p: string) =>
-    rules.test(p) ? chain.realm + "/" + p.replace(rules, "") : p.replace(/^gno\.land\/p\/gnogolf\//, `gno.land/p/${at}`);
-  const back = (s: string) => s.replaceAll(`gno.land/p/${at}`, "gno.land/p/gnogolf/").replaceAll(`gno.land/r/${at}`, "gno.land/r/gnogolf/");
-  const same = await Promise.all(Object.entries(src).map(async ([p, sum]) => (await digest(back(await chain.file(deployed(p))))) === sum));
-  if (!same.every(Boolean)) return false;
-  try {
-    localStorage.setItem(key, "ok");
-  } catch {}
-  return true;
-}
+const sourcesMatch = async (chain: SimChain) => sameSources(chain, JSON.parse(await post({ op: "sources" })) as Record<string, string>, "sim");
 
 /** Starts the local preview, once a visit: the worker, the wasm, its sources checked. */
 export function startSim(chain: SimChain): Promise<boolean> {
