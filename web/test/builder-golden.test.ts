@@ -62,6 +62,16 @@ const cases: [string, () => Draft, string[]][] = [
     ["E13 x: The rock post stands on the plain rail at (13.5, 2.3)"]],
   ["E13: two bars crossing", () => lane("garden", [put("x", "*/bar/plank", [10, 9], { size: 4 }), { ...put("y", "*/bar/plank", [12, 7], { size: 4 }), geometry: { t: "bar", a: [12, 7], b: [12, 11], thick: 0.5 } }]),
     ["E13 x: The plank bar crosses the plank bar at (13.5, 10.5)"]],
+  ["E13: a bar run through a rail", () => lane("garden", [rail("a", [15, 0], [15, 8]), { ...put("x", "*/bar/plank", [13, 6]), geometry: { t: "bar", a: [13, 6], b: [17, 6], thick: 0.5 } }]),
+    ["E13 x: The plank bar crosses the plain rail at (16.5, 7.5)"]],
+  ["E13: a bar poking through the lane's own rail", () => lane("garden", [{ ...put("x", "*/bar/plank", [10, 18]), geometry: { t: "bar", a: [10, 18], b: [10, 21], thick: 0.5 } }]),
+    ["E13 x: The plank bar crosses the plain rail at (11.5, 21)"]],
+  ["E13: a short rail wholly under a bar", () => lane("garden", [rail("a", [12, 10], [12.5, 10]), { ...put("x", "*/bar/plank", [10, 10]), geometry: { t: "bar", a: [10, 10], b: [14, 10], thick: 1 } }]),
+    ["E13 x: The plank bar crosses the plain rail at (13.5, 11.5)"]],
+  ["E13: two ponds over one another (drawn at one height: they flicker)", () => lane("garden", [put("x", "*/hazard/water", [10, 3], { size: 3 }), put("y", "*/hazard/water", [11.5, 4], { size: 3 })]),
+    ["E13 x: The water hazard lies over the water hazard at (11.5, 4.5)"]],
+  ["E13: a flowerbed over soil (two surfaces at one height)", () => lane("garden", [put("x", "*/surface/flowerbed", [10, 3], { size: 3 }), put("y", "*/surface/soil", [11.5, 4], { size: 3 })]),
+    ["E13 x: The flowerbed surface lies over the soil surface at (11.5, 4.5)"]],
   ["E14: the only way to the cup a ball only just fits", () => lane("garden", [rail("a", [15, 0], [15, 9.5]), rail("b", [15.5, 10.5], [15.5, 20])]),
     ["E14 a: The gap at (16.75, 11.5) between the plain rail and the plain rail is 1.12 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits"]],
   ["E15: a bar against a rail, swallowed by the kerb", () => lane("garden", [{ ...put("x", "*/bar/plank", [10, 0.5]), geometry: { t: "bar", a: [10, 0.5], b: [14, 0.5], thick: 0.5 } }]),
@@ -104,6 +114,10 @@ void test("E9 and E11: the data's size and the work, from the chain's own number
 // must keep passing, so a change that refuses a new one is seen here. (The
 // Crystal Mines are not a Builder world: their holes are the game's alone.)
 const REFUSED_COURSE: Record<string, string> = {
+  "garden/10": "two soil patches over one another: drawn at one height, their edges flicker",
+  "garden/14": "two ponds over one another, at one height",
+  "mountain/11": "ice over a snowdrift, at one height",
+  "town/18": "patches laid on a brick floor that covers the board, at one height",
   "town/14": "a door 1.2 deep: a fast ball can step over it",
 };
 

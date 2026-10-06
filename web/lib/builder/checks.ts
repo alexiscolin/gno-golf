@@ -271,7 +271,8 @@ const kindOf = (h: HoleIn, r: PieceRef) => (r.set === "zone" ? (pieceOf(h, r) as
 /**
  * E13: no two solid pieces in one another where the scene draws them badly:
  * posts overlapping, a post on a wall, two walls crossing, a post in a zone
- * that moves the ball, two zones of different kinds overlapping; unless the
+ * that moves the ball, two zones overlapping (of one kind, drawn at one height:
+ * they flicker); unless the
  * palette lets that pair meet (allow).
  */
 function overlaps(h: HoleIn, name: Namer, entryOf: EntryOf): Issue[] {
@@ -287,7 +288,7 @@ function overlaps(h: HoleIn, name: Namer, entryOf: EntryOf): Issue[] {
     for (const { item: z, ref: r } of zones) if (moves(z) && inZone(shapeOf(z), p.c[0], p.c[1])) say(ref, r, "stands in", p.c);
   });
   zones.forEach(({ item: z, ref }, k) => {
-    for (const { item: y, ref: r } of zones.slice(k + 1)) if (z.kind !== y.kind && !z.outside && !y.outside && overlap(z, y)) say(ref, r, "lies over", z.min);
+    for (const { item: y, ref: r } of zones.slice(k + 1)) if (!z.outside && !y.outside && overlap(z, y)) say(ref, r, "lies over", z.min);
   });
   return out;
 }

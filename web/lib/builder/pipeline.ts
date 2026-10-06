@@ -119,6 +119,11 @@ function crosses(a: V, b: V, c: V, e: V) {
   const d1 = o(c, e, a), d2 = o(c, e, b), d3 = o(a, b, c), d4 = o(a, b, e), t = 1e-9;
   return ((d1 > t && d2 < -t) || (d1 < -t && d2 > t)) && ((d3 > t && d4 < -t) || (d3 < -t && d4 > t));
 }
+/** Whether a point lies strictly inside a convex outline (its edges, in order). */
+const within = (q: V, sides: readonly [V, V][]) => {
+  const s = sides.map(([a, b]) => (b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]));
+  return s.every((x) => x > 1e-9) || s.every((x) => x < -1e-9);
+};
 const segSeg = (a: V, b: V, c: V, e: V) => (crosses(a, b, c, e) ? 0 : Math.min(segDist(a[0], a[1], c, e), segDist(b[0], b[1], c, e), segDist(c[0], c[1], a, b), segDist(e[0], e[1], a, b)));
 
 /** The draft's own rules on its bars: out of the lane (E10), crossing another bar (E13), against a rail (E15). */
@@ -134,9 +139,15 @@ function bars(d: Draft, h: GHole, palette: readonly PaletteEntry[], refs: Map<st
       const may = entryIn(p.entry, palette)?.overlaps?.includes("wall") || entryIn(q.entry, palette)?.overlaps?.includes("wall");
       if (!may && edges(p).some(([a, b]) => edges(q).some(([c, e]) => crosses(a, b, c, e)))) out.push({ ...err("E13", `${cap(pieceName(p))} crosses ${pieceName(q)} at ${pt(mid)}`, p, mid), also: refs.get(q.id) ?? [] });
     }
+    const onRails = entryIn(p.entry, palette)?.overlaps?.includes("wall");
     for (const r of rails) {
       if (r.geometry.t !== "rail") continue;
       const ra = r.geometry.a, rb = r.geometry.b;
+      // a rail run through the bar, or lying under it whole
+      if (!onRails && (edges(p).some(([a, b]) => crosses(a, b, ra, rb)) || within(ra, edges(p)) || within(rb, edges(p)))) {
+        out.push({ ...err("E13", `${cap(pieceName(p))} crosses ${pieceName(r)} at ${pt(mid)}`, p, mid), also: refs.get(r.id) ?? [] });
+        continue;
+      }
       const gap = Math.min(...edges(p).map(([a, b]) => segSeg(a, b, ra, rb)));
       if (gap > 0 && gap < KERB_GAP - 1e-9) out.push(err("E15", `${cap(pieceName(p))} is ${+gap.toFixed(2)} from ${pieceName(r)}: at least ${KERB_GAP}, or the kerb swallows it`, p, mid));
     }
