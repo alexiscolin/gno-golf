@@ -5,6 +5,12 @@ import { makeRenderer, makeScene } from "./camera";
 import { bake } from "./bake";
 import { ud, type Gnome } from "./data";
 import type { UnlockId } from "../card";
+import type { Beard, Holing, Material, Pattern, Piece, Trail } from "../gnomes/vocab";
+import { darkBody } from "../gnomes/colour";
+import { isKitHat, kitHat, kitWear, kitPiece, hatTop, patternedBody, type KitHat } from "./gnome-kit";
+import { propOf } from "./gnome-props";
+import { dressMatter } from "./gnome-matter";
+import { dressLegend } from "./gnome-legend";
 
 /** A gnome's look: what makeBall dresses him in. */
 export interface Skin {
@@ -14,8 +20,9 @@ export interface Skin {
   /** the unlock that earns him (lib/card.ts UNLOCKS); none: everyone's */
   unlock?: UnlockId;
   hat: number;
-  shape?: "tricorn" | "toque" | "tophat";
-  beard: "full" | "long" | "bushy" | "moustache" | "none";
+  /** a hat other than the cone: GNOMES' three, or one of the collection's (gnome-kit.ts) */
+  shape?: "tricorn" | "toque" | "tophat" | KitHat;
+  beard: Beard;
   hair?: number;
   body?: number;
   stripes?: readonly [number, number];
@@ -26,6 +33,28 @@ export interface Skin {
   lamp?: boolean;
   /** the brim's colour, when not the hat's (a helmet's: dark wood) */
   brim?: number;
+  // The collection's traits (lib/gnomes, docs/gnomes/design.md): none of
+  // GNOMES wears them, and a gnome without them is drawn as he always was.
+  goggles?: boolean; earring?: boolean; neckerchief?: boolean; leaf?: boolean; soot?: boolean; freckles?: boolean; moon?: boolean;
+  /** the small things' colour (a neckerchief, goggles' strap, an earring) */
+  accent?: number;
+  /** a Rare's patterned body, in body and patternColor */
+  pattern?: Exclude<Pattern, "plain">;
+  patternColor?: number;
+  /** a Rare's piece, and its colour */
+  piece?: Piece;
+  pieceColor?: number;
+  /** what he is made of (an Epic's, a Legendary's), tinted materialColor */
+  material?: Exclude<Material, "toon">;
+  materialColor?: number;
+  /** what he leaves behind rolling, and what the cup does when he drops in (gnome-fx.ts) */
+  trail?: Trail;
+  trailColor?: number;
+  holing?: Exclude<Holing, "confetti">;
+  holingColor?: number;
+  /** an Epic's or a Legendary's own thing (lib/gnomes/props.ts), and its colour */
+  prop?: string;
+  propColor?: number;
 }
 
 /** The ball is a gnome. Which one is the player's choice — cosmetic only: the
@@ -152,16 +181,79 @@ function beardOf(k: Skin["beard"], hair: number | undefined) {
       b.rotation.z = side * -0.35;
       g.add(b);
     }
+  } else if (k === "goatee") {
+    // a small point under the chin, a thin moustache over it
+    const b = inked(new THREE.ConeGeometry(0.12, 0.3, 10), m);
+    b.rotation.x = Math.PI + 0.35;
+    b.position.set(0, -0.36, 0.45);
+    g.add(b);
+    for (const side of [-1, 1]) {
+      const s = inked(new THREE.SphereGeometry(0.09, 10, 6), m);
+      s.position.set(side * 0.11, -0.1, 0.53);
+      s.scale.set(1.4, 0.45, 0.5);
+      s.rotation.z = side * -0.25;
+      g.add(s);
+    }
+  } else if (k === "braids") {
+    // a short beard parted into two braids, each a few knots down
+    const b = inked(new THREE.SphereGeometry(0.24, 12, 9), m);
+    b.position.set(0, -0.22, 0.42);
+    b.scale.set(1.05, 0.7, 0.6);
+    g.add(b);
+    for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
+      const knot = inked(new THREE.SphereGeometry(0.075 - i * 0.008, 8, 6), m);
+      knot.position.set(side * (0.13 + i * 0.01), -0.38 - i * 0.12, 0.42 - i * 0.03);
+      g.add(knot);
+    }
+  } else if (k === "chops") {
+    // mutton chops: a bush on each cheek, joined by the moustache
+    for (const side of [-1, 1]) {
+      const c = inked(new THREE.SphereGeometry(0.17, 12, 8), m);
+      c.position.set(side * 0.33, -0.16, 0.36);
+      c.scale.set(0.8, 1.15, 0.7);
+      const s = inked(new THREE.SphereGeometry(0.11, 10, 6), m);
+      s.position.set(side * 0.16, -0.1, 0.52);
+      s.scale.set(1.5, 0.55, 0.55);
+      s.rotation.z = side * -0.3;
+      g.add(c, s);
+    }
   }
   return g;
 }
 
+/** The collection's traits onto a gnome makeBall has built (none of them on
+ *  GNOMES' fourteen): his small things, a Rare's piece, an Epic's prop, a
+ *  Legendary's piece, then his material over all of it. Returns what moves. */
+function dressCollection(g: THREE.Group, hat: THREE.Group, skin: Skin, body: THREE.Mesh, beard: THREE.Group) {
+  kitWear(g, hat, skin);
+  kitPiece(g, hat, skin);
+  const prop = propOf(skin);
+  if (prop) {
+    if (prop.at === "top") prop.group.position.y = hatTop(skin);
+    (prop.at === "body" ? g : hat).add(prop.group);
+  }
+  const ticks = [dressLegend(g, hat, skin)];
+  if (skin.material) {
+    // the solids (not their ink) of a part: the hat's in the hat's colour, all of the beard
+    const solids = (o: THREE.Object3D, keep: (m: THREE.MeshToonMaterial) => boolean) => {
+      const out: THREE.Mesh[] = [];
+      o.traverse((m) => m instanceof THREE.Mesh && m.material instanceof THREE.MeshToonMaterial && m.material.side !== THREE.BackSide && keep(m.material) && out.push(m as THREE.Mesh));
+      return out;
+    };
+    const inProp = (m: THREE.Object3D) => !!prop && !!prop.group.getObjectById(m.id);
+    ticks.push(dressMatter(g, skin, { body, hat: solids(hat, (m) => m.color.getHex() === skin.hat).filter((m) => !inProp(m)), beard: solids(beard, () => true), prop: prop ? prop.matter : [] }));
+  }
+  return ticks.filter((f): f is (t: number) => void => !!f);
+}
+
 export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   const g = new THREE.Group();
-  g.add(inked(new THREE.SphereGeometry(0.55, 22, 16), skin.stripes ? stripedBody(skin.stripes) : flat(skin.body || C.cream)));
+  const body = inked(new THREE.SphereGeometry(0.55, 22, 16), skin.stripes ? stripedBody(skin.stripes) : skin.pattern ? patternedBody(skin) : flat(skin.body || C.cream));
+  g.add(body);
 
   const hat = new THREE.Group();
-  if (skin.shape === "tricorn") {
+  if (isKitHat(skin.shape)) kitHat(hat, skin as Skin & { shape: KitHat });
+  else if (skin.shape === "tricorn") {
     // a black three-cornered hat: a low crown and three turned-up corners
     const crown = inked(new THREE.CylinderGeometry(0.34, 0.42, 0.42, 14), flat(skin.hat));
     crown.position.y = -0.02;
@@ -253,10 +345,10 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   if (skin.shape === "tricorn" || skin.shape === "toque") brim.visible = false;
   brim.rotation.x = Math.PI / 2;
   brim.position.y = -0.2;
-  hat.add(brim);
+  if (!isKitHat(skin.shape)) hat.add(brim); // (the collection's hats have their own)
   if (skin.pompom) {
     const pom = inked(new THREE.SphereGeometry(0.17, 10, 8), flat(0xffffff));
-    pom.position.y = 0.6;
+    pom.position.y = isKitHat(skin.shape) ? hatTop(skin) + 0.03 : 0.6;
     hat.add(pom);
   }
   if (skin.flower) {
@@ -281,11 +373,20 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   const lampAt = new THREE.Vector3(0, ly, lz).applyMatrix4(hat.matrix);
 
   const eyes: THREE.Object3D[] = [];
+  const dark = skin.body !== undefined && darkBody(skin.body);
   for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), flat(C.ink));
+    // (on a body too dark for ink, where he looks must still read: a white
+    // round each eye, or lit eyes on lava)
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), dark && skin.material === "lava" ? LENS : flat(C.ink));
     eye.position.set(side * 0.18, 0.08, 0.5);
     g.add(eye);
     eyes.push(eye);
+    if (dark && skin.material !== "lava") {
+      const white = new THREE.Mesh(new THREE.CircleGeometry(0.125, 14), flat(0xffffff));
+      white.position.set(side * 0.18, 0.08, 0.517);
+      white.lookAt(white.position.clone().multiplyScalar(2));
+      g.add(white);
+    }
     if (skin.cheeks) {
       const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), flat(C.petal));
       cheek.position.set(side * 0.3, -0.06, 0.44);
@@ -362,7 +463,9 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   }
   const nose = inked(new THREE.SphereGeometry(0.1, 10, 8), flat(C.petal));
   nose.position.set(0, -0.02, 0.56);
-  g.add(nose, beardOf(skin.beard, skin.hair));
+  const beard = beardOf(skin.beard, skin.hair);
+  g.add(nose, beard);
+  const ticks = dressCollection(g, hat, skin, body.children[0] as THREE.Mesh, beard);
 
   const shade = new THREE.Mesh(
     new THREE.CircleGeometry(BALL_R * 1.1, 20),
@@ -385,6 +488,7 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   root.name = "gnome"; // (gnomeIn; a ghost is renamed)
   root.add(g, shade);
   root.userData = { body: g, eyes, shade, reach, mid: (box.min.y + box.max.y) / 2, lampAt };
+  if (ticks.length) (root.userData.tick = (t) => ticks.forEach((f) => f(t)))(0);
   if (skin.lamp) root.userData.lamp = lampOn(g, lampAt); // (after the bake: his glow stays a sprite of its own)
   return root;
 }
@@ -478,6 +582,7 @@ export function makePreview(canvas: HTMLCanvasElement, { act = "hop", still = fa
       }
       shade.scale.setScalar(1 - hop * 1.6);
       shade.material.opacity = 0.18 * (1 - hop * 1.4);
+      gnome.userData.tick?.(t); // (a Legendary's piece moves with the act)
     }
     // the ghost hops when he lands: their turns
     if (rival) {
