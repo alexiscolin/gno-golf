@@ -14,7 +14,7 @@ import (
 // slots in store as golf/v2 keeps them, a best on each, then the Wizard
 // minted. The gnomes line below is the mint alone: the ledger's owner and
 // balance rows, the locker's, and the earned and kind rows, no cap row:
-// 3,554 bytes, 0.36 GNOT of deposit (the spec estimated 3 to 5 KB).
+// 4,038 bytes, 0.40 GNOT of deposit (the spec estimated 3 to 5 KB).
 func f(s string) string { return strconv.Itoa(len(s)) + ":" + s }
 
 func main(cur realm) {
@@ -43,6 +43,6 @@ func main(cur realm) {
 // 1000001
 
 // Storage:
-// gno.land/r/gnogolf/gnomes: 3554
+// gno.land/r/gnogolf/gnomes: 4038
 // gno.land/r/gnogolf/store: 25207
 // gno.land/r/test/storedearned: 0

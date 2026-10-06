@@ -150,14 +150,14 @@ it leaves them and refuses to move an earned one.
 
 | what | bytes | deposit | golden |
 |---|---|---|---|
-| the realm's code with the portrait's drawing, staged (no catalogue), and p/gnogolf/weblink | 164,121 and 976 | 16.5 GNOT, the deployer | `stage.sh` |
+| the realm's code with the portrait's drawing, staged (no catalogue), and p/gnogolf/weblink | 167,391 and 976 | 16.8 GNOT, the deployer | `stage.sh` |
 | the genesis published as the catalogue lays it out, with a wave | 64,232 | 6.4 GNOT, the owner | `z_storage_genesis` |
-| a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` |
-| an earned gnome | 3,554 | 0.36 GNOT, the player | `z_storage_earned` |
+| a first buy (was 10,465 with enumerable and a traits copy) | 4,333 | 0.43 GNOT, the buyer | `z_storage_buy` |
+| an earned gnome | 4,038 | 0.40 GNOT, the player | `z_storage_earned` |
 
 | what | gas | measured by |
 |---|---|---|
-| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.34M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
+| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.62M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 | `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
@@ -175,11 +175,24 @@ The King's proof is under the 300M the client will ask for `MintEarned` and
 of the order of golf's `Claim` (70.2M); a `GnomesOf` page of 100 is about
 210M, far under a query's 3e9.
 
+**Wearing is free.** The gnome others see a player wear is the one they
+equipped, while they own it, else their best owned (Legendary, Epic, Rare,
+Common, then an earned one; the lowest id among equals), else none:
+`Worn(player)` answers it in one read, `WornMany` for a board's page or a
+duel's ghosts, so every client shows the same gnome everywhere with no
+transaction. A player plays any gnome they own for themselves in the
+browser, free and at once; `Equip` is only for showing others a gnome other
+than their best. The best is one row of an index kept best first
+(`"<holder> <rank> <id>"`), written where a mint already holds the gnome
+and moved on a transfer, so a read is one row whatever a player holds; it
+adds a row to each mint (about 480 bytes on a first buy, 0.28M gas).
+
 **Reads for the screens**, JSON starting with `"version":1`, one query each:
 `Collection`, `Gnome` (`{"version":1,"id":""}` for none), `Sold` (a bit per
 id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
 enough to draw a collection with no call per token; `total`, `next`),
-`Equipped`, `EquippedMany` (the first 50 players of a list), `Auction`,
+`Worn`, `WornMany`, `Equipped`, `EquippedMany` (the first 50 players of a
+list), `Auction`,
 `Proof`; the GRC721 surface (`TokenOfOwnerByIndex` from the locker's index,
 no `TokenByIndex`); `TokenMetadata` (name, description, image,
 `external_url`, attributes Tier, Series and an earned gnome's Kind);
@@ -229,7 +242,8 @@ the traits is the user's call.
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |
 | AddSeries | a malformed row; a gap; growth without bound | checked whole; 64 series of 1,000 rows | `TestASeriesIsRefusedWhole`, `TestASeriesIsBounded` |
 | AddWave | overlaps; too many | checked; 64 waves | `TestAWaveIsCheckedWhole`, `TestTheWavesAreBounded` |
-| reads | a query made unbounded | bounded pages and lists | `TestEquippedManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
+| reads | a query made unbounded | bounded pages and lists | `TestEquippedManyAnswersABoardPage`, `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
+| Worn | a gnome shown that the player no longer owns; the best index left behind by a transfer or a burn | equipped only while owned; the index moved by the ledger's hook and Burn | `TestTheEquippedGnomeIsWornWhileOwned`, `TestTheBestIndexFollowsTheLedger` |
 | TokenURI, TokenMetadata | markup or JSON in a name | escaped | `TestANameCannotInjectMarkup`, `TestMetadataEscapesTheName` |
 
 Reentrancy: the only calls out are to the banker, which runs no code, and

@@ -52,15 +52,24 @@ func equippedRow(player address) string {
 	if !ok {
 		return ""
 	}
-	return `"player":` + jsonString(player.String()) + `,"id":"` + tid + `","name":` + jsonString(g.name) +
-		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `}`
+	return wearerFields(player, g) + `}`
+}
+
+// wearerFields is a worn gnome's fields, after the version and before the
+// closing brace: Equipped's and Worn's rows.
+func wearerFields(player address, g gnome) string {
+	return `"player":` + jsonString(player.String()) + `,"id":"` + itoa(g.id) + `","name":` + jsonString(g.name) +
+		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits)
 }
 
 // EquippedMany is Equipped for the first 50 players of a comma-separated
 // list, those who wear one: {"version":1,"rows":[<Equipped's fields>, …]}.
-// Repeats and non-addresses are skipped, and count toward the 50, so the
-// walk stays short whatever the list.
-func EquippedMany(players string) string {
+func EquippedMany(players string) string { return rowsFor(players, equippedRow) }
+
+// rowsFor is row for the first 50 players of a comma-separated list, as one
+// versioned JSON array of those who have one. Repeats and non-addresses are
+// skipped, and count toward the 50, so the walk stays short whatever the list.
+func rowsFor(players string, row func(address) string) string {
 	var b strings.Builder
 	b.WriteString(`{"version":1,"rows":[`)
 	n := 0
@@ -73,11 +82,11 @@ func EquippedMany(players string) string {
 			continue
 		}
 		seen[p] = true
-		if row := equippedRow(address(p)); row != "" {
+		if r := row(address(p)); r != "" {
 			if n > 0 {
 				b.WriteString(",")
 			}
-			b.WriteString("{" + row)
+			b.WriteString("{" + r)
 			n++
 		}
 	}

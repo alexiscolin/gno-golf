@@ -67,7 +67,7 @@ func setUp(_ int, rlm realm, deployer address) {
 	}
 	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
 	auc, last, closeAt, pausedAt = nil, nil, 0, 0
-	bought, inWindow, equipped, held = seeded(), seeded(), seeded(), seeded()
+	bought, inWindow, equipped, held, byBest = seeded(), seeded(), seeded(), seeded(), seeded()
 	earned, kindOf, nextEarned, rows = seeded(), seeded(), firstEarned, storeReader{}
 }
 
@@ -103,6 +103,7 @@ func mintTo(whom address, g gnome) {
 	}
 	sold[(g.id-1)/8] |= 1 << uint((g.id-1)%8)
 	soldTier[g.tier]++
+	byBest.Set(bestKey(whom, g), "")
 }
 
 // soldIn is how many of ids first to last were ever sold, read from the sold
