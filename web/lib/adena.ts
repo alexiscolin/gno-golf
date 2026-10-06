@@ -286,7 +286,7 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
 
 // what is asked of the account: the gas at the price, with half again for a
 // price that rises between the reading and the block
-const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
+export const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
 // the price asked when the chain's is not given: ugnot a gas
 export const PRICE = 0.001;
 // Gas asked for one commit, calibrated on gno_call simulate=true: the work model already bounds the shots
@@ -296,8 +296,8 @@ export const PRICE = 0.001;
 // most, rain and a storm on the heaviest course holes (town/14, island/14:
 // 193M and 204M), the rest ~7M.
 // Adena simulates every tx with 2e9 gas at most: the ask stays under it.
-const MAX_GAS = 1_900_000_000;
-const PER_CALL = 30e6;
+export const MAX_GAS = 1_900_000_000;
+export const PER_CALL = 30e6;
 // a round's last commit, the one that holes it, also keeps its finish in
 // store (its best, the board, the standing, the drain's share): some 30M to
 // 40M golf's work model leaves out (golf.gno storeGas)
@@ -504,11 +504,11 @@ interface SaveRound extends Work {
 // unchecked: a package path is one of a realm's characters, the chain's id and
 // RPC are theirs or a placeholder, and an argument is checked (or quoted) by
 // the plan it is in.
-const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+export const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
 // an RPC as a command may carry it, "" for anything else
 const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "");
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
-function gnokeyOn(chainId: string | null | undefined, rpc: string) {
+export function gnokeyOn(chainId: string | null | undefined, rpc: string) {
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
   return `-broadcast -chainid ${chain} -remote ${remoteOf(rpc) || "<rpc-url>"} <your-key-name>`;
 }
