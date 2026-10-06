@@ -204,6 +204,17 @@ holes also finish with `author.Fit` (`gno.land/p/gnogolf/course/author`). Both
 are for writing holes only: nothing on chain needs them.
 The course's own holes, in `gno.land/r/gnogolf/`, are the best examples.
 
+**Or draw it in the Builder**, at `/build` on a computer (behind
+`NEXT_PUBLIC_BUILDER=1` until it is out): a palette of each world's pieces, a
+board where nothing the chain would refuse can be placed (a piece that would
+break the hole is red with the reason and does not drop; a drag stops at the
+last place it may go), the hole in 3D as players will see it, and the chain's
+own checks run in the page (`builder.wasm`, built from the realm's sources). It
+then has you hole it in each weather that moves the ball, in the game itself,
+each round replayed by the chain's code; only then does it publish, with Adena
+or a gnokey command, the cost shown first. On a phone, `/build` lists holes to
+play and says the Builder is for a computer.
+
 ## Who can change what
 
 The golf realm has one role, its owner (the account that deployed it). The
@@ -232,6 +243,8 @@ gno.land/r/gnogolf/golf/v2   the rules: rounds, previews, boards, gnoweb page (t
 gno.land/r/gnogolf/golf      v1, the rules before: on onyx, its records copied into v2
 gno.land/r/gnogolf/<hole>    each course hole's source
 web/                         Next.js + three.js client (static export)
+web/lib/builder              the hole Builder's logic: the palette, the draft, the checks, test mode, publishing
+web/lib/sim                  golf.wasm (the aim previews) and builder.wasm (the Builder), built by scripts/wasm.sh
 data/holes.txt               the course as data, one line per slot
 ```
 

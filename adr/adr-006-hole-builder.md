@@ -102,13 +102,52 @@ the realm byte for byte by `scripts/wasmparity.ts`). Every player loads it.
   fits on top of the 25,200 simulations).
 - **A hazard's `Vec` must be on the board.** The physics never reads it, but
   GG1 holds it to the board and `Fit` moves it: left at (0, 0), a hole
-  decodes, then fails once fitted. The builder sets it to the zone's middle.
+  decodes, then fails once fitted. The builder sets it to the tee (a board
+  point the extent holds, which Fit moves with the rest).
 - **What the palette does not offer yet**: loops (only the mines' rides draw
   one), the compositions (a tram line, a mill and its sails, the castle's
   slide, a seesaw, the rides, a stroke's set pieces), and stroke-clocked
   (pulse) pieces are not yet render-tested through `buildExtras`.
 - **The unit tests take about 20 s more** (the render proof builds some 800
   holes).
+
+## Amendments
+
+2026-10-06, the Builder as built on this branch (the design's amended spec
+and plan, Tasks 7.7 to 10.6):
+
+- **Prevention, not warning.** Every rule the issues list names is also the
+  board's: the armed piece's ghost is red with the rule's sentence where a
+  drop would break the hole, and drops nothing there; a drag, a handle, the
+  tee or the cup let go where it may not stay stops at the last place on its
+  way where it may (`edit.ts` canPlace, clampMove, clampHandle, clampEnd); a
+  setting that would break the hole does not take. They all ask the whole
+  pipeline (`pipeline.ts` validate). Live, it runs without the render census
+  (about 3 ms); a drop or a release with it (about 60 ms in Node). A new hole
+  starts from a starter or a blank lane that passes every check, so the
+  editor never shows a refused hole.
+- **E13 to E15 and the census (E12).** Overlaps only where the palette entry
+  says the scene draws them well, passages a ball's width and a margin wide
+  where the way to the cup goes, bars clear of the kerb; and `buildHole`
+  reports what drew each piece, so a piece the scene would draw as another
+  is refused.
+- **The builder is stricter than the course.** Four course holes would be
+  refused as drafts (mines/10, mines/7, mines/14, town/14: thin hot springs, a
+  door 1.2 deep, scenery out of reach, buffers in the void), named in the
+  golden test; 38 of the 90 open in the Builder, the rest having pieces only a
+  hand-written hole has.
+- **Work gauges measure what a hole adds.** A shot's bound and a storm's cost
+  both start from a floor every hole pays (MaxWork per shot); the gauges and
+  E11 measure the rest against what is left, or a plain lane would sit at 95%.
+- **Test mode is the game itself** on a local chain answered by
+  `builder.wasm` at one clock, a proof per weather that moves the ball,
+  replayed as its save would be cut; publishing opens only with every proof
+  of the hole as it is, under the id it will have.
+- **Publish figures from filetests.** The deposit and the gas come from the
+  `z_builder_publish_*` filetests (Storage and Gas less a warm-up publish's),
+  not from a transaction: none was sent while building this.
+- **No Builder on a phone.** Under 900 px or on a coarse pointer, `/build`
+  loads neither the editor nor `builder.wasm` (an import-graph test holds it).
 
 ## Alternatives considered
 

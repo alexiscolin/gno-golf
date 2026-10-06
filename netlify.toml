@@ -15,6 +15,8 @@
 #   NEXT_PUBLIC_NAMEREG   optional: the name registrar (found on the chain otherwise)
 #   NEXT_PUBLIC_COMMUNITY optional: 1 lists the community's holes with the cups
 #                         (off until the builder is out)
+#   NEXT_PUBLIC_BUILDER   optional: 1 opens the hole Builder at /build (off: a
+#                         page that says it is not open yet)
 #   NEXT_PUBLIC_CLIPS     optional: 1 offers a clip of the holing shot (ADR-003)
 #   NEXT_PUBLIC_POSTHOG_KEY optional: the PostHog project's public key (phc_…),
 #                         anonymous audience measurement (docs/analytics.md);
