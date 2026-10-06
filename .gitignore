@@ -8,6 +8,8 @@ media/*
 !media/promo/
 !media/lib/
 !media/og/
+# the gnome collection's renderer, its thumbnails and the Legendaries' turntables (npm run gnomes:thumbs)
+!media/gnomes/
 # promo renders and the music file are rebuilt by media/promo/render.mjs
 media/promo/*.mp4
 media/promo/music/

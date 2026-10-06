@@ -150,14 +150,14 @@ it leaves them and refuses to move an earned one.
 
 | what | bytes | deposit | golden |
 |---|---|---|---|
-| the realm's code, staged (no catalogue), and p/gnogolf/weblink | 72,351 and 976 | 7.3 GNOT, the deployer | `stage.sh` |
-| the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
+| the realm's code with the portrait's drawing, staged (no catalogue), and p/gnogolf/weblink | 164,121 and 976 | 16.5 GNOT, the deployer | `stage.sh` |
+| the genesis published as the catalogue lays it out, with a wave | 64,232 | 6.4 GNOT, the owner | `z_storage_genesis` |
 | a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` |
 | an earned gnome | 3,554 | 0.36 GNOT, the player | `z_storage_earned` |
 
 | what | gas | measured by |
 |---|---|---|
-| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.26M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
+| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.34M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 
