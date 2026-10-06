@@ -6,16 +6,14 @@ import (
 	"gno.land/p/nt/grc721/v0"
 )
 
-// site is where a gnome's page is (<site>g/<id>/): the address golf's play
-// link starts from (golf/v2 owner.gno playURL).
-const site = "https://gnogolf.xyz/"
-
 // TokenMetadata is a minted gnome as a wallet or a market reads it: the
 // keys OpenSea and Adena read, computed from its row on every read (nothing
-// is stored per token; grc721's metadata extension would keep a copy).
+// is stored per token; grc721's metadata extension would keep a copy). The
+// image is the on-chain SVG; external_url, the gnome's page on the site, is
+// there once the owner has set the site (SetSiteURL).
 //
 //	{"name":"…","description":"…","image":"data:image/svg+xml;base64,…",
-//	 "external_url":"https://gnogolf.xyz/g/1/",
+//	 "external_url":"<site>g/1/",
 //	 "attributes":[{"trait_type":"Tier","value":"common"},{"trait_type":"Series","value":"genesis"}]}
 func TokenMetadata(tid string) (string, error) {
 	if _, err := Token.OwnerOf(grc721.TokenID(tid)); err != nil {
@@ -30,8 +28,12 @@ func TokenMetadata(tid string) (string, error) {
 	if g.tier == earnedTier {
 		attrs += `,{"trait_type":"Kind","value":"` + earnedKinds[g.kind-1] + `"}`
 	}
-	return `{"name":` + jsonString(g.name) + `,"description":` + jsonString(describe(g)) + `,"image":"` + image +
-		`","external_url":"` + site + "g/" + tid + `/","attributes":[` + attrs + `]}`, nil
+	link := ""
+	if siteURL != "" {
+		link = `,"external_url":"` + siteURL + "g/" + tid + `/"`
+	}
+	return `{"name":` + jsonString(g.name) + `,"description":` + jsonString(describe(g)) + `,"image":"` + image + `"` +
+		link + `,"attributes":[` + attrs + `]}`, nil
 }
 
 // describe is a gnome's line: what it is, never what it is worth.

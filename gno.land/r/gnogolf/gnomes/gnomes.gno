@@ -14,7 +14,7 @@ import (
 // The gnomes of Gnogolf as GRC721 tokens. The ball is a gnome: a player
 // buys the one they choose from the catalogue, at its wave's price, and
 // equips it; a Legendary is auctioned. The realm holds no funds but the top
-// bid of the auction under way: a sale's payment goes to the owner in the
+// bid of the auction under way: a sale's payment goes to the treasury in the
 // same call. The catalogue is data the owner publishes a series at a time
 // (catalogue.gno), sold in waves (waves.gno). This file is the state.
 var (
@@ -29,7 +29,8 @@ var (
 	teller        grc721.Teller         // acts as this realm's caller: transfers, approvals
 	royaltyLedger *royalty.Ledger
 
-	mintOpen bool // the owner's switch over every sale and bid; starts closed
+	mintOpen bool  // the owner's switch over every sale and bid; starts closed
+	pausedAt int64 // when the last pause began (block time), for the auction's clock
 
 	catalogue []series          // in publishing order, ids following on
 	waves     []wave            // in publishing order
@@ -60,11 +61,12 @@ func setUp(_ int, rlm realm, deployer address) {
 		}
 	}
 	owner, pending, mintOpen = deployer, "", false
+	treasury, pendingTreasury, siteURL = deployer, "", ""
 	for i, tr := range tiers {
 		prices[i] = tr.price
 	}
 	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
-	auc, last, closeAt = nil, nil, 0
+	auc, last, closeAt, pausedAt = nil, nil, 0, 0
 	bought, inWindow, equipped, held = seeded(), seeded(), seeded(), seeded()
 	earned, kindOf, nextEarned, rows = seeded(), seeded(), firstEarned, storeReader{}
 }
@@ -73,9 +75,20 @@ func setUp(_ int, rlm realm, deployer address) {
 func MintOpen() bool { return mintOpen }
 
 // SetMintOpen opens or closes every sale and bid at once: the owner's
-// switch for a fault. Owner only.
+// switch for a fault. Owner only. A pause freezes the auction under way: no
+// bid and no settle while paused, and on resume its end moves on by the time
+// paused, and to at least the soft close from then, so that a pause cannot
+// end an auction at its top bid of the moment (auction.gno resume).
 func SetMintOpen(cur realm, open bool) {
 	assertOwner(0, cur)
+	if open == mintOpen {
+		return
+	}
+	if open {
+		resume(pausedAt)
+	} else {
+		pausedAt = now()
+	}
 	mintOpen = open
 	chain.Emit("MintOpen", "open", strconv.FormatBool(open))
 }
@@ -90,7 +103,19 @@ func mintTo(whom address, g gnome) {
 	}
 	sold[(g.id-1)/8] |= 1 << uint((g.id-1)%8)
 	soldTier[g.tier]++
-	catalogue[seriesAt(g.id)].sold++
+}
+
+// soldIn is how many of ids first to last were ever sold, read from the sold
+// bitmap: a query's count, kept nowhere (a count in a series would rewrite
+// its rows with every sale).
+func soldIn(first, last int64) int64 {
+	n := int64(0)
+	for id := first; id <= last; id++ {
+		if isSold(id) {
+			n++
+		}
+	}
+	return n
 }
 
 // isSold reports whether catalogue gnome id was ever sold: once sold, an id

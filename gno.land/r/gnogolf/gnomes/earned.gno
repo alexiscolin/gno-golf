@@ -63,6 +63,7 @@ const (
 	errEarned    = "gnomes: already minted: "
 	errNotProven = "gnomes: not proven: "
 	maxMissing   = 20
+	maxCupSlots  = 300 // a store page (store maxPage): a cup the proof reads whole
 )
 
 // worlds are golf/v2's cups in its order: a slot key's first digit.
@@ -217,8 +218,15 @@ func prove(kind, player string) (bool, cup, string) {
 // slots, a best per mode a slot, and the pars when asked.
 func cupOf(world, player string, withPar bool) cup {
 	d := strconv.Itoa(worldRank(world))
+	start, end := d+world+"/", d+world+"0"
+	slots := pageRows(rows.Page("slots", start, end, maxCupSlots))
+	// A cup the proof cannot read in one page is refused, never proven from
+	// its first page (golf takes up to 999 slots a world).
+	if len(slots) == maxCupSlots && rows.Page("slots", slots[maxCupSlots-1][0]+"\x00", end, 1) != "" {
+		panic("gnomes: " + world + ": cup too large for the proof")
+	}
 	var c cup
-	for _, kv := range pageRows(rows.Page("slots", d+world+"/", d+world+"0", 300)) {
+	for _, kv := range slots {
 		c.holes++
 		if withPar {
 			c.par += parOf(kv[1])

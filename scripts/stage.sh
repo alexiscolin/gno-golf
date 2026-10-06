@@ -5,6 +5,7 @@
 #
 #   p/gnogolf/physics  ->  p/<ns>/gnogolf/physics
 #   p/gnogolf/course   ->  p/<ns>/gnogolf/course
+#   p/gnogolf/weblink  ->  p/<ns>/gnogolf/weblink   the rule an owner's link follows
 #   r/gnogolf/golf     ->  r/<ns>/gnogolf/golf      the v1 rules, on onyx
 #   r/gnogolf/store    ->  r/<ns>/gnogolf/store     the records
 #   r/gnogolf/golf/v2  ->  r/<ns>/gnogolf/golf/v2   the rules that write them
@@ -44,7 +45,7 @@ to() { sed "s#gno\.land/\([pr]\)/gnogolf/#gno.land/\1/$ns/gnogolf/#g"; }
 back() { sed "s#gno\.land/\([pr]\)/$ns/gnogolf/#gno.land/\1/gnogolf/#g"; }
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-pkgs="gno.land/p/gnogolf/physics gno.land/p/gnogolf/course gno.land/r/gnogolf/golf gno.land/r/gnogolf/store gno.land/r/gnogolf/golf/v2 gno.land/r/gnogolf/gnomes"
+pkgs="gno.land/p/gnogolf/physics gno.land/p/gnogolf/course gno.land/p/gnogolf/weblink gno.land/r/gnogolf/golf gno.land/r/gnogolf/store gno.land/r/gnogolf/golf/v2 gno.land/r/gnogolf/gnomes"
 skip='_(file)?test\.gno$'
 if [ "${MAINNET:-}" = 1 ]; then
 	pkgs=$(echo "$pkgs" | sed 's# gno.land/r/gnogolf/golf # #')

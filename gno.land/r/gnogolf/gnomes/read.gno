@@ -14,13 +14,16 @@ import (
 const pageSize = 100
 
 // Collection is the mint page's header: the switch, the genesis's closing
-// date (0 for none), the owner, the tiers (the price of the next wave, the
+// date (0 for none), the owner, the treasury and the one offered it, the
+// site, the tiers (the price of the next wave, the
 // caps, how many sold), the series (how many sold; "closed" once the sale
 // closed, so its final supply is "sold") and the waves.
 func Collection() string {
 	var b strings.Builder
 	b.WriteString(`{"version":1,"open":` + strconv.FormatBool(mintOpen) + `,"closesAt":` + itoa(closeAt) +
-		`,"owner":` + jsonString(owner.String()) + `,"royaltyBps":` + itoa(royaltyBps) + `,"tiers":[`)
+		`,"owner":` + jsonString(owner.String()) + `,"treasury":` + jsonString(treasury.String()) +
+		`,"pendingTreasury":` + jsonString(pendingTreasury.String()) + `,"site":` + jsonString(siteURL) +
+		`,"royaltyBps":` + itoa(royaltyBps) + `,"tiers":[`)
 	for i, tr := range tiers {
 		if i > 0 {
 			b.WriteString(",")
@@ -34,7 +37,7 @@ func Collection() string {
 			b.WriteString(",")
 		}
 		b.WriteString(`{"name":"` + s.name + `","first":` + itoa(s.first) + `,"last":` + itoa(s.last) +
-			`,"sold":` + itoa(s.sold) + `,"closed":` + strconv.FormatBool(i == 0 && genesisClosed()) + `}`)
+			`,"sold":` + itoa(soldIn(s.first, s.last)) + `,"closed":` + strconv.FormatBool(i == 0 && genesisClosed()) + `}`)
 	}
 	b.WriteString(`],"waves":[`)
 	for i, w := range waves {

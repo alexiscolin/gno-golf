@@ -7,9 +7,10 @@ of the gnomes' design (`docs/superpowers/specs/2026-10-06-nft-gnomes-design.md`)
 as `gno.land/r/gnogolf/gnomes`, with the user's decisions: 720 gnomes, the
 research brief's waves, player window, prices and auction
 (`docs/superpowers/research/2026-10-06-nft-best-practices.md`), and a hard
-closing date for the genesis sale. golf/v2 and store do not change. Nothing
-is deployed. Two points stay open for the user: a treasury apart from the
-owner and `Renounce`, and a portrait drawn from the traits.
+closing date for the genesis sale, a treasury apart from the owner's key,
+and a site link the owner sets. golf/v2 and store do not change. Nothing is
+deployed. Two points stay open for the user: `Renounce`, and a portrait
+drawn from the traits.
 
 ## Context
 
@@ -75,7 +76,7 @@ with the waves.
 and exactly their sum in one ugnot coin, checked against `OriginSend`, which
 is trusted only on a direct user call (`cur.Previous().IsUserCall()`): a
 realm or run script in between could keep coins it attached. The state is
-written first, then the sum goes to the owner with an `OriginSend` banker,
+written first, then the sum goes to the treasury with an `OriginSend` banker,
 which can spend this call's envelope and nothing else.
 
 **A Legendary is auctioned, one at a time.** The owner starts it with
@@ -84,10 +85,14 @@ bid meets the reserve; each next beats the last by the larger of 5% and 5
 GNOT; a bid in the last 10 minutes moves the end to 10 minutes after it.
 The realm holds the top bid alone: the bid it beats is refunded in the same
 call (`RealmSend`, after the state is written). Once the end is past anyone
-settles: the gnome to the winner, the bid to the owner; with no bid it stays
-unsold. `CancelAuction` only before the first bid. `Sweep` sends the owner
+settles: the gnome to the winner, the bid to the treasury; with no bid it stays
+unsold. `CancelAuction` only before the first bid. `Sweep` sends the treasury
 any stray coins, never the escrow. `Auction()` is the one under way, else
-the last one settled.
+the last one settled; past its end it says `"over":true` and a "min" of 0.
+A pause (`SetMintOpen(false)`) freezes the auction: no bid, no settle, no
+new auction; on resume its end moves on by the time paused, and to at least
+the soft close from then. Without it, a pause (or a stolen owner key: bid
+the reserve, then pause) would end an auction at its top bid of the moment.
 
 **Earned gnomes are proven from store, free, and bound.** `MintEarned(kind)`
 mints the caller's earned gnome once store proves the feat (the nine of
@@ -96,7 +101,10 @@ store with golf/v2's key layout (slots, bests, copies, holes) and never
 calling golf/v2. A best that is a copy (a record sent again) does not count;
 only a slot's current version does. The proof refuses while store's writer
 is not the golf/v2 it was built against, and on any row not in the format
-it knows: a later format can refuse a mint, never prove a false one. Free:
+it knows: a later format can refuse a mint, never prove a false one. A cup
+is read in one store page (300 slots; golf takes up to 999 a world): a
+larger one is refused ("cup too large for the proof"), never proven from
+its first page. Free:
 nothing may be sent; once per player and kind; ids from 1,000,001, above any
 catalogue's (64 series of 1,000). An earned gnome cannot be transferred or
 approved (the ledger extension vetoes it); it can be burned, and its kind
@@ -108,11 +116,30 @@ byte (selfcheck.ts).
 (the locker's row, the equipped gnome, an earned gnome's rows) before the
 ledger's burn; the deposit returns to the holder.
 
-**The owner is the treasury,** captured at deploy and handed on with
-`Transfer` then `Accept`, as golf's; the royalty (5%, advisory) follows.
-Every check is on the immediate caller. `SetMintOpen` stops every sale and
-bid at once (not `MintEarned`, which sells nothing). There is no `Renounce`
-and no treasury apart from the owner yet: open, for the user.
+**The owner's role and the treasury are apart.** The owner, captured at
+deploy, holds the settings and hands them on with `Transfer` then
+`Accept`, as golf's; every check is on the immediate caller. The treasury
+is where the money goes: every sale, every auction's bid, the royalty (5%,
+advisory) and `Sweep`'s strays; the realm itself still holds nothing but
+the top bid of the auction under way. It is the deployer at deploy, and
+moves in two steps: the owner offers it (`SetTreasury`, never to the
+realm's own address), and the new address takes it with `AcceptTreasury`,
+a transaction signed from that address itself, so a mistyped address never
+receives a sale, and a realm cannot take it. Handing the owner's role on
+moves no money. The treasury can be, and should be, an address whose key is
+not the owner's hot key: a gnokey multisig (`gnokey add --multisig`, which
+signs `AcceptTreasury` with its threshold of keys) or a hardware wallet's
+address (a Ledger through gnokey or Adena). `SetMintOpen` stops every sale
+and bid at once (not `MintEarned`, which sells nothing). Whether the role
+may be renounced is not decided: there is no `Renounce`.
+
+**The site link is the owner's.** `SetSiteURL` sets the game's site, which
+a token's `external_url` names (`<site>g/<id>/`); none is set at deploy,
+and until one is, the metadata has no `external_url`. The image is the
+on-chain SVG, so nothing a wallet shows depends on the domain. The link
+follows golf/v2's `SetPlayURL` rule (https://, at most 100 of a-z, A-Z, 0-9
+and -._~/:%, no query or fragment), shared as `p/gnogolf/weblink`, and ends
+with "/"; golf/v2 keeps its own copy of the rule until its next version.
 
 **State in bptrees, no enumerable.** Measured with storage goldens: an avl
 row costs about 2 KB of deposit, `grc721/enumerable` added 5 to 9 KB to a
@@ -123,13 +150,14 @@ it leaves them and refuses to move an earned one.
 
 | what | bytes | deposit | golden |
 |---|---|---|---|
-| the realm's code, staged (no catalogue) | 67,015 | 6.7 GNOT, the deployer | `stage.sh` |
-| the genesis published as the catalogue lays it out, with a wave | 64,269 | 6.4 GNOT, the owner | `z_storage_genesis` |
-| a first buy (was 10,465 with enumerable and a traits copy) | 3,861 | 0.39 GNOT, the buyer | `z_storage_buy` |
+| the realm's code, staged (no catalogue), and p/gnogolf/weblink | 72,351 and 976 | 7.3 GNOT, the deployer | `stage.sh` |
+| the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
+| a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` |
 | an earned gnome | 3,554 | 0.36 GNOT, the player | `z_storage_earned` |
 
 | what | gas | measured by |
 |---|---|---|
+| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.26M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 
@@ -171,13 +199,21 @@ the traits is the user's call.
 | Bid | sniping at the bell | soft close | `TestALateBidExtendsTheEnd` |
 | Settle | early, twice, a sold Legendary auctioned again | state machine | `TestSettleGivesTheWinnerTheGnomeAndTheOwnerTheBid`, `TestAnAuctionWithNoBidLeavesTheGnomeUnsold` |
 | CancelAuction | a bidder's auction cancelled | before the first bid only | `TestCancelOnlyBeforeTheFirstBid` |
+| SetMintOpen | a pause ending an auction at its current top bid (a stolen owner key: bid, pause) | the pause freezes it; resume pushes the end on; no settle while paused | `TestAPauseFreezesTheAuction`, `TestAPausePastTheEndRefusesTheSettle`, `TestAnAuctionOverBeforeThePauseStaysOver` |
+| Auction | a minimum shown for an auction that takes no bid | "over", "min" 0 | `TestAnEndedAuctionShowsNoMinimum` |
+| SetCloseAt | a Legendary in its auction reported closed | not closed until settled unsold | `TestALegendaryInItsAuctionIsNotClosed` |
+| Buy, Settle | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | Sweep | the escrow swept | kept | `TestSweepKeepsTheEscrow` |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |
-| MintEarned | rows of new rules, or a format the proof does not know | refused, never a false proof | `TestNewRulesRefuseTheMint`, `TestARowNotAsGolfWritesItRefuses` |
+| MintEarned | rows of new rules, or a format the proof does not know; a cup past one page | refused, never a false proof | `TestNewRulesRefuseTheMint`, `TestARowNotAsGolfWritesItRefuses`, `TestACupTooLargeForThePageRefuses` |
 | MintEarned | paid; twice for a kind | free only; once per player and kind | `TestAProvenKindIsMintedFreeOnce` |
 | TransferFrom, Approve | an earned gnome sold or moved, by its player or an operator | vetoed by the ledger extension; approval refused | `TestAnEarnedGnomeIsBoundToItsPlayer`, `TestAnOperatorCannotMoveAnEarnedGnome` |
 | Burn | another's gnome burned, by anyone or an operator | the holder only | `TestABurnIsTheHoldersAndForGood` |
 | owner calls | anyone else; a realm the owner calls; no owner | immediate caller only | `TestAnEmptyOwnerHoldsNoPower`, `TestARealmTheOwnerCallsIsNotTheOwner`, `TestTheOwnerHandsOverInTwoSteps` |
+| SetTreasury, AcceptTreasury | the money sent to a mistyped or dead address; to the realm itself; taken by another or by a realm | two steps, the new address signing; not the realm's address | `TestTheTreasuryMovesInTwoSteps`, `TestARealmCannotAcceptForTheTreasury`, `TestAnOfferToTheTreasuryInPlaceCancels` |
+| Transfer, Accept | the money moved with the owner's role | the treasury stays | `TestAnOwnerHandoverLeavesTheTreasury`, `TestTheOwnerHandsOverInTwoSteps` |
+| Buy, Settle, Sweep, royalty | a payment to the owner or kept by the realm | the treasury, in the same call | `TestTheTreasuryMovesInTwoSteps`, `TestTheAuctionAndTheSweepPayTheTreasury` |
+| SetSiteURL | a link that breaks out of a page or points off https | golf's play link rule | `TestTheOwnerMovesTheSite`, `TestALinkIsHTTPSAndPlain` |
 | init | a deploy with no signer | refused off `dev` | `TestTheDeployerOwns` |
 | TransferFrom, Approve | a realm moves its caller's gnomes | the ledger's caller teller | `TestARealmCannotMoveItsCallersGnomes`, `TestTransfersGoThroughTheLedgersChecks` |
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |
@@ -206,8 +242,11 @@ date in block time, so it holds whatever becomes of the owner.
   is updated.
 - `scripts/stage.sh` stages `r/gnogolf/gnomes` beside store; the proof's
   golf/v2 path is rewritten with the other paths.
-- `external_url` is golf's play address (`https://gnogolf.xyz/`), a
-  constant: stage.sh changes nothing but the paths.
+- After deploy the owner sets the site (`SetSiteURL`) and moves the
+  treasury to its own address (`SetTreasury`, then `AcceptTreasury` from
+  that address), before the genesis is published.
+- `p/gnogolf/weblink` is one more package to deploy, before gnomes
+  (stage.sh stages it).
 - The bidder's refund is pushed, not pulled: fine while bidders are user
   accounts, which `Bid` requires.
 - In `gno test`, a recovered call's writes are not reverted (golf's

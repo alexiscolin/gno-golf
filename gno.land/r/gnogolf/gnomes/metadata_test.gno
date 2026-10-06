@@ -24,9 +24,33 @@ func TestTokenMetadataIsTheRowsAsAWalletReadsIt(cur realm, t *testing.T) {
 	uri, _ := TokenURI("1")
 	uassert.Equal(t,
 		`{"name":"Gnome 1","description":"Gnome 1 of the Gnogolf Gnomes: a common of the genesis series. A ball to play with, cosmetic only.",`+
-			`"image":"`+uri+`","external_url":"https://gnogolf.xyz/g/1/",`+
+			`"image":"`+uri+`",`+
 			`"attributes":[{"trait_type":"Tier","value":"common"},{"trait_type":"Series","value":"genesis"}]}`,
-		md)
+		md, "no site set: no external_url, and the image is on chain whatever the site")
+
+	testing.SetRealm(asUser(deployer, nil))
+	SetSiteURL(cross(cur), "https://golf.example.org/")
+	md, _ = TokenMetadata("1")
+	uassert.True(t, strings.Contains(md, `"image":"`+uri+`","external_url":"https://golf.example.org/g/1/","attributes"`), md)
+}
+
+// The site's address is the owner's to move, under golf's play link rule
+// (p/gnogolf/weblink), and ends with "/": a gnome's page is <site>g/<id>/.
+func TestTheOwnerMovesTheSite(cur realm, t *testing.T) {
+	fresh(t, cur)
+	uassert.Equal(t, "", SiteURL(), "none at deploy")
+	testing.SetRealm(asUser(alice, nil))
+	urequire.AbortsContains(t, cur, "only the owner", func() { SetSiteURL(cross(cur), "https://example.org/") })
+	testing.SetRealm(asUser(deployer, nil))
+	for _, bad := range []string{"http://example.org/", "https://", "https://x.org/?a=1", "https://x.org/)[x](y",
+		"javascript:alert(1)", "https://example.org", "https://" + strings.Repeat("x", 100) + "/"} {
+		urequire.AbortsContains(t, cur, "a site link is https://", func() { SetSiteURL(cross(cur), bad) }, bad)
+	}
+	SetSiteURL(cross(cur), "https://golf.example.org/")
+	uassert.Equal(t, "https://golf.example.org/", SiteURL())
+	uassert.True(t, strings.Contains(Collection(), `"site":"https://golf.example.org/"`))
+	owner = ""
+	urequire.AbortsContains(t, cur, "only the owner", func() { SetSiteURL(cross(cur), "https://example.org/") })
 }
 
 func TestAnEarnedTokensMetadataNamesItsKind(cur realm, t *testing.T) {

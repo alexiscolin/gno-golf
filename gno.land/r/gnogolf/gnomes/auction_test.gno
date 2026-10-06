@@ -194,7 +194,7 @@ func TestAuctionJSONShowsTheNextMinimum(cur realm, t *testing.T) {
 	StartAuction(cross(cur), id, 1)
 	end := auc.end
 	uassert.Equal(t,
-		`{"version":1,"id":"`+itoa(id)+`","reserve":777000000,"top":0,"bidder":"","end":`+itoa(end)+`,"min":777000000,"settled":false}`,
+		`{"version":1,"id":"`+itoa(id)+`","reserve":777000000,"top":0,"bidder":"","end":`+itoa(end)+`,"min":777000000,"over":false,"settled":false}`,
 		Auction())
 	CancelAuction(cross(cur))
 	uassert.Equal(t, `{"version":1,"id":""}`, Auction(), "a cancelled auction is not the last one")
@@ -206,7 +206,7 @@ func TestAuctionJSONShowsTheNextMinimum(cur realm, t *testing.T) {
 	skip(3600)
 	Settle(cross(cur), id)
 	uassert.Equal(t,
-		`{"version":1,"id":"`+itoa(id)+`","reserve":777000000,"top":777000000,"bidder":"`+alice.String()+`","end":`+itoa(end)+`,"min":0,"settled":true}`,
+		`{"version":1,"id":"`+itoa(id)+`","reserve":777000000,"top":777000000,"bidder":"`+alice.String()+`","end":`+itoa(end)+`,"min":0,"over":true,"settled":true}`,
 		Auction())
 
 	// a cancel after it leaves it the last one

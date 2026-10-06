@@ -54,12 +54,7 @@ func renderHome() string {
 	}
 	b.WriteString("## Waves\n\n| wave | gnomes | opens | common / rare / epic | found a player |\n|---|---|---|---|---|\n")
 	for i, w := range waves {
-		sold := int64(0)
-		for id := w.first; id <= w.last; id++ {
-			if isSold(id) {
-				sold++
-			}
-		}
+		sold := soldIn(w.first, w.last)
 		b.WriteString("| " + itoa(int64(i+1)) + " | " + itoa(w.first) + "–" + itoa(w.last) + " | " + dateOf(w.start) + " | " +
 			wholeGNOT(w.prices[0]) + " / " + wholeGNOT(w.prices[1]) + " / " + gnot(w.prices[2]) + " | " +
 			itoa(sold) + " of " + itoa(w.last-w.first+1) + " |\n")
