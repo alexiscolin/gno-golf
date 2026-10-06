@@ -26,6 +26,7 @@ import Publish from "./Publish";
 import TestMode from "./TestMode";
 import { worldName } from "@/lib/builder/rules";
 import { saveFile } from "./share";
+import { firstRun, HINTS_KEY } from "@/lib/builder/templates";
 
 const WORLDS = Object.keys(FIELD);
 const name = worldName;
@@ -136,8 +137,19 @@ export default function Builder() {
   const [open, setOpen] = useState<{ i: number; n: number; step: "edit" | "test" | "publish"; test?: { hex: string; key: string } } | null>(null);
   const [author, setAuthor] = useState<string | null>(null);
   const [unkept, setUnkept] = useState(false);
+  const [hints, setHints] = useState(false);
   useEffect(() => {
-    setDrafts(loadDrafts());
+    const list = loadDrafts();
+    // a new player: straight onto the Garden's dogleg, with the three hints (templates.ts firstRun)
+    let hinted = true;
+    try { hinted = !!localStorage.getItem(HINTS_KEY); } catch {}
+    const first = firstRun(list, hinted);
+    if (first) {
+      setUnkept(!saveDrafts([first]));
+      setDrafts([first]);
+      setOpen({ i: 0, n: 0, step: "edit" });
+      setHints(true);
+    } else setDrafts(list);
     setAuthor(knownAuthor());
     void loadBuilder().then(setHost, (e: Error) => setFailed(e.message));
   }, []);
@@ -189,6 +201,7 @@ export default function Builder() {
     return (
       <>
         <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => setOpen(null)} onPublish={publish}
+          hints={hints} onHinted={() => { try { localStorage.setItem(HINTS_KEY, "1"); } catch {} setHints(false); }}
           onTest={(x) => {
             const hex = canonicalHex(x, host);
             if (hex == null) return;

@@ -22,6 +22,14 @@ export function startsIn(world: string): { name: string; title: string; draft: D
   ];
 }
 
+/** Where the browser keeps that the first run's hints were seen. */
+export const HINTS_KEY = "gnogolf.builder.hinted";
+
+/** A new player's first hole (the GUI spec's B1): the Garden's dogleg, opened at once; none once hinted or once they have drafts. */
+export function firstRun(drafts: readonly Draft[], hinted: boolean): Draft | null {
+  return drafts.length || hinted ? null : startsIn("garden").find((s) => s.name === "dogleg")?.draft ?? null;
+}
+
 /** An address made from a name: lower case, a dash between words, at most 32 ("hole" if nothing is left). */
 export const slugOf = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 32).replace(/-+$/, "") || "hole";
 

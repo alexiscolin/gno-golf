@@ -34,8 +34,9 @@ async function editor(w: number, h: number, before = "") {
   if (before) await c.send("Page.addScriptToEvaluateOnNewDocument", { source: before });
   await c.send("Page.enable");
   await c.send("Page.navigate", { url: `${APP}/build/` });
-  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(500);
-  await c.js(`document.querySelector(".bholes__starts button").click()`);
+  // a fresh browser is a new player: the first run opens the starter with its hints (Got it); else the drafts screen's first starter
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button, .bhint__ok")`)); k++) await sleep(500);
+  await c.js(`(document.querySelector(".bhint__ok") || document.querySelector(".bholes__starts button")).click()`);
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".checks .gauge")`)); k++) await sleep(500);
   await sleep(800);
   return c;
@@ -86,6 +87,25 @@ for (const [w, h] of SIZES) {
   c.kill();
 }
 
+// the first run: a new player lands on the Garden's dogleg with three hints, gone with Got it, never shown again
+{
+  const c = await launch({ width: 1280, height: 800 });
+  await c.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+  await c.send("Page.navigate", { url: `${APP}/build/` });
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bhint__ok, .bholes__starts button")`)); k++) await sleep(500);
+  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "three hints");
+  assert.equal(await c.js(`document.querySelector(".bhead__hole input").value`), "Garden Dogleg", "on the Garden's dogleg");
+  assert.equal(await c.js(`document.activeElement?.textContent`), "Got it");
+  await c.js(`document.querySelector(".bhint__ok").click()`);
+  await sleep(300);
+  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 0, "gone with Got it");
+  await c.send("Page.reload");
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(500);
+  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 0, "never again: the drafts screen, the dogleg kept");
+  console.log("first run: ok");
+  c.kill();
+}
+
 // no 3D (WebGL refused): the preview says so, readably
 {
   const c = await editor(1280, 800, `HTMLCanvasElement.prototype.getContext = function () { return null; };`);
@@ -110,6 +130,12 @@ for (const [w, h] of SIZES) {
 // a piece deleted from the Inspector: the focus on the board, not lost; a draft deleted: the game's sheet, Escape keeps it
 {
   const c = await editor(1280, 800);
+  // the straight starter (its posts): from the drafts screen
+  await c.js(`document.querySelector(".bhead .round--icon").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bholes__starts button").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece][aria-label*=' post at ']")`)); k++) await sleep(300);
+  await sleep(800);
   const key = async (key: string, code = key) => {
     await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code });
     await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });

@@ -29,13 +29,14 @@ import Inspector from "./Inspector";
 import Palette from "./Palette";
 import Preview from "./Preview";
 import { plainOf } from "@/lib/builder/explain";
+import Hints from "./Hints";
 
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
 /** The id the 3D's hole is loaded under in the builder's wasm. */
 const WORLDS = Object.keys(FIELD);
 
-export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish }: {
+export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish, hints = false, onHinted = () => {} }: {
   host: BuilderHost;
   first: Draft;
   author: string | null;
@@ -46,6 +47,9 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   onTest: (d: Draft) => void;
   /** Publish: the draft proved in every weather as it is */
   onPublish: (d: Draft) => void;
+  /** the first run's three hints shown (Hints), and their Got it */
+  hints?: boolean;
+  onHinted?: () => void;
 }) {
   // one session (its undo history) while the editor is open: a step saved and handed back is not a new draft (its key opens a new one)
   const [session] = useState(() => makeSession(first));
@@ -210,6 +214,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       ) : (
         <p className="bench__wait" aria-busy="true">Loading the {draft.world}&apos;s pieces…</p>
       )}
+      {hints && <Hints onDone={onHinted} />}
     </main>
   );
 }

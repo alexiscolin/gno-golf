@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { host } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { blank, retitle, slugOf, startsIn } from "../lib/builder/templates.ts";
+import { blank, firstRun, retitle, slugOf, startsIn } from "../lib/builder/templates.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft } from "../lib/builder/draft.ts";
 import { unknownEntry } from "../lib/builder/edit.ts";
@@ -64,6 +64,14 @@ void test("blank: a plain lane that passes every check, in every world", async (
     const errors = validate(d, { host, palette, census }).issues.filter((i) => i.severity === "error");
     assert.deepEqual(errors.map((i) => `${i.rule} ${i.text}`), [], world);
   }
+});
+
+void test("firstRun: a new player opens on the Garden's dogleg, playable and passing every check; never again once hinted, never over their own drafts", () => {
+  const d = firstRun([], false);
+  assert.ok(d);
+  assert.deepEqual([d.world, d.title, d.slug, d.par], ["garden", "Garden Dogleg", "garden-dogleg", 3]);
+  assert.equal(firstRun([d], false), null, "a draft of theirs: the drafts screen");
+  assert.equal(firstRun([], true), null, "hinted once already: the drafts screen");
 });
 
 void test("defaults: a new hole is named from its world and starter, its address from its name; the address follows the name until the hole is first proved, never a hand-set one", () => {

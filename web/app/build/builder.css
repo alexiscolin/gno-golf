@@ -237,3 +237,12 @@
 /* the big button's reason, in a few words, in a slot of its own width */
 .bhead__why { width: 15ch; text-align: right; font-size: 14px; font-weight: 700; color: var(--hat-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 1100px) { .bhead__why { display: none; } }
+
+/* the first run's hints: three short notes by the palette, the big button and the steps, one Got it */
+.bhints { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+.bhint { position: absolute; display: flex; align-items: center; gap: var(--sp-2); max-width: 260px; margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); font-size: 15px; font-weight: 700; color: var(--ink); }
+.bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--gold); font-size: 13px; }
+.bhint--palette { left: 232px; top: 150px; }
+.bhint--test { right: 12px; top: 84px; }
+.bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
+.bhint__ok { position: absolute; right: 12px; top: 164px; margin: 0; pointer-events: auto; }
