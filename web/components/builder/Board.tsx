@@ -22,6 +22,7 @@ import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, Piece, V } from "@/lib/builder/draft";
 import { middleOf, PieceShape } from "./PieceShape";
+import { MOD } from "./Inspector";
 
 export interface BoardProps {
   draft: Draft;
@@ -246,6 +247,8 @@ export default function Board(props: BoardProps) {
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
       </svg>
       {props.said && <p className="board__said" role="alert">{props.said}</p>}
+      {/* the keys a first hole needs, at the board's foot (the GUI spec's B1) */}
+      {!props.said && <p className="board__keys" aria-hidden="true"><kbd>{MOD}Z</kbd> Undo · <kbd>R</kbd> Turn · <kbd>⌫</kbd> Delete</p>}
       {(ghost || live) && <span className={`measure${ghost?.why || live?.why ? " measure--no" : ""}`} role="status">{ghost ? ghost.why || `${armed?.label} · ${fmt(whereOf(ghost.p.geometry))}` : live!.why || "Let go to place it"}</span>}
     </section>
   );

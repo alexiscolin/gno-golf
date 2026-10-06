@@ -246,3 +246,7 @@
 .bhint--test { right: 12px; top: 84px; }
 .bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
 .bhint__ok { position: absolute; right: 12px; top: 164px; margin: 0; pointer-events: auto; }
+
+/* the keys at the board's foot */
+.board__keys { position: absolute; left: var(--sp-3); bottom: var(--sp-3); margin: 0; padding: 4px var(--sp-2); border-radius: 10px; background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 700; color: var(--ink); pointer-events: none; }
+.board__keys kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
