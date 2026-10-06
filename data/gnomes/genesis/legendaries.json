@@ -1,11 +1,11 @@
 {
   "note": "The seven Legendaries, one of one, one per home, in the waves' order: each a piece no other gnome wears and that moves (web/lib/scene/gnome-legend.ts), a material or hat of his own, and a trail and a holing that only he has. kind is his number (1-7) in the traits.",
   "legendaries": [
-    { "kind": 4, "home": "garden", "archetype": "gardener", "name": "Windmill King", "concept": "The garden's mill made king: his hat is the mill, a gold crown round its foot, its four sails turning.",
-      "hat": "mill", "hatColour": "linen", "body": "sky", "beard": "long", "hair": "snow", "accent": "cap", "wear": ["cheeks"],
+    { "kind": 4, "home": "garden", "archetype": "gardener", "name": "The Miller", "concept": "The garden's miller: a floury miller's cap and a blue smock, a small mill standing on the cap, whitewashed, red-roofed, its four sails turning.",
+      "hat": "mill", "hatColour": "oat", "body": "denim", "beard": "long", "hair": "snow", "accent": "cap", "wear": ["cheeks"],
       "prop": "mill-sails", "trail": "petals", "trailColour": "rose", "holing": "gale", "holingColour": "rose",
-      "line": "The mill by hole 4 crowned him. The wind does what he says, mostly.",
-      "lore": "Garden 4's mill turned for a hundred summers before a gnome climbed in. He came out with the sails on his head and a crown he did not ask for. The wind has followed him round the course ever since: it blows petals after him, and on the green it holds its breath." },
+      "line": "Took the mill by hole 4 with him, the small one. The sails turn whatever the wind thinks.",
+      "lore": "Garden 4's mill turned for a hundred summers, and its miller never left it. So when he took up golf, he took a mill along: a small one, on his cap, that grinds a little flour on every fairway. The wind follows him round the course: it blows petals after him, and on the green it holds its breath." },
     { "kind": 5, "home": "island", "archetype": "sailor", "name": "The Admiral", "concept": "The Island Cup's admiral: a golden tricorn, gold epaulettes, a navy coat, a pennant flying.",
       "hat": "tricorn", "hatColour": "gold", "body": "navy", "beard": "full", "hair": "white",
       "prop": "epaulettes", "trail": "foam", "trailColour": "white", "holing": "splash", "holingColour": "sky",

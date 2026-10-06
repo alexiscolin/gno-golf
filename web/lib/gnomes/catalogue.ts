@@ -24,6 +24,8 @@ export interface SeriesConfig {
   waves: Home[];
   /** the generator's seed: the same seed, the same gnomes */
   seed: string;
+  /** on sale (its rows sent to the realm): its looks are final, held by data/gnomes/looks.golden.json */
+  released: boolean;
   /** the realm's starting sale settings (its owner's to change) */
   sale: Record<string, unknown>;
 }
@@ -134,6 +136,17 @@ export function filterGnomes(list: readonly Entry[], q: Query): Entry[] {
     }
     return !text || e.name.toLowerCase().includes(text) || e.line.toLowerCase().includes(text);
   });
+}
+
+/** Every look the golden file holds (data/gnomes/looks.golden.json): each
+ *  token by its id, each earned kind as "earned:<kind>"; whether it is
+ *  released (its series', or always, for an earned one): its look is then final. */
+export function goldenKeys(c: Catalogue) {
+  const released = new Set(c.series.filter((s) => s.released).map((s) => s.id));
+  return [
+    ...c.earned.map((e) => ({ key: `earned:${e.unlock}`, traits: e.traits, name: e.name, released: true })),
+    ...c.gnomes.map((g) => ({ key: String(g.id), traits: g.traits, name: g.name, released: released.has(g.series) })),
+  ];
 }
 
 /** A token by its id, or undefined. */

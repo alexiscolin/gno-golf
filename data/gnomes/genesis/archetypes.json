@@ -1,385 +1,2559 @@
 {
-  "note": "The Genesis series' Commons and Rares are made from these (scripts/gnomes.ts): an archetype is a look that belongs together; a palette is a set of colours that do; a Common is an archetype in one of its palettes with a beard and a few of its things, a Rare one more (a pattern or a piece) and a trail. Lines are an opener (the palette's, or a Rare's piece or pattern) and the archetype's tail; both stand alone, so any pair reads. Colours are data/../vocab.ts COLOURS names.",
+  "note": "The Genesis series' Commons and Rares are made from these (scripts/gnomes.ts): an archetype is a look that belongs together; a palette is a set of colours that do, its key colour (the hat's, a baker's coat) worn with any of the archetype's wardrobe for the other; a Common is an archetype in one of its palettes with a beard and a few of its things, a Rare one more (a pattern or a piece) and a trail. Lines are an opener (the palette's, or a Rare's piece or pattern) and the archetype's tail; both stand alone, so any pair reads. Colours are data/../vocab.ts COLOURS names.",
   "given": [
-    "Pip", "Bramble", "Tuck", "Fennel", "Wren", "Dob", "Olm", "Bertie", "Clover", "Hob", "Juniper", "Mossy", "Nim", "Odo",
-    "Pell", "Quill", "Rudd", "Sorrel", "Tansy", "Umber", "Vetch", "Wick", "Yarrow", "Zinnia", "Alder", "Basil", "Cob",
-    "Dill", "Elm", "Fig", "Gorse", "Hazel", "Ivy", "Jory", "Kip", "Larch", "Nettle", "Pim", "Rowan", "Tam", "Ula",
-    "Vale", "Bix", "Cress", "Dunstan", "Eppie", "Fen", "Gil", "Hettie", "Jot", "Lark", "Midge", "Nib", "Orrin",
-    "Rook", "Sprout", "Thimble", "Wimble", "Bo", "Biddy", "Crumb", "Dimble", "Effie", "Flint", "Hamish", "Iggy", "Jem",
-    "Kit", "Lulu", "Mabel", "Ned", "Ozzy", "Perry", "Rosie", "Silas", "Tilly", "Ulf", "Vera", "Wilf", "Bryn", "Cosmo",
-    "Delia", "Edda", "Florin", "Gus", "Hilda", "Ike", "Jinx", "Kezia", "Milo", "Norbert", "Opal", "Pansy", "Stan",
-    "Toby", "Una", "Winnie", "Agnes", "Barnaby", "Cedric", "Dora", "Ernest", "Freda", "Gertie", "Horace", "Ida",
-    "Jasper", "Lettie", "Mortimer", "Nell", "Oswin", "Prue", "Reggie", "Sybil", "Tobias", "Verity", "Walter", "Ada",
-    "Bea", "Clem", "Doris", "Enid", "Fitz", "Greta", "Hugo", "Inigo", "Josie", "Lionel", "Maud", "Nora", "Otto",
-    "Phyllis", "Quentin", "Rupert", "Sid", "Trudy", "Vince", "Wendell", "Yvette", "Zeb"
+    "Pip",
+    "Bramble",
+    "Tuck",
+    "Fennel",
+    "Wren",
+    "Dob",
+    "Olm",
+    "Bertie",
+    "Clover",
+    "Hob",
+    "Juniper",
+    "Mossy",
+    "Nim",
+    "Odo",
+    "Pell",
+    "Quill",
+    "Rudd",
+    "Sorrel",
+    "Tansy",
+    "Umber",
+    "Vetch",
+    "Wick",
+    "Yarrow",
+    "Zinnia",
+    "Alder",
+    "Basil",
+    "Cob",
+    "Dill",
+    "Elm",
+    "Fig",
+    "Gorse",
+    "Hazel",
+    "Ivy",
+    "Jory",
+    "Kip",
+    "Larch",
+    "Nettle",
+    "Pim",
+    "Rowan",
+    "Tam",
+    "Ula",
+    "Vale",
+    "Bix",
+    "Cress",
+    "Dunstan",
+    "Eppie",
+    "Fen",
+    "Gil",
+    "Hettie",
+    "Jot",
+    "Lark",
+    "Midge",
+    "Nib",
+    "Orrin",
+    "Rook",
+    "Sprout",
+    "Thimble",
+    "Wimble",
+    "Bo",
+    "Biddy",
+    "Crumb",
+    "Dimble",
+    "Effie",
+    "Flint",
+    "Hamish",
+    "Iggy",
+    "Jem",
+    "Kit",
+    "Lulu",
+    "Mabel",
+    "Ned",
+    "Ozzy",
+    "Perry",
+    "Rosie",
+    "Silas",
+    "Tilly",
+    "Ulf",
+    "Vera",
+    "Wilf",
+    "Bryn",
+    "Cosmo",
+    "Delia",
+    "Edda",
+    "Florin",
+    "Gus",
+    "Hilda",
+    "Ike",
+    "Jinx",
+    "Kezia",
+    "Milo",
+    "Norbert",
+    "Opal",
+    "Pansy",
+    "Stan",
+    "Toby",
+    "Una",
+    "Winnie",
+    "Agnes",
+    "Barnaby",
+    "Cedric",
+    "Dora",
+    "Ernest",
+    "Freda",
+    "Gertie",
+    "Horace",
+    "Ida",
+    "Jasper",
+    "Lettie",
+    "Mortimer",
+    "Nell",
+    "Oswin",
+    "Prue",
+    "Reggie",
+    "Sybil",
+    "Tobias",
+    "Verity",
+    "Walter",
+    "Ada",
+    "Bea",
+    "Clem",
+    "Doris",
+    "Enid",
+    "Fitz",
+    "Greta",
+    "Hugo",
+    "Inigo",
+    "Josie",
+    "Lionel",
+    "Maud",
+    "Nora",
+    "Otto",
+    "Phyllis",
+    "Quentin",
+    "Rupert",
+    "Sid",
+    "Trudy",
+    "Vince",
+    "Wendell",
+    "Yvette",
+    "Zeb"
   ],
   "rare": {
     "pieces": {
-      "scarf": ["The scarf is three seasons long.", "Knitted the scarf, then kept going.", "Never takes the scarf off, even indoors."],
-      "bowtie": ["The bow tie is for special occasions. Every hole is one.", "Dressed for a wedding, playing golf.", "Ties the bow tie twice before a big putt."],
-      "plume": ["The feather was a gift from a very tall bird.", "A plume that waves at every crowd.", "Grew the feather. Probably."],
-      "earmuffs": ["Earmuffs on: no advice gets through.", "Hears nothing, putts anyway.", "The earmuffs block out the heckling."],
-      "satchel": ["The satchel holds three balls and a sandwich.", "Packs for every hole as if it were a trip.", "Nobody knows what is in the satchel."],
-      "medal": ["The medal is for something. Nobody remembers what.", "Wears the medal on the green, for luck.", "Won the medal at a hole nobody else finished."]
+      "scarf": [
+        "The scarf is three seasons long.",
+        "Knitted the scarf, then kept going.",
+        "Never takes the scarf off, even indoors."
+      ],
+      "bowtie": [
+        "The bow tie is for special occasions. Every hole is one.",
+        "Dressed for a wedding, playing golf.",
+        "Ties the bow tie twice before a big putt."
+      ],
+      "plume": [
+        "The feather was a gift from a very tall bird.",
+        "A plume that waves at every crowd.",
+        "Grew the feather. Probably."
+      ],
+      "earmuffs": [
+        "Earmuffs on: no advice gets through.",
+        "Hears nothing, putts anyway.",
+        "The earmuffs block out the heckling."
+      ],
+      "satchel": [
+        "The satchel holds three balls and a sandwich.",
+        "Packs for every hole as if it were a trip.",
+        "Nobody knows what is in the satchel."
+      ],
+      "medal": [
+        "The medal is for something. Nobody remembers what.",
+        "Wears the medal on the green, for luck.",
+        "Won the medal at a hole nobody else finished."
+      ]
     },
     "patterns": {
-      "stripes": ["Stripes, for speed.", "Wears the stripes sideways, to look wider."],
-      "spots": ["Spotted all over, like a happy toadstool.", "Counts the spots between strokes."],
-      "checks": ["Checked from top to bottom.", "The checks were a tablecloth once."],
-      "zigzag": ["A zigzag coat, which explains the putting.", "The zigzag is how the ball went last time."],
-      "argyle": ["Argyle, as a golfer should be.", "The diamonds are knitted, not real."],
-      "patchwork": ["Patched with every hole's worn-out flag.", "Every patch a different summer."]
+      "stripes": [
+        "Stripes, for speed.",
+        "Wears the stripes sideways, to look wider."
+      ],
+      "spots": [
+        "Spotted all over, like a happy toadstool.",
+        "Counts the spots between strokes."
+      ],
+      "checks": [
+        "Checked from top to bottom.",
+        "The checks were a tablecloth once."
+      ],
+      "zigzag": [
+        "A zigzag coat, which explains the putting.",
+        "The zigzag is how the ball went last time."
+      ],
+      "argyle": [
+        "Argyle, as a golfer should be.",
+        "The diamonds are knitted, not real."
+      ],
+      "patchwork": [
+        "Patched with every hole's worn-out flag.",
+        "Every patch a different summer."
+      ]
     }
   },
   "archetypes": [
     {
-      "id": "gardener", "home": "garden",
-      "hats": ["cone", "straw"], "beards": ["none", "full", "moustache", "goatee", "bushy"], "hair": ["snow", "ash", "ginger", "cocoa", "flaxen"],
-      "wear": [["flower", "leaf"], ["cheeks", "freckles"], ["glasses"]],
-      "patterns": ["patchwork", "spots", "checks"], "pieces": ["satchel", "scarf", "bowtie"],
-      "palettes": [
-        { "name": "Tomato", "hat": "cap", "body": "linen", "accent": "parrot", "lines": ["The hat ripened first.", "Tomato-red, from the kitchen garden."] },
-        { "name": "Lavender", "hat": "heather", "body": "cream", "accent": "sun", "lines": ["Lavender hat, lavender mood.", "Smells faintly of the lavender border."] },
-        { "name": "Marigold", "hat": "saffron", "body": "sage", "accent": "cap", "lines": ["A marigold hat keeps the aphids off.", "Orange as a marigold, twice as stubborn."] },
-        { "name": "Radish", "hat": "berry", "body": "mint", "accent": "white", "lines": ["Radish-pink on top, crisp underneath.", "Pulled up with the radishes, kept."] },
-        { "name": "Cornflower", "hat": "delft", "body": "oat", "accent": "lemon", "lines": ["Cornflower blue, picked this morning.", "The blue hat was a seed packet once."] },
-        { "name": "Plum Tree", "hat": "plum", "body": "blush", "accent": "sage", "lines": ["Plum hat, from the tree by hole 9.", "Ripe as a plum in August."] },
-        { "name": "Pumpkin", "hat": "terracotta", "body": "butter", "accent": "fern", "lines": ["Grows prize pumpkins. Wears one, nearly.", "The hat is the colour of the October patch."] },
-        { "name": "Sunflower", "hat": "honey", "body": "sky", "accent": "chocolate", "lines": ["Turns to face the sun, then the flag.", "Sunflower yellow on a blue-sky coat."] }
+      "id": "gardener",
+      "home": "garden",
+      "wardrobe": [
+        "linen",
+        "cream",
+        "sage",
+        "mint",
+        "oat",
+        "blush",
+        "butter",
+        "sky"
       ],
-      "surnames": ["Thistledown", "Mossbottom", "Weedwhistle", "Potting", "Greenthumb", "Seedwell", "Hedgerow", "Turnip", "Bramblepatch", "Dandelion", "Rootwhistle", "Marrowby"],
+      "hats": [
+        "cone",
+        "straw"
+      ],
+      "beards": [
+        "none",
+        "full",
+        "moustache",
+        "goatee",
+        "bushy"
+      ],
+      "hair": [
+        "snow",
+        "ash",
+        "ginger",
+        "cocoa",
+        "flaxen"
+      ],
+      "wear": [
+        [
+          "flower",
+          "leaf"
+        ],
+        [
+          "cheeks",
+          "freckles"
+        ],
+        [
+          "glasses"
+        ]
+      ],
+      "patterns": [
+        "patchwork",
+        "spots",
+        "checks"
+      ],
+      "pieces": [
+        "satchel",
+        "scarf",
+        "bowtie"
+      ],
+      "palettes": [
+        {
+          "name": "Tomato",
+          "hat": "cap",
+          "body": "linen",
+          "accent": "parrot",
+          "lines": [
+            "The hat ripened first.",
+            "Tomato-red, from the kitchen garden."
+          ]
+        },
+        {
+          "name": "Lavender",
+          "hat": "heather",
+          "body": "cream",
+          "accent": "sun",
+          "lines": [
+            "Lavender hat, lavender mood.",
+            "Smells faintly of the lavender border."
+          ]
+        },
+        {
+          "name": "Marigold",
+          "hat": "saffron",
+          "body": "sage",
+          "accent": "cap",
+          "lines": [
+            "A marigold hat keeps the aphids off.",
+            "Orange as a marigold, twice as stubborn."
+          ]
+        },
+        {
+          "name": "Radish",
+          "hat": "berry",
+          "body": "mint",
+          "accent": "white",
+          "lines": [
+            "Radish-pink on top, crisp underneath.",
+            "Pulled up with the radishes, kept."
+          ]
+        },
+        {
+          "name": "Cornflower",
+          "hat": "delft",
+          "body": "oat",
+          "accent": "lemon",
+          "lines": [
+            "Cornflower blue, picked this morning.",
+            "The blue hat was a seed packet once."
+          ]
+        },
+        {
+          "name": "Plum Tree",
+          "hat": "plum",
+          "body": "blush",
+          "accent": "sage",
+          "lines": [
+            "Plum hat, from the tree by hole 9.",
+            "Ripe as a plum in August."
+          ]
+        },
+        {
+          "name": "Pumpkin",
+          "hat": "terracotta",
+          "body": "butter",
+          "accent": "fern",
+          "lines": [
+            "Grows prize pumpkins. Wears one, nearly.",
+            "The hat is the colour of the October patch."
+          ]
+        },
+        {
+          "name": "Sunflower",
+          "hat": "honey",
+          "body": "sky",
+          "accent": "chocolate",
+          "lines": [
+            "Turns to face the sun, then the flag.",
+            "Sunflower yellow, turned to the green."
+          ]
+        }
+      ],
+      "surnames": [
+        "Thistledown",
+        "Mossbottom",
+        "Weedwhistle",
+        "Potting",
+        "Greenthumb",
+        "Seedwell",
+        "Hedgerow",
+        "Turnip",
+        "Bramblepatch",
+        "Dandelion",
+        "Rootwhistle",
+        "Marrowby"
+      ],
       "lines": [
-        "Weeds the rough between putts.", "Talks to the hedges. They listen.", "Has never met a divot that could not be replanted.",
-        "Waters the fairway whatever the forecast.", "Calls the bunkers flowerbeds that have not happened yet.", "Prunes the flagstick when nobody is looking.",
-        "Knows every blade of grass by its first name.", "Composts bad putts. They come back as good ones.", "Measures every putt in seed rows.",
-        "Says the green is greener on this side.", "Plants a bulb at every hole-in-one.", "Keeps the slugs off the greens by asking nicely.",
-        "Rakes the bunker before and after, just in case.", "Would rather mow the hole than play it.", "Reads the green like a seed catalogue.",
-        "Has a name for every worm on the course.", "Carries a trowel in case the cup needs moving.", "Grew up in a window box. Has been climbing since."
+        "Weeds the rough between putts.",
+        "Talks to the hedges. They listen.",
+        "Has never met a divot that could not be replanted.",
+        "Waters the fairway whatever the forecast.",
+        "Calls the bunkers flowerbeds that have not happened yet.",
+        "Prunes the flagstick when nobody is looking.",
+        "Knows every blade of grass by its first name.",
+        "Composts bad putts. They come back as good ones.",
+        "Measures every putt in seed rows.",
+        "Says the green is greener on this side.",
+        "Plants a bulb at every hole-in-one.",
+        "Keeps the slugs off the greens by asking nicely.",
+        "Rakes the bunker before and after, just in case.",
+        "Would rather mow the hole than play it.",
+        "Reads the green like a seed catalogue.",
+        "Has a name for every worm on the course.",
+        "Carries a trowel in case the cup needs moving.",
+        "Grew up in a window box. Has been climbing since."
       ]
     },
     {
-      "id": "fisher", "home": "garden",
-      "hats": ["bucket"], "beards": ["full", "long", "bushy", "chops", "goatee"], "hair": ["snow", "ash", "pebble", "ginger", "cocoa"],
-      "wear": [["glasses"], ["cheeks", "freckles"], ["neckerchief"]],
-      "patterns": ["checks", "stripes"], "pieces": ["satchel", "plume", "scarf"],
-      "palettes": [
-        { "name": "Reed", "hat": "olive", "body": "oat", "accent": "cap", "lines": ["Reed-green hat, for hiding on the bank.", "The hat blends in with the reeds. The gnome does not."] },
-        { "name": "Pondside", "hat": "teal", "body": "linen", "accent": "apricot", "lines": ["A pond-teal hat, wet at the brim.", "Teal as still water at dawn."] },
-        { "name": "Trout", "hat": "pebble", "body": "petal", "accent": "pine", "lines": ["Speckled like a trout, nearly.", "A trout-grey hat with a pink lining."] },
-        { "name": "Kingfisher", "hat": "denim", "body": "apricot", "accent": "lagoon", "lines": ["Kingfisher blue, kingfisher patience.", "Blue on top, orange below: a kingfisher, roughly."] },
-        { "name": "Float", "hat": "cap", "body": "cream", "accent": "coal", "lines": ["A float-red hat, so the others know where to look.", "Red on top, like a float that has not bobbed."] },
-        { "name": "Mudbank", "hat": "caramel", "body": "mint", "accent": "chestnut", "lines": ["A hat the colour of a good mudbank.", "Mud-brown hat, sky-clean coat."] },
-        { "name": "Dawn", "hat": "coral", "body": "ice", "accent": "navy", "lines": ["Up before the fish, in a dawn-pink hat.", "Coral hat, first light, first cast."] },
-        { "name": "Lily", "hat": "fern", "body": "lilac", "accent": "lemon", "lines": ["A lily-pad hat over a lilac coat.", "Sits on lily pads. They mostly hold."] }
+      "id": "fisher",
+      "home": "garden",
+      "wardrobe": [
+        "oat",
+        "linen",
+        "petal",
+        "apricot",
+        "cream",
+        "mint",
+        "ice",
+        "lilac"
       ],
-      "surnames": ["Reedwater", "Troutbridge", "Floatwell", "Pikestaff", "Dragonfly", "Bankside", "Minnow", "Hookline", "Lilypad", "Tadpole", "Rippleby", "Perchwell"],
+      "hats": [
+        "bucket"
+      ],
+      "beards": [
+        "full",
+        "long",
+        "bushy",
+        "chops",
+        "goatee"
+      ],
+      "hair": [
+        "snow",
+        "ash",
+        "pebble",
+        "ginger",
+        "cocoa"
+      ],
+      "wear": [
+        [
+          "glasses"
+        ],
+        [
+          "cheeks",
+          "freckles"
+        ],
+        [
+          "neckerchief"
+        ]
+      ],
+      "patterns": [
+        "checks",
+        "stripes"
+      ],
+      "pieces": [
+        "satchel",
+        "plume",
+        "scarf"
+      ],
+      "palettes": [
+        {
+          "name": "Reed",
+          "hat": "olive",
+          "body": "oat",
+          "accent": "cap",
+          "lines": [
+            "Reed-green hat, for hiding on the bank.",
+            "The hat blends in with the reeds. The gnome does not."
+          ]
+        },
+        {
+          "name": "Pondside",
+          "hat": "teal",
+          "body": "linen",
+          "accent": "apricot",
+          "lines": [
+            "A pond-teal hat, wet at the brim.",
+            "Teal as still water at dawn."
+          ]
+        },
+        {
+          "name": "Trout",
+          "hat": "pebble",
+          "body": "petal",
+          "accent": "pine",
+          "lines": [
+            "Speckled like a trout, nearly.",
+            "A trout-grey hat with a pink lining."
+          ]
+        },
+        {
+          "name": "Kingfisher",
+          "hat": "denim",
+          "body": "apricot",
+          "accent": "lagoon",
+          "lines": [
+            "Kingfisher blue, kingfisher patience.",
+            "Blue as a kingfisher, and nearly as quick."
+          ]
+        },
+        {
+          "name": "Float",
+          "hat": "cap",
+          "body": "cream",
+          "accent": "coal",
+          "lines": [
+            "A float-red hat, so the others know where to look.",
+            "Red on top, like a float that has not bobbed."
+          ]
+        },
+        {
+          "name": "Mudbank",
+          "hat": "caramel",
+          "body": "mint",
+          "accent": "chestnut",
+          "lines": [
+            "A hat the colour of a good mudbank.",
+            "Mud-brown hat, spotless gnome."
+          ]
+        },
+        {
+          "name": "Dawn",
+          "hat": "coral",
+          "body": "ice",
+          "accent": "navy",
+          "lines": [
+            "Up before the fish, in a dawn-pink hat.",
+            "Coral hat, first light, first cast."
+          ]
+        },
+        {
+          "name": "Lily",
+          "hat": "fern",
+          "body": "lilac",
+          "accent": "lemon",
+          "lines": [
+            "A lily-pad hat. The frogs have opinions.",
+            "Sits on lily pads. They mostly hold."
+          ]
+        }
+      ],
+      "surnames": [
+        "Reedwater",
+        "Troutbridge",
+        "Floatwell",
+        "Pikestaff",
+        "Dragonfly",
+        "Bankside",
+        "Minnow",
+        "Hookline",
+        "Lilypad",
+        "Tadpole",
+        "Rippleby",
+        "Perchwell"
+      ],
       "lines": [
-        "Fishes the water hazards. Has caught eleven balls.", "Waits for the putt like a bite.", "Says the one that got away was a birdie.",
-        "Casts a line across every pond, out of habit.", "Never hurries. The fish never do.", "Measures putts in rod lengths.",
-        "Has a lucky fly in the hat and a lucky ball in the pond.", "Takes a flask, a chair and four hours a hole.", "Lands the putt, then lets it go.",
-        "Knows where the frogs sit and putts round them.", "Swears the ball was this big.", "Reads the ripples before the green.",
-        "Brings a net to the water hazard, as a precaution.", "Hums to the carp between strokes.", "Calls a three-putt a good day on the bank.",
-        "Ties knots in the flag cord when bored.", "Keeps maggots in the hat. Does not say so.", "Has never fallen in. Officially."
+        "Fishes the water hazards. Has caught eleven balls.",
+        "Waits for the putt like a bite.",
+        "Says the one that got away was a birdie.",
+        "Casts a line across every pond, out of habit.",
+        "Never hurries. The fish never do.",
+        "Measures putts in rod lengths.",
+        "Has a lucky fly in the hat and a lucky ball in the pond.",
+        "Takes a flask, a chair and four hours a hole.",
+        "Lands the putt, then lets it go.",
+        "Knows where the frogs sit and putts round them.",
+        "Swears the ball was this big.",
+        "Reads the ripples before the green.",
+        "Brings a net to the water hazard, as a precaution.",
+        "Hums to the carp between strokes.",
+        "Calls a three-putt a good day on the bank.",
+        "Ties knots in the flag cord when bored.",
+        "Keeps maggots in the hat. Does not say so.",
+        "Has never fallen in. Officially."
       ]
     },
     {
-      "id": "sailor", "home": "island",
-      "hats": ["sailor"], "beards": ["full", "chops", "moustache", "none", "braids"], "hair": ["snow", "ash", "flaxen", "chestnut", "ginger"],
-      "wear": [["neckerchief"], ["earring"], ["cheeks", "freckles"]],
-      "patterns": ["stripes", "zigzag"], "pieces": ["medal", "scarf", "bowtie"],
-      "palettes": [
-        { "name": "Navy", "hat": "white", "body": "sky", "accent": "navy", "lines": ["Whites on, ready for inspection.", "A cap so white it squints back."] },
-        { "name": "Harbour", "hat": "white", "body": "coral", "accent": "delft", "lines": ["Harbour whites and a coral coat.", "Dressed for shore leave."] },
-        { "name": "Signal", "hat": "cap", "body": "cream", "accent": "navy", "lines": ["A signal-red cap: man the putter.", "Red cap, so the lookout can find it."] },
-        { "name": "Deep Blue", "hat": "navy", "body": "linen", "accent": "cap", "lines": ["Navy cap, a sea of patience under it.", "Deep blue on top, calm underneath."] },
-        { "name": "Lagoon", "hat": "lagoon", "body": "white", "accent": "coral", "lines": ["A lagoon-blue cap, salt in its seams.", "The cap came back from the lagoon bluer."] },
-        { "name": "Buoy", "hat": "apricot", "body": "ice", "accent": "brick", "lines": ["Bright as a buoy, and as easy to spot.", "An orange cap: man overboard, found."] },
-        { "name": "Galley", "hat": "mustard", "body": "seafoam", "accent": "navy", "lines": ["A galley-yellow cap with a soup stain.", "Mustard cap, sea-green coat."] },
-        { "name": "Spray", "hat": "seafoam", "body": "peach", "accent": "teal", "lines": ["Sea-spray green, dried in the sun.", "The cap went seafoam after one storm."] }
+      "id": "sailor",
+      "home": "island",
+      "wardrobe": [
+        "white",
+        "sky",
+        "ice",
+        "linen",
+        "cream",
+        "seafoam",
+        "peach",
+        "coral"
       ],
-      "surnames": ["Saltwater", "Bowline", "Anchorby", "Seaworthy", "Starboard", "Driftwood", "Gunwale", "Spinnaker", "Tidewell", "Shipshape", "Portside", "Mainsail"],
+      "hats": [
+        "sailor"
+      ],
+      "beards": [
+        "full",
+        "chops",
+        "moustache",
+        "none",
+        "braids"
+      ],
+      "hair": [
+        "snow",
+        "ash",
+        "flaxen",
+        "chestnut",
+        "ginger"
+      ],
+      "wear": [
+        [
+          "neckerchief"
+        ],
+        [
+          "earring"
+        ],
+        [
+          "cheeks",
+          "freckles"
+        ]
+      ],
+      "patterns": [
+        "stripes",
+        "zigzag"
+      ],
+      "pieces": [
+        "medal",
+        "scarf",
+        "bowtie"
+      ],
+      "palettes": [
+        {
+          "name": "Navy",
+          "hat": "white",
+          "body": "sky",
+          "accent": "navy",
+          "lines": [
+            "Whites on, ready for inspection.",
+            "A cap so white it squints back."
+          ]
+        },
+        {
+          "name": "Harbour",
+          "hat": "white",
+          "body": "coral",
+          "accent": "delft",
+          "lines": [
+            "Harbour whites, pressed for the dance.",
+            "Dressed for shore leave."
+          ]
+        },
+        {
+          "name": "Signal",
+          "hat": "cap",
+          "body": "cream",
+          "accent": "navy",
+          "lines": [
+            "A signal-red cap: man the putter.",
+            "Red cap, so the lookout can find it."
+          ]
+        },
+        {
+          "name": "Deep Blue",
+          "hat": "navy",
+          "body": "linen",
+          "accent": "cap",
+          "lines": [
+            "Navy cap, a sea of patience under it.",
+            "Deep blue on top, calm underneath."
+          ]
+        },
+        {
+          "name": "Lagoon",
+          "hat": "lagoon",
+          "body": "white",
+          "accent": "coral",
+          "lines": [
+            "A lagoon-blue cap, salt in its seams.",
+            "The cap came back from the lagoon bluer."
+          ]
+        },
+        {
+          "name": "Buoy",
+          "hat": "apricot",
+          "body": "ice",
+          "accent": "brick",
+          "lines": [
+            "Bright as a buoy, and as easy to spot.",
+            "An orange cap: man overboard, found."
+          ]
+        },
+        {
+          "name": "Galley",
+          "hat": "mustard",
+          "body": "seafoam",
+          "accent": "navy",
+          "lines": [
+            "A galley-yellow cap with a soup stain.",
+            "Mustard cap, smells of the galley."
+          ]
+        },
+        {
+          "name": "Spray",
+          "hat": "seafoam",
+          "body": "peach",
+          "accent": "teal",
+          "lines": [
+            "Sea-spray green, dried in the sun.",
+            "The cap went seafoam after one storm."
+          ]
+        }
+      ],
+      "surnames": [
+        "Saltwater",
+        "Bowline",
+        "Anchorby",
+        "Seaworthy",
+        "Starboard",
+        "Driftwood",
+        "Gunwale",
+        "Spinnaker",
+        "Tidewell",
+        "Shipshape",
+        "Portside",
+        "Mainsail"
+      ],
       "lines": [
-        "Calls the cup the harbour.", "Steers by the flag and the stars.", "Reads the green like a tide table.",
-        "Ties a knot in the flag cord, for luck.", "Salutes the hole before every putt.", "Swabs the green with a sleeve.",
-        "Was told to swab the deck. Found the golf course instead.", "Swears the ball listed to port.", "Rings a bell when the ball goes in.",
-        "Has a girl in every port, and a putter in every bag.", "Measures putts in fathoms.", "Shouts 'land ho' at every green.",
-        "Says a three-putt is choppy water.", "Whistles sea shanties on the backswing.", "Never putts into the wind. Waits for it to turn.",
-        "Folds the scorecard into a paper boat.", "Sails round the bunkers, never through.", "Has crossed every water hazard by putter."
+        "Calls the cup the harbour.",
+        "Steers by the flag and the stars.",
+        "Reads the green like a tide table.",
+        "Ties a knot in the flag cord, for luck.",
+        "Salutes the hole before every putt.",
+        "Swabs the green with a sleeve.",
+        "Was told to swab the deck. Found the golf course instead.",
+        "Swears the ball listed to port.",
+        "Rings a bell when the ball goes in.",
+        "Has a girl in every port, and a putter in every bag.",
+        "Measures putts in fathoms.",
+        "Shouts 'land ho' at every green.",
+        "Says a three-putt is choppy water.",
+        "Whistles sea shanties on the backswing.",
+        "Never putts into the wind. Waits for it to turn.",
+        "Folds the scorecard into a paper boat.",
+        "Sails round the bunkers, never through.",
+        "Has crossed every water hazard by putter."
       ]
     },
     {
-      "id": "deckhand", "home": "island",
-      "hats": ["bandana"], "beards": ["bushy", "braids", "goatee", "chops", "full"], "hair": ["coal", "auburn", "ginger", "chestnut", "ash"],
-      "wear": [["earring"], ["patch"], ["neckerchief"]],
-      "patterns": ["stripes", "checks"], "pieces": ["satchel", "scarf", "medal"],
-      "palettes": [
-        { "name": "Scarlet", "hat": "cap", "body": "cream", "accent": "white", "lines": ["A scarlet bandana, spotted with sea salt.", "Red bandana, tied tight for weather."] },
-        { "name": "Bosun", "hat": "navy", "body": "oat", "accent": "white", "lines": ["A bosun-blue bandana.", "Navy cloth over a sunburnt head."] },
-        { "name": "Coral Reef", "hat": "coral", "body": "seafoam", "accent": "white", "lines": ["A coral bandana from the reef market.", "Coral on top, shallow water below."] },
-        { "name": "Galleon", "hat": "plum", "body": "sand", "accent": "sun", "lines": ["A plum bandana from a plundered trunk.", "Plum cloth, gold spots, no questions."] },
-        { "name": "Palm", "hat": "emerald", "body": "linen", "accent": "lemon", "lines": ["Palm-green bandana, coconut-scented.", "Green as the island, wrapped tight."] },
-        { "name": "Sunset", "hat": "saffron", "body": "lilac", "accent": "brick", "lines": ["A sunset bandana over a lilac shirt.", "Orange cloth, the island's evening."] },
-        { "name": "Rigging", "hat": "chestnut", "body": "sky", "accent": "cream", "lines": ["Tar-brown bandana, rope-burn hands.", "The bandana smells of rigging."] },
-        { "name": "Lagoon", "hat": "lagoon", "body": "peach", "accent": "coral", "lines": ["A lagoon bandana, still dripping.", "Teal cloth, warm water."] }
+      "id": "deckhand",
+      "home": "island",
+      "wardrobe": [
+        "cream",
+        "oat",
+        "seafoam",
+        "sand",
+        "linen",
+        "lilac",
+        "sky",
+        "peach"
       ],
-      "surnames": ["Barnacle", "Bilgewater", "Swabbs", "Rigging", "Crowsnest", "Plankwell", "Seaspray", "Hammock", "Tarbucket", "Knotwell", "Galley", "Ropeburn"],
+      "hats": [
+        "bandana"
+      ],
+      "beards": [
+        "bushy",
+        "braids",
+        "goatee",
+        "chops",
+        "full"
+      ],
+      "hair": [
+        "coal",
+        "auburn",
+        "ginger",
+        "chestnut",
+        "ash"
+      ],
+      "wear": [
+        [
+          "earring"
+        ],
+        [
+          "patch"
+        ],
+        [
+          "neckerchief"
+        ]
+      ],
+      "patterns": [
+        "stripes",
+        "checks"
+      ],
+      "pieces": [
+        "satchel",
+        "scarf",
+        "medal"
+      ],
+      "palettes": [
+        {
+          "name": "Scarlet",
+          "hat": "cap",
+          "body": "cream",
+          "accent": "white",
+          "lines": [
+            "A scarlet bandana, spotted with sea salt.",
+            "Red bandana, tied tight for weather."
+          ]
+        },
+        {
+          "name": "Bosun",
+          "hat": "navy",
+          "body": "oat",
+          "accent": "white",
+          "lines": [
+            "A bosun-blue bandana.",
+            "Navy cloth over a sunburnt head."
+          ]
+        },
+        {
+          "name": "Coral Reef",
+          "hat": "coral",
+          "body": "seafoam",
+          "accent": "white",
+          "lines": [
+            "A coral bandana from the reef market.",
+            "Coral cloth from the shallow water."
+          ]
+        },
+        {
+          "name": "Galleon",
+          "hat": "plum",
+          "body": "sand",
+          "accent": "sun",
+          "lines": [
+            "A plum bandana from a plundered trunk.",
+            "Plum cloth, gold spots, no questions."
+          ]
+        },
+        {
+          "name": "Palm",
+          "hat": "emerald",
+          "body": "linen",
+          "accent": "lemon",
+          "lines": [
+            "Palm-green bandana, coconut-scented.",
+            "Green as the island, wrapped tight."
+          ]
+        },
+        {
+          "name": "Sunset",
+          "hat": "saffron",
+          "body": "lilac",
+          "accent": "brick",
+          "lines": [
+            "A sunset bandana, tied at dusk.",
+            "Orange cloth, the island's evening."
+          ]
+        },
+        {
+          "name": "Rigging",
+          "hat": "chestnut",
+          "body": "sky",
+          "accent": "cream",
+          "lines": [
+            "Tar-brown bandana, rope-burn hands.",
+            "The bandana smells of rigging."
+          ]
+        },
+        {
+          "name": "Lagoon",
+          "hat": "lagoon",
+          "body": "peach",
+          "accent": "coral",
+          "lines": [
+            "A lagoon bandana, still dripping.",
+            "Teal cloth, warm water."
+          ]
+        }
+      ],
+      "surnames": [
+        "Barnacle",
+        "Bilgewater",
+        "Swabbs",
+        "Rigging",
+        "Crowsnest",
+        "Plankwell",
+        "Seaspray",
+        "Hammock",
+        "Tarbucket",
+        "Knotwell",
+        "Galley",
+        "Ropeburn"
+      ],
       "lines": [
-        "Climbs the flagstick to see the green.", "Swabs the green before every putt.", "Sleeps in a hammock between holes.",
-        "Has walked the plank twice. Swims well.", "Swears at the wind in three languages.", "Ties every knot known, and two invented.",
-        "Keeps a biscuit in the bandana for later.", "Calls the cup the hold.", "Has been seasick on a putting green.",
-        "Hauls the ball out of the cup like an anchor.", "Never met a rope that stayed untied.", "Coils the flag cord without thinking.",
-        "Takes orders from nobody, then follows them.", "Whistles for the wind, and sometimes gets it.", "Puts a coin under the ball for luck.",
-        "Has a tattoo of a hole-in-one. Not a real one.", "Can hold a putter in a gale.", "Keeps one eye on the ball and one on the weather."
+        "Climbs the flagstick to see the green.",
+        "Swabs the green before every putt.",
+        "Sleeps in a hammock between holes.",
+        "Has walked the plank twice. Swims well.",
+        "Swears at the wind in three languages.",
+        "Ties every knot known, and two invented.",
+        "Keeps a biscuit in the bandana for later.",
+        "Calls the cup the hold.",
+        "Has been seasick on a putting green.",
+        "Hauls the ball out of the cup like an anchor.",
+        "Never met a rope that stayed untied.",
+        "Coils the flag cord without thinking.",
+        "Takes orders from nobody, then follows them.",
+        "Whistles for the wind, and sometimes gets it.",
+        "Puts a coin under the ball for luck.",
+        "Has a tattoo of a hole-in-one. Not a real one.",
+        "Can hold a putter in a gale.",
+        "Keeps one eye on the ball and one on the weather."
       ]
     },
     {
-      "id": "baker", "home": "town",
-      "hats": ["toque"], "beards": ["moustache", "full", "chops", "goatee", "none"], "hair": ["snow", "cocoa", "ginger", "ash", "flaxen"],
-      "wear": [["neckerchief"], ["cheeks", "freckles"], ["glasses"]],
-      "patterns": ["checks", "stripes"], "pieces": ["bowtie", "scarf", "medal"],
-      "palettes": [
-        { "name": "Strawberry", "hat": "white", "body": "rose", "accent": "cap", "lines": ["Strawberry coat, cream on top.", "Smells of jam tarts."] },
-        { "name": "Blueberry", "hat": "white", "body": "heather", "accent": "navy", "lines": ["Blueberry coat, flour to the elbows.", "A muffin's colours, worn proudly."] },
-        { "name": "Pistachio", "hat": "cream", "body": "sage", "accent": "berry", "lines": ["Pistachio coat, from the macaron shelf.", "Green as a pistachio, soft as a sponge."] },
-        { "name": "Lemon Curd", "hat": "white", "body": "lemon", "accent": "fern", "lines": ["Lemon coat, sharp as the curd.", "A lemon tart of a gnome."] },
-        { "name": "Toffee", "hat": "cream", "body": "caramel", "accent": "white", "lines": ["Toffee coat, sticky in summer.", "Caramel-brown, from the toffee pan."] },
-        { "name": "Peach Melba", "hat": "white", "body": "peach", "accent": "ruby", "lines": ["A peach melba coat, raspberry neckerchief.", "Peach and cream, ready by noon."] },
-        { "name": "Sugared Almond", "hat": "butter", "body": "mint", "accent": "rose", "lines": ["Sugared-almond colours, all of them.", "Pastel from the hat down."] },
-        { "name": "Blackcurrant", "hat": "white", "body": "lilac", "accent": "plum", "lines": ["Blackcurrant coat, cream toque.", "The lilac coat is a crumble stain."] }
+      "id": "baker",
+      "home": "town",
+      "key": "body",
+      "wardrobe": [
+        "white",
+        "cream",
+        "butter",
+        "blush",
+        "linen",
+        "mint",
+        "sky",
+        "lilac",
+        "peach",
+        "lemon",
+        "petal"
       ],
-      "surnames": ["Crumbleton", "Puddingstone", "Doughty", "Butterworth", "Ovenbright", "Scone", "Treacle", "Muffin", "Flourish", "Crustworth", "Pretzel", "Sourdough"],
+      "hats": [
+        "toque"
+      ],
+      "beards": [
+        "moustache",
+        "full",
+        "chops",
+        "goatee",
+        "none"
+      ],
+      "hair": [
+        "snow",
+        "cocoa",
+        "ginger",
+        "ash",
+        "flaxen"
+      ],
+      "wear": [
+        [
+          "neckerchief"
+        ],
+        [
+          "cheeks",
+          "freckles"
+        ],
+        [
+          "glasses"
+        ]
+      ],
+      "patterns": [
+        "checks",
+        "stripes"
+      ],
+      "pieces": [
+        "bowtie",
+        "scarf",
+        "medal"
+      ],
+      "palettes": [
+        {
+          "name": "Strawberry",
+          "hat": "white",
+          "body": "rose",
+          "accent": "cap",
+          "lines": [
+            "Strawberry coat, jam at the cuffs.",
+            "Smells of jam tarts."
+          ]
+        },
+        {
+          "name": "Blueberry",
+          "hat": "white",
+          "body": "heather",
+          "accent": "navy",
+          "lines": [
+            "Blueberry coat, flour to the elbows.",
+            "A muffin's colours, worn proudly."
+          ]
+        },
+        {
+          "name": "Pistachio",
+          "hat": "cream",
+          "body": "sage",
+          "accent": "berry",
+          "lines": [
+            "Pistachio coat, from the macaron shelf.",
+            "Green as a pistachio, soft as a sponge."
+          ]
+        },
+        {
+          "name": "Lemon Curd",
+          "hat": "white",
+          "body": "lemon",
+          "accent": "fern",
+          "lines": [
+            "Lemon coat, sharp as the curd.",
+            "A lemon tart of a gnome."
+          ]
+        },
+        {
+          "name": "Toffee",
+          "hat": "cream",
+          "body": "caramel",
+          "accent": "white",
+          "lines": [
+            "Toffee coat, sticky in summer.",
+            "Caramel-brown, from the toffee pan."
+          ]
+        },
+        {
+          "name": "Peach Melba",
+          "hat": "white",
+          "body": "peach",
+          "accent": "ruby",
+          "lines": [
+            "A peach melba coat, raspberry neckerchief.",
+            "Peach coat, ready by noon."
+          ]
+        },
+        {
+          "name": "Sugared Almond",
+          "hat": "butter",
+          "body": "mint",
+          "accent": "rose",
+          "lines": [
+            "Sugared-almond colours, all of them.",
+            "Pastel from the hat down."
+          ]
+        },
+        {
+          "name": "Blackcurrant",
+          "hat": "white",
+          "body": "lilac",
+          "accent": "plum",
+          "lines": [
+            "Blackcurrant coat, purple fingers.",
+            "The lilac coat is a crumble stain."
+          ]
+        }
+      ],
+      "surnames": [
+        "Crumbleton",
+        "Puddingstone",
+        "Doughty",
+        "Butterworth",
+        "Ovenbright",
+        "Scone",
+        "Treacle",
+        "Muffin",
+        "Flourish",
+        "Crustworth",
+        "Pretzel",
+        "Sourdough"
+      ],
       "lines": [
-        "Bakes a cake for every birdie. It is a lot of cake.", "Proves the dough while waiting for the green.", "Knows the course by its smells.",
-        "Says a good putt, like a good loaf, needs rest.", "Kneads the putter grip before every stroke.", "Brings warm buns to the first tee.",
-        "Times every putt like a soufflé.", "Measures putts in rolling pins.", "Has never burnt a bun, or missed a two-footer. Allegedly.",
-        "Leaves crumbs to find the way back.", "Ices the flag on special days.", "Plays fast: the bread is in the oven.",
-        "Reads the green like a recipe.", "Says the bunker is just very big brown sugar.", "Hums while the dough rises and the ball rolls.",
-        "Keeps a spoon behind the ear, in case.", "Weighs every ball before teeing off.", "Has a rival at the other bakery. Also a gnome."
+        "Bakes a cake for every birdie. It is a lot of cake.",
+        "Proves the dough while waiting for the green.",
+        "Knows the course by its smells.",
+        "Says a good putt, like a good loaf, needs rest.",
+        "Kneads the putter grip before every stroke.",
+        "Brings warm buns to the first tee.",
+        "Times every putt like a soufflé.",
+        "Measures putts in rolling pins.",
+        "Has never burnt a bun, or missed a two-footer. Allegedly.",
+        "Leaves crumbs to find the way back.",
+        "Ices the flag on special days.",
+        "Plays fast: the bread is in the oven.",
+        "Reads the green like a recipe.",
+        "Says the bunker is just very big brown sugar.",
+        "Hums while the dough rises and the ball rolls.",
+        "Keeps a spoon behind the ear, in case.",
+        "Weighs every ball before teeing off.",
+        "Has a rival at the other bakery. Also a gnome."
       ]
     },
     {
-      "id": "painter", "home": "town",
-      "hats": ["beret"], "beards": ["goatee", "moustache", "chops", "none", "full"], "hair": ["coal", "cocoa", "auburn", "ash", "snow"],
-      "wear": [["neckerchief"], ["glasses", "monocle"], ["freckles", "cheeks"]],
-      "patterns": ["spots", "stripes", "zigzag"], "pieces": ["bowtie", "scarf", "plume"],
-      "palettes": [
-        { "name": "Vermilion", "hat": "cap", "body": "linen", "accent": "delft", "lines": ["A vermilion beret, tipped just so.", "Red beret, like the masters."] },
-        { "name": "Ultramarine", "hat": "delft", "body": "butter", "accent": "cap", "lines": ["Ultramarine beret, expensive pigment.", "A blue beret and big ideas."] },
-        { "name": "Ochre", "hat": "honey", "body": "lilac", "accent": "plum", "lines": ["An ochre beret over a lilac smock.", "Earth-yellow beret, sky-purple smock."] },
-        { "name": "Charcoal", "hat": "charcoal", "body": "white", "accent": "ruby", "lines": ["A charcoal beret, for sketching.", "Black beret, white smock, no compromise."] },
-        { "name": "Viridian", "hat": "emerald", "body": "petal", "accent": "lemon", "lines": ["A viridian beret, mixed by hand.", "Green beret, pink smock, bold choices."] },
-        { "name": "Magenta", "hat": "berry", "body": "ice", "accent": "teal", "lines": ["A magenta beret with paint on it.", "The beret was a happy accident."] },
-        { "name": "Sepia", "hat": "chestnut", "body": "flaxen", "accent": "coral", "lines": ["A sepia beret, old-photograph brown.", "Brown beret, honey smock, a sepia mood."] },
-        { "name": "Cerulean", "hat": "sky", "body": "peach", "accent": "navy", "lines": ["A cerulean beret, the colour of afternoons.", "Sky-blue beret for plein air."] }
+      "id": "painter",
+      "home": "town",
+      "wardrobe": [
+        "linen",
+        "butter",
+        "lilac",
+        "white",
+        "petal",
+        "ice",
+        "flaxen",
+        "peach"
       ],
-      "surnames": ["Brushwell", "Daubney", "Pigment", "Easelby", "Smudge", "Varnish", "Ochreby", "Canvasby", "Palette", "Splatter", "Umberly", "Sketchley"],
+      "hats": [
+        "beret"
+      ],
+      "beards": [
+        "goatee",
+        "moustache",
+        "chops",
+        "none",
+        "full"
+      ],
+      "hair": [
+        "coal",
+        "cocoa",
+        "auburn",
+        "ash",
+        "snow"
+      ],
+      "wear": [
+        [
+          "neckerchief"
+        ],
+        [
+          "glasses",
+          "monocle"
+        ],
+        [
+          "freckles",
+          "cheeks"
+        ]
+      ],
+      "patterns": [
+        "spots",
+        "stripes",
+        "zigzag"
+      ],
+      "pieces": [
+        "bowtie",
+        "scarf",
+        "plume"
+      ],
+      "palettes": [
+        {
+          "name": "Vermilion",
+          "hat": "cap",
+          "body": "linen",
+          "accent": "delft",
+          "lines": [
+            "A vermilion beret, tipped just so.",
+            "Red beret, like the masters."
+          ]
+        },
+        {
+          "name": "Ultramarine",
+          "hat": "delft",
+          "body": "butter",
+          "accent": "cap",
+          "lines": [
+            "Ultramarine beret, expensive pigment.",
+            "A blue beret and big ideas."
+          ]
+        },
+        {
+          "name": "Ochre",
+          "hat": "honey",
+          "body": "lilac",
+          "accent": "plum",
+          "lines": [
+            "An ochre beret, earth from the hill.",
+            "Earth-yellow beret, still drying."
+          ]
+        },
+        {
+          "name": "Charcoal",
+          "hat": "charcoal",
+          "body": "white",
+          "accent": "ruby",
+          "lines": [
+            "A charcoal beret, for sketching.",
+            "Black beret, no compromise."
+          ]
+        },
+        {
+          "name": "Viridian",
+          "hat": "emerald",
+          "body": "petal",
+          "accent": "lemon",
+          "lines": [
+            "A viridian beret, mixed by hand.",
+            "Green beret, bold choices."
+          ]
+        },
+        {
+          "name": "Magenta",
+          "hat": "berry",
+          "body": "ice",
+          "accent": "teal",
+          "lines": [
+            "A magenta beret with paint on it.",
+            "The beret was a happy accident."
+          ]
+        },
+        {
+          "name": "Sepia",
+          "hat": "chestnut",
+          "body": "flaxen",
+          "accent": "coral",
+          "lines": [
+            "A sepia beret, old-photograph brown.",
+            "Brown beret, a sepia mood."
+          ]
+        },
+        {
+          "name": "Cerulean",
+          "hat": "sky",
+          "body": "peach",
+          "accent": "navy",
+          "lines": [
+            "A cerulean beret, the colour of afternoons.",
+            "Sky-blue beret for plein air."
+          ]
+        }
+      ],
+      "surnames": [
+        "Brushwell",
+        "Daubney",
+        "Pigment",
+        "Easelby",
+        "Smudge",
+        "Varnish",
+        "Ochreby",
+        "Canvasby",
+        "Palette",
+        "Splatter",
+        "Umberly",
+        "Sketchley"
+      ],
       "lines": [
-        "Sketches the green before every putt.", "Sees the line in colours nobody else sees.", "Signs the scorecard in the corner, small.",
-        "Calls a three-putt an abstract.", "Paints the flag a new colour every Sunday.", "Squints at the hole with a thumb out.",
-        "Has a blue period. It is mostly bunkers.", "Holds the putter like a brush, and it works.", "Never finishes a round, only abandons it.",
-        "Mixes the perfect green, then putts across it.", "Wears the smock to every hole, paint and all.", "Says the light at hole 6 is everything.",
-        "Frames the good scorecards. There are two.", "Leaves a dab of paint on every ball.", "Plays in perspective: the far holes look easier.",
-        "Has painted the clubhouse from every angle.", "Is between masterpieces, and between pars.", "Cries at sunsets and missed putts equally."
+        "Sketches the green before every putt.",
+        "Sees the line in colours nobody else sees.",
+        "Signs the scorecard in the corner, small.",
+        "Calls a three-putt an abstract.",
+        "Paints the flag a new colour every Sunday.",
+        "Squints at the hole with a thumb out.",
+        "Has a blue period. It is mostly bunkers.",
+        "Holds the putter like a brush, and it works.",
+        "Never finishes a round, only abandons it.",
+        "Mixes the perfect green, then putts across it.",
+        "Wears the smock to every hole, paint and all.",
+        "Says the light at hole 6 is everything.",
+        "Frames the good scorecards. There are two.",
+        "Leaves a dab of paint on every ball.",
+        "Plays in perspective: the far holes look easier.",
+        "Has painted the clubhouse from every angle.",
+        "Is between masterpieces, and between pars.",
+        "Cries at sunsets and missed putts equally."
       ]
     },
     {
-      "id": "skier", "home": "mountain",
-      "hats": ["beanie"], "beards": ["none", "full", "moustache", "bushy", "goatee"], "hair": ["snow", "flaxen", "ginger", "ash", "cocoa"],
-      "wear": [["pompom"], ["goggles"], ["cheeks", "freckles"]],
-      "patterns": ["argyle", "zigzag", "stripes"], "pieces": ["scarf", "earmuffs"],
-      "palettes": [
-        { "name": "Piste", "hat": "cap", "body": "white", "accent": "white", "lines": ["A red beanie for the red run.", "Red bobble, white slopes."] },
-        { "name": "Glacier", "hat": "denim", "body": "ice", "accent": "white", "lines": ["A glacier-blue beanie, frost on the bobble.", "Blue knit, cold nose."] },
-        { "name": "Chalet", "hat": "brick", "body": "oat", "accent": "cream", "lines": ["A chalet-red beanie by the fire.", "Knitted by the stove in the chalet."] },
-        { "name": "Pine", "hat": "pine", "body": "linen", "accent": "cap", "lines": ["A pine-green beanie from the tree line.", "Green knit, smells of pine needles."] },
-        { "name": "Apres", "hat": "berry", "body": "petal", "accent": "white", "lines": ["A berry beanie for après-golf.", "Pink knit, cocoa breath."] },
-        { "name": "Snowplough", "hat": "lemon", "body": "sky", "accent": "navy", "lines": ["A snowplough-yellow beanie, impossible to lose.", "Yellow knit, seen from the lift."] },
-        { "name": "Alpenglow", "hat": "coral", "body": "lilac", "accent": "white", "lines": ["Alpenglow pink on a cold blue coat.", "The beanie catches the evening light."] },
-        { "name": "Blizzard", "hat": "slate", "body": "white", "accent": "cap", "lines": ["A blizzard-grey beanie, warmer than it looks.", "Grey knit, built for whiteouts."] }
+      "id": "skier",
+      "home": "mountain",
+      "wardrobe": [
+        "white",
+        "ice",
+        "oat",
+        "linen",
+        "petal",
+        "sky",
+        "lilac",
+        "cream"
       ],
-      "surnames": ["Snowdrift", "Piste", "Slalom", "Moguls", "Powderby", "Chairlift", "Icicle", "Frostwhistle", "Sledgewood", "Toboggan", "Downhill", "Snowplough"],
+      "hats": [
+        "beanie"
+      ],
+      "beards": [
+        "none",
+        "full",
+        "moustache",
+        "bushy",
+        "goatee"
+      ],
+      "hair": [
+        "snow",
+        "flaxen",
+        "ginger",
+        "ash",
+        "cocoa"
+      ],
+      "wear": [
+        [
+          "pompom"
+        ],
+        [
+          "goggles"
+        ],
+        [
+          "cheeks",
+          "freckles"
+        ]
+      ],
+      "patterns": [
+        "argyle",
+        "zigzag",
+        "stripes"
+      ],
+      "pieces": [
+        "scarf",
+        "earmuffs"
+      ],
+      "palettes": [
+        {
+          "name": "Piste",
+          "hat": "cap",
+          "body": "white",
+          "accent": "white",
+          "lines": [
+            "A red beanie for the red run.",
+            "Red bobble, white slopes."
+          ]
+        },
+        {
+          "name": "Glacier",
+          "hat": "denim",
+          "body": "ice",
+          "accent": "white",
+          "lines": [
+            "A glacier-blue beanie, frost on the bobble.",
+            "Blue knit, cold nose."
+          ]
+        },
+        {
+          "name": "Chalet",
+          "hat": "brick",
+          "body": "oat",
+          "accent": "cream",
+          "lines": [
+            "A chalet-red beanie by the fire.",
+            "Knitted by the stove in the chalet."
+          ]
+        },
+        {
+          "name": "Pine",
+          "hat": "pine",
+          "body": "linen",
+          "accent": "cap",
+          "lines": [
+            "A pine-green beanie from the tree line.",
+            "Green knit, smells of pine needles."
+          ]
+        },
+        {
+          "name": "Apres",
+          "hat": "berry",
+          "body": "petal",
+          "accent": "white",
+          "lines": [
+            "A berry beanie for après-golf.",
+            "Pink knit, cocoa breath."
+          ]
+        },
+        {
+          "name": "Snowplough",
+          "hat": "lemon",
+          "body": "sky",
+          "accent": "navy",
+          "lines": [
+            "A snowplough-yellow beanie, impossible to lose.",
+            "Yellow knit, seen from the lift."
+          ]
+        },
+        {
+          "name": "Alpenglow",
+          "hat": "coral",
+          "body": "lilac",
+          "accent": "white",
+          "lines": [
+            "Alpenglow pink, the last light on the peak.",
+            "The beanie catches the evening light."
+          ]
+        },
+        {
+          "name": "Blizzard",
+          "hat": "slate",
+          "body": "white",
+          "accent": "cap",
+          "lines": [
+            "A blizzard-grey beanie, warmer than it looks.",
+            "Grey knit, built for whiteouts."
+          ]
+        }
+      ],
+      "surnames": [
+        "Snowdrift",
+        "Piste",
+        "Slalom",
+        "Moguls",
+        "Powderby",
+        "Chairlift",
+        "Icicle",
+        "Frostwhistle",
+        "Sledgewood",
+        "Toboggan",
+        "Downhill",
+        "Snowplough"
+      ],
       "lines": [
-        "Putts in a tuck position.", "Takes every green as a black run.", "Has never stopped in time on a downhill putt.",
-        "Says the bunker is just warm snow.", "Waxes the ball before the first tee.", "Does a little jump on every slope.",
-        "Shouts 'track!' before every putt.", "Would rather take the chairlift to the green.", "Knows a mogul when it sees one.",
-        "Snowploughs to a stop beside the cup.", "Leans into the curve, every time.", "Wipes the goggles, misses anyway.",
-        "Has been to the Alps. Talks about it.", "Was first on the slopes and first on the green.", "Thinks every green should have a lift.",
-        "Rolls downhill faster than the ball.", "Carves a perfect line, then three-putts.", "Says the cocoa tastes better after a birdie."
+        "Putts in a tuck position.",
+        "Takes every green as a black run.",
+        "Has never stopped in time on a downhill putt.",
+        "Says the bunker is just warm snow.",
+        "Waxes the ball before the first tee.",
+        "Does a little jump on every slope.",
+        "Shouts 'track!' before every putt.",
+        "Would rather take the chairlift to the green.",
+        "Knows a mogul when it sees one.",
+        "Snowploughs to a stop beside the cup.",
+        "Leans into the curve, every time.",
+        "Wipes the goggles, misses anyway.",
+        "Has been to the Alps. Talks about it.",
+        "Was first on the slopes and first on the green.",
+        "Thinks every green should have a lift.",
+        "Rolls downhill faster than the ball.",
+        "Carves a perfect line, then three-putts.",
+        "Says the cocoa tastes better after a birdie."
       ]
     },
     {
-      "id": "alpinist", "home": "mountain",
-      "hats": ["alpine"], "beards": ["long", "bushy", "full", "chops", "braids"], "hair": ["snow", "ash", "pebble", "flaxen", "chestnut"],
-      "wear": [["neckerchief"], ["cheeks"], ["glasses"]],
-      "patterns": ["checks", "argyle"], "pieces": ["plume", "satchel", "scarf"],
-      "palettes": [
-        { "name": "Loden", "hat": "fern", "body": "linen", "accent": "cap", "lines": ["A loden hat, felted in the valley.", "Green felt, a red band, a long climb."] },
-        { "name": "Edelweiss", "hat": "slate", "body": "white", "accent": "lemon", "lines": ["A slate-grey hat with a sprig of summer.", "Grey felt, white shirt, yellow band."] },
-        { "name": "Valley", "hat": "chestnut", "body": "mint", "accent": "white", "lines": ["A chestnut hat from the valley fair.", "Brown felt, a cowbell's patience."] },
-        { "name": "Gentian", "hat": "delft", "body": "cream", "accent": "sun", "lines": ["Gentian blue, the flower of the high pass.", "A blue hat for the blue flowers."] },
-        { "name": "Larch", "hat": "olive", "body": "peach", "accent": "brick", "lines": ["A larch-green hat, gold in autumn.", "Olive felt, dusty boots."] },
-        { "name": "Cowbell", "hat": "brick", "body": "butter", "accent": "fern", "lines": ["A cowbell-red hat; you hear him coming.", "Red felt, butter-yellow shirt."] },
-        { "name": "Scree", "hat": "pebble", "body": "sky", "accent": "plum", "lines": ["Scree-grey hat, hard-wearing.", "Grey as the scree slope, and as steady."] },
-        { "name": "Summer Pasture", "hat": "emerald", "body": "ice", "accent": "coral", "lines": ["A pasture-green hat with a flower in the band.", "Green as the high meadow in June."] }
+      "id": "alpinist",
+      "home": "mountain",
+      "wardrobe": [
+        "linen",
+        "white",
+        "mint",
+        "cream",
+        "peach",
+        "butter",
+        "sky",
+        "ice"
       ],
-      "surnames": ["Crag", "Summitt", "Cairnsby", "Ropewell", "Ledgeworth", "Highpass", "Scree", "Ibexby", "Glacierly", "Ridgeback", "Yodelay", "Peakwell"],
+      "hats": [
+        "alpine"
+      ],
+      "beards": [
+        "long",
+        "bushy",
+        "full",
+        "chops",
+        "braids"
+      ],
+      "hair": [
+        "snow",
+        "ash",
+        "pebble",
+        "flaxen",
+        "chestnut"
+      ],
+      "wear": [
+        [
+          "neckerchief"
+        ],
+        [
+          "cheeks"
+        ],
+        [
+          "glasses"
+        ]
+      ],
+      "patterns": [
+        "checks",
+        "argyle"
+      ],
+      "pieces": [
+        "plume",
+        "satchel",
+        "scarf"
+      ],
+      "palettes": [
+        {
+          "name": "Loden",
+          "hat": "fern",
+          "body": "linen",
+          "accent": "cap",
+          "lines": [
+            "A loden hat, felted in the valley.",
+            "Green felt, a red band, a long climb."
+          ]
+        },
+        {
+          "name": "Edelweiss",
+          "hat": "slate",
+          "body": "white",
+          "accent": "lemon",
+          "lines": [
+            "A slate-grey hat with a sprig of summer.",
+            "Grey felt, a yellow band, a long way up."
+          ]
+        },
+        {
+          "name": "Valley",
+          "hat": "chestnut",
+          "body": "mint",
+          "accent": "white",
+          "lines": [
+            "A chestnut hat from the valley fair.",
+            "Brown felt, a cowbell's patience."
+          ]
+        },
+        {
+          "name": "Gentian",
+          "hat": "delft",
+          "body": "cream",
+          "accent": "sun",
+          "lines": [
+            "Gentian blue, the flower of the high pass.",
+            "A blue hat for the blue flowers."
+          ]
+        },
+        {
+          "name": "Larch",
+          "hat": "olive",
+          "body": "peach",
+          "accent": "brick",
+          "lines": [
+            "A larch-green hat, gold in autumn.",
+            "Olive felt, dusty boots."
+          ]
+        },
+        {
+          "name": "Cowbell",
+          "hat": "brick",
+          "body": "butter",
+          "accent": "fern",
+          "lines": [
+            "A cowbell-red hat; you hear him coming.",
+            "Red felt, loud boots."
+          ]
+        },
+        {
+          "name": "Scree",
+          "hat": "pebble",
+          "body": "sky",
+          "accent": "plum",
+          "lines": [
+            "Scree-grey hat, hard-wearing.",
+            "Grey as the scree slope, and as steady."
+          ]
+        },
+        {
+          "name": "Summer Pasture",
+          "hat": "emerald",
+          "body": "ice",
+          "accent": "coral",
+          "lines": [
+            "A pasture-green hat with a flower in the band.",
+            "Green as the high meadow in June."
+          ]
+        }
+      ],
+      "surnames": [
+        "Crag",
+        "Summitt",
+        "Cairnsby",
+        "Ropewell",
+        "Ledgeworth",
+        "Highpass",
+        "Scree",
+        "Ibexby",
+        "Glacierly",
+        "Ridgeback",
+        "Yodelay",
+        "Peakwell"
+      ],
       "lines": [
-        "Ropes up before every uphill putt.", "Treats the green as a summit.", "Yodels when the ball drops.",
-        "Has climbed every flagstick on the course.", "Plans a route to the cup, with a bivouac.", "Says the air is thinner on the 18th.",
-        "Never putts downhill without a belay.", "Carries the kit of three gnomes and the patience of four.", "Reads the slope by the snowmelt.",
-        "Plants a tiny flag on every green reached.", "Calls the rough the approach.", "Respects the mountain. And the bunker.",
-        "Has a cowbell for every par.", "Stops halfway up the fairway for cheese.", "Takes the long way round, on purpose.",
-        "Measures every putt in rope lengths.", "Went up the mountain for the view. Stayed for the golf.", "Keeps a compass, a whistle and a spare ball."
+        "Ropes up before every uphill putt.",
+        "Treats the green as a summit.",
+        "Yodels when the ball drops.",
+        "Has climbed every flagstick on the course.",
+        "Plans a route to the cup, with a bivouac.",
+        "Says the air is thinner on the 18th.",
+        "Never putts downhill without a belay.",
+        "Carries the kit of three gnomes and the patience of four.",
+        "Reads the slope by the snowmelt.",
+        "Plants a tiny flag on every green reached.",
+        "Calls the rough the approach.",
+        "Respects the mountain. And the bunker.",
+        "Has a cowbell for every par.",
+        "Stops halfway up the fairway for cheese.",
+        "Takes the long way round, on purpose.",
+        "Measures every putt in rope lengths.",
+        "Went up the mountain for the view. Stayed for the golf.",
+        "Keeps a compass, a whistle and a spare ball."
       ]
     },
     {
-      "id": "miner", "home": "mines",
-      "hats": ["helmet"], "beards": ["bushy", "full", "long", "chops", "braids"], "hair": ["pebble", "ash", "snow", "coal", "ginger"],
-      "wear": [["goggles"], ["soot"], ["neckerchief"]],
-      "patterns": ["stripes", "checks"], "pieces": ["satchel", "medal", "scarf"],
-      "palettes": [
-        { "name": "Signal Red", "hat": "cap", "body": "oat", "accent": "lemon", "lines": ["A red helmet, seen down any shaft.", "Signal red, for the deep galleries."] },
-        { "name": "Copper Seam", "hat": "copper", "body": "linen", "accent": "teal", "lines": ["A copper-coloured helmet from the copper seam.", "The helmet went orange in the copper vein."] },
-        { "name": "Slate", "hat": "slate", "body": "apricot", "accent": "cap", "lines": ["A slate helmet, dented twice.", "Grey as the slate face it was dented on."] },
-        { "name": "Safety", "hat": "white", "body": "denim", "accent": "cap", "lines": ["A white helmet: a shift boss, almost.", "White helmet, blue overalls, clean for once."] },
-        { "name": "Amethyst", "hat": "amethyst", "body": "ash", "accent": "lemon", "lines": ["A helmet painted after the amethyst find.", "Purple helmet, lucky ever since."] },
-        { "name": "Pit Pony", "hat": "chestnut", "body": "peach", "accent": "cream", "lines": ["A pit-pony brown helmet.", "Brown helmet, tough as an old pony."] },
-        { "name": "Moss Gallery", "hat": "moss", "body": "sand", "accent": "cap", "lines": ["A moss-green helmet from the damp gallery.", "Moss grows on this helmet. It is fine."] },
-        { "name": "Tin", "hat": "steel", "body": "coral", "accent": "navy", "lines": ["A tin helmet that rings when knocked.", "Steel grey, sounds like a bell."] }
+      "id": "miner",
+      "home": "mines",
+      "wardrobe": [
+        "oat",
+        "linen",
+        "apricot",
+        "denim",
+        "ash",
+        "peach",
+        "sand",
+        "coral"
       ],
-      "surnames": ["Cobblepick", "Deepdelve", "Shaftsby", "Orewell", "Pickworth", "Seamstone", "Rubble", "Lanternby", "Tunneler", "Coalby", "Quarry", "Gritstone"],
+      "hats": [
+        "helmet"
+      ],
+      "beards": [
+        "bushy",
+        "full",
+        "long",
+        "chops",
+        "braids"
+      ],
+      "hair": [
+        "pebble",
+        "ash",
+        "snow",
+        "coal",
+        "ginger"
+      ],
+      "wear": [
+        [
+          "goggles"
+        ],
+        [
+          "soot"
+        ],
+        [
+          "neckerchief"
+        ]
+      ],
+      "patterns": [
+        "stripes",
+        "checks"
+      ],
+      "pieces": [
+        "satchel",
+        "medal",
+        "scarf"
+      ],
+      "palettes": [
+        {
+          "name": "Signal Red",
+          "hat": "cap",
+          "body": "oat",
+          "accent": "lemon",
+          "lines": [
+            "A red helmet, seen down any shaft.",
+            "Signal red, for the deep galleries."
+          ]
+        },
+        {
+          "name": "Copper Seam",
+          "hat": "copper",
+          "body": "linen",
+          "accent": "teal",
+          "lines": [
+            "A copper-coloured helmet from the copper seam.",
+            "The helmet went orange in the copper vein."
+          ]
+        },
+        {
+          "name": "Slate",
+          "hat": "slate",
+          "body": "apricot",
+          "accent": "cap",
+          "lines": [
+            "A slate helmet, dented twice.",
+            "Grey as the slate face it was dented on."
+          ]
+        },
+        {
+          "name": "Safety",
+          "hat": "white",
+          "body": "denim",
+          "accent": "cap",
+          "lines": [
+            "A white helmet: a shift boss, almost.",
+            "White helmet, clean for once."
+          ]
+        },
+        {
+          "name": "Amethyst",
+          "hat": "amethyst",
+          "body": "ash",
+          "accent": "lemon",
+          "lines": [
+            "A helmet painted after the amethyst find.",
+            "Purple helmet, lucky ever since."
+          ]
+        },
+        {
+          "name": "Pit Pony",
+          "hat": "chestnut",
+          "body": "peach",
+          "accent": "cream",
+          "lines": [
+            "A pit-pony brown helmet.",
+            "Brown helmet, tough as an old pony."
+          ]
+        },
+        {
+          "name": "Moss Gallery",
+          "hat": "moss",
+          "body": "sand",
+          "accent": "cap",
+          "lines": [
+            "A moss-green helmet from the damp gallery.",
+            "Moss grows on this helmet. It is fine."
+          ]
+        },
+        {
+          "name": "Tin",
+          "hat": "steel",
+          "body": "coral",
+          "accent": "navy",
+          "lines": [
+            "A tin helmet that rings when knocked.",
+            "Steel grey, sounds like a bell."
+          ]
+        }
+      ],
+      "surnames": [
+        "Cobblepick",
+        "Deepdelve",
+        "Shaftsby",
+        "Orewell",
+        "Pickworth",
+        "Seamstone",
+        "Rubble",
+        "Lanternby",
+        "Tunneler",
+        "Coalby",
+        "Quarry",
+        "Gritstone"
+      ],
       "lines": [
-        "Taps the green with a pick to check it is solid.", "Has never seen a hole he did not want to dig deeper.", "Calls the cup a shaft.",
-        "Putts by feel. Down there, there was no light.", "Knows a seam when he sees one; a line too.", "Says the rough is softer than granite.",
-        "Has been underground so long the sun is a rumour.", "Whistles to the canaries between holes.", "Measures putts in pick handles.",
-        "Swears the ball went down the wrong tunnel.", "Brings a sandwich in a tin, and a ball in another.", "Hears the ball drop from three holes away.",
-        "Never trusts a green without supports.", "Has a pick for every kind of rock and a putter for every green.", "Comes up for air and a round of golf.",
-        "Polishes every pebble found on the fairway.", "Calls a bunker an open-cast pit.", "Keeps the score in chalk on a rock."
+        "Taps the green with a pick to check it is solid.",
+        "Has never seen a hole he did not want to dig deeper.",
+        "Calls the cup a shaft.",
+        "Putts by feel. Down there, there was no light.",
+        "Knows a seam when he sees one; a line too.",
+        "Says the rough is softer than granite.",
+        "Has been underground so long the sun is a rumour.",
+        "Whistles to the canaries between holes.",
+        "Measures putts in pick handles.",
+        "Swears the ball went down the wrong tunnel.",
+        "Brings a sandwich in a tin, and a ball in another.",
+        "Hears the ball drop from three holes away.",
+        "Never trusts a green without supports.",
+        "Has a pick for every kind of rock and a putter for every green.",
+        "Comes up for air and a round of golf.",
+        "Polishes every pebble found on the fairway.",
+        "Calls a bunker an open-cast pit.",
+        "Keeps the score in chalk on a rock."
       ]
     },
     {
-      "id": "prospector", "home": "mines",
-      "hats": ["slouch"], "beards": ["long", "bushy", "chops", "goatee", "full"], "hair": ["snow", "pebble", "ash", "wheat", "chestnut"],
-      "wear": [["neckerchief"], ["soot"], ["glasses"]],
-      "patterns": ["checks", "patchwork"], "pieces": ["satchel", "plume", "scarf"],
-      "palettes": [
-        { "name": "Dust", "hat": "caramel", "body": "linen", "accent": "cap", "lines": ["A dusty hat, slapped clean once a year.", "The hat is the colour of the trail."] },
-        { "name": "Creek", "hat": "teal", "body": "sand", "accent": "honey", "lines": ["A creek-green hat, soaked at the brim.", "Teal hat from panning the creek."] },
-        { "name": "Claim", "hat": "brick", "body": "oat", "accent": "white", "lines": ["A brick-red hat to mark the claim.", "Red hat, staked out."] },
-        { "name": "Mule", "hat": "chestnut", "body": "sky", "accent": "lemon", "lines": ["A mule-brown hat, the mule's choice.", "Brown hat, blue shirt, stubborn mule."] },
-        { "name": "Nugget", "hat": "honey", "body": "mint", "accent": "chocolate", "lines": ["A nugget-gold hat. Not real gold. Yet.", "Gold-ish hat, hopes higher."] },
-        { "name": "Campfire", "hat": "rust", "body": "butter", "accent": "navy", "lines": ["A hat that smells of the campfire.", "Rust-red hat, smoked at the brim."] },
-        { "name": "Silver Strike", "hat": "silver", "body": "plum", "accent": "sun", "lines": ["A silver hat for the silver strike.", "Silver felt; the strike was copper."] },
-        { "name": "Canyon", "hat": "terracotta", "body": "ice", "accent": "teal", "lines": ["A canyon-orange hat, sun-faded.", "Terracotta hat, canyon-baked."] }
+      "id": "prospector",
+      "home": "mines",
+      "wardrobe": [
+        "linen",
+        "sand",
+        "oat",
+        "sky",
+        "mint",
+        "butter",
+        "plum",
+        "ice"
       ],
-      "surnames": ["Panwell", "Nuggetby", "Claimstake", "Goldrush", "Sluice", "Dustpan", "Muleskin", "Creekbed", "Gravelly", "Assay", "Lodestone", "Strikewell"],
+      "hats": [
+        "slouch"
+      ],
+      "beards": [
+        "long",
+        "bushy",
+        "chops",
+        "goatee",
+        "full"
+      ],
+      "hair": [
+        "snow",
+        "pebble",
+        "ash",
+        "wheat",
+        "chestnut"
+      ],
+      "wear": [
+        [
+          "neckerchief"
+        ],
+        [
+          "soot"
+        ],
+        [
+          "glasses"
+        ]
+      ],
+      "patterns": [
+        "checks",
+        "patchwork"
+      ],
+      "pieces": [
+        "satchel",
+        "plume",
+        "scarf"
+      ],
+      "palettes": [
+        {
+          "name": "Dust",
+          "hat": "caramel",
+          "body": "linen",
+          "accent": "cap",
+          "lines": [
+            "A dusty hat, slapped clean once a year.",
+            "The hat is the colour of the trail."
+          ]
+        },
+        {
+          "name": "Creek",
+          "hat": "teal",
+          "body": "sand",
+          "accent": "honey",
+          "lines": [
+            "A creek-green hat, soaked at the brim.",
+            "Teal hat from panning the creek."
+          ]
+        },
+        {
+          "name": "Claim",
+          "hat": "brick",
+          "body": "oat",
+          "accent": "white",
+          "lines": [
+            "A brick-red hat to mark the claim.",
+            "Red hat, staked out."
+          ]
+        },
+        {
+          "name": "Mule",
+          "hat": "chestnut",
+          "body": "sky",
+          "accent": "lemon",
+          "lines": [
+            "A mule-brown hat, the mule's choice.",
+            "Brown hat, stubborn mule."
+          ]
+        },
+        {
+          "name": "Nugget",
+          "hat": "honey",
+          "body": "mint",
+          "accent": "chocolate",
+          "lines": [
+            "A nugget-gold hat. Not real gold. Yet.",
+            "Gold-ish hat, hopes higher."
+          ]
+        },
+        {
+          "name": "Campfire",
+          "hat": "rust",
+          "body": "butter",
+          "accent": "navy",
+          "lines": [
+            "A hat that smells of the campfire.",
+            "Rust-red hat, smoked at the brim."
+          ]
+        },
+        {
+          "name": "Silver Strike",
+          "hat": "silver",
+          "body": "plum",
+          "accent": "sun",
+          "lines": [
+            "A silver hat for the silver strike.",
+            "Silver felt; the strike was copper."
+          ]
+        },
+        {
+          "name": "Canyon",
+          "hat": "terracotta",
+          "body": "ice",
+          "accent": "teal",
+          "lines": [
+            "A canyon-orange hat, sun-faded.",
+            "Terracotta hat, canyon-baked."
+          ]
+        }
+      ],
+      "surnames": [
+        "Panwell",
+        "Nuggetby",
+        "Claimstake",
+        "Goldrush",
+        "Sluice",
+        "Dustpan",
+        "Muleskin",
+        "Creekbed",
+        "Gravelly",
+        "Assay",
+        "Lodestone",
+        "Strikewell"
+      ],
       "lines": [
-        "Pans every water hazard for gold.", "Stakes a claim on the green.", "Has struck gold twice. It was brass.",
-        "Bites every ball to check it.", "Talks to the mule about the line.", "Says there's gold in them there bunkers.",
-        "Shakes the cup in case something is in it.", "Has a map to a lost hole. It is hole 7.", "Measures putts in shovel lengths.",
-        "Never leaves a green without a sample.", "Swears the mule can read a putt.", "Keeps a nugget in one pocket and a tee in the other.",
-        "Rolls the ball like a lucky stone.", "Has a hunch about the next hole.", "Weighs the scorecard as if it were dust.",
-        "Was rich for a day once. Bought a putter.", "Sleeps under the stars and putts under the sun.", "Knows the creek better than the course."
+        "Pans every water hazard for gold.",
+        "Stakes a claim on the green.",
+        "Has struck gold twice. It was brass.",
+        "Bites every ball to check it.",
+        "Talks to the mule about the line.",
+        "Says there's gold in them there bunkers.",
+        "Shakes the cup in case something is in it.",
+        "Has a map to a lost hole. It is hole 7.",
+        "Measures putts in shovel lengths.",
+        "Never leaves a green without a sample.",
+        "Swears the mule can read a putt.",
+        "Keeps a nugget in one pocket and a tee in the other.",
+        "Rolls the ball like a lucky stone.",
+        "Has a hunch about the next hole.",
+        "Weighs the scorecard as if it were dust.",
+        "Was rich for a day once. Bought a putter.",
+        "Sleeps under the stars and putts under the sun.",
+        "Knows the creek better than the course."
       ]
     },
     {
-      "id": "explorer", "home": "volcano",
-      "hats": ["pith"], "beards": ["moustache", "full", "goatee", "chops", "none"], "hair": ["snow", "ginger", "cocoa", "ash", "flaxen"],
-      "wear": [["goggles"], ["neckerchief"], ["glasses", "monocle"]],
-      "patterns": ["checks", "zigzag"], "pieces": ["satchel", "medal", "scarf"],
-      "palettes": [
-        { "name": "Khaki", "hat": "oat", "body": "sky", "accent": "cap", "lines": ["A khaki helmet, faded on the crater rim.", "Khaki on top, sky-blue shirt."] },
-        { "name": "Ash Cloud", "hat": "white", "body": "pebble", "accent": "lava", "lines": ["A white helmet, grey with ash by noon.", "White helmet, ash-grey coat."] },
-        { "name": "Basalt", "hat": "charcoal", "body": "apricot", "accent": "lemon", "lines": ["A basalt-black helmet, warm to the touch.", "Black helmet, sunny shirt."] },
-        { "name": "Jungle", "hat": "olive", "body": "cream", "accent": "coral", "lines": ["A jungle-green helmet from the volcano's foot.", "Olive helmet, cleared a path to the green."] },
-        { "name": "Sulphur", "hat": "lemon", "body": "lilac", "accent": "charcoal", "lines": ["A sulphur-yellow helmet. It smells, a bit.", "Yellow as the vents."] },
-        { "name": "Expedition", "hat": "terracotta", "body": "linen", "accent": "navy", "lines": ["An expedition helmet, mapped and stamped.", "Orange helmet, seen from base camp."] },
-        { "name": "Pumice", "hat": "ash", "body": "coral", "accent": "teal", "lines": ["A pumice-pale helmet, light as air.", "Pale helmet, coral shirt, floats."] },
-        { "name": "Fern Gully", "hat": "fern", "body": "peach", "accent": "white", "lines": ["A fern-green helmet from the gully.", "Green helmet, peach shirt, steamy day."] }
+      "id": "explorer",
+      "home": "volcano",
+      "wardrobe": [
+        "sky",
+        "pebble",
+        "apricot",
+        "cream",
+        "lilac",
+        "linen",
+        "coral",
+        "peach"
       ],
-      "surnames": ["Mapwell", "Compassby", "Trailblaze", "Junglewick", "Faraway", "Wanderly", "Boldfoot", "Ashcloud", "Ventworth", "Pumiceby", "Craterly", "Charwell"],
+      "hats": [
+        "pith"
+      ],
+      "beards": [
+        "moustache",
+        "full",
+        "goatee",
+        "chops",
+        "none"
+      ],
+      "hair": [
+        "snow",
+        "ginger",
+        "cocoa",
+        "ash",
+        "flaxen"
+      ],
+      "wear": [
+        [
+          "goggles"
+        ],
+        [
+          "neckerchief"
+        ],
+        [
+          "glasses",
+          "monocle"
+        ]
+      ],
+      "patterns": [
+        "checks",
+        "zigzag"
+      ],
+      "pieces": [
+        "satchel",
+        "medal",
+        "scarf"
+      ],
+      "palettes": [
+        {
+          "name": "Khaki",
+          "hat": "oat",
+          "body": "sky",
+          "accent": "cap",
+          "lines": [
+            "A khaki helmet, faded on the crater rim.",
+            "Khaki on top, curious underneath."
+          ]
+        },
+        {
+          "name": "Ash Cloud",
+          "hat": "white",
+          "body": "pebble",
+          "accent": "lava",
+          "lines": [
+            "A white helmet, grey with ash by noon.",
+            "White helmet, greyer every hole."
+          ]
+        },
+        {
+          "name": "Basalt",
+          "hat": "charcoal",
+          "body": "apricot",
+          "accent": "lemon",
+          "lines": [
+            "A basalt-black helmet, warm to the touch.",
+            "Black helmet, sunny disposition."
+          ]
+        },
+        {
+          "name": "Jungle",
+          "hat": "olive",
+          "body": "cream",
+          "accent": "coral",
+          "lines": [
+            "A jungle-green helmet from the volcano's foot.",
+            "Olive helmet, cleared a path to the green."
+          ]
+        },
+        {
+          "name": "Sulphur",
+          "hat": "lemon",
+          "body": "lilac",
+          "accent": "charcoal",
+          "lines": [
+            "A sulphur-yellow helmet. It smells, a bit.",
+            "Yellow as the vents."
+          ]
+        },
+        {
+          "name": "Expedition",
+          "hat": "terracotta",
+          "body": "linen",
+          "accent": "navy",
+          "lines": [
+            "An expedition helmet, mapped and stamped.",
+            "Orange helmet, seen from base camp."
+          ]
+        },
+        {
+          "name": "Pumice",
+          "hat": "ash",
+          "body": "coral",
+          "accent": "teal",
+          "lines": [
+            "A pumice-pale helmet, light as air.",
+            "Pale helmet. Floats."
+          ]
+        },
+        {
+          "name": "Fern Gully",
+          "hat": "fern",
+          "body": "peach",
+          "accent": "white",
+          "lines": [
+            "A fern-green helmet from the gully.",
+            "Green helmet, steamy day."
+          ]
+        }
+      ],
+      "surnames": [
+        "Mapwell",
+        "Compassby",
+        "Trailblaze",
+        "Junglewick",
+        "Faraway",
+        "Wanderly",
+        "Boldfoot",
+        "Ashcloud",
+        "Ventworth",
+        "Pumiceby",
+        "Craterly",
+        "Charwell"
+      ],
       "lines": [
-        "Has mapped every hole, and names them after himself.", "Plants a flag on every green. There is already one.", "Takes notes on the cup's depth.",
-        "Says the volcano is mostly asleep.", "Packs for a month to play nine holes.", "Measures the slope with a sextant.",
-        "Has been lost on the fairway twice. Found both times.", "Brings tea to the crater rim.", "Reads the green by the steam rising off it.",
-        "Swears there is an undiscovered hole beyond the 18th.", "Records every putt in a leather journal.", "Has a medal from a society nobody has heard of.",
-        "Calls a birdie a discovery.", "Wades through the rough with a machete. Metaphorically.", "Has seen the lava up close. Kept the eyebrows.",
-        "Insists on a guide for the bunkers.", "Toasts every par with warm lemonade.", "Is always one hill from the edge of the map."
+        "Has mapped every hole, and names them after himself.",
+        "Plants a flag on every green. There is already one.",
+        "Takes notes on the cup's depth.",
+        "Says the volcano is mostly asleep.",
+        "Packs for a month to play nine holes.",
+        "Measures the slope with a sextant.",
+        "Has been lost on the fairway twice. Found both times.",
+        "Brings tea to the crater rim.",
+        "Reads the green by the steam rising off it.",
+        "Swears there is an undiscovered hole beyond the 18th.",
+        "Records every putt in a leather journal.",
+        "Has a medal from a society nobody has heard of.",
+        "Calls a birdie a discovery.",
+        "Wades through the rough with a machete. Metaphorically.",
+        "Has seen the lava up close. Kept the eyebrows.",
+        "Insists on a guide for the bunkers.",
+        "Toasts every par with warm lemonade.",
+        "Is always one hill from the edge of the map."
       ]
     },
     {
-      "id": "smith", "home": "volcano",
-      "hats": ["skullcap"], "beards": ["bushy", "braids", "full", "chops", "goatee"], "hair": ["coal", "auburn", "ginger", "ash", "snow"],
-      "wear": [["goggles"], ["soot"], ["earring"]],
-      "patterns": ["stripes", "checks"], "pieces": ["medal", "satchel", "scarf"],
-      "palettes": [
-        { "name": "Leather", "hat": "chestnut", "body": "linen", "accent": "brass", "lines": ["A leather cap, scorched at the peak.", "Brown leather, singed and proud."] },
-        { "name": "Forge", "hat": "brick", "body": "sand", "accent": "slate", "lines": ["A forge-red cap.", "Red cap, red cheeks, red-hot iron."] },
-        { "name": "Anvil", "hat": "slate", "body": "apricot", "accent": "sun", "lines": ["An anvil-grey cap. It rings, too.", "Grey cap, heavy hands."] },
-        { "name": "Quench", "hat": "teal", "body": "oat", "accent": "copper", "lines": ["A quench-tub teal cap.", "Teal cap, steam in the beard."] },
-        { "name": "Ember", "hat": "rust", "body": "butter", "accent": "charcoal", "lines": ["An ember-orange cap, glowing a bit.", "Rust cap, still warm."] },
-        { "name": "Bellows", "hat": "olive", "body": "peach", "accent": "brick", "lines": ["An olive cap from the bellows corner.", "Olive cap, puffing cheeks."] },
-        { "name": "Charcoal", "hat": "charcoal", "body": "sky", "accent": "lava", "lines": ["A charcoal cap, soot on soot.", "Black cap, blue shirt, sparks everywhere."] },
-        { "name": "Bronze Age", "hat": "bronze", "body": "mint", "accent": "chocolate", "lines": ["A bronze cap, ancient style.", "Bronze-brown cap, very old trade."] }
+      "id": "smith",
+      "home": "volcano",
+      "wardrobe": [
+        "linen",
+        "sand",
+        "apricot",
+        "oat",
+        "butter",
+        "peach",
+        "sky",
+        "mint"
       ],
-      "surnames": ["Anvilby", "Bellowsby", "Forgewell", "Hammerly", "Sparksby", "Ironside", "Tongs", "Emberly", "Quench", "Rivet", "Cinder", "Hearth"],
+      "hats": [
+        "skullcap"
+      ],
+      "beards": [
+        "bushy",
+        "braids",
+        "full",
+        "chops",
+        "goatee"
+      ],
+      "hair": [
+        "coal",
+        "auburn",
+        "ginger",
+        "ash",
+        "snow"
+      ],
+      "wear": [
+        [
+          "goggles"
+        ],
+        [
+          "soot"
+        ],
+        [
+          "earring"
+        ]
+      ],
+      "patterns": [
+        "stripes",
+        "checks"
+      ],
+      "pieces": [
+        "medal",
+        "satchel",
+        "scarf"
+      ],
+      "palettes": [
+        {
+          "name": "Leather",
+          "hat": "chestnut",
+          "body": "linen",
+          "accent": "brass",
+          "lines": [
+            "A leather cap, scorched at the peak.",
+            "Brown leather, singed and proud."
+          ]
+        },
+        {
+          "name": "Forge",
+          "hat": "brick",
+          "body": "sand",
+          "accent": "slate",
+          "lines": [
+            "A forge-red cap.",
+            "Red cap, red cheeks, red-hot iron."
+          ]
+        },
+        {
+          "name": "Anvil",
+          "hat": "slate",
+          "body": "apricot",
+          "accent": "sun",
+          "lines": [
+            "An anvil-grey cap. It rings, too.",
+            "Grey cap, heavy hands."
+          ]
+        },
+        {
+          "name": "Quench",
+          "hat": "teal",
+          "body": "oat",
+          "accent": "copper",
+          "lines": [
+            "A quench-tub teal cap.",
+            "Teal cap, steam in the beard."
+          ]
+        },
+        {
+          "name": "Ember",
+          "hat": "rust",
+          "body": "butter",
+          "accent": "charcoal",
+          "lines": [
+            "An ember-orange cap, glowing a bit.",
+            "Rust cap, still warm."
+          ]
+        },
+        {
+          "name": "Bellows",
+          "hat": "olive",
+          "body": "peach",
+          "accent": "brick",
+          "lines": [
+            "An olive cap from the bellows corner.",
+            "Olive cap, puffing cheeks."
+          ]
+        },
+        {
+          "name": "Charcoal",
+          "hat": "charcoal",
+          "body": "sky",
+          "accent": "lava",
+          "lines": [
+            "A charcoal cap, soot on soot.",
+            "Black cap, sparks everywhere."
+          ]
+        },
+        {
+          "name": "Bronze Age",
+          "hat": "bronze",
+          "body": "mint",
+          "accent": "chocolate",
+          "lines": [
+            "A bronze cap, ancient style.",
+            "Bronze-brown cap, very old trade."
+          ]
+        }
+      ],
+      "surnames": [
+        "Anvilby",
+        "Bellowsby",
+        "Forgewell",
+        "Hammerly",
+        "Sparksby",
+        "Ironside",
+        "Tongs",
+        "Emberly",
+        "Quench",
+        "Rivet",
+        "Cinder",
+        "Hearth"
+      ],
       "lines": [
-        "Forges a new putter every morning.", "Hammers the ball straight when nobody watches.", "Says the green is just a cold anvil.",
-        "Quenches the putter after every birdie.", "Has burnt three gloves and no putts.", "Strikes while the iron is hot, and the green is fast.",
-        "Can tell a good ball by the sound.", "Measures putts in tong lengths.", "Shapes every putt like a horseshoe.",
-        "Has never met a metal it could not bend. Golf, maybe.", "Sweeps the sparks off the green.", "Keeps the forge lit between holes.",
-        "Rivets the flag back when it bends.", "Says a putt needs the right temper.", "Works the bellows, then the putter.",
-        "Rings the anvil when the ball drops.", "Brought a hammer to the first tee. Was asked to leave it.", "Sweats more on the green than at the forge."
+        "Forges a new putter every morning.",
+        "Hammers the ball straight when nobody watches.",
+        "Says the green is just a cold anvil.",
+        "Quenches the putter after every birdie.",
+        "Has burnt three gloves and no putts.",
+        "Strikes while the iron is hot, and the green is fast.",
+        "Can tell a good ball by the sound.",
+        "Measures putts in tong lengths.",
+        "Shapes every putt like a horseshoe.",
+        "Has never met a metal it could not bend. Golf, maybe.",
+        "Sweeps the sparks off the green.",
+        "Keeps the forge lit between holes.",
+        "Rivets the flag back when it bends.",
+        "Says a putt needs the right temper.",
+        "Works the bellows, then the putter.",
+        "Rings the anvil when the ball drops.",
+        "Brought a hammer to the first tee. Was asked to leave it.",
+        "Sweats more on the green than at the forge."
       ]
     },
     {
-      "id": "stormwatch", "home": "storm",
-      "hats": ["souwester"], "beards": ["full", "long", "bushy", "none", "moustache"], "hair": ["snow", "ash", "pebble", "flaxen", "ginger"],
-      "wear": [["cheeks", "freckles"], ["glasses"], ["neckerchief"]],
-      "patterns": ["stripes", "zigzag"], "pieces": ["scarf", "earmuffs", "satchel"],
-      "palettes": [
-        { "name": "Oilskin", "hat": "lemon", "body": "denim", "accent": "white", "lines": ["A yellow oilskin hat, stiff with rain.", "Yellow sou'wester, blue coat, bring it on."] },
-        { "name": "Gale", "hat": "slate", "body": "lemon", "accent": "cap", "lines": ["A gale-grey hat, tied on twice.", "Grey hat, yellow coat, holding fast."] },
-        { "name": "Drizzle", "hat": "sky", "body": "white", "accent": "navy", "lines": ["A drizzle-blue hat, damp all year.", "Blue hat, white coat, soft rain."] },
-        { "name": "Lighthouse", "hat": "cap", "body": "ice", "accent": "white", "lines": ["A lighthouse-red hat.", "Red hat in the fog, easy to find."] },
-        { "name": "Thunder", "hat": "plum", "body": "butter", "accent": "lemon", "lines": ["A thundercloud-plum hat.", "Plum hat, lightning-yellow coat."] },
-        { "name": "Sea Fret", "hat": "seafoam", "body": "linen", "accent": "teal", "lines": ["A sea-fret green hat, misty at the brim.", "Pale green hat for grey mornings."] },
-        { "name": "Squall", "hat": "navy", "body": "apricot", "accent": "lemon", "lines": ["A squall-navy hat, battened down.", "Navy hat, bright coat, dark sky."] },
-        { "name": "Rainbow", "hat": "coral", "body": "mint", "accent": "lemon", "lines": ["A coral hat for after the rain.", "Coral and mint, the rainbow's end."] }
+      "id": "stormwatch",
+      "home": "storm",
+      "wardrobe": [
+        "denim",
+        "lemon",
+        "white",
+        "ice",
+        "butter",
+        "linen",
+        "apricot",
+        "mint"
       ],
-      "surnames": ["Galeworth", "Cloudsby", "Rainwell", "Thunderby", "Drizzle", "Squall", "Mistwell", "Puddleby", "Windward", "Nimbus", "Hailstone", "Downpour"],
+      "hats": [
+        "souwester"
+      ],
+      "beards": [
+        "full",
+        "long",
+        "bushy",
+        "none",
+        "moustache"
+      ],
+      "hair": [
+        "snow",
+        "ash",
+        "pebble",
+        "flaxen",
+        "ginger"
+      ],
+      "wear": [
+        [
+          "cheeks",
+          "freckles"
+        ],
+        [
+          "glasses"
+        ],
+        [
+          "neckerchief"
+        ]
+      ],
+      "patterns": [
+        "stripes",
+        "zigzag"
+      ],
+      "pieces": [
+        "scarf",
+        "earmuffs",
+        "satchel"
+      ],
+      "palettes": [
+        {
+          "name": "Oilskin",
+          "hat": "lemon",
+          "body": "denim",
+          "accent": "white",
+          "lines": [
+            "A yellow oilskin hat, stiff with rain.",
+            "Yellow sou'wester: bring it on."
+          ]
+        },
+        {
+          "name": "Gale",
+          "hat": "slate",
+          "body": "lemon",
+          "accent": "cap",
+          "lines": [
+            "A gale-grey hat, tied on twice.",
+            "Grey hat, holding fast."
+          ]
+        },
+        {
+          "name": "Drizzle",
+          "hat": "sky",
+          "body": "white",
+          "accent": "navy",
+          "lines": [
+            "A drizzle-blue hat, damp all year.",
+            "Blue hat, soft rain."
+          ]
+        },
+        {
+          "name": "Lighthouse",
+          "hat": "cap",
+          "body": "ice",
+          "accent": "white",
+          "lines": [
+            "A lighthouse-red hat.",
+            "Red hat in the fog, easy to find."
+          ]
+        },
+        {
+          "name": "Thunder",
+          "hat": "plum",
+          "body": "butter",
+          "accent": "lemon",
+          "lines": [
+            "A thundercloud-plum hat.",
+            "Plum hat, lightning not far behind."
+          ]
+        },
+        {
+          "name": "Sea Fret",
+          "hat": "seafoam",
+          "body": "linen",
+          "accent": "teal",
+          "lines": [
+            "A sea-fret green hat, misty at the brim.",
+            "Pale green hat for grey mornings."
+          ]
+        },
+        {
+          "name": "Squall",
+          "hat": "navy",
+          "body": "apricot",
+          "accent": "lemon",
+          "lines": [
+            "A squall-navy hat, battened down.",
+            "Navy hat, dark sky."
+          ]
+        },
+        {
+          "name": "Rainbow",
+          "hat": "coral",
+          "body": "mint",
+          "accent": "lemon",
+          "lines": [
+            "A coral hat for after the rain.",
+            "Coral, the rainbow's best bit."
+          ]
+        }
+      ],
+      "surnames": [
+        "Galeworth",
+        "Cloudsby",
+        "Rainwell",
+        "Thunderby",
+        "Drizzle",
+        "Squall",
+        "Mistwell",
+        "Puddleby",
+        "Windward",
+        "Nimbus",
+        "Hailstone",
+        "Downpour"
+      ],
       "lines": [
-        "Taps the barometer before every putt.", "Plays only when it is raining.", "Says the wind is just the green breathing.",
-        "Counts the seconds between thunder and putt.", "Has a word for every kind of rain.", "Licks a finger, holds it up, misses anyway.",
-        "Reads the clouds better than the green.", "Putts between gusts.", "Has been struck by lightning. Hair still standing.",
-        "Calls a calm day suspicious.", "Ties the flag down before teeing off.", "Keeps a log of every storm and every bogey.",
-        "Says the puddles are part of the course.", "Splashes on purpose.", "Forecasts a birdie. Usually wrong.",
-        "Never carries an umbrella; it would blow away.", "Smells the storm before the first tee.", "Leans into the weather, and the putt."
+        "Taps the barometer before every putt.",
+        "Plays only when it is raining.",
+        "Says the wind is just the green breathing.",
+        "Counts the seconds between thunder and putt.",
+        "Has a word for every kind of rain.",
+        "Licks a finger, holds it up, misses anyway.",
+        "Reads the clouds better than the green.",
+        "Putts between gusts.",
+        "Has been struck by lightning. Hair still standing.",
+        "Calls a calm day suspicious.",
+        "Ties the flag down before teeing off.",
+        "Keeps a log of every storm and every bogey.",
+        "Says the puddles are part of the course.",
+        "Splashes on purpose.",
+        "Forecasts a birdie. Usually wrong.",
+        "Never carries an umbrella; it would blow away.",
+        "Smells the storm before the first tee.",
+        "Leans into the weather, and the putt."
       ]
     },
     {
-      "id": "apprentice", "home": "storm",
-      "hats": ["tall"], "beards": ["none", "goatee", "moustache"], "hair": ["flaxen", "ginger", "cocoa", "coal"],
-      "wear": [["moon"], ["freckles", "cheeks"], ["glasses"]],
-      "patterns": ["spots", "zigzag"], "pieces": ["scarf", "plume", "satchel"],
-      "palettes": [
-        { "name": "Twilight", "hat": "heather", "body": "butter", "accent": "lemon", "lines": ["A twilight hat, a size too big.", "Lilac hat, borrowed from the master."] },
-        { "name": "Midnight", "hat": "navy", "body": "ice", "accent": "sun", "lines": ["A midnight hat with the moon on it.", "Navy hat, studied by candlelight."] },
-        { "name": "Potion", "hat": "emerald", "body": "lilac", "accent": "lemon", "lines": ["A potion-green hat. It used to be blue.", "Green hat, after the experiment."] },
-        { "name": "Comet", "hat": "coral", "body": "sky", "accent": "white", "lines": ["A comet-pink hat, still smoking.", "Coral hat, singed at the tip."] },
-        { "name": "Spellbound", "hat": "berry", "body": "mint", "accent": "sun", "lines": ["A berry hat, enchanted. Slightly.", "Pink hat with a spell on it. Not a strong one."] },
-        { "name": "Starless", "hat": "slate", "body": "peach", "accent": "lemon", "lines": ["A plain grey hat: no stars yet.", "Grey hat; the stars come later."] },
-        { "name": "Moonstone", "hat": "denim", "body": "linen", "accent": "silver", "lines": ["A moonstone-blue hat.", "Blue hat, silver moon, homework due."] },
-        { "name": "Dragonfire", "hat": "brick", "body": "butter", "accent": "lemon", "lines": ["A dragonfire-red hat. Small dragon.", "Red hat, smells of toast."] }
+      "id": "apprentice",
+      "home": "storm",
+      "wardrobe": [
+        "butter",
+        "ice",
+        "lilac",
+        "sky",
+        "mint",
+        "peach",
+        "linen",
+        "cream"
       ],
-      "surnames": ["Spellwick", "Moonbeam", "Starling", "Hexley", "Potionby", "Glimmer", "Runeby", "Wandsworth", "Twinkle", "Charmwell", "Owlett", "Fizzle"],
+      "hats": [
+        "tall"
+      ],
+      "beards": [
+        "none",
+        "goatee",
+        "moustache"
+      ],
+      "hair": [
+        "flaxen",
+        "ginger",
+        "cocoa",
+        "coal"
+      ],
+      "wear": [
+        [
+          "moon"
+        ],
+        [
+          "freckles",
+          "cheeks"
+        ],
+        [
+          "glasses"
+        ]
+      ],
+      "patterns": [
+        "spots",
+        "zigzag"
+      ],
+      "pieces": [
+        "scarf",
+        "plume",
+        "satchel"
+      ],
+      "palettes": [
+        {
+          "name": "Twilight",
+          "hat": "heather",
+          "body": "butter",
+          "accent": "lemon",
+          "lines": [
+            "A twilight hat, a size too big.",
+            "Lilac hat, borrowed from the master."
+          ]
+        },
+        {
+          "name": "Midnight",
+          "hat": "navy",
+          "body": "ice",
+          "accent": "sun",
+          "lines": [
+            "A midnight hat with the moon on it.",
+            "Navy hat, studied by candlelight."
+          ]
+        },
+        {
+          "name": "Potion",
+          "hat": "emerald",
+          "body": "lilac",
+          "accent": "lemon",
+          "lines": [
+            "A potion-green hat. It used to be blue.",
+            "Green hat, after the experiment."
+          ]
+        },
+        {
+          "name": "Comet",
+          "hat": "coral",
+          "body": "sky",
+          "accent": "white",
+          "lines": [
+            "A comet-pink hat, still smoking.",
+            "Coral hat, singed at the tip."
+          ]
+        },
+        {
+          "name": "Spellbound",
+          "hat": "berry",
+          "body": "mint",
+          "accent": "sun",
+          "lines": [
+            "A berry hat, enchanted. Slightly.",
+            "Pink hat with a spell on it. Not a strong one."
+          ]
+        },
+        {
+          "name": "Starless",
+          "hat": "slate",
+          "body": "peach",
+          "accent": "lemon",
+          "lines": [
+            "A plain grey hat: no stars yet.",
+            "Grey hat; the stars come later."
+          ]
+        },
+        {
+          "name": "Moonstone",
+          "hat": "denim",
+          "body": "linen",
+          "accent": "silver",
+          "lines": [
+            "A moonstone-blue hat.",
+            "Blue hat, silver moon, homework due."
+          ]
+        },
+        {
+          "name": "Dragonfire",
+          "hat": "brick",
+          "body": "butter",
+          "accent": "lemon",
+          "lines": [
+            "A dragonfire-red hat. Small dragon.",
+            "Red hat, smells of toast."
+          ]
+        }
+      ],
+      "surnames": [
+        "Spellwick",
+        "Moonbeam",
+        "Starling",
+        "Hexley",
+        "Potionby",
+        "Glimmer",
+        "Runeby",
+        "Wandsworth",
+        "Twinkle",
+        "Charmwell",
+        "Owlett",
+        "Fizzle"
+      ],
       "lines": [
-        "Tried to magic the ball in. It went sideways.", "Has read half the book on putting spells.", "Mutters at the ball. The ball ignores it.",
-        "Turned the flag into a newt once. Turned it back.", "Says the cup moved. It did not.", "Practises levitation on the green. Not allowed.",
-        "Will have stars on the hat one day.", "Waves a twig at the ball before every stroke.", "Studies the green like a spellbook.",
-        "Knows three spells and none of them golf.", "Once made it rain on the wrong hole.", "Takes notes for the master on every putt.",
-        "Says the bunker is cursed. Has proof.", "Sweeps the green with a broom, for practice.", "Keeps a frog in the hat. Not on purpose.",
-        "Has a wand, a hat, and a three-putt.", "Thinks par is a spell.", "Is one good putt from a promotion."
+        "Tried to magic the ball in. It went sideways.",
+        "Has read half the book on putting spells.",
+        "Mutters at the ball. The ball ignores it.",
+        "Turned the flag into a newt once. Turned it back.",
+        "Says the cup moved. It did not.",
+        "Practises levitation on the green. Not allowed.",
+        "Will have stars on the hat one day.",
+        "Waves a twig at the ball before every stroke.",
+        "Studies the green like a spellbook.",
+        "Knows three spells and none of them golf.",
+        "Once made it rain on the wrong hole.",
+        "Takes notes for the master on every putt.",
+        "Says the bunker is cursed. Has proof.",
+        "Sweeps the green with a broom, for practice.",
+        "Keeps a frog in the hat. Not on purpose.",
+        "Has a wand, a hat, and a three-putt.",
+        "Thinks par is a spell.",
+        "Is one good putt from a promotion."
       ]
     }
   ]

@@ -11,14 +11,18 @@
 import fs from "node:fs";
 // the client's modules as the unit tests load them (".ts" tried, "@/" read)
 import "../web/test/setup.mjs";
+// (makeBall counts each candidate's triangles: its textures' canvases stood in for)
+import "../web/test/canvas.mjs";
 
 const { makeCatalogue } = await import("../web/lib/gnomes/generate.ts");
 const { validate } = await import("../web/lib/gnomes/validate.ts");
-const { lookOf } = await import("../web/lib/gnomes/skin.ts");
+const { lookOf, skinOf } = await import("../web/lib/gnomes/skin.ts");
 const { GNOMES } = await import("../web/lib/scene/gnome.ts");
+const { trianglesOf } = await import("../web/lib/scene/gnome-cost.ts");
 
 const DATA = new URL("../data/gnomes/", import.meta.url), OUT = new URL("../data/gnomes.json", import.meta.url);
-const catalogue = makeCatalogue((f) => JSON.parse(fs.readFileSync(new URL(f, DATA), "utf8")) as unknown);
+const catalogue = makeCatalogue((f) => JSON.parse(fs.readFileSync(new URL(f, DATA), "utf8")) as unknown,
+  (t) => trianglesOf(skinOf(t, { id: "", name: "", line: "" })));
 
 // one gnome a line: a change to one is a one-line diff
 const text = JSON.stringify({ ...catalogue, gnomes: [] }, null, 1).replace(/"gnomes": \[\]/, `"gnomes": [\n${catalogue.gnomes.map((e) => " " + JSON.stringify(e)).join(",\n")}\n]`) + "\n";

@@ -126,18 +126,17 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     brim.rotation.x = 0.22;
     return [d, brim];
   } },
-  // the Windmill King's: a little mill for a hat, a gold crown round its foot (its sails: gnome-legend.ts)
-  mill: { top: 0.72, build: (s, m) => {
-    const tower = at(inked(frustum(0.22, 0.37, 0.72), m), 0, 0.05, 0);
-    const cap = at(inked(new THREE.ConeGeometry(0.27, 0.3, 14), flat(s.accent ?? C.cap)), 0, 0.56, 0);
-    const door = at(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.16, 0.02), flat(C.woodDark)), 0, -0.04, 0.33);
-    door.rotation.x = -0.21;
-    const ring = at(inked(new THREE.CylinderGeometry(0.4, 0.4, 0.16, 18, 1, true), flat(C.sun, { side: THREE.DoubleSide })), 0, -0.2, 0);
-    const tips = Array.from({ length: 6 }, (_, k) => {
-      const a = (k / 6) * Math.PI * 2;
-      return at(inked(new THREE.ConeGeometry(0.06, 0.16, 6), flat(C.sun)), Math.cos(a) * 0.4, -0.04, Math.sin(a) * 0.4);
-    });
-    return [tower, cap, door, ring, ...tips];
+  // the Miller's: a soft miller's cap, a small mill standing on it, whitewashed, its roof
+  // in the accent (its sails: gnome-legend.ts "mill-sails", on the tower's front)
+  mill: { top: 0.6, build: (s, m) => {
+    const cap = at(inked(frustum(0.3, 0.4, 0.26), m), 0, -0.17, 0);
+    const puff = at(inked(new THREE.SphereGeometry(0.32, 16, 8), m), 0, -0.04, 0);
+    puff.scale.y = 0.32;
+    const wall = flat(0xfdf6e9);
+    const tower = at(inked(frustum(0.12, 0.19, 0.4), wall), 0, 0.22, 0);
+    const roof = at(inked(new THREE.ConeGeometry(0.16, 0.18, 12), flat(s.accent ?? C.cap)), 0, 0.51, 0);
+    const door = at(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.01), flat(C.woodDark)), 0, 0.08, 0.18);
+    return [cap, puff, tower, roof, door];
   } },
   // the Ancient Mushroom's: a wide cap, its gills under it (its glowing spots: gnome-legend.ts)
   mushroom: { top: 0.32, build: (_, m) => {
@@ -230,7 +229,7 @@ export function kitPiece(g: THREE.Group, hat: THREE.Group, skin: Skin) {
   const m = flat(skin.pieceColor ?? C.cap);
   switch (skin.piece) {
     case "scarf": {
-      const wrap = at(inked(new THREE.TorusGeometry(0.46, 0.1, 8, 24), m), 0, -0.2, 0);
+      const wrap = at(inked(new THREE.TorusGeometry(0.46, 0.1, 6, 18), m), 0, -0.2, 0);
       wrap.rotation.x = Q - 0.15;
       const tail = at(inked(new THREE.BoxGeometry(0.16, 0.42, 0.07), m), -0.38, -0.36, 0.3);
       tail.rotation.set(0.2, -0.6, 0.25);

@@ -1,4 +1,4 @@
-# ADR-008: A gnome's traits, encoded
+# ADR-009: A gnome's traits, encoded
 
 ## Status
 
@@ -19,7 +19,7 @@ an Epic's prop) and more than 16 small things worn.
 - **One byte a field, as lowercase hex, the format first** (format 1: 29
   bytes, 58 characters). A field is a code into an append-only table
   (`vocab.ts`, `props.ts`, mirrored in `data/gnomes.json`'s `vocab`), a
-  colour an index into an 84-colour palette (255: none), the things worn a
+  colour an index into an 82-colour palette (255: none), the things worn a
   32-bit mask. Tiers and earned kinds keep the spec's codes; the first 27
   colours are those `GNOMES` uses, so an earned gnome writes as drawn.
 - **Unknown is plain, never an error.** A code past its table, a colour past

@@ -107,7 +107,8 @@ function surface(kind: Material, base: number, detail: number): THREE.Material {
   if (m) return m;
   const marks = MARKS[kind], map = marks ? share(painted(key, (x, r) => marks(x, r, css(base), css(detail)))) : null;
   const polished = kind === "metal" || kind === "glaze" || kind === "porcelain" || kind === "crystal" || kind === "frost";
-  const opts: THREE.MeshToonMaterialParameters = { gradientMap: polished ? SHINE : kind === "stone" ? MATTE : undefined };
+  const opts: THREE.MeshToonMaterialParameters = {};
+  if (polished || kind === "stone") opts.gradientMap = polished ? SHINE : MATTE; // (else flat()'s own bands)
   if (map) opts.map = map;
   if (kind === "lava") Object.assign(opts, { emissive: detail, emissiveMap: map, emissiveIntensity: 0.8 });
   if (kind === "metal") opts.emissive = new THREE.Color(base).multiplyScalar(0.08);

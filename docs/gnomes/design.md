@@ -19,11 +19,16 @@ What is where:
 | the plan, tier looks, trait list, filters: what the screens call | `web/lib/gnomes/catalogue.ts` |
 | the generator and the rules | `web/lib/gnomes/generate.ts`, `validate.ts` |
 | the meshes: hats and wear, props, materials, Legendary pieces, trails and holings, the showcase | `web/lib/scene/gnome*.ts` |
+| what a gnome costs to draw | `web/lib/scene/gnome-cost.ts` |
 | make and check the catalogue | `npm run gnomes [-- --check]` (`scripts/gnomes.ts`; `scripts/check.sh` runs `--check`) |
+| **the realm's rows**, one file a series, what `AddSeries` is sent | `npm run gnomes:rows [-- --check]` (`scripts/gnomerows.ts`, `web/lib/gnomes/rows.ts`) → `data/gnomes/rows/<series>.txt` |
+| **the golden looks**: what every gnome is drawn as, for good | `npm run gnomes:looks [-- --write]` (`scripts/gnomelooks.ts`, `web/test/looks.ts`) → `data/gnomes/looks.golden.json` |
+| how far apart the gnomes are | `npm run gnomes:stats` (`scripts/gnomestats.ts`) |
 | thumbnails and turntables | `npm run gnomes:thumbs` (`media/gnomes/render.mjs`) → `media/gnomes/thumbs/<id>.webp`, `media/gnomes/turntables/<id>.webp` |
 
-Decisions: ADR-007 (the catalogue as data, in series and waves), ADR-008 (the
-trait encoding), ADR-009 (the look: style, materials, props as data, budgets).
+Decisions: ADR-008 (the catalogue as data, in series and waves), ADR-009 (the
+trait encoding), ADR-010 (the look: style, materials, props as data, budgets,
+permanence). ADR-007 is the realm's (`r/gnogolf/gnomes`).
 
 ## 1. The style
 
@@ -73,7 +78,7 @@ own gnome with more of a story, never a different art.
 
 ### The signature palette
 
-84 named colours (`COLOURS` in `vocab.ts`). The first 27 are every colour
+82 named colours (`COLOURS` in `vocab.ts`). The first 27 are every colour
 `GNOMES` draws with today, so an earned gnome encodes as it is drawn. The
 rest are the collection's: garden greens and earths, sea blues, bakery
 pastels, metals (brass, copper, bronze, silver, steel, pewter), the
@@ -132,6 +137,38 @@ one of them.
 | storm | stormwatch | sou'wester, long back brim | full, long, bushy, none, moustache | cheeks or freckles; glasses; neckerchief | stripes, zigzag / scarf, earmuffs, satchel |
 | storm | apprentice | tall cone (never the stars: the Wizard's) | none, goatee, moustache | moon; freckles or cheeks; glasses | spots, zigzag / scarf, plume, satchel |
 
+### Palettes and wardrobes
+
+Each archetype has eight named palettes and a **wardrobe**. A palette is
+known by its **key colour**: its hat's (a baker's palette by its coat, the
+toque being white or pastel whatever the coat). It is worn with its own
+other colour, or with any of the wardrobe's: the coats (or, for bakers, the
+toques) that suit that archetype, eight to eleven of them, all light enough
+for ink eyes. A wardrobe pairing must be plainly apart from the key (ΔE 0.12
+at least: no near-hue clash), and pass every readability rule. A palette's
+lines speak of its key colour only, so they read true on any of its coats.
+
+| archetype | wardrobe |
+|---|---|
+| gardener | linen, cream, sage, mint, oat, blush, butter, sky |
+| fisher | oat, linen, petal, apricot, cream, mint, ice, lilac |
+| sailor | white, sky, ice, linen, cream, seafoam, peach, coral |
+| deckhand | cream, oat, seafoam, sand, linen, lilac, sky, peach |
+| baker (toques) | white, cream, butter, blush, linen, mint, sky, lilac, peach, lemon, petal |
+| painter | linen, butter, lilac, white, petal, ice, flaxen, peach |
+| skier | white, ice, oat, linen, petal, sky, lilac, cream |
+| alpinist | linen, white, mint, cream, peach, butter, sky, ice |
+| miner | oat, linen, apricot, denim, ash, peach, sand, coral |
+| prospector | linen, sand, oat, sky, mint, butter, plum, ice |
+| explorer | sky, pebble, apricot, cream, lilac, linen, coral, peach |
+| smith | linen, sand, apricot, oat, butter, peach, sky, mint |
+| stormwatch | denim, lemon, white, ice, butter, linen, apricot, mint |
+| apprentice | butter, ice, lilac, sky, mint, peach, linen, cream |
+
+Why: no two gnomes may share their silhouette and main colours (section 4),
+so an archetype with one hat needs a different hat-and-coat for each of its
+36 Commons; eight palettes alone gave eight.
+
 The palettes, names and lines of each are in `archetypes.json`. Names are a
 given name (140, shared) and the archetype's surname (twelve each: "Thimble
 Seedwell", "Lark Orewell"). Lines are two short sentences: the palette's (or
@@ -174,8 +211,8 @@ What a gnome may cost, ink hulls included, once baked (`BUDGET` in
 
 | tier | triangles | draws | heaviest now |
 |---|---|---|---|
-| Common | 6,000 | 7 | 5,924 (#31) |
-| Rare | 6,000 | 8 | 5,892 (#184) |
+| Common | 6,000 | 7 | 5,792 (#133) |
+| Rare | 6,000 | 8 | 5,924 (#81) |
 | Epic | 6,500 | 9 | 6,140 (#507) |
 | Legendary | 8,000 | 12 | 6,592 (#720) |
 
@@ -201,17 +238,27 @@ flour (the Baker), or the tricorn with a patch (the Pirate); and every gnome
 is at least 4 apart from each of `GNOMES` (below), so none is one of the
 fourteen in other clothes.
 
-**No two alike.** The distance between two looks counts what the eye takes
-in first: the hat's shape 3, the hat's colour 2, the body's colour 2, the
-pattern 2, the beard 2 (its colour 1), each thing worn 1, a piece 2, a
-material 3, a prop 3, the trail 1. Every two gnomes of the collection are at
-least 3 apart.
+**No two alike, no twins at ball size** (`visualDiff`, `apart` in
+`validate.ts`). Two looks are compared field by field: the hat's shape, the
+hat's colour, the body's colour, its pattern, the beard, the beard's colour,
+each thing worn, a piece, a material, a prop, the trail. Every two gnomes of
+the collection **differ in at least 3 fields, and at least one of them is a
+main field**: the hat's shape or colour, the body's colour or pattern, or
+what remakes the whole gnome, a material or a prop. A beard or a small thing
+counts toward the three, never alone: two gnomes in the same hat and coat
+that differ only by a beard and a neckerchief are twins at ball size, and
+refused. From each of `GNOMES`, 4 fields with a main one.
+
+The fewest fields each gnome differs in from its nearest, Genesis
+(`npm run gnomes:stats`): before this rule, 435 gnomes at 2, 147 at 3, 71 at
+4, 55 at 5, 12 at 6, and 1,195 pairs it refuses; now 534 at 3, 88 at 4, 80
+at 5, 18 at 6, and none.
 
 ### The Legendaries
 
 | id | name | home | kind | piece | material | hat | trail | holing |
 |---|---|---|---|---|---|---|---|---|
-| 104 | Windmill King | garden | 4 | `mill-sails` | toon | linen mill | rose petals | rose gale |
+| 104 | The Miller | garden | 4 | `mill-sails` | toon | oat miller's cap and mill | rose petals | rose gale |
 | 208 | The Admiral | island | 5 | `epaulettes` | toon | gold tricorn | white foam | sky splash |
 | 311 | Ancient Mushroom | town | 6 | `fairy-ring` | toon | berry mushroom | butter spores | butter spores |
 | 414 | Summit Gnome | mountain | 7 | `frost-cap` | frost (white) | glacier cone | white snow | white avalanche |
@@ -219,7 +266,7 @@ least 3 apart.
 | 618 | Lava Gnome | volcano | 2 | `lava-vent` | lava (lava) | obsidian cone | amber embers | lava embers |
 | 720 | Storm Gnome | storm | 3 | `thundercloud` | toon | storm sou'wester | glacier streaks | lemon bolt |
 
-- **Windmill King** (#104). The garden's mill made king: his hat is the mill, a gold crown round its foot, its four sails turning. *The mill by hole 4 crowned him. The wind does what he says, mostly.* Garden 4's mill turned for a hundred summers before a gnome climbed in. He came out with the sails on his head and a crown he did not ask for. The wind has followed him round the course ever since: it blows petals after him, and on the green it holds its breath.
+- **The Miller** (#104). The garden's miller: a floury miller's cap and a blue smock, a small mill standing on the cap, whitewashed, red-roofed, its four sails turning. No crown: crowns are the earned Gnome King's. *Took the mill by hole 4 with him, the small one. The sails turn whatever the wind thinks.* Garden 4's mill turned for a hundred summers, and its miller never left it. So when he took up golf, he took a mill along: a small one, on his cap, that grinds a little flour on every fairway. The wind follows him round the course: it blows petals after him, and on the green it holds its breath.
 - **The Admiral** (#208). The Island Cup's admiral: a golden tricorn, gold epaulettes, a navy coat, a pennant flying. *Commands the island's fleet: one boat and a rubber duck.* Nobody gave him the rank. He found the hat on the beach and the coat in a sea chest, and the island agreed it suited him. He rolls in leaving a wake of foam, and every cup he sinks sends up a splash, as a ship's should.
 - **Ancient Mushroom** (#311). Mushroom Town's oldest resident: a great cap for a hat, its spots glowing and breathing, small mushrooms grown on it, spores in the air. *Was here before the town. The town grew round him.* Mushroom Town's houses are his cousins, and he is older than all of them. His cap glows when he is thinking, which is slowly. Where he rolls, spores drift; where he holes, a ring of new mushrooms will be up by morning.
 - **Summit Gnome** (#414). The Mountain Cup's summit made gnome: frost over all of him, a cap of snow on his hat, icicles from its brim. *Came down from the top for one round. Has not warmed up since.* He lives where the course's last green is, above the snow line, and comes down only to play. Frost grows on him as he rolls; behind him it snows a little; and the cup that takes him gets a small avalanche over its rim.
@@ -331,12 +378,16 @@ seed make the same gnomes, id for id.
    them.
 2. For each wave (a home) and tier, the count is split evenly over the
    home's two archetypes.
-3. For each archetype, every combination of its palettes, hats, beards,
-   hair and things worn (two at most; for a Rare one, plus its pattern
-   and/or piece) is shuffled by the seed, one queue per palette. The
+3. For each archetype, every combination of its palettes' colourings (the
+   palette's own, then its key colour with each wardrobe colour), hats,
+   beards, hair and things worn (two at most; for a Rare one, plus its
+   pattern and/or piece) is shuffled by the seed, one queue per palette. The
    palettes take turns; each takes the next of its queue that **fits**: its
-   tier's rules, readable (section 3), no earned signature, at least 3 from
-   every gnome already made and 4 from each of `GNOMES`.
+   tier's rules, readable (section 3), no earned signature, apart from every
+   gnome already made (3 fields, one main) and from each of `GNOMES` (4),
+   and **within its tier's triangle budget**, counted on the real
+   `makeBall` (`scene/gnome-cost.ts`, given to the generator by
+   `scripts/gnomes.ts`: the generator itself draws nothing).
 4. A wave's gnomes are shuffled so a gallery shows its archetypes mixed;
    then named and given lines, never the same twice.
 
@@ -401,11 +452,10 @@ a hat, a piece, a material, an effect or a colour: its mesh in `scene/`,
 then its name as the last entry of its table (its binding). Nothing else
 changes; screens that list traits read the tables.
 
-**Differences from the realm spec's draft** (`docs/superpowers/specs/2026-10-06-nft-gnomes-design.md`,
-section 10, 18 bytes, written before these decisions): series, home,
-archetype, accent and prop are added; accessories are 32 bits; the palette
-has 84 colours; tiers and earned kinds keep the spec's codes. Supply is 720
-(504 / 144 / 65 / 7), not 777, and ids run by wave (below), not by tier.
+**The realm spec** (`docs/superpowers/specs/2026-10-06-nft-gnomes-design.md`,
+"Built so far vs this spec") takes format 1 as written here: 29 bytes, the
+tiers and earned kinds with its codes, the Legendaries' kinds in design order
+(Crystal 1 … Summit 7).
 
 ## 7. Series, waves and drops
 
@@ -415,7 +465,7 @@ has 84 colours; tiers and earned kinds keep the spec's codes. Supply is 720
 { "id": "genesis", "code": 1, "name": "Genesis", "first": 1,
   "supply": { "common": 504, "rare": 144, "epic": 65, "legendary": 7 },
   "waves": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
-  "seed": "gnogolf/genesis/1",
+  "seed": "gnogolf/genesis/1", "released": false,
   "sale": { "prices": { "common": 30, "rare": 99, "epic": 333 },
             "auction": { "reserve": 777, "hours": 48, "extendMinutes": 10, "minIncrementPercent": 5, "minIncrementGnot": 5, "endsUtc": "18:00" },
             "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1 },
@@ -437,6 +487,11 @@ has 84 colours; tiers and earned kinds keep the spec's codes. Supply is 720
   | 6 | volcano | 517–618 | 72 common from 517, 20 rare from 589, 9 epic from 609, 1 legendary from 618 |
   | 7 | storm | 619–720 | 72 common from 619, 20 rare from 691, 9 epic from 711, 1 legendary from 720 |
 
+- **Earned tokens are numbered apart**, from `earned.first` (1,000,001) up,
+  as the realm spec says: far above any series a realm will ever hold, so a
+  later series' ids never meet them.
+- **`released`** is set when a series' rows go to the realm (its sale
+  opens): from then its looks are final (section 10).
 - **`sale` is the realm's starting settings**, from the research brief
   (`docs/superpowers/research/2026-10-06-nft-best-practices.md`) and the
   user's decision: prices in GNOT, the Legendary auction, the player window
@@ -447,10 +502,31 @@ has 84 colours; tiers and earned kinds keep the spec's codes. Supply is 720
 - **A new drop is data, not code.** Add a series to `series.json` (its
   `code`, `first` id after the last series', its supply and waves), a
   folder `data/gnomes/<id>/` with its `archetypes.json`, `epics.json` and
-  `legendaries.json`, run `npm run gnomes`, then `npm run gnomes:thumbs`.
+  `legendaries.json`, run `npm run gnomes`, `npm run gnomes:rows`,
+  `npm run gnomes:looks -- --write`, then `npm run gnomes:thumbs`.
   New archetypes, homes or traits are appended to `vocab.ts` (and their
   meshes added) first. The generator, the rules, the encoding and the
   screens need no change.
+
+### The realm's rows
+
+`npm run gnomes:rows` writes `data/gnomes/rows/<series>.txt`: what the
+owner sends as `AddSeries(name, rows)`. One gnome a line, in id order,
+lines joined by a newline and none after the last:
+
+```
+1|common|Juniper Troutbridge|0101010001020716ff01083000ff000200010700ff00ff00ff00ff00ff
+```
+
+`id|tier|name|traits`: the tier as the realm names it (`common`, `rare`,
+`epic`, `legendary`), the name as in the catalogue, the traits (section 6).
+Before writing, `checkRows` (`web/lib/gnomes/rows.ts`) holds every row to
+what the realm accepts and to what it does not check on chain: ids
+following on from the series' first with no gap; a name of 1 to 48 bytes and
+traits of 1 to 256, no control character and no `|`; traits that decode;
+**the row's tier equal to the tier byte of its traits**. `--check` (in
+`scripts/check.sh`) fails if a file is not what the catalogue makes, and a
+test decodes every row back to the catalogue's traits, id for id.
 
 ## 8. For the screens
 
@@ -484,9 +560,46 @@ turntable) already plays a Legendary's motion with its act.
   lines (unique, 12 to 100 characters), traits read back the same, each
   tier's rules, readability, earned signatures, the Epics' holings and
   every prop unique, no two alike, none like `GNOMES`.
+- `npm run gnomes:rows -- --check` and `npm run gnomes:looks` (both in
+  `scripts/check.sh`): the realm's rows as the catalogue makes them, each
+  row's tier its traits'; every gnome drawn as the golden looks hold.
 - `npm test`: `gnomes.test.ts` (the tables append only, the encoding and its
-  fallbacks, `skinOf`, the plan, the filters, each rule caught) and
-  `gnome.test.ts` (`GNOMES`' fourteen drawn exactly as before, by a
-  fingerprint of every vertex and material; every gnome of the collection
-  built, within budget, height and reach; faded as a ghost; every trail and
-  holing kind run to its end).
+  fallbacks, `skinOf`, the plan, the filters, each rule caught, the rows
+  decoding to the catalogue's traits id for id), `gnome.test.ts` (`GNOMES`'
+  fourteen drawn exactly as before, by a fingerprint of every vertex and
+  material; every gnome of the collection built, within budget, height and
+  reach; faded as a ghost; every trail and holing kind run to its end) and
+  `looks.test.ts` (section 10).
+
+## 10. Permanence: a gnome is drawn the same for good
+
+A token's traits are on chain for good; what they draw must be too. That is
+held by tests, not by care.
+
+- **The golden looks.** `data/gnomes/looks.golden.json` holds, for each of
+  the 720 ids and the nine earned kinds, a record of what `makeBall` builds
+  from `skinOfTraits(traits)` (`web/test/looks.ts`): how many meshes and
+  vertices, the body's box (to the thousandth), every material (its kind,
+  colour, emissive, side, opacity, and a hash of what its texture's canvas
+  was told to draw: the test's canvas writes every call down), the trail's
+  and holing's kinds with their meshes, the Legendary's piece and whether
+  he moves, and a hash of every vertex, index, placement, instance and
+  texture. `web/test/looks.test.ts` (in `npm test`) and `npm run
+  gnomes:looks` (in `scripts/check.sh`) fail, naming the gnome, if any one
+  draws differently.
+- **A released look never changes in place.** `npm run gnomes:looks --
+  --write` takes the records again for a series not yet `released` (the
+  design is still under review), but refuses to change one of a released
+  series or of an earned kind. To give a released gnome a new look is to
+  add a **new trait format** (section 6): the codec reads format 1 as it
+  always has, so a token written in format 1 keeps drawing the old way, and
+  only a token written in the new format draws the new one. A shared mesh,
+  material or texture that a change would alter for released gnomes must
+  be left as it is and the change made under the new format's own name.
+- **What the realm receives is what the catalogue holds**: the rows test
+  (section 7) decodes every row back to the catalogue's traits, id for id.
+- **Before release**, every change of look (a review verdict, a fix) is
+  regenerated deterministically from `data/gnomes/` (the same seed and
+  data, the same gnomes; ids and tiers fixed by the plan), checked by
+  `npm run gnomes:stats` and the rules, and its records rewritten with
+  `--write`; the thumbnails of the changed ids are drawn again.

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "earned": { "first": 1001 },
+  "earned": { "first": 1000001 },
   "series": [
     {
       "id": "genesis",
@@ -10,6 +10,7 @@
       "supply": { "common": 504, "rare": 144, "epic": 65, "legendary": 7 },
       "waves": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
       "seed": "gnogolf/genesis/1",
+      "released": false,
       "sale": {
         "note": "The realm's starting settings: its owner changes them between waves, never during one, and never lowers a price. GNOT.",
         "prices": { "common": 30, "rare": 99, "epic": 333 },

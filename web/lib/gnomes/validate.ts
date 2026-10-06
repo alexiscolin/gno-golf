@@ -41,26 +41,37 @@ export const TIER_FX: Readonly<Record<Tier, { trails: readonly string[]; holings
   legendary: { trails: ["shards", "embers", "streaks", "petals", "foam", "spores", "snow"], holings: ["shards", "embers", "bolt", "gale", "splash", "spores", "avalanche"] },
 };
 
-/** How different two looks are, in what the eye takes in first: the hat's
- *  shape, then colours, the beard, the things he wears. */
-export function lookDistance(a: Traits, b: Traits) {
-  let d = 0;
-  if (a.hat !== b.hat) d += 3;
-  if (a.hatColour !== b.hatColour) d += 2;
-  if (a.body !== b.body) d += 2;
-  if (a.pattern !== b.pattern || (a.pattern !== "plain" && a.patternColour !== b.patternColour)) d += 2;
-  if (a.beard !== b.beard) d += 2;
-  else if (a.beard !== "none" && a.hair !== b.hair) d += 1;
-  const sa = new Set(a.accessories);
-  d += a.accessories.filter((x) => !b.accessories.includes(x)).length + b.accessories.filter((x) => !sa.has(x)).length;
-  if (a.piece !== b.piece) d += 2;
-  if (a.material !== b.material) d += 3;
-  if (a.prop !== b.prop) d += 3;
-  if (a.trail !== b.trail || a.trailColour !== b.trailColour) d += 1;
+/** The visual fields two looks differ in: the hat's shape and colour, the
+ *  body's colour and pattern, the beard and its colour, each thing worn, a
+ *  piece, a material, a prop, the trail. (An accent colour alone is too
+ *  small to tell two gnomes apart: not counted.) */
+export function visualDiff(a: Traits, b: Traits): string[] {
+  const d: string[] = [];
+  if (a.hat !== b.hat) d.push("hat");
+  if (a.hatColour !== b.hatColour) d.push("hat colour");
+  if (a.body !== b.body) d.push("body");
+  if (a.pattern !== b.pattern || (a.pattern !== "plain" && a.patternColour !== b.patternColour)) d.push("pattern");
+  if (a.beard !== b.beard) d.push("beard");
+  else if (a.beard !== "none" && a.hair !== b.hair) d.push("hair");
+  for (const x of new Set([...a.accessories, ...b.accessories])) if (a.accessories.includes(x) !== b.accessories.includes(x)) d.push(x);
+  if (a.piece !== b.piece) d.push("piece");
+  if (a.material !== b.material) d.push("material");
+  if (a.prop !== b.prop) d.push("prop");
+  if (a.trail !== b.trail || a.trailColour !== b.trailColour) d.push("trail");
   return d;
 }
-/** The least distance between two gnomes of the collection, and from any of GNOMES. */
+/** The fields that read at ball size on their own: the silhouette and the
+ *  main colours (a hat, its colour, the body's colour or pattern), and what
+ *  remakes the whole gnome (a material, a prop). A beard or a small thing
+ *  counts toward the number, never alone. */
+export const MAIN: ReadonlySet<string> = new Set(["hat", "hat colour", "body", "pattern", "material", "prop"]);
+/** How many fields two gnomes of the collection differ in at least, and from any of GNOMES. */
 export const MIN_APART = 3, MIN_FROM_GNOMES = 4;
+/** Whether two looks read as two gnomes: at least min fields apart, one of them a main one. */
+export function apart(a: Traits, b: Traits, min = MIN_APART) {
+  const d = visualDiff(a, b);
+  return d.length >= min && d.some((f) => MAIN.has(f));
+}
 
 /** A look the earned gnomes own: their pieces (the Diver's mask, the Mayor's
  *  sash among them), and the pairs of common things that are theirs. */
@@ -128,6 +139,7 @@ export function validate(c: Catalogue, gnomes: readonly Traits[]): Report {
     if (p.tier !== e.tier || p.home !== e.home || p.wave !== e.wave || p.series !== e.series) err(e.id, `planned ${p.series} wave ${p.wave} ${p.home} ${p.tier}, is ${e.series} wave ${e.wave} ${e.home} ${e.tier}`);
     for (const [k, v] of [["tier", e.tier], ["home", e.home], ["archetype", e.archetype]] as const) counts[k][v] = (counts[k][v] ?? 0) + 1;
     if (!/^[A-Za-z' -]{3,24}$/.test(e.name)) err(e.id, `name "${e.name}"`);
+    if (/\b(king|queen|crown)/i.test(e.name)) err(e.id, `name "${e.name}": crowns are the Gnome King's, earned`);
     if (names.has(e.name)) err(e.id, `name "${e.name}" twice`);
     if (lines.has(e.line) || e.line.length > 100 || e.line.length < 12) err(e.id, `line "${e.line}"`);
     names.add(e.name), lines.add(e.line);
@@ -152,8 +164,8 @@ export function validate(c: Catalogue, gnomes: readonly Traits[]): Report {
   // no two alike, none a copy of GNOMES'
   for (let i = 0; i < looks.length; i++) {
     for (let j = i + 1; j < looks.length; j++)
-      if (lookDistance(looks[i].t, looks[j].t) < MIN_APART) err(looks[i].id, `looks like #${looks[j].id}`);
-    for (const g of gnomes) if (lookDistance(looks[i].t, g) < MIN_FROM_GNOMES) err(looks[i].id, "looks like one of GNOMES");
+      if (!apart(looks[i].t, looks[j].t)) err(looks[i].id, `looks like #${looks[j].id} (${visualDiff(looks[i].t, looks[j].t).join(", ") || "the same"})`);
+    for (const g of gnomes) if (!apart(looks[i].t, g, MIN_FROM_GNOMES)) err(looks[i].id, "looks like one of GNOMES");
   }
   return { errors, counts };
 }

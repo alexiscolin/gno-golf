@@ -1,4 +1,4 @@
-# ADR-009: How a collectible gnome looks, and what he costs
+# ADR-010: How a collectible gnome looks, and what he costs
 
 ## Status
 
@@ -42,6 +42,15 @@ change by a vertex.
   Pirate, is 5,772), 6,500 for an Epic, 8,000 for a Legendary; 7 to 12 draws.
   The spec's 5,000 for a Common would have been under what the game already
   ships; instead a Common wears at most two small things.
+- **The generator keeps every gnome within budget**: it is given the real
+  triangle count of each candidate (`scene/gnome-cost.ts`) and skips one
+  over its tier's, as it skips one that breaks any other rule.
+- **A released look is final, by test** (added 2026-10-06): a golden record
+  of what `makeBall` builds from each token's traits (720 and the nine
+  earned kinds, `data/gnomes/looks.golden.json`) fails the tests if any
+  gnome draws differently. The writer refuses to change a released series'
+  record; a new look for a released gnome is a new trait format, format 1
+  keeping its drawing.
 - **Thumbnails are the game's own render**: the real `makeBall` in headless
   Chrome, one camera, one light, the tier's ground and plinth, 256 px WebP
   under 10 KB; the Legendaries also as turntables (an animated WebP muxed

@@ -1,10 +1,10 @@
-# ADR-007: The gnome catalogue as data, in series and waves
+# ADR-008: The gnome catalogue as data, in series and waves
 
 ## Status
 
 Accepted, 2026-10-06. Built: `data/gnomes/`, `data/gnomes.json`,
 `web/lib/gnomes/`, `scripts/gnomes.ts`. The realm that sells them
-(`r/gnogolf/gnomes`, the spec's ADR-006) reads the catalogue and is not part
+(`r/gnogolf/gnomes`, ADR-007) reads the catalogue and is not part
 of this. The rules themselves: `docs/gnomes/design.md`.
 
 ## Context
@@ -40,7 +40,7 @@ designing as a system.
 - **The catalogue is made, never edited.** `scripts/gnomes.ts` (`npm run
   gnomes`) writes `data/gnomes.json`: every series with its plan, every
   token's id, series, wave, tier, home, archetype, name, line, traits
-  (ADR-008) and skin, the code tables, and the nine earned gnomes' traits.
+  (ADR-009) and skin, the code tables, and the nine earned gnomes' traits.
   The generator is deterministic from the seed; `--check` (in
   `scripts/check.sh`) fails if the file is not what the data makes.
 - **The Commons and Rares are a system**: each an archetype (a look that
@@ -53,6 +53,16 @@ designing as a system.
   and lines, each tier's traits, readability on every lane and as a ghost,
   no earned gnome's signature, no two alike. The tests hold the catalogue
   to none failing.
+- **No twins at ball size** (added 2026-10-06, after the user's review
+  found 61 pairs differing only by a beard and a small thing): any two
+  gnomes differ in at least three visual fields, one of them a main one
+  (the hat's shape or colour, the body's colour or pattern, a material, a
+  prop). To give each Common its own hat-and-coat, a palette is known by its
+  key colour and worn with any colour of its archetype's wardrobe.
+- **The realm's rows are made and checked here** (`scripts/gnomerows.ts`):
+  `id|tier|name|traits`, ids following on, fields the realm accepts, and
+  each row's tier equal to its traits' tier byte, which the realm stores
+  apart and does not compare.
 - **The screens read pure functions** of `web/lib/gnomes/` (`entryOf`,
   `filterGnomes`, `traitRows`, `TIER_LOOK`, `skinOfTraits`) over the
   catalogue: no 3D needed to list, sort, filter or describe a gnome.

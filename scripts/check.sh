@@ -46,6 +46,8 @@ echo "== typecheck" && npx tsc --noEmit
 echo "== lint" && npm run -s lint
 echo "== selfcheck" && npm run -s selfcheck
 echo "== the gnome catalogue: data/gnomes.json as data/gnomes/ makes it, every rule held" && npm run -s gnomes -- --check
+echo "== the realm's rows: each series' as the catalogue makes them, each row's tier its traits'" && npm run -s gnomes:rows -- --check
+echo "== the gnomes' golden looks: every one drawn as it was" && npm run -s gnomes:looks
 echo "== unit tests" && npm test --silent
 # the bot check's scoring: its rules are the private notes' (private/, beside the code), when checked out
 if [ -f ../private/botcheck/score.test.ts ]; then

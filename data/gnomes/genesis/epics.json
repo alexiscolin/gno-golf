@@ -145,7 +145,7 @@
       "prop": "edelweiss", "propColour": "emerald", "trail": "leaves", "trailColour": "emerald", "holing": "petals", "holingColour": "white",
       "line": "One flower from the summit, painted on and picked fresh." },
     { "home": "mountain", "archetype": "alpinist", "name": "Cairn", "concept": "A gnome of piled stone, a cairn on his hat; every climber adds one.",
-      "hat": "cone", "hatColour": "pebble", "body": "ash", "beard": "long", "hair": "ash", "material": "stone", "materialColour": "lichen",
+      "hat": "cone", "hatColour": "slate", "body": "ash", "beard": "bushy", "hair": "ash", "material": "stone", "materialColour": "lichen",
       "prop": "cairn", "propColour": "slate", "trail": "dust", "trailColour": "lichen", "holing": "crumbs", "holingColour": "lichen",
       "line": "Every climber adds a stone. He is starting to feel it." },
     { "home": "mountain", "archetype": "skier", "name": "Saint Barnabus", "concept": "A glazed mountain rescuer with a keg of cocoa under his chin.",

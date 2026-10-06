@@ -13,7 +13,7 @@ import { GNOMES, makeBall, makeGhost, type Skin } from "../lib/scene/gnome.ts";
 import { makeHoling, makeTrail } from "../lib/scene/gnome-fx.ts";
 import { BUDGET, MAX_REACH } from "../lib/gnomes/validate.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
-import type { Gnome } from "../lib/scene/data.ts";
+import { costOf } from "../lib/scene/gnome-cost.ts";
 
 /** Every drawn thing under a gnome, in order: its kind, geometry and material, rounded. */
 export function fingerprint(o: THREE.Object3D) {
@@ -44,27 +44,15 @@ test("the fourteen gnomes of GNOMES are drawn exactly as before", () => {
   assert.deepEqual(Object.fromEntries(GNOMES.map((s) => [s.id, fingerprint(makeBall(s))])), LOOKS);
 });
 
-/** What a gnome costs to draw: triangles (ink hulls included), draws after the bake, how high and how far he reaches. */
-export function cost(g: Gnome) {
-  let tris = 0, draws = 0;
-  g.traverse((o) => {
-    if (!(o instanceof THREE.Mesh || o instanceof THREE.Sprite) || !o.visible) return;
-    draws++;
-    const geo = o.geometry as THREE.BufferGeometry, n = geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3;
-    tris += o instanceof THREE.InstancedMesh ? n * o.count : n;
-  });
-  const box = new THREE.Box3().setFromObject(g.userData.body, true);
-  return { tris, draws, top: box.max.y, reach: g.userData.reach };
-}
 
 const catalogue = JSON.parse(fs.readFileSync(new URL("../../data/gnomes.json", import.meta.url), "utf8")) as Catalogue;
 
 test("every gnome of the collection builds, within his tier's budget, no taller nor wider than the game allows", () => {
-  const most = GNOMES.map((s) => cost(makeBall(s)));
+  const most = GNOMES.map((s) => costOf(makeBall(s)));
   const top = Math.max(...most.map((c) => c.top)), reach = Math.max(...most.map((c) => c.reach));
   const worst: Record<string, { tris: number; draws: number; id: number }> = {};
   for (const e of catalogue.gnomes) {
-    const c = cost(makeBall(e.skin)), b = BUDGET[e.tier];
+    const c = costOf(makeBall(e.skin)), b = BUDGET[e.tier];
     assert.ok(c.tris <= b.tris, `#${e.id} ${e.name}: ${c.tris} triangles, over ${b.tris}`);
     assert.ok(c.draws <= b.draws, `#${e.id} ${e.name}: ${c.draws} draws, over ${b.draws}`);
     assert.ok(c.top <= top + 1e-6, `#${e.id} ${e.name}: ${c.top.toFixed(3)} high, over the tall hat's ${top.toFixed(3)}`);

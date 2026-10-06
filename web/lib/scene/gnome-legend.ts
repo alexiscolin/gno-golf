@@ -94,18 +94,18 @@ const PIECES: Record<string, (g: THREE.Group, hat: THREE.Group, skin: Skin) => T
       [-0.1, 0.02, 0.12].forEach((x, k) => drop(k, x, top + 0.12 - ((t / 700 + k / 3) % 1) * 0.3, 0.05, 1));
     };
   },
-  // Windmill King: his mill's four sails, turning
+  // The Miller: the four sails of the mill on his cap (gnome-kit.ts "mill"), turning
   "mill-sails": (_, hat) => {
-    const wood = flat(C.woodDark), cloth = flat(0xfdf6e9, { side: THREE.DoubleSide });
-    const parts: THREE.Object3D[] = [inked(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 10).rotateX(Q), wood)];
+    const wood = flat(C.woodDark), cloth = flat(0xefe4cf, { side: THREE.DoubleSide });
+    const parts: THREE.Object3D[] = [inked(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 10).rotateX(Q), wood)];
     for (let k = 0; k < 4; k++) {
       const arm = new THREE.Group();
-      arm.add(at(inked(new THREE.BoxGeometry(0.035, 0.46, 0.03), wood), 0, 0.25, 0), at(new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.32), cloth), 0.075, 0.3, 0.01));
+      arm.add(at(inked(new THREE.BoxGeometry(0.03, 0.36, 0.025), wood), 0, 0.2, 0), at(new THREE.Mesh(new THREE.PlaneGeometry(0.11, 0.24), cloth), 0.06, 0.22, 0.01));
       arm.rotation.z = (k * Math.PI) / 2;
       parts.push(arm);
     }
     const sails = moving(hat, ...parts);
-    sails.position.set(0, 0.42, 0.3);
+    sails.position.set(0, 0.4, 0.2);
     sails.rotation.x = -0.25;
     return (t) => (sails.rotation.z = -t / 900);
   },

@@ -2,6 +2,7 @@
 // encoding and what a reader does with what it does not know, a token's
 // gnome, the series' plan, the rules, and data/gnomes.json being exactly what
 // data/gnomes/ makes.
+import "./canvas.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -10,10 +11,12 @@ import { PROPS, PROP_DESIGNS } from "../lib/gnomes/props.ts";
 import { FORMAT, LENGTH, PLAIN, decode, encode, type Traits } from "../lib/gnomes/codec.ts";
 import { EARNED_KINDS, lookOf, skinOf, skinOfTraits, traitsOf } from "../lib/gnomes/skin.ts";
 import { SALE_TIERS, TIER_LOOK, entryOf, evenly, filterGnomes, planSeries, thumbOf, traitRows, type Catalogue, type SeriesConfig } from "../lib/gnomes/catalogue.ts";
-import { GROUNDS, earnedSignature, lookDistance, readability, tierRules, validate } from "../lib/gnomes/validate.ts";
+import { GROUNDS, MAIN, apart, earnedSignature, readability, tierRules, validate, visualDiff } from "../lib/gnomes/validate.ts";
+import { checkRows, rowsOf } from "../lib/gnomes/rows.ts";
 import { generateSeries, makeCatalogue, type Design, type Recipe } from "../lib/gnomes/generate.ts";
 import { darkBody, deltaE, oklab, over } from "../lib/gnomes/colour.ts";
 import { GNOMES } from "../lib/scene/gnome.ts";
+import { trianglesOf } from "../lib/scene/gnome-cost.ts";
 
 const DATA = new URL("../../data/", import.meta.url);
 const json = (f: string): unknown => JSON.parse(fs.readFileSync(new URL(f, DATA), "utf8"));
@@ -150,7 +153,7 @@ test("catalogue: data/gnomes.json holds the series as configured, its gnomes as 
 });
 
 test("catalogue: it is what data/gnomes/ makes, gnome for gnome (scripts/gnomes.ts --check holds the file)", () => {
-  assert.deepEqual(makeCatalogue((f) => json(`gnomes/${f}`)), catalogue);
+  assert.deepEqual(makeCatalogue((f) => json(`gnomes/${f}`), (t) => trianglesOf(skinOf(t, { id: "", name: "", line: "" }))), catalogue);
 });
 
 test("catalogue: a gallery's filters and a token's trait list", () => {
@@ -161,7 +164,7 @@ test("catalogue: a gallery's filters and a token's trait list", () => {
   assert.ok(filterGnomes(all, { hat: "beanie" }).every((g) => decode(g.traits)!.hat === "beanie"));
   assert.ok(filterGnomes(all, { trail: true }).every((g) => g.tier !== "common"));
   assert.equal(filterGnomes(all, { trail: false }).length, all.filter((g) => g.tier === "common").length);
-  assert.deepEqual(filterGnomes(all, { text: "windmill" }).map((g) => g.name), ["Windmill King"]);
+  assert.deepEqual(filterGnomes(all, { text: "the miller" }).map((g) => g.name), ["The Miller"]);
   assert.equal(filterGnomes(all, { wave: 1, series: "genesis", archetype: "fisher" }).length, all.filter((g) => g.wave === 1 && g.archetype === "fisher").length);
   assert.equal(filterGnomes(all, { series: "nope" }).length, 0);
   const rows = traitRows(FULL);
@@ -202,11 +205,40 @@ test("validate: each rule catches what it is for", () => {
   assert.match(readability({ ...common, hatColour: V.colour("linen") }).join(), /too close/);
   assert.match(readability({ ...common, hatColour: GROUNDS.fairway, body: V.colour("sage") }).join(), /lost on fairway/);
   assert.match(readability({ ...common, trailColour: GROUNDS.fairway }).join(), /lost on the fairway/);
-  // apart: a hat's shape is three, a colour two
-  assert.equal(lookDistance(common, common), 0);
-  assert.equal(lookDistance(common, { ...common, hat: "straw" }), 3);
-  assert.equal(lookDistance(common, { ...common, accessories: ["glasses"] }), 1);
-  assert.equal(lookDistance({ ...common, hair: 1 }, { ...common, hair: 2 }), 1);
+  // apart: three fields at least, one of them the silhouette or a main colour
+  assert.deepEqual(visualDiff(common, common), []);
+  assert.deepEqual(visualDiff({ ...common, beard: "full", hair: 1 }, { ...common, beard: "full", hair: 2 }), ["hair"]);
+  const twin = { ...common, beard: "bushy" as const, accessories: ["neckerchief" as const, "glasses" as const] };
+  assert.deepEqual(visualDiff(common, twin), ["beard", "neckerchief", "glasses"]);
+  assert.equal(apart(common, twin), false, "a beard and small things alone: twins at ball size");
+  assert.equal(apart(common, { ...twin, hatColour: V.colour("plum") }), true);
+  assert.equal(apart(common, { ...common, hat: "straw", accessories: ["glasses"] }), false, "two fields are not enough");
+  assert.equal(apart(common, { ...common, hat: "straw", accessories: ["glasses"], beard: "goatee" }, 4), false, "four from GNOMES");
+  for (const f of ["hat", "hat colour", "body", "pattern", "material", "prop"]) assert.ok(MAIN.has(f), f);
+  assert.ok(!MAIN.has("beard"));
+});
+
+test("rows: what the realm receives decodes to the catalogue's traits, id for id, its tier the traits'", () => {
+  for (const s of catalogue.series) {
+    const rows = rowsOf(catalogue, s.id), mine = catalogue.gnomes.filter((g) => g.series === s.id);
+    assert.deepEqual(checkRows(rows, s.first), []);
+    const lines = rows.split("\n");
+    assert.equal(lines.length, mine.length);
+    lines.forEach((line, i) => {
+      const [id, tier, name, traits] = line.split("|");
+      assert.deepEqual([Number(id), tier, name], [mine[i].id, mine[i].tier, mine[i].name]);
+      assert.deepEqual(decode(traits), decode(mine[i].traits), `#${id}`);
+      assert.equal(traits, mine[i].traits);
+    });
+    // and the file sent is these rows, byte for byte (scripts/gnomerows.ts --check holds it too)
+    assert.equal(fs.readFileSync(new URL(`gnomes/rows/${s.id}.txt`, DATA), "utf8"), rows);
+  }
+  const g = catalogue.gnomes[0], row = (tier: string, traits = g.traits, id = 1, name = g.name) => `${id}|${tier}|${name}|${traits}`;
+  assert.match(checkRows(row("rare"), 1).join(), /tier rare, its traits say common/);
+  assert.match(checkRows(row("common", "zz"), 1).join(), /do not decode/);
+  assert.match(checkRows(row("common", g.traits, 2), 1).join(), /id 2, not 1/);
+  assert.match(checkRows(row("common", g.traits, 1, "x".repeat(49)), 1).join(), /name/);
+  assert.match(checkRows("1|common|x", 1).join(), /not id\|tier\|name\|traits/);
 });
 
 test("validate: a catalogue off its plan, or with twins, is reported", () => {
