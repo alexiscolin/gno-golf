@@ -57,8 +57,8 @@ test("shop: each read asks the gnomes' realm once, its arguments quoted, its ans
     Gnome: { version: 1, id: "94", series: "genesis", name: "Tansy", tier: "epic", traits: "01", owner: "", price: 333e6, sold: false, closed: false },
     Sold: "05",
     GnomesOf: { version: 1, owner: A, total: 1, next: -1, rows: [{ id: "3", tier: "common", traits: "01" }] },
-    Equipped: "",
-    EquippedMany: { version: 1, rows: [{ player: A, id: "3", name: "Thistle", tier: "common", traits: "01" }] },
+    Worn: "",
+    WornMany: { version: 1, rows: [{ player: A, id: "3", name: "Thistle", tier: "common", traits: "01", equipped: false }] },
     Auction: { version: 1, id: "104", reserve: 777e6, top: 0, bidder: "", end: T0 + 3600, min: 777e6, over: false, settled: false },
     CanBuy: can({ ok: true, total: 30e6 }),
     Params: { version: 1, softClose: 600, minRaiseBps: 500, minRaise: 5e6, maxHours: 168, maxBatch: 5, denom: "ugnot" },
@@ -69,26 +69,26 @@ test("shop: each read asks the gnomes' realm once, its arguments quoted, its ans
   const sold = await shop.sold();
   assert.deepEqual([1, 2, 3, 4].map(sold), [true, false, true, false]);
   assert.equal((await shop.gnomesOf(A)).rows[0].id, "3");
-  assert.equal(await shop.equipped(A), null);
-  assert.equal((await shop.equippedMany([A, "nobody", A])).get(A)?.name, "Thistle");
+  assert.equal(await shop.worn(A), null);
+  assert.equal((await shop.wornMany([A, "nobody", A])).get(A)?.name, "Thistle");
   assert.equal((await shop.auction())?.id, "104");
   assert.equal((await shop.canBuy(A, [7])).total, 30e6);
   assert.equal((await shop.params()).softClose, 600);
   assert.ok(asked.every((a) => a.realm === "gno.land/r/x/gnogolf/gnomes"));
   assert.deepEqual(asked.map((a) => a.expr), [
-    "Collection()", 'Gnome("94")', "Sold()", `GnomesOf(address("${A}"), 0)`, `Equipped(address("${A}"))`,
-    `EquippedMany("${A}")`, "Auction()", `CanBuy(address("${A}"), "7")`, "Params()",
+    "Collection()", 'Gnome("94")', "Sold()", `GnomesOf(address("${A}"), 0)`, `Worn(address("${A}"))`,
+    `WornMany("${A}")`, "Auction()", `CanBuy(address("${A}"), "7")`, "Params()",
   ]);
 });
 
 test("shop: nothing is asked for what is not an address or a gnome, and 'none' answers are null", async () => {
-  const { chain, asked } = fakeChain({ Gnome: { version: 1, id: "" }, Auction: { version: 1, id: "" }, Equipped: JSON.stringify({ version: 1, player: A, id: "9", name: "Moss", tier: "common", traits: "01" }) });
+  const { chain, asked } = fakeChain({ Gnome: { version: 1, id: "" }, Auction: { version: 1, id: "" }, Worn: JSON.stringify({ version: 1, player: A, id: "9", name: "Moss", tier: "common", traits: "01", equipped: true }) });
   const shop = makeShop(chain);
   assert.equal(await shop.gnome(99999), null);
   assert.equal(await shop.auction(), null);
-  assert.equal((await shop.equipped(A))?.id, "9");
+  assert.equal((await shop.worn(A))?.id, "9");
   assert.equal((await shop.gnomesOf("not-an-address")).total, 0);
-  assert.equal((await shop.equippedMany(["x", "y"])).size, 0);
+  assert.equal((await shop.wornMany(["x", "y"])).size, 0);
   await assert.rejects(shop.canBuy("x", [1]), /address/);
   await assert.rejects(shop.gnome(0), /number/);
   assert.equal(asked.length, 3);
@@ -246,9 +246,9 @@ test("shop: the words of each share moment: about the game, never value", () => 
   const w = shareWords;
   assert.equal(w.bought("Tansy", 94), "I just adopted Tansy, gnome #94 of Gnogolf. Tansy rolls for me now");
   assert.equal(w.equipped("Tansy", "garden"), "My gnome for the boards: Tansy of the Garden. Race my ghost");
-  assert.equal(w.bidding("The Windmill King", "Sat 18:00 UTC"), "I'm bidding on The Windmill King, one of seven. Ends Sat 18:00 UTC");
-  assert.equal(w.won("The Windmill King"), "The Windmill King is mine: one of seven Legendary gnomes of Gnogolf");
-  assert.equal(w.team(31, "The Windmill King"), "My Gnogolf team: 31 gnomes, The Windmill King up front. Race their ghosts");
+  assert.equal(w.bidding("The Miller", "Sat 18:00 UTC"), "I'm bidding on The Miller, one of seven Legendary gnomes of Gnogolf. Ends Sat 18:00 UTC");
+  assert.equal(w.won("The Miller"), "The Miller is mine: one of seven Legendary gnomes of Gnogolf");
+  assert.equal(w.team(31, "The Miller"), "My Gnogolf team: 31 gnomes, The Miller up front. Race their ghosts");
   assert.equal(w.team(1, "Tansy"), "My Gnogolf team: Tansy. Race my ghost");
   for (const s of Object.values(w).map((f) => (f as (...a: string[]) => string)("X", "1")))
     assert.doesNotMatch(s, /\b(NFT|mint|token|floor|invest|value|limited)\b/i);

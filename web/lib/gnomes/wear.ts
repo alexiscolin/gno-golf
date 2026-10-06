@@ -1,0 +1,67 @@
+// What a player wears. Wearing is free (ADR-007): everyone sees the gnome
+// the realm says a player wears (Worn: the one put on with Equip while held,
+// else their best), read once a visit for the player and a board's page or a
+// rival at a time for the others (WornMany); the ball's ghost, the boards'
+// faces and the clip dress them in it (gnome.ts knowGnome, wears). The player
+// plays any gnome they hold, or a free one, picked in this browser per
+// account: nothing on chain. Equip only shows everyone another than the best.
+import { GNOMES, knowGnome, wears, loadWardrobe, type Skin } from "../scene/gnome";
+import { skinOfTraits } from "./skin";
+import type { Worn } from "./shop";
+
+type Token = Pick<Worn, "id" | "name" | "traits">;
+/** A token's skin: under "t<id>" (as the catalogue's), an earned kind as the game's own gnome. */
+export const tokenSkin = (t: Token, line = "") => skinOfTraits(t.traits, { id: `t${t.id}`, name: t.name, line });
+
+const listeners = new Set<() => void>();
+let version = 0;
+const told = () => (version++, listeners.forEach((f) => f()));
+/** Called whenever what someone wears is learnt (a face, a ghost to redraw); returns its unsubscribe. */
+export const onWear = (fn: () => void) => (listeners.add(fn), () => void listeners.delete(fn));
+/** A number that moves with every change: React's useSyncExternalStore snapshot. */
+export const wearVersion = () => version;
+
+/** These tokens' gnomes known to the game (its wardrobe fetched first): their skins, in order. */
+export async function know(tokens: readonly Token[]): Promise<Skin[]> {
+  if (tokens.length) await loadWardrobe();
+  return tokens.map((t) => {
+    const s = tokenSkin(t);
+    if (!GNOMES.includes(s)) knowGnome(s);
+    return s;
+  });
+}
+/** What these players wear for everyone (WornMany's rows), met: the ghost and the face follow; a player asked
+ *  of without a row (players) wears nothing any more. */
+export async function meet(rows: readonly Worn[], players: readonly string[] = []) {
+  const skins = await know(rows);
+  rows.forEach((r, i) => wears(r.player, skins[i].id));
+  for (const p of players) if (!rows.some((r) => r.player === p)) wears(p, null);
+  told();
+}
+
+const PICK = (addr: string) => `gnogolf.wear.${addr}`;
+/** The gnome this account picked to play in this browser (a skin id), null for none. */
+export function pickOf(addr: string) {
+  try { return localStorage.getItem(PICK(addr)); } catch { return null; }
+}
+/** Keeps (or forgets, null) the gnome this account plays in this browser. */
+export function pick(addr: string, id: string | null) {
+  try { id ? localStorage.setItem(PICK(addr), id) : localStorage.removeItem(PICK(addr)); } catch { /* a private window: for this visit only */ }
+}
+
+/** The gnome played: the pick while it is theirs (one they hold, or a free one unlocked), else the one they
+ *  wear for everyone, else the gnome this browser kept (savedGnome: no wallet, or no collection). */
+export function playing({ pick, held, worn, saved, free }: { pick: string | null; held: ReadonlySet<string>; worn: Worn | null; saved: string; free: (id: string) => boolean }) {
+  if (pick && (held.has(pick) || free(pick))) return pick;
+  if (worn) return tokenSkin(worn).id;
+  return saved;
+}
+
+/** The one line the picker says of it, and whether "Show him to everyone" (Equip) is offered: only for a gnome
+ *  they hold that everyone does not see already (a free gnome is nobody's to show). */
+export function seen({ worn, playing, name }: { worn: Worn | null; playing: string; name: (id: string) => string }) {
+  const theirs = worn ? tokenSkin(worn).id : null;
+  if (theirs === playing) return { line: `Everyone sees ${name(playing)}`, show: false };
+  const token = !GNOMES.some((g) => g.id === playing);
+  return { line: `You play ${name(playing)} · everyone sees ${worn ? name(theirs!) : "a gnome of the game"}`, show: token };
+}

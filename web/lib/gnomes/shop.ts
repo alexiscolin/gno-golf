@@ -16,7 +16,7 @@ export const BUY_TIERS = ["common", "rare", "epic"] as const;
 export type BuyTier = (typeof BUY_TIERS)[number];
 type PerTier = Record<BuyTier, number>;
 
-// ------------------------------------------------------------ the shapes (read.gno, auction.gno, equip.gno, buy.gno)
+// ------------------------------------------------------------ the shapes (read.gno, auction.gno, equip.gno)
 export interface TierRow { name: string; price: number; cap: number; playerCap: number; sold: number }
 export interface SeriesRow { name: string; first: number; last: number; sold: number; closed: boolean }
 export interface WaveRow { first: number; last: number; start: number; playersUntil: number; prices: number[] }
@@ -29,8 +29,9 @@ export interface Collection {
 export interface GnomeRow { id: string; series: string; name: string; tier: string; traits: string; owner: string; price: number; sold: boolean; closed: boolean }
 /** GnomesOf(owner, offset): a page of a wallet's gnomes, 100 at most; next -1 at the end. */
 export interface Held { owner: string; total: number; next: number; rows: { id: string; tier: string; traits: string }[] }
-/** Equipped(player): the gnome a player wears. */
-export interface Worn { player: string; id: string; name: string; tier: string; traits: string }
+/** Worn(player): the gnome a player wears for everyone (wearing is free): the one put on with Equip
+ *  while still held (equipped), else their best. */
+export interface Worn { player: string; id: string; name: string; tier: string; traits: string; equipped: boolean }
 /** Auction(): the one under way, else the last settled; min 0 once it takes no bid. */
 export interface Auction { version: number; id: string; reserve: number; top: number; bidder: string; end: number; min: number; over: boolean; settled: boolean }
 /** Why Buy would refuse, its first reason, as CanBuy codes it ("" when it would sell). */
@@ -57,7 +58,7 @@ const checks = {
   gnome: (v: unknown): v is GnomeRow | { id: "" } =>
     isObj(v) && typeof v.id === "string" && (v.id === "" || (strs(v, "series", "name", "tier", "traits", "owner") && nums(v, "price") && bools(v, "sold", "closed"))),
   held: (v: unknown): v is Held => isObj(v) && strs(v, "owner") && nums(v, "total", "next") && every(v.rows, (r) => isObj(r) && strs(r, "id", "tier", "traits")),
-  worn: (v: unknown): v is Worn => isObj(v) && strs(v, "player", "id", "name", "tier", "traits") && isAddress(v.player),
+  worn: (v: unknown): v is Worn => isObj(v) && strs(v, "player", "id", "name", "tier", "traits") && bools(v, "equipped") && isAddress(v.player),
   wornList: (v: unknown): v is { rows: Worn[] } => isObj(v) && every(v.rows, checks.worn),
   auction: (v: unknown): v is Auction | { id: "" } =>
     isObj(v) && typeof v.id === "string" && (v.id === "" || (strs(v, "bidder") && nums(v, "reserve", "top", "end", "min") && bools(v, "over", "settled"))),
@@ -92,21 +93,21 @@ export function makeShop(chain: Pick<Chain, "qjson" | "qstr">, realm = GNOMES_RE
     /** A page of a wallet's gnomes (100 a page, from offset); none for what is not an address. */
     gnomesOf: (owner: string, offset = 0): Promise<Held> =>
       isAddress(owner) ? read(`GnomesOf(${addr(owner)}, ${Math.max(0, offset | 0)})`, checks.held) : Promise.resolve({ owner, total: 0, next: -1, rows: [] }),
-    /** The gnome a player wears, null for none ("" from the realm). */
-    equipped: async (player: string) => {
+    /** The gnome a player wears for everyone, null for none ("" from the realm). */
+    worn: async (player: string) => {
       if (!isAddress(player)) return null;
-      const raw = await chain.qstr(realm, `Equipped(${addr(player)})`);
+      const raw = await chain.qstr(realm, `Worn(${addr(player)})`);
       if (!raw) return null;
       let v: unknown;
       try { v = JSON.parse(raw); } catch { v = null; }
-      if (!checks.worn(v)) throw Object.assign(new Error("The chain's answer to Equipped is not one this page can read."), { kind: "chain" });
+      if (!checks.worn(v)) throw Object.assign(new Error("The chain's answer to Worn is not one this page can read."), { kind: "chain" });
       return v;
     },
-    /** What these players wear (the first 50 addresses, once each): a board's page, a rival. */
-    equippedMany: async (players: readonly string[]) => {
+    /** What these players wear for everyone (the first 50 addresses, once each): a board's page, a rival. */
+    wornMany: async (players: readonly string[]) => {
       const list = [...new Set(players.filter(isAddress))].slice(0, 50), got = new Map<string, Worn>();
       if (!list.length) return got;
-      for (const w of (await read(`EquippedMany(${q(list.join(","))})`, checks.wornList)).rows) if (list.includes(w.player)) got.set(w.player, w);
+      for (const w of (await read(`WornMany(${q(list.join(","))})`, checks.wornList)).rows) if (list.includes(w.player)) got.set(w.player, w);
       return got;
     },
     /** The auction under way, else the last settled; null before the first. */
@@ -284,7 +285,7 @@ export const teamOrder = <R extends { id: string; tier: string }>(rows: readonly
 export const shareWords = {
   bought: (name: string, id: number | string) => `I just adopted ${name}, gnome #${id} of Gnogolf. ${name} rolls for me now`,
   equipped: (name: string, home: string) => `My gnome for the boards: ${name} of the ${homeName(home)}. Race my ghost`,
-  bidding: (name: string, ends: string) => `I'm bidding on ${name}, one of seven. Ends ${ends}`,
+  bidding: (name: string, ends: string) => `I'm bidding on ${name}, one of seven Legendary gnomes of Gnogolf. Ends ${ends}`,
   won: (name: string) => `${name} is mine: one of seven Legendary gnomes of Gnogolf`,
   team: (count: number, best: string) => (count === 1 ? `My Gnogolf team: ${best}. Race my ghost` : `My Gnogolf team: ${count} gnomes, ${best} up front. Race their ghosts`),
 };
