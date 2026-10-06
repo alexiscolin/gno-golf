@@ -73,3 +73,22 @@ test("wear: one line says who sees what, and the one action that changes it", ()
   assert.deepEqual(seen({ worn: null, playing: "t3", name: () => "Thistle" }), { line: "You play Thistle · everyone sees a gnome of the game", show: true });
   assert.deepEqual(seen({ worn: row(94), playing: "classic", name: (id) => (id === "classic" ? "The Classic" : "Tansy") }), { line: "You play The Classic · everyone sees Tansy", show: false }, "a free gnome is not shown to everyone: it is nobody's");
 });
+
+test("wear: the faces of a board ask what their players wear in one read, each player once a visit", async () => {
+  const { askWorn } = await import("../lib/gnomes/wear.ts");
+  const reads: string[][] = [];
+  const read = (players: readonly string[]) => (reads.push([...players]), Promise.resolve(new Map(players.filter((p) => p === B).map((p) => [p, row(5, p)]))));
+  const C = "g1" + "c".repeat(38);
+  await Promise.all([askWorn(read, A), askWorn(read, B), askWorn(read, A), askWorn(read, "not an address")]);
+  assert.deepEqual(reads, [[A, B]], "one read for the page, the same player once, no non-address");
+  assert.equal(rivalSkin(B, "classic").id, "t5");
+  await askWorn(read, B);
+  assert.equal(reads.length, 1, "asked once a visit");
+  await askWorn(read, C);
+  assert.deepEqual(reads[1], [C]);
+  // a read that fails asks again next time (a node down is not "wears nothing")
+  const D = "g1" + "d".repeat(38);
+  await askWorn(() => Promise.reject(new Error("down")), D);
+  await askWorn(read, D);
+  assert.deepEqual(reads[2], [D]);
+});

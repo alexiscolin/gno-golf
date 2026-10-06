@@ -7,6 +7,7 @@
 // account: nothing on chain. Equip only shows everyone another than the best.
 import { GNOMES, knowGnome, wears, loadWardrobe, type Skin } from "../scene/gnome";
 import { skinOfTraits } from "./skin";
+import { isAddress } from "../chain";
 import type { Worn } from "./shop";
 
 type Token = Pick<Worn, "id" | "name" | "traits">;
@@ -64,4 +65,32 @@ export function seen({ worn, playing, name }: { worn: Worn | null; playing: stri
   if (theirs === playing) return { line: `Everyone sees ${name(playing)}`, show: false };
   const token = !GNOMES.some((g) => g.id === playing);
   return { line: `You play ${name(playing)} · everyone sees ${worn ? name(theirs!) : "a gnome of the game"}`, show: token };
+}
+
+// What a page's faces ask, batched: every player asked in the same moment
+// goes into one read (WornMany: 50 a read), and a player is asked once a
+// visit; a read that fails is asked again the next time.
+const asked = new Map<string, Promise<void>>();
+let batch: { players: string[]; done: Promise<void> } | null = null;
+/** What player wears for everyone, met (meet) with the rest of the page's in one read. */
+export function askWorn(read: (players: readonly string[]) => Promise<ReadonlyMap<string, Worn>>, player: string): Promise<void> {
+  if (!isAddress(player)) return Promise.resolve();
+  const had = asked.get(player);
+  if (had) return had;
+  if (!batch || batch.players.length >= 50) {
+    const b: { players: string[]; done: Promise<void> } = { players: [], done: Promise.resolve() };
+    b.done = Promise.resolve().then(async () => {
+      if (batch === b) batch = null;
+      try {
+        const got = await read(b.players);
+        await meet([...got.values()], b.players);
+      } catch {
+        for (const p of b.players) asked.delete(p);
+      }
+    });
+    batch = b;
+  }
+  batch.players.push(player);
+  asked.set(player, batch.done);
+  return batch.done;
 }
