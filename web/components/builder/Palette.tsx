@@ -42,7 +42,8 @@ export default function Palette({ world, palette, armed, off, onArm }: {
               const why = off.get(e.id);
               return (
                 <button key={e.id} type="button" className={`piece${armed?.id === e.id ? " piece--on" : ""}`} disabled={!!why} aria-pressed={armed?.id === e.id}
-                  title={why ?? `${e.label}: press, then let go on the board (Shift: several)`} onPointerDown={() => onArm(armed?.id === e.id ? null : e)}>
+                  title={why ?? `${e.label}: press, then let go on the board (Shift: several); from the keyboard, Enter places it`} onPointerDown={() => onArm(armed?.id === e.id ? null : e)}
+                  onClick={(ev) => ev.detail === 0 && onArm(armed?.id === e.id ? null : e)}>
                   <Tile e={e} />
                   <span>{e.label}</span>
                 </button>

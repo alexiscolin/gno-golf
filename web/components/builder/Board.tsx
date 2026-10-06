@@ -11,7 +11,7 @@
 // Live, the checks run without the render census (fast); a drop or a
 // release is checked with it.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, movePiece, nextId, placePiece, snap, whereOf } from "@/lib/builder/edit";
+import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, movePiece, nextId, pieceLabel, placePiece, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
 import { K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
 import { BOARD, frame } from "@/lib/builder/gg1";
@@ -54,7 +54,7 @@ type Drag =
   | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker };
 type Checker = ReturnType<typeof dragCheck>;
 
-const fmt = (v: V) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`;
+const fmt = (v: V) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`, fmtAt = (v: V) => `(${fmt(v)})`;
 
 /** The extent the view frames at first: the tee, the cup and every piece, with a margin. */
 function extent(d: Draft): [V, V] {
@@ -223,12 +223,13 @@ export default function Board(props: BoardProps) {
         <rect className="board__ground" x={0} y={0} width={BOARD} height={BOARD} />
         <g className="board__grid">{lines.map((l, i) => (l.x !== undefined ? <line key={i} x1={l.x} y1={y0} x2={l.x} y2={y1} className={l.major ? "major" : ""} /> : <line key={i} x1={x0} y1={l.y} x2={x1} y2={l.y} className={l.major ? "major" : ""} />))}</g>
         {[...draft.pieces].sort((a, b) => order(a) - order(b)).map((p) => (
-          <g key={p.id} data-piece={p.id} className={`board__piece${p.id === selected ? " board__piece--on" : ""}`} aria-label={p.id}>
+          <g key={p.id} data-piece={p.id} className={`board__piece${p.id === selected ? " board__piece--on" : ""}`} tabIndex={0} role="button"
+            aria-label={pieceLabel(p)} aria-pressed={p.id === selected} onFocus={() => props.onSelect(p.id)}>
             <PieceShape p={p} state={bad.has(p.id) || live?.id === p.id && live.why ? "bad" : undefined} />
           </g>
         ))}
-        <g data-end="tee" className="board__end" aria-label="The tee"><circle cx={draft.tee[0]} cy={draft.tee[1]} r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text x={draft.tee[0]} y={draft.tee[1] + 0.3} fontSize={0.8} textAnchor="middle">T</text></g>
-        <g data-end="pin" className="board__end" aria-label="The cup"><circle cx={draft.pin[0]} cy={draft.pin[1]} r={0.6} fill="#1f2a26" /><path d={`M${draft.pin[0]} ${draft.pin[1]} v-2.2 l1.4 0.5 -1.4 0.5`} fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /></g>
+        <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${fmtAt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")}><circle cx={draft.tee[0]} cy={draft.tee[1]} r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text x={draft.tee[0]} y={draft.tee[1] + 0.3} fontSize={0.8} textAnchor="middle">T</text></g>
+        <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${fmtAt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")}><circle cx={draft.pin[0]} cy={draft.pin[1]} r={0.6} fill="#1f2a26" /><path d={`M${draft.pin[0]} ${draft.pin[1]} v-2.2 l1.4 0.5 -1.4 0.5`} fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /></g>
         {sel && handlesOf(sel).map((h) => <rect key={h.key} data-handle={h.key} className="board__handle" x={h.at[0] - hs / 2} y={h.at[1] - hs / 2} width={hs} height={hs} />)}
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
       </svg>

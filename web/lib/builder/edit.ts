@@ -11,7 +11,7 @@ import { entryParts, frame } from "./gg1";
 import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
-import { about, validate, type ValidateOptions } from "./pipeline";
+import { about, pieceName, validate, type ValidateOptions } from "./pipeline";
 
 /** A piece's settings at placement: each within its entry's range, its default when left out. */
 export interface PlaceParams {
@@ -290,6 +290,19 @@ function nearest(rest: Draft, p: Piece, o: ValidateOptions, r0 = CELL, reach = F
     }
   }
   return null;
+}
+
+/** A piece as a screen reader names it: what it is and where ("The rock post at (13.5, 6.5)"). */
+export const pieceLabel = (p: Piece) => {
+  const n = pieceName(p);
+  return `${n.charAt(0).toUpperCase()}${n.slice(1)} at ${at(whereOf(p.geometry))}`;
+};
+
+/** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near. */
+export function placeNear(d: Draft, e: PaletteEntry, to: V, o: ValidateOptions): { draft: Draft; id: string } | null {
+  const id = nextId(d), p = movePiece(placePiece(e, id, to), onQuarter(to, d.tee));
+  const put = canPlace(d, p, o).length === 0 ? p : nearest(d, p, o);
+  return put ? { draft: frame({ ...d, pieces: [...d.pieces, put] }), id } : null;
 }
 
 /** How far a copy goes to clear its piece: a post's width, a rail's or a bar's a unit aside, a zone's longest side. */

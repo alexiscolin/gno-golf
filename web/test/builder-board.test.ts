@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
-import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
+import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, pieceLabel, placeNear, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, setHandle, turnPiece } from "../lib/builder/handles.ts";
 import { makeSession } from "../lib/builder/session.ts";
 import { K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
@@ -101,6 +101,18 @@ void test("a release or a copy asks a bounded number of checks: a long drag onto
   fits = 0;
   copyPiece({ ...boxed, pieces: boxed.pieces.map((p) => (p.id === "q" ? { ...p, geometry: { t: "post" as const, c: [13, 6] as [number, number], r: 4 } } : p)) }, "q", quick);
   assert.ok(fits <= 70, `a copy with no room: ${fits} checks`);
+});
+
+void test("the keyboard: a piece named for a screen reader by what and where it is; the armed piece dropped at the nearest place to a point that holds", () => {
+  const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
+  assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock post at (13.5, 6.5)");
+  const at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
+  const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden, census: ctx.census });
+  assert.ok(placed && placed.draft.pieces.length === d.pieces.length + 1, "placed");
+  assert.deepEqual(errors(placed.draft), [], "where the hole holds");
+  assert.equal(placed.id, nextId(d), "and named, to be selected");
+  const big = garden.find((e) => e.id === "*/hazard/water")!;
+  assert.equal(placeNear(lane("garden", [], 8, 6), big, [4, 3], { host, palette: garden }), null, "nowhere it holds: nothing");
 });
 
 void test("dragCheck: a drag (or the armed ghost) is checked again only when its snapped place changes; the hole without the piece once a drag", () => {

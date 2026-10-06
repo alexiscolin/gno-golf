@@ -8,7 +8,7 @@
 // made: the board, the inspector and the keys all ask first (edit.ts).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
-import { canPlace, toWorld, copyPiece, errorsOf, fixOf, movePiece, newErrors, removePiece, snap, whereOf, clampMove } from "@/lib/builder/edit";
+import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, removePiece, snap, whereOf, clampMove } from "@/lib/builder/edit";
 import { gauges, offAtLimit, testGate, verdict } from "@/lib/builder/editor";
 import { frame } from "@/lib/builder/gg1";
 import { turnPiece } from "@/lib/builder/handles";
@@ -125,6 +125,21 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     tryEdit({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? movePiece(piece, to) : p)) }, "");
   };
   const fix = (i: Issue) => quick && tryEdit(fixOf(i, draft, quick), "No free place near it: move it by hand.");
+  // the keyboard: the tee or the cup moved as a drag lets it go; the armed piece dropped between them, then selected
+  const moveEnd = (which: "tee" | "pin", d: V) => {
+    if (!quick || !full) return;
+    const r = dropEnd(draft, which, snap([draft[which][0] + d[0], draft[which][1] + d[1]], 0.25), quick, full);
+    if ("why" in r) return r.why && say(r.why);
+    set(r);
+  };
+  const dropArmed = () => {
+    if (!armed || !full) return;
+    const r = placeNear(draft, armed, [(draft.tee[0] + draft.pin[0]) / 2, (draft.tee[1] + draft.pin[1]) / 2], full);
+    if (!r) return say("No free place for it between the tee and the cup.");
+    set(r.draft);
+    setArmed(null);
+    setSelected(r.id);
+  };
   // another world: judged there before it is made (edit.ts toWorld), on the draft as it is once that world's pieces are in
   const world = (w: string) => {
     if (!full) return;
@@ -145,12 +160,15 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if (e.key === "Alt") return setFine(true);
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
       if (e.key === "Escape") return (setArmed(null), setSelected(null));
+      const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      const step = (k: string) => arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V;
+      if (e.key === "Enter" && armed && !t.closest("button, a")) return (e.preventDefault(), dropArmed());
+      if ((selected === "tee" || selected === "pin") && arrows[e.key]) return (e.preventDefault(), moveEnd(selected, step(e.key)));
       if (!piece) return;
       if (mod && e.key.toLowerCase() === "d") return (e.preventDefault(), copy());
       if (e.key === "Delete" || e.key === "Backspace") return (e.preventDefault(), remove());
       if (e.key.toLowerCase() === "r" && !mod) return turn();
-      const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-      if (arrows[e.key]) return (e.preventDefault(), nudge(arrows[e.key].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V));
+      if (arrows[e.key]) return (e.preventDefault(), nudge(step(e.key)));
     };
     const up = (e: KeyboardEvent) => e.key === "Alt" && setFine(false);
     window.addEventListener("keydown", key);

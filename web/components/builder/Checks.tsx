@@ -22,8 +22,8 @@ export default function Checks({ verdict, gauges, issues, busy, onSelect, onFix 
       {issues.length > 0 && (
         <ul className="issues" aria-label="What to fix, errors first">
           {issues.map((i, k) => (
-            <li key={k} className={`issue issue--${i.severity === "error" ? "error" : "warn"}`} onClick={() => i.piece && onSelect(i.piece)}>
-              <span>{i.text}</span>
+            <li key={k} className={`issue issue--${i.severity === "error" ? "error" : "warn"}`}>
+              {i.piece ? <button type="button" className="issue__go" onClick={() => onSelect(i.piece!)}>{i.text}</button> : <span>{i.text}</span>}
               {i.piece && i.severity === "error" ? <button type="button" className="btn btn--ghost btn--s" onClick={(e) => (e.stopPropagation(), onFix(i))}>Move it</button> : <span />}
             </li>
           ))}
