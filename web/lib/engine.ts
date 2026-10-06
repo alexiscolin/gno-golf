@@ -82,8 +82,8 @@ const { maxRoundStrokes, maxPower: MAX_POWER } = RULES;
 const HUD = { top: 108, bottom: 136, side: 14 };
 // the community's holes listed with the cups (off until the builder is out)
 const COMMUNITY = process.env.NEXT_PUBLIC_COMMUNITY === "1";
-const OVERVIEW_MS = 1500;
-const NO_TAKEN: ReadonlySet<string> = new Set(); // how long a new hole is shown whole before closing on the ball
+const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
+const NO_TAKEN: ReadonlySet<string> = new Set(); // the takedown list when none could be read
 
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
