@@ -5,6 +5,8 @@ import (
 	"chain/banker"
 	"chain/runtime/unsafe"
 	"strconv"
+
+	"gno.land/p/nt/bptree/v0"
 )
 
 // A Legendary is auctioned, one at a time (ADR-007): the owner starts it at
@@ -25,8 +27,9 @@ type auction struct {
 }
 
 var (
-	auc  *auction // the auction under way, or ended and not settled; nil for none
-	last *auction // the last one settled, nil before the first
+	auc     *auction       // the auction under way, or ended and not settled; nil for none
+	last    *auction       // the last one settled, nil before the first
+	offered *bptree.BPTree // Legendary id -> int64, the reserve it was first offered at
 )
 
 const errNoAuction = "gnomes: no auction of this gnome to settle"
@@ -59,7 +62,16 @@ func StartAuction(cur realm, id, hours int64) {
 	if hours < 1 || hours > maxHours {
 		panic("gnomes: an auction runs 1 to 168 hours")
 	}
-	auc = &auction{id: id, reserve: prices[auctionTier], end: now() + hours*3600}
+	// Never a discount: a Legendary offered before comes back at no less
+	// than the reserve it was first offered at; SetPrice lowers the reserve
+	// of those never offered only.
+	reserve := prices[auctionTier]
+	if v := offered.Get(itoa(id)); v == nil {
+		offered.Set(itoa(id), reserve)
+	} else if first := v.(int64); first > reserve {
+		reserve = first
+	}
+	auc = &auction{id: id, reserve: reserve, end: now() + hours*3600}
 	chain.Emit("AuctionStarted", "id", itoa(id), "reserve", itoa(auc.reserve), "end", itoa(auc.end))
 }
 
@@ -201,10 +213,12 @@ func minBidOver(top int64) int64 {
 
 // Auction is the auction under way, else the last one settled, else
 // `{"version":1,"id":""}`. "min" is the next bid's least, 0 once no bid is
-// taken ("over": past its end, settled or not):
+// taken ("over": past its end, settled or not). "paused": the sale is
+// paused, no bid taken for now; an auction running when the pause began is
+// not over and keeps its "min", which it resumes at:
 //
 //	{"version":1,"id":"104","reserve":777000000,"top":0,"bidder":"",
-//	 "end":<unix>,"min":777000000,"over":false,"settled":false}
+//	 "end":<unix>,"min":777000000,"over":false,"paused":false,"settled":false}
 func Auction() string {
 	a := auc
 	if a == nil {
@@ -212,11 +226,15 @@ func Auction() string {
 			return noneJSON
 		}
 	}
-	over, min := a.settled || now() >= a.end, int64(0)
+	// A pause freezes the clock: an auction still running when it began is
+	// not over, whatever the time, and resumes at its minimum (resume).
+	paused := !a.settled && !mintOpen
+	over, min := a.settled || now() >= a.end && (!paused || a.end <= pausedAt), int64(0)
 	if !over {
 		min = minBid()
 	}
 	return `{"version":1,"id":"` + itoa(a.id) + `","reserve":` + itoa(a.reserve) + `,"top":` + itoa(a.top) +
 		`,"bidder":` + jsonString(a.bidder.String()) + `,"end":` + itoa(a.end) + `,"min":` + itoa(min) +
-		`,"over":` + strconv.FormatBool(over) + `,"settled":` + strconv.FormatBool(a.settled) + `}`
+		`,"over":` + strconv.FormatBool(over) + `,"paused":` + strconv.FormatBool(paused) +
+		`,"settled":` + strconv.FormatBool(a.settled) + `}`
 }

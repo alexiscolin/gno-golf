@@ -66,6 +66,60 @@ func TestAPausePastTheEndRefusesTheSettle(cur realm, t *testing.T) {
 	uassert.Equal(t, alice, who)
 }
 
+// During a pause Auction says so, and keeps the minimum the auction will
+// resume at: it is not over, even past the end it had.
+func TestAPausedAuctionSaysPaused(cur realm, t *testing.T) {
+	fresh(t, cur)
+	id := legend()
+	testing.SetRealm(asUser(deployer, nil))
+	StartAuction(cross(cur), id, 1)
+	uassert.True(t, strings.Contains(Auction(), `"min":777000000,"over":false,"paused":false,"settled":false`), Auction())
+	SetMintOpen(cross(cur), false)
+	uassert.True(t, strings.Contains(Auction(), `"min":777000000,"over":false,"paused":true,"settled":false`), Auction())
+	skip(2 * 3600) // past the end it had
+	uassert.True(t, strings.Contains(Auction(), `"min":777000000,"over":false,"paused":true,"settled":false`), Auction())
+	SetMintOpen(cross(cur), true)
+	uassert.True(t, strings.Contains(Auction(), `"over":false,"paused":false`), Auction())
+}
+
+// One over before the pause began stays over through it.
+func TestAnAuctionOverBeforeThePauseSaysOver(cur realm, t *testing.T) {
+	fresh(t, cur)
+	testing.SetRealm(asUser(deployer, nil))
+	StartAuction(cross(cur), legend(), 1)
+	skip(3600 + 60)
+	SetMintOpen(cross(cur), false)
+	uassert.True(t, strings.Contains(Auction(), `"min":0,"over":true,"paused":true,"settled":false`), Auction())
+}
+
+// Never a discount: a Legendary offered once comes back at no less than its
+// first reserve, whatever SetPrice did since; one never offered takes the
+// price in force.
+func TestALegendaryComesBackAtItsReserve(cur realm, t *testing.T) {
+	fresh(t, cur)
+	a, b := legend(), nthOfTier(auctionTier, 1)
+	testing.SetRealm(asUser(deployer, nil))
+	StartAuction(cross(cur), a, 1)
+	skip(3600)
+	Settle(cross(cur), a) // no bid
+	SetPrice(cross(cur), "legendary", 300_000_000)
+	StartAuction(cross(cur), a, 1)
+	uassert.Equal(t, int64(777_000_000), auc.reserve, "its first reserve")
+	CancelAuction(cross(cur))
+	StartAuction(cross(cur), b, 1)
+	uassert.Equal(t, int64(300_000_000), auc.reserve, "never offered: the price in force")
+	CancelAuction(cross(cur))
+	// a cancelled offer counts as offered
+	SetPrice(cross(cur), "legendary", 200_000_000)
+	StartAuction(cross(cur), b, 1)
+	uassert.Equal(t, int64(300_000_000), auc.reserve)
+	CancelAuction(cross(cur))
+	// a higher price in force is taken: no discount, a raise is the owner's
+	SetPrice(cross(cur), "legendary", 900_000_000)
+	StartAuction(cross(cur), a, 1)
+	uassert.Equal(t, int64(900_000_000), auc.reserve)
+}
+
 // An auction that ended before the pause is not reopened by the resume.
 func TestAnAuctionOverBeforeThePauseStaysOver(cur realm, t *testing.T) {
 	fresh(t, cur)
@@ -118,9 +172,9 @@ func TestAnEndedAuctionShowsNoMinimum(cur realm, t *testing.T) {
 	id := legend()
 	testing.SetRealm(asUser(deployer, nil))
 	StartAuction(cross(cur), id, 1)
-	uassert.True(t, strings.Contains(Auction(), `"min":777000000,"over":false,"settled":false`), Auction())
+	uassert.True(t, strings.Contains(Auction(), `"min":777000000,"over":false,"paused":false,"settled":false`), Auction())
 	skip(3600)
-	uassert.True(t, strings.Contains(Auction(), `"min":0,"over":true,"settled":false`), Auction())
+	uassert.True(t, strings.Contains(Auction(), `"min":0,"over":true,"paused":false,"settled":false`), Auction())
 	Settle(cross(cur), id)
-	uassert.True(t, strings.Contains(Auction(), `"min":0,"over":true,"settled":true`), Auction())
+	uassert.True(t, strings.Contains(Auction(), `"min":0,"over":true,"paused":false,"settled":true`), Auction())
 }

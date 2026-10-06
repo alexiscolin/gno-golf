@@ -67,7 +67,7 @@ func setUp(_ int, rlm realm, deployer address) {
 	}
 	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
 	auc, last, closeAt, pausedAt = nil, nil, 0, 0
-	bought, inWindow, equipped, held, byBest = seeded(), seeded(), seeded(), seeded(), seeded()
+	bought, inWindow, equipped, held, byBest, offered = seeded(), seeded(), seeded(), seeded(), seeded(), seeded()
 	earned, kindOf, nextEarned, rows = seeded(), seeded(), firstEarned, storeReader{}
 }
 

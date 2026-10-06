@@ -66,8 +66,12 @@ genesis's unsold gnomes are closed for good: `Buy`, `AddWave` and
 `StartAuction` refuse them ("the genesis sale closed on <date>"), and its
 final supply is readable on chain (`Collection`: the series' `sold` and
 `closed`; `Gnome`: `closed`; `Sold` stays the sold bitmap). An auction under
-way at the close runs to its end and settles; a Legendary it leaves unsold
-is closed with the rest. A later series is not closed by it, and earned
+way at the close runs to its end and settles: `Bid` does not read the date,
+so it keeps taking bids until that auction's end, and a Legendary in its
+auction is not reported closed until it settles unsold. No auction starts
+after the close (`StartAuction` refuses every unsold genesis id), so the
+last auctions must be started before it. A Legendary an auction leaves
+unsold is closed with the rest. A later series is not closed by it, and earned
 gnomes never are. **Recommended date**: about 30 days after wave 7 opens,
 with a last auction of each unsold Legendary before it, announced at launch
 with the waves.
@@ -80,7 +84,10 @@ written first, then the sum goes to the treasury with an `OriginSend` banker,
 which can spend this call's envelope and nothing else.
 
 **A Legendary is auctioned, one at a time.** The owner starts it with
-`StartAuction(id, hours)`, its reserve the tier's price (777 GNOT). The first
+`StartAuction(id, hours)`, its reserve the tier's price (777 GNOT), and never
+less than the reserve that Legendary was first offered at: an unsold one
+comes back at no discount, and `SetPrice` lowers the reserve of Legendaries
+never offered only (each first reserve is kept, a row per Legendary). The first
 bid meets the reserve; each next beats the last by the larger of 5% and 5
 GNOT; a bid in the last 10 minutes moves the end to 10 minutes after it.
 The realm holds the top bid alone: the bid it beats is refunded in the same
@@ -88,7 +95,9 @@ call (`RealmSend`, after the state is written). Once the end is past anyone
 settles: the gnome to the winner, the bid to the treasury; with no bid it stays
 unsold. `CancelAuction` only before the first bid. `Sweep` sends the treasury
 any stray coins, never the escrow. `Auction()` is the one under way, else
-the last one settled; past its end it says `"over":true` and a "min" of 0.
+the last one settled; past its end it says `"over":true` and a "min" of 0,
+and during a pause `"paused":true` with the "min" it resumes at (one still
+running when the pause began is not over, whatever the time).
 A pause (`SetMintOpen(false)`) freezes the auction: no bid, no settle, no
 new auction; on resume its end moves on by the time paused, and to at least
 the soft close from then. Without it, a pause (or a stolen owner key: bid
@@ -150,7 +159,7 @@ it leaves them and refuses to move an earned one.
 
 | what | bytes | deposit | golden |
 |---|---|---|---|
-| the realm's code with the portrait's drawing, staged (no catalogue), and p/gnogolf/weblink | 167,391 and 976 | 16.8 GNOT, the deployer | `stage.sh` |
+| the deploy: the realm with the portrait's drawing (168,513 bytes of source, staged, no catalogue), and p/gnogolf/weblink | 249,818 and 2,029 stored | 24.98 and 0.20 GNOT, the deployer (252M gas) | an `addpkg` on an in-process node (below) |
 | the genesis published as the catalogue lays it out, with a wave | 64,232 | 6.4 GNOT, the owner | `z_storage_genesis` |
 | a first buy (was 10,465 with enumerable and a traits copy) | 4,333 | 0.43 GNOT, the buyer | `z_storage_buy` |
 | an earned gnome | 4,038 | 0.40 GNOT, the player | `z_storage_earned` |
@@ -160,6 +169,15 @@ it leaves them and refuses to move an earned one.
 | a first buy (2.45M while a sold count in the series rewrote its rows) | 2.62M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
+
+The deploy's deposit is what a chain stores, not the source's size: the
+package and its preprocessed code, about one and a half times the staged
+source. It was measured with the onyx toolchain's integration harness
+(`gno.land/pkg/integration`, a txtar that loads store and the `p/nt`
+imports, then `gnokey maketx addpkg` of the staged weblink and gnomes on
+its in-process node: `STORAGE DELTA`), and agrees with the local chain's
+20.6 GNOT for gnomes before the portrait's art. `addpkg` is sent with a
+`-max-deposit` of 40 GNOT, as planned.
 | `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
 
 Every figure above is `gno test`'s, and a chain charges more. `gno test`
@@ -213,6 +231,7 @@ the traits is the user's call.
 | Buy | a non-player in the player window, a player over its cap | store record, per-wave cap | `TestThePlayerWindowIsForPlayers`, `TestARecordInEitherModeCounts` |
 | Buy | a wallet over its cap, in one call or several | lifetime cap per tier, batch checked whole | `TestAWalletBuysUpToItsLifetimeCap` |
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
+| SetPrice, StartAuction | an unsold Legendary auctioned again below the reserve it was first offered at | its first reserve kept, a floor | `TestALegendaryComesBackAtItsReserve` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave, StartAuction | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
 | Bid, Settle | an auction under way cut short by the close; its unsold Legendary sold later | runs to its end; then closed | `TestARunningAuctionFinishesAfterTheClose`, `TestALegendaryUnsoldAtTheCloseIsClosed` |
@@ -224,6 +243,7 @@ the traits is the user's call.
 | CancelAuction | a bidder's auction cancelled | before the first bid only | `TestCancelOnlyBeforeTheFirstBid` |
 | SetMintOpen | a pause ending an auction at its current top bid (a stolen owner key: bid, pause) | the pause freezes it; resume pushes the end on; no settle while paused | `TestAPauseFreezesTheAuction`, `TestAPausePastTheEndRefusesTheSettle`, `TestAnAuctionOverBeforeThePauseStaysOver` |
 | Auction | a minimum shown for an auction that takes no bid | "over", "min" 0 | `TestAnEndedAuctionShowsNoMinimum` |
+| Auction | a paused auction shown over, its page offering a settle that is refused | "paused", the "min" it resumes at; over only if over before the pause | `TestAPausedAuctionSaysPaused`, `TestAnAuctionOverBeforeThePauseSaysOver` |
 | SetCloseAt | a Legendary in its auction reported closed | not closed until settled unsold | `TestALegendaryInItsAuctionIsNotClosed` |
 | Buy, Settle | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | Sweep | the escrow swept | kept | `TestSweepKeepsTheEscrow` |
@@ -245,6 +265,7 @@ the traits is the user's call.
 | reads | a query made unbounded | bounded pages and lists | `TestEquippedManyAnswersABoardPage`, `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
 | Worn | a gnome shown that the player no longer owns; the best index left behind by a transfer or a burn | equipped only while owned; the index moved by the ledger's hook and Burn | `TestTheEquippedGnomeIsWornWhileOwned`, `TestTheBestIndexFollowsTheLedger` |
 | TokenURI, TokenMetadata | markup or JSON in a name | escaped | `TestANameCannotInjectMarkup`, `TestMetadataEscapesTheName` |
+| TokenMetadata | an earned gnome's link to a page the static site never builds (one per earned id) | its kind's page, `g/<kind>/` | `TestAnEarnedTokensMetadataNamesItsKind` |
 
 Reentrancy: the only calls out are to the banker, which runs no code, and
 store's reads, which write nothing; each send comes after the state is
