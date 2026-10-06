@@ -23,6 +23,19 @@ test("geo: the client reads /geo.json once; a blocked answer, or none, keeps the
   assert.equal(n, 1);
 });
 
+test("geo: ?geo=blocked (a dev build's test hook) reads the answer a blocked country gets", async () => {
+  const { geoBlocked } = await import("../lib/testhooks.ts");
+  assert.equal(geoBlocked("?geo=blocked"), true);
+  assert.equal(geoBlocked("?x=1&geo=blocked"), true);
+  assert.equal(geoBlocked("?geo=blockedx"), false);
+  assert.equal(geoBlocked(""), false);
+  const asked: string[] = [];
+  const get = (url: string) => (asked.push(url), Promise.resolve({ ok: true, json: () => Promise.resolve({ shop: url === "/geo.json" }) } as Response));
+  assert.equal(await readGeo(get, true), false);
+  assert.equal(await readGeo(get, false), true);
+  assert.deepEqual(asked, ["/geo-blocked.json", "/geo.json"]);
+});
+
 test("geo: the files the site serves say open, the blocked one says shut", () => {
   const read = (f: string) => JSON.parse(fs.readFileSync(new URL(`../public/${f}`, import.meta.url), "utf8")) as { shop: unknown };
   assert.equal(read("geo.json").shop, true);
