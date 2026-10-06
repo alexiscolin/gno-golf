@@ -1,0 +1,115 @@
+"use client";
+
+// The selected piece (the GUI spec's B2, the right column under the 3D): its
+// name and place, its sizes and numbers as label · slider · value rows with
+// each range written under them, its timing (a cycle strip for a timed
+// piece), and Turn · Copy · Delete with their keys. A setting that would
+// break the hole does not take: the slider stays at the last value that
+// holds, and the reason is said once (settings.ts; edit.ts canPlace).
+import { Segmented } from "@/components/ui";
+import { canPlace, newErrors, errorsOf, whereOf } from "@/lib/builder/edit";
+import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/lib/builder/palette";
+import { DIRS, sizesOf, TIMING, withClock, withDir, withNumber, withSize, withTiming } from "@/lib/builder/settings";
+import type { ValidateOptions } from "@/lib/builder/pipeline";
+import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
+
+const CLOCKS: Record<Clock, string> = { fixed: "Always", substep: "In a stroke", stroke: "Strokes" };
+const SIZE_NAMES = { r: "Size", length: "Length", width: "Width", depth: "Depth" } as const;
+const ARROWS = ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"];
+
+function Row({ label, value, range, shown, note, onChange, onDone }: { label: string; value: number; range: Range; shown?: string; note?: string; onChange: (v: number) => void; onDone: () => void }) {
+  return (
+    <label className="range">
+      <span>{label}</span>
+      <input type="range" min={range.min} max={range.max} step={range.step} value={value} onChange={(e) => onChange(Number(e.target.value))} onPointerUp={onDone} onKeyUp={onDone} onBlur={onDone} />
+      <output>{shown ?? +value.toFixed(2)}</output>
+      <small>{note ?? `${range.min} to ${range.max}`}</small>
+    </label>
+  );
+}
+
+export default function Inspector({ draft, piece, quick, full, onPreview, onCommit, onCancel, onSet, onSay, onTurn, onCopy, onDelete }: {
+  draft: Draft;
+  piece: Piece | null;
+  quick: ValidateOptions;
+  full: ValidateOptions;
+  onPreview: (d: Draft) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+  /** a one-click change: made at once */
+  onSet: (d: Draft) => void;
+  onSay: (text: string) => void;
+  onTurn: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
+  if (!piece) return <p className="nothing">Select a piece to change it, or drag one in from the left.</p>;
+  const e = entryIn(piece.entry, quick.palette);
+  if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
+  const p = piece, ent: PaletteEntry = e;
+  // a setting tried: shown if the hole still holds (fast checks), else refused with why
+  const tryPiece = (next: Piece) => {
+    const why = canPlace(draft, next, quick);
+    if (why.length) return onSay(why[0].text);
+    onPreview({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? next : q)) });
+  };
+  const tryDraft = (next: Draft) => {
+    const why = newErrors(errorsOf(draft, quick), next, quick);
+    if (why.length) return onSay(why[0].text);
+    onPreview(next);
+  };
+  // a one-click change (a way, a clock): made if the hole holds, census and all
+  const setDraft = (next: Draft) => {
+    const why = newErrors(errorsOf(draft, full), next, full);
+    if (why.length) return onSay(why[0].text);
+    onSet(next);
+  };
+  // let go: kept if it holds with the census too
+  const done = () => {
+    const why = canPlace(draft, p, full);
+    if (why.length) return (onCancel(), onSay(why[0].text));
+    onCommit();
+  };
+  const at = whereOf(p.geometry), c = p.clock;
+  const t: Pulse | null = c.k === "substep" ? c : c.k === "stroke" ? draft.pulses[c.pulse] ?? null : null;
+  const unit = c.k === "substep" ? "substeps" : "strokes";
+  return (
+    <div className="insp">
+      <div className="insp__head">{ent.label}<small>{+at[0].toFixed(2)}, {+at[1].toFixed(2)}</small></div>
+      {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v))} onDone={done} />)}
+      {p.geometry.t === "bar" && ent.thick && <Row label="Thick" value={p.geometry.thick} range={ent.thick} onChange={(v) => tryPiece({ ...p, geometry: { ...(p.geometry as Extract<Piece["geometry"], { t: "bar" }>), thick: v } })} onDone={done} />}
+      {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : `${ent.bounce.min} to ${ent.bounce.max} (0: the field's)`} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}
+      {ent.scale && <Row label={ent.kind === "loop" ? "Speed" : "Grip"} value={p.params.scale ?? ent.scale.def} range={ent.scale} onChange={(v) => tryPiece(withNumber(p, ent, "scale", v))} onDone={done} />}
+      {ent.grade && <Row label="Grade" value={p.params.grade ?? ent.grade.def} range={ent.grade} onChange={(v) => tryPiece(withNumber(p, ent, "grade", v))} onDone={done} />}
+      {p.params.dir && (
+        <div className="range"><span>Way</span>
+          <Segmented className="seg--s insp__dirs" label="The way it pushes" value={String(DIRS.findIndex((d) => d[0] === Math.sign(p.params.dir![0]) && d[1] === Math.sign(p.params.dir![1])))}
+            options={ARROWS.map((a, i) => [String(i), a] as const)} onChange={(i) => setDraft({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? withDir(p, Number(i)) : q)) })} />
+        </div>
+      )}
+      {ent.clocks.length > 1 && (
+        <div className="range"><span>Timing</span>
+          <Segmented className="seg--s insp__clock" label="When it is there" value={c.k} options={ent.clocks.map((k) => [k, CLOCKS[k]] as const)} onChange={(k) => setDraft(withClock(draft, p.id, k, ent))} />
+        </div>
+      )}
+      {t && (
+        <>
+          <Row label="Every" value={t.every} range={{ min: TIMING.every.min, max: TIMING.every.max, step: 1, def: 40 }} shown={`${t.every}`} note={`a cycle of ${t.every} ${unit}`} onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, every: v }))} onDone={done} />
+          <Row label="On" value={t.on} range={{ min: 1, max: t.every - 1, step: 1, def: 1 }} shown={`${t.on} / ${t.every}`} note="there for this many of them" onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, on: v }))} onDone={done} />
+          <Row label="From" value={t.phase} range={{ min: 0, max: t.every - 1, step: 1, def: 0 }} shown={`step ${t.phase}`} note="where its cycle starts" onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, phase: v }))} onDone={done} />
+          <div className="cycle" aria-label={`There on ${t.on} of every ${t.every} ${unit}`}>
+            {Array.from({ length: Math.min(t.every, 40) }, (_, i) => <i key={i} className={(i + t.phase) % t.every < t.on ? "on" : ""} />)}
+          </div>
+        </>
+      )}
+      <div className="insp__acts">
+        <button type="button" className="btn btn--ghost" onClick={onTurn}>Turn<kbd>R</kbd></button>
+        <button type="button" className="btn btn--ghost" onClick={onCopy}>Copy<kbd>{MOD}D</kbd></button>
+        <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
+      </div>
+    </div>
+  );
+}
+
+/** The modifier key as this computer names it. */
+export const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";

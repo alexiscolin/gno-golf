@@ -7,7 +7,9 @@
 // knows. Rules and thresholds: docs/superpowers/specs/2026-10-06-hole-builder-design.md.
 import { inZone, segDist } from "../terrain";
 import type { PieceRef } from "../scene/census";
+import { RULES } from "../chain";
 import { LIMITS } from "./gg1";
+import { MIN_SHOT_WORK } from "./rules";
 import { CELL, laneOf, moves, reach } from "./lane";
 import type { HoleIn, PostIn, V, WallIn, ZoneIn } from "./types";
 import type { Cost } from "./wasm";
@@ -317,22 +319,30 @@ export function checkHole(h: HoleIn, { name = nameIn(h), entryOf = () => ({}) }:
   return out.filter((i) => !i.ref || judged(i.ref)).sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
 }
 
-/** A work gauge: what the hole uses of one of the realm's limits (0 to 1, past 1 refused). */
+/** A work gauge: what the hole adds of the room the realm leaves it (0 to 1, past 1 refused). */
 export interface Gauge {
   used: number;
   of: number;
   share: number;
 }
+const W = RULES.work;
+/** golf's shotBound with no wall: one shot's most (MaxWork and a step past it), whatever the hole. */
+export const SHOT_FLOOR = W.shot + (RULES.maxWork + RULES.maxWorkStep) * W.unit;
+/** golf's worstGas with nothing of the hole's: a first shot of minShotWork, whatever the hole. */
+export const STORM_FLOOR = W.shot + (RULES.maxWorkStep + MIN_SHOT_WORK) * W.unit;
 /**
- * The hole's work against the realm's limits, from builder.wasm's check: its
- * heaviest shot (refused past maxShot), a commit's first shot in its
- * dearest weather (refused past budget), and E11, a warning as either nears
- * its limit (each fixed wall costs every storm's puddle tries).
+ * The hole's work against the realm's limits, from builder.wasm's check, as
+ * what the hole adds over a floor every hole pays (a gauge on the whole
+ * would sit at 95% for a plain lane): its heaviest shot's walls and pulses'
+ * set-up (refused past maxShot), a commit's decoding, forecast, walls and
+ * set-up before a first shot in its dearest weather (refused past budget);
+ * E11, a warning as either nears its limit (each fixed wall costs every
+ * storm's puddle tries).
  */
 export function work(c: Cost, warnAt = WORK_WARN): { shot: Gauge; storm: Gauge; issues: Issue[] } {
   const g = (used: number, of: number): Gauge => ({ used, of, share: used / of });
-  const shot = g(c.bound, c.maxShot), storm = g(c.worst, c.budget), issues: Issue[] = [];
-  if (shot.share > warnAt) issues.push({ rule: "E11", severity: "warning", text: `Its heaviest shot is ${Math.round(shot.share * 100)}% of what a transaction can replay` });
+  const shot = g(c.bound - SHOT_FLOOR, c.maxShot - SHOT_FLOOR), storm = g(c.worst - STORM_FLOOR, c.budget - STORM_FLOOR), issues: Issue[] = [];
+  if (shot.share > warnAt) issues.push({ rule: "E11", severity: "warning", text: `Its walls and moving pieces take ${Math.round(shot.share * 100)}% of what one shot may cost` });
   if (storm.share > warnAt) issues.push({ rule: "E11", severity: "warning", text: `In its dearest weather, a first shot has ${c.room.toLocaleString("en")} units of room, at least ${c.minShot.toLocaleString("en")}` });
   return { shot, storm, issues };
 }

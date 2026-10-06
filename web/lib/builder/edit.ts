@@ -8,8 +8,9 @@
 import type { Issue } from "./checks";
 import type { ClockSpec, Draft, Geometry, Piece, V } from "./draft";
 import { entryParts, frame } from "./gg1";
+import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
-import type { PaletteEntry, Range } from "./palette";
+import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, validate, type ValidateOptions } from "./pipeline";
 
 /** A piece's settings at placement: each within its entry's range, its default when left out. */
@@ -111,7 +112,8 @@ export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: Is
   const v = validate({ ...rest, pieces: [...rest.pieces, piece] }, o);
   return v.issues.filter((i) => i.severity === "error" && (about(i, piece.id, v.refs) || (!i.piece && !had.has(same(i)))));
 }
-const errorsOf = (d: Draft, o: ValidateOptions) => validate(d, o).issues.filter((i) => i.severity === "error");
+/** The draft's errors (validate's, warnings left out). */
+export const errorsOf = (d: Draft, o: ValidateOptions) => validate(d, o).issues.filter((i) => i.severity === "error");
 
 /** The piece moved so its first point (whereOf) is at `to`, its shape and settings unchanged (a tunnel's way out is its own handle). */
 export function movePiece(p: Piece, to: V): Piece {
@@ -121,7 +123,25 @@ export function movePiece(p: Piece, to: V): Piece {
   return { ...p, geometry };
 }
 
-const snap = (v: V): V => [Math.round(v[0] * 4) / 4, Math.round(v[1] * 4) / 4];
+/** v on a grid of step (half a unit, the board's default; a quarter at the finest). */
+export const snap = (v: V, step = 0.5): V => [Math.round(v[0] / step) * step + 0, Math.round(v[1] / step) * step + 0];
+
+/** The last point from `from` toward `to` (a grid step at a time) that ok takes: `to` itself if it does; `from` if not even the first step does. */
+function walk(from: V, to: V, ok: (v: V) => boolean): V {
+  to = snap(to, QUARTER);
+  if (ok(to)) return to;
+  const n = Math.ceil(Math.max(Math.abs(to[0] - from[0]), Math.abs(to[1] - from[1])) / CELL);
+  let last = from;
+  for (let k = 1; k < n; k++) {
+    const v = snap([from[0] + ((to[0] - from[0]) * k) / n, from[1] + ((to[1] - from[1]) * k) / n], QUARTER);
+    if (!ok(v)) break;
+    last = v;
+  }
+  return last;
+}
+
+const without = (d: Draft, id: string) => ({ ...d, pieces: d.pieces.filter((q) => q.id !== id) });
+const replace = (d: Draft, p: Piece) => frame({ ...d, pieces: d.pieces.map((q) => (q.id === p.id ? p : q)) });
 
 /**
  * Where a drag of piece id toward `to` stops: `to` if the piece may go there,
@@ -131,18 +151,60 @@ const snap = (v: V): V => [Math.round(v[0] * 4) / 4, Math.round(v[1] * 4) / 4];
 export function clampMove(d: Draft, id: string, to: V, o: ValidateOptions): V {
   const p = d.pieces.find((q) => q.id === id);
   if (!p) return to;
-  const rest = { ...d, pieces: d.pieces.filter((q) => q.id !== id) }, before = errorsOf(rest, o);
-  const ok = (v: V) => canPlace(rest, movePiece(p, v), o, before).length === 0;
-  to = snap(to);
-  if (ok(to)) return to;
-  const from = whereOf(p.geometry), n = Math.ceil(Math.max(Math.abs(to[0] - from[0]), Math.abs(to[1] - from[1])) / CELL);
-  let last = from;
-  for (let k = 1; k < n; k++) {
-    const v = snap([from[0] + ((to[0] - from[0]) * k) / n, from[1] + ((to[1] - from[1]) * k) / n]);
-    if (!ok(v)) break;
-    last = v;
+  const rest = without(d, id), before = errorsOf(rest, o);
+  return walk(whereOf(p.geometry), to, (v) => canPlace(rest, movePiece(p, v), o, before).length === 0);
+}
+
+/** A drag of one of a piece's handles toward `to`: the piece within its entry's ranges (handles.ts), stopped at the last place the hole holds; the draft framed. */
+export function clampHandle(d: Draft, id: string, key: HandleKey, to: V, o: ValidateOptions): Draft {
+  const p = d.pieces.find((q) => q.id === id), e = p && entryIn(p.entry, o.palette), h = p && handlesOf(p).find((x) => x.key === key);
+  if (!p || !e || !h) return d;
+  const rest = without(d, id), before = errorsOf(rest, o);
+  const last = walk(h.at, to, (v) => canPlace(rest, setHandle(p, key, v, e), o, before).length === 0);
+  return replace(d, setHandle(p, key, last, e));
+}
+
+/** A drag of the tee or the cup toward `to`: stopped at the last place where the hole has no error it did not have. */
+export function clampEnd(d: Draft, which: "tee" | "pin", to: V, o: ValidateOptions): V {
+  const had = errorsOf(d, o);
+  return walk(d[which], to, (v) => newErrors(had, { ...d, [which]: v }, o).length === 0);
+}
+
+/** The errors an edit brings (a rule on a piece, or on the whole hole, that before did not have): none, it may be made. before: the draft's own errors before it. */
+export function newErrors(before: readonly Issue[], after: Draft, o: ValidateOptions): Issue[] {
+  const key = (i: Issue) => `${i.rule} ${i.piece ?? "-"}`, had = new Set(before.map(key));
+  return errorsOf(after, o).filter((i) => !had.has(key(i)));
+}
+
+/** A fresh piece name: p and the next number. */
+export function nextId(d: Draft): string {
+  const n = d.pieces.reduce((m, p) => Math.max(m, Number(/^p(\d+)$/.exec(p.id)?.[1] ?? 0)), 0);
+  return `p${n + 1}`;
+}
+
+/** The draft without the piece (its proofs kept: their key says whether they still hold, an undo brings them back). */
+export const removePiece = (d: Draft, id: string): Draft => without(d, id);
+
+/** The nearest place to p's (rings a grid step apart, out to FIX_REACH, never where it is) where it may go in rest; null if none. */
+function nearest(rest: Draft, p: Piece, o: ValidateOptions): Piece | null {
+  const before = errorsOf(rest, o), from = whereOf(p.geometry), seen = new Set<string>();
+  for (let r = CELL; r <= FIX_REACH + 1e-9; r += CELL) {
+    for (let k = 0; k < FIX_DIRECTIONS; k++) {
+      const a = (2 * Math.PI * k) / FIX_DIRECTIONS, v = snap([from[0] + r * Math.cos(a), from[1] + r * Math.sin(a)], QUARTER), key = v.join(" ");
+      if (seen.has(key) || (v[0] === from[0] && v[1] === from[1])) continue;
+      seen.add(key);
+      const moved = movePiece(p, v);
+      if (canPlace(rest, moved, o, before).length === 0) return moved;
+    }
   }
-  return last;
+  return null;
+}
+
+/** A copy of piece id, under a fresh name, at the nearest place it may go; the draft framed, or null if there is none near. */
+export function copyPiece(d: Draft, id: string, o: ValidateOptions): Draft | null {
+  const p = d.pieces.find((q) => q.id === id);
+  const c = p && nearest(d, { ...p, id: nextId(d) }, o);
+  return c ? frame({ ...d, pieces: [...d.pieces, c] }) : null;
 }
 
 /** How far fixOf looks for a place, and in how many directions on each ring. */
@@ -152,22 +214,11 @@ const FIX_DIRECTIONS = 16;
 /**
  * The one-click fix of an issue: its piece moved to the nearest place (rings
  * a grid step apart, out to FIX_REACH) where it may go, the draft framed
- * again; null when the issue
- * is the whole hole's (no piece to move) or no place near is free.
+ * again; null when the issue is the whole hole's (no piece to move) or no
+ * place near is free.
  */
 export function fixOf(issue: Issue, d: Draft, o: ValidateOptions): Draft | null {
   const p = issue.piece ? d.pieces.find((q) => q.id === issue.piece) : undefined;
-  if (!p) return null;
-  const rest = { ...d, pieces: d.pieces.filter((q) => q.id !== p.id) }, before = errorsOf(rest, o);
-  const from = whereOf(p.geometry), seen = new Set<string>();
-  for (let r = CELL; r <= FIX_REACH + 1e-9; r += CELL) {
-    for (let k = 0; k < FIX_DIRECTIONS; k++) {
-      const a = (2 * Math.PI * k) / FIX_DIRECTIONS, v = snap([from[0] + r * Math.cos(a), from[1] + r * Math.sin(a)]), key = v.join(" ");
-      if (seen.has(key) || (v[0] === from[0] && v[1] === from[1])) continue;
-      seen.add(key);
-      const moved = movePiece(p, v);
-      if (canPlace(rest, moved, o, before).length === 0) return frame({ ...d, pieces: d.pieces.map((q) => (q.id === p.id ? moved : q)) });
-    }
-  }
-  return null;
+  const moved = p && nearest(without(d, p.id), p, o);
+  return moved ? replace(d, moved) : null;
 }

@@ -125,6 +125,9 @@ check("golf.gno work model", () => {
   // the pulses' set-up, as the engine's snapshot gives it (setup) and adena.ts adds it to each shot and takes it off the cap
   assert.ok(has(golf, "w.setup += int64(len(p.Walls))*workPerPulseWall + int64(len(p.Posts))*workPerPulsePost"), "newWork(): the pulses' set-up changed");
   assert.ok(has(golf, "c -= w.setup / workPerUnit"), "next(): the set-up off the cap changed");
+  // the builder's work gauges (web/lib/builder/checks.ts SHOT_FLOOR, STORM_FLOOR) are these sums less the hole's part
+  assert.ok(has(golf, "return workPerShot + walls*workPerWall + (physics.MaxWork+physics.MaxWorkStep)*workPerUnit"), "shotBound() changed");
+  assert.ok(has(golf, "workPerShot + w.walls*workPerWall + w.setup + (physics.MaxWorkStep+minShotWork)*workPerUnit"), "worstGas() changed");
   assert.ok(has(golf, "c += w.setup"), "add(): the set-up per shot changed");
   // what HoleState says of it, which boardWork reads (the formula above its fallback)
   assert.ok(has(realm("state.gno"), 'w := newWork(h, nil) sb.WriteString(ufmt.Sprintf(`,"work":{"walls":%d,"pieces":%d,"setup":%d}`, w.walls, w.pieces, w.setup))'), "HoleState's work changed");

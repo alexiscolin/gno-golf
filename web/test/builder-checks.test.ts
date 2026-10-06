@@ -5,11 +5,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { checkHole, counts, work, ROUND_STROKES, WORK_WARN } from "../lib/builder/checks.ts";
+import { checkHole, counts, work, ROUND_STROKES, SHOT_FLOOR, STORM_FLOOR, WORK_WARN } from "../lib/builder/checks.ts";
 import { laneOf, reach } from "../lib/builder/lane.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
 import type { HoleIn, WallIn } from "../lib/builder/types.ts";
-import { host } from "./builder-fixture.ts";
+import { hexOf, host, lane } from "./builder-fixture.ts";
 
 const box = (x0: number, y0: number, x1: number, y1: number): WallIn[] =>
   [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]].map(([a, b, c, d]) => ({ a: [a, b], b: [c, d] }));
@@ -87,4 +87,15 @@ void test("work: the gauges from the realm's own numbers; E11 as either nears it
     return w.storm.share;
   });
   assert.ok(Math.max(...shares) > WORK_WARN, `${Math.max(...shares)}`);
+});
+
+void test("work: a gauge measures what the hole adds over the realm's fixed floor (one shot's most), so a plain lane sits low", () => {
+  const plain = host.check("x", hexOf(lane("garden", [])));
+  assert.ok(plain.ok);
+  const w = work(plain.cost);
+  assert.equal(w.shot.used, plain.cost.bound - SHOT_FLOOR);
+  assert.equal(w.shot.of, plain.cost.maxShot - SHOT_FLOOR);
+  assert.equal(w.storm.used, plain.cost.worst - STORM_FLOOR);
+  assert.ok(w.shot.share < 0.05 && w.storm.share < 0.3, `${w.shot.share} ${w.storm.share}`);
+  assert.deepEqual(w.issues, []);
 });

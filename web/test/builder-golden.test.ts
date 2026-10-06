@@ -15,18 +15,11 @@ import { checkHole, type EntryOf } from "../lib/builder/checks.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { canPlace, clampMove, fixOf, placePiece } from "../lib/builder/edit.ts";
 import type { Draft } from "../lib/builder/draft.ts";
-import type { Drawn } from "../lib/scene/census.ts";
-import type { Hole } from "../lib/scene/data.ts";
 import type { GHole } from "../lib/builder/types.ts";
 
-const { buildHole } = await import("../lib/scene/course.ts");
 const garden = await loadPalette("garden");
 await loadWorld("garden");
-const census = (s: Hole) => {
-  const out = new Map<string, Drawn>();
-  buildHole(s, { census: (p, d) => out.set(`${p.set}${p.i}${p.pulse ?? ""}`, d) });
-  return out;
-};
+const { census } = await import("../lib/builder/drawn.ts");
 const put = (id: string, entry: string, at: [number, number], p: Parameters<typeof placePiece>[3] = {}) => placePiece(garden.find((e) => e.id === entry)!, id, at, p);
 const run = (d: Draft, over: Partial<Parameters<typeof validate>[1]> = {}) => validate(d, { host, palette: garden, census, ...over }).issues.filter((i) => i.severity === "error");
 const said = (d: Draft, over: Partial<Parameters<typeof validate>[1]> = {}) => run(d, over).map((i) => `${i.rule} ${i.piece ?? "-"}: ${i.text}`);
@@ -84,7 +77,7 @@ for (const [what, make, want] of cases) {
 void test("E9 and E11: the data's size and the work, from the chain's own numbers", () => {
   const d = lane("garden", []);
   assert.deepEqual(said(d, { maxBytes: 100 }), ["E9 -: The hole is 367 bytes of data: at most 100"]);
-  const warn = validate(d, { host, palette: garden, census, warnAt: 0.01 }).issues.filter((i) => i.rule === "E11").map((i) => i.severity);
+  const warn = validate(d, { host, palette: garden, census, warnAt: 0.005 }).issues.filter((i) => i.rule === "E11").map((i) => i.severity);
   assert.deepEqual(warn, ["warning", "warning"]);
 });
 
