@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gnomes gallery · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- The gallery: pick a gnome. Its one action is a card; the rest waits behind a tap.
+     states: ?state=open (default) | players (the players' window, this wallet without a record) | soldout (the wave)
+     | teaser (nothing open yet) | closed (the sale over: made and never made) | loading | empty | error
+     | mine (the Mine view: the player's gnomes, who sees what, Share my team) | mineempty -->
+<style>
+  .gal { width: min(1180px, 100%); margin: 0 auto; }
+  .front__head .closes { margin-top: 10px; }
+
+  /* the sale now, one row: the wave, the Legendary's auction */
+  .now { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--gap-grid); margin: 18px 0 20px; }
+  .now > * { display: grid; gap: 8px; align-content: center; color: inherit; text-decoration: none; }
+  .now__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); font-size: 15px; font-weight: 700; }
+  .now > *, .now--auction > * { min-width: 0; }
+  .now--auction { grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; background: var(--panel-dots), #2b2550; color: var(--paper); }
+  .now--auction .gtile { border-radius: 12px; }
+  .now--auction b { color: var(--tier-legendary); }
+  .now--auction small { display: block; font-size: 12.5px; opacity: .8; }
+  .now--closed { grid-template-columns: 1fr; }
+  .now--reveal { grid-template-columns: auto 1fr auto; }
+  .reveal { display: flex; gap: var(--sp-1); }
+  .reveal .gtile { width: 52px; }
+  .now--auction small { color: #e2dcff; opacity: 1 !important; }
+  .split { height: 22px; border: var(--edge); border-radius: var(--pill); overflow: hidden; background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(var(--ink-rgb), .12) 6px 8px), var(--paper); }
+  .split > i { display: block; height: 100%; background: var(--turf); border-right: var(--edge); }
+  .tiers { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; }
+  .tiers div { display: flex; align-items: center; gap: 6px; }
+  .tiers dt, .tiers dd { margin: 0; } .tiers dd { font-size: 13px; }
+
+  /* filters: what is shown, the tiers, a name; the rest behind "More filters" */
+  .filters { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 0 14px; background: linear-gradient(var(--s0) 80%, transparent); }
+  .filters .seg button { min-height: 40px; padding: 6px 14px; font-size: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 8px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 0 var(--ink); }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .chip svg { width: 14px; height: 14px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
+  .search { position: relative; margin-left: auto; width: 230px; }
+  .search svg { position: absolute; left: 12px; top: 12px; width: 20px; height: 20px; color: var(--ink-soft); }
+  .search .field { padding-left: 40px; height: 44px; }
+  .filters__more { display: none; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); gap: 18px; }
+  .blank { display: grid; justify-items: center; gap: 10px; padding: 50px 20px; text-align: center; }
+  .blank h3 { margin: 0; font-size: 24px; }
+  .skel { aspect-ratio: .82; border: 3px dashed rgba(var(--ink-rgb), .25); border-radius: var(--r-card); }
+  .foot { margin: var(--sp-6) auto 0; text-align: center; }
+  .pager { display: grid; justify-items: center; gap: var(--sp-2); margin-top: var(--sp-5); }
+  .pager .fine { margin: 0; }
+  @media (max-width: 900px) { .now { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-3); }
+    .now--auction { grid-template-columns: 52px minmax(0, 1fr); } .now--auction .btn { grid-column: 1 / -1; }
+    .now--reveal { grid-template-columns: 1fr; } .now--reveal .btn { grid-column: auto; }
+    .filters .chips, .filters .search { display: none; }
+    .filters { flex-wrap: nowrap; } .filters .seg { flex: 1; }
+    .filters__more { display: inline-flex; }
+    .gcard__name { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<main class="front tint--shop" id="app"></main>
+<script src="kit.js"></script>
+<script>
+  const { ICON, TIER_ICON, tierChip, gnome, state, corners, netbanner, CLOSES, closes, shareRow } = Kit;
+  const s = state("open");
+  const closed = s === "closed";
+  // Mine: the gallery's own view of the player's gnomes (no page of its own), the best first
+  const mineView = s === "mine" || s === "mineempty";
+  const mine = new Set([104, 94, 95, 73, 14, 2]);
+  const players = ["nym-moustache943", "nym-itsok123", "nym-zxxma042", "nym-pebble77"];
+  // a gnome found a player (the stand-in: one in four while on sale, two in three when closed, every one when sold out)
+  const owned = (id) => mine.has(id) || (closed ? id % 3 !== 0 : s === "soldout" || id % 4 === 3);
+  const list = (mineView ? [104, 94, 95, 73, 2, 14] : [1, 3, 4, 93, 96, 97, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20]).map((id) => gnome(id, { [id]: mine.has(id) ? "nym-twee" : owned(id) ? players[id % 4] : "" }));
+
+  // a card: the gnome, then one fact: his price, his player, yours, or never made
+  const card = (g) => {
+    const isMine = mine.has(g.id), never = closed && !g.owner;
+    const fact = never ? "Never made" : isMine ? (g.id === 94 ? "You play" : g.id === 104 ? "Everyone sees" : "Yours") : g.owner;
+    const cls = ["gcard", isMine && "gcard--mine", g.owner && !isMine && !closed && "gcard--taken", never && "gcard--never"].filter(Boolean).join(" ");
+    return `<button class="${cls}" aria-label="${g.name}, number ${g.id}, ${g.tier}, ${never ? "never made" : isMine ? "yours" : g.owner ? "plays with " + g.owner : g.price + " GNOT"}">
+      <span class="gtile gtile--${g.tier} tint--${g.world}"><img src="${g.art}" alt="" loading="lazy"></span>
+      <span class="gcard__name">${g.name.split(" of ")[0]}<small>#${g.id}</small></span>
+      <span class="gcard__foot">${tierChip(g.tier)}${fact ? `<span class="gcard__who">${fact}</span>` : `<span class="gcard__price">${g.price} <small>GNOT</small></span>`}</span></button>`;
+  };
+
+  const wave = {
+    teaser: `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span>Opens Tue 6 Oct, 18:00 UTC</span></div></div>`,
+    soldout: `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span>All 104 found a player</span></div><div class="track"><i style="width:100%"></i></div></div>`,
+    players: `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span class="tag tag--gold">Players first · until Thu 18:00 UTC</span></div>
+      <p class="note note--warn" style="margin:0">Save one round on-chain to buy now, or come back Thursday. <a href="#">Play a hole →</a></p></div>`,
+  }[s] || `<div class="panel"><div class="now__row"><span class="tag">Wave 1 · Garden</span><span>58 of 104 found a player · 41 players</span></div><div class="track"><i style="width:56%"></i></div></div>`;
+  // the teaser: a daily spotlight on one Legendary; all seven are public (on chain and in the gallery) from the start
+  const reveal = `<a class="panel now--auction now--reveal" href="share-card.html?state=reveal"><span class="reveal"><span class="gtile gtile--legendary"><img src="img/g12.png" alt=""></span></span>
+      <span>Today's Legendary: The Miller<small>A spotlight a day on one of the seven · all are in the gallery</small></span><span class="btn btn--gold btn--s">See him</span></a>`;
+  // the wave's Legendary: a fixed price as every tier, one per wallet, the first buyer has him
+  const legendary = s === "teaser" ? reveal : `<a class="panel now--auction" href="gnome-sheet.html?state=legendary"><span class="gtile gtile--legendary"><img src="img/g12.png" alt=""></span>
+      <span>The Miller · Legendary<small><b>1,296 GNOT</b> · one of one, one per wallet</small></span><span class="btn btn--gold btn--s">See him</span></a>`;
+  // Mine: who sees what, one line, and the team shared with the game's own Share row
+  const who = `<div class="panel"><div class="now__row"><span>Everyone sees <b>The Miller</b> · You play <b>Tansy</b></span><button class="linkish">Show Tansy to everyone · ≈ 0.01 GNOT</button></div>${shareRow("Share my team")}</div>`;
+  const summary = `<div class="panel"><div class="now__row"><span class="tag">Closed on ${CLOSES}</span><span>486 made · 234 never made</span></div>
+      <div class="split" role="img" aria-label="486 made, 234 never made, of 720"><i style="width:67.5%"></i></div>
+      <details class="more"><summary>By tier</summary><dl class="tiers">${[["common", 352, 504], ["rare", 101, 144], ["epic", 26, 65], ["legendary", 7, 7]].map(([t, m, of]) => `<div><dt>${tierChip(t)}</dt><dd><b>${m}</b> of ${of}</dd></div>`).join("")}</dl></details></div>`;
+
+  const chip = (t, n) => `<button class="chip" aria-pressed="true">${TIER_ICON[t]}${t[0].toUpperCase() + t.slice(1)} <small>${n}</small></button>`;
+  const filters = `<div class="filters" role="search">
+      <div class="seg" role="radiogroup" aria-label="Show">${(closed ? [["Made", false], ["Mine", false], ["All 720", true]] : mineView ? [["On sale", false], ["Mine<span class=\"wide-only\"> · 6</span>", true], ["All 720", false]] : [["On sale", true], ["Mine", false], ["All 720", false]]).map(([n, on]) => `<button role="radio" aria-checked="${on}" class="${on ? "on" : ""}">${n}</button>`).join("")}</div>
+      <div class="chips" aria-label="Tier">${chip("common", closed ? 352 : 43)}${chip("rare", closed ? 101 : 11)}${chip("epic", closed ? 26 : 4)}</div>
+      <details class="more wide-only"><summary>More filters</summary><p>Hat · beard · extras · trail · world</p></details>
+      <label class="search">${ICON.search}<input class="field" placeholder="A name or a number" aria-label="Find a gnome by name or number"></label>
+      <button class="btn btn--ghost btn--s filters__more">Filters</button>
+    </div>`;
+
+  const body = {
+    loading: `<div class="grid" aria-busy="true">${Array.from({ length: 12 }, () => '<span class="skel"></span>').join("")}</div>`,
+    error: `<div class="blank"><h3>The chain did not answer</h3><button class="btn btn--main">Try again</button></div>`,
+    empty: `<div class="blank"><h3>No gnome like that one</h3><button class="btn btn--ghost">Clear the filters</button></div>`,
+    mineempty: `<div class="blank"><h3>None yet</h3><p style="margin:0;font-size:16px">You play with the free five and the gnomes you earn on the course.</p><button class="btn btn--ghost">See the gnomes on sale</button></div>`,
+  }[s] || `<div class="grid">${list.map(card).join("")}</div>
+    ${mineView ? "" : `<div class="pager"><button class="btn btn--ghost">Show more</button><span class="fine">${list.length} of ${closed ? 720 : 58}</span></div>`}`;
+
+  document.getElementById("app").innerHTML = `
+    ${corners("Back to the game", `<button class="adena adena--on" aria-label="Adena, connected as nym-twee"><span class="adena__logo">A</span><span class="adena__text"><small>Adena</small><b>nym-twee</b></span></button>`)}
+    <div class="gal">
+      <header class="front__head">
+        <span class="eyebrow--pill">The gnomes</span>
+        <h1 class="display inked">Who's on the ball?</h1>
+        ${closed ? "" : closes()}
+      </header>
+      <div class="now${closed || mineView ? " now--closed" : ""}">${closed ? summary : s === "mine" ? who : s === "mineempty" ? "" : wave + legendary}</div>
+      ${filters}
+      ${body}
+      <footer class="foot">${Kit.legal()}<details class="more"><summary>How the gnomes work</summary>
+        <p>You pick the exact gnome, he rolls for you, and rivals see him on your ghost. Cosmetic only, for adults, not an investment: nothing promises he can be sold on. The prices are golf numbers: 36, par for nine holes; 72, a course's par; 336, the dimples on a ball; 1,296, eighteen holes at par 72.</p></details></footer>
+    </div>
+    ${netbanner()}`;
+</script>
+</body>
+</html>

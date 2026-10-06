@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Builder on a phone · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- /build on a phone, or any touch screen, or under 900 px: no editor, no builder.wasm. One screen:
+     the Builder is for a computer, a link to open it there, and holes to play (playing stays on the phone).
+     states: ?state=both (default: your holes and the community's) | community (no hole of yours) -->
+<style>
+  .bp { width: min(480px, 100%); margin: 0 auto; display: grid; gap: var(--sp-5); }
+  .bp__lead { margin: 0; font-size: 16px; line-height: 1.45; text-align: center; }
+  .bp .btn--wide { margin: 0; min-height: 52px; }
+  .bp h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+  .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+  .row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-2); border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); }
+  .row .mini { position: relative; height: 48px; border-radius: 10px; overflow: hidden; background: #5c9a78; border: var(--edge); }
+  .row b { display: block; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row small { display: block; font-size: 15px; color: var(--ink-soft); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .btn { min-height: 40px; }
+</style>
+</head>
+<body>
+<main class="front tint--garden" id="app"></main>
+<script src="kit.js"></script>
+<script src="builder.js"></script>
+<script>
+  const { ICON, state, corners, netbanner } = Kit;
+  const { holeSVG } = Builder;
+  const s = state("both");
+  const row = ([n, sub, race]) => `<li class="row"><span class="mini">${holeSVG({ small: true })}</span><span><b>${n}</b><small>${sub}</small></span><button class="btn ${race ? "btn--gold" : "btn--ghost"} btn--s">${race ? "Race" : "Play"}</button></li>`;
+  document.getElementById("app").innerHTML = `
+    ${corners("Back to the game")}
+    <div class="bp">
+      <header class="front__head" style="margin:0"><span class="eyebrow--pill">The Builder</span><h1 class="display display--m inked">For a computer</h1></header>
+      <p class="bp__lead">Drawing a hole takes a mouse and a keyboard. Playing them works right here.</p>
+      <button class="btn btn--main btn--wide">${ICON.copy} Copy the link for my computer</button>
+      ${s === "both" ? `<section style="display:grid;gap:var(--sp-3)"><h2>Your holes</h2><ul class="rows">${[["Mole Run", "Garden · par 5"], ["Crab Walk", "Island · par 3"]].map(row).join("")}</ul></section>` : ""}
+      <section style="display:grid;gap:var(--sp-3)"><h2>Community holes</h2><ul class="rows">${[["The Long Ice", "by nym-pebble77 · par 4", true], ["Tide Pools", "by nym-zxxma042 · par 4", true], ["Hedge Maze", "by nym-gnorman · par 7"]].map(row).join("")}</ul>
+        <button class="btn btn--ghost btn--wide">More community holes</button></section>
+    </div>
+    ${netbanner()}`;
+</script>
+</body>
+</html>

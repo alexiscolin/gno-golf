@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1200">
+<title>Share cards · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- The share cards, at their real sizes: 1200×630 (a link card, the og:image)
+     and 1080×1080 (a post's picture). Made at build time for every gnome
+     (/g/<id>/), in the page for a hole, a team, a spotlight: no server.
+     states: ?state=gnome (default, 1200×630) | square (1080×1080) | hole (a ghost dare) | reveal (a Legendary in the spotlight, one a day) | team (a player's gnomes, made in the browser) -->
+<style>
+  html, body { margin: 0; background: var(--s0); }
+  .sc { position: relative; width: 1200px; height: 630px; overflow: hidden; display: grid; grid-template-columns: 560px 1fr; background: radial-gradient(circle, rgba(var(--ink-rgb), .09) 2px, transparent 2.5px) 0 0 / 18px 18px, var(--s0); }
+  .sc--square { width: 1080px; height: 1080px; grid-template-columns: 1fr; grid-template-rows: 620px 1fr; }
+  .sc::after { content: ""; position: absolute; inset: 18px; border: 4px solid var(--green); border-radius: 14px; pointer-events: none; }
+  .sc__art { position: relative; margin: 54px 0 54px 54px; border-radius: 30px; border: 4px solid var(--ink); box-shadow: 0 10px 0 var(--ink); overflow: hidden; }
+  .sc--square .sc__art { margin: 54px 54px 0; }
+  .sc__art img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 62%; }
+  .sc__text { display: grid; align-content: center; justify-items: start; gap: 18px; padding: 54px 70px 54px 56px; }
+  .sc--square .sc__text { padding: 36px 70px 70px; gap: 14px; }
+  .sc__name { margin: 0; font-size: 76px; line-height: 1; transform: rotate(-2deg); transform-origin: left; --ink-w: 10px; --ink-drop: 7px; }
+  .sc__line { margin: 0; font-size: 28px; font-weight: 600; line-height: 1.3; max-width: 520px; }
+  .sc__foot span { white-space: nowrap; }
+  .sc__foot { display: flex; align-items: center; gap: 18px; margin-top: 10px; font-size: 22px; font-weight: 700; color: var(--ink-soft); }
+  .sc .tier { font-size: 20px; padding: 4px 18px 4px 10px; border-width: 3px; } .sc .tier svg { width: 22px; height: 22px; }
+  .word { height: 56px; }
+  /* a Legendary's night (the spotlight) */
+  .sc--night { color: var(--paper); background: radial-gradient(circle, rgba(255, 255, 255, .06) 2px, transparent 2.5px) 0 0 / 18px 18px, #2b2550; }
+  .sc--night::after { border-color: var(--tier-legendary); }
+  .sc--night .sc__name { color: var(--tier-legendary); }
+  .sc--night .sc__foot { color: #e9e4ff; }
+  .sc--night .sc__art { box-shadow: 0 0 0 8px var(--tier-legendary), 0 0 0 12px var(--ink), 0 0 90px 30px rgba(255, 215, 94, .3); }
+  .reveal-row { display: flex; gap: 12px; }
+  .reveal-row i { width: 46px; height: 46px; border-radius: 50%; border: 3px solid var(--tier-legendary); }
+  .reveal-row i.on { background: var(--tier-legendary); }
+  /* the hole: its picture full bleed, the text on a paper scrim (never on the 3D bare) */
+  .sc--hole { grid-template-columns: 1fr; background: url(img/play-garden3.jpg) 40% 45% / cover; }
+  .sc--hole .sc__text { align-self: end; margin: 0 54px 54px; padding: 30px 40px; width: 820px; border: 4px solid var(--ink); border-radius: 26px; background: var(--paper); box-shadow: 0 10px 0 var(--ink); gap: 12px; }
+  .sc--hole .sc__name { font-size: 64px; }
+  .ghost { position: absolute; right: 120px; top: 120px; width: 210px; opacity: .6; }
+  /* the team: the six best, in a row on the paper, the rest counted */
+  .sc--team { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 60px 70px; gap: 26px; }
+  .team { display: grid; grid-template-columns: repeat(6, 1fr) 110px; gap: 16px; align-items: center; }
+  .team .gtile { border-radius: 18px; border-width: 4px; }
+  .team__more { display: grid; place-items: center; aspect-ratio: 1; border: 4px dashed rgba(var(--ink-rgb), .35); border-radius: 18px; font-size: 36px; font-weight: 700; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="kit.js"></script>
+<script>
+  const { TIER_ICON, tierChip, state } = Kit;
+  const s = state("gnome");
+  // the game's word, as the title draws it (title.css .title__word)
+  const word = `<svg class="word" viewBox="0 0 330 64" aria-label="Gnogolf"><defs><linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fe0a8"/><stop offset=".55" stop-color="#2a9d74"/><stop offset="1" stop-color="#1c7a5a"/></linearGradient></defs>
+    <text x="4" y="52" font-family="Fredoka" font-weight="700" font-size="56" letter-spacing="3" fill="url(#w)" stroke="#144134" stroke-width="5" paint-order="stroke" stroke-linejoin="round">GNOGOLF</text></svg>`;
+  const gnomeText = `${tierChip("epic")}<h1 class="sc__name inked">Tansy of the Garden</h1>
+    <p class="sc__line">A bobble that will not sit still, and a trail of petals behind every putt.</p>
+    <div class="sc__foot">${word}<span>gnome #94 · gnogolf.xyz</span></div>`;
+  const cards = {
+    gnome: `<div class="sc tint--garden"><div class="sc__art gtile--epic" style="background:var(--stage)"><img src="img/g02.png" alt=""></div><div class="sc__text">${gnomeText}</div></div>`,
+    square: `<div class="sc sc--square tint--garden"><div class="sc__art" style="background:var(--stage)"><img src="img/g02.png" alt=""></div><div class="sc__text">${gnomeText}</div></div>`,
+    reveal: `<div class="sc sc--night"><div class="sc__art" style="background:repeating-conic-gradient(from 0deg at 50% 42%, #ffe69a 0 7.5deg, #ffd25a 7.5deg 15deg)"><img src="img/g12.png" alt=""></div><div class="sc__text">
+      <span class="tier tier--legendary">${TIER_ICON.legendary}Today's Legendary · 1 of 7</span><h1 class="sc__name inked">The Miller</h1>
+      <p class="sc__line" style="color:#e9e4ff">A spotlight a day on one of the seven. All seven are in the gallery.</p>
+      <div class="reveal-row" aria-label="Spotlight 1 of 7">${Array.from({ length: 7 }, (_, i) => `<i class="${i < 1 ? "on" : ""}"></i>`).join("")}</div>
+      <div class="sc__foot">${word}<span>gnogolf.xyz/g/104</span></div></div></div>`,
+    hole: `<div class="sc sc--hole"><img class="ghost" src="img/g08.png" alt=""><div class="sc__text">
+      <span class="tag">A hole by nym-twee · Garden · par 5</span><h1 class="sc__name inked">Beat my 4 on Mole Run</h1>
+      <div class="sc__foot">${word}<span>Race my ghost · free, no wallet</span></div></div></div>`,
+  };
+  cards.team = `<div class="sc sc--team tint--shop"><h1 class="sc__name inked" style="font-size:68px">nym-twee's team</h1>
+    <div class="team">${[["img/g12.png", "legendary", "garden"], ["img/g02.png", "epic", "garden"], ["img/g13.png", "epic", "mines"], ["img/g09.png", "rare", "island"], ["img/g08.png", "rare", "island"], ["img/g06.png", "rare", "mountain"]].map(([a, t, w]) => `<span class="gtile gtile--${t} tint--${w}"><img src="${a}" alt=""></span>`).join("")}<span class="team__more">+25</span></div>
+    <div class="sc__foot">${word}<span>31 gnomes · 1 Legendary · gnogolf.xyz</span></div></div>`;
+  document.getElementById("app").innerHTML = cards[s];
+</script>
+</body>
+</html>
