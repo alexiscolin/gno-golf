@@ -166,7 +166,8 @@ check("weather.gno period", () => {
 // ---------------------------------------------------------------- the gnomes realm
 // Every count is written once (ADR-007): the catalogue's data
 // (data/gnomes/series.json) and the realm's config.gno say the same supply,
-// prices, caps and auction rules; the earned gnomes are UNLOCKS' and GNOMES'.
+// prices and caps, every tier's (a Legendary is sold at a fixed price too);
+// the earned gnomes are UNLOCKS' and GNOMES'.
 const gnomesDir = new URL("../gno.land/r/gnogolf/gnomes/", import.meta.url);
 const gnomes = (f: string) => fs.readFileSync(new URL(f, gnomesDir), "utf8");
 /** A Go array literal of numbers, `name = [len(tiers)]int64{1, 2, 3}`, as numbers. */
@@ -182,16 +183,13 @@ const stringsOf = (src: string, name: string) => {
   return [...m[1].matchAll(/"([^"]*)"/g)].map((x) => x[1]);
 };
 /** What these checks read of data/gnomes/series.json. */
-type Sale = Record<"common" | "rare" | "epic", number>;
+type Sale = Record<"common" | "rare" | "epic" | "legendary", number>;
 interface SeriesFile {
   earned: { first: number };
   series: {
     id: string;
     supply: Record<string, number>;
-    sale: {
-      prices: Sale; lifetimeCaps: Sale; playerWindowCaps: Sale; playerWindowHours: number;
-      auction: { reserve: number; hours: number; extendMinutes: number; minIncrementPercent: number; minIncrementGnot: number };
-    };
+    sale: { prices: Sale; lifetimeCaps: Sale; playerWindowCaps: Sale; playerWindowHours: number };
   }[];
 }
 const seriesFile = new URL("../data/gnomes/series.json", import.meta.url);
@@ -201,20 +199,15 @@ check("gnomes config.gno: data/gnomes/series.json", () => {
   const series = JSON.parse(fs.readFileSync(seriesFile, "utf8")) as SeriesFile;
   const genesis = series.series.find((s) => s.id === "genesis");
   assert.ok(genesis, "no genesis in series.json");
-  const TIERS = ["common", "rare", "epic", "legendary"];
+  const TIERS = ["common", "rare", "epic", "legendary"] as const;
   const realmTiers = [...config.matchAll(/^\t\{"(\w+)", ([\d_]+)\},/gm)].map((m) => [m[1], Number(m[2].replace(/_/g, ""))] as const);
-  assert.deepEqual(realmTiers.map(([n]) => n), TIERS, "tiers");
+  assert.deepEqual(realmTiers.map(([n]) => n), [...TIERS], "tiers");
   assert.deepEqual(arrayOf(config, "genesisSupply"), TIERS.map((t) => genesis.supply[t]), "genesisSupply: supply");
   const sale = genesis.sale, G = 1_000_000;
-  const SOLD = ["common", "rare", "epic"] as const;
-  assert.deepEqual(realmTiers.slice(0, 3).map(([, p]) => p), SOLD.map((t) => sale.prices[t] * G), "prices");
-  assert.equal(realmTiers[3][1], sale.auction.reserve * G, "the Legendary reserve");
-  assert.deepEqual(arrayOf(config, "lifetimeCap").slice(0, 3), SOLD.map((t) => sale.lifetimeCaps[t]), "lifetimeCap");
-  assert.deepEqual(arrayOf(config, "playerCap").slice(0, 3), SOLD.map((t) => sale.playerWindowCaps[t]), "playerCap");
-  assert.equal(constOf(config, "softClose"), sale.auction.extendMinutes * 60, "softClose");
-  assert.equal(constOf(config, "minRaiseBps"), sale.auction.minIncrementPercent * 100, "minRaiseBps");
-  assert.equal(constOf(config, "minRaise"), sale.auction.minIncrementGnot * G, "minRaise");
-  assert.ok(sale.playerWindowHours <= constOf(config, "maxHours") && sale.auction.hours <= constOf(config, "maxHours"), "maxHours");
+  assert.deepEqual(realmTiers.map(([, p]) => p), TIERS.map((t) => sale.prices[t] * G), "prices");
+  assert.deepEqual(arrayOf(config, "lifetimeCap"), TIERS.map((t) => sale.lifetimeCaps[t]), "lifetimeCap");
+  assert.deepEqual(arrayOf(config, "playerCap"), TIERS.map((t) => sale.playerWindowCaps[t]), "playerCap");
+  assert.ok(sale.playerWindowHours <= constOf(config, "maxHours"), "maxHours");
   assert.equal(series.earned.first, constOf(earned, "firstEarned"), "earned.first: firstEarned");
 });
 // the designer's codec, once it is in this checkout

@@ -16,14 +16,16 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	fresh(t, cur)
 	home := Render("")
 	has(t, home, "# Gnogolf Gnomes")
-	has(t, home, "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 GNOT | 0 of 720 |")
-	has(t, home, "No auction yet.")
+	has(t, home, "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 / 777 GNOT | 0 of 720 |")
 
 	g := Render("104")
 	has(t, g, "# Gnome 104")
 	has(t, g, "![Gnome 104](data:image/svg+xml;base64,")
 	has(t, g, "legendary")
-	has(t, g, "Unsold")
+	has(t, g, "Price: 777 GNOT")
+	mintOpen = false
+	has(t, Render("104"), "Unsold") // paused: no line to buy
+	mintOpen = true
 
 	has(t, Render("viking"), "Garden Cup at par or under")
 	has(t, Render("nope"), "Not found")
@@ -37,19 +39,21 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	has(t, p, "Equipped: [Gnome 1](/r/gnogolf/gnomes:1)")
 	has(t, p, "[#1](/r/gnogolf/gnomes:1)")
 	has(t, Render("1"), "Owner: "+alice.String())
-	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 GNOT | 1 of 720 |")
+	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 / 777 GNOT | 1 of 720 |")
 }
 
-func TestTheHomeShowsTheAuctionAndHowToBid(cur realm, t *testing.T) {
+// A gnome on sale says its price and how to buy it, a Legendary as any.
+func TestAGnomesPageSaysHowToBuyIt(cur realm, t *testing.T) {
 	fresh(t, cur)
 	testing.SetRealm(asUser(deployer, nil))
-	StartAuction(cross(cur), 104, 48)
 	SetCloseAt(cross(cur), now()+30*24*3600)
-	home := Render("")
-	has(t, home, "Gnome 104")
-	has(t, home, "Minimum bid: 777 GNOT")
-	has(t, home, "-func Bid -args 104 -send 777000000ugnot")
-	has(t, home, "The genesis sale closes on "+dateOf(closeAt))
+	has(t, Render(""), "The genesis sale closes on "+dateOf(closeAt))
+	page := Render("104")
+	has(t, page, "Price: 777 GNOT")
+	has(t, page, "-func Buy -args 104 -send 777000000ugnot")
+	testing.SetRealm(asUser(alice, ugnot(priceOf(104))))
+	Buy(cross(cur), "104")
+	uassert.False(t, strings.Contains(Render("104"), "-func Buy"), "sold: no line")
 }
 
 func TestGNOTIsWrittenPlainly(t *testing.T) {

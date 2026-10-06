@@ -11,8 +11,8 @@ import (
 
 // Buy sells the caller the gnomes ids names, 1 to 5 catalogue ids
 // separated by commas ("217,301"), and returns them as given. Each must be
-// in a wave under way, unsold, and of a tier Buy sells (a Legendary is
-// auctioned); the caller's caps hold for the whole list. Exactly the sum of
+// in a wave under way and unsold, the first buyer's, whatever its tier; the
+// caller's caps hold for the whole list. Exactly the sum of
 // their wave prices must be sent with the call (-send "<sum>ugnot"); it
 // goes to the treasury before the call returns. Any refusal reverts the call,
 // coins included.
@@ -40,9 +40,6 @@ func Buy(cur realm, ids string) string {
 		g, ok := gnomeAt(id)
 		if !ok {
 			panic(errNoGnome)
-		}
-		if g.tier == auctionTier {
-			panic("gnomes: a " + tiers[auctionTier].name + " is sold by auction")
 		}
 		wi := waveAt(id)
 		if wi < 0 {

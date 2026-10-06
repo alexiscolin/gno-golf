@@ -12,7 +12,7 @@ import (
 )
 
 // What a first buy stores, which its buyer pays: z_storage_genesis, then one
-// common bought, the bytes below less that file's: 4,333 bytes, 0.43 GNOT
+// common bought, the bytes below less that file's: 4,332 bytes, 0.43 GNOT
 // of deposit (with grc721/enumerable it was 10,465), the sold bitmap's first
 // write among them. Most of it is the ledger's own two rows for a new
 // holder, its owner and its balance. Its gas less z_storage_genesis's is
@@ -66,8 +66,8 @@ func genesis() string {
 // 1
 
 // Storage:
-// gno.land/r/gnogolf/gnomes: 68565
+// gno.land/r/gnogolf/gnomes: 68562
 // gno.land/r/test/storedbuy: 0
 
 // Gas:
-// 1406270048
+// 1406226711

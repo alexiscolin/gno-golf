@@ -55,8 +55,7 @@ func heldKey(holder address, id int64) string {
 
 // heldPage is up to n of holder's ids from offset, in id order, and whether
 // more follow. It walks the holder's own rows only, from their first: a
-// holder has their caps, the auctions they won, their earned gnomes and
-// what they were sent.
+// holder has their caps, their earned gnomes and what they were sent.
 func heldPage(holder address, offset int64, n int) ([]int64, bool) {
 	var ids []int64
 	more, i := false, int64(0)

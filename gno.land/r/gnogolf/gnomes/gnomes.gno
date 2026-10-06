@@ -12,10 +12,10 @@ import (
 )
 
 // The gnomes of Gnogolf as GRC721 tokens. The ball is a gnome: a player
-// buys the one they choose from the catalogue, at its wave's price, and
-// equips it; a Legendary is auctioned. The realm holds no funds but the top
-// bid of the auction under way: a sale's payment goes to the treasury in the
-// same call. The catalogue is data the owner publishes a series at a time
+// buys the one they choose from the catalogue, at its wave's fixed price,
+// whatever its tier, and wears it. The realm holds no funds: a sale's
+// payment goes to the treasury in the same call. The catalogue is data the
+// owner publishes a series at a time
 // (catalogue.gno), sold in waves (waves.gno). This file is the state.
 var (
 	Token     *grc721.Token    // the read side: name, symbol, owners, balances, approvals
@@ -29,8 +29,7 @@ var (
 	teller        grc721.Teller         // acts as this realm's caller: transfers, approvals
 	royaltyLedger *royalty.Ledger
 
-	mintOpen bool  // the owner's switch over every sale and bid; starts closed
-	pausedAt int64 // when the last pause began (block time), for the auction's clock
+	mintOpen bool // the owner's switch over every sale; starts closed
 
 	catalogue []series          // in publishing order, ids following on
 	waves     []wave            // in publishing order
@@ -66,34 +65,23 @@ func setUp(_ int, rlm realm, deployer address) {
 		prices[i] = tr.price
 	}
 	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
-	auc, last, closeAt, pausedAt = nil, nil, 0, 0
-	bought, inWindow, equipped, held, byBest, offered = seeded(), seeded(), seeded(), seeded(), seeded(), seeded()
+	closeAt = 0
+	bought, inWindow, equipped, held, byBest = seeded(), seeded(), seeded(), seeded(), seeded()
 	earned, kindOf, nextEarned, rows = seeded(), seeded(), firstEarned, storeReader{}
 }
 
-// MintOpen reports whether sales and bids are taken.
+// MintOpen reports whether sales are taken.
 func MintOpen() bool { return mintOpen }
 
-// SetMintOpen opens or closes every sale and bid at once: the owner's
-// switch for a fault. Owner only. A pause freezes the auction under way: no
-// bid and no settle while paused, and on resume its end moves on by the time
-// paused, and to at least the soft close from then, so that a pause cannot
-// end an auction at its top bid of the moment (auction.gno resume).
+// SetMintOpen opens or closes every sale at once: the owner's switch for a
+// fault. Owner only.
 func SetMintOpen(cur realm, open bool) {
 	assertOwner(0, cur)
-	if open == mintOpen {
-		return
-	}
-	if open {
-		resume(pausedAt)
-	} else {
-		pausedAt = now()
-	}
 	mintOpen = open
 	chain.Emit("MintOpen", "open", strconv.FormatBool(open))
 }
 
-// mintTo mints catalogue gnome g to whom: a sale's or an auction's last step.
+// mintTo mints catalogue gnome g to whom: a sale's last step.
 func mintTo(whom address, g gnome) {
 	if err := ledger.Mint(whom, grc721.TokenID(itoa(g.id))); err != nil {
 		panic(err)

@@ -59,9 +59,7 @@ func Collection() string {
 }
 
 // Gnome is gnome tid, of the catalogue or earned, `{"version":1,"id":""}`
-// when there is none: its owner ("" while unsold) and its price (its wave's;
-// the reserve of the next auction for the auction tier; the next wave's when
-// in none yet; 0 for an earned one).
+// when there is none: its owner ("" while unsold) and its price (priceNow).
 //
 //	{"version":1,"id":"217","series":"genesis","name":"…","tier":"common",
 //	 "traits":"…","owner":"","price":30000000,"sold":false}
@@ -70,18 +68,24 @@ func Gnome(tid string) string {
 	if !ok {
 		return noneJSON
 	}
-	price := int64(0)
-	if g.tier != earnedTier {
-		price = prices[g.tier]
-		if wi := waveAt(g.id); wi >= 0 && g.tier != auctionTier {
-			price = waves[wi].prices[g.tier]
-		}
-	}
+	price := priceNow(g)
 	owner, err := Token.OwnerOf(grc721.TokenID(tid))
 	return `{"version":1,"id":"` + tid + `","series":"` + g.series + `","name":` + jsonString(g.name) +
 		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `,"owner":` + jsonString(owner.String()) +
 		`,"price":` + itoa(price) + `,"sold":` + strconv.FormatBool(err == nil || isSold(g.id)) +
 		`,"closed":` + strconv.FormatBool(isClosed(g.id)) + `}`
+}
+
+// priceNow is what gnome g sells for: its wave's price, or the price in
+// force when no wave holds it yet; 0 for an earned gnome, which is free.
+func priceNow(g gnome) int64 {
+	if g.tier == earnedTier {
+		return 0
+	}
+	if wi := waveAt(g.id); wi >= 0 {
+		return waves[wi].prices[g.tier]
+	}
+	return prices[g.tier]
 }
 
 // noneJSON is the answer for a thing that does not exist: still versioned.

@@ -90,10 +90,27 @@ func TestAGnomeSellsOnce(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), id) })
 }
 
-func TestTheAuctionTierIsNotBought(cur realm, t *testing.T) {
+// A Legendary sells as any gnome does: by Buy, at its tier's fixed price
+// (777 GNOT), to the first buyer; one a wallet.
+func TestALegendaryIsBoughtLikeAnyGnome(cur realm, t *testing.T) {
 	fresh(t, cur)
-	testing.SetRealm(asUser(alice, ugnot(tiers[auctionTier].price)))
-	urequire.AbortsContains(t, cur, "auction", func() { Buy(cross(cur), itoa(legend())) })
+	a, b := legend(), nthOfTier(legendaryTier, 1)
+	price := priceOf(a)
+	uassert.Equal(t, int64(777_000_000), price)
+	before := balance(deployer)
+	testing.SetRealm(asUser(alice, ugnot(price-1)))
+	urequire.AbortsContains(t, cur, "wrong payment", func() { Buy(cross(cur), itoa(a)) })
+	testing.SetRealm(asUser(alice, ugnot(price)))
+	uassert.Equal(t, itoa(a), Buy(cross(cur), itoa(a)))
+	uassert.Equal(t, before+price, balance(deployer), "to the treasury in the same call")
+
+	testing.SetRealm(asUser(bob, ugnot(price)))
+	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), itoa(a)) })
+	testing.SetRealm(asUser(alice, ugnot(price)))
+	urequire.AbortsContains(t, cur, "cap is 1 legendary", func() { Buy(cross(cur), itoa(b)) })
+	testing.SetRealm(asUser(bob, ugnot(price)))
+	Buy(cross(cur), itoa(b)) // another wallet still can
+	uassert.Equal(t, int64(2), SoldOfTier(legendaryTier))
 }
 
 // OriginSend is only the caller's money on a direct call: a realm or a run
@@ -137,7 +154,6 @@ func TestAnEmptyOwnerHoldsNoPower(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "only the owner", func() { AddSeries(cross(cur), genesisName, placeholderGenesis()) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { AddWave(cross(cur), 1, 2, 0, 0) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { SetPrice(cross(cur), "common", minPrice) })
-	urequire.AbortsContains(t, cur, "only the owner", func() { StartAuction(cross(cur), 1, 24) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { Sweep(cross(cur)) })
 }
 
