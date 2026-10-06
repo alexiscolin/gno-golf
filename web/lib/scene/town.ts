@@ -14,7 +14,7 @@ import { timeOf } from "./camera";
 import { gnomelet, brolly, bunting, mailbox } from "./props";
 import { seeded, ISLAND, GRASS, placer, onGround, type Rand } from "./common";
 import { ud, type Hole } from "./data";
-import type { Bar } from "./worlds";
+import type { Bar, Skins } from "./worlds";
 import { boxOf, smoothstep, type Terrain } from "../terrain";
 import { STREET_Y } from "./pieces";
 import type { Extras, MutVec2, Post, Vec2, Zone } from "../types";
@@ -1602,6 +1602,16 @@ function canalOnLane(z: Zone, t: Terrain) {
   return g;
 }
 
+/** The skins piece() draws from the piece alone (the builder's palette, worlds.ts Skins); a tram is a line of them (course.ts tramLines). */
+const skins: Skins = {
+  post: ["lamp", "house", "clock", "gnome statue", "roundabout", "chimney", "cat", ...Object.keys(PLAZA_POSTS)],
+  bar: ["clock hand", "stall", "awning", "rail", "ledge"],
+  surface: [...Object.keys(PLAZA_GROUND), "plank bridge", "bridge"],
+  slope: ["funbox", "quarter pipe", "stairs"],
+  hazard: ["fountain", "canal"],
+  tunnel: ["door", "well"],
+};
+
 function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terrain, s: Hole) {
   const night = timeOf(s.hole) !== "day";
   // seeded by where it stands: two pieces of one skin get different looks
@@ -1883,4 +1893,4 @@ function extras(ex: Extras, s: Hole) {
   return { group: new THREE.Group(), skins: new Set(["bridge", "canal"]) };
 }
 
-export { base, edging, berms, decor, rough, green, piece, extras };
+export { base, edging, berms, decor, rough, green, piece, skins, extras };

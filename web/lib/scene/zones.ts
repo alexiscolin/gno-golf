@@ -5,7 +5,7 @@ import { animate, state } from "./state";
 import { stone, warp, badge, windmill } from "./props";
 import { MOUTHS, mouthAt } from "./pieces";
 import { seeded } from "./common";
-import { worldOf, fromWorld, gapWater, DECK, GAP_Y } from "./worlds";
+import { worldOf, fromWorld, gapWater, DECK, GAP_Y, type Skins } from "./worlds";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { ud, type CourseTerrain as T, type Hole } from "./data";
 import type { Rand } from "./common";
@@ -213,6 +213,20 @@ const ZONE_DRAW: [(z: Zone) => boolean, ZoneDraw][] = [
   [(z) => z.kind === "surface" || z.kind === "hazard", drawSurface],
   [(z) => z.kind === "tunnel", drawTunnel],
 ];
+
+/**
+ * The skins ZONE_DRAW draws from the zone alone, by kind (drawSurface's
+ * looks, drawTunnel's mouths beside MOUTHS), the plain form of each among
+ * them: what the hole builder offers in any world (lib/builder/palette.ts).
+ * The rest need a composition the course placed by hand (a seesaw's pair, a
+ * mill's sails, the castle's slide) or cut the lane (GAPS).
+ */
+export const DRAWN = {
+  surface: ["", "sand", "wetsand", "flowerbed", "soil", "bridge", "ice", "molehill"],
+  slope: ["moon bridge"],
+  hazard: ["", "water", "wave", "lagoon", "tidepool", "fountain", "canal"],
+  tunnel: ["", "warp"],
+} satisfies Skins;
 
 function zoneDetail(z: Zone, s: Hole, t: T) {
   const own = fromWorld(s, "zone", z, t);

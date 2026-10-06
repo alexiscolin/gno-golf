@@ -8,7 +8,7 @@ import { timeOf, islandBox } from "./camera";
 import { bush, stone, flower, tuft, mole, windmill, smokeBatch } from "./props";
 import { seeded, GRASS } from "./common";
 import { roughOf } from "./garden";
-import { worldOf, fromWorld, gapWater, DECK, GAP_Y } from "./worlds";
+import { worldOf, fromWorld, gapWater, DECK, GAP_Y, type Skins } from "./worlds";
 import { WEATHER_SKINS } from "./weather";
 import { POSTS, BARS, roofs, SLAB } from "./pieces";
 import { zoneDetail, waterMask, pondWater } from "./zones";
@@ -1839,6 +1839,20 @@ function stump(p: Post, height: Height) {
   m.position.set(p.c[0], height(p.c[0], p.c[1]) + 0.375, p.c[1]);
   return m;
 }
+
+/**
+ * The skins drawn here from the piece alone, by kind, beside the shared
+ * tables (POSTS, BARS, MOUTHS): a post (below), a bar (barPiece), a lone
+ * wall (wallPieces), a slope's ground (groundMesh's colours); the plain form
+ * of each ("", rule 2) among them. What the hole builder offers in any world
+ * (lib/builder/palette.ts): a skin drawn here and not declared here is not.
+ */
+export const DRAWN = {
+  post: ["", "bumper", "rock", "stump"],
+  bar: ["", "logs", "hay", "gate", "gate door", "hedge"],
+  rail: ["", "rampart"],
+  slope: ["", "dune", "stairs", "quarter pipe", "funbox"],
+} satisfies Skins;
 
 /** A post is a bumper; in this garden a bumper is a mushroom — or, when the
  *  chain says so, a rock or a stump. An unknown skin is a mushroom. */

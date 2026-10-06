@@ -54,6 +54,40 @@ the realm byte for byte by `scripts/wasmparity.ts`). Every player loads it.
   the builder's answers (`Checked`, `Fitted`, `Cost`), the API the editor
   calls.
 
+- **The palette is generated from the scene's own declarations**
+  (`web/lib/builder/palette.ts`): the shared tables' keys (`POSTS`, `BARS`,
+  `MOUTHS`), a `DRAWN` list beside the code that draws by skin in
+  `course.ts` and `zones.ts`, and a `skins` list each world module exports
+  beside its `piece()` (`worlds.ts` `Skins`), each met by a binding
+  (`BINDINGS`: kind, shapes, ranges, clocks). A drawing with no binding must
+  be in `HAND_ONLY`, with why. A new piece, or a new world, appears in the
+  palette by its drawing and a binding, and in no other place.
+- **Every entry is proved, not trusted** (`web/test/builder-palette.test.ts`):
+  built into a real hole by `buildHole` in Node (a 2D canvas stub is all the
+  scene needs without a GPU), in every world it is offered in, it must draw
+  something, and something other than what an unknown skin falls back to
+  (the plain form) unless it is the plain form on purpose; and its piece,
+  at the low end, default and high end of its ranges, must pass `Fit` and
+  `Check`. 384 entries across the five worlds. A world-only skin offered
+  elsewhere, or a slope skin that only reshapes the ground, fails it
+  (measured on purpose).
+- **The rules the palette is bound by are the chain's** (`rules.ts`):
+  `physics.Kicks`'s skins and `MaxBounce` (a passive piece plays 0.75 at
+  most, so no more is offered), the weather's skins, read back from
+  `step.gno` and `course.gno` by `scripts/selfcheck.ts`; each world's field
+  (substeps, friction, bounce, ball and cup) is the one most of its course
+  holes have, which a test reads from `data/holes.txt`; GG1's limits sit in
+  `gg1.ts` alone, held to `data.gno` by a test.
+- **The builder's own checks** (`web/lib/builder/checks.ts`): the tee in the
+  lane and clear of every wall (the ball's radius and 0.05), post and zone
+  that moves or sends a ball back, of any clock (E2); the cup's disc the
+  same (E3); a timed piece on for part of its cycle, a pulse's cycle within
+  a round (E7); GG1's limits, pulses counted in (E8); and the work gauges
+  from `Check` (E11). The lane is where a ball cannot leave the board, a
+  flood at a quarter unit over the untimed walls thickened by the ball's
+  radius: the chain's even-odd count (`dryLand`, for puddles) flips on a
+  rail standing inside the lane, which a builder must allow.
+
 ## Consequences
 
 - **The builder says what the chain says**, sentence for sentence, before
@@ -64,8 +98,17 @@ the realm byte for byte by `scripts/wasmparity.ts`). Every player loads it.
   leftmost piece lies a hair inside the margin, so fitting it again moves one
   float by an ulp. A draft on the builder's grid (multiples of 1/4) is
   shifted exactly.
-- **The parity test grows by about a tenth** (1,866 PublishMine calls and 180
+- **The parity test grows by about a tenth** (1,882 PublishMine calls and 180
   fits on top of the 25,200 simulations).
+- **A hazard's `Vec` must be on the board.** The physics never reads it, but
+  GG1 holds it to the board and `Fit` moves it: left at (0, 0), a hole
+  decodes, then fails once fitted. The builder sets it to the zone's middle.
+- **What the palette does not offer yet**: loops (only the mines' rides draw
+  one), the compositions (a tram line, a mill and its sails, the castle's
+  slide, a seesaw, the rides, a stroke's set pieces), and stroke-clocked
+  (pulse) pieces are not yet render-tested through `buildExtras`.
+- **The unit tests take about 20 s more** (the render proof builds some 800
+  holes).
 
 ## Alternatives considered
 

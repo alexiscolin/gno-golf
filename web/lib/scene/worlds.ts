@@ -94,8 +94,14 @@ export interface Rough {
   mound?: number;
   plant?: (rand: () => number, s: Hole, x: number, z: number) => THREE.Object3D | null;
 }
+/** A piece as the hole builder places it: a long wall, a bar (four walls round a thin box), a post, or a zone of a kind (air: a slope of moving air). */
+export type Kind = "rail" | "bar" | "post" | "surface" | "slope" | "air" | "tunnel" | "hazard" | "loop";
+/** The skins drawn from the piece alone, by kind: what the builder's palette may offer (lib/builder/palette.ts). */
+export type Skins = Partial<Record<Kind, readonly string[]>>;
 /** A world module (see the list above). */
 interface World {
+  /** the skins it draws its own way from the piece alone (piece()), for the builder's palette */
+  skins?: Skins;
   base(s: Hole, box: THREE.Box3): THREE.Object3D;
   edging(s: Hole, box: THREE.Box3): THREE.Object3D;
   berms(s: Hole): { group: THREE.Object3D; height: Height };
@@ -142,6 +148,8 @@ const LOADERS: Record<string, () => Promise<World>> = {
   mines: () => import("./mines"),
 };
 const WORLDS: Record<string, World> = { garden };
+/** Every world the client draws: the garden, then those loaded when needed. */
+export const WORLD_NAMES: readonly string[] = ["garden", ...Object.keys(LOADERS)];
 const pending: Record<string, Promise<World>> = {};
 
 /** Loads a world's module (once; later calls return at once). */

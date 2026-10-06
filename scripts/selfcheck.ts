@@ -15,6 +15,7 @@ import "../web/test/setup.mjs";
 const { RULES } = await import("../web/lib/chain.ts");
 const { SKIES } = await import("../web/lib/card.ts");
 const { CLIMATES } = await import("../web/lib/sky.ts");
+const { KICKS, MAX_BOUNCE, WEATHER } = await import("../web/lib/builder/rules.ts");
 
 let failed = 0;
 function check(name: string, f: () => void) {
@@ -160,6 +161,16 @@ check("weather.gno period", () => {
   assert.equal(RULES.periodMs, constOf(weather, "PeriodSeconds") * 1000, "PeriodSeconds");
   // a round saves in its period or the next one (Golf.tsx saveBy: period + 2)
   assert.ok(has(weather, "if period != now && period != now-1 {"), "playablePeriod: the periods a round saves in changed");
+});
+
+// the hole builder's palette (web/lib/builder/rules.ts): the skins that are
+// physics, and the bounce a passive piece plays at most, as step.gno has them
+check("the physics the builder's palette is bound by", () => {
+  const step = fs.readFileSync(new URL("../gno.land/p/gnogolf/physics/step.gno", import.meta.url), "utf8");
+  const course = fs.readFileSync(new URL("../gno.land/p/gnogolf/course/course.gno", import.meta.url), "utf8");
+  assert.ok(has(step, `return ${KICKS.map((k) => `strings.Contains(skin, "${k}")`).join(" || ")}`), "physics.Kicks: the skins that kick changed");
+  assert.equal(MAX_BOUNCE, constOf(step, "MaxBounce"), "MaxBounce");
+  for (const w of WEATHER) assert.ok(course.includes(`"${w}"`), `course: no weather skin "${w}"`);
 });
 
 if (failed) {
