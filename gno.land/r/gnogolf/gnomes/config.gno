@@ -6,18 +6,19 @@ package gnomes
 // needs nothing here: its size is its rows (catalogue.gno), its sale a wave
 // (waves.gno).
 
-// A tier: its name, and its price at deploy, in ugnot. Every tier is sold
-// the same way, by Buy at its wave's fixed price, to the first buyer.
+// A tier: its name, and its price at deploy, in ugnot: golf's numbers
+// (ADR-007 says which). Every tier is sold the same way, by Buy at its
+// wave's fixed price, to the first buyer.
 type tier struct {
 	name  string
 	price int64
 }
 
 var tiers = [...]tier{
-	{"common", 30_000_000},     // 30 GNOT
-	{"rare", 99_000_000},       // 99 GNOT
-	{"epic", 333_000_000},      // 333 GNOT
-	{"legendary", 777_000_000}, // 777 GNOT
+	{"common", 36_000_000},       // 36 GNOT
+	{"rare", 72_000_000},         // 72 GNOT
+	{"epic", 336_000_000},        // 336 GNOT
+	{"legendary", 1_296_000_000}, // 1,296 GNOT
 }
 
 // genesisSupply is how many gnomes of each tier the genesis series holds, in

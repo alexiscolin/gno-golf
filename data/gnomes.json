@@ -28,28 +28,23 @@
    "sale": {
     "note": "The realm's starting settings: its owner changes them between waves, never during one, and never lowers a price. GNOT.",
     "prices": {
-     "common": 30,
-     "rare": 99,
-     "epic": 333
-    },
-    "auction": {
-     "reserve": 777,
-     "hours": 48,
-     "extendMinutes": 10,
-     "minIncrementPercent": 5,
-     "minIncrementGnot": 5,
-     "endsUtc": "18:00"
+     "common": 36,
+     "rare": 72,
+     "epic": 336,
+     "legendary": 1296
     },
     "playerWindowHours": 48,
     "playerWindowCaps": {
      "common": 3,
      "rare": 2,
-     "epic": 1
+     "epic": 1,
+     "legendary": 1
     },
     "lifetimeCaps": {
      "common": 10,
      "rare": 5,
-     "epic": 2
+     "epic": 2,
+     "legendary": 1
     },
     "nextWaveWhenSold": 0.7
    },

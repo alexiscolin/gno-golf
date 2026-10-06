@@ -91,12 +91,12 @@ func TestAGnomeSellsOnce(cur realm, t *testing.T) {
 }
 
 // A Legendary sells as any gnome does: by Buy, at its tier's fixed price
-// (777 GNOT), to the first buyer; one a wallet.
+// (1,296 GNOT), to the first buyer; one a wallet.
 func TestALegendaryIsBoughtLikeAnyGnome(cur realm, t *testing.T) {
 	fresh(t, cur)
 	a, b := legend(), nthOfTier(legendaryTier, 1)
 	price := priceOf(a)
-	uassert.Equal(t, int64(777_000_000), price)
+	uassert.Equal(t, int64(1_296_000_000), price)
 	before := balance(deployer)
 	testing.SetRealm(asUser(alice, ugnot(price-1)))
 	urequire.AbortsContains(t, cur, "wrong payment", func() { Buy(cross(cur), itoa(a)) })

@@ -58,11 +58,14 @@ in `totals`, which v1's records were copied into), at most 3 commons, 2
 rares, 1 epic and 1 legendary each per wave; then anyone, under the lifetime
 caps (10, 5, 2, 1). A wave is never changed nor withdrawn: its ids stay on
 sale at its prices, and `SetPrice` moves only the waves published after it.
-Prices start at 30, 99, 333 and 777 GNOT; nothing on sale is ever
-discounted by the realm.
+Prices start at golf's numbers: a Common 36 GNOT, the par of nine holes; a
+Rare 72, the par of a course; an Epic 336, the dimples on a golf ball; a
+Legendary 1,296, eighteen holes of a par-72 course (18 × 72). The genesis
+sold out is 59,424 GNOT (504 × 36 + 144 × 72 + 65 × 336 + 7 × 1,296).
+Nothing on sale is ever discounted by the realm.
 
 **No auction.** A Legendary is sold as any gnome is: by `Buy`, at its wave's
-fixed price (777 GNOT to start with), to the first buyer, one a wallet. The
+fixed price (1,296 GNOT to start with), to the first buyer, one a wallet. The
 realm has no bids, no escrow and no auction clock: it holds no coins on
 purpose. `Sweep` sends the treasury coins someone sent with a call that
 keeps none.

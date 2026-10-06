@@ -62,7 +62,7 @@ func Collection() string {
 // when there is none: its owner ("" while unsold) and its price (priceNow).
 //
 //	{"version":1,"id":"217","series":"genesis","name":"…","tier":"common",
-//	 "traits":"…","owner":"","price":30000000,"sold":false}
+//	 "traits":"…","owner":"","price":36000000,"sold":false}
 func Gnome(tid string) string {
 	g, ok := tokenAt(parseID(tid))
 	if !ok {
