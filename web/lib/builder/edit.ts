@@ -84,6 +84,19 @@ export function changeWorld(d: Draft, world: string, palette: readonly PaletteEn
   return refused.length ? { refused } : { ...d, world, pieces, proofs: [] };
 }
 
+/**
+ * The draft moved to another world (changeWorld), only if it holds there:
+ * judged with that world's palette (its ranges, its drawings: the census)
+ * against what it had in this one (o: this world's checks). Refused naming
+ * the pieces it has no entry for, or with the first error it would bring.
+ */
+export function toWorld(d: Draft, world: string, palette: readonly PaletteEntry[], o: ValidateOptions): Draft | { refused: string[] } | { why: string } {
+  const r = changeWorld(d, world, palette);
+  if ("refused" in r) return r;
+  const why = newErrors(errorsOf(d, o), r, { ...o, palette });
+  return why.length ? { why: why[0].text } : r;
+}
+
 /** A world's name in a sentence: "Garden". */
 export const worldName = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
@@ -98,19 +111,26 @@ export function unknownEntry(d: Draft, palette: readonly PaletteEntry[]): string
 export const matchIn = (palette: readonly PaletteEntry[]) => (p: { kind: string; skin: string }): string | null =>
   (palette.find((e) => e.kind === p.kind && e.skin === p.skin && e.world !== "*") ?? palette.find((e) => e.kind === p.kind && e.skin === p.skin))?.id ?? null;
 
-const same = (i: Issue) => `${i.rule} ${i.text}`;
+/** An error's place: its rule and the piece it names ("-" the whole hole's). */
+const keyOf = (i: Issue) => `${i.rule} ${i.piece ?? "-"}`;
 
 /**
- * Why the piece may not go where it is in d (put in, or put back in place of
- * its old self): the errors about it, or that it brings to the whole hole
- * (the cup cut off, the hole too wide); none, it may. before: d's own errors
- * without it, when the caller has them.
+ * What a piece brings to a hole: the errors of after (the hole with it, as
+ * the edit leaves it, framed or not: validate frames) about the piece, and
+ * every other one the hole without it (rest) did not have, whichever piece
+ * it names (a bar the new rail swallows into the kerb, the cup cut off).
+ * before: rest's own errors, when the caller has them.
  */
-export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: Issue[]): Issue[] {
+export function editErrors(rest: Draft, after: Draft, id: string, o: ValidateOptions, before?: readonly Issue[]): Issue[] {
+  const had = new Set((before ?? errorsOf(rest, o)).map(keyOf));
+  const v = validate(after, o);
+  return v.issues.filter((i) => i.severity === "error" && (about(i, id, v.refs) || !had.has(keyOf(i))));
+}
+
+/** Why the piece may not go where it is in d (put in, or put back in place of its old self); none, it may (editErrors). */
+export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: readonly Issue[]): Issue[] {
   const rest = { ...d, pieces: d.pieces.filter((p) => p.id !== piece.id) };
-  const had = new Set((before ?? errorsOf(rest, o)).map(same));
-  const v = validate({ ...rest, pieces: [...rest.pieces, piece] }, o);
-  return v.issues.filter((i) => i.severity === "error" && (about(i, piece.id, v.refs) || (!i.piece && !had.has(same(i)))));
+  return editErrors(rest, { ...rest, pieces: [...rest.pieces, piece] }, piece.id, o, before);
 }
 /** The draft's errors (validate's, warnings left out). */
 export const errorsOf = (d: Draft, o: ValidateOptions) => validate(d, o).issues.filter((i) => i.severity === "error");
@@ -170,10 +190,38 @@ export function clampEnd(d: Draft, which: "tee" | "pin", to: V, o: ValidateOptio
   return walk(d[which], to, (v) => newErrors(had, { ...d, [which]: v }, o).length === 0);
 }
 
+/** A release's outcome: the draft as it is kept (framed), or why nothing changes. */
+export type Dropped = Draft | { why: string };
+const verdict = (next: Draft, why: readonly Issue[]): Dropped => (why.length ? { why: why[0].text } : next);
+
+/**
+ * A piece let go after a drag toward `to`: clamped with the fast checks
+ * (quick), then the whole result judged with the census (full) before it is
+ * kept, framed; refused if even that fails.
+ */
+export function dropMove(start: Draft, id: string, to: V, quick: ValidateOptions, full: ValidateOptions): Dropped {
+  const p = start.pieces.find((q) => q.id === id);
+  if (!p) return { why: "" };
+  const at = clampMove(start, id, to, quick), next = frame({ ...start, pieces: start.pieces.map((q) => (q.id === id ? movePiece(p, at) : q)) });
+  return verdict(next, editErrors(without(start, id), next, id, full));
+}
+
+/** A handle let go: as dropMove, the piece within its entry's ranges (clampHandle). */
+export function dropHandle(start: Draft, id: string, key: HandleKey, to: V, quick: ValidateOptions, full: ValidateOptions): Dropped {
+  const next = clampHandle(start, id, key, to, quick);
+  return verdict(next, editErrors(without(start, id), next, id, full));
+}
+
+/** The tee or the cup let go: clamped (clampEnd), then judged with the census: kept only with no error the hole did not have. */
+export function dropEnd(start: Draft, which: "tee" | "pin", to: V, quick: ValidateOptions, full: ValidateOptions): Dropped {
+  const next = frame({ ...start, [which]: clampEnd(start, which, to, quick) });
+  return verdict(next, newErrors(errorsOf(start, full), next, full));
+}
+
 /** The errors an edit brings (a rule on a piece, or on the whole hole, that before did not have): none, it may be made. before: the draft's own errors before it. */
 export function newErrors(before: readonly Issue[], after: Draft, o: ValidateOptions): Issue[] {
-  const key = (i: Issue) => `${i.rule} ${i.piece ?? "-"}`, had = new Set(before.map(key));
-  return errorsOf(after, o).filter((i) => !had.has(key(i)));
+  const had = new Set(before.map(keyOf));
+  return errorsOf(after, o).filter((i) => !had.has(keyOf(i)));
 }
 
 /** A fresh piece name: p and the next number. */

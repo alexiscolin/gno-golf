@@ -35,6 +35,12 @@ void test("publishBytes: what each measured publish stored, within a few bytes (
   assert.ok(STORED.overhead > 3000 && STORED.overhead < 5000);
 });
 
+void test("publishBytes: the chain's first community hole also opens the community's indexes (the warm-up filetest: a first publish)", () => {
+  const first = publishBytes({ bytes: 364, name: "Warm", note: "", v: 1, newAuthor: true, firstCommunity: true });
+  assert.ok(Math.abs(first - warm.stored) <= 24, `${first} for ${warm.stored}`);
+  assert.ok(deposit({ bytes: 364, name: "Warm", note: "", v: 1, newAuthor: true, firstCommunity: true, price: 100 }) >= warm.stored * 100);
+});
+
 void test("deposit: the bytes at the chain's price, a tenth more: never less than what is stored", () => {
   for (const [name, c] of Object.entries(CASES)) {
     const d = deposit({ ...c, price: 100 });
@@ -79,6 +85,8 @@ void test("publishSteps: open once every check holds; else the first that does n
   assert.deepEqual(publishSteps({ ...ready, publishing: false }, at), { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." });
   assert.deepEqual(publishSteps({ ...ready, rules: false }, at), { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." });
   assert.equal(publishSteps({ ...ready, versions: null }, at).at, "unread");
+  assert.equal(publishSteps({ ...ready, publishing: null }, at).at, "unread", "a read that failed is said, never waited on");
+  assert.equal(publishSteps({ ...ready, rules: null }, at).at, "unread");
   const newer = publishSteps({ ...ready, versions: { ...ready.versions, versions: [ver(1), ver(2)] } }, at);
   assert.deepEqual(newer, { at: "newer", why: "This one would be v3, with new weather: test it again." }, "a version published elsewhere since: its proofs are another id's");
   assert.deepEqual(publishSteps(ready, { ...at, sha: "old" }), { at: "same", why: "This is exactly the version already published." });

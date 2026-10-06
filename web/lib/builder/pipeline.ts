@@ -8,7 +8,7 @@
 // and the board's clamps read the same rules (edit.ts).
 import { checkHole, KERB_GAP, work, WORK_WARN, type Issue } from "./checks";
 import { explain } from "./explain";
-import { BOARD, MARGIN, barCorners, entryParts, frame, writeDraft } from "./gg1";
+import { BOARD, LIMITS, MARGIN, barCorners, entryParts, frame, writeDraft } from "./gg1";
 import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { FIELD } from "./rules";
@@ -53,6 +53,9 @@ export const pieceName = (p: Piece) => {
 };
 const err = (rule: Issue["rule"], text: string, p?: Piece, at?: V): Issue => ({ rule, severity: "error", text, ...(p && { piece: p.id }), ...(at && { at }) });
 
+/** A geometry in a sentence. */
+const SHAPES = { rail: "a rail", bar: "a bar", post: "a post", rect: "a box", round: "an ellipse", poly: "a polygon" } as const;
+
 /** L0: each piece's entry is its world's, within its ranges and clocks. */
 function ranges(d: Draft, palette: readonly PaletteEntry[]): Issue[] {
   const out: Issue[] = [];
@@ -61,6 +64,10 @@ function ranges(d: Draft, palette: readonly PaletteEntry[]): Issue[] {
     const e = entryIn(p.entry, palette);
     if (!e) { out.push(err("L0", `${cap(pieceName(p))} is no piece of this world's`, p)); continue; }
     const g = p.geometry;
+    // its kind's geometry, in a shape its entry takes; a polygon within GG1's points
+    const shapes: readonly string[] = e.kind === "rail" || e.kind === "bar" || e.kind === "post" ? [e.kind] : (e.shapes ?? ["rect"]);
+    if (!shapes.includes(g.t)) { out.push(err("L0", `${cap(pieceName(p))} cannot be drawn as ${SHAPES[g.t]}`, p)); continue; }
+    if (g.t === "poly" && (g.pts.length < 3 || g.pts.length > LIMITS.poly)) { out.push(err("L0", `${cap(pieceName(p))}'s outline has ${g.pts.length} points: ${g.pts.length < 3 ? "at least 3" : `at most ${LIMITS.poly}`}`, p)); continue; }
     if (g.t === "post") range(p, "radius", g.r, e.size);
     else if (g.t === "rail" || g.t === "bar") range(p, "length", Math.hypot(g.b[0] - g.a[0], g.b[1] - g.a[1]), e.size);
     else if (g.t !== "poly") (range(p, "side", g.max[0] - g.min[0], e.size), range(p, "side", g.max[1] - g.min[1], e.size));

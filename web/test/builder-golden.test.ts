@@ -74,6 +74,16 @@ for (const [what, make, want] of cases) {
   });
 }
 
+void test("L0: a piece's geometry is its entry's kind and shape, a polygon within GG1's points (a hand-edited file)", () => {
+  const rock = put("x", "*/post/rock", [12, 9]);
+  assert.deepEqual(said(lane("garden", [{ ...rock, geometry: { t: "rail", a: [12, 9], b: [14, 9] } }])), ["L0 x: The rock post cannot be drawn as a rail"]);
+  const cave = put("x", "*/tunnel/cave", [8, 8]);
+  assert.deepEqual(said(lane("garden", [{ ...cave, geometry: { t: "poly", pts: [[8, 8], [11, 8], [8, 11]] } }])), ["L0 x: The cave tunnel cannot be drawn as a polygon"]);
+  const ring = Array.from({ length: 70 }, (_, k): [number, number] => [+(15 + 3 * Math.cos((k * 2 * Math.PI) / 70)).toFixed(2), +(10 + 3 * Math.sin((k * 2 * Math.PI) / 70)).toFixed(2)].map((x) => Math.round(x * 4) / 4) as [number, number]);
+  const pond = put("x", "*/hazard/water", [12, 7]);
+  assert.deepEqual(said(lane("garden", [{ ...pond, geometry: { t: "poly", pts: ring } }])), ["L0 x: The water hazard's outline has 70 points: at most 64"]);
+});
+
 void test("E9 and E11: the data's size and the work, from the chain's own numbers", () => {
   const d = lane("garden", []);
   assert.deepEqual(said(d, { maxBytes: 100 }), ["E9 -: The hole is 367 bytes of data: at most 100"]);
@@ -116,6 +126,16 @@ void test("canPlace: the ghost is red with the rule's sentence where a drop woul
   }
   const d = lane("garden", []);
   assert.deepEqual(canPlace(d, put("x", "*/post/rock", [12, 9]), ctx), []);
+});
+
+void test("canPlace: a piece that breaks another piece is refused too (the error named for the other)", () => {
+  const bar = { ...put("x", "*/bar/plank", [10, 6]), geometry: { t: "bar" as const, a: [10, 6] as [number, number], b: [14, 6] as [number, number], thick: 0.5 } };
+  const d = lane("garden", [bar]);
+  assert.deepEqual(said(d), []);
+  const g = pieceIn(d, "x").geometry as { a: [number, number]; b: [number, number] };
+  const near = rail("y", [g.a[0], g.a[1] + 0.5], [g.b[0], g.b[1] + 0.5]); // 0.25 from the bar's edge: the kerb would swallow the bar
+  const why = canPlace(d, near, ctx);
+  assert.ok(why.some((i) => i.rule === "E15" && i.piece === "x"), JSON.stringify(why.map((i) => `${i.rule} ${i.piece}`)));
 });
 
 void test("clampMove: a drag stops at the last place it may go", () => {

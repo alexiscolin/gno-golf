@@ -68,6 +68,15 @@ void test("anything else is refused, with why", () => {
   assert.equal(why(nan), "Piece p2 has a setting that is not a number.");
 });
 
+void test("a file's draft is rebuilt from its known fields only: nothing else it carries reaches the data", () => {
+  const d = base();
+  const crafted = { ...d, extra: 1, pieces: d.pieces.map((p, i) => (i === 0 ? { ...p, raw: { wall: { a: [0, 0], b: [9, 9], skin: "gust" } }, sneaky: true } : p)), pulses: d.pulses.map((q) => ({ ...q, walls: [1] })) };
+  const r = parseDraft(JSON.stringify(crafted));
+  assert.deepEqual(r, d, "raw, and any key a draft does not have, dropped");
+  const params = { ...d, pieces: [{ ...d.pieces[1], params: { ...d.pieces[1].params, raw: 1 } }] };
+  assert.equal(why(params), "Piece p2 has a setting that is not a number.");
+});
+
 void test("a draft's proofs read back whole; one not shaped as the Builder makes them refuses the file", () => {
   const proof = { key: "ab".repeat(32), id: "g1x/mole-run/v1", kind: "wind", period: 5967997, shots: ["0.0000,7.0000"], commits: [[0, 1]] as [number, number][], strokes: 1, maxWork: 11888 };
   const d = { ...base(), proofs: [proof] };

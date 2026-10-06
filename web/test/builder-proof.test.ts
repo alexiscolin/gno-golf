@@ -109,6 +109,12 @@ void test("Proofs: a round that does not hole, or holes before its last shot, is
   assert.equal(typeof (await replay(c, { key, id: ID, kind: "", period: PERIOD, shots: [...shots, shotOf(0, 1)] })), "string");
 });
 
+void test("Proofs: one that names a weather its period did not have does not count (a file's proof is checked, not trusted)", async () => {
+  const c = chainAt(PERIOD), key = (await proofKey(d, host))!, shots = await roundOf(c, 0, PERIOD);
+  const kind = (JSON.parse(host.forecast(ID, PERIOD)) as { kind: string }).kind, other = kind === "storm" ? "rain" : "storm";
+  assert.match(JSON.stringify(await replay(c, { key, id: ID, kind: other, period: PERIOD, shots })), /weather/);
+});
+
 void test("Proofs: one with a shot over minShotWork does not count", async () => {
   const c = chainAt(PERIOD), key = (await proofKey(d, host))!, shots = await roundOf(c, 0, PERIOD);
   const heavy = { ...c, simulateRound: async (...a: Parameters<typeof c.simulateRound>) => ({ ...(await c.simulateRound(...a)), work: MIN_SHOT_WORK + 1 }) };

@@ -83,6 +83,7 @@ export async function replay(chain: LocalChain, r: Played): Promise<Proof | stri
   if (!shots.length) return "No shot was played.";
   try {
     const [s, fc] = await Promise.all([chain.state(id), chain.weather(id, period)]);
+    if ((fc.kind || "") !== r.kind) return `That round was played in another weather than the ${r.kind || "clear"} it is kept for.`;
     const pts: number[] = [], works: number[] = [];
     let rest: Vec2 | null = null, holed = false;
     for (let k = 0; k < shots.length && !holed; k++) {

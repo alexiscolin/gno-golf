@@ -8,7 +8,7 @@
 // made: the board, the inspector and the keys all ask first (edit.ts).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
-import { canPlace, changeWorld, copyPiece, errorsOf, fixOf, movePiece, newErrors, removePiece, snap, whereOf, clampMove } from "@/lib/builder/edit";
+import { canPlace, toWorld, copyPiece, errorsOf, fixOf, movePiece, newErrors, removePiece, snap, whereOf, clampMove } from "@/lib/builder/edit";
 import { gauges, offAtLimit, verdict } from "@/lib/builder/editor";
 import { frame } from "@/lib/builder/gg1";
 import { turnPiece } from "@/lib/builder/handles";
@@ -124,10 +124,13 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     tryEdit({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? movePiece(piece, to) : p)) }, "");
   };
   const fix = (i: Issue) => quick && tryEdit(fixOf(i, draft, quick), "No free place near it: move it by hand.");
+  // another world: judged there before it is made (edit.ts toWorld), on the draft as it is once that world's pieces are in
   const world = (w: string) => {
+    if (!full) return;
     void loadPalette(w).then((p) => {
-      const r = changeWorld(draft, w, p);
+      const r = toWorld(session.kept(), w, p, full);
       if ("refused" in r) return say(`The ${w} has no ${r.refused.join(", ")}.`);
+      if ("why" in r) return say(`Not in the ${w}: ${r.why}`);
       set(r);
     });
   };

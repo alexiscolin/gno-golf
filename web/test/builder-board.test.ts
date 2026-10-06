@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
-import { clampEnd, clampHandle, copyPiece, nextId, placePiece, removePiece, snap } from "../lib/builder/edit.ts";
+import { clampEnd, clampHandle, copyPiece, dropEnd, dropHandle, dropMove, nextId, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, setHandle, turnPiece } from "../lib/builder/handles.ts";
 import { makeSession } from "../lib/builder/session.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
@@ -86,6 +86,32 @@ void test("clampEnd: the cup dragged onto a post stops clear of it; the tee like
   assert.deepEqual(errors({ ...d, pin: to }), []);
   assert.ok(to[0] > 21.5 + 0.8, `${to.join(", ")}`);
   assert.deepEqual(clampEnd(d, "tee", [6, 6], ctx), [6, 6], "a free place: as dragged");
+});
+
+void test("dropMove, dropHandle, dropEnd: a release kept where it holds (census and all), clamped short of where it does not, or refused with why", () => {
+  const quick = { host, palette: garden };
+  const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
+  const free = dropMove(d, "p", [18, 9], quick, ctx);
+  assert.ok(!("why" in free) && errors(free).length === 0);
+  const onRail = dropMove(d, "p", [13.5, 1.5], quick, ctx);
+  assert.ok(!("why" in onRail), "short of the rail");
+  assert.ok((onRail.pieces.find((x) => x.id === "p")!.geometry as { c: number[] }).c[1] > 2);
+  const r = dropHandle(d, "p", "r", [13.5, 0], quick, ctx);
+  assert.ok(!("why" in r) && errors(r).length === 0);
+  const tee = dropEnd(d, "tee", [6, 7], quick, ctx);
+  assert.ok(!("why" in tee) && errors(tee).length === 0);
+  const cup = dropEnd(d, "pin", [13.5, 6.5], quick, ctx);
+  assert.ok(!("why" in cup) && errors(cup).length === 0, "the cup dragged onto the post stops clear of it");
+});
+
+void test("toWorld: a draft moved to another world only if it holds there, judged with that world's palette", async () => {
+  const d = lane("garden", [put("p", "*/post/rock", [12, 5], { size: 2 })]);
+  const town = await loadPalette("town");
+  const ok = toWorld(d, "town", town, ctx);
+  assert.ok(!("why" in ok) && !("refused" in ok) && ok.world === "town");
+  const tight = town.map((e) => (e.id === "*/post/rock" ? { ...e, size: { ...e.size, max: 1 } } : e));
+  const no = toWorld(d, "town", tight, ctx);
+  assert.ok("why" in no && /radius is 2/.test(no.why), JSON.stringify(no));
 });
 
 void test("a session: a drag previews as it goes and is one step of history once let go", () => {

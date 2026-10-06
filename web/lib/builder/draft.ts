@@ -163,7 +163,38 @@ export function parseDraft(text: string): Draft | string {
     if (c === "clock") return `Piece ${p.id} has a timing that is not whole numbers.`;
   }
   if (!Array.isArray(d.proofs) || !d.proofs.every(isProof)) return "The draft's proofs are not rounds the Builder made.";
-  return d as unknown as Draft;
+  return rebuild(d as unknown as Draft);
+}
+
+/**
+ * A checked draft copied field by field: only what a Draft has, nothing else
+ * a file carried (a piece's raw GG1 element, any other key) reaches the data
+ * the board does not show.
+ */
+function rebuild(d: Draft): Draft {
+  const v = (p: V): V => [p[0], p[1]];
+  const geometry = (g: Geometry): Geometry => {
+    switch (g.t) {
+      case "rail": return { t: g.t, a: v(g.a), b: v(g.b) };
+      case "bar": return { t: g.t, a: v(g.a), b: v(g.b), thick: g.thick };
+      case "post": return { t: g.t, c: v(g.c), r: g.r };
+      case "poly": return { t: g.t, pts: g.pts.map(v), ...(g.outside !== undefined && { outside: g.outside }) };
+      default: return { t: g.t, min: v(g.min), max: v(g.max) };
+    }
+  };
+  const params = (p: Params): Params => {
+    const out: Params = {};
+    for (const k of ["bounce", "scale", "grade"] as const) if (p[k] !== undefined) out[k] = p[k];
+    for (const k of ["dir", "to"] as const) if (p[k]) out[k] = v(p[k]);
+    return out;
+  };
+  const clock = (c: ClockSpec): ClockSpec => (c.k === "substep" ? { k: c.k, every: c.every, on: c.on, phase: c.phase } : c.k === "stroke" ? { k: c.k, pulse: c.pulse } : { k: "fixed" });
+  return {
+    v: 1, world: d.world, slug: d.slug, title: d.title, par: d.par, tee: v(d.tee), pin: v(d.pin), note: d.note,
+    pieces: d.pieces.map((p) => ({ id: p.id, entry: p.entry, geometry: geometry(p.geometry), params: params(p.params), clock: clock(p.clock) })),
+    pulses: d.pulses.map((q) => ({ every: q.every, on: q.on, phase: q.phase })),
+    proofs: d.proofs.map((p) => ({ key: p.key, id: p.id, kind: p.kind, period: p.period, shots: [...p.shots], commits: p.commits.map(([a, b]): [number, number] => [a, b]), strokes: p.strokes, maxWork: p.maxWork })),
+  };
 }
 
 /** The draft as a file. */

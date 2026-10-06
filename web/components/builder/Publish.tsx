@@ -74,17 +74,22 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const nameWhy = checked.ok ? "" : explain(checked.why);
   const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
 
-  // the chain's state, once; the proofs on the final data, and its sha, as it changes
+  // the chain's state (read again on "Try again": a read that fails is said, never waited on); the proofs on the final data, and its sha, as it changes
+  const [tries, setTries] = useState(0);
+  const [firstCommunity, setFirst] = useState(true);
   useEffect(() => {
+    setReadings((r) => ({ ...r, publishing: undefined, rules: undefined, versions: undefined }));
     void Promise.all([
-      chain.publishing().catch(() => undefined),
-      Promise.all([chain.successor(), sameSources(chain, host.sources(), "builder")]).then(([s, same]) => same && s === "", () => undefined),
+      chain.publishing().catch(() => null),
+      Promise.all([chain.successor(), sameSources(chain, host.sources(), "builder")]).then(([s, same]) => same && s === "", () => null),
       chain.versions(alias).catch(() => null),
     ]).then(([publishing, rules, versions]) => live.current && setReadings((r) => ({ ...r, publishing, rules, versions })));
+    // the chain's first community hole also opens the community's indexes: billed so until a community hole is seen
+    void chain.holes().then((list) => live.current && setFirst(!list.some((h) => h.official === false)), () => {});
     void chain.gasPrice().then((gas) => live.current && setPrices((p) => ({ ...p, gas })), () => {});
     void chain.storagePrice().then((byte) => live.current && setPrices((p) => ({ ...p, byte })), () => {});
     void chain.chainId().then((c) => live.current && setChainId(c), () => {});
-  }, [chain, alias, host]);
+  }, [chain, alias, host, tries]);
   useEffect(() => void proofKey(draft, host).then((k) => live.current && setKey(k)), [draft, host]);
   useEffect(() => {
     if (!hex || !key || !proved) return setReadings((r) => ({ ...r, proofs: key && !proved ? false : undefined }));
@@ -98,7 +103,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const step = publishSteps({ ...readings, name: nameWhy }, { author, slug: draft.slug, proved: proved ?? "", sha });
   const id = readings.versions ? holeId(author, draft.slug, readings.versions) : "";
   const v = Number(id.slice(id.lastIndexOf("/v") + 2)) || 1;
-  const sizes = { bytes: cost?.bytes ?? hex.length / 2, name, note, v, newAuthor: true };
+  const sizes = { bytes: cost?.bytes ?? hex.length / 2, name, note, v, newAuthor: true, firstCommunity };
   const b = bill({ ...sizes, gasPrice: prices.gas, bytePrice: prices.byte });
   const gas = gasFor(sizes), deposit = Math.round(b.deposit * 1e6);
 
@@ -177,6 +182,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
             <textarea value={draft.note} rows={2} aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
             {note !== draft.note && <small>Kept as: {note}</small>}
           </label>
+          {step.at === "unread" && <Button onClick={() => setTries((n) => n + 1)}>Try again</Button>}
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>
             : step.why && <p className={step.at === "name" ? "pub__bad" : "pub__note"} role={step.at === "name" ? "alert" : "status"}>{step.why}</p>}
           <dl className="pub__bill">

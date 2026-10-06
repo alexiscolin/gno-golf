@@ -16,15 +16,17 @@ import type { BuilderHost } from "./wasm";
  * What a publish stores besides its data, name and note (bytes): its entry
  * and its rows in golf's indexes (a plain lane: 4,297 stored for 364 of data
  * and a 4-byte name); an author new to golf adds their row in the
- * community's index; a later version, its alias already indexed, less.
+ * community's index; a later version, its alias already indexed, less;
+ * the chain's first community hole, the first leaf of each index golf opens
+ * for the community (the warm-up filetest: 22,680 in all).
  */
-export const STORED = { overhead: 3929, newAuthor: 385, version: -933 } as const;
+export const STORED = { overhead: 3929, newAuthor: 385, version: -933, firstCommunity: 17998 } as const;
 
 const utf8 = (s: string) => new TextEncoder().encode(s).length;
 
 /** What a publish stores: the data's bytes (course.Encode's), the name and note as the chain keeps them, its entry and index rows. */
-export function publishBytes({ bytes, name, note, v, newAuthor }: { bytes: number; name: string; note: string; v: number; newAuthor: boolean }) {
-  return bytes + utf8(name) + utf8(note) + STORED.overhead + (newAuthor ? STORED.newAuthor : 0) + (v > 1 ? STORED.version : 0);
+export function publishBytes({ bytes, name, note, v, newAuthor, firstCommunity = false }: { bytes: number; name: string; note: string; v: number; newAuthor: boolean; firstCommunity?: boolean }) {
+  return bytes + utf8(name) + utf8(note) + STORED.overhead + (newAuthor ? STORED.newAuthor : 0) + (v > 1 ? STORED.version : 0) + (firstCommunity ? STORED.firstCommunity : 0);
 }
 
 /** The storage deposit (ugnot) at price ugnot a byte (the chain's: vm params), a tenth more: the chain takes what is really written. */
@@ -63,12 +65,12 @@ export async function proofsHold(d: Draft, host: BuilderHost, hex: string, key: 
   return true;
 }
 
-/** What the publish step reads before it opens (undefined: still being read). */
+/** What the publish step reads before it opens (undefined: still being read; null: the chain could not be read). */
 export interface Readings {
   /** Publishing(): community holes open on this chain */
-  publishing: boolean | undefined;
+  publishing: boolean | null | undefined;
   /** builder.wasm's sources are the realm's, and the realm has no successor */
-  rules: boolean | undefined;
+  rules: boolean | null | undefined;
   /** Versions(alias); null: the chain could not be read */
   versions: Versions | null | undefined;
   /** every required proof replays on the final bytes */
@@ -87,7 +89,7 @@ export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "rule
 export function publishSteps(r: Readings, { author, slug, proved, sha }: { author: string; slug: string; proved: string; sha: string }): Step {
   if (r.publishing === false) return { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." };
   if (r.rules === false) return { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." };
-  if (r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
+  if (r.publishing === null || r.rules === null || r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
   if (r.publishing === undefined || r.rules === undefined || r.versions === undefined || r.proofs === undefined) return { at: "reading", why: "" };
   const id = holeId(author, slug, r.versions);
   if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: test it again.` };

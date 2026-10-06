@@ -11,7 +11,7 @@
 // Live, the checks run without the render census (fast); a drop or a
 // release is checked with it.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { canPlace, clampEnd, clampHandle, clampMove, errorsOf, movePiece, newErrors, nextId, placePiece, snap, whereOf } from "@/lib/builder/edit";
+import { canPlace, dropEnd, dropHandle, dropMove, errorsOf, movePiece, newErrors, nextId, placePiece, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
 import { BOARD, frame } from "@/lib/builder/gg1";
 import { handlesOf, setHandle, type HandleKey } from "@/lib/builder/handles";
@@ -193,21 +193,12 @@ export default function Board(props: BoardProps) {
       return;
     }
     if (!d || d.t === "pan") return;
-    // let go: where it is if it may stay there (checked with the census), else the last place on its way where it may
-    let next: Draft;
-    if (d.t === "piece") {
-      const p = d.start.pieces.find((q) => q.id === d.id)!, to = clampMove(d.start, d.id, snap([at[0] - d.grab[0], at[1] - d.grab[1]], step), quick);
-      next = frame({ ...d.start, pieces: d.start.pieces.map((q) => (q.id === d.id ? movePiece(p, to) : q)) });
-      const why = canPlace(d.start, next.pieces.find((q) => q.id === d.id)!, full);
-      if (why.length) return (props.onCancel(), props.onSay(why[0].text));
-    } else if (d.t === "handle") {
-      next = clampHandle(d.start, d.id, d.key, snap(at, step), quick);
-      const why = canPlace(d.start, next.pieces.find((q) => q.id === d.id)!, full);
-      if (why.length) return (props.onCancel(), props.onSay(why[0].text));
-    } else {
-      const v = clampEnd(d.start, d.which, snap(at, step), quick);
-      next = frame({ ...d.start, [d.which]: v });
-    }
+    // let go: where it is if it may stay there, else the last place on its way where it may; the whole result
+    // judged with the census before it is kept (edit.ts dropMove, dropHandle, dropEnd)
+    const next = d.t === "piece" ? dropMove(d.start, d.id, snap([at[0] - d.grab[0], at[1] - d.grab[1]], step), quick, full)
+      : d.t === "handle" ? dropHandle(d.start, d.id, d.key, snap(at, step), quick, full)
+        : dropEnd(d.start, d.which, snap(at, step), quick, full);
+    if ("why" in next) return (props.onCancel(), next.why && props.onSay(next.why));
     props.onPreview(next);
     props.onCommit();
   }
