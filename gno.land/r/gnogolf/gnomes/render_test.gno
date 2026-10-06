@@ -49,7 +49,7 @@ func TestTheHomeSaysTheClose(cur realm, t *testing.T) {
 }
 
 func TestGNOTIsWrittenPlainly(t *testing.T) {
-	uassert.Equal(t, "30 GNOT", gnot(30_000_000))
+	uassert.Equal(t, "36 GNOT", gnot(36_000_000))
 	uassert.Equal(t, "815.85 GNOT", gnot(815_850_000))
 	uassert.Equal(t, "0.000001 GNOT", gnot(1))
 }

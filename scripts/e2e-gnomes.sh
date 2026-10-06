@@ -4,11 +4,12 @@
 # needs (store, golf/v2, gnomes and their packages, under the test name NS,
 # as scripts/stage.sh does), publishes the genesis rows
 # (data/gnomes/rows/genesis.txt) and plays the sale through: waves and the
-# player window, buys and caps (a Legendary at its price, one a wallet),
-# Equip, the locker, the pause, the treasury moved, the site link, the
+# player window, buys and caps, a Legendary at its fixed price (one a
+# wallet, its first buyer's), the switch paused and resumed, Equip, the
+# locker, the treasury moved and a stray coin swept to it, the site link, the
 # close, an earned gnome, the token reads and the page, and the portraits:
 # every catalogue gnome's drawn, and what TokenURI costs a tier, held to
-# URIMAX (the portrait commit's figure). Each step is a call
+# URIMAX (ADR-007's figure on a chain). Each step is a call
 # and what it must give; the table of them goes to OUT, a markdown file,
 # with the gas each transaction used.
 #
@@ -22,8 +23,8 @@
 # the others are generated each run). Nothing reads or writes another
 # keybase, and no chain but that gnodev is ever named.
 #
-# It takes a few minutes: the close is waited out (a minute of chain time),
-# the rest runs as it comes.
+# It takes a few minutes: the one wait is the close's minute of chain time
+# (and up to six weather periods, if the ace on garden/3 needs one).
 #
 # MCP=1 needs gnomcp (github.com/gnoverse/gno-mcp, GNOMCP the binary): the
 # owner (test1, which gnomcp signs with on a local profile) calls through
@@ -463,17 +464,10 @@ no "catalogue: once" "already published" test1 "$GN" AddSeries genesis "$(cat "$
 is "catalogue: Gnome(104)" "Gnome(\"104\").tier,name" "legendary The Miller" "$(qg 'Gnome("104")' | jf 'd["tier"] + " " + d["name"]')"
 
 # ------------------------------------------------------- the sale opens
+REALM_ADDR=$(py realm "$GN")
 SEND=36000000ugnot no "sale: closed at deploy" "the sale is closed" p0 "$GN" Buy 1
 ok "sale: open" "open" test1 "$GN" SetMintOpen true
 is "sale: MintOpen()" "MintOpen()" "true" "$(qg 'MintOpen()')"
-
-REALM_ADDR=$(py realm "$GN")
-
-# pause: the owner's switch over every sale
-ok "pause: SetMintOpen(false)" "paused" test1 "$GN" SetMintOpen false
-SEND=36000000ugnot no "pause: no buy" "the sale is closed" p0 "$GN" Buy 1
-ok "pause: SetMintOpen(true)" "resumed" test1 "$GN" SetMintOpen true
-ok "pause: open again is a no-op" "no change" test1 "$GN" SetMintOpen true
 
 # ------------------------------------------------------------------- waves
 no "waves: owner only" "only the owner" p0 "$GN" AddWave 1 104 0 1
@@ -510,13 +504,27 @@ SEND=144000000ugnot ok "caps: 2 Rares in the window" "sold" p1 "$GN" Buy 73,74
 SEND=72000000ugnot no "caps: no third Rare in the window" "the player window takes 2 rare a wallet" p1 "$GN" Buy 75
 SEND=336000000ugnot ok "caps: 1 Epic in the window" "sold" p1 "$GN" Buy 94
 SEND=336000000ugnot no "caps: no second Epic in the window" "the player window takes 1 epic a wallet" p1 "$GN" Buy 95
-# a Legendary: bought as any gnome, at its price, by the first; one a wallet
+
+# a Legendary: sold as any gnome, by Buy at its wave's fixed price, to its
+# first buyer, one a wallet
+is "legendary: its price" "Gnome(\"104\").price" "1296000000" "$(qg 'Gnome("104")' | jf 'd["price"]')"
+SEND=1295999999ugnot no "legendary: underpaid" "wrong payment, send exactly 1296000000ugnot" p1 "$GN" Buy 104
 t_before=$(bal "$OWNER")
-SEND=1296000000ugnot ok "legendary: p1 buys The Miller (104) at its price" "sold" p1 "$GN" Buy 104
+SEND=1296000000ugnot ok "legendary: p1 buys #104 at its price" "sold" p1 "$GN" Buy 104
 is "legendary: treasury up by the price" "balance(treasury) after - before" "1296000000" "$(($(bal "$OWNER") - t_before))"
+is "legendary: the realm keeps nothing" "balance(realm)" "0" "$(bal "$REALM_ADDR")"
 is "legendary: OwnerOf(104)" "OwnerOf(\"104\")" "$P1" "$(qg 'OwnerOf("104")')"
-SEND=1296000000ugnot no "legendary: sold once" "already sold" b1 "$GN" Buy 104
-is "worn: the best held, free" "Worn(p1).id,equipped" "104 False" "$(qg "Worn(\"$P1\")" | jf 'd["id"] + " " + str(d["equipped"])')"
+SEND=1296000000ugnot no "legendary: a second buyer refused" "this gnome is already sold" b1 "$GN" Buy 104
+ok "legendary: #208 on sale alone, no window" "added" test1 "$GN" AddWave 208 208 "$(chaintime)" 0
+SEND=1296000000ugnot no "legendary: one a wallet" "the cap is 1 legendary a wallet" p1 "$GN" Buy 208
+SEND=1296000000ugnot ok "legendary: b1 buys #208" "sold" b1 "$GN" Buy 208
+SEND=1296000000ugnot no "legendary: #208 sold once" "this gnome is already sold" b2 "$GN" Buy 208
+is "legendary: SoldOfTier(3)" "SoldOfTier(3)" "2" "$(qg 'SoldOfTier(3)')"
+
+# the owner's switch: every sale paused, then open again
+ok "pause: SetMintOpen(false)" "paused" test1 "$GN" SetMintOpen false
+SEND=36000000ugnot no "pause: no buy" "the sale is closed" p0 "$GN" Buy 1
+ok "pause: SetMintOpen(true)" "open" test1 "$GN" SetMintOpen true
 
 # a wave with no window, and the lifetime cap
 no "price: owner only" "only the owner" p0 "$GN" SetPrice common 40000000
@@ -554,7 +562,7 @@ ok "equip: off" "off" p0 "$GN" Equip ""
 is "equip: Equipped(p0) after off" "Equipped(p0)" "" "$(qg "Equipped(\"$P0\")")"
 is "locker: GnomesOf(p0, 0)" "GnomesOf(p0,0) total,next,rows" "10 -1 10" "$(qg "GnomesOf(\"$P0\",0)" | jf '" ".join(str(x) for x in (d["total"], d["next"], len(d["rows"])))')"
 is "locker: GnomesOf(p0, 4)" "GnomesOf(p0,4) first row, rows" "$5 6" "$(qg "GnomesOf(\"$P0\",4)" | jf 'd["rows"][0]["id"] + " " + str(len(d["rows"]))')"
-is "locker: GnomesOf(p1, 0) in id order" "GnomesOf(p1,0) ids" "5,7,73,74,94" "$(qg "GnomesOf(\"$P1\",0)" | jf '",".join(r["id"] for r in d["rows"])')"
+is "locker: GnomesOf(p1, 0) in id order" "GnomesOf(p1,0) ids" "5,7,73,74,94,104" "$(qg "GnomesOf(\"$P1\",0)" | jf '",".join(r["id"] for r in d["rows"])')"
 is "locker: past the end" "GnomesOf(p1,99) rows,next" "0 -1" "$(qg "GnomesOf(\"$P1\",99)" | jf 'str(len(d["rows"])) + " " + str(d["next"])')"
 is "locker: TokenOfOwnerByIndex(p0, 9)" "TokenOfOwnerByIndex(p0,9)" "${10}" "$(qg "TokenOfOwnerByIndex(\"$P0\",9)")"
 
@@ -576,6 +584,19 @@ SEND=40000000ugnot ok "treasury: a buy pays the new treasury" "sold" b2 "$GN" Bu
 is "treasury: up by the price" "balance(treas) after - before" "40000000" "$(($(bal "$TREAS") - t_before))"
 is "treasury: the owner unchanged" "Owner()" "$OWNER" "$(qg 'Owner()')"
 
+# a coin sent to the realm's address stays there until swept to the treasury
+# (a call cannot carry one it does not read: the chain refuses "coins were
+# sent but the called function never read them"); a plain bank send can
+if echo "$PASS" | "$GNOKEY" maketx send -home "$KH" -to "$REALM_ADDR" -send 1ugnot -gas-fee 1000000ugnot -gas-wanted 10000000 \
+	-remote "$RPC_ADDR" -chainid "$CHAINID" -broadcast -insecure-password-stdin p0 2>&1 | grep -q '^OK!'; then
+	row "sweep: a stray coin" "p0: gnokey maketx send 1ugnot to the realm" "sent" "sent" 0
+else row "sweep: a stray coin" "p0: gnokey maketx send 1ugnot to the realm" "sent" "refused" 1; fi
+is "sweep: the realm holds it" "balance(realm)" "1" "$(bal "$REALM_ADDR")"
+no "sweep: owner only" "only the owner" p0 "$GN" Sweep
+t_before=$(bal "$TREAS")
+ok "sweep: to the treasury" "swept" test1 "$GN" Sweep
+is "sweep: the treasury has it" "balance(treas) after - before, balance(realm)" "1 0" "$(($(bal "$TREAS") - t_before)) $(bal "$REALM_ADDR")"
+
 # ---------------------------------------------------------- the site link
 no "site: owner only" "only the owner" p0 "$GN" SetSiteURL "https://gnogolf.xyz/"
 no "site: https only" "a site link is https://" test1 "$GN" SetSiteURL "http://gnogolf.xyz/"
@@ -593,10 +614,10 @@ is "metadata: JSON" "TokenMetadata(\"5\") name,external_url,tier" \
 is "token: TokenURI SVG" "TokenURI(\"5\") parsed as XML" "svg" "$(qg 'TokenURI("5")' | py svg 2>&1 | cut -d' ' -f1)"
 is "token: image is TokenURI" "TokenMetadata(\"5\").image == TokenURI(\"5\")" "True" "$(printf %s "$md" | jf "d['image'] == '''$(qg 'TokenURI("5")')'''")"
 is "token: unminted" "TokenURI(\"9\")" "error" "$(qraw 'TokenURI("9")' | grep -q 'gnomes: no such gnome' && echo error || echo none)"
-is "token: Name, Symbol, TotalSupply" "Name() Symbol() TotalSupply()" "Gnogolf Gnomes GNOME 18" "$(qg 'Name()') $(qg 'Symbol()') $(qg 'TotalSupply()')"
+is "token: Name, Symbol, TotalSupply" "Name() Symbol() TotalSupply()" "Gnogolf Gnomes GNOME 20" "$(qg 'Name()') $(qg 'Symbol()') $(qg 'TotalSupply()')"
 if [ "$MCP" = 1 ]; then page=$(py mcp gno_render "$(jq -nc --arg r "$GN" '{profile:"local",realm:$r}')"); via=gno_render
 else page=$("$GNOKEY" query vm/qrender -remote "$RPC_ADDR" -data "$GN:" 2>&1); via=qrender; fi
-has "render: the collection" "Render(\"\") [$via]" "The Miller" "$page"
+has "render: the collection" "Render(\"\") [$via]" "fixed price" "$page"
 page=$(curl -s "http://$WEB_ADDR/r/$NS/gnogolf/gnomes:5")
 has "render: a gnome on gnoweb" "GET /r/$NS/gnogolf/gnomes:5" "$(awk -F'|' '$1==5{print $3}' "$ROWS")" "$page"
 has "render: a player" "Render(\"<p1>\")" "5" "$("$GNOKEY" query vm/qrender -remote "$RPC_ADDR" -data "$GN:$P1" 2>&1)"
@@ -623,7 +644,7 @@ fi
 within "portrait: TokenURI gas, a Common (#5)" "MsgRun TokenURI(\"5\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 5)"
 within "portrait: TokenURI gas, a Rare (#73)" "MsgRun TokenURI(\"73\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 73)"
 within "portrait: TokenURI gas, an Epic (#94)" "MsgRun TokenURI(\"94\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 94)"
-within "portrait: TokenURI gas, the Legendary (#104)" "MsgRun TokenURI(\"104\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 104)"
+within "portrait: TokenURI gas, a Legendary (#104)" "MsgRun TokenURI(\"104\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 104)"
 c=14 r=3 e=1 l=2
 case $HTIER in common) c=15 ;; rare) r=4 ;; epic) e=2 ;; esac
 sold=$((c + r + e + l))
@@ -661,7 +682,8 @@ no "close: no wave for its ids" "the genesis sale closed on" test1 "$GN" AddWave
 no "close: no date after" "the genesis sale closed on" test1 "$GN" SetCloseAt "$((CLOSE + 600))"
 is "close: Collection genesis closed, sold" "Collection().series[0] closed,sold" "True $sold" "$(qg 'Collection()' | jf 'str(d["series"][0]["closed"]) + " " + str(d["series"][0]["sold"])')"
 is "close: an unsold gnome closed" "Gnome(\"1\").closed" "True" "$(qg 'Gnome("1")' | jf 'd["closed"]')"
-
+is "close: a sold Legendary is not closed" "Gnome(\"104\").closed" "False" "$(qg 'Gnome("104")' | jf 'd["closed"]')"
+is "close: an unsold Legendary is" "Gnome(\"311\").closed" "True" "$(qg 'Gnome("311")' | jf 'd["closed"]')"
 is "close: final supply" "Collection().series[0].sold, tiers sold" "$sold $c,$r,$e,$l" "$(qg 'Collection()' | jf 'str(d["series"][0]["sold"]) + " " + ",".join(str(t["sold"]) for t in d["tiers"])')"
 
 # ------------------------------------------------------------- the owner
