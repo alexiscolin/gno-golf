@@ -73,9 +73,11 @@ export interface Draft {
 }
 
 /** A draft's limits, beside GG1's own (gg1.ts LIMITS): what the editor holds at once. */
-export const MAX_PIECES = 200;
+export const MAX_PIECES = 224; // GG1's walls, posts and zones (160 + 32 + 32): a piece takes one at least (a test holds it)
 /** Where the browser keeps the drafts. */
 export const DRAFTS_KEY = "gnogolf.builder.drafts";
+/** Where a stored draft this Builder cannot read is set aside, as it was: never erased by a save. */
+export const UNREAD_KEY = "gnogolf.builder.unread";
 const MAX_TITLE = 40, MAX_NOTE = 140, MAX_PULSES = 16;
 
 /** A grid value: a multiple of a quarter (Fit shifts the hole by one exactly). */
@@ -229,12 +231,24 @@ export function history(first: Draft) {
 /** The drafts kept in this browser; none if it keeps nothing (a private window) or kept another version's. */
 export function loadDrafts(): Draft[] {
   try {
-    const j: unknown = JSON.parse(localStorage.getItem(DRAFTS_KEY) || "null");
-    if (!isObj(j) || j.v !== 1 || !Array.isArray(j.drafts)) return [];
-    return j.drafts.map((d) => parseDraft(JSON.stringify(d))).filter((d): d is Draft => typeof d !== "string");
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    const j: unknown = JSON.parse(raw || "null");
+    if (!isObj(j) || j.v !== 1 || !Array.isArray(j.drafts)) return (raw && setAside([j ?? raw]), []);
+    const read = j.drafts.map((d) => parseDraft(JSON.stringify(d)));
+    setAside(j.drafts.filter((_, i) => typeof read[i] === "string"));
+    return read.filter((d): d is Draft => typeof d !== "string");
   } catch {
     return [];
   }
+}
+
+/** Stored drafts (or a store) this Builder cannot read, kept aside as they were, each once. */
+function setAside(odd: unknown[]) {
+  if (!odd.length) return;
+  const was: unknown = JSON.parse(localStorage.getItem(UNREAD_KEY) || "[]");
+  const list: unknown[] = Array.isArray(was) ? (was as unknown[]) : [];
+  const seen = new Set(list.map((x) => JSON.stringify(x)));
+  localStorage.setItem(UNREAD_KEY, JSON.stringify([...list, ...odd.filter((x) => !seen.has(JSON.stringify(x)))]));
 }
 
 /** Keeps the drafts in this browser; false if it keeps nothing (the page then says so once). */

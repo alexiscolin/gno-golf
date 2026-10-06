@@ -3,7 +3,8 @@
 // its history; its persistence.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DRAFTS_KEY, MAX_PIECES, emptyDraft, exportDraft, history, loadDrafts, onGrid, parseDraft, saveDrafts, type Draft } from "../lib/builder/draft.ts";
+import { DRAFTS_KEY, MAX_PIECES, UNREAD_KEY, emptyDraft, exportDraft, history, loadDrafts, onGrid, parseDraft, saveDrafts, type Draft } from "../lib/builder/draft.ts";
+import { LIMITS } from "../lib/builder/gg1.ts";
 
 const base = (): Draft => ({
   ...emptyDraft("garden"),
@@ -101,6 +102,24 @@ void test("history: 200 steps deep; undo, redo, and a new step drops what was un
   h.push({ ...d0, title: "C" });
   assert.equal(h.canRedo(), false);
   assert.equal(h.now().title, "C");
+});
+
+void test("a draft holds as many pieces as the palette lets an author place: one wall, post or zone each, at GG1's limits", () => {
+  assert.equal(MAX_PIECES, LIMITS.walls + LIMITS.posts + LIMITS.zones);
+});
+
+void test("persistence: a stored draft this Builder cannot read is set aside, never erased by the next save", () => {
+  localStorage.clear();
+  const odd = { ...base(), pieces: "not a list" };
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: [base(), odd] }));
+  assert.deepEqual(loadDrafts(), [base()]);
+  saveDrafts([base(), emptyDraft("island")]);
+  assert.deepEqual(JSON.parse(localStorage.getItem(UNREAD_KEY)!), [odd], "kept aside, as it was");
+  loadDrafts();
+  assert.equal((JSON.parse(localStorage.getItem(UNREAD_KEY)!) as unknown[]).length, 1, "set aside once, not again at each load");
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 9, drafts: [base()] }));
+  assert.deepEqual(loadDrafts(), []);
+  assert.equal((JSON.parse(localStorage.getItem(UNREAD_KEY)!) as unknown[]).length, 2, "another version's store, whole");
 });
 
 void test("persistence: saved and loaded as written; a store that throws, or another version's, gives none", () => {
