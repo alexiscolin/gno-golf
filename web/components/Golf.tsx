@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
-import { GNOMES, gnomeById, cheer, motion, addGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
+import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
 import { skinOfTraits } from "@/lib/gnomes/skin";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
@@ -30,7 +31,7 @@ import Tip, { readOwner } from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
-import { CUPS, fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
+import { CUPS, backFromChain, fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
 import { messageOf, holeLink, parHere, HONEST, suggestName, saveOf, pendingOf, strokesWord, plural, vsParWords, AIMS, AIM_NAMES, shortAddr, useCopied, saveBy, mmss, costLine, fundCmd, holeNumber, nextCup, golfTerm, nextHole, chainQuery, strokeFor, minesHint, readMs, type SaveOf } from "@/components/common";
@@ -40,6 +41,16 @@ import { ADENA_URL, FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network
 import { register, track, trackLeaving, trackError, once, failure, saveBlock, cardHoles, WALLET_STEPS, type Events, type Play, type RivalKind, type ShareKind, type WalletFrom } from "@/lib/analytics";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "@/lib/prefs";
 import { darkGallery, minesOrder } from "@/lib/scene/data";
+import { SHOP, makeShop, type Worn } from "@/lib/gnomes/shop";
+import { shopInRegion } from "@/lib/gnomes/geo";
+import { served } from "@/lib/gnomes/served";
+import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/wear";
+import type { ShopView } from "@/components/gnomes/Shop";
+
+// The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/shop.ts SHOP): its screen and the picker's row of a
+// player's gnomes, each a chunk of its own, fetched only when shown; off, none of it is ever loaded.
+const Shop = dynamic(() => import("@/components/gnomes/Shop"), { ssr: false });
+const Owned = dynamic(() => import("@/components/gnomes/Owned"), { ssr: false });
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
 // dev build, or on a page opened with ?camlog where the hooks answer
@@ -57,7 +68,7 @@ declare global {
   }
 }
 
-const SCREENS = ["title", "modes", "rival", "ghosts", "worlds", "pick", "play"] as const;
+const SCREENS = ["title", "modes", "rival", "ghosts", "worlds", "pick", "play", "shop"] as const;
 type Screen = (typeof SCREENS)[number];
 const isScreen = (v: unknown): v is Screen => SCREENS.some((x) => x === v);
 // the screen before each one, for its Back button and Escape (the picker's: the cups, or a duel's ghosts)
@@ -103,7 +114,9 @@ interface Config {
   cup: string;
   place: number;
   gnome: string;
-  screen: "" | "modes" | "rival" | "worlds" | "pick";
+  screen: "" | "modes" | "rival" | "worlds" | "pick" | "shop";
+  /** the shop's own address (/g/, /g/<id>/, ?who=): a gnome open, a player's gnomes */
+  shop: ShopView;
   shot: string;
   play: boolean;
   demo: string;
@@ -128,6 +141,9 @@ function useConfig() {
     const src = p0.get("src") || ""; // (where the link was shared from: kept with every event, the address bar may drop it)
     register({ src: ["hole", "cup", "board", "duel"].includes(src) ? src : null, entry: p0.has("by") ? (p0.has("hole") || pn ? "dare_hole" : "dare_course") : p0.has("friend") ? "friend" : p0.has("hole") || pn ? "hole" : p0.has("cup") || pw ? "cup" : p0.has("screen") ? "screen" : "home" });
     if (pw && !p.has("hole") && !p.has("cup")) p.set(pn ? "hole" : "cup", pn ? `${pw}/${pn}` : pw);
+    // the shop's pages (app/g): /g/ its gallery, /g/<id>/ a gnome, /g/<kind>/ an earned one; ?who= a player's gnomes
+    const [, gp] = SHOP ? /^\/g(?:\/([a-z0-9]{1,16}))?\/?$/.exec(window.location.pathname) || [] : [];
+    const onShop = SHOP && /^\/g(\/|$)/.test(window.location.pathname);
     setCfg({
       rpc: safeEndpoint(p.get("rpc"), process.env.NEXT_PUBLIC_RPC || DEFAULT_RPC),
       web: safeEndpoint(p.get("web"), process.env.NEXT_PUBLIC_WEB || DEFAULT_WEB),
@@ -140,7 +156,8 @@ function useConfig() {
       gnome: /^[a-z]{2,16}$/.test(p.get("gnome") || "") ? p.get("gnome") || "" : "",
       // ?screen=modes, ?screen=rival, ?screen=cups: the game's choice, a duel's rival, the cups (a reload stays there);
       // ?screen=pick: a cup hole's picker, not its play
-      screen: p.get("screen") === "rival" ? "rival" : p.get("screen") === "modes" ? "modes" : p.get("screen") === "cups" ? "worlds" : p.get("screen") === "pick" ? "pick" : "",
+      screen: onShop ? "shop" : p.get("screen") === "rival" ? "rival" : p.get("screen") === "modes" ? "modes" : p.get("screen") === "cups" ? "worlds" : p.get("screen") === "pick" ? "pick" : "",
+      shop: { open: gp || undefined, who: isAddress(p.get("who")) ? p.get("who") || undefined : undefined },
       shot: p.get("shot") || "",
       // ?play skips the title screen — for screenshots and smoke tests
       play: p.has("play") || p.has("shot"),
@@ -538,8 +555,7 @@ export default function Golf() {
     if (back.length) setFreshBadges((b) => byRarity([...b, ...back]));
     if (!r.filled.length && !back.length && !gnomes.length) return void (asked && setRestoreNote("Nothing to bring back: your card has every hole you saved."));
     track("progress_restored", { holes: r.filled.length, asked });
-    const what = [r.filled.length && `${r.filled.length} ${plural("hole", r.filled.length)}`, back.length && `${back.length} ${plural("badge", back.length)}`, ...gnomes.map((g) => `the ${g.name} gnome`)].filter(Boolean);
-    setRestoreNote(`Back from the chain: ${what.join(", ").replace(/, ([^,]*)$/, " and $1")}.`);
+    setRestoreNote(backFromChain({ holes: r.filled.length, badges: back.length, gnomes: gnomes.map((g) => g.name) }));
   };
   const restoreAsked = account
     ? () => {
@@ -648,7 +664,11 @@ export default function Golf() {
     setGnome(id);
     // a locked one is only being looked at: it is not saved and not played
     if (!unlockedRef.current(id)) return;
-    saveGnome(id);
+    // a gnome of the collection is this account's pick, kept in this browser (free, nothing on chain);
+    // one of the game's is the browser's too
+    if (!GNOMES.some((g) => g.id === id)) {
+      if (account) pick(account.address, id);
+    } else (saveGnome(id), SHOP && account && pick(account.address, id));
     game.current && game.current.setGnome(id);
   };
   const unlockedRef = useRef<(id: string) => boolean>(() => true);
@@ -662,8 +682,10 @@ export default function Golf() {
     const make = (promo?: GameOptions["promo"], probes?: GameOptions["probes"]) => {
       try {
         if (cfg.rivalTraits) setRivalGnome(skinOfTraits(cfg.rivalTraits, { id: "rival-traits", name: "", line: "" }));
+        const traits = cfg.traits ? skinOfTraits(cfg.traits, { id: "traits", name: "", line: "" }) : null;
+        if (traits) knowGnome(traits);
         g = createGame(el, {
-        rpc: cfg.rpc, web: cfg.web, gnome: cfg.traits ? addGnome(skinOfTraits(cfg.traits, { id: "traits", name: "", line: "" })) : gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, promo, probes, log: logs,
+        rpc: cfg.rpc, web: cfg.web, gnome: traits ? traits.id : gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, promo, probes, log: logs,
         // the hot fields to their store; the rest re-renders only when it changed
         // (compared here, not in a setS updater: an updater that returns the
         // same state still re-renders the whole page, 60 times a second in a pull)
@@ -688,6 +710,7 @@ export default function Golf() {
         .then((to) => {
           if (cancelled) return;
           if (cfg.play) play();
+          else if (cfg.screen === "shop") (setShopView(cfg.shop), setScreen("shop"));
           else if (cfg.screen && cfg.screen !== "pick" && !dare) setScreen(cfg.screen);
           else if (cfg.hole || cfg.cup) {
             // a shared link: straight to that hole (a first-time player picks a
@@ -959,6 +982,43 @@ export default function Golf() {
     const stop = onWalletChange(() => void (!off() && current().then(keep)));
     return () => (removeEventListener("focus", look), stop());
   }, []);
+
+  // The collection (SHOP): what the player holds and wears for everyone, read once an account is
+  // here; the gnome played is their pick while it is theirs, else the one they wear (wear.ts playing).
+  const [region, setRegion] = useState(false);
+  const [held, setHeld] = useState<{ id: string; tier: string; traits: string; name: string; home: string }[]>([]);
+  const [worn, setWorn] = useState<Worn | null>(null);
+  const [shopView, setShopView] = useState<ShopView>({});
+  const shopFrom = useRef<Screen>("worlds"); // the screen the shop's Back returns to
+  const gnomeNow = useRef(gnome);
+  gnomeNow.current = gnome;
+  useEffect(() => void (SHOP && shopInRegion().then(setRegion)), []);
+  const readWorn = () => {
+    const c = game.current && game.current.chain;
+    if (!SHOP || !c || !account) return (setHeld([]), setWorn(null));
+    const shop = makeShop(c), me = account.address;
+    void Promise.all([shop.allOf(me), shop.worn(me).catch(() => null)]).then(async ([rows, w]) => {
+      const listed = rows.length ? new Map((await served().catch(() => ({ gnomes: [] }))).gnomes.map((g) => [String(g.id), g])) : new Map<string, { name: string; home: string }>();
+      const mine = rows.map((r) => ({ ...r, name: listed.get(r.id)?.name || `Gnome ${r.id}`, home: listed.get(r.id)?.home || "" }));
+      const skins = await know(w ? [...mine, w] : mine);
+      setHeld(mine);
+      setWorn(w);
+      // the gnome played: theirs while it is theirs, else the one everyone sees, else the browser's own
+      const want = playingOf({ pick: pickOf(me), held: new Set(skins.map((k) => k.id)), worn: w, saved: savedGnome(), free: (id) => GNOMES.some((g) => g.id === id) && unlockedRef.current(id) });
+      if (want !== gnomeNow.current) (setGnome(want), game.current && game.current.setGnome(want));
+    }, () => {});
+  };
+  useEffect(readWorn, [account, game.current]); // eslint-disable-line react-hooks/exhaustive-deps -- (readWorn: the account's)
+  // a rival's ghost wears the gnome they wear for everyone (gnome.ts rivalSkin), read as they are picked
+  useEffect(() => {
+    const c = game.current && game.current.chain;
+    if (SHOP && c && dare) void askWorn((ps) => makeShop(c).wornMany(ps), dare);
+  }, [dare]);
+  const openShop = (v: ShopView = {}) => {
+    if (screen !== "shop") shopFrom.current = screen === "title" ? "worlds" : screen;
+    setShopView(v);
+    setScreen("shop");
+  };
 
   // Adena has no revoke from a page: disconnecting forgets the account here,
   // and the page stops picking it up again on its own
@@ -1363,6 +1423,8 @@ export default function Golf() {
     else if (screen === "ghosts" || (screen === "title" && dare && !solo)) q.set("by", dare);
     // (the picker of a hole past the cup's first: that hole, marked the picker's, so a reload or a copied link lands on it, not in play)
     else if (screen === "pick" && world) (q.set("cup", world), place && place > 1 && (q.set("hole", String(place)), q.set("screen", "pick")), q.set("gnome", gnome));
+    // the shop's pages are its own (app/g): a gnome open at /g/<id>/, a player's gnomes by ?who=
+    else if (screen === "shop") shopView.who && q.set("who", shopView.who);
     else if (screen === "play") return; // the hole is not known yet: wait for it
     // a dare stays in the address, with the hole, while it is raced: a reload, a copied link keep it
     if (dare && !solo && idHere && (screen === "play" || screen === "pick")) {
@@ -1370,7 +1432,7 @@ export default function Golf() {
       q.set("by", dare);
     }
     // a hole's own page (/h/…) is left for the game's address once it moves on
-    const base = window.location.pathname.startsWith("/h/") ? "/" : window.location.pathname;
+    const base = screen === "shop" ? `/g/${shopView.open ? `${shopView.open}/` : ""}` : /^\/[hg]\//.test(window.location.pathname) ? "/" : window.location.pathname;
     const url = base + (String(q) ? `?${q}` : "");
     const here = window.location.pathname + window.location.search;
     // a link to a hole keeps its address while the title shows (the game on its way to it)
@@ -1381,7 +1443,7 @@ export default function Golf() {
     if (url === here && !(moved && screen === "ghosts")) return;
     if (moved) window.history.pushState({ screen }, "", url);
     else window.history.replaceState({ screen }, "", url);
-  }, [cfg, screen, place, world, gnome, idHere, dare, solo]);
+  }, [cfg, screen, place, world, gnome, idHere, dare, solo, shopView]);
   // Back and Forward: back to that screen, and that hole, without reloading the scene
   // (subscribed once: the latest goTo is read through its ref)
   useEffect(() => {
@@ -1390,6 +1452,8 @@ export default function Golf() {
       const st: unknown = e.state; // a history entry's state: this page's own, or anyone's
       const was = st && typeof st === "object" && "screen" in st && isScreen(st.screen) ? st.screen : null;
       const sc: Screen = was || (p.get("hole") ? "play" : p.get("cup") ? "worlds" : p.get("screen") === "rival" ? "rival" : p.get("screen") === "modes" ? "modes" : p.get("screen") === "cups" ? "worlds" : "title");
+      // the shop's address says what it showed
+      if (sc === "shop") setShopView({ open: (/^\/g\/([a-z0-9]{1,16})\/?$/.exec(window.location.pathname) || [])[1], who: isAddress(p.get("who")) ? p.get("who") || undefined : undefined });
       lastScreen.current = sc; // arriving here is not a new step
       setMenu(false);
       setScreen(sc);
@@ -1503,7 +1567,7 @@ export default function Golf() {
       {/* rain and storm darken and wet the whole scene a little */}
       {playing && wx && (wx.rain || wx.storm) && <div className={"wet" + (wx.storm ? " wet--storm" : "")} aria-hidden="true" />}
 
-      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => (setScreen(dare && !solo && dare === linkDare.current ? "ghosts" : "modes"), (linkDare.current = ""))} onAbout={() => setAbout(true)} />}
+      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} gnome={SHOP ? gnomeById(gnome) : undefined} onStart={() => (setScreen(dare && !solo && dare === linkDare.current ? "ghosts" : "modes"), (linkDare.current = ""))} onAbout={() => setAbout(true)} />}
       {screen === "modes" && (
         <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
           onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")} />
@@ -1532,13 +1596,20 @@ export default function Golf() {
           next={(c) => toPlay[c][0]?.name}
           podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onOpen={() => setBoard(true)}
             holes={toPlay[guessCup(s.world || "")].slice(0, 6)} onRace={(p, id) => (raceWith(p), openHole(id))}
-            extra={<button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>} />}
+            extra={<>
+              <button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>
+              {SHOP && region && <> · <button className="linkish" onClick={() => (sound("blip"), openShop())}>Gnomes →</button></>}
+            </>} />}
           onCommunity={openHole}
           onPick={enterCup}
         />
       )}
       {screen === "pick" && <Picker world={(s && s.world) || "garden"} backLabel={cupsScreen === "ghosts" ? "Back to their ghosts" : undefined} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={savedGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
+        owned={SHOP && account && held.length > 0 && game.current ? (
+          <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region} onWorn={readWorn}
+            name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
+        ) : null}
         onAbout={() => setAbout(true)}
        
         onBack={() => {
@@ -1547,6 +1618,12 @@ export default function Golf() {
           if (!unlocked(gnome)) setGnome(savedGnome());
           setScreen(cupsScreen);
         }} />}
+
+      {SHOP && screen === "shop" && game.current && (
+        <Shop chain={game.current.chain} account={account} wallet={wallet} onConnect={() => void connectWallet()} view={shopView} onView={setShopView}
+          onBack={() => (sound("blip"), setScreen(shopFrom.current))} onAbout={() => setAbout(true)} playing={gnome}
+          onPlay={(id) => (choose(id), readWorn())} onRace={(p) => toGhosts(p, undefined, "board")} />
+      )}
 
       {s && playing && (
         <>
@@ -2406,11 +2483,14 @@ interface PickerProps {
   onAbout: () => void;
   aim: Mode;
   onAim: (m: Mode) => void;
+  /** the row of the gnomes a player holds (components/gnomes/Owned), under the stage */
+  owned?: ReactNode;
 }
 
-function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, backLabel = "Back to the cups", onAbout, aim, onAim, hole = "", dare = "" }: PickerProps) {
+function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, onBack, backLabel = "Back to the cups", onAbout, aim, onAim, hole = "", dare = "", owned = null }: PickerProps) {
   const i = Math.max(0, GNOMES.findIndex((g) => g.id === gnome));
-  const skin = GNOMES[i];
+  // the game's gnomes, or one of the collection a player holds (picked in its row: owned)
+  const skin = GNOMES.find((g) => g.id === gnome) || gnomeById(gnome);
   const canvas = useGnomeStage(skin);
 
   const step = (d: number) => (sound("blip"), onChange(GNOMES[(i + d + GNOMES.length) % GNOMES.length].id));
@@ -2438,6 +2518,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
           </div>
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
+        {owned}
         <AimSetting aim={aim} onChange={onAim} compact />
         {/* a locked gnome on show: the button still plays, as the gnome really chosen */}
         <Button variant="gold" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>

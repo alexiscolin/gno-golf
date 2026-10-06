@@ -48,7 +48,7 @@ func IsApprovedForAll(owner, operator address) bool {
 	return Token.IsApprovedForAll(owner, operator)
 }
 
-// TokenOfOwnerByIndex is owner's i-th token in id order, from the locker's
+// TokenOfOwnerByIndex is owner's i-th token, best first as the locker lists them, from its
 // index (there is no TokenByIndex: no list of every token is kept).
 func TokenOfOwnerByIndex(owner address, i int64) (string, error) {
 	if i >= 0 {

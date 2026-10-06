@@ -3,3 +3,5 @@ node_modules
 out
 next-env.d.ts
 .env*.local
+# the gnomes' thumbnails and catalogue as the site serves them: made by scripts/gnomeassets.mjs
+public/gnomes/

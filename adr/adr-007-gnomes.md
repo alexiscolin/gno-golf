@@ -7,11 +7,11 @@ of the gnomes' design (`docs/superpowers/specs/2026-10-06-nft-gnomes-design.md`)
 as `gno.land/r/gnogolf/gnomes`, with the user's decisions: 720 gnomes, the
 research brief's waves, player window and prices
 (`docs/superpowers/research/2026-10-06-nft-best-practices.md`), every tier
-sold at a fixed price with no auction (the Legendaries too, one a wallet),
-a hard closing date for the genesis sale, a treasury apart from the owner's
-key, free wearing, and a site link the owner sets. golf/v2 and store do not change. Nothing is
-deployed. Two points stay open for the user: `Renounce`, and a portrait
-drawn from the traits.
+at a fixed price, the Legendaries too (no auction: the user's decision of
+2026-10-06), a hard closing date for the genesis sale, a treasury apart
+from the owner's key, and a site link the owner sets. golf/v2 and store do
+not change. Nothing is deployed. Two points stay open for the user:
+`Renounce`, and a portrait drawn from the traits.
 
 ## Context
 
@@ -56,32 +56,25 @@ a range of ids on sale from a start, at the prices of the day. Its first
 hours sell only to wallets with a record in store (a standing in either mode
 in `totals`, which v1's records were copied into), at most 3 commons, 2
 rares, 1 epic and 1 legendary each per wave; then anyone, under the lifetime
-caps (10, 5, 2, 1). A wave is never changed nor withdrawn: its ids stay on
-sale at its prices, and `SetPrice` moves only the waves published after it.
-Nothing on sale is ever discounted by the realm.
-
-**The prices are golf numbers.** They start at 36 GNOT for a Common (the
-par of nine holes), 72 for a Rare (the par of a course), 336 for an Epic
-(the dimples on a golf ball) and 1296 for a Legendary (18 holes times par
-72). The genesis sold whole at them comes to 59,424 GNOT (504 × 36 +
-144 × 72 + 65 × 336 + 7 × 1296). They are `config.gno`'s defaults, held to
-`data/gnomes/series.json` by selfcheck; the owner moves them between waves.
-
-**No auction.** A Legendary is sold as any gnome is: by `Buy`, at its wave's
-fixed price (1296 GNOT to start with), to the first buyer, one a wallet. The
-realm has no bids, no escrow and no auction clock: it holds no coins on
-purpose. `Sweep` sends the treasury coins someone sent with a call that
-keeps none.
+caps (10, 5, 2, 1: one Legendary a wallet, ever). A wave is never changed
+nor withdrawn: its ids stay on sale at its prices, and `SetPrice` moves only
+the waves published after it. Prices start at golf's own numbers: 36 GNOT
+a Common, the par of nine holes; 72 a Rare, the par of a course; 336 an
+Epic, the dimples on a golf ball; 1,296 a Legendary, eighteen holes times
+par 72 (59,424 GNOT if all 720 sell). Nothing is ever discounted by the
+realm. A Legendary is bought as any
+gnome, at its wave's price, by the first who buys it: there is no auction,
+no escrow, no bid to refund.
 
 **The genesis sale closes on a date.** `SetCloseAt(at)`, owner only, once the
 genesis is published: a date in the future, which can later be brought
 forward, never pushed back, by this owner or the next. From its block on, the
 genesis's unsold gnomes are closed for good: `Buy` and `AddWave` refuse
-them ("the genesis sale closed on <date>"), and its final supply is
-readable on chain (`Collection`: the series' `sold` and `closed`; `Gnome`:
-`closed`; `Sold` stays the sold bitmap). A later series is not closed by
-it, and earned gnomes never are. **Recommended date**: about 30 days after
-wave 7 opens, announced at launch with the waves.
+them ("the genesis sale closed on <date>"), and its
+final supply is readable on chain (`Collection`: the series' `sold` and
+`closed`; `Gnome`: `closed`; `Sold` stays the sold bitmap). A later series
+is not closed by it, and earned gnomes never are. **Recommended date**:
+about 30 days after wave 7 opens, announced at launch with the waves.
 
 **Buy is a direct, exact, forwarded payment.** `Buy(ids)` takes 1 to 5 ids
 and exactly their sum in one ugnot coin, checked against `OriginSend`, which
@@ -89,6 +82,13 @@ is trusted only on a direct user call (`cur.Previous().IsUserCall()`): a
 realm or run script in between could keep coins it attached. The state is
 written first, then the sum goes to the treasury with an `OriginSend` banker,
 which can spend this call's envelope and nothing else.
+
+**No auction.** Built at first (an auction of each Legendary, one at a
+time, its top bid held in escrow, a soft close, a pause that froze its
+clock), then removed by the user's decision: the Legendaries are sold as the
+other tiers, so the realm holds no one's money at any time, and the pause
+(`SetMintOpen(false)`) is a plain switch over every sale. `Sweep` stays: it
+sends the treasury coins someone sent the realm by a plain transfer.
 
 **Earned gnomes are proven from store, free, and bound.** `MintEarned(kind)`
 mints the caller's earned gnome once store proves the feat (the nine of
@@ -116,7 +116,8 @@ ledger's burn; the deposit returns to the holder.
 deploy, holds the settings and hands them on with `Transfer` then
 `Accept`, as golf's; every check is on the immediate caller. The treasury
 is where the money goes: every sale, the royalty (5%, advisory) and
-`Sweep`'s strays; the realm itself holds nothing. It is the deployer at deploy, and
+`Sweep`'s strays; the realm itself holds nothing. It is the deployer at
+deploy, and
 moves in two steps: the owner offers it (`SetTreasury`, never to the
 realm's own address), and the new address takes it with `AcceptTreasury`,
 a transaction signed from that address itself, so a mistyped address never
@@ -129,7 +130,7 @@ at once (not `MintEarned`, which sells nothing). Whether the role
 may be renounced is not decided: there is no `Renounce`.
 
 **The site link is the owner's.** `SetSiteURL` sets the game's site, which
-a token's `external_url` names (`<site>g/<id>/`); none is set at deploy,
+a token's `external_url` names (`<site>g/<id>/`, an earned one's `<site>g/<kind>/`: the site's static pages); none is set at deploy,
 and until one is, the metadata has no `external_url`. The image is the
 on-chain SVG, so nothing a wallet shows depends on the domain. The link
 follows golf/v2's `SetPlayURL` rule (https://, at most 100 of a-z, A-Z, 0-9
@@ -152,7 +153,7 @@ it leaves them and refuses to move an earned one.
 
 | what | gas | measured by |
 |---|---|---|
-| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.59M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
+| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.37M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 
@@ -179,25 +180,48 @@ The King's proof is under the 300M the client will ask for `MintEarned` and
 of the order of golf's `Claim` (70.2M); a `GnomesOf` page of 100 is about
 210M, far under a query's 3e9.
 
-**Wearing is free.** The gnome others see a player wear is the one they
-equipped, while they own it, else their best owned (Legendary, Epic, Rare,
-Common, then an earned one; the lowest id among equals), else none:
-`Worn(player)` answers it in one read, `WornMany` for a board's page or a
-duel's ghosts, so every client shows the same gnome everywhere with no
-transaction. A player plays any gnome they own for themselves in the
-browser, free and at once; `Equip` is only for showing others a gnome other
-than their best. The best is one row of an index kept best first
-(`"<holder> <rank> <id>"`), written where a mint already holds the gnome
-and moved on a transfer, so a read is one row whatever a player holds; it
-adds a row to each mint (about 480 bytes on a first buy, 0.28M gas).
+**Wearing is free.** Every player wears their best gnome (the highest tier
+they hold, then its lowest id; an earned one after any bought one) with no
+transaction: `Worn(player)` answers it in one read, and `WornMany` for a
+board's page or a rival (the first 50 of a list). `Equip` is optional: it
+shows everyone another gnome than the best, until it leaves its holder;
+`Worn`'s `"equipped"` says which. On their own screen a player may play any
+gnome they hold, kept in their browser: nothing on chain. To make the best
+one row away, a holder's index sorts best first (`"<holder> <rank><id>"`,
+the last tier's rank 0): `GnomesOf` and `TokenOfOwnerByIndex` list a
+wallet as its team is shown, Legendary first, and a sale writes the rank
+from the row it has already read (one byte more a row; a first buy 2.37M
+gas, 2.35M before).
+
+**Where the shop opens.** The free game plays everywhere; the shop is not
+offered in mainland China nor under the comprehensive sanctions (Cuba, Iran,
+North Korea, Syria, Russia, Belarus). The EU and the UK are not blocked: the
+buy sheet asks for their consent to delivery at once. At zero server cost:
+Netlify's country rules (`netlify.toml`) rewrite `/geo.json` to
+`/geo-blocked.json` and a gnome's page `/g/*` to a static "not available in
+your region" page for those countries; the client reads `/geo.json` once
+when the shop would open and, shut, hides the shop, its links and every buy,
+buy and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
+tests holding both rules to it). Best effort, and said so: a VPN gets round
+it, and the realm stays callable with gnokey by anyone; a realm cannot know
+a caller's country.
 
 **Reads for the screens**, JSON starting with `"version":1`, one query each:
 `Collection`, `Gnome` (`{"version":1,"id":""}` for none), `Sold` (a bit per
 id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
 enough to draw a collection with no call per token; `total`, `next`),
-`Worn`, `WornMany`, `Equipped`, `EquippedMany` (the first 50 players of a
-list), `Proof`; the GRC721 surface (`TokenOfOwnerByIndex` from the locker's index,
-no `TokenByIndex`); `TokenMetadata` (name, description, image,
+`Equipped`, `EquippedMany` (the first 50 players of a list), `Worn` and
+`WornMany` (below),
+`Proof`; `CanBuy(buyer, ids)`, the mint page's answer before any
+signature: `ok`, a `reason` code (`ids`, `paused`, `unknown`,
+`unlisted`, `later`, `taken`, `closed`, `players-only`, `wave-cap`, `cap`:
+the first refusal Buy would meet), `said` (Buy's own sentence), `total` (the
+ugnot to send), the lifetime caps `left` and the first id's player `window`
+(its end, its caps left; `until` 0 when none), asked of the very checks Buy
+runs, the payment aside; `Params` (the longest player window, the batch, the coin, from
+config.gno); the
+GRC721 surface (`TokenOfOwnerByIndex` from the locker's index, no
+`TokenByIndex`); `TokenMetadata` (name, description, image,
 `external_url`, attributes Tier, Series and an earned gnome's Kind);
 `Render` for gnoweb (the collection, a gnome with a `gnokey` line to buy it
 while on sale, an earned kind, a player).
@@ -212,17 +236,17 @@ the traits is the user's call.
 | Buy | underpay, overpay, another denom, two coins | exact single coin | `TestBuyRefusesAnyOtherPayment`, `TestBuyTakesUpToFiveAtTheirSum` |
 | Buy | malformed list: repeats, blanks, signs, leading zeros, huge numbers | strict parse, 1 to 5 | `TestBuyReadsItsIDsStrictly` |
 | Buy | the same gnome twice; a burned gnome sold again | sold once, for good | `TestAGnomeSellsOnce`, `TestABurnIsTheHoldersAndForGood` |
-| Buy | a Legendary underpaid, sold twice, or more than one to a wallet | its fixed price, first buyer, one a wallet | `TestALegendaryIsBoughtLikeAnyGnome` |
+| Buy | more than one Legendary to a wallet; a Legendary sold twice | lifetime cap 1; sold once | `TestALegendaryIsBoughtOneAWallet` |
 | Buy | before a wave, outside every wave | refused | `TestAWaveOpensItsIDsAtItsStart` |
 | Buy | a non-player in the player window, a player over its cap | store record, per-wave cap | `TestThePlayerWindowIsForPlayers`, `TestARecordInEitherModeCounts` |
 | Buy | a wallet over its cap, in one call or several | lifetime cap per tier, batch checked whole | `TestAWalletBuysUpToItsLifetimeCap` |
+| Worn | a gnome shown on a player who no longer holds it; a read that walks a whole collection | owner checked on read; the best is the holder's first row | `TestAPlayerWearsTheirBestGnome`, `TestEquipShowsAnotherGnomeToEveryone`, `TestAnEarnedGnomeIsWornLast`, `TestWornManyAnswersABoardPage` |
+| CanBuy | a refusal shown that Buy would not give, or the reverse | one check, shared | `TestCanBuyAndBuyNeverDisagree`, `TestCanBuySaysTheFirstRefusal` |
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
-| SetMintOpen | a sale while paused | refused | `TestTheOwnerPausesTheSale` |
 | Buy | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
-| Sweep | stray coins kept by the realm, or swept by another | the owner sweeps all of them to the treasury | `TestTheSweepPaysTheTreasury` |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |
 | MintEarned | rows of new rules, or a format the proof does not know; a cup past one page | refused, never a false proof | `TestNewRulesRefuseTheMint`, `TestARowNotAsGolfWritesItRefuses`, `TestACupTooLargeForThePageRefuses` |
 | MintEarned | paid; twice for a kind | free only; once per player and kind | `TestAProvenKindIsMintedFreeOnce` |
@@ -232,14 +256,14 @@ the traits is the user's call.
 | SetTreasury, AcceptTreasury | the money sent to a mistyped or dead address; to the realm itself; taken by another or by a realm | two steps, the new address signing; not the realm's address | `TestTheTreasuryMovesInTwoSteps`, `TestARealmCannotAcceptForTheTreasury`, `TestAnOfferToTheTreasuryInPlaceCancels` |
 | Transfer, Accept | the money moved with the owner's role | the treasury stays | `TestAnOwnerHandoverLeavesTheTreasury`, `TestTheOwnerHandsOverInTwoSteps` |
 | Buy, Sweep, royalty | a payment to the owner or kept by the realm | the treasury, in the same call | `TestTheTreasuryMovesInTwoSteps`, `TestTheSweepPaysTheTreasury` |
-| SetSiteURL | a link that breaks out of a page or points off https | golf's play link rule | `TestTheOwnerMovesTheSite`, `TestALinkIsHTTPSAndPlain` |
+| SetSiteURL | a link that breaks out of a page or points off https | golf's play link rule | `TestTheOwnerMovesTheSite` |
 | init | a deploy with no signer | refused off `dev` | `TestTheDeployerOwns` |
 | TransferFrom, Approve | a realm moves its caller's gnomes | the ledger's caller teller | `TestARealmCannotMoveItsCallersGnomes`, `TestTransfersGoThroughTheLedgersChecks` |
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |
 | AddSeries | a malformed row; a gap; growth without bound | checked whole; 64 series of 1,000 rows | `TestASeriesIsRefusedWhole`, `TestASeriesIsBounded` |
 | AddWave | overlaps; too many | checked; 64 waves | `TestAWaveIsCheckedWhole`, `TestTheWavesAreBounded` |
 | reads | a query made unbounded | bounded pages and lists | `TestEquippedManyAnswersABoardPage`, `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
-| Worn | a gnome shown that the player no longer owns; the best index left behind by a transfer or a burn | equipped only while owned; the index moved by the ledger's hook and Burn | `TestTheEquippedGnomeIsWornWhileOwned`, `TestTheBestIndexFollowsTheLedger` |
+| Worn | a gnome shown that the player no longer owns; the best-first index left behind by a transfer or a burn | equipped only while owned; the holder's row moved by the ledger's hook and Burn | `TestEquipShowsAnotherGnomeToEveryone`, `TestAnEarnedGnomeIsWornLast` |
 | TokenURI, TokenMetadata | markup or JSON in a name | escaped | `TestANameCannotInjectMarkup`, `TestMetadataEscapesTheName` |
 | TokenMetadata | an earned gnome's link to a page the static site never builds (one per earned id) | its kind's page, `g/<kind>/` | `TestAnEarnedTokensMetadataNamesItsKind` |
 
@@ -267,9 +291,6 @@ date in block time, so it holds whatever becomes of the owner.
   that address), before the genesis is published.
 - `p/gnogolf/weblink` is one more package to deploy, before gnomes
   (stage.sh stages it).
-- An auction (once planned for the Legendaries) was dropped: a fixed price
-  for every tier is simpler for players and for the realm, which holds no
-  coins on purpose, and is never discounted once on sale.
 - In `gno test`, a recovered call's writes are not reverted (golf's
   `z_worst_shot` notes the same): the earned veto is tested as an abort, and
   on chain the abort reverts the whole call.

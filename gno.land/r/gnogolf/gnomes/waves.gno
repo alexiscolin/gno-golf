@@ -24,8 +24,8 @@ var prices [len(tiers)]int64
 // maxWaves bounds the waves, which every sale walks.
 const maxWaves = 64
 
-// SetPrice sets a tier's price for the waves published from now on; a wave
-// on sale keeps its own. Owner only.
+// SetPrice sets a tier's price for the waves published from now on. Owner
+// only.
 func SetPrice(cur realm, tierName string, ugnot int64) {
 	assertOwner(0, cur)
 	i := tierAt(tierName)

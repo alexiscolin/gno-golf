@@ -1,0 +1,139 @@
+/* The gnome shop's own pieces (components/gnomes/*), on the game's tokens,
+   controls, sheet and front screen (globals.css, title.css): only what the
+   game had no piece for. Loaded with the shop's chunk; nothing here touches
+   a screen of the game. The GUI spec's mockups (kit.css, "NEW") are the
+   reference. */
+
+/* the tiers: one colour and one shape each (the shape reads in grey too); never --chain's blue */
+:root {
+  --tier-common: #e8dfcc; --tier-rare: #7cc8f0; --tier-epic: #c6a4f5; --tier-legendary: #ffd75e;
+  /* the shop's spacing scale: every gap, padding and margin of its pieces */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+}
+.shop, .gsheet { font-variant-numeric: tabular-nums; }
+
+/* a tier's chip: its shape and its name, on its colour */
+.tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border: var(--edge); border-radius: var(--pill); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; background: var(--tier-common); }
+.tier svg { width: 14px; height: 14px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.tier--rare { background: var(--tier-rare); }
+.tier--epic { background: var(--tier-epic); }
+.tier--legendary { background: var(--gold-grad); }
+.tier--earned { background: var(--green-light); }
+
+/* a gnome's tile: his thumbnail on his tier's stage, framed in his tier's rim */
+.gtile { position: relative; display: block; aspect-ratio: 1; border-radius: 18px; border: var(--edge-bold); background: #f6ead2; overflow: hidden; }
+.gtile img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.gtile::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none; }
+.gtile--rare::before { box-shadow: inset 0 0 0 5px var(--tier-rare), inset 0 0 0 7px var(--ink); }
+.gtile--epic::before { box-shadow: inset 0 0 0 6px var(--tier-epic), inset 0 0 0 8px var(--ink); }
+.gtile--legendary { background: repeating-conic-gradient(from 0deg at 50% 42%, #ffe69a 0 7.5deg, #ffd25a 7.5deg 15deg); }
+.gtile--legendary::before { box-shadow: inset 0 0 0 7px var(--tier-legendary), inset 0 0 0 9px var(--ink); }
+.gtile--never img { filter: grayscale(1) brightness(1.15) opacity(.3); }
+.gtile--never { border-style: dashed; border-color: rgba(var(--ink-rgb), .35); background: rgba(var(--ink-rgb), .04); }
+
+/* the gallery: its width the cups', its pieces on one column */
+.shop .worlds__in { width: min(1160px, calc(100vw - 48px)); display: grid; gap: var(--sp-4); justify-items: stretch; }
+.shop .front__head { justify-self: center; }
+@media (max-width: 600px) { .shop .worlds__in { width: calc(100vw - 32px); } }
+
+/* the sale's end: a date to know, flat, never a countdown */
+.closes { justify-self: center; display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; padding: 5px 14px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--ink-soft); text-align: center; }
+.closes b { color: var(--ink); white-space: nowrap; }
+
+/* the wave of the moment: one paper panel, its count and its green */
+.wave { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); background: var(--paper); border: var(--edge); border-radius: var(--r-card); }
+.wave__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-2); font-weight: 700; }
+.wave__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
+.track { position: relative; height: 18px; border-radius: var(--pill); background: #cfe6d4; border: var(--edge); overflow: hidden; }
+.track > i { position: absolute; inset: 0 auto 0 0; background: #8fdcae; border-right: var(--edge); }
+
+/* the filters: one row that wraps; a phone keeps them all in reach */
+.gfilters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.gfilters .seg { flex: none; max-width: 100%; }
+.gfilters .seg button { white-space: nowrap; padding-inline: 14px; }
+@media (max-width: 600px) { .gfilters > .seg { display: flex; width: 100%; } }
+.gfilters__search { flex: 1 1 180px; min-width: 0; height: 44px; padding: 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); }
+.gfilters .more { flex: 1 0 100%; }
+.gfilters .more .gfilters { margin-top: var(--sp-2); }
+
+/* the grid of cards: as many columns as fit, two on a phone */
+.gshelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--sp-4); }
+@media (max-width: 600px) { .gshelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); } }
+.gcard { display: grid; gap: var(--sp-2); width: 100%; min-width: 0; padding: var(--sp-2) var(--sp-2) 10px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
+.gcard:hover { transform: translateY(-3px); }
+.gcard__name { margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcard__name small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.gcard__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; margin: 0 2px; min-height: 26px; }
+.gcard__fact { min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gcard--mine { background: var(--ink); color: var(--paper); }
+.gcard--mine .gcard__name small, .gcard--mine .gcard__fact { color: rgba(var(--paper-rgb), .8); }
+.gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; }
+.gcard--skel { pointer-events: none; }
+.gcard--skel .gtile { background: rgba(var(--ink-rgb), .06); }
+.gshelf__more { justify-self: center; }
+.gempty { justify-self: center; text-align: center; color: var(--ink-soft); }
+
+/* secondary things wait behind a tap: a native <details>, a dashed link opening in place */
+.more { margin: 0; font-size: 14px; }
+.more > summary { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; cursor: pointer; list-style: none; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::after { content: "▾"; text-decoration: none; }
+.more[open] > summary::after { content: "▴"; }
+.more > :not(summary) { margin-top: 6px; color: var(--ink-soft); line-height: 1.45; }
+
+/* the trust strip: short facts under a buy button */
+.trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+
+/* a gnome's sheet: the game's sheet, a little wider, its parts on one column, its action pinned */
+.gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-3); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
+html:has(.gsheet) { overflow: hidden; }
+.gsheet > * { margin: 0 !important; }
+.gsheet__head { display: grid; justify-items: center; gap: var(--sp-2); text-align: center; }
+.gsheet__head .gtile { width: min(220px, 60vw); }
+.gsheet__head--small .gtile { width: 64px; border-radius: 14px; }
+.gsheet__head h2 { padding-inline: 40px; overflow-wrap: anywhere; }
+.gsheet__meta { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.gsheet__line { color: var(--ink) !important; text-align: center; }
+.gsheet__price { font-size: 28px; font-weight: 700; text-align: center; }
+.gsheet__price small { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+.gsheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-3) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-2); text-align: center; }
+.gsheet__foot .btn { margin: 0; width: 100%; }
+.gsheet__foot .btn--save { min-height: 52px; }
+.gsheet .real__fine, .gsheet__fine { margin: 0; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+@media (max-width: 600px) { .gsheet__foot { bottom: -22px; margin: 0 -18px -22px !important; padding: var(--sp-3) 18px 22px; } .gsheet .real__fine, .gsheet__fine, .trust { font-size: 15px; } }
+
+/* the order, term by term: label left, term right; one column on a phone */
+.review { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-2) var(--sp-3); margin: 0; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; line-height: 1.4; }
+.review dt { font-weight: 700; color: var(--ink-soft); }
+.review dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+@media (max-width: 600px) { .review { grid-template-columns: 1fr; gap: 0; font-size: 15px; } .review dd { margin-bottom: var(--sp-2); } }
+/* a consent: its own box, never pre-ticked; the order waits for both */
+.box { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--sp-3); align-items: start; padding: var(--sp-3); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: var(--white); color: var(--ink); font-size: 14px; line-height: 1.4; cursor: pointer; }
+.box input { width: 22px; height: 22px; margin: 0; accent-color: var(--green); }
+.box:has(input:checked) { border-color: var(--green); background: #eaf4ee; }
+@media (max-width: 600px) { .box { font-size: 15px; } }
+.legal { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); text-align: center; }
+.legal a, .gsheet a { color: var(--green); }
+/* the receipt: printed, or saved as a PDF, alone */
+.receipt { display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; background: var(--white); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.receipt h3 { margin: 0; font-size: 16px; }
+.receipt p { margin: 0 !important; color: var(--ink) !important; }
+@media print {
+  body * { visibility: hidden !important; }
+  .receipt, .receipt * { visibility: visible !important; }
+  .receipt { position: fixed; inset: 0; border: 0; }
+}
+/* the moment a gnome is yours: the tile pops in */
+.gsheet--done .gtile { animation: pop .5s var(--spring); }
+.gsheet__hop .gtile { animation: ghop .7s ease-in-out infinite alternate; }
+@keyframes ghop { to { transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) { .gsheet--done .gtile, .gsheet__hop .gtile { animation: none; } }
+
+/* the picker: one row of the gnomes a player holds, under the game's stage, and one line */
+.owned { display: grid; gap: var(--sp-1); justify-items: center; width: min(360px, 100%); margin: var(--sp-2) auto 0; }
+.owned__line { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); text-align: center; }
+.owned__row { display: flex; gap: var(--sp-2); max-width: 100%; padding: var(--sp-1) var(--sp-2); overflow-x: auto; overscroll-behavior: contain; scrollbar-width: none; border: 2px solid var(--gold); border-radius: var(--pill); background: rgba(var(--paper-rgb), .7); }
+.owned__row::-webkit-scrollbar { display: none; }
+.owned__face { flex: none; width: 44px; height: 44px; padding: 0; border: var(--edge); border-radius: 50%; overflow: hidden; background: #f6ead2; cursor: pointer; }
+.owned__face img { width: 100%; height: 100%; object-fit: cover; }
+.owned__face[aria-pressed="true"] { box-shadow: var(--ring-shadow); }

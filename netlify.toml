@@ -49,6 +49,26 @@
   force = true
   query = { cup = ":cup" }
 
+# The gnome shop's region gate (web/lib/gnomes/geo.ts, ADR-007 "Where the shop
+# opens"): not offered in mainland China nor under the comprehensive
+# sanctions. The list is geo.ts's BLOCKED, the same on both rules (the tests
+# hold them to it): CN, CU, IR, KP, SY, RU, BY. /geo.json, read once when the
+# shop would open, says shut there; a gnome's page is the "not available"
+# page. The free game plays everywhere. Best effort: a VPN gets round it.
+[[redirects]]
+  from = "/geo.json"
+  to = "/geo-blocked.json"
+  status = 200
+  force = true
+  conditions = {Country = ["CN", "CU", "IR", "KP", "SY", "RU", "BY"]}
+
+[[redirects]]
+  from = "/g/*"
+  to = "/unavailable/"
+  status = 200
+  force = true
+  conditions = {Country = ["CN", "CU", "IR", "KP", "SY", "RU", "BY"]}
+
 # PostHog EU behind the site's own path (lib/analytics.ts api_host), its
 # extensions under /e/static: a blocker sees no third party
 [[redirects]]

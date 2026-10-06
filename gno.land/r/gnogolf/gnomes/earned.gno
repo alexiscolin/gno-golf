@@ -124,7 +124,6 @@ func MintEarned(cur realm, kind string) string {
 	if err := ledger.Mint(player, grc721.TokenID(tid)); err != nil {
 		panic(err)
 	}
-	byBest.Set(bestKey(player, gnome{id: id, tier: earnedTier}), "")
 	chain.Emit("GnomeEarned", "id", tid, "kind", kind, "player", player.String())
 	return tid
 }

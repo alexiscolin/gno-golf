@@ -59,7 +59,8 @@ func Collection() string {
 }
 
 // Gnome is gnome tid, of the catalogue or earned, `{"version":1,"id":""}`
-// when there is none: its owner ("" while unsold) and its price (priceNow).
+// when there is none: its owner ("" while unsold) and its price (its wave's;
+// the next wave's when in none yet; 0 for an earned one).
 //
 //	{"version":1,"id":"217","series":"genesis","name":"…","tier":"common",
 //	 "traits":"…","owner":"","price":36000000,"sold":false}
@@ -68,24 +69,18 @@ func Gnome(tid string) string {
 	if !ok {
 		return noneJSON
 	}
-	price := priceNow(g)
+	price := int64(0)
+	if g.tier != earnedTier {
+		price = prices[g.tier]
+		if wi := waveAt(g.id); wi >= 0 {
+			price = waves[wi].prices[g.tier]
+		}
+	}
 	owner, err := Token.OwnerOf(grc721.TokenID(tid))
 	return `{"version":1,"id":"` + tid + `","series":"` + g.series + `","name":` + jsonString(g.name) +
 		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `,"owner":` + jsonString(owner.String()) +
 		`,"price":` + itoa(price) + `,"sold":` + strconv.FormatBool(err == nil || isSold(g.id)) +
 		`,"closed":` + strconv.FormatBool(isClosed(g.id)) + `}`
-}
-
-// priceNow is what gnome g sells for: its wave's price, or the price in
-// force when no wave holds it yet; 0 for an earned gnome, which is free.
-func priceNow(g gnome) int64 {
-	if g.tier == earnedTier {
-		return 0
-	}
-	if wi := waveAt(g.id); wi >= 0 {
-		return waves[wi].prices[g.tier]
-	}
-	return prices[g.tier]
 }
 
 // noneJSON is the answer for a thing that does not exist: still versioned.
@@ -134,6 +129,68 @@ func GnomesOf(owner address, offset int64) string {
 	}
 	b.WriteString(`]}`)
 	return b.String()
+}
+
+// CanBuy is the mint page's answer before any signature: whether buyer may
+// buy ids (as Buy takes them) now, and if not why. It asks Buy's own checks
+// (check), so it never says other than Buy would. "reason" is a code for
+// the screen, the first refusal Buy would meet ("" when ok): ids, paused,
+// unknown, unlisted, later, taken, closed, players-only, wave-cap,
+// cap; "said" is Buy's sentence for it, "" when ok. "total" is the ugnot to
+// send, 0 when not ok. Neither the payment nor the direct call is checked: a
+// read has no coins and no caller. "left" is what buyer's lifetime caps
+// leave per tier Buy sells, this list not counted. "window" is the player
+// window of the first id's wave until it ends (a wave yet to start
+// included): its end and what its caps leave buyer per tier, this list not
+// counted; with no such window (none, over, or no id read) "until" is 0 and
+// its "left" all 0, the lifetime caps alone holding.
+//
+//	{"version":1,"ok":false,"reason":"wave-cap","said":"the player window takes 3 common a wallet",
+//	 "total":0,"left":{"common":7,"rare":5,"epic":2,"legendary":1},
+//	 "window":{"until":1767225600,"left":{"common":0,"rare":2,"epic":1,"legendary":1}}}
+func CanBuy(buyer address, ids string) string {
+	t := now()
+	o, code, why := check(buyer, ids, t)
+	total := int64(0)
+	if code == "" {
+		total = o.total
+	}
+	until := int64(0)
+	var inWin *[len(tiers)]int64 // nil: no window
+	if list, _ := readIDs(ids); len(list) > 0 {
+		if wi := waveAt(list[0]); wi >= 0 && t < waves[wi].playersUntil {
+			until, inWin = waves[wi].playersUntil, counts(inWindow, windowKey(wi, buyer))
+		}
+	}
+	return `{"version":1,"ok":` + strconv.FormatBool(code == "") + `,"reason":"` + code +
+		`","said":` + jsonString(strings.TrimPrefix(why, "gnomes: ")) + `,"total":` + itoa(total) +
+		`,"left":` + capsLeft(lifetimeCap, counts(bought, buyer.String())) +
+		`,"window":{"until":` + itoa(until) + `,"left":` + capsLeft(playerCap, inWin) + `}}`
+}
+
+// capsLeft writes what caps leave once had is counted, per tier,
+// as {"common":n,…}; all 0 for had nil.
+func capsLeft(caps [len(tiers)]int64, had *[len(tiers)]int64) string {
+	var b strings.Builder
+	b.WriteString("{")
+	for i := range tiers {
+		n := int64(0)
+		if had != nil {
+			n = caps[i] - had[i]
+		}
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`"` + tiers[i].name + `":` + itoa(n))
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
+// Params is the rules a screen explains, from config.gno: the longest
+// player window (hours), the ids one Buy takes, the coin.
+func Params() string {
+	return `{"version":1,"maxHours":` + itoa(maxHours) + `,"maxBatch":` + itoa(maxBatch) + `,"denom":"` + payDenom + `"}`
 }
 
 const hexDigits = "0123456789abcdef"

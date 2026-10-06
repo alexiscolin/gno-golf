@@ -18,17 +18,20 @@ type holdings struct{}
 
 var _ grc721.Extension = holdings{}
 
-// held is "<holder> <id on 9 digits>" -> "", in id order per holder.
+// held is "<holder> <rank><id on 9 digits>" -> "", best first per holder (heldKey).
 var held *bptree.BPTree
 
 const errBound = "gnomes: an earned gnome is bound to its player: it cannot be transferred or approved"
 
 func (holdings) ExtensionKind() string { return "gnomes" }
 
-// (a mint's byBest row is written by mintTo and MintEarned, which hold the
-// gnome already: looking its row up again here would cost a parse a mint)
+// OnMint keeps an earned gnome's row; a catalogue gnome's is mintTo's, which
+// has its row parsed already (a second read of it would cost the sale twice
+// its gas).
 func (holdings) OnMint(to address, tid grc721.TokenID) {
-	held.Set(heldKey(to, parseID(string(tid))), "")
+	if id := parseID(string(tid)); isEarned(id) {
+		held.Set(heldKey(to, id, len(tiers)), "")
+	}
 }
 
 func (holdings) OnTransfer(from, to address, tid grc721.TokenID) {
@@ -36,26 +39,45 @@ func (holdings) OnTransfer(from, to address, tid grc721.TokenID) {
 	if isEarned(id) {
 		panic(errBound)
 	}
-	held.Remove(heldKey(from, id))
-	held.Set(heldKey(to, id), "")
-	if g, ok := tokenAt(id); ok {
-		byBest.Remove(bestKey(from, g))
-		byBest.Set(bestKey(to, g), "")
-	}
+	r := rankOf(id)
+	held.Remove(heldKey(from, id, r))
+	held.Set(heldKey(to, id, r), "")
 	unequip(from, string(tid))
 }
 
 func (holdings) OnBurn(tid grc721.TokenID) {} // Burn clears what is the burner's
 
-// heldKey pads the id so that a holder's rows sort by id.
-func heldKey(holder address, id int64) string {
+// heldKey sorts a holder's rows best first: the rank of the gnome's tier
+// (the last tier 0, down the tiers, an earned gnome last), then its id
+// padded. So a holder's first row is the gnome they wear by default (Worn),
+// and their pages come as their team is shown, Legendary first.
+func heldKey(holder address, id int64, rank int) string {
 	s := itoa(id)
-	return holder.String() + " " + strings.Repeat("0", 9-len(s)) + s
+	return holder.String() + " " + string(rune('0'+rank)) + strings.Repeat("0", 9-len(s)) + s
 }
 
-// heldPage is up to n of holder's ids from offset, in id order, and whether
-// more follow. It walks the holder's own rows only, from their first: a
-// holder has their caps, their earned gnomes and what they were sent.
+// rankOfTier is where a tier sorts in a holder's rows: 0 is the best.
+func rankOfTier(t int) int {
+	if t == earnedTier {
+		return len(tiers)
+	}
+	return len(tiers) - 1 - t
+}
+
+// rankOf is rankOfTier of gnome id, read from its row: a transfer's and a
+// burn's, which have only the id.
+func rankOf(id int64) int {
+	g, ok := tokenAt(id)
+	if !ok {
+		return len(tiers)
+	}
+	return rankOfTier(g.tier)
+}
+
+// heldPage is up to n of holder's ids from offset, best first (heldKey),
+// and whether more follow. It walks the holder's own rows only, from their
+// first: a holder has their caps, their earned gnomes and what they were
+// sent.
 func heldPage(holder address, offset int64, n int) ([]int64, bool) {
 	var ids []int64
 	more, i := false, int64(0)
@@ -66,7 +88,7 @@ func heldPage(holder address, offset int64, n int) ([]int64, bool) {
 				more = true
 				return true
 			}
-			ids = append(ids, parseID(strings.TrimLeft(key[len(prefix):], "0")))
+			ids = append(ids, parseID(strings.TrimLeft(key[len(prefix)+1:], "0")))
 		}
 		i++
 		return false

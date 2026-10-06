@@ -28,5 +28,7 @@ class MemoryStorage {
   removeItem(k) { this.#m.delete(k); }
   clear() { this.#m.clear(); }
 }
-globalThis.localStorage ??= new MemoryStorage();
-globalThis.sessionStorage ??= new MemoryStorage();
+// always ours: Node 25 has a localStorage of its own, which without
+// --localstorage-file stores nothing (and warns), so it is replaced too
+for (const name of ["localStorage", "sessionStorage"])
+  Object.defineProperty(globalThis, name, { value: new MemoryStorage(), configurable: true, writable: true });

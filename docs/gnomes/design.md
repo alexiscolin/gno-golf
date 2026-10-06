@@ -469,10 +469,9 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   "supply": { "common": 504, "rare": 144, "epic": 65, "legendary": 7 },
   "waves": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
   "seed": "gnogolf/genesis/1", "released": false,
-  "sale": { "prices": { "common": 36, "rare": 72, "epic": 336 },
-            "auction": { "reserve": 1296, "hours": 48, "extendMinutes": 10, "minIncrementPercent": 5, "minIncrementGnot": 5, "endsUtc": "18:00" },
-            "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1 },
-            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2 }, "nextWaveWhenSold": 0.7 } }
+  "sale": { "prices": { "common": 36, "rare": 72, "epic": 336, "legendary": 1296 },
+            "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1, "legendary": 1 },
+            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 }, "nextWaveWhenSold": 0.7 } }
 ```
 
 - **Waves are id ranges.** `planSeries` lays each wave out as one run of
@@ -497,9 +496,8 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   opens): from then its looks are final (section 10).
 - **`sale` is the realm's starting settings**, from the research brief
   (`docs/superpowers/research/2026-10-06-nft-best-practices.md`) and the
-  user's decision: prices in GNOT, golf numbers (36 the par of nine holes,
-  72 a course's, 336 a ball's dimples, 1,296 eighteen holes at par 72: why
-  in ADR-008), the Legendary auction, the player window
+  user's decisions: prices in GNOT, every tier at a fixed price (golf's
+  numbers, ADR-007; no auction), the player window
   (wallets with a record in `store` first), its caps, the lifetime caps,
   and when to open the next wave. The realm's owner changes them between
   waves, never during one, and never lower on what is on sale. Nothing in the client
@@ -557,7 +555,7 @@ In play (`engine.ts`): his trail is laid on the ground under him while he
 rolls and fades once he stops; his holing replaces the player's confetti (a
 duel ghost's holing keeps the confetti: a ghost carries no particles); his
 `tick` runs every frame. `makePreview` (the picker's turntable) plays a
-Legendary's motion with its act. The wardrobe (`scene/gnome-wardrobe.ts`:
+Legendary's motion with its act. The wardrobe (`scene/gnome-dress.ts`:
 the hats, props, materials and Legendary pieces) is its own chunk: the title
 screen and the holes' pages draw only `GNOMES`' fourteen and never load it
 (`web/test/bundle.test.ts` walks their eager imports).

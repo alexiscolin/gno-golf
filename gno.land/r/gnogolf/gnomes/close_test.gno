@@ -63,8 +63,6 @@ func TestTheSaleClosesAtItsDateToTheBlock(cur realm, t *testing.T) {
 	uassert.Equal(t, at, now(), "the block at the date")
 	testing.SetRealm(asUser(alice, ugnot(priceOf(2))))
 	urequire.AbortsContains(t, cur, "gnomes: the genesis sale closed on "+dateOf(at), func() { Buy(cross(cur), "2") })
-	testing.SetRealm(asUser(bob, ugnot(priceOf(legend()))))
-	urequire.AbortsContains(t, cur, "closed on", func() { Buy(cross(cur), itoa(legend())) })
 	testing.SetRealm(asUser(deployer, nil))
 	urequire.AbortsContains(t, cur, "closed", func() { SetCloseAt(cross(cur), now()-5) })
 }

@@ -14,10 +14,7 @@ func Burn(cur realm, tid string) {
 		panic(errNotYours)
 	}
 	id := parseID(tid)
-	held.Remove(heldKey(caller, id))
-	if g, ok := tokenAt(id); ok { // before an earned gnome's kind goes, below
-		byBest.Remove(bestKey(caller, g))
-	}
+	held.Remove(heldKey(caller, id, rankOf(id)))
 	unequip(caller, tid)
 	if v := kindOf.Get(tid); v != nil {
 		kindOf.Remove(tid)

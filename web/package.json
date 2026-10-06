@@ -3,8 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../scripts/gnomeassets.mjs",
     "dev": "next dev",
     "typecheck": "tsc --noEmit",
+    "prebuild": "node ../scripts/gnomeassets.mjs",
     "build": "tsc --noEmit && next build",
     "start": "npx serve out",
     "lint": "eslint --no-error-on-unmatched-pattern . ../media/promo ../media/camera ../media/lib ../media/og ../media/gnomes ../scripts ../private/botcheck",
@@ -18,7 +20,8 @@
     "gnomes:stats": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/gnomestats.ts",
     "gnomes:looks": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/gnomelooks.ts",
     "gnomes:rows": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/gnomerows.ts",
-    "gnomes:thumbs": "node ../media/gnomes/render.mjs"
+    "gnomes:thumbs": "node ../media/gnomes/render.mjs",
+    "gnomes:cards": "node ../media/gnomes/cards.mjs"
   },
   "dependencies": {
     "next": "^15.1.6",

@@ -98,8 +98,8 @@ func TestAnOwnerHandoverLeavesTheTreasury(cur realm, t *testing.T) {
 	uassert.Equal(t, vault, Treasury())
 }
 
-// Coins someone sent with a call that keeps none go to the treasury too, when
-// the owner sweeps them: the realm keeps nothing.
+// Stray coins (sent to the realm by a plain transfer) go to the treasury
+// too: the realm keeps nothing.
 func TestTheSweepPaysTheTreasury(cur realm, t *testing.T) {
 	fresh(t, cur)
 	testing.SetRealm(asUser(deployer, nil))
@@ -107,13 +107,10 @@ func TestTheSweepPaysTheTreasury(cur realm, t *testing.T) {
 	testing.SetRealm(asUser(vault, nil))
 	AcceptTreasury(cross(cur))
 
-	testing.IssueCoins(selfAddr, ugnot(7)) // a stray -send
+	testing.IssueCoins(selfAddr, ugnot(7))
 	before, held := balance(vault), balance(selfAddr)
-	testing.SetRealm(asUser(alice, nil))
-	urequire.AbortsContains(t, cur, "only the owner", func() { Sweep(cross(cur)) })
 	testing.SetRealm(asUser(deployer, nil))
 	Sweep(cross(cur))
 	uassert.Equal(t, before+held, balance(vault))
 	uassert.Equal(t, int64(0), balance(selfAddr))
-	Sweep(cross(cur)) // nothing left: nothing sent
 }

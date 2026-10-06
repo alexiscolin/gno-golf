@@ -7,7 +7,7 @@ package gnomes
 // (waves.gno).
 
 // A tier: its name, and its price at deploy, in ugnot. Every tier is sold
-// the same way, by Buy at its wave's fixed price, to the first buyer.
+// at its wave's price, the first buyer's (Buy): there is no auction.
 type tier struct {
 	name  string
 	price int64
@@ -17,7 +17,7 @@ var tiers = [...]tier{
 	{"common", 36_000_000},       // 36 GNOT: the par of nine holes
 	{"rare", 72_000_000},         // 72 GNOT: the par of a course
 	{"epic", 336_000_000},        // 336 GNOT: the dimples on a golf ball
-	{"legendary", 1_296_000_000}, // 1296 GNOT: 18 holes times par 72
+	{"legendary", 1_296_000_000}, // 1,296 GNOT: eighteen holes, times par 72
 }
 
 // genesisSupply is how many gnomes of each tier the genesis series holds, in
@@ -25,16 +25,16 @@ var tiers = [...]tier{
 var genesisSupply = [len(tiers)]int64{504, 144, 65, 7}
 
 // Per wallet: how many of each tier it may buy over its lifetime, and in a
-// wave's player window. A Legendary is one a wallet.
+// wave's player window: one Legendary a wallet, ever.
 var (
 	lifetimeCap = [len(tiers)]int64{10, 5, 2, 1}
 	playerCap   = [len(tiers)]int64{3, 2, 1, 1}
 )
 
 const (
-	maxHours = 7 * 24         // the longest player window
-	minPrice = 1_000_000      // 1 GNOT, the least SetPrice takes
-	maxPrice = 10_000_000_000 // 10,000 GNOT, the most
+	maxHours    = 7 * 24         // the longest player window
+	minPrice    = 1_000_000      // 1 GNOT, the least SetPrice takes
+	maxPrice    = 10_000_000_000 // 10,000 GNOT, the most
 )
 
 const (

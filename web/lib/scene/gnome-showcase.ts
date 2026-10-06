@@ -5,8 +5,8 @@
 // shows a gnome alone can use it as it is.
 import * as THREE from "three";
 import { makeBall, type Skin } from "./gnome";
+import "./gnome-dress"; // (the collection's wardrobe: the showcase draws nothing else)
 import { makeTrail } from "./gnome-fx";
-import "./gnome-wardrobe"; // (the showcase shows collection gnomes: their wardrobe on)
 import { makeRenderer, makeScene } from "./camera";
 import { disposeCourse } from "./materials";
 import { BALL_R } from "../terrain";

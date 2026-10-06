@@ -20,6 +20,7 @@ export const DESIGNS = path.resolve(process.env.DESIGNS || new URL("../../../", 
 // then leaves each mesh as made, one shape to trace each
 const ENTRY = `import * as THREE from "three";
 import { makeBall, GNOMES } from "./lib/scene/gnome";
+import "./lib/scene/gnome-dress";
 import { hatTop } from "./lib/scene/gnome-kit";
 import { makeTrail } from "./lib/scene/gnome-fx";
 import { makeShowcase } from "./lib/scene/gnome-showcase";

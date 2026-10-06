@@ -9,9 +9,8 @@ import (
 // TokenMetadata is a minted gnome as a wallet or a market reads it: the
 // keys OpenSea and Adena read, computed from its row on every read (nothing
 // is stored per token; grc721's metadata extension would keep a copy). The
-// image is the on-chain SVG; external_url, the gnome's page on the site
-// (<site>g/<id>/, an earned gnome's <site>g/<kind>/), is there once the
-// owner has set the site (SetSiteURL).
+// image is the on-chain SVG; external_url, the gnome's page on the site, is
+// there once the owner has set the site (SetSiteURL).
 //
 //	{"name":"…","description":"…","image":"data:image/svg+xml;base64,…",
 //	 "external_url":"<site>g/1/",
@@ -31,7 +30,7 @@ func TokenMetadata(tid string) (string, error) {
 	}
 	link := ""
 	if siteURL != "" {
-		page := tid // a catalogue gnome's page is its id's; an earned one's, its kind's
+		page := tid // a catalogue gnome's page is its id's; an earned one's, its kind's (the site's /g/<kind>/)
 		if g.tier == earnedTier {
 			page = earnedKinds[g.kind-1]
 		}

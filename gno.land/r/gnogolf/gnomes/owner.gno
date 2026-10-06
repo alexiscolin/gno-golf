@@ -141,19 +141,6 @@ func AcceptTreasury(cur realm) {
 	chain.Emit("TreasurySet", "from", from.String(), "to", treasury.String())
 }
 
-// Sweep sends the treasury whatever ugnot the realm holds: coins someone
-// sent with a call that keeps none (a sale's goes on at once). Owner only.
-func Sweep(cur realm) {
-	assertOwner(0, cur)
-	held := banker.NewReadonlyBanker().GetCoin(cur.Address(), payDenom)
-	if held <= 0 {
-		return
-	}
-	banker.NewBanker(banker.BankerTypeRealmSend, cur).
-		SendCoins(cur.Address(), treasury, chain.NewCoins(chain.NewCoin(payDenom, held)))
-	chain.Emit("Swept", "amount", itoa(held), "to", treasury.String())
-}
-
 // SetSiteURL moves the game's site, which a gnome's external_url names.
 // Only the owner can. url is https://, at most 100 of letters, digits and
 // "-._~/:%", with no query or fragment (golf's play link rule,
@@ -165,4 +152,18 @@ func SetSiteURL(cur realm, url string) {
 	}
 	siteURL = url
 	chain.Emit("SiteSet", "url", url)
+}
+
+// Sweep sends the treasury whatever ugnot the realm holds: coins sent to it
+// by a plain transfer, which no call keeps (a sale's go on in its own call).
+// Owner only.
+func Sweep(cur realm) {
+	assertOwner(0, cur)
+	held := banker.NewReadonlyBanker().GetCoin(cur.Address(), payDenom)
+	if held <= 0 {
+		return
+	}
+	banker.NewBanker(banker.BankerTypeRealmSend, cur).
+		SendCoins(cur.Address(), treasury, chain.NewCoins(chain.NewCoin(payDenom, held)))
+	chain.Emit("Swept", "amount", itoa(held), "to", treasury.String())
 }

@@ -54,7 +54,7 @@ change by a vertex.
 - **The wardrobe loads with the first collection gnome** (added 2026-10-06,
   after the review measured 37 KB more on every page's first load): the
   kit, props, materials and Legendary pieces are their own chunk
-  (`scene/gnome-wardrobe.ts`, `loadWardrobe()`), put on by the code that
+  (`scene/gnome-dress.ts`, `loadWardrobe()`), put on by the code that
   shows a collection gnome; `makeBall` draws a collection gnome plain
   without it, GNOMES' fourteen never need it.
 - **Thumbnails are the game's own render**: the real `makeBall` in headless

@@ -22,10 +22,7 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	has(t, g, "# Gnome 104")
 	has(t, g, "![Gnome 104](data:image/svg+xml;base64,")
 	has(t, g, "legendary")
-	has(t, g, "Price: 1296 GNOT")
-	mintOpen = false
-	has(t, Render("104"), "Unsold") // paused: no line to buy
-	mintOpen = true
+	has(t, g, "Unsold")
 
 	has(t, Render("viking"), "Garden Cup at par or under")
 	has(t, Render("nope"), "Not found")
@@ -42,18 +39,13 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 36 / 72 / 336 / 1296 GNOT | 1 of 720 |")
 }
 
-// A gnome on sale says its price and how to buy it, a Legendary as any.
-func TestAGnomesPageSaysHowToBuyIt(cur realm, t *testing.T) {
+func TestTheHomeSaysTheClose(cur realm, t *testing.T) {
 	fresh(t, cur)
 	testing.SetRealm(asUser(deployer, nil))
 	SetCloseAt(cross(cur), now()+30*24*3600)
-	has(t, Render(""), "The genesis sale closes on "+dateOf(closeAt))
-	page := Render("104")
-	has(t, page, "Price: 1296 GNOT")
-	has(t, page, "-func Buy -args 104 -send 1296000000ugnot")
-	testing.SetRealm(asUser(alice, ugnot(priceOf(104))))
-	Buy(cross(cur), "104")
-	uassert.False(t, strings.Contains(Render("104"), "-func Buy"), "sold: no line")
+	home := Render("")
+	has(t, home, "to the first who buys it")
+	has(t, home, "The genesis sale closes on "+dateOf(closeAt))
 }
 
 func TestGNOTIsWrittenPlainly(t *testing.T) {

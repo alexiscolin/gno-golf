@@ -7,8 +7,7 @@ import (
 	"gno.land/p/nt/urequire/v0"
 )
 
-// The review of 1b10df4: its finding's test that still stands (the others
-// were the auction's, removed with it).
+// The review of 1b10df4: each finding's test.
 
 // A world of more than a page of slots (store's 300) is refused, not proven
 // from its first page.
@@ -23,3 +22,4 @@ func TestACupTooLargeForThePageRefuses(cur realm, t *testing.T) {
 	ok, _, _ := prove("wizard", alice.String())
 	uassert.True(t, ok, "300 slots, one page: proven")
 }
+

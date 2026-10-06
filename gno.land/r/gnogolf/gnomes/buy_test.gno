@@ -90,27 +90,19 @@ func TestAGnomeSellsOnce(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), id) })
 }
 
-// A Legendary sells as any gnome does: by Buy, at its tier's fixed price
-// (1296 GNOT), to the first buyer; one a wallet.
-func TestALegendaryIsBoughtLikeAnyGnome(cur realm, t *testing.T) {
+// A Legendary is bought as any gnome, at its wave's price, by the first who
+// buys it; one a wallet, ever.
+func TestALegendaryIsBoughtOneAWallet(cur realm, t *testing.T) {
 	fresh(t, cur)
-	a, b := legend(), nthOfTier(legendaryTier, 1)
-	price := priceOf(a)
-	uassert.Equal(t, int64(1_296_000_000), price)
-	before := balance(deployer)
-	testing.SetRealm(asUser(alice, ugnot(price-1)))
-	urequire.AbortsContains(t, cur, "wrong payment", func() { Buy(cross(cur), itoa(a)) })
-	testing.SetRealm(asUser(alice, ugnot(price)))
+	a, b := legend(), nthOfTier(topTier, 1)
+	testing.SetRealm(asUser(alice, ugnot(priceOf(a))))
 	uassert.Equal(t, itoa(a), Buy(cross(cur), itoa(a)))
-	uassert.Equal(t, before+price, balance(deployer), "to the treasury in the same call")
-
-	testing.SetRealm(asUser(bob, ugnot(price)))
+	who, _ := OwnerOf(itoa(a))
+	uassert.Equal(t, alice, who)
+	testing.SetRealm(asUser(bob, ugnot(priceOf(a))))
 	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), itoa(a)) })
-	testing.SetRealm(asUser(alice, ugnot(price)))
-	urequire.AbortsContains(t, cur, "cap is 1 legendary", func() { Buy(cross(cur), itoa(b)) })
-	testing.SetRealm(asUser(bob, ugnot(price)))
-	Buy(cross(cur), itoa(b)) // another wallet still can
-	uassert.Equal(t, int64(2), SoldOfTier(legendaryTier))
+	testing.SetRealm(asUser(alice, ugnot(priceOf(b))))
+	urequire.AbortsContains(t, cur, "the cap is 1 legendary a wallet", func() { Buy(cross(cur), itoa(b)) })
 }
 
 // OriginSend is only the caller's money on a direct call: a realm or a run

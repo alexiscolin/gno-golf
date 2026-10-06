@@ -12,6 +12,11 @@ if (process.env.CONTEXT === "production") {
     !https(e.NEXT_PUBLIC_RPC) && "NEXT_PUBLIC_RPC (https://…)",
     !https(e.NEXT_PUBLIC_WEB) && "NEXT_PUBLIC_WEB (https://…)",
     !["testnet", "mainnet"].includes(e.NEXT_PUBLIC_NETWORK || "") && "NEXT_PUBLIC_NETWORK (testnet or mainnet)",
+    // the gnome shop sells: who sells, and the pages the order links, before any sale (lib/gnomes/legal.ts)
+    ...(e.NEXT_PUBLIC_GNOMES === "1"
+      ? ["NEXT_PUBLIC_SELLER_NAME", "NEXT_PUBLIC_SELLER_ADDRESS", "NEXT_PUBLIC_SELLER_EMAIL", "NEXT_PUBLIC_TERMS_VERSION"].filter((k) => !(e[k] || "").trim())
+          .concat(["NEXT_PUBLIC_TERMS_URL", "NEXT_PUBLIC_TOKUSHOHO_URL", "NEXT_PUBLIC_PRIVACY_URL"].filter((k) => !https(e[k])).map((k) => `${k} (https://…)`))
+      : []),
   ].filter(Boolean);
   if (bad.length) throw new Error(`a production build needs ${bad.join(", ")}: see netlify.toml`);
 }

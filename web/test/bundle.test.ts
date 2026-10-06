@@ -31,6 +31,6 @@ function eager(entry: string, seen = new Set<string>()) {
 test("the first load carries none of the collection gnomes' wardrobe", () => {
   const first = [...eager(path.join(WEB, "app/game.tsx"))].map((f) => path.relative(WEB, f));
   assert.ok(first.includes("lib/scene/gnome.ts"), "the walk reaches the gnome (through the title's prefs)");
-  const heavy = first.filter((f) => /scene\/gnome-(wardrobe|kit|props|matter|legend)\.ts$|gnomes\/props\.ts$/.test(f));
+  const heavy = first.filter((f) => /scene\/gnome-(dress|kit|props|matter|legend)\.ts$|gnomes\/props\.ts$/.test(f));
   assert.deepEqual(heavy, []);
 });

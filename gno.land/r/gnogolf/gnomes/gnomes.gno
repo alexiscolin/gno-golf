@@ -12,10 +12,9 @@ import (
 )
 
 // The gnomes of Gnogolf as GRC721 tokens. The ball is a gnome: a player
-// buys the one they choose from the catalogue, at its wave's fixed price,
-// whatever its tier, and wears it. The realm holds no funds: a sale's
-// payment goes to the treasury in the same call. The catalogue is data the
-// owner publishes a series at a time
+// buys the one they choose from the catalogue, at its wave's price, and
+// equips it. The realm holds no funds: a sale's payment goes to the treasury
+// in the same call. The catalogue is data the owner publishes a series at a time
 // (catalogue.gno), sold in waves (waves.gno). This file is the state.
 var (
 	Token     *grc721.Token    // the read side: name, symbol, owners, balances, approvals
@@ -66,7 +65,7 @@ func setUp(_ int, rlm realm, deployer address) {
 	}
 	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
 	closeAt = 0
-	bought, inWindow, equipped, held, byBest = seeded(), seeded(), seeded(), seeded(), seeded()
+	bought, inWindow, equipped, held = seeded(), seeded(), seeded(), seeded()
 	earned, kindOf, nextEarned, rows = seeded(), seeded(), firstEarned, storeReader{}
 }
 
@@ -77,6 +76,9 @@ func MintOpen() bool { return mintOpen }
 // fault. Owner only.
 func SetMintOpen(cur realm, open bool) {
 	assertOwner(0, cur)
+	if open == mintOpen {
+		return
+	}
 	mintOpen = open
 	chain.Emit("MintOpen", "open", strconv.FormatBool(open))
 }
@@ -86,12 +88,12 @@ func mintTo(whom address, g gnome) {
 	if err := ledger.Mint(whom, grc721.TokenID(itoa(g.id))); err != nil {
 		panic(err)
 	}
+	held.Set(heldKey(whom, g.id, rankOfTier(g.tier)), "") // (its holder's row: holdings.OnMint)
 	for int64(len(sold))*8 < g.id {
 		sold = append(sold, 0)
 	}
 	sold[(g.id-1)/8] |= 1 << uint((g.id-1)%8)
 	soldTier[g.tier]++
-	byBest.Set(bestKey(whom, g), "")
 }
 
 // soldIn is how many of ids first to last were ever sold, read from the sold

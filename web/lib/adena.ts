@@ -410,8 +410,9 @@ export async function recordRound({ address, realm, hole, shots, gas, period, re
   );
 }
 
-/** One transaction from the connected account: Adena simulates it and sets the final fee (gasWanted, at price: a starting point). */
-async function send(messages: (Call | Send)[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, memo = "gnogolf") {
+/** One transaction from the connected account: Adena simulates it and sets the final fee (gasWanted, at price: a starting point).
+ *  Exported for the calls of other realms built on it (lib/gnomes/tx.ts). */
+export async function send(messages: (Call | Send)[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, memo = "gnogolf") {
   const a = wallet();
   if (!a) throw new Error("Adena is not installed in this browser.");
   await ensureNetwork(a, { chainId, rpc });
@@ -504,17 +505,17 @@ interface SaveRound extends Work {
 // unchecked: a package path is one of a realm's characters, the chain's id and
 // RPC are theirs or a placeholder, and an argument is checked (or quoted) by
 // the plan it is in.
-const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+export const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
 // an RPC as a command may carry it, "" for anything else
 const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "");
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
-function gnokeyOn(chainId: string | null | undefined, rpc: string) {
+export function gnokeyOn(chainId: string | null | undefined, rpc: string) {
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
   return `-broadcast -chainid ${chain} -remote ${remoteOf(rpc) || "<rpc-url>"} <your-key-name>`;
 }
-/** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's. */
-const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string) =>
-  `gnokey maketx call -pkgpath ${pkg} -func ${func}${args.map((a) => ` -args ${a}`).join("")} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} ${on}`;
+/** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's; send: ugnot with it (0: none). */
+export const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string, send = 0) =>
+  `gnokey maketx call -pkgpath ${pkg} -func ${func}${args.map((a) => ` -args ${a}`).join("")}${send ? ` -send ${send}ugnot` : ""} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} ${on}`;
 
 /**
  * The same save for gnokey: one plain `gnokey maketx call` per commit, the
@@ -596,7 +597,7 @@ export function gnokeyPaste(plan: readonly string[], who: string, first = "") {
 }
 
 /** Where a gnokey paste goes: this chain (its id and RPC), at its gas price. */
-interface GnokeyAt { price?: number; chainId?: string | null; rpc: string }
+export interface GnokeyAt { price?: number; chainId?: string | null; rpc: string }
 /**
  * A name taken with gnokey, as registerName does with Adena: Register, then
  * golf's Claim, which ranks the rounds saved before it. Two transactions

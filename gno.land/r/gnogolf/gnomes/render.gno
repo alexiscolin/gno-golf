@@ -12,16 +12,12 @@ import (
 // the catalogue, the config or an address; names are the owner's rows, and
 // escaped where they go into markup.
 
-// self is this realm's pkgpath, hub its gnoweb path: every link and the buy
-// line follow from them, so the same code serves under any namespace.
+// self is this realm's pkgpath, hub its gnoweb path: every link follows
+// from them, so the same code serves under any namespace.
 var (
 	self = unsafe.CurrentRealm().PkgPath()
 	hub  = strings.TrimPrefix(self, "gno.land")
 )
-
-// buyGas is the gas a buy line asks: a buy of one gnome measured 30.4M on a
-// local chain, with room to spare.
-const buyGas = 50_000_000
 
 func Render(path string) string {
 	switch {
@@ -41,7 +37,7 @@ func Render(path string) string {
 func renderHome() string {
 	var b strings.Builder
 	b.WriteString("# Gnogolf Gnomes\n\nThe ball you play Gnogolf with, as a token: chosen by its number, seen before it is paid for, cosmetic only. " +
-		"Every gnome sells at its tier's fixed price, to the first buyer, a Legendary one a wallet; the nine earned gnomes are minted free once the chain proves the feat.\n\n")
+		"Every gnome sells at its wave's fixed price, to the first who buys it; the nine earned gnomes are minted free once the chain proves the feat.\n\n")
 	if !mintOpen {
 		b.WriteString("Sales are paused.\n\n")
 	}
@@ -62,13 +58,6 @@ func renderHome() string {
 	return b.String()
 }
 
-// onSale reports whether gnome g can be bought now: in a wave under way,
-// unsold, its sale neither paused nor closed.
-func onSale(g gnome) bool {
-	wi := waveAt(g.id)
-	return mintOpen && wi >= 0 && now() >= waves[wi].start && !isSold(g.id) && !isClosed(g.id)
-}
-
 func renderGnome(tid string, g gnome) string {
 	var b strings.Builder
 	name := xmlEscape(g.name)
@@ -81,11 +70,6 @@ func renderGnome(tid string, g gnome) string {
 		b.WriteString("Burned.\n")
 	} else if isClosed(g.id) {
 		b.WriteString("Unsold when its sale closed: never minted.\n")
-	} else if onSale(g) {
-		price := priceNow(g)
-		b.WriteString("Price: " + gnot(price) + "\n\n    gnokey maketx call -pkgpath " + self + " -func Buy -args " + tid +
-			" -send " + itoa(price) + "ugnot -gas-fee 1000000ugnot -gas-wanted " + itoa(buyGas) +
-			" -broadcast -chainid <chain-id> -remote <rpc-url> <your-key-name>\n")
 	} else {
 		b.WriteString("Unsold.\n")
 	}
