@@ -35,15 +35,13 @@ const DESKTOP = [1024, 1280, 1440];
 
 /** the pages, in the spec's order (docs/superpowers/specs/2026-10-06-gui-design.md); audit: false for a picture, not a screen */
 const PAGES = /** @type {{ page: string, title: string, shots: Shot[], audit?: boolean, widths?: number[] }[]} */ ([
-  { page: "gnomes-gallery", title: "A1 · The gallery", shots: [["", DESK], ["", PHONE], ["teaser", DESK], ["players", DESK], ["soldout", DESK], ["closed", DESK], ["closed", PHONE], ["loading", DESK], ["empty", DESK], ["error", DESK]] },
-  { page: "gnome-detail", title: "A2 · A gnome's page", shots: [["", DESK], ["", PHONE], ["nowallet", DESK], ["locked", DESK], ["cap", DESK], ["mine", DESK], ["taken", DESK], ["later", PHONE], ["nevermade", DESK]] },
-  { page: "gnome-buy", title: "A3 · Buying", shots: [["", DESK], ["", PHONE], ["connect", DESK], ["nowallet", DESK], ["elsewhere", PHONE], ["network", DESK], ["short", DESK], ["pending", DESK], ["reading", DESK], ["success", DESK], ["success", PHONE], ["taken", DESK], ["cancelled", DESK], ["unsure", DESK]] },
-  { page: "gnome-auction", title: "A4 · A Legendary's auction", shots: [["", DESK], ["", PHONE], ["outbid", DESK], ["leading", DESK], ["extended", DESK], ["ended", DESK], ["won", DESK], ["nobid", DESK], ["upcoming", DESK]] },
-  { page: "gnome-locker", title: "A5 · The picker's shelf", shots: [["", DESK], ["", PHONE], ["shown", DESK], ["free", DESK], ["many", PHONE], ["none", DESK]] },
-  { page: "collection", title: "A6 · My gnomes, their gnomes", shots: [["", DESK], ["", PHONE], ["shown", DESK], ["few", DESK], ["one", DESK], ["one", PHONE], ["empty", DESK], ["theirs", DESK], ["theirs", PHONE]] },
-  { page: "gnome-places", title: "A7 · Where the gnomes show in play", shots: [["", DESK]] },
-  { page: "share", title: "A8 · Share moments", shots: [["", DESK], ["", PHONE], ["equipped", DESK], ["bidding", DESK], ["won", PHONE], ["team", DESK], ["published", DESK], ["clip", DESK]] },
-  { page: "share-card", title: "A8 · Share cards", shots: [["", CARD], ["square", SQUARE], ["auction", CARD], ["reveal", CARD], ["team", CARD], ["hole", CARD]], audit: false },
+  { page: "gnomes-gallery", title: "A1 · The gallery (and its Mine view)", shots: [["", DESK], ["", PHONE], ["mine", DESK], ["mine", PHONE], ["mineempty", DESK], ["teaser", DESK], ["players", DESK], ["soldout", DESK], ["closed", DESK], ["closed", PHONE], ["loading", DESK], ["empty", DESK], ["error", DESK]] },
+  { page: "gnome-sheet", title: "A2 · A gnome: one sheet, from seeing him to the receipt", shots: [["", DESK], ["", PHONE], ["legendary", DESK], ["locked", DESK], ["cap", DESK], ["mine", DESK], ["taken", DESK], ["later", DESK], ["nevermade", DESK], ["review", DESK], ["review", PHONE], ["ticked", DESK], ["connect", DESK], ["nowallet", DESK], ["elsewhere", PHONE], ["network", DESK], ["short", DESK], ["pending", DESK], ["success", DESK], ["success", PHONE], ["receipt", DESK], ["sniped", DESK], ["cancelled", DESK], ["unsure", DESK]] },
+  { page: "gnome-locker", title: "A3 · The picker, plus one Yours row", shots: [["", DESK], ["", PHONE], ["shown", DESK], ["free", DESK], ["many", PHONE], ["none", DESK]] },
+  { page: "theirs", title: "A4 · Their gnomes (a sheet over the boards)", shots: [["", DESK], ["", PHONE]] },
+  { page: "gnome-places", title: "A5 · Where the gnomes show in play", shots: [["", DESK]] },
+  { page: "share-card", title: "A6 · Share cards", shots: [["", CARD], ["square", SQUARE], ["reveal", CARD], ["team", CARD], ["hole", CARD]], audit: false },
+  { page: "region", title: "A7 · Not in your region (/g/* where the shop is not offered)", shots: [["", DESK], ["", PHONE]] },
   { page: "builder-editor", title: "B2 · The editor", widths: DESKTOP, shots: [["", DESK], ["", MID], ["", LAPTOP], ["empty", DESK], ["place", DESK], ["invalid", DESK], ["issues", DESK], ["issues", LAPTOP], ["timed", DESK], ["proved", DESK], ["world", DESK]] },
   { page: "builder-test", title: "B3 · Test", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["proved", DESK], ["missed", DESK]] },
   { page: "builder-publish", title: "B4 · Publish", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["refused", DESK], ["newer", DESK], ["closed", DESK], ["pending", DESK], ["done", DESK]] },
@@ -90,6 +88,7 @@ const CHECK = `(() => {
   const ctl = [...document.querySelectorAll("button, a[href], input, textarea, summary")].filter(seen);
   for (let i = 0; i < ctl.length; i++) for (let j = i + 1; j < ctl.length; j++) {
     const a = ctl[i], c = ctl[j]; if (a.contains(c) || c.contains(a)) continue;
+    if (a.closest(".sheet__foot") !== c.closest(".sheet__foot")) continue; // (the pinned foot lies over what scrolls under it, by design)
     const p = a.getBoundingClientRect(), q = c.getBoundingClientRect();
     const x = Math.min(p.right, q.right) - Math.max(p.left, q.left), y = Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top);
     if (x > 3 && y > 3) out.push("controls overlap: " + name(a) + " / " + name(c));

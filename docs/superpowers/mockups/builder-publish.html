@@ -51,11 +51,11 @@
 <script src="builder.js"></script>
 <script>
   if (matchMedia("(max-width: 899px), (pointer: coarse)").matches) location.replace("builder-phone.html");
-  const { ICON, state } = Kit;
+  const { ICON, state, shareRow } = Kit;
   const { holeSVG, header } = Builder;
   const s = state("form");
   const bad = s === "refused";
-  const gnokey = `<details class="more"><summary>Publish with gnokey instead</summary><div><code class="code">gnokey maketx call -pkgpath "gno.land/r/gnogolf/golf/v2" -func "PublishMine" -args "mole-run" -args "4747310001…" -args "Mind the gate, and the moles." -gas-fee 1500000ugnot -gas-wanted 205000000 -broadcast -chainid gnoland-1 -remote https://rpc.gno.land:443 my-key</code>
+  const gnokey = `<details class="more"><summary>Publish with gnokey instead</summary><div><code class="code">gnokey maketx call -pkgpath gno.land/r/nym-alexiscolin000/gnogolf/golf/v2 -func "PublishMine" -args "mole-run" -args "4747310001…" -args "Mind the gate, and the moles." -gas-fee 1500000ugnot -gas-wanted 205000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 &lt;your-key-name&gt;</code>
     <button class="btn btn--main btn--s" style="margin-top:8px">Copy</button></div></details>`;
   const action = {
     form: `<button class="btn btn--chain">Publish in Adena · 1.20 GNOT</button>`,
@@ -91,7 +91,7 @@
   const done = `<section class="done"><div class="done__in"><span class="eyebrow">nym-twee/mole-run/v1 · Garden · par 5</span><h2 class="inked">Mole Run is on gno.land!</h2>
       <div class="shot"><iframe src="share-card.html?state=hole" title="The hole's share card" tabindex="-1" aria-hidden="true"></iframe></div>
       <p class="lead" style="margin:0">Play it for real: your best becomes the ghost your friends race.</p>
-      <div class="row2"><button class="btn btn--gold">${ICON.play} Play it for real</button><a class="btn btn--ghost" href="share.html?state=published">${ICON.more} Share the dare</a></div></div></section>`;
+      <button class="btn btn--gold btn--cta" style="justify-self:center;margin:0">${ICON.play} Play it for real</button><div style="display:flex;justify-content:center">${shareRow("Share the dare")}</div></div></section>`;
 
   document.getElementById("app").innerHTML = `<main class="bench bench--wide tint--garden">${header({ mode: "publish", proved: true })}${s === "done" ? done : form}</main>`;
   if (s !== "done") document.querySelector(".shot").style.backgroundImage = "url(img/play-garden3.jpg)";

@@ -7,8 +7,8 @@
 <link rel="stylesheet" href="kit.css">
 <!-- The share cards, at their real sizes: 1200×630 (a link card, the og:image)
      and 1080×1080 (a post's picture). Made at build time for every gnome
-     (/g/<id>/), in the page for a hole, a bid, a reveal: no server.
-     states: ?state=gnome (default, 1200×630) | square (1080×1080) | auction | hole (a ghost dare) | reveal (a Legendary a day) | team (a player's gnomes, made in the browser) -->
+     (/g/<id>/), in the page for a hole, a team, a spotlight: no server.
+     states: ?state=gnome (default, 1200×630) | square (1080×1080) | hole (a ghost dare) | reveal (a Legendary in the spotlight, one a day) | team (a player's gnomes, made in the browser) -->
 <style>
   html, body { margin: 0; background: var(--s0); }
   .sc { position: relative; width: 1200px; height: 630px; overflow: hidden; display: grid; grid-template-columns: 560px 1fr; background: radial-gradient(circle, rgba(var(--ink-rgb), .09) 2px, transparent 2.5px) 0 0 / 18px 18px, var(--s0); }
@@ -25,15 +25,12 @@
   .sc__foot { display: flex; align-items: center; gap: 18px; margin-top: 10px; font-size: 22px; font-weight: 700; color: var(--ink-soft); }
   .sc .tier { font-size: 20px; padding: 4px 18px 4px 10px; border-width: 3px; } .sc .tier svg { width: 22px; height: 22px; }
   .word { height: 56px; }
-  /* the auction's and the reveal's night (tint--legend) */
+  /* a Legendary's night (the spotlight) */
   .sc--night { color: var(--paper); background: radial-gradient(circle, rgba(255, 255, 255, .06) 2px, transparent 2.5px) 0 0 / 18px 18px, #2b2550; }
   .sc--night::after { border-color: var(--tier-legendary); }
   .sc--night .sc__name { color: var(--tier-legendary); }
   .sc--night .sc__foot { color: #e9e4ff; }
   .sc--night .sc__art { box-shadow: 0 0 0 8px var(--tier-legendary), 0 0 0 12px var(--ink), 0 0 90px 30px rgba(255, 215, 94, .3); }
-  .bid { display: grid; gap: 2px; font-size: 24px; font-weight: 600; color: #e9e4ff; }
-  .bid b { font-size: 52px; color: var(--paper); line-height: 1; }
-  .silhouette img { filter: brightness(0) opacity(.85); }
   .reveal-row { display: flex; gap: 12px; }
   .reveal-row i { width: 46px; height: 46px; border-radius: 50%; border: 3px solid var(--tier-legendary); }
   .reveal-row i.on { background: var(--tier-legendary); }
@@ -64,15 +61,11 @@
   const cards = {
     gnome: `<div class="sc tint--garden"><div class="sc__art gtile--epic" style="background:var(--stage)"><img src="img/g02.png" alt=""></div><div class="sc__text">${gnomeText}</div></div>`,
     square: `<div class="sc sc--square tint--garden"><div class="sc__art" style="background:var(--stage)"><img src="img/g02.png" alt=""></div><div class="sc__text">${gnomeText}</div></div>`,
-    auction: `<div class="sc sc--night"><div class="sc__art" style="background:repeating-conic-gradient(from 0deg at 50% 42%, #ffe69a 0 7.5deg, #ffd25a 7.5deg 15deg)"><img src="img/g12.png" alt=""></div><div class="sc__text">
-      <span class="tier tier--legendary">${TIER_ICON.legendary}Legendary · one of one</span><h1 class="sc__name inked">The Windmill King</h1>
-      <div class="bid">Auction ends Sat 11 Oct, 18:00 UTC<span>Top bid <b>1,240 GNOT</b></span></div>
-      <div class="sc__foot">${word}<span>gnogolf.xyz/g/715</span></div></div></div>`,
-    reveal: `<div class="sc sc--night"><div class="sc__art silhouette" style="background:repeating-conic-gradient(from 0deg at 50% 42%, #ffe69a 0 7.5deg, #ffd25a 7.5deg 15deg)"><img src="img/g13.png" alt=""></div><div class="sc__text">
-      <span class="tier tier--legendary">${TIER_ICON.legendary}Legendary 3 of 7</span><h1 class="sc__name inked">Who's in the mine?</h1>
-      <p class="sc__line" style="color:#e9e4ff">One Legendary revealed a day. Tomorrow, 18:00 UTC.</p>
-      <div class="reveal-row" aria-label="2 revealed of 7">${Array.from({ length: 7 }, (_, i) => `<i class="${i < 2 ? "on" : ""}"></i>`).join("")}</div>
-      <div class="sc__foot">${word}<span>gnogolf.xyz/g/</span></div></div></div>`,
+    reveal: `<div class="sc sc--night"><div class="sc__art" style="background:repeating-conic-gradient(from 0deg at 50% 42%, #ffe69a 0 7.5deg, #ffd25a 7.5deg 15deg)"><img src="img/g12.png" alt=""></div><div class="sc__text">
+      <span class="tier tier--legendary">${TIER_ICON.legendary}Today's Legendary · 1 of 7</span><h1 class="sc__name inked">The Miller</h1>
+      <p class="sc__line" style="color:#e9e4ff">A spotlight a day on one of the seven. All seven are in the gallery.</p>
+      <div class="reveal-row" aria-label="Spotlight 1 of 7">${Array.from({ length: 7 }, (_, i) => `<i class="${i < 1 ? "on" : ""}"></i>`).join("")}</div>
+      <div class="sc__foot">${word}<span>gnogolf.xyz/g/104</span></div></div></div>`,
     hole: `<div class="sc sc--hole"><img class="ghost" src="img/g08.png" alt=""><div class="sc__text">
       <span class="tag">A hole by nym-twee · Garden · par 5</span><h1 class="sc__name inked">Beat my 4 on Mole Run</h1>
       <div class="sc__foot">${word}<span>Race my ghost · free, no wallet</span></div></div></div>`,

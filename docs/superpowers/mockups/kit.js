@@ -53,15 +53,18 @@ const EXTRAS = ["a sunflower behind the ear", "round glasses", "a leaf in the ha
 /** A stand-in gnome for an id: wave w's world, a tier by its place in the
  *  wave, traits picked by the id (the realm's table decides, not the page). */
 function gnome(id, owners = {}) {
-  const w = WORLDS[Math.floor((id - 1) / 101) % WORLDS.length];
-  const k = (id - 1) % 101; // 72 Commons, 20 Rares, 9 Epics a wave (the brief's split)
-  const tier = k < 72 ? "common" : k < 92 ? "rare" : "epic";
-  const name = `${w.names[id % w.names.length]} ${w.of}`;
+  const w = WORLDS[Math.floor((id - 1) / 104) % WORLDS.length];
+  // the genesis table's waves (nft spec): 104 ids, Commons 1-72, Rares 73-93, Epics 94-103, the Legendary 104
+  const k = (id - 1) % 104;
+  const tier = k < 72 ? "common" : k < 93 ? "rare" : k < 103 ? "epic" : "legendary";
+  // the seven Legendaries, one a wave, by their own names (nft spec)
+  const LEGEND = { 104: "The Miller", 208: "The Admiral", 311: "Ancient Mushroom", 414: "Summit Gnome", 516: "Crystal Gnome", 618: "Lava Gnome", 720: "Storm Gnome" };
+  const name = LEGEND[id] || `${w.names[id % w.names.length]} ${w.of}`;
   const traits = { Hat: HATS[id % HATS.length], Beard: BEARDS[(id * 7) % BEARDS.length], Extra: EXTRAS[(id * 3) % EXTRAS.length] };
   if (tier !== "common") traits.Trail = ["petals", "bubbles", "sparks", "snowflakes"][id % 4];
   if (tier === "epic") traits.Holing = ["a fountain of petals", "a ring of crystal", "a burst of confetti"][id % 3];
-  const price = { common: 30, rare: 99, epic: 333 }[tier];
-  return { id, world: w.id, worldName: w.name, tier, name, line: `${cap(traits.Hat)}, ${traits.Beard} and ${traits.Extra}.`, traits, price, owner: owners[id] || "", art: art(id * 5 + (tier === "epic" ? 3 : 0)) };
+  const price = { common: 30, rare: 99, epic: 333, legendary: 777 }[tier];
+  return { id, world: w.id, worldName: w.name, tier, name, line: `${cap(traits.Hat)}, ${traits.Beard} and ${traits.Extra}.`, traits, price, owner: owners[id] || "", art: tier === "legendary" ? "img/g12.png" : art(id * 5 + (tier === "epic" ? 3 : 0)) };
 }
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
@@ -87,13 +90,16 @@ const shareRow = (label = "Share") => `
 
 // The genesis sale's end (CollectionJSON closesAt; the owner can only bring it
 // earlier): said as a date, the same words everywhere, never as a countdown.
-const CLOSES = "Sun 14 Dec, 18:00 UTC";
+const CLOSES = "Sun 13 Dec, 18:00 UTC";
 const CAL = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
 /** The closing line, a flat note: it only says. */
 const closes = () => `<p class="closes">${CAL}<span>Sale closes for good on <b>${CLOSES}</b>. Unsold gnomes are never made.</span></p>`;
 /** The trust strip, under a buy button only (once a screen): the sale's end is one of its facts. */
-const trust = () => `<ul class="trust"><li>This exact gnome: no random draw</li><li>Cosmetic only</li>
+// (docs/superpowers/legal/draft-shop-copy.md §4: the trust strip's own words)
+const trust = () => `<ul class="trust"><li>Cosmetic only: same ball, same physics</li><li>You pick the exact gnome; nothing is random</li>
   <li>Sale closes for good on ${CLOSES}. Unsold gnomes are never made.</li><li><a href="#">The contract ↗</a></li></ul>`;
+/** The shop's legal links, once a screen where it sells: the Terms, the seller (特定商取引法に基づく表記), privacy. */
+const legal = () => `<p class="legal"><a href="#">Terms of Sale</a> · <a href="#">Seller information (特定商取引法に基づく表記)</a> · <a href="#">Privacy</a></p>`;
 
-window.Kit = { ICON, TIER_ICON, TIER_NAME, tierChip, art, WORLDS, gnome, state, corners, netbanner, shareRow, CLOSES, closes, trust };
+window.Kit = { ICON, TIER_ICON, TIER_NAME, tierChip, art, WORLDS, gnome, state, corners, netbanner, shareRow, CLOSES, closes, trust, legal };
 })();

@@ -10,7 +10,7 @@
      the "Yours" row between the tile and the aim card, its faces scrolling sideways inside it, and on
      its label line who sees what. Wearing is free: you play any of yours at once, in this browser;
      everyone else sees your best one, or the one you chose to show them (optional, a small fee).
-     states: ?state=mine (default: playing Tansy, everyone sees the Windmill King) | shown (everyone sees Tansy)
+     states: ?state=mine (default: playing Tansy, everyone sees the Miller) | shown (everyone sees Tansy)
      | free (playing The Classic, a free gnome) | many (31 of yours: the row scrolls) | none (no gnome of yours: today's picker) -->
 <style>
   /* today's picker, as globals.css and title.css draw it */
@@ -50,16 +50,16 @@
   const { ICON, state, corners, netbanner } = Kit;
   const s = state("mine");
   // the player's own: the best first (Legendary, Epic, Rare, Common, then the lowest number)
-  const MINE = [["The Windmill King", "img/g12.png", "legendary"], ["Tansy", "img/g02.png", "epic"], ["Garnet", "img/g13.png", "epic"], ["Coral", "img/g09.png", "rare"], ["Kelp", "img/g08.png", "rare"], ["Basil", "img/g10.png", "common"]];
+  const MINE = [["The Miller", "img/g12.png", "legendary"], ["Tansy", "img/g02.png", "epic"], ["Garnet", "img/g13.png", "epic"], ["Coral", "img/g09.png", "rare"], ["Kelp", "img/g08.png", "rare"], ["Basil", "img/g10.png", "common"]];
   const tierBg = { legendary: "var(--tier-legendary)", epic: "var(--tier-epic)", rare: "var(--tier-rare)", common: "var(--tier-common)" };
   const playing = s === "free" ? ["The Classic", "img/g00.png"] : ["Tansy", "img/g02.png"];
-  const seen = s === "shown" ? "Tansy" : "The Windmill King";
+  const seen = s === "shown" ? "Tansy" : "The Miller";
   const own = MINE.some(([n]) => n === playing[0]);
   // who sees what, one line: "Everyone sees X" and, when you play one of yours they don't see, the optional show
   const line = `<div class="yours__line"><span>Everyone sees <b>${seen}</b></span>${own && playing[0] !== seen ? `<button class="linkish" title="Optional: rivals see him on your ghost and the boards">Show ${playing[0]} instead · ≈ 0.01 GNOT</button>` : ""}</div>`;
   const row = s === "none" ? "" : `<section class="yours" aria-label="Your gnomes">${line}<div class="yours__row">
       ${MINE.map(([n, img, t]) => `<button class="face" aria-label="${n}, ${t}${n === seen ? ", everyone sees him" : ""}" aria-current="${n === playing[0]}"><img src="${img}" alt=""><i class="face__tier" style="background:${tierBg[t]}"></i></button>`).join("")}
-      ${s === "many" ? `<a class="face face--all" href="collection.html" aria-label="All 31 of yours">+25</a>` : ""}</div></section>`;
+      ${s === "many" ? `<a class="face face--all" href="gnomes-gallery.html?state=mine" aria-label="All 31 of yours">+25</a>` : ""}</div></section>`;
 
   document.getElementById("app").innerHTML = `
     ${corners("Back to the cups")}

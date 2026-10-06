@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A gnome · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- One gnome: the game's own Sheet over the gallery (what /g/<id>/ opens), never a page of its own.
+     It shows him, then, in the same sheet, the order to review (the legal pack's final confirmation),
+     the wallet, the success with the game's Share row, and the receipt. Every tier, Legendary included,
+     is a fixed price bought the same way. One action a state.
+     states: ?state=open (default) | legendary | locked (players first, no record) | cap | mine | taken | later | nevermade
+     | review (boxes unticked) | ticked | connect | nowallet | elsewhere | network | short | pending | reading | success | receipt
+     | sniped (someone was first) | cancelled | unsure -->
+<style>
+  body { overflow: hidden; height: 100vh; }
+  .behind { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+  .sheet__in { max-width: 460px; display: grid; gap: var(--sp-3); }
+  .sheet__in > :not(.sheet__foot) { margin: 0 !important; }
+  .stage { justify-self: center; width: 200px !important; border-radius: var(--r-panel); box-shadow: var(--deep-card); }
+  .stage img { animation: turn 7s ease-in-out infinite; }
+  @keyframes turn { 25% { transform: rotateY(25deg); } 75% { transform: rotateY(-25deg); } }
+  .meta { display: flex; justify-content: center; align-items: center; gap: var(--sp-2); font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+  .gname { font-size: 34px !important; --ink-w: 6px; --ink-drop: 4px; }
+  .gline { color: var(--ink) !important; font-size: 15px !important; text-align: center; }
+  .price { display: flex; justify-content: center; align-items: baseline; gap: var(--sp-2); }
+  .price b { font-size: 30px; line-height: 1; }
+  .price span { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+  .sheet .trust { justify-content: center; }
+  .traits p { display: grid; grid-template-columns: 70px 1fr; gap: var(--sp-1) var(--sp-3); margin: 0; text-align: left; }
+  .head { display: grid; justify-items: center; gap: var(--sp-2); }
+  .head .gtile { width: 64px; border-radius: 14px; }
+  .head h2 { font-size: 26px; margin: 0; }
+  .review { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-2) var(--sp-3); margin: 0; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 14px; background: var(--white); font-size: 14px; line-height: 1.4; text-align: left; }
+  .review dt { font-weight: 700; color: var(--ink-soft); }
+  .review dd { margin: 0; color: var(--ink); }
+  .review .total { font-size: 17px; font-weight: 800; }
+  .review small { display: block; font-size: 12.5px; color: var(--ink-soft); }
+  .sheet__foot .btn { min-height: 52px; font-size: 16px; font-weight: 700; }
+  .sheet__foot .fine { margin: 0; }
+  .center { display: grid; gap: var(--sp-3); justify-items: center; text-align: center; }
+  .center .gtile { width: 160px; border-radius: var(--r-panel); box-shadow: var(--deep-card); }
+  .center h2 { font-size: 34px; --ink-w: 6px; --ink-drop: 4px; }
+  .hop { animation: hop .7s ease-in-out infinite alternate; }
+  @keyframes hop { to { transform: translateY(-12px); } }
+  .receipt { display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; background: var(--white); text-align: left; }
+  .receipt h3 { margin: 0; font-size: 16px; }
+  .receipt p { margin: 0 !important; color: var(--ink) !important; font-size: 14px !important; }
+  .receipt .mono { word-break: break-all; }
+  @media (max-width: 600px) { .review { grid-template-columns: 1fr; gap: 0; } .review dd { margin-bottom: var(--sp-2); } .review, .receipt p { font-size: 15px !important; } .gname { font-size: 30px !important; } }
+  @media print { .behind, .sheet__close, .sheet__foot, .head { display: none; } .sheet { position: static; background: none; } }
+</style>
+</head>
+<body>
+<iframe class="behind" src="gnomes-gallery.html" title="The gallery, behind the sheet" aria-hidden="true" tabindex="-1"></iframe>
+<div class="sheet" id="app"></div>
+<script src="kit.js"></script>
+<script>
+  const { ICON, TIER_ICON, tierChip, state, trust, legal, shareRow, CLOSES } = Kit;
+  const s = state("open");
+  const leg = s === "legendary";
+  const G = leg ? { name: "The Miller", short: "The Miller", id: 104, tier: "legendary", price: 777, img: "img/g12.png", line: "Sails for a crown, a beard to his knees: the windmill turns once as he drops." }
+    : { name: "Tansy of the Garden", short: "Tansy", id: 94, tier: "epic", price: 333, img: "img/g02.png", line: "A bobble that will not sit still, and a trail of petals behind every putt." };
+  const tile = (cls = "") => `<span class="gtile gtile--${G.tier} tint--garden ${cls}"><img src="${G.img}" alt=""></span>`;
+  const foot = (b, small = "") => `<div class="sheet__foot">${b}${small ? `<p class="fine">${small}</p>` : ""}</div>`;
+  const close = `<button class="round round--small sheet__close" aria-label="Close">${ICON.close}</button>`;
+  const total = (G.price + 0.46).toFixed(2);
+
+  // him: the turntable, who he is, his price, one action
+  const him = (action, note = "", withTrust = true) => `${tile("stage").replace('class="gtile', 'role="img" aria-label="' + G.name + ', turning: drag, or the arrow keys" class="gtile')}
+    <div class="meta">${tierChip(G.tier)}<span>#${G.id} · Wave 1 · Garden</span></div>
+    <h2 class="gname inked">${G.name}</h2><p class="gline">${G.line}</p>
+    ${note}${withTrust ? `<div class="price"><b>${G.price} GNOT</b><span>+ ≈ 0.46 GNOT deposit and fee</span></div>` : ""}
+    ${withTrust ? trust() : ""}
+    <details class="more traits"><summary>His traits</summary><p><span>Hat</span><b>${leg ? "Windmill sails" : "Bobble, moss green"}</b><span>Beard</span><b>${leg ? "Long, white" : "Bushy, ginger"}</b><span>Extra</span><b>${leg ? "Flour on the brim" : "Rosy cheeks"}</b><span>Trail</span><b>${leg ? "Turning sails" : "Petals"}</b></p></details>
+    ${foot(action)}`;
+
+  // the order, term by term (legal pack §1.1), the seller from the site's build settings
+  const review = (balance = false) => `<dl class="review" aria-label="Your order">
+      <dt>Item</dt><dd>${G.name} (#${G.id}, ${G.tier === "legendary" ? "Legendary, 1 of 1" : "Epic"}), 1 item</dd>
+      <dt>Price</dt><dd>${G.price} GNOT</dd>
+      <dt>Other costs</dt><dd>Storage deposit about 0.31 GNOT (held by the chain, returned if you burn the gnome) + network fee about 0.15 GNOT. Neither is paid to us.</dd>
+      <dt>Total</dt><dd><span class="total">about ${total} GNOT</span><small>${balance ? "In your Adena: 120 GNOT" : "≈ $23, approximate, rate of 18:02 UTC from [source]"}</small></dd>
+      <dt>Payment</dt><dd>Paid now, in GNOT, from your own wallet, in the transaction you sign.</dd>
+      <dt>Delivery</dt><dd>Delivered at once to g1jg8m…sqf5, in the same transaction.</dd>
+      <dt>Sale period</dt><dd>The genesis sale closes on ${CLOSES} (Mon 14 Dec, 03:00 JST).</dd>
+      <dt>Cancellation</dt><dd><b>No returns, cancellations or refunds once the transaction is final</b>, except where the law requires them.</dd>
+      <dt>Nature</dt><dd>Cosmetic only. No gameplay advantage. Not an investment.</dd>
+      <dt>Seller</dt><dd>[operator name], [address], [e-mail]</dd></dl>`;
+  const boxes = (on) => `<label class="box"><input type="checkbox"${on ? " checked" : ""}><span>I am 18 or older, and I accept the <a href="#">Terms of Sale</a>. I understand a gnome is a cosmetic item, not an investment, and that it may lose all resale value.</span></label>
+    <label class="box"><input type="checkbox"${on ? " checked" : ""}><span>I want my gnome delivered now, before the 14-day withdrawal period ends, and I understand that I therefore <b>lose my right of withdrawal</b> once it is delivered.</span></label>`;
+  // the realm's Buy(ids): the ids, exactly their prices sent; the fee as lib/adena.ts feeFor (gas × 0.001 × 1.5)
+  const gnokey = (open = false) => `<details class="more"${open ? " open" : ""}><summary>Buy with gnokey instead</summary>
+    <div><code class="code">gnokey maketx call -pkgpath gno.land/r/nym-alexiscolin000/gnogolf/gnomes -func Buy -args ${G.id} -send ${G.price}000000ugnot -gas-fee 150000ugnot -gas-wanted 100000000 -broadcast -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 &lt;your-key-name&gt;</code>
+    <button class="btn btn--main btn--s" style="margin-top:8px">Copy</button></div></details>`;
+  const order = (on) => foot(`<button class="btn btn--chain btn--wide"${on ? "" : ' disabled title="Tick both boxes first"'}>Order with obligation to pay (${total} GNOT): sign in wallet</button>`, "Your wallet will open and ask you to sign. Signing is your order. It cannot be undone.");
+  const head = (t) => `<div class="head">${tile()}<h2>${t}</h2></div>`;
+  const wait = (t) => `<div class="center">${tile("hop")}<h2 style="font-size:24px">${t}</h2></div>`;
+  const buy = `<button class="btn btn--chain btn--wide">Buy ${G.short} · ${G.price} GNOT</button>`;
+
+  const body = {
+    open: him(buy),
+    legendary: him(buy, `<p class="note note--warn" style="text-align:center">One of one. At most one Legendary per wallet; the first to buy him has him.</p>`),
+    locked: him(`<button class="btn btn--chain btn--wide" disabled>Players first until Thu 8 Oct, 18:00 UTC</button>`, `<p class="note note--warn">Save one round on-chain to buy now. <a href="#">Play a hole →</a></p>`),
+    cap: him(`<button class="btn btn--chain btn--wide" disabled>3 of 3 Commons this wave</button>`, `<p class="note note--warn">Your share until Thu 8 Oct, 18:00 UTC. Then open to everyone.</p>`),
+    mine: him(`<button class="btn btn--gold btn--wide">Play with him</button>`, `<p class="gline"><b>Yours</b> since 4 Oct · everyone sees him: he is your best</p>`, false),
+    taken: him(`<a class="btn btn--gold btn--wide" href="#">Race nym-gnorman's ghost</a>`, `<p class="gline">Plays with <b>nym-gnorman</b></p>`, false),
+    later: him(`<button class="btn btn--ghost btn--wide">♡ Keep him on my list</button>`, `<p class="gline">On sale from Wave 2. A wave not open by ${CLOSES} never opens.</p>`, false),
+    nevermade: him(`<a class="btn btn--ghost btn--wide" href="gnomes-gallery.html?state=closed">See the gnomes that were made</a>`, `<p class="gline"><b>Never made.</b> The sale closed before he found a player.</p>`, false),
+    review: `${head("Review your order")}${review()}${legal()}${boxes(false)}${gnokey()}${order(false)}`,
+    ticked: `${head("Review your order")}${review()}${legal()}${boxes(true)}${gnokey()}${order(true)}`,
+    connect: `${head("Buy " + G.short)}<p class="lead" style="text-align:center">Connect Adena, the gno.land wallet, to review your order.</p>${gnokey()}${foot(`<button class="btn btn--main btn--wide">Connect Adena</button>`)}`,
+    nowallet: `${head("Buy " + G.short)}<p class="lead" style="text-align:center">Buying takes a gno.land wallet.</p>${gnokey(true)}${foot(`<a class="btn btn--main btn--wide" href="#">Install Adena ↗</a>`)}`,
+    elsewhere: `${head("Buy " + G.short)}<p class="lead" style="text-align:center">Adena lives on a computer. The link keeps ${G.short} for you there.</p>${foot(`<button class="btn btn--main btn--wide">Send the link to my computer</button>`)}`,
+    network: `${head("Buy " + G.short)}<p class="note note--warn">Adena is on another network. Pick <b>onyx-1</b> in Adena: nothing was sent.</p>${foot(`<button class="btn btn--main btn--wide">Check again</button>`)}`,
+    short: `${head("Review your order")}${review(true)}<p class="note note--warn"><b>213.46 GNOT</b> to go.</p>${foot(`<a class="btn btn--main btn--wide" href="#">Get GNOT ↗</a>`)}`,
+    pending: wait("Sign in Adena…"),
+    reading: wait("Reading it back from the chain…"),
+    success: `<div class="center">${tile()}<h2 class="inked">${G.short}'s yours!</h2>${shareRow("Show your gnome")}<p class="fine" style="margin:0"><a class="linkish" href="?state=receipt">Your receipt: print or save it</a></p></div>${foot(`<button class="btn btn--gold btn--wide">Play with him</button>`)}`,
+    receipt: `${head("Your receipt")}<div class="receipt"><h3>Receipt: Gnogolf gnome purchase</h3>
+      <p>Seller: [operator name], [address], [e-mail]</p><p>Date and time: Tue 6 Oct 2026, 18:04 UTC (Wed 7 Oct, 03:04 JST)</p>
+      <p>Item: ${G.name}, #${G.id}. Contract <span class="mono">gno.land/r/nym-alexiscolin000/gnogolf/gnomes</span></p>
+      <p>Price paid: ${G.price} GNOT (+ network fee 0.15 GNOT, storage deposit 0.31 GNOT held by the chain)</p>
+      <p>Delivered to: <span class="mono">g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5</span></p>
+      <p>Transaction: <span class="mono">3F9A…C21B</span> (permanent record on onyx-1: <a href="#">explorer ↗</a>)</p>
+      <p>Terms accepted: Terms of Sale version [1.0, date]</p>
+      <p>Your consents, as ticked: "I am 18 or older, and I accept the Terms of Sale …"; "I want my gnome delivered now, …"</p>
+      <p>No returns or refunds once final, except where the law requires them. Questions: [e-mail].</p></div>${foot(`<button class="btn btn--main btn--wide" onclick="print()">Print or save as PDF</button>`)}`,
+    sniped: `${head("Buy " + G.short)}<p class="note note--bad">Someone bought ${G.short} a moment before you. <b>Nothing was sent.</b></p>${foot(`<a class="btn btn--main btn--wide" href="gnomes-gallery.html">Pick another</a>`)}`,
+    cancelled: `${head("Review your order")}<p class="note note--bad">Cancelled in Adena: nothing was sent.</p>${review()}${legal()}${boxes(true)}${order(true)}`,
+    unsure: `${head("Buy " + G.short)}<p class="note note--warn">Sent, but not confirmed yet. <b>Don't buy again</b>: it would pay twice.</p>${foot(`<button class="btn btn--main btn--wide">Check again</button>`)}`,
+  }[s];
+  const banner = ["pending", "reading", "success", "sniped", "unsure"].includes(s);
+  document.getElementById("app").innerHTML = `<div class="sheet__in${banner ? " sheet__in--banner" : ""}" role="dialog" aria-modal="true" aria-label="${G.name}">${s === "pending" || s === "reading" ? "" : close}${body}</div>`;
+</script>
+</body>
+</html>

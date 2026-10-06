@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Their gnomes · Gnogolf mockup</title>
+<link rel="stylesheet" href="kit.css">
+<!-- Another player's gnomes: the game's own Sheet over the boards (a row tapped), read-only, small:
+     the one they show first, the rest as faces, one action. No page of its own. One state. -->
+<style>
+  body { overflow: hidden; height: 100vh; background: #e9e2d2 url(img/game-boards.jpg) center / cover; }
+  .sheet__in { max-width: 400px; display: grid; gap: var(--sp-3); justify-items: center; text-align: center; }
+  .sheet__in > :not(.sheet__foot) { margin: 0 !important; }
+  .sheet__in > .shown { width: 132px !important; border-radius: var(--r-panel); box-shadow: var(--deep-card); }
+  .sheet__in > .faces { width: auto !important; } .faces { display: grid; grid-template-columns: repeat(5, 52px); gap: var(--sp-2); justify-content: center; }
+  .face { width: 52px; height: 52px; border: var(--edge); border-radius: 50%; overflow: hidden; background: var(--stage, #d3e8c8); }
+  .face img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.75) translateY(-6%); }
+</style>
+</head>
+<body>
+<div class="sheet" id="app"></div>
+<script src="kit.js"></script>
+<script>
+  const { ICON, tierChip } = Kit;
+  const faces = ["img/g02.png", "img/g13.png", "img/g09.png", "img/g08.png", "img/g10.png"];
+  document.getElementById("app").innerHTML = `<div class="sheet__in" role="dialog" aria-modal="true" aria-label="nym-itsok123's gnomes">
+    <button class="round round--small sheet__close" aria-label="Close">${ICON.close}</button>
+    <span class="eyebrow">Their gnomes · 6</span><h2>nym-itsok123</h2>
+    <span class="gtile gtile--legendary shown"><img src="img/g12.png" alt=""></span>
+    <p class="lead">They show <b>The Miller</b> ${tierChip("legendary")}</p>
+    <div class="faces" aria-label="Their other gnomes">${faces.map((f) => `<span class="face"><img src="${f}" alt=""></span>`).join("")}</div>
+    <div class="sheet__foot"><button class="btn btn--gold btn--wide">Race their ghost</button></div>
+  </div>`;
+</script>
+</body>
+</html>

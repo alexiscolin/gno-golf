@@ -315,6 +315,14 @@ html:has(.sheet), html:has(.sheet) body { overflow: hidden; }
 .trust li { display: inline-flex; align-items: center; gap: 6px; }
 .trust li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green-light); border: 1.5px solid var(--ink); flex: none; }
 .trust a { color: var(--green); }
+/* a consent: its own box, never pre-ticked; the order button waits for the boxes (legal pack §1.2) */
+.box { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--sp-3); align-items: start; padding: var(--sp-3); border: 2px solid rgba(var(--ink-rgb), .3); border-radius: 12px; background: var(--white); color: var(--ink); font-size: 14px; line-height: 1.4; text-align: left; cursor: pointer; }
+.box input { width: 22px; height: 22px; margin: 0; accent-color: var(--green); }
+.box:has(input:checked) { border-color: var(--green); background: var(--mint); }
+@media (max-width: 600px) { .box { font-size: 15px; } }
+/* the shop's legal links: the Terms, the seller's page (特定商取引法に基づく表記), privacy */
+.legal { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); text-align: center; }
+.legal a { display: inline-block; color: var(--green); white-space: nowrap; }
 
 /* NEW: what is secondary waits behind a tap: a dashed link that opens in place
    (a native <details>: keyboard and screen readers for free) */
