@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import type { Snapshot } from "@/lib/engine";
 import { isAddress, wait, type Chain } from "@/lib/chain";
 import type { Bests, HoleRow, Mode, StandingRow, StrokesRow } from "@/lib/types";
@@ -22,6 +22,8 @@ import { SkyIcon } from "@/components/Weather";
 import { Frame } from "@/components/Worlds";
 import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Skin } from "@/lib/scene/gnome";
+import { SHOP, makeShop } from "@/lib/gnomes/shop";
+import { askWorn, onWear, wearVersion } from "@/lib/gnomes/wear";
 
 // The leaderboards (the Players sheet: this hole, the course, friends), the records to beat
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -1067,6 +1069,7 @@ const StickerGhost = ({ at = 0 }: { at?: number }) => <div className="sticker po
 // go: what a tagged card's tap starts, said on it (Race, by default: "Their holes" lists their ghosts)
 export function Sticker({ player, at = 0, tag, sub, chain, me, gnome, onClick, say, go = "Race" }: { player: string; at?: number; tag?: string; sub: string; chain: Chain | null; me?: string | null; gnome: string; onClick?: () => void; say?: string; go?: string }) {
   const { label } = useWho(chain, player, me), mine = player === me;
+  useWorn(chain, mine ? "" : player);
   const body = (<>
     <Face skin={mine ? gnomeById(gnome) : rivalSkin(player, gnome)} />
     {tag ? <span className="sticker__tag">{tag}</span> : at > 0 && <Place at={at} />}
@@ -1077,6 +1080,14 @@ export function Sticker({ player, at = 0, tag, sub, chain, me, gnome, onClick, s
   return onClick
     ? <button className="sticker" aria-label={`${say ? `${label}: ${say}` : mine ? "Race your best" : go === "Race" ? `Race ${label}'s ghost` : `${label}: ${go.toLowerCase()}`}: ${tag || `#${at}`}, ${sub}`} onClick={onClick}>{body}</button>
     : <div className="sticker">{body}</div>;
+}
+/** A board's face wears the gnome its player wears for everyone (SHOP): asked with the page's other faces in
+ *  one read (wear.ts askWorn), drawn again once it is known. */
+function useWorn(chain: Chain | null, player: string) {
+  useSyncExternalStore(onWear, wearVersion, wearVersion);
+  useEffect(() => {
+    if (SHOP && chain && player) void askWorn((ps) => makeShop(chain).wornMany(ps), player);
+  }, [chain, player]);
 }
 const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 /** A gnome's face, flat and inked (the logo's), on a disc in his hat's colour, lighter. */
