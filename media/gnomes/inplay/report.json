@@ -1,0 +1,1353 @@
+[
+ {
+  "id": 0,
+  "tier": "earned",
+  "name": "The Classic",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      61,
+      89
+     ],
+     "cup": [
+      2268,
+      419,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.7
+     },
+     "trail": false,
+     "holing": false,
+     "holingEnded": true
+    }
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      61,
+      92
+     ],
+     "cup": [
+      1315,
+      556,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      42,
+      64
+     ],
+     "cup": [
+      2186,
+      365,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "0-garden-play.jpg",
+   "0-garden-close.jpg",
+   "0-storm-play.jpg",
+   "0-storm-close.jpg",
+   "0-storm-roll1.jpg",
+   "0-dark-play.jpg",
+   "0-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 1,
+  "tier": "common",
+  "name": "Juniper Troutbridge",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      86
+     ],
+     "cup": [
+      2276,
+      419,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": false,
+     "holing": false,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      59,
+      85
+     ],
+     "cup": [
+      1262,
+      540,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      38,
+      59
+     ],
+     "cup": [
+      1885,
+      343,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "1-garden-play.jpg",
+   "1-garden-close.jpg",
+   "1-garden-ghost.jpg",
+   "1-storm-play.jpg",
+   "1-storm-close.jpg",
+   "1-storm-roll1.jpg",
+   "1-dark-play.jpg",
+   "1-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 105,
+  "tier": "common",
+  "name": "Yarrow Gunwale",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      61,
+      76
+     ],
+     "cup": [
+      2286,
+      420,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": false,
+     "holing": false,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      60,
+      78
+     ],
+     "cup": [
+      1327,
+      559,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      43,
+      63
+     ],
+     "cup": [
+      2197,
+      365,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "105-garden-play.jpg",
+   "105-garden-close.jpg",
+   "105-garden-ghost.jpg",
+   "105-storm-play.jpg",
+   "105-storm-close.jpg",
+   "105-storm-roll1.jpg",
+   "105-dark-play.jpg",
+   "105-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 415,
+  "tier": "common",
+  "name": "Cosmo Lodestone",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      74
+     ],
+     "cup": [
+      2264,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": false,
+     "holing": false,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      77
+     ],
+     "cup": [
+      1327,
+      559,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      45,
+      62
+     ],
+     "cup": [
+      2197,
+      365,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "415-garden-play.jpg",
+   "415-garden-close.jpg",
+   "415-garden-ghost.jpg",
+   "415-storm-play.jpg",
+   "415-storm-close.jpg",
+   "415-storm-roll1.jpg",
+   "415-dark-play.jpg",
+   "415-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 73,
+  "tier": "rare",
+  "name": "Mortimer Greenthumb",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      63,
+      75
+     ],
+     "cup": [
+      2241,
+      417,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.7
+     },
+     "trail": true,
+     "holing": false,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      58,
+      71
+     ],
+     "cup": [
+      1209,
+      525,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      47,
+      65
+     ],
+     "cup": [
+      2211,
+      366,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "73-garden-play.jpg",
+   "73-garden-close.jpg",
+   "73-garden-ghost.jpg",
+   "73-storm-play.jpg",
+   "73-storm-close.jpg",
+   "73-storm-roll1.jpg",
+   "73-dark-play.jpg",
+   "73-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 177,
+  "tier": "rare",
+  "name": "Opal Swabbs",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      55,
+      68
+     ],
+     "cup": [
+      2045,
+      404,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.7
+     },
+     "trail": true,
+     "holing": false,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      61,
+      79
+     ],
+     "cup": [
+      1346,
+      565,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      43,
+      60
+     ],
+     "cup": [
+      2140,
+      361,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "177-garden-play.jpg",
+   "177-garden-close.jpg",
+   "177-garden-ghost.jpg",
+   "177-storm-play.jpg",
+   "177-storm-close.jpg",
+   "177-storm-roll1.jpg",
+   "177-dark-play.jpg",
+   "177-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 487,
+  "tier": "rare",
+  "name": "Ivy Rubble",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      58,
+      73
+     ],
+     "cup": [
+      2163,
+      412,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.7
+     },
+     "trail": true,
+     "holing": false,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      83
+     ],
+     "cup": [
+      1359,
+      569,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      44,
+      64
+     ],
+     "cup": [
+      2197,
+      365,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "487-garden-play.jpg",
+   "487-garden-close.jpg",
+   "487-garden-ghost.jpg",
+   "487-storm-play.jpg",
+   "487-storm-close.jpg",
+   "487-storm-roll1.jpg",
+   "487-dark-play.jpg",
+   "487-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 94,
+  "tier": "epic",
+  "name": "Old Tock",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      64,
+      93
+     ],
+     "cup": [
+      2265,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      64,
+      98
+     ],
+     "cup": [
+      1327,
+      559,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": true
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      46,
+      68
+     ],
+     "cup": [
+      2197,
+      365,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "94-garden-play.jpg",
+   "94-garden-close.jpg",
+   "94-garden-holed.jpg",
+   "94-garden-ghost.jpg",
+   "94-storm-play.jpg",
+   "94-storm-close.jpg",
+   "94-storm-roll1.jpg",
+   "94-dark-play.jpg",
+   "94-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 203,
+  "tier": "epic",
+  "name": "Neon Palms",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      79
+     ],
+     "cup": [
+      2239,
+      417,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      63,
+      83
+     ],
+     "cup": [
+      1329,
+      560,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      44,
+      63
+     ],
+     "cup": [
+      2208,
+      366,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "203-garden-play.jpg",
+   "203-garden-close.jpg",
+   "203-garden-holed.jpg",
+   "203-garden-ghost.jpg",
+   "203-storm-play.jpg",
+   "203-storm-close.jpg",
+   "203-storm-roll1.jpg",
+   "203-dark-play.jpg",
+   "203-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 511,
+  "tier": "epic",
+  "name": "Neon Ore",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      81
+     ],
+     "cup": [
+      2265,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      85
+     ],
+     "cup": [
+      1336,
+      562,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      43,
+      63
+     ],
+     "cup": [
+      2170,
+      363,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "511-garden-play.jpg",
+   "511-garden-close.jpg",
+   "511-garden-holed.jpg",
+   "511-garden-ghost.jpg",
+   "511-storm-play.jpg",
+   "511-storm-close.jpg",
+   "511-storm-roll1.jpg",
+   "511-dark-play.jpg",
+   "511-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 104,
+  "tier": "legendary",
+  "name": "The Miller",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      65,
+      109
+     ],
+     "cup": [
+      2238,
+      417,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      61,
+      107
+     ],
+     "cup": [
+      1222,
+      528,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": true
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      45,
+      81
+     ],
+     "cup": [
+      2197,
+      365,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "104-garden-play.jpg",
+   "104-garden-close.jpg",
+   "104-garden-holed.jpg",
+   "104-garden-ghost.jpg",
+   "104-storm-play.jpg",
+   "104-storm-close.jpg",
+   "104-storm-roll1.jpg",
+   "104-dark-play.jpg",
+   "104-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 208,
+  "tier": "legendary",
+  "name": "The Admiral",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      63,
+      85
+     ],
+     "cup": [
+      2261,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      65,
+      91
+     ],
+     "cup": [
+      1350,
+      566,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      44,
+      64
+     ],
+     "cup": [
+      2143,
+      361,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "208-garden-play.jpg",
+   "208-garden-close.jpg",
+   "208-garden-holed.jpg",
+   "208-garden-ghost.jpg",
+   "208-storm-play.jpg",
+   "208-storm-close.jpg",
+   "208-storm-roll1.jpg",
+   "208-dark-play.jpg",
+   "208-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 311,
+  "tier": "legendary",
+  "name": "Ancient Mushroom",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      67,
+      96
+     ],
+     "cup": [
+      2264,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      67,
+      100
+     ],
+     "cup": [
+      1316,
+      556,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": true
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      48,
+      75
+     ],
+     "cup": [
+      2197,
+      365,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "311-garden-play.jpg",
+   "311-garden-close.jpg",
+   "311-garden-holed.jpg",
+   "311-garden-ghost.jpg",
+   "311-storm-play.jpg",
+   "311-storm-close.jpg",
+   "311-storm-roll1.jpg",
+   "311-dark-play.jpg",
+   "311-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 414,
+  "tier": "legendary",
+  "name": "Summit Gnome",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      63,
+      102
+     ],
+     "cup": [
+      2265,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      64,
+      106
+     ],
+     "cup": [
+      1327,
+      559,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": true
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      39,
+      63
+     ],
+     "cup": [
+      1920,
+      345,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "414-garden-play.jpg",
+   "414-garden-close.jpg",
+   "414-garden-holed.jpg",
+   "414-garden-ghost.jpg",
+   "414-storm-play.jpg",
+   "414-storm-close.jpg",
+   "414-storm-roll1.jpg",
+   "414-dark-play.jpg",
+   "414-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 516,
+  "tier": "legendary",
+  "name": "Crystal Gnome",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      89
+     ],
+     "cup": [
+      2264,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      60,
+      93
+     ],
+     "cup": [
+      1326,
+      559,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": true
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      43,
+      65
+     ],
+     "cup": [
+      2198,
+      366,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "516-garden-play.jpg",
+   "516-garden-close.jpg",
+   "516-garden-holed.jpg",
+   "516-garden-ghost.jpg",
+   "516-storm-play.jpg",
+   "516-storm-close.jpg",
+   "516-storm-roll1.jpg",
+   "516-dark-play.jpg",
+   "516-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 618,
+  "tier": "legendary",
+  "name": "Lava Gnome",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      91
+     ],
+     "cup": [
+      2256,
+      418,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      62,
+      97
+     ],
+     "cup": [
+      1345,
+      564,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": true
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      38,
+      56
+     ],
+     "cup": [
+      1883,
+      343,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "618-garden-play.jpg",
+   "618-garden-close.jpg",
+   "618-garden-holed.jpg",
+   "618-garden-ghost.jpg",
+   "618-storm-play.jpg",
+   "618-storm-close.jpg",
+   "618-storm-roll1.jpg",
+   "618-dark-play.jpg",
+   "618-dark-close.jpg"
+  ],
+  "errors": []
+ },
+ {
+  "id": 720,
+  "tier": "legendary",
+  "name": "Storm Gnome",
+  "holes": {
+   "garden": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      65,
+      89
+     ],
+     "cup": [
+      2238,
+      417,
+      1
+     ]
+    },
+    "shot": {
+     "hole": "garden/3",
+     "angle": 0,
+     "power": 8.4,
+     "banner": true,
+     "fps": 60,
+     "frameMs": {
+      "median": 16.7,
+      "p95": 16.8
+     },
+     "trail": true,
+     "holing": true,
+     "holingEnded": true
+    },
+    "ghost": true
+   },
+   "storm": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      60,
+      86
+     ],
+     "cup": [
+      1216,
+      527,
+      1
+     ]
+    },
+    "roll": {
+     "pictures": 1,
+     "trail": false
+    }
+   },
+   "dark": {
+    "cupAtPlay": {
+     "covered": false,
+     "box": [
+      45,
+      64
+     ],
+     "cup": [
+      2139,
+      361,
+      1
+     ]
+    }
+   }
+  },
+  "pictures": [
+   "720-garden-play.jpg",
+   "720-garden-close.jpg",
+   "720-garden-holed.jpg",
+   "720-garden-ghost.jpg",
+   "720-storm-play.jpg",
+   "720-storm-close.jpg",
+   "720-storm-roll1.jpg",
+   "720-dark-play.jpg",
+   "720-dark-close.jpg"
+  ],
+  "errors": []
+ }
+]
