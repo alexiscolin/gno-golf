@@ -75,7 +75,21 @@ export default function TestMode({ host, draft, hex, proofKey, author, onAuthor,
   const [why, setWhy] = useState<Record<string, string>>({});
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [checking, setChecking] = useState(false);
-  const canvas = useRef<HTMLCanvasElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  // the game's canvas, one each visit (React mounts twice in development, on the same element), its
+  // WebGL context freed when the visit ends (a browser holds about sixteen); each weather's game reuses it
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    if (!stage.current) return;
+    const el = document.createElement("canvas");
+    el.id = "stage";
+    stage.current.append(el);
+    setCanvas(el);
+    return () => {
+      (el.getContext("webgl2") ?? el.getContext("webgl"))?.getExtension("WEBGL_lose_context")?.loseContext();
+      el.remove();
+    };
+  }, [!author]); // eslint-disable-line react-hooks/exhaustive-deps -- (the stage is there once an address is)
   const game = useRef<ReturnType<typeof createGame> | null>(null);
 
   // the hole's id: the author's alias's next version, as the chain says (v1 if it cannot be read)
@@ -99,11 +113,11 @@ export default function TestMode({ host, draft, hex, proofKey, author, onAuthor,
 
   // the game on the current weather's period; a new one for the next weather
   useEffect(() => {
-    if (!id || !now || !canvas.current) return;
+    if (!id || !now || !canvas) return;
     if (now.period < 0) return setNote(`No ${chip(now.kind)[1].toLowerCase()} came in the last ${FIND_DAYS} days of this hole's weather: it cannot be proved in it.`);
     const { rpc, web } = endpoints(window.location.search);
     const local = makeLocalChain(host, holeRow(id, draft), hex, now.period);
-    const g = (game.current = createGame(canvas.current, {
+    const g = (game.current = createGame(canvas, {
       chain: testChain(makeChain({ rpc, web }), local, hex),
       onChange: setSnap,
       onHoled: ({ shots }) => {
@@ -124,7 +138,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, onAuthor,
       g.destroy();
     };
     // (one game per weather: a proof of this one moves to the next)
-  }, [id, now?.kind, now?.period]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, now?.kind, now?.period, canvas]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // every weather proved: the par they suggest
   const proved = !!id && kinds.length > 0 && !left.length;
@@ -137,7 +151,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, onAuthor,
   const failed = now && why[now.kind];
   return (
     <main className="tmode">
-      <canvas ref={canvas} id="stage" />
+      <div ref={stage} className="tmode__stage" />
       <div className="tmode__strip" aria-label="The weathers to beat">
         {kinds.map(({ kind }) => {
           const done = !left.includes(kind), on = now?.kind === kind, bad = !!why[kind] && !done;

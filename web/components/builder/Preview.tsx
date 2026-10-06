@@ -14,13 +14,18 @@ import type { Hole } from "@/lib/scene/data";
 
 /** capture: set to a function that draws the view now and gives its canvas (read it in the same task: a share card). */
 export default function Preview({ state, fresh, capture }: { state: Hole | null; fresh: boolean; capture?: { current: (() => HTMLCanvasElement | null) | null } }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
+  const box = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement | null>(null);
   const three = useRef<{ renderer: THREE.WebGLRenderer; scene: ReturnType<typeof makeScene>; camera: THREE.PerspectiveCamera; course: THREE.Object3D | null } | null>(null);
   const [failed, setFailed] = useState(false);
 
+  // a canvas of its own each mount (React mounts twice in development, on the same element): its WebGL
+  // context freed when it goes, not when the canvas is collected (a browser holds about sixteen)
   useEffect(() => {
+    const el = document.createElement("canvas");
+    box.current!.prepend(el);
+    canvas.current = el;
     try {
-      const renderer = makeRenderer(canvas.current!), scene = makeScene();
+      const renderer = makeRenderer(el), scene = makeScene();
       setLighting(scene, "day");
       three.current = { renderer, scene, camera: new THREE.PerspectiveCamera(30, 1, 3, 260), course: null };
     } catch {
@@ -30,7 +35,10 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
       const t = three.current;
       if (t?.course) disposeCourse(t.course);
       t?.renderer.dispose();
+      t?.renderer.forceContextLoss();
       three.current = null;
+      canvas.current = null;
+      el.remove();
     };
   }, []);
 
@@ -63,8 +71,7 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
 
   if (failed) return <p className="preview preview--off">The 3D view can&apos;t run here; the board shows the hole as it is.</p>;
   return (
-    <div className="preview" role="img" aria-label="The hole in 3D, as players will see it">
-      <canvas ref={canvas} />
+    <div className="preview" ref={box} role="img" aria-label="The hole in 3D, as players will see it">
       <span className="pill">{state ? (fresh ? "3D · in sync" : "3D · catching up") : "3D · waiting for the checks"}</span>
     </div>
   );
