@@ -20,9 +20,8 @@ import (
 // (rows.gno): as structs they would cost several times the deposit.
 type series struct {
 	name        string
-	first, last int64 // the ids of its first and last rows
-	rows        string
-	sold        int64 // how many of its gnomes were sold, for good
+	first, last int64  // the ids of its first and last rows
+	rows        string // written once: nothing that changes is kept beside it, so no sale rewrites it
 }
 
 // A gnome is one row of the catalogue, or an earned gnome (earned.gno).

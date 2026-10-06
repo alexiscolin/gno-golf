@@ -13,7 +13,7 @@ import (
 // minutes moves the end to ten minutes after it. The realm holds the top
 // bid alone: the bid it beats goes back to its bidder in the same call.
 // Once the end is past, anyone settles: the gnome to the winner, the bid to
-// the owner; with no bid, the gnome stays unsold for a later auction. An
+// the treasury; with no bid, the gnome stays unsold for a later auction. An
 // auction under way when the sale closes runs to its end (close.gno).
 type auction struct {
 	id      int64
@@ -36,6 +36,9 @@ const errNoAuction = "gnomes: no auction of this gnome to settle"
 // waiting to be settled, and not once the sale it is in has closed.
 func StartAuction(cur realm, id, hours int64) {
 	assertOwner(0, cur)
+	if !mintOpen {
+		panic(errClosed)
+	}
 	if auc != nil {
 		if now() < auc.end {
 			panic("gnomes: an auction is under way")
@@ -120,11 +123,14 @@ func Bid(cur realm, id int64) {
 
 // Settle closes the auction of id once its end is past: anyone may (the
 // caller pays the token's storage deposit). The gnome goes to the winner and
-// the bid to the owner; with no bid, nothing moves and the gnome can be
+// the bid to the treasury; with no bid, nothing moves and the gnome can be
 // auctioned again (unless its sale has closed: then it never will be).
 func Settle(cur realm, id int64) {
 	if auc == nil || auc.id != id {
 		panic(errNoAuction)
+	}
+	if !mintOpen {
+		panic("gnomes: the sale is paused: the auction settles once it resumes")
 	}
 	if now() < auc.end {
 		panic("gnomes: the auction is not over")
@@ -140,10 +146,10 @@ func Settle(cur realm, id int64) {
 	g, _ := gnomeAt(id)
 	mintTo(done.bidder, g)
 	banker.NewBanker(banker.BankerTypeRealmSend, cur).
-		SendCoins(cur.Address(), owner, chain.NewCoins(chain.NewCoin(payDenom, done.top)))
+		SendCoins(cur.Address(), treasury, chain.NewCoins(chain.NewCoin(payDenom, done.top)))
 }
 
-// Sweep sends the owner whatever ugnot the realm holds beyond the top bid
+// Sweep sends the treasury whatever ugnot the realm holds beyond the top bid
 // in escrow: coins sent with a call that keeps none. Owner only.
 func Sweep(cur realm) {
 	assertOwner(0, cur)
@@ -155,8 +161,24 @@ func Sweep(cur realm) {
 		return
 	}
 	banker.NewBanker(banker.BankerTypeRealmSend, cur).
-		SendCoins(cur.Address(), owner, chain.NewCoins(chain.NewCoin(payDenom, held)))
-	chain.Emit("Swept", "amount", itoa(held), "to", owner.String())
+		SendCoins(cur.Address(), treasury, chain.NewCoins(chain.NewCoin(payDenom, held)))
+	chain.Emit("Swept", "amount", itoa(held), "to", treasury.String())
+}
+
+// resume moves the auction under way on by the pause that began at since:
+// its end later by the time paused, and to at least the soft close from now,
+// as a late bid would (a pause may have kept bids out). An auction already
+// over when the pause began stays over.
+func resume(since int64) {
+	if auc == nil || auc.end <= since {
+		return
+	}
+	t := now()
+	auc.end += t - since
+	if auc.end-t < softClose {
+		auc.end = t + softClose
+	}
+	chain.Emit("AuctionResumed", "id", itoa(auc.id), "end", itoa(auc.end))
 }
 
 // minBid is the least the next bid on the auction under way may be.
@@ -177,19 +199,24 @@ func minBidOver(top int64) int64 {
 	return top + raise
 }
 
-// Auction is the auction under way, else the last one settled ("min" 0),
-// else `{"version":1,"id":""}`:
+// Auction is the auction under way, else the last one settled, else
+// `{"version":1,"id":""}`. "min" is the next bid's least, 0 once no bid is
+// taken ("over": past its end, settled or not):
 //
 //	{"version":1,"id":"104","reserve":777000000,"top":0,"bidder":"",
-//	 "end":<unix>,"min":777000000,"settled":false}
+//	 "end":<unix>,"min":777000000,"over":false,"settled":false}
 func Auction() string {
-	a, min := auc, int64(0)
-	if a != nil {
+	a := auc
+	if a == nil {
+		if a = last; a == nil {
+			return noneJSON
+		}
+	}
+	over, min := a.settled || now() >= a.end, int64(0)
+	if !over {
 		min = minBid()
-	} else if a = last; a == nil {
-		return noneJSON
 	}
 	return `{"version":1,"id":"` + itoa(a.id) + `","reserve":` + itoa(a.reserve) + `,"top":` + itoa(a.top) +
 		`,"bidder":` + jsonString(a.bidder.String()) + `,"end":` + itoa(a.end) + `,"min":` + itoa(min) +
-		`,"settled":` + strconv.FormatBool(a.settled) + `}`
+		`,"over":` + strconv.FormatBool(over) + `,"settled":` + strconv.FormatBool(a.settled) + `}`
 }

@@ -45,9 +45,11 @@ func SetCloseAt(cur realm, at int64) {
 // block on.
 func genesisClosed() bool { return closeAt != 0 && now() >= closeAt }
 
-// isClosed reports whether gnome id was left unsold by a closed sale.
+// isClosed reports whether gnome id was left unsold by a closed sale. A
+// Legendary in its auction, under way or ended and not settled, is not: it
+// may still sell.
 func isClosed(id int64) bool {
-	return genesisClosed() && seriesAt(id) == 0 && !isSold(id)
+	return genesisClosed() && seriesAt(id) == 0 && !isSold(id) && (auc == nil || auc.id != id)
 }
 
 // assertNotClosed panics when id's sale has closed.

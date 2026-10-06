@@ -36,16 +36,15 @@ func TestTheOwnerHandsOverInTwoSteps(cur realm, t *testing.T) {
 	uassert.Equal(t, alice, Owner())
 	uassert.Equal(t, address(""), Pending())
 
-	// the old owner has nothing left, and the next mint pays the new one
+	// the old owner has nothing left; the money still goes to the treasury
 	testing.SetRealm(asUser(deployer, nil))
 	urequire.AbortsContains(t, cur, "only the owner", func() { SetMintOpen(cross(cur), false) })
-	before := balance(alice)
+	before := balance(Treasury())
 	id := common()
 	testing.SetRealm(asUser(bob, ugnot(priceOf(id))))
-	tid := Buy(cross(cur), itoa(id))
-	uassert.Equal(t, before+priceOf(id), balance(alice))
-	to, _, _ := RoyaltyInfo(tid, 100)
-	uassert.Equal(t, alice, to, "the royalty follows the owner")
+	Buy(cross(cur), itoa(id))
+	uassert.Equal(t, before+priceOf(id), balance(Treasury()))
+	uassert.Equal(t, deployer, Treasury(), "the role moved, the treasury did not")
 }
 
 func TestTransferToTheOwnerCancels(cur realm, t *testing.T) {

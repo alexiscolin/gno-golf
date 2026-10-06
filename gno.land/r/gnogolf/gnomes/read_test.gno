@@ -15,7 +15,8 @@ func TestCollectionSaysWhatTheMintPageShows(cur realm, t *testing.T) {
 	fresh(t, cur)
 	w := waves[0]
 	uassert.Equal(t,
-		`{"version":1,"open":true,"closesAt":0,"owner":"`+deployer.String()+`","royaltyBps":500,`+
+		`{"version":1,"open":true,"closesAt":0,"owner":"`+deployer.String()+`","treasury":"`+deployer.String()+
+			`","pendingTreasury":"","site":"","royaltyBps":500,`+
 			`"tiers":[{"name":"common","price":30000000,"cap":10,"playerCap":3,"sold":0},`+
 			`{"name":"rare","price":99000000,"cap":5,"playerCap":2,"sold":0},`+
 			`{"name":"epic","price":333000000,"cap":2,"playerCap":1,"sold":0},`+

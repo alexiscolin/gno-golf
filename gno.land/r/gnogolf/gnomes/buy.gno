@@ -14,7 +14,7 @@ import (
 // in a wave under way, unsold, and of a tier Buy sells (a Legendary is
 // auctioned); the caller's caps hold for the whole list. Exactly the sum of
 // their wave prices must be sent with the call (-send "<sum>ugnot"); it
-// goes to the owner before the call returns. Any refusal reverts the call,
+// goes to the treasury before the call returns. Any refusal reverts the call,
 // coins included.
 //
 // Only a direct user call (maketx call) is taken. That is what makes
@@ -99,12 +99,12 @@ func Buy(cur realm, ids string) string {
 	for i, g := range gnomes {
 		mintTo(buyer, g)
 		chain.Emit("GnomeBought", "id", itoa(g.id), "buyer", buyer.String(),
-			"price", itoa(paid[i]), "treasury", owner.String())
+			"price", itoa(paid[i]), "treasury", treasury.String())
 	}
 	// Forwarded at once: an OriginSend banker spends this call's envelope
 	// and nothing else.
 	banker.NewBanker(banker.BankerTypeOriginSend, cur).
-		SendCoins(cur.Address(), owner, chain.NewCoins(chain.NewCoin(payDenom, total)))
+		SendCoins(cur.Address(), treasury, chain.NewCoins(chain.NewCoin(payDenom, total)))
 	return ids
 }
 
