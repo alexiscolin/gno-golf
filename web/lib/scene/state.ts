@@ -4,6 +4,7 @@
 import type * as THREE from "three";
 import type { Zone } from "../types";
 import type { Mill, SlopeGlow, Tick, Timed, TubePath, WaterMask, Height } from "./data";
+import type { Drawn } from "./census";
 
 export const state = {
   live: [] as Tick[], // functions of time for the live parts, run each frame (userData.tick)
@@ -16,5 +17,9 @@ export const state = {
   smokes: [] as THREE.Object3D[], // chimneys' marks (props.ts smoke): their puffs drawn as one batch (smokeBatch)
   lifts: [] as Height[], // (x, z) -> extra height of a moving deck under the ball (a seesaw), or 0 (userData.height)
   ghosts: null as ((aiming: boolean) => void) | null, // the timed pieces' dashed outlines, shown while aiming
+  report: null as ((piece: object, drawn: Drawn) => void) | null, // the render census (census.ts), while buildHole is asked for one
+  origin: new WeakMap<object, object>(), // a piece drawn from a copy (a timed bar's walls): the hole's own
 };
+/** What drew a piece, for the render census (a piece's first report counts). */
+export const report = (piece: object, drawn: Drawn) => state.report?.(piece, drawn);
 export const animate = (fn: Tick) => state.live.push(fn);

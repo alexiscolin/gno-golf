@@ -9,6 +9,7 @@
 import type { Draft, Geometry, Piece, V } from "./draft";
 import type { Field } from "./rules";
 import type { GHole, GPost, GWall, GZone, HoleIn, PostIn, WallIn, ZoneIn, ZoneKind } from "./types";
+import type { PieceRef } from "../scene/census";
 
 /** GG1's frozen limits (course/data.gno), a pulse's pieces counted in: the one place the builder has them. */
 export const LIMITS = { walls: 160, posts: 32, zones: 32, poly: 64, polyTotal: 512, pulses: 16, skins: 64 } as const;
@@ -120,13 +121,19 @@ const sub = (a: V, d: V): V => [a[0] + d[0], a[1] + d[1]];
  * The draft as GG1 (hex) on a 96 by 96 board, and its bars (fit's lines:
  * "ax ay bx by thickness wallIndex pulse"). A piece of a pulse goes into
  * that pulse's lists; a hazard's unread vec is the tee (a board point in the
- * extent, as Fit moves it).
+ * extent, as Fit moves it). refs: which of the hole's pieces each draft piece
+ * became (fit keeps their order), as the render census names them.
  */
-export function writeDraft(d: Draft, field: WriteField): { hex: string; bars: string } {
+export function writeDraft(d: Draft, field: WriteField): { hex: string; bars: string; refs: Map<string, PieceRef[]> } {
   const lists = [{ walls: [] as WallIn[], posts: [] as PostIn[], zones: [] as ZoneIn[] }, ...d.pulses.map(() => ({ walls: [] as WallIn[], posts: [] as PostIn[], zones: [] as ZoneIn[] }))];
-  const bars: string[] = [];
+  const bars: string[] = [], refs = new Map<string, PieceRef[]>();
   for (const p of d.pieces as readonly DraftPiece[]) {
     const pulse = p.clock.k === "stroke" ? p.clock.pulse : -1, to = lists[pulse + 1];
+    const ref = (set: PieceRef["set"], i: number, n = 1) => refs.set(p.id, Array.from({ length: n }, (_, k) => ({ set, i: i + k, ...(pulse >= 0 && { pulse }) })));
+    if (p.raw?.wall || p.geometry.t === "rail") ref("wall", to.walls.length);
+    else if (p.geometry.t === "bar") ref("wall", to.walls.length, 4);
+    else if (p.raw?.post || p.geometry.t === "post") ref("post", to.posts.length);
+    else ref("zone", to.zones.length);
     const timing = p.clock.k === "substep" ? { every: p.clock.every, on: p.clock.on, phase: p.clock.phase } : {};
     if (p.raw?.wall) to.walls.push(p.raw.wall);
     else if (p.raw?.post) to.posts.push(p.raw.post);
@@ -147,7 +154,7 @@ export function writeDraft(d: Draft, field: WriteField): { hex: string; bars: st
     substeps: field.substeps, cupR: field.cupR, shelter: field.shelter, friction: field.friction, bounce: field.bounce, ballR: field.ballR,
     ...field0, pulses: d.pulses.map((q, i) => ({ ...q, ...pulses[i] })),
   });
-  return { hex, bars: bars.join("\n") };
+  return { hex, bars: bars.join("\n"), refs };
 }
 
 function zoneOf(kind: string, skin: string, g: Exclude<Geometry, { t: "rail" | "bar" | "post" }>, p: Piece, tee: V, timing: object): ZoneIn {

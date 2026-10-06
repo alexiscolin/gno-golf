@@ -80,6 +80,21 @@ void test("every kind of piece and clock, a pulse among them, is written and tak
   assert.ok(c.ok, c.ok ? "" : c.why);
 });
 
+void test("writeDraft says which of the hole's pieces each draft piece became; fit keeps them where they were", () => {
+  const d = box(30, 14, [
+    piece("*/bar/plank", { t: "bar", a: [10, 6], b: [13, 6], thick: 0.5 }, { id: "bar" }),
+    piece("*/post/rock", { t: "post", c: [20, 8], r: 0.75 }, { id: "rock", clock: { k: "stroke", pulse: 0 } }),
+    piece("*/hazard/water", { t: "round", min: [24, 4], max: [27, 7] }, { id: "water" }),
+  ]);
+  d.pulses = [{ every: 3, on: 1, phase: 0 }];
+  const { refs } = writeDraft(d, FIELD.garden);
+  assert.deepEqual(refs.get("bar"), [4, 5, 6, 7].map((i) => ({ set: "wall", i })));
+  assert.deepEqual(refs.get("rock"), [{ set: "post", i: 0, pulse: 0 }]);
+  assert.deepEqual(refs.get("water"), [{ set: "zone", i: 0 }]);
+  const g = host.decode(fitted(d).hex);
+  assert.ok([4, 5, 6, 7].every((i) => g.walls[i].skin === "plank") && g.pulses[0].posts[0].skin === "rock" && g.zones[0].skin === "water");
+});
+
 void test("frame moves a draft by whole grid steps so its extent starts at the margin", () => {
   const d = frame({ ...box(20, 10), pieces: rails(7, 9.25, 27, 19.25), tee: [10, 12], pin: [24, 12] });
   assert.deepEqual(d.pieces[0].geometry, { t: "rail", a: [1.5, 1.5], b: [21.5, 1.5] });

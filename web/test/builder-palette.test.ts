@@ -12,35 +12,13 @@ import { added, drawn, loadWorld, worldOf } from "./scene-harness.ts";
 import { BINDINGS, HAND_ONLY, WORLD_NAMES, entry, loadPalette, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD, MAX_BOUNCE, WEATHER, kicks } from "../lib/builder/rules.ts";
 import { placePiece } from "../lib/builder/edit.ts";
-import { frame, writeDraft } from "../lib/builder/gg1.ts";
-import { emptyDraft, type Draft, type Piece } from "../lib/builder/draft.ts";
-import { makeBuilderHost } from "../lib/builder/wasm.ts";
-import type { Hole } from "../lib/scene/data.ts";
+import { writeDraft } from "../lib/builder/gg1.ts";
+import { host, lane, stateOf } from "./builder-fixture.ts";
 
-const host = makeBuilderHost(new WebAssembly.Module(fs.readFileSync(new URL("../lib/sim/builder.wasm", import.meta.url))));
 const palettes = new Map<string, readonly PaletteEntry[]>();
 for (const w of WORLD_NAMES) palettes.set(w, await loadPalette(w));
 const every = () => [...palettes.entries()].flatMap(([w, es]) => es.map((e) => [w, e] as const));
 
-const rail = (id: string, a: [number, number], b: [number, number]): Piece => ({ id, entry: "*/rail/", geometry: { t: "rail", a, b }, params: {}, clock: { k: "fixed" } });
-/** A lane of w by h in a world, its rails, the tee and the cup at its ends, the pieces given, framed. */
-function lane(world: string, pieces: Piece[], w = 30, h = 20): Draft {
-  return frame({
-    ...emptyDraft(world), title: "Palette", tee: [3, h / 2], pin: [w - 3, h / 2],
-    pieces: [rail("r1", [0, 0], [w, 0]), rail("r2", [w, 0], [w, h]), rail("r3", [w, h], [0, h]), rail("r4", [0, h], [0, 0]), ...pieces],
-    pulses: pieces.some((p) => p.clock.k === "stroke") ? [{ every: 3, on: 1, phase: 0 }] : [],
-  });
-}
-const ID = "g1hvuayx9ll7dal54kr0f6t89j8867z8lf5vtxgv/palette/v1";
-/** The hole as a player's client would get it: written, fitted, and HoleState answered by the realm's code. */
-function stateOf(d: Draft): Hole {
-  const { hex, bars } = writeDraft(d, FIELD[d.world]);
-  const f = host.fit(hex, bars);
-  if (!f.ok) throw new Error(f.why);
-  host.load(ID, f.hex);
-  host.setperiod(5967997);
-  return JSON.parse(host.state(ID)) as Hole;
-}
 void test("the builder's worlds are the scene's; each has a palette with every kind it may offer", () => {
   assert.deepEqual(Object.keys(FIELD).sort(), [...WORLD_NAMES].sort());
   for (const [w, es] of palettes) {

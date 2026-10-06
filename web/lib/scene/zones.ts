@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { BALL_R, CELL, inZone, inset, mod, segDist, boxOf, POOLS, DISH, sandIn, smoothstep } from "../terrain";
 import { C, ink, flat, drawn, drape, clipTo, rbox, hullOf, waterTone, waterMat } from "./materials";
-import { animate, state } from "./state";
+import { animate, state, report } from "./state";
 import { stone, warp, badge, windmill } from "./props";
 import { MOUTHS, mouthAt } from "./pieces";
 import { seeded } from "./common";
@@ -231,12 +231,16 @@ export const DRAWN = {
 
 function zoneDetail(z: Zone, s: Hole, t: T) {
   const own = fromWorld(s, "zone", z, t);
-  if (own) return own;
+  if (own) return report(z, { by: "world", key: z.skin }), own;
   const g = new THREE.Group();
   const w = z.max[0] - z.min[0], h = z.max[1] - z.min[1];
   const rand = seeded("zone" + s.hole + String(z.min) + String(z.max));
   const hit = ZONE_DRAW.find(([test]) => test(z));
   if (!hit) return g;
+  // the plain surface, water and pipe draw any skin: their own look only for the skins declared (DRAWN, MOUTHS)
+  const plain = hit[1] === drawSurface || hit[1] === drawTunnel;
+  const known = !plain || (z.skin !== "" && ((DRAWN[z.kind as "surface" | "hazard" | "tunnel"] as readonly string[] | undefined)?.includes(z.skin) || Object.hasOwn(MOUTHS, z.skin)));
+  report(z, known ? { by: "table", key: z.skin } : { by: "fallback" });
   return hit[1](z, s, t, g, { w, h, rand });
 }
 
