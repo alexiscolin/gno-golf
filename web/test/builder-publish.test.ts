@@ -76,8 +76,8 @@ void test("the note comes out of the gnokey command unchanged", () => {
 
 const A = "g1" + "a".repeat(38);
 const ver = (v: number, sha = "old") => ({ id: `${A}/lane/v${v}`, v, height: 1, by: A, sha, note: "", next: "" });
-const ready = { publishing: true, rules: true, versions: { version: 1, slot: `${A}/lane`, versions: [ver(1)] }, hole: "", name: "" };
-const at = { author: A, slug: "lane", proved: `${A}/lane/v2`, sha: "new" };
+const ready = { publishing: true, rules: true, versions: { version: 1, slot: `${A}/lane`, versions: [ver(1)] }, writer: "gno.land/r/gnogolf/golf/v2", hole: "", name: "" };
+const at = { author: A, slug: "lane", proved: `${A}/lane/v2`, sha: "new", realm: "gno.land/r/gnogolf/golf/v2" };
 
 void test("publishSteps: open once every check holds; else the first that does not, in words", () => {
   assert.deepEqual(publishSteps(ready, at), { at: "ready", why: "" });
@@ -87,6 +87,11 @@ void test("publishSteps: open once every check holds; else the first that does n
   assert.equal(publishSteps({ ...ready, versions: null }, at).at, "unread");
   assert.equal(publishSteps({ ...ready, publishing: null }, at).at, "unread", "a read that failed is said, never waited on");
   assert.equal(publishSteps({ ...ready, rules: null }, at).at, "unread");
+  // the records' realm: a publish's last act is to write there (golf's flush); paused, or new rules writing, it would fail after its gas
+  assert.deepEqual(publishSteps({ ...ready, writer: "" }, at), { at: "paused", why: "Saves are paused on gno.land for now. Your draft is kept." });
+  assert.deepEqual(publishSteps({ ...ready, writer: "gno.land/r/gnogolf/golf/v3" }, at), { at: "rules", why: "New rules play this course now. Your draft is kept: reload the page once the site has caught up." });
+  assert.equal(publishSteps({ ...ready, writer: null }, at).at, "unread");
+  assert.equal(publishSteps({ ...ready, writer: undefined }, at).at, "reading");
   const newer = publishSteps({ ...ready, versions: { ...ready.versions, versions: [ver(1), ver(2)] } }, at);
   assert.deepEqual(newer, { at: "newer", why: "This one would be v3, with new weather: test it again." }, "a version published elsewhere since: its proofs are another id's");
   assert.deepEqual(publishSteps(ready, { ...at, sha: "old" }), { at: "same", why: "This is exactly the version already published." });

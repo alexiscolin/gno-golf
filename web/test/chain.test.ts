@@ -579,6 +579,9 @@ test("publishing and successor read the realm's state for a publish; anything el
   assert.equal(await chain.successor(), "gno.land/r/x/golf/v3");
   setFetch((url) => (assert.ok(decoded(url).expr.includes(`Current("${ADDR1}/lane")`)), strReply(`${ADDR1}/lane/v2`)));
   assert.equal(await chain.current(`${ADDR1}/lane`), `${ADDR1}/lane/v2`);
+  // the records' realm beside the rules: who writes there now ("" paused), as render.gno's moved() reads it
+  setFetch((url) => (assert.match(decoded(url).expr, /gno\.land\/r\/gnogolf\/store\.Writer\(\)/), strReply(chain.realm)));
+  assert.equal(await chain.writer(), chain.realm);
 });
 
 test("holeLeaderboard pages one hole's board", async () => {

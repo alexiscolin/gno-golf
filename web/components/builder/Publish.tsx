@@ -57,7 +57,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const { rpc, web } = useMemo(() => endpoints(window.location.search), []);
   const chain = useMemo(() => makeChain({ rpc, web }), [rpc, web]);
   const alias = `${author}/${draft.slug}`;
-  const [readings, setReadings] = useState<Readings>({ publishing: undefined, rules: undefined, versions: undefined, hole: undefined, name: "" });
+  const [readings, setReadings] = useState<Readings>({ publishing: undefined, rules: undefined, writer: undefined, versions: undefined, hole: undefined, name: "" });
   const [prices, setPrices] = useState({ gas: PRICE, byte: 100 });
   const [chainId, setChainId] = useState<string | null>(null);
   const [key, setKey] = useState<string | null>(null);
@@ -82,12 +82,13 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const [tries, setTries] = useState(0);
   const [firstCommunity, setFirst] = useState(true);
   useEffect(() => {
-    setReadings((r) => ({ ...r, publishing: undefined, rules: undefined, versions: undefined }));
+    setReadings((r) => ({ ...r, publishing: undefined, rules: undefined, writer: undefined, versions: undefined }));
     void Promise.all([
       chain.publishing().catch(() => null),
       Promise.all([chain.successor(), sameSources(chain, host.sources(), "builder")]).then(([s, same]) => same && s === "", () => null),
+      chain.writer().catch(() => null),
       chain.versions(alias).catch(() => null),
-    ]).then(([publishing, rules, versions]) => live.current && setReadings((r) => ({ ...r, publishing, rules, versions })));
+    ]).then(([publishing, rules, writer, versions]) => live.current && setReadings((r) => ({ ...r, publishing, rules, writer, versions })));
     // the chain's first community hole also opens the community's indexes: billed so until a community hole is seen
     void chain.holes().then((list) => live.current && setFirst(!list.some((h) => h.official === false)), () => {});
     void chain.gasPrice().then((gas) => live.current && setPrices((p) => ({ ...p, gas })), () => {});
@@ -107,7 +108,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
     }, (e: unknown) => live.current && setReadings((r) => ({ ...r, hole: e instanceof Error ? e.message : String(e) })));
   }, [hex, key, proved, draft, host, name]);
 
-  const step = publishSteps({ ...readings, name: nameWhy }, { author, slug: draft.slug, proved: proved ?? "", sha });
+  const step = publishSteps({ ...readings, name: nameWhy }, { author, slug: draft.slug, proved: proved ?? "", sha, realm: chain.realm });
   const id = readings.versions ? holeId(author, draft.slug, readings.versions) : "";
   const v = Number(id.slice(id.lastIndexOf("/v") + 2)) || 1;
   const sizes = { bytes: cost?.bytes ?? hex.length / 2, name, note, v, newAuthor: true, firstCommunity };

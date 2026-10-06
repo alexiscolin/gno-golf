@@ -85,6 +85,8 @@ export interface Readings {
   publishing: boolean | null | undefined;
   /** builder.wasm's sources are the realm's, and the realm has no successor */
   rules: boolean | null | undefined;
+  /** who writes in the records' realm (store's Writer()): "" paused, another realm once new rules took over; a publish's last act writes there */
+  writer: string | null | undefined;
   /** Versions(alias); null: the chain could not be read */
   versions: Versions | null | undefined;
   /** holeHolds on the final data: "" it may be published, else why; undefined: still being judged */
@@ -92,7 +94,7 @@ export interface Readings {
   /** check()'s refusal of the name or the note, explained; "" none */
   name: string;
 }
-export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "rules" | "unread" | "newer" | "same" | "hole" | "name"; why: string };
+export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "paused" | "rules" | "unread" | "newer" | "same" | "hole" | "name"; why: string };
 
 /**
  * Where the publish step stands: ready, or the first check that does not
@@ -100,11 +102,13 @@ export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "rule
  * the one the proofs were made under, or the weather was another's; the data
  * may not be the alias's current version's again (golf refuses it).
  */
-export function publishSteps(r: Readings, { author, slug, proved, sha }: { author: string; slug: string; proved: string; sha: string }): Step {
+export function publishSteps(r: Readings, { author, slug, proved, sha, realm }: { author: string; slug: string; proved: string; sha: string; realm: string }): Step {
   if (r.publishing === false) return { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." };
   if (r.rules === false) return { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." };
-  if (r.publishing === null || r.rules === null || r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
-  if (r.publishing === undefined || r.rules === undefined || r.versions === undefined || r.hole === undefined) return { at: "reading", why: "" };
+  if (r.writer === "") return { at: "paused", why: "Saves are paused on gno.land for now. Your draft is kept." };
+  if (r.writer && r.writer !== realm) return { at: "rules", why: "New rules play this course now. Your draft is kept: reload the page once the site has caught up." };
+  if (r.publishing === null || r.rules === null || r.writer === null || r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
+  if (r.publishing === undefined || r.rules === undefined || r.writer === undefined || r.versions === undefined || r.hole === undefined) return { at: "reading", why: "" };
   const id = holeId(author, slug, r.versions);
   if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: test it again.` };
   if (r.versions.versions.at(-1)?.sha === sha) return { at: "same", why: "This is exactly the version already published." };

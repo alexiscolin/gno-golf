@@ -456,6 +456,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     current: (alias: string) => qstr(REALM, `Current(${s(alias)})`),
     /** The realm that took this course over (Successor()), "" for none: nothing is published to a course that moved. */
     successor: () => qstr(REALM, "Successor()"),
+    /** Who writes in the records' realm now (store's Writer(): "" paused, another realm once new rules took over): a save or a publish here lands only while it is this realm. */
+    writer: () => qstr(storePath(REALM), "Writer()"),
     /** What a timed hole adds at one stroke of a round (0 = first shot): read
      *  once per hole version and stroke (Extras is a pure function of the two:
      *  the look-ahead and the next stroke ask the same), a failure not kept. */
