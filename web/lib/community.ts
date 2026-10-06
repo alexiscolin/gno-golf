@@ -10,6 +10,7 @@
 // on the first one (a chunk of their own, never on the game's first load);
 // a hole whose data cannot be read, or not yet judged, is not shown.
 import type { Chain } from "./chain";
+import { authorOf } from "./builder/holes";
 import { bytesOf, sha256 } from "./sha";
 import type { HoleRow } from "./types";
 import type { Verdict } from "./builder/verdict";
@@ -64,6 +65,11 @@ export async function verdictOf(chain: Pick<Chain, "holeData">, id: string, deps
   return v;
 }
 
+/** Whether the game may play a hole (its version or its alias): a course hole always, never judged (the
+ *  realm's own, under no address); a community hole (PublishMine's, under its author's address) once its verdict passes. */
+export const playable = async (chain: Pick<Chain, "holeData">, id: string, deps: JudgeDeps = builder): Promise<boolean> =>
+  !authorOf(id) || verdictOf(chain, id, deps).then((v) => v.ok, () => false); // (the rules not loaded: no, and nothing kept)
+
 /** A verdict this browser already has for a version, null if none: never a judging (the phone's /build screen loads no builder.wasm). */
 export async function knownVerdict(chain: Pick<Chain, "holeData">, id: string): Promise<Verdict | null> {
   try {
@@ -73,5 +79,17 @@ export async function knownVerdict(chain: Pick<Chain, "holeData">, id: string): 
   }
 }
 
+/** The rows this browser already passed, in their order: a list that judges none (the phone's /build). */
+export async function knownOnly(chain: Pick<Chain, "holeData">, rows: readonly HoleRow[]): Promise<HoleRow[]> {
+  const known = await Promise.all(rows.map((h) => knownVerdict(chain, h.id)));
+  return rows.filter((_, i) => known[i]?.ok === true);
+}
+
 /** The rows a list shows: those the Builder's rules passed (verdicts: by id); one not judged yet waits. */
 export const shownOnly = (rows: readonly HoleRow[], verdicts: ReadonlyMap<string, Verdict>) => rows.filter((h) => verdicts.get(h.id)?.ok === true);
+
+/** A list's page (its first n rows): those shown, whether some are still being judged (the list waits, one move), how many rows lie beyond. */
+export function pageOf(rows: readonly HoleRow[], n: number, verdicts: ReadonlyMap<string, Verdict>) {
+  const page = rows.slice(0, n);
+  return { rows: shownOnly(page, verdicts), judging: page.some((h) => !verdicts.has(h.id)), more: rows.length - page.length };
+}

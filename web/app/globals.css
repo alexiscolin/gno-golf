@@ -2452,3 +2452,4 @@ body:has(.pending) .turncall { top: 34%; }
 
 /* a community hole's mark: whether its author has holed it (Worlds), its line held while the chain answers */
 .community__mark { display: block; min-height: 1.3em; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.community__judging { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }

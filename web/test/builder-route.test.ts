@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { builderOn, onComputer, PHONE_QUERY } from "../lib/builder/route.ts";
-import { authorOf, listHoles, playLink } from "../lib/builder/holes.ts";
+import { authorOf, cupsLink, listHoles, playLink } from "../lib/builder/holes.ts";
 import type { HoleRow } from "../lib/types.ts";
 
 const WEB = new URL("../", import.meta.url).pathname;
@@ -81,4 +81,12 @@ void test("the phone's lists: your holes, the community's (their latest versions
   assert.equal(authorOf(`${B}/long-ice/v1`), B);
   assert.equal(authorOf("garden/1/v1"), null);
   assert.equal(playLink(row(`${B}/long-ice/v1`)), `/?hole=${encodeURIComponent(`${B}/long-ice`)}`);
+});
+
+void test("the phone lists only the community holes this browser already passed (it judges none); the rest are on the game's cups screen", () => {
+  assert.equal(cupsLink(), "/?screen=cups");
+  assert.equal(cupsLink("rpc=x"), "/?screen=cups&rpc=x");
+  const src = fs.readFileSync(path.join(WEB, "components/builder/PhoneBuilder.tsx"), "utf8");
+  assert.match(src, /knownOnly\(/, "its community list: the known verdicts only");
+  assert.doesNotMatch(src, /verdictOf\(/, "never a judging");
 });

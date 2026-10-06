@@ -241,6 +241,7 @@ const BANNER = {
   load: ["That hole did not load", "The chain did not send this hole. Try again, or pick another one from the menu."],
   draw: ["That hole could not be drawn", "Something broke on our side while building it. Pick another hole from the menu — your scores are safe."],
   limit: ["That is the most strokes a round holds", "Restart the hole to play it again."],
+  unchecked: ["That hole can't be played here", `${NOT_BUILDER} Pick another one from the menu.`],
   shot: ["That shot did not go through", "The chain could not play that shot. Nothing was lost; you can shoot again."],
 } as const satisfies Record<FatalKind | ErrorKind, readonly [string, string]>;
 

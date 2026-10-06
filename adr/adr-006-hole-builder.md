@@ -154,6 +154,71 @@ and plan, Tasks 7.7 to 10.6):
 - **No Builder on a phone.** Under 900 px or on a coarse pointer, `/build`
   loads neither the editor nor `builder.wasm` (an import-graph test holds it).
 
+## Threat model
+
+Every guarantee the editor gives is the browser's. The chain's
+`PublishMine` checks GG1's format, its limits and the work a shot may cost;
+it does not check how a hole plays or looks, and anyone can call it with
+gnokey. The deployed realms are not changed for this (the owner's rule), so
+the game closes the gap on its side: **it plays, lists and links a
+community hole only once the Builder's own rules pass it.**
+
+**The gate** (`lib/builder/verdict.ts` judge, `lib/community.ts`). A
+community hole passes when its data is hex of at most 32 KiB, decodes, is of
+a Builder world, holds only the palette's pieces, passes the whole pipeline
+(E1 to E15, the render census) and is byte for byte what the Builder writes
+for it. Its verdict is kept in the browser under the sha-256 of its data and
+the rules' version (`VERDICT_RULES`: raising it judges every hole again), so
+a version is judged once a browser, whatever id or alias names it. A hole not
+judged yet is not shown; a hole that cannot be read, or whose rules could not
+load, is not played (and nothing is kept).
+
+- **The cups screen** judges the community holes of the page it shows, one
+  after the other, and lists only those that pass ("Checking the holes
+  against the Builder rules…" until the page is judged; author marks are read
+  only for holes listed).
+- **The engine's `load`**, the one way into any hole (a link, a dare, a duel,
+  the cups' list, Next), refuses a community hole that does not pass before
+  anything of it is built: a link lands on the cups with *This hole was not
+  made with the Builder rules.*; any other way shows it as the error banner.
+  Share, dare and duel links are made from a hole being played, so only from
+  one that passed. The ghosts and the podium list course holes only, and a
+  board's row opens its hole through `load` too.
+- **The phone's `/build`** judges nothing (it never loads `builder.wasm`): it
+  lists only community holes this browser already passed (`knownOnly`), and
+  links to the cups screen for the rest.
+
+**Cost, and why lazy.** Judging needs the Builder's code and `builder.wasm`
+(290 KB, 121 KB gzipped). They load as their own chunk, only when a community
+hole is about to be shown or played, never on the game's first load nor for a
+course hole; the census and checks take tens of milliseconds a hole (about
+270 ms for the largest), once a version a browser. Rejected:
+
+- *A verdict list built at deploy time* (like the static og: pages): it needs
+  the chain at build time, which the site's build never reads, and is stale
+  between deploys (a hole published after a deploy would wait for the next
+  one, or be played unjudged).
+- *golf.wasm's checks alone*: they are the chain's checks (format, limits,
+  work), exactly what a direct `PublishMine` already passes; E2 to E15 and the
+  census live in the Builder's TypeScript and its scene.
+
+**The threats, and what holds each** (each has its test):
+
+| Threat | Defense | Test |
+|---|---|---|
+| A crafted draft file (raw GG1, extra keys, off-grid points, foreign pieces) | `parseDraft` rebuilds a Draft from its own fields; L0 holds ranges, the quarter grid from the tee, kinds and shapes; the editor opens only what the pipeline passes | `builder-draft`, `builder-import`, `builder-golden` |
+| A direct `PublishMine` of a hole the editor refuses (a cup in a post, a walled cup, overlaps, a mines or foreign piece, bytes the Builder would not write) | the gate above | `builder-verdict`, `community` ("a hostile hole published directly is not shown") |
+| XSS through a name, note, slug or author | chain text rendered only as React text, canvas `fillText` or aria labels; links built from checked ids and encoded; the only raw HTML is the JSON-LD (its `<` escaped) and literals; the og: pages are made from the course's file, never the chain | `xss`, `chain` (URL builders) |
+| Huge or griefing data | the gate never decodes more than 32 KiB or non-hex; the renderer stands every GG1 extreme (`lib/hostile.ts`); a version is judged once | `builder-verdict` ("never reaches the decoder"), `hostile` |
+| Gas and deposit (a bill that drains a wallet, a command that runs more) | the bill is computed from measured publishes and capped: gnokey's `-max-deposit`, Adena's `max_deposit`, gas at most `MAX_GAS`; a slug, data or realm not of their shape gives no command | `builder-publish`, `adena` |
+| A hole that must come down (abuse, a name) | `/takedown.json`, per chain id: every version of a listed alias is unlisted and refused by link ("This hole was taken down."), with nothing of it shown; a list too big, not JSON or another chain's takes nothing down | `takedown`, `builder-route` |
+
+**What it does not cover.** The realm's own pages on gno.land render names
+(gnoweb sanitises its Markdown; the realm is not changed here). A verdict is
+kept in the player's own browser: changing it there fools only that player.
+A hole the gate refuses still exists on the chain, unranked, and can be
+played through the realm directly.
+
 ## Alternatives considered
 
 - **Port the checks to TypeScript.** Rejected: only the chain's code refuses

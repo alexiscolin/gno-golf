@@ -6,7 +6,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { knownVerdict, shownOnly, verdictOf, VERDICT_KEY } from "../lib/community.ts";
+import { knownOnly, knownVerdict, pageOf, playable, shownOnly, verdictOf, VERDICT_KEY, type Verdict } from "../lib/community.ts";
 import { writeHole } from "../lib/builder/gg1.ts";
 import type { HoleRow } from "../lib/types.ts";
 import type { HoleIn } from "../lib/builder/types.ts";
@@ -65,7 +65,47 @@ void test("knownVerdict: a verdict this browser already has, never a judging (th
   assert.equal(loads, 1);
 });
 
+void test("knownOnly: the rows this browser already passed, in their order; none judged", async () => {
+  const chain = chainOf({ [`${A}/good/v1`]: goodHex, [`${A}/bad/v1`]: hostileHex, [`${A}/new/v1`]: hexOf(lane("island", [])) });
+  const row = (id: string): HoleRow => ({ id, name: id, official: false, plays: 0, best: 0, proBest: 0, par: 3, world: "garden", order: 0, next: "" });
+  await verdictOf(chain, `${A}/good/v1`, deps);
+  await verdictOf(chain, `${A}/bad/v1`, deps);
+  const rows = [row(`${A}/bad/v1`), row(`${A}/new/v1`), row(`${A}/good/v1`)];
+  assert.deepEqual((await knownOnly(chain, rows)).map((h) => h.id), [`${A}/good/v1`], "bad: refused; new: never judged here");
+});
+
+void test("playable: a course hole always, never judged; a community hole (its version or its alias) only once the Builder's rules pass it", async () => {
+  let loads = 0;
+  const watched = { load: () => (loads++, deps.load()) };
+  const chain = chainOf({ [`${A}/bad/v1`]: hostileHex, [`${A}/bad`]: hostileHex, [`${A}/good/v1`]: goodHex });
+  assert.equal(await playable(chain, "garden/1/v1", watched), true);
+  assert.equal(await playable(chain, "garden/1", watched), true);
+  assert.equal(loads, 0, "a course hole: builder.wasm never loaded for it");
+  assert.equal(await playable(chain, `${A}/bad/v1`, watched), false);
+  assert.equal(await playable(chain, `${A}/bad`, watched), false, "its alias too");
+  assert.equal(await playable(chain, `${A}/good/v1`, watched), true);
+  assert.deepEqual(chain.asked.filter((x) => !x.startsWith(A)), [], "a course hole's data never read for it");
+});
+
+void test("playable: the Builder's rules failing to load is a no, never kept as the hole's verdict", async () => {
+  const chain = chainOf({ [`${A}/good/v1`]: goodHex });
+  assert.equal(await playable(chain, `${A}/good/v1`, { load: () => Promise.reject(new Error("offline")) }), false);
+  assert.equal(await knownVerdict(chain, `${A}/good/v1`), null, "not judged: nothing kept");
+  assert.equal(await playable(chain, `${A}/good/v1`, deps), true);
+});
+
 void test("a hole whose data cannot be read is not shown (nothing unjudged is ever played)", async () => {
   const v = await verdictOf(chainOf({}), `${A}/gone/v1`, deps);
   assert.equal(v.ok, false);
+});
+
+void test("a list's page: its verified rows, said to be judging until every row of the page has a verdict", () => {
+  const row = (id: string): HoleRow => ({ id, name: id, official: false, plays: 0, best: 0, proBest: 0, par: 3, world: "garden", order: 0, next: "" });
+  const rows = ["a", "b", "c", "d"].map((x) => row(`${A}/${x}/v1`));
+  const no = { ok: false as const, why: "x" };
+  const half = new Map<string, Verdict>([[rows[0].id, { ok: true }], [rows[1].id, no]]);
+  assert.deepEqual(pageOf(rows, 3, half), { rows: [rows[0]], judging: true, more: 1 }, "c not judged yet: the page waits for it, d beyond the page");
+  const all = new Map<string, Verdict>([...half, [rows[2].id, { ok: true }]]);
+  assert.deepEqual(pageOf(rows, 3, all), { rows: [rows[0], rows[2]], judging: false, more: 1 });
+  assert.equal(pageOf(rows, 10, all).more, 0);
 });
