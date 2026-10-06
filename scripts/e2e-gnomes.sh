@@ -463,7 +463,7 @@ no "catalogue: once" "already published" test1 "$GN" AddSeries genesis "$(cat "$
 is "catalogue: Gnome(104)" "Gnome(\"104\").tier,name" "legendary The Miller" "$(qg 'Gnome("104")' | jf 'd["tier"] + " " + d["name"]')"
 
 # ------------------------------------------------------- the sale opens
-SEND=30000000ugnot no "sale: closed at deploy" "the sale is closed" p0 "$GN" Buy 1
+SEND=36000000ugnot no "sale: closed at deploy" "the sale is closed" p0 "$GN" Buy 1
 ok "sale: open" "open" test1 "$GN" SetMintOpen true
 is "sale: MintOpen()" "MintOpen()" "true" "$(qg 'MintOpen()')"
 
@@ -471,7 +471,7 @@ REALM_ADDR=$(py realm "$GN")
 
 # pause: the owner's switch over every sale
 ok "pause: SetMintOpen(false)" "paused" test1 "$GN" SetMintOpen false
-SEND=30000000ugnot no "pause: no buy" "the sale is closed" p0 "$GN" Buy 1
+SEND=36000000ugnot no "pause: no buy" "the sale is closed" p0 "$GN" Buy 1
 ok "pause: SetMintOpen(true)" "resumed" test1 "$GN" SetMintOpen true
 ok "pause: open again is a no-op" "no change" test1 "$GN" SetMintOpen true
 
@@ -481,7 +481,7 @@ NOW=$(chaintime)
 no "waves: 0 to 168 hours" "a player window is 0 to 168 hours" test1 "$GN" AddWave 1 104 "$NOW" 169
 ok "waves: Garden wave 1-104, 1 h player window" "added" test1 "$GN" AddWave 1 104 "$NOW" 1
 no "waves: no overlap" "are in a wave already" test1 "$GN" AddWave 100 110 "$NOW" 0
-SEND=30000000ugnot no "player window: no record, refused" "players only until" p0 "$GN" Buy 1
+SEND=36000000ugnot no "player window: no record, refused" "players only until" p0 "$GN" Buy 1
 
 # a record: p1 holes garden/3 on golf/v2 (published here alone: the local
 # Garden cup is that one hole)
@@ -492,44 +492,44 @@ ok "record: p1 holes garden/3" "holed" p1 "$GOLF" PlayRound garden/3/v1 "$shot"
 is "record: store totals" "store.Has(\"totals\",\"assisted <p1>\")" "true" "$(q "$STORE" "Has(\"totals\",\"assisted $P1\")")"
 
 # buys in the window
-SEND=29999999ugnot no "buy: underpaid" "wrong payment, send exactly 30000000ugnot" p1 "$GN" Buy 5
-SEND=30000001ugnot no "buy: overpaid" "wrong payment, send exactly 30000000ugnot" p1 "$GN" Buy 5
+SEND=35999999ugnot no "buy: underpaid" "wrong payment, send exactly 36000000ugnot" p1 "$GN" Buy 5
+SEND=36000001ugnot no "buy: overpaid" "wrong payment, send exactly 36000000ugnot" p1 "$GN" Buy 5
 no "buy: nothing sent" "wrong payment" p1 "$GN" Buy 5
-SEND=30000000ugnot no "buy: not an id" "not a gnome id" p1 "$GN" Buy 05
-SEND=180000000ugnot no "buy: at most 5 ids" "name 1 to 5 gnomes" p1 "$GN" Buy 1,2,3,4,5,6
-SEND=60000000ugnot no "buy: an id twice" "is named twice" p1 "$GN" Buy 5,5
+SEND=36000000ugnot no "buy: not an id" "not a gnome id" p1 "$GN" Buy 05
+SEND=216000000ugnot no "buy: at most 5 ids" "name 1 to 5 gnomes" p1 "$GN" Buy 1,2,3,4,5,6
+SEND=72000000ugnot no "buy: an id twice" "is named twice" p1 "$GN" Buy 5,5
 t_before=$(bal "$OWNER")
-SEND=30000000ugnot ok "buy: p1 buys Common 5 at its price" "sold" p1 "$GN" Buy 5
-is "buy: treasury up by the price" "balance(treasury) after - before" "30000000" "$(($(bal "$OWNER") - t_before))"
+SEND=36000000ugnot ok "buy: p1 buys Common 5 at its price" "sold" p1 "$GN" Buy 5
+is "buy: treasury up by the price" "balance(treasury) after - before" "36000000" "$(($(bal "$OWNER") - t_before))"
 is "buy: the realm keeps nothing" "balance(realm)" "0" "$(bal "$REALM_ADDR")"
 is "buy: OwnerOf(5)" "OwnerOf(\"5\")" "$P1" "$(qg 'OwnerOf("5")')"
-SEND=30000000ugnot no "buy: sold once" "already sold" p1 "$GN" Buy 5
-SEND=60000000ugnot ok "buy: two in one call" "sold" p1 "$GN" Buy 6,7
-SEND=30000000ugnot no "caps: player window, 3 Commons" "the player window takes 3 common a wallet" p1 "$GN" Buy 8
-SEND=198000000ugnot ok "caps: 2 Rares in the window" "sold" p1 "$GN" Buy 73,74
-SEND=99000000ugnot no "caps: no third Rare in the window" "the player window takes 2 rare a wallet" p1 "$GN" Buy 75
-SEND=333000000ugnot ok "caps: 1 Epic in the window" "sold" p1 "$GN" Buy 94
-SEND=333000000ugnot no "caps: no second Epic in the window" "the player window takes 1 epic a wallet" p1 "$GN" Buy 95
+SEND=36000000ugnot no "buy: sold once" "already sold" p1 "$GN" Buy 5
+SEND=72000000ugnot ok "buy: two in one call" "sold" p1 "$GN" Buy 6,7
+SEND=36000000ugnot no "caps: player window, 3 Commons" "the player window takes 3 common a wallet" p1 "$GN" Buy 8
+SEND=144000000ugnot ok "caps: 2 Rares in the window" "sold" p1 "$GN" Buy 73,74
+SEND=72000000ugnot no "caps: no third Rare in the window" "the player window takes 2 rare a wallet" p1 "$GN" Buy 75
+SEND=336000000ugnot ok "caps: 1 Epic in the window" "sold" p1 "$GN" Buy 94
+SEND=336000000ugnot no "caps: no second Epic in the window" "the player window takes 1 epic a wallet" p1 "$GN" Buy 95
 # a Legendary: bought as any gnome, at its price, by the first; one a wallet
 t_before=$(bal "$OWNER")
-SEND=777000000ugnot ok "legendary: p1 buys The Miller (104) at its price" "sold" p1 "$GN" Buy 104
-is "legendary: treasury up by the price" "balance(treasury) after - before" "777000000" "$(($(bal "$OWNER") - t_before))"
+SEND=1296000000ugnot ok "legendary: p1 buys The Miller (104) at its price" "sold" p1 "$GN" Buy 104
+is "legendary: treasury up by the price" "balance(treasury) after - before" "1296000000" "$(($(bal "$OWNER") - t_before))"
 is "legendary: OwnerOf(104)" "OwnerOf(\"104\")" "$P1" "$(qg 'OwnerOf("104")')"
-SEND=777000000ugnot no "legendary: sold once" "already sold" b1 "$GN" Buy 104
+SEND=1296000000ugnot no "legendary: sold once" "already sold" b1 "$GN" Buy 104
 is "worn: the best held, free" "Worn(p1).id,equipped" "104 False" "$(qg "Worn(\"$P1\")" | jf 'd["id"] + " " + str(d["equipped"])')"
 
 # a wave with no window, and the lifetime cap
 no "price: owner only" "only the owner" p0 "$GN" SetPrice common 40000000
 no "price: bounds" "a price is between" test1 "$GN" SetPrice common 999999
 ok "price: Common 40 GNOT for the next waves" "set" test1 "$GN" SetPrice common 40000000
-is "price: a wave keeps its prices" "Gnome(\"8\").price" "30000000" "$(qg 'Gnome("8")' | jf 'd["price"]')"
+is "price: a wave keeps its prices" "Gnome(\"8\").price" "36000000" "$(qg 'Gnome("8")' | jf 'd["price"]')"
 NOW=$(chaintime)
 ok "waves: 105-208, no window" "added" test1 "$GN" AddWave 105 208 "$NOW" 0
-SEND=777000000ugnot no "legendary: one a wallet" "the cap is 1 legendary a wallet" p1 "$GN" Buy 208
-SEND=777000000ugnot ok "legendary: b1 buys 208" "sold" b1 "$GN" Buy 208
+SEND=1296000000ugnot no "legendary: one a wallet" "the cap is 1 legendary a wallet" p1 "$GN" Buy 208
+SEND=1296000000ugnot ok "legendary: b1 buys 208" "sold" b1 "$GN" Buy 208
 ok "waves: 209-310, tomorrow" "added" test1 "$GN" AddWave 209 310 "$((NOW + 86400))" 0
 SEND=40000000ugnot no "waves: not yet" "is not on sale yet" p0 "$GN" Buy 209
-SEND=30000000ugnot no "waves: in no wave" "is not on sale" p0 "$GN" Buy 400
+SEND=36000000ugnot no "waves: in no wave" "is not on sale" p0 "$GN" Buy 400
 commons=$(awk -F'|' '$1>=105 && $1<=207 && $2=="common"{print $1}' "$ROWS" | head -11 | tr '\n' ' ')
 set -- $commons
 is "price: the new wave at the new price" "Gnome(\"$1\").price" "40000000" "$(qg "Gnome(\"$1\")" | jf 'd["price"]')"
@@ -565,8 +565,8 @@ ok "treasury: offered to treas" "offered" test1 "$GN" SetTreasury "$TREAS"
 is "treasury: pending" "PendingTreasury(), Treasury()" "$TREAS $OWNER" "$(qg 'PendingTreasury()') $(qg 'Treasury()')"
 rare=$(awk -F'|' '$1>=105 && $1<=207 && $2=="rare"{print $1; exit}' "$ROWS")
 t_before=$(bal "$OWNER")
-SEND=99000000ugnot ok "treasury: a buy while only offered" "sold" p0 "$GN" Buy "$rare"
-is "treasury: still paid to the old one" "balance(test1) after - before" "99000000" "$(($(bal "$OWNER") - t_before))"
+SEND=72000000ugnot ok "treasury: a buy while only offered" "sold" p0 "$GN" Buy "$rare"
+is "treasury: still paid to the old one" "balance(test1) after - before" "72000000" "$(($(bal "$OWNER") - t_before))"
 no "treasury: only the offered takes it" "no treasury is offered to you" p0 "$GN" AcceptTreasury
 ok "treasury: treas accepts" "taken" treas "$GN" AcceptTreasury
 is "treasury: moved" "Treasury(), PendingTreasury()" "$TREAS " "$(qg 'Treasury()') $(qg 'PendingTreasury()')"
@@ -656,7 +656,7 @@ CLOSE=$((NOW + 60))
 ok "close: brought forward" "set" test1 "$GN" SetCloseAt "$CLOSE"
 is "close: CloseAt()" "CloseAt()" "$CLOSE" "$(qg 'CloseAt()')"
 wait_until "$CLOSE" "the close"
-SEND=30000000ugnot no "close: buys refused" "the genesis sale closed on" p1 "$GN" Buy 1
+SEND=36000000ugnot no "close: buys refused" "the genesis sale closed on" p1 "$GN" Buy 1
 no "close: no wave for its ids" "the genesis sale closed on" test1 "$GN" AddWave 400 410 "$CLOSE" 0
 no "close: no date after" "the genesis sale closed on" test1 "$GN" SetCloseAt "$((CLOSE + 600))"
 is "close: Collection genesis closed, sold" "Collection().series[0] closed,sold" "True $sold" "$(qg 'Collection()' | jf 'str(d["series"][0]["closed"]) + " " + str(d["series"][0]["sold"])')"

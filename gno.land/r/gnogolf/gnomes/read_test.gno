@@ -17,13 +17,13 @@ func TestCollectionSaysWhatTheMintPageShows(cur realm, t *testing.T) {
 	uassert.Equal(t,
 		`{"version":1,"open":true,"closesAt":0,"owner":"`+deployer.String()+`","treasury":"`+deployer.String()+
 			`","pendingTreasury":"","site":"","royaltyBps":500,`+
-			`"tiers":[{"name":"common","price":30000000,"cap":10,"playerCap":3,"sold":0},`+
-			`{"name":"rare","price":99000000,"cap":5,"playerCap":2,"sold":0},`+
-			`{"name":"epic","price":333000000,"cap":2,"playerCap":1,"sold":0},`+
-			`{"name":"legendary","price":777000000,"cap":1,"playerCap":1,"sold":0}],`+
+			`"tiers":[{"name":"common","price":36000000,"cap":10,"playerCap":3,"sold":0},`+
+			`{"name":"rare","price":72000000,"cap":5,"playerCap":2,"sold":0},`+
+			`{"name":"epic","price":336000000,"cap":2,"playerCap":1,"sold":0},`+
+			`{"name":"legendary","price":1296000000,"cap":1,"playerCap":1,"sold":0}],`+
 			`"series":[{"name":"genesis","first":1,"last":720,"sold":0,"closed":false}],`+
 			`"waves":[{"first":1,"last":720,"start":`+itoa(w.start)+`,"playersUntil":`+itoa(w.playersUntil)+
-			`,"prices":[30000000,99000000,333000000,777000000]}]}`,
+			`,"prices":[36000000,72000000,336000000,1296000000]}]}`,
 		Collection())
 }
 
@@ -36,7 +36,7 @@ func TestGnomeSaysWhoOwnsItAndItsPrice(cur realm, t *testing.T) {
 			s = "true"
 		}
 		return `{"version":1,"id":"` + itoa(id) + `","series":"genesis","name":"Gnome ` + itoa(id) +
-			`","tier":"common","traits":"v0.` + itoa(id) + `","owner":"` + owner + `","price":30000000,"sold":` + s + `,"closed":false}`
+			`","tier":"common","traits":"v0.` + itoa(id) + `","owner":"` + owner + `","price":36000000,"sold":` + s + `,"closed":false}`
 	}
 	uassert.Equal(t, row("", false), Gnome(itoa(id)))
 	testing.SetRealm(asUser(alice, ugnot(priceOf(id))))

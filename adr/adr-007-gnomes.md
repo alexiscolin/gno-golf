@@ -58,8 +58,11 @@ in `totals`, which v1's records were copied into), at most 3 commons, 2
 rares, 1 epic and 1 legendary each per wave; then anyone, under the lifetime
 caps (10, 5, 2, 1: one Legendary a wallet, ever). A wave is never changed
 nor withdrawn: its ids stay on sale at its prices, and `SetPrice` moves only
-the waves published after it. Prices start at 30, 99, 333 and 777 GNOT;
-nothing is ever discounted by the realm. A Legendary is bought as any
+the waves published after it. Prices start at golf's own numbers: 36 GNOT
+a Common, the par of nine holes; 72 a Rare, the par of a course; 336 an
+Epic, the dimples on a golf ball; 1,296 a Legendary, eighteen holes times
+par 72 (59,424 GNOT if all 720 sell). Nothing is ever discounted by the
+realm. A Legendary is bought as any
 gnome, at its wave's price, by the first who buys it: there is no auction,
 no escrow, no bid to refund.
 

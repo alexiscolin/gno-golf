@@ -14,10 +14,10 @@ type tier struct {
 }
 
 var tiers = [...]tier{
-	{"common", 30_000_000},     // 30 GNOT
-	{"rare", 99_000_000},       // 99 GNOT
-	{"epic", 333_000_000},      // 333 GNOT
-	{"legendary", 777_000_000}, // 777 GNOT
+	{"common", 36_000_000},       // 36 GNOT: the par of nine holes
+	{"rare", 72_000_000},         // 72 GNOT: the par of a course
+	{"epic", 336_000_000},        // 336 GNOT: the dimples on a golf ball
+	{"legendary", 1_296_000_000}, // 1,296 GNOT: eighteen holes, times par 72
 }
 
 // genesisSupply is how many gnomes of each tier the genesis series holds, in

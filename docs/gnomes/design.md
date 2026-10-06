@@ -466,10 +466,9 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   "supply": { "common": 504, "rare": 144, "epic": 65, "legendary": 7 },
   "waves": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
   "seed": "gnogolf/genesis/1", "released": false,
-  "sale": { "prices": { "common": 30, "rare": 99, "epic": 333 },
-            "auction": { "reserve": 777, "hours": 48, "extendMinutes": 10, "minIncrementPercent": 5, "minIncrementGnot": 5, "endsUtc": "18:00" },
-            "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1 },
-            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2 }, "nextWaveWhenSold": 0.7 } }
+  "sale": { "prices": { "common": 36, "rare": 72, "epic": 336, "legendary": 1296 },
+            "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1, "legendary": 1 },
+            "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2, "legendary": 1 }, "nextWaveWhenSold": 0.7 } }
 ```
 
 - **Waves are id ranges.** `planSeries` lays each wave out as one run of
@@ -494,7 +493,8 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   opens): from then its looks are final (section 10).
 - **`sale` is the realm's starting settings**, from the research brief
   (`docs/superpowers/research/2026-10-06-nft-best-practices.md`) and the
-  user's decision: prices in GNOT, the Legendary auction, the player window
+  user's decisions: prices in GNOT, every tier at a fixed price (golf's
+  numbers, ADR-007; no auction), the player window
   (wallets with a record in `store` first), its caps, the lifetime caps,
   and when to open the next wave. The realm's owner changes them between
   waves, never during one, and never lowers a price. Nothing in the client

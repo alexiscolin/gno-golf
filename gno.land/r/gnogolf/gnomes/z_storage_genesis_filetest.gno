@@ -51,11 +51,11 @@ func genesis() string {
 }
 
 // Output:
-// {"version":1,"id":"720","series":"genesis","name":"Pip Seedwell 720","tier":"legendary","traits":"0100000000000000000000000000000000000000000000000000000720","owner":"","price":777000000,"sold":false,"closed":false}
+// {"version":1,"id":"720","series":"genesis","name":"Pip Seedwell 720","tier":"legendary","traits":"0100000000000000000000000000000000000000000000000000000720","owner":"","price":1296000000,"sold":false,"closed":false}
 
 // Storage:
 // gno.land/r/gnogolf/gnomes: 64230
 // gno.land/r/test/storedgenesis: 0
 
 // Gas:
-// 1403637782
+// 1403638815

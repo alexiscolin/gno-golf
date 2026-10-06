@@ -28,10 +28,10 @@
    "sale": {
     "note": "The realm's starting settings: its owner changes them between waves, never during one, and never lowers a price. GNOT.",
     "prices": {
-     "common": 30,
-     "rare": 99,
-     "epic": 333,
-     "legendary": 777
+     "common": 36,
+     "rare": 72,
+     "epic": 336,
+     "legendary": 1296
     },
     "playerWindowHours": 48,
     "playerWindowCaps": {

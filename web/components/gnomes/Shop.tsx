@@ -188,7 +188,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       )}
       <details className="more">
         <summary>How the gnomes work</summary>
-        <p>Each gnome is one of a kind: you pick the exact one, nothing is random, and it is yours on the chain the moment you buy it. Cosmetic only: same ball, same physics. Not an investment, no promise of value or resale. The shop is for adults (18+); playing stays free for everyone. Earned gnomes are free: prove the feat on the course. They can&apos;t be bought or sold.</p>
+        <p>Each gnome is one of a kind: you pick the exact one, nothing is random, and it is yours on the chain the moment you buy it. The prices are golf numbers: 36 GNOT a Common (the par of nine holes), 72 a Rare (the par of a course), 336 an Epic (the dimples on a ball), 1,296 a Legendary (eighteen holes times par 72). Cosmetic only: same ball, same physics. Not an investment, no promise of value or resale. The shop is for adults (18+); playing stays free for everyone. Earned gnomes are free: prove the feat on the course. They can&apos;t be bought or sold.</p>
       </details>
       {open && c && (
         <GnomeSheet g={open} shop={shop} chain={chain} c={c} account={account} region={region === true} now={now} wallet={wallet} onConnect={onConnect}

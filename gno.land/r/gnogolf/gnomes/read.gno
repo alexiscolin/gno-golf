@@ -63,7 +63,7 @@ func Collection() string {
 // the next wave's when in none yet; 0 for an earned one).
 //
 //	{"version":1,"id":"217","series":"genesis","name":"…","tier":"common",
-//	 "traits":"…","owner":"","price":30000000,"sold":false}
+//	 "traits":"…","owner":"","price":36000000,"sold":false}
 func Gnome(tid string) string {
 	g, ok := tokenAt(parseID(tid))
 	if !ok {

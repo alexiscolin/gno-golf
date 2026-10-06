@@ -18,13 +18,13 @@ const T0 = Date.UTC(2026, 9, 9, 18) / 1000; // Fri 9 Oct 2026, 18:00 UTC
 const collection = (o: Partial<Collection> = {}): Collection => ({
   version: 1, open: true, closesAt: Date.UTC(2026, 11, 14, 18) / 1000, owner: A, treasury: A, pendingTreasury: "", site: "", royaltyBps: 500,
   tiers: [
-    { name: "common", price: 30e6, cap: 10, playerCap: 3, sold: 0 },
-    { name: "rare", price: 99e6, cap: 5, playerCap: 2, sold: 0 },
-    { name: "epic", price: 333e6, cap: 2, playerCap: 1, sold: 0 },
-    { name: "legendary", price: 777e6, cap: 1, playerCap: 1, sold: 0 },
+    { name: "common", price: 36e6, cap: 10, playerCap: 3, sold: 0 },
+    { name: "rare", price: 72e6, cap: 5, playerCap: 2, sold: 0 },
+    { name: "epic", price: 336e6, cap: 2, playerCap: 1, sold: 0 },
+    { name: "legendary", price: 1296e6, cap: 1, playerCap: 1, sold: 0 },
   ],
   series: [{ name: "genesis", first: 1, last: 720, sold: 0, closed: false }],
-  waves: [{ first: 1, last: 104, start: T0, playersUntil: T0 + 48 * 3600, prices: [30e6, 99e6, 333e6, 777e6] }],
+  waves: [{ first: 1, last: 104, start: T0, playersUntil: T0 + 48 * 3600, prices: [36e6, 72e6, 336e6, 1296e6] }],
   ...o,
 });
 const can = (o: Partial<CanBuy> = {}): CanBuy => ({ version: 1, ok: false, reason: "", said: "", total: 0, left: { common: 10, rare: 5, epic: 2, legendary: 1 }, window: { until: 0, left: { common: 0, rare: 0, epic: 0, legendary: 0 } }, ...o });
@@ -54,12 +54,12 @@ function fakeChain(answers: Record<string, unknown>) {
 test("shop: each read asks the gnomes' realm once, its arguments quoted, its answer checked", async () => {
   const { chain, asked } = fakeChain({
     Collection: collection(),
-    Gnome: { version: 1, id: "94", series: "genesis", name: "Tansy", tier: "epic", traits: "01", owner: "", price: 333e6, sold: false, closed: false },
+    Gnome: { version: 1, id: "94", series: "genesis", name: "Tansy", tier: "epic", traits: "01", owner: "", price: 336e6, sold: false, closed: false },
     Sold: "05",
     GnomesOf: { version: 1, owner: A, total: 1, next: -1, rows: [{ id: "3", tier: "common", traits: "01" }] },
     Worn: "",
     WornMany: { version: 1, rows: [{ player: A, id: "3", name: "Thistle", tier: "common", traits: "01", equipped: false }] },
-    CanBuy: can({ ok: true, total: 30e6 }),
+    CanBuy: can({ ok: true, total: 36e6 }),
     Params: { version: 1, maxHours: 168, maxBatch: 5, denom: "ugnot" },
   });
   const shop = makeShop(chain, "gno.land/r/x/gnogolf/gnomes");
@@ -70,7 +70,7 @@ test("shop: each read asks the gnomes' realm once, its arguments quoted, its ans
   assert.equal((await shop.gnomesOf(A)).rows[0].id, "3");
   assert.equal(await shop.worn(A), null);
   assert.equal((await shop.wornMany([A, "nobody", A])).get(A)?.name, "Thistle");
-  assert.equal((await shop.canBuy(A, [7])).total, 30e6);
+  assert.equal((await shop.canBuy(A, [7])).total, 36e6);
   assert.equal((await shop.params()).maxBatch, 5);
   assert.ok(asked.every((a) => a.realm === "gno.land/r/x/gnogolf/gnomes"));
   assert.deepEqual(asked.map((a) => a.expr), [
@@ -160,7 +160,7 @@ test("shop: the now row follows the sale's life: teaser, players first, open, so
 });
 
 test("shop: a later wave is the teaser once the one before is sold out", () => {
-  const c = collection({ waves: [...collection().waves, { first: 105, last: 208, start: T0 + 86400 * 3, playersUntil: T0 + 86400 * 4, prices: [30e6, 99e6, 333e6, 777e6] }] });
+  const c = collection({ waves: [...collection().waves, { first: 105, last: 208, start: T0 + 86400 * 3, playersUntil: T0 + 86400 * 4, prices: [36e6, 72e6, 336e6, 1296e6] }] });
   const all = Array.from({ length: 104 }, (_, i) => i + 1);
   const r = nowRow(c, isSold(all), entries, T0 + 86400);
   assert.equal(r.at, "soldout");
@@ -222,10 +222,10 @@ test("shop: the gallery's shelf: on sale, mine, all; tier counts; filters; a pag
 test("shop: a card's one fact: the price, the player, Yours, Never made, its wave", () => {
   const c = collection(), now = T0 + 49 * 3600;
   const e = (id: number) => entries.find((x) => x.id === id)!;
-  assert.equal(cardFact(e(5), { c, sold: isSold([]), mine: new Set(), now }), "30 GNOT");
+  assert.equal(cardFact(e(5), { c, sold: isSold([]), mine: new Set(), now }), "36 GNOT");
   assert.equal(cardFact(e(5), { c, sold: isSold([5]), mine: new Set([5]), now }), "Yours");
   assert.equal(cardFact(e(5), { c, sold: isSold([5]), mine: new Set(), now }), "Found a player");
-  assert.equal(cardFact(e(104), { c, sold: isSold([]), mine: new Set(), now }), "777 GNOT", "a Legendary at its price, as any gnome");
+  assert.equal(cardFact(e(104), { c, sold: isSold([]), mine: new Set(), now }), "1,296 GNOT", "a Legendary at its price, as any gnome");
   assert.equal(cardFact(e(200), { c, sold: isSold([]), mine: new Set(), now }), "Wave 2 · Island");
   const closedC = collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 1, closed: true }] });
   assert.equal(cardFact(e(6), { c: closedC, sold: isSold([5]), mine: new Set(), now }), "Never made");
