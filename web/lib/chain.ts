@@ -60,6 +60,8 @@ const gamePath = (realm: string) => realm.replace(/\/v[0-9]+$/, "").replace(/[^/
 export const pkgsPath = (realm: string) => gamePath(realm).replace(/^\/r\//, "/p/");
 /** The gnoweb path of the realm that keeps the records, beside the rules: …/gnogolf/store. */
 export const storePath = (realm: string) => gamePath(realm) + "store";
+/** The gnomes' realm beside the rules (ADR-007): gno.land/r/…/gnogolf/gnomes. */
+export const GNOMES_REALM = gamePath(REALM) + "gnomes";
 const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten minutes, or in a new tab
 
 /** A pause of ms: between two reads of the chain, a retry, a beat. */
@@ -238,9 +240,11 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   const qstr = async (realm: string, expr: string, ms?: number) => unquote(await vm(realm, expr, ms), expr);
 
   // a realm read, checked: T when the answer has T's shape, refused otherwise
-  async function qeval<T>(expr: string, ok: (v: unknown) => v is T, ms?: number, signal?: AbortSignal | null, bad?: string): Promise<T> {
+  const qeval = <T>(expr: string, ok: (v: unknown) => v is T, ms?: number, signal?: AbortSignal | null, bad?: string) => qjson(REALM, expr, ok, ms, signal, bad);
+  // the same of any realm's JSON (the gnomes' beside the rules)
+  async function qjson<T>(realm: string, expr: string, ok: (v: unknown) => v is T, ms?: number, signal?: AbortSignal | null, bad?: string): Promise<T> {
     // the reply is a Gno typed result — ("<json>" string) — so it unwraps twice
-    const json = unquote(await vm(REALM, expr, ms, signal), expr);
+    const json = unquote(await vm(realm, expr, ms, signal), expr);
     let v: unknown;
     try {
       v = JSON.parse(json);
@@ -319,6 +323,10 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     rpc,
     web,
     realm: REALM,
+    /** A read of another realm's JSON, checked as the rules' are (lib/gnomes/shop.ts reads the gnomes' with it). */
+    qjson,
+    /** A read of another realm's string answer (an empty one: ""). */
+    qstr,
     /** The node's current gas price, as ugnot per gas: { gas, price } → price / gas. */
     gasPrice: memo(async () => {
       const r = await abci("auth/gasprice");
