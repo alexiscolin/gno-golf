@@ -26,7 +26,7 @@
 .bhead__hole { display: grid; min-width: 0; line-height: 1.15; }
 .bhead__hole > input { min-width: 0; width: 100%; border: 0; border-bottom: 2px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; font-size: 20px; font-weight: 700; color: var(--ink); padding: 0 0 2px; text-overflow: ellipsis; }
 .bhead__hole small { display: flex; align-items: baseline; gap: 2px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; }
-.bhead__slug { width: 11ch; field-sizing: content; min-width: 4ch; max-width: 24ch; border: 0; border-bottom: 1.5px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; color: var(--ink); padding: 0; }
+.bhead__slug { field-sizing: content; min-width: 4ch; max-width: 24ch; border: 0; border-bottom: 1.5px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; color: var(--ink); padding: 0; }
 .bhead__hole select { border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); padding: 0; }
 .bhead__end { display: flex; align-items: center; gap: var(--sp-2); justify-self: end; }
 /* the action keeps its width as its words change (Test it, Publish →); off, it stays readable: ink on paper, dashed */
@@ -61,6 +61,15 @@
 .piece { display: grid; justify-items: center; gap: 2px; min-width: 0; min-height: 66px; padding: var(--sp-2) var(--sp-1); border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 2px 0 var(--ink); font: inherit; font-size: 13px; font-weight: 700; color: var(--ink); cursor: grab; touch-action: none; }
 .piece span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .piece svg { width: 40px; height: 28px; }
+/* the five a first hole needs: one a row, big, the drawing beside the name */
+.pieces--common { grid-template-columns: 1fr; }
+.piece--big { grid-template-columns: 56px minmax(0, 1fr); justify-items: start; align-items: center; gap: var(--sp-3); padding-inline: var(--sp-3); font-size: 16px; }
+.piece--big svg { width: 56px; height: 36px; }
+.palette__more { display: grid; gap: var(--sp-3); }
+.palette__more summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.palette__more[open] summary { margin-bottom: var(--sp-2); }
+.palette__bin { margin-top: auto; padding: var(--sp-3); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; text-align: center; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+.palette__bin::before { content: "🗑 "; }
 .piece--on { background: var(--mint); box-shadow: 0 0 0 2px var(--gold), 0 2px 0 3px var(--ink); }
 .piece:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 

@@ -13,6 +13,7 @@ import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, pieceName, validate, type ValidateOptions } from "./pipeline";
 import { cap, worldName } from "./rules";
+import { plainOf } from "./explain";
 
 /** A piece's settings at placement: each within its entry's range, its default when left out. */
 export interface PlaceParams {
@@ -95,7 +96,7 @@ export function toWorld(d: Draft, world: string, palette: readonly PaletteEntry[
   const r = changeWorld(d, world, palette);
   if ("refused" in r) return r;
   const why = newErrors(errorsOf(d, o), r, { ...o, palette });
-  return why.length ? { why: why[0].text } : r;
+  return why.length ? { why: plainOf(why[0]) } : r;
 }
 
 /** A world's name in a sentence: "Garden". */
@@ -236,7 +237,7 @@ export function clampEnd(d: Draft, which: "tee" | "pin", to: V, o: ValidateOptio
 
 /** A release's outcome: the draft as it is kept (framed), or why nothing changes. */
 export type Dropped = Draft | { why: string };
-const verdict = (next: Draft, why: readonly Issue[]): Dropped => (why.length ? { why: why[0].text } : next);
+const verdict = (next: Draft, why: readonly Issue[]): Dropped => (why.length ? { why: plainOf(why[0]) } : next);
 
 /**
  * A piece let go after a drag toward `to`: clamped with the fast checks

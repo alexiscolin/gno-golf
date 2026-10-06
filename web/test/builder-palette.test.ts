@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { added, drawn, loadWorld, worldOf } from "./scene-harness.ts";
-import { BINDINGS, HAND_ONLY, WORLD_NAMES, entry, loadPalette, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
+import { BINDINGS, HAND_ONLY, WORLD_NAMES, commonOf, entry, loadPalette, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD, MAX_BOUNCE, WEATHER, kicks } from "../lib/builder/rules.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { writeDraft } from "../lib/builder/gg1.ts";
@@ -152,4 +152,13 @@ void test("the palette covers the course: every course piece whose skin has an e
     }
   }
   assert.deepEqual(out, []);
+});
+
+void test("the five common pieces first, named plainly, in every Builder world: Wall, Bumper, Sand, Water, Slope (the rest under More pieces)", async () => {
+  for (const world of Object.keys(FIELD)) {
+    const p = await loadPalette(world), common = commonOf(p);
+    assert.deepEqual(common.map((c) => c.name), ["Wall", "Bumper", "Sand", "Water", "Slope"], world);
+    for (const c of common) assert.ok(p.includes(c.entry), `${world} ${c.name}: one of its own entries`);
+    assert.deepEqual(common.map((c) => c.entry.kind), ["rail", "post", "surface", "hazard", "slope"], world);
+  }
 });

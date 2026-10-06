@@ -193,6 +193,13 @@ export function paletteOf(world: string, own: Skins = {}): PaletteEntry[] {
   return out;
 }
 
+/** The pieces a first hole needs, first in the palette and named plainly (the GUI spec's B3); the world's others under "More pieces". */
+const COMMON = [["Wall", "*/rail/"], ["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]] as const;
+
+/** A palette's common pieces, in that order, each named plainly (those it has). */
+export const commonOf = (palette: readonly PaletteEntry[]) =>
+  COMMON.flatMap(([name, id]) => palette.filter((e) => e.id === id).map((entry) => ({ name, entry })));
+
 /** A world's palette, its module loaded first (its skins are declared beside its drawings). */
 export async function loadPalette(world: string): Promise<readonly PaletteEntry[]> {
   if (!Object.hasOwn(FIELD, world)) throw new Error(notABuilderWorld(world));

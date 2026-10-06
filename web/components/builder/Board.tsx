@@ -13,6 +13,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, movePiece, nextId, pieceLabel, placePiece, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
+import { plainOf } from "@/lib/builder/explain";
 import { centreOn, K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
 import { BOARD, frame } from "@/lib/builder/gg1";
 import { handlesOf, setHandle, type HandleKey } from "@/lib/builder/handles";
@@ -39,6 +40,8 @@ export interface BoardProps {
   onCommit: () => void;
   onCancel: () => void;
   onSet: (d: Draft) => void;
+  /** a piece let go on the palette's bin: removed, if the hole holds without it */
+  onBin: (id: string) => void;
   onDisarm: () => void;
   /** a refusal, said once */
   onSay: (text: string) => void;
@@ -128,7 +131,7 @@ export default function Board(props: BoardProps) {
     const p = placePiece(armed!, nextId(draft), at), m = middleOf(p), w = whereOf(p.geometry);
     return movePiece(p, snap([w[0] + at[0] - m[0], w[1] + at[1] - m[1]], step));
   };
-  const firstWhy = (is: Issue[]) => is[0]?.text ?? "";
+  const firstWhy = (is: Issue[]) => (is[0] ? plainOf(is[0]) : "");
 
   function onDown(e: RPointerEvent<SVGSVGElement>) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
@@ -195,7 +198,7 @@ export default function Board(props: BoardProps) {
     setLive(null);
     if (armed && !d) {
       const p = ghostAt(at), why = canPlace(draft, p, full);
-      if (why.length) return props.onSay(why[0].text);
+      if (why.length) return props.onSay(plainOf(why[0]));
       props.onSet(frame({ ...draft, pieces: [...draft.pieces, p] }));
       props.onSelect(p.id);
       setGhost(null);
@@ -203,6 +206,8 @@ export default function Board(props: BoardProps) {
       return;
     }
     if (!d || d.t === "pan") return;
+    // let go on the palette's bin: removed (if the hole holds without it)
+    if (d.t === "piece" && document.elementsFromPoint(e.clientX, e.clientY).some((x) => x.closest("[data-bin]"))) return (props.onCancel(), props.onSelect(null), props.onBin(d.id));
     // let go: where it is if it may stay there, else the last place on its way where it may; the whole result
     // judged with the census before it is kept (edit.ts dropMove, dropHandle, dropEnd)
     const next = d.t === "piece" ? dropMove(d.start, d.id, snap([at[0] - d.grab[0], at[1] - d.grab[1]], step), quick, full)

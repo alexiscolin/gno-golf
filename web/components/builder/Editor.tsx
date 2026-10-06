@@ -28,6 +28,7 @@ import Header, { type Step } from "./Header";
 import Inspector from "./Inspector";
 import Palette from "./Palette";
 import Preview from "./Preview";
+import { plainOf } from "@/lib/builder/explain";
 
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
@@ -102,14 +103,14 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const tryEdit = (next: Draft | null, fail: string) => {
     if (!next || !full) return say(fail);
     const why = newErrors(errorsOf(draft, full), next, full);
-    if (why.length) return say(why[0].text);
+    if (why.length) return say(plainOf(why[0]));
     set(next);
   };
   const piece = draft.pieces.find((p) => p.id === selected) ?? null;
   const turn = () => {
     if (!piece || !full) return;
     const t = turnPiece(piece), why = canPlace(draft, t, full);
-    if (why.length) return say(why[0].text);
+    if (why.length) return say(plainOf(why[0]));
     set({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? t : p)) });
   };
   const copy = () => piece && quick && tryEdit(copyPiece(draft, piece.id, quick), "No room near it for a copy.");
@@ -196,7 +197,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <Palette world={draft.world} palette={palette} armed={armed} off={offAtLimit(draft, palette)} onArm={setArmed} />
           <div className="centre">
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onDisarm={() => setArmed(null)} onSay={say} said={said} show={show} />
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} onSay={say} said={said} show={show} />
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
               issues={v?.issues ?? []} busy={!fresh} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>

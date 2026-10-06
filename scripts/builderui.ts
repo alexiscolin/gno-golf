@@ -122,6 +122,16 @@ for (const [w, h] of SIZES) {
   await sleep(800);
   assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 1, "the piece deleted");
   assert.equal(await c.js(`document.activeElement?.classList.contains("board")`), true, "the focus on the board after a Delete");
+  // a post dragged from the board onto the palette's bin: removed
+  const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+  const centre = (sel: string) => c.js<[number, number]>(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const post = await c.js<[number, number]>(`(() => { const g = [...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const bin = await centre("[data-bin]");
+  await mouse("mousePressed", ...post);
+  for (let k = 1; k <= 6; k++) (await mouse("mouseMoved", post[0] + ((bin[0] - post[0]) * k) / 6, post[1] + ((bin[1] - post[1]) * k) / 6), await sleep(50));
+  await mouse("mouseReleased", ...bin);
+  await sleep(1200);
+  assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 2, "a post dropped on the bin is removed");
   await c.js(`document.querySelector(".bhead .round--icon").click()`); // back to the drafts
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(300);
   const drafts = await c.js<number>(`document.querySelectorAll(".bholes__list li").length`);
