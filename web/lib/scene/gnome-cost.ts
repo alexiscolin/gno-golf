@@ -4,6 +4,7 @@
 // (which keeps no gnome over it) both count with this.
 import * as THREE from "three";
 import { makeBall, type Skin } from "./gnome";
+import "./gnome-dress"; // (a collection gnome costs what his wardrobe adds)
 import type { Gnome } from "./data";
 
 /** A built gnome's cost. */

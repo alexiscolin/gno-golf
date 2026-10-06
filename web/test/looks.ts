@@ -8,6 +8,7 @@ import "./canvas.mjs";
 import { createHash } from "node:crypto";
 import * as THREE from "three";
 import { makeBall, type Skin } from "../lib/scene/gnome.ts";
+import "../lib/scene/gnome-dress.ts";
 import { makeHoling, makeTrail } from "../lib/scene/gnome-fx.ts";
 
 const r3 = (x: number) => Math.round(x * 1e3) / 1e3;

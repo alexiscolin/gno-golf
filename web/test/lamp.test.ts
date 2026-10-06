@@ -11,6 +11,7 @@ import fs from "node:fs";
 import * as THREE from "three";
 import { GNOMES, makeBall, headlamp, gnomeById, rivalSkin, knowGnome, wears } from "../lib/scene/gnome.ts";
 import type { Gnome } from "../lib/scene/data.ts";
+import "../lib/scene/gnome-dress.ts";
 import { KIT_HATS } from "../lib/scene/gnome-kit.ts";
 import { skinOfTraits } from "../lib/gnomes/skin.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";

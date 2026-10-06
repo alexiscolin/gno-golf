@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import * as THREE from "three";
 import { GNOMES, makeBall, makeGhost, type Skin } from "../lib/scene/gnome.ts";
+import "../lib/scene/gnome-dress.ts";
 import { makeHoling, makeTrail } from "../lib/scene/gnome-fx.ts";
 import { BUDGET, MAX_REACH } from "../lib/gnomes/validate.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";

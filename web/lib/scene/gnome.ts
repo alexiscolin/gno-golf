@@ -7,10 +7,7 @@ import { ud, type Gnome } from "./data";
 import type { UnlockId } from "../card";
 import type { Beard, Holing, Material, Pattern, Piece, Trail } from "../gnomes/vocab";
 import { darkBody } from "../gnomes/colour";
-import { isKitHat, kitHat, kitWear, kitPiece, hatTop, patternedBody, type KitHat } from "./gnome-kit";
-import { propOf } from "./gnome-props";
-import { dressMatter } from "./gnome-matter";
-import { dressLegend } from "./gnome-legend";
+import type { KitHat } from "./gnome-kit";
 
 /** A gnome's look: what makeBall dresses him in. */
 export interface Skin {
@@ -108,31 +105,6 @@ function lampOn(body: THREE.Object3D, at: THREE.Vector3) {
   lamp.rotation.x = -0.2; // as the hat leans back
   body.add(lamp);
   return glow;
-}
-
-/**
- * Where a lamp clips on a collection gnome: found, not guessed, his hats and
- * pieces being many. A ray from in front along the hat's centre line, from
- * just over the brim (over the brow and what he wears there) up, onto the
- * first surface that faces forward within the crown's width (a brim's edge
- * is wider: higher then): the hat, or what lies on its front (a band, a
- * badge). In the body's space, the lamp's centre just off the surface; null
- * when none is found.
- */
-function lampSpot(g: THREE.Group, hat: THREE.Group) {
-  const solids: THREE.Mesh[] = [];
-  g.updateMatrixWorld(true);
-  g.traverse((o) => void (o instanceof THREE.Mesh && (o.material as THREE.Material).side !== THREE.BackSide && solids.push(o as THREE.Mesh)));
-  const back = hat.matrix.clone().invert(), dir = new THREE.Vector3(0, 0, -1).applyQuaternion(hat.quaternion), ray = new THREE.Raycaster();
-  for (let y = -0.12; y <= 0.4; y += 0.02) {
-    ray.set(new THREE.Vector3(0, y, 1.5).applyMatrix4(hat.matrix), dir);
-    const hit = ray.intersectObjects(solids, false)[0];
-    if (!hit || !hit.face) continue;
-    const z = hit.point.clone().applyMatrix4(back).z, n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-    if (z < 0.12 || z > 0.5 || -n.dot(dir) < 0.5) continue;
-    return hit.point.addScaledVector(n, 0.05);
-  }
-  return null;
 }
 
 const FOUND = new WeakMap<THREE.Object3D, THREE.Object3D>();
@@ -256,39 +228,35 @@ function beardOf(k: Skin["beard"], hair: number | undefined) {
   return g;
 }
 
-/** The collection's traits onto a gnome makeBall has built (none of them on
- *  GNOMES' fourteen): his small things, a Rare's piece, an Epic's prop, a
- *  Legendary's piece, then his material over all of it. Returns what moves. */
-function dressCollection(g: THREE.Group, hat: THREE.Group, skin: Skin, body: THREE.Mesh, beard: THREE.Group) {
-  kitWear(g, hat, skin);
-  kitPiece(g, hat, skin);
-  const prop = propOf(skin);
-  if (prop) {
-    if (prop.at === "top") prop.group.position.y = hatTop(skin);
-    (prop.at === "body" ? g : hat).add(prop.group);
-  }
-  const ticks = [dressLegend(g, hat, skin)];
-  if (skin.material) {
-    // the solids (not their ink) of a part: the hat's in the hat's colour, all of the beard
-    const solids = (o: THREE.Object3D, keep: (m: THREE.MeshToonMaterial) => boolean) => {
-      const out: THREE.Mesh[] = [];
-      o.traverse((m) => m instanceof THREE.Mesh && m.material instanceof THREE.MeshToonMaterial && m.material.side !== THREE.BackSide && keep(m.material) && out.push(m as THREE.Mesh));
-      return out;
-    };
-    const inProp = (m: THREE.Object3D) => !!prop && !!prop.group.getObjectById(m.id);
-    ticks.push(dressMatter(g, skin, { body, hat: solids(hat, (m) => m.color.getHex() === skin.hat).filter((m) => !inProp(m)), beard: solids(beard, () => true), prop: prop ? prop.matter : [] }));
-  }
-  return ticks.filter((f): f is (t: number) => void => !!f);
+/**
+ * The collection's wardrobe (gnome-dress.ts): its hats, patterns, pieces,
+ * props, matter and Legendaries' pieces, and where a lamp clips on them.
+ * GNOMES' fourteen never need it, so it is not in the game's first load:
+ * loadWardrobe() fetches it, and a collection gnome is known (knowGnome)
+ * only once it is in. A collection skin drawn before then is drawn plain.
+ */
+export interface Wardrobe {
+  /** a patterned body's material */
+  body(skin: Skin): THREE.Material;
+  /** builds a collection hat into the hat's group: whether the skin wears one */
+  hat(hat: THREE.Group, skin: Skin): boolean;
+  /** the highest point of the hat, in its space */
+  top(skin: Skin): number;
+  /** his small things, piece, prop, Legendary's piece and material onto the built gnome: what moves */
+  dress(g: THREE.Group, hat: THREE.Group, skin: Skin, body: THREE.Mesh, beard: THREE.Group): ((t: number) => void)[];
+  /** where a lamp clips on his hat, in the body's space (null: none found) */
+  lamp(g: THREE.Group, hat: THREE.Group): THREE.Vector3 | null;
 }
+let wardrobe: Wardrobe | null = null;
+/** The wardrobe in use from now on (gnome-dress.ts gives itself on import). */
+export const setWardrobe = (w: Wardrobe) => void (wardrobe = w);
+let loading: Promise<void> | null = null;
+/** The wardrobe, fetched once (its own chunk). */
+export const loadWardrobe = () => (loading ||= import("./gnome-dress").then(() => undefined));
 
-export function makeBall(skin: Skin = GNOMES[0]): Gnome {
-  const g = new THREE.Group();
-  const body = inked(new THREE.SphereGeometry(0.55, 22, 16), skin.stripes ? stripedBody(skin.stripes) : skin.pattern ? patternedBody(skin) : flat(skin.body || C.cream));
-  g.add(body);
-
-  const hat = new THREE.Group();
-  if (isKitHat(skin.shape)) kitHat(hat, skin as Skin & { shape: KitHat });
-  else if (skin.shape === "tricorn") {
+/** The game's own hats (the cone, tall or not, the helmet, the tricorn, the toque, the top hat), into the hat's group. */
+function gameHat(hat: THREE.Group, skin: Skin) {
+  if (skin.shape === "tricorn") {
     // a black three-cornered hat: a low crown and three turned-up corners
     const crown = inked(new THREE.CylinderGeometry(0.34, 0.42, 0.42, 14), flat(skin.hat));
     crown.position.y = -0.02;
@@ -330,6 +298,17 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
     cone.position.y = top - h / 2;
     hat.add(cone);
   }
+}
+
+export function makeBall(skin: Skin = GNOMES[0]): Gnome {
+  const w = GNOMES.includes(skin) ? null : wardrobe; // (the fourteen: never the wardrobe)
+  const g = new THREE.Group();
+  const body = inked(new THREE.SphereGeometry(0.55, 22, 16), skin.stripes ? stripedBody(skin.stripes) : skin.pattern && w ? w.body(skin) : flat(skin.body || C.cream));
+  g.add(body);
+
+  const hat = new THREE.Group();
+  const kit = !!w && w.hat(hat, skin); // a collection hat, built: none of the game's own then
+  if (!kit) gameHat(hat, skin);
   if (skin.crown) {
     // a gold crown round the foot of the red hat
     const ring = inked(new THREE.CylinderGeometry(0.44, 0.44, 0.22, 18, 1, true), flat(C.sun, { side: THREE.DoubleSide }));
@@ -380,10 +359,10 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   if (skin.shape === "tricorn" || skin.shape === "toque") brim.visible = false;
   brim.rotation.x = Math.PI / 2;
   brim.position.y = -0.2;
-  if (!isKitHat(skin.shape)) hat.add(brim); // (the collection's hats have their own)
+  if (!kit) hat.add(brim); // (the collection's hats have their own)
   if (skin.pompom) {
     const pom = inked(new THREE.SphereGeometry(0.17, 10, 8), flat(0xffffff));
-    pom.position.y = isKitHat(skin.shape) ? hatTop(skin) + 0.03 : 0.6;
+    pom.position.y = kit && w ? w.top(skin) + 0.03 : 0.6;
     hat.add(pom);
   }
   if (skin.flower) {
@@ -500,9 +479,9 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   nose.position.set(0, -0.02, 0.56);
   const beard = beardOf(skin.beard, skin.hair);
   g.add(nose, beard);
-  const ticks = dressCollection(g, hat, skin, body.children[0] as THREE.Mesh, beard);
+  const ticks = w ? w.dress(g, hat, skin, body.children[0] as THREE.Mesh, beard) : [];
   // a collection gnome's lamp: found on his hat (the fourteen keep theirs, to the vertex)
-  if (!GNOMES.includes(skin)) lampAt = lampSpot(g, hat) || lampAt;
+  if (w) lampAt = w.lamp(g, hat) || lampAt;
 
   const shade = new THREE.Mesh(
     new THREE.CircleGeometry(BALL_R * 1.1, 20),
