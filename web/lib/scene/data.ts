@@ -187,6 +187,8 @@ export interface Gnome extends THREE.Group {
     body: THREE.Object3D; eyes: THREE.Object3D[]; shade: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; reach: number; mid: number;
     /** where a headlamp clips on (the body's space), its glow once lit, and whether it is a clip-on (gnome.ts headlamp) */
     lampAt: THREE.Vector3; lamp?: THREE.Object3D; clip?: boolean;
+    /** what moves on him with time (a Legendary's piece, lava's glow): the preview and the game call it with their clock, in ms */
+    tick?: Tick;
   };
 }
 
