@@ -36,6 +36,7 @@ import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
 import type { WeatherZone } from "./scene/weather";
 import type { Confetti } from "./scene/fx";
+import { makeHoling, makeTrail, type GnomeTrail, type Holed } from "./scene/gnome-fx";
 import type { promo as Promo } from "./promo";
 import type { probes as Probes } from "./engine/probes";
 import type { ClipOf, ClipRun } from "./engine/clip";
@@ -111,7 +112,16 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   const aim = makeAim();
   const band = makeBand();
   scene.add(ball, aim, band);
-  let confetti: Confetti | null = null;
+  let confetti: Confetti | Holed | null = null;
+  // a collection gnome's trail behind him while he rolls (lib/gnomes; GNOMES' have none)
+  let trail: GnomeTrail | null = null, trailUntil = 0;
+  const trailAt = new THREE.Vector3();
+  const dressTrail = (id: string) => {
+    if (trail) (scene.remove(trail.group), disposeCourse(trail.group));
+    trail = makeTrail(gnomeById(id));
+    if (trail) scene.add(trail.group);
+  };
+  dressTrail(gnomeId);
   // a burst done or replaced: out of the scene, its GPU memory freed
   const dropConfetti = () => {
     if (!confetti) return;
@@ -124,6 +134,15 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     if (!g.s) return;
     dropConfetti();
     scene.add((confetti = makeConfetti(g.s.cup, ground(g.s.cup[0], g.s.cup[1]))).group);
+    sound("pop");
+  };
+  // the player's holing: his own effect (a collection gnome's), else the confetti
+  let mine: Holed | null = null;
+  const cheerMine = () => {
+    const h = g.s && makeHoling(gnomeById(gnomeId), new THREE.Vector3(g.s.cup[0], ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]));
+    if (!h) return cheer();
+    dropConfetti();
+    scene.add((confetti = mine = h).group);
     sound("pop");
   };
   // a burst kept hidden, so its shader compiles with the hole's (warm), not on the winning putt
@@ -399,7 +418,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     const gap = prevRaf ? now - prevRaf : 0;
     prevRaf = now;
     if (!g.started || g.covered || document.hidden || (warming && warming === loads)) return (last = now), (budget = 0);
-    const busy = promo.on || g.flying || rival.busy() || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled();
+    const busy = promo.on || g.flying || rival.busy() || dragging || aimer.moving() || (g.cam === "third" && g.aiming) || growing.length > 0 || !!confetti || !!righting || !cam.settled() || now < trailUntil;
     if (blurred && !busy) return (last = now), (budget = 0);
     // moving: the sway, water, weather and decor (all still under reduced
     // motion), or timed pieces (their clock runs under reduced motion too)
@@ -476,6 +495,12 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     ball.userData.shade.position.y = floor - ball.position.y - BALL_R + 0.02;
     rp.offWalls(); // and clear of the walls he runs along
     rival.frame();
+    if (trail) {
+      // laid on the ground under him while he rolls; it fades once he stops
+      if (g.flying && ball.visible) (trail.push(trailAt.set(ball.position.x, floor + 0.04, ball.position.z), now / 1000), (trailUntil = now + 700));
+      trail.step(now / 1000);
+    }
+    ball.userData.tick?.(now); // a Legendary's piece, lava's glow
     if (!g.flying) {
       // at rest on a deck that moves (a seesaw), he rides it
       if (g.course && g.course.userData.lifts && !g.done && !g.holed) ball.position.y = floor; // never a holed ball, it stays down in the cup
@@ -867,6 +892,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.round = (g.round || 0) + 1;
     g.ride = null; // (no ride's or fall's camera carried into a new round, whatever ended the last)
     dropConfetti();
+    if (trail) trail.clear();
     clearTimeout(holedIn);
     g.flying = g.done = g.holed = g.aiming = false;
     g.error = null;
@@ -1311,7 +1337,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.facing = Math.PI / 2; // at rest he looks at the player
     rightUp();
     if (res.holed) {
-      cheer();
+      cheerMine();
       sound("win", g.strokes === 1 ? 1 : 0); // a hole-in-one gets the longer fanfare
       // let the confetti fly (and a duel's ghost play the stroke that ties) before the banner covers the course
       void answered.then(() => {
@@ -1551,6 +1577,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       scene.remove(ball);
       disposeCourse(ball);
       ball = makeBall(gnomeById((gnomeId = id)));
+      dressTrail(id);
       if (g.s) headlamp(ball, g.s.world === "mines");
       scene.add(ball);
       if (g.s) placeBall();
@@ -1619,7 +1646,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
       dropAim(); // and any preview on its way
       cut++; // every animation still running stops at its next frame
       if (g.course) disposeCourse(g.course);
-      for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group]) if (o) disposeCourse(o);
+      for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group, trail && trail.group]) if (o) disposeCourse(o);
       rival.dispose();
       renderer.dispose();
       releaseShared();
@@ -1628,6 +1655,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
   };
   // the test hooks, only for a page that asks for them
   // (always there in the type: undefined unless the page asked for them)
-  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()), stroke: (ex) => ((strokeWalls = ex.walls), (strokeEx = ex), applyWeather(ex.zones)), aimDrawn: aimer.drawn }) : {};
+  const hooked: Partial<ReturnType<typeof Probes>> = probes ? probes(E, { cam, rp, placeBall, fakeWeather: (w) => ((fakeWeather = w), applyWeather()), stroke: (ex) => ((strokeWalls = ex.walls), (strokeEx = ex), applyWeather(ex.zones)), aimDrawn: aimer.drawn, fx: () => ({ trail: !!trail && trail.group.visible, holing: !!confetti && confetti === mine }) }) : {};
   return Object.assign(api, hooked);
 }

@@ -7,7 +7,7 @@
 # client's gnome traces it; headless Chrome), and the aim preview's wasm (wasm.sh --check:
 # the build of these sources, bit for bit, and the realm's answers on the
 # whole course, byte for byte; TinyGo needed); then the client: types, lint, the realm sync
-# check, the unit tests with their coverage floor, and with --smoke the
+# check, the gnome catalogue, the unit tests with their coverage floor, and with --smoke the
 # end-to-end run against a local chain and dev server (see the README). Stops
 # at the first failure.
 # This is also what a CI would run.
@@ -57,6 +57,9 @@ cd "$root/web"
 echo "== typecheck" && npx tsc --noEmit
 echo "== lint" && npm run -s lint
 echo "== selfcheck" && npm run -s selfcheck
+echo "== the gnome catalogue: data/gnomes.json as data/gnomes/ makes it, every rule held" && npm run -s gnomes -- --check
+echo "== the realm's rows: each series' as the catalogue makes them, each row's tier its traits'" && npm run -s gnomes:rows -- --check
+echo "== the gnomes' golden looks: every one drawn as it was" && npm run -s gnomes:looks
 echo "== unit tests" && npm test --silent
 # the bot check's scoring: its rules are the private notes' (private/, beside the code), when checked out
 if [ -f ../private/botcheck/score.test.ts ]; then
