@@ -81,7 +81,10 @@
   }
 
   /** The Builder's header, on every computer screen: the hole, the three steps, the one action. */
-  function header({ mode = "edit", proved = false, errors = 0, name = "Mole Run", alias = "nym-twee/mole-run" }) {
+  // the Builder's worlds: the four classic ones (the Crystal Mines are built by hand, never in the Builder)
+  const WORLDS = [["garden", "Garden", "#1f9a6a"], ["island", "Island", "#1a86d0"], ["town", "Mushroom Town", "#cf3f7c"], ["mountain", "Mountain", "#5569db"]];
+
+  function header({ mode = "edit", proved = false, errors = 0, name = "Mole Run", alias = "nym-twee/mole-run", worldOpen = false }) {
     const I = Kit.ICON;
     const test = mode === "test" ? "now" : proved ? "done" : errors ? "locked" : "open";
     const pub = mode === "publish" ? "now" : proved ? "open" : "locked";
@@ -90,12 +93,12 @@
       : mode === "test" ? (proved ? `<button class="btn btn--chain">Publish →</button>` : `<button class="btn btn--ghost">Back to edit</button>`) : `<button class="btn btn--ghost">Back to edit</button>`;
     return `<header class="bar">
       <button class="round" aria-label="Back to the game: the draft is saved">${I.back}</button>
-      <label class="bar__hole"><input value="${name}" aria-label="The hole's name"${mode === "edit" ? "" : " readonly"}><small>${alias} · Garden</small></label>
-      <span></span>
+      <label class="bar__hole"><input value="${name}" aria-label="The hole's name"${mode === "edit" ? "" : " readonly"}><small>${alias}${mode === "edit" ? "" : " · Garden"}</small></label>
+      ${mode === "edit" ? `<div class="worldpick"><button class="btn btn--ghost btn--s" aria-haspopup="listbox" aria-expanded="${worldOpen}">Garden ▾</button>${worldOpen ? `<ul class="worldpick__menu" role="listbox" aria-label="The hole's world">${WORLDS.map(([id, n, c]) => `<li role="option" aria-selected="${id === "garden"}"><i style="background:${c}"></i>${n}${id === "garden" ? "<b>✓</b>" : ""}</li>`).join("")}</ul>` : ""}</div>` : "<span></span>"}
       <ol class="stepper" aria-label="Edit, test, publish">${step(1, "Edit", mode === "edit" ? "now" : "done")}${step(2, "Test", test, errors ? "Fix the errors first" : "")}${step(3, "Publish", pub, proved ? "" : "Hole it in every weather first")}</ol>
       <div class="bar__end">${mode === "edit" ? `<button class="round" aria-label="Undo" title="Undo · Ctrl Z">${I.undo}</button><button class="round" aria-label="Redo" title="Redo · Ctrl Shift Z" disabled>${I.redo}</button>` : ""}${action}</div>
     </header>`;
   }
 
-  window.Builder = { holeSVG, PIECE, header };
+  window.Builder = { holeSVG, PIECE, header, WORLDS };
 })();

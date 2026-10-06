@@ -11,7 +11,7 @@
      states: ?state=select (default: a bumper selected) | empty (a new hole: start from a template)
      | place (a piece dragged: its ghost snapped, green) | invalid (red: it cannot go there, and why)
      | issues (errors: the list open, one-click fixes; a limit near) | timed (the gate selected: its cycle)
-     | proved (holed in every weather: Publish is the action)
+     | proved (holed in every weather: Publish is the action) | world (the world menu open: the four classic worlds)
      A phone, a touch screen or under 900 px: builder-phone.html, the editor never loads. -->
 <style>
   .start { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--sp-5); }
@@ -34,7 +34,7 @@
   const { holeSVG, PIECE, header } = Builder;
   const s = state("select");
   const empty = s === "empty", issues = s === "issues", proved = s === "proved";
-  const sel = s === "timed" ? "gate" : s === "select" || s === "proved" || issues ? "bumper" : "";
+  const sel = s === "timed" ? "gate" : s === "select" || s === "proved" || s === "world" || issues ? "bumper" : "";
   const dragging = s === "place" ? "bumper" : s === "invalid" ? "sunflower" : "";
 
   // the palette, by kind, the world's own pieces (the hole-builder spec's palette entries)
@@ -78,7 +78,7 @@
         place: s === "place" ? { x: 24, y: 9.5, label: "Mushroom · 24, 9.5" } : s === "invalid" ? { x: 36.5, y: 22, ok: false, label: "Too close to the cup" } : null });
 
   document.getElementById("app").innerHTML = `<main class="bench tint--garden">
-    ${header({ mode: "edit", proved, errors: issues || empty ? 2 : 0 })}
+    ${header({ mode: "edit", proved, errors: issues || empty ? 2 : 0, worldOpen: s === "world" })}
     <aside class="col" aria-label="The Garden's pieces">${palette}</aside>
     <div class="centre">
       <section class="board${s === "invalid" ? " board--no" : ""}" aria-label="The board: wheel or pinch to zoom, drag empty space to pan" style="${s === "invalid" ? "cursor:not-allowed" : ""}">

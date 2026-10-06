@@ -27,13 +27,13 @@
   .traits { margin: 0; }
   .traits p { display: grid; grid-template-columns: 70px 1fr; gap: var(--sp-1) var(--sp-3); margin: 0; }
 
-  .buy { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); }
-  .buy__price { display: flex; align-items: baseline; gap: var(--sp-3); }
+  .buy { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); text-align: center; }
+  .buy__price { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: var(--sp-1) var(--sp-3); }
   .buy__price b { font-size: 36px; line-height: 1; }
   .buy__price span { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
   .buy .btn--cta { width: 100%; margin: 0; }
   .buy .note { margin: 0; }
-  .buy .trust { margin: 0; }
+  .buy .trust { margin: 0; justify-content: center; }
   @media (max-width: 860px) { .gd { grid-template-columns: 1fr; } }
   @media (max-width: 600px) {
     .gd__tile { max-width: 300px; }

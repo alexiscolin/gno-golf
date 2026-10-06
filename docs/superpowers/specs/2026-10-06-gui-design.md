@@ -116,8 +116,29 @@ the game's code or a rule this review added; every screen keeps all of them.
   canvas behind).
 - A sheet scrolls inside itself; its head and its primary action stay
   pinned (`.sheet__foot`, sticky); the page under it is locked
-  (`html:has(.sheet) { overflow: hidden }`). On a phone it rises from the
-  foot, full width, clear of the home bar (`env(safe-area-inset-bottom)`).
+  (`html:has(.sheet) { overflow: hidden }`).
+
+### Windows are centred, as the game's are
+
+The game's own rule (`globals.css` `.sheet`, `.banner`, `.btn--wide`,
+`.sheet .real__fine`; `title.css` `.front__head`), applied to every new
+sheet, dialog and panel:
+
+- The window is centred in the viewport (`place-items: center`) at a capped
+  width (380 px a plain sheet, 440 to 520 one with a bill or a card, as
+  "Get on the boards" is 520 and About 620), on a phone too, with the
+  game's 20 px round it (no bottom sheet).
+- Its head is centred: the eyebrow and the title (clear of the close
+  button in the corner), and a gnome's tile above his name when the window
+  is about him.
+- Its rows (the bill, the fields, a list) and its primary action span the
+  window's full width; nothing hugs the left of a wide window.
+- Its fine print (consent, a note under the action, a count) is centred.
+- An outcome (bought, sent, signing, someone was first, not confirmed yet,
+  published) is centred whole, as the game's banners are.
+- The panels on a page follow it: the buy panel centres its price, its
+  trust strip and its notes under its full-width button; the Builder's
+  publish panel centres its title and fine print.
 - The 3D canvas never takes the page's scroll, and the page never scrolls
   the canvas (`touch-action: none` on the canvas and the board).
 - Safe-area insets are respected (`viewport-fit=cover`, padding from
@@ -435,9 +456,18 @@ page with a phone's media and asserts that no request names
 ### B1. One header, three steps
 
 Every computer screen of the Builder has the same header: Back (the draft is
-saved), the hole's name in place with its address and world under it, the
-three steps in the middle, and on the right the history (in Edit) and the
-one primary action of the mode.
+saved), the hole's name in place with its address under it, in Edit the
+world's menu ("Garden ▾"), the three steps in the middle, and on the right
+the history (in Edit) and the one primary action of the mode.
+
+**The worlds**: the Builder offers the four classic worlds only, Garden,
+Island, Mushroom Town and Mountain, each with its colour in the menu (state
+`world`). The Crystal Mines are not a Builder world: their set pieces and
+lighting are built by hand, so they have no palette, no starters, no menu
+entry (the game still plays the mines course as before). Opening a mines
+hole in the editor, from a link or "Edit" in Your holes, is refused before
+anything loads, in one sentence on the holes list: "The Crystal Mines are
+built by hand: this hole can't be opened in the Builder."
 
 | Step | Shows | Unlocked when | Primary action |
 |---|---|---|---|
@@ -455,7 +485,8 @@ gauges and keys fold away. Never under 900 px (B6).
 
 ### B2. The editor
 
-`builder-editor.html`: select, empty, place, invalid, issues, timed, proved;
+`builder-editor.html`: select, empty, place, invalid, issues, timed, proved,
+world;
 at 1440, 1280 and 1024.
 
 The window never scrolls. Three columns under the header:
@@ -640,7 +671,7 @@ marks each new piece NEW: the reference, not code to copy.
 ## Mobile
 
 Gallery: two columns, filters in a bottom sheet. A gnome's page and the
-auction: one column. Sheets rise from the foot, their action pinned. The
+auction: one column. Sheets stay centred windows, their action pinned. The
 picker's shelf and My gnomes: two columns or a sideways shelf. The Builder:
 B6 only.
 
@@ -716,7 +747,7 @@ headless Chrome (`media/lib/cdp.mjs`), no new dependency.
 | A7 where it shows | `gnome-places.html` | one |
 | A8 share moments | `share.html` | bought, equipped, bidding, won, team, published, clip · phone |
 | A8 share cards | `share-card.html` | gnome, square, auction, reveal, team, hole |
-| B2 the editor (B1 its header) | `builder-editor.html` | select, empty, place, invalid, issues, timed, proved · 1280, 1024 |
+| B2 the editor (B1 its header) | `builder-editor.html` | select, empty, place, invalid, issues, timed, proved, world · 1280, 1024 |
 | B3 test | `builder-test.html` | playing, proved, missed · 1024 |
 | B4 publish | `builder-publish.html` | form, refused, newer, closed, pending, done · 1024 |
 | B5 the holes | `builder-holes.html` | mine, community, empty · phone |

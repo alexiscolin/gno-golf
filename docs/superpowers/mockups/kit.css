@@ -176,11 +176,21 @@ html:has(.sheet), html:has(.sheet) body { overflow: hidden; }
 /* the pinned action: the sheet's last row, on the paper, over what scrolls under it */
 .sheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-3) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-2); }
 .sheet__foot .btn { margin: 0; }
-/* a phone: the sheet comes up from the foot, the full width, clear of the home bar */
+/* the game's rule for its windows (globals.css .sheet, .banner, .real__fine;
+   title.css .front__head): the window centred in the viewport at a capped
+   width, its head centred (clear of the close button), its rows and its action
+   the window's full width, its fine print centred; an outcome (bought, sent,
+   an error) centred whole, as a banner is. A phone keeps the same centred
+   window, the game's 20 px round it. */
+.sheet__in .eyebrow, .sheet h2 { text-align: center; padding-inline: 44px; }
+.sheet__in > .fine, .sheet__foot .fine, .sheet__in > .consent { text-align: center; }
+.sheet__in > :not(.sheet__close, .sheet__foot), .sheet__foot > * { width: 100%; }
+.sheet__in > .sheet__foot { width: auto; justify-self: stretch; }
+.sheet__in--banner { text-align: center; justify-items: center; }
 @media (max-width: 600px) {
-  .sheet { padding: 0; place-items: end stretch; }
-  .sheet__in { max-width: none; border-radius: var(--r-panel) var(--r-panel) 0 0; border-bottom: 0; max-height: 92dvh; padding: 22px 16px calc(16px + env(safe-area-inset-bottom)); }
-  .sheet__foot { bottom: calc(-16px - env(safe-area-inset-bottom)); margin: 0 -16px calc(-16px - env(safe-area-inset-bottom)) !important; padding: var(--sp-3) 16px calc(16px + env(safe-area-inset-bottom)); }
+  .sheet__in { padding: 22px 18px; }
+  .sheet__foot { bottom: -22px; margin: 0 -18px -22px !important; padding: var(--sp-3) 18px 22px; }
+  .sheet__in .eyebrow, .sheet h2 { padding-inline: 40px; }
 }
 .sheet h2 { margin: 2px 0 8px; font-size: 30px; line-height: 1.1; }
 .sheet p { margin: 0 0 12px; color: var(--ink-soft); line-height: 1.5; font-size: 14px; }

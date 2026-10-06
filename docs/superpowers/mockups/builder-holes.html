@@ -40,7 +40,7 @@
     `<article class="hcard">${map}<h3>Crab Walk</h3><p class="hcard__sub">Island · par 3 · not holed by you yet</p><div class="hcard__row"><button class="btn btn--gold btn--s">${ICON.play} Play it for real</button><button class="linkish">Edit</button></div></article>`,
     `<article class="hcard hcard--draft">${map}<h3>Tram Stop</h3><p class="hcard__sub">Draft · 2 of 3 weathers holed</p><div class="hcard__row"><button class="btn btn--main btn--s">Open</button></div></article>`,
   ];
-  const community = [["Mole Run", "nym-twee", "Garden", 5, true], ["The Long Ice", "nym-pebble77", "Mountain", 4, true], ["Lava Lane", "nym-zxxma042", "Crystal Mines", 6, true], ["Bakery Bend", "nym-itsok123", "Mushroom Town", 3, true], ["Crab Walk", "nym-twee", "Island", 3, false], ["Hedge Maze of the Very Long Name", "nym-gnorman", "Garden", 7, false]]
+  const community = [["Mole Run", "nym-twee", "Garden", 5, true], ["The Long Ice", "nym-pebble77", "Mountain", 4, true], ["Tide Pools", "nym-zxxma042", "Island", 4, true], ["Bakery Bend", "nym-itsok123", "Mushroom Town", 3, true], ["Crab Walk", "nym-twee", "Island", 3, false], ["Hedge Maze of the Very Long Name", "nym-gnorman", "Garden", 7, false]]
     .map(([n, by, w, par, h]) => `<article class="hcard">${map}<h3>${n}</h3><p class="hcard__sub">by ${by} · ${w} · par ${par}</p>
       <div class="hcard__row">${h ? `<button class="btn btn--gold btn--s">Race the author</button>${holed}` : `<button class="btn btn--ghost btn--s">${ICON.play} Play</button>`}</div></article>`);
   const body = s === "empty"

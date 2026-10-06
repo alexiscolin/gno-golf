@@ -15,6 +15,14 @@
 .bar__hole { display: grid; min-width: 0; line-height: 1.15; }
 .bar__hole input { min-width: 0; width: 100%; border: 0; border-bottom: 2px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; font-size: 20px; font-weight: 700; color: var(--ink); padding: 0 0 2px; text-overflow: ellipsis; }
 .bar__hole small { font-size: 13px; font-weight: 600; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the world: a menu of the four classic worlds, each its colour (the Crystal Mines are not built here) */
+.worldpick { position: relative; }
+.worldpick > .btn { height: 40px; min-height: 40px; }
+.worldpick__menu { position: absolute; z-index: 6; top: calc(100% + var(--sp-2)); left: 0; min-width: 210px; margin: 0; padding: var(--sp-2); list-style: none; display: grid; gap: var(--sp-1); border: var(--edge); border-radius: 16px; background: var(--paper); box-shadow: var(--shadow); }
+.worldpick__menu li { display: flex; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 var(--sp-3); border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+.worldpick__menu li[aria-selected="true"] { background: var(--mint); }
+.worldpick__menu li i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ink); }
+.worldpick__menu li b { margin-left: auto; color: var(--green); }
 .bar__end { display: flex; align-items: center; gap: var(--sp-2); }
 .bar__end .round { width: 40px; height: 40px; border-width: 2px; }
 /* the steps: Edit, Test, Publish; done green, the current gold, the next open or locked with its reason */

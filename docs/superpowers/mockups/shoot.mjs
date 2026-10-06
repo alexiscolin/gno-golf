@@ -44,7 +44,7 @@ const PAGES = /** @type {{ page: string, title: string, shots: Shot[], audit?: b
   { page: "gnome-places", title: "A7 · Where the gnomes show in play", shots: [["", DESK]], audit: false },
   { page: "share", title: "A8 · Share moments", shots: [["", DESK], ["", PHONE], ["equipped", DESK], ["bidding", DESK], ["won", PHONE], ["team", DESK], ["published", DESK], ["clip", DESK]] },
   { page: "share-card", title: "A8 · Share cards", shots: [["", CARD], ["square", SQUARE], ["auction", CARD], ["reveal", CARD], ["team", CARD], ["hole", CARD]], audit: false },
-  { page: "builder-editor", title: "B2 · The editor", widths: DESKTOP, shots: [["", DESK], ["", MID], ["", LAPTOP], ["empty", DESK], ["place", DESK], ["invalid", DESK], ["issues", DESK], ["issues", LAPTOP], ["timed", DESK], ["proved", DESK]] },
+  { page: "builder-editor", title: "B2 · The editor", widths: DESKTOP, shots: [["", DESK], ["", MID], ["", LAPTOP], ["empty", DESK], ["place", DESK], ["invalid", DESK], ["issues", DESK], ["issues", LAPTOP], ["timed", DESK], ["proved", DESK], ["world", DESK]] },
   { page: "builder-test", title: "B3 · Test", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["proved", DESK], ["missed", DESK]] },
   { page: "builder-publish", title: "B4 · Publish", widths: DESKTOP, shots: [["", DESK], ["", LAPTOP], ["refused", DESK], ["newer", DESK], ["closed", DESK], ["pending", DESK], ["done", DESK]] },
   { page: "builder-phone", title: "B6 · The Builder on a phone", shots: [["", PHONE], ["community", PHONE]] },
