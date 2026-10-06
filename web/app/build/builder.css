@@ -162,3 +162,34 @@
 .bholes__new { flex-direction: column; }
 .bholes__starts { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); }
 .bholes__starts .btn { margin: 0; }
+
+/* ------------------------------------------------------------ publish (B4): the hole as players will see it, the form beside it */
+.pbench { --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; position: fixed; inset: 0; display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3); overflow: hidden; font-family: var(--font); color: var(--ink); background: var(--paper); }
+.pub { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: var(--sp-4); }
+.pub--done { display: grid; place-content: center; justify-items: center; gap: var(--sp-3); text-align: center; }
+.pub--done h2 { margin: 0; font-size: 28px; }
+.pub__hole { display: grid; align-content: start; gap: var(--sp-3); min-width: 0; }
+.pub__card { display: grid; gap: 2px; padding: var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); }
+.pub__card b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pub__card small { color: var(--ink-soft); font-weight: 600; }
+.pub__form { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; border: var(--edge); border-radius: var(--r-card); background: var(--white); overflow: hidden; }
+.pub__scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-3); padding: var(--sp-4); }
+.pub__foot { padding: var(--sp-3) var(--sp-4); border-top: var(--rule); background: var(--paper); }
+.pub__foot .btn { margin: 0; width: 100%; }
+.pub__forever a { color: var(--green); font-weight: 700; }
+.pub__forever { margin: 0; padding: var(--sp-3); border-radius: 12px; background: var(--mint); font-size: 15px; line-height: 1.4; }
+.pub__field { display: grid; gap: var(--sp-1); font-size: 13px; font-weight: 700; }
+.pub__field span { display: flex; justify-content: space-between; }
+.pub__field em { font-style: normal; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.pub__field input, .pub__field textarea { min-height: 44px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; resize: none; }
+.pub__field [aria-invalid="true"] { border-color: var(--hat-ink); }
+.pub__field code { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+.pub__field small, .pub__small { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.pub__bill { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-1) var(--sp-3); margin: 0; font-size: 15px; font-variant-numeric: tabular-nums; }
+.pub__bill dd { margin: 0; text-align: right; }
+.pub__bad { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; color: var(--hat-ink); font-weight: 700; }
+.pub__note { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: 12px; background: var(--paper); font-weight: 700; }
+.pub__gnokey summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.pub__gnokey pre { max-height: 160px; overflow: auto; overscroll-behavior: contain; padding: var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+.pub__row { display: flex; gap: var(--sp-2); }
+.pub__row .btn { margin: 0; }

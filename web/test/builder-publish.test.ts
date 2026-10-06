@@ -6,7 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { bill, deposit, gasFor, gnokeyPublish, publishBytes, shq, STORED } from "../lib/builder/publish.ts";
+import { bill, deposit, finalHex, gasFor, gnokeyPublish, proofsHold, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
+import { shaOf } from "../lib/builder/proof.ts";
 
 const GOLF = new URL("../../gno.land/r/gnogolf/golf/", import.meta.url);
 /** A filetest's golden numbers: the golf realm's storage and the gas. */
@@ -65,6 +66,50 @@ void test("the note comes out of the gnokey command unchanged", () => {
   assert.match(cmd, /-func PublishMine -args a-b -args 00ff -args 'Let'\\''s go; \$\(x\)'/);
   assert.match(cmd, /-max-deposit 600000ugnot/, "the deposit capped at the bill's");
   assert.match(cmd, /-chainid dev -remote http:\/\/127\.0\.0\.1:26657 <your-key-name>$/);
+});
+
+const A = "g1" + "a".repeat(38);
+const ver = (v: number, sha = "old") => ({ id: `${A}/lane/v${v}`, v, height: 1, by: A, sha, note: "", next: "" });
+const ready = { publishing: true, rules: true, versions: { version: 1, slot: `${A}/lane`, versions: [ver(1)] }, proofs: true, name: "" };
+const at = { author: A, slug: "lane", proved: `${A}/lane/v2`, sha: "new" };
+
+void test("publishSteps: open once every check holds; else the first that does not, in words", () => {
+  assert.deepEqual(publishSteps(ready, at), { at: "ready", why: "" });
+  assert.equal(publishSteps({ ...ready, publishing: undefined }, at).at, "reading");
+  assert.deepEqual(publishSteps({ ...ready, publishing: false }, at), { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." });
+  assert.deepEqual(publishSteps({ ...ready, rules: false }, at), { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." });
+  assert.equal(publishSteps({ ...ready, versions: null }, at).at, "unread");
+  const newer = publishSteps({ ...ready, versions: { ...ready.versions, versions: [ver(1), ver(2)] } }, at);
+  assert.deepEqual(newer, { at: "newer", why: "This one would be v3, with new weather: test it again." }, "a version published elsewhere since: its proofs are another id's");
+  assert.deepEqual(publishSteps(ready, { ...at, sha: "old" }), { at: "same", why: "This is exactly the version already published." });
+  assert.equal(publishSteps({ ...ready, proofs: false }, at).at, "proofs");
+  assert.deepEqual(publishSteps({ ...ready, name: "The name or the note looks like a web address." }, at), { at: "name", why: "The name or the note looks like a web address." });
+  assert.equal(publishSteps({ ...ready, publishing: false, rules: false }, at).at, "closed", "closed first: nothing else matters then");
+});
+
+void test("the final data: the name as the chain keeps it written in; the proofs replay on it; its sha the realm's", async () => {
+  const { host } = await import("./builder-fixture.ts");
+  await import("./scene-harness.ts");
+  const { STARTERS } = await import("../lib/builder/starters.ts");
+  const { proofKey, replay, required } = await import("../lib/builder/proof.ts");
+  const { makeLocalChain } = await import("../lib/builder/localchain.ts");
+  const { holeRow } = await import("../lib/builder/testmode.ts");
+  const rounds = JSON.parse(fs.readFileSync(new URL("./builder-starters.json", import.meta.url), "utf8")) as Record<string, Record<string, { period: number; shots: string[] }>>;
+  const id = "g1hvuayx9ll7dal54kr0f6t89j8867z8lf5vtxgv/garden-straight/v1", d0 = { ...STARTERS.garden.straight, slug: "garden-straight" };
+  const key = (await proofKey(d0, host))!, proofs = [];
+  for (const kind of required("garden")) {
+    const r = rounds["garden-straight"][kind];
+    proofs.push(await replay(makeLocalChain(host, holeRow(id, d0), finalHex(d0, host, d0.title)!, r.period), { key, id, kind, period: r.period, shots: r.shots }));
+  }
+  const d = { ...d0, proofs: proofs as never[] };
+  const hex = finalHex(d, host, "Garden Straight")!;
+  assert.equal(host.decode(hex).title, "Garden Straight", "the name as the chain keeps it, in the data");
+  assert.equal(await proofsHold(d, host, hex, key, id), true, "a new name moves no ball");
+  const moved = finalHex({ ...d, pieces: d.pieces.map((p) => (p.id === "p1" && p.geometry.t === "post" ? { ...p, geometry: { ...p.geometry, c: [p.geometry.c[0], p.geometry.c[1] + 2] as [number, number] } } : p)) }, host, "x")!;
+  assert.equal(typeof (await proofsHold(d, host, moved, key, id)), "boolean");
+  assert.equal(await proofsHold({ ...d, proofs: [] }, host, hex, key, id), false, "no proof, nothing holds");
+  assert.match(await shaOf(hex), /^[0-9a-f]{64}$/);
+  assert.notEqual(await shaOf(hex), await shaOf(moved));
 });
 
 void test("gnokeyPublish: nothing for a slug, data or realm not of their shape (nothing unchecked reaches a shell)", () => {

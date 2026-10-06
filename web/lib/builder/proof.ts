@@ -26,6 +26,11 @@ const toBytes = (hex: string) => Uint8Array.from(hex.match(/../g) ?? [], (b) => 
 export async function proofKey(d: Draft, host: BuilderHost): Promise<string | null> {
   const hex = canonicalHex({ ...d, title: "", par: 0 }, host);
   if (hex == null) return null;
+  return shaOf(hex);
+}
+
+/** The sha-256 of data given in hex, as the realm keeps it (Versions "sha"). */
+export async function shaOf(hex: string): Promise<string> {
   const sum = new Uint8Array(await crypto.subtle.digest("SHA-256", toBytes(hex)));
   return Array.from(sum, (b) => b.toString(16).padStart(2, "0")).join("");
 }

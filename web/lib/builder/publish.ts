@@ -5,6 +5,12 @@
 // warm-up's), the bill shown before any signature, and the command for
 // gnokey, whose every argument reaches the realm as the page shows it.
 import { feeFor, gnokeyOn, MAX_GAS, PER_CALL, PKG_PATH } from "../adena";
+import type { Versions } from "../types";
+import { holeId, holeRow } from "./testmode";
+import { makeLocalChain } from "./localchain";
+import { canonicalHex, replay, required } from "./proof";
+import type { Draft } from "./draft";
+import type { BuilderHost } from "./wasm";
 
 /**
  * What a publish stores besides its data, name and note (bytes): its entry
@@ -41,6 +47,54 @@ export function gasFor({ bytes, name, note }: { bytes: number; name: string; not
 export function bill(o: Parameters<typeof publishBytes>[0] & { gasPrice: number; bytePrice: number }) {
   const d = deposit({ ...o, price: o.bytePrice }) / 1e6, fee = feeFor(gasFor(o), o.gasPrice) / 1e6;
   return { deposit: d, fee, total: d + fee };
+}
+
+/** The data as it will be published: the draft framed and fitted, its title the name as the chain keeps it (check's); null if fit refuses it. */
+export const finalHex = (d: Draft, host: BuilderHost, name: string) => canonicalHex({ ...d, title: name }, host);
+
+/** Whether every weather the world asks has a proof of this hole (key) under id that replays, as a save is cut, on the final data. */
+export async function proofsHold(d: Draft, host: BuilderHost, hex: string, key: string, id: string): Promise<boolean> {
+  for (const kind of required(d.world)) {
+    const p = d.proofs.find((x) => x.kind === kind && x.key === key && x.id === id);
+    if (!p) return false;
+    const again = await replay(makeLocalChain(host, holeRow(id, d), hex, p.period), { key, id, kind, period: p.period, shots: p.shots });
+    if (typeof again === "string") return false;
+  }
+  return true;
+}
+
+/** What the publish step reads before it opens (undefined: still being read). */
+export interface Readings {
+  /** Publishing(): community holes open on this chain */
+  publishing: boolean | undefined;
+  /** builder.wasm's sources are the realm's, and the realm has no successor */
+  rules: boolean | undefined;
+  /** Versions(alias); null: the chain could not be read */
+  versions: Versions | null | undefined;
+  /** every required proof replays on the final bytes */
+  proofs: boolean | undefined;
+  /** check()'s refusal of the name or the note, explained; "" none */
+  name: string;
+}
+export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "rules" | "unread" | "newer" | "same" | "proofs" | "name"; why: string };
+
+/**
+ * Where the publish step stands: ready, or the first check that does not
+ * hold, said once. The id it publishes under (the alias's next version) is
+ * the one the proofs were made under, or the weather was another's; the data
+ * may not be the alias's current version's again (golf refuses it).
+ */
+export function publishSteps(r: Readings, { author, slug, proved, sha }: { author: string; slug: string; proved: string; sha: string }): Step {
+  if (r.publishing === false) return { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." };
+  if (r.rules === false) return { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." };
+  if (r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
+  if (r.publishing === undefined || r.rules === undefined || r.versions === undefined || r.proofs === undefined) return { at: "reading", why: "" };
+  const id = holeId(author, slug, r.versions);
+  if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: test it again.` };
+  if (r.versions.versions.at(-1)?.sha === sha) return { at: "same", why: "This is exactly the version already published." };
+  if (!r.proofs) return { at: "proofs", why: "The rounds that proved it no longer play out the same on its final data: test it again." };
+  if (r.name) return { at: "name", why: r.name };
+  return { at: "ready", why: "" };
 }
 
 /** A string as one POSIX shell word: in single quotes, each one in it as '\''. */

@@ -446,6 +446,16 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       if (!a || !isAddress(a)) throw refused("The chain's owner is not an address.");
       return a;
     },
+    /** Whether the realm takes community holes now (Publishing()): the Builder's publish step reads it first. */
+    publishing: async () => {
+      const m = (await vm(REALM, "Publishing()")).match(/^\((true|false) bool\)/);
+      if (!m) throw refused("The chain did not say whether publishing is open.");
+      return m[1] === "true";
+    },
+    /** An alias's current version's id (Current), "" for none: a publish has landed once it names the new id. */
+    current: (alias: string) => qstr(REALM, `Current(${s(alias)})`),
+    /** The realm that took this course over (Successor()), "" for none: nothing is published to a course that moved. */
+    successor: () => qstr(REALM, "Successor()"),
     /** What a timed hole adds at one stroke of a round (0 = first shot): read
      *  once per hole version and stroke (Extras is a pure function of the two:
      *  the look-ahead and the next stroke ask the same), a failure not kept. */

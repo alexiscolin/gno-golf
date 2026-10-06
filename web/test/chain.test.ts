@@ -566,6 +566,21 @@ test("owner reads the realm's owner as an address, and refuses anything else", a
   await assert.rejects(chain.owner());
 });
 
+test("publishing and successor read the realm's state for a publish; anything else is refused", async () => {
+  const chain = makeChain();
+  setFetch((url) => (decoded(url).expr.includes("Publishing()") ? rawReply("(true bool)") : strReply("")));
+  assert.equal(await chain.publishing(), true);
+  assert.equal(await chain.successor(), "", "none set");
+  setFetch(() => rawReply("(false bool)"));
+  assert.equal(await chain.publishing(), false);
+  setFetch(() => rawReply("(maybe bool)"));
+  await assert.rejects(chain.publishing());
+  setFetch(() => strReply("gno.land/r/x/golf/v3"));
+  assert.equal(await chain.successor(), "gno.land/r/x/golf/v3");
+  setFetch((url) => (assert.ok(decoded(url).expr.includes(`Current("${ADDR1}/lane")`)), strReply(`${ADDR1}/lane/v2`)));
+  assert.equal(await chain.current(`${ADDR1}/lane`), `${ADDR1}/lane/v2`);
+});
+
 test("holeLeaderboard pages one hole's board", async () => {
   const chain = makeChain();
   setFetch(() => qevalReply(HOLE_BOARD_REPLY));

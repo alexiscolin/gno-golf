@@ -33,6 +33,7 @@ import {
   sendTip,
   shortOf,
   costOf,
+  publishHole,
 } from "../lib/adena.ts";
 import type { HoleState, SimulateRound, Vec2 } from "../lib/types.ts";
 import { execFileSync } from "node:child_process";
@@ -519,6 +520,19 @@ test("recordRound: PlayRound alone for a fresh, period-less, assisted round (a h
   assert.deepEqual(tx.networkInfo, { chainId: CHAIN, rpcUrl: RPC }); // the network the tx is signed for
   assert.equal(tx.gasWanted, 1_900_000_000); // no gas given: MAX_GAS
   assert.equal(tx.gasFee, Math.ceil(1_900_000_000 * 0.001 * 1.5));
+});
+
+test("publishHole: one PublishMine of slug, data and note as given (no shell: the note untouched), its deposit capped at the bill's", async () => {
+  const { a, calls } = fakeAdena();
+  setWindow({ adena: a });
+  const note = "Let's go; $(x)";
+  await publishHole({ address: ADDR, realm: REALM, slug: "mole-run", hex: "00ff", note, gas: 50_000_000, deposit: 600_000, price: 0.001, chainId: CHAIN, rpc: RPC });
+  const tx = calls.find((c) => c.name === "DoContract")!.args[0] as { messages: { value: { pkg_path: string; func: string; args: string[]; max_deposit?: string; caller: string } }[]; gasWanted: number };
+  assert.deepEqual(tx.messages.map((m) => [m.value.pkg_path, m.value.func, m.value.args, m.value.max_deposit, m.value.caller]), [[REALM, "PublishMine", ["mole-run", "00ff", note], "600000ugnot", ADDR]]);
+  assert.equal(tx.gasWanted, 50_000_000);
+  for (const bad of [{ slug: "A b" }, { hex: "0g" }, { realm: "gno.land/r/x;y" }, { deposit: -1 }]) {
+    await assert.rejects(() => publishHole({ address: ADDR, realm: REALM, slug: "mole-run", hex: "00ff", note, gas: 50_000_000, deposit: 600_000, price: 0.001, chainId: CHAIN, rpc: RPC, ...bad }), /not publish/, JSON.stringify(bad));
+  }
 });
 
 test("recordRound: a name taken in the same signature, Register first and Claim last, their gas added", async () => {

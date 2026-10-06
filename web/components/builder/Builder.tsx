@@ -21,6 +21,7 @@ import { FIELD } from "@/lib/builder/rules";
 import type { BuilderHost } from "@/lib/builder/wasm";
 import Editor from "./Editor";
 import Header from "./Header";
+import Publish from "./Publish";
 import TestMode from "./TestMode";
 
 const WORLDS = Object.keys(FIELD);
@@ -121,7 +122,7 @@ export default function Builder() {
   const [failed, setFailed] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   // the draft open (its place in the list), how many times opened (a fresh editor each), and the step
-  const [open, setOpen] = useState<{ i: number; n: number; step: "edit" | "test"; test?: { hex: string; key: string } } | null>(null);
+  const [open, setOpen] = useState<{ i: number; n: number; step: "edit" | "test" | "publish"; test?: { hex: string; key: string } } | null>(null);
   const [author, setAuthor] = useState<string | null>(null);
   const [unkept, setUnkept] = useState(false);
   useEffect(() => {
@@ -146,14 +147,27 @@ export default function Builder() {
   const unkeptNote = unkept && <p className="bench__unkept" role="status">This browser keeps nothing (a private window?): export your hole before you leave.</p>;
   if (open && drafts[open.i]) {
     const d = drafts[open.i], edit = () => setOpen({ ...open, n: open.n + 1, step: "edit", test: undefined });
+    const publish = () => setOpen({ ...open, step: "publish" });
+    if (open.step === "publish" && author) {
+      return (
+        <div className={`pbench tint--${d.world}`}>
+          <Header title={d.title} slug={d.slug} author={author} world={d.world} worlds={[d.world]} step="publish"
+            steps={{ edit: { locked: "", done: true }, test: { locked: "", done: true }, publish: { locked: "", done: false } }}
+            action={null} history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}}
+            onStep={(s) => (s === "edit" ? edit() : s === "test" && setOpen({ ...open, step: "edit" }))} onBack={edit} />
+          <Publish host={host} draft={d} author={author} onDraft={(x) => update(() => x)} onRetest={edit} onDone={() => {}} />
+          {unkeptNote}
+        </div>
+      );
+    }
     if (open.step === "test" && open.test) {
       const { hex, key } = open.test, proved = !!author && !!provedAs(d.proofs, d.world, key, author, d.slug);
       return (
         <div className={`tbench tint--${d.world}`}>
           <Header title={d.title} slug={d.slug} author={author} world={d.world} worlds={[d.world]} step="test"
             steps={{ edit: { locked: "", done: true }, test: { locked: "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
-            action={proved ? { text: "Publish →", kind: "chain", onClick: () => {} } : { text: "Back to edit", kind: "ghost", onClick: edit }}
-            history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}} onStep={(s) => s === "edit" && edit()} onBack={edit} />
+            action={proved ? { text: "Publish →", kind: "chain", onClick: publish } : { text: "Back to edit", kind: "ghost", onClick: edit }}
+            history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}} onStep={(s) => (s === "edit" ? edit() : s === "publish" && proved && publish())} onBack={edit} />
           <TestMode host={host} draft={d} hex={hex} proofKey={key} author={author} onAuthor={setAuthor}
             onProof={(p) => update((x) => ({ ...x, proofs: [...x.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }))}
             onPar={(par) => update((x) => (parAllowed(x.proofs.filter((q) => q.key === key), x.par) ? x : { ...x, par }))} />
@@ -163,7 +177,7 @@ export default function Builder() {
     }
     return (
       <>
-        <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => setOpen(null)} onPublish={() => {}}
+        <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => setOpen(null)} onPublish={publish}
           onTest={(x) => {
             const hex = canonicalHex(x, host);
             if (hex == null) return;

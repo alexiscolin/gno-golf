@@ -32,7 +32,8 @@ const rpcOf = (n: Network) => n.rpcUrl || n.rpc_url;
 /** A /vm.m_call message, as DoContract takes it. */
 interface Call {
   type: "/vm.m_call";
-  value: { caller: string; send: string; pkg_path: string; func: string; args: string[] };
+  /** max_deposit: the most the call may lock as storage deposit ("600000ugnot"), the chain's default if none */
+  value: { caller: string; send: string; pkg_path: string; func: string; args: string[]; max_deposit?: string };
 }
 /** A /bank.MsgSend message: coins from the player's account to another. */
 interface Send {
@@ -434,9 +435,25 @@ async function send(messages: (Call | Send)[], gasWanted: number, price: number,
   return res.data ?? null;
 }
 
-/** One transaction of plain calls from the connected account. */
-const calls = (address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string) =>
-  send(list.map(([pkg_path, func, args]): Call => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args } })), gasWanted, price, chainId, rpc, failed);
+/** One transaction of plain calls from the connected account (maxDeposit: each call's storage deposit capped, "600000ugnot"). */
+const calls = (address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, maxDeposit = "") =>
+  send(list.map(([pkg_path, func, args]): Call => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args, ...(maxDeposit && { max_deposit: maxDeposit }) } })), gasWanted, price, chainId, rpc, failed);
+
+/**
+ * A hole published from the Builder: golf's PublishMine of slug, data (hex)
+ * and note, from the connected account, at the gas and the storage deposit
+ * the bill showed (lib/builder/publish.ts), the deposit capped at it. The
+ * note is any text: no shell sees it here. Refused before Adena opens for a
+ * slug, data or realm not of their shape.
+ */
+export function publishHole({ address, realm, slug, hex, note, gas, deposit, price = PRICE, chainId, rpc }: {
+  address: string; realm: string; slug: string; hex: string; note: string; gas: number; deposit: number; price?: number; chainId?: string | null; rpc: string;
+}) {
+  if (!PKG_PATH.test(realm) || !/^[a-z0-9-]{1,32}$/.test(slug) || !/^(?:[0-9a-f]{2})+$/.test(hex) || !Number.isSafeInteger(deposit) || deposit < 0) {
+    return Promise.reject(new Error("The hole was not published: its address or data is not one the chain takes."));
+  }
+  return calls(address, [[realm, "PublishMine", [slug, hex, note]]], Math.min(gas, MAX_GAS), price, chainId, rpc, "The hole was not published.", `${deposit}ugnot`);
+}
 
 // a bank send is a few hundred thousand gas: asked with room, Adena sets the final fee
 const TIP_GAS = 2_000_000;
