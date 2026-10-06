@@ -14,9 +14,9 @@ import { MAX_BYTES, type Validated } from "./pipeline";
 /** The dock's one line: what stands between the draft and the next step (off: why Test is off, testGate's; a check under way says nothing new). */
 export function verdict({ pieces, errors, proved, off = "" }: { pieces: number; errors: number; proved: boolean; off?: string }) {
   if (!pieces) return { ok: false, text: "Place pieces between the tee and the cup" };
-  if (errors) return { ok: false, text: `${errors} to fix` };
+  if (errors) return { ok: false, text: `${errors} ${errors === 1 ? "thing" : "things"} to fix` };
   if (off && off !== "Checking…") return { ok: false, text: off };
-  return { ok: true, text: proved ? "Holed in every weather" : "Ready to test" };
+  return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready to test: press Test it." };
 }
 
 /**

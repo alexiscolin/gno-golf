@@ -2,6 +2,7 @@
 // messages"): each L2 refusal is shown so, with the realm's own sentence
 // under it, for an author to search. An unknown sentence is shown as it is.
 import { LIMITS } from "./gg1";
+import type { Issue } from "./checks";
 
 const COUNTS: Record<string, keyof typeof LIMITS> = { walls: "walls", posts: "posts", zones: "zones", "polygon points": "polyTotal", pulses: "pulses", skins: "skins" };
 
@@ -33,4 +34,32 @@ export function explain(sentence: string, counts: Partial<Record<keyof typeof LI
     "golf: publishing community holes is not open yet": "Publishing is not open yet. Your draft is kept.",
   };
   return Object.hasOwn(plain, s) ? plain[s] : s;
+}
+
+/**
+ * A check's sentence in the player's words (the GUI spec's B1): what is
+ * wrong, named by its pieces, and what to do, without the place in numbers
+ * (Show me frames it) or the rule's code (a tooltip, for us). A sentence of
+ * no known shape is kept, its numbers dropped.
+ */
+export function plainOf(i: Pick<Issue, "rule" | "text">): string {
+  const t = i.text.replace(/ at \(-?[\d.]+, -?[\d.]+\)/g, "").replace(/ \(-?[\d.]+, -?[\d.]+\)/g, "");
+  const m = (re: RegExp) => re.exec(t);
+  let r: RegExpExecArray | null;
+  if ((r = m(/^The tee touches (.+)$/))) return `The tee is on ${r[1]}: move the tee or ${r[1]}.`;
+  if ((r = m(/^The cup touches (.+)$/))) return `The cup is inside ${r[1]}: move the cup or ${r[1]}.`;
+  if ((r = m(/^The cup cannot be reached from the tee: the gap between (.+) and (.+) is ([\d.]+) wide, narrower than the ball .*$/))) return `The ball can't get between ${r[1]} and ${r[2]} (${r[3]} wide): widen the gap.`;
+  if (/^The cup cannot be reached from the tee$/.test(t)) return "The ball can't get from the tee to the cup: open a way through.";
+  if ((r = m(/^The gap between (.+) and (.+) is ([\d.]+) wide, and the way to the cup goes through it: at least ([\d.]+), .*$/))) return `The way to the cup squeezes between ${r[1]} and ${r[2]} (${r[3]} wide): widen it to at least ${r[4]}.`;
+  if (i.rule === "E13" && (r = m(/^(.+) (overlaps|stands on|crosses|lies over|stands in) (.+)$/))) return `${r[1]} ${r[2]} ${r[3]}: move one of them.`;
+  if ((r = m(/^(.+) is outside the lane: no ball reaches it$/))) return `${r[1]} is outside the lane, where no ball goes: move it in or remove it.`;
+  if ((r = m(/^(.+) is ([\d.]+) from (.+): at least ([\d.]+), or the kerb swallows it$/))) return `${r[1]} is too close to ${r[3]} (${r[2]}): leave at least ${r[4]} between them.`;
+  if ((r = m(/^(.+) stands in the (.+) round the lane: the world draws over it$/))) return `${r[1]} stands in the ${r[2]} round the lane, drawn over: move it into the lane.`;
+  if ((r = m(/^The hole is ([\d.]+) across: at most ([\d.]+) between its outermost pieces$/))) return `The hole is too big (${r[1]} across): bring its outermost pieces within ${r[2]}.`;
+  if ((r = m(/^(.+) comes out, off the board once the hole is fitted$/))) return `${r[1]} comes out off the board: bring its way out inside the hole.`;
+  if ((r = m(/^(.+)'s point lies off the board once the hole is fitted$/))) return `${r[1]} has a point off the board: bring it inside the hole.`;
+  if ((r = m(/^(.+) comes out, in a zone that moves the ball on$/))) return `${r[1]} comes out where the ball is pushed on: move its way out.`;
+  if ((r = m(/^(.+)'s (.+) is (-?[\d.]+): (-?[\d.]+) to (-?[\d.]+)$/))) return `${r[1]}'s ${r[2]} is ${r[3]}: make it ${r[4]} to ${r[5]}.`;
+  if ((r = m(/^(.+) is on for (\d+) of (\d+) (\w+): (\d+) to (\d+)$/))) return `${r[1]} is on ${r[2]} of ${r[3]} ${r[4]}: make it ${r[5]} to ${r[6]}.`;
+  return /[.!?]$/.test(t) ? t : `${t}.`;
 }

@@ -11,6 +11,7 @@ import fs from "node:fs";
 import { build, loadWorld } from "./scene-harness.ts";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { validate } from "../lib/builder/pipeline.ts";
+import { plainOf } from "../lib/builder/explain.ts";
 import { checkHole, type EntryOf } from "../lib/builder/checks.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
@@ -84,6 +85,25 @@ for (const [what, make, want] of cases) {
     assert.deepEqual(said(make()), want);
   });
 }
+
+void test("in the player's words: every refusal without its place's numbers or its rule's code, and with what to do", () => {
+  for (const [what, make] of cases) {
+    for (const i of run(make())) {
+      const p = plainOf(i);
+      assert.doesNotMatch(p, /\(-?\d+(\.\d+)?, -?\d+(\.\d+)?\)/, `${what}: a place in numbers: ${p}`);
+      assert.doesNotMatch(p, /\b(E\d+b?|L\d)\b/, `${what}: a rule's code: ${p}`);
+      assert.match(p, /^[A-Z].*[:.] [a-z].*\.$|^[A-Z][^:]*\.$/, `${what}: a sentence with what to do: ${p}`);
+      assert.match(p, /move|bring|widen|leave|open|give|make|remove|write|keep|take/i, `${what}: what to do: ${p}`);
+    }
+  }
+  const one = (d: Draft) => plainOf(run(d)[0]);
+  assert.equal(one(lane("garden", [put("x", "*/hazard/water", [25.5, 8.5], { size: 3 })])), "The cup is inside the water hazard: move the cup or the water hazard.");
+  assert.equal(one(lane("garden", [put("x", "*/post/rock", [3.5, 10])])), "The tee is on the rock post: move the tee or the rock post.");
+  assert.equal(one(lane("garden", [rail("x", [20, 0], [20, 20])])), "The ball can't get from the tee to the cup: open a way through.");
+  assert.equal(one(lane("garden", [put("x", "*/post/rock", [12, 9]), put("y", "*/post/stump", [12.5, 9])])), "The rock post overlaps the stump post: move one of them.");
+  assert.equal(one(lane("garden", [rail("a", [15, 0], [15, 9.5]), rail("b", [15.5, 10.5], [15.5, 20])])), "The way to the cup squeezes between the plain rail and the plain rail (1.12 wide): widen it to at least 1.25.");
+  assert.equal(one(lane("garden", [{ ...put("x", "*/bar/plank", [10, 0.5]), geometry: { t: "bar", a: [10, 0.5], b: [14, 0.5], thick: 0.5 } }])), "The plank bar is too close to the plain rail (0.25): leave at least 0.5 between them.");
+});
 
 void test("L0: a piece's geometry is its entry's kind and shape, a polygon within GG1's points (a hand-edited file)", () => {
   const rock = put("x", "*/post/rock", [12, 9]);

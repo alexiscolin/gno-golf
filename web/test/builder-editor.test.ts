@@ -20,14 +20,14 @@ const stateAt1 = (hex: string) => (host.load(DRAFT_ID, hex), host.setperiod(1), 
 
 void test("verdict: what to fix first, then ready to test, then proved", () => {
   assert.deepEqual(verdict({ pieces: 0, errors: 0, proved: false }), { ok: false, text: "Place pieces between the tee and the cup" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false }), { ok: false, text: "2 to fix" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 1, proved: false }), { ok: false, text: "1 to fix" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false }), { ok: true, text: "Ready to test" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: true }), { ok: true, text: "Holed in every weather" });
+  assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false }), { ok: false, text: "2 things to fix" });
+  assert.deepEqual(verdict({ pieces: 3, errors: 1, proved: false }), { ok: false, text: "1 thing to fix" });
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false }), { ok: true, text: "Ready to test: press Test it." });
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: true }), { ok: true, text: "Holed in every weather: press Publish." });
   // the one place the next step's reason is said, in words (the header's action keeps its own words, so nothing moves)
   assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Give it a short name first" }), { ok: false, text: "Give it a short name first" });
-  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Checking…" }), { ok: true, text: "Ready to test" }, "a check under way changes nothing said");
-  assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false, off: "Fix 2 first" }), { ok: false, text: "2 to fix" });
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Checking…" }), { ok: true, text: "Ready to test: press Test it." }, "a check under way changes nothing said");
+  assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false, off: "Fix 2 first" }), { ok: false, text: "2 things to fix" });
   void err;
 });
 
