@@ -12,6 +12,7 @@
 import type { Chain } from "./chain";
 import { authorOf } from "./builder/holes";
 import { bytesOf, sha256 } from "./sha";
+import { takenDown } from "./takedown";
 import type { HoleRow } from "./types";
 import type { Verdict } from "./builder/verdict";
 import type { BuilderHost } from "./builder/wasm";
@@ -64,6 +65,10 @@ export async function verdictOf(chain: Pick<Chain, "holeData">, id: string, deps
   keep(key, v);
   return v;
 }
+
+/** The community holes a chain's list holds (anyone's latest versions), none taken down; none while the takedown list is unknown (null). */
+export const communityOf = (list: readonly HoleRow[], taken: ReadonlySet<string> | null): HoleRow[] =>
+  taken ? list.filter((h) => !h.next && h.official === false && !takenDown(taken, h.id)) : [];
 
 /** Whether the game may play a hole (its version or its alias): a course hole always, never judged (the
  *  realm's own, under no address); a community hole (PublishMine's, under its author's address) once its verdict passes. */

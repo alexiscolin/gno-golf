@@ -32,7 +32,8 @@ import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
 import { loadTakedown, takenDown } from "./takedown";
-import { NOT_BUILDER, playable } from "./community";
+import { communityOf, NOT_BUILDER, playable } from "./community";
+import { authorOf } from "./builder/holes";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
@@ -1397,8 +1398,9 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     // listed apart and ranked nowhere
     g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
     // not listed until the builder is out (NEXT_PUBLIC_COMMUNITY=1 lists
-    // them): the chain takes anyone's hole, the game shows the course's
-    g.community = COMMUNITY ? list.filter((h) => !h.next && h.official === false && !takenDown(g.taken ?? NO_TAKEN, h.id)) : [];
+    // them): the chain takes anyone's hole, the game shows the course's,
+    // and none until the takedown list is known
+    g.community = COMMUNITY ? communityOf(list, g.taken ?? null) : [];
   }
 
   /** The takedown list, read once a visit (none if it cannot be read: the next start tries again). */
@@ -1411,9 +1413,18 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
 
   /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", "taken" for a hole the site took down, "unchecked" for a community hole the Builder's rules do not pass, null for a link to nothing). */
   async function start(link: string | Link | null): Promise<"hole" | "cup" | "taken" | "unchecked" | null> {
-    g.taken = await takedown();
-    // a link to a hole the site took down opens the cups, and says so
-    if (typeof link === "string" && takenDown(g.taken, link)) return start(null).then((to) => (to === null ? "taken" : to));
+    // the takedown list (the site's file, the node's chain id) read beside the hole list, never before it:
+    // the community's list fills once it is known, and only a link to a community hole waits for it
+    const taking = takedown().then((t) => {
+      if (alive && g.taken !== t) {
+        g.taken = t;
+        if (g.all) setList(g.all);
+        void publish();
+      }
+      return t;
+    });
+    // a link to a hole the site took down opens the cups, and says so (a course hole is never on the list)
+    if (typeof link === "string" && authorOf(link) && takenDown(await taking, link)) return start(null).then((to) => (to === null ? "taken" : to));
     let list = await chain.holes();
     // a link to a hole the tab's kept list does not have yet: the chain's own
     if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);

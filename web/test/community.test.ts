@@ -6,7 +6,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { knownOnly, knownVerdict, pageOf, playable, shownOnly, verdictOf, VERDICT_KEY, type Verdict } from "../lib/community.ts";
+import { communityOf, knownOnly, knownVerdict, pageOf, playable, shownOnly, verdictOf, VERDICT_KEY, type Verdict } from "../lib/community.ts";
 import { writeHole } from "../lib/builder/gg1.ts";
 import type { HoleRow } from "../lib/types.ts";
 import type { HoleIn } from "../lib/builder/types.ts";
@@ -92,6 +92,13 @@ void test("playable: the Builder's rules failing to load is a no, never kept as 
   assert.equal(await playable(chain, `${A}/good/v1`, { load: () => Promise.reject(new Error("offline")) }), false);
   assert.equal(await knownVerdict(chain, `${A}/good/v1`), null, "not judged: nothing kept");
   assert.equal(await playable(chain, `${A}/good/v1`, deps), true);
+});
+
+void test("communityOf: anyone's latest holes, none taken down; none at all until the takedown list is known (the game starts without waiting for it)", () => {
+  const row = (id: string, over: Partial<HoleRow> = {}): HoleRow => ({ id, name: id, official: false, plays: 0, best: 0, proBest: 0, par: 3, world: "garden", order: 0, next: "", ...over });
+  const list = [row(`${A}/a/v2`), row(`${A}/a/v1`, { next: `${A}/a/v2` }), row(`${A}/gone/v1`), row("garden/1/v1", { official: true })];
+  assert.deepEqual(communityOf(list, null), [], "the list not read yet: nothing shown that might be down");
+  assert.deepEqual(communityOf(list, new Set([`${A}/gone`])).map((h) => h.id), [`${A}/a/v2`]);
 });
 
 void test("a hole whose data cannot be read is not shown (nothing unjudged is ever played)", async () => {
