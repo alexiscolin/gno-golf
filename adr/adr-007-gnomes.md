@@ -188,6 +188,19 @@ wallet as its team is shown, Legendary first, and a sale writes the rank
 from the row it has already read (one byte more a row; a first buy 2.37M
 gas, 2.35M before).
 
+**Where the shop opens.** The free game plays everywhere; the shop is not
+offered in mainland China nor under the comprehensive sanctions (Cuba, Iran,
+North Korea, Syria, Russia, Belarus). The EU and the UK are not blocked: the
+buy sheet asks for their consent to delivery at once. At zero server cost:
+Netlify's country rules (`netlify.toml`) rewrite `/geo.json` to
+`/geo-blocked.json` and a gnome's page `/g/*` to a static "not available in
+your region" page for those countries; the client reads `/geo.json` once
+when the shop would open and, shut, hides the shop, its links and every buy,
+bid and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
+tests holding both rules to it). Best effort, and said so: a VPN gets round
+it, and the realm stays callable with gnokey by anyone; a realm cannot know
+a caller's country.
+
 **Reads for the screens**, JSON starting with `"version":1`, one query each:
 `Collection`, `Gnome` (`{"version":1,"id":""}` for none), `Sold` (a bit per
 id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
