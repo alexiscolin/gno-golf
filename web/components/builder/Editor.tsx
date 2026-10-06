@@ -52,6 +52,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const draft = session.now(), kept = session.kept();
   const [palette, setPalette] = useState<readonly PaletteEntry[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [show, setShow] = useState<{ id: string; n: number } | null>(null); // Show me: the piece to frame
   const [armed, setArmed] = useState<PaletteEntry | null>(null);
   const [said, setSaid] = useState("");
   const [checked, setChecked] = useState<{ of: Draft; v: Validated; state: Hole | null } | null>(null);
@@ -195,9 +196,9 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <Palette world={draft.world} palette={palette} armed={armed} off={offAtLimit(draft, palette)} onArm={setArmed} />
           <div className="centre">
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onDisarm={() => setArmed(null)} onSay={say} said={said} />
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onDisarm={() => setArmed(null)} onSay={say} said={said} show={show} />
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
-              issues={v?.issues ?? []} busy={!fresh} onSelect={setSelected} onFix={fix} />
+              issues={v?.issues ?? []} busy={!fresh} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
           <aside className="col" aria-label="The hole in 3D and the selected piece">
             <Preview state={checked?.state ?? null} fresh={fresh} />

@@ -23,3 +23,6 @@ export function pinch(v: View, from: readonly [P, P], to: readonly [P, P]): View
   const k = clamp((v.k * spread(to)) / before), m0 = mid(from), m1 = mid(to);
   return { k, x: v.x + m0[0] / v.k - m1[0] / k, y: v.y + m0[1] / v.k - m1[1] / k };
 }
+
+/** The view with a board point in its middle (Show me), at the scale it is seen at; size: the board in pixels. */
+export const centreOn = (v: View, at: P, size: { w: number; h: number }): View => ({ k: v.k, x: at[0] - size.w / 2 / v.k, y: at[1] - size.h / 2 / v.k });

@@ -60,9 +60,11 @@ for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
   assert.equal(await c.js(`document.documentElement.scrollWidth > innerWidth`), false, `${at}: the window scrolls sideways`);
-  // the dock: its verdict and every gauge inside it
+  // the dock: its line and, its limits opened, every gauge inside it
+  await c.js(`document.querySelector(".checks__limits").open = true`);
+  await sleep(200);
   const dock = (await box(c, ".checks"))!;
-  const inside = await c.js<Box[]>(`[...document.querySelectorAll(".checks__row > *, .checks .gauge")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  const inside = await c.js<Box[]>(`[...document.querySelectorAll(".checks__line > *, .checks .gauge")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
   for (const b of inside.filter((x) => x.r > x.l)) assert.ok(b.r <= dock.r + 0.5 && b.l >= dock.l - 0.5, `${at}: the dock spills (${JSON.stringify(b)} out of ${JSON.stringify(dock)})`);
   // the three steps in the middle of the header
   const steps = (await box(c, ".stepper"))!;
@@ -70,12 +72,12 @@ for (const [w, h] of SIZES) {
   // the header's action and the dock keep their places as their words change (a slug, then none)
   await typeInto(c, ".bhead__slug", "a-name");
   await sleep(1500);
-  const named = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks .gauge"))! };
+  const named = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks__limits summary"))! };
   await typeInto(c, ".bhead__slug", "");
   await sleep(1500);
-  const unnamed = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks .gauge"))! };
+  const unnamed = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks__limits summary"))! };
   assert.ok(Math.abs(named.undo.l - unnamed.undo.l) < 1, `${at}: Undo moves as the action's words change (${named.undo.l} → ${unnamed.undo.l})`);
-  assert.ok(Math.abs(named.gauge.l - unnamed.gauge.l) < 1, `${at}: the gauges move as the verdict changes (${named.gauge.l} → ${unnamed.gauge.l})`);
+  assert.ok(Math.abs(named.gauge.l - unnamed.gauge.l) < 1, `${at}: the limits move as the verdict changes (${named.gauge.l} → ${unnamed.gauge.l})`);
   // the action off, its reason readable (no faded text)
   const off = await c.js<{ ratio: number; opacity: number } | null>(`(${CONTRAST})(".bhead__end .btn[aria-disabled=true]")`);
   assert.ok(off, `${at}: the action is not off with no name`);

@@ -39,6 +39,16 @@ export interface Gauge {
 const level = (share: number): Gauge["level"] => (share >= 1 ? "full" : share >= WORK_WARN ? "warn" : "ok");
 const gauge = (name: string, used: number, of: number, shown = `${used}/${of}`): Gauge => ({ name, used, of, shown, level: level(used / of) });
 
+/** The limits worth saying (amber from 80%), in words: the room left; nothing when the hole is far from them all (the full gauges behind a tap). */
+export function nearLimits(gs: readonly Gauge[]): string[] {
+  return gs.filter((g) => g.level !== "ok").map((g) => {
+    if (g.name === "Room") return `Room for a shot in its stormiest weather: ${g.shown} left`;
+    if (g.name === "Size") return `Size: ${g.shown} of ${Math.round(g.of / 1024)} KB`;
+    const left = g.of - g.used;
+    return `${g.name}: ${g.used} of ${g.of} · ${left > 0 ? `room for ${left} more` : "no room for more"}`;
+  });
+}
+
 /** The gauges: GG1's counts, the data's size, and the room a first shot has in the dearest weather (the realm's own numbers, check's cost). */
 export function gauges(h: HoleIn, cost: Cost, bytes: number): Gauge[] {
   const c = counts(h), storm = work(cost).storm;

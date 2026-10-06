@@ -13,7 +13,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, movePiece, nextId, pieceLabel, placePiece, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
-import { K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
+import { centreOn, K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
 import { BOARD, frame } from "@/lib/builder/gg1";
 import { handlesOf, setHandle, type HandleKey } from "@/lib/builder/handles";
 import { entry as entryIn, type PaletteEntry } from "@/lib/builder/palette";
@@ -44,6 +44,8 @@ export interface BoardProps {
   onSay: (text: string) => void;
   /** the last refusal, shown at the board's foot until it fades */
   said: string;
+  /** Show me: the piece to frame (n: asked again, framed again) */
+  show?: { id: string; n: number } | null;
 }
 
 interface View { x: number; y: number; k: number }
@@ -90,6 +92,11 @@ export default function Board(props: BoardProps) {
     const [lo, hi] = extent(draft), k = Math.max(K_MIN, Math.min(K_MAX, Math.min(size.w / (hi[0] - lo[0]), (size.h - 56) / (hi[1] - lo[1]))));
     setView({ x: (lo[0] + hi[0]) / 2 - size.w / 2 / k, y: (lo[1] + hi[1]) / 2 - (size.h - 56) / 2 / k, k });
   }, [size, view, draft]);
+  // Show me: the piece in the middle of the board
+  useEffect(() => {
+    const p = props.show && draft.pieces.find((q) => q.id === props.show!.id);
+    if (p && size.w) setView((v) => v && centreOn(v, middleOf(p), { w: size.w, h: size.h - 56 }));
+  }, [props.show?.n]); // eslint-disable-line react-hooks/exhaustive-deps -- (asked, not as the draft changes)
   // a re-framed draft moved as a whole: the view follows, nothing jumps
   useEffect(() => {
     const s = commonShift(prev.current, draft);

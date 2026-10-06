@@ -9,7 +9,7 @@ import { build } from "./scene-harness.ts";
 import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, pieceLabel, placeNear, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, setHandle, turnPiece } from "../lib/builder/handles.ts";
 import { makeSession, settle } from "../lib/builder/session.ts";
-import { K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
+import { centreOn, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { validate } from "../lib/builder/pipeline.ts";
 import type { Draft, Piece } from "../lib/builder/draft.ts";
@@ -187,6 +187,11 @@ void test("settle: a slider let go is checked once a change (a release, a key up
   s.done();
   s.done();
   assert.equal(checks, 1);
+});
+
+void test("centreOn: Show me puts the piece in the middle of the board, at the scale it is seen at", () => {
+  const v = centreOn({ x: 0, y: 0, k: 20 }, [30, 12], { w: 800, h: 400 });
+  assert.deepEqual(v, { k: 20, x: 30 - 400 / 20, y: 12 - 200 / 20 });
 });
 
 void test("a session: an edit beside a drag (the name, the slug) is made on the draft as kept, never on the drag's unchecked preview", () => {
