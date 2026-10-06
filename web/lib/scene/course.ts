@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { terrain, mod, CELL, cupRadius, BALL_R, airy, there, inPoly, inZone, closest, nearestOnPoly, segDist, smoothstep, POOL, POOLS, DISH, inSea } from "../terrain";
+import { terrain, mod, CELL, cupRadius, BALL_R, airy, there, inPoly, inZone, closest, nearestOnPoly, segDist, smoothstep, POOL, POOLS, DISH, inSea, emptyZone } from "../terrain";
 import { C, bankRows, ink, flat, motion, drawn, drape, rbox, ringLine, texOf, setWind, share, plantFeet, quality, geoOf, gridGeo, onTop, carved, grainSides, wetSides } from "./materials";
 import { bake } from "./bake";
 import { state } from "./state";
@@ -14,6 +14,7 @@ import { POSTS, BARS, roofs, SLAB } from "./pieces";
 import { zoneDetail, waterMask, pondWater } from "./zones";
 import { ud, withData, type Course, type CourseData, type CourseTerrain as T, type Height, type Hole, type Tick, type Timed } from "./data";
 import type { Extras, MutVec2, Post, Timing, Vec2, Wall, Wear, Zone } from "../types";
+import { own as ownKey } from "../own";
 
 // the tunnels whose mouth is a real hole in the lane (drawn by their world): its shape
 const MOUTHS: Readonly<Record<string, "round" | "square">> = { blowhole: "round", cage: "square", ladder: "square", hopper: "square" };
@@ -54,6 +55,7 @@ type Strip = readonly [number, number, number, number];
 
 // defer: leave the merge (finishHole) to the caller, to run in a task of its own
 export function buildHole(s: Hole, { defer = false } = {}): Course {
+  if (s.zones.some(emptyZone)) s = { ...s, zones: s.zones.filter((z) => !emptyZone(z)) }; // nothing to draw of a zone with no area
   state.live = [];
   state.tubes = new Map();
   state.timed = [];
@@ -70,7 +72,7 @@ export function buildHole(s: Hole, { defer = false } = {}): Course {
   // where rain lies (puddles, splashes): the lane as drawn, not the water in
   // or round it, a gap or the rooftops, nor under a wall; nor a sand's dish
   // (a puddle is flat: it soaks into the sand)
-  const open = s.zones.filter((q) => q.kind === "hazard" || GAPS.has(q.skin) || (q.kind === "surface" && (DISH[q.skin]?.depth ?? 0) > 0));
+  const open = s.zones.filter((q) => q.kind === "hazard" || GAPS.has(q.skin) || (q.kind === "surface" && (ownKey(DISH, q.skin)?.depth ?? 0) > 0));
   t.dry = (x, z) => t.onGreen(x, z) && !open.some((q) => inZone(q, x, z)) && !s.walls.some((w) => segDist(x, z, w.a, w.b) < 0.3);
 
   // the garden is an island, not a world: a raised plot of grass on a block of
@@ -335,7 +337,7 @@ export function groundMesh(s: Hole, t: T) {
   const pos: number[] = [], col: number[] = [], nor: number[] = [], edges: number[] = [];
   // a hole with sunk water: each vertex's water level (wetSides: the wet
   // band over the waterline), far under the ground where there is none
-  const wetY: number[] | null = s.zones.some((q) => q.kind === "hazard" && POOLS[q.skin]) ? [] : null;
+  const wetY: number[] | null = s.zones.some((q) => q.kind === "hazard" && ownKey(POOLS, q.skin)) ? [] : null;
   // world.green: [a, b] stripes (mountain packed snow...), or a function of
   // the hole giving them, or "planks" for a boardwalk: boards across the lane
   // with dark seams; nothing for the garden's own
@@ -361,7 +363,7 @@ export function groundMesh(s: Hole, t: T) {
   const banked = (color: THREE.Color, p: readonly number[]) => {
     const w = t.pond(p[0], p[2]), dd = w ? w.k * -POOL.bed : 0; // how far down the bank
     if (!w || dd < 0.01) return color;
-    const [e, d] = BANKS[w.skin] || BANKS.water;
+    const [e, d] = ownKey(BANKS, w.skin) || BANKS.water;
     return bank.copy(color).lerp(earth.set(e), smoothstep(dd / 0.22)).lerp(wet.set(d), smoothstep((dd - 0.25) / 0.2));
   };
   // (split along the diagonal whose ends are nearer in height: a bank's lip
@@ -449,7 +451,7 @@ export function groundMesh(s: Hole, t: T) {
   const cutAt = dropFirst(s, t);
   const crev = (a: number, b: number) => { const q = cutAt((a + 0.5) * CELL, (b + 0.5) * CELL); return !!q && (GAPS.has(q.skin) || own(q)); };
   const hasCrev = s.zones.some((q) => GAPS.has(q.skin) || own(q)) || !!s.pulseZones?.some(own);
-  if (ownSea || hasRoof || hasCrev || s.zones.some((q) => MOUTHS[q.skin]))
+  if (ownSea || hasRoof || hasCrev || s.zones.some((q) => ownKey(MOUTHS, q.skin)))
     for (let j = 0; j < t.nz; j++)
       for (let i = 0; i < t.nx; i++) {
         const q = cutAt((i + 0.5) * CELL, (j + 0.5) * CELL);
@@ -463,9 +465,9 @@ export function groundMesh(s: Hole, t: T) {
         // a blowhole's mouth is a real hole (its rim, drawn by island.ts,
         // covers the cells' stepped edge)
         // (and the mines' shaft landing, manway and hopper: a square one)
-        if (q && MOUTHS[q.skin]) {
+        if (q && ownKey(MOUTHS, q.skin)) {
           const ex = ((i + 0.5) * CELL - (q.min[0] + q.max[0]) / 2) / ((q.max[0] - q.min[0]) / 2), ez = ((j + 0.5) * CELL - (q.min[1] + q.max[1]) / 2) / ((q.max[1] - q.min[1]) / 2);
-          if (MOUTHS[q.skin] === "round" ? ex * ex + ez * ez < 0.72 * 0.72 : Math.max(Math.abs(ex), Math.abs(ez)) < 0.72) open_[t.idx(i, j)] = 2; // 2: no edge is pulled onto it
+          if (ownKey(MOUTHS, q.skin) === "round" ? ex * ex + ez * ez < 0.72 * 0.72 : Math.max(Math.abs(ex), Math.abs(ez)) < 0.72) open_[t.idx(i, j)] = 2; // 2: no edge is pulled onto it
         }
         // a plank laid between two roofs: the street shows under it (the
         // world draws the plank); 2, so the roofs' edges are not pulled onto it
@@ -1627,7 +1629,7 @@ function wallPieces(s: Hole, t: T) {
     if (q.length === 4 && q.every((w, k) => near(w.b, q[(k + 1) % 4].a))) {
       const l0 = segLen(q[0]), l1 = segLen(q[1]);
       // (any skinned one, for a world that draws its own walls: a piston's head is fat)
-      if (Math.min(l0, l1) <= 1.6 || BARS[q[0].skin] || (q[0].skin && s.board && worldOf(s).walls)) {
+      if (Math.min(l0, l1) <= 1.6 || ownKey(BARS, q[0].skin) || (q[0].skin && s.board && worldOf(s).walls)) {
         out.push(...barPiece(q, W, s, t));
         i += 3;
         continue;
@@ -1730,7 +1732,8 @@ function barPiece(q: readonly Wall[], W: readonly Wall[], s: Hole, t: T) {
   const own = s.board && fromWorld(s, "wall", { walls: q, skin, c: c0, length: L0, thick, ang, ...(barTiming && { timing: { every: barTiming.every, on: barTiming.on, phase: barTiming.phase } }) }, t);
   if (own) return [own];
   // their own look, on the chain's footprint exactly
-  if (skin === "logs" || skin === "hay" || BARS[skin]) return [(BARS[skin] || (skin === "logs" ? logs : hay))(c0, L0, thick, ang, t.height)];
+  const bar = ownKey(BARS, skin) || (skin === "logs" ? logs : skin === "hay" ? hay : undefined);
+  if (bar) return [bar(c0, L0, thick, ang, t.height)];
   parts.push(timber(cxz, L, door ? thick * 0.8 : thick, ang, t.height, tint));
   // a gnome's gate: stone pillars with a red hat on each end, and a
   // picket door with its own little hat
@@ -1860,7 +1863,8 @@ function post(p: Post, height: Height, s: Hole, t: T) {
   // the world draws its own pieces first (see worlds.ts, piece()); then ours
   const own = s && fromWorld(s, "post", p, t);
   if (own) return own;
-  if (POSTS[p.skin]) return POSTS[p.skin](p, height(p.c[0], p.c[1]));
+  const table = ownKey(POSTS, p.skin);
+  if (table) return table(p, height(p.c[0], p.c[1]));
   if (p.skin === "rock") return rock(p, height);
   if (p.skin === "stump") return stump(p, height);
   const g = new THREE.Group();
@@ -2013,6 +2017,7 @@ function wearLayer(wear: Wear, W: number, H: number, height: Height, tint: THREE
 const WEATHER = new Set([...WEATHER_SKINS, "gust"]);
 
 export function buildExtras(course: Course, ex: Extras) {
+  if ((ex.zones || []).some(emptyZone)) ex = { ...ex, zones: (ex.zones || []).filter((z) => !emptyZone(z)) }; // (as buildHole)
   const t = course.userData.terrain;
   const g = new THREE.Group();
   ud(g).live = true;

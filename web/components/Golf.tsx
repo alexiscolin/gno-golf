@@ -684,7 +684,10 @@ export default function Golf() {
             // a shared link: straight to that hole (a first-time player picks a
             // gnome first), a cup's from its first, on the picker; a link to
             // nothing lands on the cups, quietly
-            if (!to) setScreen("worlds");
+            if (!to || to === "taken") {
+              setScreen("worlds");
+              if (to === "taken") setRestoreNote("This hole was taken down."); // (nothing of it shown: no name, no note, no author)
+            }
             // straight onto the ball: the link said where (a dare stops at the picker: who, what to beat, Play solo;
             // so does the picker's own address)
             else if (to === "hole" && (cfg.gnome || hadGnome()) && !dare && cfg.screen !== "pick") play(true);

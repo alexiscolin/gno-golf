@@ -18,6 +18,7 @@ import { ud, type Hole, type Height } from "./data";
 import { GAP_Y, type Bar, type Skins } from "./worlds";
 import type { Terrain } from "../terrain";
 import type { Extras, MutVec2, Post, Vec2, Wall, Zone } from "../types";
+import { own } from "../own";
 
 /** Places reserved round the board (common.ts placer). */
 type Reserve = (x: number, z: number, r: number) => void;
@@ -2346,7 +2347,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
     const post = item as Post; // (kind says which)
     const [x, z] = post.c, r = post.r;
     const makers: Record<string, () => THREE.Group> = { pine: () => pinePost(r, rand), boulder: () => boulder(r, rand), snowman: () => snowmanPost(r), chalet: () => chaletPost(r, night), skater: () => skaterPost(r, rand, r > 0.8) };
-    const make = makers[skin];
+    const make = own(makers, skin);
     return make ? onGround(make(), x, z, t) : undefined;
   }
   if (kind === "wall") {

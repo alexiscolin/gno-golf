@@ -33,6 +33,8 @@ export interface GameState {
   all?: HoleRow[];
   /** everyone else's holes, playable outside the cups */
   community?: HoleRow[];
+  /** the community holes the site took down (/takedown.json): neither listed nor opened by a link */
+  taken?: ReadonlySet<string>;
   world?: string;
   /** the page's link named a hole that exists */
   linked?: boolean;

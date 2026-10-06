@@ -44,10 +44,13 @@ const sum = (a: ArrayLike<number> | undefined) => {
   return s.toFixed(2);
 };
 
+/** The game's own buildHole on a hole as the chain gives it (HoleState). */
+export const build = (s: Hole): THREE.Object3D => buildHole(s);
+
 /** What the scene drew: one key a mesh (its vertices, where they are, their colours, its material's), sorted. */
 export function drawn(g: GHole): string[] {
   const keys: string[] = [];
-  const root: THREE.Object3D = buildHole(holeOf(g));
+  const root = build(holeOf(g));
   root.updateMatrixWorld(true);
   root.traverse((o) => {
     const m = o as THREE.Mesh, at = m.geometry?.attributes;

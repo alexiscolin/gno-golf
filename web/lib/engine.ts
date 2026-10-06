@@ -31,6 +31,7 @@ import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
+import { readTakedown, takenDown } from "./takedown";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
 import { isDrawn } from "./scene/materials";
@@ -77,7 +78,8 @@ const { maxRoundStrokes, maxPower: MAX_POWER } = RULES;
 const HUD = { top: 108, bottom: 136, side: 14 };
 // the community's holes listed with the cups (off until the builder is out)
 const COMMUNITY = process.env.NEXT_PUBLIC_COMMUNITY === "1";
-const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
+const OVERVIEW_MS = 1500;
+const NO_TAKEN: ReadonlySet<string> = new Set(); // how long a new hole is shown whole before closing on the ball
 
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
@@ -1384,11 +1386,21 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, gnome, world: 
     g.list = list.filter((h) => !h.next && h.official !== false).sort(byNumber);
     // not listed until the builder is out (NEXT_PUBLIC_COMMUNITY=1 lists
     // them): the chain takes anyone's hole, the game shows the course's
-    g.community = COMMUNITY ? list.filter((h) => !h.next && h.official === false) : [];
+    g.community = COMMUNITY ? list.filter((h) => !h.next && h.official === false && !takenDown(g.taken ?? NO_TAKEN, h.id)) : [];
   }
 
-  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", null for a link to nothing). */
-  async function start(link: string | Link | null): Promise<"hole" | "cup" | null> {
+  /** The takedown list, read once a visit (none if it cannot be read: the next start tries again). */
+  let takenOnce: Promise<ReadonlySet<string>> | null = null;
+  const takedown = () =>
+    (takenOnce ||= Promise.all([fetch("/takedown.json", { cache: "no-cache" }).then((r) => (r.ok ? r.text() : "")), chain.chainId()])
+      .then(([text, id]) => readTakedown(text, id))
+      .catch(() => ((takenOnce = null), NO_TAKEN)));
+
+  /** Starts on the hole a link names, or a cup's first: where it landed ("hole", "cup", "taken" for a hole the site took down, null for a link to nothing). */
+  async function start(link: string | Link | null): Promise<"hole" | "cup" | "taken" | null> {
+    g.taken = await takedown();
+    // a link to a hole the site took down opens the cups, and says so
+    if (typeof link === "string" && takenDown(g.taken, link)) return start(null).then((to) => (to === null ? "taken" : to));
     let list = await chain.holes();
     // a link to a hole the tab's kept list does not have yet: the chain's own
     if (typeof link === "string" && link && !list.some((h) => h.id === link || h.slot === (oldToSlot(link) || link))) list = await chain.holes(true);

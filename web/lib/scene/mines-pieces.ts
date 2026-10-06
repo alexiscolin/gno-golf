@@ -28,6 +28,7 @@ import * as pulses from "./mines-pulses";
 import type { Terrain } from "../terrain";
 import type { Extras, Post, Vec2, Zone } from "../types";
 import type { Bar } from "./worlds";
+import { own } from "../own";
 
 // ---------------------------------------------------------------- walls
 //
@@ -340,7 +341,8 @@ function wall(bar: Bar, t: Terrain, s: Hole) {
     rope: (f) => ropeEdge(f, t, rand, s),
     railguard: (f) => railguard(f, t, s),
   };
-  if (!draw[skin]) return undefined;
+  const make = own(draw, skin);
+  if (!make) return undefined;
   const g = new THREE.Group();
   // a bar is drawn as its two long sides (its ends are its thickness); a lone wall as itself
   // (not one lying wholly in an untimed hazard: no ball reaches it, it would stand over the drop; but one along a
@@ -351,7 +353,7 @@ function wall(bar: Bar, t: Terrain, s: Hole) {
   const ws = (bar.walls.length === 4 ? longSides(bar) : bar.walls).filter((w) => ![0.1, 0.5, 0.9].every((u) => inHazard(w.a[0] + (w.b[0] - w.a[0]) * u, w.a[1] + (w.b[1] - w.a[1]) * u) && !beside(w, u)));
   // (all of its line: a wall is a collider, drawn where the chain has it, over a drop too; only what it carries
   // behind it keeps off a drop: a rock face's body, its chips, a crystal wall's clusters)
-  for (const w of ws) g.add(draw[skin](frameOf(w.a, w.b, t)));
+  for (const w of ws) g.add(make(frameOf(w.a, w.b, t)));
   if (skin === "crystal bumper") for (const w of ws) singer(s, t, { a: w.a, b: w.b }, g);
   return g;
 }

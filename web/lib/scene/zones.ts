@@ -10,6 +10,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { ud, type CourseTerrain as T, type Hole } from "./data";
 import type { Rand } from "./common";
 import type { Board, MutVec2, Post, Vec2, Wall, Zone } from "../types";
+import { own } from "../own";
 
 /** What every zone drawing gets: its rectangle's size and its own random. */
 interface Opts {
@@ -515,7 +516,7 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
   const WATER: Record<string, number> = { sea: 0x4ea3cf, wave: 0x8fd0ee, lagoon: 0x5fd0cc, tidepool: 0x6fc3c9, fountain: 0x8fd0ee, canal: 0x4d8fb3, gap: 0x1f3d4a };
   // in the mountains a bunker is a patch of deep snow: same drag, white
   const snow = s.world === "mountain" && !water && !ice && !puddle && !bed && !deck && (z.skin === "sand" || !z.skin);
-  const color = snow ? 0xf3f7fa : water ? WATER[z.skin] ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : soil ? 0x6e4d33 : deck ? C.wood : z.skin === "wetsand" ? 0xd4b77e : ice ? 0xbfe6f0 : 0xecd49c;
+  const color = snow ? 0xf3f7fa : water ? own(WATER, z.skin) ?? C.pond : puddle ? 0x9fcde0 : bed ? 0x7b5a3f : soil ? 0x6e4d33 : deck ? C.wood : z.skin === "wetsand" ? 0xd4b77e : ice ? 0xbfe6f0 : 0xecd49c;
   const blob = organic(z, rand, s.board);
   // inside the drawn shape and on the green, with a margin: where detail may go
   const inSand = (x: number, zz: number) => {
@@ -536,14 +537,14 @@ function drawSurface(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h, rand }: Opt
   };
   // a garden pond is sunk into the ground (terrain.ts, pondWater), with its
   // banks; over one, a causeway is a boardwalk on posts
-  const sunk = water && !!POOLS[z.skin];
+  const sunk = water && !!own(POOLS, z.skin);
   if (deck && t.pond((z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2)) return boardwalk(z, s, t, g);
   if (sunk) {
     pondDetail(z, s, t, g, { w, h, rand });
     return g;
   }
   // sand (a bunker, a beach's wet sand; a snow bunker): its own natural patch
-  if (DISH[z.skin] && DISH[z.skin].depth > 0 && !water && !deck) {
+  if ((own(DISH, z.skin)?.depth ?? 0) > 0 && !water && !deck) {
     const walls = s.walls.filter((q) => !q.every);
     const inside = (x: number, zz: number, m = 0.15) => x > 0.4 && zz > 0.4 && x < s.board.w - 0.4 && zz < s.board.h - 0.4 && t.onGreen(x, zz) && sandIn(z, walls, x, zz) > m;
     g.add(sandPatch(z, walls, t, color, snow));
@@ -956,7 +957,7 @@ function sandPatch(z: Zone, walls: readonly Wall[], t: T, color: number, snow: b
       const gx = (t.height(x + 0.06, zz) - t.height(x - 0.06, zz)) / 0.12, gz = (t.height(x, zz + 0.06) - t.height(x, zz - 0.06)) / 0.12;
       const lit = Math.min(1.14, Math.max(0.8, 1 - 1.3 * (gx * Lx + gz * Lz) / Math.hypot(gx, 1, gz)));
       const rim = 1 - Math.min(1, Math.max(0, d / 0.16)), lip = Math.exp(-(((d - 0.2) / 0.1) ** 2));
-      const k = lit * (snow ? 1 + 0.06 * rim : 1 - 0.15 * rim * rim) * (1 + 0.05 * lip) * (1 - 0.08 * smooth01(d / DISH[z.skin].run));
+      const k = lit * (snow ? 1 + 0.06 * rim : 1 - 0.15 * rim * rim) * (1 + 0.05 * lip) * (1 - 0.08 * smooth01(d / own(DISH, z.skin)!.run));
       c.copy(base).multiplyScalar(k);
       // (alpha along the outline's distance, on a slow ramp: the cut between
       // two vertices falls where the outline is, not on the grid)
@@ -1141,7 +1142,7 @@ function drawTunnel(z: Zone, s: Hole, t: T, g: THREE.Group, { w, h }: Opts) {
   const flat2 = (x: number, zz: number) => new THREE.Vector3(x, 0, zz);
   const dirIn = flat2(s.start[0] - cx, s.start[1] - cz).normalize();
   const dirOut = flat2(s.cup[0] - ox, s.cup[1] - oz).normalize();
-  if (MOUTHS[z.skin]) {
+  if (own(MOUTHS, z.skin)) {
     // an entrance that is a thing (a cave, a well, a door, a wreck), and
     // the same thing where the ball comes out; no pipe between
     const R = Math.max(0.6, Math.min(w, h) * 0.4);

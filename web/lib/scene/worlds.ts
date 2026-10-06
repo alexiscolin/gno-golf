@@ -58,6 +58,7 @@ import { GRASS } from "./common";
 import type { Terrain } from "../terrain";
 import type { Extras, Post, Timing, Wall, Zone } from "../types";
 import type { Hole, Height, Fade, Dress } from "./data";
+import { own } from "../own";
 
 /** What a world's decor is: an Object3D, a canopy fade and a weather dress on it. */
 type Decor = THREE.Object3D & { userData: { fade?: Fade | null; weather?: Dress | null } };
@@ -154,13 +155,15 @@ const pending: Record<string, Promise<World>> = {};
 
 /** Loads a world's module (once; later calls return at once). */
 export function loadWorld(name: string | null | undefined): Promise<World> {
-  if (!name || WORLDS[name] || !LOADERS[name]) return Promise.resolve((name && WORLDS[name]) || garden);
+  const load = name ? own(LOADERS, name) : undefined;
+  if (!name || own(WORLDS, name) || !load) return Promise.resolve((name && own(WORLDS, name)) || garden);
   // a failed load (offline, a deploy mid-flight) is forgotten, so the next
   // call tries again instead of failing forever
-  return (pending[name] ||= LOADERS[name]().then((m) => (WORLDS[name] = m)).catch((e: unknown) => { delete pending[name]; throw e; }));
+  // eslint-disable-next-line no-restricted-syntax -- a world the loaders have (own above)
+  return (pending[name] ||= load().then((m) => (WORLDS[name] = m)).catch((e: unknown) => { delete pending[name]; throw e; }));
 }
 
-export const worldOf = (s: Pick<Hole, "world">): World => WORLDS[s.world] || garden;
+export const worldOf = (s: Pick<Hole, "world">): World => own(WORLDS, s.world) || garden;
 
 /**
  * A world's own drawing of an on-lane piece, if it has one: worldOf(s).piece

@@ -30,6 +30,7 @@ import { sound } from "../feel";
 import type { Terrain } from "../terrain";
 import type { MutVec2, Vec2, Zone } from "../types";
 import type { FallIn } from "./worlds";
+import { own } from "../own";
 
 // ------------------------------------------------------------ outlines and sheets
 
@@ -240,7 +241,7 @@ function halfPlane(p: readonly Vec2[], nx: number, nz: number, c: number): MutVe
 /** The level a falling ball meets in each sunk hazard (relative to the lane at 0). */
 const LEVEL: Record<string, number> = { lava: -0.38, shaft: GAP_Y + 0.3, sump: -1.05, "hot spring": -0.6, "ore bin": -0.75 };
 // (and a rope bridge's span: the lane open under its deck, the deck the only surface there)
-export const open = (z: Zone) => (z.kind === "hazard" && !z.every && !z.outside ? LEVEL[z.skin] : z.skin === "rope bridge" ? GAP_Y + 0.3 : undefined);
+export const open = (z: Zone) => (z.kind === "hazard" && !z.every && !z.outside ? own(LEVEL, z.skin) : z.skin === "rope bridge" ? GAP_Y + 0.3 : undefined);
 
 /** An outline with its long edges split every half unit or less (a band then stops where its skip starts, not a whole edge past it). */
 const split = (pts: readonly Vec2[], step = 0.5) => pts.flatMap(([x, zz], k) => { const [x1, z1] = pts[(k + 1) % pts.length], n = Math.max(1, Math.ceil(Math.hypot(x1 - x, z1 - zz) / step)); return Array.from({ length: n }, (_, i): MutVec2 => [x + ((x1 - x) * i) / n, zz + ((z1 - zz) * i) / n]); });

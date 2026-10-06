@@ -15,6 +15,7 @@ import { timeOf } from "./camera";
 import { T } from "./town";
 import { ud, type Hole, type Height } from "./data";
 import type { Post, Vec2, Zone } from "../types";
+import { own } from "../own";
 
 /** A post as a drawing takes it: its centre and radius. */
 type PostLike = Pick<Post, "c" | "r">;
@@ -618,7 +619,7 @@ export const MOUTHS: Record<string, (R: number) => THREE.Object3D> = { cave, wel
 
 /** Places a mouth object facing `dir` at (x, y, z). */
 export function mouthAt(skin: string, x: number, y: number, z: number, R: number, dir: THREE.Vector3) {
-  const m = MOUTHS[skin](R);
+  const m = (own(MOUTHS, skin) ?? MOUTHS.cave)(R);
   m.position.set(x, y, z);
   m.rotation.y = Math.atan2(dir.x, dir.z); // its front (+z) faces dir
   return m;
