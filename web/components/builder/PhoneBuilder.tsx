@@ -10,19 +10,18 @@ import "@/app/title.css";
 import "@/app/build/phone.css";
 import { useEffect, useState } from "react";
 import { BackButton } from "@/components/About";
-import { useCopied } from "@/components/common";
+import { shortAddr, useCopied } from "@/components/common";
+import { worldName } from "@/lib/builder/rules";
 import { Button } from "@/components/ui";
 import { makeChain } from "@/lib/chain";
 import { cupsLink, endpoints, knownAuthor, listHoles, playLink } from "@/lib/builder/holes";
 import { knownOnly } from "@/lib/community";
-import { readTakedown } from "@/lib/takedown";
+import { loadTakedown } from "@/lib/takedown";
 import type { HoleRow } from "@/lib/types";
 
 /** How many community holes show before "More community holes". */
 const PAGE = 12;
 const NONE: ReadonlySet<string> = new Set();
-const worldName = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
-const short = (a: string) => `${a.slice(0, 7)}…${a.slice(-4)}`;
 
 function Row({ h, sub, keep }: { h: HoleRow; sub: string; keep: string }) {
   return (
@@ -43,8 +42,7 @@ export default function PhoneBuilder() {
     const { rpc, web, keep: k } = endpoints(window.location.search);
     setKeep(k);
     const chain = makeChain({ rpc, web });
-    const taken = Promise.all([fetch("/takedown.json", { cache: "no-cache" }).then((r) => (r.ok ? r.text() : "")), chain.chainId()])
-      .then(([text, id]) => readTakedown(text, id), () => NONE);
+    const taken = loadTakedown(chain).catch(() => NONE);
     Promise.all([chain.holes(), taken])
       .then(([rows, t]) => listHoles(rows, knownAuthor(), t))
       .then(async ({ mine, community }) => setLists({ mine, community: await knownOnly(chain, community) }), () => setFailed(true));
@@ -71,7 +69,7 @@ export default function PhoneBuilder() {
           {failed ? <p className="bphone__note" role="status">The holes can&apos;t be read right now. Try again in a moment.</p>
             : !lists ? <ul aria-busy="true">{[0, 1, 2].map((k) => <li key={k} className="bphone__row skel" />)}</ul>
             : !community.length ? <p className="bphone__note">None checked on this device yet.</p>
-            : <ul>{community.slice(0, shown).map((h) => <Row key={h.id} h={h} keep={keep} sub={`by ${short(h.id.split("/")[0])} · ${worldName(h.world)} · par ${h.par}`} />)}</ul>}
+            : <ul>{community.slice(0, shown).map((h) => <Row key={h.id} h={h} keep={keep} sub={`by ${shortAddr(h.id.split("/")[0])} · ${worldName(h.world)} · par ${h.par}`} />)}</ul>}
           {community.length > shown && <Button className="btn--wide" onClick={() => setShown((n) => n + PAGE)}>More community holes</Button>}
           {!failed && <a className="btn btn--ghost btn--wide" href={cupsLink(keep)}>Every community hole, in the game</a>}
         </section>

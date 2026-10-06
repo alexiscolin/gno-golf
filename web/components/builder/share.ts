@@ -4,15 +4,25 @@
 // with its name, world, par and author over it, built on gno.land.
 import { holeLink, shortAddr } from "@/components/common";
 import { siteURL } from "@/lib/site";
+import { MAX_TITLE } from "@/lib/builder/draft";
+import { worldName } from "@/lib/builder/rules";
+
+/** A file saved through a link the author clicked (a computer's download). */
+export function saveFile(blob: Blob, name: string) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 
 /** The link to play a published hole (by: the address whose best a friend is dared to beat). */
 export const holeLinkOf = (id: string, by = ""): string => siteURL(holeLink({ id, place: 0 }, "", by, "hole"));
 
-const MAX_NAME = 40;
 /** The card's three lines: the name (cut at 40 with an ellipsis), the world, par and author, and where it was built. */
 export function cardLines({ name, world, par, author }: { name: string; world: string; par: number; author: string }): [string, string, string] {
   const n = [...name];
-  return [n.length > MAX_NAME ? `${n.slice(0, MAX_NAME - 1).join("")}…` : name, `${world.charAt(0).toUpperCase() + world.slice(1)} · par ${par} · by ${shortAddr(author)}`, "Built on gno.land"];
+  return [n.length > MAX_TITLE ? `${n.slice(0, MAX_TITLE - 1).join("")}…` : name, `${worldName(world)} · par ${par} · by ${shortAddr(author)}`, "Built on gno.land"];
 }
 
 /** The card: the preview's picture (a canvas just drawn) with a paper strip of cardLines under it, as a PNG. */

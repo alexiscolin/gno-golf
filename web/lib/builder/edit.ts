@@ -12,6 +12,7 @@ import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, pieceName, validate, type ValidateOptions } from "./pipeline";
+import { cap, worldName } from "./rules";
 
 /** A piece's settings at placement: each within its entry's range, its default when left out. */
 export interface PlaceParams {
@@ -98,7 +99,7 @@ export function toWorld(d: Draft, world: string, palette: readonly PaletteEntry[
 }
 
 /** A world's name in a sentence: "Garden". */
-export const worldName = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+export { worldName };
 
 /** Why an opened draft is refused for its pieces: one whose entry is not its world's palette's; null if none. */
 export function unknownEntry(d: Draft, palette: readonly PaletteEntry[]): string | null {
@@ -295,7 +296,7 @@ function nearest(rest: Draft, p: Piece, o: ValidateOptions, r0 = CELL, reach = F
 /** A piece as a screen reader names it: what it is and where ("The rock post at (13.5, 6.5)"). */
 export const pieceLabel = (p: Piece) => {
   const n = pieceName(p);
-  return `${n.charAt(0).toUpperCase()}${n.slice(1)} at ${at(whereOf(p.geometry))}`;
+  return `${cap(n)} at ${at(whereOf(p.geometry))}`;
 };
 
 /** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near. */

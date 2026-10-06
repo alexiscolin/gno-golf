@@ -78,7 +78,9 @@ export const MAX_PIECES = 224; // GG1's walls, posts and zones (160 + 32 + 32): 
 export const DRAFTS_KEY = "gnogolf.builder.drafts";
 /** Where a stored draft this Builder cannot read is set aside, as it was: never erased by a save. */
 export const UNREAD_KEY = "gnogolf.builder.unread";
-const MAX_TITLE = 40, MAX_NOTE = 140, MAX_PULSES = 16;
+/** A hole's name and note at most (runes), as the realm keeps them. */
+export const MAX_TITLE = 40, MAX_NOTE = 140;
+const MAX_PULSES = 16;
 
 /** A grid value: a multiple of a quarter (Fit shifts the hole by one exactly). */
 export const onGrid = (x: number) => Number.isFinite(x) && x * 4 === Math.round(x * 4);

@@ -29,6 +29,12 @@ export function readTakedown(text: string, chainId: string): ReadonlySet<string>
   return out;
 }
 
+/** The site's list (/takedown.json, read anew: no-cache) for the chain played on; none served, none taken down; a failed read rejects (the caller says what it falls back to). */
+export async function loadTakedown(chain: { chainId: () => Promise<string> }, get: (url: string, init?: RequestInit) => Promise<Response> = fetch): Promise<ReadonlySet<string>> {
+  const [text, id] = await Promise.all([get("/takedown.json", { cache: "no-cache" }).then((r) => (r.ok ? r.text() : "")), chain.chainId()]);
+  return readTakedown(text, id);
+}
+
 /** Whether a hole (any version of an alias, or the alias) is taken down. */
 export function takenDown(set: ReadonlySet<string>, id: string) {
   const [addr, slug] = id.split("/");

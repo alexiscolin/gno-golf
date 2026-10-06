@@ -29,18 +29,11 @@ import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost, Cost } from "@/lib/builder/wasm";
 import type { Hole } from "@/lib/scene/data";
 import Preview from "./Preview";
-import { cardLines, holeLinkOf, shareCard } from "./share";
+import { cardLines, holeLinkOf, saveFile as download, shareCard } from "./share";
+import { MAX_NOTE, MAX_TITLE as MAX_NAME } from "@/lib/builder/draft";
+import { worldName } from "@/lib/builder/rules";
 
-const MAX_NAME = 40, MAX_NOTE = 140;
 const gnot = (ugnot: number) => (ugnot / 1e6).toFixed(2);
-/** A file saved through a link the author clicked (a computer's download). */
-function download(blob: Blob, name: string) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
 /** How long the chain is read for the new version after a signature (it lands within a few blocks). */
 const LAND_MS = 90_000;
 
@@ -171,7 +164,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
     <main className="pub">
       <section className="pub__hole" aria-label="The hole as players will see it">
         <Preview state={state} fresh />
-        <div className="pub__card"><b>{name}</b><small>{draft.world.charAt(0).toUpperCase() + draft.world.slice(1)} · par {draft.par || "–"}</small></div>
+        <div className="pub__card"><b>{name}</b><small>{worldName(draft.world)} · par {draft.par || "–"}</small></div>
       </section>
       <section className="pub__form" aria-label="Publish">
         <div className="pub__scroll">

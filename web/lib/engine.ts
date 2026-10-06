@@ -31,7 +31,7 @@ import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
-import { readTakedown, takenDown } from "./takedown";
+import { loadTakedown, takenDown } from "./takedown";
 import { NOT_BUILDER, playable } from "./community";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
@@ -1404,9 +1404,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
   /** The takedown list, read once a visit (none if it cannot be read: the next start tries again). */
   let takenOnce: Promise<ReadonlySet<string>> | null = null;
   const takedown = () =>
-    (takenOnce ||= Promise.all([fetch("/takedown.json", { cache: "no-cache" }).then((r) => (r.ok ? r.text() : "")), chain.chainId()])
-      .then(([text, id]) => readTakedown(text, id))
-      .catch(() => ((takenOnce = null), NO_TAKEN)));
+    (takenOnce ||= loadTakedown(chain).catch(() => ((takenOnce = null), NO_TAKEN)));
 
   // a link to a community hole the Builder's rules do not pass lands on the cups, and says so (load refuses it too)
   const unchecked = () => start(null).then((to) => (to === null ? "unchecked" : to));

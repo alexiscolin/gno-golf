@@ -9,6 +9,7 @@ import { groupsOf } from "@/lib/builder/editor";
 import { handlesOf } from "@/lib/builder/handles";
 import type { PaletteEntry } from "@/lib/builder/palette";
 import { PieceShape } from "./PieceShape";
+import { worldName } from "@/lib/builder/rules";
 
 /** A tile's drawing: a small piece of the entry, framed. */
 function Tile({ e }: { e: PaletteEntry }) {
@@ -30,7 +31,7 @@ export default function Palette({ world, palette, armed, off, onArm }: {
   off: ReadonlyMap<string, string>;
   onArm: (e: PaletteEntry | null) => void;
 }) {
-  const name = world.charAt(0).toUpperCase() + world.slice(1);
+  const name = worldName(world);
   return (
     <aside className="col palette" aria-label={`The ${name}'s pieces`}>
       <div className="palette__world">{name} pieces</div>

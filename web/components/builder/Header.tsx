@@ -5,6 +5,8 @@
 // steps, and on the right the history (in Edit) and the mode's one action.
 // A step done or open is a link back to it; a locked one says why.
 import { MOD } from "./Inspector";
+import { shortAddr } from "@/components/common";
+import { worldName } from "@/lib/builder/rules";
 
 export type Step = "edit" | "test" | "publish";
 
@@ -14,7 +16,6 @@ export interface StepState {
   done: boolean;
 }
 
-const short = (a: string) => `${a.slice(0, 7)}…${a.slice(-4)}`;
 
 export default function Header({ title, slug, author, world, worlds, step, steps, action, history, onTitle, onSlug, onWorld, onStep, onBack }: {
   title: string;
@@ -43,12 +44,12 @@ export default function Header({ title, slug, author, world, worlds, step, steps
       <div className="bhead__hole">
         <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)} />
         <small>
-          {author ? short(author) : "your address"}/
+          {author ? shortAddr(author) : "your address"}/
           <input className="bhead__slug" value={slug} maxLength={32} placeholder="short-name" aria-label="The hole's short name, in its address" disabled={step !== "edit"}
             onChange={(e) => onSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} />
           /v1 ·{" "}
           <select value={world} aria-label="The hole's world" disabled={step !== "edit"} onChange={(e) => onWorld(e.target.value)}>
-            {worlds.map((w) => <option key={w} value={w}>{w.charAt(0).toUpperCase() + w.slice(1)}</option>)}
+            {worlds.map((w) => <option key={w} value={w}>{worldName(w)}</option>)}
           </select>
         </small>
       </div>

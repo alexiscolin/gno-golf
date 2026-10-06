@@ -9,7 +9,7 @@ import { inZone, segDist } from "../terrain";
 import type { PieceRef } from "../scene/census";
 import { RULES } from "../chain";
 import { LIMITS } from "./gg1";
-import { MIN_SHOT_WORK } from "./rules";
+import { cap, MIN_SHOT_WORK } from "./rules";
 import { CELL, laneOf, moves, reach } from "./lane";
 import type { HoleIn, PostIn, V, WallIn, ZoneIn } from "./types";
 import type { Cost } from "./wasm";
@@ -305,7 +305,6 @@ function scenery(h: HoleIn, name: Namer): Issue[] {
   return out;
 }
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * The hole's checks (E1 to E8, E10, E13 to E15), errors first. name says a

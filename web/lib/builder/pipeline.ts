@@ -11,7 +11,7 @@ import { explain } from "./explain";
 import { BOARD, LIMITS, MARGIN, barCorners, entryParts, frame, writeDraft } from "./gg1";
 import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
-import { FIELD } from "./rules";
+import { cap, FIELD } from "./rules";
 import type { Draft, Piece, V } from "./draft";
 import type { BuilderHost, Cost } from "./wasm";
 import type { GHole } from "./types";
@@ -46,7 +46,6 @@ export interface Validated {
 export const MAX_BYTES = 32 << 10;
 const ACROSS = BOARD - 2 * MARGIN;
 const pt = (p: V) => `(${+p[0].toFixed(2)}, ${+p[1].toFixed(2)})`;
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const keyOf = (r: PieceRef) => `${r.set}${r.i}${r.pulse ?? ""}`;
 /** A piece's name in a sentence: "the plank bar", "the plain rail". */
 export const pieceName = (p: Piece) => {

@@ -23,18 +23,14 @@ import Editor from "./Editor";
 import Header from "./Header";
 import Publish from "./Publish";
 import TestMode from "./TestMode";
+import { worldName } from "@/lib/builder/rules";
+import { saveFile } from "./share";
 
 const WORLDS = Object.keys(FIELD);
-const name = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+const name = worldName;
 
 /** A draft saved as a file (exportDraft), named after it. */
-function download(d: Draft) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([exportDraft(d)], { type: "application/json" }));
-  a.download = draftFile(d);
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
+const download = (d: Draft) => saveFile(new Blob([exportDraft(d)], { type: "application/json" }), draftFile(d));
 
 /** The drafts kept in this browser; a new hole in a world, a file opened, a published hole opened for its next version. */
 function Drafts({ host, author, drafts, onOpen, onAdd, onDelete }: {
