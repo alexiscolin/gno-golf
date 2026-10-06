@@ -8,20 +8,21 @@
 // collection.
 import "@/app/gnomes.css";
 import { useState } from "react";
+import Share from "@/components/Share";
 import { PRICE, type SendError } from "@/lib/adena";
 import { sendGnome, gnomeCall, GNOME_TX } from "@/lib/gnomes/tx";
 import type { Chain } from "@/lib/chain";
 import { GNOMES_REALM } from "@/lib/chain";
 import { messageOf } from "@/components/common";
 import { seen, tokenSkin } from "@/lib/gnomes/wear";
-import type { Worn } from "@/lib/gnomes/shop";
+import { shareWords, type Worn } from "@/lib/gnomes/shop";
 import { thumb } from "./parts";
 
 interface Props {
   chain: Chain;
   me: string;
   /** their gnomes, best first (GnomesOf's rows) */
-  held: readonly { id: string; tier: string; traits: string; name: string }[];
+  held: readonly { id: string; tier: string; traits: string; name: string; home: string }[];
   worn: Worn | null;
   /** the gnome played (a skin id) */
   playing: string;
@@ -35,6 +36,7 @@ interface Props {
 
 export default function Owned({ chain, me, held, worn, playing, onPick, region, onWorn, name }: Props) {
   const [busy, setBusy] = useState<"" | "sign" | "done">("");
+  const [shown, setShown] = useState<{ id: string; name: string; home: string } | null>(null); // the one just shown to everyone: share him
   const [error, setError] = useState("");
   // (an earned gnome is one of the picker's own: the row is the bought ones)
   const bought = held.filter((g) => Number(g.id) < 1_000_001);
@@ -49,6 +51,8 @@ export default function Owned({ chain, me, held, worn, playing, onPick, region, 
       const price = await chain.gasPrice().catch(() => PRICE);
       await sendGnome(gnomeCall.equip(id), { address: me, realm: GNOMES_REALM, price, chainId: await chain.chainId().catch(() => null), rpc: chain.rpc });
       setBusy("done");
+      const g = bought.find((x) => x.id === String(id));
+      if (g) setShown(g);
       onWorn();
     } catch (e) {
       setBusy("");
@@ -64,6 +68,8 @@ export default function Owned({ chain, me, held, worn, playing, onPick, region, 
         )}
       </p>
       {error && <p className="owned__line" role="alert">{error}</p>}
+      {/* the moment everyone sees him: the game's own share row, once */}
+      {shown && <Share text={shareWords.equipped(shown.name, shown.home)} link={`g/${shown.id}/`} label={`Your rivals will see ${shown.name}`} kind="share" />}
       <div className="owned__row" role="group" aria-label="Your gnomes">
         {bought.map((g) => {
           const skin = tokenSkin(g).id;

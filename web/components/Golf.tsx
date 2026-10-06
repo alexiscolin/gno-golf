@@ -974,7 +974,7 @@ export default function Golf() {
   // The collection (SHOP): what the player holds and wears for everyone, read once an account is
   // here; the gnome played is their pick while it is theirs, else the one they wear (wear.ts playing).
   const [region, setRegion] = useState(false);
-  const [held, setHeld] = useState<{ id: string; tier: string; traits: string; name: string }[]>([]);
+  const [held, setHeld] = useState<{ id: string; tier: string; traits: string; name: string; home: string }[]>([]);
   const [worn, setWorn] = useState<Worn | null>(null);
   const [shopView, setShopView] = useState<ShopView>({});
   const shopFrom = useRef<Screen>("worlds"); // the screen the shop's Back returns to
@@ -986,8 +986,8 @@ export default function Golf() {
     if (!SHOP || !c || !account) return (setHeld([]), setWorn(null));
     const shop = makeShop(c), me = account.address;
     void Promise.all([shop.allOf(me), shop.worn(me).catch(() => null)]).then(async ([rows, w]) => {
-      const names = rows.length ? new Map((await served().catch(() => ({ gnomes: [] }))).gnomes.map((g) => [String(g.id), g.name])) : new Map<string, string>();
-      const mine = rows.map((r) => ({ ...r, name: names.get(r.id) || `Gnome ${r.id}` }));
+      const listed = rows.length ? new Map((await served().catch(() => ({ gnomes: [] }))).gnomes.map((g) => [String(g.id), g])) : new Map<string, { name: string; home: string }>();
+      const mine = rows.map((r) => ({ ...r, name: listed.get(r.id)?.name || `Gnome ${r.id}`, home: listed.get(r.id)?.home || "" }));
       const skins = await know(w ? [...mine, w] : mine);
       setHeld(mine);
       setWorn(w);
@@ -1555,7 +1555,7 @@ export default function Golf() {
       {/* rain and storm darken and wet the whole scene a little */}
       {playing && wx && (wx.rain || wx.storm) && <div className={"wet" + (wx.storm ? " wet--storm" : "")} aria-hidden="true" />}
 
-      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} onStart={() => (setScreen(dare && !solo && dare === linkDare.current ? "ghosts" : "modes"), (linkDare.current = ""))} onAbout={() => setAbout(true)} />}
+      {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} gnome={SHOP ? gnomeById(gnome) : undefined} onStart={() => (setScreen(dare && !solo && dare === linkDare.current ? "ghosts" : "modes"), (linkDare.current = ""))} onAbout={() => setAbout(true)} />}
       {screen === "modes" && (
         <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
           onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")} />

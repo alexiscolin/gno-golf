@@ -149,6 +149,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
                 </button>
               )}
               {equip && equip !== "busy" && equip !== "done" && <p className="gsheet__fine" role="alert">{equip}</p>}
+              {equip === "done" && <Share text={shareWords.equipped(g.name, g.home)} link={`g/${g.id}/`} label={`Your rivals will see ${g.name}`} kind="share" />}
               <p className="gsheet__fine">Playing any gnome you hold is free. {worn === skin.id ? "Everyone sees this one on your ball." : ""}</p>
             </div>
           ) : owner ? (

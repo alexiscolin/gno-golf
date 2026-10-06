@@ -509,6 +509,17 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   return root;
 }
 
+/** Another gnome in one's place (a scene's cast dressed as the player): the same
+ *  parent, position and facing; the old one leaves the scene, freed. */
+export function rewear(old: Gnome, skin: Skin): Gnome {
+  const now = makeBall(skin), parent = old.parent;
+  now.position.copy(old.position);
+  now.userData.body.rotation.copy(old.userData.body.rotation);
+  if (parent) parent.add(now), parent.remove(old);
+  disposeCourse(old);
+  return now;
+}
+
 // a duel's ghost: paper white, inked thin as a gnome is (and nobody's skin)
 const GHOST: Skin = { id: "ghost", name: "Ghost", line: "", hat: C.cream, body: C.cream, hair: C.cream, beard: "full" };
 /** A duel's rival's gnome: the one they wear (wears), else one of the others

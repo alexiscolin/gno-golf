@@ -107,3 +107,22 @@ test("trails and holings: every kind the collection uses is made and runs to its
   assert.equal(makeTrail(GNOMES[0]), null);
   assert.equal(makeHoling(GNOMES[0], new THREE.Vector3()), null);
 });
+
+test("rewear: another gnome takes one's place, its parent, position and facing; the old one leaves", async () => {
+  const { rewear } = await import("../lib/scene/gnome.ts");
+  const stage = new THREE.Group(), old = makeBall(GNOMES[0]);
+  stage.add(old);
+  old.position.set(1, 2, 3);
+  old.userData.body.rotation.y = 0.7;
+  const e = catalogue.gnomes.find((g) => g.tier === "common")!;
+  const now = rewear(old, e.skin);
+  assert.equal(now.parent, stage);
+  assert.equal(old.parent, null, "the old one is out of the scene");
+  assert.deepEqual(now.position.toArray(), [1, 2, 3]);
+  assert.equal(now.userData.body.rotation.y, 0.7);
+  const ref = makeBall(e.skin);
+  new THREE.Group().add(ref);
+  ref.position.set(1, 2, 3);
+  ref.userData.body.rotation.y = 0.7;
+  assert.equal(fingerprint(now), fingerprint(ref), "drawn as that gnome, where the old one stood");
+});

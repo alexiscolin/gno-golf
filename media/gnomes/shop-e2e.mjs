@@ -201,10 +201,28 @@ for (const width of [390, 1280]) {
     for (let i = 0; i < 60 && JSON.parse((await qg(`Worn(address("${env.p1}"))`)) || "{}").id !== "73"; i++) (await w.pump(), await sleep(500));
     say(JSON.parse((await qg(`Worn(address("${env.p1}"))`)) || "{}").id === "73", "Show to everyone: Equip signed, Worn(p1) is #73");
     await until(b, w, `document.querySelector(".owned__line")?.textContent.startsWith("Everyone sees")`, 20e3);
+    say(!!(await b.ev(`document.querySelector(".owned .share")?.textContent.includes("Your rivals will see")`)), "shown to everyone: the game's share row, \"Your rivals will see …\"");
     await shot(b, "picker-shown-1280");
   }
   b.kill();
 }
+// the title: the live scene's watcher by the cup wears the player's gnome (p1 wears #73 for everyone by now)
+{
+  const { b, w } = await open("p1", 1280);
+  // headless Chrome asks for less motion, and the title then shows its still (as render.mjs notes)
+  await b.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
+  await b.send("Page.navigate", { url: `${APP}/?camlog` });
+  const live = await until(b, w, "window.__title", 60e3);
+  if (!live) console.log("SKIP the title: no live scene in this Chrome (a weak GPU gets the still)");
+  else {
+    const ok = await until(b, w, `window.__title.info().gnome === "t73"`, 60e3);
+    say(ok, "the title's watcher wears the player's gnome", String(await b.ev("window.__title.info().gnome")));
+    await sleep(1500);
+    await shot(b, "title-1280");
+  }
+  b.kill();
+}
+
 // an earned gnome's page, a later wave's gnome
 {
   const { b } = await sheet("", "wizard", 390);

@@ -354,10 +354,12 @@ stand-in (`media/gnomes/wallet.mjs`) that signs each Adena call with gnokey
 and a throwaway key, on that chain alone (it refuses an RPC that is not
 this machine's). Every step checks the chain and is screenshotted, and every
 screenshot is audited: no sideways scroll, nothing wider than the window, no
-page error. 87 checks pass: the gallery at 320, 390, 768, 1280 and 1440 px;
+page error. 91 checks pass: the gallery at 320, 390, 768, 1280 and 1440 px;
 the players' window and its cap said on the button; the order before the
 wallet, its button off until both boxes are ticked; a cancel; a buy signed
 and read back (the chain shows the owner) and its receipt; a Legendary at
 its price; Adena failing without saying nothing went ("don't buy again"); my
 gnomes and theirs; the picker's row, a gnome played for free, then shown to
-everyone (Equip, and `Worn` says so); an earned gnome's page; a later wave's.
+everyone (Equip, and `Worn` says so) with the share row "Your rivals will
+see …"; the title's live scene, its watcher by the cup in the player's
+gnome; an earned gnome's page; a later wave's.
