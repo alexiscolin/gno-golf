@@ -298,8 +298,9 @@ screen (every safety rule of the hole-builder spec stays: the palette lock,
 the chain's checks in the wasm, the proofs):
 
 - **It opens on a working hole.** A new player lands on a starter of a
-  classic world (the Garden's dogleg, par 3), already holed in every weather,
-  with **three short hints, dismissible at once** ("Got it"), never a
+  classic world (the Garden's dogleg, par 3), a playable hole that passes
+  every check, **not yet holed** (a proof is bound to its author's address and
+  the hole's id: a starter cannot ship one), with **three short hints, dismissible at once** ("Got it"), never a
   tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press Test
   it to play your hole" (at the big button), ③ "Then Publish, once holed in
   every weather" (at the steps). They show on the first visit only.
@@ -325,7 +326,7 @@ the chain's checks in the wasm, the proofs):
 
 Back (the draft is saved), the hole's name (editable, suggested), its
 address under it, in Edit the world's menu ("Garden ▾": the four classic
-worlds, and "Start again from a starter"), the steps Edit → Test → Publish
+worlds; "Start again from a starter" may come later), the steps Edit → Test → Publish
 (done ✓, current, or 🔒 with its reason on hover), undo and redo, the big
 button. The Crystal Mines are not a Builder world; a mines hole is refused
 before anything loads ("The Crystal Mines are built by hand: this hole can't
@@ -376,13 +377,16 @@ dare".
 ### B6. Measured: five minutes, few clicks
 
 A scripted headless walkthrough (`scripts/builderwalk.ts`, on the repo's
-headless Chrome, `media/lib/cdp.mjs`) plays a new player against a local
-chain: open `/build`; "Got it"; drag a Bumper onto the starter, off the
+headless Chrome, `media/lib/cdp.mjs`) plays a new player: open `/build`; "Got it"; drag a Bumper onto the starter, off the
 ball's line; "Test it"; hole each weather with the starter's committed shots
 (the starter's proofs are its shot lists; the bumper is placed off their
 path); "Publish →"; stop on the form with the suggested name, ready to sign.
-It reports the wall time and the count of clicks and drags, and fails over
-**5 minutes**, or over the budget below. CI runs it.
+Test mode needs no chain (`builder.wasm` answers it). The Publish form reads
+the chain: with none running, the walkthrough stops there and reports
+"chain unread", which still counts as reaching the form; with a local chain it
+also checks the cost lines. It reports the wall time and the count of clicks
+and drags, and fails over **5 minutes**, or over the budget below. CI runs
+it.
 
 | Step | Clicks | Drags |
 |---|---|---|
