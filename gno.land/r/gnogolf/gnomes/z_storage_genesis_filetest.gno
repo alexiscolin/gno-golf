@@ -54,5 +54,5 @@ func genesis() string {
 // {"version":1,"id":"720","series":"genesis","name":"Pip Seedwell 720","tier":"legendary","traits":"0100000000000000000000000000000000000000000000000000000720","owner":"","price":777000000,"sold":false,"closed":false}
 
 // Storage:
-// gno.land/r/gnogolf/gnomes: 64269
+// gno.land/r/gnogolf/gnomes: 64271
 // gno.land/r/test/storedgenesis: 0
