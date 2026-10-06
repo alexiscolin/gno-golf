@@ -158,6 +158,19 @@ and plan, Tasks 7.7 to 10.6):
   leaves: the first v2 publish was billed some 2 GNOT too much.)
 - **No Builder on a phone.** Under 900 px or on a coarse pointer, `/build`
   loads neither the editor nor `builder.wasm` (an import-graph test holds it).
+- **Simple to pick up** (the GUI spec's B1 to B6, the owner's requirement;
+  every safety rule kept). A new player lands on the Garden's dogleg with
+  three hints and one Got it; the palette starts with five plainly named
+  pieces (Wall, Bumper, Sand, Water, Slope), the rest under More pieces,
+  and a bin; no number to type unless Details is opened; one big button
+  with its reason in a few words; every check in the player's words
+  (`explain.ts` plainOf), the rule's code a tooltip, with Show me; the name
+  suggested and the address made from it until the first proof. Two
+  headless scripts hold it against a dev server: `scripts/builderui.ts`
+  (the layout at 900 to 1440 px, the keyboard, the first run, Details, the
+  bin) and `scripts/builderwalk.ts` (the starter path to a proved hole on
+  the Publish form: 16 s, 4 clicks, 7 drags, 1 field typed; it fails over 5
+  minutes).
 
 ## Threat model
 
