@@ -200,6 +200,23 @@ func TestBuilderParity(cur realm, t *testing.T) {
 		for _, c := range cases {
 			wpCheck(cur, c[0], d[0], mutate(d[1], c[1]), c[1], c[2])
 		}
+		// the test mode's reads: the hole published as a community hole, then
+		// HoleState, Weather in three periods and SimulateCommit as a player
+		// sees them, at the realm's clock (builder.wasm is set to it)
+		testing.SetRealm(testing.NewUserRealm(player))
+		id := PublishMine(cross(cur), "s"+strconv.Itoa(i), d[1], "")
+		now := Period()
+		println("WP\tS\t" + d[0] + "\t" + id + "\t" + strconv.FormatInt(now, 10) + "\t" + wpSum(HoleState(id)))
+		for _, p := range []int64{now, now - 1, now - 7} {
+			println("WP\tW\t" + id + "\t" + strconv.FormatInt(p, 10) + "\t" + wpSum(Weather(id, p)))
+		}
+		for k := 0; k < 3; k++ {
+			hd := mustHole(id).hole()
+			x, y := r.unit()*float64(hd.W), r.unit()*float64(hd.H)
+			stroke, shots := 1+int(r.next()%5), r.shot()+";"+r.shot()
+			out := wpCall(func() string { return SimulateCommit(id, x, y, stroke, shots, now) })
+			println("WP\tM\t" + id + "\t" + wpNum(x) + "\t" + wpNum(y) + "\t" + strconv.Itoa(stroke) + "\t" + shots + "\t" + strconv.FormatInt(now, 10) + "\t" + wpSum(out))
+		}
 		h, err := course.Decode(unhex(d[1]))
 		if err != nil {
 			panic(err)

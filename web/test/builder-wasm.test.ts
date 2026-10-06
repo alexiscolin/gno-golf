@@ -95,8 +95,9 @@ void test("its sources are deployed files: the realm's and the course's, never a
 });
 
 void test("it plays as golf.wasm does: test mode's simulation is the game's", () => {
-  const sim = makeHost(mod);
+  const sim = makeBuilderHost(mod);
   sim.load("garden/1/v1", hex);
+  sim.setperiod(5967997);
   const golf = makeHost(new WebAssembly.Module(fs.readFileSync(new URL("web/lib/sim/golf.wasm", repo))));
   golf.load("garden/1/v1", hex);
   assert.equal(sim.from("garden/1/v1", 3, 3, "21.00,8.00", 0, 5967997), golf.from("garden/1/v1", 3, 3, "21.00,8.00", 0, 5967997));
@@ -114,4 +115,40 @@ void test("decode is lossless: every course hole, written back by gg1 and fitted
 
 void test("decode refuses what Decode refuses", () => {
   assert.throws(() => host.decode("00"), /golf: course: not GG1 data/);
+});
+
+const ID = "g1hvuayx9ll7dal54kr0f6t89j8867z8lf5vtxgv/t/v1", P = 5967997;
+
+void test("state answers HoleState at the clock set; forecast refuses a period ahead of it", () => {
+  host.load(ID, hex);
+  host.setperiod(P);
+  const s = JSON.parse(host.state(ID)) as { period: number; hole: string; slot: string; v: number; official: boolean; walls: unknown[] };
+  assert.equal(s.period, P);
+  assert.equal(s.hole, ID);
+  assert.equal(s.slot, "g1hvuayx9ll7dal54kr0f6t89j8867z8lf5vtxgv/t");
+  assert.equal(s.v, 1);
+  assert.equal(s.official, false);
+  assert.ok(s.walls.length > 0);
+  assert.equal((JSON.parse(host.forecast(ID, P)) as { period: number }).period, P);
+  assert.equal(host.forecast(ID, P + 1), "panic: golf: that weather has not come yet");
+  assert.match(host.extras(ID, 0), /^\{"version":1,"walls":/);
+});
+
+void test("the clock survives a refusal: a new instance is set to it again", () => {
+  host.setperiod(P);
+  assert.equal(host.check("Bad_Slug", hex).ok, false);
+  assert.equal((JSON.parse(host.state(ID)) as { period: number }).period, P);
+});
+
+void test("find gives the latest period of a kind; commit plays from a ball, as SimulateCommit", () => {
+  host.load(ID, hex);
+  host.setperiod(P);
+  const p = host.find(ID, "rain", P);
+  assert.ok(p > P - 10000 && p <= P, String(p));
+  assert.equal((JSON.parse(host.forecast(ID, p)) as { kind: string }).kind, "rain");
+  assert.equal(host.find(ID, "snow", P), -1, "the garden has no snow");
+  const first = JSON.parse(host.round(ID, "21.00,8.00", p)) as { rest: [number, number] };
+  assert.ok(Array.isArray(first.rest));
+  assert.match(host.commit(ID, first.rest[0], first.rest[1], 1, "290.50,7.75", P), /^\{/);
+  assert.match(host.commit(ID, 3, 3, 0, "10.00,1.00", P - 5), /^panic: golf: /, "a first stroke in a period long gone: the realm's refusal");
 });

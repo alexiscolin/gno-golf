@@ -104,7 +104,7 @@ extract() {
 }
 aim="SimulateFrom simulateRound entry.hole"
 golf=$(extract golf.go '!builder' $aim)
-builder=$(extract golf_builder.go builder $aim maxData newWork worstGas maxShotGas validSlug cleanName cleanText maxNote linkish jstr)
+builder=$(extract golf_builder.go builder $aim HoleState Extras Weather SimulateCommit maxData newWork worstGas maxShotGas validSlug cleanName cleanText maxNote linkish jstr)
 if grep -rln '^import "math"$\|^	"math"$' "$here/p" "$here/r" "$here/gnovm" --include=*.go | grep -v '/gnovm/math/native.go$'; then
 	echo "wasm.sh: a file above still imports Go's math" >&2
 	exit 1

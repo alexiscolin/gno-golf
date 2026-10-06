@@ -18,6 +18,111 @@ import (
 	"gno.land/p/gnogolf/physics/build"
 )
 
+// entry is a published version as the realm keeps what HoleState reads of
+// it: a fresh one (no round has worn it, nothing replaced it), its fields as
+// dataEntry sets them from its id and its data.
+type entry struct {
+	id, world, name, slot, next string
+	par, version                int
+	order                       float64
+	official                    bool
+}
+
+// The store, the reads and the replay are local.go's, line for line: that
+// file is golf.wasm's, and a file shared by both builds moves golf.wasm's
+// bytes (the link order), which every player's page checks.
+
+type store map[string]string
+
+// Get is the realm's view's: false for a hole never loaded.
+func (s store) Get(k string) (string, bool) {
+	v, ok := s[k]
+	return v, ok
+}
+
+var (
+	entries  = map[string]*entry{}
+	holeData = store{}
+)
+
+func readHole(id string) *entry {
+	if e := entries[id]; e != nil {
+		return e
+	}
+	panic(errUnknownHole + id)
+}
+
+func unhex(s string) string {
+	if len(s)%2 != 0 {
+		panic("golf: the data is not hex")
+	}
+	b := make([]byte, len(s)/2)
+	for i := range b {
+		b[i] = nib(s[2*i])<<4 | nib(s[2*i+1])
+	}
+	return string(b)
+}
+
+func nib(c byte) byte {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0'
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10
+	}
+	panic("golf: the data is not hex")
+}
+
+// Round is SimulateRoundAt without its clock (playablePeriod): the replay.
+func Round(id, shots string, period int64) string { return simulateRound(id, nil, 0, shots, period) }
+
+// wearGrid is a fresh hole's: no round has worn it.
+func (e *entry) wearGrid() []int { return make([]int, course.WearW*course.WearH) }
+
+var period int64
+
+// Period is the test's clock, set by SetPeriod: a proof is played in the
+// weather of the period it is set to, and nothing past it.
+func Period() int64 { return period }
+
+// SetPeriod sets the clock Period reads.
+func SetPeriod(p int64) { period = p }
+
+// findBack is how far back Find looks: a kind that has not come in that many
+// periods (about a month of five-minute periods) is not the hole's climate.
+const findBack = 10000
+
+// Find is the latest period at or before from whose weather on the hole is
+// kind (course.ForecastFor, as the realm draws it), -1 if none within findBack.
+func Find(id, kind string, from int64) int64 {
+	e := readHole(id)
+	h := e.hole()
+	for p := from; p > from-findBack && p >= 0; p-- {
+		if weatherOf(e, h, p).Kind == kind {
+			return p
+		}
+	}
+	return -1
+}
+
+// Load keeps a hole's data, HoleData's hex, under its version's id
+// ("<alias>/v<n>"), its entry as dataEntry would make it.
+func Load(id, hexData string) {
+	b := unhex(lower(hexData))
+	h, err := course.Decode(b)
+	if err != nil {
+		panic("golf: " + err.Error())
+	}
+	slot, n := id, 1
+	if i := strings.LastIndex(id, "/v"); i > 0 {
+		if v, err := strconv.Atoi(id[i+2:]); err == nil && v > 0 {
+			slot, n = id[:i], v
+		}
+	}
+	holeData[id] = b
+	entries[id] = &entry{id: id, world: h.World, name: cleanName(h.Title), slot: slot, version: n, par: h.Par(), order: h.Order}
+}
+
 // Check is PublishMine's checks of its arguments, in the order it makes them
 // before it writes anything: the slug, the data (checkData), then the hole's
 // name and the note, by the realm's own functions. Publishing being open, and

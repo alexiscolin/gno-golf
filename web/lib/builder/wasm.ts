@@ -3,15 +3,21 @@
 // work, the name and note), and the chain's author.Fit and Encode making a
 // draft publishable. A refusal is the realm's sentence, word for word
 // (scripts/wasmparity.ts holds them to PublishMine's). No DOM.
-import { makeCaller, type Base } from "../sim/wasi";
+import { makeCaller } from "../sim/wasi";
+import { simCalls, type SimExports } from "../sim/host";
 import type { GHole } from "./types";
 
-interface Exports extends Base {
+interface Exports extends SimExports {
   check(n: number, m: number): void;
   fit(n: number, margin: number): void;
   bar(): void;
   decode(): void;
-  sources(): void;
+  setperiod(p: bigint): void;
+  state(): void;
+  extras(stroke: number): void;
+  forecast(period: bigint): void;
+  find(n: number, from: bigint): bigint;
+  commit(n: number, x: number, y: number, stroke: number, period: bigint): void;
 }
 
 /**
@@ -46,9 +52,44 @@ export const MARGIN = 1.5;
 
 const refusal = (out: string) => (out.startsWith("panic: ") ? out.slice(7) : null);
 
+/**
+ * builder.wasm's host: golf.wasm's calls (simCalls: load, from, round,
+ * sources), the test mode's reads at a clock it sets, and the builder's own.
+ */
 export function makeBuilderHost(mod: WebAssembly.Module) {
-  const { put, call } = makeCaller<Exports>(mod);
+  const caller = makeCaller<Exports>(mod);
+  const { put, call, onStart } = caller;
+  const sim = simCalls(caller);
+  // the test's clock: set on every instance (a refusal's trap starts a new one)
+  let clock = 0n;
+  onStart((e) => e.setperiod(clock));
+  const onHole = sim.onHole;
   return {
+    load: sim.load,
+    has: sim.has,
+    from: sim.from,
+    round: sim.round,
+    /** The clock the realm's Period reads: a test is played in that period's weather and none past it. */
+    setperiod(p: number) {
+      clock = BigInt(p);
+      call((e) => e.setperiod(clock));
+    },
+    /** HoleState: the hole as a player's client reads it, fresh (no round, no wear). */
+    state: (id: string) => onHole(id, (e) => (put(e, id), e.state())),
+    /** Extras: a stroke's pulse pieces. */
+    extras: (id: string, stroke: number) => onHole(id, (e) => (put(e, id), e.extras(stroke))),
+    /** Weather: the hole's weather in a period (refused past the clock). */
+    forecast: (id: string, period: number) => onHole(id, (e) => (put(e, id), e.forecast(BigInt(period)))),
+    /** The latest period at or before from whose weather on the hole is kind; -1 if none in 10,000. */
+    find(id: string, kind: string, from: number): number {
+      let p = -1n;
+      const out = onHole(id, (e) => void (p = e.find(put(e, id, kind)[0], BigInt(from))));
+      if (refusal(out) != null) throw new Error(refusal(out)!);
+      return Number(p);
+    },
+    /** SimulateCommit: the shots played on from a ball, at stroke, in a period's weather. */
+    commit: (id: string, x: number, y: number, stroke: number, shots: string, period: number) =>
+      onHole(id, (e) => e.commit(put(e, id, shots)[0], x, y, stroke, BigInt(period))),
     /** PublishMine's checks of (slug, data in hex, note), as the realm makes them. */
     check(slug: string, hex: string, note = ""): Checked {
       const out = call((e) => {
@@ -83,7 +124,7 @@ export function makeBuilderHost(mod: WebAssembly.Module) {
       return JSON.parse(out) as [number, number][];
     },
     /** {path: sha256} of the deployed .gno files it was built from. */
-    sources: () => JSON.parse(call((e) => e.sources())) as Record<string, string>,
+    sources: sim.sources,
   };
 }
 export type BuilderHost = ReturnType<typeof makeBuilderHost>;

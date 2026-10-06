@@ -17,6 +17,7 @@ export interface Base {
 export function makeCaller<E extends Base>(mod: WebAssembly.Module) {
   const enc = new TextEncoder(), dec = new TextDecoder();
   let said = "", x: E | null = null, fresh = false;
+  const starts: ((e: E) => void)[] = [];
   function start(): E {
     const inst = new WebAssembly.Instance(mod, {
       wasi_snapshot_preview1: {
@@ -51,15 +52,17 @@ export function makeCaller<E extends Base>(mod: WebAssembly.Module) {
       for (const b of bs) new Uint8Array(e.memory.buffer, at, b.length).set(b), (at += b.length);
       return bs.map((b) => b.length);
     },
-    /**
-     * f's answer on the instance (begin runs first on a new one), or the
-     * refusal it printed; a trap that printed none is thrown.
-     */
-    call: (f: (e: E) => void, begin?: (e: E) => void) => {
+    /** Runs s first on every new instance: what a trap's restart must set again (the holes loaded, a clock). */
+    onStart: (s: (e: E) => void) => void starts.push(s),
+    /** f's answer on the instance, or the refusal it printed; a trap that printed none is thrown. */
+    call: (f: (e: E) => void) => {
       said = "";
       try {
         const e = x || start();
-        if (fresh) (fresh = false), begin?.(e);
+        if (fresh) {
+          fresh = false;
+          for (const s of starts) s(e);
+        }
         f(e);
         return dec.decode(new Uint8Array(e.memory.buffer, e.out(), e.outlen()));
       } catch (err) {
