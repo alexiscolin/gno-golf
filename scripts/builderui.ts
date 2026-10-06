@@ -30,6 +30,7 @@ type Box = { l: number; t: number; r: number; b: number };
 /** The page at /build/, a new hole opened (a starter), in a window w × h; before: a script run ahead of the page's own. */
 async function editor(w: number, h: number, before = "") {
   const c = await launch({ width: w, height: h });
+  await c.send("Emulation.setFocusEmulationEnabled", { enabled: true }); // (a headless page has no focus of its own: focus events need it)
   if (before) await c.send("Page.addScriptToEvaluateOnNewDocument", { source: before });
   await c.send("Page.enable");
   await c.send("Page.navigate", { url: `${APP}/build/` });
@@ -102,6 +103,35 @@ for (const [w, h] of SIZES) {
     if (b) assert.ok(!overlap(note, b), `the note covers ${sel}`);
   }
   console.log("keeps nothing: ok");
+  c.kill();
+}
+// a piece deleted from the Inspector: the focus on the board, not lost; a draft deleted: the game's sheet, Escape keeps it
+{
+  const c = await editor(1280, 800);
+  const key = async (key: string, code = key) => {
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });
+  };
+  await c.js(`[...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))).focus()`);
+  await sleep(600);
+  const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
+  await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).focus()`);
+  await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).click()`);
+  await sleep(800);
+  assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 1, "the piece deleted");
+  assert.equal(await c.js(`document.activeElement?.classList.contains("board")`), true, "the focus on the board after a Delete");
+  await c.js(`document.querySelector(".bhead .round--icon").click()`); // back to the drafts
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(300);
+  const drafts = await c.js<number>(`document.querySelectorAll(".bholes__list li").length`);
+  await c.js(`[...document.querySelectorAll(".bholes__list button")].find((b) => /Delete/.test(b.textContent)).click()`);
+  await sleep(400);
+  assert.equal(await c.js(`document.querySelector('[role="alertdialog"]')?.getAttribute("aria-label")`), "Delete this hole", "the game's sheet, not window.confirm");
+  await key("Escape");
+  await sleep(400);
+  assert.equal(await c.js(`!!document.querySelector('[role="alertdialog"]')`), false, "Escape closes it");
+  assert.equal(await c.js(`document.querySelectorAll(".bholes__list li").length`), drafts, "and keeps the draft");
+  assert.match(await c.js<string>(`document.activeElement?.textContent || ""`), /Delete/, "the focus back on the row's Delete");
+  console.log("delete: ok");
   c.kill();
 }
 console.log("builderui: all ok");

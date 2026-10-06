@@ -9,7 +9,7 @@ import "@/app/build/builder.css";
 import "@/app/build/phone.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BackButton } from "@/components/About";
-import { Button, Segmented } from "@/components/ui";
+import { Button, Segmented, Sheet } from "@/components/ui";
 import { exportDraft, loadDrafts, saveDrafts, type Draft } from "@/lib/builder/draft";
 import { draftFile, fromFile, fromPublished } from "@/lib/builder/importing";
 import { isHoleId, makeChain } from "@/lib/chain";
@@ -46,6 +46,7 @@ function Drafts({ host, author, drafts, onOpen, onAdd, onDelete }: {
   const [hole, setHole] = useState("");
   const [why, setWhy] = useState("");
   const [busy, setBusy] = useState(false);
+  const [wipe, setWipe] = useState<number | null>(null); // the draft asked to be deleted, before the sheet's yes
   const file = useRef<HTMLInputElement>(null);
   const take = (r: Draft | string) => (typeof r === "string" ? setWhy(r) : (setWhy(""), onAdd(r)));
   const openFile = (f: File | undefined) => {
@@ -85,13 +86,24 @@ function Drafts({ host, author, drafts, onOpen, onAdd, onDelete }: {
                 <span className="bholes__acts">
                   <Button className="btn--s" onClick={() => onOpen(i)}>Open</Button>
                   <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
-                  <button type="button" className="linkish" onClick={() => window.confirm(`Delete "${d.title || "this hole"}" from this browser?`) && onDelete(i)}>Delete</button>
+                  <button type="button" className="linkish" onClick={() => setWipe(i)}>Delete</button>
                 </span>
               </li>
             ))}
           </ul>
         ) : (
           <p className="bphone__note">No hole of yours yet: start one above.</p>
+        )}
+        {wipe !== null && drafts[wipe] && (
+          // the game's own sheet (focus in, Tab kept, Escape, focus back to the row's Delete)
+          <Sheet className="confirm" role="alertdialog" label="Delete this hole" onClose={() => setWipe(null)}>
+            <h2>Delete &ldquo;{drafts[wipe].title || "this hole"}&rdquo;?</h2>
+            <p>It goes from this browser. Export it first to keep a copy.</p>
+            <div className="banner__row">
+              <Button onClick={() => setWipe(null)}>Keep it</Button>
+              <Button variant="primary" className="btn--danger" onClick={() => (onDelete(wipe), setWipe(null))}>Delete</Button>
+            </div>
+          </Sheet>
         )}
         <details className="bholes__more">
           <summary>Open a file, or a published hole</summary>
@@ -150,7 +162,7 @@ export default function Builder() {
           <Header title={d.title} slug={d.slug} author={author} world={d.world} worlds={[d.world]} step="publish"
             steps={{ edit: { locked: "", done: true }, test: { locked: "", done: true }, publish: { locked: "", done: false } }}
             action={null} history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}}
-            onStep={(s) => (s === "edit" ? edit() : s === "test" && setOpen({ ...open, step: "edit" }))} onBack={edit} />
+            onStep={(s) => (s === "edit" ? edit() : s === "test" && setOpen(open.test ? { ...open, step: "test" } : { ...open, step: "edit" }))} onBack={edit} />
           <Publish host={host} draft={d} author={author} onDraft={(x) => update(() => x)} onRetest={edit} onDone={() => {}} />
           {unkeptNote}
         </div>

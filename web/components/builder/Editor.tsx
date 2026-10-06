@@ -111,7 +111,13 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     set({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? t : p)) });
   };
   const copy = () => piece && quick && tryEdit(copyPiece(draft, piece.id, quick), "No room near it for a copy.");
-  const remove = () => piece && (tryEdit(removePiece(draft, piece.id), ""), setSelected(null));
+  // deleted: the focus to the board (Tab goes on to its pieces), not lost with the Inspector's button
+  const remove = () => {
+    if (!piece) return;
+    tryEdit(removePiece(draft, piece.id), "");
+    setSelected(null);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(".board")?.focus());
+  };
   const nudge = (d: V) => {
     if (!piece || !quick || !full) return;
     const w = whereOf(piece.geometry), to = clampMove(draft, piece.id, snap([w[0] + d[0], w[1] + d[1]], 0.25), quick);

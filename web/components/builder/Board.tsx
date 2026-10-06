@@ -215,7 +215,7 @@ export default function Board(props: BoardProps) {
   const sel = draft.pieces.find((p) => p.id === selected), hs = 7 / view.k;
   const ghostBad = ghost && ghost.why;
   return (
-    <section className={`board${ghostBad || live?.why ? " board--no" : ""}`} ref={box} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
+    <section className={`board${ghostBad || live?.why ? " board--no" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
       <svg className="board__map" width={size.w} height={size.h} viewBox={`${view.x} ${view.y} ${size.w / view.k} ${size.h / view.k}`}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), props.onCancel())}
         onPointerLeave={() => setGhost(null)}>
