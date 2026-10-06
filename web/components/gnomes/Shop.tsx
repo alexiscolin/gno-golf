@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FrontScreen } from "@/components/About";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
-import { UNLOCKS, type UnlockId } from "@/lib/card";
+import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
 import { cardFact, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
@@ -130,7 +130,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
           ) : (
             <>
               <div className="wave__head">
-                <span>Wave {row.wave.n}{row.wave.home ? ` · ${row.wave.home.charAt(0).toUpperCase() + row.wave.home.slice(1)}` : ""}</span>
+                <span>Wave {row.wave.n}{row.wave.home ? ` · ${cap(row.wave.home)}` : ""}</span>
                 <span>{row.at === "soldout" ? `All ${row.wave.size} found a player` : `${row.wave.sold} of ${row.wave.size} found a player`}</span>
               </div>
               <div className="track" aria-hidden="true"><i style={{ width: `${row.wave.size ? (100 * row.wave.sold) / row.wave.size : 0}%` }} /></div>
@@ -161,7 +161,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
               </select>
               <select className="gfilters__search" aria-label="World" value={f.home || ""} onChange={(e) => setF((x) => ({ ...x, home: (e.target.value || undefined) as Home | undefined }))}>
                 <option value="">Every world</option>
-                {[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => <option key={h} value={h}>{h.charAt(0).toUpperCase() + h.slice(1)}</option>)}
+                {[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => <option key={h} value={h}>{cap(h)}</option>)}
               </select>
             </div>
           </details>

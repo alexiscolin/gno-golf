@@ -2,8 +2,10 @@
 // are physics, not looks, and each world's field. scripts/selfcheck.ts reads
 // the physics' own back (step.gno, course.gno) and fails on any drift.
 
-/** A sentence or a name with its first letter up ("garden" → "Garden"): every piece's and world's name said. */
-export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+import { cap } from "../card";
+
+/** A sentence or a name with its first letter up (card.ts): every piece's and world's name said. */
+export { cap };
 /** A world as the Builder names it. */
 export const worldName = cap;
 

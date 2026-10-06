@@ -6,6 +6,7 @@
 // trust strip. The seller is the build's (NEXT_PUBLIC_SELLER_*,
 // next.config.mjs refuses a production shop without it); a placeholder shows
 // what is missing anywhere else.
+import { shortAddr } from "../chain";
 import { gnot, utcDate } from "./shop";
 
 const env = (v: string | undefined, placeholder: string) => (v && v.trim()) || placeholder;
@@ -35,7 +36,6 @@ export const TRUST = ["Cosmetic only: same ball, same physics.", "You pick the e
 export const BANNED = ["invest ", "investment opportunity", "floor", "returns on", "roi", "profit", "appreciate", "will go up", "last chance", "only "];
 
 const TIER: Record<string, string> = { common: "Common", rare: "Rare", epic: "Epic", legendary: "Legendary", earned: "Earned" };
-const short = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const hm = (d: Date) => `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 /** A time in Japan's (UTC+9), as the copy says it: "Mon 14 Dec, 03:00 JST" (time: the hour alone). */
@@ -60,7 +60,7 @@ export function review(o: Order): [string, string][] {
     ["Other costs", `Storage deposit about ${about(o.deposit)} GNOT (held by the chain, returned if you burn the gnome) + network fee about ${about(o.fee)} GNOT. Neither is paid to us.`],
     ["Total", `about ${gnot(o.price + Math.ceil(o.deposit / 1e4) * 1e4 + Math.ceil(o.fee / 1e4) * 1e4)} GNOT`],
     ["Payment", "Paid now, in GNOT, from your own wallet, in the transaction you sign."],
-    ["Delivery", `Delivered at once to ${short(o.address)}, in the same transaction.`],
+    ["Delivery", `Delivered at once to ${shortAddr(o.address, 6)}, in the same transaction.`],
     ["Sale period", `The genesis sale closes on ${utcDate(o.closesAt, o.now)} (${jstDate(o.closesAt)}).`],
     ["Cancellation", "No returns, cancellations or refunds once the transaction is final, except where the law requires them."],
     ["Nature", "Cosmetic only. No gameplay advantage. Not an investment."],

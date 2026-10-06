@@ -678,6 +678,8 @@ function keptLines(out: string): [string, Kept][] {
 }
 /** Whether s is a gno.land address (g1…, bech32, lower case). */
 export const isAddress = (s: unknown) => typeof s === "string" && ADDR.test(s);
+/** An address shortened: its first head and last tail characters ("g1jg8mtu…sqf5"). */
+export const shortAddr = (a: string, head = 8, tail = 4) => `${String(a).slice(0, head)}…${String(a).slice(-tail)}`;
 
 const PULL_SHARE = 0.24; // a pull this share of the viewport's short side is full power
 /** How far a pull goes to full power on a vw × vh screen (px). */

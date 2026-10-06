@@ -13,7 +13,7 @@ import { BALL_R } from "../terrain";
 import { TIER_LOOK } from "../gnomes/catalogue";
 import type { Tier } from "../gnomes/vocab";
 
-/** A showcase on a canvas of its own, drawn at size px square: show(skin, tier), then shot(…) for a picture. */
+/** A showcase on a canvas of its own, drawn at size px square: show(skin, tier), then shot(…) for a picture; dispose() once done. */
 export function makeShowcase(size = 512) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
@@ -84,6 +84,12 @@ export function makeShowcase(size = 512) {
       x.imageSmoothingQuality = "high";
       x.drawImage(canvas, 0, 0, px, px);
       return out.toDataURL("image/webp", quality);
+    },
+    /** Lets the showcase go: what it drew, its renderer, and its canvas's WebGL context (a page holds about sixteen). */
+    dispose() {
+      for (const o of [gnome, trail && trail.group, plinth]) if (o) (scene.remove(o), disposeCourse(o));
+      renderer.dispose();
+      renderer.forceContextLoss();
     },
   };
 }

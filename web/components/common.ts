@@ -21,8 +21,7 @@ export const GNOME = {
 /** The error's own sentence, or the value said as it is. */
 export const messageOf = (e: unknown) => String((e && typeof e === "object" && "message" in e && e.message) || e);
 
-/** An address shortened: its first head and last tail characters ("g1jg8mtu…sqf5"). */
-export const shortAddr = (a: string, head = 8, tail = 4) => `${String(a).slice(0, head)}…${String(a).slice(-tail)}`;
+export { shortAddr } from "@/lib/chain";
 
 /** A new query for a link of the game's: a page pointed at another chain
  *  (?rpc=, ?web=) keeps pointing there, and nothing else is kept. */

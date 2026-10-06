@@ -7,10 +7,9 @@
 import fs from "node:fs";
 import { SHOP } from "@/lib/gnomes/shop";
 import { TIER_LOOK, type Catalogue } from "@/lib/gnomes/catalogue";
-import { UNLOCKS, type UnlockId } from "@/lib/card";
+import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 
 const catalogue = JSON.parse(fs.readFileSync("../data/gnomes.json", "utf8")) as Catalogue;
-const home = (h: string) => h.charAt(0).toUpperCase() + h.slice(1);
 
 /** A shop page's words and card. */
 export interface Page { slug: string; title: string; description: string; heading: string; image: string }
@@ -19,7 +18,7 @@ export const PAGES: readonly Page[] = !SHOP ? [] : [
     slug: String(g.id),
     heading: `${g.name}, gnome #${g.id} of Gnogolf`,
     title: `${g.name} · Gnome #${g.id} · Gnogolf`,
-    description: `${g.line} A ${TIER_LOOK[g.tier].label} gnome of Wave ${g.wave} · ${home(g.home)}: one of a kind, cosmetic only, the ball you play Gnogolf with.`,
+    description: `${g.line} A ${TIER_LOOK[g.tier].label} gnome of Wave ${g.wave} · ${cap(g.home)}: one of a kind, cosmetic only, the ball you play Gnogolf with.`,
     image: fs.existsSync(`public/og/g/${g.id}.jpg`) ? `/og/g/${g.id}.jpg` : "/og/g.jpg",
   })),
   ...catalogue.earned.map((e) => ({

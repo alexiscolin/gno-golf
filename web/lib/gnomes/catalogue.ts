@@ -5,6 +5,7 @@
 // read it (docs/gnomes/design.md, "For the screens").
 import { colourName, type Archetype, type Home, type Tier } from "./vocab";
 import { decode, type Traits } from "./codec";
+import { cap } from "../card";
 import type { Skin } from "../scene/gnome";
 
 /** The tiers a series sells, in id order within a wave. */
@@ -104,7 +105,6 @@ const WORDS: Record<string, string> = {
   stormwatch: "storm watcher", none: "clean-shaven", chops: "mutton chops", braids: "braided",
 };
 const word = (s: string) => (WORDS[s] ?? s.replace(/-/g, " "));
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** A token's traits as a list for people (the token page, the realm's
  *  metadata attributes): what is there, plainly named, nothing that is not. */

@@ -266,6 +266,8 @@ export type UnlockId = keyof typeof UNLOCKS;
 /** "the" before a name in a sentence, never twice: the game's gnomes are all
  *  "The …" ("the Wizard gnome", not "the The Wizard gnome"). */
 export const theName = (name: string) => `the ${name.replace(/^the\s+/i, "")}`;
+/** A sentence or a name with its first letter up ("garden" → "Garden"): a world's, a piece's, a trait's. */
+export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** What a restore from the chain brought back, in one sentence: its holes,
  *  its badges, the gnomes they unlocked by name. */
 export function backFromChain({ holes, badges, gnomes }: { holes: number; badges: number; gnomes: readonly string[] }) {

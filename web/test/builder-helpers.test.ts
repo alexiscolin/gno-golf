@@ -1,8 +1,8 @@
 // One home each for what the Builder and the game share, so copies cannot
 // drift (the header and the phone's list once kept 7 characters of an
 // address, the share card 8): the takedown list's read (lib/takedown.ts
-// loadTakedown), an address shortened (components/common.ts shortAddr), a
-// world's name (rules.ts worldName), a file saved (share.ts saveFile), the
+// loadTakedown), an address shortened (lib/chain.ts shortAddr), a
+// world's name (card.ts cap, rules.ts worldName), a file saved (share.ts saveFile), the
 // name's and the note's lengths (draft.ts MAX_TITLE, MAX_NOTE).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -19,7 +19,7 @@ const where = (re: RegExp) => ALL.filter(([, s]) => re.test(s)).map(([f]) => f);
 void test("one home each for the helpers the Builder shares", () => {
   assert.deepEqual(where(/"\/takedown\.json"/), [path.join("lib", "takedown.ts")]);
   assert.deepEqual(where(/slice\(0, ?\d\)\}…\$\{[^}]*slice\(-\d\)/), [], "an address shortened by hand");
-  assert.deepEqual(where(/charAt\(0\)\.toUpperCase\(\)(?: \+ |\}\$\{)[\w.]+\.slice\(1\)/), [path.join("lib", "builder", "rules.ts")], "a world's name, a sentence capitalised by hand");
+  assert.deepEqual(where(/charAt\(0\)\.toUpperCase\(\)(?: \+ |\}\$\{)[\w.]+\.slice\(1\)/), [path.join("lib", "card.ts")], "a world's name, a sentence capitalised by hand");
   assert.deepEqual(where(/\.download = /), [path.join("components", "builder", "share.ts")], "a file saved by hand");
   assert.deepEqual(where(/MAX_NAME = 40|MAX_NOTE = 140/).filter((f) => !f.endsWith("draft.ts")), [], "the name's and the note's lengths said twice");
 });

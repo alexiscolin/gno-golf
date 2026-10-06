@@ -5,6 +5,7 @@
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
 import { GNOMES_REALM, isAddress, type Chain } from "../chain";
+import { cap } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
 import type { Home, Tier } from "./vocab";
 
@@ -153,7 +154,6 @@ export const localDate = (unix: number) => new Date(unix * 1000).toLocaleString(
 
 const label = (t: string) => (TIER_LOOK[t as Tier] || { label: t }).label;
 const plural = (word: string, n: number) => (n === 1 ? word : word + "s");
-const homeName = (h: string) => h.charAt(0).toUpperCase() + h.slice(1);
 const tierIndex = (c: Collection, t: string) => c.tiers.findIndex((x) => x.name === t);
 
 // ------------------------------------------------------------ the sale's life (A9)
@@ -192,7 +192,7 @@ export function nowRow(c: Collection, sold: (id: number) => boolean, entries: re
 export interface WhyNot { button: string; note: string; play?: true }
 export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "tier" | "wave" | "home">, now: number): WhyNot | null {
   if (r.ok) return null;
-  const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From Wave ${g.wave} · ${homeName(g.home)}.`;
+  const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From Wave ${g.wave} · ${cap(g.home)}.`;
   const wave = c.waves.find((w) => w.start > now) || c.waves[c.waves.length - 1];
   switch (r.reason) {
     case "paused": return { button: "Paused for a moment", note: "The sale picks up where it stopped." };
@@ -255,7 +255,7 @@ export function cardFact(e: Listed, s: Seen) {
   const w = s.c.waves.find((x) => e.id >= x.first && e.id <= x.last);
   if (w && w.start <= s.now) return `${gnot(w.prices[tierIndex(s.c, e.tier)] ?? 0)} GNOT`;
   if (w) return `Opens ${utcDate(w.start, s.now, true)}`;
-  return `Wave ${e.wave} · ${homeName(e.home)}`;
+  return `Wave ${e.wave} · ${cap(e.home)}`;
 }
 
 // ------------------------------------------------------------ a team (A6)
@@ -268,6 +268,6 @@ export const teamOrder = <R extends { id: string; tier: string }>(rows: readonly
 /** What each moment says: short, about the game, never value. */
 export const shareWords = {
   bought: (name: string, id: number | string) => `I just adopted ${name}, gnome #${id} of Gnogolf. ${name} rolls for me now`,
-  equipped: (name: string, home: string) => `My gnome for the boards: ${name} of the ${homeName(home)}. Race my ghost`,
+  equipped: (name: string, home: string) => `My gnome for the boards: ${name} of the ${cap(home)}. Race my ghost`,
   team: (count: number, best: string) => (count === 1 ? `My Gnogolf team: ${best}. Race my ghost` : `My Gnogolf team: ${count} gnomes, ${best} up front. Race their ghosts`),
 };
