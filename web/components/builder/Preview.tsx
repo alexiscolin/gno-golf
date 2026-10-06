@@ -61,7 +61,7 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
     return () => ((stale = true), ro.disconnect());
   }, [state, capture]);
 
-  if (failed) return <p className="nothing preview">The 3D view can&apos;t run here; the board shows the hole as it is.</p>;
+  if (failed) return <p className="preview preview--off">The 3D view can&apos;t run here; the board shows the hole as it is.</p>;
   return (
     <div className="preview" role="img" aria-label="The hole in 3D, as players will see it">
       <canvas ref={canvas} />

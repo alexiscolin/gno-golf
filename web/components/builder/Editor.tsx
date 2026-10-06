@@ -196,7 +196,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <div className="centre">
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onDisarm={() => setArmed(null)} onSay={say} said={said} />
-            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
+            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
               issues={v?.issues ?? []} busy={!fresh} onSelect={setSelected} onFix={fix} />
           </div>
           <aside className="col" aria-label="The hole in 3D and the selected piece">

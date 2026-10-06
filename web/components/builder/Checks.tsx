@@ -30,7 +30,7 @@ export default function Checks({ verdict, gauges, issues, busy, onSelect, onFix 
         </ul>
       )}
       <div className="checks__row">
-        <span className={`verdict verdict--${verdict.ok ? "ok" : "bad"}`} role="status">{verdict.text}</span>
+        <span id="bench-verdict" className={`verdict verdict--${verdict.ok ? "ok" : "bad"}`} role="status">{verdict.text}</span>
         <div className="gauges" aria-label="The chain's limits">
           {gauges.map((g) => (
             <div key={g.name} className={`gauge gauge--${g.level}${g.name === "Points" || g.name === "Size" ? " gauge--opt" : ""}`} title={g.name === "Room" ? `Room left for a first shot in its dearest weather: ${g.shown}` : `${g.name}: ${g.shown}`}>

@@ -11,10 +11,16 @@
 .bench { position: fixed; inset: 0; display: grid; grid-template: 64px minmax(0, 1fr) / 208px minmax(0, 1fr) 300px; gap: var(--sp-3); padding: var(--sp-3) max(var(--sp-3), env(safe-area-inset-right)) var(--sp-3) max(var(--sp-3), env(safe-area-inset-left)); overflow: hidden; overscroll-behavior: none; font-family: var(--font); color: var(--ink); background: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px, var(--s0, var(--paper)); }
 @media (min-width: 1400px) { .bench { grid-template-columns: 224px minmax(0, 1fr) 340px; } }
 .bench__wait { grid-column: 1 / -1; place-self: center; font-size: 17px; }
-.bench__unkept { position: fixed; left: 50%; bottom: var(--sp-3, 12px); transform: translateX(-50%); margin: 0; padding: 8px 16px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-weight: 700; z-index: 2; }
+.bench__unkept { position: fixed; left: 50%; bottom: var(--sp-3, 12px); transform: translateX(-50%); margin: 0; padding: 8px 16px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-weight: 700; white-space: nowrap; z-index: 2; }
+/* the note has a band of its own under the screen it is said on: it covers no control */
+:is(.bench, .tbench, .pbench):has(+ .bench__unkept) { padding-bottom: 64px; }
 
 /* ------------------------------------------------------------ the header: the hole, the three steps, the one action */
-.bhead { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(120px, 280px) auto 1fr auto; align-items: center; gap: var(--sp-3); min-width: 0; }
+/* three zones, the steps in the middle of the window: the hole on the left, the history and the action on the right */
+.bhead { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--sp-3); min-width: 0; }
+.bhead__start { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.bhead__start > .round { flex: none; }
+.bhead__start .bhead__hole { flex: 0 1 280px; }
 .bhead .round { width: 48px; height: 48px; }
 .bhead .btn { height: 48px; min-height: 48px; margin: 0; white-space: nowrap; }
 .bhead__hole { display: grid; min-width: 0; line-height: 1.15; }
@@ -23,6 +29,9 @@
 .bhead__slug { width: 11ch; min-width: 4ch; border: 0; border-bottom: 1.5px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; color: var(--ink); padding: 0; }
 .bhead__hole select { border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); padding: 0; }
 .bhead__end { display: flex; align-items: center; gap: var(--sp-2); justify-self: end; }
+/* the action keeps its width as its words change (Test it, Publish →); off, it stays readable: ink on paper, dashed */
+.bhead__end .btn { min-width: 136px; justify-content: center; }
+.btn.btn--off { background: var(--paper); color: var(--ink); border-style: dashed; box-shadow: none; cursor: not-allowed; }
 .bhead__end .round { width: 40px; height: 40px; border-width: 2px; font-size: 18px; font-weight: 800; }
 .bhead__end .round:disabled { opacity: .4; }
 
@@ -78,15 +87,16 @@
 /* the checks, docked: the verdict and the limits in one row, the list above it */
 .checks { display: grid; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 16px; background: var(--paper); min-width: 0; }
 .checks[aria-busy="true"] .gauges { opacity: .6; }
-.checks__row { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
-.verdict { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: 15px; font-weight: 700; white-space: nowrap; }
+/* the verdict on its own line, the gauges under it, full width: nothing spills at 900 px, nothing moves as the verdict changes */
+.checks__row { display: grid; gap: var(--sp-2); min-width: 0; }
+.verdict { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; font-size: 15px; font-weight: 700; }
 .verdict::before { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 800; border: 1.5px solid var(--ink); }
 .verdict--ok::before { content: "✓"; background: var(--green); color: var(--paper); }
 .verdict--bad { color: var(--hat-ink); }
 .verdict--bad::before { content: "!"; background: var(--hat); color: var(--paper); }
-.gauges { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(64px, 1fr); gap: var(--sp-3); flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.gauges { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--sp-3); min-width: 0; font-variant-numeric: tabular-nums; }
 .gauge { display: grid; gap: 3px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--ink); }
-.gauge span { display: flex; justify-content: space-between; gap: var(--sp-1); white-space: nowrap; }
+.gauge span { display: flex; justify-content: space-between; gap: var(--sp-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gauge span em { font-style: normal; color: var(--ink-soft); }
 .gauge i { display: block; height: 6px; border-radius: var(--pill); background: rgba(var(--ink-rgb), .12); overflow: hidden; }
 .gauge i b { display: block; height: 100%; background: var(--green-light); }
@@ -126,6 +136,8 @@
 .insp__acts .btn { display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-height: 36px; margin: 0; padding: 4px 6px; font-size: 13px; white-space: nowrap; }
 .insp__acts kbd, .bench kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; margin-left: var(--sp-1); padding: 0 5px; border: 1.5px solid var(--ink); border-bottom-width: 3px; border-radius: 6px; background: var(--white); font: 700 12px var(--font); color: var(--ink); }
 .nothing { margin: 0; padding: var(--sp-4); border: 2px dashed rgba(var(--ink-rgb), .25); border-radius: 14px; font-size: 15px; line-height: 1.4; text-align: center; color: var(--ink-soft); }
+/* no 3D here: the preview's box kept (nothing shifts), its sentence ink on paper */
+.preview.preview--off { display: grid; place-items: center; margin: 0; padding: var(--sp-4); background: var(--paper); border-style: dashed; color: var(--ink); font-size: 15px; line-height: 1.4; text-align: center; }
 
 /* ------------------------------------------------------------ your holes (the computer's start) */
 .bholes__in { width: min(640px, 100%); margin: 0 auto; gap: var(--sp-5); padding: 72px var(--sp-4) var(--sp-5); }

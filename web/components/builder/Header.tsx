@@ -36,6 +36,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   const names: Record<Step, string> = { edit: "Edit", test: "Test", publish: "Publish" };
   return (
     <header className="bhead">
+      <div className="bhead__start">
       <button type="button" className="round round--icon" aria-label="Back to your holes (the draft is kept)" title="Back to your holes" onClick={onBack}>
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
@@ -50,6 +51,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
             {worlds.map((w) => <option key={w} value={w}>{w.charAt(0).toUpperCase() + w.slice(1)}</option>)}
           </select>
         </small>
+      </div>
       </div>
       <ol className="stepper" aria-label="Edit, test, publish">
         {(["edit", "test", "publish"] as const).map((s, i) => {
@@ -71,8 +73,11 @@ export default function Header({ title, slug, author, world, worlds, step, steps
           </>
         )}
         {action && (
-          <button type="button" className={`btn ${action.kind === "chain" ? "btn--save" : action.kind === "ghost" ? "btn--ghost" : "btn--gold"}`} disabled={!!action.off} title={action.off || undefined} onClick={action.onClick}>
-            {action.off || action.text}
+          // its own words always (nothing moves as the reason changes), readable and reachable when off: the reason is
+          // the dock's verdict (bench-verdict), and its title
+          <button type="button" className={`btn ${action.off ? "btn--off" : action.kind === "chain" ? "btn--save" : action.kind === "ghost" ? "btn--ghost" : "btn--gold"}`}
+            aria-disabled={action.off ? true : undefined} aria-describedby={action.off ? "bench-verdict" : undefined} title={action.off || undefined} onClick={() => !action.off && action.onClick()}>
+            {action.text}
           </button>
         )}
       </div>
