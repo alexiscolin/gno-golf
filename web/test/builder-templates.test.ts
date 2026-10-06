@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { host } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { blank, startsIn } from "../lib/builder/templates.ts";
+import { blank, retitle, slugOf, startsIn } from "../lib/builder/templates.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft } from "../lib/builder/draft.ts";
 import { unknownEntry } from "../lib/builder/edit.ts";
@@ -64,4 +64,19 @@ void test("blank: a plain lane that passes every check, in every world", async (
     const errors = validate(d, { host, palette, census }).issues.filter((i) => i.severity === "error");
     assert.deepEqual(errors.map((i) => `${i.rule} ${i.text}`), [], world);
   }
+});
+
+void test("defaults: a new hole is named from its world and starter, its address from its name; the address follows the name until the hole is first proved, never a hand-set one", () => {
+  const dog = startsIn("garden").find((s) => s.name === "dogleg")!;
+  assert.equal(dog.draft.title, "Garden Dogleg");
+  assert.equal(dog.draft.slug, "garden-dogleg");
+  assert.equal(startsIn("mountain").find((s) => s.name === "blank")!.draft.title, "Mountain Lane");
+  assert.equal(slugOf("  Le Grand Saut! "), "le-grand-saut");
+  assert.equal(slugOf("!!!"), "hole");
+  assert.equal(slugOf("x".repeat(50)).length, 32);
+  const d = dog.draft;
+  assert.deepEqual([retitle(d, "Mole Run").title, retitle(d, "Mole Run").slug], ["Mole Run", "mole-run"], "the address follows");
+  assert.equal(retitle({ ...d, slug: "my-own" }, "Mole Run").slug, "my-own", "a hand-set address is kept");
+  const proved = { ...d, proofs: [{ key: "k", id: "x", kind: "", period: 1, shots: [], commits: [], strokes: 2, maxWork: 1 }] };
+  assert.equal(retitle(proved, "Mole Run").slug, "garden-dogleg", "proved: its address fixed (the proofs are bound to it)");
 });

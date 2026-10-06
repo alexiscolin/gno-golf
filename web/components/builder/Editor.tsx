@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, removePiece, snap, whereOf, clampMove } from "@/lib/builder/edit";
 import { gauges, offAtLimit, testGate, verdict } from "@/lib/builder/editor";
+import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
 import { turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
@@ -188,7 +189,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
         action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
-        onTitle={(t) => (session.edit((k) => frame({ ...k, title: t })), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} />
+        onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} />
       {palette && quick && full ? (
         <>
           <Palette world={draft.world} palette={palette} armed={armed} off={offAtLimit(draft, palette)} onArm={setArmed} />
