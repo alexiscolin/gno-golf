@@ -10,7 +10,8 @@
 import { POSTS, BARS, MOUTHS } from "../scene/pieces";
 import { DRAWN as COURSE_DRAWN } from "../scene/course";
 import { DRAWN as ZONES_DRAWN } from "../scene/zones";
-import { WORLD_NAMES, type Kind, type Skins } from "../scene/worlds";
+import { WORLD_NAMES, loadWorld, worldOf, type Kind, type Skins } from "../scene/worlds";
+import { own } from "../own";
 import { MAX_BOUNCE } from "./rules";
 
 export type { Kind };
@@ -75,8 +76,9 @@ const KIND: Record<Kind, Binding> = {
   surface: { shapes: ["rect", "round", "poly"], size: r(1, 80, 0.25, 6), scale: r(0.3, 1, 0.01, 0.5), clocks: ["fixed"] },
   slope: { shapes: ["rect", "round", "poly"], size: r(1, 80, 0.25, 8), grade: r(0.05, 0.35, 0.01, 0.2), clocks: ["fixed"] },
   air: { shapes: ["rect", "round"], size: r(2, 40, 0.25, 6), grade: r(0.05, 0.35, 0.01, 0.25), clocks: ["substep", "fixed"] },
-  tunnel: { shapes: ["round", "rect"], size: r(1.2, 8, 0.1, 3), clocks: ["fixed"] },
-  hazard: { shapes: ["rect", "round", "poly"], size: r(1, 80, 0.25, 6), clocks: ["fixed", "stroke"] },
+  // a mouth at least 1.5 across: thinner, a fast ball steps over it (E5)
+  tunnel: { shapes: ["round", "rect"], size: r(1.5, 8, 0.25, 3), clocks: ["fixed"] },
+  hazard: { shapes: ["rect", "round", "poly"], size: r(1.5, 80, 0.25, 6), clocks: ["fixed", "stroke"] },
   loop: { shapes: ["rect"], size: r(1.5, 6, 0.1, 2), scale: r(1, 3.5, 0.1, 2), clocks: ["fixed"] },
 };
 
@@ -116,7 +118,7 @@ export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
     kicker: {}, terrace: {}, downhill: {}, slope: {}, "saddle crest": {}, bank: {},
     incline: {}, "ledge bank": {}, conveyor: {},
   },
-  air: { gust: {}, vent: {}, booster: {}, magnet: {} },
+  air: {},
   tunnel: { "": {}, cave: {}, well: {}, door: {}, shipwreck: {}, warp: {}, "ice cave": {} },
   hazard: {
     "": {}, water: {}, wave: {}, lagoon: {}, tidepool: {}, fountain: {}, canal: {},
@@ -133,6 +135,11 @@ export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
  */
 export const HAND_ONLY: Record<string, string> = {
   "bar/tram": "a tram line is a run of timed bars, with rails and tunnels at the board's edge (course.ts tramLines)",
+  "bar/cart": "a mines cart runs on its ride's track (mines-rides.ts)",
+  "air/gust": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
+  "air/vent": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
+  "air/booster": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
+  "air/magnet": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
 };
 
 /** The shared drawings (any world), by kind: the scene's tables and declarations. */
@@ -152,7 +159,7 @@ export function sharedSkins(): Skins {
 const DRAW_OF: Record<Kind, Draw> = { rail: "course", bar: "BARS", post: "POSTS", surface: "zones", slope: "zones", air: "zones", tunnel: "MOUTHS", hazard: "zones", loop: "zones" };
 const label = (skin: string, kind: Kind) => (skin ? skin[0].toUpperCase() + skin.slice(1) : `Plain ${kind}`);
 
-function entry(world: string, kind: Kind, skin: string, draw: Draw): PaletteEntry | null {
+function makeEntry(world: string, kind: Kind, skin: string, draw: Draw): PaletteEntry | null {
   const own = Object.hasOwn(BINDINGS[kind], skin) ? BINDINGS[kind][skin] : null;
   if (!own) return null;
   return { ...KIND[kind], ...own, ...(skin === "" && { plain: true }), id: `${world}/${kind}/${skin}`, world, label: label(skin, kind), skin, kind, draw };
@@ -176,16 +183,27 @@ export function paletteOf(world: string, own: Skins = {}): PaletteEntry[] {
   const mine = new Set<string>();
   for (const [kind, skins] of Object.entries(own) as [Kind, readonly string[]][]) {
     for (const s of skins) {
-      const e = entry(world, kind, s, "world");
+      const e = makeEntry(world, kind, s, "world");
       if (e) out.push(e), mine.add(`${kind}/${s}`);
     }
   }
   for (const [kind, skins] of Object.entries(sharedSkins()) as [Kind, readonly string[]][]) {
     for (const s of skins) {
       if (mine.has(`${kind}/${s}`)) continue;
-      const e = entry("*", kind, s, sharedDraw(kind, s));
+      const e = makeEntry("*", kind, s, sharedDraw(kind, s));
       if (e) out.push(e);
     }
   }
   return out;
+}
+
+/** A world's palette, its module loaded first (its skins are declared beside its drawings). */
+export async function loadPalette(world: string): Promise<readonly PaletteEntry[]> {
+  await loadWorld(world);
+  return paletteOf(world, worldOf({ world }).skins);
+}
+
+/** The entry of a palette by its id ("island/post/palm"), undefined for none. */
+export function entry(id: string, palette: readonly PaletteEntry[]): PaletteEntry | undefined {
+  return own(Object.fromEntries(palette.map((e) => [e.id, e])), id);
 }
