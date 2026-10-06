@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { bill, deposit, finalHex, gasFor, gnokeyPublish, proofsHold, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
+import { bill, deposit, finalHex, gasFor, gnokeyPublish, holeHolds, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
 import { shaOf } from "../lib/builder/proof.ts";
 
 const GOLF = new URL("../../gno.land/r/gnogolf/golf/", import.meta.url);
@@ -76,7 +76,7 @@ void test("the note comes out of the gnokey command unchanged", () => {
 
 const A = "g1" + "a".repeat(38);
 const ver = (v: number, sha = "old") => ({ id: `${A}/lane/v${v}`, v, height: 1, by: A, sha, note: "", next: "" });
-const ready = { publishing: true, rules: true, versions: { version: 1, slot: `${A}/lane`, versions: [ver(1)] }, proofs: true, name: "" };
+const ready = { publishing: true, rules: true, versions: { version: 1, slot: `${A}/lane`, versions: [ver(1)] }, hole: "", name: "" };
 const at = { author: A, slug: "lane", proved: `${A}/lane/v2`, sha: "new" };
 
 void test("publishSteps: open once every check holds; else the first that does not, in words", () => {
@@ -90,7 +90,8 @@ void test("publishSteps: open once every check holds; else the first that does n
   const newer = publishSteps({ ...ready, versions: { ...ready.versions, versions: [ver(1), ver(2)] } }, at);
   assert.deepEqual(newer, { at: "newer", why: "This one would be v3, with new weather: test it again." }, "a version published elsewhere since: its proofs are another id's");
   assert.deepEqual(publishSteps(ready, { ...at, sha: "old" }), { at: "same", why: "This is exactly the version already published." });
-  assert.equal(publishSteps({ ...ready, proofs: false }, at).at, "proofs");
+  assert.deepEqual(publishSteps({ ...ready, hole: "Par 1 is below the 5 strokes it was proved in: at least 6." }, at), { at: "hole", why: "Par 1 is below the 5 strokes it was proved in: at least 6." });
+  assert.equal(publishSteps({ ...ready, hole: undefined }, at).at, "reading", "the hole still being judged");
   assert.deepEqual(publishSteps({ ...ready, name: "The name or the note looks like a web address." }, at), { at: "name", why: "The name or the note looks like a web address." });
   assert.equal(publishSteps({ ...ready, publishing: false, rules: false }, at).at, "closed", "closed first: nothing else matters then");
 });
@@ -99,7 +100,9 @@ void test("the final data: the name as the chain keeps it written in; the proofs
   const { host } = await import("./builder-fixture.ts");
   await import("./scene-harness.ts");
   const { STARTERS } = await import("../lib/builder/starters.ts");
-  const { proofKey, replay, required } = await import("../lib/builder/proof.ts");
+  const { proofKey, replay, required, suggestPar } = await import("../lib/builder/proof.ts");
+  const { loadPalette } = await import("../lib/builder/palette.ts");
+  const { census } = await import("../lib/builder/drawn.ts");
   const { makeLocalChain } = await import("../lib/builder/localchain.ts");
   const { holeRow } = await import("../lib/builder/testmode.ts");
   const rounds = JSON.parse(fs.readFileSync(new URL("./builder-starters.json", import.meta.url), "utf8")) as Record<string, Record<string, { period: number; shots: string[] }>>;
@@ -110,12 +113,20 @@ void test("the final data: the name as the chain keeps it written in; the proofs
     proofs.push(await replay(makeLocalChain(host, holeRow(id, d0), finalHex(d0, host, d0.title)!, r.period), { key, id, kind, period: r.period, shots: r.shots }));
   }
   const d = { ...d0, proofs: proofs as never[] };
+  d.par = suggestPar(d.proofs);
   const hex = finalHex(d, host, "Garden Straight")!;
+  const o = { host, palette: await loadPalette("garden"), census };
   assert.equal(host.decode(hex).title, "Garden Straight", "the name as the chain keeps it, in the data");
-  assert.equal(await proofsHold(d, host, hex, key, id), true, "a new name moves no ball");
+  assert.equal(await holeHolds(d, hex, key, id, o), "", "a new name moves no ball");
   const moved = finalHex({ ...d, pieces: d.pieces.map((p) => (p.id === "p1" && p.geometry.t === "post" ? { ...p, geometry: { ...p.geometry, c: [p.geometry.c[0], p.geometry.c[1] + 2] as [number, number] } } : p)) }, host, "x")!;
-  assert.equal(typeof (await proofsHold(d, host, moved, key, id)), "boolean");
-  assert.equal(await proofsHold({ ...d, proofs: [] }, host, hex, key, id), false, "no proof, nothing holds");
+  assert.equal(typeof (await holeHolds(d, moved, key, id, o)), "string");
+  assert.match(await holeHolds({ ...d, proofs: [] }, hex, key, id, o), /^The rounds that proved it/, "no proof, nothing holds");
+  const most = Math.max(...d.proofs.map((p) => (p as { strokes: number }).strokes));
+  assert.equal(await holeHolds({ ...d, par: 1 }, hex, key, id, o), `Par 1 is below the ${most} strokes it was proved in: at least ${most + 1}.`, "a draft file's par below its proofs: refused here, test mode or not");
+  const told = { ...d, proofs: d.proofs.map((p) => ({ ...(p as object), strokes: most + 3 })) as never[] };
+  assert.match(await holeHolds({ ...told, par: most + 4 }, hex, key, id, o), /^The rounds that proved it/, "a proof's strokes must be what its replay takes");
+  const broken = { ...d, pieces: [...d.pieces, { ...d.pieces.find((p) => p.geometry.t === "post")!, id: "px", geometry: { t: "post" as const, c: d.pin, r: 0.8 } }] };
+  assert.match(await holeHolds(broken, hex, key, id, o), /^This hole breaks the Builder's rules: The .+\. Fix it in Edit\.$/, "the Builder's own rules, census included, once more on the final draft");
   assert.match(await shaOf(hex), /^[0-9a-f]{64}$/);
   assert.notEqual(await shaOf(hex), await shaOf(moved));
 });

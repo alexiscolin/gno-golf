@@ -8,7 +8,9 @@
 // Adena (or the gnokey command behind a tap), and the chain read until it
 // names the new version. Before it opens, the chain is read (publishing open,
 // the Builder's checks the realm's own, no successor, the alias's versions)
-// and the proofs replayed on the final data (publish.ts publishSteps).
+// and the hole judged once more as it will be published: the Builder's rules
+// and the census, the proofs replayed in their strokes, the par (publish.ts
+// holeHolds, publishSteps).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCopied } from "@/components/common";
 import { Button } from "@/components/ui";
@@ -16,7 +18,9 @@ import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { makeChain, wait } from "@/lib/chain";
 import { explain } from "@/lib/builder/explain";
 import { endpoints, playLink } from "@/lib/builder/holes";
-import { bill, finalHex, gasFor, gnokeyPublish, proofsHold, publishSteps, type Readings } from "@/lib/builder/publish";
+import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, publishSteps, type Readings } from "@/lib/builder/publish";
+import { census } from "@/lib/builder/drawn";
+import { loadPalette } from "@/lib/builder/palette";
 import { proofKey, provedAs, shaOf } from "@/lib/builder/proof";
 import { holeId, holeRow } from "@/lib/builder/testmode";
 import { ISSUES } from "@/lib/site";
@@ -53,7 +57,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const { rpc, web } = useMemo(() => endpoints(window.location.search), []);
   const chain = useMemo(() => makeChain({ rpc, web }), [rpc, web]);
   const alias = `${author}/${draft.slug}`;
-  const [readings, setReadings] = useState<Readings>({ publishing: undefined, rules: undefined, versions: undefined, proofs: undefined, name: "" });
+  const [readings, setReadings] = useState<Readings>({ publishing: undefined, rules: undefined, versions: undefined, hole: undefined, name: "" });
   const [prices, setPrices] = useState({ gas: PRICE, byte: 100 });
   const [chainId, setChainId] = useState<string | null>(null);
   const [key, setKey] = useState<string | null>(null);
@@ -92,12 +96,15 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   }, [chain, alias, host, tries]);
   useEffect(() => void proofKey(draft, host).then((k) => live.current && setKey(k)), [draft, host]);
   useEffect(() => {
-    if (!hex || !key || !proved) return setReadings((r) => ({ ...r, proofs: key && !proved ? false : undefined }));
-    void Promise.all([proofsHold({ ...draft, title: name }, host, hex, key, proved), shaOf(hex)]).then(([proofs, s]) => {
+    const untested = "The rounds that proved it no longer play out the same on its final data: test it again.";
+    if (!hex || !key || !proved) return setReadings((r) => ({ ...r, hole: key && !proved ? untested : undefined }));
+    setReadings((r) => ({ ...r, hole: undefined }));
+    const judged = loadPalette(draft.world).then((palette) => holeHolds({ ...draft, title: name }, hex, key, proved, { host, palette, census }));
+    void Promise.all([judged, shaOf(hex)]).then(([hole, s]) => {
       if (!live.current) return;
-      setReadings((r) => ({ ...r, proofs }));
+      setReadings((r) => ({ ...r, hole }));
       setSha(s);
-    });
+    }, (e: unknown) => live.current && setReadings((r) => ({ ...r, hole: e instanceof Error ? e.message : String(e) })));
   }, [hex, key, proved, draft, host, name]);
 
   const step = publishSteps({ ...readings, name: nameWhy }, { author, slug: draft.slug, proved: proved ?? "", sha });
@@ -206,7 +213,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           {why && <p className="pub__bad" role="alert">{why}</p>}
         </div>
         <div className="pub__foot">
-          {step.at === "newer" || step.at === "proofs" ? <Button variant="gold" className="btn--wide" onClick={onRetest}>Test again (free)</Button>
+          {step.at === "newer" || step.at === "hole" ? <Button variant="gold" className="btn--wide" onClick={onRetest}>{step.at === "hole" && !/^The rounds/.test(step.why) ? "Back to Edit" : "Test again (free)"}</Button>
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
                 : hasAdena() ? <button type="button" className="btn btn--save btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${b.total.toFixed(2)} GNOT`}</button>

@@ -8,7 +8,8 @@ import { feeFor, gnokeyOn, MAX_GAS, PER_CALL, PKG_PATH } from "../adena";
 import type { Versions } from "../types";
 import { holeId, holeRow } from "./testmode";
 import { makeLocalChain } from "./localchain";
-import { canonicalHex, replay, required } from "./proof";
+import { canonicalHex, parAllowed, replay, required, suggestPar, type Proof } from "./proof";
+import { validate, type ValidateOptions } from "./pipeline";
 import type { Draft } from "./draft";
 import type { BuilderHost } from "./wasm";
 
@@ -54,15 +55,28 @@ export function bill(o: Parameters<typeof publishBytes>[0] & { gasPrice: number;
 /** The data as it will be published: the draft framed and fitted, its title the name as the chain keeps it (check's); null if fit refuses it. */
 export const finalHex = (d: Draft, host: BuilderHost, name: string) => canonicalHex({ ...d, title: name }, host);
 
-/** Whether every weather the world asks has a proof of this hole (key) under id that replays, as a save is cut, on the final data. */
-export async function proofsHold(d: Draft, host: BuilderHost, hex: string, key: string, id: string): Promise<boolean> {
+/**
+ * Whether the hole may be published as it is, said in words ("" it may): the
+ * Builder's own rules once more on the final draft (the census included: a
+ * draft file or an undo may reach here past the editor's gate), every weather
+ * the world asks proved under id by a round that replays on the final data in
+ * the strokes it says, and a par no lower than those rounds allow.
+ */
+export async function holeHolds(d: Draft, hex: string, key: string, id: string, o: Pick<ValidateOptions, "host" | "palette" | "census">): Promise<string> {
+  const e = validate(d, { ...o, slug: d.slug }).issues.find((i) => i.severity === "error");
+  if (e) return `This hole breaks the Builder's rules: ${e.text}. Fix it in Edit.`;
+  const proofs: Proof[] = [];
   for (const kind of required(d.world)) {
     const p = d.proofs.find((x) => x.kind === kind && x.key === key && x.id === id);
-    if (!p) return false;
-    const again = await replay(makeLocalChain(host, holeRow(id, d), hex, p.period), { key, id, kind, period: p.period, shots: p.shots });
-    if (typeof again === "string") return false;
+    const again = p && (await replay(makeLocalChain(o.host, holeRow(id, d), hex, p.period), { key, id, kind, period: p.period, shots: p.shots }));
+    if (!p || !again || typeof again === "string" || again.strokes !== p.strokes) return "The rounds that proved it no longer play out the same on its final data: test it again.";
+    proofs.push(p);
   }
-  return true;
+  if (!parAllowed(proofs, d.par)) {
+    const most = Math.max(...proofs.map((p) => p.strokes));
+    return `Par ${d.par} is below the ${most} strokes it was proved in: at least ${suggestPar(proofs)}.`;
+  }
+  return "";
 }
 
 /** What the publish step reads before it opens (undefined: still being read; null: the chain could not be read). */
@@ -73,12 +87,12 @@ export interface Readings {
   rules: boolean | null | undefined;
   /** Versions(alias); null: the chain could not be read */
   versions: Versions | null | undefined;
-  /** every required proof replays on the final bytes */
-  proofs: boolean | undefined;
+  /** holeHolds on the final data: "" it may be published, else why; undefined: still being judged */
+  hole: string | undefined;
   /** check()'s refusal of the name or the note, explained; "" none */
   name: string;
 }
-export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "rules" | "unread" | "newer" | "same" | "proofs" | "name"; why: string };
+export type Step = { at: "ready" | "reading"; why: "" } | { at: "closed" | "rules" | "unread" | "newer" | "same" | "hole" | "name"; why: string };
 
 /**
  * Where the publish step stands: ready, or the first check that does not
@@ -90,11 +104,11 @@ export function publishSteps(r: Readings, { author, slug, proved, sha }: { autho
   if (r.publishing === false) return { at: "closed", why: "Publishing isn't open on gno.land yet. Your draft is kept." };
   if (r.rules === false) return { at: "rules", why: "The Builder's checks are not the chain's current rules. Reload the page, or wait for the site to catch up." };
   if (r.publishing === null || r.rules === null || r.versions === null) return { at: "unread", why: "The chain could not be read. Try again in a moment." };
-  if (r.publishing === undefined || r.rules === undefined || r.versions === undefined || r.proofs === undefined) return { at: "reading", why: "" };
+  if (r.publishing === undefined || r.rules === undefined || r.versions === undefined || r.hole === undefined) return { at: "reading", why: "" };
   const id = holeId(author, slug, r.versions);
   if (id !== proved) return { at: "newer", why: `This one would be ${id.slice(id.lastIndexOf("/") + 1)}, with new weather: test it again.` };
   if (r.versions.versions.at(-1)?.sha === sha) return { at: "same", why: "This is exactly the version already published." };
-  if (!r.proofs) return { at: "proofs", why: "The rounds that proved it no longer play out the same on its final data: test it again." };
+  if (r.hole) return { at: "hole", why: r.hole };
   if (r.name) return { at: "name", why: r.name };
   return { at: "ready", why: "" };
 }
