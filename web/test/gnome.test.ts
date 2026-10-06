@@ -11,6 +11,7 @@ import fs from "node:fs";
 import * as THREE from "three";
 import { GNOMES, makeBall, makeGhost, type Skin } from "../lib/scene/gnome.ts";
 import { makeHoling, makeTrail } from "../lib/scene/gnome-fx.ts";
+import "../lib/scene/gnome-wardrobe.ts";
 import { BUDGET, MAX_REACH } from "../lib/gnomes/validate.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
 import { costOf } from "../lib/scene/gnome-cost.ts";
@@ -74,13 +75,54 @@ test("a gnome of the collection as a ghost: his own materials, fadeable, no trai
   }
 });
 
-test("a gnome's tick moves his Legendary piece, and is there only when something moves", () => {
-  for (const e of catalogue.gnomes.filter((g) => g.tier === "legendary")) {
+/** What is drawn, as it is now: every drawn mesh's place and instances, and its material's glow. */
+const drawnNow = (g: THREE.Object3D) => {
+  const out: string[] = [];
+  g.updateMatrixWorld(true);
+  g.traverse((o) => {
+    if (!(o instanceof THREE.Mesh) || !o.visible) return;
+    const m = o.material as THREE.MeshToonMaterial;
+    out.push(o.matrixWorld.elements.map((v) => v.toFixed(3)).join(",") + "|" + (m.emissiveIntensity ?? "") + (o instanceof THREE.InstancedMesh ? "|" + Array.from(o.instanceMatrix.array, (v) => v.toFixed(3)).join(",") : ""));
+  });
+  return out;
+};
+
+test("a gnome's tick changes what is drawn (a Legendary's piece, a glow), and is there only when something moves", () => {
+  for (const e of catalogue.gnomes.filter((g) => g.tier === "legendary" || g.skin.material === "lava")) {
     const g = makeBall(e.skin);
     assert.ok(g.userData.tick, `#${e.id} has a motion`);
+    const before = drawnNow(g);
     g.userData.tick?.(1234);
+    assert.notDeepEqual(drawnNow(g), before, `#${e.id} ${e.name}: his tick moves nothing drawn`);
   }
   assert.equal(makeBall(catalogue.gnomes[0].skin).userData.tick, undefined);
+});
+
+test("the Ancient Mushroom's spots breathe: the glow drawn is the glow the tick changes", () => {
+  const e = catalogue.gnomes.find((g) => g.skin.prop === "fairy-ring")!, g = makeBall(e.skin);
+  const glows = () => {
+    const out: number[] = [];
+    g.traverse((o) => o instanceof THREE.Mesh && (o.material as THREE.MeshToonMaterial).emissiveIntensity > 0 && out.push((o.material as THREE.MeshToonMaterial).emissiveIntensity));
+    return out;
+  };
+  g.userData.tick?.(0);
+  const at0 = glows();
+  g.userData.tick?.(1250); // (a quarter of the breath's 800 ms × 2π later)
+  assert.ok(at0.length > 0);
+  assert.notDeepEqual(glows(), at0);
+});
+
+test("a metal gnome's parts merge into one draw, so none may glow in another's colour: the glow drawn is the same whatever part comes first", () => {
+  const glows = (skin: Skin) => {
+    const out = new Set<number>();
+    makeBall(skin).traverse((o) => {
+      const m = o instanceof THREE.Mesh ? (o.material as THREE.MeshToonMaterial) : null;
+      if (m && m.type === "MeshToonMaterial" && m.emissive) out.add(m.emissive.getHex());
+    });
+    return [...out].sort();
+  };
+  for (const e of catalogue.gnomes.filter((g) => g.skin.material === "metal" && g.skin.body !== undefined && g.skin.body !== g.skin.hat))
+    assert.deepEqual(glows({ ...e.skin, hat: e.skin.body!, body: e.skin.hat }), glows(e.skin), `#${e.id} ${e.name}`);
 });
 
 test("trails and holings: every kind the collection uses is made and runs to its end", () => {

@@ -51,6 +51,12 @@ change by a vertex.
   gnome draws differently. The writer refuses to change a released series'
   record; a new look for a released gnome is a new trait format, format 1
   keeping its drawing.
+- **The wardrobe loads with the first collection gnome** (added 2026-10-06,
+  after the review measured 37 KB more on every page's first load): the
+  kit, props, materials and Legendary pieces are their own chunk
+  (`scene/gnome-wardrobe.ts`, `loadWardrobe()`), put on by the code that
+  shows a collection gnome; `makeBall` draws a collection gnome plain
+  without it, GNOMES' fourteen never need it.
 - **Thumbnails are the game's own render**: the real `makeBall` in headless
   Chrome, one camera, one light, the tier's ground and plinth, 256 px WebP
   under 10 KB; the Legendaries also as turntables (an animated WebP muxed

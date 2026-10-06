@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { makeBall, type Skin } from "./gnome";
 import { makeTrail } from "./gnome-fx";
+import "./gnome-wardrobe"; // (the showcase shows collection gnomes: their wardrobe on)
 import { makeRenderer, makeScene } from "./camera";
 import { disposeCourse } from "./materials";
 import { BALL_R } from "../terrain";

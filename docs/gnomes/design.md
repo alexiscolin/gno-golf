@@ -247,7 +247,10 @@ main field**: the hat's shape or colour, the body's colour or pattern, or
 what remakes the whole gnome, a material or a prop. A beard or a small thing
 counts toward the three, never alone: two gnomes in the same hat and coat
 that differ only by a beard and a neckerchief are twins at ball size, and
-refused. From each of `GNOMES`, 4 fields with a main one.
+refused. From each of `GNOMES`, 4 fields with a main one. Fields are
+compared **as drawn**: no hat colour is the cap's red, no body the cream one,
+as `makeBall` draws them (a gnome of `GNOMES` with no body set and one in a
+cream coat are the same there).
 
 The fewest fields each gnome differs in from its nearest, Genesis
 (`npm run gnomes:stats`): before this rule, 435 gnomes at 2, 147 at 3, 71 at
@@ -284,7 +287,7 @@ material's detail colour (`materialColour`) is its marks:
 
 | material | bands | marks (detail colour) | also |
 |---|---|---|---|
-| metal | four, a bright one | none | a band round his waist in the detail colour, a glint |
+| metal | four, a bright one | none | a band round his waist in the detail colour, a glint; one faint neutral lift of light (#141414) for every metal part, since the bake merges them into one draw |
 | wood | three | fine grain running down, half seen | |
 | neon | three | none | his ink line lit in the detail colour, heavier |
 | porcelain | four | a painted band of rings and dots | a glint |
@@ -542,15 +545,25 @@ What a gallery, a token page, the mint, the locker or a builder reads
 | a tier's name and colours | `TIER_LOOK[tier]` |
 | waves and their id ranges | `planSeries(series)` (and `catalogue.series[n].plan`) |
 | the gnome to draw from a chain's traits | `skinOfTraits(hex, { id, name, line })` (falls back to the Classic) |
+| the collection's wardrobe, before the first collection gnome is drawn | `await loadWardrobe()` (`scene/gnome.ts`: its own chunk; without it a collection gnome is drawn plain) |
 | draw him | `makeBall(skin)` (`makePreview` for a turntable; `makeShowcase` for a still) |
 | his trail and holing in play | `makeTrail(skin)`, `makeHoling(skin, cupAt)` (`gnome-fx.ts`); `null`: the game's own |
 | a Legendary's motion | `gnome.userData.tick(ms)` |
 | a thumbnail | `media/gnomes/thumbs/` + `thumbOf(id)`; Legendaries' turntables in `media/gnomes/turntables/` |
 
-Not done here (the integration's): calling `makeTrail` while the ball rolls
-and `makeHoling` after the drop in `engine.ts` (dropped and disposed as its
-confetti is), and `tick` in its frame loop. `makePreview` (the picker's
-turntable) already plays a Legendary's motion with its act.
+In play (`engine.ts`): his trail is laid on the ground under him while he
+rolls and fades once he stops; his holing replaces the player's confetti (a
+duel ghost's holing keeps the confetti: a ghost carries no particles); his
+`tick` runs every frame. `makePreview` (the picker's turntable) plays a
+Legendary's motion with its act. The wardrobe (`scene/gnome-wardrobe.ts`:
+the hats, props, materials and Legendary pieces) is its own chunk: the title
+screen and the holes' pages draw only `GNOMES`' fourteen and never load it
+(`web/test/bundle.test.ts` walks their eager imports).
+
+**To see one in the real game** (the test hooks: a dev build, or a local
+build with `NEXT_PUBLIC_TEST_HOOKS=1`; never the public site):
+`?traits=<hex>` plays as that collection gnome, `?rivaltraits=<hex>` dresses
+every rival's ghost in one. `media/gnomes/inplay.mjs` plays them (section 11).
 
 ## 9. Checks
 
@@ -580,13 +593,18 @@ held by tests, not by care.
   the 720 ids and the nine earned kinds, a record of what `makeBall` builds
   from `skinOfTraits(traits)` (`web/test/looks.ts`): how many meshes and
   vertices, the body's box (to the thousandth), every material (its kind,
-  colour, emissive, side, opacity, and a hash of what its texture's canvas
-  was told to draw: the test's canvas writes every call down), the trail's
+  colour, emissive and its strength, its bands of light, side, opacity, and
+  a hash of what its texture's canvas was told to draw: the test's canvas
+  writes every call down), the trail's
   and holing's kinds with their meshes, the Legendary's piece and whether
   he moves, and a hash of every vertex, index, placement, instance and
   texture. `web/test/looks.test.ts` (in `npm test`) and `npm run
   gnomes:looks` (in `scripts/check.sh`) fail, naming the gnome, if any one
-  draws differently.
+  draws differently. The file names its **record format** (`RECORD` in
+  `web/test/looks.ts`; 2 added the bands and the glow's strength). A format
+  that sees more is taken on by `--write` only where each gnome still draws
+  as the file's own format recorded him: a richer record of the same
+  drawing, never a changed released look.
 - **A released look never changes in place.** `npm run gnomes:looks --
   --write` takes the records again for a series not yet `released` (the
   design is still under review), but refuses to change one of a released
@@ -603,3 +621,34 @@ held by tests, not by care.
   data, the same gnomes; ids and tiers fixed by the plan), checked by
   `npm run gnomes:stats` and the rules, and its records rewritten with
   `--write`; the thumbnails of the changed ids are drawn again.
+
+## 11. In play: checked in the real game
+
+`media/gnomes/inplay.mjs` plays collection gnomes in the real game (the dev
+server; the chain read only: holes, simulations, a rival's ghost; nothing
+sent), through the test hooks `?traits=` and `?rivaltraits=`. For each: a
+hole-in-one on a garden hole (one on record, its shot found again in the
+day's weather) with the CPU slowed 4× (a phone's), the frame rate counted
+every frame; a shot on an island hole in a storm; a Crystal Mines gallery in
+Lights out, where any gnome wears a headlamp; his ghost raced as a rival's.
+Pictures, the report (`report.json`) and a contact sheet (`sheet.jpg`) in
+`media/gnomes/inplay/`.
+
+Run of 2026-10-06, the Classic for comparison, then 3 Commons (1, 105, 415),
+3 Rares (73, 177, 487), 3 Epics (94, 203, 511) and the 7 Legendaries:
+
+- every one holed out (the banner shown), at 60 fps with the CPU slowed 4×
+  (a frame's median 16.7 ms, p95 16.8 ms, as the Classic's);
+- the cup never under the gnome in the play view;
+- every Rare, Epic and Legendary drew his trail behind him while he rolled;
+  every Epic's and Legendary's holing played and ended; Commons and the
+  Classic kept the confetti;
+- every ghost raced, faded and clean (a Legendary's piece fades with him);
+- in Lights out, the headlamp on every hat: the collection's hats each give
+  where it clips (`kitLamp` in `gnome-kit.ts`); the Crystal Gnome's front
+  shard and glinting core were moved off the hat's front, where the lamp
+  sat in them;
+- no page error.
+
+There is no Legendary entrance yet (the realm spec names one per
+Legendary): nothing comes between the player and his aim.

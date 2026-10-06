@@ -22,12 +22,14 @@ interface Inner {
   fakeWeather: (w: string) => void;
   stroke: (ex: Extras) => void;
   aimDrawn: () => { n: number; at: number; angle: number; power: number };
+  /** a collection gnome's effects now: his trail drawn, his own holing playing */
+  fx: () => { trail: boolean; holing: boolean };
 }
 
 const ndcTop = new THREE.Vector3(), ndcBot = new THREE.Vector3(), headAt = new THREE.Vector3();
 
 /** E: the engine's live state; cam: its camera controller. */
-export function probes(E: Live, { cam, rp, placeBall, fakeWeather, stroke, aimDrawn }: Inner) {
+export function probes(E: Live, { cam, rp, placeBall, fakeWeather, stroke, aimDrawn, fx }: Inner) {
   const { g, camera, scene, ground, band, publish } = E;
   return {
     /** For screenshots only (?won): the win card as if the hole was just holed. */
@@ -254,6 +256,22 @@ export function probes(E: Live, { cam, rp, placeBall, fakeWeather, stroke, aimDr
     /** The Far rig: the orbit share it has room for, its pitch blend, its distance. */
     farOrbit: () => g.far && { orbit: +g.far.orbit.toFixed(2), tilt: g.far.tilt, dist: +g.far.dist.toFixed(1) },
     // the Far view's lane box (laneBox, as the engine frames it): its corners on screen, as the camera is now: [x0, y0, x1, y1] in CSS px
+    /** The hole as a test plays it: its id, its cup, the ball, its world. */
+    holeNow: () => g.s && { id: g.id, cup: g.s.cup, ball: [g.ball.x, g.ball.y], world: g.s.world || "garden" },
+    /** Where the cup and the gnome are on screen, in CSS px: the cup's centre (and whether it is in front),
+     *  and the box of all of him (hat, piece, prop). */
+    onScreen: () => {
+      if (!g.s) return null;
+      const px = (v: THREE.Vector3) => (v.project(camera), [Math.round(((v.x + 1) / 2) * innerWidth), Math.round(((1 - v.y) / 2) * innerHeight), v.z < 1 ? 1 : 0]);
+      const cup = px(new THREE.Vector3(g.s.cup[0], E.ground(g.s.cup[0], g.s.cup[1]), g.s.cup[1]));
+      const box = new THREE.Box3().setFromObject(E.ball), r = [1e9, 1e9, -1e9, -1e9];
+      for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+        const [sx, sy] = px(new THREE.Vector3(x, y, z));
+        r[0] = Math.min(r[0], sx); r[1] = Math.min(r[1], sy); r[2] = Math.max(r[2], sx); r[3] = Math.max(r[3], sy);
+      }
+      return { cup, gnome: r, w: innerWidth, h: innerHeight };
+    },
+    fx,
     boardFrame: () => {
       if (!g.s) return null;
       const b = g.s.board, box = laneBox(g.s, E.ground), r = [1e9, 1e9, -1e9, -1e9], q = new THREE.Vector3();

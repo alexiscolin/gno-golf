@@ -7,10 +7,26 @@ import { ud, type Gnome } from "./data";
 import type { UnlockId } from "../card";
 import type { Beard, Holing, Material, Pattern, Piece, Trail } from "../gnomes/vocab";
 import { darkBody } from "../gnomes/colour";
-import { isKitHat, kitHat, kitWear, kitPiece, hatTop, patternedBody, type KitHat } from "./gnome-kit";
-import { propOf } from "./gnome-props";
-import { dressMatter } from "./gnome-matter";
-import { dressLegend } from "./gnome-legend";
+import type { KitHat } from "./gnome-kit";
+
+/** The collection's wardrobe (gnome-wardrobe.ts), what makeBall asks for a
+ *  collection gnome: a hat of its own (false: not one of its), where a lamp
+ *  clips on it and its top, a patterned body, and the rest of him dressed
+ *  (returning what moves). Loaded with the first collection gnome shown
+ *  (loadWardrobe): GNOMES' fourteen never need it, and the pages that draw only
+ *  them never carry it. Until it has come, a collection gnome is drawn plain. */
+export interface Wardrobe {
+  hat(hat: THREE.Group, skin: Skin): boolean;
+  lamp(skin: Skin): readonly [number, number] | null;
+  top(skin: Skin): number | null;
+  body(skin: Skin): THREE.Material | null;
+  dress(g: THREE.Group, hat: THREE.Group, skin: Skin, body: THREE.Mesh, beard: THREE.Group): ((t: number) => void)[];
+}
+let wardrobe: Wardrobe | null = null;
+/** Puts the wardrobe on (gnome-wardrobe.ts does, as it is loaded). */
+export const wear = (w: Wardrobe) => void (wardrobe = w);
+/** Loads the collection's wardrobe, once: before a collection gnome is first made (a token's, a dev hook's). */
+export const loadWardrobe = () => import("./gnome-wardrobe").then(() => undefined);
 
 /** A gnome's look: what makeBall dresses him in. */
 export interface Skin {
@@ -152,7 +168,17 @@ function stripedBody([a, b]: readonly [number, number]) {
   return flat(0xffffff, { map: t });
 }
 
-export const gnomeById = (id: string | null | undefined) => GNOMES.find((g) => g.id === id) || GNOMES[0];
+// Gnomes the game is given that are not GNOMES': a collection token's look
+// (lib/gnomes/skin.ts), by its own id; and the one every rival's ghost wears
+// in a test (the test hooks' ?rivaltraits, never a player's choice).
+const MORE = new Map<string, Skin>();
+let rivalWears: Skin | null = null;
+/** A gnome the game can then be given by id (gnomeById); returns the id. */
+export const addGnome = (skin: Skin) => (MORE.set(skin.id, skin), skin.id);
+/** (test hooks only) The gnome every rival's ghost wears, or null for rivalSkin's own pick. */
+export const setRivalGnome = (skin: Skin | null) => void (rivalWears = skin);
+
+export const gnomeById = (id: string | null | undefined) => (id && MORE.get(id)) || GNOMES.find((g) => g.id === id) || GNOMES[0];
 
 function beardOf(k: Skin["beard"], hair: number | undefined) {
   const m = flat(hair ?? 0xffffff); // (a beardless gnome has no hair colour: nothing is drawn with it)
@@ -221,38 +247,15 @@ function beardOf(k: Skin["beard"], hair: number | undefined) {
   return g;
 }
 
-/** The collection's traits onto a gnome makeBall has built (none of them on
- *  GNOMES' fourteen): his small things, a Rare's piece, an Epic's prop, a
- *  Legendary's piece, then his material over all of it. Returns what moves. */
-function dressCollection(g: THREE.Group, hat: THREE.Group, skin: Skin, body: THREE.Mesh, beard: THREE.Group) {
-  kitWear(g, hat, skin);
-  kitPiece(g, hat, skin);
-  const prop = propOf(skin);
-  if (prop) {
-    if (prop.at === "top") prop.group.position.y = hatTop(skin);
-    (prop.at === "body" ? g : hat).add(prop.group);
-  }
-  const ticks = [dressLegend(g, hat, skin)];
-  if (skin.material) {
-    // the solids (not their ink) of a part: the hat's in the hat's colour, all of the beard
-    const solids = (o: THREE.Object3D, keep: (m: THREE.MeshToonMaterial) => boolean) => {
-      const out: THREE.Mesh[] = [];
-      o.traverse((m) => m instanceof THREE.Mesh && m.material instanceof THREE.MeshToonMaterial && m.material.side !== THREE.BackSide && keep(m.material) && out.push(m as THREE.Mesh));
-      return out;
-    };
-    const inProp = (m: THREE.Object3D) => !!prop && !!prop.group.getObjectById(m.id);
-    ticks.push(dressMatter(g, skin, { body, hat: solids(hat, (m) => m.color.getHex() === skin.hat).filter((m) => !inProp(m)), beard: solids(beard, () => true), prop: prop ? prop.matter : [] }));
-  }
-  return ticks.filter((f): f is (t: number) => void => !!f);
-}
-
 export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   const g = new THREE.Group();
-  const body = inked(new THREE.SphereGeometry(0.55, 22, 16), skin.stripes ? stripedBody(skin.stripes) : skin.pattern ? patternedBody(skin) : flat(skin.body || C.cream));
+  const body = inked(new THREE.SphereGeometry(0.55, 22, 16), skin.stripes ? stripedBody(skin.stripes) : (wardrobe && wardrobe.body(skin)) || flat(skin.body || C.cream));
   g.add(body);
 
   const hat = new THREE.Group();
-  if (isKitHat(skin.shape)) kitHat(hat, skin as Skin & { shape: KitHat });
+  // one of the collection's hats, built by the wardrobe (its own brim, top and lamp), else GNOMES' own
+  const kit = !!wardrobe && wardrobe.hat(hat, skin);
+  if (kit) void 0;
   else if (skin.shape === "tricorn") {
     // a black three-cornered hat: a low crown and three turned-up corners
     const crown = inked(new THREE.CylinderGeometry(0.34, 0.42, 0.42, 14), flat(skin.hat));
@@ -345,10 +348,10 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   if (skin.shape === "tricorn" || skin.shape === "toque") brim.visible = false;
   brim.rotation.x = Math.PI / 2;
   brim.position.y = -0.2;
-  if (!isKitHat(skin.shape)) hat.add(brim); // (the collection's hats have their own)
+  if (!kit) hat.add(brim); // (the collection's hats have their own)
   if (skin.pompom) {
     const pom = inked(new THREE.SphereGeometry(0.17, 10, 8), flat(0xffffff));
-    pom.position.y = isKitHat(skin.shape) ? hatTop(skin) + 0.03 : 0.6;
+    pom.position.y = kit ? wardrobe!.top(skin)! + 0.03 : 0.6;
     hat.add(pom);
   }
   if (skin.flower) {
@@ -368,7 +371,7 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   // where a headlamp clips on: the hat's front, just over the brim (on the
   // helmet's dome, a hat's band, the cone where it is that wide; over a
   // diver's mask, in front of a crown), in the body's own space
-  const [ly, lz] = skin.helmet ? [-0.05, 0.45] : skin.shape === "tophat" ? [0, 0.4] : skin.shape ? [0.05, 0.47] : skin.mask ? [0.12, 0.27] : [-0.1, skin.crown ? 0.5 : skin.tall ? 0.37 : 0.32];
+  const [ly, lz] = kit ? wardrobe!.lamp(skin)! : skin.helmet ? [-0.05, 0.45] : skin.shape === "tophat" ? [0, 0.4] : skin.shape ? [0.05, 0.47] : skin.mask ? [0.12, 0.27] : [-0.1, skin.crown ? 0.5 : skin.tall ? 0.37 : 0.32];
   hat.updateMatrix();
   const lampAt = new THREE.Vector3(0, ly, lz).applyMatrix4(hat.matrix);
 
@@ -465,7 +468,7 @@ export function makeBall(skin: Skin = GNOMES[0]): Gnome {
   nose.position.set(0, -0.02, 0.56);
   const beard = beardOf(skin.beard, skin.hair);
   g.add(nose, beard);
-  const ticks = dressCollection(g, hat, skin, body.children[0] as THREE.Mesh, beard);
+  const ticks = wardrobe ? wardrobe.dress(g, hat, skin, body.children[0] as THREE.Mesh, beard) : [];
 
   const shade = new THREE.Mesh(
     new THREE.CircleGeometry(BALL_R * 1.1, 20),
@@ -498,6 +501,7 @@ const GHOST: Skin = { id: "ghost", name: "Ghost", line: "", hat: C.cream, body: 
 /** A duel's rival's gnome: one of the others than the player's, the same for
  *  the same rival (their address picks it), so two gnomes never look alike. */
 export function rivalSkin(player: string, mine: string) {
+  if (rivalWears) return rivalWears;
   const others = GNOMES.filter((k) => k.id !== mine);
   let h = 0;
   for (const c of player) h = (h * 31 + c.charCodeAt(0)) >>> 0;

@@ -2,7 +2,7 @@
 // wear, no two gnomes alike, none a copy of GNOMES', readable on every
 // ground and as a ghost, the counts as the series says. Pure: the catalogue
 // in, a report out (scripts/gnomes.ts prints it; the tests hold it to none).
-import { EARNED_ONLY, colourName } from "./vocab";
+import { EARNED_ONLY, colour, colourName } from "./vocab";
 import { PROP_DESIGNS } from "./props";
 import { decode, encode, type Traits } from "./codec";
 import { darkBody, deltaE, oklab, over } from "./colour";
@@ -43,13 +43,15 @@ export const TIER_FX: Readonly<Record<Tier, { trails: readonly string[]; holings
 
 /** The visual fields two looks differ in: the hat's shape and colour, the
  *  body's colour and pattern, the beard and its colour, each thing worn, a
- *  piece, a material, a prop, the trail. (An accent colour alone is too
- *  small to tell two gnomes apart: not counted.) */
+ *  piece, a material, a prop, the trail. As drawn, not as written: no hat
+ *  colour is the cap's red, no body the cream one (makeBall's own). (An
+ *  accent colour alone is too small to tell two gnomes apart: not counted.) */
+const CAP = colour("cap"), CREAM = colour("cream");
 export function visualDiff(a: Traits, b: Traits): string[] {
   const d: string[] = [];
   if (a.hat !== b.hat) d.push("hat");
-  if (a.hatColour !== b.hatColour) d.push("hat colour");
-  if (a.body !== b.body) d.push("body");
+  if ((a.hatColour ?? CAP) !== (b.hatColour ?? CAP)) d.push("hat colour");
+  if ((a.body ?? CREAM) !== (b.body ?? CREAM)) d.push("body");
   if (a.pattern !== b.pattern || (a.pattern !== "plain" && a.patternColour !== b.patternColour)) d.push("pattern");
   if (a.beard !== b.beard) d.push("beard");
   else if (a.beard !== "none" && a.hair !== b.hair) d.push("hair");

@@ -50,7 +50,8 @@ const PIECES: Record<string, (g: THREE.Group, hat: THREE.Group, skin: Skin) => T
   // Crystal Gnome: shards grown out of his hat, a core in them that glints
   "crystal-cluster": (_, hat, skin) => {
     const m = flat(skin.propColor ?? 0xa184c9);
-    const shards = [[0.24, -0.14, 0.24, -0.5, 0.2, 0.32], [-0.26, -0.12, 0.2, 0.6, 0.25, 0.26], [0.08, -0.08, 0.34, -0.1, 0.5, 0.22], [0.32, -0.16, -0.08, -0.7, -0.3, 0.2]].map(([x, y, z, rz, rx, h]) => {
+    // (none on the hat's front: a headlamp clips on there in the mines)
+    const shards = [[0.24, -0.14, 0.24, -0.5, 0.2, 0.32], [-0.26, -0.12, 0.2, 0.6, 0.25, 0.26], [-0.12, -0.08, -0.3, 0.2, -0.5, 0.22], [0.32, -0.16, -0.08, -0.7, -0.3, 0.2]].map(([x, y, z, rz, rx, h]) => {
       const s = new THREE.Group();
       s.add(inked(new THREE.CylinderGeometry(0.05, 0.06, h, 6), m), at(inked(new THREE.ConeGeometry(0.05, 0.1, 6), m), 0, h / 2 + 0.05, 0));
       s.rotation.set(rx, 0, rz);
@@ -58,7 +59,7 @@ const PIECES: Record<string, (g: THREE.Group, hat: THREE.Group, skin: Skin) => T
     });
     hat.add(...shards);
     const core = moving(hat, new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), glowOf(0xffffff)));
-    core.position.set(0.1, 0.02, 0.36);
+    core.position.set(0.24, 0.02, 0.24); // (among the shards on his right: clear of a lamp)
     return (t) => (core.rotation.y = t / 500, core.scale.setScalar(0.8 + 0.3 * Math.abs(Math.sin(t / 900))));
   },
   // Lava Gnome: a little vent on his hat's tip, smoking
@@ -146,8 +147,10 @@ const PIECES: Record<string, (g: THREE.Group, hat: THREE.Group, skin: Skin) => T
       hat.add(at(shroom, x, 0.25 - Math.hypot(x, z) * 0.45, z));
     }
     const spore = swarm(hat, new THREE.SphereGeometry(0.025, 6, 4), glowOf(0xf7d977), 5);
+    // the glow the spots are drawn with: the merge's own material (bake clones a tinted one), not glow
+    const drawn = spots.children.flatMap((o) => (o instanceof THREE.Mesh ? [o.material as THREE.MeshToonMaterial] : []));
     return (t) => {
-      glow.emissiveIntensity = 0.3 + 0.3 * (0.5 + 0.5 * Math.sin(t / 800));
+      for (const m of drawn) m.emissiveIntensity = 0.3 + 0.3 * (0.5 + 0.5 * Math.sin(t / 800));
       spots.scale.setScalar(1 + 0.02 * Math.sin(t / 800));
       for (let k = 0; k < 5; k++) {
         const f = (t / 3000 + k / 5) % 1, a = k * 1.26 + f;

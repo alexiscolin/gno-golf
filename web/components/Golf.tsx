@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
-import { GNOMES, gnomeById, cheer, motion } from "@/lib/scene";
+import { GNOMES, gnomeById, cheer, motion, addGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
+import { skinOfTraits } from "@/lib/gnomes/skin";
 import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
@@ -110,13 +111,16 @@ interface Config {
   world: string;
   won: number;
   clips: boolean;
+  /** a collection gnome's traits to play as, and to give every rival's ghost (test hooks only: lib/gnomes) */
+  traits: string;
+  rivalTraits: string;
 }
 function useConfig() {
   const [cfg, setCfg] = useState<Config | null>(null);
   useEffect(() => {
     const p0 = new URLSearchParams(window.location.search);
     const hooks = DEV || camlog();
-    const TEST = ["shot", "play", "demo", "weather", "world", "won"];
+    const TEST = ["shot", "play", "demo", "weather", "world", "won", "traits", "rivaltraits"];
     const p = new URLSearchParams([...p0].filter(([k]) => (hooks || !TEST.includes(k)) && (DEV || k !== "won")));
     // a hole's own page (app/h): /h/garden-3/ its slot, /h/garden/ its cup; a ?hole= or ?cup= wins
     const [, pw, pn] = /^\/h\/([a-z]{2,16})(?:-(\d{1,3}))?\/?$/.exec(window.location.pathname) || [];
@@ -148,6 +152,10 @@ function useConfig() {
       world: p.get("world") || "",
       won: Number(p.get("won")) || 0,
       clips: CLIPS || (DEV && p0.has("clips")),
+      // ?traits=<hex> plays as a collection gnome, ?rivaltraits=<hex> dresses every rival's ghost in one
+      // (a token's traits, lib/gnomes/codec.ts) — to see one in play before it is for sale
+      traits: /^(?:[0-9a-f]{2}){1,64}$/.test(p.get("traits") || "") ? p.get("traits") || "" : "",
+      rivalTraits: /^(?:[0-9a-f]{2}){1,64}$/.test(p.get("rivaltraits") || "") ? p.get("rivaltraits") || "" : "",
     });
   }, []);
   return cfg;
@@ -653,8 +661,9 @@ export default function Golf() {
     let cancelled = false, g: Game | null = null;
     const make = (promo?: GameOptions["promo"], probes?: GameOptions["probes"]) => {
       try {
+        if (cfg.rivalTraits) setRivalGnome(skinOfTraits(cfg.rivalTraits, { id: "rival-traits", name: "", line: "" }));
         g = createGame(el, {
-        rpc: cfg.rpc, web: cfg.web, gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, promo, probes, log: logs,
+        rpc: cfg.rpc, web: cfg.web, gnome: cfg.traits ? addGnome(skinOfTraits(cfg.traits, { id: "traits", name: "", line: "" })) : gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, promo, probes, log: logs,
         // the hot fields to their store; the rest re-renders only when it changed
         // (compared here, not in a setS updater: an updater that returns the
         // same state still re-renders the whole page, 60 times a second in a pull)
@@ -705,18 +714,19 @@ export default function Golf() {
     // modules of their own, fetched only for a page that asks for them.
     const logs = camlog();
     const wantPromo = /[?&]promo/.test(window.location.search) && (DEV || logs), wantProbes = logs || cfg.won > 0;
+    const wantWardrobe = !!(cfg.traits || cfg.rivalTraits); // (a collection gnome to draw: its wardrobe first)
     // on the title, the hole behind it is built in the first idle moment (1.2 s
     // at most): built at once with the title's own scene, a phone's first
     // frames stall on both
     let unidle = () => {};
-    if (!wantPromo && !wantProbes) {
+    if (!wantPromo && !wantProbes && !wantWardrobe) {
       if (screen !== "title" || typeof requestIdleCallback === "undefined") make();
       else {
         const id = requestIdleCallback(() => !cancelled && make(), { timeout: 1200 });
         unidle = () => cancelIdleCallback(id);
       }
     } else
-      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined])
+      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined, wantWardrobe ? loadWardrobe() : undefined])
         .then(([promo, probes]) => !cancelled && make(promo, probes))
         .catch((err: unknown) => !cancelled && setFatal({ msg: messageOf(err), kind: fatalKind(err) }));
 

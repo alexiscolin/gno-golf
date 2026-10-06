@@ -99,6 +99,7 @@ const MARKS: Partial<Record<Material, (x: CanvasRenderingContext2D, r: () => num
   },
 };
 
+const METAL_LIFT = new THREE.Color(0x141414);
 const made = new Map<string, THREE.Material>();
 /** A material's surface in a colour, its detail in another (made once per kind and pair, kept). */
 function surface(kind: Material, base: number, detail: number): THREE.Material {
@@ -111,7 +112,9 @@ function surface(kind: Material, base: number, detail: number): THREE.Material {
   if (polished || kind === "stone") opts.gradientMap = polished ? SHINE : MATTE; // (else flat()'s own bands)
   if (map) opts.map = map;
   if (kind === "lava") Object.assign(opts, { emissive: detail, emissiveMap: map, emissiveIntensity: 0.8 });
-  if (kind === "metal") opts.emissive = new THREE.Color(base).multiplyScalar(0.08);
+  // a metal's faint lift of its own light, the same for every part: the bake merges a gnome's
+  // metal parts into one draw (their colours in its vertices), and that draw has one emissive
+  if (kind === "metal") opts.emissive = METAL_LIFT;
   if (kind === "crystal") Object.assign(opts, { transparent: true, opacity: 0.86, emissive: new THREE.Color(detail).multiplyScalar(0.25) });
   m = share(flat(map ? 0xffffff : base, opts));
   if (kind === "crystal") md(m).base = 0.86; // see-through as ice is: a ghost fades it from there

@@ -207,6 +207,12 @@ test("validate: each rule catches what it is for", () => {
   assert.match(readability({ ...common, trailColour: GROUNDS.fairway }).join(), /lost on the fairway/);
   // apart: three fields at least, one of them the silhouette or a main colour
   assert.deepEqual(visualDiff(common, common), []);
+  // what is drawn, not what is written: no body is the cream one, no hat colour the cap's red
+  assert.deepEqual(visualDiff({ ...common, body: null }, { ...common, body: V.colour("cream") }), []);
+  assert.deepEqual(visualDiff({ ...common, hatColour: null }, { ...common, hatColour: V.colour("cap") }), []);
+  // and no gnome of the collection only three drawn fields from one of GNOMES
+  const gnomes = GNOMES.map((g) => lookOf(g));
+  for (const e of catalogue.gnomes) for (const g of gnomes) assert.ok(apart(decode(e.traits)!, g, 4), `#${e.id} near ${visualDiff(decode(e.traits)!, g).join(", ")}`);
   assert.deepEqual(visualDiff({ ...common, beard: "full", hair: 1 }, { ...common, beard: "full", hair: 2 }), ["hair"]);
   const twin = { ...common, beard: "bushy" as const, accessories: ["neckerchief" as const, "glasses" as const] };
   assert.deepEqual(visualDiff(common, twin), ["beard", "neckerchief", "glasses"]);

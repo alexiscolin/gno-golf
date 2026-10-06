@@ -1,0 +1,36 @@
+// What the first load of every page carries (app/game.tsx, its title screen
+// and what they import, eagerly): never the collection gnomes' wardrobe, which
+// GNOMES' fourteen never use. It is loaded where a collection gnome is shown
+// (loadWardrobe, scene/gnome.ts). Walked here from the sources: the static
+// imports, not the type-only ones nor import().
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+
+const WEB = new URL("../", import.meta.url).pathname;
+/** A module's file from an import's specifier, or null for a package. */
+function resolve(spec: string, from: string) {
+  const base = spec.startsWith("@/") ? path.join(WEB, spec.slice(2)) : spec.startsWith(".") ? path.resolve(path.dirname(from), spec) : null;
+  if (!base) return null;
+  for (const f of [base, base + ".ts", base + ".tsx", path.join(base, "index.ts")]) if (fs.existsSync(f) && fs.statSync(f).isFile()) return f;
+  return null;
+}
+/** Every module a file brings in eagerly, itself included. */
+function eager(entry: string, seen = new Set<string>()) {
+  if (seen.has(entry)) return seen;
+  seen.add(entry);
+  const src = fs.readFileSync(entry, "utf8");
+  for (const m of src.matchAll(/^\s*(?:import|export)\s+(?!type\b)(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']/gm)) {
+    const f = resolve(m[1], entry);
+    if (f) eager(f, seen);
+  }
+  return seen;
+}
+
+test("the first load carries none of the collection gnomes' wardrobe", () => {
+  const first = [...eager(path.join(WEB, "app/game.tsx"))].map((f) => path.relative(WEB, f));
+  assert.ok(first.includes("lib/scene/gnome.ts"), "the walk reaches the gnome (through the title's prefs)");
+  const heavy = first.filter((f) => /scene\/gnome-(wardrobe|kit|props|matter|legend)\.ts$|gnomes\/props\.ts$/.test(f));
+  assert.deepEqual(heavy, []);
+});

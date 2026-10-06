@@ -23,21 +23,22 @@ const accentOf = (skin: Skin) => skin.accent ?? C.sun;
 // Each hat stands in the hat's space, as makeBall's cone does: the head's top
 // is about y -0.3 there, a 0.38-wide circle; top is its highest point (where
 // a pompom or an Epic's prop sits).
-const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material) => THREE.Object3D[] }> = {
+// lamp: where a headlamp clips on (the mines: gnome.ts headlamp), [y, z] on the hat's front just over its brim
+const HATS: Record<KitHat, { top: number; lamp: readonly [number, number]; build: (skin: Skin, m: THREE.Material) => THREE.Object3D[] }> = {
   // a wide straw sun hat, a ribbon round its crown
-  straw: { top: 0.06, build: (s, m) => [
+  straw: { top: 0.06, lamp: [-0.05, 0.35], build: (s, m) => [
     at(inked(frustum(0.3, 0.36, 0.32), m), 0, -0.1, 0),
     at(inked(frustum(0.6, 0.62, 0.04), m), 0, -0.25, 0),
     at(new THREE.Mesh(frustum(0.365, 0.37, 0.08, true), flat(accentOf(s), { side: THREE.DoubleSide })), 0, -0.2, 0),
   ] },
   // a fisherman's bucket hat, its brim sloping down
-  bucket: { top: 0.12, build: (s, m) => [
+  bucket: { top: 0.12, lamp: [-0.05, 0.37], build: (s, m) => [
     at(inked(frustum(0.3, 0.38, 0.34), m), 0, -0.05, 0),
     at(inked(new THREE.SphereGeometry(0.3, 14, 6, 0, Math.PI * 2, 0, 0.5), m), 0, -0.11, 0),
     at(inked(frustum(0.4, 0.56, 0.13, true), flat(s.hat, { side: THREE.DoubleSide })), 0, -0.26, 0),
   ] },
   // a sailor's white cap, its brim turned up all round
-  sailor: { top: 0.14, build: (s, m) => [
+  sailor: { top: 0.14, lamp: [-0.05, 0.4], build: (s, m) => [
     at(inked(frustum(0.36, 0.4, 0.36), m), 0, -0.08, 0),
     // its top a shallow dome, rim on the crown's
     at(inked(new THREE.SphereGeometry(0.36, 16, 4, 0, Math.PI * 2, 0, 0.45), m), 0, -0.224, 0),
@@ -45,7 +46,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     at(new THREE.Mesh(frustum(0.365, 0.37, 0.04, true), flat(s.accent ?? 0x24406e, { side: THREE.DoubleSide })), 0, 0.04, 0),
   ] },
   // a bandana tied over the head, its knot and ends at the back, spotted
-  bandana: { top: 0.02, build: (s, m) => {
+  bandana: { top: 0.1, lamp: [-0.1, 0.42], build: (s, m) => {
     const cloth = at(inked(dome(0.46), m), 0, -0.3, 0);
     cloth.scale.y = 0.92;
     const knot = at(inked(new THREE.SphereGeometry(0.09, 10, 8), m), 0, -0.22, -0.44);
@@ -65,7 +66,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     return [cloth, knot, ...ends, ...dots];
   } },
   // a painter's beret, tipped to one side, its stalk on top
-  beret: { top: 0.06, build: (_, m) => {
+  beret: { top: 0.06, lamp: [-0.12, 0.47], build: (_, m) => {
     const b = at(inked(new THREE.SphereGeometry(0.47, 16, 10), m), 0.06, -0.14, 0);
     b.scale.set(1, 0.32, 1);
     b.rotation.z = -0.22;
@@ -73,14 +74,14 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     return [b, stalk];
   } },
   // a knitted beanie with a turned-up cuff
-  beanie: { top: 0.2, build: (s, m) => {
+  beanie: { top: 0.2, lamp: [-0.08, 0.43], build: (s, m) => {
     const b = at(inked(dome(0.43), m), 0, -0.27, 0);
     b.scale.y = 1.08;
     const cuff = at(inked(frustum(0.45, 0.45, 0.16), flat(s.accent ?? s.hat)), 0, -0.24, 0);
     return [b, cuff];
   } },
   // an alpine felt hat: a creased crown, a narrow brim up at the back, a band and a small feather
-  alpine: { top: 0.18, build: (s, m) => {
+  alpine: { top: 0.18, lamp: [-0.1, 0.34], build: (s, m) => {
     const crown = at(inked(frustum(0.22, 0.36, 0.42), m), 0, -0.03, 0);
     const brim = at(inked(frustum(0.5, 0.5, 0.035), m), 0, -0.24, 0);
     brim.rotation.x = 0.18;
@@ -91,7 +92,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     return [crown, brim, band, feather];
   } },
   // a prospector's slouch hat: a dented crown, a wide brim that droops
-  slouch: { top: 0.1, build: (s, m) => {
+  slouch: { top: 0.1, lamp: [-0.08, 0.35], build: (s, m) => {
     const crown = at(inked(frustum(0.28, 0.36, 0.32), m), 0, -0.08, 0);
     const top = at(inked(new THREE.SphereGeometry(0.28, 14, 6), m), 0, 0.07, 0);
     top.scale.y = 0.18;
@@ -100,7 +101,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     return [crown, top, brim];
   } },
   // an explorer's pith helmet, its band, a brim all round
-  pith: { top: 0.12, build: (s, m) => {
+  pith: { top: 0.12, lamp: [-0.1, 0.43], build: (s, m) => {
     const d = at(inked(dome(0.46), m), 0, -0.27, 0);
     d.scale.y = 0.85;
     const brim = at(inked(frustum(0.46, 0.58, 0.07), m), 0, -0.28, 0.02);
@@ -109,7 +110,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     return [d, brim, band, knob];
   } },
   // a smith's leather skullcap with a short peak
-  skullcap: { top: -0.02, build: (_, m) => {
+  skullcap: { top: -0.02, lamp: [-0.2, 0.42], build: (_, m) => {
     const d = at(inked(dome(0.44), m), 0, -0.3, 0);
     d.scale.y = 0.62;
     const peak = at(inked(new THREE.SphereGeometry(0.22, 12, 4, 0, Math.PI, 0, Q), m), 0, -0.28, 0.32);
@@ -118,7 +119,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     return [d, peak];
   } },
   // a sou'wester: a rain hat whose brim runs long down the back
-  souwester: { top: 0.06, build: (s, m) => {
+  souwester: { top: 0.06, lamp: [-0.15, 0.4], build: (s, m) => {
     const d = at(inked(dome(0.42), m), 0, -0.3, 0);
     d.scale.y = 0.85;
     // (its top edge tucked inside the dome: no gap shows as it tips back)
@@ -128,7 +129,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
   } },
   // the Miller's: a soft miller's cap, a small mill standing on it, whitewashed, its roof
   // in the accent (its sails: gnome-legend.ts "mill-sails", on the tower's front)
-  mill: { top: 0.6, build: (s, m) => {
+  mill: { top: 0.6, lamp: [-0.15, 0.37], build: (s, m) => {
     const cap = at(inked(frustum(0.3, 0.4, 0.26), m), 0, -0.17, 0);
     const puff = at(inked(new THREE.SphereGeometry(0.32, 16, 8), m), 0, -0.04, 0);
     puff.scale.y = 0.32;
@@ -139,7 +140,7 @@ const HATS: Record<KitHat, { top: number; build: (skin: Skin, m: THREE.Material)
     return [cap, puff, tower, roof, door];
   } },
   // the Ancient Mushroom's: a wide cap, its gills under it (its glowing spots: gnome-legend.ts)
-  mushroom: { top: 0.32, build: (_, m) => {
+  mushroom: { top: 0.32, lamp: [-0.04, 0.61], build: (_, m) => {
     const cap = at(inked(dome(0.62, 18, 9), m), 0, -0.1, 0);
     cap.scale.y = 0.68;
     const gills = at(new THREE.Mesh(new THREE.CircleGeometry(0.6, 18), flat(0xefe4cf, { side: THREE.DoubleSide })), 0, -0.1, 0);
@@ -157,6 +158,9 @@ export function hatTop(skin: Skin) {
   if (skin.shape === "tophat") return 0.6;
   return skin.tall ? 1.02 : 0.575;
 }
+
+/** Where a headlamp clips on one of the collection's hats: [y, z] in the hat's space. */
+export const kitLamp = (shape: KitHat) => HATS[shape].lamp;
 
 /** One of the collection's hats, into the hat's group. */
 export function kitHat(hat: THREE.Group, skin: Skin & { shape: KitHat }) {
