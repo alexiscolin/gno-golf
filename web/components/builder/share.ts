@@ -6,7 +6,7 @@ import { holeLink, shortAddr } from "@/components/common";
 import { siteURL } from "@/lib/site";
 
 /** The link to play a published hole (by: the address whose best a friend is dared to beat). */
-export const holeLinkOf = (id: string, by = "") => siteURL(holeLink({ id, place: 0 }, "", by, "hole"));
+export const holeLinkOf = (id: string, by = ""): string => siteURL(holeLink({ id, place: 0 }, "", by, "hole"));
 
 const MAX_NAME = 40;
 /** The card's three lines: the name (cut at 40 with an ellipsis), the world, par and author, and where it was built. */

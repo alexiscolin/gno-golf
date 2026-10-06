@@ -1521,6 +1521,7 @@ export default function Golf() {
           onBack={() => setScreen(BACK.worlds)}
           onAbout={() => setAbout(true)}
           community={s.community}
+          chain={game.current && game.current.chain}
           racing={dare && !solo && <p className="dare">Racing {rivalName}</p>}
           next={(c) => toPlay[c][0]?.name}
           podium={<Podium chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onOpen={() => setBoard(true)}

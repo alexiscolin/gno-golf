@@ -50,6 +50,12 @@ export function holeLink(s: Pick<Snapshot, "id" | "place">, gnome: string, by = 
   return (slot ? `h/${slot[1]}-${slot[2]}/` : "") + (String(q) ? `?${q}` : "");
 }
 
+/** The community's holes, those their author has holed first (holed: the chain's answer per hole, as read), each group in its own order. */
+export const authorFirst = <H extends { id: string }>(list: readonly H[], holed: ReadonlyMap<string, boolean>) =>
+  [...list.filter((h) => holed.get(h.id) === true), ...list.filter((h) => holed.get(h.id) !== true)];
+/** A community hole's mark: whether its author has holed it, nothing until the chain has said. */
+export const authorMark = (holed: boolean | undefined) => (holed === undefined ? "" : holed ? "Holed by its author" : "Not yet holed by its author");
+
 /** A dare to the whole course: friends race the player's ghost on every hole they have a best on. */
 export function dareLink(by: string, src?: ShareSrc) {
   const q = chainQuery();

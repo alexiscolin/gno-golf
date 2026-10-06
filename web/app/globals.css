@@ -2449,3 +2449,6 @@ body:has(.pending) .turncall { top: 34%; }
 
 /* /build when the Builder is not out on this build (app/build/gate.tsx) */
 .builder-off { display: grid; place-items: center; align-content: center; gap: 8px; min-height: 100dvh; padding: 16px; text-align: center; }
+
+/* a community hole's mark: whether its author has holed it (Worlds), its line held while the chain answers */
+.community__mark { display: block; min-height: 1.3em; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
