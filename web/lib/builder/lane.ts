@@ -109,7 +109,18 @@ export const FLIGHT = 12;
  * along its climb, over whatever lies there. A necessary condition, not a
  * proof: L3 is the proof.
  */
-export function reach(h: HoleIn, clearance = h.ballR): { reached: boolean; path: V[]; grid: Grid; reaches: (p: V, rad?: number) => boolean } {
+export function reach(h: HoleIn, clearance = h.ballR): Reach {
+  // a hole's flood at a clearance, once (checkHole's way and reach, the draft's bars all ask it)
+  const kept = floods.get(h)?.get(clearance);
+  if (kept) return kept;
+  const r = flooded(h, clearance);
+  floods.set(h, (floods.get(h) ?? new Map<number, Reach>()).set(clearance, r));
+  return r;
+}
+type Reach = { reached: boolean; path: V[]; grid: Grid; reaches: (p: V, rad?: number) => boolean };
+const floods = new WeakMap<HoleIn, Map<number, Reach>>();
+
+function flooded(h: HoleIn, clearance: number): Reach {
   const g = gridOf(h, clearance);
   const zones = h.zones.filter((z) => (z.kind === "hazard" && !z.every) || z.kind === "tunnel" || z.kind === "loop");
   const hills = h.zones.filter((z) => z.kind === "slope" && !z.air && z.vec && Math.hypot(z.vec[0], z.vec[1]) >= MIN_RAMP);

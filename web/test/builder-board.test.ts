@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
-import { clampEnd, clampHandle, copyPiece, dropEnd, dropHandle, dropMove, nextId, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
+import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, setHandle, turnPiece } from "../lib/builder/handles.ts";
 import { makeSession } from "../lib/builder/session.ts";
 import { K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
@@ -87,6 +87,42 @@ void test("clampEnd: the cup dragged onto a post stops clear of it; the tee like
   assert.deepEqual(errors({ ...d, pin: to }), []);
   assert.ok(to[0] > 21.5 + 0.8, `${to.join(", ")}`);
   assert.deepEqual(clampEnd(d, "tee", [6, 6], ctx), [6, 6], "a free place: as dragged");
+});
+
+void test("a release or a copy asks a bounded number of checks: a long drag onto a blocked place, a copy with no room near", () => {
+  let fits = 0;
+  const counted = { ...host, fit: (...a: Parameters<typeof host.fit>) => (fits++, host.fit(...a)) };
+  const quick = { host: counted, palette: garden };
+  const d = lane("garden", [put("p", "*/post/stump", [4, 4])], 90, 20);
+  const r = dropMove(d, "p", [91.25, 5.5], quick, { ...quick, census: ctx.census }); // the lane's length, clear, then onto its far rail
+  assert.ok(!("why" in r));
+  assert.ok(fits <= 60, `a drag of 80 units: ${fits} checks`);
+  const boxed = lane("garden", [rail("a", [10, 4], [16, 4]), rail("b", [16, 4], [16, 8]), rail("c", [16, 8], [10, 8]), rail("e", [10, 8], [10, 4]), put("q", "*/post/rock", [12.5, 5.5], { size: 1.2 })], 30, 20);
+  fits = 0;
+  copyPiece({ ...boxed, pieces: boxed.pieces.map((p) => (p.id === "q" ? { ...p, geometry: { t: "post" as const, c: [13, 6] as [number, number], r: 4 } } : p)) }, "q", quick);
+  assert.ok(fits <= 70, `a copy with no room: ${fits} checks`);
+});
+
+void test("dragCheck: a drag (or the armed ghost) is checked again only when its snapped place changes; the hole without the piece once a drag", () => {
+  let fits = 0;
+  const counted = { ...host, fit: (...a: Parameters<typeof host.fit>) => (fits++, host.fit(...a)) };
+  const quick = { host: counted, palette: garden };
+  const d = lane("garden", [put("p", "*/post/stump", [12, 5])]);
+  const check = dragCheck(d, quick), p = d.pieces.find((x) => x.id === "p")!;
+  assert.deepEqual(check.piece(p), []);
+  const first = fits;
+  assert.ok(first <= 2, "the hole without it, and with it");
+  check.piece({ ...p });
+  check.piece(JSON.parse(JSON.stringify(p)) as Piece);
+  assert.equal(fits, first, "the same place, however the piece was built: no check");
+  const onRail = { ...p, geometry: { t: "post" as const, c: [13.5, 1.5] as [number, number], r: 0.8 } };
+  assert.ok(check.piece(onRail).length > 0);
+  assert.equal(fits, first + 1, "a new place: one check, the baseline kept");
+  assert.deepEqual(check.end("pin", d.pin), []);
+  const atEnd = fits;
+  check.end("pin", [...d.pin]);
+  assert.equal(fits, atEnd, "the cup where it was: no check");
+  assert.ok(check.end("pin", [13.5, 6.5]).length > 0, "the cup onto the post");
 });
 
 void test("dropMove, dropHandle, dropEnd: a release kept where it holds (census and all), clamped short of where it does not, or refused with why", () => {

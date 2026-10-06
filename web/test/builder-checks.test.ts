@@ -99,3 +99,16 @@ void test("work: a gauge measures what the hole adds over the realm's fixed floo
   assert.ok(w.shot.share < 0.05 && w.storm.share < 0.3, `${w.shot.share} ${w.storm.share}`);
   assert.deepEqual(w.issues, []);
 });
+
+void test("a check stays quick on a hole of many bars (the board checks on a drag's every snapped move): a narrow gap the ball never gets near is never flooded again", async () => {
+  const { loadPalette } = await import("../lib/builder/palette.ts");
+  const { placePiece } = await import("../lib/builder/edit.ts");
+  const { validate } = await import("../lib/builder/pipeline.ts");
+  const garden = await loadPalette("garden"), plank = garden.find((x) => x.id === "*/bar/plank")!;
+  const bars = [];
+  for (let y = 8; y < 44; y += 9) for (let x = 12; x < 60; x += 12) bars.push({ ...placePiece(plank, `b${bars.length}`, [x, y]), geometry: { t: "bar" as const, a: [x, y] as [number, number], b: [x + 4, y] as [number, number], thick: 0.5 } });
+  const d = { ...lane("garden", bars, 70, 50), slug: "many" }, o = { host, palette: garden };
+  validate(d, o); // (warm)
+  const ms = Math.min(...[0, 1, 2].map(() => { const t0 = performance.now(); validate(d, o); return performance.now() - t0; }));
+  assert.ok(ms < 40, `${bars.length} bars: ${ms.toFixed(0)} ms`);
+});

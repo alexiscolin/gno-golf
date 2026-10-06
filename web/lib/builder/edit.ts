@@ -132,6 +132,23 @@ export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: re
   const rest = { ...d, pieces: d.pieces.filter((p) => p.id !== piece.id) };
   return editErrors(rest, { ...rest, pieces: [...rest.pieces, piece] }, piece.id, o, before);
 }
+/**
+ * The checks of a drag from start (or of the armed piece's ghost over it):
+ * a piece or an end checked again only when its place or shape changes (a
+ * pointer moves many times within one snapped place), the hole without the
+ * piece (or the hole as it was, for an end) checked once a drag.
+ */
+export function dragCheck(start: Draft, o: ValidateOptions) {
+  const base = new Map<string, readonly Issue[]>();
+  let last = "", said: Issue[] = [];
+  const once = (key: string, run: () => Issue[]) => (key === last ? said : ((last = key), (said = run())));
+  const baseOf = (id: string, d: () => Draft) => base.get(id) ?? (base.set(id, errorsOf(d(), o)), base.get(id)!);
+  return {
+    piece: (p: Piece) => once(`${p.id} ${JSON.stringify(p.geometry)} ${JSON.stringify(p.params)}`, () => canPlace(start, p, o, baseOf(p.id, () => without(start, p.id)))),
+    end: (which: "tee" | "pin", at: V) => once(`${which} ${at[0]} ${at[1]}`, () => newErrors(baseOf("", () => start), { ...start, [which]: at }, o)),
+  };
+}
+
 /** The draft's errors (validate's, warnings left out). */
 export const errorsOf = (d: Draft, o: ValidateOptions) => validate(d, o).issues.filter((i) => i.severity === "error");
 
@@ -156,15 +173,30 @@ const onQuarter = (v: V, origin: V): V => {
   return [s[0] + origin[0], s[1] + origin[1]];
 };
 
-/** The last point from `from` toward `to` (a grid step at a time) that ok takes: `to` itself if it does; `from` if not even the first step does. */
+/** How many strides a walk takes at most before its grid steps (each a whole check): a long drag stays quick. */
+const WALK_STRIDES = 32;
+
+/**
+ * The last point from `from` toward `to` that ok takes: `to` itself if it
+ * does; `from` if not even the first step does. At most WALK_STRIDES strides
+ * along the way, then grid steps within the last stride ok took: a few dozen
+ * checks however long the drag (a stride may step over a rail: where it lands
+ * still holds).
+ */
 function walk(from: V, to: V, ok: (v: V) => boolean, origin: V = [0, 0]): V {
-  const on = (v: V) => onQuarter(v, origin);
+  const on = (v: V) => onQuarter(v, origin), at = (f: number) => on([from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f]);
   to = on(to);
   if (ok(to)) return to;
   const n = Math.ceil(Math.max(Math.abs(to[0] - from[0]), Math.abs(to[1] - from[1])) / CELL);
-  let last = from;
-  for (let k = 1; k < n; k++) {
-    const v = on([from[0] + ((to[0] - from[0]) * k) / n, from[1] + ((to[1] - from[1]) * k) / n]);
+  const strides = Math.min(n, WALK_STRIDES), steps = Math.ceil(n / strides);
+  let last = from, f0 = 0;
+  for (let k = 1; k < strides; k++) {
+    const v = at(k / strides);
+    if (!ok(v)) break;
+    (last = v), (f0 = k / strides);
+  }
+  for (let j = 1; j < steps; j++) {
+    const v = at(f0 + j / (strides * steps));
     if (!ok(v)) break;
     last = v;
   }
@@ -245,12 +277,13 @@ export function nextId(d: Draft): string {
 export const removePiece = (d: Draft, id: string): Draft => without(d, id);
 
 /** The nearest place to p's (rings a grid step apart, out to FIX_REACH, never where it is) where it may go in rest; null if none. */
-function nearest(rest: Draft, p: Piece, o: ValidateOptions): Piece | null {
+function nearest(rest: Draft, p: Piece, o: ValidateOptions, r0 = CELL, reach = FIX_REACH): Piece | null {
   const before = errorsOf(rest, o), from = whereOf(p.geometry), seen = new Set<string>();
-  for (let r = CELL; r <= FIX_REACH + 1e-9; r += CELL) {
+  for (let r = r0; r <= reach + 1e-9; r += CELL) {
     for (let k = 0; k < FIX_DIRECTIONS; k++) {
       const a = (2 * Math.PI * k) / FIX_DIRECTIONS, v = onQuarter([from[0] + r * Math.cos(a), from[1] + r * Math.sin(a)], rest.tee), key = v.join(" ");
       if (seen.has(key) || (v[0] === from[0] && v[1] === from[1])) continue;
+      if (seen.size >= FIX_TRIES) return null; // (a whole check each: the nearest places only)
       seen.add(key);
       const moved = movePiece(p, v);
       if (canPlace(rest, moved, o, before).length === 0) return moved;
@@ -259,16 +292,26 @@ function nearest(rest: Draft, p: Piece, o: ValidateOptions): Piece | null {
   return null;
 }
 
+/** How far a copy goes to clear its piece: a post's width, a rail's or a bar's a unit aside, a zone's longest side. */
+const sizeOf = (g: Geometry) => {
+  const box = (pts: readonly V[]) => Math.max(Math.max(...pts.map((q) => q[0])) - Math.min(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1])) - Math.min(...pts.map((q) => q[1])));
+  const s = g.t === "post" ? 2 * g.r : g.t === "rail" || g.t === "bar" ? 1 : g.t === "poly" ? box(g.pts) : box([g.min, g.max]);
+  return Math.max(CELL, Math.ceil(s / CELL) * CELL);
+};
+
 /** A copy of piece id, under a fresh name, at the nearest place it may go; the draft framed, or null if there is none near. */
 export function copyPiece(d: Draft, id: string, o: ValidateOptions): Draft | null {
   const p = d.pieces.find((q) => q.id === id);
-  const c = p && nearest(d, { ...p, id: nextId(d) }, o);
+  // (clear of the piece copied: from its own size on, not the places it covers)
+  const c = p && nearest(d, { ...p, id: nextId(d) }, o, sizeOf(p.geometry), sizeOf(p.geometry) + FIX_REACH);
   return c ? frame({ ...d, pieces: [...d.pieces, c] }) : null;
 }
 
 /** How far fixOf looks for a place, and in how many directions on each ring. */
 export const FIX_REACH = 3;
 const FIX_DIRECTIONS = 16;
+/** The places a fix or a copy tries at most, nearest first. */
+const FIX_TRIES = 64;
 
 /**
  * The one-click fix of an issue: its piece moved to the nearest place (rings

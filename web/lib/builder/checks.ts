@@ -105,8 +105,8 @@ function cup(h: HoleIn, lane: (p: V) => boolean, name: Namer, judged: Judged): I
 function way(h: HoleIn, name: Namer): Issue[] {
   // the grid's flood is generous (a cell shut only if no ball could be anywhere in it): it must never
   // refuse a hole a ball can play; the gaps are then measured exactly
-  const loose = h.ballR - CELL * Math.SQRT1_2;
-  if (!reach(h, loose).reached) return [err("E4", "The cup cannot be reached from the tee", undefined, h.pin)];
+  const loose = h.ballR - CELL * Math.SQRT1_2, base = reach(h, loose);
+  if (!base.reached) return [err("E4", "The cup cannot be reached from the tee", undefined, h.pin)];
   // the gaps between two fixed solids (walls, posts: a pulse's and a timed one are not always there)
   const of: Solid[] = [], refs: PieceRef[] = [];
   for (const { item, ref } of each<WallIn>(h, "wall")) if (!item.every && ref.pulse === undefined) of.push({ kind: "wall", a: item.a, b: item.b }), refs.push(ref);
@@ -116,8 +116,10 @@ function way(h: HoleIn, name: Namer): Issue[] {
     for (let j = i + 1; j < of.length; j++) {
       const [gap, mid] = gapOf(of[i], of[j]);
       if (!(gap > 1e-9 && gap < wide)) continue;
-      // one the way needs: closed there, the cup is lost
-      if (reach({ ...h, posts: [...h.posts, { c: mid, r: Math.max(gap / 2, CELL) }] }, loose).reached) continue;
+      // one the way needs: closed there, the cup is lost. Closing it shuts the cells within its post's
+      // reach (gridOf's own rule, on the same grid): if the way the flood found passes none, it still holds
+      const shut = Math.max(gap / 2, CELL), closes = (p: V) => Math.hypot(p[0] - mid[0], p[1] - mid[1]) < shut + loose + 1e-9;
+      if (!base.path.some(closes) || reach({ ...h, posts: [...h.posts, { c: mid, r: shut }] }, loose).reached) continue;
       const between = `the gap at ${pt(mid)} between ${name(refs[i])} and ${name(refs[j])} is ${+gap.toFixed(2)} wide`;
       out.push(gap < ball
         ? err("E4", `The cup cannot be reached from the tee: ${between}, narrower than the ball (${ball})`, refs[i], mid, [refs[j]])

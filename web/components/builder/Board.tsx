@@ -10,8 +10,8 @@
 // place on its way where it may (edit.ts clampMove, clampHandle, clampEnd).
 // Live, the checks run without the render census (fast); a drop or a
 // release is checked with it.
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { canPlace, dropEnd, dropHandle, dropMove, errorsOf, movePiece, newErrors, nextId, placePiece, snap, whereOf } from "@/lib/builder/edit";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, movePiece, nextId, placePiece, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
 import { K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
 import { BOARD, frame } from "@/lib/builder/gg1";
@@ -49,9 +49,10 @@ export interface BoardProps {
 interface View { x: number; y: number; k: number }
 type Drag =
   | { t: "pan"; from: V; view: View }
-  | { t: "piece"; id: string; start: Draft; grab: V }
-  | { t: "handle"; id: string; key: HandleKey; start: Draft }
-  | { t: "end"; which: "tee" | "pin"; start: Draft };
+  | { t: "piece"; id: string; start: Draft; grab: V; check: Checker }
+  | { t: "handle"; id: string; key: HandleKey; start: Draft; check: Checker }
+  | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker };
+type Checker = ReturnType<typeof dragCheck>;
 
 const fmt = (v: V) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`;
 
@@ -70,6 +71,8 @@ export default function Board(props: BoardProps) {
   const drag = useRef<Drag | null>(null);
   const pointers = useRef(new Map<number, V>());
   const [ghost, setGhost] = useState<{ p: Piece; why: string } | null>(null);
+  // the armed piece's checks over the draft as it is (a place checked once, however often the pointer passes)
+  const armedCheck = useMemo(() => dragCheck(draft, quick), [draft, quick]);
   const [live, setLive] = useState<{ id: string; why: string } | null>(null); // a dragged thing where it may not stay
   const prev = useRef(draft);
   // disarmed (Escape, a drop): its ghost goes with it
@@ -130,12 +133,12 @@ export default function Board(props: BoardProps) {
     }
     const at = unit(e), target = (e.target as Element).closest<HTMLElement>("[data-piece],[data-handle],[data-end]");
     if (armed) return; // dropped on release
-    if (target?.dataset.handle && selected) return void (drag.current = { t: "handle", id: selected, key: target.dataset.handle as HandleKey, start: draft });
-    if (target?.dataset.end) return void (drag.current = { t: "end", which: target.dataset.end as "tee" | "pin", start: draft });
+    if (target?.dataset.handle && selected) return void (drag.current = { t: "handle", id: selected, key: target.dataset.handle as HandleKey, start: draft, check: dragCheck(draft, quick) });
+    if (target?.dataset.end) return void (drag.current = { t: "end", which: target.dataset.end as "tee" | "pin", start: draft, check: dragCheck(draft, quick) });
     if (target?.dataset.piece) {
       const id = target.dataset.piece, p = draft.pieces.find((q) => q.id === id)!, w = whereOf(p.geometry);
       props.onSelect(id);
-      return void (drag.current = { t: "piece", id, start: draft, grab: [at[0] - w[0], at[1] - w[1]] });
+      return void (drag.current = { t: "piece", id, start: draft, grab: [at[0] - w[0], at[1] - w[1]], check: dragCheck(draft, quick) });
     }
     props.onSelect(null);
     drag.current = { t: "pan", from: [e.clientX, e.clientY], view: shown };
@@ -155,9 +158,8 @@ export default function Board(props: BoardProps) {
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
     const at = unit(e), d = drag.current;
     if (armed && !d) {
-      const p = ghostAt(at);
-      if (ghost && ghost.p.geometry === p.geometry) return;
-      setGhost({ p, why: firstWhy(canPlace(draft, p, quick)) });
+      const p = ghostAt(at), why = firstWhy(armedCheck.piece(p)); // (the same snapped place: no check, no render)
+      if (!ghost || ghost.why !== why || whereOf(ghost.p.geometry).join() !== whereOf(p.geometry).join()) setGhost({ p, why });
       return;
     }
     if (!d) return;
@@ -165,17 +167,17 @@ export default function Board(props: BoardProps) {
     if (d.t === "piece") {
       const p = d.start.pieces.find((q) => q.id === d.id)!, moved = movePiece(p, snap([at[0] - d.grab[0], at[1] - d.grab[1]], step));
       props.onPreview({ ...d.start, pieces: d.start.pieces.map((q) => (q.id === d.id ? moved : q)) });
-      setLive({ id: d.id, why: firstWhy(canPlace(d.start, moved, quick)) });
+      setLive({ id: d.id, why: firstWhy(d.check.piece(moved)) });
     } else if (d.t === "handle") {
       const p = d.start.pieces.find((q) => q.id === d.id)!, e0 = entryIn(p.entry, quick.palette);
       if (!e0) return;
       const moved = setHandle(p, d.key, snap(at, step), e0);
       props.onPreview({ ...d.start, pieces: d.start.pieces.map((q) => (q.id === d.id ? moved : q)) });
-      setLive({ id: d.id, why: firstWhy(canPlace(d.start, moved, quick)) });
+      setLive({ id: d.id, why: firstWhy(d.check.piece(moved)) });
     } else {
       const v = snap(at, step), next = { ...d.start, [d.which]: v };
       props.onPreview(next);
-      setLive({ id: d.which, why: firstWhy(newErrors(errorsOf(d.start, quick), next, quick)) });
+      setLive({ id: d.which, why: firstWhy(d.check.end(d.which, v)) });
     }
   }
 
