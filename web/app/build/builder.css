@@ -152,3 +152,13 @@
 .tmode__ask .btn { margin: 0; }
 .tmode__addr { display: grid; gap: var(--sp-1); text-align: left; font-size: 13px; font-weight: 700; }
 .tmode__addr input { min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; font-family: var(--mono); }
+.bholes__more { width: 100%; text-align: left; }
+.bholes__more summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.bholes__open { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
+.bholes__open .btn { margin: 0; }
+.bholes__hole { display: flex; flex: 1; min-width: 240px; gap: var(--sp-2); }
+.bholes__hole input { flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-family: var(--mono); font-size: 14px; }
+.bholes__why { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-weight: 700; }
+.bholes__new { flex-direction: column; }
+.bholes__starts { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); }
+.bholes__starts .btn { margin: 0; }

@@ -7,12 +7,14 @@
 import "@/app/title.css";
 import "@/app/build/builder.css";
 import "@/app/build/phone.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BackButton } from "@/components/About";
 import { Button, Segmented } from "@/components/ui";
-import { loadDrafts, saveDrafts, type Draft } from "@/lib/builder/draft";
-import { blank } from "@/lib/builder/templates";
-import { knownAuthor } from "@/lib/builder/holes";
+import { exportDraft, loadDrafts, saveDrafts, type Draft } from "@/lib/builder/draft";
+import { draftFile, fromFile, fromPublished } from "@/lib/builder/importing";
+import { isHoleId, makeChain } from "@/lib/chain";
+import { startsIn } from "@/lib/builder/templates";
+import { endpoints, knownAuthor } from "@/lib/builder/holes";
 import { canonicalHex, parAllowed, proofKey, provedAs } from "@/lib/builder/proof";
 import { loadBuilder } from "@/lib/builder/load";
 import { FIELD } from "@/lib/builder/rules";
@@ -24,9 +26,46 @@ import TestMode from "./TestMode";
 const WORLDS = Object.keys(FIELD);
 const name = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
-/** The drafts kept in this browser, and a new hole's world. */
-function Drafts({ drafts, onOpen, onNew, onDelete }: { drafts: readonly Draft[]; onOpen: (i: number) => void; onNew: (world: string) => void; onDelete: (i: number) => void }) {
+/** A draft saved as a file (exportDraft), named after it. */
+function download(d: Draft) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([exportDraft(d)], { type: "application/json" }));
+  a.download = draftFile(d);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/** The drafts kept in this browser; a new hole in a world, a file opened, a published hole opened for its next version. */
+function Drafts({ host, author, drafts, onOpen, onAdd, onDelete }: {
+  host: BuilderHost;
+  author: string | null;
+  drafts: readonly Draft[];
+  onOpen: (i: number) => void;
+  /** a new draft, opened */
+  onAdd: (d: Draft) => void;
+  onDelete: (i: number) => void;
+}) {
   const [world, setWorld] = useState("garden");
+  const [hole, setHole] = useState("");
+  const [why, setWhy] = useState("");
+  const [busy, setBusy] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
+  const take = (r: Draft | string) => (typeof r === "string" ? setWhy(r) : (setWhy(""), onAdd(r)));
+  const openFile = (f: File | undefined) => {
+    if (!f) return;
+    if (f.size > MAX_FILE) return setWhy("That file is too big to be a draft.");
+    void f.text().then(fromFile).then(take, () => setWhy("That file could not be read."));
+  };
+  const openPublished = () => {
+    const id = hole.trim();
+    if (!isHoleId(id)) return setWhy("A hole's address is like g1…/its-name, or g1…/its-name/v2.");
+    setBusy(true);
+    const { rpc, web } = endpoints(window.location.search);
+    void makeChain({ rpc, web }).holeData(id)
+      .then((hex) => fromPublished(hex, host, id, author), () => "The chain has no hole there, or could not be read.")
+      .then(take)
+      .finally(() => setBusy(false));
+  };
   return (
     <div className="screen worlds front bholes tint--garden">
       <BackButton label="Back to the game" onClick={() => window.location.assign("/")} />
@@ -37,7 +76,9 @@ function Drafts({ drafts, onOpen, onNew, onDelete }: { drafts: readonly Draft[];
         </div>
         <section className="bholes__new" aria-label="A new hole">
           <Segmented label="Its world" value={world} options={WORLDS.map((w) => [w, name(w)] as const)} onChange={setWorld} />
-          <Button variant="gold" onClick={() => onNew(world)}>+ New hole</Button>
+          <div className="bholes__starts">
+            {startsIn(world).map((s) => <Button key={s.name} variant={s.name === "blank" ? "secondary" : "gold"} onClick={() => onAdd(s.draft)}>+ {s.title}</Button>)}
+          </div>
         </section>
         {drafts.length ? (
           <ul className="bholes__list">
@@ -46,6 +87,7 @@ function Drafts({ drafts, onOpen, onNew, onDelete }: { drafts: readonly Draft[];
                 <span className="bphone__name"><b>{d.title || "A hole with no name yet"}</b><small>{name(d.world)} · {d.pieces.length} pieces{d.slug ? ` · ${d.slug}` : ""}</small></span>
                 <span className="bholes__acts">
                   <Button className="btn--s" onClick={() => onOpen(i)}>Open</Button>
+                  <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
                   <button type="button" className="linkish" onClick={() => window.confirm(`Delete "${d.title || "this hole"}" from this browser?`) && onDelete(i)}>Delete</button>
                 </span>
               </li>
@@ -54,10 +96,25 @@ function Drafts({ drafts, onOpen, onNew, onDelete }: { drafts: readonly Draft[];
         ) : (
           <p className="bphone__note">No hole of yours yet: start one above.</p>
         )}
+        <details className="bholes__more">
+          <summary>Open a file, or a published hole</summary>
+          <div className="bholes__open">
+            <Button onClick={() => file.current?.click()}>Open a file…</Button>
+            <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => (openFile(e.target.files?.[0]), (e.target.value = ""))} />
+            <span className="bholes__hole">
+              <input value={hole} placeholder="g1…/its-name" aria-label="A published hole's address" spellCheck={false} autoCapitalize="off" onChange={(e) => setHole(e.target.value)} />
+              <Button disabled={!hole.trim() || busy} onClick={openPublished}>{busy ? "Reading…" : "Open"}</Button>
+            </span>
+          </div>
+        </details>
+        {why && <p className="bholes__why" role="alert">{why}</p>}
       </div>
     </div>
   );
 }
+
+/** A draft file's most: a draft of every limit at once is far under it. */
+const MAX_FILE = 1 << 20;
 
 export default function Builder() {
   const [host, setHost] = useState<BuilderHost | null>(null);
@@ -117,9 +174,9 @@ export default function Builder() {
     );
   }
   return (
-    <Drafts drafts={drafts}
+    <Drafts host={host} author={author} drafts={drafts}
       onOpen={(i) => setOpen({ i, n: 0, step: "edit" })}
-      onNew={(w) => { keep([...drafts, blank(w)]); setOpen({ i: drafts.length, n: 0, step: "edit" }); }}
+      onAdd={(d) => { keep([...drafts, d]); setOpen({ i: drafts.length, n: 0, step: "edit" }); }}
       onDelete={(i) => keep(drafts.filter((_, k) => k !== i))} />
   );
 }
