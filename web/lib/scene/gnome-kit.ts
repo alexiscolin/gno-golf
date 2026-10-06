@@ -265,9 +265,8 @@ export function kitPiece(g: THREE.Group, hat: THREE.Group, skin: Skin) {
         muff.scale.x = 0.55;
         g.add(muff);
       }
-      const band = at(new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.025, 4, 24, Math.PI), flat(0x5c6670)), 0, 0.12, 0);
-      band.rotation.y = Q;
-      g.add(band);
+      // the band over the head from one muff to the other (a half torus stands across, in x and y, as it is made)
+      g.add(at(new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.025, 4, 24, Math.PI), flat(0x5c6670)), 0, 0.12, 0));
       break;
     }
     case "satchel": {

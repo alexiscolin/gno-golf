@@ -15,6 +15,7 @@ import "../lib/scene/gnome-wardrobe.ts";
 import { BUDGET, MAX_REACH } from "../lib/gnomes/validate.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
 import { costOf } from "../lib/scene/gnome-cost.ts";
+import { kitPiece } from "../lib/scene/gnome-kit.ts";
 
 /** Every drawn thing under a gnome, in order: its kind, geometry and material, rounded. */
 export function fingerprint(o: THREE.Object3D) {
@@ -123,6 +124,17 @@ test("a metal gnome's parts merge into one draw, so none may glow in another's c
   };
   for (const e of catalogue.gnomes.filter((g) => g.skin.material === "metal" && g.skin.body !== undefined && g.skin.body !== g.skin.hat))
     assert.deepEqual(glows({ ...e.skin, hat: e.skin.body!, body: e.skin.hat }), glows(e.skin), `#${e.id} ${e.name}`);
+});
+
+test("earmuffs: a muff on each ear, the band over the head from one to the other (not front to back)", () => {
+  const g = new THREE.Group(), hat = new THREE.Group();
+  kitPiece(g, hat, { ...GNOMES[0], piece: "earmuffs" });
+  g.updateMatrixWorld(true);
+  const band = g.children.find((o): o is THREE.Mesh => o instanceof THREE.Mesh && (o.geometry as THREE.BufferGeometry).type === "TorusGeometry")!;
+  const box = new THREE.Box3().setFromObject(band);
+  assert.ok(box.max.x - box.min.x > 1, `the band spans ${(box.max.x - box.min.x).toFixed(2)} across, ear to ear`);
+  assert.ok(box.max.z - box.min.z < 0.2, `and ${(box.max.z - box.min.z).toFixed(2)} front to back`);
+  assert.ok(box.max.y > 0.6, "over the top of the head");
 });
 
 test("trails and holings: every kind the collection uses is made and runs to its end", () => {
