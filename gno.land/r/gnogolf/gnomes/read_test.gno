@@ -78,22 +78,24 @@ func TestGnomesOfIsTheLocker(cur realm, t *testing.T) {
 	uassert.Equal(t, `{"version":1,"owner":"`+bob.String()+`","total":1,"next":-1,"rows":[`+lockerRow(id)+`]}`, GnomesOf(bob, 0))
 }
 
-// The locker pages a wallet in id order, 100 rows a page, "next" the
+// The locker pages a wallet best first (a tier's rows in id order), 100 rows a page, "next" the
 // following page's offset or -1: a holder of many cannot make a read
 // unbounded.
 func TestGnomesOfPagesAWallet(cur realm, t *testing.T) {
 	fresh(t, cur)
-	for id := int64(1); id <= 205; id++ {
-		mintTo(alice, mustGnome(id))
+	// 205 Commons: one tier, so their rows come in id order (best first is worn_test's)
+	c := func(k int) int64 { return nthOfTier(0, k) }
+	for k := 0; k < 205; k++ {
+		mintTo(alice, mustGnome(c(k)))
 	}
 	p0 := GnomesOf(alice, 0)
-	uassert.True(t, strings.HasPrefix(p0, `{"version":1,"owner":"`+alice.String()+`","total":205,"next":100,"rows":[`+lockerRow(1)+","+lockerRow(2)+","))
+	uassert.True(t, strings.HasPrefix(p0, `{"version":1,"owner":"`+alice.String()+`","total":205,"next":100,"rows":[`+lockerRow(c(0))+","+lockerRow(c(1))+","))
 	uassert.Equal(t, 100, countRows(p0))
-	uassert.True(t, strings.Contains(GnomesOf(alice, 100), `"next":200,"rows":[`+lockerRow(101)+","))
+	uassert.True(t, strings.Contains(GnomesOf(alice, 100), `"next":200,"rows":[`+lockerRow(c(100))+","))
 	p2 := GnomesOf(alice, 200)
 	uassert.True(t, strings.Contains(p2, `"next":-1`))
 	uassert.Equal(t, 5, countRows(p2))
-	uassert.True(t, strings.HasSuffix(p2, lockerRow(205)+"]}"))
+	uassert.True(t, strings.HasSuffix(p2, lockerRow(c(204))+"]}"))
 	uassert.Equal(t, 0, countRows(GnomesOf(alice, 205)))
 	uassert.Equal(t, p0, GnomesOf(alice, -3), "a negative offset reads from the start")
 }

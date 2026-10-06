@@ -157,7 +157,7 @@ it leaves them and refuses to move an earned one.
 
 | what | gas | measured by |
 |---|---|---|
-| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.34M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
+| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.37M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 | `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
@@ -175,13 +175,35 @@ The King's proof is under the 300M the client will ask for `MintEarned` and
 of the order of golf's `Claim` (70.2M); a `GnomesOf` page of 100 is about
 210M, far under a query's 3e9.
 
+**Wearing is free.** Every player wears their best gnome (the highest tier
+they hold, then its lowest id; an earned one after any bought one) with no
+transaction: `Worn(player)` answers it in one read, and `WornMany` for a
+board's page or a rival (the first 50 of a list). `Equip` is optional: it
+shows everyone another gnome than the best, until it leaves its holder;
+`Worn`'s `"equipped"` says which. On their own screen a player may play any
+gnome they hold, kept in their browser: nothing on chain. To make the best
+one row away, a holder's index sorts best first (`"<holder> <rank><id>"`,
+the auction tier's rank 0): `GnomesOf` and `TokenOfOwnerByIndex` list a
+wallet as its team is shown, Legendary first, and a sale writes the rank
+from the row it has already read (one byte more a row; a first buy 2.37M
+gas, 2.35M before).
+
 **Reads for the screens**, JSON starting with `"version":1`, one query each:
 `Collection`, `Gnome` (`{"version":1,"id":""}` for none), `Sold` (a bit per
 id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
 enough to draw a collection with no call per token; `total`, `next`),
-`Equipped`, `EquippedMany` (the first 50 players of a list), `Auction`,
-`Proof`; the GRC721 surface (`TokenOfOwnerByIndex` from the locker's index,
-no `TokenByIndex`); `TokenMetadata` (name, description, image,
+`Equipped`, `EquippedMany` (the first 50 players of a list), `Worn` and
+`WornMany` (below), `Auction`,
+`Proof`; `CanBuy(buyer, ids)`, the mint page's answer before any
+signature: `ok`, a `reason` code (`ids`, `paused`, `unknown`, `auction`,
+`unlisted`, `later`, `taken`, `closed`, `players-only`, `wave-cap`, `cap`:
+the first refusal Buy would meet), `said` (Buy's own sentence), `total` (the
+ugnot to send), the lifetime caps `left` and the first id's player `window`
+(its end, its caps left; `until` 0 when none), asked of the very checks Buy
+runs, the payment aside; `Params` (the soft close, the minimum raise, the
+longest auction and window, the batch, the coin, from config.gno); the
+GRC721 surface (`TokenOfOwnerByIndex` from the locker's index, no
+`TokenByIndex`); `TokenMetadata` (name, description, image,
 `external_url`, attributes Tier, Series and an earned gnome's Kind);
 `Render` for gnoweb (the collection, a gnome, an earned kind, a player).
 `TokenURI` is an SVG drawn on read, its name escaped; a portrait drawn from
@@ -199,6 +221,8 @@ the traits is the user's call.
 | Buy | before a wave, outside every wave | refused | `TestAWaveOpensItsIDsAtItsStart` |
 | Buy | a non-player in the player window, a player over its cap | store record, per-wave cap | `TestThePlayerWindowIsForPlayers`, `TestARecordInEitherModeCounts` |
 | Buy | a wallet over its cap, in one call or several | lifetime cap per tier, batch checked whole | `TestAWalletBuysUpToItsLifetimeCap` |
+| Worn | a gnome shown on a player who no longer holds it; a read that walks a whole collection | owner checked on read; the best is the holder's first row | `TestAPlayerWearsTheirBestGnome`, `TestEquipShowsAnotherGnomeToEveryone`, `TestAnEarnedGnomeIsWornLast`, `TestWornManyAnswersABoardPage` |
+| CanBuy | a refusal shown that Buy would not give, or the reverse | one check, shared | `TestCanBuyAndBuyNeverDisagree`, `TestCanBuySaysTheFirstRefusal` |
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave, StartAuction | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |

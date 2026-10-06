@@ -98,6 +98,7 @@ func mintTo(whom address, g gnome) {
 	if err := ledger.Mint(whom, grc721.TokenID(itoa(g.id))); err != nil {
 		panic(err)
 	}
+	held.Set(heldKey(whom, g.id, rankOfTier(g.tier)), "") // (its holder's row: holdings.OnMint)
 	for int64(len(sold))*8 < g.id {
 		sold = append(sold, 0)
 	}

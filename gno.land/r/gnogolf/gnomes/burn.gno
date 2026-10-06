@@ -14,7 +14,7 @@ func Burn(cur realm, tid string) {
 		panic(errNotYours)
 	}
 	id := parseID(tid)
-	held.Remove(heldKey(caller, id))
+	held.Remove(heldKey(caller, id, rankOf(id)))
 	unequip(caller, tid)
 	if v := kindOf.Get(tid); v != nil {
 		kindOf.Remove(tid)

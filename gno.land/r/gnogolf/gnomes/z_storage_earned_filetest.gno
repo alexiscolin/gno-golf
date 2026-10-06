@@ -43,6 +43,6 @@ func main(cur realm) {
 // 1000001
 
 // Storage:
-// gno.land/r/gnogolf/gnomes: 3554
+// gno.land/r/gnogolf/gnomes: 3555
 // gno.land/r/gnogolf/store: 25207
 // gno.land/r/test/storedearned: 0
