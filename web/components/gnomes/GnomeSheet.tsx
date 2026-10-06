@@ -166,7 +166,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           {traits && (
             <details className="more">
               <summary>Traits</summary>
-              <dl className="review">{traitRows(traits).map((r) => <Term key={r.trait} k={r.trait} v={r.value} />)}</dl>
+              <dl className="review">{traitRows(traits).map((r, i) => <Term key={`${r.trait}-${i}`} k={r.trait} v={r.value} />)}</dl>
             </details>
           )}
           <Share text={`${g.name}, gnome #${g.id} of Gnogolf`} link={`g/${g.id}/`} what="hole" kind="share" />

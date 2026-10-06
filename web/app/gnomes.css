@@ -49,7 +49,9 @@
 
 /* the filters: one row that wraps; a phone keeps them all in reach */
 .gfilters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
-.gfilters .seg { flex: none; }
+.gfilters .seg { flex: none; max-width: 100%; }
+.gfilters .seg button { white-space: nowrap; padding-inline: 14px; }
+@media (max-width: 600px) { .gfilters > .seg { display: flex; width: 100%; } }
 .gfilters__search { flex: 1 1 180px; min-width: 0; height: 44px; padding: 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); }
 .gfilters .more { flex: 1 0 100%; }
 .gfilters .more .gfilters { margin-top: var(--sp-2); }

@@ -331,3 +331,32 @@ size, finding 3); the 720 pages through `vm/qrender`.
 | 184 | owner: the old owner no more | `test1: gnomes.SetMintOpen(false) [mcp]` | refused: only the owner | refused: gnomes: only the owner can do this | PASS | - |
 
 **183 passed, 1 failed** of 184 steps. Failed: 132.
+
+## Seed mode and the shop's UI runs (2026-10-06, later)
+
+Since this run the realm sells every tier at a fixed price (no auction: the
+user's decision), and every player wears their best gnome unless they Equip
+another (`Worn`). The scenario above was updated to match (a Legendary
+bought at its price, one a wallet; the pause a plain switch; no escrow), and
+`URIMAX` raised to the chain's 83.08M with room (finding 1). It has not been
+replayed whole since.
+
+`SEED=1 scripts/e2e-gnomes.sh` does the setup only, in about 30 seconds,
+and leaves the chain running: the genesis, wave 1 open with an hour's
+players' window, wave 2 in two days, the close in 30 days, p1 and b1 with a
+record, p1 holding Commons 1 and 2 and Rare 73 (wearing 1), b1 Common 3.
+`$WORK/seed.env` says where everything is.
+
+`media/gnomes/shop-e2e.mjs` then drives the client (a dev server on that
+chain, `NEXT_PUBLIC_GNOMES=1`) in the repo's headless Chrome, its wallet a
+stand-in (`media/gnomes/wallet.mjs`) that signs each Adena call with gnokey
+and a throwaway key, on that chain alone (it refuses an RPC that is not
+this machine's). Every step checks the chain and is screenshotted, and every
+screenshot is audited: no sideways scroll, nothing wider than the window, no
+page error. 66 checks pass: the gallery at 320, 390, 768, 1280 and 1440 px;
+the players' window and its cap said on the button; the order before the
+wallet, its button off until both boxes are ticked; a cancel; a buy signed
+and read back (the chain shows the owner) and its receipt; a Legendary at
+its price; Adena failing without saying nothing went ("don't buy again"); my
+gnomes and theirs; the picker's row, a gnome played for free, then shown to
+everyone (Equip, and `Worn` says so); an earned gnome's page; a later wave's.

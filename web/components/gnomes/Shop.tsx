@@ -156,10 +156,13 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
           <details className="more">
             <summary>More filters</summary>
             <div className="gfilters">
-              <Segmented label="Tier" options={[["", "Every tier"], ["common", "Common"], ["rare", "Rare"], ["epic", "Epic"], ["legendary", "Legendary"]] as const}
-                value={f.tier || ""} onChange={(t) => setF((x) => ({ ...x, tier: t || undefined }))} />
-              <Segmented label="World" options={[["", "Every world"], ...[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => [h, h.charAt(0).toUpperCase() + h.slice(1)] as const)]}
-                value={f.home || ""} onChange={(h) => setF((x) => ({ ...x, home: h || undefined }))} />
+              <select className="gfilters__search" aria-label="Tier" value={f.tier || ""} onChange={(e) => setF((x) => ({ ...x, tier: (e.target.value || undefined) as Listed["tier"] | undefined }))}>
+                {([["", "Every tier"], ["common", "Common"], ["rare", "Rare"], ["epic", "Epic"], ["legendary", "Legendary"]] as const).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+              </select>
+              <select className="gfilters__search" aria-label="World" value={f.home || ""} onChange={(e) => setF((x) => ({ ...x, home: (e.target.value || undefined) as Home | undefined }))}>
+                <option value="">Every world</option>
+                {[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => <option key={h} value={h}>{h.charAt(0).toUpperCase() + h.slice(1)}</option>)}
+              </select>
             </div>
           </details>
         </div>

@@ -4,8 +4,8 @@
 # needs (store, golf/v2, gnomes and their packages, under the test name NS,
 # as scripts/stage.sh does), publishes the genesis rows
 # (data/gnomes/rows/genesis.txt) and plays the sale through: waves and the
-# player window, buys and caps, Equip, the locker, a Legendary's auction
-# (outbid, pause, late bid, settle), the treasury moved, the site link, the
+# player window, buys and caps (a Legendary at its price, one a wallet),
+# Equip, the locker, the pause, the treasury moved, the site link, the
 # close, an earned gnome, the token reads and the page, and the portraits:
 # every catalogue gnome's drawn, and what TokenURI costs a tier, held to
 # URIMAX (the portrait commit's figure). Each step is a call
@@ -14,6 +14,7 @@
 #
 #   scripts/e2e-gnomes.sh                      everything with gnokey
 #   MCP=1 scripts/e2e-gnomes.sh                the owner's calls and the reads through gnomcp
+#   SEED=1 scripts/e2e-gnomes.sh               the setup only, a chain to try the shop on
 #
 # Local only. The chain is a gnodev on its own ports (RPC 127.0.0.1:26757,
 # gnoweb :8898 by default: 26657 is often another gnodev's), its keys made
@@ -21,9 +22,8 @@
 # the others are generated each run). Nothing reads or writes another
 # keybase, and no chain but that gnodev is ever named.
 #
-# It takes about an hour and five minutes: the chain's clock is the wall's,
-# and an auction runs at least an hour. The steps that need no waiting run
-# while it does.
+# It takes a few minutes: the close is waited out (a minute of chain time),
+# the rest runs as it comes.
 #
 # MCP=1 needs gnomcp (github.com/gnoverse/gno-mcp, GNOMCP the binary): the
 # owner (test1, which gnomcp signs with on a local profile) calls through
@@ -35,8 +35,18 @@
 # genesis's AddSeries, about 1.1 billion gas), is sent again with gnokey,
 # and its row says so. The players are other accounts, so they call with gnokey.
 #
+# SEED=1 plays no scenario: it deploys, then seeds what the shop's screens
+# show (the genesis published; wave 1 of data/gnomes.json open since a
+# minute, its player window an hour; wave 2 in two days; the close in 30
+# days; p1 and b1 with a record, p1 holding two Commons and a Rare, one
+# worn, b1 a Common; wave 1's Legendary on sale at its price; p0 and b2 with
+# their balance alone), in a few minutes. The chain
+# is left running (KEEP=1) and $WORK/seed.env written: its addresses, the
+# realms, the keybase and password, each key's address, what was seeded.
+# Stop it with kill $DEV_PID (seed.env).
+#
 # Env: NS (nym-gnometest000), RPC_ADDR, WEB_ADDR, WORK (a new temp dir),
-# OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the end,
+# OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the end, SEED=1,
 # GNO_TOOLCHAIN as in check.sh.
 set -u
 
@@ -264,9 +274,10 @@ urigas() {
 }
 # within <step> <call> <bound> <got>: a number at most bound
 within() { if [ "$4" -eq "$4" ] 2>/dev/null && [ "$4" -le "$3" ]; then row "$1" "$2" "≤ $3" "$4" 0; else row "$1" "$2" "≤ $3" "${4:-none}" 1; fi; }
-# URIMAX: the gas the portrait's commit gives for the heaviest TokenURI
-# (art.gno, 4a852c6: "0.076e9 gas at the heaviest")
-URIMAX=76000000
+# URIMAX: the most a TokenURI may take on a chain: the heaviest portrait's
+# measured here, 83.08M (ADR-007; 4a852c6's "0.076e9" is gno test's, which
+# charges no object loads), with room
+URIMAX=84000000
 
 # the report
 n=0 npass=0 nfail=0
@@ -313,6 +324,20 @@ is() { if [ "$3" = "$4" ]; then row "$1" "$2" "$3" "$4" 0; else row "$1" "$2" "$
 # has <step> <call> <substring> <got>
 has() { case $4 in *"$3"*) row "$1" "$2" "contains $3" "$(cell "$4" | cut -c1-140)" 0 ;; *) row "$1" "$2" "contains $3" "$4" 1 ;; esac; }
 jf() { py jq "$1"; } # a field of the JSON on stdin
+# findshot: a shot that holes garden/3/v1 in this weather, in shot ("" for
+# none found). (searched over the chain's own SimulateRound; the weather
+# changes each five minutes of chain time, and some holds no ace: then the
+# next one)
+findshot() {
+	shot=""
+	for _ in 1 2 3 4 5 6; do
+		shot=$(py holeshot "http://$RPC_ADDR" "$GOLF" garden/3/v1)
+		[ -n "$shot" ] && break
+		period=$(q "$GOLF" 'Period()')
+		log "e2e: no ace on garden/3 in period $period's weather: waiting for the next"
+		while [ "$(q "$GOLF" 'Period()')" = "$period" ]; do sleep 5; done
+	done
+}
 
 # ------------------------------------------------------------------- chain
 log "e2e: work dir $WORK"
@@ -331,7 +356,11 @@ mkdir -p "$WORK/devroot"
 (cd "$WORK/devroot" && exec "$GNODEV" local -no-watch -empty-blocks -empty-blocks-interval 1 \
 	-node-rpc-listener "$RPC_ADDR" -web-listener "$WEB_ADDR" -paths "$deps" "${pre[@]}") >"$WORK/gnodev.log" 2>&1 &
 DEV=$!
-[ "${KEEP:-}" = 1 ] || trap 'kill $DEV 2>/dev/null' EXIT
+if [ "${SEED:-}" = 1 ]; then # (kept running once seeded, killed when the seed fails)
+	trap '[ $? = 0 ] || kill $DEV 2>/dev/null' EXIT
+else
+	[ "${KEEP:-}" = 1 ] || trap 'kill $DEV 2>/dev/null' EXIT
+fi
 for _ in $(seq 60); do curl -s "http://$RPC_ADDR/status" >/dev/null && break; sleep 1; done
 curl -s "http://$RPC_ADDR/status" >/dev/null || die "gnodev did not start (see $WORK/gnodev.log)"
 
@@ -357,6 +386,73 @@ is "deploy" "gnomes.Owner()" "$OWNER" "$(qg 'Owner()')"
 is "deploy" "gnomes.Treasury()" "$OWNER" "$(qg 'Treasury()')"
 is "deploy" "store.Writer()" "$GOLF" "$(q "$STORE" 'Writer()')"
 
+# -------------------------------------------------------------------- seed
+# SEED=1: the state the shop's screens need (the header), then the chain
+# left running and $WORK/seed.env written
+if [ "${SEED:-}" = 1 ]; then
+	must() { [ "$nfail" = 0 ] || die "seed: step $n failed${TXOUT:+: $(why)} (see $OUT)"; }
+	G=$root/data/gnomes.json
+	pl() { jf "d['series'][0]['plan'][$1]$2" <"$G"; } # pl <wave index> <field path>
+	W1F=$(pl 0 "['first']") W1L=$(pl 0 "['last']") W2F=$(pl 1 "['first']") W2L=$(pl 1 "['last']")
+	C1=$(pl 0 "['tiers']['common']['first']") R1=$(pl 0 "['tiers']['rare']['first']") L1=$(pl 0 "['tiers']['legendary']['first']")
+	WIN2=$(jf "d['series'][0]['sale']['playerWindowHours']" <"$G")
+	price() { qg "Gnome(\"$1\")" | jf 'd["price"]'; }
+	recorded() { q "$STORE" "Has(\"totals\",\"assisted $1\")"; }
+	GASW=3000000000 ok "seed: publish the genesis" "published" test1 "$GN" AddSeries genesis "$(cat "$ROWS")"; must
+	ok "seed: open the sale" "open" test1 "$GN" SetMintOpen true; must
+	# the records first (finding a holing shot may wait out a period), so
+	# that the player window starts when the rest is quick
+	ok "seed: publish garden/3" "published" test1 "$GOLF" Publish garden/3 "$(awk '$1=="garden/3"{print $4}' "$root/data/holes.txt")" e2e; must
+	for k in p1 b1; do
+		a=$(addr $k)
+		for _ in 1 2 3; do # (the weather may turn between the search and the round: search again)
+			findshot
+			[ -n "$shot" ] && tx $k "$GOLF" PlayRound garden/3/v1 "$shot"
+			[ "$(recorded "$a")" = true ] && break
+		done
+		is "seed: $k holes garden/3 (a record)" "store.Has(\"totals\",\"assisted <$k>\")" "true" "$(recorded "$a")"; must
+	done
+	NOW=$(chaintime)
+	ok "seed: wave 1 ($W1F-$W1L) open, 1 h player window" "added" test1 "$GN" AddWave "$W1F" "$W1L" "$((NOW - 60))" 1; must
+	W1UNTIL=$((NOW - 60 + 3600)) W2AT=$((NOW + 2 * 86400)) CLOSE=$((NOW + 30 * 86400))
+	ok "seed: wave 2 ($W2F-$W2L) in 2 days" "added" test1 "$GN" AddWave "$W2F" "$W2L" "$W2AT" "$WIN2"; must
+	ok "seed: close in 30 days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
+	C2=$((C1 + 1)) C3=$((C1 + 2))
+	SEND=$(($(price "$C1") + $(price "$C2")))ugnot ok "seed: p1 buys Commons $C1, $C2" "sold" p1 "$GN" Buy "$C1,$C2"; must
+	SEND=$(price "$R1")ugnot ok "seed: p1 buys Rare $R1" "sold" p1 "$GN" Buy "$R1"; must
+	ok "seed: p1 wears $C1" "worn" p1 "$GN" Equip "$C1"; must
+	SEND=$(price "$C3")ugnot ok "seed: b1 buys Common $C3" "sold" b1 "$GN" Buy "$C3"; must
+	ENV=$WORK/seed.env
+	{
+		echo "# gnomes seed chain ($(date -u +%FT%TZ)): scripts/e2e-gnomes.sh SEED=1. Stop it: kill \$DEV_PID"
+		echo "RPC=http://$RPC_ADDR"
+		echo "WEB=http://$WEB_ADDR"
+		echo "CHAINID=$CHAINID"
+		echo "NS=$NS"
+		echo "GOLF=$GOLF"
+		echo "GNOMES=$GN"
+		echo "STORE=$STORE"
+		echo "KH=$KH"
+		echo "PASS=$PASS"
+		echo "GNOKEY=$GNOKEY"
+		echo "WORK=$WORK"
+		echo "DEV_PID=$DEV"
+		echo "WAVE1=$W1F-$W1L"
+		echo "WAVE1_PLAYERS_UNTIL=$W1UNTIL"
+		echo "WAVE2=$W2F-$W2L"
+		echo "WAVE2_START=$W2AT"
+		echo "CLOSE_AT=$CLOSE"
+		echo "LEGENDARY=$L1"
+		echo "P1_GNOMES=$C1,$C2,$R1"
+		echo "P1_EQUIPPED=$C1"
+		echo "B1_GNOMES=$C3"
+		for k in test1 p0 p1 b1 b2 treas; do echo "$k=$(addr $k)"; done
+	} >"$ENV"
+	log "e2e: seeded in ${SECONDS}s, $npass steps (the table is in $OUT); gnodev $DEV left running on $RPC_ADDR, gnoweb $WEB_ADDR"
+	echo "$ENV"
+	exit 0
+fi
+
 # --------------------------------------------------------------- catalogue
 no "catalogue: owner only" "only the owner" p0 "$GN" AddSeries genesis "$(cat "$ROWS")"
 no "catalogue: genesis first" "the genesis first" test1 "$GN" AddSeries drop2 "721|common|X|01"
@@ -367,48 +463,17 @@ no "catalogue: once" "already published" test1 "$GN" AddSeries genesis "$(cat "$
 is "catalogue: Gnome(104)" "Gnome(\"104\").tier,name" "legendary The Miller" "$(qg 'Gnome("104")' | jf 'd["tier"] + " " + d["name"]')"
 
 # ------------------------------------------------------- the sale opens
-no "sale: closed at deploy" "the sale is closed" test1 "$GN" StartAuction 104 1
+SEND=30000000ugnot no "sale: closed at deploy" "the sale is closed" p0 "$GN" Buy 1
 ok "sale: open" "open" test1 "$GN" SetMintOpen true
 is "sale: MintOpen()" "MintOpen()" "true" "$(qg 'MintOpen()')"
 
-# ---------------------------------------------- the auction, started first
-# (it runs an hour of chain time: the rest happens while it does)
-no "auction: owner only" "only the owner" p0 "$GN" StartAuction 104 1
-no "auction: Legendary only" "only a legendary" test1 "$GN" StartAuction 94 1
-no "auction: 1 to 168 hours" "1 to 168 hours" test1 "$GN" StartAuction 104 0
 REALM_ADDR=$(py realm "$GN")
-ok "auction: start 104 for 1 hour" "started, reserve 777 GNOT" test1 "$GN" StartAuction 104 1
-T0=$(blocktime "$HEIGHT")
-A=$(qg 'Auction()')
-is "auction: Auction() at start" "Auction() id,reserve,top,min,end-start" "104 777000000 0 777000000 3600" \
-	"$(printf %s "$A" | jf "' '.join(str(x) for x in (d['id'], d['reserve'], d['top'], d['min'], d['end'] - $T0))")"
-no "auction: one at a time" "an auction is under way" test1 "$GN" StartAuction 208 1
-no "auction: Buy refuses a Legendary" "sold by auction" p0 "$GN" Buy 104
-SEND=776999999ugnot no "auction: below the reserve" "a bid is at least 777000000ugnot" b1 "$GN" Bid 104
-SEND=777000000ugnot no "auction: only the gnome auctioned" "is not being auctioned" b1 "$GN" Bid 208
-SEND=777000000ugnot ok "auction: b1 bids the reserve" "taken" b1 "$GN" Bid 104
-is "auction: escrow" "balance(realm), the top bid held" "777000000" "$(bal "$REALM_ADDR")"
-SEND=815850000ugnot no "auction: no outbidding oneself" "you hold the top bid already" b1 "$GN" Bid 104
-SEND=815849999ugnot no "auction: min raise 5%" "a bid is at least 815850000ugnot" b2 "$GN" Bid 104
-b1before=$(bal "$B1")
-SEND=815850000ugnot ok "auction: b2 outbids" "taken" b2 "$GN" Bid 104
-is "auction: b1 refunded exactly" "balance(b1) after - before" "777000000" "$(($(bal "$B1") - b1before))"
-no "auction: no cancel after a bid" "an auction with a bid runs to its end" test1 "$GN" CancelAuction
 
-# pause: no bid, no settle, the clock frozen
-end0=$(qg 'Auction()' | jf 'd["end"]')
+# pause: the owner's switch over every sale
 ok "pause: SetMintOpen(false)" "paused" test1 "$GN" SetMintOpen false
-P_AT=$(blocktime "$HEIGHT")
-SEND=900000000ugnot no "pause: no bid" "the sale is closed" b1 "$GN" Bid 104
-no "pause: no settle" "the sale is paused" p0 "$GN" Settle 104
 SEND=30000000ugnot no "pause: no buy" "the sale is closed" p0 "$GN" Buy 1
-sleep 40
 ok "pause: SetMintOpen(true)" "resumed" test1 "$GN" SetMintOpen true
-R_AT=$(blocktime "$HEIGHT")
-end1=$(qg 'Auction()' | jf 'd["end"]')
-is "pause: the end moved by the pause" "Auction().end - end before (= resume - pause block times)" "$((R_AT - P_AT))" "$((end1 - end0))"
 ok "pause: open again is a no-op" "no change" test1 "$GN" SetMintOpen true
-is "pause: no-op leaves the end" "Auction().end" "$end1" "$(qg 'Auction()' | jf 'd["end"]')"
 
 # ------------------------------------------------------------------- waves
 no "waves: owner only" "only the owner" p0 "$GN" AddWave 1 104 0 1
@@ -421,16 +486,7 @@ SEND=30000000ugnot no "player window: no record, refused" "players only until" p
 # a record: p1 holes garden/3 on golf/v2 (published here alone: the local
 # Garden cup is that one hole)
 ok "record: publish garden/3" "published" test1 "$GOLF" Publish garden/3 "$(awk '$1=="garden/3"{print $4}' "$root/data/holes.txt")" e2e
-# (searched over the chain's own SimulateRound; the weather changes each
-# five minutes of chain time, and some holds no ace: then the next one)
-shot=""
-for _ in 1 2 3 4 5 6; do
-	shot=$(py holeshot "http://$RPC_ADDR" "$GOLF" garden/3/v1)
-	[ -n "$shot" ] && break
-	period=$(q "$GOLF" 'Period()')
-	log "e2e: no ace on garden/3 in period $period's weather: waiting for the next"
-	while [ "$(q "$GOLF" 'Period()')" = "$period" ]; do sleep 5; done
-done
+findshot
 is "record: a holing shot this weather" "SimulateRound(garden/3/v1, …)" "found ($shot)" "$([ -n "$shot" ] && echo "found ($shot)" || echo none)"
 ok "record: p1 holes garden/3" "holed" p1 "$GOLF" PlayRound garden/3/v1 "$shot"
 is "record: store totals" "store.Has(\"totals\",\"assisted <p1>\")" "true" "$(q "$STORE" "Has(\"totals\",\"assisted $P1\")")"
@@ -445,7 +501,7 @@ SEND=60000000ugnot no "buy: an id twice" "is named twice" p1 "$GN" Buy 5,5
 t_before=$(bal "$OWNER")
 SEND=30000000ugnot ok "buy: p1 buys Common 5 at its price" "sold" p1 "$GN" Buy 5
 is "buy: treasury up by the price" "balance(treasury) after - before" "30000000" "$(($(bal "$OWNER") - t_before))"
-is "buy: the realm keeps nothing" "balance(realm) = the auction's top bid in escrow" "815850000" "$(bal "$REALM_ADDR")"
+is "buy: the realm keeps nothing" "balance(realm)" "0" "$(bal "$REALM_ADDR")"
 is "buy: OwnerOf(5)" "OwnerOf(\"5\")" "$P1" "$(qg 'OwnerOf("5")')"
 SEND=30000000ugnot no "buy: sold once" "already sold" p1 "$GN" Buy 5
 SEND=60000000ugnot ok "buy: two in one call" "sold" p1 "$GN" Buy 6,7
@@ -454,6 +510,13 @@ SEND=198000000ugnot ok "caps: 2 Rares in the window" "sold" p1 "$GN" Buy 73,74
 SEND=99000000ugnot no "caps: no third Rare in the window" "the player window takes 2 rare a wallet" p1 "$GN" Buy 75
 SEND=333000000ugnot ok "caps: 1 Epic in the window" "sold" p1 "$GN" Buy 94
 SEND=333000000ugnot no "caps: no second Epic in the window" "the player window takes 1 epic a wallet" p1 "$GN" Buy 95
+# a Legendary: bought as any gnome, at its price, by the first; one a wallet
+t_before=$(bal "$OWNER")
+SEND=777000000ugnot ok "legendary: p1 buys The Miller (104) at its price" "sold" p1 "$GN" Buy 104
+is "legendary: treasury up by the price" "balance(treasury) after - before" "777000000" "$(($(bal "$OWNER") - t_before))"
+is "legendary: OwnerOf(104)" "OwnerOf(\"104\")" "$P1" "$(qg 'OwnerOf("104")')"
+SEND=777000000ugnot no "legendary: sold once" "already sold" b1 "$GN" Buy 104
+is "worn: the best held, free" "Worn(p1).id,equipped" "104 False" "$(qg "Worn(\"$P1\")" | jf 'd["id"] + " " + str(d["equipped"])')"
 
 # a wave with no window, and the lifetime cap
 no "price: owner only" "only the owner" p0 "$GN" SetPrice common 40000000
@@ -461,7 +524,9 @@ no "price: bounds" "a price is between" test1 "$GN" SetPrice common 999999
 ok "price: Common 40 GNOT for the next waves" "set" test1 "$GN" SetPrice common 40000000
 is "price: a wave keeps its prices" "Gnome(\"8\").price" "30000000" "$(qg 'Gnome("8")' | jf 'd["price"]')"
 NOW=$(chaintime)
-ok "waves: 105-207, no window" "added" test1 "$GN" AddWave 105 207 "$NOW" 0
+ok "waves: 105-208, no window" "added" test1 "$GN" AddWave 105 208 "$NOW" 0
+SEND=777000000ugnot no "legendary: one a wallet" "the cap is 1 legendary a wallet" p1 "$GN" Buy 208
+SEND=777000000ugnot ok "legendary: b1 buys 208" "sold" b1 "$GN" Buy 208
 ok "waves: 209-310, tomorrow" "added" test1 "$GN" AddWave 209 310 "$((NOW + 86400))" 0
 SEND=40000000ugnot no "waves: not yet" "is not on sale yet" p0 "$GN" Buy 209
 SEND=30000000ugnot no "waves: in no wave" "is not on sale" p0 "$GN" Buy 400
@@ -476,6 +541,7 @@ is "buy: SoldOfTier(0)" "SoldOfTier(0)" "13" "$(qg 'SoldOfTier(0)')"
 # --------------------------------------------------------- equip, locker
 ok "equip: p1 wears 5" "worn" p1 "$GN" Equip 5
 is "equip: Equipped(p1)" "Equipped(p1).id,tier" "5 common" "$(qg "Equipped(\"$P1\")" | jf 'd["id"] + " " + d["tier"]')"
+is "worn: the one put on" "Worn(p1).id,equipped" "5 True" "$(qg "Worn(\"$P1\")" | jf 'd["id"] + " " + str(d["equipped"])')"
 no "equip: not someone else's" "not your gnome" p0 "$GN" Equip 5
 no "equip: not unsold" "not your gnome" p0 "$GN" Equip 9
 ok "equip: p0 wears $1" "worn" p0 "$GN" Equip "$1"
@@ -547,7 +613,7 @@ HEAVY=$3 HTIER=$4
 within "portrait: the heaviest, #$HEAVY ($HTIER)" "its SVG's bytes (6 KiB)" 6144 "$5"
 heavyuri=$6
 if [ "$HTIER" != legendary ]; then
-	if [ "$HEAVY" -gt 207 ]; then # (105 to 207 are on sale with no window; 104 and under are players' still)
+	if [ "$HEAVY" -gt 208 ]; then # (105 to 208 are on sale with no window; 104 and under are players' still)
 		ok "portrait: a wave of #$HEAVY alone" "added" test1 "$GN" AddWave "$HEAVY" "$HEAVY" "$(chaintime)" 0
 	fi
 	SEND=$(qg "Gnome(\"$HEAVY\")" | jf 'd["price"]')ugnot ok "portrait: b2 buys #$HEAVY" "sold" b2 "$GN" Buy "$HEAVY"
@@ -557,9 +623,10 @@ fi
 within "portrait: TokenURI gas, a Common (#5)" "MsgRun TokenURI(\"5\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 5)"
 within "portrait: TokenURI gas, a Rare (#73)" "MsgRun TokenURI(\"73\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 73)"
 within "portrait: TokenURI gas, an Epic (#94)" "MsgRun TokenURI(\"94\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 94)"
-c=14 r=3 e=1 l=1
+within "portrait: TokenURI gas, the Legendary (#104)" "MsgRun TokenURI(\"104\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 104)"
+c=14 r=3 e=1 l=2
 case $HTIER in common) c=15 ;; rare) r=4 ;; epic) e=2 ;; esac
-sold=$((c + r + e + l - 1)) # (the Legendary settles last)
+sold=$((c + r + e + l))
 
 # ---------------------------------------------------------- earned gnomes
 SEND=1ugnot no "earned: free" "an earned gnome is free" p1 "$GN" MintEarned wizard
@@ -594,33 +661,8 @@ no "close: no wave for its ids" "the genesis sale closed on" test1 "$GN" AddWave
 no "close: no date after" "the genesis sale closed on" test1 "$GN" SetCloseAt "$((CLOSE + 600))"
 is "close: Collection genesis closed, sold" "Collection().series[0] closed,sold" "True $sold" "$(qg 'Collection()' | jf 'str(d["series"][0]["closed"]) + " " + str(d["series"][0]["sold"])')"
 is "close: an unsold gnome closed" "Gnome(\"1\").closed" "True" "$(qg 'Gnome("1")' | jf 'd["closed"]')"
-is "close: the auctioned one not closed" "Gnome(\"104\").closed" "False" "$(qg 'Gnome("104")' | jf 'd["closed"]')"
-no "close: no new auction while one runs" "an auction is under way" test1 "$GN" StartAuction 208 1
 
-# ------------------------------------------------- the auction's last bids
-end=$(qg 'Auction()' | jf 'd["end"]')
-wait_until "$((end - 540))" "the auction's last ten minutes"
-b2before=$(bal "$B2")
-SEND=856642500ugnot ok "auction: late bid, after the close" "taken, the end moved" b1 "$GN" Bid 104
-L_AT=$(blocktime "$HEIGHT")
-is "auction: a late bid extends to 10 min" "Auction().end - the bid's block time" "600" "$(($(qg 'Auction()' | jf 'd["end"]') - L_AT))"
-is "auction: b2 refunded exactly" "balance(b2) after - before" "815850000" "$(($(bal "$B2") - b2before))"
-is "auction: escrow" "balance(realm)" "856642500" "$(bal "$REALM_ADDR")"
-end=$(qg 'Auction()' | jf 'd["end"]')
-no "auction: not over" "the auction is not over" p0 "$GN" Settle 104
-wait_until "$((end + 1))" "the auction's end"
-SEND=900000000ugnot no "auction: over" "the auction is over" b2 "$GN" Bid 104
-is "auction: over, min 0" "Auction() over,min,settled" "True 0 False" "$(qg 'Auction()' | jf '" ".join(str(x) for x in (d["over"], d["min"], d["settled"]))')"
-t_before=$(bal "$TREAS")
-ok "auction: anyone settles" "settled" p0 "$GN" Settle 104
-is "auction: the treasury paid the bid" "balance(treas) after - before" "856642500" "$(($(bal "$TREAS") - t_before))"
-is "auction: the realm keeps nothing" "balance(realm)" "0" "$(bal "$REALM_ADDR")"
-is "auction: the winner holds it" "OwnerOf(\"104\")" "$B1" "$(qg 'OwnerOf("104")')"
-is "auction: settled" "Auction() settled,top" "True 856642500" "$(qg 'Auction()' | jf 'str(d["settled"]) + " " + str(d["top"])')"
-within "portrait: TokenURI gas, the Legendary (#104)" "MsgRun TokenURI(\"104\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 104)"
-no "auction: settles once" "no auction of this gnome to settle" p0 "$GN" Settle 104
-no "close: no auction once closed" "the genesis sale closed on" test1 "$GN" StartAuction 208 1
-is "close: final supply" "Collection().series[0].sold, tiers sold" "$((sold + 1)) $c,$r,$e,$l" "$(qg 'Collection()' | jf 'str(d["series"][0]["sold"]) + " " + ",".join(str(t["sold"]) for t in d["tiers"])')"
+is "close: final supply" "Collection().series[0].sold, tiers sold" "$sold $c,$r,$e,$l" "$(qg 'Collection()' | jf 'str(d["series"][0]["sold"]) + " " + ",".join(str(t["sold"]) for t in d["tiers"])')"
 
 # ------------------------------------------------------------- the owner
 no "owner: only the offered accepts" "no transfer of the collection is offered to you" p0 "$GN" Accept
