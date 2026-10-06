@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, errorsOf, fixOf, movePiece, newErrors, removePiece, snap, whereOf, clampMove } from "@/lib/builder/edit";
-import { gauges, offAtLimit, verdict } from "@/lib/builder/editor";
+import { gauges, offAtLimit, testGate, verdict } from "@/lib/builder/editor";
 import { frame } from "@/lib/builder/gg1";
 import { turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
@@ -46,7 +46,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   /** Publish: the draft proved in every weather as it is */
   onPublish: (d: Draft) => void;
 }) {
-  const session = useMemo(() => makeSession(first), [first]);
+  // one session (its undo history) while the editor is open: a step saved and handed back is not a new draft (its key opens a new one)
+  const [session] = useState(() => makeSession(first));
   const [, bump] = useState(0);
   const draft = session.now(), kept = session.kept();
   const [palette, setPalette] = useState<readonly PaletteEntry[] | null>(null);
@@ -160,7 +161,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const v = checked?.v, fresh = checked?.of === kept;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
   const bad = new Set(errors.map((i) => i.piece).filter((x): x is string => !!x));
-  const testOff = !v ? "Checking…" : errors.length ? `Fix ${errors.length} first` : !draft.pieces.length ? "Place a piece first" : !draft.slug ? "Give it a short name first" : "";
+  const testOff = testGate(kept, checked);
   const step: Step = "edit";
   // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
   const proved = !testOff && key?.of === kept && !!key.key && !!author && !!provedAs(kept.proofs, kept.world, key.key, author, kept.slug);

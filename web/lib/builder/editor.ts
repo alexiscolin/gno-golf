@@ -9,13 +9,23 @@ import type { Draft, V } from "./draft";
 import { whereOf } from "./edit";
 import type { PaletteEntry } from "./palette";
 import type { HoleIn } from "./types";
-import { MAX_BYTES } from "./pipeline";
+import { MAX_BYTES, type Validated } from "./pipeline";
 
 /** The dock's one line: what stands between the draft and the next step. */
 export function verdict({ pieces, errors, proved }: { pieces: number; errors: number; proved: boolean }) {
   if (!pieces) return { ok: false, text: "Place pieces between the tee and the cup" };
   if (errors) return { ok: false, text: `${errors} to fix` };
   return { ok: true, text: proved ? "Holed in every weather" : "Ready to test" };
+}
+
+/**
+ * Why Test is off ("" it is on), from the last check: only a check of the
+ * draft as kept now counts (an undo or a step since, and it is checking again).
+ */
+export function testGate(kept: Draft, checked: { of: Draft; v: Validated } | null): string {
+  if (!checked || checked.of !== kept) return "Checking…";
+  const errors = checked.v.issues.filter((i) => i.severity === "error").length;
+  return errors ? `Fix ${errors} first` : !kept.pieces.length ? "Place a piece first" : !kept.slug ? "Give it a short name first" : "";
 }
 
 export interface Gauge {

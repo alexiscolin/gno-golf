@@ -5,7 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { commonShift, gauges, groupsOf, offAtLimit, verdict } from "../lib/builder/editor.ts";
+import fs from "node:fs";
+import { commonShift, gauges, groupsOf, offAtLimit, testGate, verdict } from "../lib/builder/editor.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
@@ -64,4 +65,23 @@ void test("groupsOf: the palette by kind, in the editor's order, each group's en
   assert.deepEqual(g.map((x) => x.name), ["Walls", "Posts", "Ground", "Hazards", "Hills", "Jumps"].filter((n) => g.some((x) => x.name === n)));
   assert.ok(g.every((x) => x.entries.length > 0));
   assert.equal(g.reduce((n, x) => n + x.entries.length, 0), garden.length, "every entry once");
+});
+
+void test("testGate: Test opens only on a check of the draft as kept now (an older check's verdict never opens it)", () => {
+  const ok = { ...lane("garden", [placePiece(entry("*/post/rock"), "x", [12, 4])]), slug: "lane" };
+  const v = validate(ok, { host, palette: garden });
+  assert.equal(testGate(ok, { of: ok, v }), "");
+  const undone = { ...ok, pieces: [] };
+  assert.equal(testGate(undone, { of: ok, v }), "Checking…", "an undo since the check: its verdict is the old draft's");
+  assert.equal(testGate(ok, null), "Checking…");
+  const walled = { ...lane("garden", [rail("w", [20, 0], [20, 20])]), slug: "lane" };
+  assert.equal(testGate(walled, { of: walled, v: validate(walled, { host, palette: garden }) }), "Fix 1 first");
+  const unnamed = { ...ok, slug: "" };
+  assert.equal(testGate(unnamed, { of: unnamed, v }), "Give it a short name first");
+});
+
+void test("the Editor keeps one session (its undo history) for as long as it is open: saving a step never makes a new one", () => {
+  const src = fs.readFileSync(new URL("../components/builder/Editor.tsx", import.meta.url), "utf8");
+  assert.match(src, /const \[session\] = useState\(\(\) => makeSession\(first\)\)/, "made once per mount (its key opens a new one)");
+  assert.doesNotMatch(src, /useMemo\(\(\) => makeSession/, "not remade when the parent hands the saved draft back");
 });
