@@ -469,8 +469,8 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   "supply": { "common": 504, "rare": 144, "epic": 65, "legendary": 7 },
   "waves": ["garden", "island", "town", "mountain", "mines", "volcano", "storm"],
   "seed": "gnogolf/genesis/1", "released": false,
-  "sale": { "prices": { "common": 30, "rare": 99, "epic": 333 },
-            "auction": { "reserve": 777, "hours": 48, "extendMinutes": 10, "minIncrementPercent": 5, "minIncrementGnot": 5, "endsUtc": "18:00" },
+  "sale": { "prices": { "common": 36, "rare": 72, "epic": 336 },
+            "auction": { "reserve": 1296, "hours": 48, "extendMinutes": 10, "minIncrementPercent": 5, "minIncrementGnot": 5, "endsUtc": "18:00" },
             "playerWindowHours": 48, "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1 },
             "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2 }, "nextWaveWhenSold": 0.7 } }
 ```
@@ -497,10 +497,12 @@ tiers and earned kinds with its codes, the Legendaries' kinds in design order
   opens): from then its looks are final (section 10).
 - **`sale` is the realm's starting settings**, from the research brief
   (`docs/superpowers/research/2026-10-06-nft-best-practices.md`) and the
-  user's decision: prices in GNOT, the Legendary auction, the player window
+  user's decision: prices in GNOT, golf numbers (36 the par of nine holes,
+  72 a course's, 336 a ball's dimples, 1,296 eighteen holes at par 72: why
+  in ADR-008), the Legendary auction, the player window
   (wallets with a record in `store` first), its caps, the lifetime caps,
   and when to open the next wave. The realm's owner changes them between
-  waves, never during one, and never lowers a price. Nothing in the client
+  waves, never during one, and never lower on what is on sale. Nothing in the client
   reads them as truth: the realm's `Collection()` is.
 - **A new drop is data, not code.** Add a series to `series.json` (its
   `code`, `first` id after the last series', its supply and waves), a

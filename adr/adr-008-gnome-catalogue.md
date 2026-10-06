@@ -63,6 +63,19 @@ designing as a system.
   `id|tier|name|traits`, ids following on, fields the realm accepts, and
   each row's tier equal to its traits' tier byte, which the realm stores
   apart and does not compare.
+- **The prices are golf numbers** (the user's decision, 2026-10-06; the
+  realm's starting settings in `series.json`, set by its owner between
+  waves, never lower on what is on sale):
+
+  | tier | GNOT | why |
+  |---|---|---|
+  | Common | 36 | the par of nine holes |
+  | Rare | 72 | the par of a course |
+  | Epic | 336 | the dimples on a golf ball |
+  | Legendary | 1,296, the auction's reserve | eighteen holes at par 72 (18 × 72) |
+
+  Were every one sold at these: 504 × 36 + 144 × 72 + 65 × 336 + 7 × 1,296
+  = 59,424 GNOT (the Legendaries at their reserves).
 - **The screens read pure functions** of `web/lib/gnomes/` (`entryOf`,
   `filterGnomes`, `traitRows`, `TIER_LOOK`, `skinOfTraits`) over the
   catalogue: no 3D needed to list, sort, filter or describe a gnome.

@@ -12,9 +12,9 @@
       "seed": "gnogolf/genesis/1",
       "released": false,
       "sale": {
-        "note": "The realm's starting settings: its owner changes them between waves, never during one, and never lowers a price. GNOT.",
-        "prices": { "common": 30, "rare": 99, "epic": 333 },
-        "auction": { "reserve": 777, "hours": 48, "extendMinutes": 10, "minIncrementPercent": 5, "minIncrementGnot": 5, "endsUtc": "18:00" },
+        "note": "The realm's starting settings, in GNOT, golf numbers (ADR-008): its owner sets prices between waves, never during one, and never lower on what is on sale.",
+        "prices": { "common": 36, "rare": 72, "epic": 336 },
+        "auction": { "reserve": 1296, "hours": 48, "extendMinutes": 10, "minIncrementPercent": 5, "minIncrementGnot": 5, "endsUtc": "18:00" },
         "playerWindowHours": 48,
         "playerWindowCaps": { "common": 3, "rare": 2, "epic": 1 },
         "lifetimeCaps": { "common": 10, "rare": 5, "epic": 2 },
