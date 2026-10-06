@@ -2,93 +2,80 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pick your gnome · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
-<!-- The game's picker (Golf.tsx Picker), its dots grown into a shelf: the
-     player's own gnomes, the earned ones, everyone's, and one way to the gallery.
-     states: ?state=mine (default: two gnomes of the player's, one worn by the ghost) | nowallet (no wallet: earned and everyone's only) | locked (an earned gnome not earned yet, on show) | many (twelve of the player's own: first, set apart, the rest a tap away) -->
+<!-- The game's picker (Golf.tsx Picker) exactly as today: the Solo tag, the eyebrow, the name, the tile
+     with its dots, the aim card, Choose this gnome. One thing is added, for a player who owns gnomes:
+     the "Yours" row between the tile and the aim card, its faces scrolling sideways inside it, and on
+     its label line who sees what. Wearing is free: you play any of yours at once, in this browser;
+     everyone else sees your best one, or the one you chose to show them (optional, a small fee).
+     states: ?state=mine (default: playing Tansy, everyone sees the Windmill King) | shown (everyone sees Tansy)
+     | free (playing The Classic, a free gnome) | many (31 of yours: the row scrolls) | none (no gnome of yours: today's picker) -->
 <style>
-  .pick { display: grid; justify-items: center; text-align: center; gap: 4px; }
-  .pick__name { margin: 4px 0 0; font-size: clamp(44px, 6vw, 76px); line-height: 1.05; --ink-w: 7px; --ink-drop: 5px; }
-  .pick__sub { display: flex; gap: 8px; align-items: center; justify-content: center; min-height: 28px; font-size: 14px; font-weight: 700; }
-  .pick__stage { display: flex; align-items: center; gap: clamp(8px, 4vw, 60px); margin: 12px 0 8px; }
-  .pick__tile { width: min(290px, 62vw); border-radius: var(--r-panel); box-shadow: var(--deep-card); }
-  .pick__lock { position: absolute; left: 0; right: 0; bottom: 26%; z-index: 3; margin: 0; padding: 6px 10px; font-size: 15px !important; background: var(--ink); color: var(--paper); font-size: 14px; font-weight: 700; }
+  /* today's picker, as globals.css and title.css draw it */
+  .pick { display: grid; justify-items: center; text-align: center; }
+  .modetag { position: fixed; top: 34px; left: 96px; z-index: 4; padding: 2px 16px 6px; border: var(--edge-bold); border-radius: var(--pill); background: var(--c2); font-size: 30px; font-weight: 700; line-height: 1.2; --ink-drop: 0; box-shadow: var(--shadow-btn); transform: rotate(-3deg); }
+  .pick__name { margin: 4px 0 0; font-size: clamp(36px, min(4.2vw, 6.5vh), 56px); line-height: 1.05; --ink-w: 7px; --ink-drop: 5px; }
+  .pick__stage { display: flex; align-items: center; gap: clamp(8px, 5vw, 70px); margin: clamp(12px, 2.5vh, 32px) 0 6px; }
+  .pick__tile { position: relative; width: min(360px, 62vw); aspect-ratio: 360 / 410; border: var(--edge-bold); border-radius: var(--r-panel); background: var(--panel-dots), var(--stage); box-shadow: var(--deep-card); overflow: hidden; }
+  .pick__tile img { width: 100%; height: 88%; object-fit: contain; }
+  .pick__dots { position: absolute; left: 0; right: 0; bottom: 16px; display: flex; justify-content: center; gap: 8px; }
+  .pick__dots span { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--green); }
+  .pick__dots span[aria-current="true"] { background: var(--gold); border-color: var(--ink); }
+  .aim { display: grid; gap: 6px; justify-items: center; width: min(360px, 100%); margin: 16px 0 0; padding: 10px 16px 12px; border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
+  .aim__row { display: flex; align-items: center; gap: 12px; }
+  .aim .seg button { min-height: 34px; padding: 4px 12px; font-size: 13px; }
+  .aim p { margin: 0; font-size: 13px; line-height: 1.4; }
+  .pick .btn--cta { margin-top: 26px; }
 
-  /* the shelf: the dots' place, a row of faces in groups; the one on show ringed gold */
-  .shelf { display: flex; gap: 14px; align-items: end; max-width: min(1100px, 100%); overflow-x: auto; padding: 18px 8px 10px; scroll-snap-type: x proximity; }
-  .shelf__group { display: grid; gap: 6px; justify-items: start; flex: none; }
-  .shelf__group > span { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); padding-left: 4px; }
-  .shelf__row { display: flex; gap: 8px; padding: 6px; border-radius: 22px; background: rgba(var(--ink-rgb), .06); }
-  /* the player's own, set apart: a gold well, first on the shelf */
-  .shelf__group--yours .shelf__row { background: rgba(242, 193, 78, .35); box-shadow: inset 0 0 0 2px var(--gold); }
-  .shelf__group > span a { margin-left: var(--sp-2); color: var(--ink); letter-spacing: 0; text-transform: none; font-size: 13px; }
-  .face { position: relative; width: 62px; height: 62px; padding: 0; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--stage); cursor: pointer; flex: none; scroll-snap-align: center; box-shadow: 0 3px 0 var(--ink); }
-  .face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; transform: scale(1.75) translateY(-6%); }
-  .face[aria-current="true"] { box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--ink), 0 3px 0 5px var(--ink); }
-  .face--locked img { filter: grayscale(1) opacity(.55); }
-  .face--locked::after { content: "🔒"; position: absolute; inset: auto 0 2px; font-size: 13px; }
-  /* the tier, a mark on the rim: the shape that reads in grey */
-  .face__tier { position: absolute; top: -2px; right: -2px; z-index: 1; width: 22px; height: 22px; border: 2px solid var(--ink); border-radius: 50%; display: grid; place-items: center; }
-  .face__tier svg { width: 12px; height: 12px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
-  .face--more { display: grid; place-items: center; background: var(--paper); border-style: dashed; font-size: 26px; font-weight: 700; color: var(--ink-soft); box-shadow: none; }
-  .shelf__more { display: grid; justify-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: var(--ink); text-decoration: none; flex: none; }
-
-  .wear { display: inline-flex; align-items: center; gap: 10px; margin: 4px 0 6px; padding: 6px 8px 6px 14px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-size: 14px; font-weight: 600; }
-  .aim { display: flex; gap: 10px; align-items: center; padding: 6px 8px 6px 16px; margin: 4px 0 18px; border-radius: var(--pill); }
-  .aim p { margin: 0; font-size: 13px; }
-  @media (max-width: 600px) {
-    .pick__name { font-size: 40px; --ink-w: 6px; }
-    .pick__stage .round { display: none; }
-    .shelf { width: calc(100vw - 32px); justify-content: start; }
-    .face { width: 54px; height: 54px; }
-    .wear { flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 18px; font-size: 13px; }
-  }
+  /* NEW, the one addition: the player's gnomes, one compact row the aim card's width; its faces scroll sideways inside it */
+  .yours { display: grid; gap: 6px; width: min(360px, 100%); margin: 14px 0 0; }
+  .yours__line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); text-align: left; }
+  .yours__line b { font-weight: 800; }
+  .yours__line .linkish { padding: 0; min-height: 0; font-size: 13px; color: var(--ink); text-align: left; }
+  .yours__row { display: flex; gap: 8px; padding: 6px; border-radius: 20px; background: rgba(242, 193, 78, .35); box-shadow: inset 0 0 0 2px var(--gold); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
+  .face { position: relative; flex: none; width: 46px; height: 46px; padding: 0; border: var(--edge); border-radius: 50%; overflow: hidden; background: var(--stage); cursor: pointer; scroll-snap-align: start; box-shadow: 0 2px 0 var(--ink); }
+  .face img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.75) translateY(-6%); }
+  .face[aria-current="true"] { box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--ink); }
+  .face__tier { position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; border: 1.5px solid var(--ink); border-radius: 50%; }
+  .face--all { display: grid; place-items: center; border-style: dashed; background: var(--paper); font-size: 12px; font-weight: 800; color: var(--ink); box-shadow: none; text-decoration: none; }
+  @media (max-width: 600px) { .modetag { top: 30px; left: 88px; font-size: 22px; padding: 1px 12px 4px; --ink-w: 4px; } .pick__stage .round { display: none; } .yours__line, .yours__line .linkish, .aim p { font-size: 15px; } }
 </style>
 </head>
 <body>
 <main class="front tint--island" id="app"></main>
 <script src="kit.js"></script>
 <script>
-  const { ICON, TIER_ICON, state, corners, netbanner } = Kit;
+  const { ICON, state, corners, netbanner } = Kit;
   const s = state("mine");
-  const yours = s === "nowallet" ? [] : s === "many"
-    ? [["The Windmill King", "img/g12.png", "legendary"], ["Tansy", "img/g02.png", "epic"], ["Garnet", "img/g13.png", "epic"], ["Coral", "img/g09.png", "rare"], ["Kelp", "img/g08.png", "rare"], ["Basil", "img/g10.png", "common"]]
-    : [["Tansy", "img/g02.png", "epic"], ["Basil", "img/g10.png", "common"]];
-  const owned = s === "many" ? 12 : yours.length;
-  const earned = [["The Wizard", "img/g05.png"], ["The Viking", "img/g06.png"], ["The Pirate", "img/g08.png"], ["The Diver", "img/g09.png", 1], ["The Baker", "img/g10.png", 1], ["The Miner", "img/g13.png", 1]];
-  const free = [["The Classic", "img/g00.png"], ["The Sage", "img/g01.png"], ["The Ginger", "img/g02.png"], ["The Moustache", "img/g03.png"], ["The Gardener", "img/g04.png"]];
-  const on = s === "locked" ? "The Diver" : s === "nowallet" ? "The Pirate" : "Tansy";
+  // the player's own: the best first (Legendary, Epic, Rare, Common, then the lowest number)
+  const MINE = [["The Windmill King", "img/g12.png", "legendary"], ["Tansy", "img/g02.png", "epic"], ["Garnet", "img/g13.png", "epic"], ["Coral", "img/g09.png", "rare"], ["Kelp", "img/g08.png", "rare"], ["Basil", "img/g10.png", "common"]];
   const tierBg = { legendary: "var(--tier-legendary)", epic: "var(--tier-epic)", rare: "var(--tier-rare)", common: "var(--tier-common)" };
-  const face = ([name, img, locked], tier) => `<button class="face${locked ? " face--locked" : ""}" aria-label="${name}${tier ? `, yours, ${tier}` : locked ? ", not earned yet" : ""}" aria-current="${name === on}">${tier ? `<span class="face__tier" style="background:${tierBg[tier]}">${TIER_ICON[tier]}</span>` : ""}<img src="${img}" alt=""></button>`;
-  const shown = { Tansy: ["Tansy of the Island", "img/g02.png"], "The Pirate": ["The Pirate", "img/g08.png"], "The Diver": ["The Diver", "img/g09.png"] }[on];
-
-  const sub = s === "mine" || s === "many"
-    ? `<span class="pick__sub"><span class="tier tier--epic">${TIER_ICON.epic}Epic</span><span>Yours</span></span>
-       <span class="wear"><span>Your ghost wears <b>The Pirate</b></span><a class="btn btn--ghost btn--s" href="share.html?state=equipped">Wear Tansy instead</a></span>`
-    : s === "locked" ? `<span class="pick__sub">Earned, not bought</span>`
-    : `<span class="pick__sub">Earned on the Island Cup</span>`;
+  const playing = s === "free" ? ["The Classic", "img/g00.png"] : ["Tansy", "img/g02.png"];
+  const seen = s === "shown" ? "Tansy" : "The Windmill King";
+  const own = MINE.some(([n]) => n === playing[0]);
+  // who sees what, one line: "Everyone sees X" and, when you play one of yours they don't see, the optional show
+  const line = `<div class="yours__line"><span>Everyone sees <b>${seen}</b></span>${own && playing[0] !== seen ? `<button class="linkish" title="Optional: rivals see him on your ghost and the boards">Show ${playing[0]} instead · ≈ 0.01 GNOT</button>` : ""}</div>`;
+  const row = s === "none" ? "" : `<section class="yours" aria-label="Your gnomes">${line}<div class="yours__row">
+      ${MINE.map(([n, img, t]) => `<button class="face" aria-label="${n}, ${t}${n === seen ? ", everyone sees him" : ""}" aria-current="${n === playing[0]}"><img src="${img}" alt=""><i class="face__tier" style="background:${tierBg[t]}"></i></button>`).join("")}
+      ${s === "many" ? `<a class="face face--all" href="collection.html" aria-label="All 31 of yours">+25</a>` : ""}</div></section>`;
 
   document.getElementById("app").innerHTML = `
     ${corners("Back to the cups")}
+    <span class="modetag inked">Solo</span>
     <div class="pick">
       <span class="eyebrow--pill">Hole 1 · Sandy Start<span class="wide-only"> · pick your gnome</span></span>
-      <h1 class="pick__name inked">${shown[0]}</h1>
-      ${sub}
+      <h1 class="pick__name inked">${playing[0]}</h1>
       <div class="pick__stage">
         <button class="round round--big" aria-label="Previous gnome">${ICON.back}</button>
-        <span class="gtile ${s === "mine" || s === "many" ? "gtile--epic" : ""} pick__tile" style="position:relative"><img src="${shown[1]}" alt="" style="${s === "locked" ? "filter:grayscale(.8) opacity(.7)" : ""}">${s === "locked" ? '<p class="pick__lock">🔒 The Island Cup at par or under</p>' : ""}</span>
+        <div class="pick__tile"><img src="${playing[1]}" alt=""><div class="pick__dots" aria-hidden="true">${Array.from({ length: 14 }, (_, i) => `<span aria-current="${s === "free" ? i === 0 : false}"></span>`).join("")}</div></div>
         <button class="round round--big" aria-label="Next gnome">${ICON.next}</button>
       </div>
-      <nav class="shelf" aria-label="Your gnomes">
-        ${yours.length ? `<div class="shelf__group shelf__group--yours"><span>Yours · ${owned}${owned > yours.length ? `<a href="collection.html">See all →</a>` : ""}</span><div class="shelf__row">${yours.map(([n, img, tier]) => face([n, img], tier)).join("")}</div></div>` : ""}
-        <div class="shelf__group"><span>Earned</span><div class="shelf__row">${earned.map((g) => face(g)).join("")}</div></div>
-        <div class="shelf__group"><span>Everyone's</span><div class="shelf__row">${free.map((g) => face(g)).join("")}</div></div>
-        <a class="shelf__more" href="gnomes-gallery.html"><span class="face face--more" aria-hidden="true">+</span>More gnomes</a>
-      </nav>
-      <div class="aim panel"><span class="eyebrow">Aim</span><div class="seg seg--s"><button class="on">Pro</button><button>Assisted</button></div><button class="linkish" aria-label="About the aim">ⓘ</button></div>
-      <button class="btn btn--gold btn--cta">${s === "locked" ? "Play as The Pirate" : "Choose this gnome"}</button>
+      ${row}
+      <div class="aim"><div class="aim__row"><span class="eyebrow">Aim</span><div class="seg seg--s"><button class="on">Pro</button><button>Assisted</button></div></div>
+        <p>No aim line: you read the course yourself. Ranked on its own board. ⓘ</p></div>
+      <button class="btn btn--gold btn--cta">Choose this gnome</button>
     </div>
     ${netbanner()}`;
 </script>

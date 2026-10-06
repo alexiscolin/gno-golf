@@ -64,7 +64,8 @@ the game's code or a rule this review added; every screen keeps all of them.
    price in the buy panel, the closing date in the gallery's head and in the
    trust strip under a buy button, never both on one screen.
 4. **What signs is blue.** `--chain` (`.btn--save`'s Adena blue) is the one
-   action that puts something on the chain: buy, bid, wear (equip), publish.
+   action that puts something on the chain: buy, bid, show a gnome to
+   everyone (equip, optional), publish. Playing a gnome yourself is free.
    Gold stays the game's call to action (Play, Race, Choose this gnome,
    Share my team).
 5. **What only shows is flat** (`--info-edge`, no drop); **what presses has
@@ -185,7 +186,6 @@ Title ─ Modes ─┬─ Solo ─ Cups ─┬─ Picker (shelf: yours · earned
 | The picker's shelf | "Yours · 12 · See all →" (My gnomes), "+ More gnomes" (the gallery) |
 | A rival's ghost, its tag | the rival's gnome's page, in a sheet, between shots |
 | A board row, a friend, a ghost's tag | their gnomes (read-only) |
-| The finish card, after a personal best only | "Try another gnome on it" on the share card |
 | Modes | the Builder panel loses "Coming soon" |
 
 The title screen does not change.
@@ -294,7 +294,7 @@ Tansy", the trust strip. States change only the button or add one note:
 | no wallet | + "With Adena, or a gnokey command: the next step has both." |
 | players' window | button off: "Players first until Thu 18:00 UTC"; note "Save one round on-chain to buy now. Play a hole →" |
 | window cap | button off: "3 of 3 Commons this wave"; note "Your share until Thu 18:00 UTC. Then open to everyone." |
-| yours | "Yours since 4 Oct"; gold "Play with him"; "Your ghost wears him. Show him off" |
+| yours | "Yours since 4 Oct"; gold "Play with him"; "Everyone sees him: he is your best. Show him off" |
 | taken | "Plays with **nym-gnorman**"; gold "Race nym-gnorman's ghost" |
 | later wave | "from Wave 2 · Island"; "♡ Keep him on my list"; "A wave not open by Sun 14 Dec, 18:00 UTC never opens." |
 | never made | the tile faded and dashed; "**Never made.** The sale closed before he found a player."; "See the gnomes that were made" |
@@ -308,8 +308,8 @@ adults."), gnokey behind a tap, and the pinned blue "Buy in Adena · 333.33
 GNOT". States: the wallet path's.
 
 **Success** is a moment: the tile pops in, "Tansy's yours!", gold "Play with
-him" and "Show your gnome" (the share moment, A8). Wearing him on the
-ghost is the picker's (A5), not another button here.
+him" and "Show your gnome" (the share moment, A9). Choosing whom others
+see is the picker's and My gnomes' (A5), not another button here.
 
 **Taken in the same block**: "Someone took Tansy a moment before you.
 **Nothing was sent.**" · Pick another.
@@ -325,7 +325,7 @@ who, the end as a date on the right ("Sat 18:00 UTC / Ends Sat 11 Oct"),
 the bid field and the blue "Bid 1,302 GNOT" on one row, one line "At least
 1,302. Outbid? Your GNOT comes straight back."; "The bids · 3" and "How the
 auction works" (48 h, the increment, the 10-minute rule, the reserve, the
-contract) behind taps. Under the panel: "Share the auction →" (A8).
+contract) behind taps. Under the panel: "Share the auction →" (A9).
 
 | State | Only what changes |
 |---|---|
@@ -340,52 +340,85 @@ contract) behind taps. Under the panel: "Share the auction →" (A8).
 `Auction` is polled every 30 s while the page is visible, and at once on
 focus; a new top bid fades in.
 
-### A5. The picker's shelf
+### A5. Wearing is free
 
-`gnome-locker.html`: mine, many, nowallet, locked; phone.
+The owner's decision, one rule everywhere (the picker, My gnomes, the ghost,
+the boards, the clip):
 
-The game's picker keeps its stage, arrows, aim row and "Choose this gnome".
-Its dots become a shelf of faces in three groups: **Yours** first, set apart
-in a gold well, each face with its tier mark ("Yours · 12 · See all →" when
-there are more than the shelf shows: Legendary first, then by tier); then
-**Earned** (locked ones grey); then **Everyone's**; then "+ More gnomes".
-Under an owned gnome's name: one pill, "Your ghost wears **The Pirate** ·
-Wear Tansy instead" (Equip, alone), followed by the share moment "Your
-rivals will see him". On a phone the shelf scrolls sideways.
+- **Everyone sees your best gnome by default**: Legendary, then Epic, Rare,
+  Common, then the lowest number, computed by every client from the chain,
+  no transaction.
+- **You play any gnome of yours, free and at once**: kept in this browser
+  (`prefs.savedGnome`), for your ball and your clip, nobody else's view.
+- **Showing another one to everyone is optional**: "Show Tansy instead ·
+  ≈ 0.01 GNOT" (`Equip`, alone, the blue of a signature in its sheet), only
+  when the one you play is not the one everyone sees. Then "Your rivals will
+  see him" (A9).
+- One line says who sees what, never two states to puzzle over: "Everyone
+  sees **The Miller** · You play **Tansy**".
+- The realm gives it in one cheap read, `Worn(addr)`: the equipped gnome if
+  still owned, else the best owned, else none (the free look the player
+  chose locally); `WornMany(addrs)` for a board page.
 
-### A6. My gnomes, their gnomes
+### A6. The picker
 
-`collection.html`: many (31, paged by 12), few, one, empty, theirs; phone.
+`gnome-locker.html`: mine, shown, free, many, none; phone.
+
+The game's picker **exactly as today**: the Solo tag, the eyebrow, the name,
+the tile with its dots, the arrows, the aim card with its sentence and ⓘ,
+"Choose this gnome". Nothing of it is removed or resized. One thing is
+added, only for a player who owns gnomes: the **Yours** row, the aim card's
+width, between the tile and the aim card:
+
+- its line: "Everyone sees **The Miller**" and, when you play one of yours
+  that others don't see, "Show Tansy instead · ≈ 0.01 GNOT";
+- its faces (40 px, the best first, a tier dot each), the one you play
+  ringed gold; a tap plays him (free, at once) and puts him on the stage;
+- with more than the row holds, its last face "+25" opens My gnomes.
+
+Scrolling: the faces scroll sideways inside the row only. The screen keeps
+today's behaviour: it fits a tall window and scrolls as a whole on a short
+one (`.screen`'s `place-items: safe center`), so "Choose this gnome" is
+always reachable. A player with no gnome of theirs sees today's picker,
+unchanged.
+
+### A7. My gnomes, their gnomes
+
+`collection.html`: many (31, paged by 12), shown, few, one, empty, theirs;
+phone.
 
 - **Head**: the pill "My gnomes", "Your team of 31", the tier counts as
-  chips, the one action: gold "Share my team" (A8).
-- **The shelf**: large cards, Legendary first, then Epic, Rare, Common, then
-  by number. Each: the tile on its tier's stage (the Legendary on his
-  sunburst), for a Rare or better a "Trail" / "His holing" chip on the tile
-  that plays it in place; the name, the tier chip; one action: blue "Wear
-  him", or for the worn one a gold "On your ball" sticker and "Your ghost
-  wears him".
-- **Many**: "Show 12 more · 12 of 31", the next page read from
-  `GnomesOf(addr, from)`; two columns on a phone, nothing wider than the
-  screen.
-- **One**: his tile large beside his name and one line; "Share him".
-- **Empty**: "None yet. You play with the free five and the gnomes you
-  earn on the course." · "See the gallery" (a ghost button: an invitation,
-  not a push).
-- **Theirs** (from a board row, a friend, a ghost's tag): the pill "Their
-  gnomes", "nym-itsok123's team", the same shelf with no Wear and no prices,
-  "Worn" on theirs, each `#id` to its page; the one action: "Race their
-  ghost".
+  chips, the who-sees-what line ("Everyone sees **The Miller** · You play
+  **Tansy** · Show Tansy to everyone · ≈ 0.01 GNOT"), the one action: gold
+  "Share my team" (A9).
+- **The shelf**: large cards, the best first. Each: the tile on its tier's
+  stage (a Legendary on his sunburst), a "Trail" / "His holing" chip on a
+  Rare or better that plays it in place; the name, the tier chip; one
+  action: "Play him" (free), or "Playing" on the one you play. Stickers:
+  "You play" (ink) and "Everyone sees" (gold).
+- **Many**: "Show 12 more · 12 of 31"; two columns on a phone.
+- **One**: his tile large beside his name, "Your best, so everyone sees him",
+  "Share him".
+- **Empty**: "None yet. You play with the free five and the gnomes you earn
+  on the course." · "See the gallery".
+- **Theirs** (a board row, a friend, a ghost's tag): "Their gnomes", the same
+  shelf read-only, "They show" on the one they show, each `#id` to its page;
+  the one action: "Race their ghost".
 
-### A7. Where the collection shows in play
+### A8. Where the collection shows in play
 
-`gnome-places.html`: the cups' link; a rival's ghost wearing their gnome
-(meshes only), its tag a tap away between shots; the finish card's "Try
-another gnome on it" after a personal best only; the boards, where a face
-is the player's gnome, a Legendary adds his name in gold, and a row opens
-their gnomes.
+`gnome-places.html`: the game's own screens, captured from the running
+game, untouched, each with its one addition ringed: the cups' links row
+gains "Gnomes →"; a rival's ghost wears the gnome its player shows, with a
+small tag a tap away between shots; on the boards, a Legendary's player
+gains a small gold pill after their name and a row opens their gnomes.
 
-### A8. Share moments and share cards
+**Rule: never remove or resize the game's UI.** The finish card, its clip
+(it simply wears the gnome you play), its share and save rows, the HUD's
+cards, the title, the menu stay exactly as they are. The collection is added
+as one extra line or one compact section where it is needed, never more.
+
+### A9. Share moments and share cards
 
 At no server cost: the cards are drawn by the page or prebuilt at build
 time; the share uses the system share sheet on a phone, copy, X and Bluesky
@@ -400,7 +433,7 @@ sheet takes the picture, the words and the link), copy beside it.
 | Moment | From | Card | Words |
 |---|---|---|---|
 | Show your gnome | after a buy | the gnome's | "I just adopted Tansy, gnome #94 of Gnogolf. He rolls for me now" |
-| Your rivals will see him | after Wear | the gnome's | "My gnome for the boards: Tansy of the Garden. Race his ghost" |
+| Your rivals will see him | after "Show … to everyone" | the gnome's | "My gnome for the boards: Tansy of the Garden. Race his ghost" |
 | Share the auction | a Legendary's page, bidding | the auction's | "I'm bidding on the Windmill King, one of seven. Ends Sat 18:00 UTC" |
 | Show him off | an auction won | the auction's | "The Windmill King is mine: one of seven Legendary gnomes of Gnogolf" |
 | Share my team | My gnomes | the team's, made in the browser | "My Gnogolf team: 31 gnomes, the Windmill King up front. Race their ghosts" |
@@ -428,7 +461,7 @@ the share sheet. The reveal is honest: a Legendary's art ships with the
 site only on his day (the daily build adds it), so no one finds him early in
 the bundle.
 
-### A9. The sale's life
+### A10. The sale's life
 
 | Phase | Gallery's "now" row | A gnome's page |
 |---|---|---|
@@ -573,7 +606,7 @@ window Adena opened, and sign there."
 
 **Done**: "Mole Run is on gno.land!", the hole's share card, "Play it for
 real: your best becomes the ghost your friends race.", gold "Play it for
-real" and "Share the dare" (A8; the dare carries the author's ghost once
+real" and "Share the dare" (A9; the dare carries the author's ghost once
 their best is saved).
 
 ### B5. Your holes, the community's
@@ -645,7 +678,7 @@ players, holedByAuthor}`) and `MineJSON(addr)`.
 |---|---|---|
 | `web/components/Gnomes.tsx` (new) | `Gallery`, `GnomePage`, `BuySheet`, `Auction`, `Team` (mine and theirs), `GnomeCard`, `TierChip`, `TrustStrip`, `Closes`, `Bill` | `FrontScreen`, `Button`, `Segmented`, `Sheet`, `Share`, `GnokeyTx` |
 | `web/components/ShareMoment.tsx` (new) | the share sheet and the in-page cards (team, hole, moments) | `Share`, the `snapshot` path |
-| `web/components/Golf.tsx` | the picker's shelf, the wear pill, the ghost's tag, the finish card's try-on | |
+| `web/components/Golf.tsx` | the picker's Yours row and who-sees-what line, the ghost's tag (the finish card unchanged) | |
 | `web/components/Worlds.tsx`, `Leaderboard.tsx`, `Modes.tsx`, `About.tsx` | the cups' link; faces, the Legendary pill, a row's "their gnomes"; the Builder panel; "How the gnomes work" | |
 | `web/components/builder/*` | the hole-builder spec's files, plus `Header.tsx` (the three steps and the mode's action), `Checks.tsx` (the docked verdict, gauges and issues with their fixes), the board's placement ghost, `Holes.tsx`, `PhoneBuilder.tsx` | `Segmented`, `Sheet`, the engine and HUD for the test |
 | `web/app/globals.css`, `title.css` | tiers, `.gcard`, `.closes`, `.trust`, `.bill`, `.more`, `.sheet__foot`, the spacing scale, `--ink-soft`, `.tint--shop`, `.tint--legend` | |
@@ -742,11 +775,11 @@ headless Chrome (`media/lib/cdp.mjs`), no new dependency.
 | A2 a gnome's page | `gnome-detail.html` | open, nowallet, locked, cap, mine, taken, later, nevermade · phone |
 | A3 buying | `gnome-buy.html` | confirm, connect, nowallet, elsewhere, network, short, pending, reading, success, taken, cancelled, unsure · phone |
 | A4 the auction | `gnome-auction.html` | live, outbid, leading, extended, ended, won, nobid, upcoming · phone |
-| A5 the picker's shelf | `gnome-locker.html` | mine, many, nowallet, locked · phone |
-| A6 my gnomes, theirs | `collection.html` | many, few, one, empty, theirs · phone |
-| A7 where it shows | `gnome-places.html` | one |
-| A8 share moments | `share.html` | bought, equipped, bidding, won, team, published, clip · phone |
-| A8 share cards | `share-card.html` | gnome, square, auction, reveal, team, hole |
+| A6 the picker | `gnome-locker.html` | mine, shown, free, many, none · phone |
+| A7 my gnomes, theirs | `collection.html` | many, shown, few, one, empty, theirs · phone |
+| A8 where it shows | `gnome-places.html` | the game's screens, one addition each |
+| A9 share moments | `share.html` | bought, equipped, bidding, won, team, published, clip · phone |
+| A9 share cards | `share-card.html` | gnome, square, auction, reveal, team, hole |
 | B2 the editor (B1 its header) | `builder-editor.html` | select, empty, place, invalid, issues, timed, proved, world · 1280, 1024 |
 | B3 test | `builder-test.html` | playing, proved, missed · 1024 |
 | B4 publish | `builder-publish.html` | form, refused, newer, closed, pending, done · 1024 |

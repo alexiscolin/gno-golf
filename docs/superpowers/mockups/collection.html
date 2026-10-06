@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>My gnomes · Gnogolf mockup</title>
 <link rel="stylesheet" href="kit.css">
-<!-- A player's gnomes, shown off: each one large, the Legendary on his sunburst, the worn one marked,
-     one tap to wear, one tap to share the team. Someone else's: the same shelf, read-only.
-     states: ?state=many (default: 31, paged by 12) | few (3) | one | empty | theirs (another player's, from a board row, a friend, a ghost) -->
+<!-- A player's gnomes, shown off: each one large, the Legendary on his sunburst. Wearing is free: you play
+     any of yours at once (this browser); everyone else sees your best, or the one you chose to show them
+     (optional, a small fee). One line says who sees what. Someone else's: the same shelf, read-only.
+     states: ?state=many (default: 31, paged by 12; you play Tansy, everyone sees the Windmill King) | shown (everyone sees Tansy)
+     | few (3) | one | empty | theirs (another player's, from a board row, a friend, a ghost) -->
 <style>
   .col { width: min(1120px, 100%); margin: 0 auto; display: grid; gap: var(--sp-5); }
   .col__sum { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); margin-top: var(--sp-3); }
@@ -23,8 +25,14 @@
   .item__name b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item__foot { display: flex; align-items: center; min-height: 40px; gap: var(--sp-2); margin: 0 var(--sp-1); }
   .item__foot .btn { min-height: 40px; }
-  .worn { position: absolute; top: -12px; right: -8px; z-index: 3; padding: 2px 12px; border: var(--edge); border-radius: var(--pill); background: var(--gold); font-size: 13px; font-weight: 800; transform: rotate(4deg); }
+  /* who sees what: "You play" (ink) on the one you play, "Everyone sees" (gold) on the one the others see */
+  .worn { position: absolute; top: -12px; right: -8px; z-index: 3; display: grid; justify-items: end; gap: 4px; transform: rotate(4deg); }
+  .worn span { padding: 2px 12px; border: var(--edge); border-radius: var(--pill); background: var(--gold); font-size: 13px; font-weight: 800; white-space: nowrap; }
+  .worn span.me { background: var(--ink); color: var(--paper); }
   .item--worn { box-shadow: 0 0 0 3px var(--gold), 0 4px 0 3px var(--ink); }
+  .who { margin: var(--sp-3) 0 0; font-size: 16px; font-weight: 600; }
+  .who b { font-weight: 800; }
+  .who .linkish { font-size: 15px; margin-left: var(--sp-2); }
   /* a Rare or better: its trail and holing a tap away, on the tile's corner */
   .fx { position: absolute; left: var(--sp-3); bottom: var(--sp-3); z-index: 3; display: inline-flex; align-items: center; gap: var(--sp-1); height: 32px; padding: 0 var(--sp-3); border: var(--edge); border-radius: var(--pill); background: rgba(var(--paper-rgb), .95); font-size: 13px; font-weight: 800; }
   .fx svg { width: 14px; height: 14px; }
@@ -60,15 +68,16 @@
   const ALL = [["The Windmill King", 715, "legendary", "img/g12.png", "garden"], ["Tansy", 94, "epic", "img/g02.png", "garden"], ["Garnet", 640, "epic", "img/g13.png", "mines"], ["Coral", 175, "rare", "img/g09.png", "island"], ["Kelp", 181, "rare", "img/g08.png", "island"], ["Flint", 377, "rare", "img/g06.png", "mountain"],
     ["Basil", 2, "common", "img/g10.png", "garden"], ["Moss", 4, "common", "img/g03.png", "garden"], ["Pip", 20, "common", "img/g07.png", "garden"], ["Crumpet", 210, "common", "img/g11.png", "town"], ["Barley", 214, "common", "img/g05.png", "town"], ["Quartz", 611, "common", "img/g04.png", "mines"]];
   const list = s === "few" ? [ALL[1], ALL[3], ALL[6]] : ALL;
-  const worn = theirs ? 715 : 94;
-  const count = { many: 31, few: 3, one: 1, empty: 0, theirs: 12 }[s];
+  // you play (free, this browser) and everyone sees (the chain's Worn: shown if still yours, else your best)
+  const play = theirs ? 0 : 94, seen = s === "shown" ? 94 : 715;
+  const count = { many: 31, shown: 31, few: 3, one: 1, empty: 0, theirs: 12 }[s];
 
-  const item = ([n, id, tier, img, world]) => `<article class="item${id === worn ? " item--worn" : ""}" aria-label="${n}, ${tier}${id === worn ? ", worn" : ""}">
-      ${id === worn ? `<span class="worn">${theirs ? "Worn" : "On your ball"}</span>` : ""}
+  const item = ([n, id, tier, img, world]) => `<article class="item${id === play ? " item--worn" : ""}" aria-label="${n}, ${tier}${id === play ? ", you play him" : ""}${id === seen ? `, ${theirs ? "they show him" : "everyone sees him"}` : ""}">
+      ${id === play || id === seen ? `<span class="worn">${id === play ? `<span class="me">You play</span>` : ""}${id === seen ? `<span>${theirs ? "They show" : "Everyone sees"}</span>` : ""}</span>` : ""}
       <div class="item__tile"><span class="gtile gtile--${tier} tint--${world}"><img src="${img}" alt="" loading="lazy"></span>
         ${tier !== "common" ? `<button class="fx" aria-label="See ${n}'s ${tier === "legendary" ? "entrance and holing" : "trail and holing"}">${ICON.play}${tier === "legendary" ? "His holing" : "Trail"}</button>` : ""}</div>
       <div class="item__name"><b>${n}</b>${tierChip(tier)}</div>
-      <div class="item__foot">${theirs ? `<a class="linkish" href="gnome-detail.html?state=taken">#${id}</a>` : id === worn ? `<span class="fine" style="margin:0">Your ghost wears him</span>` : `<button class="btn btn--chain btn--s">Wear him</button>`}</div>
+      <div class="item__foot">${theirs ? `<a class="linkish" href="gnome-detail.html?state=taken">#${id}</a>` : id === play ? `<span class="fine" style="margin:0">Playing</span>` : `<button class="btn btn--ghost btn--s">Play him</button>`}</div>
     </article>`;
   const sum = `<div class="col__sum" aria-label="By tier">${(theirs ? [["legendary", 1], ["epic", 2], ["rare", 3], ["common", 6]] : [["legendary", 1], ["epic", 2], ["rare", 6], ["common", 22]]).map(([t, n]) => tierChip(t).replace(/<\/span>$/, ` · ${n}</span>`)).join("")}</div>`;
 
@@ -76,10 +85,10 @@
     ? `<div class="blank"><p>None yet. You play with the free five and the gnomes you earn on the course.</p><a class="btn btn--ghost" href="gnomes-gallery.html">See the gallery</a></div>`
     : s === "one"
     ? `<div class="solo"><span class="gtile gtile--epic tint--garden"><img src="img/g02.png" alt=""></span>
-        <div>${tierChip("epic")}<h2 class="inked">Tansy</h2><p>On your ball, and on your ghost for every rival who races it.</p>
+        <div>${tierChip("epic")}<h2 class="inked">Tansy</h2><p>Your best, so everyone sees him: on your ball and on your ghost.</p>
         <button class="btn btn--gold btn--cta" style="margin:0">Share him</button></div></div>`
     : `<div class="shelf">${list.map(item).join("")}</div>
-       ${s === "many" ? `<div class="more-row"><button class="btn btn--ghost">Show 12 more</button><p class="fine">12 of ${count}</p></div>` : ""}`;
+       ${s === "many" || s === "shown" ? `<div class="more-row"><button class="btn btn--ghost">Show 12 more</button><p class="fine">12 of ${count}</p></div>` : ""}`;
 
   document.getElementById("app").innerHTML = `
     ${corners(theirs ? "Back to the boards" : "Back to the game")}
@@ -87,7 +96,8 @@
       <header class="front__head">
         <span class="eyebrow--pill">${theirs ? "Their gnomes" : "My gnomes"}</span>
         <h1 class="display inked">${theirs ? "nym-itsok123's team" : s === "empty" ? "Your team" : `Your team of ${count}`}</h1>
-        ${s === "many" || theirs ? sum : ""}
+        ${s === "many" || s === "shown" || theirs ? sum : ""}
+        ${theirs || s === "empty" || s === "one" ? "" : `<p class="who">Everyone sees <b>${seen === 94 ? "Tansy" : "The Windmill King"}</b> · You play <b>Tansy</b>${seen !== play ? `<button class="linkish">Show Tansy to everyone · ≈ 0.01 GNOT</button>` : ""}</p>`}
         ${s === "empty" || s === "one" ? "" : `<div class="col__act">${theirs ? `<button class="btn btn--gold btn--cta">Race their ghost</button>` : `<a class="btn btn--gold btn--cta" href="share.html?state=team">Share my team</a>`}</div>`}
       </header>
       ${body}

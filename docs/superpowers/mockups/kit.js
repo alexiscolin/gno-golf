@@ -70,8 +70,8 @@ const state = (def) => new URLSearchParams(location.search).get("state") || def;
 
 /** The corner's Back and About, the game's own. */
 const corners = (back = "Back", right = "") => `
-  <div class="corner corner--l"><button class="round round--big" aria-label="${back}">${ICON.back}</button></div>
-  <div class="corner corner--r">${right}<button class="round round--big" aria-label="About">${ICON.about}</button></div>`;
+  <div class="corner corner--l"><button class="round" aria-label="${back}">${ICON.back}</button></div>
+  <div class="corner corner--r">${right}<button class="round" aria-label="About">${ICON.about}</button></div>`;
 
 /** The testnet's banner, bottom left, as on every front screen (a phone's: "TEST" and the icon). */
 const netbanner = () => `
