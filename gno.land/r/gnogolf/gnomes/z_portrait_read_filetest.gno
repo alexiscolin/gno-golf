@@ -31,7 +31,7 @@ func main(cur realm) {
 	gnomes.SetMintOpen(cross(cur), true)
 
 	buyer := testutils.TestAddress("buyer")
-	price := chain.Coins{{"ugnot", 333_000_000}}
+	price := chain.Coins{{"ugnot", 336_000_000}}
 	testing.SetOriginCaller(buyer)
 	testing.SetOriginSend(price)
 	testing.IssueCoins(chain.PackageAddress("gno.land/r/gnogolf/gnomes"), price)

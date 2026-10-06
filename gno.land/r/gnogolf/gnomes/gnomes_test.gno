@@ -162,7 +162,7 @@ func TestTheGenesisIs720Gnomes(t *testing.T) {
 }
 
 func TestThePricesAtDeployAreTheDecidedOnes(t *testing.T) {
-	want := map[string]int64{"common": 30_000_000, "rare": 99_000_000, "epic": 333_000_000, "legendary": 777_000_000}
+	want := map[string]int64{"common": 36_000_000, "rare": 72_000_000, "epic": 336_000_000, "legendary": 1_296_000_000}
 	for _, tr := range tiers {
 		uassert.Equal(t, want[tr.name], tr.price, tr.name)
 		uassert.True(t, tr.price >= minPrice && tr.price <= maxPrice, tr.name+": within SetPrice's bounds")

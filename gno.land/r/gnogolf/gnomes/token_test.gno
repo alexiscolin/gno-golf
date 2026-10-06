@@ -70,7 +70,7 @@ func TestABurnIsTheHoldersAndForGood(cur realm, t *testing.T) {
 	uassert.True(t, isSold(id), "a sold id stays sold")
 	testing.SetRealm(asUser(bob, ugnot(priceOf(id))))
 	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), tid) })
-	uassert.True(t, strings.Contains(Gnome(tid), `"owner":"","price":30000000,"sold":true`))
+	uassert.True(t, strings.Contains(Gnome(tid), `"owner":"","price":36000000,"sold":true`))
 }
 
 func TestTheRoyaltyIsFivePercentToTheOwner(cur realm, t *testing.T) {

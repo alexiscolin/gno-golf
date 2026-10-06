@@ -16,13 +16,13 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	fresh(t, cur)
 	home := Render("")
 	has(t, home, "# Gnogolf Gnomes")
-	has(t, home, "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 / 777 GNOT | 0 of 720 |")
+	has(t, home, "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 36 / 72 / 336 / 1296 GNOT | 0 of 720 |")
 
 	g := Render("104")
 	has(t, g, "# Gnome 104")
 	has(t, g, "![Gnome 104](data:image/svg+xml;base64,")
 	has(t, g, "legendary")
-	has(t, g, "Price: 777 GNOT")
+	has(t, g, "Price: 1296 GNOT")
 	mintOpen = false
 	has(t, Render("104"), "Unsold") // paused: no line to buy
 	mintOpen = true
@@ -39,7 +39,7 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	has(t, p, "Equipped: [Gnome 1](/r/gnogolf/gnomes:1)")
 	has(t, p, "[#1](/r/gnogolf/gnomes:1)")
 	has(t, Render("1"), "Owner: "+alice.String())
-	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 / 777 GNOT | 1 of 720 |")
+	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 36 / 72 / 336 / 1296 GNOT | 1 of 720 |")
 }
 
 // A gnome on sale says its price and how to buy it, a Legendary as any.
@@ -49,8 +49,8 @@ func TestAGnomesPageSaysHowToBuyIt(cur realm, t *testing.T) {
 	SetCloseAt(cross(cur), now()+30*24*3600)
 	has(t, Render(""), "The genesis sale closes on "+dateOf(closeAt))
 	page := Render("104")
-	has(t, page, "Price: 777 GNOT")
-	has(t, page, "-func Buy -args 104 -send 777000000ugnot")
+	has(t, page, "Price: 1296 GNOT")
+	has(t, page, "-func Buy -args 104 -send 1296000000ugnot")
 	testing.SetRealm(asUser(alice, ugnot(priceOf(104))))
 	Buy(cross(cur), "104")
 	uassert.False(t, strings.Contains(Render("104"), "-func Buy"), "sold: no line")
