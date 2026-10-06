@@ -356,8 +356,10 @@ near, proved, world; at 1440, 1280 and 1024.
 
 ### B4. Test
 
-`builder-test.html`: playing, proved, missed. The game takes the window
-under the header; the weathers to beat as chips that tick when holed (☀
+`builder-test.html`: address, playing, proved, missed. First, once, the
+address the hole is proved under (its proofs are bound to it): with Adena,
+"Connect"; without, one field and "Test with this address". Then the game
+takes the window under the header; the weathers to beat as chips that tick when holed (☀
 Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –", then the suggested par;
 a round that does not count says why in one line. The big button: "Back to
 edit", then "Publish →". The next weather starts by itself.
@@ -394,9 +396,15 @@ it.
 | "Got it" | 1 | 0 |
 | A Bumper onto the board | 0 | 1 |
 | "Test it" | 1 | 0 |
+| The address the hole is proved under (one field typed and "Test with this address"; with Adena, "Connect" instead) | 1 | 0 |
 | Clear, wind, rain holed (about 2 shots each; the next weather starts by itself) | 0 | 6 |
 | "Publish →", the form ready (name suggested) | 1 | 0 |
-| **Starter path to a proved, publish-ready hole** | **3** | **7** |
+| **Starter path to a proved, publish-ready hole** | **4** | **7** |
+
+Measured on the implementation (`scripts/builderwalk.ts`): 16 s, 4 clicks,
+7 drags, 1 field typed. Past the path, the script also checks that the
+Publish card stays in sight at 1366 × 650 and that the Publish header's Test
+step returns to the test.
 
 ### B7. Your holes, the community's
 
