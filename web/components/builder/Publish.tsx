@@ -61,7 +61,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const [copied, copy] = useCopied();
   const live = useRef(true);
   const capture = useRef<(() => HTMLCanvasElement | null) | null>(null);
-  useEffect(() => () => void (live.current = false), []);
+  useEffect(() => ((live.current = true), () => void (live.current = false)), []); // (true again on a remount: dev's StrictMode mounts twice)
 
   // the name and note as the chain will keep them, and what the data will be with that name in it
   const first = host.check(draft.slug, finalHex(draft, host, draft.title) ?? "", draft.note);
