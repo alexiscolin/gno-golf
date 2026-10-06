@@ -3,8 +3,9 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   vsPar, parOf, cupOf, cardKey, scoreOf, legacyOf, oldToSlot, migrate, loadCard, recordScore, clearCard, clearCup, badgesFor, byRarity, loadOnChain, markOnChain, fromChain, syncedTo, markSynced,
-  totals, cupTotals, UNLOCKS, cupFinishLine, CUP_NAMES, CUPS, CLASSIC, guessCup,
+  totals, cupTotals, UNLOCKS, cupFinishLine, CUP_NAMES, CUPS, CLASSIC, guessCup, theName, backFromChain,
 } from "../lib/card.ts";
+import { GNOMES } from "../lib/scene/gnome.ts";
 import type { Finish, SkyKind } from "../lib/card.ts";
 import type { ChainBest } from "../lib/chain.ts";
 import { skyOf } from "../lib/sky.ts";
@@ -457,4 +458,18 @@ test("syncedTo / markSynced: an address's height, 0 for one never synced; one re
   assert.equal(syncedTo("g1old"), Number.MAX_SAFE_INTEGER);
   clearCard();
   assert.equal(syncedTo("g1abc"), 42, "a New game does not forget it: the chain does not fill back what was cleared");
+});
+
+test("theName: 'the' before a name, never twice (the game's gnomes are all 'The …')", () => {
+  assert.equal(theName("The Wizard"), "the Wizard");
+  assert.equal(theName("the Gnome King"), "the Gnome King");
+  assert.equal(theName("Juniper Troutbridge"), "the Juniper Troutbridge");
+  assert.equal(theName("Theodora"), "the Theodora", "a name that only begins with the letters");
+  for (const g of GNOMES) assert.doesNotMatch(`${theName(g.name)} gnome`, /\bthe the\b/i, g.id);
+});
+
+test("backFromChain: what a restore brought back, in one sentence, no gnome named twice 'the'", () => {
+  assert.equal(backFromChain({ holes: 1, badges: 4, gnomes: ["The Wizard", "The Viking"] }), "Back from the chain: 1 hole, 4 badges, the Wizard gnome and the Viking gnome.");
+  assert.equal(backFromChain({ holes: 3, badges: 0, gnomes: [] }), "Back from the chain: 3 holes.");
+  assert.equal(backFromChain({ holes: 0, badges: 1, gnomes: ["The Gnome King"] }), "Back from the chain: 1 badge and the Gnome King gnome.");
 });

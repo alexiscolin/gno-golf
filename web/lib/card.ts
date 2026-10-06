@@ -263,13 +263,24 @@ export const UNLOCKS = {
   miner: { cup: "mines", need: "Finish the Crystal Mines", ok: (t) => t.mines.all },
 } satisfies Record<string, Unlock>;
 export type UnlockId = keyof typeof UNLOCKS;
+/** "the" before a name in a sentence, never twice: the game's gnomes are all
+ *  "The …" ("the Wizard gnome", not "the The Wizard gnome"). */
+export const theName = (name: string) => `the ${name.replace(/^the\s+/i, "")}`;
+/** What a restore from the chain brought back, in one sentence: its holes,
+ *  its badges, the gnomes they unlocked by name. */
+export function backFromChain({ holes, badges, gnomes }: { holes: number; badges: number; gnomes: readonly string[] }) {
+  const n = (k: number, w: string) => `${k} ${w}${k === 1 ? "" : "s"}`;
+  const what = [holes && n(holes, "hole"), badges && n(badges, "badge"), ...gnomes.map((g) => `${theName(g)} gnome`)].filter(Boolean);
+  return `Back from the chain: ${what.join(", ").replace(/, ([^,]*)$/, " and $1")}.`;
+}
+
 /** What a cup just finished says it earned: at par or under, its par gnome
  *  (the Mountain Cup has none), or its par badge (the Crystal Mines' Mother
  *  Lode); over par, a gnome for finishing when that is the cup's only one (the Miner);
  *  nothing earned, nothing (""). */
 export function cupFinishLine(cup: string, atPar: boolean) {
   const gnomes = Object.values<Unlock>(UNLOCKS).filter((u) => u.cup === cup), badge = BADGES.find((b) => b.cup === cup);
-  if (atPar) return gnomes.some((u) => u.par) ? "Cup finished at par or under: a gnome is waiting in the picker." : badge ? `Cup finished at par or under: the ${badge.name} badge is yours.` : "";
+  if (atPar) return gnomes.some((u) => u.par) ? "Cup finished at par or under: a gnome is waiting in the picker." : badge ? `Cup finished at par or under: ${theName(badge.name)} badge is yours.` : "";
   return gnomes.length && !gnomes.some((u) => u.par) ? "Cup finished: a gnome is waiting in the picker." : "";
 }
 
