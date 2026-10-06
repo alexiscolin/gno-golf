@@ -121,11 +121,15 @@ export function traitRows(t: Traits): { trait: string; value: string }[] {
   return rows.filter(([, v]) => v.trim()).map(([trait, value]) => ({ trait, value: cap(value.trim()) }));
 }
 
+/** A token as the site serves the catalogue (public/gnomes/catalogue.json, scripts/gnomeassets.mjs): its look
+ *  as traits alone, drawn when needed (skin.ts skinOfTraits). */
+export type Listed = Omit<Entry, "skin">;
+
 /** What a gallery filters on; an empty field filters nothing. */
 export interface Query { series?: string; wave?: number; tier?: Tier; home?: Home; archetype?: Archetype; hat?: string; trail?: boolean; text?: string }
 
 /** The entries a query keeps, in id order. */
-export function filterGnomes(list: readonly Entry[], q: Query): Entry[] {
+export function filterGnomes<E extends Listed>(list: readonly E[], q: Query): E[] {
   const text = q.text?.trim().toLowerCase();
   return list.filter((e) => {
     if ((q.series && e.series !== q.series) || (q.wave && e.wave !== q.wave) || (q.tier && e.tier !== q.tier)) return false;

@@ -1,10 +1,11 @@
-// lib/adena.ts, the gnomes' signatures (r/gnogolf/gnomes, ADR-007): each one
+// lib/gnomes/tx.ts, the gnomes' signatures (r/gnogolf/gnomes, ADR-007): each one
 // call alone (Buy, Equip), the exact coins with it, the gas the
 // chain was measured to take with room; and the same call as a gnokey line,
 // built from it, never written by hand.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type Adena, GNOME_TX, gnomeCall, sendGnome, gnokeyGnome } from "../lib/adena.ts";
+import type { Adena } from "../lib/adena.ts";
+import { GNOME_TX, gnomeCall, sendGnome, gnokeyGnome, blockTime } from "../lib/gnomes/tx.ts";
 
 const ADDR = "g1" + "a".repeat(38), RPC = "http://127.0.0.1:26657", CHAIN = "dev", GN = "gno.land/r/nym-x/gnogolf/gnomes";
 type Tx = { messages: { type: string; value: Record<string, unknown> }[]; gasFee: number; gasWanted: number; memo: string };
@@ -64,4 +65,17 @@ test("gnokeyGnome: the very call, as one gnokey line at its gas and fee, for thi
   assert.match(gnokeyGnome(gnomeCall.equip(null), at), / -func Equip -args '' -gas-fee /);
   assert.doesNotMatch(gnokeyGnome(gnomeCall.equip(5), at), /-send/);
   assert.equal(gnokeyGnome(gnomeCall.buy([104], 777e6), { ...at, realm: "not a realm" }), "");
+});
+
+test("blockTime: a block's time (unix seconds) from /block?height, null when the node cannot say", async () => {
+  const asked: string[] = [];
+  const answer = (body: unknown) => (globalThis.fetch = ((url: string) => (asked.push(url), Promise.resolve({ json: () => Promise.resolve(body) }))) as unknown as typeof fetch);
+  answer({ result: { block: { header: { time: "2026-10-06T18:04:05.123456Z" } } } });
+  assert.equal(await blockTime("http://node", 42), Date.UTC(2026, 9, 6, 18, 4, 5) / 1000);
+  assert.deepEqual(asked, ["http://node/block?height=42"]);
+  answer({ result: {} });
+  assert.equal(await blockTime("http://node", 42), null);
+  globalThis.fetch = () => Promise.reject(new Error("down"));
+  assert.equal(await blockTime("http://node", 42), null);
+  assert.equal(await blockTime("http://node", -1), null, "no such height: nothing asked");
 });

@@ -12,7 +12,7 @@ import type { Catalogue } from "../lib/gnomes/catalogue.ts";
 
 const catalogue = JSON.parse(fs.readFileSync(new URL("../../data/gnomes.json", import.meta.url), "utf8")) as Catalogue;
 const entries = catalogue.gnomes;
-const A = "g1" + "a".repeat(38), B = "g1" + "b".repeat(38);
+const A = "g1" + "a".repeat(38);
 const T0 = Date.UTC(2026, 9, 9, 18) / 1000; // Fri 9 Oct 2026, 18:00 UTC
 
 const collection = (o: Partial<Collection> = {}): Collection => ({
@@ -89,6 +89,23 @@ test("shop: nothing is asked for what is not an address or a gnome, and 'none' a
   await assert.rejects(shop.canBuy("x", [1]), /address/);
   await assert.rejects(shop.gnome(0), /number/);
   assert.equal(asked.length, 2);
+});
+
+test("shop: a whole collection is read page by page, until the realm says there is no next", async () => {
+  const asked: string[] = [];
+  const chain = {
+    qjson: <T>(_: string, expr: string, ok: (v: unknown) => v is T) => {
+      asked.push(expr);
+      const at = Number(/, (\d+)\)$/.exec(expr)![1]);
+      const v = { version: 1, owner: A, total: 150, next: at === 0 ? 100 : -1, rows: Array.from({ length: at === 0 ? 100 : 50 }, (_, i) => ({ id: String(at + i + 1), tier: "common", traits: "01" })) };
+      return ok(v) ? Promise.resolve(v) : Promise.reject(new Error("shape"));
+    },
+    qstr: () => Promise.resolve(""),
+  };
+  const rows = await makeShop(chain).allOf(A);
+  assert.equal(rows.length, 150);
+  assert.deepEqual(asked, [`GnomesOf(address("${A}"), 0)`, `GnomesOf(address("${A}"), 100)`]);
+  assert.deepEqual(await makeShop(chain).allOf("nope"), []);
 });
 
 test("shop: an answer of another shape is refused, as the chain's", async () => {

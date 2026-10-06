@@ -5,7 +5,7 @@
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
 import { GNOMES_REALM, isAddress, type Chain } from "../chain";
-import { TIER_LOOK, filterGnomes, type Entry, type Query } from "./catalogue";
+import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
 import type { Home, Tier } from "./vocab";
 
 /** The shop is on (NEXT_PUBLIC_GNOMES=1); off, the game is exactly as before it. */
@@ -89,6 +89,16 @@ export function makeShop(chain: Pick<Chain, "qjson" | "qstr">, realm = GNOMES_RE
     /** A page of a wallet's gnomes (100 a page, from offset); none for what is not an address. */
     gnomesOf: (owner: string, offset = 0): Promise<Held> =>
       isAddress(owner) ? read(`GnomesOf(${addr(owner)}, ${Math.max(0, offset | 0)})`, checks.held) : Promise.resolve({ owner, total: 0, next: -1, rows: [] }),
+    /** A wallet's gnomes, every page (10 at most: 1,000 gnomes), best first as the realm lists them. */
+    allOf: async (owner: string) => {
+      const rows: Held["rows"] = [];
+      for (let at = 0, n = 0; at >= 0 && n < 10 && isAddress(owner); n++) {
+        const p = await read(`GnomesOf(${addr(owner)}, ${at})`, checks.held);
+        rows.push(...p.rows);
+        at = p.next;
+      }
+      return rows;
+    },
     /** The gnome a player wears for everyone, null for none ("" from the realm). */
     worn: async (player: string) => {
       if (!isAddress(player)) return null;
@@ -147,7 +157,7 @@ const homeName = (h: string) => h.charAt(0).toUpperCase() + h.slice(1);
 const tierIndex = (c: Collection, t: string) => c.tiers.findIndex((x) => x.name === t);
 
 // ------------------------------------------------------------ the sale's life (A9)
-type Some = Pick<Entry, "id" | "tier" | "home">;
+type Some = Pick<Listed, "id" | "tier" | "home">;
 export interface WaveInfo { n: number; row: WaveRow; home: Home | ""; size: number; sold: number }
 /** The gallery's "now" row: closed (made and never made), or the wave of the moment (the last
  *  started, else the next: a teaser) and what it is at, with the next wave once it is sold out. */
@@ -180,7 +190,7 @@ export function nowRow(c: Collection, sold: (id: number) => boolean, entries: re
 // ------------------------------------------------------------ why not (A2), every CanBuy code in words
 /** What the buy panel says instead of buying: its button's words (off) and one note; play: the note links to a hole. */
 export interface WhyNot { button: string; note: string; play?: true }
-export function whyNot(r: CanBuy, c: Collection, g: Pick<Entry, "tier" | "wave" | "home">, now: number): WhyNot | null {
+export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "tier" | "wave" | "home">, now: number): WhyNot | null {
   if (r.ok) return null;
   const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From Wave ${g.wave} · ${homeName(g.home)}.`;
   const wave = c.waves.find((w) => w.start > now) || c.waves[c.waves.length - 1];
@@ -226,7 +236,7 @@ export function onSale(e: Some, c: Collection, sold: (id: number) => boolean, no
 }
 const neverMade = (e: Some, s: Seen) => !!s.c.series[0]?.closed && e.id >= s.c.series[0].first && e.id <= s.c.series[0].last && !s.sold(e.id);
 /** The gallery's list for a view and its filters, in id order (a number searched comes first), and each tier's count in the view. */
-export function shelf(entries: readonly Entry[], f: Query & { view: View }, s: Seen) {
+export function shelf<E extends Listed>(entries: readonly E[], f: Query & { view: View }, s: Seen) {
   const inView = entries.filter((e) => (f.view === "sale" ? onSale(e, s.c, s.sold, s.now) : f.view === "mine" ? s.mine.has(e.id) : f.view === "made" ? s.sold(e.id) : true));
   const tiers = { common: 0, rare: 0, epic: 0, legendary: 0 };
   for (const e of inView) if (e.tier in tiers) tiers[e.tier as keyof typeof tiers]++;
@@ -238,7 +248,7 @@ export function shelf(entries: readonly Entry[], f: Query & { view: View }, s: S
   return { list, tiers };
 }
 /** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", or its wave. */
-export function cardFact(e: Entry, s: Seen) {
+export function cardFact(e: Listed, s: Seen) {
   if (s.mine.has(e.id)) return "Yours";
   if (s.sold(e.id)) return "Found a player";
   if (neverMade(e, s)) return "Never made";
