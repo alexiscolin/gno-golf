@@ -90,10 +90,19 @@ func TestAGnomeSellsOnce(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), id) })
 }
 
-func TestTheAuctionTierIsNotBought(cur realm, t *testing.T) {
+// A Legendary is bought as any gnome, at its wave's price, by the first who
+// buys it; one a wallet, ever.
+func TestALegendaryIsBoughtOneAWallet(cur realm, t *testing.T) {
 	fresh(t, cur)
-	testing.SetRealm(asUser(alice, ugnot(tiers[auctionTier].price)))
-	urequire.AbortsContains(t, cur, "auction", func() { Buy(cross(cur), itoa(legend())) })
+	a, b := legend(), nthOfTier(topTier, 1)
+	testing.SetRealm(asUser(alice, ugnot(priceOf(a))))
+	uassert.Equal(t, itoa(a), Buy(cross(cur), itoa(a)))
+	who, _ := OwnerOf(itoa(a))
+	uassert.Equal(t, alice, who)
+	testing.SetRealm(asUser(bob, ugnot(priceOf(a))))
+	urequire.AbortsContains(t, cur, "already sold", func() { Buy(cross(cur), itoa(a)) })
+	testing.SetRealm(asUser(alice, ugnot(priceOf(b))))
+	urequire.AbortsContains(t, cur, "the cap is 1 legendary a wallet", func() { Buy(cross(cur), itoa(b)) })
 }
 
 // OriginSend is only the caller's money on a direct call: a realm or a run
@@ -137,7 +146,6 @@ func TestAnEmptyOwnerHoldsNoPower(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "only the owner", func() { AddSeries(cross(cur), genesisName, placeholderGenesis()) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { AddWave(cross(cur), 1, 2, 0, 0) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { SetPrice(cross(cur), "common", minPrice) })
-	urequire.AbortsContains(t, cur, "only the owner", func() { StartAuction(cross(cur), 1, 24) })
 	urequire.AbortsContains(t, cur, "only the owner", func() { Sweep(cross(cur)) })
 }
 

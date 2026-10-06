@@ -60,8 +60,7 @@ func Collection() string {
 
 // Gnome is gnome tid, of the catalogue or earned, `{"version":1,"id":""}`
 // when there is none: its owner ("" while unsold) and its price (its wave's;
-// the reserve of the next auction for the auction tier; the next wave's when
-// in none yet; 0 for an earned one).
+// the next wave's when in none yet; 0 for an earned one).
 //
 //	{"version":1,"id":"217","series":"genesis","name":"…","tier":"common",
 //	 "traits":"…","owner":"","price":30000000,"sold":false}
@@ -73,7 +72,7 @@ func Gnome(tid string) string {
 	price := int64(0)
 	if g.tier != earnedTier {
 		price = prices[g.tier]
-		if wi := waveAt(g.id); wi >= 0 && g.tier != auctionTier {
+		if wi := waveAt(g.id); wi >= 0 {
 			price = waves[wi].prices[g.tier]
 		}
 	}
@@ -136,7 +135,7 @@ func GnomesOf(owner address, offset int64) string {
 // buy ids (as Buy takes them) now, and if not why. It asks Buy's own checks
 // (check), so it never says other than Buy would. "reason" is a code for
 // the screen, the first refusal Buy would meet ("" when ok): ids, paused,
-// unknown, auction, unlisted, later, taken, closed, players-only, wave-cap,
+// unknown, unlisted, later, taken, closed, players-only, wave-cap,
 // cap; "said" is Buy's sentence for it, "" when ok. "total" is the ugnot to
 // send, 0 when not ok. Neither the payment nor the direct call is checked: a
 // read has no coins and no caller. "left" is what buyer's lifetime caps
@@ -147,8 +146,8 @@ func GnomesOf(owner address, offset int64) string {
 // its "left" all 0, the lifetime caps alone holding.
 //
 //	{"version":1,"ok":false,"reason":"wave-cap","said":"the player window takes 3 common a wallet",
-//	 "total":0,"left":{"common":7,"rare":5,"epic":2},
-//	 "window":{"until":1767225600,"left":{"common":0,"rare":2,"epic":1}}}
+//	 "total":0,"left":{"common":7,"rare":5,"epic":2,"legendary":1},
+//	 "window":{"until":1767225600,"left":{"common":0,"rare":2,"epic":1,"legendary":1}}}
 func CanBuy(buyer address, ids string) string {
 	t := now()
 	o, code, why := check(buyer, ids, t)
@@ -169,12 +168,12 @@ func CanBuy(buyer address, ids string) string {
 		`,"window":{"until":` + itoa(until) + `,"left":` + capsLeft(playerCap, inWin) + `}}`
 }
 
-// capsLeft writes what caps leave once had is counted, per tier Buy sells,
+// capsLeft writes what caps leave once had is counted, per tier,
 // as {"common":n,…}; all 0 for had nil.
 func capsLeft(caps [len(tiers)]int64, had *[len(tiers)]int64) string {
 	var b strings.Builder
 	b.WriteString("{")
-	for i := 0; i < auctionTier; i++ {
+	for i := range tiers {
 		n := int64(0)
 		if had != nil {
 			n = caps[i] - had[i]
@@ -188,14 +187,10 @@ func capsLeft(caps [len(tiers)]int64, had *[len(tiers)]int64) string {
 	return b.String()
 }
 
-// Params is the rules a screen explains, from config.gno: the auction's
-// soft close (seconds) and its minimum raise (basis points of the last bid,
-// and ugnot), the longest auction and player window (hours), the ids one
-// Buy takes, the coin.
+// Params is the rules a screen explains, from config.gno: the longest
+// player window (hours), the ids one Buy takes, the coin.
 func Params() string {
-	return `{"version":1,"softClose":` + itoa(softClose) + `,"minRaiseBps":` + itoa(minRaiseBps) +
-		`,"minRaise":` + itoa(minRaise) + `,"maxHours":` + itoa(maxHours) + `,"maxBatch":` + itoa(maxBatch) +
-		`,"denom":"` + payDenom + `"}`
+	return `{"version":1,"maxHours":` + itoa(maxHours) + `,"maxBatch":` + itoa(maxBatch) + `,"denom":"` + payDenom + `"}`
 }
 
 const hexDigits = "0123456789abcdef"

@@ -57,7 +57,6 @@ func TestCanBuyAndBuyNeverDisagree(cur realm, t *testing.T) {
 		{"ids", "not a gnome id: +1", alice, func() string { return "+1" }, nil},
 		{"paused", "the sale is closed", alice, func() string { return "1,1" }, func() { mintOpen = false }},
 		{"unknown", "no such gnome", alice, func() string { return itoa(lastID() + 1) }, nil},
-		{"auction", "a legendary is sold by auction", alice, func() string { return itoa(legend()) }, nil},
 		{"unlisted", "gnome 200 is not on sale", alice, func() string { return "1,200" },
 			func() { waves = nil; addWave(1, 100, now(), 0) }},
 		{"later", "gnome 1 is not on sale yet", alice, func() string { return "1" },
@@ -94,8 +93,8 @@ func TestCanBuySaysTheFirstRefusal(cur realm, t *testing.T) {
 	mintOpen = false
 	uassert.True(t, strings.Contains(CanBuy(alice, ""), `"reason":"paused"`), "the switch before the list")
 	mintOpen = true
-	ids := itoa(legend()) + "," + itoa(lastID()+1)
-	uassert.True(t, strings.Contains(CanBuy(alice, ids), `"reason":"auction"`), "the ids in their order")
+	ids := itoa(lastID()+1) + "," + itoa(common())
+	uassert.True(t, strings.Contains(CanBuy(alice, ids), `"reason":"unknown"`), "the ids in their order")
 	ids = idsOf(2, 3) + "," + itoa(lastID()+1)
 	uassert.True(t, strings.Contains(CanBuy(alice, ids), `"reason":"unknown"`), "the ids before the caps")
 }
@@ -106,12 +105,12 @@ func TestCanBuySaysWhatToSend(cur realm, t *testing.T) {
 	sum := priceOf(nthOfTier(0, 0)) + priceOf(nthOfTier(1, 0))
 	uassert.Equal(t,
 		`{"version":1,"ok":true,"reason":"","said":"","total":`+itoa(sum)+
-			`,"left":{"common":10,"rare":5,"epic":2},"window":{"until":0,"left":{"common":0,"rare":0,"epic":0}}}`,
+			`,"left":{"common":10,"rare":5,"epic":2,"legendary":1},"window":{"until":0,"left":{"common":0,"rare":0,"epic":0,"legendary":0}}}`,
 		CanBuy(alice, ids))
 	testing.SetRealm(asUser(alice, ugnot(sum)))
 	uassert.Equal(t, ids, Buy(cross(cur), ids), "Buy takes it at that sum")
 	uassert.True(t, strings.Contains(CanBuy(alice, ids), `"reason":"taken"`))
-	uassert.True(t, strings.Contains(CanBuy(alice, "1"), `"left":{"common":9,"rare":4,"epic":2}`), "the caps left")
+	uassert.True(t, strings.Contains(CanBuy(alice, "1"), `"left":{"common":9,"rare":4,"epic":2,"legendary":1}`), "the caps left")
 }
 
 // "left" is the lifetime caps less what was bought; "window" the first id's
@@ -131,17 +130,17 @@ func TestCanBuyShowsTheCapsLeft(cur realm, t *testing.T) {
 	next := itoa(nthOfTier(0, 2))
 	uassert.Equal(t,
 		`{"version":1,"ok":true,"reason":"","said":"","total":`+itoa(priceOf(common()))+
-			`,"left":{"common":8,"rare":5,"epic":2},"window":{"until":`+until+`,"left":{"common":1,"rare":2,"epic":1}}}`,
+			`,"left":{"common":8,"rare":5,"epic":2,"legendary":1},"window":{"until":`+until+`,"left":{"common":1,"rare":2,"epic":1,"legendary":1}}}`,
 		CanBuy(player, next))
 	got := CanBuy(bob, next)
 	uassert.True(t, strings.Contains(got, `"reason":"players-only"`), got)
-	uassert.True(t, strings.Contains(got, `"window":{"until":`+until+`,"left":{"common":3,"rare":2,"epic":1}}`), got)
+	uassert.True(t, strings.Contains(got, `"window":{"until":`+until+`,"left":{"common":3,"rare":2,"epic":1,"legendary":1}}`), got)
 	uassert.True(t, strings.Contains(CanBuy(player, "x"), `"window":{"until":0,`), "no id read, no window")
 
 	skip(48 * 3600)
 	uassert.True(t, strings.Contains(CanBuy(player, next),
 		`"ok":true,"reason":"","said":"","total":`+itoa(priceOf(common()))+
-			`,"left":{"common":8,"rare":5,"epic":2},"window":{"until":0,"left":{"common":0,"rare":0,"epic":0}}}`),
+			`,"left":{"common":8,"rare":5,"epic":2,"legendary":1},"window":{"until":0,"left":{"common":0,"rare":0,"epic":0,"legendary":0}}}`),
 		"the window over: the lifetime caps alone")
 }
 
@@ -159,6 +158,6 @@ func TestCanBuyWritesNothing(cur realm, t *testing.T) {
 
 func TestParamsAreTheConfigs(t *testing.T) {
 	uassert.Equal(t,
-		`{"version":1,"softClose":600,"minRaiseBps":500,"minRaise":5000000,"maxHours":168,"maxBatch":5,"denom":"ugnot"}`,
+		`{"version":1,"maxHours":168,"maxBatch":5,"denom":"ugnot"}`,
 		Params())
 }

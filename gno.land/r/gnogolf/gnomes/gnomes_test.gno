@@ -81,7 +81,7 @@ func TestThePlaceholderIsLaidOutAsTheCatalogue(cur realm, t *testing.T) {
 		{312, 383, 404, 413, 414}, {415, 486, 506, 515, 516}, {517, 588, 608, 617, 618}, {619, 690, 710, 719, 720},
 	} {
 		for i, id := range w {
-			want := []int{0, 0, 1, 2, auctionTier}[i]
+			want := []int{0, 0, 1, 2, topTier}[i]
 			uassert.Equal(t, want, mustGnome(id).tier, "id "+itoa(id))
 		}
 	}
@@ -143,7 +143,10 @@ func priceOf(id int64) int64 {
 
 func common() int64 { return nthOfTier(0, 0) }
 
-func legend() int64 { return nthOfTier(auctionTier, 0) }
+func legend() int64 { return nthOfTier(topTier, 0) }
+
+// topTier is the last tier, the Legendaries'.
+const topTier = len(tiers) - 1
 
 // --- the config
 
@@ -164,7 +167,7 @@ func TestThePricesAtDeployAreTheDecidedOnes(t *testing.T) {
 		uassert.Equal(t, want[tr.name], tr.price, tr.name)
 		uassert.True(t, tr.price >= minPrice && tr.price <= maxPrice, tr.name+": within SetPrice's bounds")
 	}
-	uassert.Equal(t, "legendary", tiers[auctionTier].name)
+	uassert.Equal(t, "legendary", tiers[topTier].name)
 }
 
 func TestTheTiersGetDearerAndScarcer(t *testing.T) {
@@ -174,10 +177,9 @@ func TestTheTiersGetDearerAndScarcer(t *testing.T) {
 	}
 }
 
-func TestTheAuctionTierHasNoCap(t *testing.T) {
-	uassert.Equal(t, int64(0), lifetimeCap[auctionTier])
-	uassert.Equal(t, int64(0), playerCap[auctionTier])
-	for i := 0; i < auctionTier; i++ {
+func TestEveryTierHasItsCaps(t *testing.T) {
+	uassert.Equal(t, int64(1), lifetimeCap[topTier], "one Legendary a wallet")
+	for i := range tiers {
 		uassert.True(t, playerCap[i] > 0 && playerCap[i] <= lifetimeCap[i], tiers[i].name)
 	}
 }

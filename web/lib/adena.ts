@@ -676,22 +676,19 @@ export const shortOf = (gas: number, price: number, deposit: number, balance: nu
 export const costOf = (gas: number, price = PRICE) => ((gas * price) / 1e6).toFixed(3);
 
 // ------------------------------------------------------------ the gnomes (r/gnogolf/gnomes, ADR-007)
-// Each signature alone, the realm's own function: Buy(ids), Bid(id) with the
-// bid, Settle(id), Equip(id). What each asks: the most it took on a local
-// chain of the onyx toolchain (docs/superpowers/e2e/2026-10-06-gnomes-local.md:
-// a Buy of one 31.0M gas, two 36.0M, five 55.4M; a Bid 7.9M; a Settle that
-// mints 27.3M; an Equip 10.8M), with room; the bytes it stores, bounded by the
-// realm's goldens (a first buy 3,850, z_storage_buy) or, unmeasured, generously
-// (an equip's row, a bid's change of the auction): the bill says "at most",
-// and Adena charges what it simulates.
+// Each signature alone, the realm's own function: Buy(ids), Equip(id). What
+// each asks: the most it took on a local chain of the onyx toolchain
+// (docs/superpowers/e2e/2026-10-06-gnomes-local.md: a Buy of one 31.0M gas,
+// two 36.0M, five 55.4M; an Equip 10.8M), with room; the bytes it stores,
+// bounded by the realm's goldens (a first buy 3,850, z_storage_buy) or,
+// unmeasured, generously (an equip's row): the bill says "at most", and Adena
+// charges what it simulates.
 export const GNOME_TX = {
   buy: { gas: (n: number) => 40e6 + 10e6 * (n - 1), bytes: (n: number) => 3900 * n },
-  bid: { gas: 20e6, bytes: 600 },
-  settle: { gas: 60e6, bytes: 3900 },
   equip: { gas: 25e6, bytes: 600 },
 } as const;
 /** One of the gnomes' calls: its function and arguments, the ugnot sent with it, its gas and bytes. */
-export interface GnomeCall { func: "Buy" | "Bid" | "Settle" | "Equip"; args: string[]; send: number; gas: number; bytes: number }
+export interface GnomeCall { func: "Buy" | "Equip"; args: string[]; send: number; gas: number; bytes: number }
 const NOTHING = "Nothing to sign.";
 const gnomeNo = (id: number) => {
   if (!Number.isSafeInteger(id) || id < 1) throw new Error(NOTHING);
@@ -707,12 +704,10 @@ export const gnomeCall = {
     if (!ids.length || ids.length > 5 || new Set(ids).size !== ids.length) throw new Error(NOTHING);
     return { func: "Buy", args: [ids.map(gnomeNo).join(",")], send: ugnotOf(total), gas: GNOME_TX.buy.gas(ids.length), bytes: GNOME_TX.buy.bytes(ids.length) };
   },
-  bid: (id: number, amount: number): GnomeCall => ({ func: "Bid", args: [gnomeNo(id)], send: ugnotOf(amount), ...GNOME_TX.bid }),
-  settle: (id: number): GnomeCall => ({ func: "Settle", args: [gnomeNo(id)], send: 0, ...GNOME_TX.settle }),
   /** null takes it off: everyone sees the best again */
   equip: (id: number | null): GnomeCall => ({ func: "Equip", args: [id === null ? "" : gnomeNo(id)], send: 0, ...GNOME_TX.equip }),
 };
-const FAILED: Record<GnomeCall["func"], string> = { Buy: "The gnome was not bought.", Bid: "The bid was not sent.", Settle: "The auction was not settled.", Equip: "Nothing was changed." };
+const FAILED: Record<GnomeCall["func"], string> = { Buy: "The gnome was not bought.", Equip: "Nothing was changed." };
 /** Signs one of the gnomes' calls from the connected account (realm: the gnomes' path). Resolves with the tx (hash, height). */
 export function sendGnome(c: GnomeCall, { address, realm, price = PRICE, chainId, rpc }: { address: string; realm: string; price?: number; chainId?: string | null; rpc: string }) {
   if (!isAddress(address) || !PKG_PATH.test(realm)) return Promise.reject(new Error(NOTHING));

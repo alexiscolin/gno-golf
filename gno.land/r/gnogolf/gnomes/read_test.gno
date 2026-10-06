@@ -20,7 +20,7 @@ func TestCollectionSaysWhatTheMintPageShows(cur realm, t *testing.T) {
 			`"tiers":[{"name":"common","price":30000000,"cap":10,"playerCap":3,"sold":0},`+
 			`{"name":"rare","price":99000000,"cap":5,"playerCap":2,"sold":0},`+
 			`{"name":"epic","price":333000000,"cap":2,"playerCap":1,"sold":0},`+
-			`{"name":"legendary","price":777000000,"cap":0,"playerCap":0,"sold":0}],`+
+			`{"name":"legendary","price":777000000,"cap":1,"playerCap":1,"sold":0}],`+
 			`"series":[{"name":"genesis","first":1,"last":720,"sold":0,"closed":false}],`+
 			`"waves":[{"first":1,"last":720,"start":`+itoa(w.start)+`,"playersUntil":`+itoa(w.playersUntil)+
 			`,"prices":[30000000,99000000,333000000,777000000]}]}`,

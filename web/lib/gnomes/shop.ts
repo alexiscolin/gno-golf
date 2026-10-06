@@ -2,7 +2,7 @@
 // answers (r/gnogolf/gnomes, ADR-007) checked into these shapes, one query
 // each, and what a screen decides from them, pure, so the tests hold every
 // state: the sale's phase, why a gnome can't be bought in plain words, the
-// bill before a signature, the auction's state, the gallery's shelf. The
+// bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
 import { GNOMES_REALM, isAddress, type Chain } from "../chain";
 import { TIER_LOOK, filterGnomes, type Entry, type Query } from "./catalogue";
@@ -11,12 +11,12 @@ import type { Home, Tier } from "./vocab";
 /** The shop is on (NEXT_PUBLIC_GNOMES=1); off, the game is exactly as before it. */
 export const SHOP = process.env.NEXT_PUBLIC_GNOMES === "1";
 
-/** The tiers Buy sells; the last one of Collection's is auctioned. */
-export const BUY_TIERS = ["common", "rare", "epic"] as const;
+/** The tiers Buy sells: every one, at its wave's fixed price (there is no auction). */
+export const BUY_TIERS = ["common", "rare", "epic", "legendary"] as const;
 export type BuyTier = (typeof BUY_TIERS)[number];
 type PerTier = Record<BuyTier, number>;
 
-// ------------------------------------------------------------ the shapes (read.gno, auction.gno, equip.gno)
+// ------------------------------------------------------------ the shapes (read.gno, equip.gno)
 export interface TierRow { name: string; price: number; cap: number; playerCap: number; sold: number }
 export interface SeriesRow { name: string; first: number; last: number; sold: number; closed: boolean }
 export interface WaveRow { first: number; last: number; start: number; playersUntil: number; prices: number[] }
@@ -32,14 +32,12 @@ export interface Held { owner: string; total: number; next: number; rows: { id: 
 /** Worn(player): the gnome a player wears for everyone (wearing is free): the one put on with Equip
  *  while still held (equipped), else their best. */
 export interface Worn { player: string; id: string; name: string; tier: string; traits: string; equipped: boolean }
-/** Auction(): the one under way, else the last settled; min 0 once it takes no bid. */
-export interface Auction { version: number; id: string; reserve: number; top: number; bidder: string; end: number; min: number; over: boolean; settled: boolean }
 /** Why Buy would refuse, its first reason, as CanBuy codes it ("" when it would sell). */
-export type Reason = "" | "ids" | "unknown" | "auction" | "unlisted" | "later" | "taken" | "closed" | "paused" | "players-only" | "wave-cap" | "cap";
+export type Reason = "" | "ids" | "unknown" | "unlisted" | "later" | "taken" | "closed" | "paused" | "players-only" | "wave-cap" | "cap";
 /** CanBuy(buyer, ids): what Buy would do, its own sentence (said), the sum to send; the caps left, the window's while it runs. */
 export interface CanBuy { version: number; ok: boolean; reason: Reason; said: string; total: number; left: PerTier; window: { until: number; left: PerTier } }
-/** Params(): the auction's rules and a Buy's batch, as the realm holds them. */
-export interface Params { version: number; softClose: number; minRaiseBps: number; minRaise: number; maxHours: number; maxBatch: number; denom: string }
+/** Params(): the longest player window and a Buy's batch, as the realm holds them. */
+export interface Params { version: number; maxHours: number; maxBatch: number; denom: string }
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -60,11 +58,9 @@ const checks = {
   held: (v: unknown): v is Held => isObj(v) && strs(v, "owner") && nums(v, "total", "next") && every(v.rows, (r) => isObj(r) && strs(r, "id", "tier", "traits")),
   worn: (v: unknown): v is Worn => isObj(v) && strs(v, "player", "id", "name", "tier", "traits") && bools(v, "equipped") && isAddress(v.player),
   wornList: (v: unknown): v is { rows: Worn[] } => isObj(v) && every(v.rows, checks.worn),
-  auction: (v: unknown): v is Auction | { id: "" } =>
-    isObj(v) && typeof v.id === "string" && (v.id === "" || (strs(v, "bidder") && nums(v, "reserve", "top", "end", "min") && bools(v, "over", "settled"))),
   canBuy: (v: unknown): v is CanBuy =>
     isObj(v) && bools(v, "ok") && strs(v, "reason", "said") && nums(v, "total") && perTier(v.left) && isObj(v.window) && nums(v.window, "until") && perTier(v.window.left),
-  params: (v: unknown): v is Params => isObj(v) && nums(v, "softClose", "minRaiseBps", "minRaise", "maxHours", "maxBatch") && strs(v, "denom"),
+  params: (v: unknown): v is Params => isObj(v) && nums(v, "maxHours", "maxBatch") && strs(v, "denom"),
 };
 
 const q = (v: unknown) => JSON.stringify(String(v));
@@ -110,11 +106,6 @@ export function makeShop(chain: Pick<Chain, "qjson" | "qstr">, realm = GNOMES_RE
       for (const w of (await read(`WornMany(${q(list.join(","))})`, checks.wornList)).rows) if (list.includes(w.player)) got.set(w.player, w);
       return got;
     },
-    /** The auction under way, else the last settled; null before the first. */
-    auction: async () => {
-      const a = await read("Auction()", checks.auction);
-      return a.id ? (a as Auction) : null;
-    },
     canBuy: async (buyer: string, ids: readonly number[]) => read(`CanBuy(${addr(buyer)}, ${q(ids.map((id) => JSON.parse(gnomeId(id)) as string).join(","))})`, checks.canBuy),
     params: () => read("Params()", checks.params),
   };
@@ -154,8 +145,6 @@ const label = (t: string) => (TIER_LOOK[t as Tier] || { label: t }).label;
 const plural = (word: string, n: number) => (n === 1 ? word : word + "s");
 const homeName = (h: string) => h.charAt(0).toUpperCase() + h.slice(1);
 const tierIndex = (c: Collection, t: string) => c.tiers.findIndex((x) => x.name === t);
-/** The auction tier: Collection's last. */
-const auctionTier = (c: Collection) => c.tiers[c.tiers.length - 1]?.name;
 
 // ------------------------------------------------------------ the sale's life (A9)
 type Some = Pick<Entry, "id" | "tier" | "home">;
@@ -170,9 +159,8 @@ export type Now =
 export function nowRow(c: Collection, sold: (id: number) => boolean, entries: readonly Some[], now: number): Now {
   const genesis = c.series[0];
   if (genesis && genesis.closed) return { at: "closed", closesAt: c.closesAt, made: genesis.sold, never: genesis.last - genesis.first + 1 - genesis.sold };
-  const top = auctionTier(c);
   const info = (n: number): WaveInfo => {
-    const row = c.waves[n - 1], ids = entries.filter((e) => e.id >= row.first && e.id <= row.last && e.tier !== top);
+    const row = c.waves[n - 1], ids = entries.filter((e) => e.id >= row.first && e.id <= row.last);
     return { n, row, home: entries.find((e) => e.id === row.first)?.home || "", size: ids.length, sold: ids.filter((e) => sold(e.id)).length };
   };
   const started = c.waves.map((w, i) => [w, i + 1] as const).filter(([w]) => w.start <= now).pop();
@@ -211,7 +199,6 @@ export function whyNot(r: CanBuy, c: Collection, g: Pick<Entry, "tier" | "wave" 
     case "unlisted": return { button: "Not on sale yet", note: c.closesAt ? `${from} A wave not open by ${utcDate(c.closesAt, now)} never opens.` : from };
     case "taken": return { button: "Already found a player", note: "" };
     case "closed": return { button: "Never made", note: "The sale closed before this gnome found a player." };
-    case "auction": return { button: "Sold at auction", note: "" };
     case "unknown": case "ids": return { button: "No gnome by that number", note: "" };
     default: return { button: "Can't be bought now", note: `The chain says: ${r.said}.` };
   }
@@ -228,26 +215,14 @@ export function bill({ price, bytes, storagePrice, gas, gasPrice, balance }: { p
   return { lines: lines.filter(([k, v]) => v > 0 || k !== "Price"), most, short: balance == null ? null : Math.max(0, most - balance) };
 }
 
-// ------------------------------------------------------------ the auction (A4)
-export type AuctionAt = "live" | "outbid" | "leading" | "ended" | "won" | "sold" | "nobid";
-/** The auction as the page shows it, for a player (me: their address, null without a wallet; bid: what they bid
- *  last on it, remembered; firstEnd: its end when first seen: a later one was moved by a late bid). */
-export function auctionView(a: Auction, { me, now, bid = 0, firstEnd = 0 }: { me: string | null; now: number; bid?: number; firstEnd?: number }) {
-  const extended = !!firstEnd && a.end > firstEnd && !a.over;
-  let at: AuctionAt;
-  if (a.over || now >= a.end) at = !a.bidder ? "nobid" : !a.settled ? "ended" : a.bidder === me ? "won" : "sold";
-  else at = me && a.bidder === me ? "leading" : bid > 0 && me ? "outbid" : "live";
-  return { at, extended };
-}
-
 // ------------------------------------------------------------ the shelf (A1)
 /** A page of the gallery's grid. */
 export const PAGE = 48;
 export type View = "sale" | "mine" | "all" | "made";
 interface Seen { c: Collection; sold: (id: number) => boolean; mine: ReadonlySet<number>; now: number }
-/** Whether a gnome is on sale now: in a started wave, not sold, not closed, not the auction tier. */
+/** Whether a gnome is on sale now: in a started wave, not sold, not closed. */
 export function onSale(e: Some, c: Collection, sold: (id: number) => boolean, now: number) {
-  return e.tier !== auctionTier(c) && !sold(e.id) && !c.series[0]?.closed && c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now);
+  return !sold(e.id) && !c.series[0]?.closed && c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now);
 }
 const neverMade = (e: Some, s: Seen) => !!s.c.series[0]?.closed && e.id >= s.c.series[0].first && e.id <= s.c.series[0].last && !s.sold(e.id);
 /** The gallery's list for a view and its filters, in id order (a number searched comes first), and each tier's count in the view. */
@@ -262,12 +237,11 @@ export function shelf(entries: readonly Entry[], f: Query & { view: View }, s: S
   if (num) list.sort((a, b) => Number(b.id === Number(num[1])) - Number(a.id === Number(num[1])) || a.id - b.id);
   return { list, tiers };
 }
-/** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", "At auction", or its wave. */
+/** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", or its wave. */
 export function cardFact(e: Entry, s: Seen) {
   if (s.mine.has(e.id)) return "Yours";
   if (s.sold(e.id)) return "Found a player";
   if (neverMade(e, s)) return "Never made";
-  if (e.tier === auctionTier(s.c)) return "At auction";
   const w = s.c.waves.find((x) => e.id >= x.first && e.id <= x.last);
   if (w && w.start <= s.now) return `${gnot(w.prices[tierIndex(s.c, e.tier)] ?? 0)} GNOT`;
   if (w) return `Opens ${utcDate(w.start, s.now, true)}`;
@@ -285,7 +259,5 @@ export const teamOrder = <R extends { id: string; tier: string }>(rows: readonly
 export const shareWords = {
   bought: (name: string, id: number | string) => `I just adopted ${name}, gnome #${id} of Gnogolf. ${name} rolls for me now`,
   equipped: (name: string, home: string) => `My gnome for the boards: ${name} of the ${homeName(home)}. Race my ghost`,
-  bidding: (name: string, ends: string) => `I'm bidding on ${name}, one of seven Legendary gnomes of Gnogolf. Ends ${ends}`,
-  won: (name: string) => `${name} is mine: one of seven Legendary gnomes of Gnogolf`,
   team: (count: number, best: string) => (count === 1 ? `My Gnogolf team: ${best}. Race my ghost` : `My Gnogolf team: ${count} gnomes, ${best} up front. Race their ghosts`),
 };

@@ -30,26 +30,21 @@
     "prices": {
      "common": 30,
      "rare": 99,
-     "epic": 333
-    },
-    "auction": {
-     "reserve": 777,
-     "hours": 48,
-     "extendMinutes": 10,
-     "minIncrementPercent": 5,
-     "minIncrementGnot": 5,
-     "endsUtc": "18:00"
+     "epic": 333,
+     "legendary": 777
     },
     "playerWindowHours": 48,
     "playerWindowCaps": {
      "common": 3,
      "rare": 2,
-     "epic": 1
+     "epic": 1,
+     "legendary": 1
     },
     "lifetimeCaps": {
      "common": 10,
      "rare": 5,
-     "epic": 2
+     "epic": 2,
+     "legendary": 1
     },
     "nextWaveWhenSold": 0.7
    },

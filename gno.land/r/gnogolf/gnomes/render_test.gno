@@ -16,8 +16,7 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	fresh(t, cur)
 	home := Render("")
 	has(t, home, "# Gnogolf Gnomes")
-	has(t, home, "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 GNOT | 0 of 720 |")
-	has(t, home, "No auction yet.")
+	has(t, home, "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 / 777 GNOT | 0 of 720 |")
 
 	g := Render("104")
 	has(t, g, "# Gnome 104")
@@ -37,18 +36,15 @@ func TestThePagesGnowebShows(cur realm, t *testing.T) {
 	has(t, p, "Equipped: [Gnome 1](/r/gnogolf/gnomes:1)")
 	has(t, p, "[#1](/r/gnogolf/gnomes:1)")
 	has(t, Render("1"), "Owner: "+alice.String())
-	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 GNOT | 1 of 720 |")
+	has(t, Render(""), "| 1 | 1–720 | "+dateOf(waves[0].start)+" | 30 / 99 / 333 / 777 GNOT | 1 of 720 |")
 }
 
-func TestTheHomeShowsTheAuctionAndHowToBid(cur realm, t *testing.T) {
+func TestTheHomeSaysTheClose(cur realm, t *testing.T) {
 	fresh(t, cur)
 	testing.SetRealm(asUser(deployer, nil))
-	StartAuction(cross(cur), 104, 48)
 	SetCloseAt(cross(cur), now()+30*24*3600)
 	home := Render("")
-	has(t, home, "Gnome 104")
-	has(t, home, "Minimum bid: 777 GNOT")
-	has(t, home, "-func Bid -args 104 -send 777000000ugnot")
+	has(t, home, "to the first who buys it")
 	has(t, home, "The genesis sale closes on "+dateOf(closeAt))
 }
 

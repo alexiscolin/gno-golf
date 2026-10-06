@@ -18,15 +18,14 @@ type wave struct {
 	prices       [len(tiers)]int64 // ugnot, per tier, as published
 }
 
-// prices is what the next wave is published at, per tier; the auction
-// tier's is the reserve of the next auction.
+// prices is what the next wave is published at, per tier.
 var prices [len(tiers)]int64
 
 // maxWaves bounds the waves, which every sale walks.
 const maxWaves = 64
 
-// SetPrice sets a tier's price for the waves published from now on (the
-// reserve of the next auctions, for the auction tier). Owner only.
+// SetPrice sets a tier's price for the waves published from now on. Owner
+// only.
 func SetPrice(cur realm, tierName string, ugnot int64) {
 	assertOwner(0, cur)
 	i := tierAt(tierName)

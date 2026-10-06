@@ -6,8 +6,8 @@ package gnomes
 // needs nothing here: its size is its rows (catalogue.gno), its sale a wave
 // (waves.gno).
 
-// A tier: its name, and its price at deploy, in ugnot. The last tier is
-// sold by auction only, its price the reserve of its next auction.
+// A tier: its name, and its price at deploy, in ugnot. Every tier is sold
+// at its wave's price, the first buyer's (Buy): there is no auction.
 type tier struct {
 	name  string
 	price int64
@@ -17,31 +17,22 @@ var tiers = [...]tier{
 	{"common", 30_000_000},     // 30 GNOT
 	{"rare", 99_000_000},       // 99 GNOT
 	{"epic", 333_000_000},      // 333 GNOT
-	{"legendary", 777_000_000}, // the reserve: 777 GNOT
+	{"legendary", 777_000_000}, // 777 GNOT
 }
-
-// auctionTier is the tier sold by auction, never by Buy.
-const auctionTier = len(tiers) - 1
 
 // genesisSupply is how many gnomes of each tier the genesis series holds, in
 // the order of tiers. AddSeries refuses a genesis that differs.
 var genesisSupply = [len(tiers)]int64{504, 144, 65, 7}
 
 // Per wallet: how many of each tier it may buy over its lifetime, and in a
-// wave's player window. The auction tier has no cap: it is bid for.
+// wave's player window: one Legendary a wallet, ever.
 var (
-	lifetimeCap = [len(tiers)]int64{10, 5, 2, 0}
-	playerCap   = [len(tiers)]int64{3, 2, 1, 0}
+	lifetimeCap = [len(tiers)]int64{10, 5, 2, 1}
+	playerCap   = [len(tiers)]int64{3, 2, 1, 1}
 )
 
-// The auction's rules: a bid in its last softClose seconds moves its end to
-// softClose after that bid; each bid beats the last by the larger of
-// minRaiseBps of it and minRaise.
 const (
-	softClose   = 10 * 60        // seconds
-	minRaiseBps = 500            // 5%
-	minRaise    = 5_000_000      // 5 GNOT
-	maxHours    = 7 * 24         // the longest auction, and the longest player window
+	maxHours    = 7 * 24         // the longest player window
 	minPrice    = 1_000_000      // 1 GNOT, the least SetPrice takes
 	maxPrice    = 10_000_000_000 // 10,000 GNOT, the most
 )

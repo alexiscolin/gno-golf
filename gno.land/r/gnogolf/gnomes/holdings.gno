@@ -48,7 +48,7 @@ func (holdings) OnTransfer(from, to address, tid grc721.TokenID) {
 func (holdings) OnBurn(tid grc721.TokenID) {} // Burn clears what is the burner's
 
 // heldKey sorts a holder's rows best first: the rank of the gnome's tier
-// (the auction tier 0, down the tiers, an earned gnome last), then its id
+// (the last tier 0, down the tiers, an earned gnome last), then its id
 // padded. So a holder's first row is the gnome they wear by default (Worn),
 // and their pages come as their team is shown, Legendary first.
 func heldKey(holder address, id int64, rank int) string {
@@ -61,7 +61,7 @@ func rankOfTier(t int) int {
 	if t == earnedTier {
 		return len(tiers)
 	}
-	return auctionTier - t
+	return len(tiers) - 1 - t
 }
 
 // rankOf is rankOfTier of gnome id, read from its row: a transfer's and a
@@ -76,8 +76,8 @@ func rankOf(id int64) int {
 
 // heldPage is up to n of holder's ids from offset, best first (heldKey),
 // and whether more follow. It walks the holder's own rows only, from their
-// first: a holder has their caps, the auctions they won, their earned
-// gnomes and what they were sent.
+// first: a holder has their caps, their earned gnomes and what they were
+// sent.
 func heldPage(holder address, offset int64, n int) ([]int64, bool) {
 	var ids []int64
 	more, i := false, int64(0)

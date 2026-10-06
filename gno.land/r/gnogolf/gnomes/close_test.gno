@@ -64,7 +64,6 @@ func TestTheSaleClosesAtItsDateToTheBlock(cur realm, t *testing.T) {
 	testing.SetRealm(asUser(alice, ugnot(priceOf(2))))
 	urequire.AbortsContains(t, cur, "gnomes: the genesis sale closed on "+dateOf(at), func() { Buy(cross(cur), "2") })
 	testing.SetRealm(asUser(deployer, nil))
-	urequire.AbortsContains(t, cur, "closed on", func() { StartAuction(cross(cur), legend(), 48) })
 	urequire.AbortsContains(t, cur, "closed", func() { SetCloseAt(cross(cur), now()-5) })
 }
 
@@ -82,36 +81,6 @@ func TestAClosedGnomeIsNeverSold(cur realm, t *testing.T) {
 	uassert.True(t, strings.Contains(Gnome("2"), `"sold":false,"closed":true`))
 	uassert.True(t, strings.Contains(Collection(), `"series":[{"name":"genesis","first":1,"last":720,"sold":1,"closed":true}]`))
 	uassert.True(t, strings.Contains(Collection(), `"closesAt":`+itoa(closeAt)))
-}
-
-// An auction under way at the close runs to its end and settles; one with
-// no bid leaves its Legendary closed for good.
-func TestARunningAuctionFinishesAfterTheClose(cur realm, t *testing.T) {
-	fresh(t, cur)
-	id := legend()
-	testing.SetRealm(asUser(deployer, nil))
-	StartAuction(cross(cur), id, 2)
-	SetCloseAt(cross(cur), now()+3600)
-	skip(3600)
-	testing.SetRealm(asUser(alice, ugnot(reserve)))
-	Bid(cross(cur), id)
-	skip(3600)
-	Settle(cross(cur), id)
-	who, _ := OwnerOf(itoa(id))
-	uassert.Equal(t, alice, who)
-}
-
-// A Legendary whose auction got no bid by the close is never auctioned again.
-func TestALegendaryUnsoldAtTheCloseIsClosed(cur realm, t *testing.T) {
-	fresh(t, cur)
-	id := legend()
-	testing.SetRealm(asUser(deployer, nil))
-	StartAuction(cross(cur), id, 2)
-	SetCloseAt(cross(cur), now()+3600)
-	skip(2 * 3600)
-	Settle(cross(cur), id)
-	urequire.AbortsContains(t, cur, "closed on", func() { StartAuction(cross(cur), id, 48) })
-	uassert.True(t, strings.Contains(Gnome(itoa(id)), `"closed":true`))
 }
 
 // A later series has its own sale: the genesis's date does not close it.

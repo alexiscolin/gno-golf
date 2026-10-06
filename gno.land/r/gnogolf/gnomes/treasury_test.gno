@@ -98,23 +98,14 @@ func TestAnOwnerHandoverLeavesTheTreasury(cur realm, t *testing.T) {
 	uassert.Equal(t, vault, Treasury())
 }
 
-// An auction's bid and the stray coins go to the treasury too; the realm
-// keeps nothing but the escrow.
-func TestTheAuctionAndTheSweepPayTheTreasury(cur realm, t *testing.T) {
+// Stray coins (sent to the realm by a plain transfer) go to the treasury
+// too: the realm keeps nothing.
+func TestTheSweepPaysTheTreasury(cur realm, t *testing.T) {
 	fresh(t, cur)
 	testing.SetRealm(asUser(deployer, nil))
 	SetTreasury(cross(cur), vault)
 	testing.SetRealm(asUser(vault, nil))
 	AcceptTreasury(cross(cur))
-
-	testing.SetRealm(asUser(deployer, nil))
-	StartAuction(cross(cur), legend(), 1)
-	testing.SetRealm(asUser(alice, ugnot(reserve)))
-	Bid(cross(cur), legend())
-	skip(3600)
-	before := balance(vault)
-	Settle(cross(cur), legend())
-	uassert.Equal(t, before+reserve, balance(vault))
 
 	testing.IssueCoins(selfAddr, ugnot(7))
 	before, held := balance(vault), balance(selfAddr)

@@ -2,6 +2,7 @@ package gnomes
 
 import (
 	"chain"
+	"chain/banker"
 	"strings"
 
 	"gno.land/p/gnogolf/weblink"
@@ -18,7 +19,7 @@ var (
 )
 
 // The treasury is where the money goes, an address apart from the owner's
-// key: every sale, every auction's bid, the royalty and Sweep's strays. It
+// key: every sale, the royalty and Sweep's strays. It
 // is the deployer at deploy. The owner moves it in two steps: SetTreasury
 // offers it, and the new address takes it with AcceptTreasury, signed from
 // that address itself, so a mistyped one never receives a sale. A gnokey
@@ -151,4 +152,18 @@ func SetSiteURL(cur realm, url string) {
 	}
 	siteURL = url
 	chain.Emit("SiteSet", "url", url)
+}
+
+// Sweep sends the treasury whatever ugnot the realm holds: coins sent to it
+// by a plain transfer, which no call keeps (a sale's go on in its own call).
+// Owner only.
+func Sweep(cur realm) {
+	assertOwner(0, cur)
+	held := banker.NewReadonlyBanker().GetCoin(cur.Address(), payDenom)
+	if held <= 0 {
+		return
+	}
+	banker.NewBanker(banker.BankerTypeRealmSend, cur).
+		SendCoins(cur.Address(), treasury, chain.NewCoins(chain.NewCoin(payDenom, held)))
+	chain.Emit("Swept", "amount", itoa(held), "to", treasury.String())
 }

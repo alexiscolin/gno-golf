@@ -12,16 +12,12 @@ import (
 // the catalogue, the config or an address; names are the owner's rows, and
 // escaped where they go into markup.
 
-// self is this realm's pkgpath, hub its gnoweb path: every link and the bid
-// line follow from them, so the same code serves under any namespace.
+// self is this realm's pkgpath, hub its gnoweb path: every link follows
+// from them, so the same code serves under any namespace.
 var (
 	self = unsafe.CurrentRealm().PkgPath()
 	hub  = strings.TrimPrefix(self, "gno.land")
 )
-
-// bidGas is the gas a bid line asks (a bid writes one auction and sends one
-// refund), with room to spare.
-const bidGas = 50_000_000
 
 func Render(path string) string {
 	switch {
@@ -41,7 +37,7 @@ func Render(path string) string {
 func renderHome() string {
 	var b strings.Builder
 	b.WriteString("# Gnogolf Gnomes\n\nThe ball you play Gnogolf with, as a token: chosen by its number, seen before it is paid for, cosmetic only. " +
-		"Common, Rare and Epic gnomes sell at a fixed price, Legendaries by auction, one at a time; the nine earned gnomes are minted free once the chain proves the feat.\n\n")
+		"Every gnome sells at its wave's fixed price, to the first who buys it; the nine earned gnomes are minted free once the chain proves the feat.\n\n")
 	if !mintOpen {
 		b.WriteString("Sales are paused.\n\n")
 	}
@@ -52,34 +48,12 @@ func renderHome() string {
 		}
 		b.WriteString("The genesis sale " + verb + " on " + dateOf(closeAt) + ".\n\n")
 	}
-	b.WriteString("## Waves\n\n| wave | gnomes | opens | common / rare / epic | found a player |\n|---|---|---|---|---|\n")
+	b.WriteString("## Waves\n\n| wave | gnomes | opens | common / rare / epic / legendary | found a player |\n|---|---|---|---|---|\n")
 	for i, w := range waves {
 		sold := soldIn(w.first, w.last)
 		b.WriteString("| " + itoa(int64(i+1)) + " | " + itoa(w.first) + "–" + itoa(w.last) + " | " + dateOf(w.start) + " | " +
-			wholeGNOT(w.prices[0]) + " / " + wholeGNOT(w.prices[1]) + " / " + gnot(w.prices[2]) + " | " +
+			wholeGNOT(w.prices[0]) + " / " + wholeGNOT(w.prices[1]) + " / " + wholeGNOT(w.prices[2]) + " / " + gnot(w.prices[3]) + " | " +
 			itoa(sold) + " of " + itoa(w.last-w.first+1) + " |\n")
-	}
-	b.WriteString("\n## Auction\n\n")
-	a := auc
-	switch {
-	case a != nil:
-		g, _ := gnomeAt(a.id)
-		b.WriteString("[" + xmlEscape(g.name) + "](" + hub + ":" + itoa(a.id) + "), until " + dateOf(a.end) + ". ")
-		if a.bidder != "" {
-			b.WriteString("Top bid: " + gnot(a.top) + ". ")
-		}
-		if now() < a.end {
-			b.WriteString("Minimum bid: " + gnot(minBid()) + ".\n\n    gnokey maketx call -pkgpath " + self + " -func Bid -args " + itoa(a.id) +
-				" -send " + itoa(minBid()) + "ugnot -gas-fee 1000000ugnot -gas-wanted " + itoa(bidGas) +
-				" -broadcast -chainid <chain-id> -remote <rpc-url> <your-key-name>\n")
-		} else {
-			b.WriteString("Over: anyone may settle it.\n")
-		}
-	case last != nil:
-		g, _ := gnomeAt(last.id)
-		b.WriteString("The last: [" + xmlEscape(g.name) + "](" + hub + ":" + itoa(last.id) + "), settled.\n")
-	default:
-		b.WriteString("No auction yet.\n")
 	}
 	return b.String()
 }
