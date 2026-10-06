@@ -38,7 +38,7 @@ export function chainQuery() {
 
 /** The address of this hole, to put in the bar and in shared links; by: the
  *  sharer, whose best on the chain the friend is dared to beat; src: where it was shared from (analytics). */
-export function holeLink(s: Snapshot, gnome: string, by = "", src?: ShareSrc) {
+export function holeLink(s: Pick<Snapshot, "id" | "place">, gnome: string, by = "", src?: ShareSrc) {
   const q = chainQuery();
   // a cup's hole by its own page (app/h, its link card); one in no cup
   // (community, archived) by its id, never as place 1

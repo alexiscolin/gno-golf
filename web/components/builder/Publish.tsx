@@ -25,9 +25,18 @@ import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost, Cost } from "@/lib/builder/wasm";
 import type { Hole } from "@/lib/scene/data";
 import Preview from "./Preview";
+import { cardLines, holeLinkOf, shareCard } from "./share";
 
 const MAX_NAME = 40, MAX_NOTE = 140;
 const gnot = (ugnot: number) => (ugnot / 1e6).toFixed(2);
+/** A file saved through a link the author clicked (a computer's download). */
+function download(blob: Blob, name: string) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 /** How long the chain is read for the new version after a signature (it lands within a few blocks). */
 const LAND_MS = 90_000;
 
@@ -53,6 +62,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const [why, setWhy] = useState("");
   const [copied, copy] = useCopied();
   const live = useRef(true);
+  const capture = useRef<(() => HTMLCanvasElement | null) | null>(null);
   useEffect(() => () => void (live.current = false), []);
 
   // the name and note as the chain will keep them, and what the data will be with that name in it
@@ -124,11 +134,25 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   }, [hex, alias, host]);
 
   if (sent === "done") {
+    const link = holeLinkOf(id), lines = cardLines({ name, world: draft.world, par: draft.par, author });
+    const share = () => (navigator.share ? navigator.share({ title: name, text: `${name}, a mini-golf hole on gno.land`, url: link }).catch(() => {}) : copy(link));
+    const card = () => {
+      const c = capture.current?.();
+      if (c) void shareCard(c, lines).then((blob) => blob && download(blob, `${draft.slug}.png`));
+    };
     return (
       <main className="pub pub--done">
-        <h2>{name} is on gno.land!</h2>
-        <p>Play it for real: your best becomes the ghost your friends race.</p>
-        <a className="btn btn--gold" href={playLink(holeRow(id, draft))}>Play it for real</a>
+        <section className="pub__hole" aria-label="Your hole">
+          <Preview state={state} fresh capture={capture} />
+          <div className="pub__card"><b>{lines[0]}</b><small>{lines[1]}</small></div>
+        </section>
+        <section className="pub__doneform">
+          <h2>{name} is on gno.land!</h2>
+          <p>Play it for real: your best becomes the ghost your friends race.</p>
+          <a className="btn btn--gold" href={playLink(holeRow(id, draft))}>Play it for real</a>
+          <Button onClick={() => void share()}>{copied ? "Link copied" : "Share it"}</Button>
+          <button type="button" className="linkish" onClick={card}>Save its card</button>
+        </section>
       </main>
     );
   }

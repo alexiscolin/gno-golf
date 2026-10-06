@@ -166,8 +166,10 @@
 /* ------------------------------------------------------------ publish (B4): the hole as players will see it, the form beside it */
 .pbench { --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; position: fixed; inset: 0; display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3); overflow: hidden; font-family: var(--font); color: var(--ink); background: var(--paper); }
 .pub { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: var(--sp-4); }
-.pub--done { display: grid; place-content: center; justify-items: center; gap: var(--sp-3); text-align: center; }
-.pub--done h2 { margin: 0; font-size: 28px; }
+.pub__doneform { display: grid; align-content: center; justify-items: center; gap: var(--sp-3); padding: var(--sp-4); text-align: center; }
+.pub__doneform h2 { margin: 0; font-size: 28px; }
+.pub__doneform p { margin: 0; font-size: 15px; }
+.pub__doneform .btn { margin: 0; }
 .pub__hole { display: grid; align-content: start; gap: var(--sp-3); min-width: 0; }
 .pub__card { display: grid; gap: 2px; padding: var(--sp-3); border: var(--edge); border-radius: 14px; background: var(--white); }
 .pub__card b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

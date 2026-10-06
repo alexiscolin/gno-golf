@@ -20,6 +20,10 @@ test("siteURL: the page's own site, from its root (a hole's page too)", () => {
   assert.equal(siteHost(), "gnogolf.xyz");
   at("https://ipfs.io/ipfs/bafy/");
   assert.equal(siteURL("?hole=garden/1"), "https://ipfs.io/ipfs/bafy/?hole=garden/1", "under a path: kept");
+  at("https://gnogolf.xyz/build/");
+  assert.equal(siteURL("?hole=x/v1"), "https://gnogolf.xyz/?hole=x/v1", "so does the Builder");
+  at("https://ipfs.io/ipfs/bafy/build/");
+  assert.equal(siteURL("?hole=x/v1"), "https://ipfs.io/ipfs/bafy/?hole=x/v1");
 });
 
 test("siteURL: never a local dev address, the public one instead", () => {

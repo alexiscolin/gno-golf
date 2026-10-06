@@ -12,7 +12,8 @@ import { disposeCourse } from "@/lib/scene/materials";
 import { loadWorld } from "@/lib/scene/worlds";
 import type { Hole } from "@/lib/scene/data";
 
-export default function Preview({ state, fresh }: { state: Hole | null; fresh: boolean }) {
+/** capture: set to a function that draws the view now and gives its canvas (read it in the same task: a share card). */
+export default function Preview({ state, fresh, capture }: { state: Hole | null; fresh: boolean; capture?: { current: (() => HTMLCanvasElement | null) | null } }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const three = useRef<{ renderer: THREE.WebGLRenderer; scene: ReturnType<typeof makeScene>; camera: THREE.PerspectiveCamera; course: THREE.Object3D | null } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -45,6 +46,7 @@ export default function Preview({ state, fresh }: { state: Hole | null; fresh: b
       applyRig(t.camera, overviewRig(laneBox(state), view), view);
       t.renderer.render(t.scene, t.camera);
     };
+    if (capture) capture.current = () => (draw(), el);
     void loadWorld(state.world).then(() => {
       if (stale) return;
       if (t.course) (t.scene.remove(t.course), disposeCourse(t.course));
@@ -57,7 +59,7 @@ export default function Preview({ state, fresh }: { state: Hole | null; fresh: b
     const ro = new ResizeObserver(draw);
     ro.observe(el);
     return () => ((stale = true), ro.disconnect());
-  }, [state]);
+  }, [state, capture]);
 
   if (failed) return <p className="nothing preview">The 3D view can&apos;t run here; the board shows the hole as it is.</p>;
   return (
