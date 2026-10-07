@@ -4,7 +4,7 @@
 scripts/try-local.sh          # start (Ctrl+C stops it all)
 scripts/try-local.sh wave2    # open the gnomes' wave 2 now
 scripts/try-local.sh all      # open every wave now
-scripts/try-local.sh close 30 # bring the genesis sale's closing date forward, to 30 days on (90 at start)
+scripts/try-local.sh close 30 # give the genesis sale a closing date, in 30 days (then only earlier)
 scripts/try-local.sh rebuild  # build the site again, served without a break
 scripts/try-local.sh down     # clean up after a crash
 ```
@@ -39,8 +39,8 @@ Duel, "Builder" (on a computer) and "Gnomes", the collection (also
 atop the gnome picker and on the cups screen). `p1` has a
 record (the players' window lets it buy) and a few gnomes; `p0` has
 neither. Wave 1 (the Garden) is on sale, its players' window one hour, and the
-genesis sale closes in 90 days (the realm wants a closing date before any
-wave; `close [days]` brings it forward, to 30 days by default). `rebuild` builds the site anew with the
+genesis sale has no closing date (the shop then shows none; `close [days]`
+sets one, 30 days by default, and once set only brings it forward). `rebuild` builds the site anew with the
 code as it is now, beside the one served, then swaps them in one step:
 the chain and the links never stop, and a failed build leaves the site as
 it was. The
@@ -78,9 +78,9 @@ coupes), Duel, « Builder » (sur un ordinateur) et « Gnomes », la
 collection (aussi en haut du choix du gnome et sur l'écran des coupes).
 `p1` a un record (la fenêtre des joueurs le laisse acheter) et quelques
 gnomes ; `p0` n'a ni l'un ni l'autre. La vague 1 (le Jardin) est en vente,
-fenêtre des joueurs d'une heure, et la vente genesis ferme dans 90 jours
-(le realm veut une date de fin avant toute vague ; `close [jours]`
-l'avance, à 30 jours par défaut). `rebuild` reconstruit le site avec le code actuel, à
+fenêtre des joueurs d'une heure, et la vente genesis n'a pas de date de
+fin (la boutique n'en affiche alors aucune ; `close [jours]` en fixe une,
+30 jours par défaut, puis ne fait que l'avancer). `rebuild` reconstruit le site avec le code actuel, à
 côté de celui servi, puis les échange d'un coup : la chaîne et les liens ne
 s'arrêtent jamais, et un build raté laisse le site tel quel. Le blocage par région : `/g/?geo=blocked`. Il faut la toolchain onyx (README, « Running
 it locally ») et `cd web && npm ci`. `TAILNET=0` le garde sur cette machine.

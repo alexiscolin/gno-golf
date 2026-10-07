@@ -67,12 +67,12 @@ realm. A Legendary is bought as any
 gnome, at its wave's price, by the first who buys it: there is no auction,
 no escrow, no bid to refund.
 
-**The genesis sale closes on a date.** `SetCloseAt(at)`, owner only, once the
-genesis is published and before anything is sold: `AddWave` and
-`SetMintOpen(true)` are refused until it is set, so no sale runs without an
-end. A date in the future, which can later be brought forward, never pushed
-back, by this owner or the next; no genesis wave may start at or after it,
-which nobody could buy from. From its block on, the
+**The genesis sale can close on a date.** None is set at deploy, and the
+sale runs on until the owner sets one (the user's decision of 2026-10-07):
+`SetCloseAt(at)`, owner only, once the genesis is published. A date in the
+future, which can later be brought forward, never pushed back, by this
+owner or the next; once one is set, no genesis wave may start at or after
+it, which nobody could buy from. From its block on, the
 genesis's unsold gnomes are closed for good: `Buy` and `AddWave` refuse
 them ("the genesis sale closed on <date>"), and its
 final supply is readable on chain (`Collection`: the series' `sold` and
@@ -153,7 +153,7 @@ it leaves them and refuses to move an earned one.
 | what | bytes | deposit | golden |
 |---|---|---|---|
 | the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink (p/gnogolf/jsonq, added since, is of weblink's size and not measured) | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
-| the genesis published as the catalogue lays it out, with its closing date and a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
+| the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
 | a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
 | an earned gnome | 3,555 | 0.36 GNOT, the player | `z_storage_earned` |
 
@@ -251,7 +251,7 @@ while on sale, an earned kind, a player).
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
-| AddWave, SetMintOpen | a sale opened with no end; a genesis wave that starts at or after the close | the date set first; a genesis wave starts before it | `TestTheCloseIsSetBeforeAnyWaveOrSale` |
+| AddWave | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it | `TestAWaveStartsBeforeTheCloseOnceOneIsSet` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
 | Buy | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |

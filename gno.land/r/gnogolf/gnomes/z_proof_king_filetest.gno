@@ -13,7 +13,7 @@ import (
 // z_proof_seed's cups, then Proof("king"): the four classic cups read
 // whole, 72 slots, a best in each mode a slot and each par. The difference
 // of the two files' gas (the two `// Gas:` goldens) is the King's proof, the
-// heaviest MintEarned makes: 44,237,733 (112,404,345 less 68,166,612, on
+// heaviest MintEarned makes: 44,237,400 (112,404,012 less 68,166,612, on
 // the onyx toolchain, this file's loading of gnomes included), of the order
 // of golf's Claim (70.2M). No client sends MintEarned yet; the e2e run
 // sends it with 200M.
@@ -47,4 +47,4 @@ func main(cur realm) {
 // {"version":1,"kind":"king","player":"g1dd5kue6lta047h6lta047h6lta047h6l9pfacj","ok":true,"minted":"","holes":72,"finished":72,"strokes":216,"par":216,"missing":[]}
 
 // Gas:
-// 112404345
+// 112404012

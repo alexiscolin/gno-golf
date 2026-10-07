@@ -73,12 +73,9 @@ func setUp(_ int, rlm realm, deployer address) {
 func MintOpen() bool { return mintOpen }
 
 // SetMintOpen opens or closes every sale at once: the owner's switch for a
-// fault. Owner only; opened once the genesis sale's closing date is set.
+// fault. Owner only.
 func SetMintOpen(cur realm, open bool) {
 	assertOwner(0, cur)
-	if open && closeAt == 0 {
-		panic(errNoClose)
-	}
 	if open == mintOpen {
 		return
 	}
