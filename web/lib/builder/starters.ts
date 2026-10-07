@@ -288,7 +288,7 @@ export const STARTERS: Readonly<Record<string, Readonly<Record<string, Draft>>>>
    "v": 1,
    "world": "garden",
    "slug": "",
-   "title": "The scarecrow",
+   "title": "The moon bridge",
    "par": 3,
    "tee": [
     4.5,
@@ -377,16 +377,25 @@ export const STARTERS: Readonly<Record<string, Readonly<Record<string, Draft>>>>
     },
     {
      "id": "p1",
-     "entry": "*/post/scarecrow",
+     "entry": "*/slope/moon bridge",
      "geometry": {
-      "t": "post",
-      "c": [
-       18.5,
-       8.5
+      "t": "rect",
+      "min": [
+       15.5,
+       5.5
       ],
-      "r": 0.8
+      "max": [
+       20.5,
+       10.5
+      ]
      },
-     "params": {},
+     "params": {
+      "grade": 0.2,
+      "dir": [
+       1,
+       0
+      ]
+     },
      "clock": {
       "k": "fixed"
      }

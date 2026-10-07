@@ -26,13 +26,17 @@ const DROPS = new Set(["cliff", "serac", "crevasse"]);
 
 /**
  * The tiles by what a piece does, the first that takes an entry its tile: a
- * bar that blinks from the start (a clock's hand), a rail, a bar, a post
+ * bar that blinks from the start (a clock's hand), moving air, a tunnel or a
+ * hazard timed from the start (a blowhole, a serac), a rail, a bar, a post
  * that kicks, any post, a surface by its grip (faster than grass, much
  * slower, about as grass), a hill, a hazard (a drop or water), a tunnel.
  * An entry none takes gets a tile of its own (a new kind shows without a change here).
  */
 export const TILES: readonly { key: string; name: string; does: string; group: Group; takes: (e: Named) => boolean }[] = [
   { key: "timed", name: "Blinking bar", does: "comes and goes", group: "Moving pieces", takes: (e) => e.kind === "bar" && e.clocks[0] !== "fixed" },
+  { key: "air", name: "Moving air", does: "blows in bursts", group: "Moving pieces", takes: (e) => e.kind === "air" },
+  { key: "spout", name: "Timed tunnel", does: "throws, then rests", group: "Moving pieces", takes: (e) => e.kind === "tunnel" && e.clocks[0] !== "fixed" },
+  { key: "fall", name: "Timed trap", does: "now and then", group: "Moving pieces", takes: (e) => e.kind === "hazard" && e.clocks[0] !== "fixed" },
   { key: "wall", name: "Wall", does: "edges the lane", group: "Walls", takes: (e) => e.kind === "rail" },
   { key: "barrier", name: "Barrier", does: "blocks the way", group: "Walls", takes: (e) => e.kind === "bar" },
   { key: "bumper", name: "Bumper", does: "bounces hard", group: "Obstacles", takes: (e) => e.kind === "post" && kicks(e.skin) },
@@ -62,6 +66,7 @@ const NAMED: Readonly<Record<string, string>> = {
   "post/clock": "Clock tower", "post/palm": "Palm tree", "post/pine": "Pine tree", "post/lamp": "Street lamp", "post/stump": "Tree stump",
   "surface/wetsand": "Wet sand", "surface/soil": "Vegetable patch", "surface/brick": "Bricks", "surface/herringbone": "Herringbone paving",
   "bar/clock hand": "Blinking hand", // (drawn as a clock's hand, it blinks: it never sweeps)
+  "air/gust": "Snow cannon", // (drawn as the cannon that blows it)
   "slope/slope": "Ski slope", "slope/saddle crest": "Saddle", "hazard/wave": "Waves", "hazard/tidepool": "Tide pool",
 };
 

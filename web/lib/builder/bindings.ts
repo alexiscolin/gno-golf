@@ -91,11 +91,17 @@ export const BINDINGS: Record<Kind, Record<string, Partial<Binding>>> = {
     "": {}, dune: {}, stairs: {}, "quarter pipe": {}, funbox: {}, "moon bridge": {},
     kicker: {}, terrace: {}, downhill: {}, slope: {}, "saddle crest": {}, bank: {},
   },
-  air: {},
-  tunnel: { "": {}, cave: {}, well: {}, door: {}, shipwreck: {}, warp: {}, "ice cave": {} },
+  // (the snow cannon blows in bursts: drawn idle, never blowing all the time)
+  air: { gust: { clocks: ["substep"] } },
+  tunnel: {
+    "": {}, cave: {}, well: {}, door: {}, shipwreck: {}, warp: {}, "ice cave": {},
+    // (it spouts now and then, out of the round hole its rim is drawn on)
+    blowhole: { shapes: ["round"], clocks: ["substep"] },
+  },
   hazard: {
     "": {}, water: {}, wave: {}, lagoon: {}, tidepool: {}, fountain: {}, canal: {},
-    cliff: {}, serac: {}, crevasse: {},
+    // (the serac's ice falls now and then, its shadow before it)
+    cliff: {}, serac: { clocks: ["substep", "fixed"] }, crevasse: {},
   },
   loop: {},
 };

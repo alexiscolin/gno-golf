@@ -9,14 +9,16 @@ import fs from "node:fs";
 import "./scene-harness.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { GROUPS, pictureOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
-import { entryName } from "../lib/builder/names.ts";
+import { foldOpen, GROUPS, pictureOf, saveFold, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { entryName, TILES } from "../lib/builder/names.ts";
 
 const palettes = new Map<string, readonly PaletteEntry[]>();
 for (const w of Object.keys(FIELD)) palettes.set(w, await loadPalette(w));
-const tiles = (w: string) => { const t = tilesOf(palettes.get(w)!); return [...t.first, ...t.more.flatMap((g) => g.tiles)]; };
+const tiles = (w: string) => { const t = tilesOf(palettes.get(w)!); return [...t.first, ...t.more.flatMap((g) => g.tiles), ...t.others]; };
 const named = (w: string, name: string) => tiles(w).find((t) => t.name === name)!;
 const skins = (t: Tile) => t.looks.map((e) => e.skin);
+// a tile's place in TILES (what it does), a tile of its own last
+const order = (t: Tile) => { const k = TILES.findIndex((d) => `other/${d.key}` === t.key); return k < 0 ? TILES.length : k; };
 
 void test("every entry of every Builder world in exactly one tile, each tile one kind and one way of playing", () => {
   for (const [w, p] of palettes) {
@@ -40,10 +42,25 @@ void test("the five a first hole needs first, each with its common look first; t
   }
 });
 
+void test("a world's own pieces first; another world's under From other worlds, by what they do, each look in one place", () => {
+  for (const [w, p] of palettes) {
+    const { first, more, others } = tilesOf(p);
+    for (const t of [...first, ...more.flatMap((g) => g.tiles)]) assert.ok(t.looks.every((e) => !e.borrowed), `${w} ${t.name}: its own looks only`);
+    for (const t of others) assert.ok(t.looks.every((e) => e.borrowed) && t.key.startsWith("other/"), `${w} ${t.name}: borrowed looks only, a key of its own`);
+    assert.equal(new Set(tiles(w).map((t) => t.key)).size, tiles(w).length, `${w}: a tile's key twice`);
+    assert.deepEqual(others.map((t) => t.key), [...others].sort((a, b) => order(a) - order(b)).map((t) => t.key), `${w}: by what they do`);
+  }
+  const lent = (w: string, name: string) => tilesOf(palettes.get(w)!).others.find((t) => t.name === name);
+  assert.ok(skins(named("garden", "Obstacle")).includes("scarecrow") && !skins(named("garden", "Obstacle")).includes("lamp"), "the garden's scarecrow its own, the town's lamp not");
+  assert.ok(skins(lent("garden", "Obstacle")!).includes("lamp"), "the town's lamp under From other worlds");
+  assert.ok(skins(named("mountain", "Obstacle")).includes("boulder") && skins(lent("mountain", "Obstacle")!).includes("scarecrow"));
+  assert.ok(skins(named("town", "Floor")).includes("brick") && skins(named("island", "Water")).includes("lagoon"));
+});
+
 void test("variants that play alike are one tile with looks: water, hills, tunnels, posts", () => {
-  assert.deepEqual(skins(named("garden", "Water")).sort(), ["", "canal", "fountain", "lagoon", "tidepool", "water", "wave"]);
+  assert.deepEqual(skins(named("garden", "Water")).sort(), ["", "water"], "the garden's own ponds (the town's under From other worlds; the shore's not at all)");
   assert.deepEqual(skins(named("island", "Water")).slice(0, 4), ["water", "tidepool", "lagoon", "wave"], "the common look, then the island's own");
-  assert.deepEqual(skins(named("mountain", "Drop")).sort(), ["cliff", "crevasse", "serac"]);
+  assert.deepEqual(skins(named("mountain", "Drop")).sort(), ["cliff", "crevasse"]);
   assert.ok(skins(named("town", "Slope")).includes("quarter pipe") && skins(named("town", "Slope")).includes("stairs"));
   assert.deepEqual(skins(named("garden", "Tunnel")).at(-1), "", "the plain look last");
   assert.deepEqual(skins(named("garden", "Bumper")), ["bumper"]);
@@ -52,6 +69,17 @@ void test("variants that play alike are one tile with looks: water, hills, tunne
   assert.ok(skins(named("town", "Floor")).includes("brick") && !skins(named("town", "Sand")).includes("brick"));
   assert.deepEqual(skins(named("town", "Blinking bar")), ["clock hand"], "named for what it does: it blinks, it never sweeps");
   assert.equal(entryName(named("garden", "Tunnel").looks.at(-1)!), "Pipe", "the plain tunnel, a pipe as drawn");
+});
+
+void test("the moving pieces the course's own holes have: the mountain's snow cannon and falling serac, the island's blowhole, each timed from the start", () => {
+  const moving = (w: string) => tilesOf(palettes.get(w)!).more.find((g) => g.group === "Moving pieces")?.tiles ?? [];
+  const looks = (w: string, name: string) => moving(w).find((t) => t.name === name)?.looks ?? [];
+  assert.deepEqual(looks("mountain", "Moving air").map((e) => [e.id, entryName(e), e.clocks]), [["mountain/air/gust", "Snow cannon", ["substep"]]]);
+  assert.deepEqual(looks("mountain", "Timed trap").map((e) => [e.id, e.clocks[0]]), [["mountain/hazard/serac", "substep"]]);
+  assert.deepEqual(looks("island", "Timed tunnel").map((e) => [e.id, entryName(e), e.clocks, e.shapes]), [["island/tunnel/blowhole", "Blowhole", ["substep"], ["round"]]]);
+  assert.deepEqual(moving("town").map((t) => t.name), ["Blinking bar"]);
+  assert.deepEqual(moving("garden"), [], "the garden's own moving pieces are assemblies (the mill, the seesaw): none to place alone");
+  assert.ok(!skins(named("mountain", "Drop")).includes("serac"), "the serac falls now and then: a timed trap, not a drop");
 });
 
 void test("every look in every Builder world has its picture: a small WebP of the game's drawing", () => {
@@ -67,6 +95,11 @@ void test("every look in every Builder world has its picture: a small WebP of th
   }
   assert.deepEqual(missing, [], "no picture: run `node media/builder/tiles.mjs`");
   assert.deepEqual(big, [], "over 8 KB");
+  // and no picture of a look no world has (one taken out of its palette)
+  const looks = new Set([...palettes].flatMap(([w, p]) => p.map((e) => pictureOf(w, e))));
+  const dir = new URL("../public/builder/tiles/", import.meta.url);
+  const stale = fs.readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".webp") && !looks.has(`/builder/tiles/${f}`));
+  assert.deepEqual(stale, [], "a picture of no look: remove it");
 });
 
 void test("one name per piece, its own: a clean name for every entry of every world, the same on the board, in the looks and in every sentence", async () => {
@@ -89,5 +122,21 @@ void test("one name per piece, its own: a clean name for every entry of every wo
       names.set(name, e.id);
       assert.equal(`the ${name.toLowerCase()}`, pieceName(piece(e.id)), `${w} ${e.id}: one name on the board and in a sentence`);
     }
+  }
+});
+
+void test("the palette's folds: More pieces open and From other worlds folded at first; as the author leaves them, for the visit; a browser that keeps nothing, at first", () => {
+  sessionStorage.clear();
+  assert.deepEqual([foldOpen("more"), foldOpen("others")], [true, false]);
+  saveFold("more", false), saveFold("others", true);
+  assert.deepEqual([foldOpen("more"), foldOpen("others")], [false, true]);
+  sessionStorage.clear();
+  const real = globalThis.sessionStorage;
+  Object.defineProperty(globalThis, "sessionStorage", { get: () => { throw new Error("blocked"); }, configurable: true });
+  try {
+    saveFold("more", false);
+    assert.deepEqual([foldOpen("more"), foldOpen("others")], [true, false]);
+  } finally {
+    Object.defineProperty(globalThis, "sessionStorage", { value: real, configurable: true, writable: true });
   }
 });

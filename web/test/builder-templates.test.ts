@@ -60,11 +60,18 @@ void test("startsIn: a world's starters then a blank lane, each a copy of its ow
 
 void test("startsIn: each card says in a line what it is, a signature by its world's own piece", () => {
   const lines = Object.fromEntries(Object.keys(FIELD).map((w) => [w, startsIn(w).map((x) => `${x.title}: ${x.line}`)]));
-  assert.deepEqual(lines.garden, ["Straight: A short lane to learn the tools", "Dogleg: One turn to bank around", "The scarecrow: A scarecrow in the lane: play round it", "Blank lane: An empty lane, all yours"]);
+  assert.deepEqual(lines.garden, ["Straight: A short lane to learn the tools", "Dogleg: One turn to bank around", "The moon bridge: A moon bridge in the lane: roll up and over it", "Blank lane: An empty lane, all yours"]);
   assert.equal(lines.island[2], "The tidepool: A tidepool in the lane: keep the ball out of it");
   assert.equal(lines.town[2], "The funbox: A funbox in the lane: roll up and over it");
   assert.equal(lines.mountain[2], "The kicker: A kicker in the lane: roll up and over it");
   for (const [w, l] of Object.entries(lines)) assert.ok(l.every((x) => x.length <= 64), `${w}: a line fits a card`);
+});
+
+void test("the starters are made of their world's own pieces: none borrowed from another world", async () => {
+  for (const world of Object.keys(FIELD)) {
+    const palette = await loadPalette(world);
+    for (const s of startsIn(world)) for (const p of s.draft.pieces) assert.ok(palette.some((e) => e.id === p.entry && !e.borrowed), `${world} ${s.name}: ${p.entry}`);
+  }
 });
 
 void test("blank: a plain lane that passes every check, in every world", async () => {

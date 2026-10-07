@@ -32,9 +32,10 @@ function pieceOf(e: PaletteEntry): Piece {
   return placePiece(e, "x", AT, { size, to: [26, 6] });
 }
 
-/** Where to look: the middle of the piece's handles (its ends, its corners, its centre and rim), and its reach. */
-function aim(p: Piece) {
+/** Where to look: the middle of the piece's handles (its ends, its corners, its centre and rim), and its reach; moving air with what blows it (the mountain's cannon, 2 up-wind of its edge). */
+function aim(p: Piece, e: PaletteEntry) {
   const pts = handlesOf(p).map((h) => h.at).filter((v) => !p.params.to || v !== p.params.to);
+  if (e.kind === "air" && p.geometry.t !== "post" && p.geometry.t !== "rail" && p.geometry.t !== "bar" && p.geometry.t !== "poly") pts.push([p.geometry.min[0] - 3, p.geometry.min[1]]);
   if (p.geometry.t === "post") pts.push([p.geometry.c[0] - p.geometry.r, p.geometry.c[1] - p.geometry.r], [p.geometry.c[0] + p.geometry.r, p.geometry.c[1] + p.geometry.r]);
   if (p.geometry.t === "bar") pts.push(p.geometry.a, p.geometry.b);
   const xs = pts.map((v) => v[0]), ys = pts.map((v) => v[1]);
@@ -59,7 +60,7 @@ for (const world of Object.keys(FIELD)) {
     const state = JSON.parse(host.state(`tiles/${world}/v1`)) as { start: V; weather?: unknown };
     // (the state's board is the framed draft's: fit keeps a framed draft where it is)
     if (state.start[0] !== d.tee[0] || state.start[1] !== d.tee[1]) throw new Error(`${file}: the state is not where the draft is`);
-    jobs.push({ file, world, kind: e.kind, ...aim(p), state });
+    jobs.push({ file, world, kind: e.kind, ...aim(p, e), state });
   }
 }
 const json = JSON.stringify(jobs);

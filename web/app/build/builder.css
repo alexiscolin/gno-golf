@@ -67,7 +67,7 @@
 .palette { gap: var(--sp-4); }
 .palette__world { display: flex; align-items: center; gap: var(--sp-2); margin: calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3)) 0; padding: var(--sp-2) var(--sp-3); border-radius: 18px 18px 0 0; background: var(--ink); box-shadow: inset 0 -6px 0 var(--c2, var(--green)); color: var(--paper); font-size: 15px; font-weight: 700; }
 .palette__group { display: grid; gap: var(--sp-2); }
-.palette__group + .palette__group { margin-top: var(--sp-2); }
+.palette__group + .palette__group { margin-top: var(--sp-4); }
 .ptiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3) var(--sp-2); --pic: 60px; }
 @media (min-width: 1280px) { .ptiles { --pic: 68px; } }
 @media (min-width: 1400px) { .ptiles { --pic: 76px; } }
@@ -93,8 +93,11 @@
 .ptile__looks[aria-expanded="true"] { background: var(--gold); }
 .palette__more { display: grid; gap: var(--sp-2); }
 .palette__more summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
-.palette__more[open] summary { margin-bottom: var(--sp-1); }
-.palette__bin { margin-top: auto; padding: var(--sp-3); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; text-align: center; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+.palette__more[open] summary { margin-bottom: var(--sp-2); }
+/* "From other worlds" under the world's own, a rule between them */
+.palette__more + .palette__more { padding-top: var(--sp-3); border-top: var(--rule); }
+/* the bin: kept in sight at the column's foot however far it is scrolled */
+.palette__bin { position: sticky; bottom: 0; z-index: 1; margin-top: auto; padding: var(--sp-3); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; background: var(--paper); box-shadow: 0 0 0 var(--sp-3) var(--paper); text-align: center; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
 .palette__bin::before { content: "🗑 "; }
 .piece--on { background: var(--mint); box-shadow: 0 0 0 2px var(--gold), 0 2px 0 3px var(--ink); }
 .piece:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }

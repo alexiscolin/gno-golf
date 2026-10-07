@@ -2,16 +2,18 @@
 
 // The palette (the GUI spec's B3): the pieces by what they do (tiles.ts),
 // the five a first hole needs first, big (Wall, Bumper, Sand, Water,
-// Slope), the others by group under "More pieces", and the bin a piece
+// Slope), the world's others by group under "More pieces" (open at first),
+// another world's under "From other worlds" (palette.ts HOME, folded at
+// first), each fold kept as left for the visit, and the bin a piece
 // dragged from the board is dropped on to remove it. Each tile is the
 // game's own picture of its piece (drawn offline: media/builder/tiles.mjs),
 // its name and what it does; a tile of several looks has a chooser beside
 // the board, each look pictured. Press a tile (or a look) and it follows
 // the pointer onto the board (Board's ghost); a limit reached switches the
 // tiles it would pass off, with why. It scrolls in itself.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { type PaletteEntry } from "@/lib/builder/palette";
-import { pictureOf, tilesOf, type Tile } from "@/lib/builder/tiles";
+import { foldOpen, pictureOf, saveFold, tilesOf, type Fold, type Tile } from "@/lib/builder/tiles";
 import { entryName } from "@/lib/builder/names";
 import { cap, theWorld, worldName } from "@/lib/builder/rules";
 import { sound } from "@/lib/feel";
@@ -34,7 +36,7 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
   chosen: Readonly<Record<string, string>>;
   onChoose: (tile: string, entry: string) => void;
 }) {
-  const name = worldName(world), { first, more } = tilesOf(palette);
+  const name = worldName(world), { first, more, others } = tilesOf(palette);
   // the tile whose looks are open
   const [open, setOpen] = useState<{ tile: Tile; from: HTMLElement } | null>(null);
   const lookOf = (t: Tile) => t.looks.find((e) => e.id === chosen[t.key]) ?? t.looks[0];
@@ -66,21 +68,36 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
     <aside className="col palette" aria-label={`${cap(theWorld(world))}'s pieces`} onScroll={() => setOpen(null)}>
       <div className="palette__world">{name} pieces</div>
       <div className="ptiles ptiles--first">{first.map((t) => tile(t, true))}</div>
-      <details className="palette__more">
-        <summary>More pieces</summary>
+      <Folding fold="more" title="More pieces">
         {more.map((g) => (
           <section key={g.group} className="palette__group">
             <h3>{g.group}</h3>
             <div className="ptiles">{g.tiles.map((t) => tile(t))}</div>
           </section>
         ))}
-      </details>
+      </Folding>
+      {others.length > 0 && (
+        <Folding fold="others" title="From other worlds">
+          <div className="ptiles">{others.map((t) => tile(t))}</div>
+        </Folding>
+      )}
       {bin && <div className="palette__bin" data-bin aria-hidden="true">Drop a piece here to remove it</div>}
       {open && (
         <Looks world={world} tile={open.tile} from={open.from} now={lookOf(open.tile)} off={off} onClose={() => setOpen(null)}
           onPick={(e) => (onChoose(open.tile.key, e.id), sound("select"), onArm(e))} />
       )}
     </aside>
+  );
+}
+
+/** A section of the palette that folds: open or folded as the author left it this visit (tiles.ts foldOpen). */
+function Folding({ fold, title, children }: { fold: Fold; title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(() => foldOpen(fold));
+  return (
+    <details className="palette__more" data-fold={fold} open={open} onToggle={(e) => (setOpen(e.currentTarget.open), saveFold(fold, e.currentTarget.open))}>
+      <summary>{title}</summary>
+      {children}
+    </details>
   );
 }
 
