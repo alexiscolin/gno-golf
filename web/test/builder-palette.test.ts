@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { added, drawn, loadWorld, worldOf } from "./scene-harness.ts";
-import { BINDINGS, HAND_ONLY, WORLD_NAMES, commonOf, entry, loadPalette, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
+import { BINDINGS, HAND_ONLY, HOME, WORLD_NAMES, commonOf, entry, loadPalette, sharedSkins, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD, MAX_BOUNCE, WEATHER, kicks } from "../lib/builder/rules.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { writeDraft } from "../lib/builder/gg1.ts";
@@ -72,6 +72,38 @@ void test("every drawing the scene declares for the Builder's worlds is bound or
     }
   }
   assert.ok(Object.hasOwn(HAND_ONLY, "bar/tram"));
+});
+
+void test("every shared drawing has a home: every world's, some worlds', or the shore's; a world's course pieces are its own; the shore's pieces only by the sea", () => {
+  const shared = new Set(Object.entries(sharedSkins()).flatMap(([kind, list]) => list.map((s) => `${kind}/${s}`)).filter((k) => !Object.hasOwn(HAND_ONLY, k)));
+  assert.deepEqual(new Set(Object.keys(HOME)), shared, "a home for every shared drawing the palette offers, and for no other");
+  for (const [k, home] of Object.entries(HOME)) if (typeof home !== "string") for (const w of home) assert.ok(Object.hasOwn(FIELD, w), `${k}: ${w} is no Builder world`);
+  // what the game's own holes of a world place is that world's own, never borrowed
+  const course = fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n").map((l) => l.split(" "));
+  const borrowed: string[] = [];
+  for (const [slot, , , hex] of course) {
+    const g = host.decode(hex), es = palettes.get(g.world);
+    if (!es) continue;
+    const zones = [g, ...g.pulses].flatMap((l) => l.zones.map((z) => [z.kind === "slope" && z.air ? "air" : z.kind, z.skin]));
+    const pieces = [g, ...g.pulses].flatMap((l) => [...l.posts.map((p) => ["post", p.skin]), ...l.walls.flatMap((w) => [["rail", w.skin], ["bar", w.skin]]), ...zones]);
+    for (const [kind, skin] of pieces) for (const e of es) if (e.kind === kind && e.skin === skin && e.borrowed) borrowed.push(`${slot} ${e.id}`);
+  }
+  assert.deepEqual([...new Set(borrowed)], []);
+  // the shore's (a palm, a crab, the waves) look wrong away from the sea: only a world with one offers them
+  for (const [w, es] of palettes) {
+    const shore = es.filter((e) => e.world === "*" && HOME[`${e.kind}/${e.skin}`] === "sea").map((e) => e.id);
+    if (w === "island") assert.ok(shore.includes("*/post/sandcastle") && shore.includes("*/surface/wetsand"), w);
+    else assert.deepEqual(shore, [], `${w}: no sea, none of the shore's pieces`);
+  }
+  // each world's own, as the game dresses it
+  const own = (w: string) => palettes.get(w)!.filter((e) => !e.borrowed).map((e) => e.skin);
+  const lent = (w: string) => palettes.get(w)!.filter((e) => e.borrowed).map((e) => e.skin);
+  for (const s of ["hedge", "flowerbed", "molehill", "sunflower", "scarecrow", "moon bridge", "wheelbarrow"]) assert.ok(own("garden").includes(s), `garden: ${s}`);
+  for (const s of ["palm", "wetsand", "lagoon", "rowing boat", "sandcastle", "shipwreck"]) assert.ok(own("island").includes(s), `island: ${s}`);
+  for (const s of ["brick", "herringbone", "stall", "lamp", "fountain", "canal"]) assert.ok(own("town").includes(s), `town: ${s}`);
+  for (const s of ["boulder", "snowdrift", "ice", "pine", "crevasse"]) assert.ok(own("mountain").includes(s), `mountain: ${s}`);
+  assert.ok(lent("mountain").includes("scarecrow") && lent("garden").includes("lamp") && lent("island").includes("hedge"), "another world's pieces, borrowed");
+  for (const s of ["", "bumper", "sand", "water"]) for (const w of palettes.keys()) assert.ok(own(w).includes(s), `${w}: "${s}" every world's`);
 });
 
 void test("every binding is inside GG1's bounds and the plan's: a bounce above 1 exactly where the skin kicks; mouths 1.5 across; ice a surface; no weather", () => {

@@ -37,8 +37,10 @@ void test("changeWorld: kept where every piece has an entry there (or a shared o
   assert.ok(!("refused" in moved));
   assert.equal(moved.world, "town");
   assert.deepEqual(moved.pieces, plain.pieces);
-  const back = changeWorld({ ...d, pieces: [placePiece(byId(island, "island/post/palm"), "c", [1, 1])] }, "garden", garden);
-  assert.ok(!("refused" in back) && back.pieces[0].entry === "*/post/palm", "the island's own palm: the shared one in the garden");
+  const back = changeWorld({ ...d, pieces: [placePiece(byId(island, "island/post/outcrop"), "c", [1, 1])] }, "garden", garden);
+  assert.ok(!("refused" in back) && back.pieces[0].entry === "*/post/outcrop", "the island's own outcrop: the shared one in the garden");
+  const shore = changeWorld({ ...d, pieces: [placePiece(byId(island, "island/post/palm"), "c", [1, 1])] }, "garden", garden);
+  assert.deepEqual(shore, { refused: ["the palm tree at (1, 1)"] }, "the shore's palm: none in a world with no sea");
   const own = changeWorld({ ...emptyDraft("town"), pieces: [placePiece(byId(town, "town/post/lamp"), "l", [1, 1])] }, "island", island);
   assert.ok(!("refused" in own) && own.pieces[0].entry === "*/post/lamp", "a world's own drawing of a shared skin: the shared one in the next world");
 });

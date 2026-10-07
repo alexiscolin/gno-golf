@@ -30,6 +30,8 @@ export interface PaletteEntry extends Binding {
   skin: string;
   kind: Kind;
   draw: Draw;
+  /** another world's piece (HOME), offered under "From other worlds" */
+  borrowed?: true;
 }
 
 /**
@@ -42,6 +44,30 @@ export interface PaletteEntry extends Binding {
 export const HAND_ONLY: Record<string, string> = {
   "bar/tram": "a tram line is a run of timed bars, with rails and tunnels at the board's edge (course.ts tramLines)",
   "air/gust": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
+};
+
+/**
+ * Where each shared drawing is at home, by kind and skin: every world ("*",
+ * a plain piece any lane has), the worlds named (the game's own holes there
+ * place it, or it is of their kind), or the shore ("sea": a world with a sea,
+ * worlds.ts SEA; away from one a palm, a crab or the waves look wrong, and no
+ * other world offers them). Elsewhere a piece is borrowed: offered under
+ * "From other worlds". A world's own drawings (its module's skins) are its
+ * own. Every shared drawing has one (builder-palette.test.ts), so a new one
+ * says where it belongs.
+ */
+export const HOME: Readonly<Record<string, "*" | "sea" | readonly string[]>> = {
+  "rail/": "*", "rail/rampart": ["island"],
+  "bar/": "*", "bar/plank": "*", "bar/logs": ["garden", "town", "mountain"], "bar/hay": ["garden"], "bar/gate": ["garden"], "bar/gate door": ["garden"],
+  "bar/hedge": ["garden"], "bar/wheelbarrow": ["garden"], "bar/stall": ["town"], "bar/awning": ["town"], "bar/clock hand": ["town"], "bar/driftwood": "sea",
+  "post/": "*", "post/bumper": "*", "post/rock": "*", "post/stump": ["garden", "town", "mountain"], "post/scarecrow": ["garden"], "post/sunflower": ["garden"],
+  "post/lantern": ["garden"], "post/outcrop": ["island"], "post/sandcastle": "sea", "post/palm": "sea", "post/coral": "sea", "post/buoy": "sea", "post/crab": "sea",
+  "post/driftwood": "sea", "post/lamp": ["town"], "post/clock": ["town"], "post/roundabout": ["town"], "post/chimney": ["town"], "post/house": ["town"], "post/gnome statue": ["town"],
+  "tunnel/": "*", "tunnel/warp": "*", "tunnel/cave": ["island"], "tunnel/well": ["town"], "tunnel/door": ["town"], "tunnel/shipwreck": "sea",
+  "surface/": "*", "surface/sand": "*", "surface/wetsand": "sea", "surface/flowerbed": ["garden", "town"], "surface/soil": ["garden"], "surface/bridge": ["garden", "town"],
+  "surface/ice": ["garden", "mountain"], "surface/molehill": ["garden"],
+  "slope/": "*", "slope/dune": "sea", "slope/stairs": ["town"], "slope/quarter pipe": ["town"], "slope/funbox": ["town"], "slope/moon bridge": ["garden"],
+  "hazard/": "*", "hazard/water": "*", "hazard/wave": "sea", "hazard/lagoon": "sea", "hazard/tidepool": "sea", "hazard/fountain": ["town"], "hazard/canal": ["town"],
 };
 
 /** The shared drawings (any world), by kind: the scene's tables and declarations. */
@@ -75,11 +101,12 @@ function sharedDraw(kind: Kind, skin: string): Draw {
 }
 
 /**
- * The palette of a world: the shared entries ("*") and its own (skins, the
- * world module's declaration), a skin the world draws its own way kept once,
- * as the world's.
+ * The palette of a world: its own entries (skins, the world module's
+ * declaration), then the shared ones ("*"), a skin the world draws its own
+ * way kept once, as the world's; a shared one away from its HOME borrowed,
+ * and the shore's left out where there is no sea.
  */
-export function paletteOf(world: string, own: Skins = {}): PaletteEntry[] {
+export function paletteOf(world: string, own: Skins = {}, sea = false): PaletteEntry[] {
   const out: PaletteEntry[] = [];
   const mine = new Set<string>();
   for (const [kind, skins] of Object.entries(own) as [Kind, readonly string[]][]) {
@@ -90,9 +117,10 @@ export function paletteOf(world: string, own: Skins = {}): PaletteEntry[] {
   }
   for (const [kind, skins] of Object.entries(sharedSkins()) as [Kind, readonly string[]][]) {
     for (const s of skins) {
-      if (mine.has(`${kind}/${s}`)) continue;
+      const home = Object.hasOwn(HOME, `${kind}/${s}`) ? HOME[`${kind}/${s}`] : [];
+      if (mine.has(`${kind}/${s}`) || (home === "sea" && !sea)) continue;
       const e = makeEntry("*", kind, s, sharedDraw(kind, s));
-      if (e) out.push(e);
+      if (e) out.push(home === "*" || home === "sea" || home.includes(world) ? e : { ...e, borrowed: true });
     }
   }
   return out;
@@ -109,7 +137,8 @@ export const commonOf = (palette: readonly PaletteEntry[]) =>
 export async function loadPalette(world: string): Promise<readonly PaletteEntry[]> {
   if (!Object.hasOwn(FIELD, world)) throw new Error(notABuilderWorld(world));
   await loadWorld(world);
-  return paletteOf(world, worldOf({ world }).skins);
+  const w = worldOf({ world });
+  return paletteOf(world, w.skins, w.SEA !== undefined);
 }
 
 /** The entry of a palette by its id ("island/post/palm"), undefined for none. */

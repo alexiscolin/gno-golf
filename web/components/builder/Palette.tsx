@@ -2,7 +2,8 @@
 
 // The palette (the GUI spec's B3): the pieces by what they do (tiles.ts),
 // the five a first hole needs first, big (Wall, Bumper, Sand, Water,
-// Slope), the others by group under "More pieces", and the bin a piece
+// Slope), the world's others by group under "More pieces", another world's
+// under "From other worlds" (palette.ts HOME), and the bin a piece
 // dragged from the board is dropped on to remove it. Each tile is the
 // game's own picture of its piece (drawn offline: media/builder/tiles.mjs),
 // its name and what it does; a tile of several looks has a chooser beside
@@ -34,7 +35,7 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
   chosen: Readonly<Record<string, string>>;
   onChoose: (tile: string, entry: string) => void;
 }) {
-  const name = worldName(world), { first, more } = tilesOf(palette);
+  const name = worldName(world), { first, more, others } = tilesOf(palette);
   // the tile whose looks are open
   const [open, setOpen] = useState<{ tile: Tile; from: HTMLElement } | null>(null);
   const lookOf = (t: Tile) => t.looks.find((e) => e.id === chosen[t.key]) ?? t.looks[0];
@@ -75,6 +76,12 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
           </section>
         ))}
       </details>
+      {others.length > 0 && (
+        <details className="palette__more">
+          <summary>From other worlds</summary>
+          <div className="ptiles">{others.map((t) => tile(t))}</div>
+        </details>
+      )}
       {bin && <div className="palette__bin" data-bin aria-hidden="true">Drop a piece here to remove it</div>}
       {open && (
         <Looks world={world} tile={open.tile} from={open.from} now={lookOf(open.tile)} off={off} onClose={() => setOpen(null)}
