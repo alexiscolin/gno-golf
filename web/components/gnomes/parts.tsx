@@ -116,29 +116,34 @@ export function Closes({ at, now }: { at: number; now: number }) {
   );
 }
 
-/** The sale in one line: a little fairway, the ball rolled from the tee to the share that found a player (still
- *  with reduced motion), the flag, the wave's Legendary waiting at it in gold, the wave's words, and its state's chip
- *  (a date, never a countdown); the sale's end in words. Its height the slot's (ShopFrame WaveSlot). */
+/** The sale's card, the game's front card (title.css): the wave's Legendary in gold on the left, the wave's title in
+ *  bold over its count and the Legendary's words, its state's chip at the right of the title (a date, never a
+ *  countdown; a phone's shorter), the fairway under them its whole width, the ball rolled from the tee to the share
+ *  that found a player (still with reduced motion); the sale's end in words. Its height the slot's (ShopFrame WaveSlot). */
 export function SaleLine({ line }: { line: WaveLine }) {
-  if (line.at === "closed") return <section className="wline" aria-label="The sale"><span className="wline__words">{line.words}</span></section>;
+  if (line.at === "closed")
+    return <section className="wcard wcard--closed" aria-label="The sale"><b className="wcard__title">{line.title}</b><span className="wcard__count">{line.count}</span></section>;
   const { legend, chip } = line;
   return (
-    <section className={`wline${chip ? " wline--chip" : ""}`} aria-label="The sale">
+    <section className="wcard" aria-label="The sale">
+      {legend && <span className="wcard__legend" title={legend.words}><img src={thumb(legend.id)} alt="" width={256} height={256} decoding="async" /></span>}
+      <b className="wcard__title" aria-hidden="true">{line.title}</b>
+      {chip && (
+        <span className="wcard__chip" role="note" aria-label={chip.full} title={chip.full}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" /><path d="M8 4.5V8l2.5 1.6" /></svg>
+          <span className="wcard__long">{chip.text}</span><span className="wcard__short">{chip.short}</span>
+        </span>
+      )}
+      <span className="wcard__count" aria-hidden="true">
+        <span>{line.count}</span>
+        {legend && <span className="wcard__who"><b>{legend.name}</b> {legend.words.slice(legend.name.length + 1)}</span>}
+      </span>
       <span className="fw" role="img" aria-label={legend ? `${line.label}. ${legend.words}` : line.label} style={{ "--at": line.share } as CSSProperties}>
         <span className="fw__lane" />
         <span className="fw__tee" />
         <svg className="fw__flag" viewBox="0 0 16 32" aria-hidden="true"><ellipse cx="4" cy="23" rx="4" ry="2" className="fw__cup" /><path d="M4 23V2" className="w__pole" /><path d="M4 2l11 4-11 4z" className="w__flag" /></svg>
         <span className="fw__ball" />
       </span>
-      {legend && <span className="wline__legend" title={legend.words}><img src={thumb(legend.id)} alt="" width={256} height={256} decoding="async" /></span>}
-      <span className="wline__words" aria-hidden="true">{line.words}</span>
-      {legend && <span className="wline__who" aria-hidden="true"><b>{legend.name}</b> {legend.words.slice(legend.name.length + 1)}</span>}
-      {chip && (
-        <span className="wline__chip" role="note" aria-label={chip.full} title={chip.full}>
-          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" /><path d="M8 4.5V8l2.5 1.6" /></svg>
-          {chip.text}
-        </span>
-      )}
     </section>
   );
 }
@@ -152,7 +157,7 @@ export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierSha
       {(["common", "rare", "epic", "legendary"] as const).map((t) => {
         const s = known.get(t);
         return (
-          <Button key={t} size="m" type="button" className={`tier tier--${t} tierbtn`} aria-pressed={value === t} onClick={() => onChange(value === t ? undefined : t)}
+          <Button key={t} size="s" type="button" className={`tier tier--${t} tierbtn`} aria-pressed={value === t} onClick={() => onChange(value === t ? undefined : t)}
             aria-label={s ? s.label : tierName(t)}>
             <svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE[t]}</svg>
             <span className="tierbtn__name">{tierName(t)}</span>
@@ -177,7 +182,7 @@ export function SearchToggle({ value, onChange }: { value: string; onChange: (te
   const close = () => ((back.current = true), onChange(""), setOpen(false));
   if (!shown)
     return (
-      <Button ref={icon} variant="icon" size="m" type="button" className="gbar__icon" aria-label="Find a gnome by name or number" aria-expanded={false} onClick={() => setOpen(true)}>
+      <Button ref={icon} variant="icon" size="s" type="button" className="gbar__icon" aria-label="Find a gnome by name or number" aria-expanded={false} onClick={() => setOpen(true)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
       </Button>
     );

@@ -23,11 +23,10 @@ import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
 import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, SearchToggle, TierChip, TierFilter } from "./parts";
-import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, ShopTitle, WaveSlot } from "./ShopFrame";
+import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
 import GnomeSheet from "./GnomeSheet";
-import type { Skin } from "@/lib/scene/gnome";
 import Album from "./Album";
 import Collector from "./Rank";
 import { ALBUM_WORDS, album, albumLine, albumShown, collectorsOf } from "@/lib/gnomes/collection";
@@ -50,11 +49,9 @@ export interface ShopProps {
   onPlay: (skinId: string) => void;
   /** race a player's ghost */
   onRace: (player: string) => void;
-  /** the shopkeeper by the title: the menu's Shop panel's gnome (null: not known yet) */
-  keeper?: Skin | null;
 }
 
-export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace, keeper }: ShopProps) {
+export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace }: ShopProps) {
   const shop = useMemo(() => makeShop(chain), [chain]);
   const me = account && account.address;
   // the first frame from the sale the menu already read (its panel), when it has: then read again (load)
@@ -144,7 +141,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   }, [cat, mine]);
 
   // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
-  const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : <ShopTitle keeper={keeper} />;
+  const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
 
   if (region === null)
@@ -184,11 +181,13 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
           <div className="gbar">
             <Segmented label="Which gnomes" className="gbar__views" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
             <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
-            <SearchToggle value={f.text} onChange={(text) => setF((x) => ({ ...x, text }))} />
-            <LookSwitch look={look} onLook={onLook} />
-            <Button variant="icon" size="m" type="button" className={`gbar__icon gbar__more${f.home ? " btn--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.4" /><circle cx="15" cy="17" r="2.4" /></svg>
-            </Button>
+            <div className="gbar__end">
+              <SearchToggle value={f.text} onChange={(text) => setF((x) => ({ ...x, text }))} />
+              <LookSwitch look={look} onLook={onLook} />
+              <Button variant="icon" size="s" type="button" className={`gbar__icon gbar__more${f.home ? " btn--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.4" /><circle cx="15" cy="17" r="2.4" /></svg>
+              </Button>
+            </div>
           </div>
           {more && (
             <div className="gfilters" id="gmore">

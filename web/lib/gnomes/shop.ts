@@ -200,29 +200,33 @@ export function nowRow(c: Collection, sold: (id: number) => boolean, entries: re
 // ------------------------------------------------------------ the shop's wave line (a little fairway, tee to flag)
 /** A tier of the wave: what found a player of what it holds, its price (ugnot, 0: none said), all in words. */
 export interface TierShare { tier: BuyTier; found: number; total: number; price: number; label: string }
-/** The shop's one line of the sale: the wave's words and the same said whole (label), the ball's place
+/** The shop's wave card: the wave's title ("Wave 1 · Garden") and its count ("4 of 104 found a player"), the same said
+ *  whole (label), the ball's place
  *  from tee (0) to flag (1) as the share that found a player, each tier's share, the wave's Legendary at
- *  the flag, and the state's chip (a date, never a countdown: none while the wave is simply open);
+ *  the flag, and the state's chip (a date, never a countdown: none while the wave is simply open; short, a phone's);
  *  closed: what was made and never made; null: no wave to show. */
 export type WaveLine =
-  | { at: "closed"; words: string; label: string }
-  | { at: "teaser" | "players" | "open" | "paused" | "soldout"; n: number; words: string; label: string; share: number; tiers: TierShare[];
-      legend: { id: number; name: string; words: string } | null; chip: { text: string; full: string } | null };
+  | { at: "closed"; title: string; count: string; label: string }
+  | { at: "teaser" | "players" | "open" | "paused" | "soldout"; n: number; title: string; count: string; label: string; share: number; tiers: TierShare[];
+      legend: { id: number; name: string; words: string } | null; chip: { text: string; short: string; full: string } | null };
 export function waveLine(row: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "name">[], sold: (id: number) => boolean, now: number): WaveLine | null {
   if (row.at === "none") return null;
-  if (row.at === "closed") return { at: "closed", words: `Closed: ${row.made} made · ${row.never} never made`, label: `The sale is closed: ${row.made} gnomes made, ${row.never} never made` };
+  if (row.at === "closed") return { at: "closed", title: "The sale is closed", count: `${row.made} made · ${row.never} never made`, label: `The sale is closed: ${row.made} gnomes made, ${row.never} never made` };
   const { wave } = row, inWave = entries.filter((e) => e.id >= wave.row.first && e.id <= wave.row.last);
   const tiers = BUY_TIERS.map((tier) => {
     const of = inWave.filter((e) => e.tier === tier), found = of.filter((e) => sold(e.id)).length, price = wave.row.prices[tierIndex(c, tier)] ?? 0;
     return { tier, found, total: of.length, price, label: `${label(tier)}${price > 0 ? `, ${gnot(price)} GNOT` : ""}: ${found} of ${of.length} found a player` };
   }).filter((t) => t.total > 0);
   const legend = inWave.find((e) => e.tier === "legendary"), until = utcDate(wave.row.playersUntil, now, true), opens = utcDate(wave.row.start, now, true);
-  const chip = row.at === "teaser" ? { text: `Opens ${opens}`, full: `Wave ${wave.n} opens ${opens}.` }
-    : row.at === "players" ? { text: `Players first · until ${until}`, full: `Players first until ${until}: save one round on-chain to buy now.` }
-    : row.at === "paused" ? { text: "Paused for a moment", full: "Paused for a moment: the sale picks up where it stopped." } : null;
+  // (short: a phone's, the day said only when it is not today's)
+  const bare = (s: string) => s.replace(/^today, /, "");
+  const chip = row.at === "teaser" ? { text: `Opens ${opens}`, short: `Opens ${bare(opens)}`, full: `Wave ${wave.n} opens ${opens}.` }
+    : row.at === "players" ? { text: `Players first · until ${until}`, short: `Players first · ${bare(until)}`, full: `Players first until ${until}: save one round on-chain to buy now.` }
+    : row.at === "paused" ? { text: "Paused for a moment", short: "Paused", full: "Paused for a moment: the sale picks up where it stopped." } : null;
   return {
     at: row.at, n: wave.n, chip, tiers,
-    words: `Wave ${wave.n}${wave.home ? ` · ${worldName(wave.home)}` : ""} · ${wave.sold}/${wave.size}`,
+    title: `Wave ${wave.n}${wave.home ? ` · ${worldName(wave.home)}` : ""}`,
+    count: `${wave.size && wave.sold >= wave.size ? `All ${wave.size}` : `${wave.sold} of ${wave.size}`} found a player`,
     label: `Wave ${wave.n}${wave.home ? `, ${theWorld(wave.home)}` : ""}: ${wave.size && wave.sold >= wave.size ? `all ${wave.size}` : `${wave.sold} of ${wave.size}`} ${plural("gnome", wave.size)} found a player`,
     share: wave.size ? Math.min(1, wave.sold / wave.size) : 0,
     legend: legend ? { id: legend.id, name: legend.name, words: `${legend.name} ${sold(legend.id) ? "found a player" : "waits at the flag"}` } : null,
