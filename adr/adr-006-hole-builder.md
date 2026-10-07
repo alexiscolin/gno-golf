@@ -28,15 +28,16 @@ the realm byte for byte by `scripts/wasmparity.ts`). Every player loads it.
   `maxShotGas`, `maxData`, `validSlug`, `cleanName`, `cleanText`, `linkish`),
   built with `-tags builder`. `golf.wasm` is unchanged, byte for byte: no
   player downloads the builder (187,825 B, 83,973 B gzipped, as before;
-  `builder.wasm` 235,743 B, 103,633 B gzipped). `wasm.sh` fails past 300 KB or
-  130 KB gzipped.
+  `builder.wasm` 290,331 B, 121,412 B gzipped, 235,743 and 103,633 at first).
+  `wasm.sh` fails past 300 KB or 130 KB gzipped.
 - **The checks are the realm's code, driven by a hand-written `Check`**
   (`scripts/wasm/r/gnogolf/golf/local_builder.go`): `decodeData`'s steps in
   its order (`course.DecodeChecked`, `course.Encode`'s very bytes, the two
   work bounds), less its sha256, then `publishMineNow`'s slug, name and note
   checks. Extracting `decodeData` whole would link `crypto/sha256`, which in
   TinyGo brings its FIPS module (aes, sha3, gcm, hmac, drbg), and
-  `encoding/hex`, which brings `fmt`: measured, 347 KB instead of 235. The
+  `encoding/hex`, which brings `fmt`: measured, 347 KB instead of 235 (as it
+  was then). The
   driver is a mirror of ten lines, and the parity test holds it to
   `PublishMine` itself: every course hole, mutated byte by byte, cut, in
   capitals, with refused slugs and notes, and holes past each of GG1's bounds

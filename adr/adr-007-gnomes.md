@@ -10,8 +10,9 @@ research brief's waves, player window and prices
 at a fixed price, the Legendaries too (no auction: the user's decision of
 2026-10-06), a hard closing date for the genesis sale, a treasury apart
 from the owner's key, and a site link the owner sets. golf/v2 and store do
-not change. Nothing is deployed. Two points stay open for the user:
-`Renounce`, and a portrait drawn from the traits.
+not change. Nothing is deployed. One point stays open for the user:
+`Renounce`. The portrait drawn from the traits is built (`svg.gno`,
+`art.gno`).
 
 ## Context
 
@@ -152,7 +153,7 @@ it leaves them and refuses to move an earned one.
 | what | bytes | deposit | golden |
 |---|---|---|---|
 | the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink (p/gnogolf/jsonq, added since, is of weblink's size and not measured) | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
-| the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
+| the genesis published as the catalogue lays it out, with its closing date and a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
 | a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
 | an earned gnome | 3,555 | 0.36 GNOT, the player | `z_storage_earned` |
 
@@ -161,6 +162,7 @@ it leaves them and refuses to move an earned one.
 | a first buy | 7.55M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens), two files the same but the `Buy` (the 2.37M given before left a `Gnome` read and the buyer's set-up in one of them alone) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.2M | `z_proof_king` less `z_proof_seed` (`// Gas:` goldens) |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
+| `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
 
 The deploy's deposit is what a chain stores, not the source's size: the
 package and its preprocessed code, about one and a half times the staged
@@ -170,7 +172,6 @@ imports, then `gnokey maketx addpkg` of the staged weblink and gnomes on
 its in-process node: `STORAGE DELTA`), and agrees with the local chain's
 20.6 GNOT for gnomes before the portrait's art. `addpkg` is sent with a
 `-max-deposit` of 40 GNOT, as planned.
-| `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
 
 Every figure above is `gno test`'s, and a chain charges more. `gno test`
 runs on a store with no gas meter: it never charges what a call pays to load
@@ -205,8 +206,8 @@ buy sheet asks for their consent to delivery at once. At zero server cost:
 Netlify's country rules (`netlify.toml`) rewrite `/geo.json` to
 `/geo-blocked.json` and a gnome's page `/g/*` to a static "not available in
 your region" page for those countries; the client reads `/geo.json` once
-when the shop would open and, shut, hides the shop, its links and every buy,
-buy and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
+when the shop would open and, shut, hides the shop, its links and every buy
+and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
 tests holding both rules to it). Best effort, and said so: a VPN gets round
 it, and the realm stays callable with gnokey by anyone; a realm cannot know
 a caller's country.
@@ -230,8 +231,8 @@ GRC721 surface (`TokenOfOwnerByIndex` from the locker's index, no
 `external_url`, attributes Tier, Series and an earned gnome's Kind);
 `Render` for gnoweb (the collection, a gnome with a `gnokey` line to buy it
 while on sale, an earned kind, a player).
-`TokenURI` is an SVG drawn on read, its name escaped; a portrait drawn from
-the traits is the user's call.
+`TokenURI` is the gnome's portrait, an SVG drawn on read from its traits
+(`svg.gno`, `art.gno`), its name escaped.
 
 ## Threats, and the test for each
 
