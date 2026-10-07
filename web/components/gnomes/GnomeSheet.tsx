@@ -47,6 +47,7 @@ interface Props {
 export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onChanged, look, onLook }: Props) {
   const me = account && account.address;
   const [row, setRow] = useState<GnomeRow | null>(null);
+  const [unread, setUnread] = useState(false); // (the gnome's read failed: said, never a Buy greyed out with no reason)
   const [can, setCan] = useState<CanBuy | null>(null);
   const [step, setStep] = useState<Step>({ at: "view" });
   const [ticks, setTicks] = useState({ a: false, b: false });
@@ -56,7 +57,8 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   const [equip, setEquip] = useState("");
 
   const read = () => {
-    void shop.gnome(g.id).then(setRow, () => setRow(null));
+    setUnread(false);
+    void shop.gnome(g.id).then(setRow, () => (setRow(null), setUnread(true)));
     if (me) void shop.canBuy(me, [g.id]).then(setCan, () => setCan(null));
   };
   useEffect(read, [g.id, me]); // eslint-disable-line react-hooks/exhaustive-deps -- (shop: the same for the visit)
@@ -163,6 +165,8 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
             </div>
           ) : owner ? (
             <p className="gsheet__fine">Found a player. <button className="linkish" onClick={() => onTheirs(owner)}>Their gnomes →</button></p>
+          ) : unread ? (
+            <div className="gsheet__foot"><p className="note note--bad" role="alert">The chain did not answer.</p><Button variant="primary" className="btn--wide" onClick={read}>Try again</Button></div>
           ) : region ? (
             <>
               {row && <p className="gsheet__price">{gnot(price)} GNOT <small>+ a small deposit and fee</small></p>}
