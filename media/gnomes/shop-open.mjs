@@ -9,7 +9,7 @@
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
 // every card's #number in sight however long its name; the toolbar's controls, on each of its
 // lines, as tall as one another, on one top, their words on one baseline, and More filters open
-// gold (on) in the box it has shut; the picker's collection between its tile and its aim card, as
+// gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card, as
 // wide, one compact row, its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs). Before, the title screen alone: none of
 // the sale read (the catalogue), the collection's wardrobe nor the shop's
 // part of the game (components/gnomes/Game.tsx: a dev build's chunk names
@@ -99,9 +99,14 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.js(`document.querySelector(".gbar__more").click(); true`);
   await sleep(300);
   const on = { box: JSON.stringify(await b.ev(footprint(".gbar__more"))) === JSON.stringify(shut), gold: await b.ev(gold(".gbar__more")), line: await b.ev(misaligned(bar)) };
-  const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0;
+  // a tier selected and the view chosen: the one selected look (gold), the tier's box kept, the bar in line
+  const tier = await b.ev(footprint(".gbar .tierbtn"));
+  await b.js(`document.querySelector(".gbar .tierbtn").click(); true`);
+  await sleep(300);
+  const sel = { box: JSON.stringify(await b.ev(footprint(".gbar .tierbtn"))) === JSON.stringify(tier), gold: await b.ev(gold(".gbar .tierbtn")), view: await b.ev(gold(".gbar__views button.on")), line: await b.ev(misaligned(bar)) };
+  const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0 && sel.box && sel.gold && sel.view && sel.line.length === 0;
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}`, ok ? "" : JSON.stringify({ off, on }));
+  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}; a tier and the view selected: gold ${sel.gold && sel.view}, the tier's box kept ${sel.box}`, ok ? "" : JSON.stringify({ off, on, sel }));
   // the picker: the collection between the tile and the aim card, the aim card's width, one compact row; the head whole
   await b.send("Page.navigate", { url: APP + "/?cup=garden&screen=pick" });
   for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".screen--pick .gcollect")`)); i++) await sleep(500);

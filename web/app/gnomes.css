@@ -109,10 +109,11 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 .gbar__views button { padding: 6px 14px; white-space: nowrap; }
 .gbar__tiers { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tierbtn__unit { font-size: 11px; }
-/* a tier's chip as the shelf's filter (Button, a toolbar's): pressed, ringed, on its own colour */
+/* a tier's chip as the shelf's filter (Button, a toolbar's): its shape and colour its tier's; pressed, the one
+   selected look (gold, globals.css), its shape kept, the others faded */
 .tierbtn { gap: 5px; padding: 0 10px 0 7px; font-size: 13px; font-weight: 800; letter-spacing: .04em; }
 .tierbtn__price { margin-left: 2px; font-size: 13px; letter-spacing: 0; text-transform: none; }
-.tierbtn[aria-pressed="true"] { background: var(--tier-bg); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+.tierbtn[aria-pressed="true"] { background: var(--gold); }
 .gbar__tiers:has([aria-pressed="true"]) .tierbtn:not([aria-pressed="true"]) { opacity: .55; }
 .gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .gbar__icon svg, .gsearch svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
