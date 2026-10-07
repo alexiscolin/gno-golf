@@ -94,8 +94,9 @@
 /* the bin: kept in sight at the column's foot however far it is scrolled */
 .palette__bin { position: sticky; bottom: 0; z-index: 1; margin-top: auto; padding: var(--sp-3); border: 2px dashed rgba(var(--ink-rgb), .35); border-radius: 12px; background: var(--paper); box-shadow: 0 0 0 var(--sp-3) var(--paper); text-align: center; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
 .palette__bin::before { content: "🗑 "; }
-.piece--on { background: var(--mint); box-shadow: 0 0 0 2px var(--gold), 0 2px 0 3px var(--ink); }
-.piece:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.piece--on { background: var(--gold); } /* (on, as a button is: gold, its box kept) */
+.piece--on .piece__does { color: var(--ink); } /* (its words read on the gold) */
+.piece:disabled { opacity: .45; cursor: not-allowed; }
 /* a tile's looks: a panel beside the palette, level with the tile, scrolling in itself */
 .looks { position: fixed; z-index: 4; width: 296px; max-height: calc(100vh - 24px); overflow: auto; overscroll-behavior: contain; display: grid; gap: var(--sp-2); padding: var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: var(--paper); box-shadow: 0 10px 28px rgba(var(--ink-rgb), .22); }
 .looks__head { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
@@ -104,7 +105,7 @@
 .look { display: grid; justify-items: center; gap: 2px; min-width: 0; padding: 6px 4px; border: var(--edge); border-radius: 12px; background: var(--white); font: inherit; font-size: 12px; font-weight: 700; color: var(--ink); cursor: grab; touch-action: none; }
 .look img { width: 64px; height: 64px; border-radius: 8px; pointer-events: none; }
 .look span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.look[aria-pressed="true"] { background: var(--mint); box-shadow: 0 0 0 2px var(--gold); }
+.look[aria-pressed="true"] { background: var(--gold); }
 .look:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ------------------------------------------------------------ the centre: the board, its checks docked under it */

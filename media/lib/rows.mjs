@@ -1,7 +1,7 @@
 // @ts-check
 // Buttons side by side, as a player sees them (components/ui.tsx Button, Chip):
 // in a row, every control as tall as the others, on one top, and their words
-// on one baseline; off (disabled), a button keeps the box it has on. For the
+// on one baseline; off (disabled) or on (pressed, open: gold), a button keeps its box. For the
 // headless checks (scripts/builderui.ts, media/gnomes/shop-open.mjs): each is
 // an expression to evaluate in the page (its function runs there, not in Node).
 /* global document, NodeFilter, getComputedStyle */
@@ -74,4 +74,12 @@ export const footprint = (/** @type {string} */ sel) => `(() => {
   const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null;
   const r = e.getBoundingClientRect(), s = getComputedStyle(e);
   return { l: r.left, t: r.top, w: r.width, h: r.height, edge: s.borderTopWidth + " " + s.borderBottomWidth + " " + s.borderTopStyle, drop: s.boxShadow.replace(/rgba?\\([^)]*\\)|#[0-9a-f]+/gi, "").trim() };
+})()`;
+
+/** In the page: whether a control shows on (a toggle pressed, a panel open): the one on look, gold. */
+export const gold = (/** @type {string} */ sel) => `(() => {
+  const e = document.querySelector(${JSON.stringify(sel)}), probe = document.createElement("i");
+  probe.style.color = "var(--gold)"; document.body.append(probe);
+  const on = getComputedStyle(probe).color; probe.remove();
+  return !!e && getComputedStyle(e).backgroundColor === on;
 })()`;

@@ -31,9 +31,10 @@ const cdp = (await import("../media/lib/cdp.mjs")) as {
   APP: string;
 };
 const { launch, sleep, APP } = cdp;
-const { misaligned, footprint } = (await import("../media/lib/rows.mjs")) as {
+const { misaligned, footprint, gold } = (await import("../media/lib/rows.mjs")) as {
   misaligned: (rows: { name: string; box: string; words?: string; by?: string }[]) => string;
   footprint: (sel: string) => string;
+  gold: (sel: string) => string;
 };
 type Box = { l: number; t: number; r: number; b: number };
 
@@ -126,8 +127,8 @@ for (const [w, h] of SIZES) {
 
 // the buttons in a row as tall as one another, on one top and their words on one baseline (Button's sizes): the
 // header's (Back, the steps, the meter, ?, undo, redo, the action), the board's, the Inspector's; off, a button keeps
-// the box it has on (undo, before and after an edit); the header's address shows its short name whole, and the
-// palette's "More pieces" lie on the column's grid
+// the box it has on (undo, before and after an edit), and so does one on (Show the line: gold, as every on control);
+// the header's address shows its short name whole, and the palette's "More pieces" lie on the column's grid
 for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   const c = await editor(w, h);
   const at = `buttons ${w}×${h}`;
@@ -150,6 +151,15 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   await sleep(600);
   assert.equal(await c.js(`document.querySelector(".bhead__hist").disabled`), false, `${at}: undo on after an edit`);
   assert.deepEqual(await c.js<object>(footprint(".bhead__hist")), off, `${at}: undo's box changes as it comes on`);
+  // on (Show the line pressed): gold, its box kept, its row still in line
+  for (let k = 0; k < 40 && (await c.ev<boolean>(`document.querySelector(".board__toggle").disabled`)); k++) await sleep(300);
+  const unpressed = await c.js<object>(footprint(".board__toggle"));
+  await c.js(`document.querySelector(".board__toggle").click()`);
+  await sleep(300);
+  assert.equal(await c.js(`document.querySelector(".board__toggle").getAttribute("aria-pressed")`), "true", `${at}: Show the line not on`);
+  assert.deepEqual(await c.js<object>(footprint(".board__toggle")), unpressed, `${at}: Show the line's box changes as it comes on`);
+  assert.equal(await c.js(gold(".board__toggle")), true, `${at}: Show the line on, not gold`);
+  assert.deepEqual(await c.js<string[]>(misaligned([rows[1]])), [], `${at}: the board's row out of line with Show the line on`);
   const grid = await c.js<{ col: number; tiles: { l: number; w: number }[] }>(`(() => { const r = document.querySelector(".ptiles--first").getBoundingClientRect(); return { col: r.width, tiles: [...document.querySelectorAll('.palette [data-fold="more"] .ptile')].map((t) => ({ l: t.getBoundingClientRect().left - r.left, w: t.getBoundingClientRect().width })) }; })()`);
   for (const t of grid.tiles) assert.ok(Math.abs(t.w - grid.col) < 1 || (Math.abs(t.l) < 1 || Math.abs(t.l + t.w - grid.col) < 1) && t.w < grid.col / 2, `${at}: a "More pieces" tile off the column's grid (${JSON.stringify(t)} in ${grid.col})`);
   const alone = await c.js<number>(`[...document.querySelectorAll('.palette [data-fold="more"] .ptiles')].filter((g) => { const t = [...g.children].map((x) => x.getBoundingClientRect()); return t.some((a) => a.width < g.getBoundingClientRect().width / 2 && !t.some((b) => b !== a && Math.abs(b.top - a.top) < 1)); }).length`);
