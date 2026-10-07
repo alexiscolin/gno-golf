@@ -157,14 +157,16 @@ export const localDate = (unix: number) => new Date(unix * 1000).toLocaleString(
 const label = (t: string) => (TIER_LOOK[t as Tier] || { label: t }).label;
 const plural = (word: string, n: number) => (n === 1 ? word : word + "s");
 const tierIndex = (c: Collection, t: string) => c.tiers.findIndex((x) => x.name === t);
+/** Whether a gnome is the closed genesis's: the closing closes the genesis alone (close.gno isClosed), a later series sells on. */
+const closedOut = (c: Collection, id: number) => !!c.series[0]?.closed && id >= c.series[0].first && id <= c.series[0].last;
 /** The published wave a gnome is in, by its id (none: not published yet). */
 const waveOf = (c: Collection, id: number) => c.waves.find((w) => id >= w.first && id <= w.last);
 
 // ------------------------------------------------------------ the sale's life (A9)
 type Some = Pick<Listed, "id" | "tier" | "home">;
 export interface WaveInfo { n: number; row: WaveRow; home: Home | ""; size: number; sold: number }
-/** The gallery's "now" row: closed (made and never made), or the wave of the moment (the last
- *  started, else the next: a teaser) and what it is at, with the next wave once it is sold out. */
+/** The gallery's "now" row: closed (made and never made: the genesis closed, no later series' wave), or the wave
+ *  of the moment (the last started, else the next: a teaser) and what it is at, with the next wave once it is sold out. */
 export type Now =
   | { at: "closed"; closesAt: number; made: number; never: number }
   | { at: "none" }
@@ -172,20 +174,22 @@ export type Now =
   | { at: "soldout"; wave: WaveInfo; next?: WaveInfo };
 export function nowRow(c: Collection, sold: (id: number) => boolean, entries: readonly Some[], now: number): Now {
   const genesis = c.series[0];
-  if (genesis && genesis.closed) return { at: "closed", closesAt: c.closesAt, made: genesis.sold, never: genesis.last - genesis.first + 1 - genesis.sold };
+  // each wave and its number; once the genesis closed, a later series' alone
+  const waves = c.waves.map((w, i) => [w, i + 1] as const).filter(([w]) => !closedOut(c, w.first));
+  if (genesis && genesis.closed && !waves.length) return { at: "closed", closesAt: c.closesAt, made: genesis.sold, never: genesis.last - genesis.first + 1 - genesis.sold };
   const info = (n: number): WaveInfo => {
     const row = c.waves[n - 1], ids = entries.filter((e) => e.id >= row.first && e.id <= row.last);
     return { n, row, home: entries.find((e) => e.id === row.first)?.home || "", size: ids.length, sold: ids.filter((e) => sold(e.id)).length };
   };
-  const started = c.waves.map((w, i) => [w, i + 1] as const).filter(([w]) => w.start <= now).pop();
+  const started = waves.filter(([w]) => w.start <= now).pop();
   if (!started) {
-    const first = c.waves.map((w, i) => [w, i + 1] as const).sort(([a], [b]) => a.start - b.start)[0];
+    const first = [...waves].sort(([a], [b]) => a.start - b.start)[0];
     return first ? { at: "teaser", wave: info(first[1]) } : { at: "none" };
   }
   const wave = info(started[1]);
   if (!c.open) return { at: "paused", wave };
   if (wave.size && wave.sold >= wave.size) {
-    const later = c.waves.map((w, i) => [w, i + 1] as const).filter(([w]) => w.start > now).sort(([a], [b]) => a.start - b.start)[0];
+    const later = waves.filter(([w]) => w.start > now).sort(([a], [b]) => a.start - b.start)[0];
     return { at: "soldout", wave, ...(later ? { next: info(later[1]) } : {}) };
   }
   return { at: now < started[0].playersUntil ? "players" : "open", wave };
@@ -313,11 +317,12 @@ export function bill({ price, bytes, storagePrice, gas, gasPrice, balance }: { p
 export const PAGE = 48;
 export type View = "sale" | "mine" | "all" | "made";
 interface Seen { c: Collection; sold: (id: number) => boolean; mine: ReadonlySet<number>; now: number }
-/** Whether a gnome is on sale now: in a started wave, not sold, not closed. */
+/** Whether a gnome is on sale now: in a started wave, not sold, not the closed genesis's. */
 export function onSale(e: Some, c: Collection, sold: (id: number) => boolean, now: number) {
-  return !sold(e.id) && !c.series[0]?.closed && c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now);
+  return !sold(e.id) && !closedOut(c, e.id) && c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now);
 }
-const neverMade = (e: Some, s: Seen) => !!s.c.series[0]?.closed && e.id >= s.c.series[0].first && e.id <= s.c.series[0].last && !s.sold(e.id);
+/** Whether a gnome was never made: the closed genesis's, never sold. */
+export const neverMade = (e: Some, s: Seen) => closedOut(s.c, e.id) && !s.sold(e.id);
 /** The gallery's list for a view and its filters, in id order (a number searched comes first), and each tier's count in the view. */
 export function shelf<E extends Listed>(entries: readonly E[], f: Query & { view: View }, s: Seen) {
   const inView = entries.filter((e) => (f.view === "sale" ? onSale(e, s.c, s.sold, s.now) : f.view === "mine" ? s.mine.has(e.id) : f.view === "made" ? s.sold(e.id) : true));
@@ -350,10 +355,9 @@ export function cardFact(e: Listed, s: Seen) {
 }
 
 /** The Legendaries the gallery shows coming, to look at: each wave's while no started wave holds it (not published
- *  yet, or its start to come), in id order; none once the genesis has closed (a wave not open by then never opens). */
+ *  yet, or its start to come), in id order; none of the genesis once it has closed (a wave not open by then never opens). */
 export function comingLegends<E extends Some>(entries: readonly E[], c: Collection, now: number): E[] {
-  if (c.series[0]?.closed) return [];
-  return entries.filter((e) => e.tier === "legendary" && !c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now));
+  return entries.filter((e) => e.tier === "legendary" && !closedOut(c, e.id) && !c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now));
 }
 /** A coming Legendary's one fact: his wave, no price, no date. */
 export const comingFact = (e: Pick<Listed, "wave">) => `Coming · wave ${e.wave}`;

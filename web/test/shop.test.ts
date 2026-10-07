@@ -155,6 +155,24 @@ test("shop: the now row follows the sale's life: teaser, players first, open, so
   assert.equal(nowRow(collection({ waves: [] }), isSold([]), entries, T0).at, "none");
 });
 
+test("shop: the genesis closing closes the genesis alone: a later series' wave sells on (close.gno isClosed)", () => {
+  const later = [721, 722, 723].map((id, i) => ({ ...entries[0], id, series: "winter-2027", wave: 8, tier: i === 2 ? ("legendary" as const) : ("common" as const), home: "mountain" as const }));
+  const all = [...entries, ...later];
+  const prices = [36e6, 72e6, 336e6, 1296e6];
+  const c = collection({
+    series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }, { name: "winter-2027", first: 721, last: 723, sold: 0, closed: false }],
+    waves: [...collection().waves, { first: 721, last: 722, start: T0, playersUntil: T0, prices }, { first: 723, last: 723, start: T0 + 86400 * 30, playersUntil: T0 + 86400 * 30, prices }],
+  });
+  const now = T0 + 60, none = isSold([]);
+  assert.equal(onSale(all.find((e) => e.id === 721)!, c, none, now), true, "the later series' open wave: on sale");
+  assert.equal(onSale(entries[4], c, none, now), false, "a genesis gnome never sold: never made");
+  const row = nowRow(c, none, all, now);
+  assert.ok(row.at === "open" && row.wave.n === 2 && row.wave.size === 2, `the head shows the later series' wave, not "closed": ${row.at}`);
+  assert.deepEqual(comingLegends(all, c, now).map((e) => e.id), [723], "the later series' Legendary still to come; none of the genesis");
+  // no later wave at all: the sale is closed
+  assert.equal(nowRow({ ...c, waves: collection().waves }, none, all, now).at, "closed");
+});
+
 test("shop: a later wave is the teaser once the one before is sold out", () => {
   const c = collection({ waves: [...collection().waves, { first: 105, last: 208, start: T0 + 86400 * 3, playersUntil: T0 + 86400 * 4, prices: [36e6, 72e6, 336e6, 1296e6] }] });
   const all = Array.from({ length: 104 }, (_, i) => i + 1);

@@ -17,7 +17,7 @@ import Share from "@/components/Share";
 import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { canBuyCard, cardFact, closingSlot, theirTitle, comingLegends, makeShop, nowRow, shelf, shareWords, teamOrder, waveLine, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, closingSlot, theirTitle, comingLegends, makeShop, neverMade, nowRow, shelf, shareWords, teamOrder, waveLine, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
@@ -118,7 +118,6 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const mineSet = useMemo(() => new Set(mine), [mine]);
   const myAlbum = useMemo(() => (cat && held ? album(cat.gnomes, cat.earned, held) : null), [cat, held]);
   const seen = useMemo(() => (c && sold ? { c, sold, mine: mineSet, now } : null), [c, sold, mineSet, now]);
-  const closed = !!c && !!c.series[0] && c.series[0].closed;
   const viewing = theirs ? "theirs" : view.who === me && me ? "mine" : f.view;
   const list = useMemo(() => {
     if (!cat || !seen) return [];
@@ -135,6 +134,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const earned = view.open && cat && !open ? cat.earned.find((e) => e.unlock === view.open) : undefined;
   const row = c && sold && cat ? nowRow(c, sold, cat.gnomes, now) : null;
   const line = row && c && sold && cat ? waveLine(row, c, cat.gnomes, sold, now) : null;
+  const closed = !!row && row.at === "closed"; // (the genesis closed, no later series' wave: what was made, not on sale)
   const nameOf = (id: string) => (id.startsWith("t") ? cat?.gnomes.find((g) => `t${g.id}` === id)?.name || "a gnome" : "a gnome of the game");
   const playingName = nameOf(playing), wornSkin = worn ? tokenSkin(worn).id : null;
 
@@ -220,7 +220,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
         <>
           <ul className="gshelf">
             {list.slice(0, shown).map((g) => (
-              <li key={g.id}><GnomeCard g={g} fact={cardFact(g, seen)} mine={mineSet.has(g.id)} never={closed && !sold!(g.id)} buy={canBuyCard(g, seen)} onChain={onChain} onOpen={() => onView({ ...view, open: String(g.id) })} /></li>
+              <li key={g.id}><GnomeCard g={g} fact={cardFact(g, seen)} mine={mineSet.has(g.id)} never={neverMade(g, seen)} buy={canBuyCard(g, seen)} onChain={onChain} onOpen={() => onView({ ...view, open: String(g.id) })} /></li>
             ))}
             {coming.map((g) => <li key={g.id}><ComingCard g={g} onChain={onChain} /></li>)}
           </ul>
