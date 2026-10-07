@@ -5,11 +5,14 @@
 // (the shop draws its final frame first: ShopFrame.tsx); then every card's
 // picture in sight loaded (no broken image), and the shop never wider than
 // the window (no sideways scroll); a gnome's sheet opened from a card over
-// everything, the network banner too (never a chip over its Buy); the
+// everything, the network banner too (never a chip over its Buy), its Buy
+// footer over nothing that follows it (its Traits there to click); the
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
 // every card's #number in sight however long its name; the toolbar's controls, on each of its
 // lines, as tall as one another, on one top, their words on one baseline, and More filters open
-// gold (on) in the box it has shut (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs). Before, the title screen alone: none of
+// gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card,
+// one slim row (its thumbnails of one frame, its line on one line, two on a phone, on its button's baseline), its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
+// and the shop never sideways from 360 to 1440 px wide; About's link cards' words on one left edge. Before, the title screen alone: none of
 // the sale read (the catalogue), the collection's wardrobe nor the shop's
 // part of the game (components/gnomes/Game.tsx: a dev build's chunk names
 // it) fetched, which only a screen showing the sale needs. With OUT, a frame every 100 ms and a
@@ -69,9 +72,12 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.js(`document.querySelector(".gshelf li .gcard").click(); true`);
   for (let i = 0; i < 20 && !(await b.ev(`!!document.querySelector(".gsheet")`)); i++) await sleep(250);
   const over = await b.ev(`(() => { const n = document.querySelector(".netbanner"); if (!n) return 0; return [...n.querySelectorAll("*")].filter((e) => { const r = e.getBoundingClientRect(); if (!r.width) return false; const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return at && at.closest(".netbanner"); }).length; })()`);
-  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length && wide <= 0 && !early.length && over === 0 && !low.length && cut === 0;
+  // and its sticky Buy footer over nothing that follows it: the Traits summary's top is the summary's, there to click
+  for (let i = 0; i < 20 && !(await b.ev(`!!document.querySelector(".gsheet .gsheet__foot .btn")`)); i++) await sleep(250);
+  const covered = await b.ev(`(() => { const s = document.querySelector(".gsheet details.more > summary"); if (!s) return "no Traits"; const r = s.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return ""; const at = document.elementFromPoint(r.left + r.width / 2, r.top + 3); return at && s.contains(at) ? "" : "Traits under " + (at ? at.className || at.nodeName : "nothing"); })()`);
+  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length && wide <= 0 && !early.length && over === 0 && !low.length && cut === 0 && !covered;
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: ${early.length} sale reads on the title screen, layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken, ${wide} px sideways, ${over} of the banner over a sheet, ${low.length} small words under 4.5:1, ${cut} #numbers cut`, low.length ? JSON.stringify(low) : "", early.length ? JSON.stringify(early) : "", pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
+  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: ${early.length} sale reads on the title screen, layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken, ${wide} px sideways, ${over} of the banner over a sheet, ${low.length} small words under 4.5:1, ${cut} #numbers cut${covered ? `, ${covered}` : ""}`, low.length ? JSON.stringify(low) : "", early.length ? JSON.stringify(early) : "", pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
   b.kill();
   if (!dir) continue;
   // a strip: every other frame (0-5.8 s), 6 a row
@@ -98,9 +104,83 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.js(`document.querySelector(".gbar__more").click(); true`);
   await sleep(300);
   const on = { box: JSON.stringify(await b.ev(footprint(".gbar__more"))) === JSON.stringify(shut), gold: await b.ev(gold(".gbar__more")), line: await b.ev(misaligned(bar)) };
-  const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0;
+  // a tier selected and the view chosen: the one selected look (gold), the tier's box kept, the bar in line
+  const tier = await b.ev(footprint(".gbar .tierbtn"));
+  await b.js(`document.querySelector(".gbar .tierbtn").click(); true`);
+  await sleep(300);
+  const sel = { box: JSON.stringify(await b.ev(footprint(".gbar .tierbtn"))) === JSON.stringify(tier), gold: await b.ev(gold(".gbar .tierbtn")), view: await b.ev(gold(".gbar__views button.on")), line: await b.ev(misaligned(bar)) };
+  const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0 && sel.box && sel.gold && sel.view && sel.line.length === 0;
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}`, ok ? "" : JSON.stringify({ off, on }));
+  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}; a tier and the view selected: gold ${sel.gold && sel.view}, the tier's box kept ${sel.box}`, ok ? "" : JSON.stringify({ off, on, sel }));
+  // the picker: the collection between the tile and the aim card, at least as wide, one slim row (about a button
+  // high): its thumbnails of one size and one frame, its line on one line on a computer (two at most on a phone),
+  // the line and its button on one baseline (one middle on a phone); the head whole
+  await b.send("Page.navigate", { url: APP + "/?cup=garden&screen=pick" });
+  for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".screen--pick .gcollect")`)); i++) await sleep(500);
+  await sleep(500);
+  const pick = await b.ev(`(() => { const r = (s) => document.querySelector(".screen--pick " + s)?.getBoundingClientRect(); const band = r(".gcollect"), stage = r(".pick__tile"), aim = r(".aimset"), go = r(".gcollect__go"), eyebrow = document.querySelector(".pick > .eyebrow");
+    const text = document.querySelector(".gcollect__text"), said = text.getBoundingClientRect();
+    const faces = [...document.querySelectorAll(".gcollect__faces .gtile")].filter((t) => t.checkVisibility()).map((t) => { const s = getComputedStyle(t), q = t.getBoundingClientRect(); return [q.width, q.height, s.borderTopWidth, s.borderTopColor, s.borderRadius, getComputedStyle(t, "::before").boxShadow.replace(/rgba?\\([^)]*\\)/g, "")].join(" "); });
+    return { below: band.top >= stage.bottom, above: band.bottom <= aim.top, narrow: band.width < aim.width - 0.5, tall: band.height, lines: Math.round(said.height / parseFloat(getComputedStyle(text).lineHeight)),
+      middle: Math.abs(said.top + said.height / 2 - (go.top + go.height / 2)), faces: faces.length, frames: new Set(faces).size, head: eyebrow?.nextElementSibling?.matches(".pick__name, .dare") ?? false }; })()`);
+  const line = mobile ? [] : await b.ev(misaligned([{ name: "the picker's band", box: ".gcollect__go", words: ".gcollect__text, .gcollect__go" }]));
+  const fits = pick.below && pick.above && !pick.narrow && pick.tall <= 56 && pick.lines <= (mobile ? 2 : 1) && pick.middle <= 1 && pick.faces >= 3 && pick.frames === 1 && line.length === 0 && pick.head;
+  results.push({ w, ok: fits });
+  console.log(`${fits ? "PASS" : "FAIL"} the picker's collection under its tile, ${Math.round(pick.tall)} px tall, its line on ${pick.lines}, ${pick.faces} thumbnails of one frame, the head whole at ${w}×${h}`, fits ? "" : JSON.stringify({ pick, line }));
+  b.kill();
+}
+// never sideways: the menu (its shop panel the way in) and the shop, from 360 to 1440 px wide in steps of 40, the
+// page and its screen no wider than the window (a trackpad's swipe shifts nothing)
+{
+  const b = await launch({ width: 1440, height: 900 });
+  for (const at of ["/?screen=modes", "/g/"]) {
+    await b.send("Page.navigate", { url: APP + at });
+    for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".screen.modes .mode, .screen.shop .gbar")`)); i++) await sleep(500);
+    const wide = [];
+    for (let w = 360; w <= 1440; w += 40) {
+      await b.send("Emulation.setDeviceMetricsOverride", { width: w, height: 900, deviceScaleFactor: 1, mobile: false });
+      await sleep(250);
+      const over = await b.ev(`Math.max(document.documentElement.scrollWidth - innerWidth, ...[...document.querySelectorAll(".screen")].map((s) => s.scrollWidth - s.clientWidth))`);
+      if (over > 0) wide.push(`${w}: ${over} px`);
+    }
+    results.push({ w: at, ok: !wide.length });
+    console.log(`${wide.length ? "FAIL" : "PASS"} ${at} never sideways from 360 to 1440 px`, wide.length ? JSON.stringify(wide) : "");
+  }
+  // About's link cards (Button's look, a card's shape): each card's words from its padding, the four on one left edge
+  for (const w of [1280, 390]) {
+    await b.send("Emulation.setDeviceMetricsOverride", { width: w, height: 844, deviceScaleFactor: 1, mobile: w < 600 });
+    await b.send("Page.navigate", { url: APP + "/?screen=modes" });
+    for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".screen__about")`)); i++) await sleep(500);
+    await b.js(`document.querySelector(".screen__about").click(); true`);
+    for (let i = 0; i < 20 && !(await b.ev(`!!document.querySelector(".about__links .btn")`)); i++) await sleep(250);
+    await sleep(800); // (the sheet's pop settled)
+    const edges = await b.ev(`[...document.querySelectorAll(".about__links .btn")].map((a) => { const s = getComputedStyle(a); return Math.round(a.querySelector("b").getBoundingClientRect().left - a.getBoundingClientRect().left - parseFloat(s.borderLeftWidth) - parseFloat(s.paddingLeft)); })`);
+    const ok = edges.length > 0 && edges.every((x) => x === 0);
+    results.push({ w: `about ${w}`, ok });
+    console.log(`${ok ? "PASS" : "FAIL"} About's link cards, their words from their padding, at ${w}`, ok ? "" : JSON.stringify(edges));
+  }
+  b.kill();
+}
+// the shop's part of the game (components/gnomes/Game.tsx) not fetched (offline, a deploy that took the old files):
+// the shop's screen still has its Back, About and Try again, and Escape leaves it; Try again with the network back
+// opens the shop (a dev build's chunk names it: the URL blocked by its name)
+{
+  const b = await launch({ width: 1280, height: 800 });
+  await b.send("Network.enable");
+  await b.send("Network.setBlockedURLs", { urls: ["*components_gnomes_Game*"] });
+  await b.send("Page.navigate", { url: APP + "/g/" });
+  for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".shop [role=alert] button")`)); i++) await sleep(500);
+  const off = await b.ev(`(() => ({ back: !!document.querySelector(".shop .screen__back"), about: !!document.querySelector(".shop .screen__about"), retry: !!document.querySelector(".shop [role=alert] button") }))()`);
+  await b.send("Network.setBlockedURLs", { urls: [] });
+  await b.js(`document.querySelector(".shop [role=alert] button")?.click(); true`);
+  for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".gshelf li .gcard")`)); i++) await sleep(500);
+  const back = !!(await b.ev(`!!document.querySelector(".gshelf li .gcard")`));
+  await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(800);
+  const left = await b.ev(`!document.querySelector(".screen.shop")`);
+  const ok = !!off && off.back && off.about && off.retry && back && left;
+  results.push({ w: 1280, ok });
+  console.log(`${ok ? "PASS" : "FAIL"} the shop's part not fetched: Back ${off && off.back}, About ${off && off.about}, Try again ${off && off.retry}; then the shelf ${back}; Escape leaves the shop ${left}`);
   b.kill();
 }
 process.exit(results.every((r) => r.ok) ? 0 : 1);

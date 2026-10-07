@@ -458,13 +458,14 @@ func Burn(cur realm, id grc721.TokenID)
 ```go
 func AddSeries(cur realm, name string, rows string)    // the next series, "id|tier|name|traits" a line, checked whole (section 9); the genesis first
 func SetCloseAt(cur realm, at int64)                   // the genesis's closing time (unix); unset at deploy, optional, set at launch or later; once set, only earlier, never later nor in the past
-func AddWave(cur realm, first, last, start, playerHours int64) // ids first to last on sale from start (unix), its first playerHours (0 to 168) for players, at the prices in force; no overlap; refused until the closing date is set, and for a start at or after it
+func AddWave(cur realm, first, last, start, playerHours int64) // ids first to last on sale from start (unix), its first playerHours (0 to 168) for players, at the prices in force; no overlap; once a closing date is set, refused for a start at or after it
 func SetPrice(cur realm, tier string, ugnot int64)     // 1 to 10,000 GNOT; for the waves opened after it
-func SetMintOpen(cur realm, open bool)                 // pause or resume every sale at once; closed at deploy; opening refused until the closing date is set
+func SetMintOpen(cur realm, open bool)                 // pause or resume every sale at once; closed at deploy
 func SetSiteURL(cur realm, url string)                 // https://, at most 128 printable bytes; external_url and Render's links
 func SetTreasury(cur realm, to address)                // offers the treasury to a valid address, not the realm's; it takes it with AcceptTreasury
 func SetRoyaltyBps(cur realm, bps int64)               // 0 to 1,000
 func Sweep(cur realm)                                  // sends the realm's ugnot, coins sent to it by mistake, to the treasury
+func AcceptRules(cur realm, path string)               // the rules the earned gnomes' proof reads: store's current writer only, a realm (ADR-012)
 func Transfer(cur realm, to address)
 func Accept(cur realm)
 func Renounce(cur realm)
@@ -597,14 +598,14 @@ page with their tokens and worn gnome.
   its own. A cap spreads the sale over players, it is not a defence: anyone
   can open more wallets. The caps are constants of the realm, kept with
   the supply in one config file.
-- **The close.** The genesis has a hard closing date, `SetCloseAt`, unset
-  at deploy and set at launch: no wave can be added and the sale cannot be
-  opened until it is. Once set it can only move earlier (never later, and
+- **The close.** The genesis can have a hard closing date, `SetCloseAt`:
+  unset at deploy and optional (decided 2026-10-07): the owner may set it at
+  launch or later, and waves and the sale run without one. Once set it can only move earlier (never later, and
   never into the past), so the date a buyer reads is the latest the sale
   can run. From it on, `Buy` refuses every genesis id ("sale closed"),
   whatever wave holds it; an id unsold then is never minted, by anyone,
   and no wave may start at or after it. A later series has its own sale,
-  not more of the genesis. The shop shows the date on every page.
+  not more of the genesis. The shop shows the date on every page once one is set.
 - **Royalty**: 5% by default, to the treasury, through royalty/v0's default
   royalty, readable as `RoyaltyInfo`. EIP-2981 is advisory: a plain
   `TransferFrom` pays none.
@@ -672,11 +673,14 @@ format. It fails closed in three places:
 - a best whose strokes are not one to three digits and a space panics;
 - `bests` values carry no format version, so a later rules realm could
   change their shape unseen. The realm therefore refuses to prove anything
-  while `store.Writer()` is not the golf/v2 path it was built against (a
-  constant, rewritten per namespace by `scripts/stage.sh` as the other
-  imports are). When store moves to new rules (`Propose`, `Ready`),
-  `MintEarned` refuses with "rules changed" until gnomes is updated;
-  `Proof` answers `"ok":false` with that reason.
+  while `store.Writer()` is not the rules it reads: state, golf/v2 at
+  deploy (rewritten per namespace by `scripts/stage.sh` as the other
+  imports are). When store moves to new rules (`Propose`, `Ready`), or is
+  paused, `MintEarned` refuses with "rules changed" and `Proof` answers
+  `"ok":false` with that reason, until the owner, having checked that the
+  new rules keep `bests`, `copies` and `holes` as golf/v2 writes them,
+  calls `AcceptRules` with their path: store's current writer only, never
+  another realm nor a paused store's `""` (ADR-012).
 
 So a later format can refuse a mint, never prove a false one. A script
 compares the proof with golf/v2's `BestOf` on onyx's real rows before each
@@ -978,7 +982,7 @@ How the project's owner earns, and only that:
 | The treasury moved to a wrong or hostile address | two steps: `SetTreasury` only offers, and the sales keep going to the old treasury until the new address calls `AcceptTreasury`; the offer refuses the realm's own address and an invalid one |
 | GNOT restricted again by governance | every `Buy` reverts (the treasury send fails) and nobody's coins move; nothing is held, so nothing is stuck |
 | The closing date pushed back to sell more | `SetCloseAt` only moves it earlier; `AddWave` refuses a start at or after it; `Buy` refuses a genesis id from it on |
-| A stolen owner key | can publish a series, open waves before the close, change the prices of the waves to come, bring the close forward, pause the sale, set the site's URL (which the shop's links and `external_url` follow), offer the treasury (it moves only if the new address accepts) and set the royalty; cannot mint for anyone, move or burn a token, take a sale, push the close later, or change a published series or an opened wave. `Renounce` freezes the settings for good |
+| A stolen owner key | can publish a series, open waves before the close, change the prices of the waves to come, bring the close forward, pause the sale, set the site's URL (which the shop's links and `external_url` follow), offer the treasury (it moves only if the new address accepts), set the royalty and accept store's current rules for the earned gnomes' proof (`AcceptRules`, never another realm); cannot mint for anyone, move or burn a token, take a sale, push the close later, or change a published series or an opened wave. `Renounce` freezes the settings for good |
 | A price cut that undercuts earlier buyers | a wave keeps the prices it opened at; `SetPrice` moves only the waves opened after it |
 | A wallet taking several Legendaries | the lifetime cap of one Legendary a wallet; like every cap, it spreads the sale, it does not stop a buyer with many wallets |
 | The player window gamed by fresh wallets | a record costs a finished hole on chain, and the window has its own cap per wallet and wave; it spreads the first days over players, it does not claim to stop a determined buyer |
@@ -1023,7 +1027,7 @@ shop's words, are in `docs/superpowers/legal/`.
 - **No auction.** Dropped for legal clarity as much as simplicity: no bid
   that is an order, no auction rules, no coins held for anyone, the same
   confirmation screen for every purchase.
-- **A hard closing date**, shown on every shop page and on the confirmation
+- **A hard closing date** once the owner sets one (optional), shown on every shop page and on the confirmation
   screen (申込期間): it can only come earlier, and nothing unsold is minted
   after it, so "limited" means what it says for the genesis; the shop still
   says later series may be sold.
@@ -1106,8 +1110,8 @@ shop's words, are in `docs/superpowers/legal/`.
   the read and the `Buy` of a wave not yet opened, refused by the exact
   check, coins kept.
 - Waves: `AddWave` refuses an overlap, a range past the catalogue, a
-  window over 168 hours, a 65th wave, any wave while the closing date is
-  unset, and a start at or after it.
+  window over 168 hours, a 65th wave, and, once a closing date is set, a start at
+  or after it.
 - The close, with `testing.SkipHeights` to move time (5 s a block):
   a sale with no closing date runs on; `SetCloseAt` later than the one
   set, or in the past, refused, earlier taken; a `Buy` of a genesis id one
@@ -1199,8 +1203,9 @@ them, closed for CN, CU, IR, KP, SY, RU and BY.
    as "not yet on sale".
    - The two weeks before: one Legendary shown a day, with its lore; the
      gallery live, nothing for sale.
-   - At launch the owner sets the genesis's closing date (`SetCloseAt`),
-     which the shop shows from then on; it can come earlier, never later.
+   - At launch, or later, the owner may set the genesis's closing date
+     (`SetCloseAt`), which the shop shows from then on; it can come earlier,
+     never later. Without one the sale runs on.
    - Wave 1 (the Garden, ids 1–104, its Legendary The Miller among them)
      opens with `AddWave(1, 104, start, 48)` and `SetMintOpen(true)`.
    - Wave 2 (the Island Cup, ids 105–208), then each next wave, about a
@@ -1257,7 +1262,7 @@ throughout; the script that writes the realm's rows.
 | Waves replace `SetOpen` per tier; caps are constants (no `SetCap`); `SetMintOpen` pauses all | `waves.gno`, `config.gno`, `gnomes.gno` | spec |
 | An auction for the Legendaries (`StartAuction`, `Bid`, `Settle`, `CancelAuction`, `Auction`, escrow in `Sweep`) | `auction.gno`, `gnomes.gno` | code: removed; the Legendaries are sold by `Buy` at 1,296 GNOT, one a wallet (decided) |
 | Prices 30/99/333 and a 777 reserve | `config.gno`, `data/gnomes/series.json` | code: 36/72/336/1,296 GNOT (decided) |
-| No closing date | `waves.gno`, `config.gno` | code: `SetCloseAt`, earlier only, required before the first wave (decided) |
+| No closing date | `waves.gno`, `config.gno` | code: `SetCloseAt`, optional (none at deploy), earlier only once set (decided 2026-10-07) |
 | `Equipped`/`EquippedMany` answer only an `Equip` choice | `equip.gno` | code: `Worn`/`WornMany`, the best owned unless equipped (decided) |
 | No site URL setting; `external_url` a constant | `token.gno` | code: `SetSiteURL` (decided) |
 | `Sold` asks the ledger per id instead of a stored bitmap | `read.gno` | spec |

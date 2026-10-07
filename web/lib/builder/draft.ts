@@ -4,7 +4,7 @@
 // that will be published. A draft read from a file or from the browser is
 // untrusted: parseDraft takes it only whole, on the grid and within its
 // limits. Its history (undo, redo) and its keeping in the browser are here.
-import { isSlug } from "../chain";
+import { isObj, isSlug } from "../chain";
 import { FIELD, gameWorld, MAX_PAR, notABuilderWorld } from "./rules";
 
 export type V = [number, number];
@@ -96,7 +96,6 @@ export const onGrid = (x: number, origin: number) => Number.isFinite(x) && Math.
 /** A new draft in a world: an empty board, the tee and the cup apart. */
 export const emptyDraft = (world: string): Draft => ({ v: 1, world, slug: "", title: "", par: 0, tee: [4, 6], pin: [24, 6], pieces: [], pulses: [], note: "", proofs: [] });
 
-const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 const isInt = (x: unknown, lo: number, hi: number): x is number => Number.isInteger(x) && (x as number) >= lo && (x as number) <= hi;
 const isV = (x: unknown): x is V => Array.isArray(x) && x.length === 2 && isNum(x[0]) && isNum(x[1]);
@@ -313,6 +312,28 @@ export function saveDraft(key: string, d: Draft): boolean {
   } catch {
     return false;
   }
+}
+
+/** What this browser keeps under a key, as written (null: nothing, or it keeps nothing). */
+export function keptText(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keeps an open draft under its key, if what is kept there is still what
+ * this tab last read or wrote (was; null for a key nothing was kept under):
+ * kept, the text written (the next save's was). "elsewhere": another tab changed or
+ * deleted it since, and nothing is written (the last save would win, a
+ * delete come back); null: the browser keeps nothing.
+ */
+export function saveOver(key: string, d: Draft, was: string | null): { kept: string } | "elsewhere" | null {
+  if (keptText(key) !== was) return "elsewhere";
+  const text = JSON.stringify(d);
+  return saveDraft(key, d) ? { kept: text } : null;
 }
 
 /** A draft deleted from this browser. */

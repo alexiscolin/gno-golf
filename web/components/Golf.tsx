@@ -6,7 +6,7 @@ import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
 import { NOT_BUILDER } from "@/lib/community";
-import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
+import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, BYTE_PRICE, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
 import type { Skin } from "@/lib/scene/gnome";
@@ -30,6 +30,7 @@ import Tip, { readOwner } from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import { CUPS, backFromChain, fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
@@ -1013,12 +1014,16 @@ export default function Golf() {
   const shopBits = useShopPart(!!saleChain); // (the panel's line with its price, once the shop's part is in)
   // the shop's chunk, fetched as soon as a door to it shows (the menu's panel, the cups' link): opening it then draws at once
   useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && shopPart()?.then((m) => m.prefetchShop(), () => {})), [shopOn, screen]);
+  // whose gnomes are shown: another account's answer, landing late, is dropped; a new account starts from none
+  const heldOf = useRef("");
   const readWorn = () => {
     const c = game.current && game.current.chain, part = SHOP && c && account ? shopPart() : null;
-    if (!c || !account || !part) return (setHeld([]), setWorn(null));
+    if (!c || !account || !part) return ((heldOf.current = ""), setHeld([]), setWorn(null));
     const me = account.address;
+    if (heldOf.current !== me) ((heldOf.current = me), setHeld([]), setWorn(null));
     void part.then(async (m) => {
       const { mine, worn: w, skins } = await m.readHeld(c, me);
+      if (heldOf.current !== me) return;
       setHeld(mine);
       setWorn(w);
       if (!skins) return; // (the wardrobe not fetched: their gnomes listed, the gnome played as it is until the next read)
@@ -1074,7 +1079,7 @@ export default function Golf() {
   const [chainId, setChainId] = useState<string | null>(null);
   const [ourNode, setOurNode] = useState<boolean | null>(null); // is Adena's active network this node?
   const [slowSign, setSlowSign] = useState(false); // Adena open for more than 10 s
-  const [bytePrice, setBytePrice] = useState(100); // ugnot per stored byte (vm params)
+  const [bytePrice, setBytePrice] = useState(BYTE_PRICE); // ugnot per stored byte (vm params)
   const [best, setBest] = useState<number | null>(null); // this player's best on this hole, in this round's mode (0: none; null: unknown)
   const saved = best == null ? null : best > 0; // whether they have one
   const [ghostHere, setGhostHere] = useState(false); // a best of theirs here in either mode: their link dares (a friend races either)
@@ -1374,9 +1379,9 @@ export default function Golf() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // an open dialog hears Escape first and keeps it (useDialog); with none
-      // open, a screen goes back to the one before it
+      // open, a screen goes back to the one before it (the shop: the screen it was opened from)
       if (e.key !== "Escape") return;
-      setScreen((sc) => (sc === "pick" ? cupsScreen : (BACK as Partial<Record<Screen, Screen>>)[sc] || sc));
+      setScreen((sc) => (sc === "pick" ? cupsScreen : sc === "shop" ? shopFrom.current : (BACK as Partial<Record<Screen, Screen>>)[sc] || sc));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1630,12 +1635,12 @@ export default function Golf() {
       {screen === "pick" && <Picker world={(s && s.world) || "garden"} backLabel={cupsScreen === "ghosts" ? "Back to their ghosts" : undefined} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} mark={<Collector chain={game.current?.chain} player={dare} />} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={savedGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         owned={(() => {
-          // the collection at the picker's top (in a region the shop is offered in): the player's own gnomes first, else the wave
+          // the collection under the picker's tile (in a region the shop is offered in): the player's own gnomes first, else the wave
           const row = SHOP && account && held.length > 0 && game.current ? (
             <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region === true} onWorn={readWorn}
               name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
           ) : null;
-          return shopOn ? <CollectionSection promo={promo} now={promoNow} owned={row} onOpen={() => openShop()} /> : row;
+          return shopOn ? <CollectionSection promo={promo} owned={row} onOpen={() => openShop()} /> : row;
         })()}
         onAbout={() => setAbout(true)}
        
@@ -1989,17 +1994,17 @@ export default function Golf() {
                 </Button>
               )}
               {cupWon && cupWon.id === s.id ? (
-                <button className={"btn " + (pushSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
+                <Button variant={pushSave || rematch ? "secondary" : "primary"} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
                   Cup complete! →
-                </button>
+                </Button>
               ) : (
-                <button className={"btn " + (pushSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => {
+                <Button variant={pushSave || rematch ? "secondary" : "primary"} onClick={() => {
                   // (a duel with no other ghost in this cup: back to their ghosts)
                   const n = nextHole(s, card, duelHole);
                   n ? goTo(n.id) : duelHole ? setScreen(cupsScreen) : goTo(s.holes[0].id);
                 }}>
                   Next hole →
-                </button>
+                </Button>
               )}
             </div>
             {canSave && phoneOnly && (
@@ -2450,7 +2455,7 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
             </>
           ) : (
             <>
-              <a className="btn btn--main btn--wide" href={ADENA_URL} target="_blank" rel="noopener noreferrer">
+              <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={ADENA_URL} target="_blank" rel="noopener noreferrer">
                 Install Adena ↗
               </a>
               <p className="real__fine">
@@ -2466,7 +2471,7 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
               {sent ? "Copied: run it in a terminal ✓" : "Copy the gnokey command"}
             </Button>
           ) : now === 2 ? (
-            <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
+            <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (
             <Button variant="chain" className="btn--wide" disabled={!nameOk} onClick={() => (track("save_clicked", { from: "sheet", blocked: null }), onSave())}>Save on-chain</Button>
           ) : (
@@ -2512,7 +2517,7 @@ interface PickerProps {
   onAbout: () => void;
   aim: Mode;
   onAim: (m: Mode) => void;
-  /** the collection at the top (components/gnomes/Promo CollectionSection: the gnomes a player holds first) */
+  /** the collection, under the tile (components/gnomes/Promo CollectionSection: the gnomes a player holds first) */
   owned?: ReactNode;
 }
 
@@ -2531,7 +2536,6 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
       <div className="pick">
         <span className="eyebrow">{hole ? <>{hole}<span className="pick__ask"> · pick your gnome</span></> : "Pick your gnome"}</span>
         {dare && (typeof dare === "string" ? <p className="dare">{dare}</p> : dare)}
-        {owned}
         <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
@@ -2548,6 +2552,8 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
           </div>
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
+        {/* the collection between the tile and the aim card, the aim card's width (the GUI spec's A3) */}
+        {owned}
         <AimSetting aim={aim} onChange={onAim} compact />
         {/* a locked gnome on show: the button still plays, as the gnome really chosen */}
         <Button variant="gold" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>
@@ -2573,11 +2579,11 @@ function NetBanner({ rpc, onSupport, onFeedback }: { rpc: string; onSupport: () 
       <p className={`netbanner__band netbanner--${net}`}>
         <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
         <span>{net === "local" ? "a node on this machine" : "practice scores"}</span>
-        {net === "testnet" && OTHER_URL && <a className="btn btn--ghost btn--s netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
-        <button className="btn btn--ghost btn--s netbanner__feedback" aria-label="Send feedback" onClick={onFeedback}>
+        {net === "testnet" && OTHER_URL && <a className={buttonClass({ size: "s" }, "netbanner__go")} href={OTHER_URL}>Play on mainnet →</a>}
+        <Button size="s" className="netbanner__feedback" aria-label="Send feedback" onClick={onFeedback}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" /></svg>
           <i>Feedback</i>
-        </button>
+        </Button>
       </p>
       {/* the Players chip's twin, on the left (not on a phone: About has the tip) */}
       <Button variant="chip" className="netbanner__support" aria-label="Support the game" onClick={onSupport}>

@@ -210,7 +210,8 @@ short, signing, reading back, cancelled, unsure); **success**: the tile,
 "Tansy's yours!", the game's Share row "Show your gnome", "Your receipt:
 print or save it", pinned gold "Play with him"; **the receipt** (legal pack
 §3): seller, date and time (UTC and JST), item and contract, price paid and
-costs, delivered to, transaction and explorer link, the terms' version, the
+costs, delivered to, the transaction's hash with the chain it is recorded on
+(gno.land has no transaction page to link to: no explorer link), the terms' version, the
 consents as ticked, the finality line; "Print or save as PDF". **Someone
 was first**: "Someone bought Tansy a moment before you. **Nothing was
 sent.**" · Pick another.

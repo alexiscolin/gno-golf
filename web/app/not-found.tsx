@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buttonClass } from "@/components/button";
 
 // an address with no page (Netlify serves it as 404.html): out of search
 // results, and not taken for the home page the layout describes
@@ -11,7 +12,7 @@ export default function NotFound() {
         <h2 id="lost-title">No such page</h2>
         <p>This ball rolled off the course.</p>
         <div className="banner__row">
-          <a className="btn btn--main" href="/">Play Gnogolf</a>
+          <a className={buttonClass({ variant: "primary" })} href="/">Play Gnogolf</a>
         </div>
       </div>
     </div>

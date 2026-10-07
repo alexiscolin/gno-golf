@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, isSlug, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC,
+  makeChain, errorKind, isAddress, isHoleId, isSlug, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC, BYTE_PRICE,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -208,10 +208,11 @@ test("storagePrice parses the vm param", async () => {
   assert.equal(await chain.storagePrice(), 100);
 });
 
-test("storagePrice defaults to 100 when the reply doesn't match, instead of throwing", async () => {
+test("storagePrice defaults to the one fallback, BYTE_PRICE (100), when the reply doesn't match, instead of throwing", async () => {
   const chain = makeChain();
   setFetch(() => okReply(JSON.stringify("garbage")));
-  assert.equal(await chain.storagePrice(), 100);
+  assert.equal(BYTE_PRICE, 100);
+  assert.equal(await chain.storagePrice(), BYTE_PRICE);
 });
 
 test("balance reads ugnot out of the coin string", async () => {

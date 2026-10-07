@@ -104,7 +104,7 @@ chainnow() {
 # a call by the collection's owner (test1) on the gnomes realm; refused: its reason in REFUSED
 owner() {
 	RPC_ADDR=$RPC gnotx test1 "$GNOMES" "$@" && return 0
-	REFUSED=$(printf %s "$TXOUT" | grep -o 'gnomes: [^"]*' | head -1)
+	REFUSED=$(why)
 	[ -n "$REFUSED" ] || REFUSED=$(printf '%s\n' "$TXOUT" | tail -1)
 	return 1
 }

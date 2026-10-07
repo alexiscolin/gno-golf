@@ -3,7 +3,7 @@
 // its history; its persistence.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DRAFTS_KEY, MAX_PIECES, dropDraft, emptyDraft, exportDraft, history, loadDrafts, newKey, onGrid, parseDraft, saveDraft, type Draft } from "../lib/builder/draft.ts";
+import { DRAFTS_KEY, MAX_PIECES, dropDraft, emptyDraft, exportDraft, history, keptText, loadDrafts, newKey, onGrid, parseDraft, saveDraft, saveOver, type Draft } from "../lib/builder/draft.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
 
 const base = (): Draft => ({
@@ -141,6 +141,24 @@ void test("persistence: two tabs on one browser never write over each other's dr
   assert.deepEqual(drafts().map((d) => d.title), ["Moved in B", "New in A"], "A's new hole kept, B's edit kept, B's delete done");
   assert.ok(saveDraft(a[0].key, { ...a[0].draft, title: "Then in A" }));
   assert.deepEqual(drafts().map((d) => d.title), ["Then in A", "New in A"], "the same draft saved twice: the last save is that draft's, the others untouched");
+});
+
+void test("persistence: a draft open in two tabs: a save never writes over the other tab's edit, nor brings back its delete", () => {
+  localStorage.clear();
+  const k = newKey();
+  saveDraft(k, base());
+  const a = keptText(k), b = keptText(k); // each tab opens it
+  const b1 = saveOver(k, { ...base(), title: "Edited in B" }, b);
+  assert.ok(b1 && b1 !== "elsewhere", "B's edit kept");
+  assert.equal(saveOver(k, { ...base(), title: "Edited in A" }, a), "elsewhere", "A's next save: the draft changed since A read it");
+  assert.equal(drafts()[0].title, "Edited in B", "B's edit stands");
+  const b2 = saveOver(k, { ...base(), title: "Again in B" }, b1.kept);
+  assert.ok(b2 && b2 !== "elsewhere", "B goes on");
+  dropDraft(k); // A deletes it from its list
+  assert.equal(saveOver(k, { ...base(), title: "After the delete" }, b2.kept), "elsewhere", "deleted in another tab: not written again");
+  assert.deepEqual(drafts(), []);
+  const fresh = saveOver(newKey(), base(), null);
+  assert.ok(fresh && fresh !== "elsewhere", "a new key: nothing there to write over");
 });
 
 void test("persistence: a stored draft this Builder cannot read is left out and left as it is, never erased by a save", () => {

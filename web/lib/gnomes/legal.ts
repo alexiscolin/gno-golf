@@ -6,6 +6,7 @@
 // trust strip. The seller is the build's (NEXT_PUBLIC_SELLER_*,
 // next.config.mjs refuses a production shop without it); a placeholder shows
 // what is missing anywhere else.
+import { aboutGnot as about, upToHundredth as up } from "../adena";
 import { shortAddr } from "../chain";
 import { dateParts, gnot, utcDate } from "./shop";
 
@@ -46,26 +47,27 @@ const stamp = (unix: number) => {
   const p = dateParts(unix);
   return `${p.weekday} ${p.day} ${p.year}, ${p.hm} UTC (${jstDate(unix)})`;
 };
-/** A figure up to the hundredth of a GNOT (a deposit, a fee), in ugnot; about: that, in GNOT. */
-const up = (ugnot: number) => Math.ceil(ugnot / 1e4) * 1e4;
-const about = (ugnot: number) => (up(ugnot) / 1e6).toFixed(2);
+
+/** The sale period (申込期間), on the confirmation and the receipt: the genesis's closing date, or plainly that none
+ *  is set (the realm runs the sale without one until the owner sets it). */
+const salePeriod = (closesAt: number, now: number) =>
+  closesAt ? `The genesis sale closes on ${utcDate(closesAt, now)} (${jstDate(closesAt)}).` : "The genesis sale has no closing date set: it runs until the owner sets one on the Contract.";
 
 interface Order { name: string; id: number; tier: string; n: number; price: number; deposit: number; fee: number; address: string; closesAt: number; now: number }
 /** The order, term by term (§1.1): [label, term]; the total "about" (the deposit and fee are the bill's most). */
 export function review(o: Order): [string, string][] {
-  const rows: [string, string][] = [
+  return [
     ["Item", `${o.name} (#${o.id}, ${TIER[o.tier] || o.tier}), ${o.n} ${o.n === 1 ? "item" : "items"}`],
     ["Price", `${gnot(o.price)} GNOT`],
     ["Other costs", `Storage deposit about ${about(o.deposit)} GNOT (held by the chain, returned if you burn the gnome) + network fee about ${about(o.fee)} GNOT. Neither is paid to us.`],
     ["Total", `about ${gnot(o.price + up(o.deposit) + up(o.fee))} GNOT`],
     ["Payment", "Paid now, in GNOT, from your own wallet, in the transaction you sign."],
     ["Delivery", `Delivered at once to ${shortAddr(o.address, 6)}, in the same transaction.`],
-    ["Sale period", `The genesis sale closes on ${utcDate(o.closesAt, o.now)} (${jstDate(o.closesAt)}).`],
+    ["Sale period", salePeriod(o.closesAt, o.now)],
     ["Cancellation", "No returns, cancellations or refunds once the transaction is final, except where the law requires them."],
     ["Nature", "Cosmetic only. No gameplay advantage. Not an investment."],
     ["Seller", `${SELLER.name}, ${SELLER.address}, ${SELLER.email}`],
   ];
-  return o.closesAt ? rows : rows.filter(([k]) => k !== "Sale period");
 }
 /** The order's button (§1.3), the total in it. */
 export const orderButton = (total: number) => `Order with obligation to pay (${gnot(total)} GNOT): sign in wallet`;
@@ -79,6 +81,7 @@ export function receipt(r: Receipt) {
     `Item: ${r.name}, #${r.id}, ${TIER[r.tier] || r.tier}. Contract ${r.realm}`,
     `Price paid: ${gnot(r.price)} GNOT (+ network fee ${about(r.fee)} GNOT, storage deposit ${about(r.deposit)} GNOT held by the chain)`,
     `Delivered to: ${r.address}`,
+    `Sale period: ${salePeriod(r.closesAt, r.now)}`,
     `Transaction: ${r.hash || "in your wallet's history"} (permanent record on ${r.chainId})`,
     `Terms accepted: Terms of Sale version ${TERMS_VERSION}`,
     `Your consents, as ticked: ${r.consents.map((c) => `"${c}"`).join("; ")}`,

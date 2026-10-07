@@ -51,7 +51,12 @@ function editor(first: Draft) {
 }
 
 const THREE = await import("three");
-const { orthoFor, shownAt } = await import("../lib/builder/camera3d.ts");
+const { orthoFor } = await import("../lib/builder/camera3d.ts");
+/** Where a point of the scene shows on the board (its pixels), through cam. */
+function shownAt(cam: InstanceType<typeof THREE.Camera>, p: InstanceType<typeof THREE.Vector3>, size: { w: number; h: number }): [number, number] {
+  const q = p.clone().project(cam);
+  return [((q.x + 1) / 2) * size.w, ((1 - q.y) / 2) * size.h];
+}
 const SIZE = { w: 1000, h: 640 };
 
 /**

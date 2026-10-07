@@ -125,3 +125,24 @@ func TestAWaveStartsBeforeTheCloseOnceOneIsSet(cur realm, t *testing.T) {
 	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
 	urequire.NoError(t, addWave(721, 723, at, 0), "a later series is not the genesis's")
 }
+
+// From the other side: a close is never set, nor brought forward, to at or
+// before a genesis wave yet to open, which nobody could then buy from.
+func TestTheCloseNeverComesBeforeAGenesisWaveYetToOpen(cur realm, t *testing.T) {
+	noWave(t, cur)
+	start := now() + 2*24*3600
+	urequire.NoError(t, addWave(1, 104, now(), 0))
+	urequire.NoError(t, addWave(105, 208, start, 0))
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.AbortsContains(t, cur, "gnomes: a genesis wave starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start) })
+	urequire.AbortsContains(t, cur, "gnomes: a genesis wave starts on "+dateOf(start), func() { SetCloseAt(cross(cur), now()+3600) })
+	SetCloseAt(cross(cur), start+3600)
+	urequire.AbortsContains(t, cur, "gnomes: a genesis wave starts on "+dateOf(start), func() { SetCloseAt(cross(cur), start-5) })
+	uassert.Equal(t, start+3600, CloseAt())
+
+	// a later series' wave does not hold the genesis's date
+	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
+	urequire.NoError(t, addWave(721, 723, start+7200, 0))
+	SetCloseAt(cross(cur), start+5)
+	uassert.Equal(t, start+5, CloseAt())
+}

@@ -297,6 +297,10 @@ export const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted 
 // what is asked of the account to store bytes at price ugnot a byte (the
 // chain's: vm params), a tenth more: the chain takes what is really written
 export const depositFor = (bytes: number, price: number) => Math.ceil(bytes * price * 1.1);
+/** A figure (a deposit, a fee) up to the hundredth of a GNOT, in ugnot: never under what the wallet may be asked. */
+export const upToHundredth = (ugnot: number) => Math.ceil(ugnot / 1e4) * 1e4;
+/** That figure in GNOT, as a bill says it: 124900 → "0.13". */
+export const aboutGnot = (ugnot: number) => (upToHundredth(ugnot) / 1e6).toFixed(2);
 // the price asked when the chain's is not given: ugnot a gas
 export const PRICE = 0.001;
 // Gas asked for one commit, calibrated on gno_call simulate=true: the work model already bounds the shots

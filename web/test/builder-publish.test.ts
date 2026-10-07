@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { gnokeyCall, gnokeyOn } from "../lib/adena.ts";
+import { aboutGnot, gnokeyCall, gnokeyOn, upToHundredth } from "../lib/adena.ts";
 import { bill, deposit, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
 import { shaOf } from "../lib/builder/proof.ts";
 
@@ -61,11 +61,15 @@ void test("gasFor: above each measured publish's own gas (and a call's), never p
   assert.ok(gasFor({ bytes: 32 << 10, name: FOUR.repeat(40), note: FOUR.repeat(140) }) <= 1.9e9, "the largest hole the realm takes, the longest text");
 });
 
-void test("bill: the deposit, the fee (gas at the price, half again for a rising one) and their total, in GNOT", () => {
+void test("bill: the deposit, the fee (gas at the price, half again for a rising one) in ugnot, as the wallet is asked them; at most their sum, each up to the hundredth", () => {
   const b = bill({ ...CASES.more, gasPrice: 0.001, bytePrice: 100 });
-  assert.equal(b.total, b.deposit + b.fee);
-  assert.equal(b.fee, Math.ceil(gasFor(CASES.more) * 0.001 * 1.5) / 1e6);
-  assert.equal(b.deposit, deposit({ ...CASES.more, price: 100 }) / 1e6);
+  assert.equal(b.fee, Math.ceil(gasFor(CASES.more) * 0.001 * 1.5));
+  assert.equal(b.deposit, deposit({ ...CASES.more, price: 100 }));
+  assert.equal(b.most, upToHundredth(b.deposit) + upToHundredth(b.fee));
+  assert.ok(b.most >= b.deposit + b.fee);
+  // a total of 0.1249 GNOT said at most 0.13, never 0.12 (what the wallet may be asked)
+  assert.equal(aboutGnot(124_900), "0.13");
+  assert.equal(aboutGnot(120_000), "0.12");
 });
 
 void test("the note comes out of the gnokey command unchanged", () => {

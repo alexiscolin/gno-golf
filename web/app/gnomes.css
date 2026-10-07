@@ -109,10 +109,11 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 .gbar__views button { padding: 6px 14px; white-space: nowrap; }
 .gbar__tiers { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tierbtn__unit { font-size: 11px; }
-/* a tier's chip as the shelf's filter (Button, a toolbar's): pressed, ringed, on its own colour */
+/* a tier's chip as the shelf's filter (Button, a toolbar's): its shape and colour its tier's; pressed, the one
+   selected look (gold, globals.css), its shape kept, the others faded */
 .tierbtn { gap: 5px; padding: 0 10px 0 7px; font-size: 13px; font-weight: 800; letter-spacing: .04em; }
 .tierbtn__price { margin-left: 2px; font-size: 13px; letter-spacing: 0; text-transform: none; }
-.tierbtn[aria-pressed="true"] { background: var(--tier-bg); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+.tierbtn[aria-pressed="true"] { background: var(--gold); }
 .gbar__tiers:has([aria-pressed="true"]) .tierbtn:not([aria-pressed="true"]) { opacity: .55; }
 .gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .gbar__icon svg, .gsearch svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
@@ -182,6 +183,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 
 /* the trust strip: short facts under a buy button */
 .trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.trust li { text-align: center; } /* (a line that wraps on a phone stays centred under the first) */
 
 /* a gnome's sheet: the game's sheet, a little wider, its parts on one column, its action pinned */
 .gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-3); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
@@ -199,6 +201,8 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .gsheet__price { font-size: 28px; font-weight: 700; text-align: center; }
 .gsheet__price small { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
 .gsheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-3) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-2); text-align: center; }
+/* (its negative bottom margin is the sheet's last child's: with Traits and Share after it, it sits in the flow, never over them) */
+.gsheet__foot:not(:last-child) { margin-bottom: 0 !important; }
 .gsheet__foot .btn { margin: 0; width: 100%; }
 .gsheet__foot .btn--save { min-height: 52px; }
 .gsheet .real__fine, .gsheet__fine { margin: 0; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
@@ -241,32 +245,29 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .owned__face[aria-pressed="true"] { box-shadow: var(--ring-shadow); }
 
 /* ---------------------------------------------------------------- the collection on the game's screens (Promo.tsx) */
-/* the picker's Collection section, at its top: one band, the aim card's width or so */
-.gcollect { display: flex; align-items: center; gap: 12px; width: min(100%, 560px); margin: 4px auto 10px; padding: 10px 12px; border: var(--edge-bold); border-radius: 18px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
-.gcollect .owned { flex: 1; min-width: 0; margin: 0; }
-.gcollect__all { flex: none; align-self: end; font-size: 14px; }
+/* the picker's Collection section, between the tile and the aim card (the GUI spec's A3), at least the aim card's
+   width: one slim row about a button high, its thumbnails, its line and its button on one middle line; the line
+   shortened at its end, never wrapped on a computer, two lines at most on a phone; the player's own gnomes, their
+   line over their faces, the whole collection under them */
+.gcollect { display: flex; align-items: center; gap: 10px; width: fit-content; min-width: max(var(--pick-w, 100%), 230px); max-width: 100%; margin: 0 auto var(--gap-l, 12px); padding: 6px 6px 6px 8px; border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
+.gcollect:has(.owned) { flex-direction: column; align-items: stretch; width: max(var(--pick-w, 100%), 230px); }
+.gcollect .owned { min-width: 0; width: 100%; margin: 0; }
+.gcollect__all { align-self: center; font-size: 13px; }
+/* a stack of thumbnails: one size, one frame (the ink's edge round a ring of the tier's colour), on one ground */
 .gcollect__faces { flex: none; display: flex; }
-.gcollect__faces .gtile { width: 48px; margin-right: -8px; border-radius: 12px; }
-.gcollect__faces .gtile:last-child { margin-right: 0; }
-.gcollect__text { flex: 1; min-width: 0; display: grid; gap: 2px; font-size: 14px; font-weight: 700; line-height: 1.25; }
-.gcollect__text b { font-size: 16px; }
-.gcollect__text small { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-.gcollect__go { flex: none; min-height: 42px; padding: 0 16px; font-size: 15px; }
+.gcollect__faces .gtile { --rim: var(--tier-common); width: 32px; border: 2px solid var(--ink); border-radius: 10px; background: #f6ead2; }
+.gcollect__faces .gtile::before { box-shadow: inset 0 0 0 2px var(--rim); }
+.gcollect__faces .gtile--rare { --rim: var(--tier-rare); } .gcollect__faces .gtile--epic { --rim: var(--tier-epic); } .gcollect__faces .gtile--legendary { --rim: var(--tier-legendary); }
+.gcollect__faces .gtile + .gtile { margin-left: -8px; }
+.gcollect__faces .gtile:nth-child(n + 5) { display: none; }
+.gcollect__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 1.3; }
+.gcollect__text b { font-weight: 800; }
+@media (max-width: 600px) {
+  .gcollect__faces .gtile:nth-child(n + 4) { display: none; }
+  .gcollect__text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
 .gcollect--door { color: inherit; font: inherit; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
 .gcollect--door:hover { transform: translateY(-2px); }
-.gcollect__go { pointer-events: none; }
-.gcollect__short { display: none; }
-@media (max-width: 560px) {
-  .gcollect { gap: 8px; padding: 6px 8px; }
-  .gcollect__faces .gtile { width: 34px; margin-right: -10px; border-radius: 10px; }
-  .gcollect__faces .gtile:nth-child(n + 4) { display: none; }
-  .gcollect__text { font-size: 12px; }
-  .gcollect__text b { font-size: 14px; }
-  .gcollect__text small { display: none; }
-  .gcollect__go { min-height: 34px; padding: 0 12px; font-size: 14px; }
-  .gcollect__long { display: none; }
-  .gcollect__short { display: inline; }
-}
-@media (max-height: 760px) { .gcollect { margin-bottom: 6px; padding: 6px 10px; } .gcollect__text small { display: none; } }
+.gcollect__go { flex: none; pointer-events: none; }
 /* the finish card's one line, at its foot */
 .gpromo__line { margin: 12px 0 0; text-align: center; font-size: 14px; }

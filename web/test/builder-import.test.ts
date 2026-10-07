@@ -17,6 +17,8 @@ import { census } from "../lib/builder/drawn.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { validate } from "../lib/builder/pipeline.ts";
 import { testGate } from "../lib/builder/editor.ts";
+import { placePiece } from "../lib/builder/edit.ts";
+import { judge } from "../lib/builder/verdict.ts";
 import type { Hole } from "../lib/scene/data.ts";
 
 const holes = new Map(fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n").map((l) => l.split(" ")).map(([slot, , , hex]) => [slot, hex]));
@@ -148,4 +150,16 @@ void test("openPublished: a published hole by its id, as Start and a remix open 
     throw new Error("a chunk did not load");
   };
   assert.equal(await openPublished(chain, host, broken, id, B, list), "The Builder's pieces could not load. Try again in a moment.", "a failure past the read: said, never unhandled");
+});
+
+void test("a bar on a hole a post's rim frames off the board's quarters: published, it opens again and the community verdict takes it", async () => {
+  const island = await loadPalette("island"), entry = (id: string) => island.find((e) => e.id === id)!;
+  const framed = lane("island", [placePiece(entry("*/post/sandcastle"), "s", [15, 1.5])]);
+  assert.notEqual(framed.tee[1] % 0.25, 0, "the tee off the board's quarters");
+  const [tx, ty] = framed.tee, d = { ...framed, pieces: [...framed.pieces, placePiece(entry("*/bar/plank"), "b", [tx + 6, ty - 3])] };
+  const v = validate(d, { host, palette: island, census });
+  assert.deepEqual(v.issues.filter((i) => i.severity === "error"), []);
+  const opened = await fromPublished(v.hex!, host, `${A}/plank/v1`, A, census);
+  assert.equal(typeof opened, "object", typeof opened === "string" ? opened : "");
+  assert.deepEqual(await judge(v.hex!, host, census), { ok: true });
 });

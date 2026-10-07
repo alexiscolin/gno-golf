@@ -98,8 +98,9 @@ function cup(h: HoleIn, lane: (p: V) => boolean, name: Namer, judged: Judged): I
 /**
  * E4: the cup reached from the tee at the ball's clearance (the most open the
  * hole ever is: its timed and pulsed pieces left out; tunnels jump, hazards
- * stop). E14: and at the ball's diameter and PASSAGE, so no way to the cup is
- * one a ball only just threads; the pieces at the narrowest place named.
+ * stop). E14: and at the width a ball needs there (passages: its diameter,
+ * its radius beside a hazard) and PASSAGE, so no way to the cup is one a
+ * ball only just threads; the pieces at the narrowest place named.
  */
 function way(h: HoleIn, name: Namer): Issue[] {
   const loose = LOOSE(h), from = reach(h, loose);
@@ -109,11 +110,12 @@ function way(h: HoleIn, name: Namer): Issue[] {
     return [err("E4", `The cup cannot be reached from the tee: ${shut}`, undefined, shut === "the tee is closed in" ? h.tee : h.pin)];
   }
   // E4 the gaps no ball passes the way needs, E14 the rest the way needs a ball only just fits through
-  const ball = 2 * h.ballR, wide = ball + PASSAGE, shut = passages(h, ball), same = (p: Passage, q: Passage) => p.mid[0] === q.mid[0] && p.mid[1] === q.mid[1];
+  const ball = 2 * h.ballR, shut = passages(h, 0), same = (p: Passage, q: Passage) => p.mid[0] === q.mid[0] && p.mid[1] === q.mid[1];
+  const needs = (need: number) => (need === ball ? `the ball (${ball})` : `the ball (${need} beside a hazard)`);
   return [
-    ...shut.map(({ gap, mid, a, b }) => err("E4", `The cup cannot be reached from the tee: ${between(name, gap, mid, a, b)}, narrower than the ball (${ball})`, a, mid, [b])),
-    ...passages(h, wide).filter((p) => !shut.some((q) => same(p, q))).map(({ gap, mid, a, b }) =>
-      err("E14", `${cap(between(name, gap, mid, a, b))}, and the way to the cup goes through it: at least ${wide}, or a ball only just fits`, a, mid, [b])),
+    ...shut.map(({ gap, need, mid, a, b }) => err("E4", `The cup cannot be reached from the tee: ${between(name, gap, mid, a, b)}, narrower than ${needs(need)}`, a, mid, [b])),
+    ...passages(h, PASSAGE).filter((p) => !shut.some((q) => same(p, q))).map(({ gap, need, mid, a, b }) =>
+      err("E14", `${cap(between(name, gap, mid, a, b))}, and the way to the cup goes through it: at least ${need + PASSAGE}, or a ball only just fits`, a, mid, [b])),
   ];
 }
 const between = (name: Namer, gap: number, mid: V, a: PieceRef, b: PieceRef) => `the gap at ${pt(mid)} between ${name(a)} and ${name(b)} is ${+gap.toFixed(2)} wide`;
@@ -121,61 +123,82 @@ const between = (name: Namer, gap: number, mid: V, a: PieceRef, b: PieceRef) => 
 /** The clearance the way's flood is made at: generous (a cell shut only if no ball could be anywhere in it), so it never refuses a hole a ball can play. */
 export const LOOSE = (h: HoleIn) => h.ballR - CELL * Math.SQRT1_2;
 
-/** A gap between two fixed solids the way to the cup goes through: its width, the middle of its narrowest place, the two pieces. */
+/** A gap between two fixed solids the way to the cup goes through: its width, the width a ball needs there, the middle of its narrowest place, the two pieces. */
 export interface Passage {
   gap: number;
+  need: number;
   mid: V;
   a: PieceRef;
   b: PieceRef;
 }
 
 /**
- * The gaps narrower than under between two fixed solids (walls, posts: a
- * pulse's and a timed one are not always there) that the way to the cup
+ * The gaps narrower than a ball needs and slack between two fixed solids
+ * (walls, posts, a hazard's edges: a pulse's and a timed one are not always
+ * there) that the way to the cup
  * needs: closed there, alone or with the other such gaps, the cup is lost
- * (two gaps side by side, each too narrow, are a way shut as one is). E4 and
- * E14 read them at the ball's width; the difficulty meter wider. None if the
- * cup is not reached at all.
+ * (two gaps side by side, each too narrow, are a way shut as one is). A ball
+ * needs its diameter between two walls or posts, its radius beside a hazard
+ * (its centre only must stay out), none between two. E4 reads them with no
+ * slack, E14 with PASSAGE, the difficulty meter more. None if the cup is not
+ * reached at all.
  */
-export function passages(h: HoleIn, under: number): Passage[] {
+export function passages(h: HoleIn, slack: number): Passage[] {
   // the gaps are measured exactly, the way found by the flood
   const loose = LOOSE(h), base = reach(h, loose);
   if (!base.reached) return [];
-  const of: Solid[] = [], refs: PieceRef[] = [];
-  for (const { item, ref } of each<WallIn>(h, "wall")) if (!item.every && ref.pulse === undefined) of.push({ kind: "wall", a: item.a, b: item.b }), refs.push(ref);
-  for (const { item, ref } of each<PostIn>(h, "post")) if (ref.pulse === undefined) of.push({ kind: "post", c: item.c, r: item.r }), refs.push(ref);
+  // each solid with the room a ball's centre keeps from it, and for a hazard's edge its hazard
+  const of: (Solid & { keep: number; zone?: ZoneIn })[] = [], refs: PieceRef[] = [];
+  for (const { item, ref } of each<WallIn>(h, "wall")) if (!item.every && ref.pulse === undefined) of.push({ kind: "wall", a: item.a, b: item.b, keep: h.ballR }), refs.push(ref);
+  for (const { item, ref } of each<PostIn>(h, "post")) if (ref.pulse === undefined) of.push({ kind: "post", c: item.c, r: item.r, keep: h.ballR }), refs.push(ref);
+  for (const { item: z, ref } of each<ZoneIn>(h, "zone")) {
+    if (z.kind !== "hazard" || z.every || ref.pulse !== undefined) continue;
+    const pts = outline(z);
+    pts.forEach((a, k) => (of.push({ kind: "wall", a, b: pts[(k + 1) % pts.length], keep: 0, zone: z }), refs.push(ref)));
+  }
   // each gap closed by a post at its middle: its cells within the post's reach shut (gridOf's own rule, on the same grid)
   const gaps: (Passage & { post: PostIn })[] = [];
   for (let i = 0; i < of.length; i++) {
     for (let j = i + 1; j < of.length; j++) {
-      const [gap, mid] = gapOf(of[i], of[j]);
-      if (gap > 1e-9 && gap < under) gaps.push({ gap, mid, a: refs[i], b: refs[j], post: { c: mid, r: Math.max(gap / 2, CELL) } });
+      const [gap, mid] = gapOf(of[i], of[j]), need = of[i].keep + of[j].keep;
+      // (a hazard's two edges about its own inside: no way, the hazard's)
+      if (!(gap > 1e-9 && gap < need + slack) || (of[i].zone && of[i].zone === of[j].zone && inZone(shapeOf(of[i].zone!), mid[0], mid[1]))) continue;
+      gaps.push({ gap, need, mid, a: refs[i], b: refs[j], post: { c: mid, r: Math.max(gap / 2, CELL) } });
     }
   }
   type Gap = (typeof gaps)[number];
   const closing = (closed: readonly Gap[]) => reach({ ...h, posts: [...h.posts, ...closed.map((g) => g.post)] }, loose);
   // a gap a way passes: within its post's reach of a cell on it (if the way the flood found passes none of its cells, closing it leaves that way)
   const passes = (path: readonly V[], g: Gap) => path.some((p) => Math.hypot(p[0] - g.mid[0], p[1] - g.mid[1]) < g.post.r + loose + 1e-9);
-  const onWay = gaps.filter((g) => passes(base.path, g)), alone = new Map(onWay.map((g) => [g, closing([g])]));
-  // one the way needs alone: closed there, the cup is lost
-  const needed = new Set(onWay.filter((g) => !alone.get(g)!.reached));
-  // and the ones it needs together: those on the way closed, then those on the way found round them, until the cup
-  // is lost or a way passes none (then no set of them shuts it); lost, each reopened in turn and kept open while the
-  // cup stays lost, those left shut the way's
-  const shut: Gap[] = [];
+  // those on the way closed together, then those on the way found round them, until the cup is lost or a way
+  // passes none: then it holds with them all shut, and no one of them, nor any set, is a way the cup needs
+  const onWay = gaps.filter((g) => passes(base.path, g)), shut: Gap[] = [];
   let way = base;
   for (let fresh = onWay; fresh.length && way.reached; fresh = gaps.filter((g) => !shut.includes(g) && passes(way.path, g))) {
     shut.push(...fresh);
-    way = shut.length === 1 ? alone.get(shut[0])! : closing(shut);
+    way = closing(shut);
   }
-  if (!way.reached && shut.length > 1) {
+  if (way.reached) return [];
+  // lost: the ones the way needs alone (closed there, the cup is lost), and those it needs together (each of
+  // the shut reopened in turn, kept open while the cup stays lost: those left shut the way's)
+  const needed = new Set(onWay.filter((g) => !closing([g]).reached));
+  if (shut.length > 1) {
     for (const g of [...shut]) {
       const rest = shut.filter((x) => x !== g);
       if (!closing(rest).reached) shut.splice(shut.indexOf(g), 1);
     }
-    for (const g of shut) needed.add(g);
   }
-  return gaps.filter((g) => needed.has(g)).map(({ gap, mid, a, b }) => ({ gap, mid, a, b }));
+  for (const g of shut) needed.add(g);
+  return gaps.filter((g) => needed.has(g)).map(({ gap, need, mid, a, b }) => ({ gap, need, mid, a, b }));
+}
+
+/** A zone's outline: its polygon, its box's corners, an ellipse by ROUND_SIDES points on it. */
+const ROUND_SIDES = 32;
+function outline(z: ZoneIn): V[] {
+  if (z.poly?.length) return [...z.poly];
+  if (!z.round) return [z.min, [z.max[0], z.min[1]], z.max, [z.min[0], z.max[1]]];
+  const [cx, cy] = centreOf(z), rx = (z.max[0] - z.min[0]) / 2, ry = (z.max[1] - z.min[1]) / 2;
+  return Array.from({ length: ROUND_SIDES }, (_, k): V => [cx + rx * Math.cos((2 * Math.PI * k) / ROUND_SIDES), cy + ry * Math.sin((2 * Math.PI * k) / ROUND_SIDES)]);
 }
 
 /** The gap between two solids (a wall a segment, a post a circle) and the middle of its narrowest place. */

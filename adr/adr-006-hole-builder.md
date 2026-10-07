@@ -61,17 +61,21 @@ the realm byte for byte by `scripts/wasmparity.ts`). Every player loads it.
   `course.ts` and `zones.ts`, and a `skins` list each world module exports
   beside its `piece()` (`worlds.ts` `Skins`), each met by a binding
   (`BINDINGS`: kind, shapes, ranges, clocks). A drawing with no binding must
-  be in `HAND_ONLY`, with why. A new piece, or a new world, appears in the
-  palette by its drawing and a binding, and in no other place.
+  be in `HAND_ONLY`, with why. A shared drawing also names where it is at
+  home (`HOME`: `"*"` every world, the worlds named, or `"sea"` the shore's);
+  away from its home it is offered as borrowed, under "From other worlds",
+  and a shore piece (a palm, a crab, the waves) not at all in a world with no
+  sea. A new piece appears in the palette by its drawing, a binding and,
+  shared, its `HOME` (the palette test asks one for every shared drawing),
+  and in no other place; a new world by its module's skins.
 - **Every entry is proved, not trusted** (`web/test/builder-palette.test.ts`):
   built into a real hole by `buildHole` in Node (a 2D canvas stub is all the
   scene needs without a GPU), in every world it is offered in, it must draw
   something, and something other than what an unknown skin falls back to
   (the plain form) unless it is the plain form on purpose; and its piece,
   at the low end, default and high end of its ranges, must pass `Fit` and
-  `Check`. 273 entries across the Builder's four worlds (garden 61, island
-  62, town 72, mountain 78; 384 across five before the Crystal Mines left
-  the Builder). A world-only skin offered
+  `Check` (no count is kept here: a world's entries change as its pieces
+  do). A world-only skin offered
   elsewhere, or a slope skin that only reshapes the ground, fails it
   (measured on purpose).
 - **The rules the palette is bound by are the chain's** (`rules.ts`):

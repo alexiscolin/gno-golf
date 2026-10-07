@@ -100,6 +100,20 @@ void test("E13: zones lie over one another by their shapes, not their boxes: rou
   assert.equal(e13(sand([10, 4], [14, 8]), sand([14, 4], [18, 8])), 0, "boxes side by side");
 });
 
+void test("E4, E14: a gap a fixed hazard bounds: the ball keeps its radius from a wall or a post and none from the hazard", () => {
+  const water = (min: V, max: V): ZoneIn => ({ kind: "hazard", min, max });
+  const of = (h: HoleIn) => rules(h).filter((r) => /^E(4|14) /.test(r));
+  const post = (gap: number) => hole({ walls: [...box(0, 0, 40, 20), { a: [20, 12.6 + gap + 0.15], b: [20, 20] }], zones: [water([18, 0], [22, 8])], posts: [{ c: [20, 8 + gap + 2.1], r: 2.1 }] });
+  assert.equal(reach(post(0.4), 0.5).reached, false, "no ball passes");
+  assert.match(of(post(0.4))[0] ?? "", /^E4 .* between the plain post and the plain hazard is 0.4 wide, narrower than the ball/);
+  assert.match(of(post(0.6))[0] ?? "", /^E14 .* 0.6 wide, .* at least 0.75/, "a ball's radius and PASSAGE");
+  assert.deepEqual(of(post(1)), [], "room enough");
+  const end = hole({ walls: [...box(0, 0, 40, 20), { a: [20, 8.48], b: [20, 20] }], zones: [water([18, 0], [22, 8])] });
+  assert.match(of(end)[0] ?? "", /^E4 .* 0.48 wide/);
+  const sliver = hole({ zones: [water([18, 0], [22, 10]), water([18, 10.2], [22, 20])] });
+  assert.match(of(sliver)[0] ?? "", /^E14 .* 0.2 wide, .* at least 0.25/, "between two hazards: PASSAGE");
+});
+
 void test("E8: GG1's limits, pulses' pieces counted in", () => {
   const many = (n: number) => Array.from({ length: n }, (_, k): WallIn => ({ a: [5 + (k % 30), 2], b: [5 + (k % 30), 3] }));
   assert.deepEqual(counts(hole()).walls, [4, LIMITS.walls]);

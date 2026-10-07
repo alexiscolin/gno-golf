@@ -24,9 +24,3 @@ export function orthoFor(cam: THREE.OrthographicCamera, v: View, look: Look, siz
   cam.updateMatrixWorld();
   return cam;
 }
-
-/** Where a point of the scene shows on the board (its pixels), through cam. */
-export function shownAt(cam: THREE.Camera, p: THREE.Vector3, size: { w: number; h: number }): [number, number] {
-  const q = p.clone().project(cam);
-  return [((q.x + 1) / 2) * size.w, ((1 - q.y) / 2) * size.h];
-}
