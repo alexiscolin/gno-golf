@@ -71,10 +71,11 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
   latest.current = { view, look, size, paused, keep };
   const lens = useRef<THREE.PerspectiveCamera>(null);
 
-  /** One frame: the camera as the board looks, the timed pieces at the game's clock, drawn. */
-  const draw = (now = performance.now()) => {
+  /** One frame: the camera as the board looks, the timed pieces at the game's clock, drawn; none while the canvas is
+   *  lent (a quick test, Prove it: the game sizes and draws it). Whether it drew. */
+  const draw = (now = performance.now()): boolean => {
     const t = three.current, r = stageRenderer();
-    if (!t || !r || !latest.current.size.w) return;
+    if (!t || !r || !latest.current.size.w || r.domElement.parentElement !== box.current) return false;
     const { view: v, look: l, size: s } = latest.current;
     r.setSize(s.w, s.h, false);
     orthoFor(t.cam, v, l, s);
@@ -85,6 +86,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
       for (const p of t.course.userData.timed) p.at(step);
     }
     r.render(t.scene, t.cam);
+    return true;
   };
 
   /** The player's view in eye's canvas: rendered in the board canvas's corner (at most its size), copied, then the
@@ -127,6 +129,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
       c.removeAttribute("id"), c.removeAttribute("style"); // (the game's sizing and its #stage, gone with it)
       r.resetState();
       draw();
+      if (latest.current.keep) waker.current?.(); // (a timed piece kept moving: its loop, stopped while lent, again)
     });
     return () => {
       const t = three.current;
@@ -136,7 +139,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
       built.current = "";
       give();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- (waker: the Board's ref, read when the canvas comes back)
 
   // the hole built again as it is checked (its world's module first), when what it draws changed
   useEffect(() => {
@@ -171,6 +174,8 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
       const t = three.current;
       if (!t) return;
       const s = Math.floor(now / MS_PER_STEP);
+      // (the canvas lent: nothing to draw, the loop stops; its holder's back wakes it)
+      if (stageRenderer()?.domElement.parentElement !== box.current) return void (t.loop = 0);
       if (motion || ((t.course?.userData.timed.length ?? 0) > 0 && s !== step)) (draw(now), (step = s));
       t.loop = now - last < IDLE_MS || latest.current.keep ? requestAnimationFrame(frame) : 0;
     };
@@ -184,7 +189,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
 
   // kept moving: woken now (and on, while kept); paused or played: one frame
   useEffect(() => void (keep && waker.current?.()), [keep, waker]);
-  useEffect(() => draw(), [paused]);
+  useEffect(() => void draw(), [paused]);
 
   return <div className="board__scene" ref={box} aria-hidden="true" />;
 }
