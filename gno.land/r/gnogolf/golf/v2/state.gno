@@ -260,6 +260,42 @@ func Community(after string, limit int) string {
 	return sb.String()
 }
 
+// DayCandidates is a page of the community holes a hole of the day is picked
+// from, the same for everyone all day whatever is published in it: each
+// alias's current version, not hidden, in alias order after the alias after
+// ("" from the first), as Holes lists it with born, the height its alias's
+// first version was published at (0 for one whose first came from v1: long
+// before). It
+// walks limit aliases at most (1..pageMax), a hidden one among them, and
+// next is the alias to go on from, "" at the end.
+func DayCandidates(after string, limit int) string {
+	var sb strings.Builder
+	sb.WriteString("{" + versionJSON + `,"rows":[`)
+	n := 0
+	next := page(aliases.Iterate, after, limit, func(_ int, slot, id string) {
+		if hidden.Has(slot) {
+			return
+		}
+		e := find(id)
+		row := holeRow(e)
+		sb.WriteString(sep(n) + row[:len(row)-1] + `,"born":` + strconv.FormatInt(bornAt(e), 10) + "}")
+		n++
+	})
+	sb.WriteString(`],"next":` + jstr(next) + "}")
+	return sb.String()
+}
+
+// bornAt is the height now's alias was first published at (now: its current
+// version): its v1's, however many came after, or 0 when its v1 is not here
+// (its first came from v1).
+func bornAt(now *entry) int64 {
+	first := find(now.slot + "/v1")
+	if first == nil {
+		return 0
+	}
+	return first.height
+}
+
 // perAuthor is the most published holes of one address Holes and the hub
 // list: one address publishing a hundred cannot push everyone else's out.
 const perAuthor = 3

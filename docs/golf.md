@@ -390,6 +390,24 @@ A page of every community hole, every version of each, by id: all that
 {"version":1,"rows":[<a Holes row>, …],"next":"g1…/my-hole/v2"}
 ```
 
+#### `DayCandidates(after string, limit int) string`
+
+The community holes a hole of the day is picked from: each alias's current
+version, in alias order after the alias `after` (`""` from the first), as
+`Holes` lists it, with `born`, the block height its alias's first version
+was published at, however many came after (`0` when its first came from
+v1: long before). A hidden hole is not in
+it. A page walks `limit` aliases at most (1 to 100), a hidden one among
+them, so it may hold fewer rows; `next` is the alias to go on from, `""` at
+the end. The game reads it from the UTC day's point round to it and takes
+the first hole published before the day began that the Builder's rules
+pass: whatever is published, versioned or hidden that day, the others keep
+their order.
+
+```json
+{"version":1,"rows":[<a Holes row, with "born":1204>, …],"next":"g1…/my-hole"}
+```
+
 #### `Current(alias string) string`
 
 The id of the version an alias (`"garden/7"`, `"g1…/my-hole"`) plays now, or

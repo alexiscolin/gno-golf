@@ -37,4 +37,4 @@ func main(cur realm) {
 // gno.land/r/test/builderpublishv2version: 0
 
 // Gas:
-// 38132363
+// 38136890
