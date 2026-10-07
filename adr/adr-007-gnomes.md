@@ -139,6 +139,8 @@ on-chain SVG, so nothing a wallet shows depends on the domain. The link
 follows golf/v2's `SetPlayURL` rule (https://, at most 100 of a-z, A-Z, 0-9
 and -._~/:%, no query or fragment), shared as `p/gnogolf/weblink`, and ends
 with "/"; golf/v2 keeps its own copy of the rule until its next version.
+Every string an answer carries is quoted by `p/gnogolf/jsonq`, golf/v2's
+`jstr` shared the same way (nothing escaped, nothing copied).
 
 **State in bptrees, no enumerable.** Measured with storage goldens: an avl
 row costs about 2 KB of deposit, `grc721/enumerable` added 5 to 9 KB to a
@@ -149,7 +151,7 @@ it leaves them and refuses to move an earned one.
 
 | what | bytes | deposit | golden |
 |---|---|---|---|
-| the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
+| the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink (p/gnogolf/jsonq, added since, is of weblink's size and not measured) | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
 | the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
 | a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
 | an earned gnome | 3,555 | 0.36 GNOT, the player | `z_storage_earned` |
@@ -157,7 +159,7 @@ it leaves them and refuses to move an earned one.
 | what | gas | measured by |
 |---|---|---|
 | a first buy (2.45M while a sold count in the series rewrote its rows) | 2.34M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
-| the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.7M | `z_proof_king` less `z_proof_seed` (`// Gas:` goldens) |
+| the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.2M | `z_proof_king` less `z_proof_seed` (`// Gas:` goldens) |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 
 The deploy's deposit is what a chain stores, not the source's size: the
@@ -297,8 +299,8 @@ setters' events are the spec's names (`CloseAtSet`, `SiteURLSet`, …),
 - After deploy the owner sets the site (`SetSiteURL`) and moves the
   treasury to its own address (`SetTreasury`, then `AcceptTreasury` from
   that address), before the genesis is published.
-- `p/gnogolf/weblink` is one more package to deploy, before gnomes
-  (stage.sh stages it).
+- `p/gnogolf/weblink` and `p/gnogolf/jsonq` are two more packages to
+  deploy, before gnomes (stage.sh stages them).
 - In `gno test`, a recovered call's writes are not reverted (golf's
   `z_worst_shot` notes the same): the earned veto is tested as an abort, and
   on chain the abort reverts the whole call.

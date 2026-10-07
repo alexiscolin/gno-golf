@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gno.land/p/gnogolf/jsonq"
 	"gno.land/p/nt/bptree/v0"
 	"gno.land/p/nt/grc721/v0"
 	"gno.land/r/gnogolf/store"
@@ -358,14 +359,14 @@ func Proof(kind string, player address) string {
 		minted = v.(string)
 	}
 	var b strings.Builder
-	b.WriteString(`{"version":1,"kind":"` + kind + `","player":` + jsonString(player.String()) + `,"ok":` + strconv.FormatBool(ok) +
+	b.WriteString(`{"version":1,"kind":"` + kind + `","player":` + jsonq.Quote(player.String()) + `,"ok":` + strconv.FormatBool(ok) +
 		`,"minted":"` + minted + `","holes":` + strconv.Itoa(c.holes) + `,"finished":` + strconv.Itoa(c.finished) +
 		`,"strokes":` + strconv.Itoa(c.strokes) + `,"par":` + strconv.Itoa(c.par) + `,"missing":[`)
 	for i, m := range c.missing {
 		if i > 0 {
 			b.WriteString(",")
 		}
-		b.WriteString(jsonString(m))
+		b.WriteString(jsonq.Quote(m))
 	}
 	b.WriteString("]")
 	if why != "" {

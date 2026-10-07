@@ -4,6 +4,7 @@ import (
 	"chain"
 	"strings"
 
+	"gno.land/p/gnogolf/jsonq"
 	"gno.land/p/nt/grc721/v0"
 )
 
@@ -55,8 +56,8 @@ func equippedRow(player address) string {
 	if !ok {
 		return ""
 	}
-	return `"player":` + jsonString(player.String()) + `,"id":"` + tid + `","name":` + jsonString(g.name) +
-		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `}`
+	return `"player":` + jsonq.Quote(player.String()) + `,"id":"` + tid + `","name":` + jsonq.Quote(g.name) +
+		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonq.Quote(g.traits) + `}`
 }
 
 // Worn is the gnome player wears for everyone: the one put on with Equip
@@ -84,8 +85,8 @@ func wornRow(player address) string {
 	if !ok {
 		return ""
 	}
-	return `"player":` + jsonString(player.String()) + `,"id":"` + itoa(g.id) + `","name":` + jsonString(g.name) +
-		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `,"equipped":false}`
+	return `"player":` + jsonq.Quote(player.String()) + `,"id":"` + itoa(g.id) + `","name":` + jsonq.Quote(g.name) +
+		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonq.Quote(g.traits) + `,"equipped":false}`
 }
 
 // WornMany is Worn for the first 50 players of a comma-separated list, those

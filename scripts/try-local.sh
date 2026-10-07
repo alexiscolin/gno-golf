@@ -14,7 +14,7 @@
 #   scripts/try-local.sh down     clean up after a crash: its processes and its Serve entries
 #
 # What it does: scripts/e2e-gnomes.sh SEED=1 starts gnodev (the onyx
-# toolchain's) and deploys physics, course, weblink, store, golf/v2 and
+# toolchain's) and deploys physics, course, weblink, jsonq, store, golf/v2 and
 # gnomes under the test name NS; publishes the Garden's eighteen holes; the
 # genesis series, its closing date 90 days on (the realm wants one before any
 # wave: "close" brings it forward), wave 1 open (its players' window an

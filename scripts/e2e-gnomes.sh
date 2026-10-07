@@ -378,7 +378,7 @@ curl -s "http://$RPC_ADDR/status" >/dev/null || die "gnodev did not start (see $
 
 # ------------------------------------------------------------------ deploy
 MAINNET=1 sh "$root/scripts/stage.sh" "$NS" "$WORK/stage" >"$WORK/stage.log" 2>&1 || die "stage.sh failed (see $WORK/stage.log)"
-for p in p/$NS/gnogolf/physics p/$NS/gnogolf/course p/$NS/gnogolf/weblink r/$NS/gnogolf/store r/$NS/gnogolf/golf/v2 r/$NS/gnogolf/gnomes; do
+for p in p/$NS/gnogolf/physics p/$NS/gnogolf/course p/$NS/gnogolf/weblink p/$NS/gnogolf/jsonq r/$NS/gnogolf/store r/$NS/gnogolf/golf/v2 r/$NS/gnogolf/gnomes; do
 	d=$WORK/stage/gno.land/$p
 	if [ "$MCP" = 1 ] && [ "${p%%/*}" = p ]; then
 		files=$(cd "$d" && for f in *; do jq -n --arg n "$f" --rawfile b "$f" '{name:$n,body:$b}'; done | jq -sc .)

@@ -102,10 +102,6 @@ func TestGnomesOfPagesAWallet(cur realm, t *testing.T) {
 
 func countRows(s string) int { return strings.Count(s, `{"id":`) }
 
-func TestAJSONStringIsEscaped(t *testing.T) {
-	uassert.Equal(t, `"a\"b\\c\n\u0001"`, jsonString("a\"b\\c\n\x01"))
-}
-
 func TestReadsAreBounded(t *testing.T) {
 	urequire.True(t, pageSize <= 100)
 	urequire.True(t, maxPlayers <= 50)

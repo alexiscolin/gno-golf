@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gno.land/p/gnogolf/jsonq"
 	"gno.land/p/nt/grc721/v0"
 )
 
@@ -21,8 +22,8 @@ const pageSize = 100
 func Collection() string {
 	var b strings.Builder
 	b.WriteString(`{"version":1,"open":` + strconv.FormatBool(mintOpen) + `,"closesAt":` + itoa(closeAt) +
-		`,"owner":` + jsonString(owner.String()) + `,"treasury":` + jsonString(treasury.String()) +
-		`,"pendingTreasury":` + jsonString(pendingTreasury.String()) + `,"site":` + jsonString(siteURL) +
+		`,"owner":` + jsonq.Quote(owner.String()) + `,"treasury":` + jsonq.Quote(treasury.String()) +
+		`,"pendingTreasury":` + jsonq.Quote(pendingTreasury.String()) + `,"site":` + jsonq.Quote(siteURL) +
 		`,"royaltyBps":` + itoa(royaltyBps) + `,"tiers":[`)
 	for i, tr := range tiers {
 		if i > 0 {
@@ -77,8 +78,8 @@ func Gnome(tid string) string {
 		}
 	}
 	owner, err := Token.OwnerOf(grc721.TokenID(tid))
-	return `{"version":1,"id":"` + tid + `","series":"` + g.series + `","name":` + jsonString(g.name) +
-		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `,"owner":` + jsonString(owner.String()) +
+	return `{"version":1,"id":"` + tid + `","series":"` + g.series + `","name":` + jsonq.Quote(g.name) +
+		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonq.Quote(g.traits) + `,"owner":` + jsonq.Quote(owner.String()) +
 		`,"price":` + itoa(price) + `,"sold":` + strconv.FormatBool(err == nil || isSold(g.id)) +
 		`,"closed":` + strconv.FormatBool(isClosed(g.id)) + `}`
 }
@@ -118,14 +119,14 @@ func GnomesOf(owner address, offset int64) string {
 		next = offset + pageSize
 	}
 	var b strings.Builder
-	b.WriteString(`{"version":1,"owner":` + jsonString(owner.String()) + `,"total":` + itoa(total) +
+	b.WriteString(`{"version":1,"owner":` + jsonq.Quote(owner.String()) + `,"total":` + itoa(total) +
 		`,"next":` + itoa(next) + `,"rows":[`)
 	for i, id := range ids {
 		g, _ := tokenAt(id)
 		if i > 0 {
 			b.WriteString(",")
 		}
-		b.WriteString(`{"id":"` + itoa(id) + `","tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `}`)
+		b.WriteString(`{"id":"` + itoa(id) + `","tier":"` + tierName(g.tier) + `","traits":` + jsonq.Quote(g.traits) + `}`)
 	}
 	b.WriteString(`]}`)
 	return b.String()
@@ -163,7 +164,7 @@ func CanBuy(buyer address, ids string) string {
 		}
 	}
 	return `{"version":1,"ok":` + strconv.FormatBool(code == "") + `,"reason":"` + code +
-		`","said":` + jsonString(strings.TrimPrefix(why, "gnomes: ")) + `,"total":` + itoa(total) +
+		`","said":` + jsonq.Quote(strings.TrimPrefix(why, "gnomes: ")) + `,"total":` + itoa(total) +
 		`,"left":` + capsLeft(lifetimeCap, counts(bought, buyer.String())) +
 		`,"window":{"until":` + itoa(until) + `,"left":` + capsLeft(playerCap, inWin) + `}}`
 }
@@ -194,26 +195,3 @@ func Params() string {
 }
 
 const hexDigits = "0123456789abcdef"
-
-// jsonString quotes s as a JSON string.
-func jsonString(s string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for i := 0; i < len(s); i++ {
-		switch c := s[i]; {
-		case c == '"' || c == '\\':
-			b.WriteByte('\\')
-			b.WriteByte(c)
-		case c == '\n':
-			b.WriteString(`\n`)
-		case c < 0x20:
-			b.WriteString(`\u00`)
-			b.WriteByte(hexDigits[c>>4])
-			b.WriteByte(hexDigits[c&0xf])
-		default:
-			b.WriteByte(c)
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
-}
