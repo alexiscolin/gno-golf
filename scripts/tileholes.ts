@@ -13,7 +13,7 @@ import fs from "node:fs";
 import type { Piece, V } from "../web/lib/builder/draft.ts";
 import type { PaletteEntry } from "../web/lib/builder/palette.ts";
 
-const { host, lane } = await import("../web/test/builder-fixture.ts");
+const { host, lane, rail } = await import("../web/test/builder-fixture.ts");
 await import("../web/test/scene-harness.ts");
 const { loadPalette } = await import("../web/lib/builder/palette.ts");
 const { placePiece } = await import("../web/lib/builder/edit.ts");
@@ -32,10 +32,21 @@ function pieceOf(e: PaletteEntry): Piece {
   return placePiece(e, "x", AT, { size, to: [26, 6] });
 }
 
-/** Where to look: the middle of the piece's handles (its ends, its corners, its centre and rim), and its reach; moving air with what blows it (the mountain's cannon, 2 up-wind of its edge). */
+/** A walled patch of rough beside the piece for what stands by it, off the lane (lib/scene/mountain.ts standsOff):
+ *  the snow cannon up-wind of its gust, the serac's tower uphill of its spot. */
+const ROOM: Record<string, [V, V]> = { "mountain/air/gust": [[9.5, 19], [12.5, 23]], "mountain/hazard/serac": [[12.5, 13], [17.5, 18.5]] };
+const roomOf = (e: PaletteEntry): Piece[] => {
+  const r = ROOM[e.id];
+  if (!r) return [];
+  const [[x0, y0], [x1, y1]] = r;
+  return [rail("k1", [x0, y0], [x1, y0]), rail("k2", [x1, y0], [x1, y1]), rail("k3", [x1, y1], [x0, y1]), rail("k4", [x0, y1], [x0, y0])];
+};
+
+/** Where to look: the middle of the piece's handles (its ends, its corners, its centre and rim), and its reach, with what
+ *  stands by it (its ROOM). */
 function aim(p: Piece, e: PaletteEntry) {
   const pts = handlesOf(p).map((h) => h.at).filter((v) => !p.params.to || v !== p.params.to);
-  if (e.kind === "air" && p.geometry.t !== "post" && p.geometry.t !== "rail" && p.geometry.t !== "bar" && p.geometry.t !== "poly") pts.push([p.geometry.min[0] - 3, p.geometry.min[1]]);
+  if (ROOM[e.id]) pts.push(...ROOM[e.id]);
   if (p.geometry.t === "post") pts.push([p.geometry.c[0] - p.geometry.r, p.geometry.c[1] - p.geometry.r], [p.geometry.c[0] + p.geometry.r, p.geometry.c[1] + p.geometry.r]);
   if (p.geometry.t === "bar") pts.push(p.geometry.a, p.geometry.b);
   const xs = pts.map((v) => v[0]), ys = pts.map((v) => v[1]);
@@ -51,7 +62,7 @@ for (const world of Object.keys(FIELD)) {
   for (const e of await loadPalette(world)) {
     const file = pictureOf(world, e).replace(/^\/builder\/tiles\//, "");
     if (only.length && !only.some((o) => file.startsWith(o))) continue;
-    const d = lane(world, [pieceOf(e)], W, H), p = d.pieces.at(-1)!;
+    const d = lane(world, [...roomOf(e), pieceOf(e)], W, H), p = d.pieces.at(-1)!;
     const { hex, bars } = writeDraft(d, FIELD[world]);
     const f = host.fit(hex, bars);
     if (!f.ok) throw new Error(`${file}: ${f.why}`);
