@@ -7,21 +7,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ChangeEventHandler, type HTMLAttributes, type ReactNode } from "react";
 import { vsPar } from "@/lib/card";
 import { vsParWords } from "@/components/common";
+import { buttonClass, type ButtonLook } from "@/components/button";
 
-/**
- * A button. variant: "primary" (green), "secondary" (paper), "gold" (the
- * front's call to action: a duel's Race), "chain" (the one action that goes
- * to the chain: Adena's blue), "chip" (a HUD card that is a button), "icon"
- * (round, an icon or a sign in it: as wide as it is high). size: "l" (a
- * screen's, the default), "m" (a toolbar's), "s" (a small one beside what it
- * acts on): one height each, whatever is inside, so a row of one size lines
- * up. keycap: its key, in a cap after the words (never taller than the button).
- * A link that looks like a button takes buttonClass.
- */
-const VARIANTS = { primary: "btn--main", secondary: "btn--ghost", gold: "btn--gold", chain: "btn--save", chip: "btn--chip", icon: "btn--ghost btn--icon" };
-const SIZES = { l: "", m: "btn--m", s: "btn--s" };
-export type ButtonLook = { variant?: keyof typeof VARIANTS; size?: keyof typeof SIZES };
-export const buttonClass = ({ variant = "secondary", size = "l" }: ButtonLook, className = "") => ["btn", VARIANTS[variant], SIZES[size], className].filter(Boolean).join(" ");
+/** A button (its variants and sizes: button.ts); keycap: its key, in a cap after the words (never taller than the button). */
 interface ButtonProps extends ComponentProps<"button">, ButtonLook {
   keycap?: ReactNode;
 }

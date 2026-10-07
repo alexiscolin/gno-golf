@@ -325,7 +325,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
    toon colours, ours (the fairway, the hat, the sun), inked; a flat disc for
    the gnomes, who hop in 3D out over the panel's top; the name inked big; the
    one under the pointer leaps */
-.modes .worlds__in { width: min(1100px, calc(100vw - 48px)); }
+.modes .worlds__in { width: min(1100px, 100%); } /* (inside the screen's padding: 100vw would spill 8px sideways) */
 .modes__list { list-style: none; margin: 0 auto; padding: var(--gap-xl) 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-grid); width: min(100%, var(--front-w)); }
 /* four cards: the games and the collection (NEXT_PUBLIC_GNOMES), each a little narrower, their names to fit */
 .modes__list--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }

@@ -8,6 +8,8 @@ import { siteURL } from "@/lib/site";
 import { pasted, shareLinks, useCopied } from "./common";
 import { isTouch, reducedMotion } from "@/lib/device";
 import { track, type Events, type ShareKind } from "@/lib/analytics";
+import { Button } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 
 // Sharing a moment on the networks: a small cluster of round icons that sits
 // with the score (X, Facebook, WhatsApp, Bluesky, copy link), each opening
@@ -146,7 +148,7 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
   if (!go)
     return (
       <div className="clip">
-        <button className="btn btn--ghost" onClick={() => (sound("blip"), setGo(true))}>Make a clip of the shot</button>
+        <Button onClick={() => (sound("blip"), setGo(true))}>Make a clip of the shot</Button>
       </div>
     );
   return (
@@ -166,7 +168,7 @@ export function ShareClip({ make, name, onClip }: ClipProps) {
               </button>
             )}
             {/* on the video, top right (the brand's card has the bottom): a post with a video gets way more views */}
-            <a className="btn btn--ghost btn--s clip__save" href={clip.url} download={clip.file.name} title="Download the video: posts with a video get way more views" onClick={() => (sound("blip"), track("share", { target: "download", what: "clip" }))}>
+            <a className={buttonClass({ size: "s" }, "clip__save")} href={clip.url} download={clip.file.name} title="Download the video: posts with a video get way more views" onClick={() => (sound("blip"), track("share", { target: "download", what: "clip" }))}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 19h14" /></svg>
               Show off your shot
             </a>

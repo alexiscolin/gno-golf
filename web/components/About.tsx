@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { ADENA_URL, FAUCET, NETWORK, OTHER_URL } from "@/lib/network";
 import { Sheet } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import { REALM_PATH, pkgsPath, storePath } from "@/lib/chain";
 import { sound } from "@/lib/feel";
 import { optedOut, optOut } from "@/lib/analytics";
@@ -199,7 +200,7 @@ export default function About({ onClose, onRules, web, support = null, counts = 
       <ul className="about__links">
         {links.map(([name, href, what]) => (
           <li key={name}>
-            <a className="btn btn--ghost" href={href} {...out}><b>{name} ↗</b><span>{what}</span></a>
+            <a className={buttonClass({})} href={href} {...out}><b>{name} ↗</b><span>{what}</span></a>
           </li>
         ))}
       </ul>

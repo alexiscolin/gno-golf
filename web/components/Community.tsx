@@ -179,7 +179,7 @@ function HoleCard({ h, big, map, players, mark, level, remix, onPlay }: {
         {mark && <small className="community__mark">{mark}</small>}
       </span>
       <span className="ccard__acts">
-        <Button className="btn--s" onClick={onPlay}>Play</Button>
+        <Button size="s" onClick={onPlay}>Play</Button>
         {remix && <a className="linkish" href={remixLink(h.id, String(chainQuery()))}>Remix</a>}
       </span>
     </article>

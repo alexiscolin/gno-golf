@@ -30,6 +30,7 @@ import Tip, { readOwner } from "@/components/Tip";
 import Modes, { Ghosts, ModeTag, Rival } from "@/components/Modes";
 import { useGnomeStage } from "@/components/Stage";
 import { Button, Segmented, Toggle, Sheet, SheetClose, Dialog, InfoTip, VsPar } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import { CUPS, backFromChain, fromChain, syncedTo, markSynced, loadCard, recordScore, clearCard, clearCup, totals, cupTotals, parOf, UNLOCKS, cupFinishLine, cupOf, cardKey, scoreOf, vsPar, badgesFor, byRarity, BADGES, loadOnChain, markOnChain, guessCup, HARD } from "@/lib/card";
 import { feel, setFeel, sound, hush } from "@/lib/feel";
 import { addFriend } from "@/lib/friends";
@@ -1989,17 +1990,17 @@ export default function Golf() {
                 </Button>
               )}
               {cupWon && cupWon.id === s.id ? (
-                <button className={"btn " + (pushSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
+                <Button variant={pushSave || rematch ? "secondary" : "primary"} onClick={() => (sound("select"), setCupWon({ ...cupWon, open: true }))}>
                   Cup complete! →
-                </button>
+                </Button>
               ) : (
-                <button className={"btn " + (pushSave || rematch ? "btn--ghost" : "btn--main")} onClick={() => {
+                <Button variant={pushSave || rematch ? "secondary" : "primary"} onClick={() => {
                   // (a duel with no other ghost in this cup: back to their ghosts)
                   const n = nextHole(s, card, duelHole);
                   n ? goTo(n.id) : duelHole ? setScreen(cupsScreen) : goTo(s.holes[0].id);
                 }}>
                   Next hole →
-                </button>
+                </Button>
               )}
             </div>
             {canSave && phoneOnly && (
@@ -2450,7 +2451,7 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
             </>
           ) : (
             <>
-              <a className="btn btn--main btn--wide" href={ADENA_URL} target="_blank" rel="noopener noreferrer">
+              <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={ADENA_URL} target="_blank" rel="noopener noreferrer">
                 Install Adena ↗
               </a>
               <p className="real__fine">
@@ -2466,7 +2467,7 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
               {sent ? "Copied: run it in a terminal ✓" : "Copy the gnokey command"}
             </Button>
           ) : now === 2 ? (
-            <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
+            <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (
             <Button variant="chain" className="btn--wide" disabled={!nameOk} onClick={() => (track("save_clicked", { from: "sheet", blocked: null }), onSave())}>Save on-chain</Button>
           ) : (
@@ -2574,11 +2575,11 @@ function NetBanner({ rpc, onSupport, onFeedback }: { rpc: string; onSupport: () 
       <p className={`netbanner__band netbanner--${net}`}>
         <b data-short={net === "local" ? "Local" : "Test"}>{net === "local" ? "Local chain" : "Testnet"}</b>
         <span>{net === "local" ? "a node on this machine" : "practice scores"}</span>
-        {net === "testnet" && OTHER_URL && <a className="btn btn--ghost btn--s netbanner__go" href={OTHER_URL}>Play on mainnet →</a>}
-        <button className="btn btn--ghost btn--s netbanner__feedback" aria-label="Send feedback" onClick={onFeedback}>
+        {net === "testnet" && OTHER_URL && <a className={buttonClass({ size: "s" }, "netbanner__go")} href={OTHER_URL}>Play on mainnet →</a>}
+        <Button size="s" className="netbanner__feedback" aria-label="Send feedback" onClick={onFeedback}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3v-3H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" /></svg>
           <i>Feedback</i>
-        </button>
+        </Button>
       </p>
       {/* the Players chip's twin, on the left (not on a phone: About has the tip) */}
       <Button variant="chip" className="netbanner__support" aria-label="Support the game" onClick={onSupport}>

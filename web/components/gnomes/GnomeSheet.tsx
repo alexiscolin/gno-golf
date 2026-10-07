@@ -9,7 +9,8 @@
 // is drawn in the look the shop shows (his 3D portrait, or the chain's), the
 // switch under his picture.
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, buttonClass, Sheet } from "@/components/ui";
+import { Button, Sheet } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
 import { GnokeyTx } from "@/components/Gnokey";
 import { messageOf } from "@/components/common";
