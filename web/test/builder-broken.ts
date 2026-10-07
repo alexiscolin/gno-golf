@@ -5,6 +5,7 @@
 import { lane, rail } from "./builder-fixture.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
+import { BUILDER_LIMITS } from "../lib/builder/limits.ts";
 import type { Draft } from "../lib/builder/draft.ts";
 
 export const garden = await loadPalette("garden");
@@ -58,6 +59,13 @@ export const cases: [string, () => Draft, string[]][] = [
     ["E14 a: The gap at (16.75, 11.5) between the plain rail and the plain rail is 1.12 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits"]],
   ["E15: a bar against a rail, swallowed by the kerb", () => lane("garden", [{ ...put("x", "*/bar/plank", [10, 0.5]), geometry: { t: "bar", a: [10, 0.5], b: [14, 0.5], thick: 0.5 } }]),
     ["E15 x: The plank bar is 0.25 from the plain rail: at least 0.5, or the kerb swallows it"]],
+  ["E16: a piece past the Builder's limit (posts and sand in rows, clear of one another)", () => lane("garden", Array.from({ length: BUILDER_LIMITS.pieces - 3 }, (_, k) => {
+    const at: [number, number] = [4 + (k % 14) * 3, 4 + Math.floor(k / 14) * 4.5];
+    return k % 2 ? put(`s${k}`, "*/post/rock", at, { size: 0.3 }) : put(`s${k}`, "*/surface/sand", at, { size: 1 });
+  }), 50, 30),
+    [`E16 -: Too many pieces: ${BUILDER_LIMITS.pieces + 1} of ${BUILDER_LIMITS.pieces}`]],
+  ["E16: a moving piece past the Builder's limit (clock hands)", () => lane("garden", Array.from({ length: BUILDER_LIMITS.moving + 1 }, (_, k) => put(`h${k}`, "*/bar/clock hand", [8, 4 + 2 * k])), 50, 30),
+    [`E16 -: Too many moving pieces: ${BUILDER_LIMITS.moving + 1} of ${BUILDER_LIMITS.moving}`]],
   ["L2: a name the chain refuses", () => ({ ...lane("garden", []), title: "see t.me/x" }),
     ["L2 -: The name or the note looks like a web address. Write \"St. Andrews\", not \"St.Andrews\"."]],
 ];

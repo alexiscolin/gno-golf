@@ -10,6 +10,7 @@ import { whereOf } from "./edit";
 import type { PaletteEntry } from "./palette";
 import type { HoleIn } from "./types";
 import { MAX_BYTES, type Validated } from "./pipeline";
+import { BUILDER_LIMITS, pieceCounts } from "./limits";
 
 /** The dock's one line: what stands between the draft and the next step (off: why Test is off, testGate's; a check under way says nothing new). */
 export function verdict({ pieces, errors, proved, off = "" }: { pieces: number; errors: number; proved: boolean; off?: string }) {
@@ -53,7 +54,7 @@ export function nearLimits(gs: readonly Gauge[]): string[] {
     if (g.name === "Room") return `Room for a shot in its stormiest weather: ${g.shown} left`;
     if (g.name === "Size") return `Size: ${g.shown} of ${Math.round(g.of / 1024)} KB`;
     const left = g.of - g.used;
-    return `${g.name}: ${g.used} of ${g.of} · ${left > 0 ? `room for ${left} more` : "no room for more"}`;
+    return `${g.name === "Moving" ? "Moving pieces" : g.name}: ${g.used} of ${g.of} · ${left > 0 ? `room for ${left} more` : "no room for more"}`;
   });
 }
 
@@ -65,6 +66,12 @@ export function gauges(h: HoleIn, cost: Cost, bytes: number): Gauge[] {
     gauge("Size", bytes, MAX_BYTES, `${(bytes / 1024).toFixed(1)} KB`),
     { name: "Room", used: storm.used, of: storm.of, shown: `${Math.max(0, Math.round((1 - storm.share) * 100))}%`, level: level(storm.share) },
   ];
+}
+
+/** The Builder's own limits (limits.ts, E16), the dock's first gauges: the draft's pieces and its moving ones, known before any check. */
+export function pieceGauges(d: Pick<Draft, "pieces">): Gauge[] {
+  const c = pieceCounts(d);
+  return [gauge("Pieces", c.pieces, BUILDER_LIMITS.pieces, `${c.pieces} / ${BUILDER_LIMITS.pieces}`), gauge("Moving", c.moving, BUILDER_LIMITS.moving, `${c.moving} / ${BUILDER_LIMITS.moving}`)];
 }
 
 /** What one piece of an entry takes of each count: a bar four walls, a polygon its points. */

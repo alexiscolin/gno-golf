@@ -105,6 +105,9 @@
 .checks__near { margin: 0; font-size: 13px; font-weight: 700; color: #8a5a00; }
 .checks__limits summary { cursor: pointer; width: max-content; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
 .checks__limits .gauges { margin-top: var(--sp-2); }
+/* the Builder's own count beside it, always there and calm: amber near the cap, red at it */
+.checks__count { margin-left: var(--sp-2); font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
+.checks__count--warn { color: #8a5a00; } .checks__count--full { color: var(--hat-ink); }
 .verdict { display: flex; align-items: center; gap: var(--sp-2); flex: 1 1 260px; min-width: 0; font-size: 15px; font-weight: 700; }
 .verdict::before { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 800; border: 1.5px solid var(--ink); }
 .verdict--ok::before { content: "✓"; background: var(--green); color: var(--paper); }

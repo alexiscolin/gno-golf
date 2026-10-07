@@ -5,7 +5,8 @@
 // the rule's code a tooltip, for us), with Show me (it selects the piece
 // and frames it) and Move it where the piece can simply move (edit.ts
 // fixOf); the others behind "N more"; a limit said only when near it, the
-// full gauges behind "Limits". The list scrolls in itself. Under the line,
+// full gauges behind "Limits" (the pieces' count beside it, calm: the
+// Builder's own limit, limits.ts). The list scrolls in itself. Under the line,
 // the difficulty meter's one line (difficulty.ts meterLine): a guess, calm,
 // its piece a click away; its place kept when it has nothing to say.
 import { useState } from "react";
@@ -36,7 +37,7 @@ export default function Checks({ verdict, gauges, issues, busy, meter, onShow, o
   onFix: (issue: Issue) => void;
 }) {
   const [all, setAll] = useState(false);
-  const first = issues[0], near = nearLimits(gauges);
+  const first = issues[0], near = nearLimits(gauges), pieces = gauges.find((g) => g.name === "Pieces");
   const bad = first ? first.severity === "error" : !verdict.ok;
   return (
     <section className="checks" aria-label="Checks" aria-busy={busy}>
@@ -62,8 +63,8 @@ export default function Checks({ verdict, gauges, issues, busy, meter, onShow, o
       </p>
       {near.length > 0 && <p className="checks__near">{near.join(" · ")}</p>}
       <details className="checks__limits">
-        <summary>Limits</summary>
-        <div className="gauges" aria-label="The chain's limits">
+        <summary>Limits{pieces && <em className={`checks__count checks__count--${pieces.level}`}>{pieces.shown} pieces</em>}</summary>
+        <div className="gauges" aria-label="The Builder's limits and the chain's">
           {gauges.map((g) => (
             <div key={g.name} className={`gauge gauge--${g.level}`} title={g.name === "Room" ? `Room left for a first shot in its dearest weather: ${g.shown}` : `${g.name}: ${g.shown}`}>
               <span>{g.name}<em>{g.shown}</em></span>

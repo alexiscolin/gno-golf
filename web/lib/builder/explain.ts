@@ -60,6 +60,7 @@ export function plainOf(i: Pick<Issue, "rule" | "text">): string {
   if ((r = m(/^(.+)'s point lies off the board once the hole is fitted$/))) return `${r[1]} has a point off the board: bring it inside the hole.`;
   if ((r = m(/^(.+) comes out, in a zone that moves the ball on$/))) return `${r[1]} comes out where the ball is pushed on: move its way out.`;
   if ((r = m(/^(.+)'s (.+) is (-?[\d.]+): (-?[\d.]+) to (-?[\d.]+)$/))) return `${r[1]}'s ${r[2]} is ${r[3]}: make it ${r[4]} to ${r[5]}.`;
+  if ((r = m(/^Too many (pieces|moving pieces): \d+ of (\d+)$/)) && i.rule === "E16") return `A Builder hole holds ${r[2]} ${r[1]} at most: ${r[1] === "pieces" ? "remove one to add another" : "remove one, or make one still"}.`;
   if ((r = m(/^(.+) is on for (\d+) of (\d+) (\w+): (\d+) to (\d+)$/))) return `${r[1]} is on ${r[2]} of ${r[3]} ${r[4]}: make it ${r[5]} to ${r[6]}.`;
   return /[.!?]$/.test(t) ? t : `${t}.`;
 }

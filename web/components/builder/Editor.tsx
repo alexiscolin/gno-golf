@@ -8,8 +8,8 @@
 // made: the board, the inspector and the keys all ask first (edit.ts).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
-import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, removePiece, snap, whereOf, clampMove } from "@/lib/builder/edit";
-import { gauges, offAtLimit, testGate, verdict } from "@/lib/builder/editor";
+import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, snap, whereOf, clampMove } from "@/lib/builder/edit";
+import { gauges, offAtLimit, pieceGauges, testGate, verdict } from "@/lib/builder/editor";
 import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
 import { notTurned, turnPiece } from "@/lib/builder/handles";
@@ -143,7 +143,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     if (why.length) return say(plainOf(why[0]));
     set({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? t : p)) });
   };
-  const copy = () => piece && quick && tryEdit(copyPiece(draft, piece.id, quick), "No room near it for a copy.");
+  // a copy, or the keyboard's drop, past the Builder's limits: refused with why (the ghost says it on the board)
+  const copy = () => piece && quick && tryEdit(copyPiece(draft, piece.id, quick), roomFor(draft, piece) || "No room near it for a copy.");
   // deleted: the focus to the board (Tab goes on to its pieces), not lost with the Inspector's button
   const remove = () => {
     if (!piece) return;
@@ -166,8 +167,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   };
   const dropArmed = () => {
     if (!armed || !full) return;
-    const r = placeNear(draft, armed, [(draft.tee[0] + draft.pin[0]) / 2, (draft.tee[1] + draft.pin[1]) / 2], full);
-    if (!r) return say("No free place for it between the tee and the cup.");
+    const at: V = [(draft.tee[0] + draft.pin[0]) / 2, (draft.tee[1] + draft.pin[1]) / 2], r = placeNear(draft, armed, at, full);
+    if (!r) return say(roomFor(draft, placePiece(armed, "", at)) || "No free place for it between the tee and the cup.");
     set(r.draft);
     setArmed(null);
     setSelected(r.id);
@@ -229,7 +230,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <div className="centre">
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} onSay={say} said={said} show={show} />
-            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
+            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
           <aside className="col" aria-label="The hole in 3D and the selected piece">
