@@ -152,15 +152,26 @@ export function passages(h: HoleIn, under: number): Passage[] {
       if (gap > 1e-9 && gap < under) gaps.push({ gap, mid, a: refs[i], b: refs[j], post: { c: mid, r: Math.max(gap / 2, CELL) } });
     }
   }
-  const lost = (closed: readonly { post: PostIn }[]) => !reach({ ...h, posts: [...h.posts, ...closed.map((g) => g.post)] }, loose).reached;
-  // one the way needs alone: closed there, the cup is lost (if the way the flood found passes none of its cells, it still holds)
-  const needed = new Set(gaps.filter((g) => base.path.some((p) => Math.hypot(p[0] - g.mid[0], p[1] - g.mid[1]) < g.post.r + loose + 1e-9) && lost([g])));
-  // and the ones the way needs together: all closed, the cup lost, each reopened in turn and kept open while the cup stays lost; those left shut are the way's
-  if (gaps.length && lost(gaps)) {
-    const shut = new Set(gaps);
-    for (const g of gaps) {
-      shut.delete(g);
-      if (!lost([...shut])) shut.add(g);
+  type Gap = (typeof gaps)[number];
+  const closing = (closed: readonly Gap[]) => reach({ ...h, posts: [...h.posts, ...closed.map((g) => g.post)] }, loose);
+  // a gap a way passes: within its post's reach of a cell on it (if the way the flood found passes none of its cells, closing it leaves that way)
+  const passes = (path: readonly V[], g: Gap) => path.some((p) => Math.hypot(p[0] - g.mid[0], p[1] - g.mid[1]) < g.post.r + loose + 1e-9);
+  const onWay = gaps.filter((g) => passes(base.path, g)), alone = new Map(onWay.map((g) => [g, closing([g])]));
+  // one the way needs alone: closed there, the cup is lost
+  const needed = new Set(onWay.filter((g) => !alone.get(g)!.reached));
+  // and the ones it needs together: those on the way closed, then those on the way found round them, until the cup
+  // is lost or a way passes none (then no set of them shuts it); lost, each reopened in turn and kept open while the
+  // cup stays lost, those left shut the way's
+  const shut: Gap[] = [];
+  let way = base;
+  for (let fresh = onWay; fresh.length && way.reached; fresh = gaps.filter((g) => !shut.includes(g) && passes(way.path, g))) {
+    shut.push(...fresh);
+    way = shut.length === 1 ? alone.get(shut[0])! : closing(shut);
+  }
+  if (!way.reached && shut.length > 1) {
+    for (const g of [...shut]) {
+      const rest = shut.filter((x) => x !== g);
+      if (!closing(rest).reached) shut.splice(shut.indexOf(g), 1);
     }
     for (const g of shut) needed.add(g);
   }

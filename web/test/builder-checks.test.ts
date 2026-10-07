@@ -122,5 +122,5 @@ void test("a check stays quick on a hole of many bars (the board checks on a dra
   const bare = { ...lane("garden", [], 70, 50), slug: "many" };
   const best = (x: typeof d) => (validate(x, o), Math.min(...[0, 1, 2, 3, 4].map(() => { const t0 = performance.now(); validate(x, o); return performance.now() - t0; })));
   const ratio = best(d) / best(bare);
-  assert.ok(ratio < 6, `${bars.length} bars: ${ratio.toFixed(1)} times the bare lane's check (it was some 20 before)`);
+  assert.ok(ratio < 3, `${bars.length} bars: ${ratio.toFixed(1)} times the bare lane's check (some 1.8; it was some 20 before)`);
 });
