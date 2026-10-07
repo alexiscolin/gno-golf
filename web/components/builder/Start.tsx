@@ -86,21 +86,29 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
               ))}
             </div>
           </div>
-          <ul className="bholes__starts">
-            {starts.map((s) => (
-              <li key={s.name}>
-                <button type="button" className={`bholes__start${s.name === "blank" ? " bholes__start--blank" : ""}`} aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
-                  <span className="bholes__map"><HoleMap hole={s.map} className="bholes__svg" /></span>
-                  <b>{s.title}</b>
-                  <span className="bholes__line">{s.line}</span>
-                  <span className="bholes__foot" aria-hidden="true">
-                    <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
-                    <span className="bholes__go">Start <i>→</i></span>
-                  </span>
-                </button>
-              </li>
+          {/* the starters are templates, ready-made holes to change; the blank lane one card of the same row, under its own label */}
+          <div className="bholes__starts">
+            {[{ label: "Start from a template", list: starts.filter((s) => s.name !== "blank") }, { label: "Or start blank", list: starts.filter((s) => s.name === "blank") }].map(({ label, list }) => (
+              <section key={label} className={`bholes__set${list[0]?.name === "blank" ? " bholes__set--blank" : ""}`} aria-label={label}>
+                <h3 className="bholes__group">{label}</h3>
+                <ul>
+                  {list.map((s) => (
+                    <li key={s.name}>
+                      <button type="button" className={`bholes__start${s.name === "blank" ? " bholes__start--blank" : ""}`} aria-label={`${s.title}: ${s.line}${s.par ? `, par ${s.par}` : ""}. Start it`} onClick={() => onAdd(s.draft)}>
+                        <span className={`bholes__map${s.name === "blank" ? " bholes__blank" : ""}`}><HoleMap hole={s.map} className="bholes__svg" /></span>
+                        <b>{s.title}</b>
+                        <span className="bholes__line">{s.line}</span>
+                        <span className="bholes__foot" aria-hidden="true">
+                          <span className="bholes__par">{s.par ? `Par ${s.par}` : "Your par"}</span>
+                          <span className="bholes__go">Start <i>→</i></span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         </section>
         <section className="bholes__mine" aria-labelledby="bholes-mine">
           <h2 id="bholes-mine" className="bholes__h">Your holes {drafts.length > 0 && <small>{drafts.length}</small>}</h2>
@@ -181,7 +189,7 @@ function Workshop() {
         <p>Build your own hole. Test it. Put your name on it.</p>
       </div>
       <ol className="bholes__steps" aria-label="How it goes">
-        <Step n={1} name="Pick" line="a starter or a blank lane"><path d="M5 6h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" className="i-paper" /><path d="M6 16q4-7 8-2t4-4" className="i-dash" /><circle cx="18" cy="10" r="1.6" className="i-ink" /></Step>
+        <Step n={1} name="Pick" line="a template or a blank lane"><path d="M5 6h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" className="i-paper" /><path d="M6 16q4-7 8-2t4-4" className="i-dash" /><circle cx="18" cy="10" r="1.6" className="i-ink" /></Step>
         <Step n={2} name="Build" line="drag pieces onto the board"><path d="M4 20 13 11" className="i-line" /><path d="M11 6.5 15 3l6 6-3.5 4z" className="i-gold" /></Step>
         <Step n={3} name="Test & publish" line="hole it, then sign it"><path d="M8 21V4" className="i-line" /><path d="M8 4l10 3.5L8 11z" className="i-flag" /><ellipse cx="9" cy="21" rx="6" ry="1.6" className="i-ink" /></Step>
       </ol>

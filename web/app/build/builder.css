@@ -214,13 +214,19 @@
 .bholes__h small { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 12px; letter-spacing: 0; }
 
 /* the workshop's sign: a blueprint (the build emblem's), the Miner out of his disc on its left, its words, its three steps */
-.bholes__sign {
-  --bp: #2f6db3; position: relative; display: grid; grid-template-columns: 148px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5);
-  margin-top: 28px; padding: var(--sp-4) var(--sp-5) var(--sp-4) var(--sp-4); border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper);
-  background: linear-gradient(rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px,
-    linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, var(--bp);
-  box-shadow: var(--deep-card);
+/* the blueprint (the build emblem's): the sign's paper, and the blank lane's picture */
+.bholes {
+  --blueprint: linear-gradient(rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px,
+    linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, #2f6db3;
 }
+/* its padding the same on every side: the steps never touch its edges */
+.bholes__sign {
+  position: relative; display: grid; grid-template-columns: 148px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5);
+  margin-top: 28px; padding: var(--sp-5); border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper);
+  background: var(--blueprint); box-shadow: var(--deep-card);
+}
+/* a section's gap under the sign (its deep shadow eats some): the world tabs never right under it */
+.bholes__sign + .bholes__new { margin-top: var(--sp-3); }
 /* the Miner stands out over the sign's top edge, as a menu panel's gnome does */
 .bholes__gnome { position: relative; display: block; width: 210px; height: 210px; margin: -78px -31px -26px; }
 .bholes__gnome > svg { position: absolute; left: 50%; bottom: 36px; width: 124px; height: 124px; transform: translateX(-50%); filter: drop-shadow(0 4px 0 var(--ink)); }
@@ -254,7 +260,12 @@
 .bholes__world:hover:not(.on) { background: color-mix(in srgb, var(--c1) 35%, var(--paper)); }
 .bholes__world.on { background: var(--c2); color: var(--paper); box-shadow: inset 0 0 0 2px var(--ink); }
 .bholes__world:focus-visible { outline: var(--ring); outline-offset: 2px; }
-.bholes__starts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); margin: 0; padding: 0; list-style: none; }
+/* the starts: the templates under their label, the blank lane under its own, every card one column of the same four */
+.bholes__starts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--sp-4); row-gap: var(--sp-2); }
+.bholes__set { display: grid; grid-column: span 3; grid-template-columns: subgrid; grid-template-rows: subgrid; grid-row: span 2; }
+.bholes__set--blank { grid-column: span 1; }
+.bholes__group { grid-column: 1 / -1; margin: 0; font-size: 14px; font-weight: 800; color: var(--ink-soft); }
+.bholes__set ul { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; margin: 0; padding: 0; list-style: none; }
 .bholes__start {
   display: grid; grid-template-rows: auto auto 1fr auto; justify-items: start; gap: 4px; width: 100%; height: 100%; padding: 0 0 var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card);
   background: var(--white); font: inherit; color: var(--ink); text-align: left; cursor: pointer; overflow: hidden; box-shadow: var(--shadow-btn); transition: transform var(--t-pop) var(--spring), box-shadow .2s;
@@ -267,7 +278,7 @@
 /* the map on the world's panel colour, its dots: the hole as the game draws one */
 .bholes__map { display: grid; place-items: center; width: 100%; padding: var(--sp-3) 0; border-bottom: var(--edge); background: var(--panel-dots), var(--c1); }
 .bholes__svg { width: min(136px, 100%); aspect-ratio: 1; filter: drop-shadow(0 3px 0 var(--ink)); }
-.bholes__start--blank .bholes__map { background: var(--panel-dots), var(--paper); }
+.bholes__start--blank .bholes__map { background: var(--blueprint); }
 .bholes__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); width: 100%; padding: var(--sp-1) var(--sp-3) 0; }
 .bholes__par { padding: 2px 10px; border: 2px solid var(--ink); border-radius: var(--pill); font-size: 13px; font-weight: 800; }
 .bholes__go { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border: var(--edge); border-radius: var(--pill); background: var(--gold-grad); font-size: 14px; font-weight: 800; }
@@ -292,7 +303,8 @@
 /* a short window (a 700 px laptop's): the sign and the maps a size under, the starters still above the fold */
 @media (max-height: 780px) {
   .bholes__in { gap: var(--sp-4); }
-  .bholes__sign { padding-block: var(--sp-2); }
+  .bholes__sign { padding: var(--sp-4); }
+  .bholes__sign + .bholes__new { margin-top: var(--sp-4); }
   .bholes__step { padding-block: 3px; }
   .bholes__svg { width: min(108px, 100%); }
   .bholes__map { padding: var(--sp-2) 0; }

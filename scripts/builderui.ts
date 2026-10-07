@@ -110,6 +110,16 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   for (const sel of [".bholes__sign", ".bholes__bar", ".bholes__starts"]) assert.ok(!overlap(back, (await box(c, sel))!), `${at}: ${sel} under the corner's Back`);
   const sign = (await box(c, ".bholes__sign"))!, starts = (await box(c, ".bholes__starts"))!;
   assert.ok(Math.abs(sign.l + sign.r - w) <= 2 && Math.abs(starts.l + starts.r - w) <= 2, `${at}: the column is not centred`);
+  // room: the steps inside the sign by its own padding at least, the world tabs a section's gap under it
+  const steps = (await box(c, ".bholes__steps"))!, bar = (await box(c, ".bholes__bar"))!, pad = await c.js<number>(`parseFloat(getComputedStyle(document.querySelector(".bholes__sign")).paddingLeft)`);
+  assert.ok(steps.t - sign.t >= pad && sign.b - steps.b >= pad && sign.r - steps.r >= pad, `${at}: the steps touch the sign's edges (${JSON.stringify({ sign, steps, pad })})`);
+  assert.ok(bar.t - sign.b >= 32, `${at}: the world tabs sit right under the sign (${bar.t - sign.b}px)`);
+  // the starters as templates, the blank lane as one of the cards, as big, under its own label, its own picture
+  assert.deepEqual(await c.js<string[]>(`[...document.querySelectorAll(".bholes__group")].map((e) => e.textContent)`), ["Start from a template", "Or start blank"], `${at}: the start's groups`);
+  const blank = cards[3], first = cards[0];
+  assert.ok(Math.abs(blank.r - blank.l - (first.r - first.l)) <= 1 && Math.abs(blank.b - blank.t - (first.b - first.t)) <= 1, `${at}: the blank lane's card is not a starter's size`);
+  assert.equal(await c.js<string>(`document.querySelector(".bholes__start--blank b").textContent`), "Blank lane");
+  assert.ok(await c.js<boolean>(`!!document.querySelector(".bholes__start--blank .bholes__blank")`), `${at}: the blank lane has no picture of its own`);
   console.log(`${at}: ok`);
   c.kill();
 }
