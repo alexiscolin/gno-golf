@@ -269,6 +269,31 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   console.log("delete: ok");
   c.kill();
 }
+// two tabs on one browser (the second a frame of the same origin: one storage, its events): a hole one starts and
+// an edit the other makes, on a list it read before, are both kept; the drafts screen shows what the other kept
+{
+  const c = await editor(1280, 800); // tab A, on the dogleg
+  const inB = (expr: string) => c.js(`(() => { const document = window.frames[0].document; return ${expr}; })()`);
+  await c.js(`(() => { const f = document.createElement("iframe"); f.src = "/build/"; f.style.cssText = "position:fixed;inset:0;width:1100px;height:780px;z-index:99"; document.body.append(f); })()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!window.frames[0]?.document.querySelector(".bholes__list button")`)); k++) await sleep(500);
+  await inB(`[...document.querySelectorAll(".bholes__list button")].find((b) => b.textContent === "Open").click()`); // tab B, on the dogleg too
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!window.frames[0].document.querySelector(".checks .gauge")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bhead .round--icon").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bholes__starts button").click()`); // A starts a hole
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector(".checks .gauge")`)); k++) await sleep(300);
+  await inB(`(() => { const el = document.querySelector("[aria-label=\\"The hole's name\\"]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "Named in B"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  await sleep(1500);
+  await inB(`document.querySelector(".bhead .round--icon").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!window.frames[0].document.querySelector(".bholes__list")`)); k++) await sleep(300);
+  assert.equal(await inB(`document.querySelectorAll(".bholes__list li").length`), 2, "tab B back on its drafts: A's new hole there");
+  await c.send("Page.reload");
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(500);
+  assert.equal(await c.js(`document.querySelectorAll(".bholes__list li").length`), 2, "the hole A started, kept through B's save");
+  assert.match(await c.js<string>(`document.querySelector(".bholes__list").textContent`), /Named in B/, "B's edit kept");
+  console.log("two tabs: ok");
+  c.kill();
+}
 // the keys: 1 to 5 pick the palette's first five, Space and a drag pan (a piece under it too), F frames the hole,
 // T plays a quick test over the editor, Escape comes back to it as it was; the board's key line says them
 {
