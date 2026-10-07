@@ -77,3 +77,16 @@ export function pulled(press: readonly [number, number], at: readonly [number, n
   const { deg, power } = pullShot(Math.hypot(dx, dy), vw, vh, Math.atan2(dy, dx));
   return power > 0 ? shotOf(deg, power) : null;
 }
+
+/** A round's shots (a quick test's) as quick shots: the first from the tee, each next from where the one before stopped; cut where the realm refuses one. */
+export function roundOf(sim: Shooter, d: Draft, shots: readonly string[]): QuickShot[] {
+  const out: QuickShot[] = [];
+  let from: V | null = null;
+  for (const [stroke, shot] of shots.entries()) {
+    const q: QuickShot = { from, stroke, shot }, [p] = quickShots(sim, d, [q]) ?? [null];
+    out.push(q);
+    if (!p || p.holed) break;
+    from = p.rest;
+  }
+  return out;
+}

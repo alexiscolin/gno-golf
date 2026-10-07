@@ -1,7 +1,12 @@
 // The Builder's feel (the game-design review's "juice"), pure: the snap's
 // tick at most so often, a label by the pointer kept in its box (a refusal
-// said where the cursor is, once), and the confetti of the last weather
-// proved, the same each time. The sounds are the game's own (feel.ts sound).
+// said where the cursor is, once), the confetti of the last weather proved,
+// the same each time; and the board's: placements chained (the plop's note
+// climbing), what a piece landing stirs (water ripples, sand puffs), how
+// far a dragged piece leans. The sounds are the game's own (feel.ts sound).
+import { inZone } from "../terrain";
+import { entryParts } from "./gg1";
+import type { Draft, V } from "./draft";
 
 /** f, run at most once every ms (now: the clock, performance.now's by default). */
 export function throttle(f: () => void, ms: number, now: () => number = () => performance.now()) {
@@ -41,3 +46,28 @@ export function confetti(n: number): Bit[] {
   const r = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff), s / 0x7fffffff);
   return Array.from({ length: n }, (_, i) => ({ x: Math.round(r() * 1000) / 10, delay: Math.round(r() * 400), drift: Math.round((r() - 0.5) * 120), turn: Math.round(r() * 720 - 360), color: COLORS[i % COLORS.length] }));
 }
+
+/** A placement's step in a chain: 0, then one more for each placed within ms of the one before (the plop climbing a scale). */
+export function chain(ms: number, now: () => number = () => performance.now()) {
+  let last = -Infinity, n = -1;
+  return () => {
+    const t = now();
+    n = t - last <= ms ? n + 1 : 0;
+    last = t;
+    return n;
+  };
+}
+
+/** What a piece landing at a board point stirs: water ripples, sand or other ground puffs, the lane a little dust. */
+export function reactionAt(d: Pick<Draft, "pieces">, at: V): "ripple" | "puff" | "dust" {
+  for (const p of [...d.pieces].reverse()) {
+    const g = p.geometry, kind = entryParts(p.entry).kind;
+    if (g.t === "rail" || g.t === "bar" || g.t === "post" || (kind !== "hazard" && kind !== "surface" && kind !== "slope")) continue;
+    const z = g.t === "poly" ? { min: [Math.min(...g.pts.map((q) => q[0])), Math.min(...g.pts.map((q) => q[1]))], max: [Math.max(...g.pts.map((q) => q[0])), Math.max(...g.pts.map((q) => q[1]))], poly: g.pts, outside: !!g.outside } : { min: g.min, max: g.max, round: g.t === "round" };
+    if (inZone(z as Parameters<typeof inZone>[0], at[0], at[1])) return kind === "hazard" ? "ripple" : "puff";
+  }
+  return "dust";
+}
+
+/** How far a dragged piece leans toward where it goes (degrees), from its last move across the screen (px). */
+export const lean = (dx: number) => Math.max(-6, Math.min(6, Math.round(dx * 0.6 * 10) / 10)) + 0;

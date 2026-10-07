@@ -76,7 +76,7 @@ function AddressStep({ onAddress }: { onAddress: (a: string) => void }) {
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, quick = false, onAuthor = () => {}, onProof = () => {}, onPar = () => {}, onLeave }: {
+export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, quick = false, onAuthor = () => {}, onProof = () => {}, onPar = () => {}, onRound = () => {}, onLeave }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -92,6 +92,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   onPar?: (par: number) => void;
   /** a quick test: calm weather, no address, no proof */
   quick?: boolean;
+  /** a quick test's round that holed, its shots (left on the board as a trail) */
+  onRound?: (shots: readonly string[]) => void;
   /** Escape: back to the editor (not while aiming: Escape drops the aim, the game's) */
   onLeave?: () => void;
 }) {
@@ -168,7 +170,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       onChange: (s) => ((aiming.current = s.aiming), setSnap(s)),
       onHoled: ({ shots }) => {
         setTimes((t) => ({ ...t, [now.kind]: performance.now() - since.current }));
-        if (quick) return (setHoled(shots.length), sound("cup")); // (a quick test: no replay, no proof)
+        if (quick) return (setHoled(shots.length), onRound(shots), sound("cup")); // (a quick test: no replay, no proof)
         setChecking(true);
         void replay(local, { key: proofKey, id, kind: now.kind, period: now.period, shots: [...shots] }).then((p) => {
           setChecking(false);

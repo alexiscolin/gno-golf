@@ -40,7 +40,7 @@ import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
 import { tilesOf } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
-import { quickShots, type QuickShot } from "@/lib/builder/quickshot";
+import { quickShots, roundOf, type QuickShot } from "@/lib/builder/quickshot";
 import { FLAT, fromPlane, TILT, type Look } from "@/lib/builder/view";
 
 /** How long after the last change the whole pipeline runs. */
@@ -107,6 +107,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [look, setLook] = useState<Look>(FLAT);
   // a quick test (T): the draft as kept, its canonical bytes, played over the editor (kept open: the same zoom, selection and history after)
   const [trying, setTrying] = useState<{ of: Draft; hex: string } | null>(null);
+  // the last quick test's round that holed, left on the board as a dotted trail (played again as the hole changes)
+  const [trail, setTrail] = useState<QuickShot[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
@@ -157,6 +159,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   // the quick shots on the hole as shown (a drag's too: they replay live), the one being pulled last
   const played = useMemo(() => quickShots(host, draft, aim ? [...shots, aim] : shots) ?? [], [host, draft, shots, aim]);
   const landed = aim ? played.slice(0, -1) : played;
+  const trailed = useMemo(() => quickShots(host, draft, trail) ?? [], [host, draft, trail]);
   // a new quick shot holed: the cup's sound (its putt is played as it is let go)
   const shotSeen = useRef<QuickShot | undefined>(undefined);
   useEffect(() => {
@@ -278,7 +281,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if (act?.t === "turn") return setLook((l) => ({ ...l, turns: (l.turns + act.by + 4) % 4 }));
       if (act?.t === "test") return tryIt();
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
-      if (e.key === "Escape") return (setArmed(null), setSelected(null), setShots([]));
+      if (e.key === "Escape") return (setArmed(null), setSelected(null), setShots([]), setTrail([]));
       const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       // (an arrow moves a piece the way it points on the screen, however the board is turned)
       const step = (k: string) => fromPlane(arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V, { turns: look.turns, tilt: 0 });
@@ -330,7 +333,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null }}
               // (the first run's hints first: the board's tools come once they are gone)
               ball={hints ? undefined : {
-                played: landed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
+                played: landed, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
                 line: guess && est?.of === kept && draft === kept ? { path: guess.path, heat: guess.heat } : null,
                 tryOff, onTry: tryIt, onAim: setAim, onShot: (q) => (sound("putt"), setAim(null), setShots((s) => [...s, q].slice(-SHOTS_KEPT))),
               }} />
@@ -350,7 +353,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
             <b>Quick test</b><span>Calm weather · not a proof</span>
             <button type="button" className="btn btn--ghost" onClick={() => setTrying(null)}>Back to edit<kbd>Esc</kbd></button>
           </div>
-          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onLeave={() => setTrying(null)} />
+          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onRound={(r) => setTrail(roundOf(host, trying.of, r))} onLeave={() => setTrying(null)} />
         </div>
       )}
       {(hints || again) && <Hints glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}

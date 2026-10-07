@@ -374,7 +374,23 @@ near, proved, world; at 1440, 1280 and 1024.
   the pointer is about, the water (with motion allowed) and the timed pieces
   (on the game's clock) move, and idle the loop stops. One canvas and one
   WebGL context for the page (`lib/builder/stage.ts`), lent to Test. No
-  WebGL: the 2D board below, as it was.
+  WebGL: the 2D board below, as it was. Its feel, in the order the research
+  ranked it:
+  - the ghost green where it may go, red with the reason by the pointer
+    where not (red is for that alone);
+  - a piece placed pops in (0, 1.15, 1 over 150 ms) and stirs what it lands
+    on; a piece taken away shrinks into a puff;
+  - a soft plop climbs a major scale as placements chain (within 1.5 s), and
+    falls for a piece taken away; a soft tick each grid step;
+  - the grid only by the pointer, fading out over four units;
+  - T tests in place;
+  - the last quick test's holing round stays on the board as a dotted trail,
+    played again as the hole changes;
+  - water ripples and sand puffs under a piece landing;
+  - a dragged piece leans a little toward where it goes (never a shake), and
+    a piece hovered lifts on a soft shadow.
+  None of it moves with reduced motion; no animation delays an edit (the
+  edit is made, the motion decorates it).
 - **The board** (2D, the fallback): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last

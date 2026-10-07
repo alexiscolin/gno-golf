@@ -30,7 +30,7 @@ import Scene from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
-import { labelAt, throttle } from "@/lib/builder/juice";
+import { chain, labelAt, lean, reactionAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
 import { KEYS } from "@/lib/builder/keys";
 import { pt, xy } from "@/lib/builder/rules";
@@ -76,6 +76,8 @@ export interface BoardProps {
 /** The quick shots on the board: those played (the latest last; null, one the realm refused), the one being pulled, and the meter's line. */
 export interface Ball {
   played: readonly (Played | null)[];
+  /** the last quick test's round that holed, as played on the hole as it is now: a dotted trail */
+  trail: readonly (Played | null)[];
   /** the latest's spec (where the next may start from: its rest, unless it holed) */
   last: QuickShot | null;
   aimed: Played | null;
@@ -126,6 +128,11 @@ export default function Board(props: BoardProps) {
   const pointer = useRef<[number, number]>([0, 0]), label = useRef<HTMLSpanElement>(null), cell = useRef("");
   const [flash, setFlash] = useState<{ text: string; n: number } | null>(null);
   const [popped, setPopped] = useState<string | null>(null);
+  // what a drop stirs (a ripple, a puff, dust) and a piece taken away (it shrinks into a puff), each for a moment
+  const [fx, setFx] = useState<{ n: number; at: V; kind: "ripple" | "puff" | "dust" | "gone"; p?: Piece }[]>([]);
+  const fxN = useRef(0), chained = useMemo(() => chain(1500), []);
+  // the grid by the pointer (3D): its middle moved with the pointer, no render; the pointer's last move across (a dragged piece leans with it)
+  const near = useRef<SVGRadialGradientElement>(null), dx = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const tick = useMemo(() => throttle(() => sound("stretch", 0.1), 70), []);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -146,12 +153,20 @@ export default function Board(props: BoardProps) {
     setFlash((f) => ({ text, n: (f?.n ?? 0) + 1 }));
     later(() => setFlash((f) => (f?.text === text ? null : f)), 2600);
   };
-  /** A drop that held: a knock, and the piece pops. */
-  const dropped = (id: string) => {
-    sound("knock");
+  /** A moment of an effect at a board point, gone after ms. */
+  const stir = (at: V, kind: (typeof fx)[number]["kind"], p?: Piece, ms = 650) => {
+    const n = ++fxN.current;
+    setFx((f) => [...f, { n, at, kind, p }]);
+    later(() => setFx((f) => f.filter((x) => x.n !== n)), ms);
+  };
+  /** A drop that held: the piece pops in (0 → 1.15 → 1), stirs what it lands on; placed, a plop climbing a scale as placements chain; moved, a knock. */
+  const dropped = (id: string, placed: boolean) => {
+    sound(placed ? "plop" : "knock", placed ? chained() : undefined);
     setPopped(id);
     later(() => setPopped((x) => (x === id ? null : x)), 300);
+    toStir.current = id; // (stirred once the draft has it where it landed)
   };
+  const toStir = useRef<string | null>(null);
   /** The snap's tick: a grid step further, a soft creak (at most every 70 ms). */
   const stepped = (key: string) => key !== cell.current && ((cell.current = key), tick());
   // disarmed (Escape, a drop): its ghost goes with it
@@ -186,8 +201,12 @@ export default function Board(props: BoardProps) {
   }, [props.show?.n]); // eslint-disable-line react-hooks/exhaustive-deps -- (asked, not as the draft changes)
   // a re-framed draft moved as a whole: the view follows, nothing jumps
   useEffect(() => {
-    const s = commonShift(prev.current, draft);
+    const s = commonShift(prev.current, draft), had = prev.current.pieces;
     prev.current = draft;
+    const landed = toStir.current && draft.pieces.find((q) => q.id === toStir.current);
+    if (landed) (stir(middleOf(landed), reactionAt(draft, middleOf(landed))), (toStir.current = null));
+    // a piece taken away (a key, the bin, the inspector): it shrinks into a puff, and a falling plop
+    for (const p of had) if (!draft.pieces.some((q) => q.id === p.id)) (stir(middleOf(p), "gone", p, 420), sound("plop", -1));
     const u = toPlane(s, look);
     if (s[0] || s[1]) setView((v) => v && { ...v, x: v.x + u[0], y: v.y + u[1] });
   }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps -- (the look as it is)
@@ -259,6 +278,8 @@ export default function Board(props: BoardProps) {
     pointer.current = [e.clientX - r.left, e.clientY - r.top];
     place();
     const at = unit(e), d = drag.current;
+    dx.current = e.movementX || dx.current * 0.8;
+    near.current?.setAttribute("cx", String(at[0])), near.current?.setAttribute("cy", String(at[1]));
     if (d?.t === "aim") {
       const shot = pulled(d.press, [e.clientX, e.clientY], innerWidth, innerHeight);
       if (shot !== d.shot) (d.shot = shot), props.ball?.onAim(shot ? { from: d.from, stroke: d.stroke, shot } : null);
@@ -284,8 +305,8 @@ export default function Board(props: BoardProps) {
     const r = gesture.up(env, at, { keep: e.shiftKey, bin });
     if (!r) return;
     if ("refused" in r) return refuse(r.refused); // (said by the pointer, where the ghost is: once)
-    if ("placed" in r) (dropped(r.placed), setGhost(null));
-    else if (r.moved) dropped(r.moved);
+    if ("placed" in r) (dropped(r.placed, true), setGhost(null));
+    else if (r.moved) dropped(r.moved, false);
   }
 
   // what the view shows: the grid's lines in sight, every unit, every fifth darker
@@ -313,16 +334,23 @@ export default function Board(props: BoardProps) {
       {gl && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} />}
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null))}
-        onPointerLeave={() => setGhost(null)}>
+        onPointerLeave={() => (setGhost(null), near.current?.setAttribute("cx", "-99"))}>
         <defs><marker id="arrow" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 6 3 0 6z" fill="#fff" /></marker></defs>
         {/* the board in its units, looked at through the look (view.ts matrixOf); the tee's and the cup's badges upright over it */}
         <g className="board__plane" transform={`matrix(${matrixOf(view, look).join(" ")})`}>
         {!gl && <rect className="board__ground" x={0} y={0} width={BOARD} height={BOARD} />}
-        <g className="board__grid">{lines.map((l, i) => (l.x !== undefined ? <line key={i} x1={l.x} y1={y0} x2={l.x} y2={y1} className={l.major ? "major" : ""} /> : <line key={i} x1={x0} y1={l.y} x2={x1} y2={l.y} className={l.major ? "major" : ""} />))}</g>
+        {gl && (
+          <defs>
+            <radialGradient id="board-near" ref={near} gradientUnits="userSpaceOnUse" cx={-99} cy={-99} r={4}><stop offset="0" stopColor="#fff" /><stop offset="1" stopColor="#000" /></radialGradient>
+            <mask id="board-near-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={BOARD} height={BOARD}><rect x={0} y={0} width={BOARD} height={BOARD} fill="url(#board-near)" /></mask>
+          </defs>
+        )}
+        <g className="board__grid" mask={gl ? "url(#board-near-mask)" : undefined}>{lines.map((l, i) => (l.x !== undefined ? <line key={i} x1={l.x} y1={y0} x2={l.x} y2={y1} className={l.major ? "major" : ""} /> : <line key={i} x1={x0} y1={l.y} x2={x1} y2={l.y} className={l.major ? "major" : ""} />))}</g>
         {[...draft.pieces].sort((a, b) => order(a) - order(b)).map((p) => (
           <g key={p.id} data-piece={p.id} className={`board__piece${p.id === selected ? " board__piece--on" : ""}${p.id === popped ? " board__piece--pop" : ""}`} tabIndex={0} role="button"
             aria-label={pieceLabel(p)} aria-pressed={p.id === selected} onFocus={() => props.onSelect(p.id)}>
-            <PieceShape p={p} state={bad.has(p.id) || live?.id === p.id && live.why ? "bad" : undefined} hit={!pending(p)} />
+            {live?.id === p.id ? <g className="board__lean" style={{ rotate: `${lean(dx.current)}deg` }}><PieceShape p={p} state={live.why ? "bad" : undefined} /></g>
+              : <PieceShape p={p} state={bad.has(p.id) ? "bad" : undefined} hit={!pending(p)} />}
           </g>
         ))}
         {sel && handlesOf(sel).map((h) => <rect key={h.key} data-handle={h.key} className="board__handle" x={h.at[0] - hs / 2} y={h.at[1] - hs / 2} width={hs} height={hs} />)}
@@ -334,19 +362,26 @@ export default function Board(props: BoardProps) {
         )}
         {ball && (
           <g className="board__shots" pointerEvents="none">
+            {ball.trail.map((p, i) => p && <polyline key={`t${i}`} className="trail" points={pathOf(p.path)} />)}
             {ball.played.map((p, i) => p && <polyline key={i} className={i < ball.played.length - 1 ? "old" : undefined} points={pathOf(p.path)} />)}
             {latest && !latest.holed && <circle className="board__ball" cx={latest.rest[0]} cy={latest.rest[1]} r={0.5} />}
             {ball.aimed && <polyline className="aim" points={pathOf(ball.aimed.path)} />}
           </g>
         )}
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
+        {fx.map((f) => (
+          <g key={f.n} className={`board__fx board__fx--${f.kind}`} pointerEvents="none">
+            {f.p && <g className="board__shrink"><PieceShape p={f.p} /></g>}
+            <circle cx={f.at[0]} cy={f.at[1]} r={1.2} />
+          </g>
+        ))}
         </g>
         <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${pt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")} transform={badge(draft.tee)}><circle r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text y={0.3} fontSize={0.8} textAnchor="middle">T</text><circle className="board__hit" r={hit} /></g>
         <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${pt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")} transform={badge(draft.pin)}><circle r={0.6} fill="#1f2a26" /><path d="M0 0 v-2.2 l1.4 0.5 -1.4 0.5" fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /><rect className="board__hit" x={-hit} y={-2.2 - hit / 2} width={1.4 + 2 * hit} height={2.2 + 1.5 * hit} rx={hit} /></g>
       </svg>
       {ball && (
         <div className="board__tools">
-          {(aiming || ball.played.length > 0) && <span className="board__quick" role="status">Quick shot: not a proof</span>}
+          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <span className="board__quick" role="status">Quick shot: not a proof</span>}
           <button type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
             title={ball.line ? "The difficulty meter's best line, and where its shots stopped (a guess, calm weather)" : "Shown once the meter has measured the hole as it is"}
             onClick={ball.onLine}>Show the line</button>

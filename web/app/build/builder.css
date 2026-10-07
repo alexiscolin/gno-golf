@@ -132,8 +132,6 @@
 .measure--shake { animation: bshake .3s ease-in-out; }
 @keyframes bshake { 20% { translate: -5px 0; } 40% { translate: 4px 0; } 60% { translate: -3px 0; } 80% { translate: 2px 0; } }
 /* a piece just dropped pops (120 ms) */
-.board__piece--pop { animation: bpop .12s ease-out; transform-box: fill-box; transform-origin: center; }
-@keyframes bpop { from { transform: scale(.8); } 70% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .measure--shake, .board__piece--pop { animation: none; } }
 .board__said { position: absolute; left: 50%; bottom: var(--sp-3); transform: translateX(-50%); max-width: 80%; margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-size: 15px; font-weight: 700; z-index: 1; }
 
@@ -462,5 +460,22 @@
 .tmode__small a { color: var(--green); font-weight: 700; }
 /* the board in 3D (Scene.tsx): the game's scene under the overlay, which picks and draws only the selection, the handles, the ghost and what the scene does not show yet */
 .board__scene, .board__scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.board--3d .board__grid { display: none; }
 .board--3d .board__piece--on > :first-child { stroke: var(--gold); stroke-width: 3px; }
+/* the board's feel (juice.ts): the ghost green where it may go (red stays for where it may not), a piece hovered lifted on a soft shadow, a dragged one leaning,
+   a drop popping in (0, 1.15, 1) and stirring what it lands on (water ripples, sand puffs, dust), a piece taken away shrinking into a puff; none of it moves with reduced motion */
+.board--3d .board__ghost > :first-child:not([stroke="#c8322b"]) { fill: rgba(92, 214, 140, .45); stroke: #1c9a55; }
+.board--3d .board__ghost > :first-child[stroke="#c8322b"] { fill: rgba(225, 75, 59, .35); }
+.board--3d .board__piece:hover > :first-child { stroke: rgba(255, 255, 255, .9); stroke-width: 2px; filter: drop-shadow(0 .12px .1px rgba(0, 0, 0, .45)); }
+.board__lean { transform-box: fill-box; transform-origin: center; transition: rotate .12s ease-out; }
+.board__piece--pop { animation: bpop .15s ease-out; transform-box: fill-box; transform-origin: center; }
+@keyframes bpop { from { transform: scale(0); } 60% { transform: scale(1.15); } to { transform: scale(1); } }
+.board__fx circle { fill: none; stroke-width: 2px; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: bfx .6s ease-out forwards; }
+.board__fx--ripple circle { stroke: rgba(220, 245, 255, .95); }
+.board__fx--puff circle { stroke: rgba(236, 210, 140, .95); fill: rgba(236, 210, 140, .35); }
+.board__fx--dust circle, .board__fx--gone circle { stroke: rgba(255, 255, 255, .7); fill: rgba(255, 255, 255, .25); }
+@keyframes bfx { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+.board__shrink { transform-box: fill-box; transform-origin: center; animation: bshrink .25s ease-in forwards; }
+@keyframes bshrink { to { transform: scale(0); opacity: 0; } }
+.board--3d .board__grid line { stroke: rgba(255, 255, 255, .5); }
+@media (prefers-reduced-motion: reduce) { .board__piece--pop, .board__fx circle, .board__shrink { animation: none; } .board__fx { display: none; } .board__lean { rotate: 0deg !important; transition: none; } }
+.board__shots polyline.trail { stroke-dasharray: 1 7; stroke-width: 3.5px; opacity: .85; }

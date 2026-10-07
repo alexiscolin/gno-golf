@@ -54,3 +54,16 @@ void test("a pull on the board, as the game's slingshot: the ball flies away fro
   assert.equal(Number(pulled([500, 400], [500, 300], 1440, 900)!.split(",")[0]), 90, "pulled up the screen, it goes down the board (y down)");
   assert.equal(pulled([500, 400], [500, 400], 1440, 900), null);
 });
+
+void test("a test's round as quick shots (the trail it leaves on the board): each from where the last stopped, the last in the cup", async () => {
+  const { roundOf } = await import("../lib/builder/quickshot.ts");
+  const fs = await import("node:fs");
+  const kept = JSON.parse(fs.readFileSync(new URL("./builder-starters.json", import.meta.url), "utf8")) as Record<string, Record<string, { shots: string[] }>>;
+  const d = STARTERS.garden.dogleg, shots = kept["garden-dogleg"][""].shots, round = roundOf(host, d, shots);
+  assert.equal(round.length, shots.length);
+  assert.deepEqual(round.map((q) => q.stroke), shots.map((_, k) => k));
+  assert.equal(round[0].from, null, "the first from the tee");
+  const played = quickShots(host, d, round)!;
+  assert.ok(played.slice(1).every((p, k) => p && near(p.path[0], played[k]!.rest, 1e-3)), "each from where the one before stopped");
+  assert.equal(played.at(-1)?.holed, true, "in calm weather, as tested, it holes");
+});
