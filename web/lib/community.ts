@@ -210,19 +210,22 @@ export function sortHoles(rows: readonly HoleRow[], by: SortBy, levels: Readonly
   return rows.map((h, i) => ({ h, i })).sort((x, y) => key(y.h) - key(x.h) || x.i - y.i).map(({ h }) => h);
 }
 
-/** Where a hole's level on the meter (lib/builder/difficulty.ts, worked out in this browser) is kept: this, its version's id. */
+/** Where a hole's level on the meter (lib/builder/difficulty.ts, worked out in this browser) is kept: this, which chain's realm (its id, genesis, realm), its version's id. */
 export const HARD_KEY = "gnogolf.hardness";
-/** The level kept for a version (its data never changes), null if none or not one. */
-export function keptLevel(id: string): Level | null {
+const hardKeyOf = async (chain: Which, id: string) => (isVersion(id) ? `${HARD_KEY}|${await whichOf(chain)}|${id}` : null);
+/** The level kept for a version on its chain (its data never changes), null if none, not one, an alias or its chain not read. */
+export async function keptLevel(chain: Which, id: string): Promise<Level | null> {
   try {
-    const v = localStorage.getItem(`${HARD_KEY}|${id}`);
+    const key = await hardKeyOf(chain, id), v = key && localStorage.getItem(key);
     return v === "0" || v === "1" || v === "2" || v === "3" ? (Number(v) as Level) : null;
   } catch {
     return null;
   }
 }
-export function keepLevel(id: string, level: Level): void {
+/** Keeps a version's level on its chain (an alias's never; nothing when its chain or the store cannot be read). */
+export async function keepLevel(chain: Which, id: string, level: Level): Promise<void> {
   try {
-    localStorage.setItem(`${HARD_KEY}|${id}`, String(level));
+    const key = await hardKeyOf(chain, id);
+    if (key) localStorage.setItem(key, String(level));
   } catch {}
 }

@@ -202,7 +202,7 @@ function HoleCard({ h, big, map, players, mark, level, remix, onPlay }: {
 }
 
 /** The meter's level of each of these holes (null: not measured), each version measured once a browser (keptLevel), one after the other in the meter's worker, loaded only once one is asked and kept till the list goes. */
-function useLevels(chain: Pick<Chain, "holeData"> | null, rows: readonly HoleRow[]) {
+function useLevels(chain: Pick<Chain, "holeData" | "chainId" | "genesis" | "realm"> | null, rows: readonly HoleRow[]) {
   const [levels, setLevels] = useState<ReadonlyMap<string, Level | null>>(new Map());
   const meter = useRef<Meter | null>(null);
   useEffect(() => () => (meter.current?.stop(), void (meter.current = null)), []);
@@ -214,12 +214,12 @@ function useLevels(chain: Pick<Chain, "holeData"> | null, rows: readonly HoleRow
       for (const id of ids.split(" ")) {
         if (!live) return;
         if (levels.has(id)) continue;
-        let level = keptLevel(id);
+        let level = await keptLevel(chain, id);
         if (level == null) {
           const { makeMeter } = await import("@/lib/builder/meter");
           const m = (meter.current ??= makeMeter(() => {}));
           level = await chain.holeData(id).then((hex) => m.rate(hex), () => null);
-          if (level != null) keepLevel(id, level);
+          if (level != null) void keepLevel(chain, id, level);
         }
         // (a level measured is kept and shown, even if the rows changed meanwhile)
         setLevels((m) => new Map(m).set(id, level));

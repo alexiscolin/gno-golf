@@ -271,19 +271,25 @@ void test("sortHoles: newest as the chain lists them, most played, hardest by th
   assert.deepEqual(rows, [a, b, c, d], "the list itself untouched");
 });
 
-void test("a hole's meter level, kept by its version (whose data never changes), in this browser; junk or a store that throws: none", () => {
-  const id = `${A}/a/v1`;
-  assert.equal(keptLevel(id), null);
-  keepLevel(id, 2);
-  assert.equal(keptLevel(id), 2);
-  localStorage.setItem(`${HARD_KEY}|${id}`, "7");
-  assert.equal(keptLevel(id), null);
+void test("a hole's meter level, kept by its version on its chain (its id, genesis, realm), in this browser; an alias, junk or a store that throws: none", async () => {
+  const id = `${A}/a/v1`, chain = chainOf({}), reseeded = chainOf({}, "dev", "G2");
+  assert.equal(await keptLevel(chain, id), null);
+  await keepLevel(chain, id, 2);
+  assert.equal(await keptLevel(chain, id), 2);
+  assert.equal(await keptLevel(reseeded, id), null, "the same id on a chain reseeded: measured afresh");
+  assert.equal(await keptLevel(chainOf({}, "test-2"), id), null, "on another chain too");
+  await keepLevel(chain, `${A}/v3`, 1);
+  assert.equal(await keptLevel(chain, `${A}/v3`), null, "an alias (its slug like a version): never kept");
+  const key = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? "").find((k) => k.startsWith(HARD_KEY))!;
+  localStorage.setItem(key, "7");
+  assert.equal(await keptLevel(chain, id), null);
   const was = globalThis.localStorage;
   Object.defineProperty(globalThis, "localStorage", { configurable: true, get: () => { throw new Error("denied"); } });
   try {
-    assert.equal(keptLevel(id), null);
-    assert.doesNotThrow(() => keepLevel(id, 1));
+    assert.equal(await keptLevel(chain, id), null);
+    await assert.doesNotReject(keepLevel(chain, id, 1));
   } finally {
     Object.defineProperty(globalThis, "localStorage", { configurable: true, value: was, writable: true });
   }
+  await assert.doesNotReject(keepLevel({ ...chain, genesis: () => Promise.reject(new Error("down")) }, id, 1), "its chain not read: nothing kept, nothing thrown");
 });
