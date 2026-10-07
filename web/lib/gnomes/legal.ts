@@ -6,6 +6,7 @@
 // trust strip. The seller is the build's (NEXT_PUBLIC_SELLER_*,
 // next.config.mjs refuses a production shop without it); a placeholder shows
 // what is missing anywhere else.
+import { aboutGnot as about, upToHundredth as up } from "../adena";
 import { shortAddr } from "../chain";
 import { dateParts, gnot, utcDate } from "./shop";
 
@@ -46,9 +47,6 @@ const stamp = (unix: number) => {
   const p = dateParts(unix);
   return `${p.weekday} ${p.day} ${p.year}, ${p.hm} UTC (${jstDate(unix)})`;
 };
-/** A figure up to the hundredth of a GNOT (a deposit, a fee), in ugnot; about: that, in GNOT. */
-const up = (ugnot: number) => Math.ceil(ugnot / 1e4) * 1e4;
-const about = (ugnot: number) => (up(ugnot) / 1e6).toFixed(2);
 
 interface Order { name: string; id: number; tier: string; n: number; price: number; deposit: number; fee: number; address: string; closesAt: number; now: number }
 /** The order, term by term (§1.1): [label, term]; the total "about" (the deposit and fee are the bill's most). */

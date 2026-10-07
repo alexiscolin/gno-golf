@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCopied } from "@/components/common";
 import { Button, buttonClass } from "@/components/ui";
 import Share from "@/components/Share";
-import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
+import { aboutGnot, connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { makeChain, wait } from "@/lib/chain";
 import { explain } from "@/lib/builder/explain";
 import { endpoints, playLink } from "@/lib/builder/holes";
@@ -35,7 +35,6 @@ import { cardLines, holeShare, saveFile as download, shareCard } from "./share";
 import { MAX_NOTE, MAX_TITLE as MAX_NAME } from "@/lib/builder/draft";
 import { worldName } from "@/lib/builder/rules";
 
-const gnot = (ugnot: number) => (ugnot / 1e6).toFixed(2);
 /** How long the chain is read for the new version after a signature (it lands within a few blocks). */
 const LAND_MS = 90_000;
 
@@ -107,7 +106,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const v = Number(id.slice(id.lastIndexOf("/v") + 2)) || 1;
   const sizes = { bytes: cost?.bytes ?? hex.length / 2, name, note, v, newAuthor: true };
   const b = bill({ ...sizes, gasPrice: prices.gas, bytePrice: prices.byte });
-  const gas = gasFor(sizes), deposit = Math.round(b.deposit * 1e6);
+  const gas = gasFor(sizes), deposit = b.deposit;
 
   // after a signature: the chain read until it names the new version
   const land = async () => {
@@ -189,9 +188,9 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           {step.at === "reading" ? <p className="pub__note" role="status">Checking with the chain…</p>
             : step.why && <p className={step.at === "name" ? "pub__bad" : "pub__note"} role={step.at === "name" ? "alert" : "status"}>{step.why}</p>}
           <dl className="pub__bill">
-            <dt>Storage deposit</dt><dd>{gnot(deposit)} GNOT</dd>
-            <dt>Network fee</dt><dd>{b.fee.toFixed(2)} GNOT</dd>
-            <dt>At most</dt><dd><b>{b.total.toFixed(2)} GNOT</b></dd>
+            <dt>Storage deposit</dt><dd>{aboutGnot(b.deposit)} GNOT</dd>
+            <dt>Network fee</dt><dd>{aboutGnot(b.fee)} GNOT</dd>
+            <dt>At most</dt><dd><b>{aboutGnot(b.most)} GNOT</b></dd>
           </dl>
           <p className="pub__small">The chain&apos;s price for keeping and checking the hole. Nothing goes to the game.</p>
           <details className="pub__gnokey">
@@ -213,7 +212,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           {step.at === "newer" || step.at === "hole" ? <Button variant="gold" className="btn--wide" onClick={onRetest}>{step.at === "hole" && !/^The rounds/.test(step.why) ? "Back to Edit" : "Test again (free)"}</Button>
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
-                : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${b.total.toFixed(2)} GNOT`}</Button>
+                : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${aboutGnot(b.most)} GNOT`}</Button>
                   : <p className="pub__note">Adena is not in this browser: publish with gnokey above.</p>}
         </div>
       </section>

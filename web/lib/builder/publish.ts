@@ -4,7 +4,7 @@
 // warm-up hole, then the one measured; their Storage and Gas less the
 // warm-up's), the bill shown before any signature, and the command for
 // gnokey, whose every argument reaches the realm as the page shows it.
-import { depositFor, feeFor, gnokeyCall, gnokeyOn, MAX_GAS, PER_CALL, publishArgs } from "../adena";
+import { depositFor, feeFor, gnokeyCall, gnokeyOn, MAX_GAS, PER_CALL, publishArgs, upToHundredth } from "../adena";
 import { isAddress } from "../chain";
 import type { Versions } from "../types";
 import { holeId, holeRow } from "./testmode";
@@ -50,10 +50,10 @@ export function gasFor({ bytes, name, note }: { bytes: number; name: string; not
   return Math.min(MAX_GAS, Math.ceil(PER_CALL + 1.25 * (GAS.base + GAS.perByte * bytes + GAS.perRune * runes)));
 }
 
-/** The bill before any signature, in GNOT: the deposit, the fee (the gas at gasPrice, half again for a price that rises), at most their total. */
+/** The bill before any signature, in ugnot as the wallet is asked them: the deposit, the fee (the gas at gasPrice, half again for a price that rises); most: their sum, each up to the hundredth as the bill says them. */
 export function bill(o: Parameters<typeof publishBytes>[0] & { gasPrice: number; bytePrice: number }) {
-  const d = deposit({ ...o, price: o.bytePrice }) / 1e6, fee = feeFor(gasFor(o), o.gasPrice) / 1e6;
-  return { deposit: d, fee, total: d + fee };
+  const d = deposit({ ...o, price: o.bytePrice }), fee = feeFor(gasFor(o), o.gasPrice);
+  return { deposit: d, fee, most: upToHundredth(d) + upToHundredth(fee) };
 }
 
 /** The data as it will be published: the draft framed and fitted, its title the name as the chain keeps it (check's); null if fit refuses it. */
