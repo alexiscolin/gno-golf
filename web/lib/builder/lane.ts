@@ -102,7 +102,7 @@ export const FLIGHT = 12;
 /**
  * The way from the tee at a clearance, the most open the hole ever is:
  * whether the cup is reached (a cell within the cup's radius of the pin), and
- * the cells passed on the way to it (the path, cup first). Fixed hazards stop
+ * the cells passed on the way to it (the path, cup first), and how many cells it reaches (size). Fixed hazards stop
  * it (a timed one is sometimes gone); a tunnel of any clock moves it on to
  * its way out, ahead of a hazard it sits in (a geyser in a hot spring); a
  * hill steep enough to launch (MIN_RAMP) hops it off its crest, up to FLIGHT
@@ -117,7 +117,7 @@ export function reach(h: HoleIn, clearance = h.ballR): Reach {
   floods.set(h, (floods.get(h) ?? new Map<number, Reach>()).set(clearance, r));
   return r;
 }
-type Reach = { reached: boolean; path: V[]; grid: Grid; reaches: (p: V, rad?: number) => boolean };
+type Reach = { reached: boolean; path: V[]; grid: Grid; reaches: (p: V, rad?: number) => boolean; size: number };
 const floods = new WeakMap<HoleIn, Map<number, Reach>>();
 
 function flooded(h: HoleIn, clearance: number): Reach {
@@ -143,8 +143,10 @@ function flooded(h: HoleIn, clearance: number): Reach {
   const tee = g.cell(h.tee);
   const parent = flood(g, tee >= 0 ? [tee] : [], (k) => jumps.get(k) ?? []);
   const cup = h.cupR, ends: number[] = [];
+  let size = 0;
   for (let k = 0; k < parent.length; k++) {
     if (parent[k] === -2) continue;
+    size++;
     const [x, y] = g.centre(k);
     if (Math.hypot(x - h.pin[0], y - h.pin[1]) <= cup) ends.push(k);
   }
@@ -157,8 +159,8 @@ function flooded(h: HoleIn, clearance: number): Reach {
     }
     return false;
   };
-  if (!ends.length) return { reached: false, path: [], grid: g, reaches };
+  if (!ends.length) return { reached: false, path: [], grid: g, reaches, size };
   const path: V[] = [];
   for (let k = ends[0]; k >= 0; k = parent[k]) path.push(g.centre(k));
-  return { reached: true, path, grid: g, reaches };
+  return { reached: true, path, grid: g, reaches, size };
 }

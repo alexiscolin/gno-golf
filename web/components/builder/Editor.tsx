@@ -29,7 +29,7 @@ import Header, { type Step } from "./Header";
 import Inspector, { MOD } from "./Inspector";
 import Palette from "./Palette";
 import Preview from "./Preview";
-import { plainOf } from "@/lib/builder/explain";
+import { refusalOf } from "@/lib/builder/explain";
 import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
@@ -178,7 +178,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const tryEdit = (next: Draft | null, fail: string) => {
     if (!next || !full) return say(fail);
     const why = newErrors(errorsOf(draft, full), next, full);
-    if (why.length) return say(plainOf(why[0]));
+    if (why.length) return say(refusalOf(why[0]));
     set(next);
   };
   const piece = draft.pieces.find((p) => p.id === selected) ?? null;
@@ -187,7 +187,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     const same = notTurned(piece);
     if (same) return say(same);
     const t = turnPiece(piece), why = canPlace(draft, t, full);
-    if (why.length) return say(plainOf(why[0]));
+    if (why.length) return say(refusalOf(why[0]));
     set({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? t : p)) });
   };
   // a copy, or the keyboard's drop, past the Builder's limits: refused with why (the ghost says it on the board)

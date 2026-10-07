@@ -49,6 +49,7 @@ export function plainOf(i: Pick<Issue, "rule" | "text">): string {
   if ((r = m(/^The tee touches (.+)$/))) return `The tee is on ${r[1]}: move the tee or ${r[1]}.`;
   if ((r = m(/^The cup touches (.+)$/))) return `The cup is inside ${r[1]}: move the cup or ${r[1]}.`;
   if ((r = m(/^The cup cannot be reached from the tee: the gap between (.+) and (.+) is ([\d.]+) wide, narrower than the ball .*$/))) return `The ball can't get between ${r[1]} and ${r[2]} (${r[3]} wide): widen the gap.`;
+  if ((r = m(/^The cup cannot be reached from the tee: the (tee is closed in|cup is closed off)$/))) return r[1] === "tee is closed in" ? "The tee is closed in: no way to the cup. Open a way through." : "The cup is closed off: no way from the tee. Open a way through.";
   if (/^The cup cannot be reached from the tee$/.test(t)) return "The ball can't get from the tee to the cup: open a way through.";
   if ((r = m(/^The gap between (.+) and (.+) is ([\d.]+) wide, and the way to the cup goes through it: at least ([\d.]+), .*$/))) return `The way to the cup squeezes between ${r[1]} and ${r[2]} (${r[3]} wide): widen it to at least ${r[4]}.`;
   if (i.rule === "E13" && (r = m(/^(.+) (overlaps|stands on|crosses|lies over|stands in) (.+)$/))) return `${r[1]} ${r[2]} ${r[3]}: move one of them.`;
@@ -63,4 +64,10 @@ export function plainOf(i: Pick<Issue, "rule" | "text">): string {
   if ((r = m(/^Too many (pieces|moving pieces): \d+ of (\d+)$/)) && i.rule === "E16") return `A Builder hole holds ${r[2]} ${r[1]} at most: ${r[1] === "pieces" ? "remove one to add another" : "remove one, or make one still"}.`;
   if ((r = m(/^(.+) is on for (\d+) of (\d+) (\w+): (\d+) to (\d+)$/))) return `${r[1]} is on ${r[2]} of ${r[3]} ${r[4]}: make it ${r[5]} to ${r[6]}.`;
   return /[.!?]$/.test(t) ? t : `${t}.`;
+}
+
+/** Why an edit is refused, in the player's words (plainOf), the edit named: "This closes the tee in: no way to the cup." */
+export function refusalOf(i: Pick<Issue, "rule" | "text">): string {
+  const p = plainOf(i), r = /^The (tee is closed in|cup is closed off): (no way (?:to|from) the (?:cup|tee))\./.exec(p);
+  return r ? `This closes the ${r[1] === "tee is closed in" ? "tee in" : "cup off"}: ${r[2]}.` : p;
 }

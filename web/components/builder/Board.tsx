@@ -13,7 +13,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, ghostAt, middleOf, movePiece, nextId, pieceLabel, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
-import { plainOf } from "@/lib/builder/explain";
+import { refusalOf } from "@/lib/builder/explain";
 import { centreOn, K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
 import { BOARD, frame } from "@/lib/builder/gg1";
 import { handlesOf, setHandle, type HandleKey } from "@/lib/builder/handles";
@@ -174,7 +174,7 @@ export default function Board(props: BoardProps) {
 
   // the armed entry's piece, centred under the pointer, every point of it on the grid
   const ghostOf = (at: V): Piece => ghostAt(armed!, nextId(draft), at, step);
-  const firstWhy = (is: Issue[]) => (is[0] ? plainOf(is[0]) : "");
+  const firstWhy = (is: Issue[]) => (is[0] ? refusalOf(is[0]) : "");
 
   function onDown(e: RPointerEvent<SVGSVGElement>) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
@@ -247,7 +247,7 @@ export default function Board(props: BoardProps) {
     setLive(null);
     if (armed && !d) {
       const p = ghostOf(at), why = canPlace(draft, p, full);
-      if (why.length) return refuse(plainOf(why[0])); // (said by the pointer, where the ghost is: once)
+      if (why.length) return refuse(refusalOf(why[0])); // (said by the pointer, where the ghost is: once)
       props.onSet(frame({ ...draft, pieces: [...draft.pieces, p] }));
       props.onSelect(p.id);
       dropped(p.id);

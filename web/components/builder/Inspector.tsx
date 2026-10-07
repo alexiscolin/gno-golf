@@ -15,7 +15,7 @@ import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/l
 import { DIRS, sizesOf, TIMING, withClock, withDir, withNumber, withSize, withTiming } from "@/lib/builder/settings";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
-import { plainOf } from "@/lib/builder/explain";
+import { refusalOf } from "@/lib/builder/explain";
 import { notTurned } from "@/lib/builder/handles";
 
 const CLOCKS: Record<Clock, string> = { fixed: "Always", substep: "In a stroke", stroke: "Strokes" };
@@ -59,24 +59,24 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
   // a setting tried: shown if the hole still holds (fast checks), else refused with why
   const tryPiece = (next: Piece) => {
     const why = canPlace(draft, next, quick);
-    if (why.length) return onSay(plainOf(why[0]));
+    if (why.length) return onSay(refusalOf(why[0]));
     onPreview({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? next : q)) });
   };
   const tryDraft = (next: Draft) => {
     const why = newErrors(errorsOf(draft, quick), next, quick);
-    if (why.length) return onSay(plainOf(why[0]));
+    if (why.length) return onSay(refusalOf(why[0]));
     onPreview(next);
   };
   // a one-click change (a way, a clock): made if the hole holds, census and all
   const setDraft = (next: Draft) => {
     const why = newErrors(errorsOf(draft, full), next, full);
-    if (why.length) return onSay(plainOf(why[0]));
+    if (why.length) return onSay(refusalOf(why[0]));
     onSet(next);
   };
   // let go: kept if it holds with the census too
   const done = () => {
     const why = canPlace(draft, p, full);
-    if (why.length) return (onCancel(), onSay(plainOf(why[0])));
+    if (why.length) return (onCancel(), onSay(refusalOf(why[0])));
     onCommit();
   };
   const at = whereOf(p.geometry), c = p.clock;

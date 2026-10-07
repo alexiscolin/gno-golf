@@ -14,7 +14,7 @@ import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, validate, type ValidateOptions } from "./pipeline";
 import { cap, worldName } from "./rules";
-import { plainOf } from "./explain";
+import { refusalOf } from "./explain";
 import { pastLimits } from "./limits";
 
 /** A piece's settings at placement: each within its entry's range, its default when left out. */
@@ -117,7 +117,7 @@ export function toWorld(d: Draft, world: string, palette: readonly PaletteEntry[
   const r = changeWorld(d, world, palette);
   if ("refused" in r) return r;
   const why = newErrors(errorsOf(d, o), r, { ...o, palette });
-  return why.length ? { why: plainOf(why[0]) } : r;
+  return why.length ? { why: refusalOf(why[0]) } : r;
 }
 
 /** A world's name in a sentence: "Garden". */
@@ -138,14 +138,16 @@ export const matchIn = (palette: readonly PaletteEntry[]) => (p: { kind: string;
 const keyOf = (i: Issue) => `${i.rule} ${i.piece ?? "-"}`;
 
 /**
- * What a piece brings to a hole: the errors of after (the hole with it, as
- * the edit leaves it, framed or not: validate frames) about the piece, and
- * every other one the hole without it (rest) did not have, whichever piece
- * it names (a bar the new rail swallows into the kerb, the cup cut off).
- * before: rest's own errors, when the caller has them.
+ * What an edit brings to a hole: the errors of after (the hole as the edit
+ * leaves it, framed or not: validate frames) about the piece, and every
+ * other one the hole as it was (was: the piece where it stood, or not there
+ * yet) did not have, whichever piece it names (a bar the new rail swallows
+ * into the kerb, the cup cut off). Never the hole without the piece: a rail
+ * of the lane's own taken out leaves it open, its errors no measure of what
+ * the rail does where it goes. before: was's own errors, when the caller has them.
  */
-export function editErrors(rest: Draft, after: Draft, id: string, o: ValidateOptions, before?: readonly Issue[]): Issue[] {
-  const had = new Set((before ?? errorsOf(rest, o)).map(keyOf));
+export function editErrors(was: Draft, after: Draft, id: string, o: ValidateOptions, before?: readonly Issue[]): Issue[] {
+  const had = new Set((before ?? errorsOf(was, o)).map(keyOf));
   const v = validate(after, o);
   return v.issues.filter((i) => i.severity === "error" && (about(i, id, v.refs) || !had.has(keyOf(i))));
 }
@@ -156,24 +158,23 @@ export function editErrors(rest: Draft, after: Draft, id: string, o: ValidateOpt
  * limits take (E16) is refused before anything else is asked.
  */
 export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: readonly Issue[]): Issue[] {
-  const rest = { ...d, pieces: d.pieces.filter((p) => p.id !== piece.id) }, after = { ...rest, pieces: [...rest.pieces, piece] };
+  const after = { ...d, pieces: [...d.pieces.filter((p) => p.id !== piece.id), piece] };
   const full = pastLimits(d, after);
-  return full.length ? full : editErrors(rest, after, piece.id, o, before);
+  return full.length ? full : editErrors(d, after, piece.id, o, before);
 }
 /**
  * The checks of a drag from start (or of the armed piece's ghost over it):
  * a piece or an end checked again only when its place or shape changes (a
- * pointer moves many times within one snapped place), the hole without the
- * piece (or the hole as it was, for an end) checked once a drag.
+ * pointer moves many times within one snapped place), the hole as it was
+ * checked once a drag.
  */
 export function dragCheck(start: Draft, o: ValidateOptions) {
-  const base = new Map<string, readonly Issue[]>();
-  let last = "", said: Issue[] = [];
+  let base: readonly Issue[] | null = null, last = "", said: Issue[] = [];
   const once = (key: string, run: () => Issue[]) => (key === last ? said : ((last = key), (said = run())));
-  const baseOf = (id: string, d: () => Draft) => base.get(id) ?? (base.set(id, errorsOf(d(), o)), base.get(id)!);
+  const was = () => (base ??= errorsOf(start, o));
   return {
-    piece: (p: Piece) => once(`${p.id} ${JSON.stringify(p.geometry)} ${JSON.stringify(p.params)}`, () => canPlace(start, p, o, baseOf(p.id, () => without(start, p.id)))),
-    end: (which: "tee" | "pin", at: V) => once(`${which} ${at[0]} ${at[1]}`, () => newErrors(baseOf("", () => start), { ...start, [which]: at }, o)),
+    piece: (p: Piece) => once(`${p.id} ${JSON.stringify(p.geometry)} ${JSON.stringify(p.params)}`, () => canPlace(start, p, o, was())),
+    end: (which: "tee" | "pin", at: V) => once(`${which} ${at[0]} ${at[1]}`, () => newErrors(was(), { ...start, [which]: at }, o)),
   };
 }
 
@@ -242,16 +243,16 @@ const replace = (d: Draft, p: Piece) => frame({ ...d, pieces: d.pieces.map((q) =
 export function clampMove(d: Draft, id: string, to: V, o: ValidateOptions): V {
   const p = d.pieces.find((q) => q.id === id);
   if (!p) return to;
-  const rest = without(d, id), before = errorsOf(rest, o);
-  return walk(whereOf(p.geometry), to, (v) => canPlace(rest, movePiece(p, v), o, before).length === 0, d.tee);
+  const before = errorsOf(d, o);
+  return walk(whereOf(p.geometry), to, (v) => canPlace(d, movePiece(p, v), o, before).length === 0, d.tee);
 }
 
 /** A drag of one of a piece's handles toward `to`: the piece within its entry's ranges (handles.ts), stopped at the last place the hole holds; the draft framed. */
 export function clampHandle(d: Draft, id: string, key: HandleKey, to: V, o: ValidateOptions): Draft {
   const p = d.pieces.find((q) => q.id === id), e = p && entryIn(p.entry, o.palette), h = p && handlesOf(p).find((x) => x.key === key);
   if (!p || !e || !h) return d;
-  const rest = without(d, id), before = errorsOf(rest, o);
-  const last = walk(h.at, to, (v) => canPlace(rest, setHandle(p, key, v, e), o, before).length === 0);
+  const before = errorsOf(d, o);
+  const last = walk(h.at, to, (v) => canPlace(d, setHandle(p, key, v, e), o, before).length === 0);
   return replace(d, setHandle(p, key, last, e));
 }
 
@@ -263,7 +264,7 @@ export function clampEnd(d: Draft, which: "tee" | "pin", to: V, o: ValidateOptio
 
 /** A release's outcome: the draft as it is kept (framed), or why nothing changes. */
 export type Dropped = Draft | { why: string };
-const verdict = (next: Draft, why: readonly Issue[]): Dropped => (why.length ? { why: plainOf(why[0]) } : next);
+const verdict = (next: Draft, why: readonly Issue[]): Dropped => (why.length ? { why: refusalOf(why[0]) } : next);
 
 /**
  * A piece let go after a drag toward `to`: clamped with the fast checks
@@ -274,13 +275,13 @@ export function dropMove(start: Draft, id: string, to: V, quick: ValidateOptions
   const p = start.pieces.find((q) => q.id === id);
   if (!p) return { why: "" };
   const at = clampMove(start, id, to, quick), next = frame({ ...start, pieces: start.pieces.map((q) => (q.id === id ? movePiece(p, at) : q)) });
-  return verdict(next, editErrors(without(start, id), next, id, full));
+  return verdict(next, editErrors(start, next, id, full));
 }
 
 /** A handle let go: as dropMove, the piece within its entry's ranges (clampHandle). */
 export function dropHandle(start: Draft, id: string, key: HandleKey, to: V, quick: ValidateOptions, full: ValidateOptions): Dropped {
   const next = clampHandle(start, id, key, to, quick);
-  return verdict(next, editErrors(without(start, id), next, id, full));
+  return verdict(next, editErrors(start, next, id, full));
 }
 
 /** The tee or the cup let go: clamped (clampEnd), then judged with the census: kept only with no error the hole did not have. */
@@ -329,7 +330,7 @@ export const pieceLabel = (p: Piece) => {
 /** Why one more piece like p (a copy, the keyboard's drop) would pass the Builder's limits, in the player's words; "" if it would not. */
 export const roomFor = (d: Draft, p: Piece): string => {
   const why = pastLimits(d, { pieces: [...d.pieces, { ...p, id: nextId(d) }] });
-  return why.length ? plainOf(why[0]) : "";
+  return why.length ? refusalOf(why[0]) : "";
 };
 
 /** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near (roomFor says when the limits are why). */

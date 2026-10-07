@@ -12,13 +12,15 @@ import { build, loadWorld } from "./scene-harness.ts";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { cases, garden, put } from "./builder-broken.ts";
 import { validate } from "../lib/builder/pipeline.ts";
-import { plainOf } from "../lib/builder/explain.ts";
+import { plainOf, refusalOf } from "../lib/builder/explain.ts";
 import { checkHole, type EntryOf } from "../lib/builder/checks.ts";
-import { loadPalette } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { canPlace, clampMove, fixOf } from "../lib/builder/edit.ts";
+import { canPlace, clampMove, dragCheck, dropHandle, fixOf } from "../lib/builder/edit.ts";
+import { setHandle } from "../lib/builder/handles.ts";
+import { entry as entryIn, loadPalette } from "../lib/builder/palette.ts";
+import { frame } from "../lib/builder/gg1.ts";
 import type { Draft } from "../lib/builder/draft.ts";
-import type { GHole } from "../lib/builder/types.ts";
+import type { GHole, V } from "../lib/builder/types.ts";
 
 await loadWorld("garden");
 const { census } = await import("../lib/builder/drawn.ts");
@@ -48,7 +50,8 @@ void test("in the player's words: every refusal without its place's numbers or i
   const one = (d: Draft) => plainOf(run(d)[0]);
   assert.equal(one(lane("garden", [put("x", "*/hazard/water", [25.5, 8.5], { size: 3 })])), "The cup is inside the water: move the cup or the water.");
   assert.equal(one(lane("garden", [put("x", "*/post/rock", [3.5, 10])])), "The tee is on the rock obstacle: move the tee or the rock obstacle.");
-  assert.equal(one(lane("garden", [rail("x", [20, 0], [20, 20])])), "The ball can't get from the tee to the cup: open a way through.");
+  assert.equal(one(lane("garden", [rail("x", [20, 0], [20, 20])])), "The cup is closed off: no way from the tee. Open a way through.");
+  assert.equal(one(lane("garden", [rail("x", [0, 0], [12, 20])])), "The tee is closed in: no way to the cup. Open a way through.");
   assert.equal(one(lane("garden", [put("x", "*/post/rock", [12, 9]), put("y", "*/post/stump", [12.5, 9])])), "The rock obstacle overlaps the stump obstacle: move one of them.");
   assert.equal(one(lane("garden", [rail("a", [15, 0], [15, 9.5]), rail("b", [15.5, 10.5], [15.5, 20])])), "The way to the cup squeezes between the wall and the wall (1.12 wide): widen it to at least 1.25.");
   assert.equal(one(lane("garden", [{ ...put("x", "*/bar/plank", [10, 0.5]), geometry: { t: "bar", a: [10, 0.5], b: [14, 0.5], thick: 0.5 } }])), "The plank barrier is too close to the wall (0.25): leave at least 0.5 between them.");
@@ -155,4 +158,33 @@ void test("fixOf: one click moves the piece where its issue is gone, and the hol
   }
   const walled = cases.find(([w]) => w.startsWith("E4"))![1]();
   assert.equal(fixOf(run(walled)[0], walled, ctx), null, "no obvious fix: none offered");
+});
+
+// E4 on an edit: a rail of the lane's own, its end dragged across (the hole without it already open, so its
+// errors are no measure), a new rail, a long bar: refused while dragged (the drag stops at the last place the
+// hole holds) and when let go, in an edit's words
+void test("E4 on an edit: closing the tee in or the cup off is refused, dragged or dropped, whichever piece does it", () => {
+  const d = lane("garden", []), r1 = pieceIn(d, "r1"), closes = { tee: "This closes the tee in: no way to the cup.", cup: "This closes the cup off: no way from the tee." };
+  // the top rail's end dragged down to the bottom rail: its far end closes the tee in, its near end the cup off
+  for (const [key, to, why] of [["b", [13.5, 21.5], closes.tee], ["a", [19.5, 21.5], closes.cup]] as const) {
+    const there = setHandle(r1, key, to, entryIn(r1.entry, garden)!);
+    // while dragged: the ghost red, in an edit's words
+    const live = dragCheck(d, ctx).piece(there);
+    assert.equal(refusalOf(live[0]), why, `r1.${key} while dragged`);
+    assert.equal(refusalOf(canPlace(d, there, ctx)[0]), why, `r1.${key} put there`);
+    // let go there: kept at the last place on the way the hole holds, never where it closes
+    const dropped = dropHandle(d, "r1", key, to, ctx, ctx);
+    assert.ok(!("why" in dropped), `r1.${key} let go: stopped short, not lost`);
+    if ("why" in dropped) return;
+    assert.notDeepEqual(pieceIn(dropped, "r1").geometry, there.geometry, `r1.${key}: the drag stops short`);
+    assert.deepEqual(said(dropped), [], `r1.${key}: where it stops, the hole holds`);
+  }
+  // a new rail drawn across the tee's corner
+  assert.equal(refusalOf(canPlace(d, rail("n", [1.5, 1.5], [13.5, 21.5]), ctx)[0]), closes.tee);
+  // a long bar's end dragged across the tee's corner, by the left rail down to the bottom one
+  const bar = { ...put("y", "*/bar/hedge", [3, 4]), geometry: { t: "bar" as const, a: [2.5, 4] as V, b: [3.5, 4] as V, thick: 0.5 } }, withBar = frame({ ...d, pieces: [...d.pieces, bar] });
+  assert.deepEqual(said(withBar), []);
+  const across = dropHandle(withBar, "y", "b", [8.5, 20.5], ctx, ctx);
+  if ("why" in across) assert.match(across.why, /^This closes the tee in|^The ball can't get between/, "the bar's drop refused, said why");
+  else assert.deepEqual(said(across), [], "or stopped where the hole holds");
 });

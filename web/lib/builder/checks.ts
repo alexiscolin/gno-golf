@@ -103,7 +103,12 @@ function cup(h: HoleIn, lane: (p: V) => boolean, name: Namer, judged: Judged): I
  * one a ball only just threads; the pieces at the narrowest place named.
  */
 function way(h: HoleIn, name: Namer): Issue[] {
-  if (!reach(h, LOOSE(h)).reached) return [err("E4", "The cup cannot be reached from the tee", undefined, h.pin)];
+  const loose = LOOSE(h), from = reach(h, loose);
+  if (!from.reached) {
+    // which end is shut in: the smaller of the two places a ball can be, the tee's or the cup's
+    const shut = from.size <= reach({ ...h, tee: h.pin }, loose).size ? "the tee is closed in" : "the cup is closed off";
+    return [err("E4", `The cup cannot be reached from the tee: ${shut}`, undefined, shut === "the tee is closed in" ? h.tee : h.pin)];
+  }
   const ball = 2 * h.ballR, wide = ball + PASSAGE;
   return passages(h, wide).map(({ gap, mid, a, b }) => {
     const between = `the gap at ${pt(mid)} between ${name(a)} and ${name(b)} is ${+gap.toFixed(2)} wide`;
@@ -338,8 +343,11 @@ function scenery(h: HoleIn, name: Namer): Issue[] {
 export function checkHole(h: HoleIn, { name = nameIn(h), entryOf = () => ({}) }: { name?: Namer; entryOf?: EntryOf } = {}): Issue[] {
   const lane = laneOf(h), judged: Judged = (r) => !!entryOf(r);
   const ends = [...tee(h, lane, name, judged), ...cup(h, lane, name, judged)].filter((i) => !i.ref || judged(i.ref));
-  // (the way follows from its ends: with the tee or the cup refused, E4 would only say so again)
-  const out = [...board(h, name), ...ends, ...(ends.length ? [] : way(h, name)), ...mouths(h, name), ...exits(h, lane, name),
+  // the way follows from its ends: with the tee or the cup on a piece, E4 would only say so again. An end
+  // only out of the lane (a rail of its own moved across it) may be the other end shut in: said first
+  const asked = !ends.length || (!ends.some((i) => i.ref) && (lane(h.tee) || lane(h.pin)));
+  const ways = asked ? way(h, name).filter((i) => !ends.length || !i.ref) : []; // (with an end out, only the way's absence: no gap's)
+  const out = [...board(h, name), ...ways, ...ends, ...mouths(h, name), ...exits(h, lane, name),
     ...clocks(h, name), ...limits(h, name), ...(ends.length ? [] : inReach(h, reach(h, LOOSE(h)).reaches, name)), ...overlaps(h, name, entryOf), ...scenery(h, name)];
   return out.filter((i) => !i.ref || judged(i.ref)).sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
 }
