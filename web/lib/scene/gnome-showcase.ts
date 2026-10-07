@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { makeBall, type Skin } from "./gnome";
 import "./gnome-dress"; // (the collection's wardrobe: the showcase draws nothing else)
 import { makeTrail } from "./gnome-fx";
-import { makeRenderer, makeScene } from "./camera";
+import { makeStudio } from "./camera";
 import { disposeCourse } from "./materials";
 import { BALL_R } from "../terrain";
 import { TIER_LOOK } from "../gnomes/catalogue";
@@ -15,12 +15,7 @@ import type { Tier } from "../gnomes/vocab";
 
 /** A showcase on a canvas of its own, drawn at size px square: show(skin, tier), then shot(…) for a picture; dispose() once done. */
 export function makeShowcase(size = 512) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const renderer = makeRenderer(canvas);
-  renderer.setPixelRatio(1);
-  renderer.setSize(size, size, false);
-  const scene = makeScene();
+  const studio = makeStudio(size), { scene } = studio;
   const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 50);
   // three-quarters: from his front, on the side he carries things (+x: the
   // Pirate's parrot, the Diver's snorkel), a little above, the tallest hat in frame
@@ -55,9 +50,8 @@ export function makeShowcase(size = 512) {
       }
   };
 
-  const out = document.createElement("canvas");
   return {
-    canvas,
+    canvas: studio.canvas,
     /** A gnome on show, in his tier's colours. */
     show(skin: Skin, tier: Tier) {
       for (const o of [gnome, trail && trail.group]) if (o) (scene.remove(o), disposeCourse(o));
@@ -78,18 +72,12 @@ export function makeShowcase(size = 512) {
     /** The gnome at time t (ms: a Legendary's piece moves) turned by turn, drawn and scaled to px square, as a WebP data URL. */
     shot(px: number, quality: number, t = 0, turn = 0) {
       if (gnome) (gnome.userData.body.rotation.y = turn), gnome.userData.tick?.(t);
-      renderer.render(scene, camera); // (read in the same task: the drawing buffer is not kept)
-      out.width = out.height = px;
-      const x = out.getContext("2d")!;
-      x.imageSmoothingQuality = "high";
-      x.drawImage(canvas, 0, 0, px, px);
-      return out.toDataURL("image/webp", quality);
+      return studio.snap(camera, px, quality);
     },
     /** Lets the showcase go: what it drew, its renderer, and its canvas's WebGL context (a page holds about sixteen). */
     dispose() {
       for (const o of [gnome, trail && trail.group, plinth]) if (o) (scene.remove(o), disposeCourse(o));
-      renderer.dispose();
-      renderer.forceContextLoss();
+      studio.dispose();
     },
   };
 }

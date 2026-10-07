@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { buildHole } from "./course";
 import { loadWorld } from "./worlds";
-import { makeRenderer, makeScene, setLighting } from "./camera";
+import { makeStudio, setLighting } from "./camera";
 import { disposeCourse, setTime } from "./materials";
 import type { Course, Hole } from "./data";
 
@@ -15,15 +15,9 @@ const FOV = 30;
 
 /** A showcase on a canvas of its own, drawn at size px square: shot(…) a picture a call; dispose() once done. */
 export function makePieceShowcase(size = 384) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const renderer = makeRenderer(canvas);
-  renderer.setPixelRatio(1);
-  renderer.setSize(size, size, false);
-  const scene = makeScene();
+  const studio = makeStudio(size), { scene } = studio;
   setLighting(scene, "day");
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 400);
-  const out = document.createElement("canvas");
   let course: Course | null = null;
 
   return {
@@ -46,18 +40,12 @@ export function makePieceShowcase(size = 384) {
       camera.position.copy(target).addScaledVector(from ? new THREE.Vector3(...from).normalize() : FROM, dist);
       camera.lookAt(target);
       camera.updateProjectionMatrix();
-      renderer.render(scene, camera); // (read in the same task: the drawing buffer is not kept)
-      out.width = out.height = px;
-      const x = out.getContext("2d")!;
-      x.imageSmoothingQuality = "high";
-      x.drawImage(canvas, 0, 0, px, px);
-      return out.toDataURL("image/webp", quality);
+      return studio.snap(camera, px, quality);
     },
     /** Lets the showcase go: what it drew, its renderer, its WebGL context. */
     dispose() {
       if (course) (scene.remove(course), disposeCourse(course));
-      renderer.dispose();
-      renderer.forceContextLoss();
+      studio.dispose();
     },
   };
 }
