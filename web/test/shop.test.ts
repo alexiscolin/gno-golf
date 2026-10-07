@@ -390,11 +390,11 @@ test("shop: the wave line's edges: none sold, all sold, not started, players fir
   assert.ok(full.tiers.every((t) => t.found === t.total));
   const teaser = waveLine(nowRow(c, none, entries, T0 - 60), c, entries, none, T0 - 60)!;
   assert.ok(teaser.at === "teaser" && teaser.share === 0);
-  assert.deepEqual(teaser.chip, { text: "Opens today, 18:00 UTC", full: "Wave 1 opens today, 18:00 UTC." });
+  assert.deepEqual(teaser.chip, { text: "Opens today, 18:00 UTC", short: "Opens 18:00 UTC", full: "Wave 1 opens today, 18:00 UTC." });
   const players = waveLine(nowRow(c, none, entries, T0 + 60), c, entries, none, T0 + 60)!;
-  assert.deepEqual(players.chip, { text: "Players first · until Sun 18:00 UTC", full: "Players first until Sun 18:00 UTC: save one round on-chain to buy now." });
+  assert.deepEqual(players.chip, { text: "Players first · until Sun 18:00 UTC", short: "Players first · Sun 18:00 UTC", full: "Players first until Sun 18:00 UTC: save one round on-chain to buy now." });
   const p = collection({ open: false }), paused = waveLine(nowRow(p, none, entries, T0 + 60), p, entries, none, T0 + 60)!;
-  assert.deepEqual(paused.chip, { text: "Paused for a moment", full: "Paused for a moment: the sale picks up where it stopped." });
+  assert.deepEqual(paused.chip, { text: "Paused for a moment", short: "Paused", full: "Paused for a moment: the sale picks up where it stopped." });
   const k = collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] });
   assert.deepEqual(waveLine(nowRow(k, none, entries, T0), k, entries, none, T0), { at: "closed", title: "The sale is closed", count: "486 made · 234 never made", label: "The sale is closed: 486 gnomes made, 234 never made" });
   const w = collection({ waves: [] });

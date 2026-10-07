@@ -117,26 +117,27 @@ export function Closes({ at, now }: { at: number; now: number }) {
 }
 
 /** The sale's card, the game's front card (title.css): the wave's Legendary in gold on the left, the wave's title in
- *  bold over its count and the Legendary's words, the fairway under them its whole width, the ball rolled from the
- *  tee to the share that found a player (still with reduced motion), and its state's chip at the card's top right (a
- *  date, never a countdown); the sale's end in words. Its height the slot's (ShopFrame WaveSlot). */
+ *  bold over its count and the Legendary's words, its state's chip at the right of the title (a date, never a
+ *  countdown; a phone's shorter), the fairway under them its whole width, the ball rolled from the tee to the share
+ *  that found a player (still with reduced motion); the sale's end in words. Its height the slot's (ShopFrame WaveSlot). */
 export function SaleLine({ line }: { line: WaveLine }) {
   if (line.at === "closed")
-    return <section className="wcard wcard--closed" aria-label="The sale"><span className="wcard__text"><b className="wcard__title">{line.title}</b><span className="wcard__count">{line.count}</span></span></section>;
+    return <section className="wcard wcard--closed" aria-label="The sale"><b className="wcard__title">{line.title}</b><span className="wcard__count">{line.count}</span></section>;
   const { legend, chip } = line;
   return (
     <section className="wcard" aria-label="The sale">
       {legend && <span className="wcard__legend" title={legend.words}><img src={thumb(legend.id)} alt="" width={256} height={256} decoding="async" /></span>}
-      <span className="wcard__text" aria-hidden="true">
-        <b className="wcard__title">{line.title}</b>
-        <span className="wcard__count">{line.count}{legend && <> · <b>{legend.name}</b> {legend.words.slice(legend.name.length + 1)}</>}</span>
-      </span>
+      <b className="wcard__title" aria-hidden="true">{line.title}</b>
       {chip && (
         <span className="wcard__chip" role="note" aria-label={chip.full} title={chip.full}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" /><path d="M8 4.5V8l2.5 1.6" /></svg>
-          {chip.text}
+          <span className="wcard__long">{chip.text}</span><span className="wcard__short">{chip.short}</span>
         </span>
       )}
+      <span className="wcard__count" aria-hidden="true">
+        <span>{line.count}</span>
+        {legend && <span className="wcard__who"><b>{legend.name}</b> {legend.words.slice(legend.name.length + 1)}</span>}
+      </span>
       <span className="fw" role="img" aria-label={legend ? `${line.label}. ${legend.words}` : line.label} style={{ "--at": line.share } as CSSProperties}>
         <span className="fw__lane" />
         <span className="fw__tee" />
