@@ -9,6 +9,7 @@
 // ball shows in Edit too: quick shots pulled on the board, played on the
 // hole as it is (quickshot.ts), and the meter's best line; never a proof.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui";
 import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, whereOf, clampMove } from "@/lib/builder/edit";
 import { NO_GL, gauges, meterFace, offAtLimit, pieceGauges, testGate, verdict } from "@/lib/builder/editor";
@@ -80,6 +81,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [again, setAgain] = useState(false); // the hints asked for again (the header's "?")
   const draft = session.now(), kept = session.kept();
   const [palette, setPalette] = useState<readonly PaletteEntry[] | null>(null);
+  // its load failed (offline, an old deploy's chunk gone), and each Try again (the world's loader forgets a failed load)
+  const [unloaded, setUnloaded] = useState(false), [tries, setTries] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [show, setShow] = useState<{ id: string; n: number } | null>(null); // Show me: the piece to frame
   const [armed, setArmed] = useState<PaletteEntry | null>(null);
@@ -133,9 +136,10 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   useEffect(() => {
     let stale = false;
     setPalette(null);
-    void loadPalette(draft.world).then((p) => !stale && setPalette(p), () => say("This world's pieces could not load. Reload the page."));
+    setUnloaded(false);
+    void loadPalette(draft.world).then((p) => !stale && setPalette(p), () => !stale && setUnloaded(true));
     return () => void (stale = true);
-  }, [draft.world, say]);
+  }, [draft.world, tries]);
 
   const quick: ValidateOptions | null = useMemo(() => palette && { host, palette, slug: draft.slug || undefined }, [host, palette, draft.slug]);
   const full: ValidateOptions | null = useMemo(() => quick && { ...quick, census }, [quick]);
@@ -359,7 +363,12 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           </aside>
         </>
       ) : (
-        <p className="bench__wait" aria-busy="true">Loading the {draft.world}&apos;s pieces…</p>
+        unloaded ? (
+          <div className="bench__wait" role="alert">
+            <p>The {draft.world}&apos;s pieces could not load: check the connection.</p>
+            <Button type="button" onClick={() => setTries((n) => n + 1)}>Try again</Button>
+          </div>
+        ) : <p className="bench__wait" aria-busy="true">Loading the {draft.world}&apos;s pieces…</p>
       )}
       {trying && (
         <div className={`tbench tbench--quick tint--${draft.world}`}>

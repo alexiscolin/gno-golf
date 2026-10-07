@@ -16,7 +16,7 @@
 // weather: the weathers are the test's.
 import { RULES, shotOf } from "../chain";
 import { inZone, segDist } from "../terrain";
-import { LOOSE, nameIn, passages } from "./checks";
+import { LOOSE, nameIn, passages, type Passage } from "./checks";
 import type { Draft, V } from "./draft";
 import { frame, keyOf, piecesBy, writeDraft } from "./gg1";
 import { pieceName } from "./names";
@@ -410,19 +410,20 @@ export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) =
   if (stopped) return null;
 
   // what the way squeezes through and waits for
-  const ball = 2 * h.ballR, gaps = passages(h, NARROW * ball).sort((x, y) => x.gap - y.gap), timed = timedOnWay(h);
-  const tee = sharesOf(teeShots), strokes = line ? line.length : null, narrowest = gaps.length ? gaps[0].gap / ball : null;
+  // (a gap in balls as a ball has it: beside a hazard, it needs its radius only)
+  const ball = 2 * h.ballR, balls = (g: Passage) => (g.gap - g.need + ball) / ball, gaps = passages(h, (NARROW - 1) * ball).sort((x, y) => balls(x) - balls(y)), timed = timedOnWay(h);
+  const tee = sharesOf(teeShots), strokes = line ? line.length : null, narrowest = gaps.length ? balls(gaps[0]) : null;
   const level = levelOf({ strokes, forgiving, narrowest, rarest: timed.length ? timed[0].open : null, cut });
   const reasons: Reason[] = [], about = (n: Named) => (n.piece ? { piece: n.piece } : {});
   const say = (text: string, weight: number, n?: Named) => reasons.some((r) => r.text === text) || reasons.push({ text, weight, ...(n && about(n)) });
   const pairs = new Set<string>();
   for (const g of gaps) {
     // the piece placed in the way named first, not the lane's edge; a pair said once, at its narrowest
-    const x = of(g.a), y = of(g.b), [first, other] = x.rail && !y.rail ? [y, x] : [x, y], balls = g.gap / ball;
+    const x = of(g.a), y = of(g.b), [first, other] = x.rail && !y.rail ? [y, x] : [x, y], wide = balls(g);
     if (pairs.has(`${first.piece ?? first.name} ${other.piece ?? other.name}`)) continue;
     pairs.add(`${first.piece ?? first.name} ${other.piece ?? other.name}`);
     const between = first.name === other.name ? `two ${first.name.replace(/^the /, "")}s` : `${first.name} and ${other.name}`;
-    say(`The gap between ${between} is only ${balls.toFixed(1)} balls wide: ${balls < 1.5 ? "most shots will catch an edge" : "a shot must be straight to pass"}.`, 3 - balls, first);
+    say(`The gap between ${between} is only ${wide.toFixed(1)} balls wide: ${wide < 1.5 ? "most shots will catch an edge" : "a shot must be straight to pass"}.`, 3 - wide, first);
   }
   for (const t of timed) {
     const n = of(t.ref);

@@ -6,6 +6,7 @@
 // trust strip. The seller is the build's (NEXT_PUBLIC_SELLER_*,
 // next.config.mjs refuses a production shop without it); a placeholder shows
 // what is missing anywhere else.
+import { aboutGnot as about, upToHundredth as up } from "../adena";
 import { shortAddr } from "../chain";
 import { dateParts, gnot, utcDate } from "./shop";
 
@@ -46,9 +47,6 @@ const stamp = (unix: number) => {
   const p = dateParts(unix);
   return `${p.weekday} ${p.day} ${p.year}, ${p.hm} UTC (${jstDate(unix)})`;
 };
-/** A figure up to the hundredth of a GNOT (a deposit, a fee), in ugnot; about: that, in GNOT. */
-const up = (ugnot: number) => Math.ceil(ugnot / 1e4) * 1e4;
-const about = (ugnot: number) => (up(ugnot) / 1e6).toFixed(2);
 
 /** The sale period (申込期間), on the confirmation and the receipt: the genesis's closing date, or plainly that none
  *  is set (the realm runs the sale without one until the owner sets it). */

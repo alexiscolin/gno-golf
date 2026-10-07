@@ -58,6 +58,8 @@ export const cases: [string, () => Draft, string[]][] = [
       "E14 a: The gap at (16.75, 7) between the wall and the wall is 1.12 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits",
       "E14 b: The gap at (16.75, 16) between the wall and the wall is 1.12 wide, and the way to the cup goes through it: at least 1.25, or a ball only just fits",
     ]],
+  ["E4: the only way between a rock and a pond, 0.4 apart: a ball keeps its radius from the rock, none from the water", () => lane("garden", [{ ...put("w", "*/hazard/water", [13, 0]), geometry: { t: "rect", min: [13, 0], max: [17, 8] } }, { ...put("x", "*/post/rock", [15, 10.5]), geometry: { t: "post", c: [15, 10.5], r: 2.1 } }, rail("a", [15, 12.75], [15, 20])]),
+    ["E4 x: The cup cannot be reached from the tee: the gap at (16.5, 9.7) between the rock and the water is 0.4 wide, narrower than the ball (0.5 beside a hazard)"]],
   ["E5: a pond too thin to stop a fast ball (a hand-edited file)", () => lane("garden", [{ ...put("x", "*/hazard/water", [12, 2]), geometry: { t: "rect", min: [12, 2], max: [13.25, 18] } }]),
     ["L0 x: The water's side is 1.25: 1.5 to 80"]],
   ["E6: a tunnel out into the water", () => lane("garden", [put("x", "*/tunnel/cave", [8, 3], { to: [20, 10] }), put("w", "*/hazard/water", [18, 8], { size: 4 })]),

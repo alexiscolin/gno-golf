@@ -67,7 +67,7 @@ const CONTRAST = `(sel) => {
   return { ratio: (a + 0.05) / (b + 0.05), opacity: op };
 }`;
 
-const SIZES: [number, number][] = [[900, 800], [1024, 768], [1280, 800], [1440, 900], [1366, 650], [1512, 982]];
+const SIZES: [number, number][] = [[900, 800], [1024, 768], [1280, 800], [1440, 900], [1366, 650], [1512, 982], [1920, 1080]];
 for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
@@ -90,6 +90,9 @@ for (const [w, h] of SIZES) {
     assert.ok(Math.abs(g.r - g.l - (dials[0].r - dials[0].l)) < 0.5, `${at}: the gauges of different widths (${dials.map((x) => Math.round(x.r - x.l)).join()})`);
     if (w >= 1280) assert.ok(Math.abs(g.t - dials[0].t) < 0.5 && Math.abs(g.label.b - g.value.b) < 0.5 && Math.abs(g.value.r - g.r) < 0.5, `${at}: a gauge's label, value or row out of line (${JSON.stringify(g)})`);
   }
+  // on one row, the four gauges fill it: no empty tracks before the chain's limits, at every width alike
+  const row = (await box(c, ".gauges"))!;
+  if (dials.every((g) => Math.abs(g.t - dials[0].t) < 0.5)) assert.ok(row.r - dials[dials.length - 1].r < 1, `${at}: the gauges leave ${Math.round(row.r - dials[dials.length - 1].r)} px of their row empty`);
   // all well, two lines: the next step and the meter's guess on one, the gauges on the other; the rest of the height the board's
   if (w >= 1280) {
     const line = (await box(c, ".checks__line"))!;
@@ -508,6 +511,74 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 }
 // every palette entry dropped on a blank lane, at a laptop's size and a retina one's: the selection's outline and a hover's
 // a few css px whatever the zoom (never a stroke in the board's units: a fat capsule over the cup), no overlay drawn empty
+// the open hole changed, then deleted, in another tab: this tab's edits not written over it, said, and its choice kept
+{
+  const c = await editor(1280, 800);
+  const stored = () => c.js<string | null>(`(() => { const k = Object.keys(localStorage).find((x) => x.startsWith(${JSON.stringify("gnogolf.builder.draft.")})); return k ? localStorage.getItem(k) : null; })()`);
+  const nudge = async () => {
+    await c.js(`document.querySelector("[data-piece^='p']").focus()`);
+    await sleep(300);
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight" });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight" });
+    await sleep(800);
+  };
+  const theirs = await c.js<string>(`(() => { const k = Object.keys(localStorage).find((x) => x.startsWith(${JSON.stringify("gnogolf.builder.draft.")})); const d = JSON.parse(localStorage.getItem(k)); d.title = "Renamed elsewhere"; localStorage.setItem(k, JSON.stringify(d)); return localStorage.getItem(k); })()`);
+  await nudge();
+  assert.equal(await stored(), theirs, "the other tab's edit not written over");
+  assert.match(await c.js<string>(`document.querySelector(".bench__unkept--elsewhere")?.textContent ?? ""`), /changed in another tab/, "said");
+  await c.js(`[...document.querySelectorAll(".bench__unkept--elsewhere button")].find((b) => /Keep mine/.test(b.textContent)).click()`);
+  await sleep(500);
+  assert.notEqual(await stored(), theirs, "Keep mine: this tab's hole kept");
+  assert.equal(await c.js(`!!document.querySelector(".bench__unkept--elsewhere")`), false);
+  await c.js(`Object.keys(localStorage).filter((x) => x.startsWith(${JSON.stringify("gnogolf.builder.draft.")})).forEach((k) => localStorage.removeItem(k))`);
+  await nudge();
+  assert.equal(await stored(), null, "deleted in another tab: not brought back");
+  await c.js(`[...document.querySelectorAll(".bench__unkept--elsewhere button")].find((b) => /Open it as kept/.test(b.textContent)).click()`);
+  await sleep(800);
+  assert.equal(await c.js(`!!document.querySelector(".bholes")`), true, "opened as kept: gone, so back to the holes");
+  c.kill();
+}
+
+// a world's pieces that cannot load (offline, an old deploy's chunk gone): said, with a Try again that loads them
+{
+  const c = await editor(1280, 800);
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__world")`)); k++) await sleep(300);
+  await c.send("Network.enable");
+  await c.send("Network.setBlockedURLs", { urls: ["*scene_island*", "*scene/island*"] });
+  await c.js(`[...document.querySelectorAll(".bholes__world")].find((b) => /Island/.test(b.textContent)).click()`);
+  await sleep(300);
+  await c.js(`document.querySelector(".bholes__starts .bholes__start").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`/could not load/.test(document.querySelector(".bench__wait")?.textContent ?? "")`)); k++) await sleep(300);
+  assert.match(await c.js<string>(`document.querySelector(".bench__wait")?.textContent ?? ""`), /could not load/, "a world's pieces that fail to load: said where the board would be");
+  await c.send("Network.setBlockedURLs", { urls: [] });
+  await c.js(`[...document.querySelectorAll(".bench__wait button")].find((b) => /Try again/.test(b.textContent)).click()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette")`)); k++) await sleep(500);
+  assert.equal(await c.js(`!!document.querySelector(".palette")`), true, "Try again: the pieces loaded");
+  c.kill();
+}
+
+// the Inspector's choices whole in their rows (a push's eight ways the widest), at the usual width and the floor:
+// the garden's signature hole, its moon bridge (p1) selected
+for (const [w, h] of [[1280, 800], [900, 800]] as const) {
+  const c = await editor(w, h);
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
+  await c.js(`document.querySelectorAll(".bholes__starts .bholes__start")[2].click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece='p1']")`)); k++) await sleep(300);
+  await sleep(800);
+  await c.js(`document.querySelector("[data-piece='p1']").focus()`);
+  await sleep(600);
+  if (!(await c.js<boolean>(`!!document.querySelector(".insp__dirs")?.checkVisibility()`))) {
+    await c.js(`document.querySelector(".insp__details summary").click()`);
+    await sleep(200);
+  }
+  assert.equal(await c.js(`!!document.querySelector(".insp__dirs")?.checkVisibility()`), true, `${w}×${h}: the moon bridge's way shown`);
+  const cut = await c.js<string[]>(`[...document.querySelectorAll(".insp .seg")].filter((s) => s.checkVisibility() && (s.scrollWidth > s.clientWidth + 0.5 || [...s.querySelectorAll("button")].some((b) => b.getBoundingClientRect().right > s.getBoundingClientRect().right + 0.5))).map((s) => s.getAttribute("aria-label") || s.className)`);
+  assert.deepEqual(cut, [], `${w}×${h}: the Inspector's choices clipped`);
+  c.kill();
+}
+
 for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
   const c = await launch({ width: w, height: h });
   await c.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: dpr, mobile: false });

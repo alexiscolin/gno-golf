@@ -4,9 +4,12 @@
 // a binding. The drawings are the scene's own declarations (the shared
 // tables POSTS, BARS, MOUTHS, course.ts's and zones.ts's DRAWN, and each
 // world module's skins); the bindings are bindings.ts BINDINGS. A drawing that
-// cannot be placed alone is in HAND_ONLY, with why. So a new piece, or a new
-// world, appears here by its drawing and a binding, and nowhere else
-// (web/test/builder-palette.test.ts holds every entry to both).
+// cannot be placed alone is in HAND_ONLY, with why. A shared drawing also
+// says where it is at home (HOME: every world, the worlds named, or the
+// shore's), elsewhere offered as borrowed ("From other worlds") or, a shore
+// piece, not at all. So a new piece appears here by its drawing, a binding
+// and, shared, its HOME, and nowhere else; a new world by its skins
+// (web/test/builder-palette.test.ts holds every entry to all three).
 import { POSTS, BARS, MOUTHS } from "../scene/pieces";
 import { DRAWN as COURSE_DRAWN } from "../scene/course";
 import { DRAWN as ZONES_DRAWN } from "../scene/zones";

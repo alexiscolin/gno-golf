@@ -8,9 +8,9 @@
 import "@/app/title.css";
 import "@/app/build/builder.css";
 import "@/app/build/phone.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui";
-import { DRAFT_PREFIX, dropDraft, loadDrafts, newKey, saveDraft, type Draft, type Kept } from "@/lib/builder/draft";
+import { DRAFT_PREFIX, dropDraft, keptText, loadDrafts, newKey, saveDraft, saveOver, type Draft, type Kept } from "@/lib/builder/draft";
 import { endpoints, knownAuthor, remixId } from "@/lib/builder/holes";
 import { remixFrom } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
@@ -37,13 +37,21 @@ export default function Builder() {
   const [guess, setGuess] = useState(0); // the meter's par for the draft last edited, until its test rounds set one
   const [said, setSaid] = useState(""); // why a remix asked for did not open
   const [opened, setOpened] = useState(""); // why a file opened as it is is broken ("" none)
+  // the open draft as this tab last read or wrote it (a save writes only over that), and whether another tab has changed it since
+  const was = useRef<string | null>(null);
+  const [elsewhere, setElsewhere] = useState(false);
+  const openAt = useCallback((at: string) => {
+    was.current = keptText(at);
+    setElsewhere(false);
+    setOpen({ at, n: 0, step: "edit" });
+  }, []);
   // a draft added (a new hole, a file, a remix) under a key of its own, and opened
   const add = useCallback((draft: Draft) => {
     const key = newKey();
     setUnkept(!saveDraft(key, draft));
     setDrafts((list) => [...list, { key, draft }]);
-    setOpen({ at: key, n: 0, step: "edit" });
-  }, []);
+    openAt(key);
+  }, [openAt]);
   useEffect(() => {
     const list = loadDrafts();
     // a remix asked for (taken from the address at once: a reload does not make another)
@@ -72,10 +80,13 @@ export default function Builder() {
     setDrafts((list) => list.map((k) => {
       if (k.key !== at) return k;
       const draft = f(k.draft);
-      setUnkept(!saveDraft(at, draft));
+      // (changed in another tab: kept here only, until this tab says which stands)
+      const kept = elsewhere ? "elsewhere" : saveOver(at, draft, was.current);
+      if (kept === "elsewhere") setElsewhere(true);
+      else (setUnkept(kept === null), kept && (was.current = kept.kept));
       return { key: at, draft };
     }));
-  }, [at]);
+  }, [at, elsewhere]);
   // while this tab keeps every draft, its list follows what the other tabs keep (each saves only its own drafts)
   const home = !open && !unkept;
   useEffect(() => {
@@ -88,8 +99,24 @@ export default function Builder() {
 
   if (failed) return <main className="builder-off" role="alert"><h1>The Builder could not load.</h1><p>{failed}</p><Button onClick={() => window.location.reload()}>Try again</Button></main>;
   if (!host) return <main className="builder-off" aria-busy="true"><p>Loading the Builder…</p></main>;
-  const unkeptNote = unkept && <p className="bench__unkept" role="status">This browser keeps nothing (a private window?): export your hole before you leave.</p>;
   const d = open && drafts.find((k) => k.key === open.at)?.draft;
+  // the open draft changed or deleted in another tab: open it as kept there (gone: back to the holes), or keep this tab's
+  const theirs = () => {
+    const list = loadDrafts();
+    setDrafts(list);
+    if (open && list.some((k) => k.key === open.at)) (was.current = keptText(open.at), setElsewhere(false), setOpen({ ...open, n: open.n + 1, step: "edit", test: undefined }));
+    else (setElsewhere(false), setOpen(null));
+  };
+  const mine = () => open && d && (setUnkept(!saveDraft(open.at, d)), (was.current = keptText(open.at)), setElsewhere(false));
+  const unkeptNote = (
+    <>
+      {unkept && <p className="bench__unkept" role="status">This browser keeps nothing (a private window?): export your hole before you leave.</p>}
+      {elsewhere && (
+        <p className="bench__unkept bench__unkept--elsewhere" role="alert">This hole was changed in another tab: your edits here are not kept.
+          <Button size="s" onClick={theirs}>Open it as kept</Button><Button size="s" onClick={mine}>Keep mine</Button></p>
+      )}
+    </>
+  );
   if (open && d) {
     const edit = () => setOpen({ ...open, n: open.n + 1, step: "edit", test: undefined });
     const publish = () => setOpen({ ...open, step: "publish" });
@@ -135,7 +162,7 @@ export default function Builder() {
   }
   return (
     <Start host={host} author={author} drafts={drafts.map((k) => k.draft)} said={said}
-      onOpen={(i) => setOpen({ at: drafts[i].key, n: 0, step: "edit" })}
+      onOpen={(i) => openAt(drafts[i].key)}
       onAdd={(d, broken = "") => { add(d); setOpened(broken); }}
       onDelete={(i) => { dropDraft(drafts[i].key); setDrafts(drafts.filter((_, k) => k !== i)); }} />
   );
