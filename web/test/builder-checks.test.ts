@@ -62,6 +62,16 @@ void test("E7: a timed piece on for part of its cycle; a pulse that comes and go
   assert.match(rules(pulse(1, 1))[0], /^E7 Pulse 1/);
 });
 
+void test("E4, E14: gaps side by side, each too narrow, shut the way as one does; beside a wide one, they do not", () => {
+  const across = (...ys: [number, number][]) => hole({ walls: [...box(0, 0, 40, 20), ...[0, ...ys.flat(), 20].flatMap((y, k, all) => (k % 2 ? [] : [{ a: [20, y], b: [20, all[k + 1]] }]))] });
+  assert.match(rules(across([5, 5.9]))[0], /^E4 .* 0\.9 wide, narrower than the ball \(1\)$/);
+  assert.equal(rules(across([5, 5.9], [14.1, 15])).filter((r) => r.startsWith("E4")).length, 2, "two");
+  assert.equal(rules(across([3, 3.9], [9.55, 10.45], [16.1, 17])).filter((r) => r.startsWith("E4")).length, 3, "three");
+  assert.equal(rules(across([5, 6.1], [13.9, 15])).filter((r) => r.startsWith("E14")).length, 2, "two a ball only just fits");
+  assert.deepEqual(rules(across([5, 5.9], [12, 15])), [], "one a ball passes well: the narrow one is not the way");
+  assert.deepEqual(rules(across([5, 6.1], [12, 15])), [], "nor one it only just fits");
+});
+
 void test("E8: GG1's limits, pulses' pieces counted in", () => {
   const many = (n: number) => Array.from({ length: n }, (_, k): WallIn => ({ a: [5 + (k % 30), 2], b: [5 + (k % 30), 3] }));
   assert.deepEqual(counts(hole()).walls, [4, LIMITS.walls]);
