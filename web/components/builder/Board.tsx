@@ -14,7 +14,7 @@
 // its path drawn, the last three faded, all played again as the hole changes;
 // the board says it is no proof. "Show the line" draws the meter's best line
 // and where its shots stopped.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
 import { centreOn, FLAT, K_MAX, K_MIN, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
@@ -395,7 +395,7 @@ export default function Board(props: BoardProps) {
       )}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}
       {/* the keys a first hole needs, at the board's foot (the GUI spec's B1) */}
-      {!props.said && <p className="board__keys" aria-hidden="true">{KEYS.map((k, i) => <span key={k.key}>{i ? " · " : ""}<kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span>)}</p>}
+      {!props.said && <p className="board__keys" aria-hidden="true">{KEYS.map((k, i) => <Fragment key={k.key}>{i ? " " : ""}<span><kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span></Fragment>)}</p>}
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
       {(flash || ghost || live || (aiming && ball?.aimed)) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">
