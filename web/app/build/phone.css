@@ -15,3 +15,5 @@
 .bphone__row .btn { min-height: 44px; }
 .bphone__note { margin: 0; font-size: 15px; color: var(--ink-soft); }
 .bphone__row.skel { background: rgba(var(--paper-rgb), .6); box-shadow: none; }
+/* what is new on one of the author's holes since their last look (useRewards.ts): a gold dot by its name, here and on a computer */
+.bholes__dot { display: inline-block; width: 10px; height: 10px; margin-left: 6px; border: 2px solid var(--ink); border-radius: 50%; background: var(--gold); vertical-align: 0; }

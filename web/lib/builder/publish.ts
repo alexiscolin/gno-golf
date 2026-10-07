@@ -9,8 +9,9 @@ import { isAddress } from "../chain";
 import type { Versions } from "../types";
 import { holeId, holeRow } from "./testmode";
 import { makeLocalChain } from "./localchain";
-import { canonicalHex, parAllowed, replay, required, suggestPar, type Proof } from "./proof";
+import { canonicalHex, parAllowed, replay, suggestPar, type Proof } from "./proof";
 import { validate, type ValidateOptions } from "./pipeline";
+import { required } from "./rules";
 import type { Draft } from "./draft";
 import type { BuilderHost } from "./wasm";
 

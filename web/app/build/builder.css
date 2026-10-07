@@ -287,6 +287,23 @@
 .bholes__state--testing { border-style: solid; border-color: var(--sunny); background: var(--lamp); }
 .bholes__state--ready { border-style: solid; border-color: var(--green); background: var(--mint); color: var(--green); }
 .bholes__state--changed { border-color: var(--hat-ink); color: var(--hat-ink); }
+/* a hole on the chain (Rewards.tsx): its pill (its dot: phone.css), who played it */
+.bholes__state--live { border-style: solid; border-color: var(--ink); background: var(--green-light); }
+.bholes__name .bholes__stats { font-size: 13px; font-weight: 700; color: var(--ink); }
+/* the author's test round, saved: one button and its line */
+.bsave { display: grid; justify-items: start; gap: 2px; margin-top: var(--sp-1); }
+.bsave .btn { margin: 0; }
+.bsave small { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.pub__doneform .bsave { justify-items: center; }
+.bsave--done { margin: var(--sp-1) 0 0; font-size: 13px; font-weight: 800; color: var(--green); }
+/* the Builder's badges: the game's medals in a row, each named, what earns it under one not earned yet */
+.bbadges { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.bbadges li { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: 4px var(--sp-3) 4px 4px; border: var(--edge); border-radius: 14px; background: var(--paper); }
+.bbadges svg { flex: none; width: 30px; height: 34px; }
+.bbadges span { display: grid; min-width: 0; line-height: 1.15; }
+.bbadges b { font-size: 14px; }
+.bbadges small { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.bbadges__off { background: rgba(var(--paper-rgb), .7); border-style: dashed; }
 .bholes__acts { display: flex; align-items: center; gap: var(--sp-3); }
 .bholes__acts .btn { margin: 0; }
 /* a short window (a 700 px laptop's): the sign and the maps a size under, the starters still above the fold */

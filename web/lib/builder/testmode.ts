@@ -8,7 +8,8 @@ import type { Chain } from "../chain";
 import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
-import { periodFor, required } from "./proof";
+import { periodFor } from "./proof";
+import { required } from "./rules";
 import type { BuilderHost } from "./wasm";
 
 /** The id the draft will be published under: the alias's next version (Versions), the first for a new alias. */
