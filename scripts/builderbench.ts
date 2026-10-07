@@ -112,7 +112,7 @@ for (let k = 0; k < 5; k++) {
   await c.js(`document.querySelector(".board").focus()`);
   await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "t", code: "KeyT", text: "t" });
   await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "t", code: "KeyT" });
-  await until(`!!document.querySelector(".tbench--quick .tmode__chip")`, "the quick test");
+  await until(`!!document.querySelector(".tbench--quick .tmode__score")`, "the quick test");
   await sleep(2500);
   await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
   await until(`!document.querySelector(".tbench--quick")`, "back from the quick test");
