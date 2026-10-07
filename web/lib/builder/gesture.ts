@@ -139,4 +139,3 @@ export function makeGesture(out: Out) {
     },
   };
 }
-export type Gesture = ReturnType<typeof makeGesture>;
