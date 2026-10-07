@@ -7,7 +7,8 @@
 // issues list would.
 import type { Issue } from "./checks";
 import type { ClockSpec, Draft, Geometry, Piece, V } from "./draft";
-import { entryParts, frame, pieceName } from "./gg1";
+import { entryParts, frame } from "./gg1";
+import { pieceName } from "./names";
 import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
@@ -67,6 +68,25 @@ export function placePiece(e: PaletteEntry, id: string, at: V, p: PlaceParams = 
   return { id, entry: e.id, geometry, params, clock };
 }
 
+/** A piece's middle, for an arrow, a label or the pointer it follows. */
+export function middleOf(p: Piece): V {
+  const g = p.geometry;
+  if (g.t === "rail" || g.t === "bar") return [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2];
+  if (g.t === "post") return g.c;
+  if (g.t === "poly") return [g.pts.reduce((s, v) => s + v[0], 0) / g.pts.length, g.pts.reduce((s, v) => s + v[1], 0) / g.pts.length];
+  return [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2];
+}
+
+/**
+ * The armed entry's piece as the board's ghost has it: centred under the
+ * pointer, placed at a point on the grid of step (so every point of it is,
+ * a tunnel's way out with the rest: placePiece puts it from that point).
+ */
+export function ghostAt(e: PaletteEntry, id: string, pointer: V, step: number): Piece {
+  const p = placePiece(e, id, pointer), m = middleOf(p);
+  return placePiece(e, id, snap([2 * pointer[0] - m[0], 2 * pointer[1] - m[1]], step));
+}
+
 /** Where a piece is, for a sentence: its first point. */
 export const whereOf = (g: Geometry): V => (g.t === "rail" || g.t === "bar" ? g.a : g.t === "post" ? g.c : g.t === "poly" ? g.pts[0] : g.min);
 const at = (v: V) => `(${+v[0].toFixed(2)}, ${+v[1].toFixed(2)})`;
@@ -81,7 +101,7 @@ export function changeWorld(d: Draft, world: string, palette: readonly PaletteEn
   const pieces = d.pieces.map((p) => {
     const { kind, skin } = entryParts(p.entry);
     const e = palette.find((x) => x.kind === kind && x.skin === skin && x.world === world) ?? palette.find((x) => x.kind === kind && x.skin === skin);
-    if (!e) refused.push(`the ${skin || "plain"} ${kind} at ${at(whereOf(p.geometry))}`);
+    if (!e) refused.push(`${pieceName(p)} at ${at(whereOf(p.geometry))}`);
     return e ? { ...p, entry: e.id } : p;
   });
   return refused.length ? { refused } : { ...d, world, pieces, proofs: [] };
@@ -300,7 +320,7 @@ function nearest(rest: Draft, p: Piece, o: ValidateOptions, r0 = CELL, reach = F
   return null;
 }
 
-/** A piece as a screen reader names it: what it is and where ("The rock post at (13.5, 6.5)"). */
+/** A piece as a screen reader names it: what it is and where ("The rock obstacle at (13.5, 6.5)"). */
 export const pieceLabel = (p: Piece) => {
   const n = pieceName(p);
   return `${cap(n)} at ${at(whereOf(p.geometry))}`;
@@ -314,7 +334,7 @@ export const roomFor = (d: Draft, p: Piece): string => {
 
 /** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near (roomFor says when the limits are why). */
 export function placeNear(d: Draft, e: PaletteEntry, to: V, o: ValidateOptions): { draft: Draft; id: string } | null {
-  const id = nextId(d), p = movePiece(placePiece(e, id, to), onQuarter(to, d.tee));
+  const id = nextId(d), p = placePiece(e, id, onQuarter(to, d.tee)); // (placed on the grid: its way out too)
   if (roomFor(d, p)) return null;
   const put = canPlace(d, p, o).length === 0 ? p : nearest(d, p, o);
   return put ? { draft: frame({ ...d, pieces: [...d.pieces, put] }), id } : null;

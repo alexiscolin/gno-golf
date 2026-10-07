@@ -33,6 +33,10 @@ export function makeSession(first: Draft) {
     edit(f: (kept: Draft) => Draft) {
       this.set(f(h.now()));
     },
+    /** What the draft as kept gained after the edit that made it (the proofs an edit carried over): the same step, amended. */
+    amend(d: Draft) {
+      h.amend(d);
+    },
     undo: () => ((live = null), h.undo()),
     redo: () => ((live = null), h.redo()),
     canUndo: () => h.canUndo(),

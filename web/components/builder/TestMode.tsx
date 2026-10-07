@@ -19,6 +19,8 @@ import { AUTHOR_KEY, endpoints } from "@/lib/builder/holes";
 import { makeLocalChain } from "@/lib/builder/localchain";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
 import { holeId, holeRow, plan, testChain } from "@/lib/builder/testmode";
+import { confetti } from "@/lib/builder/juice";
+import { sound } from "@/lib/feel";
 import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost } from "@/lib/builder/wasm";
 import type { Snapshot } from "@/lib/engine/types";
@@ -26,6 +28,8 @@ import type { Snapshot } from "@/lib/engine/types";
 /** A weather's chip: its sign and its name ("" is clear). */
 const KINDS: Record<string, [string, string]> = { "": ["☀", "Clear"], wind: ["≋", "Wind"], rain: ["☂", "Rain"], storm: ["⚡", "Storm"], snow: ["❄", "Snow"] };
 const chip = (k: string) => KINDS[k] ?? ["•", k];
+/** The celebration's confetti: a little, the same each time. */
+const BITS = confetti(28);
 /** How far back a weather is looked for (FIND_BACK periods), in days, for a sentence. */
 const FIND_DAYS = Math.round((FIND_BACK * RULES.periodMs) / 86_400_000);
 
@@ -57,7 +61,7 @@ function AddressStep({ onAddress }: { onAddress: (a: string) => void }) {
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, onAuthor, onProof, onPar }: {
+export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, onAuthor, onProof, onPar, onLeave }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -71,6 +75,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   onProof: (p: Proof) => void;
   /** the proofs' suggested par, once every weather is proved */
   onPar: (par: number) => void;
+  /** Escape: back to the editor (not while aiming: Escape drops the aim, the game's) */
+  onLeave?: () => void;
 }) {
   const [id, setId] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -93,6 +99,14 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     };
   }, [!author]); // eslint-disable-line react-hooks/exhaustive-deps -- (the stage is there once an address is)
   const game = useRef<ReturnType<typeof createGame> | null>(null);
+  // Escape leaves Test, unless it drops an aim (the game's) or is a field's
+  const aiming = useRef(false);
+  useEffect(() => {
+    if (!onLeave) return;
+    const key = (e: KeyboardEvent) => e.key === "Escape" && !aiming.current && !(e.target as HTMLElement).closest("input, select, textarea") && onLeave();
+    addEventListener("keydown", key, true); // (before the game's own: an aim it drops is still an aim here)
+    return () => removeEventListener("keydown", key, true);
+  }, [onLeave]);
 
   // the hole's id: the author's alias's next version, as the chain says (v1 if it cannot be read)
   useEffect(() => {
@@ -121,13 +135,14 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     const local = makeLocalChain(host, holeRow(id, draft), hex, now.period);
     const g = (game.current = createGame(canvas, {
       chain: testChain(makeChain({ rpc, web }), local, hex),
-      onChange: setSnap,
+      onChange: (s) => ((aiming.current = s.aiming), setSnap(s)),
       onHoled: ({ shots }) => {
         setChecking(true);
         void replay(local, { key: proofKey, id, kind: now.kind, period: now.period, shots: [...shots] }).then((p) => {
           setChecking(false);
           if (typeof p === "string") return setWhy((w) => ({ ...w, [now.kind]: p }));
           setWhy((w) => ({ ...w, [now.kind]: "" }));
+          sound("cup");
           onProof(p);
         });
       },
@@ -142,23 +157,34 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     // (one game per weather: a proof of this one moves to the next)
   }, [id, now?.kind, now?.period, canvas]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // every weather proved: the par they suggest
+  // every weather proved: the par they suggest; proved here, by this visit's last round, a small celebration
+  // (the chips fill one by one, a little confetti, a chime; Publish pulses in the header)
   const proved = !!id && kinds.length > 0 && !left.length;
+  const [party, setParty] = useState(false), wasProved = useRef<boolean | null>(null);
   useEffect(() => {
-    if (proved) onPar(suggestPar(draft.proofs.filter((p) => p.key === proofKey && p.id === id)));
-  }, [proved]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (kinds.length && wasProved.current === null) wasProved.current = proved; // (proved as it opened: no party)
+    if (!proved) return;
+    onPar(suggestPar(draft.proofs.filter((p) => p.key === proofKey && p.id === id)));
+    if (wasProved.current !== false) return;
+    wasProved.current = true;
+    sound("start"); // (the game's own fanfare has just played for the hole: Publish's chime after it)
+    setParty(true);
+    const t = setTimeout(() => setParty(false), 2400);
+    return () => clearTimeout(t);
+  }, [proved, kinds.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!author) return <main className="tmode tmode--ask"><AddressStep onAddress={(a) => { try { localStorage.setItem(AUTHOR_KEY, a); } catch {} onAuthor(a); }} /></main>;
   const par = proved ? suggestPar(draft.proofs.filter((p) => p.key === proofKey && p.id === id)) : 0;
   const failed = now && why[now.kind];
   return (
-    <main className="tmode">
+    <main className={`tmode${party ? " tmode--party" : ""}`}>
+      {party && <div className="bconfetti" aria-hidden="true">{BITS.map((b, i) => <i key={i} style={{ left: `${b.x}%`, background: b.color, animationDelay: `${b.delay}ms`, ["--drift" as string]: `${b.drift}px`, ["--turn" as string]: `${b.turn}deg` }} />)}</div>}
       <div ref={stage} className="tmode__stage" />
       <div className="tmode__strip" aria-label="The weathers to beat">
-        {kinds.map(({ kind }) => {
+        {kinds.map(({ kind }, i) => {
           const done = !left.includes(kind), on = now?.kind === kind, bad = !!why[kind] && !done;
           const best = draft.proofs.find((p) => p.kind === kind && p.key === proofKey && p.id === id);
-          return <span key={kind} className={`tmode__chip${done ? " tmode__chip--done" : on ? " tmode__chip--now" : ""}${bad ? " tmode__chip--bad" : ""}`}>{chip(kind)[0]} {chip(kind)[1]}{done ? ` ✓ ${best?.strokes ?? ""}` : on ? ", now" : ""}</span>;
+          return <span key={kind} style={{ animationDelay: `${i * 140}ms` }} className={`tmode__chip${done ? " tmode__chip--done" : on ? " tmode__chip--now" : ""}${bad ? " tmode__chip--bad" : ""}`}>{chip(kind)[0]} {chip(kind)[1]}{done ? ` ✓ ${best?.strokes ?? ""}` : on ? ", now" : ""}</span>;
         })}
         <span className="tmode__par" title={par ? "Par, from your rounds" : guess ? "Par, the difficulty meter's guess until your rounds set it" : undefined}>{par ? `Par ${par}` : guess ? `Par ${guess}?` : "Par –"}</span>
       </div>

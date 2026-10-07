@@ -3,18 +3,11 @@
 // box, ellipse or polygon; a tunnel's way out dashed to a ring, a hill's
 // push as an arrow. The board and the palette's tiles both draw with it.
 import { barCorners } from "@/lib/builder/gg1";
+import { middleOf } from "@/lib/builder/edit";
 import type { Piece, V } from "@/lib/builder/draft";
 import { fillOf } from "./look";
 
 const pts = (vs: readonly V[]) => vs.map((v) => `${v[0]},${v[1]}`).join(" ");
-/** Its middle, for an arrow or a label. */
-export function middleOf(p: Piece): V {
-  const g = p.geometry;
-  if (g.t === "rail" || g.t === "bar") return [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2];
-  if (g.t === "post") return g.c;
-  if (g.t === "poly") return [g.pts.reduce((s, v) => s + v[0], 0) / g.pts.length, g.pts.reduce((s, v) => s + v[1], 0) / g.pts.length];
-  return [(g.min[0] + g.max[0]) / 2, (g.min[1] + g.max[1]) / 2];
-}
 
 /** state: "bad" outlined red (an issue, a ghost that cannot go), "ghost" see-through. */
 export function PieceShape({ p, state }: { p: Piece; state?: "bad" | "ghost" }) {

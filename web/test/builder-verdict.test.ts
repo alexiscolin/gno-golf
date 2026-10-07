@@ -47,7 +47,7 @@ void test("a hole the Builder made passes: every starter's published bytes, and 
 
 void test("threat: direct PublishMine of a hole the editor refuses: a cup in a post, a cup walled off, two posts in one another", async () => {
   const inPost = await okFor(direct(box({ posts: [{ c: [35.5, 11.5], r: 1, skin: "rock" }] })));
-  assert.match(inPost.ok ? "" : inPost.why, /^This hole was not made with the Builder rules\. This hole breaks the Builder's rules: The cup touches the rock post/);
+  assert.match(inPost.ok ? "" : inPost.why, /^This hole was not made with the Builder rules\. This hole breaks the Builder's rules: The cup touches the rock obstacle/);
   const walled = await okFor(direct(box({ walls: [...box().walls, { a: [21.5, 1.5], b: [21.5, 21.5] }] })));
   assert.equal(walled.ok, false);
   assert.match(walled.ok ? "" : walled.why, /cannot be reached from the tee/);

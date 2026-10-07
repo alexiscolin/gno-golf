@@ -6,6 +6,7 @@
 // piece), and Turn · Copy · Delete with their keys. A setting that would
 // break the hole does not take: the slider stays at the last value that
 // holds, and the reason is said once (settings.ts; edit.ts canPlace).
+import { entryName } from "@/lib/builder/names";
 import { useRef, useState } from "react";
 import { Segmented } from "@/components/ui";
 import { settle } from "@/lib/builder/session";
@@ -83,7 +84,7 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
   const unit = c.k === "substep" ? "substeps" : "strokes";
   return (
     <div className="insp">
-      <div className="insp__head">{ent.label}</div>
+      <div className="insp__head">{entryName(ent)}</div>
       <div className="insp__acts">
         {/* (a round piece: off, the reason its title, as R says it) */}
         <button type="button" className={`btn btn--ghost${notTurned(p) ? " btn--off" : ""}`} aria-disabled={notTurned(p) ? true : undefined} title={notTurned(p) || "Turn it a quarter (R)"} onClick={onTurn}>Turn<kbd>R</kbd></button>

@@ -25,7 +25,8 @@ function Fix({ i, onShow, onFix }: { i: Issue; onShow: (piece: string) => void; 
 }
 
 export default function Checks({ verdict, gauges, issues, busy, meter, onShow, onFix }: {
-  verdict: { ok: boolean; text: string };
+  /** warn: a round an edit broke, said calm (amber) */
+  verdict: { ok: boolean; warn?: boolean; text: string };
   gauges: readonly Gauge[];
   issues: readonly Issue[];
   /** the checks are running again */
@@ -52,7 +53,7 @@ export default function Checks({ verdict, gauges, issues, busy, meter, onShow, o
         </ul>
       )}
       <div className="checks__line">
-        <span id="bench-verdict" className={`verdict verdict--${bad ? "bad" : "ok"}`} role="status" title={first?.rule}>{first ? plainOf(first) : verdict.text}</span>
+        <span id="bench-verdict" className={`verdict verdict--${bad ? "bad" : verdict.warn ? "warn" : "ok"}`} role="status" title={first?.rule}>{first ? plainOf(first) : verdict.text}</span>
         {first && <Fix i={first} onShow={onShow} onFix={onFix} />}
         {issues.length > 1 && <button type="button" className="linkish checks__more" aria-expanded={all} onClick={() => setAll((o) => !o)}>{all ? "Fewer" : `${issues.length - 1} more`}</button>}
       </div>

@@ -9,7 +9,8 @@
 // and the board's clamps read the same rules (edit.ts).
 import { checkHole, KERB_GAP, LOOSE, work, WORK_WARN, type Issue } from "./checks";
 import { explain } from "./explain";
-import { BOARD, LIMITS, MARGIN, barCorners, frame, keyOf, pieceName, piecesBy, writeDraft } from "./gg1";
+import { BOARD, LIMITS, MARGIN, barCorners, frame, keyOf, piecesBy, writeDraft } from "./gg1";
+import { pieceName } from "./names";
 import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { cap, FIELD } from "./rules";

@@ -31,7 +31,7 @@ void test("placePiece: on the grid, the entry's defaults, its first clock", () =
 void test("changeWorld: kept where every piece has an entry there (or a shared one); refused naming those that have none", () => {
   const d: Draft = { ...emptyDraft("island"), pieces: [placePiece(byId(island, "*/post/rock"), "a", [5, 5]), placePiece(byId(island, "island/bar/rowing boat"), "b", [8, 5])] };
   const r = changeWorld(d, "town", town);
-  assert.deepEqual(r, { refused: ["the rowing boat bar at (8, 5)"] });
+  assert.deepEqual(r, { refused: ["the rowing boat barrier at (8, 5)"] });
   const plain: Draft = { ...d, pieces: [d.pieces[0]] };
   const moved = changeWorld(plain, "town", town);
   assert.ok(!("refused" in moved));

@@ -303,7 +303,10 @@ the chain's checks in the wasm, the proofs):
   the hole's id: a starter cannot ship one), with **three short hints, dismissible at once** ("Got it"), never a
   tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press Test
   it to play your hole" (at the big button), ③ "Then Publish, once holed in
-  every weather" (at the steps). They show on the first visit only.
+  every weather" (at the steps). They show on the first visit only, and
+  never over the 3D. The header's "?" shows them again in one panel with,
+  under them, a one-screen glossary of the world's pieces: each palette
+  tile's picture, its name and what it does.
 - **The next step is always one big button**, top right: "Test it" (gold),
   then "Publish →" (blue). When it waits, the reason sits beside it in a few
   words ("1 thing to fix ↓") and, in full, in the player's words under the
@@ -324,7 +327,9 @@ the chain's checks in the wasm, the proofs):
 
 ### B2. One header, three steps
 
-Back (the draft is saved), the hole's name (editable, suggested), its
+Back (the draft is saved), the hole's name (editable, suggested; in Edit a
+die beside it rolls a playful name from the world's own words, "Mossy Snail
+Trail", the same for a draft and a roll, another at each roll), its
 address under it, in Edit the world's menu ("Garden ▾": the four classic
 worlds; "Start again from a starter" may come later), the steps Edit → Test → Publish
 (done ✓, current, or 🔒 with its reason on hover), undo and redo, the big
@@ -345,12 +350,22 @@ near, proved, world; at 1440, 1280 and 1024.
   name and what it does in two or three words ("slows the ball"); its looks
   (Lagoon, Tidepool, Fountain, Canal) in a chooser by the tile, each
   pictured. Under "More pieces", by group: Walls, Obstacles, Ground, Traps,
-  Moving pieces.
+  Moving pieces. A piece is called by its tile's name everywhere, its look
+  before it when it has one: the board's label, the inspector and every
+  sentence of the checks say "the wall", "the lagoon water", "the rock
+  obstacle" (never "the plain rail").
 - **The board** (centre): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last
   valid place; a handle stops at its range. The wheel and the pinch zoom it,
-  never the page.
+  never the page. The ghost's words sit by the pointer, and a refusal is said
+  there once (a small shake). The game's own sounds, quiet: a tick to pick a
+  piece, a soft creak each grid step, a knock and a 120 ms pop on a drop, a
+  thud on a refusal. The keys, said in the board's key line and the glossary: 1–5
+  pick the palette's first five pieces (each tile's look as chosen), R
+  turns, ⌫ deletes, ⌘Z undoes, Space held makes a drag pan, F frames the
+  whole hole, T goes to Test, Escape drops the piece in hand or leaves Test
+  (not while aiming: there it drops the aim, the game's).
 - **The right**: the hole in 3D, in sync; the selected piece only: its name,
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
   sliders: size, bounce, timing). Nothing selected: "Click a piece to change
@@ -359,6 +374,14 @@ near, proved, world; at 1440, 1280 and 1024.
   or the one thing to fix, in words, with "Show me"; a limit appears only
   when near ("Bumpers and posts: 27 of 32 · room for 5 more"), amber; the
   full gauges are the hole-builder spec's, behind the limit's tap.
+- **Proofs over an edit**: an edit changes the hole, so each weather's
+  round is replayed whole on the new bytes, in the editor's worker (the
+  meter's); a weather whose round still holes in its strokes stays proved,
+  the others are said in the checks' line, amber ("Your Wind round now stops
+  short · Clear and Rain still holed"), and a toast over the board says it
+  once ("This drops your Wind proof · ⌘Z keeps it"). Test then opens on the
+  first weather not proved. Only the author's own rounds are replayed: the
+  solver never makes a proof.
 
 ### B4. Test
 
@@ -368,14 +391,18 @@ address the hole is proved under (its proofs are bound to it): with Adena,
 takes the window under the header; the weathers to beat as chips that tick when holed (☀
 Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –", then the suggested par;
 a round that does not count says why in one line. The big button: "Back to
-edit", then "Publish →". The next weather starts by itself.
+edit", then "Publish →". The next weather starts by itself. Each weather
+proved plays the cup's sound; the last one gets a small celebration: the
+chips fill one by one, a little confetti, a chime, and "Publish →" pulses
+three times (no motion with reduced motion).
 
 ### B5. Publish
 
 `builder-publish.html`: form, refused, newer, closed, pending, done. The
 hole as players will see it; the form: the name, suggested ("Suggested from
 the world and the starter: change it if you like."), the address ("From the
-name, at the first test"), a line for players (optional), the cost before
+name, at the first test"), the par explained by the rounds that proved it
+("Holed in 2 everywhere · par 3 leaves room"), a line for players (optional), the cost before
 signing (storage deposit, network fee, "At most 1.20 GNOT", "Nothing goes to
 the game"), gnokey behind a tap, the pinned blue "Publish in Adena · 1.20
 GNOT". Done: the hole's card, "Play it for real: your best becomes the ghost

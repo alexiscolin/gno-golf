@@ -13,27 +13,30 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type PaletteEntry } from "@/lib/builder/palette";
 import { lookName, pictureOf, tilesOf, type Tile } from "@/lib/builder/tiles";
 import { worldName } from "@/lib/builder/rules";
+import { sound } from "@/lib/feel";
 
 /** A look's picture: a file, its place kept (no shift as it loads). */
 const Picture = ({ world, e, px }: { world: string; e: PaletteEntry; px: number }) => (
   <img src={pictureOf(world, e)} width={px} height={px} alt="" draggable={false} decoding="async" />
 );
 
-export default function Palette({ world, palette, armed, off, onArm }: {
+export default function Palette({ world, palette, armed, off, onArm, chosen, onChoose }: {
   world: string;
   palette: readonly PaletteEntry[];
   armed: PaletteEntry | null;
   /** entries a limit switches off, with why */
   off: ReadonlyMap<string, string>;
   onArm: (e: PaletteEntry | null) => void;
+  /** each tile's look as chosen (its first until then), the editor's (its keys arm it too) */
+  chosen: Readonly<Record<string, string>>;
+  onChoose: (tile: string, entry: string) => void;
 }) {
   const name = worldName(world), { first, more } = tilesOf(palette);
-  // each tile's look as chosen (its first until then), and the tile whose looks are open
-  // (another world loads its own palette: the editor mounts a new one, chosen afresh)
-  const [chosen, setChosen] = useState<Record<string, string>>({});
+  // the tile whose looks are open
   const [open, setOpen] = useState<{ tile: Tile; from: HTMLElement } | null>(null);
   const lookOf = (t: Tile) => t.looks.find((e) => e.id === chosen[t.key]) ?? t.looks[0];
-  const arm = (e: PaletteEntry) => onArm(armed?.id === e.id ? null : e);
+  // picked up: the game's wooden tick (put back: nothing)
+  const arm = (e: PaletteEntry) => (armed?.id !== e.id && sound("select"), onArm(armed?.id === e.id ? null : e));
 
   const tile = (t: Tile, big = false) => {
     const e = lookOf(t), why = off.get(e.id), on = !!armed && t.looks.some((x) => x.id === armed.id);
@@ -72,7 +75,7 @@ export default function Palette({ world, palette, armed, off, onArm }: {
       <div className="palette__bin" data-bin aria-hidden="true">Drop a piece here to remove it</div>
       {open && (
         <Looks world={world} tile={open.tile} from={open.from} now={lookOf(open.tile)} off={off} onClose={() => setOpen(null)}
-          onPick={(e) => (setChosen((c) => ({ ...c, [open.tile.key]: e.id })), onArm(e))} />
+          onPick={(e) => (onChoose(open.tile.key, e.id), sound("select"), onArm(e))} />
       )}
     </aside>
   );

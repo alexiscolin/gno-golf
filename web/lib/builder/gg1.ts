@@ -103,11 +103,6 @@ export function entryParts(id: string): { world: string; kind: string; skin: str
   return { world, kind, skin: skin.join("/") };
 }
 
-/** A piece's name in a sentence: "the plank bar", "the plain rail". */
-export const pieceName = (p: Piece) => {
-  const { kind, skin } = entryParts(p.entry);
-  return `the ${skin || "plain"} ${kind}`;
-};
 
 /** A hole's piece as a key: "wall4", "post0", "zone2p1" (the census's). */
 export const keyOf = (r: PieceRef) => `${r.set}${r.i}${r.pulse ?? ""}`;

@@ -123,12 +123,38 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "three hints");
   assert.equal(await c.js(`document.querySelector(".bhead__hole input").value`), "Garden Dogleg", "on the Garden's dogleg");
   assert.equal(await c.js(`document.activeElement?.textContent`), "Got it");
+  // the hints leave the 3D in sight: none of them, nor Got it, over the preview
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".col .preview")`)); k++) await sleep(300);
+  const preview = await box(c, ".col .preview");
+  assert.ok(preview, "the 3D's place");
+  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
+    assert.ok(!overlap(part, preview), `hint ${i + 1} covers the 3D preview`);
+  }
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "the first run: three hints, no glossary");
   await c.js(`document.querySelector(".bhint__ok").click()`);
   await sleep(300);
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 0, "gone with Got it");
   await c.send("Page.reload");
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(500);
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 0, "never again: the drafts screen, the dogleg kept");
+  // "?": the three hints again and, under them, one screen of the world's pieces (each tile's picture, name, what it does), the keys
+  await c.js(`document.querySelector(".bholes__starts button").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector(".checks .gauge")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bhead [aria-label^='How it works']").click()`);
+  await sleep(500);
+  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "?: the three hints");
+  const tiles = await c.js<number>(`document.querySelectorAll(".palette [data-tile]").length`);
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss__piece").length`), tiles, "?: a line for each tile of the palette");
+  assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".bgloss__piece")].every((e) => e.querySelector("img") && e.querySelector("b").textContent && e.querySelector("small").textContent)`), "each: its picture, its name, what it does");
+  const g = (await box(c, ".bgloss"))!;
+  assert.ok(g.t >= 0 && g.b <= 800 && g.l >= 0 && g.r <= 1280, `the glossary on one screen: ${JSON.stringify(g)}`);
+  assert.ok(await c.js<boolean>(`(() => { const e = document.querySelector(".bgloss"); return e.scrollHeight <= e.clientHeight + 1; })()`), "the glossary on one screen, not scrolled");
+  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok, .bgloss")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
+    assert.ok(!overlap(part, (await box(c, ".col .preview"))!), `help part ${i + 1} covers the 3D preview`);
+  }
+  await c.js(`document.querySelector(".bhint__ok").click()`);
+  await sleep(300);
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss, .bhint").length`), 0, "gone with Got it");
   console.log("first run: ok");
   c.kill();
 }
@@ -157,17 +183,17 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 // a piece deleted from the Inspector: the focus on the board, not lost; a draft deleted: the game's sheet, Escape keeps it
 {
   const c = await editor(1280, 800);
-  // the straight starter (its posts): from the drafts screen
+  // the straight starter (its obstacles): from the drafts screen
   await c.js(`document.querySelector(".bhead .round--icon").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
   await c.js(`document.querySelector(".bholes__starts button").click()`);
-  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece][aria-label*=' post at ']")`)); k++) await sleep(300);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece][aria-label*=' obstacle at ']")`)); k++) await sleep(300);
   await sleep(800);
   const key = async (key: string, code = key) => {
     await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code });
     await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });
   };
-  await c.js(`[...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))).focus()`);
+  await c.js(`[...document.querySelectorAll("[data-piece]")].find((g) => / obstacle at /.test(g.getAttribute("aria-label"))).focus()`);
   await sleep(600);
   const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
   assert.equal(await c.js(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`), 0, "a piece selected: no number to type until Details is opened");
@@ -182,7 +208,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   // a post dragged from the board onto the palette's bin: removed
   const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
   const centre = (sel: string) => c.js<[number, number]>(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-  const post = await c.js<[number, number]>(`(() => { const g = [...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const post = await c.js<[number, number]>(`(() => { const g = [...document.querySelectorAll("[data-piece]")].find((g) => / obstacle at /.test(g.getAttribute("aria-label"))); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const bin = await centre("[data-bin]");
   await mouse("mousePressed", ...post);
   for (let k = 1; k <= 6; k++) {
@@ -192,6 +218,25 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await mouse("mouseReleased", ...bin);
   await sleep(1200);
   assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 2, "a post dropped on the bin is removed");
+  // the cup taken by its flag, the tee by its edge: each moved, the board not panned (a hit area bigger than the drawing)
+  const at = (sel: string) => c.js<[number, number]>(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return [+e.getAttribute("cx"), +e.getAttribute("cy")]; })()`);
+  const onScreen = (sel: string) => c.js<[number, number]>(`(() => { const svg = document.querySelector(".board__map"), e = document.querySelector(${JSON.stringify(sel)}); const p = svg.createSVGPoint(); p.x = +e.getAttribute("cx"); p.y = +e.getAttribute("cy"); const s = p.matrixTransform(svg.getScreenCTM()); return [s.x, s.y]; })()`);
+  const drag = async (from: [number, number], dx: number) => {
+    await mouse("mousePressed", ...from);
+    for (let k = 1; k <= 6; k++) {
+      await mouse("mouseMoved", from[0] + (dx * k) / 6, from[1]);
+      await sleep(40);
+    }
+    await mouse("mouseReleased", from[0] + dx, from[1]);
+    await sleep(1000);
+  };
+  const k = await c.js<number>(`document.querySelector(".board__map").getScreenCTM().a`); // (px a unit)
+  for (const [what, sel, grip] of [["the cup, by its flag", "[data-end='pin'] circle", (p: [number, number]): [number, number] => [p[0] + 0.35 * k, p[1] - 0.95 * k]], ["the tee, by its edge", "[data-end='tee'] circle", (p: [number, number]): [number, number] => [p[0] + 0.8 * k, p[1] + 0.3 * k]]] as const) {
+    const was = await at(sel), other = await onScreen(sel === "[data-end='tee'] circle" ? "[data-end='pin'] circle" : "[data-end='tee'] circle");
+    await drag(grip(await onScreen(sel)), -1.5 * k);
+    assert.notDeepEqual(await at(sel), was, `${what}: moved`);
+    assert.deepEqual(await onScreen(sel === "[data-end='tee'] circle" ? "[data-end='pin'] circle" : "[data-end='tee'] circle"), other, `${what}: the board not panned`);
+  }
   await c.js(`document.querySelector(".bhead .round--icon").click()`); // back to the drafts
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(300);
   const drafts = await c.js<number>(`document.querySelectorAll(".bholes__list li").length`);
@@ -204,6 +249,66 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelectorAll(".bholes__list li").length`), drafts, "and keeps the draft");
   assert.match(await c.js<string>(`document.activeElement?.textContent || ""`), /Delete/, "the focus back on the row's Delete");
   console.log("delete: ok");
+  c.kill();
+}
+// the keys: 1 to 5 pick the palette's first five, Space and a drag pan (a piece under it too), F frames the hole,
+// T goes to Test, Escape comes back; the board's key line says them
+{
+  const c = await editor(1280, 800);
+  const key = async (key: string, code: string, type: "both" | "down" | "up" = "both") => {
+    if (type !== "up") await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code, ...(key.length === 1 && { text: key }) });
+    if (type !== "down") await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });
+    await sleep(150);
+  };
+  const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+  await c.js(`document.querySelector(".board").focus()`);
+  await key("2", "Digit2");
+  assert.equal(await c.js(`document.querySelector(".palette .piece--on .piece__name")?.textContent`), "Bumper", "2: the second piece, armed");
+  await key("Escape", "Escape");
+  const keys = await c.js<string>(`document.querySelector(".board__keys").textContent`);
+  for (const k of ["1–5", "Space", "F", "T"]) assert.ok(keys.includes(k), `the key line says ${k}: ${keys}`);
+  // Space held, a drag over a piece pans (the piece stays)
+  const tee = () => c.js<[number, number]>(`(() => { const r = document.querySelector("[data-end='tee'] circle").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const piece = await c.js<[number, number]>(`(() => { const r = document.querySelector("[data-piece]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const pieceAt = () => c.js<string>(`document.querySelector("[data-piece]").getAttribute("aria-label")`);
+  const was = await tee(), label = await pieceAt();
+  await key(" ", "Space", "down");
+  await mouse("mousePressed", ...piece);
+  for (let k = 1; k <= 5; k++) {
+    await mouse("mouseMoved", piece[0] + 12 * k, piece[1] + 8 * k);
+    await sleep(30);
+  }
+  await mouse("mouseReleased", piece[0] + 60, piece[1] + 40);
+  await key(" ", "Space", "up");
+  await sleep(300);
+  const now = await tee();
+  assert.ok(Math.abs(now[0] - was[0] - 60) < 2 && Math.abs(now[1] - was[1] - 40) < 2, `Space and a drag: the board panned (${was.join()} → ${now.join()})`);
+  assert.equal(await pieceAt(), label, "the piece under it not moved");
+  // F: framed again (the tee back where the first framing had it)
+  await key("f", "KeyF");
+  await sleep(300);
+  const back = await tee();
+  assert.ok(Math.abs(back[0] - was[0]) < 2 && Math.abs(back[1] - was[1]) < 2, `F frames the hole (${was.join()} → ${back.join()})`);
+  // the die by the name: a name suggested, another at each roll, the slug following it (not yet proved)
+  const name = () => c.js<string>(`document.querySelector(".bhead__name input").value`);
+  const before = await name();
+  await c.js(`document.querySelector(".bhead__roll").click()`);
+  await sleep(200);
+  const first = await name();
+  await c.js(`document.querySelector(".bhead__roll").click()`);
+  await sleep(200);
+  const second = await name();
+  assert.ok(first !== before && second !== first && /^[A-Z][a-z]+ [A-Z]/.test(first) && first.length <= 40, `the die: ${before} → ${first} → ${second}`);
+  assert.equal(await c.js(`document.querySelector(".bhead__slug").value`), second.toLowerCase().replace(/[^a-z0-9]+/g, "-"), "the slug follows the name");
+  // T: to Test; Escape: back to the editor
+  for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
+  await key("t", "KeyT");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tmode")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tmode")`), "T: to Test");
+  await key("Escape", "Escape");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".board__map")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".board__map")`), "Escape: back from Test to the editor");
+  console.log("keys: ok");
   c.kill();
 }
 console.log("builderui: all ok");

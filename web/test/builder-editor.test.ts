@@ -28,6 +28,13 @@ void test("verdict: what to fix first, then ready to test, then proved", () => {
   assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Give it a short name first" }), { ok: false, text: "Give it a short name first" });
   assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, off: "Checking…" }), { ok: true, text: "Ready to test: press Test it." }, "a check under way changes nothing said");
   assert.deepEqual(verdict({ pieces: 3, errors: 2, proved: false, off: "Fix 2 first" }), { ok: false, text: "2 things to fix" });
+  // proofs over an edit: the rounds that broke said, the weathers still holed after them, ready to test again
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, rounds: { kept: ["", "rain"], broken: ["Your Wind round now stops short"] } }),
+    { ok: true, warn: true, text: "Your Wind round now stops short · Clear and Rain still holed" });
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: false, rounds: { kept: [], broken: ["Your Clear round now stops short", "Your Wind round now stops short"] } }),
+    { ok: true, warn: true, text: "Your Clear round now stops short · and 1 more" });
+  assert.deepEqual(verdict({ pieces: 3, errors: 0, proved: true, rounds: { kept: ["", "wind", "rain"], broken: [] } }), { ok: true, text: "Holed in every weather: press Publish." });
+  assert.deepEqual(verdict({ pieces: 3, errors: 1, proved: false, rounds: { kept: [], broken: ["Your Wind round now stops short"] } }), { ok: false, text: "1 thing to fix" }, "a thing to fix first");
   void err;
 });
 

@@ -108,7 +108,7 @@ void test("a release or a copy asks a bounded number of checks: a long drag onto
 
 void test("the keyboard: a piece named for a screen reader by what and where it is; the armed piece dropped at the nearest place to a point that holds", () => {
   const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
-  assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock post at (13.5, 6.5)");
+  assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock obstacle at (13.5, 6.5)");
   const at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
   const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden, census: ctx.census });
   assert.ok(placed && placed.draft.pieces.length === d.pieces.length + 1, "placed");
@@ -223,4 +223,15 @@ void test("a session: a drag previews as it goes and is one step of history once
   assert.equal(s.now(), b, "a drag let go off the board: nothing");
   s.set(a);
   assert.equal(s.undo(), b, "a click's edit: one step");
+});
+
+void test("a session: proofs carried over an edit amend the step it is, never one of their own", () => {
+  const d = lane("garden", []), s = makeSession(d);
+  const a = { ...d, pieces: [...d.pieces, rail("x", [10, 2], [10, 4])] };
+  s.set(a);
+  const carried = { ...a, proofs: [{ key: "k", id: "x", kind: "", period: 1, shots: ["0,1"], commits: [[0, 1]] as [number, number][], strokes: 1, maxWork: 1 }] };
+  s.amend(carried);
+  assert.equal(s.kept(), carried);
+  assert.equal(s.undo(), d, "one undo: back before the edit, its carried proofs with it");
+  assert.equal(s.redo(), carried, "redo: the edit, its proofs carried");
 });

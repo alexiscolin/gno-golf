@@ -18,7 +18,7 @@ import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { makeChain, wait } from "@/lib/chain";
 import { explain } from "@/lib/builder/explain";
 import { endpoints, playLink } from "@/lib/builder/holes";
-import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, publishSteps, type Readings } from "@/lib/builder/publish";
+import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishSteps, type Readings } from "@/lib/builder/publish";
 import { census } from "@/lib/builder/drawn";
 import { loadPalette } from "@/lib/builder/palette";
 import { proofKey, provedAs, shaOf } from "@/lib/builder/proof";
@@ -71,6 +71,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const cost: Cost | null = checked.ok ? checked.cost : null;
   const nameWhy = checked.ok ? "" : explain(checked.why);
   const proved = key ? provedAs(draft.proofs, draft.world, key, author, draft.slug) : null;
+  const par = proved ? parLine(draft.proofs.filter((p) => p.key === key && p.id === proved), draft.par) : "";
 
   // the chain's state (read again on "Try again": a read that fails is said, never waited on); the proofs on the final data, and its sha, as it changes
   const [tries, setTries] = useState(0);
@@ -177,6 +178,8 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
             {name !== draft.title && <small>Kept as: {name}</small>}
           </label>
           <div className="pub__field"><span>Address</span><code>{id || `${alias}/v…`}</code><small>Fixed at the test: the weather comes from it.</small></div>
+          {/* the par, explained by the rounds that proved it */}
+          {par && <div className="pub__field"><span>Par</span><code>{draft.par}</code><small>{par}</small></div>}
           <label className="pub__field">
             <span>A line for players <em>{[...draft.note].length}/{MAX_NOTE}</em></span>
             <textarea value={draft.note} rows={2} aria-invalid={step.at === "name"} onChange={(e) => onDraft({ ...draft, note: [...e.target.value.replace(/\n/g, " ")].slice(0, MAX_NOTE).join("") })} disabled={!!sent} />
