@@ -28,7 +28,7 @@ export type Height = (x: number, z: number) => number;
 /** A function of the scene's time in seconds, run each frame. */
 export type Tick = (time: number) => void;
 /** A canopy fading what stands between the eye and the ball. */
-export type Fade = (eye: THREE.Vector3, ball: THREE.Vector3) => void;
+export type Fade = (eye: THREE.Vector3, ball: THREE.Vector3, cup?: THREE.Vector3 | null) => void;
 /** A decor dressed for the weather (see weatherLooks). */
 export type Dress = (w: WeatherNow | null) => void;
 
