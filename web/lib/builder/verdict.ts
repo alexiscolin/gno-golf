@@ -7,7 +7,7 @@
 // palette's, every rule passed (E1 to E15, the render census), and its bytes
 // exactly the ones the Builder writes for it (importing.ts asDraft).
 import { asDraft } from "./importing";
-import { MAX_BYTES, type ValidateOptions } from "./pipeline";
+import { MAX_BYTES, type Census } from "./pipeline";
 import type { BuilderHost } from "./wasm";
 import { NOT_BUILDER } from "../community";
 
@@ -17,7 +17,7 @@ export type Verdict = { ok: true } | { ok: false; why: string };
 const no = (why: string): Verdict => ({ ok: false, why: `${NOT_BUILDER} ${why}` });
 
 /** The Builder's verdict on a published hole's data (hex, as HoleData gives it); census: the render census (E12), as the editor runs it. */
-export async function judge(hex: string, host: BuilderHost, census?: ValidateOptions["census"]): Promise<Verdict> {
+export async function judge(hex: string, host: BuilderHost, census: Census): Promise<Verdict> {
   // nothing too big or not hex reaches the decoder
   if (!/^(?:[0-9a-f]{2})+$/.test(hex) || hex.length / 2 > MAX_BYTES) return no("Its data is not a hole's.");
   try {

@@ -158,6 +158,13 @@ const SOUNDS = {
     notes.forEach((f, i) => tone(a, { type: "triangle", f0: f, at: 0.25 + i * 0.1, dur: i === notes.length - 1 ? 0.5 : 0.16, gain: 0.11 }));
     tone(a, { type: "sine", f0: notes[0] / 2, at: 0.25, dur: 0.7, gain: 0.07 });
   },
+  // the Builder: a piece placed, a soft round plop (n: its step up a major scale as placements chain, an
+  // octave a lap); n below 0, a piece taken away: the same plop falling
+  plop: (a, n = 0) => {
+    const up = Math.max(0, Math.round(n)), f = 392 * 2 ** ([0, 2, 4, 5, 7, 9, 11][up % 7] / 12 + Math.min(1, Math.floor(up / 7)));
+    tone(a, { type: "sine", f0: n < 0 ? f : f * 1.5, f1: n < 0 ? f * 0.55 : f, dur: 0.1, gain: 0.13 });
+    noise(a, { dur: 0.03, f0: 1800, q: 2, gain: 0.05 });
+  },
   // the menus: a wooden tick to choose, a blip to flick through, a chime to go
   select: (a) => (tone(a, { type: "triangle", f0: 660, f1: 520, dur: 0.07, gain: 0.12 }), noise(a, { dur: 0.03, f0: 2600, q: 3, gain: 0.08 })),
   blip: (a) => tone(a, { type: "sine", f0: 880, f1: 990, dur: 0.05, gain: 0.08 }),

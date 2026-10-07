@@ -301,13 +301,13 @@ the chain's checks in the wasm, the proofs):
   classic world (the Garden's dogleg, par 3), a playable hole that passes
   every check, **not yet holed** (a proof is bound to its author's address and
   the hole's id: a starter cannot ship one), with **three short hints, dismissible at once** ("Got it"), never a
-  tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press Test
-  it to play your hole" (at the big button), ③ "Then Publish, once holed in
+  tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press T to
+  try it, Prove it to make it count" (at the big button), ③ "Then Publish, once holed in
   every weather" (at the steps). They show on the first visit only, and
   never over the 3D. The header's "?" shows them again in one panel with,
   under them, a one-screen glossary of the world's pieces: each palette
   tile's picture, its name and what it does.
-- **The next step is always one big button**, top right: "Test it" (gold),
+- **The next step is always one big button**, top right: "Prove it" (gold),
   then "Publish →" (blue). When it waits, the reason sits beside it in a few
   words ("1 thing to fix ↓") and, in full, in the player's words under the
   board.
@@ -348,13 +348,59 @@ near, proved, world; at 1440, 1280 and 1024.
   piece by what it does (Water: every pond; Slope: every hill), with the
   game's own picture of it (rendered offline from the game's meshes), its
   name and what it does in two or three words ("slows the ball"); its looks
-  (Lagoon, Tidepool, Fountain, Canal) in a chooser by the tile, each
+  (Lagoon, Tide pool, Fountain, Canal) in a chooser by the tile, each
   pictured. Under "More pieces", by group: Walls, Obstacles, Ground, Traps,
-  Moving pieces. A piece is called by its tile's name everywhere, its look
-  before it when it has one: the board's label, the inspector and every
-  sentence of the checks say "the wall", "the lagoon water", "the rock
-  obstacle" (never "the plain rail").
-- **The board** (centre): the hole from above on its snapping grid; a piece
+  Moving pieces. Every piece has one name of its own, the same in every
+  world it is in and unique there: its look's ("Lagoon", "Wet sand",
+  "Flowerbed", "Blinking hand": drawn as a clock's hand, it blinks, never sweeps), the plain forms named as they are drawn
+  ("Pipe", "Mushroom", "Pond"), a skin two kinds share named apart
+  ("Driftwood log", "Driftwood post"). The board's label, the inspector, the
+  looks, the glossary, the toasts and every sentence of the checks say it:
+  "the wall", "the lagoon", "the rock" (never "the plain rail", never "the
+  rock obstacle").
+- **The board in 3D** (centre): the game's own scene of the hole as checked
+  (`buildHole` on the pipeline's HoleState: what will be published: the
+  turf's mowing stripes, the world's rails, bumpers, water, timed pieces
+  moving), seen by an orthographic camera straight down; V tilts it 16°
+  (heights and shadows, the tee and the cup still in sight), Q turns it a
+  quarter (⇧Q back), never a free orbit. It only shows: a light overlay picks
+  and edits on the ground grid as the 2D board did, in the same map, and
+  draws only the selection, the handles, the ghost, the measurements, the
+  tee and the cup as upright badges, and a piece the scene does not show yet
+  (dragged, or dropped before the hole is built again). The same pointer
+  edits make the same drafts, byte for byte, flat, turned or tilted
+  (`web/test/builder-gesture.test.ts`). Drawn on demand: the hole is built
+  again when the checked hole changes, never as the pointer moves; while
+  the pointer is about, the water (with motion allowed) and the timed pieces
+  (on the game's clock) move, and idle the loop stops. One canvas and one
+  WebGL context for the page (`lib/builder/stage.ts`), lent to Test. No
+  WebGL: the 2D board below, as it was. Its feel, in the order the research
+  ranked it:
+  - the ghost green where it may go, red with the reason by the pointer
+    where not (red is for that alone);
+  - a piece placed pops in (0, 1.15, 1 over 150 ms) and stirs what it lands
+    on; a piece taken away shrinks into a puff;
+  - a soft plop climbs a major scale as placements chain (within 1.5 s), and
+    falls for a piece taken away; a soft tick each grid step;
+  - the grid only by the pointer, fading out over four units;
+  - T tests in place;
+  - the last quick test's holing round stays on the board as a dotted trail,
+    played again as the hole changes;
+  - water ripples and sand puffs under a piece landing;
+  - a dragged piece leans a little toward where it goes (never a shake), and
+    a piece hovered lifts on a soft shadow.
+  None of it moves with reduced motion; no animation delays an edit (the
+  edit is made, the motion decorates it).
+  Its budget is enforced by `scripts/builderbench.ts` (headless Chrome,
+  1440 × 900):
+  - 60 fps while the pointer sweeps the board, the scene drawn each frame;
+  - a frame's main-thread work within 33 ms with the CPU four times slower;
+  - the hole never built during a drag, and once after the drop;
+  - idle, no frame asked for and next to no CPU;
+  - one WebGL context after a quick test and Prove;
+  - without WebGL, the 2D board.
+  Measured: 60 fps; 0.8 ms of work a frame, 1.6 ms at 4×.
+- **The board** (2D, the fallback): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last
   valid place; a handle stops at its range. The wheel and the pinch zoom it,
@@ -364,13 +410,31 @@ near, proved, world; at 1440, 1280 and 1024.
   thud on a refusal. The keys, said in the board's key line and the glossary: 1–5
   pick the palette's first five pieces (each tile's look as chosen), R
   turns, ⌫ deletes, ⌘Z undoes, Space held makes a drag pan, F frames the
-  whole hole, T goes to Test, Escape drops the piece in hand or leaves Test
+  whole hole, V tilts and Q turns the 3D board, T plays a quick test, Escape drops the piece in hand or leaves Test
   (not while aiming: there it drops the aim, the game's).
-- **The right**: the hole in 3D, in sync; the selected piece only: its name,
+- **The ball in Edit**: Shift and a pull on the board plays a quick shot, as
+  the game's slingshot pulls one (the ball flies away from the pull), from
+  the tee, or from where the last one stopped when the pull starts on its
+  ball; in calm weather, by `builder.wasm`'s `round` and `from` (the
+  realm's own physics). Its path is drawn, white, the last three faded, and
+  the pull under way dashed; as a piece is dragged, they all play again on
+  the hole as it is. The board says "Quick shot: not a proof" (a quick shot
+  is never kept with the draft, never replayed into a proof: Test proves).
+  "Show the line" (top right of the board) draws the difficulty meter's best
+  line, gold, and a light heat map of where its shots stopped; only on the
+  hole the meter measured, never during a drag. Escape clears the quick
+  shots.
+- **The right**: the selected piece only: its name,
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
-  sliders: size, bounce, timing). Nothing selected: "Click a piece to change
+  sliders: size, bounce). A timed piece's timing in words under it:
+  Always · In a stroke · Strokes; for one that blinks, "Blinks: Slow ·
+  Medium · Fast" (80, 40, 20 substeps: about 5.8, 2.9, 1.4 s) and "Open:
+  Most · Half · Little" of the time; its cycle as a strip whose step now is
+  outlined as it plays, with play/pause (the board's timed pieces pause with
+  it; selected and playing, the board keeps them moving); the numbers
+  (Every, On, From) under "Fine". Loops are not offered yet. Nothing selected: "Click a piece to change
   it. Drag its handles to size and turn it."
-- **The checks** (one line under the board): "Ready to test: press Test it."
+- **The checks** (one line under the board): "Ready: press T to try it, or Prove it."
   or the one thing to fix, in words, with "Show me"; a limit appears only
   when near ("Bumpers and posts: 27 of 32 · room for 5 more"), amber; the
   full gauges are the hole-builder spec's, behind the limit's tap.
@@ -383,18 +447,35 @@ near, proved, world; at 1440, 1280 and 1024.
   first weather not proved. Only the author's own rounds are replayed: the
   solver never makes a proof.
 
-### B4. Test
+### B4. Quick test and Prove
 
-`builder-test.html`: address, playing, proved, missed. First, once, the
-address the hole is proved under (its proofs are bound to it): with Adena,
-"Connect"; without, one field and "Test with this address". Then the game
-takes the window under the header; the weathers to beat as chips that tick when holed (☀
-Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –", then the suggested par;
-a round that does not count says why in one line. The big button: "Back to
-edit", then "Publish →". The next weather starts by itself. Each weather
-proved plays the cup's sound; the last one gets a small celebration: the
-chips fill one by one, a little confetti, a chime, and "Publish →" pulses
-three times (no motion with reduced motion).
+Two ways to play the hole, and only one counts.
+
+- **Quick test** (T, or "Quick test" on the board): the game, at once, over
+  the editor, in calm weather only; no address asked, nothing replayed,
+  nothing proved ("Quick test: calm weather, not a proof. Prove it to
+  publish."). Escape, or "Back to edit", returns to the editor as it was
+  left: the same zoom, selection, history and quick shots.
+- **Prove it** (the big button; the steps say Edit → Prove → Publish):
+  `builder-test.html`: address, playing, proved, missed. First, once, the
+  address the hole is proved under, Prove's alone: "Sign your hole", "Your
+  address is part of its name and sets its weather, so your proofs still
+  count when you publish. Nothing is signed now.", the primary "Use my Adena
+  address" (without Adena, one line: "No Adena here: get it at adena.app,
+  then come back."), and "Or paste an address (g1…)", which shows the field
+  and "Use this address". Then the game takes the window under the header,
+  on the first weather not proved (those proved already were replayed by the
+  editor, B3); the weathers to beat as chips that tick when holed, each with
+  its time in play (☀ Clear ✓ 3 0:14.2 · ≋ Wind ✓ 4 0:21.0 · ☂ Rain, now
+  0:05.3) and "Par –", then the suggested par; a round that does not count
+  says why in one line. The big button: "Back to edit", then "Publish →". The
+  next weather starts by itself. Each weather proved plays the cup's sound;
+  the last one gets a small celebration: the chips fill one by one, a little
+  confetti, a chime, and "Publish →" pulses three times (no motion with
+  reduced motion).
+- **In play**, either way: R or Backspace plays again from the tee, V swaps
+  the overview camera and back, Escape goes back to Edit (while aiming, it
+  drops the aim: the game's).
 
 ### B5. Publish
 
@@ -413,7 +494,7 @@ dare".
 
 A scripted headless walkthrough (`scripts/builderwalk.ts`, on the repo's
 headless Chrome, `media/lib/cdp.mjs`) plays a new player: open `/build`; "Got it"; drag a Bumper onto the starter, off the
-ball's line; "Test it"; hole each weather with the starter's committed shots
+ball's line; "Prove it"; paste the address; hole each weather with the starter's committed shots
 (the starter's proofs are its shot lists; the bumper is placed off their
 path); "Publish →"; stop on the form with the suggested name, ready to sign.
 Test mode needs no chain (`builder.wasm` answers it). The Publish form reads
@@ -428,15 +509,15 @@ it.
 | Open `/build` (the starter, the hints) | 0 | 0 |
 | "Got it" | 1 | 0 |
 | A Bumper onto the board | 0 | 1 |
-| "Test it" | 1 | 0 |
-| The address the hole is proved under (one field typed and "Test with this address"; with Adena, "Connect" instead) | 1 | 0 |
+| "Prove it" | 1 | 0 |
+| The address the hole is proved under ("Or paste an address", one field typed and "Use this address"; with Adena, "Use my Adena address" instead) | 2 | 0 |
 | Clear, wind, rain holed (about 2 shots each; the next weather starts by itself) | 0 | 6 |
 | "Publish →", the form ready (name suggested) | 1 | 0 |
-| **Starter path to a proved, publish-ready hole** | **4** | **7** |
+| **Starter path to a proved, publish-ready hole** | **5** | **7** |
 
-Measured on the implementation (`scripts/builderwalk.ts`): 16 s, 4 clicks,
+Measured on the implementation (`scripts/builderwalk.ts`): 16 s, 5 clicks,
 7 drags, 1 field typed. Past the path, the script also checks that the
-Publish card stays in sight at 1366 × 650 and that the Publish header's Test
+Publish card stays in sight at 1366 × 650 and that the Publish header's Prove
 step returns to the test.
 
 ### B7. Your holes, the community's
@@ -448,7 +529,11 @@ Cards on one grid: the map, the name (one line), one line of facts ("Garden ·
 par 5 · 23 players", "by nym-pebble77 · Mountain · par 4"), one button
 ("Play", "Race the author" with "✓ Holed by its author" beside it when the
 chain says so, "Open" for a draft) and "Edit" as a link on the player's own.
-Empty: "No hole of yours yet" · Draw a hole.
+Empty: "No hole of yours yet" · Draw a hole. Folded under the list, "Open
+a file, or a published hole": either opens only as the editor would let it
+be made, its world's pieces and every check passed, the render census too;
+else one line says why ("This draft breaks the Builder's rules: The cup is
+inside the bumper: move the cup or the bumper.").
 
 ### B8. On a phone
 

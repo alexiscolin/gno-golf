@@ -13,7 +13,7 @@ import { BOARD, LIMITS, MARGIN, barCorners, frame, keyOf, piecesBy, writeDraft }
 import { pieceName } from "./names";
 import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
-import { cap, FIELD } from "./rules";
+import { cap, FIELD, pt } from "./rules";
 import { builderLimits } from "./limits";
 import type { Draft, Piece, V } from "./draft";
 import type { BuilderHost, Cost } from "./wasm";
@@ -34,6 +34,8 @@ export interface ValidateOptions {
   /** the share of a work limit past which E11 warns */
   warnAt?: number;
 }
+/** The render census as an opened hole is always judged with (drawn.ts census). */
+export type Census = NonNullable<ValidateOptions["census"]>;
 export interface Validated {
   issues: Issue[];
   /** the canonical bytes, once fitted */
@@ -48,7 +50,6 @@ export interface Validated {
 /** The realm's maxData: a version's data at most. */
 export const MAX_BYTES = 32 << 10;
 const ACROSS = BOARD - 2 * MARGIN;
-const pt = (p: V) => `(${+p[0].toFixed(2)}, ${+p[1].toFixed(2)})`;
 const err = (rule: Issue["rule"], text: string, p?: Piece, at?: V): Issue => ({ rule, severity: "error", text, ...(p && { piece: p.id }), ...(at && { at }) });
 
 /** A geometry in a sentence. */

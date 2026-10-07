@@ -71,3 +71,25 @@ export function withTiming(d: Draft, id: string, t: Pulse): Draft {
   if (c?.k === "stroke") return { ...d, pulses: d.pulses.map((q, i) => (i === c.pulse ? timing(t) : q)) };
   return d;
 }
+
+/** A blink's speed, as the inspector offers it: its cycle in substeps (a substep a 72 ms frame of play: slow about 5.8 s, medium 2.9 s, fast 1.4 s). */
+export const BLINK = { slow: 80, medium: 40, fast: 20 } as const;
+/** How much of its cycle a blinking piece is away (the way open): half, most or little of the time. */
+export const OPEN = { half: 0.5, most: 0.75, little: 0.25 } as const;
+export type Speed = keyof typeof BLINK;
+export type Open = keyof typeof OPEN;
+const keyOf = <K extends string>(o: Readonly<Record<K, number>>, v: number) => (Object.keys(o) as K[]).find((k) => o[k] === v) ?? null;
+
+/** A timing read as the presets say it: its speed and how open, each null where Fine set it otherwise. */
+export function blinkOf(t: Pulse): { speed: Speed | null; open: Open | null } {
+  const speed = keyOf(BLINK, t.every), open = keyOf(OPEN, 1 - t.on / t.every);
+  return { speed, open: open && Number.isInteger(t.every * OPEN[open]) ? open : null };
+}
+
+/** The draft with piece id blinking at a preset speed and openness (the one not given kept as it reads, else medium and half), its phase kept. */
+export function withBlink(d: Draft, id: string, to: { speed?: Speed; open?: Open }): Draft {
+  const c = d.pieces.find((p) => p.id === id)?.clock;
+  if (c?.k !== "substep") return d;
+  const now = blinkOf(c), every = BLINK[to.speed ?? now.speed ?? "medium"], open = OPEN[to.open ?? now.open ?? "half"];
+  return withTiming(d, id, { every, on: Math.round(every * (1 - open)), phase: Math.min(c.phase, every - 1) });
+}

@@ -25,6 +25,7 @@ import { cap, FIELD, MAX_PAR } from "./rules";
 import type { GHole, GZone } from "./types";
 import type { BuilderHost } from "./wasm";
 import type { PieceRef } from "../scene/census";
+import { calmPeriod } from "./quickshot";
 
 /** The calls the meter plays with: builder.wasm's (the editor's worker has its own host). */
 export type Sim = Pick<BuilderHost, "load" | "setperiod" | "find" | "round" | "from" | "fit" | "decode">;
@@ -107,6 +108,10 @@ export interface Estimate {
   shots: number;
   ms: number;
   cut: boolean;
+  /** the best line's paths, a stroke each (as far as it went), for Edit's "Show the line" */
+  path: V[][];
+  /** where the meter's shots stopped: [x, y, how many] for each unit cell some stopped in, by its middle */
+  heat: [number, number, number][];
 }
 
 const share = (s: Shares, k: "holed" | "near") => (s.n ? s[k] / s.n : 0);
@@ -309,8 +314,6 @@ export function levelOf(m: { strokes: number | null; forgiving: readonly number[
 
 /** The id the meter loads a hole under in its host (the editor's checks use their own). */
 export const METER_ID = "meter/v1";
-/** The clock the meter's calm period is found from. */
-export const METER_NOW = 1_000_000;
 /** How the meter runs: its budget and fan, and pause (between fans: false, a newer run took over, and it gives up). */
 export interface Run {
   budget?: Budget;
@@ -343,7 +346,7 @@ export async function estimate(sim: Sim, draft: Draft, o: Run = {}): Promise<Est
  */
 export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) => Named | undefined = () => undefined, o: Run = {}, t0 = performance.now()): Promise<Estimate | null> {
   const budget = o.budget ?? BUDGET, fan = o.fan ?? METER_FAN;
-  let h: GHole, found = -1;
+  let h: GHole;
   try {
     h = sim.decode(hex);
   } catch {
@@ -351,18 +354,20 @@ export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) =
   }
   const plain = nameIn(h), of = (r: PieceRef): Named => named(r) ?? { name: plain(r), rail: false };
   sim.load(METER_ID, hex);
-  sim.setperiod(METER_NOW);
-  try {
-    found = sim.find(METER_ID, "", METER_NOW);
-  } catch {
-    // (a hole the realm refuses to forecast is still measured, at the clock itself)
-  }
-  const period = found < 0 ? METER_NOW : found;
+  const period = calmPeriod(sim, METER_ID); // (a hole the realm refuses to forecast is still measured, at the clock itself)
   const way = wayOf(h), along = way.reached(h.tee);
   const dist = along ? (p: V) => Math.min(way.dist(p), 1e6 + way.straight(p)) : way.straight;
   const aim = along ? way.aim : (p: V) => (Math.atan2(h.pin[1] - p[1], h.pin[0] - p[0]) * 180) / Math.PI;
   const near = (p: Played) => p.holed || dist(p.rest) <= NEAR;
   const sharesOf = (ps: readonly Played[]): Shares => ({ n: ps.length, holed: ps.filter((p) => p.holed).length, near: ps.filter(near).length });
+  // where every shot played stopped, by unit cell (Edit's heat map); the best line's paths
+  const stops = new Map<string, [number, number, number]>(), path: V[][] = [];
+  const counted = (ps: readonly Played[]) => {
+    for (const p of ps) {
+      const x = Math.floor(p.rest[0]) + 0.5, y = Math.floor(p.rest[1]) + 0.5, k = `${x} ${y}`;
+      stops.set(k, [x, y, (stops.get(k)?.[2] ?? 0) + 1]);
+    }
+  };
 
   let shots = 0, cut = false, stopped = false;
   const stop = () => (++shots > budget.shots || performance.now() - t0 > budget.ms ? (cut = true) : false);
@@ -375,7 +380,9 @@ export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) =
     seen: (k, from, ps, chosen) => {
       if (k === 0) teeShots = [...ps];
       if (k === 1) spots = add(spots, sharesOf(ps));
+      counted(ps);
       if (!chosen) return;
+      path.push([...chosen.path]);
       // the chosen shot played a little off, as a player would
       const [a, pw] = chosen.shot.split(",").map(Number), d = dist(chosen.rest), off: Played[] = [];
       const jittered: Fan = { spread: 0, step: 1, powers: [...new Set(JITTER.powers.map((x) => Math.min(RULES.maxPower, Math.round(pw * x * 100) / 100)))] };
@@ -396,6 +403,7 @@ export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) =
     const ps: Played[] = [];
     playFan(sim, METER_ID, at, 1, period, aim(at), fan, (p) => (stop() ? false : void ps.push(p)));
     spots = add(spots, sharesOf(ps));
+    counted(ps);
   }
   if (stopped) return null;
 
@@ -444,6 +452,7 @@ export async function estimateHole(sim: Sim, hex: string, named: (r: PieceRef) =
     par: strokes ? Math.min(MAX_PAR, strokes + 1) : 0,
     strokes, tee, spots, forgiving, narrowest,
     shots: Math.min(shots, budget.shots), ms: Math.round(performance.now() - t0), cut,
+    path, heat: [...stops.values()],
   };
 }
 
@@ -464,11 +473,10 @@ export function meterTitle(e: Estimate): string {
 }
 
 /** What the editor shows of an estimate (made in the meter's worker: the editor's own chunk carries none of the meter): the level and its word, the dock's line, the chip's words in full, the par. */
-export interface Shown {
+export interface Shown extends Pick<Estimate, "par" | "path" | "heat"> {
   level: Level;
   word: string;
   line: { text: string; piece?: string };
   title: string;
-  par: number;
 }
-export const shown = (e: Estimate): Shown => ({ level: e.level, word: LEVELS[e.level], line: meterLine(e), title: meterTitle(e), par: e.par });
+export const shown = (e: Estimate): Shown => ({ level: e.level, word: LEVELS[e.level], line: meterLine(e), title: meterTitle(e), par: e.par, path: e.path, heat: e.heat });

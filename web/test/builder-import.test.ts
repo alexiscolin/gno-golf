@@ -11,60 +11,77 @@ import { draftFile, fromFile, fromPublished } from "../lib/builder/importing.ts"
 import { exportDraft } from "../lib/builder/draft.ts";
 import { canonicalHex } from "../lib/builder/proof.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
+import { census } from "../lib/builder/drawn.ts";
+import type { Hole } from "../lib/scene/data.ts";
 
 const holes = new Map(fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n").map((l) => l.split(" ")).map(([slot, , , hex]) => [slot, hex]));
 const A = "g1" + "a".repeat(38), B = "g1" + "b".repeat(38);
 
 void test("fromFile: a draft whole and of its world's pieces; else why", async () => {
   const d = lane("garden", []);
-  assert.deepEqual(await fromFile(exportDraft(d)), d);
-  assert.equal(await fromFile("{"), "The file is not a draft.");
+  assert.deepEqual(await fromFile(exportDraft(d), host, census), d);
+  assert.equal(await fromFile("{", host, census), "The file is not a draft.");
   const foreign = { ...d, pieces: [{ ...d.pieces[0], entry: "island/post/palm" }] };
-  assert.equal(await fromFile(exportDraft(foreign)), "Piece r1 is no piece of the Garden's.");
+  assert.equal(await fromFile(exportDraft(foreign), host, census), "Piece r1 is no piece of the Garden's.");
+});
+
+void test("fromFile, fromPublished: an opened hole goes through the editor's own checks, the render census with them; one they refuse never opens", async () => {
+  const d = lane("garden", []), drawn: Hole[] = [], spy = (s: Hole) => (drawn.push(s), census(s));
+  // a bumper on the cup: every piece the palette's, every number in range, and refused all the same (E3), as the board refuses it
+  const onCup = { ...d, pieces: [...d.pieces, { id: "p1", entry: "*/post/bumper", geometry: { t: "post" as const, c: d.pin, r: 0.8 }, params: { bounce: 1.2 }, clock: { k: "fixed" as const } }] };
+  const refused = await fromFile(exportDraft(onCup), host, spy);
+  assert.match(typeof refused === "string" ? refused : "opened", /^This draft breaks the Builder's rules: The cup is inside the bumper/);
+  drawn.length = 0;
+  assert.deepEqual(await fromFile(exportDraft(d), host, spy), d);
+  assert.equal(drawn.length, 1, "the file's hole drawn for the census");
+  drawn.length = 0;
+  const opened = await fromPublished(canonicalHex(STARTERS.garden.straight, host)!, host, `${B}/lane/v1`, A, spy);
+  assert.equal(typeof opened, "object", typeof opened === "string" ? opened : "");
+  assert.equal(drawn.length, 1, "a published hole's drawn for the census too");
 });
 
 void test("fromPublished: a hole the Builder published opens as a draft (its slug yours only if the hole is yours); an off-grid course hole does not", async () => {
   const hex = canonicalHex({ ...STARTERS.garden.straight, title: "Mole Run" }, host)!;
-  const d = await fromPublished(hex, host, `${B}/lane/v1`, A);
+  const d = await fromPublished(hex, host, `${B}/lane/v1`, A, census);
   assert.equal(typeof d, "object", JSON.stringify(d));
   if (typeof d === "string") return;
   assert.equal(d.world, "garden");
   assert.ok(d.pieces.length > 0 && d.title === "Mole Run");
   assert.equal(d.slug, "");
-  const mine = await fromPublished(hex, host, `${A}/mole-run/v3`, A);
+  const mine = await fromPublished(hex, host, `${A}/mole-run/v3`, A, census);
   assert.equal(typeof mine !== "string" && mine.slug, "mole-run", "your own hole: its next version");
-  const byHand = await fromPublished(holes.get("garden/6")!, host, "garden/6/v1", A);
+  const byHand = await fromPublished(holes.get("garden/6")!, host, "garden/6/v1", A, census);
   assert.match(typeof byHand === "string" ? byHand : "", /off the grid/, "a course hole written by hand: not on the Builder's grid");
 });
 
 void test("fromPublished: a hole the site took down never opens in the Builder (nor comes back as a new version), its data not even read", async () => {
   const hex = hexOf(lane("garden", []));
   const taken = new Set([`${B}/rude`]);
-  for (const id of [`${B}/rude/v1`, `${B}/rude/v3`, `${B}/rude`]) assert.equal(await fromPublished(hex, host, id, A, taken), "This hole was taken down: it cannot be opened in the Builder.", id);
-  assert.equal(await fromPublished("zz", host, `${B}/rude/v1`, A, taken), "This hole was taken down: it cannot be opened in the Builder.", "said before the data is decoded");
-  assert.equal(typeof (await fromPublished(hex, host, `${B}/other/v1`, A, taken)), "object");
+  for (const id of [`${B}/rude/v1`, `${B}/rude/v3`, `${B}/rude`]) assert.equal(await fromPublished(hex, host, id, A, census, taken), "This hole was taken down: it cannot be opened in the Builder.", id);
+  assert.equal(await fromPublished("zz", host, `${B}/rude/v1`, A, census, taken), "This hole was taken down: it cannot be opened in the Builder.", "said before the data is decoded");
+  assert.equal(typeof (await fromPublished(hex, host, `${B}/other/v1`, A, census, taken)), "object");
 });
 
 void test("fromPublished: a hole with pieces the Builder does not make is refused, naming them", async () => {
-  const r = await fromPublished(holes.get("island/4")!, host, "island/4/v1", A);
+  const r = await fromPublished(holes.get("island/4")!, host, "island/4/v1", A, census);
   assert.equal(typeof r, "string");
   assert.match(typeof r === "string" ? r : "", /^This hole has pieces the Builder doesn't make: the rail rowing boat at \(30\.24, 7\.19\)/);
-  assert.equal(await fromPublished("zz", host, "x/v1", A), "This hole's data could not be read.");
+  assert.equal(await fromPublished("zz", host, "x/v1", A, census), "This hole's data could not be read.");
 });
 
 void test("fromPublished: a hole the Builder's rules refuse never opens in the editor (the course holes it is stricter on)", async () => {
   for (const slot of ["town/14"]) {
-    const r = await fromPublished(holes.get(slot)!, host, `${slot}/v1`, A);
+    const r = await fromPublished(holes.get(slot)!, host, `${slot}/v1`, A, census);
     assert.equal(typeof r, "string", `${slot} opened`);
   }
-  const door = await fromPublished(holes.get("town/14")!, host, "town/14/v1", A);
+  const door = await fromPublished(holes.get("town/14")!, host, "town/14/v1", A, census);
   assert.match(typeof door === "string" ? door : "", /^This hole breaks the Builder's rules: /);
 });
 
 void test("fromPublished, fromFile: a Crystal Mines hole never opens in the Builder (not one of its worlds), said plainly", async () => {
   const want = "The Builder makes holes in the Garden, the Island, Mushroom Town and the Mountain: this one is in the Crystal Mines, and stays playable in the game.";
-  for (const slot of ["mines/1", "mines/3", "mines/12"]) assert.equal(await fromPublished(holes.get(slot)!, host, `${slot}/v1`, A), want, slot);
-  assert.equal(await fromFile(JSON.stringify({ ...lane("garden", []), world: "mines" })), want);
+  for (const slot of ["mines/1", "mines/3", "mines/12"]) assert.equal(await fromPublished(holes.get(slot)!, host, `${slot}/v1`, A, census), want, slot);
+  assert.equal(await fromFile(JSON.stringify({ ...lane("garden", []), world: "mines" }), host, census), want);
 });
 
 void test("draftFile: a file name from the slug, else the name, else a plain one; never a path", () => {

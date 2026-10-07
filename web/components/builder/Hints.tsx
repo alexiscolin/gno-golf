@@ -11,11 +11,12 @@ import { pictureOf, tilesOf } from "@/lib/builder/tiles";
 import { worldName } from "@/lib/builder/rules";
 import type { PaletteEntry } from "@/lib/builder/palette";
 import { KEYS } from "@/lib/builder/keys";
+import { entryName } from "@/lib/builder/names";
 import { MOD } from "./Inspector";
 
 const HINTS = [
   ["palette", "Drag a piece onto the board"],
-  ["test", "Press Test it to play your hole"],
+  ["test", "Press T to try it, Prove it to make it count"],
   ["steps", "Then Publish, once holed in every weather"],
 ] as const;
 
@@ -39,7 +40,7 @@ export default function Hints({ onDone, glossary = null }: {
           <h2>The {worldName(glossary.world)}&apos;s pieces</h2>
           <ul>
             {tiles.map((t) => (
-              <li key={t.key} className="bgloss__piece">
+              <li key={t.key} className="bgloss__piece" title={t.looks.length > 1 ? t.looks.map(entryName).join(", ") : undefined}>
                 <img src={pictureOf(glossary.world, t.looks[0])} width={44} height={44} alt="" decoding="async" />
                 <span><b>{t.name}</b><small>{t.does || "a piece of its own"}</small></span>
               </li>

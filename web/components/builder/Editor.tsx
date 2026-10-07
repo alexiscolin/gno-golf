@@ -5,7 +5,9 @@
 // lives in a session (its history; a drag one step); every change is
 // checked by the whole pipeline (pipeline.ts validate, the render census
 // included) 150 ms after the last, and nothing that breaks the hole is ever
-// made: the board, the inspector and the keys all ask first (edit.ts).
+// made: the board, the inspector and the keys all ask first (edit.ts). The
+// ball shows in Edit too: quick shots pulled on the board, played on the
+// hole as it is (quickshot.ts), and the meter's best line; never a proof.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, snap, whereOf, clampMove } from "@/lib/builder/edit";
@@ -17,7 +19,7 @@ import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
 import { canonicalHex, proofKey, provedAs } from "@/lib/builder/proof";
 import { dropped, toCarry, weatherName, withCarried } from "@/lib/builder/carry";
-import { FIELD } from "@/lib/builder/rules";
+import { FIELD, listed } from "@/lib/builder/rules";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, V } from "@/lib/builder/draft";
@@ -28,22 +30,27 @@ import Checks from "./Checks";
 import Header, { type Step } from "./Header";
 import Inspector, { MOD } from "./Inspector";
 import Palette from "./Palette";
-import Preview from "./Preview";
 import { refusalOf } from "@/lib/builder/explain";
 import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
+import TestMode from "./TestMode";
+import { canonicalHex as hexOf } from "@/lib/builder/proof";
 import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
 import { tilesOf } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
+import { quickShots, roundOf, type QuickShot } from "@/lib/builder/quickshot";
+import { FLAT, fromPlane, TILT, type Look } from "@/lib/builder/view";
 
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
 /** How long after a clean check the difficulty meter is asked (about 400 ms after the last change). */
 const METER_MS = 250;
-/** The id the 3D's hole is loaded under in the builder's wasm. */
+/** The Builder's worlds, for the header's menu. */
 const WORLDS = Object.keys(FIELD);
+/** Quick shots kept on the board: the latest and three faded. */
+const SHOTS_KEPT = 4;
 
 export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish, onEstimate = () => {}, hints = false, onHinted = () => {} }: {
   host: BuilderHost;
@@ -92,6 +99,18 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [rounds, setRounds] = useState<{ key: string; kept: string[]; broken: string[] } | null>(null);
   const prevKey = useRef<string | null>(null);
   const [toast, setToast] = useState("");
+  // quick shots: the last few pulled (their specs, played again on the hole as it is now), the one being pulled, and the meter's line shown
+  const [shots, setShots] = useState<QuickShot[]>([]);
+  const [aim, setAim] = useState<QuickShot | null>(null);
+  const [lineOn, setLineOn] = useState(false);
+  // how the board is looked at: V tilts it, Q turns it a quarter (the 3D board; the 2D one too)
+  const [look, setLook] = useState<Look>(FLAT);
+  // a timed piece's blinking played, in the inspector and on the board (its pause holds both)
+  const [playing, setPlaying] = useState(true);
+  // a quick test (T): the draft as kept, its canonical bytes, played over the editor (kept open: the same zoom, selection and history after)
+  const [trying, setTrying] = useState<{ of: Draft; hex: string } | null>(null);
+  // the last quick test's round that holed, left on the board as a dotted trail (played again as the hole changes)
+  const [trail, setTrail] = useState<QuickShot[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
@@ -139,6 +158,17 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     return () => clearTimeout(t);
   }, [clean, kept]);
   const guess = clean && est?.e ? est.e : null, measuring = clean && est?.of !== kept;
+  // the quick shots on the hole as shown (a drag's too: they replay live), the one being pulled last
+  const played = useMemo(() => quickShots(host, draft, aim ? [...shots, aim] : shots) ?? [], [host, draft, shots, aim]);
+  const landed = aim ? played.slice(0, -1) : played;
+  const trailed = useMemo(() => quickShots(host, draft, trail) ?? [], [host, draft, trail]);
+  // a new quick shot holed: the cup's sound (its putt is played as it is let go)
+  const shotSeen = useRef<QuickShot | undefined>(undefined);
+  useEffect(() => {
+    if (shots.at(-1) === shotSeen.current || aim) return;
+    shotSeen.current = shots.at(-1);
+    if (landed.at(-1)?.holed) sound("cup");
+  }, [shots, aim, landed]);
   useEffect(() => void (est?.of === kept && onEstimate(est.e?.par ?? 0)), [est, kept, onEstimate]);
 
   // a new key for the hole as kept: the author's rounds of the hole before replayed on its bytes, off the main
@@ -151,8 +181,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     const sayDropped = (proofs: Draft["proofs"]) => {
       const gone = dropped(proofs, prev, k).map(weatherName);
       if (!gone.length) return;
-      const names = gone.length > 1 ? `${gone.slice(0, -1).join(", ")} and ${gone.at(-1)}` : gone[0];
-      setToast(`This drops your ${names} proof${gone.length > 1 ? "s" : ""} · ${MOD}Z keeps ${gone.length > 1 ? "them" : "it"}`);
+      setToast(`This drops your ${listed(gone)} proof${gone.length > 1 ? "s" : ""} · ${MOD}Z keeps ${gone.length > 1 ? "them" : "it"}`);
       clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(""), 5000);
     };
@@ -234,6 +263,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   // the keys: always the editor's, never a field's
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if (trying) return; // (a quick test's keys are its own)
       const t = e.target as HTMLElement;
       if (t.closest("input, select, textarea, [contenteditable]")) return;
       const mod = e.metaKey || e.ctrlKey;
@@ -249,11 +279,14 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         return setArmed(en);
       }
       if (act?.t === "frame") return setFrameAsk((n) => n + 1);
-      if (act?.t === "test") return void (!testOff && onTest(kept));
+      if (act?.t === "tilt") return setLook((l) => ({ ...l, tilt: l.tilt ? 0 : TILT }));
+      if (act?.t === "turn") return setLook((l) => ({ ...l, turns: (l.turns + act.by + 4) % 4 }));
+      if (act?.t === "test") return tryIt();
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
-      if (e.key === "Escape") return (setArmed(null), setSelected(null));
+      if (e.key === "Escape") return (setArmed(null), setSelected(null), setShots([]), setTrail([]));
       const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-      const step = (k: string) => arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V;
+      // (an arrow moves a piece the way it points on the screen, however the board is turned)
+      const step = (k: string) => fromPlane(arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V, { turns: look.turns, tilt: 0 });
       if (e.key === "Enter" && armed && !t.closest("button, a")) return (e.preventDefault(), dropArmed());
       if ((selected === "tee" || selected === "pin") && arrows[e.key]) return (e.preventDefault(), moveEnd(selected, step(e.key)));
       if (!piece) return;
@@ -277,12 +310,18 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const off = palette ? offAtLimit(draft, palette) : new Map<string, string>();
   const step: Step = "edit";
   // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
+  // a quick test: the hole as kept with no error (no name nor address needed)
+  const tryOff = !checked || checked.of !== kept ? "Checking…" : errors.length ? testOff : "";
+  function tryIt() {
+    const hex = !tryOff && hexOf(kept, host);
+    if (hex) (setArmed(null), setAim(null), setTrying({ of: kept, hex }));
+  }
   const proved = !testOff && key?.of === kept && !!key.key && !!author && !!provedAs(kept.proofs, kept.world, key.key, author, kept.slug);
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
         steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
-        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
+        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Prove it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         meter={{ level: guess?.level ?? null, word: guess?.word ?? "–", title: guess ? guess.title : clean ? "Difficulty: measuring…" : "Difficulty: measured once the hole has no error", busy: measuring }}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)}
@@ -293,18 +332,31 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <div className="centre">
             {toast && <p className="btoast" role="status">{toast}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} />
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep" }}
+              // (the first run's hints first: the board's tools come once they are gone)
+              ball={hints ? undefined : {
+                played: landed, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
+                line: guess && est?.of === kept && draft === kept ? { path: guess.path, heat: guess.heat } : null,
+                tryOff, onTry: tryIt, onAim: setAim, onShot: (q) => (sound("putt"), setAim(null), setShots((s) => [...s, q].slice(-SHOTS_KEPT))),
+              }} />
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff, rounds: rounds && key?.of === kept && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
-          <aside className="col" aria-label="The hole in 3D and the selected piece">
-            <Preview state={checked?.state ?? null} fresh={fresh} />
-            <hr />
-            <Inspector draft={draft} piece={piece} quick={quick} full={full} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove} />
+          <aside className="col" aria-label="The selected piece">
+            <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={playing} onPlay={() => setPlaying((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove} />
           </aside>
         </>
       ) : (
         <p className="bench__wait" aria-busy="true">Loading the {draft.world}&apos;s pieces…</p>
+      )}
+      {trying && (
+        <div className={`tbench tbench--quick tint--${draft.world}`}>
+          <div className="qbar">
+            <b>Quick test</b><span>Calm weather · not a proof</span>
+            <button type="button" className="btn btn--ghost" onClick={() => setTrying(null)}>Back to edit<kbd>Esc</kbd></button>
+          </div>
+          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onRound={(r) => setTrail(roundOf(host, trying.of, r))} onLeave={() => setTrying(null)} />
+        </div>
       )}
       {(hints || again) && <Hints glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}
     </main>

@@ -71,7 +71,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   onStep: (s: Step) => void;
   onBack: () => void;
 }) {
-  const names: Record<Step, string> = { edit: "Edit", test: "Test", publish: "Publish" };
+  const names: Record<Step, string> = { edit: "Edit", test: "Prove", publish: "Publish" };
   const waits = !!action?.off && action.off !== "Checking…";
   return (
     <header className="bhead">
@@ -95,7 +95,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
         </small>
       </div>
       </div>
-      <ol className="stepper" aria-label="Edit, test, publish">
+      <ol className="stepper" aria-label="Edit, prove, publish">
         {(["edit", "test", "publish"] as const).map((s, i) => {
           const st = steps[s], now = s === step;
           return (

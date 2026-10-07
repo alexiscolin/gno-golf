@@ -7,16 +7,18 @@
 // break the hole does not take: the slider stays at the last value that
 // holds, and the reason is said once (settings.ts; edit.ts canPlace).
 import { entryName } from "@/lib/builder/names";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Segmented } from "@/components/ui";
 import { settle } from "@/lib/builder/session";
 import { canPlace, newErrors, errorsOf, whereOf } from "@/lib/builder/edit";
 import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/lib/builder/palette";
-import { DIRS, sizesOf, TIMING, withClock, withDir, withNumber, withSize, withTiming } from "@/lib/builder/settings";
+import { blinkOf, DIRS, sizesOf, TIMING, withBlink, withClock, withDir, withNumber, withSize, withTiming, type Open, type Speed } from "@/lib/builder/settings";
+import { MS_PER_STEP } from "@/lib/engine/replay";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
 import { refusalOf } from "@/lib/builder/explain";
 import { notTurned } from "@/lib/builder/handles";
+import { xy } from "@/lib/builder/rules";
 
 const CLOCKS: Record<Clock, string> = { fixed: "Always", substep: "In a stroke", stroke: "Strokes" };
 const SIZE_NAMES = { r: "Size", length: "Length", width: "Width", depth: "Depth" } as const;
@@ -37,11 +39,37 @@ function Row({ label, value, range, shown, note, onChange, onDone }: { label: st
   );
 }
 
-export default function Inspector({ draft, piece, quick, full, onPreview, onCommit, onCancel, onSet, onSay, onTurn, onCopy, onDelete }: {
+/** The cycle of a timed piece as a strip of its steps (there: filled), a playhead running on the game's clock (72 ms a substep) while it plays. */
+function Cycle({ t, unit, playing, onPlay }: { t: Pulse; unit: string; playing: boolean; onPlay: () => void }) {
+  const cells = Math.min(t.every, 40), [step, setStep] = useState(0);
+  useEffect(() => {
+    if (!playing || unit !== "substeps") return;
+    const at = () => setStep(Math.floor(performance.now() / MS_PER_STEP) % t.every);
+    const i = setInterval(at, MS_PER_STEP);
+    return () => clearInterval(i);
+  }, [playing, unit, t.every]);
+  const now = (step + t.phase) % t.every < t.on;
+  return (
+    <div className="cycle__row">
+      {unit === "substeps" && <button type="button" className="round round--s" aria-pressed={playing} aria-label={playing ? "Pause its blinking" : "Play its blinking"} title={playing ? "Pause (on the board too)" : "Play (on the board too)"} onClick={onPlay}>{playing ? "❚❚" : "▶"}</button>}
+      <div className="cycle" aria-label={`There on ${t.on} of every ${t.every} ${unit}${unit === "substeps" ? `: ${now ? "there" : "open"} now` : ""}`}>
+        {Array.from({ length: cells }, (_, i) => <i key={i} className={`${(Math.floor((i * t.every) / cells) + t.phase) % t.every < t.on ? "on" : ""}${unit === "substeps" && Math.floor((step * cells) / t.every) === i ? " now" : ""}`} />)}
+      </div>
+    </div>
+  );
+}
+
+const SPEEDS: readonly (readonly [Speed, string])[] = [["slow", "Slow"], ["medium", "Medium"], ["fast", "Fast"]];
+const OPENS: readonly (readonly [Open, string])[] = [["most", "Most"], ["half", "Half"], ["little", "Little"]];
+
+export default function Inspector({ draft, piece, quick, full, playing = true, onPlay = () => {}, onPreview, onCommit, onCancel, onSet, onSay, onTurn, onCopy, onDelete }: {
   draft: Draft;
   piece: Piece | null;
   quick: ValidateOptions;
   full: ValidateOptions;
+  /** a timed piece's blinking played (here and on the board), and its play/pause */
+  playing?: boolean;
+  onPlay?: () => void;
   onPreview: (d: Draft) => void;
   onCommit: () => void;
   onCancel: () => void;
@@ -95,7 +123,7 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
       {/* the numbers, for whoever asks for them (the GUI spec's B1: none to type unless Details is opened) */}
       <details className="insp__details">
       <summary>Details</summary>
-      <p className="insp__at">At {+at[0].toFixed(2)}, {+at[1].toFixed(2)}</p>
+      <p className="insp__at">At {xy(at)}</p>
       {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v))} onDone={done} />)}
       {p.geometry.t === "bar" && ent.thick && <Row label="Thick" value={p.geometry.thick} range={ent.thick} onChange={(v) => tryPiece({ ...p, geometry: { ...(p.geometry as Extract<Piece["geometry"], { t: "bar" }>), thick: v } })} onDone={done} />}
       {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : `${ent.bounce.min} to ${ent.bounce.max} (0: the field's)`} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}
@@ -107,22 +135,36 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
             options={ARROWS.map((a, i) => [String(i), a] as const)} onChange={(i) => setDraft({ ...draft, pieces: draft.pieces.map((q) => (q.id === p.id ? withDir(p, Number(i)) : q)) })} />
         </div>
       )}
+      </details>
+      {/* its timing, in words (the review's "timed pieces readable"): when it is there, how fast it blinks and how open it
+          leaves the way, its cycle playing as it plays on the board; the numbers under Fine */}
       {ent.clocks.length > 1 && (
         <div className="range"><span>Timing</span>
           <Segmented className="seg--s insp__clock" label="When it is there" value={c.k} options={ent.clocks.map((k) => [k, CLOCKS[k]] as const)} onChange={(k) => setDraft(withClock(draft, p.id, k, ent))} />
         </div>
       )}
-      {t && (
+      {c.k === "substep" && (
         <>
-          <Row label="Every" value={t.every} range={{ min: TIMING.every.min, max: TIMING.every.max, step: 1, def: 40 }} shown={`${t.every}`} note={`a cycle of ${t.every} ${unit}`} onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, every: v }))} onDone={done} />
-          <Row label="On" value={t.on} range={{ min: 1, max: t.every - 1, step: 1, def: 1 }} shown={`${t.on} / ${t.every}`} note="there for this many of them" onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, on: v }))} onDone={done} />
-          <Row label="From" value={t.phase} range={{ min: 0, max: t.every - 1, step: 1, def: 0 }} shown={`step ${t.phase}`} note="where its cycle starts" onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, phase: v }))} onDone={done} />
-          <div className="cycle" aria-label={`There on ${t.on} of every ${t.every} ${unit}`}>
-            {Array.from({ length: Math.min(t.every, 40) }, (_, i) => <i key={i} className={(i + t.phase) % t.every < t.on ? "on" : ""} />)}
+          <div className="range"><span>Blinks</span>
+            <Segmented<Speed | ""> className="seg--s insp__blink" label="How fast it blinks" value={blinkOf(c).speed ?? ""} options={SPEEDS} onChange={(v) => v && setDraft(withBlink(draft, p.id, { speed: v }))} />
+          </div>
+          <div className="range"><span>Open</span>
+            <Segmented<Open | ""> className="seg--s insp__open" label="How much of the time the way is open" value={blinkOf(c).open ?? ""} options={OPENS} onChange={(v) => v && setDraft(withBlink(draft, p.id, { open: v }))} />
+            <small>{blinkOf(c).open ? `the way open ${blinkOf(c).open} of the time` : `the way open ${Math.round((1 - c.on / c.every) * 100)}% of the time`}</small>
           </div>
         </>
       )}
-      </details>
+      {t && (
+        <>
+          <Cycle t={t} unit={unit} playing={playing} onPlay={onPlay} />
+          <details className="insp__details insp__fine">
+            <summary>Fine</summary>
+            <Row label="Every" value={t.every} range={{ min: TIMING.every.min, max: TIMING.every.max, step: 1, def: 40 }} shown={`${t.every}`} note={`a cycle of ${t.every} ${unit}`} onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, every: v }))} onDone={done} />
+            <Row label="On" value={t.on} range={{ min: 1, max: t.every - 1, step: 1, def: 1 }} shown={`${t.on} / ${t.every}`} note="there for this many of them" onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, on: v }))} onDone={done} />
+            <Row label="From" value={t.phase} range={{ min: 0, max: t.every - 1, step: 1, def: 0 }} shown={`step ${t.phase}`} note="where its cycle starts" onChange={(v) => tryDraft(withTiming(draft, p.id, { ...t, phase: v }))} onDone={done} />
+          </details>
+        </>
+      )}
     </div>
   );
 }

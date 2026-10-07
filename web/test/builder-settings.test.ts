@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { emptyDraft } from "../lib/builder/draft.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
-import { DIRS, sizesOf, TIMING, withClock, withDir, withNumber, withSize, withTiming } from "../lib/builder/settings.ts";
+import { BLINK, blinkOf, DIRS, OPEN, sizesOf, TIMING, withBlink, withClock, withDir, withNumber, withSize, withTiming } from "../lib/builder/settings.ts";
 import "./scene-harness.ts";
 
 const garden = await loadPalette("garden");
@@ -48,4 +48,21 @@ void test("withClock, withTiming: a clock its entry allows; a pulse made for the
   assert.deepEqual(t.pieces[0].clock, { k: "substep", every: TIMING.every.max, on: TIMING.every.max - 1, phase: 0 });
   const p = withTiming(pulsed, "b", { every: 4, on: 2, phase: 1 });
   assert.deepEqual(p.pulses, [{ every: 4, on: 2, phase: 1 }], "a pulsed piece's timing is its pulse's");
+});
+
+void test("blink presets: slow, medium, fast; open half, most or little of the time; read back from a timing, none when Fine set it otherwise", () => {
+  const hand = { ...placePiece(entry("*/bar/clock hand"), "h", [5, 5]) };
+  const d = { ...emptyDraft("garden"), pieces: [hand] };
+  const t = (x: typeof d) => x.pieces[0].clock as { every: number; on: number; phase: number };
+  assert.deepEqual(blinkOf(t(d)), { speed: "medium", open: "half" }, "a timed piece starts on medium, open half the time");
+  const fast = withBlink(d, "h", { speed: "fast" });
+  assert.deepEqual([t(fast).every, t(fast).on], [BLINK.fast, BLINK.fast / 2]);
+  const most = withBlink(fast, "h", { open: "most" });
+  assert.deepEqual([t(most).every, t(most).on], [BLINK.fast, BLINK.fast * (1 - OPEN.most)], "open most of the time: there a quarter");
+  assert.deepEqual(blinkOf(t(most)), { speed: "fast", open: "most" });
+  const slowLittle = withBlink(most, "h", { speed: "slow", open: "little" });
+  assert.deepEqual([t(slowLittle).every, t(slowLittle).on], [BLINK.slow, BLINK.slow * 0.75]);
+  const fine = withTiming(d, "h", { every: 37, on: 11, phase: 0 });
+  assert.deepEqual(blinkOf(t(fine)), { speed: null, open: null }, "set by Fine: no preset claims it");
+  assert.ok(Object.values(BLINK).every((n) => n >= TIMING.every.min && n <= TIMING.every.max));
 });

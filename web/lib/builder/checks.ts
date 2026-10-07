@@ -9,7 +9,7 @@ import { inZone, segDist } from "../terrain";
 import type { PieceRef } from "../scene/census";
 import { RULES } from "../chain";
 import { LIMITS } from "./gg1";
-import { cap, MIN_SHOT_WORK } from "./rules";
+import { cap, MIN_SHOT_WORK, pt } from "./rules";
 import { CELL, laneOf, moves, reach } from "./lane";
 import type { HoleIn, PostIn, V, WallIn, ZoneIn } from "./types";
 import type { Cost } from "./wasm";
@@ -53,7 +53,6 @@ const pieceOf = (h: HoleIn, r: PieceRef) => {
   return (r.set === "wall" ? list.walls : r.set === "post" ? list.posts : list.zones)[r.i];
 };
 const shapeOf = (z: ZoneIn) => ({ min: z.min, max: z.max, round: !!z.round, poly: z.poly, outside: z.outside });
-const pt = (p: V) => `(${+p[0].toFixed(2)}, ${+p[1].toFixed(2)})`;
 const centreOf = (z: ZoneIn): V => [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2];
 
 /** A piece's name in a sentence: "the hedge wall", "the plain post", "the water hazard". */

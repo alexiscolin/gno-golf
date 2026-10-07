@@ -133,12 +133,13 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "three hints");
   assert.equal(await c.js(`document.querySelector(".bhead__hole input").value`), "Garden Dogleg", "on the Garden's dogleg");
   assert.equal(await c.js(`document.activeElement?.textContent`), "Got it");
-  // the hints leave the 3D in sight: none of them, nor Got it, over the preview
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".col .preview")`)); k++) await sleep(300);
-  const preview = await box(c, ".col .preview");
-  assert.ok(preview, "the 3D's place");
-  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
-    assert.ok(!overlap(part, preview), `hint ${i + 1} covers the 3D preview`);
+  // the hints leave the hole in sight: none of them, nor Got it, over the tee or the cup
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector("[data-end='pin']")`)); k++) await sleep(300);
+  for (const end of ["tee", "pin"]) {
+    const at = (await box(c, `[data-end='${end}'] circle`))!;
+    for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
+      assert.ok(!overlap(part, at), `hint ${i + 1} covers the ${end === "pin" ? "cup" : "tee"}`);
+    }
   }
   assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "the first run: three hints, no glossary");
   await c.js(`document.querySelector(".bhint__ok").click()`);
@@ -159,9 +160,6 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const g = (await box(c, ".bgloss"))!;
   assert.ok(g.t >= 0 && g.b <= 800 && g.l >= 0 && g.r <= 1280, `the glossary on one screen: ${JSON.stringify(g)}`);
   assert.ok(await c.js<boolean>(`(() => { const e = document.querySelector(".bgloss"); return e.scrollHeight <= e.clientHeight + 1; })()`), "the glossary on one screen, not scrolled");
-  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok, .bgloss")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
-    assert.ok(!overlap(part, (await box(c, ".col .preview"))!), `help part ${i + 1} covers the 3D preview`);
-  }
   await c.js(`document.querySelector(".bhint__ok").click()`);
   await sleep(300);
   assert.equal(await c.js(`document.querySelectorAll(".bgloss, .bhint").length`), 0, "gone with Got it");
@@ -169,13 +167,16 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   c.kill();
 }
 
-// no 3D (WebGL refused): the preview says so, readably
+// the board in 3D (WebGL: the game's scene under the overlay); without WebGL, the 2D board as it was, every piece drawn
 {
-  const c = await editor(1280, 800, `HTMLCanvasElement.prototype.getContext = function () { return null; };`);
-  const r = await c.js<{ ratio: number; opacity: number } | null>(`(${CONTRAST})(".col .preview--off, .col .preview.nothing")`);
-  assert.ok(r && r.ratio >= 4.5, `no WebGL: the preview's sentence reads at ${r?.ratio.toFixed(2)}:1`);
-  console.log("no 3D: ok");
+  const c = await editor(1280, 800);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".board--3d .board__scene canvas")`), "the board in 3D");
   c.kill();
+  const flat = await editor(1280, 800, `HTMLCanvasElement.prototype.getContext = function () { return null; };`);
+  assert.ok(await flat.ev<boolean>(`!document.querySelector(".board--3d") && !!document.querySelector(".board__ground")`), "no WebGL: the 2D board");
+  assert.ok(await flat.ev<boolean>(`[...document.querySelectorAll(".board__piece > :first-child")].every((e) => getComputedStyle(e).fill !== "transparent" || getComputedStyle(e).stroke !== "transparent")`), "no WebGL: every piece drawn");
+  console.log("no 3D: ok");
+  flat.kill();
 }
 
 // a browser that keeps nothing (a private window): its note covers no control
@@ -193,17 +194,17 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 // a piece deleted from the Inspector: the focus on the board, not lost; a draft deleted: the game's sheet, Escape keeps it
 {
   const c = await editor(1280, 800);
-  // the straight starter (its obstacles): from the drafts screen
+  // the straight starter (its two posts, p1 and p2; its rails are r1 to r4): from the drafts screen
   await c.js(`document.querySelector(".bhead .round--icon").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
   await c.js(`document.querySelector(".bholes__starts button").click()`);
-  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece][aria-label*=' obstacle at ']")`)); k++) await sleep(300);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece^='p']")`)); k++) await sleep(300);
   await sleep(800);
   const key = async (key: string, code = key) => {
     await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code });
     await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });
   };
-  await c.js(`[...document.querySelectorAll("[data-piece]")].find((g) => / obstacle at /.test(g.getAttribute("aria-label"))).focus()`);
+  await c.js(`document.querySelector("[data-piece^='p']").focus()`);
   await sleep(600);
   const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
   assert.equal(await c.js(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`), 0, "a piece selected: no number to type until Details is opened");
@@ -218,7 +219,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   // a post dragged from the board onto the palette's bin: removed
   const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
   const centre = (sel: string) => c.js<[number, number]>(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-  const post = await c.js<[number, number]>(`(() => { const g = [...document.querySelectorAll("[data-piece]")].find((g) => / obstacle at /.test(g.getAttribute("aria-label"))); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const post = await c.js<[number, number]>(`(() => { const g = document.querySelector("[data-piece^='p']"); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const bin = await centre("[data-bin]");
   await mouse("mousePressed", ...post);
   for (let k = 1; k <= 6; k++) {
@@ -229,8 +230,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await sleep(1200);
   assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 2, "a post dropped on the bin is removed");
   // the cup taken by its flag, the tee by its edge: each moved, the board not panned (a hit area bigger than the drawing)
-  const at = (sel: string) => c.js<[number, number]>(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return [+e.getAttribute("cx"), +e.getAttribute("cy")]; })()`);
-  const onScreen = (sel: string) => c.js<[number, number]>(`(() => { const svg = document.querySelector(".board__map"), e = document.querySelector(${JSON.stringify(sel)}); const p = svg.createSVGPoint(); p.x = +e.getAttribute("cx"); p.y = +e.getAttribute("cy"); const s = p.matrixTransform(svg.getScreenCTM()); return [s.x, s.y]; })()`);
+  // (an end's place on the board, as its label says it; its badge's middle on the screen)
+  const at = (sel: string) => c.js<string>(`/\\(.*\\)/.exec(document.querySelector(${JSON.stringify(sel)}).closest("[data-end]").getAttribute("aria-label"))[0]`);
+  const onScreen = (sel: string) => c.js<[number, number]>(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const drag = async (from: [number, number], dx: number) => {
     await mouse("mousePressed", ...from);
     for (let k = 1; k <= 6; k++) {
@@ -240,7 +242,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
     await mouse("mouseReleased", from[0] + dx, from[1]);
     await sleep(1000);
   };
-  const k = await c.js<number>(`document.querySelector(".board__map").getScreenCTM().a`); // (px a unit)
+  const k = await c.js<number>(`document.querySelector(".board__plane").getScreenCTM().a`); // (px a unit)
   for (const [what, sel, grip] of [["the cup, by its flag", "[data-end='pin'] circle", (p: [number, number]): [number, number] => [p[0] + 0.35 * k, p[1] - 0.95 * k]], ["the tee, by its edge", "[data-end='tee'] circle", (p: [number, number]): [number, number] => [p[0] + 0.8 * k, p[1] + 0.3 * k]]] as const) {
     const was = await at(sel), other = await onScreen(sel === "[data-end='tee'] circle" ? "[data-end='pin'] circle" : "[data-end='tee'] circle");
     await drag(grip(await onScreen(sel)), -1.5 * k);
@@ -262,7 +264,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   c.kill();
 }
 // the keys: 1 to 5 pick the palette's first five, Space and a drag pan (a piece under it too), F frames the hole,
-// T goes to Test, Escape comes back; the board's key line says them
+// T plays a quick test over the editor, Escape comes back to it as it was; the board's key line says them
 {
   const c = await editor(1280, 800);
   const key = async (key: string, code: string, type: "both" | "down" | "up" = "both") => {
@@ -310,14 +312,18 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const second = await name();
   assert.ok(first !== before && second !== first && /^[A-Z][a-z]+ [A-Z]/.test(first) && first.length <= 40, `the die: ${before} → ${first} → ${second}`);
   assert.equal(await c.js(`document.querySelector(".bhead__slug").value`), second.toLowerCase().replace(/[^a-z0-9]+/g, "-"), "the slug follows the name");
-  // T: to Test; Escape: back to the editor
+  // T: a quick test, over the editor, no address asked; Escape: back to the editor at the same zoom
+  await c.js(`document.querySelector(".bhead__roll").blur()`);
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
+  const at = await tee();
   await key("t", "KeyT");
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tmode")`)); k++) await sleep(300);
-  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tmode")`), "T: to Test");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip") && !document.querySelector(".tmode--ask")`), "T: a quick test, with no address step");
+  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__notes").textContent`), /not a proof/, "said to be no proof");
   await key("Escape", "Escape");
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".board__map")`)); k++) await sleep(300);
-  assert.ok(await c.ev<boolean>(`!!document.querySelector(".board__map")`), "Escape: back from Test to the editor");
+  for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".tbench--quick")`)); k++) await sleep(300);
+  const after = await tee();
+  assert.ok(!(await c.ev<boolean>(`!!document.querySelector(".tbench--quick")`)) && Math.abs(after[0] - at[0]) < 1 && Math.abs(after[1] - at[1]) < 1, `Escape: back to the editor at the same zoom (${at.join()} → ${after.join()})`);
   console.log("keys: ok");
   c.kill();
 }

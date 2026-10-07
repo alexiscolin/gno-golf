@@ -3,7 +3,7 @@
 // headless Chrome against a dev server with the Builder on, from /build to a
 // proved hole on the Publish form. It opens /build (the first run: the
 // Garden's dogleg and its hints), presses Got it, drags a Bumper onto the
-// starter, presses Test it, gives the address the hole is proved under, holes
+// starter, presses Prove it, pastes the address the hole is proved under, holes
 // each weather (each round found as scripts/starters.ts finds one, through
 // the page's own test chain, builder.wasm; each shot fired as an aim would
 // fire it, through the game's ?camlog hook, and counted as one drag), and
@@ -46,8 +46,8 @@ const stand = SEED
   : null;
 const env = stand ? stand.seedEnv(SEED) : null;
 const LIMIT_MS = 5 * 60_000;
-/** B6's budget for the starter path: Got it, Test it, Publish, and the address the hole is proved under. */
-const BUDGET = { clicks: 4, typed: 1 };
+/** B6's budget for the starter path: Got it, Prove it, the address the hole is proved under (pasted: its field shown, then used), Publish. */
+const BUDGET = { clicks: 5, typed: 1 };
 const AUTHOR = env ? env[KEY] : "g1" + "q".repeat(38);
 
 const t0 = Date.now();
@@ -104,7 +104,7 @@ try {
   // (the Bumper's tile: its picture, its name, what it does)
   const tile = await c.js<[number, number]>(`(() => { const b = [...document.querySelectorAll(".palette [data-tile]")].find((t) => t.querySelector(".piece__name")?.textContent === "Bumper"); const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   for (const [dx, dy] of [[6, -2.5], [6, 2.5], [9, -2], [12, 2.5]]) {
-    const to = await c.js<[number, number]>(`(() => { const svg = document.querySelector(".board__map"), t = document.querySelector("[data-end='tee'] circle"); const p = svg.createSVGPoint(); p.x = +t.getAttribute("cx") + ${dx}; p.y = +t.getAttribute("cy") + ${dy}; const s = p.matrixTransform(svg.getScreenCTM()); return [s.x, s.y]; })()`);
+    const to = await c.js<[number, number]>(`(() => { const m = document.querySelector(".board__plane").getScreenCTM(), r = document.querySelector("[data-end='tee'] circle").getBoundingClientRect(); const t = new DOMPoint(r.left + r.width / 2, r.top + r.height / 2).matrixTransform(m.inverse()), s = new DOMPoint(t.x + ${dx}, t.y + ${dy}).matrixTransform(m); return [s.x, s.y]; })()`);
     await mouse("mousePressed", ...tile);
     for (let k = 1; k <= 8; k++) {
       await mouse("mouseMoved", tile[0] + ((to[0] - tile[0]) * k) / 8, tile[1] + ((to[1] - tile[1]) * k) / 8);
@@ -119,13 +119,14 @@ try {
   if ((await c.js<number>(`document.querySelectorAll("[data-piece]").length`)) <= n0) throw new Error("no bumper placed");
   said("drag: a Bumper onto the board");
 
-  // Test it, under the author's address
-  await until(`!document.querySelector(".bhead__end .btn[aria-disabled]")`, "Test it on");
-  await click(button(/^Test it$/), "Test it");
+  // Prove it, under the author's address
+  await until(`!document.querySelector(".bhead__end .btn[aria-disabled]")`, "Prove it on");
+  await click(button(/^Prove it$/), "Prove it");
+  await click(button(/^Or paste an address/), "Or paste an address");
   await until(`!!document.querySelector(".tmode__addr input")`, "the address step");
   await c.js(`(() => { const el = document.querySelector(".tmode__addr input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, ${JSON.stringify(AUTHOR)}); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   count.typed++;
-  await click(button(/Test with this address/), "Test with this address");
+  await click(button(/^Use this address$/), "Use this address");
 
   // each weather holed: a round found through the page's test chain, then played shot by shot
   for (let w = 0; w < 6; w++) {
@@ -182,13 +183,13 @@ try {
   console.log(JSON.stringify({ seconds: Math.round(ms / 1000), ...count }));
   if (ms > LIMIT_MS) throw new Error(`over 5 minutes: ${Math.round(ms / 1000)} s`);
   if (count.clicks > BUDGET.clicks || count.typed > BUDGET.typed) throw new Error(`over budget: ${count.clicks} clicks, ${count.typed} fields typed`);
-  // past the path (not counted): a short wide window keeps the hole's card in sight; the Test step goes back to the test
+  // past the path (not counted): a short wide window keeps the hole's card in sight; the Prove step goes back to the test
   await c.send("Emulation.setDeviceMetricsOverride", { width: 1366, height: 650, deviceScaleFactor: 1, mobile: false });
   await sleep(800);
   const short = await c.js<{ b: number; h: number }>(`(() => { const r = document.querySelector(".pub__card").getBoundingClientRect(); return { b: r.bottom, h: innerHeight }; })()`);
   if (short.b > short.h) throw new Error(`1366x650: the hole's card is cut off the Publish form (${short.b} > ${short.h})`);
-  await c.js(`[...document.querySelectorAll(".step button")].find((b) => /Test/.test(b.textContent)).click()`);
-  await until(`!!document.querySelector(".tmode")`, "the Test step from Publish: test mode", 10_000);
+  await c.js(`[...document.querySelectorAll(".step button")].find((b) => /Prove/.test(b.textContent)).click()`);
+  await until(`!!document.querySelector(".tmode")`, "the Prove step from Publish: test mode", 10_000);
   if (wallet) {
     // published for real: back to Publish, Publish in Adena, signed by the stand-in, until the page says it landed
     await c.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
