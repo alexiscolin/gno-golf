@@ -254,7 +254,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           {head(true, "Your receipt")}
           <div className="receipt" id="receipt">
             <h3>Receipt: Gnogolf gnome purchase</h3>
-            {order && receipt({ ...order, at: step.when || 0, hash: step.hash, realm: shop.realm, chainId: (costs && costs.chainId) || "", explorer: "", consents: [BOX_A, BOX_B] }).map((l) => <p key={l}>{l}</p>)}
+            {order && receipt({ ...order, at: step.when || 0, hash: step.hash, realm: shop.realm, chainId: (costs && costs.chainId) || "", consents: [BOX_A, BOX_B] }).map((l) => <p key={l}>{l}</p>)}
           </div>
           <div className="gsheet__foot"><Button variant="primary" className="btn--wide" onClick={() => window.print()}>Print or save as PDF</Button></div>
         </>

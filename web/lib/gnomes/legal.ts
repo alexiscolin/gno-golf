@@ -72,7 +72,7 @@ export function review(o: Order): [string, string][] {
 /** The order's button (§1.3), the total in it. */
 export const orderButton = (total: number) => `Order with obligation to pay (${gnot(total)} GNOT): sign in wallet`;
 
-interface Receipt extends Order { at: number; hash: string; realm: string; chainId: string; explorer: string; consents: readonly string[] }
+interface Receipt extends Order { at: number; hash: string; realm: string; chainId: string; consents: readonly string[] }
 /** The receipt (§3), a line each: what the buyer prints or saves. consents: the boxes shown and ticked, word for word. */
 export function receipt(r: Receipt) {
   return [
@@ -81,7 +81,7 @@ export function receipt(r: Receipt) {
     `Item: ${r.name}, #${r.id}, ${TIER[r.tier] || r.tier}. Contract ${r.realm}`,
     `Price paid: ${gnot(r.price)} GNOT (+ network fee ${about(r.fee)} GNOT, storage deposit ${about(r.deposit)} GNOT held by the chain)`,
     `Delivered to: ${r.address}`,
-    `Transaction: ${r.hash} (permanent record on ${r.chainId}${r.explorer ? `: ${r.explorer}` : ""})`,
+    `Transaction: ${r.hash} (permanent record on ${r.chainId})`,
     `Terms accepted: Terms of Sale version ${TERMS_VERSION}`,
     `Your consents, as ticked: ${r.consents.map((c) => `"${c}"`).join("; ")}`,
     `No returns or refunds once final, except where the law requires them. Questions: ${SELLER.email}.`,
