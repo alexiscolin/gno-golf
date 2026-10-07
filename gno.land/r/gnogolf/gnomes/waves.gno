@@ -41,8 +41,9 @@ func SetPrice(cur realm, tierName string, ugnot int64) {
 
 // AddWave puts ids first to last on sale from start (unix seconds, block
 // time), to wallets with a record only for its first playerHours (0 for
-// none), at today's prices. Owner only; not once the genesis sale has
-// closed, for its ids (close.gno).
+// none), at today's prices. Owner only; refused until the genesis sale's
+// closing date is set, and for the genesis's ids once it has closed or from
+// a start at or after it (close.gno).
 func AddWave(cur realm, first, last, start, playerHours int64) {
 	assertOwner(0, cur)
 	if err := addWave(first, last, start, playerHours); err != nil {
@@ -59,7 +60,7 @@ func addWave(first, last, start, playerHours int64) error {
 	if first < 1 || first > last || last > lastID() {
 		return errors.New("gnomes: a wave is ids first to last of the catalogue")
 	}
-	if err := checkNotClosed(first, last); err != nil {
+	if err := checkCloseFor(first, start); err != nil {
 		return err
 	}
 	if playerHours < 0 || playerHours > maxHours {

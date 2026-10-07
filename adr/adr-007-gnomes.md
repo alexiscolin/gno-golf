@@ -67,8 +67,11 @@ gnome, at its wave's price, by the first who buys it: there is no auction,
 no escrow, no bid to refund.
 
 **The genesis sale closes on a date.** `SetCloseAt(at)`, owner only, once the
-genesis is published: a date in the future, which can later be brought
-forward, never pushed back, by this owner or the next. From its block on, the
+genesis is published and before anything is sold: `AddWave` and
+`SetMintOpen(true)` are refused until it is set, so no sale runs without an
+end. A date in the future, which can later be brought forward, never pushed
+back, by this owner or the next; no genesis wave may start at or after it,
+which nobody could buy from. From its block on, the
 genesis's unsold gnomes are closed for good: `Buy` and `AddWave` refuse
 them ("the genesis sale closed on <date>"), and its
 final supply is readable on chain (`Collection`: the series' `sold` and
@@ -246,6 +249,7 @@ the traits is the user's call.
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
+| AddWave, SetMintOpen | a sale opened with no end; a genesis wave that starts at or after the close | the date set first; a genesis wave starts before it | `TestTheCloseIsSetBeforeAnyWaveOrSale` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
 | Buy | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |

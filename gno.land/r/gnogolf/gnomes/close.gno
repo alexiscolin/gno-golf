@@ -7,10 +7,11 @@ import (
 )
 
 // The genesis sale's closing date (ADR-007). The owner sets it once the
-// genesis is published, and may bring it forward, never push it back: a
-// buyer can count on the date announced, and on no gnome of the genesis
-// being sold after it. From that block on, its unsold gnomes are closed for
-// good: Buy and AddWave refuse them, and the genesis's final
+// genesis is published, before any wave and before the sale opens, and may
+// bring it forward, never push it back: a buyer can count on the date
+// announced, and on no gnome of the genesis being sold after it. No genesis
+// wave starts at or after it. From that block on, its unsold gnomes are
+// closed for good: Buy and AddWave refuse them, and the genesis's final
 // supply is what was sold (Collection's "sold"). A later series is not closed by
 // it, and earned gnomes never are. 0 is no date set.
 var closeAt int64
@@ -49,19 +50,24 @@ func isClosed(id int64) bool {
 	return genesisClosed() && seriesAt(id) == 0 && !isSold(id)
 }
 
-// assertNotClosed panics when id's sale has closed.
-func assertNotClosed(id int64) {
-	if isClosed(id) {
-		panic(errClosedOn())
-	}
-}
-
 func errClosedOn() string { return "gnomes: the genesis sale closed on " + dateOf(closeAt) }
 
-// checkNotClosed is assertNotClosed for the ids first to last, as an error.
-func checkNotClosed(first, last int64) error {
-	if genesisClosed() && seriesAt(first) == 0 {
+const errNoClose = "gnomes: set the genesis sale's closing date first"
+
+// checkCloseFor checks a wave of ids from first, from start, against the
+// close: no wave until its date is set; for the genesis's ids (the first
+// series: a range is the genesis's when its first id is), none once it has
+// closed, nor one starting at or after it, which nobody could buy from.
+func checkCloseFor(first, start int64) error {
+	switch {
+	case closeAt == 0:
+		return errors.New(errNoClose)
+	case seriesAt(first) != 0:
+		return nil
+	case genesisClosed():
 		return errors.New(errClosedOn())
+	case start >= closeAt:
+		return errors.New("gnomes: a genesis wave starts before the genesis sale closes, on " + dateOf(closeAt))
 	}
 	return nil
 }

@@ -104,3 +104,24 @@ func TestTheCloseIsTheGenesissOnly(cur realm, t *testing.T) {
 func TestTheCloseDateReads(t *testing.T) {
 	uassert.Equal(t, "2026-11-30 18:00 UTC", dateOf(1796061600))
 }
+
+// The closing date comes first: no wave and no open sale until it is set,
+// and no genesis wave starting at or after it, which nobody could buy from.
+func TestTheCloseIsSetBeforeAnyWaveOrSale(cur realm, t *testing.T) {
+	setUp(0, cur, deployer)
+	urequire.NoError(t, addSeries(genesisName, placeholderGenesis()))
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.AbortsContains(t, cur, "closing date first", func() { AddWave(cross(cur), 1, 104, now(), 0) })
+	urequire.AbortsContains(t, cur, "closing date first", func() { SetMintOpen(cross(cur), true) })
+	SetMintOpen(cross(cur), false) // a pause needs none
+
+	at := now() + 3600
+	SetCloseAt(cross(cur), at)
+	urequire.ErrorContains(t, addWave(1, 104, at, 0), "before the genesis sale closes")
+	urequire.NoError(t, addWave(1, 104, at-5, 0))
+	SetMintOpen(cross(cur), true)
+	uassert.True(t, MintOpen())
+
+	urequire.NoError(t, addSeries("winter-2027", placeholderRows(721, [len(tiers)]int64{3})))
+	urequire.NoError(t, addWave(721, 723, at, 0), "a later series is not the genesis's")
+}

@@ -5,17 +5,20 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	gnomes "gno.land/r/gnogolf/gnomes"
 )
 
 // What publishing the genesis stores, which its owner pays: 720 rows kept
-// as one string, as the catalogue lays them out, and a wave over all of it:
+// as one string, as the catalogue lays them out, its closing date and a
+// wave over all of it:
 // 64,232 bytes, 6.4 GNOT of deposit at 100 ugnot a byte. z_storage_buy is
 // this plus a first buy.
 func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
+	gnomes.SetCloseAt(cross(cur), time.Now().Unix()+30*24*3600) // before any wave
 	gnomes.AddWave(cross(cur), 1, 720, 0, 0)
 	println(gnomes.Gnome("720"))
 }
@@ -58,4 +61,4 @@ func genesis() string {
 // gno.land/r/test/storedgenesis: 0
 
 // Gas:
-// 1403638473
+// 1403904458
