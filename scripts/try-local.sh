@@ -7,13 +7,14 @@
 #   scripts/try-local.sh          start it all (a new chain each time)
 #   scripts/try-local.sh wave2    open the gnomes' wave 2 now, on the chain running
 #   scripts/try-local.sh all      open every wave not yet open, now (testing only)
-#   scripts/try-local.sh close [days]  set the genesis's closing date, days from now (30); none is set at start
+#   scripts/try-local.sh close [days]  set the genesis's closing date, days from now (30), or bring it
+#                                 forward; none is set at start
 #   scripts/try-local.sh rebuild  build the site again from this checkout and swap it in, the chain and the
 #                                 links running all along (the old site serves until the new one is in)
 #   scripts/try-local.sh down     clean up after a crash: its processes and its Serve entries
 #
 # What it does: scripts/e2e-gnomes.sh SEED=1 starts gnodev (the onyx
-# toolchain's) and deploys physics, course, weblink, store, golf/v2 and
+# toolchain's) and deploys physics, course, weblink, jsonq, store, golf/v2 and
 # gnomes under the test name NS; publishes the Garden's eighteen holes; the
 # genesis series, wave 1 open (its players' window an hour), no closing date
 # (a launch may leave it unset: "close" sets one); community publishing open; the treasury moved to a test key; p1 and
@@ -58,6 +59,8 @@ cache=${XDG_CACHE_HOME:-$HOME/.cache}/gnogolf-try-local
 last=$cache/last # the WORK of the playground running, for `wave2` and `down`
 log() { printf '%s\n' "$*" >&2; }
 die() { log "try-local: $*"; exit 1; }
+# shellcheck source=lib/e2e.sh
+. "$root/scripts/lib/e2e.sh"
 tree() { local c; for c in $(pgrep -P "$1"); do tree "$c"; done; echo "$1"; } # a process and all it started
 # the site built as the real one is, with the playground's settings ($WORK/site.env), into a new folder, then swapped
 # in: $WORK/site is a link the server reads on every request, replaced in one rename. Kept: the build served until
@@ -100,14 +103,9 @@ chainnow() {
 }
 # a call by the collection's owner (test1) on the gnomes realm; refused: its reason in REFUSED
 owner() {
-	local fn=$1 a=() x out
-	shift
-	for x in "$@"; do a+=(-args "$x"); done
-	out=$(echo "$PASS" | "$GNOKEY" maketx call -home "$KH" -pkgpath "$GNOMES" -func "$fn" "${a[@]}" \
-		-gas-fee 5000000ugnot -gas-wanted 200000000 -remote "$RPC" -chainid "$CHAINID" -broadcast -insecure-password-stdin test1 2>&1)
-	printf %s "$out" | grep -q '^OK!' && return 0
-	REFUSED=$(printf %s "$out" | grep -o 'gnomes: [^"]*' | head -1)
-	[ -n "$REFUSED" ] || REFUSED=$(printf '%s\n' "$out" | tail -1)
+	RPC_ADDR=$RPC gnotx test1 "$GNOMES" "$@" && return 0
+	REFUSED=$(printf %s "$TXOUT" | grep -o 'gnomes: [^"]*' | head -1)
+	[ -n "$REFUSED" ] || REFUSED=$(printf '%s\n' "$TXOUT" | tail -1)
 	return 1
 }
 # a wave of data/gnomes.json (index from 0) on sale from NOW, its players' window as the catalogue says

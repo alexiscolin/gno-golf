@@ -21,15 +21,21 @@ var (
 // `gno test` runs init with no signer: each test starts from a fresh
 // collection owned by the deployer, the placeholder genesis published, one
 // wave over all of it on sale now with no player window, the mint open.
-func fresh(_ *testing.T, rlm realm) {
-	setUp(0, rlm, deployer)
-	if err := addSeries(genesisName, placeholderGenesis()); err != nil {
-		panic(err)
-	}
+func fresh(t *testing.T, rlm realm) {
+	published(t, rlm)
 	if err := addWave(1, genesisTotal(), now(), 0); err != nil {
 		panic(err)
 	}
 	mintOpen = true
+}
+
+// published is a fresh collection with the placeholder genesis published,
+// no closing date set.
+func published(_ *testing.T, rlm realm) {
+	setUp(0, rlm, deployer)
+	if err := addSeries(genesisName, placeholderGenesis()); err != nil {
+		panic(err)
+	}
 }
 
 // skip moves block time on by at least seconds (a block is 5 seconds).

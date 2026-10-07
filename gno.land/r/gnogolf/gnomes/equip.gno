@@ -4,6 +4,7 @@ import (
 	"chain"
 	"strings"
 
+	"gno.land/p/gnogolf/jsonq"
 	"gno.land/p/nt/grc721/v0"
 )
 
@@ -13,7 +14,7 @@ import (
 // game reads Worn (once a visit) and WornMany (once a board page, a rival),
 // and dresses the ball from the traits; Equipped is what was put on alone.
 
-// maxPlayers bounds EquippedMany.
+// maxPlayers bounds WornMany.
 const maxPlayers = 50
 
 // Equip wears gnome tid, which the caller must own; "" takes it off.
@@ -55,44 +56,8 @@ func equippedRow(player address) string {
 	if !ok {
 		return ""
 	}
-	return `"player":` + jsonString(player.String()) + `,"id":"` + tid + `","name":` + jsonString(g.name) +
-		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `}`
-}
-
-// EquippedMany is Equipped for the first 50 players of a comma-separated
-// list, those who wear one: {"version":1,"rows":[<Equipped's fields>, …]}.
-// Repeats and non-addresses are skipped, and count toward the 50, so the
-// walk stays short whatever the list.
-func EquippedMany(players string) string {
-	return manyRows(players, equippedRow)
-}
-
-// manyRows is row for the first 50 players of a comma-separated list, those
-// it gives one: repeats and non-addresses are skipped and count toward the
-// 50, so the walk stays short whatever the list.
-func manyRows(players string, row func(address) string) string {
-	var b strings.Builder
-	b.WriteString(`{"version":1,"rows":[`)
-	n := 0
-	seen := map[string]bool{}
-	for i, p := range strings.SplitN(players, ",", maxPlayers+1) {
-		if i == maxPlayers || players == "" {
-			break
-		}
-		if seen[p] || !address(p).IsValid() {
-			continue
-		}
-		seen[p] = true
-		if r := row(address(p)); r != "" {
-			if n > 0 {
-				b.WriteString(",")
-			}
-			b.WriteString("{" + r)
-			n++
-		}
-	}
-	b.WriteString("]}")
-	return b.String()
+	return `"player":` + jsonq.Quote(player.String()) + `,"id":"` + tid + `","name":` + jsonq.Quote(g.name) +
+		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonq.Quote(g.traits) + `}`
 }
 
 // Worn is the gnome player wears for everyone: the one put on with Equip
@@ -120,12 +85,35 @@ func wornRow(player address) string {
 	if !ok {
 		return ""
 	}
-	return `"player":` + jsonString(player.String()) + `,"id":"` + itoa(g.id) + `","name":` + jsonString(g.name) +
-		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonString(g.traits) + `,"equipped":false}`
+	return `"player":` + jsonq.Quote(player.String()) + `,"id":"` + itoa(g.id) + `","name":` + jsonq.Quote(g.name) +
+		`,"tier":"` + tierName(g.tier) + `","traits":` + jsonq.Quote(g.traits) + `,"equipped":false}`
 }
 
 // WornMany is Worn for the first 50 players of a comma-separated list, those
-// who wear one, as EquippedMany walks its list: {"version":1,"rows":[…]}.
+// who wear one: {"version":1,"rows":[<Worn's fields>, …]}. Repeats and
+// non-addresses are skipped, and count toward the 50, so the walk stays
+// short whatever the list.
 func WornMany(players string) string {
-	return manyRows(players, wornRow)
+	var b strings.Builder
+	b.WriteString(`{"version":1,"rows":[`)
+	n := 0
+	seen := map[string]bool{}
+	for i, p := range strings.SplitN(players, ",", maxPlayers+1) {
+		if i == maxPlayers || players == "" {
+			break
+		}
+		if seen[p] || !address(p).IsValid() {
+			continue
+		}
+		seen[p] = true
+		if r := wornRow(address(p)); r != "" {
+			if n > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString("{" + r)
+			n++
+		}
+	}
+	b.WriteString("]}")
+	return b.String()
 }

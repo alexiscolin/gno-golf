@@ -13,6 +13,14 @@ type Server = http.Server;
 const { playgroundServer } = (await import("../../scripts/playground-server.mjs")) as { playgroundServer: (o: { root: string; rpc: string }) => Server };
 
 const listen = (s: Server) => new Promise<number>((r) => s.listen(0, "127.0.0.1", () => r((s.address() as { port: number }).port)));
+/** A request sent with its path as written (fetch would normalize it). */
+const raw = (port: number, p: string) => new Promise<{ status: number; body: string }>((ok, ko) => {
+  http.get({ host: "127.0.0.1", port, path: p }, (r) => {
+    let b = "";
+    r.on("data", (c: Buffer) => (b += String(c)));
+    r.on("end", () => ok({ status: r.statusCode || 0, body: b }));
+  }).on("error", ko);
+});
 const get = async (port: number, p: string, init: RequestInit = {}) => {
   const r = await fetch(`http://127.0.0.1:${port}${p}`, { redirect: "manual", ...init });
   return { status: r.status, type: r.headers.get("content-type") || "", location: r.headers.get("location") || "", body: await r.text() };
@@ -30,9 +38,12 @@ void test("the playground serves the build as the static host does, and /rpc fro
   const node = http.createServer((req, res) => {
     let b = "";
     req.on("data", (c: Buffer) => (b += String(c)));
-    req.on("end", () => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ method: req.method, url: req.url, body: b })));
+    req.on("end", () => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ node: true, method: req.method, url: req.url, body: b })));
   });
   const nodePort = await listen(node);
+  // another server on this machine, which /rpc must never reach
+  const other = http.createServer((_req, res) => res.writeHead(200, { "content-type": "application/json" }).end('{"node":false}'));
+  const otherPort = await listen(other);
   const site = playgroundServer({ root: out, rpc: `http://127.0.0.1:${nodePort}` });
   const port = await listen(site);
   try {
@@ -43,11 +54,18 @@ void test("the playground serves the build as the static host does, and /rpc fro
     assert.equal((await get(port, "/golf.wasm")).type, "application/wasm");
     for (const p of ["/nowhere/", "/.secret", "/../outside.txt", "/%2e%2e/outside.txt", "/link.txt"]) assert.deepEqual(await get(port, p).then((r) => [r.status, r.body]), [404, "missing"], p);
     assert.equal((await get(port, "/", { method: "POST" })).status, 405);
-    assert.deepEqual(JSON.parse((await get(port, "/rpc/status?x=1")).body), { method: "GET", url: "/status?x=1", body: "" });
-    assert.deepEqual(JSON.parse((await get(port, "/rpc/", { method: "POST", body: '{"id":1}', headers: { "content-type": "application/json" } })).body), { method: "POST", url: "/", body: '{"id":1}' });
+    assert.deepEqual(JSON.parse((await get(port, "/rpc/status?x=1")).body), { node: true, method: "GET", url: "/status?x=1", body: "" });
+    assert.deepEqual(JSON.parse((await get(port, "/rpc/", { method: "POST", body: '{"id":1}', headers: { "content-type": "application/json" } })).body), { node: true, method: "POST", url: "/", body: '{"id":1}' });
+    // a path that would name another host (protocol-relative, a backslash, escaped): still this node, never another
+    for (const p of ["//127.0.0.1:%d/x", "/\\127.0.0.1:%d/x", "/%2F%2F127.0.0.1:%d/x"].map((p) => p.replace("%d", String(otherPort)))) {
+      const r = await raw(port, "/rpc" + p);
+      assert.equal(r.status, 200, p);
+      assert.equal((JSON.parse(r.body) as { node: boolean }).node, true, p);
+    }
   } finally {
     site.close();
     node.close();
+    other.close();
   }
   // the root a link swapped to a new build (try-local.sh rebuild): the next request is the new build's
   const v1 = path.join(dir, "site.1"), v2 = path.join(dir, "site.2"), link = path.join(dir, "site");

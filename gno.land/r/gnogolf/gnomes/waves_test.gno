@@ -10,11 +10,8 @@ import (
 )
 
 // noWave is a fresh collection with no wave yet.
-func noWave(_ *testing.T, rlm realm) {
-	setUp(0, rlm, deployer)
-	if err := addSeries(genesisName, placeholderGenesis()); err != nil {
-		panic(err)
-	}
+func noWave(t *testing.T, rlm realm) {
+	published(t, rlm)
 	mintOpen = true
 }
 

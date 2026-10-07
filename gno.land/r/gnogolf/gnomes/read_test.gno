@@ -15,7 +15,7 @@ func TestCollectionSaysWhatTheMintPageShows(cur realm, t *testing.T) {
 	fresh(t, cur)
 	w := waves[0]
 	uassert.Equal(t,
-		`{"version":1,"open":true,"closesAt":0,"owner":"`+deployer.String()+`","treasury":"`+deployer.String()+
+		`{"version":1,"open":true,"closesAt":`+itoa(closeAt)+`,"owner":"`+deployer.String()+`","treasury":"`+deployer.String()+
 			`","pendingTreasury":"","site":"","royaltyBps":500,`+
 			`"tiers":[{"name":"common","price":36000000,"cap":10,"playerCap":3,"sold":0},`+
 			`{"name":"rare","price":72000000,"cap":5,"playerCap":2,"sold":0},`+
@@ -101,10 +101,6 @@ func TestGnomesOfPagesAWallet(cur realm, t *testing.T) {
 }
 
 func countRows(s string) int { return strings.Count(s, `{"id":`) }
-
-func TestAJSONStringIsEscaped(t *testing.T) {
-	uassert.Equal(t, `"a\"b\\c\n\u0001"`, jsonString("a\"b\\c\n\x01"))
-}
 
 func TestReadsAreBounded(t *testing.T) {
 	urequire.True(t, pageSize <= 100)

@@ -10,8 +10,9 @@ research brief's waves, player window and prices
 at a fixed price, the Legendaries too (no auction: the user's decision of
 2026-10-06), a hard closing date for the genesis sale, a treasury apart
 from the owner's key, and a site link the owner sets. golf/v2 and store do
-not change. Nothing is deployed. Two points stay open for the user:
-`Renounce`, and a portrait drawn from the traits.
+not change. Nothing is deployed. One point stays open for the user:
+`Renounce`. The portrait drawn from the traits is built (`svg.gno`,
+`art.gno`).
 
 ## Context
 
@@ -66,9 +67,12 @@ realm. A Legendary is bought as any
 gnome, at its wave's price, by the first who buys it: there is no auction,
 no escrow, no bid to refund.
 
-**The genesis sale closes on a date.** `SetCloseAt(at)`, owner only, once the
-genesis is published: a date in the future, which can later be brought
-forward, never pushed back, by this owner or the next. From its block on, the
+**The genesis sale can close on a date.** None is set at deploy, and the
+sale runs on until the owner sets one (the user's decision of 2026-10-07):
+`SetCloseAt(at)`, owner only, once the genesis is published. A date in the
+future, which can later be brought forward, never pushed back, by this
+owner or the next; once one is set, no genesis wave may start at or after
+it, which nobody could buy from. From its block on, the
 genesis's unsold gnomes are closed for good: `Buy` and `AddWave` refuse
 them ("the genesis sale closed on <date>"), and its
 final supply is readable on chain (`Collection`: the series' `sold` and
@@ -129,6 +133,16 @@ address (a Ledger through gnokey or Adena). `SetMintOpen` stops every sale
 at once (not `MintEarned`, which sells nothing). Whether the role
 may be renounced is not decided: there is no `Renounce`.
 
+**New rules are the owner's to accept for the proof (ADR-012).** The
+earned gnomes' proof reads store's rows only while store's writer is the
+rules it reads (golf/v2 at deploy): after a rules change every proof
+refuses ("rules changed"), until the owner, having checked that the new
+rules keep `bests`, `copies` and `holes` as golf/v2 writes them, calls
+`AcceptRules(path)`. It takes store's current writer and nothing else, so
+the owner can follow a change store's own public delay has carried out,
+never point the proof elsewhere; it emits `RulesAccepted`. An earned gnome
+minted stays minted once, whatever the rules.
+
 **The site link is the owner's.** `SetSiteURL` sets the game's site, which
 a token's `external_url` names (`<site>g/<id>/`, an earned one's `<site>g/<kind>/`: the site's static pages); none is set at deploy,
 and until one is, the metadata has no `external_url`. The image is the
@@ -136,6 +150,8 @@ on-chain SVG, so nothing a wallet shows depends on the domain. The link
 follows golf/v2's `SetPlayURL` rule (https://, at most 100 of a-z, A-Z, 0-9
 and -._~/:%, no query or fragment), shared as `p/gnogolf/weblink`, and ends
 with "/"; golf/v2 keeps its own copy of the rule until its next version.
+Every string an answer carries is quoted by `p/gnogolf/jsonq`, golf/v2's
+`jstr` shared the same way (nothing escaped, nothing copied).
 
 **State in bptrees, no enumerable.** Measured with storage goldens: an avl
 row costs about 2 KB of deposit, `grc721/enumerable` added 5 to 9 KB to a
@@ -146,16 +162,17 @@ it leaves them and refuses to move an earned one.
 
 | what | bytes | deposit | golden |
 |---|---|---|---|
-| the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
+| the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink (p/gnogolf/jsonq, added since, is of weblink's size and not measured) | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
 | the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
-| a first buy (was 10,465 with enumerable and a traits copy) | 4,332 | 0.43 GNOT, the buyer | `z_storage_buy` |
-| an earned gnome | 4,038 | 0.40 GNOT, the player | `z_storage_earned` |
+| a first buy (was 10,465 with enumerable and a traits copy) | 3,850 | 0.39 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
+| an earned gnome | 3,555 | 0.36 GNOT, the player | `z_storage_earned` |
 
 | what | gas | measured by |
 |---|---|---|
-| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.37M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
-| the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
+| a first buy | 7.55M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens), two files the same but the `Buy` (the 2.37M given before left a `Gnome` read and the buyer's set-up in one of them alone) |
+| the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.2M | `z_proof_king` less `z_proof_seed` (`// Gas:` goldens) |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
+| `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
 
 The deploy's deposit is what a chain stores, not the source's size: the
 package and its preprocessed code, about one and a half times the staged
@@ -165,7 +182,6 @@ imports, then `gnokey maketx addpkg` of the staged weblink and gnomes on
 its in-process node: `STORAGE DELTA`), and agrees with the local chain's
 20.6 GNOT for gnomes before the portrait's art. `addpkg` is sent with a
 `-max-deposit` of 40 GNOT, as planned.
-| `TokenURI` of the heaviest portrait, gnome 199 (Figurehead Fen, an Epic: 8,170 bytes of data URI, the largest of the Genesis) | 76.0M; **83.08M on a chain** | `z_portrait_read` less `z_portrait_base`; a local chain from the onyx toolchain |
 
 Every figure above is `gno test`'s, and a chain charges more. `gno test`
 runs on a store with no gas meter: it never charges what a call pays to load
@@ -176,8 +192,8 @@ catalogue's 60 KB string and the ledger's nodes among it; a read of the
 catalogue (a buy, a proof's cups) pays its share too. The client's gas for
 a call is the chain's figure with a margin, never a filetest's.
 
-The King's proof is under the 300M the client will ask for `MintEarned` and
-of the order of golf's `Claim` (70.2M); a `GnomesOf` page of 100 is about
+The King's proof is of the order of golf's `Claim` (70.2M), and under the
+200M the e2e run sends `MintEarned` with (no client sends it yet); a `GnomesOf` page of 100 is about
 210M, far under a query's 3e9.
 
 **Wearing is free.** Every player wears their best gnome (the highest tier
@@ -190,8 +206,8 @@ gnome they hold, kept in their browser: nothing on chain. To make the best
 one row away, a holder's index sorts best first (`"<holder> <rank><id>"`,
 the last tier's rank 0): `GnomesOf` and `TokenOfOwnerByIndex` list a
 wallet as its team is shown, Legendary first, and a sale writes the rank
-from the row it has already read (one byte more a row; a first buy 2.37M
-gas, 2.35M before).
+from the row it has already read (one byte more a row, about 20K more gas
+a first buy).
 
 **Where the shop opens.** The free game plays everywhere; the shop is not
 offered in mainland China nor under the comprehensive sanctions (Cuba, Iran,
@@ -200,8 +216,8 @@ buy sheet asks for their consent to delivery at once. At zero server cost:
 Netlify's country rules (`netlify.toml`) rewrite `/geo.json` to
 `/geo-blocked.json` and a gnome's page `/g/*` to a static "not available in
 your region" page for those countries; the client reads `/geo.json` once
-when the shop would open and, shut, hides the shop, its links and every buy,
-buy and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
+when the shop would open and, shut, hides the shop, its links and every buy
+and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
 tests holding both rules to it). Best effort, and said so: a VPN gets round
 it, and the realm stays callable with gnokey by anyone; a realm cannot know
 a caller's country.
@@ -211,8 +227,7 @@ a caller's country.
 id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
 enough to draw a collection with no call per token; `total`, `next`;
 a player's album and collector rank are read from it: ADR-011),
-`Equipped`, `EquippedMany` (the first 50 players of a list), `Worn` and
-`WornMany` (below),
+`Equipped`, `Worn` and `WornMany` (the first 50 players of a list: below),
 `Proof`; `CanBuy(buyer, ids)`, the mint page's answer before any
 signature: `ok`, a `reason` code (`ids`, `paused`, `unknown`,
 `unlisted`, `later`, `taken`, `closed`, `players-only`, `wave-cap`, `cap`:
@@ -226,8 +241,8 @@ GRC721 surface (`TokenOfOwnerByIndex` from the locker's index, no
 `external_url`, attributes Tier, Series and an earned gnome's Kind);
 `Render` for gnoweb (the collection, a gnome with a `gnokey` line to buy it
 while on sale, an earned kind, a player).
-`TokenURI` is an SVG drawn on read, its name escaped; a portrait drawn from
-the traits is the user's call.
+`TokenURI` is the gnome's portrait, an SVG drawn on read from its traits
+(`svg.gno`, `art.gno`), its name escaped.
 
 ## Threats, and the test for each
 
@@ -246,6 +261,7 @@ the traits is the user's call.
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
+| AddWave | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it | `TestAWaveStartsBeforeTheCloseOnceOneIsSet` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
 | Buy | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |
@@ -258,12 +274,13 @@ the traits is the user's call.
 | Transfer, Accept | the money moved with the owner's role | the treasury stays | `TestAnOwnerHandoverLeavesTheTreasury`, `TestTheOwnerHandsOverInTwoSteps` |
 | Buy, Sweep, royalty | a payment to the owner or kept by the realm | the treasury, in the same call | `TestTheTreasuryMovesInTwoSteps`, `TestTheSweepPaysTheTreasury` |
 | SetSiteURL | a link that breaks out of a page or points off https | golf's play link rule | `TestTheOwnerMovesTheSite` |
+| AcceptRules, MintEarned | proofs read from rules with another layout; the proof pointed at a realm store has not moved to; accepted by another; a kind minted twice across a change | store's current writer only; owner only; the earned tree kept | `TestTheOwnerAcceptsOnlyStoresNewRules`, `TestNewRulesProveNothing`, `TestNewRulesRefuseTheMint` |
 | init | a deploy with no signer | refused off `dev` | `TestTheDeployerOwns` |
 | TransferFrom, Approve | a realm moves its caller's gnomes | the ledger's caller teller | `TestARealmCannotMoveItsCallersGnomes`, `TestTransfersGoThroughTheLedgersChecks` |
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |
 | AddSeries | a malformed row; a gap; growth without bound | checked whole; 64 series of 1,000 rows | `TestASeriesIsRefusedWhole`, `TestASeriesIsBounded` |
 | AddWave | overlaps; too many | checked; 64 waves | `TestAWaveIsCheckedWhole`, `TestTheWavesAreBounded` |
-| reads | a query made unbounded | bounded pages and lists | `TestEquippedManyAnswersABoardPage`, `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
+| reads | a query made unbounded | bounded pages and lists | `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
 | Worn | a gnome shown that the player no longer owns; the best-first index left behind by a transfer or a burn | equipped only while owned; the holder's row moved by the ledger's hook and Burn | `TestEquipShowsAnotherGnomeToEveryone`, `TestAnEarnedGnomeIsWornLast` |
 | TokenURI, TokenMetadata | markup or JSON in a name | escaped | `TestANameCannotInjectMarkup`, `TestMetadataEscapesTheName` |
 | TokenMetadata | an earned gnome's link to a page the static site never builds (one per earned id) | its kind's page, `g/<kind>/` | `TestAnEarnedTokensMetadataNamesItsKind` |
@@ -271,8 +288,12 @@ the traits is the user's call.
 Reentrancy: the only calls out are to the banker, which runs no code, and
 store's reads, which write nothing; each send comes after the state is
 written. Overflow: a Buy's sum is at most 5 times the highest price
-SetPrice takes. Not tested, and not built: `Renounce` (open); the close is a
-date in block time, so it holds whatever becomes of the owner.
+SetPrice takes. Not tested, and not built: `Renounce` (open), so no
+`OwnershipRenounced`; the close is a date in block time, so it holds
+whatever becomes of the owner. Not built either: the spec's `SetRoyaltyBps`
+and its `RoyaltySet`: the royalty is a constant (5%, config.gno). The
+setters' events are the spec's names (`CloseAtSet`, `SiteURLSet`, …),
+`z_setter_events` holding the two.
 
 ## Consequences
 
@@ -282,16 +303,22 @@ date in block time, so it holds whatever becomes of the owner.
 - The client draws a gnome from its traits; an unknown version or trait
   falls back to a plain gnome (the client's side, not this realm's).
 - Store's layout is now read by a second realm: `totals` for the player
-  window, `slots`, `bests`, `copies` and `holes` for the proof. Rules that
-  change them must keep the same answers, or the proof refuses until gnomes
-  is updated.
+  window, `slots`, `bests`, `copies` and `holes` for the proof. After a
+  rules change the proof refuses until the owner accepts the new rules
+  (`AcceptRules`, ADR-012), which they do only once those rows keep the
+  same answers; rules that change them need a proof of their own, not an
+  acceptance.
 - `scripts/stage.sh` stages `r/gnogolf/gnomes` beside store; the proof's
   golf/v2 path is rewritten with the other paths.
 - After deploy the owner sets the site (`SetSiteURL`) and moves the
   treasury to its own address (`SetTreasury`, then `AcceptTreasury` from
   that address), before the genesis is published.
-- `p/gnogolf/weblink` is one more package to deploy, before gnomes
-  (stage.sh stages it).
+- At each rules release, once the new rules' 72 hours are over and they are
+  store's writer, the gnomes owner checks their `bests`, `copies` and
+  `holes` and calls `AcceptRules(<the new rules' path>)`; until then the
+  earned gnomes are paused.
+- `p/gnogolf/weblink` and `p/gnogolf/jsonq` are two more packages to
+  deploy, before gnomes (stage.sh stages them).
 - In `gno test`, a recovered call's writes are not reverted (golf's
   `z_worst_shot` notes the same): the earned veto is tested as an abort, and
   on chain the abort reverts the whole call.

@@ -17,11 +17,11 @@ const NOW = 1_800_000_000;
 const made: string[] = [];
 after(() => made.forEach((d) => fs.rmSync(d, { recursive: true, force: true })));
 
-/** A copy of the scripts and the catalogue in a folder of its own, a playground "running" from it. */
+/** A copy of the scripts (try-local.sh and the helpers it sources) and the catalogue in a folder of its own, a playground "running" from it. */
 function playground(rpc: string, gnokeySays: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "try-local-")), work = path.join(dir, "cache/gnogolf-try-local/run.x");
   made.push(dir);
-  for (const f of ["scripts/try-local.sh", "data/gnomes.json"]) fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }), fs.copyFileSync(path.join(repo, f), path.join(dir, f));
+  for (const f of ["scripts/try-local.sh", "scripts/lib/e2e.sh", "data/gnomes.json"]) fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }), fs.copyFileSync(path.join(repo, f), path.join(dir, f));
   fs.mkdirSync(work, { recursive: true });
   fs.writeFileSync(path.join(dir, "cache/gnogolf-try-local/last"), work);
   const bin = path.join(dir, "bin");

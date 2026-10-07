@@ -239,19 +239,25 @@ The details are in [docs/golf.md](docs/golf.md#who-can-change-what).
 ```
 gno.land/p/gnogolf/physics   2D rolling-ball engine
 gno.land/p/gnogolf/course    the hole contract and the weather
+gno.land/p/gnogolf/weblink   the rule a link an owner sets follows (golf/v2's, shared)
+gno.land/p/gnogolf/jsonq     a string quoted as JSON (golf/v2's jstr, shared)
 gno.land/r/gnogolf/store     the records: every hole, round, best, board and standing
 gno.land/r/gnogolf/golf/v2   the rules: rounds, previews, boards, gnoweb page (the only writer of store)
 gno.land/r/gnogolf/golf      v1, the rules before: on onyx, its records copied into v2
+gno.land/r/gnogolf/gnomes    the gnomes: the catalogue, its sale in waves, the earned ones (ADR-007)
 gno.land/r/gnogolf/<hole>    each course hole's source
 web/                         Next.js + three.js client (static export)
 web/lib/builder              the hole Builder's logic: the palette, the draft, the checks, test mode, publishing
 web/lib/sim                  golf.wasm (the aim previews) and builder.wasm (the Builder), built by scripts/wasm.sh
+web/lib/gnomes               the gnomes: the catalogue's pure reads, the looks, the shop
 data/holes.txt               the course as data, one line per slot
+data/gnomes/                 the gnome catalogue's sources, which make data/gnomes.json (ADR-008)
 ```
 
 On a chain, the deployed packages sit under their owner's name and the game's
 sub-path: `p/<ns>/gnogolf/physics`, `p/<ns>/gnogolf/course`,
-`r/<ns>/gnogolf/store` and `r/<ns>/gnogolf/golf/v2` (and v1 on onyx).
+`p/<ns>/gnogolf/weblink`, `p/<ns>/gnogolf/jsonq`, `r/<ns>/gnogolf/store`,
+`r/<ns>/gnogolf/golf/v2` and `r/<ns>/gnogolf/gnomes` (and v1 on onyx).
 `scripts/stage.sh <ns>` stages them so (`MAINNET=1`: without v1 and the import
 of its records), and `scripts/importv1.sh` copies onyx's v1 records into v2.
 
@@ -264,4 +270,6 @@ of its records), and `scripts/importv1.sh` copies onyx's v1 records into v2.
 - [docs/leaderboards.md](docs/leaderboards.md): the boards, the ghost duels, and the bot check.
 - [CLIENT.md](CLIENT.md): how to write a client.
 - [docs/analytics.md](docs/analytics.md): the anonymous audience measurement.
+- [docs/gnomes/design.md](docs/gnomes/design.md): the gnome collection: the rules every gnome is made to.
+- [docs/try-local.md](docs/try-local.md): the whole game on this machine, to try by hand.
 - [adr/](adr/): the architecture decisions.

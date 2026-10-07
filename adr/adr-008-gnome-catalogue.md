@@ -72,10 +72,10 @@ designing as a system.
   | Common | 36 | the par of nine holes |
   | Rare | 72 | the par of a course |
   | Epic | 336 | the dimples on a golf ball |
-  | Legendary | 1,296, the auction's reserve | eighteen holes at par 72 (18 × 72) |
+  | Legendary | 1,296 | eighteen holes at par 72 (18 × 72) |
 
   Were every one sold at these: 504 × 36 + 144 × 72 + 65 × 336 + 7 × 1,296
-  = 59,424 GNOT (the Legendaries at their reserves).
+  = 59,424 GNOT.
 - **The screens read pure functions** of `web/lib/gnomes/` (`entryOf`,
   `filterGnomes`, `traitRows`, `TIER_LOOK`, `skinOfTraits`) over the
   catalogue: no 3D needed to list, sort, filter or describe a gnome.

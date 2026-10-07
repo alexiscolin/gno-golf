@@ -3,6 +3,7 @@ package gnomes
 import (
 	"errors"
 
+	"gno.land/p/gnogolf/jsonq"
 	"gno.land/p/nt/grc721/v0"
 )
 
@@ -36,7 +37,7 @@ func TokenMetadata(tid string) (string, error) {
 		}
 		link = `,"external_url":"` + siteURL + "g/" + page + `/"`
 	}
-	return `{"name":` + jsonString(g.name) + `,"description":` + jsonString(describe(g)) + `,"image":"` + image + `"` +
+	return `{"name":` + jsonq.Quote(g.name) + `,"description":` + jsonq.Quote(describe(g)) + `,"image":"` + image + `"` +
 		link + `,"attributes":[` + attrs + `]}`, nil
 }
 

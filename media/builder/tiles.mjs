@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { launch, sleep } from "../lib/cdp.mjs";
+import { bundledPage, SEEDED, sheet, webpUnder } from "../lib/page.mjs";
 
 const ROOT = new URL("../../", import.meta.url), WEB = new URL("web/", ROOT);
 const OUT = new URL("web/public/builder/tiles/", ROOT);
@@ -33,33 +33,15 @@ const jobs = JSON.parse(fs.readFileSync(holes, "utf8"));
 
 // the showcase bundled for the page, with the same throw of the dice every time: a picture made twice is the same
 const ENTRY = `import { makePieceShowcase } from "./web/lib/scene/piece-showcase";
-let seed = 7;
-Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+${SEEDED}
 const s = makePieceShowcase(${RENDER});
 window.shot = (state, mid, span, lift, px, q, from) => ((seed = 7), s.shot(state, mid, span, lift, px, q, from));
 window.ready = true;`;
-const bundle = path.join(tmp, "tiles.js");
-// (from stdin, its imports resolve from the working directory: the repo's root)
-execFileSync("npx", ["--yes", "esbuild@0.24.2", "--bundle", "--format=iife", "--sourcefile=tiles.js", `--outfile=${bundle}`, "--log-level=warning", "--define:process.env.NODE_ENV=\"production\""], {
-  input: ENTRY, stdio: ["pipe", "inherit", "inherit"], cwd: ROOT.pathname,
-});
-
-const b = await launch({ width: 600, height: 600 });
-await b.send("Page.navigate", { url: "about:blank" });
-await sleep(300);
-await b.js(fs.readFileSync(bundle, "utf8") + ";1");
-if (!(await b.ev("window.ready"))) throw new Error(`the showcase did not start: ${b.errors.slice(0, 3)}`);
+// (its imports resolve from the repo's root; piece-showcase's own imports read process.env)
+const b = await bundledPage(ENTRY, { cwd: ROOT.pathname, name: "tiles.js", define: { "process.env.NODE_ENV": '"production"' }, width: 600, height: 600 });
 
 /** A job's WebP at the best quality that keeps under MAX_BYTES. @param {typeof jobs[number]} j */
-async function webp(j) {
-  let out = Buffer.alloc(0);
-  for (let q = 0.86; q >= 0.3; q -= 0.06) {
-    const url = await b.js(`shot(${JSON.stringify(j.state)}, ${JSON.stringify(j.mid)}, ${j.span}, ${j.lift}, ${PX}, ${q.toFixed(2)}, ${JSON.stringify(j.from)})`);
-    out = Buffer.from(url.split(",")[1], "base64");
-    if (out.length <= MAX_BYTES) break;
-  }
-  return out;
-}
+const webp = (j) => webpUnder((q) => b.js(`shot(${JSON.stringify(j.state)}, ${JSON.stringify(j.mid)}, ${j.span}, ${j.lift}, ${PX}, ${q}, ${JSON.stringify(j.from)})`), MAX_BYTES, 0.86);
 
 let bytes = 0, most = 0;
 for (const j of jobs) {
@@ -75,14 +57,10 @@ if (b.errors.length) console.log("page errors:", b.errors.slice(0, 5));
 if (sheetDir) {
   // a sheet a world: every picture, its file under it
   fs.mkdirSync(sheetDir, { recursive: true });
-  const { frameTree } = await b.send("Page.getFrameTree");
   for (const world of [...new Set(jobs.map((j) => j.world))]) {
     const mine = jobs.filter((j) => j.world === world), rows = Math.ceil(mine.length / 10);
-    await b.send("Emulation.setDeviceMetricsOverride", { width: 10 * 150, height: rows * 170, deviceScaleFactor: 1, mobile: false });
     const cells = mine.map((j) => `<figure><img src="data:image/webp;base64,${fs.readFileSync(new URL(j.file, OUT)).toString("base64")}"><figcaption>${j.file.split("/")[1].replace(".webp", "")}</figcaption></figure>`).join("");
-    await b.send("Page.setDocumentContent", { frameId: frameTree.frame.id, html: `<style>body{margin:0;display:grid;grid-template-columns:repeat(10,150px);font:11px system-ui;background:#fff}figure{margin:0;width:150px;height:170px;overflow:hidden}img{width:144px;height:144px;margin:3px}figcaption{white-space:nowrap;overflow:hidden;padding:0 4px}</style>${cells}` });
-    await sleep(500);
-    const jpg = Buffer.from((await b.send("Page.captureScreenshot", { format: "jpeg", quality: 82 })).data, "base64");
+    const jpg = await sheet(b, `<style>body{margin:0;display:grid;grid-template-columns:repeat(10,150px);font:11px system-ui;background:#fff}figure{margin:0;width:150px;height:170px;overflow:hidden}img{width:144px;height:144px;margin:3px}figcaption{white-space:nowrap;overflow:hidden;padding:0 4px}</style>${cells}`, 10 * 150, rows * 170, 82);
     fs.writeFileSync(path.join(sheetDir, `${world}.jpg`), jpg);
   }
   console.log(`contact sheets in ${sheetDir}`);

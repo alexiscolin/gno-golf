@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 
 const CONFIG = new URL("../next.config.mjs", import.meta.url).href;
 /** The config as next.config.mjs exports it under env, or the error it throws. */
@@ -35,4 +36,14 @@ void test("Netlify's production build refuses the playground's variables", () =>
     assert.equal(config, null, k);
     assert.match(error, new RegExp(`no ${k}`));
   }
+});
+
+void test("every variable the production build asks for or refuses is in netlify.toml, which its error names", () => {
+  const { error } = load({ ...SITE, NEXT_PUBLIC_REALM: "", NEXT_PUBLIC_GNOMES: "1", NEXT_PUBLIC_PLAYGROUND: "1", NEXT_PUBLIC_WALLET_RPC: "1", NEXT_PUBLIC_TEST_HOOKS: "1" });
+  assert.match(error, /see netlify\.toml/);
+  const named = [...new Set(error.match(/NEXT_PUBLIC_[A-Z_]+/g))];
+  assert.ok(named.length >= 11, error);
+  const toml = fs.readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8");
+  const header = toml.slice(0, toml.indexOf("[build]"));
+  assert.deepEqual(named.filter((k) => !new RegExp(`\\b${k}\\b`).test(header)), []);
 });

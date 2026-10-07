@@ -12,7 +12,7 @@ import (
 // The four classic cups as golf/v2 keeps them in store (slotKey,
 // encodeEntry, bestOf): 72 current versions, each with a best in both modes
 // for one player. z_proof_king seeds the same, then asks Proof("king"): the
-// difference of their gas is the heaviest proof.
+// difference of their gas (the `// Gas:` goldens) is the heaviest proof.
 func f(s string) string { return strconv.Itoa(len(s)) + ":" + s }
 
 func main(cur realm) {
@@ -40,3 +40,6 @@ func main(cur realm) {
 
 // Output:
 // 72
+
+// Gas:
+// 68166612

@@ -94,6 +94,15 @@ func TestWornManyAnswersABoardPage(cur realm, t *testing.T) {
 	got := WornMany(alice.String() + ",nope," + bob.String() + "," + alice.String() + "," + nobody.String())
 	uassert.Equal(t, `{"version":1,"rows":[`+row(alice, common())+","+row(bob, nthOfTier(1, 0))+"]}", got, "those who hold one, once each, in order")
 	uassert.Equal(t, `{"version":1,"rows":[]}`, WornMany(""))
+
+	// past the first 50 players (repeats and junk count, so the walk stays
+	// short), the rest are not read
+	many := ""
+	for i := 0; i < maxPlayers; i++ {
+		many += testutils.TestAddress("p"+itoa(int64(i))).String() + ","
+	}
+	uassert.Equal(t, `{"version":1,"rows":[]}`, WornMany(many+alice.String()))
+	uassert.Equal(t, `{"version":1,"rows":[`+row(alice, common())+`]}`, WornMany(alice.String()+","+many))
 }
 
 // mintEarnedFor gives who earned kind k (1 to 9) as MintEarned does once proven.

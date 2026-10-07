@@ -15,7 +15,7 @@ import { STARTERS } from "../lib/builder/starters.ts";
 import { canonicalHex } from "../lib/builder/proof.ts";
 import { writeHole } from "../lib/builder/gg1.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { hostileHoles } from "../lib/hostile.ts";
+import { hostileHoles } from "./hostile.ts";
 import type { Draft } from "../lib/builder/draft.ts";
 import type { GHole } from "../lib/builder/types.ts";
 
