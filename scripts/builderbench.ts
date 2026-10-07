@@ -165,8 +165,12 @@ await sleep(1500);
 const lost = { whileLost, backIn3d: await c.js<boolean>(`!!document.querySelector(".board--3d") && !document.querySelector(".board__ground")`), drawn: (await c.js<number>(`window.__renders`)) > renders1 };
 
 // the island's module blocked, the hole moved there: left where it is, said, nothing thrown; unblocked, moved and built
-await c.send("Network.enable");
-await c.send("Network.setBlockedURLs", { urls: ["*lib_scene_island*"] });
+// (in the page: any script not loaded yet fails, as offline would; the island's own chunk is one of them, whatever a
+// production build names it)
+await c.js(`(() => { const seen = new Set(performance.getEntriesByType("resource").map((e) => e.name)); window.__offline = true;
+  const off = (n) => window.__offline && n && n.tagName === "SCRIPT" && n.src && !seen.has(n.src) && (n.src = location.origin + "/__offline__.js");
+  for (const k of ["appendChild", "insertBefore"]) { const f = Node.prototype[k]; Node.prototype[k] = function (n, ...r) { off(n); return f.call(this, n, ...r); }; }
+  return true; })()`);
 const islandBuilds = await builds(), errors0 = c.errors.length;
 const toIsland = () => c.js(`(() => { const el = document.querySelector('select[aria-label="The hole\\'s world"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, "island"); el.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 await toIsland();
@@ -176,8 +180,8 @@ for (let k = 0; k < 25 && !said; k++) {
   said = await c.js<string>(`document.querySelector(".board__said")?.textContent ?? ""`);
 }
 await sleep(2000);
-const offline = { built: (await builds()) - islandBuilds, said, thrown: c.errors.slice(errors0).filter((e) => !/Failed to load resource/.test(String(e))) };
-await c.send("Network.setBlockedURLs", { urls: [] });
+const offline = { built: (await builds()) - islandBuilds, said, thrown: c.errors.slice(errors0).filter((e) => !/Failed to load resource|__offline__/.test(String(e))) };
+await c.js(`window.__offline = false`);
 await toIsland();
 await sleep(2500);
 const world = { ...offline, builtAgain: (await builds()) - islandBuilds - offline.built };
