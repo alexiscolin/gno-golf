@@ -9,6 +9,7 @@ import type { HoleRow, Versions } from "../types";
 import type { Draft } from "./draft";
 import type { LocalChain } from "./localchain";
 import { periodFor, required } from "./proof";
+import { calmPeriod } from "./quickshot";
 import type { BuilderHost } from "./wasm";
 
 /** The id the draft will be published under: the alias's next version (Versions), the first for a new alias. */
@@ -30,4 +31,16 @@ export function holeRow(id: string, d: Draft): HoleRow {
 /** The chain the engine plays the draft on: the local one's reads over the network's; the hole's data the draft's bytes, its chain none the takedown list names. */
 export function testChain(base: Chain, local: LocalChain, hex: string): Chain {
   return { ...base, ...local, holeData: () => Promise.resolve(hex), chainId: () => Promise.resolve("builder") };
+}
+
+/** The id a quick test plays the draft under: no author's (no address is asked), and no proof is ever kept for it. */
+export const QUICK_HOLE = "quick/test/v1";
+
+/** A quick test's one weather: calm, at its period (quickshot.ts calmPeriod), the draft loaded under id first. */
+export const quickPlan = (host: Pick<BuilderHost, "setperiod" | "find">, id: string): { kind: string; period: number }[] => [{ kind: "", period: calmPeriod(host, id) }];
+
+/** A weather's time in play, as its chip says it: "0:14.2". */
+export function clock(ms: number): string {
+  const t = Math.floor(ms / 100), s = Math.floor(t / 10);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}.${t % 10}`;
 }

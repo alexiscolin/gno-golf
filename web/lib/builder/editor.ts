@@ -30,7 +30,7 @@ export function verdict({ pieces, errors, proved, off = "", rounds }: { pieces: 
     const more = rounds.broken.length - 1;
     return { ok: true, warn: true, text: `${rounds.broken[0]}${more ? ` · and ${more} more` : rounds.kept.length ? ` · ${weathers(rounds.kept)} still holed` : ""}` };
   }
-  return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready to test: press Test it." };
+  return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready: press T to try it, or Prove it." };
 }
 
 /**

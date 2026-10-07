@@ -449,3 +449,14 @@
 .board__toggle { padding: 4px var(--sp-3); border: 1.5px solid var(--ink); border-radius: var(--pill); background: rgba(var(--paper-rgb), .92); font: 700 13px var(--font); color: var(--ink); white-space: nowrap; cursor: pointer; }
 .board__toggle[aria-pressed="true"] { background: var(--gold); }
 .board__toggle:disabled { opacity: .6; cursor: default; }
+/* a quick test, over the editor (kept open below it): its bar where Test's header is */
+.tbench--quick { z-index: 5; background: var(--paper); }
+.qbar { position: absolute; left: var(--sp-3); right: var(--sp-3); top: var(--sp-3); z-index: 2; display: flex; align-items: center; gap: var(--sp-3); min-height: 64px; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: rgba(var(--paper-rgb), .96); font-size: 15px; }
+.qbar b { font-size: 18px; }
+.qbar span { color: var(--ink-soft); font-weight: 700; }
+.qbar .btn { margin: 0 0 0 auto; }
+.tmode__time { margin-left: var(--sp-1); font-size: 12px; font-weight: 700; opacity: .75; }
+.tmode__small { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.board__toggle[aria-disabled="true"] { opacity: .6; cursor: default; }
+.board__toggle kbd { margin-left: var(--sp-1); }
+.tmode__small a { color: var(--green); font-weight: 700; }

@@ -301,13 +301,13 @@ the chain's checks in the wasm, the proofs):
   classic world (the Garden's dogleg, par 3), a playable hole that passes
   every check, **not yet holed** (a proof is bound to its author's address and
   the hole's id: a starter cannot ship one), with **three short hints, dismissible at once** ("Got it"), never a
-  tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press Test
-  it to play your hole" (at the big button), ③ "Then Publish, once holed in
+  tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press T to
+  try it, Prove it to make it count" (at the big button), ③ "Then Publish, once holed in
   every weather" (at the steps). They show on the first visit only, and
   never over the 3D. The header's "?" shows them again in one panel with,
   under them, a one-screen glossary of the world's pieces: each palette
   tile's picture, its name and what it does.
-- **The next step is always one big button**, top right: "Test it" (gold),
+- **The next step is always one big button**, top right: "Prove it" (gold),
   then "Publish →" (blue). When it waits, the reason sits beside it in a few
   words ("1 thing to fix ↓") and, in full, in the player's words under the
   board.
@@ -386,7 +386,7 @@ near, proved, world; at 1440, 1280 and 1024.
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
   sliders: size, bounce, timing). Nothing selected: "Click a piece to change
   it. Drag its handles to size and turn it."
-- **The checks** (one line under the board): "Ready to test: press Test it."
+- **The checks** (one line under the board): "Ready: press T to try it, or Prove it."
   or the one thing to fix, in words, with "Show me"; a limit appears only
   when near ("Bumpers and posts: 27 of 32 · room for 5 more"), amber; the
   full gauges are the hole-builder spec's, behind the limit's tap.
@@ -399,18 +399,35 @@ near, proved, world; at 1440, 1280 and 1024.
   first weather not proved. Only the author's own rounds are replayed: the
   solver never makes a proof.
 
-### B4. Test
+### B4. Quick test and Prove
 
-`builder-test.html`: address, playing, proved, missed. First, once, the
-address the hole is proved under (its proofs are bound to it): with Adena,
-"Connect"; without, one field and "Test with this address". Then the game
-takes the window under the header; the weathers to beat as chips that tick when holed (☀
-Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –", then the suggested par;
-a round that does not count says why in one line. The big button: "Back to
-edit", then "Publish →". The next weather starts by itself. Each weather
-proved plays the cup's sound; the last one gets a small celebration: the
-chips fill one by one, a little confetti, a chime, and "Publish →" pulses
-three times (no motion with reduced motion).
+Two ways to play the hole, and only one counts.
+
+- **Quick test** (T, or "Quick test" on the board): the game, at once, over
+  the editor, in calm weather only; no address asked, nothing replayed,
+  nothing proved ("Quick test: calm weather, not a proof. Prove it to
+  publish."). Escape, or "Back to edit", returns to the editor as it was
+  left: the same zoom, selection, history and quick shots.
+- **Prove it** (the big button; the steps say Edit → Prove → Publish):
+  `builder-test.html`: address, playing, proved, missed. First, once, the
+  address the hole is proved under, Prove's alone: "Sign your hole", "Your
+  address is part of its name and sets its weather, so your proofs still
+  count when you publish. Nothing is signed now.", the primary "Use my Adena
+  address" (without Adena, one line: "No Adena here: get it at adena.app,
+  then come back."), and "Or paste an address (g1…)", which shows the field
+  and "Use this address". Then the game takes the window under the header,
+  on the first weather not proved (those proved already were replayed by the
+  editor, B3); the weathers to beat as chips that tick when holed, each with
+  its time in play (☀ Clear ✓ 3 0:14.2 · ≋ Wind ✓ 4 0:21.0 · ☂ Rain, now
+  0:05.3) and "Par –", then the suggested par; a round that does not count
+  says why in one line. The big button: "Back to edit", then "Publish →". The
+  next weather starts by itself. Each weather proved plays the cup's sound;
+  the last one gets a small celebration: the chips fill one by one, a little
+  confetti, a chime, and "Publish →" pulses three times (no motion with
+  reduced motion).
+- **In play**, either way: R or Backspace plays again from the tee, V swaps
+  the overview camera and back, Escape goes back to Edit (while aiming, it
+  drops the aim: the game's).
 
 ### B5. Publish
 
@@ -429,7 +446,7 @@ dare".
 
 A scripted headless walkthrough (`scripts/builderwalk.ts`, on the repo's
 headless Chrome, `media/lib/cdp.mjs`) plays a new player: open `/build`; "Got it"; drag a Bumper onto the starter, off the
-ball's line; "Test it"; hole each weather with the starter's committed shots
+ball's line; "Prove it"; paste the address; hole each weather with the starter's committed shots
 (the starter's proofs are its shot lists; the bumper is placed off their
 path); "Publish →"; stop on the form with the suggested name, ready to sign.
 Test mode needs no chain (`builder.wasm` answers it). The Publish form reads
@@ -444,15 +461,15 @@ it.
 | Open `/build` (the starter, the hints) | 0 | 0 |
 | "Got it" | 1 | 0 |
 | A Bumper onto the board | 0 | 1 |
-| "Test it" | 1 | 0 |
-| The address the hole is proved under (one field typed and "Test with this address"; with Adena, "Connect" instead) | 1 | 0 |
+| "Prove it" | 1 | 0 |
+| The address the hole is proved under ("Or paste an address", one field typed and "Use this address"; with Adena, "Use my Adena address" instead) | 2 | 0 |
 | Clear, wind, rain holed (about 2 shots each; the next weather starts by itself) | 0 | 6 |
 | "Publish →", the form ready (name suggested) | 1 | 0 |
-| **Starter path to a proved, publish-ready hole** | **4** | **7** |
+| **Starter path to a proved, publish-ready hole** | **5** | **7** |
 
-Measured on the implementation (`scripts/builderwalk.ts`): 16 s, 4 clicks,
+Measured on the implementation (`scripts/builderwalk.ts`): 16 s, 5 clicks,
 7 drags, 1 field typed. Past the path, the script also checks that the
-Publish card stays in sight at 1366 × 650 and that the Publish header's Test
+Publish card stays in sight at 1366 × 650 and that the Publish header's Prove
 step returns to the test.
 
 ### B7. Your holes, the community's

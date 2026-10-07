@@ -35,6 +35,8 @@ import { plainOf } from "@/lib/builder/explain";
 import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
+import TestMode from "./TestMode";
+import { canonicalHex as hexOf } from "@/lib/builder/proof";
 import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
 import { tilesOf } from "@/lib/builder/tiles";
@@ -101,6 +103,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [shots, setShots] = useState<QuickShot[]>([]);
   const [aim, setAim] = useState<QuickShot | null>(null);
   const [lineOn, setLineOn] = useState(false);
+  // a quick test (T): the draft as kept, its canonical bytes, played over the editor (kept open: the same zoom, selection and history after)
+  const [trying, setTrying] = useState<{ of: Draft; hex: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
@@ -252,6 +256,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   // the keys: always the editor's, never a field's
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if (trying) return; // (a quick test's keys are its own)
       const t = e.target as HTMLElement;
       if (t.closest("input, select, textarea, [contenteditable]")) return;
       const mod = e.metaKey || e.ctrlKey;
@@ -267,7 +272,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         return setArmed(en);
       }
       if (act?.t === "frame") return setFrameAsk((n) => n + 1);
-      if (act?.t === "test") return void (!testOff && onTest(kept));
+      if (act?.t === "test") return tryIt();
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
       if (e.key === "Escape") return (setArmed(null), setSelected(null), setShots([]));
       const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -295,12 +300,18 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const off = palette ? offAtLimit(draft, palette) : new Map<string, string>();
   const step: Step = "edit";
   // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
+  // a quick test: the hole as kept with no error (no name nor address needed)
+  const tryOff = !checked || checked.of !== kept ? "Checking…" : errors.length ? testOff : "";
+  function tryIt() {
+    const hex = !tryOff && hexOf(kept, host);
+    if (hex) (setArmed(null), setAim(null), setTrying({ of: kept, hex }));
+  }
   const proved = !testOff && key?.of === kept && !!key.key && !!author && !!provedAs(kept.proofs, kept.world, key.key, author, kept.slug);
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
         steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
-        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
+        action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Prove it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         meter={{ level: guess?.level ?? null, word: guess?.word ?? "–", title: guess ? guess.title : clean ? "Difficulty: measuring…" : "Difficulty: measured once the hole has no error", busy: measuring }}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)}
@@ -312,10 +323,11 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
             {toast && <p className="btoast" role="status">{toast}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show}
-              ball={{
+              // (the first run's hints first: the board's tools come once they are gone)
+              ball={hints ? undefined : {
                 played: landed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
                 line: guess && est?.of === kept && draft === kept ? { path: guess.path, heat: guess.heat } : null,
-                onAim: setAim, onShot: (q) => (sound("putt"), setAim(null), setShots((s) => [...s, q].slice(-SHOTS_KEPT))),
+                tryOff, onTry: tryIt, onAim: setAim, onShot: (q) => (sound("putt"), setAim(null), setShots((s) => [...s, q].slice(-SHOTS_KEPT))),
               }} />
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff, rounds: rounds && key?.of === kept && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
@@ -328,6 +340,15 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         </>
       ) : (
         <p className="bench__wait" aria-busy="true">Loading the {draft.world}&apos;s pieces…</p>
+      )}
+      {trying && (
+        <div className={`tbench tbench--quick tint--${draft.world}`}>
+          <div className="qbar">
+            <b>Quick test</b><span>Calm weather · not a proof</span>
+            <button type="button" className="btn btn--ghost" onClick={() => setTrying(null)}>Back to edit<kbd>Esc</kbd></button>
+          </div>
+          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onLeave={() => setTrying(null)} />
+        </div>
       )}
       {(hints || again) && <Hints glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}
     </main>

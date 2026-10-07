@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
-import { holeId, holeRow, plan, testChain } from "../lib/builder/testmode.ts";
+import { clock, holeId, holeRow, plan, QUICK_HOLE, quickPlan, testChain } from "../lib/builder/testmode.ts";
+import fs from "node:fs";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { makeChain } from "../lib/chain.ts";
 import { RULES } from "../lib/chain.ts";
@@ -41,4 +42,26 @@ void test("holeRow and testChain: the engine finds the draft's hole and plays it
   assert.equal(await c.holeData(id), hex, "the page's own previews play the same bytes");
   assert.equal(await c.chainId(), "builder", "no takedown list is another chain's");
   assert.equal(c.realm, base.realm);
+});
+
+void test("a quick test: calm weather only, under an id of its own (no address asked, nothing proved)", () => {
+  const d = lane("garden", []);
+  host.load(QUICK_HOLE, hexOf(d));
+  const p = quickPlan(host, QUICK_HOLE);
+  assert.deepEqual(p.map((x) => x.kind), [""]);
+  assert.equal((JSON.parse(host.forecast(QUICK_HOLE, p[0].period)) as { kind: string }).kind, "");
+});
+
+void test("clock: a weather's time in play, minutes, seconds and tenths", () => {
+  assert.equal(clock(0), "0:00.0");
+  assert.equal(clock(14_230), "0:14.2");
+  assert.equal(clock(65_000), "1:05.0");
+});
+
+void test("the address step, Prove's alone: its words, Adena first, an address pasted behind a tap, where to get Adena", () => {
+  const src = fs.readFileSync(new URL("../components/builder/TestMode.tsx", import.meta.url), "utf8");
+  assert.match(src, /<h2>Sign your hole<\/h2>/);
+  assert.ok(src.includes("Your address is part of its name and sets its weather, so your proofs still count when you publish. Nothing is signed now."));
+  assert.ok(src.includes(">Use my Adena address<") && src.includes("Or paste an address (g1…)") && src.includes("ADENA_URL"));
+  assert.match(src, /if \(!author && !quick\)/, "a quick test never asks");
 });

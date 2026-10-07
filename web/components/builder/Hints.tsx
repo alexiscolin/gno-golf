@@ -16,7 +16,7 @@ import { MOD } from "./Inspector";
 
 const HINTS = [
   ["palette", "Drag a piece onto the board"],
-  ["test", "Press Test it to play your hole"],
+  ["test", "Press T to try it, Prove it to make it count"],
   ["steps", "Then Publish, once holed in every weather"],
 ] as const;
 

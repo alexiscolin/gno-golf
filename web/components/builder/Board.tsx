@@ -79,6 +79,9 @@ export interface Ball {
   onLine: () => void;
   onAim: (s: QuickShot | null) => void;
   onShot: (s: QuickShot) => void;
+  /** a quick test (T), and why it waits ("" it does not) */
+  onTry: () => void;
+  tryOff: string;
 }
 
 interface View { x: number; y: number; k: number }
@@ -355,6 +358,8 @@ export default function Board(props: BoardProps) {
           <button type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
             title={ball.line ? "The difficulty meter's best line, and where its shots stopped (a guess, calm weather)" : "Shown once the meter has measured the hole as it is"}
             onClick={ball.onLine}>Show the line</button>
+          <button type="button" className="board__toggle" aria-disabled={ball.tryOff ? true : undefined} title={ball.tryOff || "Play it now in calm weather, then back here: never a proof (T)"}
+            onClick={() => !ball.tryOff && ball.onTry()}>Quick test<kbd>T</kbd></button>
         </div>
       )}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}

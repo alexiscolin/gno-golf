@@ -252,7 +252,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   c.kill();
 }
 // the keys: 1 to 5 pick the palette's first five, Space and a drag pan (a piece under it too), F frames the hole,
-// T goes to Test, Escape comes back; the board's key line says them
+// T plays a quick test over the editor, Escape comes back to it as it was; the board's key line says them
 {
   const c = await editor(1280, 800);
   const key = async (key: string, code: string, type: "both" | "down" | "up" = "both") => {
@@ -300,14 +300,18 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const second = await name();
   assert.ok(first !== before && second !== first && /^[A-Z][a-z]+ [A-Z]/.test(first) && first.length <= 40, `the die: ${before} → ${first} → ${second}`);
   assert.equal(await c.js(`document.querySelector(".bhead__slug").value`), second.toLowerCase().replace(/[^a-z0-9]+/g, "-"), "the slug follows the name");
-  // T: to Test; Escape: back to the editor
+  // T: a quick test, over the editor, no address asked; Escape: back to the editor at the same zoom
+  await c.js(`document.querySelector(".bhead__roll").blur()`);
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
+  const at = await tee();
   await key("t", "KeyT");
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tmode")`)); k++) await sleep(300);
-  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tmode")`), "T: to Test");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip") && !document.querySelector(".tmode--ask")`), "T: a quick test, with no address step");
+  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__notes").textContent`), /not a proof/, "said to be no proof");
   await key("Escape", "Escape");
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".board__map")`)); k++) await sleep(300);
-  assert.ok(await c.ev<boolean>(`!!document.querySelector(".board__map")`), "Escape: back from Test to the editor");
+  for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".tbench--quick")`)); k++) await sleep(300);
+  const after = await tee();
+  assert.ok(!(await c.ev<boolean>(`!!document.querySelector(".tbench--quick")`)) && Math.abs(after[0] - at[0]) < 1 && Math.abs(after[1] - at[1]) < 1, `Escape: back to the editor at the same zoom (${at.join()} → ${after.join()})`);
   console.log("keys: ok");
   c.kill();
 }

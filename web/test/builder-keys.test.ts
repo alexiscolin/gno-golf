@@ -2,7 +2,7 @@
 // keys as the board's key line and the glossary say them (one list).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { KEYS, keyAction } from "../lib/builder/keys.ts";
+import { KEYS, keyAction, playKey } from "../lib/builder/keys.ts";
 
 const press = (key: string, o: { meta?: boolean; ctrl?: boolean; alt?: boolean } = {}) => keyAction({ key, metaKey: !!o.meta, ctrlKey: !!o.ctrl, altKey: !!o.alt });
 
@@ -22,4 +22,11 @@ void test("KEYS: each key once, in a few words for the key line and a sentence f
   assert.equal(new Set(keys).size, keys.length);
   for (const k of ["1–5", "Space", "F", "T", "Esc", "⇧ drag"]) assert.ok(keys.includes(k), k);
   for (const k of KEYS) assert.ok(k.short.split(" ").length <= 2 && k.long.length > k.short.length, k.key);
+});
+
+void test("playKey: in a test, R or Backspace plays again from the tee, V swaps the overview, Escape goes back to Edit; with a modifier, none", () => {
+  const k = (key: string, meta = false) => playKey({ key, metaKey: meta, ctrlKey: false, altKey: false });
+  assert.deepEqual([k("r"), k("R"), k("Backspace"), k("v"), k("Escape")], ["restart", "restart", "restart", "view", "leave"]);
+  assert.equal(k("r", true), null, "⌘R: the browser's");
+  assert.equal(k("x"), null);
 });
