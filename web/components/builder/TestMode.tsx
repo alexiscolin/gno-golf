@@ -25,7 +25,7 @@ import { makeLocalChain } from "@/lib/builder/localchain";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
 import { clock, holeId, holeRow, plan, QUICK_HOLE, quickPlan, testChain } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
-import { hold, stageCanvas } from "@/lib/builder/stage";
+import { hold, stageCanvas, stageRenderer } from "@/lib/builder/stage";
 import { ADENA_URL } from "@/lib/network";
 import { confetti } from "@/lib/builder/juice";
 import { weatherName } from "@/lib/builder/carry";
@@ -166,6 +166,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     const { rpc, web } = endpoints(window.location.search);
     const local = makeLocalChain(host, holeRow(id, draft), hex, now.period);
     const g = (game.current = createGame(canvas, {
+      renderer: stageRenderer() ?? undefined, // (the board's, lent: a game leaves no GL objects of its own on the context)
       chain: testChain(makeChain({ rpc, web }), local, hex),
       onChange: (s) => ((aiming.current = s.aiming), setSnap(s)),
       onHoled: ({ shots }) => {

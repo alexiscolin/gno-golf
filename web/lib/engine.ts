@@ -65,6 +65,9 @@ export interface GameOptions {
    *  the page loads them only when its link asks for them */
   promo?: typeof Promo;
   probes?: typeof Probes;
+  /** the renderer already on canvas, lent for the game (the Builder's test mode lends the board's, lib/builder/stage.ts):
+   *  handed back on destroy as it was, never disposed; else the game makes its own */
+  renderer?: THREE.WebGLRenderer;
   /** ?camlog: the camera logs every frame (for the probes' camLog) */
   log?: boolean;
   onChange?: (snap: Snapshot) => void;
@@ -90,10 +93,10 @@ const NO_TAKEN: ReadonlySet<string> = new Set(); // the takedown list when none 
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
 
-export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
+export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, gnome, world: forceWorld = "", weather: fakeWeather0 = "", aimMode = "assisted", camMode = "classic", gfx = "auto", promo = NO_PROMO, probes, renderer: lent, log: logCam = false, onChange = () => {}, onHoled = () => {} }: GameOptions = {}) {
   const chain = given ?? makeChain({ rpc, web });
 
-  const renderer = makeRenderer(canvas);
+  const renderer = lent ?? makeRenderer(canvas), lentDpr = renderer.getPixelRatio();
   const scene = makeScene();
   // a storm's lightning: the scene lights up, the page flashes (silently)
   const causes = makeCauses(scene);
@@ -1694,8 +1697,10 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       if (g.course) disposeCourse(g.course);
       for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group, trail && trail.group]) if (o) disposeCourse(o);
       rival.dispose();
-      renderer.dispose();
-      releaseShared();
+      // a lent renderer keeps what it holds for the shared looks (its next game, or the board, draws them again),
+      // handed back at its own pixel ratio and its GL state reset; the game's own is disposed, and the looks let go of it
+      if (lent) (renderer.setPixelRatio(lentDpr), renderer.resetState());
+      else (renderer.dispose(), releaseShared());
       pip.remove();
     },
   };
