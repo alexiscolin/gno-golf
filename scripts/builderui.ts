@@ -123,12 +123,13 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "three hints");
   assert.equal(await c.js(`document.querySelector(".bhead__hole input").value`), "Garden Dogleg", "on the Garden's dogleg");
   assert.equal(await c.js(`document.activeElement?.textContent`), "Got it");
-  // the hints leave the 3D in sight: none of them, nor Got it, over the preview
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".col .preview")`)); k++) await sleep(300);
-  const preview = await box(c, ".col .preview");
-  assert.ok(preview, "the 3D's place");
-  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
-    assert.ok(!overlap(part, preview), `hint ${i + 1} covers the 3D preview`);
+  // the hints leave the hole in sight: none of them, nor Got it, over the tee or the cup
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector("[data-end='pin']")`)); k++) await sleep(300);
+  for (const end of ["tee", "pin"]) {
+    const at = (await box(c, `[data-end='${end}'] circle`))!;
+    for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
+      assert.ok(!overlap(part, at), `hint ${i + 1} covers the ${end === "pin" ? "cup" : "tee"}`);
+    }
   }
   assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "the first run: three hints, no glossary");
   await c.js(`document.querySelector(".bhint__ok").click()`);
@@ -149,9 +150,6 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const g = (await box(c, ".bgloss"))!;
   assert.ok(g.t >= 0 && g.b <= 800 && g.l >= 0 && g.r <= 1280, `the glossary on one screen: ${JSON.stringify(g)}`);
   assert.ok(await c.js<boolean>(`(() => { const e = document.querySelector(".bgloss"); return e.scrollHeight <= e.clientHeight + 1; })()`), "the glossary on one screen, not scrolled");
-  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok, .bgloss")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
-    assert.ok(!overlap(part, (await box(c, ".col .preview"))!), `help part ${i + 1} covers the 3D preview`);
-  }
   await c.js(`document.querySelector(".bhint__ok").click()`);
   await sleep(300);
   assert.equal(await c.js(`document.querySelectorAll(".bgloss, .bhint").length`), 0, "gone with Got it");
@@ -159,13 +157,16 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   c.kill();
 }
 
-// no 3D (WebGL refused): the preview says so, readably
+// the board in 3D (WebGL: the game's scene under the overlay); without WebGL, the 2D board as it was, every piece drawn
 {
-  const c = await editor(1280, 800, `HTMLCanvasElement.prototype.getContext = function () { return null; };`);
-  const r = await c.js<{ ratio: number; opacity: number } | null>(`(${CONTRAST})(".col .preview--off, .col .preview.nothing")`);
-  assert.ok(r && r.ratio >= 4.5, `no WebGL: the preview's sentence reads at ${r?.ratio.toFixed(2)}:1`);
-  console.log("no 3D: ok");
+  const c = await editor(1280, 800);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".board--3d .board__scene canvas")`), "the board in 3D");
   c.kill();
+  const flat = await editor(1280, 800, `HTMLCanvasElement.prototype.getContext = function () { return null; };`);
+  assert.ok(await flat.ev<boolean>(`!document.querySelector(".board--3d") && !!document.querySelector(".board__ground")`), "no WebGL: the 2D board");
+  assert.ok(await flat.ev<boolean>(`[...document.querySelectorAll(".board__piece > :first-child")].every((e) => getComputedStyle(e).fill !== "transparent" || getComputedStyle(e).stroke !== "transparent")`), "no WebGL: every piece drawn");
+  console.log("no 3D: ok");
+  flat.kill();
 }
 
 // a browser that keeps nothing (a private window): its note covers no control

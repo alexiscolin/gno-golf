@@ -24,6 +24,9 @@ import { type PaletteEntry } from "@/lib/builder/palette";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, V } from "@/lib/builder/draft";
 import { makeGesture, type Env, type Target } from "@/lib/builder/gesture";
+import { stageRenderer } from "@/lib/builder/stage";
+import type { Hole } from "@/lib/scene/data";
+import Scene from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
@@ -66,6 +69,8 @@ export interface BoardProps {
   ball?: Ball;
   /** how the board is looked at: turned, tilted (view.ts Look; flat by default) */
   look?: Look;
+  /** the hole as checked (the pipeline's HoleState), and the draft it is of: the board drawn in 3D from it (none: in 2D) */
+  scene?: { state: Hole | null; of: Draft | null };
 }
 
 /** The quick shots on the board: those played (the latest last; null, one the realm refused), the one being pulled, and the meter's line. */
@@ -99,6 +104,9 @@ function extent(d: Draft): [V, V] {
 
 export default function Board(props: BoardProps) {
   const { draft, quick, full, selected, armed, step, bad } = props, look = props.look ?? FLAT;
+  // in 3D where this browser has WebGL (the Builder's one context: stage.ts), else the 2D board as it was
+  const [gl] = useState(() => !!props.scene && !!stageRenderer());
+  const waker = useRef<(() => void) | null>(null);
   const box = useRef<HTMLElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<View | null>(null);
@@ -198,6 +206,7 @@ export default function Board(props: BoardProps) {
       e.preventDefault();
       const r = el.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
       setView((v) => v && zoomAt(v, [px, py], v.k * Math.exp(-e.deltaY * 0.0015)));
+      waker.current?.();
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
@@ -246,6 +255,7 @@ export default function Board(props: BoardProps) {
     }
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
     const r = box.current!.getBoundingClientRect();
+    waker.current?.();
     pointer.current = [e.clientX - r.left, e.clientY - r.top];
     place();
     const at = unit(e), d = drag.current;
@@ -290,25 +300,29 @@ export default function Board(props: BoardProps) {
   // flag and its pole with the cup), 14 px at least
   const hit = Math.max(0.9, 14 / view.k);
   const ghostBad = ghost && ghost.why;
+  // in 3D, the overlay draws a piece only where the scene does not show it yet: dragged, or changed since the hole drawn was checked
+  const shownBefore = new Map((props.scene?.of?.pieces ?? []).map((p) => [p.id, JSON.stringify(p)]));
+  const pending = (p: Piece) => !gl || shownBefore.get(p.id) !== JSON.stringify(p);
   const ball = props.ball, aiming = drag.current?.t === "aim", line = ball?.lineOn ? ball.line : null;
   const most = line ? Math.max(1, ...line.heat.map((c) => c[2])) : 1, latest = ball?.played.at(-1);
   const pathOf = (p: readonly V[]) => p.map((v) => `${v[0]},${v[1]}`).join(" ");
   // the tee's and the cup's badges: where they are, upright and at the board's scale whatever the look
   const badge = (at: V) => { const q = toScreen(view, look, at); return `translate(${q[0]} ${q[1]}) scale(${view.k})`; };
   return (
-    <section className={`board${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
+    <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
+      {gl && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} />}
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null))}
         onPointerLeave={() => setGhost(null)}>
         <defs><marker id="arrow" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 6 3 0 6z" fill="#fff" /></marker></defs>
         {/* the board in its units, looked at through the look (view.ts matrixOf); the tee's and the cup's badges upright over it */}
         <g className="board__plane" transform={`matrix(${matrixOf(view, look).join(" ")})`}>
-        <rect className="board__ground" x={0} y={0} width={BOARD} height={BOARD} />
+        {!gl && <rect className="board__ground" x={0} y={0} width={BOARD} height={BOARD} />}
         <g className="board__grid">{lines.map((l, i) => (l.x !== undefined ? <line key={i} x1={l.x} y1={y0} x2={l.x} y2={y1} className={l.major ? "major" : ""} /> : <line key={i} x1={x0} y1={l.y} x2={x1} y2={l.y} className={l.major ? "major" : ""} />))}</g>
         {[...draft.pieces].sort((a, b) => order(a) - order(b)).map((p) => (
           <g key={p.id} data-piece={p.id} className={`board__piece${p.id === selected ? " board__piece--on" : ""}${p.id === popped ? " board__piece--pop" : ""}`} tabIndex={0} role="button"
             aria-label={pieceLabel(p)} aria-pressed={p.id === selected} onFocus={() => props.onSelect(p.id)}>
-            <PieceShape p={p} state={bad.has(p.id) || live?.id === p.id && live.why ? "bad" : undefined} />
+            <PieceShape p={p} state={bad.has(p.id) || live?.id === p.id && live.why ? "bad" : undefined} hit={!pending(p)} />
           </g>
         ))}
         {sel && handlesOf(sel).map((h) => <rect key={h.key} data-handle={h.key} className="board__handle" x={h.at[0] - hs / 2} y={h.at[1] - hs / 2} width={hs} height={hs} />)}

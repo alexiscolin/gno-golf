@@ -358,7 +358,24 @@ near, proved, world; at 1440, 1280 and 1024.
   looks, the glossary, the toasts and every sentence of the checks say it:
   "the wall", "the lagoon", "the rock" (never "the plain rail", never "the
   rock obstacle").
-- **The board** (centre): the hole from above on its snapping grid; a piece
+- **The board in 3D** (centre): the game's own scene of the hole as checked
+  (`buildHole` on the pipeline's HoleState: what will be published: the
+  turf's mowing stripes, the world's rails, bumpers, water, timed pieces
+  moving), seen by an orthographic camera straight down; V tilts it 16°
+  (heights and shadows, the tee and the cup still in sight), Q turns it a
+  quarter (⇧Q back), never a free orbit. It only shows: a light overlay picks
+  and edits on the ground grid as the 2D board did, in the same map, and
+  draws only the selection, the handles, the ghost, the measurements, the
+  tee and the cup as upright badges, and a piece the scene does not show yet
+  (dragged, or dropped before the hole is built again). The same pointer
+  edits make the same drafts, byte for byte, flat, turned or tilted
+  (`web/test/builder-gesture.test.ts`). Drawn on demand: the hole is built
+  again when the checked hole changes, never as the pointer moves; while
+  the pointer is about, the water (with motion allowed) and the timed pieces
+  (on the game's clock) move, and idle the loop stops. One canvas and one
+  WebGL context for the page (`lib/builder/stage.ts`), lent to Test. No
+  WebGL: the 2D board below, as it was.
+- **The board** (2D, the fallback): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last
   valid place; a handle stops at its range. The wheel and the pinch zoom it,
@@ -368,7 +385,7 @@ near, proved, world; at 1440, 1280 and 1024.
   thud on a refusal. The keys, said in the board's key line and the glossary: 1–5
   pick the palette's first five pieces (each tile's look as chosen), R
   turns, ⌫ deletes, ⌘Z undoes, Space held makes a drag pan, F frames the
-  whole hole, T goes to Test, Escape drops the piece in hand or leaves Test
+  whole hole, V tilts and Q turns the 3D board, T plays a quick test, Escape drops the piece in hand or leaves Test
   (not while aiming: there it drops the aim, the game's).
 - **The ball in Edit**: Shift and a pull on the board plays a quick shot, as
   the game's slingshot pulls one (the ball flies away from the pull), from
@@ -382,7 +399,7 @@ near, proved, world; at 1440, 1280 and 1024.
   line, gold, and a light heat map of where its shots stopped; only on the
   hole the meter measured, never during a drag. Escape clears the quick
   shots.
-- **The right**: the hole in 3D, in sync; the selected piece only: its name,
+- **The right**: the selected piece only: its name,
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
   sliders: size, bounce, timing). Nothing selected: "Click a piece to change
   it. Drag its handles to size and turn it."

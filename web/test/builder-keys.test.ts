@@ -17,10 +17,17 @@ void test("keyAction: 1 to 5 pick the palette's first five, F frames the hole, T
   assert.equal(press("f", { alt: true }), null);
 });
 
+void test("keyAction: V tilts the 3D board and back, Q turns it a quarter (with Shift, the other way)", () => {
+  assert.deepEqual(press("v"), { t: "tilt" });
+  assert.deepEqual(press("q"), { t: "turn", by: 1 });
+  assert.deepEqual(keyAction({ key: "Q", metaKey: false, ctrlKey: false, altKey: false, shiftKey: true }), { t: "turn", by: -1 });
+  assert.equal(press("q", { meta: true }), null);
+});
+
 void test("KEYS: each key once, in a few words for the key line and a sentence for the glossary", () => {
   const keys = KEYS.map((k) => k.key);
   assert.equal(new Set(keys).size, keys.length);
-  for (const k of ["1–5", "Space", "F", "T", "Esc", "⇧ drag"]) assert.ok(keys.includes(k), k);
+  for (const k of ["1–5", "Space", "F", "T", "Esc", "⇧ drag", "V", "Q"]) assert.ok(keys.includes(k), k);
   for (const k of KEYS) assert.ok(k.short.split(" ").length <= 2 && k.long.length > k.short.length, k.key);
 });
 

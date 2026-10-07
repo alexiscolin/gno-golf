@@ -30,7 +30,6 @@ import Checks from "./Checks";
 import Header, { type Step } from "./Header";
 import Inspector, { MOD } from "./Inspector";
 import Palette from "./Palette";
-import Preview from "./Preview";
 import { plainOf } from "@/lib/builder/explain";
 import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
@@ -42,6 +41,7 @@ import { seedOf, suggestName } from "@/lib/builder/naming";
 import { tilesOf } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
 import { quickShots, type QuickShot } from "@/lib/builder/quickshot";
+import { FLAT, fromPlane, TILT, type Look } from "@/lib/builder/view";
 
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
@@ -103,6 +103,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [shots, setShots] = useState<QuickShot[]>([]);
   const [aim, setAim] = useState<QuickShot | null>(null);
   const [lineOn, setLineOn] = useState(false);
+  // how the board is looked at: V tilts it, Q turns it a quarter (the 3D board; the 2D one too)
+  const [look, setLook] = useState<Look>(FLAT);
   // a quick test (T): the draft as kept, its canonical bytes, played over the editor (kept open: the same zoom, selection and history after)
   const [trying, setTrying] = useState<{ of: Draft; hex: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -272,11 +274,14 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         return setArmed(en);
       }
       if (act?.t === "frame") return setFrameAsk((n) => n + 1);
+      if (act?.t === "tilt") return setLook((l) => ({ ...l, tilt: l.tilt ? 0 : TILT }));
+      if (act?.t === "turn") return setLook((l) => ({ ...l, turns: (l.turns + act.by + 4) % 4 }));
       if (act?.t === "test") return tryIt();
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
       if (e.key === "Escape") return (setArmed(null), setSelected(null), setShots([]));
       const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-      const step = (k: string) => arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V;
+      // (an arrow moves a piece the way it points on the screen, however the board is turned)
+      const step = (k: string) => fromPlane(arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V, { turns: look.turns, tilt: 0 });
       if (e.key === "Enter" && armed && !t.closest("button, a")) return (e.preventDefault(), dropArmed());
       if ((selected === "tee" || selected === "pin") && arrows[e.key]) return (e.preventDefault(), moveEnd(selected, step(e.key)));
       if (!piece) return;
@@ -322,7 +327,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <div className="centre">
             {toast && <p className="btoast" role="status">{toast}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show}
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null }}
               // (the first run's hints first: the board's tools come once they are gone)
               ball={hints ? undefined : {
                 played: landed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
@@ -332,9 +337,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff, rounds: rounds && key?.of === kept && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
-          <aside className="col" aria-label="The hole in 3D and the selected piece">
-            <Preview state={checked?.state ?? null} fresh={fresh} />
-            <hr />
+          <aside className="col" aria-label="The selected piece">
             <Inspector draft={draft} piece={piece} quick={quick} full={full} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove} />
           </aside>
         </>

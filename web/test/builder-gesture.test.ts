@@ -47,11 +47,29 @@ function editor(first: Draft) {
   return { s, g, sel: () => selected, arm: (e: PaletteEntry | null) => (armed = e), armed: () => armed };
 }
 
-/** One pointer's moves on a board looked at through look: board points shown at whole pixels (where a pointer can be), read back through the lens. */
-async function play(world: string, look: Look) {
+const THREE = await import("three");
+const { orthoFor, shownAt } = await import("../lib/builder/camera3d.ts");
+const SIZE = { w: 1000, h: 640 };
+
+/**
+ * One pointer's moves on a board looked at through look: each board point
+ * where it shows at a whole pixel (where a pointer can be), read back as the
+ * board reads the pointer (the lens). On the 3D board (three), where the
+ * scene's camera shows it, and the ground under that pixel by a ray too.
+ */
+async function play(world: string, look: Look, three = false) {
   const palette = await loadPalette(world), o = { host, palette }, full = { ...o, census };
   const ed = editor({ ...lane(world, [], 40, 24), slug: "lens" }), v: View = { x: -2, y: -3, k: 24 };
-  const at = (p: V): V => { const px = toScreen(v, look, p); return toBoard(v, look, [Math.round(px[0]), Math.round(px[1])]); };
+  const cam = orthoFor(new THREE.OrthographicCamera(), v, look, SIZE), ray = new THREE.Raycaster(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const at = (p: V): V => {
+    const px = three ? shownAt(cam, new THREE.Vector3(p[0], 0, p[1]), SIZE) : toScreen(v, look, p), q: V = [Math.round(px[0]), Math.round(px[1])], b = toBoard(v, look, q);
+    if (three) {
+      ray.setFromCamera(new THREE.Vector2((q[0] / SIZE.w) * 2 - 1, 1 - (q[1] / SIZE.h) * 2), cam);
+      const hit = ray.ray.intersectPlane(ground, new THREE.Vector3())!;
+      assert.ok(near([hit.x, hit.z], b, 1e-6), "the pointer's ray meets the ground where the lens says");
+    }
+    return b;
+  };
   const env = () => ({ draft: ed.s.now(), quick: o, full, armed: ed.armed(), selected: ed.sel(), step: 0.5 });
   const drag = (target: Target, from: V, to: V, bin = false) => {
     ed.g.down(env(), at(from), target);
@@ -78,10 +96,21 @@ async function play(world: string, look: Look) {
   return keys;
 }
 
-void test("the same pointer edits on a board flat, turned and tilted: the same drafts, byte for byte, in every Builder world", async () => {
+void test("the same pointer edits on the 2D board and on the 3D one, flat, turned and tilted: the same drafts, byte for byte, in every Builder world", async () => {
   for (const world of Object.keys(FIELD)) {
     const flat = await play(world, FLAT);
     assert.equal(new Set(flat).size > 5, true, `${world}: the edits change the hole`);
-    for (const look of LOOKS.slice(1)) assert.deepEqual(await play(world, look), flat, `${world}: turned ${look.turns}, tilted ${look.tilt.toFixed(2)}`);
+    for (const look of LOOKS) assert.deepEqual(await play(world, look, true), flat, `${world}, in 3D: turned ${look.turns}, tilted ${look.tilt.toFixed(2)}`);
+  }
+});
+
+void test("the 3D board's camera shows the ground where the lens puts it: the overlay on its pieces, the pointer on the ground it is over", () => {
+  const size = { w: 900, h: 560 }, v: View = { x: -1.5, y: 4, k: 21 }, cam = new THREE.OrthographicCamera();
+  for (const look of LOOKS) {
+    orthoFor(cam, v, look, size);
+    for (const p of [[0, 0], [20.25, 7.5], [33, 21.75]] as V[]) {
+      const s = shownAt(cam, new THREE.Vector3(p[0], 0, p[1]), size);
+      assert.ok(near(s, toScreen(v, look, p), 1e-6), `${look.turns}/${look.tilt.toFixed(2)} ${p.join()}: ${s.join()} for ${toScreen(v, look, p).join()}`);
+    }
   }
 });

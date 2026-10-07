@@ -9,13 +9,13 @@ import { fillOf } from "./look";
 
 const pts = (vs: readonly V[]) => vs.map((v) => `${v[0]},${v[1]}`).join(" ");
 
-/** state: "bad" outlined red (an issue, a ghost that cannot go), "ghost" see-through. */
-export function PieceShape({ p, state }: { p: Piece; state?: "bad" | "ghost" }) {
-  const g = p.geometry, fill = fillOf(p.entry), line = state === "bad" ? "#c8322b" : "#1f2a26", w = state === "bad" ? 2.5 : 1; // (px: non-scaling)
+/** state: "bad" outlined red (an issue, a ghost that cannot go), "ghost" see-through; hit: only its outline, to pick it by (the 3D board shows the piece itself; outlined red if bad). */
+export function PieceShape({ p, state, hit = false }: { p: Piece; state?: "bad" | "ghost"; hit?: boolean }) {
+  const g = p.geometry, fill = hit ? "transparent" : fillOf(p.entry), line = state === "bad" ? "#c8322b" : hit ? "transparent" : "#1f2a26", w = state === "bad" ? 2.5 : 1; // (px: non-scaling)
   const common = { fill, stroke: line, strokeWidth: w, opacity: state === "ghost" ? 0.7 : 1, vectorEffect: "non-scaling-stroke" as const };
   let body;
   switch (g.t) {
-    case "rail": body = <line x1={g.a[0]} y1={g.a[1]} x2={g.b[0]} y2={g.b[1]} stroke={state === "bad" ? line : fill} strokeWidth={0.3} strokeLinecap="round" opacity={common.opacity} />; break;
+    case "rail": body = <line x1={g.a[0]} y1={g.a[1]} x2={g.b[0]} y2={g.b[1]} stroke={state === "bad" ? line : hit ? "transparent" : fill} strokeWidth={hit ? 0.6 : 0.3} strokeLinecap="round" opacity={common.opacity} />; break;
     case "bar": body = <polygon points={pts(barCorners(g.a, g.b, g.thick))} {...common} />; break;
     case "post": body = <circle cx={g.c[0]} cy={g.c[1]} r={g.r} {...common} />; break;
     case "poly": body = <polygon points={pts(g.pts)} {...common} fillOpacity={0.85} />; break;
@@ -26,8 +26,8 @@ export function PieceShape({ p, state }: { p: Piece; state?: "bad" | "ghost" }) 
   return (
     <>
       {body}
-      {to && <><line x1={m[0]} y1={m[1]} x2={to[0]} y2={to[1]} stroke="#1f2a26" strokeWidth={0.12} strokeDasharray="0.4 0.3" /><circle cx={to[0]} cy={to[1]} r={0.6} fill="none" stroke="#1f2a26" strokeWidth={0.15} /></>}
-      {dir && <line x1={m[0] - dir[0]} y1={m[1] - dir[1]} x2={m[0] + dir[0]} y2={m[1] + dir[1]} stroke="#fff" strokeWidth={0.2} markerEnd="url(#arrow)" />}
+      {to && !hit && <><line x1={m[0]} y1={m[1]} x2={to[0]} y2={to[1]} stroke="#1f2a26" strokeWidth={0.12} strokeDasharray="0.4 0.3" /><circle cx={to[0]} cy={to[1]} r={0.6} fill="none" stroke="#1f2a26" strokeWidth={0.15} /></>}
+      {dir && !hit && <line x1={m[0] - dir[0]} y1={m[1] - dir[1]} x2={m[0] + dir[0]} y2={m[1] + dir[1]} stroke="#fff" strokeWidth={0.2} markerEnd="url(#arrow)" />}
     </>
   );
 }

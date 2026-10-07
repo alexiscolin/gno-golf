@@ -411,7 +411,7 @@
 .bhint b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--gold); font-size: 13px; }
 /* never over the 3D (the right column), nor over one another down to 1024 wide: Test it's hint at the board's top right,
    under the steps' hint; the palette's lower, by its tiles; Got it in the board's middle under them */
-.bhint--palette { left: calc(var(--palette-w) + 24px); top: 220px; }
+.bhint--palette { left: calc(var(--palette-w) + 24px); top: 440px; }
 .bhint--test { right: calc(var(--col-w) + 3 * var(--sp-3)); top: 160px; }
 .bhint--steps { left: 50%; top: 84px; transform: translateX(-50%); }
 .bhints__centre { position: absolute; left: calc(var(--palette-w) + 2 * var(--sp-3)); right: calc(var(--col-w) + 2 * var(--sp-3)); top: 280px; display: flex; justify-content: center; pointer-events: none; }
@@ -460,3 +460,7 @@
 .board__toggle[aria-disabled="true"] { opacity: .6; cursor: default; }
 .board__toggle kbd { margin-left: var(--sp-1); }
 .tmode__small a { color: var(--green); font-weight: 700; }
+/* the board in 3D (Scene.tsx): the game's scene under the overlay, which picks and draws only the selection, the handles, the ghost and what the scene does not show yet */
+.board__scene, .board__scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.board--3d .board__grid { display: none; }
+.board--3d .board__piece--on > :first-child { stroke: var(--gold); stroke-width: 3px; }

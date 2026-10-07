@@ -25,6 +25,7 @@ import { makeLocalChain } from "@/lib/builder/localchain";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
 import { clock, holeId, holeRow, plan, QUICK_HOLE, quickPlan, testChain } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
+import { hold, stageCanvas } from "@/lib/builder/stage";
 import { ADENA_URL } from "@/lib/network";
 import { confetti } from "@/lib/builder/juice";
 import { weatherName } from "@/lib/builder/carry";
@@ -100,19 +101,15 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [checking, setChecking] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
-  // the game's canvas, one each visit (React mounts twice in development, on the same element), its
-  // WebGL context freed when the visit ends (a browser holds about sixteen); each weather's game reuses it
+  // the game's canvas: the Builder's one (stage.ts), lent for the visit (no context of its own: a browser holds about
+  // sixteen), the game's #stage while it is here; each weather's game reuses it, and the board has it back after
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   useEffect(() => {
     if (!stage.current) return;
-    const el = document.createElement("canvas");
+    const give = hold(stage.current), el = stageCanvas();
     el.id = "stage";
-    stage.current.append(el);
     setCanvas(el);
-    return () => {
-      (el.getContext("webgl2") ?? el.getContext("webgl"))?.getExtension("WEBGL_lose_context")?.loseContext();
-      el.remove();
-    };
+    return give;
   }, [!author && !quick]); // eslint-disable-line react-hooks/exhaustive-deps -- (the stage is there once an address is)
   const game = useRef<ReturnType<typeof createGame> | null>(null);
   // the keys in play (keys.ts playKey): Escape leaves, unless it drops an aim (the game's); R or Backspace from the tee; V the overview; never a field's
