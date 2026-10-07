@@ -343,7 +343,16 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode--solo { --c1: var(--turf); --c2: var(--fairway); } /* the fairway */
 .mode--duel { --c1: #f6a79b; --c2: var(--hat); } /* the hat: the rival */
 .mode--build { --c1: var(--lamp); --c2: var(--sunny); } /* the sun */
-.mode--gnomes { --c1: #d9c4ff; --c2: #6a4fc2; } /* the Epic's amethyst: the collection */
+.mode--shop { --c1: #d9c4ff; --c2: #6a4fc2; } /* the Epic's amethyst: the gnome shop */
+/* what stands behind a panel's gnome in its disc (the Builder's sketch, the shop's awning): under his canvas */
+.mode__stage > svg { z-index: 0; }
+.mode__stage > .pick__canvas { z-index: 1; }
+/* the shop's awning across the disc's top, behind its gnome: the panel's colours, inked */
+.mode__stage > .mode__awning { inset: 27% 0 auto; width: 74%; } /* (inside the disc's top, under the gnome's head) */
+.mode__awning-top { fill: var(--paper); }
+.mode__awning-band { fill: var(--c2); }
+.mode__awning-scallop { fill: var(--paper); }
+.mode__awning-ink { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
 .worlds--v2 .world:focus-visible, .mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
 .mode[disabled] { cursor: default; }
 .mode[disabled] > :not(.mode__soon, .mode__line, .rival__tag) { opacity: .7; filter: saturate(.35); } /* (its line stays readable) */
@@ -370,6 +379,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
     background: radial-gradient(circle at 23% 50%, var(--c1) 0 50px, var(--ink) 50px 52.5px, transparent 53px), var(--panel-dots), var(--c2); }
   .mode__stage { grid-row: 1 / 3; margin-top: -10px; }
   .mode__stage svg { inset: 0; width: 78%; }
+  .mode__stage > .mode__awning { inset: 10% 0 auto; width: 62%; }
   .mode__name { align-self: end; margin: 0 14px 0 4px; font-size: 32px; --ink-w: 5px; }
   .mode__line { margin: 6px 14px 0 4px; font-size: 13px; }
   .modes__list--four { grid-template-columns: 1fr; }

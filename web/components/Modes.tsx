@@ -23,18 +23,20 @@ import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2, Zone } from "@/lib/types";
 
-// onBuild: the Builder's page (none: it is to come); gnomes: a fourth panel, the collection's, its picture (the
-// wave's Legendary turning: components/gnomes/Promo Turning) and where it leads (the gallery)
-export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, gnomes, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; gnomes?: { art: ReactNode; onOpen: () => void }; onBack: () => void; onAbout: () => void }) {
+// onBuild: the Builder's page (none: it is to come); shop: a fourth panel, the gnome shop's: its gnome (one of the
+// wave's, once read: null until then), its line and where it leads (the gallery)
+export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, shop, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; shop?: { skin: Skin | null; line: string; onOpen: () => void }; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
   const cups = courseCount(counts).cups || CLASSIC.length; // (the chain's, once it has answered)
   return (
     <FrontScreen className="modes" back="Back to the title" onBack={onBack} onAbout={onAbout} eyebrow="Choose your game" title="How do we play?">
-      <ul className={`modes__list${gnomes ? " modes__list--four" : ""}`}>
+      <ul className={`modes__list${shop ? " modes__list--four" : ""}`}>
         <li><Panel kind="solo" name="Solo" line={`${countWord(cups)} cups, your best on the boards`} skin={skin} onClick={onSolo} /></li>
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
-        <li><Panel kind="build" name="Builder" line={onBuild ? "Draw a hole, publish it under your name" : "Draw your own hole, dare the others"} skin={skin} soon={!onBuild} onClick={onBuild} /></li>
-        {gnomes && <li><Panel kind="gnomes" name="Gnomes" line="720 gnomes, each one of a kind" skin={skin} art={gnomes.art} onClick={gnomes.onOpen} /></li>}
+        {/* the Builder: the game's Miner in his hard hat over a hole's sketch, once out; to come, the sketch alone */}
+        <li><Panel kind="build" name="Builder" line={onBuild ? "Draw a hole, publish it under your name" : "Draw your own hole, dare the others"} skin={onBuild ? gnomeById("miner") : null} back={<Emblem id="build" />} soon={!onBuild} onClick={onBuild} /></li>
+        {/* the gnome shop ("Shop": one line, as the games' names): one of the wave's gnomes before a stall's awning */}
+        {shop && <li><Panel kind="shop" name="Shop" line={shop.line} skin={shop.skin} back={<Awning />} onClick={shop.onOpen} /></li>}
       </ul>
     </FrontScreen>
   );
@@ -44,13 +46,13 @@ export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, gno
  *  gnome's act in 3D (a duel's ghost taking turns with him) playing under the
  *  pointer or the focus only, its name inked big. One to come is drawn,
  *  dimmed, with its sticker (and no 3D of its own). */
-// art: a picture in the disc in place of the 3D (the collection's)
-function Panel({ kind, name, line, skin, soon = false, art, onClick }: { kind: "solo" | "duel" | "build" | "gnomes"; name: string; line: string; skin: Skin; soon?: boolean; art?: ReactNode; onClick?: () => void }) {
+// skin: the gnome on the stage (null: none yet, the stage's back alone); back: what stands behind him in the disc
+function Panel({ kind, name, line, skin, soon = false, back, onClick }: { kind: "solo" | "duel" | "build" | "shop"; name: string; line: string; skin: Skin | null; soon?: boolean; back?: ReactNode; onClick?: () => void }) {
   const [hot, on] = useHot();
   return (
     <button className={`mode mode--${kind}`} disabled={soon} aria-label={`${name}: ${line}${soon ? ". Coming soon" : ""}`} {...on}
       onClick={() => (sound("select"), onClick && onClick())}>
-      {kind === "build" ? <span className="mode__stage"><Emblem id="build" /></span> : art ? <span className="mode__stage">{art}</span> : <Stage skin={skin} act={kind === "gnomes" ? "hop" : kind} playing={hot} />}
+      {skin ? <Stage skin={skin} act={kind === "duel" ? "duel" : kind === "solo" ? "solo" : "hop"} playing={hot}>{back}</Stage> : <span className="mode__stage">{back}</span>}
       <span className="mode__name">{name}</span>
       <span className="mode__line">{line}</span>
       {soon && <span className="dare mode__soon">Coming soon</span>}
@@ -62,7 +64,19 @@ function useHot() {
   const [hot, setHot] = useState(false);
   return [hot, { onPointerEnter: () => setHot(true), onPointerLeave: () => setHot(false), onFocus: () => setHot(true), onBlur: () => setHot(false) }] as const;
 }
-const Stage = ({ skin, act, playing, className = "mode__stage" }: { skin: Skin; act: Act; playing: boolean; className?: string }) => <span ref={useGnomeStage<HTMLSpanElement>(skin, { act, playing })} className={className} />;
+// children: what stands behind the gnome (the canvas is added after them, over them)
+const Stage = ({ skin, act, playing, className = "mode__stage", children }: { skin: Skin; act: Act; playing: boolean; className?: string; children?: ReactNode }) =>
+  <span ref={useGnomeStage<HTMLSpanElement>(skin, { act, playing })} className={className}>{children}</span>;
+
+/** A market stall's awning, inked, in the shop panel's colours: what says "a shop" behind its gnome. */
+const Awning = () => (
+  <svg className="mode__awning" viewBox="0 0 120 54" aria-hidden="true">
+    <path d="M10 6h100l8 22H2z" className="mode__awning-top" />
+    {[0, 1, 2, 3, 4].map((k) => <path key={k} d={`M${10 + k * 20} 6h10l-${3 - k * 1.5} 22h-12z`} className="mode__awning-band" />)}
+    <path d="M2 28q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0" className="mode__awning-scallop" />
+    <path d="M10 6h100l8 22H2zM2 28q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0" className="mode__awning-ink" />
+  </svg>
+);
 
 /**
  * A duel's rival, on a screen of their own: a friend's name or address typed
