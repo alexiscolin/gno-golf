@@ -11,7 +11,7 @@
 .bench { --palette-w: 220px; --col-w: 300px; position: fixed; inset: 0; display: grid; grid-template: 64px minmax(0, 1fr) / var(--palette-w) minmax(0, 1fr) var(--col-w); gap: var(--sp-3); padding: var(--sp-3) max(var(--sp-3), env(safe-area-inset-right)) var(--sp-3) max(var(--sp-3), env(safe-area-inset-left)); overflow: hidden; overscroll-behavior: none; font-family: var(--font); color: var(--ink); background: radial-gradient(circle, rgba(var(--ink-rgb), .08) 1.6px, transparent 2px) 0 0 / 14px 14px, var(--s0, var(--paper)); }
 @media (min-width: 1280px) { .bench { --palette-w: 248px; } }
 @media (min-width: 1400px) { .bench { --palette-w: 264px; --col-w: 340px; grid-template-columns: var(--palette-w) minmax(0, 1fr) var(--col-w); } }
-.bench__wait { grid-column: 1 / -1; place-self: center; font-size: 17px; }
+.bench__wait { grid-column: 1 / -1; place-self: center; font-size: 17px; text-align: center; }
 .bench__unkept { position: fixed; left: 50%; bottom: var(--sp-3, 12px); transform: translateX(-50%); margin: 0; padding: 8px 16px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-weight: 700; white-space: nowrap; z-index: 2; }
 /* the note has a band of its own under the screen it is said on: it covers no control */
 :is(.bench, .tbench, .pbench):has(+ .bench__unkept) { padding-bottom: 64px; }

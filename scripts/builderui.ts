@@ -511,6 +511,25 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 }
 // every palette entry dropped on a blank lane, at a laptop's size and a retina one's: the selection's outline and a hover's
 // a few css px whatever the zoom (never a stroke in the board's units: a fat capsule over the cup), no overlay drawn empty
+// a world's pieces that cannot load (offline, an old deploy's chunk gone): said, with a Try again that loads them
+{
+  const c = await editor(1280, 800);
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__world")`)); k++) await sleep(300);
+  await c.send("Network.enable");
+  await c.send("Network.setBlockedURLs", { urls: ["*scene_island*", "*scene/island*"] });
+  await c.js(`[...document.querySelectorAll(".bholes__world")].find((b) => /Island/.test(b.textContent)).click()`);
+  await sleep(300);
+  await c.js(`document.querySelector(".bholes__starts .bholes__start").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`/could not load/.test(document.querySelector(".bench__wait")?.textContent ?? "")`)); k++) await sleep(300);
+  assert.match(await c.js<string>(`document.querySelector(".bench__wait")?.textContent ?? ""`), /could not load/, "a world's pieces that fail to load: said where the board would be");
+  await c.send("Network.setBlockedURLs", { urls: [] });
+  await c.js(`[...document.querySelectorAll(".bench__wait button")].find((b) => /Try again/.test(b.textContent)).click()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette")`)); k++) await sleep(500);
+  assert.equal(await c.js(`!!document.querySelector(".palette")`), true, "Try again: the pieces loaded");
+  c.kill();
+}
+
 // the Inspector's choices whole in their rows (a push's eight ways the widest), at the usual width and the floor:
 // the garden's signature hole, its moon bridge (p1) selected
 for (const [w, h] of [[1280, 800], [900, 800]] as const) {
