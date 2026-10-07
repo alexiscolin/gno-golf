@@ -14,6 +14,7 @@ import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, validate, type ValidateOptions } from "./pipeline";
 import { cap, worldName } from "./rules";
 import { plainOf } from "./explain";
+import { pastLimits } from "./limits";
 
 /** A piece's settings at placement: each within its entry's range, its default when left out. */
 export interface PlaceParams {
@@ -129,10 +130,15 @@ export function editErrors(rest: Draft, after: Draft, id: string, o: ValidateOpt
   return v.issues.filter((i) => i.severity === "error" && (about(i, id, v.refs) || !had.has(keyOf(i))));
 }
 
-/** Why the piece may not go where it is in d (put in, or put back in place of its old self); none, it may (editErrors). */
+/**
+ * Why the piece may not go where it is in d (put in, or put back in place of
+ * its old self); none, it may (editErrors). A piece more than the Builder's
+ * limits take (E16) is refused before anything else is asked.
+ */
 export function canPlace(d: Draft, piece: Piece, o: ValidateOptions, before?: readonly Issue[]): Issue[] {
-  const rest = { ...d, pieces: d.pieces.filter((p) => p.id !== piece.id) };
-  return editErrors(rest, { ...rest, pieces: [...rest.pieces, piece] }, piece.id, o, before);
+  const rest = { ...d, pieces: d.pieces.filter((p) => p.id !== piece.id) }, after = { ...rest, pieces: [...rest.pieces, piece] };
+  const full = pastLimits(d, after);
+  return full.length ? full : editErrors(rest, after, piece.id, o, before);
 }
 /**
  * The checks of a drag from start (or of the armed piece's ghost over it):
@@ -300,9 +306,16 @@ export const pieceLabel = (p: Piece) => {
   return `${cap(n)} at ${at(whereOf(p.geometry))}`;
 };
 
-/** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near. */
+/** Why one more piece like p (a copy, the keyboard's drop) would pass the Builder's limits, in the player's words; "" if it would not. */
+export const roomFor = (d: Draft, p: Piece): string => {
+  const why = pastLimits(d, { pieces: [...d.pieces, { ...p, id: nextId(d) }] });
+  return why.length ? plainOf(why[0]) : "";
+};
+
+/** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near (roomFor says when the limits are why). */
 export function placeNear(d: Draft, e: PaletteEntry, to: V, o: ValidateOptions): { draft: Draft; id: string } | null {
   const id = nextId(d), p = movePiece(placePiece(e, id, to), onQuarter(to, d.tee));
+  if (roomFor(d, p)) return null;
   const put = canPlace(d, p, o).length === 0 ? p : nearest(d, p, o);
   return put ? { draft: frame({ ...d, pieces: [...d.pieces, put] }), id } : null;
 }
@@ -314,9 +327,10 @@ const sizeOf = (g: Geometry) => {
   return Math.max(CELL, Math.ceil(s / CELL) * CELL);
 };
 
-/** A copy of piece id, under a fresh name, at the nearest place it may go; the draft framed, or null if there is none near. */
+/** A copy of piece id, under a fresh name, at the nearest place it may go; the draft framed, or null if there is none near (roomFor says when the limits are why). */
 export function copyPiece(d: Draft, id: string, o: ValidateOptions): Draft | null {
   const p = d.pieces.find((q) => q.id === id);
+  if (p && roomFor(d, p)) return null;
   // (clear of the piece copied: from its own size on, not the places it covers)
   const c = p && nearest(d, { ...p, id: nextId(d) }, o, sizeOf(p.geometry), sizeOf(p.geometry) + FIX_REACH);
   return c ? frame({ ...d, pieces: [...d.pieces, c] }) : null;

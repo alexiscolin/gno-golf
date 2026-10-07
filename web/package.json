@@ -9,7 +9,7 @@
     "prebuild": "node ../scripts/gnomeassets.mjs",
     "build": "tsc --noEmit && next build",
     "start": "npx serve out",
-    "lint": "eslint --no-error-on-unmatched-pattern . ../media/promo ../media/camera ../media/lib ../media/og ../media/gnomes ../scripts ../private/botcheck",
+    "lint": "eslint --no-error-on-unmatched-pattern . ../media/promo ../media/camera ../media/lib ../media/og ../media/gnomes ../media/builder ../scripts ../private/botcheck",
     "selfcheck": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/selfcheck.ts",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --import ./test/setup.mjs --test --experimental-test-coverage --test-coverage-include='lib/**/*.ts' --test-coverage-exclude='lib/scene/**' --test-coverage-exclude='lib/scene.ts' --test-coverage-exclude='lib/engine.ts' --test-coverage-exclude='lib/promo.ts' --test-coverage-exclude='lib/types.ts' --test-coverage-exclude='lib/engine/types.ts' --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=70 test/*.test.ts",
     "check": "sh ../scripts/check.sh",
@@ -23,7 +23,8 @@
     "gnomes:looks": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/gnomelooks.ts",
     "gnomes:rows": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/gnomerows.ts",
     "gnomes:thumbs": "node ../media/gnomes/render.mjs",
-    "gnomes:cards": "node ../media/gnomes/cards.mjs"
+    "gnomes:cards": "node ../media/gnomes/cards.mjs",
+    "builder:tiles": "node ../media/builder/tiles.mjs"
   },
   "dependencies": {
     "next": "^15.1.6",

@@ -3,6 +3,7 @@
 // the hole's extent before it is fitted (E1, E1b); fit, the chain's own
 // (a refusal: L2); the editor's checks on the hole as fit gives it, each
 // issue named by the draft piece it is about (E2 to E8, E10, E13 to E15);
+// the Builder's own piece limits (E16);
 // the render census (E12); the chain's PublishMine checks (L2), the data's
 // size (E9) and its work (E11). The issues are the issues list's; canPlace
 // and the board's clamps read the same rules (edit.ts).
@@ -12,6 +13,7 @@ import { BOARD, LIMITS, MARGIN, barCorners, frame, keyOf, pieceName, piecesBy, w
 import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { cap, FIELD } from "./rules";
+import { builderLimits } from "./limits";
 import type { Draft, Piece, V } from "./draft";
 import type { BuilderHost, Cost } from "./wasm";
 import type { GHole } from "./types";
@@ -198,6 +200,7 @@ export function validate(draft: Draft, o: ValidateOptions): Validated {
     const k = `${i.rule} ${piece} ${i.text}`;
     if (!seen.has(k)) seen.add(k), issues.push({ ...i, ...(piece && { piece }) });
   }
+  issues.push(...builderLimits(d));
   let state: Hole | undefined;
   if (o.census) {
     host.load(DRAFT_ID, f.hex);

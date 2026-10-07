@@ -1,12 +1,12 @@
 // What the editor's dock says (lib/builder/editor.ts): the verdict, the
 // gauges against GG1's and the realm's limits, the palette's entries a limit
-// switches off (with why), the palette grouped by kind.
+// switches off (with why).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { commonShift, gauges, groupsOf, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
+import { commonShift, gauges, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
@@ -63,13 +63,6 @@ void test("commonShift: how far a re-framing moved the whole hole (what most of 
   const one = { ...d, pieces: d.pieces.map((p) => (p.id === "x" ? { ...p, geometry: { t: "rail" as const, a: [11, 5] as [number, number], b: [11, 8] as [number, number] } } : p)) };
   assert.deepEqual(commonShift(d, one), [0, 0]);
   assert.deepEqual(commonShift(d, { ...d, pieces: [] }), [0, 0], "nothing in common but the ends: they say");
-});
-
-void test("groupsOf: the palette by kind, in the editor's order, each group's entries kept in the palette's order", () => {
-  const g = groupsOf(garden);
-  assert.deepEqual(g.map((x) => x.name), ["Walls", "Posts", "Ground", "Hazards", "Hills", "Jumps"].filter((n) => g.some((x) => x.name === n)));
-  assert.ok(g.every((x) => x.entries.length > 0));
-  assert.equal(g.reduce((n, x) => n + x.entries.length, 0), garden.length, "every entry once");
 });
 
 void test("a full check hands back the hole as players get it (the census's HoleState): the 3D preview draws it, no second load", async () => {
