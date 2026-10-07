@@ -207,16 +207,34 @@ function gapOf(a: Solid, b: Solid): [number, V] {
   return best;
 }
 
-/** The widest circle inside a polygon, by its diameter: a grid's points inside, each one's distance to the edges. */
-function inscribed(poly: readonly V[]): number {
-  const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]), step = 0.05;
+/**
+ * The widest circle inside a polygon, by its diameter, as soon as it is
+ * known to be at least enough: each point's distance to the edges (less than
+ * none outside it), on a grid of COARSE, then of FINE about the points within
+ * a coarse cell's reach of the widest yet (a point a cell away is at most
+ * that much further from the edges).
+ */
+function inscribed(poly: readonly V[], enough: number): number {
+  const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]), lo: V = [Math.min(...xs), Math.min(...ys)];
+  const shape = { min: lo, max: [Math.max(...xs) + 1e-9, Math.max(...ys) + 1e-9] as V, round: false, poly };
+  const depth = (x: number, y: number) => {
+    let d = Infinity;
+    for (let k = 0; k < poly.length; k++) d = Math.min(d, segDist(x, y, poly[k], poly[(k + 1) % poly.length]));
+    return inZone(shape, x, y) ? d : -d;
+  };
+  const COARSE = 0.25, FINE = 0.05, reach = COARSE * Math.SQRT1_2, coarse: [number, number, number][] = [];
   let best = 0;
-  for (let x = Math.min(...xs); x <= Math.max(...xs); x += step) {
-    for (let y = Math.min(...ys); y <= Math.max(...ys); y += step) {
-      if (!inZone({ min: [Math.min(...xs), Math.min(...ys)], max: [Math.max(...xs) + 1e-9, Math.max(...ys) + 1e-9], round: false, poly }, x, y)) continue;
-      let d = Infinity;
-      for (let k = 0; k < poly.length; k++) d = Math.min(d, segDist(x, y, poly[k], poly[(k + 1) % poly.length]));
-      best = Math.max(best, d);
+  for (let x = lo[0]; x <= shape.max[0]; x += COARSE) {
+    for (let y = lo[1]; y <= shape.max[1]; y += COARSE) {
+      const d = depth(x, y);
+      if ((best = Math.max(best, d)) * 2 >= enough) return 2 * best;
+      coarse.push([x, y, d]);
+    }
+  }
+  for (const [cx, cy, d] of coarse) {
+    if (d + reach < best) continue;
+    for (let x = cx - COARSE / 2; x <= cx + COARSE / 2; x += FINE) {
+      for (let y = cy - COARSE / 2; y <= cy + COARSE / 2; y += FINE) if ((best = Math.max(best, depth(x, y))) * 2 >= enough) return 2 * best;
     }
   }
   return 2 * best;
@@ -228,7 +246,7 @@ function mouths(h: HoleIn, name: Namer): Issue[] {
   for (const { item: z, ref } of each<ZoneIn>(h, "zone")) {
     if (z.kind !== "hazard" && z.kind !== "tunnel") continue;
     if (z.outside) continue; // (all the box but a polygon: the sea round a lane, as wide as the board)
-    const w = z.poly?.length ? inscribed(z.poly) : Math.min(z.max[0] - z.min[0], z.max[1] - z.min[1]);
+    const w = z.poly?.length ? inscribed(z.poly, MOUTH - 1e-9) : Math.min(z.max[0] - z.min[0], z.max[1] - z.min[1]);
     if (w < MOUTH - 1e-9) out.push(err("E5", `${cap(name(ref))} is ${+w.toFixed(2)} across: at least ${MOUTH}, or a fast ball steps over it`, ref, z.min));
   }
   return out;

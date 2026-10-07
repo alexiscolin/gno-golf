@@ -72,6 +72,22 @@ void test("E4, E14: gaps side by side, each too narrow, shut the way as one does
   assert.deepEqual(rules(across([5, 6.1], [12, 15])), [], "nor one it only just fits");
 });
 
+void test("E5: a polygon's mouth by the widest circle in it, its width said when thin; quick on a wide one (each check on a drag measures it)", () => {
+  const e5 = (h: HoleIn) => checkHole(h).filter((i) => i.rule === "E5").map((i) => i.text);
+  const thin = hole({ zones: [{ kind: "hazard", min: [5, 5], max: [35, 16], poly: [[5, 5], [35, 15], [35, 16], [5, 6]] }] });
+  const [said] = e5(thin), w = Number(/is ([\d.]+) across/.exec(said ?? "")?.[1]);
+  assert.ok(Math.abs(w - 3 / Math.sqrt(10)) < 0.03, `a slanting strip a unit high is ${(3 / Math.sqrt(10)).toFixed(2)} across: ${said}`);
+  // a pond of 16 points 60 across, against the same pond as a box (its mouth at once): best of three, each hole new (its floods not kept)
+  const pond = (round: boolean) => hole({
+    w: 80, h: 80, walls: box(0, 0, 80, 80), tee: [2, 2], pin: [78, 78],
+    zones: [{ kind: "hazard", min: [10, 10], max: [70, 70], ...(round && { poly: Array.from({ length: 16 }, (_, k): [number, number] => [40 + 30 * Math.cos((k * Math.PI) / 8), 40 + 30 * Math.sin((k * Math.PI) / 8)]) }) }],
+  });
+  const best = (round: boolean) => Math.min(...[0, 1, 2].map(() => { const h = pond(round), t0 = performance.now(); checkHole(h); return performance.now() - t0; }));
+  assert.deepEqual(e5(pond(true)), []);
+  const ratio = best(true) / best(false);
+  assert.ok(ratio < 40, `the polygon's check: ${ratio.toFixed(1)} times the box's (some 10; its every point measured, some 180)`);
+});
+
 void test("E8: GG1's limits, pulses' pieces counted in", () => {
   const many = (n: number) => Array.from({ length: n }, (_, k): WallIn => ({ a: [5 + (k % 30), 2], b: [5 + (k % 30), 3] }));
   assert.deepEqual(counts(hole()).walls, [4, LIMITS.walls]);
