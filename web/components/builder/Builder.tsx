@@ -10,7 +10,7 @@ import "@/app/build/builder.css";
 import "@/app/build/phone.css";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
-import { loadDrafts, saveDrafts, type Draft } from "@/lib/builder/draft";
+import { DRAFT_PREFIX, dropDraft, loadDrafts, newKey, saveDraft, type Draft, type Kept } from "@/lib/builder/draft";
 import { endpoints, knownAuthor, remixId } from "@/lib/builder/holes";
 import { remixFrom } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
@@ -28,15 +28,22 @@ import { firstRun, HINTS_KEY } from "@/lib/builder/templates";
 export default function Builder() {
   const [host, setHost] = useState<BuilderHost | null>(null);
   const [failed, setFailed] = useState("");
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  // the draft open (its place in the list), how many times opened (a fresh editor each), and the step
-  const [open, setOpen] = useState<{ i: number; n: number; step: "edit" | "test" | "publish"; test?: { hex: string; key: string } } | null>(null);
+  const [drafts, setDrafts] = useState<Kept[]>([]);
+  // the draft open (its key), how many times opened (a fresh editor each), and the step
+  const [open, setOpen] = useState<{ at: string; n: number; step: "edit" | "test" | "publish"; test?: { hex: string; key: string } } | null>(null);
   const [author, setAuthor] = useState<string | null>(null);
   const [unkept, setUnkept] = useState(false);
   const [hints, setHints] = useState(false);
   const [guess, setGuess] = useState(0); // the meter's par for the draft last edited, until its test rounds set one
   const [said, setSaid] = useState(""); // why a remix asked for did not open
   const [opened, setOpened] = useState(""); // why a file opened as it is is broken ("" none)
+  // a draft added (a new hole, a file, a remix) under a key of its own, and opened
+  const add = useCallback((draft: Draft) => {
+    const key = newKey();
+    setUnkept(!saveDraft(key, draft));
+    setDrafts((list) => [...list, { key, draft }]);
+    setOpen({ at: key, n: 0, step: "edit" });
+  }, []);
   useEffect(() => {
     const list = loadDrafts();
     // a remix asked for (taken from the address at once: a reload does not make another)
@@ -45,13 +52,9 @@ export default function Builder() {
     // a new player: straight onto the Garden's dogleg, with the three hints (templates.ts firstRun); not on a remix
     let hinted = true;
     try { hinted = !!localStorage.getItem(HINTS_KEY); } catch {}
-    const first = remix ? null : firstRun(list, hinted);
-    if (first) {
-      setUnkept(!saveDrafts([first]));
-      setDrafts([first]);
-      setOpen({ i: 0, n: 0, step: "edit" });
-      setHints(true);
-    } else setDrafts(list);
+    const first = remix ? null : firstRun(list.map((k) => k.draft), hinted);
+    setDrafts(list);
+    if (first) add(first), setHints(true);
     setAuthor(knownAuthor());
     void loadBuilder().then((h) => {
       setHost(h);
@@ -59,30 +62,36 @@ export default function Builder() {
       const { rpc, web } = endpoints(window.location.search);
       void remixFrom(makeChain({ rpc, web }), h, census, remix).then((d) => {
         if (typeof d === "string") return setSaid(d);
-        const next = [...list, d];
-        setUnkept(!saveDrafts(next));
-        setDrafts(next);
-        setOpen({ i: next.length - 1, n: 0, step: "edit" });
+        add(d);
       });
     }, (e: Error) => setFailed(e.message));
-  }, []);
-  const keep = useCallback((list: Draft[]) => (setDrafts(list), setUnkept(!saveDrafts(list))), []);
-  const at = open?.i ?? -1;
+  }, [add]);
+  const at = open?.at;
   const update = useCallback((f: (d: Draft) => Draft) => {
-    if (at < 0) return;
-    setDrafts((list) => {
-      const next = list.map((x, k) => (k === at ? f(x) : x));
-      setUnkept(!saveDrafts(next));
-      return next;
-    });
+    if (!at) return;
+    setDrafts((list) => list.map((k) => {
+      if (k.key !== at) return k;
+      const draft = f(k.draft);
+      setUnkept(!saveDraft(at, draft));
+      return { key: at, draft };
+    }));
   }, [at]);
+  // while this tab keeps every draft, its list follows what the other tabs keep (each saves only its own drafts)
+  const home = !open && !unkept;
+  useEffect(() => {
+    if (!home) return;
+    const on = (e: StorageEvent) => (e.key === null || e.key.startsWith(DRAFT_PREFIX)) && setDrafts(loadDrafts());
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }, [home]);
   const onSave = useCallback((d: Draft) => update(() => d), [update]);
 
   if (failed) return <main className="builder-off" role="alert"><h1>The Builder could not load.</h1><p>{failed}</p><Button onClick={() => window.location.reload()}>Try again</Button></main>;
   if (!host) return <main className="builder-off" aria-busy="true"><p>Loading the Builder…</p></main>;
   const unkeptNote = unkept && <p className="bench__unkept" role="status">This browser keeps nothing (a private window?): export your hole before you leave.</p>;
-  if (open && drafts[open.i]) {
-    const d = drafts[open.i], edit = () => setOpen({ ...open, n: open.n + 1, step: "edit", test: undefined });
+  const d = open && drafts.find((k) => k.key === open.at)?.draft;
+  if (open && d) {
+    const edit = () => setOpen({ ...open, n: open.n + 1, step: "edit", test: undefined });
     const publish = () => setOpen({ ...open, step: "publish" });
     if (open.step === "publish" && author) {
       return (
@@ -113,7 +122,7 @@ export default function Builder() {
     }
     return (
       <>
-        <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null))} onPublish={publish} opened={opened} onEstimate={setGuess}
+        <Editor key={`${open.at}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null), unkept || setDrafts(loadDrafts()))} onPublish={publish} opened={opened} onEstimate={setGuess}
           hints={hints} onHinted={() => { try { localStorage.setItem(HINTS_KEY, "1"); } catch {} setHints(false); }}
           onTest={(x) => {
             const hex = canonicalHex(x, host);
@@ -125,9 +134,9 @@ export default function Builder() {
     );
   }
   return (
-    <Start host={host} author={author} drafts={drafts} said={said}
-      onOpen={(i) => setOpen({ i, n: 0, step: "edit" })}
-      onAdd={(d, broken = "") => { keep([...drafts, d]); setOpened(broken); setOpen({ i: drafts.length, n: 0, step: "edit" }); }}
-      onDelete={(i) => keep(drafts.filter((_, k) => k !== i))} />
+    <Start host={host} author={author} drafts={drafts.map((k) => k.draft)} said={said}
+      onOpen={(i) => setOpen({ at: drafts[i].key, n: 0, step: "edit" })}
+      onAdd={(d, broken = "") => { add(d); setOpened(broken); }}
+      onDelete={(i) => { dropDraft(drafts[i].key); setDrafts(drafts.filter((_, k) => k !== i)); }} />
   );
 }

@@ -74,10 +74,13 @@ export interface Draft {
 
 /** A draft's limits, beside GG1's own (gg1.ts LIMITS): what the editor holds at once. */
 export const MAX_PIECES = 224; // GG1's walls, posts and zones (160 + 32 + 32): a piece takes one at least (a test holds it)
-/** Where the browser keeps the drafts. */
+/**
+ * Where the browser keeps each draft: a key of its own (newKey), so a save
+ * writes that draft only, and two tabs never write over each other's.
+ */
+export const DRAFT_PREFIX = "gnogolf.builder.draft.";
+/** Where earlier Builders kept every draft in one list: moved to keys of their own (loadDrafts), or left as it is. */
 export const DRAFTS_KEY = "gnogolf.builder.drafts";
-/** Where a stored draft this Builder cannot read is set aside, as it was: never erased by a save. */
-export const UNREAD_KEY = "gnogolf.builder.unread";
 /** A hole's name and note at most (runes), as the realm keeps them. */
 export const MAX_TITLE = 40, MAX_NOTE = 140;
 const MAX_PULSES = 16;
@@ -234,35 +237,82 @@ export function history(first: Draft) {
   };
 }
 
-/** The drafts kept in this browser; none if it keeps nothing (a private window) or kept another version's. */
-export function loadDrafts(): Draft[] {
+/** A draft as this browser keeps it: under its key. */
+export interface Kept {
+  key: string;
+  draft: Draft;
+}
+
+let last = 0;
+/** A new draft's key: when it was started (the drafts' order, never twice the same in a tab), then a random tail (another tab's). */
+export function newKey() {
+  last = Math.max(Date.now(), last + 1);
+  return `${DRAFT_PREFIX}${last}-${Math.random().toString(36).slice(2, 10)}`;
+}
+const started = (key: string) => Number.parseInt(key.slice(DRAFT_PREFIX.length), 10);
+
+/**
+ * The drafts kept in this browser, oldest first; none if it keeps nothing (a
+ * private window). A stored draft this Builder cannot read (edited by hand,
+ * another version's) is left out, and left as it is: no save writes its key.
+ */
+export function loadDrafts(): Kept[] {
   try {
-    const raw = localStorage.getItem(DRAFTS_KEY);
-    const j: unknown = JSON.parse(raw || "null");
-    if (!isObj(j) || j.v !== 1 || !Array.isArray(j.drafts)) return (raw && setAside([j ?? raw]), []);
-    const read = j.drafts.map((d) => parseDraft(JSON.stringify(d)));
-    setAside(j.drafts.filter((_, i) => typeof read[i] === "string"));
-    return read.filter((d): d is Draft => typeof d !== "string");
+    const out = fromList();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const d = key?.startsWith(DRAFT_PREFIX) ? parseDraft(localStorage.getItem(key) ?? "") : "";
+      if (key && typeof d !== "string") out.push({ key, draft: d });
+    }
+    return out.sort((a, b) => started(a.key) - started(b.key) || (a.key < b.key ? -1 : 1));
   } catch {
     return [];
   }
 }
 
-/** Stored drafts (or a store) this Builder cannot read, kept aside as they were, each once. */
-function setAside(odd: unknown[]) {
-  if (!odd.length) return;
-  const was: unknown = JSON.parse(localStorage.getItem(UNREAD_KEY) || "[]");
-  const list: unknown[] = Array.isArray(was) ? (was as unknown[]) : [];
-  const seen = new Set(list.map((x) => JSON.stringify(x)));
-  localStorage.setItem(UNREAD_KEY, JSON.stringify([...list, ...odd.filter((x) => !seen.has(JSON.stringify(x)))]));
+/**
+ * An earlier Builder's list, each draft moved as it is to a key of its own
+ * (unless that key is there already: a later save of it), the list removed
+ * once every one is; the readable drafts the store refused to take, from the
+ * list. A list this Builder cannot read stays as it is.
+ */
+function fromList(): Kept[] {
+  let j: unknown;
+  try {
+    j = JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? "null");
+  } catch {
+    return [];
+  }
+  if (!isObj(j) || j.v !== 1 || !Array.isArray(j.drafts)) return [];
+  let moved = true;
+  const unmoved: Kept[] = [];
+  j.drafts.forEach((x: unknown, i) => {
+    const key = `${DRAFT_PREFIX}${i}-list`;
+    try {
+      if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify(x));
+    } catch {
+      moved = false;
+      const draft = parseDraft(JSON.stringify(x));
+      if (typeof draft !== "string") unmoved.push({ key, draft });
+    }
+  });
+  if (moved) localStorage.removeItem(DRAFTS_KEY);
+  return unmoved;
 }
 
-/** Keeps the drafts in this browser; false if it keeps nothing (the page then says so once). */
-export function saveDrafts(list: readonly Draft[]): boolean {
+/** Keeps a draft in this browser, under its key; false if it keeps nothing (the page then says so once). */
+export function saveDraft(key: string, d: Draft): boolean {
   try {
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify({ v: 1, drafts: list }));
+    localStorage.setItem(key, JSON.stringify(d));
     return true;
   } catch {
     return false;
   }
+}
+
+/** A draft deleted from this browser. */
+export function dropDraft(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {}
 }
