@@ -43,6 +43,8 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
   // picked up: the game's wooden tick (put back: nothing)
   const arm = (e: PaletteEntry) => (armed?.id !== e.id && sound("select"), onArm(armed?.id === e.id ? null : e));
 
+  // on the column's grid: two a row, a tile alone on its row (a group of one, an odd one out) the row's width, as the first five
+  const tiles = (ts: readonly Tile[]) => <div className="ptiles">{ts.map((t, i) => tile(t, i === ts.length - 1 && ts.length % 2 === 1))}</div>;
   const tile = (t: Tile, big = false) => {
     const e = lookOf(t), why = off.get(e.id), on = !!armed && t.looks.some((x) => x.id === armed.id);
     return (
@@ -72,13 +74,13 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
         {more.map((g) => (
           <section key={g.group} className="palette__group">
             <h3>{g.group}</h3>
-            <div className="ptiles">{g.tiles.map((t) => tile(t))}</div>
+            {tiles(g.tiles)}
           </section>
         ))}
       </Folding>
       {others.length > 0 && (
         <Folding fold="others" title="From other worlds">
-          <div className="ptiles">{others.map((t) => tile(t))}</div>
+          {tiles(others)}
         </Folding>
       )}
       {bin && <div className="palette__bin" data-bin aria-hidden="true">Drop a piece here to remove it</div>}

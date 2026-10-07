@@ -71,9 +71,11 @@
 .piece__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 800; line-height: 1.2; }
 .piece__does { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; line-height: 1.2; color: var(--ink-soft); }
 /* a small tile's words may take two lines (a narrow window): every tile of a row as tall */
-.ptiles:not(.ptiles--first) .piece__does { white-space: normal; text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.4em; }
-.ptiles--first { grid-template-columns: 1fr; gap: var(--sp-2); --pic: 52px; }
-@media (min-width: 1280px) { .ptiles--first { --pic: 60px; } }
+.ptile:not(.ptile--big) .piece__does { white-space: normal; text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.4em; }
+/* the five a first hole needs, and a tile alone on its row: the row's width, the picture beside the name and what it does */
+.ptiles--first { grid-template-columns: 1fr; gap: var(--sp-2); }
+.ptile--big { grid-column: 1 / -1; --pic: 52px; }
+@media (min-width: 1280px) { .ptile--big { --pic: 60px; } }
 .ptile--big .piece { grid-template: auto auto / var(--pic) minmax(0, 1fr); justify-items: start; align-items: center; align-content: center; column-gap: var(--sp-3); padding: 6px var(--sp-3) 6px 6px; text-align: left; }
 .ptile--big .piece img { grid-row: 1 / 3; margin: 0; }
 .ptile--big .piece__name { align-self: end; font-size: 16px; }
@@ -233,11 +235,11 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__gnome > svg { position: absolute; left: 50%; bottom: 36px; width: 124px; height: 124px; transform: translateX(-50%); filter: drop-shadow(0 4px 0 var(--ink)); }
 .bholes__gnome > .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
 /* the screen's head (the game's: its pill and outlined title) at the sign's start, what the Builder is for under it */
-.bholes__say p { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
-/* the three steps: paper chips, a little picture each, joined by a dashed line */
 .bholes__say { display: grid; justify-items: start; gap: 6px; min-width: 0; }
 .bholes__say .front__head { justify-items: start; margin: 0; }
 .front .bholes__say .worlds__title { font-size: var(--fs-fit); }
+.bholes__say p { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
+/* the three steps: paper chips, a little picture each, joined by a dashed line */
 .bholes__steps { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; counter-reset: none; }
 .bholes__step { position: relative; display: flex; align-items: center; gap: var(--sp-2); padding: 6px var(--sp-3) 6px 6px; border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); }
 .bholes__step + .bholes__step::before { content: ""; position: absolute; left: 24px; top: -10px; height: 10px; border-left: 2px dashed rgba(255, 255, 255, .7); }
