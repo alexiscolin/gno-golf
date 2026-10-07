@@ -9,7 +9,7 @@
 // a file or a published hole opened. A new player never lands here first: the
 // first run opens the Garden's dogleg (templates.ts firstRun).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BackButton } from "@/components/About";
+import { BackButton, FrontHead } from "@/components/About";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
 import { Emblem } from "@/components/Worlds";
@@ -236,8 +236,7 @@ function Workshop() {
     <header className="bholes__sign" onPointerEnter={() => setHot(true)} onPointerLeave={() => setHot(false)}>
       <span ref={stage} className="bholes__gnome"><Emblem id="build" /></span>
       <div className="bholes__say">
-        <span className="eyebrow">The Builder</span>
-        <h1 className="worlds__title">Hard hats on!</h1>
+        <FrontHead eyebrow="The Builder" title="Hard hats on!" h1 />
         <p>Build your own hole. Test it. Put your name on it.</p>
       </div>
       <ol className="bholes__steps" aria-label="How it goes">

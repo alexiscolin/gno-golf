@@ -232,12 +232,12 @@ button.issue__why:hover { text-decoration-style: solid; }
 .bholes__gnome { position: relative; display: block; width: 210px; height: 210px; margin: -78px -31px -26px; }
 .bholes__gnome > svg { position: absolute; left: 50%; bottom: 36px; width: 124px; height: 124px; transform: translateX(-50%); filter: drop-shadow(0 4px 0 var(--ink)); }
 .bholes__gnome > .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
-.bholes__say { display: grid; justify-items: start; gap: 6px; min-width: 0; }
-.bholes__say .eyebrow { padding: 2px 12px; font-size: 12px; background: var(--paper); color: var(--ink); }
-.front .bholes__say .worlds__title { margin: 0; font-size: clamp(36px, 4vw, 52px); line-height: 1; --ink-w: 6px; --ink-drop: 4px; transform: rotate(-2deg); transform-origin: left; }
 /* the screen's head (the game's: its pill and outlined title) at the sign's start, what the Builder is for under it */
 .bholes__say p { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
 /* the three steps: paper chips, a little picture each, joined by a dashed line */
+.bholes__say { display: grid; justify-items: start; gap: 6px; min-width: 0; }
+.bholes__say .front__head { justify-items: start; margin: 0; }
+.front .bholes__say .worlds__title { font-size: var(--fs-fit); }
 .bholes__steps { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; counter-reset: none; }
 .bholes__step { position: relative; display: flex; align-items: center; gap: var(--sp-2); padding: 6px var(--sp-3) 6px 6px; border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); }
 .bholes__step + .bholes__step::before { content: ""; position: absolute; left: 24px; top: -10px; height: 10px; border-left: 2px dashed rgba(255, 255, 255, .7); }

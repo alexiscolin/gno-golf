@@ -187,6 +187,8 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const steps = (await box(c, ".bholes__steps"))!, bar = (await box(c, ".bholes__bar"))!, pad = await c.js<number>(`parseFloat(getComputedStyle(document.querySelector(".bholes__sign")).paddingLeft)`);
   assert.ok(steps.t - sign.t >= pad && sign.b - steps.b >= pad && sign.r - steps.r >= pad, `${at}: the steps touch the sign's edges (${JSON.stringify({ sign, steps, pad })})`);
   assert.ok(bar.t - sign.b >= 32, `${at}: the world tabs sit right under the sign (${bar.t - sign.b}px)`);
+  // its head the game's (a front screen's pill and outlined title)
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".bholes__sign .front__head > *")].map((e) => e.tagName + " " + e.className + " " + e.textContent)`), ["SPAN eyebrow The Builder", "H1 worlds__title Hard hats on!"], `${at}: the head is not a front screen's`);
   // the starters as templates, the blank lane as one of the cards, as big, under its own label, its own picture
   assert.deepEqual(await c.js<string[]>(`[...document.querySelectorAll(".bholes__group")].map((e) => e.textContent)`), ["Start from a template", "Or start blank"], `${at}: the start's groups`);
   const blank = cards[3], first = cards[0];
