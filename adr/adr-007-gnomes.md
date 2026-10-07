@@ -72,7 +72,10 @@ sale runs on until the owner sets one (the user's decision of 2026-10-07):
 `SetCloseAt(at)`, owner only, once the genesis is published. A date in the
 future, which can later be brought forward, never pushed back, by this
 owner or the next; once one is set, no genesis wave may start at or after
-it, which nobody could buy from. From its block on, the
+it, which nobody could buy from, from either side: `AddWave` refuses such
+a start, and `SetCloseAt` a date at or before a genesis wave yet to open
+(a wave is never withdrawn, so a close cannot come before one the owner
+has announced). From its block on, the
 genesis's unsold gnomes are closed for good: `Buy` and `AddWave` refuse
 them ("the genesis sale closed on <date>"), and its
 final supply is readable on chain (`Collection`: the series' `sold` and
@@ -262,7 +265,7 @@ while on sale, an earned kind, a player).
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
-| AddWave | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it | `TestAWaveStartsBeforeTheCloseOnceOneIsSet` |
+| AddWave, SetCloseAt | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it, and the date never comes to or before a genesis wave yet to open | `TestAWaveStartsBeforeTheCloseOnceOneIsSet`, `TestTheCloseNeverComesBeforeAGenesisWaveYetToOpen` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
 | Buy | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |

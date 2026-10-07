@@ -505,8 +505,10 @@ ok "price: Common 40 GNOT for the next waves" "set" test1 "$GN" SetPrice common 
 is "price: a wave keeps its prices" "Gnome(\"8\").price" "36000000" "$(qg 'Gnome("8")' | jf 'd["price"]')"
 NOW=$(chaintime)
 ok "waves: 105-207, no window (208 on sale alone already)" "added" test1 "$GN" AddWave 105 207 "$NOW" 0
-ok "waves: 209-310, tomorrow" "added" test1 "$GN" AddWave 209 310 "$((NOW + 86400))" 0
+W209=$((NOW + 90))
+ok "waves: 209-310, in a minute and a half" "added" test1 "$GN" AddWave 209 310 "$W209" 0
 SEND=40000000ugnot no "waves: not yet" "is not on sale yet" p0 "$GN" Buy 209
+no "close: never before a genesis wave yet to open" "a genesis wave starts on" test1 "$GN" SetCloseAt "$((W209 - 30))"
 SEND=36000000ugnot no "waves: in no wave" "is not on sale" p0 "$GN" Buy 400
 commons=$(awk -F'|' '$1>=105 && $1<=207 && $2=="common"{print $1}' "$ROWS" | head -11 | tr '\n' ' ')
 set -- $commons
@@ -637,6 +639,7 @@ is "earned: TokenURI SVG" "TokenURI(\"1000001\") parsed as XML" "svg" "$(qg 'Tok
 within "portrait: TokenURI gas, an earned gnome" "MsgRun TokenURI(\"1000001\") - MsgRun OwnerOf" "$URIMAX" "$(urigas 1000001)"
 
 # ------------------------------------------------------------------- close
+wait_until "$((W209 + 5))" "wave 209-310 open" # (a close comes after every genesis wave's start)
 NOW=$(chaintime)
 no "close: owner only" "only the owner" p0 "$GN" SetCloseAt "$((NOW + 600))"
 no "close: in the future" "a closing date is in the future" test1 "$GN" SetCloseAt "$((NOW - 10))"

@@ -22,7 +22,9 @@ func CloseAt() int64 { return closeAt }
 
 // SetCloseAt sets the genesis sale's closing date, or brings it forward:
 // later than the one set is refused, as is a date not in the future or one
-// already reached. Owner only, once the genesis is published.
+// already reached, and one at or before the start of a genesis wave yet to
+// open (a wave is never withdrawn: it would never sell). Owner only, once
+// the genesis is published.
 func SetCloseAt(cur realm, at int64) {
 	assertOwner(0, cur)
 	if len(catalogue) == 0 {
@@ -36,6 +38,11 @@ func SetCloseAt(cur realm, at int64) {
 	}
 	if closeAt != 0 && at > closeAt {
 		panic("gnomes: the closing date comes forward, never later than " + dateOf(closeAt))
+	}
+	for _, w := range waves {
+		if seriesAt(w.first) == 0 && w.start >= at {
+			panic("gnomes: a genesis wave starts on " + dateOf(w.start) + ": the close comes after it")
+		}
 	}
 	closeAt = at
 	chain.Emit("CloseAtSet", "at", itoa(at))
