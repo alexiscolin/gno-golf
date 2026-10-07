@@ -57,12 +57,14 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
     if (capture) capture.current = () => (draw(), el);
     void loadWorld(state.world).then(() => {
       if (stale) return;
-      if (t.course) (t.scene.remove(t.course), disposeCourse(t.course));
+      const old = t.course;
+      if (old) t.scene.remove(old);
       const g = buildHole(state);
       finishHole(g);
       t.scene.add(g);
       t.course = g;
       draw();
+      if (old) disposeCourse(old); // (once the new one is drawn: the shader programs they share kept)
     }, () => setFailed(true));
     const ro = new ResizeObserver(draw);
     ro.observe(el);

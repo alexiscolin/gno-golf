@@ -94,12 +94,15 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
     void loadWorld(state.world).then(() => {
       const t = three.current;
       if (stale || !t) return;
-      if (t.course) (t.scene.remove(t.course), disposeCourse(t.course));
+      const old = t.course;
+      if (old) t.scene.remove(old);
       t.course = buildHole(state);
       if (camlog()) window.__builds = (window.__builds ?? 0) + 1;
       setLighting(t.scene as Parameters<typeof setLighting>[0], t.course.userData.time);
       t.scene.add(t.course);
       draw();
+      // the old hole freed once the new one is drawn: the shader programs they share are kept, not linked again
+      if (old) disposeCourse(old);
     });
     return () => void (stale = true);
   }, [state]);
