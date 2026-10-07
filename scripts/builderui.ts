@@ -522,7 +522,10 @@ for (const [w, h] of [[1280, 800], [900, 800]] as const) {
   await sleep(800);
   await c.js(`document.querySelector("[data-piece='p1']").focus()`);
   await sleep(600);
-  if (!(await c.js<boolean>(`!!document.querySelector(".insp__dirs")?.checkVisibility()`))) await c.js(`document.querySelector(".insp__details summary").click()`), await sleep(200);
+  if (!(await c.js<boolean>(`!!document.querySelector(".insp__dirs")?.checkVisibility()`))) {
+    await c.js(`document.querySelector(".insp__details summary").click()`);
+    await sleep(200);
+  }
   assert.equal(await c.js(`!!document.querySelector(".insp__dirs")?.checkVisibility()`), true, `${w}×${h}: the moon bridge's way shown`);
   const cut = await c.js<string[]>(`[...document.querySelectorAll(".insp .seg")].filter((s) => s.checkVisibility() && (s.scrollWidth > s.clientWidth + 0.5 || [...s.querySelectorAll("button")].some((b) => b.getBoundingClientRect().right > s.getBoundingClientRect().right + 0.5))).map((s) => s.getAttribute("aria-label") || s.className)`);
   assert.deepEqual(cut, [], `${w}×${h}: the Inspector's choices clipped`);
