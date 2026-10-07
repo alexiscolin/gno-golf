@@ -29,10 +29,10 @@ export function makePieceShowcase(size = 384) {
   return {
     /**
      * The hole s drawn, looked at lift above the ground at mid (the board's x
-     * and y) so that a piece span across fills the picture; scaled to px
-     * square, a WebP data URL.
+     * and y) from FROM (or from, a hill's: more from the side) so that a piece
+     * span across fills the picture; scaled to px square, a WebP data URL.
      */
-    async shot(s: Hole, mid: readonly [number, number], span: number, lift: number, px: number, quality: number) {
+    async shot(s: Hole, mid: readonly [number, number], span: number, lift: number, px: number, quality: number, from?: readonly [number, number, number]) {
       await loadWorld(s.world);
       if (course) (scene.remove(course), disposeCourse(course));
       course = buildHole(s);
@@ -43,7 +43,7 @@ export function makePieceShowcase(size = 384) {
       const ground = course.userData.height(mid[0], mid[1]);
       const target = new THREE.Vector3(mid[0], ground + lift, mid[1]);
       const dist = (span * 0.6 + 0.8) / Math.tan(((FOV / 2) * Math.PI) / 180);
-      camera.position.copy(target).addScaledVector(FROM, dist);
+      camera.position.copy(target).addScaledVector(from ? new THREE.Vector3(...from).normalize() : FROM, dist);
       camera.lookAt(target);
       camera.updateProjectionMatrix();
       renderer.render(scene, camera); // (read in the same task: the drawing buffer is not kept)

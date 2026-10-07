@@ -3,7 +3,8 @@
 // every look of every Builder world, a lane with that one piece in it, as
 // placed from the palette, as a player's client gets it (builder.wasm's
 // HoleState, at period 1, the census's), and where to look at it: the
-// piece's middle on the board, how far it reaches, how high to look.
+// piece's middle on the board, how far it reaches, how high to look (and
+// from where, for a hill: more from the side).
 // Written as JSON to the file named (stdout without one).
 //
 //   (from web/) node --experimental-strip-types --disable-warning=ExperimentalWarning --import ./test/setup.mjs ../scripts/tileholes.ts [out.json] [world/kind-skin …]
@@ -39,7 +40,9 @@ function aim(p: Piece) {
   const xs = pts.map((v) => v[0]), ys = pts.map((v) => v[1]);
   const mid: V = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2], across = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1.6);
   // a post stands up (a palm, a lamp, a house): framed taller, looked at higher
-  return p.geometry.t === "post" ? { mid, span: across + 1.6, lift: (across + 1.6) * 0.42 } : { mid, span: across, lift: across * 0.12 };
+  if (p.geometry.t === "post") return { mid, span: across + 1.6, lift: (across + 1.6) * 0.42 };
+  // a hill seen more from the side, across its push: its rise shows
+  return { mid, span: across, lift: across * 0.12, ...(p.params.grade !== undefined && { from: [0.3, 0.6, 1] }) };
 }
 
 const jobs = [];

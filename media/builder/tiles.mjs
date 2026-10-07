@@ -28,7 +28,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-tiles-"));
 // the holes: one a look, from builder.wasm in Node
 const holes = path.join(tmp, "holes.json");
 execFileSync("node", ["--experimental-strip-types", "--disable-warning=ExperimentalWarning", "--import", "./test/setup.mjs", "../scripts/tileholes.ts", holes, ...args], { cwd: WEB.pathname, stdio: "inherit" });
-/** @type {{ file: string, world: string, mid: [number, number], span: number, lift: number, state: object }[]} */
+/** @type {{ file: string, world: string, mid: [number, number], span: number, lift: number, from?: number[], state: object }[]} */
 const jobs = JSON.parse(fs.readFileSync(holes, "utf8"));
 
 // the showcase bundled for the page, with the same throw of the dice every time: a picture made twice is the same
@@ -36,7 +36,7 @@ const ENTRY = `import { makePieceShowcase } from "./web/lib/scene/piece-showcase
 let seed = 7;
 Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
 const s = makePieceShowcase(${RENDER});
-window.shot = (state, mid, span, lift, px, q) => ((seed = 7), s.shot(state, mid, span, lift, px, q));
+window.shot = (state, mid, span, lift, px, q, from) => ((seed = 7), s.shot(state, mid, span, lift, px, q, from));
 window.ready = true;`;
 const bundle = path.join(tmp, "tiles.js");
 // (from stdin, its imports resolve from the working directory: the repo's root)
@@ -54,7 +54,7 @@ if (!(await b.ev("window.ready"))) throw new Error(`the showcase did not start: 
 async function webp(j) {
   let out = Buffer.alloc(0);
   for (let q = 0.86; q >= 0.3; q -= 0.06) {
-    const url = await b.js(`shot(${JSON.stringify(j.state)}, ${JSON.stringify(j.mid)}, ${j.span}, ${j.lift}, ${PX}, ${q.toFixed(2)})`);
+    const url = await b.js(`shot(${JSON.stringify(j.state)}, ${JSON.stringify(j.mid)}, ${j.span}, ${j.lift}, ${PX}, ${q.toFixed(2)}, ${JSON.stringify(j.from)})`);
     out = Buffer.from(url.split(",")[1], "base64");
     if (out.length <= MAX_BYTES) break;
   }
