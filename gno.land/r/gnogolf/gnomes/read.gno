@@ -101,9 +101,9 @@ func Sold() string {
 	return string(out)
 }
 
-// GnomesOf is the locker: owner's tokens from offset, at most 100, in id
-// order; "total" is how many they hold, "next" the offset of the following
-// page, or -1.
+// GnomesOf is the locker: owner's tokens from offset, at most 100, best
+// first (heldKey: tier rank, then id), as the locker shows a team; "total"
+// is how many they hold, "next" the offset of the following page, or -1.
 //
 //	{"version":1,"owner":"g1…","total":3,"next":-1,
 //	 "rows":[{"id":"217","tier":"common","traits":"…"},…]}
