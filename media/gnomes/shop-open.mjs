@@ -4,7 +4,9 @@
 // and 390: the layout shifts the page reports over 6 s, failing over 0.01
 // (the shop draws its final frame first: ShopFrame.tsx); then every card's
 // picture in sight loaded (no broken image), and the shop never wider than
-// the window (no sideways scroll). With OUT, a frame every 100 ms and a
+// the window (no sideways scroll). Before, the title screen alone: none of
+// the sale read (the catalogue) nor the collection's wardrobe fetched, which
+// only a screen showing the sale needs. With OUT, a frame every 100 ms and a
 // strip of them.
 //   APP=https://… node media/gnomes/shop-open.mjs   (OUT=<dir> for the frames)
 import fs from "node:fs";
@@ -19,6 +21,8 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.send("Network.setCacheDisabled", { cacheDisabled: false });
   await b.send("Page.navigate", { url: APP + "/" });
   for (let i = 0; i < 90 && !(await b.ev(`!![...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent))`)); i++) await sleep(500);
+  await sleep(3000);
+  const early = await b.ev(`performance.getEntriesByType("resource").map((e) => e.name).filter((n) => n.includes("/gnomes/catalogue.json") || n.includes("gnome-dress"))`);
   await b.js(`[...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent)).click()`);
   for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".mode--shop")`)); i++) await sleep(500);
   await sleep(1500);
@@ -45,9 +49,9 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   const pics = await b.ev(`(() => { const s = ${seen}; return { n: s.length, broken: s.filter((i) => !i.complete || !i.naturalWidth).map((i) => i.getAttribute("src")) }; })()`);
   // the shop's room the window's: nothing past its side (a trackpad's swipe shifts nothing)
   const wide = await b.ev(`(() => { const s = document.querySelector(".screen.shop"); return s.scrollWidth - s.clientWidth; })()`);
-  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length && wide <= 0;
+  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length && wide <= 0 && !early.length;
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken, ${wide} px sideways`, pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
+  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: ${early.length} sale reads on the title screen, layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken, ${wide} px sideways`, early.length ? JSON.stringify(early) : "", pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
   b.kill();
   if (!dir) continue;
   // a strip: every other frame (0-5.8 s), 6 a row

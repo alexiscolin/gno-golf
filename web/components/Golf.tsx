@@ -1025,9 +1025,14 @@ export default function Golf() {
   const gnomeNow = useRef(gnome);
   gnomeNow.current = gnome;
   useEffect(() => void (SHOP && shopInRegion().then(setRegion)), []);
-  // the sale as the menu, the picker and the finish card show it (read once a visit, where the shop is offered)
-  const { promo, now: promoNow } = usePromo(shopOn ? (game.current && game.current.chain) || null : null);
-  const shopSkin = useShopSkin(shopOn ? (game.current && game.current.chain) || null : null, promo);
+  // the sale as the menu, the picker, the shop and the finish card show it: read once a visit, where the shop is
+  // offered, from the first screen that shows it on (never the title's: the catalogue and the wardrobe wait for it)
+  const saleHere = shopOn && (screen === "modes" || screen === "worlds" || screen === "pick" || screen === "shop" || (playing && holedNow));
+  const [saleShown, setSaleShown] = useState(false);
+  useEffect(() => void (saleHere && setSaleShown(true)), [saleHere]);
+  const saleChain = shopOn && (saleHere || saleShown) ? (game.current && game.current.chain) || null : null;
+  const { promo, now: promoNow } = usePromo(saleChain);
+  const shopSkin = useShopSkin(saleChain, promo);
   // the shop's chunk, fetched as soon as a door to it shows (the menu's panel, the cups' link): opening it then draws at once
   useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && shopChunk.prefetch()), [shopOn, screen]);
   const readWorn = () => {
