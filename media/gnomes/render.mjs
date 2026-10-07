@@ -7,11 +7,9 @@
 // media/gnomes/turntables/. No dev server, no chain.
 //   npm run gnomes:thumbs [-- 104 720 | --tier legendary] [--sheet <dir>]
 // --sheet also writes contact sheets of what was drawn (a page of 48 a JPEG), to look at.
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { launch, sleep } from "../lib/cdp.mjs";
+import { bundledPage, SEEDED, sheet, webpUnder } from "../lib/page.mjs";
 import { animate } from "./webp.mjs";
 
 const HERE = new URL("./", import.meta.url), ROOT = new URL("../../", import.meta.url);
@@ -29,36 +27,16 @@ const todo = catalogue.gnomes.filter((g) => (!ids.length || ids.includes(g.id)) 
 // the game's showcase (web/lib/scene/gnome-showcase.ts) bundled for the page, with the
 // same throw of the dice every time: a thumbnail made twice is the same picture
 const ENTRY = `import { makeShowcase } from "./web/lib/scene/gnome-showcase";
-let seed = 7;
-Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+${SEEDED}
 const s = makeShowcase(512);
 window.show = (skin, tier) => ((seed = 7), s.show(skin, tier));
 window.shot = s.shot;
 window.ready = true;`;
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-gnomes-"));
-const bundle = path.join(tmp, "showcase.js");
-// (from stdin, its imports resolve from the working directory: the repo's root)
-execFileSync("npx", ["--yes", "esbuild@0.24.2", "--bundle", "--format=iife", "--sourcefile=showcase.js", `--outfile=${bundle}`, "--log-level=warning"], {
-  input: ENTRY, stdio: ["pipe", "inherit", "inherit"], cwd: ROOT.pathname,
-});
+// (its imports resolve from the repo's root)
+const b = await bundledPage(ENTRY, { cwd: ROOT.pathname, name: "showcase.js", motion: true, width: 600, height: 600 });
 
-const b = await launch({ width: 600, height: 600 });
-// headless Chrome asks for less motion: the game would draw no trail
-await b.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
-await b.send("Page.navigate", { url: "about:blank" });
-await sleep(300);
-await b.js(fs.readFileSync(bundle, "utf8") + ";1");
-if (!(await b.ev("window.ready"))) throw new Error(`the showcase did not start: ${b.errors.slice(0, 3)}`);
-
-/** The page's WebP at the best quality that keeps under MAX_BYTES. @param {string} expr a call returning a data URL, Q in it */
-async function webp(expr, max = MAX_BYTES) {
-  let out = Buffer.alloc(0);
-  for (let q = 0.9; q >= 0.3; q -= 0.06) {
-    out = Buffer.from((await b.js(expr.replace("Q", q.toFixed(2)))).split(",")[1], "base64");
-    if (out.length <= max) break;
-  }
-  return out;
-}
+/** The page's WebP at the best quality that keeps under max. @param {string} expr a call returning a data URL, Q in it */
+const webp = (expr, max = MAX_BYTES) => webpUnder((q) => b.js(expr.replace("Q", q)), max, 0.9);
 
 fs.mkdirSync(THUMBS, { recursive: true });
 fs.mkdirSync(TURNS, { recursive: true });
@@ -84,17 +62,12 @@ if (b.errors.length) console.log("page errors:", b.errors.slice(0, 5));
 if (sheetDir) {
   // contact sheets: 48 a page, the id and name under each
   fs.mkdirSync(sheetDir, { recursive: true });
-  const { frameTree } = await b.send("Page.getFrameTree");
-  await b.send("Emulation.setDeviceMetricsOverride", { width: 8 * 150, height: 6 * 172, deviceScaleFactor: 1, mobile: false });
   for (let p = 0; p * 48 < todo.length; p++) {
     const cells = todo.slice(p * 48, p * 48 + 48).map((g) => `<figure><img src="data:image/webp;base64,${fs.readFileSync(new URL(`${g.id}.webp`, THUMBS)).toString("base64")}"><figcaption>#${g.id} ${g.name}</figcaption></figure>`).join("");
-    await b.send("Page.setDocumentContent", { frameId: frameTree.frame.id, html: `<style>body{margin:0;display:grid;grid-template-columns:repeat(8,150px);font:10px system-ui;background:#fff}figure{margin:0;width:150px;height:172px;overflow:hidden}img{width:150px;height:150px}figcaption{white-space:nowrap;overflow:hidden;padding:2px 4px}</style>${cells}` });
-    await sleep(400);
-    const jpg = Buffer.from((await b.send("Page.captureScreenshot", { format: "jpeg", quality: 80 })).data, "base64");
+    const jpg = await sheet(b, `<style>body{margin:0;display:grid;grid-template-columns:repeat(8,150px);font:10px system-ui;background:#fff}figure{margin:0;width:150px;height:172px;overflow:hidden}img{width:150px;height:150px}figcaption{white-space:nowrap;overflow:hidden;padding:2px 4px}</style>${cells}`, 8 * 150, 6 * 172, 80);
     fs.writeFileSync(path.join(sheetDir, `sheet-${String(p + 1).padStart(2, "0")}.jpg`), jpg);
   }
   console.log(`contact sheets in ${sheetDir}`);
 }
 b.kill();
-fs.rmSync(tmp, { recursive: true, force: true });
 process.exit(0);

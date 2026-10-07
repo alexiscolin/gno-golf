@@ -8,11 +8,9 @@
 // The client is read from DESIGNS (default: this repo's root), bundled with
 // the same pinned esbuild as media/gnomes/render.mjs, from its web/ (its node_modules installed). Its bake is kept from
 // merging: every object is made "live" as it is made, so each mesh stays one.
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { launch, sleep } from "../../lib/cdp.mjs";
+import { bundledPage, SEEDED } from "../../lib/page.mjs";
 
 export const DESIGNS = path.resolve(process.env.DESIGNS || new URL("../../../", import.meta.url).pathname);
 
@@ -33,8 +31,7 @@ import { darkBody } from "./lib/gnomes/colour";
 import { BALL_R } from "./lib/terrain";
 Object.defineProperty(THREE.Object3D.prototype, "userData", { configurable: true,
   get() { return this.__ud; }, set(v) { if (v && typeof v === "object") v.live = true; this.__ud = v; } });
-let seed = 7;
-Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+${SEEDED}
 // (by the texture itself: its uuid comes from Math.random, seeded the same for each gnome)
 const textures = new Map(), ids = new WeakMap();
 const pixels = (t) => {
@@ -131,17 +128,8 @@ window.ready = true;`;
 /** A headless Chrome with the client's gnome in it: { meshes(skin, trail?), texture(id), page(expr), kill() }; the
  *  page also holds gnomes (GNOMES), props (each prop's anchor), vocab (the code tables, TIER_LOOK), earned (the nine's looks). */
 export async function gnomePage() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gnogolf-portrait-"));
-  const bundle = path.join(tmp, "extract.js");
-  execFileSync("npx", ["--yes", "esbuild@0.24.2", "--bundle", "--format=iife", "--sourcefile=extract.js", `--outfile=${bundle}`, "--log-level=warning"], {
-    input: ENTRY, stdio: ["pipe", "inherit", "inherit"], cwd: path.join(DESIGNS, "web"), // (three resolves from the client's own node_modules)
-  });
-  const b = await launch({ width: 300, height: 300 });
-  await b.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
-  await b.send("Page.navigate", { url: "about:blank" });
-  await sleep(300);
-  await b.js(fs.readFileSync(bundle, "utf8") + ";1");
-  if (!(await b.ev("window.ready"))) throw new Error(`the gnome page did not start: ${b.errors.slice(0, 3)}`);
+  // (three resolves from the client's own node_modules)
+  const b = await bundledPage(ENTRY, { cwd: path.join(DESIGNS, "web"), name: "extract.js", motion: true, width: 300, height: 300 });
   /** @type {Map<string, any>} */
   const tex = new Map();
   return {
