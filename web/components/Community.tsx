@@ -24,13 +24,15 @@ import type { Meter } from "@/lib/builder/meter";
 import { savedOnAll, statsOf, type SavedOn } from "@/lib/builder/rewards";
 import { builderOn, onComputer } from "@/lib/builder/route";
 import { worldName } from "@/lib/builder/rules";
-import type { MapHole } from "@/lib/duel";
+import { inTurn, type MapHole } from "@/lib/duel";
 import { shortAddr, type Chain } from "@/lib/chain";
-import { dayOrder, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdicts } from "@/lib/community";
+import { dayOrder, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
 
 /** How many community holes a page judges and lists, one more page on each "Show more". */
 const PAGE = 24;
 const SORTS: readonly (readonly [SortBy, string])[] = [["new", "Newest"], ["played", "Most played"], ["hard", "Hardest"]];
+/** How many community holes are judged at once (their data read side by side). */
+const JUDGE_AT_ONCE = 4;
 /** How many holes the day's pick tries, at most, for one the Builder's rules pass. */
 const DAY_TRIES = 8;
 
@@ -46,7 +48,7 @@ export default function Community({ community, chain, onPlay }: {
   // most played: the whole list ordered first, then paged; hardest: the page as shown, once each of it is measured
   const ordered = useMemo(() => (by === "played" ? sortHoles(community, "played", new Map()) : community), [community, by]);
   // each hole about to be shown judged by the Builder's own rules (lib/community.ts: anyone can publish
-  // past the Builder with gnokey), one after the other, once a version a browser: only those it passes are
+  // past the Builder with gnokey), a few at a time, once a version a browser: only those it passes are
   // listed; the day's first. One whose data or the rules could not be read now has no verdict (null): not
   // shown, never skipped for the day's, asked again on Try again
   const [verdicts, setVerdicts] = useState<Verdicts>(new Map());
@@ -54,20 +56,19 @@ export default function Community({ community, chain, onPlay }: {
   useEffect(() => {
     if (!chain) return;
     let live = true;
+    const turn = inTurn(JUDGE_AT_ONCE), asked = new Map<string, Promise<Verdict | null>>();
+    const judge = (h: HoleRow): Promise<Verdict | null> => {
+      if (verdicts.has(h.id)) return Promise.resolve(verdicts.get(h.id) ?? null);
+      let p = asked.get(h.id);
+      if (!p) asked.set(h.id, (p = turn(() => verdictOf(chain, h.id).catch(() => null)).then((v) => (live && setVerdicts((m) => new Map(m).set(h.id, v)), v))));
+      return p;
+    };
+    // the day's: its candidates in turn, until one passes (or one is not read: the day waits for it), asked
+    // first; the page's beside them
     void (async () => {
-      const judged = new Map(verdicts);
-      const judge = async (h: HoleRow) => {
-        const v = judged.has(h.id) ? (judged.get(h.id) ?? null) : await verdictOf(chain, h.id).catch(() => null);
-        if (live && !judged.has(h.id)) judged.set(h.id, v), setVerdicts((m) => new Map(m).set(h.id, v));
-        return v;
-      };
-      // the day's: its candidates in turn, until one passes (or one is not read: the day waits for it)
       for (const h of candidates) if (!live || (await judge(h))?.ok !== false) break;
-      for (const h of ordered.slice(0, shown)) {
-        if (!live) return;
-        await judge(h);
-      }
     })();
+    for (const h of ordered.slice(0, shown)) void judge(h);
     return () => void (live = false);
   }, [chain, ordered, candidates, shown, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts: judged once each, not again as they fill)
   // Try again: the holes not read asked anew

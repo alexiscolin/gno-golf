@@ -271,6 +271,8 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // a failure is not.
   // Extras(hole, stroke), per hole version and stroke (chain.extras)
   const extrasRead = new Map<string, Promise<Extras>>();
+  // HoleData(version), by version id (its data never changes; an alias's is read each time)
+  const dataRead = new Map<string, Promise<string>>();
   const memo = <T>(fn: () => Promise<T>, ttl: number) => {
     let at = 0, p: Promise<T> | null = null;
     return (): Promise<T> => {
@@ -430,11 +432,22 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
     /** A community hole's versions (an alias, "<address>/<slug>"): what the next one's id will be, and each one's sha. */
     versions: (alias: string) => qeval(`Versions(${s(alias)})`, checks.versions),
-    /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim). */
-    holeData: async (hole: string) => {
-      const hex = await qstr(REALM, `HoleData(${s(hole)})`);
-      if (!/^([0-9a-f]{2})+$/.test(hex)) throw refused("The chain's hole data is not hex.");
-      return hex;
+    /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim), the community
+     *  list judges and the meter rates. A version's read once a visit (its data never changes), a failure not kept. */
+    holeData: (hole: string) => {
+      const read = async () => {
+        const hex = await qstr(REALM, `HoleData(${s(hole)})`);
+        if (!/^([0-9a-f]{2})+$/.test(hex)) throw refused("The chain's hole data is not hex.");
+        return hex;
+      };
+      if (!/\/v\d+$/.test(hole)) return read();
+      let p = dataRead.get(hole);
+      if (!p) {
+        if (dataRead.size >= 64) dataRead.clear(); // (up to 64 KB of hex each: a long session from scratch, never unbounded)
+        p = read().catch((e: unknown) => (dataRead.delete(hole), Promise.reject(e instanceof Error ? e : new Error(String(e)))));
+        dataRead.set(hole, p);
+      }
+      return p;
     },
     /** A deployed package's file, as the node keeps it (vm/qfile). */
     file: (path: string) => query(`${rpc}/abci_query?path=%22vm/qfile%22&data=0x${hexOf(path)}`),

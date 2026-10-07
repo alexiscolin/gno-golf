@@ -482,6 +482,31 @@ test("extras: read once per hole version and stroke (the look-ahead and the next
   assert.equal(asked.length, tried + 1, "asked again once, then kept");
 });
 
+test("holeData: a version's data read once a visit (it never changes), an alias's each time, a failure asked again", async () => {
+  const chain = makeChain();
+  const asked: string[] = [];
+  let down = false;
+  setFetch((url) => {
+    asked.push(decoded(url).expr.replace(/^.*HoleData/, "HoleData"));
+    if (down) throw new Error("node down");
+    return strReply("ab01");
+  });
+  const v1 = `${ADDR1}/lane/v1`, alias = `${ADDR1}/lane`;
+  await Promise.all([chain.holeData(v1), chain.holeData(v1)]);
+  assert.equal(await chain.holeData(v1), "ab01");
+  assert.deepEqual(asked, [`HoleData("${v1}")`], "once, however many ask (the list, the meter, the load)");
+  await chain.holeData(alias);
+  await chain.holeData(alias);
+  assert.equal(asked.length, 3, "an alias names the next version once one is published: read each time");
+  down = true;
+  await assert.rejects(chain.holeData(`${ADDR1}/lane/v2`));
+  const tried = asked.length;
+  down = false;
+  await chain.holeData(`${ADDR1}/lane/v2`);
+  await chain.holeData(`${ADDR1}/lane/v2`);
+  assert.equal(asked.length, tried + 1, "a failed read is not kept: asked again once, then kept");
+});
+
 // ------------------------------------------------------------ boards, and the mode guard
 test("leaderboard defaults to assisted mode, and normalizes anything that isn't 'pro'", async () => {
   const chain = makeChain();
