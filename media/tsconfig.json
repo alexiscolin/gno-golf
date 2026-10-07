@@ -18,5 +18,5 @@
     "types": ["node"],
     "typeRoots": ["../web/node_modules/@types"]
   },
-  "include": ["lib/*.mjs", "promo/*.mjs", "camera/*.mjs", "gnomes/*.mjs", "gnomes/portrait/*.mjs"]
+  "include": ["lib/*.mjs", "promo/*.mjs", "camera/*.mjs", "gnomes/*.mjs", "gnomes/portrait/*.mjs", "builder/*.mjs"]
 }

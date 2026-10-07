@@ -1,0 +1,69 @@
+// The palette as tiles (lib/builder/tiles.ts): in every Builder world each
+// entry in exactly one tile, the tiles by what they do (a look is still its
+// own entry: what the chain stores does not change), the five a first hole
+// needs first, named plainly, the rest by group; and every look's picture,
+// drawn by the game's own meshes (media/builder/tiles.mjs), there and small.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import "./scene-harness.ts";
+import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
+import { FIELD } from "../lib/builder/rules.ts";
+import { GROUPS, lookName, pictureOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+
+const palettes = new Map<string, readonly PaletteEntry[]>();
+for (const w of Object.keys(FIELD)) palettes.set(w, await loadPalette(w));
+const tiles = (w: string) => { const t = tilesOf(palettes.get(w)!); return [...t.first, ...t.more.flatMap((g) => g.tiles)]; };
+const named = (w: string, name: string) => tiles(w).find((t) => t.name === name)!;
+const skins = (t: Tile) => t.looks.map((e) => e.skin);
+
+void test("every entry of every Builder world in exactly one tile, each tile one kind and one way of playing", () => {
+  for (const [w, p] of palettes) {
+    const seen = tiles(w).flatMap((t) => t.looks);
+    assert.equal(seen.length, p.length, `${w}: an entry twice or left out`);
+    assert.deepEqual(new Set(seen), new Set(p), w);
+    for (const t of tiles(w)) {
+      assert.equal(new Set(t.looks.map((e) => e.kind)).size, 1, `${w} ${t.name}: one kind`);
+      assert.equal(new Set(t.looks.map((e) => `${e.clocks[0]} ${e.bounce?.max ?? ""} ${e.grade?.max ?? ""} ${e.shapes?.join() ?? ""}`)).size, 1, `${w} ${t.name}: its looks play alike`);
+      assert.ok(t.does && t.does.split(" ").length <= 3, `${w} ${t.name}: what it does in two or three words: ${t.does}`);
+    }
+  }
+});
+
+void test("the five a first hole needs first, each with its common look first; the rest by group, in order", () => {
+  for (const w of palettes.keys()) {
+    const { first, more } = tilesOf(palettes.get(w)!);
+    assert.deepEqual(first.map((t) => [t.name, t.looks[0].id]), [["Wall", "*/rail/"], ["Bumper", "*/post/bumper"], ["Sand", "*/surface/sand"], ["Water", "*/hazard/water"], ["Slope", "*/slope/"]], w);
+    assert.deepEqual(more.map((g) => g.group), GROUPS.filter((g) => more.some((x) => x.group === g)), w);
+    assert.ok(!more.some((g) => g.tiles.some((t) => first.some((f) => f.key === t.key))), `${w}: a first tile again under More`);
+  }
+});
+
+void test("variants that play alike are one tile with looks: water, hills, tunnels, posts", () => {
+  assert.deepEqual(skins(named("garden", "Water")).sort(), ["", "canal", "fountain", "lagoon", "tidepool", "water", "wave"]);
+  assert.deepEqual(skins(named("island", "Water")).slice(0, 4), ["water", "tidepool", "lagoon", "wave"], "the common look, then the island's own");
+  assert.deepEqual(skins(named("mountain", "Drop")).sort(), ["cliff", "crevasse", "serac"]);
+  assert.ok(skins(named("town", "Slope")).includes("quarter pipe") && skins(named("town", "Slope")).includes("stairs"));
+  assert.deepEqual(skins(named("garden", "Tunnel")).at(-1), "", "the plain look last");
+  assert.deepEqual(skins(named("garden", "Bumper")), ["bumper"]);
+  assert.ok(!skins(named("garden", "Obstacle")).includes("bumper"));
+  assert.deepEqual(skins(named("mountain", "Ice")), ["ice"]);
+  assert.ok(skins(named("town", "Floor")).includes("brick") && !skins(named("town", "Sand")).includes("brick"));
+  assert.deepEqual(skins(named("town", "Moving bar")), ["clock hand"]);
+  assert.equal(lookName(named("garden", "Tunnel").looks.at(-1)!), "Plain");
+});
+
+void test("every look in every Builder world has its picture: a small WebP of the game's drawing", () => {
+  const missing: string[] = [], big: string[] = [];
+  for (const [w, p] of palettes) {
+    for (const e of p) {
+      const f = new URL(`../public${pictureOf(w, e)}`, import.meta.url);
+      if (!fs.existsSync(f)) { missing.push(`${w} ${e.id}`); continue; }
+      const b = fs.readFileSync(f);
+      assert.equal(b.toString("latin1", 8, 12), "WEBP", `${w} ${e.id}`);
+      if (b.length > 8192) big.push(`${w} ${e.id} ${b.length} B`);
+    }
+  }
+  assert.deepEqual(missing, [], "no picture: run `node media/builder/tiles.mjs`");
+  assert.deepEqual(big, [], "over 8 KB");
+});

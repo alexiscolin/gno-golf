@@ -10,6 +10,8 @@ media/*
 !media/og/
 # the gnome collection's renderer, its thumbnails and the Legendaries' turntables (npm run gnomes:thumbs)
 !media/gnomes/
+# the Builder palette's pictures' renderer (npm run builder:tiles; the pictures are web/public/builder/tiles/)
+!media/builder/
 # promo renders and the music file are rebuilt by media/promo/render.mjs
 media/promo/*.mp4
 media/promo/music/
