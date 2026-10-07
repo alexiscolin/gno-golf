@@ -312,15 +312,28 @@ export function farRig(box: THREE.Box3, view: View, mouse = typeof matchMedia ==
 /** The follow camera, nearer the gnome than focusRig frames it (engine/camera.ts). */
 export const FOLLOW_CLOSER = 0.7;
 
-/** The player's view as a hole opens on the gnome at its tee (the classic
- *  camera at rest, engine/camera.ts): close on the tee, leaning toward the cup.
- *  height: the course's ground (Course userData.height). */
-export function teeRig(s: Pick<HoleState, "board" | "start" | "cup">, height: (x: number, z: number) => number, view: View): Rig {
-  const tee = new THREE.Vector3(s.start[0], height(s.start[0], s.start[1]), s.start[1]);
-  const r = focusRig(tee, overviewRig(courseBox(s.board), view), view, new THREE.Vector3(s.cup[0], tee.y, s.cup[1]));
+// The camera on the ball stands off half the overview's distance. A board
+// longer or wider than any of the first four cups' (garden13's 90, town18's
+// 47: the mines' marathons, 96 by 80) would put it off so far the gnome is a
+// speck on a phone: it stands off as it would on the largest of those (the
+// overview of the board cut down to that size); any other hole, as ever.
+const FOLLOW_BOARD = { w: 90, h: 47 };
+/** The overview's distance the follow camera stands off from (focusRig's overview), for a board seen in view. */
+export function followDist(b: Board, view: View, over = overviewRig(courseBox(b), view)) {
+  return b.w > FOLLOW_BOARD.w || b.h > FOLLOW_BOARD.h ? Math.min(over.dist, overviewRig(courseBox({ w: Math.min(b.w, FOLLOW_BOARD.w), h: Math.min(b.h, FOLLOW_BOARD.h) }), view).dist) : over.dist;
+}
+
+/** The classic camera at rest on a ball at p (engine/camera.ts goal): close on it, leaning toward the cup. */
+export function restRig(s: Pick<HoleState, "board" | "cup">, p: THREE.Vector3, view: View): Rig {
+  const r = focusRig(p, { dist: followDist(s.board, view) }, view, new THREE.Vector3(s.cup[0], p.y, s.cup[1]));
   r.dist *= FOLLOW_CLOSER;
   return r;
 }
+
+/** The player's view as a hole opens on the gnome at its tee: the camera at rest on the tee.
+ *  height: the course's ground (Course userData.height). */
+export const teeRig = (s: Pick<HoleState, "board" | "start" | "cup">, height: (x: number, z: number) => number, view: View): Rig =>
+  restRig(s, new THREE.Vector3(s.start[0], height(s.start[0], s.start[1]), s.start[1]), view);
 
 /** Close on a point — the ball — centred in the free part of the screen. */
 // pass `out` (a rig from an earlier call) to reuse it: called every frame,

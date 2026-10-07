@@ -25,7 +25,8 @@ export type Drawn =
   /** the plain form an unknown skin falls back to (CLIENT.md, rule 2) */
   | { by: "fallback" }
   /** not drawn: out in the sea, out of reach, a zone with no area, a timed wall that is not one of a bar's four, or what
-   *  stands beside it (the mountain's snow cannon, a serac's tower) with no room for it off the lane */
-  | { by: "hidden"; why: "sea" | "unreached" | "empty" | "timed" | "room" };
+   *  stands beside it (the mountain's snow cannon, a serac's tower) with no room for it off the lane, or standing between
+   *  the player's camera and the ball or the cup (sight.ts) */
+  | { by: "hidden"; why: "sea" | "unreached" | "empty" | "timed" | "room" | "view" };
 
 export type Census = (piece: PieceRef, drawn: Drawn) => void;

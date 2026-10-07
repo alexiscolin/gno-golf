@@ -5,7 +5,7 @@
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
 import { behind, chaseState } from "../chase";
-import { focusRig, applyRig, ORBIT, overviewRig, courseBox, FOLLOW_CLOSER } from "../scene";
+import { focusRig, applyRig, ORBIT, followDist, FOLLOW_CLOSER } from "../scene";
 import { BALL_R, CELL, onAt, closest, segHit, rayCircle, angDiff, inZone } from "../terrain";
 import { worldOf } from "../scene/worlds";
 import { ud, md } from "../scene/data";
@@ -48,12 +48,7 @@ export function makeCamera(E: Live) {
     lean.y = Math.max(-1, Math.min(1, (ev.clientY / window.innerHeight - 0.5) * 2));
   };
   const leant = { target: new THREE.Vector3(), dist: 0, ox: 0, oy: 0, tilt: 0, yaw: 0 };
-  // The camera on the ball stands off half the overview's distance. A board
-  // longer or wider than any of the first four cups' (garden13's 90, town18's
-  // 47: the mines' marathons, 96 by 80) would put it off so far the gnome is
-  // a speck on a phone: it stands off as it would on the largest of those
-  // (the overview of the board cut down to that size); any other hole, as ever.
-  const FOLLOW_BOARD = { w: 90, h: 47 };
+  // the camera on the ball stands off from the overview's distance (scene/camera.ts followDist), worked out once an overview
   let followFor: Rig | null = null;
   const followOver = { dist: 0 };
   const follow = () => {
@@ -62,7 +57,7 @@ export function makeCamera(E: Live) {
     const b = g.s.board;
     if (followFor !== o) {
       followFor = o;
-      followOver.dist = b.w > FOLLOW_BOARD.w || b.h > FOLLOW_BOARD.h ? Math.min(o.dist, overviewRig(courseBox({ w: Math.min(b.w, FOLLOW_BOARD.w), h: Math.min(b.h, FOLLOW_BOARD.h) }), screen()).dist) : o.dist;
+      followOver.dist = followDist(b, screen(), o);
     }
     return followOver;
   };
