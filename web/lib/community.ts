@@ -5,7 +5,8 @@
 // pass it (lib/builder/verdict.ts judge: its world, its pieces, E1 to E15,
 // the render census, the bytes the Builder writes). Each version is judged
 // once a browser, its verdict kept by the sha of its data and by its id on its
-// chain (a version's data never changes: one known is never read again), under
+// chain (its id and genesis: a chain reseeded is another; a version's data
+// never changes: one known is never read again), under
 // the rules' version (VERDICT_RULES: a change to the rules judges every hole
 // again), and only for holes about to be shown. The Builder's code and builder.wasm load
 // on the first one (a chunk of their own, never on the game's first load);
@@ -27,13 +28,18 @@ export type { Verdict };
 
 /** The rules' version the kept verdicts were judged under: raise it with any change to the Builder's rules. */
 export const VERDICT_RULES = 1;
-/** Where a verdict is kept: this, the rules' version, the sha of the data. */
+/** Where a verdict is kept: this, the rules' version, then the sha of the data, or which chain's realm and the version's id. */
 export const VERDICT_KEY = "gnogolf.verdict";
 /** What the game says of a community hole it will not show. */
 export const NOT_BUILDER = "This hole was not made with the Builder rules.";
 
+/** Which chain's realm: what this browser keeps of a hole is kept under it (a version's verdict, when an alias was first
+ *  published), its id, its genesis (a chain reseeded under the same id is another) and the realm. */
+type Which = Pick<Chain, "chainId" | "genesis" | "realm">;
+const whichOf = async (chain: Which) => `${await chain.chainId()}|${await chain.genesis()}|${chain.realm}`;
+
 /** What judging reads of a chain: a hole's data, and which chain's realm it is (a version's verdict is kept by its id there). */
-export type Judging = Pick<Chain, "holeData" | "chainId" | "realm">;
+export type Judging = Pick<Chain, "holeData"> & Which;
 
 /** What judging needs: builder.wasm's host, and the render census (the game's scene). */
 export interface JudgeDeps {
@@ -45,7 +51,7 @@ const builder: JudgeDeps = {
 
 const keyOf = async (hex: string) => `${VERDICT_KEY}|${VERDICT_RULES}|${await sha256(bytesOf(hex))}`;
 /** A version's key ("<alias>/v<n>": its data never changes), on its chain's realm; null for an alias (it names the next version once one is published). */
-const idKeyOf = async (chain: Judging, id: string) => (/\/v\d+$/.test(id) ? `${VERDICT_KEY}|${VERDICT_RULES}|${await chain.chainId()}|${chain.realm}|${id}` : null);
+const idKeyOf = async (chain: Judging, id: string) => (/\/v\d+$/.test(id) ? `${VERDICT_KEY}|${VERDICT_RULES}|${await whichOf(chain)}|${id}` : null);
 const kept = (key: string): Verdict | null => {
   try {
     const v = localStorage.getItem(key);
@@ -152,12 +158,12 @@ export function dayHole<H extends Pick<HoleRow, "id" | "slot">>(candidates: read
   return { day: null, unread: false };
 }
 
-/** Where when an alias was first published is kept (ms): this, its chain's realm, the alias. */
+/** Where when an alias was first published is kept (ms): this, which chain's realm (its id, genesis, realm), the alias. */
 export const BORN_KEY = "gnogolf.born";
 /** Whether a community hole's alias was first published before a time: its oldest version's block (Versions, then that
  *  block's time), kept once known (it never changes); throws if it cannot be read now. */
-export async function bornBefore(chain: Pick<Chain, "versions" | "blockTime" | "chainId" | "realm">, alias: string, at: number): Promise<boolean> {
-  const key = `${BORN_KEY}|${await chain.chainId()}|${chain.realm}|${alias}`;
+export async function bornBefore(chain: Pick<Chain, "versions" | "blockTime"> & Which, alias: string, at: number): Promise<boolean> {
+  const key = `${BORN_KEY}|${await whichOf(chain)}|${alias}`;
   let ms: number | null = null;
   try {
     const v = Number(localStorage.getItem(key) ?? NaN);

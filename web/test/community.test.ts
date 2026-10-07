@@ -28,9 +28,9 @@ const hostileHex = (() => {
 })();
 const goodHex = hexOf(lane("garden", []));
 
-function chainOf(data: Record<string, string>, network = "dev") {
+function chainOf(data: Record<string, string>, network = "dev", genesis = "G1") {
   const asked: string[] = [];
-  return { asked, realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve(network), holeData: (id: string) => (asked.push(id), Object.hasOwn(data, id) ? Promise.resolve(data[id]) : Promise.reject(new Error("no hole"))) };
+  return { asked, realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve(network), genesis: () => Promise.resolve(genesis), holeData: (id: string) => (asked.push(id), Object.hasOwn(data, id) ? Promise.resolve(data[id]) : Promise.reject(new Error("no hole"))) };
 }
 const deps = { load: () => Promise.resolve({ host, census }) };
 
@@ -69,6 +69,9 @@ void test("a version's verdict is kept by its id on its chain (its data never ch
   assert.deepEqual(chain.asked.slice(1), [`${A}/good`, `${A}/good`], "an alias names a new version once one is published: read each time");
   const other = chainOf({ [`${A}/good/v1`]: hostileHex }, "test-2");
   assert.equal((await verdictOf(other, `${A}/good/v1`, deps)).ok, false, "the same id on another chain: its own data judged");
+  const reseeded = chainOf({ [`${A}/good/v1`]: hostileHex }, "dev", "G2");
+  assert.equal((await verdictOf(reseeded, `${A}/good/v1`, deps)).ok, false, "the same chain id and realm, another genesis (a chain reseeded): read afresh, its own data judged");
+  assert.deepEqual(reseeded.asked, [`${A}/good/v1`]);
 });
 
 void test("knownVerdict: a verdict this browser already has, never a judging (the phone's /build screen loads no builder.wasm)", async () => {
@@ -180,9 +183,9 @@ void test("dayHole: the first candidate published before the day began that the 
 
 void test("bornBefore: whether a hole was first published before a time (its oldest version's block), kept once known (it never changes); not read: it throws", async () => {
   const alias = `${A}/a`, at = Date.UTC(2026, 9, 7);
-  let reads = 0, down = false;
+  let reads = 0, down = false, genesis = "G1";
   const chain = {
-    realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve("dev"),
+    realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve("dev"), genesis: () => Promise.resolve(genesis),
     versions: () => (reads++, down ? Promise.reject(new Error("node down")) : Promise.resolve({ version: 1, slot: alias, versions: [{ id: `${alias}/v1`, v: 1, height: 7, by: A, sha: "", note: "", next: `${alias}/v2` }, { id: `${alias}/v2`, v: 2, height: 90, by: A, sha: "", note: "", next: "" }] })),
     blockTime: (h: number) => Promise.resolve(h === 7 ? at - 1 : at + 1),
   };
@@ -192,6 +195,9 @@ void test("bornBefore: whether a hole was first published before a time (its old
   assert.equal(await bornBefore(chain, alias, at), true, "its first version's block, not its latest's");
   assert.equal(await bornBefore(chain, alias, at - 1), false);
   assert.equal(reads, 2, "known: not read again");
+  genesis = "G2";
+  assert.equal(await bornBefore(chain, alias, at), true);
+  assert.equal(reads, 3, "a chain reseeded under the same id: read afresh");
 });
 
 void test("sortHoles: newest as the chain lists them, most played, hardest by the meter's level (not rated yet: last)", () => {
