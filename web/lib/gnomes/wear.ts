@@ -31,12 +31,15 @@ export async function know(tokens: readonly Token[]): Promise<Skin[]> {
     return s;
   });
 }
+const worn = new Map<string, Worn | null>();
+/** What a player was last met wearing (meet): their row, null for nothing (they hold no gnome), undefined not asked. */
+export const wornKnown = (player: string) => worn.get(player);
 /** What these players wear for everyone (WornMany's rows), met: the ghost and the face follow; a player asked
  *  of without a row (players) wears nothing any more. */
 export async function meet(rows: readonly Worn[], players: readonly string[] = []) {
   const skins = await know(rows);
-  rows.forEach((r, i) => wears(r.player, skins[i].id));
-  for (const p of players) if (!rows.some((r) => r.player === p)) wears(p, null);
+  rows.forEach((r, i) => (wears(r.player, skins[i].id), worn.set(r.player, r)));
+  for (const p of players) if (!rows.some((r) => r.player === p)) (wears(p, null), worn.set(p, null));
   told();
 }
 
