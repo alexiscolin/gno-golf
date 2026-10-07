@@ -2,25 +2,37 @@
 package storedgenesis
 
 import (
+	"chain"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"gno.land/p/nt/testutils/v0"
 	gnomes "gno.land/r/gnogolf/gnomes"
 )
 
 // What publishing the genesis stores, which its owner pays: 720 rows kept
 // as one string, as the catalogue lays them out, its closing date and a
 // wave over all of it:
-// 64,230 bytes, 6.4 GNOT of deposit at 100 ugnot a byte. z_storage_buy is
-// this plus a first buy.
+// 64,230 bytes, 6.4 GNOT of deposit at 100 ugnot a byte. Then the buyer
+// z_storage_buy has, its coins and its realm: that file is this one and its
+// Buy, so their difference is the Buy alone.
 func main(cur realm) {
 	testing.SetRealm(testing.NewUserRealm(gnomes.Owner()))
 	gnomes.AddSeries(cross(cur), "genesis", genesis())
 	gnomes.SetCloseAt(cross(cur), time.Now().Unix()+30*24*3600) // before any wave
 	gnomes.AddWave(cross(cur), 1, 720, 0, 0)
+	gnomes.SetMintOpen(cross(cur), true)
 	println(gnomes.Gnome("720"))
+
+	buyer := testutils.TestAddress("buyer")
+	price := chain.Coins{{"ugnot", 36_000_000}}
+	testing.SetOriginCaller(buyer)
+	testing.SetOriginSend(price)
+	testing.IssueCoins(chain.PackageAddress("gno.land/r/gnogolf/gnomes"), price)
+	testing.SetRealm(testing.NewCodeRealm("gno.land/r/gnogolf/gnomes"))
+	testing.SetRealm(testing.NewUserRealm(buyer))
 }
 
 // genesis is 720 rows "id|tier|name|traits" laid out as the catalogue is
@@ -61,4 +73,4 @@ func genesis() string {
 // gno.land/r/test/storedgenesis: 0
 
 // Gas:
-// 1403004203
+// 1405405821

@@ -13,12 +13,12 @@ import (
 )
 
 // What a first buy stores, which its buyer pays: z_storage_genesis, then one
-// common bought, the bytes below less that file's: 3,849 bytes, 0.38 GNOT
+// common bought (that file is this one but the Buy), the bytes below less that file's: 3,849 bytes, 0.38 GNOT
 // of deposit (with grc721/enumerable it was 10,465), the sold bitmap's first
 // write among them. Most of it is the ledger's own two rows for a new
 // holder, its owner and its balance. Its gas less z_storage_genesis's is
-// the buy's, 2.34M: a sale writes nothing beside the catalogue's rows,
-// so it never rewrites them (a sold count kept in the series did: 2.45M).
+// the buy's, 7.55M: a sale writes nothing beside the catalogue's rows,
+// so it never rewrites them.
 // The -send envelope lands on the realm called, as on chain: the test names
 // gnomes its payee.
 func main(cur realm) {
@@ -27,6 +27,7 @@ func main(cur realm) {
 	gnomes.SetCloseAt(cross(cur), time.Now().Unix()+30*24*3600) // before any wave
 	gnomes.AddWave(cross(cur), 1, 720, 0, 0)
 	gnomes.SetMintOpen(cross(cur), true)
+	println(gnomes.Gnome("720"))
 
 	buyer := testutils.TestAddress("buyer")
 	price := chain.Coins{{"ugnot", 36_000_000}}
@@ -65,6 +66,7 @@ func genesis() string {
 }
 
 // Output:
+// {"version":1,"id":"720","series":"genesis","name":"Pip Seedwell 720","tier":"legendary","traits":"0100000000000000000000000000000000000000000000000000000720","owner":"","price":1296000000,"sold":false,"closed":false}
 // 1
 
 // Storage:
@@ -72,4 +74,4 @@ func genesis() string {
 // gno.land/r/test/storedbuy: 0
 
 // Gas:
-// 1406232683
+// 1412958565

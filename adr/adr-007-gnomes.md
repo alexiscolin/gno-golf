@@ -158,7 +158,7 @@ it leaves them and refuses to move an earned one.
 
 | what | gas | measured by |
 |---|---|---|
-| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.34M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
+| a first buy | 7.55M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens), two files the same but the `Buy` (the 2.37M given before left a `Gnome` read and the buyer's set-up in one of them alone) |
 | the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.2M | `z_proof_king` less `z_proof_seed` (`// Gas:` goldens) |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 
