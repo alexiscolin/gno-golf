@@ -17,7 +17,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
-import { centreOn, FLAT, gridLines, K_MAX, K_MIN, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
+import { centreOn, FLAT, frameView, gridLines, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
 import { BOARD } from "@/lib/builder/gg1";
 import { handlesOf, type HandleKey } from "@/lib/builder/handles";
 import { type PaletteEntry } from "@/lib/builder/palette";
@@ -188,9 +188,7 @@ export default function Board(props: BoardProps) {
   const framed = (): View => {
     // the extent's corners in the view's plane (turned, tilted), and their box
     const [a, b] = extent(draft), cs = [a, b, [a[0], b[1]] as V, [b[0], a[1]] as V].map((c) => toPlane(c, look));
-    const lo = [Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1]))], hi = [Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))];
-    const k = Math.max(K_MIN, Math.min(K_MAX, Math.min(size.w / (hi[0] - lo[0]), (size.h - 56) / (hi[1] - lo[1]))));
-    return { x: (lo[0] + hi[0]) / 2 - size.w / 2 / k, y: (lo[1] + hi[1]) / 2 - (size.h - 56) / 2 / k, k };
+    return frameView([Math.min(...cs.map((c) => c[0])), Math.min(...cs.map((c) => c[1]))], [Math.max(...cs.map((c) => c[0])), Math.max(...cs.map((c) => c[1]))], size);
   };
   useEffect(() => {
     if (view || !size.w) return;

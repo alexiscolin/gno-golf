@@ -10,6 +10,26 @@ export interface View { x: number; y: number; k: number }
 export const K_MIN = 3, K_MAX = 90;
 const clamp = (k: number) => Math.max(K_MIN, Math.min(K_MAX, k));
 
+/** The board a 1440 by 900 window gives (its client box, px): F frames the hole on it as it always has. */
+export const FRAME_REF = { w: 782, h: 714 };
+/** The world shown round the hole at most, each side (board units), on a board bigger than FRAME_REF. */
+const ROOM = 6;
+/** What the dock covers at the board's foot (px): the hole is framed above it. */
+const DOCK = 56;
+
+/**
+ * F: the box lo..hi (in the view's plane) framed in a board of size: fitted,
+ * as it always was, on a board no bigger than FRAME_REF; on a bigger one the
+ * room past what FRAME_REF would give shows the world round it, up to ROOM
+ * a side, the hole never drawn smaller than FRAME_REF draws it (nor larger
+ * than it filling the board).
+ */
+export function frameView(lo: P, hi: P, size: { w: number; h: number }): View {
+  const fit = (w: number, h: number, m: number) => Math.min(w / (hi[0] - lo[0] + 2 * m), (h - DOCK) / (hi[1] - lo[1] + 2 * m));
+  const now = fit(size.w, size.h, 0), k = clamp(Math.max(Math.min(fit(FRAME_REF.w, FRAME_REF.h, 0), now), fit(size.w, size.h, ROOM)));
+  return { x: (lo[0] + hi[0]) / 2 - size.w / 2 / k, y: (lo[1] + hi[1]) / 2 - (size.h - DOCK) / 2 / k, k };
+}
+
 /** The view at scale k (clamped), the board point under p where it was. */
 export function zoomAt(v: View, p: P, k: number): View {
   const to = clamp(k);
