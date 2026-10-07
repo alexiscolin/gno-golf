@@ -1,9 +1,8 @@
-// A published hole shared from the Builder: its link is the game's own
-// (components/common.ts holeLink, on the site's address: a community hole by
-// its id, a dare with the sharer's address), and its card is the 3D preview
+// A published hole shared from the Builder: as the game shares
+// (components/Share.tsx), its link the game's own (components/common.ts
+// holeLink: a community hole by its id), and its card is the 3D preview
 // with its name, world, par and author over it, built on gno.land.
 import { holeLink, shortAddr } from "@/components/common";
-import { siteURL } from "@/lib/site";
 import { MAX_TITLE } from "@/lib/builder/draft";
 import { worldName } from "@/lib/builder/rules";
 
@@ -16,8 +15,8 @@ export function saveFile(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-/** The link to play a published hole (by: the address whose best a friend is dared to beat). */
-export const holeLinkOf = (id: string, by = ""): string => siteURL(holeLink({ id, place: 0 }, "", by, "hole"));
+/** What the game's Share (components/Share.tsx) sends for a published hole: its words, and its link (Share puts it on the site's address). */
+export const holeShare = (name: string, id: string) => ({ text: `${name}, a mini-golf hole on gno.land`, link: holeLink({ id, place: 0 }, "", "", "hole") });
 
 /** The card's three lines: the name (cut at 40 with an ellipsis), the world, par and author, and where it was built. */
 export function cardLines({ name, world, par, author }: { name: string; world: string; par: number; author: string }): [string, string, string] {
