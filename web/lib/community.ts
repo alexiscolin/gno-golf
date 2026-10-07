@@ -171,7 +171,9 @@ export async function bornBefore(chain: Pick<Chain, "versions" | "blockTime"> & 
   } catch {}
   if (ms == null) {
     const first = (await chain.versions(alias)).versions[0];
-    ms = first ? await chain.blockTime(first.height) : Infinity; // (no version: not one listed before)
+    // (its oldest listed past v1: Versions shows an alias's newest pageMax, or its first came from the old realm, so
+    // its v1 is older still, long before any day picked; no version: never one listed before)
+    ms = !first ? Infinity : first.v > 1 ? 0 : await chain.blockTime(first.height);
     try {
       if (Number.isFinite(ms)) localStorage.setItem(key, String(ms));
     } catch {}

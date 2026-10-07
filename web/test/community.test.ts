@@ -200,6 +200,18 @@ void test("bornBefore: whether a hole was first published before a time (its old
   assert.equal(reads, 3, "a chain reseeded under the same id: read afresh");
 });
 
+void test("bornBefore: an alias whose oldest version listed is past v1 (Versions shows its newest 100; or v1 came from the old realm) was published long ago, whatever that version's block", async () => {
+  const alias = `${A}/many`, at = Date.UTC(2026, 9, 7);
+  let blocks = 0;
+  const chain = {
+    realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve("dev"), genesis: () => Promise.resolve("G1"),
+    versions: () => Promise.resolve({ version: 1, slot: alias, versions: [{ id: `${alias}/v101`, v: 101, height: 900, by: A, sha: "", note: "", next: "" }] }),
+    blockTime: () => (blocks++, Promise.resolve(at + 1)),
+  };
+  assert.equal(await bornBefore(chain, alias, at), true, "its v1 is older still: before the day, for everyone");
+  assert.equal(blocks, 0, "no block read for it");
+});
+
 void test("sortHoles: newest as the chain lists them, most played, hardest by the meter's level (not rated yet: last)", () => {
   const [a, b, c, d] = [rowOf(`${A}/a/v1`, { plays: 2 }), rowOf(`${A}/b/v1`, { plays: 9 }), rowOf(`${A}/c/v1`, { plays: 2 }), rowOf(`${A}/d/v1`, { plays: 5 })];
   const rows = [a, b, c, d];
