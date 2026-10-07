@@ -108,9 +108,9 @@ void test("the same pointer edits on the 2D board and on the 3D one, flat, turne
 });
 
 void test("a post whose rim sets the frame (the hole shifted off the board's quarters): the grid the hole's own, the tee's, for every edit", async () => {
-  const palette = await loadPalette("garden"), o = { host, palette }, full = { ...o, census }, entry = (id: string) => palette.find((e) => e.id === id)!;
-  const castle = placePiece(entry("*/post/sandcastle"), "s", [15, 0]); // (r 2.2, on the rail: the hole's low edge its rim)
-  const ed = editor({ ...lane("garden", [castle]), slug: "rim" }), env = () => ({ draft: ed.s.now(), quick: o, full, armed: ed.armed(), selected: ed.sel(), step: 0.5 });
+  const palette = await loadPalette("island"), o = { host, palette }, full = { ...o, census }, entry = (id: string) => palette.find((e) => e.id === id)!;
+  const castle = placePiece(entry("*/post/sandcastle"), "s", [15, 0]); // (the island's sandcastle, r 2.2, may sit on a rail: the hole's low edge its rim)
+  const ed = editor({ ...lane("island", [castle]), slug: "rim" }), env = () => ({ draft: ed.s.now(), quick: o, full, armed: ed.armed(), selected: ed.sel(), step: 0.5 });
   assert.notEqual(ed.s.now().tee[1] % QUARTER, 0, "framed by the rim: the tee off the board's quarters");
   const drag = (target: Target, from: V, to: V) => (ed.g.down(env(), from, target), ed.g.move(env(), to), ed.g.up(env(), to));
   ed.arm(entry("*/post/rock"));
