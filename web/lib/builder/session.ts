@@ -43,7 +43,6 @@ export function makeSession(first: Draft) {
     canRedo: () => h.canRedo(),
   };
 }
-export type Session = ReturnType<typeof makeSession>;
 
 /** A gesture with many ends (a slider: its pointer up, its key up, its blur): run once each time something changed, never for nothing. */
 export function settle(run: () => void) {

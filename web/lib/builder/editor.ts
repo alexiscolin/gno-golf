@@ -3,7 +3,7 @@
 // realm's (size, work), the entries a limit switches off and why.
 import { counts, work, WORK_WARN } from "./checks";
 import { draftHole } from "./gg1";
-import { FIELD } from "./rules";
+import { FIELD, listed } from "./rules";
 import type { Cost } from "./wasm";
 import type { Draft, V } from "./draft";
 import { whereOf } from "./edit";
@@ -14,10 +14,7 @@ import { MAX_BYTES, type Validated } from "./pipeline";
 import { BUILDER_LIMITS, pieceCounts } from "./limits";
 
 /** Weathers in a sentence: "Clear and Rain", "Clear, Wind and Rain". */
-const weathers = (kinds: readonly string[]) => {
-  const n = kinds.map(weatherName);
-  return n.length > 1 ? `${n.slice(0, -1).join(", ")} and ${n.at(-1)}` : (n[0] ?? "");
-};
+const weathers = (kinds: readonly string[]) => listed(kinds.map(weatherName));
 
 /**
  * The dock's one line: what stands between the draft and the next step (off:

@@ -17,6 +17,7 @@ import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
 import { plainOf } from "@/lib/builder/explain";
 import { notTurned } from "@/lib/builder/handles";
+import { xy } from "@/lib/builder/rules";
 
 const CLOCKS: Record<Clock, string> = { fixed: "Always", substep: "In a stroke", stroke: "Strokes" };
 const SIZE_NAMES = { r: "Size", length: "Length", width: "Width", depth: "Depth" } as const;
@@ -95,7 +96,7 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
       {/* the numbers, for whoever asks for them (the GUI spec's B1: none to type unless Details is opened) */}
       <details className="insp__details">
       <summary>Details</summary>
-      <p className="insp__at">At {+at[0].toFixed(2)}, {+at[1].toFixed(2)}</p>
+      <p className="insp__at">At {xy(at)}</p>
       {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v))} onDone={done} />)}
       {p.geometry.t === "bar" && ent.thick && <Row label="Thick" value={p.geometry.thick} range={ent.thick} onChange={(v) => tryPiece({ ...p, geometry: { ...(p.geometry as Extract<Piece["geometry"], { t: "bar" }>), thick: v } })} onDone={done} />}
       {ent.bounce && <Row label="Bounce" value={p.params.bounce ?? 0} range={ent.bounce} note={ent.bounce.max > 1 ? "Above 1 it kicks" : `${ent.bounce.min} to ${ent.bounce.max} (0: the field's)`} onChange={(v) => tryPiece(withNumber(p, ent, "bounce", v))} onDone={done} />}

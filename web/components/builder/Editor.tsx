@@ -17,7 +17,7 @@ import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
 import { canonicalHex, proofKey, provedAs } from "@/lib/builder/proof";
 import { dropped, toCarry, weatherName, withCarried } from "@/lib/builder/carry";
-import { FIELD } from "@/lib/builder/rules";
+import { FIELD, listed } from "@/lib/builder/rules";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, V } from "@/lib/builder/draft";
@@ -151,8 +151,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     const sayDropped = (proofs: Draft["proofs"]) => {
       const gone = dropped(proofs, prev, k).map(weatherName);
       if (!gone.length) return;
-      const names = gone.length > 1 ? `${gone.slice(0, -1).join(", ")} and ${gone.at(-1)}` : gone[0];
-      setToast(`This drops your ${names} proof${gone.length > 1 ? "s" : ""} · ${MOD}Z keeps ${gone.length > 1 ? "them" : "it"}`);
+      setToast(`This drops your ${listed(gone)} proof${gone.length > 1 ? "s" : ""} · ${MOD}Z keeps ${gone.length > 1 ? "them" : "it"}`);
       clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(""), 5000);
     };

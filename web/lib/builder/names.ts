@@ -6,7 +6,7 @@
 // (tiles.ts) name alike.
 import { BINDINGS, KIND, type Binding } from "./bindings";
 import { entryParts } from "./gg1";
-import { kicks } from "./rules";
+import { cap, kicks } from "./rules";
 import type { Draft } from "./draft";
 import type { Kind } from "../scene/worlds";
 
@@ -54,8 +54,8 @@ function partsOf(e: Named): { tile: string; look: string } {
 
 /** An entry as the board and the inspector name it: its look, then its tile's name ("Lagoon water", "Wall"). */
 export function entryName(e: Named): string {
-  const { tile, look } = partsOf(e), s = look ? `${look} ${tile.toLowerCase()}` : tile;
-  return s[0].toUpperCase() + s.slice(1);
+  const { tile, look } = partsOf(e);
+  return cap(look ? `${look} ${tile.toLowerCase()}` : tile);
 }
 
 /** An entry by its id, as naming reads it: its kind and skin, with their binding (none: the plain form). */

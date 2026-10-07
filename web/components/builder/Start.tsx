@@ -17,6 +17,7 @@ import { gnomeById } from "@/lib/scene";
 import { exportDraft, type Draft } from "@/lib/builder/draft";
 import { draftMap, draftState } from "@/lib/builder/cards";
 import { draftFile, fromFile, fromPublished } from "@/lib/builder/importing";
+import { census } from "@/lib/builder/drawn";
 import { loadTakedown } from "@/lib/takedown";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
@@ -55,7 +56,7 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
   const openFile = (f: File | undefined) => {
     if (!f) return;
     if (f.size > MAX_FILE) return setWhy("That file is too big to be a draft.");
-    void f.text().then(fromFile).then(take, () => setWhy("That file could not be read."));
+    void f.text().then((t) => fromFile(t, host, census)).then(take, () => setWhy("That file could not be read."));
   };
   const openPublished = () => {
     const id = hole.trim();
@@ -65,7 +66,7 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
     const chain = makeChain({ rpc, web });
     // the site's takedown list too: a hole taken down never opens (the list unread, nothing does)
     void Promise.all([chain.holeData(id), loadTakedown(chain)])
-      .then(([hex, taken]) => fromPublished(hex, host, id, author, taken), () => "The chain has no hole there, or could not be read.")
+      .then(([hex, taken]) => fromPublished(hex, host, id, author, census, taken), () => "The chain has no hole there, or could not be read.")
       .then(take)
       .finally(() => setBusy(false));
   };

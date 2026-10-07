@@ -385,7 +385,7 @@ if (v1) {
     if (!sent.ok) continue;
     const id = event(sent, "HolePublished").hole;
     is(`hostile, ${label}: PublishMine's own checks pass`, "builder.wasm check()", "ok", c.ok ? "ok" : c.why);
-    const opened = await fromPublished(await chain.holeData(id), host, id, KEYS.a2);
+    const opened = await fromPublished(await chain.holeData(id), host, id, KEYS.a2, census);
     row(`hostile, ${label}: the Builder will not open it`, "fromPublished(HoleData(id))", "refused, its rules named", typeof opened === "string" ? opened : "opened", typeof opened === "string" && opened.startsWith("This hole breaks the Builder's rules"));
     const { community, mine } = listHoles(await chain.holes(true), null, new Set());
     const shown = [...community, ...mine].some((h) => h.id === id);

@@ -13,7 +13,7 @@ import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, validate, type ValidateOptions } from "./pipeline";
-import { cap, worldName } from "./rules";
+import { cap, pt, worldName } from "./rules";
 import { plainOf } from "./explain";
 import { pastLimits } from "./limits";
 
@@ -89,7 +89,6 @@ export function ghostAt(e: PaletteEntry, id: string, pointer: V, step: number): 
 
 /** Where a piece is, for a sentence: its first point. */
 export const whereOf = (g: Geometry): V => (g.t === "rail" || g.t === "bar" ? g.a : g.t === "post" ? g.c : g.t === "poly" ? g.pts[0] : g.min);
-const at = (v: V) => `(${+v[0].toFixed(2)}, ${+v[1].toFixed(2)})`;
 
 /**
  * The draft in another world: each piece takes the same skin's entry there
@@ -101,7 +100,7 @@ export function changeWorld(d: Draft, world: string, palette: readonly PaletteEn
   const pieces = d.pieces.map((p) => {
     const { kind, skin } = entryParts(p.entry);
     const e = palette.find((x) => x.kind === kind && x.skin === skin && x.world === world) ?? palette.find((x) => x.kind === kind && x.skin === skin);
-    if (!e) refused.push(`${pieceName(p)} at ${at(whereOf(p.geometry))}`);
+    if (!e) refused.push(`${pieceName(p)} at ${pt(whereOf(p.geometry))}`);
     return e ? { ...p, entry: e.id } : p;
   });
   return refused.length ? { refused } : { ...d, world, pieces, proofs: [] };
@@ -119,9 +118,6 @@ export function toWorld(d: Draft, world: string, palette: readonly PaletteEntry[
   const why = newErrors(errorsOf(d, o), r, { ...o, palette });
   return why.length ? { why: plainOf(why[0]) } : r;
 }
-
-/** A world's name in a sentence: "Garden". */
-export { worldName };
 
 /** Why an opened draft is refused for its pieces: one whose entry is not its world's palette's; null if none. */
 export function unknownEntry(d: Draft, palette: readonly PaletteEntry[]): string | null {
@@ -323,7 +319,7 @@ function nearest(rest: Draft, p: Piece, o: ValidateOptions, r0 = CELL, reach = F
 /** A piece as a screen reader names it: what it is and where ("The rock obstacle at (13.5, 6.5)"). */
 export const pieceLabel = (p: Piece) => {
   const n = pieceName(p);
-  return `${cap(n)} at ${at(whereOf(p.geometry))}`;
+  return `${cap(n)} at ${pt(whereOf(p.geometry))}`;
 };
 
 /** Why one more piece like p (a copy, the keyboard's drop) would pass the Builder's limits, in the player's words; "" if it would not. */

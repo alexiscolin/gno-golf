@@ -687,7 +687,11 @@ coordinates are the published ones.
   is one step. Ctrl+Z, Ctrl+Shift+Z.
 - **Persistence.** Every change is saved to `localStorage`
   (`gnogolf.builder.drafts`, versioned, wrapped in try/catch: a private
-  window keeps the draft in memory). Export and import as a `.json` file.
+  window keeps the draft in memory). Export and import as a `.json` file:
+  an imported file is taken only whole, of its world's pieces, and only if
+  it passes every check the editor makes, the render census with them; one
+  they refuse never opens. There is no raw GG1 way in: the writer takes a
+  draft piece's entry, geometry, settings and clock, nothing else.
 - **Opening a published hole** for its next version: `HoleData(alias)` from
   the chain, `decode` in the wasm (never `state`, which is lossy), then
   `gg1.ts` matches every piece to a palette entry: a skin, kind, ranges and
@@ -696,7 +700,9 @@ coordinates are the published ones.
   ends and thickness gives their corners exactly. A hole with a piece no
   entry matches (written in Go, with a hand-only skin, or off the grid) is
   refused, with the pieces listed: the Builder never republishes what it
-  cannot vouch for. A hole the Builder published imports whole.
+  cannot vouch for. Its pieces matched, it goes through the editor's checks
+  and the render census too, as a file does. A hole the Builder published
+  imports whole.
 
 ### Starter templates
 

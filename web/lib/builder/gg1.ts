@@ -7,7 +7,7 @@
 // field for field: a change to it is a new format (GG2), not an edit here.
 // And the way back: a hole's decoded data (builder.wasm's decode) as a Draft.
 import type { Draft, Geometry, Piece, V } from "./draft";
-import type { Field } from "./rules";
+import { pt, type Field } from "./rules";
 import type { GHole, GPost, GWall, GZone, HoleIn, PostIn, WallIn, ZoneIn, ZoneKind } from "./types";
 import type { PieceRef } from "../scene/census";
 
@@ -113,18 +113,6 @@ export function piecesBy(d: Draft, refs: Map<string, PieceRef[]>): Map<string, P
   return by;
 }
 
-/** A piece's raw GG1 element, carried by a hole read back as it is (rawDraft): written as it was. */
-export interface Raw {
-  wall?: GWall;
-  post?: GPost;
-  zone?: GZone;
-}
-/** What the writer and readHole take beyond a piece: its raw element (an import's), or nothing. */
-export type DraftPiece = Piece & { raw?: Raw };
-
-/** A field written with a draft: its world's (rules.ts FIELD), or a raw hole's own, with its order. */
-export type WriteField = Field & { order?: number };
-
 const sub = (a: V, d: V): V => [a[0] + d[0], a[1] + d[1]];
 
 /**
@@ -134,7 +122,7 @@ const sub = (a: V, d: V): V => [a[0] + d[0], a[1] + d[1]];
  * extent, as Fit moves it). refs: which of the hole's pieces each draft piece
  * became (fit keeps their order), as the render census names them.
  */
-export function writeDraft(d: Draft, field: WriteField): { hex: string; bars: string; refs: Map<string, PieceRef[]> } {
+export function writeDraft(d: Draft, field: Field): { hex: string; bars: string; refs: Map<string, PieceRef[]> } {
   const { hole, bars, refs } = draftHole(d, field);
   return { hex: writeHole(hole), bars, refs };
 }
@@ -145,34 +133,26 @@ export function writeDraft(d: Draft, field: WriteField): { hex: string; bars: st
  * round its corners near enough to judge without the wasm (a drag's every
  * step; never stored: only fit's bytes are published).
  */
-export function draftHole(d: Draft, field: WriteField, corners = false): { hole: HoleIn; bars: string; refs: Map<string, PieceRef[]> } {
+export function draftHole(d: Draft, field: Field, corners = false): { hole: HoleIn; bars: string; refs: Map<string, PieceRef[]> } {
   const lists = [{ walls: [] as WallIn[], posts: [] as PostIn[], zones: [] as ZoneIn[] }, ...d.pulses.map(() => ({ walls: [] as WallIn[], posts: [] as PostIn[], zones: [] as ZoneIn[] }))];
   const bars: string[] = [], refs = new Map<string, PieceRef[]>();
-  for (const p of d.pieces as readonly DraftPiece[]) {
+  for (const p of d.pieces) {
     const pulse = p.clock.k === "stroke" ? p.clock.pulse : -1, to = lists[pulse + 1];
     const ref = (set: PieceRef["set"], i: number, n = 1) => refs.set(p.id, Array.from({ length: n }, (_, k) => ({ set, i: i + k, ...(pulse >= 0 && { pulse }) })));
-    if (p.raw?.wall || p.geometry.t === "rail") ref("wall", to.walls.length);
-    else if (p.geometry.t === "bar") ref("wall", to.walls.length, 4);
-    else if (p.raw?.post || p.geometry.t === "post") ref("post", to.posts.length);
-    else ref("zone", to.zones.length);
     const timing = p.clock.k === "substep" ? { every: p.clock.every, on: p.clock.on, phase: p.clock.phase } : {};
-    if (p.raw?.wall) to.walls.push(p.raw.wall);
-    else if (p.raw?.post) to.posts.push(p.raw.post);
-    else if (p.raw?.zone) to.zones.push(p.raw.zone);
-    else {
-      const { kind, skin } = entryParts(p.entry), g = p.geometry, bounce = p.params.bounce ?? 0;
-      if (g.t === "rail") to.walls.push({ a: g.a, b: g.b, bounce, skin, ...timing });
-      else if (g.t === "bar") {
-        bars.push(`${g.a[0]} ${g.a[1]} ${g.b[0]} ${g.b[1]} ${g.thick} ${to.walls.length} ${pulse}`);
-        const c = barCorners(g.a, g.b, g.thick);
-        for (let k = 0; k < 4; k++) to.walls.push({ ...(corners ? { a: c[k], b: c[(k + 1) % 4] } : { a: g.a, b: g.b }), bounce, skin, ...timing });
-      } else if (g.t === "post") to.posts.push({ c: g.c, r: g.r, bounce, skin });
-      else to.zones.push(zoneOf(kind, skin, g, p, d.tee, timing));
-    }
+    const { kind, skin } = entryParts(p.entry), g = p.geometry, bounce = p.params.bounce ?? 0;
+    if (g.t === "rail") (ref("wall", to.walls.length), to.walls.push({ a: g.a, b: g.b, bounce, skin, ...timing }));
+    else if (g.t === "bar") {
+      ref("wall", to.walls.length, 4);
+      bars.push(`${g.a[0]} ${g.a[1]} ${g.b[0]} ${g.b[1]} ${g.thick} ${to.walls.length} ${pulse}`);
+      const c = barCorners(g.a, g.b, g.thick);
+      for (let k = 0; k < 4; k++) to.walls.push({ ...(corners ? { a: c[k], b: c[(k + 1) % 4] } : { a: g.a, b: g.b }), bounce, skin, ...timing });
+    } else if (g.t === "post") (ref("post", to.posts.length), to.posts.push({ c: g.c, r: g.r, bounce, skin }));
+    else (ref("zone", to.zones.length), to.zones.push(zoneOf(kind, skin, g, p, d.tee, timing)));
   }
   const [field0, ...pulses] = lists;
   const hole: HoleIn = {
-    w: BOARD, h: BOARD, title: d.title, par: d.par, tee: d.tee, pin: d.pin, world: d.world, order: field.order ?? 0,
+    w: BOARD, h: BOARD, title: d.title, par: d.par, tee: d.tee, pin: d.pin, world: d.world, order: 0,
     substeps: field.substeps, cupR: field.cupR, shelter: field.shelter, friction: field.friction, bounce: field.bounce, ballR: field.ballR,
     ...field0, pulses: d.pulses.map((q, i) => ({ ...q, ...pulses[i] })),
   };
@@ -238,28 +218,6 @@ const cut = (v: readonly [number, number]): V => [v[0], v[1]];
 const clockOf = (t: { every: number; on: number; phase: number }, pulse: number): Piece["clock"] =>
   pulse >= 0 ? { k: "stroke", pulse } : t.every ? { k: "substep", every: t.every, on: t.on, phase: t.phase } : { k: "fixed" };
 
-/**
- * A decoded hole as a Draft of raw pieces (each its GG1 element, written
- * back as it was) and its own field: the golden round trip's, and nothing a
- * player publishes (a published draft takes its world's field).
- */
-export function rawDraft(g: GHole): { draft: Draft; field: WriteField } {
-  let n = 0;
-  const pieces: DraftPiece[] = [];
-  const add = (list: { walls: GWall[]; posts: GPost[]; zones: GZone[] }, pulse: number) => {
-    for (const w of list.walls) pieces.push({ id: `r${++n}`, entry: `raw/rail/${w.skin}`, geometry: { t: "rail", a: cut(w.a), b: cut(w.b) }, params: {}, clock: clockOf(w, pulse), raw: { wall: w } });
-    for (const p of list.posts) pieces.push({ id: `r${++n}`, entry: `raw/post/${p.skin}`, geometry: { t: "post", c: cut(p.c), r: p.r }, params: {}, clock: clockOf({ every: 0, on: 0, phase: 0 }, pulse), raw: { post: p } });
-    for (const z of list.zones) pieces.push({ id: `r${++n}`, entry: `raw/${z.kind}/${z.skin}`, geometry: { t: "rect", min: cut(z.min), max: cut(z.max) }, params: {}, clock: clockOf(z, pulse), raw: { zone: z } });
-  };
-  add(g, -1);
-  g.pulses.forEach((p, i) => add(p, i));
-  const draft: Draft = {
-    v: 1, world: g.world, slug: "", title: g.title, par: g.par, tee: cut(g.tee), pin: cut(g.pin), pieces,
-    pulses: g.pulses.map(({ every, on, phase }) => ({ every, on, phase })), note: "", proofs: [],
-  };
-  return { draft, field: { substeps: g.substeps, friction: g.friction, bounce: g.bounce, ballR: g.ballR, cupR: g.cupR, shelter: g.shelter, order: g.order } };
-}
-
 /** A hole's piece as readHole hands it to a matcher: its kind (rail, bar, post or a zone's), skin and element. */
 export interface RawPiece {
   kind: string;
@@ -272,7 +230,6 @@ export interface RawPiece {
 export type Match = (p: RawPiece) => string | null;
 
 const near = (a: readonly number[], b: readonly number[]) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
-const at = (v: readonly number[]) => `(${+v[0].toFixed(2)}, ${+v[1].toFixed(2)})`;
 
 /**
  * Four walls build.Bar made: the bar's axis and thickness, recovered from its
@@ -305,18 +262,18 @@ export function readHole(g: GHole, match: Match, bar: (line: string) => [number,
     for (let i = 0; i < list.walls.length; ) {
       const w = list.walls[i], b = barOf(list.walls.slice(i, i + 4), bar);
       const raw: RawPiece = { kind: b ? "bar" : "rail", skin: w.skin, wall: w }, entry = match(raw);
-      if (!entry) refused.push(`the ${raw.kind} ${w.skin || "plain"} at ${at(w.a)}`);
+      if (!entry) refused.push(`the ${raw.kind} ${w.skin || "plain"} at ${pt(w.a)}`);
       else pieces.push({ id: `p${++n}`, entry, geometry: b ? { t: "bar", ...b } : { t: "rail", a: cut(w.a), b: cut(w.b) }, params: w.bounce ? { bounce: w.bounce } : {}, clock: clockOf(w, pulse) });
       i += b ? 4 : 1;
     }
     for (const p of list.posts) {
       const entry = match({ kind: "post", skin: p.skin, post: p });
-      if (!entry) refused.push(`the post ${p.skin || "plain"} at ${at(p.c)}`);
+      if (!entry) refused.push(`the post ${p.skin || "plain"} at ${pt(p.c)}`);
       else pieces.push({ id: `p${++n}`, entry, geometry: { t: "post", c: cut(p.c), r: p.r }, params: p.bounce ? { bounce: p.bounce } : {}, clock: clockOf({ every: 0, on: 0, phase: 0 }, pulse) });
     }
     for (const z of list.zones) {
       const kind = z.kind === "slope" && z.air ? "air" : z.kind, entry = match({ kind, skin: z.skin, zone: z });
-      if (!entry) { refused.push(`the ${kind} ${z.skin || "plain"} at ${at(z.min)}`); continue; }
+      if (!entry) { refused.push(`the ${kind} ${z.skin || "plain"} at ${pt(z.min)}`); continue; }
       const geometry: Geometry = z.poly.length ? { t: "poly", pts: z.poly.map(cut), ...(z.outside && { outside: true }) } : { t: z.round ? "round" : "rect", min: cut(z.min), max: cut(z.max) };
       const params: Piece["params"] = {};
       if (z.kind === "slope") {

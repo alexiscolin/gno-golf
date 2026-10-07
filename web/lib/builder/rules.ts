@@ -8,6 +8,11 @@ import { cap } from "../card";
 export { cap };
 /** A world as the Builder names it. */
 export const worldName = cap;
+/** A board point in a sentence, "13.5, 6.5" (xy), "(13.5, 6.5)" (pt): to two places at most. */
+export const xy = (v: readonly number[]) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`;
+export const pt = (v: readonly number[]) => `(${xy(v)})`;
+/** Things in a sentence: "the tee", "the tee and the cup", "the Garden, the Island and the Mountain". */
+export const listed = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : (xs[0] ?? ""));
 
 /** physics.Kicks: a piece whose skin holds one of these may play a bounce above 1. */
 export const KICKS = ["bumper", "pinball", "mushroom"] as const;
@@ -55,6 +60,5 @@ export const gameWorld = (w: string) => Object.hasOwn(IN_WORDS, w);
 const said = (w: string) => (gameWorld(w) ? IN_WORDS[w] : w);
 /** Why a hole of another world never opens in the Builder (it stays playable in the game). */
 export const notABuilderWorld = (world: string) => {
-  const ws = Object.keys(FIELD).map(said);
-  return `The Builder makes holes in ${ws.slice(0, -1).join(", ")} and ${ws.at(-1)}: this one is in ${said(world)}, and stays playable in the game.`;
+  return `The Builder makes holes in ${listed(Object.keys(FIELD).map(said))}: this one is in ${said(world)}, and stays playable in the game.`;
 };

@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { frame, rawDraft, readHole, writeDraft, type Match } from "../lib/builder/gg1.ts";
+import * as gg1 from "../lib/builder/gg1.ts";
+import { BOARD, frame, readHole, writeDraft, writeHole, type Match } from "../lib/builder/gg1.ts";
 import { emptyDraft, type Draft, type Piece, type V } from "../lib/builder/draft.ts";
 import { FIELD } from "../lib/builder/rules.ts";
 import { makeBuilderHost } from "../lib/builder/wasm.ts";
@@ -109,15 +110,19 @@ void test("out of its frame, fit refuses in the driver's words", () => {
   assert.equal(why(host.fit(hex, bars)), "builder: the draft is not in its frame");
 });
 
-void test("golden round trip: every course hole, decoded, read raw and written back, is the same bytes", () => {
+void test("golden round trip: every course hole, decoded and written back as GG1, is the same bytes", () => {
   for (const { slot, hex } of course) {
-    const g = host.decode(hex);
-    const { draft, field } = rawDraft(g);
-    const { hex: back, bars } = writeDraft(draft, field);
-    const f = host.fit(back, bars);
+    const f = host.fit(writeHole({ ...host.decode(hex), w: BOARD, h: BOARD }));
     assert.ok(f.ok, slot);
     if (slot !== "mines/17") assert.equal(f.hex, hex, slot);
   }
+});
+
+void test("a draft's piece is written from its entry, geometry, settings and clock alone: no raw GG1 element it carries reaches the bytes", () => {
+  const d = box(20, 10), hex = writeDraft(d, FIELD.garden).hex;
+  const crafted = { ...d, pieces: d.pieces.map((p, i) => (i === 0 ? { ...p, raw: { wall: { a: [0, 0], b: [9, 9], bounce: 1.5, mark: 0, skin: "gust", every: 0, on: 0, phase: 0 } } } : p)) };
+  assert.equal(writeDraft(crafted, FIELD.garden).hex, hex);
+  assert.ok(!("rawDraft" in gg1), "no raw draft: a hole is read back only through the palette (readHole)");
 });
 
 void test("a hole read back: matched piece by piece, its bars found again; a piece no entry matches refuses it, named", () => {

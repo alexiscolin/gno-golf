@@ -1,7 +1,7 @@
 // A piece drawn from above in the board's units (an SVG fragment): a rail
 // as a line, a bar as its four corners, a post as its circle, a zone as its
 // box, ellipse or polygon; a tunnel's way out dashed to a ring, a hill's
-// push as an arrow. The board and the palette's tiles both draw with it.
+// push as an arrow, as the board draws it.
 import { barCorners } from "@/lib/builder/gg1";
 import { middleOf } from "@/lib/builder/edit";
 import type { Piece, V } from "@/lib/builder/draft";

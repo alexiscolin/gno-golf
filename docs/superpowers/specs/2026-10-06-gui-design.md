@@ -448,7 +448,11 @@ Cards on one grid: the map, the name (one line), one line of facts ("Garden ·
 par 5 · 23 players", "by nym-pebble77 · Mountain · par 4"), one button
 ("Play", "Race the author" with "✓ Holed by its author" beside it when the
 chain says so, "Open" for a draft) and "Edit" as a link on the player's own.
-Empty: "No hole of yours yet" · Draw a hole.
+Empty: "No hole of yours yet" · Draw a hole. Folded under the list, "Open
+a file, or a published hole": either opens only as the editor would let it
+be made, its world's pieces and every check passed, the render census too;
+else one line says why ("This draft breaks the Builder's rules: The cup is
+inside the bumper: move the cup or the bumper.").
 
 ### B8. On a phone
 

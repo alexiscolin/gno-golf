@@ -6,6 +6,7 @@
 import { makeCaller } from "../sim/wasi";
 import { simCalls, type SimExports } from "../sim/host";
 import type { GHole } from "./types";
+import { MARGIN } from "./gg1";
 
 interface Exports extends SimExports {
   check(n: number, m: number): void;
@@ -46,9 +47,6 @@ export type Checked = { ok: true; cost: Cost } | { ok: false; why: string };
 
 /** A draft fitted: its data (hex), the shift author.Fit applied (always none: a draft is framed), the board it sized, the extent's low corner. */
 export type Fitted = { ok: true; hex: string; dx: number; dy: number; w: number; h: number; lo: [number, number] } | { ok: false; why: string };
-
-/** The margin round a hole's pieces, as every course hole has it (author.Fit's). */
-export const MARGIN = 1.5;
 
 const refusal = (out: string) => (out.startsWith("panic: ") ? out.slice(7) : null);
 

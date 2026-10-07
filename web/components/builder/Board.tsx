@@ -27,6 +27,7 @@ import { sound } from "@/lib/feel";
 import { labelAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
 import { KEYS } from "@/lib/builder/keys";
+import { pt, xy } from "@/lib/builder/rules";
 
 export interface BoardProps {
   draft: Draft;
@@ -65,8 +66,6 @@ type Drag =
   | { t: "handle"; id: string; key: HandleKey; start: Draft; check: Checker }
   | { t: "end"; which: "tee" | "pin"; start: Draft; check: Checker };
 type Checker = ReturnType<typeof dragCheck>;
-
-const fmt = (v: V) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`, fmtAt = (v: V) => `(${fmt(v)})`;
 
 /** The extent the view frames at first: the tee, the cup and every piece, with a margin. */
 function extent(d: Draft): [V, V] {
@@ -294,8 +293,8 @@ export default function Board(props: BoardProps) {
             <PieceShape p={p} state={bad.has(p.id) || live?.id === p.id && live.why ? "bad" : undefined} />
           </g>
         ))}
-        <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${fmtAt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")}><circle cx={draft.tee[0]} cy={draft.tee[1]} r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text x={draft.tee[0]} y={draft.tee[1] + 0.3} fontSize={0.8} textAnchor="middle">T</text><circle className="board__hit" cx={draft.tee[0]} cy={draft.tee[1]} r={hit} /></g>
-        <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${fmtAt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")}><circle cx={draft.pin[0]} cy={draft.pin[1]} r={0.6} fill="#1f2a26" /><path d={`M${draft.pin[0]} ${draft.pin[1]} v-2.2 l1.4 0.5 -1.4 0.5`} fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /><rect className="board__hit" x={draft.pin[0] - hit} y={draft.pin[1] - 2.2 - hit / 2} width={1.4 + 2 * hit} height={2.2 + 1.5 * hit} rx={hit} /></g>
+        <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${pt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")}><circle cx={draft.tee[0]} cy={draft.tee[1]} r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text x={draft.tee[0]} y={draft.tee[1] + 0.3} fontSize={0.8} textAnchor="middle">T</text><circle className="board__hit" cx={draft.tee[0]} cy={draft.tee[1]} r={hit} /></g>
+        <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${pt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")}><circle cx={draft.pin[0]} cy={draft.pin[1]} r={0.6} fill="#1f2a26" /><path d={`M${draft.pin[0]} ${draft.pin[1]} v-2.2 l1.4 0.5 -1.4 0.5`} fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /><rect className="board__hit" x={draft.pin[0] - hit} y={draft.pin[1] - 2.2 - hit / 2} width={1.4 + 2 * hit} height={2.2 + 1.5 * hit} rx={hit} /></g>
         {sel && handlesOf(sel).map((h) => <rect key={h.key} data-handle={h.key} className="board__handle" x={h.at[0] - hs / 2} y={h.at[1] - hs / 2} width={hs} height={hs} />)}
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
       </svg>
@@ -305,7 +304,7 @@ export default function Board(props: BoardProps) {
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
       {(flash || ghost || live) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">
-          {flash ? flash.text : ghost ? ghost.why || `${armed ? entryName(armed) : ""} · ${fmt(whereOf(ghost.p.geometry))}` : live!.why || "Let go to place it"}
+          {flash ? flash.text : ghost ? ghost.why || `${armed ? entryName(armed) : ""} · ${xy(whereOf(ghost.p.geometry))}` : live!.why || "Let go to place it"}
         </span>
       )}
     </section>

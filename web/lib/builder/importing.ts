@@ -3,23 +3,29 @@
 // or a published hole read back as a draft for its next version (gg1.ts
 // readHole on builder.wasm's decode: each piece matched to the palette, each
 // bar recovered from build.Bar's corners), refused naming the pieces the
-// Builder does not make, or whose world is not one of the Builder's, or
-// that the Builder's own rules refuse (it opens only what it can vouch for).
+// Builder does not make, or whose world is not one of the Builder's. Either
+// way the hole then goes through the editor's own checks, the render census
+// with them, and one they refuse never opens: no way in skips the palette
+// or the rules (the Builder opens only what it can vouch for).
 // And a draft's file name.
-import { matchIn, unknownEntry } from "./edit";
+import { errorsOf, matchIn, unknownEntry } from "./edit";
+import { plainOf } from "./explain";
 import { readHole } from "./gg1";
 import { loadPalette } from "./palette";
-import { validate, type ValidateOptions } from "./pipeline";
+import { validate, type Census } from "./pipeline";
 import { FIELD, notABuilderWorld } from "./rules";
 import { parseDraft, type Draft } from "./draft";
 import type { BuilderHost } from "./wasm";
 import { takenDown } from "../takedown";
 
-/** A draft from a file's text, or why not. */
-export async function fromFile(text: string): Promise<Draft | string> {
+/** A draft from a file's text, or why not: whole, of its world's pieces, and passing every rule (the census too). */
+export async function fromFile(text: string, host: BuilderHost, census: Census): Promise<Draft | string> {
   const d = parseDraft(text);
   if (typeof d === "string") return d;
-  return unknownEntry(d, await loadPalette(d.world)) ?? d;
+  const palette = await loadPalette(d.world), unknown = unknownEntry(d, palette);
+  if (unknown) return unknown;
+  const why = errorsOf(d, { host, palette, census })[0];
+  return why ? `This draft breaks the Builder's rules: ${plainOf(why)}` : d;
 }
 
 /** How many refused pieces a sentence names before "and n more". */
@@ -27,10 +33,10 @@ const NAMED = 4;
 
 /**
  * A published hole's data read as the Builder reads it: its world one of the
- * Builder's, its pieces its palette's, every rule passed (with the census if
- * given), and the bytes the Builder would write for it; or why not.
+ * Builder's, its pieces its palette's, every rule passed (the census too),
+ * and the bytes the Builder would write for it; or why not.
  */
-export async function asDraft(hex: string, host: BuilderHost, census?: ValidateOptions["census"]): Promise<{ draft: Draft; hex: string } | string> {
+export async function asDraft(hex: string, host: BuilderHost, census: Census): Promise<{ draft: Draft; hex: string } | string> {
   let g;
   try {
     g = host.decode(hex);
@@ -43,7 +49,7 @@ export async function asDraft(hex: string, host: BuilderHost, census?: ValidateO
     const more = r.refused.length - NAMED;
     return `This hole has pieces the Builder doesn't make: ${r.refused.slice(0, NAMED).join(", ")}${more > 0 ? `, and ${more} more` : ""}.`;
   }
-  const v = validate(r, { host, palette, ...(census && { census }) }), why = v.issues.find((i) => i.severity === "error");
+  const v = validate(r, { host, palette, census }), why = v.issues.find((i) => i.severity === "error");
   if (why) return `This hole breaks the Builder's rules: ${why.text}. It stays playable in the game.`;
   return { draft: r, hex: v.hex! };
 }
@@ -53,10 +59,10 @@ export async function asDraft(hex: string, host: BuilderHost, census?: ValidateO
  * when the hole is me's (the slug its alias's), a new hole otherwise; or why
  * not (asDraft: the Builder opens only what it can vouch for).
  */
-export async function fromPublished(hex: string, host: BuilderHost, id: string, me: string | null, taken: ReadonlySet<string> = new Set()): Promise<Draft | string> {
+export async function fromPublished(hex: string, host: BuilderHost, id: string, me: string | null, census: Census, taken: ReadonlySet<string> = new Set()): Promise<Draft | string> {
   // a hole the site took down (takedown.ts): never opened, nor published again as its next version
   if (takenDown(taken, id)) return "This hole was taken down: it cannot be opened in the Builder.";
-  const r = await asDraft(hex, host);
+  const r = await asDraft(hex, host, census);
   if (typeof r === "string") return r;
   const [author, slug] = id.split("/");
   return { ...r.draft, slug: me && author === me && /^[a-z0-9-]{1,32}$/.test(slug) ? slug : "" };

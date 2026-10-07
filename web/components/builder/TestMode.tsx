@@ -20,14 +20,15 @@ import { makeLocalChain } from "@/lib/builder/localchain";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
 import { holeId, holeRow, plan, testChain } from "@/lib/builder/testmode";
 import { confetti } from "@/lib/builder/juice";
+import { weatherName } from "@/lib/builder/carry";
 import { sound } from "@/lib/feel";
 import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost } from "@/lib/builder/wasm";
 import type { Snapshot } from "@/lib/engine/types";
 
 /** A weather's chip: its sign and its name ("" is clear). */
-const KINDS: Record<string, [string, string]> = { "": ["☀", "Clear"], wind: ["≋", "Wind"], rain: ["☂", "Rain"], storm: ["⚡", "Storm"], snow: ["❄", "Snow"] };
-const chip = (k: string) => KINDS[k] ?? ["•", k];
+const SIGNS: Record<string, string> = { "": "☀", wind: "≋", rain: "☂", storm: "⚡", snow: "❄" };
+const chip = (k: string): [string, string] => [Object.hasOwn(SIGNS, k) ? SIGNS[k] : "•", weatherName(k)];
 /** The celebration's confetti: a little, the same each time. */
 const BITS = confetti(28);
 /** How far back a weather is looked for (FIND_BACK periods), in days, for a sentence. */

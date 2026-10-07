@@ -26,7 +26,6 @@ export interface PaletteEntry extends Binding {
   id: string;
   /** "*": every world */
   world: string;
-  label: string;
   /** the exact GG1 skin ("" the plain form) */
   skin: string;
   kind: Kind;
@@ -60,12 +59,11 @@ export function sharedSkins(): Skins {
 }
 
 const DRAW_OF: Record<Kind, Draw> = { rail: "course", bar: "BARS", post: "POSTS", surface: "zones", slope: "zones", air: "zones", tunnel: "MOUTHS", hazard: "zones", loop: "zones" };
-const label = (skin: string, kind: Kind) => (skin ? skin[0].toUpperCase() + skin.slice(1) : `Plain ${kind}`);
 
 function makeEntry(world: string, kind: Kind, skin: string, draw: Draw): PaletteEntry | null {
   const own = Object.hasOwn(BINDINGS[kind], skin) ? BINDINGS[kind][skin] : null;
   if (!own) return null;
-  return { ...KIND[kind], ...own, ...(skin === "" && { plain: true }), id: `${world}/${kind}/${skin}`, world, label: label(skin, kind), skin, kind, draw };
+  return { ...KIND[kind], ...own, ...(skin === "" && { plain: true }), id: `${world}/${kind}/${skin}`, world, skin, kind, draw };
 }
 
 /** The draw of a shared skin: the table that has it, or the module that declares it. */
