@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { gnokeyPlan, gnokeyPaste, gnokeyLate, chainSplit, PRICE } from "@/lib/adena";
+import { gnokeyPlan, gnokeyPaste, gnokeyLate, chainSplit, GNOKEY_ADDR_KEY, PRICE } from "@/lib/adena";
 import { Button } from "@/components/ui";
 import { messageOf, useCopied } from "@/components/common";
 import { errorKind, isAddress, type Chain } from "@/lib/chain";
@@ -17,7 +17,7 @@ import { errorKind, isAddress, type Chain } from "@/lib/chain";
 // for the account connected (me), else for the key's address, typed once
 // (optional, kept in this browser like the name); with neither, the round stays.
 // The name, a Claim and a tip go the same way (GnokeyTx), in the same panel (Panel).
-const KEY = "gnogolf.gnokey", ADDR = "gnogolf.gnokey.addr";
+const KEY = "gnogolf.gnokey";
 // any name gnokey takes, quoted for the shell: all but a quote and control characters
 const keyOk = (k: string) => /^[^'\\\u0000-\u001f]{1,64}$/.test(k);
 const saved = (k: string) => () => {
@@ -87,7 +87,7 @@ export default function Gnokey({ s, chain, price, chainId, me, onSent }: {
   s: Parameters<typeof gnokeyPlan>[0] | null; chain: Chain | null; price: number; chainId: string | null; me?: string | null; onSent: (player: string) => void;
 }) {
   const [out, setOut] = useState(""); // the round last copied
-  const [addr, setAddr] = useState(saved(ADDR)); // the key's address, with no account connected
+  const [addr, setAddr] = useState(saved(GNOKEY_ADDR_KEY)); // the key's address, with no account connected
   const typed = addr.trim(), who = me || (isAddress(typed) ? typed : "");
   // the commits as the chain itself cuts them, asked when the panel opens:
   // the same split an Adena save sends (keyed by the round it is for)
@@ -116,7 +116,7 @@ export default function Gnokey({ s, chain, price, chainId, me, onSent }: {
       {!me && (
         <label className="gnokey__addr">
           Your key&apos;s address (g1…, <code>gnokey list</code> shows it), to check the save here. Optional.
-          <input className="gnokey__key" value={addr} onChange={(e) => (setAddr(e.target.value), keep(ADDR, e.target.value))} placeholder="g1…" aria-invalid={!!typed && !who} spellCheck={false} autoCapitalize="off" autoComplete="off" />
+          <input className="gnokey__key" value={addr} onChange={(e) => (setAddr(e.target.value), keep(GNOKEY_ADDR_KEY, e.target.value))} placeholder="g1…" aria-invalid={!!typed && !who} spellCheck={false} autoCapitalize="off" autoComplete="off" />
           {typed && !who && <small className="gnokey__bad">That is not a gno.land address: g1 and 38 more letters and digits.</small>}
         </label>
       )}

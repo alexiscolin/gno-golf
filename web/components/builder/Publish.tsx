@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCopied } from "@/components/common";
 import { Button } from "@/components/ui";
+import Share from "@/components/Share";
 import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { makeChain, wait } from "@/lib/chain";
 import { explain } from "@/lib/builder/explain";
@@ -30,7 +31,7 @@ import type { Draft } from "@/lib/builder/draft";
 import type { BuilderHost, Cost } from "@/lib/builder/wasm";
 import type { Hole } from "@/lib/scene/data";
 import Preview from "./Preview";
-import { cardLines, holeLinkOf, saveFile as download, shareCard } from "./share";
+import { cardLines, holeShare, saveFile as download, shareCard } from "./share";
 import { MAX_NOTE, MAX_TITLE as MAX_NAME } from "@/lib/builder/draft";
 import { worldName } from "@/lib/builder/rules";
 
@@ -140,8 +141,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   }, [hex, alias, host]);
 
   if (sent === "done") {
-    const link = holeLinkOf(id), lines = cardLines({ name, world: draft.world, par: draft.par, author });
-    const share = () => (navigator.share ? navigator.share({ title: name, text: `${name}, a mini-golf hole on gno.land`, url: link }).catch(() => {}) : copy(link));
+    const lines = cardLines({ name, world: draft.world, par: draft.par, author });
     const card = () => {
       const c = capture.current?.();
       if (c) void shareCard(c, lines).then((blob) => blob && download(blob, `${draft.slug}.png`));
@@ -156,7 +156,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           <h2>{name} is on gno.land!</h2>
           <p>Play it for real: your best becomes the ghost your friends race.</p>
           <a className="btn btn--gold" href={playLink(holeRow(id, draft))}>Play it for real</a>
-          <Button onClick={() => void share()}>{copied ? "Link copied" : "Share it"}</Button>
+          <Share {...holeShare(name, id)} label="Share it" />
           <button type="button" className="linkish" onClick={card}>Save its card</button>
         </section>
       </main>

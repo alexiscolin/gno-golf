@@ -722,9 +722,13 @@ function allowedHost(h: string, extra = process.env.NEXT_PUBLIC_ALLOWED_HOSTS ||
 // a realm or package path as the chain names it, and nothing else
 const PKG = /^gno\.land\/[rp]\/[\w/.-]+$/;
 const ADDR = /^g1[0-9a-z]{38}$/;
+// a community hole's short name, as golf's validSlug takes it
+const SLUG = "[a-z0-9-]{1,32}", ONE_SLUG = new RegExp(`^${SLUG}$`);
+/** Whether s is a community hole's short name: 1 to 32 lower-case letters, digits and dashes (golf's validSlug). */
+export const isSlug = (s: unknown) => typeof s === "string" && ONE_SLUG.test(s);
 // a data hole: a course slot "garden/7" or its version "garden/7/v2", a
 // community hole "<address>/<slug>" or its version
-const DATA = /^([a-z]{1,16}\/[1-9]\d{0,2}|g1[0-9a-z]{38}\/[a-z0-9-]{1,32})(\/v[1-9]\d*)?$/;
+const DATA = new RegExp(`^([a-z]{1,16}/[1-9]\\d{0,2}|g1[0-9a-z]{38}/${SLUG})(/v[1-9]\\d*)?$`);
 /** Whether s names a hole: a realm's path, or a data hole's id or alias. */
 export const isHoleId = (s: unknown) => PKG.test(String(s)) || DATA.test(String(s));
 /** A best as the realm keeps it (recordsOf). */

@@ -10,7 +10,7 @@
 // itself — the page sends decisions, never outcomes — so a recorded score is
 // one nobody can type in.
 
-import { RULES, isAddress, nameShape, errorKind, type Chain } from "./chain";
+import { RULES, isAddress, isSlug, nameShape, errorKind, type Chain } from "./chain";
 import { trackError } from "./analytics";
 import type { HoleState, Mode, Vec2, Zone } from "./types";
 
@@ -446,6 +446,10 @@ export async function send(messages: (Call | Send)[], gasWanted: number, price: 
 const calls = (address: string, list: readonly (readonly [string, string, string[]])[], gasWanted: number, price: number, chainId: string | null | undefined, rpc: string, failed: string, maxDeposit = "") =>
   send(list.map(([pkg_path, func, args]): Call => ({ type: "/vm.m_call", value: { caller: address, send: "", pkg_path, func, args, ...(maxDeposit && { max_deposit: maxDeposit }) } })), gasWanted, price, chainId, rpc, failed);
 
+/** PublishMine's realm, slug, data (hex) and storage deposit, of the shapes the chain takes: what a publish checks, by Adena or by gnokey. */
+export const publishArgs = ({ realm, slug, hex, deposit }: { realm: string; slug: string; hex: string; deposit: number }) =>
+  PKG_PATH.test(realm) && isSlug(slug) && /^(?:[0-9a-f]{2})+$/.test(hex) && Number.isSafeInteger(deposit) && deposit >= 0;
+
 /**
  * A hole published from the Builder: golf's PublishMine of slug, data (hex)
  * and note, from the connected account, at the gas and the storage deposit
@@ -456,7 +460,7 @@ const calls = (address: string, list: readonly (readonly [string, string, string
 export function publishHole({ address, realm, slug, hex, note, gas, deposit, price = PRICE, chainId, rpc }: {
   address: string; realm: string; slug: string; hex: string; note: string; gas: number; deposit: number; price?: number; chainId?: string | null; rpc: string;
 }) {
-  if (!PKG_PATH.test(realm) || !/^[a-z0-9-]{1,32}$/.test(slug) || !/^(?:[0-9a-f]{2})+$/.test(hex) || !Number.isSafeInteger(deposit) || deposit < 0) {
+  if (!publishArgs({ realm, slug, hex, deposit })) {
     return Promise.reject(new Error("The hole was not published: its address or data is not one the chain takes."));
   }
   return calls(address, [[realm, "PublishMine", [slug, hex, note]]], Math.min(gas, MAX_GAS), price, chainId, rpc, "The hole was not published.", `${deposit}ugnot`);
@@ -529,6 +533,8 @@ interface SaveRound extends Work {
 // RPC are theirs or a placeholder, and an argument is checked (or quoted) by
 // the plan it is in.
 export const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+/** Where the save flow's gnokey panel (components/Gnokey.tsx) keeps the key's address, typed once: the Builder knows its author by it too. */
+export const GNOKEY_ADDR_KEY = "gnogolf.gnokey.addr";
 // an RPC as a command may carry it, "" for anything else
 const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "");
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
@@ -536,9 +542,9 @@ export function gnokeyOn(chainId: string | null | undefined, rpc: string, key = 
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
   return `-broadcast -chainid ${chain} -remote ${remoteOf(walletNode(rpc)) || "<rpc-url>"} ${key}`;
 }
-/** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's; send: ugnot with it (0: none). */
-export const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string, send = 0) =>
-  `gnokey maketx call -pkgpath ${pkg} -func ${func}${args.map((a) => ` -args ${a}`).join("")}${send ? ` -send ${send}ugnot` : ""} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} ${on}`;
+/** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's; send: ugnot with it (0: none); maxDeposit: its storage deposit capped, in ugnot (none: uncapped). */
+export const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string, send = 0, maxDeposit?: number) =>
+  `gnokey maketx call -pkgpath ${pkg} -func ${func}${args.map((a) => ` -args ${a}`).join("")}${send ? ` -send ${send}ugnot` : ""} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas}${maxDeposit === undefined ? "" : ` -max-deposit ${maxDeposit}ugnot`} ${on}`;
 
 /**
  * The same save for gnokey: one plain `gnokey maketx call` per commit, the

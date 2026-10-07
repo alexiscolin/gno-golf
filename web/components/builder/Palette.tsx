@@ -13,7 +13,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type PaletteEntry } from "@/lib/builder/palette";
 import { pictureOf, tilesOf, type Tile } from "@/lib/builder/tiles";
 import { entryName } from "@/lib/builder/names";
-import { worldName } from "@/lib/builder/rules";
+import { cap, theWorld, worldName } from "@/lib/builder/rules";
 import { sound } from "@/lib/feel";
 
 /** A look's picture: a file, its place kept (no shift as it loads). */
@@ -63,7 +63,7 @@ export default function Palette({ world, palette, armed, off, bin, onArm, chosen
     );
   };
   return (
-    <aside className="col palette" aria-label={`The ${name}'s pieces`} onScroll={() => setOpen(null)}>
+    <aside className="col palette" aria-label={`${cap(theWorld(world))}'s pieces`} onScroll={() => setOpen(null)}>
       <div className="palette__world">{name} pieces</div>
       <div className="ptiles ptiles--first">{first.map((t) => tile(t, true))}</div>
       <details className="palette__more">

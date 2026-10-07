@@ -2,11 +2,10 @@
 // when: docs/leaderboards.md): community holes the site no longer shows,
 // listed or linked, whatever the chain still keeps. Read as flags.ts reads
 // its list: only what it should hold, from the chain the game plays on.
-import { isAddress } from "./chain";
+import { isAddress, isSlug } from "./chain";
 
 // a list a few thousand holes long is some 200 kB; past this it is not read at all
 const MAX_BYTES = 1 << 20;
-const SLUG = /^[a-z0-9-]{1,32}$/;
 
 /** The aliases ("<address>/<slug>") taken down: none if the list is too big, not JSON, or another chain's. */
 export function readTakedown(text: string, chainId: string): ReadonlySet<string> {
@@ -24,7 +23,7 @@ export function readTakedown(text: string, chainId: string): ReadonlySet<string>
   for (const h of holes) {
     if (typeof h !== "string") continue;
     const [addr, slug, ...rest] = h.split("/");
-    if (!rest.length && isAddress(addr) && SLUG.test(slug)) out.add(h);
+    if (!rest.length && isAddress(addr) && isSlug(slug)) out.add(h);
   }
   return out;
 }

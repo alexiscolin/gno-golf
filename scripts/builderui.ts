@@ -63,6 +63,13 @@ for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
   assert.equal(await c.js(`document.documentElement.scrollWidth > innerWidth`), false, `${at}: the window scrolls sideways`);
+  // the keys line: each key with its words on one line, and a line starts with a key, never a separator
+  const legend = await c.js<{ broken: string[]; led: string[] }>(`(() => {
+    const spans = [...document.querySelectorAll(".board__keys > span")], rects = spans.map((s) => s.getClientRects());
+    const lineStart = (i) => i === 0 || rects[i][0].top > rects[i - 1][rects[i - 1].length - 1].top + 2;
+    return { broken: spans.filter((_, i) => rects[i].length > 1).map((s) => s.textContent), led: spans.filter((s, i) => lineStart(i) && !s.textContent.trim().startsWith(s.querySelector("kbd").textContent)).map((s) => s.textContent) };
+  })()`);
+  assert.deepEqual(legend, { broken: [], led: [] }, `${at}: the keys line breaks inside an entry, or a line starts with a separator`);
   // the dock: its line and, its limits opened, every gauge inside it
   await c.js(`document.querySelector(".checks__limits").open = true`);
   await sleep(200);

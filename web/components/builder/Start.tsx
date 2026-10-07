@@ -17,9 +17,8 @@ import { Button, Sheet } from "@/components/ui";
 import { gnomeById } from "@/lib/scene";
 import { exportDraft, type Draft } from "@/lib/builder/draft";
 import { draftMap, draftState } from "@/lib/builder/cards";
-import { draftFile, fromFile, fromPublished, type Opened } from "@/lib/builder/importing";
+import { draftFile, fromFile, openPublished, type Opened } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
-import { takedownOf } from "@/lib/takedown";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
 import { endpoints, playLink } from "@/lib/builder/holes";
@@ -81,14 +80,10 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
     if (f.size > MAX_FILE) return setWhy("That file is too big to be a draft.");
     void f.text().then((t) => fromFile(t, host, census)).then(take, () => setWhy("That file could not be read."));
   };
-  const openPublished = (id = hole.trim()) => {
+  const openHole = (id = hole.trim()) => {
     if (!isHoleId(id)) return setWhy("A hole's address is like g1…/its-name, or g1…/its-name/v2.");
     setBusy(true);
-    // the site's takedown list too: a hole taken down never opens (the list unread, nothing does)
-    void Promise.all([chain.holeData(id), takedownOf(chain)])
-      .then(([hex, taken]) => fromPublished(hex, host, id, author, census, taken), () => "The chain has no hole there, or could not be read.")
-      .then(take)
-      .finally(() => setBusy(false));
+    void openPublished(chain, host, census, id, author).then(take).finally(() => setBusy(false));
   };
   return (
     <div className={`screen worlds front bholes tint--${world}`}>
@@ -172,7 +167,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                     </span>
                     <span className="bholes__acts">
                       <a className="btn btn--ghost btn--s" href={playLink(h, keep)}>Play</a>
-                      <button type="button" className="linkish" disabled={busy} onClick={() => openPublished(h.id)}>Open its next version</button>
+                      <button type="button" className="linkish" disabled={busy} onClick={() => openHole(h.id)}>Open its next version</button>
                     </span>
                   </li>
                 );
@@ -200,7 +195,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
             <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => (openFile(e.target.files?.[0]), (e.target.value = ""))} />
             <span className="bholes__hole">
               <input value={hole} placeholder="g1…/its-name" aria-label="A published hole's address" spellCheck={false} autoCapitalize="off" onChange={(e) => setHole(e.target.value)} />
-              <Button disabled={!hole.trim() || busy} onClick={() => openPublished()}>{busy ? "Reading…" : "Open"}</Button>
+              <Button disabled={!hole.trim() || busy} onClick={() => openHole()}>{busy ? "Reading…" : "Open"}</Button>
             </span>
           </div>
         </details>

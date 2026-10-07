@@ -1,6 +1,7 @@
 // The community's holes as the Builder lists them (the GUI spec's B5 and B6):
 // an author's own, and everyone else's, each at its latest version, never a
 // course hole, never one the site took down (takedown.ts).
+import { GNOKEY_ADDR_KEY } from "../adena";
 import { buildRpc, buildWeb, isAddress, isHoleId, safeEndpoint, shortAddr } from "../chain";
 import { worldName } from "./rules";
 import { takenDown } from "../takedown";
@@ -46,7 +47,7 @@ export function endpoints(search: string) {
 /** The author's address as this browser knows it: the one the Builder last used, else the save flow's gnokey address. */
 export function knownAuthor(): string | null {
   try {
-    for (const k of [AUTHOR_KEY, "gnogolf.gnokey.addr"]) {
+    for (const k of [AUTHOR_KEY, GNOKEY_ADDR_KEY]) {
       const a = (localStorage.getItem(k) || "").trim();
       if (isAddress(a)) return a;
     }
