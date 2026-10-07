@@ -47,7 +47,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 /* the shop's slots (ShopFrame): the same height before and after their figures are read */
 .closes-slot { min-height: 34px; display: grid; justify-items: center; align-items: center; }
 .gcard__buy.gcard__buy--skel { background: rgba(var(--ink-rgb), .08); border-color: transparent; box-shadow: none; }
-.shop__pitch { margin: var(--sp-2) auto 0; max-width: 640px; text-align: center; font-size: 16px; font-weight: 700; line-height: 1.35; color: var(--ink-soft); }
+.shop__pitch { margin: var(--sp-2) auto 0; max-width: 640px; text-align: center; font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--ink); } /* (small words in ink: the soft ink is under 4.5:1 on a front's ground) */
 /* Buy on a card on sale: the blue of what leads to a signature, a pill at the card's foot (the card opens the order) */
 .gcard__buy { justify-self: stretch; margin: 2px 2px 0; padding: 6px 0; border: var(--edge); border-radius: var(--pill); background: var(--chain); color: var(--white); font-size: 14px; font-weight: 800; text-align: center; box-shadow: var(--shadow-btn); }
 .wave__note { margin: 0; color: var(--ink-soft); font-size: 14px; }
@@ -71,7 +71,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
    state's chip; one row, two on a phone (fixed heights: the slot while it is read is the same room) */
 .wline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; align-content: center; gap: 6px var(--sp-4); height: 72px; margin: var(--sp-4) 0; font-size: 18px; font-weight: 800; color: var(--ink); }
 .wline__words { white-space: nowrap; }
-.wline__who { font-size: 16px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.wline__who { font-size: 16px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .wline__who b { color: var(--ink); font-weight: 800; }
 .wline__legend { flex: none; width: 60px; height: 60px; margin-left: -6px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 3px var(--gold); }
 .wline__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
@@ -157,8 +157,10 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 @media (max-width: 600px) { .gshelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); } }
 .gcard { display: grid; gap: var(--sp-2); width: 100%; min-width: 0; padding: var(--sp-2) var(--sp-2) 10px; border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
 .gcard:hover { transform: translateY(-3px); }
-.gcard__name { margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gcard__name small { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+/* the name cut short when it is long, never his number: the gnome's identity in the shop */
+.gcard__name { display: flex; align-items: baseline; min-width: 0; margin: 0 4px; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; }
+.gcard__name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gcard__name small { flex: none; margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .gcard__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; margin: 0 2px; min-height: 26px; }
 .gcard__fact { min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gcard--mine { background: var(--ink); color: var(--paper); }
