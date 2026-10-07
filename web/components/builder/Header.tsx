@@ -37,6 +37,16 @@ function Meter({ m }: { m: MeterChip }) {
   );
 }
 
+/** Undo's arrow, inked (the Back button's stroke): back along a curve to where it was; redo, the same turned the other way. */
+const HistoryIcon = ({ redo = false }: { redo?: boolean }) => (
+  <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" style={redo ? { transform: "scaleX(-1)" } : undefined}>
+    <path d="M7.5 3.5 3.5 7.5l4 4" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 7.5h7.5a4.75 4.75 0 0 1 0 9.5H8" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+/** Undo's or redo's keys as aria-keyshortcuts names them (MOD: ⌘ on a Mac, Ctrl elsewhere). */
+const keys = (redo: boolean) => `${MOD === "⌘" ? "Meta" : "Control"}+${redo ? "Shift+" : ""}Z`;
+
 export default function Header({ title, slug, author, world, worlds, step, steps, action, history, meter, onTitle, onSlug, onWorld, onStep, onBack, onHelp }: {
   title: string;
   slug: string;
@@ -102,8 +112,8 @@ export default function Header({ title, slug, author, world, worlds, step, steps
         {onHelp && <button type="button" className="round" aria-label="How it works: the three steps" title="How it works" onClick={onHelp}>?</button>}
         {history && (
           <>
-            <button type="button" className="round" aria-label={`Undo (${MOD}Z)`} title={`Undo (${MOD}Z)`} disabled={!history.canUndo} onClick={history.undo}>↶</button>
-            <button type="button" className="round" aria-label={`Redo (⇧${MOD}Z)`} title={`Redo (⇧${MOD}Z)`} disabled={!history.canRedo} onClick={history.redo}>↷</button>
+            <button type="button" className="round round--icon bhead__hist" aria-label="Undo" aria-keyshortcuts={keys(false)} title={`Undo (${MOD}Z)`} disabled={!history.canUndo} onClick={history.undo}><HistoryIcon /></button>
+            <button type="button" className="round round--icon bhead__hist" aria-label="Redo" aria-keyshortcuts={keys(true)} title={`Redo (⇧${MOD}Z)`} disabled={!history.canRedo} onClick={history.redo}><HistoryIcon redo /></button>
           </>
         )}
         {action && (

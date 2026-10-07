@@ -124,6 +124,9 @@ export function mapFit(hole: Pick<HoleState, "start" | "cup" | "walls" | "zones"
   return [hole.start, hole.cup, ...path, ...hole.walls.flatMap((w) => [w.a, w.b]), ...hole.zones.flatMap((z) => (z.outside && z.poly) || [])];
 }
 
+/** What a hole's map (components/HoleMap.tsx) draws of it: its world (its colours), its tee and cup, and its pieces. */
+export type MapHole = Pick<HoleState, "world" | "start" | "cup" | "cupR" | "walls" | "posts" | "zones">;
+
 export type MapKind = "pond" | "drop" | "sand" | "ice" | "slope" | "over";
 // the hazards the ball drops down (drawn dark), not into water
 const DROPS = new Set(["crevasse", "ditch", "gap", "cliff", "roof"]);

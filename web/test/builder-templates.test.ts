@@ -50,10 +50,20 @@ void test("the starters: three a world, each whole, passing every check, holed i
 void test("startsIn: a world's starters then a blank lane, each a copy of its own", () => {
   const s = startsIn("island");
   assert.deepEqual(s.map((x) => x.name), ["straight", "dogleg", "signature", "blank"]);
-  assert.match(s[0].title, /^Straight · par 2$/);
+  assert.deepEqual([s[0].title, s[0].par], ["Straight", 2]);
+  assert.deepEqual([s[3].title, s[3].par], ["Blank lane", 0], "a blank lane has no par yet");
   s[0].draft.pieces.length = 0;
   assert.ok(STARTERS.island.straight.pieces.length > 0, "a starter is never changed through its copy");
   assert.deepEqual(startsIn("nowhere").map((x) => x.name), ["blank"]);
+});
+
+void test("startsIn: each card says in a line what it is, a signature by its world's own piece", () => {
+  const lines = Object.fromEntries(Object.keys(FIELD).map((w) => [w, startsIn(w).map((x) => `${x.title}: ${x.line}`)]));
+  assert.deepEqual(lines.garden, ["Straight: A short lane to learn the tools", "Dogleg: One turn to bank around", "The scarecrow: A scarecrow in the lane: play round it", "Blank lane: An empty lane, all yours"]);
+  assert.equal(lines.island[2], "The tidepool: A tidepool in the lane: keep the ball out of it");
+  assert.equal(lines.town[2], "The funbox: A funbox in the lane: roll up and over it");
+  assert.equal(lines.mountain[2], "The kicker: A kicker in the lane: roll up and over it");
+  for (const [w, l] of Object.entries(lines)) assert.ok(l.every((x) => x.length <= 64), `${w}: a line fits a card`);
 });
 
 void test("blank: a plain lane that passes every check, in every world", async () => {
@@ -79,6 +89,7 @@ void test("defaults: a new hole is named from its world and starter, its address
   assert.equal(dog.draft.title, "Garden Dogleg");
   assert.equal(dog.draft.slug, "garden-dogleg");
   assert.equal(startsIn("mountain").find((s) => s.name === "blank")!.draft.title, "Mountain Lane");
+  assert.equal(startsIn("island").find((s) => s.name === "signature")!.draft.title, "Island Tidepool", "a signature named by its piece");
   assert.equal(slugOf("  Le Grand Saut! "), "le-grand-saut");
   assert.equal(slugOf("!!!"), "hole");
   assert.equal(slugOf("x".repeat(50)).length, 32);

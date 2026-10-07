@@ -4,22 +4,47 @@
 // (test/builder-templates.test.ts): a new hole is never one the Builder
 // refuses, and every edit after it keeps it so.
 import { emptyDraft, type Draft, type Piece, type V } from "./draft";
-import { frame } from "./gg1";
+import { entryParts, frame } from "./gg1";
 import { STARTERS } from "./starters";
-import { worldName } from "./rules";
+import { cap, worldName } from "./rules";
 
 /** The blank lane's size: long enough to play, narrow enough to aim. */
 const W = 28, H = 12;
 const rail = (id: string, a: V, b: V): Piece => ({ id, entry: "*/rail/", geometry: { t: "rail", a, b }, params: {}, clock: { k: "fixed" } });
 
-/** A new hole's choices in a world: its starters (scripts/starters.ts), then a blank lane; each a fresh copy, named from its world and starter ("Garden Dogleg"), its address from its name. */
-export function startsIn(world: string): { name: string; title: string; draft: Draft }[] {
+/** A new hole's choice: its name in the list ("dogleg", "blank"), its card's title and one line, its par (0: none yet), and the draft it opens. */
+export interface Start {
+  name: string;
+  title: string;
+  line: string;
+  par: number;
+  draft: Draft;
+}
+
+/** A new hole's choices in a world: its starters (scripts/starters.ts), then a blank lane; each a fresh copy, named from its world and starter ("Garden Dogleg", "Island Tidepool"), its address from its name. */
+export function startsIn(world: string): Start[] {
   const own = Object.hasOwn(STARTERS, world) ? STARTERS[world] : {};
   const named = (d: Draft, what: string) => retitle({ ...d, slug: "" }, `${worldName(world)} ${what}`);
   return [
-    ...Object.entries(own).map(([name, d]) => ({ name, title: `${d.title} · par ${d.par}`, draft: named(structuredClone(d), d.title) })),
-    { name: "blank", title: "A blank lane", draft: named(blank(world), "Lane") },
+    ...Object.entries(own).map(([name, d]) => ({ name, title: d.title, line: startLine(name, d), par: d.par, draft: named(structuredClone(d), cap(d.title.replace(/^The /, ""))) })),
+    { name: "blank", title: "Blank lane", line: "An empty lane, all yours", par: 0, draft: named(blank(world), "Lane") },
   ];
+}
+
+/** What a starter's card says it is, in a line: the straight and the dogleg by their shape, a signature by its world's own piece (its first that is not a rail) and what it does to the ball. */
+export function startLine(name: string, d: Draft): string {
+  if (name === "straight") return "A short lane to learn the tools";
+  if (name === "dogleg") return "One turn to bank around";
+  const sig = d.pieces.find((p) => p.geometry.t !== "rail");
+  const { kind, skin } = sig ? entryParts(sig.entry) : { kind: "", skin: "" };
+  const what = skin || kind;
+  switch (kind) {
+    case "post": return `A ${what} in the lane: play round it`;
+    case "hazard": return `A ${what} in the lane: keep the ball out of it`;
+    case "slope": return `A ${what} in the lane: roll up and over it`;
+    case "surface": return `A patch of ${what}: it changes the roll`;
+    default: return sig ? `The world's own ${what}, to play round` : "A lane of the world's own";
+  }
 }
 
 /** Where the browser keeps that the first run's hints were seen. */

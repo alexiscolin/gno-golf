@@ -32,8 +32,9 @@
 /* the action keeps its width as its words change (Test it, Publish →); off, it stays readable: ink on paper, dashed */
 .bhead__end .btn { min-width: 136px; justify-content: center; }
 .btn.btn--off { background: var(--paper); color: var(--ink); border-style: dashed; box-shadow: none; cursor: not-allowed; }
-.bhead__end .round { width: 40px; height: 40px; border-width: 2px; font-size: 18px; font-weight: 800; }
-.bhead__end .round:disabled { opacity: .4; }
+.bhead__end .round { flex: none; width: 40px; height: 40px; border-width: 2px; font-size: 18px; font-weight: 800; }
+/* undo, redo: the arrow drawn (no font's glyph to clip); off, still read: dashed and flat, its arrow in the soft ink */
+.bhead__end .round:disabled { background: transparent; border-style: dashed; color: var(--ink-soft); box-shadow: none; transform: none; cursor: not-allowed; }
 
 /* the steps: Edit, Test, Publish; done green, the current gold, the next open or locked with its reason */
 .stepper { justify-self: center; display: flex; align-items: center; gap: var(--sp-1); margin: 0; padding: var(--sp-1); list-style: none; border: var(--edge); border-radius: var(--pill); background: var(--paper); }
@@ -152,12 +153,107 @@
 .preview.preview--off { display: grid; place-items: center; margin: 0; padding: var(--sp-4); background: var(--paper); border-style: dashed; color: var(--ink); font-size: 15px; line-height: 1.4; text-align: center; }
 
 /* ------------------------------------------------------------ your holes (the computer's start) */
-.bholes__in { width: min(640px, 100%); margin: 0 auto; gap: var(--sp-5); padding: 72px var(--sp-4) var(--sp-5); }
-.bholes__new { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--sp-3); }
-.bholes__new .btn { margin: 0; }
-.bholes__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); width: 100%; text-align: left; }
+/* ------------------------------------------------------------ your holes (the computer's start, B7): the workshop, a new hole, the drafts */
+/* the screen's column, centred, as wide as the menu's cards; compact enough that the starters stand above the fold of a laptop */
+.screen.bholes { padding-top: clamp(28px, 6vh, 64px); }
+/* a window too narrow for the column beside the corner's Back: the column starts under it */
+@media (max-width: 1240px) { .screen.bholes { padding-top: 76px; } }
+.bholes__in { width: min(1040px, 100%); margin: 0 auto; justify-items: stretch; gap: var(--sp-5); padding: 0 var(--sp-5) var(--sp-5); text-align: left; }
+.bholes__h { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+.bholes__h small { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--pill); background: var(--ink); color: var(--paper); font-size: 12px; letter-spacing: 0; }
+
+/* the workshop's sign: a blueprint (the build emblem's), the Miner out of his disc on its left, its words, its three steps */
+.bholes__sign {
+  --bp: #2f6db3; position: relative; display: grid; grid-template-columns: 148px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5);
+  margin-top: 28px; padding: var(--sp-4) var(--sp-5) var(--sp-4) var(--sp-4); border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper);
+  background: linear-gradient(rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255, 255, 255, .13) 1.5px, transparent 1.5px) 0 0 / 24px 24px,
+    linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 6px 6px, var(--bp);
+  box-shadow: var(--deep-card);
+}
+/* the Miner stands out over the sign's top edge, as a menu panel's gnome does */
+.bholes__gnome { position: relative; display: block; width: 210px; height: 210px; margin: -78px -31px -26px; }
+.bholes__gnome > svg { position: absolute; left: 50%; bottom: 36px; width: 124px; height: 124px; transform: translateX(-50%); filter: drop-shadow(0 4px 0 var(--ink)); }
+.bholes__gnome > .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+.bholes__say { display: grid; justify-items: start; gap: 6px; min-width: 0; }
+.bholes__say .eyebrow { padding: 2px 12px; font-size: 12px; background: var(--paper); color: var(--ink); }
+.front .bholes__say .worlds__title { margin: 0; font-size: clamp(36px, 4vw, 52px); line-height: 1; --ink-w: 6px; --ink-drop: 4px; transform: rotate(-2deg); transform-origin: left; }
+.bholes__say p { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.3; }
+/* the three steps: paper chips, a little picture each, joined by a dashed line */
+.bholes__steps { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.bholes__step { position: relative; display: flex; align-items: center; gap: var(--sp-2); padding: 6px var(--sp-3) 6px 6px; border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); }
+.bholes__step + .bholes__step::before { content: ""; position: absolute; left: 24px; top: -10px; height: 10px; border-left: 2px dashed rgba(255, 255, 255, .7); }
+.bholes__step svg { flex: none; width: 34px; height: 34px; padding: 4px; border-radius: 10px; background: var(--lamp); overflow: visible; }
+.bholes__step span { display: grid; line-height: 1.15; }
+.bholes__step b { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.bholes__step i { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 11px; font-style: normal; }
+.bholes__step small { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.i-paper { fill: var(--white); stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; }
+.i-dash { fill: none; stroke: var(--green); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 2 2.4; }
+.i-ink { fill: var(--ink); }
+.i-line { fill: none; stroke: var(--ink); stroke-width: 2.6; stroke-linecap: round; }
+.i-gold { fill: var(--sunny); stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; }
+.i-flag { fill: var(--hat); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
+
+/* a new hole: its world as tabs (each its emblem and colours), its starters as cards */
+.bholes__new { display: grid; gap: var(--sp-3); }
+.bholes__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.bholes__worlds { display: flex; gap: var(--sp-2); padding: 4px; border: var(--edge); border-radius: var(--pill); background: var(--paper); }
+.bholes__world { display: inline-flex; align-items: center; gap: var(--sp-2); height: 40px; padding: 0 var(--sp-4) 0 4px; border: 0; border-radius: var(--pill); background: none; font: inherit; font-size: 15px; font-weight: 700; color: var(--ink); cursor: pointer; }
+.bholes__world svg { width: 32px; height: 32px; }
+.bholes__world:hover:not(.on) { background: color-mix(in srgb, var(--c1) 35%, var(--paper)); }
+.bholes__world.on { background: var(--c2); color: var(--paper); box-shadow: inset 0 0 0 2px var(--ink); }
+.bholes__world:focus-visible { outline: var(--ring); outline-offset: 2px; }
+.bholes__starts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); margin: 0; padding: 0; list-style: none; }
+.bholes__start {
+  display: grid; grid-template-rows: auto auto 1fr auto; justify-items: start; gap: 4px; width: 100%; height: 100%; padding: 0 0 var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card);
+  background: var(--white); font: inherit; color: var(--ink); text-align: left; cursor: pointer; overflow: hidden; box-shadow: var(--shadow-btn); transition: transform var(--t-pop) var(--spring), box-shadow .2s;
+}
+.bholes__start:hover, .bholes__start:focus-visible { transform: translateY(-4px) rotate(-.6deg); box-shadow: 0 0 0 4px var(--glow), 0 8px 0 var(--ink); }
+.bholes__start:focus-visible { outline: none; box-shadow: var(--ring-shadow), 0 8px 0 var(--ink); }
+.bholes__start:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.bholes__start > b { margin: 2px var(--sp-3) 0; font-size: 18px; line-height: 1.15; }
+.bholes__line { margin: 0 var(--sp-3); font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--ink-soft); }
+/* the map on the world's panel colour, its dots: the hole as the game draws one */
+.bholes__map { display: grid; place-items: center; width: 100%; padding: var(--sp-3) 0; border-bottom: var(--edge); background: var(--panel-dots), var(--c1); }
+.bholes__svg { width: min(136px, 100%); aspect-ratio: 1; filter: drop-shadow(0 3px 0 var(--ink)); }
+.bholes__start--blank .bholes__map { background: var(--panel-dots), var(--paper); }
+.bholes__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); width: 100%; padding: var(--sp-1) var(--sp-3) 0; }
+.bholes__par { padding: 2px 10px; border: 2px solid var(--ink); border-radius: var(--pill); font-size: 13px; font-weight: 800; }
+.bholes__go { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border: var(--edge); border-radius: var(--pill); background: var(--gold-grad); font-size: 14px; font-weight: 800; }
+.bholes__go i { font-style: normal; transition: transform .2s; }
+.bholes__start:hover .bholes__go i { transform: translateX(3px); }
+
+/* the drafts: cards on one grid, the map, the name, the facts, the state, Open */
+.bholes__mine { display: grid; gap: var(--sp-3); }
+.bholes__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--sp-3); width: 100%; text-align: left; }
+.bholes__draft { display: grid; grid-template-columns: 76px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: var(--sp-3); row-gap: var(--sp-2); padding: var(--sp-3); border: var(--edge-bold); border-radius: var(--r-card); background: var(--white); box-shadow: var(--shadow-btn); }
+.bholes__map--s { grid-row: 1 / 3; align-self: start; padding: 6px; border: var(--edge); border-radius: 14px; }
+.bholes__map--s .bholes__svg { width: 60px; }
+.bholes__name { display: grid; justify-items: start; gap: 2px; min-width: 0; line-height: 1.2; }
+.bholes__name b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; }
+.bholes__name small { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.bholes__state { margin-top: 2px; padding: 1px 10px; border-radius: var(--pill); border: 2px dashed rgba(var(--ink-rgb), .45); font-size: 12px; font-weight: 800; }
+.bholes__state--testing { border-style: solid; border-color: var(--sunny); background: var(--lamp); }
+.bholes__state--ready { border-style: solid; border-color: var(--green); background: var(--mint); color: var(--green); }
+.bholes__state--changed { border-color: var(--hat-ink); color: var(--hat-ink); }
 .bholes__acts { display: flex; align-items: center; gap: var(--sp-3); }
 .bholes__acts .btn { margin: 0; }
+/* a short window (a 700 px laptop's): the sign and the maps a size under, the starters still above the fold */
+@media (max-height: 780px) {
+  .bholes__in { gap: var(--sp-4); }
+  .bholes__sign { padding-block: var(--sp-2); }
+  .bholes__step { padding-block: 3px; }
+  .bholes__svg { width: min(108px, 100%); }
+  .bholes__map { padding: var(--sp-2) 0; }
+}
+.bholes__none { margin: 0; padding: var(--sp-4); border: 2px dashed rgba(var(--ink-rgb), .3); border-radius: var(--r-card); background: rgba(var(--paper-rgb), .7); font-size: 15px; font-weight: 600; text-align: center; }
+.bholes__more { width: 100%; text-align: left; }
+.bholes__more summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
+.bholes__open { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
+.bholes__open .btn { margin: 0; }
+.bholes__hole { display: flex; flex: 1; min-width: 240px; gap: var(--sp-2); }
+.bholes__hole input { flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-family: var(--mono); font-size: 14px; }
+.bholes__why { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-weight: 700; }
 
 /* ------------------------------------------------------------ test mode (B3): the game under the header, the weathers over it */
 .tbench { --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; position: fixed; inset: 0; overflow: hidden; font-family: var(--font); color: var(--ink); }
@@ -184,16 +280,6 @@
 .tmode__ask .btn { margin: 0; }
 .tmode__addr { display: grid; gap: var(--sp-1); text-align: left; font-size: 13px; font-weight: 700; }
 .tmode__addr input { min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-size: 15px; font-family: var(--mono); }
-.bholes__more { width: 100%; text-align: left; }
-.bholes__more summary { cursor: pointer; font-weight: 700; color: var(--green); text-decoration: underline dashed; text-underline-offset: 3px; }
-.bholes__open { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
-.bholes__open .btn { margin: 0; }
-.bholes__hole { display: flex; flex: 1; min-width: 240px; gap: var(--sp-2); }
-.bholes__hole input { flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--sp-3); border: var(--edge); border-radius: 12px; font: inherit; font-family: var(--mono); font-size: 14px; }
-.bholes__why { margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-weight: 700; }
-.bholes__new { flex-direction: column; }
-.bholes__starts { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); }
-.bholes__starts .btn { margin: 0; }
 
 /* ------------------------------------------------------------ publish (B4): the hole as players will see it, the form beside it */
 .pbench { --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; position: fixed; inset: 0; display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3); overflow: hidden; font-family: var(--font); color: var(--ink); background: var(--paper); }

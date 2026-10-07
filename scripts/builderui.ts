@@ -6,7 +6,9 @@
 // gauges, the three steps sit in the middle of the header, the header's
 // action and the dock keep their places as their words change, what a step
 // says when it is off is readable, and the note of a browser that keeps
-// nothing covers no control. Exits non-zero on the first failure.
+// nothing covers no control; undo and redo stand whole in the header; the
+// start screen (a player back) never scrolls sideways, keeps clear of the
+// corner's Back and shows its starters above the fold. Exits non-zero on the first failure.
 //
 //   APP=http://localhost:3471 node --experimental-strip-types scripts/builderui.ts
 
@@ -56,7 +58,7 @@ const CONTRAST = `(sel) => {
   return { ratio: (a + 0.05) / (b + 0.05), opacity: op };
 }`;
 
-const SIZES: [number, number][] = [[900, 800], [1024, 768], [1280, 800], [1440, 900], [1366, 650]];
+const SIZES: [number, number][] = [[900, 800], [1024, 768], [1280, 800], [1440, 900], [1366, 650], [1512, 982]];
 for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
@@ -70,6 +72,11 @@ for (const [w, h] of SIZES) {
   // the three steps in the middle of the header
   const steps = (await box(c, ".stepper"))!;
   assert.ok(Math.abs((steps.l + steps.r) / 2 - w / 2) <= 2, `${at}: the steps sit at ${(steps.l + steps.r) / 2}, not ${w / 2}`);
+  // undo and redo: whole, inside the header, clear of the steps (nothing clipped, nothing under the steps)
+  const head = (await box(c, ".bhead"))!, hist = await c.js<Box[]>(`[...document.querySelectorAll(".bhead__hist")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  assert.equal(hist.length, 2, `${at}: undo and redo in the header`);
+  for (const b of hist) assert.ok(b.l >= head.l && b.r <= head.r && b.t >= head.t - 0.5 && b.b <= head.b + 0.5 && !overlap(b, steps) && b.r - b.l >= 39.5, `${at}: undo or redo cut or under the steps (${JSON.stringify(b)})`);
+  assert.equal(await c.js(`[...document.querySelectorAll(".bhead__hist")].map((e) => e.getAttribute("aria-label")).join()`), "Undo,Redo", `${at}: undo and redo named`);
   // the header's action and the dock keep their places as their words change (a slug, then none)
   await typeInto(c, ".bhead__slug", "a-name");
   await sleep(1500);
@@ -83,6 +90,26 @@ for (const [w, h] of SIZES) {
   const off = await c.js<{ ratio: number; opacity: number } | null>(`(${CONTRAST})(".bhead__end .btn[aria-disabled=true]")`);
   assert.ok(off, `${at}: the action is not off with no name`);
   assert.ok(off.opacity === 1 && off.ratio >= 4.5, `${at}: the action's reason, off, reads at ${off.ratio.toFixed(2)}:1, opacity ${off.opacity}`);
+  console.log(`${at}: ok`);
+  c.kill();
+}
+
+// the start screen (a player back, hinted): it never scrolls sideways, sits clear of the corner's Back, and its starters stand above the fold
+for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
+  const c = await launch({ width: w, height: h });
+  await c.send("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.setItem("gnogolf.builder.hinted", "1"); } catch {}` });
+  await c.send("Page.navigate", { url: `${APP}/build/` });
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__start")`)); k++) await sleep(500);
+  await sleep(600);
+  const at = `start ${w}×${h}`;
+  assert.equal(await c.js(`document.documentElement.scrollWidth > innerWidth || document.querySelector(".bholes").scrollWidth > innerWidth`), false, `${at}: the window scrolls sideways`);
+  const cards = await c.js<Box[]>(`[...document.querySelectorAll(".bholes__start")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  assert.equal(cards.length, 4, `${at}: three starters and a blank lane`);
+  for (const b of cards) assert.ok(b.b <= h - 16 && b.l >= 0 && b.r <= w, `${at}: a starter's card below the fold or out of the window (${JSON.stringify(b)})`);
+  const back = (await box(c, ".screen__back"))!;
+  for (const sel of [".bholes__sign", ".bholes__bar", ".bholes__starts"]) assert.ok(!overlap(back, (await box(c, sel))!), `${at}: ${sel} under the corner's Back`);
+  const sign = (await box(c, ".bholes__sign"))!, starts = (await box(c, ".bholes__starts"))!;
+  assert.ok(Math.abs(sign.l + sign.r - w) <= 2 && Math.abs(starts.l + starts.r - w) <= 2, `${at}: the column is not centred`);
   console.log(`${at}: ok`);
   c.kill();
 }
