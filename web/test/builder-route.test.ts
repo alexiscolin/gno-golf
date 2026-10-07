@@ -96,7 +96,7 @@ void test("the phone lists only the community holes this browser already passed 
 });
 
 void test("holeByline: a community hole's line under its name, the same on the game's list, the phone's and the share card", () => {
-  assert.equal(holeByline({ author: "g1" + "a".repeat(38), world: "island", par: 4 }), "by g1aaaaaa…aaaa · Island · par 4");
+  assert.equal(holeByline({ author: "g1" + "a".repeat(38), world: "island", par: 4 }), "Island · par 4 · by g1aaaaaa…aaaa");
 });
 
 void test("knownAuthor: the address the Builder last used, else the one the save flow's gnokey panel keeps (one key, both read it)", () => {

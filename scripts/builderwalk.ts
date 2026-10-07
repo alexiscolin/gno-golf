@@ -6,9 +6,9 @@
 // starter, presses Prove it, pastes the address the hole is proved under, holes
 // each weather (each round found as scripts/starters.ts finds one, through
 // the page's own test chain, builder.wasm; each shot fired as an aim would
-// fire it, through the game's ?camlog hook, and counted as one drag), and
-// presses Next weather on each hole-finished card but the last, and Publish on
-// that one. It reports the wall time and the clicks, drags and fields
+// fire it, through the game's ?camlog hook, and counted as one drag; each
+// next weather starting on its own), and presses Publish on the summary
+// card the last one ends on. It reports the wall time and the clicks, drags and fields
 // typed in, and fails over 5 minutes or over B6's budget. Without a local
 // chain the Publish form says the chain is unread: it still counts as
 // reached (B6).
@@ -47,11 +47,7 @@ const stand = SEED
   : null;
 const env = stand ? stand.seedEnv(SEED) : null;
 const LIMIT_MS = 5 * 60_000;
-/**
- * B6's budget for the starter path: Got it, Prove it, the address the hole is proved under (pasted: its field shown,
- * then used), Publish; and Next weather on each finished card but the last (a press a weather proved: the round's card
- * stays up, so its result is read, until the player goes on).
- */
+/** B6's budget for the starter path: Got it, Prove it, the address the hole is proved under (pasted: its field shown, then used), Publish. */
 const BUDGET = { clicks: 5, typed: 1 };
 const AUTHOR = env ? env[KEY] : "g1" + "q".repeat(38);
 
@@ -136,10 +132,9 @@ try {
   await click(button(/^Use this address$/), "Use this address");
 
   // each weather holed: a round found through the page's test chain, then played shot by shot
-  let nexts = 0;
   for (let w = 0; w < 6; w++) {
-    await until(`!!window.__g && !!document.querySelector(".tmode__chip--now") && !document.querySelector(".tmode__won")`, "a weather to play", 90_000);
-    const kind = await c.js<string>(`document.querySelector(".tmode__chip--now").textContent`);
+    await until(`!!window.__g && !!document.querySelector(".tmode__chip--now:not(.tmode__chip--done)") && document.querySelector(".tmode__score strong")?.textContent === "0" && !document.querySelector(".tmode__won")`, "a weather to play", 90_000);
+    const kind = await c.js<string>(`document.querySelector(".tmode__chip--now .weather__say").textContent`);
     await sleep(1500);
     const round = await c.js<[number, number][] | null>(`(async () => {
       const g = window.__g, id = g.current(), p = await g.chain.period(), s = await g.chain.state(id);
@@ -171,13 +166,14 @@ try {
       count.drags++;
       count.shots++;
     }
-    await until(`!!document.querySelector(".tmode__chip--now.tmode__chip--done") && / proved$/.test(document.querySelector(".tmode__won h2")?.textContent || "")`, `${kind} proved`, 60_000);
-    said(`${kind}: holed and proved, its card: ${await c.js<string>(`document.querySelector(".tmode__won h2").textContent`)}`);
-    if (!(await c.ev<boolean>(`!!${onCard(/^Next weather/)}`))) break;
-    await click(onCard(/^Next weather/), "Next weather");
-    nexts++;
+    // proved: the next weather on its own, said in the HUD, or the summary
+    await until(`[...document.querySelectorAll(".tmode__chip--done .weather__say")].some((x) => x.textContent === ${JSON.stringify(kind)})`, `${kind} proved`, 60_000);
+    await until(`!!document.querySelector(".tmode__sum") || (document.querySelector(".tmode__done")?.textContent || "").startsWith(${JSON.stringify(`${kind} proved · next: `)})`, `${kind}: the summary or the next weather said`, 10_000);
+    said(`${kind}: holed and proved · ${await c.js<string>(`document.querySelector(".tmode__sum") ? "the summary" : document.querySelector(".tmode__done").textContent`)}`);
+    if (await c.ev<boolean>(`!!document.querySelector(".tmode__sum")`)) break;
   }
-  await until(`!!${onCard(/^Publish →$/)}`, "every weather proved: Publish on the card", 60_000);
+  await until(`!!${onCard(/^Publish →$/)}`, "every weather proved: Publish on the summary", 60_000);
+  said(`the summary: ${await c.js<string>(`[...document.querySelectorAll(".tmode__sum tbody tr")].map((r) => r.textContent).join(" | ")`)}`);
 
   // Publish: the form, the name suggested
   await click(onCard(/^Publish →$/), "Publish →");
@@ -192,7 +188,7 @@ try {
   const ms = Date.now() - t0;
   console.log(JSON.stringify({ seconds: Math.round(ms / 1000), ...count }));
   if (ms > LIMIT_MS) throw new Error(`over 5 minutes: ${Math.round(ms / 1000)} s`);
-  if (count.clicks > BUDGET.clicks + nexts || count.typed > BUDGET.typed) throw new Error(`over budget: ${count.clicks} clicks, ${count.typed} fields typed`);
+  if (count.clicks > BUDGET.clicks || count.typed > BUDGET.typed) throw new Error(`over budget: ${count.clicks} clicks, ${count.typed} fields typed`);
   // past the path (not counted): a short wide window keeps the hole's card in sight; the Prove step goes back to the test
   await c.send("Emulation.setDeviceMetricsOverride", { width: 1366, height: 650, deviceScaleFactor: 1, mobile: false });
   await sleep(800);

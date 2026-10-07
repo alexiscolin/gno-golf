@@ -21,6 +21,6 @@ void test("holeShare: what the shared Share sends for a published hole, its link
 });
 
 void test("cardLines: the name, the world and par, the author short, and where it was built", () => {
-  assert.deepEqual(cardLines({ name: "Mole Run", world: "island", par: 4, author: A }), ["Mole Run", "by g1aaaaaa…aaaa · Island · par 4", "Built on gno.land"]);
+  assert.deepEqual(cardLines({ name: "Mole Run", world: "island", par: 4, author: A }), ["Mole Run", "Island · par 4 · by g1aaaaaa…aaaa", "Built on gno.land"]);
   assert.equal(cardLines({ name: "x".repeat(80), world: "garden", par: 3, author: A })[0].length <= 41, true, "a long name cut with an ellipsis");
 });

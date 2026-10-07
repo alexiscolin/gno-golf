@@ -36,7 +36,7 @@ const JUDGE_AT_ONCE = 4;
 
 export default function Community({ community, chain, onPlay }: {
   community: readonly HoleRow[];
-  chain: Pick<Chain, "bests" | "blockTime" | "holeData" | "chainId" | "realm" | "state" | "savedOn" | "versions"> | null;
+  chain: Pick<Chain, "bests" | "blockTime" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn" | "versions"> | null;
   onPlay: (id: string) => void;
 }) {
   const [by, setBy] = useState<SortBy>("new");

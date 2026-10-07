@@ -321,6 +321,24 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   }, 60e3);
   const PARAMS_TTL = 10 * 60e3;
 
+  // a block's hash and time (ms), from its header as /blockchain gives it; down if the node has no such block or does not answer
+  async function blockMeta(height: number) {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT), at = Math.max(1, height | 0);
+    try {
+      const res = await fetch(`${rpc}/blockchain?minHeight=${at}&maxHeight=${at}`, { signal: c.signal });
+      if (!res.ok) throw new Error(`RPC ${res.status}`);
+      const r = (await res.json()) as { result?: { block_metas?: { block_id?: { hash?: string }; header?: { height?: string; time?: string } }[] } };
+      const m = r.result?.block_metas?.[0], ms = Date.parse(m?.header?.time ?? ""), hash = m?.block_id?.hash ?? "";
+      if (m?.header?.height !== String(at) || !Number.isFinite(ms) || !hash) throw new Error(`The node has no block ${at}.`);
+      return { hash, ms };
+    } catch (e) {
+      throw down(e);
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  const genesis = memo(() => blockMeta(1).then((b) => b.hash), Infinity);
+
   // whether the chain runs pkg: a package it doesn't know is its answer
   // (false); a node not answering is thrown, not kept
   const has = async (pkg: string) => {
@@ -444,21 +462,9 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     simulateCommit: (hole: string, ball: Vec2, stroke: number, shots: readonly string[], period: number, ms?: number, signal?: AbortSignal | null) =>
       qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
     /** When a block was made (ms): its header's time, as /blockchain gives it; down if the node has no such block or does not answer. */
-    blockTime: async (height: number) => {
-      const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT), at = Math.max(1, height | 0);
-      try {
-        const res = await fetch(`${rpc}/blockchain?minHeight=${at}&maxHeight=${at}`, { signal: c.signal });
-        if (!res.ok) throw new Error(`RPC ${res.status}`);
-        const r = (await res.json()) as { result?: { block_metas?: { header?: { height?: string; time?: string } }[] } };
-        const h = r.result?.block_metas?.[0]?.header, ms = Date.parse(h?.time ?? "");
-        if (h?.height !== String(at) || !Number.isFinite(ms)) throw new Error(`The node has no block ${at}.`);
-        return ms;
-      } catch (e) {
-        throw down(e);
-      } finally {
-        clearTimeout(t);
-      }
-    },
+    blockTime: async (height: number) => (await blockMeta(height)).ms,
+    /** The chain's first block's hash, read once: what tells a chain apart from another reseeded under the same id (what this browser keeps of one is never another's). */
+    genesis,
     /** A community hole's versions (an alias, "<address>/<slug>"): what the next one's id will be, and each one's sha. */
     versions: (alias: string) => qeval(`Versions(${s(alias)})`, checks.versions),
     /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim), the community

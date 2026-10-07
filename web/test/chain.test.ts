@@ -516,12 +516,23 @@ test("holeData: a version's data read once a visit (it never changes), an alias'
 
 test("blockTime: a block's time (ms) from its header; a node that does not have it, or does not answer, is down", async () => {
   const chain = makeChain();
-  setFetch((url) => (assert.match(url, /\/blockchain\?minHeight=7&maxHeight=7$/), { result: { block_metas: [{ header: { height: "7", time: "2026-10-07T06:43:54.238331Z" } }] } }));
+  setFetch((url) => (assert.match(url, /\/blockchain\?minHeight=7&maxHeight=7$/), { result: { block_metas: [{ block_id: { hash: "h7" }, header: { height: "7", time: "2026-10-07T06:43:54.238331Z" } }] } }));
   assert.equal(await chain.blockTime(7), Date.parse("2026-10-07T06:43:54.238Z"));
   setFetch(() => ({ result: { block_metas: [] } }));
   await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
   setFetch(() => { throw new Error("node down"); });
   await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
+});
+
+test("genesis: the chain's first block's hash, read once (what tells a chain reseeded under the same id apart), a failure asked again", async () => {
+  const chain = makeChain();
+  let reads = 0, down = true;
+  setFetch((url) => (reads++, assert.match(url, /\/blockchain\?minHeight=1&maxHeight=1$/), down ? { result: { block_metas: [] } } : { result: { block_metas: [{ block_id: { hash: "9oXA=" }, header: { height: "1", time: "2026-10-07T06:43:54Z" } }] } }));
+  await assert.rejects(chain.genesis(), (e: unknown) => errorKind(e) === "down");
+  down = false;
+  assert.equal(await chain.genesis(), "9oXA=");
+  assert.equal(await chain.genesis(), "9oXA=");
+  assert.equal(reads, 2);
 });
 
 // ------------------------------------------------------------ boards, and the mode guard

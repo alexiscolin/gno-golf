@@ -221,7 +221,7 @@ interface WorldsProps {
   community?: readonly HoleRow[];
   onCommunity?: (id: string) => void;
   /** the chain: each community hole judged by the Builder's rules before it is listed, its map, its players, whether its author has holed it */
-  chain?: Pick<Chain, "bests" | "blockTime" | "holeData" | "chainId" | "realm" | "state" | "savedOn" | "versions"> | null;
+  chain?: Pick<Chain, "bests" | "blockTime" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn" | "versions"> | null;
   /** the course's records to beat, under the cups */
   podium?: ReactNode;
   /** a cup's next hole to play, said on its card once begun */
