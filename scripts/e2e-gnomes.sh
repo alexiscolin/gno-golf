@@ -585,8 +585,8 @@ is "worn: the one put on" "Worn(p1).id,equipped" "5 True" "$(qg "Worn(\"$P1\")" 
 no "equip: not someone else's" "not your gnome" p0 "$GN" Equip 5
 no "equip: not unsold" "not your gnome" p0 "$GN" Equip 9
 ok "equip: p0 wears $1" "worn" p0 "$GN" Equip "$1"
-is "equip: EquippedMany, repeats and junk skipped" "EquippedMany(\"p1,p0,p1,junk,b1\")" "5,$1" \
-	"$(qg "EquippedMany(\"$P1,$P0,$P1,junk,$B1\")" | jf '",".join(r["id"] for r in d["rows"])')"
+is "worn: WornMany, repeats and junk skipped" "WornMany(\"p1,p0,p1,junk\")" "5,$1" \
+	"$(qg "WornMany(\"$P1,$P0,$P1,junk\")" | jf '",".join(r["id"] for r in d["rows"])')"
 ok "equip: p1 wears 6" "worn" p1 "$GN" Equip 6
 ok "equip: p1 sends 6 to b1" "moved" p1 "$GN" TransferFrom "$P1" "$B1" 6
 is "equip: a gnome sent on is worn no more" "Equipped(p1)" "" "$(qg "Equipped(\"$P1\")")"

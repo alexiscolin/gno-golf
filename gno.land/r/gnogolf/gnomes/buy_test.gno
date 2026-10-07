@@ -21,7 +21,6 @@ func TestBuyPaysTheExactPriceToTheOwner(cur realm, t *testing.T) {
 	owner, err := OwnerOf(itoa(id))
 	urequire.NoError(t, err)
 	uassert.Equal(t, alice, owner)
-	uassert.Equal(t, mustGnome(id).traits, TraitsOf(itoa(id)), "the traits are kept per token")
 	uassert.Equal(t, before+price, balance(deployer), "forwarded to the owner")
 	uassert.Equal(t, held, balance(selfAddr), "the realm keeps nothing")
 	uassert.Equal(t, int64(1), TotalSupply())

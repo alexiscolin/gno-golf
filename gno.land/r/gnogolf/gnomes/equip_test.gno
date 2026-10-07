@@ -1,10 +1,8 @@
 package gnomes
 
 import (
-	"strings"
 	"testing"
 
-	"gno.land/p/nt/testutils/v0"
 	"gno.land/p/nt/uassert/v0"
 	"gno.land/p/nt/urequire/v0"
 )
@@ -50,29 +48,4 @@ func TestAGnomeSoldIsNoLongerWorn(cur realm, t *testing.T) {
 	testing.SetRealm(asUser(bob, nil))
 	Equip(cross(cur), tid)
 	uassert.Equal(t, equippedJSON(bob, id), Equipped(bob))
-}
-
-// A board page asks for its players at once: repeats and junk are skipped,
-// and the list is bounded.
-func TestEquippedManyAnswersABoardPage(cur realm, t *testing.T) {
-	fresh(t, cur)
-	id := common()
-	testing.SetRealm(asUser(alice, ugnot(priceOf(id))))
-	tid := Buy(cross(cur), itoa(id))
-	testing.SetRealm(asUser(alice, nil))
-	Equip(cross(cur), tid)
-
-	row := strings.Replace(equippedJSON(alice, id), `{"version":1,`, "{", 1)
-	uassert.Equal(t, `{"version":1,"rows":[`+row+`]}`,
-		EquippedMany(alice.String()+","+bob.String()+",junk,"+alice.String()))
-	uassert.Equal(t, `{"version":1,"rows":[]}`, EquippedMany(""))
-
-	// past the first 50 players (repeats and junk count, so the walk stays
-	// short), the rest are not read
-	many := ""
-	for i := 0; i < maxPlayers; i++ {
-		many += testutils.TestAddress("p"+itoa(int64(i))).String() + ","
-	}
-	uassert.Equal(t, `{"version":1,"rows":[]}`, EquippedMany(many+alice.String()))
-	uassert.Equal(t, `{"version":1,"rows":[`+row+`]}`, EquippedMany(alice.String()+","+many))
 }

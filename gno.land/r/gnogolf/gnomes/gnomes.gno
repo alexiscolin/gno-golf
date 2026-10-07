@@ -142,18 +142,6 @@ func SoldOfTier(i int) int64 {
 	return soldTier[i]
 }
 
-// TraitsOf returns the traits of token tid, "" when it is not minted. A sold
-// token's are its catalogue row's: its id is its row's, and a published
-// series never changes, so the row is the token's record; a copy per token
-// would cost its holder about 2 KB of deposit for nothing.
-func TraitsOf(tid string) string {
-	if _, err := Token.OwnerOf(grc721.TokenID(tid)); err != nil {
-		return ""
-	}
-	g, _ := tokenAt(parseID(tid))
-	return g.traits
-}
-
 // The refusals, as strings: a stored error value costs a kilobyte of
 // deposit, a string constant its length.
 const (

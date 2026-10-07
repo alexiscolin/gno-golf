@@ -151,7 +151,7 @@ it leaves them and refuses to move an earned one.
 |---|---|---|---|
 | the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
 | the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
-| a first buy (was 10,465 with enumerable and a traits copy) | 3,850 | 0.39 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
+| a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
 | an earned gnome | 3,555 | 0.36 GNOT, the player | `z_storage_earned` |
 
 | what | gas | measured by |
@@ -214,8 +214,7 @@ a caller's country.
 id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
 enough to draw a collection with no call per token; `total`, `next`;
 a player's album and collector rank are read from it: ADR-011),
-`Equipped`, `EquippedMany` (the first 50 players of a list), `Worn` and
-`WornMany` (below),
+`Equipped`, `Worn` and `WornMany` (the first 50 players of a list: below),
 `Proof`; `CanBuy(buyer, ids)`, the mint page's answer before any
 signature: `ok`, a `reason` code (`ids`, `paused`, `unknown`,
 `unlisted`, `later`, `taken`, `closed`, `players-only`, `wave-cap`, `cap`:
@@ -267,7 +266,7 @@ the traits is the user's call.
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |
 | AddSeries | a malformed row; a gap; growth without bound | checked whole; 64 series of 1,000 rows | `TestASeriesIsRefusedWhole`, `TestASeriesIsBounded` |
 | AddWave | overlaps; too many | checked; 64 waves | `TestAWaveIsCheckedWhole`, `TestTheWavesAreBounded` |
-| reads | a query made unbounded | bounded pages and lists | `TestEquippedManyAnswersABoardPage`, `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
+| reads | a query made unbounded | bounded pages and lists | `TestWornManyAnswersABoardPage`, `TestGnomesOfPagesAWallet`, `TestACollectionOf1_50And205ReadsInPages` |
 | Worn | a gnome shown that the player no longer owns; the best-first index left behind by a transfer or a burn | equipped only while owned; the holder's row moved by the ledger's hook and Burn | `TestEquipShowsAnotherGnomeToEveryone`, `TestAnEarnedGnomeIsWornLast` |
 | TokenURI, TokenMetadata | markup or JSON in a name | escaped | `TestANameCannotInjectMarkup`, `TestMetadataEscapesTheName` |
 | TokenMetadata | an earned gnome's link to a page the static site never builds (one per earned id) | its kind's page, `g/<kind>/` | `TestAnEarnedTokensMetadataNamesItsKind` |
