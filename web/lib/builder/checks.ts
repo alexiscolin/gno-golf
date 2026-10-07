@@ -103,27 +103,50 @@ function cup(h: HoleIn, lane: (p: V) => boolean, name: Namer, judged: Judged): I
  * one a ball only just threads; the pieces at the narrowest place named.
  */
 function way(h: HoleIn, name: Namer): Issue[] {
-  // the grid's flood is generous (a cell shut only if no ball could be anywhere in it): it must never
-  // refuse a hole a ball can play; the gaps are then measured exactly
-  const loose = h.ballR - CELL * Math.SQRT1_2, base = reach(h, loose);
-  if (!base.reached) return [err("E4", "The cup cannot be reached from the tee", undefined, h.pin)];
-  // the gaps between two fixed solids (walls, posts: a pulse's and a timed one are not always there)
+  if (!reach(h, LOOSE(h)).reached) return [err("E4", "The cup cannot be reached from the tee", undefined, h.pin)];
+  const ball = 2 * h.ballR, wide = ball + PASSAGE;
+  return passages(h, wide).map(({ gap, mid, a, b }) => {
+    const between = `the gap at ${pt(mid)} between ${name(a)} and ${name(b)} is ${+gap.toFixed(2)} wide`;
+    return gap < ball
+      ? err("E4", `The cup cannot be reached from the tee: ${between}, narrower than the ball (${ball})`, a, mid, [b])
+      : err("E14", `${cap(between)}, and the way to the cup goes through it: at least ${wide}, or a ball only just fits`, a, mid, [b]);
+  });
+}
+
+/** The clearance the way's flood is made at: generous (a cell shut only if no ball could be anywhere in it), so it never refuses a hole a ball can play. */
+export const LOOSE = (h: HoleIn) => h.ballR - CELL * Math.SQRT1_2;
+
+/** A gap between two fixed solids the way to the cup goes through: its width, the middle of its narrowest place, the two pieces. */
+export interface Passage {
+  gap: number;
+  mid: V;
+  a: PieceRef;
+  b: PieceRef;
+}
+
+/**
+ * The gaps narrower than under between two fixed solids (walls, posts: a
+ * pulse's and a timed one are not always there) that the way to the cup
+ * needs: closed there, the cup is lost. E4 and E14 read them at the ball's
+ * width; the difficulty meter wider. None if the cup is not reached at all.
+ */
+export function passages(h: HoleIn, under: number): Passage[] {
+  // the gaps are measured exactly, the way found by the flood
+  const loose = LOOSE(h), base = reach(h, loose);
+  if (!base.reached) return [];
   const of: Solid[] = [], refs: PieceRef[] = [];
   for (const { item, ref } of each<WallIn>(h, "wall")) if (!item.every && ref.pulse === undefined) of.push({ kind: "wall", a: item.a, b: item.b }), refs.push(ref);
   for (const { item, ref } of each<PostIn>(h, "post")) if (ref.pulse === undefined) of.push({ kind: "post", c: item.c, r: item.r }), refs.push(ref);
-  const ball = 2 * h.ballR, wide = ball + PASSAGE, out: Issue[] = [];
+  const out: Passage[] = [];
   for (let i = 0; i < of.length; i++) {
     for (let j = i + 1; j < of.length; j++) {
       const [gap, mid] = gapOf(of[i], of[j]);
-      if (!(gap > 1e-9 && gap < wide)) continue;
+      if (!(gap > 1e-9 && gap < under)) continue;
       // one the way needs: closed there, the cup is lost. Closing it shuts the cells within its post's
       // reach (gridOf's own rule, on the same grid): if the way the flood found passes none, it still holds
       const shut = Math.max(gap / 2, CELL), closes = (p: V) => Math.hypot(p[0] - mid[0], p[1] - mid[1]) < shut + loose + 1e-9;
       if (!base.path.some(closes) || reach({ ...h, posts: [...h.posts, { c: mid, r: shut }] }, loose).reached) continue;
-      const between = `the gap at ${pt(mid)} between ${name(refs[i])} and ${name(refs[j])} is ${+gap.toFixed(2)} wide`;
-      out.push(gap < ball
-        ? err("E4", `The cup cannot be reached from the tee: ${between}, narrower than the ball (${ball})`, refs[i], mid, [refs[j]])
-        : err("E14", `${cap(between)}, and the way to the cup goes through it: at least ${wide}, or a ball only just fits`, refs[i], mid, [refs[j]]));
+      out.push({ gap, mid, a: refs[i], b: refs[j] });
     }
   }
   return out;
@@ -317,7 +340,7 @@ export function checkHole(h: HoleIn, { name = nameIn(h), entryOf = () => ({}) }:
   const ends = [...tee(h, lane, name, judged), ...cup(h, lane, name, judged)].filter((i) => !i.ref || judged(i.ref));
   // (the way follows from its ends: with the tee or the cup refused, E4 would only say so again)
   const out = [...board(h, name), ...ends, ...(ends.length ? [] : way(h, name)), ...mouths(h, name), ...exits(h, lane, name),
-    ...clocks(h, name), ...limits(h, name), ...(ends.length ? [] : inReach(h, reach(h, h.ballR - CELL * Math.SQRT1_2).reaches, name)), ...overlaps(h, name, entryOf), ...scenery(h, name)];
+    ...clocks(h, name), ...limits(h, name), ...(ends.length ? [] : inReach(h, reach(h, LOOSE(h)).reaches, name)), ...overlaps(h, name, entryOf), ...scenery(h, name)];
   return out.filter((i) => !i.ref || judged(i.ref)).sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
 }
 

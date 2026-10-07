@@ -5,7 +5,9 @@
 // the rule's code a tooltip, for us), with Show me (it selects the piece
 // and frames it) and Move it where the piece can simply move (edit.ts
 // fixOf); the others behind "N more"; a limit said only when near it, the
-// full gauges behind "Limits". The list scrolls in itself.
+// full gauges behind "Limits". The list scrolls in itself. Under the line,
+// the difficulty meter's one line (difficulty.ts meterLine): a guess, calm,
+// its piece a click away; its place kept when it has nothing to say.
 import { useState } from "react";
 import type { Issue } from "@/lib/builder/checks";
 import { nearLimits, type Gauge } from "@/lib/builder/editor";
@@ -21,12 +23,14 @@ function Fix({ i, onShow, onFix }: { i: Issue; onShow: (piece: string) => void; 
   );
 }
 
-export default function Checks({ verdict, gauges, issues, busy, onShow, onFix }: {
+export default function Checks({ verdict, gauges, issues, busy, meter, onShow, onFix }: {
   verdict: { ok: boolean; text: string };
   gauges: readonly Gauge[];
   issues: readonly Issue[];
   /** the checks are running again */
   busy: boolean;
+  /** the meter's line (null: nothing to say), and whether it is measuring again */
+  meter: { text: string; piece?: string; busy: boolean } | null;
   /** select a piece and frame it on the board */
   onShow: (piece: string) => void;
   onFix: (issue: Issue) => void;
@@ -51,6 +55,11 @@ export default function Checks({ verdict, gauges, issues, busy, onShow, onFix }:
         {first && <Fix i={first} onShow={onShow} onFix={onFix} />}
         {issues.length > 1 && <button type="button" className="linkish checks__more" aria-expanded={all} onClick={() => setAll((o) => !o)}>{all ? "Fewer" : `${issues.length - 1} more`}</button>}
       </div>
+      <p className="checks__meter" aria-busy={meter?.busy}>
+        {meter?.piece ? (
+          <button type="button" className="linkish" title={`${meter.text} Show me.`} onClick={() => onShow(meter.piece!)}>{meter.text}</button>
+        ) : meter && <span title={meter.text}>{meter.text}</span>}
+      </p>
       {near.length > 0 && <p className="checks__near">{near.join(" · ")}</p>}
       <details className="checks__limits">
         <summary>Limits</summary>

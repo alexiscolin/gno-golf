@@ -8,6 +8,7 @@ import { MOD } from "./Inspector";
 import { shortAddr } from "@/components/common";
 import { worldName } from "@/lib/builder/rules";
 import { shortWhy } from "@/lib/builder/editor";
+import type { Level } from "@/lib/builder/difficulty";
 
 export type Step = "edit" | "test" | "publish";
 
@@ -18,7 +19,25 @@ export interface StepState {
 }
 
 
-export default function Header({ title, slug, author, world, worlds, step, steps, action, history, onTitle, onSlug, onWorld, onStep, onBack, onHelp }: {
+/** The difficulty meter's chip: its level (null: none yet, or the hole has errors) and word, the meter's words in full, and whether it is measuring again. */
+export interface MeterChip {
+  level: Level | null;
+  word: string;
+  title: string;
+  busy: boolean;
+}
+
+/** The meter beside the big button: four pips and a word, its width kept (nothing moves as it changes); a guess, never a gate. */
+function Meter({ m }: { m: MeterChip }) {
+  return (
+    <span className={`meter meter--${m.level ?? "none"}`} title={m.title} aria-label={m.title} aria-busy={m.busy} role="img">
+      <i aria-hidden="true">{[0, 1, 2, 3].map((k) => <b key={k} className={m.level != null && k <= m.level ? "on" : undefined} />)}</i>
+      <span aria-hidden="true">{m.word}</span>
+    </span>
+  );
+}
+
+export default function Header({ title, slug, author, world, worlds, step, steps, action, history, meter, onTitle, onSlug, onWorld, onStep, onBack, onHelp }: {
   title: string;
   slug: string;
   author: string | null;
@@ -29,6 +48,8 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   /** the mode's one action: its words, its look, off with why */
   action: { text: string; kind: "gold" | "chain" | "ghost"; off?: string; onClick: () => void } | null;
   history: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } | null;
+  /** the difficulty meter, in Edit: none elsewhere */
+  meter?: MeterChip;
   /** the three hints again (Hints), on the editor: none elsewhere */
   onHelp?: () => void;
   onTitle: (v: string) => void;
@@ -38,6 +59,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   onBack: () => void;
 }) {
   const names: Record<Step, string> = { edit: "Edit", test: "Test", publish: "Publish" };
+  const waits = !!action?.off && action.off !== "Checking…";
   return (
     <header className="bhead">
       <div className="bhead__start">
@@ -70,8 +92,13 @@ export default function Header({ title, slug, author, world, worlds, step, steps
         })}
       </ol>
       <div className="bhead__end">
-        {/* why the big button waits, in a few words (its slot kept: nothing moves); in full under the board */}
-        {action && <span className="bhead__why" aria-hidden="true">{shortWhy(action.off ?? "")}</span>}
+        {/* one slot of its own width (nothing moves): why the big button waits, in a few words (in full under the board),
+            else the difficulty meter; a check under way keeps what was there */}
+        {(action || meter) && (
+          <span className="bhead__slot">
+            {meter && !waits ? <Meter m={meter} /> : action && <span className="bhead__why" aria-hidden="true">{shortWhy(action.off ?? "")}</span>}
+          </span>
+        )}
         {onHelp && <button type="button" className="round" aria-label="How it works: the three steps" title="How it works" onClick={onHelp}>?</button>}
         {history && (
           <>

@@ -29,14 +29,18 @@ import Inspector from "./Inspector";
 import Palette from "./Palette";
 import Preview from "./Preview";
 import { plainOf } from "@/lib/builder/explain";
+import type { Shown } from "@/lib/builder/difficulty";
+import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
 
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
+/** How long after a clean check the difficulty meter is asked (about 400 ms after the last change). */
+const METER_MS = 250;
 /** The id the 3D's hole is loaded under in the builder's wasm. */
 const WORLDS = Object.keys(FIELD);
 
-export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish, hints = false, onHinted = () => {} }: {
+export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish, onEstimate = () => {}, hints = false, onHinted = () => {} }: {
   host: BuilderHost;
   first: Draft;
   author: string | null;
@@ -47,6 +51,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   onTest: (d: Draft) => void;
   /** Publish: the draft proved in every weather as it is */
   onPublish: (d: Draft) => void;
+  /** the meter's par for the draft as kept (0: none), shown in Test until its rounds set one */
+  onEstimate?: (par: number) => void;
   /** the first run's three hints shown (Hints), and their Got it */
   hints?: boolean;
   onHinted?: () => void;
@@ -65,6 +71,9 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [fine, setFine] = useState(false);
   const [key, setKey] = useState<{ of: Draft; key: string | null } | null>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // the difficulty meter (its worker), and its last answer with the draft it is of
+  const meter = useRef<Meter | null>(null);
+  const [est, setEst] = useState<{ of: Draft; e: Shown | null } | null>(null);
 
   const refresh = () => bump((n) => n + 1);
   const say = useCallback((text: string) => {
@@ -98,6 +107,20 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
 
   // each step kept in the browser
   useEffect(() => onSave(kept), [kept, onSave]);
+
+  // the meter: its worker while the editor is open, asked METER_MS after a check of the draft as kept finds no error
+  useEffect(() => {
+    const m = (meter.current = makeMeter((of, e) => setEst({ of, e })));
+    return () => m?.stop();
+  }, []);
+  const clean = !!checked && checked.of === kept && !checked.v.issues.some((i) => i.severity === "error");
+  useEffect(() => {
+    if (!clean) return;
+    const t = setTimeout(() => meter.current?.ask(kept), METER_MS);
+    return () => clearTimeout(t);
+  }, [clean, kept]);
+  const guess = clean && est?.e ? est.e : null, measuring = clean && est?.of !== kept;
+  useEffect(() => void (est?.of === kept && onEstimate(est.e?.par ?? 0)), [est, kept, onEstimate]);
 
   const set = (d: Draft) => (session.set(frame(d)), refresh());
   const preview = (d: Draft) => (session.preview(d), refresh());
@@ -195,6 +218,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
         steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
         action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
+        meter={{ level: guess?.level ?? null, word: guess?.word ?? "–", title: guess ? guess.title : clean ? "Difficulty: measuring…" : "Difficulty: measured once the hole has no error", busy: measuring }}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)} />
       {palette && quick && full ? (
@@ -204,7 +228,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} onSay={say} said={said} show={show} />
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff })} gauges={v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : []}
-              issues={v?.issues ?? []} busy={!fresh} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
+              issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
           <aside className="col" aria-label="The hole in 3D and the selected piece">
             <Preview state={checked?.state ?? null} fresh={fresh} />

@@ -7,11 +7,11 @@
 // issues list would.
 import type { Issue } from "./checks";
 import type { ClockSpec, Draft, Geometry, Piece, V } from "./draft";
-import { entryParts, frame } from "./gg1";
+import { entryParts, frame, pieceName } from "./gg1";
 import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
-import { about, pieceName, validate, type ValidateOptions } from "./pipeline";
+import { about, validate, type ValidateOptions } from "./pipeline";
 import { cap, worldName } from "./rules";
 import { plainOf } from "./explain";
 

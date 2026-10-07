@@ -138,6 +138,7 @@ export default function Builder() {
   const [author, setAuthor] = useState<string | null>(null);
   const [unkept, setUnkept] = useState(false);
   const [hints, setHints] = useState(false);
+  const [guess, setGuess] = useState(0); // the meter's par for the draft last edited, until its test rounds set one
   useEffect(() => {
     const list = loadDrafts();
     // a new player: straight onto the Garden's dogleg, with the three hints (templates.ts firstRun)
@@ -191,7 +192,7 @@ export default function Builder() {
             steps={{ edit: { locked: "", done: true }, test: { locked: "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
             action={proved ? { text: "Publish →", kind: "chain", onClick: publish } : { text: "Back to edit", kind: "ghost", onClick: edit }}
             history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}} onStep={(s) => (s === "edit" ? edit() : s === "publish" && proved && publish())} onBack={edit} />
-          <TestMode host={host} draft={d} hex={hex} proofKey={key} author={author} onAuthor={setAuthor}
+          <TestMode host={host} draft={d} hex={hex} proofKey={key} author={author} guess={guess} onAuthor={setAuthor}
             onProof={(p) => update((x) => ({ ...x, proofs: [...x.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }))}
             onPar={(par) => update((x) => (parAllowed(x.proofs.filter((q) => q.key === key), x.par) ? x : { ...x, par }))} />
           {unkeptNote}
@@ -200,7 +201,7 @@ export default function Builder() {
     }
     return (
       <>
-        <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => setOpen(null)} onPublish={publish}
+        <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => setOpen(null)} onPublish={publish} onEstimate={setGuess}
           hints={hints} onHinted={() => { try { localStorage.setItem(HINTS_KEY, "1"); } catch {} setHints(false); }}
           onTest={(x) => {
             const hex = canonicalHex(x, host);

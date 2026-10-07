@@ -6,9 +6,9 @@
 // the render census (E12); the chain's PublishMine checks (L2), the data's
 // size (E9) and its work (E11). The issues are the issues list's; canPlace
 // and the board's clamps read the same rules (edit.ts).
-import { checkHole, KERB_GAP, work, WORK_WARN, type Issue } from "./checks";
+import { checkHole, KERB_GAP, LOOSE, work, WORK_WARN, type Issue } from "./checks";
 import { explain } from "./explain";
-import { BOARD, LIMITS, MARGIN, barCorners, entryParts, frame, writeDraft } from "./gg1";
+import { BOARD, LIMITS, MARGIN, barCorners, frame, keyOf, pieceName, piecesBy, writeDraft } from "./gg1";
 import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { cap, FIELD } from "./rules";
@@ -46,12 +46,6 @@ export interface Validated {
 export const MAX_BYTES = 32 << 10;
 const ACROSS = BOARD - 2 * MARGIN;
 const pt = (p: V) => `(${+p[0].toFixed(2)}, ${+p[1].toFixed(2)})`;
-const keyOf = (r: PieceRef) => `${r.set}${r.i}${r.pulse ?? ""}`;
-/** A piece's name in a sentence: "the plank bar", "the plain rail". */
-export const pieceName = (p: Piece) => {
-  const { kind, skin } = entryParts(p.entry);
-  return `the ${skin || "plain"} ${kind}`;
-};
 const err = (rule: Issue["rule"], text: string, p?: Piece, at?: V): Issue => ({ rule, severity: "error", text, ...(p && { piece: p.id }), ...(at && { at }) });
 
 /** A geometry in a sentence. */
@@ -129,7 +123,7 @@ const segSeg = (a: V, b: V, c: V, e: V) => (crosses(a, b, c, e) ? 0 : Math.min(s
 
 /** The draft's own rules on its bars: out of the lane (E10), crossing another bar (E13), against a rail (E15). */
 function bars(d: Draft, h: GHole, palette: readonly PaletteEntry[], refs: Map<string, PieceRef[]>): Issue[] {
-  const out: Issue[] = [], { reaches } = reach(h, h.ballR - CELL * Math.SQRT1_2);
+  const out: Issue[] = [], { reaches } = reach(h, LOOSE(h));
   const barList = d.pieces.filter((p): p is Piece & { geometry: { t: "bar"; a: V; b: V; thick: number } } => p.geometry.t === "bar" && p.clock.k !== "stroke");
   const rails = d.pieces.filter((p) => p.geometry.t === "rail" && p.clock.k === "fixed");
   const edges = (p: (typeof barList)[number]) => { const c = barCorners(p.geometry.a, p.geometry.b, p.geometry.thick); return c.map((q, k): [V, V] => [q, c[(k + 1) % 4]]); };
@@ -195,8 +189,7 @@ export function validate(draft: Draft, o: ValidateOptions): Validated {
   if (!f.ok) return { issues: [{ rule: "L2", severity: "error", text: explain(f.why) }], refs };
   const h = host.decode(f.hex);
   // the hole's pieces back to the draft's
-  const byRef = new Map<string, Piece>();
-  for (const p of d.pieces) for (const r of refs.get(p.id) ?? []) byRef.set(keyOf(r), p);
+  const byRef = piecesBy(d, refs);
   const name = (r: PieceRef) => (byRef.has(keyOf(r)) ? pieceName(byRef.get(keyOf(r))!) : `a piece`);
   const entryOf = (r: PieceRef) => { const p = byRef.get(keyOf(r)); return p ? entryIn(p.entry, palette) : undefined; };
   const seen = new Set<string>(), issues: Issue[] = [];
