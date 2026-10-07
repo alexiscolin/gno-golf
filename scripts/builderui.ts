@@ -7,6 +7,8 @@
 // action and the dock keep their places as their words change, what a step
 // says when it is off is readable, and the note of a browser that keeps
 // nothing covers no control; undo and redo stand whole in the header; the
+// palette opens on all its groups, folds as left for the visit and scrolls
+// in itself; the
 // start screen (a player back) never scrolls sideways, keeps clear of the
 // corner's Back and shows its starters above the fold. Exits non-zero on the first failure.
 //
@@ -90,7 +92,25 @@ for (const [w, h] of SIZES) {
   const off = await c.js<{ ratio: number; opacity: number } | null>(`(${CONTRAST})(".bhead__end .btn[aria-disabled=true]")`);
   assert.ok(off, `${at}: the action is not off with no name`);
   assert.ok(off.opacity === 1 && off.ratio >= 4.5, `${at}: the action's reason, off, reads at ${off.ratio.toFixed(2)}:1, opacity ${off.opacity}`);
+  // the palette: "More pieces" open at first (every group in sight), "From other worlds" folded; it scrolls in itself, never the window
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more true", "others false"], `${at}: the palette's folds at first`);
+  const pal = await c.js<{ over: string; sh: number; ch: number }>(`(() => { const p = document.querySelector(".palette"); return { over: getComputedStyle(p).overflowY, sh: p.scrollHeight, ch: p.clientHeight }; })()`);
+  assert.ok(pal.over === "auto" && (pal.sh <= pal.ch || (await c.js(`document.documentElement.scrollHeight <= innerHeight`))), `${at}: the palette spills onto the page (${JSON.stringify(pal)})`);
   console.log(`${at}: ok`);
+  c.kill();
+}
+
+// the palette's folds kept as left for the visit: "More pieces" folded, the page loaded again, still folded
+{
+  const c = await editor(1440, 900);
+  await c.js(`document.querySelector('.palette [data-fold="more"] summary').click()`);
+  await sleep(300);
+  await c.send("Page.reload");
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette [data-fold], .bholes__starts button")`)); k++) await sleep(500);
+  await c.js(`document.querySelector(".palette") || document.querySelector(".bholes__starts button").click()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette [data-fold]")`)); k++) await sleep(500);
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more false", "others false"], "the palette's folds not kept for the visit");
+  console.log("the palette's folds kept: ok");
   c.kill();
 }
 
@@ -154,8 +174,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await c.js(`document.querySelector(".bhead [aria-label^='How it works']").click()`);
   await sleep(500);
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "?: the three hints");
-  const tiles = await c.js<number>(`document.querySelectorAll(".palette [data-tile]").length`);
-  assert.equal(await c.js(`document.querySelectorAll(".bgloss__piece").length`), tiles, "?: a line for each tile of the palette");
+  // (the world's own: another world's, under From other worlds, are theirs)
+  const tiles = await c.js<number>(`document.querySelectorAll(".palette [data-tile]").length - document.querySelectorAll('.palette [data-fold="others"] [data-tile]').length`);
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss__piece").length`), tiles, "?: a line for each tile of the world's own");
   assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".bgloss__piece")].every((e) => e.querySelector("img") && e.querySelector("b").textContent && e.querySelector("small").textContent)`), "each: its picture, its name, what it does");
   const g = (await box(c, ".bgloss"))!;
   assert.ok(g.t >= 0 && g.b <= 800 && g.l >= 0 && g.r <= 1280, `the glossary on one screen: ${JSON.stringify(g)}`);

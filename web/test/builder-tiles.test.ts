@@ -9,7 +9,7 @@ import fs from "node:fs";
 import "./scene-harness.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { GROUPS, pictureOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { foldOpen, GROUPS, pictureOf, saveFold, tilesOf, type Tile } from "../lib/builder/tiles.ts";
 import { entryName, TILES } from "../lib/builder/names.ts";
 
 const palettes = new Map<string, readonly PaletteEntry[]>();
@@ -122,5 +122,21 @@ void test("one name per piece, its own: a clean name for every entry of every wo
       names.set(name, e.id);
       assert.equal(`the ${name.toLowerCase()}`, pieceName(piece(e.id)), `${w} ${e.id}: one name on the board and in a sentence`);
     }
+  }
+});
+
+void test("the palette's folds: More pieces open and From other worlds folded at first; as the author leaves them, for the visit; a browser that keeps nothing, at first", () => {
+  sessionStorage.clear();
+  assert.deepEqual([foldOpen("more"), foldOpen("others")], [true, false]);
+  saveFold("more", false), saveFold("others", true);
+  assert.deepEqual([foldOpen("more"), foldOpen("others")], [false, true]);
+  sessionStorage.clear();
+  const real = globalThis.sessionStorage;
+  Object.defineProperty(globalThis, "sessionStorage", { get: () => { throw new Error("blocked"); }, configurable: true });
+  try {
+    saveFold("more", false);
+    assert.deepEqual([foldOpen("more"), foldOpen("others")], [true, false]);
+  } finally {
+    Object.defineProperty(globalThis, "sessionStorage", { value: real, configurable: true, writable: true });
   }
 });

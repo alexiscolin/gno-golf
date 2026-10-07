@@ -57,3 +57,22 @@ export function tilesOf(palette: readonly PaletteEntry[]): { first: Tile[]; more
     others: byWhatTheyDo(palette.filter((e) => e.borrowed), "other/"),
   };
 }
+
+/** The palette's folding sections, each open at first or not: "More pieces" open (every group in sight), "From other worlds" folded. */
+export const FOLDS = { more: true, others: false } as const;
+export type Fold = keyof typeof FOLDS;
+const foldKey = (k: Fold) => `gnogolf.builder.fold.${k}`;
+
+/** Whether a section is open: as the author left it this visit (the tab's session), else as at first. */
+export function foldOpen(k: Fold): boolean {
+  try {
+    const v = sessionStorage.getItem(foldKey(k));
+    return v === null ? FOLDS[k] : v === "1";
+  } catch {
+    return FOLDS[k];
+  }
+}
+/** A section opened or folded, kept for the visit (a browser that keeps nothing: forgotten). */
+export function saveFold(k: Fold, open: boolean) {
+  try { sessionStorage.setItem(foldKey(k), open ? "1" : "0"); } catch {}
+}
