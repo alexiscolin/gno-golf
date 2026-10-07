@@ -28,7 +28,9 @@ void test("the builder's worlds are the scene's classic four (no Crystal Mines);
   for (const [w, es] of palettes) {
     const kinds = new Set(es.map((e) => e.kind));
     for (const k of ["rail", "bar", "post", "surface", "slope", "tunnel", "hazard"] as const) assert.ok(kinds.has(k), `${w}: no ${k}`);
-    assert.ok(!kinds.has("loop") && !kinds.has("air"), `${w}: no loop, no moving air (the plan's v1)`);
+    // moving air where a world draws it (the mountain's snow cannon); no loop (the island's castle tube is an assembly)
+    assert.equal(kinds.has("air"), w === "mountain", `${w}: moving air only where it is drawn`);
+    assert.ok(!kinds.has("loop"), `${w}: no loop`);
     assert.equal(new Set(es.map((e) => e.id)).size, es.length, `${w}: an id twice`);
     for (const e of es) assert.equal(entry(e.id, es), e);
   }
@@ -193,4 +195,16 @@ void test("the five common pieces first, named plainly, in every Builder world: 
     for (const c of common) assert.ok(p.includes(c.entry), `${world} ${c.name}: one of its own entries`);
     assert.deepEqual(common.map((c) => c.entry.kind), ["rail", "post", "surface", "hazard", "slope"], world);
   }
+});
+
+void test("the moving pieces are judged like any other: a blowhole out onto a rock, the serac's ice on the cup, a gust over a hill, refused", async () => {
+  const { validate } = await import("../lib/builder/pipeline.ts");
+  const { census } = await import("../lib/builder/drawn.ts");
+  const said = (w: string, pieces: Parameters<typeof lane>[1]) => validate(lane(w, pieces), { host, palette: palettes.get(w)!, census }).issues.filter((i) => i.severity === "error").map((i) => `${i.rule} ${i.piece}: ${i.text}`);
+  const put = (w: string, id: string, at: [number, number], p: Parameters<typeof placePiece>[3] = {}) => placePiece(entry(id, palettes.get(w)!)!, id.split("/").at(-1)!, at, p);
+  // each placed alone in the lane: it passes
+  for (const [w, id] of [["island", "island/tunnel/blowhole"], ["mountain", "mountain/hazard/serac"], ["mountain", "mountain/air/gust"]] as const) assert.deepEqual(said(w, [put(w, id, [12, 4], { size: 4, to: [20, 15] })]), [], id);
+  assert.deepEqual(said("island", [put("island", "island/tunnel/blowhole", [8, 8], { to: [20, 10] }), put("island", "*/post/rock", [20, 10])]), ["E6 blowhole: The blowhole comes out at (21.5, 11.5), on a wall or a post"]);
+  assert.deepEqual(said("mountain", [put("mountain", "mountain/hazard/serac", [25, 8], { size: 3 })]), ["E3 serac: The cup touches the serac at (28.5, 11.5)"]);
+  assert.deepEqual(said("mountain", [put("mountain", "mountain/air/gust", [10, 6], { size: 6 }), put("mountain", "mountain/slope/kicker", [12, 8], { size: 4 })]), ["E13 gust: The snow cannon lies over the kicker at (11.5, 7.5)"]);
 });

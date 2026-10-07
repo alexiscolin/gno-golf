@@ -43,7 +43,6 @@ export interface PaletteEntry extends Binding {
  */
 export const HAND_ONLY: Record<string, string> = {
   "bar/tram": "a tram line is a run of timed bars, with rails and tunnels at the board's edge (course.ts tramLines)",
-  "air/gust": "moving air is not in the first palette: it shows only while it blows, and a ball's path in it is hard to read",
 };
 
 /**

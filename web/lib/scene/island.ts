@@ -2121,7 +2121,7 @@ export const skins: Skins = {
   post: ["palm", "coral", "outcrop", "buoy", "crab", "driftwood"],
   bar: ["driftwood", "rowing boat"],
   hazard: ["tidepool", "lagoon", "wave"],
-  tunnel: ["shipwreck", "cave"],
+  tunnel: ["shipwreck", "cave", "blowhole"],
 };
 
 export function piece(kind: "post", item: Post, t: Terrain, s: Hole): THREE.Object3D | null;

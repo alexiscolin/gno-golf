@@ -60,7 +60,7 @@ void test("a world's own pieces first; another world's under From other worlds, 
 void test("variants that play alike are one tile with looks: water, hills, tunnels, posts", () => {
   assert.deepEqual(skins(named("garden", "Water")).sort(), ["", "water"], "the garden's own ponds (the town's under From other worlds; the shore's not at all)");
   assert.deepEqual(skins(named("island", "Water")).slice(0, 4), ["water", "tidepool", "lagoon", "wave"], "the common look, then the island's own");
-  assert.deepEqual(skins(named("mountain", "Drop")).sort(), ["cliff", "crevasse", "serac"]);
+  assert.deepEqual(skins(named("mountain", "Drop")).sort(), ["cliff", "crevasse"]);
   assert.ok(skins(named("town", "Slope")).includes("quarter pipe") && skins(named("town", "Slope")).includes("stairs"));
   assert.deepEqual(skins(named("garden", "Tunnel")).at(-1), "", "the plain look last");
   assert.deepEqual(skins(named("garden", "Bumper")), ["bumper"]);
@@ -69,6 +69,17 @@ void test("variants that play alike are one tile with looks: water, hills, tunne
   assert.ok(skins(named("town", "Floor")).includes("brick") && !skins(named("town", "Sand")).includes("brick"));
   assert.deepEqual(skins(named("town", "Blinking bar")), ["clock hand"], "named for what it does: it blinks, it never sweeps");
   assert.equal(entryName(named("garden", "Tunnel").looks.at(-1)!), "Pipe", "the plain tunnel, a pipe as drawn");
+});
+
+void test("the moving pieces the course's own holes have: the mountain's snow cannon and falling serac, the island's blowhole, each timed from the start", () => {
+  const moving = (w: string) => tilesOf(palettes.get(w)!).more.find((g) => g.group === "Moving pieces")?.tiles ?? [];
+  const looks = (w: string, name: string) => moving(w).find((t) => t.name === name)?.looks ?? [];
+  assert.deepEqual(looks("mountain", "Moving air").map((e) => [e.id, entryName(e), e.clocks]), [["mountain/air/gust", "Snow cannon", ["substep"]]]);
+  assert.deepEqual(looks("mountain", "Timed trap").map((e) => [e.id, e.clocks[0]]), [["mountain/hazard/serac", "substep"]]);
+  assert.deepEqual(looks("island", "Timed tunnel").map((e) => [e.id, entryName(e), e.clocks, e.shapes]), [["island/tunnel/blowhole", "Blowhole", ["substep"], ["round"]]]);
+  assert.deepEqual(moving("town").map((t) => t.name), ["Blinking bar"]);
+  assert.deepEqual(moving("garden"), [], "the garden's own moving pieces are assemblies (the mill, the seesaw): none to place alone");
+  assert.ok(!skins(named("mountain", "Drop")).includes("serac"), "the serac falls now and then: a timed trap, not a drop");
 });
 
 void test("every look in every Builder world has its picture: a small WebP of the game's drawing", () => {
