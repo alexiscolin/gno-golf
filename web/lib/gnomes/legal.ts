@@ -81,7 +81,7 @@ export function receipt(r: Receipt) {
     `Item: ${r.name}, #${r.id}, ${TIER[r.tier] || r.tier}. Contract ${r.realm}`,
     `Price paid: ${gnot(r.price)} GNOT (+ network fee ${about(r.fee)} GNOT, storage deposit ${about(r.deposit)} GNOT held by the chain)`,
     `Delivered to: ${r.address}`,
-    `Transaction: ${r.hash} (permanent record on ${r.chainId})`,
+    `Transaction: ${r.hash || "in your wallet's history"} (permanent record on ${r.chainId})`,
     `Terms accepted: Terms of Sale version ${TERMS_VERSION}`,
     `Your consents, as ticked: ${r.consents.map((c) => `"${c}"`).join("; ")}`,
     `No returns or refunds once final, except where the law requires them. Questions: ${SELLER.email}.`,

@@ -20,7 +20,7 @@ import { errorKind, wait, type Chain } from "@/lib/chain";
 import { cap } from "@/lib/card";
 import { traitRows, type Listed } from "@/lib/gnomes/catalogue";
 import { decode } from "@/lib/gnomes/codec";
-import { bill, gnot, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
+import { bill, gnot, landing, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
 import { BOX_A, BOX_B, LINKS, SIGN_NOTE, TRUST, orderButton, receipt, review } from "@/lib/gnomes/legal";
 import { tokenSkin } from "@/lib/gnomes/wear";
 import { portraitsOf, type Look } from "@/lib/gnomes/onchain";
@@ -112,6 +112,20 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       await wait(1500);
     }
     setStep({ at: "unsure", hash, why: "The chain has not shown it yet." });
+  }
+  // no hash to read (the wallet gave none): the gnome read again, a few times: ours, another's, or nothing landed
+  async function settle() {
+    if (!me) return;
+    setStep({ at: "read", hash: "", height: 0 });
+    for (let i = 0; i < 6; i++) {
+      const now = await shop.gnome(g.id).catch(() => undefined);
+      if (now === undefined) return setStep({ at: "unsure", why: "The chain did not answer." });
+      const at = landing(now, me);
+      if (at === "mine") return (setRow(now), onChanged(), setStep({ at: "done", hash: "", height: 0, when: null }));
+      if (at === "taken") return setStep({ at: "taken" });
+      await wait(1500);
+    }
+    setStep({ at: "review", note: <p className="note note--warn" role="status">Nothing landed: {g.name} is still on sale. You can order again.</p> });
   }
 
   async function showEveryone() {
@@ -269,7 +283,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           {head(true)}
           <p className="note note--warn" role="alert">Sent, but not confirmed yet. <b>Don&apos;t buy again</b>: it would pay twice.</p>
           <div className="gsheet__foot">
-            <Button variant="primary" className="btn--wide" onClick={() => (step.hash ? (setStep({ at: "read", hash: step.hash, height: 0 }), void readBack(step.hash, 0)) : read())}>Check again</Button>
+            <Button variant="primary" className="btn--wide" onClick={() => (step.hash ? (setStep({ at: "read", hash: step.hash, height: 0 }), void readBack(step.hash, 0)) : void settle())}>Check again</Button>
             <p className="gsheet__fine">{step.why}</p>
           </div>
         </>

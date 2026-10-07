@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, utcDate, nowRow, promoOf, promoWords, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
+  makeShop, soldSet, gnot, landing, utcDate, nowRow, promoOf, promoWords, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -240,6 +240,16 @@ test("shop: every refusal CanBuy gives has its words: the button's and a note", 
   assert.deepEqual(w(can({ reason: "unknown" })), { button: "No gnome by that number", note: "" });
   // a code this page does not know: the realm's own sentence, never silence
   assert.deepEqual(w(can({ reason: "newer" as CanBuy["reason"], said: "the moon is full" })), { button: "Can't be bought now", note: "The chain says: the moon is full." });
+});
+
+// ------------------------------------------------------------ a buy sent, not confirmed
+test("shop: a buy with no hash to read, by the gnome read again: landed (the buyer's), taken (another's), or not yet", () => {
+  const me = "g1u6gljuvfjhfp6rzeud99567tmr5zncl6sa54vd", other = "g1f3chauez3mk9evmwczjwcwfy8pysfy9jn2p3m7";
+  const g = { id: "5", series: "genesis", name: "Nell", tier: "common", traits: "", owner: "", price: 36e6, sold: false, closed: false };
+  assert.equal(landing({ ...g, owner: me, sold: true }, me), "mine");
+  assert.equal(landing({ ...g, owner: other, sold: true }, me), "taken");
+  assert.equal(landing(g, me), null, "still unsold: nothing landed yet");
+  assert.equal(landing(null, me), null);
 });
 
 // ------------------------------------------------------------ the bill

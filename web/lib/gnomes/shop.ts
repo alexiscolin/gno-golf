@@ -290,6 +290,11 @@ export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "tier" | "wave"
   }
 }
 
+// ------------------------------------------------------------ a buy sent, not confirmed
+/** Where a buy the wallet gave no hash for stands, by the gnome read again: the buyer's ("mine": it landed), another's
+ *  ("taken"), or null, still unsold: nothing landed (yet). */
+export const landing = (row: GnomeRow | null, me: string) => (!row || !row.owner ? null : row.owner === me ? "mine" : "taken");
+
 // ------------------------------------------------------------ the bill (shared pieces)
 /** What a signature costs, each line in ugnot: the price, the storage deposit for bytes, the network fee for
  *  gas, both as the wallet is asked them (adena.ts depositFor, feeFor); most: their sum; short: what the
