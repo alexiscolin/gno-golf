@@ -7,14 +7,14 @@
 // author), in the order asked: newest (the chain's order), most played, or
 // hardest (the Builder's meter, worked out in this browser, in its worker,
 // for the page shown only, each version once). A hole of the day above them,
-// the same for everyone all day (lib/community.ts dayOrder and dayHole: the
-// holes published before the UTC day began, in the day's hash order, no
-// server). On a computer, "Remix" opens a hole in the Builder as a new draft,
+// the same for everyone all day (lib/community.ts dayRows and dayHole: the
+// realm's DayCandidates from the UTC day's point in alias order, those
+// published before the day began, no server). On a computer, "Remix" opens a hole in the Builder as a new draft,
 // its maker credited (the Builder never loads on a phone). Every hole listed,
 // the day's too, is first judged by the Builder's own rules (verdictOf), and
 // none the site took down is ever in the list (communityOf).
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { HoleRow } from "@/lib/types";
+import type { DayRow, HoleRow } from "@/lib/types";
 import { sound } from "@/lib/feel";
 import { Button, Segmented } from "@/components/ui";
 import { authorFirst, authorMark, chainQuery, plural } from "@/components/common";
@@ -26,7 +26,8 @@ import { savedOnMore, statsOf, type SavedRead } from "@/lib/builder/rewards";
 import { builderOn, onComputer } from "@/lib/builder/route";
 import { inTurn, type MapHole } from "@/lib/duel";
 import type { Chain } from "@/lib/chain";
-import { aliasOf, bornBefore, DAY_TRIES, dayHole, dayOrder, dayStart, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
+import { aliasOf, bornBefore, DAY_TRIES, dayHole, dayRows, dayStart, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
+import { takedownOf } from "@/lib/takedown";
 
 /** How many community holes a page judges and lists, one more page on each "Show more". */
 const PAGE = 24;
@@ -36,14 +37,13 @@ const JUDGE_AT_ONCE = 4;
 
 export default function Community({ community, chain, onPlay }: {
   community: readonly HoleRow[];
-  chain: Pick<Chain, "bests" | "blockTime" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn" | "versions"> | null;
+  chain: Pick<Chain, "bests" | "blockTime" | "dayCandidates" | "holeData" | "chainId" | "genesis" | "realm" | "state" | "savedOn"> | null;
   onPlay: (id: string) => void;
 }) {
   const [by, setBy] = useState<SortBy>("new");
   const [shown, setShown] = useState(PAGE);
-  // the day's candidates, in the order of the visit's UTC day (it changes at midnight UTC, not under the player)
+  // the visit's UTC day: its hole changes at midnight UTC, not under the player
   const [now] = useState(() => Date.now());
-  const candidates = useMemo(() => dayOrder(community, now), [community, now]);
   // most played: the whole list ordered first, then paged; hardest: the page as shown, once each of it is measured
   const ordered = useMemo(() => (by === "played" ? sortHoles(community, "played", new Map()) : community), [community, by]);
   // each hole about to be shown judged by the Builder's own rules (lib/community.ts: anyone can publish
@@ -51,39 +51,54 @@ export default function Community({ community, chain, onPlay }: {
   // listed; the day's first. One whose data or the rules could not be read now has no verdict (null): not
   // shown, never skipped for the day's, asked again on Try again
   const [verdicts, setVerdicts] = useState<Verdicts>(new Map());
-  // whether each candidate's alias was published before the day began (by alias; null: not read now)
-  const [born, setBorn] = useState<ReadonlyMap<string, boolean | null>>(new Map());
   const [tries, setTries] = useState(0);
+  const [turn] = useState(() => inTurn(JUDGE_AT_ONCE));
+  const asked = useRef(new Map<string, Promise<Verdict | null>>()); // (the judgings under way)
+  const judge = (c: NonNullable<typeof chain>, h: HoleRow): Promise<Verdict | null> => {
+    if (verdicts.has(h.id)) return Promise.resolve(verdicts.get(h.id) ?? null);
+    let p = asked.current.get(h.id);
+    if (!p) {
+      p = turn(() => verdictOf(c, h.id).catch(() => null)).then((v) => (asked.current.delete(h.id), setVerdicts((m) => new Map(m).set(h.id, v)), v));
+      asked.current.set(h.id, p);
+    }
+    return p;
+  };
+  useEffect(() => {
+    if (chain) for (const h of ordered.slice(0, shown)) void judge(chain, h);
+  }, [chain, ordered, shown, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts: judged once each, not again as they fill)
+  // the hole of the day: the realm's candidates from the day's point (lib/community.ts dayRows), as read so far; whether
+  // each one's alias was published before the day began (by alias; null: not read now); whether a page could not be read
+  const [dayList, setDayList] = useState<readonly DayRow[]>([]);
+  const [born, setBorn] = useState<ReadonlyMap<string, boolean | null>>(new Map());
+  const [dayDown, setDayDown] = useState(false);
   useEffect(() => {
     if (!chain) return;
     let live = true;
-    const turn = inTurn(JUDGE_AT_ONCE), asked = new Map<string, Promise<Verdict | null>>();
-    const judge = (h: HoleRow): Promise<Verdict | null> => {
-      if (verdicts.has(h.id)) return Promise.resolve(verdicts.get(h.id) ?? null);
-      let p = asked.get(h.id);
-      if (!p) asked.set(h.id, (p = turn(() => verdictOf(chain, h.id).catch(() => null)).then((v) => (live && setVerdicts((m) => new Map(m).set(h.id, v)), v))));
-      return p;
-    };
-    const bornOf = (h: HoleRow): Promise<boolean | null> => {
+    const bornOf = (h: DayRow): Promise<boolean | null> => {
       const a = aliasOf(h);
-      return born.has(a)
-        ? Promise.resolve(born.get(a) ?? null)
-        : bornBefore(chain, a, dayStart(now)).catch(() => null).then((b) => (live && setBorn((m) => new Map(m).set(a, b)), b));
+      return born.has(a) ? Promise.resolve(born.get(a) ?? null) : bornBefore(chain, h, dayStart(now)).catch(() => null).then((b) => (setBorn((m) => new Map(m).set(a, b)), b));
     };
-    // the day's: its candidates in turn (those published today passed over), until one passes, DAY_TRIES judged
-    // at most (or one is not read: the day waits for it), asked first; the page's beside them (as dayHole picks)
+    setDayList([]);
+    setDayDown(false);
+    // its candidates in turn, a page at a time (those published today passed over), until one passes, DAY_TRIES
+    // judged at most (or one is not read: the day waits for it), as dayHole picks
     void (async () => {
+      const list: DayRow[] = [];
       let tried = 0;
-      for (const h of candidates) {
+      for await (const rows of dayRows(chain, now, await takedownOf(chain))) {
         if (!live) return;
-        const b = await bornOf(h);
-        if (b === false) continue;
-        if (!b || (await judge(h))?.ok !== false || ++tried >= DAY_TRIES) return;
+        list.push(...rows);
+        setDayList([...list]);
+        for (const h of rows) {
+          const b = await bornOf(h);
+          if (!live) return;
+          if (b === false) continue;
+          if (!b || (await judge(chain, h))?.ok !== false || ++tried >= DAY_TRIES) return;
+        }
       }
-    })();
-    for (const h of ordered.slice(0, shown)) void judge(h);
+    })().catch(() => live && setDayDown(true));
     return () => void (live = false);
-  }, [chain, ordered, candidates, shown, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts, born: asked once each, not again as they fill)
+  }, [chain, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (born, verdicts: asked once each, not again as they fill)
   // Try again: the holes not read asked anew
   const retry = () => {
     const known = <T,>(m: ReadonlyMap<string, T | null>) => new Map([...m].filter(([, v]) => v !== null));
@@ -110,7 +125,7 @@ export default function Community({ community, chain, onPlay }: {
   // the players of the page's holes and the day's (one read a dozen holes), once the page is judged, each hole read once
   const [saved, setSaved] = useState<SavedRead | null>(null);
   // the day's hole: the first candidate published before the day that the rules pass, once every one before it is known
-  const today = dayHole(candidates, born, verdicts), day = today.day, unread = page.unread || today.unread;
+  const today = dayHole(dayList, born, verdicts), day = today.day, unread = page.unread || today.unread || dayDown;
   const seen = [...(day ? [day.id] : []), ...page.rows.map((h) => h.id)];
   useEffect(() => {
     if (!chain || page.judging || !seen.length) return;

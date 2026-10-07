@@ -535,6 +535,16 @@ test("genesis: the chain's first block's hash, read once (what tells a chain res
   assert.equal(reads, 2);
 });
 
+test("dayCandidates: DayCandidates' page as asked (after, limit), each row a hole with its alias and born; another shape refused", async () => {
+  const chain = makeChain();
+  const row = { id: `${ADDR1}/lane/v2`, name: "Lane", official: false, plays: 0, best: 0, proBest: 0, par: 3, world: "garden", order: 0, next: "", slot: `${ADDR1}/lane`, born: 7 };
+  let reply: unknown = { version: 1, rows: [row], next: `${ADDR1}/lane` };
+  setFetch((url) => (assert.equal(decoded(url).expr.replace(/^.*DayCandidates/, "DayCandidates"), `DayCandidates("g1x", 25)`), qevalReply(reply)));
+  assert.deepEqual(await chain.dayCandidates("g1x", 25), reply);
+  reply = { version: 1, rows: [{ ...row, born: "7" }], next: "" };
+  await assert.rejects(chain.dayCandidates("g1x", 25));
+});
+
 // ------------------------------------------------------------ boards, and the mode guard
 test("leaderboard defaults to assisted mode, and normalizes anything that isn't 'pro'", async () => {
   const chain = makeChain();

@@ -34,6 +34,7 @@ const { FIELD } = await import("../web/lib/builder/rules.ts");
 const { STARTERS } = await import("../web/lib/builder/starters.ts");
 const { canonicalHex, proofKey, provedAs, replay, shaOf, suggestPar } = await import("../web/lib/builder/proof.ts");
 const { plan, holeId, holeRow } = await import("../web/lib/builder/testmode.ts");
+const { dayRows } = await import("../web/lib/community.ts");
 const { makeLocalChain } = await import("../web/lib/builder/localchain.ts");
 const { bill, finalHex, gasFor, gnokeyPublish, holeHolds, publishBytes, publishSteps } = await import("../web/lib/builder/publish.ts");
 const { fromPublished } = await import("../web/lib/builder/importing.ts");
@@ -391,6 +392,22 @@ if (v1) {
     const shown = [...community, ...mine].some((h) => h.id === id);
     row(`hostile, ${label}: hidden from the lists`, "listHoles(Holes()) after re-validation", "hidden", shown ? "listed (no re-validation in the lists yet)" : "hidden", shown ? "note" : true);
   }
+}
+
+// ------------------------------------------------------------------ the hole of the day's list
+{
+  // DayCandidates from the day's point round to it, two a page: every community hole Holes() lists, each once,
+  // with the block its first version was published at
+  const day: string[] = [], born: number[] = [];
+  for await (const rows of dayRows(chain, Date.now(), new Set(), 2))
+    for (const h of rows) {
+      day.push(h.id);
+      born.push(h.born);
+    }
+  const { community, mine } = listHoles(await chain.holes(true), null, new Set()), listed = [...community, ...mine].map((h) => h.id);
+  is("the hole of the day's list: every listed community hole, each once", "dayRows(DayCandidates, 2 a page)", [...listed].sort().join(" "), [...new Set(day)].sort().filter((id) => listed.includes(id)).join(" "));
+  is("the hole of the day's list: no hole twice", "dayRows(DayCandidates)", day.length, new Set(day).size);
+  is("the hole of the day's list: each with its first version's block", "DayCandidates born", true, born.every((b) => b > 0));
 }
 
 // ------------------------------------------------------------------ summary
