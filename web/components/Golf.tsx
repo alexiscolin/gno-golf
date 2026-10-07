@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import dynamic from "next/dynamic";
 import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/engine";
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
@@ -55,6 +54,7 @@ import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/
 import { collectorsOf } from "@/lib/gnomes/collection";
 import Collector from "@/components/gnomes/Rank";
 import type { ShopProps, ShopView } from "@/components/gnomes/Shop";
+import type { OwnedProps } from "@/components/gnomes/Owned";
 
 // The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/shop.ts SHOP): its screen and the picker's row of a
 // player's gnomes, each a chunk of its own, fetched only when shown; off, none of it is ever loaded.
@@ -75,7 +75,19 @@ function Shop(props: ShopProps) {
   const closing = closingSlot(knownSale(props.chain)?.c ?? null);
   return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} keeper={props.keeper} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
 }
-const Owned = dynamic(() => import("@/components/gnomes/Owned"), { ssr: false });
+// the picker's row of the player's gnomes, the same way: nothing while it downloads or if it could not come (the
+// collection's door stays), asked again the next time the picker shows it
+const ownedChunk = chunk(() => import("@/components/gnomes/Owned"));
+function Owned(props: OwnedProps) {
+  const [Row, setLoaded] = useState(() => ownedChunk.value()?.default);
+  useEffect(() => {
+    if (Row) return;
+    let live = true;
+    ownedChunk.load().then((m) => live && setLoaded(() => m.default), () => {});
+    return () => void (live = false);
+  }, [Row]);
+  return Row ? <Row {...props} /> : null;
+}
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
 // dev build, or on a page opened with ?camlog where the hooks answer
@@ -779,7 +791,7 @@ export default function Golf() {
         unidle = () => cancelIdleCallback(id);
       }
     } else
-      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined, wantWardrobe ? loadWardrobe() : undefined])
+      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined, wantWardrobe ? loadWardrobe().catch(() => undefined) /* (not fetched: drawn plain) */ : undefined])
         .then(([promo, probes]) => !cancelled && make(promo, probes))
         .catch((err: unknown) => !cancelled && setFatal({ msg: messageOf(err), kind: fatalKind(err) }));
 
@@ -1043,9 +1055,10 @@ export default function Golf() {
       collectorsOf(c).know(me, { total: rows.length, rows }); // (their collector rank, every page counted: ADR-011)
       const listed = rows.length ? new Map((await served().catch(() => ({ gnomes: [] }))).gnomes.map((g) => [String(g.id), g])) : new Map<string, { name: string; home: string }>();
       const mine = rows.map((r) => ({ ...r, name: listed.get(r.id)?.name || `Gnome ${r.id}`, home: listed.get(r.id)?.home || "" }));
-      const skins = await know(w ? [...mine, w] : mine);
+      const skins = await know(w ? [...mine, w] : mine).catch(() => null);
       setHeld(mine);
       setWorn(w);
+      if (!skins) return; // (the wardrobe not fetched: their gnomes listed, the gnome played as it is until the next read)
       // the gnome played: theirs while it is theirs, else the one everyone sees, else the browser's own
       const want = playingOf({ pick: pickOf(me), held: new Set(skins.map((k) => k.id)), worn: w, saved: savedGnome(), free: (id) => GNOMES.some((g) => g.id === id) && unlockedRef.current(id) });
       if (want !== gnomeNow.current) (setGnome(want), game.current && game.current.setGnome(want));
