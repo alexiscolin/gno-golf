@@ -8,6 +8,7 @@
 // - the hole built once a checked hole: never while a piece is dragged, once
 //   after the drop (Scene.tsx, ?camlog's window.__builds), and no shader
 //   program linked for it (the old hole let go once the new one is drawn);
+//   never for an edit that changes nothing drawn (the slug);
 // - idle, the loop stopped: no frame asked for, little CPU;
 // - one WebGL context for the page, a quick test and Prove it visited and
 //   left (stage.ts);
@@ -101,6 +102,12 @@ await mouse("mouseReleased", piece[0] - 30, piece[1] + 24);
 await sleep(1500);
 const after = (await builds()) - before, relinked = (await linked()) - linked0;
 
+// the slug edited: checked again, the same hole drawn, not built again
+const builds0 = await builds();
+await c.js(`(() => { const el = document.querySelector(".bhead__slug"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "bench-slug"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+await sleep(1500);
+const slugBuilt = (await builds()) - builds0;
+
 // idle: past the scene's IDLE_MS, nothing asked of the screen, little of the CPU
 await mouse("mouseMoved", 5, 5);
 await sleep(2600);
@@ -138,12 +145,13 @@ for (let k = 0; k < 120 && !(await flat.ev<boolean>(`!!document.querySelector(".
 const fallback = await flat.ev<boolean>(`!!document.querySelector(".board__ground") && !document.querySelector(".board--3d")`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, idle, contexts, live, fallback2D: fallback };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, idle, contexts, live, fallback2D: fallback };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
 assert.equal(during, 0, "the hole built again while a piece was dragged");
 assert.equal(after, 1, `the drop built the hole ${after} times`);
+assert.equal(slugBuilt, 0, `a slug edit built the hole ${slugBuilt} times`);
 assert.equal(relinked, 0, `the drop's rebuild linked ${relinked} shader programs`);
 assert.ok(idle.frames <= BUDGET.idleFrames, `idle: ${idle.frames} frames asked for`);
 assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);

@@ -30,6 +30,9 @@ declare global {
   }
 }
 
+/** What of a checked hole its 3D draws: all of it but the par (its name is drawn: it seeds the scenery). */
+const drawnKey = (s: Hole) => JSON.stringify({ ...s, par: 0 });
+
 /** How long after the pointer's last move the scene keeps moving (ms). */
 export const IDLE_MS = 2000;
 
@@ -48,6 +51,8 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
   const box = useRef<HTMLDivElement>(null);
   const three = useRef<{ scene: THREE.Scene; cam: THREE.OrthographicCamera; course: Course | null; loop: number } | null>(null);
   const latest = useRef({ view, look, size, paused, keep }), held = useRef(0);
+  // the hole drawn, as drawnKey has it: a check that changes nothing drawn (a slug, a proof carried, the par) builds nothing
+  const built = useRef("");
   latest.current = { view, look, size, paused, keep };
 
   /** One frame: the camera as the board looks, the timed pieces at the game's clock, drawn. */
@@ -83,13 +88,16 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
       cancelAnimationFrame(t?.loop ?? 0);
       if (t?.course) disposeCourse(t.course);
       three.current = null;
+      built.current = "";
       give();
     };
   }, []);
 
-  // the hole built again as it is checked (its world's module first)
+  // the hole built again as it is checked (its world's module first), when what it draws changed
   useEffect(() => {
     if (!state) return;
+    const key = drawnKey(state);
+    if (key === built.current) return;
     let stale = false;
     void loadWorld(state.world).then(() => {
       const t = three.current;
@@ -97,6 +105,7 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
       const old = t.course;
       if (old) t.scene.remove(old);
       t.course = buildHole(state);
+      built.current = key;
       if (camlog()) window.__builds = (window.__builds ?? 0) + 1;
       setLighting(t.scene as Parameters<typeof setLighting>[0], t.course.userData.time);
       t.scene.add(t.course);
