@@ -25,6 +25,7 @@ import { makeLocalChain } from "@/lib/builder/localchain";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
 import { clock, holeId, holeRow, plan, QUICK_HOLE, quickPlan, testChain } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
+import { NO_GL } from "@/lib/builder/editor";
 import { hold, stageCanvas, stageRenderer } from "@/lib/builder/stage";
 import { ADENA_URL } from "@/lib/network";
 import { confetti } from "@/lib/builder/juice";
@@ -163,10 +164,12 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   useEffect(() => {
     if (!id || !now || !canvas) return;
     if (now.period < 0) return setNote(`No ${chip(now.kind)[1].toLowerCase()} came in the last ${FIND_DAYS} days of this hole's weather: it cannot be proved in it.`);
+    const renderer = stageRenderer();
+    if (!renderer) return setNote(NO_GL); // (the Editor turns Test off then: a page opened on it still says why)
     const { rpc, web } = endpoints(window.location.search);
     const local = makeLocalChain(host, holeRow(id, draft), hex, now.period);
     const g = (game.current = createGame(canvas, {
-      renderer: stageRenderer() ?? undefined, // (the board's, lent: a game leaves no GL objects of its own on the context)
+      renderer, // (the board's, lent: a game leaves no GL objects of its own on the context)
       chain: testChain(makeChain({ rpc, web }), local, hex),
       onChange: (s) => ((aiming.current = s.aiming), setSnap(s)),
       onHoled: ({ shots }) => {

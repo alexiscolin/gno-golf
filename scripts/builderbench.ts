@@ -15,7 +15,8 @@
 //   left (stage.ts);
 // - five quick tests in a row leave no GL program, texture or buffer behind
 //   (the game draws with the board's own renderer, lent to it);
-// - no WebGL: the 2D board.
+// - no WebGL: the 2D board, and no test (T and Prove it say why; the
+//   Builder never falls over).
 // It prints the numbers as JSON.
 //
 //   APP=http://127.0.0.1:3451 node --experimental-strip-types scripts/builderbench.ts
@@ -151,13 +152,21 @@ c.kill();
 
 // no WebGL: the 2D board
 const flat = await launch({ width: W, height: H });
-await flat.send("Page.addScriptToEvaluateOnNewDocument", { source: `HTMLCanvasElement.prototype.getContext = function () { return null; };` });
+await flat.send("Page.addScriptToEvaluateOnNewDocument", { source: `{ const gc = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/.test(t) ? null : gc.call(this, t, ...a); }; }` });
 await flat.send("Page.navigate", { url: `${APP}/build/` });
 for (let k = 0; k < 120 && !(await flat.ev<boolean>(`!!document.querySelector(".board__ground")`)); k++) await sleep(250);
 const fallback = await flat.ev<boolean>(`!!document.querySelector(".board__ground") && !document.querySelector(".board--3d")`);
+await flat.js(`document.querySelector(".bhint__ok")?.click()`);
+for (let k = 0; k < 40 && !(await flat.ev<boolean>(`!!document.querySelector(".board__toggle[aria-disabled]")`)); k++) await sleep(250);
+await flat.js(`document.querySelector(".board").focus()`);
+await flat.send("Input.dispatchKeyEvent", { type: "keyDown", key: "t", code: "KeyT", text: "t" });
+await flat.send("Input.dispatchKeyEvent", { type: "keyUp", key: "t", code: "KeyT" });
+await flat.js(`[...document.querySelectorAll("button")].find((b) => /^Prove it$/.test(b.textContent))?.click()`);
+await sleep(1500);
+const noTest = await flat.js<{ quick: string; game: boolean; fell: boolean }>(`({ quick: [...document.querySelectorAll(".board__toggle")].find((b) => /Quick test/.test(b.textContent))?.title ?? "", game: !!document.querySelector(".tbench--quick, .tmode"), fell: !document.querySelector(".board") })`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, fallback2D: fallback };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, fallback2D: fallback, noTest };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
@@ -171,5 +180,6 @@ assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);
 assert.equal(contexts, 1, `${contexts} WebGL contexts`);
 for (const k of Object.keys(live[0])) assert.ok(live.every((l) => l[k] <= live[0][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
 assert.ok(fallback, "no WebGL: no 2D board");
+assert.ok(!noTest.fell && !noTest.game && /WebGL/.test(noTest.quick), `no WebGL: a test opened or the Builder fell over: ${JSON.stringify(noTest)}`);
 console.log("builderbench: ok");
 process.exit(0);

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { commonShift, gauges, meterFace, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
+import { NO_GL, commonShift, gauges, meterFace, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
 import type { Shown } from "../lib/builder/difficulty.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
@@ -110,6 +110,8 @@ void test("testGate: Test opens only on a check of the draft as kept now (an old
   assert.equal(testGate(walled, { of: walled, v: validate(walled, { host, palette: garden }) }), "Fix 1 first");
   const unnamed = { ...ok, slug: "" };
   assert.equal(testGate(unnamed, { of: unnamed, v }), "Give it a short name first");
+  assert.equal(testGate(ok, { of: ok, v }, false), NO_GL, "no WebGL: no game to test it in, said plainly");
+  assert.equal(shortWhy(NO_GL), "Needs 3D (WebGL)");
 });
 
 void test("the Editor keeps one session (its undo history) for as long as it is open: saving a step never makes a new one", () => {

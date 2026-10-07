@@ -11,7 +11,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, snap, whereOf, clampMove } from "@/lib/builder/edit";
-import { gauges, meterFace, offAtLimit, pieceGauges, testGate, verdict } from "@/lib/builder/editor";
+import { NO_GL, gauges, meterFace, offAtLimit, pieceGauges, testGate, verdict } from "@/lib/builder/editor";
+import { stageRenderer } from "@/lib/builder/stage";
 import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
 import { notTurned, turnPiece } from "@/lib/builder/handles";
@@ -309,12 +310,13 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const v = checked?.v, fresh = checked?.of === kept;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
   const bad = v ? atFault(v, kept.pieces.map((p) => p.id)) : new Set<string>(); // (both of an overlap, each piece an error meets)
-  const testOff = carrying === kept ? "Checking…" : testGate(kept, checked);
+  const gl = !!stageRenderer();
+  const testOff = carrying === kept ? "Checking…" : testGate(kept, checked, gl);
   const off = palette ? offAtLimit(draft, palette) : new Map<string, string>();
   const step: Step = "edit";
   // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
   // a quick test: the hole as kept with no error (no name nor address needed)
-  const tryOff = !checked || checked.of !== kept ? "Checking…" : errors.length ? testOff : "";
+  const tryOff = !gl ? NO_GL : !checked || checked.of !== kept ? "Checking…" : errors.length ? testOff : "";
   function tryIt() {
     const hex = !tryOff && hexOf(kept, host);
     if (hex) (setArmed(null), setAim(null), setTrying({ of: kept, hex }));
@@ -323,7 +325,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   return (
     <main className={`bench tint--${draft.world}`}>
       <Header title={draft.title} slug={draft.slug} author={author} world={draft.world} worlds={WORLDS} step={step}
-        steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? "Fix the errors first" : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
+        steps={{ edit: { locked: "", done: false }, test: { locked: testOff ? (gl ? "Fix the errors first" : NO_GL) : "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
         action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Prove it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         meter={meterFace(clean, est, kept)}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
