@@ -126,10 +126,18 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
   // a collection gnome's trail behind him while he rolls (lib/gnomes; GNOMES' have none)
   let trail: GnomeTrail | null = null, trailUntil = 0;
   const trailAt = new THREE.Vector3();
+  // set aside, never drawn, compiled with the hole (warm): a burst of confetti and the player's own holing,
+  // kept so their shaders are linked with the hole's, not on the winning putt
+  const aside = new THREE.Group(), confettiWarm = makeConfetti([0, 0]);
+  aside.add(confettiWarm.group);
+  let holingWarm: Holed | null = null;
   const dressTrail = (id: string) => {
     if (trail) (scene.remove(trail.group), disposeCourse(trail.group));
     trail = makeTrail(gnomeById(id));
     if (trail) scene.add(trail.group);
+    if (holingWarm) (aside.remove(holingWarm.group), disposeCourse(holingWarm.group));
+    holingWarm = makeHoling(gnomeById(id), new THREE.Vector3());
+    if (holingWarm) aside.add(holingWarm.group);
   };
   dressTrail(gnomeId);
   // a burst done or replaced: out of the scene, its GPU memory freed
@@ -155,10 +163,6 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     scene.add((confetti = mine = h).group);
     sound("pop");
   };
-  // a burst kept hidden, so its shader compiles with the hole's (warm), not on the winning putt
-  const confettiWarm = makeConfetti([0, 0]);
-  confettiWarm.group.visible = false;
-  scene.add(confettiWarm.group);
   let blinkAt = 0, blinkUntil = 0;
   // small moods of the gnome: a hop of joy when he holes out, a head shake
   // when he comes out of the water. Cosmetic, timed on the page clock.
@@ -726,11 +730,13 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     if (g.started) closeIn = setTimeout(intro, OVERVIEW_MS);
   }
 
-  // Every shader the hole can need, compiled now: the scene as it is, and the
-  // see-through variant of what a canopy fade turns transparent (fog and the
-  // lightning's light never change the programs: see weather.ts)
-  // (the see-through ones are only started: they are ready long before a fade
-  // needs them). Resolves once the ones drawn now are linked.
+  /** What is set aside (the confetti, the player's holing) compiled, lit as the hole is. */
+  const warmAside = () => renderer.compile(aside, camera, scene);
+  // Every shader the hole can need, compiled now: the scene as it is, what is
+  // set aside, and the see-through variant of what a canopy fade turns
+  // transparent (fog and the lightning's light never change the programs: see
+  // weather.ts) (the see-through ones are only started: they are ready long
+  // before a fade needs them). Resolves once the ones drawn now are linked.
   function warm() {
     const fades: THREE.Material[] = [];
     scene.traverse((o) => {
@@ -742,6 +748,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       renderer.compile(scene, camera);
       for (const m of fades) (m.transparent = false), (m.needsUpdate = true);
     }
+    warmAside();
     // (a context without parallel compiling resolves at once: the old way;
     // and a driver that never says a program is ready is waited 2 s at most)
     let t: ReturnType<typeof setTimeout> | undefined;
@@ -1627,7 +1634,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       disposeCourse(ball);
       ball = makeBall(gnomeById((gnomeId = id)));
       dressTrail(id);
-      if (g.s) headlamp(ball, g.s.world === "mines");
+      if (g.s) (headlamp(ball, g.s.world === "mines"), warmAside()); // (his holing's shaders now, not at the putt)
       scene.add(ball);
       if (g.s) placeBall();
     },
@@ -1695,7 +1702,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       dropAim(); // and any preview on its way
       cut++; // every animation still running stops at its next frame
       if (g.course) disposeCourse(g.course);
-      for (const o of [ball, aim, band, confetti && confetti.group, confettiWarm.group, trail && trail.group]) if (o) disposeCourse(o);
+      for (const o of [ball, aim, band, confetti && confetti.group, aside, trail && trail.group]) if (o) disposeCourse(o);
       rival.dispose();
       // a lent renderer keeps what it holds for the shared looks (its next game, or the board, draws them again),
       // handed back at its own pixel ratio and its GL state reset; the game's own is disposed, and the looks let go of it

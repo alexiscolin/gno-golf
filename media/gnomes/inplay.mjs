@@ -6,7 +6,8 @@
 // out, and raced as a rival's ghost (?rivaltraits=). For each: the play view
 // and a close-up; the cup never under him; a holing shot played with the CPU
 // slowed 4× (a phone), its frame rate, his trail while he rolls, his holing
-// played and ended; his ghost; his headlamp in the dark. Pictures and a report
+// played and ended (and no shader program linked for it: compiled with the
+// hole); his ghost; his headlamp in the dark. Pictures and a report
 // (report.json) in media/gnomes/inplay/, and a contact sheet.
 //   APP=http://localhost:3417 RPC=https://rpc.onyx.testnets.gno.land:443 node media/gnomes/inplay.mjs [ids…]
 import fs from "node:fs";
@@ -27,6 +28,8 @@ const HOLES = [
 fs.mkdirSync(OUT, { recursive: true });
 
 const b = await launch({ width: 1100, height: 700 });
+// the shader programs linked, counted from the first script
+await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__linked = 0; { const p = WebGL2RenderingContext.prototype, make = p.createProgram; p.createProgram = function () { window.__linked++; return make.call(this); }; }` });
 await b.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
 /** @param {string} expr @param {number} tries */
 async function until(expr, tries = 120, ms = 250) {
@@ -145,6 +148,7 @@ for (const g of todo) {
         // a phone: the CPU slowed 4×, every frame's gap counted while he flies and the cup cheers
         await b.send("Emulation.setCPUThrottlingRate", { rate: 4 });
         await b.ev(`(window.__gaps = [], window.__fx = [], (() => { let p = 0; const f = (t) => { if (p) __gaps.push(t - p); p = t; __fx.push(window.__g.fx()); if (__gaps.length < 4000) requestAnimationFrame(f); }; requestAnimationFrame(f); })(), 1)`);
+        const linked0 = await b.ev(`window.__linked`);
         await b.ev(`window.__g.shoot(${holing[0]}, ${holing[1]})`);
         let rolled = false;
         for (let i = 0; i < 200; i++) {
@@ -160,9 +164,10 @@ for (const g of todo) {
           if (p && !p.flying && rolled && !(await b.ev(`window.__g.fx().holing`)) && i > 60) break;
         }
         await sleep(2500);
+        const linked = (await b.ev(`window.__linked`)) - linked0;
         const f = await b.ev(`(() => { const g = __gaps.slice().sort((a, b) => a - b); const fx = __fx; return { n: g.length, median: g[g.length >> 1], p95: g[Math.floor(g.length * 0.95)], trail: fx.some((x) => x.trail), holing: fx.some((x) => x.holing), holingEnded: fx.length > 0 && !fx[fx.length - 1].holing }; })()`);
         await b.send("Emulation.setCPUThrottlingRate", { rate: 1 });
-        out.shot = { hole: h.slot, angle: +holing[0].toFixed(2), power: holing[1], banner: await b.ev(`!!document.querySelector('.banner--win')`), fps: f.median ? Math.round(1000 / f.median) : 0, frameMs: { median: +(f.median || 0).toFixed(1), p95: +(f.p95 || 0).toFixed(1) }, trail: f.trail, holing: f.holing, holingEnded: f.holingEnded };
+        out.shot = { hole: h.slot, angle: +holing[0].toFixed(2), power: holing[1], banner: await b.ev(`!!document.querySelector('.banner--win')`), fps: f.median ? Math.round(1000 / f.median) : 0, frameMs: { median: +(f.median || 0).toFixed(1), p95: +(f.p95 || 0).toFixed(1) }, trail: f.trail, holing: f.holing, holingEnded: f.holingEnded, linked };
         if (!out.shot.banner) holing = null; // the weather moved on: found again for the next gnome
       }
     }
