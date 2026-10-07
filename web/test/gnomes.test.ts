@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as V from "../lib/gnomes/vocab.ts";
-import { PROPS, PROP_DESIGNS } from "../lib/gnomes/props.ts";
+import { PROP_DESIGNS } from "../lib/gnomes/props.ts";
 import { FORMAT, LENGTH, PLAIN, decode, encode, type Traits } from "../lib/gnomes/codec.ts";
 import { EARNED_KINDS, lookOf, skinOf, skinOfTraits, traitsOf } from "../lib/gnomes/skin.ts";
 import { SALE_TIERS, TIER_LOOK, entryOf, evenly, filterGnomes, planSeries, thumbOf, traitRows, type Catalogue, type SeriesConfig } from "../lib/gnomes/catalogue.ts";
@@ -39,11 +39,11 @@ const FULL: Traits = {
 };
 
 test("vocab: each table without a repeat, every colour named once and valued once", () => {
-  for (const t of [V.TIERS, V.HOMES, V.ARCHETYPES, V.HATS, V.BEARDS, V.PATTERNS, V.ACCESSORIES, V.PIECES, V.MATERIALS, V.TRAILS, V.HOLINGS, PROPS])
+  for (const t of [V.TIERS, V.HOMES, V.ARCHETYPES, V.HATS, V.BEARDS, V.PATTERNS, V.ACCESSORIES, V.PIECES, V.MATERIALS, V.TRAILS, V.HOLINGS, V.PROPS])
     assert.equal(new Set(t).size, t.length, t.join(","));
   assert.equal(new Set(V.COLOURS.map(([n]) => n)).size, V.COLOURS.length);
   assert.equal(new Set(V.COLOURS.map(([, v]) => v)).size, V.COLOURS.length);
-  assert.ok(V.COLOURS.length < 255 && V.ACCESSORIES.length <= 32 && PROPS.length < 256, "every code fits its field");
+  assert.ok(V.COLOURS.length < 255 && V.ACCESSORIES.length <= 32 && V.PROPS.length < 256, "every code fits its field");
   assert.throws(() => V.colour("chartreuse"), /no colour "chartreuse"/);
   assert.equal(V.colourCode(0x123456), -1);
   assert.equal(V.colourName(0xe0524b), "cap");
@@ -54,8 +54,10 @@ test("vocab: append only, the codes tokens carry keep their meaning", () => {
   assert.deepEqual(V.HATS.slice(0, 19), ["cone", "tall", "tricorn", "toque", "tophat", "helmet", "straw", "bucket", "sailor", "bandana", "beret", "beanie", "alpine", "slouch", "pith", "skullcap", "souwester", "mill", "mushroom"]);
   assert.deepEqual(V.ACCESSORIES.slice(0, 22), ["glasses", "pompom", "flower", "cheeks", "stars", "horns", "patch", "parrot", "mask", "flour", "sash", "monocle", "crown", "cape", "lamp", "goggles", "earring", "neckerchief", "leaf", "soot", "freckles", "moon"]);
   assert.deepEqual(V.COLOURS.slice(0, 5).map(([n]) => n), ["cap", "cream", "sun", "white", "ink"]);
-  assert.equal(PROPS.indexOf("windup-key"), 1);
-  assert.equal(PROPS.indexOf("frost-cap"), PROPS.length - 1);
+  assert.equal(V.PROPS.indexOf("windup-key"), 1);
+  assert.equal(V.PROPS.indexOf("frost-cap"), V.PROPS.length - 1);
+  // the codes the codec reads (vocab, no shapes) are the props drawn, in their order
+  assert.deepEqual(V.PROPS.slice(1), Object.keys(PROP_DESIGNS));
   assert.equal(V.HOLINGS.indexOf("gale"), V.HOLINGS.length - 1);
 });
 

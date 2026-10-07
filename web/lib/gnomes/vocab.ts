@@ -60,6 +60,17 @@ export const TRAILS = ["", "ribbon", "sparks", "shavings", "light", "shards", "e
 export const HOLINGS = ["confetti", "sparks", "shavings", "pulse", "shards", "embers", "bolt", "petals", "splash",
   "spores", "avalanche", "bubbles", "leaves", "stars", "notes", "steam", "crumbs", "ripples", "feathers", "gale"] as const;
 
+/** An Epic's own thing (and a Legendary's piece) by code, 0: none; each one's shapes are props.ts PROP_DESIGNS'. */
+export const PROPS = ["", "windup-key", "watering-can", "acorn", "spade", "snail", "teacup", "knitting",
+  "neon-bloom", "koi", "fishing-rod", "bosun-whistle", "ship-wheel", "anchor", "beacon", "conch", "palm", "spyglass",
+  "rope-coil", "gull", "oyster", "rolling-pin", "cupcake", "whisk", "paint-palette", "paintbrush", "clock-face",
+  "pigeon", "candle", "cinnamon-roll", "ice-axe", "alphorn", "cuckoo-clock", "cocoa-mug", "skis", "edelweiss",
+  "cairn", "rescue-keg", "snowglobe", "pickaxe", "geode", "canary-cage", "gold-pan", "glow-crystal", "gears",
+  "hand-lantern", "mole", "nugget", "hammer", "bellows", "map-scroll", "thermometer", "pineapple", "neon-flame",
+  "clay-pot", "torch", "kettle", "lightning-rod", "weathervane", "barometer", "spellbook", "umbrella", "kite",
+  "crystal-ball", "stone-wings", "owl", "crystal-cluster", "lava-vent", "thundercloud", "mill-sails", "epaulettes",
+  "fairy-ring", "frost-cap"] as const;
+
 export type Tier = (typeof TIERS)[number];
 export type Home = Exclude<(typeof HOMES)[number], "">;
 export type Archetype = Exclude<(typeof ARCHETYPES)[number], "">;

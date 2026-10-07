@@ -4,10 +4,9 @@
 // colour past the palette, a field the string is too short to hold. A field
 // added later is appended, so an older reader still reads the ones it knows;
 // a format other than its own (a field whose meaning changed) it does not read.
-import { ACCESSORIES, ARCHETYPES, BEARDS, COLOURS, HATS, HOLINGS, HOMES, MATERIALS, PATTERNS, PIECES, TIERS, TRAILS,
+import { ACCESSORIES, ARCHETYPES, BEARDS, COLOURS, HATS, HOLINGS, HOMES, MATERIALS, PATTERNS, PIECES, PROPS, TIERS, TRAILS,
   type Accessory, type Archetype, type Beard, type Hat, type Holing, type Home, type Material, type Pattern,
   type Piece, type Tier, type Trail } from "./vocab";
-import { PROPS } from "./props";
 
 /** The format this client writes and reads. */
 export const FORMAT = 1;
