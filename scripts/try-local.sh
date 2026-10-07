@@ -72,6 +72,12 @@ build_site() {
 	local n=1
 	while [ -e "$WORK/site.$n" ]; do n=$((n + 1)); done
 	cp -R "$root/web/out" "$WORK/site.$n"
+	if [ -d "$WORK/site" ] && [ ! -L "$WORK/site" ]; then
+		# a playground started before the link (its server reads the folder itself): the folders swapped, two renames
+		python3 -I -c 'import os, sys; os.rename(sys.argv[1], sys.argv[3]); os.rename(sys.argv[2], sys.argv[1])' "$WORK/site" "$WORK/site.$n" "$WORK/site.old.$n"
+		rm -rf "$WORK/site.old.$n"
+		return
+	fi
 	rm -f "$WORK/site.next" && ln -s "site.$n" "$WORK/site.next"
 	python3 -I -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$WORK/site.next" "$WORK/site" # (one rename: the link swapped at once)
 	[ ! -e "$WORK/site.$((n - 2))" ] || rm -rf "$WORK/site.$((n - 2))"
