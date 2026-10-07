@@ -242,21 +242,27 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .owned__face[aria-pressed="true"] { box-shadow: var(--ring-shadow); }
 
 /* ---------------------------------------------------------------- the collection on the game's screens (Promo.tsx) */
-/* the picker's Collection section, between the tile and the aim card, the aim card's width (the GUI spec's A3):
-   compact, a row; the player's own gnomes, their line over their faces, the whole collection under them */
-.gcollect { display: flex; align-items: center; gap: 8px; width: max(var(--pick-w, 100%), 230px); margin: 0 auto var(--gap-l, 12px); padding: 6px 8px; border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
-.gcollect:has(.owned) { flex-direction: column; align-items: stretch; }
+/* the picker's Collection section, between the tile and the aim card (the GUI spec's A3), at least the aim card's
+   width: one slim row about a button high, its thumbnails, its line and its button on one middle line; the line
+   shortened at its end, never wrapped on a computer, two lines at most on a phone; the player's own gnomes, their
+   line over their faces, the whole collection under them */
+.gcollect { display: flex; align-items: center; gap: 10px; width: fit-content; min-width: max(var(--pick-w, 100%), 230px); max-width: 100%; margin: 0 auto var(--gap-l, 12px); padding: 6px 6px 6px 8px; border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
+.gcollect:has(.owned) { flex-direction: column; align-items: stretch; width: max(var(--pick-w, 100%), 230px); }
 .gcollect .owned { min-width: 0; width: 100%; margin: 0; }
 .gcollect__all { align-self: center; font-size: 13px; }
+/* a stack of thumbnails: one size, one frame (the ink's edge round a ring of the tier's colour), on one ground */
 .gcollect__faces { flex: none; display: flex; }
-.gcollect__faces .gtile { width: 34px; border-radius: 10px; }
-.gcollect__faces .gtile + .gtile { margin-left: -10px; }
-.gcollect__faces .gtile:nth-child(n + 4) { display: none; }
-@media (max-width: 600px) { .gcollect__faces .gtile:nth-child(n + 2) { display: none; } } /* (a phone: the Legendary alone, the words their room) */
-.gcollect__text { flex: 1; min-width: 0; display: grid; font-size: 12px; font-weight: 700; line-height: 1.25; }
-.gcollect__text b { font-size: 14px; }
-.gcollect__text > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gcollect__text small { display: none; }
+.gcollect__faces .gtile { --rim: var(--tier-common); width: 32px; border: 2px solid var(--ink); border-radius: 10px; background: #f6ead2; }
+.gcollect__faces .gtile::before { box-shadow: inset 0 0 0 2px var(--rim); }
+.gcollect__faces .gtile--rare { --rim: var(--tier-rare); } .gcollect__faces .gtile--epic { --rim: var(--tier-epic); } .gcollect__faces .gtile--legendary { --rim: var(--tier-legendary); }
+.gcollect__faces .gtile + .gtile { margin-left: -8px; }
+.gcollect__faces .gtile:nth-child(n + 5) { display: none; }
+.gcollect__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 1.3; }
+.gcollect__text b { font-weight: 800; }
+@media (max-width: 600px) {
+  .gcollect__faces .gtile:nth-child(n + 4) { display: none; }
+  .gcollect__text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
 .gcollect--door { color: inherit; font: inherit; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
 .gcollect--door:hover { transform: translateY(-2px); }
 .gcollect__go { flex: none; pointer-events: none; }

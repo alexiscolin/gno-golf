@@ -9,8 +9,8 @@
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
 // every card's #number in sight however long its name; the toolbar's controls, on each of its
 // lines, as tall as one another, on one top, their words on one baseline, and More filters open
-// gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card, as
-// wide, one compact row, its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
+// gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card,
+// one slim row (its thumbnails of one frame, its line on one line, two on a phone, on its button's baseline), its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
 // and the shop never sideways from 360 to 1440 px wide; About's link cards' words on one left edge. Before, the title screen alone: none of
 // the sale read (the catalogue), the collection's wardrobe nor the shop's
 // part of the game (components/gnomes/Game.tsx: a dev build's chunk names
@@ -108,15 +108,21 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0 && sel.box && sel.gold && sel.view && sel.line.length === 0;
   results.push({ w, ok });
   console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}; a tier and the view selected: gold ${sel.gold && sel.view}, the tier's box kept ${sel.box}`, ok ? "" : JSON.stringify({ off, on, sel }));
-  // the picker: the collection between the tile and the aim card, the aim card's width, one compact row; the head whole
+  // the picker: the collection between the tile and the aim card, at least as wide, one slim row (about a button
+  // high): its thumbnails of one size and one frame, its line on one line on a computer (two at most on a phone),
+  // the line and its button on one baseline (one middle on a phone); the head whole
   await b.send("Page.navigate", { url: APP + "/?cup=garden&screen=pick" });
   for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".screen--pick .gcollect")`)); i++) await sleep(500);
   await sleep(500);
-  const pick = await b.ev(`(() => { const r = (s) => document.querySelector(".screen--pick " + s)?.getBoundingClientRect(); const band = r(".gcollect"), stage = r(".pick__tile"), aim = r(".aimset"), eyebrow = document.querySelector(".pick > .eyebrow");
-    return { below: band.top >= stage.bottom, above: band.bottom <= aim.top, width: Math.abs(band.width - aim.width), tall: band.height, head: eyebrow?.nextElementSibling?.matches(".pick__name, .dare") ?? false }; })()`);
-  const fits = pick.below && pick.above && pick.width < 1 && pick.tall <= 56 && pick.head;
+  const pick = await b.ev(`(() => { const r = (s) => document.querySelector(".screen--pick " + s)?.getBoundingClientRect(); const band = r(".gcollect"), stage = r(".pick__tile"), aim = r(".aimset"), go = r(".gcollect__go"), eyebrow = document.querySelector(".pick > .eyebrow");
+    const text = document.querySelector(".gcollect__text"), said = text.getBoundingClientRect();
+    const faces = [...document.querySelectorAll(".gcollect__faces .gtile")].filter((t) => t.checkVisibility()).map((t) => { const s = getComputedStyle(t), q = t.getBoundingClientRect(); return [q.width, q.height, s.borderTopWidth, s.borderTopColor, s.borderRadius, getComputedStyle(t, "::before").boxShadow.replace(/rgba?\\([^)]*\\)/g, "")].join(" "); });
+    return { below: band.top >= stage.bottom, above: band.bottom <= aim.top, narrow: band.width < aim.width - 0.5, tall: band.height, lines: Math.round(said.height / parseFloat(getComputedStyle(text).lineHeight)),
+      middle: Math.abs(said.top + said.height / 2 - (go.top + go.height / 2)), faces: faces.length, frames: new Set(faces).size, head: eyebrow?.nextElementSibling?.matches(".pick__name, .dare") ?? false }; })()`);
+  const line = mobile ? [] : await b.ev(misaligned([{ name: "the picker's band", box: ".gcollect__go", words: ".gcollect__text, .gcollect__go" }]));
+  const fits = pick.below && pick.above && !pick.narrow && pick.tall <= 56 && pick.lines <= (mobile ? 2 : 1) && pick.middle <= 1 && pick.faces >= 3 && pick.frames === 1 && line.length === 0 && pick.head;
   results.push({ w, ok: fits });
-  console.log(`${fits ? "PASS" : "FAIL"} the picker's collection under its tile, the aim card's width, ${Math.round(pick.tall)} px tall, the head whole at ${w}×${h}`, fits ? "" : JSON.stringify(pick));
+  console.log(`${fits ? "PASS" : "FAIL"} the picker's collection under its tile, ${Math.round(pick.tall)} px tall, its line on ${pick.lines}, ${pick.faces} thumbnails of one frame, the head whole at ${w}×${h}`, fits ? "" : JSON.stringify({ pick, line }));
   b.kill();
 }
 // never sideways: the menu (its shop panel the way in) and the shop, from 360 to 1440 px wide in steps of 40, the
