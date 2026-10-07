@@ -1658,7 +1658,7 @@ export default function Golf() {
             holes={toPlay[guessCup(s.world || "")].slice(0, 6)} onRace={(p, id) => (raceWith(p), openHole(id))}
             extra={<>
               <button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>
-              {shopOn && <> · <button className="linkish" onClick={() => (sound("blip"), openShop())}>Gnomes →</button></>}
+              {shopOn && <button className="linkish" onClick={() => (sound("blip"), openShop())}>Gnomes →</button>}
             </>} />}
           onCommunity={openHole}
           onPick={enterCup}
