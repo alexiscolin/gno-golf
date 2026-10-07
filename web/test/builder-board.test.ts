@@ -6,8 +6,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
-import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, pieceLabel, placeNear, placePiece, removePiece, toWorld } from "../lib/builder/edit.ts";
+import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, errorsOf, newErrors, nextId, pieceLabel, placeNear, placePiece, removePiece, toWorld } from "../lib/builder/edit.ts";
 import { handlesOf, notTurned, setHandle, snap, turnPiece } from "../lib/builder/handles.ts";
+import { frame } from "../lib/builder/gg1.ts";
 import { makeSession, settle } from "../lib/builder/session.ts";
 import { centreOn, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
@@ -133,6 +134,22 @@ void test("the keyboard's drop searches with the fast checks and judges only the
       assert.ok(drawn <= 2, `${world} ${kind} ${e.id}: ${drawn} census checks`);
     }
   }
+});
+
+void test("an edit as the editor makes it pays one census: the draft's own errors known from its check, the edit's from its own", () => {
+  let drawn = 0;
+  const full = { ...ctx, census: (...a: Parameters<typeof census>) => (drawn++, census(...a)) };
+  let kept = lane("garden", [put("p", "*/post/rock", [12, 5])]);
+  validate(kept, full); // (the editor's check of the draft as kept)
+  drawn = 0;
+  for (const step of [0.25, 0.5, 0.75]) {
+    // a nudge (Editor tryEdit): the edit judged against the draft's errors, kept, then checked as kept
+    const next = { ...kept, pieces: kept.pieces.map((q) => (q.id === "p" ? { ...q, geometry: { ...q.geometry, c: [12 + step, 5] as [number, number] } } as Piece : q)) };
+    assert.deepEqual(newErrors(errorsOf(kept, full), next, full), []);
+    kept = frame(next);
+    validate(kept, full);
+  }
+  assert.equal(drawn, 3, "three edits, three censuses");
 });
 
 void test("dragCheck: a drag (or the armed ghost) is checked again only when its snapped place changes; the hole without the piece once a drag", () => {

@@ -148,7 +148,8 @@ void test("a check stays quick on a hole of many bars (the board checks on a dra
   const d = { ...lane("garden", bars, 70, 50), slug: "many" }, o = { host, palette: garden };
   // against the same lane bare, timed alike (best of five, the machine's load the same for both)
   const bare = { ...lane("garden", [], 70, 50), slug: "many" };
-  const best = (x: typeof d) => (validate(x, o), Math.min(...[0, 1, 2, 3, 4].map(() => { const t0 = performance.now(); validate(x, o); return performance.now() - t0; })));
+  // (a copy each time: validate keeps a draft's check, and the time measured is a check's)
+  const best = (x: typeof d) => (validate({ ...x }, o), Math.min(...[0, 1, 2, 3, 4].map(() => { const c = { ...x }, t0 = performance.now(); validate(c, o); return performance.now() - t0; })));
   const ratio = best(d) / best(bare);
   assert.ok(ratio < 3, `${bars.length} bars: ${ratio.toFixed(1)} times the bare lane's check (some 1.8; it was some 20 before)`);
 });
