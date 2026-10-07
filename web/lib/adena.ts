@@ -533,6 +533,8 @@ interface SaveRound extends Work {
 // RPC are theirs or a placeholder, and an argument is checked (or quoted) by
 // the plan it is in.
 export const PKG_PATH = /^gno\.land\/r\/[\w/.-]+$/;
+/** Where the save flow's gnokey panel (components/Gnokey.tsx) keeps the key's address, typed once: the Builder knows its author by it too. */
+export const GNOKEY_ADDR_KEY = "gnogolf.gnokey.addr";
 // an RPC as a command may carry it, "" for anything else
 const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(norm(rpc)) ? norm(rpc) : "");
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
