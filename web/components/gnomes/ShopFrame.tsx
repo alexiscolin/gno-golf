@@ -19,7 +19,7 @@ export const SHOP_HEAD = {
 };
 /** The shelf while it is read: a page of blank cards, each the size of a card on sale. */
 export const BlankShelf = ({ n = 12 }: { n?: number }) => <ul className="gshelf" aria-busy="true">{Array.from({ length: n }, (_, i) => <li key={i}><BlankCard /></li>)}</ul>;
-/** The closing date's place: its line once read, the same height before (and blank when no date is set). */
+/** The closing date's line, its height fixed; only when a date is set (none by default: the frame keeps no room for it). */
 export const ClosesSlot = ({ children }: { children?: ReactNode }) => <div className="closes-slot">{children}</div>;
 /** The wave panel while it is read: its head, bar, prices and note lines, blank. */
 export const WaveSlot = () => (
@@ -36,7 +36,6 @@ export function ShopSkeleton({ onBack = () => {}, onAbout = () => {} }: { onBack
   return (
     <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.eyebrow} title={SHOP_HEAD.title}>
       <p className="shop__pitch">{SHOP_HEAD.pitch}</p>
-      <ClosesSlot />
       <WaveSlot />
       <div className="gfilters gfilters--skel" aria-hidden="true" />
       <BlankShelf />

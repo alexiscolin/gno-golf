@@ -6,20 +6,26 @@
 #
 #   scripts/try-local.sh          start it all (a new chain each time)
 #   scripts/try-local.sh wave2    open the gnomes' wave 2 now, on the chain running
+#   scripts/try-local.sh all      open every wave not yet open, now (testing only)
+#   scripts/try-local.sh close [days]  set the genesis's closing date, days from now (30); none is set at start
+#   scripts/try-local.sh rebuild  build the site again from this checkout and swap it in, the chain and the
+#                                 links running all along (the old site serves until the new one is in)
 #   scripts/try-local.sh down     clean up after a crash: its processes and its Serve entries
 #
 # What it does: scripts/e2e-gnomes.sh SEED=1 starts gnodev (the onyx
 # toolchain's) and deploys physics, course, weblink, store, golf/v2 and
 # gnomes under the test name NS; publishes the Garden's eighteen holes; the
-# genesis series, wave 1 open (its players' window an hour), the close in 30
-# days; community publishing open; the treasury moved to a test key; p1 and
+# genesis series, wave 1 open (its players' window an hour), no closing date
+# (a launch may leave it unset: "close" sets one); community publishing open; the treasury moved to a test key; p1 and
 # b1 with a record and a few gnomes; all the course, the four classic cups
 # and the Crystal Mines. Then the site built as the real one is (next build:
 # no dev server's compiles or reloads over a proxied link), with the shop,
 # the Builder and the community holes on (NEXT_PUBLIC_GNOMES, BUILDER,
 # COMMUNITY) and the test hooks (?geo=blocked), pointed at that chain, and
 # served by scripts/playground-server.mjs. The build is web/out's, as `npm
-# run build` writes it; the site is served from a copy in WORK.
+# run build` writes it; the site is served from a copy in WORK, through a
+# link the server reads on every request, so "rebuild" swaps a new build in
+# at once (one rename) while the old one keeps serving.
 #
 # Every server listens on 127.0.0.1 alone. With Tailscale, the tailnet-preview
 # skill (TAILNET_PREVIEW, ~/.claude/skills/tailnet-preview) opens Tailscale
@@ -53,21 +59,74 @@ last=$cache/last # the WORK of the playground running, for `wave2` and `down`
 log() { printf '%s\n' "$*" >&2; }
 die() { log "try-local: $*"; exit 1; }
 tree() { local c; for c in $(pgrep -P "$1"); do tree "$c"; done; echo "$1"; } # a process and all it started
+# the site built as the real one is, with the playground's settings ($WORK/site.env), into a new folder, then swapped
+# in: $WORK/site is a link the server reads on every request, replaced in one rename; the last two builds are kept
+build_site() {
+	# shellcheck disable=SC1091
+	. "$WORK/site.env"
+	log "try-local: the site built (a few minutes; its log: $WORK/build.log)"
+	(cd "$root/web" && env NEXT_PUBLIC_PLAYGROUND=1 NEXT_PUBLIC_TEST_HOOKS=1 NEXT_PUBLIC_RPC=/rpc NEXT_PUBLIC_WALLET_RPC="$WALLET_RPC" \
+		NEXT_PUBLIC_WEB="$WEB_URL" NEXT_PUBLIC_REALM="$GOLF" NEXT_PUBLIC_NETWORK=testnet \
+		NEXT_PUBLIC_GNOMES=1 NEXT_PUBLIC_BUILDER=1 NEXT_PUBLIC_COMMUNITY=1 npm run -s build) >"$WORK/build.log" 2>&1 ||
+		{ tail -5 "$WORK/build.log" >&2; die "the site's build failed (the site running is untouched)"; }
+	local n=1
+	while [ -e "$WORK/site.$n" ]; do n=$((n + 1)); done
+	cp -R "$root/web/out" "$WORK/site.$n"
+	rm -f "$WORK/site.next" && ln -s "site.$n" "$WORK/site.next"
+	python3 -I -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$WORK/site.next" "$WORK/site" # (one rename: the link swapped at once)
+	[ ! -e "$WORK/site.$((n - 2))" ] || rm -rf "$WORK/site.$((n - 2))"
+}
 
-case "${1:-}" in
-wave2)
-	# the next wave of data/gnomes.json on sale from now, its players' window
-	# as the catalogue says, sent by the collection's owner (test1)
+# the running playground's settings (its WORK's seed.env and site.env), for the commands below
+running() {
 	[ -f "$last" ] && WORK=$(cat "$last") && [ -f "$WORK/seed.env" ] || die "no playground running (start one with scripts/try-local.sh)"
 	# shellcheck disable=SC1091
 	. "$WORK/seed.env"
+}
+# a call by the collection's owner (test1) on the gnomes realm, its output's first refusal said
+owner() {
+	local fn=$1 a=() x out
+	shift
+	for x in "$@"; do a+=(-args "$x"); done
+	out=$(echo "$PASS" | "$GNOKEY" maketx call -home "$KH" -pkgpath "$GNOMES" -func "$fn" "${a[@]}" \
+		-gas-fee 5000000ugnot -gas-wanted 200000000 -remote "$RPC" -chainid "$CHAINID" -broadcast -insecure-password-stdin test1 2>&1)
+	printf %s "$out" | grep -q '^OK!' || { printf %s "$out" | grep -o 'gnomes: [^"]*' | head -1 >&2; return 1; }
+}
+chainnow() { curl -s "$RPC/status" | python3 -I -c 'import json,sys,re; from datetime import datetime; t=json.load(sys.stdin)["result"]["sync_info"]["latest_block_time"]; print(int(datetime.fromisoformat(re.sub(r"\.\d+","",t).replace("Z","+00:00")).timestamp()))'; }
+# a wave of data/gnomes.json (index from 0) on sale from now, its players' window as the catalogue says
+open_wave() {
 	jf() { python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(eval(sys.argv[2], {"d": d}))' "$root/data/gnomes.json" "$1"; }
-	first=$(jf "d['series'][0]['plan'][1]['first']") lastid=$(jf "d['series'][0]['plan'][1]['last']") hours=$(jf "d['series'][0]['sale']['playerWindowHours']")
-	now=$(curl -s "$RPC/status" | python3 -I -c 'import json,sys,re; from datetime import datetime; t=json.load(sys.stdin)["result"]["sync_info"]["latest_block_time"]; print(int(datetime.fromisoformat(re.sub(r"\.\d+","",t).replace("Z","+00:00")).timestamp()))')
-	echo "$PASS" | "$GNOKEY" maketx call -home "$KH" -pkgpath "$GNOMES" -func AddWave -args "$first" -args "$lastid" -args "$now" -args "$hours" \
-		-gas-fee 5000000ugnot -gas-wanted 200000000 -remote "$RPC" -chainid "$CHAINID" -broadcast -insecure-password-stdin test1 |
-		grep -q '^OK!' || die "AddWave($first, $lastid) was refused (is wave 2 open already?)"
-	log "try-local: wave 2 ($first-$lastid) on sale from now, its players' window ${hours} h"
+	local first lastid hours
+	first=$(jf "d['series'][0]['plan'][$1]['first']") lastid=$(jf "d['series'][0]['plan'][$1]['last']") hours=$(jf "d['series'][0]['sale']['playerWindowHours']")
+	owner AddWave "$first" "$lastid" "$(chainnow)" "$hours" && log "try-local: wave $(($1 + 1)) ($first-$lastid) on sale from now, its players' window ${hours} h"
+}
+
+case "${1:-}" in
+wave2)
+	running
+	open_wave 1 || die "wave 2 was refused (is it open already?)"
+	exit 0
+	;;
+all)
+	# every wave not yet open, now (a wave open already is refused, and left as it is)
+	running
+	n=$(python3 -I -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["series"][0]["plan"]))' "$root/data/gnomes.json")
+	for k in $(seq 0 $((n - 1))); do open_wave "$k" 2>/dev/null || true; done
+	exit 0
+	;;
+close)
+	running
+	days=${2:-30}
+	[[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ] || die "usage: scripts/try-local.sh close [days]"
+	owner SetCloseAt "$(($(chainnow) + days * 86400))" || die "SetCloseAt was refused (a date can only move earlier)"
+	log "try-local: the genesis closes in $days days"
+	exit 0
+	;;
+rebuild)
+	running
+	[ -f "$WORK/site.env" ] || die "this playground was started before rebuild existed: restart it once"
+	build_site
+	log "try-local: the new site is in (the chain and the links kept running)"
 	exit 0
 	;;
 down)
@@ -81,7 +140,7 @@ down)
 	exit 0
 	;;
 "") ;;
-*) die "usage: scripts/try-local.sh [wave2|down]" ;;
+*) die "usage: scripts/try-local.sh [wave2|all|close [days]|rebuild|down]" ;;
 esac
 
 # a port listened on, on any address (netstat sees tailscaled's own too, which lsof run as a user does not)
@@ -131,7 +190,7 @@ MNEMONIC_p1=$("$GNOKEY" generate 2>/dev/null | tail -1) MNEMONIC_p0=$("$GNOKEY" 
 [ "$(printf %s "$MNEMONIC_p1" | wc -w)" -ge 12 ] && [ "$(printf %s "$MNEMONIC_p0" | wc -w)" -ge 12 ] || die "gnokey generate made no seed phrase"
 log "try-local: a local chain ($CHAINID), the realms under $NS and the course's 90 holes (a few minutes; its log: $WORK/seed.log)"
 MNEMONIC_p1=$MNEMONIC_p1 MNEMONIC_p0=$MNEMONIC_p0 \
-	SEED=1 SEED_WAVE2=0 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
+	SEED=1 SEED_WAVE2=0 SEED_CLOSE=0 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
 	RPC_ADDR=127.0.0.1:$RPC_PORT WEB_ADDR=127.0.0.1:$GNOWEB_PORT \
 	bash "$root/scripts/e2e-gnomes.sh" >"$WORK/seed.out" 2>"$WORK/seed.log" ||
 	{ DEV_PID=$(sed -n 's/^DEV_PID=//p' "$WORK/seed.env" 2>/dev/null); tail -5 "$WORK/seed.log" >&2; die "the seed failed (its steps: $WORK/e2e.md)"; }
@@ -143,12 +202,8 @@ echo "$DEV_PID" >"$WORK/dev.pid"
 WALLET_RPC=http://127.0.0.1:$RPC_PORT WEB_URL=http://127.0.0.1:$GNOWEB_PORT
 # the site as the real one is built, the playground's settings in it; served from WORK
 start_app() {
-	log "try-local: the site built (a few minutes; its log: $WORK/build.log)"
-	(cd "$root/web" && env NEXT_PUBLIC_PLAYGROUND=1 NEXT_PUBLIC_TEST_HOOKS=1 NEXT_PUBLIC_RPC=/rpc NEXT_PUBLIC_WALLET_RPC="$WALLET_RPC" \
-		NEXT_PUBLIC_WEB="$WEB_URL" NEXT_PUBLIC_REALM="$GOLF" NEXT_PUBLIC_NETWORK=testnet \
-		NEXT_PUBLIC_GNOMES=1 NEXT_PUBLIC_BUILDER=1 NEXT_PUBLIC_COMMUNITY=1 npm run -s build) >"$WORK/build.log" 2>&1 ||
-		{ tail -5 "$WORK/build.log" >&2; die "the site's build failed"; }
-	rm -rf "$WORK/site" && cp -R "$root/web/out" "$WORK/site"
+	printf 'WALLET_RPC=%s\nWEB_URL=%s\n' "$WALLET_RPC" "$WEB_URL" >"$WORK/site.env"
+	build_site
 	log "try-local: the site on 127.0.0.1:$APP_PORT (its log: $WORK/site.log)"
 	node "$root/scripts/playground-server.mjs" "$WORK/site" "$APP_PORT" "http://127.0.0.1:$RPC_PORT" >"$WORK/site.log" 2>&1 &
 	APP_PID=$!
@@ -228,7 +283,8 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
        community holes to play): the three hints (again with "?"), make a hole,
        Test it (hole it in each weather), Publish.
     6. Find it: Solo, the cups screen's "Community holes", under the cups.
-  Wave 2 on sale now:  scripts/try-local.sh wave2   (another terminal)
+  Wave 2 on sale now:  scripts/try-local.sh wave2   (every wave: all; a closing date: close [days])
+  This checkout's changes in, the site running all along:  scripts/try-local.sh rebuild
   Logs: $WORK   Ctrl+C stops everything (after a crash: scripts/try-local.sh down).
 ================================================================================
 EOF

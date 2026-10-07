@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
+  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -196,6 +196,13 @@ test("shop: the promo is the wave to see, its lowest price, its Legendary and th
   assert.equal(promoWords(none, T0 + 60).line, "104 gnomes");
   // the words never press: no countdown, no "only", no "last"
   for (const p of [open]) for (const w of Object.values(promoWords(p, T0))) assert.doesNotMatch(w, /only|last|hurry|left|invest|value/i);
+});
+
+// ------------------------------------------------------------ the closing line
+test("shop: no closing line when no closing date is set (a launch may leave it unset), nor once closed", () => {
+  assert.equal(showsClosing(collection({ closesAt: 0 })), false);
+  assert.equal(showsClosing(collection()), true);
+  assert.equal(showsClosing(collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] })), false, "closed: the wave panel says it");
 });
 
 // ------------------------------------------------------------ the gallery as a shop

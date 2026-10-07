@@ -49,6 +49,19 @@ void test("the playground serves the build as the static host does, and /rpc fro
     site.close();
     node.close();
   }
+  // the root a link swapped to a new build (try-local.sh rebuild): the next request is the new build's
+  const v1 = path.join(dir, "site.1"), v2 = path.join(dir, "site.2"), link = path.join(dir, "site");
+  for (const [d, body] of [[v1, "old"], [v2, "new"]] as const) (fs.mkdirSync(d), fs.writeFileSync(path.join(d, "index.html"), body));
+  fs.symlinkSync("site.1", link);
+  const swapped = playgroundServer({ root: link, rpc: `http://127.0.0.1:${nodePort}` }), sp = await listen(swapped);
+  try {
+    assert.equal((await get(sp, "/")).body, "old");
+    fs.symlinkSync("site.2", link + ".next");
+    fs.renameSync(link + ".next", link);
+    assert.equal((await get(sp, "/")).body, "new");
+  } finally {
+    swapped.close();
+  }
   assert.throws(() => playgroundServer({ root: out, rpc: "http://100.104.210.102:26657" }), /127\.0\.0\.1/);
   assert.throws(() => playgroundServer({ root: out, rpc: "http://127.0.0.1.example:80" }), /127\.0\.0\.1/);
 });

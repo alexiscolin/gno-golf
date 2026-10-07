@@ -290,6 +290,8 @@ export function shelf<E extends Listed>(entries: readonly E[], f: Query & { view
   return { list, tiers };
 }
 /** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", or its wave. */
+/** Whether the gallery says the genesis sale's closing date: one is set (0: none, as a launch may leave it), not yet passed. */
+export const showsClosing = (c: Collection) => c.closesAt > 0 && !c.series[0]?.closed;
 /** Whether a card in the gallery shows Buy: on sale now (its wave open, unsold, the sale not closed) and not the player's. */
 export const canBuyCard = (e: Listed, s: Seen) => !s.mine.has(e.id) && onSale(e, s.c, s.sold, s.now);
 /** A wave's prices as the gallery's head says them: [tier, ugnot] in the tiers' order, a tier at 0 left out. */

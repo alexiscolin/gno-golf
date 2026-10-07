@@ -30,10 +30,12 @@ export const LOCAL_RPC = /^http:\/\/127\.0\.0\.1:\d{1,5}$/;
  */
 export function playgroundServer({ root, rpc }) {
   if (!LOCAL_RPC.test(rpc)) throw new Error(`the node is on this machine, http://127.0.0.1:<port>, not "${rpc}"`);
-  const base = fs.realpathSync(root);
-  /** The file a path names under the root, or null. @param {string} p */
+  /** The file a path names under the root, or null: the root resolved anew each time (a link try-local.sh rebuild swaps
+   *  to a new build in one rename: every request is the old build's or the new one's, whole). @param {string} p */
   const fileOf = (p) => {
     if (p.split("/").some((s) => s.startsWith("."))) return null; // (no dotfile, no "..")
+    let base;
+    try { base = fs.realpathSync(root); } catch { return null; }
     for (const f of [p, path.join(p, "index.html"), `${p}.html`]) {
       let real;
       try { real = fs.realpathSync(path.join(base, f)); } catch { continue; }

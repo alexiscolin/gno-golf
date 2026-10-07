@@ -15,7 +15,7 @@ import Share from "@/components/Share";
 import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { canBuyCard, cardFact, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, showsClosing, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
@@ -127,8 +127,8 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   return (
     <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={eyebrow} title={title}>
       {!theirs && viewing !== "mine" && <p className="shop__pitch">{SHOP_HEAD.pitch}</p>}
-      {/* the closing date and the wave in their places from the first frame (ShopFrame): nothing moves as they are read */}
-      {!theirs && viewing !== "mine" && <ClosesSlot>{c && c.closesAt > 0 && !closed && <Closes at={c.closesAt} now={now} />}</ClosesSlot>}
+      {/* the wave in its place from the first frame (ShopFrame), the closing line only when a date is set: nothing moves as they are read */}
+      {!theirs && viewing !== "mine" && c && showsClosing(c) && <ClosesSlot><Closes at={c.closesAt} now={now} /></ClosesSlot>}
       {!theirs && viewing !== "mine" && !row && <WaveSlot />}
       {/* the wave of the moment, or the sale's end: one panel, one line of numbers */}
       {!theirs && viewing !== "mine" && row && row.at !== "none" && (

@@ -53,7 +53,8 @@
 # new temp dir), OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the
 # end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WAVE2=0 adds
 # no wave 2, SEED_WORLDS publishes every course hole of those worlds too
-# ("garden island": garden/3 alone by default), SEED_PUBLISHING=1 opens
+# ("garden island": garden/3 alone by default), SEED_CLOSE=0 sets no closing
+# date (as a launch may leave it unset), SEED_PUBLISHING=1 opens
 # community publishing, SEED_TREASURY=1 moves the treasury to the treas key.
 set -u
 
@@ -428,7 +429,9 @@ if [ "${SEED:-}" = 1 ]; then
 	if [ "${SEED_WAVE2:-1}" = 1 ]; then
 		ok "seed: wave 2 ($W2F-$W2L) in 2 days" "added" test1 "$GN" AddWave "$W2F" "$W2L" "$W2AT" "$WIN2"; must
 	else W2AT=""; fi
-	ok "seed: close in 30 days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
+	if [ "${SEED_CLOSE:-1}" = 1 ]; then
+		ok "seed: close in 30 days" "set" test1 "$GN" SetCloseAt "$CLOSE"; must
+	else CLOSE=0; fi
 	C2=$((C1 + 1)) C3=$((C1 + 2))
 	SEND=$(($(price "$C1") + $(price "$C2")))ugnot ok "seed: p1 buys Commons $C1, $C2" "sold" p1 "$GN" Buy "$C1,$C2"; must
 	SEND=$(price "$R1")ugnot ok "seed: p1 buys Rare $R1" "sold" p1 "$GN" Buy "$R1"; must
