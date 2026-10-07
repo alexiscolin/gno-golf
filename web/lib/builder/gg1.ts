@@ -7,6 +7,7 @@
 // field for field: a change to it is a new format (GG2), not an edit here.
 // And the way back: a hole's decoded data (builder.wasm's decode) as a Draft.
 import type { Draft, Geometry, Piece, V } from "./draft";
+import { QUARTER, snap } from "./handles";
 import { pt, type Field } from "./rules";
 import type { GHole, GPost, GWall, GZone, HoleIn, PostIn, WallIn, ZoneIn, ZoneKind } from "./types";
 import type { PieceRef } from "../scene/census";
@@ -233,10 +234,11 @@ const near = (a: readonly number[], b: readonly number[]) => Math.abs(a[0] - b[0
 
 /**
  * Four walls build.Bar made: the bar's axis and thickness, recovered from its
- * corners (the short sides' middles, less the caps), on the grid, and
+ * corners (the short sides' middles, less the caps), on the grid from tee
+ * (the hole's own: a post's rim may frame it off the board's quarters), and
  * checked against bar (builder.wasm's build.Bar) corner for corner.
  */
-function barOf(ws: readonly GWall[], bar: (line: string) => [number, number][]): { a: V; b: V; thick: number } | null {
+function barOf(ws: readonly GWall[], bar: (line: string) => [number, number][], tee: V): { a: V; b: V; thick: number } | null {
   if (ws.length < 4 || !ws.every((w, k) => near(w.b, ws[(k + 1) % 4].a) && w.skin === ws[0].skin && w.every === ws[0].every && w.on === ws[0].on && w.phase === ws[0].phase && w.bounce === ws[0].bounce)) return null;
   const c = ws.map((w) => w.a);
   const l0 = Math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1]), l1 = Math.hypot(c[2][0] - c[1][0], c[2][1] - c[1][1]);
@@ -244,8 +246,7 @@ function barOf(ws: readonly GWall[], bar: (line: string) => [number, number][]):
   if (!(thick > 0) || long <= thick) return null;
   const m0: V = [(c[0][0] + c[3][0]) / 2, (c[0][1] + c[3][1]) / 2], m1: V = [(c[1][0] + c[2][0]) / 2, (c[1][1] + c[2][1]) / 2];
   const ux = (m1[0] - m0[0]) / long, uy = (m1[1] - m0[1]) / long, e = thick / 2;
-  const snap = (x: number) => Math.round(x * 4) / 4;
-  const a: V = [snap(m0[0] + ux * e), snap(m0[1] + uy * e)], b: V = [snap(m1[0] - ux * e), snap(m1[1] - uy * e)];
+  const a = snap([m0[0] + ux * e, m0[1] + uy * e], QUARTER, tee), b = snap([m1[0] - ux * e, m1[1] - uy * e], QUARTER, tee);
   const got = bar(`${a[0]} ${a[1]} ${b[0]} ${b[1]} ${thick}`);
   return got.length === 4 && got.every((p, k) => p[0] === c[k][0] && p[1] === c[k][1]) ? { a, b, thick } : null;
 }
@@ -260,7 +261,7 @@ export function readHole(g: GHole, match: Match, bar: (line: string) => [number,
   const pieces: Piece[] = [], refused: string[] = [];
   const read = (list: { walls: GWall[]; posts: GPost[]; zones: GZone[] }, pulse: number) => {
     for (let i = 0; i < list.walls.length; ) {
-      const w = list.walls[i], b = barOf(list.walls.slice(i, i + 4), bar);
+      const w = list.walls[i], b = barOf(list.walls.slice(i, i + 4), bar, cut(g.tee));
       const raw: RawPiece = { kind: b ? "bar" : "rail", skin: w.skin, wall: w }, entry = match(raw);
       if (!entry) refused.push(`the ${raw.kind} ${w.skin || "plain"} at ${pt(w.a)}`);
       else pieces.push({ id: `p${++n}`, entry, geometry: b ? { t: "bar", ...b } : { t: "rail", a: cut(w.a), b: cut(w.b) }, params: w.bounce ? { bounce: w.bounce } : {}, clock: clockOf(w, pulse) });
