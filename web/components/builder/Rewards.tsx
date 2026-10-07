@@ -78,7 +78,7 @@ export function SaveTestRound({ chain, proofs, id, world, author, onSaved }: { c
   const busy = s.at === "checking" || s.at === "signing" || s.at === "landing";
   return (
     <div className="bsave">
-      <Button className="btn--s" disabled={busy} onClick={() => void save()}>
+      <Button size="s" disabled={busy} onClick={() => void save()}>
         {s.at === "checking" ? "Checking the weather…" : s.at === "signing" ? "Sign in Adena…" : s.at === "landing" ? "Saving…" : "Save your test round"}
       </Button>
       <small>{"why" in s ? s.why : "It becomes the record to beat, and your ghost."}</small>

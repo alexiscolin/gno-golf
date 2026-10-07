@@ -13,6 +13,7 @@ import type { PaletteEntry } from "@/lib/builder/palette";
 import { KEYS } from "@/lib/builder/keys";
 import { entryName } from "@/lib/builder/names";
 import { MOD } from "./Inspector";
+import { Button } from "@/components/ui";
 
 const HINTS = [
   ["palette", "Drag a piece onto the board"],
@@ -29,7 +30,7 @@ export default function Hints({ onDone, glossary = null }: {
   useEffect(() => got.current?.focus(), []);
   const tiles = glossary ? (({ first, more }) => [...first, ...more.flatMap((g) => g.tiles)])(tilesOf(glossary.palette)) : [];
   const hints = (inPanel: boolean) => HINTS.map(([at, text], k) => <p key={at} className={`bhint bhint--${inPanel ? "in" : at}`}><b>{k + 1}</b>{text}</p>);
-  const ok = <button ref={got} type="button" className="btn btn--gold bhint__ok" onClick={onDone}>Got it</button>;
+  const ok = <Button ref={got} variant="gold" type="button" className="bhint__ok" onClick={onDone}>Got it</Button>;
   // the first run: each hint by its place; the "?": one panel in the middle, the hints, then the pieces
   if (!glossary) return <div className="bhints" role="note" aria-label="Three hints" onKeyDown={(e) => e.key === "Escape" && onDone()}>{hints(false)}<div className="bhints__centre">{ok}</div></div>;
   return (

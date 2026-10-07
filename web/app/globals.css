@@ -456,14 +456,25 @@ html, body {
   width: max-content; max-width: calc(100vw - 32px); text-align: center; /* (wrapped inside the screen when it does not fit) */
 }
 
+/* a button (Button): one height a size (--h: a screen's 48, a toolbar's 40
+   with .btn--m, a small one's 32 with .btn--s), whatever is inside (a line of
+   words, a keycap, an icon), its words in the middle: buttons of a size side by
+   side share their height and their words' baseline */
 .btn {
+  --h: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: var(--edge);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
   font-size: 15px;
-  padding: 12px 22px;
-  min-height: 44px; /* a target a thumb can hit */
+  line-height: 20px;
+  text-align: center;
+  padding: 4px 22px;
+  min-height: var(--h); /* (a target a thumb can hit) */
   border-radius: 16px;
   box-shadow: var(--shadow-btn);
   text-decoration: none; /* an a.btn too */
@@ -479,19 +490,16 @@ html, body {
   color: var(--ink);
 }
 
+/* a toolbar's: the Builder's header, its test card, the shop's bar */
+.btn--m { --h: 40px; padding-inline: 16px; border-radius: 14px; font-size: 14px; font-weight: 700; }
 /* a small one: a menu's item (the cups' resets), a band's link (the
-   network's), the clip's download */
-.btn--s {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 800;
-}
+   network's), the clip's download, the board's switches */
+.btn--s { --h: 32px; padding-inline: 12px; border-radius: 12px; font-size: 13px; font-weight: 800; }
+/* round, an icon or a sign in it (undo, How it works, the shop's search) */
+.btn--icon { flex: none; width: var(--h); padding: 0; border-radius: 50%; font-size: 18px; font-weight: 800; }
+/* a key in its cap (the Builder's: Quick test T, Back to edit Esc), in the button's line: never taller than it */
+kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border: 1.5px solid var(--ink); border-bottom-width: 3px; border-radius: 6px; background: var(--white); font: 700 12px/1 var(--font); color: var(--ink); }
+.btn__key { margin-block: -4px; }
 
 .banner, .sheet {
   position: fixed;
@@ -797,7 +805,7 @@ html, body {
 }
 
 .btn--wide {
-  display: block;
+  display: flex;
   width: 100%;
   text-align: center;
   margin-top: 16px;
@@ -1930,11 +1938,19 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
    lifts a little under the pointer, rings when focused, greys when disabled.
    The segmented switch and the toggle are the same family. */
 .btn, .burger, .adena { position: relative; transition: transform var(--t-press), box-shadow var(--t-press), background .15s; }
-.btn:hover:not([disabled]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
-.btn:active:not([disabled]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
+.btn:hover:not([disabled], [aria-disabled="true"]), .burger:hover, .adena:hover { transform: translateY(calc(-1 * var(--lift))); box-shadow: 0 5px 0 var(--ink); }
+.btn:active:not([disabled], [aria-disabled="true"]), .burger:active, .adena:active { transform: translateY(var(--press)); box-shadow: 0 1px 0 var(--ink); }
+/* a toggle on (the board's line), a panel open (the shop's filters) */
+.btn--ghost[aria-pressed="true"] { background: var(--gold); }
+.btn--ghost:is([aria-expanded="true"], .btn--on) { background: var(--mint); }
 /* inside the button: .seg clips its overflow, so a ring outside shows as a stripe beside the next segment */
 .seg button:focus-visible { outline: var(--ring); outline-offset: -5px; box-shadow: inset 0 0 0 7px var(--ink); } /* the gold inked on both sides (ink 0-2, gold 2-5, ink 5-7) */
-.btn[disabled] { cursor: default; opacity: .5; box-shadow: 0 2px 0 var(--ink); transform: none; }
+/* off (disabled, or aria-disabled: off with its reason a press or a hover away): the same box, its edge and drop the
+   same size, in a paler ink; its words still read (4.5:1), nothing moves when it comes on */
+.btn:is([disabled], [aria-disabled="true"]) { cursor: not-allowed; transform: none; background: var(--paper); color: var(--ink-soft); border-color: rgba(var(--ink-rgb), .3); box-shadow: 0 4px 0 rgba(var(--ink-rgb), .3); }
+/* what only shows in a row of buttons (Chip): their height and edge, flat */
+.chip { --h: 48px; display: inline-flex; align-items: center; gap: 6px; height: var(--h); padding: 0 14px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-size: 13px; font-weight: 700; line-height: 20px; color: var(--ink); white-space: nowrap; }
+.chip--m { --h: 40px; } .chip--s { --h: 32px; padding: 0 10px; }
 /* a HUD card that is a button (the leaderboard) */
 .btn--chip { background: var(--paper); color: var(--ink); display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 800; }
 .btn--chip svg { width: 22px; height: 22px; fill: var(--gold); stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
@@ -2204,11 +2220,11 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 .cuppip__disc { fill: var(--paper); stroke: var(--ink); stroke-width: 2.5; }
 .cuppip__flag { fill: var(--hat); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
 .cuppip__arrow { fill: var(--ink); transform: rotate(var(--a, 0rad)); transform-origin: 0 0; }
-.btn--save { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn--save { gap: 8px; }
 /* the win card's second action a size under its one solid button */
 .banner--win .banner__row .btn--ghost:not(.btn--save) { font-size: 15px; padding: 10px 18px; }
-.btn--save:not([disabled]) { background: var(--chain); color: var(--white); }
-.btn--save:not([disabled]):hover { background: #264bd1; }
+.btn--save:not([disabled], [aria-disabled="true"]) { background: var(--chain); color: var(--white); }
+.btn--save:not([disabled], [aria-disabled="true"]):hover { background: #264bd1; }
 /* the place the save would take: a gold sticker on the button's corner */
 /* a gold sticker: the place a save would take, a shared link's dare, a badge just earned */
 .btn__rank, .dare, .badges__new { padding: 3px 10px; border: var(--edge); border-radius: var(--pill); background: var(--gold); color: var(--ink); font-size: 13px; font-weight: 800; }

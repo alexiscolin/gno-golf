@@ -275,7 +275,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
         )}
         {quick && onLeave && (
           <div className="hud__right">
-            <Button onClick={onLeave}>Back to edit<kbd>Esc</kbd></Button>
+            <Button keycap="Esc" onClick={onLeave}>Back to edit</Button>
           </div>
         )}
       </header>
@@ -288,7 +288,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       )}
       {now && !card && (
         <footer className="hud hud--bottom">
-          <Button title="R or Backspace" onClick={again}>Try again<kbd>R</kbd></Button>
+          <Button title="R or Backspace" keycap="R" onClick={again}>Try again</Button>
         </footer>
       )}
       {/* holed: the game's hole-finished card (Golf.tsx's banner--win), its ways on */}
@@ -301,9 +301,9 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
             {card.actions.length > 0 && (
               <div className="banner__row">
                 {card.actions.map((a) => (
-                  <Button key={a.act} variant={a.primary ? "primary" : "secondary"} aria-disabled={a.off ? true : undefined} title={a.off || undefined}
-                    className={a.off ? "btn--off" : a.act === "publish" ? "btn--save" : undefined} onClick={() => !a.off && act[a.act]?.()}>
-                    {a.text}{a.key && <kbd>{a.key}</kbd>}
+                  <Button key={a.act} variant={a.act === "publish" ? "chain" : a.primary ? "primary" : "secondary"} aria-disabled={a.off ? true : undefined} title={a.off || undefined}
+                    keycap={a.key} onClick={() => !a.off && act[a.act]?.()}>
+                    {a.text}
                   </Button>
                 ))}
               </div>

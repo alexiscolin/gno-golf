@@ -31,6 +31,10 @@ const cdp = (await import("../media/lib/cdp.mjs")) as {
   APP: string;
 };
 const { launch, sleep, APP } = cdp;
+const { misaligned, footprint } = (await import("../media/lib/rows.mjs")) as {
+  misaligned: (rows: { name: string; box: string; words?: string; by?: string }[]) => string;
+  footprint: (sel: string) => string;
+};
 type Box = { l: number; t: number; r: number; b: number };
 
 /** The page at /build/, a new hole opened (a starter), in a window w × h; before: a script run ahead of the page's own. */
@@ -102,10 +106,10 @@ for (const [w, h] of SIZES) {
   // the header's action and the dock keep their places as their words change (a slug, then none)
   await typeInto(c, ".bhead__slug", "a-name");
   await sleep(1500);
-  const named = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks .gauge"))! };
+  const named = { undo: (await box(c, ".bhead__hist"))!, gauge: (await box(c, ".checks .gauge"))! };
   await typeInto(c, ".bhead__slug", "");
   await sleep(1500);
-  const unnamed = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks .gauge"))! };
+  const unnamed = { undo: (await box(c, ".bhead__hist"))!, gauge: (await box(c, ".checks .gauge"))! };
   assert.ok(Math.abs(named.undo.l - unnamed.undo.l) < 1, `${at}: Undo moves as the action's words change (${named.undo.l} → ${unnamed.undo.l})`);
   assert.ok(Math.abs(named.gauge.l - unnamed.gauge.l) < 1, `${at}: the limits move as the verdict changes (${named.gauge.l} → ${unnamed.gauge.l})`);
   // the action off, its reason readable (no faded text)
@@ -116,6 +120,32 @@ for (const [w, h] of SIZES) {
   assert.deepEqual(await c.js(`[...document.querySelectorAll(".palette [data-fold]")].map((d) => d.dataset.fold + " " + d.open)`), ["more true", "others false"], `${at}: the palette's folds at first`);
   const pal = await c.js<{ over: string; sh: number; ch: number }>(`(() => { const p = document.querySelector(".palette"); return { over: getComputedStyle(p).overflowY, sh: p.scrollHeight, ch: p.clientHeight }; })()`);
   assert.ok(pal.over === "auto" && (pal.sh <= pal.ch || (await c.js(`document.documentElement.scrollHeight <= innerHeight`))), `${at}: the palette spills onto the page (${JSON.stringify(pal)})`);
+  console.log(`${at}: ok`);
+  c.kill();
+}
+
+// the buttons in a row as tall as one another, on one top and their words on one baseline (Button's sizes): the
+// header's (Back, the steps, the meter, ?, undo, redo, the action), the board's, the Inspector's; off, a button keeps
+// the box it has on (undo, before and after an edit)
+for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
+  const c = await editor(w, h);
+  const at = `buttons ${w}×${h}`;
+  await c.js(`document.querySelector("[data-piece]").focus()`);
+  await sleep(600);
+  const rows = [
+    { name: "the header", box: ".bhead__start > .btn, .bhead .stepper, .bhead__end .btn, .bhead__end .chip", words: ".bhead .step span, .bhead__end .chip > span, .bhead__act" },
+    { name: "the board's", box: ".board__tools > *" },
+    { name: "the Inspector's", box: ".insp__acts .btn" },
+  ];
+  assert.deepEqual(await c.js<string[]>(misaligned(rows)), [], `${at}: out of line`);
+  const head = await c.js<{ l: number; r: number }[]>(`[...document.querySelectorAll(".bhead__start > *, .bhead .stepper, .bhead__end > *")].filter((e) => e.getBoundingClientRect().width).map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right }; })`);
+  for (const [i, b] of head.slice(1).entries()) assert.ok(b.l >= head[i].r - 0.5, `${at}: the header's parts overlap (${JSON.stringify(head)})`);
+  const off = await c.js<object>(footprint(".bhead__hist"));
+  assert.equal(await c.js(`document.querySelector(".bhead__hist").disabled`), true, `${at}: undo off before any edit`);
+  await typeInto(c, ".bhead__hole input", "Moved nothing");
+  await sleep(600);
+  assert.equal(await c.js(`document.querySelector(".bhead__hist").disabled`), false, `${at}: undo on after an edit`);
+  assert.deepEqual(await c.js<object>(footprint(".bhead__hist")), off, `${at}: undo's box changes as it comes on`);
   console.log(`${at}: ok`);
   c.kill();
 }
@@ -260,7 +290,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 {
   const c = await editor(1280, 800);
   // the straight starter (its two posts, p1 and p2; its rails are r1 to r4): from the drafts screen
-  await c.js(`document.querySelector(".bhead .round--icon").click()`);
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
   await c.js(`document.querySelector(".bholes__starts button").click()`);
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece^='p']")`)); k++) await sleep(300);
@@ -333,7 +363,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
     assert.notDeepEqual(await at(sel), was, `${what}: moved`);
     assert.deepEqual(await onScreen(sel === "[data-end='tee'] circle" ? "[data-end='pin'] circle" : "[data-end='tee'] circle"), other, `${what}: the board not panned`);
   }
-  await c.js(`document.querySelector(".bhead .round--icon").click()`); // back to the drafts
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`); // back to the drafts
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(300);
   const drafts = await c.js<number>(`document.querySelectorAll(".bholes__list li").length`);
   await c.js(`[...document.querySelectorAll(".bholes__list button")].find((b) => /Delete/.test(b.textContent)).click()`);
@@ -356,13 +386,13 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!window.frames[0]?.document.querySelector(".bholes__list button")`)); k++) await sleep(500);
   await inB(`[...document.querySelectorAll(".bholes__list button")].find((b) => b.textContent === "Open").click()`); // tab B, on the dogleg too
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!window.frames[0].document.querySelector(".checks .gauge")`)); k++) await sleep(300);
-  await c.js(`document.querySelector(".bhead .round--icon").click()`);
+  await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
   await c.js(`document.querySelector(".bholes__starts button").click()`); // A starts a hole
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector(".checks .gauge")`)); k++) await sleep(300);
   await inB(`(() => { const el = document.querySelector("[aria-label=\\"The hole's name\\"]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "Named in B"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   await sleep(1500);
-  await inB(`document.querySelector(".bhead .round--icon").click()`);
+  await inB(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!window.frames[0].document.querySelector(".bholes__list")`)); k++) await sleep(300);
   assert.equal(await inB(`document.querySelectorAll(".bholes__list li").length`), 2, "tab B back on its drafts: A's new hole there");
   await c.send("Page.reload");

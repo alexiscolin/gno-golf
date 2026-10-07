@@ -2017,7 +2017,7 @@ export default function Golf() {
                 </Button>
               )}
               {canSave && !phoneOnly && (
-                <Button variant="secondary" className={(pushSave ? "btn--save" : "") + (rankAt ? " btn--save-rank" : "")} disabled={busy(record) || !nameReady} onClick={() => (track("save_clicked", { from: "card", blocked: block }), void recordIt())}>
+                <Button variant={pushSave ? "chain" : "secondary"} className={rankAt ? "btn--save-rank" : ""} disabled={busy(record) || !nameReady} onClick={() => (track("save_clicked", { from: "card", blocked: block }), void recordIt())}>
                   <svg className="btn__mark" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="2.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 8 12)" /><rect x="10.5" y="8" width="11" height="8" rx="4" transform="rotate(-35 16 12)" /></g></svg>
                   {record?.at === "signing" && record.of !== undefined ? `Adena: part ${record.part} of ${record.of}…` : saveLabel(record)}
                   {rankAt > 0 && !busy(record) && (
@@ -2337,7 +2337,7 @@ function PendingSave({ r, rec, by, clock = Date.now, onSave, onForget }: { r: Sa
             {(rec?.at === "refused" || rec?.at === "unsure") && <small className="pending__err" role="alert">{rec.error}</small>}
           </span>
           {!(rec?.at === "refused" && rec.final) && (
-            <Button variant="secondary" className="btn--save" disabled={busy(rec)} onClick={onSave}>
+            <Button variant="chain" disabled={busy(rec)} onClick={onSave}>
               {saveLabel(rec)}
             </Button>
           )}
@@ -2505,7 +2505,7 @@ function RealPlay({ from, account, wallet, onConnect, onClose, onSave, rpc, chai
           ) : now === 2 ? (
             <a className="btn btn--main btn--wide" href={main ? GNOT_URL : FAUCET} target="_blank" rel="noopener noreferrer">{main ? "Get GNOT ↗" : "Get free test GNOT ↗"}</a>
           ) : onSave && funded ? (
-            <Button variant="secondary" className="btn--wide btn--save" disabled={!nameOk} onClick={() => (track("save_clicked", { from: "sheet", blocked: null }), onSave())}>Save on-chain</Button>
+            <Button variant="chain" className="btn--wide" disabled={!nameOk} onClick={() => (track("save_clicked", { from: "sheet", blocked: null }), onSave())}>Save on-chain</Button>
           ) : (
             <Button variant={now === -1 || now === 4 ? "primary" : "secondary"} className="btn--wide" onClick={onClose}>
               {now === -1 ? "All set: play" : now === 4 ? "Play a hole, then save it" : "Later: keep playing"}

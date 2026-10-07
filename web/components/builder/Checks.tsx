@@ -10,7 +10,7 @@
 // plainOf; the rule's code a tooltip, for us), a click on it selecting its
 // piece and framing it, Move it where the piece can simply move (edit.ts
 // fixOf); fixed, it folds back. Its live parts are said by a screen reader.
-import { InfoTip } from "@/components/ui";
+import { Button, InfoTip } from "@/components/ui";
 import type { Issue } from "@/lib/builder/checks";
 import { dials, problems, type Gauge } from "@/lib/builder/editor";
 
@@ -44,7 +44,7 @@ export default function Checks({ verdict, gauges, issues, busy, meter, onShow, o
         {rows.map((r, k) => (
           <li key={k} className={`issue issue--${r.bad ? "error" : "warn"}`} title={r.rule}>
             {r.piece ? <button type="button" className="issue__why" title="Show me" onClick={() => onShow(r.piece!)}>{r.text}</button> : <span className="issue__why">{r.text}</span>}
-            {r.fix && <button type="button" className="btn btn--ghost btn--s" onClick={() => onFix(issues[k])}>Move it</button>}
+            {r.fix && <Button size="s" type="button" onClick={() => onFix(issues[k])}>Move it</Button>}
           </li>
         ))}
       </ul>
