@@ -40,21 +40,11 @@ const SHAPES: Record<string, Motion> = {
   steam: { geo: share(new THREE.IcosahedronGeometry(0.1, 1)), up: 1.4, out: 0.4, g: -0.8, spin: 0.5, grow: 2 },
 };
 
-// the particles not lit by themselves: one toon a colour, shared (never freed
-// with a swarm, so its shader is never linked again); unbanded, as the gnomes'
-// recorded looks hold them (data/gnomes/looks.golden.json)
-const toons = new Map<number, THREE.MeshToonMaterial>();
-const toonOf = (color: number) => {
-  let m = toons.get(color);
-  if (!m) toons.set(color, (m = share(new THREE.MeshToonMaterial({ color }))));
-  return m;
-};
-
 /** A swarm of particles in one instanced draw: spawn, then step(dt). */
 function swarm(kind: Motion, color: number, n: number, life: number) {
   const mat = kind.lit
     ? new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false })
-    : toonOf(color);
+    : new THREE.MeshToonMaterial({ color }); // (each its own: making one draws on Math.random, its uuid, and the portrait's trace of a trail is seeded)
   const mesh = new THREE.InstancedMesh(kind.geo, mat, n);
   mesh.frustumCulled = false;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
