@@ -14,6 +14,12 @@
 //
 //   APP=http://localhost:3471 node --experimental-strip-types scripts/builderwalk.ts
 //
+// WIDTH and HEIGHT set the window (1280x800); NOSUBTLE=1 takes crypto.subtle
+// away, as a page on plain http from another machine is. At the first run it checks
+// that the three hints, Got it and the three steps' words are each in the
+// window, on top (nothing drawn over them), and readable (4.5:1 on their
+// ground at least).
+//
 // With SEED (a seed.env of scripts/e2e-gnomes.sh SEED=1 or try-local.sh)
 // and KEY (one of its keys, p1 by default), the hole is proved under that
 // key's address and published for real once the walk is timed: Publish in
@@ -45,11 +51,14 @@ const BUDGET = { clicks: 4, typed: 1 };
 const AUTHOR = env ? env[KEY] : "g1" + "q".repeat(38);
 
 const t0 = Date.now();
+const innerSize = () => `${Number(process.env.WIDTH) || 1280}x${Number(process.env.HEIGHT) || 800}`;
 const said = (s: string) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)} s  ${s}`);
 const count = { clicks: 0, drags: 0, typed: 0, shots: 0 };
-const c = await launch({ width: 1280, height: 800 });
+const c = await launch({ width: Number(process.env.WIDTH) || 1280, height: Number(process.env.HEIGHT) || 800 });
 await c.send("Emulation.setFocusEmulationEnabled", { enabled: true });
 const wallet = stand && env ? await stand.fakeAdena(c, env, KEY) : null;
+// NOSUBTLE=1: the page as a plain-http one elsewhere has it, no crypto.subtle (lib/sha.ts's own digest then)
+if (process.env.NOSUBTLE === "1") await c.send("Page.addScriptToEvaluateOnNewDocument", { source: "Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined })" });
 const until = async (expr: string, what: string, ms = 60_000) => {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(250)) if (await c.ev<boolean>(expr)) return;
   throw new Error(`waited ${ms / 1000} s for ${what}`);
@@ -68,6 +77,26 @@ try {
   await c.send("Page.navigate", { url: `${APP}/build/?camlog` });
   await until(`!!document.querySelector(".bhint__ok")`, "the first run's hints");
   said(`opened on ${await c.js<string>(`document.querySelector(".bhead__hole input").value`)}`);
+  // the first run's guidance, every part of it seen: in the window, on top, readable
+  const unseen = await c.js<string[]>(`(() => {
+    const lum = (rgb) => { const [r, g, b] = rgb.match(/[\\d.]+/g).slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const ground = (el) => { for (let e = el; e; e = e.parentElement) { const bg = getComputedStyle(e).backgroundColor; if (!/rgba\\(.*, 0\\)$/.test(bg) && bg !== "transparent") return bg; } return "rgb(255, 255, 255)"; };
+    const parts = [...document.querySelectorAll(".bhint, .bhint__ok"), ...[...document.querySelectorAll(".stepper .step button")].map((b) => b.querySelector("span") || b)];
+    const bad = [];
+    if (parts.length < 7) bad.push("only " + parts.length + " parts (3 hints, Got it, 3 steps)");
+    for (const el of parts) {
+      const r = el.getBoundingClientRect(), name = (el.textContent || "").trim().slice(0, 30), cs = getComputedStyle(el);
+      if (!r.width || !r.height || cs.display === "none" || cs.visibility !== "visible" || +cs.opacity < 0.9) { bad.push(name + ": not shown"); continue; }
+      if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) { bad.push(name + ": out of the window"); continue; }
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (!top || !(top === el || el.contains(top) || top.contains(el) || el.closest("button") === top.closest("button"))) bad.push(name + ": under " + (top ? String(top.className || top.tagName) : "nothing"));
+      const [a, b] = [lum(cs.color), lum(ground(el))], ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      if (ratio < 4.5) bad.push(name + ": contrast " + ratio.toFixed(1));
+    }
+    return bad;
+  })()`);
+  if (unseen.length) throw new Error(`the first run's guidance is not all seen at ${innerSize()}: ${unseen.join("; ")}`);
+  said(`the hints, Got it and the steps' words all seen at ${innerSize()}`);
   await click(`document.querySelector(".bhint__ok")`, "Got it");
 
   // a Bumper dragged onto the starter, beside the tee (the pieces' count says where it held)

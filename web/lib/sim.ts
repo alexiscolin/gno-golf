@@ -11,7 +11,7 @@
 // It is used only once its sources are the realm's: the .gno files it was
 // built from, read back from the chain (vm/qfile) through stage.sh's prefix,
 // hashed and compared (once a browser: a package on the chain never changes).
-// No worker, no WebAssembly, no crypto.subtle, a load or a check that fails:
+// No worker, no WebAssembly, a load or a check that fails:
 // the chain's previews, as before.
 
 import { track, trackError } from "./analytics";
@@ -42,7 +42,7 @@ const sourcesMatch = async (chain: SimChain) => sameSources(chain, JSON.parse(aw
 /** Starts the local preview, once a visit: the worker, the wasm, its sources checked. */
 export function startSim(chain: SimChain): Promise<boolean> {
   if (on && !off) return on;
-  if (off || typeof Worker === "undefined" || typeof WebAssembly === "undefined" || !globalThis.crypto?.subtle) return Promise.resolve(false);
+  if (off || typeof Worker === "undefined" || typeof WebAssembly === "undefined") return Promise.resolve(false);
   worker = new Worker(new URL("./sim/worker.ts", import.meta.url), { type: "module" });
   worker.onmessage = ({ data: r }: MessageEvent<Reply>) => {
     const w = waiting.get(r.n);

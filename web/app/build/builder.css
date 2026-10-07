@@ -47,7 +47,8 @@
 .step--locked i { background: transparent; border-style: dashed; }
 .step { display: flex; align-items: center; }
 .step + .step::before { content: ""; width: 14px; height: 2px; margin-right: var(--sp-2); background: rgba(var(--ink-rgb), .25); }
-@media (max-width: 1180px) { .step span { display: none; } .step button { padding-right: var(--sp-1); } .step--now span { display: inline; } .step--now button { padding-right: var(--sp-4); } }
+/* a narrower window: every step keeps its word (the three steps are the Builder's map), the pill tighter */
+@media (max-width: 1180px) { .step button { gap: 6px; padding-right: var(--sp-2); font-size: 14px; } .step + .step::before { width: 8px; margin-right: 4px; } }
 
 /* ------------------------------------------------------------ a column: a paper panel that scrolls in itself */
 .col { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--sp-3); padding: var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }

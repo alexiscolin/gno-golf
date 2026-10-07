@@ -18,7 +18,7 @@ export interface StepState {
 }
 
 
-export default function Header({ title, slug, author, world, worlds, step, steps, action, history, onTitle, onSlug, onWorld, onStep, onBack }: {
+export default function Header({ title, slug, author, world, worlds, step, steps, action, history, onTitle, onSlug, onWorld, onStep, onBack, onHelp }: {
   title: string;
   slug: string;
   author: string | null;
@@ -29,6 +29,8 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   /** the mode's one action: its words, its look, off with why */
   action: { text: string; kind: "gold" | "chain" | "ghost"; off?: string; onClick: () => void } | null;
   history: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } | null;
+  /** the three hints again (Hints), on the editor: none elsewhere */
+  onHelp?: () => void;
   onTitle: (v: string) => void;
   onSlug: (v: string) => void;
   onWorld: (w: string) => void;
@@ -70,6 +72,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
       <div className="bhead__end">
         {/* why the big button waits, in a few words (its slot kept: nothing moves); in full under the board */}
         {action && <span className="bhead__why" aria-hidden="true">{shortWhy(action.off ?? "")}</span>}
+        {onHelp && <button type="button" className="round" aria-label="How it works: the three steps" title="How it works" onClick={onHelp}>?</button>}
         {history && (
           <>
             <button type="button" className="round" aria-label={`Undo (${MOD}Z)`} title={`Undo (${MOD}Z)`} disabled={!history.canUndo} onClick={history.undo}>↶</button>
