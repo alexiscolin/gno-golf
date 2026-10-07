@@ -52,6 +52,8 @@ import { builderOn } from "@/lib/builder/route";
 import { shopInRegion, shopShown } from "@/lib/gnomes/geo";
 import { served } from "@/lib/gnomes/served";
 import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/wear";
+import { collectorsOf } from "@/lib/gnomes/collection";
+import Collector from "@/components/gnomes/Rank";
 import type { ShopProps, ShopView } from "@/components/gnomes/Shop";
 
 // The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/shop.ts SHOP): its screen and the picker's row of a
@@ -1033,6 +1035,7 @@ export default function Golf() {
     if (!SHOP || !c || !account) return (setHeld([]), setWorn(null));
     const shop = makeShop(c), me = account.address;
     void Promise.all([shop.allOf(me), shop.worn(me).catch(() => null)]).then(async ([rows, w]) => {
+      collectorsOf(c).know(me, { total: rows.length, rows }); // (their collector rank, every page counted: ADR-011)
       const listed = rows.length ? new Map((await served().catch(() => ({ gnomes: [] }))).gnomes.map((g) => [String(g.id), g])) : new Map<string, { name: string; home: string }>();
       const mine = rows.map((r) => ({ ...r, name: listed.get(r.id)?.name || `Gnome ${r.id}`, home: listed.get(r.id)?.home || "" }));
       const skins = await know(w ? [...mine, w] : mine);
@@ -1643,7 +1646,7 @@ export default function Golf() {
           onPick={enterCup}
         />
       )}
-      {screen === "pick" && <Picker world={(s && s.world) || "garden"} backLabel={cupsScreen === "ghosts" ? "Back to their ghosts" : undefined} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={savedGnome()}
+      {screen === "pick" && <Picker world={(s && s.world) || "garden"} backLabel={cupsScreen === "ghosts" ? "Back to their ghosts" : undefined} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} mark={<Collector chain={game.current?.chain} player={dare} />} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={savedGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         owned={(() => {
           // the collection at the picker's top (in a region the shop is offered in): the player's own gnomes first, else the wave
@@ -1694,7 +1697,7 @@ export default function Golf() {
                   <span className="eyebrow">You</span><strong>{s.strokes}</strong>
                 </span>
                 <span className="duel__row">
-                  <span className="eyebrow">{racing.self ? "Your best" : racing.name}</span><strong>{s.rival ?? 0}<small> / {racing.ghost.strokes}</small></strong>
+                  <span className="eyebrow">{racing.self ? "Your best" : <><Collector chain={game.current?.chain} player={dare} />{racing.name}</>}</span><strong>{s.rival ?? 0}<small> / {racing.ghost.strokes}</small></strong>
                 </span>
                 <span className="card__par">
                   {s.done && !s.flying ? { win: racing.self ? "You beat your best" : "You won", tie: "Tie", loss: racing.self ? "Your best won" : "They won" }[duelResult(s.strokes, racing, "").result] : theyWon ? (racing.self ? "Your best won" : "They won") : raceLeft(s.strokes + 1, racing.ghost.strokes)}
