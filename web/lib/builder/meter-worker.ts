@@ -5,23 +5,35 @@
 //   one asked mid-run takes over at the next fan (difficulty.ts pause), the
 //   older one dropped unanswered;
 // - the proofs carried over an edit (carry.ts): the author's rounds replayed
-//   on the new bytes, each ask answered.
-import { estimate, shown, type Shown } from "./difficulty";
+//   on the new bytes, each ask answered;
+// - a published hole's level (the game's community list sorted by Hardest):
+//   its data measured as the meter measures a draft, on the meter's host,
+//   each ask answered.
+import { estimate, estimateHole, shown, type Level, type Shown } from "./difficulty";
 import { carry, type Carried } from "./carry";
 import { loadBuilder, loadModule } from "./load";
 import { makeBuilderHost, type BuilderHost } from "./wasm";
 import type { Draft } from "./draft";
 
-/** What the editor asks: a run's number and the draft as kept (the meter), or a carry of its proofs onto its bytes. */
-export type Ask = { run: number; draft: Draft } | { job: "carry"; n: number; draft: Draft; hex: string; key: string; author: string };
-/** Its answer: the run's estimate as the editor shows it (null: fit refused the draft), or what went wrong; a carry's outcome (null: it failed). */
-export type Reply = { run: number; shown: Shown | null; err?: string } | { job: "carry"; n: number; carried: Carried | null };
+/** What the editor asks: a run's number and the draft as kept (the meter), or a carry of its proofs onto its bytes; the game: a hole's level. */
+export type Ask = { run: number; draft: Draft } | { job: "carry"; n: number; draft: Draft; hex: string; key: string; author: string } | { job: "rate"; n: number; hex: string };
+/** Its answer: the run's estimate as the editor shows it (null: fit refused the draft), or what went wrong; a carry's outcome (null: it failed); a level (null: not measured). */
+export type Reply = { run: number; shown: Shown | null; err?: string } | { job: "carry"; n: number; carried: Carried | null } | { job: "rate"; n: number; level: Level | null };
 
 let latest = 0, replays: Promise<BuilderHost> | null = null;
 /** Between fans: the messages waiting are let in, and the run goes on only if it is still the latest. */
 const still = (run: number) => () => new Promise<boolean>((ok) => setTimeout(() => ok(run === latest), 0));
 
 self.onmessage = async ({ data: m }: MessageEvent<Ask>) => {
+  if ("job" in m && m.job === "rate") {
+    let level: Level | null = null;
+    try {
+      level = (await estimateHole(await loadBuilder(), m.hex))?.level ?? null;
+    } catch {
+      // (not measured: the list leaves it last)
+    }
+    return postMessage({ job: "rate", n: m.n, level } satisfies Reply);
+  }
   if ("job" in m) {
     let carried: Carried | null = null;
     try {

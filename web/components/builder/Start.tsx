@@ -10,7 +10,7 @@
 // first run opens the Garden's dogleg (templates.ts firstRun).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BackButton } from "@/components/About";
-import { HoleMap, NoMap } from "@/components/HoleMap";
+import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
 import { Emblem } from "@/components/Worlds";
 import { Button, Sheet } from "@/components/ui";
@@ -19,14 +19,13 @@ import { exportDraft, type Draft } from "@/lib/builder/draft";
 import { draftMap, draftState } from "@/lib/builder/cards";
 import { draftFile, fromFile, fromPublished } from "@/lib/builder/importing";
 import { loadTakedown } from "@/lib/takedown";
-import { isHoleId, makeChain, type Chain } from "@/lib/chain";
+import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
 import { endpoints, playLink } from "@/lib/builder/holes";
 import { proofKey } from "@/lib/builder/proof";
 import { FIELD, worldName } from "@/lib/builder/rules";
 import { factsOf, isFresh, statsLine, statsOf, versusLine, type HoleStats } from "@/lib/builder/rewards";
 import type { BuilderHost } from "@/lib/builder/wasm";
-import type { MapHole } from "@/lib/duel";
 import type { HoleRow } from "@/lib/types";
 import { BuilderBadges, SaveTestRound } from "./Rewards";
 import { useRewards } from "./useRewards";
@@ -40,10 +39,12 @@ const MAX_FILE = 1 << 20;
 const download = (d: Draft) => saveFile(new Blob([exportDraft(d)], { type: "application/json" }), draftFile(d));
 
 /** The drafts kept in this browser; a new hole in a world, a file opened, a published hole opened for its next version. */
-export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }: {
+export default function Start({ host, author, drafts, said = "", onOpen, onAdd, onDelete }: {
   host: BuilderHost;
   author: string | null;
   drafts: readonly Draft[];
+  /** why something asked of the Builder on arrival (a remix) did not open */
+  said?: string;
   onOpen: (i: number) => void;
   /** a new draft, opened */
   onAdd: (d: Draft) => void;
@@ -51,7 +52,8 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
 }) {
   const [world, setWorld] = useState("garden");
   const [hole, setHole] = useState("");
-  const [why, setWhy] = useState("");
+  const [why, setWhy] = useState(said);
+  useEffect(() => void (said && setWhy(said)), [said]);
   const [busy, setBusy] = useState(false);
   const [wipe, setWipe] = useState<number | null>(null); // the draft asked to be deleted, before the sheet's yes
   const file = useRef<HTMLInputElement>(null);
@@ -65,7 +67,7 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
   const { got, reload } = useRewards(chain, author);
   const rowOf = (d: Draft) => (author && d.slug && got?.rows.find((h) => h.slot === `${author}/${d.slug}`)) || null;
   const elsewhere = got?.rows.filter((h) => !drafts.some((d) => rowOf(d) === h)) ?? [];
-  const maps = useMaps(chain, elsewhere);
+  const maps = useHoleMaps(chain, elsewhere.map((h) => h.id));
   const live = (h: HoleRow) => {
     if (!got || !author) return null;
     const s = statsOf(h, got.saved, author);
@@ -208,21 +210,6 @@ function Live({ s, fresh }: { s: HoleStats; fresh: boolean }) {
       {vs && <small className="bholes__stats">{vs}</small>}
     </>
   );
-}
-
-/** The maps of holes on the chain (their HoleState: what the map draws), each read once while listed. */
-function useMaps(chain: Chain, rows: readonly HoleRow[]) {
-  const [maps, setMaps] = useState<ReadonlyMap<string, MapHole>>(new Map());
-  const ids = rows.map((h) => h.id).join(" ");
-  useEffect(() => {
-    let live = true;
-    for (const id of ids.split(" ").filter(Boolean)) {
-      if (maps.has(id)) continue;
-      void chain.state(id).then((m) => live && setMaps((was) => new Map(was).set(id, m)), () => {});
-    }
-    return () => void (live = false);
-  }, [chain, ids]); // eslint-disable-line react-hooks/exhaustive-deps -- (maps: read once each, not again as they fill)
-  return maps;
 }
 
 /** Each draft's proof key (proof.ts proofKey: the hole as it is now), for its state; null with no proofs, or one fit refuses. */

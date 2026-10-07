@@ -12,9 +12,11 @@
 import type { Chain } from "./chain";
 import { authorOf } from "./builder/holes";
 import { bytesOf, sha256 } from "./sha";
+import { fnv1a } from "./sky";
 import { takenDown } from "./takedown";
 import type { HoleRow } from "./types";
 import type { Verdict } from "./builder/verdict";
+import type { Level } from "./builder/levels";
 import type { BuilderHost } from "./builder/wasm";
 import type { ValidateOptions } from "./builder/pipeline";
 
@@ -97,4 +99,38 @@ export const shownOnly = (rows: readonly HoleRow[], verdicts: ReadonlyMap<string
 export function pageOf(rows: readonly HoleRow[], n: number, verdicts: ReadonlyMap<string, Verdict>) {
   const page = rows.slice(0, n);
   return { rows: shownOnly(page, verdicts), judging: page.some((h) => !verdicts.has(h.id)), more: rows.length - page.length };
+}
+
+/** The hole of the day's candidates: the listed community holes (communityOf's, in the chain's order) from
+ *  the one the hash of the UTC day picks (sky.ts fnv1a, the realm's), on round the list. The day's hole is the
+ *  first the Builder's rules pass (verdictOf: the same verdict everywhere), so the same for everyone, no server. */
+export function dayOrder<H>(rows: readonly H[], now: number): H[] {
+  if (!rows.length) return [];
+  const at = Number(fnv1a(new Date(now).toISOString().slice(0, 10)) % BigInt(rows.length));
+  return [...rows.slice(at), ...rows.slice(0, at)];
+}
+
+/** How the community holes are listed: as the chain lists them (newest first), by plays, or by the meter's level. */
+export type SortBy = "new" | "played" | "hard";
+/** The rows in that order (a copy): most plays first, or the hardest first (levels: the meter's, by id; one not rated yet goes last), a tie in the chain's order. */
+export function sortHoles(rows: readonly HoleRow[], by: SortBy, levels: ReadonlyMap<string, number | null>): HoleRow[] {
+  const key = (h: HoleRow) => (by === "played" ? h.plays : by === "hard" ? (levels.get(h.id) ?? -1) : 0);
+  return rows.map((h, i) => ({ h, i })).sort((x, y) => key(y.h) - key(x.h) || x.i - y.i).map(({ h }) => h);
+}
+
+/** Where a hole's level on the meter (lib/builder/difficulty.ts, worked out in this browser) is kept: this, its version's id. */
+export const HARD_KEY = "gnogolf.hardness";
+/** The level kept for a version (its data never changes), null if none or not one. */
+export function keptLevel(id: string): Level | null {
+  try {
+    const v = localStorage.getItem(`${HARD_KEY}|${id}`);
+    return v === "0" || v === "1" || v === "2" || v === "3" ? (Number(v) as Level) : null;
+  } catch {
+    return null;
+  }
+}
+export function keepLevel(id: string, level: Level): void {
+  try {
+    localStorage.setItem(`${HARD_KEY}|${id}`, String(level));
+  } catch {}
 }

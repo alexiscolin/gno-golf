@@ -75,8 +75,8 @@ export interface Reason {
   piece?: string;
   weight: number;
 }
-export const LEVELS = ["Easy", "Medium", "Hard", "Very hard"] as const;
-export type Level = 0 | 1 | 2 | 3;
+import { LEVELS, type Level } from "./levels";
+export { LEVELS, type Level };
 
 /** A fan's shares: of the shots played (the realm refuses none from a resting ball), those that holed, and those that holed or stopped near. */
 export interface Shares {

@@ -26,12 +26,18 @@ export const SAVED_PAGE = 100;
 /** How many holes one savedOn read takes (chain.ts MAX_SAVED_HOLES). */
 const SAVED_HOLES = 12;
 
-/** An author's published holes (holesOf's, none taken down) and the rounds saved on them, a read a dozen holes. */
-export async function readRewards(chain: Pick<Chain, "holesOf" | "savedOn">, author: string, taken: ReadonlySet<string>): Promise<{ rows: HoleRow[]; saved: SavedOn }> {
-  const rows = listHoles(await chain.holesOf(author), author, taken).mine, ids = rows.map((h) => h.id), reads = [];
+/** The rounds saved on these holes (savedOn's), a read a dozen holes. */
+export async function savedOnAll(chain: Pick<Chain, "savedOn">, ids: readonly string[]): Promise<SavedOn> {
+  const reads = [];
   for (let i = 0; i < ids.length; i += SAVED_HOLES) reads.push(chain.savedOn(ids.slice(i, i + SAVED_HOLES)));
   const parts = await Promise.all(reads);
-  return { rows, saved: { rows: parts.flatMap((p) => p.rows), more: new Set(parts.flatMap((p) => [...p.more])) } };
+  return { rows: parts.flatMap((p) => p.rows), more: new Set(parts.flatMap((p) => [...p.more])) };
+}
+
+/** An author's published holes (holesOf's, none taken down) and the rounds saved on them. */
+export async function readRewards(chain: Pick<Chain, "holesOf" | "savedOn">, author: string, taken: ReadonlySet<string>): Promise<{ rows: HoleRow[]; saved: SavedOn }> {
+  const rows = listHoles(await chain.holesOf(author), author, taken).mine;
+  return { rows, saved: await savedOnAll(chain, rows.map((h) => h.id)) };
 }
 
 /** A published hole's numbers: its players (more: past what one read takes), plays, best, the author's own best (0: none saved) and the players who beat it. */

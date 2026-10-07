@@ -1,7 +1,7 @@
 // The community's holes as the Builder lists them (the GUI spec's B5 and B6):
 // an author's own, and everyone else's, each at its latest version, never a
 // course hole, never one the site took down (takedown.ts).
-import { buildRpc, buildWeb, isAddress, safeEndpoint } from "../chain";
+import { buildRpc, buildWeb, isAddress, isHoleId, safeEndpoint } from "../chain";
 import { takenDown } from "../takedown";
 import type { HoleRow } from "../types";
 
@@ -23,6 +23,13 @@ export const playLink = (h: HoleRow, keep = "") => `/?hole=${encodeURIComponent(
 export const cupsLink = (keep = "") => `/?screen=cups${keep && `&${keep}`}`;
 /** The Builder's page, from the game (keep: as playLink's). */
 export const buildLink = (keep = "") => `/build/${keep && `?${keep}`}`;
+/** The Builder's page opening a community hole's version as a new draft of the player's (keep: as playLink's). */
+export const remixLink = (id: string, keep = "") => `/build/?remix=${encodeURIComponent(id)}${keep && `&${keep}`}`;
+/** The community hole's version a Builder's address asks to remix (?remix=), null if none or not one. */
+export function remixId(search: string): string | null {
+  const id = new URLSearchParams(search).get("remix") || "";
+  return isHoleId(id) && /\/v\d+$/.test(id) && authorOf(id) ? id : null;
+}
 
 /** The node the Builder reads (and its gnoweb): the page's ?rpc= and ?web= as the game takes them, else the build's. */
 export function endpoints(search: string) {

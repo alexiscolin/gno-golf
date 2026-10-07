@@ -7,7 +7,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { hexOf, host, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { draftFile, fromFile, fromPublished } from "../lib/builder/importing.ts";
+import { draftFile, fromFile, fromPublished, remixFrom, remixOf } from "../lib/builder/importing.ts";
+import { remixId, remixLink } from "../lib/builder/holes.ts";
+import { MAX_NOTE } from "../lib/builder/draft.ts";
 import { exportDraft } from "../lib/builder/draft.ts";
 import { canonicalHex } from "../lib/builder/proof.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
@@ -72,4 +74,38 @@ void test("draftFile: a file name from the slug, else the name, else a plain one
   assert.equal(draftFile({ ...d, slug: "mole-run" }), "mole-run.gnogolf.json");
   assert.equal(draftFile({ ...d, title: "Mole Run / ../x" }), "mole-run-x.gnogolf.json");
   assert.equal(draftFile({ ...d, title: "" }), "hole.gnogolf.json");
+});
+
+void test("remixOf: someone's hole as a new draft of the remixer's, its maker credited in the note, no name, no par, no proofs", async () => {
+  const hex = canonicalHex({ ...STARTERS.garden.straight, title: "Mole Run" }, host)!;
+  const d = await fromPublished(hex, host, `${B}/mole-run/v2`, A);
+  if (typeof d === "string") throw new Error(d);
+  const r = remixOf({ ...d, par: 3, note: "theirs" }, `${B}/mole-run/v2`);
+  assert.deepEqual([r.slug, r.title, r.par, r.proofs], ["", "", 0, []]);
+  assert.equal(r.note, `Remix of Mole Run by ${B.slice(0, 8)}…${B.slice(-4)}`);
+  assert.deepEqual(r.pieces, d.pieces, "the hole itself as it was");
+  const long = remixOf({ ...d, title: "M".repeat(40) }, `${B}/x/v1`);
+  assert.ok([...long.note].length <= MAX_NOTE);
+});
+
+void test("remixId and remixLink: a community hole's version to remix, from the Builder's address; anything else none", () => {
+  assert.equal(remixLink(`${B}/mole-run/v2`), `/build/?remix=${encodeURIComponent(`${B}/mole-run/v2`)}`);
+  assert.equal(remixLink(`${B}/mole-run/v2`, "rpc=x"), `/build/?remix=${encodeURIComponent(`${B}/mole-run/v2`)}&rpc=x`);
+  assert.equal(remixId(`?remix=${encodeURIComponent(`${B}/mole-run/v2`)}&rpc=x`), `${B}/mole-run/v2`);
+  for (const q of ["", "?remix=", "?remix=garden/1/v1", "?remix=nope", `?remix=${B}/Bad Slug/v1`]) assert.equal(remixId(q), null, q);
+});
+
+void test("remixFrom: the chain's version read, judged as the Builder opens any, credited; one taken down or unread: why not", async () => {
+  const hex = canonicalHex({ ...STARTERS.garden.straight, title: "Mole Run" }, host)!, id = `${B}/mole-run/v2`;
+  const chain = (data: Record<string, string>, taken = "") => ({
+    holeData: (x: string) => (Object.hasOwn(data, x) ? Promise.resolve(data[x]) : Promise.reject(new Error("no hole"))),
+    chainId: () => Promise.resolve("dev"),
+    get: () => Promise.resolve(new Response(JSON.stringify({ holes: taken ? [taken] : [] }))),
+  });
+  const ok = chain({ [id]: hex });
+  const d = await remixFrom(ok, host, id, ok.get);
+  assert.ok(typeof d === "object" && d.note.startsWith("Remix of Mole Run by ") && d.slug === "", JSON.stringify(d));
+  assert.equal(await remixFrom(chain({}), host, id, ok.get), "The chain has no hole there, or could not be read.");
+  const gone = chain({ [id]: hex }, `${B}/mole-run`);
+  assert.equal(await remixFrom(gone, host, id, gone.get), "This hole was taken down: it cannot be opened in the Builder.");
 });
