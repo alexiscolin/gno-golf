@@ -5,12 +5,10 @@
 // it). The five a first hole needs first (palette.ts commonOf), the rest by
 // group under "More". Each look has its picture, drawn by the game's own
 // meshes offline (media/builder/tiles.mjs) and served as a file.
-import { kicks } from "./rules";
 import { commonOf, type PaletteEntry } from "./palette";
+import { entryName, GROUPS, TILES, type Group } from "./names";
 
-/** The palette's groups under "More", in order. */
-export const GROUPS = ["Walls", "Obstacles", "Ground", "Traps", "Moving pieces"] as const;
-export type Group = (typeof GROUPS)[number];
+export { GROUPS, type Group };
 
 /** One tile: what it is and does, and its looks (the first its own unless chosen otherwise). */
 export interface Tile {
@@ -21,31 +19,6 @@ export interface Tile {
   group: Group;
   looks: readonly PaletteEntry[];
 }
-
-// the mountain's drops: a hazard as a pond is, but what they look like is a fall, not water
-const DROPS = new Set(["cliff", "serac", "crevasse"]);
-
-/**
- * The tiles by what a piece does, the first that takes an entry its tile: a
- * bar that moves from the start (a clock's hand), a rail, a bar, a post
- * that kicks, any post, a surface by its grip (faster than grass, much
- * slower, about as grass), a hill, a hazard (a drop or water), a tunnel.
- * An entry none takes gets a tile of its own (a new kind shows without a change here).
- */
-const TILES: readonly (Omit<Tile, "looks"> & { takes: (e: PaletteEntry) => boolean })[] = [
-  { key: "timed", name: "Moving bar", does: "comes and goes", group: "Moving pieces", takes: (e) => e.kind === "bar" && e.clocks[0] !== "fixed" },
-  { key: "wall", name: "Wall", does: "edges the lane", group: "Walls", takes: (e) => e.kind === "rail" },
-  { key: "barrier", name: "Barrier", does: "blocks the way", group: "Walls", takes: (e) => e.kind === "bar" },
-  { key: "bumper", name: "Bumper", does: "bounces hard", group: "Obstacles", takes: (e) => e.kind === "post" && kicks(e.skin) },
-  { key: "obstacle", name: "Obstacle", does: "in the way", group: "Obstacles", takes: (e) => e.kind === "post" },
-  { key: "ice", name: "Ice", does: "speeds it up", group: "Ground", takes: (e) => e.kind === "surface" && !!e.scale && e.scale.min > 1 },
-  { key: "sand", name: "Sand", does: "slows the ball", group: "Ground", takes: (e) => e.kind === "surface" && !!e.scale && e.scale.def < 0.8 },
-  { key: "floor", name: "Floor", does: "rolls like grass", group: "Ground", takes: (e) => e.kind === "surface" },
-  { key: "slope", name: "Slope", does: "pushes the ball", group: "Ground", takes: (e) => e.kind === "slope" },
-  { key: "drop", name: "Drop", does: "sends it back", group: "Traps", takes: (e) => e.kind === "hazard" && DROPS.has(e.skin) },
-  { key: "water", name: "Water", does: "sends it back", group: "Traps", takes: (e) => e.kind === "hazard" },
-  { key: "tunnel", name: "Tunnel", does: "pops out further", group: "Traps", takes: (e) => e.kind === "tunnel" },
-];
 
 /** A look's name in the chooser: its skin, or Plain. */
 export const lookName = (e: PaletteEntry) => (e.skin ? e.skin[0].toUpperCase() + e.skin.slice(1) : "Plain");
@@ -65,7 +38,7 @@ export function tilesOf(palette: readonly PaletteEntry[]): { first: Tile[]; more
     const looks = palette.filter((e) => def.takes(e) && !all.some((t) => t.looks.includes(e)));
     if (looks.length) all.push({ key: def.key, name: def.name, does: def.does, group: def.group, looks: [...looks].sort((a, b) => order(a) - order(b)) });
   }
-  for (const e of palette) if (!all.some((t) => t.looks.includes(e))) all.push({ key: e.id, name: e.label, does: "", group: "Obstacles", looks: [e] });
+  for (const e of palette) if (!all.some((t) => t.looks.includes(e))) all.push({ key: e.id, name: entryName(e), does: "", group: "Obstacles", looks: [e] });
   const first: Tile[] = [];
   for (const { name, entry } of commonOf(palette)) {
     const t = all.find((x) => x.looks.includes(entry))!;

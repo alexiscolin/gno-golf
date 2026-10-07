@@ -345,7 +345,10 @@ near, proved, world; at 1440, 1280 and 1024.
   name and what it does in two or three words ("slows the ball"); its looks
   (Lagoon, Tidepool, Fountain, Canal) in a chooser by the tile, each
   pictured. Under "More pieces", by group: Walls, Obstacles, Ground, Traps,
-  Moving pieces.
+  Moving pieces. A piece is called by its tile's name everywhere, its look
+  before it when it has one: the board's label, the inspector and every
+  sentence of the checks say "the wall", "the lagoon water", "the rock
+  obstacle" (never "the plain rail").
 - **The board** (centre): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last

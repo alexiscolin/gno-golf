@@ -46,27 +46,27 @@ void test("in the player's words: every refusal without its place's numbers or i
     }
   }
   const one = (d: Draft) => plainOf(run(d)[0]);
-  assert.equal(one(lane("garden", [put("x", "*/hazard/water", [25.5, 8.5], { size: 3 })])), "The cup is inside the water hazard: move the cup or the water hazard.");
-  assert.equal(one(lane("garden", [put("x", "*/post/rock", [3.5, 10])])), "The tee is on the rock post: move the tee or the rock post.");
+  assert.equal(one(lane("garden", [put("x", "*/hazard/water", [25.5, 8.5], { size: 3 })])), "The cup is inside the water: move the cup or the water.");
+  assert.equal(one(lane("garden", [put("x", "*/post/rock", [3.5, 10])])), "The tee is on the rock obstacle: move the tee or the rock obstacle.");
   assert.equal(one(lane("garden", [rail("x", [20, 0], [20, 20])])), "The ball can't get from the tee to the cup: open a way through.");
-  assert.equal(one(lane("garden", [put("x", "*/post/rock", [12, 9]), put("y", "*/post/stump", [12.5, 9])])), "The rock post overlaps the stump post: move one of them.");
-  assert.equal(one(lane("garden", [rail("a", [15, 0], [15, 9.5]), rail("b", [15.5, 10.5], [15.5, 20])])), "The way to the cup squeezes between the plain rail and the plain rail (1.12 wide): widen it to at least 1.25.");
-  assert.equal(one(lane("garden", [{ ...put("x", "*/bar/plank", [10, 0.5]), geometry: { t: "bar", a: [10, 0.5], b: [14, 0.5], thick: 0.5 } }])), "The plank bar is too close to the plain rail (0.25): leave at least 0.5 between them.");
+  assert.equal(one(lane("garden", [put("x", "*/post/rock", [12, 9]), put("y", "*/post/stump", [12.5, 9])])), "The rock obstacle overlaps the stump obstacle: move one of them.");
+  assert.equal(one(lane("garden", [rail("a", [15, 0], [15, 9.5]), rail("b", [15.5, 10.5], [15.5, 20])])), "The way to the cup squeezes between the wall and the wall (1.12 wide): widen it to at least 1.25.");
+  assert.equal(one(lane("garden", [{ ...put("x", "*/bar/plank", [10, 0.5]), geometry: { t: "bar", a: [10, 0.5], b: [14, 0.5], thick: 0.5 } }])), "The plank barrier is too close to the wall (0.25): leave at least 0.5 between them.");
 });
 
 void test("L0: a piece's geometry is its entry's kind and shape, a polygon within GG1's points (a hand-edited file)", () => {
   const rock = put("x", "*/post/rock", [12, 9]);
-  assert.deepEqual(said(lane("garden", [{ ...rock, geometry: { t: "rail", a: [12, 9], b: [14, 9] } }])), ["L0 x: The rock post cannot be drawn as a rail"]);
+  assert.deepEqual(said(lane("garden", [{ ...rock, geometry: { t: "rail", a: [12, 9], b: [14, 9] } }])), ["L0 x: The rock obstacle cannot be drawn as a rail"]);
   const cave = put("x", "*/tunnel/cave", [8, 8]);
   assert.deepEqual(said(lane("garden", [{ ...cave, geometry: { t: "poly", pts: [[8, 8], [11, 8], [8, 11]] } }])), ["L0 x: The cave tunnel cannot be drawn as a polygon"]);
   const ring = Array.from({ length: 70 }, (_, k): [number, number] => [+(15 + 3 * Math.cos((k * 2 * Math.PI) / 70)).toFixed(2), +(10 + 3 * Math.sin((k * 2 * Math.PI) / 70)).toFixed(2)].map((x) => Math.round(x * 4) / 4) as [number, number]);
   const pond = put("x", "*/hazard/water", [12, 7]);
-  assert.deepEqual(said(lane("garden", [{ ...pond, geometry: { t: "poly", pts: ring } }])), ["L0 x: The water hazard's outline has 70 points: at most 64"]);
+  assert.deepEqual(said(lane("garden", [{ ...pond, geometry: { t: "poly", pts: ring } }])), ["L0 x: The water's outline has 70 points: at most 64"]);
 });
 
 void test("L0: every point on the quarter grid, as the board places them (a hole read back, a hand-edited file)", () => {
   const off = { ...rail("x", [10, 4], [14, 4]), geometry: { t: "rail" as const, a: [10.1, 4] as [number, number], b: [14, 4] as [number, number] } };
-  assert.deepEqual(said(lane("garden", [off])), ["L0 x: The plain rail is off the grid: every point on a quarter"]);
+  assert.deepEqual(said(lane("garden", [off])), ["L0 x: The wall is off the grid: every point on a quarter"]);
   assert.deepEqual(said({ ...lane("garden", []), pin: [28.6, 11.5] }), ["L0 -: The cup is off the grid: every point on a quarter"]);
 });
 

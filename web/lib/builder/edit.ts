@@ -7,7 +7,8 @@
 // issues list would.
 import type { Issue } from "./checks";
 import type { ClockSpec, Draft, Geometry, Piece, V } from "./draft";
-import { entryParts, frame, pieceName } from "./gg1";
+import { entryParts, frame } from "./gg1";
+import { pieceName } from "./names";
 import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
@@ -100,7 +101,7 @@ export function changeWorld(d: Draft, world: string, palette: readonly PaletteEn
   const pieces = d.pieces.map((p) => {
     const { kind, skin } = entryParts(p.entry);
     const e = palette.find((x) => x.kind === kind && x.skin === skin && x.world === world) ?? palette.find((x) => x.kind === kind && x.skin === skin);
-    if (!e) refused.push(`the ${skin || "plain"} ${kind} at ${at(whereOf(p.geometry))}`);
+    if (!e) refused.push(`${pieceName(p)} at ${at(whereOf(p.geometry))}`);
     return e ? { ...p, entry: e.id } : p;
   });
   return refused.length ? { refused } : { ...d, world, pieces, proofs: [] };
@@ -319,7 +320,7 @@ function nearest(rest: Draft, p: Piece, o: ValidateOptions, r0 = CELL, reach = F
   return null;
 }
 
-/** A piece as a screen reader names it: what it is and where ("The rock post at (13.5, 6.5)"). */
+/** A piece as a screen reader names it: what it is and where ("The rock obstacle at (13.5, 6.5)"). */
 export const pieceLabel = (p: Piece) => {
   const n = pieceName(p);
   return `${cap(n)} at ${at(whereOf(p.geometry))}`;

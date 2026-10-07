@@ -25,6 +25,7 @@ import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
 import { labelAt, throttle } from "@/lib/builder/juice";
+import { entryName } from "@/lib/builder/names";
 
 export interface BoardProps {
   draft: Draft;
@@ -288,7 +289,7 @@ export default function Board(props: BoardProps) {
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
       {(flash || ghost || live) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">
-          {flash ? flash.text : ghost ? ghost.why || `${armed?.label} · ${fmt(whereOf(ghost.p.geometry))}` : live!.why || "Let go to place it"}
+          {flash ? flash.text : ghost ? ghost.why || `${armed ? entryName(armed) : ""} · ${fmt(whereOf(ghost.p.geometry))}` : live!.why || "Let go to place it"}
         </span>
       )}
     </section>

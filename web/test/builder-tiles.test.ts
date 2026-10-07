@@ -67,3 +67,23 @@ void test("every look in every Builder world has its picture: a small WebP of th
   assert.deepEqual(missing, [], "no picture: run `node media/builder/tiles.mjs`");
   assert.deepEqual(big, [], "over 8 KB");
 });
+
+void test("one name per piece: the board, the inspector and every sentence name a piece as its palette tile does", async () => {
+  const { entryName, pieceName } = await import("../lib/builder/names.ts");
+  const piece = (entry: string) => ({ id: "x", entry, geometry: { t: "post" as const, c: [0, 0] as [number, number], r: 1 }, params: {}, clock: { k: "fixed" as const } });
+  assert.equal(pieceName(piece("*/rail/")), "the wall", "not the plain rail");
+  assert.equal(pieceName(piece("*/slope/")), "the slope", "not the plain slope");
+  assert.equal(pieceName(piece("*/post/bumper")), "the bumper");
+  assert.equal(pieceName(piece("*/hazard/lagoon")), "the lagoon water");
+  assert.equal(pieceName(piece("*/post/rock")), "the rock obstacle");
+  assert.equal(pieceName(piece("*/bar/plank")), "the plank barrier");
+  for (const [w] of palettes) {
+    for (const t of tiles(w)) {
+      for (const e of t.looks) {
+        const name = entryName(e);
+        assert.ok(name.toLowerCase().includes(t.name.toLowerCase()), `${w} ${e.id}: "${name}" says its tile's name, ${t.name}`);
+        assert.equal(`the ${name.toLowerCase()}`, pieceName(piece(e.id)), `${w} ${e.id}: one name on the board and in a sentence`);
+      }
+    }
+  }
+});

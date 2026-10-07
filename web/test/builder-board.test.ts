@@ -108,7 +108,7 @@ void test("a release or a copy asks a bounded number of checks: a long drag onto
 
 void test("the keyboard: a piece named for a screen reader by what and where it is; the armed piece dropped at the nearest place to a point that holds", () => {
   const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
-  assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock post at (13.5, 6.5)");
+  assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock obstacle at (13.5, 6.5)");
   const at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
   const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden, census: ctx.census });
   assert.ok(placed && placed.draft.pieces.length === d.pieces.length + 1, "placed");

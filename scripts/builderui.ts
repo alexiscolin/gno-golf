@@ -157,17 +157,17 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 // a piece deleted from the Inspector: the focus on the board, not lost; a draft deleted: the game's sheet, Escape keeps it
 {
   const c = await editor(1280, 800);
-  // the straight starter (its posts): from the drafts screen
+  // the straight starter (its obstacles): from the drafts screen
   await c.js(`document.querySelector(".bhead .round--icon").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__starts button")`)); k++) await sleep(300);
   await c.js(`document.querySelector(".bholes__starts button").click()`);
-  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece][aria-label*=' post at ']")`)); k++) await sleep(300);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece][aria-label*=' obstacle at ']")`)); k++) await sleep(300);
   await sleep(800);
   const key = async (key: string, code = key) => {
     await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code });
     await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });
   };
-  await c.js(`[...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))).focus()`);
+  await c.js(`[...document.querySelectorAll("[data-piece]")].find((g) => / obstacle at /.test(g.getAttribute("aria-label"))).focus()`);
   await sleep(600);
   const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
   assert.equal(await c.js(`[...document.querySelectorAll(".insp input")].filter((x) => x.checkVisibility()).length`), 0, "a piece selected: no number to type until Details is opened");
@@ -182,7 +182,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   // a post dragged from the board onto the palette's bin: removed
   const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
   const centre = (sel: string) => c.js<[number, number]>(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-  const post = await c.js<[number, number]>(`(() => { const g = [...document.querySelectorAll("[data-piece]")].find((g) => / post at /.test(g.getAttribute("aria-label"))); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const post = await c.js<[number, number]>(`(() => { const g = [...document.querySelectorAll("[data-piece]")].find((g) => / obstacle at /.test(g.getAttribute("aria-label"))); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const bin = await centre("[data-bin]");
   await mouse("mousePressed", ...post);
   for (let k = 1; k <= 6; k++) {
