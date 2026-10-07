@@ -10,6 +10,8 @@
 // - idle, the loop stopped: no frame asked for, little CPU;
 // - one WebGL context for the page, a quick test and Prove it visited and
 //   left (stage.ts);
+// - five quick tests in a row leave no GL program, texture or buffer behind
+//   (the game draws with the board's own renderer, lent to it);
 // - no WebGL: the 2D board.
 // It prints the numbers as JSON.
 //
@@ -29,10 +31,15 @@ const { launch, sleep, APP } = cdp;
 // (fps: the frames shown a second, with room for the harness's pacing; the frame's work is held to 60 and 30 exactly)
 const W = 1440, H = 900, BUDGET = { fps: 50, slowFps: 30, idleCpu: 0.05, idleFrames: 2 };
 
-// counted from the first script: the canvases given a WebGL context, and the frames asked for
-const COUNT = `window.__gl = new Set(); window.__raf = 0;
+// counted from the first script: the canvases given a WebGL context, the GL objects alive on them, and the frames asked for
+const COUNT = `window.__gl = new Set(); window.__raf = 0; window.__live = { Program: 0, Texture: 0, Buffer: 0 };
 const gc = HTMLCanvasElement.prototype.getContext;
 HTMLCanvasElement.prototype.getContext = function (t, ...a) { const r = gc.call(this, t, ...a); if (r && /webgl/.test(t)) window.__gl.add(this); return r; };
+for (const k of Object.keys(window.__live)) {
+  const p = WebGL2RenderingContext.prototype, make = p["create" + k], drop = p["delete" + k];
+  p["create" + k] = function (...a) { const o = make.apply(this, a); if (o) window.__live[k]++; return o; };
+  p["delete" + k] = function (o) { if (o) window.__live[k]--; return drop.call(this, o); };
+}
 const raf = window.requestAnimationFrame.bind(window);
 window.requestAnimationFrame = (f) => (window.__raf++, raf(f));`;
 
@@ -99,14 +106,20 @@ const raf0 = await c.js<number>(`window.__raf`), t0 = await task(), w0 = Date.no
 await sleep(3000);
 const idle = { frames: (await c.js<number>(`window.__raf`)) - raf0, cpu: Math.round(((await task()) - t0) / ((Date.now() - w0) / 1000) * 1000) / 1000 };
 
-// a quick test and Prove it, and back: still the one context
-await c.js(`document.querySelector(".board").focus()`);
-await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "t", code: "KeyT", text: "t" });
-await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "t", code: "KeyT" });
-await until(`!!document.querySelector(".tbench--quick .tmode__chip")`, "the quick test");
-await sleep(1500);
-await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
-await until(`!document.querySelector(".tbench--quick")`, "back from the quick test");
+// five quick tests, and back from each: the GL objects alive after each (the first one's left are the board's renderer's cache)
+const live: Record<string, number>[] = [];
+for (let k = 0; k < 5; k++) {
+  await c.js(`document.querySelector(".board").focus()`);
+  await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "t", code: "KeyT", text: "t" });
+  await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "t", code: "KeyT" });
+  await until(`!!document.querySelector(".tbench--quick .tmode__chip")`, "the quick test");
+  await sleep(2500);
+  await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+  await until(`!document.querySelector(".tbench--quick")`, "back from the quick test");
+  await sleep(800);
+  live.push(await c.js<Record<string, number>>(`({ ...window.__live })`));
+}
+// and Prove it, and back: still the one context
 await c.js(`[...document.querySelectorAll("button")].find((b) => /^Prove it$/.test(b.textContent)).click()`);
 await until(`!!document.querySelector(".tmode")`, "Prove");
 await c.js(`[...document.querySelectorAll("button")].find((b) => /^Back to edit$/.test(b.textContent)).click()`);
@@ -123,7 +136,7 @@ for (let k = 0; k < 120 && !(await flat.ev<boolean>(`!!document.querySelector(".
 const fallback = await flat.ev<boolean>(`!!document.querySelector(".board__ground") && !document.querySelector(".board--3d")`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after }, idle, contexts, fallback2D: fallback };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after }, idle, contexts, live, fallback2D: fallback };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
@@ -132,6 +145,7 @@ assert.equal(after, 1, `the drop built the hole ${after} times`);
 assert.ok(idle.frames <= BUDGET.idleFrames, `idle: ${idle.frames} frames asked for`);
 assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);
 assert.equal(contexts, 1, `${contexts} WebGL contexts`);
+for (const k of Object.keys(live[0])) assert.ok(live.every((l) => l[k] <= live[0][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
 assert.ok(fallback, "no WebGL: no 2D board");
 console.log("builderbench: ok");
 process.exit(0);
