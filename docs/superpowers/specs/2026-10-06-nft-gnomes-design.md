@@ -465,6 +465,7 @@ func SetSiteURL(cur realm, url string)                 // https://, at most 128 
 func SetTreasury(cur realm, to address)                // offers the treasury to a valid address, not the realm's; it takes it with AcceptTreasury
 func SetRoyaltyBps(cur realm, bps int64)               // 0 to 1,000
 func Sweep(cur realm)                                  // sends the realm's ugnot, coins sent to it by mistake, to the treasury
+func AcceptRules(cur realm, path string)               // the rules the earned gnomes' proof reads: store's current writer only, a realm (ADR-012)
 func Transfer(cur realm, to address)
 func Accept(cur realm)
 func Renounce(cur realm)
@@ -672,11 +673,14 @@ format. It fails closed in three places:
 - a best whose strokes are not one to three digits and a space panics;
 - `bests` values carry no format version, so a later rules realm could
   change their shape unseen. The realm therefore refuses to prove anything
-  while `store.Writer()` is not the golf/v2 path it was built against (a
-  constant, rewritten per namespace by `scripts/stage.sh` as the other
-  imports are). When store moves to new rules (`Propose`, `Ready`),
-  `MintEarned` refuses with "rules changed" until gnomes is updated;
-  `Proof` answers `"ok":false` with that reason.
+  while `store.Writer()` is not the rules it reads: state, golf/v2 at
+  deploy (rewritten per namespace by `scripts/stage.sh` as the other
+  imports are). When store moves to new rules (`Propose`, `Ready`), or is
+  paused, `MintEarned` refuses with "rules changed" and `Proof` answers
+  `"ok":false` with that reason, until the owner, having checked that the
+  new rules keep `bests`, `copies` and `holes` as golf/v2 writes them,
+  calls `AcceptRules` with their path: store's current writer only, never
+  another realm nor a paused store's `""` (ADR-012).
 
 So a later format can refuse a mint, never prove a false one. A script
 compares the proof with golf/v2's `BestOf` on onyx's real rows before each
@@ -978,7 +982,7 @@ How the project's owner earns, and only that:
 | The treasury moved to a wrong or hostile address | two steps: `SetTreasury` only offers, and the sales keep going to the old treasury until the new address calls `AcceptTreasury`; the offer refuses the realm's own address and an invalid one |
 | GNOT restricted again by governance | every `Buy` reverts (the treasury send fails) and nobody's coins move; nothing is held, so nothing is stuck |
 | The closing date pushed back to sell more | `SetCloseAt` only moves it earlier; `AddWave` refuses a start at or after it; `Buy` refuses a genesis id from it on |
-| A stolen owner key | can publish a series, open waves before the close, change the prices of the waves to come, bring the close forward, pause the sale, set the site's URL (which the shop's links and `external_url` follow), offer the treasury (it moves only if the new address accepts) and set the royalty; cannot mint for anyone, move or burn a token, take a sale, push the close later, or change a published series or an opened wave. `Renounce` freezes the settings for good |
+| A stolen owner key | can publish a series, open waves before the close, change the prices of the waves to come, bring the close forward, pause the sale, set the site's URL (which the shop's links and `external_url` follow), offer the treasury (it moves only if the new address accepts), set the royalty and accept store's current rules for the earned gnomes' proof (`AcceptRules`, never another realm); cannot mint for anyone, move or burn a token, take a sale, push the close later, or change a published series or an opened wave. `Renounce` freezes the settings for good |
 | A price cut that undercuts earlier buyers | a wave keeps the prices it opened at; `SetPrice` moves only the waves opened after it |
 | A wallet taking several Legendaries | the lifetime cap of one Legendary a wallet; like every cap, it spreads the sale, it does not stop a buyer with many wallets |
 | The player window gamed by fresh wallets | a record costs a finished hole on chain, and the window has its own cap per wallet and wave; it spreads the first days over players, it does not claim to stop a determined buyer |
