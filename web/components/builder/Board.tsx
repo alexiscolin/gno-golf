@@ -11,7 +11,7 @@
 // Live, the checks run without the render census (fast); a drop or a
 // release is checked with it.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, movePiece, nextId, pieceLabel, placePiece, snap, whereOf } from "@/lib/builder/edit";
+import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, ghostAt, middleOf, movePiece, nextId, pieceLabel, snap, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
 import { plainOf } from "@/lib/builder/explain";
 import { centreOn, K_MAX, K_MIN, pinch, zoomAt } from "@/lib/builder/view";
@@ -21,7 +21,7 @@ import { entry as entryIn, type PaletteEntry } from "@/lib/builder/palette";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, Piece, V } from "@/lib/builder/draft";
-import { middleOf, PieceShape } from "./PieceShape";
+import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 
 export interface BoardProps {
@@ -127,11 +127,8 @@ export default function Board(props: BoardProps) {
     return [view.x + (e.clientX - r.left) / view.k, view.y + (e.clientY - r.top) / view.k];
   };
 
-  // the armed entry's piece, centred under the pointer, snapped
-  const ghostAt = (at: V): Piece => {
-    const p = placePiece(armed!, nextId(draft), at), m = middleOf(p), w = whereOf(p.geometry);
-    return movePiece(p, snap([w[0] + at[0] - m[0], w[1] + at[1] - m[1]], step));
-  };
+  // the armed entry's piece, centred under the pointer, every point of it on the grid
+  const ghostOf = (at: V): Piece => ghostAt(armed!, nextId(draft), at, step);
   const firstWhy = (is: Issue[]) => (is[0] ? plainOf(is[0]) : "");
 
   function onDown(e: RPointerEvent<SVGSVGElement>) {
@@ -169,7 +166,7 @@ export default function Board(props: BoardProps) {
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
     const at = unit(e), d = drag.current;
     if (armed && !d) {
-      const p = ghostAt(at), why = firstWhy(armedCheck.piece(p)); // (the same snapped place: no check, no render)
+      const p = ghostOf(at), why = firstWhy(armedCheck.piece(p)); // (the same snapped place: no check, no render)
       if (!ghost || ghost.why !== why || whereOf(ghost.p.geometry).join() !== whereOf(p.geometry).join()) setGhost({ p, why });
       return;
     }
@@ -198,7 +195,7 @@ export default function Board(props: BoardProps) {
     drag.current = null;
     setLive(null);
     if (armed && !d) {
-      const p = ghostAt(at), why = canPlace(draft, p, full);
+      const p = ghostOf(at), why = canPlace(draft, p, full);
       if (why.length) return props.onSay(plainOf(why[0]));
       props.onSet(frame({ ...draft, pieces: [...draft.pieces, p] }));
       props.onSelect(p.id);
