@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buttonClass } from "@/components/button";
 
 // What a gnome's page is where the shop is not offered (netlify.toml's
 // country rules, lib/gnomes/geo.ts): the shop is not here, the game is.
@@ -12,7 +13,7 @@ export default function Unavailable() {
         <h2 id="away-title">The gnome shop is not available in your region</h2>
         <p>The game itself is free to play, here as everywhere.</p>
         <div className="banner__row">
-          <a className="btn btn--main" href="/">Play Gnogolf</a>
+          <a className={buttonClass({ variant: "primary" })} href="/">Play Gnogolf</a>
         </div>
       </div>
     </div>

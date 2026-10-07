@@ -17,7 +17,7 @@ import { SHOP_LINE } from "@/lib/gnomes/door";
 import type { Tier } from "@/lib/gnomes/vocab";
 import { sound } from "@/lib/feel";
 import { Tile } from "./parts";
-import { buttonClass } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 
 /** The menu's shop panel's gnome: the wave's Epic (a gnome's size, as the games' panels show theirs), else its
  *  Legendary, its id; 0 for none. */

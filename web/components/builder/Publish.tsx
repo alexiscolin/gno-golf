@@ -13,7 +13,8 @@
 // holeHolds, publishSteps).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCopied } from "@/components/common";
-import { Button, buttonClass } from "@/components/ui";
+import { Button } from "@/components/ui";
+import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
 import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { makeChain, wait } from "@/lib/chain";
