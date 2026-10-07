@@ -9,7 +9,7 @@ import { timeOf, islandBox } from "./camera";
 import { bush, stone, flower, tuft, mole, windmill, smokeBatch } from "./props";
 import { seeded, GRASS } from "./common";
 import { roughOf } from "./garden";
-import { worldOf, fromWorld, gapWater, DECK, GAP_Y, type Skins } from "./worlds";
+import { worldOf, drawnBy, fromWorld, gapWater, DECK, GAP_Y, type Skins } from "./worlds";
 import { WEATHER_SKINS } from "./weather";
 import { POSTS, BARS, roofs, SLAB } from "./pieces";
 import { zoneDetail, waterMask, pondWater } from "./zones";
@@ -170,6 +170,7 @@ export function buildHole(s: Hole, { defer = false, census }: { defer?: boolean;
     ticks,
     tick: (time: number) => { if (motion) for (const f of ticks) f(time); },
     smokes,
+    scenery: drawnBy(s),
   };
   const course: Course = withData(g, data);
   state.report = null;

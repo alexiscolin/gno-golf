@@ -175,6 +175,8 @@ export interface CourseData extends ObjData {
   ticks: Tick[];
   tick: Tick;
   smokes: THREE.Object3D[] | null;
+  /** the world whose module drew it (worlds.ts drawnBy): the hole's own, or the garden it fell back to */
+  scenery: string;
 }
 export interface Course extends THREE.Group {
   userData: CourseData;

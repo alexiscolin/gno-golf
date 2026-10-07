@@ -18,6 +18,8 @@
 // - five quick tests in a row leave no GL program, texture or buffer behind
 //   (the game draws with the board's own renderer, lent to it);
 // - the context lost: the 2D board until it is back, then the 3D drawn again;
+// - round the worlds (Island, Town, Mountain, back to the Garden): each hole
+//   built with its own world's scenery, the player's view painted with it;
 // - a world's module that would not load (offline): the hole left where it
 //   is, said, nothing thrown; picked again once it loads, built there;
 // - no WebGL: the 2D board, and no test (T and Prove it say why; the
@@ -172,7 +174,8 @@ await c.js(`(() => { const seen = new Set(performance.getEntriesByType("resource
   for (const k of ["appendChild", "insertBefore"]) { const f = Node.prototype[k]; Node.prototype[k] = function (n, ...r) { off(n); return f.call(this, n, ...r); }; }
   return true; })()`);
 const islandBuilds = await builds(), errors0 = c.errors.length;
-const toIsland = () => c.js(`(() => { const el = document.querySelector('select[aria-label="The hole\\'s world"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, "island"); el.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+const toWorld = (w: string) => c.js(`(() => { const el = document.querySelector('select[aria-label="The hole\\'s world"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, "${w}"); el.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+const toIsland = () => toWorld("island");
 await toIsland();
 let said = "";
 for (let k = 0; k < 25 && !said; k++) {
@@ -185,6 +188,16 @@ await c.js(`window.__offline = false`);
 await toIsland();
 await sleep(2500);
 const world = { ...offline, builtAgain: (await builds()) - islandBuilds - offline.built };
+
+// round the worlds and back: each built with its own scenery (Scene's ?camlog __scenery: the module that drew it), the player's view painted with it
+const scenery: { world: string; drawn: string; eyes: number }[] = [{ world: "island", drawn: await c.js<string>(`window.__scenery`), eyes: 0 }];
+for (const w of ["town", "mountain", "garden"]) {
+  const b0 = await builds(), e0 = await eyes();
+  await toWorld(w);
+  for (let k = 0; k < 50 && (await builds()) === b0; k++) await sleep(200);
+  await sleep(300);
+  scenery.push({ world: w, drawn: await c.js<string>(`window.__scenery`), eyes: (await eyes()) - e0 });
+}
 c.kill();
 
 // no WebGL: the 2D board
@@ -203,7 +216,7 @@ await sleep(1500);
 const noTest = await flat.js<{ quick: string; game: boolean; fell: boolean }>(`({ quick: [...document.querySelectorAll(".board__toggle")].find((b) => /Quick test/.test(b.textContent))?.title ?? "", game: !!document.querySelector(".tbench--quick, .tmode"), fell: !document.querySelector(".board") })`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked, eyesDuring, eyesAfter }, slugBuilt, zoom, idle, contexts, live, lost, world, fallback2D: fallback, noTest };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked, eyesDuring, eyesAfter }, slugBuilt, zoom, idle, contexts, live, lost, world, scenery, fallback2D: fallback, noTest };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
@@ -216,6 +229,7 @@ assert.ok(zoom.renders <= zoom.frames + 1, `zoomed: ${zoom.renders} renders in $
 assert.ok(idle.frames <= BUDGET.idleFrames, `idle: ${idle.frames} frames asked for`);
 assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);
 assert.equal(contexts, 1, `${contexts} WebGL contexts`);
+assert.ok(scenery.every((x, i) => x.drawn === x.world && (i === 0 || x.eyes === 1)), `a world's own scenery: ${JSON.stringify(scenery)}`);
 assert.ok(world.built === 0 && /could not load/.test(world.said) && !world.thrown.length && world.builtAgain === 1, `a world that would not load: ${JSON.stringify(world)}`);
 assert.ok(lost.whileLost && lost.backIn3d && lost.drawn, `the context lost and back: ${JSON.stringify(lost)}`);
 for (const k of Object.keys(live[0])) assert.ok(live.every((l) => l[k] <= live[0][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
