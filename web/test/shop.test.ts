@@ -9,6 +9,7 @@ import {
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
+import { depositFor, feeFor } from "../lib/adena.ts";
 
 const catalogue = JSON.parse(fs.readFileSync(new URL("../../data/gnomes.json", import.meta.url), "utf8")) as Catalogue;
 const entries = catalogue.gnomes;
@@ -253,9 +254,12 @@ test("shop: the bill: each cost on a line, at most their sum, short by what the 
   const b = bill({ price: 333_330_000, bytes: 3849, storagePrice: 100, gas: 50e6, gasPrice: 0.001, balance: 120e6 });
   assert.deepEqual(b.lines.map(([k]) => k), ["Price", "Storage deposit", "Network fee"]);
   assert.equal(b.lines[0][1], 333_330_000);
-  assert.equal(b.lines[1][1], 423_400); // 3,849 bytes and a tenth more, at 100 ugnot
+  assert.equal(b.lines[1][1], 423_391); // 3,849 bytes at 100 ugnot, and a tenth more, rounded up
   assert.equal(b.lines[2][1], 75_000); // 50M gas at 0.001, half again
-  assert.equal(b.most, 333_330_000 + 423_400 + 75_000);
+  // the wallet's own rules, the Builder's bill's too (adena.ts): never a copy that drifts from what Adena is asked
+  assert.equal(b.lines[1][1], depositFor(3849, 100));
+  assert.equal(b.lines[2][1], feeFor(50e6, 0.001));
+  assert.equal(b.most, 333_330_000 + 423_391 + 75_000);
   assert.equal(b.short, b.most - 120e6);
   assert.equal(bill({ price: 0, bytes: 100, storagePrice: 100, gas: 1e6, gasPrice: 0.001, balance: null }).short, null);
   assert.equal(bill({ price: 0, bytes: 100, storagePrice: 100, gas: 1e6, gasPrice: 0.001, balance: 10e6 }).short, 0);

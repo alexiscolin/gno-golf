@@ -4,6 +4,7 @@
 // state: the sale's phase, why a gnome can't be bought in plain words, the
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
+import { depositFor, feeFor } from "../adena";
 import { GNOMES_REALM, isAddress, shortAddr, type Chain } from "../chain";
 import { cap } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
@@ -295,11 +296,11 @@ export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "tier" | "wave"
 }
 
 // ------------------------------------------------------------ the bill (shared pieces)
-/** What a signature costs, each line in ugnot: the price, the storage deposit for bytes (and a tenth more:
- *  the chain charges what is written), the network fee for gas (half again for a rising price, as every ask);
- *  most: their sum; short: what the balance lacks (0 enough, null unknown). */
+/** What a signature costs, each line in ugnot: the price, the storage deposit for bytes, the network fee for
+ *  gas, both as the wallet is asked them (adena.ts depositFor, feeFor); most: their sum; short: what the
+ *  balance lacks (0 enough, null unknown). */
 export function bill({ price, bytes, storagePrice, gas, gasPrice, balance }: { price: number; bytes: number; storagePrice: number; gas: number; gasPrice: number; balance: number | null }) {
-  const deposit = Math.ceil(bytes * 1.1) * storagePrice, fee = Math.ceil(gas * gasPrice * 1.5);
+  const deposit = depositFor(bytes, storagePrice), fee = feeFor(gas, gasPrice);
   const lines: [string, number][] = [["Price", price], ["Storage deposit", deposit], ["Network fee", fee]];
   const most = price + deposit + fee;
   return { lines: lines.filter(([k, v]) => v > 0 || k !== "Price"), most, short: balance == null ? null : Math.max(0, most - balance) };

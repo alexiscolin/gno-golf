@@ -294,6 +294,9 @@ export function commitsOf(c: Work, n = (c.pts || []).length, start = 0) {
 // what is asked of the account: the gas at the price, with half again for a
 // price that rises between the reading and the block
 export const feeFor = (gasWanted: number, price: number) => Math.ceil(gasWanted * price * 1.5);
+// what is asked of the account to store bytes at price ugnot a byte (the
+// chain's: vm params), a tenth more: the chain takes what is really written
+export const depositFor = (bytes: number, price: number) => Math.ceil(bytes * price * 1.1);
 // the price asked when the chain's is not given: ugnot a gas
 export const PRICE = 0.001;
 // Gas asked for one commit, calibrated on gno_call simulate=true: the work model already bounds the shots

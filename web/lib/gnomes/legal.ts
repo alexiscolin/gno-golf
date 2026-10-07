@@ -48,8 +48,9 @@ const stamp = (unix: number) => {
   const d = new Date(unix * 1000);
   return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${hm(d)} UTC (${jstDate(unix)})`;
 };
-/** GNOT "about" a figure, to the hundredth (a deposit, a fee). */
-const about = (ugnot: number) => (Math.ceil(ugnot / 1e4) / 100).toFixed(2);
+/** A figure up to the hundredth of a GNOT (a deposit, a fee), in ugnot; about: that, in GNOT. */
+const up = (ugnot: number) => Math.ceil(ugnot / 1e4) * 1e4;
+const about = (ugnot: number) => (up(ugnot) / 1e6).toFixed(2);
 
 interface Order { name: string; id: number; tier: string; n: number; price: number; deposit: number; fee: number; address: string; closesAt: number; now: number }
 /** The order, term by term (§1.1): [label, term]; the total "about" (the deposit and fee are the bill's most). */
@@ -58,7 +59,7 @@ export function review(o: Order): [string, string][] {
     ["Item", `${o.name} (#${o.id}, ${TIER[o.tier] || o.tier}), ${o.n} ${o.n === 1 ? "item" : "items"}`],
     ["Price", `${gnot(o.price)} GNOT`],
     ["Other costs", `Storage deposit about ${about(o.deposit)} GNOT (held by the chain, returned if you burn the gnome) + network fee about ${about(o.fee)} GNOT. Neither is paid to us.`],
-    ["Total", `about ${gnot(o.price + Math.ceil(o.deposit / 1e4) * 1e4 + Math.ceil(o.fee / 1e4) * 1e4)} GNOT`],
+    ["Total", `about ${gnot(o.price + up(o.deposit) + up(o.fee))} GNOT`],
     ["Payment", "Paid now, in GNOT, from your own wallet, in the transaction you sign."],
     ["Delivery", `Delivered at once to ${shortAddr(o.address, 6)}, in the same transaction.`],
     ["Sale period", `The genesis sale closes on ${utcDate(o.closesAt, o.now)} (${jstDate(o.closesAt)}).`],
