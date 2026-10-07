@@ -10,11 +10,11 @@
 // hole as it is (quickshot.ts), and the meter's best line; never a proof.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
-import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, snap, whereOf, clampMove } from "@/lib/builder/edit";
+import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, whereOf, clampMove } from "@/lib/builder/edit";
 import { gauges, meterFace, offAtLimit, pieceGauges, testGate, verdict } from "@/lib/builder/editor";
 import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
-import { notTurned, turnPiece } from "@/lib/builder/handles";
+import { notTurned, QUARTER, snap, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
 import { canonicalHex, proofKey, provedAs } from "@/lib/builder/proof";
@@ -216,9 +216,9 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const piece = draft.pieces.find((p) => p.id === selected) ?? null;
   const turn = () => {
     if (!piece || !full) return;
-    const same = notTurned(piece);
+    const same = notTurned(piece, draft.tee);
     if (same) return say(same);
-    const t = turnPiece(piece), why = canPlace(draft, t, full);
+    const t = turnPiece(piece, draft.tee), why = canPlace(draft, t, full);
     if (why.length) return say(refusalOf(why[0]));
     set({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? t : p)) });
   };
@@ -233,14 +233,14 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   };
   const nudge = (d: V) => {
     if (!piece || !quick || !full) return;
-    const w = whereOf(piece.geometry), to = clampMove(draft, piece.id, snap([w[0] + d[0], w[1] + d[1]], 0.25), quick);
+    const w = whereOf(piece.geometry), to = clampMove(draft, piece.id, snap([w[0] + d[0], w[1] + d[1]], QUARTER, draft.tee), quick);
     tryEdit({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? movePiece(piece, to) : p)) }, "");
   };
   const fix = (i: Issue) => quick && tryEdit(fixOf(i, draft, quick), "No free place near it: move it by hand.");
   // the keyboard: the tee or the cup moved as a drag lets it go; the armed piece dropped between them, then selected
   const moveEnd = (which: "tee" | "pin", d: V) => {
     if (!quick || !full) return;
-    const r = dropEnd(draft, which, snap([draft[which][0] + d[0], draft[which][1] + d[1]], 0.25), quick, full);
+    const r = dropEnd(draft, which, snap([draft[which][0] + d[0], draft[which][1] + d[1]], QUARTER, draft.tee), quick, full);
     if ("why" in r) return r.why && say(r.why);
     set(r);
   };

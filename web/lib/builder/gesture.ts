@@ -8,10 +8,10 @@
 // census before it is kept (edit.ts dropMove, dropHandle, dropEnd). The
 // board's own gestures in pixels (a pan, a pinch, a quick shot's pull) are
 // the board's.
-import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, ghostAt, movePiece, nextId, snap, whereOf } from "./edit";
+import { canPlace, dragCheck, dropEnd, dropHandle, dropMove, ghostAt, movePiece, nextId, whereOf } from "./edit";
 import { refusalOf } from "./explain";
 import { frame } from "./gg1";
-import { setHandle, type HandleKey } from "./handles";
+import { setHandle, snap, type HandleKey } from "./handles";
 import { entry as entryIn, type PaletteEntry } from "./palette";
 import type { ValidateOptions } from "./pipeline";
 import type { Issue } from "./checks";
@@ -61,8 +61,8 @@ export function makeGesture(out: Out) {
   // the armed piece's checks over the draft as it is (a place checked once, however often the pointer passes)
   let armedCheck: { of: Draft; c: Checker } | null = null;
   const armedOf = (e: Env) => (armedCheck?.of === e.draft ? armedCheck.c : (armedCheck = { of: e.draft, c: dragCheck(e.draft, e.quick) }).c);
-  // the armed entry's piece, centred under the pointer, every point of it on the grid
-  const ghostOf = (e: Env, at: V): Piece => ghostAt(e.armed!, nextId(e.draft), at, e.step);
+  // the armed entry's piece, centred under the pointer, every point of it on the grid (the hole's: from its tee)
+  const ghostOf = (e: Env, at: V): Piece => ghostAt(e.armed!, nextId(e.draft), at, e.step, e.draft.tee);
   return {
     /** Something grabbed (a piece, a handle, an end): the board leaves the press alone. */
     grabbing: () => !!grab,
@@ -91,19 +91,20 @@ export function makeGesture(out: Out) {
       }
       const d = grab;
       if (!d) return null;
+      const on = (v: V) => snap(v, e.step, d.start.tee);
       if (d.t === "piece") {
-        const p = d.start.pieces.find((q) => q.id === d.id)!, moved = movePiece(p, snap([at[0] - d.grab[0], at[1] - d.grab[1]], e.step));
+        const p = d.start.pieces.find((q) => q.id === d.id)!, moved = movePiece(p, on([at[0] - d.grab[0], at[1] - d.grab[1]]));
         out.onPreview({ ...d.start, pieces: d.start.pieces.map((q) => (q.id === d.id ? moved : q)) });
         return { live: { id: d.id, why: firstWhy(d.check.piece(moved)) }, cell: whereOf(moved.geometry).join() };
       }
       if (d.t === "handle") {
         const p = d.start.pieces.find((q) => q.id === d.id)!, e0 = entryIn(p.entry, e.quick.palette);
         if (!e0) return null;
-        const moved = setHandle(p, d.key, snap(at, e.step), e0);
+        const moved = setHandle(p, d.key, on(at), e0, d.start.tee);
         out.onPreview({ ...d.start, pieces: d.start.pieces.map((q) => (q.id === d.id ? moved : q)) });
-        return { live: { id: d.id, why: firstWhy(d.check.piece(moved)) }, cell: snap(at, e.step).join() };
+        return { live: { id: d.id, why: firstWhy(d.check.piece(moved)) }, cell: on(at).join() };
       }
-      const v = snap(at, e.step);
+      const v = on(at);
       out.onPreview({ ...d.start, [d.which]: v });
       return { live: { id: d.which, why: firstWhy(d.check.end(d.which, v)) }, cell: v.join() };
     },
@@ -122,9 +123,10 @@ export function makeGesture(out: Out) {
       if (!d) return null;
       // let go on the palette's bin: removed (if the hole holds without it)
       if (d.t === "piece" && bin) return (out.onCancel(), out.onSelect(null), out.onBin(d.id), null);
-      const next = d.t === "piece" ? dropMove(d.start, d.id, snap([at[0] - d.grab[0], at[1] - d.grab[1]], e.step), e.quick, e.full)
-        : d.t === "handle" ? dropHandle(d.start, d.id, d.key, snap(at, e.step), e.quick, e.full)
-          : dropEnd(d.start, d.which, snap(at, e.step), e.quick, e.full);
+      const on = (v: V) => snap(v, e.step, d.start.tee);
+      const next = d.t === "piece" ? dropMove(d.start, d.id, on([at[0] - d.grab[0], at[1] - d.grab[1]]), e.quick, e.full)
+        : d.t === "handle" ? dropHandle(d.start, d.id, d.key, on(at), e.quick, e.full)
+          : dropEnd(d.start, d.which, on(at), e.quick, e.full);
       if ("why" in next) return (out.onCancel(), next.why ? { refused: next.why } : null);
       out.onPreview(next);
       out.onCommit();
