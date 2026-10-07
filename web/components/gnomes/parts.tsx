@@ -51,7 +51,7 @@ export function GnomeCard({ g, fact, mine, never, buy = false, onOpen }: { g: Li
 }
 /** A card's place while the grid is read: the same size, blank. */
 export const BlankCard = () => (
-  <span className="gcard gcard--skel" aria-hidden="true"><span className="gtile" /><span className="gcard__name">&nbsp;</span><span className="gcard__foot" /></span>
+  <span className="gcard gcard--skel" aria-hidden="true"><span className="gtile" /><span className="gcard__name">&nbsp;</span><span className="gcard__foot" /><span className="gcard__buy gcard__buy--skel">&nbsp;</span></span>
 );
 
 /** The closing date: a date in UTC (the player's own time on hover and for a screen reader), never a countdown. */

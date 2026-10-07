@@ -45,6 +45,7 @@ import { darkGallery, minesOrder } from "@/lib/scene/data";
 import { SHOP, makeShop, type Worn } from "@/lib/gnomes/shop";
 import { buildLink, endpoints } from "@/lib/builder/holes";
 import { CollectionSection, PromoLine, shopLine, useShopSkin, usePromo } from "@/components/gnomes/Promo";
+import { ShopSkeleton } from "@/components/gnomes/ShopFrame";
 import { builderOn } from "@/lib/builder/route";
 import { shopInRegion, shopShown } from "@/lib/gnomes/geo";
 import { served } from "@/lib/gnomes/served";
@@ -53,7 +54,9 @@ import type { ShopView } from "@/components/gnomes/Shop";
 
 // The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/shop.ts SHOP): its screen and the picker's row of a
 // player's gnomes, each a chunk of its own, fetched only when shown; off, none of it is ever loaded.
-const Shop = dynamic(() => import("@/components/gnomes/Shop"), { ssr: false });
+// the shop's chunk: its frame (ShopFrame, in the first load) while it downloads; fetched early as soon as a door to it shows (below)
+const loadShop = () => import("@/components/gnomes/Shop");
+const Shop = dynamic(loadShop, { ssr: false, loading: () => <ShopSkeleton /> });
 const Owned = dynamic(() => import("@/components/gnomes/Owned"), { ssr: false });
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -1007,6 +1010,8 @@ export default function Golf() {
   // the sale as the menu, the picker and the finish card show it (read once a visit, where the shop is offered)
   const { promo, now: promoNow } = usePromo(shopOn ? (game.current && game.current.chain) || null : null);
   const shopSkin = useShopSkin(shopOn ? (game.current && game.current.chain) || null : null, promo);
+  // the shop's chunk, fetched as soon as a door to it shows (the menu's panel, the cups' link): opening it then draws at once
+  useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && loadShop()), [shopOn, screen]);
   const readWorn = () => {
     const c = game.current && game.current.chain;
     if (!SHOP || !c || !account) return (setHeld([]), setWorn(null));

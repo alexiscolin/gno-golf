@@ -42,6 +42,11 @@
 
 /* the wave of the moment: one paper panel, its count and its green */
 .wave { display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); background: var(--paper); border: var(--edge); border-radius: var(--r-card); }
+/* the shop's slots (ShopFrame): the same height before and after their figures are read */
+.closes-slot { min-height: 34px; display: grid; justify-items: center; align-items: center; }
+.wave--skel .track { opacity: .5; }
+.gfilters--skel { min-height: 92px; }
+.gcard__buy.gcard__buy--skel { background: rgba(var(--ink-rgb), .08); border-color: transparent; box-shadow: none; }
 .shop__pitch { margin: 0 auto; max-width: 640px; text-align: center; font-size: 16px; font-weight: 700; color: var(--ink-soft); }
 .wave__prices { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin: 0; font-size: 14px; font-weight: 700; }
 .wave__prices > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }

@@ -1,0 +1,55 @@
+// @ts-check
+// The gnome shop opened from the menu's Shop panel as a player on a slow
+// link and a phone's CPU would (Fast 3G, the CPU 4x slower), at 1440 and
+// 390: the layout shifts the page reports over 6 s, failing over 0.01 (the
+// shop draws its final frame first: ShopFrame.tsx). With OUT, a frame every
+// 100 ms and a strip of them.
+//   APP=https://… node media/gnomes/shop-open.mjs   (OUT=<dir> for the frames)
+import fs from "node:fs";
+import path from "node:path";
+import { launch, sleep } from "../lib/cdp.mjs";
+const APP = process.env.APP || "http://127.0.0.1:5175", OUT = process.env.OUT || "", TAG = process.env.TAG || "open";
+const results = [];
+for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [390, 844, true]])) {
+  const b = await launch({ width: w, height: h, mobile, touch: mobile });
+  await b.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
+  await b.send("Network.enable");
+  await b.send("Network.setCacheDisabled", { cacheDisabled: false });
+  await b.send("Page.navigate", { url: APP + "/" });
+  for (let i = 0; i < 90 && !(await b.ev(`!![...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent))`)); i++) await sleep(500);
+  await b.js(`[...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent)).click()`);
+  for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".mode--shop")`)); i++) await sleep(500);
+  await sleep(1500);
+  // throttled from here: what a player on a slow link and a phone's CPU sees
+  await b.send("Network.emulateNetworkConditions", { offline: false, latency: 563, downloadThroughput: (1.6 * 1024 * 1024) / 8, uploadThroughput: (750 * 1024) / 8 });
+  await b.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await b.js(`window.__cls = 0; window.__shifts = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; window.__shifts.push([Math.round(performance.now()), +e.value.toFixed(4), (e.sources || []).map((s) => s.node ? (s.node.className || s.node.nodeName) : "").join(" ").slice(0, 120)]); } }).observe({ type: "layout-shift", buffered: false }); true`);
+  const r = await b.ev(`(() => { const r = document.querySelector(".mode--shop").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const dir = OUT && path.join(OUT, `${TAG}-${w}`);
+  if (dir) fs.mkdirSync(dir, { recursive: true });
+  const t0 = Date.now(), files = [];
+  await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: r[0], y: r[1] });
+  for (const type of ["mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, x: r[0], y: r[1], button: "left", clickCount: 1 });
+  for (let k = 0; k < 60; k++) {
+    while (Date.now() - t0 < k * 100) await sleep(5);
+    if (!dir) continue;
+    const { data } = await b.send("Page.captureScreenshot", { format: "jpeg", quality: 60 });
+    const f = path.join(dir, `${String(k).padStart(2, "0")}.jpg`); fs.writeFileSync(f, Buffer.from(data, "base64")); files.push(f);
+  }
+  const cls = await b.ev(`({ cls: +window.__cls.toFixed(4), shifts: window.__shifts })`);
+  results.push({ w, cls });
+  console.log(`${cls.cls < 0.01 ? "PASS" : "FAIL"} opening the shop at ${w}: layout shift ${cls.cls}`, cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
+  b.kill();
+  if (!dir) continue;
+  // a strip: every other frame (0-5.8 s), 6 a row
+  const b2 = await launch({ width: 1600, height: 1000 });
+  const sel = files.filter((_, i) => i % 2 === 0), cw = w > 600 ? 240 : 120;
+  const html = `<html><body style="margin:0;font:12px sans-serif;background:#fff"><div style="display:grid;grid-template-columns:repeat(${w > 600 ? 6 : 10},${cw}px);gap:3px">${sel.map((f, i) => `<figure style="margin:0"><img src="file://${f}" width="${cw}"><figcaption>${i * 200} ms</figcaption></figure>`).join("")}</div></body></html>`;
+  const page = path.join(OUT, `${TAG}-${w}.html`); fs.writeFileSync(page, html);
+  await b2.send("Page.navigate", { url: "file://" + page }); await sleep(1500);
+  const { width, height } = await b2.ev(`({ width: document.body.scrollWidth, height: document.body.scrollHeight })`);
+  const { data } = await b2.send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width, height, scale: 1 } });
+  fs.writeFileSync(path.join(OUT, `strip-${TAG}-${w}.png`), Buffer.from(data, "base64"));
+  b2.kill();
+}
+process.exit(results.every((r) => r.cls.cls < 0.01) ? 0 : 1);

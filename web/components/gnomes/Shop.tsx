@@ -20,7 +20,9 @@ import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
-import { Closes, GnomeCard, BlankCard, TierChip } from "./parts";
+import { Closes, GnomeCard, TierChip } from "./parts";
+import { BlankShelf, ClosesSlot, SHOP_HEAD, WaveSlot } from "./ShopFrame";
+import { knownSale } from "@/lib/gnomes/promo";
 import GnomeSheet from "./GnomeSheet";
 
 /** What the shop shows: a player's gnomes (who: their address, theirs read-only) and a gnome open (its id, or an earned kind). */
@@ -46,9 +48,11 @@ export interface ShopProps {
 export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace }: ShopProps) {
   const shop = useMemo(() => makeShop(chain), [chain]);
   const me = account && account.address;
-  const [cat, setCat] = useState<Served | null>(null);
-  const [c, setC] = useState<Collection | null>(null);
-  const [sold, setSold] = useState<((id: number) => boolean) | null>(null);
+  // the first frame from the sale the menu already read (its panel), when it has: then read again (load)
+  const [known] = useState(() => knownSale(chain));
+  const [cat, setCat] = useState<Served | null>(known && known.served);
+  const [c, setC] = useState<Collection | null>(known && known.c);
+  const [sold, setSold] = useState<((id: number) => boolean) | null>(() => known && known.sold);
   const [error, setError] = useState(false);
   const [region, setRegion] = useState<boolean | null>(null);
   const [mine, setMine] = useState<number[]>([]);
@@ -110,8 +114,8 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   }, [cat, mine]);
 
   // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
-  const title = theirs ? `${theirs.name || "Their"}'s gnomes` : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : "Gnome shop";
-  const eyebrow = theirs ? "Their gnomes" : viewing === "mine" ? "My gnomes" : "Who's on the ball?";
+  const title = theirs ? `${theirs.name || "Their"}'s gnomes` : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
+  const eyebrow = theirs ? "Their gnomes" : viewing === "mine" ? "My gnomes" : SHOP_HEAD.eyebrow;
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
 
   if (region === false)
@@ -122,8 +126,10 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
     );
   return (
     <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={eyebrow} title={title}>
-      {!theirs && viewing !== "mine" && <p className="shop__pitch">Pick the exact gnome you play as. Cosmetic only: the same ball, the same physics.</p>}
-      {!theirs && viewing !== "mine" && c && c.closesAt > 0 && !closed && <Closes at={c.closesAt} now={now} />}
+      {!theirs && viewing !== "mine" && <p className="shop__pitch">{SHOP_HEAD.pitch}</p>}
+      {/* the closing date and the wave in their places from the first frame (ShopFrame): nothing moves as they are read */}
+      {!theirs && viewing !== "mine" && <ClosesSlot>{c && c.closesAt > 0 && !closed && <Closes at={c.closesAt} now={now} />}</ClosesSlot>}
+      {!theirs && viewing !== "mine" && !row && <WaveSlot />}
       {/* the wave of the moment, or the sale's end: one panel, one line of numbers */}
       {!theirs && viewing !== "mine" && row && row.at !== "none" && (
         <section className="wave" aria-label="The sale">
@@ -137,9 +143,8 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
               </div>
               <div className="track" aria-hidden="true"><i style={{ width: `${row.wave.size ? (100 * row.wave.sold) / row.wave.size : 0}%` }} /></div>
               {c && <p className="wave__prices">{wavePrices(c, row.wave.row).map(([t, p]) => <span key={t}><TierChip tier={t} /> {gnot(p)} GNOT</span>)}</p>}
-              {row.at === "teaser" && <p className="wave__note">Opens {utcDate(row.wave.row.start, now)}.</p>}
-              {row.at === "players" && <p className="wave__note">Players first until {utcDate(row.wave.row.playersUntil, now, true)}: save one round on-chain to buy now.</p>}
-              {row.at === "paused" && <p className="wave__note">Paused for a moment: the sale picks up where it stopped.</p>}
+              {/* (its note's line kept when there is none: the panel never changes height) */}
+              <p className="wave__note">{row.at === "teaser" ? `Opens ${utcDate(row.wave.row.start, now)}.` : row.at === "players" ? `Players first until ${utcDate(row.wave.row.playersUntil, now, true)}: save one round on-chain to buy now.` : row.at === "paused" ? "Paused for a moment: the sale picks up where it stopped." : "\u00a0"}</p>
             </>
           )}
         </section>
@@ -173,7 +178,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       {error ? (
         <div className="gempty" role="alert"><p>The chain did not answer.</p><Button variant="primary" onClick={load}>Try again</Button></div>
       ) : !seen || !cat ? (
-        <ul className="gshelf" aria-busy="true">{Array.from({ length: 12 }, (_, i) => <li key={i}><BlankCard /></li>)}</ul>
+        <BlankShelf />
       ) : !list.length ? (
         <div className="gempty">
           {viewing === "mine" ? <p>None yet. You play with the free gnomes and the ones you earn on the course.</p> : theirs ? <p>No gnome yet.</p> : <p>No gnome like that one.</p>}
