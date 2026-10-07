@@ -63,7 +63,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [c, setC] = useState<Collection | null>(known && known.c);
   const [sold, setSold] = useState<((id: number) => boolean) | null>(() => known && known.sold);
   const [error, setError] = useState(false);
-  const [region, setRegion] = useState<boolean | null>(null);
+  const [region, setRegion] = useState<boolean | null | undefined>(undefined); // (undefined: not read yet; null: could not be read)
   const [mine, setMine] = useState<number[]>([]);
   const [held, setHeld] = useState<Held["rows"] | null>(null); // (the same, as the realm lists them: the album's; null: not read)
   const [worn, setWorn] = useState<Worn | null>(null);
@@ -84,9 +84,10 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       .then(([k, col, s]) => (setCat(k), setC(col), setSold(() => s), setNow(Math.floor(chain.now() / 1000))))
       .catch(() => setError(true));
   };
+  const askRegion = () => (setRegion(undefined), void shopInRegion().then(setRegion));
   useEffect(() => {
     load();
-    void shopInRegion().then(setRegion);
+    askRegion();
     addEventListener("focus", load);
     return () => removeEventListener("focus", load);
   }, [shop]); // eslint-disable-line react-hooks/exhaustive-deps -- (load reads the same shop)
@@ -136,6 +137,12 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : <ShopTitle keeper={keeper} />;
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
 
+  if (region === null)
+    return (
+      <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.page} title={SHOP_HEAD.title}>
+        <div className="gempty" role="alert"><p>Couldn't check whether the gnome shop is offered here.</p><Button variant="primary" onClick={askRegion}>Try again</Button></div>
+      </FrontScreen>
+    );
   if (region === false)
     return (
       <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.page} title="Not here">
@@ -159,7 +166,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       )}
       {theirs && <Button variant="gold" className="btn--cta" onClick={() => onRace(theirs.who)}>Race their ghost</Button>}
       {/* the album (ADR-011): the player's own, or theirs (under their Race), a row a world, a tier, a set */}
-      {cat && albumShown(SHOP, region) && (viewing === "mine" && me ? <Album cat={cat} owned={held || []} chain={chain} player={me} mine onOpen={(o) => onView({ ...view, open: o })} />
+      {cat && albumShown(SHOP, region ?? null) && (viewing === "mine" && me ? <Album cat={cat} owned={held || []} chain={chain} player={me} mine onOpen={(o) => onView({ ...view, open: o })} />
         : theirs && theirs.rows.length > 0 && <Album cat={cat} owned={theirs.rows} chain={chain} player={theirs.who} mine={false} onOpen={(o) => onView({ ...view, open: o })} />)}
       {/* one toolbar: which gnomes, the tiers (their prices, once), the search, the look, more filters folded */}
       {!theirs && (
@@ -185,7 +192,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       )}
       {/* the player's album in one line, its room kept from the first frame (ADR-011): a tap to it */}
       {!theirs && viewing !== "mine" && me && (
-        <p className="galbum-line">{myAlbum && albumShown(SHOP, region) && (
+        <p className="galbum-line">{myAlbum && albumShown(SHOP, region ?? null) && (
           <button className="linkish" onClick={() => onView({ who: me })}>{ALBUM_WORDS.open}{myAlbum.have > 0 && <> · {albumLine(myAlbum, row && row.at !== "none" && row.at !== "closed" ? row.wave.home : undefined)}<Collector chain={chain} player={me} /></>} ›</button>
         )}</p>
       )}

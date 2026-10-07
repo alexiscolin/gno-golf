@@ -1015,7 +1015,7 @@ export default function Golf() {
 
   // The collection (SHOP): what the player holds and wears for everyone, read once an account is
   // here; the gnome played is their pick while it is theirs, else the one they wear (wear.ts playing).
-  const [region, setRegion] = useState<boolean | null>(null); // (null: not read yet)
+  const [region, setRegion] = useState<boolean | null>(null); // (null: not read yet, or could not be: asked again on the next screen)
   // the shop's every door (the menu's card, the picker's section, the finish card's line, the cups' link): one gate
   const shopOn = shopShown(SHOP, region);
   const [held, setHeld] = useState<{ id: string; tier: string; traits: string; name: string; home: string }[]>([]);
@@ -1024,7 +1024,7 @@ export default function Golf() {
   const shopFrom = useRef<Screen>("worlds"); // the screen the shop's Back returns to
   const gnomeNow = useRef(gnome);
   gnomeNow.current = gnome;
-  useEffect(() => void (SHOP && shopInRegion().then(setRegion)), []);
+  useEffect(() => void (SHOP && region === null && shopInRegion().then(setRegion)), [screen]); // eslint-disable-line react-hooks/exhaustive-deps -- (asked while unanswered)
   // the sale as the menu, the picker, the shop and the finish card show it: read once a visit, where the shop is
   // offered, from the first screen that shows it on (never the title's: the catalogue and the wardrobe wait for it)
   const saleHere = shopOn && (screen === "modes" || screen === "worlds" || screen === "pick" || screen === "shop" || (playing && holedNow));
