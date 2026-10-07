@@ -279,7 +279,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       ) : (
         <p className="bench__wait" aria-busy="true">Loading the {draft.world}&apos;s pieces…</p>
       )}
-      {(hints || again) && <Hints onDone={() => (setAgain(false), onHinted())} />}
+      {(hints || again) && <Hints glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}
     </main>
   );
 }

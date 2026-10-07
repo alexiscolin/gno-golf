@@ -303,7 +303,10 @@ the chain's checks in the wasm, the proofs):
   the hole's id: a starter cannot ship one), with **three short hints, dismissible at once** ("Got it"), never a
   tutorial: ① "Drag a piece onto the board" (at the palette), ② "Press Test
   it to play your hole" (at the big button), ③ "Then Publish, once holed in
-  every weather" (at the steps). They show on the first visit only.
+  every weather" (at the steps). They show on the first visit only, and
+  never over the 3D. The header's "?" shows them again in one panel with,
+  under them, a one-screen glossary of the world's pieces: each palette
+  tile's picture, its name and what it does.
 - **The next step is always one big button**, top right: "Test it" (gold),
   then "Publish →" (blue). When it waits, the reason sits beside it in a few
   words ("1 thing to fix ↓") and, in full, in the player's words under the

@@ -123,12 +123,38 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "three hints");
   assert.equal(await c.js(`document.querySelector(".bhead__hole input").value`), "Garden Dogleg", "on the Garden's dogleg");
   assert.equal(await c.js(`document.activeElement?.textContent`), "Got it");
+  // the hints leave the 3D in sight: none of them, nor Got it, over the preview
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".col .preview")`)); k++) await sleep(300);
+  const preview = await box(c, ".col .preview");
+  assert.ok(preview, "the 3D's place");
+  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
+    assert.ok(!overlap(part, preview), `hint ${i + 1} covers the 3D preview`);
+  }
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss").length`), 0, "the first run: three hints, no glossary");
   await c.js(`document.querySelector(".bhint__ok").click()`);
   await sleep(300);
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 0, "gone with Got it");
   await c.send("Page.reload");
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__list")`)); k++) await sleep(500);
   assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 0, "never again: the drafts screen, the dogleg kept");
+  // "?": the three hints again and, under them, one screen of the world's pieces (each tile's picture, name, what it does), the keys
+  await c.js(`document.querySelector(".bholes__starts button").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector(".checks .gauge")`)); k++) await sleep(300);
+  await c.js(`document.querySelector(".bhead [aria-label^='How it works']").click()`);
+  await sleep(500);
+  assert.equal(await c.js(`document.querySelectorAll(".bhint").length`), 3, "?: the three hints");
+  const tiles = await c.js<number>(`document.querySelectorAll(".palette [data-tile]").length`);
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss__piece").length`), tiles, "?: a line for each tile of the palette");
+  assert.ok(await c.js<boolean>(`[...document.querySelectorAll(".bgloss__piece")].every((e) => e.querySelector("img") && e.querySelector("b").textContent && e.querySelector("small").textContent)`), "each: its picture, its name, what it does");
+  const g = (await box(c, ".bgloss"))!;
+  assert.ok(g.t >= 0 && g.b <= 800 && g.l >= 0 && g.r <= 1280, `the glossary on one screen: ${JSON.stringify(g)}`);
+  assert.ok(await c.js<boolean>(`(() => { const e = document.querySelector(".bgloss"); return e.scrollHeight <= e.clientHeight + 1; })()`), "the glossary on one screen, not scrolled");
+  for (const [i, part] of (await c.js<Box[]>(`[...document.querySelectorAll(".bhint, .bhint__ok, .bgloss")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`)).entries()) {
+    assert.ok(!overlap(part, (await box(c, ".col .preview"))!), `help part ${i + 1} covers the 3D preview`);
+  }
+  await c.js(`document.querySelector(".bhint__ok").click()`);
+  await sleep(300);
+  assert.equal(await c.js(`document.querySelectorAll(".bgloss, .bhint").length`), 0, "gone with Got it");
   console.log("first run: ok");
   c.kill();
 }
