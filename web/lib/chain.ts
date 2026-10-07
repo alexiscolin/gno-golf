@@ -657,7 +657,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
 }
 export type Chain = ReturnType<typeof makeChain>;
 
-/** A path the build names for its node or gnoweb ("/rpc": scripts/try-local.sh's dev server proxies it) on the page's own origin; a URL as it is. */
+/** A path the build names for its node or gnoweb ("/rpc": scripts/playground-server.mjs, which try-local.sh starts, streams it to the node) on the page's own origin; a URL as it is. */
 const onPage = (v: string) => (v.startsWith("/") && typeof location !== "undefined" ? location.origin + v : v);
 /** The build's node and gnoweb (NEXT_PUBLIC_RPC, NEXT_PUBLIC_WEB; this machine's by default), each a URL. */
 export const buildRpc = () => onPage(process.env.NEXT_PUBLIC_RPC || DEFAULT_RPC);
