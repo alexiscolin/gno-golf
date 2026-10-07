@@ -26,7 +26,7 @@ import { builderOn, onComputer } from "@/lib/builder/route";
 import { worldName } from "@/lib/builder/rules";
 import type { MapHole } from "@/lib/duel";
 import { shortAddr, type Chain } from "@/lib/chain";
-import { dayOrder, keepLevel, keptLevel, NOT_BUILDER, pageOf, sortHoles, verdictOf, type SortBy, type Verdict } from "@/lib/community";
+import { dayOrder, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdicts } from "@/lib/community";
 
 /** How many community holes a page judges and lists, one more page on each "Show more". */
 const PAGE = 24;
@@ -47,28 +47,31 @@ export default function Community({ community, chain, onPlay }: {
   const ordered = useMemo(() => (by === "played" ? sortHoles(community, "played", new Map()) : community), [community, by]);
   // each hole about to be shown judged by the Builder's own rules (lib/community.ts: anyone can publish
   // past the Builder with gnokey), one after the other, once a version a browser: only those it passes are
-  // listed; the day's first
-  const [verdicts, setVerdicts] = useState<ReadonlyMap<string, Verdict>>(new Map());
+  // listed; the day's first. One whose data or the rules could not be read now has no verdict (null): not
+  // shown, never skipped for the day's, asked again on Try again
+  const [verdicts, setVerdicts] = useState<Verdicts>(new Map());
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     if (!chain) return;
     let live = true;
     void (async () => {
       const judged = new Map(verdicts);
       const judge = async (h: HoleRow) => {
-        // (the rules not loaded: not shown this visit, nothing kept)
-        const v = judged.get(h.id) ?? (await verdictOf(chain, h.id).catch((): Verdict => ({ ok: false, why: NOT_BUILDER })));
+        const v = judged.has(h.id) ? (judged.get(h.id) ?? null) : await verdictOf(chain, h.id).catch(() => null);
         if (live && !judged.has(h.id)) judged.set(h.id, v), setVerdicts((m) => new Map(m).set(h.id, v));
         return v;
       };
-      // the day's: its candidates in turn, until one passes
-      for (const h of candidates) if (!live || (await judge(h)).ok) break;
+      // the day's: its candidates in turn, until one passes (or one is not read: the day waits for it)
+      for (const h of candidates) if (!live || (await judge(h))?.ok !== false) break;
       for (const h of ordered.slice(0, shown)) {
         if (!live) return;
         await judge(h);
       }
     })();
     return () => void (live = false);
-  }, [chain, ordered, candidates, shown]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts: judged once each, not again as they fill)
+  }, [chain, ordered, candidates, shown, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts: judged once each, not again as they fill)
+  // Try again: the holes not read asked anew
+  const retry = () => (setVerdicts((m) => new Map([...m].filter(([, v]) => v !== null))), setTries((n) => n + 1));
   const page = pageOf(ordered, shown, verdicts);
   const ids = page.rows.map((h) => h.id).join(" ");
   // whether each hole listed has been holed by its author (its best on the chain), read once a hole;
@@ -87,9 +90,10 @@ export default function Community({ community, chain, onPlay }: {
   }, [chain, page.judging, ids]); // eslint-disable-line react-hooks/exhaustive-deps -- (holed: read once each, not again as it fills)
   // the players of the page's holes and the day's (one read a dozen holes), as the page changes
   const [saved, setSaved] = useState<SavedOn | null>(null);
-  // the day's hole: the first candidate the rules pass, once every one before it is judged
+  // the day's hole: the first candidate the rules pass, once every one before it is judged (and read)
   const first = candidates.findIndex((h) => verdicts.get(h.id)?.ok !== false);
   const day = first >= 0 && verdicts.get(candidates[first].id)?.ok ? candidates[first] : null;
+  const unread = page.unread || (first >= 0 && verdicts.get(candidates[first].id) === null);
   const seen = [...(day ? [day.id] : []), ...page.rows.map((h) => h.id)];
   useEffect(() => {
     if (!chain || !seen.length) return;
@@ -124,6 +128,7 @@ export default function Community({ community, chain, onPlay }: {
       <ul className="community__cards">
         {listed.map((h) => <li key={h.id}>{card(h)}</li>)}
       </ul>
+      {unread && !page.judging && <p className="note note--bad">Some holes did not load. <button className="linkish" onClick={retry}>Try again</button></p>}
       {page.judging ? (
         <p className="community__judging" aria-live="polite">Checking the holes against the Builder rules…</p>
       ) : rating ? (
