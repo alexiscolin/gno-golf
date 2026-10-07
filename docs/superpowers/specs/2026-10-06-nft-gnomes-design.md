@@ -458,9 +458,9 @@ func Burn(cur realm, id grc721.TokenID)
 ```go
 func AddSeries(cur realm, name string, rows string)    // the next series, "id|tier|name|traits" a line, checked whole (section 9); the genesis first
 func SetCloseAt(cur realm, at int64)                   // the genesis's closing time (unix); unset at deploy, optional, set at launch or later; once set, only earlier, never later nor in the past
-func AddWave(cur realm, first, last, start, playerHours int64) // ids first to last on sale from start (unix), its first playerHours (0 to 168) for players, at the prices in force; no overlap; refused until the closing date is set, and for a start at or after it
+func AddWave(cur realm, first, last, start, playerHours int64) // ids first to last on sale from start (unix), its first playerHours (0 to 168) for players, at the prices in force; no overlap; once a closing date is set, refused for a start at or after it
 func SetPrice(cur realm, tier string, ugnot int64)     // 1 to 10,000 GNOT; for the waves opened after it
-func SetMintOpen(cur realm, open bool)                 // pause or resume every sale at once; closed at deploy; opening refused until the closing date is set
+func SetMintOpen(cur realm, open bool)                 // pause or resume every sale at once; closed at deploy
 func SetSiteURL(cur realm, url string)                 // https://, at most 128 printable bytes; external_url and Render's links
 func SetTreasury(cur realm, to address)                // offers the treasury to a valid address, not the realm's; it takes it with AcceptTreasury
 func SetRoyaltyBps(cur realm, bps int64)               // 0 to 1,000
@@ -597,14 +597,14 @@ page with their tokens and worn gnome.
   its own. A cap spreads the sale over players, it is not a defence: anyone
   can open more wallets. The caps are constants of the realm, kept with
   the supply in one config file.
-- **The close.** The genesis has a hard closing date, `SetCloseAt`, unset
-  at deploy and set at launch: no wave can be added and the sale cannot be
-  opened until it is. Once set it can only move earlier (never later, and
+- **The close.** The genesis can have a hard closing date, `SetCloseAt`:
+  unset at deploy and optional (decided 2026-10-07): the owner may set it at
+  launch or later, and waves and the sale run without one. Once set it can only move earlier (never later, and
   never into the past), so the date a buyer reads is the latest the sale
   can run. From it on, `Buy` refuses every genesis id ("sale closed"),
   whatever wave holds it; an id unsold then is never minted, by anyone,
   and no wave may start at or after it. A later series has its own sale,
-  not more of the genesis. The shop shows the date on every page.
+  not more of the genesis. The shop shows the date on every page once one is set.
 - **Royalty**: 5% by default, to the treasury, through royalty/v0's default
   royalty, readable as `RoyaltyInfo`. EIP-2981 is advisory: a plain
   `TransferFrom` pays none.
@@ -1023,7 +1023,7 @@ shop's words, are in `docs/superpowers/legal/`.
 - **No auction.** Dropped for legal clarity as much as simplicity: no bid
   that is an order, no auction rules, no coins held for anyone, the same
   confirmation screen for every purchase.
-- **A hard closing date**, shown on every shop page and on the confirmation
+- **A hard closing date** once the owner sets one (optional), shown on every shop page and on the confirmation
   screen (申込期間): it can only come earlier, and nothing unsold is minted
   after it, so "limited" means what it says for the genesis; the shop still
   says later series may be sold.
@@ -1106,8 +1106,8 @@ shop's words, are in `docs/superpowers/legal/`.
   the read and the `Buy` of a wave not yet opened, refused by the exact
   check, coins kept.
 - Waves: `AddWave` refuses an overlap, a range past the catalogue, a
-  window over 168 hours, a 65th wave, any wave while the closing date is
-  unset, and a start at or after it.
+  window over 168 hours, a 65th wave, and, once a closing date is set, a start at
+  or after it.
 - The close, with `testing.SkipHeights` to move time (5 s a block):
   a sale with no closing date runs on; `SetCloseAt` later than the one
   set, or in the past, refused, earlier taken; a `Buy` of a genesis id one
@@ -1199,8 +1199,9 @@ them, closed for CN, CU, IR, KP, SY, RU and BY.
    as "not yet on sale".
    - The two weeks before: one Legendary shown a day, with its lore; the
      gallery live, nothing for sale.
-   - At launch the owner sets the genesis's closing date (`SetCloseAt`),
-     which the shop shows from then on; it can come earlier, never later.
+   - At launch, or later, the owner may set the genesis's closing date
+     (`SetCloseAt`), which the shop shows from then on; it can come earlier,
+     never later. Without one the sale runs on.
    - Wave 1 (the Garden, ids 1–104, its Legendary The Miller among them)
      opens with `AddWave(1, 104, start, 48)` and `SetMintOpen(true)`.
    - Wave 2 (the Island Cup, ids 105–208), then each next wave, about a
@@ -1257,7 +1258,7 @@ throughout; the script that writes the realm's rows.
 | Waves replace `SetOpen` per tier; caps are constants (no `SetCap`); `SetMintOpen` pauses all | `waves.gno`, `config.gno`, `gnomes.gno` | spec |
 | An auction for the Legendaries (`StartAuction`, `Bid`, `Settle`, `CancelAuction`, `Auction`, escrow in `Sweep`) | `auction.gno`, `gnomes.gno` | code: removed; the Legendaries are sold by `Buy` at 1,296 GNOT, one a wallet (decided) |
 | Prices 30/99/333 and a 777 reserve | `config.gno`, `data/gnomes/series.json` | code: 36/72/336/1,296 GNOT (decided) |
-| No closing date | `waves.gno`, `config.gno` | code: `SetCloseAt`, earlier only, required before the first wave (decided) |
+| No closing date | `waves.gno`, `config.gno` | code: `SetCloseAt`, optional (none at deploy), earlier only once set (decided 2026-10-07) |
 | `Equipped`/`EquippedMany` answer only an `Equip` choice | `equip.gno` | code: `Worn`/`WornMany`, the best owned unless equipped (decided) |
 | No site URL setting; `external_url` a constant | `token.gno` | code: `SetSiteURL` (decided) |
 | `Sold` asks the ledger per id instead of a stored bitmap | `read.gno` | spec |
