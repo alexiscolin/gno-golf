@@ -12,7 +12,7 @@ import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newE
 import { gauges, offAtLimit, testGate, verdict } from "@/lib/builder/editor";
 import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
-import { turnPiece } from "@/lib/builder/handles";
+import { notTurned, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
 import { proofKey, provedAs } from "@/lib/builder/proof";
@@ -137,6 +137,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const piece = draft.pieces.find((p) => p.id === selected) ?? null;
   const turn = () => {
     if (!piece || !full) return;
+    const same = notTurned(piece);
+    if (same) return say(same);
     const t = turnPiece(piece), why = canPlace(draft, t, full);
     if (why.length) return say(plainOf(why[0]));
     set({ ...draft, pieces: draft.pieces.map((p) => (p.id === piece.id ? t : p)) });

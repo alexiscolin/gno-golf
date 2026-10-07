@@ -15,6 +15,7 @@ import { DIRS, sizesOf, TIMING, withClock, withDir, withNumber, withSize, withTi
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
 import { plainOf } from "@/lib/builder/explain";
+import { notTurned } from "@/lib/builder/handles";
 
 const CLOCKS: Record<Clock, string> = { fixed: "Always", substep: "In a stroke", stroke: "Strokes" };
 const SIZE_NAMES = { r: "Size", length: "Length", width: "Width", depth: "Depth" } as const;
@@ -84,7 +85,8 @@ export default function Inspector({ draft, piece, quick, full, onPreview, onComm
     <div className="insp">
       <div className="insp__head">{ent.label}</div>
       <div className="insp__acts">
-        <button type="button" className="btn btn--ghost" onClick={onTurn}>Turn<kbd>R</kbd></button>
+        {/* (a round piece: off, the reason its title, as R says it) */}
+        <button type="button" className={`btn btn--ghost${notTurned(p) ? " btn--off" : ""}`} aria-disabled={notTurned(p) ? true : undefined} title={notTurned(p) || "Turn it a quarter (R)"} onClick={onTurn}>Turn<kbd>R</kbd></button>
         <button type="button" className="btn btn--ghost" onClick={onCopy}>Copy<kbd>{MOD}D</kbd></button>
         <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
       </div>

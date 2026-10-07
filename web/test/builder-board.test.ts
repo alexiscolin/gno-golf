@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { build } from "./scene-harness.ts";
 import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropMove, nextId, pieceLabel, placeNear, placePiece, removePiece, snap, toWorld } from "../lib/builder/edit.ts";
-import { handlesOf, setHandle, turnPiece } from "../lib/builder/handles.ts";
+import { handlesOf, notTurned, setHandle, turnPiece } from "../lib/builder/handles.ts";
 import { makeSession, settle } from "../lib/builder/session.ts";
 import { centreOn, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
@@ -57,6 +57,9 @@ void test("turnPiece: a quarter turn about its middle, on the grid", () => {
   assert.deepEqual((turnPiece(plank).geometry), { t: "bar", a: [7, 3], b: [7, 7], thick: 0.5 });
   const rock = put("p", "*/post/rock", [5, 5]);
   assert.deepEqual(turnPiece(rock).geometry, rock.geometry, "a round thing: unchanged");
+  // what R and Turn say of a piece turning leaves the same: never a silent key
+  assert.equal(notTurned(rock), "A round piece looks the same turned: nothing to turn.");
+  assert.equal(notTurned(plank), "");
 });
 
 void test("nextId, copyPiece, removePiece: a fresh name; a copy where it may go, framed; a removal (proofs kept: their key says whether they still hold)", () => {

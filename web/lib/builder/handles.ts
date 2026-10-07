@@ -71,6 +71,9 @@ export function setHandle(p: Piece, key: HandleKey, to: V, e: PaletteEntry): Pie
 }
 
 /** The piece turned a quarter about its middle, on the grid (a slope's push turned with it); a post as it was. */
+/** Why turning p changes nothing ("" when it does): R and Turn say it rather than do nothing. */
+export const notTurned = (p: Piece) => (JSON.stringify(turnPiece(p)) === JSON.stringify(p) ? "A round piece looks the same turned: nothing to turn." : "");
+
 export function turnPiece(p: Piece): Piece {
   const g = p.geometry;
   const mid: V = g.t === "rail" || g.t === "bar" ? [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2]
