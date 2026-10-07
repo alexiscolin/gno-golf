@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
-import { clock, holeId, holeRow, plan, QUICK_HOLE, quickPlan, testChain } from "../lib/builder/testmode.ts";
+import { clock, finished, holeId, holeRow, parSaid, plan, QUICK_HOLE, quickPlan, testChain } from "../lib/builder/testmode.ts";
 import fs from "node:fs";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { makeChain } from "../lib/chain.ts";
@@ -56,6 +56,41 @@ void test("clock: a weather's time in play, minutes, seconds and tenths", () => 
   assert.equal(clock(0), "0:00.0");
   assert.equal(clock(14_230), "0:14.2");
   assert.equal(clock(65_000), "1:05.0");
+});
+
+void test("parSaid: the score card's par, the rounds' once proved, else the meter's guess, else none", () => {
+  assert.equal(parSaid(3, 4), "par 3");
+  assert.equal(parSaid(0, 4), "par 4?");
+  assert.equal(parSaid(0, 0), "");
+});
+
+void test("finished: a test's hole-finished card, its words and its actions (the way on last, the one primary)", () => {
+  const acts = (f: ReturnType<typeof finished>) => f.actions.map((a) => `${a.text}${a.key ? ` (${a.key})` : ""}${a.primary ? "*" : ""}${a.off ? "!" : ""}`);
+  // a quick test: never a proof, Prove it the way on (off with why while the hole cannot be proved)
+  const q = finished({ quick: true, strokes: 7, kind: "" });
+  assert.deepEqual([q.title, q.sub], ["Holed in 7", ""]);
+  assert.doesNotMatch(q.line, /not a proof/, "said once, on the label");
+  assert.deepEqual(acts(q), ["Try again (R)", "Back to edit (Esc)", "Prove it*"]);
+  assert.equal(finished({ quick: true, strokes: 7, kind: "", proveOff: "Fix the errors first" }).actions[2].off, "Fix the errors first");
+  assert.deepEqual(acts(finished({ quick: true, strokes: 2, kind: "", checking: true, why: "x" })), ["Try again (R)", "Back to edit (Esc)", "Prove it*"], "a quick test is never replayed");
+  // Prove: the chain replaying the round, nothing to press yet
+  const c = finished({ quick: false, strokes: 3, kind: "wind", checking: true, next: "rain" });
+  assert.deepEqual([c.title, c.sub, c.line, c.actions.length], ["Holed in 3", "", "The chain's code replays your round…", 0]);
+  // a round that does not count: why, and play it again first
+  const w = finished({ quick: false, strokes: 3, kind: "wind", why: "It took too much work.", next: "wind" });
+  assert.equal(w.line, "That wind round doesn't count: It took too much work.");
+  assert.deepEqual(acts(w), ["Try again (R)*", "Back to edit (Esc)"]);
+  // proved, a weather left: the next one
+  const n = finished({ quick: false, strokes: 3, kind: "wind", next: "rain" });
+  assert.deepEqual([`${n.title} · ${n.sub}`, n.line], ["Holed in 3 · Wind proved", "Next: rain."]);
+  assert.deepEqual(acts(n), ["Try again (R)", "Back to edit (Esc)", "Next weather*"]);
+  assert.equal(finished({ quick: false, strokes: 2, kind: "", next: "wind" }).sub, "Clear proved");
+  // proved, none left: publish, with the par the rounds set
+  const p = finished({ quick: false, strokes: 4, kind: "rain", next: null, par: 3 });
+  assert.deepEqual([p.sub, p.line], ["Rain proved", "Every weather proved: par 3."]);
+  assert.deepEqual(acts(p), ["Try again (R)", "Back to edit (Esc)", "Publish →*"]);
+  assert.equal(finished({ quick: false, strokes: 4, kind: "rain", next: null }).line, "Every weather proved.");
+  for (const f of [q, w, n, p]) assert.equal(f.actions.filter((a) => a.primary).length, 1, "one primary");
 });
 
 void test("the address step, Prove's alone: its words, Adena first, an address pasted behind a tap, where to get Adena", () => {

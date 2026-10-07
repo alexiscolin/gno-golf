@@ -113,7 +113,7 @@ export default function Builder() {
             steps={{ edit: { locked: "", done: true }, test: { locked: "", done: proved }, publish: { locked: proved ? "" : "Hole it in every weather first", done: false } }}
             action={proved ? { text: "Publish →", kind: "chain", pulse: true, onClick: publish } : { text: "Back to edit", kind: "ghost", onClick: edit }}
             history={null} onTitle={(t) => update((x) => ({ ...x, title: t }))} onSlug={() => {}} onWorld={() => {}} onStep={(s) => (s === "edit" ? edit() : s === "publish" && proved && publish())} onBack={edit} />
-          <TestMode host={host} draft={d} hex={hex} proofKey={key} author={author} guess={guess} onAuthor={setAuthor} onLeave={edit}
+          <TestMode host={host} draft={d} hex={hex} proofKey={key} author={author} guess={guess} onAuthor={setAuthor} onLeave={edit} onPublish={publish}
             onProof={(p) => update((x) => ({ ...x, proofs: [...x.proofs.filter((q) => !(q.kind === p.kind && q.id === p.id && q.key === p.key)), p] }))}
             onPar={(par) => update((x) => (parAllowed(x.proofs.filter((q) => q.key === key), x.par) ? x : { ...x, par }))} />
           {unkeptNote}

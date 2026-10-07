@@ -3,11 +3,10 @@
 // realm's (size, work), the entries a limit switches off and why.
 import { counts, work, WORK_WARN } from "./checks";
 import { draftHole } from "./gg1";
-import { FIELD, listed } from "./rules";
+import { FIELD, listed, weatherName } from "./rules";
 import type { Cost } from "./wasm";
 import type { Draft, V } from "./draft";
 import { whereOf } from "./edit";
-import { weatherName } from "./carry";
 import type { Level, Shown } from "./difficulty";
 import type { PaletteEntry } from "./palette";
 import type { HoleIn } from "./types";

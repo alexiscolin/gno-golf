@@ -18,8 +18,8 @@ import { notTurned, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
 import { canonicalHex, proofKey, provedAs } from "@/lib/builder/proof";
-import { dropped, toCarry, weatherName, withCarried } from "@/lib/builder/carry";
-import { FIELD, listed } from "@/lib/builder/rules";
+import { dropped, toCarry, withCarried } from "@/lib/builder/carry";
+import { FIELD, listed, weatherName } from "@/lib/builder/rules";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
 import type { Draft, V } from "@/lib/builder/draft";
@@ -355,11 +355,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       )}
       {trying && (
         <div className={`tbench tbench--quick tint--${draft.world}`}>
-          <div className="qbar">
-            <b>Quick test</b><span>Calm weather · not a proof</span>
-            <button type="button" className="btn btn--ghost" onClick={() => setTrying(null)}>Back to edit<kbd>Esc</kbd></button>
-          </div>
-          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onRound={(r) => setTrail(roundOf(host, trying.of, r))} onLeave={() => setTrying(null)} />
+          <TestMode quick host={host} draft={trying.of} hex={trying.hex} proofKey="" author={author} onRound={(r) => setTrail(roundOf(host, trying.of, r))} onLeave={() => setTrying(null)}
+            proveOff={trying.of === kept ? testOff : "Checking…"} onProve={() => (setTrying(null), onTest(trying.of))} />
         </div>
       )}
       {(hints || again) && <Hints glossary={again && palette ? { world: draft.world, palette } : null} onDone={() => (setAgain(false), onHinted())} />}
