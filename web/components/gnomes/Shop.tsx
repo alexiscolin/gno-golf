@@ -23,7 +23,7 @@ import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
 import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, SearchToggle, TierChip, TierFilter } from "./parts";
-import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
+import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, ShopTitle, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
 import GnomeSheet from "./GnomeSheet";
@@ -133,17 +133,17 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   }, [cat, mine]);
 
   // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
-  const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
+  const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : <ShopTitle keeper={keeper} />;
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
 
   if (region === false)
     return (
-      <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow="The gnomes" title="Not here">
+      <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.page} title="Not here">
         <p className="gempty">The gnome shop is not offered in your region. The game stays free to play.</p>
       </FrontScreen>
     );
   return (
-    <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} title={title} dare={!theirs && viewing !== "mine" ? <ShopPitch keeper={keeper} /> : undefined}>
+    <FrontScreen className="front--fit shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={theirs || viewing === "mine" ? SHOP_HEAD.page : SHOP_HEAD.eyebrow} title={title} dare={!theirs && viewing !== "mine" ? <ShopPitch /> : undefined}>
       {/* the closing line and the wave in their places from the first frame (ShopFrame), the line's room kept until the
           sale is read (no room at all when it says no date): nothing moves as they are read */}
       {!theirs && viewing !== "mine" && closingSlot(c) !== "none" && <ClosesSlot>{c && closingSlot(c) === "line" && <Closes at={c.closesAt} now={now} />}</ClosesSlot>}

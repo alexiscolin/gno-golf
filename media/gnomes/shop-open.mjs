@@ -1,9 +1,10 @@
 // @ts-check
 // The gnome shop opened from the menu's Shop panel as a player on a slow
-// link and a phone's CPU would (Fast 3G, the CPU 4x slower), at 1440 and
-// 390: the layout shifts the page reports over 6 s, failing over 0.01 (the
-// shop draws its final frame first: ShopFrame.tsx); then every card's picture
-// in sight loaded (no broken image). With OUT, a frame every 100 ms and a
+// link and a phone's CPU would (Fast 3G, the CPU 4x slower), at 1440, 1024
+// and 390: the layout shifts the page reports over 6 s, failing over 0.01
+// (the shop draws its final frame first: ShopFrame.tsx); then every card's
+// picture in sight loaded (no broken image), and the shop never wider than
+// the window (no sideways scroll). With OUT, a frame every 100 ms and a
 // strip of them.
 //   APP=https://… node media/gnomes/shop-open.mjs   (OUT=<dir> for the frames)
 import fs from "node:fs";
@@ -11,7 +12,7 @@ import path from "node:path";
 import { launch, sleep } from "../lib/cdp.mjs";
 const APP = process.env.APP || "http://127.0.0.1:5175", OUT = process.env.OUT || "", TAG = process.env.TAG || "open";
 const results = [];
-for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [390, 844, true]])) {
+for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [1024, 768, false], [390, 844, true]])) {
   const b = await launch({ width: w, height: h, mobile, touch: mobile });
   await b.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "no-preference" }] });
   await b.send("Network.enable");
@@ -42,9 +43,11 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   const seen = `[...document.querySelectorAll(".gshelf li img")].filter((i) => { const r = i.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; })`;
   for (let i = 0; i < 60 && !(await b.ev(`${seen}.every((i) => i.complete)`)); i++) await sleep(500);
   const pics = await b.ev(`(() => { const s = ${seen}; return { n: s.length, broken: s.filter((i) => !i.complete || !i.naturalWidth).map((i) => i.getAttribute("src")) }; })()`);
-  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length;
+  // the shop's room the window's: nothing past its side (a trackpad's swipe shifts nothing)
+  const wide = await b.ev(`(() => { const s = document.querySelector(".screen.shop"); return s.scrollWidth - s.clientWidth; })()`);
+  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length && wide <= 0;
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken`, pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
+  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken, ${wide} px sideways`, pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
   b.kill();
   if (!dir) continue;
   // a strip: every other frame (0-5.8 s), 6 a row
