@@ -76,8 +76,8 @@ designing as a system.
 
   Were every one sold at these: 504 × 36 + 144 × 72 + 65 × 336 + 7 × 1,296
   = 59,424 GNOT.
-- **The screens read pure functions** of `web/lib/gnomes/` (`entryOf`,
-  `filterGnomes`, `traitRows`, `TIER_LOOK`, `skinOfTraits`) over the
+- **The screens read pure functions** of `web/lib/gnomes/` (`filterGnomes`,
+  `traitRows`, `TIER_LOOK`, `skinOfTraits`; a token found by id inline) over the
   catalogue: no 3D needed to list, sort, filter or describe a gnome.
 
 ## Consequences
