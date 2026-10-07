@@ -35,7 +35,7 @@
    column; a front screen's head (the rival's: title.css .front--fit) but the screen scrolling from its top, the
    head in the corner buttons' row, the gutters slim (the banner's room at the end, as the cups') */
 .screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { justify-content: flex-start; padding: 0 40px 48px; } /* (24 inside the page's frame, 16 in) */
-body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
+body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room); }
 @media (max-width: 600px) { .screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { padding-inline: 16px; } } /* (the page's frame closer: globals.css) */
 .shop .worlds__in { width: min(1160px, 100%); display: grid; gap: var(--sp-4); justify-items: stretch; }
 .shop .front__head { justify-self: center; }

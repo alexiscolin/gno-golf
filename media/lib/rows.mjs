@@ -83,3 +83,17 @@ export const gold = (/** @type {string} */ sel) => `(() => {
   const on = getComputedStyle(probe).color; probe.remove();
   return !!e && getComputedStyle(e).backgroundColor === on;
 })()`;
+
+/**
+ * In the page: every screen scrolled to its foot, the controls shown that lie under the network chip (the fixed
+ * band at the bottom left: the game's .netbanner), their words; [] when the last row scrolls clear of it.
+ */
+export const underChip = () => `(async () => {
+  for (const s of document.querySelectorAll(".screen")) s.scrollTop = s.scrollHeight;
+  await new Promise((r) => setTimeout(r, 400));
+  const chip = [...document.querySelectorAll(".netbanner > *")].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
+  const over = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  return [...document.querySelectorAll(".screen :is(button, a, [role=button], summary)")].filter((e) => e.checkVisibility() && !e.closest(".netbanner"))
+    .filter((e) => { const r = e.getBoundingClientRect(); return r.width && chip.some((c) => over(r, c)); })
+    .map((e) => (e.getAttribute("aria-label") || e.textContent || e.className).trim().slice(0, 40));
+})()`;

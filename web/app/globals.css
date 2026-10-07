@@ -1774,7 +1774,7 @@ body .toast.toast--center { top: 50%; margin-top: -22px; }
 .sky--night.sky--w-mountain { background: linear-gradient(178deg, #141c3a 0%, #253255 60%, #3a4a72 100%); }
 /* the cup screen scrolls when its cards do not fit (a phone), never cut at the top */
 .screen.worlds { overflow-y: auto; }
-body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bottom left, never over a card's foot */
+body:has(.netbanner) .screen.worlds { padding-bottom: var(--chip-room); } /* the banner, bottom left, never over a card's foot */
 
 /* the forecast as a HUD card, next to the strokes */
 .card--weather { display: flex; align-items: center; gap: 8px; padding: 8px 12px; position: relative; font: inherit; color: inherit; cursor: pointer; }
@@ -2234,11 +2234,15 @@ body:has(.sheet) .screen__about, body:has(.sheet) .screen__back { visibility: hi
 
 /* which chain this is (under the sheets and banners, z 5–9, like the Players chip), bottom left on every screen but mainnet's: coloured,
    so no one takes a practice score for a real one, with the way to mainnet */
+/* its footprint over a screen: its height and its height off the bottom (a phone's: below), and the room every screen
+   that scrolls under it leaves at its foot (--chip-room: those, and a gap), so its last row scrolls clear of it */
+:root { --chip-h: 48px; --chip-low: 34px; --chip-room: 0px; }
+body:has(.netbanner) { --chip-room: calc(max(var(--chip-low), env(safe-area-inset-bottom)) + var(--chip-h) + 8px); }
 .netbanner { position: fixed; left: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: var(--z-chip); display: flex; align-items: center; gap: 10px; } /* the band, then the Support chip (not on a phone) */
-.netbanner__band { display: flex; align-items: center; gap: 10px; height: 48px; margin: 0; padding: 0 6px 0 16px; border: var(--edge); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; } /* the bottom buttons' height and edge, flat: it says, it is not pressed */
+.netbanner__band { display: flex; align-items: center; gap: 10px; height: var(--chip-h); margin: 0; padding: 0 6px 0 16px; border: var(--edge); border-radius: 16px; background: var(--gold); color: var(--ink); font-size: 14px; } /* the bottom buttons' height and edge, flat: it says, it is not pressed */
 .netbanner--local { background: var(--hat); color: var(--paper); } /* a node on this machine in the hat's red; the testnet keeps the gold */
 .netbanner__support svg { fill: var(--hat); } /* a red heart where the Leaderboard has its gold cup */
-.screen ~ .netbanner { z-index: var(--z-screen); left: 34px; bottom: max(34px, env(safe-area-inset-bottom)); } /* over the title, cups and gnome screens too (under the sheets, 5), inside their frame, where their corner buttons are */
+.screen ~ .netbanner { z-index: var(--z-screen); left: 34px; bottom: max(var(--chip-low), env(safe-area-inset-bottom)); } /* over the title, cups and gnome screens too (under the sheets, 5), inside their frame, where their corner buttons are */
 .netbanner b { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .netbanner__band span { font-weight: 600; opacity: .9; }
 .netbanner__band:not(:has(.netbanner__go, .netbanner__feedback)) { padding-right: 16px; }
@@ -2330,15 +2334,16 @@ body:has(.screen) .pending { top: 60px; transform: translate(-50%, -50%); }
   .screen--title .title { padding-top: 52px; }
   .screen--pick .pick { padding-top: 60px; }
   /* and the picker's button clear of the network banner's row, as the title's */
-  body:has(.netbanner) .screen--pick { padding-bottom: 90px; }
+  body:has(.netbanner) .screen--pick { padding-bottom: var(--chip-room); }
   /* on a phone it joins the bottom row, left of the play buttons: a short word, no link (About has it) */
-  .netbanner__band { height: 44px; padding: 0 8px; font-size: 11px; border-radius: 12px; }
+  :root { --chip-h: 44px; --chip-low: 30px; }
+  .netbanner__band { padding: 0 8px; font-size: 11px; border-radius: 12px; }
   .netbanner b { font-size: 0; } .netbanner b::after { content: attr(data-short); font-size: 11px; }
   .netbanner__band span, .netbanner__go, .netbanner__support span { display: none; }
   .netbanner__feedback i { display: none; } .netbanner__feedback { min-height: 26px; height: 26px; padding: 0 5px; } .netbanner__feedback::before { content: ""; position: absolute; inset: -9px; } /* (a 44px tap round the small icon) */ .netbanner__band:has(.netbanner__feedback) { gap: 6px; padding-right: 6px; } .netbanner:has(.netbanner__feedback) { gap: 6px; }
   .netbanner__support { display: none; } /* (About has the tip) */
   .netbanner { left: 12px; } /* the top cards' gutter */
-  .screen ~ .netbanner { left: 30px; bottom: max(30px, env(safe-area-inset-bottom)); } /* (a phone's corner buttons) */
+  .screen ~ .netbanner { left: 30px; } /* (a phone's corner buttons; its height off the bottom: --chip-low) */
   /* the play buttons start right of it, not under it */
   body:has(.netbanner) .hud--bottom { padding-left: 110px; padding-right: 14px; justify-content: flex-end; } /* (the band and a gap; the right edge the leaderboard chip's) */
   .share__icon { width: 40px; height: 40px; }

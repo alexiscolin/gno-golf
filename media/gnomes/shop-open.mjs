@@ -12,7 +12,8 @@
 // lines, as tall as one another, on one top, their words on one baseline, and More filters open
 // gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card,
 // one slim row (its thumbnails of one frame, its line on one line, two on a phone, on its button's baseline), its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
-// and the shop never sideways from 360 to 1440 px wide; About's link cards' words on one left edge. Before, the title screen alone: none of
+// and the shop never sideways from 360 to 1440 px wide; the shop, the cups and the menu scrolled to their foot clear
+// of the network chip (at 1440, 1024, 390); About's link cards' words on one left edge. Before, the title screen alone: none of
 // the sale read (the catalogue), the collection's wardrobe nor the shop's
 // part of the game (components/gnomes/Game.tsx: a dev build's chunk names
 // it) fetched, which only a screen showing the sale needs. With OUT, a frame every 100 ms and a
@@ -21,7 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { launch, offline, sleep } from "../lib/cdp.mjs";
-import { footprint, gold, misaligned } from "../lib/rows.mjs";
+import { footprint, gold, misaligned, underChip } from "../lib/rows.mjs";
 const APP = process.env.APP || "http://127.0.0.1:5175", OUT = process.env.OUT || "", TAG = process.env.TAG || "open";
 const results = [];
 for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [1024, 768, false], [390, 844, true]])) {
@@ -187,4 +188,19 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   console.log(`${ok ? "PASS" : "FAIL"} the shop's part not fetched: Back ${off && off.back}, About ${off && off.about}, Try again ${off && off.retry}; then the shelf ${back}; Escape leaves the shop ${left}`);
   b.kill();
 }
+// the network chip (bottom left, fixed) never over the last row: the shop's gallery (every gnome shown), the cups
+// (the community's list at their foot) and the menu, each scrolled to its foot, no control under the chip
+for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [1024, 768, false], [390, 844, true]]))
+  for (const [at, ready] of [["/g/", ".gshelf li"], ["/?screen=cups", ".world"], ["/?screen=modes", ".mode"]]) {
+    const b = await launch({ width: w, height: h, mobile, touch: mobile });
+    await b.send("Page.navigate", { url: APP + at });
+    for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(${JSON.stringify(ready)})`)); i++) await sleep(500);
+    await sleep(1500);
+    for (let k = 0; k < 40 && (await b.ev(`!!document.querySelector(".gshelf__more")`)); k++) await b.js(`document.querySelector(".gshelf__more").click(); true`), await sleep(300);
+    const under = await b.ev(underChip());
+    const ok = (await b.ev(`!!document.querySelector(".netbanner")`)) && Array.isArray(under) && under.length === 0;
+    results.push({ w: `${at} ${w}`, ok });
+    console.log(`${ok ? "PASS" : "FAIL"} ${at} at ${w}×${h}: scrolled to its foot, nothing under the network chip`, ok ? "" : JSON.stringify(under));
+    b.kill();
+  }
 process.exit(results.every((r) => r.ok) ? 0 : 1);

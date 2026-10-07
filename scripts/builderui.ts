@@ -32,7 +32,8 @@ const cdp = (await import("../media/lib/cdp.mjs")) as {
   offline: (b: Browser, now?: boolean) => Promise<{ back: () => Promise<unknown> }>;
 };
 const { launch, sleep, APP } = cdp;
-const { misaligned, footprint, gold } = (await import("../media/lib/rows.mjs")) as {
+const { misaligned, footprint, gold, underChip } = (await import("../media/lib/rows.mjs")) as {
+  underChip: () => string;
   misaligned: (rows: { name: string; box: string; words?: string; by?: string }[]) => string;
   footprint: (sel: string) => string;
   gold: (sel: string) => string;
@@ -216,6 +217,8 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   assert.deepEqual(await c.js<object>(footprint(".bholes__world.on")), tab, `${at}: a world tab's box changes as it is chosen`);
   await c.js(`document.querySelector(".bholes__world").click()`);
   await sleep(300);
+  // scrolled to its foot, nothing under the network chip (the game's, bottom left: none on this page today)
+  assert.deepEqual(await c.js<string[]>(underChip()), [], `${at}: a control under the network chip`);
   // its head the game's (a front screen's pill and outlined title)
   assert.deepEqual(await c.js(`[...document.querySelectorAll(".bholes__sign .front__head > *")].map((e) => e.tagName + " " + e.className + " " + e.textContent)`), ["SPAN eyebrow The Builder", "H1 worlds__title Hard hats on!"], `${at}: the head is not a front screen's`);
   // the starters as templates, the blank lane as one of the cards, as big, under its own label, its own picture
