@@ -1,10 +1,10 @@
 // Holes no course hole is like, all within GG1's bounds: what anyone can
 // publish from a terminal once community publishing opens, for the renderer
-// to stand (web/test/hostile.test.ts builds each in every world). Zones with
+// to stand (hostile.test.ts builds each in every world). Zones with
 // no area, every limit at once, and every piece and the world itself named
 // like Object.prototype's keys, which a table looked up by name would answer
 // (lib/own.ts). Plain data in HoleState's shape: no three.js.
-import type { HoleState, Post, Vec2, Wall, Zone } from "./types";
+import type { HoleState, Post, Vec2, Wall, Zone } from "../lib/types.ts";
 
 /** Names a lookup on a plain object answers with Object.prototype's. */
 export const HOSTILE_NAMES = ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"];

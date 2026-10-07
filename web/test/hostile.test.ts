@@ -1,10 +1,10 @@
-// The hostile holes (lib/hostile.ts): what anyone can publish from a terminal
+// The hostile holes (test/hostile.ts): what anyone can publish from a terminal
 // once publishing opens, within GG1's bounds and past what any course hole
 // does. Each is built by the game's own buildHole, in every world, in Node
 // (test/scene-harness.ts): it must build, never throw.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hostileHoles, HOSTILE_NAMES } from "../lib/hostile.ts";
+import { hostileHoles, HOSTILE_NAMES } from "./hostile.ts";
 import { build, loadWorld } from "./scene-harness.ts";
 import { WORLD_NAMES } from "../lib/scene/worlds.ts";
 
