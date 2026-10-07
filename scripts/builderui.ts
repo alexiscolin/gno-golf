@@ -219,8 +219,9 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await sleep(1200);
   assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 2, "a post dropped on the bin is removed");
   // the cup taken by its flag, the tee by its edge: each moved, the board not panned (a hit area bigger than the drawing)
-  const at = (sel: string) => c.js<[number, number]>(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return [+e.getAttribute("cx"), +e.getAttribute("cy")]; })()`);
-  const onScreen = (sel: string) => c.js<[number, number]>(`(() => { const svg = document.querySelector(".board__map"), e = document.querySelector(${JSON.stringify(sel)}); const p = svg.createSVGPoint(); p.x = +e.getAttribute("cx"); p.y = +e.getAttribute("cy"); const s = p.matrixTransform(svg.getScreenCTM()); return [s.x, s.y]; })()`);
+  // (an end's place on the board, as its label says it; its badge's middle on the screen)
+  const at = (sel: string) => c.js<string>(`/\\(.*\\)/.exec(document.querySelector(${JSON.stringify(sel)}).closest("[data-end]").getAttribute("aria-label"))[0]`);
+  const onScreen = (sel: string) => c.js<[number, number]>(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const drag = async (from: [number, number], dx: number) => {
     await mouse("mousePressed", ...from);
     for (let k = 1; k <= 6; k++) {
@@ -230,7 +231,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
     await mouse("mouseReleased", from[0] + dx, from[1]);
     await sleep(1000);
   };
-  const k = await c.js<number>(`document.querySelector(".board__map").getScreenCTM().a`); // (px a unit)
+  const k = await c.js<number>(`document.querySelector(".board__plane").getScreenCTM().a`); // (px a unit)
   for (const [what, sel, grip] of [["the cup, by its flag", "[data-end='pin'] circle", (p: [number, number]): [number, number] => [p[0] + 0.35 * k, p[1] - 0.95 * k]], ["the tee, by its edge", "[data-end='tee'] circle", (p: [number, number]): [number, number] => [p[0] + 0.8 * k, p[1] + 0.3 * k]]] as const) {
     const was = await at(sel), other = await onScreen(sel === "[data-end='tee'] circle" ? "[data-end='pin'] circle" : "[data-end='tee'] circle");
     await drag(grip(await onScreen(sel)), -1.5 * k);

@@ -104,7 +104,7 @@ try {
   // (the Bumper's tile: its picture, its name, what it does)
   const tile = await c.js<[number, number]>(`(() => { const b = [...document.querySelectorAll(".palette [data-tile]")].find((t) => t.querySelector(".piece__name")?.textContent === "Bumper"); const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   for (const [dx, dy] of [[6, -2.5], [6, 2.5], [9, -2], [12, 2.5]]) {
-    const to = await c.js<[number, number]>(`(() => { const svg = document.querySelector(".board__map"), t = document.querySelector("[data-end='tee'] circle"); const p = svg.createSVGPoint(); p.x = +t.getAttribute("cx") + ${dx}; p.y = +t.getAttribute("cy") + ${dy}; const s = p.matrixTransform(svg.getScreenCTM()); return [s.x, s.y]; })()`);
+    const to = await c.js<[number, number]>(`(() => { const m = document.querySelector(".board__plane").getScreenCTM(), r = document.querySelector("[data-end='tee'] circle").getBoundingClientRect(); const t = new DOMPoint(r.left + r.width / 2, r.top + r.height / 2).matrixTransform(m.inverse()), s = new DOMPoint(t.x + ${dx}, t.y + ${dy}).matrixTransform(m); return [s.x, s.y]; })()`);
     await mouse("mousePressed", ...tile);
     for (let k = 1; k <= 8; k++) {
       await mouse("mouseMoved", tile[0] + ((to[0] - tile[0]) * k) / 8, tile[1] + ((to[1] - tile[1]) * k) / 8);
