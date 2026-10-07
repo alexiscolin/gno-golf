@@ -13,7 +13,7 @@ import { worldOf, drawnBy, fromWorld, gapWater, DECK, GAP_Y, type Skins } from "
 import { WEATHER_SKINS } from "./weather";
 import { POSTS, BARS, roofs, SLAB } from "./pieces";
 import { zoneDetail, waterMask, pondWater } from "./zones";
-import { ud, withData, type Course, type CourseData, type CourseTerrain as T, type Height, type Hole, type Tick, type Timed } from "./data";
+import { ud, withData, type Course, type CourseData, type CourseTerrain as T, type Fade, type Height, type Hole, type Tick, type Timed } from "./data";
 import type { Extras, MutVec2, Post, Timing, Vec2, Wall, Wear, Zone } from "../types";
 import { own as ownKey } from "../own";
 
@@ -1354,11 +1354,11 @@ function tramClipped(was: THREE.Material, c: TramClip) {
 
 /** What fades out of the camera's way: the decor's canopy, and for a world that asks (worlds.ts pieceFade) its pieces' own fades too: fade(eye, ball). */
 function fadeOf(g: THREE.Object3D, dec: THREE.Object3D, s: Hole) {
-  const fades: ((eye: THREE.Vector3, ball: THREE.Vector3) => void)[] = [];
+  const fades: Fade[] = [];
   if (worldOf(s).pieceFade) for (const c of g.children) if (c !== dec) c.traverse((o) => { if (ud(o).fade) fades.push(ud(o).fade!); });
   if (!fades.length) return ud(dec).fade || null;
   if (ud(dec).fade) fades.unshift(ud(dec).fade!);
-  return (eye: THREE.Vector3, ball: THREE.Vector3) => { for (const f of fades) f(eye, ball); };
+  return (eye: THREE.Vector3, ball: THREE.Vector3, cup: THREE.Vector3 | null = null) => { for (const f of fades) f(eye, ball, cup); };
 }
 
 /** A timed piece as the clock drives it. */

@@ -558,26 +558,33 @@ export interface FadeItem {
   mats: readonly THREE.Material[];
   obj?: THREE.Object3D;
 }
+/** How far at is from the line from eye to ball, and (cup given) from the line from eye to cup: the nearer. */
+export function sightDist(eye: THREE.Vector3, ball: THREE.Vector3, cup: THREE.Vector3 | null, at: THREE.Vector3) {
+  const d = _seg.set(eye, ball).closestPointToPoint(at, true, _near).distanceTo(at);
+  return cup ? Math.min(d, _seg.set(eye, cup).closestPointToPoint(at, true, _near).distanceTo(at)) : d;
+}
+const _seg = new THREE.Line3(), _near = new THREE.Vector3();
+
 /**
  * The canopy fade every world uses: each item is { at: THREE.Vector3 (world),
  * r: radius, mats: [materials] }, and with obj (an Object3D that moves) its
- * at is read from where obj is now. Returns fade(eye, ball): items near the
- * line from the eye to the ball go see-through, others come back.
+ * at is read from where obj is now. Returns fade(eye, ball, cup): items near
+ * the line from the eye to the ball, or to the cup (when the game gives it:
+ * on screen), go see-through, others come back.
  */
 export function fadeLoop(items: readonly FadeItem[], { min = 0.22 } = {}) {
-  const seg = new THREE.Line3(), near = new THREE.Vector3();
-  // nothing that moves by itself, the eye and the ball where they were: every
-  // fade stands as it is (a still camera on a ball at rest, frame after frame)
-  const lastEye = new THREE.Vector3(NaN, 0, 0), lastBall = new THREE.Vector3(), moving = items.some((it) => it.obj);
-  return (eye: THREE.Vector3, ball: THREE.Vector3) => {
-    if (!moving && eye.equals(lastEye) && ball.equals(lastBall)) return;
+  // nothing that moves by itself, the eye, the ball and the cup where they were:
+  // every fade stands as it is (a still camera on a ball at rest, frame after frame)
+  const lastEye = new THREE.Vector3(NaN, 0, 0), lastBall = new THREE.Vector3(), lastCup = new THREE.Vector3(), moving = items.some((it) => it.obj);
+  let hadCup = false;
+  return (eye: THREE.Vector3, ball: THREE.Vector3, cup: THREE.Vector3 | null = null) => {
+    if (!moving && eye.equals(lastEye) && ball.equals(lastBall) && !!cup === hadCup && (!cup || cup.equals(lastCup))) return;
     lastEye.copy(eye);
     lastBall.copy(ball);
-    seg.set(eye, ball);
+    if ((hadCup = !!cup)) lastCup.copy(cup);
     for (const it of items) {
       if (it.obj) it.obj.getWorldPosition(it.at);
-      seg.closestPointToPoint(it.at, true, near);
-      const d = near.distanceTo(it.at), o = d < it.r * 1.3 ? min : d < it.r * 2.2 ? min + ((d - it.r * 1.3) / (it.r * 0.9)) * (1 - min) : 1;
+      const d = sightDist(eye, ball, cup, it.at), o = d < it.r * 1.3 ? min : d < it.r * 2.2 ? min + ((d - it.r * 1.3) / (it.r * 0.9)) * (1 - min) : 1;
       for (const m of it.mats) setFade(m, o);
     }
   };

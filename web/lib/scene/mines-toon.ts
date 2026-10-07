@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { drawn, relief, hullOf, share, ownFade, setFade, flat } from "./materials";
+import { drawn, relief, hullOf, share, ownFade, setFade, sightDist, flat } from "./materials";
 import { bakeLocal } from "./bake";
 import { ud } from "./data";
 import { md } from "./data";
@@ -324,7 +324,7 @@ export function shared<S extends { root: THREE.Object3D }>(build: object, key: s
 
 // ---------------------------------------------------------------- out of the camera's way
 //
-// Nothing of the mines may hide the ball from the player: a piece that can
+// Nothing of the mines may hide the ball (or the cup, on screen) from the player: a piece that can
 // stand between the camera and a ball at rest fades out of that line (the
 // town's canopies' way: materials.ts fadeable), one fade a hole (shared),
 // the course calling it each frame (worlds.ts pieceFade). A still piece is
@@ -337,8 +337,8 @@ const newSet = (): FadeSet => ({ own: new Map(), ink: null, mats: [] });
 function sightSystem(): Sight {
   const root = new THREE.Group(), sys: Sight = { root, items: [], buckets: new Map() };
   ud(root).live = true;
-  const seg = new THREE.Line3(), near = new THREE.Vector3(), least = new Map<FadeSet, number>();
-  ud(root).fade = (eye: THREE.Vector3, ball: THREE.Vector3) => {
+  const least = new Map<FadeSet, number>();
+  ud(root).fade = (eye: THREE.Vector3, ball: THREE.Vector3, cup: THREE.Vector3 | null = null) => {
     // (a still bucket merged once, before its first frame: its materials the ones faded)
     for (const b of sys.buckets.values()) if (!b.baked) {
       b.baked = true;
@@ -347,11 +347,9 @@ function sightSystem(): Sight {
       b.root.traverse((o) => void (o instanceof THREE.Mesh && ms.add(o.material as THREE.Material)));
       b.set.mats = [...ms];
     }
-    seg.set(eye, ball);
     least.clear();
     for (const it of sys.items) {
-      seg.closestPointToPoint(it.at, true, near);
-      const d = near.distanceTo(it.at), o = d < it.r * 1.1 ? 0.1 : d < it.r * 1.8 ? 0.1 + ((d - it.r * 1.1) / (it.r * 0.7)) * 0.9 : 1; // (nearly gone: a ghost, not a pale blob by the ball)
+      const d = sightDist(eye, ball, cup, it.at), o = d < it.r * 1.1 ? 0.1 : d < it.r * 1.8 ? 0.1 + ((d - it.r * 1.1) / (it.r * 0.7)) * 0.9 : 1; // (nearly gone: a ghost, not a pale blob by the ball)
       least.set(it.set, Math.min(least.get(it.set) ?? 1, o));
     }
     // (a piece faded out keeps its own colours; its ink goes at once, or the outline alone would stand there as a dark slab)
