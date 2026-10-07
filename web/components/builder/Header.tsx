@@ -9,7 +9,7 @@ import { shortAddr } from "@/components/common";
 import { worldName } from "@/lib/builder/rules";
 import { shortWhy } from "@/lib/builder/editor";
 import type { Level } from "@/lib/builder/difficulty";
-import { Dice } from "@/components/ui";
+import { Button, Chip, Dice } from "@/components/ui";
 
 export type Step = "edit" | "test" | "publish";
 
@@ -28,13 +28,13 @@ export interface MeterChip {
   busy: boolean;
 }
 
-/** The meter beside the big button: four pips and a word, its width kept (nothing moves as it changes); a guess, never a gate. */
+/** The meter beside the big button: a chip of four pips and a word, its width kept (nothing moves as it changes); a guess, never a gate. */
 function Meter({ m }: { m: MeterChip }) {
   return (
-    <span className={`meter meter--${m.level ?? "none"}`} title={m.title} aria-label={m.title} aria-busy={m.busy} role="img">
+    <Chip size="m" className={`meter meter--${m.level ?? "none"}`} title={m.title} aria-label={m.title} aria-busy={m.busy} role="img">
       <i aria-hidden="true">{[0, 1, 2, 3].map((k) => <b key={k} className={m.level != null && k <= m.level ? "on" : undefined} />)}</i>
       <span aria-hidden="true">{m.word}</span>
-    </span>
+    </Chip>
   );
 }
 
@@ -57,7 +57,7 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   step: Step;
   steps: Record<Step, StepState>;
   /** the mode's one action: its words, its look, off with why */
-  action: { text: string; kind: "gold" | "chain" | "ghost"; off?: string; pulse?: boolean; onClick: () => void } | null;
+  action: { text: string; kind: "gold" | "chain" | "secondary"; off?: string; pulse?: boolean; onClick: () => void } | null;
   history: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } | null;
   /** the difficulty meter, in Edit: none elsewhere */
   meter?: MeterChip;
@@ -76,9 +76,9 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   return (
     <header className="bhead">
       <div className="bhead__start">
-      <button type="button" className="round round--icon" aria-label="Back to your holes (the draft is kept)" title="Back to your holes" onClick={onBack}>
+      <Button variant="icon" size="m" type="button" aria-label="Back to your holes (the draft is kept)" title="Back to your holes" onClick={onBack}>
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
+      </Button>
       <div className="bhead__hole">
         <span className="bhead__name">
           <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)} />
@@ -115,20 +115,20 @@ export default function Header({ title, slug, author, world, worlds, step, steps
             {meter && !waits ? <Meter m={meter} /> : action && <span className="bhead__why" aria-hidden="true">{shortWhy(action.off ?? "")}</span>}
           </span>
         )}
-        {onHelp && <button type="button" className="round" aria-label="How it works: the three steps" title="How it works" onClick={onHelp}>?</button>}
+        {onHelp && <Button variant="icon" size="m" type="button" aria-label="How it works: the three steps" title="How it works" onClick={onHelp}>?</Button>}
         {history && (
           <>
-            <button type="button" className="round round--icon bhead__hist" aria-label="Undo" aria-keyshortcuts={keys(false)} title={`Undo (${MOD}Z)`} disabled={!history.canUndo} onClick={history.undo}><HistoryIcon /></button>
-            <button type="button" className="round round--icon bhead__hist" aria-label="Redo" aria-keyshortcuts={keys(true)} title={`Redo (⇧${MOD}Z)`} disabled={!history.canRedo} onClick={history.redo}><HistoryIcon redo /></button>
+            <Button variant="icon" size="m" type="button" className="bhead__hist" aria-label="Undo" aria-keyshortcuts={keys(false)} title={`Undo (${MOD}Z)`} disabled={!history.canUndo} onClick={history.undo}><HistoryIcon /></Button>
+            <Button variant="icon" size="m" type="button" className="bhead__hist" aria-label="Redo" aria-keyshortcuts={keys(true)} title={`Redo (⇧${MOD}Z)`} disabled={!history.canRedo} onClick={history.redo}><HistoryIcon redo /></Button>
           </>
         )}
         {action && (
           // its own words always (nothing moves as the reason changes), readable and reachable when off: the reason is
           // the dock's verdict (bench-verdict), and its title
-          <button type="button" className={`btn ${action.off ? "btn--off" : action.kind === "chain" ? "btn--save" : action.kind === "ghost" ? "btn--ghost" : "btn--gold"}${action.pulse && !action.off ? " btn--pulse" : ""}`}
+          <Button variant={action.kind} size="m" type="button" className={`bhead__act${action.pulse && !action.off ? " btn--pulse" : ""}`}
             aria-disabled={action.off ? true : undefined} aria-describedby={action.off ? "bench-verdict" : undefined} title={action.off || undefined} onClick={() => !action.off && action.onClick()}>
             {action.text}
-          </button>
+          </Button>
         )}
       </div>
     </header>

@@ -34,6 +34,7 @@
   --ground: #6aa585; --pond: #79c0e8; /* (the moss a shade deeper: the felt reads on it) */
   /* type: a display heading, a card's name, a pill's label */
   --fs-display: clamp(36px, 5.4vw, 72px);
+  --fs-fit: clamp(34px, min(4.2vw, 6.5vh), 56px); /* a display heading on a screen that fits its window, or on a panel (the Builder's sign) */
   --fs-name: clamp(15px, 1.4vw, 18px);
   --fs-pill: 15px;
   /* space: the vertical rhythm, small to large */
@@ -412,7 +413,7 @@ body:has(.netbanner) .screen.front--fit { padding-bottom: 106px; }
 @media (min-height: 880px) { body:has(.netbanner) .screen.front--fit { padding-top: 106px; } } /* (room to spare: the block in the page's middle, not just above the banner) */
 .worlds__in.rival { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 3.4vh, 40px); width: min(var(--front-w), 100%); } /* (the parts apart, less so on a short window) */ /* (the screen's room, its padding off: 100vw overflowed it, a sideways scroll) */
 .rival .front__head { margin: 0; }
-.front--fit .worlds__title { font-size: clamp(34px, min(4.2vw, 6.5vh), 56px); } /* (the picker's own, .screen--pick .pick__name) */
+.front--fit .worlds__title { font-size: var(--fs-fit); } /* (the picker's own, .screen--pick .pick__name) */
 @media (max-height: 720px) { .front--fit .front__head > .eyebrow { display: none; } }
 /* where the cups' screen scrolls from its top (globals.css): the head under the
    corner row as there, the network banner's room the screen's own (90px) */

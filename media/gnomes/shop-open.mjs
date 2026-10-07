@@ -7,7 +7,9 @@
 // the window (no sideways scroll); a gnome's sheet opened from a card over
 // everything, the network banner too (never a chip over its Buy); the
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
-// every card's #number in sight however long its name. Before, the title screen alone: none of
+// every card's #number in sight however long its name; the toolbar's controls, on each of its
+// lines, as tall as one another, on one top, their words on one baseline (at 1440, 1280, 1024 and
+// 390, unthrottled: media/lib/rows.mjs). Before, the title screen alone: none of
 // the sale read (the catalogue) nor the collection's wardrobe fetched, which
 // only a screen showing the sale needs. With OUT, a frame every 100 ms and a
 // strip of them.
@@ -15,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { launch, sleep } from "../lib/cdp.mjs";
+import { misaligned } from "../lib/rows.mjs";
 const APP = process.env.APP || "http://127.0.0.1:5175", OUT = process.env.OUT || "", TAG = process.env.TAG || "open";
 const results = [];
 for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [1024, 768, false], [390, 844, true]])) {
@@ -80,5 +83,17 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   const { data } = await b2.send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width, height, scale: 1 } });
   fs.writeFileSync(path.join(OUT, `strip-${TAG}-${w}.png`), Buffer.from(data, "base64"));
   b2.kill();
+}
+// the toolbar: one height, one top and one baseline a line (the views, the tiers, the search, the look, more filters)
+for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [1280, 800, false], [1024, 700, false], [390, 844, true]])) {
+  const b = await launch({ width: w, height: h, mobile, touch: mobile });
+  await b.send("Page.navigate", { url: APP + "/g/" });
+  for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".gbar .tierbtn")`)); i++) await sleep(500);
+  await sleep(1000);
+  const off = await b.ev(misaligned([{ name: "the shop's bar", box: ".gbar .seg, .gbar .tierbtn, .gbar > .btn, .gbar .gsearch", by: ".gbar" }]));
+  const ok = Array.isArray(off) && off.length === 0;
+  results.push({ w, ok });
+  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}`, ok ? "" : JSON.stringify(off));
+  b.kill();
 }
 process.exit(results.every((r) => r.ok) ? 0 : 1);

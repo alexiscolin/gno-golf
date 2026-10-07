@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BackButton } from "@/components/About";
 import { useCopied } from "@/components/common";
 import { worldName } from "@/lib/builder/rules";
-import { Button } from "@/components/ui";
+import { Button, buttonClass } from "@/components/ui";
 import { makeChain } from "@/lib/chain";
 import { authorOf, cupsLink, endpoints, holeByline, knownAuthor, listHoles, playLink } from "@/lib/builder/holes";
 import { knownOnly } from "@/lib/community";
@@ -29,7 +29,7 @@ function Row({ h, sub, keep, fresh = false }: { h: HoleRow; sub: string; keep: s
   return (
     <li className="bphone__row">
       <span className="bphone__name"><b>{h.name || h.slot || h.id}{fresh && <i className="bholes__dot" role="img" aria-label="New since your last visit" title="New since your last visit" />}</b><small>{sub}</small></span>
-      <a className="btn btn--ghost btn--s" href={playLink(h, keep)}>Play</a>
+      <a className={buttonClass({ size: "s" })} href={playLink(h, keep)}>Play</a>
     </li>
   );
 }
@@ -80,7 +80,7 @@ export default function PhoneBuilder() {
             : !community.length ? <p className="bphone__note">None checked on this device yet.</p>
             : <ul>{community.slice(0, shown).map((h) => <Row key={h.id} h={h} keep={keep} sub={holeByline({ author: authorOf(h.id) ?? "", world: h.world, par: h.par })} />)}</ul>}
           {community.length > shown && <Button className="btn--wide" onClick={() => setShown((n) => n + PAGE)}>More community holes</Button>}
-          {!failed && <a className="btn btn--ghost btn--wide" href={cupsLink(keep)}>Every community hole, in the game</a>}
+          {!failed && <a className={buttonClass({}, "btn--wide")} href={cupsLink(keep)}>Every community hole, in the game</a>}
         </section>
       </div>
     </div>

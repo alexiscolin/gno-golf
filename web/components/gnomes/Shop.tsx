@@ -186,9 +186,9 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
             <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
             <SearchToggle value={f.text} onChange={(text) => setF((x) => ({ ...x, text }))} />
             <LookSwitch look={look} onLook={onLook} />
-            <button type="button" className={`gbar__icon gbar__more${f.home ? " gbar__icon--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
+            <Button variant="icon" size="m" type="button" className={`gbar__icon gbar__more${f.home ? " btn--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.4" /><circle cx="15" cy="17" r="2.4" /></svg>
-            </button>
+            </Button>
           </div>
           {more && (
             <div className="gfilters" id="gmore">

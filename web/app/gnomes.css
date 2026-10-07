@@ -13,12 +13,12 @@
 .shop, .gsheet { font-variant-numeric: tabular-nums; }
 
 /* a tier's chip: its shape and its name, on its colour */
-.tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border: var(--edge); border-radius: var(--pill); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; background: var(--tier-common); }
+.tier { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border: var(--edge); border-radius: var(--pill); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; --tier-bg: var(--tier-common); background: var(--tier-bg); }
 .tier svg { width: 14px; height: 14px; fill: var(--paper); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
-.tier--rare { background: var(--tier-rare); }
-.tier--epic { background: var(--tier-epic); }
-.tier--legendary { background: var(--gold-grad); }
-.tier--earned { background: var(--green-light); }
+.tier--rare { --tier-bg: var(--tier-rare); }
+.tier--epic { --tier-bg: var(--tier-epic); }
+.tier--legendary { --tier-bg: var(--gold-grad); }
+.tier--earned { --tier-bg: var(--green-light); }
 
 /* a gnome's tile: his thumbnail on his tier's stage, framed in his tier's rim */
 .gtile { position: relative; display: block; aspect-ratio: 1; border-radius: 18px; border: var(--edge-bold); background: #f6ead2; overflow: hidden; }
@@ -104,20 +104,17 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
    narrower (each row's height fixed: the slot while it is read is the same room) */
 .gbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto auto; grid-template-areas: "views tiers . search look more"; grid-template-rows: 48px; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .gbar__views { grid-area: views; } .gbar__tiers { grid-area: tiers; } .gbar > .gbar__icon:not(.gbar__more), .gsearch { grid-area: search; } .gbar > .seg--look { grid-area: look; } .gbar__more { grid-area: more; }
-.gbar .seg { box-shadow: none; }
 /* every control the same height, on one line: the toolbar's rhythm */
-.gbar .seg button { min-height: 36px; } /* (in the segment's 2 px edge: 40 all told) */
-.gbar__views button { padding: 6px 14px; font-size: 14px; white-space: nowrap; }
+.gbar .seg button { min-height: 36px; font-size: 13px; } /* (in the segment's 2 px edge: 40 all told; the words of one size, on one baseline) */
+.gbar__views button { padding: 6px 14px; white-space: nowrap; }
 .gbar__tiers { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tierbtn__unit { font-size: 11px; }
-.tierbtn { height: 40px; padding: 0 10px 0 7px; font: inherit; font-size: 12px; font-weight: 800; letter-spacing: .04em; cursor: pointer; transition: transform var(--t-press), box-shadow var(--t-press); }
+/* a tier's chip as the shelf's filter (Button, a toolbar's): pressed, ringed, on its own colour */
+.tierbtn { gap: 5px; padding: 0 10px 0 7px; font-size: 13px; font-weight: 800; letter-spacing: .04em; }
 .tierbtn__price { margin-left: 2px; font-size: 13px; letter-spacing: 0; text-transform: none; }
-.tierbtn:hover { transform: translateY(-1px); }
-.tierbtn[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+.tierbtn[aria-pressed="true"] { background: var(--tier-bg); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
 .gbar__tiers:has([aria-pressed="true"]) .tierbtn:not([aria-pressed="true"]) { opacity: .55; }
-.tierbtn:focus-visible, .gbar__icon:focus-visible, .gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
-.gbar__icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); cursor: pointer; }
-.gbar__icon:hover, .gbar__icon[aria-expanded="true"], .gbar__icon--on { background: var(--mint); }
+.gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
 .gbar__icon svg, .gsearch svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
 .gbar__more svg circle { fill: var(--paper); }
 .gsearch { display: flex; align-items: center; gap: 6px; width: 260px; height: 40px; padding: 0 4px 0 12px; border: var(--edge); border-radius: 14px; background: var(--white); }
@@ -137,7 +134,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 @media (max-width: 700px) {
   .gbar, .gbar--skel { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "views search look" "tiers tiers tiers"; grid-template-rows: 48px 44px; column-gap: var(--sp-2); }
   .gbar:has(.gsearch) { grid-template-areas: "views . look" "tiers tiers tiers" "search search search"; grid-template-rows: 48px 44px 44px; }
-  .gbar__views { display: flex; } .gbar__views button { flex: 1; padding: 6px 8px; font-size: 13px; }
+  .gbar__views { display: flex; } .gbar__views button { flex: 1; padding: 6px 8px; }
   .gbar__tiers { justify-content: flex-start; gap: 5px; }
   .tierbtn__name, .tierbtn__unit { display: none; }
   .tierbtn { padding: 0 9px 0 6px; }

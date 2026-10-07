@@ -9,11 +9,11 @@
 // a file or a published hole opened. A new player never lands here first: the
 // first run opens the Garden's dogleg (templates.ts firstRun).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BackButton } from "@/components/About";
+import { BackButton, FrontHead } from "@/components/About";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
 import { Emblem } from "@/components/Worlds";
-import { Button, Sheet } from "@/components/ui";
+import { Button, buttonClass, Sheet } from "@/components/ui";
 import { gnomeById } from "@/lib/scene";
 import { exportDraft, type Draft } from "@/lib/builder/draft";
 import { draftMap, draftState } from "@/lib/builder/cards";
@@ -146,7 +146,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                       {h && got && author && !statsOf(h, got.saved, author).mine && <SaveTestRound chain={chain} proofs={d.proofs} id={h.id} world={d.world} author={author} onSaved={reload} />}
                     </span>
                     <span className="bholes__acts">
-                      <Button className="btn--s" onClick={() => onOpen(i)}>Open</Button>
+                      <Button size="s" onClick={() => onOpen(i)}>Open</Button>
                       {h && <a className="linkish" href={playLink(h, keep)}>Play</a>}
                       <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
                       <button type="button" className="linkish" onClick={() => setWipe(i)}>Delete</button>
@@ -166,7 +166,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
                       {live(h)}
                     </span>
                     <span className="bholes__acts">
-                      <a className="btn btn--ghost btn--s" href={playLink(h, keep)}>Play</a>
+                      <a className={buttonClass({ size: "s" })} href={playLink(h, keep)}>Play</a>
                       <button type="button" className="linkish" disabled={busy} onClick={() => openHole(h.id)}>Open its next version</button>
                     </span>
                   </li>
@@ -236,8 +236,7 @@ function Workshop() {
     <header className="bholes__sign" onPointerEnter={() => setHot(true)} onPointerLeave={() => setHot(false)}>
       <span ref={stage} className="bholes__gnome"><Emblem id="build" /></span>
       <div className="bholes__say">
-        <span className="eyebrow">The Builder</span>
-        <h1 className="worlds__title">Hard hats on!</h1>
+        <FrontHead eyebrow="The Builder" title="Hard hats on!" h1 />
         <p>Build your own hole. Test it. Put your name on it.</p>
       </div>
       <ol className="bholes__steps" aria-label="How it goes">

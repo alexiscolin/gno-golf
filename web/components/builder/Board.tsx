@@ -30,6 +30,7 @@ import Scene, { type Eye } from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
+import { Button, Chip } from "@/components/ui";
 import { chain, labelAt, lean, reactionAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
 import { KEYS } from "@/lib/builder/keys";
@@ -386,12 +387,12 @@ export default function Board(props: BoardProps) {
       </svg>
       {ball && (
         <div className="board__tools">
-          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <span className="board__quick" role="status">Quick shot: not a proof</span>}
-          <button type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
+          {(aiming || ball.played.length > 0 || ball.trail.length > 0) && <Chip size="s" className="board__quick" role="status">Quick shot: not a proof</Chip>}
+          <Button size="s" type="button" className="board__toggle" aria-pressed={ball.lineOn} disabled={!ball.line && !ball.lineOn}
             title={ball.line ? "The difficulty meter's best line, and where its shots stopped (a guess, calm weather)" : "Shown once the meter has measured the hole as it is"}
-            onClick={ball.onLine}>Show the line</button>
-          <button type="button" className="board__toggle" aria-disabled={ball.tryOff ? true : undefined} title={ball.tryOff || "Play it now in calm weather, then back here: never a proof (T)"}
-            onClick={() => !ball.tryOff && ball.onTry()}>Quick test<kbd>T</kbd></button>
+            onClick={ball.onLine}>Show the line</Button>
+          <Button size="s" type="button" className="board__toggle" keycap="T" aria-disabled={ball.tryOff ? true : undefined} title={ball.tryOff || "Play it now in calm weather, then back here: never a proof (T)"}
+            onClick={() => !ball.tryOff && ball.onTry()}>Quick test</Button>
         </div>
       )}
       {props.said && <p className="board__said" role="alert">{props.said}</p>}

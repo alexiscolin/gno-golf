@@ -7,6 +7,7 @@
 // shows it large; Escape, Close or a click outside puts it back.
 import { useEffect, useRef, useState } from "react";
 import type { Eye } from "./Scene";
+import { Button } from "@/components/ui";
 
 export default function PlayerView({ eye }: { eye: Eye }) {
   const small = useRef<HTMLCanvasElement>(null), big = useRef<HTMLCanvasElement>(null), dialog = useRef<HTMLDialogElement>(null);
@@ -35,7 +36,7 @@ export default function PlayerView({ eye }: { eye: Eye }) {
       </button>
       <dialog ref={dialog} className="pview__big" aria-label="The player's view" onClose={() => setLarge(false)} onClick={(e) => e.target === e.currentTarget && dialog.current?.close()}>
         <canvas ref={big} />
-        <form method="dialog"><button type="submit" className="btn btn--ghost">Close<kbd>Esc</kbd></button></form>
+        <form method="dialog"><Button type="submit" keycap="Esc">Close</Button></form>
       </dialog>
     </section>
   );

@@ -5,7 +5,7 @@
 // a grid (and a Legendary's to come, to look at), the switch between the two
 // looks, the closing date. On the game's own tokens (app/gnomes.css).
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Segmented } from "@/components/ui";
+import { Button, Segmented } from "@/components/ui";
 import { retryIn } from "@/lib/retry";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
 import type { Look, Portraits } from "@/lib/gnomes/onchain";
@@ -152,12 +152,12 @@ export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierSha
       {(["common", "rare", "epic", "legendary"] as const).map((t) => {
         const s = known.get(t);
         return (
-          <button key={t} type="button" className={`tier tier--${t} tierbtn`} aria-pressed={value === t} onClick={() => onChange(value === t ? undefined : t)}
+          <Button key={t} size="m" type="button" className={`tier tier--${t} tierbtn`} aria-pressed={value === t} onClick={() => onChange(value === t ? undefined : t)}
             aria-label={s ? s.label : tierName(t)}>
             <svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE[t]}</svg>
             <span className="tierbtn__name">{tierName(t)}</span>
             {s && s.price > 0 && <span className="tierbtn__price">{gnot(s.price)}<span className="tierbtn__unit"> GNOT</span></span>}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -177,9 +177,9 @@ export function SearchToggle({ value, onChange }: { value: string; onChange: (te
   const close = () => ((back.current = true), onChange(""), setOpen(false));
   if (!shown)
     return (
-      <button ref={icon} type="button" className="gbar__icon" aria-label="Find a gnome by name or number" aria-expanded={false} onClick={() => setOpen(true)}>
+      <Button ref={icon} variant="icon" size="m" type="button" className="gbar__icon" aria-label="Find a gnome by name or number" aria-expanded={false} onClick={() => setOpen(true)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
-      </button>
+      </Button>
     );
   return (
     <span className="gsearch" onBlur={(e) => !value && !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}>

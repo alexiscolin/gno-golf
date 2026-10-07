@@ -13,7 +13,7 @@
 // holeHolds, publishSteps).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCopied } from "@/components/common";
-import { Button } from "@/components/ui";
+import { Button, buttonClass } from "@/components/ui";
 import Share from "@/components/Share";
 import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
 import { makeChain, wait } from "@/lib/chain";
@@ -155,7 +155,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
         <section className="pub__doneform">
           <h2>{name} is on gno.land!</h2>
           <p>Play it for real: your best becomes the ghost your friends race.</p>
-          <a className="btn btn--gold" href={playLink(holeRow(id, draft))}>Play it for real</a>
+          <a className={buttonClass({ variant: "gold" })} href={playLink(holeRow(id, draft))}>Play it for real</a>
           <Share {...holeShare(name, id)} label="Share it" />
           <button type="button" className="linkish" onClick={card}>Save its card</button>
         </section>
@@ -213,7 +213,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
           {step.at === "newer" || step.at === "hole" ? <Button variant="gold" className="btn--wide" onClick={onRetest}>{step.at === "hole" && !/^The rounds/.test(step.why) ? "Back to Edit" : "Test again (free)"}</Button>
             : sent === "signing" ? <p className="pub__note" role="status">Check the window Adena opened, and sign there.</p>
               : sent === "landing" ? <p className="pub__note" role="status">Signed: the chain is taking it…</p>
-                : hasAdena() ? <button type="button" className="btn btn--save btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${b.total.toFixed(2)} GNOT`}</button>
+                : hasAdena() ? <Button variant="chain" type="button" className="btn--wide" disabled={off} onClick={() => void adena()}>{step.at === "reading" ? "Checking with the chain…" : `Publish in Adena · ${b.total.toFixed(2)} GNOT`}</Button>
                   : <p className="pub__note">Adena is not in this browser: publish with gnokey above.</p>}
         </div>
       </section>

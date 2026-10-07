@@ -8,7 +8,7 @@
 // holds, and the reason is said once (settings.ts; edit.ts canPlace).
 import { entryName } from "@/lib/builder/names";
 import { useEffect, useRef, useState } from "react";
-import { Segmented } from "@/components/ui";
+import { Button, Segmented } from "@/components/ui";
 import { settle } from "@/lib/builder/session";
 import { canPlace, newErrors, errorsOf, whereOf } from "@/lib/builder/edit";
 import { entry as entryIn, type Clock, type PaletteEntry, type Range } from "@/lib/builder/palette";
@@ -52,7 +52,7 @@ function Cycle({ t, unit, playing, onPlay }: { t: Pulse; unit: string; playing: 
   const now = (step + t.phase) % t.every < t.on;
   return (
     <div className="cycle__row">
-      {unit === "substeps" && <button type="button" className="round round--s" aria-pressed={playing} aria-label={playing ? "Pause its blinking" : "Play its blinking"} title={playing ? "Pause (on the board too)" : "Play (on the board too)"} onClick={onPlay}>{playing ? "❚❚" : "▶"}</button>}
+      {unit === "substeps" && <Button variant="icon" size="s" type="button" aria-pressed={playing} aria-label={playing ? "Pause its blinking" : "Play its blinking"} title={playing ? "Pause (on the board too)" : "Play (on the board too)"} onClick={onPlay}>{playing ? "❚❚" : "▶"}</Button>}
       <div className="cycle" aria-label={`There on ${t.on} of every ${t.every} ${unit}${unit === "substeps" ? `: ${now ? "there" : "open"} now` : ""}`}>
         {Array.from({ length: cells }, (_, i) => <i key={i} className={`${(Math.floor((i * t.every) / cells) + t.phase) % t.every < t.on ? "on" : ""}${unit === "substeps" && Math.floor((step * cells) / t.every) === i ? " now" : ""}`} />)}
       </div>
@@ -118,9 +118,9 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
       <div className="insp__head">{entryName(ent)}</div>
       <div className="insp__acts">
         {/* (a round piece: off, the reason its title, as R says it) */}
-        <button type="button" className={`btn btn--ghost${notTurned(p, draft.tee) ? " btn--off" : ""}`} aria-disabled={notTurned(p, draft.tee) ? true : undefined} title={notTurned(p, draft.tee) || "Turn it a quarter (R)"} onClick={onTurn}>Turn<kbd>R</kbd></button>
-        <button type="button" className="btn btn--ghost" onClick={onCopy}>Copy<kbd>{MOD}D</kbd></button>
-        <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
+        <Button size="s" type="button" keycap="R" aria-disabled={notTurned(p, draft.tee) ? true : undefined} title={notTurned(p, draft.tee) || "Turn it a quarter (R)"} onClick={onTurn}>Turn</Button>
+        <Button size="s" type="button" keycap={`${MOD}D`} onClick={onCopy}>Copy</Button>
+        <Button size="s" type="button" keycap="⌫" onClick={onDelete}>Delete</Button>
       </div>
       <p className="insp__hint">Drag it to move it, its handles to size and turn it.</p>
       {/* the numbers, open (else the column stands empty), folded away for the visit by whoever would rather not see them */}

@@ -867,7 +867,7 @@ export function NameForm({ chain, account, chainId, price, lead, onNamed, typed,
           <span aria-hidden="true">nym-</span>
           <input value={stem} onChange={(e) => (setErr(null), setStem(e.target.value.toLowerCase().replace(/^nym-/, "").trim()))} aria-label="Your gno.land name, after nym-" placeholder="golfer123" spellCheck={false} autoCapitalize="off" autoComplete="off" maxLength={16} />
         </label>
-        {!typed && account && <Button variant="secondary" className="btn--save" type="submit" disabled={busy || !!hint || !stem}>{busy ? "Adena…" : "Get this name"}</Button>}
+        {!typed && account && <Button variant="chain" type="submit" disabled={busy || !!hint || !stem}>{busy ? "Adena…" : "Get this name"}</Button>}
       </span>
       <small className={bad ? "nameform__err" : !stem || hint || why === undefined ? "" : "nameform__ok"} aria-live="polite">
         {typed && !stem

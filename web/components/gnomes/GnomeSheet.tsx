@@ -9,7 +9,7 @@
 // is drawn in the look the shop shows (his 3D portrait, or the chain's), the
 // switch under his picture.
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, Sheet } from "@/components/ui";
+import { Button, buttonClass, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
 import { GnokeyTx } from "@/components/Gnokey";
 import { messageOf } from "@/components/common";
@@ -186,7 +186,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
               {row && <p className="gsheet__price">{gnot(price)} GNOT <small>+ a small deposit and fee</small></p>}
               <ul className="trust">{TRUST.slice(0, 2).map((t) => <li key={t}>{t}</li>)}</ul>
               <div className="gsheet__foot">
-                <Button variant="secondary" className="btn--wide btn--save" disabled={!row || !!why} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
+                <Button variant="chain" className="btn--wide" disabled={!row || !!why} onClick={toReview}>{why ? why.button : `Buy ${g.name}`}</Button>
                 {why && why.note && <p className="gsheet__fine">{why.note}</p>}
               </div>
             </>
@@ -215,7 +215,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
               <Gnokey chain={chain} shop={shop} id={g.id} price={price} />
               <div className="gsheet__foot">
                 {hasAdena() ? <Button variant="primary" className="btn--wide" disabled={wallet.busy} onClick={onConnect}>{wallet.busy ? "Waiting for Adena…" : "Connect Adena"}</Button>
-                  : <a className="btn btn--main btn--wide" href={ADENA_URL} target="_blank" rel="noopener noreferrer">Install Adena ↗</a>}
+                  : <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={ADENA_URL} target="_blank" rel="noopener noreferrer">Install Adena ↗</a>}
               </div>
             </>
           ) : !order ? (
@@ -233,9 +233,9 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
                     <Button variant="primary" className="btn--wide" onClick={toReview}>Check again</Button></>
                 ) : cost && cost.short ? (
                   <><p className="note note--warn" role="status"><b>{gnot(cost.short)} GNOT</b> to go.</p>
-                    <a className="btn btn--main btn--wide" href={GNOT_URL} target="_blank" rel="noopener noreferrer">Get GNOT ↗</a></>
+                    <a className={buttonClass({ variant: "primary" }, "btn--wide")} href={GNOT_URL} target="_blank" rel="noopener noreferrer">Get GNOT ↗</a></>
                 ) : (
-                  <Button variant="secondary" className="btn--wide btn--save" disabled={!ticks.a || !ticks.b} title={ticks.a && ticks.b ? undefined : "Tick both boxes first"} onClick={() => void buy()}>
+                  <Button variant="chain" className="btn--wide" disabled={!ticks.a || !ticks.b} title={ticks.a && ticks.b ? undefined : "Tick both boxes first"} onClick={() => void buy()}>
                     {orderButton(cost ? cost.most : price)}
                   </Button>
                 )}
