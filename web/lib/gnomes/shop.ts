@@ -5,7 +5,7 @@
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
 import { GNOMES_REALM, isAddress, shortAddr, type Chain } from "../chain";
-import { cap } from "../card";
+import { theWorld, worldName } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
 import type { Home, Tier } from "./vocab";
 
@@ -218,8 +218,8 @@ export function waveLine(row: Now, c: Collection, entries: readonly Pick<Listed,
     : row.at === "paused" ? { text: "Paused for a moment", full: "Paused for a moment: the sale picks up where it stopped." } : null;
   return {
     at: row.at, n: wave.n, chip, tiers,
-    words: `Wave ${wave.n}${wave.home ? ` · ${cap(wave.home)}` : ""} · ${wave.sold}/${wave.size}`,
-    label: `Wave ${wave.n}${wave.home ? `, the ${cap(wave.home)}` : ""}: ${wave.size && wave.sold >= wave.size ? `all ${wave.size}` : `${wave.sold} of ${wave.size}`} ${plural("gnome", wave.size)} found a player`,
+    words: `Wave ${wave.n}${wave.home ? ` · ${worldName(wave.home)}` : ""} · ${wave.sold}/${wave.size}`,
+    label: `Wave ${wave.n}${wave.home ? `, ${theWorld(wave.home)}` : ""}: ${wave.size && wave.sold >= wave.size ? `all ${wave.size}` : `${wave.sold} of ${wave.size}`} ${plural("gnome", wave.size)} found a player`,
     share: wave.size ? Math.min(1, wave.sold / wave.size) : 0,
     legend: legend ? { id: legend.id, name: legend.name, words: `${legend.name} ${sold(legend.id) ? "found a player" : "waits at the flag"}` } : null,
   };
@@ -260,7 +260,7 @@ export function promoOf(now: Now, c: Collection, entries: readonly Pick<Listed, 
 /** A promo in words: its title ("Wave 1 · the Garden"), what it holds ("104 gnomes, from 36 GNOT") and where it is. */
 export function promoWords(p: Promo, now: number) {
   return {
-    title: `Wave ${p.n}${p.home ? ` · the ${cap(p.home)}` : ""}`,
+    title: `Wave ${p.n}${p.home ? ` · ${theWorld(p.home)}` : ""}`,
     line: `${p.size} ${plural("gnome", p.size)}${p.from > 0 ? `, from ${gnot(p.from)} GNOT` : ""}`,
     state: p.at === "teaser" ? `Opens ${utcDate(p.start, now, true)}` : p.at === "paused" ? "Paused for a moment"
       : p.at === "players" ? `Players first until ${utcDate(p.playersUntil, now, true)}` : `${p.sold} of ${p.size} found a player`,
@@ -272,7 +272,7 @@ export function promoWords(p: Promo, now: number) {
 export interface WhyNot { button: string; note: string; play?: true }
 export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "tier" | "wave" | "home">, now: number): WhyNot | null {
   if (r.ok) return null;
-  const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From Wave ${g.wave} · ${cap(g.home)}.`;
+  const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From Wave ${g.wave} · ${worldName(g.home)}.`;
   const wave = c.waves.find((w) => w.start > now) || c.waves[c.waves.length - 1];
   switch (r.reason) {
     case "paused": return { button: "Paused for a moment", note: "The sale picks up where it stopped." };
@@ -345,7 +345,7 @@ export function cardFact(e: Listed, s: Seen) {
   const w = s.c.waves.find((x) => e.id >= x.first && e.id <= x.last);
   if (w && w.start <= s.now) return `${gnot(w.prices[tierIndex(s.c, e.tier)] ?? 0)} GNOT`;
   if (w) return `Opens ${utcDate(w.start, s.now, true)}`;
-  return `Wave ${e.wave} · ${cap(e.home)}`;
+  return `Wave ${e.wave} · ${worldName(e.home)}`;
 }
 
 /** The Legendaries the gallery shows coming, to look at: each wave's while no started wave holds it (not published
@@ -367,6 +367,6 @@ export const teamOrder = <R extends { id: string; tier: string }>(rows: readonly
 /** What each moment says: short, about the game, never value. */
 export const shareWords = {
   bought: (name: string, id: number | string) => `I just adopted ${name}, gnome #${id} of Gnogolf. ${name} rolls for me now`,
-  equipped: (name: string, home: string) => `My gnome for the boards: ${name} of the ${cap(home)}. Race my ghost`,
+  equipped: (name: string, home: string) => `My gnome for the boards: ${name} of ${theWorld(home)}. Race my ghost`,
   team: (count: number, best: string) => (count === 1 ? `My Gnogolf team: ${best}. Race my ghost` : `My Gnogolf team: ${count} gnomes, ${best} up front. Race their ghosts`),
 };

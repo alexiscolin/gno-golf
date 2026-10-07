@@ -302,6 +302,8 @@ test("shop: the words of each share moment: about the game, never value", () => 
   const w = shareWords;
   assert.equal(w.bought("Tansy", 94), "I just adopted Tansy, gnome #94 of Gnogolf. Tansy rolls for me now");
   assert.equal(w.equipped("Tansy", "garden"), "My gnome for the boards: Tansy of the Garden. Race my ghost");
+  assert.equal(w.equipped("Tansy", "town"), "My gnome for the boards: Tansy of Mushroom Town. Race my ghost", "the world as the game names it");
+  assert.equal(w.equipped("Tansy", "mines"), "My gnome for the boards: Tansy of the Crystal Mines. Race my ghost");
   assert.equal(w.team(31, "The Miller"), "My Gnogolf team: 31 gnomes, The Miller up front. Race their ghosts");
   assert.equal(w.team(1, "Tansy"), "My Gnogolf team: Tansy. Race my ghost");
   for (const s of Object.values(w).map((f) => (f as (...a: string[]) => string)("X", "1")))

@@ -17,7 +17,7 @@ import { ADENA_URL, GNOT_URL } from "@/lib/network";
 import { hasAdena, onOurNode, resultOf, PRICE, type SendError } from "@/lib/adena";
 import { sendGnome, gnokeyGnome, gnomeCall, blockTime, GNOME_TX } from "@/lib/gnomes/tx";
 import { errorKind, type Chain } from "@/lib/chain";
-import { cap } from "@/lib/card";
+import { worldName } from "@/lib/card";
 import { traitRows, type Listed } from "@/lib/gnomes/catalogue";
 import { decode } from "@/lib/gnomes/codec";
 import { bill, gnot, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
@@ -131,7 +131,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
       <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
       {swap && <LookSwitch look={look} onLook={onLook} />}
-      {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /> #{g.id} · Wave {g.wave} · {cap(g.home)}</span>}
+      {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /> #{g.id} · Wave {g.wave} · {worldName(g.home)}</span>}
       <h2>{title}</h2>
     </div>
   );

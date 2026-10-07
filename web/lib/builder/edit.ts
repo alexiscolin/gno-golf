@@ -13,7 +13,7 @@ import { handlesOf, QUARTER, setHandle, type HandleKey } from "./handles";
 import { CELL } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { about, validate, type ValidateOptions } from "./pipeline";
-import { cap, pt, worldName } from "./rules";
+import { cap, pt, theWorld } from "./rules";
 import { refusalOf } from "./explain";
 import { pastLimits } from "./limits";
 
@@ -123,7 +123,7 @@ export function toWorld(d: Draft, world: string, palette: readonly PaletteEntry[
 export function unknownEntry(d: Draft, palette: readonly PaletteEntry[]): string | null {
   const ids = new Set(palette.map((e) => e.id));
   const p = d.pieces.find((q) => !ids.has(q.entry));
-  return p ? `Piece ${p.id} is no piece of the ${worldName(d.world)}'s.` : null;
+  return p ? `Piece ${p.id} is no piece of ${theWorld(d.world)}'s.` : null;
 }
 
 /** readHole's matcher for a world: a hole's piece to its entry there, the world's own drawing first, null for none. */

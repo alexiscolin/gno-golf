@@ -2,13 +2,11 @@
 // are physics, not looks, and each world's field. scripts/selfcheck.ts reads
 // the physics' own back (step.gno, course.gno) and fails on any drift.
 
-import { cap } from "../card";
+import { cap, CUPS, theWorld, worldName } from "../card";
 import { CLIMATES } from "../sky";
 
-/** A sentence or a name with its first letter up (card.ts): every piece's and world's name said. */
-export { cap };
-/** A world as the Builder names it. */
-export const worldName = cap;
+/** A sentence or a name with its first letter up, a world's name alone and in a sentence (card.ts): as the game says them. */
+export { cap, theWorld, worldName };
 /** A board point in a sentence, "13.5, 6.5" (xy), "(13.5, 6.5)" (pt): to two places at most. */
 export const xy = (v: readonly number[]) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`;
 export const pt = (v: readonly number[]) => `(${xy(v)})`;
@@ -58,11 +56,9 @@ export const FIELD: Record<string, Field> = {
   mountain: field(28, 0.87),
 };
 
-/** A world in a sentence: the Builder's, and the game's others. */
-const IN_WORDS: Record<string, string> = { garden: "the Garden", island: "the Island", town: "Mushroom Town", mountain: "the Mountain", mines: "the Crystal Mines" };
 /** Whether a world is one of the game's (the Builder's, or one it leaves to the game). */
-export const gameWorld = (w: string) => Object.hasOwn(IN_WORDS, w);
-const said = (w: string) => (gameWorld(w) ? IN_WORDS[w] : w);
+export const gameWorld = (w: string) => (CUPS as readonly string[]).includes(w);
+const said = (w: string) => (gameWorld(w) ? theWorld(w) : w);
 /** Why a hole of another world never opens in the Builder (it stays playable in the game). */
 export const notABuilderWorld = (world: string) => {
   return `The Builder makes holes in ${listed(Object.keys(FIELD).map(said))}: this one is in ${said(world)}, and stays playable in the game.`;
