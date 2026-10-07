@@ -39,6 +39,8 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 @media (max-width: 600px) { .screen.front--fit.shop, body:has(.netbanner) .screen.front--fit.shop { padding-inline: 16px; } } /* (the page's frame closer: globals.css) */
 .shop .worlds__in { width: min(1160px, 100%); display: grid; gap: var(--sp-4); justify-items: stretch; }
 .shop .front__head { justify-self: center; }
+/* a player's page's Race: centred at its own width, as every call to action of the game (the column stretches the rest) */
+.shop .worlds__in > .btn--cta { justify-self: center; }
 
 /* the sale's end: a date to know, flat, never a countdown */
 .closes { justify-self: center; display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0; padding: 5px 14px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--ink-soft); text-align: center; }
