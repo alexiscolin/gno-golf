@@ -5,7 +5,7 @@
 // E: the engine's live state (engine/types.ts Live).
 import * as THREE from "three";
 import { behind, chaseState } from "../chase";
-import { focusRig, applyRig, ORBIT, overviewRig, courseBox } from "../scene";
+import { focusRig, applyRig, ORBIT, overviewRig, courseBox, FOLLOW_CLOSER } from "../scene";
 import { BALL_R, CELL, onAt, closest, segHit, rayCircle, angDiff, inZone } from "../terrain";
 import { worldOf } from "../scene/worlds";
 import { ud, md } from "../scene/data";
@@ -30,7 +30,6 @@ type CamRow = (number | string)[];
 
 const N4: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const NO_WALLS: readonly Wall[] = [], NO_POSTS: readonly Post[] = [];
-const FOLLOW_CLOSER = 0.7; // the follow camera, nearer the gnome than the rig frames it
 const WALK_SPEED = 30, APPROACH = 8; // board units a second (×farOf on a portrait screen): the most one hold moves the third person's pose, the fastest it closes in on the ball
 
 export function makeCamera(E: Live) {

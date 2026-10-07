@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { makeCamera } from "../lib/engine/camera.ts";
-import { timeOf, overviewRig, courseBox } from "../lib/scene/camera.ts";
+import { timeOf, overviewRig, courseBox, teeRig } from "../lib/scene/camera.ts";
 import { angDiff, terrain } from "../lib/terrain.ts";
 import type { Live } from "../lib/engine/types.ts";
 import type { HoleState, Post, Vec2, Wall } from "../lib/types.ts";
@@ -446,4 +446,13 @@ void test("third person, a world's solids: a moving piece is boxed again only on
   assert.ok(xs().every((x, i) => Math.abs(x - at[i] - 2) < 1e-6), "and its boxes moved with it");
   cam.api.collect(null);
   assert.equal(cam.api.solidsInfo(5, 5).solids, 0, "a world without solids: none kept");
+});
+
+test("teeRig: the player's view as a round opens, close on the tee and leaning toward the cup (the Builder's player's view)", () => {
+  const s = { board: { w: 32, h: 20 }, start: [4, 10] as Vec2, cup: [28, 10] as Vec2 }, view = { w: 320, h: 200, top: 0, bottom: 0, side: 0 };
+  const r = teeRig(s, () => 0.5, view), over = overviewRig(courseBox(s.board), view);
+  assert.ok(r.dist < over.dist, "nearer than the overview");
+  assert.equal(r.tilt, 1, "at the follow camera's angle");
+  assert.ok(r.target.x > s.start[0] && r.target.x < (s.start[0] + s.cup[0]) / 2, `the tee, leaning toward the cup: ${r.target.x}`);
+  assert.equal(r.target.y, 0.5, "on the ground there");
 });

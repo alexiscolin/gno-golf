@@ -34,11 +34,16 @@ export function verdict({ pieces, errors, proved, off = "", rounds }: { pieces: 
   return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready: press T to try it, or Prove it." };
 }
 
+/** Why Prove it and a quick test are off in a browser without WebGL (the board is drawn in 2D: the game cannot run). */
+export const NO_GL = "Testing needs 3D (WebGL), which this browser has turned off";
+
 /**
  * Why Test is off ("" it is on), from the last check: only a check of the
  * draft as kept now counts (an undo or a step since, and it is checking again).
+ * gl: this browser can draw the game (stage.ts), else no test at all.
  */
-export function testGate(kept: Draft, checked: { of: Draft; v: Validated } | null): string {
+export function testGate(kept: Draft, checked: { of: Draft; v: Validated } | null, gl = true): string {
+  if (!gl) return NO_GL;
   if (!checked || checked.of !== kept) return "Checking…";
   const errors = checked.v.issues.filter((i) => i.severity === "error").length;
   return errors ? `Fix ${errors} first` : !kept.pieces.length ? "Place a piece first" : !kept.slug ? "Give it a short name first" : "";
@@ -49,6 +54,7 @@ export function shortWhy(off: string): string {
   const fix = /^Fix (\d+) first$/.exec(off);
   if (fix) return `${fix[1]} ${fix[1] === "1" ? "thing" : "things"} to fix ↓`;
   if (off === "Give it a short name first") return "Name it first ↓";
+  if (off === NO_GL) return "Needs 3D (WebGL)";
   return off;
 }
 

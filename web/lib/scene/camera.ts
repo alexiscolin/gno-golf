@@ -276,6 +276,19 @@ export function farRig(box: THREE.Box3, view: View, mouse = typeof matchMedia ==
   return Object.assign(rig, { orbit: a, oy: (u.y0 + u.y1) / 2 - (top + (h - top - bottom) / 2) });
 }
 
+/** The follow camera, nearer the gnome than focusRig frames it (engine/camera.ts). */
+export const FOLLOW_CLOSER = 0.7;
+
+/** The player's view as a hole opens on the gnome at its tee (the classic
+ *  camera at rest, engine/camera.ts): close on the tee, leaning toward the cup.
+ *  height: the course's ground (Course userData.height). */
+export function teeRig(s: Pick<HoleState, "board" | "start" | "cup">, height: (x: number, z: number) => number, view: View): Rig {
+  const tee = new THREE.Vector3(s.start[0], height(s.start[0], s.start[1]), s.start[1]);
+  const r = focusRig(tee, overviewRig(courseBox(s.board), view), view, new THREE.Vector3(s.cup[0], tee.y, s.cup[1]));
+  r.dist *= FOLLOW_CLOSER;
+  return r;
+}
+
 /** Close on a point — the ball — centred in the free part of the screen. */
 // pass `out` (a rig from an earlier call) to reuse it: called every frame,
 // it then allocates nothing

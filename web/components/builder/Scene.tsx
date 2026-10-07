@@ -10,14 +10,17 @@
 // timed pieces move on the game's clock and, with motion allowed, its water
 // moves too; idle, the loop stops. The hole is built again only when the
 // checked hole changes (a drop, an undo), never as the pointer moves.
+// The same scene gives the player's view (PlayerView.tsx): the hole from the
+// tee through the game's lens, drawn in a corner of the board's canvas and
+// copied out, once a build (the edit settled) or when asked, never a frame.
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { makeScene, setLighting } from "@/lib/scene/camera";
+import { applyRig, makeScene, setLighting, teeRig } from "@/lib/scene/camera";
 import { buildHole } from "@/lib/scene/course";
 import { disposeCourse, motion, setTime } from "@/lib/scene/materials";
 import { loadWorld } from "@/lib/scene/worlds";
 import { MS_PER_STEP } from "@/lib/engine/replay";
-import { hold, stageRenderer } from "@/lib/builder/stage";
+import { hold, stageRenderer, stageUp } from "@/lib/builder/stage";
 import { orthoFor } from "@/lib/builder/camera3d";
 import type { Course, Hole } from "@/lib/scene/data";
 import type { Look, View } from "@/lib/builder/view";
@@ -25,21 +28,34 @@ import { camlog } from "@/lib/testhooks";
 
 declare global {
   interface Window {
-    // ?camlog: how many times the board's hole was built (a test hook: the bench holds it to one a checked hole)
+    // ?camlog: how many times the board's hole was built (a test hook: the bench holds it to one a checked hole),
+    // and the player's view painted (one a build)
     __builds?: number;
+    __eyes?: number;
   }
+}
+
+/** What of a checked hole its 3D draws: all of it but the par (its name is drawn: it seeds the scenery). */
+const drawnKey = (s: Hole) => JSON.stringify({ ...s, par: 0 });
+
+/** The player's view's canvas (a 2D one: PlayerView.tsx), and paint(): it drawn now (set by the Scene, a no-op without one). */
+export interface Eye {
+  canvas: HTMLCanvasElement | null;
+  paint: () => void;
 }
 
 /** How long after the pointer's last move the scene keeps moving (ms). */
 export const IDLE_MS = 2000;
 
-export default function Scene({ state, view, look, size, waker, paused = false, keep = false }: {
+export default function Scene({ state, view, look, size, waker, eye, paused = false, keep = false }: {
   state: Hole | null;
   view: View;
   look: Look;
   size: { w: number; h: number };
   /** set to wake(): the pointer moved over the board, the scene moves for IDLE_MS after (no render of the board's for it) */
   waker: { current: (() => void) | null };
+  /** the player's view, painted from this scene */
+  eye?: Eye;
   /** the timed pieces held where they are (the inspector's pause) */
   paused?: boolean;
   /** kept moving, idle or not (a timed piece selected, playing) */
@@ -48,7 +64,10 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
   const box = useRef<HTMLDivElement>(null);
   const three = useRef<{ scene: THREE.Scene; cam: THREE.OrthographicCamera; course: Course | null; loop: number } | null>(null);
   const latest = useRef({ view, look, size, paused, keep }), held = useRef(0);
+  // the hole drawn, as drawnKey has it: a check that changes nothing drawn (a slug, a proof carried, the par) builds nothing
+  const built = useRef("");
   latest.current = { view, look, size, paused, keep };
+  const lens = useRef<THREE.PerspectiveCamera>(null);
 
   /** One frame: the camera as the board looks, the timed pieces at the game's clock, drawn. */
   const draw = (now = performance.now()) => {
@@ -65,6 +84,35 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
     }
     r.render(t.scene, t.cam);
   };
+
+  /** The player's view in eye's canvas: rendered in the board canvas's corner (at most its size), copied, then the
+   *  board drawn again, in one task (never seen); only while the board holds the canvas (a quick test has it else).
+   *  Whether it painted (and so drew the board). */
+  const paint = (): boolean => {
+    const t = three.current, r = stageRenderer(), el = eye?.canvas, s = latest.current.size;
+    if (!t?.course || !r || !el || !stageUp() || r.domElement.parentElement !== box.current) return false;
+    const k = Math.min(1, s.w / el.clientWidth, s.h / el.clientHeight), w = Math.floor(el.clientWidth * k), h = Math.floor(el.clientHeight * k);
+    if (!(w > 0 && h > 0)) return false;
+    const cam = (lens.current ??= new THREE.PerspectiveCamera(30, 1, 3, 260)), view = { w, h, top: 0, bottom: 0, side: 0 };
+    applyRig(cam, teeRig(t.course.userData.state, t.course.userData.height, view), view);
+    r.setSize(s.w, s.h, false);
+    r.setViewport(0, 0, w, h);
+    r.setScissor(0, 0, w, h);
+    r.setScissorTest(true);
+    r.render(t.scene, cam);
+    r.setScissorTest(false);
+    const dpr = r.getPixelRatio(), pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    if (el.width !== pw || el.height !== ph) (el.width = pw), (el.height = ph);
+    el.getContext("2d")?.drawImage(r.domElement, 0, r.domElement.height - ph, pw, ph, 0, 0, pw, ph);
+    draw();
+    if (camlog()) window.__eyes = (window.__eyes ?? 0) + 1;
+    return true;
+  };
+  useEffect(() => {
+    if (!eye) return;
+    eye.paint = () => void paint();
+    return () => void (eye.paint = () => {});
+  }, [eye]); // eslint-disable-line react-hooks/exhaustive-deps -- (paint reads refs only)
 
   // the scene, on the Builder's canvas, while the board is up; given back after a quick test, it draws again
   useEffect(() => {
@@ -83,29 +131,36 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
       cancelAnimationFrame(t?.loop ?? 0);
       if (t?.course) disposeCourse(t.course);
       three.current = null;
+      built.current = "";
       give();
     };
   }, []);
 
-  // the hole built again as it is checked (its world's module first)
+  // the hole built again as it is checked (its world's module first), when what it draws changed
   useEffect(() => {
     if (!state) return;
+    const key = drawnKey(state);
+    if (key === built.current) return;
     let stale = false;
     void loadWorld(state.world).then(() => {
       const t = three.current;
       if (stale || !t) return;
-      if (t.course) (t.scene.remove(t.course), disposeCourse(t.course));
+      const old = t.course;
+      if (old) t.scene.remove(old);
       t.course = buildHole(state);
+      built.current = key;
       if (camlog()) window.__builds = (window.__builds ?? 0) + 1;
       setLighting(t.scene as Parameters<typeof setLighting>[0], t.course.userData.time);
       t.scene.add(t.course);
-      draw();
+      if (!paint()) draw(); // (painted: the board drawn with it)
+      // the old hole freed once the new one is drawn: the shader programs they share are kept, not linked again
+      if (old) disposeCourse(old);
     });
     return () => void (stale = true);
-  }, [state]);
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps -- (draw and paint read refs only)
 
-  // the view, the look, the size: one frame
-  useEffect(() => draw(), [view, look, size]);
+  // the view, the look, the size: one frame (awake with motion, the loop's next one: one render a frame)
+  useEffect(() => void (!(motion && three.current?.loop) && draw()), [view, look, size]);
 
   // awake: moving (its water with motion allowed, its timed pieces always), until IDLE_MS after the pointer's last move
   useEffect(() => {

@@ -536,3 +536,13 @@ button.issue__why:hover { text-decoration-style: solid; }
 .cycle__row .round--s { width: 32px; height: 32px; font-size: 11px; }
 .cycle i.now { outline: 2px solid var(--ink); outline-offset: 1px; }
 .insp__fine summary { font-size: 13px; }
+
+/* the player's view (PlayerView.tsx): under the inspector, the hole from the tee; large in a dialog on a click; not on a narrow screen */
+.pview { display: grid; gap: var(--sp-2); }
+.pview__pic { display: block; width: 100%; margin: 0; padding: 0; cursor: zoom-in; }
+.pview__pic:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.pview__big { width: min(92vw, 1040px); max-height: 92dvh; padding: var(--sp-3); border: var(--edge); border-radius: var(--r-card); background: var(--paper); }
+.pview__big::backdrop { background: rgba(0, 0, 0, .45); }
+.pview__big canvas { display: block; width: 100%; aspect-ratio: 16 / 10; max-height: calc(92dvh - 96px); border-radius: 14px; background: #3f9a72; }
+.pview__big form { display: flex; justify-content: flex-end; margin-top: var(--sp-3); }
+@media (max-width: 1099px) { .pview { display: none; } }
