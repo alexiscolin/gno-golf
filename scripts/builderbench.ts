@@ -47,7 +47,7 @@ interface Browser {
   errors: unknown[];
   kill: () => void;
 }
-const cdp = (await import("../media/lib/cdp.mjs")) as { launch: (o: { width: number; height: number }) => Promise<Browser>; sleep: (ms: number) => Promise<void>; APP: string };
+const cdp = (await import("../media/lib/cdp.mjs")) as { launch: (o: { width: number; height: number }) => Promise<Browser>; sleep: (ms: number) => Promise<void>; APP: string; offline: (b: Browser, now?: boolean) => Promise<{ back: () => Promise<unknown> }> };
 const { launch, sleep, APP } = cdp;
 // (fps: the frames shown a second, with room for the harness's pacing; the frame's work is held to 60 and 30 exactly)
 const W = 1440, H = 900, BUDGET = { fps: 50, slowFps: 30, idleCpu: 0.05, idleFrames: 2 };
@@ -226,17 +226,14 @@ const lost = { whileLost, backIn3d: await c.js<boolean>(`!!document.querySelecto
 // the island's module blocked, the hole moved there: left where it is, said, nothing thrown; unblocked, moved and built
 // (in the page: any script not loaded yet fails, as offline would; the island's own chunk is one of them, whatever a
 // production build names it)
-await c.js(`(() => { const seen = new Set(performance.getEntriesByType("resource").map((e) => e.name)); window.__offline = true;
-  const off = (n) => window.__offline && n && n.tagName === "SCRIPT" && n.src && !seen.has(n.src) && (n.src = location.origin + "/__offline__.js");
-  for (const k of ["appendChild", "insertBefore"]) { const f = Node.prototype[k]; Node.prototype[k] = function (n, ...r) { off(n); return f.call(this, n, ...r); }; }
-  return true; })()`);
+const net = await cdp.offline(c);
 const islandBuilds = await builds(), errors0 = c.errors.length;
 await pickWorld(c, "island");
 const said = await waitFor<string>(c, `document.querySelector(".board__said")?.textContent ?? ""`, "the line said of a world that would not load", 30_000).catch(() => "");
 // (refused: the hole stays in the garden, nothing to build; a build, if one came, would be seen within the quiet second)
 await settled(c, `window.__builds`, "the builds after the refused pick", 1000);
 const offline = { built: (await builds()) - islandBuilds, said, thrown: c.errors.slice(errors0).filter((e) => !/Failed to load resource|__offline__/.test(String(e))) };
-await c.js(`window.__offline = false`);
+await net.back();
 await pickWorld(c, "island");
 await builtIn(c, "island", islandBuilds + offline.built).catch(() => null);
 await settled(c, `window.__builds`, "the island's build", 800);

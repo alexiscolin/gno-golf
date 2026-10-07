@@ -29,6 +29,7 @@ const cdp = (await import("../media/lib/cdp.mjs")) as {
   launch: (o: { width: number; height: number }) => Promise<Browser>;
   sleep: (ms: number) => Promise<void>;
   APP: string;
+  offline: (b: Browser, now?: boolean) => Promise<{ back: () => Promise<unknown> }>;
 };
 const { launch, sleep, APP } = cdp;
 const { misaligned, footprint, gold } = (await import("../media/lib/rows.mjs")) as {
@@ -544,14 +545,13 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const c = await editor(1280, 800);
   await c.js(`document.querySelector(".bhead [aria-label^='Back to your holes']").click()`);
   for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__world")`)); k++) await sleep(300);
-  await c.send("Network.enable");
-  await c.send("Network.setBlockedURLs", { urls: ["*scene_island*", "*scene/island*"] });
+  const net = await cdp.offline(c); // (the island's chunk among the scripts not loaded yet, whatever a build names it)
   await c.js(`[...document.querySelectorAll(".bholes__world")].find((b) => /Island/.test(b.textContent)).click()`);
   await sleep(300);
   await c.js(`document.querySelector(".bholes__starts .bholes__start").click()`);
   for (let k = 0; k < 40 && !(await c.ev<boolean>(`/could not load/.test(document.querySelector(".bench__wait")?.textContent ?? "")`)); k++) await sleep(300);
   assert.match(await c.js<string>(`document.querySelector(".bench__wait")?.textContent ?? ""`), /could not load/, "a world's pieces that fail to load: said where the board would be");
-  await c.send("Network.setBlockedURLs", { urls: [] });
+  await net.back();
   await c.js(`[...document.querySelectorAll(".bench__wait button")].find((b) => /Try again/.test(b.textContent)).click()`);
   for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".palette")`)); k++) await sleep(500);
   assert.equal(await c.js(`!!document.querySelector(".palette")`), true, "Try again: the pieces loaded");

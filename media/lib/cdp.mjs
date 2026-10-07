@@ -101,6 +101,22 @@ export async function launch({ width = 1100, height = 700, mobile = false, touch
   return { send, ev, js, errors, kill: () => { try { ws.close(); } catch {} kill(); } };
 }
 
+/**
+ * Offline in the page, as a deploy that took the old files or a lost network would be: every script not loaded yet
+ * fails (a chunk a dev build names and a production build hashes, alike). now: from this moment, the scripts loaded
+ * so far still running; else from the next page loaded. back(): online again.
+ * @param {{ js: (expr: string) => Promise<any>, send: (method: string, params?: object) => Promise<any> }} b
+ */
+export async function offline(b, now = true) {
+  const source = `(() => { const seen = new Set(${now ? 'performance.getEntriesByType("resource").map((e) => e.name)' : "[]"}); window.__offline = true;
+    const off = (n) => window.__offline && n && n.tagName === "SCRIPT" && n.src && !seen.has(n.src) && (n.src = location.origin + "/__offline__.js");
+    for (const k of ["appendChild", "insertBefore"]) { const f = Node.prototype[k]; Node.prototype[k] = function (n, ...r) { off(n); return f.call(this, n, ...r); }; }
+    return true; })()`;
+  if (now) await b.js(source);
+  else await b.send("Page.addScriptToEvaluateOnNewDocument", { source });
+  return { back: () => b.js("window.__offline = false") };
+}
+
 /** Waits until the local chain answers (it restarts on hot reloads): up to tries × 5 s. */
 export async function chainUp(tries = 120) {
   const hex = Buffer.from(`${REALM}.Period()`).toString("hex");

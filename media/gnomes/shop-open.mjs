@@ -20,7 +20,7 @@
 //   APP=https://… node media/gnomes/shop-open.mjs   (OUT=<dir> for the frames)
 import fs from "node:fs";
 import path from "node:path";
-import { launch, sleep } from "../lib/cdp.mjs";
+import { launch, offline, sleep } from "../lib/cdp.mjs";
 import { footprint, gold, misaligned } from "../lib/rows.mjs";
 const APP = process.env.APP || "http://127.0.0.1:5175", OUT = process.env.OUT || "", TAG = process.env.TAG || "open";
 const results = [];
@@ -163,15 +163,19 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
 }
 // the shop's part of the game (components/gnomes/Game.tsx) not fetched (offline, a deploy that took the old files):
 // the shop's screen still has its Back, About and Try again, and Escape leaves it; Try again with the network back
-// opens the shop (a dev build's chunk names it: the URL blocked by its name)
+// opens the shop (offline in the page: lib/cdp.mjs offline, the chunk whatever a build names it)
 {
   const b = await launch({ width: 1280, height: 800 });
-  await b.send("Network.enable");
-  await b.send("Network.setBlockedURLs", { urls: ["*components_gnomes_Game*"] });
-  await b.send("Page.navigate", { url: APP + "/g/" });
+  // offline from the title screen on (the game itself loaded), the shop then opened from the menu
+  await b.send("Page.navigate", { url: APP + "/" });
+  for (let i = 0; i < 90 && !(await b.ev(`!![...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent))`)); i++) await sleep(500);
+  const net = await offline(b);
+  await b.js(`[...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent)).click()`);
+  for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".mode--shop")`)); i++) await sleep(500);
+  await b.js(`document.querySelector(".mode--shop").click()`);
   for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".shop [role=alert] button")`)); i++) await sleep(500);
   const off = await b.ev(`(() => ({ back: !!document.querySelector(".shop .screen__back"), about: !!document.querySelector(".shop .screen__about"), retry: !!document.querySelector(".shop [role=alert] button") }))()`);
-  await b.send("Network.setBlockedURLs", { urls: [] });
+  await net.back();
   await b.js(`document.querySelector(".shop [role=alert] button")?.click(); true`);
   for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".gshelf li .gcard")`)); i++) await sleep(500);
   const back = !!(await b.ev(`!!document.querySelector(".gshelf li .gcard")`));
