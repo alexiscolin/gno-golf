@@ -15,8 +15,8 @@ import { GnokeyTx } from "@/components/Gnokey";
 import { messageOf } from "@/components/common";
 import { ADENA_URL, GNOT_URL } from "@/lib/network";
 import { hasAdena, onOurNode, resultOf, PRICE, type SendError } from "@/lib/adena";
-import { sendGnome, gnokeyGnome, gnomeCall, blockTime, GNOME_TX } from "@/lib/gnomes/tx";
-import { errorKind, type Chain } from "@/lib/chain";
+import { sendGnome, gnokeyGnome, gnomeCall, GNOME_TX } from "@/lib/gnomes/tx";
+import { errorKind, wait, type Chain } from "@/lib/chain";
 import { cap } from "@/lib/card";
 import { traitRows, type Listed } from "@/lib/gnomes/catalogue";
 import { decode } from "@/lib/gnomes/codec";
@@ -99,7 +99,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
         const got = await resultOf(chain, hash);
         const now = await shop.gnome(g.id);
         if ((got != null && got.includes(String(g.id))) || (now && now.owner === me)) {
-          const when = await blockTime(chain.rpc, height);
+          const when = await chain.blockTime(height).catch(() => null);
           setRow(now);
           onChanged();
           return setStep({ at: "done", hash, height, when });
@@ -107,7 +107,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       } catch (e) {
         if (errorKind(e) === "chain") return /already sold/.test(messageOf(e)) ? setStep({ at: "taken" }) : setStep({ at: "unsure", hash, why: messageOf(e) });
       }
-      await new Promise((r) => setTimeout(r, 1500));
+      await wait(1500);
     }
     setStep({ at: "unsure", hash, why: "The chain has not shown it yet." });
   }

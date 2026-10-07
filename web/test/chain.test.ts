@@ -927,6 +927,21 @@ test("a newer realm version warns once, then stays quiet", async () => {
   assert.match(String(seen[0][0]), /version 2/);
 });
 
+test("blockTime: a block's time (unix seconds) from /block?height, null when the node says none; a node not answering, down", async () => {
+  const chain = makeChain({ rpc: "http://node" });
+  const asked: string[] = [];
+  setFetch((url) => (asked.push(url), { result: { block: { header: { time: "2026-10-06T18:04:05.123456Z" } } } }));
+  assert.equal(await chain.blockTime(42), Date.UTC(2026, 9, 6, 18, 4, 5) / 1000);
+  assert.deepEqual(asked, ["http://node/block?height=42"]);
+  setFetch(() => ({ result: {} }));
+  assert.equal(await chain.blockTime(42), null);
+  assert.equal(await chain.blockTime(-1), null, "no such height: nothing asked");
+  setFetch(() => ({ __status: 500 }));
+  await assert.rejects(chain.blockTime(42), (e: unknown) => errorKind(e) === "down");
+  setFetch(() => Promise.reject(new Error("offline")));
+  await assert.rejects(chain.blockTime(42), (e: unknown) => errorKind(e) === "down");
+});
+
 test("txResult: what a transaction's calls returned, by its hash in base64 or hex; null for none; a failed one and a bad hash refused", async () => {
   const chain = makeChain();
   const hex = "ab".repeat(32), b64 = Buffer.from(hex, "hex").toString("base64");

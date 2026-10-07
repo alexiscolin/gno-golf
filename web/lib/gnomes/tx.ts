@@ -48,19 +48,3 @@ export function gnokeyGnome(c: GnomeCall, { realm, price = PRICE, chainId, rpc }
   // (an id list is digits and commas; Equip's empty id is quoted for the shell)
   return gnokeyCall(realm, c.func, c.args.map((a) => a || "''"), c.gas, price, gnokeyOn(chainId, rpc), c.send);
 }
-
-/** A block's time, unix seconds (a receipt's "date and time"), from the node at rpc; null when it cannot say. */
-export async function blockTime(rpc: string, height: number): Promise<number | null> {
-  if (!Number.isSafeInteger(height) || height < 1) return null;
-  const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
-  try {
-    const res = await fetch(`${rpc}/block?height=${height}`, { signal: c.signal });
-    const body = (await res.json()) as { result?: { block?: { header?: { time?: string } } } };
-    const at = Date.parse(body.result?.block?.header?.time || "");
-    return Number.isFinite(at) ? Math.floor(at / 1000) : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(t);
-  }
-}

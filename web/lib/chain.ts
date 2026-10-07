@@ -174,6 +174,19 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
   // refusal — whose text is the realm's own sentence, not the VM's trace.
   const down = (e: unknown): ChainError => Object.assign(e instanceof Error ? e : new Error(String(e)), { kind: "down" as const });
   const refused = (message: string, log?: string): ChainError => Object.assign(new Error(message), { kind: "chain" as const, log });
+  // one of the node's own endpoints (/tx, /block), its JSON; down when it did not answer
+  const rpcGet = async <T>(path: string): Promise<T> => {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT);
+    try {
+      const res = await fetch(`${rpc}${path}`, { signal: c.signal });
+      if (!res.ok) throw new Error(`RPC ${res.status}`);
+      return (await res.json()) as T;
+    } catch (e) {
+      throw down(e);
+    } finally {
+      clearTimeout(t);
+    }
+  };
   interface AbciReply {
     error?: { data?: string; message?: string };
     result?: { response?: { ResponseBase?: { Error?: unknown; Log?: string; Data?: string } } };
@@ -637,21 +650,18 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
         hex = /^(0x)?[0-9a-f]{64}$/i.test(hash) ? hash.replace(/^0x/i, "") : [...atob(hash)].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
       } catch {}
       if (hex.length !== 64) throw refused("Not a transaction hash.");
-      const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT);
-      let r;
-      try {
-        const res = await fetch(`${rpc}/tx?hash=0x${hex}`, { signal: c.signal });
-        if (!res.ok) throw new Error(`RPC ${res.status}`);
-        const body = (await res.json()) as { error?: unknown; result?: { tx_result?: { ResponseBase?: { Error?: unknown; Log?: string; Data?: string } } } };
-        r = body.result && body.result.tx_result && body.result.tx_result.ResponseBase;
-      } catch (e) {
-        throw down(e);
-      } finally {
-        clearTimeout(t);
-      }
+      const body = await rpcGet<{ error?: unknown; result?: { tx_result?: { ResponseBase?: { Error?: unknown; Log?: string; Data?: string } } } }>(`/tx?hash=0x${hex}`);
+      const r = body.result && body.result.tx_result && body.result.tx_result.ResponseBase;
       // (the realm's own sentence for the player; the VM's whole log kept on the error)
       if (r && r.Error) throw refused(refusal(r.Log) || "The transaction failed.", r.Log);
       return r ? utf8(r.Data || "") : null;
+    },
+    /** A block's time, unix seconds (a receipt's "date and time"); null when the node has no such block or time. */
+    blockTime: async (height: number) => {
+      if (!Number.isSafeInteger(height) || height < 1) return null;
+      const body = await rpcGet<{ result?: { block?: { header?: { time?: string } } } }>(`/block?height=${height}`);
+      const at = Date.parse(body.result?.block?.header?.time || "");
+      return Number.isFinite(at) ? Math.floor(at / 1000) : null;
     },
   };
 }
