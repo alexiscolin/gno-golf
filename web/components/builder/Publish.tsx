@@ -17,7 +17,7 @@ import { Button } from "@/components/ui";
 import { buttonClass } from "@/components/button";
 import Share from "@/components/Share";
 import { connect, hasAdena, publishHole, PRICE } from "@/lib/adena";
-import { makeChain, wait } from "@/lib/chain";
+import { BYTE_PRICE, makeChain, wait } from "@/lib/chain";
 import { explain } from "@/lib/builder/explain";
 import { endpoints, playLink } from "@/lib/builder/holes";
 import { bill, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishSteps, type Readings } from "@/lib/builder/publish";
@@ -54,7 +54,7 @@ export default function Publish({ host, draft, author, onDraft, onRetest, onDone
   const chain = useMemo(() => makeChain({ rpc, web }), [rpc, web]);
   const alias = `${author}/${draft.slug}`;
   const [readings, setReadings] = useState<Readings>({ publishing: undefined, rules: undefined, writer: undefined, taken: undefined, versions: undefined, hole: undefined, name: "" });
-  const [prices, setPrices] = useState({ gas: PRICE, byte: 100 });
+  const [prices, setPrices] = useState({ gas: PRICE, byte: BYTE_PRICE });
   const [chainId, setChainId] = useState<string | null>(null);
   const [key, setKey] = useState<string | null>(null);
   const [sha, setSha] = useState("");

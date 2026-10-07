@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FrontScreen } from "@/components/About";
 import { Button, Segmented, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
-import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
+import { UNLOCKS, worldName, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
 import { canBuyCard, cardFact, closingSlot, theirTitle, comingLegends, makeShop, neverMade, nowRow, shelf, shareWords, teamOrder, waveLine, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
@@ -194,7 +194,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
             <div className="gfilters" id="gmore">
               <select className="gfilters__search" aria-label="World" value={f.home || ""} onChange={(e) => setF((x) => ({ ...x, home: (e.target.value || undefined) as Home | undefined }))}>
                 <option value="">Every world</option>
-                {[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => <option key={h} value={h}>{cap(h)}</option>)}
+                {[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => <option key={h} value={h}>{worldName(h)}</option>)}
               </select>
             </div>
           )}

@@ -183,6 +183,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 
 /* the trust strip: short facts under a buy button */
 .trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.trust li { text-align: center; } /* (a line that wraps on a phone stays centred under the first) */
 
 /* a gnome's sheet: the game's sheet, a little wider, its parts on one column, its action pinned */
 .gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-3); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
@@ -200,6 +201,8 @@ body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .gsheet__price { font-size: 28px; font-weight: 700; text-align: center; }
 .gsheet__price small { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
 .gsheet__foot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px !important; padding: var(--sp-3) 26px 26px; background: var(--paper); border-top: var(--rule); display: grid; gap: var(--sp-2); text-align: center; }
+/* (its negative bottom margin is the sheet's last child's: with Traits and Share after it, it sits in the flow, never over them) */
+.gsheet__foot:not(:last-child) { margin-bottom: 0 !important; }
 .gsheet__foot .btn { margin: 0; width: 100%; }
 .gsheet__foot .btn--save { min-height: 52px; }
 .gsheet .real__fine, .gsheet__fine { margin: 0; font-size: 12.5px; color: var(--ink-soft); text-align: center; }

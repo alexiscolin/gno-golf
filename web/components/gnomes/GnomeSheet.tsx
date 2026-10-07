@@ -17,7 +17,7 @@ import { messageOf } from "@/components/common";
 import { ADENA_URL, GNOT_URL } from "@/lib/network";
 import { hasAdena, onOurNode, resultOf, PRICE, type SendError } from "@/lib/adena";
 import { sendGnome, gnokeyGnome, gnomeCall, GNOME_TX } from "@/lib/gnomes/tx";
-import { errorKind, wait, type Chain } from "@/lib/chain";
+import { BYTE_PRICE, errorKind, wait, type Chain } from "@/lib/chain";
 import { worldName } from "@/lib/card";
 import { traitRows, type Listed } from "@/lib/gnomes/catalogue";
 import { decode } from "@/lib/gnomes/codec";
@@ -74,7 +74,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   const toReview = () => {
     setStep({ at: "review" });
     void Promise.all([
-      chain.gasPrice().catch(() => PRICE), chain.storagePrice().catch(() => 100),
+      chain.gasPrice().catch(() => PRICE), chain.storagePrice().catch(() => BYTE_PRICE),
       me ? chain.balance(me) : Promise.resolve(null), chain.chainId().catch(() => null), onOurNode(chain.rpc),
     ]).then(([p, storage, balance, chainId, ours]) => setCosts({ price: p, storage, balance, chainId, ours }));
   };

@@ -8,6 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
+import { worldName } from "../lib/card.ts";
 import {
   COLLECTOR, album, albumLine, albumShown, makeCollectors, nextRank, pointsOf, rankOf, rankWords, rankLine, ranksShown, type Holding,
 } from "../lib/gnomes/collection.ts";
@@ -27,6 +28,9 @@ test("collection: the album's worlds, tiers and sets are the catalogue's own, no
   assert.deepEqual(a.worlds.map((w) => w.key), homes, "one row per home, in the catalogue's order");
   for (const w of a.worlds) assert.equal(w.of, gnomes.filter((g) => g.home === w.key).length);
   assert.equal(a.worlds[0].label, "Garden");
+  // the worlds by the game's one name for them (card.ts worldName): "Mushroom Town", never "Town"
+  assert.deepEqual(a.worlds.map((w) => w.label), homes.map(worldName));
+  assert.ok(a.worlds.some((w) => w.label === "Mushroom Town") && a.worlds.some((w) => w.label === "Crystal Mines"));
   assert.deepEqual(a.tiers.map((t) => [t.key, t.of]), [["common", 504], ["rare", 144], ["epic", 65], ["legendary", 7], ["earned", earned.length]]);
   assert.deepEqual(a.tiers.map((t) => t.label), ["Commons", "Rares", "Epics", "Legendaries", "Earned"]);
   const kinds = [...new Set(gnomes.map((g) => g.archetype))];
@@ -54,7 +58,7 @@ test("collection: some owned fill their world, tier and set; an earned gnome its
   assert.equal(a.sets.find((s) => s.key === g1.archetype)!.items.find((x) => x.id === 1)!.mine, true);
   assert.equal(a.have, 5);
   assert.equal(albumLine(a, g1.home), `${a.worlds.find((w) => w.key === g1.home)!.label} ${a.worlds.find((w) => w.key === g1.home)!.have}/${a.worlds.find((w) => w.key === g1.home)!.of}`);
-  assert.match(albumLine(a), /^\w+ \d+\/\d+$/, "no world asked: the one most filled");
+  assert.match(albumLine(a), /^[\w ]+ \d+\/\d+$/, "no world asked: the one most filled");
 });
 
 test("collection: all owned fills every row; unknown ids are counted apart, never in a row", () => {

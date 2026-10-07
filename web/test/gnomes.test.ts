@@ -168,6 +168,7 @@ test("catalogue: a gallery's filters and a token's trait list", () => {
   assert.equal(filterGnomes(all, { series: "nope" }).length, 0);
   const rows = traitRows(FULL);
   assert.deepEqual(rows.find((r) => r.trait === "Hat"), { trait: "Hat", value: "Copper slouch" });
+  assert.deepEqual(rows.find((r) => r.trait === "Home"), { trait: "Home", value: "Crystal Mines" }, "the world by the game's name (card.ts worldName)");
   assert.deepEqual(rows.filter((r) => r.trait === "Wears").map((r) => r.value), ["Glasses", "Goggles", "Moon"]);
   assert.ok(rows.some((r) => r.trait === "Material" && r.value === "Metal"));
   assert.ok(!traitRows(PLAIN).some((r) => ["Material", "Trail", "Holing", "Prop", "Piece"].includes(r.trait)), "nothing that is not there");
