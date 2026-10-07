@@ -17,6 +17,7 @@ import { MS_PER_STEP } from "@/lib/engine/replay";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, Pulse } from "@/lib/builder/draft";
 import { refusalOf } from "@/lib/builder/explain";
+import { detailsOpen, saveDetailsOpen } from "@/lib/prefs";
 import { notTurned } from "@/lib/builder/handles";
 import { xy } from "@/lib/builder/rules";
 
@@ -80,6 +81,8 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
   onCopy: () => void;
   onDelete: () => void;
 }) {
+  // Details open unless the player folded them this visit (prefs.ts)
+  const [open] = useState(detailsOpen);
   if (!piece) return <p className="nothing">Click a piece to change it. Drag its handles to size and turn it.</p>;
   const e = entryIn(piece.entry, quick.palette);
   if (!e) return <p className="nothing">This piece is no piece of this world&apos;s.</p>;
@@ -120,8 +123,8 @@ export default function Inspector({ draft, piece, quick, full, playing = true, o
         <button type="button" className="btn btn--ghost" onClick={onDelete}>Delete<kbd>⌫</kbd></button>
       </div>
       <p className="insp__hint">Drag it to move it, its handles to size and turn it.</p>
-      {/* the numbers, for whoever asks for them (the GUI spec's B1: none to type unless Details is opened) */}
-      <details className="insp__details">
+      {/* the numbers, open (else the column stands empty), folded away for the visit by whoever would rather not see them */}
+      <details className="insp__details" open={open} onToggle={(e) => saveDetailsOpen(e.currentTarget.open)}>
       <summary>Details</summary>
       <p className="insp__at">At {xy(at)}</p>
       {sizesOf(p, ent).map((s) => <Row key={s.key} label={SIZE_NAMES[s.key]} value={s.value} range={s.range} onChange={(v) => tryPiece(withSize(p, ent, s.key, v, draft.tee))} onDone={done} />)}

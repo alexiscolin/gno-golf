@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, stillsOnly, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "../lib/prefs.ts";
+import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, earned, remember, stillsOnly, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid, detailsOpen, saveDetailsOpen } from "../lib/prefs.ts";
 import { GNOMES } from "../lib/scene/gnome.ts";
 
 beforeEach(() => {
@@ -55,6 +55,26 @@ test("saveCam: swallows a storage that throws", () => {
   try {
     assert.doesNotThrow(() => saveCam("far"));
   } finally {
+    delete (sessionStorage as unknown as Record<string, unknown>).setItem;
+  }
+});
+
+// ---- the Builder's Inspector ----
+
+test("detailsOpen: open until the player folds it, kept for the visit (sessionStorage), open again if storage throws", () => {
+  assert.equal(detailsOpen(), true);
+  saveDetailsOpen(false);
+  assert.equal(detailsOpen(), false);
+  assert.equal(localStorage.length, 0, "for the visit only");
+  saveDetailsOpen(true);
+  assert.equal(detailsOpen(), true);
+  sessionStorage.getItem = () => { throw new Error("boom"); };
+  sessionStorage.setItem = () => { throw new Error("quota"); };
+  try {
+    assert.doesNotThrow(() => saveDetailsOpen(false));
+    assert.equal(detailsOpen(), true);
+  } finally {
+    delete (sessionStorage as unknown as Record<string, unknown>).getItem;
     delete (sessionStorage as unknown as Record<string, unknown>).setItem;
   }
 });
