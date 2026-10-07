@@ -12,7 +12,7 @@ import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Act, type Skin } from "@/lib/scene/gnome";
 import type { Snapshot } from "@/lib/engine";
 import { FrontScreen } from "@/components/About";
-import { Button, InfoTip } from "@/components/ui";
+import { Button, Dice, InfoTip } from "@/components/ui";
 import { FullBoard, Sticker, useRivalPicks, useWho, type Placed } from "@/components/Leaderboard";
 import { countWord, courseCount, ghostsWord, golfTerm, holeNumber, holesWord, plural, standingVs } from "@/components/common";
 import { isAddress, type Chain } from "@/lib/chain";
@@ -272,14 +272,6 @@ function Pick({ kind, label, tint, first, row, reading, failed, chain, me, gnome
     </button>
   );
 }
-
-/** A die, inked: the pick at random. */
-const Dice = () => (
-  <svg viewBox="0 0 24 24" className="rival__dice" aria-hidden="true">
-    <rect x="2" y="2" width="20" height="20" rx="5" />
-    {[[7.5, 7.5], [16.5, 7.5], [12, 12], [7.5, 16.5], [16.5, 16.5]].map(([x, y]) => <circle key={x * 99 + y} cx={x} cy={y} r="2" />)}
-  </svg>
-);
 
 /**
  * A duel's holes, in place of the cups: each one the rival has a best on, a

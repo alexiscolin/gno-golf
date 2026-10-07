@@ -9,6 +9,7 @@ import { shortAddr } from "@/components/common";
 import { worldName } from "@/lib/builder/rules";
 import { shortWhy } from "@/lib/builder/editor";
 import type { Level } from "@/lib/builder/difficulty";
+import { Dice } from "@/components/ui";
 
 export type Step = "edit" | "test" | "publish";
 
@@ -47,7 +48,7 @@ const HistoryIcon = ({ redo = false }: { redo?: boolean }) => (
 /** Undo's or redo's keys as aria-keyshortcuts names them (MOD: ⌘ on a Mac, Ctrl elsewhere). */
 const keys = (redo: boolean) => `${MOD === "⌘" ? "Meta" : "Control"}+${redo ? "Shift+" : ""}Z`;
 
-export default function Header({ title, slug, author, world, worlds, step, steps, action, history, meter, onTitle, onSlug, onWorld, onStep, onBack, onHelp }: {
+export default function Header({ title, slug, author, world, worlds, step, steps, action, history, meter, onTitle, onSlug, onWorld, onStep, onBack, onHelp, onRoll }: {
   title: string;
   slug: string;
   author: string | null;
@@ -62,6 +63,8 @@ export default function Header({ title, slug, author, world, worlds, step, steps
   meter?: MeterChip;
   /** the three hints again (Hints), on the editor: none elsewhere */
   onHelp?: () => void;
+  /** a name suggested, another at each roll (the die by the name; in Edit only) */
+  onRoll?: () => void;
   onTitle: (v: string) => void;
   onSlug: (v: string) => void;
   onWorld: (w: string) => void;
@@ -77,7 +80,10 @@ export default function Header({ title, slug, author, world, worlds, step, steps
         <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
       <div className="bhead__hole">
-        <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)} />
+        <span className="bhead__name">
+          <input value={title} maxLength={40} placeholder="Name your hole" aria-label="The hole's name" onChange={(e) => onTitle(e.target.value)} />
+          {onRoll && <button type="button" className="bhead__roll" aria-label="Suggest a name" title="Suggest a name (again: another)" onClick={onRoll}><Dice /></button>}
+        </span>
         <small>
           {author ? shortAddr(author) : "your address"}/
           <input className="bhead__slug" value={slug} maxLength={32} placeholder="short-name" aria-label="The hole's short name, in its address" disabled={step !== "edit"}

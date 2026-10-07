@@ -289,6 +289,17 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await sleep(300);
   const back = await tee();
   assert.ok(Math.abs(back[0] - was[0]) < 2 && Math.abs(back[1] - was[1]) < 2, `F frames the hole (${was.join()} → ${back.join()})`);
+  // the die by the name: a name suggested, another at each roll, the slug following it (not yet proved)
+  const name = () => c.js<string>(`document.querySelector(".bhead__name input").value`);
+  const before = await name();
+  await c.js(`document.querySelector(".bhead__roll").click()`);
+  await sleep(200);
+  const first = await name();
+  await c.js(`document.querySelector(".bhead__roll").click()`);
+  await sleep(200);
+  const second = await name();
+  assert.ok(first !== before && second !== first && /^[A-Z][a-z]+ [A-Z]/.test(first) && first.length <= 40, `the die: ${before} → ${first} → ${second}`);
+  assert.equal(await c.js(`document.querySelector(".bhead__slug").value`), second.toLowerCase().replace(/[^a-z0-9]+/g, "-"), "the slug follows the name");
   // T: to Test; Escape: back to the editor
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
   await key("t", "KeyT");

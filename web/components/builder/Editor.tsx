@@ -34,6 +34,7 @@ import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
 import { keyAction } from "@/lib/builder/keys";
+import { seedOf, suggestName } from "@/lib/builder/naming";
 import { tilesOf } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
 
@@ -73,6 +74,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [said, setSaid] = useState("");
   const [checked, setChecked] = useState<{ of: Draft; v: Validated; state: Hole | null } | null>(null);
   const [fine, setFine] = useState(false);
+  // the die by the name: a name suggested from the draft as opened, another at each roll
+  const [roll, setRoll] = useState(0), seed = useMemo(() => seedOf(first), [first]);
   // Space held: a drag pans the board; F: the hole framed again (asked n times); each tile's look as chosen (the keys arm it)
   const [pan, setPan] = useState(false);
   const [frameAsk, setFrameAsk] = useState(0);
@@ -282,7 +285,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         action={proved ? { text: "Publish →", kind: "chain", onClick: () => onPublish(kept) } : { text: "Test it", kind: "gold", off: testOff, onClick: () => onTest(kept) }}
         meter={{ level: guess?.level ?? null, word: guess?.word ?? "–", title: guess ? guess.title : clean ? "Difficulty: measuring…" : "Difficulty: measured once the hole has no error", busy: measuring }}
         history={{ undo: () => (session.undo(), refresh()), redo: () => (session.redo(), refresh()), canUndo: session.canUndo(), canRedo: session.canRedo() }}
-        onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)} />
+        onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)}
+        onRoll={() => (sound("blip"), session.edit((k) => frame(retitle(k, suggestName(k.world, seed, roll)))), setRoll((n) => n + 1), refresh())} />
       {palette && quick && full ? (
         <>
           <Palette world={draft.world} palette={palette} armed={armed} off={off} onArm={setArmed} chosen={looks} onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />

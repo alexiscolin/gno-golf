@@ -327,7 +327,9 @@ the chain's checks in the wasm, the proofs):
 
 ### B2. One header, three steps
 
-Back (the draft is saved), the hole's name (editable, suggested), its
+Back (the draft is saved), the hole's name (editable, suggested; in Edit a
+die beside it rolls a playful name from the world's own words, "Mossy Snail
+Trail", the same for a draft and a roll, another at each roll), its
 address under it, in Edit the world's menu ("Garden ▾": the four classic
 worlds; "Start again from a starter" may come later), the steps Edit → Test → Publish
 (done ✓, current, or 🔒 with its reason on hover), undo and redo, the big
