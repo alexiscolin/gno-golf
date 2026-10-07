@@ -1,7 +1,8 @@
 // What the editor's dock and palette say, from the checks (the GUI spec's
 // B2): the verdict, the gauges against the Builder's limits, GG1's and the
 // realm's (size, work), the entries a limit switches off and why.
-import { counts, work, WORK_WARN } from "./checks";
+import { counts, work, WORK_WARN, type Issue } from "./checks";
+import { plainOf } from "./explain";
 import { draftHole } from "./gg1";
 import { FIELD, listed, weatherName } from "./rules";
 import type { Cost } from "./wasm";
@@ -61,7 +62,7 @@ export interface Gauge {
 const level = (share: number): Gauge["level"] => (share >= 1 ? "full" : share >= WORK_WARN ? "warn" : "ok");
 const gauge = (name: string, used: number, of: number, shown = `${used}/${of}`): Gauge => ({ name, used, of, shown, level: level(used / of) });
 
-/** The limits worth saying (amber from 80%), in words: the room left; nothing when the hole is far from them all (the full gauges behind a tap). */
+/** The limits worth saying (amber from 80%), in words: the room left; nothing when the hole is far from them all (dials: a gauge's title, a limit reached's sentence). */
 export function nearLimits(gs: readonly Gauge[]): string[] {
   return gs.filter((g) => g.level !== "ok").map((g) => {
     if (g.name === "Room") return `Room for a shot in its stormiest weather: ${g.shown} left`;
@@ -70,6 +71,46 @@ export function nearLimits(gs: readonly Gauge[]): string[] {
     return `${g.name === "Moving" ? "Moving pieces" : g.name}: ${g.used} of ${g.of} · ${left > 0 ? `room for ${left} more` : "no room for more"}`;
   });
 }
+
+/** A gauge as the dock draws it: its words for a player, its value, how full its bar is (%), its colour, its sentence in full. */
+export interface Dial extends Pick<Gauge, "name" | "shown" | "level"> {
+  label: string;
+  fill: number;
+  title: string;
+}
+// the four a player reads (the room before the size: the one a hole runs out of), and GG1's own counts
+const PLAYER = ["Pieces", "Moving", "Room", "Size"] as const, CHAIN = ["Walls", "Posts", "Zones", "Points"];
+const ROOM = "Room for shots";
+
+/**
+ * The dock's gauges (the GUI spec's B3): the player's four always, in their
+ * places (the room and the size "–" until the first check); a chain count
+ * only once near its limit (amber from 80%, red at it), the others in the
+ * chain limits' note (chain); a sentence for each limit reached. The
+ * room's bar is the room left, as its words say.
+ */
+export function dials(gs: readonly Gauge[]): { dials: Dial[]; chain: string; reached: string[] } {
+  const of = (g: Gauge): Dial => {
+    const room = g.name === "Room", share = Math.min(1, Math.max(0, g.used / g.of));
+    return {
+      name: g.name, label: room ? ROOM : g.name, shown: g.shown, level: g.level, fill: Math.round((room ? 1 - share : share) * 100),
+      title: room ? `Room left for a first shot in its stormiest weather: ${g.shown}` : nearLimits([g])[0] ?? `${g.name}: ${g.shown}`,
+    };
+  };
+  const byName = new Map(gs.map((g) => [g.name, g])), chain = gs.filter((g) => CHAIN.includes(g.name));
+  return {
+    dials: [
+      ...PLAYER.map((n) => { const g = byName.get(n); return g ? of(g) : { name: n, label: n === "Room" ? ROOM : n, shown: "–", level: "ok" as const, fill: 0, title: "Measured once the hole is checked" }; }),
+      ...chain.filter((g) => g.level !== "ok").map(of),
+    ],
+    chain: chain.filter((g) => g.level === "ok").map((g) => `${g.name} ${g.shown}`).join(" · "),
+    reached: nearLimits(gs.filter((g) => g.level === "full")),
+  };
+}
+
+/** The issues as the dock lists them: each one's plain sentence (its rule a tooltip), the piece a click on it selects, and whether Move it can mend it. */
+export const problems = (issues: readonly Issue[]) =>
+  issues.map((i) => ({ text: plainOf(i), rule: i.rule, bad: i.severity === "error", ...(i.piece && { piece: i.piece }), fix: i.severity === "error" && !!i.piece }));
 
 /** The gauges: GG1's counts, the data's size, and the room a first shot has in the dearest weather (the realm's own numbers, check's cost). */
 export function gauges(h: HoleIn, cost: Cost, bytes: number): Gauge[] {

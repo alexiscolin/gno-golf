@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { commonShift, gauges, meterFace, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
+import { commonShift, dials, gauges, meterFace, nearLimits, offAtLimit, problems, shortWhy, testGate, verdict, type Gauge } from "../lib/builder/editor.ts";
 import type { Shown } from "../lib/builder/difficulty.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
@@ -89,6 +89,43 @@ void test("nearLimits: a limit said only when near it (amber from 80%), in words
   assert.deepEqual(nearLimits([g("Size", 28000, 32768, "warn", "27.3 KB")]), ["Size: 27.3 KB of 32 KB"]);
   assert.deepEqual(nearLimits([g("Room", 90, 100, "warn", "10%")]), ["Room for a shot in its stormiest weather: 10% left"]);
   assert.deepEqual(nearLimits([g("Walls", 4, 160, "ok")]), [], "far from every limit: nothing said");
+});
+
+void test("dials: the player's four gauges always, a chain count only from 80%, the rest in the chain limits' tooltip", () => {
+  const g = (name: string, used: number, of: number, level: Gauge["level"], shown = `${used}/${of}`): Gauge => ({ name, used, of, level, shown });
+  const calm = [g("Pieces", 6, 60, "ok", "6 / 60"), g("Moving", 0, 8, "ok", "0 / 8"), g("Walls", 4, 160, "ok"), g("Posts", 2, 32, "ok"), g("Zones", 0, 32, "ok"), g("Points", 0, 512, "ok"), g("Size", 512, 32768, "ok", "0.5 KB"), g("Room", 19, 100, "ok", "81%")];
+  const d = dials(calm);
+  assert.deepEqual(d.dials.map((x) => [x.label, x.shown, x.fill, x.level]), [["Pieces", "6 / 60", 10, "ok"], ["Moving", "0 / 8", 0, "ok"], ["Room for shots", "81%", 81, "ok"], ["Size", "0.5 KB", 2, "ok"]],
+    "Pieces, Moving, the room (its bar the room left), Size; nothing of the chain's counts");
+  assert.equal(d.chain, "Walls 4/160 · Posts 2/32 · Zones 0/32 · Points 0/512");
+  assert.deepEqual(d.reached, [], "no limit reached: no sentence");
+  assert.match(d.dials[2].title, /room left for a first shot in its stormiest weather: 81%/i);
+  // a chain count near its limit (80%) joins the line, amber; one at its cap, red, and its sentence said
+  const near = dials(calm.map((x) => (x.name === "Posts" ? g("Posts", 26, 32, "warn") : x.name === "Zones" ? g("Zones", 32, 32, "full") : x)));
+  assert.deepEqual(near.dials.slice(4).map((x) => [x.label, x.shown, x.fill, x.level]), [["Posts", "26/32", 81, "warn"], ["Zones", "32/32", 100, "full"]]);
+  assert.equal(near.chain, "Walls 4/160 · Points 0/512");
+  assert.deepEqual(near.reached, ["Zones: 32 of 32 · no room for more"]);
+  // the room nearly gone: amber at 80% used (20% left), red when none is left
+  assert.equal(dials([g("Room", 80, 100, "warn", "20%")]).dials.find((x) => x.name === "Room")!.fill, 20);
+  assert.deepEqual(dials([g("Room", 100, 100, "full", "0%")]).reached, ["Room for a shot in its stormiest weather: 0% left"]);
+  // before the first check: the room and the size kept in their places, not yet measured
+  const first = dials([g("Pieces", 1, 60, "ok", "1 / 60"), g("Moving", 0, 8, "ok", "0 / 8")]);
+  assert.deepEqual(first.dials.map((x) => [x.label, x.shown, x.fill]), [["Pieces", "1 / 60", 2], ["Moving", "0 / 8", 0], ["Room for shots", "–", 0], ["Size", "–", 0]]);
+  assert.equal(first.chain, "");
+});
+
+void test("problems: each issue's plain reason and the piece a click selects; Move it for an error on a piece", () => {
+  const rows = problems([
+    { rule: "E13", severity: "error", text: "The plank overlaps the rock", piece: "p3" },
+    { rule: "L2", severity: "error", text: "The hole does not load" },
+    { rule: "E11", severity: "warning", text: "Its walls and moving pieces take 85% of what one shot may cost", piece: "s1" },
+  ]);
+  assert.deepEqual(rows, [
+    { text: "The plank overlaps the rock: move one of them.", rule: "E13", bad: true, piece: "p3", fix: true },
+    { text: "The hole does not load.", rule: "L2", bad: true, fix: false },
+    { text: "Its walls and moving pieces take 85% of what one shot may cost.", rule: "E11", bad: false, piece: "s1", fix: false },
+  ]);
+  assert.deepEqual(problems([]), [], "none: the panel folds back to its line");
 });
 
 void test("shortWhy: the reason beside the big button, in a few words (the full one in the checks line under the board)", () => {

@@ -3,9 +3,11 @@
 // Builder on (NEXT_PUBLIC_BUILDER=1): at the widths a computer opens it at
 // (900 px, its floor, to a wide screen, and a short laptop window), the
 // window never scrolls sideways, the checks' dock holds its verdict and
-// gauges, the three steps sit in the middle of the header, the header's
-// action and the dock keep their places as their words change, what a step
-// says when it is off is readable, and the note of a browser that keeps
+// gauges (two lines when all is well, the gauges of one width and in line;
+// a problem opens it, its piece a click away, and fixed it folds back), the
+// three steps sit in the middle of the header, the header's action and the
+// dock keep their places as their words change, what a step says when it is
+// off is readable, and the note of a browser that keeps
 // nothing covers no control; undo and redo stand whole in the header; the
 // start screen (a player back) never scrolls sideways, keeps clear of the
 // corner's Back and shows its starters above the fold. Exits non-zero on the first failure.
@@ -63,12 +65,23 @@ for (const [w, h] of SIZES) {
   const c = await editor(w, h);
   const at = `${w}×${h}`;
   assert.equal(await c.js(`document.documentElement.scrollWidth > innerWidth`), false, `${at}: the window scrolls sideways`);
-  // the dock: its line and, its limits opened, every gauge inside it
-  await c.js(`document.querySelector(".checks__limits").open = true`);
-  await sleep(200);
+  // the dock: its line and every gauge inside it, the gauges open (no disclosure), one width each, side by side on one top
   const dock = (await box(c, ".checks"))!;
-  const inside = await c.js<Box[]>(`[...document.querySelectorAll(".checks__line > *, .checks .gauge")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  const inside = await c.js<Box[]>(`[...document.querySelectorAll(".checks__line > *, .checks .gauge, .checks__chain")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
   for (const b of inside.filter((x) => x.r > x.l)) assert.ok(b.r <= dock.r + 0.5 && b.l >= dock.l - 0.5, `${at}: the dock spills (${JSON.stringify(b)} out of ${JSON.stringify(dock)})`);
+  const dials = await c.js<(Box & { label: Box; value: Box })[]>(`[...document.querySelectorAll(".checks .gauge")].map((e) => { const b = (x) => { const r = x.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; }; return { ...b(e), label: b(e.querySelector("span")), value: b(e.querySelector("em")) }; })`);
+  assert.deepEqual(await c.js(`[...document.querySelectorAll(".checks .gauge span")].map((e) => e.textContent)`), ["Pieces", "Moving", "Room for shots", "Size"], `${at}: the player's gauges, the chain's counts far off`);
+  assert.equal(await c.js(`!!document.querySelector(".checks details")`), false, `${at}: the gauges behind a disclosure`);
+  for (const g of dials) {
+    assert.ok(Math.abs(g.r - g.l - (dials[0].r - dials[0].l)) < 0.5, `${at}: the gauges of different widths (${dials.map((x) => Math.round(x.r - x.l)).join()})`);
+    if (w >= 1280) assert.ok(Math.abs(g.t - dials[0].t) < 0.5 && Math.abs(g.label.b - g.value.b) < 0.5 && Math.abs(g.value.r - g.r) < 0.5, `${at}: a gauge's label, value or row out of line (${JSON.stringify(g)})`);
+  }
+  // all well, two lines: the next step and the meter's guess on one, the gauges on the other; the rest of the height the board's
+  if (w >= 1280) {
+    const line = (await box(c, ".checks__line"))!;
+    assert.ok(line.b - line.t <= 26, `${at}: the dock's first line wraps (${line.b - line.t} px)`);
+    assert.ok(dock.b - dock.t <= 72, `${at}: the dock takes ${dock.b - dock.t} px of the board's height (98 before)`);
+  }
   // the three steps in the middle of the header
   const steps = (await box(c, ".stepper"))!;
   assert.ok(Math.abs((steps.l + steps.r) / 2 - w / 2) <= 2, `${at}: the steps sit at ${(steps.l + steps.r) / 2}, not ${w / 2}`);
@@ -80,10 +93,10 @@ for (const [w, h] of SIZES) {
   // the header's action and the dock keep their places as their words change (a slug, then none)
   await typeInto(c, ".bhead__slug", "a-name");
   await sleep(1500);
-  const named = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks__limits summary"))! };
+  const named = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks .gauge"))! };
   await typeInto(c, ".bhead__slug", "");
   await sleep(1500);
-  const unnamed = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks__limits summary"))! };
+  const unnamed = { undo: (await box(c, ".bhead__end .round"))!, gauge: (await box(c, ".checks .gauge"))! };
   assert.ok(Math.abs(named.undo.l - unnamed.undo.l) < 1, `${at}: Undo moves as the action's words change (${named.undo.l} → ${unnamed.undo.l})`);
   assert.ok(Math.abs(named.gauge.l - unnamed.gauge.l) < 1, `${at}: the limits move as the verdict changes (${named.gauge.l} → ${unnamed.gauge.l})`);
   // the action off, its reason readable (no faded text)
@@ -191,6 +204,30 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   console.log("keeps nothing: ok");
   c.kill();
 }
+// a problem (a draft kept with a piece doubled where it stands): the dock opens on it, a click on it selects the piece; fixed, it folds back
+{
+  const c = await editor(1440, 900);
+  await c.js(`(() => { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("gnogolf.builder.draft.")) { const d = JSON.parse(localStorage.getItem(k)); const p = d.pieces.find((q) => q.geometry.t === "post") || d.pieces.at(-1); d.pieces.push({ ...p, id: p.id + "x" }); localStorage.setItem(k, JSON.stringify(d)); } } })()`);
+  await c.send("Page.reload");
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`[...document.querySelectorAll(".bholes button")].some((b) => b.textContent.trim() === "Open")`)); k++) await sleep(300);
+  await c.js(`[...document.querySelectorAll(".bholes button")].find((b) => b.textContent.trim() === "Open").click()`);
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".issue button.issue__why")`)); k++) await sleep(300);
+  const well = (await box(c, ".checks"))!, row = await c.js<string>(`document.querySelector(".issue button.issue__why").textContent`);
+  assert.match(row, /overlaps/, "a problem: its plain reason in the dock");
+  assert.ok(well.b - well.t > 72, "a problem: the dock opened on it");
+  await c.js(`document.querySelector(".issue button.issue__why").click()`);
+  await sleep(500);
+  const picked = await c.js<string>(`document.querySelector(".board__piece--on")?.getAttribute("data-piece") ?? ""`);
+  assert.ok(picked, "a click on the problem: its piece selected");
+  await c.js(`[...document.querySelectorAll(".insp button")].find((b) => /Delete/.test(b.textContent)).click()`);
+  for (let k = 0; k < 30 && (await c.ev<boolean>(`!!document.querySelector(".issue")`)); k++) await sleep(300);
+  const fixed = (await box(c, ".checks"))!;
+  assert.equal(await c.js(`document.querySelectorAll(".issue").length`), 0, "fixed: nothing left to fix");
+  assert.ok(fixed.b - fixed.t <= 72, `fixed: the dock folds back (${fixed.b - fixed.t} px)`);
+  console.log("a problem in the dock: ok");
+  c.kill();
+}
+
 // a piece deleted from the Inspector: the focus on the board, not lost; a draft deleted: the game's sheet, Escape keeps it
 {
   const c = await editor(1280, 800);
