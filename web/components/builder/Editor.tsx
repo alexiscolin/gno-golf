@@ -261,7 +261,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if ("refused" in r) return say(`The ${w} has no ${r.refused.join(", ")}.`);
       if ("why" in r) return say(`Not in the ${w}: ${r.why}`);
       set(r);
-    });
+    }, () => say(`The ${w}'s pieces could not load: try again.`)); // (offline, a deploy mid-flight: the hole stays where it is)
   };
 
   // the keys: always the editor's, never a field's

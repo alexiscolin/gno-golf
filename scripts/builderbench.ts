@@ -16,6 +16,8 @@
 // - five quick tests in a row leave no GL program, texture or buffer behind
 //   (the game draws with the board's own renderer, lent to it);
 // - the context lost: the 2D board until it is back, then the 3D drawn again;
+// - a world's module that would not load (offline): the hole left where it
+//   is, said, nothing thrown; picked again once it loads, built there;
 // - no WebGL: the 2D board, and no test (T and Prove it say why; the
 //   Builder never falls over).
 // It prints the numbers as JSON.
@@ -158,6 +160,24 @@ const renders1 = await c.js<number>(`window.__renders`);
 await c.js(`window.__lose.restoreContext()`);
 await sleep(1500);
 const lost = { whileLost, backIn3d: await c.js<boolean>(`!!document.querySelector(".board--3d") && !document.querySelector(".board__ground")`), drawn: (await c.js<number>(`window.__renders`)) > renders1 };
+
+// the island's module blocked, the hole moved there: left where it is, said, nothing thrown; unblocked, moved and built
+await c.send("Network.enable");
+await c.send("Network.setBlockedURLs", { urls: ["*lib_scene_island*"] });
+const islandBuilds = await builds(), errors0 = c.errors.length;
+const toIsland = () => c.js(`(() => { const el = document.querySelector('select[aria-label="The hole\\'s world"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, "island"); el.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+await toIsland();
+let said = "";
+for (let k = 0; k < 25 && !said; k++) {
+  await sleep(100);
+  said = await c.js<string>(`document.querySelector(".board__said")?.textContent ?? ""`);
+}
+await sleep(2000);
+const offline = { built: (await builds()) - islandBuilds, said, thrown: c.errors.slice(errors0).filter((e) => !/Failed to load resource/.test(String(e))) };
+await c.send("Network.setBlockedURLs", { urls: [] });
+await toIsland();
+await sleep(2500);
+const world = { ...offline, builtAgain: (await builds()) - islandBuilds - offline.built };
 c.kill();
 
 // no WebGL: the 2D board
@@ -176,7 +196,7 @@ await sleep(1500);
 const noTest = await flat.js<{ quick: string; game: boolean; fell: boolean }>(`({ quick: [...document.querySelectorAll(".board__toggle")].find((b) => /Quick test/.test(b.textContent))?.title ?? "", game: !!document.querySelector(".tbench--quick, .tmode"), fell: !document.querySelector(".board") })`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, lost, fallback2D: fallback, noTest };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, lost, world, fallback2D: fallback, noTest };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
@@ -188,6 +208,7 @@ assert.ok(zoom.renders <= zoom.frames + 1, `zoomed: ${zoom.renders} renders in $
 assert.ok(idle.frames <= BUDGET.idleFrames, `idle: ${idle.frames} frames asked for`);
 assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);
 assert.equal(contexts, 1, `${contexts} WebGL contexts`);
+assert.ok(world.built === 0 && /could not load/.test(world.said) && !world.thrown.length && world.builtAgain === 1, `a world that would not load: ${JSON.stringify(world)}`);
 assert.ok(lost.whileLost && lost.backIn3d && lost.drawn, `the context lost and back: ${JSON.stringify(lost)}`);
 for (const k of Object.keys(live[0])) assert.ok(live.every((l) => l[k] <= live[0][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
 assert.ok(fallback, "no WebGL: no 2D board");
