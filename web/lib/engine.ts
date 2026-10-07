@@ -31,7 +31,7 @@ import { makeReplay, outlived, MS_PER_STEP, SHOW_SPEED } from "./engine/replay";
 import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
-import { loadTakedown, takenDown } from "./takedown";
+import { NO_TAKEN, takedownOf, takenDown } from "./takedown";
 import { communityOf, NOT_BUILDER, playable, refused } from "./community";
 import { authorOf } from "./builder/holes";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
@@ -85,7 +85,6 @@ const HUD = { top: 108, bottom: 136, side: 14 };
 // the community's holes listed with the cups (off until the builder is out)
 const COMMUNITY = process.env.NEXT_PUBLIC_COMMUNITY === "1";
 const OVERVIEW_MS = 1500; // how long a new hole is shown whole before closing on the ball
-const NO_TAKEN: ReadonlySet<string> = new Set(); // the takedown list when none could be read
 
 /** No trailer rig: what the engine calls on it does nothing. */
 const NO_PROMO: typeof Promo = { on: false, attach() {}, camera() {} };
@@ -1438,9 +1437,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
   }
 
   /** The takedown list, read once a visit (none if it cannot be read: the next start tries again). */
-  let takenOnce: Promise<ReadonlySet<string>> | null = null;
-  const takedown = () =>
-    (takenOnce ||= loadTakedown(chain).catch(() => ((takenOnce = null), NO_TAKEN)));
+  const takedown = () => takedownOf(chain).catch(() => NO_TAKEN);
 
   // a link to a community hole the Builder's rules do not pass lands on the cups, and says so (load refuses it too)
   const unchecked = () => start(null).then((to) => (to === null ? "unchecked" : to));

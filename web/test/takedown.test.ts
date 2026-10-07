@@ -2,7 +2,7 @@
 // holes the site no longer shows, whatever the chain lists.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadTakedown, readTakedown, takenDown } from "../lib/takedown.ts";
+import { loadTakedown, readTakedown, takedownOf, takenDown } from "../lib/takedown.ts";
 
 const A = "g1hvuayx9ll7dal54kr0f6t89j8867z8lf5vtxgv";
 
@@ -30,4 +30,19 @@ void test("takedown: another chain's list, a list too big or not JSON, takes not
   assert.equal(readTakedown(JSON.stringify({ chain: "dev", holes: [`${A}/rude`] }), "onyx-1").size, 0);
   assert.equal(readTakedown(JSON.stringify({ chain: "", holes: [`${A}/rude`] }), "onyx-1").size, 1, "no chain said: read (a local list)");
   for (const t of ["", "not json", "null", "[]", JSON.stringify({ holes: "x" }), "x".repeat((1 << 20) + 1)]) assert.equal(readTakedown(t, "onyx-1").size, 0, t.slice(0, 12));
+});
+
+void test("takedownOf: the list read once a visit for each chain (the game, the Builder's lists and its rewards ask the same), a failed read asked again", async () => {
+  let reads = 0, down = true;
+  const get = () => (reads++, down ? Promise.reject(new Error("offline")) : Promise.resolve(new Response(JSON.stringify({ holes: [`${A}/rude`] }))));
+  const onyx = { chainId: () => Promise.resolve("onyx-1") }, dev = { chainId: () => Promise.resolve("dev") };
+  await assert.rejects(takedownOf(onyx, get));
+  down = false;
+  const [a, b] = await Promise.all([takedownOf(onyx, get), takedownOf(onyx, get)]);
+  assert.deepEqual([...a], [`${A}/rude`]);
+  assert.equal(a, b);
+  assert.equal(await takedownOf({ chainId: () => Promise.resolve("onyx-1") }, get), a, "another reader of the same chain: the same list");
+  assert.equal(reads, 2, "the failure, then once");
+  await takedownOf(dev, get);
+  assert.equal(reads, 3, "another chain: its own read");
 });

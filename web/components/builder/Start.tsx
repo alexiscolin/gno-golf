@@ -19,7 +19,7 @@ import { exportDraft, type Draft } from "@/lib/builder/draft";
 import { draftMap, draftState } from "@/lib/builder/cards";
 import { draftFile, fromFile, fromPublished, type Opened } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
-import { loadTakedown } from "@/lib/takedown";
+import { takedownOf } from "@/lib/takedown";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
 import { endpoints, playLink } from "@/lib/builder/holes";
@@ -85,7 +85,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
     if (!isHoleId(id)) return setWhy("A hole's address is like g1…/its-name, or g1…/its-name/v2.");
     setBusy(true);
     // the site's takedown list too: a hole taken down never opens (the list unread, nothing does)
-    void Promise.all([chain.holeData(id), loadTakedown(chain)])
+    void Promise.all([chain.holeData(id), takedownOf(chain)])
       .then(([hex, taken]) => fromPublished(hex, host, id, author, census, taken), () => "The chain has no hole there, or could not be read.")
       .then(take)
       .finally(() => setBusy(false));

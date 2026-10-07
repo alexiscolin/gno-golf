@@ -7,10 +7,8 @@
 import { useEffect, useState } from "react";
 import type { Chain } from "@/lib/chain";
 import { keepSeen, loadSeen, readRewards, statsOf, type SavedOn, type Seen } from "@/lib/builder/rewards";
-import { loadTakedown } from "@/lib/takedown";
+import { NO_TAKEN, takedownOf } from "@/lib/takedown";
 import type { HoleRow } from "@/lib/types";
-
-const NONE: ReadonlySet<string> = new Set();
 
 /**
  * The author's published holes and the rounds saved on them (null: still
@@ -23,7 +21,7 @@ export function useRewards(chain: Chain | null, author: string | null) {
   useEffect(() => {
     if (!chain || !author) return setGot(null);
     let live = true;
-    const taken = loadTakedown(chain).catch(() => NONE);
+    const taken = takedownOf(chain).catch(() => NO_TAKEN);
     void taken.then((t) => readRewards(chain, author, t)).then(({ rows, saved }) => {
       if (!live) return;
       const seen = loadSeen();
@@ -32,7 +30,7 @@ export function useRewards(chain: Chain | null, author: string | null) {
         return [h.id, { plays, players }];
       })));
       setGot({ rows, saved, seen });
-    }, () => live && setGot({ rows: [], saved: { rows: [], more: NONE }, seen: {} }));
+    }, () => live && setGot({ rows: [], saved: { rows: [], more: new Set() }, seen: {} }));
     return () => void (live = false);
   }, [chain, author, tries]);
   return { got, reload: () => setTries((n) => n + 1) };

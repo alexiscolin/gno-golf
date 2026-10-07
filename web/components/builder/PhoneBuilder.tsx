@@ -18,13 +18,12 @@ import { makeChain } from "@/lib/chain";
 import { authorOf, cupsLink, endpoints, holeByline, knownAuthor, listHoles, playLink } from "@/lib/builder/holes";
 import { knownOnly } from "@/lib/community";
 import { isFresh, statsLine, statsOf } from "@/lib/builder/rewards";
-import { loadTakedown } from "@/lib/takedown";
+import { NO_TAKEN, takedownOf } from "@/lib/takedown";
 import type { HoleRow } from "@/lib/types";
 import { useRewards } from "./useRewards";
 
 /** How many community holes show before "More community holes". */
 const PAGE = 12;
-const NONE: ReadonlySet<string> = new Set();
 
 function Row({ h, sub, keep, fresh = false }: { h: HoleRow; sub: string; keep: string; fresh?: boolean }) {
   return (
@@ -47,7 +46,7 @@ export default function PhoneBuilder() {
   // the author's holes, every one of theirs with who played it (Holes() lists three an author)
   const { got } = useRewards(chain, author);
   useEffect(() => {
-    const taken = loadTakedown(chain).catch(() => NONE);
+    const taken = takedownOf(chain).catch(() => NO_TAKEN);
     Promise.all([chain.holes(), taken])
       .then(([rows, t]) => listHoles(rows, author, t))
       .then(async ({ mine, community }) => setLists({ mine, community: await knownOnly(chain, community) }), () => setFailed(true));
