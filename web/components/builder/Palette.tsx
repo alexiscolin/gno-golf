@@ -13,6 +13,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type PaletteEntry } from "@/lib/builder/palette";
 import { lookName, pictureOf, tilesOf, type Tile } from "@/lib/builder/tiles";
 import { worldName } from "@/lib/builder/rules";
+import { sound } from "@/lib/feel";
 
 /** A look's picture: a file, its place kept (no shift as it loads). */
 const Picture = ({ world, e, px }: { world: string; e: PaletteEntry; px: number }) => (
@@ -33,7 +34,8 @@ export default function Palette({ world, palette, armed, off, onArm }: {
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<{ tile: Tile; from: HTMLElement } | null>(null);
   const lookOf = (t: Tile) => t.looks.find((e) => e.id === chosen[t.key]) ?? t.looks[0];
-  const arm = (e: PaletteEntry) => onArm(armed?.id === e.id ? null : e);
+  // picked up: the game's wooden tick (put back: nothing)
+  const arm = (e: PaletteEntry) => (armed?.id !== e.id && sound("select"), onArm(armed?.id === e.id ? null : e));
 
   const tile = (t: Tile, big = false) => {
     const e = lookOf(t), why = off.get(e.id), on = !!armed && t.looks.some((x) => x.id === armed.id);
@@ -72,7 +74,7 @@ export default function Palette({ world, palette, armed, off, onArm }: {
       <div className="palette__bin" data-bin aria-hidden="true">Drop a piece here to remove it</div>
       {open && (
         <Looks world={world} tile={open.tile} from={open.from} now={lookOf(open.tile)} off={off} onClose={() => setOpen(null)}
-          onPick={(e) => (setChosen((c) => ({ ...c, [open.tile.key]: e.id })), onArm(e))} />
+          onPick={(e) => (setChosen((c) => ({ ...c, [open.tile.key]: e.id })), sound("select"), onArm(e))} />
       )}
     </aside>
   );

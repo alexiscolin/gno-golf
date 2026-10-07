@@ -119,8 +119,15 @@
 .board__piece:focus-visible > :first-child, .board__end:focus-visible > :first-child { filter: drop-shadow(0 0 .3px var(--ink)) drop-shadow(0 0 .3px var(--gold)) drop-shadow(0 0 .3px var(--gold)); }
 .board__end text { font-family: var(--font); font-weight: 800; fill: var(--ink); pointer-events: none; }
 .board__handle { fill: var(--white); stroke: var(--ink); stroke-width: 1.5px; vector-effect: non-scaling-stroke; cursor: crosshair; }
-.measure { position: absolute; left: var(--sp-3); top: var(--sp-3); max-width: calc(100% - 2 * var(--sp-3)); padding: 4px var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+/* by the pointer (Board places it, kept inside the board): the ghost's name and place, or why not; a refusal just made shakes once */
+.measure { position: absolute; left: var(--sp-3); top: var(--sp-3); z-index: 2; max-width: min(420px, calc(100% - 2 * var(--sp-3))); padding: 4px var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .measure--no { background: var(--hat-ink); }
+.measure--shake { animation: bshake .3s ease-in-out; }
+@keyframes bshake { 20% { translate: -5px 0; } 40% { translate: 4px 0; } 60% { translate: -3px 0; } 80% { translate: 2px 0; } }
+/* a piece just dropped pops (120 ms) */
+.board__piece--pop { animation: bpop .12s ease-out; transform-box: fill-box; transform-origin: center; }
+@keyframes bpop { from { transform: scale(.8); } 70% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .measure--shake, .board__piece--pop { animation: none; } }
 .board__said { position: absolute; left: 50%; bottom: var(--sp-3); transform: translateX(-50%); max-width: 80%; margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--hat-ink); border-radius: 12px; background: var(--white); color: var(--hat-ink); font-size: 15px; font-weight: 700; z-index: 1; }
 
 /* the checks, docked: the verdict and the limits in one row, the list above it */
@@ -301,6 +308,15 @@
 .tmode__chip--now { border-color: var(--ink); background: var(--gold); }
 .tmode__chip--done { border-color: var(--green); background: var(--mint); color: var(--green); }
 .tmode__chip--bad { border-color: var(--hat-ink); color: var(--hat-ink); background: var(--white); }
+/* the last weather proved: the chips fill one by one, a little confetti, Publish pulses (calm, short; none with reduced motion) */
+.tmode--party .tmode__chip--done { animation: bfill .5s ease-out both; }
+@keyframes bfill { from { background: var(--white); transform: scale(.92); } 60% { transform: scale(1.08); } }
+.bconfetti { position: fixed; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; }
+.bconfetti i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; animation: bfall 1.6s cubic-bezier(.3, .6, .5, 1) both; }
+@keyframes bfall { to { transform: translate(var(--drift), 70vh) rotate(var(--turn)); opacity: 0; } }
+.btn--pulse { animation: bpulse 1.1s ease-in-out 3; }
+@keyframes bpulse { 50% { box-shadow: 0 0 0 6px rgba(var(--ink-rgb), .12); transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) { .tmode--party .tmode__chip--done, .btn--pulse { animation: none; } .bconfetti { display: none; } }
 .tmode__par { border-style: dashed; }
 .tmode__card { position: absolute; top: 96px; left: var(--sp-3); z-index: 1; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 14px; background: rgba(var(--paper-rgb), .96); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .tmode__notes { position: absolute; top: 148px; left: 50%; transform: translateX(-50%); z-index: 1; display: grid; justify-items: center; gap: var(--sp-2); width: min(640px, calc(100% - 2 * var(--sp-3))); pointer-events: none; }

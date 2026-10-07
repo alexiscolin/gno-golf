@@ -350,7 +350,10 @@ near, proved, world; at 1440, 1280 and 1024.
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last
   valid place; a handle stops at its range. The wheel and the pinch zoom it,
-  never the page.
+  never the page. The ghost's words sit by the pointer, and a refusal is said
+  there once (a small shake). The game's own sounds, quiet: a tick to pick a
+  piece, a soft creak each grid step, a knock and a 120 ms pop on a drop, a
+  thud on a refusal.
 - **The right**: the hole in 3D, in sync; the selected piece only: its name,
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
   sliders: size, bounce, timing). Nothing selected: "Click a piece to change
@@ -376,7 +379,10 @@ address the hole is proved under (its proofs are bound to it): with Adena,
 takes the window under the header; the weathers to beat as chips that tick when holed (☀
 Clear ✓ 3 · ≋ Wind ✓ 4 · ☂ Rain, now) and "Par –", then the suggested par;
 a round that does not count says why in one line. The big button: "Back to
-edit", then "Publish →". The next weather starts by itself.
+edit", then "Publish →". The next weather starts by itself. Each weather
+proved plays the cup's sound; the last one gets a small celebration: the
+chips fill one by one, a little confetti, a chime, and "Publish →" pulses
+three times (no motion with reduced motion).
 
 ### B5. Publish
 
