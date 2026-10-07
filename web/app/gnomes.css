@@ -83,6 +83,8 @@
 .gcard--mine .gcard__name small, .gcard--mine .gcard__fact { color: rgba(var(--paper-rgb), .8); }
 .gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; }
 .gcard--skel { pointer-events: none; }
+.gcard--coming { cursor: default; box-shadow: none; border-style: dashed; }
+.gcard--coming:hover { transform: none; }
 .gcard--skel .gtile { background: rgba(var(--ink-rgb), .06); }
 .gshelf__more { justify-self: center; }
 .gempty { justify-self: center; text-align: center; color: var(--ink-soft); }

@@ -2,13 +2,13 @@
 
 // The shop's small pieces, one of each (the GUI spec's "Shared pieces"): a
 // tier's chip, a gnome's tile (his 3D portrait, or the chain's), his card in
-// a grid, the switch between the two looks, the closing date. On the game's
-// own tokens (app/gnomes.css).
+// a grid (and a Legendary's to come, to look at), the switch between the two
+// looks, the closing date. On the game's own tokens (app/gnomes.css).
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Segmented } from "@/components/ui";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
 import type { Look, Portraits } from "@/lib/gnomes/onchain";
-import { utcDate, localDate } from "@/lib/gnomes/shop";
+import { comingFact, utcDate, localDate } from "@/lib/gnomes/shop";
 import type { Tier } from "@/lib/gnomes/vocab";
 
 // a tier's shape, read in grey too: a disc, a diamond, a gem, a crown; a leaf for an earned one
@@ -84,6 +84,15 @@ export function GnomeCard({ g, fact, mine, never, buy = false, onChain = null, o
     </button>
   );
 }
+/** A Legendary of a wave not open yet, to look at: his tile, name and number, his tier and his wave. No price, no Buy,
+ *  no date, nothing to press. */
+export const ComingCard = ({ g, onChain = null }: { g: Listed; onChain?: Portraits | null }) => (
+  <article className="gcard gcard--coming" aria-label={`${g.name}, number ${g.id}, ${tierName(g.tier)}: ${comingFact(g)}`}>
+    <Tile id={g.id} tier={g.tier} onChain={onChain} />
+    <span className="gcard__name">{g.name}<small>#{g.id}</small></span>
+    <span className="gcard__foot"><TierChip tier={g.tier} /><span className="gcard__fact">{comingFact(g)}</span></span>
+  </article>
+);
 /** A card's place while the grid is read: the same size, blank. */
 export const BlankCard = () => (
   <span className="gcard gcard--skel" aria-hidden="true"><span className="gtile" /><span className="gcard__name">&nbsp;</span><span className="gcard__foot" /><span className="gcard__buy gcard__buy--skel">&nbsp;</span></span>

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
+  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -300,4 +300,26 @@ test("shop: the words of each share moment: about the game, never value", () => 
   assert.equal(w.team(1, "Tansy"), "My Gnogolf team: Tansy. Race my ghost");
   for (const s of Object.values(w).map((f) => (f as (...a: string[]) => string)("X", "1")))
     assert.doesNotMatch(s, /\b(NFT|mint|token|floor|invest|value|limited)\b/i);
+});
+
+// ------------------------------------------------------------ the Legendaries to come
+test("shop: the gallery shows each wave's Legendary while its wave is not open, none once the genesis has closed", () => {
+  const legends = entries.filter((e) => e.tier === "legendary");
+  const ids = (c: Collection, now = T0 + 60) => comingLegends(entries, c, now).map((e) => [e.id, e.wave]);
+  const all = legends.map((e) => [e.id, e.wave]);
+  assert.equal(legends.length, 7, "one a wave");
+  // none open: no wave on the chain yet, or each still to start
+  assert.deepEqual(ids(collection({ waves: [] })), all);
+  assert.deepEqual(ids(collection(), T0 - 60), all, "wave 1 published, its start to come");
+  // some: wave 1 open, wave 2 published for later; a paused sale still has its wave open
+  const two = [collection().waves[0], { first: 105, last: 208, start: T0 + 2 * 86400, playersUntil: T0 + 3 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }];
+  assert.deepEqual(ids(collection({ waves: two })), all.slice(1));
+  assert.deepEqual(ids(collection({ waves: two }), T0 + 2 * 86400), all.slice(2), "wave 2 opened in turn");
+  assert.deepEqual(ids(collection({ waves: two, open: false })), all.slice(1));
+  // all open
+  assert.deepEqual(ids(collection({ waves: [{ first: 1, last: 720, start: T0, playersUntil: T0, prices: [36e6, 72e6, 336e6, 1296e6] }] })), []);
+  // the genesis closed: what never opened never will
+  assert.deepEqual(ids(collection({ waves: two, series: [{ name: "genesis", first: 1, last: 720, sold: 40, closed: true }] })), []);
+  // its card says its wave alone: no price, no date, no scarcity
+  assert.equal(comingFact(legends[2]), "Coming · wave 3");
 });

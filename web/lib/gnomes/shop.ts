@@ -314,6 +314,15 @@ export function cardFact(e: Listed, s: Seen) {
   return `Wave ${e.wave} · ${cap(e.home)}`;
 }
 
+/** The Legendaries the gallery shows coming, to look at: each wave's while no started wave holds it (not published
+ *  yet, or its start to come), in id order; none once the genesis has closed (a wave not open by then never opens). */
+export function comingLegends<E extends Some>(entries: readonly E[], c: Collection, now: number): E[] {
+  if (c.series[0]?.closed) return [];
+  return entries.filter((e) => e.tier === "legendary" && !c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now));
+}
+/** A coming Legendary's one fact: his wave, no price, no date. */
+export const comingFact = (e: Pick<Listed, "wave">) => `Coming · wave ${e.wave}`;
+
 // ------------------------------------------------------------ a team (A6)
 const RANK: Record<string, number> = { legendary: 0, epic: 1, rare: 2, common: 3, earned: 4 };
 /** A wallet's gnomes as the shelf lays them out: Legendary first, then Epic, Rare, Common, earned, then by number. */
