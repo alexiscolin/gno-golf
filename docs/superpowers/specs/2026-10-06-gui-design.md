@@ -359,7 +359,11 @@ near, proved, world; at 1440, 1280 and 1024.
   never the page. The ghost's words sit by the pointer, and a refusal is said
   there once (a small shake). The game's own sounds, quiet: a tick to pick a
   piece, a soft creak each grid step, a knock and a 120 ms pop on a drop, a
-  thud on a refusal.
+  thud on a refusal. The keys, said in the board's key line and the glossary: 1–5
+  pick the palette's first five pieces (each tile's look as chosen), R
+  turns, ⌫ deletes, ⌘Z undoes, Space held makes a drag pan, F frames the
+  whole hole, T goes to Test, Escape drops the piece in hand or leaves Test
+  (not while aiming: there it drops the aim, the game's).
 - **The right**: the hole in 3D, in sync; the selected piece only: its name,
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
   sliders: size, bounce, timing). Nothing selected: "Click a piece to change

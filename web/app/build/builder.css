@@ -416,6 +416,9 @@
 .bgloss { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 100%; width: min(640px, 100%); overflow: auto; overscroll-behavior: contain; padding: var(--sp-3) var(--sp-4); border: var(--edge); border-radius: 16px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); pointer-events: auto; }
 .bgloss__hints { display: grid; gap: var(--sp-1); }
 .bhint--in { position: static; max-width: none; padding: 0; border: 0; box-shadow: none; background: none; }
+.bgloss__keys { margin: var(--sp-1) 0 0; font-size: 13px; font-weight: 600; line-height: 1.7; color: var(--ink); }
+.bgloss__keys kbd { font: inherit; font-weight: 800; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
+.board--pan, .board--pan * { cursor: grab !important; }
 .bgloss .bhint__ok { align-self: flex-end; position: sticky; bottom: 0; }
 .bgloss h2 { margin: var(--sp-2) 0 0; font-size: 15px; }
 .bgloss ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--sp-2) var(--sp-3); }
@@ -426,5 +429,5 @@
 .bgloss__piece small { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 
 /* the keys at the board's foot */
-.board__keys { position: absolute; left: var(--sp-3); bottom: var(--sp-3); margin: 0; padding: 4px var(--sp-2); border-radius: 10px; background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 700; color: var(--ink); pointer-events: none; }
+.board__keys { position: absolute; left: var(--sp-3); bottom: var(--sp-3); max-width: calc(100% - 2 * var(--sp-3)); margin: 0; padding: 4px var(--sp-2); border-radius: 10px; background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 700; color: var(--ink); pointer-events: none; }
 .board__keys kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }

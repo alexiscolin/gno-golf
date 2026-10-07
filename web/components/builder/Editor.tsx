@@ -33,6 +33,9 @@ import { plainOf } from "@/lib/builder/explain";
 import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
+import { keyAction } from "@/lib/builder/keys";
+import { tilesOf } from "@/lib/builder/tiles";
+import { sound } from "@/lib/feel";
 
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
@@ -70,6 +73,11 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [said, setSaid] = useState("");
   const [checked, setChecked] = useState<{ of: Draft; v: Validated; state: Hole | null } | null>(null);
   const [fine, setFine] = useState(false);
+  // Space held: a drag pans the board; F: the hole framed again (asked n times); each tile's look as chosen (the keys arm it)
+  const [pan, setPan] = useState(false);
+  const [frameAsk, setFrameAsk] = useState(0);
+  const [chosen, setChosen] = useState<{ world: string; looks: Record<string, string> }>({ world: first.world, looks: {} });
+  const looks = chosen.world === draft.world ? chosen.looks : {};
   const [key, setKey] = useState<{ of: Draft; key: string | null } | null>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // the difficulty meter (its worker), and its last answer with the draft it is of
@@ -227,6 +235,18 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if (t.closest("input, select, textarea, [contenteditable]")) return;
       const mod = e.metaKey || e.ctrlKey;
       if (e.key === "Alt") return setFine(true);
+      // Space: held, a drag pans (a button keeps its Space unless the pointer is on the board)
+      if (e.key === " " && !mod && (!t.closest("button, a, summary") || document.querySelector(".board:hover"))) return (e.preventDefault(), setPan(true));
+      const act = keyAction(e);
+      if (act?.t === "arm" && palette) {
+        const tile = tilesOf(palette).first[act.n], en = tile && (tile.looks.find((x) => x.id === looks[tile.key]) ?? tile.looks[0]);
+        if (!en) return;
+        if (off.has(en.id)) return say(off.get(en.id)!);
+        if (armed?.id !== en.id) sound("select");
+        return setArmed(en);
+      }
+      if (act?.t === "frame") return setFrameAsk((n) => n + 1);
+      if (act?.t === "test") return void (!testOff && onTest(kept));
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
       if (e.key === "Escape") return (setArmed(null), setSelected(null));
       const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -239,16 +259,19 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if (e.key.toLowerCase() === "r" && !mod) return turn();
       if (arrows[e.key]) return (e.preventDefault(), nudge(step(e.key)));
     };
-    const up = (e: KeyboardEvent) => e.key === "Alt" && setFine(false);
+    const up = (e: KeyboardEvent) => (e.key === "Alt" && setFine(false), e.key === " " && setPan(false));
+    const away = () => (setPan(false), setFine(false));
+    window.addEventListener("blur", away);
     window.addEventListener("keydown", key);
     window.addEventListener("keyup", up);
-    return () => (window.removeEventListener("keydown", key), window.removeEventListener("keyup", up));
+    return () => (window.removeEventListener("keydown", key), window.removeEventListener("keyup", up), window.removeEventListener("blur", away));
   });
 
   const v = checked?.v, fresh = checked?.of === kept;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
   const bad = new Set(errors.map((i) => i.piece).filter((x): x is string => !!x));
   const testOff = carrying === kept ? "Checking…" : testGate(kept, checked);
+  const off = palette ? offAtLimit(draft, palette) : new Map<string, string>();
   const step: Step = "edit";
   // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
   const proved = !testOff && key?.of === kept && !!key.key && !!author && !!provedAs(kept.proofs, kept.world, key.key, author, kept.slug);
@@ -262,10 +285,10 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         onTitle={(t) => (session.edit((k) => frame(retitle(k, t))), refresh())} onSlug={(s) => (session.edit((k) => frame({ ...k, slug: s })), refresh())} onWorld={world} onStep={(s) => (s === "test" && !testOff ? onTest(kept) : s === "publish" && proved && onPublish(kept))} onBack={onBack} onHelp={() => setAgain(true)} />
       {palette && quick && full ? (
         <>
-          <Palette world={draft.world} palette={palette} armed={armed} off={offAtLimit(draft, palette)} onArm={setArmed} />
+          <Palette world={draft.world} palette={palette} armed={armed} off={off} onArm={setArmed} chosen={looks} onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />
           <div className="centre">
             {toast && <p className="btoast" role="status">{toast}</p>}
-            <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
+            <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} />
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff, rounds: rounds && key?.of === kept && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />

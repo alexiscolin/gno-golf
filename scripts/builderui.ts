@@ -251,5 +251,54 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   console.log("delete: ok");
   c.kill();
 }
+// the keys: 1 to 5 pick the palette's first five, Space and a drag pan (a piece under it too), F frames the hole,
+// T goes to Test, Escape comes back; the board's key line says them
+{
+  const c = await editor(1280, 800);
+  const key = async (key: string, code: string, type: "both" | "down" | "up" = "both") => {
+    if (type !== "up") await c.send("Input.dispatchKeyEvent", { type: "keyDown", key, code, ...(key.length === 1 && { text: key }) });
+    if (type !== "down") await c.send("Input.dispatchKeyEvent", { type: "keyUp", key, code });
+    await sleep(150);
+  };
+  const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+  await c.js(`document.querySelector(".board").focus()`);
+  await key("2", "Digit2");
+  assert.equal(await c.js(`document.querySelector(".palette .piece--on .piece__name")?.textContent`), "Bumper", "2: the second piece, armed");
+  await key("Escape", "Escape");
+  const keys = await c.js<string>(`document.querySelector(".board__keys").textContent`);
+  for (const k of ["1–5", "Space", "F", "T"]) assert.ok(keys.includes(k), `the key line says ${k}: ${keys}`);
+  // Space held, a drag over a piece pans (the piece stays)
+  const tee = () => c.js<[number, number]>(`(() => { const r = document.querySelector("[data-end='tee'] circle").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const piece = await c.js<[number, number]>(`(() => { const r = document.querySelector("[data-piece]").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const pieceAt = () => c.js<string>(`document.querySelector("[data-piece]").getAttribute("aria-label")`);
+  const was = await tee(), label = await pieceAt();
+  await key(" ", "Space", "down");
+  await mouse("mousePressed", ...piece);
+  for (let k = 1; k <= 5; k++) {
+    await mouse("mouseMoved", piece[0] + 12 * k, piece[1] + 8 * k);
+    await sleep(30);
+  }
+  await mouse("mouseReleased", piece[0] + 60, piece[1] + 40);
+  await key(" ", "Space", "up");
+  await sleep(300);
+  const now = await tee();
+  assert.ok(Math.abs(now[0] - was[0] - 60) < 2 && Math.abs(now[1] - was[1] - 40) < 2, `Space and a drag: the board panned (${was.join()} → ${now.join()})`);
+  assert.equal(await pieceAt(), label, "the piece under it not moved");
+  // F: framed again (the tee back where the first framing had it)
+  await key("f", "KeyF");
+  await sleep(300);
+  const back = await tee();
+  assert.ok(Math.abs(back[0] - was[0]) < 2 && Math.abs(back[1] - was[1]) < 2, `F frames the hole (${was.join()} → ${back.join()})`);
+  // T: to Test; Escape: back to the editor
+  for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
+  await key("t", "KeyT");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tmode")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tmode")`), "T: to Test");
+  await key("Escape", "Escape");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".board__map")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".board__map")`), "Escape: back from Test to the editor");
+  console.log("keys: ok");
+  c.kill();
+}
 console.log("builderui: all ok");
 process.exit(0);

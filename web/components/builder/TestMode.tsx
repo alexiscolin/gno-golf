@@ -61,7 +61,7 @@ function AddressStep({ onAddress }: { onAddress: (a: string) => void }) {
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, onAuthor, onProof, onPar }: {
+export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, onAuthor, onProof, onPar, onLeave }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -75,6 +75,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   onProof: (p: Proof) => void;
   /** the proofs' suggested par, once every weather is proved */
   onPar: (par: number) => void;
+  /** Escape: back to the editor (not while aiming: Escape drops the aim, the game's) */
+  onLeave?: () => void;
 }) {
   const [id, setId] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -97,6 +99,14 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     };
   }, [!author]); // eslint-disable-line react-hooks/exhaustive-deps -- (the stage is there once an address is)
   const game = useRef<ReturnType<typeof createGame> | null>(null);
+  // Escape leaves Test, unless it drops an aim (the game's) or is a field's
+  const aiming = useRef(false);
+  useEffect(() => {
+    if (!onLeave) return;
+    const key = (e: KeyboardEvent) => e.key === "Escape" && !aiming.current && !(e.target as HTMLElement).closest("input, select, textarea") && onLeave();
+    addEventListener("keydown", key, true); // (before the game's own: an aim it drops is still an aim here)
+    return () => removeEventListener("keydown", key, true);
+  }, [onLeave]);
 
   // the hole's id: the author's alias's next version, as the chain says (v1 if it cannot be read)
   useEffect(() => {
@@ -125,7 +135,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     const local = makeLocalChain(host, holeRow(id, draft), hex, now.period);
     const g = (game.current = createGame(canvas, {
       chain: testChain(makeChain({ rpc, web }), local, hex),
-      onChange: setSnap,
+      onChange: (s) => ((aiming.current = s.aiming), setSnap(s)),
       onHoled: ({ shots }) => {
         setChecking(true);
         void replay(local, { key: proofKey, id, kind: now.kind, period: now.period, shots: [...shots] }).then((p) => {

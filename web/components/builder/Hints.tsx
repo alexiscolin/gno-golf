@@ -10,6 +10,8 @@ import { useEffect, useRef } from "react";
 import { pictureOf, tilesOf } from "@/lib/builder/tiles";
 import { worldName } from "@/lib/builder/rules";
 import type { PaletteEntry } from "@/lib/builder/palette";
+import { KEYS } from "@/lib/builder/keys";
+import { MOD } from "./Inspector";
 
 const HINTS = [
   ["palette", "Drag a piece onto the board"],
@@ -43,6 +45,7 @@ export default function Hints({ onDone, glossary = null }: {
               </li>
             ))}
           </ul>
+          <p className="bgloss__keys">{KEYS.map((k, i) => <span key={k.key}>{i ? " · " : ""}<kbd>{k.key.replace("mod", MOD)}</kbd> {k.long}</span>)}</p>
           {ok}
         </section>
       </div>

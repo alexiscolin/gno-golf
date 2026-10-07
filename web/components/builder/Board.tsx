@@ -26,6 +26,7 @@ import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
 import { labelAt, throttle } from "@/lib/builder/juice";
 import { entryName } from "@/lib/builder/names";
+import { KEYS } from "@/lib/builder/keys";
 
 export interface BoardProps {
   draft: Draft;
@@ -49,6 +50,10 @@ export interface BoardProps {
   onDisarm: () => void;
   /** the last refusal made off the board (a key, the inspector), shown at the board's foot until it fades; the board's own are said by the pointer */
   said: string;
+  /** Space held: a press and a drag pan the board, whatever is under it */
+  pan?: boolean;
+  /** F: the whole hole framed again, each time this changes */
+  frameAsk?: number;
   /** Show me: the piece to frame (n: asked again, framed again) */
   show?: { id: string; n: number } | null;
 }
@@ -124,11 +129,18 @@ export default function Board(props: BoardProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const framed = (): View => {
+    const [lo, hi] = extent(draft), k = Math.max(K_MIN, Math.min(K_MAX, Math.min(size.w / (hi[0] - lo[0]), (size.h - 56) / (hi[1] - lo[1]))));
+    return { x: (lo[0] + hi[0]) / 2 - size.w / 2 / k, y: (lo[1] + hi[1]) / 2 - (size.h - 56) / 2 / k, k };
+  };
   useEffect(() => {
     if (view || !size.w) return;
-    const [lo, hi] = extent(draft), k = Math.max(K_MIN, Math.min(K_MAX, Math.min(size.w / (hi[0] - lo[0]), (size.h - 56) / (hi[1] - lo[1]))));
-    setView({ x: (lo[0] + hi[0]) / 2 - size.w / 2 / k, y: (lo[1] + hi[1]) / 2 - (size.h - 56) / 2 / k, k });
-  }, [size, view, draft]);
+    setView(framed());
+  }, [size, view, draft]); // eslint-disable-line react-hooks/exhaustive-deps -- (framed reads them)
+  // F: the whole hole framed again
+  useEffect(() => {
+    if (props.frameAsk && size.w) setView(framed());
+  }, [props.frameAsk]); // eslint-disable-line react-hooks/exhaustive-deps -- (asked, not as the draft changes)
   // Show me: the piece in the middle of the board
   useEffect(() => {
     const p = props.show && draft.pieces.find((q) => q.id === props.show!.id);
@@ -173,6 +185,7 @@ export default function Board(props: BoardProps) {
       return void (drag.current = null);
     }
     const at = unit(e), target = (e.target as Element).closest<HTMLElement>("[data-piece],[data-handle],[data-end]");
+    if (props.pan) return void (drag.current = { t: "pan", from: [e.clientX, e.clientY], view: shown }); // (Space held: whatever is under it)
     if (armed) return; // dropped on release
     if (target?.dataset.handle && selected) return void (drag.current = { t: "handle", id: selected, key: target.dataset.handle as HandleKey, start: draft, check: dragCheck(draft, quick) });
     if (target?.dataset.end) return void (drag.current = { t: "end", which: target.dataset.end as "tee" | "pin", start: draft, check: dragCheck(draft, quick) });
@@ -268,7 +281,7 @@ export default function Board(props: BoardProps) {
   const hit = Math.max(0.9, 14 / view.k);
   const ghostBad = ghost && ghost.why;
   return (
-    <section className={`board${ghostBad || live?.why ? " board--no" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
+    <section className={`board${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
       <svg className="board__map" width={size.w} height={size.h} viewBox={`${view.x} ${view.y} ${size.w / view.k} ${size.h / view.k}`}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), props.onCancel())}
         onPointerLeave={() => setGhost(null)}>
@@ -288,7 +301,7 @@ export default function Board(props: BoardProps) {
       </svg>
       {props.said && <p className="board__said" role="alert">{props.said}</p>}
       {/* the keys a first hole needs, at the board's foot (the GUI spec's B1) */}
-      {!props.said && <p className="board__keys" aria-hidden="true"><kbd>{MOD}Z</kbd> Undo · <kbd>R</kbd> Turn · <kbd>⌫</kbd> Delete</p>}
+      {!props.said && <p className="board__keys" aria-hidden="true">{KEYS.map((k, i) => <span key={k.key}>{i ? " · " : ""}<kbd>{k.key.replace("mod", MOD)}</kbd> {k.short}</span>)}</p>}
       {/* by the pointer: the ghost's name and place or why not, a drag's, or a refusal just made (once, shaken) */}
       {(flash || ghost || live) && (
         <span key={flash ? `f${flash.n}` : "m"} ref={label} className={`measure${flash || ghost?.why || live?.why ? " measure--no" : ""}${flash ? " measure--shake" : ""}`} role="status">
