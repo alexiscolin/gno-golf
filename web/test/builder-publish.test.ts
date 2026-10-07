@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { bill, deposit, finalHex, gasFor, gnokeyPublish, holeHolds, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
+import { bill, deposit, finalHex, gasFor, gnokeyPublish, holeHolds, parLine, publishBytes, publishSteps, shq, STORED } from "../lib/builder/publish.ts";
 import { shaOf } from "../lib/builder/proof.ts";
 
 // the rules the Builder publishes under (golf/v2, chain.ts's REALM), its records in store
@@ -149,4 +149,14 @@ void test("gnokeyPublish: nothing for a slug, data or realm not of their shape (
   for (const bad of [{ slug: "a b" }, { slug: "$(x)" }, { hex: "0g" }, { hex: "0" }, { realm: "gno.land/r/x;rm" }, { deposit: -1 }, { gas: 1.5 }, { author: "" }, { author: "mykey" }, { author: "g1x; rm -rf ~" }]) {
     assert.equal(gnokeyPublish({ ...ok, ...bad }), "", JSON.stringify(bad));
   }
+});
+
+void test("parLine: the par explained from the rounds that proved it", () => {
+  const s = (...strokes: number[]) => strokes.map((n) => ({ strokes: n }));
+  assert.equal(parLine(s(2, 2, 2), 3), "Holed in 2 everywhere · par 3 leaves room");
+  assert.equal(parLine(s(2, 3, 2), 4), "Holed in 2 to 3 by weather · par 4 leaves room");
+  assert.equal(parLine(s(1, 1, 1), 2), "Holed in 1 everywhere · par 2 leaves room");
+  assert.equal(parLine(s(2, 2, 2), 5), "Holed in 2 everywhere · par 5 leaves room");
+  assert.equal(parLine(s(3, 3), 3), "Holed in 3 everywhere · par 3 leaves none: at least 4", "a par the rounds do not allow (Publish refuses it too)");
+  assert.equal(parLine([], 3), "");
 });

@@ -401,7 +401,8 @@ three times (no motion with reduced motion).
 `builder-publish.html`: form, refused, newer, closed, pending, done. The
 hole as players will see it; the form: the name, suggested ("Suggested from
 the world and the starter: change it if you like."), the address ("From the
-name, at the first test"), a line for players (optional), the cost before
+name, at the first test"), the par explained by the rounds that proved it
+("Holed in 2 everywhere · par 3 leaves room"), a line for players (optional), the cost before
 signing (storage deposit, network fee, "At most 1.20 GNOT", "Nothing goes to
 the game"), gnokey behind a tap, the pinned blue "Publish in Adena · 1.20
 GNOT". Done: the hole's card, "Play it for real: your best becomes the ghost

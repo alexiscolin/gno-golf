@@ -82,6 +82,14 @@ export async function holeHolds(d: Draft, hex: string, key: string, id: string, 
   return "";
 }
 
+/** The par explained from the rounds that proved the hole (the review's quick win 12): "Holed in 2 everywhere · par 3 leaves room"; "" with none. */
+export function parLine(proofs: readonly Pick<Proof, "strokes">[], par: number): string {
+  if (!proofs.length) return "";
+  const n = proofs.map((p) => p.strokes), lo = Math.min(...n), hi = Math.max(...n);
+  const holed = lo === hi ? `Holed in ${hi} everywhere` : `Holed in ${lo} to ${hi} by weather`;
+  return `${holed} · par ${par} ${par > hi ? "leaves room" : `leaves none: at least ${suggestPar(proofs)}`}`;
+}
+
 /** What the publish step reads before it opens (undefined: still being read; null: the chain could not be read). */
 export interface Readings {
   /** Publishing(): community holes open on this chain */
