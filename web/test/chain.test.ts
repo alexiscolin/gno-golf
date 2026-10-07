@@ -507,6 +507,16 @@ test("holeData: a version's data read once a visit (it never changes), an alias'
   assert.equal(asked.length, tried + 1, "a failed read is not kept: asked again once, then kept");
 });
 
+test("blockTime: a block's time (ms) from its header; a node that does not have it, or does not answer, is down", async () => {
+  const chain = makeChain();
+  setFetch((url) => (assert.match(url, /\/blockchain\?minHeight=7&maxHeight=7$/), { result: { block_metas: [{ header: { height: "7", time: "2026-10-07T06:43:54.238331Z" } }] } }));
+  assert.equal(await chain.blockTime(7), Date.parse("2026-10-07T06:43:54.238Z"));
+  setFetch(() => ({ result: { block_metas: [] } }));
+  await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
+  setFetch(() => { throw new Error("node down"); });
+  await assert.rejects(chain.blockTime(7), (e: unknown) => errorKind(e) === "down");
+});
+
 // ------------------------------------------------------------ boards, and the mode guard
 test("leaderboard defaults to assisted mode, and normalizes anything that isn't 'pro'", async () => {
   const chain = makeChain();

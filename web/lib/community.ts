@@ -118,14 +118,59 @@ export function pageOf(rows: readonly HoleRow[], n: number, verdicts: Verdicts) 
   return { rows: shownOnly(page, verdicts), judging: page.some((h) => !verdicts.has(h.id)), unread: page.some((h) => verdicts.get(h.id) === null), more: rows.length - page.length };
 }
 
-/** The hole of the day's candidates: the listed community holes (communityOf's, in the chain's order) from
- *  the one the hash of the UTC day picks (sky.ts fnv1a, the realm's), on round the list. The day's hole is the
- *  first the Builder's rules pass (verdictOf: the same verdict everywhere; one not read here now is waited for, never
- *  skipped), so the same for everyone, no server. */
-export function dayOrder<H>(rows: readonly H[], now: number): H[] {
-  if (!rows.length) return [];
-  const at = Number(fnv1a(new Date(now).toISOString().slice(0, 10)) % BigInt(rows.length));
-  return [...rows.slice(at), ...rows.slice(0, at)];
+/** How many holes the day's pick judges, at most, for one the Builder's rules pass. */
+export const DAY_TRIES = 8;
+
+/** A listed hole's alias (its slot; a version id less its "/v<n>"). */
+export const aliasOf = (h: Pick<HoleRow, "id" | "slot">) => h.slot || h.id.replace(/\/v\d+$/, "");
+
+/** The hole of the day's candidates: the listed community holes (communityOf's) in the UTC day's own order, each alias
+ *  hashed with the day (sky.ts fnv1a, the realm's), so a hole published, versioned or taken down moves no other. The
+ *  day's hole is dayHole's: the first published before the day began that the Builder's rules pass (the same verdict
+ *  everywhere), so the same for everyone all day, no server. */
+export function dayOrder<H extends Pick<HoleRow, "id" | "slot">>(rows: readonly H[], now: number): H[] {
+  const day = new Date(now).toISOString().slice(0, 10);
+  return rows.map((h) => ({ h, k: fnv1a(`${day} ${aliasOf(h)}`) })).sort((x, y) => (x.k < y.k ? -1 : x.k > y.k ? 1 : 0)).map(({ h }) => h);
+}
+
+/** The UTC day's first moment (ms). */
+export const dayStart = (now: number) => now - (now % 864e5);
+
+/** The day's hole among its candidates (dayOrder's): the first whose alias was published before the day began (born: by
+ *  alias) and the Builder's rules pass (verdicts: by id), DAY_TRIES judged at most; null while one before it is not known
+ *  yet, or one could not be read (unread: never skipped, so never another hole than everyone else's). */
+export function dayHole<H extends Pick<HoleRow, "id" | "slot">>(candidates: readonly H[], born: ReadonlyMap<string, boolean | null>, verdicts: Verdicts): { day: H | null; unread: boolean } {
+  let tried = 0;
+  for (const h of candidates) {
+    const b = born.get(aliasOf(h));
+    if (b === false) continue;
+    const v = b ? verdicts.get(h.id) : b;
+    if (v === undefined || v === null) return { day: null, unread: v === null };
+    if (v.ok) return { day: h, unread: false };
+    if (++tried >= DAY_TRIES) break;
+  }
+  return { day: null, unread: false };
+}
+
+/** Where when an alias was first published is kept (ms): this, its chain's realm, the alias. */
+export const BORN_KEY = "gnogolf.born";
+/** Whether a community hole's alias was first published before a time: its oldest version's block (Versions, then that
+ *  block's time), kept once known (it never changes); throws if it cannot be read now. */
+export async function bornBefore(chain: Pick<Chain, "versions" | "blockTime" | "chainId" | "realm">, alias: string, at: number): Promise<boolean> {
+  const key = `${BORN_KEY}|${await chain.chainId()}|${chain.realm}|${alias}`;
+  let ms: number | null = null;
+  try {
+    const v = Number(localStorage.getItem(key) ?? NaN);
+    if (Number.isFinite(v)) ms = v;
+  } catch {}
+  if (ms == null) {
+    const first = (await chain.versions(alias)).versions[0];
+    ms = first ? await chain.blockTime(first.height) : Infinity; // (no version: not one listed before)
+    try {
+      if (Number.isFinite(ms)) localStorage.setItem(key, String(ms));
+    } catch {}
+  }
+  return ms < at;
 }
 
 /** How the community holes are listed: as the chain lists them (newest first), by plays, or by the meter's level. */

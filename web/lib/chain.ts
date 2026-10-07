@@ -430,6 +430,22 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
      */
     simulateCommit: (hole: string, ball: Vec2, stroke: number, shots: readonly string[], period: number, ms?: number, signal?: AbortSignal | null) =>
       qeval(`SimulateCommit(${s(hole)}, ${fx(ball[0])}, ${fx(ball[1])}, ${stroke | 0}, ${s(shots.join(";"))}, ${period | 0})`, checks.simRound, ms, signal, NO_PATH),
+    /** When a block was made (ms): its header's time, as /blockchain gives it; down if the node has no such block or does not answer. */
+    blockTime: async (height: number) => {
+      const c = new AbortController(), t = setTimeout(() => c.abort(), TIMEOUT), at = Math.max(1, height | 0);
+      try {
+        const res = await fetch(`${rpc}/blockchain?minHeight=${at}&maxHeight=${at}`, { signal: c.signal });
+        if (!res.ok) throw new Error(`RPC ${res.status}`);
+        const r = (await res.json()) as { result?: { block_metas?: { header?: { height?: string; time?: string } }[] } };
+        const h = r.result?.block_metas?.[0]?.header, ms = Date.parse(h?.time ?? "");
+        if (h?.height !== String(at) || !Number.isFinite(ms)) throw new Error(`The node has no block ${at}.`);
+        return ms;
+      } catch (e) {
+        throw down(e);
+      } finally {
+        clearTimeout(t);
+      }
+    },
     /** A community hole's versions (an alias, "<address>/<slug>"): what the next one's id will be, and each one's sha. */
     versions: (alias: string) => qeval(`Versions(${s(alias)})`, checks.versions),
     /** A version's data (GG1) in hex, as it was published: what the local preview plays (lib/sim), the community
