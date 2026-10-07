@@ -13,6 +13,7 @@
 @media (min-width: 1400px) { .bench { --palette-w: 264px; --col-w: 340px; grid-template-columns: var(--palette-w) minmax(0, 1fr) var(--col-w); } }
 .bench__wait { grid-column: 1 / -1; place-self: center; font-size: 17px; text-align: center; }
 .bench__unkept { position: fixed; left: 50%; bottom: var(--sp-3, 12px); transform: translateX(-50%); margin: 0; padding: 8px 16px; border: var(--edge); border-radius: var(--pill); background: var(--paper); font-weight: 700; white-space: nowrap; z-index: 2; }
+.bench__unkept--elsewhere { display: flex; align-items: center; gap: var(--sp-2, 8px); }
 /* the note has a band of its own under the screen it is said on: it covers no control */
 :is(.bench, .tbench, .pbench):has(+ .bench__unkept) { padding-bottom: 64px; }
 

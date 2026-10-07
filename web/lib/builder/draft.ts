@@ -314,6 +314,28 @@ export function saveDraft(key: string, d: Draft): boolean {
   }
 }
 
+/** What this browser keeps under a key, as written (null: nothing, or it keeps nothing). */
+export function keptText(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keeps an open draft under its key, if what is kept there is still what
+ * this tab last read or wrote (was; null for a key nothing was kept under):
+ * kept, the text written (the next save's was). "elsewhere": another tab changed or
+ * deleted it since, and nothing is written (the last save would win, a
+ * delete come back); null: the browser keeps nothing.
+ */
+export function saveOver(key: string, d: Draft, was: string | null): { kept: string } | "elsewhere" | null {
+  if (keptText(key) !== was) return "elsewhere";
+  const text = JSON.stringify(d);
+  return saveDraft(key, d) ? { kept: text } : null;
+}
+
 /** A draft deleted from this browser. */
 export function dropDraft(key: string) {
   try {

@@ -511,6 +511,34 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
 }
 // every palette entry dropped on a blank lane, at a laptop's size and a retina one's: the selection's outline and a hover's
 // a few css px whatever the zoom (never a stroke in the board's units: a fat capsule over the cup), no overlay drawn empty
+// the open hole changed, then deleted, in another tab: this tab's edits not written over it, said, and its choice kept
+{
+  const c = await editor(1280, 800);
+  const stored = () => c.js<string | null>(`(() => { const k = Object.keys(localStorage).find((x) => x.startsWith(${JSON.stringify("gnogolf.builder.draft.")})); return k ? localStorage.getItem(k) : null; })()`);
+  const nudge = async () => {
+    await c.js(`document.querySelector("[data-piece^='p']").focus()`);
+    await sleep(300);
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight" });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight" });
+    await sleep(800);
+  };
+  const theirs = await c.js<string>(`(() => { const k = Object.keys(localStorage).find((x) => x.startsWith(${JSON.stringify("gnogolf.builder.draft.")})); const d = JSON.parse(localStorage.getItem(k)); d.title = "Renamed elsewhere"; localStorage.setItem(k, JSON.stringify(d)); return localStorage.getItem(k); })()`);
+  await nudge();
+  assert.equal(await stored(), theirs, "the other tab's edit not written over");
+  assert.match(await c.js<string>(`document.querySelector(".bench__unkept--elsewhere")?.textContent ?? ""`), /changed in another tab/, "said");
+  await c.js(`[...document.querySelectorAll(".bench__unkept--elsewhere button")].find((b) => /Keep mine/.test(b.textContent)).click()`);
+  await sleep(500);
+  assert.notEqual(await stored(), theirs, "Keep mine: this tab's hole kept");
+  assert.equal(await c.js(`!!document.querySelector(".bench__unkept--elsewhere")`), false);
+  await c.js(`Object.keys(localStorage).filter((x) => x.startsWith(${JSON.stringify("gnogolf.builder.draft.")})).forEach((k) => localStorage.removeItem(k))`);
+  await nudge();
+  assert.equal(await stored(), null, "deleted in another tab: not brought back");
+  await c.js(`[...document.querySelectorAll(".bench__unkept--elsewhere button")].find((b) => /Open it as kept/.test(b.textContent)).click()`);
+  await sleep(800);
+  assert.equal(await c.js(`!!document.querySelector(".bholes")`), true, "opened as kept: gone, so back to the holes");
+  c.kill();
+}
+
 // a world's pieces that cannot load (offline, an old deploy's chunk gone): said, with a Try again that loads them
 {
   const c = await editor(1280, 800);
