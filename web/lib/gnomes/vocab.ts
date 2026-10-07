@@ -86,12 +86,12 @@ export type Holing = (typeof HOLINGS)[number];
 /** The earned gnomes' pieces: no gnome of the sale wears one (design.md, "Never a copy"). */
 export const EARNED_ONLY: readonly Accessory[] = ["stars", "horns", "parrot", "mask", "sash", "crown", "cape", "lamp"];
 
-const byName = new Map(COLOURS.map(([n, v], i) => [n, { v, i }]));
+const byName = new Map(COLOURS);
 /** A colour's value by its name; throws on a name the palette lacks (data is checked, not guessed). */
 export function colour(name: string) {
-  const c = byName.get(name);
-  if (!c) throw new Error(`gnomes: no colour "${name}" in the palette`);
-  return c.v;
+  const v = byName.get(name);
+  if (v === undefined) throw new Error(`gnomes: no colour "${name}" in the palette`);
+  return v;
 }
 /** A colour's code (its index), or -1 for a value outside the palette. */
 export const colourCode = (v: number) => COLOURS.findIndex(([, x]) => x === v);

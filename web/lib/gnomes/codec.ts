@@ -6,7 +6,7 @@
 // a format other than its own (a field whose meaning changed) it does not read.
 import { ACCESSORIES, ARCHETYPES, BEARDS, COLOURS, HATS, HOLINGS, HOMES, MATERIALS, PATTERNS, PIECES, PROPS, TIERS, TRAILS,
   type Accessory, type Archetype, type Beard, type Hat, type Holing, type Home, type Material, type Pattern,
-  type Piece, type Tier, type Trail } from "./vocab";
+  type Piece, type Tier, type Trail, colourCode } from "./vocab";
 
 /** The format this client writes and reads. */
 export const FORMAT = 1;
@@ -86,7 +86,7 @@ export function encode(t: Traits): string {
       }
       out += (m >>> 0).toString(16).padStart(8, "0");
     } else if (f.colour) {
-      const i = v === null ? NONE : COLOURS.findIndex(([, x]) => x === v);
+      const i = v === null ? NONE : colourCode(v as number);
       if (i < 0 || (i >= NONE && v !== null)) throw new Error(`gnomes: ${f.key} ${(v as number).toString(16)} is not in the palette`);
       out += byte(i);
     } else if (f.table) {

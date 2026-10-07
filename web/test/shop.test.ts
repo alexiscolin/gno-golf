@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
+  makeShop, soldSet, gnot, utcDate, nowRow, promoOf, promoWords, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -129,11 +129,6 @@ test("shop: GNOT exact, thousands apart; typed amounts back to ugnot", () => {
   assert.equal(gnot(1_240e6), "1,240");
   assert.equal(gnot(385_000), "0.385");
   assert.equal(gnot(1), "0.000001");
-  assert.equal(parseGnot("1,302"), 1_302e6);
-  assert.equal(parseGnot(" 12.5 "), 12_500_000);
-  assert.ok(Number.isNaN(parseGnot("1.0000001")));
-  assert.ok(Number.isNaN(parseGnot("-3")));
-  assert.ok(Number.isNaN(parseGnot("")));
 });
 
 test("shop: a date is a date in UTC, today said as today; never a countdown", () => {
@@ -218,10 +213,8 @@ test("shop: a player's gnomes titled by their name, else their short address, ne
 });
 
 // ------------------------------------------------------------ the gallery as a shop
-test("shop: the wave's prices tier by tier, and Buy on a card on sale only", () => {
+test("shop: Buy on a card on sale only", () => {
   const c = collection();
-  assert.deepEqual(wavePrices(c, c.waves[0]), [["common", 36e6], ["rare", 72e6], ["epic", 336e6], ["legendary", 1296e6]]);
-  assert.deepEqual(wavePrices(c, { ...c.waves[0], prices: [36e6, 0, 336e6, 0] }), [["common", 36e6], ["epic", 336e6]], "a tier at 0: not said");
   const seen = { c, sold: isSold([2]), mine: new Set([3]), now: T0 + 49 * 3600 };
   assert.equal(canBuyCard(entries[0], seen), true);
   assert.equal(canBuyCard(entries[1], seen), false, "found a player");

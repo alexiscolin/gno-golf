@@ -142,11 +142,6 @@ export function gnot(ugnot: number) {
   const n = Math.max(0, Math.round(ugnot)), whole = Math.floor(n / 1e6), frac = String(n % 1e6).padStart(6, "0").replace(/0+$/, "");
   return whole.toLocaleString("en-US") + (frac ? "." + frac : "");
 }
-/** A typed amount of GNOT as ugnot (commas and spaces aside, at most 6 decimals), NaN for anything else. */
-export function parseGnot(text: string) {
-  const m = /^(\d+)(?:\.(\d{1,6}))?$/.exec(text.replace(/[,\s]/g, ""));
-  return m ? Number(m[1]) * 1e6 + Number((m[2] || "").padEnd(6, "0")) : NaN;
-}
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** A time as a date in UTC, as the screens say it ("Mon 14 Dec, 18:00 UTC"; on its own day "today, 18:00 UTC";
  *  short: the weekday alone within the week). Never a countdown. */
@@ -336,8 +331,6 @@ export const showsClosing = (c: Collection) => c.closesAt > 0 && !c.series[0]?.c
 export const closingSlot = (c: Collection | null): "line" | "none" | "room" => (!c ? "room" : showsClosing(c) ? "line" : "none");
 /** Whether a card in the gallery shows Buy: on sale now (its wave open, unsold, the sale not closed) and not the player's. */
 export const canBuyCard = (e: Listed, s: Seen) => !s.mine.has(e.id) && onSale(e, s.c, s.sold, s.now);
-/** A wave's prices as the gallery's head says them: [tier, ugnot] in the tiers' order, a tier at 0 left out. */
-export const wavePrices = (c: Collection, w: WaveRow) => c.tiers.map((t, i) => [t.name, w.prices[i] ?? 0] as const).filter(([, p]) => p > 0);
 /** A card's one fact: the price on sale, "Yours", "Found a player", "Never made", or its wave. */
 export function cardFact(e: Listed, s: Seen) {
   if (s.mine.has(e.id)) return "Yours";

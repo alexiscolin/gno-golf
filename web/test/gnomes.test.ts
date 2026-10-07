@@ -10,7 +10,7 @@ import * as V from "../lib/gnomes/vocab.ts";
 import { PROP_DESIGNS } from "../lib/gnomes/props.ts";
 import { FORMAT, LENGTH, PLAIN, decode, encode, type Traits } from "../lib/gnomes/codec.ts";
 import { EARNED_KINDS, lookOf, skinOf, skinOfTraits, traitsOf } from "../lib/gnomes/skin.ts";
-import { SALE_TIERS, TIER_LOOK, entryOf, evenly, filterGnomes, planSeries, thumbOf, traitRows, type Catalogue, type SeriesConfig } from "../lib/gnomes/catalogue.ts";
+import { SALE_TIERS, TIER_LOOK, evenly, filterGnomes, planSeries, traitRows, type Catalogue, type SeriesConfig } from "../lib/gnomes/catalogue.ts";
 import { GROUNDS, MAIN, apart, earnedSignature, readability, tierRules, validate, visualDiff } from "../lib/gnomes/validate.ts";
 import { checkRows, rowsOf } from "../lib/gnomes/rows.ts";
 import { generateSeries, makeCatalogue, type Design, type Recipe } from "../lib/gnomes/generate.ts";
@@ -148,9 +148,6 @@ test("catalogue: data/gnomes.json holds the series as configured, its gnomes as 
   for (const g of catalogue.gnomes) assert.deepEqual(skinOf(decode(g.traits)!, { id: `t${g.id}`, name: g.name, line: g.line }), g.skin, `#${g.id}`);
   for (const t of SALE_TIERS)
     assert.equal(catalogue.gnomes.filter((g) => g.tier === t).length, config.series.reduce((n, s) => n + s.supply[t], 0));
-  assert.equal(entryOf(catalogue, 1)!.id, 1);
-  assert.equal(entryOf(catalogue, 99999), undefined);
-  assert.equal(thumbOf(7), "7.webp");
   assert.deepEqual(Object.keys(TIER_LOOK), [...V.TIERS]);
 });
 

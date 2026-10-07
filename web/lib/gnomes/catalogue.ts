@@ -154,8 +154,3 @@ export function goldenKeys(c: Catalogue) {
     ...c.gnomes.map((g) => ({ key: String(g.id), traits: g.traits, name: g.name, released: released.has(g.series) })),
   ];
 }
-
-/** A token by its id, or undefined. */
-export const entryOf = (c: Catalogue, id: number) => c.gnomes.find((e) => e.id === id);
-/** The thumbnail's file name of a token (media/gnomes/render.mjs makes them). */
-export const thumbOf = (id: number) => `${id}.webp`;

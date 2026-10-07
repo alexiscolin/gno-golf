@@ -265,7 +265,7 @@ async function shapeOf(d, i, L, front, key) {
     for (const [at, on, p] of paths) {
       const [name, t] = at.split("~");
       // the mark's colour: its slot (its default: the unset drawing's texel, unblended), or a fixed one
-      const tone = name === "ink" ? "#" + hex(INK) : name + (await markDefault(d, i, L, on, Number(t) / 10));
+      const tone = name === "ink" ? "#" + hex(INK) : name + (await markDefault(d, i, on, Number(t) / 10));
       // (a glowing texture's marks are lit: lava's cracks)
       out.push(`${k}${m.emissiveMap ? "k" : "m"}${tone}${t === "10" ? "" : "~" + t}:${p}`);
     }
@@ -287,7 +287,7 @@ async function shapeOf(d, i, L, front, key) {
 }
 
 /** The colour a slot's mark is when the slot is unset: the unset drawing's texels there, unblended from its base. */
-async function markDefault(/** @type {Drawn} */ d, /** @type {number} */ i, /** @type {import("./raster.mjs").Layer} */ L, /** @type {Uint8Array} */ on, /** @type {number} */ t) {
+async function markDefault(/** @type {Drawn} */ d, /** @type {number} */ i, /** @type {Uint8Array} */ on, /** @type {number} */ t) {
   const slot = d.real && Object.entries(d.real).find(([k]) => k === "M");
   if (slot) return slot[1][1];
   const m = d.U[i];
