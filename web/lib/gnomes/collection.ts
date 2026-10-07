@@ -13,7 +13,7 @@
 // read for the faces: wear.ts askWorn), a few at a time, once a visit for
 // each chain and address.
 import { isAddress, type Chain } from "../chain";
-import { cap } from "../card";
+import { worldName } from "../card";
 import { wordOf, type Listed } from "./catalogue";
 import { makeShop, type Held } from "./shop";
 import { askWorn, wornKnown } from "./wear";
@@ -109,7 +109,7 @@ export function album(gnomes: readonly Gnome[], earned: Served["earned"], owned:
   const groups = (field: "home" | "archetype", label: (k: string) => string) =>
     [...new Set(gnomes.map((g) => g[field]))].map((k) => row(k, label(k), slots.filter((_, i) => gnomes[i][field] === k)));
   return {
-    worlds: groups("home", cap),
+    worlds: groups("home", worldName),
     tiers: TIER_ROWS.map(([t, label]) => row(t, label, t === "earned" ? earnedSlots : slots.filter((s) => s.tier === t))).filter((p) => p.of > 0),
     sets: groups("archetype", setLabel),
     have: ids.size + kinds.size,

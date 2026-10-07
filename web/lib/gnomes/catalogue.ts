@@ -5,7 +5,7 @@
 // read it (docs/gnomes/design.md, "For the screens").
 import { colourName, type Archetype, type Home, type Tier } from "./vocab";
 import { decode, type Traits } from "./codec";
-import { cap } from "../card";
+import { cap, worldName } from "../card";
 import type { Skin } from "../scene/gnome";
 
 /** The tiers a series sells, in id order within a wave. */
@@ -112,7 +112,7 @@ const word = wordOf;
  *  metadata attributes): what is there, plainly named, nothing that is not. */
 export function traitRows(t: Traits): { trait: string; value: string }[] {
   const rows: [string, string][] = [
-    ["Tier", t.tier], ["Home", t.home], ["Archetype", t.archetype],
+    ["Tier", t.tier], ["Home", worldName(t.home)], ["Archetype", t.archetype],
     ["Hat", `${colourName(t.hatColour ?? -1)} ${word(t.hat)}`], ["Beard", t.beard === "none" ? word("none") : `${colourName(t.hair ?? -1)} ${word(t.beard)}`],
     ["Body", t.pattern === "plain" ? colourName(t.body ?? -1) : `${colourName(t.body ?? -1)} ${t.pattern}, ${colourName(t.patternColour ?? -1)}`],
     ...t.accessories.map((a): [string, string] => ["Wears", word(a)]),
