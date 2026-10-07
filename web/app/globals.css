@@ -471,7 +471,6 @@ html, body {
   font: inherit;
   font-weight: 600;
   font-size: 15px;
-  line-height: 20px;
   text-align: center;
   padding: 4px 22px;
   min-height: var(--h); /* (a target a thumb can hit) */
