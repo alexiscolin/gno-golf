@@ -10,7 +10,7 @@ import fs from "node:fs";
 import { createHash } from "node:crypto";
 import * as THREE from "three";
 import { build, keysOf, loadWorld } from "./scene-harness.ts";
-import { host, lane, stateOf } from "./builder-fixture.ts";
+import { host, lane, rail, stateOf } from "./builder-fixture.ts";
 import { entry, loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
@@ -92,4 +92,31 @@ void test("a gust against the board's edge, its cannon with nowhere to stand up-
   const errs = validate(d, { host, palette, census }).issues.filter((i) => i.severity === "error").map((i) => `${i.rule} ${i.text}`);
   assert.deepEqual(errs.filter((e) => ROOM.test(e)).length, 1, errs.join("; "));
   assert.match(errs.find((e) => ROOM.test(e))!, /^E12 /);
+});
+
+// The serac's tower, its leaning top and snow cap included, seen from the play cameras (scene/sight.ts): the classic
+// follow camera at rest on the ball, as the game frames it on a computer and on a phone, with the ball anywhere on the
+// lane and at the cup. Where it would stand between that camera and the ball or the cup, the serac is refused.
+const VIEW = /stand between the player's camera and the ball/;
+
+void test("a serac whose tower would hide the ball from the player's camera: refused, said plainly (E12); the course's own pass", () => {
+  // a walled patch of rough in the middle of the lane, the serac just below it: its tower stands in the patch, and the
+  // lane goes on behind it, where the camera, from below, would look at a ball over its top
+  const box = (x0: number, y0: number, x1: number, y1: number) => [rail("k1", [x0, y0], [x1, y0]), rail("k2", [x1, y0], [x1, y1]), rail("k3", [x1, y1], [x0, y1]), rail("k4", [x0, y1], [x0, y0])];
+  const hidden = lane("mountain", [...box(12.5, 13, 17.5, 18.5), placePiece(entry("mountain/hazard/serac", palette)!, "x", [13, 19], { size: 4 })], 30, 30);
+  const errs = validate(hidden, { host, palette, census }).issues.filter((i) => i.severity === "error").map((i) => `${i.rule} ${i.text}`);
+  assert.equal(errs.filter((e) => VIEW.test(e)).length, 1, errs.join("; "));
+  assert.match(errs.find((e) => VIEW.test(e))!, /^E12 /);
+  // the same patch at the lane's top edge: nothing of the lane behind the tower, nothing hidden
+  const open = lane("mountain", [...box(12.5, 0, 17.5, 5.5), placePiece(entry("mountain/hazard/serac", palette)!, "x", [13, 6], { size: 4 })], 30, 30);
+  assert.deepEqual(validate(open, { host, palette, census }).issues.filter((i) => i.severity === "error").map((i) => i.text), []);
+  // mountain/15's three seracs, as they are
+  for (const l of fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n")) {
+    const [slot, , , hex] = l.split(" ");
+    if (slot !== "mountain/15" && slot !== "mountain/10") continue;
+    host.load(slot, hex);
+    host.setperiod(5967997);
+    const said = [...census(JSON.parse(host.state(slot)) as Hole).values()].filter((d) => d.by === "hidden" && (d.why === "view" || d.why === "room"));
+    assert.deepEqual(said, [], `${slot}: as it is`);
+  }
 });

@@ -164,7 +164,8 @@ function drawnAs(d: Draft, refs: Map<string, PieceRef[]>, palette: readonly Pale
     for (const r of rs) {
       const s = said.get(keyOf(r));
       if (!s) continue;
-      const why = s.by === "hidden" && s.why === "room" ? "has no room beside the lane for what stands by it (a cannon, an ice tower): leave it some room off the lane"
+      const why = s.by === "hidden" && s.why === "view" ? "would stand between the player's camera and the ball or the cup, its ice tower in the way: move it where nothing of the lane is behind its tower"
+        : s.by === "hidden" && s.why === "room" ? "has no room beside the lane for what stands by it (a cannon, an ice tower): leave it some room off the lane"
         : s.by === "hidden" ? `is not drawn (${s.why === "sea" ? "out in the sea" : s.why === "unreached" ? "out of every ball's reach" : s.why === "timed" ? "a timed wall alone" : "it has no area"})`
         : s.by === "tram" ? "is drawn as part of a tram line"
         : e.kind === "rail" && s.by === "bar" ? "is drawn as part of a bar: give it room from the other rails"
