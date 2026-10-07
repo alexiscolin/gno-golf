@@ -6,7 +6,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { host, hexOf, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { communityOf, dayOrder, HARD_KEY, keepLevel, keptLevel, knownOnly, knownVerdict, pageOf, playable, refused, shownOnly, sortHoles, verdictOf, VERDICT_KEY, type Verdict } from "../lib/community.ts";
+import { bornBefore, communityOf, DAY_TRIES, dayHole, dayOrder, HARD_KEY, keepLevel, keptLevel, knownOnly, knownVerdict, pageOf, playable, refused, shownOnly, sortHoles, verdictOf, VERDICT_KEY, type Verdict } from "../lib/community.ts";
 import { writeHole } from "../lib/builder/gg1.ts";
 import type { HoleRow } from "../lib/types.ts";
 import type { HoleIn } from "../lib/builder/types.ts";
@@ -28,9 +28,9 @@ const hostileHex = (() => {
 })();
 const goodHex = hexOf(lane("garden", []));
 
-function chainOf(data: Record<string, string>) {
+function chainOf(data: Record<string, string>, network = "dev") {
   const asked: string[] = [];
-  return { asked, holeData: (id: string) => (asked.push(id), Object.hasOwn(data, id) ? Promise.resolve(data[id]) : Promise.reject(new Error("no hole"))) };
+  return { asked, realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve(network), holeData: (id: string) => (asked.push(id), Object.hasOwn(data, id) ? Promise.resolve(data[id]) : Promise.reject(new Error("no hole"))) };
 }
 const deps = { load: () => Promise.resolve({ host, census }) };
 
@@ -53,6 +53,22 @@ void test("a version is judged once a browser: its verdict kept by the sha of it
   await verdictOf(chain, `${A}/bad2/v1`, counting);
   assert.equal(judged, 1, "the same data under another id: its sha's verdict, not judged again");
   assert.ok(Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? "").some((k) => k.startsWith(VERDICT_KEY)), "kept in this browser");
+});
+
+void test("a version's verdict is kept by its id on its chain (its data never changes): known, its data never read again; an alias's always read", async () => {
+  const data = { [`${A}/good/v1`]: goodHex, [`${A}/good`]: goodHex };
+  const chain = chainOf(data);
+  assert.deepEqual(await verdictOf(chain, `${A}/good/v1`, deps), { ok: true });
+  assert.deepEqual(chain.asked, [`${A}/good/v1`]);
+  assert.deepEqual(await verdictOf(chain, `${A}/good/v1`, deps), { ok: true });
+  assert.deepEqual(await knownVerdict(chain, `${A}/good/v1`), { ok: true });
+  assert.deepEqual(await knownOnly(chain, [rowOf(`${A}/good/v1`)]).then((r) => r.map((h) => h.id)), [`${A}/good/v1`]);
+  assert.deepEqual(chain.asked, [`${A}/good/v1`], "known: no read");
+  await verdictOf(chain, `${A}/good`, deps);
+  await verdictOf(chain, `${A}/good`, deps);
+  assert.deepEqual(chain.asked.slice(1), [`${A}/good`, `${A}/good`], "an alias names a new version once one is published: read each time");
+  const other = chainOf({ [`${A}/good/v1`]: hostileHex }, "test-2");
+  assert.equal((await verdictOf(other, `${A}/good/v1`, deps)).ok, false, "the same id on another chain: its own data judged");
 });
 
 void test("knownVerdict: a verdict this browser already has, never a judging (the phone's /build screen loads no builder.wasm)", async () => {
@@ -130,16 +146,52 @@ void test("a list's page: its verified rows, said to be judging until every row 
 
 const rowOf = (id: string, over: Partial<HoleRow> = {}): HoleRow => ({ id, name: id, official: false, plays: 0, best: 0, proBest: 0, par: 3, world: "garden", order: 0, next: "", ...over });
 
-void test("dayOrder: the listed holes from the one the UTC day's hash picks, on round the list: the same for everyone that day", () => {
-  const rows = ["a", "b", "c", "d", "e", "f", "g"].map((x) => rowOf(`${A}/${x}/v1`));
+const listed = (x: string, v = 1) => rowOf(`${A}/${x}/v${v}`, { slot: `${A}/${x}` });
+
+void test("dayOrder: the listed holes in the UTC day's own order (each alias hashed with the day): the same for everyone that day, a hole published, versioned or taken down moving no other", () => {
+  const rows = ["a", "b", "c", "d", "e", "f", "g"].map((x) => listed(x));
   const day = Date.UTC(2026, 9, 7, 0, 0, 1);
   assert.deepEqual(dayOrder([], day), []);
-  const order = dayOrder(rows, day), at = rows.indexOf(order[0]);
-  assert.deepEqual(order, [...rows.slice(at), ...rows.slice(0, at)], "every hole once, from the day's pick on: the next passed hole if the pick is not");
-  assert.deepEqual(dayOrder(rows, Date.UTC(2026, 9, 7, 23, 59, 59)), order, "all that UTC day");
-  assert.deepEqual(dayOrder([...rows], day + 3600e3), order, "whoever asks: only the list and the day count");
+  const order = dayOrder(rows, day), ids = (hs: readonly HoleRow[]) => hs.map((h) => h.id);
+  assert.deepEqual(ids(order).sort(), ids(rows).sort(), "every hole once");
+  assert.deepEqual(ids(dayOrder(rows, Date.UTC(2026, 9, 7, 23, 59, 59))), ids(order), "all that UTC day");
+  assert.deepEqual(ids(dayOrder([...rows].reverse(), day + 3600e3)), ids(order), "whoever asks, the list in any order");
+  assert.deepEqual(ids(dayOrder([listed("new"), ...rows], day).filter((h) => h.id !== `${A}/new/v1`)), ids(order), "a hole published: the others' order unchanged");
+  assert.deepEqual(ids(dayOrder(rows.filter((h) => h.id !== order[3].id), day)), ids(order).filter((id) => id !== order[3].id), "one taken down: the others' order unchanged");
+  const versioned = dayOrder(rows.map((h) => (h.id === order[0].id ? listed(h.id.split("/")[1], 2) : h)), day);
+  assert.equal(versioned[0].slot, order[0].slot, "a new version of a hole: in its place");
   const week = new Set(Array.from({ length: 7 }, (_, i) => dayOrder(rows, day + i * 864e5)[0].id));
   assert.ok(week.size > 1, "it changes from day to day");
+});
+
+void test("dayHole: the first candidate published before the day began that the rules pass; one not known yet holds the day back, one not read says so", () => {
+  const [a, b, c] = ["a", "b", "c"].map((x) => listed(x));
+  const ok = { ok: true as const }, no = { ok: false as const, why: "x" };
+  const born = (m: [HoleRow, boolean | null][]) => new Map(m.map(([h, v]) => [h.slot ?? "", v]));
+  const v = (m: [HoleRow, Verdict | null][]) => new Map(m.map(([h, x]) => [h.id, x]));
+  assert.deepEqual(dayHole([a, b, c], born([[a, false], [b, true]]), v([[b, ok]])), { day: b, unread: false }, "a: published today, never the day's");
+  assert.deepEqual(dayHole([a, b, c], born([[a, true], [b, true]]), v([[a, no], [b, ok]])), { day: b, unread: false }, "a: refused, the next");
+  assert.deepEqual(dayHole([a, b, c], born([[a, true]]), v([])), { day: null, unread: false }, "a not judged yet: the day waits");
+  assert.deepEqual(dayHole([a, b, c], born([[a, true], [b, true]]), v([[a, null], [b, ok]])), { day: null, unread: true }, "a not read: never skipped");
+  assert.deepEqual(dayHole([a, b, c], born([[a, null]]), v([])), { day: null, unread: true }, "when a was published not read: never skipped");
+  const many = Array.from({ length: DAY_TRIES + 1 }, (_, i) => listed(`h${i}`));
+  assert.deepEqual(dayHole(many, born(many.map((h) => [h, true])), v(many.map((h, i) => [h, i < DAY_TRIES ? no : ok]))), { day: null, unread: false }, "DAY_TRIES refused: none today");
+});
+
+void test("bornBefore: whether a hole was first published before a time (its oldest version's block), kept once known (it never changes); not read: it throws", async () => {
+  const alias = `${A}/a`, at = Date.UTC(2026, 9, 7);
+  let reads = 0, down = false;
+  const chain = {
+    realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve("dev"),
+    versions: () => (reads++, down ? Promise.reject(new Error("node down")) : Promise.resolve({ version: 1, slot: alias, versions: [{ id: `${alias}/v1`, v: 1, height: 7, by: A, sha: "", note: "", next: `${alias}/v2` }, { id: `${alias}/v2`, v: 2, height: 90, by: A, sha: "", note: "", next: "" }] })),
+    blockTime: (h: number) => Promise.resolve(h === 7 ? at - 1 : at + 1),
+  };
+  down = true;
+  await assert.rejects(bornBefore(chain, alias, at), /node down/);
+  down = false;
+  assert.equal(await bornBefore(chain, alias, at), true, "its first version's block, not its latest's");
+  assert.equal(await bornBefore(chain, alias, at - 1), false);
+  assert.equal(reads, 2, "known: not read again");
 });
 
 void test("sortHoles: newest as the chain lists them, most played, hardest by the meter's level (not rated yet: last)", () => {

@@ -2,10 +2,10 @@
 // (components/common.ts holeLink, on the site's address: a community hole by
 // its id, a dare with the sharer's address), and its card is the 3D preview
 // with its name, world, par and author over it, built on gno.land.
-import { holeLink, shortAddr } from "@/components/common";
+import { holeLink } from "@/components/common";
 import { siteURL } from "@/lib/site";
 import { MAX_TITLE } from "@/lib/builder/draft";
-import { worldName } from "@/lib/builder/rules";
+import { holeByline } from "@/lib/builder/holes";
 
 /** A file saved through a link the author clicked (a computer's download). */
 export function saveFile(blob: Blob, name: string) {
@@ -19,10 +19,10 @@ export function saveFile(blob: Blob, name: string) {
 /** The link to play a published hole (by: the address whose best a friend is dared to beat). */
 export const holeLinkOf = (id: string, by = ""): string => siteURL(holeLink({ id, place: 0 }, "", by, "hole"));
 
-/** The card's three lines: the name (cut at 40 with an ellipsis), the world, par and author, and where it was built. */
+/** The card's three lines: the name (cut at 40 with an ellipsis), its byline (holeByline), and where it was built. */
 export function cardLines({ name, world, par, author }: { name: string; world: string; par: number; author: string }): [string, string, string] {
   const n = [...name];
-  return [n.length > MAX_TITLE ? `${n.slice(0, MAX_TITLE - 1).join("")}…` : name, `${worldName(world)} · par ${par} · by ${shortAddr(author)}`, "Built on gno.land"];
+  return [n.length > MAX_TITLE ? `${n.slice(0, MAX_TITLE - 1).join("")}…` : name, holeByline({ author, world, par }), "Built on gno.land"];
 }
 
 /** The card: the preview's picture (a canvas just drawn) with a paper strip of cardLines under it, as a PNG. */

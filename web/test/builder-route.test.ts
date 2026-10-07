@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { builderOn, onComputer, PHONE_QUERY } from "../lib/builder/route.ts";
-import { authorOf, cupsLink, listHoles, playLink } from "../lib/builder/holes.ts";
+import { authorOf, cupsLink, holeByline, listHoles, playLink } from "../lib/builder/holes.ts";
 import type { HoleRow } from "../lib/types.ts";
 
 const WEB = new URL("../", import.meta.url).pathname;
@@ -92,4 +92,8 @@ void test("the phone lists only the community holes this browser already passed 
   const src = fs.readFileSync(path.join(WEB, "components/builder/PhoneBuilder.tsx"), "utf8");
   assert.match(src, /knownOnly\(/, "its community list: the known verdicts only");
   assert.doesNotMatch(src, /verdictOf\(/, "never a judging");
+});
+
+void test("holeByline: a community hole's line under its name, the same on the game's list, the phone's and the share card", () => {
+  assert.equal(holeByline({ author: "g1" + "a".repeat(38), world: "island", par: 4 }), "by g1aaaaaa…aaaa · Island · par 4");
 });

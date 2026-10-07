@@ -18,7 +18,7 @@ import { MAX_NOTE, parseDraft, type Draft } from "./draft";
 import { authorOf } from "./holes";
 import { shortAddr, type Chain } from "../chain";
 import type { BuilderHost } from "./wasm";
-import { loadTakedown, takenDown } from "../takedown";
+import { takedownOf, takenDown } from "../takedown";
 
 /** A file opened: its draft as it is, and why it is broken ("" if it passes every rule). */
 export interface Opened {
@@ -96,10 +96,10 @@ export function remixOf(d: Draft, id: string): Draft {
  * the chain, the site's takedown list with it (one taken down never opens),
  * opened as the Builder opens any published hole (fromPublished); or why not.
  */
-export async function remixFrom(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, get?: Parameters<typeof loadTakedown>[1]): Promise<Draft | string> {
+export async function remixFrom(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, get?: Parameters<typeof takedownOf>[1]): Promise<Draft | string> {
   let d: Draft | string;
   try {
-    const [hex, taken] = await Promise.all([chain.holeData(id), loadTakedown(chain, get)]);
+    const [hex, taken] = await Promise.all([chain.holeData(id), takedownOf(chain, get)]);
     d = await fromPublished(hex, host, id, null, census, taken);
   } catch {
     return "The chain has no hole there, or could not be read.";

@@ -7,71 +7,90 @@
 // author), in the order asked: newest (the chain's order), most played, or
 // hardest (the Builder's meter, worked out in this browser, in its worker,
 // for the page shown only, each version once). A hole of the day above them,
-// the same for everyone (lib/community.ts dayOrder: the UTC day's hash, no
+// the same for everyone all day (lib/community.ts dayOrder and dayHole: the
+// holes published before the UTC day began, in the day's hash order, no
 // server). On a computer, "Remix" opens a hole in the Builder as a new draft,
 // its maker credited (the Builder never loads on a phone). Every hole listed,
 // the day's too, is first judged by the Builder's own rules (verdictOf), and
 // none the site took down is ever in the list (communityOf).
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { HoleRow } from "@/lib/types";
 import { sound } from "@/lib/feel";
 import { Button, Segmented } from "@/components/ui";
 import { authorFirst, authorMark, chainQuery, plural } from "@/components/common";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
-import { authorOf, remixLink } from "@/lib/builder/holes";
+import { authorOf, holeByline, remixLink } from "@/lib/builder/holes";
 import { LEVELS, type Level } from "@/lib/builder/levels";
 import type { Meter } from "@/lib/builder/meter";
-import { savedOnAll, statsOf, type SavedOn } from "@/lib/builder/rewards";
+import { savedOnMore, statsOf, type SavedRead } from "@/lib/builder/rewards";
 import { builderOn, onComputer } from "@/lib/builder/route";
-import { worldName } from "@/lib/builder/rules";
-import type { MapHole } from "@/lib/duel";
-import { shortAddr, type Chain } from "@/lib/chain";
-import { dayOrder, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdicts } from "@/lib/community";
+import { inTurn, type MapHole } from "@/lib/duel";
+import type { Chain } from "@/lib/chain";
+import { aliasOf, bornBefore, DAY_TRIES, dayHole, dayOrder, dayStart, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
 
 /** How many community holes a page judges and lists, one more page on each "Show more". */
 const PAGE = 24;
 const SORTS: readonly (readonly [SortBy, string])[] = [["new", "Newest"], ["played", "Most played"], ["hard", "Hardest"]];
-/** How many holes the day's pick tries, at most, for one the Builder's rules pass. */
-const DAY_TRIES = 8;
+/** How many community holes are judged at once (their data read side by side). */
+const JUDGE_AT_ONCE = 4;
 
 export default function Community({ community, chain, onPlay }: {
   community: readonly HoleRow[];
-  chain: Pick<Chain, "bests" | "holeData" | "state" | "savedOn"> | null;
+  chain: Pick<Chain, "bests" | "blockTime" | "holeData" | "chainId" | "realm" | "state" | "savedOn" | "versions"> | null;
   onPlay: (id: string) => void;
 }) {
   const [by, setBy] = useState<SortBy>("new");
   const [shown, setShown] = useState(PAGE);
-  // the day's candidates, once a visit (they change at midnight UTC, not under the player)
-  const candidates = useMemo(() => dayOrder(community, Date.now()).slice(0, DAY_TRIES), [community]);
+  // the day's candidates, in the order of the visit's UTC day (it changes at midnight UTC, not under the player)
+  const [now] = useState(() => Date.now());
+  const candidates = useMemo(() => dayOrder(community, now), [community, now]);
   // most played: the whole list ordered first, then paged; hardest: the page as shown, once each of it is measured
   const ordered = useMemo(() => (by === "played" ? sortHoles(community, "played", new Map()) : community), [community, by]);
   // each hole about to be shown judged by the Builder's own rules (lib/community.ts: anyone can publish
-  // past the Builder with gnokey), one after the other, once a version a browser: only those it passes are
+  // past the Builder with gnokey), a few at a time, once a version a browser: only those it passes are
   // listed; the day's first. One whose data or the rules could not be read now has no verdict (null): not
   // shown, never skipped for the day's, asked again on Try again
   const [verdicts, setVerdicts] = useState<Verdicts>(new Map());
+  // whether each candidate's alias was published before the day began (by alias; null: not read now)
+  const [born, setBorn] = useState<ReadonlyMap<string, boolean | null>>(new Map());
   const [tries, setTries] = useState(0);
   useEffect(() => {
     if (!chain) return;
     let live = true;
+    const turn = inTurn(JUDGE_AT_ONCE), asked = new Map<string, Promise<Verdict | null>>();
+    const judge = (h: HoleRow): Promise<Verdict | null> => {
+      if (verdicts.has(h.id)) return Promise.resolve(verdicts.get(h.id) ?? null);
+      let p = asked.get(h.id);
+      if (!p) asked.set(h.id, (p = turn(() => verdictOf(chain, h.id).catch(() => null)).then((v) => (live && setVerdicts((m) => new Map(m).set(h.id, v)), v))));
+      return p;
+    };
+    const bornOf = (h: HoleRow): Promise<boolean | null> => {
+      const a = aliasOf(h);
+      return born.has(a)
+        ? Promise.resolve(born.get(a) ?? null)
+        : bornBefore(chain, a, dayStart(now)).catch(() => null).then((b) => (live && setBorn((m) => new Map(m).set(a, b)), b));
+    };
+    // the day's: its candidates in turn (those published today passed over), until one passes, DAY_TRIES judged
+    // at most (or one is not read: the day waits for it), asked first; the page's beside them (as dayHole picks)
     void (async () => {
-      const judged = new Map(verdicts);
-      const judge = async (h: HoleRow) => {
-        const v = judged.has(h.id) ? (judged.get(h.id) ?? null) : await verdictOf(chain, h.id).catch(() => null);
-        if (live && !judged.has(h.id)) judged.set(h.id, v), setVerdicts((m) => new Map(m).set(h.id, v));
-        return v;
-      };
-      // the day's: its candidates in turn, until one passes (or one is not read: the day waits for it)
-      for (const h of candidates) if (!live || (await judge(h))?.ok !== false) break;
-      for (const h of ordered.slice(0, shown)) {
+      let tried = 0;
+      for (const h of candidates) {
         if (!live) return;
-        await judge(h);
+        const b = await bornOf(h);
+        if (b === false) continue;
+        if (!b || (await judge(h))?.ok !== false || ++tried >= DAY_TRIES) return;
       }
     })();
+    for (const h of ordered.slice(0, shown)) void judge(h);
     return () => void (live = false);
-  }, [chain, ordered, candidates, shown, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts: judged once each, not again as they fill)
+  }, [chain, ordered, candidates, shown, tries]); // eslint-disable-line react-hooks/exhaustive-deps -- (verdicts, born: asked once each, not again as they fill)
   // Try again: the holes not read asked anew
-  const retry = () => (setVerdicts((m) => new Map([...m].filter(([, v]) => v !== null))), setTries((n) => n + 1));
+  const retry = () => {
+    const known = <T,>(m: ReadonlyMap<string, T | null>) => new Map([...m].filter(([, v]) => v !== null));
+    setVerdicts(known);
+    setBorn(known);
+    setTries((n) => n + 1);
+  };
   const page = pageOf(ordered, shown, verdicts);
   const ids = page.rows.map((h) => h.id).join(" ");
   // whether each hole listed has been holed by its author (its best on the chain), read once a hole;
@@ -88,20 +107,19 @@ export default function Community({ community, chain, onPlay }: {
     }
     return () => void (live = false);
   }, [chain, page.judging, ids]); // eslint-disable-line react-hooks/exhaustive-deps -- (holed: read once each, not again as it fills)
-  // the players of the page's holes and the day's (one read a dozen holes), as the page changes
-  const [saved, setSaved] = useState<SavedOn | null>(null);
-  // the day's hole: the first candidate the rules pass, once every one before it is judged (and read)
-  const first = candidates.findIndex((h) => verdicts.get(h.id)?.ok !== false);
-  const day = first >= 0 && verdicts.get(candidates[first].id)?.ok ? candidates[first] : null;
-  const unread = page.unread || (first >= 0 && verdicts.get(candidates[first].id) === null);
+  // the players of the page's holes and the day's (one read a dozen holes), once the page is judged, each hole read once
+  const [saved, setSaved] = useState<SavedRead | null>(null);
+  // the day's hole: the first candidate published before the day that the rules pass, once every one before it is known
+  const today = dayHole(candidates, born, verdicts), day = today.day, unread = page.unread || today.unread;
   const seen = [...(day ? [day.id] : []), ...page.rows.map((h) => h.id)];
   useEffect(() => {
-    if (!chain || !seen.length) return;
+    if (!chain || page.judging || !seen.length) return;
     let live = true;
-    void savedOnAll(chain, seen).then((s) => live && setSaved(s), () => {});
+    void savedOnMore(chain, saved, seen).then((s) => live && setSaved(s), () => {});
     return () => void (live = false);
-  }, [chain, seen.join(" ")]); // eslint-disable-line react-hooks/exhaustive-deps -- (seen: its ids, not the array)
-  const levels = useLevels(chain, by === "hard" ? page.rows : []);
+  }, [chain, page.judging, seen.join(" ")]); // eslint-disable-line react-hooks/exhaustive-deps -- (seen: its ids, not the array; saved: read once each, not again as it fills)
+  // the levels measured once the page is judged (not one meter run per verdict as it fills)
+  const levels = useLevels(chain, by === "hard" && !page.judging ? page.rows : []);
   const rating = by === "hard" && page.rows.some((h) => !levels.has(h.id));
   const settled = !page.judging && page.rows.every((h) => holed.has(h.id) || !authorOf(h.id));
   const listed = by === "hard" ? (rating ? page.rows : sortHoles(page.rows, "hard", levels)) : by === "new" && settled ? authorFirst(page.rows, holed) : page.rows;
@@ -110,7 +128,7 @@ export default function Community({ community, chain, onPlay }: {
   const [remix, setRemix] = useState(false);
   useEffect(() => setRemix(builderOn() && onComputer((q) => window.matchMedia(q).matches)), []);
   const card = (h: HoleRow, big = false) => (
-    <HoleCard h={h} big={big} map={maps.get(h.id)} players={saved && statsOf(h, saved, authorOf(h.id) ?? "")} mark={authorMark(holed.get(h.id))}
+    <HoleCard h={h} big={big} map={maps.get(h.id)} players={saved && statsOf(h, saved.saved, authorOf(h.id) ?? "")} mark={authorMark(holed.get(h.id))}
       level={by === "hard" ? levels.get(h.id) : undefined} remix={remix} onPlay={() => (sound("select"), onPlay(h.id))} />
   );
   return (
@@ -152,7 +170,7 @@ function HoleCard({ h, big, map, players, mark, level, remix, onPlay }: {
       <span className="ccard__map">{map ? <HoleMap hole={map} className="ccard__svg" /> : <NoMap className="ccard__svg" />}</span>
       <span className="ccard__text">
         <b>{h.name || h.slot || h.id}</b>
-        <small>by {shortAddr(author)} · {worldName(h.world)} · par {h.par}</small>
+        <small>{holeByline({ author, world: h.world, par: h.par })}</small>
         <small>
           {players ? `${players.players}${players.more ? "+" : ""} ${plural("player", players.more ? 2 : players.players)}` : "…"}
           {level != null && ` · ${LEVELS[level]}`}
@@ -171,30 +189,31 @@ function HoleCard({ h, big, map, players, mark, level, remix, onPlay }: {
 /** No worker in this browser: nothing measured. */
 const NO_METER: Meter = { ask: () => {}, carry: () => Promise.resolve(null), rate: () => Promise.resolve(null), stop: () => {} };
 
-/** The meter's level of each of these holes (null: not measured), each version measured once a browser (keptLevel), one after the other in the meter's worker, loaded only once one is asked. */
+/** The meter's level of each of these holes (null: not measured), each version measured once a browser (keptLevel), one after the other in the meter's worker, loaded only once one is asked and kept till the list goes. */
 function useLevels(chain: Pick<Chain, "holeData"> | null, rows: readonly HoleRow[]) {
   const [levels, setLevels] = useState<ReadonlyMap<string, Level | null>>(new Map());
+  const meter = useRef<Meter | null>(null);
+  useEffect(() => () => (meter.current?.stop(), void (meter.current = null)), []);
   const ids = rows.map((h) => h.id).join(" ");
   useEffect(() => {
     if (!chain || !ids) return;
-    let live = true, meter: Meter | null = null;
+    let live = true;
     void (async () => {
       for (const id of ids.split(" ")) {
         if (!live) return;
         if (levels.has(id)) continue;
         let level = keptLevel(id);
         if (level == null) {
-          const m = (meter ??= (await import("@/lib/builder/meter")).makeMeter(() => {}) ?? NO_METER);
+          const { makeMeter } = await import("@/lib/builder/meter");
+          const m = (meter.current ??= makeMeter(() => {}) ?? NO_METER);
           level = await chain.holeData(id).then((hex) => m.rate(hex), () => null);
           if (level != null) keepLevel(id, level);
         }
-        if (live) setLevels((m) => new Map(m).set(id, level));
+        // (a level measured is kept and shown, even if the rows changed meanwhile)
+        setLevels((m) => new Map(m).set(id, level));
       }
     })();
-    return () => {
-      live = false;
-      meter?.stop();
-    };
+    return () => void (live = false);
   }, [chain, ids]); // eslint-disable-line react-hooks/exhaustive-deps -- (levels: measured once each, not again as they fill)
   return levels;
 }
