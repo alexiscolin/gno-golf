@@ -54,4 +54,12 @@
 .galbum__slot--miss svg { width: 70%; height: 70%; fill: rgba(var(--ink-rgb), .12); }
 .galbum__slot:focus-visible { outline: none; box-shadow: var(--ring-shadow); }
 .galbum .more { font-size: 13px; }
+/* another player's album, folded to its head (their gnomes first), opened by it */
+.galbum--fold { display: block; }
+.galbum--fold > summary { list-style: none; cursor: pointer; }
+.galbum--fold > summary::-webkit-details-marker { display: none; }
+.galbum--fold > summary h2::after { content: " ▸"; font-size: .8em; }
+.galbum--fold[open] > summary h2::after { content: " ▾"; }
+.galbum--fold > summary:focus-visible { outline: var(--ring); outline-offset: 4px; border-radius: 8px; }
+.galbum--fold[open] > * + * { margin-top: 10px; }
 @media (max-width: 600px) { .galbum { padding: 10px 12px; } .galbum__slots { grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 5px; } }

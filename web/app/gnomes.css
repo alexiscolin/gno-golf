@@ -56,9 +56,10 @@
 @media (max-width: 700px) { .shop .front__head { gap: 12px; } } /* (the line clear of the corner buttons) */
 /* the shopkeeper peeking beside the title, out of the flow (the head no taller), clear of the corner buttons */
 .shop .front__head { position: relative; }
-.shopkeeper { position: absolute; top: -18px; left: calc(50% + 94px); width: 54px; height: 54px; pointer-events: none; }
+.shopkeeper { position: absolute; top: -36px; left: calc(50% + 84px); width: 76px; height: 76px; pointer-events: none; }
 .shopkeeper .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-@media (max-width: 700px) { .shopkeeper { top: -36px; left: calc(50% + 46px); width: 44px; height: 44px; } } /* (over the title's end, between the corner buttons) */
+/* a phone: no room beside the title between the corner buttons; he peeks from behind its end, the letters over him */
+@media (max-width: 700px) { .shopkeeper { top: -34px; left: calc(50% + 30px); width: 64px; height: 64px; z-index: 0; } .shop .worlds__title { position: relative; z-index: 1; } } /* (over the title's end, between the corner buttons) */
 .shop .worlds__title { margin: 0 56px; font-size: 30px; line-height: 1.15; --ink-w: 4px; --ink-drop: 2px; }
 
 /* the sale in one line: a little fairway from the tee to the flag, the ball at the share that found a player, the

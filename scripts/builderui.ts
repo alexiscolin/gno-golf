@@ -220,8 +220,13 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
   const centre = (sel: string) => c.js<[number, number]>(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   const post = await c.js<[number, number]>(`(() => { const g = document.querySelector("[data-piece^='p']"); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-  const bin = await centre("[data-bin]");
+  // the bin shows only while a piece is carried
+  assert.equal(await c.js(`!!document.querySelector("[data-bin]")`), false, "no bin while nothing is carried");
   await mouse("mousePressed", ...post);
+  await mouse("mouseMoved", post[0] + 4, post[1] + 4);
+  await sleep(200);
+  assert.equal(await c.js(`!!document.querySelector("[data-bin]")`), true, "the bin while a piece is carried");
+  const bin = await centre("[data-bin]");
   for (let k = 1; k <= 6; k++) {
     await mouse("mouseMoved", post[0] + ((bin[0] - post[0]) * k) / 6, post[1] + ((bin[1] - post[1]) * k) / 6);
     await sleep(50);
@@ -229,6 +234,7 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   await mouse("mouseReleased", ...bin);
   await sleep(1200);
   assert.equal(await c.js(`document.querySelectorAll("[data-piece]").length`), n - 2, "a post dropped on the bin is removed");
+  assert.equal(await c.js(`!!document.querySelector("[data-bin]")`), false, "the bin gone once let go");
   // the cup taken by its flag, the tee by its edge: each moved, the board not panned (a hit area bigger than the drawing)
   // (an end's place on the board, as its label says it; its badge's middle on the screen)
   const at = (sel: string) => c.js<string>(`/\\(.*\\)/.exec(document.querySelector(${JSON.stringify(sel)}).closest("[data-end]").getAttribute("aria-label"))[0]`);

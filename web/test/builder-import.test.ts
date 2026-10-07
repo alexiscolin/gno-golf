@@ -14,6 +14,9 @@ import { exportDraft } from "../lib/builder/draft.ts";
 import { canonicalHex } from "../lib/builder/proof.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { census } from "../lib/builder/drawn.ts";
+import { loadPalette } from "../lib/builder/palette.ts";
+import { validate } from "../lib/builder/pipeline.ts";
+import { testGate } from "../lib/builder/editor.ts";
 import type { Hole } from "../lib/scene/data.ts";
 
 const holes = new Map(fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n").map((l) => l.split(" ")).map(([slot, , , hex]) => [slot, hex]));
@@ -21,20 +24,26 @@ const A = "g1" + "a".repeat(38), B = "g1" + "b".repeat(38);
 
 void test("fromFile: a draft whole and of its world's pieces; else why", async () => {
   const d = lane("garden", []);
-  assert.deepEqual(await fromFile(exportDraft(d), host, census), d);
+  assert.deepEqual(await fromFile(exportDraft(d), host, census), { draft: d, broken: "" });
   assert.equal(await fromFile("{", host, census), "The file is not a draft.");
   const foreign = { ...d, pieces: [{ ...d.pieces[0], entry: "island/post/palm" }] };
   assert.equal(await fromFile(exportDraft(foreign), host, census), "Piece r1 is no piece of the Garden's.");
 });
 
-void test("fromFile, fromPublished: an opened hole goes through the editor's own checks, the render census with them; one they refuse never opens", async () => {
+void test("fromFile, fromPublished: an opened hole goes through the editor's own checks, the render census with them; a file they refuse opens as it is, said broken, a published one never", async () => {
   const d = lane("garden", []), drawn: Hole[] = [], spy = (s: Hole) => (drawn.push(s), census(s));
   // a bumper on the cup: every piece the palette's, every number in range, and refused all the same (E3), as the board refuses it
   const onCup = { ...d, pieces: [...d.pieces, { id: "p1", entry: "*/post/bumper", geometry: { t: "post" as const, c: d.pin, r: 0.8 }, params: { bounce: 1.2 }, clock: { k: "fixed" as const } }] };
-  const refused = await fromFile(exportDraft(onCup), host, spy);
-  assert.match(typeof refused === "string" ? refused : "opened", /^This draft breaks the Builder's rules: The cup is inside the bumper/);
+  const broken = await fromFile(exportDraft(onCup), host, spy);
+  assert.ok(typeof broken === "object", "a broken file opens");
+  if (typeof broken === "string") return;
+  assert.deepEqual(broken.draft, onCup, "as it is, nothing changed");
+  assert.equal(broken.broken, "This draft breaks the Builder's rules: The cup is inside the bumper: move the cup or the bumper. Fix what is marked: Prove and Publish stay locked until it passes.");
+  // never proved nor published while broken: the editor's gate (and every edit judged against it as it was: never worse)
+  const palette = await loadPalette("garden");
+  assert.match(testGate(onCup, { of: onCup, v: validate(onCup, { host, palette, census }) }), /^Fix \d+ first$/);
   drawn.length = 0;
-  assert.deepEqual(await fromFile(exportDraft(d), host, spy), d);
+  assert.deepEqual(await fromFile(exportDraft(d), host, spy), { draft: d, broken: "" });
   assert.equal(drawn.length, 1, "the file's hole drawn for the census");
   drawn.length = 0;
   const opened = await fromPublished(canonicalHex(STARTERS.garden.straight, host)!, host, `${B}/lane/v1`, A, spy);

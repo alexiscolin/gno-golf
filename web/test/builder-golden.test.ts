@@ -11,7 +11,7 @@ import fs from "node:fs";
 import { build, loadWorld } from "./scene-harness.ts";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { cases, garden, put } from "./builder-broken.ts";
-import { validate } from "../lib/builder/pipeline.ts";
+import { atFault, validate } from "../lib/builder/pipeline.ts";
 import { plainOf, refusalOf } from "../lib/builder/explain.ts";
 import { checkHole, type EntryOf } from "../lib/builder/checks.ts";
 import { FIELD } from "../lib/builder/rules.ts";
@@ -187,4 +187,12 @@ void test("E4 on an edit: closing the tee in or the cup off is refused, dragged 
   const across = dropHandle(withBar, "y", "b", [8.5, 20.5], ctx, ctx);
   if ("why" in across) assert.match(across.why, /^This closes the tee in|^The ball can't get between/, "the bar's drop refused, said why");
   else assert.deepEqual(said(across), [], "or stopped where the hole holds");
+});
+
+void test("atFault: every piece an error is about, both of an overlap, none of a hole that passes", () => {
+  const two = lane("garden", [put("x", "*/post/rock", [12, 9]), put("y", "*/post/stump", [12.5, 9]), put("z", "*/post/rock", [20, 4])]);
+  const v = validate(two, ctx);
+  assert.deepEqual([...atFault(v, two.pieces.map((p) => p.id))].sort(), ["x", "y"]);
+  const fine = lane("garden", []);
+  assert.deepEqual([...atFault(validate(fine, ctx), fine.pieces.map((p) => p.id))], []);
 });

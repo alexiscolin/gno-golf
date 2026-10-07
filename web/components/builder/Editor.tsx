@@ -16,7 +16,7 @@ import { retitle } from "@/lib/builder/templates";
 import { frame } from "@/lib/builder/gg1";
 import { notTurned, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
-import { validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
+import { atFault, validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
 import { canonicalHex, proofKey, provedAs } from "@/lib/builder/proof";
 import { dropped, toCarry, weatherName, withCarried } from "@/lib/builder/carry";
 import { FIELD, listed } from "@/lib/builder/rules";
@@ -52,7 +52,7 @@ const WORLDS = Object.keys(FIELD);
 /** Quick shots kept on the board: the latest and three faded. */
 const SHOTS_KEPT = 4;
 
-export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish, onEstimate = () => {}, hints = false, onHinted = () => {} }: {
+export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish, onEstimate = () => {}, hints = false, onHinted = () => {}, opened = "" }: {
   host: BuilderHost;
   first: Draft;
   author: string | null;
@@ -68,6 +68,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   /** the first run's three hints shown (Hints), and their Got it */
   hints?: boolean;
   onHinted?: () => void;
+  /** a file opened as it is: why it is broken, said until it passes ("" none) */
+  opened?: string;
 }) {
   // one session (its undo history) while the editor is open: a step saved and handed back is not a new draft (its key opens a new one)
   const [session] = useState(() => makeSession(first));
@@ -78,6 +80,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [selected, setSelected] = useState<string | null>(null);
   const [show, setShow] = useState<{ id: string; n: number } | null>(null); // Show me: the piece to frame
   const [armed, setArmed] = useState<PaletteEntry | null>(null);
+  const [binShown, setBinShown] = useState(false); // a piece carried on the board: the palette's bin shown
   const [said, setSaid] = useState("");
   const [checked, setChecked] = useState<{ of: Draft; v: Validated; state: Hole | null } | null>(null);
   const [fine, setFine] = useState(false);
@@ -305,7 +308,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
 
   const v = checked?.v, fresh = checked?.of === kept;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
-  const bad = new Set(errors.map((i) => i.piece).filter((x): x is string => !!x));
+  const bad = v ? atFault(v, kept.pieces.map((p) => p.id)) : new Set<string>(); // (both of an overlap, each piece an error meets)
   const testOff = carrying === kept ? "Checking…" : testGate(kept, checked);
   const off = palette ? offAtLimit(draft, palette) : new Map<string, string>();
   const step: Step = "edit";
@@ -328,11 +331,12 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         onRoll={() => (sound("blip"), session.edit((k) => frame(retitle(k, suggestName(k.world, seed, roll)))), setRoll((n) => n + 1), refresh())} />
       {palette && quick && full ? (
         <>
-          <Palette world={draft.world} palette={palette} armed={armed} off={off} onArm={setArmed} chosen={looks} onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />
+          <Palette world={draft.world} palette={palette} armed={armed} off={off} bin={binShown} onArm={setArmed} chosen={looks} onChoose={(tile, id) => setChosen({ world: draft.world, looks: { ...looks, [tile]: id } })} />
           <div className="centre">
             {toast && <p className="btoast" role="status">{toast}</p>}
+            {opened && errors.length > 0 && <p className="bbroken" role="status">{opened}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep" }}
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep" }}
               // (the first run's hints first: the board's tools come once they are gone)
               ball={hints ? undefined : {
                 played: landed, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),

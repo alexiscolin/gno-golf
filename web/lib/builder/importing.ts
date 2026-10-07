@@ -20,14 +20,25 @@ import { shortAddr, type Chain } from "../chain";
 import type { BuilderHost } from "./wasm";
 import { loadTakedown, takenDown } from "../takedown";
 
-/** A draft from a file's text, or why not: whole, of its world's pieces, and passing every rule (the census too). */
-export async function fromFile(text: string, host: BuilderHost, census: Census): Promise<Draft | string> {
+/** A file opened: its draft as it is, and why it is broken ("" if it passes every rule). */
+export interface Opened {
+  draft: Draft;
+  broken: string;
+}
+
+/**
+ * A draft from a file's text, or why not: whole and of its world's pieces;
+ * judged by every rule (the census too). One that breaks them opens as it is,
+ * said broken: the editor marks its pieces at fault and locks Prove and
+ * Publish until it passes, and no edit may make it worse (edit.ts).
+ */
+export async function fromFile(text: string, host: BuilderHost, census: Census): Promise<Opened | string> {
   const d = parseDraft(text);
   if (typeof d === "string") return d;
   const palette = await loadPalette(d.world), unknown = unknownEntry(d, palette);
   if (unknown) return unknown;
   const why = errorsOf(d, { host, palette, census })[0];
-  return why ? `This draft breaks the Builder's rules: ${plainOf(why)}` : d;
+  return { draft: d, broken: why ? `This draft breaks the Builder's rules: ${plainOf(why)} Fix what is marked: Prove and Publish stay locked until it passes.` : "" };
 }
 
 /** How many refused pieces a sentence names before "and n more". */

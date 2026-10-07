@@ -17,7 +17,7 @@ import { Button, Sheet } from "@/components/ui";
 import { gnomeById } from "@/lib/scene";
 import { exportDraft, type Draft } from "@/lib/builder/draft";
 import { draftMap, draftState } from "@/lib/builder/cards";
-import { draftFile, fromFile, fromPublished } from "@/lib/builder/importing";
+import { draftFile, fromFile, fromPublished, type Opened } from "@/lib/builder/importing";
 import { census } from "@/lib/builder/drawn";
 import { loadTakedown } from "@/lib/takedown";
 import { isHoleId, makeChain } from "@/lib/chain";
@@ -48,7 +48,8 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
   said?: string;
   onOpen: (i: number) => void;
   /** a new draft, opened */
-  onAdd: (d: Draft) => void;
+  /** a new draft, and why it is broken if it is (a file opened as it is: "" if it passes) */
+  onAdd: (d: Draft, broken?: string) => void;
   onDelete: (i: number) => void;
 }) {
   const [world, setWorld] = useState("garden");
@@ -74,7 +75,7 @@ export default function Start({ host, author, drafts, said = "", onOpen, onAdd, 
     const s = statsOf(h, got.saved, author);
     return <Live s={s} fresh={isFresh(h.id, s, got.seen)} />;
   };
-  const take = (r: Draft | string) => (typeof r === "string" ? setWhy(r) : (setWhy(""), onAdd(r)));
+  const take = (r: Draft | Opened | string) => (typeof r === "string" ? setWhy(r) : (setWhy(""), "broken" in r ? onAdd(r.draft, r.broken) : onAdd(r)));
   const openFile = (f: File | undefined) => {
     if (!f) return;
     if (f.size > MAX_FILE) return setWhy("That file is too big to be a draft.");

@@ -35,12 +35,14 @@ export default function Album({ cat, owned, chain, player, mine, onOpen }: {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const rows: Progress[] = a[group];
   const toggle = (key: string, on: boolean) => setOpen((s) => (on === s.has(key) ? s : new Set(on ? [...s, key] : [...s].filter((k) => k !== key))));
-  return (
-    <section className="galbum" aria-label={mine ? ALBUM_WORDS.title : ALBUM_WORDS.theirs}>
-      <div className="galbum__head">
-        <h2>{mine ? ALBUM_WORDS.title : ALBUM_WORDS.theirs}</h2>
-        <Collector chain={chain} player={player} full />
-      </div>
+  const head = (
+    <div className="galbum__head">
+      <h2>{mine ? ALBUM_WORDS.title : ALBUM_WORDS.theirs}</h2>
+      <Collector chain={chain} player={player} full />
+    </div>
+  );
+  const body = (
+    <>
       {mine && <p className="galbum__rank">{rankLine({ total: owned.length, rows: owned })}</p>}
       <Segmented label="Album by" options={[["worlds", ALBUM_WORDS.worlds], ["tiers", ALBUM_WORDS.tiers], ["sets", ALBUM_WORDS.sets]]} value={group} onChange={setGroup} />
       <ul className="galbum__rows">
@@ -76,6 +78,15 @@ export default function Album({ cat, owned, chain, player, mine, onOpen }: {
           <p>{howRanks()}</p>
         </details>
       )}
-    </section>
+    </>
+  );
+  // the player's own open; another player's folded to its head, their gnomes first
+  return mine ? (
+    <section className="galbum" aria-label={ALBUM_WORDS.title}>{head}{body}</section>
+  ) : (
+    <details className="galbum galbum--fold" aria-label={ALBUM_WORDS.theirs}>
+      <summary>{head}</summary>
+      {body}
+    </details>
   );
 }

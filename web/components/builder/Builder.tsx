@@ -36,6 +36,7 @@ export default function Builder() {
   const [hints, setHints] = useState(false);
   const [guess, setGuess] = useState(0); // the meter's par for the draft last edited, until its test rounds set one
   const [said, setSaid] = useState(""); // why a remix asked for did not open
+  const [opened, setOpened] = useState(""); // why a file opened as it is is broken ("" none)
   useEffect(() => {
     const list = loadDrafts();
     // a remix asked for (taken from the address at once: a reload does not make another)
@@ -112,7 +113,7 @@ export default function Builder() {
     }
     return (
       <>
-        <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => setOpen(null)} onPublish={publish} onEstimate={setGuess}
+        <Editor key={`${open.i}/${open.n}`} host={host} first={d} author={author} onSave={onSave} onBack={() => (setOpened(""), setOpen(null))} onPublish={publish} opened={opened} onEstimate={setGuess}
           hints={hints} onHinted={() => { try { localStorage.setItem(HINTS_KEY, "1"); } catch {} setHints(false); }}
           onTest={(x) => {
             const hex = canonicalHex(x, host);
@@ -126,7 +127,7 @@ export default function Builder() {
   return (
     <Start host={host} author={author} drafts={drafts} said={said}
       onOpen={(i) => setOpen({ i, n: 0, step: "edit" })}
-      onAdd={(d) => { keep([...drafts, d]); setOpen({ i: drafts.length, n: 0, step: "edit" }); }}
+      onAdd={(d, broken = "") => { keep([...drafts, d]); setOpened(broken); setOpen({ i: drafts.length, n: 0, step: "edit" }); }}
       onDelete={(i) => keep(drafts.filter((_, k) => k !== i))} />
   );
 }

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
+  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, theirTitle, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -208,6 +208,12 @@ test("shop: the closing line's room: the line with a date, none without, kept wh
   assert.equal(closingSlot(collection()), "line");
   assert.equal(closingSlot(collection({ closesAt: 0 })), "none");
   assert.equal(closingSlot(null), "room", "unknown: the room kept, the line may come");
+});
+
+// ------------------------------------------------------------ a player's gnomes
+test("shop: a player's gnomes titled by their name, else their short address, never \"Their's\"", () => {
+  assert.equal(theirTitle("alice", "g1abcdefghijklmnopqrstuvwxyz0123456789cd"), "alice's gnomes");
+  assert.equal(theirTitle("", "g1abcdefghijklmnopqrstuvwxyz0123456789cd"), "g1abcdef…89cd's gnomes");
 });
 
 // ------------------------------------------------------------ the gallery as a shop

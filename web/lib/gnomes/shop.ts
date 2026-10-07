@@ -4,7 +4,7 @@
 // state: the sale's phase, why a gnome can't be bought in plain words, the
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
-import { GNOMES_REALM, isAddress, type Chain } from "../chain";
+import { GNOMES_REALM, isAddress, shortAddr, type Chain } from "../chain";
 import { cap } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
 import type { Home, Tier } from "./vocab";
@@ -327,6 +327,8 @@ export function shelf<E extends Listed>(entries: readonly E[], f: Query & { view
   if (num) list.sort((a, b) => Number(b.id === Number(num[1])) - Number(a.id === Number(num[1])) || a.id - b.id);
   return { list, tiers };
 }
+/** A player's gnomes page's title: their gno.land name, else their short address ("g1abcdef…89cd's gnomes"). */
+export const theirTitle = (name: string, who: string) => `${name || shortAddr(who)}'s gnomes`;
 /** Whether the gallery says the genesis sale's closing date: one is set (0: none, as a launch may leave it), not yet passed. */
 export const showsClosing = (c: Collection) => c.closesAt > 0 && !c.series[0]?.closed;
 /** The closing line's place in the shop's head: its line, none, or its room kept while the sale is not read yet (null). */

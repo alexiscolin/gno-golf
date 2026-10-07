@@ -17,7 +17,7 @@ import Share from "@/components/Share";
 import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { canBuyCard, cardFact, closingSlot, comingLegends, makeShop, nowRow, shelf, shareWords, teamOrder, waveLine, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, closingSlot, theirTitle, comingLegends, makeShop, nowRow, shelf, shareWords, teamOrder, waveLine, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
@@ -133,7 +133,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   }, [cat, mine]);
 
   // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
-  const title = theirs ? `${theirs.name || "Their"}'s gnomes` : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
+  const title = theirs ? theirTitle(theirs.name, theirs.who) : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
 
   if (region === false)

@@ -56,6 +56,8 @@ export interface BoardProps {
   onSet: (d: Draft) => void;
   /** a piece let go on the palette's bin: removed, if the hole holds without it */
   onBin: (id: string) => void;
+  /** a piece carried (pressed on and held), or let go: the palette's bin shows meanwhile */
+  onCarry?: (on: boolean) => void;
   onDisarm: () => void;
   /** the last refusal made off the board (a key, the inspector), shown at the board's foot until it fades; the board's own are said by the pointer */
   said: string;
@@ -245,7 +247,7 @@ export default function Board(props: BoardProps) {
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
     if (pointers.current.size > 1) {
       // a pinch: a drag under way is dropped, its unchecked preview with it (never kept by the next edit)
-      if (gesture.grabbing()) (gesture.cancel(), setLive(null));
+      if (gesture.grabbing()) (gesture.cancel(), setLive(null), props.onCarry?.(false));
       return void (drag.current = null);
     }
     const at = unit(e), hit = (e.target as Element).closest<HTMLElement>("[data-piece],[data-handle],[data-end]");
@@ -259,6 +261,7 @@ export default function Board(props: BoardProps) {
     const target: Target = hit?.dataset.handle ? { t: "handle", key: hit.dataset.handle as HandleKey } : hit?.dataset.end ? { t: "end", which: hit.dataset.end as "tee" | "pin" }
       : hit?.dataset.piece ? { t: "piece", id: hit.dataset.piece } : null;
     if (!gesture.down(env, at, target)) drag.current = { t: "pan", from: [e.clientX, e.clientY], view: shown };
+    else if (target?.t === "piece") props.onCarry?.(true);
   }
 
   function onMove(e: RPointerEvent<SVGSVGElement>) {
@@ -299,6 +302,7 @@ export default function Board(props: BoardProps) {
     const d = drag.current, at = unit(e);
     drag.current = null;
     setLive(null);
+    props.onCarry?.(false);
     if (d?.t === "aim") return (props.ball?.onAim(null), void (d.shot && props.ball?.onShot({ from: d.from, stroke: d.stroke, shot: d.shot })));
     if (d) return; // (a pan)
     const bin = document.elementsFromPoint(e.clientX, e.clientY).some((x) => x.closest("[data-bin]"));
@@ -333,7 +337,7 @@ export default function Board(props: BoardProps) {
     <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
       {gl && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} paused={props.scene.paused} keep={props.scene.keep} />}
       <svg className="board__map" width={size.w} height={size.h}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null))}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
         onPointerLeave={() => (setGhost(null), near.current?.setAttribute("cx", "-99"))}>
         <defs><marker id="arrow" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 6 3 0 6z" fill="#fff" /></marker></defs>
         {/* the board in its units, looked at through the look (view.ts matrixOf); the tee's and the cup's badges upright over it */}

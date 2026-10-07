@@ -229,6 +229,10 @@ export function about(i: Issue, id: string, refs: Map<string, PieceRef[]>): bool
   return !!i.also?.some((r) => mine.has(keyOf(r)));
 }
 
+/** The draft pieces an error of v is about (about: named, or met by it): each outlined on the board. */
+export const atFault = (v: Pick<Validated, "issues" | "refs">, ids: readonly string[]): Set<string> =>
+  new Set(ids.filter((id) => v.issues.some((i) => i.severity === "error" && about(i, id, v.refs))));
+
 /** The id a draft is shown under in the builder's own wasm (its test mode has its real one). */
 /** The id a full check loads the draft under (its census, its state). */
 export const DRAFT_ID = "draft/v1";

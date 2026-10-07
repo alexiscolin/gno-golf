@@ -21,8 +21,10 @@ const Picture = ({ world, e, px }: { world: string; e: PaletteEntry; px: number 
   <img src={pictureOf(world, e)} width={px} height={px} alt="" draggable={false} decoding="async" />
 );
 
-export default function Palette({ world, palette, armed, off, onArm, chosen, onChoose }: {
+export default function Palette({ world, palette, armed, off, bin, onArm, chosen, onChoose }: {
   world: string;
+  /** a piece carried on the board: the bin shown, to let it go on */
+  bin: boolean;
   palette: readonly PaletteEntry[];
   armed: PaletteEntry | null;
   /** entries a limit switches off, with why */
@@ -73,7 +75,7 @@ export default function Palette({ world, palette, armed, off, onArm, chosen, onC
           </section>
         ))}
       </details>
-      <div className="palette__bin" data-bin aria-hidden="true">Drop a piece here to remove it</div>
+      {bin && <div className="palette__bin" data-bin aria-hidden="true">Drop a piece here to remove it</div>}
       {open && (
         <Looks world={world} tile={open.tile} from={open.from} now={lookOf(open.tile)} off={off} onClose={() => setOpen(null)}
           onPick={(e) => (onChoose(open.tile.key, e.id), sound("select"), onArm(e))} />
