@@ -1630,7 +1630,7 @@ export default function Golf() {
       {screen === "pick" && <Picker world={(s && s.world) || "garden"} backLabel={cupsScreen === "ghosts" ? "Back to their ghosts" : undefined} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} mark={<Collector chain={game.current?.chain} player={dare} />} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={savedGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
         owned={(() => {
-          // the collection at the picker's top (in a region the shop is offered in): the player's own gnomes first, else the wave
+          // the collection under the picker's tile (in a region the shop is offered in): the player's own gnomes first, else the wave
           const row = SHOP && account && held.length > 0 && game.current ? (
             <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region === true} onWorn={readWorn}
               name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
@@ -2512,7 +2512,7 @@ interface PickerProps {
   onAbout: () => void;
   aim: Mode;
   onAim: (m: Mode) => void;
-  /** the collection at the top (components/gnomes/Promo CollectionSection: the gnomes a player holds first) */
+  /** the collection, under the tile (components/gnomes/Promo CollectionSection: the gnomes a player holds first) */
   owned?: ReactNode;
 }
 
@@ -2531,7 +2531,6 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
       <div className="pick">
         <span className="eyebrow">{hole ? <>{hole}<span className="pick__ask"> · pick your gnome</span></> : "Pick your gnome"}</span>
         {dare && (typeof dare === "string" ? <p className="dare">{dare}</p> : dare)}
-        {owned}
         <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
@@ -2548,6 +2547,8 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
           </div>
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
+        {/* the collection between the tile and the aim card, the aim card's width (the GUI spec's A3) */}
+        {owned}
         <AimSetting aim={aim} onChange={onAim} compact />
         {/* a locked gnome on show: the button still plays, as the gnome really chosen */}
         <Button variant="gold" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>
