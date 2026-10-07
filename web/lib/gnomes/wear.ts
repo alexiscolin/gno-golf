@@ -9,18 +9,14 @@ import { GNOMES, knowGnome, wears, loadWardrobe, type Skin } from "../scene/gnom
 import { skinOfTraits } from "./skin";
 import { isAddress } from "../chain";
 import type { Worn } from "./shop";
+import { told } from "./door";
 
 type Token = Pick<Worn, "id" | "name" | "traits">;
 /** A token's skin: under "t<id>" (as the catalogue's), an earned kind as the game's own gnome. */
 export const tokenSkin = (t: Token, line = "") => skinOfTraits(t.traits, { id: `t${t.id}`, name: t.name, line });
 
-const listeners = new Set<() => void>();
-let version = 0;
-const told = () => (version++, listeners.forEach((f) => f()));
-/** Called whenever what someone wears is learnt (a face, a ghost to redraw); returns its unsubscribe. */
-export const onWear = (fn: () => void) => (listeners.add(fn), () => void listeners.delete(fn));
-/** A number that moves with every change: React's useSyncExternalStore snapshot. */
-export const wearVersion = () => version;
+// (the signal of what players wear, and the player's pick, are the shop's door's: the game's first load reads them)
+export { onWear, wearVersion, pick, pickOf } from "./door";
 
 /** These tokens' gnomes known to the game (its wardrobe fetched first): their skins, in order. */
 export async function know(tokens: readonly Token[]): Promise<Skin[]> {
@@ -41,16 +37,6 @@ export async function meet(rows: readonly Worn[], players: readonly string[] = [
   rows.forEach((r, i) => (wears(r.player, skins[i].id), worn.set(r.player, r)));
   for (const p of players) if (!rows.some((r) => r.player === p)) (wears(p, null), worn.set(p, null));
   told();
-}
-
-const PICK = (addr: string) => `gnogolf.wear.${addr}`;
-/** The gnome this account picked to play in this browser (a skin id), null for none. */
-export function pickOf(addr: string) {
-  try { return localStorage.getItem(PICK(addr)); } catch { return null; }
-}
-/** Keeps (or forgets, null) the gnome this account plays in this browser. */
-export function pick(addr: string, id: string | null) {
-  try { id ? localStorage.setItem(PICK(addr), id) : localStorage.removeItem(PICK(addr)); } catch { /* a private window: for this visit only */ }
 }
 
 /** The gnome played: the pick while it is theirs (one they hold, or a free one unlocked), else the one they

@@ -10,8 +10,9 @@
 // every card's #number in sight however long its name; the toolbar's controls, on each of its
 // lines, as tall as one another, on one top, their words on one baseline (at 1440, 1280, 1024 and
 // 390, unthrottled: media/lib/rows.mjs). Before, the title screen alone: none of
-// the sale read (the catalogue) nor the collection's wardrobe fetched, which
-// only a screen showing the sale needs. With OUT, a frame every 100 ms and a
+// the sale read (the catalogue), the collection's wardrobe nor the shop's
+// part of the game (components/gnomes/Game.tsx: a dev build's chunk names
+// it) fetched, which only a screen showing the sale needs. With OUT, a frame every 100 ms and a
 // strip of them.
 //   APP=https://… node media/gnomes/shop-open.mjs   (OUT=<dir> for the frames)
 import fs from "node:fs";
@@ -28,7 +29,7 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.send("Page.navigate", { url: APP + "/" });
   for (let i = 0; i < 90 && !(await b.ev(`!![...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent))`)); i++) await sleep(500);
   await sleep(3000);
-  const early = await b.ev(`performance.getEntriesByType("resource").map((e) => e.name).filter((n) => n.includes("/gnomes/catalogue.json") || n.includes("gnome-dress"))`);
+  const early = await b.ev(`performance.getEntriesByType("resource").map((e) => e.name).filter((n) => n.includes("/gnomes/catalogue.json") || n.includes("gnome-dress") || n.includes("components_gnomes_"))`);
   await b.js(`[...document.querySelectorAll("button")].find((x) => /Click to start/.test(x.textContent)).click()`);
   for (let i = 0; i < 60 && !(await b.ev(`!!document.querySelector(".mode--shop")`)); i++) await sleep(500);
   await sleep(1500);

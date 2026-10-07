@@ -7,51 +7,30 @@
 // wave to see, its size, its lowest price, its Legendary), read once a visit.
 // Plain words, dates and counts: never a countdown, never "only" or "last".
 import "@/app/gnomes.css";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Chain } from "@/lib/chain";
 import { gnot, promoWords, type Promo } from "@/lib/gnomes/shop";
 import { know } from "@/lib/gnomes/wear";
 import type { Skin } from "@/lib/scene/gnome";
-import { readSale, saleAt, type Sale } from "@/lib/gnomes/promo";
+import { readSale } from "@/lib/gnomes/promo";
+import { SHOP_LINE } from "@/lib/gnomes/door";
 import type { Tier } from "@/lib/gnomes/vocab";
 import { sound } from "@/lib/feel";
 import { Tile } from "./parts";
 
-/** The sale on this chain (lib/gnomes/promo.ts, read once a chain) as the screens show it now, by the chain's clock
- *  (whole seconds, as the gallery's): promo undefined while read, null for none; none at all without a chain. */
-export function usePromo(chain: Chain | null): { promo: Promo | null | undefined; now: number } {
-  const [sale, setSale] = useState<Sale | null | undefined>(undefined);
-  useEffect(() => {
-    setSale(undefined);
-    if (!chain) return;
-    let live = true;
-    readSale(chain).then((s) => live && setSale(s), () => live && setSale(null));
-    return () => void (live = false);
-  }, [chain]);
-  const now = chain ? Math.floor(chain.now() / 1000) : 0;
-  return { promo: !chain || sale === undefined ? undefined : sale && saleAt(sale, now), now };
-}
-
-/** One of the wave's gnomes as the game draws him (his traits from the catalogue, the collection's wardrobe fetched
- *  first): the menu's shop panel's gnome, the wave's Epic (a gnome's size, as the games' panels show theirs), else
- *  its Legendary; null until he is known. */
-export function useShopSkin(chain: Chain | null, promo: Promo | null | undefined): Skin | null {
-  const [skin, setSkin] = useState<Skin | null>(null);
-  const id = promo?.faces.find((f) => f.tier === "epic")?.id ?? promo?.legendary?.id ?? 0;
-  useEffect(() => {
-    if (!chain || !id) return setSkin(null);
-    let live = true;
-    readSale(chain)
-      .then((sale) => sale.gnomes.find((g) => g.id === id))
-      .then((g) => (g ? know([{ id: String(g.id), name: g.name, traits: g.traits }]) : []))
-      .then(([s]) => live && setSkin(s || null), () => live && setSkin(null));
-    return () => void (live = false);
-  }, [chain, id]);
-  return skin;
-}
+/** The menu's shop panel's gnome: the wave's Epic (a gnome's size, as the games' panels show theirs), else its
+ *  Legendary, its id; 0 for none. */
+export const shopFace = (promo: Promo | null | undefined) => promo?.faces.find((f) => f.tier === "epic")?.id ?? promo?.legendary?.id ?? 0;
+/** That gnome as the game draws him (his traits from the catalogue, the collection's wardrobe fetched first); null for
+ *  none. */
+export const shopSkinOf = (chain: Chain, id: number): Promise<Skin | null> =>
+  readSale(chain)
+    .then((sale) => sale.gnomes.find((g) => g.id === id))
+    .then((g) => (g ? know([{ id: String(g.id), name: g.name, traits: g.traits }]) : []))
+    .then(([s]) => s || null);
 
 /** The shop panel's line: what it is, and the wave's lowest price when there is one. */
-export const shopLine = (promo: Promo | null | undefined) => `Collect gnomes, play as them${promo && promo.from > 0 ? `, from ${gnot(promo.from)} GNOT` : ""}`;
+export const shopLine = (promo: Promo | null | undefined) => `${SHOP_LINE}${promo && promo.from > 0 ? `, from ${gnot(promo.from)} GNOT` : ""}`;
 
 /** The picker's Collection section, at its top: the player's own gnomes first (owned) and the whole collection a
  *  tap away; else one band that is the gallery's door: the wave's Legendary and three of its gnomes, the wave in a

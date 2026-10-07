@@ -5,7 +5,6 @@ import { createGame, type Game, type GameOptions, type Snapshot } from "@/lib/en
 import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
-import { skinOfTraits } from "@/lib/gnomes/skin";
 import { NOT_BUILDER } from "@/lib/community";
 import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
@@ -41,53 +40,19 @@ import { ADENA_URL, FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network
 import { register, track, trackLeaving, trackError, once, failure, saveBlock, cardHoles, WALLET_STEPS, type Events, type Play, type RivalKind, type ShareKind, type WalletFrom } from "@/lib/analytics";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "@/lib/prefs";
 import { darkGallery, minesOrder } from "@/lib/scene/data";
-import { SHOP, closingSlot, makeShop, type Worn } from "@/lib/gnomes/shop";
-import { knownSale } from "@/lib/gnomes/promo";
-import { chunk } from "@/lib/chunk";
+import { SHOP, SHOP_LINE, pick, pickOf } from "@/lib/gnomes/door";
+import type { Worn } from "@/lib/gnomes/shop";
 import { buildLink, endpoints } from "@/lib/builder/holes";
-import { CollectionSection, PromoLine, shopLine, useShopSkin, usePromo } from "@/components/gnomes/Promo";
-import { ShopSkeleton } from "@/components/gnomes/ShopFrame";
+import { CollectionSection, Collector, Owned, PromoLine, ShopScreen as Shop, askWorn, shopPart, useSale, useShopPart, useShopSkin } from "@/components/gnomes/Door";
 import { builderOn } from "@/lib/builder/route";
 import { shopInRegion, shopShown } from "@/lib/gnomes/geo";
-import { served } from "@/lib/gnomes/served";
-import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/wear";
-import { collectorsOf } from "@/lib/gnomes/collection";
-import Collector from "@/components/gnomes/Rank";
-import type { ShopProps, ShopView } from "@/components/gnomes/Shop";
-import type { OwnedProps } from "@/components/gnomes/Owned";
+import type { ShopView } from "@/components/gnomes/Shop";
+import type { skinOfTraits } from "@/lib/gnomes/skin";
 
-// The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/shop.ts SHOP): its screen and the picker's row of a
-// player's gnomes, each a chunk of its own, fetched only when shown; off, none of it is ever loaded.
-// the shop's chunk (lib/chunk.ts), fetched early once a door to it shows (below); while it downloads, its frame
-// (ShopFrame, in the first load) with the shop's own Back and About, and Try again if it could not come
-const shopChunk = chunk(() => import("@/components/gnomes/Shop"));
-function Shop(props: ShopProps) {
-  const [Screen, setLoaded] = useState(() => shopChunk.value()?.default);
-  const [failed, setFailed] = useState(false), [tries, setTries] = useState(0);
-  useEffect(() => {
-    if (Screen) return;
-    let live = true;
-    setFailed(false);
-    shopChunk.load().then((m) => live && setLoaded(() => m.default), () => live && setFailed(true));
-    return () => void (live = false);
-  }, [Screen, tries]);
-  if (Screen) return <Screen {...props} />;
-  const closing = closingSlot(knownSale(props.chain)?.c ?? null);
-  return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} keeper={props.keeper} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
-}
-// the picker's row of the player's gnomes, the same way: nothing while it downloads or if it could not come (the
-// collection's door stays), asked again the next time the picker shows it
-const ownedChunk = chunk(() => import("@/components/gnomes/Owned"));
-function Owned(props: OwnedProps) {
-  const [Row, setLoaded] = useState(() => ownedChunk.value()?.default);
-  useEffect(() => {
-    if (Row) return;
-    let live = true;
-    ownedChunk.load().then((m) => live && setLoaded(() => m.default), () => {});
-    return () => void (live = false);
-  }, [Row]);
-  return Row ? <Row {...props} /> : null;
-}
+// The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/door.ts SHOP): its pieces on these screens (the menu's panel, the
+// picker's section and the player's row, the finish card's line, the collector badges, what a player holds and
+// wears) and its screen are the shop's own chunk, fetched through its door (components/gnomes/Door.tsx) once a
+// screen wants them; off, none of it is ever built.
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
 // dev build, or on a page opened with ?camlog where the hooks answer
@@ -161,7 +126,7 @@ interface Config {
   world: string;
   won: number;
   clips: boolean;
-  /** a collection gnome's traits to play as, and to give every rival's ghost (test hooks only: lib/gnomes) */
+  /** a collection gnome's traits to play as, and to give every rival's ghost (test hooks only, the shop built: lib/gnomes) */
   traits: string;
   rivalTraits: string;
 }
@@ -717,10 +682,10 @@ export default function Golf() {
     // a dev remount destroys this game while it is still starting: it must
     // not then drive the live one
     let cancelled = false, g: Game | null = null;
-    const make = (promo?: GameOptions["promo"], probes?: GameOptions["probes"]) => {
+    const make = (promo?: GameOptions["promo"], probes?: GameOptions["probes"], dress?: { skinOfTraits: typeof skinOfTraits } | null) => {
       try {
-        if (cfg.rivalTraits) setRivalGnome(skinOfTraits(cfg.rivalTraits, { id: "rival-traits", name: "", line: "" }));
-        const traits = cfg.traits ? skinOfTraits(cfg.traits, { id: "traits", name: "", line: "" }) : null;
+        if (cfg.rivalTraits && dress) setRivalGnome(dress.skinOfTraits(cfg.rivalTraits, { id: "rival-traits", name: "", line: "" }));
+        const traits = cfg.traits && dress ? dress.skinOfTraits(cfg.traits, { id: "traits", name: "", line: "" }) : null;
         if (traits) knowGnome(traits);
         g = createGame(el, {
         rpc: cfg.rpc, web: cfg.web, gnome: traits ? traits.id : gnome, world: cfg.world, weather: cfg.weather, aimMode: aim, camMode: savedCam(), gfx, promo, probes, log: logs,
@@ -779,7 +744,7 @@ export default function Golf() {
     // modules of their own, fetched only for a page that asks for them.
     const logs = camlog();
     const wantPromo = /[?&]promo/.test(window.location.search) && (DEV || logs), wantProbes = logs || cfg.won > 0;
-    const wantWardrobe = !!(cfg.traits || cfg.rivalTraits); // (a collection gnome to draw: its wardrobe first)
+    const wantWardrobe = SHOP && !!(cfg.traits || cfg.rivalTraits); // (a collection gnome to draw: its wardrobe and the shop's part first)
     // on the title, the hole behind it is built in the first idle moment (1.2 s
     // at most): built at once with the title's own scene, a phone's first
     // frames stall on both
@@ -791,8 +756,8 @@ export default function Golf() {
         unidle = () => cancelIdleCallback(id);
       }
     } else
-      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined, wantWardrobe ? loadWardrobe().catch(() => undefined) /* (not fetched: drawn plain) */ : undefined])
-        .then(([promo, probes]) => !cancelled && make(promo, probes))
+      void Promise.all([wantPromo ? import("@/lib/promo").then((m) => m.promo) : undefined, wantProbes ? import("@/lib/engine/probes").then((m) => m.probes) : undefined, wantWardrobe ? loadWardrobe().catch(() => undefined) /* (not fetched: drawn plain) */ : undefined, wantWardrobe ? shopPart()?.catch(() => null) /* (not fetched: drawn as the game's own) */ : undefined])
+        .then(([promo, probes, , dress]) => !cancelled && make(promo, probes, dress))
         .catch((err: unknown) => !cancelled && setFatal({ msg: messageOf(err), kind: fatalKind(err) }));
 
     return () => {
@@ -1043,32 +1008,30 @@ export default function Golf() {
   const [saleShown, setSaleShown] = useState(false);
   useEffect(() => void (saleHere && setSaleShown(true)), [saleHere]);
   const saleChain = shopOn && (saleHere || saleShown) ? (game.current && game.current.chain) || null : null;
-  const { promo, now: promoNow } = usePromo(saleChain);
+  const { promo, now: promoNow } = useSale(saleChain);
   const shopSkin = useShopSkin(saleChain, promo);
+  const shopBits = useShopPart(!!saleChain); // (the panel's line with its price, once the shop's part is in)
   // the shop's chunk, fetched as soon as a door to it shows (the menu's panel, the cups' link): opening it then draws at once
-  useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && shopChunk.prefetch()), [shopOn, screen]);
+  useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && shopPart()?.then((m) => m.prefetchShop(), () => {})), [shopOn, screen]);
   const readWorn = () => {
-    const c = game.current && game.current.chain;
-    if (!SHOP || !c || !account) return (setHeld([]), setWorn(null));
-    const shop = makeShop(c), me = account.address;
-    void Promise.all([shop.allOf(me), shop.worn(me).catch(() => null)]).then(async ([rows, w]) => {
-      collectorsOf(c).know(me, { total: rows.length, rows }); // (their collector rank, every page counted: ADR-011)
-      const listed = rows.length ? new Map((await served().catch(() => ({ gnomes: [] }))).gnomes.map((g) => [String(g.id), g])) : new Map<string, { name: string; home: string }>();
-      const mine = rows.map((r) => ({ ...r, name: listed.get(r.id)?.name || `Gnome ${r.id}`, home: listed.get(r.id)?.home || "" }));
-      const skins = await know(w ? [...mine, w] : mine).catch(() => null);
+    const c = game.current && game.current.chain, part = SHOP && c && account ? shopPart() : null;
+    if (!c || !account || !part) return (setHeld([]), setWorn(null));
+    const me = account.address;
+    void part.then(async (m) => {
+      const { mine, worn: w, skins } = await m.readHeld(c, me);
       setHeld(mine);
       setWorn(w);
       if (!skins) return; // (the wardrobe not fetched: their gnomes listed, the gnome played as it is until the next read)
       // the gnome played: theirs while it is theirs, else the one everyone sees, else the browser's own
-      const want = playingOf({ pick: pickOf(me), held: new Set(skins.map((k) => k.id)), worn: w, saved: savedGnome(), free: (id) => GNOMES.some((g) => g.id === id) && unlockedRef.current(id) });
+      const want = m.playing({ pick: pickOf(me), held: new Set(skins.map((k) => k.id)), worn: w, saved: savedGnome(), free: (id) => GNOMES.some((g) => g.id === id) && unlockedRef.current(id) });
       if (want !== gnomeNow.current) (setGnome(want), game.current && game.current.setGnome(want));
-    }, () => {});
+    }).catch(() => {});
   };
   useEffect(readWorn, [account, game.current]); // eslint-disable-line react-hooks/exhaustive-deps -- (readWorn: the account's)
   // a rival's ghost wears the gnome they wear for everyone (gnome.ts rivalSkin), read as they are picked
   useEffect(() => {
     const c = game.current && game.current.chain;
-    if (SHOP && c && dare) void askWorn((ps) => makeShop(c).wornMany(ps), dare);
+    if (SHOP && c && dare) askWorn(c, dare);
   }, [dare]);
   const openShop = (v: ShopView = {}) => {
     if (!shopOn) return; // (no door to the shop where it is not offered, nor before the region has answered)
@@ -1629,7 +1592,7 @@ export default function Golf() {
         <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
           onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")}
           onBuild={builderOn() ? () => window.location.assign(buildLink(endpoints(window.location.search).keep)) : undefined}
-          shop={shopOn ? { skin: shopSkin, line: shopLine(promo), onOpen: () => openShop() } : undefined} />
+          shop={shopOn ? { skin: shopSkin, line: shopBits ? shopBits.shopLine(promo) : SHOP_LINE, onOpen: () => openShop() } : undefined} />
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
