@@ -25,7 +25,7 @@ const { FIELD } = await import("../web/lib/builder/rules.ts");
 const { canonicalHex, proofKey, replay } = await import("../web/lib/builder/proof.ts");
 const { plan, holeRow } = await import("../web/lib/builder/testmode.ts");
 const { makeLocalChain } = await import("../web/lib/builder/localchain.ts");
-const { shotOf } = await import("../web/lib/chain.ts");
+const { holing } = await import("../web/lib/builder/difficulty.ts");
 
 /** The test id's author (builder-templates.test.ts proves each starter under it) and the clock its weathers are found from. */
 const AUTHOR = "g1hvuayx9ll7dal54kr0f6t89j8867z8lf5vtxgv", NOW = 5967997;
@@ -48,32 +48,6 @@ function starters(world: string, palette: readonly PaletteEntry[]): Record<strin
   return { straight, dogleg, signature };
 }
 
-/** A holing round by search: each stroke the best of a fan of shots toward the cup (holed, or the nearest), 8 strokes at most. */
-function holing(id: string, d: Draft, period: number): string[] | null {
-  const shots: string[] = [];
-  let rest: V = d.tee;
-  host.setperiod(period);
-  for (let k = 0; k < 8; k++) {
-    let best: { s: string; rest: V; d: number } | null = null;
-    const toward = (Math.atan2(d.pin[1] - rest[1], d.pin[0] - rest[0]) * 180) / Math.PI;
-    for (let da = -40; da <= 40; da += 2) {
-      for (let pw = 0.5; pw <= 10; pw += 0.25) {
-        const s = shotOf(Math.round((toward + da) * 100) / 100, pw);
-        const out = k === 0 ? host.round(id, s, period) : host.from(id, rest[0], rest[1], s, k, period);
-        if (out.startsWith("panic: ")) continue;
-        const r = JSON.parse(out) as { holed: boolean; rest: V };
-        if (r.holed) return [...shots, s];
-        const dd = Math.hypot(r.rest[0] - d.pin[0], r.rest[1] - d.pin[1]);
-        if (!best || dd < best.d) best = { s, rest: r.rest, d: dd };
-      }
-    }
-    if (!best) return null;
-    shots.push(best.s);
-    rest = best.rest;
-  }
-  return null;
-}
-
 const out: Record<string, Record<string, Draft>> = {}, rounds: Record<string, Record<string, { period: number; shots: string[] }>> = {};
 let failed = 0;
 for (const world of Object.keys(FIELD)) {
@@ -91,7 +65,8 @@ for (const world of Object.keys(FIELD)) {
     host.load(id, hex);
     rounds[slug] = {};
     for (const { kind, period } of plan(host, id, world, NOW)) {
-      const shots = holing(id, d, period);
+      // a holing round by search (difficulty.ts holing: the best of a fan toward the cup each stroke, 8 strokes at most)
+      const shots = await holing(host, id, d.tee, d.pin, period);
       const p = shots && (await replay(makeLocalChain(host, holeRow(id, d), hex, period), { key, id, kind, period, shots }));
       if (p && typeof p !== "string") rounds[slug][kind] = { period, shots: p.shots };
       else {
