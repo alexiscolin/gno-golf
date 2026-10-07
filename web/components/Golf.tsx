@@ -42,7 +42,9 @@ import { ADENA_URL, FAUCET, GNOT_URL, networkOf, OTHER_URL } from "@/lib/network
 import { register, track, trackLeaving, trackError, once, failure, saveBlock, cardHoles, WALLET_STEPS, type Events, type Play, type RivalKind, type ShareKind, type WalletFrom } from "@/lib/analytics";
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "@/lib/prefs";
 import { darkGallery, minesOrder } from "@/lib/scene/data";
-import { SHOP, makeShop, type Worn } from "@/lib/gnomes/shop";
+import { SHOP, closingSlot, makeShop, type Worn } from "@/lib/gnomes/shop";
+import { knownSale } from "@/lib/gnomes/promo";
+import { chunk } from "@/lib/chunk";
 import { buildLink, endpoints } from "@/lib/builder/holes";
 import { CollectionSection, PromoLine, shopLine, useShopSkin, usePromo } from "@/components/gnomes/Promo";
 import { ShopSkeleton } from "@/components/gnomes/ShopFrame";
@@ -50,13 +52,27 @@ import { builderOn } from "@/lib/builder/route";
 import { shopInRegion, shopShown } from "@/lib/gnomes/geo";
 import { served } from "@/lib/gnomes/served";
 import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/wear";
-import type { ShopView } from "@/components/gnomes/Shop";
+import type { ShopProps, ShopView } from "@/components/gnomes/Shop";
 
 // The gnome shop (NEXT_PUBLIC_GNOMES, lib/gnomes/shop.ts SHOP): its screen and the picker's row of a
 // player's gnomes, each a chunk of its own, fetched only when shown; off, none of it is ever loaded.
-// the shop's chunk: its frame (ShopFrame, in the first load) while it downloads; fetched early as soon as a door to it shows (below)
-const loadShop = () => import("@/components/gnomes/Shop");
-const Shop = dynamic(loadShop, { ssr: false, loading: () => <ShopSkeleton /> });
+// the shop's chunk (lib/chunk.ts), fetched early once a door to it shows (below); while it downloads, its frame
+// (ShopFrame, in the first load) with the shop's own Back and About, and Try again if it could not come
+const shopChunk = chunk(() => import("@/components/gnomes/Shop"));
+function Shop(props: ShopProps) {
+  const [Screen, setLoaded] = useState(() => shopChunk.value()?.default);
+  const [failed, setFailed] = useState(false), [tries, setTries] = useState(0);
+  useEffect(() => {
+    if (Screen) return;
+    let live = true;
+    setFailed(false);
+    shopChunk.load().then((m) => live && setLoaded(() => m.default), () => live && setFailed(true));
+    return () => void (live = false);
+  }, [Screen, tries]);
+  if (Screen) return <Screen {...props} />;
+  const closing = closingSlot(knownSale(props.chain)?.c ?? null);
+  return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
+}
 const Owned = dynamic(() => import("@/components/gnomes/Owned"), { ssr: false });
 
 // The test hooks (?play, ?shot, ?demo, ?weather, ?world, ?promo) answer in a
@@ -1011,7 +1027,7 @@ export default function Golf() {
   const { promo, now: promoNow } = usePromo(shopOn ? (game.current && game.current.chain) || null : null);
   const shopSkin = useShopSkin(shopOn ? (game.current && game.current.chain) || null : null, promo);
   // the shop's chunk, fetched as soon as a door to it shows (the menu's panel, the cups' link): opening it then draws at once
-  useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && loadShop()), [shopOn, screen]);
+  useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && shopChunk.prefetch()), [shopOn, screen]);
   const readWorn = () => {
     const c = game.current && game.current.chain;
     if (!SHOP || !c || !account) return (setHeld([]), setWorn(null));

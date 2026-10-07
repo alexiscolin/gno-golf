@@ -62,6 +62,9 @@ void test("the playground serves the build as the static host does, and /rpc fro
   } finally {
     swapped.close();
   }
+  // a root that is not there, or not a folder: refused at once, not a 404 on every request
+  assert.throws(() => playgroundServer({ root: path.join(dir, "nowhere"), rpc: `http://127.0.0.1:${nodePort}` }), /nowhere/);
+  assert.throws(() => playgroundServer({ root: path.join(dir, "outside.txt"), rpc: `http://127.0.0.1:${nodePort}` }), /folder/);
   assert.throws(() => playgroundServer({ root: out, rpc: "http://100.104.210.102:26657" }), /127\.0\.0\.1/);
   assert.throws(() => playgroundServer({ root: out, rpc: "http://127.0.0.1.example:80" }), /127\.0\.0\.1/);
 });

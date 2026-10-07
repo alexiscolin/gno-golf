@@ -60,8 +60,10 @@ log() { printf '%s\n' "$*" >&2; }
 die() { log "try-local: $*"; exit 1; }
 tree() { local c; for c in $(pgrep -P "$1"); do tree "$c"; done; echo "$1"; } # a process and all it started
 # the site built as the real one is, with the playground's settings ($WORK/site.env), into a new folder, then swapped
-# in: $WORK/site is a link the server reads on every request, replaced in one rename; the last two builds are kept
+# in: $WORK/site is a link the server reads on every request, replaced in one rename. Kept: the build served until
+# then (a request still reading it finishes) and the new one; the folders' numbers only grow.
 build_site() {
+	[ ! -e "$WORK/site" ] || [ -L "$WORK/site" ] || die "this playground's site is a folder, from before rebuild: restart the playground once"
 	# shellcheck disable=SC1091
 	. "$WORK/site.env"
 	log "try-local: the site built (a few minutes; its log: $WORK/build.log)"
@@ -69,62 +71,86 @@ build_site() {
 		NEXT_PUBLIC_WEB="$WEB_URL" NEXT_PUBLIC_REALM="$GOLF" NEXT_PUBLIC_NETWORK=testnet \
 		NEXT_PUBLIC_GNOMES=1 NEXT_PUBLIC_BUILDER=1 NEXT_PUBLIC_COMMUNITY=1 npm run -s build) >"$WORK/build.log" 2>&1 ||
 		{ tail -5 "$WORK/build.log" >&2; die "the site's build failed (the site running is untouched)"; }
-	local n=1
-	while [ -e "$WORK/site.$n" ]; do n=$((n + 1)); done
+	local n=0 d k served
+	for d in "$WORK"/site.[0-9]*; do
+		k=${d##*.}
+		[[ $k =~ ^[0-9]+$ ]] && [ "$k" -gt "$n" ] && n=$k
+	done
+	n=$((n + 1))
+	served=$(readlink "$WORK/site" 2>/dev/null || true)
 	cp -R "$root/web/out" "$WORK/site.$n"
-	if [ -d "$WORK/site" ] && [ ! -L "$WORK/site" ]; then
-		# a playground started before the link (its server reads the folder itself): the folders swapped, two renames
-		python3 -I -c 'import os, sys; os.rename(sys.argv[1], sys.argv[3]); os.rename(sys.argv[2], sys.argv[1])' "$WORK/site" "$WORK/site.$n" "$WORK/site.old.$n"
-		rm -rf "$WORK/site.old.$n"
-		return
-	fi
 	rm -f "$WORK/site.next" && ln -s "site.$n" "$WORK/site.next"
 	python3 -I -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$WORK/site.next" "$WORK/site" # (one rename: the link swapped at once)
-	[ ! -e "$WORK/site.$((n - 2))" ] || rm -rf "$WORK/site.$((n - 2))"
+	for d in "$WORK"/site.[0-9]*; do
+		[[ ${d##*.} =~ ^[0-9]+$ ]] && [ "${d##*/}" != "site.$n" ] && [ "${d##*/}" != "$served" ] && rm -rf "$d"
+	done
+	return 0
 }
 
-# the running playground's settings (its WORK's seed.env and site.env), for the commands below
+# the running playground's settings (its WORK's seed.env), for the commands below
 running() {
 	[ -f "$last" ] && WORK=$(cat "$last") && [ -f "$WORK/seed.env" ] || die "no playground running (start one with scripts/try-local.sh)"
 	# shellcheck disable=SC1091
 	. "$WORK/seed.env"
 }
-# a call by the collection's owner (test1) on the gnomes realm, its output's first refusal said
+# the chain's time (unix seconds, its last block's) in NOW; the command stops if the chain does not answer
+chainnow() {
+	NOW=$(curl -sf --max-time 10 "$RPC/status" | python3 -I -c 'import json,sys,re; from datetime import datetime; t=json.load(sys.stdin)["result"]["sync_info"]["latest_block_time"]; print(int(datetime.fromisoformat(re.sub(r"\.\d+","",t).replace("Z","+00:00")).timestamp()))' 2>/dev/null) &&
+		[ -n "$NOW" ] || die "the chain does not answer at $RPC (is the playground running?)"
+}
+# a call by the collection's owner (test1) on the gnomes realm; refused: its reason in REFUSED
 owner() {
 	local fn=$1 a=() x out
 	shift
 	for x in "$@"; do a+=(-args "$x"); done
 	out=$(echo "$PASS" | "$GNOKEY" maketx call -home "$KH" -pkgpath "$GNOMES" -func "$fn" "${a[@]}" \
 		-gas-fee 5000000ugnot -gas-wanted 200000000 -remote "$RPC" -chainid "$CHAINID" -broadcast -insecure-password-stdin test1 2>&1)
-	printf %s "$out" | grep -q '^OK!' || { printf %s "$out" | grep -o 'gnomes: [^"]*' | head -1 >&2; return 1; }
+	printf %s "$out" | grep -q '^OK!' && return 0
+	REFUSED=$(printf %s "$out" | grep -o 'gnomes: [^"]*' | head -1)
+	[ -n "$REFUSED" ] || REFUSED=$(printf '%s\n' "$out" | tail -1)
+	return 1
 }
-chainnow() { curl -s "$RPC/status" | python3 -I -c 'import json,sys,re; from datetime import datetime; t=json.load(sys.stdin)["result"]["sync_info"]["latest_block_time"]; print(int(datetime.fromisoformat(re.sub(r"\.\d+","",t).replace("Z","+00:00")).timestamp()))'; }
-# a wave of data/gnomes.json (index from 0) on sale from now, its players' window as the catalogue says
+# a wave of data/gnomes.json (index from 0) on sale from NOW, its players' window as the catalogue says
 open_wave() {
-	jf() { python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(eval(sys.argv[2], {"d": d}))' "$root/data/gnomes.json" "$1"; }
 	local first lastid hours
-	first=$(jf "d['series'][0]['plan'][$1]['first']") lastid=$(jf "d['series'][0]['plan'][$1]['last']") hours=$(jf "d['series'][0]['sale']['playerWindowHours']")
-	owner AddWave "$first" "$lastid" "$(chainnow)" "$hours" && log "try-local: wave $(($1 + 1)) ($first-$lastid) on sale from now, its players' window ${hours} h"
+	read -r first lastid hours < <(python3 -I -c 'import json,sys; s=json.load(open(sys.argv[1]))["series"][0]; w=s["plan"][int(sys.argv[2])]; print(w["first"], w["last"], s["sale"]["playerWindowHours"])' "$root/data/gnomes.json" "$1")
+	owner AddWave "$first" "$lastid" "$NOW" "$hours" || return 1
+	log "try-local: wave $(($1 + 1)) ($first-$lastid) on sale from now, its players' window ${hours} h"
 }
 
 case "${1:-}" in
 wave2)
 	running
-	open_wave 1 || die "wave 2 was refused (is it open already?)"
+	chainnow
+	open_wave 1 || die "wave 2 was refused: $REFUSED"
 	exit 0
 	;;
 all)
-	# every wave not yet open, now (a wave open already is refused, and left as it is)
+	# every wave not yet open, now: a wave open already is left as it is; any other refusal fails the command
 	running
+	chainnow
 	n=$(python3 -I -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["series"][0]["plan"]))' "$root/data/gnomes.json")
-	for k in $(seq 0 $((n - 1))); do open_wave "$k" 2>/dev/null || true; done
+	failed=0 already=0
+	for k in $(seq 0 $((n - 1))); do
+		open_wave "$k" && continue
+		case $REFUSED in
+		*"in a wave already"*) already=$((already + 1)) ;;
+		*) log "try-local: wave $((k + 1)) was refused: $REFUSED" && failed=$((failed + 1)) ;;
+		esac
+	done
+	log "try-local: $already of $n waves were open already"
+	[ "$failed" = 0 ] || die "$failed refused"
 	exit 0
 	;;
 close)
 	running
 	days=${2:-30}
 	[[ $days =~ ^[0-9]+$ ]] && [ "$days" -gt 0 ] || die "usage: scripts/try-local.sh close [days]"
-	owner SetCloseAt "$(($(chainnow) + days * 86400))" || die "SetCloseAt was refused (a date can only move earlier)"
+	chainnow
+	at=$((NOW + days * 86400))
+	owner SetCloseAt "$at" || die "SetCloseAt was refused: $REFUSED"
+	# seed.env says it too, as the seed wrote it
+	{ grep -v '^CLOSE_AT=' "$WORK/seed.env"; echo "CLOSE_AT=$at"; } >"$WORK/seed.env.new" && mv "$WORK/seed.env.new" "$WORK/seed.env"
 	log "try-local: the genesis closes in $days days"
 	exit 0
 	;;

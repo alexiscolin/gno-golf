@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
+  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -203,6 +203,11 @@ test("shop: no closing line when no closing date is set (a launch may leave it u
   assert.equal(showsClosing(collection({ closesAt: 0 })), false);
   assert.equal(showsClosing(collection()), true);
   assert.equal(showsClosing(collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] })), false, "closed: the wave panel says it");
+});
+test("shop: the closing line's room: the line with a date, none without, kept while the sale is not read yet", () => {
+  assert.equal(closingSlot(collection()), "line");
+  assert.equal(closingSlot(collection({ closesAt: 0 })), "none");
+  assert.equal(closingSlot(null), "room", "unknown: the room kept, the line may come");
 });
 
 // ------------------------------------------------------------ the gallery as a shop

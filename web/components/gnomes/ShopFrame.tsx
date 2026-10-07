@@ -9,6 +9,7 @@
 import "@/app/gnomes.css";
 import type { ReactNode } from "react";
 import { FrontScreen } from "@/components/About";
+import { Button } from "@/components/ui";
 import { BlankCard } from "./parts";
 
 /** The sale's own head: its eyebrow, its name, one line of what it sells. */
@@ -19,7 +20,7 @@ export const SHOP_HEAD = {
 };
 /** The shelf while it is read: a page of blank cards, each the size of a card on sale. */
 export const BlankShelf = ({ n = 12 }: { n?: number }) => <ul className="gshelf" aria-busy="true">{Array.from({ length: n }, (_, i) => <li key={i}><BlankCard /></li>)}</ul>;
-/** The closing date's line, its height fixed; only when a date is set (none by default: the frame keeps no room for it). */
+/** The closing date's line, its height fixed: where a date is set, or while it is not known (lib/gnomes/shop.ts closingSlot). */
 export const ClosesSlot = ({ children }: { children?: ReactNode }) => <div className="closes-slot">{children}</div>;
 /** The wave panel while it is read: its head, bar, prices and note lines, blank. */
 export const WaveSlot = () => (
@@ -31,14 +32,16 @@ export const WaveSlot = () => (
   </section>
 );
 
-/** The shop as it opens, before its chunk has come: its final frame, blank. */
-export function ShopSkeleton({ onBack = () => {}, onAbout = () => {} }: { onBack?: () => void; onAbout?: () => void }) {
+/** The shop as it opens, before its chunk has come: its final frame, blank, Back and About working (the shop's own),
+ *  the closing line's room as the sale already read says (closing); onRetry, once the chunk could not be fetched. */
+export function ShopSkeleton({ onBack, onAbout, closing, onRetry }: { onBack: () => void; onAbout: () => void; closing: "line" | "none" | "room"; onRetry?: () => void }) {
   return (
     <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={SHOP_HEAD.eyebrow} title={SHOP_HEAD.title}>
       <p className="shop__pitch">{SHOP_HEAD.pitch}</p>
+      {closing !== "none" && <ClosesSlot />}
       <WaveSlot />
       <div className="gfilters gfilters--skel" aria-hidden="true" />
-      <BlankShelf />
+      {onRetry ? <div className="gempty" role="alert"><p>The shop did not load.</p><Button variant="primary" onClick={onRetry}>Try again</Button></div> : <BlankShelf />}
     </FrontScreen>
   );
 }
