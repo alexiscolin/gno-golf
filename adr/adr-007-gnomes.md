@@ -151,13 +151,13 @@ it leaves them and refuses to move an earned one.
 |---|---|---|---|
 | the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
 | the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
-| a first buy (was 10,465 with enumerable and a traits copy) | 4,332 | 0.43 GNOT, the buyer | `z_storage_buy` |
-| an earned gnome | 4,038 | 0.40 GNOT, the player | `z_storage_earned` |
+| a first buy (was 10,465 with enumerable and a traits copy) | 3,850 | 0.39 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
+| an earned gnome | 3,555 | 0.36 GNOT, the player | `z_storage_earned` |
 
 | what | gas | measured by |
 |---|---|---|
-| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.37M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
-| the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.6M | `z_proof_king` less `z_proof_seed` |
+| a first buy (2.45M while a sold count in the series rewrote its rows) | 2.34M | `z_storage_buy` less `z_storage_genesis` (`// Gas:` goldens) |
+| the King's proof, the heaviest `MintEarned` reads (72 slots, both modes, the pars) | 44.7M | `z_proof_king` less `z_proof_seed` (`// Gas:` goldens) |
 | a collection read whole with `GnomesOf`: 1, 50, 205 gnomes | 4.8M, 144M, 616M (3 pages) | the `TestLockerGas*` pairs |
 
 The deploy's deposit is what a chain stores, not the source's size: the
@@ -179,8 +179,8 @@ catalogue's 60 KB string and the ledger's nodes among it; a read of the
 catalogue (a buy, a proof's cups) pays its share too. The client's gas for
 a call is the chain's figure with a margin, never a filetest's.
 
-The King's proof is under the 300M the client will ask for `MintEarned` and
-of the order of golf's `Claim` (70.2M); a `GnomesOf` page of 100 is about
+The King's proof is of the order of golf's `Claim` (70.2M), and under the
+200M the e2e run sends `MintEarned` with (no client sends it yet); a `GnomesOf` page of 100 is about
 210M, far under a query's 3e9.
 
 **Wearing is free.** Every player wears their best gnome (the highest tier
@@ -193,8 +193,8 @@ gnome they hold, kept in their browser: nothing on chain. To make the best
 one row away, a holder's index sorts best first (`"<holder> <rank><id>"`,
 the last tier's rank 0): `GnomesOf` and `TokenOfOwnerByIndex` list a
 wallet as its team is shown, Legendary first, and a sale writes the rank
-from the row it has already read (one byte more a row; a first buy 2.37M
-gas, 2.35M before).
+from the row it has already read (one byte more a row, about 20K more gas
+a first buy).
 
 **Where the shop opens.** The free game plays everywhere; the shop is not
 offered in mainland China nor under the comprehensive sanctions (Cuba, Iran,
