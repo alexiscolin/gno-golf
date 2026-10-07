@@ -1013,12 +1013,16 @@ export default function Golf() {
   const shopBits = useShopPart(!!saleChain); // (the panel's line with its price, once the shop's part is in)
   // the shop's chunk, fetched as soon as a door to it shows (the menu's panel, the cups' link): opening it then draws at once
   useEffect(() => void (shopOn && (screen === "modes" || screen === "worlds" || screen === "pick") && shopPart()?.then((m) => m.prefetchShop(), () => {})), [shopOn, screen]);
+  // whose gnomes are shown: another account's answer, landing late, is dropped; a new account starts from none
+  const heldOf = useRef("");
   const readWorn = () => {
     const c = game.current && game.current.chain, part = SHOP && c && account ? shopPart() : null;
-    if (!c || !account || !part) return (setHeld([]), setWorn(null));
+    if (!c || !account || !part) return ((heldOf.current = ""), setHeld([]), setWorn(null));
     const me = account.address;
+    if (heldOf.current !== me) ((heldOf.current = me), setHeld([]), setWorn(null));
     void part.then(async (m) => {
       const { mine, worn: w, skins } = await m.readHeld(c, me);
+      if (heldOf.current !== me) return;
       setHeld(mine);
       setWorn(w);
       if (!skins) return; // (the wardrobe not fetched: their gnomes listed, the gnome played as it is until the next read)
