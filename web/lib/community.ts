@@ -13,12 +13,12 @@
 // a hole not yet judged is not shown. A hole whose data, or the rules, cannot
 // be read right now has no verdict at all (verdictOf throws, nothing kept):
 // it is said not to load, with Try again, never to break the rules.
-import type { Chain } from "./chain";
+import { isVersion, type Chain } from "./chain";
 import { authorOf } from "./builder/holes";
 import { bytesOf, sha256 } from "./sha";
 import { fnv1a } from "./sky";
 import { takenDown } from "./takedown";
-import type { HoleRow } from "./types";
+import type { DayRow, HoleRow } from "./types";
 import type { Verdict } from "./builder/verdict";
 import type { Level } from "./builder/levels";
 import type { BuilderHost } from "./builder/wasm";
@@ -51,7 +51,7 @@ const builder: JudgeDeps = {
 
 const keyOf = async (hex: string) => `${VERDICT_KEY}|${VERDICT_RULES}|${await sha256(bytesOf(hex))}`;
 /** A version's key ("<alias>/v<n>": its data never changes), on its chain's realm; null for an alias (it names the next version once one is published). */
-const idKeyOf = async (chain: Judging, id: string) => (/\/v\d+$/.test(id) ? `${VERDICT_KEY}|${VERDICT_RULES}|${await whichOf(chain)}|${id}` : null);
+const idKeyOf = async (chain: Judging, id: string) => (isVersion(id) ? `${VERDICT_KEY}|${VERDICT_RULES}|${await whichOf(chain)}|${id}` : null);
 const kept = (key: string): Verdict | null => {
   try {
     const v = localStorage.getItem(key);
@@ -130,19 +130,42 @@ export const DAY_TRIES = 8;
 /** A listed hole's alias (its slot; a version id less its "/v<n>"). */
 export const aliasOf = (h: Pick<HoleRow, "id" | "slot">) => h.slot || h.id.replace(/\/v\d+$/, "");
 
-/** The hole of the day's candidates: the listed community holes (communityOf's) in the UTC day's own order, each alias
- *  hashed with the day (sky.ts fnv1a, the realm's), so a hole published, versioned or taken down moves no other. The
- *  day's hole is dayHole's: the first published before the day began that the Builder's rules pass (the same verdict
- *  everywhere), so the same for everyone all day, no server. */
-export function dayOrder<H extends Pick<HoleRow, "id" | "slot">>(rows: readonly H[], now: number): H[] {
-  const day = new Date(now).toISOString().slice(0, 10);
-  return rows.map((h) => ({ h, k: fnv1a(`${day} ${aliasOf(h)}`) })).sort((x, y) => (x.k < y.k ? -1 : x.k > y.k ? 1 : 0)).map(({ h }) => h);
+// the characters of an address after its "g1" (bech32's), in their byte order
+const BECH32 = "023456789acdefghjklmnpqrstuvwxyz";
+/** Where in alias order the UTC day's pick starts: the day's hash (sky.ts fnv1a, the realm's) spelled as an address
+ *  ("g1" and 13 of its characters), so any alias, of any author, is as likely to follow it. */
+export function dayPoint(now: number): string {
+  const h = fnv1a(new Date(now).toISOString().slice(0, 10));
+  return "g1" + Array.from({ length: 13 }, (_, i) => BECH32[Number((h >> BigInt(5 * (12 - i))) & 31n)]).join("");
+}
+
+/** How many candidates one DayCandidates read takes. */
+const DAY_PAGE = 25;
+
+/** The hole of the day's candidates, a page at a time: every community hole the realm lists for it (DayCandidates: each
+ *  alias's current version, none hidden, in alias order, with the block it was first published at), from the day's
+ *  point on and round to it, each once, none the site took down. Whatever is published, versioned or hidden that day,
+ *  the holes published before it keep their order from the point: the day's hole (dayHole's: the first published
+ *  before the day began that the Builder's rules pass, the same verdict everywhere) is the same for everyone all day,
+ *  no server. A page not read throws. */
+export async function* dayRows(chain: Pick<Chain, "dayCandidates">, now: number, taken: ReadonlySet<string>, n = DAY_PAGE): AsyncGenerator<DayRow[]> {
+  const at = dayPoint(now);
+  // from the point to the end, then from the start up to it
+  for (const [from, upTo] of [[at, null], ["", at]] as const) {
+    let after: string = from;
+    do {
+      const p = await chain.dayCandidates(after, n);
+      const rows = p.rows.filter((h) => (upTo === null || aliasOf(h) < upTo) && !takenDown(taken, h.id));
+      if (rows.length) yield rows;
+      after = p.next;
+    } while (after && (upTo === null || after < upTo));
+  }
 }
 
 /** The UTC day's first moment (ms). */
 export const dayStart = (now: number) => now - (now % 864e5);
 
-/** The day's hole among its candidates (dayOrder's): the first whose alias was published before the day began (born: by
+/** The day's hole among its candidates (dayRows'): the first whose alias was published before the day began (born: by
  *  alias) and the Builder's rules pass (verdicts: by id), DAY_TRIES judged at most; null while one before it is not known
  *  yet, or one could not be read (unread: never skipped, so never another hole than everyone else's). */
 export function dayHole<H extends Pick<HoleRow, "id" | "slot">>(candidates: readonly H[], born: ReadonlyMap<string, boolean | null>, verdicts: Verdicts): { day: H | null; unread: boolean } {
@@ -160,22 +183,20 @@ export function dayHole<H extends Pick<HoleRow, "id" | "slot">>(candidates: read
 
 /** Where when an alias was first published is kept (ms): this, which chain's realm (its id, genesis, realm), the alias. */
 export const BORN_KEY = "gnogolf.born";
-/** Whether a community hole's alias was first published before a time: its oldest version's block (Versions, then that
- *  block's time), kept once known (it never changes); throws if it cannot be read now. */
-export async function bornBefore(chain: Pick<Chain, "versions" | "blockTime"> & Which, alias: string, at: number): Promise<boolean> {
-  const key = `${BORN_KEY}|${await whichOf(chain)}|${alias}`;
+/** Whether a candidate's alias was first published before a time: the block DayCandidates gives (born; 0: long before),
+ *  its time kept once known (it never changes); throws if it cannot be read now. */
+export async function bornBefore(chain: Pick<Chain, "blockTime"> & Which, h: DayRow, at: number): Promise<boolean> {
+  if (!h.born) return true;
+  const key = `${BORN_KEY}|${await whichOf(chain)}|${aliasOf(h)}`;
   let ms: number | null = null;
   try {
     const v = Number(localStorage.getItem(key) ?? NaN);
     if (Number.isFinite(v)) ms = v;
   } catch {}
   if (ms == null) {
-    const first = (await chain.versions(alias)).versions[0];
-    // (its oldest listed past v1: Versions shows an alias's newest pageMax, or its first came from the old realm, so
-    // its v1 is older still, long before any day picked; no version: never one listed before)
-    ms = !first ? Infinity : first.v > 1 ? 0 : await chain.blockTime(first.height);
+    ms = await chain.blockTime(h.born);
     try {
-      if (Number.isFinite(ms)) localStorage.setItem(key, String(ms));
+      localStorage.setItem(key, String(ms));
     } catch {}
   }
   return ms < at;
@@ -189,19 +210,22 @@ export function sortHoles(rows: readonly HoleRow[], by: SortBy, levels: Readonly
   return rows.map((h, i) => ({ h, i })).sort((x, y) => key(y.h) - key(x.h) || x.i - y.i).map(({ h }) => h);
 }
 
-/** Where a hole's level on the meter (lib/builder/difficulty.ts, worked out in this browser) is kept: this, its version's id. */
+/** Where a hole's level on the meter (lib/builder/difficulty.ts, worked out in this browser) is kept: this, which chain's realm (its id, genesis, realm), its version's id. */
 export const HARD_KEY = "gnogolf.hardness";
-/** The level kept for a version (its data never changes), null if none or not one. */
-export function keptLevel(id: string): Level | null {
+const hardKeyOf = async (chain: Which, id: string) => (isVersion(id) ? `${HARD_KEY}|${await whichOf(chain)}|${id}` : null);
+/** The level kept for a version on its chain (its data never changes), null if none, not one, an alias or its chain not read. */
+export async function keptLevel(chain: Which, id: string): Promise<Level | null> {
   try {
-    const v = localStorage.getItem(`${HARD_KEY}|${id}`);
+    const key = await hardKeyOf(chain, id), v = key && localStorage.getItem(key);
     return v === "0" || v === "1" || v === "2" || v === "3" ? (Number(v) as Level) : null;
   } catch {
     return null;
   }
 }
-export function keepLevel(id: string, level: Level): void {
+/** Keeps a version's level on its chain (an alias's never; nothing when its chain or the store cannot be read). */
+export async function keepLevel(chain: Which, id: string, level: Level): Promise<void> {
   try {
-    localStorage.setItem(`${HARD_KEY}|${id}`, String(level));
+    const key = await hardKeyOf(chain, id);
+    if (key) localStorage.setItem(key, String(level));
   } catch {}
 }

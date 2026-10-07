@@ -191,15 +191,29 @@ community hole passes when its data is hex of at most 32 KiB, decodes, is of
 a Builder world, holds only the palette's pieces, passes the whole pipeline
 (E1 to E15, the render census) and is byte for byte what the Builder writes
 for it. Its verdict is kept in the browser under the sha-256 of its data and
-the rules' version (`VERDICT_RULES`: raising it judges every hole again), so
-a version is judged once a browser, whatever id or alias names it. A hole not
-judged yet is not shown; a hole that cannot be read, or whose rules could not
-load, is not played (and nothing is kept).
+the rules' version (`VERDICT_RULES`: raising it judges every hole again), and
+under its version id on its chain (the chain id, its genesis block's hash and
+the realm: a chain reseeded under the same id is another), so a version is
+judged once a browser, whatever id or alias names it, and one known is never
+read again. A hole not judged yet is not shown; a hole whose data or rules
+cannot be read now has no verdict at all: it is said not to load, with Try
+again, never to break the rules, and nothing is kept.
 
-- **The cups screen** judges the community holes of the page it shows, one
-  after the other, and lists only those that pass ("Checking the holes
-  against the Builder rules…" until the page is judged; author marks are read
-  only for holes listed).
+- **The cups screen** judges the community holes of the page it shows, a few
+  at a time, and lists only those that pass ("Checking the holes against the
+  Builder rules…" until the page is judged; author marks, players and the
+  Hardest meter are read only once it is, for holes listed).
+- **The hole of the day** is picked from the realm's `DayCandidates` (golf.md),
+  the one read added to the realm for the community: every alias's current
+  version, none hidden, in alias order, with the block its first version was
+  published at. The client reads it from the UTC day's point (the day's hash
+  spelled as an address), round to it, leaves out holes taken down and those
+  first published that day, and takes the first the gate passes (8 judged at
+  most). Holes() lists only the newest holes, so a pick made from it moved
+  when a hole slid out of it; this list is every hole, and a hole published,
+  versioned or hidden during the day moves no other: the day's hole is the
+  same for everyone all day, no server. A page not read holds the day back
+  (Try again), never skipped.
 - **The engine's `load`**, the one way into any hole (a link, a dare, a duel,
   the cups' list, Next), refuses a community hole that does not pass before
   anything of it is built: a link lands on the cups with *This hole was not

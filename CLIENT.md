@@ -121,6 +121,7 @@ a client that finds one can offer to go there).
 | To | Read |
 |---|---|
 | build a menu | `Holes()` (the course first, at most 120), then `Community(after, limit)` for the rest |
+| pick a hole of the day, the same for everyone all day | `DayCandidates(after, limit)` from a point in alias order the day picks, round to it: those with a `born` block before the day began |
 | draw a hole and aim | `HoleState(hole)`: the geometry, weather and wear, without the rounds |
 | preview the first stroke | `SimulateRoundAt(hole, shots, period)`, from the tee exactly |
 | preview any later stroke | `SimulateFrom(hole, x, y, shot, stroke, period)` from the last `"rest"` |

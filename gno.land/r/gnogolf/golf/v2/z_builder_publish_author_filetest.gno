@@ -42,4 +42,4 @@ func main(cur realm) {
 // gno.land/r/test/builderpublishv2author: 0
 
 // Gas:
-// 37852042
+// 37856569

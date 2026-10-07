@@ -193,6 +193,17 @@ export interface Holes extends Versioned {
   holes: readonly HoleRow[];
 }
 
+/** A hole of the day's candidate (DayCandidates): its Holes row, and the block its alias was first published at (0: long before). */
+export interface DayRow extends HoleRow {
+  born: number;
+}
+
+/** DayCandidates(after, limit): a page of them in alias order, none hidden, and the alias to go on from ("" at the end). */
+export interface DayCandidates extends Versioned {
+  rows: readonly DayRow[];
+  next: string;
+}
+
 /** Versions(alias): a community hole's versions, oldest shown first ("" slot and none for an alias with none). */
 export interface Versions extends Versioned {
   slot: string;
