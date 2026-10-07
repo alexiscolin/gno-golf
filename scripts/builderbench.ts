@@ -9,6 +9,7 @@
 //   after the drop (Scene.tsx, ?camlog's window.__builds), and no shader
 //   program linked for it (the old hole let go once the new one is drawn);
 //   never for an edit that changes nothing drawn (the slug);
+// - zoomed with the wheel (motion on), the board drawn once a frame at most;
 // - idle, the loop stopped: no frame asked for, little CPU;
 // - one WebGL context for the page, a quick test and Prove it visited and
 //   left (stage.ts);
@@ -34,9 +35,11 @@ const { launch, sleep, APP } = cdp;
 const W = 1440, H = 900, BUDGET = { fps: 50, slowFps: 30, idleCpu: 0.05, idleFrames: 2 };
 
 // counted from the first script: the canvases given a WebGL context, the GL objects alive on them, and the frames asked for
-const COUNT = `window.__gl = new Set(); window.__raf = 0; window.__live = { Program: 0, Texture: 0, Buffer: 0 }; window.__linked = 0;
+const COUNT = `window.__gl = new Set(); window.__raf = 0; window.__live = { Program: 0, Texture: 0, Buffer: 0 }; window.__linked = 0; window.__renders = 0;
 const gc = HTMLCanvasElement.prototype.getContext;
 HTMLCanvasElement.prototype.getContext = function (t, ...a) { const r = gc.call(this, t, ...a); if (r && /webgl/.test(t)) window.__gl.add(this); return r; };
+const clear = WebGL2RenderingContext.prototype.clear;
+WebGL2RenderingContext.prototype.clear = function (m) { window.__renders++; return clear.call(this, m); };
 for (const k of Object.keys(window.__live)) {
   const p = WebGL2RenderingContext.prototype, make = p["create" + k], drop = p["delete" + k];
   p["create" + k] = function (...a) { const o = make.apply(this, a); if (o) (window.__live[k]++, k === "Program" && window.__linked++); return o; };
@@ -108,6 +111,15 @@ await c.js(`(() => { const el = document.querySelector(".bhead__slug"); Object.g
 await sleep(1500);
 const slugBuilt = (await builds()) - builds0;
 
+// zoomed with the wheel, in and out: the renders (a render clears once) over the frames shown
+await c.js(`(() => { window.__frames = 0; const f = () => { window.__frames++; if (!window.__stop) requestAnimationFrame(f); }; window.__stop = false; requestAnimationFrame(f); })()`);
+const renders0 = await c.js<number>(`window.__renders`);
+for (let k = 0; k < 40; k++) {
+  await c.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: board.l + board.w / 2, y: board.t + board.h / 2, deltaX: 0, deltaY: k % 20 < 10 ? -40 : 40 });
+  await sleep(16);
+}
+const zoomFrames = await c.js<number>(`(window.__stop = true, window.__frames)`), zoom = { renders: (await c.js<number>(`window.__renders`)) - renders0, frames: zoomFrames };
+
 // idle: past the scene's IDLE_MS, nothing asked of the screen, little of the CPU
 await mouse("mouseMoved", 5, 5);
 await sleep(2600);
@@ -145,7 +157,7 @@ for (let k = 0; k < 120 && !(await flat.ev<boolean>(`!!document.querySelector(".
 const fallback = await flat.ev<boolean>(`!!document.querySelector(".board__ground") && !document.querySelector(".board--3d")`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, idle, contexts, live, fallback2D: fallback };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, fallback2D: fallback };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
@@ -153,6 +165,7 @@ assert.equal(during, 0, "the hole built again while a piece was dragged");
 assert.equal(after, 1, `the drop built the hole ${after} times`);
 assert.equal(slugBuilt, 0, `a slug edit built the hole ${slugBuilt} times`);
 assert.equal(relinked, 0, `the drop's rebuild linked ${relinked} shader programs`);
+assert.ok(zoom.renders <= zoom.frames + 1, `zoomed: ${zoom.renders} renders in ${zoom.frames} frames`);
 assert.ok(idle.frames <= BUDGET.idleFrames, `idle: ${idle.frames} frames asked for`);
 assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);
 assert.equal(contexts, 1, `${contexts} WebGL contexts`);

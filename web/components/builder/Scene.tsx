@@ -116,8 +116,8 @@ export default function Scene({ state, view, look, size, waker, paused = false, 
     return () => void (stale = true);
   }, [state]);
 
-  // the view, the look, the size: one frame
-  useEffect(() => draw(), [view, look, size]);
+  // the view, the look, the size: one frame (awake with motion, the loop's next one: one render a frame)
+  useEffect(() => void (!(motion && three.current?.loop) && draw()), [view, look, size]);
 
   // awake: moving (its water with motion allowed, its timed pieces always), until IDLE_MS after the pointer's last move
   useEffect(() => {
