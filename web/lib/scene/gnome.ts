@@ -559,8 +559,8 @@ export function makeGhost(o: number, skin: Skin = GHOST) {
 /** A little act a preview plays: "hop" (the picker: he hops, turning), "solo"
  *  (he rolls on the spot, rights himself, blinks, hops), "duel" (he and a
  *  duel's ghost hop in turn, as a duel's strokes go), "build" (he hammers:
- *  he tips forward to strike, three beats and a hop) or "shop" (he turns
- *  round to show himself off, then bows). */
+ *  three eased leans forward and a little hop) or "shop" (he sways to show
+ *  either side of himself, with a small bow). */
 export type Act = "hop" | "solo" | "duel" | "build" | "shop";
 
 const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
@@ -586,25 +586,31 @@ function hopAt(g: Gnome, t: number) {
   body.position.y = hop;
   return hop;
 }
-/** He hammers, as at a workbench: a quick tip forward to strike and back, three beats, then a little hop (2.4 s). */
+/** He hammers, as at a workbench: three leans forward from his feet, each eased in and out (0.8 s), then a
+ *  little hop (3.2 s in all); rest, the pose he starts and ends in. */
 function buildAt(g: Gnome, t: number) {
-  const { body } = g.userData, k = t % 2400, beat = k % 600;
-  const strike = k < 1800 ? (beat < 120 ? beat / 120 : Math.max(0, 1 - (beat - 120) / 360)) : 0;
-  const hop = k >= 1800 && k < 2200 ? Math.sin(((k - 1800) / 400) * Math.PI) * 0.2 : 0;
-  body.rotation.set(strike * 0.42, 0.45, 0);
+  const { body } = g.userData, k = t % 3200;
+  const lean = k < 2400 ? (1 - Math.cos(((k % 800) / 800) * Math.PI * 2)) / 2 : 0;
+  const hop = k >= 2500 && k < 3000 ? Math.sin(((k - 2500) / 500) * Math.PI) * 0.18 : 0;
+  body.rotation.set(lean * 0.24, 0.42, 0);
   body.position.set(0, hop, 0);
   return hop;
 }
-/** He shows himself off: a full turn, eased, then a bow, then a moment still (4 s). */
+/** He shows himself off: he sways to show one side then the other, with a small bow at each (4 s). */
 function shopAt(g: Gnome, t: number) {
-  const { body } = g.userData, k = t % 4000;
-  const turn = k < 1600 ? ease(k / 1600) * Math.PI * 2 : 0, bow = k >= 1700 && k < 2300 ? Math.sin(((k - 1700) / 600) * Math.PI) * 0.35 : 0;
-  body.rotation.set(bow, turn, 0);
+  const { body } = g.userData, a = ((t % 4000) / 4000) * Math.PI * 2;
+  body.rotation.set(Math.max(0, Math.sin(a * 2)) * 0.12, Math.sin(a) * 0.75, 0);
   body.position.set(0, 0, 0);
   return 0;
 }
-/** Each act's pose at time t (ms): his body moved and turned; what it returns, his hop's height (his shadow follows). */
+/** Each act's pose at time t (ms): his body moved and turned; what it returns, his hop's height (his shadow follows).
+ *  Each loops seamlessly and turns no faster than the others' calm pace (tested). */
 export const ACTS: Record<Act, (g: Gnome, t: number) => number> = { hop: hopAt, duel: hopAt, solo: (g, t) => soloAt(g, t % 3600), build: buildAt, shop: shopAt };
+/** Each act's stage: how far back the camera stands (z) and how much higher it looks (lift: the gnome stands lower
+ *  in the frame), so every panel's gnome stands on the same baseline (a duel's pair, a step back to fit both). */
+export const STAGES: Record<Act, { z: number; lift: number }> = {
+  hop: { z: 4.2, lift: 0 }, solo: { z: 4.2, lift: 0 }, build: { z: 4.2, lift: 0 }, shop: { z: 4.2, lift: 0 }, duel: { z: 5.2, lift: 0.2 },
+};
 
 /** A turntable for the gnome picker, and the game's choice's panels (act; a
  *  duel's ghost hops beside him in "duel"): its own small renderer, nothing
@@ -613,13 +619,13 @@ export const ACTS: Record<Act, (g: Gnome, t: number) => number> = { hop: hopAt, 
 export function makePreview(canvas: HTMLCanvasElement, { act = "hop", still = false }: { act?: Act; still?: boolean } = {}) {
   const renderer = makeRenderer(canvas);
   const scene = makeScene();
-  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
-  camera.position.set(0, 0.95, 4.2);
-  camera.lookAt(0, 0.38, 0); // pompom at the top of a hop to the shadow, in frame
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50), stage = STAGES[act];
+  camera.position.set(0, 0.95 + stage.lift, stage.z);
+  camera.lookAt(0, 0.38 + stage.lift, 0); // pompom at the top of a hop to the shadow, in frame
   let gnome: Gnome | null = null, alive = true;
   // the ghost, a step to his right
   const rival = act === "duel" ? makeGhost(0.55).ball : null;
-  if (rival) (rival.scale.setScalar(0.82), rival.position.set(0.46, 0, -0.25), scene.add(rival), camera.position.setZ(5.2)); // (the pair, a step back: room at both sides)
+  if (rival) (rival.scale.setScalar(0.82), rival.position.set(0.46, 0, -0.25), scene.add(rival)); // (the pair: its stage a step back, room at both sides)
   // the act's own clock: it runs only while playing (and never under reduced motion)
   let t = 0, last = 0, playing = !still, drawn = false;
   const size = () => {
