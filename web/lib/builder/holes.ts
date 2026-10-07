@@ -13,8 +13,8 @@ export const authorOf = (id: string): string | null => {
   return isAddress(a) ? a : null;
 };
 
-/** A community hole's line under its name: its author (short), world and par, on every list and card. */
-export const holeByline = ({ author, world, par }: { author: string; world: string; par: number }) => `by ${shortAddr(author)} · ${worldName(world)} · par ${par}`;
+/** A community hole's line under its name: its world, par and author (short), on every list and card. */
+export const holeByline = ({ author, world, par }: { author: string; world: string; par: number }) => `${worldName(world)} · par ${par} · by ${shortAddr(author)}`;
 
 /** The holes to list: me's own (none when no address is known) and the rest of the community's. */
 export function listHoles(rows: readonly HoleRow[], me: string | null, taken: ReadonlySet<string>) {
