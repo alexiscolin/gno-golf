@@ -30,6 +30,7 @@ export const LOCAL_RPC = /^http:\/\/127\.0\.0\.1:\d{1,5}$/;
  */
 export function playgroundServer({ root, rpc }) {
   if (!LOCAL_RPC.test(rpc)) throw new Error(`the node is on this machine, http://127.0.0.1:<port>, not "${rpc}"`);
+  const node = new URL(rpc).origin;
   if (!fs.statSync(fs.realpathSync(root)).isDirectory()) throw new Error(`the build is a folder, not "${root}"`); // (missing: realpath's own error, naming it)
   /** The file a path names under the root, or null: the root resolved anew each time (a link try-local.sh rebuild swaps
    *  to a new build in one rename: every request is the old build's or the new one's, whole). @param {string} p */
@@ -59,7 +60,9 @@ export function playgroundServer({ root, rpc }) {
   return http.createServer((req, res) => {
     const url = new URL(req.url || "/", "http://playground");
     if (url.pathname === "/rpc" || url.pathname.startsWith("/rpc/")) {
-      const to = new URL(url.pathname.slice(4) + url.search, rpc);
+      // the node's origin and the path after it, never a reference resolved against it ("//host/" would name another host)
+      const to = new URL(node + url.pathname.slice(4) + url.search);
+      if (to.origin !== node) return void res.writeHead(400).end();
       const up = http.request(to, { method: req.method, headers: { "content-type": req.headers["content-type"] || "application/json" } }, (r) => {
         res.writeHead(r.statusCode || 502, { "content-type": r.headers["content-type"] || "application/json" });
         r.pipe(res);
