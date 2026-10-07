@@ -119,6 +119,12 @@ export function makeShop(chain: Pick<Chain, "qjson" | "qstr">, realm = GNOMES_RE
     },
     canBuy: async (buyer: string, ids: readonly number[]) => read(`CanBuy(${addr(buyer)}, ${q(ids.map((id) => JSON.parse(gnomeId(id)) as string).join(","))})`, checks.canBuy),
     params: () => read("Params()", checks.params),
+    /** A gnome's picture as the chain draws it: his TokenURI once minted, else his page (Render), which draws any
+     *  gnome of a published series; the answer as the realm gives it (onchain.ts reads it). */
+    portrait: async (id: number) => {
+      const tid = gnomeId(id);
+      return chain.qstr(realm, `func() string { if u, err := TokenURI(${tid}); err == nil { return u }; return Render(${tid}) }()`);
+    },
   };
 }
 export type Shop = ReturnType<typeof makeShop>;
@@ -307,6 +313,15 @@ export function cardFact(e: Listed, s: Seen) {
   if (w) return `Opens ${utcDate(w.start, s.now, true)}`;
   return `Wave ${e.wave} · ${cap(e.home)}`;
 }
+
+/** The Legendaries the gallery shows coming, to look at: each wave's while no started wave holds it (not published
+ *  yet, or its start to come), in id order; none once the genesis has closed (a wave not open by then never opens). */
+export function comingLegends<E extends Some>(entries: readonly E[], c: Collection, now: number): E[] {
+  if (c.series[0]?.closed) return [];
+  return entries.filter((e) => e.tier === "legendary" && !c.waves.some((w) => e.id >= w.first && e.id <= w.last && w.start <= now));
+}
+/** A coming Legendary's one fact: his wave, no price, no date. */
+export const comingFact = (e: Pick<Listed, "wave">) => `Coming · wave ${e.wave}`;
 
 // ------------------------------------------------------------ a team (A6)
 const RANK: Record<string, number> = { legendary: 0, epic: 1, rare: 2, common: 3, earned: 4 };

@@ -64,6 +64,10 @@
 @media (max-width: 600px) { .gfilters > .seg { display: flex; width: 100%; } }
 .gfilters__search { flex: 1 1 180px; min-width: 0; height: 44px; padding: 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); }
 .gfilters .more { flex: 1 0 100%; }
+/* the look switch (3D · On chain): small, beside the search on a phone too */
+.seg.seg--look { flex: none; width: auto; box-shadow: none; }
+.seg--look button { min-height: 40px; padding: 6px 11px; font-size: 13px; white-space: nowrap; }
+.gfilters .seg--look button { padding-inline: 11px; }
 .gfilters .more .gfilters { margin-top: var(--sp-2); }
 
 /* the grid of cards: as many columns as fit, two on a phone */
@@ -79,6 +83,8 @@
 .gcard--mine .gcard__name small, .gcard--mine .gcard__fact { color: rgba(var(--paper-rgb), .8); }
 .gcard--never { background: transparent; border-style: dashed; border-color: rgba(var(--ink-rgb), .35); box-shadow: none; }
 .gcard--skel { pointer-events: none; }
+.gcard--coming { cursor: default; box-shadow: none; border-style: dashed; }
+.gcard--coming:hover { transform: none; }
 .gcard--skel .gtile { background: rgba(var(--ink-rgb), .06); }
 .gshelf__more { justify-self: center; }
 .gempty { justify-self: center; text-align: center; color: var(--ink-soft); }

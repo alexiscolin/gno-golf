@@ -5,7 +5,9 @@
 // the two boxes, the button that names the obligation to pay: legal.ts),
 // then the wallet (lib/adena.ts sendGnome, gnokey behind a tap), the chain
 // read back, and the moment he is yours with the receipt. A step changes the
-// sheet's content, never opens another. One gnome, one call (Buy(id)).
+// sheet's content, never opens another. One gnome, one call (Buy(id)). He
+// is drawn in the look the shop shows (his 3D portrait, or the chain's), the
+// switch under his picture.
 import { useEffect, useState, type ReactNode } from "react";
 import { Button, Sheet } from "@/components/ui";
 import Share from "@/components/Share";
@@ -21,7 +23,8 @@ import { decode } from "@/lib/gnomes/codec";
 import { bill, gnot, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
 import { BOX_A, BOX_B, LINKS, SIGN_NOTE, TRUST, orderButton, receipt, review } from "@/lib/gnomes/legal";
 import { tokenSkin } from "@/lib/gnomes/wear";
-import { TierChip, Tile, tierName } from "./parts";
+import { portraitsOf, type Look } from "@/lib/gnomes/onchain";
+import { LookSwitch, TierChip, Tile, tierName } from "./parts";
 
 type Account = { address: string; chainId: string };
 type Step =
@@ -37,9 +40,11 @@ interface Props {
   onPlay: (skinId: string) => void; onTheirs: (owner: string) => void;
   /** after a buy or an equip: read the player's gnomes again */
   onChanged: () => void;
+  /** how he is drawn (the shop's look), and the switch to the other */
+  look: Look; onLook: (l: Look) => void;
 }
 
-export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onChanged }: Props) {
+export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onChanged, look, onLook }: Props) {
   const me = account && account.address;
   const [row, setRow] = useState<GnomeRow | null>(null);
   const [can, setCan] = useState<CanBuy | null>(null);
@@ -120,9 +125,12 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
     }
   }
 
-  const head = (small = false, title: ReactNode = g.name) => (
+  const onChain = look === "chain" ? portraitsOf(chain) : null;
+  // his picture, the look switch under it (switch: in his first view alone), his tier, number and wave, a title
+  const head = (small = false, title: ReactNode = g.name, swap = false) => (
     <div className={`gsheet__head${small ? " gsheet__head--small" : ""}`}>
-      <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} />
+      <Tile id={g.id} tier={g.tier} lazy={false} never={!!row && row.closed} onChain={onChain} />
+      {swap && <LookSwitch look={look} onLook={onLook} />}
       {!small && <span className="gsheet__meta"><TierChip tier={g.tier} /> #{g.id} · Wave {g.wave} · {cap(g.home)}</span>}
       <h2>{title}</h2>
     </div>
@@ -137,7 +145,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       const traits = decode(g.traits);
       body = (
         <>
-          {head()}
+          {head(false, g.name, true)}
           <p className="gsheet__line">{g.line}</p>
           {row && row.closed ? (
             <p className="gsheet__fine"><b>Never made.</b> The sale closed before this gnome found a player.</p>
@@ -222,7 +230,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       break;
     }
     case "sign": case "read":
-      body = <div className="gsheet__head gsheet__hop" role="status"><Tile id={g.id} tier={g.tier} lazy={false} /><h2>{step.at === "sign" ? "Sign in Adena…" : "Reading it back from the chain…"}</h2></div>;
+      body = <div className="gsheet__head gsheet__hop" role="status"><Tile id={g.id} tier={g.tier} lazy={false} onChain={onChain} /><h2>{step.at === "sign" ? "Sign in Adena…" : "Reading it back from the chain…"}</h2></div>;
       break;
     case "done":
       body = (

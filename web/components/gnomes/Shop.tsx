@@ -6,7 +6,9 @@
 // over it (GnomeSheet). Loaded only when it is opened (Golf.tsx, behind
 // NEXT_PUBLIC_GNOMES), with its styles: the title and the holes' pages carry
 // none of it. Everything it shows is read: the catalogue the site serves, the
-// realm's Collection, Sold, GnomesOf and Worn, the region.
+// realm's Collection, Sold, GnomesOf and Worn, the region; each gnome drawn
+// as the thumbnails show him, or as the chain does (the look switch). On
+// sale, each wave's Legendary to come shows too, to look at.
 import "@/app/gnomes.css";
 import { useEffect, useMemo, useState } from "react";
 import { FrontScreen } from "@/components/About";
@@ -15,14 +17,15 @@ import Share from "@/components/Share";
 import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { canBuyCard, cardFact, closingSlot, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, closingSlot, comingLegends, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
-import { Closes, GnomeCard, TierChip } from "./parts";
+import { Closes, ComingCard, GnomeCard, LookSwitch, TierChip } from "./parts";
 import { BlankShelf, ClosesSlot, SHOP_HEAD, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
+import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
 import GnomeSheet from "./GnomeSheet";
 
 /** What the shop shows: a player's gnomes (who: their address, theirs read-only) and a gnome open (its id, or an earned kind). */
@@ -61,6 +64,10 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [now, setNow] = useState(() => Math.floor(chain.now() / 1000));
   const [f, setF] = useState<{ view: View; tier?: Listed["tier"]; home?: Home; text: string }>({ view: "sale", text: "" });
   const [shown, setShown] = useState(PAGE);
+  // the look the viewer picked, kept in this browser: on chain, the portraits read as the cards come into view
+  const [look, setLook] = useState<Look>(savedLook);
+  const onLook = (l: Look) => (setLook(l), saveLook(l));
+  const onChain = look === "chain" ? portraitsOf(chain) : null;
 
   // the sale's figures, again on coming back to the page: a closing date moved, a gnome taken
   const load = () => {
@@ -100,6 +107,8 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
     const out = shelf(cat.gnomes, { view: v, tier: f.tier, home: f.home, text: f.text }, seen).list;
     return v === "mine" ? teamOrder(out.map((g) => ({ ...g, id: String(g.id) }))).map((g) => ({ ...g, id: Number(g.id) })) : out;
   }, [cat, seen, theirs, viewing, f]);
+  // on sale, the Legendary of each wave not open yet, to look at, after the page of gnomes on sale (the same filters)
+  const coming = useMemo(() => (cat && seen && viewing === "sale" ? shelf(comingLegends(cat.gnomes, seen.c, seen.now), { view: "all", tier: f.tier, home: f.home, text: f.text }, seen).list : []), [cat, seen, viewing, f]);
   useEffect(() => setShown(PAGE), [f, viewing]);
 
   const open = view.open && cat ? cat.gnomes.find((g) => String(g.id) === view.open) : undefined;
@@ -162,6 +171,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
         <div className="gfilters">
           <Segmented label="Which gnomes" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
           <input className="gfilters__search" type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={f.text} onChange={(e) => setF((x) => ({ ...x, text: e.target.value }))} />
+          <LookSwitch look={look} onLook={onLook} />
           <details className="more">
             <summary>More filters</summary>
             <div className="gfilters">
@@ -180,7 +190,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
         <div className="gempty" role="alert"><p>The chain did not answer.</p><Button variant="primary" onClick={load}>Try again</Button></div>
       ) : !seen || !cat ? (
         <BlankShelf />
-      ) : !list.length ? (
+      ) : !list.length && !coming.length ? (
         <div className="gempty">
           {viewing === "mine" ? <p>None yet. You play with the free gnomes and the ones you earn on the course.</p> : theirs ? <p>No gnome yet.</p> : <p>No gnome like that one.</p>}
           {!theirs && viewing !== "mine" && <Button variant="secondary" onClick={() => setF({ view: f.view, text: "" })}>Clear the filters</Button>}
@@ -189,8 +199,9 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
         <>
           <ul className="gshelf">
             {list.slice(0, shown).map((g) => (
-              <li key={g.id}><GnomeCard g={g} fact={cardFact(g, seen)} mine={mineSet.has(g.id)} never={closed && !sold!(g.id)} buy={canBuyCard(g, seen)} onOpen={() => onView({ ...view, open: String(g.id) })} /></li>
+              <li key={g.id}><GnomeCard g={g} fact={cardFact(g, seen)} mine={mineSet.has(g.id)} never={closed && !sold!(g.id)} buy={canBuyCard(g, seen)} onChain={onChain} onOpen={() => onView({ ...view, open: String(g.id) })} /></li>
             ))}
+            {coming.map((g) => <li key={g.id}><ComingCard g={g} onChain={onChain} /></li>)}
           </ul>
           {list.length > shown && <Button variant="secondary" className="gshelf__more" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, list.length - shown)} more · {shown} of {list.length}</Button>}
         </>
@@ -201,7 +212,8 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       </details>
       {open && c && (
         <GnomeSheet g={open} shop={shop} chain={chain} c={c} account={account} region={region === true} now={now} wallet={wallet} onConnect={onConnect}
-          onClose={() => onView({ who: view.who })} playing={playing} worn={wornSkin} onPlay={onPlay} onTheirs={(who) => onView({ who })} onChanged={mineLoad} />
+          onClose={() => onView({ who: view.who })} playing={playing} worn={wornSkin} onPlay={onPlay} onTheirs={(who) => onView({ who })} onChanged={mineLoad}
+          look={look} onLook={onLook} />
       )}
       {earned && (
         <Sheet label={earned.name} onClose={() => onView({ who: view.who })} className="gsheet">
