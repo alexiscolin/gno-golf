@@ -29,5 +29,7 @@ export default {
   images: { unoptimized: true },
   devIndicators: false, // the dev badge sits on the HUD's bottom-left button
   // the commit a build is of (Netlify's COMMIT_REF), said with every analytics event
-  env: { NEXT_PUBLIC_BUILD: (process.env.COMMIT_REF || "").slice(0, 7) },
+  // the gnome shop's flag written in even when unset (""), so a build without it drops the shop's import() and makes
+  // no chunk of it (components/gnomes/Door.tsx)
+  env: { NEXT_PUBLIC_BUILD: (process.env.COMMIT_REF || "").slice(0, 7), NEXT_PUBLIC_GNOMES: process.env.NEXT_PUBLIC_GNOMES || "" },
 };

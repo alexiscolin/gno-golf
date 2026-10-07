@@ -22,9 +22,8 @@ import { SkyIcon } from "@/components/Weather";
 import { Frame } from "@/components/Worlds";
 import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Skin } from "@/lib/scene/gnome";
-import { SHOP, makeShop } from "@/lib/gnomes/shop";
-import { askWorn, onWear, wearVersion } from "@/lib/gnomes/wear";
-import Collector from "@/components/gnomes/Rank";
+import { SHOP, onWear, wearVersion } from "@/lib/gnomes/door";
+import { Collector, askWorn } from "@/components/gnomes/Door";
 
 // The leaderboards (the Players sheet: this hole, the course, friends), the records to beat
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -1088,7 +1087,7 @@ export function Sticker({ player, at = 0, tag, sub, chain, me, gnome, onClick, s
 function useWorn(chain: Chain | null, player: string) {
   useSyncExternalStore(onWear, wearVersion, wearVersion);
   useEffect(() => {
-    if (SHOP && chain && player) void askWorn((ps) => makeShop(chain).wornMany(ps), player);
+    if (SHOP && chain && player) askWorn(chain, player);
   }, [chain, player]);
 }
 const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;

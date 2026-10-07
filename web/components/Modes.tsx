@@ -22,7 +22,7 @@ import { track, type RivalKind } from "@/lib/analytics";
 import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2 } from "@/lib/types";
-import Collector from "@/components/gnomes/Rank";
+import { Collector } from "@/components/gnomes/Door";
 
 // onBuild: the Builder's page (none: it is to come); shop: a fourth panel, the gnome shop's: its gnome (one of the
 // wave's, once read: null until then), its line and where it leads (the gallery)

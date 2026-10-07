@@ -10,8 +10,7 @@ import { theWorld, worldName } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
 import type { Home, Tier } from "./vocab";
 
-/** The shop is on (NEXT_PUBLIC_GNOMES=1); off, the game is exactly as before it. */
-export const SHOP = process.env.NEXT_PUBLIC_GNOMES === "1";
+export { SHOP } from "./door";
 
 /** The tiers Buy sells: every one, at its wave's fixed price (there is no auction). */
 export const BUY_TIERS = ["common", "rare", "epic", "legendary"] as const;
