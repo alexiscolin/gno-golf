@@ -4,9 +4,10 @@
 // lists, links and plays a community hole only once the Builder's own rules
 // pass it (lib/builder/verdict.ts judge: its world, its pieces, E1 to E15,
 // the render census, the bytes the Builder writes). Each version is judged
-// once a browser, its verdict kept by the sha of its data under the rules'
-// version (VERDICT_RULES: a change to the rules judges every hole again), and
-// only for holes about to be shown. The Builder's code and builder.wasm load
+// once a browser, its verdict kept by the sha of its data and by its id on its
+// chain (a version's data never changes: one known is never read again), under
+// the rules' version (VERDICT_RULES: a change to the rules judges every hole
+// again), and only for holes about to be shown. The Builder's code and builder.wasm load
 // on the first one (a chunk of their own, never on the game's first load);
 // a hole not yet judged is not shown. A hole whose data, or the rules, cannot
 // be read right now has no verdict at all (verdictOf throws, nothing kept):
@@ -31,6 +32,9 @@ export const VERDICT_KEY = "gnogolf.verdict";
 /** What the game says of a community hole it will not show. */
 export const NOT_BUILDER = "This hole was not made with the Builder rules.";
 
+/** What judging reads of a chain: a hole's data, and which chain's realm it is (a version's verdict is kept by its id there). */
+export type Judging = Pick<Chain, "holeData" | "chainId" | "realm">;
+
 /** What judging needs: builder.wasm's host, and the render census (the game's scene). */
 export interface JudgeDeps {
   load: () => Promise<{ host: BuilderHost; census: NonNullable<ValidateOptions["census"]> }>;
@@ -40,6 +44,8 @@ const builder: JudgeDeps = {
 };
 
 const keyOf = async (hex: string) => `${VERDICT_KEY}|${VERDICT_RULES}|${await sha256(bytesOf(hex))}`;
+/** A version's key ("<alias>/v<n>": its data never changes), on its chain's realm; null for an alias (it names the next version once one is published). */
+const idKeyOf = async (chain: Judging, id: string) => (/\/v\d+$/.test(id) ? `${VERDICT_KEY}|${VERDICT_RULES}|${await chain.chainId()}|${chain.realm}|${id}` : null);
 const kept = (key: string): Verdict | null => {
   try {
     const v = localStorage.getItem(key);
@@ -55,13 +61,17 @@ const keep = (key: string, v: Verdict) => {
 };
 
 /** The Builder's verdict on a community hole's version (its id), judged at most once a browser; throws if its data or the rules cannot be read now (no verdict, nothing kept). */
-export async function verdictOf(chain: Pick<Chain, "holeData">, id: string, deps: JudgeDeps = builder): Promise<Verdict> {
+export async function verdictOf(chain: Judging, id: string, deps: JudgeDeps = builder): Promise<Verdict> {
+  const idKey = await idKeyOf(chain, id), known = idKey && kept(idKey);
+  if (known) return known;
   const hex = await chain.holeData(id);
-  const key = await keyOf(hex), was = kept(key);
-  if (was) return was;
-  const [{ judge }, { host, census }] = await Promise.all([import("./builder/verdict"), deps.load()]);
-  const v = await judge(hex, host, census);
-  keep(key, v);
+  const key = await keyOf(hex);
+  let v = kept(key);
+  if (!v) {
+    const [{ judge }, { host, census }] = await Promise.all([import("./builder/verdict"), deps.load()]);
+    v = await judge(hex, host, census);
+  }
+  for (const k of [key, idKey]) if (k) keep(k, v);
   return v;
 }
 
@@ -72,25 +82,26 @@ export const communityOf = (list: readonly HoleRow[], taken: ReadonlySet<string>
 /** Whether the game may play a hole (its version or its alias): a course hole always, never judged (the
  *  realm's own, under no address); a community hole (PublishMine's, under its author's address) once its verdict
  *  passes. Rejects when there is no verdict (its data or the rules not read now): the hole did not load. */
-export const playable = async (chain: Pick<Chain, "holeData">, id: string, deps: JudgeDeps = builder): Promise<boolean> =>
+export const playable = async (chain: Judging, id: string, deps: JudgeDeps = builder): Promise<boolean> =>
   !authorOf(id) || verdictOf(chain, id, deps).then((v) => v.ok);
 
 /** Whether the Builder's rules refuse a hole: only on a verdict that refuses it, never for one not read now (a link to it,
  *  or to an id the chain has not, is loaded, and said not to load or to lead nowhere). */
-export const refused = (chain: Pick<Chain, "holeData">, id: string, deps: JudgeDeps = builder): Promise<boolean> =>
+export const refused = (chain: Judging, id: string, deps: JudgeDeps = builder): Promise<boolean> =>
   playable(chain, id, deps).then((ok) => !ok, () => false);
 
 /** A verdict this browser already has for a version, null if none: never a judging (the phone's /build screen loads no builder.wasm). */
-export async function knownVerdict(chain: Pick<Chain, "holeData">, id: string): Promise<Verdict | null> {
+export async function knownVerdict(chain: Judging, id: string): Promise<Verdict | null> {
   try {
-    return kept(await keyOf(await chain.holeData(id)));
+    const idKey = await idKeyOf(chain, id);
+    return (idKey && kept(idKey)) || kept(await keyOf(await chain.holeData(id)));
   } catch {
     return null;
   }
 }
 
 /** The rows this browser already passed, in their order: a list that judges none (the phone's /build). */
-export async function knownOnly(chain: Pick<Chain, "holeData">, rows: readonly HoleRow[]): Promise<HoleRow[]> {
+export async function knownOnly(chain: Judging, rows: readonly HoleRow[]): Promise<HoleRow[]> {
   const known = await Promise.all(rows.map((h) => knownVerdict(chain, h.id)));
   return rows.filter((_, i) => known[i]?.ok === true);
 }

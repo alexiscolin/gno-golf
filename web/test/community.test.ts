@@ -28,9 +28,9 @@ const hostileHex = (() => {
 })();
 const goodHex = hexOf(lane("garden", []));
 
-function chainOf(data: Record<string, string>) {
+function chainOf(data: Record<string, string>, network = "dev") {
   const asked: string[] = [];
-  return { asked, holeData: (id: string) => (asked.push(id), Object.hasOwn(data, id) ? Promise.resolve(data[id]) : Promise.reject(new Error("no hole"))) };
+  return { asked, realm: "gno.land/r/gnogolf/golf/v2", chainId: () => Promise.resolve(network), holeData: (id: string) => (asked.push(id), Object.hasOwn(data, id) ? Promise.resolve(data[id]) : Promise.reject(new Error("no hole"))) };
 }
 const deps = { load: () => Promise.resolve({ host, census }) };
 
@@ -53,6 +53,22 @@ void test("a version is judged once a browser: its verdict kept by the sha of it
   await verdictOf(chain, `${A}/bad2/v1`, counting);
   assert.equal(judged, 1, "the same data under another id: its sha's verdict, not judged again");
   assert.ok(Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? "").some((k) => k.startsWith(VERDICT_KEY)), "kept in this browser");
+});
+
+void test("a version's verdict is kept by its id on its chain (its data never changes): known, its data never read again; an alias's always read", async () => {
+  const data = { [`${A}/good/v1`]: goodHex, [`${A}/good`]: goodHex };
+  const chain = chainOf(data);
+  assert.deepEqual(await verdictOf(chain, `${A}/good/v1`, deps), { ok: true });
+  assert.deepEqual(chain.asked, [`${A}/good/v1`]);
+  assert.deepEqual(await verdictOf(chain, `${A}/good/v1`, deps), { ok: true });
+  assert.deepEqual(await knownVerdict(chain, `${A}/good/v1`), { ok: true });
+  assert.deepEqual(await knownOnly(chain, [rowOf(`${A}/good/v1`)]).then((r) => r.map((h) => h.id)), [`${A}/good/v1`]);
+  assert.deepEqual(chain.asked, [`${A}/good/v1`], "known: no read");
+  await verdictOf(chain, `${A}/good`, deps);
+  await verdictOf(chain, `${A}/good`, deps);
+  assert.deepEqual(chain.asked.slice(1), [`${A}/good`, `${A}/good`], "an alias names a new version once one is published: read each time");
+  const other = chainOf({ [`${A}/good/v1`]: hostileHex }, "test-2");
+  assert.equal((await verdictOf(other, `${A}/good/v1`, deps)).ok, false, "the same id on another chain: its own data judged");
 });
 
 void test("knownVerdict: a verdict this browser already has, never a judging (the phone's /build screen loads no builder.wasm)", async () => {

@@ -36,7 +36,7 @@ const DAY_TRIES = 8;
 
 export default function Community({ community, chain, onPlay }: {
   community: readonly HoleRow[];
-  chain: Pick<Chain, "bests" | "holeData" | "state" | "savedOn"> | null;
+  chain: Pick<Chain, "bests" | "holeData" | "chainId" | "realm" | "state" | "savedOn"> | null;
   onPlay: (id: string) => void;
 }) {
   const [by, setBy] = useState<SortBy>("new");
