@@ -63,6 +63,9 @@ void test("the phone's path reaches neither the editor nor builder.wasm; the com
   const editor = reached(path.join(WEB, "components/builder/Builder.tsx"));
   assert.ok(editor.has(path.join(WEB, "lib/builder/wasm.ts")), "the editor itself reaches its host (the checks above are not vacuous)");
   assert.ok([...editor].some((f) => /["'`][^"'`\n]*builder\.wasm["'`]/.test(fs.readFileSync(f, "utf8"))), "and asks for builder.wasm");
+  // the difficulty meter runs in its worker, a chunk of its own: the editor carries only the line that starts it
+  assert.ok(editor.has(path.join(WEB, "lib/builder/meter.ts")) && !editor.has(path.join(WEB, "lib/builder/difficulty.ts")), "the editor: the meter's worker, not the meter");
+  assert.ok(reached(path.join(WEB, "lib/builder/meter-worker.ts")).has(path.join(WEB, "lib/builder/difficulty.ts")), "the worker: the meter");
 });
 
 const A = "g1" + "a".repeat(38), B = "g1" + "b".repeat(38);

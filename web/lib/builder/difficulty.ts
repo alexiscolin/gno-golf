@@ -18,9 +18,8 @@ import { RULES, shotOf } from "../chain";
 import { inZone, segDist } from "../terrain";
 import { LOOSE, nameIn, passages } from "./checks";
 import type { Draft, V } from "./draft";
-import { frame, writeDraft } from "./gg1";
+import { frame, keyOf, pieceName, piecesBy, writeDraft } from "./gg1";
 import { CELL, gridOf, reach } from "./lane";
-import { keyOf, pieceName, piecesBy } from "./pipeline";
 import { cap, FIELD, MAX_PAR } from "./rules";
 import type { GHole, GZone } from "./types";
 import type { BuilderHost } from "./wasm";
@@ -462,3 +461,13 @@ export function meterTitle(e: Estimate): string {
   const par = e.par ? ` ${cap(parWords(e))}, until your test rounds set it.` : "";
   return `Difficulty, the meter's guess: ${LEVELS[e.level]}.${par} (${e.shots.toLocaleString("en")} shots in ${e.ms} ms${e.cut ? ", cut short" : ""}.)`;
 }
+
+/** What the editor shows of an estimate (made in the meter's worker: the editor's own chunk carries none of the meter): the level and its word, the dock's line, the chip's words in full, the par. */
+export interface Shown {
+  level: Level;
+  word: string;
+  line: { text: string; piece?: string };
+  title: string;
+  par: number;
+}
+export const shown = (e: Estimate): Shown => ({ level: e.level, word: LEVELS[e.level], line: meterLine(e), title: meterTitle(e), par: e.par });

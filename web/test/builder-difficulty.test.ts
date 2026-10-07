@@ -10,7 +10,7 @@ import fs from "node:fs";
 import { host, lane, rail } from "./builder-fixture.ts";
 import { cases, garden, put } from "./builder-broken.ts";
 import { loadWorld } from "./scene-harness.ts";
-import { BUDGET, estimate, estimateHole, fraction, holing, levelOf, LEVELS, meterLine, meterTitle, type Estimate } from "../lib/builder/difficulty.ts";
+import { BUDGET, estimate, estimateHole, fraction, holing, levelOf, LEVELS, meterLine, meterTitle, shown, type Estimate } from "../lib/builder/difficulty.ts";
 import { STARTERS } from "../lib/builder/starters.ts";
 import { canonicalHex } from "../lib/builder/proof.ts";
 import { writeHole } from "../lib/builder/gg1.ts";
@@ -127,6 +127,7 @@ void test("a hole made very hard on purpose: the rules let it through, the meter
   ]);
   assert.deepEqual(meterLine(e), { text: "The plank bar lets the ball by only 1/6 of the time.", piece: "gate" });
   assert.match(meterTitle(e), /^Difficulty, the meter's guess: Very hard\. \(\d[\d,]* shots in \d+ ms\.\)$/);
+  assert.deepEqual(shown(e), { level: 3, word: "Very hard", line: meterLine(e), title: meterTitle(e), par: 0 }, "what the worker sends the editor");
 });
 
 void test("one narrow gap alone, or one rare window alone: at least Medium, the piece named", async () => {

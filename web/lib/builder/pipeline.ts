@@ -8,7 +8,7 @@
 // and the board's clamps read the same rules (edit.ts).
 import { checkHole, KERB_GAP, LOOSE, work, WORK_WARN, type Issue } from "./checks";
 import { explain } from "./explain";
-import { BOARD, LIMITS, MARGIN, barCorners, entryParts, frame, writeDraft } from "./gg1";
+import { BOARD, LIMITS, MARGIN, barCorners, frame, keyOf, pieceName, piecesBy, writeDraft } from "./gg1";
 import { CELL, reach } from "./lane";
 import { entry as entryIn, type PaletteEntry, type Range } from "./palette";
 import { cap, FIELD } from "./rules";
@@ -46,19 +46,6 @@ export interface Validated {
 export const MAX_BYTES = 32 << 10;
 const ACROSS = BOARD - 2 * MARGIN;
 const pt = (p: V) => `(${+p[0].toFixed(2)}, ${+p[1].toFixed(2)})`;
-/** A hole's piece as a key: "wall4", "post0", "zone2p1"'s order (the census's). */
-export const keyOf = (r: PieceRef) => `${r.set}${r.i}${r.pulse ?? ""}`;
-/** The draft piece each of the hole's pieces came from, by keyOf (writeDraft's refs). */
-export function piecesBy(d: Draft, refs: Map<string, PieceRef[]>): Map<string, Piece> {
-  const by = new Map<string, Piece>();
-  for (const p of d.pieces) for (const r of refs.get(p.id) ?? []) by.set(keyOf(r), p);
-  return by;
-}
-/** A piece's name in a sentence: "the plank bar", "the plain rail". */
-export const pieceName = (p: Piece) => {
-  const { kind, skin } = entryParts(p.entry);
-  return `the ${skin || "plain"} ${kind}`;
-};
 const err = (rule: Issue["rule"], text: string, p?: Piece, at?: V): Issue => ({ rule, severity: "error", text, ...(p && { piece: p.id }), ...(at && { at }) });
 
 /** A geometry in a sentence. */
