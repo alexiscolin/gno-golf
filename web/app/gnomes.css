@@ -185,6 +185,9 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: 90px; }
 /* a gnome's sheet: the game's sheet, a little wider, its parts on one column, its action pinned */
 .gsheet.sheet__in { max-width: 520px; width: 100%; display: grid; gap: var(--sp-3); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; }
 html:has(.gsheet) { overflow: hidden; }
+/* the shop's sheets open inside its screen (its stacking context, under the network banner, a later sibling): the
+   banner goes while one is open, as the corner buttons do (globals.css), never a chip over the sheet's Buy */
+body:has(.shop .sheet) .netbanner { visibility: hidden; }
 .gsheet > * { margin: 0 !important; }
 .gsheet__head { display: grid; justify-items: center; gap: var(--sp-2); text-align: center; }
 .gsheet__head .gtile { width: min(220px, 60vw); }

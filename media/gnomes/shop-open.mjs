@@ -4,7 +4,8 @@
 // and 390: the layout shifts the page reports over 6 s, failing over 0.01
 // (the shop draws its final frame first: ShopFrame.tsx); then every card's
 // picture in sight loaded (no broken image), and the shop never wider than
-// the window (no sideways scroll). Before, the title screen alone: none of
+// the window (no sideways scroll); a gnome's sheet opened from a card over
+// everything, the network banner too (never a chip over its Buy). Before, the title screen alone: none of
 // the sale read (the catalogue) nor the collection's wardrobe fetched, which
 // only a screen showing the sale needs. With OUT, a frame every 100 ms and a
 // strip of them.
@@ -49,9 +50,13 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   const pics = await b.ev(`(() => { const s = ${seen}; return { n: s.length, broken: s.filter((i) => !i.complete || !i.naturalWidth).map((i) => i.getAttribute("src")) }; })()`);
   // the shop's room the window's: nothing past its side (a trackpad's swipe shifts nothing)
   const wide = await b.ev(`(() => { const s = document.querySelector(".screen.shop"); return s.scrollWidth - s.clientWidth; })()`);
-  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length && wide <= 0 && !early.length;
+  // a card's sheet: nothing of the banner (Local chain, Feedback, Support) over it, nor clickable through it
+  await b.js(`document.querySelector(".gshelf li .gcard").click(); true`);
+  for (let i = 0; i < 20 && !(await b.ev(`!!document.querySelector(".gsheet")`)); i++) await sleep(250);
+  const over = await b.ev(`(() => { const n = document.querySelector(".netbanner"); if (!n) return 0; return [...n.querySelectorAll("*")].filter((e) => { const r = e.getBoundingClientRect(); if (!r.width) return false; const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return at && at.closest(".netbanner"); }).length; })()`);
+  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length && wide <= 0 && !early.length && over === 0;
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: ${early.length} sale reads on the title screen, layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken, ${wide} px sideways`, early.length ? JSON.stringify(early) : "", pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
+  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: ${early.length} sale reads on the title screen, layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken, ${wide} px sideways, ${over} of the banner over a sheet`, early.length ? JSON.stringify(early) : "", pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
   b.kill();
   if (!dir) continue;
   // a strip: every other frame (0-5.8 s), 6 a row
