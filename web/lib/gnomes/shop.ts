@@ -5,7 +5,7 @@
 // bill before a signature, the gallery's shelf. The
 // figures are all read: no price, cap or date is written here.
 import { depositFor, feeFor } from "../adena";
-import { GNOMES_REALM, isAddress, shortAddr, type Chain } from "../chain";
+import { GNOMES_REALM, isAddress, isObj, nums, shortAddr, strs, type Chain, type Obj } from "../chain";
 import { cap } from "../card";
 import { TIER_LOOK, filterGnomes, type Listed, type Query } from "./catalogue";
 import type { Home, Tier } from "./vocab";
@@ -41,10 +41,7 @@ export interface CanBuy { version: number; ok: boolean; reason: Reason; said: st
 /** Params(): the longest player window and a Buy's batch, as the realm holds them. */
 export interface Params { version: number; maxHours: number; maxBatch: number; denom: string }
 
-type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
-const nums = (v: Obj, ...k: string[]) => k.every((x) => Number.isFinite(v[x]));
-const strs = (v: Obj, ...k: string[]) => k.every((x) => typeof v[x] === "string");
+// (the shape checks the chain's reads use, chain.ts; booleans, the gnomes' alone)
 const bools = (v: Obj, ...k: string[]) => k.every((x) => typeof v[x] === "boolean");
 const every = (v: unknown, ok: (x: unknown) => boolean) => Array.isArray(v) && v.every(ok);
 const perTier = (v: unknown): v is PerTier => isObj(v) && nums(v, ...BUY_TIERS);

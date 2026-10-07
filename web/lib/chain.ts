@@ -106,12 +106,12 @@ function refusal(log: string | undefined) {
 // Small and structural: what the page reads without looking twice. Anything
 // deeper (a skin's name, a zone's numbers) the scene already treats as data.
 
-type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
+export type Obj = Record<string, unknown>;
+export const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isVec = (p: unknown): p is Vec2 => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]);
 const arrays = (v: Obj, ...keys: string[]) => keys.every((k) => Array.isArray(v[k]));
-const nums = (v: Obj, ...keys: string[]) => keys.every((k) => Number.isFinite(v[k]));
-const strs = (v: Obj, ...keys: string[]) => keys.every((k) => typeof v[k] === "string");
+export const nums = (v: Obj, ...keys: string[]) => keys.every((k) => Number.isFinite(v[k]));
+export const strs = (v: Obj, ...keys: string[]) => keys.every((k) => typeof v[k] === "string");
 const isMode = (m: unknown): m is Mode => m === "assisted" || m === "pro";
 const holeRow = (h: unknown) => isObj(h) && typeof h.id === "string";
 // a path is points of two finite numbers
