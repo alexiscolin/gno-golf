@@ -69,7 +69,7 @@ void test("the course holes of the Builder's worlds: each measured within the bu
     tally[e.level]++;
     if (e.par && Math.abs(e.par - g.par) <= 1) near.push(slot);
     if (e.ms > heaviest.ms) heaviest = { slot, ms: e.ms, shots: e.shots };
-    const r = await asDraft(hex, host);
+    const r = await asDraft(hex, host, census);
     if (typeof r !== "string") {
       opened++;
       const de = (await estimate(host, r.draft))!, ids = new Set(r.draft.pieces.map((p) => p.id));
@@ -127,7 +127,7 @@ void test("a hole made very hard on purpose: the rules let it through, the meter
   ]);
   assert.deepEqual(meterLine(e), { text: "The plank lets the ball by only 1/6 of the time.", piece: "gate" });
   assert.match(meterTitle(e), /^Difficulty, the meter's guess: Very hard\. \(\d[\d,]* shots in \d+ ms\.\)$/);
-  assert.deepEqual(shown(e), { level: 3, word: "Very hard", line: meterLine(e), title: meterTitle(e), par: 0 }, "what the worker sends the editor");
+  assert.deepEqual(shown(e), { level: 3, word: "Very hard", line: meterLine(e), title: meterTitle(e), par: 0, path: e.path, heat: e.heat }, "what the worker sends the editor");
 });
 
 void test("one narrow gap alone, or one rare window alone: at least Medium, the piece named", async () => {
@@ -172,4 +172,16 @@ void test("the level from what was measured", () => {
   assert.equal(levelOf({ ...m, rarest: 1 / 8 }), 2, "a window a quarter of the time or less");
   assert.equal(levelOf({ ...m, rarest: 1 / 2 }), 1);
   assert.deepEqual([1 / 8, 1 / 2, 5 / 12, 1 / 6, 0.37].map(fraction), ["1/8", "1/2", "5/12", "1/6", "37%"]);
+});
+
+void test("the line to show in Edit: the best line's paths stroke by stroke from the tee, and where the meter's shots stopped, counted by cell", async () => {
+  const d = STARTERS.garden.dogleg, e = (await estimate(host, d))!;
+  assert.equal(e.path.length, e.strokes, "a path a stroke");
+  assert.ok(Math.hypot(e.path[0][0][0] - d.tee[0], e.path[0][0][1] - d.tee[1]) < 1e-6, "the first from the tee");
+  for (let k = 1; k < e.path.length; k++) assert.deepEqual(e.path[k][0], e.path[k - 1].at(-1), `stroke ${k + 1} from where stroke ${k} stopped`);
+  const counted = e.heat.reduce((n, [, , k]) => n + k, 0);
+  assert.ok(counted > 0 && counted <= e.shots, `${counted} stops of ${e.shots} shots`);
+  assert.ok(e.heat.every(([x, y]) => x === Math.floor(x) + 0.5 && y === Math.floor(y) + 0.5), "each cell by its middle");
+  const s = shown(e);
+  assert.deepEqual([s.path, s.heat], [e.path, e.heat], "the editor is handed them");
 });

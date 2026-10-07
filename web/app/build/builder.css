@@ -437,3 +437,15 @@
 /* the keys at the board's foot */
 .board__keys { position: absolute; left: var(--sp-3); bottom: var(--sp-3); max-width: calc(100% - 2 * var(--sp-3)); margin: 0; padding: 4px var(--sp-2); border-radius: 10px; background: rgba(var(--paper-rgb), .92); font-size: 13px; font-weight: 700; color: var(--ink); pointer-events: none; }
 .board__keys kbd { font: inherit; font-family: var(--mono); padding: 0 4px; border: 1.5px solid rgba(var(--ink-rgb), .35); border-radius: 5px; }
+/* quick shots and the meter's line (Board's ball): paths in the board's units, their strokes in pixels; the latest bright, three before it faded */
+.board__shots polyline { fill: none; stroke: var(--white); stroke-width: 2.5px; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.board__shots polyline.old { opacity: .35; }
+.board__shots polyline.aim { stroke-dasharray: 6 5; opacity: .9; }
+.board__ball { fill: var(--white); stroke: var(--ink); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.board__line polyline { fill: none; stroke: var(--gold); stroke-width: 3px; stroke-dasharray: 1 6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.board__line circle { fill: #ffb547; }
+.board__tools { position: absolute; right: var(--sp-3); top: var(--sp-3); z-index: 1; display: flex; align-items: center; gap: var(--sp-2); }
+.board__quick { padding: 4px var(--sp-2); border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.board__toggle { padding: 4px var(--sp-3); border: 1.5px solid var(--ink); border-radius: var(--pill); background: rgba(var(--paper-rgb), .92); font: 700 13px var(--font); color: var(--ink); white-space: nowrap; cursor: pointer; }
+.board__toggle[aria-pressed="true"] { background: var(--gold); }
+.board__toggle:disabled { opacity: .6; cursor: default; }

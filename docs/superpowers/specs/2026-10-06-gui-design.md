@@ -370,6 +370,18 @@ near, proved, world; at 1440, 1280 and 1024.
   turns, ⌫ deletes, ⌘Z undoes, Space held makes a drag pan, F frames the
   whole hole, T goes to Test, Escape drops the piece in hand or leaves Test
   (not while aiming: there it drops the aim, the game's).
+- **The ball in Edit**: Shift and a pull on the board plays a quick shot, as
+  the game's slingshot pulls one (the ball flies away from the pull), from
+  the tee, or from where the last one stopped when the pull starts on its
+  ball; in calm weather, by `builder.wasm`'s `round` and `from` (the
+  realm's own physics). Its path is drawn, white, the last three faded, and
+  the pull under way dashed; as a piece is dragged, they all play again on
+  the hole as it is. The board says "Quick shot: not a proof" (a quick shot
+  is never kept with the draft, never replayed into a proof: Test proves).
+  "Show the line" (top right of the board) draws the difficulty meter's best
+  line, gold, and a light heat map of where its shots stopped; only on the
+  hole the meter measured, never during a drag. Escape clears the quick
+  shots.
 - **The right**: the hole in 3D, in sync; the selected piece only: its name,
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
   sliders: size, bounce, timing). Nothing selected: "Click a piece to change

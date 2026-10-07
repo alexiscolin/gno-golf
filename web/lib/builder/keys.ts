@@ -22,5 +22,6 @@ export const KEYS: readonly { key: string; short: string; long: string }[] = [
   { key: "Space", short: "Pan", long: "held, a drag pans the board" },
   { key: "F", short: "Frame", long: "frames the whole hole" },
   { key: "T", short: "Test", long: "plays it in Test" },
-  { key: "Esc", short: "Back", long: "drops the piece in hand, or leaves Test" },
+  { key: "⇧ drag", short: "Quick shot", long: "on the board, pulls back a quick shot from the tee, or from where the last one stopped (calm weather; never a proof)" },
+  { key: "Esc", short: "Back", long: "drops the piece in hand and the quick shots, or leaves Test" },
 ];

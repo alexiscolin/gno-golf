@@ -33,7 +33,7 @@ export async function proofKey(d: Draft, host: BuilderHost): Promise<string | nu
 export const shaOf = (hex: string): Promise<string> => sha256(bytesOf(hex));
 
 /** The draft's canonical bytes (framed, written, fit): what is played in test mode and published; null if fit refuses it. */
-export function canonicalHex(d: Draft, host: BuilderHost): string | null {
+export function canonicalHex(d: Draft, host: Pick<BuilderHost, "fit">): string | null {
   const { hex, bars } = writeDraft(frame(d), FIELD[d.world]);
   const f = host.fit(hex, bars);
   return f.ok ? f.hex : null;

@@ -5,7 +5,9 @@
 // lives in a session (its history; a drag one step); every change is
 // checked by the whole pipeline (pipeline.ts validate, the render census
 // included) 150 ms after the last, and nothing that breaks the hole is ever
-// made: the board, the inspector and the keys all ask first (edit.ts).
+// made: the board, the inspector and the keys all ask first (edit.ts). The
+// ball shows in Edit too: quick shots pulled on the board, played on the
+// hole as it is (quickshot.ts), and the meter's best line; never a proof.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { census } from "@/lib/builder/drawn";
 import { canPlace, toWorld, copyPiece, dropEnd, errorsOf, fixOf, movePiece, newErrors, placeNear, placePiece, removePiece, roomFor, snap, whereOf, clampMove } from "@/lib/builder/edit";
@@ -37,13 +39,16 @@ import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
 import { tilesOf } from "@/lib/builder/tiles";
 import { sound } from "@/lib/feel";
+import { quickShots, type QuickShot } from "@/lib/builder/quickshot";
 
 /** How long after the last change the whole pipeline runs. */
 const CHECK_MS = 150;
 /** How long after a clean check the difficulty meter is asked (about 400 ms after the last change). */
 const METER_MS = 250;
-/** The id the 3D's hole is loaded under in the builder's wasm. */
+/** The Builder's worlds, for the header's menu. */
 const WORLDS = Object.keys(FIELD);
+/** Quick shots kept on the board: the latest and three faded. */
+const SHOTS_KEPT = 4;
 
 export default function Editor({ host, first, author, onSave, onBack, onTest, onPublish, onEstimate = () => {}, hints = false, onHinted = () => {} }: {
   host: BuilderHost;
@@ -92,6 +97,10 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [rounds, setRounds] = useState<{ key: string; kept: string[]; broken: string[] } | null>(null);
   const prevKey = useRef<string | null>(null);
   const [toast, setToast] = useState("");
+  // quick shots: the last few pulled (their specs, played again on the hole as it is now), the one being pulled, and the meter's line shown
+  const [shots, setShots] = useState<QuickShot[]>([]);
+  const [aim, setAim] = useState<QuickShot | null>(null);
+  const [lineOn, setLineOn] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
@@ -139,6 +148,16 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     return () => clearTimeout(t);
   }, [clean, kept]);
   const guess = clean && est?.e ? est.e : null, measuring = clean && est?.of !== kept;
+  // the quick shots on the hole as shown (a drag's too: they replay live), the one being pulled last
+  const played = useMemo(() => quickShots(host, draft, aim ? [...shots, aim] : shots) ?? [], [host, draft, shots, aim]);
+  const landed = aim ? played.slice(0, -1) : played;
+  // a new quick shot holed: the cup's sound (its putt is played as it is let go)
+  const shotSeen = useRef<QuickShot | undefined>(undefined);
+  useEffect(() => {
+    if (shots.at(-1) === shotSeen.current || aim) return;
+    shotSeen.current = shots.at(-1);
+    if (landed.at(-1)?.holed) sound("cup");
+  }, [shots, aim, landed]);
   useEffect(() => void (est?.of === kept && onEstimate(est.e?.par ?? 0)), [est, kept, onEstimate]);
 
   // a new key for the hole as kept: the author's rounds of the hole before replayed on its bytes, off the main
@@ -250,7 +269,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
       if (act?.t === "frame") return setFrameAsk((n) => n + 1);
       if (act?.t === "test") return void (!testOff && onTest(kept));
       if (mod && e.key.toLowerCase() === "z") return (e.preventDefault(), e.shiftKey ? session.redo() : session.undo(), refresh());
-      if (e.key === "Escape") return (setArmed(null), setSelected(null));
+      if (e.key === "Escape") return (setArmed(null), setSelected(null), setShots([]));
       const arrows: Record<string, V> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       const step = (k: string) => arrows[k].map((x) => x * (e.shiftKey ? 2 : 0.5)) as V;
       if (e.key === "Enter" && armed && !t.closest("button, a")) return (e.preventDefault(), dropArmed());
@@ -292,7 +311,12 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <div className="centre">
             {toast && <p className="btoast" role="status">{toast}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} />
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show}
+              ball={{
+                played: landed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
+                line: guess && est?.of === kept && draft === kept ? { path: guess.path, heat: guess.heat } : null,
+                onAim: setAim, onShot: (q) => (sound("putt"), setAim(null), setShots((s) => [...s, q].slice(-SHOTS_KEPT))),
+              }} />
             <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff, rounds: rounds && key?.of === kept && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>

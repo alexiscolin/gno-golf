@@ -116,3 +116,12 @@ void test("the Editor keeps one session (its undo history) for as long as it is 
   assert.match(src, /const \[session\] = useState\(\(\) => makeSession\(first\)\)/, "made once per mount (its key opens a new one)");
   assert.doesNotMatch(src, /useMemo\(\(\) => makeSession/, "not remade when the parent hands the saved draft back");
 });
+
+void test("quick shots in Edit: said on the board to be no proof, never handed to a proof, and the meter's line shown only on the hole it measured", () => {
+  const board = fs.readFileSync(new URL("../components/builder/Board.tsx", import.meta.url), "utf8");
+  const editor = fs.readFileSync(new URL("../components/builder/Editor.tsx", import.meta.url), "utf8");
+  assert.match(board, />Quick shot: not a proof</);
+  assert.match(editor, /quickShots\(host, /);
+  assert.doesNotMatch(editor, /replay\(|onProof/, "the editor never makes a proof: Test does");
+  assert.match(editor, /est\?\.of === kept && draft === kept/, "the line: of the hole as kept, and not while a drag moves it");
+});
