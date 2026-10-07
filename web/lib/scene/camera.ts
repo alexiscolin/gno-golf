@@ -59,6 +59,39 @@ export function makeScene(): LitScene {
   return scene;
 }
 
+/**
+ * A studio for pictures (the showcases: piece-showcase.ts, gnome-showcase.ts):
+ * a canvas of its own, size px square, its renderer at a pixel ratio of 1, a
+ * lit scene. snap(camera, px, quality) draws the scene and scales it to px
+ * square, a WebP data URL (read in the same task: the drawing buffer is not
+ * kept); dispose() lets its renderer and its WebGL context go (a page holds
+ * about sixteen).
+ */
+export function makeStudio(size: number) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const renderer = makeRenderer(canvas);
+  renderer.setPixelRatio(1);
+  renderer.setSize(size, size, false);
+  const scene = makeScene(), out = document.createElement("canvas");
+  return {
+    canvas,
+    scene,
+    snap(camera: THREE.Camera, px: number, quality: number) {
+      renderer.render(scene, camera);
+      out.width = out.height = px;
+      const x = out.getContext("2d")!;
+      x.imageSmoothingQuality = "high";
+      x.drawImage(canvas, 0, 0, px, px);
+      return out.toDataURL("image/webp", quality);
+    },
+    dispose() {
+      renderer.dispose();
+      renderer.forceContextLoss();
+    },
+  };
+}
+
 // ------------------------------------------------------------ time of day
 //
 // A hole is played at one moment of the day, and keeps it: day, evening or
