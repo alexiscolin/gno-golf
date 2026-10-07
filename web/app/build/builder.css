@@ -196,7 +196,7 @@ button.issue__why:hover { text-decoration-style: solid; }
 .range small { grid-column: 2 / -1; font-size: 11px; font-weight: 600; line-height: 1.25; color: var(--ink-soft); }
 .range .seg { grid-column: 2 / -1; box-shadow: none; }
 .range .seg button { min-height: 32px; padding: 4px 6px; font-size: 13px; }
-.insp__dirs button { padding: 4px 0; }
+.insp__dirs button { flex: 1 1 0; min-width: 0; padding: 4px 0; } /* (eight ways in the row's width: each its share, the glyph inside it) */
 .cycle { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 16px; margin-left: 66px; }
 .cycle i { border-radius: 3px; background: rgba(var(--ink-rgb), .12); }
 .cycle i.on { background: var(--hat); }
