@@ -16,7 +16,7 @@ import { validate, type Census } from "./pipeline";
 import { FIELD, notABuilderWorld } from "./rules";
 import { MAX_NOTE, parseDraft, type Draft } from "./draft";
 import { authorOf } from "./holes";
-import { shortAddr, type Chain } from "../chain";
+import { isSlug, shortAddr, type Chain } from "../chain";
 import type { BuilderHost } from "./wasm";
 import { loadTakedown, takenDown } from "../takedown";
 
@@ -78,7 +78,7 @@ export async function fromPublished(hex: string, host: BuilderHost, id: string, 
   const r = await asDraft(hex, host, census);
   if (typeof r === "string") return r;
   const [author, slug] = id.split("/");
-  return { ...r.draft, slug: me && author === me && /^[a-z0-9-]{1,32}$/.test(slug) ? slug : "" };
+  return { ...r.draft, slug: me && author === me && isSlug(slug) ? slug : "" };
 }
 
 /**

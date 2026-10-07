@@ -4,6 +4,7 @@
 // that will be published. A draft read from a file or from the browser is
 // untrusted: parseDraft takes it only whole, on the grid and within its
 // limits. Its history (undo, redo) and its keeping in the browser are here.
+import { isSlug } from "../chain";
 import { FIELD, gameWorld, MAX_PAR, notABuilderWorld } from "./rules";
 
 export type V = [number, number];
@@ -141,7 +142,7 @@ export function parseDraft(text: string): Draft | string {
   if (!isObj(d)) return "The file is not a draft.";
   if (d.v !== 1) return "This draft is from another version of the Builder.";
   if (typeof d.world !== "string" || !Object.hasOwn(FIELD, d.world)) return gameWorld(String(d.world)) ? notABuilderWorld(String(d.world)) : `No world is called ${String(d.world)}.`;
-  if (typeof d.slug !== "string" || (d.slug !== "" && !/^[a-z0-9-]{1,32}$/.test(d.slug))) return "The hole's short name is 1 to 32 lower-case letters, digits and dashes.";
+  if (typeof d.slug !== "string" || (d.slug !== "" && !isSlug(d.slug))) return "The hole's short name is 1 to 32 lower-case letters, digits and dashes.";
   if (typeof d.title !== "string" || [...d.title].length > MAX_TITLE) return `The name is at most ${MAX_TITLE} characters.`;
   if (typeof d.note !== "string" || [...d.note].length > MAX_NOTE) return `The line for players is at most ${MAX_NOTE} characters.`;
   if (!isInt(d.par, 0, MAX_PAR)) return `Par is a whole number from 0 to ${MAX_PAR}.`;

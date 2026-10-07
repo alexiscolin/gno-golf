@@ -4,7 +4,7 @@
 // warm-up hole, then the one measured; their Storage and Gas less the
 // warm-up's), the bill shown before any signature, and the command for
 // gnokey, whose every argument reaches the realm as the page shows it.
-import { feeFor, gnokeyOn, MAX_GAS, PER_CALL, PKG_PATH } from "../adena";
+import { feeFor, gnokeyCall, gnokeyOn, MAX_GAS, PER_CALL, publishArgs } from "../adena";
 import { isAddress } from "../chain";
 import type { Versions } from "../types";
 import { holeId, holeRow } from "./testmode";
@@ -147,6 +147,6 @@ export const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 export function gnokeyPublish({ realm, slug, hex, note, gas, price, deposit: max, chainId, rpc, author }: {
   realm: string; slug: string; hex: string; note: string; gas: number; price: number; deposit: number; chainId: string | null | undefined; rpc: string; author: string;
 }) {
-  if (!isAddress(author) || !PKG_PATH.test(realm) || !/^[a-z0-9-]{1,32}$/.test(slug) || !/^(?:[0-9a-f]{2})+$/.test(hex) || !Number.isSafeInteger(gas) || gas <= 0 || !Number.isSafeInteger(max) || max < 0) return "";
-  return `gnokey maketx call -pkgpath ${realm} -func PublishMine -args ${slug} -args ${hex} -args ${shq(note)} -gas-fee ${feeFor(gas, price)}ugnot -gas-wanted ${gas} -max-deposit ${max}ugnot ${gnokeyOn(chainId, rpc, author)}`;
+  if (!isAddress(author) || !publishArgs({ realm, slug, hex, deposit: max }) || !Number.isSafeInteger(gas) || gas <= 0) return "";
+  return gnokeyCall(realm, "PublishMine", [slug, hex, shq(note)], gas, price, gnokeyOn(chainId, rpc, author), 0, max);
 }

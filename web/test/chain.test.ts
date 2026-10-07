@@ -4,7 +4,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
-  makeChain, errorKind, isAddress, isHoleId, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC,
+  makeChain, errorKind, isAddress, isHoleId, isSlug, safeEndpoint, pullShot, shotOf, roundShots, RULES, REALM_PATH, pkgsPath, storePath, isRealmPath, DEFAULT_RPC,
 } from "../lib/chain.ts";
 
 // ------------------------------------------------------------ the wire
@@ -99,6 +99,13 @@ test("isAddress accepts only a lowercase g1-bech32 address", () => {
   assert.equal(isAddress(ADDR1.toUpperCase()), false);
   assert.equal(isAddress(ADDR1.slice(0, -1)), false); // one char short
   assert.equal(isAddress(123), false);
+});
+
+test("isSlug: golf's validSlug, 1 to 32 lower-case letters, digits and dashes; the one rule every caller reads", () => {
+  for (const ok of ["a", "mole-run", "a1-", "x".repeat(32)]) assert.equal(isSlug(ok), true, ok);
+  for (const bad of ["", "x".repeat(33), "Mole", "a b", "a_b", "$(x)", "a/b", 7, null]) assert.equal(isSlug(bad), false, String(bad));
+  assert.equal(isHoleId(`${ADDR1}/${"x".repeat(32)}`), true, "a hole id's slug is the same rule");
+  assert.equal(isHoleId(`${ADDR1}/${"x".repeat(33)}`), false);
 });
 
 test("isHoleId accepts a realm path, a course slot (and its version), a community hole", () => {
