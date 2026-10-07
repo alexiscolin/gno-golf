@@ -1,7 +1,8 @@
 // The community's holes as the Builder lists them (the GUI spec's B5 and B6):
 // an author's own, and everyone else's, each at its latest version, never a
 // course hole, never one the site took down (takedown.ts).
-import { buildRpc, buildWeb, isAddress, isHoleId, safeEndpoint } from "../chain";
+import { buildRpc, buildWeb, isAddress, isHoleId, safeEndpoint, shortAddr } from "../chain";
+import { worldName } from "./rules";
 import { takenDown } from "../takedown";
 import type { HoleRow } from "../types";
 
@@ -10,6 +11,9 @@ export const authorOf = (id: string): string | null => {
   const a = id.split("/")[0];
   return isAddress(a) ? a : null;
 };
+
+/** A community hole's line under its name: its author (short), world and par, on every list and card. */
+export const holeByline = ({ author, world, par }: { author: string; world: string; par: number }) => `by ${shortAddr(author)} · ${worldName(world)} · par ${par}`;
 
 /** The holes to list: me's own (none when no address is known) and the rest of the community's. */
 export function listHoles(rows: readonly HoleRow[], me: string | null, taken: ReadonlySet<string>) {

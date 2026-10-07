@@ -19,14 +19,13 @@ import { sound } from "@/lib/feel";
 import { Button, Segmented } from "@/components/ui";
 import { authorFirst, authorMark, chainQuery, plural } from "@/components/common";
 import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
-import { authorOf, remixLink } from "@/lib/builder/holes";
+import { authorOf, holeByline, remixLink } from "@/lib/builder/holes";
 import { LEVELS, type Level } from "@/lib/builder/levels";
 import type { Meter } from "@/lib/builder/meter";
 import { savedOnMore, statsOf, type SavedRead } from "@/lib/builder/rewards";
 import { builderOn, onComputer } from "@/lib/builder/route";
-import { worldName } from "@/lib/builder/rules";
 import { inTurn, type MapHole } from "@/lib/duel";
-import { shortAddr, type Chain } from "@/lib/chain";
+import type { Chain } from "@/lib/chain";
 import { aliasOf, bornBefore, DAY_TRIES, dayHole, dayOrder, dayStart, keepLevel, keptLevel, pageOf, sortHoles, verdictOf, type SortBy, type Verdict, type Verdicts } from "@/lib/community";
 
 /** How many community holes a page judges and lists, one more page on each "Show more". */
@@ -171,7 +170,7 @@ function HoleCard({ h, big, map, players, mark, level, remix, onPlay }: {
       <span className="ccard__map">{map ? <HoleMap hole={map} className="ccard__svg" /> : <NoMap className="ccard__svg" />}</span>
       <span className="ccard__text">
         <b>{h.name || h.slot || h.id}</b>
-        <small>by {shortAddr(author)} · {worldName(h.world)} · par {h.par}</small>
+        <small>{holeByline({ author, world: h.world, par: h.par })}</small>
         <small>
           {players ? `${players.players}${players.more ? "+" : ""} ${plural("player", players.more ? 2 : players.players)}` : "…"}
           {level != null && ` · ${LEVELS[level]}`}
