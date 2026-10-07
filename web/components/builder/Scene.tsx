@@ -89,17 +89,17 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
     return true;
   };
 
-  /** The player's view in eye's canvas: rendered in the board canvas's corner (at most its size), copied, then the
-   *  board drawn again, in one task (never seen); only while the board holds the canvas (a quick test has it else).
-   *  Whether it painted (and so drew the board). */
+  /** The player's view in eye's canvas, at its own size: rendered in the board canvas's corner (the canvas grown for
+   *  it if it is the larger: the view shown large), copied, then the board drawn again at its size, in one task (never
+   *  seen); only while the board holds the canvas (a quick test has it else). Whether it painted (and drew the board). */
   const paint = (): boolean => {
     const t = three.current, r = stageRenderer(), el = eye?.canvas, s = latest.current.size;
     if (!t?.course || !r || !el || !stageUp() || r.domElement.parentElement !== box.current) return false;
-    const k = Math.min(1, s.w / el.clientWidth, s.h / el.clientHeight), w = Math.floor(el.clientWidth * k), h = Math.floor(el.clientHeight * k);
+    const w = el.clientWidth, h = el.clientHeight;
     if (!(w > 0 && h > 0)) return false;
     const cam = (lens.current ??= new THREE.PerspectiveCamera(30, 1, 3, 260)), view = { w, h, top: 0, bottom: 0, side: 0 };
     applyRig(cam, teeRig(t.course.userData.state, t.course.userData.height, view), view);
-    r.setSize(s.w, s.h, false);
+    r.setSize(Math.max(s.w, w), Math.max(s.h, h), false);
     r.setViewport(0, 0, w, h);
     r.setScissor(0, 0, w, h);
     r.setScissorTest(true);

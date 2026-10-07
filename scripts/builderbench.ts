@@ -18,6 +18,8 @@
 // - five quick tests in a row leave no GL program, texture or buffer behind
 //   (the game draws with the board's own renderer, lent to it);
 // - the context lost: the 2D board until it is back, then the 3D drawn again;
+// - the player's view shown large: drawn at its own size, never a smaller
+//   picture stretched;
 // - a quick test over a timed piece kept moving (Moving air, selected and
 //   playing): the board's loop draws nothing on the lent canvas, so the game
 //   alone draws, at the window's own shape; its context lost meanwhile, the
@@ -240,6 +242,14 @@ await builtIn(c, "island", islandBuilds + offline.built).catch(() => null);
 await settled(c, `window.__builds`, "the island's build", 800);
 const world = { ...offline, builtAgain: (await builds()) - islandBuilds - offline.built };
 
+// the player's view large (its dialog): its picture of the dialog canvas's own size, not the board's, stretched
+await c.js(`document.querySelector(".pview__pic").click()`);
+const e1 = await eyes();
+await waitFor(c, `document.querySelector(".pview__big")?.open && (window.__eyes ?? 0) > ${e1 - 1}`, "the player's view large");
+await settled(c, `window.__eyes`, "the large view painted", 600);
+const large = await c.js<{ css: number; px: number; dpr: number }>(`(() => { const e = document.querySelector(".pview__big canvas"); return { css: e.clientWidth, px: e.width, dpr: devicePixelRatio }; })()`);
+await c.js(`document.querySelector(".pview__big form button").click()`);
+await until(`!document.querySelector(".pview__big")?.open`, "the large view closed");
 let lent = { renders: 0, frames: 0, shape: 0, window: 0 }, testLost = { said: false, unsaid: false };
 // round the worlds and back: each built with its own scenery (Scene's ?camlog __scenery: the module that drew it), the player's view painted with it
 const scenery: { world: string; drawn: string; eyes: number }[] = [{ world: "island", drawn: await c.js<string>(`window.__scenery`), eyes: 0 }];
@@ -304,7 +314,7 @@ await settled(flat, `[!!document.querySelector(".tbench--quick, .tmode"), !!docu
 const noTest = await flat.js<{ quick: string; game: boolean; fell: boolean }>(`({ quick: [...document.querySelectorAll(".board__toggle")].find((b) => /Quick test/.test(b.textContent))?.title ?? "", game: !!document.querySelector(".tbench--quick, .tmode"), fell: !document.querySelector(".board") })`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked, eyesDuring, eyesAfter }, slugBuilt, zoom, idle, contexts, live, lost, world, scenery, lent, testLost, fallback2D: fallback, noTest };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked, eyesDuring, eyesAfter }, slugBuilt, zoom, idle, contexts, live, lost, world, scenery, large, lent, testLost, fallback2D: fallback, noTest };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
@@ -318,6 +328,7 @@ assert.ok(idle.frames <= BUDGET.idleFrames, `idle: ${idle.frames} frames asked f
 assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);
 assert.equal(contexts, 1, `${contexts} WebGL contexts`);
 assert.ok(lent.renders <= lent.frames + 1 && Math.abs(lent.shape - lent.window) <= 0.02, `a quick test over a timed piece kept moving: ${JSON.stringify(lent)} (the board drew on the lent canvas)`);
+assert.ok(large.px >= Math.round(large.css * Math.min(large.dpr, 1.25)) - 1, `the player's view large: ${large.px} px drawn for ${large.css} css px (stretched)`);
 assert.ok(testLost.said && testLost.unsaid, `a quick test's context lost and back: ${JSON.stringify(testLost)}`);
 assert.ok(scenery.every((x, i) => x.drawn === x.world && (i === 0 || x.eyes === 1)), `a world's own scenery: ${JSON.stringify(scenery)}`);
 assert.ok(world.built === 0 && /could not load/.test(world.said) && !world.thrown.length && world.builtAgain === 1, `a world that would not load: ${JSON.stringify(world)}`);
