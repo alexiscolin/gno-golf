@@ -8,7 +8,9 @@
 // version (VERDICT_RULES: a change to the rules judges every hole again), and
 // only for holes about to be shown. The Builder's code and builder.wasm load
 // on the first one (a chunk of their own, never on the game's first load);
-// a hole whose data cannot be read, or not yet judged, is not shown.
+// a hole not yet judged is not shown. A hole whose data, or the rules, cannot
+// be read right now has no verdict at all (verdictOf throws, nothing kept):
+// it is said not to load, with Try again, never to break the rules.
 import type { Chain } from "./chain";
 import { authorOf } from "./builder/holes";
 import { bytesOf, sha256 } from "./sha";
@@ -52,14 +54,9 @@ const keep = (key: string, v: Verdict) => {
   } catch {}
 };
 
-/** The Builder's verdict on a community hole's version (its id), judged at most once a browser. */
+/** The Builder's verdict on a community hole's version (its id), judged at most once a browser; throws if its data or the rules cannot be read now (no verdict, nothing kept). */
 export async function verdictOf(chain: Pick<Chain, "holeData">, id: string, deps: JudgeDeps = builder): Promise<Verdict> {
-  let hex: string;
-  try {
-    hex = await chain.holeData(id);
-  } catch {
-    return { ok: false, why: "This hole's data could not be read." };
-  }
+  const hex = await chain.holeData(id);
   const key = await keyOf(hex), was = kept(key);
   if (was) return was;
   const [{ judge }, { host, census }] = await Promise.all([import("./builder/verdict"), deps.load()]);
@@ -73,9 +70,15 @@ export const communityOf = (list: readonly HoleRow[], taken: ReadonlySet<string>
   taken ? list.filter((h) => !h.next && h.official === false && !takenDown(taken, h.id)) : [];
 
 /** Whether the game may play a hole (its version or its alias): a course hole always, never judged (the
- *  realm's own, under no address); a community hole (PublishMine's, under its author's address) once its verdict passes. */
+ *  realm's own, under no address); a community hole (PublishMine's, under its author's address) once its verdict
+ *  passes. Rejects when there is no verdict (its data or the rules not read now): the hole did not load. */
 export const playable = async (chain: Pick<Chain, "holeData">, id: string, deps: JudgeDeps = builder): Promise<boolean> =>
-  !authorOf(id) || verdictOf(chain, id, deps).then((v) => v.ok, () => false); // (the rules not loaded: no, and nothing kept)
+  !authorOf(id) || verdictOf(chain, id, deps).then((v) => v.ok);
+
+/** Whether the Builder's rules refuse a hole: only on a verdict that refuses it, never for one not read now (a link to it,
+ *  or to an id the chain has not, is loaded, and said not to load or to lead nowhere). */
+export const refused = (chain: Pick<Chain, "holeData">, id: string, deps: JudgeDeps = builder): Promise<boolean> =>
+  playable(chain, id, deps).then((ok) => !ok, () => false);
 
 /** A verdict this browser already has for a version, null if none: never a judging (the phone's /build screen loads no builder.wasm). */
 export async function knownVerdict(chain: Pick<Chain, "holeData">, id: string): Promise<Verdict | null> {
@@ -92,18 +95,22 @@ export async function knownOnly(chain: Pick<Chain, "holeData">, rows: readonly H
   return rows.filter((_, i) => known[i]?.ok === true);
 }
 
-/** The rows a list shows: those the Builder's rules passed (verdicts: by id); one not judged yet waits. */
-export const shownOnly = (rows: readonly HoleRow[], verdicts: ReadonlyMap<string, Verdict>) => rows.filter((h) => verdicts.get(h.id)?.ok === true);
+/** What a list knows of each hole, by id: its verdict, or null for one not read now (no verdict: asked again on Try again). */
+export type Verdicts = ReadonlyMap<string, Verdict | null>;
 
-/** A list's page (its first n rows): those shown, whether some are still being judged (the list waits, one move), how many rows lie beyond. */
-export function pageOf(rows: readonly HoleRow[], n: number, verdicts: ReadonlyMap<string, Verdict>) {
+/** The rows a list shows: those the Builder's rules passed; one not judged yet waits, one not read now is not shown. */
+export const shownOnly = (rows: readonly HoleRow[], verdicts: Verdicts) => rows.filter((h) => verdicts.get(h.id)?.ok === true);
+
+/** A list's page (its first n rows): those shown, whether some are still being judged (the list waits, one move), whether some could not be read, how many rows lie beyond. */
+export function pageOf(rows: readonly HoleRow[], n: number, verdicts: Verdicts) {
   const page = rows.slice(0, n);
-  return { rows: shownOnly(page, verdicts), judging: page.some((h) => !verdicts.has(h.id)), more: rows.length - page.length };
+  return { rows: shownOnly(page, verdicts), judging: page.some((h) => !verdicts.has(h.id)), unread: page.some((h) => verdicts.get(h.id) === null), more: rows.length - page.length };
 }
 
 /** The hole of the day's candidates: the listed community holes (communityOf's, in the chain's order) from
  *  the one the hash of the UTC day picks (sky.ts fnv1a, the realm's), on round the list. The day's hole is the
- *  first the Builder's rules pass (verdictOf: the same verdict everywhere), so the same for everyone, no server. */
+ *  first the Builder's rules pass (verdictOf: the same verdict everywhere; one not read here now is waited for, never
+ *  skipped), so the same for everyone, no server. */
 export function dayOrder<H>(rows: readonly H[], now: number): H[] {
   if (!rows.length) return [];
   const at = Number(fnv1a(new Date(now).toISOString().slice(0, 10)) % BigInt(rows.length));

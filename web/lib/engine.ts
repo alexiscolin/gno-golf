@@ -32,7 +32,7 @@ import { makeAimer, steerAim } from "./engine/aim";
 import { makeRival } from "./engine/rival";
 import { simHole, simReady, simStroke } from "./sim";
 import { loadTakedown, takenDown } from "./takedown";
-import { communityOf, NOT_BUILDER, playable } from "./community";
+import { communityOf, NOT_BUILDER, playable, refused } from "./community";
 import { authorOf } from "./builder/holes";
 import type { Extras, Ghost, HoleRow, Mode, Post, Stroke, Wall, Zone } from "./types";
 import { md, ud, type Course, type Gnome, type Hole } from "./scene/data";
@@ -594,8 +594,16 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     newRound(false);
     // a community hole plays only once the Builder's own rules pass it (lib/community.ts, judged once a
     // browser, the Builder's code loaded only then): anyone can publish one with gnokey, past the Builder.
-    // Every way into a hole comes here (a link, the cups' list, Next); nothing of a refused one is built
-    if (!(await playable(chain, id))) {
+    // Every way into a hole comes here (a link, the cups' list, Next); nothing of a refused one is built.
+    // Its data or the rules not read now is no verdict: the hole did not load, with Try again
+    let ok: boolean;
+    try {
+      ok = await playable(chain, id);
+    } catch (err) {
+      if (ticket === loads && alive) (g.failed = id), fail(err, "load");
+      return;
+    }
+    if (!ok) {
       if (ticket === loads && alive) fail(new Error(NOT_BUILDER), "unchecked");
       return;
     }
@@ -1462,7 +1470,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
     // an older archived version, past what Holes() lists: the chain may
     // still have it, so it is asked for; one it has not lands on the cups
     if (!asked && typeof link === "string" && link) {
-      if (!(await playable(chain, link))) return unchecked();
+      if (await refused(chain, link)) return unchecked(); // (not read now, or a link to nothing: loaded, and it fails)
       await load(link);
       if (!alive) return null;
       if (g.s) {
@@ -1473,7 +1481,7 @@ export function createGame(canvas: HTMLCanvasElement, { rpc, web, chain: given, 
       g.error = null;
       g.failed = null;
     }
-    if (asked && !(await playable(chain, asked.id))) return unchecked();
+    if (asked && (await refused(chain, asked.id))) return unchecked();
     g.linked = !!asked;
     // ?cup=island alone: that cup, on its first hole
     const cupWant = typeof link === "object" && link && "cup" in link ? link.cup : undefined;
