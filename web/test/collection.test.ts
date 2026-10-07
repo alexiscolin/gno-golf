@@ -167,7 +167,7 @@ test("collection: the album where the shop opens; ranks wherever the shop is bui
 // ------------------------------------------------------------ honest words
 test("collection: the module's words carry no money, no promise and no hurry", () => {
   const BANNED = /\b(value|valuable|worth|invest\w*|asset|floor|profit\w*|resale|resell|flip|apprecia\w*|scarc\w*|rarest|hurry|last chance|limited time|only \d+ left|don't miss|price|gain|earnings?|roi)\b/i;
-  for (const f of ["../lib/gnomes/collection.ts"]) {
+  for (const f of ["../lib/gnomes/collection.ts", "../components/gnomes/Album.tsx", "../components/gnomes/Rank.tsx"]) {
     const src = fs.readFileSync(new URL(f, import.meta.url), "utf8");
     // what a player reads: quoted strings, template literals and JSX text (comments aside)
     const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");

@@ -17,7 +17,7 @@ import Share from "@/components/Share";
 import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { canBuyCard, cardFact, closingSlot, comingLegends, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, closingSlot, comingLegends, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, SHOP, type Collection, type Held, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
@@ -27,6 +27,9 @@ import { BlankShelf, ClosesSlot, SHOP_HEAD, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
 import GnomeSheet from "./GnomeSheet";
+import Album from "./Album";
+import Collector from "./Rank";
+import { ALBUM_WORDS, album, albumLine, albumShown, collectorsOf } from "@/lib/gnomes/collection";
 
 /** What the shop shows: a player's gnomes (who: their address, theirs read-only) and a gnome open (its id, or an earned kind). */
 export interface ShopView { who?: string; open?: string }
@@ -59,8 +62,9 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [error, setError] = useState(false);
   const [region, setRegion] = useState<boolean | null>(null);
   const [mine, setMine] = useState<number[]>([]);
+  const [held, setHeld] = useState<Held["rows"] | null>(null); // (the same, as the realm lists them: the album's; null: not read)
   const [worn, setWorn] = useState<Worn | null>(null);
-  const [theirs, setTheirs] = useState<{ who: string; ids: number[]; name: string } | null>(null);
+  const [theirs, setTheirs] = useState<{ who: string; ids: number[]; name: string; rows: Held["rows"] } | null>(null);
   const [now, setNow] = useState(() => Math.floor(chain.now() / 1000));
   const [f, setF] = useState<{ view: View; tier?: Listed["tier"]; home?: Home; text: string }>({ view: "sale", text: "" });
   const [shown, setShown] = useState(PAGE);
@@ -84,19 +88,20 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   }, [shop]); // eslint-disable-line react-hooks/exhaustive-deps -- (load reads the same shop)
   // the player's own: what they hold and what everyone sees them wear
   const mineLoad = () => {
-    if (!me) return (setMine([]), setWorn(null));
-    void shop.allOf(me).then((rows) => setMine(rows.map((r) => Number(r.id))), () => {});
+    if (!me) return (setMine([]), setHeld(null), setWorn(null));
+    void shop.allOf(me).then((rows) => (setMine(rows.map((r) => Number(r.id))), setHeld(rows), collectorsOf(chain).know(me, { total: rows.length, rows })), () => {});
     void shop.worn(me).then(setWorn, () => setWorn(null));
   };
-  useEffect(mineLoad, [shop, me]);
+  useEffect(mineLoad, [shop, chain, me]);
   // a player's gnomes, read-only
   useEffect(() => {
     if (!view.who || view.who === me) return setTheirs(null);
     const who = view.who;
-    void Promise.all([shop.allOf(who), chain.nameOf(who).catch(() => "")]).then(([rows, name]) => setTheirs({ who, ids: rows.map((r) => Number(r.id)), name }), () => setTheirs({ who, ids: [], name: "" }));
+    void Promise.all([shop.allOf(who), chain.nameOf(who).catch(() => "")]).then(([rows, name]) => (setTheirs({ who, ids: rows.map((r) => Number(r.id)), name, rows }), collectorsOf(chain).know(who, { total: rows.length, rows })), () => setTheirs({ who, ids: [], name: "", rows: [] }));
   }, [shop, chain, view.who, me]);
 
   const mineSet = useMemo(() => new Set(mine), [mine]);
+  const myAlbum = useMemo(() => (cat && held ? album(cat.gnomes, cat.earned, held) : null), [cat, held]);
   const seen = useMemo(() => (c && sold ? { c, sold, mine: mineSet, now } : null), [c, sold, mineSet, now]);
   const closed = !!c && !!c.series[0] && c.series[0].closed;
   const viewing = theirs ? "theirs" : view.who === me && me ? "mine" : f.view;
@@ -167,6 +172,9 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
         </>
       )}
       {theirs && <Button variant="gold" className="btn--cta" onClick={() => onRace(theirs.who)}>Race their ghost</Button>}
+      {/* the album (ADR-011): the player's own, or theirs (under their Race), a row a world, a tier, a set */}
+      {cat && albumShown(SHOP, region) && (viewing === "mine" && me ? <Album cat={cat} owned={held || []} chain={chain} player={me} mine onOpen={(o) => onView({ ...view, open: o })} />
+        : theirs && theirs.rows.length > 0 && <Album cat={cat} owned={theirs.rows} chain={chain} player={theirs.who} mine={false} onOpen={(o) => onView({ ...view, open: o })} />)}
       {!theirs && (
         <div className="gfilters">
           <Segmented label="Which gnomes" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
@@ -185,6 +193,12 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
             </div>
           </details>
         </div>
+      )}
+      {/* the player's album in one line, its room kept from the first frame (ADR-011): a tap to it */}
+      {!theirs && viewing !== "mine" && me && (
+        <p className="galbum-line">{myAlbum && albumShown(SHOP, region) && (
+          <button className="linkish" onClick={() => onView({ who: me })}>{ALBUM_WORDS.open}{myAlbum.have > 0 && <> · {albumLine(myAlbum, row && row.at !== "none" && row.at !== "closed" ? row.wave.home : undefined)}<Collector chain={chain} player={me} /></>} ›</button>
+        )}</p>
       )}
       {error ? (
         <div className="gempty" role="alert"><p>The chain did not answer.</p><Button variant="primary" onClick={load}>Try again</Button></div>
