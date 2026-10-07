@@ -7,7 +7,6 @@
 // meshes offline (media/builder/tiles.mjs) and served as a file.
 import { commonOf, type PaletteEntry } from "./palette";
 import { entryName, GROUPS, TILES, type Group } from "./names";
-import { cap } from "./rules";
 
 export { GROUPS, type Group };
 
@@ -20,9 +19,6 @@ export interface Tile {
   group: Group;
   looks: readonly PaletteEntry[];
 }
-
-/** A look's name in the chooser: its skin, or Plain. */
-export const lookName = (e: PaletteEntry) => (e.skin ? cap(e.skin) : "Plain");
 
 /** A look's picture (the game's own drawing of it, in its world), as the site serves it. */
 export const pictureOf = (world: string, e: Pick<PaletteEntry, "kind" | "skin">) => `/builder/tiles/${world}/${e.kind}-${(e.skin || "plain").replaceAll(" ", "-")}.webp`;

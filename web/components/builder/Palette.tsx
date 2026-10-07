@@ -11,7 +11,8 @@
 // tiles it would pass off, with why. It scrolls in itself.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type PaletteEntry } from "@/lib/builder/palette";
-import { lookName, pictureOf, tilesOf, type Tile } from "@/lib/builder/tiles";
+import { pictureOf, tilesOf, type Tile } from "@/lib/builder/tiles";
+import { entryName } from "@/lib/builder/names";
 import { worldName } from "@/lib/builder/rules";
 import { sound } from "@/lib/feel";
 
@@ -43,7 +44,7 @@ export default function Palette({ world, palette, armed, off, onArm, chosen, onC
     return (
       <div key={t.key} className={`ptile${big ? " ptile--big" : ""}`}>
         <button type="button" className={`piece${on ? " piece--on" : ""}`} data-tile={t.key} disabled={!!why} aria-pressed={on}
-          title={why ?? `${t.name} (${lookName(e)}): ${t.does}. Drag it onto the board (Shift: several); from the keyboard, Enter places it`}
+          title={why ?? `${entryName(e)}: ${t.does}. Drag it onto the board (Shift: several); from the keyboard, Enter places it`}
           onPointerDown={() => arm(e)} onClick={(ev) => ev.detail === 0 && arm(e)}>
           <Picture world={world} e={e} px={big ? 64 : 72} />
           <span className="piece__name">{t.name}</span>
@@ -51,7 +52,7 @@ export default function Palette({ world, palette, armed, off, onArm, chosen, onC
         </button>
         {t.looks.length > 1 && (
           <button type="button" className="ptile__looks" aria-haspopup="dialog" aria-expanded={open?.tile.key === t.key}
-            title={`${t.looks.length} looks: ${lookName(e)} now. Choose another`}
+            title={`${t.looks.length} looks: ${entryName(e)} now. Choose another`}
             onClick={(ev) => setOpen(open?.tile.key === t.key ? null : { tile: t, from: ev.currentTarget })}>
             {t.looks.length}<span aria-hidden="true"> looks</span>
           </button>
@@ -119,10 +120,10 @@ function Looks({ world, tile, from, now, off, onPick, onClose }: {
         {tile.looks.map((e) => {
           const why = off.get(e.id);
           return (
-            <button key={e.id} type="button" className="look" aria-pressed={e.id === now.id} disabled={!!why} title={why ?? `${lookName(e)}: drag it onto the board`}
+            <button key={e.id} type="button" className="look" aria-pressed={e.id === now.id} disabled={!!why} title={why ?? `${entryName(e)}: drag it onto the board`}
               onPointerDown={() => pick(e)} onClick={(ev) => ev.detail === 0 && (pick(e), from.parentElement?.querySelector<HTMLElement>(".piece")?.focus())}>
               <Picture world={world} e={e} px={64} />
-              <span>{lookName(e)}</span>
+              <span>{entryName(e)}</span>
             </button>
           );
         })}

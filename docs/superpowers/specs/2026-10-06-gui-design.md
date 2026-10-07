@@ -348,12 +348,16 @@ near, proved, world; at 1440, 1280 and 1024.
   piece by what it does (Water: every pond; Slope: every hill), with the
   game's own picture of it (rendered offline from the game's meshes), its
   name and what it does in two or three words ("slows the ball"); its looks
-  (Lagoon, Tidepool, Fountain, Canal) in a chooser by the tile, each
+  (Lagoon, Tide pool, Fountain, Canal) in a chooser by the tile, each
   pictured. Under "More pieces", by group: Walls, Obstacles, Ground, Traps,
-  Moving pieces. A piece is called by its tile's name everywhere, its look
-  before it when it has one: the board's label, the inspector and every
-  sentence of the checks say "the wall", "the lagoon water", "the rock
-  obstacle" (never "the plain rail").
+  Moving pieces. Every piece has one name of its own, the same in every
+  world it is in and unique there: its look's ("Lagoon", "Wet sand",
+  "Flowerbed", "Clock hand"), the plain forms named as they are drawn
+  ("Pipe", "Mushroom", "Pond"), a skin two kinds share named apart
+  ("Driftwood log", "Driftwood post"). The board's label, the inspector, the
+  looks, the glossary, the toasts and every sentence of the checks say it:
+  "the wall", "the lagoon", "the rock" (never "the plain rail", never "the
+  rock obstacle").
 - **The board** (centre): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last

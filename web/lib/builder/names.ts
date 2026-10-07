@@ -1,9 +1,12 @@
-// One name per piece (the game-design review's quick win 5): a piece is
-// called what its palette tile calls it, on the board, in the inspector and
-// in every sentence the checks say ("the wall", not "the plain rail"; "the
-// lagoon water"). The tiles by what a piece does live here, plain data on
-// the bindings (no scene), so the checks, the worker and the palette
-// (tiles.ts) name alike.
+// One name per piece (the game-design review's quick win 5, then its piece
+// names): every palette entry has one clean name of its own, said on the
+// board, in the inspector and the looks, in the glossary and the toasts, and
+// in every sentence the checks say ("the wall", "the wet sand", "the lagoon",
+// "the clock hand"). A look is named by its skin ("lagoon": the Lagoon); a
+// plain form, or a skin two kinds share or that says too little, by NAMED.
+// The palette's tiles (what a piece does: Wall, Water, Barrier) are named
+// here too. Plain data on the bindings (no scene), so the checks, the worker
+// and the palette (tiles.ts) name alike.
 import { BINDINGS, KIND, type Binding } from "./bindings";
 import { entryParts } from "./gg1";
 import { cap, kicks } from "./rules";
@@ -44,18 +47,28 @@ export const TILES: readonly { key: string; name: string; does: string; group: G
 ];
 
 
-/** An entry's tile name and its look ("" when its skin says no more than the tile: the plain one, "water" in Water). */
-function partsOf(e: Named): { tile: string; look: string } {
-  const t = TILES.find((x) => x.takes(e));
-  if (!t) return { tile: e.skin ? e.kind : `plain ${e.kind}`, look: e.skin };
-  const look = e.skin && !t.name.toLowerCase().includes(e.skin) ? e.skin : "";
-  return { tile: t.name, look };
-}
+/**
+ * The names a skin alone does not give, by kind and skin: the plain forms
+ * (named as they are drawn: the plain tunnel is a pipe, the plain post a
+ * mushroom), a skin two kinds share (driftwood, a stall: a log and a post, a
+ * counter and a stand), and a skin that says too little or too much
+ * ("wetsand", "saddle crest"). Every name unique in its world, no word twice
+ * (builder-tiles.test.ts).
+ */
+const NAMED: Readonly<Record<string, string>> = {
+  "rail/": "Wall", "bar/": "Barrier", "post/": "Mushroom", "surface/": "Dirt", "slope/": "Slope", "hazard/": "Pond", "tunnel/": "Pipe",
+  "bar/driftwood": "Driftwood log", "post/driftwood": "Driftwood post", "bar/stall": "Market stall", "post/stall": "Sweet stand",
+  "bar/logs": "Fallen log", "bar/hay": "Hay bales", "bar/rail": "Railing", "bar/gate": "Castle gate", "bar/gate door": "Garden gate",
+  "post/clock": "Clock tower", "post/palm": "Palm tree", "post/pine": "Pine tree", "post/lamp": "Street lamp", "post/stump": "Tree stump",
+  "surface/wetsand": "Wet sand", "surface/soil": "Vegetable patch", "surface/brick": "Bricks", "surface/herringbone": "Herringbone paving",
+  "slope/slope": "Ski slope", "slope/saddle crest": "Saddle", "hazard/wave": "Waves", "hazard/tidepool": "Tide pool",
+};
 
-/** An entry as the board and the inspector name it: its look, then its tile's name ("Lagoon water", "Wall"). */
+/** An entry's one name ("Wall", "Wet sand", "Lagoon"): NAMED's, else its skin's, else (a plain form of a new kind) its tile's. */
 export function entryName(e: Named): string {
-  const { tile, look } = partsOf(e);
-  return cap(look ? `${look} ${tile.toLowerCase()}` : tile);
+  const own = `${e.kind}/${e.skin}`;
+  if (Object.hasOwn(NAMED, own)) return NAMED[own];
+  return cap(e.skin || (TILES.find((t) => t.takes(e))?.name ?? e.kind));
 }
 
 /** An entry by its id, as naming reads it: its kind and skin, with their binding (none: the plain form). */
@@ -65,5 +78,5 @@ const namedOf = (id: string): Named => {
   return { clocks: ["fixed"], ...k, ...own, kind, skin };
 };
 
-/** A piece's name in a sentence: "the wall", "the plank barrier", "the lagoon water". */
+/** A piece's name in a sentence: "the wall", "the plank", "the lagoon". */
 export const pieceName = (p: Pick<Draft["pieces"][number], "entry">) => `the ${entryName(namedOf(p.entry)).toLowerCase()}`;

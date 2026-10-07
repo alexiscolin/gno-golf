@@ -9,7 +9,8 @@ import fs from "node:fs";
 import "./scene-harness.ts";
 import { loadPalette, type PaletteEntry } from "../lib/builder/palette.ts";
 import { FIELD } from "../lib/builder/rules.ts";
-import { GROUPS, lookName, pictureOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { GROUPS, pictureOf, tilesOf, type Tile } from "../lib/builder/tiles.ts";
+import { entryName } from "../lib/builder/names.ts";
 
 const palettes = new Map<string, readonly PaletteEntry[]>();
 for (const w of Object.keys(FIELD)) palettes.set(w, await loadPalette(w));
@@ -50,7 +51,7 @@ void test("variants that play alike are one tile with looks: water, hills, tunne
   assert.deepEqual(skins(named("mountain", "Ice")), ["ice"]);
   assert.ok(skins(named("town", "Floor")).includes("brick") && !skins(named("town", "Sand")).includes("brick"));
   assert.deepEqual(skins(named("town", "Moving bar")), ["clock hand"]);
-  assert.equal(lookName(named("garden", "Tunnel").looks.at(-1)!), "Plain");
+  assert.equal(entryName(named("garden", "Tunnel").looks.at(-1)!), "Pipe", "the plain tunnel, a pipe as drawn");
 });
 
 void test("every look in every Builder world has its picture: a small WebP of the game's drawing", () => {
@@ -68,22 +69,25 @@ void test("every look in every Builder world has its picture: a small WebP of th
   assert.deepEqual(big, [], "over 8 KB");
 });
 
-void test("one name per piece: the board, the inspector and every sentence name a piece as its palette tile does", async () => {
+void test("one name per piece, its own: a clean name for every entry of every world, the same on the board, in the looks and in every sentence", async () => {
   const { entryName, pieceName } = await import("../lib/builder/names.ts");
   const piece = (entry: string) => ({ id: "x", entry, geometry: { t: "post" as const, c: [0, 0] as [number, number], r: 1 }, params: {}, clock: { k: "fixed" as const } });
-  assert.equal(pieceName(piece("*/rail/")), "the wall", "not the plain rail");
-  assert.equal(pieceName(piece("*/slope/")), "the slope", "not the plain slope");
-  assert.equal(pieceName(piece("*/post/bumper")), "the bumper");
-  assert.equal(pieceName(piece("*/hazard/lagoon")), "the lagoon water");
-  assert.equal(pieceName(piece("*/post/rock")), "the rock obstacle");
-  assert.equal(pieceName(piece("*/bar/plank")), "the plank barrier");
-  for (const [w] of palettes) {
-    for (const t of tiles(w)) {
-      for (const e of t.looks) {
-        const name = entryName(e);
-        assert.ok(name.toLowerCase().includes(t.name.toLowerCase()), `${w} ${e.id}: "${name}" says its tile's name, ${t.name}`);
-        assert.equal(`the ${name.toLowerCase()}`, pieceName(piece(e.id)), `${w} ${e.id}: one name on the board and in a sentence`);
-      }
+  const said: [string, string][] = [
+    ["*/rail/", "the wall"], ["*/slope/", "the slope"], ["*/post/bumper", "the bumper"], ["*/surface/wetsand", "the wet sand"], ["*/surface/flowerbed", "the flowerbed"],
+    ["*/bar/clock hand", "the clock hand"], ["*/hazard/lagoon", "the lagoon"], ["*/post/rock", "the rock"], ["*/bar/plank", "the plank"], ["*/tunnel/", "the pipe"],
+  ];
+  for (const [id, want] of said) assert.equal(pieceName(piece(id)), want, id);
+  // a word said once in a name, its plural too ("Sand sand", "Logs log", "Clock hand moving bar" never)
+  const stem = (w: string) => w.toLowerCase().replace(/(es|s)$/, "");
+  for (const [w, p] of palettes) {
+    const names = new Map<string, string>();
+    for (const e of p) {
+      const name = entryName(e), words = name.split(" ");
+      assert.match(name, /^[A-Z][a-z-]*( [a-z-]+)*$/, `${w} ${e.id}: "${name}" is words, not an id`);
+      assert.equal(new Set(words.map(stem)).size, words.length, `${w} ${e.id}: "${name}" says a word twice`);
+      assert.ok(!names.has(name), `${w}: "${name}" names both ${names.get(name)} and ${e.id}`);
+      names.set(name, e.id);
+      assert.equal(`the ${name.toLowerCase()}`, pieceName(piece(e.id)), `${w} ${e.id}: one name on the board and in a sentence`);
     }
   }
 });

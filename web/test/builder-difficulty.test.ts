@@ -122,10 +122,10 @@ void test("a hole made very hard on purpose: the rules let it through, the meter
   assert.equal(e.level, 3);
   assert.ok(e.narrowest! > 1.2 && e.narrowest! < 1.3);
   assert.deepEqual(e.reasons.slice(0, 2).map((r) => [r.piece, r.text]), [
-    ["gate", "The plank barrier lets the ball by only 1/6 of the time."],
+    ["gate", "The plank lets the ball by only 1/6 of the time."],
     ["w1", "The gap between two walls is only 1.3 balls wide: most shots will catch an edge."],
   ]);
-  assert.deepEqual(meterLine(e), { text: "The plank barrier lets the ball by only 1/6 of the time.", piece: "gate" });
+  assert.deepEqual(meterLine(e), { text: "The plank lets the ball by only 1/6 of the time.", piece: "gate" });
   assert.match(meterTitle(e), /^Difficulty, the meter's guess: Very hard\. \(\d[\d,]* shots in \d+ ms\.\)$/);
   assert.deepEqual(shown(e), { level: 3, word: "Very hard", line: meterLine(e), title: meterTitle(e), par: 0 }, "what the worker sends the editor");
 });
@@ -138,7 +138,7 @@ void test("one narrow gap alone, or one rare window alone: at least Medium, the 
   assert.equal(wide.level, 0, `a gap of two balls: ${said(wide)}`);
   const timed = (await estimate(host, { ...lane("garden", [rail("w3", [26, 0], [26, 4]), rail("w4", [26, 8], [26, 16]), gate(4, 3)], 40, 16), pin: [37, 13] }))!;
   assert.ok(timed.level >= 2, said(timed));
-  assert.equal(timed.reasons.find((r) => r.piece === "gate")?.text, "The plank barrier lets the ball by only 1/4 of the time.");
+  assert.equal(timed.reasons.find((r) => r.piece === "gate")?.text, "The plank lets the ball by only 1/4 of the time.");
 });
 
 void test("the meter's words are calm: no alarm, no command, never a refusal", async () => {
