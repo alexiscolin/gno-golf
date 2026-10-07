@@ -137,3 +137,52 @@ html:has(.gsheet) { overflow: hidden; }
 .owned__face { flex: none; width: 44px; height: 44px; padding: 0; border: var(--edge); border-radius: 50%; overflow: hidden; background: #f6ead2; cursor: pointer; }
 .owned__face img { width: 100%; height: 100%; object-fit: cover; }
 .owned__face[aria-pressed="true"] { box-shadow: var(--ring-shadow); }
+
+/* ---------------------------------------------------------------- the collection on the game's screens (Promo.tsx) */
+/* the menu's card: the Legendary turning in the disc, three of the wave's gnomes at his feet, a gold "See the gnomes" */
+.mode.mode--gnomes { background: var(--panel-dots), var(--c2); } /* (its own round frame below: the games' disc would sit behind it) */
+.mode--gnomes .mode__stage { margin-top: 0; display: grid; place-items: center; padding-top: 18px; } /* (over title.css's .mode__stage, whatever the order the sheets load in) */
+.gpromo__legend { position: relative; display: block; width: min(64%, 190px); aspect-ratio: 1; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: #fbe7a6; box-shadow: 0 0 0 6px var(--c1); }
+.gpromo__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.08); }
+.gpromo__faces { position: absolute; right: 8%; bottom: 0; display: flex; }
+.gpromo__faces img { width: clamp(32px, 3vw, 42px); height: auto; margin-left: -8px; border: var(--edge); border-radius: 50%; background: #f6ead2; }
+.gpromo__state { font-size: 13px; opacity: .92; }
+.gpromo__go { justify-self: start; margin: 12px 20px 0; padding: 0 18px; min-height: 40px; font-size: 15px; pointer-events: none; }
+@media (max-width: 700px) {
+  .mode.mode--gnomes { grid-template-columns: 46% 1fr; grid-template-rows: auto auto auto; }
+  .mode--gnomes .mode__stage { grid-row: 1 / 4; margin-top: 0; padding: 0; }
+  .gpromo__legend { width: 104px; box-shadow: 0 0 0 4px var(--c1); }
+  .gpromo__faces { right: 4px; bottom: -6px; }
+  .gpromo__faces img { width: 28px; }
+  .mode--gnomes .mode__name, .mode--gnomes .mode__line, .gpromo__go { grid-column: 2; }
+  .gpromo__go { margin: 8px 14px 0 4px; min-height: 34px; padding: 0 14px; font-size: 14px; }
+}
+/* the picker's Collection section, at its top: one band, the aim card's width or so */
+.gcollect { display: flex; align-items: center; gap: 12px; width: min(100%, 560px); margin: 4px auto 10px; padding: 10px 12px; border: var(--edge-bold); border-radius: 18px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
+.gcollect .owned { flex: 1; min-width: 0; margin: 0; }
+.gcollect__all { flex: none; align-self: end; font-size: 14px; }
+.gcollect__faces { flex: none; display: flex; }
+.gcollect__faces .gtile { width: 48px; margin-right: -8px; border-radius: 12px; }
+.gcollect__faces .gtile:last-child { margin-right: 0; }
+.gcollect__text { flex: 1; min-width: 0; display: grid; gap: 2px; font-size: 14px; font-weight: 700; line-height: 1.25; }
+.gcollect__text b { font-size: 16px; }
+.gcollect__text small { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.gcollect__go { flex: none; min-height: 42px; padding: 0 16px; font-size: 15px; }
+.gcollect--door { color: inherit; font: inherit; cursor: pointer; transition: transform var(--t-pop) var(--spring); }
+.gcollect--door:hover { transform: translateY(-2px); }
+.gcollect__go { pointer-events: none; }
+.gcollect__short { display: none; }
+@media (max-width: 560px) {
+  .gcollect { gap: 8px; padding: 6px 8px; }
+  .gcollect__faces .gtile { width: 34px; margin-right: -10px; border-radius: 10px; }
+  .gcollect__faces .gtile:nth-child(n + 4) { display: none; }
+  .gcollect__text { font-size: 12px; }
+  .gcollect__text b { font-size: 14px; }
+  .gcollect__text small { display: none; }
+  .gcollect__go { min-height: 34px; padding: 0 12px; font-size: 14px; }
+  .gcollect__long { display: none; }
+  .gcollect__short { display: inline; }
+}
+@media (max-height: 760px) { .gcollect { margin-bottom: 6px; padding: 6px 10px; } .gcollect__text small { display: none; } }
+/* the finish card's one line, at its foot */
+.gpromo__line { margin: 12px 0 0; text-align: center; font-size: 14px; }

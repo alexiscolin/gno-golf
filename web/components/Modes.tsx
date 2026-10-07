@@ -23,18 +23,20 @@ import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2, Zone } from "@/lib/types";
 
-// onBuild: the Builder's page (none: it is to come); more: one compact line under the panels (the gnomes' gallery)
-export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, more, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; more?: ReactNode; onBack: () => void; onAbout: () => void }) {
+// onBuild: the Builder's page (none: it is to come); gnomes: a fourth card, the collection's (components/gnomes/Promo)
+export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, gnomes, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; gnomes?: ReactNode; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
   const cups = courseCount(counts).cups || CLASSIC.length; // (the chain's, once it has answered)
   return (
     <FrontScreen className="modes" back="Back to the title" onBack={onBack} onAbout={onAbout} eyebrow="Choose your game" title="How do we play?">
-      <ul className="modes__list">
+      <ul className={`modes__list${gnomes ? " modes__list--four" : ""}`}>
         <li><Panel kind="solo" name="Solo" line={`${countWord(cups)} cups, your best on the boards`} skin={skin} onClick={onSolo} /></li>
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
-        <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon={!onBuild} onClick={onBuild} /></li>
+        {onBuild
+          ? <li><Panel kind="build" name="Build your hole" line="Draw a hole, test it, publish it under your name" skin={skin} onClick={onBuild} /></li>
+          : <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>}
+        {gnomes && <li>{gnomes}</li>}
       </ul>
-      {more && <p className="modes__more">{more}</p>}
     </FrontScreen>
   );
 }

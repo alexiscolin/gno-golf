@@ -187,6 +187,48 @@ export function nowRow(c: Collection, sold: (id: number) => boolean, entries: re
   return { at: now < started[0].playersUntil ? "players" : "open", wave };
 }
 
+// ------------------------------------------------------------ the collection on the game's screens
+/** What the menu's Gnomes card, the picker's Collection section and the finish card say of the sale: the
+ *  wave to see (on sale, players first, paused, or the next one opening), its size and what found a player,
+ *  its lowest price, its Legendary and three faces (an Epic, a Rare, a Common); null when there is none
+ *  to show (closed for good, no wave yet published). Dates, never a countdown. */
+export interface Promo {
+  at: "open" | "players" | "paused" | "teaser";
+  n: number;
+  home: Home | "";
+  size: number;
+  sold: number;
+  /** ugnot: the lowest price of the tiers the wave holds (0: none above 0, no price said) */
+  from: number;
+  start: number;
+  playersUntil: number;
+  legendary: { id: number; name: string; price: number } | null;
+  /** an Epic, a Rare, a Common of the wave, those it holds, each with its own tier */
+  faces: { id: number; tier: Tier }[];
+}
+export function promoOf(now: Now, c: Collection, entries: readonly Pick<Listed, "id" | "tier" | "home" | "name">[]): Promo | null {
+  const shown = now.at === "soldout" ? (now.next ? { at: "teaser" as const, wave: now.next } : null) : now.at === "closed" || now.at === "none" ? null : { at: now.at, wave: now.wave };
+  if (!shown) return null;
+  const { row } = shown.wave, inWave = entries.filter((e) => e.id >= row.first && e.id <= row.last);
+  const priceOf = (t: string) => row.prices[tierIndex(c, t)] ?? 0, legend = inWave.find((e) => e.tier === "legendary");
+  const prices = [...new Set(inWave.map((e) => e.tier))].map(priceOf).filter((p) => p > 0);
+  return {
+    at: shown.at, n: shown.wave.n, home: shown.wave.home, size: shown.wave.size, sold: shown.wave.sold,
+    from: prices.length ? Math.min(...prices) : 0, start: row.start, playersUntil: row.playersUntil,
+    legendary: legend ? { id: legend.id, name: legend.name, price: priceOf("legendary") } : null,
+    faces: (["epic", "rare", "common"] as const).flatMap((t) => inWave.filter((e) => e.tier === t).slice(0, 1).map((e) => ({ id: e.id, tier: t }))),
+  };
+}
+/** A promo in words: its title ("Wave 1 · the Garden"), what it holds ("104 gnomes, from 36 GNOT") and where it is. */
+export function promoWords(p: Promo, now: number) {
+  return {
+    title: `Wave ${p.n}${p.home ? ` · the ${cap(p.home)}` : ""}`,
+    line: `${p.size} ${plural("gnome", p.size)}${p.from > 0 ? `, from ${gnot(p.from)} GNOT` : ""}`,
+    state: p.at === "teaser" ? `Opens ${utcDate(p.start, now, true)}` : p.at === "paused" ? "Paused for a moment"
+      : p.at === "players" ? `Players first until ${utcDate(p.playersUntil, now, true)}` : `${p.sold} of ${p.size} found a player`,
+  };
+}
+
 // ------------------------------------------------------------ why not (A2), every CanBuy code in words
 /** What the buy panel says instead of buying: its button's words (off) and one note; play: the note links to a hole. */
 export interface WhyNot { button: string; note: string; play?: true }

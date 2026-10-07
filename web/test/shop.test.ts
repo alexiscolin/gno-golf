@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
+  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -165,6 +165,37 @@ test("shop: a later wave is the teaser once the one before is sold out", () => {
   const r = nowRow(c, isSold(all), entries, T0 + 86400);
   assert.equal(r.at, "soldout");
   assert.ok(r.at === "soldout" && r.next?.n === 2 && r.next.home === "island");
+});
+
+// ------------------------------------------------------------ the collection on the game's screens
+test("shop: the promo is the wave to see, its lowest price, its Legendary and three faces; none once closed", () => {
+  const c = collection(), open = promoOf(nowRow(c, isSold([1, 2, 3, 4]), entries, T0 + 49 * 3600), c, entries)!;
+  assert.equal(open.at, "open");
+  assert.deepEqual([open.n, open.home, open.size, open.sold, open.from], [1, "garden", 104, 4, 36e6]);
+  assert.ok(open.legendary && open.legendary.id === 104 && open.legendary.price === 1296e6);
+  // each face with its own tier, the catalogue's: an Epic, a Rare, a Common of the wave
+  assert.deepEqual(open.faces.map((f) => f.tier), ["epic", "rare", "common"]);
+  for (const f of open.faces) assert.equal(entries.find((e) => e.id === f.id)?.tier, f.tier);
+  assert.deepEqual(promoWords(open, T0 + 49 * 3600), { title: "Wave 1 · the Garden", line: "104 gnomes, from 36 GNOT", state: "4 of 104 found a player" });
+  assert.match(promoWords(promoOf(nowRow(c, isSold([]), entries, T0 + 60), c, entries)!, T0 + 60).state, /^Players first until /);
+  assert.match(promoWords(promoOf(nowRow(c, isSold([]), entries, T0 - 60), c, entries)!, T0 - 60).state, /^Opens /);
+  assert.equal(promoOf(nowRow(collection({ open: false }), isSold([]), entries, T0 + 60), c, entries)!.at, "paused");
+  const all = Array.from({ length: 104 }, (_, i) => i + 1);
+  assert.equal(promoOf(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries), null, "sold out, no wave after it: nothing to promote");
+  assert.equal(promoOf(nowRow(collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] }), isSold([]), entries, T0), c, entries), null);
+  // a wave without some tiers: its faces are what it holds, each named with its tier (never by its place)
+  const commons = entries.filter((e) => e.tier === "common"), onlyCommons = collection({ waves: [{ first: 1, last: 104, start: T0, playersUntil: T0, prices: [36e6, 72e6, 336e6, 1296e6] }] });
+  const thin = promoOf(nowRow(onlyCommons, isSold([]), commons, T0 + 60), onlyCommons, commons)!;
+  assert.deepEqual(thin.faces.map((f) => f.tier), ["common"]);
+  assert.equal(thin.legendary, null);
+  assert.equal(thin.from, 36e6, "from: the tiers the wave holds, not the others' prices");
+  // no price above 0 in what it holds: no "from" at all (never "from Infinity GNOT", never "from 0")
+  const free = collection({ waves: [{ first: 1, last: 104, start: T0, playersUntil: T0, prices: [0, 0, 0, 0] }] });
+  const none = promoOf(nowRow(free, isSold([]), entries, T0 + 60), free, entries)!;
+  assert.equal(none.from, 0);
+  assert.equal(promoWords(none, T0 + 60).line, "104 gnomes");
+  // the words never press: no countdown, no "only", no "last"
+  for (const p of [open]) for (const w of Object.values(promoWords(p, T0))) assert.doesNotMatch(w, /only|last|hurry|left|invest|value/i);
 });
 
 // ------------------------------------------------------------ why not, in plain words

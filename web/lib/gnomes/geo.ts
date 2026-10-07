@@ -33,3 +33,5 @@ export async function readGeo(get: (url: string) => Promise<Response> = (u) => f
 let asked: Promise<boolean> | null = null;
 /** readGeo, once a visit. */
 export const shopInRegion = (get?: (url: string) => Promise<Response>) => (asked ||= readGeo(get));
+/** Whether the shop shows at all: the build's (NEXT_PUBLIC_GNOMES) and a region that answered yes (null: not yet). */
+export const shopShown = (flag: boolean, region: boolean | null) => flag && region === true;

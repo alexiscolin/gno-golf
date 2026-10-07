@@ -44,8 +44,9 @@ import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, 
 import { darkGallery, minesOrder } from "@/lib/scene/data";
 import { SHOP, makeShop, type Worn } from "@/lib/gnomes/shop";
 import { buildLink, endpoints } from "@/lib/builder/holes";
+import { CollectionSection, GnomesCard, PromoLine, usePromo } from "@/components/gnomes/Promo";
 import { builderOn } from "@/lib/builder/route";
-import { shopInRegion } from "@/lib/gnomes/geo";
+import { shopInRegion, shopShown } from "@/lib/gnomes/geo";
 import { served } from "@/lib/gnomes/served";
 import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/wear";
 import type { ShopView } from "@/components/gnomes/Shop";
@@ -993,7 +994,9 @@ export default function Golf() {
 
   // The collection (SHOP): what the player holds and wears for everyone, read once an account is
   // here; the gnome played is their pick while it is theirs, else the one they wear (wear.ts playing).
-  const [region, setRegion] = useState(false);
+  const [region, setRegion] = useState<boolean | null>(null); // (null: not read yet)
+  // the shop's every door (the menu's card, the picker's section, the finish card's line, the cups' link): one gate
+  const shopOn = shopShown(SHOP, region);
   const [held, setHeld] = useState<{ id: string; tier: string; traits: string; name: string; home: string }[]>([]);
   const [worn, setWorn] = useState<Worn | null>(null);
   const [shopView, setShopView] = useState<ShopView>({});
@@ -1001,6 +1004,8 @@ export default function Golf() {
   const gnomeNow = useRef(gnome);
   gnomeNow.current = gnome;
   useEffect(() => void (SHOP && shopInRegion().then(setRegion)), []);
+  // the sale as the menu, the picker and the finish card show it (read once a visit, where the shop is offered)
+  const { promo, now: promoNow } = usePromo(shopOn ? (game.current && game.current.chain) || null : null);
   const readWorn = () => {
     const c = game.current && game.current.chain;
     if (!SHOP || !c || !account) return (setHeld([]), setWorn(null));
@@ -1023,6 +1028,7 @@ export default function Golf() {
     if (SHOP && c && dare) void askWorn((ps) => makeShop(c).wornMany(ps), dare);
   }, [dare]);
   const openShop = (v: ShopView = {}) => {
+    if (!shopOn) return; // (no door to the shop where it is not offered, nor before the region has answered)
     if (screen !== "shop") shopFrom.current = screen === "title" ? "worlds" : screen;
     setShopView(v);
     setScreen("shop");
@@ -1580,7 +1586,7 @@ export default function Golf() {
         <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
           onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")}
           onBuild={builderOn() ? () => window.location.assign(buildLink(endpoints(window.location.search).keep)) : undefined}
-          more={SHOP && region ? <button className="linkish" onClick={() => (sound("blip"), openShop())}>Gnomes →</button> : null} />
+          gnomes={shopOn ? <GnomesCard promo={promo} now={promoNow} onOpen={() => openShop()} /> : null} />
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
@@ -1609,7 +1615,7 @@ export default function Golf() {
             holes={toPlay[guessCup(s.world || "")].slice(0, 6)} onRace={(p, id) => (raceWith(p), openHole(id))}
             extra={<>
               <button className="linkish" onClick={() => (sound("blip"), setBadgesOpen(true))}>Badges {badgesEarned().length}/{BADGES.length} →</button>
-              {SHOP && region && <> · <button className="linkish" onClick={() => (sound("blip"), openShop())}>Gnomes →</button></>}
+              {shopOn && <> · <button className="linkish" onClick={() => (sound("blip"), openShop())}>Gnomes →</button></>}
             </>} />}
           onCommunity={openHole}
           onPick={enterCup}
@@ -1617,10 +1623,14 @@ export default function Golf() {
       )}
       {screen === "pick" && <Picker world={(s && s.world) || "garden"} backLabel={cupsScreen === "ghosts" ? "Back to their ghosts" : undefined} hole={linked} dare={duel ? <DuelNote duel={duel} mode={aim} sky={sky} onDrop={dropDuel} /> : !dareHole || dareHole === holeId ? dareNote : ""} aim={aim} onAim={setAim} gnome={gnome} onChange={choose} onPick={play} unlocked={unlocked} chosen={savedGnome()}
         onPlayAs={(id) => (setGnome(id), play())}
-        owned={SHOP && account && held.length > 0 && game.current ? (
-          <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region} onWorn={readWorn}
-            name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
-        ) : SHOP && region ? <p className="owned__line"><button className="linkish" onClick={() => (sound("blip"), openShop())}>More gnomes: the collection →</button></p> : null}
+        owned={(() => {
+          // the collection at the picker's top (in a region the shop is offered in): the player's own gnomes first, else the wave
+          const row = SHOP && account && held.length > 0 && game.current ? (
+            <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region === true} onWorn={readWorn}
+              name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
+          ) : null;
+          return shopOn ? <CollectionSection promo={promo} now={promoNow} owned={row} onOpen={() => openShop()} /> : row;
+        })()}
         onAbout={() => setAbout(true)}
        
         onBack={() => {
@@ -2001,6 +2011,8 @@ export default function Golf() {
                 <NameForm chain={game.current.chain} account={null} chainId={chainId || chainName || null} price={gasPrice} lead="Your name on the board" onNamed={() => {}} folded />
               </details>
             )}
+            {/* the gnomes' wave, one quiet line at the card's foot (never among its actions) */}
+            {shopOn && <PromoLine promo={promo} now={promoNow} onOpen={() => openShop()} />}
           </Dialog>
         </div>
       )}
@@ -2494,7 +2506,7 @@ interface PickerProps {
   onAbout: () => void;
   aim: Mode;
   onAim: (m: Mode) => void;
-  /** the row of the gnomes a player holds (components/gnomes/Owned), under the stage */
+  /** the collection at the top (components/gnomes/Promo CollectionSection: the gnomes a player holds first) */
   owned?: ReactNode;
 }
 
@@ -2513,6 +2525,7 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
       <div className="pick">
         <span className="eyebrow">{hole ? <>{hole}<span className="pick__ask"> · pick your gnome</span></> : "Pick your gnome"}</span>
         {dare && (typeof dare === "string" ? <p className="dare">{dare}</p> : dare)}
+        {owned}
         <h2 className="pick__name">{skin.name}</h2>
         <div className="pick__stage">
           <button className="round" aria-label="Previous gnome" onClick={() => step(-1)}>‹</button>
@@ -2529,7 +2542,6 @@ function Picker({ world, gnome, onChange, onPick, unlocked, chosen, onPlayAs, on
           </div>
           <button className="round" aria-label="Next gnome" onClick={() => step(1)}>›</button>
         </div>
-        {owned}
         <AimSetting aim={aim} onChange={onAim} compact />
         {/* a locked gnome on show: the button still plays, as the gnome really chosen */}
         <Button variant="gold" className="btn--play btn--cta btn--pop" onClick={() => (sound("start"), unlocked(skin.id) ? onPick() : onPlayAs(chosen))}>
