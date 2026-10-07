@@ -23,9 +23,8 @@ entries on the tailnet only (never Funnel), removed on Ctrl+C:
   page (the Builder, the community holes and copying links need one). If
   it does not open on a device, turn on *Use Tailscale DNS* in that
   device's Tailscale app.
-- `http://<tailscale-ip>:<port>/`: the fallback, plain http: the game and
-  the shop work; the Builder's test and publish, the community holes and
-  copying links do not.
+- `http://<tailscale-ip>:<port>/`: the fallback, plain http: all of it
+  works but copying and sharing links.
 - The page reads the chain on its own origin (`/rpc`, streamed to the node
   by `scripts/playground-server.mjs`), so both links behave alike. Adena signs straight to the node: add
   a custom network with the printed RPC (`http://<tailscale-ip>:<port>`)
@@ -33,8 +32,8 @@ entries on the tailnet only (never Funnel), removed on Ctrl+C:
   profile of its own keeps your real wallet apart).
 
 Where to click: "Click to start", then "How do we play?": Solo (the cups),
-Duel, the Builder (on a computer), and "Gnomes →" under them for the
-collection (also on the cups screen and in the gnome picker). `p1` has a
+Duel, "Build your hole" (on a computer) and "Gnomes", the collection (also
+atop the gnome picker and on the cups screen). `p1` has a
 record (the players' window lets it buy) and a few gnomes; `p0` has
 neither. Wave 1 (the Garden) is on sale, its players' window one hour. The
 region gate: `/g/?geo=blocked`. Needs the onyx
@@ -57,9 +56,8 @@ Funnel), retirées au Ctrl+C :
   page sécurisée (le Builder, les trous de la communauté et la copie de
   liens en ont besoin). S'il ne s'ouvre pas sur un appareil, activer *Use
   Tailscale DNS* dans l'app Tailscale de cet appareil.
-- `http://<ip-tailscale>:<port>/` : le secours, en http simple : le jeu et
-  la boutique marchent ; le test et la publication du Builder, les trous de
-  la communauté et la copie de liens non.
+- `http://<ip-tailscale>:<port>/` : le secours, en http simple : tout y
+  marche sauf copier et partager les liens.
 - La page lit la chaîne sur sa propre origine (`/rpc`, relayé au nœud par
   `scripts/playground-server.mjs`) : les deux liens se comportent pareil. Adena signe directement
   vers le nœud : ajouter un réseau personnalisé avec le RPC affiché
@@ -68,8 +66,8 @@ Funnel), retirées au Ctrl+C :
   portefeuille séparé).
 
 Où cliquer : « Click to start », puis « How do we play? » : Solo (les
-coupes), Duel, le Builder (sur un ordinateur), et « Gnomes → » dessous pour
-la collection (aussi sur l'écran des coupes et dans le choix du gnome).
+coupes), Duel, « Build your hole » (sur un ordinateur) et « Gnomes », la
+collection (aussi en haut du choix du gnome et sur l'écran des coupes).
 `p1` a un record (la fenêtre des joueurs le laisse acheter) et quelques
 gnomes ; `p0` n'a ni l'un ni l'autre. La vague 1 (le Jardin) est en vente,
 fenêtre des joueurs d'une heure. Le blocage par région : `/g/?geo=blocked`. Il faut la toolchain onyx (README, « Running

@@ -24,9 +24,9 @@
 # Every server listens on 127.0.0.1 alone. With Tailscale, the tailnet-preview
 # skill (TAILNET_PREVIEW, ~/.claude/skills/tailnet-preview) opens Tailscale
 # Serve entries, tailnet only, never Funnel, and removes them on exit: the site
-# as https on the machine's ts.net name (a secure context: the Builder, the
-# community holes' check and copying links need one) and as raw TCP on its
-# Tailscale IP (the fallback, plain http), the node's RPC as raw TCP for a
+# as https on the machine's ts.net name (a secure context: copying and sharing
+# links need one) and as raw TCP on its Tailscale IP (the fallback, plain
+# http: the rest works there too), the node's RPC as raw TCP for a
 # wallet, which signs straight to it, and gnoweb as raw TCP for the "read
 # its code" links. The page reads the chain on its own origin, /rpc, which
 # the site's server streams to the node: no CORS, no second host, both links
@@ -187,8 +187,8 @@ cat <<EOF
 ================================================================ Gnogolf, local
 $(if [ -n "$APP_HTTPS" ]; then
 	printf '  Open  %s/   (https, a secure page: everything works)\n' "$APP_HTTPS"
-	printf '  or    %s/   (http fallback, no Tailscale DNS needed: no Builder\n' "$APP_TCP"
-	printf '        test or publish, no community holes, no copying links)\n'
+	printf '  or    %s/   (http fallback, no Tailscale DNS needed: all of it\n' "$APP_TCP"
+	printf '        but copying and sharing links)\n'
 	printf '  If the https link does not open: Use Tailscale DNS on in that device'"'"'s Tailscale app.'
 else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
 
@@ -215,16 +215,18 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
     gnokey maketx call -pkgpath $GNOMES -func Buy -args <id> -send <price>ugnot \\
       -gas-fee 5000000ugnot -gas-wanted 200000000 -remote $WALLET_RPC -chainid $CHAINID -broadcast p1
 
-  Try (the title's "Click to start" opens "How do we play?"):
-    1. Play: Solo, a cup (all five are there), a hole; finish it, see the card.
-    2. The gnomes: "Gnomes →" under the three games (also on the cups screen, and
-       "More gnomes" in the gnome picker). Buy a Common, a Rare, an Epic and the
+  Try (the title's "Click to start" opens "How do we play?": four cards):
+    1. Play: Solo, a cup (all five are there), a hole; finish it, see the card
+       (and the wave's line at its foot).
+    2. The gnomes: the "Gnomes" card (also the picker's Collection band at its
+       top, the cups screen's "Gnomes →"). Buy a Common, a Rare, an Epic and the
        Legendary #$LEGENDARY (p1: its window's caps); the two boxes, Adena, the receipt.
     3. Wear one: the gnome picker's row of yours; Show to everyone (Equip).
        Duel: race a player's ghost, their gnome on the boards and as the ghost.
     4. The region gate: add ?geo=blocked to the gnomes' page (/g/?geo=blocked).
-    5. The Builder: the "Builder" game on a computer (a phone gets its play-only
-       screen): make a hole, Test it (hole it in each weather), Publish.
+    5. The Builder: the "Build your hole" card on a computer (a phone gets the
+       community holes to play): the three hints (again with "?"), make a hole,
+       Test it (hole it in each weather), Publish.
     6. Find it: Solo, the cups screen's "Community holes", under the cups.
   Wave 2 on sale now:  scripts/try-local.sh wave2   (another terminal)
   Logs: $WORK   Ctrl+C stops everything (after a crash: scripts/try-local.sh down).
