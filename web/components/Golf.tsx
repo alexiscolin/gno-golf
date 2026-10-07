@@ -1636,7 +1636,7 @@ export default function Golf() {
             <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region === true} onWorn={readWorn}
               name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
           ) : null;
-          return shopOn ? <CollectionSection promo={promo} now={promoNow} owned={row} onOpen={() => openShop()} /> : row;
+          return shopOn ? <CollectionSection promo={promo} owned={row} onOpen={() => openShop()} /> : row;
         })()}
         onAbout={() => setAbout(true)}
        
