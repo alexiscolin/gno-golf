@@ -34,6 +34,23 @@ export async function savedOnAll(chain: Pick<Chain, "savedOn">, ids: readonly st
   return { rows: parts.flatMap((p) => p.rows), more: new Set(parts.flatMap((p) => [...p.more])) };
 }
 
+/** What a list has read of savedOn: the rounds, and the holes it asked for (a hole with none saved has no row). */
+export interface SavedRead {
+  saved: SavedOn;
+  asked: ReadonlySet<string>;
+}
+
+/** The rounds saved on these holes, added to those already read (have): only the holes not asked yet are read (a list's next page asks its new holes only). */
+export async function savedOnMore(chain: Pick<Chain, "savedOn">, have: SavedRead | null, ids: readonly string[]): Promise<SavedRead> {
+  const fresh = ids.filter((id) => !have?.asked.has(id));
+  if (have && !fresh.length) return have;
+  const got = await savedOnAll(chain, fresh);
+  return {
+    saved: { rows: [...(have?.saved.rows ?? []), ...got.rows], more: new Set([...(have?.saved.more ?? []), ...got.more]) },
+    asked: new Set([...(have?.asked ?? []), ...fresh]),
+  };
+}
+
 /** An author's published holes (holesOf's, none taken down) and the rounds saved on them. */
 export async function readRewards(chain: Pick<Chain, "holesOf" | "savedOn">, author: string, taken: ReadonlySet<string>): Promise<{ rows: HoleRow[]; saved: SavedOn }> {
   const rows = listHoles(await chain.holesOf(author), author, taken).mine;

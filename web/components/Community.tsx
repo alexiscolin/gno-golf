@@ -12,7 +12,7 @@
 // its maker credited (the Builder never loads on a phone). Every hole listed,
 // the day's too, is first judged by the Builder's own rules (verdictOf), and
 // none the site took down is ever in the list (communityOf).
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { HoleRow } from "@/lib/types";
 import { sound } from "@/lib/feel";
 import { Button, Segmented } from "@/components/ui";
@@ -21,7 +21,7 @@ import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { authorOf, remixLink } from "@/lib/builder/holes";
 import { LEVELS, type Level } from "@/lib/builder/levels";
 import type { Meter } from "@/lib/builder/meter";
-import { savedOnAll, statsOf, type SavedOn } from "@/lib/builder/rewards";
+import { savedOnMore, statsOf, type SavedRead } from "@/lib/builder/rewards";
 import { builderOn, onComputer } from "@/lib/builder/route";
 import { worldName } from "@/lib/builder/rules";
 import { inTurn, type MapHole } from "@/lib/duel";
@@ -89,20 +89,21 @@ export default function Community({ community, chain, onPlay }: {
     }
     return () => void (live = false);
   }, [chain, page.judging, ids]); // eslint-disable-line react-hooks/exhaustive-deps -- (holed: read once each, not again as it fills)
-  // the players of the page's holes and the day's (one read a dozen holes), as the page changes
-  const [saved, setSaved] = useState<SavedOn | null>(null);
+  // the players of the page's holes and the day's (one read a dozen holes), once the page is judged, each hole read once
+  const [saved, setSaved] = useState<SavedRead | null>(null);
   // the day's hole: the first candidate the rules pass, once every one before it is judged (and read)
   const first = candidates.findIndex((h) => verdicts.get(h.id)?.ok !== false);
   const day = first >= 0 && verdicts.get(candidates[first].id)?.ok ? candidates[first] : null;
   const unread = page.unread || (first >= 0 && verdicts.get(candidates[first].id) === null);
   const seen = [...(day ? [day.id] : []), ...page.rows.map((h) => h.id)];
   useEffect(() => {
-    if (!chain || !seen.length) return;
+    if (!chain || page.judging || !seen.length) return;
     let live = true;
-    void savedOnAll(chain, seen).then((s) => live && setSaved(s), () => {});
+    void savedOnMore(chain, saved, seen).then((s) => live && setSaved(s), () => {});
     return () => void (live = false);
-  }, [chain, seen.join(" ")]); // eslint-disable-line react-hooks/exhaustive-deps -- (seen: its ids, not the array)
-  const levels = useLevels(chain, by === "hard" ? page.rows : []);
+  }, [chain, page.judging, seen.join(" ")]); // eslint-disable-line react-hooks/exhaustive-deps -- (seen: its ids, not the array; saved: read once each, not again as it fills)
+  // the levels measured once the page is judged (not one meter run per verdict as it fills)
+  const levels = useLevels(chain, by === "hard" && !page.judging ? page.rows : []);
   const rating = by === "hard" && page.rows.some((h) => !levels.has(h.id));
   const settled = !page.judging && page.rows.every((h) => holed.has(h.id) || !authorOf(h.id));
   const listed = by === "hard" ? (rating ? page.rows : sortHoles(page.rows, "hard", levels)) : by === "new" && settled ? authorFirst(page.rows, holed) : page.rows;
@@ -111,7 +112,7 @@ export default function Community({ community, chain, onPlay }: {
   const [remix, setRemix] = useState(false);
   useEffect(() => setRemix(builderOn() && onComputer((q) => window.matchMedia(q).matches)), []);
   const card = (h: HoleRow, big = false) => (
-    <HoleCard h={h} big={big} map={maps.get(h.id)} players={saved && statsOf(h, saved, authorOf(h.id) ?? "")} mark={authorMark(holed.get(h.id))}
+    <HoleCard h={h} big={big} map={maps.get(h.id)} players={saved && statsOf(h, saved.saved, authorOf(h.id) ?? "")} mark={authorMark(holed.get(h.id))}
       level={by === "hard" ? levels.get(h.id) : undefined} remix={remix} onPlay={() => (sound("select"), onPlay(h.id))} />
   );
   return (
@@ -172,30 +173,31 @@ function HoleCard({ h, big, map, players, mark, level, remix, onPlay }: {
 /** No worker in this browser: nothing measured. */
 const NO_METER: Meter = { ask: () => {}, carry: () => Promise.resolve(null), rate: () => Promise.resolve(null), stop: () => {} };
 
-/** The meter's level of each of these holes (null: not measured), each version measured once a browser (keptLevel), one after the other in the meter's worker, loaded only once one is asked. */
+/** The meter's level of each of these holes (null: not measured), each version measured once a browser (keptLevel), one after the other in the meter's worker, loaded only once one is asked and kept till the list goes. */
 function useLevels(chain: Pick<Chain, "holeData"> | null, rows: readonly HoleRow[]) {
   const [levels, setLevels] = useState<ReadonlyMap<string, Level | null>>(new Map());
+  const meter = useRef<Meter | null>(null);
+  useEffect(() => () => (meter.current?.stop(), void (meter.current = null)), []);
   const ids = rows.map((h) => h.id).join(" ");
   useEffect(() => {
     if (!chain || !ids) return;
-    let live = true, meter: Meter | null = null;
+    let live = true;
     void (async () => {
       for (const id of ids.split(" ")) {
         if (!live) return;
         if (levels.has(id)) continue;
         let level = keptLevel(id);
         if (level == null) {
-          const m = (meter ??= (await import("@/lib/builder/meter")).makeMeter(() => {}) ?? NO_METER);
+          const { makeMeter } = await import("@/lib/builder/meter");
+          const m = (meter.current ??= makeMeter(() => {}) ?? NO_METER);
           level = await chain.holeData(id).then((hex) => m.rate(hex), () => null);
           if (level != null) keepLevel(id, level);
         }
-        if (live) setLevels((m) => new Map(m).set(id, level));
+        // (a level measured is kept and shown, even if the rows changed meanwhile)
+        setLevels((m) => new Map(m).set(id, level));
       }
     })();
-    return () => {
-      live = false;
-      meter?.stop();
-    };
+    return () => void (live = false);
   }, [chain, ids]); // eslint-disable-line react-hooks/exhaustive-deps -- (levels: measured once each, not again as they fill)
   return levels;
 }
