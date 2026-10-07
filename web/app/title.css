@@ -349,9 +349,9 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode__stage > .pick__canvas { z-index: 1; }
 /* the shop's awning across the disc's top, behind its gnome: the panel's colours, inked */
 .mode__stage > .mode__awning { inset: 27% 0 auto; width: 74%; } /* (inside the disc's top, under the gnome's head) */
-.mode__awning-top { fill: var(--paper); }
 .mode__awning-band { fill: var(--c2); }
-.mode__awning-scallop { fill: var(--paper); }
+.mode__awning-paper { fill: var(--paper); }
+.mode__awning-post { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
 .mode__awning-ink { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
 .worlds--v2 .world:focus-visible, .mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
 .mode[disabled] { cursor: default; }

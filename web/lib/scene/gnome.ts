@@ -557,9 +557,11 @@ export function makeGhost(o: number, skin: Skin = GHOST) {
 }
 
 /** A little act a preview plays: "hop" (the picker: he hops, turning), "solo"
- *  (he rolls on the spot, rights himself, blinks, hops) or "duel" (he and a
- *  duel's ghost hop in turn, as a duel's strokes go). */
-export type Act = "hop" | "solo" | "duel";
+ *  (he rolls on the spot, rights himself, blinks, hops), "duel" (he and a
+ *  duel's ghost hop in turn, as a duel's strokes go), "build" (he hammers:
+ *  he tips forward to strike, three beats and a hop) or "shop" (he turns
+ *  round to show himself off, then bows). */
+export type Act = "hop" | "solo" | "duel" | "build" | "shop";
 
 const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
 /** One gnome at time k (ms) of the solo act's 3.6 s: a roll of two turns
@@ -575,6 +577,34 @@ function soloAt(g: Gnome, k: number) {
   for (const e of eyes || []) e.scale.y = k > 2300 && k < 2430 ? 0.12 : 1;
   return hop;
 }
+
+/** He hops, turning (the picker, and a duel's pair). */
+function hopAt(g: Gnome, t: number) {
+  const { body } = g.userData;
+  const hop = Math.abs(Math.sin((t + 900) / 380)) * 0.22;
+  body.rotation.y = Math.sin((t + 900) / 1400) * 0.7;
+  body.position.y = hop;
+  return hop;
+}
+/** He hammers, as at a workbench: a quick tip forward to strike and back, three beats, then a little hop (2.4 s). */
+function buildAt(g: Gnome, t: number) {
+  const { body } = g.userData, k = t % 2400, beat = k % 600;
+  const strike = k < 1800 ? (beat < 120 ? beat / 120 : Math.max(0, 1 - (beat - 120) / 360)) : 0;
+  const hop = k >= 1800 && k < 2200 ? Math.sin(((k - 1800) / 400) * Math.PI) * 0.2 : 0;
+  body.rotation.set(strike * 0.42, 0.45, 0);
+  body.position.set(0, hop, 0);
+  return hop;
+}
+/** He shows himself off: a full turn, eased, then a bow, then a moment still (4 s). */
+function shopAt(g: Gnome, t: number) {
+  const { body } = g.userData, k = t % 4000;
+  const turn = k < 1600 ? ease(k / 1600) * Math.PI * 2 : 0, bow = k >= 1700 && k < 2300 ? Math.sin(((k - 1700) / 600) * Math.PI) * 0.35 : 0;
+  body.rotation.set(bow, turn, 0);
+  body.position.set(0, 0, 0);
+  return 0;
+}
+/** Each act's pose at time t (ms): his body moved and turned; what it returns, his hop's height (his shadow follows). */
+export const ACTS: Record<Act, (g: Gnome, t: number) => number> = { hop: hopAt, duel: hopAt, solo: (g, t) => soloAt(g, t % 3600), build: buildAt, shop: shopAt };
 
 /** A turntable for the gnome picker, and the game's choice's panels (act; a
  *  duel's ghost hops beside him in "duel"): its own small renderer, nothing
@@ -607,15 +637,9 @@ export function makePreview(canvas: HTMLCanvasElement, { act = "hop", still = fa
     if (playing && motion) t += dt;
     else if (drawn) return;
     if (gnome) {
-      const { body, shade } = gnome.userData;
-      let hop: number;
-      if (act === "solo") hop = soloAt(gnome, t % 3600);
-      else {
-        // he hops, turning; his shadow stays on the ground and shrinks as he rises
-        hop = Math.abs(Math.sin((t + 900) / 380)) * 0.22;
-        body.rotation.y = Math.sin((t + 900) / 1400) * 0.7;
-        body.position.y = hop;
-      }
+      const { shade } = gnome.userData;
+      // his act's pose; his shadow stays on the ground and shrinks as he rises
+      const hop = ACTS[act](gnome, t);
       shade.scale.setScalar(1 - hop * 1.6);
       shade.material.opacity = 0.18 * (1 - hop * 1.4);
       gnome.userData.tick?.(t); // (a Legendary's piece moves with the act)

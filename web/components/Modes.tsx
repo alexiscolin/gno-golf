@@ -52,7 +52,7 @@ function Panel({ kind, name, line, skin, soon = false, back, onClick }: { kind: 
   return (
     <button className={`mode mode--${kind}`} disabled={soon} aria-label={`${name}: ${line}${soon ? ". Coming soon" : ""}`} {...on}
       onClick={() => (sound("select"), onClick && onClick())}>
-      {skin ? <Stage skin={skin} act={kind === "duel" ? "duel" : kind === "solo" ? "solo" : "hop"} playing={hot}>{back}</Stage> : <span className="mode__stage">{back}</span>}
+      {skin ? <Stage skin={skin} act={kind} playing={hot}>{back}</Stage> : <span className="mode__stage">{back}</span>}
       <span className="mode__name">{name}</span>
       <span className="mode__line">{line}</span>
       {soon && <span className="dare mode__soon">Coming soon</span>}
@@ -68,15 +68,25 @@ function useHot() {
 const Stage = ({ skin, act, playing, className = "mode__stage", children }: { skin: Skin; act: Act; playing: boolean; className?: string; children?: ReactNode }) =>
   <span ref={useGnomeStage<HTMLSpanElement>(skin, { act, playing })} className={className}>{children}</span>;
 
-/** A market stall's awning, inked, in the shop panel's colours: what says "a shop" behind its gnome. */
-const Awning = () => (
-  <svg className="mode__awning" viewBox="0 0 120 54" aria-hidden="true">
-    <path d="M10 6h100l8 22H2z" className="mode__awning-top" />
-    {[0, 1, 2, 3, 4].map((k) => <path key={k} d={`M${10 + k * 20} 6h10l-${3 - k * 1.5} 22h-12z`} className="mode__awning-band" />)}
-    <path d="M2 28q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0" className="mode__awning-scallop" />
-    <path d="M10 6h100l8 22H2zM2 28q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0q7.3 12 14.6 0" className="mode__awning-ink" />
-  </svg>
-);
+/** A market stall, inked, in the shop panel's colours (behind its gnome: what says "a shop"): its striped awning,
+ *  every stripe and scallop painted, on two posts. */
+const STRIPES = 8;
+const Awning = () => {
+  const top = (k: number) => 14 + k * (92 / STRIPES), low = (k: number) => 4 + k * (112 / STRIPES); // (the awning widens downward)
+  const w = 112 / STRIPES, scallop = (k: number) => `M${low(k)} 30a${w / 2} ${w / 2.2} 0 0 0 ${w} 0z`;
+  return (
+    <svg className="mode__awning" viewBox="0 0 120 70" aria-hidden="true">
+      <path d="M14 30v38M106 30v38" className="mode__awning-post" />
+      {Array.from({ length: STRIPES }, (_, k) => (
+        <g key={k} className={k % 2 ? "mode__awning-paper" : "mode__awning-band"}>
+          <path d={`M${top(k)} 8H${top(k + 1)}L${low(k + 1)} 30H${low(k)}z`} />
+          <path d={scallop(k)} />
+        </g>
+      ))}
+      <path d={`M14 8H106L116 30H4z${Array.from({ length: STRIPES }, (_, k) => scallop(k).replace(/z$/, "")).join("")}`} className="mode__awning-ink" />
+    </svg>
+  );
+};
 
 /**
  * A duel's rival, on a screen of their own: a friend's name or address typed
