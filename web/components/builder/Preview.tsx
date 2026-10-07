@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { applyRig, laneBox, makeRenderer, makeScene, overviewRig, setLighting } from "@/lib/scene/camera";
-import { buildHole, finishHole } from "@/lib/scene/course";
+import { buildHole } from "@/lib/scene/course";
 import { disposeCourse } from "@/lib/scene/materials";
 import { loadWorld } from "@/lib/scene/worlds";
 import type { Hole } from "@/lib/scene/data";
@@ -59,8 +59,7 @@ export default function Preview({ state, fresh, capture }: { state: Hole | null;
       if (stale) return;
       const old = t.course;
       if (old) t.scene.remove(old);
-      const g = buildHole(state);
-      finishHole(g);
+      const g = buildHole(state); // (finished: merged, and a world's own pass over it, once)
       t.scene.add(g);
       t.course = g;
       draw();

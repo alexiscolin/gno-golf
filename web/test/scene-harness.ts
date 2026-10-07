@@ -32,8 +32,11 @@ const sum = (a: ArrayLike<number> | undefined) => {
 };
 
 /** What the scene drew: one key a mesh (its vertices, where they are, their colours, its material's), sorted. */
-export function drawn(s: Hole): string[] {
-  const keys: string[] = [], root = build(s);
+export const drawn = (s: Hole): string[] => keysOf(build(s));
+
+/** A built group's keys, as drawn has them. */
+export function keysOf(root: THREE.Object3D): string[] {
+  const keys: string[] = [];
   root.updateMatrixWorld(true);
   root.traverse((o) => {
     const m = o as THREE.Mesh, at = m.geometry?.attributes;
