@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { host, lane, rail } from "./builder-fixture.ts";
 import "./scene-harness.ts";
 import fs from "node:fs";
-import { commonShift, gauges, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
+import { commonShift, gauges, meterFace, nearLimits, offAtLimit, shortWhy, testGate, verdict } from "../lib/builder/editor.ts";
+import type { Shown } from "../lib/builder/difficulty.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
@@ -125,3 +126,14 @@ void test("quick shots in Edit: said on the board to be no proof, never handed t
   assert.doesNotMatch(editor, /replay\(|onProof/, "the editor never makes a proof: Test does");
   assert.match(editor, /est\?\.of === kept && draft === kept/, "the line: of the hole as kept, and not while a drag moves it");
 });
+
+void test("meterFace: measured, measuring, not measurable (said so, never \"measuring\" for ever), a hole with errors", () => {
+  const d = lane("garden", []), other = { ...d, title: "Other" };
+  const e = { level: 1, word: "Easy", title: "Difficulty: easy", line: { text: "" }, par: 2, path: [], heat: [] } as unknown as Shown;
+  assert.deepEqual(meterFace(true, { of: d, e }, d), { level: 1, word: "Easy", title: "Difficulty: easy", busy: false });
+  assert.deepEqual(meterFace(true, { of: other, e }, d), { level: null, word: "–", title: "Difficulty: measuring…", busy: true });
+  assert.deepEqual(meterFace(true, null, d), { level: null, word: "–", title: "Difficulty: measuring…", busy: true });
+  assert.deepEqual(meterFace(true, { of: d, e: null }, d), { level: null, word: "–", title: "Difficulty: not measured: the meter's shots found no way to hole it, or it could not run here. Try it yourself; it never stops you publishing.", busy: false });
+  assert.deepEqual(meterFace(false, { of: d, e }, d), { level: null, word: "–", title: "Difficulty: measured once the hole has no error", busy: false });
+});
+

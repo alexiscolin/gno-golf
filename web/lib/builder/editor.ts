@@ -8,6 +8,7 @@ import type { Cost } from "./wasm";
 import type { Draft, V } from "./draft";
 import { whereOf } from "./edit";
 import { weatherName } from "./carry";
+import type { Level, Shown } from "./difficulty";
 import type { PaletteEntry } from "./palette";
 import type { HoleIn } from "./types";
 import { MAX_BYTES, type Validated } from "./pipeline";
@@ -131,3 +132,16 @@ export function commonShift(prev: Draft, next: Draft): V {
   }
   return [...tally.values()].reduce((a, b) => (b.n > a.n ? b : a)).v.map((x) => x + 0) as V;
 }
+
+/**
+ * The difficulty meter as the header shows it, for the draft as kept: its level once measured; "measuring" while the
+ * worker works on it; said not measured when it answered none (its shots found no way to hole it, or its worker could
+ * not run): never "measuring" for ever; none while the hole has errors. It never gates anything.
+ */
+export function meterFace(clean: boolean, est: { of: Draft; e: Shown | null } | null, kept: Draft): { level: Level | null; word: string; title: string; busy: boolean } {
+  if (!clean) return { level: null, word: "–", title: "Difficulty: measured once the hole has no error", busy: false };
+  if (!est || est.of !== kept) return { level: null, word: "–", title: "Difficulty: measuring…", busy: true };
+  if (!est.e) return { level: null, word: "–", title: "Difficulty: not measured: the meter's shots found no way to hole it, or it could not run here. Try it yourself; it never stops you publishing.", busy: false };
+  return { level: est.e.level, word: est.e.word, title: est.e.title, busy: false };
+}
+

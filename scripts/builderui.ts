@@ -333,5 +333,61 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   console.log("keys: ok");
   c.kill();
 }
+// every palette entry dropped on a blank lane, at a laptop's size and a retina one's: the selection's outline and a hover's
+// a few css px whatever the zoom (never a stroke in the board's units: a fat capsule over the cup), no overlay drawn empty
+for (const [w, h, dpr] of [[1440, 900, 1], [1800, 1170, 2]] as const) {
+  const c = await launch({ width: w, height: h });
+  await c.send("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: dpr, mobile: false });
+  await c.send("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.setItem("gnogolf.builder.hinted", "1"); } catch {}` });
+  await c.send("Page.navigate", { url: `${APP}/build/` });
+  for (let k = 0; k < 60 && !(await c.ev<boolean>(`!!document.querySelector(".bholes__start--blank")`)); k++) await sleep(500);
+  await c.js(`document.querySelector(".bholes__start--blank").click()`);
+  for (let k = 0; k < 40 && !(await c.ev<boolean>(`!!document.querySelector("[data-piece=p1]")`)); k++) await sleep(300);
+  await sleep(1500);
+  await c.js(`document.querySelector(".palette__more")?.setAttribute("open", "")`);
+  await sleep(300);
+  const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mousePressed" ? 1 : 0, clickCount: 1 });
+  // the outline's width on screen: its stroke, in css px if non-scaling, else times the board's scale
+  const outline = (sel: string) => c.js<number | null>(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const s = getComputedStyle(e), sw = parseFloat(s.strokeWidth) || 0;
+    return s.vectorEffect === "non-scaling-stroke" ? sw : sw * Math.hypot(e.getScreenCTM().a, e.getScreenCTM().b); })()`);
+  const empty = () => c.js<string[]>(`[...document.querySelectorAll(".centre .measure, .centre .btoast, .centre .bbroken, .centre [role=status]")].filter((e) => e.offsetParent && !e.textContent.trim()).map((e) => e.className)`);
+  const lane = (await box(c, "[data-piece=p1]"))!, spot: [number, number] = [lane.l + (lane.r - lane.l) * 0.45, lane.t + 140];
+  // a hover on the lane's top wall
+  await mouse("mouseMoved", (lane.l + lane.r) / 2, lane.t + 1);
+  await sleep(200);
+  const hovered = await outline(".board__piece:hover > :first-child");
+  assert.ok(hovered === null || hovered <= 4, `${w}×${h}@${dpr}: a wall hovered drawn ${hovered} px wide`);
+  const tiles = await c.js<number>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled])").length`);
+  assert.ok(tiles >= 5, `${w}: the palette's tiles (${tiles})`);
+  for (let t = 0; t < tiles; t++) {
+    const name = await c.js<string>(`document.querySelectorAll(".palette .ptile > .piece:not([disabled])")[${t}].textContent.trim().slice(0, 30)`);
+    await c.js(`document.querySelectorAll(".palette .ptile > .piece:not([disabled])")[${t}].click()`);
+    await sleep(150);
+    const n = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
+    await mouse("mouseMoved", spot[0] - 8, spot[1]); await mouse("mouseMoved", ...spot);
+    await sleep(120);
+    await mouse("mousePressed", ...spot); await mouse("mouseReleased", ...spot);
+    await sleep(500);
+    assert.deepEqual(await empty(), [], `${w}: ${name}: an overlay drawn empty`);
+    if ((await c.js<number>(`document.querySelectorAll("[data-piece]").length`)) > n) {
+      const px = await outline(".board__piece--on > :first-child");
+      assert.ok(px !== null && px <= 4, `${w}×${h}@${dpr}: ${name} selected, its outline ${px} px wide`);
+      await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "z", code: "KeyZ", modifiers: 4, windowsVirtualKeyCode: 90 });
+      await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "z", code: "KeyZ", modifiers: 4, windowsVirtualKeyCode: 90 });
+      await sleep(300);
+    }
+    await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  }
+  // the lane's right wall selected: a thin outline, the cup's badge on top of it
+  await c.js(`document.querySelector("[data-piece=p2]").dispatchEvent(new FocusEvent("focus"))`);
+  const r2 = (await box(c, "[data-piece=p2]"))!;
+  await mouse("mousePressed", (r2.l + r2.r) / 2, (r2.t + r2.b) / 2 + 30); await mouse("mouseReleased", (r2.l + r2.r) / 2, (r2.t + r2.b) / 2 + 30);
+  await sleep(300);
+  const wallPx = await outline(".board__piece--on > :first-child");
+  assert.ok(wallPx !== null && wallPx <= 4, `${w}×${h}@${dpr}: the right wall selected, its outline ${wallPx} px wide`);
+  console.log(`palette drops ${w}×${h}@${dpr}: ok (${tiles} entries)`);
+  c.kill();
+}
 console.log("builderui: all ok");
 process.exit(0);

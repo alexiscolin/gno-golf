@@ -339,7 +339,7 @@ export default function Board(props: BoardProps) {
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
         onPointerLeave={() => (setGhost(null), near.current?.setAttribute("cx", "-99"))}>
-        <defs><marker id="arrow" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 6 3 0 6z" fill="#fff" /></marker></defs>
+        <defs><marker id="arrow" viewBox="0 0 6 6" refX="3" refY="3" markerUnits="userSpaceOnUse" markerWidth="0.8" markerHeight="0.8" orient="auto"><path d="M0 0 6 3 0 6z" fill="#fff" /></marker></defs>
         {/* the board in its units, looked at through the look (view.ts matrixOf); the tee's and the cup's badges upright over it */}
         <g className="board__plane" transform={`matrix(${matrixOf(view, look).join(" ")})`}>
         {!gl && <rect className="board__ground" x={0} y={0} width={BOARD} height={BOARD} />}
