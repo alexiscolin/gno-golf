@@ -71,7 +71,7 @@ function Shop(props: ShopProps) {
   }, [Screen, tries]);
   if (Screen) return <Screen {...props} />;
   const closing = closingSlot(knownSale(props.chain)?.c ?? null);
-  return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
+  return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} keeper={props.keeper} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
 }
 const Owned = dynamic(() => import("@/components/gnomes/Owned"), { ssr: false });
 
@@ -1665,7 +1665,7 @@ export default function Golf() {
       {SHOP && screen === "shop" && game.current && (
         <Shop chain={game.current.chain} account={account} wallet={wallet} onConnect={() => void connectWallet()} view={shopView} onView={setShopView}
           onBack={() => (sound("blip"), setScreen(shopFrom.current))} onAbout={() => setAbout(true)} playing={gnome}
-          onPlay={(id) => (choose(id), readWorn())} onRace={(p) => toGhosts(p, undefined, "board")} />
+          onPlay={(id) => (choose(id), readWorn())} onRace={(p) => toGhosts(p, undefined, "board")} keeper={shopSkin} />
       )}
 
       {s && playing && (

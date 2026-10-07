@@ -88,7 +88,8 @@ interface FrontScreenProps {
   back: string;
   onBack: () => void;
   onAbout: () => void;
-  eyebrow: string;
+  /** the line over the title (none: the title alone, as the shop's) */
+  eyebrow?: string;
   title: string;
   dare?: ReactNode;
   corner?: ReactNode;
@@ -102,7 +103,7 @@ export function FrontScreen({ className, tint = "garden", inner = "", back, onBa
       {corner}
       <div className={`worlds__in ${inner}`.trim()}>
         <div className="front__head">
-          <span className="eyebrow">{eyebrow}</span>
+          {eyebrow && <span className="eyebrow">{eyebrow}</span>}
           <h2 className="worlds__title">{title}</h2>
           {dare}
         </div>

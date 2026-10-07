@@ -17,16 +17,17 @@ import Share from "@/components/Share";
 import { UNLOCKS, cap, type UnlockId } from "@/lib/card";
 import type { Chain } from "@/lib/chain";
 import type { Listed } from "@/lib/gnomes/catalogue";
-import { canBuyCard, cardFact, closingSlot, comingLegends, gnot, makeShop, nowRow, shelf, shareWords, teamOrder, utcDate, wavePrices, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
+import { canBuyCard, cardFact, closingSlot, comingLegends, makeShop, nowRow, shelf, shareWords, teamOrder, waveLine, PAGE, type Collection, type View, type Worn } from "@/lib/gnomes/shop";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { know, tokenSkin } from "@/lib/gnomes/wear";
 import { served as catalogue, type Served } from "@/lib/gnomes/served";
 import type { Home } from "@/lib/gnomes/vocab";
-import { Closes, ComingCard, GnomeCard, LookSwitch, TierChip } from "./parts";
-import { BlankShelf, ClosesSlot, SHOP_HEAD, WaveSlot } from "./ShopFrame";
+import { Closes, ComingCard, GnomeCard, LookSwitch, SaleLine, SearchToggle, TierChip, TierFilter } from "./parts";
+import { BlankShelf, ClosesSlot, SHOP_HEAD, ShopPitch, WaveSlot } from "./ShopFrame";
 import { knownSale } from "@/lib/gnomes/promo";
 import { portraitsOf, savedLook, saveLook, type Look } from "@/lib/gnomes/onchain";
 import GnomeSheet from "./GnomeSheet";
+import type { Skin } from "@/lib/scene/gnome";
 
 /** What the shop shows: a player's gnomes (who: their address, theirs read-only) and a gnome open (its id, or an earned kind). */
 export interface ShopView { who?: string; open?: string }
@@ -46,9 +47,11 @@ export interface ShopProps {
   onPlay: (skinId: string) => void;
   /** race a player's ghost */
   onRace: (player: string) => void;
+  /** the shopkeeper by the title: the menu's Shop panel's gnome (null: not known yet) */
+  keeper?: Skin | null;
 }
 
-export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace }: ShopProps) {
+export default function ShopScreen({ chain, account, wallet, onConnect, view, onView, onBack, onAbout, playing, onPlay, onRace, keeper }: ShopProps) {
   const shop = useMemo(() => makeShop(chain), [chain]);
   const me = account && account.address;
   // the first frame from the sale the menu already read (its panel), when it has: then read again (load)
@@ -64,6 +67,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const [now, setNow] = useState(() => Math.floor(chain.now() / 1000));
   const [f, setF] = useState<{ view: View; tier?: Listed["tier"]; home?: Home; text: string }>({ view: "sale", text: "" });
   const [shown, setShown] = useState(PAGE);
+  const [more, setMore] = useState(false);
   // the look the viewer picked, kept in this browser: on chain, the portraits read as the cards come into view
   const [look, setLook] = useState<Look>(savedLook);
   const onLook = (l: Look) => (setLook(l), saveLook(l));
@@ -114,6 +118,7 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
   const open = view.open && cat ? cat.gnomes.find((g) => String(g.id) === view.open) : undefined;
   const earned = view.open && cat && !open ? cat.earned.find((e) => e.unlock === view.open) : undefined;
   const row = c && sold && cat ? nowRow(c, sold, cat.gnomes, now) : null;
+  const line = row && c && sold && cat ? waveLine(row, c, cat.gnomes, sold, now) : null;
   const nameOf = (id: string) => (id.startsWith("t") ? cat?.gnomes.find((g) => `t${g.id}` === id)?.name || "a gnome" : "a gnome of the game");
   const playingName = nameOf(playing), wornSkin = worn ? tokenSkin(worn).id : null;
 
@@ -124,7 +129,6 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
 
   // a shop at first glance: its name, then one line of what is sold (the player's own gnomes and another's keep theirs)
   const title = theirs ? `${theirs.name || "Their"}'s gnomes` : viewing === "mine" ? (mine.length ? `Your team of ${mine.length}` : "Your gnomes") : SHOP_HEAD.title;
-  const eyebrow = theirs ? "Their gnomes" : viewing === "mine" ? "My gnomes" : SHOP_HEAD.eyebrow;
   const views: (readonly [View, string])[] = [[closed ? "made" : "sale", closed ? "Made" : "On sale"], ...(me ? [["mine", "Mine"] as const] : []), ["all", `All ${cat ? cat.gnomes.length : ""}`.trim()]];
 
   if (region === false)
@@ -134,31 +138,13 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
       </FrontScreen>
     );
   return (
-    <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} eyebrow={eyebrow} title={title}>
-      {!theirs && viewing !== "mine" && <p className="shop__pitch">{SHOP_HEAD.pitch}</p>}
+    <FrontScreen className="shop" back="Back" onBack={onBack} onAbout={onAbout} title={title} dare={!theirs && viewing !== "mine" ? <ShopPitch keeper={keeper} /> : undefined}>
       {/* the closing line and the wave in their places from the first frame (ShopFrame), the line's room kept until the
           sale is read (no room at all when it says no date): nothing moves as they are read */}
       {!theirs && viewing !== "mine" && closingSlot(c) !== "none" && <ClosesSlot>{c && closingSlot(c) === "line" && <Closes at={c.closesAt} now={now} />}</ClosesSlot>}
       {!theirs && viewing !== "mine" && !row && <WaveSlot />}
-      {/* the wave of the moment, or the sale's end: one panel, one line of numbers */}
-      {!theirs && viewing !== "mine" && row && row.at !== "none" && (
-        <section className="wave" aria-label="The sale">
-          {row.at === "closed" ? (
-            <div className="wave__head"><span>Closed: {row.made} made · {row.never} never made</span></div>
-          ) : (
-            <>
-              <div className="wave__head">
-                <span>Wave {row.wave.n}{row.wave.home ? ` · ${cap(row.wave.home)}` : ""}</span>
-                <span>{row.at === "soldout" ? `All ${row.wave.size} found a player` : `${row.wave.sold} of ${row.wave.size} found a player`}</span>
-              </div>
-              <div className="track" aria-hidden="true"><i style={{ width: `${row.wave.size ? (100 * row.wave.sold) / row.wave.size : 0}%` }} /></div>
-              {c && <p className="wave__prices">{wavePrices(c, row.wave.row).map(([t, p]) => <span key={t}><TierChip tier={t} /> {gnot(p)} GNOT</span>)}</p>}
-              {/* (its note's line kept when there is none: the panel never changes height) */}
-              <p className="wave__note">{row.at === "teaser" ? `Opens ${utcDate(row.wave.row.start, now)}.` : row.at === "players" ? `Players first until ${utcDate(row.wave.row.playersUntil, now, true)}: save one round on-chain to buy now.` : row.at === "paused" ? "Paused for a moment: the sale picks up where it stopped." : "\u00a0"}</p>
-            </>
-          )}
-        </section>
-      )}
+      {/* the sale in one line, a little fairway: the wave of the moment, or the sale's end (none: no wave yet) */}
+      {!theirs && viewing !== "mine" && line && <SaleLine line={line} />}
       {/* the player's own: who sees what, and their team to share */}
       {viewing === "mine" && me && mine.length > 0 && (
         <>
@@ -167,24 +153,27 @@ export default function ShopScreen({ chain, account, wallet, onConnect, view, on
         </>
       )}
       {theirs && <Button variant="gold" className="btn--cta" onClick={() => onRace(theirs.who)}>Race their ghost</Button>}
+      {/* one toolbar: which gnomes, the tiers (their prices, once), the search, the look, more filters folded */}
       {!theirs && (
-        <div className="gfilters">
-          <Segmented label="Which gnomes" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
-          <input className="gfilters__search" type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={f.text} onChange={(e) => setF((x) => ({ ...x, text: e.target.value }))} />
-          <LookSwitch look={look} onLook={onLook} />
-          <details className="more">
-            <summary>More filters</summary>
-            <div className="gfilters">
-              <select className="gfilters__search" aria-label="Tier" value={f.tier || ""} onChange={(e) => setF((x) => ({ ...x, tier: (e.target.value || undefined) as Listed["tier"] | undefined }))}>
-                {([["", "Every tier"], ["common", "Common"], ["rare", "Rare"], ["epic", "Epic"], ["legendary", "Legendary"]] as const).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
-              </select>
+        <>
+          <div className="gbar">
+            <Segmented label="Which gnomes" className="gbar__views" options={views} value={viewing === "mine" ? "mine" : f.view} onChange={(v) => (v === "mine" && me ? onView({ who: me }) : (onView({}), setF((x) => ({ ...x, view: v }))))} />
+            <TierFilter tiers={line && line.at !== "closed" ? line.tiers : []} value={f.tier} onChange={(t) => setF((x) => ({ ...x, tier: t as Listed["tier"] | undefined }))} />
+            <SearchToggle value={f.text} onChange={(text) => setF((x) => ({ ...x, text }))} />
+            <LookSwitch look={look} onLook={onLook} />
+            <button type="button" className={`gbar__icon gbar__more${f.home ? " gbar__icon--on" : ""}`} aria-label="More filters" aria-expanded={more} aria-controls="gmore" onClick={() => setMore((m) => !m)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.4" /><circle cx="15" cy="17" r="2.4" /></svg>
+            </button>
+          </div>
+          {more && (
+            <div className="gfilters" id="gmore">
               <select className="gfilters__search" aria-label="World" value={f.home || ""} onChange={(e) => setF((x) => ({ ...x, home: (e.target.value || undefined) as Home | undefined }))}>
                 <option value="">Every world</option>
                 {[...new Set((cat ? cat.gnomes : []).map((g) => g.home))].map((h) => <option key={h} value={h}>{cap(h)}</option>)}
               </select>
             </div>
-          </details>
-        </div>
+          )}
+        </>
       )}
       {error ? (
         <div className="gempty" role="alert"><p>The chain did not answer.</p><Button variant="primary" onClick={load}>Try again</Button></div>
