@@ -57,7 +57,7 @@ function AddressStep({ onAddress }: { onAddress: (a: string) => void }) {
   );
 }
 
-export default function TestMode({ host, draft, hex, proofKey, author, onAuthor, onProof, onPar }: {
+export default function TestMode({ host, draft, hex, proofKey, author, guess = 0, onAuthor, onProof, onPar }: {
   host: BuilderHost;
   draft: Draft;
   /** its canonical bytes (fit) */
@@ -65,6 +65,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, onAuthor,
   /** proof.ts proofKey of the draft */
   proofKey: string;
   author: string | null;
+  /** the difficulty meter's par (0: none): shown, as a guess, until the rounds set it */
+  guess?: number;
   onAuthor: (a: string) => void;
   onProof: (p: Proof) => void;
   /** the proofs' suggested par, once every weather is proved */
@@ -158,7 +160,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, onAuthor,
           const best = draft.proofs.find((p) => p.kind === kind && p.key === proofKey && p.id === id);
           return <span key={kind} className={`tmode__chip${done ? " tmode__chip--done" : on ? " tmode__chip--now" : ""}${bad ? " tmode__chip--bad" : ""}`}>{chip(kind)[0]} {chip(kind)[1]}{done ? ` ✓ ${best?.strokes ?? ""}` : on ? ", now" : ""}</span>;
         })}
-        <span className="tmode__par">{par ? `Par ${par}` : "Par –"}</span>
+        <span className="tmode__par" title={par ? "Par, from your rounds" : guess ? "Par, the difficulty meter's guess until your rounds set it" : undefined}>{par ? `Par ${par}` : guess ? `Par ${guess}?` : "Par –"}</span>
       </div>
       <div className="tmode__card" aria-live="polite">{checking ? "The chain's code replays your round…" : `Stroke ${snap ? snap.strokes : 0}`}</div>
       <div className="tmode__notes">
