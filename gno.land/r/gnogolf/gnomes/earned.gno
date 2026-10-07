@@ -25,12 +25,29 @@ import (
 //   - a version's par: "holes", "<id>" -> the entry, field 2 (encodeEntry).
 //
 // bests carry no format version, so the proof refuses while store's writer
-// is not the rules it was built against: a later format can refuse a mint,
-// never prove a false one.
+// is not the rules it reads: a later format can refuse a mint, never prove
+// a false one. After a rules change the owner accepts the new rules
+// (AcceptRules, ADR-012), once checked to keep these rows as golf/v2 writes
+// them, and the proof reads again.
 
-// rules is the golf realm whose rows the proof reads (stage.sh rewrites it
-// with the other paths).
-const rules = "gno.land/r/gnogolf/golf/v2"
+// rulesAtDeploy is the golf realm whose rows the proof reads at deploy
+// (stage.sh rewrites it with the other paths); rules is the one it reads now.
+const rulesAtDeploy = "gno.land/r/gnogolf/golf/v2"
+
+var rules string
+
+// AcceptRules makes path the rules the proof reads: store's current writer
+// and no other, so the owner can follow a rules change store's own public
+// delay has carried out, never point the proof elsewhere (ADR-012). Owner
+// only.
+func AcceptRules(cur realm, path string) {
+	assertOwner(0, cur)
+	if w := rows.Writer(); path != w {
+		panic("gnomes: the rules accepted are store's writer, " + w + ", not " + path)
+	}
+	rules = path
+	chain.Emit("RulesAccepted", "rules", path)
+}
 
 // Earned ids start above any id a catalogue can reach (64 series of 1,000
 // rows end at 64,000).

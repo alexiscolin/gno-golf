@@ -64,7 +64,7 @@ func setUp(_ int, rlm realm, deployer address) {
 		prices[i] = tr.price
 	}
 	catalogue, waves, soldTier, sold = nil, nil, [len(tiers)]int64{}, nil
-	closeAt = 0
+	closeAt, rules = 0, rulesAtDeploy
 	bought, inWindow, equipped, held = seeded(), seeded(), seeded(), seeded()
 	earned, kindOf, nextEarned, rows = seeded(), seeded(), firstEarned, storeReader{}
 }

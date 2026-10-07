@@ -965,7 +965,10 @@ score honest through it.
   once (Resume: nothing new runs), and give the role up for good (Renounce,
   never while paused: the rules can then never change). store's page says which rules are in force and
   what is proposed. Nothing is reset at a switch: the next rules read the data
-  on from where it is.
+  on from where it is. The earned gnomes' proof (r/<ns>/gnogolf/gnomes)
+  pauses at the switch, until its owner checks that the new rules keep
+  `bests`, `copies` and `holes` as golf/v2 writes them and calls
+  `AcceptRules` with their path (ADR-012).
 - **v1's records come over to v2 (onyx),** read on chain from v1 itself (its
   `HoleData`, `Versions`, `Ghost`, `Records`) in the transaction that writes
   them, so nobody can change one: `ImportHole` (the owner: a course hole keeps

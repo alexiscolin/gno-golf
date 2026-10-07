@@ -133,6 +133,16 @@ address (a Ledger through gnokey or Adena). `SetMintOpen` stops every sale
 at once (not `MintEarned`, which sells nothing). Whether the role
 may be renounced is not decided: there is no `Renounce`.
 
+**New rules are the owner's to accept for the proof (ADR-012).** The
+earned gnomes' proof reads store's rows only while store's writer is the
+rules it reads (golf/v2 at deploy): after a rules change every proof
+refuses ("rules changed"), until the owner, having checked that the new
+rules keep `bests`, `copies` and `holes` as golf/v2 writes them, calls
+`AcceptRules(path)`. It takes store's current writer and nothing else, so
+the owner can follow a change store's own public delay has carried out,
+never point the proof elsewhere; it emits `RulesAccepted`. An earned gnome
+minted stays minted once, whatever the rules.
+
 **The site link is the owner's.** `SetSiteURL` sets the game's site, which
 a token's `external_url` names (`<site>g/<id>/`, an earned one's `<site>g/<kind>/`: the site's static pages); none is set at deploy,
 and until one is, the metadata has no `external_url`. The image is the
@@ -154,7 +164,7 @@ it leaves them and refuses to move an earned one.
 |---|---|---|---|
 | the deploy: the realm with the portrait's drawing (159,277 bytes of source, staged, no catalogue), and p/gnogolf/weblink (p/gnogolf/jsonq, added since, is of weblink's size and not measured) | 236,801 and 2,029 stored | 23.68 and 0.20 GNOT, the deployer (239M gas) | an `addpkg` on an in-process node (below) |
 | the genesis published as the catalogue lays it out, with a wave | 64,230 | 6.4 GNOT, the owner | `z_storage_genesis` |
-| a first buy (was 10,465 with enumerable and a traits copy) | 3,849 | 0.38 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
+| a first buy (was 10,465 with enumerable and a traits copy) | 3,850 | 0.39 GNOT, the buyer | `z_storage_buy` less `z_storage_genesis` |
 | an earned gnome | 3,555 | 0.36 GNOT, the player | `z_storage_earned` |
 
 | what | gas | measured by |
@@ -264,6 +274,7 @@ while on sale, an earned kind, a player).
 | Transfer, Accept | the money moved with the owner's role | the treasury stays | `TestAnOwnerHandoverLeavesTheTreasury`, `TestTheOwnerHandsOverInTwoSteps` |
 | Buy, Sweep, royalty | a payment to the owner or kept by the realm | the treasury, in the same call | `TestTheTreasuryMovesInTwoSteps`, `TestTheSweepPaysTheTreasury` |
 | SetSiteURL | a link that breaks out of a page or points off https | golf's play link rule | `TestTheOwnerMovesTheSite` |
+| AcceptRules, MintEarned | proofs read from rules with another layout; the proof pointed at a realm store has not moved to; accepted by another; a kind minted twice across a change | store's current writer only; owner only; the earned tree kept | `TestTheOwnerAcceptsOnlyStoresNewRules`, `TestNewRulesProveNothing`, `TestNewRulesRefuseTheMint` |
 | init | a deploy with no signer | refused off `dev` | `TestTheDeployerOwns` |
 | TransferFrom, Approve | a realm moves its caller's gnomes | the ledger's caller teller | `TestARealmCannotMoveItsCallersGnomes`, `TestTransfersGoThroughTheLedgersChecks` |
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |
@@ -292,14 +303,20 @@ setters' events are the spec's names (`CloseAtSet`, `SiteURLSet`, …),
 - The client draws a gnome from its traits; an unknown version or trait
   falls back to a plain gnome (the client's side, not this realm's).
 - Store's layout is now read by a second realm: `totals` for the player
-  window, `slots`, `bests`, `copies` and `holes` for the proof. Rules that
-  change them must keep the same answers, or the proof refuses until gnomes
-  is updated.
+  window, `slots`, `bests`, `copies` and `holes` for the proof. After a
+  rules change the proof refuses until the owner accepts the new rules
+  (`AcceptRules`, ADR-012), which they do only once those rows keep the
+  same answers; rules that change them need a proof of their own, not an
+  acceptance.
 - `scripts/stage.sh` stages `r/gnogolf/gnomes` beside store; the proof's
   golf/v2 path is rewritten with the other paths.
 - After deploy the owner sets the site (`SetSiteURL`) and moves the
   treasury to its own address (`SetTreasury`, then `AcceptTreasury` from
   that address), before the genesis is published.
+- At each rules release, once the new rules' 72 hours are over and they are
+  store's writer, the gnomes owner checks their `bests`, `copies` and
+  `holes` and calls `AcceptRules(<the new rules' path>)`; until then the
+  earned gnomes are paused.
 - `p/gnogolf/weblink` and `p/gnogolf/jsonq` are two more packages to
   deploy, before gnomes (stage.sh stages them).
 - In `gno test`, a recovered call's writes are not reverted (golf's

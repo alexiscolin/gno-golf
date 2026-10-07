@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed, 2026-10-07, awaiting the owner's decision: nothing in the realm
-has changed. It answers the review's finding on `gno.land/r/gnogolf/gnomes/earned.gno:32`
+Accepted (pending the owner's final word), 2026-10-07: option 3 is built
+(`earned.gno`'s `rules` and `AcceptRules`). It answers the review's finding on `gno.land/r/gnogolf/gnomes/earned.gno:32`
 and corrects ADR-007's Consequences ("the proof refuses until gnomes is
 updated", which cannot happen).
 
@@ -51,25 +51,25 @@ meant.
    checked that the new rules keep `bests`, `copies` and `holes` as golf/v2
    writes them, which is ADR-007's own condition.
 
-## Decision (proposed)
+## Decision
 
 Option 3:
 
-- `var rules = "gno.land/r/gnogolf/golf/v2"` (stage.sh still rewrites the
-  path), and `AcceptRules(cur realm, path string)`:
+- `var rules`, set at deploy to `rulesAtDeploy`, golf/v2 (stage.sh still
+  rewrites the path), and `AcceptRules(cur realm, path string)`:
   - owner only;
   - `path` must equal `rows.Writer()`, else it panics;
   - emits `RulesAccepted`.
 - `Proof` keeps saying "rules changed" until the owner accepts the new
   rules. The page reads that as "earned gnomes paused for a rules update".
-- Tests:
+- Tests (`TestTheOwnerAcceptsOnlyStoresNewRules`):
   - a writer change refuses every proof;
   - `AcceptRules` refuses a path that is not the writer, and refuses anyone
     but the owner;
   - once accepted, the same player's proof passes again;
   - an earned gnome already minted is never minted twice.
-- ADR-007's Consequences and the spec's line on it are corrected to point
-  here.
+- ADR-007's Consequences point here, with the release step; the spec's
+  line on it is the user's to correct.
 
 ## Consequences
 
@@ -77,5 +77,5 @@ Option 3:
   cannot aim the proof anywhere store has not already, publicly, moved.
 - One owner call per rules change, in the release checklist after the new
   rules' delay ends.
-- Not built until the owner says yes: this is a realm change, and a
-  product and security decision.
+- Built before the realm's deploy: the owner's final word still stands, and
+  dropping it before then removes one call.

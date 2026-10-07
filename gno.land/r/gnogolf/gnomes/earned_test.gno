@@ -303,6 +303,40 @@ func TestNewRulesRefuseTheMint(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "rules changed", func() { MintEarned(cross(cur), "wizard") })
 }
 
+// New rules (store's writer moved, ADR-012): every proof refuses until the
+// owner accepts them, and only store's current writer can be accepted; then
+// the same player's proof passes again, and what was minted stays minted once.
+func TestTheOwnerAcceptsOnlyStoresNewRules(cur realm, t *testing.T) {
+	f := withRows(t, cur)
+	for _, id := range cupHoles(f, "garden", 18) {
+		best(f, id, "assisted", alice.String(), 3)
+	}
+	testing.SetRealm(asUser(alice, nil))
+	uassert.Equal(t, "1000001", MintEarned(cross(cur), "wizard"))
+
+	const v3 = "gno.land/r/gnogolf/golf/v3"
+	f.writer = v3
+	for _, kind := range earnedKinds {
+		_, _, why := prove(kind, alice.String())
+		uassert.Equal(t, errRules, why, kind)
+	}
+	urequire.AbortsContains(t, cur, "rules changed", func() { MintEarned(cross(cur), "viking") })
+
+	urequire.AbortsContains(t, cur, "only the owner", func() { AcceptRules(cross(cur), v3) })
+	testing.SetRealm(asUser(deployer, nil))
+	for _, other := range []string{rulesAtDeploy, "gno.land/r/attacker/rules", ""} {
+		urequire.AbortsContains(t, cur, "gnomes: the rules accepted are store's writer, "+v3, func() { AcceptRules(cross(cur), other) }, other)
+	}
+	AcceptRules(cross(cur), v3)
+
+	ok, _, why := prove("viking", alice.String())
+	uassert.True(t, ok)
+	uassert.Equal(t, "", why)
+	testing.SetRealm(asUser(alice, nil))
+	uassert.Equal(t, "1000002", MintEarned(cross(cur), "viking"))
+	urequire.AbortsContains(t, cur, "already minted: wizard", func() { MintEarned(cross(cur), "wizard") })
+}
+
 func TestAnEarnedGnomeIsBoundToItsPlayer(cur realm, t *testing.T) {
 	f := withRows(t, cur)
 	for _, id := range cupHoles(f, "mines", 18) {
