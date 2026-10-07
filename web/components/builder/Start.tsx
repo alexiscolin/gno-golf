@@ -4,12 +4,13 @@
 // workshop (the game's Miner in his hard hat over a blueprint, what the
 // Builder is for and its three steps), a new hole in a world (its tab, its
 // starters as cards that show the hole and say in a line what it is), the
-// drafts this browser keeps as cards with their state, and a file or a
-// published hole opened. A new player never lands here first: the first run
-// opens the Garden's dogleg (templates.ts firstRun).
+// drafts this browser keeps as cards with their state, the author's holes on
+// the chain with who played them and the Builder's badges (Rewards.tsx), and
+// a file or a published hole opened. A new player never lands here first: the
+// first run opens the Garden's dogleg (templates.ts firstRun).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BackButton } from "@/components/About";
-import { HoleMap } from "@/components/HoleMap";
+import { HoleMap, NoMap, useHoleMaps } from "@/components/HoleMap";
 import { useGnomeStage } from "@/components/Stage";
 import { Emblem } from "@/components/Worlds";
 import { Button, Sheet } from "@/components/ui";
@@ -21,10 +22,14 @@ import { census } from "@/lib/builder/drawn";
 import { loadTakedown } from "@/lib/takedown";
 import { isHoleId, makeChain } from "@/lib/chain";
 import { startsIn } from "@/lib/builder/templates";
-import { endpoints } from "@/lib/builder/holes";
+import { endpoints, playLink } from "@/lib/builder/holes";
 import { proofKey } from "@/lib/builder/proof";
 import { FIELD, worldName } from "@/lib/builder/rules";
+import { factsOf, isFresh, statsLine, statsOf, versusLine, type HoleStats } from "@/lib/builder/rewards";
 import type { BuilderHost } from "@/lib/builder/wasm";
+import type { HoleRow } from "@/lib/types";
+import { BuilderBadges, SaveTestRound } from "./Rewards";
+import { useRewards } from "./useRewards";
 import { saveFile } from "./share";
 
 const WORLDS = Object.keys(FIELD);
@@ -35,10 +40,12 @@ const MAX_FILE = 1 << 20;
 const download = (d: Draft) => saveFile(new Blob([exportDraft(d)], { type: "application/json" }), draftFile(d));
 
 /** The drafts kept in this browser; a new hole in a world, a file opened, a published hole opened for its next version. */
-export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }: {
+export default function Start({ host, author, drafts, said = "", onOpen, onAdd, onDelete }: {
   host: BuilderHost;
   author: string | null;
   drafts: readonly Draft[];
+  /** why something asked of the Builder on arrival (a remix) did not open */
+  said?: string;
   onOpen: (i: number) => void;
   /** a new draft, opened */
   onAdd: (d: Draft) => void;
@@ -46,24 +53,36 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
 }) {
   const [world, setWorld] = useState("garden");
   const [hole, setHole] = useState("");
-  const [why, setWhy] = useState("");
+  const [why, setWhy] = useState(said);
+  useEffect(() => void (said && setWhy(said)), [said]);
   const [busy, setBusy] = useState(false);
   const [wipe, setWipe] = useState<number | null>(null); // the draft asked to be deleted, before the sheet's yes
   const file = useRef<HTMLInputElement>(null);
   const starts = useMemo(() => startsIn(world).map((s) => ({ ...s, map: draftMap(s.draft) })), [world]);
   const keys = useKeys(drafts, host);
+  const { chain, keep } = useMemo(() => {
+    const { rpc, web, keep } = endpoints(window.location.search);
+    return { chain: makeChain({ rpc, web }), keep };
+  }, []);
+  // the author's holes on the chain: each draft's own (its alias), and those this browser has no draft of
+  const { got, reload } = useRewards(chain, author);
+  const rowOf = (d: Draft) => (author && d.slug && got?.rows.find((h) => h.slot === `${author}/${d.slug}`)) || null;
+  const elsewhere = got?.rows.filter((h) => !drafts.some((d) => rowOf(d) === h)) ?? [];
+  const maps = useHoleMaps(chain, elsewhere.map((h) => h.id));
+  const live = (h: HoleRow) => {
+    if (!got || !author) return null;
+    const s = statsOf(h, got.saved, author);
+    return <Live s={s} fresh={isFresh(h.id, s, got.seen)} />;
+  };
   const take = (r: Draft | string) => (typeof r === "string" ? setWhy(r) : (setWhy(""), onAdd(r)));
   const openFile = (f: File | undefined) => {
     if (!f) return;
     if (f.size > MAX_FILE) return setWhy("That file is too big to be a draft.");
     void f.text().then((t) => fromFile(t, host, census)).then(take, () => setWhy("That file could not be read."));
   };
-  const openPublished = () => {
-    const id = hole.trim();
+  const openPublished = (id = hole.trim()) => {
     if (!isHoleId(id)) return setWhy("A hole's address is like g1…/its-name, or g1…/its-name/v2.");
     setBusy(true);
-    const { rpc, web } = endpoints(window.location.search);
-    const chain = makeChain({ rpc, web });
     // the site's takedown list too: a hole taken down never opens (the list unread, nothing does)
     void Promise.all([chain.holeData(id), loadTakedown(chain)])
       .then(([hex, taken]) => fromPublished(hex, host, id, author, census, taken), () => "The chain has no hole there, or could not be read.")
@@ -112,23 +131,47 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
           </div>
         </section>
         <section className="bholes__mine" aria-labelledby="bholes-mine">
-          <h2 id="bholes-mine" className="bholes__h">Your holes {drafts.length > 0 && <small>{drafts.length}</small>}</h2>
-          {drafts.length ? (
+          <h2 id="bholes-mine" className="bholes__h">Your holes {drafts.length + elsewhere.length > 0 && <small>{drafts.length + elsewhere.length}</small>}</h2>
+          {got && author && got.rows.length > 0 && <BuilderBadges facts={factsOf(got.rows, got.saved, author)} />}
+          {drafts.length + elsewhere.length ? (
             <ul className="bholes__list">
               {drafts.map((d, i) => {
-                const st = draftState(d, keys[i] ?? null);
+                const st = draftState(d, keys[i] ?? null), h = rowOf(d);
                 return (
                   <li key={i} className="bholes__draft">
                     <span className="bholes__map bholes__map--s"><HoleMap hole={draftMap(d)} className="bholes__svg" /></span>
                     <span className="bholes__name">
                       <b>{d.title || "A hole with no name yet"}</b>
                       <small>{worldName(d.world)} · {d.pieces.length} pieces</small>
-                      <span className={`bholes__state bholes__state--${st.stage}`}>{st.word}</span>
+                      {/* (published and not tested here since: its line on the chain says it all) */}
+                      {!(h && st.stage === "new") && <span className={`bholes__state bholes__state--${st.stage}`}>{st.word}</span>}
+                      {h && live(h)}
+                      {/* the author's test round, the record to beat while none of theirs is saved */}
+                      {h && got && author && !statsOf(h, got.saved, author).mine && <SaveTestRound chain={chain} proofs={d.proofs} id={h.id} world={d.world} author={author} onSaved={reload} />}
                     </span>
                     <span className="bholes__acts">
                       <Button className="btn--s" onClick={() => onOpen(i)}>Open</Button>
+                      {h && <a className="linkish" href={playLink(h, keep)}>Play</a>}
                       <button type="button" className="linkish" onClick={() => download(d)}>Export</button>
                       <button type="button" className="linkish" onClick={() => setWipe(i)}>Delete</button>
+                    </span>
+                  </li>
+                );
+              })}
+              {/* published from another browser (or the draft deleted): on the chain, opened as its next version */}
+              {elsewhere.map((h) => {
+                const m = maps.get(h.id);
+                return (
+                  <li key={h.id} className="bholes__draft">
+                    <span className="bholes__map bholes__map--s">{m ? <HoleMap hole={m} className="bholes__svg" /> : <NoMap className="bholes__svg" />}</span>
+                    <span className="bholes__name">
+                      <b>{h.name || h.slot}</b>
+                      <small>{worldName(h.world)} · par {h.par}</small>
+                      {live(h)}
+                    </span>
+                    <span className="bholes__acts">
+                      <a className="btn btn--ghost btn--s" href={playLink(h, keep)}>Play</a>
+                      <button type="button" className="linkish" disabled={busy} onClick={() => openPublished(h.id)}>Open its next version</button>
                     </span>
                   </li>
                 );
@@ -156,13 +199,25 @@ export default function Start({ host, author, drafts, onOpen, onAdd, onDelete }:
             <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => (openFile(e.target.files?.[0]), (e.target.value = ""))} />
             <span className="bholes__hole">
               <input value={hole} placeholder="g1…/its-name" aria-label="A published hole's address" spellCheck={false} autoCapitalize="off" onChange={(e) => setHole(e.target.value)} />
-              <Button disabled={!hole.trim() || busy} onClick={openPublished}>{busy ? "Reading…" : "Open"}</Button>
+              <Button disabled={!hole.trim() || busy} onClick={() => openPublished()}>{busy ? "Reading…" : "Open"}</Button>
             </span>
           </div>
         </details>
         {why && <p className="bholes__why" role="alert">{why}</p>}
       </div>
     </div>
+  );
+}
+
+/** A published hole's line on its card: on the chain, a dot for what is new since the last look, its players and plays, its best against the author's. */
+function Live({ s, fresh }: { s: HoleStats; fresh: boolean }) {
+  const vs = versusLine(s);
+  return (
+    <>
+      <span className="bholes__state bholes__state--live">On gno.land{fresh && <i className="bholes__dot" role="img" aria-label="New since your last visit" title="New since your last visit" />}</span>
+      <small className="bholes__stats">{statsLine(s)}</small>
+      {vs && <small className="bholes__stats">{vs}</small>}
+    </>
   );
 }
 

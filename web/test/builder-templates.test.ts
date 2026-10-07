@@ -11,7 +11,8 @@ import { blank, firstRun, retitle, slugOf, startsIn } from "../lib/builder/templ
 import { STARTERS } from "../lib/builder/starters.ts";
 import { exportDraft, parseDraft } from "../lib/builder/draft.ts";
 import { unknownEntry } from "../lib/builder/edit.ts";
-import { canonicalHex, proofKey, replay, required, unproven, type Proof } from "../lib/builder/proof.ts";
+import { canonicalHex, proofKey, replay, unproven, type Proof } from "../lib/builder/proof.ts";
+import { required } from "../lib/builder/rules.ts";
 import { holeRow } from "../lib/builder/testmode.ts";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { loadPalette } from "../lib/builder/palette.ts";

@@ -22,19 +22,23 @@ const GLYPH: Record<string, string> = {
   snail: "M13 17a5 5 0 1 1 5-5c0 2-1.6 3.5-3.5 3.5a2.5 2.5 0 1 1 2.5-2.5M3 19h15l3-3",
   ghost: "M6 20v-8a6 6 0 0 1 12 0v8l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM10 11v1M14 11v1",
   sport: "M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z",
+  // the Builder's (lib/builder/rewards.ts): the workshop's hammer, a player, two players
+  published: "M4 20 13 11M11 6.5 15 3l6 6-3.5 4Z",
+  player: "M12 4a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7M5 20a7 7 0 0 1 14 0Z",
+  players: "M9 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6M3 19a6 6 0 0 1 12 0ZM16 6a3 3 0 1 1 0 6M17 13a6 6 0 0 1 4 6h-4",
 };
 // the families, in the sheet's order, as they are said
 const FAMILIES: readonly [Badge["family"], string][] = [["skill", "Skill"], ["weather", "Weather"], ["chain", "On-chain"], ["fun", "Just for fun"]];
 
 /** A badge's medal: a paper rim inked round its family's colour, on a red
- *  ribbon; a dashed grey one until it is earned. */
-function Medal({ b, on }: { b: Badge; on: boolean }) {
+ *  ribbon; a dashed grey one until it is earned; glyph: its picture (GLYPH's, the badge's own by default). */
+export function Medal({ b, on, glyph = b.id }: { b: Pick<Badge, "id" | "family">; on: boolean; glyph?: string }) {
   return (
     <svg viewBox="0 0 48 54" className={`medal medal--${b.family}` + (on ? "" : " medal--off")} aria-hidden="true">
       <path d="M15 34 11 52l6-3 4 4 3-16M33 34l4 18-6-3-4 4-3-16" className="medal__ribbon" />
       <circle cx="24" cy="24" r="20" className="medal__rim" />
       <circle cx="24" cy="24" r="15" className="medal__face" />
-      <path d={GLYPH[b.id]} transform="translate(13.2 13.2) scale(.9)" className="medal__glyph" />
+      <path d={GLYPH[glyph]} transform="translate(13.2 13.2) scale(.9)" className="medal__glyph" />
     </svg>
   );
 }

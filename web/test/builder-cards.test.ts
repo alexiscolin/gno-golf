@@ -5,7 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { draftMap, draftState } from "../lib/builder/cards.ts";
 import { startsIn } from "../lib/builder/templates.ts";
-import { required, type Proof } from "../lib/builder/proof.ts";
+import type { Proof } from "../lib/builder/proof.ts";
+import { required } from "../lib/builder/rules.ts";
 import type { Draft } from "../lib/builder/draft.ts";
 
 const proof = (kind: string, key = "k", id = "g1me/hole/v1"): Proof => ({ key, id, kind, period: 1, shots: [], commits: [], strokes: 2, maxWork: 0 });

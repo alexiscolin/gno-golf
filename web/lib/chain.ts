@@ -15,7 +15,7 @@ import { hostOf, isLoopback } from "./network";
 import { trackError } from "./analytics";
 import type {
   Bests, CourseLeaderboard, Extras, Ghost, HoleLeaderboard, HoleRank, HoleRow, Holes, HoleState, Leaderboard, Mode, Rank, Round, SimulateFrom,
-  SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Versions, Weather,
+  Saved, SimulateRound, Standings, StandingRow, StrokesRow, Vec2, Versions, Weather,
 } from "./types";
 
 /**
@@ -539,6 +539,40 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
       const lines = out.split("\n").filter(Boolean);
       return { rows: keptLines(out), next: lines.length === n ? at + n : 0 };
     },
+    /** An author's holes, newest first: their current versions not hidden (the realm's byAuthor rows), at most
+     *  MAX_OWN, each as Holes() lists one (which keeps three an author). One read: the Builder's "Your holes". */
+    holesOf: async (author: string): Promise<HoleRow[]> => {
+      if (!isAddress(author)) return [];
+      const out = await qstr(REALM, `func() (s string) { n := 0; byAuthor.ReverseIterate(${s(author + " ")}, ${s(author + "!")}, func(_, id string) bool { if e := find(id); e != nil { s += holeRow(e) + "\\n" }; n++; return n == ${MAX_OWN} }); return }()`);
+      const rows: HoleRow[] = [];
+      for (const line of out.split("\n").filter(Boolean)) {
+        let r: unknown;
+        try {
+          r = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (ownRow(r, author)) rows.push(r); // (the author's only, every field as the realm writes it)
+      }
+      return rows;
+    },
+    /** The rounds saved on these holes (the first MAX_SAVED_HOLES asked): each player's best there in each
+     *  mode, with its weather's period, never a copy of another's (the realm keeps those apart), the first
+     *  MAX_SAVED a hole and mode by address; more: the holes that have more. One read: who played an
+     *  author's holes (lib/builder/rewards.ts). */
+    savedOn: async (holes: readonly string[]): Promise<{ rows: Saved[]; more: Set<string> }> => {
+      const ids = holes.filter(isHoleId).slice(0, MAX_SAVED_HOLES), rows: Saved[] = [], more = new Set<string>();
+      if (!ids.length) return { rows, more };
+      const out = await qstr(REALM, `func() (s string) { for _, id := range []string{${ids.map(s).join(", ")}} { e := find(id); if e == nil { continue }; for m := 0; m < modes; m++ { n := 0; e.bests(m).Iterate("", "", func(p, v string) bool { if n == ${MAX_SAVED} { s += "more " + id + "\\n"; return true }; n++; if !e.copies(m).Has(p) { _, period, _ := bestFields(v); s += id + " " + modeNames[m] + " " + p + " " + itoa(bestStrokes(v)) + " " + i64(period) + "\\n" }; return false }) } }; return }()`);
+      for (const line of out.split("\n")) {
+        const [id, mode, player, strokes, period, ...rest] = line.split(" ");
+        if (id === "more" && ids.includes(mode) && player === undefined) more.add(mode);
+        else if (ids.includes(id) && isMode(mode) && isAddress(player) && !rest.length && /^[1-9]\d?$/.test(strokes) && +strokes <= RULES.maxRoundStrokes && /^-?\d{1,15}$/.test(period)) {
+          rows.push({ id, mode, player, strokes: +strokes, period: +period });
+        }
+      }
+      return { rows, more };
+    },
     /** A gno.land name's address, or "" (r/sys/users). */
     resolveName: (name: string) =>
       isName(name)
@@ -665,6 +699,14 @@ const DATA = /^([a-z]{1,16}\/[1-9]\d{0,2}|g1[0-9a-z]{38}\/[a-z0-9-]{1,32})(\/v[1
 /** Whether s names a hole: a realm's path, or a data hole's id or alias. */
 export const isHoleId = (s: unknown) => PKG.test(String(s)) || DATA.test(String(s));
 /** A best as the realm keeps it (recordsOf). */
+/** The most holes holesOf reads of an author's (their newest), and savedOn of holes at once, and of rounds a hole and mode. */
+const MAX_OWN = 24, MAX_SAVED_HOLES = 12, MAX_SAVED = 100;
+/** A row holesOf takes: one of author's community holes (its id and alias theirs), every field as holeRow writes it. */
+function ownRow(r: unknown, author: string): r is HoleRow {
+  if (!isObj(r) || typeof r.id !== "string" || !isHoleId(r.id) || !r.id.startsWith(author + "/") || r.official !== false) return false;
+  if (!strs(r, "name", "world", "next") || !/^[a-z]{1,16}$/.test(r.world as string) || !nums(r, "plays", "best", "proBest", "par", "order")) return false;
+  return r.slot === undefined || r.slot === r.id.replace(/\/v\d+$/, "");
+}
 export interface Kept { strokes: number; height: number; period: number; shots: string }
 /** One of a player's records (progressOf): the hole's version, slot, world and par; the mode, strokes,
  *  the block it was saved at and its weather's period; whether it holds the hole's record in that mode. */

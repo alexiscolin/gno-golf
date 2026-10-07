@@ -112,7 +112,8 @@ void test("the final data: the name as the chain keeps it written in; the proofs
   const { host } = await import("./builder-fixture.ts");
   await import("./scene-harness.ts");
   const { STARTERS } = await import("../lib/builder/starters.ts");
-  const { proofKey, replay, required, suggestPar } = await import("../lib/builder/proof.ts");
+  const { proofKey, replay, suggestPar } = await import("../lib/builder/proof.ts");
+  const { required } = await import("../lib/builder/rules.ts");
   const { loadPalette } = await import("../lib/builder/palette.ts");
   const { census } = await import("../lib/builder/drawn.ts");
   const { makeLocalChain } = await import("../lib/builder/localchain.ts");

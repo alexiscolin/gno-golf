@@ -2,15 +2,19 @@
 
 // The Builder on a computer (the GUI spec's B1, B2, B5): builder.wasm
 // loaded, then the drafts this browser keeps (Start: open one, or start a
-// new hole in a world), then the editor. Reached only through app/build/gate.tsx's
-// dynamic import: nothing here loads on a phone.
+// new hole in a world), then the editor; a community hole remixed from the
+// game (?remix=, Community.tsx) opens as a new draft. Reached only through
+// app/build/gate.tsx's dynamic import: nothing here loads on a phone.
 import "@/app/title.css";
 import "@/app/build/builder.css";
 import "@/app/build/phone.css";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { loadDrafts, saveDrafts, type Draft } from "@/lib/builder/draft";
-import { knownAuthor } from "@/lib/builder/holes";
+import { endpoints, knownAuthor, remixId } from "@/lib/builder/holes";
+import { remixFrom } from "@/lib/builder/importing";
+import { census } from "@/lib/builder/drawn";
+import { makeChain } from "@/lib/chain";
 import { canonicalHex, parAllowed, proofKey, provedAs } from "@/lib/builder/proof";
 import { loadBuilder } from "@/lib/builder/load";
 import type { BuilderHost } from "@/lib/builder/wasm";
@@ -31,12 +35,16 @@ export default function Builder() {
   const [unkept, setUnkept] = useState(false);
   const [hints, setHints] = useState(false);
   const [guess, setGuess] = useState(0); // the meter's par for the draft last edited, until its test rounds set one
+  const [said, setSaid] = useState(""); // why a remix asked for did not open
   useEffect(() => {
     const list = loadDrafts();
-    // a new player: straight onto the Garden's dogleg, with the three hints (templates.ts firstRun)
+    // a remix asked for (taken from the address at once: a reload does not make another)
+    const remix = remixId(window.location.search), url = new URL(window.location.href);
+    if (remix) url.searchParams.delete("remix"), window.history.replaceState(window.history.state, "", url);
+    // a new player: straight onto the Garden's dogleg, with the three hints (templates.ts firstRun); not on a remix
     let hinted = true;
     try { hinted = !!localStorage.getItem(HINTS_KEY); } catch {}
-    const first = firstRun(list, hinted);
+    const first = remix ? null : firstRun(list, hinted);
     if (first) {
       setUnkept(!saveDrafts([first]));
       setDrafts([first]);
@@ -44,7 +52,18 @@ export default function Builder() {
       setHints(true);
     } else setDrafts(list);
     setAuthor(knownAuthor());
-    void loadBuilder().then(setHost, (e: Error) => setFailed(e.message));
+    void loadBuilder().then((h) => {
+      setHost(h);
+      if (!remix) return;
+      const { rpc, web } = endpoints(window.location.search);
+      void remixFrom(makeChain({ rpc, web }), h, census, remix).then((d) => {
+        if (typeof d === "string") return setSaid(d);
+        const next = [...list, d];
+        setUnkept(!saveDrafts(next));
+        setDrafts(next);
+        setOpen({ i: next.length - 1, n: 0, step: "edit" });
+      });
+    }, (e: Error) => setFailed(e.message));
   }, []);
   const keep = useCallback((list: Draft[]) => (setDrafts(list), setUnkept(!saveDrafts(list))), []);
   const at = open?.i ?? -1;
@@ -105,7 +124,7 @@ export default function Builder() {
     );
   }
   return (
-    <Start host={host} author={author} drafts={drafts}
+    <Start host={host} author={author} drafts={drafts} said={said}
       onOpen={(i) => setOpen({ i, n: 0, step: "edit" })}
       onAdd={(d) => { keep([...drafts, d]); setOpen({ i: drafts.length, n: 0, step: "edit" }); }}
       onDelete={(i) => keep(drafts.filter((_, k) => k !== i))} />

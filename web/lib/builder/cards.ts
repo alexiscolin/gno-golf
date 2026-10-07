@@ -6,8 +6,8 @@ import type { MapHole } from "../duel";
 import type { Post, Wall, Zone } from "../types";
 import type { Draft } from "./draft";
 import { draftHole } from "./gg1";
-import { required, unproven } from "./proof";
-import { FIELD } from "./rules";
+import { unproven } from "./proof";
+import { FIELD, required } from "./rules";
 import type { PostIn, WallIn, ZoneIn } from "./types";
 
 const wall = (w: WallIn, moving = false): Wall => ({ a: w.a, b: w.b, skin: w.skin ?? "", every: moving ? w.every || 1 : (w.every ?? 0), on: w.on ?? 0, phase: w.phase ?? 0 });

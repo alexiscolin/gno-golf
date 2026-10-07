@@ -1,8 +1,9 @@
 // A hole drawn from above in a round inked window, as a cup's diorama: a
 // duel's rival's best hole with their ghost's path (Modes.tsx), a Builder's
-// starter or draft (components/builder/Start.tsx). Flat SVG: no WebGL, as
-// many on a screen as it needs.
-import { useId } from "react";
+// starter or draft (components/builder/Start.tsx), a community hole's card
+// (Worlds.tsx). Flat SVG: no WebGL, as many on a screen as it needs.
+import { useEffect, useId, useState } from "react";
+import type { Chain } from "@/lib/chain";
 import { Frame } from "@/components/Worlds";
 import { mapFit, mapView, mapZone, pathD, railRuns, type MapHole, type MapKind } from "@/lib/duel";
 import { BALL_R, cupRadius, inSea } from "@/lib/terrain";
@@ -67,6 +68,25 @@ function ZoneShape({ z, kind, at }: { z: Zone; kind: MapKind; at: (p: Vec2) => V
   const c: Vec2 = [(z.min[0] + z.max[0]) / 2, (z.min[1] + z.max[1]) / 2], [mx, my] = at(c), [fx, fy] = at([c[0] + z.vec[0], c[1] + z.vec[1]]);
   const l = Math.hypot(fx - mx, fy - my) || 1, [ux, uy] = [(fx - mx) / l, (fy - my) / l], r = Math.min(4, box.width / 3, box.height / 3);
   return (<>{shape}{r >= 1.5 && <path d={`M${mx - r * (ux + uy)} ${my - r * (uy - ux)}L${mx + r * ux} ${my + r * uy}L${mx - r * (ux - uy)} ${my - r * (uy + ux)}`} className="map__fall" />}</>);
+}
+
+// a version's map, read once a session (its lanes are its id's: they never change); a read that failed is asked again next time
+const read = new Map<string, Promise<MapHole>>();
+/** The maps of holes on the chain (their HoleState, all a map draws), by id, as each read comes in: only those asked (a list's page). */
+export function useHoleMaps(chain: Pick<Chain, "state"> | null, ids: readonly string[]): ReadonlyMap<string, MapHole> {
+  const [maps, setMaps] = useState<ReadonlyMap<string, MapHole>>(new Map());
+  const key = ids.join(" ");
+  useEffect(() => {
+    if (!chain) return;
+    let live = true;
+    for (const id of key.split(" ").filter(Boolean)) {
+      let p = read.get(id);
+      if (!p) read.set(id, (p = chain.state(id))), p.catch(() => read.delete(id));
+      void p.then((m) => live && setMaps((was) => (was.has(id) ? was : new Map(was).set(id, m))), () => {});
+    }
+    return () => void (live = false);
+  }, [chain, key]);
+  return maps;
 }
 
 /** A map's window, empty: while it reads, or without one. */

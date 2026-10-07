@@ -6,9 +6,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, ID, PERIOD, hexOf, lane, rail } from "./builder-fixture.ts";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
-import { parAllowed, periodFor, proofKey, provedAs, replay, required, suggestPar, unproven, type Proof } from "../lib/builder/proof.ts";
-import { MIN_SHOT_WORK } from "../lib/builder/rules.ts";
+import { parAllowed, periodFor, proofKey, provedAs, replay, replayed, suggestPar, unproven, type Proof } from "../lib/builder/proof.ts";
+import { MIN_SHOT_WORK, required } from "../lib/builder/rules.ts";
 import { RULES, shotOf } from "../lib/chain.ts";
+import { PER_CALL } from "../lib/adena.ts";
 import type { HoleRow, SimulateFrom, Vec2 } from "../lib/types.ts";
 
 const d = lane("garden", []);
@@ -100,6 +101,9 @@ void test("Proofs: a round of more than 12 strokes replays in several commits an
   assert.ok(proof.commits.length >= 2, JSON.stringify(proof));
   assert.ok(proof.commits.every(([a, b]) => b - a <= RULES.maxShots));
   assert.equal(proof.commits.at(-1)![1], shots.length);
+  // what a save of it sends: each commit's gas, the call's and its shots' work on top
+  const sent = await replayed(c, { key, id: ID, kind: "", period: PERIOD, shots });
+  assert.ok(typeof sent === "object" && sent.gas.length === proof.commits.length && sent.gas.every((g) => g > PER_CALL), JSON.stringify(sent));
 });
 
 void test("Proofs: a round that does not hole, or holes before its last shot, is no proof (in words)", async () => {

@@ -206,6 +206,15 @@ export interface StrokesRow {
   strokes: number;
 }
 
+/** A round saved on a hole (chain.ts savedOn): a player's best there in a mode, its strokes and its weather's period. */
+export interface Saved {
+  id: string;
+  mode: Mode;
+  player: string;
+  strokes: number;
+  period: number;
+}
+
 /** A course standing: its best on each hole counted, summed, and those holes' pars (strokes − par: its score against par, which ranks it after its holes). */
 export interface StandingRow extends StrokesRow {
   holes: number;

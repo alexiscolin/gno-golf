@@ -14,9 +14,11 @@ import { readHole } from "./gg1";
 import { loadPalette } from "./palette";
 import { validate, type Census } from "./pipeline";
 import { FIELD, notABuilderWorld } from "./rules";
-import { parseDraft, type Draft } from "./draft";
+import { MAX_NOTE, parseDraft, type Draft } from "./draft";
+import { authorOf } from "./holes";
+import { shortAddr, type Chain } from "../chain";
 import type { BuilderHost } from "./wasm";
-import { takenDown } from "../takedown";
+import { loadTakedown, takenDown } from "../takedown";
 
 /** A draft from a file's text, or why not: whole, of its world's pieces, and passing every rule (the census too). */
 export async function fromFile(text: string, host: BuilderHost, census: Census): Promise<Draft | string> {
@@ -66,6 +68,32 @@ export async function fromPublished(hex: string, host: BuilderHost, id: string, 
   if (typeof r === "string") return r;
   const [author, slug] = id.split("/");
   return { ...r.draft, slug: me && author === me && /^[a-z0-9-]{1,32}$/.test(slug) ? slug : "" };
+}
+
+/**
+ * Someone's hole (a draft fromPublished made of its version id) as a new
+ * hole of the remixer's: its maker credited in the note ("Remix of Mole Run
+ * by g1abcdef…wxyz"), and no name, par or proofs of its own yet.
+ */
+export function remixOf(d: Draft, id: string): Draft {
+  const credit = `Remix of ${d.title || "a hole"} by ${shortAddr(authorOf(id) ?? "")}`;
+  return { ...d, slug: "", title: "", par: 0, proofs: [], note: [...credit].slice(0, MAX_NOTE).join("") };
+}
+
+/**
+ * A community hole's version (id) as a remix (remixOf): its data read from
+ * the chain, the site's takedown list with it (one taken down never opens),
+ * opened as the Builder opens any published hole (fromPublished); or why not.
+ */
+export async function remixFrom(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, get?: Parameters<typeof loadTakedown>[1]): Promise<Draft | string> {
+  let d: Draft | string;
+  try {
+    const [hex, taken] = await Promise.all([chain.holeData(id), loadTakedown(chain, get)]);
+    d = await fromPublished(hex, host, id, null, census, taken);
+  } catch {
+    return "The chain has no hole there, or could not be read.";
+  }
+  return typeof d === "string" ? d : remixOf(d, id);
 }
 
 /** A draft's file name: its slug, else its name made safe, else "hole". */

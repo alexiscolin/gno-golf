@@ -3,6 +3,7 @@
 // the physics' own back (step.gno, course.gno) and fails on any drift.
 
 import { cap } from "../card";
+import { CLIMATES } from "../sky";
 
 /** A sentence or a name with its first letter up (card.ts): every piece's and world's name said. */
 export { cap };
@@ -27,6 +28,10 @@ export const MAX_MOVE = 1.5;
 export const MAX_PAR = 19;
 /** golf's minShotWork: the work a commit's first shot may do in its dearest weather, four fifths of physics.MaxWork. */
 export const MIN_SHOT_WORK = 800_000;
+/** The weathers a hole is proven in: every kind of its world's climate but fog (which only hides the far end); "" is clear. The mines take the garden's, as the chain does. */
+export function required(world: string): string[] {
+  return (Object.hasOwn(CLIMATES, world) ? CLIMATES[world] : CLIMATES.garden).map(([, k]) => k as string).filter((k) => k !== "fog");
+}
 /** The weather's skins (course.WithWeather, and the puddles it lays): never a piece's. */
 export const WEATHER = ["wind", "rain", "fog", "storm", "snow", "puddle"] as const;
 

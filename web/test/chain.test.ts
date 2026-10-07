@@ -948,3 +948,54 @@ test("txResult: what a transaction's calls returned, by its hash in base64 or he
   setFetch(() => ({ __status: 500 }));
   await assert.rejects(chain.txResult(hex), (e: unknown) => errorKind(e) === "down");
 });
+
+test("holesOf: one read of an author's own holes, newest first, each row strictly read; none for a bad address, no network call", async () => {
+  const chain = makeChain();
+  setFetch(() => { throw new Error("should not be called"); });
+  assert.deepEqual(await chain.holesOf("not-an-address"), []);
+  const row = (slug: string, o: Record<string, unknown> = {}) => JSON.stringify({ id: `${ADDR1}/${slug}/v1`, name: "Dogleg", official: false, plays: 4, best: 2, proBest: 0, par: 3, world: "garden", order: 0, next: "", slot: `${ADDR1}/${slug}`, ...o });
+  const lines = [
+    row("dogleg"),
+    row("odd", { id: `${ADDR2}/odd/v1` }), // another author's: never theirs
+    row("odd", { plays: "4" }), // a number not a number
+    row("odd", { official: true }), // a course hole is no author's
+    row("odd", { name: 3 }),
+    row("odd", { slot: `${ADDR1}/other` }), // a slot not its id's
+    "{not json",
+  ];
+  setFetch((url) => {
+    const e = decoded(url).expr;
+    assert.ok(e.includes(`byAuthor.ReverseIterate("${ADDR1} ", "${ADDR1}!"`) && e.includes("holeRow(e)") && !e.includes("\n"), "the author's rows, one line");
+    return strReply(lines.join("\n") + "\n");
+  });
+  assert.deepEqual(await chain.holesOf(ADDR1), [JSON.parse(row("dogleg"))]);
+});
+
+test("savedOn: one read of the rounds saved on holes (each player's best a mode, never a copy), every field strictly read; the holes with more said", async () => {
+  const chain = makeChain();
+  setFetch(() => { throw new Error("should not be called"); });
+  assert.deepEqual(await chain.savedOn([]), { rows: [], more: new Set() });
+  const id = `${ADDR1}/dogleg/v1`;
+  const lines = [
+    `${id} assisted ${ADDR2} 3 5969251`,
+    `${id} pro ${ADDR3} 2 7`,
+    `${id} fast ${ADDR2} 3 1`, // no such mode
+    `${id} pro not-an-address 2 1`,
+    `${id} pro ${ADDR2} 61 1`, // past the rules
+    `${id} pro ${ADDR2} 02 1`,
+    `${id} pro ${ADDR2} 2 x`,
+    `${id} pro ${ADDR2} 2 1 x`, // a field more
+    `${ADDR2}/not-asked/v1 pro ${ADDR2} 2 1`,
+    `more ${id}`,
+    `more ${ADDR2}/not-asked/v1`,
+  ];
+  setFetch((url) => {
+    const e = decoded(url).expr;
+    assert.ok(e.includes(`[]string{"${id}"}`) && e.includes("!e.copies(m).Has(p)") && !e.includes("\n"), "the holes asked, never a copy, one line");
+    return strReply(lines.join("\n") + "\n");
+  });
+  assert.deepEqual(await chain.savedOn([id]), {
+    rows: [{ id, mode: "assisted", player: ADDR2, strokes: 3, period: 5969251 }, { id, mode: "pro", player: ADDR3, strokes: 2, period: 7 }],
+    more: new Set([id]),
+  });
+});

@@ -4,10 +4,9 @@
 // by the hole's canonical data with no name and no par: renaming the hole
 // or changing its par keeps the proofs, any other change drops them. Par is
 // then at least the most strokes a proof took, plus one.
-import { boardWork, chainSplit } from "../adena";
-import { CLIMATES } from "../sky";
+import { boardWork, chainSplit, gasOf } from "../adena";
 import { bytesOf, sha256 } from "../sha";
-import { FIELD, MAX_PAR, MIN_SHOT_WORK } from "./rules";
+import { FIELD, MAX_PAR, MIN_SHOT_WORK, required } from "./rules";
 import { frame, writeDraft } from "./gg1";
 import type { Draft, Proof } from "./draft";
 import type { LocalChain } from "./localchain";
@@ -15,11 +14,6 @@ import type { BuilderHost } from "./wasm";
 import type { SimulateFrom, Vec2 } from "../types";
 
 export type { Proof };
-
-/** The weathers a hole is proven in: every kind of its world's climate but fog (which only hides the far end); "" is clear. The mines take the garden's, as the chain does. */
-export function required(world: string): string[] {
-  return (Object.hasOwn(CLIMATES, world) ? CLIMATES[world] : CLIMATES.garden).map(([, k]) => k as string).filter((k) => k !== "fog");
-}
 
 
 /** The key the draft's proofs hold for: sha-256 of its canonical data written with no name and par 0; null if fit refuses it. */
@@ -76,6 +70,12 @@ export interface Played {
  * or why not in a sentence.
  */
 export async function replay(chain: LocalChain, r: Played): Promise<Proof | string> {
+  const got = await replayed(chain, r);
+  return typeof got === "string" ? got : got.proof;
+}
+
+/** replay's Proof, and the gas each of its commits asks for (adena.ts gasOf): what a save of the round sends. */
+export async function replayed(chain: LocalChain, r: Played): Promise<{ proof: Proof; gas: number[] } | string> {
   const { id, period, shots } = r;
   if (!shots.length) return "No shot was played.";
   try {
@@ -93,7 +93,7 @@ export async function replay(chain: LocalChain, r: Played): Promise<Proof | stri
     if (maxWork > MIN_SHOT_WORK) return `A shot of this round does ${maxWork.toLocaleString("en")} units of work, more than ${MIN_SHOT_WORK.toLocaleString("en")}: on the chain it could be cut short in its dearest weather. Hole it another way.`;
     const work = { ...boardWork(s, { walls: 0, posts: 0, pieces: 0 }, fc.zones), kind: fc.kind, pts, works, fixed: fc.gas || 0 };
     const commits = await chainSplit(chain, { id, shots, period, ...work }, period);
-    return { ...r, shots: [...shots], commits, strokes: shots.length, maxWork };
+    return { proof: { ...r, shots: [...shots], commits, strokes: shots.length, maxWork }, gas: commits.map(([from, to]) => gasOf(work, from, to)) };
   } catch (e) {
     return e instanceof Error ? e.message : String(e);
   }
