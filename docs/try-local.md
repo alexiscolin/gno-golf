@@ -32,7 +32,7 @@ entries on the tailnet only (never Funnel), removed on Ctrl+C:
   profile of its own keeps your real wallet apart).
 
 Where to click: "Click to start", then "How do we play?": Solo (the cups),
-Duel, "Build your hole" (on a computer) and "Gnomes", the collection (also
+Duel, "Builder" (on a computer) and "Gnomes", the collection (also
 atop the gnome picker and on the cups screen). `p1` has a
 record (the players' window lets it buy) and a few gnomes; `p0` has
 neither. Wave 1 (the Garden) is on sale, its players' window one hour. The
@@ -66,7 +66,7 @@ Funnel), retirées au Ctrl+C :
   portefeuille séparé).
 
 Où cliquer : « Click to start », puis « How do we play? » : Solo (les
-coupes), Duel, « Build your hole » (sur un ordinateur) et « Gnomes », la
+coupes), Duel, « Builder » (sur un ordinateur) et « Gnomes », la
 collection (aussi en haut du choix du gnome et sur l'écran des coupes).
 `p1` a un record (la fenêtre des joueurs le laisse acheter) et quelques
 gnomes ; `p0` n'a ni l'un ni l'autre. La vague 1 (le Jardin) est en vente,

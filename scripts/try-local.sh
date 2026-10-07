@@ -215,7 +215,7 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
     gnokey maketx call -pkgpath $GNOMES -func Buy -args <id> -send <price>ugnot \\
       -gas-fee 5000000ugnot -gas-wanted 200000000 -remote $WALLET_RPC -chainid $CHAINID -broadcast p1
 
-  Try (the title's "Click to start" opens "How do we play?": four cards):
+  Try (the title's "Click to start" opens "How do we play?": Solo, Duel, Builder, Gnomes):
     1. Play: Solo, a cup (all five are there), a hole; finish it, see the card
        (and the wave's line at its foot).
     2. The gnomes: the "Gnomes" card (also the picker's Collection band at its
@@ -224,7 +224,7 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
     3. Wear one: the gnome picker's row of yours; Show to everyone (Equip).
        Duel: race a player's ghost, their gnome on the boards and as the ghost.
     4. The region gate: add ?geo=blocked to the gnomes' page (/g/?geo=blocked).
-    5. The Builder: the "Build your hole" card on a computer (a phone gets the
+    5. The Builder: the "Builder" card on a computer (a phone gets the
        community holes to play): the three hints (again with "?"), make a hole,
        Test it (hole it in each weather), Publish.
     6. Find it: Solo, the cups screen's "Community holes", under the cups.
