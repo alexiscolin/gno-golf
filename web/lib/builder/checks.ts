@@ -329,8 +329,22 @@ function crosses(a: V, b: V, c: V, d: V) {
   const d1 = o(c, d, a), d2 = o(c, d, b), d3 = o(a, b, c), d4 = o(a, b, d), e = 1e-9;
   return ((d1 > e && d2 < -e) || (d1 < -e && d2 > e)) && ((d3 > e && d4 < -e) || (d3 < -e && d4 > e));
 }
-/** Whether two zones' boxes overlap with an area (touching edges do not). */
-const overlap = (a: ZoneIn, b: ZoneIn) => Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]) > 1e-9 && Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]) > 1e-9;
+/** How finely two zones' shapes are compared where their boxes meet: OVER at least, the shared box in at most OVER_STEPS a side. */
+const OVER = 0.05, OVER_STEPS = 256;
+/**
+ * Whether two zones overlap with an area (touching edges do not): their
+ * boxes, then, for a round or a polygon one, their shapes, at points of a
+ * grid over the box they share (set off its lines by odd fractions, so a
+ * shared edge on the quarter grid, a diagonal's too, holds none).
+ */
+function overlap(a: ZoneIn, b: ZoneIn): boolean {
+  const lo: V = [Math.max(a.min[0], b.min[0]), Math.max(a.min[1], b.min[1])], hi: V = [Math.min(a.max[0], b.max[0]), Math.min(a.max[1], b.max[1])];
+  if (!(hi[0] - lo[0] > 1e-9 && hi[1] - lo[1] > 1e-9)) return false;
+  if (!a.round && !a.poly?.length && !b.round && !b.poly?.length) return true;
+  const step = Math.max(OVER, (hi[0] - lo[0]) / OVER_STEPS, (hi[1] - lo[1]) / OVER_STEPS), sa = shapeOf(a), sb = shapeOf(b);
+  for (let x = lo[0] + 0.371 * step; x < hi[0]; x += step) for (let y = lo[1] + 0.613 * step; y < hi[1]; y += step) if (inZone(sa, x, y) && inZone(sb, x, y)) return true;
+  return false;
+}
 /** A piece's palette entry as the checks read it (its overlaps), or none: a piece the builder did not place (an imported hole's composition) is not judged. */
 export type EntryOf = (r: PieceRef) => { overlaps?: readonly string[] } | undefined;
 type Judged = (r: PieceRef) => boolean;

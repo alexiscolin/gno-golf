@@ -8,7 +8,7 @@ import fs from "node:fs";
 import { checkHole, counts, work, ROUND_STROKES, SHOT_FLOOR, STORM_FLOOR, WORK_WARN } from "../lib/builder/checks.ts";
 import { laneOf, reach } from "../lib/builder/lane.ts";
 import { LIMITS } from "../lib/builder/gg1.ts";
-import type { HoleIn, WallIn } from "../lib/builder/types.ts";
+import type { HoleIn, V, WallIn, ZoneIn } from "../lib/builder/types.ts";
 import { hexOf, host, lane } from "./builder-fixture.ts";
 
 const box = (x0: number, y0: number, x1: number, y1: number): WallIn[] =>
@@ -86,6 +86,18 @@ void test("E5: a polygon's mouth by the widest circle in it, its width said when
   assert.deepEqual(e5(pond(true)), []);
   const ratio = best(true) / best(false);
   assert.ok(ratio < 40, `the polygon's check: ${ratio.toFixed(1)} times the box's (some 10; its every point measured, some 180)`);
+});
+
+void test("E13: zones lie over one another by their shapes, not their boxes: round ones apart, two triangles making a square, meet nowhere", () => {
+  const e13 = (...zones: ZoneIn[]) => rules(hole({ zones })).filter((r) => r.startsWith("E13")).length;
+  const sand = (min: V, max: V, more: Partial<ZoneIn> = {}): ZoneIn => ({ kind: "surface", min, max, skin: "sand", ...more });
+  assert.equal(e13(sand([10, 4], [14, 8], { round: true }), sand([13.5, 7.5], [17.5, 11.5], { round: true })), 0, "two discs whose boxes meet at a corner");
+  assert.equal(e13(sand([10, 4], [14, 8], { round: true }), sand([12, 4], [16, 8], { round: true })), 1, "two that do");
+  const tri = (pts: V[]) => sand([Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1]))], [Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))], { poly: pts });
+  assert.equal(e13(tri([[10, 4], [14, 4], [10, 8]]), tri([[14, 4], [14, 8], [10, 8]])), 0, "two triangles on one diagonal");
+  assert.equal(e13(tri([[10, 4], [14, 4], [10, 8]]), tri([[10, 4], [14, 4], [10, 8]])), 1, "one on another");
+  assert.equal(e13(tri([[10, 4], [14, 4], [10, 8]]), sand([11, 5], [13, 7])), 1, "a box over a triangle");
+  assert.equal(e13(sand([10, 4], [14, 8]), sand([14, 4], [18, 8])), 0, "boxes side by side");
 });
 
 void test("E8: GG1's limits, pulses' pieces counted in", () => {
