@@ -7,7 +7,7 @@
 // next.config.mjs refuses a production shop without it); a placeholder shows
 // what is missing anywhere else.
 import { shortAddr } from "../chain";
-import { gnot, utcDate } from "./shop";
+import { dateParts, gnot, utcDate } from "./shop";
 
 const env = (v: string | undefined, placeholder: string) => (v && v.trim()) || placeholder;
 /** Who sells (特定商取引法に基づく表記; the EU's trader): name, geographical address, e-mail. */
@@ -36,17 +36,15 @@ export const TRUST = ["Cosmetic only: same ball, same physics.", "You pick the e
 export const BANNED = ["invest ", "investment opportunity", "floor", "returns on", "roi", "profit", "appreciate", "will go up", "last chance", "only "];
 
 const TIER: Record<string, string> = { common: "Common", rare: "Rare", epic: "Epic", legendary: "Legendary", earned: "Earned" };
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const hm = (d: Date) => `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-/** A time in Japan's (UTC+9), as the copy says it: "Mon 14 Dec, 03:00 JST" (time: the hour alone). */
-export function jstDate(unix: number, time = false) {
-  const d = new Date((unix + 9 * 3600) * 1000);
-  return time ? `${hm(d)} JST` : `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, ${hm(d)} JST`;
+/** A time in Japan's (UTC+9), as the copy says it: "Mon 14 Dec, 03:00 JST". */
+export function jstDate(unix: number) {
+  const p = dateParts(unix + 9 * 3600);
+  return `${p.weekday} ${p.day}, ${p.hm} JST`;
 }
 /** A date the receipt keeps: the year too ("Tue 6 Oct 2026, 18:04 UTC (Wed 7 Oct, 03:04 JST)"). */
 const stamp = (unix: number) => {
-  const d = new Date(unix * 1000);
-  return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${hm(d)} UTC (${jstDate(unix)})`;
+  const p = dateParts(unix);
+  return `${p.weekday} ${p.day} ${p.year}, ${p.hm} UTC (${jstDate(unix)})`;
 };
 /** A figure up to the hundredth of a GNOT (a deposit, a fee), in ugnot; about: that, in GNOT. */
 const up = (ugnot: number) => Math.ceil(ugnot / 1e4) * 1e4;

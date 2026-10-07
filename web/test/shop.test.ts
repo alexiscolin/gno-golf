@@ -1,6 +1,6 @@
 // lib/gnomes/shop.ts: the gnomes' shop as the screens read it. The realm's
 // answers in the shapes r/gnogolf/gnomes writes them (read.gno, buy.gno,
-// auction.gno, equip.gno), and every state a screen shows decided from them.
+// equip.gno), and every state a screen shows decided from them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
