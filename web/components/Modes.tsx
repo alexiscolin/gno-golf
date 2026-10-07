@@ -34,8 +34,8 @@ export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, sho
       <ul className={`modes__list${shop ? " modes__list--four" : ""}`}>
         <li><Panel kind="solo" name="Solo" line={`${countWord(cups)} cups, your best on the boards`} skin={skin} onClick={onSolo} /></li>
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
-        {/* the Builder: the game's Miner in his hard hat over a hole's sketch, once out; to come, the sketch alone */}
-        <li><Panel kind="build" name="Builder" line={onBuild ? "Draw a hole, publish it under your name" : "Draw your own hole, dare the others"} skin={onBuild ? gnomeById("miner") : null} back={<Emblem id="build" />} soon={!onBuild} onClick={onBuild} /></li>
+        {/* the Builder: the game's Miner in his hard hat before a hole's sketch, once out; to come, the sketch alone */}
+        <li><Panel kind="build" name="Builder" line={onBuild ? "Draw a hole, publish it under your name" : "Draw your own hole, dare the others"} skin={onBuild ? gnomeById("miner") : null} back={<Sketch />} soon={!onBuild} onClick={onBuild} /></li>
         {/* the gnome shop ("Shop": one line, as the games' names): one of the wave's gnomes before a stall's awning */}
         {shop && <li><Panel kind="shop" name="Shop" line={shop.line} skin={shop.skin} back={<Awning />} onClick={shop.onOpen} /></li>}
       </ul>
@@ -88,6 +88,24 @@ const Awning = () => {
     </svg>
   );
 };
+
+/** A hole's sketch on its blueprint, inked (behind the Builder's gnome, as the shop's awning: what says "you draw
+ *  holes"): the sheet tilted, its grid, the lane round its bend, the ball at its tee, the flag rising out of the
+ *  disc over the sheet's top, the pencil out of its side. */
+const Sketch = () => (
+  <svg className="mode__sketch" viewBox="0 0 120 96" aria-hidden="true">
+    <g transform="rotate(-6 60 56)">
+      <rect x="12" y="26" width="96" height="64" rx="5" className="mode__sketch-sheet" />
+      <path d="M12 42h96M12 58h96M12 74h96M28 26v64M44 26v64M60 26v64M76 26v64M92 26v64" className="mode__sketch-grid" />
+      <path d="M26 78Q34 50 60 56T92 40" className="mode__sketch-lane" />
+      <circle cx="26" cy="78" r="4.5" className="mode__sketch-ball" />
+      <path d="M92 42V6" className="mode__sketch-pole" />
+      <path d="M92 6l16 6-16 6z" className="mode__sketch-flag" />
+      <rect x="12" y="26" width="96" height="64" rx="5" className="mode__sketch-ink" />
+    </g>
+    <path d="M2 70l20-26 7 5-20 26-9 4z" className="mode__sketch-pencil" />
+  </svg>
+);
 
 /**
  * A duel's rival, on a screen of their own: a friend's name or address typed

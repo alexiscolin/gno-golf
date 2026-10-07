@@ -8,8 +8,8 @@
 // everything, the network banner too (never a chip over its Buy); the
 // head's and the cards' small words at WCAG AA (4.5:1) on their ground, and
 // every card's #number in sight however long its name; the toolbar's controls, on each of its
-// lines, as tall as one another, on one top, their words on one baseline (at 1440, 1280, 1024 and
-// 390, unthrottled: media/lib/rows.mjs). Before, the title screen alone: none of
+// lines, as tall as one another, on one top, their words on one baseline, and More filters open
+// gold (on) in the box it has shut (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs). Before, the title screen alone: none of
 // the sale read (the catalogue) nor the collection's wardrobe fetched, which
 // only a screen showing the sale needs. With OUT, a frame every 100 ms and a
 // strip of them.
@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { launch, sleep } from "../lib/cdp.mjs";
-import { misaligned } from "../lib/rows.mjs";
+import { footprint, gold, misaligned } from "../lib/rows.mjs";
 const APP = process.env.APP || "http://127.0.0.1:5175", OUT = process.env.OUT || "", TAG = process.env.TAG || "open";
 const results = [];
 for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440, 900, false], [1024, 768, false], [390, 844, true]])) {
@@ -90,10 +90,16 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.send("Page.navigate", { url: APP + "/g/" });
   for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".gbar .tierbtn")`)); i++) await sleep(500);
   await sleep(1000);
-  const off = await b.ev(misaligned([{ name: "the shop's bar", box: ".gbar .seg, .gbar .tierbtn, .gbar > .btn, .gbar .gsearch", by: ".gbar" }]));
-  const ok = Array.isArray(off) && off.length === 0;
+  const bar = [{ name: "the shop's bar", box: ".gbar .seg, .gbar .tierbtn, .gbar > .btn, .gbar .gsearch", by: ".gbar" }];
+  const off = await b.ev(misaligned(bar));
+  // more filters open: on (gold, as every on control), its box kept, the bar still in line
+  const shut = await b.ev(footprint(".gbar__more"));
+  await b.js(`document.querySelector(".gbar__more").click(); true`);
+  await sleep(300);
+  const on = { box: JSON.stringify(await b.ev(footprint(".gbar__more"))) === JSON.stringify(shut), gold: await b.ev(gold(".gbar__more")), line: await b.ev(misaligned(bar)) };
+  const ok = Array.isArray(off) && off.length === 0 && on.box && on.gold && on.line.length === 0;
   results.push({ w, ok });
-  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}`, ok ? "" : JSON.stringify(off));
+  console.log(`${ok ? "PASS" : "FAIL"} the shop's bar in line at ${w}×${h}, more filters on: gold ${on.gold}, its box kept ${on.box}`, ok ? "" : JSON.stringify({ off, on }));
   b.kill();
 }
 process.exit(results.every((r) => r.ok) ? 0 : 1);

@@ -354,6 +354,16 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode__awning-paper { fill: var(--paper); }
 .mode__awning-post { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
 .mode__awning-ink { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+/* the Builder's sketch behind its gnome, wider than him: its sheet's corners, its flag and its pencil out of the disc */
+.mode__stage > .mode__sketch { inset: 22% 0 auto; width: 84%; }
+.mode__sketch-sheet { fill: #2f6db3; } /* (the blueprint's, the Builder's own: build/builder.css .bholes) */
+.mode__sketch-grid { fill: none; stroke: rgba(255, 255, 255, .28); stroke-width: 1.2; }
+.mode__sketch-lane { fill: none; stroke: var(--paper); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 5 4; }
+.mode__sketch-ball { fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
+.mode__sketch-pole { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+.mode__sketch-flag { fill: var(--hat); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.mode__sketch-ink { fill: none; stroke: var(--ink); stroke-width: 3; }
+.mode__sketch-pencil { fill: var(--gold); stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
 .worlds--v2 .world:focus-visible, .mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
 .mode[disabled] { cursor: default; }
 .mode[disabled] > :not(.mode__soon, .mode__line, .rival__tag) { opacity: .7; filter: saturate(.35); } /* (its line stays readable) */
@@ -381,6 +391,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   .mode__stage { grid-row: 1 / 3; margin-top: -10px; }
   .mode__stage svg { inset: 0; width: 78%; }
   .mode__stage > .mode__awning { inset: 10% 0 auto; width: 62%; }
+  .mode__stage > .mode__sketch { inset: 4% 0 auto; width: 76%; }
   .mode__name { align-self: end; margin: 0 14px 0 4px; font-size: 32px; --ink-w: 5px; }
   .mode__line { margin: 6px 14px 0 4px; font-size: 13px; }
   .modes__list--four { grid-template-columns: 1fr; }
