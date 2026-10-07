@@ -30,8 +30,9 @@
 @media (prefers-reduced-motion: reduce) { .bhead__roll .rival__dice { transition: none; } }
 .bhead__name > input { min-width: 0; width: 100%; border: 0; border-bottom: 2px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; font-size: 20px; font-weight: 700; color: var(--ink); padding: 0 0 2px; text-overflow: ellipsis; }
 .bhead__hole small { display: flex; align-items: baseline; gap: 2px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; }
-.bhead__slug { field-sizing: content; min-width: 4ch; max-width: 24ch; border: 0; border-bottom: 1.5px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; color: var(--ink); padding: 0; }
-.bhead__hole select { border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); padding: 0; }
+/* the short name whole in its address (the world's name gives way first) */
+.bhead__slug { flex: none; field-sizing: content; min-width: 4ch; max-width: 24ch; border: 0; border-bottom: 1.5px dashed rgba(var(--ink-rgb), .3); background: none; font: inherit; color: var(--ink); padding: 0; }
+.bhead__hole select { min-width: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); padding: 0; }
 .bhead__end { display: flex; align-items: center; gap: var(--sp-2); justify-self: end; }
 /* the action keeps its width as its words change (Test it, Publish →) */
 .bhead__act { min-width: 136px; }

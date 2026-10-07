@@ -126,7 +126,7 @@ for (const [w, h] of SIZES) {
 
 // the buttons in a row as tall as one another, on one top and their words on one baseline (Button's sizes): the
 // header's (Back, the steps, the meter, ?, undo, redo, the action), the board's, the Inspector's; off, a button keeps
-// the box it has on (undo, before and after an edit)
+// the box it has on (undo, before and after an edit); the header's address shows its short name whole
 for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   const c = await editor(w, h);
   const at = `buttons ${w}×${h}`;
@@ -140,6 +140,9 @@ for (const [w, h] of [[1440, 900], [1280, 800], [1024, 700]] as const) {
   assert.deepEqual(await c.js<string[]>(misaligned(rows)), [], `${at}: out of line`);
   const head = await c.js<{ l: number; r: number }[]>(`[...document.querySelectorAll(".bhead__start > *, .bhead .stepper, .bhead__end > *")].filter((e) => e.getBoundingClientRect().width).map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right }; })`);
   for (const [i, b] of head.slice(1).entries()) assert.ok(b.l >= head[i].r - 0.5, `${at}: the header's parts overlap (${JSON.stringify(head)})`);
+  // the hole's address: its short name whole (the world's name gives way first)
+  const slug = await c.js<{ cut: number; out: number }>(`(() => { const e = document.querySelector(".bhead__slug"), r = e.getBoundingClientRect(), box = e.parentElement.getBoundingClientRect(); return { cut: e.scrollWidth - e.clientWidth, out: r.right - box.right }; })()`);
+  assert.ok(slug.cut <= 1 && slug.out <= 0.5, `${at}: the address cuts the short name (${JSON.stringify(slug)})`);
   const off = await c.js<object>(footprint(".bhead__hist"));
   assert.equal(await c.js(`document.querySelector(".bhead__hist").disabled`), true, `${at}: undo off before any edit`);
   await typeInto(c, ".bhead__hole input", "Moved nothing");
