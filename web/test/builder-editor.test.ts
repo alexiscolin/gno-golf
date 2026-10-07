@@ -164,6 +164,19 @@ void test("quick shots in Edit: said on the board to be no proof, never handed t
   assert.match(editor, /est\?\.of === kept && draft === kept/, "the line: of the hole as kept, and not while a drag moves it");
 });
 
+void test("the meter where no worker can run (here, in node): every ask answered as not measured, none carried, no level; never measuring for ever", async () => {
+  assert.equal(typeof (globalThis as { Worker?: unknown }).Worker, "undefined");
+  const { makeMeter } = await import("../lib/builder/meter.ts");
+  const d = lane("garden", []), said: unknown[] = [];
+  const m = makeMeter((of, e) => said.push([of, e]));
+  m.ask(d);
+  assert.deepEqual(said, [[d, null]]);
+  assert.equal(meterFace(true, { of: d, e: null }, d).busy, false);
+  assert.equal(await m.carry(d, "", "", ""), null);
+  assert.equal(await m.rate(""), null);
+  m.stop();
+});
+
 void test("meterFace: measured, measuring, not measurable (said so, never \"measuring\" for ever), a hole with errors", () => {
   const d = lane("garden", []), other = { ...d, title: "Other" };
   const e = { level: 1, word: "Easy", title: "Difficulty: easy", line: { text: "" }, par: 2, path: [], heat: [] } as unknown as Shown;

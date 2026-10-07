@@ -180,9 +180,21 @@ function drawnAs(d: Draft, refs: Map<string, PieceRef[]>, palette: readonly Pale
  * Every check the builder makes of a draft, errors first; a layer runs only
  * once the ones before it pass. The draft is judged framed (gg1.ts frame:
  * as the editor keeps it), so a piece moved past the hole's low edge is
- * judged where the hole will put it.
+ * judged where the hole will put it. A draft (never changed once made: an
+ * edit makes a new one) is checked once for each options: an edit's own
+ * check is the next edit's "before", the editor's check of it as kept the
+ * same, so an edit pays one census, not three.
  */
 export function validate(draft: Draft, o: ValidateOptions): Validated {
+  const kept = checked.get(o)?.get(draft);
+  if (kept) return kept;
+  const v = validated(draft, o);
+  checked.set(o, (checked.get(o) ?? new WeakMap<Draft, Validated>()).set(draft, v));
+  return v;
+}
+const checked = new WeakMap<ValidateOptions, WeakMap<Draft, Validated>>();
+
+function validated(draft: Draft, o: ValidateOptions): Validated {
   const { host, palette } = o, d = frame(draft);
   const l0 = ranges(d, palette);
   const { hex, bars: barLines, refs } = writeDraft(d, FIELD[d.world]);

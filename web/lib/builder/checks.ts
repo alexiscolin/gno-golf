@@ -152,15 +152,26 @@ export function passages(h: HoleIn, under: number): Passage[] {
       if (gap > 1e-9 && gap < under) gaps.push({ gap, mid, a: refs[i], b: refs[j], post: { c: mid, r: Math.max(gap / 2, CELL) } });
     }
   }
-  const lost = (closed: readonly { post: PostIn }[]) => !reach({ ...h, posts: [...h.posts, ...closed.map((g) => g.post)] }, loose).reached;
-  // one the way needs alone: closed there, the cup is lost (if the way the flood found passes none of its cells, it still holds)
-  const needed = new Set(gaps.filter((g) => base.path.some((p) => Math.hypot(p[0] - g.mid[0], p[1] - g.mid[1]) < g.post.r + loose + 1e-9) && lost([g])));
-  // and the ones the way needs together: all closed, the cup lost, each reopened in turn and kept open while the cup stays lost; those left shut are the way's
-  if (gaps.length && lost(gaps)) {
-    const shut = new Set(gaps);
-    for (const g of gaps) {
-      shut.delete(g);
-      if (!lost([...shut])) shut.add(g);
+  type Gap = (typeof gaps)[number];
+  const closing = (closed: readonly Gap[]) => reach({ ...h, posts: [...h.posts, ...closed.map((g) => g.post)] }, loose);
+  // a gap a way passes: within its post's reach of a cell on it (if the way the flood found passes none of its cells, closing it leaves that way)
+  const passes = (path: readonly V[], g: Gap) => path.some((p) => Math.hypot(p[0] - g.mid[0], p[1] - g.mid[1]) < g.post.r + loose + 1e-9);
+  const onWay = gaps.filter((g) => passes(base.path, g)), alone = new Map(onWay.map((g) => [g, closing([g])]));
+  // one the way needs alone: closed there, the cup is lost
+  const needed = new Set(onWay.filter((g) => !alone.get(g)!.reached));
+  // and the ones it needs together: those on the way closed, then those on the way found round them, until the cup
+  // is lost or a way passes none (then no set of them shuts it); lost, each reopened in turn and kept open while the
+  // cup stays lost, those left shut the way's
+  const shut: Gap[] = [];
+  let way = base;
+  for (let fresh = onWay; fresh.length && way.reached; fresh = gaps.filter((g) => !shut.includes(g) && passes(way.path, g))) {
+    shut.push(...fresh);
+    way = shut.length === 1 ? alone.get(shut[0])! : closing(shut);
+  }
+  if (!way.reached && shut.length > 1) {
+    for (const g of [...shut]) {
+      const rest = shut.filter((x) => x !== g);
+      if (!closing(rest).reached) shut.splice(shut.indexOf(g), 1);
     }
     for (const g of shut) needed.add(g);
   }
@@ -196,16 +207,34 @@ function gapOf(a: Solid, b: Solid): [number, V] {
   return best;
 }
 
-/** The widest circle inside a polygon, by its diameter: a grid's points inside, each one's distance to the edges. */
-function inscribed(poly: readonly V[]): number {
-  const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]), step = 0.05;
+/**
+ * The widest circle inside a polygon, by its diameter, as soon as it is
+ * known to be at least enough: each point's distance to the edges (less than
+ * none outside it), on a grid of COARSE, then of FINE about the points within
+ * a coarse cell's reach of the widest yet (a point a cell away is at most
+ * that much further from the edges).
+ */
+function inscribed(poly: readonly V[], enough: number): number {
+  const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]), lo: V = [Math.min(...xs), Math.min(...ys)];
+  const shape = { min: lo, max: [Math.max(...xs) + 1e-9, Math.max(...ys) + 1e-9] as V, round: false, poly };
+  const depth = (x: number, y: number) => {
+    let d = Infinity;
+    for (let k = 0; k < poly.length; k++) d = Math.min(d, segDist(x, y, poly[k], poly[(k + 1) % poly.length]));
+    return inZone(shape, x, y) ? d : -d;
+  };
+  const COARSE = 0.25, FINE = 0.05, reach = COARSE * Math.SQRT1_2, coarse: [number, number, number][] = [];
   let best = 0;
-  for (let x = Math.min(...xs); x <= Math.max(...xs); x += step) {
-    for (let y = Math.min(...ys); y <= Math.max(...ys); y += step) {
-      if (!inZone({ min: [Math.min(...xs), Math.min(...ys)], max: [Math.max(...xs) + 1e-9, Math.max(...ys) + 1e-9], round: false, poly }, x, y)) continue;
-      let d = Infinity;
-      for (let k = 0; k < poly.length; k++) d = Math.min(d, segDist(x, y, poly[k], poly[(k + 1) % poly.length]));
-      best = Math.max(best, d);
+  for (let x = lo[0]; x <= shape.max[0]; x += COARSE) {
+    for (let y = lo[1]; y <= shape.max[1]; y += COARSE) {
+      const d = depth(x, y);
+      if ((best = Math.max(best, d)) * 2 >= enough) return 2 * best;
+      coarse.push([x, y, d]);
+    }
+  }
+  for (const [cx, cy, d] of coarse) {
+    if (d + reach < best) continue;
+    for (let x = cx - COARSE / 2; x <= cx + COARSE / 2; x += FINE) {
+      for (let y = cy - COARSE / 2; y <= cy + COARSE / 2; y += FINE) if ((best = Math.max(best, depth(x, y))) * 2 >= enough) return 2 * best;
     }
   }
   return 2 * best;
@@ -217,7 +246,7 @@ function mouths(h: HoleIn, name: Namer): Issue[] {
   for (const { item: z, ref } of each<ZoneIn>(h, "zone")) {
     if (z.kind !== "hazard" && z.kind !== "tunnel") continue;
     if (z.outside) continue; // (all the box but a polygon: the sea round a lane, as wide as the board)
-    const w = z.poly?.length ? inscribed(z.poly) : Math.min(z.max[0] - z.min[0], z.max[1] - z.min[1]);
+    const w = z.poly?.length ? inscribed(z.poly, MOUTH - 1e-9) : Math.min(z.max[0] - z.min[0], z.max[1] - z.min[1]);
     if (w < MOUTH - 1e-9) out.push(err("E5", `${cap(name(ref))} is ${+w.toFixed(2)} across: at least ${MOUTH}, or a fast ball steps over it`, ref, z.min));
   }
   return out;
@@ -300,8 +329,22 @@ function crosses(a: V, b: V, c: V, d: V) {
   const d1 = o(c, d, a), d2 = o(c, d, b), d3 = o(a, b, c), d4 = o(a, b, d), e = 1e-9;
   return ((d1 > e && d2 < -e) || (d1 < -e && d2 > e)) && ((d3 > e && d4 < -e) || (d3 < -e && d4 > e));
 }
-/** Whether two zones' boxes overlap with an area (touching edges do not). */
-const overlap = (a: ZoneIn, b: ZoneIn) => Math.min(a.max[0], b.max[0]) - Math.max(a.min[0], b.min[0]) > 1e-9 && Math.min(a.max[1], b.max[1]) - Math.max(a.min[1], b.min[1]) > 1e-9;
+/** How finely two zones' shapes are compared where their boxes meet: OVER at least, the shared box in at most OVER_STEPS a side. */
+const OVER = 0.05, OVER_STEPS = 256;
+/**
+ * Whether two zones overlap with an area (touching edges do not): their
+ * boxes, then, for a round or a polygon one, their shapes, at points of a
+ * grid over the box they share (set off its lines by odd fractions, so a
+ * shared edge on the quarter grid, a diagonal's too, holds none).
+ */
+function overlap(a: ZoneIn, b: ZoneIn): boolean {
+  const lo: V = [Math.max(a.min[0], b.min[0]), Math.max(a.min[1], b.min[1])], hi: V = [Math.min(a.max[0], b.max[0]), Math.min(a.max[1], b.max[1])];
+  if (!(hi[0] - lo[0] > 1e-9 && hi[1] - lo[1] > 1e-9)) return false;
+  if (!a.round && !a.poly?.length && !b.round && !b.poly?.length) return true;
+  const step = Math.max(OVER, (hi[0] - lo[0]) / OVER_STEPS, (hi[1] - lo[1]) / OVER_STEPS), sa = shapeOf(a), sb = shapeOf(b);
+  for (let x = lo[0] + 0.371 * step; x < hi[0]; x += step) for (let y = lo[1] + 0.613 * step; y < hi[1]; y += step) if (inZone(sa, x, y) && inZone(sb, x, y)) return true;
+  return false;
+}
 /** A piece's palette entry as the checks read it (its overlaps), or none: a piece the builder did not place (an imported hole's composition) is not judged. */
 export type EntryOf = (r: PieceRef) => { overlaps?: readonly string[] } | undefined;
 type Judged = (r: PieceRef) => boolean;

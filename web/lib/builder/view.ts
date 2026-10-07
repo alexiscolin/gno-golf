@@ -26,6 +26,18 @@ export function pinch(v: View, from: readonly [P, P], to: readonly [P, P]): View
   return { k, x: v.x + m0[0] / v.k - m1[0] / k, y: v.y + m0[1] / v.k - m1[1] / k };
 }
 
+/**
+ * The grid's lines in sight (from lo to hi, in board units): every unit from
+ * origin, the tee (the hole's grid: framing shifts a whole hole, by a post's
+ * rim at times, off the board's units), every fifth from it darker.
+ */
+export function gridLines(lo: P, hi: P, origin: P): { x?: number; y?: number; major: boolean }[] {
+  const out: { x?: number; y?: number; major: boolean }[] = [];
+  for (let k = Math.ceil(lo[0] - origin[0]); origin[0] + k <= hi[0]; k++) out.push({ x: origin[0] + k, major: k % 5 === 0 });
+  for (let k = Math.ceil(lo[1] - origin[1]); origin[1] + k <= hi[1]; k++) out.push({ y: origin[1] + k, major: k % 5 === 0 });
+  return out;
+}
+
 /** The view with a board point in its middle (Show me), at the scale it is seen at; size: the board in pixels. */
 export const centreOn = (v: View, at: P, size: { w: number; h: number }): View => ({ k: v.k, x: at[0] - size.w / 2 / v.k, y: at[1] - size.h / 2 / v.k });
 

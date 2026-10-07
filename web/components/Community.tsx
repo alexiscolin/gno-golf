@@ -186,9 +186,6 @@ function HoleCard({ h, big, map, players, mark, level, remix, onPlay }: {
   );
 }
 
-/** No worker in this browser: nothing measured. */
-const NO_METER: Meter = { ask: () => {}, carry: () => Promise.resolve(null), rate: () => Promise.resolve(null), stop: () => {} };
-
 /** The meter's level of each of these holes (null: not measured), each version measured once a browser (keptLevel), one after the other in the meter's worker, loaded only once one is asked and kept till the list goes. */
 function useLevels(chain: Pick<Chain, "holeData"> | null, rows: readonly HoleRow[]) {
   const [levels, setLevels] = useState<ReadonlyMap<string, Level | null>>(new Map());
@@ -205,7 +202,7 @@ function useLevels(chain: Pick<Chain, "holeData"> | null, rows: readonly HoleRow
         let level = keptLevel(id);
         if (level == null) {
           const { makeMeter } = await import("@/lib/builder/meter");
-          const m = (meter.current ??= makeMeter(() => {}) ?? NO_METER);
+          const m = (meter.current ??= makeMeter(() => {}));
           level = await chain.holeData(id).then((hex) => m.rate(hex), () => null);
           if (level != null) keepLevel(id, level);
         }
