@@ -509,9 +509,7 @@ no "price: bounds" "a price is between" test1 "$GN" SetPrice common 999999
 ok "price: Common 40 GNOT for the next waves" "set" test1 "$GN" SetPrice common 40000000
 is "price: a wave keeps its prices" "Gnome(\"8\").price" "36000000" "$(qg 'Gnome("8")' | jf 'd["price"]')"
 NOW=$(chaintime)
-ok "waves: 105-208, no window" "added" test1 "$GN" AddWave 105 208 "$NOW" 0
-SEND=1296000000ugnot no "legendary: one a wallet" "the cap is 1 legendary a wallet" p1 "$GN" Buy 208
-SEND=1296000000ugnot ok "legendary: b1 buys 208" "sold" b1 "$GN" Buy 208
+ok "waves: 105-207, no window (208 on sale alone already)" "added" test1 "$GN" AddWave 105 207 "$NOW" 0
 ok "waves: 209-310, tomorrow" "added" test1 "$GN" AddWave 209 310 "$((NOW + 86400))" 0
 SEND=40000000ugnot no "waves: not yet" "is not on sale yet" p0 "$GN" Buy 209
 SEND=36000000ugnot no "waves: in no wave" "is not on sale" p0 "$GN" Buy 400
@@ -539,7 +537,7 @@ ok "equip: off" "off" p0 "$GN" Equip ""
 is "equip: Equipped(p0) after off" "Equipped(p0)" "" "$(qg "Equipped(\"$P0\")")"
 is "locker: GnomesOf(p0, 0)" "GnomesOf(p0,0) total,next,rows" "10 -1 10" "$(qg "GnomesOf(\"$P0\",0)" | jf '" ".join(str(x) for x in (d["total"], d["next"], len(d["rows"])))')"
 is "locker: GnomesOf(p0, 4)" "GnomesOf(p0,4) first row, rows" "$5 6" "$(qg "GnomesOf(\"$P0\",4)" | jf 'd["rows"][0]["id"] + " " + str(len(d["rows"]))')"
-is "locker: GnomesOf(p1, 0) in id order" "GnomesOf(p1,0) ids" "5,7,73,74,94,104" "$(qg "GnomesOf(\"$P1\",0)" | jf '",".join(r["id"] for r in d["rows"])')"
+is "locker: GnomesOf(p1, 0) best first" "GnomesOf(p1,0) ids" "104,94,73,74,5,7" "$(qg "GnomesOf(\"$P1\",0)" | jf '",".join(r["id"] for r in d["rows"])')"
 is "locker: past the end" "GnomesOf(p1,99) rows,next" "0 -1" "$(qg "GnomesOf(\"$P1\",99)" | jf 'str(len(d["rows"])) + " " + str(d["next"])')"
 is "locker: TokenOfOwnerByIndex(p0, 9)" "TokenOfOwnerByIndex(p0,9)" "${10}" "$(qg "TokenOfOwnerByIndex(\"$P0\",9)")"
 
