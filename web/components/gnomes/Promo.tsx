@@ -1,7 +1,7 @@
 "use client";
 
 // The collection on the game's own screens, behind NEXT_PUBLIC_GNOMES and the
-// region gate (the caller's): the menu's Gnomes card beside the games, the
+// region gate (the caller's): the menu's Gnomes panel's picture, the
 // picker's Collection section at its top, the finish card's one line. What
 // they say is the gallery's own (lib/gnomes/shop.ts promoOf, promoWords: the
 // wave to see, its size, its lowest price, its Legendary), read once a visit.
@@ -30,31 +30,14 @@ export function usePromo(chain: Chain | null): { promo: Promo | null | undefined
   return { promo: !chain || sale === undefined ? undefined : sale && saleAt(sale, now), now };
 }
 
-/** The wave's Legendary turning (his turntable; still, as his thumbnail, where motion is reduced). */
-const Turning = ({ id, className }: { id: number; className: string }) => (
-  <picture className={className}>
+/** The wave's Legendary turning (his turntable; still, as his thumbnail, where motion is reduced): the menu's Gnomes
+ *  panel's picture, in its disc as the Builder's emblem is in its own (the panel is Modes.tsx's, as the games'). */
+export const Turning = ({ id }: { id: number }) => (
+  <picture className="mode__art">
     <source media="(prefers-reduced-motion: no-preference)" srcSet={`/gnomes/turn/${id}.webp`} />
     <img src={thumb(id)} alt="" width={256} height={256} decoding="async" />
   </picture>
 );
-
-/** The menu's fourth card, beside Solo, Duel and the Builder: the wave on sale, its Legendary turning, three of its
- *  gnomes, its lowest price, and "See the gnomes". The card is the button (one action), as the games' are. */
-export function GnomesCard({ promo, now, onOpen }: { promo: Promo | null | undefined; now: number; onOpen: () => void }) {
-  const w = promo ? promoWords(promo, now) : null;
-  return (
-    <button className="mode mode--gnomes" aria-label={w ? `The gnomes: ${w.title}, ${w.line}. ${w.state}. See the gnomes` : "The gnomes: see the collection"}
-      onClick={() => (sound("select"), onOpen())}>
-      <span className="mode__stage">
-        {promo?.legendary ? <Turning id={promo.legendary.id} className="gpromo__legend" /> : <span className="gpromo__legend" />}
-        <span className="gpromo__faces" aria-hidden="true">{(promo?.faces || []).map((f) => <img key={f.id} src={thumb(f.id)} alt="" width={64} height={64} loading="lazy" />)}</span>
-      </span>
-      <span className="mode__name">Gnomes</span>
-      <span className="mode__line">{w ? <>{w.title} · {w.line}<br /><span className="gpromo__state">{w.state}</span></> : "The collection: 720 gnomes to play with"}</span>
-      <span className="btn btn--gold gpromo__go" aria-hidden="true">See the gnomes</span>
-    </button>
-  );
-}
 
 /** The picker's Collection section, at its top: the player's own gnomes first (owned) and the whole collection a
  *  tap away; else one band that is the gallery's door: the wave's Legendary and three of its gnomes, the wave in a

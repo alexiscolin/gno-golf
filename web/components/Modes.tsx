@@ -23,8 +23,9 @@ import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2, Zone } from "@/lib/types";
 
-// onBuild: the Builder's page (none: it is to come); gnomes: a fourth card, the collection's (components/gnomes/Promo)
-export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, gnomes, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; gnomes?: ReactNode; onBack: () => void; onAbout: () => void }) {
+// onBuild: the Builder's page (none: it is to come); gnomes: a fourth panel, the collection's, its picture (the
+// wave's Legendary turning: components/gnomes/Promo Turning) and where it leads (the gallery)
+export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, gnomes, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; gnomes?: { art: ReactNode; onOpen: () => void }; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
   const cups = courseCount(counts).cups || CLASSIC.length; // (the chain's, once it has answered)
   return (
@@ -32,10 +33,8 @@ export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, gno
       <ul className={`modes__list${gnomes ? " modes__list--four" : ""}`}>
         <li><Panel kind="solo" name="Solo" line={`${countWord(cups)} cups, your best on the boards`} skin={skin} onClick={onSolo} /></li>
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
-        {onBuild
-          ? <li><Panel kind="build" name="Build your hole" line="Draw a hole, test it, publish it under your name" skin={skin} onClick={onBuild} /></li>
-          : <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>}
-        {gnomes && <li>{gnomes}</li>}
+        <li><Panel kind="build" name="Builder" line={onBuild ? "Draw a hole, publish it under your name" : "Draw your own hole, dare the others"} skin={skin} soon={!onBuild} onClick={onBuild} /></li>
+        {gnomes && <li><Panel kind="gnomes" name="Gnomes" line="720 gnomes, each one of a kind" skin={skin} art={gnomes.art} onClick={gnomes.onOpen} /></li>}
       </ul>
     </FrontScreen>
   );
@@ -45,12 +44,13 @@ export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, gno
  *  gnome's act in 3D (a duel's ghost taking turns with him) playing under the
  *  pointer or the focus only, its name inked big. One to come is drawn,
  *  dimmed, with its sticker (and no 3D of its own). */
-function Panel({ kind, name, line, skin, soon = false, onClick }: { kind: "solo" | "duel" | "build"; name: string; line: string; skin: Skin; soon?: boolean; onClick?: () => void }) {
+// art: a picture in the disc in place of the 3D (the collection's)
+function Panel({ kind, name, line, skin, soon = false, art, onClick }: { kind: "solo" | "duel" | "build" | "gnomes"; name: string; line: string; skin: Skin; soon?: boolean; art?: ReactNode; onClick?: () => void }) {
   const [hot, on] = useHot();
   return (
     <button className={`mode mode--${kind}`} disabled={soon} aria-label={`${name}: ${line}${soon ? ". Coming soon" : ""}`} {...on}
       onClick={() => (sound("select"), onClick && onClick())}>
-      {kind === "build" ? <span className="mode__stage"><Emblem id="build" /></span> : <Stage skin={skin} act={kind} playing={hot} />}
+      {kind === "build" ? <span className="mode__stage"><Emblem id="build" /></span> : art ? <span className="mode__stage">{art}</span> : <Stage skin={skin} act={kind === "gnomes" ? "hop" : kind} playing={hot} />}
       <span className="mode__name">{name}</span>
       <span className="mode__line">{line}</span>
       {soon && <span className="dare mode__soon">Coming soon</span>}

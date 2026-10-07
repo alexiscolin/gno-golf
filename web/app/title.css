@@ -343,7 +343,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
 .mode--solo { --c1: var(--turf); --c2: var(--fairway); } /* the fairway */
 .mode--duel { --c1: #f6a79b; --c2: var(--hat); } /* the hat: the rival */
 .mode--build { --c1: var(--lamp); --c2: var(--sunny); } /* the sun */
-.mode--gnomes { --c1: #d9c4ff; --c2: #6a4fc2; grid-template-rows: minmax(0, 1fr) auto auto auto; } /* the Epic's amethyst: the collection */
+.mode--gnomes { --c1: #d9c4ff; --c2: #6a4fc2; } /* the Epic's amethyst: the collection */
 .worlds--v2 .world:focus-visible, .mode:focus-visible { outline: none; box-shadow: var(--ring-shadow), var(--deep-card); }
 .mode[disabled] { cursor: default; }
 .mode[disabled] > :not(.mode__soon, .mode__line, .rival__tag) { opacity: .7; filter: saturate(.35); } /* (its line stays readable) */
@@ -375,7 +375,6 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
   .modes__list--four { grid-template-columns: 1fr; }
   .modes__list--four .mode { aspect-ratio: auto; min-height: 124px; }
   .modes__list--four .mode__name { font-size: 28px; }
-  .mode--gnomes .gpromo__state { display: none; } /* (the card stays as short as the others: the gallery says it) */
 }
 /* the game chosen, big, beside Back: its panel's colour, inked (over the screens, under the sheets) */
 .modetag {

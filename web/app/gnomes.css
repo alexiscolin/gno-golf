@@ -139,24 +139,10 @@ html:has(.gsheet) { overflow: hidden; }
 .owned__face[aria-pressed="true"] { box-shadow: var(--ring-shadow); }
 
 /* ---------------------------------------------------------------- the collection on the game's screens (Promo.tsx) */
-/* the menu's card: the Legendary turning in the disc, three of the wave's gnomes at his feet, a gold "See the gnomes" */
-.mode.mode--gnomes { background: var(--panel-dots), var(--c2); } /* (its own round frame below: the games' disc would sit behind it) */
-.mode--gnomes .mode__stage { margin-top: 0; display: grid; place-items: center; padding-top: 18px; } /* (over title.css's .mode__stage, whatever the order the sheets load in) */
-.gpromo__legend { position: relative; display: block; width: min(64%, 190px); aspect-ratio: 1; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: #fbe7a6; box-shadow: 0 0 0 6px var(--c1); }
-.gpromo__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.08); }
-.gpromo__faces { position: absolute; right: 8%; bottom: 0; display: flex; }
-.gpromo__faces img { width: clamp(32px, 3vw, 42px); height: auto; margin-left: -8px; border: var(--edge); border-radius: 50%; background: #f6ead2; }
-.gpromo__state { font-size: 13px; opacity: .92; }
-.gpromo__go { justify-self: start; margin: 12px 20px 0; padding: 0 18px; min-height: 40px; font-size: 15px; pointer-events: none; }
-@media (max-width: 700px) {
-  .mode.mode--gnomes { grid-template-columns: 46% 1fr; grid-template-rows: auto auto auto; }
-  .mode--gnomes .mode__stage { grid-row: 1 / 4; margin-top: 0; padding: 0; }
-  .gpromo__legend { width: 104px; box-shadow: 0 0 0 4px var(--c1); }
-  .gpromo__faces { right: 4px; bottom: -6px; }
-  .gpromo__faces img { width: 28px; }
-  .mode--gnomes .mode__name, .mode--gnomes .mode__line, .gpromo__go { grid-column: 2; }
-  .gpromo__go { margin: 8px 14px 0 4px; min-height: 34px; padding: 0 14px; font-size: 14px; }
-}
+/* the menu's Gnomes panel (Modes.tsx's, as the games'): its picture in the disc where the Builder's emblem sits */
+.mode__stage .mode__art { position: absolute; inset: 26% 0 0; margin: auto; display: block; width: 56%; aspect-ratio: 1; height: auto; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: #fbe7a6; }
+.mode__stage .mode__art img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.1); }
+@media (max-width: 700px) { .mode__stage .mode__art { inset: 0; width: 78%; } }
 /* the picker's Collection section, at its top: one band, the aim card's width or so */
 .gcollect { display: flex; align-items: center; gap: 12px; width: min(100%, 560px); margin: 4px auto 10px; padding: 10px 12px; border: var(--edge-bold); border-radius: 18px; background: var(--white); box-shadow: var(--shadow-btn); text-align: left; }
 .gcollect .owned { flex: 1; min-width: 0; margin: 0; }

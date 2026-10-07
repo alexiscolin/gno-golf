@@ -44,7 +44,7 @@ import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, 
 import { darkGallery, minesOrder } from "@/lib/scene/data";
 import { SHOP, makeShop, type Worn } from "@/lib/gnomes/shop";
 import { buildLink, endpoints } from "@/lib/builder/holes";
-import { CollectionSection, GnomesCard, PromoLine, usePromo } from "@/components/gnomes/Promo";
+import { CollectionSection, PromoLine, Turning, usePromo } from "@/components/gnomes/Promo";
 import { builderOn } from "@/lib/builder/route";
 import { shopInRegion, shopShown } from "@/lib/gnomes/geo";
 import { served } from "@/lib/gnomes/served";
@@ -1586,7 +1586,7 @@ export default function Golf() {
         <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
           onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")}
           onBuild={builderOn() ? () => window.location.assign(buildLink(endpoints(window.location.search).keep)) : undefined}
-          gnomes={shopOn ? <GnomesCard promo={promo} now={promoNow} onOpen={() => openShop()} /> : null} />
+          gnomes={shopOn ? { art: promo?.legendary ? <Turning id={promo.legendary.id} /> : null /* (the disc empty until the sale is read) */, onOpen: () => openShop() } : undefined} />
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
