@@ -138,7 +138,8 @@ earned gnomes' proof reads store's rows only while store's writer is the
 rules it reads (golf/v2 at deploy): after a rules change every proof
 refuses ("rules changed"), until the owner, having checked that the new
 rules keep `bests`, `copies` and `holes` as golf/v2 writes them, calls
-`AcceptRules(path)`. It takes store's current writer and nothing else, so
+`AcceptRules(path)`. It takes store's current writer and nothing else (never
+`""`, a paused store's: a pause pauses the proof), so
 the owner can follow a change store's own public delay has carried out,
 never point the proof elsewhere; it emits `RulesAccepted`. An earned gnome
 minted stays minted once, whatever the rules.
@@ -274,7 +275,7 @@ while on sale, an earned kind, a player).
 | Transfer, Accept | the money moved with the owner's role | the treasury stays | `TestAnOwnerHandoverLeavesTheTreasury`, `TestTheOwnerHandsOverInTwoSteps` |
 | Buy, Sweep, royalty | a payment to the owner or kept by the realm | the treasury, in the same call | `TestTheTreasuryMovesInTwoSteps`, `TestTheSweepPaysTheTreasury` |
 | SetSiteURL | a link that breaks out of a page or points off https | golf's play link rule | `TestTheOwnerMovesTheSite` |
-| AcceptRules, MintEarned | proofs read from rules with another layout; the proof pointed at a realm store has not moved to; accepted by another; a kind minted twice across a change | store's current writer only; owner only; the earned tree kept | `TestTheOwnerAcceptsOnlyStoresNewRules`, `TestNewRulesProveNothing`, `TestNewRulesRefuseTheMint` |
+| AcceptRules, MintEarned | proofs read from rules with another layout; the proof pointed at a realm store has not moved to, or at a paused store's ""; accepted by another; a kind minted twice across a change | store's current writer only, a realm; owner only; the earned tree kept | `TestTheOwnerAcceptsOnlyStoresNewRules`, `TestAPausedStoreHasNoRulesToAccept`, `TestNewRulesProveNothing`, `TestNewRulesRefuseTheMint` |
 | init | a deploy with no signer | refused off `dev` | `TestTheDeployerOwns` |
 | TransferFrom, Approve | a realm moves its caller's gnomes | the ledger's caller teller | `TestARealmCannotMoveItsCallersGnomes`, `TestTransfersGoThroughTheLedgersChecks` |
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |

@@ -59,6 +59,9 @@ Option 3:
   rewrites the path), and `AcceptRules(cur realm, path string)`:
   - owner only;
   - `path` must equal `rows.Writer()`, else it panics;
+  - a writer that is not a realm (`""` while store is paused) is refused:
+    a pause pauses the proof too, and the rules accepted read again once
+    store resumes;
   - emits `RulesAccepted`.
 - `Proof` keeps saying "rules changed" until the owner accepts the new
   rules. The page reads that as "earned gnomes paused for a rules update".

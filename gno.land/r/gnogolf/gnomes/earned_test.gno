@@ -337,6 +337,22 @@ func TestTheOwnerAcceptsOnlyStoresNewRules(cur realm, t *testing.T) {
 	urequire.AbortsContains(t, cur, "already minted: wizard", func() { MintEarned(cross(cur), "wizard") })
 }
 
+// A paused store has no writer (""): there are no rules to accept, and the
+// proof stays refused through the pause and after it.
+func TestAPausedStoreHasNoRulesToAccept(cur realm, t *testing.T) {
+	f := withRows(t, cur)
+	f.writer = ""
+	testing.SetRealm(asUser(deployer, nil))
+	urequire.AbortsContains(t, cur, "gnomes: store has no rules to accept", func() { AcceptRules(cross(cur), "") })
+	_, _, why := prove("wizard", alice.String())
+	uassert.Equal(t, errRules, why)
+	f.writer = "gno.land/p/gnogolf/course" // not a realm
+	urequire.AbortsContains(t, cur, "gnomes: store has no rules to accept", func() { AcceptRules(cross(cur), f.writer) })
+	f.writer = rulesAtDeploy // resumed: the rules accepted at deploy read again
+	_, _, why = prove("wizard", alice.String())
+	uassert.Equal(t, "", why)
+}
+
 func TestAnEarnedGnomeIsBoundToItsPlayer(cur realm, t *testing.T) {
 	f := withRows(t, cur)
 	for _, id := range cupHoles(f, "mines", 18) {
