@@ -8,12 +8,14 @@
 // the live play, is the proof. Its HUD is the game's own (Golf.tsx): the
 // strokes card with the par and the time in play, the weather card, and
 // beside them the weathers to prove, ticked once proved, red once for a
-// round that does not count; holed, the game's hole-finished card says how
-// it went and the ways on (testmode.ts finished). The hole's id is fixed
-// first (the author's address, the slug, the next version): its weather
-// hangs on it. Prove opens on the first weather not proved (the others
-// proved already, their rounds replayed by the editor: carry.ts), and stays
-// on it, proved, until Next weather. A quick test (quick) is the same game
+// round that does not count. The hole's id is fixed first (the author's
+// address, the slug, the next version): its weather hangs on it. Prove
+// opens on the first weather not proved (the others proved already, their
+// rounds replayed by the editor: carry.ts); each one proved, the next starts
+// on its own, said a moment in the HUD, and the last ends on one card, the
+// game's hole-finished card, with each weather's strokes and time and
+// Publish (testmode.ts summary); a round that does not count gets that card
+// with why (finished). A quick test (quick) is the same game
 // in calm weather only, under an id of its own: no address asked, nothing
 // replayed, nothing proved (its label says so, once). In play R or
 // Backspace plays again from the tee, V swaps the overview camera, Escape
@@ -28,7 +30,7 @@ import { camlog } from "@/lib/testhooks";
 import { AUTHOR_KEY, endpoints } from "@/lib/builder/holes";
 import { makeLocalChain } from "@/lib/builder/localchain";
 import { FIND_BACK, replay, suggestPar, unproven, type Proof } from "@/lib/builder/proof";
-import { clock, finished, holeId, holeRow, parSaid, plan, QUICK_HOLE, quickPlan, testChain, type Act } from "@/lib/builder/testmode";
+import { clock, finished, holeId, holeRow, parSaid, plan, provedNote, QUICK_HOLE, quickPlan, summary, testChain, type Act } from "@/lib/builder/testmode";
 import { playKey } from "@/lib/builder/keys";
 import { NO_GL } from "@/lib/builder/editor";
 import { hold, stageCanvas, stageRenderer } from "@/lib/builder/stage";
@@ -151,7 +153,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     );
   }, [author, draft.slug, quick]);
 
-  // the round holed in the weather played (its strokes; 0 not yet): its card is up until a play again or the next weather
+  // the round holed in the weather played (its strokes; 0 not yet), until a play again or the next weather
   const [holed, setHoled] = useState(0);
   // the weathers not proved yet (a quick test's one: never proved, so never left)
   const left = !id ? [] : quick ? (holed ? [] : [""]) : unproven(draft.proofs, draft.world, proofKey, id);
@@ -161,13 +163,14 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
     host.load(id, hex);
     setKinds(quick ? quickPlan(host, id) : plan(host, id, draft.world, Math.floor(Date.now() / RULES.periodMs)));
   }, [id, hex, host, draft.world, quick]);
-  // the weather played: the first not proved as it opens, kept once proved (its card says so) until Next weather
+  // the weather played: the first not proved as it opens, then the next one not proved once it is
   const [on, setOn] = useState<string | null>(null);
   const first = quick ? kinds[0]?.kind : kinds.find((k) => left.includes(k.kind))?.kind;
   useEffect(() => void (on === null && first !== undefined && setOn(first)), [on, first]);
   const now = kinds.find((k) => k.kind === on) ?? null;
-  // the round's time in play: from its game's start (or a play again) to the cup
+  // the round's time in play: from its game's start (or a play again) to the cup; each weather's proved on this visit (the summary's)
   const [took, setTook] = useState<number | null>(null);
+  const [times, setTimes] = useState<Record<string, number>>({});
   const since = useRef(0), [tick, setTick] = useState(0);
   useEffect(() => {
     if (!now || holed) return;
@@ -176,7 +179,20 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   }, [now?.kind, holed]); // eslint-disable-line react-hooks/exhaustive-deps
   const fresh = () => (setHoled(0), setTook(null), (since.current = performance.now()));
   const again = () => (setWhy((w) => (now ? { ...w, [now.kind]: "" } : w)), fresh(), game.current?.reset());
-  const next = () => first !== undefined && (fresh(), setOn(first));
+  // a weather proved (its round replayed and counted): the next starts on its own, said a moment in the HUD; the last ends on the summary
+  const provedNow = !quick && !!now && holed > 0 && !checking && !why[now.kind] && !left.includes(now.kind);
+  const [said, setSaid] = useState("");
+  useEffect(() => {
+    if (!provedNow || !now || first === undefined) return;
+    setSaid(provedNote(now.kind, first));
+    fresh();
+    setOn(first);
+  }, [provedNow]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!said) return;
+    const t = setTimeout(() => setSaid(""), 3000);
+    return () => clearTimeout(t);
+  }, [said]);
 
   // the game on the current weather's period; a new one for the next weather
   useEffect(() => {
@@ -191,7 +207,8 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       chain: testChain(makeChain({ rpc, web }), local, hex),
       onChange: (s) => ((aiming.current = s.aiming), setSnap(s)),
       onHoled: ({ shots }) => {
-        setTook(performance.now() - since.current);
+        const ms = performance.now() - since.current;
+        setTook(ms);
         setHoled(shots.length);
         if (quick) return (onRound(shots), sound("cup")); // (a quick test: no replay, no proof)
         setChecking(true);
@@ -199,6 +216,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
           setChecking(false);
           if (typeof p === "string") return setWhy((w) => ({ ...w, [now.kind]: p }));
           setWhy((w) => ({ ...w, [now.kind]: "" }));
+          setTimes((t) => ({ ...t, [now.kind]: ms }));
           sound("cup");
           onProof(p);
         });
@@ -211,7 +229,7 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       game.current = null;
       g.destroy();
     };
-    // (one game per weather: Next weather moves to the next)
+    // (one game per weather: a proof of this one moves to the next)
   }, [id, now?.kind, now?.period, canvas]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // every weather proved: the par they suggest; proved here, by this visit's last round, a small celebration
@@ -231,11 +249,14 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
   }, [proved, kinds.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!author && !quick) return <main className="tmode tmode--ask"><AddressStep onAddress={(a) => { try { localStorage.setItem(AUTHOR_KEY, a); } catch {} onAuthor(a); }} /></main>;
-  const par = proved ? suggestPar(draft.proofs.filter((p) => p.key === proofKey && p.id === id)) : 0;
+  const mineProofs = draft.proofs.filter((p) => p.key === proofKey && p.id === id);
+  const par = proved ? suggestPar(mineProofs) : 0;
   const time = took ?? (now && tick ? Math.max(0, tick - since.current) : null);
-  const card = holed > 0 && now ? finished({ quick, strokes: holed, kind: now.kind, checking, why: why[now.kind], next: first ?? null, par, proveOff }) : null;
+  const card = !holed || !now || checking ? null
+    : provedNow ? (first === undefined ? summary(kinds.map(({ kind }) => ({ kind, strokes: mineProofs.find((p) => p.kind === kind)?.strokes ?? 0, ms: times[kind] })), par) : null)
+    : finished({ quick, strokes: holed, kind: now.kind, why: why[now.kind], proveOff });
   const waits = card?.actions.find((a) => a.off)?.off; // (why the way on waits, under it)
-  const act: Record<Act, (() => void) | undefined> = { again, edit: onLeave, prove: onProve, next, publish: onPublish };
+  const act: Record<Act, (() => void) | undefined> = { again, edit: onLeave, prove: onProve, publish: onPublish };
   const mine = draft.world === "mines";
   return (
     <main className={`tmode${quick ? " tmode--quick" : ""}${party ? " tmode--party" : ""}`}>
@@ -279,10 +300,12 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
           </div>
         )}
       </header>
-      {(snap?.error || note || (proved && !now)) && (
+      {(snap?.error || note || checking || said || (proved && !now)) && (
         <div className="tmode__notes">
           {snap?.error && <p className="tmode__why" role="alert">{snap.error}</p>}
           {note && <p className="tmode__note" role="status">{note}</p>}
+          {checking && <p className="tmode__note" role="status">The chain&apos;s code replays your round…</p>}
+          {said && <p className="tmode__done" role="status">{said}</p>}
           {proved && !now && <p className="tmode__done" role="status">Holed in every weather: publish it.</p>}
         </div>
       )}
@@ -294,10 +317,16 @@ export default function TestMode({ host, draft, hex, proofKey, author, guess = 0
       {/* holed: the game's hole-finished card (Golf.tsx's banner--win), its ways on */}
       {card && (
         <div className="banner banner--win tmode__won">
-          <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label="Hole finished">
+          <Dialog className="banner__in" role="dialog" aria-modal="true" aria-label={card.rows ? "Every weather proved" : "Hole finished"}>
             <span className="eyebrow">In the hole! · {draft.title || "Your hole"}</span>
-            <h2>{card.title}{card.sub && <span className="tmode__sub"> · {card.sub}</span>}</h2>
+            <h2>{card.title}</h2>
             {card.line && <p aria-live="polite">{card.line}</p>}
+            {card.rows && (
+              <table className="tmode__sum">
+                <thead><tr><th scope="col">Weather</th><th scope="col">Strokes</th><th scope="col">Time</th></tr></thead>
+                <tbody>{card.rows.map((r) => <tr key={r.weather}><th scope="row">{r.weather}</th><td>{r.strokes}</td><td>{r.time}</td></tr>)}</tbody>
+              </table>
+            )}
             {card.actions.length > 0 && (
               <div className="banner__row">
                 {card.actions.map((a) => (

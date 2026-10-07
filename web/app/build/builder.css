@@ -376,7 +376,11 @@ button.issue__why:hover { text-decoration-style: solid; }
 /* holed: the game's hole-finished card (globals.css .banner--win), a test's few words and its three ways on */
 .tmode__won .banner__in { max-width: 680px; padding: 32px 36px 26px; }
 .tmode__won h2 { font-size: clamp(40px, 4.4vw, 56px); }
-.tmode__sub { font-size: .62em; color: var(--ink); white-space: nowrap; vertical-align: .18em; }
+.tmode__sum { margin: 0 auto 4px; border-collapse: collapse; font-size: 16px; font-variant-numeric: tabular-nums; }
+.tmode__sum th, .tmode__sum td { padding: 6px 18px; text-align: center; border-bottom: 2px solid rgba(var(--ink-rgb), .12); }
+.tmode__sum thead th { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+.tmode__sum tbody th { text-align: left; font-weight: 800; }
+.tmode__sum tbody tr:last-child > * { border-bottom: 0; }
 .tmode__won .banner__row { position: static; margin-top: 18px; }
 .tmode__won .btn { margin: 0; }
 .tmode__won .banner__in .tmode__small { margin: 10px 0 0; font-size: 14px; }
