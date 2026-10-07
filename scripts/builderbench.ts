@@ -15,6 +15,7 @@
 //   left (stage.ts);
 // - five quick tests in a row leave no GL program, texture or buffer behind
 //   (the game draws with the board's own renderer, lent to it);
+// - the context lost: the 2D board until it is back, then the 3D drawn again;
 // - no WebGL: the 2D board, and no test (T and Prove it say why; the
 //   Builder never falls over).
 // It prints the numbers as JSON.
@@ -148,6 +149,15 @@ await c.js(`[...document.querySelectorAll("button")].find((b) => /^Back to edit$
 await until(`!!document.querySelector(".board--3d canvas")`, "the board again");
 await sleep(800);
 const contexts = await c.js<number>(`window.__gl.size`);
+
+// the context lost (a GPU reset): the board in 2D meanwhile; back, in 3D and drawn again
+await c.js(`window.__lose = document.querySelector(".board__scene canvas").getContext("webgl2").getExtension("WEBGL_lose_context"), window.__lose.loseContext()`);
+await sleep(800);
+const whileLost = await c.js<boolean>(`!!document.querySelector(".board__ground") && !document.querySelector(".board--3d")`);
+const renders1 = await c.js<number>(`window.__renders`);
+await c.js(`window.__lose.restoreContext()`);
+await sleep(1500);
+const lost = { whileLost, backIn3d: await c.js<boolean>(`!!document.querySelector(".board--3d") && !document.querySelector(".board__ground")`), drawn: (await c.js<number>(`window.__renders`)) > renders1 };
 c.kill();
 
 // no WebGL: the 2D board
@@ -166,7 +176,7 @@ await sleep(1500);
 const noTest = await flat.js<{ quick: string; game: boolean; fell: boolean }>(`({ quick: [...document.querySelectorAll(".board__toggle")].find((b) => /Quick test/.test(b.textContent))?.title ?? "", game: !!document.querySelector(".tbench--quick, .tmode"), fell: !document.querySelector(".board") })`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, fallback2D: fallback, noTest };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, lost, fallback2D: fallback, noTest };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
@@ -178,6 +188,7 @@ assert.ok(zoom.renders <= zoom.frames + 1, `zoomed: ${zoom.renders} renders in $
 assert.ok(idle.frames <= BUDGET.idleFrames, `idle: ${idle.frames} frames asked for`);
 assert.ok(idle.cpu <= BUDGET.idleCpu, `idle: ${idle.cpu * 100}% CPU`);
 assert.equal(contexts, 1, `${contexts} WebGL contexts`);
+assert.ok(lost.whileLost && lost.backIn3d && lost.drawn, `the context lost and back: ${JSON.stringify(lost)}`);
 for (const k of Object.keys(live[0])) assert.ok(live.every((l) => l[k] <= live[0][k]), `GL ${k.toLowerCase()}s left by each quick test: ${live.map((l) => l[k]).join(" -> ")}`);
 assert.ok(fallback, "no WebGL: no 2D board");
 assert.ok(!noTest.fell && !noTest.game && /WebGL/.test(noTest.quick), `no WebGL: a test opened or the Builder fell over: ${JSON.stringify(noTest)}`);

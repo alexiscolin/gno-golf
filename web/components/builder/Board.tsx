@@ -14,7 +14,7 @@
 // its path drawn, the last three faded, all played again as the hole changes;
 // the board says it is no proof. "Show the line" draws the meter's best line
 // and where its shots stopped.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
 import { centreOn, FLAT, K_MAX, K_MIN, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
@@ -24,7 +24,7 @@ import { type PaletteEntry } from "@/lib/builder/palette";
 import type { ValidateOptions } from "@/lib/builder/pipeline";
 import type { Draft, Piece, V } from "@/lib/builder/draft";
 import { makeGesture, type Env, type Target } from "@/lib/builder/gesture";
-import { stageRenderer } from "@/lib/builder/stage";
+import { onStage, stageRenderer, stageUp } from "@/lib/builder/stage";
 import type { Hole } from "@/lib/scene/data";
 import Scene from "./Scene";
 import { PieceShape } from "./PieceShape";
@@ -108,8 +108,10 @@ function extent(d: Draft): [V, V] {
 
 export default function Board(props: BoardProps) {
   const { draft, quick, full, selected, armed, step, bad } = props, look = props.look ?? FLAT;
-  // in 3D where this browser has WebGL (the Builder's one context: stage.ts), else the 2D board as it was
-  const [gl] = useState(() => !!props.scene && !!stageRenderer());
+  // in 3D where this browser has WebGL (the Builder's one context: stage.ts), else the 2D board as it was;
+  // its context lost, in 2D until it is back (the scene kept, to draw again then)
+  const [in3d] = useState(() => !!props.scene && !!stageRenderer());
+  const gl = useSyncExternalStore(onStage, stageUp) && in3d;
   const waker = useRef<(() => void) | null>(null);
   const box = useRef<HTMLElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -335,7 +337,7 @@ export default function Board(props: BoardProps) {
   const badge = (at: V) => { const q = toScreen(view, look, at); return `translate(${q[0]} ${q[1]}) scale(${view.k})`; };
   return (
     <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
-      {gl && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} paused={props.scene.paused} keep={props.scene.keep} />}
+      {in3d && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} paused={props.scene.paused} keep={props.scene.keep} />}
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
         onPointerLeave={() => (setGhost(null), near.current?.setAttribute("cx", "-99"))}>
