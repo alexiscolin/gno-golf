@@ -359,6 +359,14 @@ near, proved, world; at 1440, 1280 and 1024.
   or the one thing to fix, in words, with "Show me"; a limit appears only
   when near ("Bumpers and posts: 27 of 32 · room for 5 more"), amber; the
   full gauges are the hole-builder spec's, behind the limit's tap.
+- **Proofs over an edit**: an edit changes the hole, so each weather's
+  round is replayed whole on the new bytes, in the editor's worker (the
+  meter's); a weather whose round still holes in its strokes stays proved,
+  the others are said in the checks' line, amber ("Your Wind round now stops
+  short · Clear and Rain still holed"), and a toast over the board says it
+  once ("This drops your Wind proof · ⌘Z keeps it"). Test then opens on the
+  first weather not proved. Only the author's own rounds are replayed: the
+  solver never makes a proof.
 
 ### B4. Test
 

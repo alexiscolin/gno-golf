@@ -217,6 +217,10 @@ export function history(first: Draft) {
       now = d;
       future = [];
     },
+    /** The step as it is, changed in place: no step of its own (proofs carried over to it). */
+    amend(d: Draft) {
+      now = d;
+    },
     canUndo: () => past.length > 0,
     canRedo: () => future.length > 0,
     undo() {

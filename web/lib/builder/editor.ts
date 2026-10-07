@@ -7,16 +7,32 @@ import { FIELD } from "./rules";
 import type { Cost } from "./wasm";
 import type { Draft, V } from "./draft";
 import { whereOf } from "./edit";
+import { weatherName } from "./carry";
 import type { PaletteEntry } from "./palette";
 import type { HoleIn } from "./types";
 import { MAX_BYTES, type Validated } from "./pipeline";
 import { BUILDER_LIMITS, pieceCounts } from "./limits";
 
-/** The dock's one line: what stands between the draft and the next step (off: why Test is off, testGate's; a check under way says nothing new). */
-export function verdict({ pieces, errors, proved, off = "" }: { pieces: number; errors: number; proved: boolean; off?: string }) {
+/** Weathers in a sentence: "Clear and Rain", "Clear, Wind and Rain". */
+const weathers = (kinds: readonly string[]) => {
+  const n = kinds.map(weatherName);
+  return n.length > 1 ? `${n.slice(0, -1).join(", ")} and ${n.at(-1)}` : (n[0] ?? "");
+};
+
+/**
+ * The dock's one line: what stands between the draft and the next step (off:
+ * why Test is off, testGate's; a check under way says nothing new). rounds:
+ * the proofs an edit carried over (carry.ts), the weathers still holed and
+ * the lines of the rounds that broke (warn: said calm, ready to test again).
+ */
+export function verdict({ pieces, errors, proved, off = "", rounds }: { pieces: number; errors: number; proved: boolean; off?: string; rounds?: { kept: readonly string[]; broken: readonly string[] } | null }): { ok: boolean; warn?: boolean; text: string } {
   if (!pieces) return { ok: false, text: "Place pieces between the tee and the cup" };
   if (errors) return { ok: false, text: `${errors} ${errors === 1 ? "thing" : "things"} to fix` };
   if (off && off !== "Checking…") return { ok: false, text: off };
+  if (!proved && rounds?.broken.length) {
+    const more = rounds.broken.length - 1;
+    return { ok: true, warn: true, text: `${rounds.broken[0]}${more ? ` · and ${more} more` : rounds.kept.length ? ` · ${weathers(rounds.kept)} still holed` : ""}` };
+  }
   return { ok: true, text: proved ? "Holed in every weather: press Publish." : "Ready to test: press Test it." };
 }
 

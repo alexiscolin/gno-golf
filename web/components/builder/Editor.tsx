@@ -15,7 +15,8 @@ import { frame } from "@/lib/builder/gg1";
 import { notTurned, turnPiece } from "@/lib/builder/handles";
 import { loadPalette, type PaletteEntry } from "@/lib/builder/palette";
 import { validate, type ValidateOptions, type Validated } from "@/lib/builder/pipeline";
-import { proofKey, provedAs } from "@/lib/builder/proof";
+import { canonicalHex, proofKey, provedAs } from "@/lib/builder/proof";
+import { dropped, toCarry, weatherName, withCarried } from "@/lib/builder/carry";
 import { FIELD } from "@/lib/builder/rules";
 import { makeSession } from "@/lib/builder/session";
 import type { Issue } from "@/lib/builder/checks";
@@ -25,7 +26,7 @@ import type { Hole } from "@/lib/scene/data";
 import Board from "./Board";
 import Checks from "./Checks";
 import Header, { type Step } from "./Header";
-import Inspector from "./Inspector";
+import Inspector, { MOD } from "./Inspector";
 import Palette from "./Palette";
 import Preview from "./Preview";
 import { plainOf } from "@/lib/builder/explain";
@@ -74,6 +75,13 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   // the difficulty meter (its worker), and its last answer with the draft it is of
   const meter = useRef<Meter | null>(null);
   const [est, setEst] = useState<{ of: Draft; e: Shown | null } | null>(null);
+  // the proofs an edit carried over (carry.ts, in the worker): the draft being carried (Test waits for it), what
+  // came of it for the hole as it is now (its key), the key before it, and the toast of the proofs an edit dropped
+  const [carrying, setCarrying] = useState<Draft | null>(null);
+  const [rounds, setRounds] = useState<{ key: string; kept: string[]; broken: string[] } | null>(null);
+  const prevKey = useRef<string | null>(null);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
   const say = useCallback((text: string) => {
@@ -81,7 +89,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     clearTimeout(sayTimer.current);
     sayTimer.current = setTimeout(() => setSaid(""), 4000);
   }, []);
-  useEffect(() => () => clearTimeout(sayTimer.current), []);
+  useEffect(() => () => (clearTimeout(sayTimer.current), clearTimeout(toastTimer.current)), []);
 
   // the world's palette, loaded with its module
   useEffect(() => {
@@ -121,6 +129,34 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   }, [clean, kept]);
   const guess = clean && est?.e ? est.e : null, measuring = clean && est?.of !== kept;
   useEffect(() => void (est?.of === kept && onEstimate(est.e?.par ?? 0)), [est, kept, onEstimate]);
+
+  // a new key for the hole as kept: the author's rounds of the hole before replayed on its bytes, off the main
+  // thread; those that still hole in their strokes are its proofs (the step amended, never one of its own), the
+  // others said; the weathers the edit dropped said once in a toast, an undo away from kept
+  useEffect(() => {
+    const k = key?.of === kept ? key.key : null, prev = prevKey.current;
+    if (!k || k === prev) return;
+    prevKey.current = k;
+    const sayDropped = (proofs: Draft["proofs"]) => {
+      const gone = dropped(proofs, prev, k).map(weatherName);
+      if (!gone.length) return;
+      const names = gone.length > 1 ? `${gone.slice(0, -1).join(", ")} and ${gone.at(-1)}` : gone[0];
+      setToast(`This drops your ${names} proof${gone.length > 1 ? "s" : ""} · ${MOD}Z keeps ${gone.length > 1 ? "them" : "it"}`);
+      clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(""), 5000);
+    };
+    const hex = author && kept.slug && meter.current && toCarry(kept.proofs, k, author, kept.slug).length ? canonicalHex(kept, host) : null;
+    if (!author || hex == null || !meter.current) return sayDropped(kept.proofs);
+    setCarrying(kept);
+    void meter.current.carry(kept, hex, k, author).then((c) => {
+      setCarrying((x) => (x === kept ? null : x));
+      if (session.kept() !== kept) return; // (an edit since: its own carry)
+      const proofs = c?.proofs.length ? withCarried(kept.proofs, c.proofs) : kept.proofs;
+      if (proofs !== kept.proofs) (session.amend({ ...kept, proofs }), refresh());
+      setRounds({ key: k, kept: c?.proofs.map((p) => p.kind) ?? [], broken: c?.broken.map((b) => b.why) ?? [] });
+      sayDropped(proofs);
+    });
+  }, [key, kept, author, host, session]);
 
   const set = (d: Draft) => (session.set(frame(d)), refresh());
   const preview = (d: Draft) => (session.preview(d), refresh());
@@ -212,7 +248,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const v = checked?.v, fresh = checked?.of === kept;
   const errors = v ? v.issues.filter((i) => i.severity === "error") : [];
   const bad = new Set(errors.map((i) => i.piece).filter((x): x is string => !!x));
-  const testOff = testGate(kept, checked);
+  const testOff = carrying === kept ? "Checking…" : testGate(kept, checked);
   const step: Step = "edit";
   // proved as it is now: Test done, Publish the action (proofs keep while the hole is the same: an undo brings them back)
   const proved = !testOff && key?.of === kept && !!key.key && !!author && !!provedAs(kept.proofs, kept.world, key.key, author, kept.slug);
@@ -228,9 +264,10 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
         <>
           <Palette world={draft.world} palette={palette} armed={armed} off={offAtLimit(draft, palette)} onArm={setArmed} />
           <div className="centre">
+            {toast && <p className="btoast" role="status">{toast}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad}
               onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} onSay={say} said={said} show={show} />
-            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
+            <Checks verdict={verdict({ pieces: draft.pieces.length, errors: errors.length, proved, off: testOff, rounds: rounds && key?.of === kept && rounds.key === key.key ? rounds : null })} gauges={[...pieceGauges(draft), ...(v?.hole && v.cost && v.hex ? gauges(v.hole, v.cost, v.hex.length / 2) : [])]}
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
           <aside className="col" aria-label="The hole in 3D and the selected piece">

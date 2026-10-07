@@ -142,6 +142,12 @@
 .verdict--ok::before { content: "✓"; background: var(--green); color: var(--paper); }
 .verdict--bad { color: var(--hat-ink); }
 .verdict--bad::before { content: "!"; background: var(--hat); color: var(--paper); }
+.verdict--warn { color: #8a5a00; }
+.verdict--warn::before { content: "↺"; background: var(--gold); color: var(--ink); }
+/* a toast over the board's top: what an edit dropped, an undo away (calm, never in the way of the pointer) */
+.btoast { position: absolute; left: 50%; top: var(--sp-3); z-index: 2; transform: translateX(-50%); max-width: calc(100% - 2 * var(--sp-4)); margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--edge); border-radius: 12px; background: var(--white); box-shadow: 0 6px 18px rgba(var(--ink-rgb), .18); color: var(--ink); font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; animation: btoast-in .18s ease-out; }
+@keyframes btoast-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+@media (prefers-reduced-motion: reduce) { .btoast { animation: none; } }
 .gauges { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: var(--sp-2) var(--sp-3); min-width: 0; font-variant-numeric: tabular-nums; }
 .gauge { display: grid; gap: 3px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--ink); }
 .gauge span { display: flex; justify-content: space-between; gap: var(--sp-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
