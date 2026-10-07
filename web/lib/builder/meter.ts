@@ -21,9 +21,15 @@ export interface Meter {
   stop(): void;
 }
 
-/** The worker, its estimates to onEstimate with the draft they are of; null where there is no worker. */
-export function makeMeter(onEstimate: (of: Draft, e: Shown | null) => void): Meter | null {
-  if (typeof Worker === "undefined" || typeof WebAssembly === "undefined") return null;
+/**
+ * The worker, its estimates to onEstimate with the draft they are of. Where
+ * no worker can run, a meter all the same: each draft asked said not
+ * measured (never "measuring" for ever), none carried, no level.
+ */
+export function makeMeter(onEstimate: (of: Draft, e: Shown | null) => void): Meter {
+  if (typeof Worker === "undefined" || typeof WebAssembly === "undefined") {
+    return { ask: (d) => onEstimate(d, null), carry: () => Promise.resolve(null), rate: () => Promise.resolve(null), stop: () => {} };
+  }
   let worker: Worker | null = new Worker(new URL("./meter-worker.ts", import.meta.url), { type: "module" });
   let run = 0, asked: Draft | null = null, n = 0;
   // the asks each answered (a carry, a level), by number: null for each if the worker goes
