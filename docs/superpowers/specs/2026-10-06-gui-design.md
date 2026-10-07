@@ -339,7 +339,13 @@ near, proved, world; at 1440, 1280 and 1024.
 
 - **The palette** (left): the world's name; **five common pieces, big, named
   plainly**: Wall, Bumper, Sand, Water, Slope; the world's other pieces
-  under "More pieces"; the bin ("Drop here to remove").
+  under "More pieces"; the bin ("Drop here to remove"). A tile is a kind of
+  piece by what it does (Water: every pond; Slope: every hill), with the
+  game's own picture of it (rendered offline from the game's meshes), its
+  name and what it does in two or three words ("slows the ball"); its looks
+  (Lagoon, Tidepool, Fountain, Canal) in a chooser by the tile, each
+  pictured. Under "More pieces", by group: Walls, Obstacles, Ground, Traps,
+  Moving pieces.
 - **The board** (centre): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last

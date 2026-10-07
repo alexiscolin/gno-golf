@@ -101,7 +101,8 @@ try {
 
   // a Bumper dragged onto the starter, beside the tee (the pieces' count says where it held)
   const n0 = await c.js<number>(`document.querySelectorAll("[data-piece]").length`);
-  const tile = await c.js<[number, number]>(`(() => { const b = ${button(/^.*Bumper$/)}; const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  // (the Bumper's tile: its picture, its name, what it does)
+  const tile = await c.js<[number, number]>(`(() => { const b = [...document.querySelectorAll(".palette [data-tile]")].find((t) => t.querySelector(".piece__name")?.textContent === "Bumper"); const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
   for (const [dx, dy] of [[6, -2.5], [6, 2.5], [9, -2], [12, 2.5]]) {
     const to = await c.js<[number, number]>(`(() => { const svg = document.querySelector(".board__map"), t = document.querySelector("[data-end='tee'] circle"); const p = svg.createSVGPoint(); p.x = +t.getAttribute("cx") + ${dx}; p.y = +t.getAttribute("cy") + ${dy}; const s = p.matrixTransform(svg.getScreenCTM()); return [s.x, s.y]; })()`);
     await mouse("mousePressed", ...tile);

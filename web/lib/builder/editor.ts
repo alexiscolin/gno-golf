@@ -1,6 +1,6 @@
 // What the editor's dock and palette say, from the checks (the GUI spec's
-// B2): the verdict, the gauges against GG1's limits and the realm's (size,
-// work), the entries a limit switches off and why, the palette by kind.
+// B2): the verdict, the gauges against the Builder's limits, GG1's and the
+// realm's (size, work), the entries a limit switches off and why.
 import { counts, work, WORK_WARN } from "./checks";
 import { draftHole } from "./gg1";
 import { FIELD } from "./rules";
@@ -117,14 +117,4 @@ export function commonShift(prev: Draft, next: Draft): V {
     tally.set(k, { v, n: t.n + 1 });
   }
   return [...tally.values()].reduce((a, b) => (b.n > a.n ? b : a)).v.map((x) => x + 0) as V;
-}
-
-/** The palette's groups, in the editor's order; a kind no group names goes in "More" (a new kind shows without a change here). */
-const GROUPS: readonly (readonly [string, readonly string[]])[] = [
-  ["Walls", ["rail", "bar"]], ["Posts", ["post"]], ["Ground", ["surface"]], ["Hazards", ["hazard"]], ["Hills", ["slope"]], ["Jumps", ["tunnel", "loop"]],
-];
-export function groupsOf(palette: readonly PaletteEntry[]) {
-  const named = new Set(GROUPS.flatMap(([, ks]) => ks));
-  return [...GROUPS.map(([name, kinds]) => ({ name, entries: palette.filter((e) => kinds.includes(e.kind)) })), { name: "More", entries: palette.filter((e) => !named.has(e.kind)) }]
-    .filter((g) => g.entries.length);
 }
