@@ -7,7 +7,8 @@
 // each weather (each round found as scripts/starters.ts finds one, through
 // the page's own test chain, builder.wasm; each shot fired as an aim would
 // fire it, through the game's ?camlog hook, and counted as one drag), and
-// presses Publish. It reports the wall time and the clicks, drags and fields
+// presses Next weather on each hole-finished card but the last, and Publish on
+// that one. It reports the wall time and the clicks, drags and fields
 // typed in, and fails over 5 minutes or over B6's budget. Without a local
 // chain the Publish form says the chain is unread: it still counts as
 // reached (B6).
@@ -46,7 +47,11 @@ const stand = SEED
   : null;
 const env = stand ? stand.seedEnv(SEED) : null;
 const LIMIT_MS = 5 * 60_000;
-/** B6's budget for the starter path: Got it, Prove it, the address the hole is proved under (pasted: its field shown, then used), Publish. */
+/**
+ * B6's budget for the starter path: Got it, Prove it, the address the hole is proved under (pasted: its field shown,
+ * then used), Publish; and Next weather on each finished card but the last (a press a weather proved: the round's card
+ * stays up, so its result is read, until the player goes on).
+ */
 const BUDGET = { clicks: 5, typed: 1 };
 const AUTHOR = env ? env[KEY] : "g1" + "q".repeat(38);
 
@@ -70,6 +75,8 @@ const click = async (expr: string, what: string) => {
   said(`click: ${what}`);
 };
 const button = (re: RegExp) => `[...document.querySelectorAll("button")].find((b) => ${re}.test(b.textContent))`;
+/** A button on the hole-finished card. */
+const onCard = (re: RegExp) => `[...document.querySelectorAll(".tmode__won button")].find((b) => ${re}.test(b.textContent))`;
 const mouse = (type: string, x: number, y: number) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
 
 try {
@@ -129,9 +136,9 @@ try {
   await click(button(/^Use this address$/), "Use this address");
 
   // each weather holed: a round found through the page's test chain, then played shot by shot
+  let nexts = 0;
   for (let w = 0; w < 6; w++) {
-    await until(`!!document.querySelector(".tmode__done") || (!!window.__g && !!document.querySelector(".tmode__chip--now"))`, "a weather to play", 90_000);
-    if (await c.ev<boolean>(`!!document.querySelector(".tmode__done")`)) break;
+    await until(`!!window.__g && !!document.querySelector(".tmode__chip--now") && !document.querySelector(".tmode__won")`, "a weather to play", 90_000);
     const kind = await c.js<string>(`document.querySelector(".tmode__chip--now").textContent`);
     await sleep(1500);
     const round = await c.js<[number, number][] | null>(`(async () => {
@@ -159,18 +166,21 @@ try {
     if (!round) throw new Error(`no round found in ${kind}`);
     said(`${kind}: a round of ${round.length} found`);
     for (const [k, [a, pw]] of round.entries()) {
-      await until(`document.querySelector(".tmode__card")?.textContent === "Stroke ${k}"`, `stroke ${k} ready`, 30_000);
+      await until(`document.querySelector(".tmode__score strong")?.textContent === "${k}"`, `stroke ${k} ready`, 30_000);
       await c.js(`window.__g.shoot(${a}, ${pw})`);
       count.drags++;
       count.shots++;
     }
-    await until(`![...document.querySelectorAll(".tmode__chip--now")].some((x) => x.textContent === ${JSON.stringify(kind)})`, `${kind} proved`, 60_000);
-    said(`${kind}: holed and proved`);
+    await until(`!!document.querySelector(".tmode__chip--now.tmode__chip--done") && / proved$/.test(document.querySelector(".tmode__won h2")?.textContent || "")`, `${kind} proved`, 60_000);
+    said(`${kind}: holed and proved, its card: ${await c.js<string>(`document.querySelector(".tmode__won h2").textContent`)}`);
+    if (!(await c.ev<boolean>(`!!${onCard(/^Next weather/)}`))) break;
+    await click(onCard(/^Next weather/), "Next weather");
+    nexts++;
   }
-  await until(`!!document.querySelector(".tmode__done")`, "every weather proved", 60_000);
+  await until(`!!${onCard(/^Publish →$/)}`, "every weather proved: Publish on the card", 60_000);
 
   // Publish: the form, the name suggested
-  await click(button(/^Publish →$/), "Publish →");
+  await click(onCard(/^Publish →$/), "Publish →");
   await until(`!!document.querySelector(".pub")`, "the Publish form");
   await sleep(3000);
   const form = await c.js<{ name: string; note: string }>(`({ name: document.querySelector(".pub input")?.value || "", note: [...document.querySelectorAll(".pub__note, .pub__bad")].map((x) => x.textContent).join(" | ") })`);
@@ -182,7 +192,7 @@ try {
   const ms = Date.now() - t0;
   console.log(JSON.stringify({ seconds: Math.round(ms / 1000), ...count }));
   if (ms > LIMIT_MS) throw new Error(`over 5 minutes: ${Math.round(ms / 1000)} s`);
-  if (count.clicks > BUDGET.clicks || count.typed > BUDGET.typed) throw new Error(`over budget: ${count.clicks} clicks, ${count.typed} fields typed`);
+  if (count.clicks > BUDGET.clicks + nexts || count.typed > BUDGET.typed) throw new Error(`over budget: ${count.clicks} clicks, ${count.typed} fields typed`);
   // past the path (not counted): a short wide window keeps the hole's card in sight; the Prove step goes back to the test
   await c.send("Emulation.setDeviceMetricsOverride", { width: 1366, height: 650, deviceScaleFactor: 1, mobile: false });
   await sleep(800);
@@ -205,7 +215,7 @@ try {
   process.exit(0);
 } catch (e) {
   console.error(`builderwalk: ${e instanceof Error ? e.message : String(e)}`, JSON.stringify(count), JSON.stringify(c.errors).slice(0, 800));
-  console.error("state", JSON.stringify(await c.ev(`({ pub: document.querySelector(".pub")?.textContent.replace(/\\s+/g, " ").slice(-400), chips: [...document.querySelectorAll(".tmode__chip")].map((x) => x.className + " " + x.textContent), card: document.querySelector(".tmode__card")?.textContent, notes: [...document.querySelectorAll(".tmode__notes p")].map((x) => x.textContent), step: document.querySelector("[aria-current=step]")?.textContent })`)));
+  console.error("state", JSON.stringify(await c.ev(`({ pub: document.querySelector(".pub")?.textContent.replace(/\\s+/g, " ").slice(-400), chips: [...document.querySelectorAll(".tmode__chip")].map((x) => x.className + " " + x.textContent), score: document.querySelector(".tmode__score")?.textContent, won: document.querySelector(".tmode__won")?.textContent, notes: [...document.querySelectorAll(".tmode__notes p")].map((x) => x.textContent), step: document.querySelector("[aria-current=step]")?.textContent })`)));
   c.kill();
   process.exit(1);
 }

@@ -6,7 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { host, ID, PERIOD, hexOf, lane, rail } from "./builder-fixture.ts";
-import { carry, dropped, KEPT_KEYS, toCarry, weatherName, withCarried } from "../lib/builder/carry.ts";
+import { carry, dropped, KEPT_KEYS, toCarry, withCarried } from "../lib/builder/carry.ts";
+import { weatherName } from "../lib/builder/rules.ts";
 import { makeLocalChain } from "../lib/builder/localchain.ts";
 import { holeRow } from "../lib/builder/testmode.ts";
 import { proofKey, replay, type Proof } from "../lib/builder/proof.ts";

@@ -9,6 +9,8 @@ import { CLIMATES } from "../sky";
 export { cap };
 /** A world as the Builder names it. */
 export const worldName = cap;
+/** A weather's name in a sentence ("" is clear). */
+export const weatherName = (kind: string) => (kind ? cap(kind) : "Clear");
 /** A board point in a sentence, "13.5, 6.5" (xy), "(13.5, 6.5)" (pt): to two places at most. */
 export const xy = (v: readonly number[]) => `${+v[0].toFixed(2)}, ${+v[1].toFixed(2)}`;
 export const pt = (v: readonly number[]) => `(${xy(v)})`;

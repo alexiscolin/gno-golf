@@ -323,9 +323,19 @@ for (const [w, h] of [[1440, 900], [1280, 720], [1024, 700]] as const) {
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".bhead__end .btn[aria-disabled]")`)); k++) await sleep(300);
   const at = await tee();
   await key("t", "KeyT");
-  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip")`)); k++) await sleep(300);
-  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__chip") && !document.querySelector(".tmode--ask")`), "T: a quick test, with no address step");
-  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__notes").textContent`), /not a proof/, "said to be no proof");
+  for (let k = 0; k < 20 && !(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__score")`)); k++) await sleep(300);
+  assert.ok(await c.ev<boolean>(`!!document.querySelector(".tbench--quick .tmode__score") && !document.querySelector(".tmode--ask")`), "T: a quick test, with no address step");
+  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .tmode__label").textContent`), /Quick test not a proof$/, "its label: a quick test, no proof");
+  assert.equal(await c.js<number>(`document.querySelector(".tbench--quick").textContent.split("not a proof").length - 1`), 1, "no proof, said once");
+  // the game's HUD: its cards in one row along the top, in the window, none over another; Try again at the bottom
+  const cards = await c.js<Box[]>(`[...document.querySelectorAll(".tbench--quick .hud--top > *")].map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })`);
+  const wide = await c.js<number>("innerWidth");
+  assert.ok(cards.length >= 4, `the HUD's cards: ${cards.length}`);
+  for (const [i, b] of cards.entries()) {
+    assert.ok(b.l >= 0 && b.r <= wide && b.t >= 0 && Math.abs(b.t - cards[0].t) < 1, `a HUD card out of its row or the window (${JSON.stringify(b)})`);
+    for (const o of cards.slice(i + 1)) assert.ok(!overlap(b, o), `two HUD cards over each other (${JSON.stringify(b)}, ${JSON.stringify(o)})`);
+  }
+  assert.match(await c.js<string>(`document.querySelector(".tbench--quick .hud--bottom").textContent`), /^Try againR$/, "Try again (R) at the bottom");
   await key("Escape", "Escape");
   for (let k = 0; k < 20 && (await c.ev<boolean>(`!!document.querySelector(".tbench--quick")`)); k++) await sleep(300);
   const after = await tee();
