@@ -209,7 +209,8 @@ a caller's country.
 **Reads for the screens**, JSON starting with `"version":1`, one query each:
 `Collection`, `Gnome` (`{"version":1,"id":""}` for none), `Sold` (a bit per
 id), `GnomesOf(owner, offset)` (100 rows a page, each id, tier and traits:
-enough to draw a collection with no call per token; `total`, `next`),
+enough to draw a collection with no call per token; `total`, `next`;
+a player's album and collector rank are read from it: ADR-011),
 `Equipped`, `EquippedMany` (the first 50 players of a list), `Worn` and
 `WornMany` (below),
 `Proof`; `CanBuy(buyer, ids)`, the mint page's answer before any

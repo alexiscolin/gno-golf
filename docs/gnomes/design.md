@@ -28,7 +28,8 @@ What is where:
 
 Decisions: ADR-008 (the catalogue as data, in series and waves), ADR-009 (the
 trait encoding), ADR-010 (the look: style, materials, props as data, budgets,
-permanence). ADR-007 is the realm's (`r/gnogolf/gnomes`).
+permanence), ADR-011 (the collection as status: the album and the collector
+rank). ADR-007 is the realm's (`r/gnogolf/gnomes`).
 
 ## 1. The style
 

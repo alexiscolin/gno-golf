@@ -24,6 +24,7 @@ import { gnomeById } from "@/lib/scene";
 import { rivalSkin, type Skin } from "@/lib/scene/gnome";
 import { SHOP, makeShop } from "@/lib/gnomes/shop";
 import { askWorn, onWear, wearVersion } from "@/lib/gnomes/wear";
+import Collector from "@/components/gnomes/Rank";
 
 // The leaderboards (the Players sheet: this hole, the course, friends), the records to beat
 // on the cups screen, a player's place and name, and the names read on-chain.
@@ -193,7 +194,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
           {h.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{label(r.player)}{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
+              <span className="lb__who">{label(r.player)}<Collector chain={chain} player={r.player} />{mode === "pro" && <em className="pro-chip pro-chip--row">PRO</em>}</span>
               <span className="lb__holes">{strokesWord(r.strokes)}{ahead(h, i) && " · ahead of you"}</span>
               <strong><VsPar vs={r.strokes - ((hole && hole.par) || parHere(s))} /></strong>
               <RaceButton player={r.player} name={label(r.player)} me={me} here onClick={onRace} gold={ahead(h, i)} />
@@ -209,7 +210,7 @@ function Friends({ s, chain, me, mode = "pro", inHole = true, onConnect, onRace 
           {c.map((r, i) => (
             <li key={r.player} className={r.player === me ? "me" : ""}>
               <span className="lb__rank">{i + 1}</span>
-              <span className="lb__who">{label(r.player)}</span>
+              <span className="lb__who">{label(r.player)}<Collector chain={chain} player={r.player} /></span>
               <span className="lb__holes">{holesWord(r.holes)}{ahead(c, i) && " · ahead of you"}</span>
               <strong><VsPar vs={standingVs(r)} /></strong>
             </li>
@@ -650,7 +651,7 @@ export function FullBoard({ kind, s, chain, me, mode = "pro", onConnect, onRace,
         <ol className="lb__mine">
           <li className="me">
             <span className="lb__rank">{mine.rank}</span>
-            <span className="lb__who">You</span>
+            <span className="lb__who">You<Collector chain={chain} player={me} /></span>
             {score(mine)}
           </li>
         </ol>
@@ -967,13 +968,14 @@ export function useWho(chain: Chain | null, addr: string, me?: string | null) {
 /** A ranked player as the boards show them (useWho), their address under their name in full. */
 function Who({ chain, addr, me, link, title = "See this round on gno.land" }: { chain: Chain | null; addr: string; me?: string | null; link?: string; title?: string }) {
   const { label, name } = useWho(chain, addr, me);
+  // (their collector rank after the name, on its line: ADR-011)
   const body = name || addr === me ? (
     <span className="who">
-      <span className="who__name">{label}</span>
+      <span className="who__line"><span className="who__name">{label}</span><Collector chain={chain} player={addr} /></span>
       <small>{shortAddr(addr)}</small>
     </span>
   ) : (
-    label
+    <>{label}<Collector chain={chain} player={addr} /></>
   );
   return link && link !== "#" ? (
     <a href={link} target="_blank" rel="noopener noreferrer" title={title}>
@@ -1073,7 +1075,7 @@ export function Sticker({ player, at = 0, tag, sub, chain, me, gnome, onClick, s
   const body = (<>
     <Face skin={mine ? gnomeById(gnome) : rivalSkin(player, gnome)} />
     {tag ? <span className="sticker__tag">{tag}</span> : at > 0 && <Place at={at} />}
-    <span className="sticker__who">{label}</span>
+    <span className="sticker__who"><Collector chain={chain} player={player} />{label}</span>
     <span className="sticker__sub">{sub}</span>
     {tag && onClick && !say && <span className="sticker__go" aria-hidden="true">{go} ▸</span>}
   </>);

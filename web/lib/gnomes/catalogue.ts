@@ -104,7 +104,9 @@ const WORDS: Record<string, string> = {
   tall: "tall cone", tophat: "top hat", souwester: "sou'wester", pith: "pith helmet", mill: "windmill", bowtie: "bow tie",
   stormwatch: "storm watcher", none: "clean-shaven", chops: "mutton chops", braids: "braided",
 };
-const word = (s: string) => (WORDS[s] ?? s.replace(/-/g, " "));
+/** A code as people say it ("stormwatch": "storm watcher"). */
+export const wordOf = (s: string) => (WORDS[s] ?? s.replace(/-/g, " "));
+const word = wordOf;
 
 /** A token's traits as a list for people (the token page, the realm's
  *  metadata attributes): what is there, plainly named, nothing that is not. */

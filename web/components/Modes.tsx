@@ -22,6 +22,7 @@ import { track, type RivalKind } from "@/lib/analytics";
 import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2 } from "@/lib/types";
+import Collector from "@/components/gnomes/Rank";
 
 // onBuild: the Builder's page (none: it is to come); shop: a fourth panel, the gnome shop's: its gnome (one of the
 // wave's, once read: null until then), its line and where it leads (the gallery)
@@ -266,7 +267,7 @@ function Pick({ kind, label, tint, first, row, reading, failed, chain, me, gnome
         {/* (its room kept when there is none: the circles the same size in every pick) */}
         <span className="rival__best" hidden={!best} aria-hidden={!best}>{best || "\u00a0"}</span>
       </span>
-      <span className="rival__name">{row ? who.label : kind === "self" ? "Your ghost" : reading ? "…" : failed ? "Not read" : "Nobody yet"}</span>
+      <span className="rival__name">{row ? <>{who.label}<Collector chain={chain} player={row.player} /></> : kind === "self" ? "Your ghost" : reading ? "…" : failed ? "Not read" : "Nobody yet"}</span>
       <span className="rival__line">{line}</span>
       <span className="rival__go" hidden={!(open || connect)}>{connect ? "Connect" : "Race"}</span>
     </button>
@@ -295,7 +296,7 @@ export function Ghosts({ holes, name, player, chain, bests, card, mode, onRace, 
   onAbout: () => void;
 }) {
   return (
-    <FrontScreen className="front--fit modes" inner="rival" back="Back to the rivals" onBack={onBack} onAbout={onAbout} eyebrow="Choose your hole" title="Their ghosts" dare={<><p className="dare">Racing {name}</p>{chain && isAddress(player) && <a className="real__fine" href={chain.userURL(player)} target="_blank" rel="noopener noreferrer">Player page on gno.land ↗</a>}</>}>
+    <FrontScreen className="front--fit modes" inner="rival" back="Back to the rivals" onBack={onBack} onAbout={onAbout} eyebrow="Choose your hole" title="Their ghosts" dare={<><p className="dare">Racing {name}<Collector chain={chain} player={player} /></p>{chain && isAddress(player) && <a className="real__fine" href={chain.userURL(player)} target="_blank" rel="noopener noreferrer">Player page on gno.land ↗</a>}</>}>
       {/* while read: a band of blank cards, in the frame's place */}
       {bests === undefined && (
         <div className="ghosts__list">

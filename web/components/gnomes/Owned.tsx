@@ -17,6 +17,7 @@ import { messageOf } from "@/components/common";
 import { seen, tokenSkin } from "@/lib/gnomes/wear";
 import { shareWords, type Worn } from "@/lib/gnomes/shop";
 import { thumb } from "./parts";
+import Collector from "./Rank";
 
 interface Props {
   chain: Chain;
@@ -63,6 +64,7 @@ export default function Owned({ chain, me, held, worn, playing, onPick, region, 
     <div className="owned">
       <p className="owned__line" role="status">
         {said.line}
+        <Collector chain={chain} player={me} />
         {said.show && region && Number.isSafeInteger(id) && (
           <> · <button className="linkish" disabled={busy === "sign"} onClick={() => void show()}>{busy === "sign" ? "Sign in Adena…" : `Show to everyone · about ${fee} GNOT`}</button></>
         )}
