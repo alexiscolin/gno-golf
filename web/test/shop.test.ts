@@ -366,7 +366,9 @@ test("shop: the wave line: the ball at the share that found a player, each tier'
   const c = collection(), at = T0 + 49 * 3600;
   const line = waveLine(nowRow(c, isSold([1, 2, 3, 73]), entries, at), c, entries, isSold([1, 2, 3, 73]), at)!;
   assert.ok(line.at === "open");
-  assert.equal(line.words, "Wave 1 · Garden · 4/104");
+  // the wave card's two lines: its title, then its count (the Legendary's words beside it)
+  assert.equal(line.title, "Wave 1 · Garden");
+  assert.equal(line.count, "4 of 104 found a player");
   assert.equal(line.label, "Wave 1, the Garden: 4 of 104 gnomes found a player");
   assert.equal(line.share, 4 / 104);
   assert.deepEqual(line.tiers.map((t) => [t.tier, t.found, t.total, t.price]), [["common", 3, 72, 36e6], ["rare", 1, 21, 72e6], ["epic", 0, 10, 336e6], ["legendary", 0, 1, 1296e6]]);
@@ -381,9 +383,9 @@ test("shop: the wave line: the ball at the share that found a player, each tier'
 test("shop: the wave line's edges: none sold, all sold, not started, players first, paused, closed, no wave", () => {
   const c = collection(), all = Array.from({ length: 104 }, (_, i) => i + 1), none = isSold([]);
   const zero = waveLine(nowRow(c, none, entries, T0 + 49 * 3600), c, entries, none, T0 + 49 * 3600)!;
-  assert.ok(zero.at === "open" && zero.share === 0 && zero.words.endsWith("0/104") && zero.tiers.every((t) => t.found === 0));
+  assert.ok(zero.at === "open" && zero.share === 0 && zero.count === "0 of 104 found a player" && zero.tiers.every((t) => t.found === 0));
   const full = waveLine(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries, isSold(all), T0 + 49 * 3600)!;
-  assert.ok(full.at === "soldout" && full.share === 1 && full.words.endsWith("104/104"));
+  assert.ok(full.at === "soldout" && full.share === 1 && full.count === "All 104 found a player");
   assert.equal(full.label, "Wave 1, the Garden: all 104 gnomes found a player");
   assert.ok(full.tiers.every((t) => t.found === t.total));
   const teaser = waveLine(nowRow(c, none, entries, T0 - 60), c, entries, none, T0 - 60)!;
@@ -394,7 +396,7 @@ test("shop: the wave line's edges: none sold, all sold, not started, players fir
   const p = collection({ open: false }), paused = waveLine(nowRow(p, none, entries, T0 + 60), p, entries, none, T0 + 60)!;
   assert.deepEqual(paused.chip, { text: "Paused for a moment", full: "Paused for a moment: the sale picks up where it stopped." });
   const k = collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] });
-  assert.deepEqual(waveLine(nowRow(k, none, entries, T0), k, entries, none, T0), { at: "closed", words: "Closed: 486 made · 234 never made", label: "The sale is closed: 486 gnomes made, 234 never made" });
+  assert.deepEqual(waveLine(nowRow(k, none, entries, T0), k, entries, none, T0), { at: "closed", title: "The sale is closed", count: "486 made · 234 never made", label: "The sale is closed: 486 gnomes made, 234 never made" });
   const w = collection({ waves: [] });
   assert.equal(waveLine(nowRow(w, none, entries, T0), w, entries, none, T0), null);
   // a tier the wave holds at no price: its count kept, no price said; a wave of one tier holds that tier alone
@@ -404,5 +406,5 @@ test("shop: the wave line's edges: none sold, all sold, not started, players fir
   const commons = entries.filter((e) => e.tier === "common"), one = waveLine(nowRow(c, none, commons, at), c, commons, none, at)!;
   assert.ok(one.at === "open" && one.tiers.length === 1 && one.legend === null);
   // the words never press: no countdown, no "only", no "last"
-  for (const l of [zero, full, teaser, players, paused]) for (const s of [l.label, l.at === "closed" ? "" : l.words, l.at !== "closed" && l.chip ? l.chip.text + l.chip.full : ""]) assert.doesNotMatch(s, /only|last|hurry|left|invest|value/i);
+  for (const l of [zero, full, teaser, players, paused]) for (const s of [l.label, l.title, l.count, l.at !== "closed" && l.chip ? l.chip.text + l.chip.full : ""]) assert.doesNotMatch(s, /only|last|hurry|left|invest|value/i);
 });

@@ -54,7 +54,7 @@ export function ShopScreen(props: ShopProps) {
   }, [Screen, tries]);
   if (Screen) return <Screen {...props} />;
   const closing = closingSlot(knownSale(props.chain)?.c ?? null);
-  return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} keeper={props.keeper} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
+  return <ShopSkeleton onBack={props.onBack} onAbout={props.onAbout} closing={closing} onRetry={failed ? () => setTries((t) => t + 1) : undefined} />;
 }
 // the picker's row of the player's gnomes, the same way: nothing while it downloads or if it could not come (the
 // collection's door stays), asked again the next time the picker shows it

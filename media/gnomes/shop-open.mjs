@@ -97,7 +97,7 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   await b.send("Page.navigate", { url: APP + "/g/" });
   for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".gbar .tierbtn")`)); i++) await sleep(500);
   await sleep(1000);
-  const bar = [{ name: "the shop's bar", box: ".gbar .seg, .gbar .tierbtn, .gbar > .btn, .gbar .gsearch", by: ".gbar" }];
+  const bar = [{ name: "the shop's bar", box: ".gbar .seg, .gbar .btn, .gbar .gsearch", by: ".gbar" }];
   const off = await b.ev(misaligned(bar));
   // more filters open: on (gold, as every on control), its box kept, the bar still in line
   const shut = await b.ev(footprint(".gbar__more"));

@@ -101,9 +101,9 @@
 }
 /* a front's paper panel: a card's standing (on its card's face, and its
    drop), the title's facts, the aim's card, the community holes, a new
-   gnome's (flat: they only show) */
-.world__info, .screen--title .title__facts li, .front .aimset--compact, .worlds--v2 .community, .newgnome { background: var(--paper); border: var(--edge); border-radius: var(--r-card); }
-.world__info { box-shadow: var(--shadow-btn); }
+   gnome's (flat: they only show), the gnome shop's wave (gnomes.css .wcard) */
+.world__info, .screen--title .title__facts li, .front .aimset--compact, .worlds--v2 .community, .newgnome, .wcard { background: var(--paper); border: var(--edge); border-radius: var(--r-card); }
+.world__info, .wcard { box-shadow: var(--shadow-btn); }
 /* the call to action: gold, inked, on its shadow (Button's "gold": the title's
    start and the picker's pick, globals.css .btn--cta; a duel's Race: the
    picks', the hole cards', a friend's, a board row's) */
