@@ -17,7 +17,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { middleOf, pieceLabel, whereOf } from "@/lib/builder/edit";
 import { commonShift } from "@/lib/builder/editor";
-import { centreOn, FLAT, K_MAX, K_MIN, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
+import { centreOn, FLAT, gridLines, K_MAX, K_MIN, matrixOf, pinch, relook, toBoard, toPlane, toScreen, zoomAt, type Look, type View } from "@/lib/builder/view";
 import { BOARD } from "@/lib/builder/gg1";
 import { handlesOf, type HandleKey } from "@/lib/builder/handles";
 import { type PaletteEntry } from "@/lib/builder/palette";
@@ -313,13 +313,11 @@ export default function Board(props: BoardProps) {
     else if (r.moved) dropped(r.moved, false);
   }
 
-  // what the view shows: the grid's lines in sight, every unit, every fifth darker
+  // what the view shows: the grid's lines in sight, every unit from the tee, every fifth darker
   const seen = ([[0, 0], [size.w, 0], [0, size.h], [size.w, size.h]] as const).map((c) => toBoard(view, look, c));
   const x0 = Math.max(0, Math.floor(Math.min(...seen.map((c) => c[0])))), x1 = Math.min(BOARD, Math.ceil(Math.max(...seen.map((c) => c[0]))));
   const y0 = Math.max(0, Math.floor(Math.min(...seen.map((c) => c[1])))), y1 = Math.min(BOARD, Math.ceil(Math.max(...seen.map((c) => c[1]))));
-  const lines: { x?: number; y?: number; major: boolean }[] = [];
-  if (view.k >= 6) for (let x = x0; x <= x1; x++) lines.push({ x, major: x % 5 === 0 });
-  if (view.k >= 6) for (let y = y0; y <= y1; y++) lines.push({ y, major: y % 5 === 0 });
+  const lines = view.k >= 6 ? gridLines([x0, y0], [x1, y1], draft.tee) : [];
   const sel = draft.pieces.find((p) => p.id === selected), hs = 7 / view.k;
   // the tee's and the cup's hit areas, last in their groups (the selection glows their drawing): wider than it (the
   // flag and its pole with the cup), 14 px at least

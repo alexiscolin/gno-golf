@@ -10,7 +10,7 @@ import { clampEnd, clampHandle, copyPiece, dragCheck, dropEnd, dropHandle, dropM
 import { handlesOf, notTurned, setHandle, snap, turnPiece } from "../lib/builder/handles.ts";
 import { frame } from "../lib/builder/gg1.ts";
 import { makeSession, settle } from "../lib/builder/session.ts";
-import { centreOn, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
+import { centreOn, gridLines, K_MAX, pinch, zoomAt } from "../lib/builder/view.ts";
 import { loadPalette } from "../lib/builder/palette.ts";
 import { validate } from "../lib/builder/pipeline.ts";
 import type { Draft, Piece, V } from "../lib/builder/draft.ts";
@@ -38,6 +38,14 @@ void test("handles: a post's centre and radius, a rail's or a bar's ends, a zone
   assert.deepEqual(handlesOf(put("t", "*/tunnel/cave", [5, 5])).map((h) => h.key), ["min", "max", "to"]);
   const poly: Piece = { ...put("z", "*/hazard/water", [5, 5]), geometry: { t: "poly", pts: [[5, 5], [9, 5], [5, 9]] } };
   assert.deepEqual(handlesOf(poly).map((h) => h.key), ["p0", "p1", "p2"]);
+});
+
+void test("the board's grid lines: every unit from the tee, every fifth from it darker (a hole framed by a post's rim off the board's units)", () => {
+  const lines = gridLines([0, 0], [12, 3], [4.5, 1.7]);
+  assert.deepEqual(lines.filter((l) => l.x !== undefined).map((l) => l.x), [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5]);
+  assert.deepEqual(lines.filter((l) => l.x !== undefined && l.major).map((l) => l.x), [4.5, 9.5]);
+  assert.deepEqual(lines.filter((l) => l.y !== undefined).map((l) => +l.y!.toFixed(6)), [0.7, 1.7, 2.7]);
+  assert.deepEqual(lines.filter((l) => l.y !== undefined && l.major).map((l) => +l.y!.toFixed(6)), [1.7]);
 });
 
 void test("setHandle: within the entry's range and on the grid", () => {
