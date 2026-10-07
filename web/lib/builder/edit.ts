@@ -320,12 +320,21 @@ export const roomFor = (d: Draft, p: Piece): string => {
   return why.length ? refusalOf(why[0]) : "";
 };
 
-/** The keyboard's drop: the entry placed at `to` or the nearest place to it the hole holds (census and all), under a fresh name; null if none near (roomFor says when the limits are why). */
-export function placeNear(d: Draft, e: PaletteEntry, to: V, o: ValidateOptions): { draft: Draft; id: string } | null {
+/**
+ * The keyboard's drop: the entry placed at `to` or the nearest place to it
+ * the hole holds, under a fresh name. Searched with the fast checks (quick:
+ * a census for each place tried froze the board for seconds), the place
+ * found judged with the census (full) before it is kept, as a copy and a fix
+ * are; why it is refused, or null if none near (roomFor says when the limits
+ * are why).
+ */
+export function placeNear(d: Draft, e: PaletteEntry, to: V, quick: ValidateOptions, full: ValidateOptions): { draft: Draft; id: string } | { why: string } | null {
   const id = nextId(d), p = placePiece(e, id, onQuarter(to, d.tee)); // (placed on the grid: its way out too)
   if (roomFor(d, p)) return null;
-  const put = canPlace(d, p, o).length === 0 ? p : nearest(d, p, o);
-  return put ? { draft: frame({ ...d, pieces: [...d.pieces, put] }), id } : null;
+  const put = canPlace(d, p, quick).length === 0 ? p : nearest(d, p, quick);
+  if (!put) return null;
+  const why = canPlace(d, put, full);
+  return why.length ? { why: refusalOf(why[0]) } : { draft: frame({ ...d, pieces: [...d.pieces, put] }), id };
 }
 
 /** How far a copy goes to clear its piece: a post's width, a rail's or a bar's a unit aside, a zone's longest side. */

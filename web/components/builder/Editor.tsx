@@ -245,9 +245,10 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     set(r);
   };
   const dropArmed = () => {
-    if (!armed || !full) return;
-    const at: V = [(draft.tee[0] + draft.pin[0]) / 2, (draft.tee[1] + draft.pin[1]) / 2], r = placeNear(draft, armed, at, full);
+    if (!armed || !quick || !full) return;
+    const at: V = [(draft.tee[0] + draft.pin[0]) / 2, (draft.tee[1] + draft.pin[1]) / 2], r = placeNear(draft, armed, at, quick, full);
     if (!r) return say(roomFor(draft, placePiece(armed, "", at)) || "No free place for it between the tee and the cup.");
+    if ("why" in r) return say(r.why);
     set(r.draft);
     setArmed(null);
     setSelected(r.id);

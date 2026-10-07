@@ -113,12 +113,26 @@ void test("the keyboard: a piece named for a screen reader by what and where it 
   const d = lane("garden", [put("p", "*/post/rock", [12, 5])]);
   assert.equal(pieceLabel(d.pieces.find((x) => x.id === "p")!), "The rock at (13.5, 6.5)");
   const at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
-  const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden, census: ctx.census });
-  assert.ok(placed && placed.draft.pieces.length === d.pieces.length + 1, "placed");
+  const placed = placeNear(d, garden.find((e) => e.id === "*/post/rock")!, at, { host, palette: garden }, ctx);
+  assert.ok(placed && !("why" in placed) && placed.draft.pieces.length === d.pieces.length + 1, "placed");
   assert.deepEqual(errors(placed.draft), [], "where the hole holds");
   assert.equal(placed.id, nextId(d), "and named, to be selected");
   const big = garden.find((e) => e.id === "*/hazard/water")!;
-  assert.equal(placeNear(lane("garden", [], 8, 6), big, [4, 3], { host, palette: garden }), null, "nowhere it holds: nothing");
+  assert.equal(placeNear(lane("garden", [], 8, 6), big, [4, 3], { host, palette: garden }, ctx), null, "nowhere it holds: nothing");
+});
+
+void test("the keyboard's drop searches with the fast checks and judges only the place found with the census: no freeze where the middle is taken", async () => {
+  const { STARTERS } = await import("../lib/builder/starters.ts");
+  let drawn = 0;
+  const counted = { ...ctx, census: (...a: Parameters<typeof census>) => (drawn++, census(...a)) }, quick = { host, palette: garden };
+  for (const [world, kind] of [["garden", "dogleg"], ["garden", "signature"], ["island", "dogleg"]] as const) {
+    const d = STARTERS[world][kind], palette = await loadPalette(world), at: [number, number] = [(d.tee[0] + d.pin[0]) / 2, (d.tee[1] + d.pin[1]) / 2];
+    for (const e of palette.filter((x) => x.kind === "post" || x.kind === "hazard").slice(0, 4)) {
+      drawn = 0;
+      placeNear(d, e, at, { ...quick, palette }, { ...counted, palette });
+      assert.ok(drawn <= 2, `${world} ${kind} ${e.id}: ${drawn} census checks`);
+    }
+  }
 });
 
 void test("dragCheck: a drag (or the armed ghost) is checked again only when its snapped place changes; the hole without the piece once a drag", () => {
