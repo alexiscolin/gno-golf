@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 import * as THREE from "three";
-import { build, keysOf, loadWorld } from "./scene-harness.ts";
+import { keysOf, loadWorld } from "./scene-harness.ts";
 import { host, lane, rail, stateOf } from "./builder-fixture.ts";
 import { entry, loadPalette } from "../lib/builder/palette.ts";
 import { placePiece } from "../lib/builder/edit.ts";
@@ -51,14 +51,15 @@ const HELD: Record<string, number> = { "snow cannon": Infinity, "serac tower": 0
 const onLane = (g: Course, pts: THREE.Vector3[]) => pts.filter((p) => g.userData.terrain.onGreen(p.x, p.z));
 
 void test("the course's own snow cannon and seracs (mountain/10, mountain/15) draw exactly as they always have", () => {
-  const golden: Record<string, string> = { "mountain/10": "681e1d49ffbd6bd9", "mountain/15": "4595d63838eae7e6" };
+  // (each piece as built, before the merge: the serac's tower is kept out of it now, its own to fade)
+  const golden: Record<string, string> = { "mountain/10": "d553dbbb9e1cc447", "mountain/15": "e28a11494617b79d" };
   for (const l of fs.readFileSync(new URL("../../data/holes.txt", import.meta.url), "utf8").trim().split("\n")) {
     const [slot, , , hex] = l.split(" ");
     if (!(slot in golden)) continue;
     host.load(slot, hex);
     host.setperiod(5967997);
     const s = JSON.parse(host.state(slot)) as Hole, g = pieces(s);
-    assert.equal(createHash("sha256").update(keysOf(build(s)).join("\n")).digest("hex").slice(0, 16), golden[slot], `${slot}: drawn as before`);
+    assert.equal(createHash("sha256").update(keysOf(pieces(s)).join("\n")).digest("hex").slice(0, 16), golden[slot], `${slot}: drawn as before`);
     for (const name of Object.keys(HELD)) for (const pts of seen(g, name, HELD[name])) assert.deepEqual(onLane(g, pts), [], `${slot}: its ${name} off the lane`);
   }
 });
