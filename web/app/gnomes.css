@@ -57,7 +57,11 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 /* the shop's head: the game's front head (its pill, its title at the rival's size, its line), level with the corner
    buttons; then the sale's line and the toolbar, the gnomes above the fold */
 /* one rhythm: the game's section gap between the head, the sale's line, the toolbar and the shelf */
-.shop .worlds__in { padding-top: 34px; gap: var(--sp-4); }
+/* room to breathe, the game's steps: a section's gap (24) between the head, the card, the toolbar and the shelf, the card
+   a step more on each side (28); a phone a step tighter (16, the card 20) */
+.shop .worlds__in { padding-top: 34px; gap: var(--sp-5); }
+.shop .wcard { margin-block: var(--sp-1); }
+@media (max-width: 700px) { .shop .worlds__in { gap: var(--sp-4); } }
 .shop .front__head { margin: 0; }
 /* a phone: the title alone (title.css), between the corner buttons, a line clear of them */
 @media (max-width: 700px) { .shop .front__head { gap: var(--sp-3); } .shop .worlds__title { margin-inline: 56px; } }
@@ -66,7 +70,7 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
    gallery's width, 720 at most, compact: the wave's Legendary on the left, its title with the state's chip at its
    right (in the card, as the duel cards' tags), its count under it, the fairway under them its whole inner width
    (fixed tracks: the slot while it is read is the same room) */
-.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 28px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: var(--sp-4); color: var(--ink); font-style: normal; text-align: left; }
+.wcard { justify-self: center; width: min(720px, 100%); display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: 22px 20px 36px; grid-template-areas: "legend title chip" "legend count count" "fw fw fw"; align-items: center; gap: 0 var(--sp-4); padding: var(--sp-5); color: var(--ink); font-style: normal; text-align: left; }
 .wcard__legend { grid-area: legend; align-self: center; width: 48px; height: 48px; border: var(--edge-bold); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
 .wcard__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
 .wcard__title { grid-area: title; min-width: 0; font-size: 17px; font-weight: 800; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -78,19 +82,19 @@ body:has(.netbanner) .screen.front--fit.shop { padding-bottom: var(--chip-room);
 .wcard__chip svg { width: 14px; height: 14px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
 .wcard__short { display: none; }
 .wcard--closed { grid-template-areas: "title title title" "count count count" "fw fw fw"; justify-items: center; text-align: center; }
-/* the fairway, from the tee to the flag, the ball at the share that found a player, 8 under the words (its track 28) */
-.fw { grid-area: fw; align-self: end; position: relative; width: 100%; height: 20px; margin-top: var(--sp-2); }
-.fw__lane { position: absolute; left: 0; right: 0; top: 2px; height: 16px; border: var(--edge); border-radius: var(--pill); background: repeating-linear-gradient(90deg, var(--turf) 0 12px, #a3e6bf 12px 24px); }
-.fw__tee { position: absolute; left: 7px; top: 5px; width: 3px; height: 10px; border-radius: 2px; background: var(--paper); border: 1.5px solid var(--ink); }
-.fw__flag { position: absolute; right: 5px; top: -10px; width: 15px; height: 30px; overflow: visible; } /* (its cup on the lane, its flag over it) */
+/* the fairway, from the tee to the flag, the ball at the share that found a player, 12 under the words (its track 36) */
+.fw { grid-area: fw; align-self: end; position: relative; width: 100%; height: 24px; margin-top: var(--sp-3); }
+.fw__lane { position: absolute; left: 0; right: 0; top: 2px; height: 20px; border: var(--edge); border-radius: var(--pill); background: repeating-linear-gradient(90deg, var(--turf) 0 12px, #a3e6bf 12px 24px); }
+.fw__tee { position: absolute; left: 8px; top: 6px; width: 3px; height: 12px; border-radius: 2px; background: var(--paper); border: 1.5px solid var(--ink); }
+.fw__flag { position: absolute; right: 5px; top: -8px; width: 15px; height: 30px; overflow: visible; } /* (its cup on the lane, its flag over it) */
 .fw__cup { fill: var(--ink); }
-.fw__ball { position: absolute; top: 3px; left: calc(14px + var(--at) * (100% - 46px)); width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--white) 0 50%, #e8e2d3); animation: fw-roll 1.6s cubic-bezier(.2, .75, .3, 1) both; }
+.fw__ball { position: absolute; top: 4px; left: calc(14px + var(--at) * (100% - 48px)); width: 16px; height: 16px; border: 2px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--white) 0 50%, #e8e2d3); animation: fw-roll 1.6s cubic-bezier(.2, .75, .3, 1) both; }
 .fw__ball::after { content: ""; position: absolute; left: 2px; top: 3px; width: 3px; height: 3px; border-radius: 50%; background: rgba(var(--ink-rgb), .45); }
 @keyframes fw-roll { from { left: 14px; transform: rotate(-600deg); } }
 @media (prefers-reduced-motion: reduce) { .fw__ball { animation: none; } }
 /* a phone: the count and the Legendary's words on two clean lines, the chip's words short */
 @media (max-width: 480px) {
-  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: 22px 36px 28px; column-gap: var(--sp-2); }
+  .wcard { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-rows: 22px 36px 36px; column-gap: var(--sp-2); padding: var(--sp-4); }
   .wcard__legend { width: 40px; height: 40px; }
   .wcard__title { font-size: 15px; }
   .wcard__count { font-size: 13px; line-height: 18px; }
