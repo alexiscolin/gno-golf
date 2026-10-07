@@ -17,6 +17,7 @@ import { SHOP_LINE } from "@/lib/gnomes/door";
 import type { Tier } from "@/lib/gnomes/vocab";
 import { sound } from "@/lib/feel";
 import { Tile } from "./parts";
+import { buttonClass } from "@/components/ui";
 
 /** The menu's shop panel's gnome: the wave's Epic (a gnome's size, as the games' panels show theirs), else its
  *  Legendary, its id; 0 for none. */
@@ -32,9 +33,9 @@ export const shopSkinOf = (chain: Chain, id: number): Promise<Skin | null> =>
 /** The shop panel's line: what it is, and the wave's lowest price when there is one. */
 export const shopLine = (promo: Promo | null | undefined) => `${SHOP_LINE}${promo && promo.from > 0 ? `, from ${gnot(promo.from)} GNOT` : ""}`;
 
-/** The picker's Collection section, at its top: the player's own gnomes first (owned) and the whole collection a
- *  tap away; else one band that is the gallery's door: the wave's Legendary and three of its gnomes, the wave in a
- *  line, "See the collection". */
+/** The picker's Collection section, between its tile and its aim card: the player's own gnomes first (owned) and
+ *  the whole collection a tap away; else one compact band that is the gallery's door: the wave's Legendary and two
+ *  of its gnomes, the wave in a line, "See". */
 export function CollectionSection({ promo, now, owned, onOpen }: { promo: Promo | null | undefined; now: number; owned: ReactNode; onOpen: () => void }) {
   const w = promo ? promoWords(promo, now) : null;
   const open = () => (sound("blip"), onOpen());
@@ -48,9 +49,8 @@ export function CollectionSection({ promo, now, owned, onOpen }: { promo: Promo 
       <span className="gcollect__text">
         <b>The collection</b>
         <span>{w ? `${w.title} · ${w.line}` : "720 gnomes, each one of a kind"}</span>
-        <small>Cosmetic only: the same ball, the same physics.</small>
       </span>
-      <span className="btn btn--gold gcollect__go" aria-hidden="true"><span className="gcollect__long">See the collection</span><span className="gcollect__short">See ›</span></span>
+      <span className={buttonClass({ variant: "gold", size: "s" }, "gcollect__go")} aria-hidden="true">See ›</span>
     </button>
   );
 }
