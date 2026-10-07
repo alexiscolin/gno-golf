@@ -1,7 +1,7 @@
 // The community's holes as the Builder lists them (the GUI spec's B5 and B6):
 // an author's own, and everyone else's, each at its latest version, never a
 // course hole, never one the site took down (takedown.ts).
-import { DEFAULT_RPC, DEFAULT_WEB, isAddress, safeEndpoint } from "../chain";
+import { buildRpc, buildWeb, isAddress, safeEndpoint } from "../chain";
 import { takenDown } from "../takedown";
 import type { HoleRow } from "../types";
 
@@ -25,7 +25,7 @@ export const cupsLink = (keep = "") => `/?screen=cups${keep && `&${keep}`}`;
 /** The node the Builder reads (and its gnoweb): the page's ?rpc= and ?web= as the game takes them, else the build's. */
 export function endpoints(search: string) {
   const p = new URLSearchParams(search);
-  const rpc = safeEndpoint(p.get("rpc"), process.env.NEXT_PUBLIC_RPC || DEFAULT_RPC), web = safeEndpoint(p.get("web"), process.env.NEXT_PUBLIC_WEB || DEFAULT_WEB);
+  const rpc = safeEndpoint(p.get("rpc"), buildRpc()), web = safeEndpoint(p.get("web"), buildWeb());
   const keep = new URLSearchParams([...(p.has("rpc") ? [["rpc", rpc]] : []), ...(p.has("web") ? [["web", web]] : [])]).toString();
   return { rpc, web, keep };
 }

@@ -44,13 +44,12 @@
 # their balance alone), in a few minutes. The chain
 # is left running (KEEP=1) and $WORK/seed.env written: its addresses, the
 # realms, the keybase and password, each key's address, what was seeded.
-# Stop it with kill $DEV_PID (seed.env). The throwaway keys' mnemonics are
-# in $WORK/mnemonics.env (this chain's alone). scripts/try-local.sh seeds
-# more for a person to try it all (its env below).
+# Stop it with kill $DEV_PID (seed.env). scripts/try-local.sh seeds more for
+# a person to try it all (its env below), with the wallets' phrases it made
+# (MNEMONIC_p0, MNEMONIC_p1: written nowhere).
 #
-# Env: NS (nym-gnometest000), RPC_ADDR, WEB_ADDR (where this script reaches
-# the node and gnoweb), RPC_LISTEN, WEB_LISTEN (where gnodev listens: those
-# by default; 0.0.0.0:<port> for another machine), CHAINID (dev), WORK (a
+# Env: NS (nym-gnometest000), RPC_ADDR, WEB_ADDR (where gnodev listens, on
+# this machine), CHAINID (dev), WORK (a
 # new temp dir), OUT ($WORK/e2e.md), KEEP=1 leaves the chain running at the
 # end, SEED=1, GNO_TOOLCHAIN as in check.sh. With SEED=1: SEED_WAVE2=0 adds
 # no wave 2, SEED_WORLDS publishes every course hole of those worlds too
@@ -66,8 +65,6 @@ GNOMCP=${GNOMCP:-$HOME/.local/src/gno-mcp/bin/gnomcp}
 NS=${NS:-nym-gnometest000}
 RPC_ADDR=${RPC_ADDR:-127.0.0.1:26757}
 WEB_ADDR=${WEB_ADDR:-127.0.0.1:8898}
-RPC_LISTEN=${RPC_LISTEN:-$RPC_ADDR}
-WEB_LISTEN=${WEB_LISTEN:-$WEB_ADDR}
 WORK=${WORK:-$(mktemp -d)}
 OUT=${OUT:-$WORK/e2e.md}
 MCP=${MCP:-0}
@@ -190,10 +187,7 @@ EOF
 
 KH=$WORK/keys
 addr() { "$GNOKEY" list -home "$KH" | grep " $1 (" | sed 's/.*addr: \([^ ]*\).*/\1/'; }
-addkey() { # (each mnemonic kept in WORK too: throwaway keys of this chain alone)
-	printf '%s\n%s\n%s\n' "$2" "$PASS" "$PASS" | "$GNOKEY" add -home "$KH" -recover -insecure-password-stdin "$1" >/dev/null 2>&1
-	(umask 077 && printf "MNEMONIC_%s='%s'\n" "$1" "$2" >>"$WORK/mnemonics.env")
-}
+addkey() { printf '%s\n%s\n%s\n' "$2" "$PASS" "$PASS" | "$GNOKEY" add -home "$KH" -recover -insecure-password-stdin "$1" >/dev/null 2>&1; }
 
 # chain time: the last block's, unix seconds; a block's by height
 chaintime() { curl -s "http://$RPC_ADDR/status" | jq -r .result.sync_info.latest_block_time | py epoch; }
@@ -355,7 +349,10 @@ findshot() {
 # ------------------------------------------------------------------- chain
 log "e2e: work dir $WORK"
 addkey test1 "source bonus chronic canvas draft south burst lottery vacant surface solve popular case indicate oppose farm nothing bullet exhibit title speed wink action roast"
-for k in p0 p1 b1 b2 treas; do addkey $k "$("$GNOKEY" generate 2>/dev/null | tail -1)"; done
+for k in p0 p1 b1 b2 treas; do # (MNEMONIC_<key>: a phrase the caller made, try-local.sh's; else one made here)
+	m=MNEMONIC_$k
+	addkey $k "${!m:-$("$GNOKEY" generate 2>/dev/null | tail -1)}"
+done
 OWNER=$(addr test1) P0=$(addr p0) P1=$(addr p1) B1=$(addr b1) B2=$(addr b2) TREAS=$(addr treas)
 [ -n "$TREAS" ] || die "the keys were not made"
 if curl -s "http://$RPC_ADDR/status" >/dev/null; then die "a node answers on $RPC_ADDR already: stop it, or set RPC_ADDR"; fi
@@ -367,7 +364,7 @@ for a in $P0 $P1 $B1 $B2 $TREAS; do pre+=(-add-account "$a=5000000000ugnot"); do
 deps=gno.land/p/nt/bptree/v0,gno.land/p/nt/grc721/v0,gno.land/p/nt/grc721/royalty/v0,gno.land/p/nt/ufmt/v0,gno.land/r/sys/users
 mkdir -p "$WORK/devroot"
 (cd "$WORK/devroot" && exec "$GNODEV" local -no-watch -empty-blocks -empty-blocks-interval 1 \
-	-chain-id "$CHAINID" -node-rpc-listener "$RPC_LISTEN" -web-listener "$WEB_LISTEN" -paths "$deps" "${pre[@]}") >"$WORK/gnodev.log" 2>&1 &
+	-chain-id "$CHAINID" -node-rpc-listener "$RPC_ADDR" -web-listener "$WEB_ADDR" -paths "$deps" "${pre[@]}") >"$WORK/gnodev.log" 2>&1 &
 DEV=$!
 if [ "${SEED:-}" = 1 ]; then # (kept running once seeded, killed when the seed fails)
 	trap '[ $? = 0 ] || kill $DEV 2>/dev/null' EXIT

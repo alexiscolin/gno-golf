@@ -113,6 +113,10 @@ function refusal(res: AdenaRes | null | undefined) {
 
 // the same address written the same way: Adena compares RPCs as strings
 const norm = (u: string | null | undefined) => String(u || "").trim().replace(/\/+$/, "");
+/** The node as a wallet reaches it: NEXT_PUBLIC_WALLET_RPC when a dev server reads it through another address
+ *  (scripts/try-local.sh: the page's own /rpc, the wallet the node's raw port), else the page's own RPC. A
+ *  production build never takes it: its wallet signs on the very node the page reads. */
+const walletNode = (rpc: string) => (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_WALLET_RPC) || rpc;
 
 /**
  * Puts Adena on this page's chain (id and RPC), adding the network if it has
@@ -125,6 +129,7 @@ const norm = (u: string | null | undefined) => String(u || "").trim().replace(/\
 async function ensureNetwork(a: Adena, { chainId, rpc, name = `gno.land (${chainId})` }: { chainId?: string | null; rpc: string; name?: string }) {
   // no chain id, no signature: Adena would sign on whatever network it has on
   if (!chainId) throw new Error("The chain's id is not known yet (is the node up?). Try again in a moment.");
+  rpc = walletNode(rpc);
   const active = async () => {
     try {
       const n = await a.GetNetwork?.();
@@ -187,6 +192,7 @@ const port = (u: string) => {
 export async function onOurNode(rpc: string | null | undefined) {
   const a = wallet();
   if (!a || !a.GetNetwork || !rpc) return null;
+  rpc = walletNode(rpc);
   try {
     const n = await a.GetNetwork();
     const url = n && n.data && rpcOf(n.data);
@@ -423,7 +429,7 @@ export async function send(messages: (Call | Send)[], gasWanted: number, price: 
     gasWanted,
     memo,
     // this exact chain: id and RPC (Adena's own "dev" is another node)
-    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(rpc) } } : {}),
+    ...(chainId && rpc ? { networkInfo: { chainId, rpcUrl: norm(walletNode(rpc)) } } : {}),
   });
   if (res.status !== "success") {
     const e: SendError = new Error(why(res, failed));
@@ -528,7 +534,7 @@ const remoteOf = (rpc: string) => (/^https?:\/\/[\w.:[\]-]+(\/[\w./-]*)?$/.test(
 /** The end of every command: sent to this chain (its id and RPC, a placeholder for anything else), signed by <your-key-name>. */
 export function gnokeyOn(chainId: string | null | undefined, rpc: string, key = "<your-key-name>") {
   const chain = chainId && /^[\w.-]{1,64}$/.test(chainId) ? chainId : "<chain-id>";
-  return `-broadcast -chainid ${chain} -remote ${remoteOf(rpc) || "<rpc-url>"} ${key}`;
+  return `-broadcast -chainid ${chain} -remote ${remoteOf(walletNode(rpc)) || "<rpc-url>"} ${key}`;
 }
 /** One plain `gnokey maketx call`, at gas (its fee as Adena's ask, feeFor), on: gnokeyOn's; send: ugnot with it (0: none). */
 export const gnokeyCall = (pkg: string, func: string, args: readonly string[], gas: number, price: number, on: string, send = 0) =>

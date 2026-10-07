@@ -8,7 +8,7 @@ import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
 import { skinOfTraits } from "@/lib/gnomes/skin";
 import { NOT_BUILDER } from "@/lib/community";
-import { DEFAULT_RPC, DEFAULT_WEB, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
+import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
 import type { Skin } from "@/lib/scene/gnome";
@@ -146,8 +146,8 @@ function useConfig() {
     const [, gp] = SHOP ? /^\/g(?:\/([a-z0-9]{1,16}))?\/?$/.exec(window.location.pathname) || [] : [];
     const onShop = SHOP && /^\/g(\/|$)/.test(window.location.pathname);
     setCfg({
-      rpc: safeEndpoint(p.get("rpc"), process.env.NEXT_PUBLIC_RPC || DEFAULT_RPC),
-      web: safeEndpoint(p.get("web"), process.env.NEXT_PUBLIC_WEB || DEFAULT_WEB),
+      rpc: safeEndpoint(p.get("rpc"), buildRpc()),
+      web: safeEndpoint(p.get("web"), buildWeb()),
       // a link to a hole: ?cup=island&hole=3 (its place in the cup), or its
       // id (?hole=garden/7/v2, a slot's current version ?hole=garden/7, a
       // community or realm hole's id); &gnome= the sharer's gnome

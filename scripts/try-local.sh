@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # try-local.sh: the whole game on this machine, to try by hand, from this
-# machine or another one (Tailscale): a local chain with the game, the gnome
-# shop and the Builder on it, throwaway wallets, and the site's dev server.
-# Ctrl+C stops everything. docs/try-local.md says what to try.
+# machine or another one on the tailnet: a local chain with the game, the
+# gnome shop and the Builder on it, throwaway wallets, and the site's dev
+# server. Ctrl+C stops everything. docs/try-local.md says what to try.
 #
 #   scripts/try-local.sh          start it all (a new chain each time)
 #   scripts/try-local.sh wave2    open the gnomes' wave 2 now, on the chain running
+#   scripts/try-local.sh down     clean up after a crash: its processes and its Serve entries
 #
 # What it does: scripts/e2e-gnomes.sh SEED=1 starts gnodev (the onyx
 # toolchain's) and deploys physics, course, weblink, store, golf/v2 and
@@ -16,40 +17,43 @@
 # Builder and the community holes on (NEXT_PUBLIC_GNOMES, BUILDER,
 # COMMUNITY), pointed at that chain.
 #
-# Everything listens on 0.0.0.0, and the client is given HOST's addresses:
-# a browser on another machine reaches the RPC and gnoweb at the address it
-# loaded the page from (127.0.0.1 there would be its own machine).
+# Every server listens on 127.0.0.1 alone. With Tailscale, the tailnet-preview
+# skill (TAILNET_PREVIEW, ~/.claude/skills/tailnet-preview) opens Tailscale
+# Serve entries, tailnet only, never Funnel, and removes them on exit: the site
+# as https on the machine's ts.net name (a secure context: the Builder, the
+# community holes' check and copying links need one) and as raw TCP on its
+# Tailscale IP (the fallback, plain http), the node's RPC as raw TCP for a
+# wallet, which signs straight to it, and gnoweb as raw TCP for the "read
+# its code" links. The page reads the chain on its own origin, /rpc, which
+# the dev server proxies to the node (next.config.mjs: GNOGOLF_PLAYGROUND, a
+# dev server's alone): no CORS, no second host, both links alike.
 #
-# A page from http://<HOST> is not a "secure context" for a browser elsewhere
-# (only https and this machine's own addresses are): no crypto.subtle (the
-# Builder's proofs, the community holes' verdicts), no clipboard. So with
-# Tailscale it is served over HTTPS too, on the tailnet alone (`tailscale
-# serve`, never funnel): https://<this machine's MagicDNS name>/ for the site,
-# :8443 the RPC, :8444 gnoweb, and the client given those https addresses
-# (an http page may read them too). Its three entries are removed on exit;
-# the other entries of `tailscale serve` are not touched. TS_HTTPS=0: http
-# alone (the guide then prints the Chrome flag that makes it secure).
+# The wallets' seed phrases are made each run, held in memory and printed in
+# the terminal only; the keybase in WORK holds the keys under a throwaway
+# password, for this chain alone.
 #
-# Env: HOST (this machine's Tailscale address, `tailscale ip -4`, else
-# 127.0.0.1), APP_PORT (5174, or the first free port after it when unset:
-# `tailscale serve` may hold it on the Tailscale address), RPC_PORT (26667), GNOWEB_PORT (8868: not
-# gnodev's own 26657 and 8888, often another node's), CHAINID
-# (gnogolf-local: not "dev", which Adena keeps for its own network), NS
-# (nym-trylocal000), WORK (a new folder under ~/.cache/gnogolf-try-local),
-# GNO_TOOLCHAIN as in check.sh. Local only: the keys are made for this chain
-# and nothing is sent anywhere else.
+# Env: APP_PORT (the dev server, 5175 or the next free port), RPC_PORT
+# (26667) and GNOWEB_PORT (8868: not gnodev's own 26657 and 8888, often
+# another node's), CHAINID (gnogolf-local: not "dev", which Adena keeps for its
+# own network), NS (nym-trylocal000), WORK (a new folder under
+# ~/.cache/gnogolf-try-local), TAILNET=0 (this machine alone), GNO_TOOLCHAIN
+# as in check.sh. Local only: nothing is sent anywhere else.
 set -u
 root=$(cd "$(dirname "$0")/.." && pwd)
 toolchain=${GNO_TOOLCHAIN:-${XDG_CACHE_HOME:-$HOME/.cache}/gno-toolchains/onyx}
 GNOKEY=${GNOKEY:-$toolchain/gnokey}
+PREVIEW=${TAILNET_PREVIEW:-$HOME/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh}
+NAME=gnogolf-try # the Serve entries' name in tailnet-preview
 cache=${XDG_CACHE_HOME:-$HOME/.cache}/gnogolf-try-local
-last=$cache/last # the WORK of the chain running, for `wave2`
+last=$cache/last # the WORK of the playground running, for `wave2` and `down`
 log() { printf '%s\n' "$*" >&2; }
 die() { log "try-local: $*"; exit 1; }
+tree() { local c; for c in $(pgrep -P "$1"); do tree "$c"; done; echo "$1"; } # a process and all it started
 
-# wave2: the next wave of data/gnomes.json on sale from now, its players'
-# window as the catalogue says, sent by the collection's owner (test1)
-if [ "${1:-}" = wave2 ]; then
+case "${1:-}" in
+wave2)
+	# the next wave of data/gnomes.json on sale from now, its players' window
+	# as the catalogue says, sent by the collection's owner (test1)
 	[ -f "$last" ] && WORK=$(cat "$last") && [ -f "$WORK/seed.env" ] || die "no playground running (start one with scripts/try-local.sh)"
 	# shellcheck disable=SC1091
 	. "$WORK/seed.env"
@@ -61,25 +65,28 @@ if [ "${1:-}" = wave2 ]; then
 		grep -q '^OK!' || die "AddWave($first, $lastid) was refused (is wave 2 open already?)"
 	log "try-local: wave 2 ($first-$lastid) on sale from now, its players' window ${hours} h"
 	exit 0
-fi
-[ -z "${1:-}" ] || die "usage: scripts/try-local.sh [wave2]"
+	;;
+down)
+	# after a crash: the processes the last run recorded, and its Serve entries
+	if [ -f "$last" ] && WORK=$(cat "$last") && [ -d "$WORK" ]; then
+		for f in "$WORK/app.pid" "$WORK/dev.pid"; do [ -f "$f" ] && kill $(tree "$(cat "$f")") 2>/dev/null; done
+		rm -f "$last"
+	fi
+	[ -x "$PREVIEW" ] && "$PREVIEW" list | grep -qx "$NAME:" && "$PREVIEW" down "$NAME"
+	log "try-local: down"
+	exit 0
+	;;
+"") ;;
+*) die "usage: scripts/try-local.sh [wave2|down]" ;;
+esac
 
-HOST=${HOST:-$(tailscale ip -4 2>/dev/null | head -1)}
-HOST=${HOST:-127.0.0.1}
 # a port listened on, on any address (netstat sees tailscaled's own too, which lsof run as a user does not)
 taken() { netstat -an -p tcp 2>/dev/null | grep -Eq "[.:]$1 +[^ ]+ +LISTEN"; }
 if [ -z "${APP_PORT:-}" ]; then
-	APP_PORT=5174
+	APP_PORT=5175
 	while taken "$APP_PORT"; do APP_PORT=$((APP_PORT + 1)); done
 fi
 RPC_PORT=${RPC_PORT:-26667} GNOWEB_PORT=${GNOWEB_PORT:-8868}
-# HTTPS on the tailnet: the MagicDNS name, and three serve ports free of the user's own entries
-TS_NAME="" TS_PORTS="443 8443 8444"
-if [ "${TS_HTTPS:-1}" = 1 ] && command -v tailscale >/dev/null && tailscale ip -4 2>/dev/null | grep -qx "$HOST"; then
-	TS_NAME=$(tailscale status --json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
-	used=$(tailscale serve status --json | python3 -I -c 'import json,sys; d=json.load(sys.stdin) or {}; print(" ".join(list(d.get("TCP") or {})))')
-	for p in $TS_PORTS; do case " $used " in *" $p "*) die "tailscale serve already uses port $p: remove that entry, or TS_HTTPS=0" ;; esac; done
-fi
 CHAINID=${CHAINID:-gnogolf-local}
 NS=${NS:-nym-trylocal000}
 [ -x "$GNOKEY" ] && [ -x "$toolchain/gnodev" ] || die "no onyx toolchain in $toolchain (the README, \"Running it locally\"), or set GNO_TOOLCHAIN"
@@ -87,77 +94,104 @@ NS=${NS:-nym-trylocal000}
 for p in "$APP_PORT" "$RPC_PORT" "$GNOWEB_PORT"; do
 	! taken "$p" || die "port $p is taken (another gnodev or dev server?): stop it, or set APP_PORT, RPC_PORT, GNOWEB_PORT"
 done
+# the tailnet: this machine's Tailscale IP and ts.net name, and the skill that opens the Serve entries
+TS_IP="" TS_NAME=""
+if [ "${TAILNET:-1}" = 1 ] && command -v tailscale >/dev/null && TS_IP=$(tailscale ip -4 2>/dev/null | head -1) && [ -n "$TS_IP" ]; then
+	[ -x "$PREVIEW" ] || die "the tailnet-preview skill is not at $PREVIEW (set TAILNET_PREVIEW, or TAILNET=0 for this machine alone)"
+	! "$PREVIEW" list | grep -qx "$NAME:" || die "Serve entries of a former run are still up: scripts/try-local.sh down"
+	TS_NAME=$(tailscale status --json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
+fi
 mkdir -p "$cache"
 WORK=${WORK:-$(mktemp -d "$cache/run.XXXXXX")}
 
-# Ctrl+C (or any end): the dev server, then the chain, each with what it started
-DEV_PID="" APP_PID=""
-tree() { local c; for c in $(pgrep -P "$1"); do tree "$c"; done; echo "$1"; }
+# Ctrl+C (or any end): the Serve entries, the dev server, then the chain, each with what it started
+DEV_PID="" APP_PID="" SERVED=""
 stop() {
 	trap - INT TERM EXIT
 	log ""
 	log "try-local: stopping"
-	if [ -n "$TS_NAME" ]; then for p in $TS_PORTS; do tailscale serve --https="$p" off >/dev/null 2>&1; done; fi
+	[ -z "$SERVED" ] || "$PREVIEW" down "$NAME" >&2 || true
 	for p in $APP_PID $DEV_PID; do kill $(tree "$p") 2>/dev/null; done
 	wait 2>/dev/null
-	rm -f "$last"
+	rm -f "$last" "$WORK/app.pid" "$WORK/dev.pid"
 	log "try-local: stopped (its files stay in $WORK)"
 	exit 0
 }
 trap stop INT TERM EXIT
+echo "$WORK" >"$last"
 
 # ------------------------------------------------------------------ the chain
-log "try-local: a local chain ($CHAINID) and the realms under $NS, seeded (a few minutes; its log: $WORK/seed.log)"
-SEED=1 SEED_WAVE2=0 SEED_WORLDS=garden SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
-	RPC_ADDR=127.0.0.1:$RPC_PORT WEB_ADDR=127.0.0.1:$GNOWEB_PORT RPC_LISTEN=0.0.0.0:$RPC_PORT WEB_LISTEN=0.0.0.0:$GNOWEB_PORT \
+# the two wallets a person imports: made here, handed to the seed in its
+# environment, never written down (the others stay the seed's own)
+MNEMONIC_p1=$("$GNOKEY" generate 2>/dev/null | tail -1) MNEMONIC_p0=$("$GNOKEY" generate 2>/dev/null | tail -1)
+[ "$(printf %s "$MNEMONIC_p1" | wc -w)" -ge 12 ] && [ "$(printf %s "$MNEMONIC_p0" | wc -w)" -ge 12 ] || die "gnokey generate made no seed phrase"
+log "try-local: a local chain ($CHAINID) and the realms under $NS, seeded (a minute or so; its log: $WORK/seed.log)"
+MNEMONIC_p1=$MNEMONIC_p1 MNEMONIC_p0=$MNEMONIC_p0 \
+	SEED=1 SEED_WAVE2=0 SEED_WORLDS=garden SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
+	RPC_ADDR=127.0.0.1:$RPC_PORT WEB_ADDR=127.0.0.1:$GNOWEB_PORT \
 	bash "$root/scripts/e2e-gnomes.sh" >"$WORK/seed.out" 2>"$WORK/seed.log" ||
 	{ DEV_PID=$(sed -n 's/^DEV_PID=//p' "$WORK/seed.env" 2>/dev/null); tail -5 "$WORK/seed.log" >&2; die "the seed failed (its steps: $WORK/e2e.md)"; }
 # shellcheck disable=SC1091
 . "$WORK/seed.env"
-echo "$WORK" >"$last"
+echo "$DEV_PID" >"$WORK/dev.pid"
 
 # ------------------------------------------------------------------ the site
-RPC_URL=http://$HOST:$RPC_PORT WEB_URL=http://$HOST:$GNOWEB_PORT APP_URL=http://$HOST:$APP_PORT
-APP_HTTPS="" ORIGINS=$HOST
+ORIGINS="" WALLET_RPC=http://127.0.0.1:$RPC_PORT WEB_URL=http://127.0.0.1:$GNOWEB_PORT
+[ -z "$TS_NAME" ] || ORIGINS=$TS_NAME,$TS_IP
+log "try-local: the site's dev server on 127.0.0.1:$APP_PORT (its log: $WORK/next.log)"
+start_app() {
+	(cd "$root/web" && exec env GNOGOLF_PLAYGROUND=1 PLAYGROUND_RPC="http://127.0.0.1:$RPC_PORT" PLAYGROUND_ORIGINS="$ORIGINS" \
+		NEXT_PUBLIC_RPC=/rpc NEXT_PUBLIC_WALLET_RPC="$WALLET_RPC" NEXT_PUBLIC_WEB="$WEB_URL" NEXT_PUBLIC_REALM="$GOLF" \
+		NEXT_PUBLIC_NETWORK=testnet NEXT_PUBLIC_GNOMES=1 NEXT_PUBLIC_BUILDER=1 NEXT_PUBLIC_COMMUNITY=1 \
+		npm run -s dev -- -H 127.0.0.1 -p "$APP_PORT") >>"$WORK/next.log" 2>&1 &
+	APP_PID=$!
+	echo "$APP_PID" >"$WORK/app.pid"
+}
+# the Serve entries first (the wallet's RPC and gnoweb are the client's settings), then the site
+APP_HTTPS="" APP_TCP=""
 if [ -n "$TS_NAME" ]; then
-	set -- $TS_PORTS
-	tailscale serve --bg --https="$1" "http://127.0.0.1:$APP_PORT" >/dev/null &&
-		tailscale serve --bg --https="$2" "http://127.0.0.1:$RPC_PORT" >/dev/null &&
-		tailscale serve --bg --https="$3" "http://127.0.0.1:$GNOWEB_PORT" >/dev/null || die "tailscale serve refused (TS_HTTPS=0 for http alone)"
-	APP_HTTPS=https://$TS_NAME RPC_URL=https://$TS_NAME:$2 WEB_URL=https://$TS_NAME:$3 ORIGINS=$HOST,$TS_NAME
-	[ "$1" = 443 ] || APP_HTTPS=$APP_HTTPS:$1
+	SERVED=1 # (before: what a failing `up` opened is recorded, and removed on exit all the same)
+	out=$("$PREVIEW" up "$NAME" "$APP_PORT" "$RPC_PORT:-" "$GNOWEB_PORT:-") || die "tailnet-preview refused: $out"
+	APP_HTTPS=$(printf '%s\n' "$out" | sed -n "s#^ *\(https://[^ ]*\) *-> *127.0.0.1:$APP_PORT\$#\1#p")
+	APP_TCP=$(printf '%s\n' "$out" | sed -n "s#^ *\(http://[^ ]*\) *-> *127.0.0.1:$APP_PORT .*#\1#p")
+	WALLET_RPC=$(printf '%s\n' "$out" | sed -n "s#^ *\(http://[^ ]*\) *-> *127.0.0.1:$RPC_PORT .*#\1#p")
+	WEB_URL=$(printf '%s\n' "$out" | sed -n "s#^ *\(http://[^ ]*\) *-> *127.0.0.1:$GNOWEB_PORT .*#\1#p")
+	[ -n "$APP_HTTPS" ] && [ -n "$APP_TCP" ] && [ -n "$WALLET_RPC" ] && [ -n "$WEB_URL" ] || die "tailnet-preview said what this cannot read: $out"
 fi
-log "try-local: the site's dev server on $APP_URL (its log: $WORK/next.log)"
-(cd "$root/web" && exec env NEXT_PUBLIC_RPC="$RPC_URL" NEXT_PUBLIC_WEB="$WEB_URL" NEXT_PUBLIC_REALM="$GOLF" \
-	NEXT_PUBLIC_NETWORK=testnet NEXT_PUBLIC_GNOMES=1 NEXT_PUBLIC_BUILDER=1 NEXT_PUBLIC_COMMUNITY=1 DEV_ORIGINS="$ORIGINS" \
-	npm run -s dev -- -H 0.0.0.0 -p "$APP_PORT") >"$WORK/next.log" 2>&1 &
-APP_PID=$!
+start_app
 for _ in $(seq 120); do curl -sf -o /dev/null "http://127.0.0.1:$APP_PORT/" && break; sleep 1; done
 curl -sf -o /dev/null "http://127.0.0.1:$APP_PORT/" || { tail -5 "$WORK/next.log" >&2; die "the dev server did not start"; }
-# each address as a browser elsewhere reaches it (the MagicDNS name pinned to HOST: this machine's own
-# resolver may not use Tailscale's DNS); the first https request waits for its certificate
-for u in "$APP_URL/" ${APP_HTTPS:+"$APP_HTTPS/"} "$RPC_URL/status" "$WEB_URL/"; do
-	pin=$(printf %s "$u" | sed -n "s#^https://\($TS_NAME\)\(:\([0-9]*\)\)\{0,1\}/.*#--resolve \1:\3:$HOST#p" | sed "s/::/:443:/")
-	curl -s -o /dev/null --max-time 90 $pin "$u" || log "try-local: warning: $u does not answer from this machine (a firewall?)"
+# each address as a device on the tailnet reaches it (the ts.net name pinned to the IP: this machine's
+# own resolver may not use Tailscale's DNS); the first https request waits for its certificate
+check() { curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$@"; }
+pin=""
+[ -z "$APP_HTTPS" ] || pin="--resolve ${APP_HTTPS#https://}:$TS_IP"
+for u in "http://127.0.0.1:$APP_PORT" ${APP_TCP:+"$APP_TCP"} ${APP_HTTPS:+"$APP_HTTPS"}; do
+	for path in / /rpc/status /g/; do
+		code=$(check $pin "$u$path")
+		[ "$code" = 200 ] || log "try-local: warning: $u$path answers $code"
+	done
 done
-curl -sf -o /dev/null "$APP_URL/g/" # (the first visit of a page compiles it: the gallery's, before anyone waits on it)
+[ -z "$TS_NAME" ] || [ "$(check "$WALLET_RPC/status")" = 200 ] || log "try-local: warning: the wallet's RPC $WALLET_RPC does not answer"
 
 # ------------------------------------------------------------------ the guide
-# shellcheck disable=SC1091
-. "$WORK/mnemonics.env"
 cat <<EOF
 
 ================================================================ Gnogolf, local
-$( [ -n "$APP_HTTPS" ] && printf '  Open  %s/   (https: everything works, any browser on the tailnet)\n  or    %s/   (http)' "$APP_HTTPS" "$APP_URL" || printf '  Open  %s/' "$APP_URL")
-  (this machine: http://127.0.0.1:$APP_PORT/ plays the same chain)
+$(if [ -n "$APP_HTTPS" ]; then
+	printf '  Open  %s/   (https, a secure page: everything works)\n' "$APP_HTTPS"
+	printf '  or    %s/   (http fallback, no Tailscale DNS needed: no Builder\n' "$APP_TCP"
+	printf '        test or publish, no community holes, no copying links)\n'
+	printf '  If the https link does not open: Use Tailscale DNS on in that device'"'"'s Tailscale app.'
+else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
 
   Chain id   $CHAINID
-  RPC        $RPC_URL
+  Wallet RPC $WALLET_RPC   (the page reads the chain through its own /rpc)
   gnoweb     $WEB_URL
   Realms     $GOLF
              $GNOMES
 
-  Throwaway wallets (this chain only, 5,000 GNOT each):
+  Throwaway wallets, made for this run and this chain alone (5,000 GNOT each):
     p1  has a record (garden/3), Commons $(echo "$P1_GNOMES" | cut -d, -f1-2), Rare $(echo "$P1_GNOMES" | cut -d, -f3); wears $P1_EQUIPPED
         $MNEMONIC_p1
         address $p1
@@ -165,19 +199,14 @@ $( [ -n "$APP_HTTPS" ] && printf '  Open  %s/   (https: everything works, any br
         $MNEMONIC_p0
         address $p0
 
-  The http link elsewhere is not a secure page: the Builder (test, publish),
-  the community holes' check and copying links need one. Use https, or in
-  that device's Chrome enable chrome://flags/#unsafely-treat-insecure-origin-as-secure
-  for $APP_URL
-
   Adena: Settings > Change Network > Add Custom Network:
-    Network name  Gnogolf local    Chain ID  $CHAINID    RPC URL  $RPC_URL
+    Network name  Gnogolf local    Chain ID  $CHAINID    RPC URL  $WALLET_RPC
   then import a seed phrase above as a wallet (a Chrome profile of its own
   keeps your real Adena apart).
   gnokey instead:
     gnokey add p1 -recover          (paste p1's phrase)
     gnokey maketx call -pkgpath $GNOMES -func Buy -args <id> -send <price>ugnot \\
-      -gas-fee 5000000ugnot -gas-wanted 200000000 -remote $RPC_URL -chainid $CHAINID -broadcast p1
+      -gas-fee 5000000ugnot -gas-wanted 200000000 -remote $WALLET_RPC -chainid $CHAINID -broadcast p1
 
   Try:
     1. Play a Garden hole (the title's Play), finish it, see the card.
@@ -190,7 +219,7 @@ $( [ -n "$APP_HTTPS" ] && printf '  Open  %s/   (https: everything works, any br
        (hole it in each weather), Publish (Adena or the gnokey line).
     6. Find it: the cups screen's community holes.
   Wave 2 on sale now:  scripts/try-local.sh wave2   (another terminal)
-  Logs: $WORK   Ctrl+C stops everything.
+  Logs: $WORK   Ctrl+C stops everything (after a crash: scripts/try-local.sh down).
 ================================================================================
 EOF
 wait "$APP_PID"

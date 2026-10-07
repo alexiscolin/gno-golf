@@ -12,7 +12,7 @@
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 
-/** seed.env as an object; PAGE_RPC (env) is the same node as the page names it (scripts/try-local.sh: this machine's Tailscale address), RPC by default. @param {string} file */
+/** seed.env as an object; PAGE_RPC (env) is the same node as the page's wallet names it (scripts/try-local.sh: its raw TCP port on the tailnet, NEXT_PUBLIC_WALLET_RPC), RPC by default. @param {string} file */
 export function seedEnv(file) {
   /** @type {Record<string, string>} */
   const env = {};

@@ -1,61 +1,68 @@
 # Try it all locally / Tout essayer en local
 
 ```sh
-scripts/try-local.sh
+scripts/try-local.sh          # start (Ctrl+C stops it all)
+scripts/try-local.sh wave2    # open the gnomes' wave 2 now
+scripts/try-local.sh down     # clean up after a crash
 ```
 
 **English.** One command starts a local chain with the game, the gnome shop
-and the Builder deployed, throwaway wallets, and the site's dev server with
-`NEXT_PUBLIC_GNOMES`, `NEXT_PUBLIC_BUILDER` and `NEXT_PUBLIC_COMMUNITY` on.
-It takes a few minutes, then prints the URL, the wallets' seed phrases, the
-network to add to Adena and what to try. Ctrl+C stops everything. Nothing
-leaves this machine: the keys exist for that chain alone.
+and the Builder deployed, two throwaway wallets, and the site's dev server
+with `NEXT_PUBLIC_GNOMES`, `NEXT_PUBLIC_BUILDER` and `NEXT_PUBLIC_COMMUNITY`
+on. In a minute or two it prints the links, the wallets' seed phrases (made
+for this run, printed here and written nowhere), the network to add to
+Adena and what to try.
 
-Everything listens on all interfaces and the site is given this machine's
-Tailscale address (`tailscale ip -4`; `HOST=` to choose another), so it
-opens from a phone or another computer on the tailnet:
-`http://<host>:5174/` (or the next free port: it prints the URL). Such a
-page is not a secure context for a browser elsewhere, which the Builder and
-copying links need: on that device, enable
-`chrome://flags/#unsafely-treat-insecure-origin-as-secure` for the three
-origins it prints (site, RPC, gnoweb). Adena: *Settings → Change Network → Add Custom
-Network*, chain id `gnogolf-local`, RPC `http://<host>:26667`, then import a
-printed seed phrase (a separate Chrome profile keeps your own wallet apart).
+Every server listens on 127.0.0.1 alone. With Tailscale, the
+tailnet-preview skill (`~/.claude/skills/tailnet-preview`) opens Serve
+entries on the tailnet only (never Funnel), removed on Ctrl+C:
 
-- `p1` has a record (the player window lets it buy) and a few gnomes;
-  `p0` has neither.
-- Wave 1 (the Garden) is on sale, its players' window one hour. Wave 2:
-  `scripts/try-local.sh wave2` in another terminal.
-- The region gate, in a dev build only: `/g/?geo=blocked`.
-- Needs the onyx toolchain (README, "Running it locally") and
-  `cd web && npm ci`. Ports: `APP_PORT` 5174, `RPC_PORT` 26667,
-  `GNOWEB_PORT` 8868. Logs and keys: the folder it prints.
+- `https://<machine>.<tailnet>.ts.net:<port>/`: the link to use, a secure
+  page (the Builder, the community holes and copying links need one). If
+  it does not open on a device, turn on *Use Tailscale DNS* in that
+  device's Tailscale app.
+- `http://<tailscale-ip>:<port>/`: the fallback, plain http: the game and
+  the shop work; the Builder's test and publish, the community holes and
+  copying links do not.
+- The page reads the chain on its own origin (`/rpc`, proxied by the dev
+  server), so both links behave alike. Adena signs straight to the node: add
+  a custom network with the printed RPC (`http://<tailscale-ip>:<port>`)
+  and chain id `gnogolf-local`, then import a printed seed phrase (a Chrome
+  profile of its own keeps your real wallet apart).
+
+`p1` has a record (the players' window lets it buy) and a few gnomes; `p0`
+has neither. Wave 1 (the Garden) is on sale, its players' window one hour.
+The region gate, in a dev build only: `/g/?geo=blocked`. Needs the onyx
+toolchain (README, "Running it locally") and `cd web && npm ci`.
+`TAILNET=0` keeps it on this machine.
 
 **Français.** Une seule commande lance une chaîne locale avec le jeu, la
-boutique de gnomes et le Builder déployés, des portefeuilles jetables, et le
-serveur de dev du site avec `NEXT_PUBLIC_GNOMES`, `NEXT_PUBLIC_BUILDER` et
-`NEXT_PUBLIC_COMMUNITY` activés. Quelques minutes, puis elle affiche l'URL,
-les phrases de récupération des portefeuilles, le réseau à ajouter dans
-Adena et quoi essayer. Ctrl+C arrête tout. Rien ne sort de cette machine :
-les clés n'existent que pour cette chaîne.
+boutique de gnomes et le Builder déployés, deux portefeuilles jetables, et
+le serveur de dev du site avec `NEXT_PUBLIC_GNOMES`, `NEXT_PUBLIC_BUILDER`
+et `NEXT_PUBLIC_COMMUNITY` activés. En une ou deux minutes elle affiche les
+liens, les phrases de récupération (faites pour cette session, affichées
+ici et écrites nulle part), le réseau à ajouter dans Adena et quoi essayer.
 
-Tout écoute sur toutes les interfaces et le site reçoit l'adresse Tailscale
-de la machine (`tailscale ip -4` ; `HOST=` pour en choisir une autre) : il
-s'ouvre depuis un téléphone ou un autre ordinateur du tailnet,
-`http://<host>:5174/` (ou le port libre suivant : l'URL est affichée). Une
-telle page n'est pas un contexte sécurisé pour un navigateur ailleurs, ce
-dont le Builder et la copie de liens ont besoin : sur cet appareil, activer
-`chrome://flags/#unsafely-treat-insecure-origin-as-secure` pour les trois
-origines affichées (site, RPC, gnoweb). Adena : *Settings → Change Network → Add Custom
-Network*, chain id `gnogolf-local`, RPC `http://<host>:26667`, puis importer
-une phrase affichée (un profil Chrome à part garde votre vrai portefeuille
-séparé).
+Chaque serveur n'écoute que sur 127.0.0.1. Avec Tailscale, le skill
+tailnet-preview ouvre des entrées Serve sur le tailnet seulement (jamais
+Funnel), retirées au Ctrl+C :
 
-- `p1` a un record (la fenêtre des joueurs le laisse acheter) et quelques
-  gnomes ; `p0` n'a ni l'un ni l'autre.
-- La vague 1 (le Jardin) est en vente, fenêtre des joueurs d'une heure.
-  Vague 2 : `scripts/try-local.sh wave2` dans un autre terminal.
-- Le blocage par région, en build de dev seulement : `/g/?geo=blocked`.
-- Il faut la toolchain onyx (README, « Running it locally ») et
-  `cd web && npm ci`. Ports : `APP_PORT` 5174, `RPC_PORT` 26667,
-  `GNOWEB_PORT` 8868. Journaux et clés : le dossier affiché.
+- `https://<machine>.<tailnet>.ts.net:<port>/` : le lien à utiliser, une
+  page sécurisée (le Builder, les trous de la communauté et la copie de
+  liens en ont besoin). S'il ne s'ouvre pas sur un appareil, activer *Use
+  Tailscale DNS* dans l'app Tailscale de cet appareil.
+- `http://<ip-tailscale>:<port>/` : le secours, en http simple : le jeu et
+  la boutique marchent ; le test et la publication du Builder, les trous de
+  la communauté et la copie de liens non.
+- La page lit la chaîne sur sa propre origine (`/rpc`, relayé par le serveur
+  de dev) : les deux liens se comportent pareil. Adena signe directement
+  vers le nœud : ajouter un réseau personnalisé avec le RPC affiché
+  (`http://<ip-tailscale>:<port>`) et le chain id `gnogolf-local`, puis
+  importer une phrase affichée (un profil Chrome à part garde votre vrai
+  portefeuille séparé).
+
+`p1` a un record (la fenêtre des joueurs le laisse acheter) et quelques
+gnomes ; `p0` n'a ni l'un ni l'autre. La vague 1 (le Jardin) est en vente,
+fenêtre des joueurs d'une heure. Le blocage par région, en build de dev
+seulement : `/g/?geo=blocked`. Il faut la toolchain onyx (README, « Running
+it locally ») et `cd web && npm ci`. `TAILNET=0` le garde sur cette machine.
