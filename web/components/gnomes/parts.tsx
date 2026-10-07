@@ -4,11 +4,11 @@
 // tier's chip, a gnome's tile (his 3D portrait, or the chain's), his card in
 // a grid (and a Legendary's to come, to look at), the switch between the two
 // looks, the closing date. On the game's own tokens (app/gnomes.css).
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Segmented } from "@/components/ui";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
 import type { Look, Portraits } from "@/lib/gnomes/onchain";
-import { comingFact, utcDate, localDate } from "@/lib/gnomes/shop";
+import { comingFact, gnot, utcDate, localDate, type TierShare, type WaveLine } from "@/lib/gnomes/shop";
 import type { Tier } from "@/lib/gnomes/vocab";
 
 // a tier's shape, read in grey too: a disc, a diamond, a gem, a crown; a leaf for an earned one
@@ -104,5 +104,83 @@ export function Closes({ at, now }: { at: number; now: number }) {
     <p className="closes" title={localDate(at)}>
       <span>Sale closes for good on <b aria-label={`${utcDate(at, now)}, ${localDate(at)} your time`}>{utcDate(at, now)}</b>. Unsold gnomes are never made.</span>
     </p>
+  );
+}
+
+/** The sale in one line: a little fairway, the ball rolled from the tee to the share that found a player (still
+ *  with reduced motion), the flag, the wave's Legendary waiting at it in gold, the wave's words, and its state's chip
+ *  (a date, never a countdown); the sale's end in words. Its height the slot's (ShopFrame WaveSlot). */
+export function SaleLine({ line }: { line: WaveLine }) {
+  if (line.at === "closed") return <section className="wline" aria-label="The sale"><span className="wline__words">{line.words}</span></section>;
+  const { legend, chip } = line;
+  return (
+    <section className={`wline${chip ? " wline--chip" : ""}`} aria-label="The sale">
+      <span className="fw" role="img" aria-label={legend ? `${line.label}. ${legend.words}` : line.label} style={{ "--at": line.share } as CSSProperties}>
+        <span className="fw__lane" />
+        <span className="fw__tee" />
+        <svg className="fw__flag" viewBox="0 0 16 32" aria-hidden="true"><ellipse cx="4" cy="23" rx="4" ry="2" className="fw__cup" /><path d="M4 23V2" className="w__pole" /><path d="M4 2l11 4-11 4z" className="w__flag" /></svg>
+        <span className="fw__ball" />
+      </span>
+      {legend && <span className="wline__legend" title={legend.words}><img src={thumb(legend.id)} alt="" width={256} height={256} decoding="async" /></span>}
+      <span className="wline__words" aria-hidden="true">{line.words}</span>
+      {legend && <span className="wline__who" aria-hidden="true"><b>{legend.name}</b> {legend.words.slice(legend.name.length + 1)}</span>}
+      {chip && (
+        <span className="wline__chip" role="note" aria-label={chip.full} title={chip.full}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" /><path d="M8 4.5V8l2.5 1.6" /></svg>
+          {chip.text}
+        </span>
+      )}
+    </section>
+  );
+}
+
+/** The tiers as the shelf's filter: a chip each, its price in the wave (once, here; no price, none said), pressed
+ *  when it filters; pressed again, every tier. Each chip says its tier's share of the wave to a screen reader. */
+export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierShare[]; value?: string; onChange: (t: string | undefined) => void }) {
+  const known = new Map(tiers.map((t) => [t.tier, t]));
+  return (
+    <div className="gbar__tiers" role="group" aria-label="Show one tier">
+      {(["common", "rare", "epic", "legendary"] as const).map((t) => {
+        const s = known.get(t);
+        return (
+          <button key={t} type="button" className={`tier tier--${t} tierbtn`} aria-pressed={value === t} onClick={() => onChange(value === t ? undefined : t)}
+            aria-label={s ? s.label : tierName(t)}>
+            <svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE[t]}</svg>
+            <span className="tierbtn__name">{tierName(t)}</span>
+            {s && s.price > 0 && <span className="tierbtn__price">{gnot(s.price)}</span>}
+          </button>
+        );
+      })}
+      {tiers.some((t) => t.price > 0) && <span className="gbar__unit" aria-hidden="true">GNOT</span>}
+    </div>
+  );
+}
+
+/** The search, an icon until it is used: it opens into its field (focused), Escape or ✕ clears and closes it (the
+ *  icon focused again), leaving it empty closes it; a query typed keeps it open. */
+export function SearchToggle({ value, onChange }: { value: string; onChange: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const field = useRef<HTMLInputElement>(null), icon = useRef<HTMLButtonElement>(null), back = useRef(false);
+  const shown = open || value !== "";
+  useEffect(() => {
+    if (shown && open) field.current?.focus();
+    if (!shown && back.current) (back.current = false), icon.current?.focus();
+  }, [shown, open]);
+  const close = () => ((back.current = true), onChange(""), setOpen(false));
+  if (!shown)
+    return (
+      <button ref={icon} type="button" className="gbar__icon" aria-label="Find a gnome by name or number" aria-expanded={false} onClick={() => setOpen(true)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+      </button>
+    );
+  return (
+    <span className="gsearch" onBlur={(e) => !value && !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+      <input ref={field} type="search" placeholder="A name or a number" aria-label="Find a gnome by name or number" value={value}
+        onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => e.key === "Escape" && (e.preventDefault(), close())} />
+      <button type="button" className="gsearch__close" aria-label="Close the search" onClick={close}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+    </span>
   );
 }

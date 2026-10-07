@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact,
+  makeShop, soldSet, gnot, parseGnot, utcDate, nowRow, promoOf, promoWords, wavePrices, canBuyCard, showsClosing, closingSlot, whyNot, bill, shelf, teamOrder, shareWords, PAGE, onSale, cardFact, comingLegends, comingFact, waveLine,
   type Collection, type CanBuy,
 } from "../lib/gnomes/shop.ts";
 import type { Catalogue } from "../lib/gnomes/catalogue.ts";
@@ -322,4 +322,50 @@ test("shop: the gallery shows each wave's Legendary while its wave is not open, 
   assert.deepEqual(ids(collection({ waves: two, series: [{ name: "genesis", first: 1, last: 720, sold: 40, closed: true }] })), []);
   // its card says its wave alone: no price, no date, no scarcity
   assert.equal(comingFact(legends[2]), "Coming · wave 3");
+});
+
+// ------------------------------------------------------------ the shop's wave line: a little fairway, tee to flag
+test("shop: the wave line: the ball at the share that found a player, each tier's own, the Legendary at the flag", () => {
+  const c = collection(), at = T0 + 49 * 3600;
+  const line = waveLine(nowRow(c, isSold([1, 2, 3, 73]), entries, at), c, entries, isSold([1, 2, 3, 73]), at)!;
+  assert.ok(line.at === "open");
+  assert.equal(line.words, "Wave 1 · Garden · 4/104");
+  assert.equal(line.label, "Wave 1, the Garden: 4 of 104 gnomes found a player");
+  assert.equal(line.share, 4 / 104);
+  assert.deepEqual(line.tiers.map((t) => [t.tier, t.found, t.total, t.price]), [["common", 3, 72, 36e6], ["rare", 1, 21, 72e6], ["epic", 0, 10, 336e6], ["legendary", 0, 1, 1296e6]]);
+  assert.equal(line.tiers[0].label, "Common, 36 GNOT: 3 of 72 found a player");
+  assert.deepEqual(line.legend, { id: 104, name: "The Miller", words: "The Miller waits at the flag" });
+  assert.equal(line.chip, null, "open to everyone: nothing to say but the count");
+  // the Legendary taken: said so, never "waits"
+  const won = waveLine(nowRow(c, isSold([104]), entries, at), c, entries, isSold([104]), at)!;
+  assert.ok(won.at === "open" && won.legend?.words === "The Miller found a player");
+});
+
+test("shop: the wave line's edges: none sold, all sold, not started, players first, paused, closed, no wave", () => {
+  const c = collection(), all = Array.from({ length: 104 }, (_, i) => i + 1), none = isSold([]);
+  const zero = waveLine(nowRow(c, none, entries, T0 + 49 * 3600), c, entries, none, T0 + 49 * 3600)!;
+  assert.ok(zero.at === "open" && zero.share === 0 && zero.words.endsWith("0/104") && zero.tiers.every((t) => t.found === 0));
+  const full = waveLine(nowRow(c, isSold(all), entries, T0 + 49 * 3600), c, entries, isSold(all), T0 + 49 * 3600)!;
+  assert.ok(full.at === "soldout" && full.share === 1 && full.words.endsWith("104/104"));
+  assert.equal(full.label, "Wave 1, the Garden: all 104 gnomes found a player");
+  assert.ok(full.tiers.every((t) => t.found === t.total));
+  const teaser = waveLine(nowRow(c, none, entries, T0 - 60), c, entries, none, T0 - 60)!;
+  assert.ok(teaser.at === "teaser" && teaser.share === 0);
+  assert.deepEqual(teaser.chip, { text: "Opens today, 18:00 UTC", full: "Wave 1 opens today, 18:00 UTC." });
+  const players = waveLine(nowRow(c, none, entries, T0 + 60), c, entries, none, T0 + 60)!;
+  assert.deepEqual(players.chip, { text: "Players first · until Sun 18:00 UTC", full: "Players first until Sun 18:00 UTC: save one round on-chain to buy now." });
+  const p = collection({ open: false }), paused = waveLine(nowRow(p, none, entries, T0 + 60), p, entries, none, T0 + 60)!;
+  assert.deepEqual(paused.chip, { text: "Paused for a moment", full: "Paused for a moment: the sale picks up where it stopped." });
+  const k = collection({ series: [{ name: "genesis", first: 1, last: 720, sold: 486, closed: true }] });
+  assert.deepEqual(waveLine(nowRow(k, none, entries, T0), k, entries, none, T0), { at: "closed", words: "Closed: 486 made · 234 never made", label: "The sale is closed: 486 gnomes made, 234 never made" });
+  const w = collection({ waves: [] });
+  assert.equal(waveLine(nowRow(w, none, entries, T0), w, entries, none, T0), null);
+  // a tier the wave holds at no price: its count kept, no price said; a wave of one tier holds that tier alone
+  const free = collection({ waves: [{ ...c.waves[0], prices: [36e6, 0, 336e6, 1296e6] }] }), at = T0 + 49 * 3600;
+  const thin = waveLine(nowRow(free, none, entries, at), free, entries, none, at)!;
+  assert.ok(thin.at === "open" && thin.tiers[1].price === 0 && thin.tiers[1].label === "Rare: 0 of 21 found a player");
+  const commons = entries.filter((e) => e.tier === "common"), one = waveLine(nowRow(c, none, commons, at), c, commons, none, at)!;
+  assert.ok(one.at === "open" && one.tiers.length === 1 && one.legend === null);
+  // the words never press: no countdown, no "only", no "last"
+  for (const l of [zero, full, teaser, players, paused]) for (const s of [l.label, l.at === "closed" ? "" : l.words, l.at !== "closed" && l.chip ? l.chip.text + l.chip.full : ""]) assert.doesNotMatch(s, /only|last|hurry|left|invest|value/i);
 });
