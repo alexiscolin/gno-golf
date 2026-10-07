@@ -119,6 +119,12 @@ export function makeShop(chain: Pick<Chain, "qjson" | "qstr">, realm = GNOMES_RE
     },
     canBuy: async (buyer: string, ids: readonly number[]) => read(`CanBuy(${addr(buyer)}, ${q(ids.map((id) => JSON.parse(gnomeId(id)) as string).join(","))})`, checks.canBuy),
     params: () => read("Params()", checks.params),
+    /** A gnome's picture as the chain draws it: his TokenURI once minted, else his page (Render), which draws any
+     *  gnome of a published series; the answer as the realm gives it (onchain.ts reads it). */
+    portrait: async (id: number) => {
+      const tid = gnomeId(id);
+      return chain.qstr(realm, `func() string { if u, err := TokenURI(${tid}); err == nil { return u }; return Render(${tid}) }()`);
+    },
   };
 }
 export type Shop = ReturnType<typeof makeShop>;

@@ -64,6 +64,10 @@
 @media (max-width: 600px) { .gfilters > .seg { display: flex; width: 100%; } }
 .gfilters__search { flex: 1 1 180px; min-width: 0; height: 44px; padding: 0 14px; border: var(--edge); border-radius: 14px; background: var(--white); font: inherit; font-size: 15px; color: var(--ink); }
 .gfilters .more { flex: 1 0 100%; }
+/* the look switch (3D · On chain): small, beside the search on a phone too */
+.seg.seg--look { flex: none; width: auto; box-shadow: none; }
+.seg--look button { min-height: 40px; padding: 6px 11px; font-size: 13px; white-space: nowrap; }
+.gfilters .seg--look button { padding-inline: 11px; }
 .gfilters .more .gfilters { margin-top: var(--sp-2); }
 
 /* the grid of cards: as many columns as fit, two on a phone */
