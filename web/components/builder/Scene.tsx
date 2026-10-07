@@ -32,6 +32,8 @@ declare global {
     // and the player's view painted (one a build)
     __builds?: number;
     __eyes?: number;
+    // and the world whose scenery it was built with (the hole's own, or the garden it fell back to)
+    __scenery?: string;
   }
 }
 
@@ -149,7 +151,7 @@ export default function Scene({ state, view, look, size, waker, eye, paused = fa
       if (old) t.scene.remove(old);
       t.course = buildHole(state);
       built.current = key;
-      if (camlog()) window.__builds = (window.__builds ?? 0) + 1;
+      if (camlog()) (window.__builds = (window.__builds ?? 0) + 1), (window.__scenery = t.course.userData.scenery);
       setLighting(t.scene as Parameters<typeof setLighting>[0], t.course.userData.time);
       t.scene.add(t.course);
       if (!paint()) draw(); // (painted: the board drawn with it)

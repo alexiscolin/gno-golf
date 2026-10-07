@@ -164,6 +164,8 @@ export function loadWorld(name: string | null | undefined): Promise<World> {
 }
 
 export const worldOf = (s: Pick<Hole, "world">): World => own(WORLDS, s.world) || garden;
+/** The world whose module worldOf gives for s: its own once loaded, else the garden it falls back to. */
+export const drawnBy = (s: Pick<Hole, "world">): string => (own(WORLDS, s.world) ? s.world : "garden");
 
 /**
  * A world's own drawing of an on-lane piece, if it has one: worldOf(s).piece
