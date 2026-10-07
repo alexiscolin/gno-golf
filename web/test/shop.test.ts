@@ -226,7 +226,7 @@ test("shop: Buy on a card on sale only", () => {
 // ------------------------------------------------------------ why not, in plain words
 test("shop: every refusal CanBuy gives has its words: the button's and a note", () => {
   const c = collection(), until = T0 + 48 * 3600;
-  const tansy = { tier: "epic" as const, wave: 1, home: "garden" as const };
+  const tansy = { id: 94, tier: "epic" as const, wave: 1, home: "garden" as const };
   const w = (r: CanBuy) => whyNot(r, c, tansy, T0 + 60);
   assert.equal(w(can({ ok: true })), null);
   assert.deepEqual(w(can({ reason: "paused" })), { button: "Paused for a moment", note: "The sale picks up where it stopped." });
@@ -234,6 +234,10 @@ test("shop: every refusal CanBuy gives has its words: the button's and a note", 
   assert.deepEqual(w(can({ reason: "wave-cap", window: { until, left: { common: 3, rare: 2, epic: 0 } } })), { button: "1 of 1 Epic this wave", note: "Your share until Sun 18:00 UTC. Then open to everyone." });
   assert.deepEqual(w(can({ reason: "cap", left: { common: 10, rare: 5, epic: 0 } })), { button: "2 of 2 Epics", note: "The most one wallet buys." });
   assert.deepEqual(w(can({ reason: "later" })), { button: "Opens today, 18:00 UTC", note: "From Wave 1 · Garden." });
+  // two waves to come, published in any order: the date is the gnome's own wave's
+  const two = collection({ waves: [{ first: 105, last: 208, start: T0 + 7 * 86400, playersUntil: T0 + 9 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }, { first: 1, last: 104, start: T0 + 86400, playersUntil: T0 + 3 * 86400, prices: [36e6, 72e6, 336e6, 1296e6] }] });
+  assert.equal(whyNot(can({ reason: "later" }), two, { id: 150, tier: "common", wave: 2, home: "island" }, T0)?.button, "Opens Fri 16 Oct, 18:00 UTC");
+  assert.equal(whyNot(can({ reason: "later" }), two, tansy, T0)?.button, "Opens Sat 18:00 UTC");
   assert.deepEqual(w(can({ reason: "unlisted" })), { button: "Not on sale yet", note: "From Wave 1 · Garden. A wave not open by Mon 14 Dec, 18:00 UTC never opens." });
   assert.deepEqual(w(can({ reason: "taken" })), { button: "Already found a player", note: "" });
   assert.deepEqual(w(can({ reason: "closed" })), { button: "Never made", note: "The sale closed before this gnome found a player." });

@@ -157,6 +157,8 @@ export const localDate = (unix: number) => new Date(unix * 1000).toLocaleString(
 const label = (t: string) => (TIER_LOOK[t as Tier] || { label: t }).label;
 const plural = (word: string, n: number) => (n === 1 ? word : word + "s");
 const tierIndex = (c: Collection, t: string) => c.tiers.findIndex((x) => x.name === t);
+/** The published wave a gnome is in, by its id (none: not published yet). */
+const waveOf = (c: Collection, id: number) => c.waves.find((w) => id >= w.first && id <= w.last);
 
 // ------------------------------------------------------------ the sale's life (A9)
 type Some = Pick<Listed, "id" | "tier" | "home">;
@@ -266,10 +268,10 @@ export function promoWords(p: Promo, now: number) {
 // ------------------------------------------------------------ why not (A2), every CanBuy code in words
 /** What the buy panel says instead of buying: its button's words (off) and one note; play: the note links to a hole. */
 export interface WhyNot { button: string; note: string; play?: true }
-export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "tier" | "wave" | "home">, now: number): WhyNot | null {
+export function whyNot(r: CanBuy, c: Collection, g: Pick<Listed, "id" | "tier" | "wave" | "home">, now: number): WhyNot | null {
   if (r.ok) return null;
   const t = g.tier as BuyTier, i = tierIndex(c, t), from = `From Wave ${g.wave} · ${cap(g.home)}.`;
-  const wave = c.waves.find((w) => w.start > now) || c.waves[c.waves.length - 1];
+  const wave = waveOf(c, g.id);
   switch (r.reason) {
     case "paused": return { button: "Paused for a moment", note: "The sale picks up where it stopped." };
     case "players-only": return { button: `Players first until ${utcDate(r.window.until, now, true)}`, note: "Save one round on-chain to buy now.", play: true };
@@ -341,7 +343,7 @@ export function cardFact(e: Listed, s: Seen) {
   if (s.mine.has(e.id)) return "Yours";
   if (s.sold(e.id)) return "Found a player";
   if (neverMade(e, s)) return "Never made";
-  const w = s.c.waves.find((x) => e.id >= x.first && e.id <= x.last);
+  const w = waveOf(s.c, e.id);
   if (w && w.start <= s.now) return `${gnot(w.prices[tierIndex(s.c, e.tier)] ?? 0)} GNOT`;
   if (w) return `Opens ${utcDate(w.start, s.now, true)}`;
   return `Wave ${e.wave} · ${cap(e.home)}`;
