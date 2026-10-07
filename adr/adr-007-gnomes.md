@@ -72,7 +72,10 @@ sale runs on until the owner sets one (the user's decision of 2026-10-07):
 `SetCloseAt(at)`, owner only, once the genesis is published. A date in the
 future, which can later be brought forward, never pushed back, by this
 owner or the next; once one is set, no genesis wave may start at or after
-it, which nobody could buy from. From its block on, the
+it, which nobody could buy from, from either side: `AddWave` refuses such
+a start, and `SetCloseAt` a date at or before a genesis wave yet to open
+(a wave is never withdrawn, so a close cannot come before one the owner
+has announced). From its block on, the
 genesis's unsold gnomes are closed for good: `Buy` and `AddWave` refuse
 them ("the genesis sale closed on <date>"), and its
 final supply is readable on chain (`Collection`: the series' `sold` and
@@ -138,7 +141,8 @@ earned gnomes' proof reads store's rows only while store's writer is the
 rules it reads (golf/v2 at deploy): after a rules change every proof
 refuses ("rules changed"), until the owner, having checked that the new
 rules keep `bests`, `copies` and `holes` as golf/v2 writes them, calls
-`AcceptRules(path)`. It takes store's current writer and nothing else, so
+`AcceptRules(path)`. It takes store's current writer and nothing else (never
+`""`, a paused store's: a pause pauses the proof), so
 the owner can follow a change store's own public delay has carried out,
 never point the proof elsewhere; it emits `RulesAccepted`. An earned gnome
 minted stays minted once, whatever the rules.
@@ -215,7 +219,10 @@ North Korea, Syria, Russia, Belarus). The EU and the UK are not blocked: the
 buy sheet asks for their consent to delivery at once. At zero server cost:
 Netlify's country rules (`netlify.toml`) rewrite `/geo.json` to
 `/geo-blocked.json` and a gnome's page `/g/*` to a static "not available in
-your region" page for those countries; the client reads `/geo.json` once
+your region" page for those countries, and `/geo.json` to `/geo-open.json`
+for everyone else. The file itself says shut (`{"shop":false}`), so a host
+without those rules (IPFS, any static host, a local preview) never opens
+the shop. The client reads `/geo.json` once
 when the shop would open and, shut, hides the shop, its links and every buy
 and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
 tests holding both rules to it). Best effort, and said so: a VPN gets round
@@ -261,7 +268,7 @@ while on sale, an earned kind, a player).
 | SetPrice | an announced wave discounted or raised | waves keep their prices | `TestAWaveKeepsItsPrices` |
 | SetCloseAt | the date pushed back; set by another; before the genesis; in the past | forward only, by this owner or the next; future only | `TestOnlyTheOwnerSetsTheCloseOncePublished`, `TestTheCloseComesForwardNeverBack`, `TestAnEmptyOwnerCannotSetTheClose` |
 | Buy, AddWave | a sale after the close, at the boundary block | closed at the date's block | `TestTheSaleClosesAtItsDateToTheBlock`, `TestAClosedGnomeIsNeverSold` |
-| AddWave | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it | `TestAWaveStartsBeforeTheCloseOnceOneIsSet` |
+| AddWave, SetCloseAt | a genesis wave that starts at or after the close, which nobody could buy from | once a date is set, a genesis wave starts before it, and the date never comes to or before a genesis wave yet to open | `TestAWaveStartsBeforeTheCloseOnceOneIsSet`, `TestTheCloseNeverComesBeforeAGenesisWaveYetToOpen` |
 | SetCloseAt | a later series or an earned gnome closed by the genesis's date | the genesis only | `TestTheCloseIsTheGenesissOnly` |
 | Buy | each sale rewriting the catalogue's rows (gas) | nothing that changes kept beside them | `z_storage_buy`'s `// Gas:` golden |
 | MintEarned | a resent ghost, an archived version, a cup with no slot, one hole short, over par | the proof's rules | `TestWhatDoesNotCount`, `TestEachKindIsProvenAndRefusedOneShort`, `TestParMeansTheSumAtOrUnder` |
@@ -274,7 +281,7 @@ while on sale, an earned kind, a player).
 | Transfer, Accept | the money moved with the owner's role | the treasury stays | `TestAnOwnerHandoverLeavesTheTreasury`, `TestTheOwnerHandsOverInTwoSteps` |
 | Buy, Sweep, royalty | a payment to the owner or kept by the realm | the treasury, in the same call | `TestTheTreasuryMovesInTwoSteps`, `TestTheSweepPaysTheTreasury` |
 | SetSiteURL | a link that breaks out of a page or points off https | golf's play link rule | `TestTheOwnerMovesTheSite` |
-| AcceptRules, MintEarned | proofs read from rules with another layout; the proof pointed at a realm store has not moved to; accepted by another; a kind minted twice across a change | store's current writer only; owner only; the earned tree kept | `TestTheOwnerAcceptsOnlyStoresNewRules`, `TestNewRulesProveNothing`, `TestNewRulesRefuseTheMint` |
+| AcceptRules, MintEarned | proofs read from rules with another layout; the proof pointed at a realm store has not moved to, or at a paused store's ""; accepted by another; a kind minted twice across a change | store's current writer only, a realm; owner only; the earned tree kept | `TestTheOwnerAcceptsOnlyStoresNewRules`, `TestAPausedStoreHasNoRulesToAccept`, `TestNewRulesProveNothing`, `TestNewRulesRefuseTheMint` |
 | init | a deploy with no signer | refused off `dev` | `TestTheDeployerOwns` |
 | TransferFrom, Approve | a realm moves its caller's gnomes | the ledger's caller teller | `TestARealmCannotMoveItsCallersGnomes`, `TestTransfersGoThroughTheLedgersChecks` |
 | Equip | wearing another's gnome; a gnome sold on | owner checked on write and on read | `TestEquipWearsAGnomeTheCallerOwns`, `TestAGnomeSoldIsNoLongerWorn` |

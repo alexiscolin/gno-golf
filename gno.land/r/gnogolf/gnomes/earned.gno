@@ -38,11 +38,16 @@ var rules string
 
 // AcceptRules makes path the rules the proof reads: store's current writer
 // and no other, so the owner can follow a rules change store's own public
-// delay has carried out, never point the proof elsewhere (ADR-012). Owner
-// only.
+// delay has carried out, never point the proof elsewhere (ADR-012). A
+// paused store has no writer (""): nothing to accept, and the proof stays
+// refused until it resumes. Owner only.
 func AcceptRules(cur realm, path string) {
 	assertOwner(0, cur)
-	if w := rows.Writer(); path != w {
+	w := rows.Writer()
+	if !strings.HasPrefix(w, "gno.land/r/") {
+		panic("gnomes: store has no rules to accept: its writer is \"" + w + "\", not a realm (\"\" while paused)")
+	}
+	if path != w {
 		panic("gnomes: the rules accepted are store's writer, " + w + ", not " + path)
 	}
 	rules = path

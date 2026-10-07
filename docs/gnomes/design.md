@@ -540,7 +540,7 @@ What a gallery, a token page, the mint, the locker or a builder reads
 | need | call |
 |---|---|
 | all tokens, their series and plan, the tables | `data/gnomes.json` (`Catalogue`) |
-| one token | `entryOf(catalogue, id)` |
+| one token | `catalogue.gnomes.find((g) => g.id === id)` (the screens look it up inline) |
 | filter a gallery (series, wave, tier, home, archetype, hat, has a trail, text) | `filterGnomes(list, query)` |
 | a token's trait list, plainly worded | `traitRows(decode(entry.traits))` |
 | a tier's name and colours | `TIER_LOOK[tier]` |
@@ -550,7 +550,7 @@ What a gallery, a token page, the mint, the locker or a builder reads
 | draw him | `makeBall(skin)` (`makePreview` for a turntable; `makeShowcase` for a still) |
 | his trail and holing in play | `makeTrail(skin)`, `makeHoling(skin, cupAt)` (`gnome-fx.ts`); `null`: the game's own |
 | a Legendary's motion | `gnome.userData.tick(ms)` |
-| a thumbnail | `media/gnomes/thumbs/` + `thumbOf(id)`; Legendaries' turntables in `media/gnomes/turntables/` |
+| a thumbnail | `thumb(id)` (`components/gnomes/parts.tsx`: `/gnomes/<id>.webp`, copied from `media/gnomes/thumbs/` before each build); Legendaries' turntables from `media/gnomes/turntables/` |
 
 In play (`engine.ts`): his trail is laid on the ground under him while he
 rolls and fades once he stops; his holing replaces the player's confetti (a

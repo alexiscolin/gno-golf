@@ -14,11 +14,11 @@ const { playgroundServer } = (await import("../../scripts/playground-server.mjs"
 
 const listen = (s: Server) => new Promise<number>((r) => s.listen(0, "127.0.0.1", () => r((s.address() as { port: number }).port)));
 /** A request sent with its path as written (fetch would normalize it). */
-const raw = (port: number, p: string) => new Promise<{ status: number; body: string }>((ok, ko) => {
+const raw = (port: number, p: string) => new Promise<{ status: number; body: string; location: string }>((ok, ko) => {
   http.get({ host: "127.0.0.1", port, path: p }, (r) => {
     let b = "";
     r.on("data", (c: Buffer) => (b += String(c)));
-    r.on("end", () => ok({ status: r.statusCode || 0, body: b }));
+    r.on("end", () => ok({ status: r.statusCode || 0, body: b, location: r.headers.location || "" }));
   }).on("error", ko);
 });
 const get = async (port: number, p: string, init: RequestInit = {}) => {
@@ -49,6 +49,11 @@ void test("the playground serves the build as the static host does, and /rpc fro
   try {
     assert.equal((await get(port, "/")).body, "home");
     assert.deepEqual(await get(port, "/g").then((r) => [r.status, r.location]), [308, "/g/"]);
+    // an escaped leading slash names no host: a folder's redirect stays on this site
+    for (const p of ["/%2Fg", "/%2F%2Fg", "/%5Cg"]) {
+      const r = await raw(port, p);
+      assert.ok(r.status === 404 || (r.status === 308 && /^\/[^/\\]/.test(r.location)), `${p}: ${r.status} ${r.location}`);
+    }
     assert.equal((await get(port, "/g/")).body, "gallery");
     assert.match((await get(port, "/_next/static/a.js")).type, /^text\/javascript/);
     assert.equal((await get(port, "/golf.wasm")).type, "application/wasm");
