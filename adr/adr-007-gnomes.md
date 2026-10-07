@@ -219,7 +219,10 @@ North Korea, Syria, Russia, Belarus). The EU and the UK are not blocked: the
 buy sheet asks for their consent to delivery at once. At zero server cost:
 Netlify's country rules (`netlify.toml`) rewrite `/geo.json` to
 `/geo-blocked.json` and a gnome's page `/g/*` to a static "not available in
-your region" page for those countries; the client reads `/geo.json` once
+your region" page for those countries, and `/geo.json` to `/geo-open.json`
+for everyone else. The file itself says shut (`{"shop":false}`), so a host
+without those rules (IPFS, any static host, a local preview) never opens
+the shop. The client reads `/geo.json` once
 when the shop would open and, shut, hides the shop, its links and every buy
 and equip (`web/lib/gnomes/geo.ts`, whose `BLOCKED` is the one list, the
 tests holding both rules to it). Best effort, and said so: a VPN gets round
