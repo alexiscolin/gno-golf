@@ -122,6 +122,7 @@
 /* by the pointer (Board places it, kept inside the board): the ghost's name and place, or why not; a refusal just made shakes once */
 .measure { position: absolute; left: var(--sp-3); top: var(--sp-3); z-index: 2; max-width: min(420px, calc(100% - 2 * var(--sp-3))); padding: 4px var(--sp-2); border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .measure--no { background: var(--hat-ink); }
+.board__hit { fill: transparent; pointer-events: all; }
 .measure--shake { animation: bshake .3s ease-in-out; }
 @keyframes bshake { 20% { translate: -5px 0; } 40% { translate: 4px 0; } 60% { translate: -3px 0; } 80% { translate: 2px 0; } }
 /* a piece just dropped pops (120 ms) */

@@ -263,6 +263,9 @@ export default function Board(props: BoardProps) {
   if (view.k >= 6) for (let x = x0; x <= x1; x++) lines.push({ x, major: x % 5 === 0 });
   if (view.k >= 6) for (let y = y0; y <= y1; y++) lines.push({ y, major: y % 5 === 0 });
   const sel = draft.pieces.find((p) => p.id === selected), hs = 7 / view.k;
+  // the tee's and the cup's hit areas, last in their groups (the selection glows their drawing): wider than it (the
+  // flag and its pole with the cup), 14 px at least
+  const hit = Math.max(0.9, 14 / view.k);
   const ghostBad = ghost && ghost.why;
   return (
     <section className={`board${ghostBad || live?.why ? " board--no" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
@@ -278,8 +281,8 @@ export default function Board(props: BoardProps) {
             <PieceShape p={p} state={bad.has(p.id) || live?.id === p.id && live.why ? "bad" : undefined} />
           </g>
         ))}
-        <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${fmtAt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")}><circle cx={draft.tee[0]} cy={draft.tee[1]} r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text x={draft.tee[0]} y={draft.tee[1] + 0.3} fontSize={0.8} textAnchor="middle">T</text></g>
-        <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${fmtAt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")}><circle cx={draft.pin[0]} cy={draft.pin[1]} r={0.6} fill="#1f2a26" /><path d={`M${draft.pin[0]} ${draft.pin[1]} v-2.2 l1.4 0.5 -1.4 0.5`} fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /></g>
+        <g data-end="tee" className={`board__end${selected === "tee" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The tee at ${fmtAt(draft.tee)}: the arrows move it`} aria-pressed={selected === "tee"} onFocus={() => props.onSelect("tee")}><circle cx={draft.tee[0]} cy={draft.tee[1]} r={0.55} fill="#fff" stroke="#1f2a26" strokeWidth={0.15} /><text x={draft.tee[0]} y={draft.tee[1] + 0.3} fontSize={0.8} textAnchor="middle">T</text><circle className="board__hit" cx={draft.tee[0]} cy={draft.tee[1]} r={hit} /></g>
+        <g data-end="pin" className={`board__end${selected === "pin" ? " board__end--on" : ""}`} tabIndex={0} role="button" aria-label={`The cup at ${fmtAt(draft.pin)}: the arrows move it`} aria-pressed={selected === "pin"} onFocus={() => props.onSelect("pin")}><circle cx={draft.pin[0]} cy={draft.pin[1]} r={0.6} fill="#1f2a26" /><path d={`M${draft.pin[0]} ${draft.pin[1]} v-2.2 l1.4 0.5 -1.4 0.5`} fill="#e14b3b" stroke="#1f2a26" strokeWidth={0.1} /><rect className="board__hit" x={draft.pin[0] - hit} y={draft.pin[1] - 2.2 - hit / 2} width={1.4 + 2 * hit} height={2.2 + 1.5 * hit} rx={hit} /></g>
         {sel && handlesOf(sel).map((h) => <rect key={h.key} data-handle={h.key} className="board__handle" x={h.at[0] - hs / 2} y={h.at[1] - hs / 2} width={hs} height={hs} />)}
         {ghost && <g className="board__ghost" pointerEvents="none"><PieceShape p={ghost.p} state={ghost.why ? "bad" : "ghost"} /></g>}
       </svg>
