@@ -7,6 +7,7 @@ import { ud, type Gnome } from "./data";
 import type { UnlockId } from "../card";
 import type { Beard, Holing, Material, Pattern, Piece, Trail } from "../gnomes/vocab";
 import { darkBody } from "../gnomes/colour";
+import { chunk } from "../chunk";
 import type { KitHat } from "./gnome-kit";
 
 /** A gnome's look: what makeBall dresses him in. */
@@ -254,9 +255,10 @@ export interface Wardrobe {
 let wardrobe: Wardrobe | null = null;
 /** The wardrobe in use from now on (gnome-dress.ts gives itself on import). */
 export const setWardrobe = (w: Wardrobe) => void (wardrobe = w);
-let loading: Promise<void> | null = null;
-/** The wardrobe, fetched once (its own chunk). */
-export const loadWardrobe = () => (loading ||= import("./gnome-dress").then(() => undefined));
+const dress = chunk(() => import("./gnome-dress"));
+/** The wardrobe, fetched once (its own chunk, lib/chunk.ts): a failed fetch (offline, a deploy mid-flight) is
+ *  asked again by the next call, never kept as a failure for the visit. */
+export const loadWardrobe = () => dress.load().then(() => undefined);
 
 /** The game's own hats (the cone, tall or not, the helmet, the tricorn, the toque, the top hat), into the hat's group. */
 function gameHat(hat: THREE.Group, skin: Skin) {

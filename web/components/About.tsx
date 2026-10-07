@@ -88,9 +88,10 @@ interface FrontScreenProps {
   back: string;
   onBack: () => void;
   onAbout: () => void;
-  /** the line over the title (none: the title alone, as the shop's) */
+  /** the line over the title (none: the title alone) */
   eyebrow?: string;
-  title: string;
+  /** the title's words (and what stands by them, out of the flow: the shop's keeper) */
+  title: ReactNode;
   dare?: ReactNode;
   corner?: ReactNode;
   children?: ReactNode;

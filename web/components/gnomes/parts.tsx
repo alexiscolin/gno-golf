@@ -87,7 +87,7 @@ export function GnomeCard({ g, fact, mine, never, buy = false, onChain = null, o
     <button type="button" className={`gcard${mine ? " gcard--mine" : ""}${never ? " gcard--never" : ""}`} onClick={onOpen}
       aria-label={`${g.name}, number ${g.id}, ${tierName(g.tier)}: ${fact}${buy ? ". Buy" : ""}`}>
       <Tile id={g.id} tier={g.tier} never={never} onChain={onChain} />
-      <span className="gcard__name">{g.name}<small>#{g.id}</small></span>
+      <span className="gcard__name"><span>{g.name}</span><small>#{g.id}</small></span>
       <span className="gcard__foot"><TierChip tier={g.tier} /><span className="gcard__fact">{fact}</span></span>
       {buy && <span className="gcard__buy" aria-hidden="true">Buy</span>}
     </button>
@@ -98,7 +98,7 @@ export function GnomeCard({ g, fact, mine, never, buy = false, onChain = null, o
 export const ComingCard = ({ g, onChain = null }: { g: Listed; onChain?: Portraits | null }) => (
   <article className="gcard gcard--coming" aria-label={`${g.name}, number ${g.id}, ${tierName(g.tier)}: ${comingFact(g)}`}>
     <Tile id={g.id} tier={g.tier} onChain={onChain} />
-    <span className="gcard__name">{g.name}<small>#{g.id}</small></span>
+    <span className="gcard__name"><span>{g.name}</span><small>#{g.id}</small></span>
     <span className="gcard__foot"><TierChip tier={g.tier} /><span className="gcard__fact">{comingFact(g)}</span></span>
   </article>
 );

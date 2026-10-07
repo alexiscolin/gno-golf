@@ -15,12 +15,12 @@ import { GnokeyTx } from "@/components/Gnokey";
 import { messageOf } from "@/components/common";
 import { ADENA_URL, GNOT_URL } from "@/lib/network";
 import { hasAdena, onOurNode, resultOf, PRICE, type SendError } from "@/lib/adena";
-import { sendGnome, gnokeyGnome, gnomeCall, blockTime, GNOME_TX } from "@/lib/gnomes/tx";
-import { errorKind, type Chain } from "@/lib/chain";
+import { sendGnome, gnokeyGnome, gnomeCall, GNOME_TX } from "@/lib/gnomes/tx";
+import { errorKind, wait, type Chain } from "@/lib/chain";
 import { worldName } from "@/lib/card";
 import { traitRows, type Listed } from "@/lib/gnomes/catalogue";
 import { decode } from "@/lib/gnomes/codec";
-import { bill, gnot, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
+import { bill, gnot, landing, whyNot, shareWords, type CanBuy, type Collection, type GnomeRow, type Shop } from "@/lib/gnomes/shop";
 import { BOX_A, BOX_B, LINKS, SIGN_NOTE, TRUST, orderButton, receipt, review } from "@/lib/gnomes/legal";
 import { tokenSkin } from "@/lib/gnomes/wear";
 import { portraitsOf, type Look } from "@/lib/gnomes/onchain";
@@ -47,6 +47,7 @@ interface Props {
 export default function GnomeSheet({ g, shop, chain, c, account, region, now, wallet, onConnect, onClose, playing, worn, onPlay, onTheirs, onChanged, look, onLook }: Props) {
   const me = account && account.address;
   const [row, setRow] = useState<GnomeRow | null>(null);
+  const [unread, setUnread] = useState(false); // (the gnome's read failed: said, never a Buy greyed out with no reason)
   const [can, setCan] = useState<CanBuy | null>(null);
   const [step, setStep] = useState<Step>({ at: "view" });
   const [ticks, setTicks] = useState({ a: false, b: false });
@@ -56,7 +57,8 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
   const [equip, setEquip] = useState("");
 
   const read = () => {
-    void shop.gnome(g.id).then(setRow, () => setRow(null));
+    setUnread(false);
+    void shop.gnome(g.id).then(setRow, () => (setRow(null), setUnread(true)));
     if (me) void shop.canBuy(me, [g.id]).then(setCan, () => setCan(null));
   };
   useEffect(read, [g.id, me]); // eslint-disable-line react-hooks/exhaustive-deps -- (shop: the same for the visit)
@@ -99,7 +101,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
         const got = await resultOf(chain, hash);
         const now = await shop.gnome(g.id);
         if ((got != null && got.includes(String(g.id))) || (now && now.owner === me)) {
-          const when = await blockTime(chain.rpc, height);
+          const when = await chain.blockTime(height).then((ms) => Math.floor(ms / 1000), () => null); // (the receipt says it in seconds)
           setRow(now);
           onChanged();
           return setStep({ at: "done", hash, height, when });
@@ -107,9 +109,23 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
       } catch (e) {
         if (errorKind(e) === "chain") return /already sold/.test(messageOf(e)) ? setStep({ at: "taken" }) : setStep({ at: "unsure", hash, why: messageOf(e) });
       }
-      await new Promise((r) => setTimeout(r, 1500));
+      await wait(1500);
     }
     setStep({ at: "unsure", hash, why: "The chain has not shown it yet." });
+  }
+  // no hash to read (the wallet gave none): the gnome read again, a few times: ours, another's, or nothing landed
+  async function settle() {
+    if (!me) return;
+    setStep({ at: "read", hash: "", height: 0 });
+    for (let i = 0; i < 6; i++) {
+      const now = await shop.gnome(g.id).catch(() => undefined);
+      if (now === undefined) return setStep({ at: "unsure", why: "The chain did not answer." });
+      const at = landing(now, me);
+      if (at === "mine") return (setRow(now), onChanged(), setStep({ at: "done", hash: "", height: 0, when: null }));
+      if (at === "taken") return setStep({ at: "taken" });
+      await wait(1500);
+    }
+    setStep({ at: "review", note: <p className="note note--warn" role="status">Nothing landed: {g.name} is still on sale. You can order again.</p> });
   }
 
   async function showEveryone() {
@@ -163,6 +179,8 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
             </div>
           ) : owner ? (
             <p className="gsheet__fine">Found a player. <button className="linkish" onClick={() => onTheirs(owner)}>Their gnomes →</button></p>
+          ) : unread ? (
+            <div className="gsheet__foot"><p className="note note--bad" role="alert">The chain did not answer.</p><Button variant="primary" className="btn--wide" onClick={read}>Try again</Button></div>
           ) : region ? (
             <>
               {row && <p className="gsheet__price">{gnot(price)} GNOT <small>+ a small deposit and fee</small></p>}
@@ -250,7 +268,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           {head(true, "Your receipt")}
           <div className="receipt" id="receipt">
             <h3>Receipt: Gnogolf gnome purchase</h3>
-            {order && receipt({ ...order, at: step.when || 0, hash: step.hash, realm: shop.realm, chainId: (costs && costs.chainId) || "", explorer: "", consents: [BOX_A, BOX_B] }).map((l) => <p key={l}>{l}</p>)}
+            {order && receipt({ ...order, at: step.when || 0, hash: step.hash, realm: shop.realm, chainId: (costs && costs.chainId) || "", consents: [BOX_A, BOX_B] }).map((l) => <p key={l}>{l}</p>)}
           </div>
           <div className="gsheet__foot"><Button variant="primary" className="btn--wide" onClick={() => window.print()}>Print or save as PDF</Button></div>
         </>
@@ -265,7 +283,7 @@ export default function GnomeSheet({ g, shop, chain, c, account, region, now, wa
           {head(true)}
           <p className="note note--warn" role="alert">Sent, but not confirmed yet. <b>Don&apos;t buy again</b>: it would pay twice.</p>
           <div className="gsheet__foot">
-            <Button variant="primary" className="btn--wide" onClick={() => (step.hash ? (setStep({ at: "read", hash: step.hash, height: 0 }), void readBack(step.hash, 0)) : read())}>Check again</Button>
+            <Button variant="primary" className="btn--wide" onClick={() => (step.hash ? (setStep({ at: "read", hash: step.hash, height: 0 }), void readBack(step.hash, 0)) : void settle())}>Check again</Button>
             <p className="gsheet__fine">{step.why}</p>
           </div>
         </>
