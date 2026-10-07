@@ -2194,7 +2194,7 @@ body:has(.netbanner) .screen.worlds { padding-bottom: 90px; } /* the banner, bot
 .newbadge > svg { flex: 0 0 auto; width: 34px; height: 38px; }
 .about__links { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .about__links li:nth-child(odd):last-child { grid-column: 1 / -1; } /* an odd one out spans the row */
-.about__links .btn { display: grid; gap: 2px; height: 100%; padding: 10px 12px; background: var(--white); text-align: left; } /* a link out: a button (Button's look), a card's shape */
+.about__links .btn { display: grid; justify-content: stretch; align-content: center; gap: 2px; height: 100%; padding: 10px 12px; background: var(--white); text-align: left; } /* a link out: a button (Button's look), a card's shape, its words from its padding (not the button's centring) */
 .about__links b { font-size: 14px; }
 .about__links span { font-size: 12.5px; font-weight: 400; color: var(--ink-soft); }
 .about__credit { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: var(--rule); font-size: 13px; color: var(--ink-soft); }

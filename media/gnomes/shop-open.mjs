@@ -11,7 +11,7 @@
 // lines, as tall as one another, on one top, their words on one baseline, and More filters open
 // gold (on) in the box it has shut, a tier filter and the view selected gold as well; the picker's collection between its tile and its aim card, as
 // wide, one compact row, its head whole (at 1440, 1280, 1024 and 390, unthrottled: media/lib/rows.mjs); the menu
-// and the shop never sideways from 360 to 1440 px wide. Before, the title screen alone: none of
+// and the shop never sideways from 360 to 1440 px wide; About's link cards' words on one left edge. Before, the title screen alone: none of
 // the sale read (the catalogue), the collection's wardrobe nor the shop's
 // part of the game (components/gnomes/Game.tsx: a dev build's chunk names
 // it) fetched, which only a screen showing the sale needs. With OUT, a frame every 100 ms and a
@@ -135,6 +135,19 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
     }
     results.push({ w: at, ok: !wide.length });
     console.log(`${wide.length ? "FAIL" : "PASS"} ${at} never sideways from 360 to 1440 px`, wide.length ? JSON.stringify(wide) : "");
+  }
+  // About's link cards (Button's look, a card's shape): each card's words from its padding, the four on one left edge
+  for (const w of [1280, 390]) {
+    await b.send("Emulation.setDeviceMetricsOverride", { width: w, height: 844, deviceScaleFactor: 1, mobile: w < 600 });
+    await b.send("Page.navigate", { url: APP + "/?screen=modes" });
+    for (let i = 0; i < 90 && !(await b.ev(`!!document.querySelector(".screen__about")`)); i++) await sleep(500);
+    await b.js(`document.querySelector(".screen__about").click(); true`);
+    for (let i = 0; i < 20 && !(await b.ev(`!!document.querySelector(".about__links .btn")`)); i++) await sleep(250);
+    await sleep(800); // (the sheet's pop settled)
+    const edges = await b.ev(`[...document.querySelectorAll(".about__links .btn")].map((a) => { const s = getComputedStyle(a); return Math.round(a.querySelector("b").getBoundingClientRect().left - a.getBoundingClientRect().left - parseFloat(s.borderLeftWidth) - parseFloat(s.paddingLeft)); })`);
+    const ok = edges.length > 0 && edges.every((x) => x === 0);
+    results.push({ w: `about ${w}`, ok });
+    console.log(`${ok ? "PASS" : "FAIL"} About's link cards, their words from their padding, at ${w}`, ok ? "" : JSON.stringify(edges));
   }
   b.kill();
 }
