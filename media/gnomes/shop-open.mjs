@@ -2,8 +2,9 @@
 // The gnome shop opened from the menu's Shop panel as a player on a slow
 // link and a phone's CPU would (Fast 3G, the CPU 4x slower), at 1440 and
 // 390: the layout shifts the page reports over 6 s, failing over 0.01 (the
-// shop draws its final frame first: ShopFrame.tsx). With OUT, a frame every
-// 100 ms and a strip of them.
+// shop draws its final frame first: ShopFrame.tsx); then every card's picture
+// in sight loaded (no broken image). With OUT, a frame every 100 ms and a
+// strip of them.
 //   APP=https://… node media/gnomes/shop-open.mjs   (OUT=<dir> for the frames)
 import fs from "node:fs";
 import path from "node:path";
@@ -37,8 +38,13 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
     const f = path.join(dir, `${String(k).padStart(2, "0")}.jpg`); fs.writeFileSync(f, Buffer.from(data, "base64")); files.push(f);
   }
   const cls = await b.ev(`({ cls: +window.__cls.toFixed(4), shifts: window.__shifts })`);
-  results.push({ w, cls });
-  console.log(`${cls.cls < 0.01 ? "PASS" : "FAIL"} opening the shop at ${w}: layout shift ${cls.cls}`, cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
+  // every card's picture in sight: loaded, none a broken image (a 404, a wrong path, a server gone)
+  const seen = `[...document.querySelectorAll(".gshelf li img")].filter((i) => { const r = i.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; })`;
+  for (let i = 0; i < 60 && !(await b.ev(`${seen}.every((i) => i.complete)`)); i++) await sleep(500);
+  const pics = await b.ev(`(() => { const s = ${seen}; return { n: s.length, broken: s.filter((i) => !i.complete || !i.naturalWidth).map((i) => i.getAttribute("src")) }; })()`);
+  const ok = cls.cls < 0.01 && pics.n > 0 && !pics.broken.length;
+  results.push({ w, ok });
+  console.log(`${ok ? "PASS" : "FAIL"} opening the shop at ${w}: layout shift ${cls.cls}, ${pics.n} pictures in sight, ${pics.broken.length} broken`, pics.broken.length ? JSON.stringify(pics.broken.slice(0, 6)) : "", cls.shifts.length ? JSON.stringify(cls.shifts).slice(0, 400) : "");
   b.kill();
   if (!dir) continue;
   // a strip: every other frame (0-5.8 s), 6 a row
@@ -52,4 +58,4 @@ for (const [w, h, mobile] of /** @type {[number, number, boolean][]} */ ([[1440,
   fs.writeFileSync(path.join(OUT, `strip-${TAG}-${w}.png`), Buffer.from(data, "base64"));
   b2.kill();
 }
-process.exit(results.every((r) => r.cls.cls < 0.01) ? 0 : 1);
+process.exit(results.every((r) => r.ok) ? 0 : 1);

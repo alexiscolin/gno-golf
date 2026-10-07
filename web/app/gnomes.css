@@ -51,15 +51,16 @@
 /* the shop's head, slim: its title at a sheet title's size (globals.css .sheet h2), level with the corner buttons,
    its one line under it; then the sale's line and the toolbar, the gnomes above the fold */
 .screen.worlds.shop { padding-top: 0; }
-.shop .worlds__in { padding-top: 38px; gap: var(--sp-3); }
-.shop .front__head { display: grid; justify-items: center; gap: 2px; margin: 0; }
-@media (max-width: 700px) { .shop .front__head { gap: 12px; } } /* (the line clear of the corner buttons) */
+/* one rhythm: the game's section gap between the head, the sale's line, the toolbar and the shelf; the head's own lines a step apart */
+.shop .worlds__in { padding-top: 38px; gap: var(--sp-4); }
+.shop .front__head { display: grid; justify-items: center; gap: var(--sp-2); margin: 0; }
+@media (max-width: 700px) { .shop .front__head { gap: var(--sp-3); } } /* (the line clear of the corner buttons) */
 /* the shopkeeper peeking beside the title, out of the flow (the head no taller), clear of the corner buttons */
 .shop .front__head { position: relative; }
-.shopkeeper { position: absolute; top: -36px; left: calc(50% + 84px); width: 76px; height: 76px; pointer-events: none; }
+.shopkeeper { position: absolute; top: -30px; left: calc(50% + 92px); width: 68px; height: 68px; pointer-events: none; } /* (his feet on the title's line, clear of its last letter) */
 .shopkeeper .pick__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-/* a phone: no room beside the title between the corner buttons; he peeks from behind its end, the letters over him */
-@media (max-width: 700px) { .shopkeeper { top: -34px; left: calc(50% + 30px); width: 64px; height: 64px; z-index: 0; } .shop .worlds__title { position: relative; z-index: 1; } } /* (over the title's end, between the corner buttons) */
+/* a phone: no room beside the title between the corner buttons, and none over it without crowding it: he stays on the menu's panel */
+@media (max-width: 700px) { .shopkeeper { display: none; } }
 .shop .worlds__title { margin: 0 56px; font-size: 30px; line-height: 1.15; --ink-w: 4px; --ink-drop: 2px; }
 
 /* the sale in one line: a little fairway from the tee to the flag, the ball at the share that found a player, the
@@ -69,16 +70,16 @@
 .wline__words { white-space: nowrap; }
 .wline__who { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
 .wline__who b { color: var(--ink); font-weight: 800; }
-.wline__legend { flex: none; width: 34px; height: 34px; margin-left: -6px; border: var(--edge); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
+.wline__legend { flex: none; width: 36px; height: 36px; margin-left: -6px; border: var(--edge); border-radius: 50%; overflow: hidden; background: var(--gold-grad); box-shadow: 0 0 0 2px var(--gold); }
 .wline__legend img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.25) translateY(4%); }
 .wline__chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 8px; border: var(--info-edge); border-radius: var(--pill); background: var(--info-bg); font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .wline__chip svg { width: 15px; height: 15px; fill: var(--lamp); stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
-.fw { position: relative; flex: none; width: 220px; height: 32px; }
-.fw__lane { position: absolute; left: 0; right: 0; top: 13px; height: 18px; border: var(--edge); border-radius: var(--pill); background: repeating-linear-gradient(90deg, var(--turf) 0 12px, #a3e6bf 12px 24px); }
-.fw__tee { position: absolute; left: 6px; top: 17px; width: 4px; height: 10px; border-radius: 2px; background: var(--paper); border: 1.5px solid var(--ink); }
-.fw__flag { position: absolute; right: 2px; top: 0; width: 16px; height: 32px; overflow: visible; }
+.fw { position: relative; flex: none; width: 260px; height: 32px; }
+.fw__lane { position: absolute; left: 0; right: 0; top: 6px; height: 20px; border: var(--edge); border-radius: var(--pill); background: repeating-linear-gradient(90deg, var(--turf) 0 12px, #a3e6bf 12px 24px); }
+.fw__tee { position: absolute; left: 6px; top: 11px; width: 4px; height: 10px; border-radius: 2px; background: var(--paper); border: 1.5px solid var(--ink); }
+.fw__flag { position: absolute; right: 2px; top: -7px; width: 16px; height: 32px; overflow: visible; } /* (its cup on the lane, its flag over it) */
 .fw__cup { fill: var(--ink); }
-.fw__ball { position: absolute; top: 15px; left: calc(10px + var(--at) * (100% - 38px)); width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--white) 0 50%, #e8e2d3); animation: fw-roll 1.6s cubic-bezier(.2, .75, .3, 1) both; }
+.fw__ball { position: absolute; top: 9px; left: calc(10px + var(--at) * (100% - 38px)); width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--white) 0 50%, #e8e2d3); animation: fw-roll 1.6s cubic-bezier(.2, .75, .3, 1) both; }
 .fw__ball::after { content: ""; position: absolute; left: 2px; top: 3px; width: 3px; height: 3px; border-radius: 50%; background: rgba(var(--ink-rgb), .45); }
 @keyframes fw-roll { from { left: 10px; transform: rotate(-600deg); } }
 @media (prefers-reduced-motion: reduce) { .fw__ball { animation: none; } }
@@ -99,20 +100,22 @@
 .gbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto auto; grid-template-areas: "views tiers . search look more"; grid-template-rows: 48px; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .gbar__views { grid-area: views; } .gbar__tiers { grid-area: tiers; } .gbar > .gbar__icon:not(.gbar__more), .gsearch { grid-area: search; } .gbar > .seg--look { grid-area: look; } .gbar__more { grid-area: more; }
 .gbar .seg { box-shadow: none; }
-.gbar__views button { min-height: 44px; padding: 6px 14px; font-size: 14px; white-space: nowrap; }
+/* every control the same height, on one line: the toolbar's rhythm */
+.gbar .seg button { min-height: 36px; } /* (in the segment's 2 px edge: 40 all told) */
+.gbar__views button { padding: 6px 14px; font-size: 14px; white-space: nowrap; }
 .gbar__tiers { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.gbar__unit { font-size: 12px; font-weight: 800; color: var(--ink-soft); }
-.tierbtn { height: 34px; padding: 0 10px 0 7px; font: inherit; font-size: 12px; font-weight: 800; letter-spacing: .04em; cursor: pointer; transition: transform var(--t-press), box-shadow var(--t-press); }
+.tierbtn__unit { font-size: 11px; }
+.tierbtn { height: 40px; padding: 0 10px 0 7px; font: inherit; font-size: 12px; font-weight: 800; letter-spacing: .04em; cursor: pointer; transition: transform var(--t-press), box-shadow var(--t-press); }
 .tierbtn__price { margin-left: 2px; font-size: 13px; letter-spacing: 0; text-transform: none; }
 .tierbtn:hover { transform: translateY(-1px); }
 .tierbtn[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
 .gbar__tiers:has([aria-pressed="true"]) .tierbtn:not([aria-pressed="true"]) { opacity: .55; }
 .tierbtn:focus-visible, .gbar__icon:focus-visible, .gsearch__close:focus-visible { outline: var(--ring); outline-offset: 2px; }
-.gbar__icon { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.gbar__icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: var(--edge); border-radius: 14px; background: var(--paper); color: var(--ink); cursor: pointer; }
 .gbar__icon:hover, .gbar__icon[aria-expanded="true"], .gbar__icon--on { background: var(--mint); }
 .gbar__icon svg, .gsearch svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
 .gbar__more svg circle { fill: var(--paper); }
-.gsearch { display: flex; align-items: center; gap: 6px; width: 260px; height: 44px; padding: 0 4px 0 12px; border: var(--edge); border-radius: 14px; background: var(--white); }
+.gsearch { display: flex; align-items: center; gap: 6px; width: 260px; height: 40px; padding: 0 4px 0 12px; border: var(--edge); border-radius: 14px; background: var(--white); }
 .gsearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); outline: none; }
 .gsearch input::-webkit-search-cancel-button { display: none; }
 .gsearch:focus-within { outline: var(--ring); outline-offset: 2px; }
@@ -131,7 +134,7 @@
   .gbar:has(.gsearch) { grid-template-areas: "views . look" "tiers tiers tiers" "search search search"; grid-template-rows: 48px 44px 44px; }
   .gbar__views { display: flex; } .gbar__views button { flex: 1; padding: 6px 8px; font-size: 13px; }
   .gbar__tiers { justify-content: flex-start; gap: 5px; }
-  .tierbtn__name, .gbar__unit { display: none; }
+  .tierbtn__name, .tierbtn__unit { display: none; }
   .tierbtn { padding: 0 9px 0 6px; }
   .gbar__more { grid-area: tiers; justify-self: end; } /* (at the tiers' row's end, clear of them) */
   .gsearch { width: auto; }
@@ -143,7 +146,7 @@
 /* the look switch (3D · On chain): small, in the toolbar on a phone too */
 .seg.seg--look { flex: none; width: auto; box-shadow: none; }
 .seg--look button { min-height: 40px; padding: 6px 11px; font-size: 13px; white-space: nowrap; }
-.gbar .seg--look button { min-height: 44px; padding-inline: 10px; }
+.gbar .seg--look button { min-height: 36px; padding-inline: 10px; }
 @media (max-width: 700px) { .gbar .seg--look button { padding-inline: 8px; font-size: 12px; } }
 
 /* the grid of cards: as many columns as fit, two on a phone */

@@ -6,6 +6,7 @@
 // looks, the closing date. On the game's own tokens (app/gnomes.css).
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Segmented } from "@/components/ui";
+import { retryIn } from "@/lib/retry";
 import { TIER_LOOK, type Listed } from "@/lib/gnomes/catalogue";
 import type { Look, Portraits } from "@/lib/gnomes/onchain";
 import { comingFact, gnot, utcDate, localDate, type TierShare, type WaveLine } from "@/lib/gnomes/shop";
@@ -58,10 +59,18 @@ function useOnChain(id: number, from: Portraits | null, lazy: boolean) {
 export function Tile({ id, tier, never = false, lazy = true, onChain = null }: { id: number; tier: string; never?: boolean; lazy?: boolean; onChain?: Portraits | null }) {
   const { ref, url } = useOnChain(id, onChain, lazy);
   const [broken, setBroken] = useState<string | null>(null);
+  // the thumbnail not fetched (the site restarting, the network gone a moment): asked again a few times, then the bare stage, never a broken icon
+  const [tries, setTries] = useState(0), [gone, setGone] = useState(false);
   const src = !onChain ? thumb(id) : url === undefined ? null : url && url !== broken ? url : thumb(id);
+  const failed = () => {
+    if (url && src === url) return setBroken(url); // (the chain's drawing refused: his thumbnail instead)
+    const wait = retryIn(tries);
+    if (wait === null) return setGone(true);
+    setTimeout(() => setTries((n) => n + 1), wait);
+  };
   return (
     <span ref={ref} className={`gtile gtile--${tier}${never ? " gtile--never" : ""}`}>
-      {src && <img src={src} alt="" width={256} height={256} loading={lazy ? "lazy" : "eager"} decoding="async" onError={() => url && setBroken(url)} />}
+      {src && !gone && <img key={tries} src={src} alt="" width={256} height={256} loading={lazy ? "lazy" : "eager"} decoding="async" onError={failed} />}
     </span>
   );
 }
@@ -147,11 +156,10 @@ export function TierFilter({ tiers, value, onChange }: { tiers: readonly TierSha
             aria-label={s ? s.label : tierName(t)}>
             <svg viewBox="0 0 16 16" aria-hidden="true">{SHAPE[t]}</svg>
             <span className="tierbtn__name">{tierName(t)}</span>
-            {s && s.price > 0 && <span className="tierbtn__price">{gnot(s.price)}</span>}
+            {s && s.price > 0 && <span className="tierbtn__price">{gnot(s.price)}<span className="tierbtn__unit"> GNOT</span></span>}
           </button>
         );
       })}
-      {tiers.some((t) => t.price > 0) && <span className="gbar__unit" aria-hidden="true">GNOT</span>}
     </div>
   );
 }
