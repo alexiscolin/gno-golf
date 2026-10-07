@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (pending the owner's final word), 2026-10-07: option 3 is built
+Accepted, 2026-10-07: the owner approved option 3, built
 (`earned.gno`'s `rules` and `AcceptRules`). It answers the review's finding on `gno.land/r/gnogolf/gnomes/earned.gno:32`
 and corrects ADR-007's Consequences ("the proof refuses until gnomes is
 updated", which cannot happen).
@@ -77,5 +77,4 @@ Option 3:
   cannot aim the proof anywhere store has not already, publicly, moved.
 - One owner call per rules change, in the release checklist after the new
   rules' delay ends.
-- Built before the realm's deploy: the owner's final word still stands, and
-  dropping it before then removes one call.
+- Built before the realm's deploy, so it is on chain from the first block.
