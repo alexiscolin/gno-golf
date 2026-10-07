@@ -8,7 +8,9 @@
 // - the hole built once a checked hole: never while a piece is dragged, once
 //   after the drop (Scene.tsx, ?camlog's window.__builds), and no shader
 //   program linked for it (the old hole let go once the new one is drawn);
-//   never for an edit that changes nothing drawn (the slug);
+//   never for an edit that changes nothing drawn (the slug); the player's
+//   view painted once a build, from the same scene and context, never as
+//   the pointer moves or the board zooms;
 // - zoomed with the wheel (motion on), the board drawn once a frame at most;
 // - idle, the loop stopped: no frame asked for, little CPU;
 // - one WebGL context for the page, a quick test and Prove it visited and
@@ -97,17 +99,18 @@ await c.send("Emulation.setCPUThrottlingRate", { rate: 1 });
 // a piece dragged about for two seconds: the hole not built again; let go, built once
 const builds = () => c.js<number>(`window.__builds ?? 0`);
 const piece = await c.js<[number, number]>(`(() => { const r = document.querySelector("[data-piece='p1']").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+const eyes = () => c.js<number>(`window.__eyes ?? 0`), eyes0 = await eyes();
 const before = await builds(), linked = () => c.js<number>(`window.__linked`);
 await mouse("mousePressed", ...piece, 1);
 for (let k = 1; k <= 120; k++) {
   await mouse("mouseMoved", piece[0] - 40 * Math.sin(k / 12), piece[1] + 30 * Math.sin(k / 9), 1);
   await sleep(16);
 }
-const during = (await builds()) - before;
+const during = (await builds()) - before, eyesDuring = (await eyes()) - eyes0;
 const linked0 = await linked();
 await mouse("mouseReleased", piece[0] - 30, piece[1] + 24);
 await sleep(1500);
-const after = (await builds()) - before, relinked = (await linked()) - linked0;
+const after = (await builds()) - before, relinked = (await linked()) - linked0, eyesAfter = (await eyes()) - eyes0;
 
 // the slug edited: checked again, the same hole drawn, not built again
 const builds0 = await builds();
@@ -117,12 +120,12 @@ const slugBuilt = (await builds()) - builds0;
 
 // zoomed with the wheel, in and out: the renders (a render clears once) over the frames shown
 await c.js(`(() => { window.__frames = 0; const f = () => { window.__frames++; if (!window.__stop) requestAnimationFrame(f); }; window.__stop = false; requestAnimationFrame(f); })()`);
-const renders0 = await c.js<number>(`window.__renders`);
+const renders0 = await c.js<number>(`window.__renders`), eyesZoom0 = await eyes();
 for (let k = 0; k < 40; k++) {
   await c.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: board.l + board.w / 2, y: board.t + board.h / 2, deltaX: 0, deltaY: k % 20 < 10 ? -40 : 40 });
   await sleep(16);
 }
-const zoomFrames = await c.js<number>(`(window.__stop = true, window.__frames)`), zoom = { renders: (await c.js<number>(`window.__renders`)) - renders0, frames: zoomFrames };
+const zoomFrames = await c.js<number>(`(window.__stop = true, window.__frames)`), zoom = { renders: (await c.js<number>(`window.__renders`)) - renders0, frames: zoomFrames, eyes: (await eyes()) - eyesZoom0 };
 
 // idle: past the scene's IDLE_MS, nothing asked of the screen, little of the CPU
 await mouse("mouseMoved", 5, 5);
@@ -196,12 +199,13 @@ await sleep(1500);
 const noTest = await flat.js<{ quick: string; game: boolean; fell: boolean }>(`({ quick: [...document.querySelectorAll(".board__toggle")].find((b) => /Quick test/.test(b.textContent))?.title ?? "", game: !!document.querySelector(".tbench--quick, .tmode"), fell: !document.querySelector(".board") })`);
 flat.kill();
 
-const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked }, slugBuilt, zoom, idle, contexts, live, lost, world, fallback2D: fallback, noTest };
+const out = { at: `${W}×${H}`, normal, cpu4x: slow, drag: { builtDuring: during, builtAfter: after, relinked, eyesDuring, eyesAfter }, slugBuilt, zoom, idle, contexts, live, lost, world, fallback2D: fallback, noTest };
 console.log(JSON.stringify(out, null, 1));
 assert.ok(normal.msPerFrame <= 1000 / 60 && normal.fps >= BUDGET.fps, `under 60 fps: ${JSON.stringify(normal)}`);
 assert.ok(slow.msPerFrame <= 1000 / BUDGET.slowFps, `CPU 4x: under 30 fps: ${JSON.stringify(slow)}`);
 assert.equal(during, 0, "the hole built again while a piece was dragged");
 assert.equal(after, 1, `the drop built the hole ${after} times`);
+assert.ok(eyesDuring === 0 && eyesAfter === 1 && zoom.eyes === 0, `the player's view painted ${eyesDuring} times during the drag, ${eyesAfter} after, ${zoom.eyes} while zoomed`);
 assert.equal(slugBuilt, 0, `a slug edit built the hole ${slugBuilt} times`);
 assert.equal(relinked, 0, `the drop's rebuild linked ${relinked} shader programs`);
 assert.ok(zoom.renders <= zoom.frames + 1, `zoomed: ${zoom.renders} renders in ${zoom.frames} frames`);

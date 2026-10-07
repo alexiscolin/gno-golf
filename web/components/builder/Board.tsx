@@ -26,7 +26,7 @@ import type { Draft, Piece, V } from "@/lib/builder/draft";
 import { makeGesture, type Env, type Target } from "@/lib/builder/gesture";
 import { onStage, stageRenderer, stageUp } from "@/lib/builder/stage";
 import type { Hole } from "@/lib/scene/data";
-import Scene from "./Scene";
+import Scene, { type Eye } from "./Scene";
 import { PieceShape } from "./PieceShape";
 import { MOD } from "./Inspector";
 import { sound } from "@/lib/feel";
@@ -71,8 +71,9 @@ export interface BoardProps {
   ball?: Ball;
   /** how the board is looked at: turned, tilted (view.ts Look; flat by default) */
   look?: Look;
-  /** the hole as checked (the pipeline's HoleState), and the draft it is of: the board drawn in 3D from it (none: in 2D) */
-  scene?: { state: Hole | null; of: Draft | null; paused?: boolean; keep?: boolean };
+  /** the hole as checked (the pipeline's HoleState), and the draft it is of: the board drawn in 3D from it (none: in 2D);
+   *  eye: the player's view painted from the same scene */
+  scene?: { state: Hole | null; of: Draft | null; paused?: boolean; keep?: boolean; eye?: Eye };
 }
 
 /** The quick shots on the board: those played (the latest last; null, one the realm refused), the one being pulled, and the meter's line. */
@@ -337,7 +338,7 @@ export default function Board(props: BoardProps) {
   const badge = (at: V) => { const q = toScreen(view, look, at); return `translate(${q[0]} ${q[1]}) scale(${view.k})`; };
   return (
     <section className={`board${gl ? " board--3d" : ""}${ghostBad || live?.why ? " board--no" : ""}${props.pan ? " board--pan" : ""}`} ref={box} tabIndex={-1} aria-label="The board: the wheel or a pinch zooms, a drag on empty space pans">
-      {in3d && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} paused={props.scene.paused} keep={props.scene.keep} />}
+      {in3d && props.scene && <Scene state={props.scene.state} view={view} look={look} size={size} waker={waker} eye={props.scene.eye} paused={props.scene.paused} keep={props.scene.keep} />}
       <svg className="board__map" width={size.w} height={size.h}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={(e) => (pointers.current.delete(e.pointerId), (drag.current = null), setLive(null), gesture.cancel(), props.ball?.onAim(null), props.onCarry?.(false))}
         onPointerLeave={() => (setGhost(null), near.current?.setAttribute("cx", "-99"))}>

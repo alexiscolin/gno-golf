@@ -36,6 +36,8 @@ import type { Shown } from "@/lib/builder/difficulty";
 import { makeMeter, type Meter } from "@/lib/builder/meter";
 import Hints from "./Hints";
 import TestMode from "./TestMode";
+import PlayerView from "./PlayerView";
+import type { Eye } from "./Scene";
 import { canonicalHex as hexOf } from "@/lib/builder/proof";
 import { keyAction } from "@/lib/builder/keys";
 import { seedOf, suggestName } from "@/lib/builder/naming";
@@ -115,6 +117,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [trying, setTrying] = useState<{ of: Draft; hex: string } | null>(null);
   // the last quick test's round that holed, left on the board as a dotted trail (played again as the hole changes)
   const [trail, setTrail] = useState<QuickShot[]>([]);
+  // the player's view (PlayerView.tsx), painted by the board's 3D scene
+  const [eye] = useState<Eye>(() => ({ canvas: null, paint: () => {} }));
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refresh = () => bump((n) => n + 1);
@@ -269,7 +273,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
     const key = (e: KeyboardEvent) => {
       if (trying) return; // (a quick test's keys are its own)
       const t = e.target as HTMLElement;
-      if (t.closest("input, select, textarea, [contenteditable]")) return;
+      if (t.closest("input, select, textarea, [contenteditable], dialog")) return; // (a dialog's keys are its own)
       const mod = e.metaKey || e.ctrlKey;
       if (e.key === "Alt") return setFine(true);
       // Space: held, a drag pans (a button keeps its Space unless the pointer is on the board)
@@ -338,7 +342,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
             {toast && <p className="btoast" role="status">{toast}</p>}
             {opened && errors.length > 0 && <p className="bbroken" role="status">{opened}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep" }}
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onCarry={setBinShown} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep", eye }}
               // (the first run's hints first: the board's tools come once they are gone)
               ball={hints ? undefined : {
                 played: landed, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
@@ -350,6 +354,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           </div>
           <aside className="col" aria-label="The selected piece">
             <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={playing} onPlay={() => setPlaying((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove} />
+            {gl && <PlayerView eye={eye} />}
           </aside>
         </>
       ) : (
