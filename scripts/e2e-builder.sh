@@ -42,40 +42,16 @@ log() { printf '%s\n' "$*" >&2; }
 die() { log "e2e: $*"; exit 1; }
 [ -d "$root/web/node_modules/three" ] || die "web/node_modules is missing: npm ci in web/"
 
-addr() { "$GNOKEY" list -home "$KH" | grep " $1 (" | sed 's/.*addr: \([^ ]*\).*/\1/'; }
-addkey() { printf '%s\n%s\n%s\n' "$2" "$PASS" "$PASS" | "$GNOKEY" add -home "$KH" -recover -insecure-password-stdin "$1" >/dev/null 2>&1; }
-
-# tx <key> <func> [args...]: a call of golf's; sets TXOUT, GAS; 0 when it went through
-tx() {
-	local key=$1 fn=$2 x a=()
-	shift 2
-	for x in "$@"; do a+=(-args "$x"); done
-	TXOUT=$(echo "$PASS" | "$GNOKEY" maketx call -home "$KH" -pkgpath "$GOLF" -func "$fn" ${a[@]+"${a[@]}"} \
-		-gas-fee 5000000ugnot -gas-wanted 200000000 -max-deposit 100000000ugnot \
-		-remote "$RPC_ADDR" -chainid "$CHAINID" -broadcast -insecure-password-stdin "$key" 2>&1)
-	GAS=$(printf %s "$TXOUT" | sed -n 's/^GAS USED: *//p' | head -1)
-	printf %s "$TXOUT" | grep -q '^OK!'
-}
+# shellcheck source=lib/e2e.sh
+. "$root/scripts/lib/e2e.sh"
 q() { "$GNOKEY" query vm/qeval -remote "$RPC_ADDR" -data "$GOLF.$1" 2>&1 | sed -n 's/^data: //p'; }
 
 # the report: the rows the TypeScript driver goes on with (its row(), the same table)
-n=0 npass=0 nfail=0 FAILS=""
-cat >"$OUT" <<EOF
-| # | step | call | expected | got | result | gas |
-|---|------|------|----------|-----|--------|-----|
-EOF
-cell() { printf %s "$1" | tr '\n' ' ' | sed 's/|/\\|/g' | cut -c1-220; }
-row() { # row <step> <call> <expected> <got> <ok 0|1> [gas]
-	n=$((n + 1))
-	local r=PASS
-	if [ "$5" = 0 ]; then npass=$((npass + 1)); else r=FAIL nfail=$((nfail + 1)) FAILS="$FAILS $n"; fi
-	printf '| %s | %s | `%s` | %s | %s | %s | %s |\n' "$n" "$(cell "$1")" "$(cell "$2")" "$(cell "$3")" "$(cell "$4")" "$r" "${6:--}" >>"$OUT"
-	log "$r $n $1: $(cell "$4")"
-}
+report
 
 # ------------------------------------------------------------------- chain
 log "e2e: work dir $WORK"
-addkey test1 "source bonus chronic canvas draft south burst lottery vacant surface solve popular case indicate oppose farm nothing bullet exhibit title speed wink action roast"
+addkey test1 "$TEST1_MNEMONIC"
 for k in a1 a2 pl; do addkey $k "$("$GNOKEY" generate 2>/dev/null | tail -1)"; done
 OWNER=$(addr test1) A1=$(addr a1) A2=$(addr a2) PL=$(addr pl)
 [ -n "$PL" ] || die "the keys were not made"
@@ -106,20 +82,10 @@ for p in p/$NS/gnogolf/physics p/$NS/gnogolf/course r/$NS/gnogolf/store r/$NS/gn
 done
 
 # --------------------------------------------------- publishing, opened
-# no <step> <panic> <key> <func> [args...]: refused, with that panic
-no() {
-	local s=$1 e=$2 k=$3 f=$4 w
-	shift 4
-	if tx "$k" "$f" "$@"; then row "$s" "$k: $f(…)" "refused: $e" "went through" 1 "$GAS"; return; fi
-	w=$(printf %s "$TXOUT" | sed -n 's/^Data: //p' | head -1)
-	case $w in *"$e"*) row "$s" "$k: $f(…)" "refused: $e" "refused: $w" 0 "$GAS" ;; *) row "$s" "$k: $f(…)" "refused: $e" "refused otherwise: $w" 1 "$GAS" ;; esac
-}
-no "publishing: closed at deploy" "golf: publishing community holes is not open yet" a1 PublishMine early "$(awk '$1=="garden/3"{print $4}' "$root/data/holes.txt")" ""
-no "publishing: owner only" "golf: only the owner can open or close publishing" a1 SetPublishing true
-if tx test1 SetPublishing true; then row "publishing: the owner opens it" "test1: SetPublishing(true)" "opened" "went through" 0 "$GAS"
-else row "publishing: the owner opens it" "test1: SetPublishing(true)" "opened" "$(printf %s "$TXOUT" | sed -n 's/^Data: //p' | head -1)" 1 "$GAS"; fi
-got=$(q 'Publishing()')
-row "publishing: Publishing()" "Publishing()" "(true bool)" "$got" "$([ "$got" = "(true bool)" ] && echo 0 || echo 1)"
+no "publishing: closed at deploy" "golf: publishing community holes is not open yet" a1 "$GOLF" PublishMine early "$(awk '$1=="garden/3"{print $4}' "$root/data/holes.txt")" ""
+no "publishing: owner only" "golf: only the owner can open or close publishing" a1 "$GOLF" SetPublishing true
+ok "publishing: the owner opens it" "opened" test1 "$GOLF" SetPublishing true
+is "publishing: Publishing()" "Publishing()" "(true bool)" "$(q 'Publishing()')"
 
 # --------------------------------------------- the Builder's holes, played
 cd "$root/web" || die "no web/"

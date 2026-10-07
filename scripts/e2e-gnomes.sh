@@ -79,6 +79,8 @@ ROWS=$root/data/gnomes/rows/genesis.txt
 mkdir -p "$WORK"
 log() { printf '%s\n' "$*" >&2; }
 die() { log "e2e: $*"; exit 1; }
+# shellcheck source=lib/e2e.sh
+. "$root/scripts/lib/e2e.sh"
 
 # ------------------------------------------------------------------ helpers
 # python3 for what sh reads badly: a qeval answer, JSON, base64, gnomcp's
@@ -188,8 +190,6 @@ gnoweb-url = "http://$WEB_ADDR"
 EOF
 
 KH=$WORK/keys
-addr() { "$GNOKEY" list -home "$KH" | grep " $1 (" | sed 's/.*addr: \([^ ]*\).*/\1/'; }
-addkey() { printf '%s\n%s\n%s\n' "$2" "$PASS" "$PASS" | "$GNOKEY" add -home "$KH" -recover -insecure-password-stdin "$1" >/dev/null 2>&1; }
 
 # chain time: the last block's, unix seconds; a block's by height
 chaintime() { curl -s "http://$RPC_ADDR/status" | jq -r .result.sync_info.latest_block_time | py epoch; }
@@ -223,9 +223,8 @@ bal() { # ugnot of an address
 	fi
 }
 
-# tx <key> <pkg> <func> [args...]: a call, SEND coins attached; sets TXOUT,
-# GAS, HEIGHT, VIA, and returns 0 when it went through. test1's go through
-# gnomcp with MCP=1.
+# tx <key> <pkg> <func> [args...]: lib/e2e.sh's, test1's through gnomcp
+# with MCP=1 (sets TXOUT, GAS, HEIGHT, VIA; 0 when it went through).
 tx() {
 	local key=$1 pkg=$2 fn=$3 rc
 	shift 3
@@ -246,21 +245,8 @@ tx() {
 			return $rc
 		fi
 	fi
-	local a=() try
-	for x in "$@"; do a+=(-args "$x"); done
-	for try in 1 2 3; do # (a sequence read before the last tx's block is "unauthorized": again)
-	TXOUT=$(echo "$PASS" | "$GNOKEY" maketx call -home "$KH" -pkgpath "$pkg" -func "$fn" ${a[@]+"${a[@]}"} \
-		${SEND:+-send "$SEND"} -gas-fee 5000000ugnot -gas-wanted "${GASW:-200000000}" -max-deposit 100000000ugnot \
-		-remote "$RPC_ADDR" -chainid "$CHAINID" -broadcast -insecure-password-stdin "$key" 2>&1)
-	printf %s "$TXOUT" | grep -q 'unauthorized error' || break
-	sleep 2
-	done
-	GAS=$(printf %s "$TXOUT" | sed -n 's/^GAS USED: *//p' | head -1)
-	HEIGHT=$(printf %s "$TXOUT" | sed -n 's/^HEIGHT: *//p' | head -1)
-	printf %s "$TXOUT" | grep -q '^OK!'
+	gnotx "$key" "$pkg" "$fn" "$@"
 }
-# the panic a refused call gave, on one line
-why() { printf %s "$TXOUT" | sed -n 's/^Data: //p;s/^.*\(gnomes: [^"]*\).*$/\1/p;s/^.*\(golf: [^"]*\).*$/\1/p' | head -1 | cut -c1-160; }
 
 # urigas <id>: the gas TokenURI(id) takes in a transaction of its own: a
 # MsgRun of it, less the same MsgRun reading OwnerOf(id) alone (gnomcp's
@@ -288,48 +274,7 @@ within() { if [ "$4" -eq "$4" ] 2>/dev/null && [ "$4" -le "$3" ]; then row "$1" 
 # charges no object loads), with room
 URIMAX=84000000
 
-# the report
-n=0 npass=0 nfail=0
-FAILS=""
-cat >"$OUT" <<EOF
-| # | step | call | expected | got | result | gas |
-|---|------|------|----------|-----|--------|-----|
-EOF
-cell() { printf %s "$1" | tr '\n' ' ' | sed 's/|/\\|/g' | cut -c1-220; }
-row() { # row <step> <call> <expected> <got> <ok 0|1> [gas]
-	n=$((n + 1))
-	local r=PASS
-	if [ "$5" = 0 ]; then npass=$((npass + 1)); else r=FAIL nfail=$((nfail + 1)) FAILS="$FAILS $n"; fi
-	printf '| %s | %s | `%s` | %s | %s | %s | %s |\n' "$n" "$(cell "$1")" "$(cell "$2")" "$(cell "$3")" "$(cell "$4")" "$r" "${6:--}" >>"$OUT"
-	log "$r $n $1: $(cell "$4")"
-}
-# args: a call's arguments for the table, a long one as its size
-args() {
-	local x out=""
-	for x in "$@"; do
-		[ ${#x} -gt 64 ] && x="<${#x} bytes>"
-		out="$out${out:+, }$x"
-	done
-	printf %s "$out"
-}
-# ok <step> <expected> <key> <pkg> <func> [args...]: the call must go through
-ok() {
-	local s=$1 e=$2 k=$3 p=$4 f=$5
-	shift 5
-	if tx "$k" "$p" "$f" "$@"; then row "$s" "$k: ${p##*/}.$f($(args "$@"))${SEND:+ send $SEND} [$VIA]" "$e" "went through" 0 "$GAS"
-	else row "$s" "$k: ${p##*/}.$f($(args "$@"))${SEND:+ send $SEND} [$VIA]" "$e" "refused: $(why)" 1 "$GAS"; fi
-}
-# no <step> <panic substring> <key> <pkg> <func> [args...]: refused, with that panic
-no() {
-	local s=$1 e=$2 k=$3 p=$4 f=$5 w
-	shift 5
-	if tx "$k" "$p" "$f" "$@"; then row "$s" "$k: ${p##*/}.$f($(args "$@"))${SEND:+ send $SEND} [$VIA]" "refused: $e" "went through" 1 "$GAS"; return; fi
-	w=$(printf %s "$TXOUT" | grep -o "$e" | head -1)
-	if [ -n "$w" ]; then row "$s" "$k: ${p##*/}.$f($(args "$@"))${SEND:+ send $SEND} [$VIA]" "refused: $e" "refused: $(why)" 0 "${GAS:-}"
-	else row "$s" "$k: ${p##*/}.$f($(args "$@"))${SEND:+ send $SEND} [$VIA]" "refused: $e" "refused otherwise: $(why)" 1 "${GAS:-}"; fi
-}
-# is <step> <call> <expected> <got>: a read or a balance, compared
-is() { if [ "$3" = "$4" ]; then row "$1" "$2" "$3" "$4" 0; else row "$1" "$2" "$3" "$4" 1; fi; }
+report
 # has <step> <call> <substring> <got>
 has() { case $4 in *"$3"*) row "$1" "$2" "contains $3" "$(cell "$4" | cut -c1-140)" 0 ;; *) row "$1" "$2" "contains $3" "$4" 1 ;; esac; }
 jf() { py jq "$1"; } # a field of the JSON on stdin
@@ -350,7 +295,7 @@ findshot() {
 
 # ------------------------------------------------------------------- chain
 log "e2e: work dir $WORK"
-addkey test1 "source bonus chronic canvas draft south burst lottery vacant surface solve popular case indicate oppose farm nothing bullet exhibit title speed wink action roast"
+addkey test1 "$TEST1_MNEMONIC"
 for k in p0 p1 b1 b2 treas; do # (MNEMONIC_<key>: a phrase the caller made, try-local.sh's; else one made here)
 	m=MNEMONIC_$k
 	addkey $k "${!m:-$("$GNOKEY" generate 2>/dev/null | tail -1)}"

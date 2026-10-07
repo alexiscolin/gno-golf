@@ -60,6 +60,8 @@ cache=${XDG_CACHE_HOME:-$HOME/.cache}/gnogolf-try-local
 last=$cache/last # the WORK of the playground running, for `wave2` and `down`
 log() { printf '%s\n' "$*" >&2; }
 die() { log "try-local: $*"; exit 1; }
+# shellcheck source=lib/e2e.sh
+. "$root/scripts/lib/e2e.sh"
 tree() { local c; for c in $(pgrep -P "$1"); do tree "$c"; done; echo "$1"; } # a process and all it started
 # the site built as the real one is, with the playground's settings ($WORK/site.env), into a new folder, then swapped
 # in: $WORK/site is a link the server reads on every request, replaced in one rename. Kept: the build served until
@@ -102,14 +104,9 @@ chainnow() {
 }
 # a call by the collection's owner (test1) on the gnomes realm; refused: its reason in REFUSED
 owner() {
-	local fn=$1 a=() x out
-	shift
-	for x in "$@"; do a+=(-args "$x"); done
-	out=$(echo "$PASS" | "$GNOKEY" maketx call -home "$KH" -pkgpath "$GNOMES" -func "$fn" "${a[@]}" \
-		-gas-fee 5000000ugnot -gas-wanted 200000000 -remote "$RPC" -chainid "$CHAINID" -broadcast -insecure-password-stdin test1 2>&1)
-	printf %s "$out" | grep -q '^OK!' && return 0
-	REFUSED=$(printf %s "$out" | grep -o 'gnomes: [^"]*' | head -1)
-	[ -n "$REFUSED" ] || REFUSED=$(printf '%s\n' "$out" | tail -1)
+	RPC_ADDR=$RPC gnotx test1 "$GNOMES" "$@" && return 0
+	REFUSED=$(printf %s "$TXOUT" | grep -o 'gnomes: [^"]*' | head -1)
+	[ -n "$REFUSED" ] || REFUSED=$(printf '%s\n' "$TXOUT" | tail -1)
 	return 1
 }
 # a wave of data/gnomes.json (index from 0) on sale from NOW, its players' window as the catalogue says
