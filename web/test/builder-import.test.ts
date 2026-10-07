@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { hexOf, host, lane } from "./builder-fixture.ts";
 import "./scene-harness.ts";
-import { draftFile, fromFile, fromPublished, remixFrom, remixOf } from "../lib/builder/importing.ts";
+import { draftFile, fromFile, fromPublished, openPublished, remixFrom, remixOf } from "../lib/builder/importing.ts";
 import { remixId, remixLink } from "../lib/builder/holes.ts";
 import { MAX_NOTE } from "../lib/builder/draft.ts";
 import { exportDraft } from "../lib/builder/draft.ts";
@@ -134,4 +134,18 @@ void test("remixFrom: the chain's version read, judged as the Builder opens any,
   assert.equal(await remixFrom(chain({}), host, census, id, ok.get), "The chain has no hole there, or could not be read.");
   const gone = chain({ [id]: hex }, `${B}/mole-run`);
   assert.equal(await remixFrom(gone, host, census, id, gone.get), "This hole was taken down: it cannot be opened in the Builder.");
+});
+
+void test("openPublished: a published hole by its id, as Start and a remix open it; each failure said for what failed", async () => {
+  const hex = canonicalHex({ ...STARTERS.garden.straight, title: "Mole Run" }, host)!, id = `${B}/mole-run/v2`;
+  const chain = { holeData: (x: string) => (x === id ? Promise.resolve(hex) : Promise.reject(new Error("no hole"))), chainId: () => Promise.resolve("dev") };
+  const list = () => Promise.resolve(new Response(JSON.stringify({ holes: [] })));
+  const mine = await openPublished(chain, host, census, id, B, list);
+  assert.ok(typeof mine === "object" && mine.slug === "mole-run" && mine.title === "Mole Run", "the author's own: its next version");
+  assert.equal(await openPublished(chain, host, census, `${B}/nope/v1`, B, list), "The chain has no hole there, or could not be read.");
+  assert.equal(await openPublished(chain, host, census, id, B, () => Promise.reject(new Error("offline"))), "The site's list of holes taken down could not be read. Try again in a moment.", "the site's list, not the chain");
+  const broken = () => {
+    throw new Error("a chunk did not load");
+  };
+  assert.equal(await openPublished(chain, host, broken, id, B, list), "The Builder's pieces could not load. Try again in a moment.", "a failure past the read: said, never unhandled");
 });

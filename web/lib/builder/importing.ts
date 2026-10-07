@@ -92,18 +92,24 @@ export function remixOf(d: Draft, id: string): Draft {
 }
 
 /**
- * A community hole's version (id) as a remix (remixOf): its data read from
- * the chain, the site's takedown list with it (one taken down never opens),
- * opened as the Builder opens any published hole (fromPublished); or why not.
+ * A published hole by its id, as the Builder opens one (fromPublished): its
+ * data read from the chain, the site's takedown list with it (one taken down
+ * never opens, the list unread nothing does); or why not, for what failed.
  */
-export async function remixFrom(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, get?: Parameters<typeof loadTakedown>[1]): Promise<Draft | string> {
-  let d: Draft | string;
+export async function openPublished(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, me: string | null, get?: Parameters<typeof loadTakedown>[1]): Promise<Draft | string> {
+  const [hex, taken] = await Promise.all([chain.holeData(id).catch(() => null), loadTakedown(chain, get).catch(() => null)]);
+  if (hex === null) return "The chain has no hole there, or could not be read.";
+  if (taken === null) return "The site's list of holes taken down could not be read. Try again in a moment.";
   try {
-    const [hex, taken] = await Promise.all([chain.holeData(id), loadTakedown(chain, get)]);
-    d = await fromPublished(hex, host, id, null, census, taken);
+    return await fromPublished(hex, host, id, me, census, taken);
   } catch {
-    return "The chain has no hole there, or could not be read.";
+    return "The Builder's pieces could not load. Try again in a moment.";
   }
+}
+
+/** A community hole's version (id) as a remix (remixOf) of the hole openPublished opens; or why not. */
+export async function remixFrom(chain: Pick<Chain, "holeData" | "chainId">, host: BuilderHost, census: Census, id: string, get?: Parameters<typeof loadTakedown>[1]): Promise<Draft | string> {
+  const d = await openPublished(chain, host, census, id, null, get);
   return typeof d === "string" ? d : remixOf(d, id);
 }
 
