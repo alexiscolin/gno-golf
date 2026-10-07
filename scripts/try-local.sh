@@ -13,9 +13,13 @@
 # gnomes under the test name NS; publishes the Garden's eighteen holes; the
 # genesis series, wave 1 open (its players' window an hour), the close in 30
 # days; community publishing open; the treasury moved to a test key; p1 and
-# b1 with a record and a few gnomes. Then `next dev` with the shop, the
-# Builder and the community holes on (NEXT_PUBLIC_GNOMES, BUILDER,
-# COMMUNITY), pointed at that chain.
+# b1 with a record and a few gnomes; all the course, the four classic cups
+# and the Crystal Mines. Then the site built as the real one is (next build:
+# no dev server's compiles or reloads over a proxied link), with the shop,
+# the Builder and the community holes on (NEXT_PUBLIC_GNOMES, BUILDER,
+# COMMUNITY) and the test hooks (?geo=blocked), pointed at that chain, and
+# served by scripts/playground-server.mjs. The build is web/out's, as `npm
+# run build` writes it; the site is served from a copy in WORK.
 #
 # Every server listens on 127.0.0.1 alone. With Tailscale, the tailnet-preview
 # skill (TAILNET_PREVIEW, ~/.claude/skills/tailnet-preview) opens Tailscale
@@ -25,14 +29,14 @@
 # Tailscale IP (the fallback, plain http), the node's RPC as raw TCP for a
 # wallet, which signs straight to it, and gnoweb as raw TCP for the "read
 # its code" links. The page reads the chain on its own origin, /rpc, which
-# the dev server proxies to the node (next.config.mjs: GNOGOLF_PLAYGROUND, a
-# dev server's alone): no CORS, no second host, both links alike.
+# the site's server streams to the node: no CORS, no second host, both links
+# alike.
 #
 # The wallets' seed phrases are made each run, held in memory and printed in
 # the terminal only; the keybase in WORK holds the keys under a throwaway
 # password, for this chain alone.
 #
-# Env: APP_PORT (the dev server, 5175 or the next free port), RPC_PORT
+# Env: APP_PORT (the site, 5175 or the next free port), RPC_PORT
 # (26667) and GNOWEB_PORT (8868: not gnodev's own 26657 and 8888, often
 # another node's), CHAINID (gnogolf-local: not "dev", which Adena keeps for its
 # own network), NS (nym-trylocal000), WORK (a new folder under
@@ -104,7 +108,7 @@ fi
 mkdir -p "$cache"
 WORK=${WORK:-$(mktemp -d "$cache/run.XXXXXX")}
 
-# Ctrl+C (or any end): the Serve entries, the dev server, then the chain, each with what it started
+# Ctrl+C (or any end): the Serve entries, the site, then the chain, each with what it started
 DEV_PID="" APP_PID="" SERVED=""
 stop() {
 	trap - INT TERM EXIT
@@ -125,9 +129,9 @@ echo "$WORK" >"$last"
 # environment, never written down (the others stay the seed's own)
 MNEMONIC_p1=$("$GNOKEY" generate 2>/dev/null | tail -1) MNEMONIC_p0=$("$GNOKEY" generate 2>/dev/null | tail -1)
 [ "$(printf %s "$MNEMONIC_p1" | wc -w)" -ge 12 ] && [ "$(printf %s "$MNEMONIC_p0" | wc -w)" -ge 12 ] || die "gnokey generate made no seed phrase"
-log "try-local: a local chain ($CHAINID) and the realms under $NS, seeded (a minute or so; its log: $WORK/seed.log)"
+log "try-local: a local chain ($CHAINID), the realms under $NS and the course's 90 holes (a few minutes; its log: $WORK/seed.log)"
 MNEMONIC_p1=$MNEMONIC_p1 MNEMONIC_p0=$MNEMONIC_p0 \
-	SEED=1 SEED_WAVE2=0 SEED_WORLDS=garden SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
+	SEED=1 SEED_WAVE2=0 SEED_WORLDS="garden island town mountain mines" SEED_PUBLISHING=1 SEED_TREASURY=1 NS=$NS CHAINID=$CHAINID WORK=$WORK \
 	RPC_ADDR=127.0.0.1:$RPC_PORT WEB_ADDR=127.0.0.1:$GNOWEB_PORT \
 	bash "$root/scripts/e2e-gnomes.sh" >"$WORK/seed.out" 2>"$WORK/seed.log" ||
 	{ DEV_PID=$(sed -n 's/^DEV_PID=//p' "$WORK/seed.env" 2>/dev/null); tail -5 "$WORK/seed.log" >&2; die "the seed failed (its steps: $WORK/e2e.md)"; }
@@ -136,14 +140,17 @@ MNEMONIC_p1=$MNEMONIC_p1 MNEMONIC_p0=$MNEMONIC_p0 \
 echo "$DEV_PID" >"$WORK/dev.pid"
 
 # ------------------------------------------------------------------ the site
-ORIGINS="" WALLET_RPC=http://127.0.0.1:$RPC_PORT WEB_URL=http://127.0.0.1:$GNOWEB_PORT
-[ -z "$TS_NAME" ] || ORIGINS=$TS_NAME,$TS_IP
-log "try-local: the site's dev server on 127.0.0.1:$APP_PORT (its log: $WORK/next.log)"
+WALLET_RPC=http://127.0.0.1:$RPC_PORT WEB_URL=http://127.0.0.1:$GNOWEB_PORT
+# the site as the real one is built, the playground's settings in it; served from WORK
 start_app() {
-	(cd "$root/web" && exec env GNOGOLF_PLAYGROUND=1 PLAYGROUND_RPC="http://127.0.0.1:$RPC_PORT" PLAYGROUND_ORIGINS="$ORIGINS" \
-		NEXT_PUBLIC_RPC=/rpc NEXT_PUBLIC_WALLET_RPC="$WALLET_RPC" NEXT_PUBLIC_WEB="$WEB_URL" NEXT_PUBLIC_REALM="$GOLF" \
-		NEXT_PUBLIC_NETWORK=testnet NEXT_PUBLIC_GNOMES=1 NEXT_PUBLIC_BUILDER=1 NEXT_PUBLIC_COMMUNITY=1 \
-		npm run -s dev -- -H 127.0.0.1 -p "$APP_PORT") >>"$WORK/next.log" 2>&1 &
+	log "try-local: the site built (a few minutes; its log: $WORK/build.log)"
+	(cd "$root/web" && env NEXT_PUBLIC_PLAYGROUND=1 NEXT_PUBLIC_TEST_HOOKS=1 NEXT_PUBLIC_RPC=/rpc NEXT_PUBLIC_WALLET_RPC="$WALLET_RPC" \
+		NEXT_PUBLIC_WEB="$WEB_URL" NEXT_PUBLIC_REALM="$GOLF" NEXT_PUBLIC_NETWORK=testnet \
+		NEXT_PUBLIC_GNOMES=1 NEXT_PUBLIC_BUILDER=1 NEXT_PUBLIC_COMMUNITY=1 npm run -s build) >"$WORK/build.log" 2>&1 ||
+		{ tail -5 "$WORK/build.log" >&2; die "the site's build failed"; }
+	rm -rf "$WORK/site" && cp -R "$root/web/out" "$WORK/site"
+	log "try-local: the site on 127.0.0.1:$APP_PORT (its log: $WORK/site.log)"
+	node "$root/scripts/playground-server.mjs" "$WORK/site" "$APP_PORT" "http://127.0.0.1:$RPC_PORT" >"$WORK/site.log" 2>&1 &
 	APP_PID=$!
 	echo "$APP_PID" >"$WORK/app.pid"
 }
@@ -160,7 +167,7 @@ if [ -n "$TS_NAME" ]; then
 fi
 start_app
 for _ in $(seq 120); do curl -sf -o /dev/null "http://127.0.0.1:$APP_PORT/" && break; sleep 1; done
-curl -sf -o /dev/null "http://127.0.0.1:$APP_PORT/" || { tail -5 "$WORK/next.log" >&2; die "the dev server did not start"; }
+curl -sf -o /dev/null "http://127.0.0.1:$APP_PORT/" || { tail -5 "$WORK/site.log" >&2; die "the site's server did not start"; }
 # each address as a device on the tailnet reaches it (the ts.net name pinned to the IP: this machine's
 # own resolver may not use Tailscale's DNS); the first https request waits for its certificate
 check() { curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$@"; }
@@ -208,16 +215,17 @@ else printf '  Open  http://127.0.0.1:%s/   (this machine)' "$APP_PORT"; fi)
     gnokey maketx call -pkgpath $GNOMES -func Buy -args <id> -send <price>ugnot \\
       -gas-fee 5000000ugnot -gas-wanted 200000000 -remote $WALLET_RPC -chainid $CHAINID -broadcast p1
 
-  Try:
-    1. Play a Garden hole (the title's Play), finish it, see the card.
-    2. The gnomes: /g/ . Buy a Common, a Rare, an Epic and the Legendary #$LEGENDARY
-       (p1: its window's caps); the order's two boxes, Adena, the receipt.
-    3. Wear one: the gnome picker's Yours row; Show to everyone (Equip).
-       Race a board's ghost: see the rivals' gnomes on the boards and as ghosts.
-    4. The region gate: /g/?geo=blocked (a dev build alone).
-    5. The Builder: /build/ on a computer: make a hole, Test it
-       (hole it in each weather), Publish (Adena or the gnokey line).
-    6. Find it: the cups screen's community holes.
+  Try (the title's "Click to start" opens "How do we play?"):
+    1. Play: Solo, a cup (all five are there), a hole; finish it, see the card.
+    2. The gnomes: "Gnomes →" under the three games (also on the cups screen, and
+       "More gnomes" in the gnome picker). Buy a Common, a Rare, an Epic and the
+       Legendary #$LEGENDARY (p1: its window's caps); the two boxes, Adena, the receipt.
+    3. Wear one: the gnome picker's row of yours; Show to everyone (Equip).
+       Duel: race a player's ghost, their gnome on the boards and as the ghost.
+    4. The region gate: add ?geo=blocked to the gnomes' page (/g/?geo=blocked).
+    5. The Builder: the "Builder" game on a computer (a phone gets its play-only
+       screen): make a hole, Test it (hole it in each weather), Publish.
+    6. Find it: Solo, the cups screen's "Community holes", under the cups.
   Wave 2 on sale now:  scripts/try-local.sh wave2   (another terminal)
   Logs: $WORK   Ctrl+C stops everything (after a crash: scripts/try-local.sh down).
 ================================================================================

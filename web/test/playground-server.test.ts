@@ -1,0 +1,54 @@
+// scripts/playground-server.mjs: the playground's static build and its /rpc,
+// as the static host serves the site, and nothing more: a folder's page at
+// its slash, the build's 404, no file outside the build (dotfiles, "..", a
+// link leading out), and /rpc to a node on this machine only.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+
+type Server = http.Server;
+const { playgroundServer } = (await import("../../scripts/playground-server.mjs")) as { playgroundServer: (o: { root: string; rpc: string }) => Server };
+
+const listen = (s: Server) => new Promise<number>((r) => s.listen(0, "127.0.0.1", () => r((s.address() as { port: number }).port)));
+const get = async (port: number, p: string, init: RequestInit = {}) => {
+  const r = await fetch(`http://127.0.0.1:${port}${p}`, { redirect: "manual", ...init });
+  return { status: r.status, type: r.headers.get("content-type") || "", location: r.headers.get("location") || "", body: await r.text() };
+};
+
+void test("the playground serves the build as the static host does, and /rpc from the node on this machine", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "playground-")), out = path.join(dir, "out");
+  for (const [f, body] of [["index.html", "home"], ["g/index.html", "gallery"], ["404.html", "missing"], ["_next/static/a.js", "js"], ["golf.wasm", "wasm"], [".secret", "no"]] as const) {
+    fs.mkdirSync(path.dirname(path.join(out, f)), { recursive: true });
+    fs.writeFileSync(path.join(out, f), body);
+  }
+  fs.writeFileSync(path.join(dir, "outside.txt"), "no");
+  fs.symlinkSync(path.join(dir, "outside.txt"), path.join(out, "link.txt"));
+  // the node: says what it was asked
+  const node = http.createServer((req, res) => {
+    let b = "";
+    req.on("data", (c: Buffer) => (b += String(c)));
+    req.on("end", () => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ method: req.method, url: req.url, body: b })));
+  });
+  const nodePort = await listen(node);
+  const site = playgroundServer({ root: out, rpc: `http://127.0.0.1:${nodePort}` });
+  const port = await listen(site);
+  try {
+    assert.equal((await get(port, "/")).body, "home");
+    assert.deepEqual(await get(port, "/g").then((r) => [r.status, r.location]), [308, "/g/"]);
+    assert.equal((await get(port, "/g/")).body, "gallery");
+    assert.match((await get(port, "/_next/static/a.js")).type, /^text\/javascript/);
+    assert.equal((await get(port, "/golf.wasm")).type, "application/wasm");
+    for (const p of ["/nowhere/", "/.secret", "/../outside.txt", "/%2e%2e/outside.txt", "/link.txt"]) assert.deepEqual(await get(port, p).then((r) => [r.status, r.body]), [404, "missing"], p);
+    assert.equal((await get(port, "/", { method: "POST" })).status, 405);
+    assert.deepEqual(JSON.parse((await get(port, "/rpc/status?x=1")).body), { method: "GET", url: "/status?x=1", body: "" });
+    assert.deepEqual(JSON.parse((await get(port, "/rpc/", { method: "POST", body: '{"id":1}', headers: { "content-type": "application/json" } })).body), { method: "POST", url: "/", body: '{"id":1}' });
+  } finally {
+    site.close();
+    node.close();
+  }
+  assert.throws(() => playgroundServer({ root: out, rpc: "http://100.104.210.102:26657" }), /127\.0\.0\.1/);
+  assert.throws(() => playgroundServer({ root: out, rpc: "http://127.0.0.1.example:80" }), /127\.0\.0\.1/);
+});

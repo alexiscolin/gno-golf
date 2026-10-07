@@ -1,5 +1,3 @@
-import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
-
 // A static export: the game is a client that talks to a gno node over HTTP, so
 // there is no server side to host. `next build` writes out/ — drop it on any
 // static host, or on IPFS.
@@ -19,11 +17,13 @@ if (process.env.CONTEXT === "production") {
       ? ["NEXT_PUBLIC_SELLER_NAME", "NEXT_PUBLIC_SELLER_ADDRESS", "NEXT_PUBLIC_SELLER_EMAIL", "NEXT_PUBLIC_TERMS_VERSION"].filter((k) => !(e[k] || "").trim())
           .concat(["NEXT_PUBLIC_TERMS_URL", "NEXT_PUBLIC_TOKUSHOHO_URL", "NEXT_PUBLIC_PRIVACY_URL"].filter((k) => !https(e[k])).map((k) => `${k} (https://…)`))
       : []),
+    // the local playground's (scripts/try-local.sh), never the site's
+    ...["NEXT_PUBLIC_PLAYGROUND", "NEXT_PUBLIC_WALLET_RPC", "NEXT_PUBLIC_TEST_HOOKS"].filter((k) => e[k]).map((k) => `no ${k}`),
   ].filter(Boolean);
   if (bad.length) throw new Error(`a production build needs ${bad.join(", ")}: see netlify.toml`);
 }
 
-const base = {
+export default {
   output: "export",
   trailingSlash: true, // a hole's page is out/h/garden-3/index.html: /h/garden-3/ on any static host
   images: { unoptimized: true },
@@ -31,26 +31,3 @@ const base = {
   // the commit a build is of (Netlify's COMMIT_REF), said with every analytics event
   env: { NEXT_PUBLIC_BUILD: (process.env.COMMIT_REF || "").slice(0, 7) },
 };
-
-/**
- * scripts/try-local.sh's playground, on `next dev` alone (GNOGOLF_PLAYGROUND=1,
- * never a build: phase): the page's own /rpc proxied to the node on this
- * machine (PLAYGROUND_RPC, http://127.0.0.1:<port> and nothing else), so a
- * device on the tailnet reads the chain on the page's origin; and the dev
- * server's scripts served to the hosts PLAYGROUND_ORIGINS names exactly (the
- * machine's ts.net name and Tailscale IP, comma-separated: no wildcard).
- */
-export function playground(phase, env = process.env) {
-  if (phase !== PHASE_DEVELOPMENT_SERVER || env.GNOGOLF_PLAYGROUND !== "1") return {};
-  const rpc = env.PLAYGROUND_RPC || "";
-  if (!/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(rpc)) throw new Error(`PLAYGROUND_RPC is the node on this machine, http://127.0.0.1:<port>, not "${rpc}"`);
-  const origins = (env.PLAYGROUND_ORIGINS || "").split(",").map((h) => h.trim()).filter(Boolean);
-  for (const h of origins) if (!/^[a-z0-9.-]+$/i.test(h)) throw new Error(`PLAYGROUND_ORIGINS names hosts exactly, not "${h}"`);
-  return {
-    allowedDevOrigins: origins,
-    skipTrailingSlashRedirect: true, // (/rpc/status reaches the node as /status, not /status/)
-    rewrites: async () => [{ source: "/rpc/:path*", destination: `${rpc}/:path*` }],
-  };
-}
-
-export default (phase) => ({ ...base, ...playground(phase) });

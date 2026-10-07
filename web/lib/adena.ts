@@ -113,10 +113,10 @@ function refusal(res: AdenaRes | null | undefined) {
 
 // the same address written the same way: Adena compares RPCs as strings
 const norm = (u: string | null | undefined) => String(u || "").trim().replace(/\/+$/, "");
-/** The node as a wallet reaches it: NEXT_PUBLIC_WALLET_RPC when a dev server reads it through another address
- *  (scripts/try-local.sh: the page's own /rpc, the wallet the node's raw port), else the page's own RPC. A
- *  production build never takes it: its wallet signs on the very node the page reads. */
-const walletNode = (rpc: string) => (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_WALLET_RPC) || rpc;
+/** The node as a wallet reaches it: NEXT_PUBLIC_WALLET_RPC in the local playground's build (NEXT_PUBLIC_PLAYGROUND,
+ *  scripts/try-local.sh: the page reads its own /rpc, the wallet signs on the node's raw port), else the page's own
+ *  RPC. The site never takes it (next.config.mjs refuses both on Netlify): its wallet signs on the node it reads. */
+const walletNode = (rpc: string) => (process.env.NEXT_PUBLIC_PLAYGROUND === "1" && process.env.NEXT_PUBLIC_WALLET_RPC) || rpc;
 
 /**
  * Puts Adena on this page's chain (id and RPC), adding the network if it has

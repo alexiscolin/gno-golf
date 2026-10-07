@@ -1,10 +1,10 @@
 "use client";
 
 // The first choice, before the cups: play alone, race a player's ghost
-// (ADR-004), or, to come, build a hole. A duel asks whom to race on a screen
+// (ADR-004), or build a hole (the Builder, once out: onBuild). A duel asks whom to race on a screen
 // of its own (Rival), then on which of the holes they have a best on (Ghosts),
 // in place of the cups. Panels of their own, a kart game's modes.
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Emblem, Frame, WORLDS } from "@/components/Worlds";
 import { useGnomeStage } from "@/components/Stage";
 import { gnomeById } from "@/lib/scene";
@@ -23,7 +23,8 @@ import { motion } from "@/lib/scene/materials";
 import { sound } from "@/lib/feel";
 import type { HoleRow, HoleState, Mode, Stroke, Vec2, Zone } from "@/lib/types";
 
-export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBack: () => void; onAbout: () => void }) {
+// onBuild: the Builder's page (none: it is to come); more: one compact line under the panels (the gnomes' gallery)
+export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBuild, more, onBack, onAbout }: { gnome: string; counts?: Readonly<Record<string, number>>; onSolo: () => void; onDuel: () => void; onBuild?: () => void; more?: ReactNode; onBack: () => void; onAbout: () => void }) {
   const skin = gnomeById(gnome);
   const cups = courseCount(counts).cups || CLASSIC.length; // (the chain's, once it has answered)
   return (
@@ -31,8 +32,9 @@ export default function Modes({ gnome, counts = {}, onSolo, onDuel, onBack, onAb
       <ul className="modes__list">
         <li><Panel kind="solo" name="Solo" line={`${countWord(cups)} cups, your best on the boards`} skin={skin} onClick={onSolo} /></li>
         <li><Panel kind="duel" name="Duel" line="Race a player's ghost, stroke for stroke" skin={skin} onClick={onDuel} /></li>
-        <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon /></li>
+        <li><Panel kind="build" name="Builder" line="Draw your own hole, dare the others" skin={skin} soon={!onBuild} onClick={onBuild} /></li>
       </ul>
+      {more && <p className="modes__more">{more}</p>}
     </FrontScreen>
   );
 }

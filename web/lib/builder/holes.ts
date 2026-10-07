@@ -21,6 +21,8 @@ export function listHoles(rows: readonly HoleRow[], me: string | null, taken: Re
 export const playLink = (h: HoleRow, keep = "") => `/?hole=${encodeURIComponent(h.slot || h.id)}${keep && `&${keep}`}`;
 /** The game's cups screen, where every community hole is judged and listed (keep: as playLink's). */
 export const cupsLink = (keep = "") => `/?screen=cups${keep && `&${keep}`}`;
+/** The Builder's page, from the game (keep: as playLink's). */
+export const buildLink = (keep = "") => `/build/${keep && `?${keep}`}`;
 
 /** The node the Builder reads (and its gnoweb): the page's ?rpc= and ?web= as the game takes them, else the build's. */
 export function endpoints(search: string) {

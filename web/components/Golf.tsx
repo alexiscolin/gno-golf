@@ -43,6 +43,8 @@ import { register, track, trackLeaving, trackError, once, failure, saveBlock, ca
 import { CAM_ORDER, savedCam, saveCam, hadGnome, savedGnome, saveGnome, earned, remember, badgesAt, badgesEarned, forgetBadges, rememberBadges, seeWeather, weathersSeen, minesHinted, minesHintSaid } from "@/lib/prefs";
 import { darkGallery, minesOrder } from "@/lib/scene/data";
 import { SHOP, makeShop, type Worn } from "@/lib/gnomes/shop";
+import { buildLink, endpoints } from "@/lib/builder/holes";
+import { builderOn } from "@/lib/builder/route";
 import { shopInRegion } from "@/lib/gnomes/geo";
 import { served } from "@/lib/gnomes/served";
 import { askWorn, know, pick, pickOf, playing as playingOf } from "@/lib/gnomes/wear";
@@ -1576,7 +1578,9 @@ export default function Golf() {
       {screen === "title" && <Title loading={!s} world={s ? s.world : undefined} gnome={SHOP ? gnomeById(gnome) : undefined} onStart={() => (setScreen(dare && !solo && dare === linkDare.current ? "ghosts" : "modes"), (linkDare.current = ""))} onAbout={() => setAbout(true)} />}
       {screen === "modes" && (
         <Modes gnome={gnome} counts={s ? s.worlds : undefined} onBack={() => setScreen(BACK.modes)} onAbout={() => setAbout(true)}
-          onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")} />
+          onSolo={() => (dare && !solo && track("duel_dropped", { rival: rivalKind() }), setSolo(true), setRival(null), setLinkNote(null), setDareNote(""), setScreen("worlds"))} onDuel={() => setScreen("rival")}
+          onBuild={builderOn() ? () => window.location.assign(buildLink(endpoints(window.location.search).keep)) : undefined}
+          more={SHOP && region ? <button className="linkish" onClick={() => (sound("blip"), openShop())}>Gnomes →</button> : null} />
       )}
       {screen === "rival" && s && (
         <Rival s={s} chain={game.current && game.current.chain} me={account && account.address} mode={aim} gnome={gnome} onBack={() => setScreen(BACK.rival)} onAbout={() => setAbout(true)}
@@ -1616,7 +1620,7 @@ export default function Golf() {
         owned={SHOP && account && held.length > 0 && game.current ? (
           <Owned chain={game.current.chain} me={account.address} held={held} worn={worn} playing={gnome} onPick={choose} region={region} onWorn={readWorn}
             name={(id) => held.find((g) => `t${g.id}` === id)?.name || gnomeById(id).name} />
-        ) : null}
+        ) : SHOP && region ? <p className="owned__line"><button className="linkish" onClick={() => (sound("blip"), openShop())}>More gnomes: the collection →</button></p> : null}
         onAbout={() => setAbout(true)}
        
         onBack={() => {

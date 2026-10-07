@@ -1,34 +1,38 @@
-// next.config.mjs: scripts/try-local.sh's playground (the page's /rpc proxied to
-// a node on this machine, the dev server's scripts served to the tailnet's
-// hosts) is a dev server's alone. No build has it, whatever its environment
-// says: not with the shop, the Builder and the community holes on, not with
-// the playground's own variables set by mistake.
+// next.config.mjs: the site's build has nothing of scripts/try-local.sh's
+// playground. No rewrite and no dev origins in any build (the playground's
+// /rpc is its own server's, scripts/playground-server.mjs), and Netlify's
+// production build refuses the playground's variables outright.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PHASE_DEVELOPMENT_SERVER, PHASE_EXPORT, PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from "next/constants.js";
+import { execFileSync } from "node:child_process";
 
-type Config = { rewrites?: () => Promise<{ source: string; destination: string }[]>; allowedDevOrigins?: string[]; skipTrailingSlashRedirect?: boolean };
-const { default: config, playground } = (await import("../next.config.mjs")) as { default: (phase: string) => Config; playground: (phase: string, env: Record<string, string>) => Config };
-const ON = { NEXT_PUBLIC_GNOMES: "1", NEXT_PUBLIC_BUILDER: "1", NEXT_PUBLIC_COMMUNITY: "1" };
-const PLAYGROUND = { GNOGOLF_PLAYGROUND: "1", PLAYGROUND_RPC: "http://127.0.0.1:26667", PLAYGROUND_ORIGINS: "mac-studio.tail8cf12f.ts.net,100.104.210.102" };
+const CONFIG = new URL("../next.config.mjs", import.meta.url).href;
+/** The config as next.config.mjs exports it under env, or the error it throws. */
+function load(env: Record<string, string>) {
+  try {
+    return { config: JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", `const c = (await import(${JSON.stringify(CONFIG)})).default; console.log(JSON.stringify({ keys: Object.keys(c) }))`], { env: { PATH: process.env.PATH || "", ...env }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })) as { keys: string[] }, error: "" };
+  } catch (e) {
+    return { config: null, error: String((e as { stderr?: string }).stderr || e) };
+  }
+}
+const SITE = {
+  CONTEXT: "production", NEXT_PUBLIC_REALM: "gno.land/r/gnogolf/golf/v2", NEXT_PUBLIC_RPC: "https://rpc.gno.land", NEXT_PUBLIC_WEB: "https://gno.land", NEXT_PUBLIC_NETWORK: "mainnet",
+};
+const PLAYGROUND = { NEXT_PUBLIC_GNOMES: "1", NEXT_PUBLIC_BUILDER: "1", NEXT_PUBLIC_COMMUNITY: "1", NEXT_PUBLIC_RPC: "/rpc", NEXT_PUBLIC_PLAYGROUND: "1", NEXT_PUBLIC_WALLET_RPC: "http://100.104.210.102:5182", NEXT_PUBLIC_TEST_HOOKS: "1" };
 
-void test("no build has the playground: no rewrite, no dev origins, flags on, its variables set or not", () => {
-  for (const phase of [PHASE_PRODUCTION_BUILD, PHASE_EXPORT, PHASE_PRODUCTION_SERVER])
-    for (const env of [ON, { ...ON, ...PLAYGROUND }]) {
-      const c = { ...config(phase), ...playground(phase, env) };
-      assert.equal(c.rewrites, undefined, `${phase}: a rewrite`);
-      assert.equal(c.allowedDevOrigins, undefined, `${phase}: dev origins`);
-      assert.equal(c.skipTrailingSlashRedirect, undefined, `${phase}: the trailing slash`);
-    }
+void test("no build of the site has a rewrite or dev origins, flags on, the playground's variables set or not", () => {
+  for (const env of [{}, PLAYGROUND]) {
+    const { config, error } = load(env);
+    assert.ok(config, error);
+    assert.deepEqual(config.keys.filter((k) => /rewrites|redirects|headers|allowedDevOrigins|skipTrailingSlashRedirect/.test(k)), []);
+  }
 });
 
-void test("a dev server has it only with GNOGOLF_PLAYGROUND=1: /rpc to 127.0.0.1, the hosts named exactly", async () => {
-  assert.deepEqual(playground(PHASE_DEVELOPMENT_SERVER, ON), {});
-  assert.deepEqual(playground(PHASE_DEVELOPMENT_SERVER, { ...PLAYGROUND, GNOGOLF_PLAYGROUND: "" }), {});
-  const c = playground(PHASE_DEVELOPMENT_SERVER, { ...ON, ...PLAYGROUND });
-  assert.deepEqual(c.allowedDevOrigins, ["mac-studio.tail8cf12f.ts.net", "100.104.210.102"]);
-  assert.deepEqual(await c.rewrites!(), [{ source: "/rpc/:path*", destination: "http://127.0.0.1:26667/:path*" }]);
-  assert.throws(() => playground(PHASE_DEVELOPMENT_SERVER, { ...PLAYGROUND, PLAYGROUND_RPC: "http://100.104.210.102:26667" }), /127\.0\.0\.1/);
-  assert.throws(() => playground(PHASE_DEVELOPMENT_SERVER, { ...PLAYGROUND, PLAYGROUND_RPC: "http://127.0.0.1.evil.example:80" }), /127\.0\.0\.1/);
-  assert.throws(() => playground(PHASE_DEVELOPMENT_SERVER, { ...PLAYGROUND, PLAYGROUND_ORIGINS: "*.ts.net" }), /exactly/);
+void test("Netlify's production build refuses the playground's variables", () => {
+  assert.ok(load(SITE).config, "the site's own settings build");
+  for (const k of ["NEXT_PUBLIC_PLAYGROUND", "NEXT_PUBLIC_WALLET_RPC", "NEXT_PUBLIC_TEST_HOOKS"]) {
+    const { config, error } = load({ ...SITE, [k]: "1" });
+    assert.equal(config, null, k);
+    assert.match(error, new RegExp(`no ${k}`));
+  }
 });

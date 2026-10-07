@@ -326,6 +326,7 @@ body:has(.netbanner) .screen--title { padding-bottom: 90px; }
    one under the pointer leaps */
 .modes .worlds__in { width: min(1100px, calc(100vw - 48px)); }
 .modes__list { list-style: none; margin: 0 auto; padding: var(--gap-xl) 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-grid); width: min(100%, var(--front-w)); }
+.modes__more { margin: var(--gap-l) 0 0; text-align: center; }
 .mode {
   position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; width: 100%; aspect-ratio: 3 / 4; padding: 0 0 20px; overflow: visible;
   border: var(--edge-bold); border-radius: var(--r-panel); color: var(--paper); font: inherit; text-align: left; cursor: pointer;
