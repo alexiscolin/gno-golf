@@ -391,6 +391,15 @@ near, proved, world; at 1440, 1280 and 1024.
     a piece hovered lifts on a soft shadow.
   None of it moves with reduced motion; no animation delays an edit (the
   edit is made, the motion decorates it).
+  Its budget is enforced by `scripts/builderbench.ts` (headless Chrome,
+  1440 × 900):
+  - 60 fps while the pointer sweeps the board, the scene drawn each frame;
+  - a frame's main-thread work within 33 ms with the CPU four times slower;
+  - the hole never built during a drag, and once after the drop;
+  - idle, no frame asked for and next to no CPU;
+  - one WebGL context after a quick test and Prove;
+  - without WebGL, the 2D board.
+  Measured: 60 fps; 0.8 ms of work a frame, 1.6 ms at 4×.
 - **The board** (2D, the fallback): the hole from above on its snapping grid; a piece
   dragged in is a ghost under the cursor, snapped, green ("Bumper"), or red
   with the reason ("Not on the cup") and no drop; moving clamps to the last

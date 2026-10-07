@@ -21,6 +21,14 @@ import { hold, stageRenderer } from "@/lib/builder/stage";
 import { orthoFor } from "@/lib/builder/camera3d";
 import type { Course, Hole } from "@/lib/scene/data";
 import type { Look, View } from "@/lib/builder/view";
+import { camlog } from "@/lib/testhooks";
+
+declare global {
+  interface Window {
+    // ?camlog: how many times the board's hole was built (a test hook: the bench holds it to one a checked hole)
+    __builds?: number;
+  }
+}
 
 /** How long after the pointer's last move the scene keeps moving (ms). */
 export const IDLE_MS = 2000;
@@ -82,6 +90,7 @@ export default function Scene({ state, view, look, size, waker }: {
       if (stale || !t) return;
       if (t.course) (t.scene.remove(t.course), disposeCourse(t.course));
       t.course = buildHole(state);
+      if (camlog()) window.__builds = (window.__builds ?? 0) + 1;
       setLighting(t.scene as Parameters<typeof setLighting>[0], t.course.userData.time);
       t.scene.add(t.course);
       draw();

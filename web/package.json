@@ -17,6 +17,7 @@
     "smoke": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/smoke.ts",
     "builderui": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/builderui.ts",
     "builderwalk": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/builderwalk.ts",
+    "builderbench": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/builderbench.ts",
     "og": "node ../media/og/og.mjs",
     "gnomes": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/gnomes.ts",
     "gnomes:stats": "node --experimental-strip-types --disable-warning=ExperimentalWarning ../scripts/gnomestats.ts",
