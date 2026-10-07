@@ -2328,6 +2328,13 @@ function serac(z: Zone, t: Terrain, s: Hole) {
   if (at) (tower.rotation.y = Math.atan2(at.to[0], at.to[1])), g.add(onGround(tower, at.x, at.z, t));
   // (in the Builder: refused where it would stand between the player's camera and the ball or the cup: sight.ts)
   if (at && state.report && hidesPlay(tower, s, t)) report(z, { by: "hidden", why: "view" });
+  // and in play, on any screen, it fades out of the camera's way as the trees do (the canopy fade): watched at its
+  // middle and at its leaning top (worlds' pieceFade: course.ts fadeOf gathers it)
+  if (at) {
+    tower.updateMatrixWorld(true);
+    const mats = ownFade(tower);
+    ud(tower).fade = fadeLoop([[0, 1.5, 0.2], [0, 3.8, 0.7]].map(([x, y, zz]) => ({ at: tower.localToWorld(new THREE.Vector3(x, y, zz)), r: 1.4, mats })));
+  }
   // the fall: blocks dropping on the spot, and the shadow before them
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 28).scale(ax * 0.85, az * 0.85, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x1d3550, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));
   shadow.position.set(cx, t.height(cx, cz) + 0.06, cz);
@@ -2617,4 +2624,7 @@ function piece(kind: "post" | "wall" | "zone", item: Post | Bar | Zone, t: Terra
   return undefined;
 }
 
-export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece, skins, liftPlan, liftChairs };
+// (a piece's own fade gathered with the canopy's: the serac's tower)
+const pieceFade = true;
+
+export { base, edging, berms, decor, rough, kerb, green, edgeInk, extras, piece, skins, pieceFade, liftPlan, liftChairs };
