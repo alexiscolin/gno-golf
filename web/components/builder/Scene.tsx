@@ -33,18 +33,22 @@ declare global {
 /** How long after the pointer's last move the scene keeps moving (ms). */
 export const IDLE_MS = 2000;
 
-export default function Scene({ state, view, look, size, waker }: {
+export default function Scene({ state, view, look, size, waker, paused = false, keep = false }: {
   state: Hole | null;
   view: View;
   look: Look;
   size: { w: number; h: number };
   /** set to wake(): the pointer moved over the board, the scene moves for IDLE_MS after (no render of the board's for it) */
   waker: { current: (() => void) | null };
+  /** the timed pieces held where they are (the inspector's pause) */
+  paused?: boolean;
+  /** kept moving, idle or not (a timed piece selected, playing) */
+  keep?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const three = useRef<{ scene: THREE.Scene; cam: THREE.OrthographicCamera; course: Course | null; loop: number } | null>(null);
-  const latest = useRef({ view, look, size });
-  latest.current = { view, look, size };
+  const latest = useRef({ view, look, size, paused, keep }), held = useRef(0);
+  latest.current = { view, look, size, paused, keep };
 
   /** One frame: the camera as the board looks, the timed pieces at the game's clock, drawn. */
   const draw = (now = performance.now()) => {
@@ -55,7 +59,9 @@ export default function Scene({ state, view, look, size, waker }: {
     orthoFor(t.cam, v, l, s);
     if (t.course) {
       if (motion) (setTime(now / 1000), t.course.userData.tick(now / 1000));
-      for (const p of t.course.userData.timed) p.at(Math.floor(now / MS_PER_STEP)); // (the clock runs under reduced motion too, as the game's)
+      // (the clock runs under reduced motion too, as the game's; paused, it holds)
+      const step = latest.current.paused ? held.current : (held.current = Math.floor(now / MS_PER_STEP));
+      for (const p of t.course.userData.timed) p.at(step);
     }
     r.render(t.scene, t.cam);
   };
@@ -109,7 +115,7 @@ export default function Scene({ state, view, look, size, waker }: {
       if (!t) return;
       const s = Math.floor(now / MS_PER_STEP);
       if (motion || ((t.course?.userData.timed.length ?? 0) > 0 && s !== step)) (draw(now), (step = s));
-      t.loop = now - last < IDLE_MS ? requestAnimationFrame(frame) : 0;
+      t.loop = now - last < IDLE_MS || latest.current.keep ? requestAnimationFrame(frame) : 0;
     };
     waker.current = () => {
       const t = three.current;
@@ -118,6 +124,10 @@ export default function Scene({ state, view, look, size, waker }: {
     };
     return () => void (waker.current = null);
   }, [waker]);
+
+  // kept moving: woken now (and on, while kept); paused or played: one frame
+  useEffect(() => void (keep && waker.current?.()), [keep, waker]);
+  useEffect(() => draw(), [paused]);
 
   return <div className="board__scene" ref={box} aria-hidden="true" />;
 }

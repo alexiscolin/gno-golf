@@ -105,6 +105,8 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
   const [lineOn, setLineOn] = useState(false);
   // how the board is looked at: V tilts it, Q turns it a quarter (the 3D board; the 2D one too)
   const [look, setLook] = useState<Look>(FLAT);
+  // a timed piece's blinking played, in the inspector and on the board (its pause holds both)
+  const [playing, setPlaying] = useState(true);
   // a quick test (T): the draft as kept, its canonical bytes, played over the editor (kept open: the same zoom, selection and history after)
   const [trying, setTrying] = useState<{ of: Draft; hex: string } | null>(null);
   // the last quick test's round that holed, left on the board as a dotted trail (played again as the hole changes)
@@ -330,7 +332,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
           <div className="centre">
             {toast && <p className="btoast" role="status">{toast}</p>}
             <Board draft={draft} quick={quick} full={full} selected={selected} armed={armed} step={fine ? 0.25 : 0.5} bad={bad} pan={pan} frameAsk={frameAsk}
-              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null }}
+              onSelect={setSelected} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onBin={(id) => tryEdit(removePiece(draft, id), "")} onDisarm={() => setArmed(null)} said={said} show={show} look={look} scene={{ state: checked?.state ?? null, of: checked?.of ?? null, paused: !playing, keep: playing && piece?.clock.k === "substep" }}
               // (the first run's hints first: the board's tools come once they are gone)
               ball={hints ? undefined : {
                 played: landed, trail: trailed, last: shots.at(-1) ?? null, aimed: aim ? played.at(-1) ?? null : null, lineOn, onLine: () => setLineOn((on) => !on),
@@ -341,7 +343,7 @@ export default function Editor({ host, first, author, onSave, onBack, onTest, on
               issues={v?.issues ?? []} busy={!fresh} meter={guess && { ...guess.line, busy: measuring }} onShow={(id) => (setSelected(id), setShow((s) => ({ id, n: (s?.n ?? 0) + 1 })))} onFix={fix} />
           </div>
           <aside className="col" aria-label="The selected piece">
-            <Inspector draft={draft} piece={piece} quick={quick} full={full} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove} />
+            <Inspector draft={draft} piece={piece} quick={quick} full={full} playing={playing} onPlay={() => setPlaying((on) => !on)} onPreview={preview} onCommit={commit} onCancel={cancel} onSet={set} onSay={say} onTurn={turn} onCopy={copy} onDelete={remove} />
           </aside>
         </>
       ) : (

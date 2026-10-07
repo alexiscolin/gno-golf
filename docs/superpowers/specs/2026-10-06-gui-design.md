@@ -352,7 +352,7 @@ near, proved, world; at 1440, 1280 and 1024.
   pictured. Under "More pieces", by group: Walls, Obstacles, Ground, Traps,
   Moving pieces. Every piece has one name of its own, the same in every
   world it is in and unique there: its look's ("Lagoon", "Wet sand",
-  "Flowerbed", "Clock hand"), the plain forms named as they are drawn
+  "Flowerbed", "Blinking hand": drawn as a clock's hand, it blinks, never sweeps), the plain forms named as they are drawn
   ("Pipe", "Mushroom", "Pond"), a skin two kinds share named apart
   ("Driftwood log", "Driftwood post"). The board's label, the inspector, the
   looks, the glossary, the toasts and every sentence of the checks say it:
@@ -426,7 +426,13 @@ near, proved, world; at 1440, 1280 and 1024.
   shots.
 - **The right**: the selected piece only: its name,
   Turn · Copy · Delete (with their keys), and **"Details"** behind a tap (the
-  sliders: size, bounce, timing). Nothing selected: "Click a piece to change
+  sliders: size, bounce). A timed piece's timing in words under it:
+  Always · In a stroke · Strokes; for one that blinks, "Blinks: Slow ·
+  Medium · Fast" (80, 40, 20 substeps: about 5.8, 2.9, 1.4 s) and "Open:
+  Most · Half · Little" of the time; its cycle as a strip whose step now is
+  outlined as it plays, with play/pause (the board's timed pieces pause with
+  it; selected and playing, the board keeps them moving); the numbers
+  (Every, On, From) under "Fine". Loops are not offered yet. Nothing selected: "Click a piece to change
   it. Drag its handles to size and turn it."
 - **The checks** (one line under the board): "Ready: press T to try it, or Prove it."
   or the one thing to fix, in words, with "Show me"; a limit appears only

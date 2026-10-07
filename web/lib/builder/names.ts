@@ -2,7 +2,7 @@
 // names): every palette entry has one clean name of its own, said on the
 // board, in the inspector and the looks, in the glossary and the toasts, and
 // in every sentence the checks say ("the wall", "the wet sand", "the lagoon",
-// "the clock hand"). A look is named by its skin ("lagoon": the Lagoon); a
+// "the blinking hand"). A look is named by its skin ("lagoon": the Lagoon); a
 // plain form, or a skin two kinds share or that says too little, by NAMED.
 // The palette's tiles (what a piece does: Wall, Water, Barrier) are named
 // here too. Plain data on the bindings (no scene), so the checks, the worker
@@ -26,13 +26,13 @@ const DROPS = new Set(["cliff", "serac", "crevasse"]);
 
 /**
  * The tiles by what a piece does, the first that takes an entry its tile: a
- * bar that moves from the start (a clock's hand), a rail, a bar, a post
+ * bar that blinks from the start (a clock's hand), a rail, a bar, a post
  * that kicks, any post, a surface by its grip (faster than grass, much
  * slower, about as grass), a hill, a hazard (a drop or water), a tunnel.
  * An entry none takes gets a tile of its own (a new kind shows without a change here).
  */
 export const TILES: readonly { key: string; name: string; does: string; group: Group; takes: (e: Named) => boolean }[] = [
-  { key: "timed", name: "Moving bar", does: "comes and goes", group: "Moving pieces", takes: (e) => e.kind === "bar" && e.clocks[0] !== "fixed" },
+  { key: "timed", name: "Blinking bar", does: "comes and goes", group: "Moving pieces", takes: (e) => e.kind === "bar" && e.clocks[0] !== "fixed" },
   { key: "wall", name: "Wall", does: "edges the lane", group: "Walls", takes: (e) => e.kind === "rail" },
   { key: "barrier", name: "Barrier", does: "blocks the way", group: "Walls", takes: (e) => e.kind === "bar" },
   { key: "bumper", name: "Bumper", does: "bounces hard", group: "Obstacles", takes: (e) => e.kind === "post" && kicks(e.skin) },
@@ -61,6 +61,7 @@ const NAMED: Readonly<Record<string, string>> = {
   "bar/logs": "Fallen log", "bar/hay": "Hay bales", "bar/rail": "Railing", "bar/gate": "Castle gate", "bar/gate door": "Garden gate",
   "post/clock": "Clock tower", "post/palm": "Palm tree", "post/pine": "Pine tree", "post/lamp": "Street lamp", "post/stump": "Tree stump",
   "surface/wetsand": "Wet sand", "surface/soil": "Vegetable patch", "surface/brick": "Bricks", "surface/herringbone": "Herringbone paving",
+  "bar/clock hand": "Blinking hand", // (drawn as a clock's hand, it blinks: it never sweeps)
   "slope/slope": "Ski slope", "slope/saddle crest": "Saddle", "hazard/wave": "Waves", "hazard/tidepool": "Tide pool",
 };
 

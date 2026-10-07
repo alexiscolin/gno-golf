@@ -50,7 +50,7 @@ void test("variants that play alike are one tile with looks: water, hills, tunne
   assert.ok(!skins(named("garden", "Obstacle")).includes("bumper"));
   assert.deepEqual(skins(named("mountain", "Ice")), ["ice"]);
   assert.ok(skins(named("town", "Floor")).includes("brick") && !skins(named("town", "Sand")).includes("brick"));
-  assert.deepEqual(skins(named("town", "Moving bar")), ["clock hand"]);
+  assert.deepEqual(skins(named("town", "Blinking bar")), ["clock hand"], "named for what it does: it blinks, it never sweeps");
   assert.equal(entryName(named("garden", "Tunnel").looks.at(-1)!), "Pipe", "the plain tunnel, a pipe as drawn");
 });
 
@@ -74,7 +74,7 @@ void test("one name per piece, its own: a clean name for every entry of every wo
   const piece = (entry: string) => ({ id: "x", entry, geometry: { t: "post" as const, c: [0, 0] as [number, number], r: 1 }, params: {}, clock: { k: "fixed" as const } });
   const said: [string, string][] = [
     ["*/rail/", "the wall"], ["*/slope/", "the slope"], ["*/post/bumper", "the bumper"], ["*/surface/wetsand", "the wet sand"], ["*/surface/flowerbed", "the flowerbed"],
-    ["*/bar/clock hand", "the clock hand"], ["*/hazard/lagoon", "the lagoon"], ["*/post/rock", "the rock"], ["*/bar/plank", "the plank"], ["*/tunnel/", "the pipe"],
+    ["*/bar/clock hand", "the blinking hand"], ["*/hazard/lagoon", "the lagoon"], ["*/post/rock", "the rock"], ["*/bar/plank", "the plank"], ["*/tunnel/", "the pipe"],
   ];
   for (const [id, want] of said) assert.equal(pieceName(piece(id)), want, id);
   // a word said once in a name, its plural too ("Sand sand", "Logs log", "Clock hand moving bar" never)

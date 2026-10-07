@@ -479,3 +479,9 @@
 .board--3d .board__grid line { stroke: rgba(255, 255, 255, .5); }
 @media (prefers-reduced-motion: reduce) { .board__piece--pop, .board__fx circle, .board__shrink { animation: none; } .board__fx { display: none; } .board__lean { rotate: 0deg !important; transition: none; } }
 .board__shots polyline.trail { stroke-dasharray: 1 7; stroke-width: 3.5px; opacity: .85; }
+/* a timed piece's cycle: its steps, the one now outlined as it plays (the board's clock), play/pause before it */
+.cycle__row { display: flex; align-items: center; gap: var(--sp-2); }
+.cycle__row .cycle { flex: 1; margin-left: 0; }
+.cycle__row .round--s { width: 32px; height: 32px; font-size: 11px; }
+.cycle i.now { outline: 2px solid var(--ink); outline-offset: 1px; }
+.insp__fine summary { font-size: 13px; }
