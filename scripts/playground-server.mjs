@@ -35,7 +35,8 @@ export function playgroundServer({ root, rpc }) {
   /** The file a path names under the root, or null: the root resolved anew each time (a link try-local.sh rebuild swaps
    *  to a new build in one rename: every request is the old build's or the new one's, whole). @param {string} p */
   const fileOf = (p) => {
-    if (p.split("/").some((s) => s.startsWith("."))) return null; // (no dotfile, no "..")
+    // (no dotfile, no "..", nor a path a redirect would read as another host: "//host", a backslash)
+    if (p.startsWith("//") || p.includes("\\") || p.split("/").some((s) => s.startsWith("."))) return null;
     const base = fs.realpathSync(root);
     for (const f of [p, path.join(p, "index.html"), `${p}.html`]) {
       let real;
