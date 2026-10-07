@@ -66,6 +66,8 @@ const HOLES_TTL = 10 * 60e3; // a hole registered meanwhile shows within ten min
 
 /** A pause of ms: between two reads of the chain, a retry, a beat. */
 export const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** What the chain charges per stored byte (ugnot) when its own price is not read yet or not readable: the vm's default. */
+export const BYTE_PRICE = 100;
 
 export const DEFAULT_RPC = "http://127.0.0.1:26657";
 export const DEFAULT_WEB = "http://127.0.0.1:8888";
@@ -395,7 +397,7 @@ export function makeChain({ rpc = DEFAULT_RPC, web = DEFAULT_WEB }: { rpc?: stri
     /** What the chain charges per byte a transaction stores, in ugnot (vm params). */
     storagePrice: memo(async () => {
       const m = String(JSON.parse(await abci("params/vm:p:storage_price"))).match(/^(\d+)ugnot$/);
-      return m ? Number(m[1]) : 100;
+      return m ? Number(m[1]) : BYTE_PRICE;
     }, PARAMS_TTL),
     /** gnoweb page of one player's round on a hole. */
     roundURL: (hole: string, player: string) =>

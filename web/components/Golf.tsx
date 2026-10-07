@@ -6,7 +6,7 @@ import { isTouch } from "@/lib/device";
 import { camlog } from "@/lib/testhooks";
 import { GNOMES, gnomeById, cheer, motion, knowGnome, setRivalGnome, loadWardrobe } from "@/lib/scene";
 import { NOT_BUILDER } from "@/lib/community";
-import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
+import { buildRpc, buildWeb, safeEndpoint, isHoleId, isAddress, errorKind, BYTE_PRICE, REALM_PATH, RULES, roundShots, wait, type Chain } from "@/lib/chain";
 import { HOT, type CamMode, type ErrorKind, type GfxMode } from "@/lib/engine/types";
 import { savedGfx, saveGfx } from "@/lib/engine/pace";
 import type { Skin } from "@/lib/scene/gnome";
@@ -1074,7 +1074,7 @@ export default function Golf() {
   const [chainId, setChainId] = useState<string | null>(null);
   const [ourNode, setOurNode] = useState<boolean | null>(null); // is Adena's active network this node?
   const [slowSign, setSlowSign] = useState(false); // Adena open for more than 10 s
-  const [bytePrice, setBytePrice] = useState(100); // ugnot per stored byte (vm params)
+  const [bytePrice, setBytePrice] = useState(BYTE_PRICE); // ugnot per stored byte (vm params)
   const [best, setBest] = useState<number | null>(null); // this player's best on this hole, in this round's mode (0: none; null: unknown)
   const saved = best == null ? null : best > 0; // whether they have one
   const [ghostHere, setGhostHere] = useState(false); // a best of theirs here in either mode: their link dares (a friend races either)
